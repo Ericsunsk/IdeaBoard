@@ -139,7 +139,7 @@ Admin route pages 不直接依赖 generated API。每个 Admin vertical context 
 | ---------------- | --------------- | --------- |
 | `features/admin/users` | `internal/identity/users` | 用户列表、角色/status、会话、伪装登录、受控注销 |
 | `features/admin/provider-config` | `internal/accountpool` | channel/account/provider payload、模型检测、调度可见性 |
-| `features/admin/prompt-config` | `internal/prompts`, `internal/workflow` | 当前 Workflow Feature 配置、canonical model、prompt template、variables |
+| `features/admin/prompt-config` | `internal/prompts`, `internal/workflow` | 当前 Workflow Feature 的 prompt template；变量和 merge policy 由代码维护 |
 | `features/admin/storage` | `internal/media/storage` | storage provider/profile、secret masking、bucket test/apply |
 | `features/admin/task-monitor` | `internal/tasking` | task list/detail、runtime monitor、stream/poll fallback |
 | `features/admin/statistics` | `internal/tasking/taskstats` | statistics aggregation、backfill status、range contract |

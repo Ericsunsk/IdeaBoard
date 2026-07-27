@@ -4,6 +4,7 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { AdminTaskBillingSnapshotSettlementState } from './adminTaskBillingSnapshotSettlementState'
 import type { BillingSKUCode } from './billingSKUCode'
 
 export interface AdminTaskBillingSnapshot {
@@ -30,6 +31,9 @@ export interface AdminTaskBillingSnapshot {
    */
   total_credits: number
   quoted_at: string
+  settlement_state: AdminTaskBillingSnapshotSettlementState
+  /** @nullable */
+  settled_at: string | null
   /** Dynamically resolved from the current Billable Item Registry. */
   feature_exists: boolean
 }

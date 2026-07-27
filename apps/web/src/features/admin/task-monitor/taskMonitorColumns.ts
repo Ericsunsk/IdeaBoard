@@ -26,7 +26,7 @@ export function getTaskUserIdentifier(row: Task) {
 }
 
 export function getTaskEndpointLabel(row: Task) {
-  return row.provider_endpoint_name || formatIDLabel('Endpoint', row.assigned_provider_endpoint_id)
+  return row.provider_endpoint_name || ''
 }
 
 export function getTaskCredentialLabel(row: Task) {

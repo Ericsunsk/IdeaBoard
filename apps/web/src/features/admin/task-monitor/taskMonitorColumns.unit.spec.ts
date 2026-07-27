@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest'
 import type { Task } from '../../../shared/api/task'
-import { getTaskModelLabel } from './taskMonitorColumns'
+import { getTaskEndpointLabel, getTaskModelLabel } from './taskMonitorColumns'
 
 describe('task monitor model column', () => {
   it('shows only the model resolved by runtime assignment', () => {
     expect(getTaskModelLabel(makeTask({ resolved_model: 'imagen-4' }))).toBe('imagen-4')
     expect(getTaskModelLabel(makeTask())).toBe('')
+  })
+
+  it('does not reconstruct a current Endpoint from historical Task assignment ids', () => {
+    expect(getTaskEndpointLabel(makeTask({ assigned_provider_endpoint_id: 42 }))).toBe('')
+    expect(getTaskEndpointLabel(makeTask({ provider_endpoint_name: 'Provider A' }))).toBe(
+      'Provider A',
+    )
   })
 })
 

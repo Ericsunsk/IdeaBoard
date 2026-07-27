@@ -5,8 +5,10 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AdminTaskBillingSnapshot } from './adminTaskBillingSnapshot'
+import type { AdminTaskExecutionAttempt } from './adminTaskExecutionAttempt'
 import type { Task } from './task'
 
 export type AdminTask = Task & {
   billing?: AdminTaskBillingSnapshot
+  execution_attempts?: AdminTaskExecutionAttempt[]
 }

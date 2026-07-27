@@ -16,8 +16,10 @@ import (
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/tasking/taskbilling"
+	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/testsupport"
 	"ideaboard/api/internal/workflow"
@@ -61,7 +63,7 @@ func TestSubmitTaskHandlerReturnsEnvelopeAndSubmitsCanonicalPayload(t *testing.T
 	gin.SetMode(gin.TestMode)
 
 	submissionStore := &recordingSubmissionStore{}
-	service := NewService(ServiceDeps{
+	service := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
 			{
 				ID: 101,
@@ -108,19 +110,10 @@ func TestSubmitTaskHandlerReturnsEnvelopeAndSubmitsCanonicalPayload(t *testing.T
 		t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
 	}
 	call := submissionStore.calls[0]
-	if call.task.TaskID != body.Data.TaskID || call.queueTask.TaskID != body.Data.TaskID {
-		t.Fatalf("task ids do not match response: task=%q queue=%q response=%q", call.task.TaskID, call.queueTask.TaskID, body.Data.TaskID)
+	if call.canonical.UserID() != 42 {
+		t.Fatalf("canonical user id=%d, want 42", call.canonical.UserID())
 	}
-	if call.task.EffectiveCorrelationID() != body.Data.TaskID || call.queueTask.EffectiveCorrelationID() != body.Data.TaskID {
-		t.Fatalf("correlation ids task=%q queue=%q, want response task_id %q", call.task.EffectiveCorrelationID(), call.queueTask.EffectiveCorrelationID(), body.Data.TaskID)
-	}
-	if call.task.UserID != 42 || call.queueTask.UserID != 42 {
-		t.Fatalf("user ids task=%d queue=%d, want 42", call.task.UserID, call.queueTask.UserID)
-	}
-	if call.task.Params != call.queueTask.Params {
-		t.Fatalf("task params and queue params differ: task=%s queue=%s", call.task.Params, call.queueTask.Params)
-	}
-	typedParams, err := tasks.UnmarshalParams(call.queueTask.Params)
+	typedParams, err := tasks.UnmarshalParams(call.canonical.Params())
 	if err != nil {
 		t.Fatalf("unmarshal queue params: %v", err)
 	}
@@ -142,7 +135,7 @@ func TestSubmitTaskHandlerReturnsEnvelopeAndSubmitsCanonicalPayload(t *testing.T
 func TestSubmitTaskHandlerReturnsStructuredInsufficientCreditsError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	service := NewService(ServiceDeps{
+	service := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
 			{
 				ID: 101,
@@ -185,7 +178,7 @@ func TestSubmitTaskHandlerReturnsStructuredInsufficientCreditsError(t *testing.T
 func TestSubmitTaskHandlerReturnsStructuredPricingUnavailableError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	service := NewService(ServiceDeps{
+	service := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
 			ID: 101,
 			Models: []accounts.AccountModel{{
@@ -211,7 +204,7 @@ func TestSubmitTaskHandlerReturnsStructuredPricingUnavailableError(t *testing.T)
 func TestSubmitTaskHandlerHidesSubmissionStoreCause(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	const internalCause = "river database connection refused"
-	service := NewService(ServiceDeps{
+	service := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
 			ID: 101,
 			Models: []accounts.AccountModel{{
@@ -238,7 +231,7 @@ func TestSubmitTaskHandlerHidesSubmissionStoreCause(t *testing.T) {
 
 func TestSubmitTaskHandlerMissingSubmissionStoreReturnsSafeServiceUnavailable(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	service := NewService(ServiceDeps{
+	service := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
 			ID: 101,
 			Models: []accounts.AccountModel{{
@@ -264,7 +257,7 @@ func TestSubmitTaskHandlerMissingSubmissionStoreReturnsSafeServiceUnavailable(t 
 
 func TestCheckSubmitTaskReadinessHandlerMissingBillingReturnsStructuredSafeError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	service := NewService(ServiceDeps{
+	service := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
 			ID: 101,
 			Models: []accounts.AccountModel{{
@@ -307,7 +300,7 @@ func TestCheckSubmitTaskReadinessHandlerMissingBillingReturnsStructuredSafeError
 func TestCheckSubmitTaskReadinessHandlerReturnsFeatureEnvelope(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	service := NewService(ServiceDeps{
+	service := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
 			{
 				ID: 101,
@@ -366,7 +359,7 @@ func TestCheckSubmitTaskReadinessHandlerReturnsFeatureEnvelope(t *testing.T) {
 func TestCheckSubmitTaskReadinessHandlerHidesMissingProviderConfiguration(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	service := NewService(ServiceDeps{
+	service := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo:     &fakeSubmitAccountStore{},
 		SubmissionStore: &recordingSubmissionStore{},
 		MediaValidator:  testSubmitMediaValidator{},
@@ -429,7 +422,7 @@ func TestCheckSubmitTaskReadinessHandlerReturnsStructuredPricingUnavailableError
 
 	for _, quoteErr := range []error{billing.ErrSKUNotFound, billing.ErrPricingUnavailable} {
 		t.Run(quoteErr.Error(), func(t *testing.T) {
-			service := NewService(ServiceDeps{
+			service := newSubmitServiceForTest(submitTestServiceDeps{
 				AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
 					ID: 101,
 					Models: []accounts.AccountModel{{
@@ -495,6 +488,39 @@ func newHandlerTaskBillingService() *taskbilling.Service {
 	return taskbilling.NewService(handlerBillingQuoter{}, handlerBillingCredits{})
 }
 
+type submitTestServiceDeps struct {
+	AccountRepo        AccountStore
+	SubmissionStore    TaskSubmissionStore
+	MediaValidator     taskmedia.Validator
+	PromptStore        FeaturePromptStore
+	GenerationSettings settings.GoogleNativeGenerationSettingProvider
+	TaskBilling        *taskbilling.Service
+}
+
+func newSubmitServiceForTest(deps submitTestServiceDeps, opts ServiceOptions) *Service {
+	promptStore := deps.PromptStore
+	if promptStore == nil {
+		configs := make(map[string]prompts.FeaturePromptRuntimeConfig)
+		for _, slug := range workflow.SupportedFeatureSlugs() {
+			configs[slug] = prompts.FeaturePromptRuntimeConfig{
+				Prompt:                "{{user_prompt}}",
+				UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(slug),
+			}
+		}
+		promptStore = fakeFeaturePromptStore{configs: configs}
+	}
+	return NewService(ServiceDeps{
+		TaskIntake: NewTaskIntake(TaskIntakeDeps{
+			Accounts:           deps.AccountRepo,
+			Prompts:            promptStore,
+			Media:              deps.MediaValidator,
+			GenerationSettings: deps.GenerationSettings,
+		}),
+		SubmissionStore: deps.SubmissionStore,
+		TaskBilling:     deps.TaskBilling,
+	}, opts)
+}
+
 func assertMachineErrorResponse(t *testing.T, recorder *httptest.ResponseRecorder, status int, code, msg string) {
 	t.Helper()
 	if recorder.Code != status {
@@ -512,18 +538,34 @@ func assertMachineErrorResponse(t *testing.T, recorder *httptest.ResponseRecorde
 	}
 }
 
+func TestAdminTaskDTOExposesCurrentAssignmentOnlyWithActiveLeaseSnapshot(t *testing.T) {
+	accountID := int64(7)
+	endpointID := int64(8)
+	credentialID := int64(9)
+	historical := &tasks.Task{
+		TaskID: "terminal-task", AccountID: &accountID,
+		AssignedProviderEndpointID: &endpointID, AssignedCredentialID: &credentialID,
+	}
+
+	terminalDTO := toAdminTaskDTO(historical)
+	if terminalDTO.AccountID != nil ||
+		terminalDTO.AssignedProviderEndpointID != nil ||
+		terminalDTO.AssignedCredentialID != nil {
+		t.Fatalf("terminal Admin assignment leaked historical Task ids: %+v", terminalDTO)
+	}
+
+	active := *historical
+	active.ResolvedModel = "image-model"
+	activeDTO := toAdminTaskDTO(&active)
+	if activeDTO.AccountID == nil || *activeDTO.AccountID != accountID ||
+		activeDTO.AssignedProviderEndpointID == nil || *activeDTO.AssignedProviderEndpointID != endpointID ||
+		activeDTO.AssignedCredentialID == nil || *activeDTO.AssignedCredentialID != credentialID {
+		t.Fatalf("active Admin assignment missing lease-owned ids: %+v", activeDTO)
+	}
+}
+
 func newSubmitHandlerTestRouter(t testing.TB, service *Service, userID int64) *gin.Engine {
 	t.Helper()
-	if service != nil && service.promptStore == nil {
-		configs := make(map[string]prompts.FeaturePromptRuntimeConfig)
-		for _, slug := range workflow.SupportedFeatureSlugs() {
-			configs[slug] = prompts.FeaturePromptRuntimeConfig{
-				Prompt:                "{{user_prompt}}",
-				UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(slug),
-			}
-		}
-		service.promptStore = fakeFeaturePromptStore{configs: configs}
-	}
 	handler := NewHandler(service)
 	router := gin.New()
 	router.POST("/submit", func(c *gin.Context) {

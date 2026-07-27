@@ -82,18 +82,18 @@ SELECT has_table_privilege(current_user, 'task_submission_claims', 'SELECT'),
 	)
 	task := newBilledAIImageTask("task_style_variation_runtime_role", "style-variation-runtime-role", request)
 
-	result, err := store.SubmitTask(t.Context(), task, newTaskSubmissionQueueTask(task))
+	result, err := store.SubmitTask(t.Context(), canonicalRequestForTest(task))
 	if err != nil {
 		t.Fatalf("submit billed style variation as runtime role: %v", err)
 	}
 	if !result.Created || result.HoldTransactionID == "" {
 		t.Fatalf("submission result=%+v", result)
 	}
-	assertTaskRowCount(t, db, task.TaskID, 1)
-	assertBillingSnapshotCount(t, db, task.TaskID, 1)
-	assertCreditCommandCount(t, db, task.TaskID, "hold", 1)
+	assertTaskRowCount(t, db, result.TaskID, 1)
+	assertBillingSnapshotCount(t, db, result.TaskID, 1)
+	assertCreditCommandCount(t, db, result.TaskID, "hold", 1)
 	var claimCount int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM task_submission_claims WHERE task_id = $1`, task.TaskID).Scan(&claimCount); err != nil {
+	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM task_submission_claims WHERE task_id = $1`, result.TaskID).Scan(&claimCount); err != nil {
 		t.Fatalf("count task submission claim: %v", err)
 	}
 	if claimCount != 1 {
@@ -105,13 +105,13 @@ func TestBilledSubmissionHoldsAndReturnsOriginalFactsAcrossPriceChange(t *testin
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
-	request := seedPatternBillingProduct(t, billingService, "gpt-image-1", 25)
+	request := seedPatternBillingProduct(t, billingService, 25)
 	seedCreditWallet(t, pool, creditService, 42, 100)
 	client := newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
 	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts, taskbilling.NewService(billingService, creditService))
 
 	first := newBilledPatternTask("task_billed_first", "pattern-action-1", request)
-	firstResult, err := store.SubmitTask(t.Context(), first, newTaskSubmissionQueueTask(first))
+	firstResult, err := store.SubmitTask(t.Context(), canonicalRequestForTest(first))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func TestBilledSubmissionHoldsAndReturnsOriginalFactsAcrossPriceChange(t *testin
 	}
 
 	duplicate := newBilledPatternTask("task_billed_duplicate", "pattern-action-1", request)
-	duplicateResult, err := store.SubmitTask(t.Context(), duplicate, newTaskSubmissionQueueTask(duplicate))
+	duplicateResult, err := store.SubmitTask(t.Context(), canonicalRequestForTest(duplicate))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestConcurrentBilledDuplicateCreatesOneTaskHoldAndRiverJob(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
-	request := seedPatternBillingProduct(t, billingService, "gpt-image-1", 25)
+	request := seedPatternBillingProduct(t, billingService, 25)
 	seedCreditWallet(t, pool, creditService, 42, 100)
 	client := &countingRiverTxClient{inner: newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)}
 	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts, taskbilling.NewService(billingService, creditService))
@@ -162,7 +162,7 @@ func TestConcurrentBilledDuplicateCreatesOneTaskHoldAndRiverJob(t *testing.T) {
 			defer wg.Done()
 			<-start
 			task := newBilledPatternTask(taskID, "pattern-action-concurrent", request)
-			result, err := store.SubmitTask(context.Background(), task, newTaskSubmissionQueueTask(task))
+			result, err := store.SubmitTask(context.Background(), canonicalRequestForTest(task))
 			results <- result
 			errs <- err
 		}(taskID)
@@ -204,7 +204,7 @@ func TestBilledDuplicateFailsClosedWhenBillingFactsAreIncomplete(t *testing.T) {
 			db, pool := testdb.OpenWithPool(t)
 			creditService := credits.NewService(pool)
 			billingService := billing.NewService(pool)
-			request := seedPatternBillingProduct(t, billingService, "gpt-image-1", 25)
+			request := seedPatternBillingProduct(t, billingService, 25)
 			seedCreditWallet(t, pool, creditService, 42, 100)
 			repo := taskstore.NewRepository(db)
 			client := newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
@@ -216,19 +216,20 @@ func TestBilledDuplicateFailsClosedWhenBillingFactsAreIncomplete(t *testing.T) {
 					t.Fatal(err)
 				}
 			} else {
-				if _, err := store.SubmitTask(t.Context(), original, newTaskSubmissionQueueTask(original)); err != nil {
+				result, err := store.SubmitTask(t.Context(), canonicalRequestForTest(original))
+				if err != nil {
 					t.Fatal(err)
 				}
 				if _, err := db.ExecContext(t.Context(), `DROP TRIGGER task_billing_settlements_state_machine ON task_billing_settlements`); err != nil {
 					t.Fatal(err)
 				}
-				if _, err := db.ExecContext(t.Context(), `DELETE FROM task_billing_settlements WHERE task_id = $1`, original.TaskID); err != nil {
+				if _, err := db.ExecContext(t.Context(), `DELETE FROM task_billing_settlements WHERE task_id = $1`, result.TaskID); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			duplicate := newBilledPatternTask("task_billed_duplicate_incomplete_"+missing, original.ClientActionID, request)
-			if _, err := store.SubmitTask(t.Context(), duplicate, newTaskSubmissionQueueTask(duplicate)); !errors.Is(err, taskbilling.ErrIntegrity) {
+			if _, err := store.SubmitTask(t.Context(), canonicalRequestForTest(duplicate)); !errors.Is(err, taskbilling.ErrIntegrity) {
 				t.Fatalf("duplicate error=%v, want billing integrity error", err)
 			}
 		})
@@ -239,14 +240,14 @@ func TestBilledDuplicateReturnsDurableClaimAfterTaskDeletion(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
-	request := seedPatternBillingProduct(t, billingService, "gpt-image-1", 25)
+	request := seedPatternBillingProduct(t, billingService, 25)
 	seedCreditWallet(t, pool, creditService, 42, 100)
 	repo := taskstore.NewRepository(db)
 	client := &countingRiverTxClient{inner: newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)}
 	store := NewStore(pool, repo, client, submissionRiverTestQueue, submissionRiverTestMaxAttempts, taskbilling.NewService(billingService, creditService))
 	original := newBilledPatternTask("task_billed_deleted", "pattern-action-deleted", request)
 
-	first, err := store.SubmitTask(t.Context(), original, newTaskSubmissionQueueTask(original))
+	first, err := store.SubmitTask(t.Context(), canonicalRequestForTest(original))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +259,7 @@ func TestBilledDuplicateReturnsDurableClaimAfterTaskDeletion(t *testing.T) {
 	}
 
 	duplicate := newBilledPatternTask("task_billed_after_delete", original.ClientActionID, request)
-	replayed, err := store.SubmitTask(t.Context(), duplicate, newTaskSubmissionQueueTask(duplicate))
+	replayed, err := store.SubmitTask(t.Context(), canonicalRequestForTest(duplicate))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,46 +285,53 @@ func TestBilledDuplicateRejectsDifferentProductForSameClientAction(t *testing.T)
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
-	firstRequest := seedPatternBillingProduct(t, billingService, "gpt-image-1", 25)
-	secondRequest := seedPatternBillingProduct(t, billingService, "imagen-4", 30)
+	firstRequest := seedPatternBillingProduct(t, billingService, 25)
+	secondRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugStyleVariation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := billingService.PublishPrice(t.Context(), submissionPriceInput(mustResolveSKU(t, secondRequest), "Style Variation", 30)); err != nil {
+		t.Fatal(err)
+	}
 	seedCreditWallet(t, pool, creditService, 42, 100)
 	client := newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
 	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts, taskbilling.NewService(billingService, creditService))
 	first := newBilledPatternTask("task_billed_product_first", "pattern-action-product-conflict", firstRequest)
-	if _, err := store.SubmitTask(t.Context(), first, newTaskSubmissionQueueTask(first)); err != nil {
+	if _, err := store.SubmitTask(t.Context(), canonicalRequestForTest(first)); err != nil {
 		t.Fatal(err)
 	}
-	conflict := newBilledPatternTask("task_billed_product_second", first.ClientActionID, secondRequest)
-	if _, err := store.SubmitTask(t.Context(), conflict, newTaskSubmissionQueueTask(conflict)); !errors.Is(err, taskbilling.ErrIdempotencyConflict) {
+	conflict := newBilledAIImageTask("task_billed_product_second", first.ClientActionID, secondRequest)
+	conflictResult, err := store.SubmitTask(t.Context(), canonicalRequestForTest(conflict))
+	if !errors.Is(err, taskbilling.ErrIdempotencyConflict) {
 		t.Fatalf("error=%v, want idempotency conflict", err)
 	}
-	assertTaskRowCount(t, db, conflict.TaskID, 0)
+	assertTaskRowCount(t, db, conflictResult.TaskID, 0)
 }
 
 func TestBilledSubmissionInsufficientCreditsCreatesNothing(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
-	request := seedPatternBillingProduct(t, billingService, "gpt-image-1", 25)
+	request := seedPatternBillingProduct(t, billingService, 25)
 	seedCreditWallet(t, pool, creditService, 42, 10)
 	client := newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
 	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts, taskbilling.NewService(billingService, creditService))
 	task := newBilledPatternTask("task_billed_insufficient", "pattern-action-insufficient", request)
 
-	_, err := store.SubmitTask(t.Context(), task, newTaskSubmissionQueueTask(task))
+	result, err := store.SubmitTask(t.Context(), canonicalRequestForTest(task))
 	if !errors.Is(err, taskbilling.ErrInsufficientCredits) {
 		t.Fatalf("error=%v", err)
 	}
-	assertTaskRowCount(t, db, task.TaskID, 0)
-	assertRiverJobRowCount(t, db, task.TaskID, 0)
-	assertBillingSnapshotCount(t, db, task.TaskID, 0)
+	assertTaskRowCount(t, db, result.TaskID, 0)
+	assertRiverJobRowCount(t, db, result.TaskID, 0)
+	assertBillingSnapshotCount(t, db, result.TaskID, 0)
 }
 
 func TestConcurrentBilledSubmissionsLeaveNoWritesForInsufficientLoser(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
-	request := seedPatternBillingProduct(t, billingService, "gpt-image-1", 25)
+	request := seedPatternBillingProduct(t, billingService, 25)
 	seedCreditWallet(t, pool, creditService, 42, 25)
 	client := &countingRiverTxClient{inner: newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)}
 	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts, taskbilling.NewService(billingService, creditService))
@@ -344,8 +352,8 @@ func TestConcurrentBilledSubmissionsLeaveNoWritesForInsufficientLoser(t *testing
 		go func(task *tasks.Task) {
 			defer wg.Done()
 			<-start
-			_, err := store.SubmitTask(context.Background(), task, newTaskSubmissionQueueTask(task))
-			outcomes <- submissionOutcome{taskID: task.TaskID, err: err}
+			result, err := store.SubmitTask(context.Background(), canonicalRequestForTest(task))
+			outcomes <- submissionOutcome{taskID: result.TaskID, err: err}
 		}(task)
 	}
 	close(start)
@@ -382,18 +390,19 @@ func TestBilledSubmissionRollsBackHoldSnapshotTaskAndRiver(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
-	request := seedPatternBillingProduct(t, billingService, "gpt-image-1", 25)
+	request := seedPatternBillingProduct(t, billingService, 25)
 	seedCreditWallet(t, pool, creditService, 42, 100)
 	client := newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
 	store := NewStore(pool, taskstore.NewRepository(db), insertThenFailRiverTxClient{inner: client, err: errors.New("forced River failure")}, submissionRiverTestQueue, submissionRiverTestMaxAttempts, taskbilling.NewService(billingService, creditService))
 	task := newBilledPatternTask("task_billed_rollback", "pattern-action-rollback", request)
 
-	if _, err := store.SubmitTask(t.Context(), task, newTaskSubmissionQueueTask(task)); err == nil {
+	result, err := store.SubmitTask(t.Context(), canonicalRequestForTest(task))
+	if err == nil {
 		t.Fatal("expected submission failure")
 	}
-	assertTaskRowCount(t, db, task.TaskID, 0)
-	assertRiverJobRowCount(t, db, task.TaskID, 0)
-	assertBillingSnapshotCount(t, db, task.TaskID, 0)
+	assertTaskRowCount(t, db, result.TaskID, 0)
+	assertRiverJobRowCount(t, db, result.TaskID, 0)
+	assertBillingSnapshotCount(t, db, result.TaskID, 0)
 	wallet, err := creditService.GetWallet(t.Context(), 42)
 	if err != nil {
 		t.Fatal(err)
@@ -407,13 +416,13 @@ func TestFreeBilledSubmissionPersistsSnapshotWithoutLedgerMovement(t *testing.T)
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
-	request := seedPatternBillingProduct(t, billingService, "gpt-image-1", 0)
+	request := seedPatternBillingProduct(t, billingService, 0)
 	seedCreditWallet(t, pool, creditService, 42, 0)
 	client := newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
 	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts, taskbilling.NewService(billingService, creditService))
 	task := newBilledPatternTask("task_billed_free", "pattern-action-free", request)
 
-	result, err := store.SubmitTask(t.Context(), task, newTaskSubmissionQueueTask(task))
+	result, err := store.SubmitTask(t.Context(), canonicalRequestForTest(task))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -471,29 +480,29 @@ func TestAllAIImageWorkflowSubmissionPricingMatrix(t *testing.T) {
 				store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts, taskbilling.NewService(billingService, creditService))
 				task := newBilledAIImageTask("task_"+strings.ReplaceAll(feature, "-", "_")+"_"+scenario.name, "action:"+feature+":"+scenario.name, request)
 
-				result, err := store.SubmitTask(t.Context(), task, newTaskSubmissionQueueTask(task))
+				result, err := store.SubmitTask(t.Context(), canonicalRequestForTest(task))
 				if scenario.wantErr != nil {
 					if !errors.Is(err, scenario.wantErr) {
 						t.Fatalf("error=%v, want %v", err, scenario.wantErr)
 					}
-					assertTaskRowCount(t, db, task.TaskID, 0)
-					assertRiverJobRowCount(t, db, task.TaskID, 0)
-					assertBillingSnapshotCount(t, db, task.TaskID, 0)
+					assertTaskRowCount(t, db, result.TaskID, 0)
+					assertRiverJobRowCount(t, db, result.TaskID, 0)
+					assertBillingSnapshotCount(t, db, result.TaskID, 0)
 					return
 				}
 				if err != nil {
 					t.Fatal(err)
 				}
-				var snapshotFeature, snapshotModel, state string
+				var snapshotFeature, state string
 				if err := db.QueryRowContext(t.Context(), `
-SELECT snapshots.feature_slug, snapshots.model, settlements.state
+SELECT snapshots.feature_slug, settlements.state
 FROM task_billing_snapshots snapshots
 JOIN task_billing_settlements settlements USING (task_id)
-WHERE snapshots.task_id = $1`, result.TaskID).Scan(&snapshotFeature, &snapshotModel, &state); err != nil {
+WHERE snapshots.task_id = $1`, result.TaskID).Scan(&snapshotFeature, &state); err != nil {
 					t.Fatal(err)
 				}
-				if snapshotFeature != feature || snapshotModel != "gpt-image-1" || state != scenario.wantState {
-					t.Fatalf("snapshot feature/model/state=%q/%q/%q", snapshotFeature, snapshotModel, state)
+				if snapshotFeature != feature || state != scenario.wantState {
+					t.Fatalf("snapshot feature/state=%q/%q", snapshotFeature, state)
 				}
 				var holdCount int
 				if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE command_type = 'hold' AND business_reference_id = $1`, result.TaskID).Scan(&holdCount); err != nil {
@@ -507,7 +516,7 @@ WHERE snapshots.task_id = $1`, result.TaskID).Scan(&snapshotFeature, &snapshotMo
 	}
 }
 
-func seedPatternBillingProduct(t *testing.T, service *billing.Service, model string, unitCredits int64) taskbilling.Request {
+func seedPatternBillingProduct(t *testing.T, service *billing.Service, unitCredits int64) taskbilling.Request {
 	t.Helper()
 	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen)
 	if err != nil {

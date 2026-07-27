@@ -1,7 +1,6 @@
 package taskservice
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -117,12 +116,6 @@ func validateSubmitTaskPrompt(prompt string, maxBytes int, label string) error {
 	return nil
 }
 
-func (s *Service) validateSubmitTaskImageURLs(ctx context.Context, userID int64, imageURLs []string) error {
-	return validateSubmitTaskImageURLsWithRefValidator(imageURLs, func(raw string) error {
-		return s.validateSubmitTaskMediaRef(ctx, userID, raw)
-	})
-}
-
 func validateSubmitTaskImageURLsWithRefValidator(imageURLs []string, validateRef func(string) error) error {
 	if len(imageURLs) > maxSubmitTaskImageURLs {
 		return fmt.Errorf("图片数量不能超过 %d 张", maxSubmitTaskImageURLs)
@@ -140,12 +133,6 @@ func validateSubmitTaskImageURLsWithRefValidator(imageURLs []string, validateRef
 		}
 	}
 	return nil
-}
-
-func (s *Service) validateSubmitTaskMediaParams(ctx context.Context, userID int64, params map[string]interface{}) error {
-	return validateSubmitTaskMediaParamsWithRefValidator(params, func(raw string) error {
-		return s.validateSubmitTaskMediaRef(ctx, userID, raw)
-	})
 }
 
 func validateSubmitTaskMediaParamsWithRefValidator(params map[string]interface{}, validateRef func(string) error) error {
@@ -176,13 +163,6 @@ func validateSubmitTaskContractKeys(params map[string]interface{}) error {
 		}
 	}
 	return nil
-}
-
-func (s *Service) validateSubmitTaskMediaRef(ctx context.Context, userID int64, raw string) error {
-	if s == nil || s.mediaValidator == nil {
-		return fmt.Errorf("任务媒体校验服务未配置")
-	}
-	return s.mediaValidator.ValidateSubmitMediaRef(ctx, userID, raw)
 }
 
 func marshalWorkflowTaskParams(params *tasks.WorkflowTaskParams, source map[string]interface{}) (string, error) {

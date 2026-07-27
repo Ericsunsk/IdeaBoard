@@ -17,11 +17,16 @@ func newRepositoryTestDB(t *testing.T) (*Repository, *sql.DB) {
 	return NewRepository(db), db
 }
 
+func terminalStatsTestTime() time.Time {
+	return time.Date(2026, time.July, 15, 12, 0, 0, 0, time.Local)
+}
+
 func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 	ctx := context.Background()
 	taskRepo, db := newRepositoryTestDB(t)
 	accountID := seedRepositoryTestAccount(t, db, 66)
-	createdAt := time.Now().Add(-10 * time.Minute)
+	failedAt := terminalStatsTestTime()
+	createdAt := failedAt.Add(-10 * time.Minute)
 
 	if err := createRepositoryTestTask(t, taskRepo, ctx, &tasks.Task{
 		TaskID:                     "acc-fail-1",
@@ -58,7 +63,7 @@ func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback()
-	failedTaskIDs, err := taskRepo.FailRunningByAccountIDWithTx(ctx, tx, accountID, "stopped", time.Now())
+	failedTaskIDs, err := taskRepo.FailRunningByAccountIDWithTx(ctx, tx, accountID, "stopped", failedAt)
 	if err != nil {
 		t.Fatalf("FailRunningByAccountIDWithTx failed: %v", err)
 	}
@@ -76,7 +81,7 @@ func TestFailRunningByAccountIDUpsertsDailyStats(t *testing.T) {
 		t.Fatalf("failedTaskIDs=%v, want acc-fail-1 and acc-fail-2", failedTaskIDs)
 	}
 
-	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, createdAt, createdAt)
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, failedAt, failedAt)
 	if err != nil {
 		t.Fatalf("list daily stats failed: %v", err)
 	}
@@ -114,8 +119,8 @@ WHERE task_id = 'acc-fail-1'`,
 func TestMarkTaskFailedUpsertsDailyStats(t *testing.T) {
 	ctx := context.Background()
 	taskRepo, _ := newRepositoryTestDB(t)
-	createdAt := time.Now().Add(-3 * time.Minute)
-	completedAt := createdAt.Add(30 * time.Second)
+	completedAt := terminalStatsTestTime()
+	createdAt := completedAt.Add(-3 * time.Minute)
 	task := &tasks.Task{
 		TaskID:    "mark-failed-stat",
 		UserID:    11,
@@ -142,7 +147,7 @@ func TestMarkTaskFailedUpsertsDailyStats(t *testing.T) {
 		t.Fatalf("second terminal transition rows=%d, want 0", rowsAffected)
 	}
 
-	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, createdAt, createdAt)
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, completedAt, completedAt)
 	if err != nil {
 		t.Fatalf("list daily stats failed: %v", err)
 	}
@@ -161,8 +166,8 @@ func TestMarkTaskFailedUpsertsDailyStats(t *testing.T) {
 func TestMarkTaskCancelledUpsertsDailyStats(t *testing.T) {
 	ctx := context.Background()
 	taskRepo, _ := newRepositoryTestDB(t)
-	createdAt := time.Now().Add(-5 * time.Minute)
-	cancelledAt := createdAt.Add(45 * time.Second)
+	cancelledAt := terminalStatsTestTime()
+	createdAt := cancelledAt.Add(-5 * time.Minute)
 	task := &tasks.Task{
 		TaskID:    "mark-cancelled-stat",
 		UserID:    12,
@@ -186,12 +191,74 @@ func TestMarkTaskCancelledUpsertsDailyStats(t *testing.T) {
 		t.Fatalf("rows=%d, want 1", rowsAffected)
 	}
 
-	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, createdAt, createdAt)
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, cancelledAt, cancelledAt)
 	if err != nil {
 		t.Fatalf("list daily stats failed: %v", err)
 	}
 	if len(rows) != 1 || rows[0].Cancelled != 1 || rows[0].Total != 1 || rows[0].Completed != 0 || rows[0].Failed != 0 {
 		t.Fatalf("unexpected cancelled daily row: %+v", rows)
+	}
+}
+
+func TestCompleteWithOutputsRecordsDailyStatsOnTerminalDateAcrossMidnight(t *testing.T) {
+	ctx := context.Background()
+	taskRepo, db := newRepositoryTestDB(t)
+	accountID := seedRepositoryTestAccount(t, db, 67)
+	channelID := accountID + 10000
+	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
+	createdAt := time.Date(2026, time.July, 15, 23, 59, 0, 0, time.Local)
+	completedAt := createdAt.Add(2 * time.Minute)
+	task := &tasks.Task{
+		TaskID:                     "complete-stat-across-midnight",
+		UserID:                     10,
+		AssignedProviderEndpointID: tasks.IDPtr(channelID),
+		AssignedCredentialID:       tasks.IDPtr(credentialID),
+		AccountID:                  tasks.IDPtr(accountID),
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "lease-complete-stat-across-midnight",
+		CreatedAt:                  createdAt,
+	}
+	if err := createRepositoryTestTask(t, taskRepo, ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, task.LeaseToken)
+
+	rowsAffected, err := taskRepo.CompleteWithOutputsAndLeaseToken(
+		ctx,
+		task.TaskID,
+		[]string{tasks.StatusRunning},
+		accountID,
+		channelID,
+		credentialID,
+		task.LeaseToken,
+		`{"model":"model-complete","username":"user-complete"}`,
+		completedAt,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("CompleteWithOutputsAndLeaseToken failed: %v", err)
+	}
+	if rowsAffected != 1 {
+		t.Fatalf("rows=%d, want 1", rowsAffected)
+	}
+
+	createdDateRows, err := taskRepo.ListDailyStatsByDateRange(ctx, createdAt, createdAt)
+	if err != nil {
+		t.Fatalf("list created-date stats failed: %v", err)
+	}
+	if len(createdDateRows) != 0 {
+		t.Fatalf("created-date stats=%+v, want no rows", createdDateRows)
+	}
+
+	completedDateRows, err := taskRepo.ListDailyStatsByDateRange(ctx, completedAt, completedAt)
+	if err != nil {
+		t.Fatalf("list terminal-date stats failed: %v", err)
+	}
+	if len(completedDateRows) != 1 || completedDateRows[0].Completed != 1 ||
+		completedDateRows[0].Total != 1 || completedDateRows[0].Failed != 0 ||
+		completedDateRows[0].Cancelled != 0 {
+		t.Fatalf("unexpected terminal-date daily row: %+v", completedDateRows)
 	}
 }
 

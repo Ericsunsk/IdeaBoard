@@ -1,0 +1,341 @@
+package taskstore
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"strings"
+	"time"
+
+	"ideaboard/api/internal/db/dbutil"
+	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/tasking/taskbilling"
+	"ideaboard/api/internal/tasking/tasks"
+)
+
+type terminalTransitionKind string
+
+const (
+	terminalTransitionCompleted terminalTransitionKind = "completed"
+	terminalTransitionFailed    terminalTransitionKind = "failed"
+	terminalTransitionCancelled terminalTransitionKind = "cancelled"
+)
+
+type terminalLeaseReleaseMode uint8
+
+const (
+	terminalLeaseReleaseNone terminalLeaseReleaseMode = iota
+	terminalLeaseReleaseExact
+	terminalLeaseReleaseActive
+)
+
+type terminalLeaseRelease struct {
+	mode               terminalLeaseReleaseMode
+	accountID          int64
+	providerEndpointID int64
+	credentialID       int64
+	leaseToken         string
+}
+
+type terminalTransitionCommand struct {
+	taskID          string
+	kind            terminalTransitionKind
+	finishedAt      time.Time
+	errorMessage    string
+	failureStage    string
+	failureCategory string
+	attemptFinish   *tasks.TaskAttemptFinish
+	lease           terminalLeaseRelease
+	outputs         []tasks.TaskOutput
+	writeTaskFact   func(context.Context, *dbsqlc.Queries) (int64, error)
+}
+
+type terminalTransitionPolicy struct {
+	taskStatus      string
+	attemptStatus   string
+	executionStage  string
+	failureStage    string
+	failureCategory string
+	leaseReason     string
+	billingOutcome  taskbilling.TerminalOutcome
+	replacesOutputs bool
+}
+
+// runTerminalTransition owns the atomic terminal recipe. Repository methods
+// only adapt their caller-specific task fact command into this invariant.
+func (r *Repository) runTerminalTransition(ctx context.Context, command terminalTransitionCommand) (int64, error) {
+	if r == nil || r.db == nil {
+		return 0, fmt.Errorf("task terminal repository is unavailable")
+	}
+	command.taskID = strings.TrimSpace(command.taskID)
+	if command.taskID == "" {
+		return 0, fmt.Errorf("task_id is required")
+	}
+	if command.writeTaskFact == nil {
+		return 0, fmt.Errorf("task terminal fact writer is required")
+	}
+	if command.finishedAt.IsZero() {
+		command.finishedAt = time.Now()
+	}
+	policy, err := resolveTerminalTransitionPolicy(command.kind)
+	if err != nil {
+		return 0, err
+	}
+
+	var rowsAffected int64
+	err = dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx *sql.Tx) error {
+		normalizedAttemptFinish, err := normalizeTerminalAttemptFinishTx(ctx, q, command, policy)
+		if err != nil {
+			return err
+		}
+		command.attemptFinish = normalizedAttemptFinish
+
+		updated, err := command.writeTaskFact(ctx, q)
+		if err != nil || updated == 0 {
+			return err
+		}
+
+		taskRow, err := q.GetTaskByTaskID(ctx, command.taskID)
+		if err != nil {
+			return err
+		}
+		task := taskFromSQLC(taskRow)
+		if task.Status != policy.taskStatus {
+			return fmt.Errorf("task terminal fact status=%q, want %q", task.Status, policy.taskStatus)
+		}
+
+		if policy.replacesOutputs {
+			if err := replaceTaskOutputsTx(ctx, q, &task, command.outputs); err != nil {
+				return err
+			}
+		}
+		if err := finishTerminalTaskAttemptTx(ctx, q, command, policy); err != nil {
+			return err
+		}
+		if err := releaseTerminalTaskLeaseTx(ctx, q, command, policy); err != nil {
+			return err
+		}
+		metricsByTaskID, err := listExecutionMetricsByTaskIDsTx(ctx, q, []string{command.taskID})
+		if err != nil {
+			return err
+		}
+		if err := applyTerminalOutcomeTx(ctx, q, tx, &task, metricsByTaskID[command.taskID], command, policy); err != nil {
+			return err
+		}
+		rowsAffected = updated
+		return nil
+	})
+	return rowsAffected, err
+}
+
+func applyTerminalOutcomeTx(
+	ctx context.Context,
+	q *dbsqlc.Queries,
+	tx *sql.Tx,
+	task *tasks.Task,
+	metrics *tasks.TaskExecutionMetrics,
+	command terminalTransitionCommand,
+	policy terminalTransitionPolicy,
+) error {
+	if err := upsertDailyStatByTaskTx(ctx, q, task, command.attemptFinish); err != nil {
+		return err
+	}
+	if err := patchTerminalExecutionMetricsForTaskTx(
+		ctx,
+		q,
+		command.taskID,
+		task.CreatedAt,
+		metrics,
+		policy.executionStage,
+		terminalCommandFailureStage(command, policy),
+		terminalCommandFailureCategory(command, policy),
+		command.finishedAt,
+	); err != nil {
+		return err
+	}
+	return taskbilling.SettleTerminal(ctx, tx, command.taskID, policy.billingOutcome)
+}
+
+func resolveTerminalTransitionPolicy(kind terminalTransitionKind) (terminalTransitionPolicy, error) {
+	switch kind {
+	case terminalTransitionCompleted:
+		return terminalTransitionPolicy{
+			taskStatus:      tasks.StatusCompleted,
+			attemptStatus:   tasks.TaskAttemptStatusCompleted,
+			executionStage:  tasks.ExecutionStageCompleted,
+			leaseReason:     tasks.TaskAttemptStatusCompleted,
+			billingOutcome:  taskbilling.TerminalOutcomeSucceeded,
+			replacesOutputs: true,
+		}, nil
+	case terminalTransitionFailed:
+		return terminalTransitionPolicy{
+			taskStatus:      tasks.StatusFailed,
+			attemptStatus:   tasks.TaskAttemptStatusFailed,
+			executionStage:  tasks.ExecutionStageFailed,
+			failureStage:    tasks.ExecutionStageAssigned,
+			failureCategory: tasks.FailureCategoryUnknown,
+			leaseReason:     tasks.TaskAttemptStatusFailed,
+			billingOutcome:  taskbilling.TerminalOutcomeUnsuccessful,
+		}, nil
+	case terminalTransitionCancelled:
+		return terminalTransitionPolicy{
+			taskStatus:      tasks.StatusCancelled,
+			attemptStatus:   tasks.TaskAttemptStatusCancelled,
+			executionStage:  tasks.ExecutionStageCancelled,
+			failureStage:    tasks.ExecutionStageQueued,
+			failureCategory: tasks.FailureCategoryCancelled,
+			leaseReason:     tasks.TaskAttemptStatusCancelled,
+			billingOutcome:  taskbilling.TerminalOutcomeUnsuccessful,
+		}, nil
+	default:
+		return terminalTransitionPolicy{}, fmt.Errorf("unsupported task terminal transition %q", kind)
+	}
+}
+
+func replaceTaskOutputsTx(ctx context.Context, q *dbsqlc.Queries, task *tasks.Task, outputs []tasks.TaskOutput) error {
+	if err := q.DeleteTaskOutputMediaRefsByTaskID(ctx, task.TaskID); err != nil {
+		return err
+	}
+	if err := q.DeleteOutputsByTaskID(ctx, task.TaskID); err != nil {
+		return err
+	}
+	return insertTaskOutputs(ctx, q, task.TaskID, task.UserID, outputs)
+}
+
+func finishTerminalTaskAttemptTx(
+	ctx context.Context,
+	q *dbsqlc.Queries,
+	command terminalTransitionCommand,
+	policy terminalTransitionPolicy,
+) error {
+	if command.attemptFinish != nil && command.attemptFinish.ID > 0 {
+		return finishTaskAttemptTx(ctx, q, command.attemptFinish)
+	}
+	errorMessage := strings.TrimSpace(command.errorMessage)
+	if errorMessage == "" && policy.attemptStatus != tasks.TaskAttemptStatusCompleted {
+		errorMessage = "task " + string(command.kind)
+	}
+	_, err := q.FinishRunningTaskAttemptsByTaskIDs(ctx, dbsqlc.FinishRunningTaskAttemptsByTaskIDsParams{
+		Status:          policy.attemptStatus,
+		FailureStage:    terminalCommandFailureStage(command, policy),
+		FailureCategory: terminalCommandFailureCategory(command, policy),
+		ErrorMsg:        errorMessage,
+		FinishedAt:      sql.NullTime{Time: command.finishedAt, Valid: true},
+		TaskIds:         []string{command.taskID},
+	})
+	return err
+}
+
+func normalizeTerminalAttemptFinishTx(
+	ctx context.Context,
+	q *dbsqlc.Queries,
+	command terminalTransitionCommand,
+	policy terminalTransitionPolicy,
+) (*tasks.TaskAttemptFinish, error) {
+	if command.attemptFinish == nil || command.attemptFinish.ID == 0 {
+		return command.attemptFinish, nil
+	}
+	finish := *command.attemptFinish
+	if callerStatus := strings.TrimSpace(finish.Status); callerStatus != "" && callerStatus != policy.attemptStatus {
+		return nil, fmt.Errorf(
+			"task attempt terminal status=%q conflicts with policy status=%q",
+			callerStatus,
+			policy.attemptStatus,
+		)
+	}
+	finish.Status = policy.attemptStatus
+
+	switch command.lease.mode {
+	case terminalLeaseReleaseExact:
+		return taskAttemptFinishWithLeaseIdentity(
+			&finish,
+			command.taskID,
+			command.lease.accountID,
+			command.lease.providerEndpointID,
+			command.lease.credentialID,
+			command.lease.leaseToken,
+		)
+	case terminalLeaseReleaseActive:
+		lease, err := q.GetActiveTaskLeaseByTaskID(ctx, command.taskID)
+		if err != nil {
+			return nil, fmt.Errorf("resolve active lease for terminal attempt: %w", err)
+		}
+		return taskAttemptFinishWithLeaseIdentity(
+			&finish,
+			command.taskID,
+			lease.AccountID,
+			lease.ProviderEndpointID,
+			lease.CredentialID,
+			lease.LeaseToken,
+		)
+	case terminalLeaseReleaseNone:
+		if strings.TrimSpace(finish.TaskID) == "" {
+			finish.TaskID = command.taskID
+		}
+		if err := validateTaskAttemptFinishIdentity(finish); err != nil {
+			return nil, err
+		}
+		return &finish, nil
+	default:
+		return nil, fmt.Errorf("unsupported task terminal lease release mode %d", command.lease.mode)
+	}
+}
+
+func releaseTerminalTaskLeaseTx(
+	ctx context.Context,
+	q *dbsqlc.Queries,
+	command terminalTransitionCommand,
+	policy terminalTransitionPolicy,
+) error {
+	switch command.lease.mode {
+	case terminalLeaseReleaseNone:
+		return nil
+	case terminalLeaseReleaseExact:
+		return releaseTaskLeaseTx(
+			ctx,
+			q,
+			command.taskID,
+			command.lease.accountID,
+			command.lease.providerEndpointID,
+			command.lease.credentialID,
+			command.lease.leaseToken,
+			policy.leaseReason,
+			command.finishedAt,
+		)
+	case terminalLeaseReleaseActive:
+		return releaseActiveTaskLeaseByTaskIDTx(ctx, q, command.taskID, policy.leaseReason, command.finishedAt)
+	default:
+		return fmt.Errorf("unsupported task terminal lease release mode %d", command.lease.mode)
+	}
+}
+
+func terminalCommandFailureStage(command terminalTransitionCommand, policy terminalTransitionPolicy) string {
+	if value := strings.TrimSpace(command.failureStage); value != "" {
+		return value
+	}
+	if command.attemptFinish != nil {
+		if value := strings.TrimSpace(command.attemptFinish.FailureStage); value != "" {
+			return value
+		}
+	}
+	return policy.failureStage
+}
+
+func terminalCommandFailureCategory(command terminalTransitionCommand, policy terminalTransitionPolicy) string {
+	if value := strings.TrimSpace(command.failureCategory); value != "" {
+		return value
+	}
+	if command.attemptFinish != nil {
+		if value := strings.TrimSpace(command.attemptFinish.FailureCategory); value != "" {
+			return value
+		}
+	}
+	return policy.failureCategory
+}
+
+func terminalTransitionTime(value time.Time) time.Time {
+	if value.IsZero() {
+		return time.Now()
+	}
+	return value
+}

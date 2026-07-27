@@ -380,7 +380,14 @@
       </DataTableFrame>
     </AdminTablePanel>
 
-    <AdminTaskResultDialog v-model:visible="detailModalVisible" :task="detailTask" />
+    <AdminTaskResultDialog
+      v-model:visible="detailModalVisible"
+      :task-id="selectedDetailTaskID"
+      :task="detailTask"
+      :loading="isDetailLoading"
+      :error-message="detailErrorMessage"
+      @retry="retryTaskDetail"
+    />
   </div>
 </template>
 
@@ -435,6 +442,7 @@ import {
 } from '../../task-monitor/taskMonitorStatus'
 import { useTaskMonitorCharts } from '../../task-monitor/useTaskMonitorCharts'
 import { type AdminTaskRow, useAdminTaskList } from '../../task-monitor/useAdminTaskList'
+import { useAdminTaskDetailResource } from '../../task-monitor/taskMonitorResource'
 import { useAdminTaskSelectionDelete } from '../../task-monitor/useAdminTaskSelectionDelete'
 import { useAdminTaskRuntimeSnapshot } from '../../task-monitor/useAdminTaskRuntimeSnapshot'
 
@@ -442,7 +450,22 @@ const taskDeletionFeedback = useAdminTaskDeletionFeedback()
 const adminConfirm = useAdminConfirm()
 const taskCards = adminCards.taskMonitor
 const detailModalVisible = ref(false)
-const detailTask = ref<AdminTaskRow | null>(null)
+const selectedDetailTaskID = ref('')
+const detailQuery = useAdminTaskDetailResource(selectedDetailTaskID, {
+  query: {
+    enabled: computed(() => detailModalVisible.value && selectedDetailTaskID.value.length > 0),
+  },
+})
+const detailTask = computed(() => {
+  const task = detailQuery.data.value?.task
+  return task?.task_id === selectedDetailTaskID.value ? task : null
+})
+const isDetailLoading = computed(
+  () => detailModalVisible.value && detailTask.value === null && !detailQuery.isError.value,
+)
+const detailErrorMessage = computed(() =>
+  detailQuery.isError.value ? formatDisplayErrorMessage(detailQuery.error.value, '加载任务详情失败') : '',
+)
 
 const {
   tasks,
@@ -549,8 +572,12 @@ function clearSearch() {
 }
 
 function showDetail(task: AdminTaskRow) {
-  detailTask.value = task
+  selectedDetailTaskID.value = task.task_id
   detailModalVisible.value = true
+}
+
+function retryTaskDetail() {
+  void detailQuery.refetch()
 }
 
 function getTaskDurationClass(task: Parameters<typeof getTaskDuration>[0]) {

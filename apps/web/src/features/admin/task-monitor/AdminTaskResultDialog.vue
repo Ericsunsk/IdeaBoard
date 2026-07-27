@@ -2,7 +2,7 @@
   <Dialog
     :visible="visible"
     modal
-    :style="{ width: '680px', maxWidth: '95vw' }"
+    :style="{ width: '760px', maxWidth: '95vw' }"
     :pt="taskDetailDialogPt"
     :draggable="false"
     aria-label="任务详情控制台"
@@ -29,7 +29,7 @@
               任务详情控制台
             </span>
             <span class="mt-1 truncate font-mono text-admin-caption text-admin-subtitle-color">
-              ID: {{ detailTask?.task_id || '-' }}
+              ID: {{ detailTask?.task_id || taskId || '-' }}
             </span>
           </div>
         </div>
@@ -56,7 +56,28 @@
       </div>
     </template>
 
-    <div v-if="detailTask" class="flex flex-col gap-[18px]">
+    <div
+      v-if="loading"
+      class="flex min-h-48 items-center justify-center rounded-[14px] border border-admin-border-soft bg-admin-surface-muted/65 text-admin-body text-admin-text-3"
+      role="status"
+    >
+      正在加载任务详情…
+    </div>
+    <div
+      v-else-if="errorMessage"
+      class="flex min-h-48 flex-col items-center justify-center gap-3 rounded-[14px] border border-admin-danger/20 bg-admin-danger/5 px-5 text-center"
+      role="alert"
+    >
+      <span class="text-admin-body font-semibold text-admin-danger">{{ errorMessage }}</span>
+      <Button label="重试" size="small" severity="secondary" @click="emit('retry')" />
+    </div>
+    <div
+      v-else-if="!detailTask"
+      class="flex min-h-48 items-center justify-center rounded-[14px] border border-admin-border-soft bg-admin-surface-muted/65 text-admin-body text-admin-text-3"
+    >
+      任务详情不可用
+    </div>
+    <div v-else class="flex flex-col gap-[18px]">
       <div :class="getTaskStatusBannerClass(detailTask.status)">
         <div class="flex flex-col gap-1.5">
           <span class="text-admin-caption font-bold text-admin-text-3">当前状态</span>
@@ -76,7 +97,7 @@
         </div>
         <div
           v-else-if="detailTask.status === adminTaskStatuses.cancelled"
-          class="flex items-start gap-2.5 rounded-xl border border-admin-border bg-white/70 px-3 py-2.5 text-admin-body leading-[1.55] text-admin-text-2-strong"
+          class="flex items-start gap-2.5 rounded-xl border border-admin-border bg-admin-surface px-3 py-2.5 text-admin-body leading-[1.55] text-admin-text-2-strong"
         >
           <WarningTriangle class="mt-0.5 shrink-0 text-admin-text-3" />
           <span>{{ getErrorReason(detailTask) || '任务已停止，未继续执行。' }}</span>
@@ -120,19 +141,84 @@
             </div>
           </div>
           <DetailMetric label="优先级" :value="getTaskPriorityLabel(detailTask)" />
-          <DetailMetric label="账号 ID" :value="String(detailTask.account_id || 'N/A')" />
+          <DetailMetric label="账号 ID" :value="detailTask.account_id ? String(detailTask.account_id) : '-'" />
           <DetailMetric
             label="Endpoint"
-            :value="getTaskEndpointLabel(detailTask) || 'N/A'"
-            :title="detailTask.provider_endpoint_base_url || getTaskEndpointLabel(detailTask)"
+            :value="getTaskEndpointLabel(detailTask) || '-'"
+            :title="detailTask.provider_endpoint_base_url || getTaskEndpointLabel(detailTask) || '-'"
           />
-          <DetailMetric label="Credential" :value="getTaskCredentialLabel(detailTask) || 'N/A'" />
           <DetailMetric
             label="模型 / API Type"
-            :value="`${getTaskModelLabel(detailTask) || 'N/A'} · ${detailTask.api_type || 'N/A'}`"
+            :value="getCurrentAssignmentModelLabel(detailTask)"
           />
           <DetailMetric label="创建时间" :value="formatDateTime(detailTask.created_at)" />
           <DetailMetric label="完成时间" :value="formatDateTime(detailTask.completed_at)" />
+        </div>
+      </section>
+
+      <section class="flex flex-col gap-2.5" aria-labelledby="task-detail-execution-trace">
+        <div
+          class="flex min-w-0 items-center gap-2 text-admin-body font-bold text-admin-title-color"
+        >
+          <Clock class="h-[17px] w-[17px] shrink-0 text-admin-subtitle-color" />
+          <span id="task-detail-execution-trace">执行轨迹</span>
+          <Tag
+            :value="`${detailTask.execution_attempts?.length || 0} 次尝试`"
+            severity="secondary"
+            rounded
+            class="ml-auto"
+          />
+        </div>
+        <div
+          v-if="detailTask.execution_attempts?.length"
+          class="flex flex-col overflow-hidden rounded-[14px] border border-admin-border-soft bg-admin-surface"
+        >
+          <article
+            v-for="attempt in detailTask.execution_attempts"
+            :key="attempt.attempt_no"
+            class="flex flex-col gap-3 border-b border-admin-divider px-4 py-3.5 last:border-b-0"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex min-w-0 items-center gap-2">
+                <span class="font-mono text-admin-caption font-bold text-admin-text-3">
+                  #{{ attempt.attempt_no }}
+                </span>
+                <span class="truncate text-admin-body font-bold text-admin-text-1">
+                  {{ getAttemptProviderLabel(attempt) }}
+                </span>
+                <span class="text-admin-meta text-admin-text-3">/</span>
+                <span class="truncate font-mono text-admin-meta text-admin-text-2-strong">
+                  {{ attempt.resolved_model || '-' }}
+                </span>
+              </div>
+              <Tag
+                :value="getAttemptStatusLabel(attempt.status)"
+                :severity="getAttemptStatusSeverity(attempt.status)"
+                rounded
+              />
+            </div>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-2 md:grid-cols-4">
+              <DetailMetric label="阶段" :value="getAttemptStageLabel(attempt.stage)" />
+              <DetailMetric
+                label="失败分类"
+                :value="getAttemptFailureLabel(attempt.failure_category)"
+              />
+              <DetailMetric
+                label="Provider 耗时"
+                :value="formatAttemptLatency(attempt.provider_latency_ms)"
+              />
+              <DetailMetric
+                label="总耗时"
+                :value="formatAttemptLatency(attempt.total_latency_ms)"
+              />
+            </div>
+          </article>
+        </div>
+        <div
+          v-else
+          class="flex min-h-24 items-center justify-center rounded-[14px] border border-admin-border-soft bg-admin-surface-muted/65 text-admin-body text-admin-text-3"
+        >
+          暂无执行记录
         </div>
       </section>
 
@@ -161,6 +247,14 @@
           <DetailMetric label="调用数量" :value="String(detailTask.billing.quantity)" />
           <DetailMetric label="总消耗" :value="formatIdeaAmount(detailTask.billing.total_credits)" />
           <DetailMetric label="报价时间" :value="formatDateTime(detailTask.billing.quoted_at)" />
+          <DetailMetric
+            label="结算状态"
+            :value="getBillingSettlementLabel(detailTask.billing.settlement_state)"
+          />
+          <DetailMetric
+            label="结算时间"
+            :value="formatDateTime(detailTask.billing.settled_at)"
+          />
         </div>
       </section>
 
@@ -180,7 +274,7 @@
           />
         </div>
         <div
-          class="max-h-[210px] overflow-y-auto rounded-[14px] border border-admin-border-soft bg-white/80 px-4 py-3.5"
+          class="max-h-[210px] overflow-y-auto rounded-[14px] border border-admin-border-soft bg-admin-surface px-4 py-3.5"
         >
           <div
             class="whitespace-pre-wrap break-words text-admin-body leading-[1.7] text-admin-text-2-strong"
@@ -241,7 +335,7 @@
           />
         </div>
         <div
-          class="overflow-x-auto rounded-[14px] border border-admin-border-soft bg-white/80 px-4 py-3.5 font-mono text-admin-meta"
+          class="overflow-x-auto rounded-[14px] border border-admin-border-soft bg-admin-surface px-4 py-3.5 font-mono text-admin-meta"
         >
           <pre class="m-0 leading-[1.6] text-admin-text-2-strong">{{
             resultSummaryText || '暂无 API 响应结果'
@@ -270,7 +364,7 @@
           <div
             v-show="showDebugResult"
             id="task-result-debug-details"
-            class="overflow-x-auto rounded-none border-0 border-t border-admin-border-soft bg-white/75 px-4 py-3.5 font-mono text-admin-meta"
+            class="overflow-x-auto rounded-none border-0 border-t border-admin-border-soft bg-admin-surface px-4 py-3.5 font-mono text-admin-meta"
           >
             <pre class="m-0 leading-[1.6] text-admin-text-3">{{ resultDebugText }}</pre>
           </div>
@@ -303,19 +397,34 @@ import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
 import { adminOverlayDialogRootClass, createAdminDialogPt } from '../shared/lib/adminOverlayPt'
 import { adminTextButtonClass } from '../shared/lib/adminUiClasses'
 import {
-  getTaskCredentialLabel,
   getTaskEndpointLabel,
   getTaskModelLabel,
   getTaskPriorityLabel,
 } from './taskMonitorColumns'
 import { adminTaskStatuses, getTaskStatusDefinition } from './taskMonitorStatus'
-import type { AdminTask } from './taskMonitorResource'
+import type { AdminTask, AdminTaskExecutionAttempt } from './taskMonitorResource'
 import DetailMetric from './TaskResultDetailMetric.vue'
 import { useAdminTaskResultFeedback } from './useAdminTaskMonitorFeedback'
 import { useTaskResultDetail } from './useTaskResultDetail'
 
-const props = defineProps<{ visible: boolean; task: AdminTask | null }>()
-const emit = defineEmits<{ 'update:visible': [visible: boolean] }>()
+const props = withDefaults(
+  defineProps<{
+    visible: boolean
+    task: AdminTask | null
+    taskId?: string
+    loading?: boolean
+    errorMessage?: string
+  }>(),
+  {
+    taskId: '',
+    loading: false,
+    errorMessage: '',
+  },
+)
+const emit = defineEmits<{
+  'update:visible': [visible: boolean]
+  retry: []
+}>()
 const feedback = useAdminTaskResultFeedback()
 const {
   detailTask,
@@ -360,5 +469,87 @@ function getTaskStatusBannerClass(status: string) {
 }
 function getTaskStatusDotClass(status: string) {
   return [detailStatusDotBaseClass, getTaskStatusDefinition(status).dotClass]
+}
+
+function getCurrentAssignmentModelLabel(task: AdminTask) {
+  const model = getTaskModelLabel(task)
+  const apiType = task.api_type || ''
+  if (!model && !apiType) return '-'
+  return [model, apiType].filter(Boolean).join(' · ')
+}
+
+function getAttemptProviderLabel(attempt: AdminTaskExecutionAttempt) {
+  return attempt.provider_endpoint_name || `Endpoint ${attempt.provider_endpoint_id}`
+}
+
+function getAttemptStatusLabel(status: string) {
+  return (
+    {
+      running: '执行中',
+      completed: '已完成',
+      failed: '失败',
+      requeued: '已重试',
+      cancelled: '已取消',
+    }[status] || status
+  )
+}
+
+function getAttemptStatusSeverity(status: string) {
+  const severityByStatus: Record<string, 'success' | 'danger' | 'warn' | 'secondary' | 'info'> = {
+    running: 'info',
+    completed: 'success',
+    failed: 'danger',
+    requeued: 'warn',
+    cancelled: 'secondary',
+  }
+  return severityByStatus[status] || 'secondary'
+}
+
+function getAttemptStageLabel(stage: string) {
+  return (
+    {
+      queued: '排队中',
+      assigned: '已分配',
+      provider: 'Provider',
+      finalizing: '结果落盘',
+      completed: '已完成',
+      failed: '失败',
+      cancelled: '已取消',
+    }[stage] || stage
+  )
+}
+
+function getAttemptFailureLabel(category: string) {
+  if (!category) return '-'
+  return (
+    {
+      input_invalid: '输入无效',
+      auth: '鉴权',
+      quota: '配额',
+      timeout: '超时',
+      provider_error: 'Provider 错误',
+      storage_error: '存储错误',
+      finalize_error: '结果处理错误',
+      cancelled: '已取消',
+      unknown: '未知',
+    }[category] || category
+  )
+}
+
+function formatAttemptLatency(milliseconds: number) {
+  if (milliseconds <= 0) return '-'
+  if (milliseconds < 1000) return `${milliseconds} ms`
+  return `${(milliseconds / 1000).toFixed(milliseconds < 10000 ? 1 : 0)} s`
+}
+
+function getBillingSettlementLabel(state: string) {
+  return (
+    {
+      held: '待结算',
+      free: '免费',
+      captured: '已扣费',
+      released: '已释放',
+    }[state] || state
+  )
 }
 </script>

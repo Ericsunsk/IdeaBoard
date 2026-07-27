@@ -1,0 +1,275 @@
+package taskservice
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+
+	"ideaboard/api/internal/accountpool/accounts"
+	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/platform/validation"
+	"ideaboard/api/internal/prompts"
+	"ideaboard/api/internal/tasking/taskbilling"
+	"ideaboard/api/internal/tasking/taskmedia"
+	"ideaboard/api/internal/tasking/tasks"
+	"ideaboard/api/internal/tasking/tasksubmission"
+	"ideaboard/api/internal/workflow"
+)
+
+const (
+	maxSubmitTaskPromptBytes         = 8 * 1024
+	maxSubmitTaskFinalPromptBytes    = 32 * 1024
+	maxSubmitTaskImageURLs           = 16
+	maxSubmitTaskImageURLBytes       = 4096
+	maxSubmitTaskClientActionIDBytes = 128
+	maxSubmitTaskParamsBytes         = 2 * 1024 * 1024
+	maxSubmitTaskParamsDepth         = 24
+	providerUnavailableMessage       = "生图服务暂不可用，请稍后重试"
+)
+
+var errNoAvailableAPIAccount = errors.New("no available API account")
+
+// TaskIntake is the single public seam that turns an HTTP submission request
+// into the canonical Tasking request shared by Readiness and Submit.
+type TaskIntake interface {
+	Prepare(context.Context, int64, *tasks.SubmitTaskRequest) (CanonicalTaskRequest, error)
+}
+
+type CanonicalTaskRequest = tasksubmission.CanonicalRequest
+
+type FeaturePromptStore interface {
+	GetRuntimeConfig(ctx context.Context, slug string) (prompts.FeaturePromptRuntimeConfig, error)
+}
+
+type AccountStore interface {
+	GetAllEnabled(ctx context.Context) ([]*accounts.ApiAccount, error)
+}
+
+type TaskIntakeDeps struct {
+	Accounts           AccountStore
+	Prompts            FeaturePromptStore
+	Media              taskmedia.Validator
+	GenerationSettings settings.GoogleNativeGenerationSettingProvider
+}
+
+type taskIntake struct {
+	accounts           AccountStore
+	prompts            FeaturePromptStore
+	media              taskmedia.Validator
+	generationSettings settings.GoogleNativeGenerationSettingProvider
+}
+
+func NewTaskIntake(deps TaskIntakeDeps) TaskIntake {
+	return &taskIntake{
+		accounts:           deps.Accounts,
+		prompts:            deps.Prompts,
+		media:              deps.Media,
+		generationSettings: deps.GenerationSettings,
+	}
+}
+
+func (i *taskIntake) Prepare(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (CanonicalTaskRequest, error) {
+	if req == nil {
+		return CanonicalTaskRequest{}, validation.New("请求参数错误")
+	}
+	clientActionID, err := normalizeSubmitTaskClientActionID(req.ClientActionID)
+	if err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+	priority := tasks.EffectiveTaskPriority(req.Priority)
+	if !tasks.IsValidTaskPriority(priority) {
+		return CanonicalTaskRequest{}, validation.New("priority 仅支持 1-4")
+	}
+	if err := validateSubmitTaskPrompt(req.Prompt, maxSubmitTaskPromptBytes, "提示词"); err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+	if err := i.validateImageURLs(ctx, userID, req.ImageURLs); err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+
+	params := make(map[string]interface{}, len(req.Params)+2)
+	for key, value := range req.Params {
+		params[key] = value
+	}
+	if req.Feature != "" {
+		params["feature"] = req.Feature
+	}
+	if len(req.ImageURLs) > 0 {
+		params["image_urls"] = req.ImageURLs
+	}
+	normalizeSubmitTaskMediaParams(params)
+	if err := i.validateMediaParams(ctx, userID, params); err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+
+	featureSlug, err := workflow.ResolveWorkflowFeatureSlug(params)
+	if err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+	if featureSlug == "" {
+		return CanonicalTaskRequest{}, validation.New("feature 不能为空")
+	}
+	params["feature"] = featureSlug
+	delete(params, "model")
+	if err := workflow.NormalizeStructuredPromptContractParams(params, featureSlug); err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+	if featureSlug == workflow.FeatureSlugPatternGen {
+		if err := workflow.ValidatePatternGenSubmitContract(req.Prompt, params); err != nil {
+			return CanonicalTaskRequest{}, err
+		}
+	}
+	if featureSlug == workflow.FeatureSlugStyleFusion {
+		if err := normalizeStyleFusionParams(params); err != nil {
+			return CanonicalTaskRequest{}, err
+		}
+	}
+	typedParams, err := workflowTaskParamsFromMap(params, featureSlug)
+	if err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+	if err := i.ensureProviderAvailable(ctx, userID); err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+
+	promptConfig := prompts.FeaturePromptRuntimeConfig{
+		UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(featureSlug),
+	}
+	if i.prompts != nil {
+		promptConfig, err = i.prompts.GetRuntimeConfig(ctx, featureSlug)
+		if err != nil {
+			return CanonicalTaskRequest{}, newSubmissionError("prompt_unavailable", "系统提示词暂不可用", err)
+		}
+	}
+	fullPrompt := prompts.ApplyFeatureSystemPromptWithConfig(req.Prompt, req.Prompt, featureSlug, params, promptConfig)
+	if err := validateSubmitTaskPrompt(fullPrompt, maxSubmitTaskFinalPromptBytes, "最终提示词"); err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+	billingRequest, err := resolveTaskBillingRequest(featureSlug)
+	if err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+	if billingRequest != nil && clientActionID == "" {
+		return CanonicalTaskRequest{}, validation.New("AI 生图任务必须提供 client_action_id")
+	}
+	paramsJSON, err := marshalWorkflowTaskParams(typedParams, params)
+	if err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+	return tasksubmission.NewCanonicalRequest(tasksubmission.CanonicalRequestInput{
+		UserID: userID, Feature: featureSlug, UserPrompt: req.Prompt, Prompt: fullPrompt,
+		Params: paramsJSON, ClientActionID: clientActionID, Priority: priority,
+		BillingRequest: billingRequest, MaxBillingQuantity: int64(maxSubmitTaskImageURLs),
+	})
+}
+
+func (i *taskIntake) validateImageURLs(ctx context.Context, userID int64, imageURLs []string) error {
+	return validateSubmitTaskImageURLsWithRefValidator(imageURLs, func(raw string) error {
+		return i.validateMediaRef(ctx, userID, raw)
+	})
+}
+
+func (i *taskIntake) validateMediaParams(ctx context.Context, userID int64, params map[string]interface{}) error {
+	return validateSubmitTaskMediaParamsWithRefValidator(params, func(raw string) error {
+		return i.validateMediaRef(ctx, userID, raw)
+	})
+}
+
+func (i *taskIntake) validateMediaRef(ctx context.Context, userID int64, raw string) error {
+	if i == nil || i.media == nil {
+		return fmt.Errorf("任务媒体校验服务未配置")
+	}
+	return i.media.ValidateSubmitMediaRef(ctx, userID, raw)
+}
+
+func (i *taskIntake) ensureProviderAvailable(ctx context.Context, userID int64) error {
+	if i == nil || i.accounts == nil {
+		return newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
+	}
+	apiAccounts, err := i.accounts.GetAllEnabled(ctx)
+	if err != nil {
+		return newSubmissionError("provider_unavailable", providerUnavailableMessage, err)
+	}
+	apiAccounts = accounts.FilterAccountsWithEnabledModels(apiAccounts)
+	if len(apiAccounts) == 0 {
+		return newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
+	}
+	apiAccounts, err = i.filterGoogleNativeAccounts(ctx, userID, apiAccounts)
+	if err != nil {
+		return err
+	}
+	if len(apiAccounts) == 0 {
+		return newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
+	}
+	return nil
+}
+
+func (i *taskIntake) filterGoogleNativeAccounts(ctx context.Context, userID int64, apiAccounts []*accounts.ApiAccount) ([]*accounts.ApiAccount, error) {
+	if len(apiAccounts) == 0 || i.generationSettings == nil {
+		return apiAccounts, nil
+	}
+	hasGoogleNative := false
+	for _, account := range apiAccounts {
+		if accountUsesGoogleNativeAPI(account) {
+			hasGoogleNative = true
+			break
+		}
+	}
+	if !hasGoogleNative {
+		return apiAccounts, nil
+	}
+	setting, err := i.generationSettings.GetGoogleNativeGeneration(ctx)
+	if err != nil {
+		return nil, newSubmissionError("provider_unavailable", providerUnavailableMessage, err)
+	}
+	evaluation := settings.EvaluateGoogleNativeGeneration(setting, userID)
+	if evaluation.Allowed {
+		return apiAccounts, nil
+	}
+	if evaluation.Message != "" {
+		return nil, newSubmissionError("provider_unavailable", evaluation.Message, errors.New(evaluation.Message))
+	}
+	return nil, newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
+}
+
+func accountUsesGoogleNativeAPI(account *accounts.ApiAccount) bool {
+	if account == nil {
+		return false
+	}
+	apiType, ok := workflow.ValidateProviderAPIType(account.ApiType, account.ProxyURL)
+	return ok && workflow.IsGoogleNativeAPIType(apiType)
+}
+
+func resolveTaskBillingRequest(feature string) (*taskbilling.Request, error) {
+	if !taskbilling.RequiresBilling(feature) {
+		return nil, nil
+	}
+	request, err := taskbilling.AIImageRequest(feature)
+	if err != nil {
+		return nil, err
+	}
+	return &request, nil
+}
+
+func normalizeSubmitTaskClientActionID(raw string) (string, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return "", nil
+	}
+	if len(value) > maxSubmitTaskClientActionIDBytes {
+		return "", fmt.Errorf("client_action_id 过长")
+	}
+	for _, r := range value {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' {
+			continue
+		}
+		switch r {
+		case '-', '_', '.', ':':
+			continue
+		default:
+			return "", fmt.Errorf("client_action_id 只能包含字母、数字、横线、下划线、点或冒号")
+		}
+	}
+	return value, nil
+}

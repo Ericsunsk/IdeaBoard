@@ -66,6 +66,14 @@ describe('AdminTaskResultDialog', () => {
     expect(screen.getByText('暂无 API 响应结果')).toBeInTheDocument()
   })
 
+  it('uses one empty marker when there is no active assignment', async () => {
+    renderDialog(makeTask())
+
+    expect(await screen.findByText('身份与归属')).toBeVisible()
+    expect(screen.queryByText('N/A')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Endpoint #/)).not.toBeInTheDocument()
+  })
+
   it('rejects unsafe result images without rendering them', async () => {
     renderDialog(makeTask({ result: '{"image_url":"javascript:alert(1)"}' }))
 
@@ -120,6 +128,8 @@ describe('AdminTaskResultDialog', () => {
           quantity: 2,
           total_credits: 6,
           quoted_at: '2026-07-15T08:00:00Z',
+          settlement_state: 'released',
+          settled_at: '2026-07-15T08:01:00Z',
           feature_exists: false,
         },
       }),
@@ -130,8 +140,98 @@ describe('AdminTaskResultDialog', () => {
     expect(screen.getByText('已移除功能')).toBeVisible()
     expect(screen.getByText('legacy:removed')).toBeVisible()
     expect(screen.getByText('6 Ideas')).toBeVisible()
+    expect(screen.getByText('已释放')).toBeVisible()
+  })
+
+  it('renders ordered retry and failover attempts without exposing credentials', async () => {
+    renderDialog(
+      makeTask({
+        execution_attempts: [
+          makeAttempt({
+            attempt_no: 1,
+            status: 'requeued',
+            stage: 'provider',
+            failure_category: 'timeout',
+            provider_endpoint_id: 11,
+            provider_endpoint_name: 'Provider A',
+            resolved_model: 'model-a',
+            total_latency_ms: 1800,
+          }),
+          makeAttempt({
+            attempt_no: 2,
+            status: 'completed',
+            stage: 'completed',
+            provider_endpoint_id: 12,
+            provider_endpoint_name: 'Provider B',
+            resolved_model: 'model-b',
+            total_latency_ms: 900,
+          }),
+        ],
+      }),
+    )
+
+    const firstProvider = await screen.findByText('Provider A')
+    const secondProvider = screen.getByText('Provider B')
+    expect(
+      firstProvider.compareDocumentPosition(secondProvider) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(screen.getByText('model-a')).toBeVisible()
+    expect(screen.getByText('model-b')).toBeVisible()
+    expect(screen.getByText('超时')).toBeVisible()
+    expect(screen.queryByText('Credential')).not.toBeInTheDocument()
+  })
+
+  it('renders explicit loading, error, and empty trace states', async () => {
+    const retry = vi.fn()
+    const { rerender, user } = renderWithUser(AdminTaskResultDialog, {
+      props: {
+        task: null,
+        taskId: 'task_1',
+        visible: true,
+        loading: true,
+        onRetry: retry,
+      },
+      global: {
+        plugins: [[PrimeVue, primeVueTestOptions]],
+        stubs: { transition: false },
+      },
+    })
+
+    expect(await screen.findByText('正在加载任务详情…')).toBeVisible()
+
+    await rerender({ loading: false, errorMessage: '加载任务详情失败' })
+    await user.click(await screen.findByRole('button', { name: '重试' }))
+    expect(retry).toHaveBeenCalledOnce()
+
+    await rerender({ task: makeTask(), errorMessage: '' })
+    expect(await screen.findByText('暂无执行记录')).toBeVisible()
   })
 })
+
+function makeAttempt(
+  overrides: Partial<NonNullable<AdminTask['execution_attempts']>[number]> = {},
+): NonNullable<AdminTask['execution_attempts']>[number] {
+  return {
+    attempt_no: 1,
+    status: 'completed',
+    stage: 'completed',
+    failure_category: '',
+    provider_endpoint_id: 1,
+    provider_endpoint_name: 'Provider',
+    resolved_model: 'model',
+    api_type: 'google-native',
+    provider_started_at: '2026-07-06T00:00:00Z',
+    provider_finished_at: '2026-07-06T00:00:01Z',
+    finalize_started_at: null,
+    finalize_finished_at: null,
+    completed_at: '2026-07-06T00:00:01Z',
+    cancelled_at: null,
+    provider_latency_ms: 800,
+    finalize_latency_ms: 0,
+    total_latency_ms: 1000,
+    ...overrides,
+  }
+}
 
 function makeTask(overrides: Partial<AdminTask> = {}): AdminTask {
   return {

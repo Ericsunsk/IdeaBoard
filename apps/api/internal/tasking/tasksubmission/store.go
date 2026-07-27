@@ -2,6 +2,8 @@ package tasksubmission
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -39,7 +41,7 @@ func NewStore(pool *pgxpool.Pool, repository *taskstore.Repository, client taskq
 	}
 }
 
-func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tasks.TaskPayload) (tasks.TaskSubmissionResult, error) {
+func (s *Store) SubmitTask(ctx context.Context, canonical CanonicalRequest) (tasks.TaskSubmissionResult, error) {
 	var emptyResult tasks.TaskSubmissionResult
 	if s == nil || s.pool == nil {
 		return emptyResult, fmt.Errorf("submit task: pgx pool not configured")
@@ -50,41 +52,12 @@ func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tas
 	if s.repository == nil {
 		return emptyResult, fmt.Errorf("submit task: repository not configured")
 	}
-	if task == nil {
-		return emptyResult, fmt.Errorf("submit task: task is nil")
+	if !canonical.valid() {
+		return emptyResult, fmt.Errorf("submit task: canonical request is invalid")
 	}
-	if queueTask == nil {
-		return emptyResult, fmt.Errorf("submit task: queue task is nil")
-	}
-	if task.CorrelationID = tasks.NormalizeCorrelationID(task.CorrelationID); task.CorrelationID == "" {
-		task.CorrelationID = tasks.CorrelationIDForTaskID(task.TaskID)
-	}
-	queueTask.CorrelationID = tasks.NormalizeCorrelationID(queueTask.CorrelationID)
-	if queueTask.CorrelationID == "" {
-		queueTask.CorrelationID = task.CorrelationID
-	}
-	if queueTask.CorrelationID != task.CorrelationID {
-		return emptyResult, fmt.Errorf("submit task: correlation id mismatch task=%q queue=%q", task.CorrelationID, queueTask.CorrelationID)
-	}
-	if task.Priority == 0 && queueTask.Priority != 0 {
-		task.Priority = queueTask.Priority
-	} else {
-		task.Priority = tasks.EffectiveTaskPriority(task.Priority)
-	}
-	if !tasks.IsValidTaskPriority(task.Priority) {
-		return emptyResult, fmt.Errorf("submit task: invalid priority %d", task.Priority)
-	}
-	if queueTask.Priority == 0 {
-		queueTask.Priority = task.Priority
-	} else {
-		queueTask.Priority = tasks.EffectiveTaskPriority(queueTask.Priority)
-	}
-	if !tasks.IsValidTaskPriority(queueTask.Priority) {
-		return emptyResult, fmt.Errorf("submit task: invalid queue priority %d", queueTask.Priority)
-	}
-	if queueTask.Priority != task.Priority {
-		return emptyResult, fmt.Errorf("submit task: priority mismatch task=%d queue=%d", task.Priority, queueTask.Priority)
-	}
+	taskID := generateTaskID()
+	emptyResult.TaskID = taskID
+	task, queueTask := canonical.materialize(taskID, time.Now())
 	var billingRequest taskbilling.Request
 	if task.BillingRequest != nil {
 		if strings.TrimSpace(task.BillingRequest.Feature) != strings.TrimSpace(task.FeatureSlug) {
@@ -169,4 +142,12 @@ func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tas
 	}
 	committed = true
 	return tasks.TaskSubmissionResult{TaskID: task.TaskID, HoldTransactionID: emptyResult.HoldTransactionID, Created: true}, nil
+}
+
+func generateTaskID() string {
+	random := make([]byte, 12)
+	if _, err := rand.Read(random); err != nil {
+		return fmt.Sprintf("task_%d", time.Now().UnixNano())
+	}
+	return "task_" + hex.EncodeToString(random)
 }

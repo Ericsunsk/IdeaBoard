@@ -201,6 +201,15 @@ func (s adminBillingHistoryStub) ListAdminBillingSnapshots(context.Context, []st
 	return s.snapshots, s.err
 }
 
+type adminTaskTraceStub struct {
+	attempts map[string][]tasks.AdminTaskAttempt
+	err      error
+}
+
+func (s adminTaskTraceStub) ListAdminTaskAttempts(context.Context, []string) (map[string][]tasks.AdminTaskAttempt, error) {
+	return s.attempts, s.err
+}
+
 type billableItemLookupStub map[string]bool
 
 func (s billableItemLookupStub) Contains(sku string) bool {
@@ -235,6 +244,27 @@ func TestAttachAdminBillingSnapshotsResolvesFeatureExistenceFromCurrentRegistry(
 	}
 	if items[1].BillingSnapshot.DisplayName != "已移除功能" {
 		t.Fatalf("immutable Snapshot wording changed: %+v", items[1].BillingSnapshot)
+	}
+}
+
+func TestAttachAdminTaskAttemptsUsesTaskOwnedOrderedHistory(t *testing.T) {
+	service := NewService(ServiceDeps{
+		AdminTaskTrace: adminTaskTraceStub{attempts: map[string][]tasks.AdminTaskAttempt{
+			"task-failover": {
+				{AttemptNo: 1, Status: tasks.TaskAttemptStatusRequeued, ResolvedModel: "model-a"},
+				{AttemptNo: 2, Status: tasks.TaskAttemptStatusCompleted, ResolvedModel: "model-b"},
+			},
+		}},
+	}, ServiceOptions{})
+	task := &tasks.Task{TaskID: "task-failover"}
+
+	if err := service.attachAdminTaskAttempts(t.Context(), task); err != nil {
+		t.Fatal(err)
+	}
+	if len(task.ExecutionAttempts) != 2 ||
+		task.ExecutionAttempts[0].AttemptNo != 1 ||
+		task.ExecutionAttempts[1].ResolvedModel != "model-b" {
+		t.Fatalf("execution attempts=%+v", task.ExecutionAttempts)
 	}
 }
 
@@ -686,33 +716,43 @@ func TestSubmitTaskCanvasUploadRefsRequireBoardAccess(t *testing.T) {
 		testTaskUploadBoardAccessResolver{service: boards.NewBoardService(boardRepo, userRepo)},
 		testTaskUploadOwnerStorageUIDResolver{repo: userRepo},
 	)
-	svc := NewService(ServiceDeps{
-		MediaValidator: taskmedia.NewSubmitMediaValidator(
+	intake := NewTaskIntake(TaskIntakeDeps{
+		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+			ID: 101, Models: []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
+		}}},
+		Media: taskmedia.NewSubmitMediaValidator(
 			testPublicURLProvider{setting: settings.PublicURLSetting{PublicAssetBaseURL: "https://assets.example.com"}},
 			mediaAuthorizer,
 		),
-	}, ServiceOptions{})
+	})
+	prepare := func(userID int64, ref string) error {
+		_, err := intake.Prepare(ctx, userID, &tasks.SubmitTaskRequest{
+			Prompt: "image", Feature: workflow.FeatureSlugSketchToImage,
+			ImageURLs: []string{ref}, ClientActionID: "media-access",
+		})
+		return err
+	}
 	allowed := "/uploads/canvas/OWNR1A/board-1/content/demo.png"
-	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, allowed); err != nil {
+	if err := prepare(member.ID, allowed); err != nil {
 		t.Fatalf("expected member to use canvas upload: %v", err)
 	}
 	absoluteAllowed := "https://assets.example.com/uploads/canvas/OWNR1A/board-1/content/demo.png"
-	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, absoluteAllowed); err != nil {
+	if err := prepare(member.ID, absoluteAllowed); err != nil {
 		t.Fatalf("expected member to use public canvas upload URL: %v", err)
 	}
-	if err := svc.validateSubmitTaskMediaRef(ctx, outsider.ID, absoluteAllowed); err == nil {
+	if err := prepare(outsider.ID, absoluteAllowed); err == nil {
 		t.Fatalf("expected outsider to be rejected for public canvas upload URL")
 	}
-	if err := svc.validateSubmitTaskMediaRef(ctx, outsider.ID, allowed); err == nil {
+	if err := prepare(outsider.ID, allowed); err == nil {
 		t.Fatalf("expected outsider to be rejected")
 	}
-	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, "/uploads/canvas/WRONG1/board-1/content/demo.png"); err == nil {
+	if err := prepare(member.ID, "/uploads/canvas/WRONG1/board-1/content/demo.png"); err == nil {
 		t.Fatalf("expected owner segment mismatch to be rejected")
 	}
-	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, "/uploads/2026/05/13/demo.png"); err == nil {
+	if err := prepare(member.ID, "/uploads/2026/05/13/demo.png"); err == nil {
 		t.Fatalf("expected generic upload path to be rejected")
 	}
-	if err := svc.validateSubmitTaskMediaRef(ctx, member.ID, "/uploads/profile/MEMB1A/avatar/demo.png"); err == nil {
+	if err := prepare(member.ID, "/uploads/profile/MEMB1A/avatar/demo.png"); err == nil {
 		t.Fatalf("expected non-canvas upload path to be rejected")
 	}
 }
@@ -722,23 +762,16 @@ func TestSubmitTaskMediaRefValidationFailsClosedWithoutServiceValidator(t *testi
 	const allowedByFormat = "/uploads/canvas/OWNR1A/board-1/content/demo.png"
 	want := "任务媒体校验服务未配置"
 
-	tests := []struct {
-		name string
-		svc  *Service
-	}{
-		{name: "nil service"},
-		{name: "nil media validator", svc: NewService(ServiceDeps{}, ServiceOptions{})},
+	intake := NewTaskIntake(TaskIntakeDeps{})
+	_, err := intake.Prepare(ctx, 42, &tasks.SubmitTaskRequest{
+		Prompt: "image", Feature: workflow.FeatureSlugSketchToImage,
+		ImageURLs: []string{allowedByFormat}, ClientActionID: "missing-media-validator",
+	})
+	if err == nil {
+		t.Fatalf("expected missing validator to fail closed")
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := tt.svc.validateSubmitTaskMediaRef(ctx, 42, allowedByFormat)
-			if err == nil {
-				t.Fatalf("expected missing validator to fail closed")
-			}
-			if err.Error() != want {
-				t.Fatalf("error = %q, want %q", err.Error(), want)
-			}
-		})
+	if err.Error() != want {
+		t.Fatalf("error = %q, want %q", err.Error(), want)
 	}
 }
 
@@ -750,7 +783,7 @@ func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 	}}
 	submissionStore := &recordingSubmissionStore{}
 	taskEvents := &recordingTaskStatusPublisher{}
-	svc := NewService(ServiceDeps{
+	svc := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo:     accountRepo,
 		SubmissionStore: submissionStore,
 		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugSketchToImage, "gpt-image-1"),
@@ -774,17 +807,14 @@ func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 		t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
 	}
 	call := submissionStore.calls[0]
-	if call.task.TaskID != taskID || call.task.UserID != 42 || call.task.Status != tasks.StatusPending {
-		t.Fatalf("unexpected task: %+v", call.task)
+	if call.canonical.UserID() != 42 {
+		t.Fatalf("canonical user id=%d, want 42", call.canonical.UserID())
 	}
-	if call.task.ClientActionID != "canvas-action-1" {
-		t.Fatalf("client_action_id=%q, want normalized canvas-action-1", call.task.ClientActionID)
+	if call.canonical.ClientActionID() != "canvas-action-1" {
+		t.Fatalf("client_action_id=%q, want normalized canvas-action-1", call.canonical.ClientActionID())
 	}
-	if call.task.Priority != tasks.TaskPriorityDefault || call.queueTask.Priority != tasks.TaskPriorityDefault {
-		t.Fatalf("priority task=%d queue=%d, want default %d", call.task.Priority, call.queueTask.Priority, tasks.TaskPriorityDefault)
-	}
-	if call.queueTask.TaskID != taskID || call.queueTask.UserID != 42 {
-		t.Fatalf("unexpected queue task: %+v", call.queueTask)
+	if call.canonical.Priority() != tasks.TaskPriorityDefault {
+		t.Fatalf("priority=%d, want default %d", call.canonical.Priority(), tasks.TaskPriorityDefault)
 	}
 	if len(taskEvents.events) != 1 || taskEvents.events[0].TaskID != taskID || taskEvents.events[0].Status != tasks.StatusPending {
 		t.Fatalf("unexpected task events: %+v", taskEvents.events)
@@ -794,7 +824,7 @@ func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 func TestSubmitTaskPreservesSubmissionStoreCause(t *testing.T) {
 	ctx := context.Background()
 	cause := errors.New("river insert unavailable")
-	svc := NewService(ServiceDeps{
+	svc := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
 			{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
 		}},
@@ -820,7 +850,7 @@ func TestSubmitTaskPreservesSubmissionStoreCause(t *testing.T) {
 }
 
 func TestSubmitTaskMissingSubmissionStoreReturnsTypedSafeError(t *testing.T) {
-	svc := NewService(ServiceDeps{
+	svc := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
 			{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
 		}},
@@ -845,7 +875,7 @@ func TestSubmitTaskMissingSubmissionStoreReturnsTypedSafeError(t *testing.T) {
 }
 
 func TestCheckSubmitTaskReadinessMissingBillingReturnsTypedSafeError(t *testing.T) {
-	svc := NewService(ServiceDeps{
+	svc := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
 			{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
 		}},
@@ -1023,7 +1053,7 @@ func TestSubmitTaskRejectsInvalidPatternGenContractBeforeSubmission(t *testing.T
 		},
 	}}
 	submissionStore := &recordingSubmissionStore{}
-	svc := NewService(ServiceDeps{
+	svc := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo:     accountRepo,
 		SubmissionStore: submissionStore,
 		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugPatternGen, "gpt-image-1"),
@@ -1053,7 +1083,7 @@ func TestSubmitTaskUsesInteractivePriority(t *testing.T) {
 		{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
 	}}
 	submissionStore := &recordingSubmissionStore{}
-	svc := NewService(ServiceDeps{
+	svc := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo:     accountRepo,
 		SubmissionStore: submissionStore,
 		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugSketchToImage, "gpt-image-1"),
@@ -1073,14 +1103,14 @@ func TestSubmitTaskUsesInteractivePriority(t *testing.T) {
 		t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
 	}
 	call := submissionStore.calls[0]
-	if call.task.Priority != tasks.TaskPriorityInteractive || call.queueTask.Priority != tasks.TaskPriorityInteractive {
-		t.Fatalf("priority task=%d queue=%d, want interactive %d", call.task.Priority, call.queueTask.Priority, tasks.TaskPriorityInteractive)
+	if call.canonical.Priority() != tasks.TaskPriorityInteractive {
+		t.Fatalf("priority=%d, want interactive %d", call.canonical.Priority(), tasks.TaskPriorityInteractive)
 	}
 }
 
 func TestSubmitTaskRejectsInvalidPriority(t *testing.T) {
 	ctx := context.Background()
-	svc := NewService(ServiceDeps{}, ServiceOptions{})
+	svc := newSubmitServiceForTest(submitTestServiceDeps{}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
 		Prompt:   "draw a chair",
@@ -1101,7 +1131,7 @@ func TestSubmitTaskReturnsExistingTaskWithoutPublishingWhenClientActionRepeats(t
 		result: tasks.TaskSubmissionResult{TaskID: "task_existing_action", Created: false},
 	}
 	taskEvents := &recordingTaskStatusPublisher{}
-	svc := NewService(ServiceDeps{
+	svc := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo:     accountRepo,
 		SubmissionStore: submissionStore,
 		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugSketchToImage, "gpt-image-1"),
@@ -1131,7 +1161,7 @@ func TestSubmitTaskReturnsExistingTaskWithoutPublishingWhenClientActionRepeats(t
 
 func TestSubmitTaskRejectsInvalidClientActionID(t *testing.T) {
 	ctx := context.Background()
-	svc := NewService(ServiceDeps{}, ServiceOptions{})
+	svc := newSubmitServiceForTest(submitTestServiceDeps{}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
 		Prompt:         "draw a chair",
@@ -1155,7 +1185,7 @@ func TestSubmitTaskNormalizesStyleFusionContract(t *testing.T) {
 		},
 	}}
 	submissionStore := &recordingSubmissionStore{}
-	svc := NewService(ServiceDeps{
+	svc := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo:     accountRepo,
 		SubmissionStore: submissionStore,
 		MediaValidator:  testSubmitMediaValidator{},
@@ -1184,17 +1214,11 @@ func TestSubmitTaskNormalizesStyleFusionContract(t *testing.T) {
 		t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
 	}
 	call := submissionStore.calls[0]
-	if call.queueTask.Params != call.task.Params {
-		t.Fatalf("queue params differ from task params: queue=%s task=%s", call.queueTask.Params, call.task.Params)
-	}
-	if call.queueTask.Prompt != call.task.Prompt {
-		t.Fatalf("queue prompt=%q, want task prompt=%q", call.queueTask.Prompt, call.task.Prompt)
-	}
 	var params map[string]interface{}
-	if err := json.Unmarshal([]byte(call.task.Params), &params); err != nil {
+	if err := json.Unmarshal([]byte(call.canonical.Params()), &params); err != nil {
 		t.Fatalf("unmarshal task params: %v", err)
 	}
-	typedParams, err := tasks.UnmarshalParams(call.queueTask.Params)
+	typedParams, err := tasks.UnmarshalParams(call.canonical.Params())
 	if err != nil {
 		t.Fatalf("unmarshal queue params: %v", err)
 	}
@@ -1257,7 +1281,7 @@ func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
 		},
 	}}
 	submissionStore := &recordingSubmissionStore{}
-	svc := NewService(ServiceDeps{
+	svc := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo:     accountRepo,
 		SubmissionStore: submissionStore,
 		MediaValidator:  testSubmitMediaValidator{},
@@ -1286,7 +1310,7 @@ func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
 	}
 
 	var params map[string]interface{}
-	if err := json.Unmarshal([]byte(submissionStore.calls[0].task.Params), &params); err != nil {
+	if err := json.Unmarshal([]byte(submissionStore.calls[0].canonical.Params()), &params); err != nil {
 		t.Fatalf("unmarshal task params: %v", err)
 	}
 	extend, ok := params["extend"].(map[string]interface{})
@@ -1378,7 +1402,7 @@ func newGoogleNativeSubmitTestServiceWithSettings(generationSettings *testGoogle
 }
 
 func newGoogleNativeSubmitTestServiceWithAccounts(generationSettings *testGoogleNativeGenerationSettings, submissionStore *recordingSubmissionStore, apiAccounts []*accounts.ApiAccount) *Service {
-	return NewService(ServiceDeps{
+	return newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo:        &fakeSubmitAccountStore{accounts: apiAccounts},
 		SubmissionStore:    submissionStore,
 		GenerationSettings: generationSettings,
@@ -1433,19 +1457,18 @@ type recordingSubmissionStore struct {
 }
 
 type submitCall struct {
-	task      *tasks.Task
-	queueTask *tasks.TaskPayload
+	canonical CanonicalTaskRequest
 }
 
-func (s *recordingSubmissionStore) SubmitTask(_ context.Context, task *tasks.Task, queueTask *tasks.TaskPayload) (tasks.TaskSubmissionResult, error) {
+func (s *recordingSubmissionStore) SubmitTask(_ context.Context, canonical CanonicalTaskRequest) (tasks.TaskSubmissionResult, error) {
 	if s.err != nil {
 		return tasks.TaskSubmissionResult{}, s.err
 	}
-	s.calls = append(s.calls, submitCall{task: task, queueTask: queueTask})
+	s.calls = append(s.calls, submitCall{canonical: canonical})
 	if s.result.TaskID != "" {
 		return s.result, nil
 	}
-	return tasks.TaskSubmissionResult{TaskID: task.TaskID, Created: true}, nil
+	return tasks.TaskSubmissionResult{TaskID: "task_recorded_" + strconv.Itoa(len(s.calls)), Created: true}, nil
 }
 
 type recordingTaskStatusPublisher struct {

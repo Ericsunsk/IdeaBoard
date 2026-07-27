@@ -52,6 +52,7 @@ type adminTaskDTO struct {
 	CancelledBy                *int64                      `json:"cancelled_by"`
 	CancelReason               string                      `json:"cancel_reason"`
 	Billing                    *tasks.AdminBillingSnapshot `json:"billing,omitempty"`
+	ExecutionAttempts          []tasks.AdminTaskAttempt    `json:"execution_attempts,omitempty"`
 }
 
 type submitTaskResponse struct {
@@ -345,14 +346,20 @@ func toAdminTaskDTO(task *tasks.Task) adminTaskDTO {
 	if task == nil {
 		return adminTaskDTO{}
 	}
+	var accountID, providerEndpointID, credentialID *int64
+	if strings.TrimSpace(task.ResolvedModel) != "" {
+		accountID = task.AccountID
+		providerEndpointID = task.AssignedProviderEndpointID
+		credentialID = task.AssignedCredentialID
+	}
 	return adminTaskDTO{
 		ID:                         task.ID,
 		TaskID:                     task.TaskID,
 		CorrelationID:              task.EffectiveCorrelationID(),
 		UserID:                     task.UserID,
-		AssignedProviderEndpointID: task.AssignedProviderEndpointID,
-		AssignedCredentialID:       task.AssignedCredentialID,
-		AccountID:                  task.AccountID,
+		AssignedProviderEndpointID: providerEndpointID,
+		AssignedCredentialID:       credentialID,
+		AccountID:                  accountID,
 		Prompt:                     task.Prompt,
 		UserPrompt:                 task.UserPrompt,
 		Params:                     task.Params,
@@ -377,6 +384,7 @@ func toAdminTaskDTO(task *tasks.Task) adminTaskDTO {
 		CancelledBy:                task.CancelledBy,
 		CancelReason:               task.CancelReason,
 		Billing:                    task.BillingSnapshot,
+		ExecutionAttempts:          task.ExecutionAttempts,
 	}
 }
 

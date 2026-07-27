@@ -11,7 +11,6 @@ import (
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
-	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/tasks"
 )
 
@@ -19,41 +18,34 @@ import (
 var ErrTaskLeaseStateConflict = errors.New("task lease state conflict")
 
 func (r *Repository) MarkTaskFailedWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
-	var rowsAffected int64
-	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx *sql.Tx) error {
-		updated, err := q.MarkTaskFailedWithLease(ctx, dbsqlc.MarkTaskFailedWithLeaseParams{
-			ErrorMsg:                   errMsg,
-			Result:                     result,
-			CompletedAt:                sql.NullTime{Time: completedAt, Valid: true},
-			TaskID:                     taskID,
-			Statuses:                   statuses,
-			AccountID:                  sql.NullInt64{Int64: accountID, Valid: accountID > 0},
-			AssignedProviderEndpointID: sql.NullInt64{Int64: providerEndpointID, Valid: providerEndpointID > 0},
-			AssignedCredentialID:       sql.NullInt64{Int64: credentialID, Valid: credentialID > 0},
-			LeaseToken:                 leaseToken,
-		})
-		if err != nil || updated == 0 {
-			return err
-		}
-		if err := releaseTaskLeaseTx(ctx, q, taskID, accountID, providerEndpointID, credentialID, leaseToken, tasks.TaskAttemptStatusFailed, completedAt); err != nil {
-			return err
-		}
-		if err := upsertDailyStatByTaskIDTx(ctx, q, taskID, attemptFinish); err != nil {
-			return err
-		}
-		if err := finishTaskAttemptTx(ctx, q, attemptFinish); err != nil {
-			return err
-		}
-		if err := patchTerminalExecutionMetricsTx(ctx, q, taskID, tasks.ExecutionStageFailed, taskAttemptFailureStage(attemptFinish, tasks.ExecutionStageAssigned), taskAttemptFailureCategory(attemptFinish, tasks.FailureCategoryUnknown), completedAt); err != nil {
-			return err
-		}
-		if err := taskbilling.SettleTerminal(ctx, tx, taskID, taskbilling.TerminalOutcomeUnsuccessful); err != nil {
-			return err
-		}
-		rowsAffected = updated
-		return nil
+	completedAt = terminalTransitionTime(completedAt)
+	return r.runTerminalTransition(ctx, terminalTransitionCommand{
+		taskID:        taskID,
+		kind:          terminalTransitionFailed,
+		finishedAt:    completedAt,
+		errorMessage:  errMsg,
+		attemptFinish: attemptFinish,
+		lease: terminalLeaseRelease{
+			mode:               terminalLeaseReleaseExact,
+			accountID:          accountID,
+			providerEndpointID: providerEndpointID,
+			credentialID:       credentialID,
+			leaseToken:         leaseToken,
+		},
+		writeTaskFact: func(ctx context.Context, q *dbsqlc.Queries) (int64, error) {
+			return q.MarkTaskFailedWithLease(ctx, dbsqlc.MarkTaskFailedWithLeaseParams{
+				ErrorMsg:                   errMsg,
+				Result:                     result,
+				CompletedAt:                sql.NullTime{Time: completedAt, Valid: true},
+				TaskID:                     taskID,
+				Statuses:                   statuses,
+				AccountID:                  sql.NullInt64{Int64: accountID, Valid: accountID > 0},
+				AssignedProviderEndpointID: sql.NullInt64{Int64: providerEndpointID, Valid: providerEndpointID > 0},
+				AssignedCredentialID:       sql.NullInt64{Int64: credentialID, Valid: credentialID > 0},
+				LeaseToken:                 leaseToken,
+			})
+		},
 	})
-	return rowsAffected, err
 }
 
 func (r *Repository) ResetTaskRunningToPendingWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
@@ -72,10 +64,16 @@ func (r *Repository) ResetTaskRunningToPendingWithLease(ctx context.Context, tas
 		if err != nil || updated == 0 {
 			return err
 		}
-		if err := releaseTaskLeaseTx(ctx, q, taskID, accountID, providerEndpointID, credentialID, leaseToken, "reset", time.Now()); err != nil {
+		normalizedFinish, err := taskAttemptFinishWithLeaseIdentity(
+			attemptFinish, taskID, accountID, providerEndpointID, credentialID, leaseToken,
+		)
+		if err != nil {
 			return err
 		}
-		if err := finishTaskAttemptTx(ctx, q, attemptFinish); err != nil {
+		if err := finishTaskAttemptTx(ctx, q, normalizedFinish); err != nil {
+			return err
+		}
+		if err := releaseTaskLeaseTx(ctx, q, taskID, accountID, providerEndpointID, credentialID, leaseToken, "reset", time.Now()); err != nil {
 			return err
 		}
 		rowsAffected = updated
@@ -105,10 +103,16 @@ func (r *Repository) RequeueTaskRunningWithLease(ctx context.Context, taskID str
 		if attemptFinish != nil && !attemptFinish.CompletedAt.IsZero() {
 			releasedAt = attemptFinish.CompletedAt
 		}
-		if err := releaseTaskLeaseTx(ctx, q, taskID, accountID, providerEndpointID, credentialID, leaseToken, tasks.TaskAttemptStatusRequeued, releasedAt); err != nil {
+		normalizedFinish, err := taskAttemptFinishWithLeaseIdentity(
+			attemptFinish, taskID, accountID, providerEndpointID, credentialID, leaseToken,
+		)
+		if err != nil {
 			return err
 		}
-		if err := finishTaskAttemptTx(ctx, q, attemptFinish); err != nil {
+		if err := finishTaskAttemptTx(ctx, q, normalizedFinish); err != nil {
+			return err
+		}
+		if err := releaseTaskLeaseTx(ctx, q, taskID, accountID, providerEndpointID, credentialID, leaseToken, tasks.TaskAttemptStatusRequeued, releasedAt); err != nil {
 			return err
 		}
 		rowsAffected = updated
@@ -118,95 +122,64 @@ func (r *Repository) RequeueTaskRunningWithLease(ctx context.Context, taskID str
 }
 
 func (r *Repository) FinalFailTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
-	var rowsAffected int64
-	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx *sql.Tx) error {
-		updated, err := q.FinalFailTaskRunningWithLease(ctx, dbsqlc.FinalFailTaskRunningWithLeaseParams{
-			ErrorMsg:                   errMsg,
-			Result:                     result,
-			CompletedAt:                sql.NullTime{Time: completedAt, Valid: true},
-			TaskID:                     taskID,
-			Statuses:                   statuses,
-			AccountID:                  sql.NullInt64{Int64: accountID, Valid: accountID > 0},
-			AssignedProviderEndpointID: sql.NullInt64{Int64: providerEndpointID, Valid: providerEndpointID > 0},
-			AssignedCredentialID:       sql.NullInt64{Int64: credentialID, Valid: credentialID > 0},
-			LeaseToken:                 leaseToken,
-		})
-		if err != nil || updated == 0 {
-			return err
-		}
-		if err := releaseTaskLeaseTx(ctx, q, taskID, accountID, providerEndpointID, credentialID, leaseToken, tasks.TaskAttemptStatusFailed, completedAt); err != nil {
-			return err
-		}
-		if err := upsertDailyStatByTaskIDTx(ctx, q, taskID, attemptFinish); err != nil {
-			return err
-		}
-		if err := finishTaskAttemptTx(ctx, q, attemptFinish); err != nil {
-			return err
-		}
-		if err := patchTerminalExecutionMetricsTx(ctx, q, taskID, tasks.ExecutionStageFailed, taskAttemptFailureStage(attemptFinish, tasks.ExecutionStageAssigned), taskAttemptFailureCategory(attemptFinish, tasks.FailureCategoryUnknown), completedAt); err != nil {
-			return err
-		}
-		if err := taskbilling.SettleTerminal(ctx, tx, taskID, taskbilling.TerminalOutcomeUnsuccessful); err != nil {
-			return err
-		}
-		rowsAffected = updated
-		return nil
+	completedAt = terminalTransitionTime(completedAt)
+	return r.runTerminalTransition(ctx, terminalTransitionCommand{
+		taskID:        taskID,
+		kind:          terminalTransitionFailed,
+		finishedAt:    completedAt,
+		errorMessage:  errMsg,
+		attemptFinish: attemptFinish,
+		lease: terminalLeaseRelease{
+			mode:               terminalLeaseReleaseExact,
+			accountID:          accountID,
+			providerEndpointID: providerEndpointID,
+			credentialID:       credentialID,
+			leaseToken:         leaseToken,
+		},
+		writeTaskFact: func(ctx context.Context, q *dbsqlc.Queries) (int64, error) {
+			return q.FinalFailTaskRunningWithLease(ctx, dbsqlc.FinalFailTaskRunningWithLeaseParams{
+				ErrorMsg:                   errMsg,
+				Result:                     result,
+				CompletedAt:                sql.NullTime{Time: completedAt, Valid: true},
+				TaskID:                     taskID,
+				Statuses:                   statuses,
+				AccountID:                  sql.NullInt64{Int64: accountID, Valid: accountID > 0},
+				AssignedProviderEndpointID: sql.NullInt64{Int64: providerEndpointID, Valid: providerEndpointID > 0},
+				AssignedCredentialID:       sql.NullInt64{Int64: credentialID, Valid: credentialID > 0},
+				LeaseToken:                 leaseToken,
+			})
+		},
 	})
-	return rowsAffected, err
 }
 
 func (r *Repository) CompleteWithOutputsAndLeaseToken(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, result string, completedAt time.Time, outputs []tasks.TaskOutput, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
-	var rowsAffected int64
-	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx *sql.Tx) error {
-		updated, err := q.CompleteTaskWithLease(ctx, dbsqlc.CompleteTaskWithLeaseParams{
-			Result:                     result,
-			CompletedAt:                sql.NullTime{Time: completedAt, Valid: true},
-			TaskID:                     taskID,
-			Statuses:                   statuses,
-			AccountID:                  sql.NullInt64{Int64: accountID, Valid: accountID > 0},
-			AssignedProviderEndpointID: sql.NullInt64{Int64: providerEndpointID, Valid: providerEndpointID > 0},
-			AssignedCredentialID:       sql.NullInt64{Int64: credentialID, Valid: credentialID > 0},
-			LeaseToken:                 leaseToken,
-		})
-		if err != nil || updated == 0 {
-			return err
-		}
-		if err := releaseTaskLeaseTx(ctx, q, taskID, accountID, providerEndpointID, credentialID, leaseToken, tasks.TaskAttemptStatusCompleted, completedAt); err != nil {
-			return err
-		}
-		if err := q.DeleteTaskOutputMediaRefsByTaskID(ctx, taskID); err != nil {
-			return err
-		}
-		if err := q.DeleteOutputsByTaskID(ctx, taskID); err != nil {
-			return err
-		}
-		taskRow, err := q.GetTaskByTaskID(ctx, taskID)
-		if err != nil {
-			return err
-		}
-		if err := insertTaskOutputs(ctx, q, taskID, taskRow.Task.UserID, outputs); err != nil {
-			return err
-		}
-		if err := upsertDailyStatByTaskIDTx(ctx, q, taskID, attemptFinish); err != nil {
-			return err
-		}
-		if err := finishTaskAttemptTx(ctx, q, attemptFinish); err != nil {
-			return err
-		}
-		metricsByTaskID, err := listExecutionMetricsByTaskIDsTx(ctx, q, []string{taskID})
-		if err != nil {
-			return err
-		}
-		if err := patchTerminalExecutionMetricsForTaskTx(ctx, q, taskID, taskRow.Task.CreatedAt, metricsByTaskID[taskID], tasks.ExecutionStageCompleted, "", "", completedAt); err != nil {
-			return err
-		}
-		if err := taskbilling.SettleTerminal(ctx, tx, taskID, taskbilling.TerminalOutcomeSucceeded); err != nil {
-			return err
-		}
-		rowsAffected = updated
-		return nil
+	completedAt = terminalTransitionTime(completedAt)
+	return r.runTerminalTransition(ctx, terminalTransitionCommand{
+		taskID:        taskID,
+		kind:          terminalTransitionCompleted,
+		finishedAt:    completedAt,
+		attemptFinish: attemptFinish,
+		outputs:       outputs,
+		lease: terminalLeaseRelease{
+			mode:               terminalLeaseReleaseExact,
+			accountID:          accountID,
+			providerEndpointID: providerEndpointID,
+			credentialID:       credentialID,
+			leaseToken:         leaseToken,
+		},
+		writeTaskFact: func(ctx context.Context, q *dbsqlc.Queries) (int64, error) {
+			return q.CompleteTaskWithLease(ctx, dbsqlc.CompleteTaskWithLeaseParams{
+				Result:                     result,
+				CompletedAt:                sql.NullTime{Time: completedAt, Valid: true},
+				TaskID:                     taskID,
+				Statuses:                   statuses,
+				AccountID:                  sql.NullInt64{Int64: accountID, Valid: accountID > 0},
+				AssignedProviderEndpointID: sql.NullInt64{Int64: providerEndpointID, Valid: providerEndpointID > 0},
+				AssignedCredentialID:       sql.NullInt64{Int64: credentialID, Valid: credentialID > 0},
+				LeaseToken:                 leaseToken,
+			})
+		},
 	})
-	return rowsAffected, err
 }
 
 func insertTaskOutputs(ctx context.Context, q *dbsqlc.Queries, taskID string, ownerUserID int64, outputs []tasks.TaskOutput) error {
@@ -402,44 +375,26 @@ func (r *Repository) MarkTaskCancelled(ctx context.Context, snapshot tasks.TaskC
 	if taskID == "" {
 		return 0, fmt.Errorf("task_id is required")
 	}
-	cancelledAt := snapshot.CancelledAt
-	if cancelledAt.IsZero() {
-		cancelledAt = time.Now()
-	}
-	var rowsAffected int64
-	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx *sql.Tx) error {
-		updated, err := q.MarkTaskCancelled(ctx, dbsqlc.MarkTaskCancelledParams{
-			CancelledAt:  sql.NullTime{Time: cancelledAt, Valid: true},
-			CancelledBy:  dbutil.NullInt64(snapshot.CancelledBy),
-			CancelReason: strings.TrimSpace(snapshot.Reason),
-			TaskID:       taskID,
-		})
-		if err != nil || updated == 0 {
-			return err
-		}
-		if err := releaseActiveTaskLeaseByTaskIDTx(ctx, q, taskID, tasks.TaskAttemptStatusCancelled, cancelledAt); err != nil {
-			return err
-		}
-		if err := finishTaskAttemptTx(ctx, q, attemptFinish); err != nil {
-			return err
-		}
-		cancelStage := tasks.ExecutionStageQueued
-		if attemptFinish != nil && strings.TrimSpace(attemptFinish.FailureStage) != "" {
-			cancelStage = strings.TrimSpace(attemptFinish.FailureStage)
-		}
-		if err := patchTerminalExecutionMetricsTx(ctx, q, taskID, tasks.ExecutionStageCancelled, cancelStage, tasks.FailureCategoryCancelled, cancelledAt); err != nil {
-			return err
-		}
-		if err := upsertDailyStatByTaskIDTx(ctx, q, taskID, attemptFinish); err != nil {
-			return err
-		}
-		if err := taskbilling.SettleTerminal(ctx, tx, taskID, taskbilling.TerminalOutcomeUnsuccessful); err != nil {
-			return err
-		}
-		rowsAffected = updated
-		return nil
+	cancelledAt := terminalTransitionTime(snapshot.CancelledAt)
+	reason := strings.TrimSpace(snapshot.Reason)
+	return r.runTerminalTransition(ctx, terminalTransitionCommand{
+		taskID:        taskID,
+		kind:          terminalTransitionCancelled,
+		finishedAt:    cancelledAt,
+		errorMessage:  reason,
+		attemptFinish: attemptFinish,
+		lease: terminalLeaseRelease{
+			mode: terminalLeaseReleaseActive,
+		},
+		writeTaskFact: func(ctx context.Context, q *dbsqlc.Queries) (int64, error) {
+			return q.MarkTaskCancelled(ctx, dbsqlc.MarkTaskCancelledParams{
+				CancelledAt:  sql.NullTime{Time: cancelledAt, Valid: true},
+				CancelledBy:  dbutil.NullInt64(snapshot.CancelledBy),
+				CancelReason: reason,
+				TaskID:       taskID,
+			})
+		},
 	})
-	return rowsAffected, err
 }
 
 func (r *Repository) CancelRunningTasksForStartupRecovery(ctx context.Context, reason string, cancelledAt time.Time) ([]StartupRecoveredTask, error) {
@@ -485,6 +440,10 @@ func (r *Repository) CancelRunningTasksForStartupRecovery(ctx context.Context, r
 		if err != nil {
 			return err
 		}
+		policy, err := resolveTerminalTransitionPolicy(terminalTransitionCancelled)
+		if err != nil {
+			return err
+		}
 		for _, c := range updated {
 			terminalAt := cancelledAt
 			if c.CancelledAt.Valid {
@@ -504,14 +463,15 @@ func (r *Repository) CancelRunningTasksForStartupRecovery(ctx context.Context, r
 				CompletedAt:                &terminalAt,
 				CancelledAt:                &terminalAt,
 			}
-			if err := upsertDailyStatByTaskTx(ctx, q, task, nil); err != nil {
-				return fmt.Errorf("upsert daily stat for task %s: %w", c.TaskID, err)
-			}
-			if err := patchTerminalExecutionMetricsForTaskTx(ctx, q, c.TaskID, c.CreatedAt, metricsByTaskID[c.TaskID], tasks.ExecutionStageCancelled, tasks.ExecutionStageAssigned, tasks.FailureCategoryCancelled, terminalAt); err != nil {
-				return fmt.Errorf("patch terminal execution metrics for task %s: %w", c.TaskID, err)
-			}
-			if err := taskbilling.SettleTerminal(ctx, tx, c.TaskID, taskbilling.TerminalOutcomeUnsuccessful); err != nil {
-				return fmt.Errorf("release task billing for task %s: %w", c.TaskID, err)
+			if err := applyTerminalOutcomeTx(ctx, q, tx, task, metricsByTaskID[c.TaskID], terminalTransitionCommand{
+				taskID:          c.TaskID,
+				kind:            terminalTransitionCancelled,
+				finishedAt:      terminalAt,
+				errorMessage:    reason,
+				failureStage:    tasks.ExecutionStageAssigned,
+				failureCategory: tasks.FailureCategoryCancelled,
+			}, policy); err != nil {
+				return fmt.Errorf("converge terminal outcome for task %s: %w", c.TaskID, err)
 			}
 		}
 		return nil
@@ -615,6 +575,10 @@ func (r *Repository) failRunningByAccountIDTx(ctx context.Context, q *dbsqlc.Que
 	if err != nil {
 		return nil, err
 	}
+	policy, err := resolveTerminalTransitionPolicy(terminalTransitionFailed)
+	if err != nil {
+		return nil, err
+	}
 	for _, c := range updated {
 		task := &tasks.Task{
 			TaskID:                     c.TaskID,
@@ -629,14 +593,15 @@ func (r *Repository) failRunningByAccountIDTx(ctx context.Context, q *dbsqlc.Que
 			CreatedAt:                  c.CreatedAt,
 			CompletedAt:                &completedAt,
 		}
-		if err := upsertDailyStatByTaskTx(ctx, q, task, nil); err != nil {
-			return nil, fmt.Errorf("upsert daily stat for task %s: %w", c.TaskID, err)
-		}
-		if err := patchTerminalExecutionMetricsForTaskTx(ctx, q, c.TaskID, c.CreatedAt, metricsByTaskID[c.TaskID], tasks.ExecutionStageFailed, tasks.ExecutionStageAssigned, tasks.FailureCategoryCancelled, completedAt); err != nil {
-			return nil, fmt.Errorf("patch terminal execution metrics for task %s: %w", c.TaskID, err)
-		}
-		if err := taskbilling.SettleTerminal(ctx, tx, c.TaskID, taskbilling.TerminalOutcomeUnsuccessful); err != nil {
-			return nil, fmt.Errorf("release task billing for task %s: %w", c.TaskID, err)
+		if err := applyTerminalOutcomeTx(ctx, q, tx, task, metricsByTaskID[c.TaskID], terminalTransitionCommand{
+			taskID:          c.TaskID,
+			kind:            terminalTransitionFailed,
+			finishedAt:      completedAt,
+			errorMessage:    errMsg,
+			failureStage:    tasks.ExecutionStageAssigned,
+			failureCategory: tasks.FailureCategoryCancelled,
+		}, policy); err != nil {
+			return nil, fmt.Errorf("converge terminal outcome for task %s: %w", c.TaskID, err)
 		}
 	}
 	return taskIDs, nil

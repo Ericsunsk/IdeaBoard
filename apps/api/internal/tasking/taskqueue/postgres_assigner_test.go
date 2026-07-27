@@ -169,6 +169,89 @@ func TestPostgresTaskAssignerSkipsDisabledProviderEndpoint(t *testing.T) {
 	}
 }
 
+func TestPostgresTaskAssignerExcludesIneligibleRoutingCandidates(t *testing.T) {
+	tests := []struct {
+		name    string
+		exclude func(*testing.T, *sql.DB, int64)
+	}{
+		{
+			name: "disabled account",
+			exclude: func(t *testing.T, db *sql.DB, accountID int64) {
+				setAssignerAccountStatus(t, db, accountID, 0)
+			},
+		},
+		{
+			name: "disabled endpoint",
+			exclude: func(t *testing.T, db *sql.DB, accountID int64) {
+				setAssignerProviderEndpointStatus(t, db, accountID, 0)
+			},
+		},
+		{
+			name: "disabled model",
+			exclude: func(t *testing.T, db *sql.DB, accountID int64) {
+				setAssignerModelEnabled(t, db, accountID, "gpt-image-1", false)
+			},
+		},
+		{
+			name: "no active credential",
+			exclude: func(t *testing.T, db *sql.DB, accountID int64) {
+				retireAssignerCredential(t, db, accountID)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := newPostgresAssignerTestDB(t)
+			assigner := NewPostgresTaskAssigner(db)
+			ctx := context.Background()
+
+			slug := strings.ReplaceAll(tt.name, " ", "-")
+			excluded := createAssignerAccount(t, db, "excluded-"+slug, 3)
+			eligible := createAssignerAccount(t, db, "eligible-"+slug, 3)
+			tt.exclude(t, db, excluded)
+			taskID := "pending-eligibility-" + slug
+			createAssignerTask(t, db, taskID, 0, tasks.StatusPending, "")
+
+			assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
+				TaskID:     taskID,
+				RiverJobID: 120,
+			})
+			if err != nil {
+				t.Fatalf("Assign failed: %v", err)
+			}
+			if assignment.Status != AssignStatusAssigned || assignment.AccountID != eligible {
+				t.Fatalf("assignment=%+v, want ineligible account %d skipped and account %d assigned", assignment, excluded, eligible)
+			}
+		})
+	}
+}
+
+func TestPostgresTaskAssignerUsesModelSortOrderThenStableID(t *testing.T) {
+	db := newPostgresAssignerTestDB(t)
+	assigner := NewPostgresTaskAssigner(db)
+	ctx := context.Background()
+
+	accountID := createAssignerAccount(t, db, "stable-model-order", 3)
+	addAssignerModel(t, db, accountID, "preferred-first", -1, 3)
+	addAssignerModel(t, db, accountID, "preferred-second", -1, 3)
+	createAssignerTask(t, db, "pending-stable-model-order", 0, tasks.StatusPending, "")
+
+	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
+		TaskID:     "pending-stable-model-order",
+		RiverJobID: 121,
+	})
+	if err != nil {
+		t.Fatalf("Assign failed: %v", err)
+	}
+	if assignment.Status != AssignStatusAssigned || assignment.AccountID != accountID {
+		t.Fatalf("assignment=%+v, want account %d assigned", assignment, accountID)
+	}
+	if assignment.ResolvedModel != "preferred-first" {
+		t.Fatalf("resolved_model=%q, want lower sort order then lower stable model id preferred-first", assignment.ResolvedModel)
+	}
+}
+
 func TestPostgresTaskAssignerWritesRuntimeAssignmentSnapshot(t *testing.T) {
 	db := newPostgresAssignerTestDB(t)
 	assigner := NewPostgresTaskAssigner(db)
@@ -308,6 +391,53 @@ func TestPostgresTaskAssignerDefersBusyTenantForCompetingTenant(t *testing.T) {
 		t.Fatalf("assignment=%+v, want no_capacity so another tenant can dispatch", assignment)
 	}
 	assertTaskPendingWithoutLease(t, db, "pending-busy-tenant")
+}
+
+func TestPostgresTaskAssignerFairnessUsesTheSameDispatchableCandidatesAsSelection(t *testing.T) {
+	db := newPostgresAssignerTestDB(t)
+	assigner := NewPostgresTaskAssigner(db)
+	ctx := context.Background()
+
+	lockedAccount := createAssignerAccount(t, db, "locked-routing-candidate", 3)
+	selectedAccount := createAssignerAccount(t, db, "selected-routing-candidate", 3)
+	createAssignerTaskWithOptions(t, db, "running-selected-routing-candidate", selectedAccount, tasks.StatusRunning, "lease-selected-routing-candidate", "", assignerTaskOptions{
+		UserID: 1,
+	})
+	now := time.Now()
+	createAssignerTaskWithOptions(t, db, "pending-current-routing-candidate", 0, tasks.StatusPending, "", "", assignerTaskOptions{
+		UserID:    1,
+		Priority:  tasks.TaskPriorityInteractive,
+		CreatedAt: now,
+	})
+	createAssignerTaskWithOptions(t, db, "pending-future-routing-candidate", 0, tasks.StatusPending, "", "", assignerTaskOptions{
+		UserID:    1,
+		Priority:  tasks.TaskPriorityInteractive,
+		CreatedAt: now.Add(time.Minute),
+	})
+
+	lockTx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin candidate lock transaction failed: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = lockTx.Rollback()
+	})
+	if _, err := lockTx.ExecContext(ctx, `SELECT id FROM api_accounts WHERE id = $1 FOR UPDATE`, lockedAccount); err != nil {
+		t.Fatalf("lock routing candidate failed: %v", err)
+	}
+
+	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
+		TaskID:     "pending-current-routing-candidate",
+		UserID:     1,
+		Priority:   tasks.TaskPriorityInteractive,
+		RiverJobID: 209,
+	})
+	if err != nil {
+		t.Fatalf("Assign failed: %v", err)
+	}
+	if assignment.Status != AssignStatusAssigned || assignment.AccountID != selectedAccount {
+		t.Fatalf("assignment=%+v, want locked candidate excluded consistently and account %d assigned", assignment, selectedAccount)
+	}
 }
 
 func TestPostgresTaskAssignerKeepsPriorityOrderBeforeAgeBoost(t *testing.T) {
@@ -663,6 +793,39 @@ UPDATE provider_endpoints
 SET status = $2
 WHERE id = (SELECT provider_endpoint_id FROM api_accounts WHERE id = $1)`, accountID, status); err != nil {
 		t.Fatalf("set provider endpoint status for account %d failed: %v", accountID, err)
+	}
+}
+
+func setAssignerAccountStatus(t *testing.T, db *sql.DB, accountID int64, status int) {
+	t.Helper()
+	if _, err := db.Exec(`
+UPDATE api_accounts
+SET status = $2
+WHERE id = $1`, accountID, status); err != nil {
+		t.Fatalf("set account status for account %d failed: %v", accountID, err)
+	}
+}
+
+func setAssignerModelEnabled(t *testing.T, db *sql.DB, accountID int64, modelName string, enabled bool) {
+	t.Helper()
+	if _, err := db.Exec(`
+UPDATE api_account_models
+SET enabled = $3
+WHERE account_id = $1
+  AND model_name = $2`, accountID, modelName, enabled); err != nil {
+		t.Fatalf("set model %q enabled=%v for account %d failed: %v", modelName, enabled, accountID, err)
+	}
+}
+
+func retireAssignerCredential(t *testing.T, db *sql.DB, accountID int64) {
+	t.Helper()
+	if _, err := db.Exec(`
+UPDATE api_account_secrets
+SET status = 'retired',
+    retired_at = now()
+WHERE account_id = $1
+  AND status = 'active'`, accountID); err != nil {
+		t.Fatalf("retire credential for account %d failed: %v", accountID, err)
 	}
 }
 

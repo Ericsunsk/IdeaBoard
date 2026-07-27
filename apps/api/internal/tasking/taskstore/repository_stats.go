@@ -24,15 +24,6 @@ func (r *Repository) UpsertDailyStatByTask(ctx context.Context, task *tasks.Task
 	})
 }
 
-func upsertDailyStatByTaskIDTx(ctx context.Context, q *dbsqlc.Queries, taskID string, attemptFinish *tasks.TaskAttemptFinish) error {
-	row, err := q.GetTaskByTaskID(ctx, taskID)
-	if err != nil {
-		return err
-	}
-	task := taskFromSQLC(row)
-	return upsertDailyStatByTaskTx(ctx, q, &task, attemptFinish)
-}
-
 func upsertDailyStatByTaskTx(ctx context.Context, q *dbsqlc.Queries, task *tasks.Task, attemptFinish *tasks.TaskAttemptFinish) error {
 	event, ok := taskStatEventFromTask(task, attemptFinish)
 	if !ok {

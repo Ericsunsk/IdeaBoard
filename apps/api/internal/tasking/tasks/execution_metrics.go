@@ -64,13 +64,23 @@ type TaskAttemptStart struct {
 }
 
 type TaskAttemptRef struct {
-	ID        int64
-	LeaseID   int64
-	AttemptNo int
+	ID                 int64
+	LeaseID            int64
+	AttemptNo          int
+	TaskID             string
+	LeaseToken         string
+	AccountID          int64
+	ProviderEndpointID int64
+	CredentialID       int64
 }
 
 type TaskAttemptFinish struct {
 	ID                 int64
+	TaskID             string
+	LeaseToken         string
+	AccountID          int64
+	ProviderEndpointID int64
+	CredentialID       int64
 	Status             string
 	FailureStage       string
 	FailureCategory    string

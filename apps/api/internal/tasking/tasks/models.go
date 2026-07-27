@@ -41,6 +41,7 @@ type Task struct {
 	ExecutionMetrics           *TaskExecutionMetrics `json:"execution_metrics,omitempty"`
 	BillingRequest             *TaskBillingRequest   `json:"-"`
 	BillingSnapshot            *AdminBillingSnapshot `json:"-"`
+	ExecutionAttempts          []AdminTaskAttempt    `json:"-"`
 }
 
 type TaskBillingRequest struct {
@@ -51,15 +52,39 @@ type TaskBillingRequest struct {
 // AdminBillingSnapshot is a read-only projection over immutable Task Billing
 // facts. FeatureExists is resolved dynamically from the current Registry.
 type AdminBillingSnapshot struct {
-	SKU            string    `json:"sku"`
-	DisplayName    string    `json:"display_name"`
-	PriceVersionID int64     `json:"price_version_id"`
-	PriceVersion   int64     `json:"price_version"`
-	UnitCredits    int64     `json:"unit_credits"`
-	Quantity       int64     `json:"quantity"`
-	TotalCredits   int64     `json:"total_credits"`
-	QuotedAt       time.Time `json:"quoted_at"`
-	FeatureExists  bool      `json:"feature_exists"`
+	SKU             string     `json:"sku"`
+	DisplayName     string     `json:"display_name"`
+	PriceVersionID  int64      `json:"price_version_id"`
+	PriceVersion    int64      `json:"price_version"`
+	UnitCredits     int64      `json:"unit_credits"`
+	Quantity        int64      `json:"quantity"`
+	TotalCredits    int64      `json:"total_credits"`
+	QuotedAt        time.Time  `json:"quoted_at"`
+	SettlementState string     `json:"settlement_state"`
+	SettledAt       *time.Time `json:"settled_at"`
+	FeatureExists   bool       `json:"feature_exists"`
+}
+
+// AdminTaskAttempt is the safe, immutable execution history projection for
+// Admin Task details. It intentionally excludes credentials and queue metadata.
+type AdminTaskAttempt struct {
+	AttemptNo            int        `json:"attempt_no"`
+	Status               string     `json:"status"`
+	Stage                string     `json:"stage"`
+	FailureCategory      string     `json:"failure_category"`
+	ProviderEndpointID   int64      `json:"provider_endpoint_id"`
+	ProviderEndpointName string     `json:"provider_endpoint_name"`
+	ResolvedModel        string     `json:"resolved_model"`
+	APIType              string     `json:"api_type"`
+	ProviderStartedAt    *time.Time `json:"provider_started_at"`
+	ProviderFinishedAt   *time.Time `json:"provider_finished_at"`
+	FinalizeStartedAt    *time.Time `json:"finalize_started_at"`
+	FinalizeFinishedAt   *time.Time `json:"finalize_finished_at"`
+	CompletedAt          *time.Time `json:"completed_at"`
+	CancelledAt          *time.Time `json:"cancelled_at"`
+	ProviderLatencyMS    int64      `json:"provider_latency_ms"`
+	FinalizeLatencyMS    int64      `json:"finalize_latency_ms"`
+	TotalLatencyMS       int64      `json:"total_latency_ms"`
 }
 
 type TaskOutput struct {

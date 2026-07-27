@@ -18,8 +18,6 @@ type PostgresTaskAssigner struct {
 	db *sql.DB
 }
 
-const taskAssignmentAgeBoostAfter = 15 * time.Minute
-
 func NewPostgresTaskAssigner(db *sql.DB) *PostgresTaskAssigner {
 	return &PostgresTaskAssigner{db: db}
 }
@@ -64,18 +62,14 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, task *tasks.TaskPaylo
 	}
 
 	featureSlug := taskFeatureSlug(task.Params)
-	selectedAccount, err := selectLeastLoadedAccountTx(ctx, tx)
+	selectedAccount, shouldDefer, err := chooseTaskRoutingTx(ctx, tx, task.TaskID, taskState, time.Now())
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return commitTaskAssignment(tx, &committed, policy.noCapacity(task.TaskID))
 		}
 		return TaskAssignment{}, err
 	}
-	deferCurrent, err := shouldDeferTaskAssignmentTx(ctx, tx, task.TaskID, taskState, selectedAccount, time.Now())
-	if err != nil {
-		return TaskAssignment{}, err
-	}
-	if deferCurrent {
+	if shouldDefer {
 		return commitTaskAssignment(tx, &committed, policy.noCapacity(task.TaskID))
 	}
 
@@ -217,155 +211,6 @@ FOR UPDATE OF t`, taskID).Scan(
 	}, nil
 }
 
-func shouldDeferTaskAssignmentTx(ctx context.Context, tx *sql.Tx, taskID string, current taskAssignmentTaskState, selected taskAssignmentSelectedAccount, now time.Time) (bool, error) {
-	activeUser, activeTenant, err := taskAssignmentActiveShareTx(ctx, tx, current.UserID, selected.ProviderEndpointID)
-	if err != nil {
-		return false, err
-	}
-	currentPriority := taskAssignmentEffectivePriority(current.Priority, current.CreatedAt, now)
-	ageBoostCutoff := now.Add(-taskAssignmentAgeBoostAfter)
-
-	var shouldDefer bool
-	err = tx.QueryRowContext(ctx, `
-WITH pending_candidates AS (
-  SELECT
-    p.task_id,
-    p.user_id,
-    p.created_at,
-    CASE
-      WHEN p.created_at <= $3 THEN $4
-      ELSE p.priority
-    END AS effective_priority
-  FROM tasks p
-  WHERE p.status = $10
-    AND p.task_id <> $1
-),
-eligible_models AS (
-  SELECT
-    pc.task_id,
-    pc.user_id,
-    pc.created_at,
-    pc.effective_priority,
-    a.id AS account_id,
-    a.provider_endpoint_id,
-    GREATEST(LEAST(a.max_concurrent, 64), 0) AS account_max_concurrent,
-    m.model_name,
-    GREATEST(LEAST(COALESCE(m.max_concurrent, a.max_concurrent), 64), 0) AS model_max_concurrent
-  FROM pending_candidates pc
-  JOIN api_accounts a ON a.status = 1
-    AND a.deleted_at IS NULL
-  JOIN provider_endpoints pe ON pe.id = a.provider_endpoint_id
-    AND pe.status = 1
-  JOIN LATERAL (
-    SELECT id
-    FROM api_account_secrets
-    WHERE account_id = a.id
-      AND status = 'active'
-      AND secret_material_kind = 'encrypted'
-      AND btrim(secret_payload) <> ''
-    ORDER BY rotated_at DESC, id DESC
-    LIMIT 1
-  ) AS credential ON TRUE
-  JOIN api_account_models m ON m.account_id = a.id
-    AND m.enabled = TRUE
-),
-account_load AS (
-  SELECT
-    em.task_id,
-    em.user_id,
-    em.created_at,
-    em.effective_priority,
-    em.account_id,
-    em.provider_endpoint_id,
-    em.account_max_concurrent,
-    em.model_name,
-    em.model_max_concurrent,
-    COUNT(tl.id) AS running_count,
-    COUNT(tl.id) FILTER (
-      WHERE lower(btrim(tl.resolved_model)) = lower(em.model_name)
-    ) AS model_running_count
-  FROM eligible_models em
-  LEFT JOIN task_leases tl ON tl.account_id = em.account_id
-    AND tl.released_at IS NULL
-  GROUP BY em.task_id, em.user_id, em.created_at, em.effective_priority,
-    em.account_id, em.provider_endpoint_id, em.account_max_concurrent,
-    em.model_name, em.model_max_concurrent
-),
-eligible_candidates AS (
-  SELECT DISTINCT
-    task_id,
-    user_id,
-    created_at,
-    effective_priority,
-    provider_endpoint_id
-  FROM account_load
-  WHERE running_count < account_max_concurrent
-    AND model_running_count < model_max_concurrent
-)
-SELECT EXISTS (
-  SELECT 1
-  FROM eligible_candidates
-  WHERE (
-    effective_priority < $5
-    OR (effective_priority = $5 AND created_at < $6)
-    OR (
-      ($7::boolean OR $8::boolean)
-      AND effective_priority <= $5
-      AND (
-        ($7::boolean AND user_id <> $9)
-        OR ($8::boolean AND provider_endpoint_id <> $2)
-      )
-    )
-  )
-)`,
-		taskID,
-		selected.ProviderEndpointID,
-		ageBoostCutoff,
-		tasks.TaskPriorityInteractive,
-		currentPriority,
-		current.CreatedAt,
-		activeUser,
-		activeTenant,
-		current.UserID,
-		tasks.StatusPending,
-	).Scan(&shouldDefer)
-	if err != nil {
-		return false, err
-	}
-	return shouldDefer, nil
-}
-
-func taskAssignmentActiveShareTx(ctx context.Context, tx *sql.Tx, userID int64, providerEndpointID int64) (bool, bool, error) {
-	var activeUser bool
-	var activeTenant bool
-	err := tx.QueryRowContext(ctx, `
-SELECT
-  COALESCE(bool_or(t.user_id = $1), FALSE) AS active_user,
-  COALESCE(bool_or(tl.provider_endpoint_id = $2), FALSE) AS active_tenant
-FROM task_leases tl
-JOIN tasks t ON t.task_id = tl.task_id
-WHERE tl.released_at IS NULL
-  AND (
-    ($1 > 0 AND t.user_id = $1)
-    OR ($2 > 0 AND tl.provider_endpoint_id = $2)
-  )`,
-		userID,
-		providerEndpointID,
-	).Scan(&activeUser, &activeTenant)
-	if err != nil {
-		return false, false, err
-	}
-	return activeUser, activeTenant, nil
-}
-
-func taskAssignmentEffectivePriority(priority int, createdAt time.Time, now time.Time) int {
-	priority = tasks.EffectiveTaskPriority(priority)
-	if !createdAt.IsZero() && !now.IsZero() && !createdAt.After(now.Add(-taskAssignmentAgeBoostAfter)) {
-		return tasks.TaskPriorityInteractive
-	}
-	return priority
-}
-
 func markTaskAssignedTx(ctx context.Context, tx *sql.Tx, taskID string, selected taskAssignmentSelectedAccount, leaseToken string) (int64, error) {
 	result, err := tx.ExecContext(ctx, `
 	UPDATE tasks
@@ -459,131 +304,6 @@ SET current_stage = EXCLUDED.current_stage,
 		queueWaitMS,
 	)
 	return err
-}
-
-func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx) (taskAssignmentSelectedAccount, error) {
-	var accountID int64
-	var providerEndpointID int64
-	var credentialID int64
-	var modelName string
-	var apiType string
-	var providerEndpointName string
-	var providerEndpointBaseURL string
-	var credentialFingerprint string
-	var credentialKeyVersion string
-	err := tx.QueryRowContext(ctx, `
-	WITH locked_accounts AS (
-	  SELECT
-	    a.id,
-	    a.provider_endpoint_id,
-	    pe.api_type,
-	    pe.name AS provider_endpoint_name,
-	    pe.base_url AS provider_endpoint_base_url,
-	    credential.id AS credential_id,
-	    credential.fingerprint AS credential_fingerprint,
-	    credential.key_version AS credential_key_version,
-	    GREATEST(LEAST(a.max_concurrent, 64), 0) AS max_concurrent
-	  FROM api_accounts AS a
-	  JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
-	    AND pe.status = 1
-	  JOIN LATERAL (
-	    SELECT id, fingerprint, key_version
-	    FROM api_account_secrets
-	    WHERE account_id = a.id
-	      AND status = 'active'
-	      AND secret_material_kind = 'encrypted'
-	      AND btrim(secret_payload) <> ''
-	    ORDER BY rotated_at DESC, id DESC
-	    LIMIT 1
-	  ) AS credential ON TRUE
-	  WHERE a.status = 1
-	    AND a.deleted_at IS NULL
-	  ORDER BY id ASC
-	  FOR UPDATE OF a SKIP LOCKED
-	),
-	eligible_models AS (
-	  SELECT
-	    a.id,
-	    a.provider_endpoint_id,
-	    a.api_type,
-	    a.provider_endpoint_name,
-	    a.provider_endpoint_base_url,
-	    a.credential_id,
-	    a.credential_fingerprint,
-	    a.credential_key_version,
-	    a.max_concurrent AS account_max_concurrent,
-	    m.model_name,
-	    GREATEST(LEAST(COALESCE(m.max_concurrent, a.max_concurrent), 64), 0) AS model_max_concurrent,
-	    m.sort_order AS model_sort_order,
-	    m.id AS model_id
-	  FROM locked_accounts a
-	  JOIN api_account_models AS m ON m.account_id = a.id
-	    AND m.enabled = TRUE
-	),
-	account_load AS (
-	  SELECT
-	    em.id,
-	    em.provider_endpoint_id,
-	    em.api_type,
-	    em.provider_endpoint_name,
-	    em.provider_endpoint_base_url,
-	    em.credential_id,
-	    em.credential_fingerprint,
-	    em.credential_key_version,
-	    em.account_max_concurrent,
-	    em.model_name,
-	    em.model_max_concurrent,
-	    em.model_sort_order,
-	    em.model_id,
-	    COUNT(tl.id) AS running_count,
-	    COUNT(tl.id) FILTER (
-	      WHERE lower(btrim(tl.resolved_model)) = lower(em.model_name)
-	    ) AS model_running_count
-	  FROM eligible_models em
-	  LEFT JOIN task_leases tl ON tl.account_id = em.id
-	    AND tl.released_at IS NULL
-	  GROUP BY em.id, em.provider_endpoint_id, em.api_type, em.provider_endpoint_name, em.provider_endpoint_base_url,
-	    em.credential_id, em.credential_fingerprint, em.credential_key_version,
-	    em.account_max_concurrent, em.model_name, em.model_max_concurrent, em.model_sort_order, em.model_id
-	)
-	SELECT id, provider_endpoint_id, credential_id, model_name, api_type,
-	       provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version
-	FROM account_load
-	WHERE running_count < account_max_concurrent
-	  AND model_running_count < model_max_concurrent
-	ORDER BY GREATEST(
-	  running_count::numeric / account_max_concurrent::numeric,
-	  model_running_count::numeric / model_max_concurrent::numeric
-	) ASC,
-	model_sort_order ASC,
-	model_id ASC,
-	id ASC
-	LIMIT 1`,
-	).Scan(
-		&accountID,
-		&providerEndpointID,
-		&credentialID,
-		&modelName,
-		&apiType,
-		&providerEndpointName,
-		&providerEndpointBaseURL,
-		&credentialFingerprint,
-		&credentialKeyVersion,
-	)
-	if err != nil {
-		return taskAssignmentSelectedAccount{}, err
-	}
-	return taskAssignmentSelectedAccount{
-		AccountID:               accountID,
-		ProviderEndpointID:      providerEndpointID,
-		CredentialID:            credentialID,
-		ResolvedModel:           modelName,
-		APIType:                 apiType,
-		ProviderEndpointName:    providerEndpointName,
-		ProviderEndpointBaseURL: providerEndpointBaseURL,
-		CredentialFingerprint:   credentialFingerprint,
-		CredentialKeyVersion:    credentialKeyVersion,
-	}, nil
 }
 
 func taskFeatureSlug(paramsJSON string) string {

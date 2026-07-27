@@ -337,10 +337,10 @@ SELECT display_name FROM task_billing_snapshots WHERE task_id = 'immutable-billi
 	}
 	if _, err := db.ExecContext(t.Context(), `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, feature_slug, model, sku, display_name, price_version_id, price_version,
+  task_id, user_id, feature_slug, sku, display_name, price_version_id, price_version,
   unit_credits, quantity, total_credits, quoted_at
 )
-SELECT 'invalid-initial-settlement', 1, feature_slug, model, sku, display_name, price_version_id, price_version,
+SELECT 'invalid-initial-settlement', 1, feature_slug, sku, display_name, price_version_id, price_version,
        unit_credits, quantity, total_credits, quoted_at
 FROM task_billing_snapshots WHERE task_id = 'immutable-billing-task'`); err != nil {
 		t.Fatal(err)

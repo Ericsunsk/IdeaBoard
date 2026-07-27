@@ -87,18 +87,18 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 	task.BillingRequest = &tasks.TaskBillingRequest{
 		Feature: billingRequest.Feature, Quantity: billingRequest.Quantity,
 	}
-	queueTask := newSubmitToRiverWorkerQueueTask(task)
 	if task.Status != tasks.StatusPending {
 		t.Fatalf("new task status=%q, want %q", task.Status, tasks.StatusPending)
 	}
 	store := tasksubmission.NewStore(pool, taskRepo, client, submitToRiverWorkerQueue, submitToRiverWorkerMaxAttempts, taskBilling)
-	result, err := store.SubmitTask(ctx, task, queueTask)
+	result, err := store.SubmitTask(ctx, newSubmitToRiverWorkerCanonicalRequest(t, task))
 	if err != nil {
 		t.Fatalf("SubmitTask failed: %v", err)
 	}
-	if result.TaskID != task.TaskID || !result.Created {
-		t.Fatalf("SubmitTask result=%+v, want created task %q", result, task.TaskID)
+	if result.TaskID == "" || !result.Created {
+		t.Fatalf("SubmitTask result=%+v, want created task", result)
 	}
+	task.TaskID = result.TaskID
 
 	pending := loadSubmitToRiverWorkerTask(t, taskRepo, task.TaskID)
 	if pending.Status != tasks.StatusPending {
@@ -218,18 +218,15 @@ func TestRiverFinalFailureSettlementRetrySurvivesRestartWithoutProviderRecall(t 
 		Status:         tasks.StatusPending,
 		BillingRequest: &tasks.TaskBillingRequest{Feature: request.Feature, Quantity: request.Quantity},
 	}
-	queueTask := &tasks.TaskPayload{
-		TaskID: task.TaskID, UserID: task.UserID, Prompt: task.Prompt,
-		Params: task.Params, CreatedAt: time.Now().Unix(),
-	}
 	store := tasksubmission.NewStore(pool, taskRepo, client, queueName, submitToRiverWorkerMaxAttempts, taskBilling)
-	result, err := store.SubmitTask(ctx, task, queueTask)
+	result, err := store.SubmitTask(ctx, newSubmitToRiverWorkerCanonicalRequest(t, task))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if result.HoldTransactionID == "" {
 		t.Fatal("billed submission did not create Hold")
 	}
+	task.TaskID = result.TaskID
 
 	clientStopped := false
 	t.Cleanup(func() {
@@ -448,6 +445,32 @@ func newSubmitToRiverWorkerQueueTask(task *tasks.Task) *tasks.TaskPayload {
 		Params:    task.Params,
 		CreatedAt: time.Now().Unix(),
 	}
+}
+
+func newSubmitToRiverWorkerCanonicalRequest(t testing.TB, task *tasks.Task) tasksubmission.CanonicalRequest {
+	t.Helper()
+	var billingRequest *taskbilling.Request
+	if task.BillingRequest != nil {
+		billingRequest = &taskbilling.Request{
+			Feature:  task.BillingRequest.Feature,
+			Quantity: task.BillingRequest.Quantity,
+		}
+	}
+	request, err := tasksubmission.NewCanonicalRequest(tasksubmission.CanonicalRequestInput{
+		UserID:             task.UserID,
+		UserPrompt:         task.UserPrompt,
+		Prompt:             task.Prompt,
+		Params:             task.Params,
+		ClientActionID:     task.ClientActionID,
+		Feature:            task.FeatureSlug,
+		Priority:           task.Priority,
+		BillingRequest:     billingRequest,
+		MaxBillingQuantity: 16,
+	})
+	if err != nil {
+		t.Fatalf("build canonical task request: %v", err)
+	}
+	return request
 }
 
 func stopRiverClientForSubmitToWorkerTest(t testing.TB, client *river.Client[pgx.Tx]) {

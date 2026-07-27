@@ -335,7 +335,7 @@ CROSS JOIN active_lease
 RETURNING id, lease_id, attempt_no;
 
 -- name: FinishTaskAttempt :execrows
-UPDATE task_attempts
+UPDATE task_attempts AS attempts
 SET status = sqlc.arg(status),
     failure_stage = CASE
       WHEN sqlc.arg(status) = 'completed' THEN ''
@@ -363,9 +363,74 @@ SET status = sqlc.arg(status),
       WHEN sqlc.arg(status) = 'cancelled' THEN sqlc.narg(completed_at)::timestamptz
       ELSE NULL
     END
-WHERE id = sqlc.arg(id)
-  AND status = 'running'
+FROM task_leases AS leases
+WHERE attempts.id = sqlc.arg(id)
+  AND attempts.task_id = sqlc.arg(task_id)
+  AND attempts.lease_id = leases.id
+  AND leases.task_id = sqlc.arg(task_id)
+  AND leases.account_id = sqlc.arg(account_id)
+  AND leases.provider_endpoint_id = sqlc.arg(provider_endpoint_id)
+  AND leases.credential_id = sqlc.arg(credential_id)
+  AND leases.lease_token = sqlc.arg(lease_token)
+  AND leases.released_at IS NULL
+  AND attempts.status = 'running'
   AND sqlc.arg(status) IN ('completed', 'failed', 'requeued', 'cancelled');
+
+-- name: ListAdminTaskAttemptsByTaskIDs :many
+SELECT
+  attempts.task_id,
+  attempts.attempt_no,
+  attempts.status,
+  attempts.failure_stage,
+  attempts.failure_category,
+  leases.provider_endpoint_id,
+  leases.provider_endpoint_name,
+  leases.resolved_model,
+  leases.api_type,
+  attempts.provider_started_at,
+  attempts.provider_finished_at,
+  attempts.finalize_started_at,
+  attempts.finalize_finished_at,
+  attempts.completed_at,
+  attempts.cancelled_at,
+  attempts.provider_latency_ms,
+  attempts.finalize_latency_ms,
+  attempts.total_latency_ms
+FROM task_attempts attempts
+JOIN task_leases leases ON leases.id = attempts.lease_id
+WHERE attempts.task_id = ANY(sqlc.arg(task_ids)::text[])
+ORDER BY attempts.task_id ASC, attempts.attempt_no ASC, attempts.id ASC;
+
+-- name: FinishRunningTaskAttemptsByTaskIDs :execrows
+UPDATE task_attempts
+SET status = sqlc.arg(status),
+    failure_stage = CASE
+      WHEN sqlc.arg(status) = 'completed' THEN ''
+      ELSE sqlc.arg(failure_stage)
+    END,
+    failure_category = CASE
+      WHEN sqlc.arg(status) = 'completed' THEN ''
+      ELSE sqlc.arg(failure_category)
+    END,
+    error_msg = CASE
+      WHEN sqlc.arg(status) = 'completed' THEN ''
+      ELSE sqlc.arg(error_msg)
+    END,
+    total_latency_ms = GREATEST(
+      EXTRACT(EPOCH FROM (sqlc.narg(finished_at)::timestamptz - created_at)) * 1000,
+      0
+    )::bigint,
+    completed_at = CASE
+      WHEN sqlc.arg(status) = 'cancelled' THEN NULL
+      ELSE sqlc.narg(finished_at)::timestamptz
+    END,
+    cancelled_at = CASE
+      WHEN sqlc.arg(status) = 'cancelled' THEN sqlc.narg(finished_at)::timestamptz
+      ELSE NULL
+    END
+WHERE task_id = ANY(sqlc.arg(task_ids)::text[])
+  AND status = 'running'
+  AND sqlc.arg(status) IN ('completed', 'failed', 'cancelled');
 
 -- name: CancelRunningTaskAttemptsByTaskIDs :execrows
 UPDATE task_attempts

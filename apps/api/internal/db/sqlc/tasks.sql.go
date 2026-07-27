@@ -577,8 +577,64 @@ func (q *Queries) FinalFailTaskRunningWithLease(ctx context.Context, arg FinalFa
 	return result.RowsAffected()
 }
 
-const finishTaskAttempt = `-- name: FinishTaskAttempt :execrows
+const finishRunningTaskAttemptsByTaskIDs = `-- name: FinishRunningTaskAttemptsByTaskIDs :execrows
 UPDATE task_attempts
+SET status = $1,
+    failure_stage = CASE
+      WHEN $1 = 'completed' THEN ''
+      ELSE $2
+    END,
+    failure_category = CASE
+      WHEN $1 = 'completed' THEN ''
+      ELSE $3
+    END,
+    error_msg = CASE
+      WHEN $1 = 'completed' THEN ''
+      ELSE $4
+    END,
+    total_latency_ms = GREATEST(
+      EXTRACT(EPOCH FROM ($5::timestamptz - created_at)) * 1000,
+      0
+    )::bigint,
+    completed_at = CASE
+      WHEN $1 = 'cancelled' THEN NULL
+      ELSE $5::timestamptz
+    END,
+    cancelled_at = CASE
+      WHEN $1 = 'cancelled' THEN $5::timestamptz
+      ELSE NULL
+    END
+WHERE task_id = ANY($6::text[])
+  AND status = 'running'
+  AND $1 IN ('completed', 'failed', 'cancelled')
+`
+
+type FinishRunningTaskAttemptsByTaskIDsParams struct {
+	Status          string       `json:"status"`
+	FailureStage    string       `json:"failure_stage"`
+	FailureCategory string       `json:"failure_category"`
+	ErrorMsg        string       `json:"error_msg"`
+	FinishedAt      sql.NullTime `json:"finished_at"`
+	TaskIds         []string     `json:"task_ids"`
+}
+
+func (q *Queries) FinishRunningTaskAttemptsByTaskIDs(ctx context.Context, arg FinishRunningTaskAttemptsByTaskIDsParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, finishRunningTaskAttemptsByTaskIDs,
+		arg.Status,
+		arg.FailureStage,
+		arg.FailureCategory,
+		arg.ErrorMsg,
+		arg.FinishedAt,
+		pq.Array(arg.TaskIds),
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const finishTaskAttempt = `-- name: FinishTaskAttempt :execrows
+UPDATE task_attempts AS attempts
 SET status = $1,
     failure_stage = CASE
       WHEN $1 = 'completed' THEN ''
@@ -606,8 +662,17 @@ SET status = $1,
       WHEN $1 = 'cancelled' THEN $11::timestamptz
       ELSE NULL
     END
-WHERE id = $12
-  AND status = 'running'
+FROM task_leases AS leases
+WHERE attempts.id = $12
+  AND attempts.task_id = $13
+  AND attempts.lease_id = leases.id
+  AND leases.task_id = $13
+  AND leases.account_id = $14
+  AND leases.provider_endpoint_id = $15
+  AND leases.credential_id = $16
+  AND leases.lease_token = $17
+  AND leases.released_at IS NULL
+  AND attempts.status = 'running'
   AND $1 IN ('completed', 'failed', 'requeued', 'cancelled')
 `
 
@@ -624,6 +689,11 @@ type FinishTaskAttemptParams struct {
 	TotalLatencyMs     int64        `json:"total_latency_ms"`
 	CompletedAt        sql.NullTime `json:"completed_at"`
 	ID                 int64        `json:"id"`
+	TaskID             string       `json:"task_id"`
+	AccountID          int64        `json:"account_id"`
+	ProviderEndpointID int64        `json:"provider_endpoint_id"`
+	CredentialID       int64        `json:"credential_id"`
+	LeaseToken         string       `json:"lease_token"`
 }
 
 func (q *Queries) FinishTaskAttempt(ctx context.Context, arg FinishTaskAttemptParams) (int64, error) {
@@ -640,6 +710,11 @@ func (q *Queries) FinishTaskAttempt(ctx context.Context, arg FinishTaskAttemptPa
 		arg.TotalLatencyMs,
 		arg.CompletedAt,
 		arg.ID,
+		arg.TaskID,
+		arg.AccountID,
+		arg.ProviderEndpointID,
+		arg.CredentialID,
+		arg.LeaseToken,
 	)
 	if err != nil {
 		return 0, err
@@ -825,6 +900,95 @@ func (q *Queries) GetTaskByTaskIDAndUserID(ctx context.Context, arg GetTaskByTas
 		&i.CredentialKeyVersion,
 	)
 	return i, err
+}
+
+const listAdminTaskAttemptsByTaskIDs = `-- name: ListAdminTaskAttemptsByTaskIDs :many
+SELECT
+  attempts.task_id,
+  attempts.attempt_no,
+  attempts.status,
+  attempts.failure_stage,
+  attempts.failure_category,
+  leases.provider_endpoint_id,
+  leases.provider_endpoint_name,
+  leases.resolved_model,
+  leases.api_type,
+  attempts.provider_started_at,
+  attempts.provider_finished_at,
+  attempts.finalize_started_at,
+  attempts.finalize_finished_at,
+  attempts.completed_at,
+  attempts.cancelled_at,
+  attempts.provider_latency_ms,
+  attempts.finalize_latency_ms,
+  attempts.total_latency_ms
+FROM task_attempts attempts
+JOIN task_leases leases ON leases.id = attempts.lease_id
+WHERE attempts.task_id = ANY($1::text[])
+ORDER BY attempts.task_id ASC, attempts.attempt_no ASC, attempts.id ASC
+`
+
+type ListAdminTaskAttemptsByTaskIDsRow struct {
+	TaskID               string       `json:"task_id"`
+	AttemptNo            int32        `json:"attempt_no"`
+	Status               string       `json:"status"`
+	FailureStage         string       `json:"failure_stage"`
+	FailureCategory      string       `json:"failure_category"`
+	ProviderEndpointID   int64        `json:"provider_endpoint_id"`
+	ProviderEndpointName string       `json:"provider_endpoint_name"`
+	ResolvedModel        string       `json:"resolved_model"`
+	ApiType              string       `json:"api_type"`
+	ProviderStartedAt    sql.NullTime `json:"provider_started_at"`
+	ProviderFinishedAt   sql.NullTime `json:"provider_finished_at"`
+	FinalizeStartedAt    sql.NullTime `json:"finalize_started_at"`
+	FinalizeFinishedAt   sql.NullTime `json:"finalize_finished_at"`
+	CompletedAt          sql.NullTime `json:"completed_at"`
+	CancelledAt          sql.NullTime `json:"cancelled_at"`
+	ProviderLatencyMs    int64        `json:"provider_latency_ms"`
+	FinalizeLatencyMs    int64        `json:"finalize_latency_ms"`
+	TotalLatencyMs       int64        `json:"total_latency_ms"`
+}
+
+func (q *Queries) ListAdminTaskAttemptsByTaskIDs(ctx context.Context, taskIds []string) ([]ListAdminTaskAttemptsByTaskIDsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAdminTaskAttemptsByTaskIDs, pq.Array(taskIds))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAdminTaskAttemptsByTaskIDsRow
+	for rows.Next() {
+		var i ListAdminTaskAttemptsByTaskIDsRow
+		if err := rows.Scan(
+			&i.TaskID,
+			&i.AttemptNo,
+			&i.Status,
+			&i.FailureStage,
+			&i.FailureCategory,
+			&i.ProviderEndpointID,
+			&i.ProviderEndpointName,
+			&i.ResolvedModel,
+			&i.ApiType,
+			&i.ProviderStartedAt,
+			&i.ProviderFinishedAt,
+			&i.FinalizeStartedAt,
+			&i.FinalizeFinishedAt,
+			&i.CompletedAt,
+			&i.CancelledAt,
+			&i.ProviderLatencyMs,
+			&i.FinalizeLatencyMs,
+			&i.TotalLatencyMs,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listMonitorExecutionPressureByRange = `-- name: ListMonitorExecutionPressureByRange :many

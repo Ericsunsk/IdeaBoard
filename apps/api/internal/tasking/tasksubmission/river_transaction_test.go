@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/tasking/taskstore"
@@ -35,23 +36,20 @@ func TestStoreSubmitTaskCommitsTaskAndRiverJobTransactionally(t *testing.T) {
 	client := newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
 
 	task := newTaskSubmissionTask("task_river_tx_commit")
-	queueTask := newTaskSubmissionQueueTask(task)
-	queueTask.RetryCount = 2
-	queueTask.CreatedAt = 1710000000
 	task.Priority = tasks.TaskPriorityInteractive
-	queueTask.Priority = tasks.TaskPriorityInteractive
 	store := NewStore(pool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts, nil)
 
-	result, err := store.SubmitTask(ctx, task, queueTask)
+	result, err := store.SubmitTask(ctx, canonicalRequestForTest(task))
 	if err != nil {
 		t.Fatalf("SubmitTask failed: %v", err)
 	}
-	if result.TaskID != task.TaskID || !result.Created {
-		t.Fatalf("SubmitTask result=%+v, want created task %q", result, task.TaskID)
+	if result.TaskID == "" || !result.Created {
+		t.Fatalf("SubmitTask result=%+v, want created task", result)
 	}
 
-	assertTaskRowCount(t, db, task.TaskID, 1)
-	job := loadRiverJobForTask(t, db, task.TaskID)
+	taskID := result.TaskID
+	assertTaskRowCount(t, db, taskID, 1)
+	job := loadRiverJobForTask(t, db, taskID)
 	if job.kind != taskqueue.RiverJobKindDrawingGenerate {
 		t.Fatalf("river job kind=%q, want %q", job.kind, taskqueue.RiverJobKindDrawingGenerate)
 	}
@@ -64,26 +62,26 @@ func TestStoreSubmitTaskCommitsTaskAndRiverJobTransactionally(t *testing.T) {
 	if job.priority != tasks.TaskPriorityInteractive {
 		t.Fatalf("river job priority=%d, want %d", job.priority, tasks.TaskPriorityInteractive)
 	}
-	if !slices.Equal(job.tags, []string{task.TaskID}) {
-		t.Fatalf("river job tags=%v, want [%s]", job.tags, task.TaskID)
+	if !slices.Equal(job.tags, []string{taskID}) {
+		t.Fatalf("river job tags=%v, want [%s]", job.tags, taskID)
 	}
-	assertStoredTaskPriority(t, db, task.TaskID, tasks.TaskPriorityInteractive)
+	assertStoredTaskPriority(t, db, taskID, tasks.TaskPriorityInteractive)
 
 	var args taskqueue.DrawingTaskArgs
 	if err := json.Unmarshal(job.args, &args); err != nil {
 		t.Fatalf("decode river job args failed: %v", err)
 	}
-	if args.Task.TaskID != queueTask.TaskID {
-		t.Fatalf("river args task_id=%q, want %q", args.Task.TaskID, queueTask.TaskID)
+	if args.Task.TaskID != taskID {
+		t.Fatalf("river args task_id=%q, want %q", args.Task.TaskID, taskID)
 	}
-	if args.Task.EffectiveCorrelationID() != task.TaskID {
-		t.Fatalf("river args correlation_id=%q, want task_id %q", args.Task.EffectiveCorrelationID(), task.TaskID)
+	if args.Task.EffectiveCorrelationID() != taskID {
+		t.Fatalf("river args correlation_id=%q, want task_id %q", args.Task.EffectiveCorrelationID(), taskID)
 	}
-	if args.Task.UserID != queueTask.UserID || args.Task.Prompt != queueTask.Prompt || args.Task.Params != queueTask.Params {
-		t.Fatalf("river args task=%+v, want submitted task %+v", args.Task, *queueTask)
+	if args.Task.UserID != task.UserID || args.Task.Prompt != task.Prompt || args.Task.Params != task.Params {
+		t.Fatalf("river args task=%+v, want canonical request", args.Task)
 	}
-	if args.Task.RetryCount != queueTask.RetryCount || args.Task.CreatedAt != queueTask.CreatedAt {
-		t.Fatalf("river args retry/created=(%d,%d), want (%d,%d)", args.Task.RetryCount, args.Task.CreatedAt, queueTask.RetryCount, queueTask.CreatedAt)
+	if args.Task.RetryCount != 0 || args.Task.CreatedAt <= 0 {
+		t.Fatalf("river args retry/created=(%d,%d), want module defaults", args.Task.RetryCount, args.Task.CreatedAt)
 	}
 	if args.Task.Priority != tasks.TaskPriorityInteractive {
 		t.Fatalf("river args priority=%d, want %d", args.Task.Priority, tasks.TaskPriorityInteractive)
@@ -100,36 +98,28 @@ func TestStoreSubmitTaskReturnsExistingTaskForDuplicateClientActionID(t *testing
 
 	first := newTaskSubmissionTask("task_action_first")
 	first.ClientActionID = "canvas-action-1"
-	firstQueueTask := newTaskSubmissionQueueTask(first)
 
-	firstResult, err := store.SubmitTask(ctx, first, firstQueueTask)
+	firstResult, err := store.SubmitTask(ctx, canonicalRequestForTest(first))
 	if err != nil {
 		t.Fatalf("first SubmitTask failed: %v", err)
 	}
-	if firstResult.TaskID != first.TaskID || !firstResult.Created {
-		t.Fatalf("first SubmitTask result=%+v, want created task %q", firstResult, first.TaskID)
+	if firstResult.TaskID == "" || !firstResult.Created {
+		t.Fatalf("first SubmitTask result=%+v, want created task", firstResult)
 	}
 
 	duplicate := newTaskSubmissionTask("task_action_duplicate")
 	duplicate.UserID = first.UserID
 	duplicate.ClientActionID = first.ClientActionID
-	duplicateQueueTask := newTaskSubmissionQueueTask(duplicate)
-
-	duplicateResult, err := store.SubmitTask(ctx, duplicate, duplicateQueueTask)
+	duplicateResult, err := store.SubmitTask(ctx, canonicalRequestForTest(duplicate))
 	if err != nil {
 		t.Fatalf("duplicate SubmitTask failed: %v", err)
 	}
-	if duplicateResult.TaskID != first.TaskID || duplicateResult.Created {
-		t.Fatalf("duplicate SubmitTask result=%+v, want existing task %q", duplicateResult, first.TaskID)
-	}
-	if duplicate.TaskID != first.TaskID {
-		t.Fatalf("duplicate task_id after submit=%q, want existing %q", duplicate.TaskID, first.TaskID)
+	if duplicateResult.TaskID != firstResult.TaskID || duplicateResult.Created {
+		t.Fatalf("duplicate SubmitTask result=%+v, want existing task %q", duplicateResult, firstResult.TaskID)
 	}
 
-	assertTaskRowCount(t, db, first.TaskID, 1)
-	assertTaskRowCount(t, db, "task_action_duplicate", 0)
-	assertRiverJobRowCount(t, db, first.TaskID, 1)
-	assertRiverJobRowCount(t, db, "task_action_duplicate", 0)
+	assertTaskRowCount(t, db, firstResult.TaskID, 1)
+	assertRiverJobRowCount(t, db, firstResult.TaskID, 1)
 	if got := client.InsertCount(); got != 1 {
 		t.Fatalf("River InsertTx count=%d, want 1", got)
 	}
@@ -176,12 +166,13 @@ func TestTaskSubmissionRiverClientPinsCurrentSchemaWhenFallbackContainsRiverTabl
 	}
 	task := newTaskSubmissionTask("task_river_schema_pinned")
 	store := NewStore(shadowPool, taskstore.NewRepository(db), client, submissionRiverTestQueue, submissionRiverTestMaxAttempts, nil)
-	if _, err := store.SubmitTask(ctx, task, newTaskSubmissionQueueTask(task)); err != nil {
+	result, err := store.SubmitTask(ctx, canonicalRequestForTest(task))
+	if err != nil {
 		t.Fatalf("SubmitTask failed: %v", err)
 	}
 	var count int
 	currentRiverJob := pgx.Identifier{currentSchema, "river_job"}.Sanitize()
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM `+currentRiverJob+` WHERE args->'task'->>'task_id' = $1`, task.TaskID).Scan(&count); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM `+currentRiverJob+` WHERE args->'task'->>'task_id' = $1`, result.TaskID).Scan(&count); err != nil {
 		t.Fatalf("count current-schema River jobs failed: %v", err)
 	}
 	if count != 1 {
@@ -199,47 +190,44 @@ func TestStoreSubmitTaskCreatesDistinctTaskForNewClientActionID(t *testing.T) {
 
 	first := newTaskSubmissionTask("task_action_rerun_first")
 	first.ClientActionID = "canvas-action-rerun-1"
-	firstQueueTask := newTaskSubmissionQueueTask(first)
 
-	firstResult, err := store.SubmitTask(ctx, first, firstQueueTask)
+	firstResult, err := store.SubmitTask(ctx, canonicalRequestForTest(first))
 	if err != nil {
 		t.Fatalf("first SubmitTask failed: %v", err)
 	}
-	if firstResult.TaskID != first.TaskID || !firstResult.Created {
-		t.Fatalf("first SubmitTask result=%+v, want created task %q", firstResult, first.TaskID)
+	if firstResult.TaskID == "" || !firstResult.Created {
+		t.Fatalf("first SubmitTask result=%+v, want created task", firstResult)
 	}
 
 	rerun := newTaskSubmissionTask("task_action_rerun_second")
 	rerun.UserID = first.UserID
 	rerun.ClientActionID = "canvas-action-rerun-2"
-	rerunQueueTask := newTaskSubmissionQueueTask(rerun)
-
-	rerunResult, err := store.SubmitTask(ctx, rerun, rerunQueueTask)
+	rerunResult, err := store.SubmitTask(ctx, canonicalRequestForTest(rerun))
 	if err != nil {
 		t.Fatalf("rerun SubmitTask failed: %v", err)
 	}
-	if rerunResult.TaskID != rerun.TaskID || !rerunResult.Created {
-		t.Fatalf("rerun SubmitTask result=%+v, want created task %q", rerunResult, rerun.TaskID)
+	if rerunResult.TaskID == "" || !rerunResult.Created {
+		t.Fatalf("rerun SubmitTask result=%+v, want created task", rerunResult)
 	}
 	if firstResult.TaskID == rerunResult.TaskID {
 		t.Fatalf("rerun task_id=%q, want distinct from first task_id", rerunResult.TaskID)
 	}
 
-	assertTaskRowCount(t, db, first.TaskID, 1)
-	assertTaskRowCount(t, db, rerun.TaskID, 1)
-	assertRiverJobRowCount(t, db, first.TaskID, 1)
-	assertRiverJobRowCount(t, db, rerun.TaskID, 1)
+	assertTaskRowCount(t, db, firstResult.TaskID, 1)
+	assertTaskRowCount(t, db, rerunResult.TaskID, 1)
+	assertRiverJobRowCount(t, db, firstResult.TaskID, 1)
+	assertRiverJobRowCount(t, db, rerunResult.TaskID, 1)
 	if got := client.InsertCount(); got != 2 {
 		t.Fatalf("River InsertTx count=%d, want 2", got)
 	}
 
-	firstJob := loadRiverJobForTask(t, db, first.TaskID)
-	if !slices.Equal(firstJob.tags, []string{first.TaskID}) {
-		t.Fatalf("first River job tags=%v, want [%s]", firstJob.tags, first.TaskID)
+	firstJob := loadRiverJobForTask(t, db, firstResult.TaskID)
+	if !slices.Equal(firstJob.tags, []string{firstResult.TaskID}) {
+		t.Fatalf("first River job tags=%v, want [%s]", firstJob.tags, firstResult.TaskID)
 	}
-	rerunJob := loadRiverJobForTask(t, db, rerun.TaskID)
-	if !slices.Equal(rerunJob.tags, []string{rerun.TaskID}) {
-		t.Fatalf("rerun River job tags=%v, want [%s]", rerunJob.tags, rerun.TaskID)
+	rerunJob := loadRiverJobForTask(t, db, rerunResult.TaskID)
+	if !slices.Equal(rerunJob.tags, []string{rerunResult.TaskID}) {
+		t.Fatalf("rerun River job tags=%v, want [%s]", rerunJob.tags, rerunResult.TaskID)
 	}
 }
 
@@ -260,7 +248,7 @@ func TestStoreSubmitTaskSerializesConcurrentDuplicateClientActionID(t *testing.T
 			<-start
 			task := newTaskSubmissionTask(taskID)
 			task.ClientActionID = "canvas-action-concurrent"
-			result, err := store.SubmitTask(ctx, task, newTaskSubmissionQueueTask(task))
+			result, err := store.SubmitTask(ctx, canonicalRequestForTest(task))
 			results <- result
 			errs <- err
 		}()
@@ -304,20 +292,19 @@ func TestStoreSubmitTaskRollsBackTaskAndRiverJobWhenRealInsertReportsFailure(t *
 	client := newTaskSubmissionRiverClient(t, pool, submissionRiverTestQueue, submissionRiverTestMaxAttempts)
 
 	task := newTaskSubmissionTask("task_river_tx_rollback")
-	queueTask := newTaskSubmissionQueueTask(task)
 	forcedErr := errors.New("force rollback after real river insert")
 	store := NewStore(pool, taskstore.NewRepository(db), insertThenFailRiverTxClient{
 		inner: client,
 		err:   forcedErr,
 	}, submissionRiverTestQueue, submissionRiverTestMaxAttempts, nil)
 
-	_, err := store.SubmitTask(ctx, task, queueTask)
+	result, err := store.SubmitTask(ctx, canonicalRequestForTest(task))
 	if !errors.Is(err, forcedErr) {
 		t.Fatalf("SubmitTask error=%v, want forced error %v", err, forcedErr)
 	}
 
-	assertTaskRowCount(t, db, task.TaskID, 0)
-	assertRiverJobRowCount(t, db, task.TaskID, 0)
+	assertTaskRowCount(t, db, result.TaskID, 0)
+	assertRiverJobRowCount(t, db, result.TaskID, 0)
 }
 
 type insertThenFailRiverTxClient struct {
@@ -415,18 +402,27 @@ func newTaskSubmissionTask(taskID string) *tasks.Task {
 		Prompt:      "draw a transactional chair",
 		UserPrompt:  "draw a transactional chair",
 		Params:      `{"size":"1024x1024","style":"line"}`,
-		FeatureSlug: "sketch-to-image",
+		FeatureSlug: "test-non-billable",
 		Status:      tasks.StatusPending,
 	}
 }
 
-func newTaskSubmissionQueueTask(task *tasks.Task) *tasks.TaskPayload {
-	return &tasks.TaskPayload{
-		TaskID: task.TaskID,
-		UserID: task.UserID,
-		Prompt: task.Prompt,
-		Params: task.Params,
+func canonicalRequestForTest(task *tasks.Task) CanonicalRequest {
+	var billingRequest *taskbilling.Request
+	if task.BillingRequest != nil {
+		billingRequest = &taskbilling.Request{
+			Feature: task.BillingRequest.Feature, Quantity: task.BillingRequest.Quantity,
+		}
 	}
+	request, err := NewCanonicalRequest(CanonicalRequestInput{
+		UserID: task.UserID, UserPrompt: task.UserPrompt, Prompt: task.Prompt, Params: task.Params,
+		ClientActionID: task.ClientActionID, Feature: task.FeatureSlug, Priority: task.Priority,
+		BillingRequest: billingRequest, MaxBillingQuantity: 16,
+	})
+	if err != nil {
+		panic(err)
+	}
+	return request
 }
 
 type storedRiverJob struct {

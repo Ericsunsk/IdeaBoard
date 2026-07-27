@@ -2,8 +2,6 @@ package taskservice
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,36 +9,27 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/events"
-	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/platform/validation"
-	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
-	"ideaboard/api/internal/workflow"
+	"ideaboard/api/internal/tasking/tasksubmission"
 )
 
 type Service struct {
-	accountRepo         AccountStore
+	taskIntake          TaskIntake
 	taskRepo            TaskStore
 	submissionStore     TaskSubmissionStore
 	cancelStore         taskqueue.TaskCancellationStore
-	promptStore         FeaturePromptStore
-	mediaValidator      taskmedia.Validator
 	taskOutputCleaner   taskmedia.TaskOutputCleaner
-	generationSettings  settings.GoogleNativeGenerationSettingProvider
 	eventHub            *EventHub
 	taskEvents          events.TaskStatusPublisher
 	taskBilling         *taskbilling.Service
 	adminBillingHistory AdminBillingHistoryStore
+	adminTaskTrace      AdminTaskTraceStore
 	billableItems       BillableItemLookup
-}
-
-type AccountStore interface {
-	GetAllEnabled(ctx context.Context) ([]*accounts.ApiAccount, error)
 }
 
 type TaskStore interface {
@@ -56,15 +45,15 @@ type TaskStore interface {
 }
 
 type TaskSubmissionStore interface {
-	SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tasks.TaskPayload) (tasks.TaskSubmissionResult, error)
-}
-
-type FeaturePromptStore interface {
-	GetRuntimeConfig(ctx context.Context, slug string) (prompts.FeaturePromptRuntimeConfig, error)
+	SubmitTask(ctx context.Context, canonical tasksubmission.CanonicalRequest) (tasks.TaskSubmissionResult, error)
 }
 
 type AdminBillingHistoryStore interface {
 	ListAdminBillingSnapshots(context.Context, []string) (map[string]tasks.AdminBillingSnapshot, error)
+}
+
+type AdminTaskTraceStore interface {
+	ListAdminTaskAttempts(context.Context, []string) (map[string][]tasks.AdminTaskAttempt, error)
 }
 
 type BillableItemLookup interface {
@@ -72,16 +61,14 @@ type BillableItemLookup interface {
 }
 
 type ServiceDeps struct {
-	AccountRepo         AccountStore
+	TaskIntake          TaskIntake
 	TaskRepo            TaskStore
 	SubmissionStore     TaskSubmissionStore
 	CancelStore         taskqueue.TaskCancellationStore
-	PromptStore         FeaturePromptStore
-	MediaValidator      taskmedia.Validator
 	TaskOutputCleaner   taskmedia.TaskOutputCleaner
-	GenerationSettings  settings.GoogleNativeGenerationSettingProvider
 	TaskBilling         *taskbilling.Service
 	AdminBillingHistory AdminBillingHistoryStore
+	AdminTaskTrace      AdminTaskTraceStore
 	BillableItems       BillableItemLookup
 }
 
@@ -94,35 +81,25 @@ const taskCancelTTL = 24 * time.Hour
 const userDeletedTaskCancelReason = "用户删除节点"
 const maxTaskKeywordLength = 200
 const maxDeleteTaskIDs = 200
-const maxSubmitTaskPromptBytes = 8 * 1024
-const maxSubmitTaskFinalPromptBytes = 32 * 1024
-const maxSubmitTaskImageURLs = 16
-const maxSubmitTaskImageURLBytes = 4096
-const maxSubmitTaskClientActionIDBytes = 128
-const maxSubmitTaskParamsBytes = 2 * 1024 * 1024
-const maxSubmitTaskParamsDepth = 24
-const providerUnavailableMessage = "生图服务暂不可用，请稍后重试"
 
 var (
-	errNoAvailableAPIAccount          = errors.New("no available API account")
+	errTaskIntakeUnavailable          = errors.New("task intake not configured")
 	errTaskSubmissionStoreUnavailable = errors.New("task submission store not configured")
 	errTaskBillingUnavailable         = errors.New("task billing service not configured")
 )
 
 func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 	return &Service{
-		accountRepo:         deps.AccountRepo,
+		taskIntake:          deps.TaskIntake,
 		taskRepo:            deps.TaskRepo,
 		submissionStore:     deps.SubmissionStore,
 		cancelStore:         deps.CancelStore,
-		promptStore:         deps.PromptStore,
-		mediaValidator:      deps.MediaValidator,
 		taskOutputCleaner:   deps.TaskOutputCleaner,
-		generationSettings:  deps.GenerationSettings,
 		eventHub:            opts.EventHub,
 		taskEvents:          opts.TaskEvents,
 		taskBilling:         deps.TaskBilling,
 		adminBillingHistory: deps.AdminBillingHistory,
+		adminTaskTrace:      deps.AdminTaskTrace,
 		billableItems:       deps.BillableItems,
 	}
 }
@@ -136,49 +113,20 @@ func (s *Service) publishTaskStatusEvent(ctx context.Context, taskID, status str
 }
 
 func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (string, error) {
-	plan, err := s.PlanSubmission(ctx, userID, req)
+	if s == nil || s.taskIntake == nil {
+		return "", newSubmissionError("submission_failed", "任务提交失败，请稍后重试", errTaskIntakeUnavailable)
+	}
+	canonical, err := s.taskIntake.Prepare(ctx, userID, req)
 	if err != nil {
 		return "", err
-	}
-
-	taskID := generateSecureTaskID("task")
-	correlationID := tasks.CorrelationIDForTaskID(taskID)
-
-	task := &tasks.Task{
-		TaskID:         taskID,
-		CorrelationID:  correlationID,
-		UserID:         userID,
-		ClientActionID: plan.ClientActionID,
-		Prompt:         plan.FullPrompt,
-		UserPrompt:     plan.UserPrompt,
-		Params:         plan.ParamsJSON,
-		FeatureSlug:    plan.FeatureSlug,
-		Priority:       plan.Priority,
-		Status:         tasks.StatusPending,
-	}
-	if plan.BillingRequest != nil {
-		task.BillingRequest = &tasks.TaskBillingRequest{
-			Feature: plan.BillingRequest.Feature, Quantity: plan.BillingRequest.Quantity,
-		}
-	}
-
-	queueTask := &tasks.TaskPayload{
-		TaskID:        taskID,
-		CorrelationID: correlationID,
-		UserID:        userID,
-		Prompt:        plan.FullPrompt,
-		Params:        plan.ParamsJSON,
-		Priority:      plan.Priority,
-		RetryCount:    0,
-		CreatedAt:     time.Now().Unix(),
 	}
 
 	if s.submissionStore == nil {
 		return "", newSubmissionError("submission_failed", "任务提交失败，请稍后重试", errTaskSubmissionStoreUnavailable)
 	}
-	result, err := s.submissionStore.SubmitTask(ctx, task, queueTask)
+	result, err := s.submissionStore.SubmitTask(ctx, canonical)
 	if err != nil {
-		slog.Warn("submit task transaction failed", "task_id", taskID, "correlation_id", correlationID, "err", err)
+		slog.Warn("submit task transaction failed", "user_id", userID, "feature", canonical.Feature(), "err", err)
 		if errors.Is(err, taskbilling.ErrInsufficientCredits) {
 			return "", taskbilling.ErrInsufficientCredits
 		}
@@ -200,19 +148,23 @@ type SubmitTaskReadiness struct {
 }
 
 func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest, billingQuantity int64) (SubmitTaskReadiness, error) {
-	plan, err := s.PlanSubmission(ctx, userID, req)
+	if s == nil || s.taskIntake == nil {
+		return SubmitTaskReadiness{}, newSubmissionError(
+			"submission_failed", "任务提交检查暂不可用，请稍后重试", errTaskIntakeUnavailable,
+		)
+	}
+	canonical, err := s.taskIntake.Prepare(ctx, userID, req)
 	if err != nil {
 		return SubmitTaskReadiness{}, err
 	}
-	result := SubmitTaskReadiness{Feature: plan.FeatureSlug}
-	if plan.BillingRequest == nil {
+	result := SubmitTaskReadiness{Feature: canonical.Feature()}
+	billingRequest, err := canonical.BillingRequest(billingQuantity)
+	if err != nil {
+		return SubmitTaskReadiness{}, err
+	}
+	if billingRequest == nil {
 		return result, nil
 	}
-	if billingQuantity <= 0 || billingQuantity > int64(maxSubmitTaskImageURLs) {
-		return SubmitTaskReadiness{}, validation.New("billing_quantity 必须为 1-16")
-	}
-	billingRequest := *plan.BillingRequest
-	billingRequest.Quantity = billingQuantity
 	if s.taskBilling == nil {
 		return SubmitTaskReadiness{}, newSubmissionError(
 			"submission_failed",
@@ -220,209 +172,12 @@ func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, re
 			errTaskBillingUnavailable,
 		)
 	}
-	readiness, err := s.taskBilling.Readiness(ctx, userID, billingRequest)
+	readiness, err := s.taskBilling.Readiness(ctx, userID, *billingRequest)
 	if err != nil {
 		return SubmitTaskReadiness{}, err
 	}
 	result.Billing = &readiness
 	return result, nil
-}
-
-func resolveTaskBillingRequest(feature string) (*taskbilling.Request, error) {
-	if !taskbilling.RequiresBilling(feature) {
-		return nil, nil
-	}
-	request, err := taskbilling.AIImageRequest(feature)
-	if err != nil {
-		return nil, err
-	}
-	return &request, nil
-}
-
-func normalizeSubmitTaskClientActionID(raw string) (string, error) {
-	value := strings.TrimSpace(raw)
-	if value == "" {
-		return "", nil
-	}
-	if len(value) > maxSubmitTaskClientActionIDBytes {
-		return "", fmt.Errorf("client_action_id 过长")
-	}
-	for _, r := range value {
-		if r >= 'a' && r <= 'z' {
-			continue
-		}
-		if r >= 'A' && r <= 'Z' {
-			continue
-		}
-		if r >= '0' && r <= '9' {
-			continue
-		}
-		switch r {
-		case '-', '_', '.', ':':
-			continue
-		default:
-			return "", fmt.Errorf("client_action_id 只能包含字母、数字、横线、下划线、点或冒号")
-		}
-	}
-	return value, nil
-}
-
-type SubmissionPlan struct {
-	FeatureSlug    string
-	UserPrompt     string
-	FullPrompt     string
-	TypedParams    *tasks.WorkflowTaskParams
-	ParamsJSON     string
-	ClientActionID string
-	Priority       int
-	BillingRequest *taskbilling.Request
-}
-
-func (s *Service) PlanSubmission(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (*SubmissionPlan, error) {
-	if req == nil {
-		return nil, validation.New("请求参数错误")
-	}
-	clientActionID, err := normalizeSubmitTaskClientActionID(req.ClientActionID)
-	if err != nil {
-		return nil, err
-	}
-	priority := tasks.EffectiveTaskPriority(req.Priority)
-	if !tasks.IsValidTaskPriority(priority) {
-		return nil, validation.New("priority 仅支持 1-4")
-	}
-	if err := validateSubmitTaskPrompt(req.Prompt, maxSubmitTaskPromptBytes, "提示词"); err != nil {
-		return nil, err
-	}
-	if err := s.validateSubmitTaskImageURLs(ctx, userID, req.ImageURLs); err != nil {
-		return nil, err
-	}
-
-	params := make(map[string]interface{}, len(req.Params)+2)
-	for key, value := range req.Params {
-		params[key] = value
-	}
-	if req.Feature != "" {
-		params["feature"] = req.Feature
-	}
-	if len(req.ImageURLs) > 0 {
-		params["image_urls"] = req.ImageURLs
-	}
-	normalizeSubmitTaskMediaParams(params)
-	if err := s.validateSubmitTaskMediaParams(ctx, userID, params); err != nil {
-		return nil, err
-	}
-
-	featureSlug, err := workflow.ResolveWorkflowFeatureSlug(params)
-	if err != nil {
-		return nil, err
-	}
-	if featureSlug == "" {
-		return nil, validation.New("feature 不能为空")
-	}
-	params["feature"] = featureSlug
-	delete(params, "model")
-	if err := workflow.NormalizeStructuredPromptContractParams(params, featureSlug); err != nil {
-		return nil, err
-	}
-	if featureSlug == workflow.FeatureSlugPatternGen {
-		if err := workflow.ValidatePatternGenSubmitContract(req.Prompt, params); err != nil {
-			return nil, err
-		}
-	}
-	if featureSlug == workflow.FeatureSlugStyleFusion {
-		if err := normalizeStyleFusionParams(params); err != nil {
-			return nil, err
-		}
-	}
-	typedParams, err := workflowTaskParamsFromMap(params, featureSlug)
-	if err != nil {
-		return nil, err
-	}
-
-	apiAccounts, err := s.accountRepo.GetAllEnabled(ctx)
-	if err != nil {
-		return nil, newSubmissionError("provider_unavailable", providerUnavailableMessage, err)
-	}
-	apiAccounts = accounts.FilterAccountsWithEnabledModels(apiAccounts)
-	if len(apiAccounts) == 0 {
-		return nil, newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
-	}
-	apiAccounts, err = s.filterGoogleNativeAccountsForSubmit(ctx, userID, apiAccounts)
-	if err != nil {
-		return nil, err
-	}
-	if len(apiAccounts) == 0 {
-		return nil, newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
-	}
-
-	promptConfig := prompts.FeaturePromptRuntimeConfig{
-		UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(featureSlug),
-	}
-	if s.promptStore != nil {
-		promptConfig, err = s.promptStore.GetRuntimeConfig(ctx, featureSlug)
-		if err != nil {
-			return nil, newSubmissionError("prompt_unavailable", "系统提示词暂不可用", err)
-		}
-	}
-	fullPrompt := prompts.ApplyFeatureSystemPromptWithConfig(req.Prompt, req.Prompt, featureSlug, params, promptConfig)
-	if err := validateSubmitTaskPrompt(fullPrompt, maxSubmitTaskFinalPromptBytes, "最终提示词"); err != nil {
-		return nil, err
-	}
-	billingRequest, err := resolveTaskBillingRequest(featureSlug)
-	if err != nil {
-		return nil, err
-	}
-	if billingRequest != nil && clientActionID == "" {
-		return nil, validation.New("AI 生图任务必须提供 client_action_id")
-	}
-	paramsJSON, err := marshalWorkflowTaskParams(typedParams, params)
-	if err != nil {
-		return nil, err
-	}
-	return &SubmissionPlan{
-		FeatureSlug: featureSlug,
-		UserPrompt:  req.Prompt, FullPrompt: fullPrompt, TypedParams: typedParams, ParamsJSON: paramsJSON,
-		ClientActionID: clientActionID, Priority: priority,
-		BillingRequest: billingRequest,
-	}, nil
-}
-
-func (s *Service) filterGoogleNativeAccountsForSubmit(ctx context.Context, userID int64, apiAccounts []*accounts.ApiAccount) ([]*accounts.ApiAccount, error) {
-	if len(apiAccounts) == 0 || s.generationSettings == nil {
-		return apiAccounts, nil
-	}
-	hasGoogleNative := false
-	for _, account := range apiAccounts {
-		if accountUsesGoogleNativeAPI(account) {
-			hasGoogleNative = true
-			break
-		}
-	}
-	if !hasGoogleNative {
-		return apiAccounts, nil
-	}
-
-	setting, err := s.generationSettings.GetGoogleNativeGeneration(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("生成策略设置读取失败，请稍后重试")
-	}
-	evaluation := settings.EvaluateGoogleNativeGeneration(setting, userID)
-	if evaluation.Allowed {
-		return apiAccounts, nil
-	}
-
-	if evaluation.Message != "" {
-		return nil, errors.New(evaluation.Message)
-	}
-	return nil, errNoAvailableAPIAccount
-}
-
-func accountUsesGoogleNativeAPI(account *accounts.ApiAccount) bool {
-	if account == nil {
-		return false
-	}
-	apiType, ok := workflow.ValidateProviderAPIType(account.ApiType, account.ProxyURL)
-	return ok && workflow.IsGoogleNativeAPIType(apiType)
 }
 
 func (s *Service) GetTask(ctx context.Context, taskID string) (*tasks.Task, error) {
@@ -432,6 +187,9 @@ func (s *Service) GetTask(ctx context.Context, taskID string) (*tasks.Task, erro
 	}
 	s.attachOutputsForTasks(ctx, []*tasks.Task{task})
 	if err := s.attachAdminBillingSnapshots(ctx, []*tasks.Task{task}); err != nil {
+		return nil, err
+	}
+	if err := s.attachAdminTaskAttempts(ctx, task); err != nil {
 		return nil, err
 	}
 	return task, nil
@@ -493,6 +251,21 @@ func (s *Service) attachAdminBillingSnapshots(ctx context.Context, items []*task
 		}
 		value := snapshot
 		byTaskID[taskID].BillingSnapshot = &value
+	}
+	return nil
+}
+
+func (s *Service) attachAdminTaskAttempts(ctx context.Context, task *tasks.Task) error {
+	if s.adminTaskTrace == nil || task == nil || task.TaskID == "" {
+		return nil
+	}
+	attemptsByTaskID, err := s.adminTaskTrace.ListAdminTaskAttempts(ctx, []string{task.TaskID})
+	if err != nil {
+		return fmt.Errorf("load Admin Task execution trace: %w", err)
+	}
+	task.ExecutionAttempts = attemptsByTaskID[task.TaskID]
+	if task.ExecutionAttempts == nil {
+		task.ExecutionAttempts = []tasks.AdminTaskAttempt{}
 	}
 	return nil
 }
@@ -685,12 +458,4 @@ func (s *Service) GetUserTasks(ctx context.Context, userID int64, page, pageSize
 	}
 	s.attachOutputsForTasks(ctx, items)
 	return items, total, nil
-}
-
-func generateSecureTaskID(prefix string) string {
-	b := make([]byte, 12)
-	if _, err := rand.Read(b); err != nil {
-		return fmt.Sprintf("%s_%d", prefix, time.Now().UnixNano())
-	}
-	return fmt.Sprintf("%s_%s", prefix, hex.EncodeToString(b))
 }

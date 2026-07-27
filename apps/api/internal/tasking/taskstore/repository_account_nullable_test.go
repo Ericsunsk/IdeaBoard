@@ -225,12 +225,13 @@ func TestListMonitorExecutionPressureByRangeUsesQueueAndAttemptFacts(t *testing.
 	if err != nil {
 		t.Fatalf("create failed attempt failed: %v", err)
 	}
-	if _, err := repo.FinishTaskAttempt(ctx, tasks.TaskAttemptFinish{
-		ID:             failedRef.ID,
-		Status:         tasks.TaskAttemptStatusFailed,
-		TotalLatencyMS: 70_000,
-		CompletedAt:    now.Add(-time.Minute),
-	}); err != nil {
+	failedFinish := taskAttemptFinishForRef(
+		failedRef,
+		tasks.TaskAttemptStatusFailed,
+		now.Add(-time.Minute),
+	)
+	failedFinish.TotalLatencyMS = 70_000
+	if _, err := repo.FinishTaskAttempt(ctx, failedFinish); err != nil {
 		t.Fatalf("finish failed attempt failed: %v", err)
 	}
 
@@ -261,12 +262,13 @@ func TestListMonitorExecutionPressureByRangeUsesQueueAndAttemptFacts(t *testing.
 	if err != nil {
 		t.Fatalf("create retry attempt failed: %v", err)
 	}
-	if _, err := repo.FinishTaskAttempt(ctx, tasks.TaskAttemptFinish{
-		ID:             retryRef.ID,
-		Status:         tasks.TaskAttemptStatusRequeued,
-		TotalLatencyMS: 45_000,
-		CompletedAt:    now.Add(-30 * time.Second),
-	}); err != nil {
+	retryFinish := taskAttemptFinishForRef(
+		retryRef,
+		tasks.TaskAttemptStatusRequeued,
+		now.Add(-30*time.Second),
+	)
+	retryFinish.TotalLatencyMS = 45_000
+	if _, err := repo.FinishTaskAttempt(ctx, retryFinish); err != nil {
 		t.Fatalf("finish retry attempt failed: %v", err)
 	}
 
@@ -391,20 +393,20 @@ func TestFinishTaskAttemptOnlyUpdatesRunningAttempt(t *testing.T) {
 		t.Fatalf("create attempt failed: %v", err)
 	}
 	finishedAt := time.Now()
-	rows, err := repo.FinishTaskAttempt(ctx, tasks.TaskAttemptFinish{
-		ID:          ref.ID,
-		Status:      tasks.TaskAttemptStatusRequeued,
-		CompletedAt: finishedAt,
-	})
+	rows, err := repo.FinishTaskAttempt(
+		ctx,
+		taskAttemptFinishForRef(ref, tasks.TaskAttemptStatusRequeued, finishedAt),
+	)
 	if err != nil || rows != 1 {
 		t.Fatalf("finish running attempt rows=%d err=%v, want rows=1 nil err", rows, err)
 	}
-	rows, err = repo.FinishTaskAttempt(ctx, tasks.TaskAttemptFinish{
-		ID:          ref.ID,
-		Status:      tasks.TaskAttemptStatusFailed,
-		ErrorMsg:    "late failure",
-		CompletedAt: finishedAt.Add(time.Second),
-	})
+	lateFinish := taskAttemptFinishForRef(
+		ref,
+		tasks.TaskAttemptStatusFailed,
+		finishedAt.Add(time.Second),
+	)
+	lateFinish.ErrorMsg = "late failure"
+	rows, err = repo.FinishTaskAttempt(ctx, lateFinish)
 	if err != nil || rows != 0 {
 		t.Fatalf("finish terminal attempt rows=%d err=%v, want rows=0 nil err", rows, err)
 	}
@@ -414,6 +416,18 @@ func TestFinishTaskAttemptOnlyUpdatesRunningAttempt(t *testing.T) {
 	}
 	if status != tasks.TaskAttemptStatusRequeued {
 		t.Fatalf("attempt status=%q, want %q", status, tasks.TaskAttemptStatusRequeued)
+	}
+}
+
+func taskAttemptFinishForRef(
+	ref tasks.TaskAttemptRef,
+	status string,
+	completedAt time.Time,
+) tasks.TaskAttemptFinish {
+	return tasks.TaskAttemptFinish{
+		ID: ref.ID, TaskID: ref.TaskID, LeaseToken: ref.LeaseToken,
+		AccountID: ref.AccountID, ProviderEndpointID: ref.ProviderEndpointID,
+		CredentialID: ref.CredentialID, Status: status, CompletedAt: completedAt,
 	}
 }
 
@@ -582,6 +596,133 @@ func TestCompleteWithAttemptRollsBackWhenAttemptFinishFails(t *testing.T) {
 	}
 	if loaded.LeaseToken != task.LeaseToken {
 		t.Fatalf("lease_token=%q, want %q", loaded.LeaseToken, task.LeaseToken)
+	}
+}
+
+func TestCompleteRollsBackWhenAttemptBelongsToAnotherTask(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	repo := NewRepository(db)
+	accountID := seedRepositoryTestAccount(t, db, 191)
+	channelID := accountID + 10000
+	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
+	taskA := seedRepositoryRunningTaskWithActiveLease(t, repo, db, ctx, "terminal-cross-task-a", accountID, channelID, credentialID, "lease-cross-a", "lease-cross-a")
+	taskB := seedRepositoryRunningTaskWithActiveLease(t, repo, db, ctx, "terminal-cross-task-b", accountID, channelID, credentialID, "lease-cross-b", "lease-cross-b")
+	attemptA, err := repo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
+		TaskID: taskA.TaskID, LeaseToken: taskA.LeaseToken, AccountID: accountID,
+		ProviderEndpointID: channelID, CredentialID: credentialID, ProviderStartedAt: time.Now(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	attemptB, err := repo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
+		TaskID: taskB.TaskID, LeaseToken: taskB.LeaseToken, AccountID: accountID,
+		ProviderEndpointID: channelID, CredentialID: credentialID, ProviderStartedAt: time.Now(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := repo.CompleteWithOutputsAndLeaseToken(
+		ctx, taskA.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID,
+		taskA.LeaseToken, `{}`, time.Now(), nil,
+		&tasks.TaskAttemptFinish{ID: attemptB.ID, Status: tasks.TaskAttemptStatusCompleted, CompletedAt: time.Now()},
+	)
+	if err == nil || rows != 0 {
+		t.Fatalf("cross-task attempt rows=%d err=%v, want rollback", rows, err)
+	}
+	assertTaskAndAttemptStillRunning(t, db, taskA.TaskID, attemptA.ID)
+	assertTaskAndAttemptStillRunning(t, db, taskB.TaskID, attemptB.ID)
+}
+
+func TestCompleteRollsBackWhenAttemptBelongsToStaleLease(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	repo := NewRepository(db)
+	accountID := seedRepositoryTestAccount(t, db, 192)
+	channelID := accountID + 10000
+	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
+	task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, ctx, "terminal-stale-lease", accountID, channelID, credentialID, "lease-stale-old", "lease-stale-old")
+	oldAttempt, err := repo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
+		TaskID: task.TaskID, LeaseToken: task.LeaseToken, AccountID: accountID,
+		ProviderEndpointID: channelID, CredentialID: credentialID, ProviderStartedAt: time.Now(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `
+UPDATE task_leases
+SET released_at = now(), release_reason = 'reset'
+WHERE task_id = $1 AND lease_token = $2`,
+		task.TaskID, task.LeaseToken); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `
+UPDATE tasks
+SET lease_token = 'lease-stale-new'
+WHERE task_id = $1`, task.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, "lease-stale-new")
+
+	rows, err := repo.CompleteWithOutputsAndLeaseToken(
+		ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID,
+		"lease-stale-new", `{}`, time.Now(), nil,
+		&tasks.TaskAttemptFinish{ID: oldAttempt.ID, Status: tasks.TaskAttemptStatusCompleted, CompletedAt: time.Now()},
+	)
+	if err == nil || rows != 0 {
+		t.Fatalf("stale-lease attempt rows=%d err=%v, want rollback", rows, err)
+	}
+	assertTaskAndAttemptStillRunning(t, db, task.TaskID, oldAttempt.ID)
+	var activeLeaseToken string
+	if err := db.QueryRowContext(ctx, `
+SELECT lease_token FROM task_leases WHERE task_id = $1 AND released_at IS NULL`, task.TaskID).Scan(&activeLeaseToken); err != nil {
+		t.Fatal(err)
+	}
+	if activeLeaseToken != "lease-stale-new" {
+		t.Fatalf("active lease token=%q, want new lease preserved", activeLeaseToken)
+	}
+}
+
+func TestCompleteRollsBackWhenAttemptStatusConflictsWithTerminalPolicy(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	repo := NewRepository(db)
+	accountID := seedRepositoryTestAccount(t, db, 193)
+	channelID := accountID + 10000
+	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
+	task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, ctx, "terminal-status-mismatch", accountID, channelID, credentialID, "lease-status-mismatch", "lease-status-mismatch")
+	attempt, err := repo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
+		TaskID: task.TaskID, LeaseToken: task.LeaseToken, AccountID: accountID,
+		ProviderEndpointID: channelID, CredentialID: credentialID, ProviderStartedAt: time.Now(),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := repo.CompleteWithOutputsAndLeaseToken(
+		ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID,
+		task.LeaseToken, `{}`, time.Now(), nil,
+		&tasks.TaskAttemptFinish{ID: attempt.ID, Status: tasks.TaskAttemptStatusFailed, CompletedAt: time.Now()},
+	)
+	if err == nil || rows != 0 {
+		t.Fatalf("attempt status mismatch rows=%d err=%v, want rollback", rows, err)
+	}
+	assertTaskAndAttemptStillRunning(t, db, task.TaskID, attempt.ID)
+}
+
+func assertTaskAndAttemptStillRunning(t *testing.T, db *sql.DB, taskID string, attemptID int64) {
+	t.Helper()
+	var taskStatus, attemptStatus string
+	if err := db.QueryRow(`
+SELECT tasks.status, attempts.status
+FROM tasks
+JOIN task_attempts attempts ON attempts.task_id = tasks.task_id
+WHERE tasks.task_id = $1 AND attempts.id = $2`, taskID, attemptID).Scan(&taskStatus, &attemptStatus); err != nil {
+		t.Fatal(err)
+	}
+	if taskStatus != tasks.StatusRunning || attemptStatus != tasks.TaskAttemptStatusRunning {
+		t.Fatalf("task/attempt status=%q/%q, want running/running", taskStatus, attemptStatus)
 	}
 }
 

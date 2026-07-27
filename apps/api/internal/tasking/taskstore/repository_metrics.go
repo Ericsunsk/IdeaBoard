@@ -51,18 +51,6 @@ func (r *Repository) PatchExecutionMetrics(ctx context.Context, patch tasks.Task
 	})
 }
 
-func patchTerminalExecutionMetricsTx(ctx context.Context, q *dbsqlc.Queries, taskID string, currentStage string, failureStage string, failureCategory string, finishedAt time.Time) error {
-	taskRow, err := q.GetTaskByTaskID(ctx, taskID)
-	if err != nil {
-		return err
-	}
-	metricsByTaskID, err := listExecutionMetricsByTaskIDsTx(ctx, q, []string{taskID})
-	if err != nil {
-		return err
-	}
-	return patchTerminalExecutionMetricsForTaskTx(ctx, q, taskID, taskRow.Task.CreatedAt, metricsByTaskID[taskID], currentStage, failureStage, failureCategory, finishedAt)
-}
-
 func patchTerminalExecutionMetricsForTaskTx(
 	ctx context.Context,
 	q *dbsqlc.Queries,
@@ -119,24 +107,6 @@ func listExecutionMetricsByTaskIDsTx(ctx context.Context, q *dbsqlc.Queries, tas
 	return result, nil
 }
 
-func taskAttemptFailureStage(attemptFinish *tasks.TaskAttemptFinish, fallback string) string {
-	if attemptFinish != nil {
-		if stage := strings.TrimSpace(attemptFinish.FailureStage); stage != "" {
-			return stage
-		}
-	}
-	return fallback
-}
-
-func taskAttemptFailureCategory(attemptFinish *tasks.TaskAttemptFinish, fallback string) string {
-	if attemptFinish != nil {
-		if category := strings.TrimSpace(attemptFinish.FailureCategory); category != "" {
-			return category
-		}
-	}
-	return fallback
-}
-
 func (r *Repository) PatchExecutionSnapshot(ctx context.Context, snapshot tasks.TaskExecutionSnapshot) (int64, error) {
 	taskID := strings.TrimSpace(snapshot.TaskID)
 	if taskID == "" {
@@ -172,12 +142,20 @@ func (r *Repository) CreateTaskAttempt(ctx context.Context, start tasks.TaskAtte
 	if err != nil {
 		return tasks.TaskAttemptRef{}, err
 	}
-	return tasks.TaskAttemptRef{ID: row.ID, LeaseID: row.LeaseID, AttemptNo: int(row.AttemptNo)}, nil
+	return tasks.TaskAttemptRef{
+		ID: row.ID, LeaseID: row.LeaseID, AttemptNo: int(row.AttemptNo),
+		TaskID: taskID, LeaseToken: strings.TrimSpace(start.LeaseToken),
+		AccountID: start.AccountID, ProviderEndpointID: start.ProviderEndpointID,
+		CredentialID: start.CredentialID,
+	}, nil
 }
 
 func (r *Repository) FinishTaskAttempt(ctx context.Context, finish tasks.TaskAttemptFinish) (int64, error) {
 	if finish.ID == 0 {
 		return 0, fmt.Errorf("task_attempt id is required")
+	}
+	if err := validateTaskAttemptFinishIdentity(finish); err != nil {
+		return 0, err
 	}
 	return r.q.FinishTaskAttempt(ctx, finishTaskAttemptParams(finish))
 }
@@ -245,7 +223,70 @@ func finishTaskAttemptParams(finish tasks.TaskAttemptFinish) dbsqlc.FinishTaskAt
 		TotalLatencyMs:     finish.TotalLatencyMS,
 		CompletedAt:        sql.NullTime{Time: completedAt, Valid: true},
 		ID:                 finish.ID,
+		TaskID:             strings.TrimSpace(finish.TaskID),
+		AccountID:          finish.AccountID,
+		ProviderEndpointID: finish.ProviderEndpointID,
+		CredentialID:       finish.CredentialID,
+		LeaseToken:         strings.TrimSpace(finish.LeaseToken),
 	}
+}
+
+func validateTaskAttemptFinishIdentity(finish tasks.TaskAttemptFinish) error {
+	if strings.TrimSpace(finish.TaskID) == "" {
+		return fmt.Errorf("task_attempt task_id is required")
+	}
+	if finish.AccountID <= 0 || finish.ProviderEndpointID <= 0 || finish.CredentialID <= 0 {
+		return fmt.Errorf("task_attempt active lease identity is required")
+	}
+	if strings.TrimSpace(finish.LeaseToken) == "" {
+		return fmt.Errorf("task_attempt lease_token is required")
+	}
+	return nil
+}
+
+func taskAttemptFinishWithLeaseIdentity(
+	finish *tasks.TaskAttemptFinish,
+	taskID string,
+	accountID int64,
+	providerEndpointID int64,
+	credentialID int64,
+	leaseToken string,
+) (*tasks.TaskAttemptFinish, error) {
+	if finish == nil || finish.ID == 0 {
+		return finish, nil
+	}
+	taskID = strings.TrimSpace(taskID)
+	leaseToken = strings.TrimSpace(leaseToken)
+	if value := strings.TrimSpace(finish.TaskID); value != "" && value != taskID {
+		return nil, fmt.Errorf("task_attempt task_id=%q conflicts with active lease task_id=%q", value, taskID)
+	}
+	if finish.AccountID > 0 && finish.AccountID != accountID {
+		return nil, fmt.Errorf("task_attempt account_id=%d conflicts with active lease account_id=%d", finish.AccountID, accountID)
+	}
+	if finish.ProviderEndpointID > 0 && finish.ProviderEndpointID != providerEndpointID {
+		return nil, fmt.Errorf(
+			"task_attempt provider_endpoint_id=%d conflicts with active lease provider_endpoint_id=%d",
+			finish.ProviderEndpointID,
+			providerEndpointID,
+		)
+	}
+	if finish.CredentialID > 0 && finish.CredentialID != credentialID {
+		return nil, fmt.Errorf("task_attempt credential_id=%d conflicts with active lease credential_id=%d", finish.CredentialID, credentialID)
+	}
+	if value := strings.TrimSpace(finish.LeaseToken); value != "" && value != leaseToken {
+		return nil, fmt.Errorf("task_attempt lease_token conflicts with active lease")
+	}
+
+	result := *finish
+	result.TaskID = taskID
+	result.AccountID = accountID
+	result.ProviderEndpointID = providerEndpointID
+	result.CredentialID = credentialID
+	result.LeaseToken = leaseToken
+	if err := validateTaskAttemptFinishIdentity(result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 func (r *Repository) ListMonitorExecutionPressureByRange(ctx context.Context, start, now time.Time) ([]MonitorExecutionPressureAggregate, error) {

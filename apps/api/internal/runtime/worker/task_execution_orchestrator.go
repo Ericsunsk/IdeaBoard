@@ -656,6 +656,11 @@ func buildTaskAttemptFinish(
 	}
 	return tasks.TaskAttemptFinish{
 		ID:                 ref.ID,
+		TaskID:             ref.TaskID,
+		LeaseToken:         ref.LeaseToken,
+		AccountID:          ref.AccountID,
+		ProviderEndpointID: ref.ProviderEndpointID,
+		CredentialID:       ref.CredentialID,
 		Status:             status,
 		FailureStage:       failureStage,
 		FailureCategory:    failureCategory,

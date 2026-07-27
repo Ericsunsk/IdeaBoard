@@ -145,16 +145,19 @@ func newAppTaskRuntime(
 
 	submissionStore := tasksubmission.NewStore(dbs.riverPool, repos.taskRepo, riverClient, taskqueue.RiverQueueDefault, taskRuntimeSetting.MaxRetry, taskBillingService)
 	taskService := taskservice.NewService(taskservice.ServiceDeps{
-		AccountRepo:         repos.accountRepo,
+		TaskIntake: taskservice.NewTaskIntake(taskservice.TaskIntakeDeps{
+			Accounts:           repos.accountRepo,
+			Prompts:            repos.featurePromptRepo,
+			Media:              submitMediaValidator,
+			GenerationSettings: services.runtimeSettings,
+		}),
 		TaskRepo:            repos.taskRepo,
 		SubmissionStore:     submissionStore,
 		CancelStore:         postgresRuntimeStore,
-		PromptStore:         repos.featurePromptRepo,
-		MediaValidator:      submitMediaValidator,
 		TaskOutputCleaner:   runtimeTaskMediaStore,
-		GenerationSettings:  services.runtimeSettings,
 		TaskBilling:         taskBillingService,
 		AdminBillingHistory: repos.taskRepo,
+		AdminTaskTrace:      repos.taskRepo,
 		BillableItems:       services.billableItemRegistry,
 	}, taskservice.ServiceOptions{
 		EventHub:   taskEventHub,

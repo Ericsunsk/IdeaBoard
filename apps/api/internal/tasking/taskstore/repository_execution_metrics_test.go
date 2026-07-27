@@ -245,6 +245,7 @@ func TestCompleteWithOutputsWritesTerminalExecutionMetrics(t *testing.T) {
 	taskRepo, db := newRepositoryTestDB(t)
 	accountID := seedRepositoryTestAccount(t, db, 95)
 	channelID := accountID + 10000
+	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
 	completedAt := time.Now()
 	task := &tasks.Task{
 		TaskID:                     "metrics-completed-with-outputs",
@@ -258,9 +259,28 @@ func TestCompleteWithOutputsWritesTerminalExecutionMetrics(t *testing.T) {
 	if err := createRepositoryTestTask(t, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)
 	}
-	insertRepositoryActiveTaskLease(t, db, "metrics-completed-with-outputs", accountID, channelID, loadRepositoryTestCredentialID(t, db, accountID), task.LeaseToken)
+	insertRepositoryActiveTaskLease(t, db, "metrics-completed-with-outputs", accountID, channelID, credentialID, task.LeaseToken)
 
-	rows, err := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, loadRepositoryTestCredentialID(t, db, accountID), task.LeaseToken, `{"status":"success"}`, completedAt, nil, nil)
+	attempt, err := taskRepo.CreateTaskAttempt(ctx, tasks.TaskAttemptStart{
+		TaskID:             task.TaskID,
+		LeaseToken:         task.LeaseToken,
+		AccountID:          accountID,
+		ProviderEndpointID: channelID,
+		CredentialID:       credentialID,
+		ProviderStartedAt:  completedAt.Add(-2 * time.Second),
+	})
+	if err != nil {
+		t.Fatalf("create attempt failed: %v", err)
+	}
+	providerFinishedAt := completedAt.Add(-time.Second)
+	rows, err := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, `{"status":"success"}`, completedAt, nil, &tasks.TaskAttemptFinish{
+		ID:                 attempt.ID,
+		Status:             tasks.TaskAttemptStatusCompleted,
+		ProviderFinishedAt: &providerFinishedAt,
+		ProviderLatencyMS:  1000,
+		TotalLatencyMS:     2000,
+		CompletedAt:        completedAt,
+	})
 	if err != nil || rows != 1 {
 		t.Fatalf("complete task rows=%d err=%v, want rows=1 nil err", rows, err)
 	}
@@ -283,6 +303,15 @@ func TestCompleteWithOutputsWritesTerminalExecutionMetrics(t *testing.T) {
 	}
 	if loaded.ExecutionMetrics.TotalLatencyMS <= 0 {
 		t.Fatalf("total_latency_ms=%d, want positive", loaded.ExecutionMetrics.TotalLatencyMS)
+	}
+	history, err := taskRepo.ListAdminTaskAttempts(ctx, []string{task.TaskID})
+	if err != nil {
+		t.Fatalf("ListAdminTaskAttempts failed: %v", err)
+	}
+	if len(history[task.TaskID]) != 1 ||
+		history[task.TaskID][0].Status != tasks.TaskAttemptStatusCompleted ||
+		history[task.TaskID][0].Stage != tasks.ExecutionStageCompleted {
+		t.Fatalf("single-success execution trace=%+v", history[task.TaskID])
 	}
 }
 
@@ -540,6 +569,13 @@ WHERE task_id = $1`,
 		t.Fatalf("assign second lease snapshot failed: %v", err)
 	}
 	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, secondLease)
+	if _, err := db.ExecContext(ctx, `
+UPDATE task_leases
+SET provider_endpoint_name = 'Provider B',
+    resolved_model = 'gpt-image-2'
+WHERE lease_token = $1`, secondLease); err != nil {
+		t.Fatalf("update second immutable lease snapshot failed: %v", err)
+	}
 
 	secondProviderFinishedAt := now.Add(-60 * time.Second)
 	finalizeStartedAt := now.Add(-59 * time.Second)
@@ -592,5 +628,30 @@ WHERE task_id = $1`,
 	}
 	if rows[0].ProviderAttempts != 2 || rows[0].ProviderErrors != 1 {
 		t.Fatalf("provider attempts/errors=%d/%d, want 2/1 row=%+v", rows[0].ProviderAttempts, rows[0].ProviderErrors, rows[0])
+	}
+
+	traces, err := taskRepo.ListAdminTaskAttempts(ctx, []string{task.TaskID})
+	if err != nil {
+		t.Fatalf("ListAdminTaskAttempts failed: %v", err)
+	}
+	attempts := traces[task.TaskID]
+	if len(attempts) != 2 {
+		t.Fatalf("execution attempts=%d, want 2: %+v", len(attempts), attempts)
+	}
+	if attempts[0].AttemptNo != 1 || attempts[0].Status != tasks.TaskAttemptStatusRequeued ||
+		attempts[0].ResolvedModel != "gpt-image-1" || attempts[0].FailureCategory != tasks.FailureCategoryProviderError {
+		t.Fatalf("first execution attempt=%+v", attempts[0])
+	}
+	if attempts[1].AttemptNo != 2 || attempts[1].Status != tasks.TaskAttemptStatusCompleted ||
+		attempts[1].ProviderEndpointName != "Provider B" || attempts[1].ResolvedModel != "gpt-image-2" {
+		t.Fatalf("second execution attempt=%+v", attempts[1])
+	}
+	terminalTask, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("GetByTaskID failed: %v", err)
+	}
+	if terminalTask.ResolvedModel != "" ||
+		terminalTask.ProviderEndpointName != "" {
+		t.Fatalf("terminal current assignment leaked historical lease: %+v", terminalTask)
 	}
 }

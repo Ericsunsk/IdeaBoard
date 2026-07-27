@@ -44,6 +44,73 @@ func TestBilledTaskFailureAndCancellationReleaseHold(t *testing.T) {
 	}
 }
 
+func TestBilledTaskCancellationWithoutExplicitAttemptFinishConvergesAllTerminalFacts(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	repo, taskBilling, request := newBillingSettlementFixture(t, db, pool, 1, 100, 25)
+	accountID := seedRepositoryTestAccount(t, db, 770)
+	channelID := accountID + 10000
+	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
+	task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-cancel-active-attempt", accountID, channelID, credentialID, "lease-cancel", "lease-cancel")
+	holdTaskForSettlementTest(t, pool, taskBilling, task, request)
+
+	attempt, err := repo.CreateTaskAttempt(t.Context(), tasks.TaskAttemptStart{
+		TaskID:             task.TaskID,
+		RiverJobID:         1,
+		LeaseToken:         task.LeaseToken,
+		AccountID:          accountID,
+		ProviderEndpointID: channelID,
+		CredentialID:       credentialID,
+		ProviderStartedAt:  time.Now().Add(-time.Second),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelledAt := time.Now()
+	rows, err := repo.MarkTaskCancelled(t.Context(), tasks.TaskCancellationSnapshot{
+		TaskID:      task.TaskID,
+		CancelledAt: cancelledAt,
+		Reason:      "cancelled by user",
+	}, nil)
+	if err != nil || rows != 1 {
+		t.Fatalf("rows=%d err=%v", rows, err)
+	}
+
+	loaded, err := repo.GetByTaskID(t.Context(), task.TaskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Status != tasks.StatusCancelled {
+		t.Fatalf("task status=%q, want cancelled", loaded.Status)
+	}
+	if loaded.ExecutionMetrics == nil || loaded.ExecutionMetrics.CurrentStage != tasks.ExecutionStageCancelled {
+		t.Fatalf("execution metrics=%+v, want cancelled", loaded.ExecutionMetrics)
+	}
+	assertRepositoryActiveLeaseCount(t, db, task.TaskID, 0)
+	assertTaskBillingSettlement(t, db, task.TaskID, "released", 100, 0)
+
+	var attemptStatus string
+	var attemptCancelledAt sql.NullTime
+	if err := db.QueryRowContext(t.Context(), `
+SELECT status, cancelled_at
+FROM task_attempts
+WHERE id = $1`, attempt.ID).Scan(&attemptStatus, &attemptCancelledAt); err != nil {
+		t.Fatal(err)
+	}
+	if attemptStatus != tasks.TaskAttemptStatusCancelled || !attemptCancelledAt.Valid {
+		t.Fatalf("attempt status/cancelled_at=%q/%v, want cancelled timestamp", attemptStatus, attemptCancelledAt)
+	}
+	var statStatus string
+	if err := db.QueryRowContext(t.Context(), `
+SELECT status
+FROM task_stat_events
+WHERE task_id = $1`, task.TaskID).Scan(&statStatus); err != nil {
+		t.Fatal(err)
+	}
+	if statStatus != tasks.StatusCancelled {
+		t.Fatalf("daily stat event status=%q, want cancelled", statStatus)
+	}
+}
+
 func TestBilledTaskCompletionCapturesWithResultAndRejectsWrongLease(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	repo, taskBilling, request := newBillingSettlementFixture(t, db, pool, 1, 100, 25)
@@ -71,6 +138,35 @@ func TestBilledTaskCompletionCapturesWithResultAndRejectsWrongLease(t *testing.T
 	if status != tasks.StatusCompleted || result != `{"status":"success"}` {
 		t.Fatalf("status=%q result=%q", status, result)
 	}
+	history, err := repo.ListAdminBillingSnapshots(t.Context(), []string{task.TaskID})
+	if err != nil {
+		t.Fatalf("ListAdminBillingSnapshots failed: %v", err)
+	}
+	if history[task.TaskID].SettlementState != "captured" || history[task.TaskID].SettledAt == nil {
+		t.Fatalf("Admin Billing settlement projection=%+v", history[task.TaskID])
+	}
+}
+
+func TestAdminBillingSnapshotProjectsFreeSettlementWithoutLedgerMetadata(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	repo, taskBilling, request := newBillingSettlementFixture(t, db, pool, 1, 0, 0)
+	task := &tasks.Task{
+		TaskID:      "billing-free-admin-history",
+		UserID:      1,
+		Status:      tasks.StatusPending,
+		FeatureSlug: request.Feature,
+	}
+	seedTasks(t, repo, t.Context(), task)
+	holdTaskForSettlementTest(t, pool, taskBilling, task, request)
+
+	history, err := repo.ListAdminBillingSnapshots(t.Context(), []string{task.TaskID})
+	if err != nil {
+		t.Fatalf("ListAdminBillingSnapshots failed: %v", err)
+	}
+	snapshot := history[task.TaskID]
+	if snapshot.SettlementState != "free" || snapshot.SettledAt == nil || snapshot.TotalCredits != 0 {
+		t.Fatalf("free Admin Billing settlement projection=%+v", snapshot)
+	}
 }
 
 func TestPaidTaskTerminalSettlementMatrix(t *testing.T) {
@@ -82,7 +178,7 @@ func TestPaidTaskTerminalSettlementMatrix(t *testing.T) {
 			channelID := accountID + 10000
 			credentialID := loadRepositoryTestCredentialID(t, db, accountID)
 			task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-matrix-"+terminal, accountID, channelID, credentialID, "lease-"+terminal, "lease-"+terminal)
-			if _, err := db.ExecContext(t.Context(), `UPDATE tasks SET feature_slug = $2 WHERE task_id = $1`, task.TaskID, request.Feature, request.Feature); err != nil {
+			if _, err := db.ExecContext(t.Context(), `UPDATE tasks SET feature_slug = $2 WHERE task_id = $1`, task.TaskID, request.Feature); err != nil {
 				t.Fatal(err)
 			}
 			holdTaskForSettlementTest(t, pool, taskBilling, task, request)
@@ -253,6 +349,13 @@ func TestStartupRecoveryReleasesBilledHolds(t *testing.T) {
 		t.Fatalf("ids=%v err=%v", ids, err)
 	}
 	assertTaskBillingSettlement(t, db, task.TaskID, "released", 100, 0)
+	history, err := repo.ListAdminBillingSnapshots(t.Context(), []string{task.TaskID})
+	if err != nil {
+		t.Fatalf("ListAdminBillingSnapshots failed: %v", err)
+	}
+	if history[task.TaskID].SettlementState != "released" || history[task.TaskID].SettledAt == nil {
+		t.Fatalf("released Admin Billing settlement projection=%+v", history[task.TaskID])
+	}
 }
 
 func TestAccountStopAndArchiveReleaseBilledHoldsAtomically(t *testing.T) {

@@ -375,10 +375,12 @@ func (r *Repository) ListAdminBillingSnapshots(ctx context.Context, taskIDs []st
 		return result, nil
 	}
 	rows, err := r.dbWithContext(ctx).Query(`
-SELECT task_id, sku, display_name, price_version_id, price_version,
-       unit_credits, quantity, total_credits, quoted_at
-FROM task_billing_snapshots
-WHERE task_id = ANY($1::text[])`, pq.Array(taskIDs))
+SELECT snapshots.task_id, snapshots.sku, snapshots.display_name, snapshots.price_version_id, snapshots.price_version,
+       unit_credits, quantity, total_credits, quoted_at,
+       settlements.state, settlements.settled_at
+FROM task_billing_snapshots snapshots
+JOIN task_billing_settlements settlements ON settlements.task_id = snapshots.task_id
+WHERE snapshots.task_id = ANY($1::text[])`, pq.Array(taskIDs))
 	if err != nil {
 		return nil, fmt.Errorf("taskstore: list Admin Billing snapshots: %w", err)
 	}
@@ -386,13 +388,15 @@ WHERE task_id = ANY($1::text[])`, pq.Array(taskIDs))
 	for rows.Next() {
 		var taskID string
 		var snapshot tasks.AdminBillingSnapshot
+		var settledAt sql.NullTime
 		if err := rows.Scan(
 			&taskID, &snapshot.SKU, &snapshot.DisplayName, &snapshot.PriceVersionID,
 			&snapshot.PriceVersion, &snapshot.UnitCredits, &snapshot.Quantity,
-			&snapshot.TotalCredits, &snapshot.QuotedAt,
+			&snapshot.TotalCredits, &snapshot.QuotedAt, &snapshot.SettlementState, &settledAt,
 		); err != nil {
 			return nil, fmt.Errorf("taskstore: scan Admin Billing snapshot: %w", err)
 		}
+		snapshot.SettledAt = nullTimePointer(settledAt)
 		result[taskID] = snapshot
 	}
 	if err := rows.Err(); err != nil {
@@ -426,34 +430,23 @@ func (r *Repository) ListByTaskIDs(ctx context.Context, taskIDs []string) ([]*ta
 }
 
 func (r *Repository) MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
-	var rowsAffected int64
-	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx *sql.Tx) error {
-		updated, err := q.MarkTaskFailed(ctx, dbsqlc.MarkTaskFailedParams{
-			ErrorMsg:    errMsg,
-			Result:      result,
-			CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
-			TaskID:      taskID,
-			Statuses:    statuses,
-		})
-		if err != nil || updated == 0 {
-			return err
-		}
-		if err := upsertDailyStatByTaskIDTx(ctx, q, taskID, attemptFinish); err != nil {
-			return err
-		}
-		if err := finishTaskAttemptTx(ctx, q, attemptFinish); err != nil {
-			return err
-		}
-		if err := patchTerminalExecutionMetricsTx(ctx, q, taskID, tasks.ExecutionStageFailed, taskAttemptFailureStage(attemptFinish, tasks.ExecutionStageAssigned), taskAttemptFailureCategory(attemptFinish, tasks.FailureCategoryUnknown), completedAt); err != nil {
-			return err
-		}
-		if err := taskbilling.SettleTerminal(ctx, tx, taskID, taskbilling.TerminalOutcomeUnsuccessful); err != nil {
-			return err
-		}
-		rowsAffected = updated
-		return nil
+	completedAt = terminalTransitionTime(completedAt)
+	return r.runTerminalTransition(ctx, terminalTransitionCommand{
+		taskID:        taskID,
+		kind:          terminalTransitionFailed,
+		finishedAt:    completedAt,
+		errorMessage:  errMsg,
+		attemptFinish: attemptFinish,
+		writeTaskFact: func(ctx context.Context, q *dbsqlc.Queries) (int64, error) {
+			return q.MarkTaskFailed(ctx, dbsqlc.MarkTaskFailedParams{
+				ErrorMsg:    errMsg,
+				Result:      result,
+				CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
+				TaskID:      taskID,
+				Statuses:    statuses,
+			})
+		},
 	})
-	return rowsAffected, err
 }
 
 func (r *Repository) List(ctx context.Context, userID int64, accountID int64, status string, keyword string, page, pageSize int) ([]*tasks.Task, tasks.TaskListCounts, error) {
