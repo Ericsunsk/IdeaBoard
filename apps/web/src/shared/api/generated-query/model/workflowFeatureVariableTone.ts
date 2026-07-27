@@ -5,10 +5,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type FeaturePromptVariableTone =
-  (typeof FeaturePromptVariableTone)[keyof typeof FeaturePromptVariableTone]
+export type WorkflowFeatureVariableTone =
+  (typeof WorkflowFeatureVariableTone)[keyof typeof WorkflowFeatureVariableTone]
 
-export const FeaturePromptVariableTone = {
+export const WorkflowFeatureVariableTone = {
   prompt: 'prompt',
   control: 'control',
   context: 'context',

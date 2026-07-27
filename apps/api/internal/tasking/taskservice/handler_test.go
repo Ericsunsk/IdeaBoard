@@ -15,6 +15,7 @@ import (
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/testsupport"
@@ -300,8 +301,8 @@ func TestCheckSubmitTaskReadinessHandlerHidesMissingProviderConfiguration(t *tes
 	if body.Code != 0 || body.Msg != "success" || body.Data.Ready {
 		t.Fatalf("unexpected readiness response: %+v", body)
 	}
-	if body.Data.Message != "生图服务暂不可用，请稍后重试" {
-		t.Fatalf("message=%q, want user-facing provider unavailable copy", body.Data.Message)
+	if body.Data.Message != "该功能配置的模型当前不可用" || body.Data.ErrorCode != "workflow_model_unavailable" {
+		t.Fatalf("readiness error=%+v, want structured workflow model unavailable", body.Data)
 	}
 }
 
@@ -419,6 +420,16 @@ func assertMachineErrorResponse(t *testing.T, recorder *httptest.ResponseRecorde
 
 func newSubmitHandlerTestRouter(t testing.TB, service *Service, userID int64) *gin.Engine {
 	t.Helper()
+	if service != nil && service.workflowFeatures == nil {
+		configs := make(map[string]prompts.WorkflowFeatureRuntimeConfig)
+		for _, slug := range workflow.SupportedFeatureSlugs() {
+			configs[slug] = prompts.WorkflowFeatureRuntimeConfig{
+				FeatureSlug: slug, CanonicalModel: "gpt-image-1", SystemPrompt: "{{user_prompt}}",
+				UserPromptMergePolicy: prompts.DefaultWorkflowFeaturePromptMergePolicy(slug),
+			}
+		}
+		service.workflowFeatures = fakeWorkflowFeatureStore{configs: configs}
+	}
 	handler := NewHandler(service)
 	router := gin.New()
 	router.POST("/submit", func(c *gin.Context) {

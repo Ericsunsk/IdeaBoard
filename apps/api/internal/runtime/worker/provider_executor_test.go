@@ -39,6 +39,22 @@ func TestMarshalProviderTaskResultReturnsContextualError(t *testing.T) {
 	}
 }
 
+func TestResolveAccountModelForExecutionRequiresExactCanonicalModel(t *testing.T) {
+	account := &accounts.ApiAccount{Models: []accounts.AccountModel{
+		{Name: "first-model", Enabled: true},
+		{Name: "canonical-model", Enabled: true},
+	}}
+	params := newProviderTaskParams(&tasks.WorkflowTaskParams{Model: "canonical-model"})
+
+	model, ok := resolveAccountModelForExecution(account, params, "")
+	if !ok || model.Name != "canonical-model" {
+		t.Fatalf("resolved model = %+v ok=%v, want exact canonical-model", model, ok)
+	}
+	if _, ok := resolveAccountModelForExecution(account, params, "missing-model"); ok {
+		t.Fatal("assigned missing model must not fall back to another account model")
+	}
+}
+
 func TestResolveAccountTimeout(t *testing.T) {
 	tests := []struct {
 		name    string

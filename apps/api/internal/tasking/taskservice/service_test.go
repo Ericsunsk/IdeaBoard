@@ -42,9 +42,9 @@ func applyTaskSystemPrompt(basePrompt, userPrompt, featureSlug string, params ma
 	if err != nil || prompt == "" {
 		return basePrompt
 	}
-	return prompts.ApplyFeatureSystemPromptWithConfig(basePrompt, userPrompt, featureSlug, params, prompts.FeaturePromptRuntimeConfig{
-		Prompt:                prompt,
-		UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(featureSlug),
+	return prompts.ApplyFeatureSystemPromptWithConfig(basePrompt, userPrompt, featureSlug, params, prompts.WorkflowFeatureRuntimeConfig{
+		SystemPrompt:          prompt,
+		UserPromptMergePolicy: prompts.DefaultWorkflowFeaturePromptMergePolicy(featureSlug),
 	})
 }
 
@@ -766,14 +766,16 @@ func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 	submissionStore := &recordingSubmissionStore{}
 	taskEvents := &recordingTaskStatusPublisher{}
 	svc := NewService(ServiceDeps{
-		AccountRepo:     accountRepo,
-		SubmissionStore: submissionStore,
+		AccountRepo:      accountRepo,
+		SubmissionStore:  submissionStore,
+		WorkflowFeatures: workflowFeatureStoreForTest(workflow.FeatureSlugSketchToImage, "gpt-image-1"),
 	}, ServiceOptions{
 		TaskEvents: taskEvents,
 	})
 
 	taskID, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
 		Prompt:         "draw a chair",
+		Feature:        workflow.FeatureSlugSketchToImage,
 		ClientActionID: " canvas-action-1 ",
 		Params:         map[string]interface{}{"size": "1024x1024"},
 	})
@@ -966,8 +968,9 @@ func TestSubmitTaskRejectsInvalidPatternGenContractBeforeSubmission(t *testing.T
 	}}
 	submissionStore := &recordingSubmissionStore{}
 	svc := NewService(ServiceDeps{
-		AccountRepo:     accountRepo,
-		SubmissionStore: submissionStore,
+		AccountRepo:      accountRepo,
+		SubmissionStore:  submissionStore,
+		WorkflowFeatures: workflowFeatureStoreForTest(workflow.FeatureSlugPatternGen, "gpt-image-1"),
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
@@ -995,14 +998,17 @@ func TestSubmitTaskUsesInteractivePriority(t *testing.T) {
 	}}
 	submissionStore := &recordingSubmissionStore{}
 	svc := NewService(ServiceDeps{
-		AccountRepo:     accountRepo,
-		SubmissionStore: submissionStore,
+		AccountRepo:      accountRepo,
+		SubmissionStore:  submissionStore,
+		WorkflowFeatures: workflowFeatureStoreForTest(workflow.FeatureSlugSketchToImage, "gpt-image-1"),
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
-		Prompt:   "draw a chair",
-		Priority: tasks.TaskPriorityInteractive,
-		Params:   map[string]interface{}{"size": "1024x1024"},
+		Prompt:         "draw a chair",
+		Feature:        workflow.FeatureSlugSketchToImage,
+		ClientActionID: "interactive-priority",
+		Priority:       tasks.TaskPriorityInteractive,
+		Params:         map[string]interface{}{"size": "1024x1024"},
 	})
 	if err != nil {
 		t.Fatalf("SubmitTask failed: %v", err)
@@ -1040,14 +1046,16 @@ func TestSubmitTaskReturnsExistingTaskWithoutPublishingWhenClientActionRepeats(t
 	}
 	taskEvents := &recordingTaskStatusPublisher{}
 	svc := NewService(ServiceDeps{
-		AccountRepo:     accountRepo,
-		SubmissionStore: submissionStore,
+		AccountRepo:      accountRepo,
+		SubmissionStore:  submissionStore,
+		WorkflowFeatures: workflowFeatureStoreForTest(workflow.FeatureSlugSketchToImage, "gpt-image-1"),
 	}, ServiceOptions{
 		TaskEvents: taskEvents,
 	})
 
 	taskID, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
 		Prompt:         "draw a chair",
+		Feature:        workflow.FeatureSlugSketchToImage,
 		ClientActionID: "canvas-action-repeat",
 		Params:         map[string]interface{}{"size": "1024x1024"},
 	})
@@ -1079,7 +1087,7 @@ func TestSubmitTaskRejectsInvalidClientActionID(t *testing.T) {
 	}
 }
 
-func TestSubmitTaskAppliesFeaturePromptModelDefaultBeforeRouting(t *testing.T) {
+func TestSubmitTaskUsesWorkflowCanonicalModelForRouting(t *testing.T) {
 	ctx := context.Background()
 	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
 		{
@@ -1103,11 +1111,12 @@ func TestSubmitTaskAppliesFeaturePromptModelDefaultBeforeRouting(t *testing.T) {
 	svc := NewService(ServiceDeps{
 		AccountRepo:     accountRepo,
 		SubmissionStore: submissionStore,
-		FeaturePrompts: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
+		WorkflowFeatures: fakeWorkflowFeatureStore{configs: map[string]prompts.WorkflowFeatureRuntimeConfig{
 			workflow.FeatureSlugPatternGen: {
-				Prompt:                "{{user_prompt}}",
-				ModelDefaults:         prompts.FeaturePromptModelDefaults{Model: "image-alpha"},
-				UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(workflow.FeatureSlugPatternGen),
+				FeatureSlug:           workflow.FeatureSlugPatternGen,
+				CanonicalModel:        "image-alpha",
+				SystemPrompt:          "{{user_prompt}}",
+				UserPromptMergePolicy: prompts.DefaultWorkflowFeaturePromptMergePolicy(workflow.FeatureSlugPatternGen),
 			},
 		}},
 	}, ServiceOptions{})
@@ -1139,7 +1148,71 @@ func TestSubmitTaskAppliesFeaturePromptModelDefaultBeforeRouting(t *testing.T) {
 	}
 }
 
-func TestSubmitTaskExplicitModelOverridesFeaturePromptModelDefault(t *testing.T) {
+func TestStyleVariationResolvesCanonicalModelForReadinessAndSubmit(t *testing.T) {
+	ctx := context.Background()
+	const model = "gemini-3.1-flash-lite-image"
+	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+		ID: 101,
+		Models: []accounts.AccountModel{{
+			Name:         model,
+			Enabled:      true,
+			FeatureSlugs: []string{workflow.FeatureSlugStyleVariation},
+		}},
+	}}}
+	submissionStore := &recordingSubmissionStore{}
+	svc := NewService(ServiceDeps{
+		AccountRepo:     accountRepo,
+		SubmissionStore: submissionStore,
+		WorkflowFeatures: fakeWorkflowFeatureStore{configs: map[string]prompts.WorkflowFeatureRuntimeConfig{
+			workflow.FeatureSlugStyleVariation: {
+				FeatureSlug:           workflow.FeatureSlugStyleVariation,
+				CanonicalModel:        model,
+				SystemPrompt:          "Create a faithful style variation of the input image.",
+				UserPromptMergePolicy: prompts.DefaultWorkflowFeaturePromptMergePolicy(workflow.FeatureSlugStyleVariation),
+			},
+		}},
+		MediaValidator: testSubmitMediaValidator{},
+		TaskBilling:    newHandlerTaskBillingService(),
+	}, ServiceOptions{})
+	newRequest := func(clientActionID string) *tasks.SubmitTaskRequest {
+		return &tasks.SubmitTaskRequest{
+			Feature:        workflow.FeatureSlugStyleVariation,
+			ImageURLs:      []string{"/uploads/style-source.png"},
+			ClientActionID: clientActionID,
+			Params: map[string]interface{}{
+				"variation": map[string]interface{}{"strength": float64(50)},
+			},
+		}
+	}
+
+	readiness, err := svc.CheckSubmitTaskReadiness(ctx, 42, newRequest("canvas:style-variation-readiness"), 1)
+	if err != nil {
+		t.Fatalf("CheckSubmitTaskReadiness failed: %v", err)
+	}
+	if readiness.Feature != workflow.FeatureSlugStyleVariation || readiness.Billing == nil {
+		t.Fatalf("readiness=%+v, want style variation billing quote", readiness)
+	}
+
+	if _, err := svc.SubmitTask(ctx, 42, newRequest("canvas:style-variation-submit")); err != nil {
+		t.Fatalf("SubmitTask failed: %v", err)
+	}
+	if len(submissionStore.calls) != 1 {
+		t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
+	}
+	call := submissionStore.calls[0]
+	if call.task.RequestedModel != model {
+		t.Fatalf("requested model=%q, want %q", call.task.RequestedModel, model)
+	}
+	typedParams, err := tasks.UnmarshalParams(call.task.Params)
+	if err != nil {
+		t.Fatalf("unmarshal task params: %v", err)
+	}
+	if typedParams.Model != model {
+		t.Fatalf("typed model=%q, want %q", typedParams.Model, model)
+	}
+}
+
+func TestSubmitTaskIgnoresClientModelOverride(t *testing.T) {
 	ctx := context.Background()
 	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
 		{
@@ -1163,11 +1236,12 @@ func TestSubmitTaskExplicitModelOverridesFeaturePromptModelDefault(t *testing.T)
 	svc := NewService(ServiceDeps{
 		AccountRepo:     accountRepo,
 		SubmissionStore: submissionStore,
-		FeaturePrompts: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
+		WorkflowFeatures: fakeWorkflowFeatureStore{configs: map[string]prompts.WorkflowFeatureRuntimeConfig{
 			workflow.FeatureSlugPatternGen: {
-				Prompt:                "{{user_prompt}}",
-				ModelDefaults:         prompts.FeaturePromptModelDefaults{Model: "image-alpha"},
-				UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(workflow.FeatureSlugPatternGen),
+				FeatureSlug:           workflow.FeatureSlugPatternGen,
+				CanonicalModel:        "image-alpha",
+				SystemPrompt:          "{{user_prompt}}",
+				UserPromptMergePolicy: prompts.DefaultWorkflowFeaturePromptMergePolicy(workflow.FeatureSlugPatternGen),
 			},
 		}},
 	}, ServiceOptions{})
@@ -1185,11 +1259,11 @@ func TestSubmitTaskExplicitModelOverridesFeaturePromptModelDefault(t *testing.T)
 		t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
 	}
 	call := submissionStore.calls[0]
-	if call.task.RequestedModel != "gpt-image-1" {
-		t.Fatalf("requested model=%q, want gpt-image-1", call.task.RequestedModel)
+	if call.task.RequestedModel != "image-alpha" {
+		t.Fatalf("requested model=%q, want image-alpha", call.task.RequestedModel)
 	}
-	if !slices.Equal(call.queueTask.AccountIDs, []int64{101}) {
-		t.Fatalf("queue account ids=%v, want [101]", call.queueTask.AccountIDs)
+	if !slices.Equal(call.queueTask.AccountIDs, []int64{202}) {
+		t.Fatalf("queue account ids=%v, want [202]", call.queueTask.AccountIDs)
 	}
 }
 
@@ -1207,9 +1281,10 @@ func TestSubmitTaskNormalizesStyleFusionContract(t *testing.T) {
 	}}
 	submissionStore := &recordingSubmissionStore{}
 	svc := NewService(ServiceDeps{
-		AccountRepo:     accountRepo,
-		SubmissionStore: submissionStore,
-		MediaValidator:  testSubmitMediaValidator{},
+		AccountRepo:      accountRepo,
+		SubmissionStore:  submissionStore,
+		MediaValidator:   testSubmitMediaValidator{},
+		WorkflowFeatures: workflowFeatureStoreForTest(workflow.FeatureSlugStyleFusion, "gpt-image-1"),
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
@@ -1309,9 +1384,10 @@ func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
 	}}
 	submissionStore := &recordingSubmissionStore{}
 	svc := NewService(ServiceDeps{
-		AccountRepo:     accountRepo,
-		SubmissionStore: submissionStore,
-		MediaValidator:  testSubmitMediaValidator{},
+		AccountRepo:      accountRepo,
+		SubmissionStore:  submissionStore,
+		MediaValidator:   testSubmitMediaValidator{},
+		WorkflowFeatures: workflowFeatureStoreForTest(workflow.FeatureSlugImageExtend, "gpt-image-1"),
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
@@ -1432,41 +1508,47 @@ func newGoogleNativeSubmitTestServiceWithAccounts(generationSettings *testGoogle
 		AccountRepo:        &fakeSubmitAccountStore{accounts: apiAccounts},
 		SubmissionStore:    submissionStore,
 		GenerationSettings: generationSettings,
+		TaskBilling:        newHandlerTaskBillingService(),
+		WorkflowFeatures: fakeWorkflowFeatureStore{configs: map[string]prompts.WorkflowFeatureRuntimeConfig{
+			workflow.FeatureSlugSketchToImage: {
+				FeatureSlug: workflow.FeatureSlugSketchToImage, CanonicalModel: "gemini-2.5-flash-image",
+				SystemPrompt: "{{user_prompt}}", UserPromptMergePolicy: prompts.DefaultWorkflowFeaturePromptMergePolicy(workflow.FeatureSlugSketchToImage),
+			},
+		}},
 	}, ServiceOptions{})
+}
+
+func workflowFeatureStoreForTest(slug, model string) fakeWorkflowFeatureStore {
+	return fakeWorkflowFeatureStore{configs: map[string]prompts.WorkflowFeatureRuntimeConfig{
+		slug: {
+			FeatureSlug: slug, CanonicalModel: model, SystemPrompt: "{{user_prompt}}",
+			UserPromptMergePolicy: prompts.DefaultWorkflowFeaturePromptMergePolicy(slug),
+		},
+	}}
 }
 
 func newGoogleNativeSubmitRequest() *tasks.SubmitTaskRequest {
 	return &tasks.SubmitTaskRequest{
-		Prompt: "draw a product mockup",
-		Params: map[string]interface{}{
-			"model": "gemini-2.5-flash-image",
-		},
+		Prompt: "draw a product mockup", Feature: workflow.FeatureSlugSketchToImage,
+		ClientActionID: "google-native-test",
 	}
 }
 
-type fakeFeaturePromptStore struct {
-	configs map[string]prompts.FeaturePromptRuntimeConfig
+type fakeWorkflowFeatureStore struct {
+	configs map[string]prompts.WorkflowFeatureRuntimeConfig
 	err     error
 }
 
-func (s fakeFeaturePromptStore) GetPrompt(ctx context.Context, slug string) (string, error) {
-	config, err := s.GetPromptRuntimeConfig(ctx, slug)
-	if err != nil {
-		return "", err
-	}
-	return config.Prompt, nil
-}
-
-func (s fakeFeaturePromptStore) GetPromptRuntimeConfig(_ context.Context, slug string) (prompts.FeaturePromptRuntimeConfig, error) {
+func (s fakeWorkflowFeatureStore) GetRuntimeConfig(_ context.Context, slug string) (prompts.WorkflowFeatureRuntimeConfig, error) {
 	if s.err != nil {
-		return prompts.FeaturePromptRuntimeConfig{}, s.err
+		return prompts.WorkflowFeatureRuntimeConfig{}, s.err
 	}
 	if s.configs == nil {
-		return prompts.FeaturePromptRuntimeConfig{}, errors.New("feature prompt not found")
+		return prompts.WorkflowFeatureRuntimeConfig{}, prompts.ErrWorkflowFeatureNotConfigured
 	}
 	config, ok := s.configs[slug]
 	if !ok {
-		return prompts.FeaturePromptRuntimeConfig{}, errors.New("feature prompt not found")
+		return prompts.WorkflowFeatureRuntimeConfig{}, prompts.ErrWorkflowFeatureNotConfigured
 	}
 	return config, nil
 }

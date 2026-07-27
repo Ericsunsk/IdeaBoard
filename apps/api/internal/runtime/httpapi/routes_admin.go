@@ -21,7 +21,7 @@ func registerAdminRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	registerAdminStorageRoutes(adminAPI, h)
 	registerAdminProviderEndpointRoutes(adminAPI, h)
 	registerAdminLineDraftRoutes(adminAPI, h)
-	registerAdminFeaturePromptRoutes(adminAPI, h)
+	registerAdminWorkflowFeatureRoutes(adminAPI, h)
 	registerAdminCreditRoutes(adminAPI, h)
 	registerAdminBillingRoutes(adminAPI, h)
 	registerAdminRewardRoutes(adminAPI, h)
@@ -142,8 +142,8 @@ func registerAdminLineDraftRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.DELETE("/line-draft-modes/:id", h.LineDraftHandler.Delete)
 }
 
-func registerAdminFeaturePromptRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
-	adminAPI.GET("/feature-prompts", h.FeaturePromptHandler.ListPrompts)
-	adminAPI.GET("/feature-prompts/:slug", h.FeaturePromptHandler.GetPrompt)
-	adminAPI.PUT("/feature-prompts/:slug", h.FeaturePromptHandler.SetPrompt)
+func registerAdminWorkflowFeatureRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+	adminAPI.GET("/workflow-features", h.WorkflowFeatureHandler.List)
+	adminAPI.GET("/workflow-features/:slug", h.WorkflowFeatureHandler.Get)
+	adminAPI.PUT("/workflow-features/:slug", h.WorkflowFeatureHandler.Save)
 }

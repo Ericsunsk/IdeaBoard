@@ -184,72 +184,33 @@ WHERE profile_id = sqlc.arg(profile_id)
   AND secret_name = sqlc.arg(secret_name)
 ORDER BY version_number DESC;
 
--- name: EnsureFeaturePrompt :exec
-INSERT INTO feature_prompts (feature_slug)
-VALUES (sqlc.arg(feature_slug))
-ON CONFLICT (feature_slug) DO NOTHING;
+-- name: GetWorkflowFeature :one
+SELECT feature_slug, canonical_model, system_prompt, variables,
+       user_prompt_merge_policy, enabled, updated_by, created_at, updated_at
+FROM workflow_features
+WHERE feature_slug = sqlc.arg(feature_slug);
 
--- name: GetFeaturePromptForUpdate :one
-SELECT feature_slug, current_revision_id, created_at, updated_at
-FROM feature_prompts
-WHERE feature_slug = sqlc.arg(feature_slug)
-FOR UPDATE;
+-- name: ListWorkflowFeatures :many
+SELECT feature_slug, canonical_model, system_prompt, variables,
+       user_prompt_merge_policy, enabled, updated_by, created_at, updated_at
+FROM workflow_features
+ORDER BY feature_slug ASC;
 
--- name: GetFeaturePrompt :one
-SELECT
-  p.feature_slug, p.current_revision_id,
-  r.id AS revision_id, r.prompt, r.variables,
-  r.model_defaults, r.user_prompt_merge_policy,
-  r.schema_version, r.updated_by,
-  p.created_at, p.updated_at, r.created_at AS revision_created_at
-FROM feature_prompts AS p
-JOIN feature_prompt_revisions AS r ON r.id = p.current_revision_id
-WHERE p.feature_slug = sqlc.arg(feature_slug);
-
--- name: ListFeaturePrompts :many
-SELECT
-  p.feature_slug, p.current_revision_id,
-  r.id AS revision_id, r.prompt, r.variables,
-  r.model_defaults, r.user_prompt_merge_policy,
-  r.schema_version, r.updated_by,
-  p.created_at, p.updated_at, r.created_at AS revision_created_at
-FROM feature_prompts AS p
-JOIN feature_prompt_revisions AS r ON r.id = p.current_revision_id
-ORDER BY p.feature_slug ASC;
-
--- name: CreateFeaturePromptRevision :one
-WITH input AS (
-  SELECT
-    sqlc.arg(feature_slug)::varchar(64) AS feature_slug,
-    sqlc.arg(prompt)::text AS prompt,
-    sqlc.arg(variables)::jsonb AS variables,
-    sqlc.arg(model_defaults)::jsonb AS model_defaults,
-    sqlc.arg(user_prompt_merge_policy)::jsonb AS user_prompt_merge_policy,
-    sqlc.narg(updated_by)::bigint AS updated_by
+-- name: UpsertWorkflowFeature :one
+INSERT INTO workflow_features (
+  feature_slug, canonical_model, system_prompt, variables,
+  user_prompt_merge_policy, enabled, updated_by
+) VALUES (
+  sqlc.arg(feature_slug), sqlc.arg(canonical_model), sqlc.arg(system_prompt),
+  sqlc.arg(variables), sqlc.arg(user_prompt_merge_policy), sqlc.arg(enabled),
+  sqlc.narg(updated_by)
 )
-INSERT INTO feature_prompt_revisions (
-  feature_slug, prompt, variables, model_defaults,
-  user_prompt_merge_policy, schema_version, updated_by
-)
-SELECT
-  input.feature_slug,
-  input.prompt,
-  input.variables,
-  input.model_defaults,
-  input.user_prompt_merge_policy,
-  COALESCE((
-    SELECT MAX(schema_version) + 1
-    FROM feature_prompt_revisions
-    WHERE feature_slug = input.feature_slug
-  ), 1),
-  input.updated_by
-FROM input
-RETURNING
-  id, feature_slug, prompt, variables, model_defaults,
-  user_prompt_merge_policy, schema_version, updated_by, created_at;
-
--- name: SetFeaturePromptCurrentRevision :one
-UPDATE feature_prompts
-SET current_revision_id = sqlc.arg(revision_id)
-WHERE feature_slug = sqlc.arg(feature_slug)
-RETURNING feature_slug, current_revision_id, created_at, updated_at;
+ON CONFLICT (feature_slug) DO UPDATE SET
+  canonical_model = EXCLUDED.canonical_model,
+  system_prompt = EXCLUDED.system_prompt,
+  variables = EXCLUDED.variables,
+  user_prompt_merge_policy = EXCLUDED.user_prompt_merge_policy,
+  enabled = EXCLUDED.enabled,
+  updated_by = EXCLUDED.updated_by
+RETURNING feature_slug, canonical_model, system_prompt, variables,
+          user_prompt_merge_policy, enabled, updated_by, created_at, updated_at;

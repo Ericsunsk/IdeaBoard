@@ -1,24 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
-import { createAdminPromptConfigResource } from './promptConfigResource'
-import type { FeaturePrompt } from './promptConfigResource'
+import { createAdminWorkflowFeatureResource } from './promptConfigResource'
+import type { WorkflowFeature } from './promptConfigResource'
 
-const promptSlug = 'sketch-to-image'
+const featureSlug = 'sketch-to-image'
 
-describe('prompt config resource', () => {
-  it('maps generated prompt APIs behind the feature resource seam', async () => {
+describe('workflow feature resource', () => {
+  it('maps generated workflow feature APIs behind the Admin resource seam', async () => {
     const requests: Array<{ method: string; path: string; body?: unknown }> = []
     useMswHandlers(
-      http.get('/api/admin/feature-prompts', () =>
+      http.get('/api/admin/workflow-features', () =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',
           data: {
-            prompts: [makePrompt({ prompt: 'Initial prompt' })],
+            workflow_features: [makeWorkflowFeature({ system_prompt: 'Initial prompt' })],
           },
         }),
       ),
-      http.put('/api/admin/feature-prompts/:slug', async ({ request }) => {
+      http.put('/api/admin/workflow-features/:slug', async ({ request }) => {
         const body = await readRequestJson(request)
         const url = new URL(request.url)
         requests.push({ method: request.method, path: url.pathname, body })
@@ -26,33 +26,48 @@ describe('prompt config resource', () => {
         return HttpResponse.json({
           code: 0,
           msg: 'ok',
-          data: makePrompt({
-            prompt: 'Saved prompt',
-            schema_version: 2,
+          data: makeWorkflowFeature({
+            canonical_model: 'image-beta',
+            system_prompt: 'Saved prompt',
+            enabled: false,
           }),
         })
       }),
     )
 
-    const resource = createAdminPromptConfigResource()
-    const prompts = await resource.fetchPrompts()
-    const saved = await resource.savePrompt({
-      slug: promptSlug,
-      prompt: 'Saved prompt',
+    const resource = createAdminWorkflowFeatureResource()
+    const workflowFeatures = await resource.fetchWorkflowFeatures()
+    const saved = await resource.saveWorkflowFeature({
+      slug: featureSlug,
+      canonical_model: 'image-beta',
+      system_prompt: 'Saved prompt',
+      enabled: false,
+      variables: [{ key: '{{prompt}}', tone: 'prompt' }],
+      user_prompt_merge_policy: {
+        append_base_prompt_without_template: true,
+        append_user_prompt_when_template_misses_placeholder: true,
+      },
     })
 
-    expect(prompts[0]?.prompt).toBe('Initial prompt')
+    expect(workflowFeatures[0]?.system_prompt).toBe('Initial prompt')
     expect(requests).toEqual([
       {
         method: 'PUT',
-        path: `/api/admin/feature-prompts/${promptSlug}`,
+        path: `/api/admin/workflow-features/${featureSlug}`,
         body: {
-          prompt: 'Saved prompt',
+          canonical_model: 'image-beta',
+          system_prompt: 'Saved prompt',
+          enabled: false,
+          variables: [{ key: '{{prompt}}', tone: 'prompt' }],
+          user_prompt_merge_policy: {
+            append_base_prompt_without_template: true,
+            append_user_prompt_when_template_misses_placeholder: true,
+          },
         },
       },
     ])
-    expect(saved.prompt).toBe('Saved prompt')
-    expect(saved.schema_version).toBe(2)
+    expect(saved.canonical_model).toBe('image-beta')
+    expect(saved.enabled).toBe(false)
   })
 })
 
@@ -61,17 +76,17 @@ async function readRequestJson(request: Request) {
   return text ? JSON.parse(text) : undefined
 }
 
-function makePrompt(overrides: Partial<FeaturePrompt> = {}): FeaturePrompt {
+function makeWorkflowFeature(overrides: Partial<WorkflowFeature> = {}): WorkflowFeature {
   return {
-    slug: promptSlug,
-    prompt: '',
+    feature_slug: featureSlug,
+    canonical_model: 'image-alpha',
+    system_prompt: '',
     variables: [{ key: '{{prompt}}', tone: 'prompt' }],
-    model_defaults: {},
     user_prompt_merge_policy: {
       append_base_prompt_without_template: true,
       append_user_prompt_when_template_misses_placeholder: true,
     },
-    schema_version: 1,
+    enabled: true,
     updated_at: '2026-01-01T00:00:00Z',
     ...overrides,
   }

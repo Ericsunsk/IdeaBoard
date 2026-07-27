@@ -1,7 +1,7 @@
 import {
   ADMIN_PROVIDER_ENDPOINTS_PATH,
   ADMIN_CREDITS_PATH,
-  ADMIN_FEATURE_PROMPTS_PATH,
+  ADMIN_WORKFLOW_FEATURES_PATH,
   ADMIN_LOGIN_PATH,
   ADMIN_OSS_CONFIG_PATH,
   ADMIN_SETTINGS_PATH,
@@ -19,7 +19,7 @@ export type AdminNavigationKey =
   | 'provider-endpoints'
   | 'statistics'
   | 'task-monitor'
-  | 'feature-prompts'
+  | 'workflow-features'
   | 'system-settings'
   | 'oss-config'
 
@@ -74,12 +74,12 @@ export const adminNavigationRouteDefs: AdminNavigationRouteDef[] = [
     routeName: 'AdminTaskMonitor',
   },
   {
-    key: 'feature-prompts',
-    path: ADMIN_FEATURE_PROMPTS_PATH,
-    childPath: 'feature-prompts',
-    label: '系统提示词',
-    title: '系统提示词',
-    routeName: 'AdminFeaturePrompts',
+    key: 'workflow-features',
+    path: ADMIN_WORKFLOW_FEATURES_PATH,
+    childPath: 'workflow-features',
+    label: '工作流配置',
+    title: '工作流配置',
+    routeName: 'AdminWorkflowFeatures',
   },
   {
     key: 'oss-config',

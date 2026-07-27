@@ -9,7 +9,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"time"
 
 	"github.com/lib/pq"
 )
@@ -22,82 +21,6 @@ WHERE is_current
 
 func (q *Queries) ClearCurrentStorageProfiles(ctx context.Context) error {
 	_, err := q.db.ExecContext(ctx, clearCurrentStorageProfiles)
-	return err
-}
-
-const createFeaturePromptRevision = `-- name: CreateFeaturePromptRevision :one
-WITH input AS (
-  SELECT
-    $1::varchar(64) AS feature_slug,
-    $2::text AS prompt,
-    $3::jsonb AS variables,
-    $4::jsonb AS model_defaults,
-    $5::jsonb AS user_prompt_merge_policy,
-    $6::bigint AS updated_by
-)
-INSERT INTO feature_prompt_revisions (
-  feature_slug, prompt, variables, model_defaults,
-  user_prompt_merge_policy, schema_version, updated_by
-)
-SELECT
-  input.feature_slug,
-  input.prompt,
-  input.variables,
-  input.model_defaults,
-  input.user_prompt_merge_policy,
-  COALESCE((
-    SELECT MAX(schema_version) + 1
-    FROM feature_prompt_revisions
-    WHERE feature_slug = input.feature_slug
-  ), 1),
-  input.updated_by
-FROM input
-RETURNING
-  id, feature_slug, prompt, variables, model_defaults,
-  user_prompt_merge_policy, schema_version, updated_by, created_at
-`
-
-type CreateFeaturePromptRevisionParams struct {
-	FeatureSlug           string          `json:"feature_slug"`
-	Prompt                string          `json:"prompt"`
-	Variables             json.RawMessage `json:"variables"`
-	ModelDefaults         json.RawMessage `json:"model_defaults"`
-	UserPromptMergePolicy json.RawMessage `json:"user_prompt_merge_policy"`
-	UpdatedBy             sql.NullInt64   `json:"updated_by"`
-}
-
-func (q *Queries) CreateFeaturePromptRevision(ctx context.Context, arg CreateFeaturePromptRevisionParams) (FeaturePromptRevision, error) {
-	row := q.db.QueryRowContext(ctx, createFeaturePromptRevision,
-		arg.FeatureSlug,
-		arg.Prompt,
-		arg.Variables,
-		arg.ModelDefaults,
-		arg.UserPromptMergePolicy,
-		arg.UpdatedBy,
-	)
-	var i FeaturePromptRevision
-	err := row.Scan(
-		&i.ID,
-		&i.FeatureSlug,
-		&i.Prompt,
-		&i.Variables,
-		&i.ModelDefaults,
-		&i.UserPromptMergePolicy,
-		&i.SchemaVersion,
-		&i.UpdatedBy,
-		&i.CreatedAt,
-	)
-	return i, err
-}
-
-const ensureFeaturePrompt = `-- name: EnsureFeaturePrompt :exec
-INSERT INTO feature_prompts (feature_slug)
-VALUES ($1)
-ON CONFLICT (feature_slug) DO NOTHING
-`
-
-func (q *Queries) EnsureFeaturePrompt(ctx context.Context, featureSlug string) error {
-	_, err := q.db.ExecContext(ctx, ensureFeaturePrompt, featureSlug)
 	return err
 }
 
@@ -140,72 +63,6 @@ func (q *Queries) GetActiveStorageProfileSecretVersion(ctx context.Context, arg 
 	return i, err
 }
 
-const getFeaturePrompt = `-- name: GetFeaturePrompt :one
-SELECT
-  p.feature_slug, p.current_revision_id,
-  r.id AS revision_id, r.prompt, r.variables,
-  r.model_defaults, r.user_prompt_merge_policy,
-  r.schema_version, r.updated_by,
-  p.created_at, p.updated_at, r.created_at AS revision_created_at
-FROM feature_prompts AS p
-JOIN feature_prompt_revisions AS r ON r.id = p.current_revision_id
-WHERE p.feature_slug = $1
-`
-
-type GetFeaturePromptRow struct {
-	FeatureSlug           string          `json:"feature_slug"`
-	CurrentRevisionID     sql.NullInt64   `json:"current_revision_id"`
-	RevisionID            int64           `json:"revision_id"`
-	Prompt                string          `json:"prompt"`
-	Variables             json.RawMessage `json:"variables"`
-	ModelDefaults         json.RawMessage `json:"model_defaults"`
-	UserPromptMergePolicy json.RawMessage `json:"user_prompt_merge_policy"`
-	SchemaVersion         int32           `json:"schema_version"`
-	UpdatedBy             sql.NullInt64   `json:"updated_by"`
-	CreatedAt             time.Time       `json:"created_at"`
-	UpdatedAt             time.Time       `json:"updated_at"`
-	RevisionCreatedAt     time.Time       `json:"revision_created_at"`
-}
-
-func (q *Queries) GetFeaturePrompt(ctx context.Context, featureSlug string) (GetFeaturePromptRow, error) {
-	row := q.db.QueryRowContext(ctx, getFeaturePrompt, featureSlug)
-	var i GetFeaturePromptRow
-	err := row.Scan(
-		&i.FeatureSlug,
-		&i.CurrentRevisionID,
-		&i.RevisionID,
-		&i.Prompt,
-		&i.Variables,
-		&i.ModelDefaults,
-		&i.UserPromptMergePolicy,
-		&i.SchemaVersion,
-		&i.UpdatedBy,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.RevisionCreatedAt,
-	)
-	return i, err
-}
-
-const getFeaturePromptForUpdate = `-- name: GetFeaturePromptForUpdate :one
-SELECT feature_slug, current_revision_id, created_at, updated_at
-FROM feature_prompts
-WHERE feature_slug = $1
-FOR UPDATE
-`
-
-func (q *Queries) GetFeaturePromptForUpdate(ctx context.Context, featureSlug string) (FeaturePrompt, error) {
-	row := q.db.QueryRowContext(ctx, getFeaturePromptForUpdate, featureSlug)
-	var i FeaturePrompt
-	err := row.Scan(
-		&i.FeatureSlug,
-		&i.CurrentRevisionID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const getSystemConfig = `-- name: GetSystemConfig :one
 SELECT id, config_key, value, created_at, updated_at
 FROM system_configs
@@ -219,6 +76,30 @@ func (q *Queries) GetSystemConfig(ctx context.Context, configKey string) (System
 		&i.ID,
 		&i.ConfigKey,
 		&i.Value,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getWorkflowFeature = `-- name: GetWorkflowFeature :one
+SELECT feature_slug, canonical_model, system_prompt, variables,
+       user_prompt_merge_policy, enabled, updated_by, created_at, updated_at
+FROM workflow_features
+WHERE feature_slug = $1
+`
+
+func (q *Queries) GetWorkflowFeature(ctx context.Context, featureSlug string) (WorkflowFeature, error) {
+	row := q.db.QueryRowContext(ctx, getWorkflowFeature, featureSlug)
+	var i WorkflowFeature
+	err := row.Scan(
+		&i.FeatureSlug,
+		&i.CanonicalModel,
+		&i.SystemPrompt,
+		&i.Variables,
+		&i.UserPromptMergePolicy,
+		&i.Enabled,
+		&i.UpdatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -334,69 +215,6 @@ func (q *Queries) InsertStorageProfileSecretVersion(ctx context.Context, arg Ins
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const listFeaturePrompts = `-- name: ListFeaturePrompts :many
-SELECT
-  p.feature_slug, p.current_revision_id,
-  r.id AS revision_id, r.prompt, r.variables,
-  r.model_defaults, r.user_prompt_merge_policy,
-  r.schema_version, r.updated_by,
-  p.created_at, p.updated_at, r.created_at AS revision_created_at
-FROM feature_prompts AS p
-JOIN feature_prompt_revisions AS r ON r.id = p.current_revision_id
-ORDER BY p.feature_slug ASC
-`
-
-type ListFeaturePromptsRow struct {
-	FeatureSlug           string          `json:"feature_slug"`
-	CurrentRevisionID     sql.NullInt64   `json:"current_revision_id"`
-	RevisionID            int64           `json:"revision_id"`
-	Prompt                string          `json:"prompt"`
-	Variables             json.RawMessage `json:"variables"`
-	ModelDefaults         json.RawMessage `json:"model_defaults"`
-	UserPromptMergePolicy json.RawMessage `json:"user_prompt_merge_policy"`
-	SchemaVersion         int32           `json:"schema_version"`
-	UpdatedBy             sql.NullInt64   `json:"updated_by"`
-	CreatedAt             time.Time       `json:"created_at"`
-	UpdatedAt             time.Time       `json:"updated_at"`
-	RevisionCreatedAt     time.Time       `json:"revision_created_at"`
-}
-
-func (q *Queries) ListFeaturePrompts(ctx context.Context) ([]ListFeaturePromptsRow, error) {
-	rows, err := q.db.QueryContext(ctx, listFeaturePrompts)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []ListFeaturePromptsRow
-	for rows.Next() {
-		var i ListFeaturePromptsRow
-		if err := rows.Scan(
-			&i.FeatureSlug,
-			&i.CurrentRevisionID,
-			&i.RevisionID,
-			&i.Prompt,
-			&i.Variables,
-			&i.ModelDefaults,
-			&i.UserPromptMergePolicy,
-			&i.SchemaVersion,
-			&i.UpdatedBy,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.RevisionCreatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listStorageProfileSecretVersions = `-- name: ListStorageProfileSecretVersions :many
@@ -572,6 +390,46 @@ func (q *Queries) ListSystemConfigsByPrefix(ctx context.Context, configKeyLike s
 	return items, nil
 }
 
+const listWorkflowFeatures = `-- name: ListWorkflowFeatures :many
+SELECT feature_slug, canonical_model, system_prompt, variables,
+       user_prompt_merge_policy, enabled, updated_by, created_at, updated_at
+FROM workflow_features
+ORDER BY feature_slug ASC
+`
+
+func (q *Queries) ListWorkflowFeatures(ctx context.Context) ([]WorkflowFeature, error) {
+	rows, err := q.db.QueryContext(ctx, listWorkflowFeatures)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WorkflowFeature
+	for rows.Next() {
+		var i WorkflowFeature
+		if err := rows.Scan(
+			&i.FeatureSlug,
+			&i.CanonicalModel,
+			&i.SystemPrompt,
+			&i.Variables,
+			&i.UserPromptMergePolicy,
+			&i.Enabled,
+			&i.UpdatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockStorageProfileSecretVersionRotation = `-- name: LockStorageProfileSecretVersionRotation :one
 SELECT TRUE::boolean AS locked
 FROM (
@@ -663,30 +521,6 @@ func (q *Queries) SetCurrentStorageProfile(ctx context.Context, arg SetCurrentSt
 	return result.RowsAffected()
 }
 
-const setFeaturePromptCurrentRevision = `-- name: SetFeaturePromptCurrentRevision :one
-UPDATE feature_prompts
-SET current_revision_id = $1
-WHERE feature_slug = $2
-RETURNING feature_slug, current_revision_id, created_at, updated_at
-`
-
-type SetFeaturePromptCurrentRevisionParams struct {
-	RevisionID  sql.NullInt64 `json:"revision_id"`
-	FeatureSlug string        `json:"feature_slug"`
-}
-
-func (q *Queries) SetFeaturePromptCurrentRevision(ctx context.Context, arg SetFeaturePromptCurrentRevisionParams) (FeaturePrompt, error) {
-	row := q.db.QueryRowContext(ctx, setFeaturePromptCurrentRevision, arg.RevisionID, arg.FeatureSlug)
-	var i FeaturePrompt
-	err := row.Scan(
-		&i.FeatureSlug,
-		&i.CurrentRevisionID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const upsertStorageProfile = `-- name: UpsertStorageProfile :exec
 WITH input AS (
   SELECT
@@ -772,4 +606,59 @@ type UpsertSystemConfigParams struct {
 func (q *Queries) UpsertSystemConfig(ctx context.Context, arg UpsertSystemConfigParams) error {
 	_, err := q.db.ExecContext(ctx, upsertSystemConfig, arg.ConfigKey, arg.Value)
 	return err
+}
+
+const upsertWorkflowFeature = `-- name: UpsertWorkflowFeature :one
+INSERT INTO workflow_features (
+  feature_slug, canonical_model, system_prompt, variables,
+  user_prompt_merge_policy, enabled, updated_by
+) VALUES (
+  $1, $2, $3,
+  $4, $5, $6,
+  $7
+)
+ON CONFLICT (feature_slug) DO UPDATE SET
+  canonical_model = EXCLUDED.canonical_model,
+  system_prompt = EXCLUDED.system_prompt,
+  variables = EXCLUDED.variables,
+  user_prompt_merge_policy = EXCLUDED.user_prompt_merge_policy,
+  enabled = EXCLUDED.enabled,
+  updated_by = EXCLUDED.updated_by
+RETURNING feature_slug, canonical_model, system_prompt, variables,
+          user_prompt_merge_policy, enabled, updated_by, created_at, updated_at
+`
+
+type UpsertWorkflowFeatureParams struct {
+	FeatureSlug           string          `json:"feature_slug"`
+	CanonicalModel        string          `json:"canonical_model"`
+	SystemPrompt          string          `json:"system_prompt"`
+	Variables             json.RawMessage `json:"variables"`
+	UserPromptMergePolicy json.RawMessage `json:"user_prompt_merge_policy"`
+	Enabled               bool            `json:"enabled"`
+	UpdatedBy             sql.NullInt64   `json:"updated_by"`
+}
+
+func (q *Queries) UpsertWorkflowFeature(ctx context.Context, arg UpsertWorkflowFeatureParams) (WorkflowFeature, error) {
+	row := q.db.QueryRowContext(ctx, upsertWorkflowFeature,
+		arg.FeatureSlug,
+		arg.CanonicalModel,
+		arg.SystemPrompt,
+		arg.Variables,
+		arg.UserPromptMergePolicy,
+		arg.Enabled,
+		arg.UpdatedBy,
+	)
+	var i WorkflowFeature
+	err := row.Scan(
+		&i.FeatureSlug,
+		&i.CanonicalModel,
+		&i.SystemPrompt,
+		&i.Variables,
+		&i.UserPromptMergePolicy,
+		&i.Enabled,
+		&i.UpdatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

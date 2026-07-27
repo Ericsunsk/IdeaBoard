@@ -78,7 +78,7 @@ func newAppRouter(
 			ProviderEndpointHandler: providerendpoints.NewProviderEndpointHandler(repos.providerEndpointRepo, cfg.App.Env),
 			StorageHandler:          storage.NewStorageHandler(services.storageService),
 			LineDraftHandler:        assets.NewLineDraftHandler(repos.lineDraftModeRepo),
-			FeaturePromptHandler:    prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
+			WorkflowFeatureHandler:  prompts.NewWorkflowFeatureHandler(repos.workflowFeatureRepo, repos.accountRepo),
 			StorageService:          services.storageService,
 			UploadSettings:          services.runtimeSettings,
 			RewardHandler:           rewards.NewHandler(services.rewardService),

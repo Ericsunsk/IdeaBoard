@@ -1,25 +1,25 @@
 import {
-  listAdminFeaturePrompts,
-  setAdminFeaturePrompt,
-} from '../../../shared/api/generated-query/admin-feature-prompts/admin-feature-prompts'
+  listAdminWorkflowFeatures,
+  setAdminWorkflowFeature,
+} from '../../../shared/api/generated-query/admin-workflow-features/admin-workflow-features'
 import type {
-  FeaturePrompt,
-  SetAdminFeaturePromptBody,
+  SetAdminWorkflowFeatureBody,
+  WorkflowFeature,
 } from '../../../shared/api/generated-query/model'
 import { resolveApiData } from '../../../shared/api/apiResponse'
 
-export type SaveFeaturePromptInput = {
+export type SaveWorkflowFeatureInput = {
   slug: string
-} & SetAdminFeaturePromptBody
+} & SetAdminWorkflowFeatureBody
 
-export async function fetchAdminFeaturePrompts(): Promise<FeaturePrompt[]> {
-  const data = await resolveApiData(listAdminFeaturePrompts(), '加载提示词失败')
-  return data.prompts ?? []
+export async function fetchAdminWorkflowFeatures(): Promise<WorkflowFeature[]> {
+  const data = await resolveApiData(listAdminWorkflowFeatures(), '加载工作流配置失败')
+  return data.workflow_features ?? []
 }
 
-export async function saveAdminFeaturePrompt(
-  input: SaveFeaturePromptInput,
-): Promise<FeaturePrompt> {
+export async function saveAdminWorkflowFeature(
+  input: SaveWorkflowFeatureInput,
+): Promise<WorkflowFeature> {
   const { slug, ...payload } = input
-  return resolveApiData(setAdminFeaturePrompt(slug, payload), '保存提示词失败')
+  return resolveApiData(setAdminWorkflowFeature(slug, payload), '保存工作流配置失败')
 }

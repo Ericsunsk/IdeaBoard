@@ -4,11 +4,13 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { ApiResponseTaskSubmitReadinessDataErrorCode } from './apiResponseTaskSubmitReadinessDataErrorCode'
 import type { TaskBillingReadiness } from './taskBillingReadiness'
 
 export type ApiResponseTaskSubmitReadinessData = {
   ready: boolean
   message?: string
+  error_code?: ApiResponseTaskSubmitReadinessDataErrorCode
   feature?: string
   billing?: TaskBillingReadiness
 }

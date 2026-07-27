@@ -59,9 +59,9 @@ func TestApplyFeatureSystemPromptUsesCanonicalKeys(t *testing.T) {
 		"user prompt",
 		"hd-upscale",
 		params,
-		prompts.FeaturePromptRuntimeConfig{
-			Prompt:                "SYS={{user_prompt}}|{{clarity_strength}}",
-			UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy("hd-upscale"),
+		prompts.WorkflowFeatureRuntimeConfig{
+			SystemPrompt:          "SYS={{user_prompt}}|{{clarity_strength}}",
+			UserPromptMergePolicy: prompts.DefaultWorkflowFeaturePromptMergePolicy("hd-upscale"),
 		},
 	)
 
@@ -84,9 +84,9 @@ func TestFeatureSystemPromptDoesNotContainHiddenConstraintSnippet(t *testing.T) 
 				"left_percent":   0,
 			},
 		},
-		prompts.FeaturePromptRuntimeConfig{
-			Prompt:                "SYS=canvas extend only",
-			UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy("image-extend"),
+		prompts.WorkflowFeatureRuntimeConfig{
+			SystemPrompt:          "SYS=canvas extend only",
+			UserPromptMergePolicy: prompts.DefaultWorkflowFeaturePromptMergePolicy("image-extend"),
 		},
 	)
 

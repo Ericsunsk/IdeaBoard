@@ -54,17 +54,17 @@ export interface WorkflowFeatureRegistryItem {
   imageActionTitle?: string
 }
 
-export interface WorkflowFeaturePromptConfigItem {
+export interface WorkflowFeatureConfigItem {
   slug: WorkflowFeature
   title: string
   label: string
 }
 
-export interface WorkflowFeaturePromptConfigGroup {
+export interface WorkflowFeatureConfigGroup {
   key: string
   title: string
   order: number
-  items: readonly WorkflowFeaturePromptConfigItem[]
+  items: readonly WorkflowFeatureConfigItem[]
 }
 
 export interface WorkflowFeatureImageActionText {
@@ -149,7 +149,7 @@ export const WORKFLOW_FEATURE_REGISTRY_MAP = Object.fromEntries(
   WORKFLOW_FEATURE_REGISTRY.map((item) => [item.slug, item]),
 ) as Record<WorkflowFeature, WorkflowFeatureRegistryItem>
 
-const WORKFLOW_FEATURE_PROMPT_CONFIG_GROUP_DEFS = [
+const WORKFLOW_FEATURE_CONFIG_GROUP_DEFS = [
   {
     key: 'image',
     title: 'Image',
@@ -182,10 +182,10 @@ const WORKFLOW_FEATURE_PROMPT_CONFIG_GROUP_DEFS = [
   slugs: readonly WorkflowFeature[]
 }[]
 
-function toWorkflowFeaturePromptConfigItem(
+function toWorkflowFeatureConfigItem(
   slug: WorkflowFeature,
   groupTitle: string,
-): WorkflowFeaturePromptConfigItem {
+): WorkflowFeatureConfigItem {
   const feature = WORKFLOW_FEATURE_REGISTRY_MAP[slug]
   return {
     slug,
@@ -194,24 +194,24 @@ function toWorkflowFeaturePromptConfigItem(
   }
 }
 
-export const WORKFLOW_FEATURE_PROMPT_CONFIG_ITEMS =
-  WORKFLOW_FEATURE_PROMPT_CONFIG_GROUP_DEFS.flatMap((group) =>
-    group.slugs.map((slug) => toWorkflowFeaturePromptConfigItem(slug, group.title)),
-  )
+export const WORKFLOW_FEATURE_CONFIG_ITEMS = WORKFLOW_FEATURE_CONFIG_GROUP_DEFS.flatMap((group) =>
+  group.slugs.map((slug) => toWorkflowFeatureConfigItem(slug, group.title)),
+)
 
-export const WORKFLOW_FEATURE_PROMPT_CONFIG_ITEM_MAP = Object.fromEntries(
-  WORKFLOW_FEATURE_PROMPT_CONFIG_ITEMS.map((item) => [item.slug, item]),
-) as Record<WorkflowFeature, WorkflowFeaturePromptConfigItem>
+export const WORKFLOW_FEATURE_CONFIG_ITEM_MAP = Object.fromEntries(
+  WORKFLOW_FEATURE_CONFIG_ITEMS.map((item) => [item.slug, item]),
+) as Record<WorkflowFeature, WorkflowFeatureConfigItem>
 
-export const WORKFLOW_FEATURE_PROMPT_CONFIG_GROUPS =
-  WORKFLOW_FEATURE_PROMPT_CONFIG_GROUP_DEFS.filter((group) => group.slugs.length > 0)
-    .sort((a, b) => a.order - b.order)
-    .map((group) => ({
-      key: group.key,
-      title: group.title,
-      order: group.order,
-      items: group.slugs.map((slug) => WORKFLOW_FEATURE_PROMPT_CONFIG_ITEM_MAP[slug]),
-    })) satisfies readonly WorkflowFeaturePromptConfigGroup[]
+export const WORKFLOW_FEATURE_CONFIG_GROUPS = WORKFLOW_FEATURE_CONFIG_GROUP_DEFS.filter(
+  (group) => group.slugs.length > 0,
+)
+  .sort((a, b) => a.order - b.order)
+  .map((group) => ({
+    key: group.key,
+    title: group.title,
+    order: group.order,
+    items: group.slugs.map((slug) => WORKFLOW_FEATURE_CONFIG_ITEM_MAP[slug]),
+  })) satisfies readonly WorkflowFeatureConfigGroup[]
 
 export const WORKFLOW_FEATURE_IMAGE_ACTION_TEXT_MAP = Object.fromEntries(
   WORKFLOW_FEATURE_REGISTRY.map((item) => [

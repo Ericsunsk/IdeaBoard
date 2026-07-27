@@ -29,7 +29,7 @@ type Service struct {
 	taskRepo            TaskStore
 	submissionStore     TaskSubmissionStore
 	cancelStore         taskqueue.TaskCancellationStore
-	featurePrompts      FeaturePromptStore
+	workflowFeatures    WorkflowFeatureStore
 	mediaValidator      taskmedia.Validator
 	taskOutputCleaner   taskmedia.TaskOutputCleaner
 	generationSettings  settings.GoogleNativeGenerationSettingProvider
@@ -60,9 +60,8 @@ type TaskSubmissionStore interface {
 	SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tasks.TaskPayload) (tasks.TaskSubmissionResult, error)
 }
 
-type FeaturePromptStore interface {
-	GetPrompt(ctx context.Context, slug string) (string, error)
-	GetPromptRuntimeConfig(ctx context.Context, slug string) (prompts.FeaturePromptRuntimeConfig, error)
+type WorkflowFeatureStore interface {
+	GetRuntimeConfig(ctx context.Context, slug string) (prompts.WorkflowFeatureRuntimeConfig, error)
 }
 
 type AdminBillingHistoryStore interface {
@@ -78,7 +77,7 @@ type ServiceDeps struct {
 	TaskRepo            TaskStore
 	SubmissionStore     TaskSubmissionStore
 	CancelStore         taskqueue.TaskCancellationStore
-	FeaturePrompts      FeaturePromptStore
+	WorkflowFeatures    WorkflowFeatureStore
 	MediaValidator      taskmedia.Validator
 	TaskOutputCleaner   taskmedia.TaskOutputCleaner
 	GenerationSettings  settings.GoogleNativeGenerationSettingProvider
@@ -113,7 +112,7 @@ func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 		taskRepo:            deps.TaskRepo,
 		submissionStore:     deps.SubmissionStore,
 		cancelStore:         deps.CancelStore,
-		featurePrompts:      deps.FeaturePrompts,
+		workflowFeatures:    deps.WorkflowFeatures,
 		mediaValidator:      deps.MediaValidator,
 		taskOutputCleaner:   deps.TaskOutputCleaner,
 		generationSettings:  deps.GenerationSettings,
@@ -134,75 +133,41 @@ func (s *Service) publishTaskStatusEvent(ctx context.Context, taskID, status str
 }
 
 func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (string, error) {
-	if req == nil {
-		return "", fmt.Errorf("请求参数错误")
-	}
-	clientActionID, err := normalizeSubmitTaskClientActionID(req.ClientActionID)
+	plan, err := s.PlanSubmission(ctx, userID, req)
 	if err != nil {
 		return "", err
-	}
-	priority := tasks.EffectiveTaskPriority(req.Priority)
-	if !tasks.IsValidTaskPriority(priority) {
-		return "", validation.New("priority 仅支持 1-4")
-	}
-	apiAccounts, typedParams, sourceParams, featureSlug, fullPrompt, err := s.prepareSubmitTask(ctx, userID, req)
-	if err != nil {
-		return "", err
-	}
-	billingRequest, err := resolveTaskBillingRequest(featureSlug, typedParams.Model)
-	if err != nil {
-		return "", err
-	}
-	if billingRequest != nil {
-		if clientActionID == "" {
-			return "", validation.New("AI 生图任务必须提供 client_action_id")
-		}
-		typedParams.Model = billingRequest.Model
-		sourceParams[paramkeys.Model] = billingRequest.Model
 	}
 
 	taskID := generateSecureTaskID("task")
 	correlationID := tasks.CorrelationIDForTaskID(taskID)
 
-	paramsJSON, err := marshalWorkflowTaskParams(typedParams, sourceParams)
-	if err != nil {
-		return "", err
-	}
-
-	requestedModel := typedParams.Model
-
 	task := &tasks.Task{
 		TaskID:         taskID,
 		CorrelationID:  correlationID,
 		UserID:         userID,
-		ClientActionID: clientActionID,
-		Prompt:         fullPrompt,
-		UserPrompt:     req.Prompt,
-		Params:         paramsJSON,
-		FeatureSlug:    featureSlug,
-		RequestedModel: requestedModel,
-		Priority:       priority,
+		ClientActionID: plan.ClientActionID,
+		Prompt:         plan.FullPrompt,
+		UserPrompt:     plan.UserPrompt,
+		Params:         plan.ParamsJSON,
+		FeatureSlug:    plan.FeatureSlug,
+		RequestedModel: plan.CanonicalModel,
+		Priority:       plan.Priority,
 		Status:         tasks.StatusPending,
 	}
-	if billingRequest != nil {
+	if plan.BillingRequest != nil {
 		task.BillingRequest = &tasks.TaskBillingRequest{
-			Feature: billingRequest.Feature, Model: billingRequest.Model, Quantity: billingRequest.Quantity,
+			Feature: plan.BillingRequest.Feature, Model: plan.BillingRequest.Model, Quantity: plan.BillingRequest.Quantity,
 		}
-	}
-
-	accountIDs := make([]int64, len(apiAccounts))
-	for i, acc := range apiAccounts {
-		accountIDs[i] = acc.ID
 	}
 
 	queueTask := &tasks.TaskPayload{
 		TaskID:        taskID,
 		CorrelationID: correlationID,
 		UserID:        userID,
-		Prompt:        fullPrompt,
-		Params:        paramsJSON,
-		Priority:      priority,
-		AccountIDs:    accountIDs,
+		Prompt:        plan.FullPrompt,
+		Params:        plan.ParamsJSON,
+		Priority:      plan.Priority,
+		AccountIDs:    plan.EligibleAccountIDs,
 		RetryCount:    0,
 		CreatedAt:     time.Now().Unix(),
 	}
@@ -234,36 +199,23 @@ type SubmitTaskReadiness struct {
 }
 
 func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest, billingQuantity int64) (SubmitTaskReadiness, error) {
-	if req == nil {
-		return SubmitTaskReadiness{}, fmt.Errorf("请求参数错误")
-	}
-	clientActionID, err := normalizeSubmitTaskClientActionID(req.ClientActionID)
+	plan, err := s.PlanSubmission(ctx, userID, req)
 	if err != nil {
 		return SubmitTaskReadiness{}, err
 	}
-	_, typedParams, _, featureSlug, _, err := s.prepareSubmitTask(ctx, userID, req)
-	if err != nil {
-		return SubmitTaskReadiness{}, err
-	}
-	result := SubmitTaskReadiness{Feature: featureSlug}
-	billingRequest, err := resolveTaskBillingRequest(featureSlug, typedParams.Model)
-	if err != nil {
-		return SubmitTaskReadiness{}, err
-	}
-	if billingRequest == nil {
+	result := SubmitTaskReadiness{Feature: plan.FeatureSlug}
+	if plan.BillingRequest == nil {
 		return result, nil
 	}
 	if billingQuantity <= 0 || billingQuantity > int64(maxSubmitTaskImageURLs) {
 		return SubmitTaskReadiness{}, validation.New("billing_quantity 必须为 1-16")
 	}
+	billingRequest := *plan.BillingRequest
 	billingRequest.Quantity = billingQuantity
-	if clientActionID == "" {
-		return SubmitTaskReadiness{}, validation.New("AI 生图任务必须提供 client_action_id")
-	}
 	if s.taskBilling == nil {
 		return SubmitTaskReadiness{}, fmt.Errorf("Idea计费服务暂不可用")
 	}
-	readiness, err := s.taskBilling.Readiness(ctx, userID, *billingRequest)
+	readiness, err := s.taskBilling.Readiness(ctx, userID, billingRequest)
 	if err != nil {
 		return SubmitTaskReadiness{}, err
 	}
@@ -310,20 +262,36 @@ func normalizeSubmitTaskClientActionID(raw string) (string, error) {
 	return value, nil
 }
 
-func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) ([]*accounts.ApiAccount, *tasks.WorkflowTaskParams, map[string]interface{}, string, string, error) {
+type SubmissionPlan struct {
+	FeatureSlug        string
+	CanonicalModel     string
+	UserPrompt         string
+	FullPrompt         string
+	TypedParams        *tasks.WorkflowTaskParams
+	ParamsJSON         string
+	ClientActionID     string
+	Priority           int
+	EligibleAccountIDs []int64
+	BillingRequest     *taskbilling.Request
+}
+
+func (s *Service) PlanSubmission(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (*SubmissionPlan, error) {
+	if req == nil {
+		return nil, validation.New("请求参数错误")
+	}
+	clientActionID, err := normalizeSubmitTaskClientActionID(req.ClientActionID)
+	if err != nil {
+		return nil, err
+	}
+	priority := tasks.EffectiveTaskPriority(req.Priority)
+	if !tasks.IsValidTaskPriority(priority) {
+		return nil, validation.New("priority 仅支持 1-4")
+	}
 	if err := validateSubmitTaskPrompt(req.Prompt, maxSubmitTaskPromptBytes, "提示词"); err != nil {
-		return nil, nil, nil, "", "", err
+		return nil, err
 	}
 	if err := s.validateSubmitTaskImageURLs(ctx, userID, req.ImageURLs); err != nil {
-		return nil, nil, nil, "", "", err
-	}
-
-	apiAccounts, err := s.accountRepo.GetAllEnabled(ctx)
-	if err != nil {
-		return nil, nil, nil, "", "", fmt.Errorf("任务提交失败，请稍后重试")
-	}
-	if len(apiAccounts) == 0 {
-		return nil, nil, nil, "", "", errNoAvailableAPIAccount
+		return nil, err
 	}
 
 	params := make(map[string]interface{}, len(req.Params)+2)
@@ -337,67 +305,96 @@ func (s *Service) prepareSubmitTask(ctx context.Context, userID int64, req *task
 		params["image_urls"] = req.ImageURLs
 	}
 	normalizeSubmitTaskMediaParams(params)
-	req.Params = params
-	if err := s.validateSubmitTaskMediaParams(ctx, userID, req.Params); err != nil {
-		return nil, nil, nil, "", "", err
+	if err := s.validateSubmitTaskMediaParams(ctx, userID, params); err != nil {
+		return nil, err
 	}
 
-	featureSlug := ""
-	if req.Params != nil {
-		featureSlug, err = workflow.ResolveWorkflowFeatureSlug(req.Params)
-		if err != nil {
-			return nil, nil, nil, "", "", err
-		}
-		if featureSlug != "" {
-			req.Params["feature"] = featureSlug
+	featureSlug, err := workflow.ResolveWorkflowFeatureSlug(params)
+	if err != nil {
+		return nil, err
+	}
+	if featureSlug == "" {
+		return nil, validation.New("feature 不能为空")
+	}
+	params["feature"] = featureSlug
+	if s.workflowFeatures == nil {
+		return nil, newSubmissionPlanError("workflow_configuration_unavailable", "该功能暂不可用", errors.New("workflow feature store is nil"))
+	}
+	runtimeConfig, err := s.workflowFeatures.GetRuntimeConfig(ctx, featureSlug)
+	if err != nil {
+		switch {
+		case errors.Is(err, prompts.ErrWorkflowFeatureNotConfigured):
+			return nil, newSubmissionPlanError("workflow_not_configured", "该功能尚未配置", err)
+		case errors.Is(err, prompts.ErrWorkflowFeatureDisabled):
+			return nil, newSubmissionPlanError("workflow_disabled", "该功能当前未启用", err)
+		default:
+			return nil, newSubmissionPlanError("workflow_configuration_unavailable", "该功能暂不可用", err)
 		}
 	}
-
-	var runtimePromptConfig *prompts.FeaturePromptRuntimeConfig
-	if s.featurePrompts != nil {
-		if config, err := s.featurePrompts.GetPromptRuntimeConfig(ctx, featureSlug); err == nil {
-			runtimePromptConfig = &config
-			applyFeaturePromptModelDefaults(req.Params, config.ModelDefaults)
-		}
-	}
-	if err := workflow.NormalizeStructuredPromptContractParams(req.Params, featureSlug); err != nil {
-		return nil, nil, nil, "", "", err
+	delete(params, paramkeys.Model)
+	params[paramkeys.Model] = runtimeConfig.CanonicalModel
+	if err := workflow.NormalizeStructuredPromptContractParams(params, featureSlug); err != nil {
+		return nil, err
 	}
 	if featureSlug == workflow.FeatureSlugPatternGen {
-		if err := workflow.ValidatePatternGenSubmitContract(req.Prompt, req.Params); err != nil {
-			return nil, nil, nil, "", "", err
+		if err := workflow.ValidatePatternGenSubmitContract(req.Prompt, params); err != nil {
+			return nil, err
 		}
 	}
 	if featureSlug == workflow.FeatureSlugStyleFusion {
-		if err := normalizeStyleFusionParams(req.Params); err != nil {
-			return nil, nil, nil, "", "", err
+		if err := normalizeStyleFusionParams(params); err != nil {
+			return nil, err
 		}
 	}
-	typedParams, err := workflowTaskParamsFromMap(req.Params, featureSlug)
+	typedParams, err := workflowTaskParamsFromMap(params, featureSlug)
 	if err != nil {
-		return nil, nil, nil, "", "", err
+		return nil, err
 	}
-	apiAccounts = accounts.FilterAccountsForRequest(apiAccounts, featureSlug, req.Params)
+
+	apiAccounts, err := s.accountRepo.GetAllEnabled(ctx)
+	if err != nil {
+		return nil, newSubmissionPlanError("provider_unavailable", providerUnavailableMessage, err)
+	}
+	apiAccounts = accounts.FilterAccountsForRequest(apiAccounts, featureSlug, params)
+	if len(apiAccounts) == 0 {
+		return nil, newSubmissionPlanError("workflow_model_unavailable", "该功能配置的模型当前不可用", errNoAvailableAPIAccount)
+	}
 	apiAccounts, err = s.filterGoogleNativeAccountsForSubmit(ctx, userID, apiAccounts)
 	if err != nil {
-		return nil, nil, nil, "", "", err
+		return nil, err
 	}
 	if len(apiAccounts) == 0 {
-		return nil, nil, nil, "", "", errNoAvailableAPIAccount
+		return nil, newSubmissionPlanError("workflow_model_unavailable", "该功能配置的模型当前不可用", errNoAvailableAPIAccount)
 	}
 
-	fullPrompt := req.Prompt
-	if runtimePromptConfig != nil {
-		fullPrompt = prompts.ApplyFeatureSystemPromptWithConfig(req.Prompt, req.Prompt, featureSlug, req.Params, *runtimePromptConfig)
-	}
+	fullPrompt := prompts.ApplyFeatureSystemPromptWithConfig(req.Prompt, req.Prompt, featureSlug, params, runtimeConfig)
 	if err := validateExecutablePrompt(fullPrompt); err != nil {
-		return nil, nil, nil, "", "", err
+		return nil, err
 	}
 	if err := validateSubmitTaskPrompt(fullPrompt, maxSubmitTaskFinalPromptBytes, "最终提示词"); err != nil {
-		return nil, nil, nil, "", "", err
+		return nil, err
 	}
-
-	return apiAccounts, typedParams, req.Params, featureSlug, fullPrompt, nil
+	billingRequest, err := resolveTaskBillingRequest(featureSlug, runtimeConfig.CanonicalModel)
+	if err != nil {
+		return nil, err
+	}
+	if billingRequest != nil && clientActionID == "" {
+		return nil, validation.New("AI 生图任务必须提供 client_action_id")
+	}
+	paramsJSON, err := marshalWorkflowTaskParams(typedParams, params)
+	if err != nil {
+		return nil, err
+	}
+	accountIDs := make([]int64, len(apiAccounts))
+	for i, account := range apiAccounts {
+		accountIDs[i] = account.ID
+	}
+	return &SubmissionPlan{
+		FeatureSlug: featureSlug, CanonicalModel: runtimeConfig.CanonicalModel,
+		UserPrompt: req.Prompt, FullPrompt: fullPrompt, TypedParams: typedParams, ParamsJSON: paramsJSON,
+		ClientActionID: clientActionID, Priority: priority, EligibleAccountIDs: accountIDs,
+		BillingRequest: billingRequest,
+	}, nil
 }
 
 func (s *Service) filterGoogleNativeAccountsForSubmit(ctx context.Context, userID int64, apiAccounts []*accounts.ApiAccount) ([]*accounts.ApiAccount, error) {
@@ -436,18 +433,6 @@ func accountUsesGoogleNativeAPI(account *accounts.ApiAccount) bool {
 	}
 	apiType, ok := workflow.ValidateProviderAPIType(account.ApiType, account.ProxyURL)
 	return ok && workflow.IsGoogleNativeAPIType(apiType)
-}
-
-func applyFeaturePromptModelDefaults(params map[string]interface{}, defaults prompts.FeaturePromptModelDefaults) {
-	if params == nil {
-		return
-	}
-	if _, exists := params[paramkeys.Model]; exists {
-		return
-	}
-	if defaults.Model != "" {
-		params[paramkeys.Model] = defaults.Model
-	}
 }
 
 func (s *Service) GetTask(ctx context.Context, taskID string) (*tasks.Task, error) {

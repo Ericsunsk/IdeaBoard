@@ -5,7 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface FeaturePromptMergePolicy {
+export interface WorkflowFeatureMergePolicy {
   append_user_prompt_when_template_misses_placeholder: boolean
   append_base_prompt_without_template: boolean
 }

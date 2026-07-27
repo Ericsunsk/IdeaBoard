@@ -278,7 +278,8 @@ eligible_models AS (
   ) AS credential ON TRUE
   JOIN api_account_models m ON m.account_id = a.id
     AND m.enabled = TRUE
-    AND (pc.requested_model = '' OR lower(m.model_name) = lower(pc.requested_model))
+    AND pc.requested_model <> ''
+    AND lower(m.model_name) = lower(pc.requested_model)
     AND (pc.feature_slug = '' OR jsonb_array_length(m.feature_slugs) = 0 OR m.feature_slugs ? pc.feature_slug)
 ),
 account_load AS (
@@ -534,7 +535,8 @@ func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx, accountIDs []in
 	  FROM locked_accounts a
 	  JOIN api_account_models AS m ON m.account_id = a.id
 	    AND m.enabled = TRUE
-	    AND ($2 = '' OR lower(m.model_name) = lower($2))
+	    AND btrim($2) <> ''
+	    AND lower(m.model_name) = lower($2)
 	    AND ($3 = '' OR jsonb_array_length(m.feature_slugs) = 0 OR m.feature_slugs ? $3)
 	),
 	account_load AS (

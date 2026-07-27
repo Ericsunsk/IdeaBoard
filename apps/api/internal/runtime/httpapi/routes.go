@@ -79,7 +79,7 @@ type AdminRouteDeps struct {
 	ProviderEndpointHandler *providerendpoints.ProviderEndpointHandler
 	StorageHandler          *storage.StorageHandler
 	LineDraftHandler        *assets.LineDraftHandler
-	FeaturePromptHandler    *prompts.FeaturePromptHandler
+	WorkflowFeatureHandler  *prompts.WorkflowFeatureHandler
 	StorageService          *storage.StorageService
 	UploadSettings          settings.MediaUploadSettingProvider
 	RewardHandler           *rewards.Handler

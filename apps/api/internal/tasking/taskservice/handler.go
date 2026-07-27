@@ -2,6 +2,7 @@ package taskservice
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -59,10 +60,11 @@ type submitTaskResponse struct {
 }
 
 type submitTaskReadinessResponse struct {
-	Ready   bool                   `json:"ready"`
-	Message string                 `json:"message,omitempty"`
-	Feature string                 `json:"feature,omitempty"`
-	Billing *taskbilling.Readiness `json:"billing,omitempty"`
+	Ready     bool                   `json:"ready"`
+	Message   string                 `json:"message,omitempty"`
+	ErrorCode string                 `json:"error_code,omitempty"`
+	Feature   string                 `json:"feature,omitempty"`
+	Billing   *taskbilling.Readiness `json:"billing,omitempty"`
 }
 
 type adminTaskResponse struct {
@@ -121,6 +123,16 @@ func (h *Handler) SubmitTask(c *gin.Context) {
 	}
 	taskID, err := h.taskService.SubmitTask(c.Request.Context(), userID, &req)
 	if err != nil {
+		var submissionErr *SubmissionError
+		if errors.As(err, &submissionErr) {
+			slog.Warn("task submission planning failed", "user_id", userID, "feature", req.Feature, "error_code", submissionErr.Code, "err", err)
+			status := http.StatusConflict
+			if submissionErr.Code == "workflow_configuration_unavailable" || submissionErr.Code == "provider_unavailable" || submissionErr.Code == "workflow_model_unavailable" {
+				status = http.StatusServiceUnavailable
+			}
+			response.MachineError(c, status, submissionErr.Code, submissionErr.SafeMessage)
+			return
+		}
 		if errors.Is(err, taskbilling.ErrInsufficientCredits) {
 			response.MachineError(c, http.StatusPaymentRequired, "insufficient_credits", "Idea不足")
 			return
@@ -147,11 +159,17 @@ func (h *Handler) CheckSubmitTaskReadiness(c *gin.Context) {
 	}
 	readiness, err := h.taskService.CheckSubmitTaskReadiness(c.Request.Context(), userID, &req.SubmitTaskRequest, req.BillingQuantity)
 	if err != nil {
+		slog.Warn("task submit readiness failed", "user_id", userID, "feature", req.Feature, "err", err)
 		if errors.Is(err, taskbilling.ErrPricingUnavailable) {
 			response.MachineError(c, http.StatusServiceUnavailable, "pricing_unavailable", "暂时无法获取报价，请重试")
 			return
 		}
-		response.SuccessDTO(c, submitTaskReadinessResponse{Ready: false, Message: userFacingSubmitError(err)})
+		var submissionErr *SubmissionError
+		if errors.As(err, &submissionErr) {
+			response.SuccessDTO(c, submitTaskReadinessResponse{Ready: false, Message: submissionErr.SafeMessage, ErrorCode: submissionErr.Code})
+			return
+		}
+		response.SuccessDTO(c, submitTaskReadinessResponse{Ready: false, Message: userFacingSubmitError(err), ErrorCode: "submission_invalid"})
 		return
 	}
 	ready := readiness.Billing == nil || readiness.Billing.Sufficient

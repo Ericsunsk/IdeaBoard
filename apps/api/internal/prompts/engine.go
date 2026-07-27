@@ -20,7 +20,7 @@ type promptTemplateBinding struct {
 	formatter   promptParamFormatter
 }
 
-type FeaturePromptMergePolicy struct {
+type WorkflowFeaturePromptMergePolicy struct {
 	AppendUserPromptWhenTemplateMissesPlaceholder bool `json:"append_user_prompt_when_template_misses_placeholder"`
 	AppendBasePromptWithoutTemplate               bool `json:"append_base_prompt_without_template"`
 }
@@ -44,14 +44,14 @@ var featurePromptBindings = map[string][]promptTemplateBinding{
 	},
 }
 
-var defaultPromptMergePolicy = FeaturePromptMergePolicy{
+var defaultPromptMergePolicy = WorkflowFeaturePromptMergePolicy{
 	AppendUserPromptWhenTemplateMissesPlaceholder: true,
 	AppendBasePromptWithoutTemplate:               true,
 }
 
-func DefaultFeaturePromptMergePolicy(featureSlug string) FeaturePromptMergePolicy {
+func DefaultWorkflowFeaturePromptMergePolicy(featureSlug string) WorkflowFeaturePromptMergePolicy {
 	if featureSlug == workflow.FeatureSlugStyleVariation {
-		return FeaturePromptMergePolicy{}
+		return WorkflowFeaturePromptMergePolicy{}
 	}
 	return defaultPromptMergePolicy
 }
@@ -134,12 +134,12 @@ func ApplyFeatureSystemPromptWithConfig(
 	userPrompt string,
 	featureSlug string,
 	params map[string]interface{},
-	config FeaturePromptRuntimeConfig,
+	config WorkflowFeatureRuntimeConfig,
 ) string {
-	if featureSlug == "" || config.Prompt == "" {
+	if featureSlug == "" || config.SystemPrompt == "" {
 		return basePrompt
 	}
-	return applyFeatureSystemPromptWithMergePolicy(basePrompt, userPrompt, featureSlug, params, config.Prompt, config.UserPromptMergePolicy)
+	return applyFeatureSystemPromptWithMergePolicy(basePrompt, userPrompt, featureSlug, params, config.SystemPrompt, config.UserPromptMergePolicy)
 }
 
 func applyFeatureSystemPromptWithMergePolicy(
@@ -148,7 +148,7 @@ func applyFeatureSystemPromptWithMergePolicy(
 	featureSlug string,
 	params map[string]interface{},
 	sysPrompt string,
-	policy FeaturePromptMergePolicy,
+	policy WorkflowFeaturePromptMergePolicy,
 ) string {
 	varMap := map[string]string{
 		"{{user_prompt}}": userPrompt,

@@ -107,9 +107,9 @@ NATS JetStream 只负责持久领域事件、audit 和 realtime fanout。当前�
 
 不要把 worker implementation 挪进 Tasking。Tasking 拥有任务模型、提交、队列、统计和运行状态语义；worker 拥有执行适配。
 
-### 5. Prompt 是配置，不是隐藏执行协议
+### 5. Workflow Feature 是当前执行配置
 
-系统提示词由 `feature_prompts` 驱动，按 `feature_slug` 读取 Prompt revision 并做变量替换。Prompt 只描述任务边界、允许变化、禁止变化和质量要求，不拥有 Feature availability；功能可用状态由 Billing Catalog 统一管理。媒体输入、mask、多参考图、multipart 上传、本地重绘窗口和 provider 参数由运行时处理。
+`workflow_features` 按 `feature_slug` 保存唯一当前配置：canonical model、system prompt、模板变量、merge policy 和 enabled 状态。配置原地更新，不创建 Prompt version、revision 或 history。Admin 配置拥有 canonical model，用户请求不能覆盖；Readiness 与 Submit 通过同一个 Submission Planner 固化 model、prompt、typed params、eligible accounts 和 Billing request。媒体输入、mask、多参考图、multipart 上传、本地重绘窗口和 provider 参数仍由运行时处理。
 
 稳定变量和运营模板见 [docs/runbooks/system-prompts.md](./docs/runbooks/system-prompts.md)。
 
@@ -139,7 +139,7 @@ Admin route pages 不直接依赖 generated API。每个 Admin vertical context 
 | ---------------- | --------------- | --------- |
 | `features/admin/users` | `internal/identity/users` | 用户列表、角色/status、会话、伪装登录、受控注销 |
 | `features/admin/provider-config` | `internal/accountpool` | channel/account/provider payload、模型检测、调度可见性 |
-| `features/admin/prompt-config` | `internal/prompts`, `internal/workflow` | feature slug、prompt template、variables、revisions |
+| `features/admin/prompt-config` | `internal/prompts`, `internal/workflow` | 当前 Workflow Feature 配置、canonical model、prompt template、variables |
 | `features/admin/storage` | `internal/media/storage` | storage provider/profile、secret masking、bucket test/apply |
 | `features/admin/task-monitor` | `internal/tasking` | task list/detail、runtime monitor、stream/poll fallback |
 | `features/admin/statistics` | `internal/tasking/taskstats` | statistics aggregation、backfill status、range contract |

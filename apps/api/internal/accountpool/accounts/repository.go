@@ -185,6 +185,19 @@ func (r *AccountRepository) GetAllEnabled(ctx context.Context) ([]*ApiAccount, e
 	return accounts, nil
 }
 
+func (r *AccountRepository) HasEligibleModel(ctx context.Context, featureSlug, model string) (bool, error) {
+	accounts, err := r.GetAllEnabled(ctx)
+	if err != nil {
+		return false, err
+	}
+	for _, account := range accounts {
+		if _, ok := ResolveAccountModel(account, featureSlug, model); ok {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (r *AccountRepository) ListAccountIDs(ctx context.Context) ([]int64, error) {
 	return r.q.ListAccountIDs(ctx)
 }

@@ -25,7 +25,7 @@ tags:
   - name: AdminStatistics
   - name: AdminProviderEndpoints
   - name: AdminStorage
-  - name: AdminFeaturePrompts
+  - name: AdminWorkflowFeatures
   - name: UserAssets
   - name: AdminAssets
   - name: UserLineDraftModes
@@ -1971,21 +1971,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseEmpty'
 
-  /admin/feature-prompts:
+  /admin/workflow-features:
     get:
-      tags: [AdminFeaturePrompts]
-      operationId: listAdminFeaturePrompts
+      tags: [AdminWorkflowFeatures]
+      operationId: listAdminWorkflowFeatures
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseFeaturePromptList'
-  /admin/feature-prompts/{slug}:
+                $ref: '#/components/schemas/ApiResponseWorkflowFeatureList'
+  /admin/workflow-features/{slug}:
     get:
-      tags: [AdminFeaturePrompts]
-      operationId: getAdminFeaturePrompt
+      tags: [AdminWorkflowFeatures]
+      operationId: getAdminWorkflowFeature
       parameters:
         - name: slug
           in: path
@@ -1997,10 +1997,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseFeaturePrompt'
+                $ref: '#/components/schemas/ApiResponseWorkflowFeature'
     put:
-      tags: [AdminFeaturePrompts]
-      operationId: setAdminFeaturePrompt
+      tags: [AdminWorkflowFeatures]
+      operationId: setAdminWorkflowFeature
       parameters:
         - name: slug
           in: path
@@ -2013,25 +2013,27 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [prompt]
+              required: [canonical_model, system_prompt, enabled]
               properties:
-                prompt:
+                canonical_model:
                   type: string
+                system_prompt:
+                  type: string
+                enabled:
+                  type: boolean
                 variables:
                   type: array
                   items:
-                    $ref: '#/components/schemas/FeaturePromptVariable'
-                model_defaults:
-                  $ref: '#/components/schemas/FeaturePromptModelDefaults'
+                    $ref: '#/components/schemas/WorkflowFeatureVariable'
                 user_prompt_merge_policy:
-                  $ref: '#/components/schemas/FeaturePromptMergePolicy'
+                  $ref: '#/components/schemas/WorkflowFeatureMergePolicy'
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseFeaturePrompt'
+                $ref: '#/components/schemas/ApiResponseWorkflowFeature'
 components:
   securitySchemes:
     cookieAuth:
@@ -4119,27 +4121,26 @@ components:
         sort_order: { type: integer }
         is_enabled: { type: boolean }
 
-    FeaturePrompt:
+    WorkflowFeature:
       type: object
-      required: [slug, prompt, variables, model_defaults, user_prompt_merge_policy, schema_version]
+      required:
+        [feature_slug, canonical_model, system_prompt, variables, user_prompt_merge_policy, enabled]
       properties:
-        slug: { type: string }
-        current_revision_id: { type: integer }
-        prompt: { type: string }
+        feature_slug: { type: string }
+        canonical_model: { type: string }
+        system_prompt: { type: string }
         variables:
           type: array
           items:
-            $ref: '#/components/schemas/FeaturePromptVariable'
-        model_defaults:
-          $ref: '#/components/schemas/FeaturePromptModelDefaults'
+            $ref: '#/components/schemas/WorkflowFeatureVariable'
         user_prompt_merge_policy:
-          $ref: '#/components/schemas/FeaturePromptMergePolicy'
-        schema_version: { type: integer }
+          $ref: '#/components/schemas/WorkflowFeatureMergePolicy'
+        enabled: { type: boolean }
         updated_at:
           type: string
           nullable: true
 
-    FeaturePromptVariable:
+    WorkflowFeatureVariable:
       type: object
       required: [key]
       properties:
@@ -4148,14 +4149,7 @@ components:
           type: string
           enum: [prompt, control, context]
 
-    FeaturePromptModelDefaults:
-      type: object
-      additionalProperties: false
-      properties:
-        model:
-          type: string
-
-    FeaturePromptMergePolicy:
+    WorkflowFeatureMergePolicy:
       type: object
       required: [append_user_prompt_when_template_misses_placeholder, append_base_prompt_without_template]
       properties:
@@ -4298,6 +4292,9 @@ components:
               properties:
                 ready: { type: boolean }
                 message: { type: string }
+                error_code:
+                  type: string
+                  enum: [submission_invalid, workflow_not_configured, workflow_disabled, workflow_configuration_unavailable, workflow_model_unavailable, provider_unavailable]
                 feature: { type: string }
                 billing:
                   $ref: '#/components/schemas/TaskBillingReadiness'
@@ -4876,24 +4873,24 @@ components:
                 mode:
                   $ref: '#/components/schemas/LineDraftMode'
 
-    ApiResponseFeaturePromptList:
+    ApiResponseWorkflowFeatureList:
       allOf:
         - $ref: '#/components/schemas/ApiResponseBase'
         - type: object
           properties:
             data:
               type: object
-              required: [prompts]
+              required: [workflow_features]
               properties:
-                prompts:
+                workflow_features:
                   type: array
                   items:
-                    $ref: '#/components/schemas/FeaturePrompt'
+                    $ref: '#/components/schemas/WorkflowFeature'
 
-    ApiResponseFeaturePrompt:
+    ApiResponseWorkflowFeature:
       allOf:
         - $ref: '#/components/schemas/ApiResponseBase'
         - type: object
           properties:
             data:
-              $ref: '#/components/schemas/FeaturePrompt'
+              $ref: '#/components/schemas/WorkflowFeature'

@@ -1,134 +1,127 @@
 package prompts
 
 import (
+	"context"
 	"errors"
+	"strings"
 
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/workflow"
 
 	"github.com/gin-gonic/gin"
 )
 
-const maxFeaturePromptRequestBytes = 64 << 10
+const maxWorkflowFeatureRequestBytes = 64 << 10
 
-type FeaturePromptHandler struct {
-	promptRepo *FeaturePromptRepository
+type EligibleModelLookup interface {
+	HasEligibleModel(ctx context.Context, featureSlug, model string) (bool, error)
 }
 
-type featurePromptPayload struct {
-	Prompt                *string                     `json:"prompt"`
-	Variables             []FeaturePromptVariable     `json:"variables"`
-	ModelDefaults         *FeaturePromptModelDefaults `json:"model_defaults"`
-	UserPromptMergePolicy *FeaturePromptMergePolicy   `json:"user_prompt_merge_policy"`
+type WorkflowFeatureHandler struct {
+	repository *WorkflowFeatureRepository
+	models     EligibleModelLookup
 }
 
-type featurePromptListResponse struct {
-	Prompts []FeaturePromptConfig `json:"prompts"`
+type workflowFeaturePayload struct {
+	CanonicalModel        string                            `json:"canonical_model"`
+	SystemPrompt          string                            `json:"system_prompt"`
+	Variables             []WorkflowFeatureVariable         `json:"variables"`
+	UserPromptMergePolicy *WorkflowFeaturePromptMergePolicy `json:"user_prompt_merge_policy"`
+	Enabled               bool                              `json:"enabled"`
 }
 
-func NewFeaturePromptHandler(promptRepo *FeaturePromptRepository) *FeaturePromptHandler {
-	return &FeaturePromptHandler{promptRepo: promptRepo}
+type workflowFeatureListResponse struct {
+	WorkflowFeatures []WorkflowFeatureConfig `json:"workflow_features"`
 }
 
-// GetPrompt 获取某功能的系统提示词
-func (h *FeaturePromptHandler) GetPrompt(c *gin.Context) {
-	rawSlug := c.Param("slug")
-	if rawSlug == "" {
-		response.Error(c, 400, "缺少 slug 参数")
-		return
-	}
-	slug, err := workflow.ValidateWorkflowFeatureSlug(rawSlug)
+func NewWorkflowFeatureHandler(repository *WorkflowFeatureRepository, models EligibleModelLookup) *WorkflowFeatureHandler {
+	return &WorkflowFeatureHandler{repository: repository, models: models}
+}
+
+func (h *WorkflowFeatureHandler) Get(c *gin.Context) {
+	slug, err := workflowFeatureSlugFromRequest(c)
 	if err != nil {
 		response.Error(c, 400, err.Error())
 		return
 	}
-
-	config, err := h.promptRepo.GetPromptConfig(c.Request.Context(), slug)
+	config, err := h.repository.GetConfig(c.Request.Context(), slug)
 	if err != nil {
-		response.InternalError(c, 500, "获取失败", err)
+		response.InternalError(c, 500, "获取 Workflow Feature 配置失败", err)
 		return
 	}
 	response.Success(c, config)
 }
 
-// SetPrompt 设置某功能的系统提示词
-func (h *FeaturePromptHandler) SetPrompt(c *gin.Context) {
+func (h *WorkflowFeatureHandler) Save(c *gin.Context) {
 	identityPrincipal, ok := principal.RequireAdmin(c)
 	if !ok {
 		return
 	}
-	slug, err := featurePromptSlugFromRequest(c)
+	slug, err := workflowFeatureSlugFromRequest(c)
 	if err != nil {
 		response.Error(c, 400, err.Error())
 		return
 	}
-
-	var req featurePromptPayload
-	if err := jsonlimit.DecodeStrictRequest(c.Writer, c.Request, maxFeaturePromptRequestBytes, &req); err != nil {
+	var request workflowFeaturePayload
+	if err := jsonlimit.DecodeStrictRequest(c.Writer, c.Request, maxWorkflowFeatureRequestBytes, &request); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	if req.Prompt == nil {
-		response.Error(c, 400, "缺少 prompt 参数")
+	request.CanonicalModel = strings.TrimSpace(request.CanonicalModel)
+	if request.CanonicalModel == "" {
+		response.Error(c, 400, "canonical_model 不能为空")
 		return
 	}
-
-	saveInput, err := h.featurePromptSaveInput(c, slug, req)
-	if err != nil {
-		response.InternalError(c, 500, "读取当前配置失败", err)
-		return
+	if request.Enabled {
+		if h.models == nil {
+			response.InternalError(c, 500, "模型可用性校验服务未配置", errors.New("eligible model lookup is nil"))
+			return
+		}
+		eligible, err := h.models.HasEligibleModel(c.Request.Context(), slug, request.CanonicalModel)
+		if err != nil {
+			response.InternalError(c, 500, "校验模型可用性失败", err)
+			return
+		}
+		if !eligible {
+			response.Error(c, 400, "当前没有支持该 Workflow Feature 和 canonical_model 的可用账号")
+			return
+		}
 	}
 	updatedBy := identityPrincipal.UserID()
-	config, err := h.promptRepo.SetPromptConfig(c.Request.Context(), slug, saveInput, &updatedBy)
+	config, err := h.repository.SaveConfig(c.Request.Context(), slug, WorkflowFeatureSaveInput{
+		CanonicalModel:        request.CanonicalModel,
+		SystemPrompt:          request.SystemPrompt,
+		Variables:             request.Variables,
+		UserPromptMergePolicy: request.UserPromptMergePolicy,
+		Enabled:               request.Enabled,
+	}, &updatedBy)
 	if err != nil {
-		response.InternalError(c, 500, "保存失败", err)
+		if validation.Is(err) {
+			response.Error(c, 400, err.Error())
+			return
+		}
+		response.InternalError(c, 500, "保存 Workflow Feature 配置失败", err)
 		return
 	}
-
 	response.Success(c, config)
 }
 
-// ListPrompts 获取所有功能的系统提示词
-func (h *FeaturePromptHandler) ListPrompts(c *gin.Context) {
-	prompts, err := h.promptRepo.ListPromptConfigs(c.Request.Context())
+func (h *WorkflowFeatureHandler) List(c *gin.Context) {
+	configs, err := h.repository.ListConfigs(c.Request.Context())
 	if err != nil {
-		response.InternalError(c, 500, "获取失败", err)
+		response.InternalError(c, 500, "获取 Workflow Feature 配置失败", err)
 		return
 	}
-	response.SuccessDTO(c, featurePromptListResponse{Prompts: prompts})
+	response.SuccessDTO(c, workflowFeatureListResponse{WorkflowFeatures: configs})
 }
 
-func featurePromptSlugFromRequest(c *gin.Context) (string, error) {
+func workflowFeatureSlugFromRequest(c *gin.Context) (string, error) {
 	rawSlug := c.Param("slug")
 	if rawSlug == "" {
 		return "", errors.New("缺少 slug 参数")
 	}
 	return workflow.ValidateWorkflowFeatureSlug(rawSlug)
-}
-
-func (h *FeaturePromptHandler) featurePromptSaveInput(c *gin.Context, slug string, req featurePromptPayload) (FeaturePromptSaveInput, error) {
-	current, err := h.promptRepo.GetPromptConfig(c.Request.Context(), slug)
-	if err != nil {
-		return FeaturePromptSaveInput{}, err
-	}
-	variables := req.Variables
-	if variables == nil {
-		variables = current.Variables
-	}
-	modelDefaults := current.ModelDefaults
-	if req.ModelDefaults != nil {
-		modelDefaults = *req.ModelDefaults
-	}
-	mergePolicy := req.UserPromptMergePolicy
-	if mergePolicy == nil {
-		mergePolicy = &current.UserPromptMergePolicy
-	}
-	return FeaturePromptSaveInput{
-		Prompt:                *req.Prompt,
-		Variables:             variables,
-		ModelDefaults:         modelDefaults,
-		UserPromptMergePolicy: mergePolicy,
-	}, nil
 }

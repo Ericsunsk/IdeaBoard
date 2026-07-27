@@ -234,25 +234,6 @@ type CreditWalletRestriction struct {
 	ReleaseReason       sql.NullString `json:"release_reason"`
 }
 
-type FeaturePrompt struct {
-	FeatureSlug       string        `json:"feature_slug"`
-	CurrentRevisionID sql.NullInt64 `json:"current_revision_id"`
-	CreatedAt         time.Time     `json:"created_at"`
-	UpdatedAt         time.Time     `json:"updated_at"`
-}
-
-type FeaturePromptRevision struct {
-	ID                    int64           `json:"id"`
-	FeatureSlug           string          `json:"feature_slug"`
-	Prompt                string          `json:"prompt"`
-	Variables             json.RawMessage `json:"variables"`
-	ModelDefaults         json.RawMessage `json:"model_defaults"`
-	UserPromptMergePolicy json.RawMessage `json:"user_prompt_merge_policy"`
-	SchemaVersion         int32           `json:"schema_version"`
-	UpdatedBy             sql.NullInt64   `json:"updated_by"`
-	CreatedAt             time.Time       `json:"created_at"`
-}
-
 type LineDraftMode struct {
 	ID         int64     `json:"id"`
 	Name       string    `json:"name"`
@@ -579,4 +560,16 @@ type UsersUsedUid struct {
 	ID         int64     `json:"id"`
 	StorageUid string    `json:"storage_uid"`
 	CreatedAt  time.Time `json:"created_at"`
+}
+
+type WorkflowFeature struct {
+	FeatureSlug           string          `json:"feature_slug"`
+	CanonicalModel        string          `json:"canonical_model"`
+	SystemPrompt          string          `json:"system_prompt"`
+	Variables             json.RawMessage `json:"variables"`
+	UserPromptMergePolicy json.RawMessage `json:"user_prompt_merge_policy"`
+	Enabled               bool            `json:"enabled"`
+	UpdatedBy             sql.NullInt64   `json:"updated_by"`
+	CreatedAt             time.Time       `json:"created_at"`
+	UpdatedAt             time.Time       `json:"updated_at"`
 }

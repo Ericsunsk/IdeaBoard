@@ -1,6 +1,6 @@
 # Feature System Prompt 运营手册
 
-本文用于管理后台 `feature_prompts.feature_slug` 的配置、评审与上线检查。它不是模型能力说明，也不是产品文案；它的目标是让每个 workflow feature 的 system prompt 稳定、可执行、可审计。
+本文用于管理后台 `workflow_features.feature_slug` 的当前执行配置、评审与上线检查。它不是模型能力说明，也不是产品文案；它的目标是让每个 workflow feature 的 system prompt 稳定且可执行。
 
 ## 0. 核心原则
 
@@ -22,23 +22,22 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 
 ### 2.1 配置事实源
 
-- 后台配置事实源是 `feature_prompts`。
+- 后台配置事实源是 `workflow_features`。
 - Admin API 返回所有支持的 feature 配置。
 - 运行时只读取 `enabled = true` 的配置。
-- `enabled = false` 表示配置在后台可见、可编辑、可审计，但运行时视为未配置。
+- `enabled = false` 表示配置在后台可见、可编辑，但运行时禁止提交该 feature。
 
 ### 2.2 字段语义
 
 - `variables` 是后台展示用的稳定变量清单，格式为 `{ key: string, tone?: "prompt" | "control" | "context" }[]`。
 - 运行时实际替换能力以后端模板绑定为准，不以后台展示字段为准。
-- `schema_version` 每次保存递增。
-- `published_at` 只在启用配置时写入；禁用配置保持为空。
-- `feature_prompt_revisions` 保存每次提交的 `prompt`、`enabled`、`variables`、`schema_version`、`published_at` 快照，用于审计和回滚设计。
+- `canonical_model` 是执行模型的唯一事实源；用户任务参数不能覆盖它。
+- 每个 feature 只保存一份当前配置；保存是原地更新，不创建 version、revision 或 history。
 
 ### 2.3 模板装配
 
-- 后端按 `feature_slug` 从 `feature_prompts` 读取后台配置。
-- 配置为空或读取失败时，直接返回当前请求的 `basePrompt`，不再拼接后端默认模板链。
+- 后端按 `feature_slug` 从 `workflow_features` 读取当前配置。
+- 配置缺失、禁用或读取失败时拒绝任务提交，不做隐式 fallback。
 - `{{user_prompt}}` 始终会被替换为字符串；用户没有输入时替换为空字符串。
 - 模板中存在但后端不支持或运行时没有提供的变量会原样保留，所以不要写不属于当前 feature 的变量。
 - 除 `style-variation` 外，如果模板没有显式写 `{{user_prompt}}`，运行时可能把用户输入追加到模板末尾。
@@ -340,7 +339,7 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 
 ### 5.2 Prompt 节点
 
-Prompt 节点的 `pattern-gen` system prompt 是可选配置；未配置时直接使用用户输入。
+Prompt 节点的 `pattern-gen` system prompt 可以为空；Workflow Feature 本身仍必须配置 canonical model 并启用。空 system prompt 时直接使用用户输入。
 
 后续需要统一补充图案边界、输出格式或风格约束时，再在 Admin 面板中配置。
 

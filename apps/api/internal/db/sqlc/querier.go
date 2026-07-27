@@ -31,7 +31,6 @@ type Querier interface {
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (int64, error)
 	CreateAccountSecret(ctx context.Context, arg CreateAccountSecretParams) (int64, error)
 	CreateBoardShareToken(ctx context.Context, arg CreateBoardShareTokenParams) (int64, error)
-	CreateFeaturePromptRevision(ctx context.Context, arg CreateFeaturePromptRevisionParams) (FeaturePromptRevision, error)
 	CreateLineDraftMode(ctx context.Context, arg CreateLineDraftModeParams) (int64, error)
 	CreateProviderEndpoint(ctx context.Context, arg CreateProviderEndpointParams) (int64, error)
 	CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error)
@@ -57,7 +56,6 @@ type Querier interface {
 	DeleteTasksByUserID(ctx context.Context, userID int64) error
 	DeleteUserBoardsByUserID(ctx context.Context, userID int64) error
 	DeleteUserByID(ctx context.Context, id int64) (int64, error)
-	EnsureFeaturePrompt(ctx context.Context, featureSlug string) error
 	FailRunningTaskAttemptsByAccountID(ctx context.Context, arg FailRunningTaskAttemptsByAccountIDParams) (int64, error)
 	FailRunningTasksByAccountID(ctx context.Context, arg FailRunningTasksByAccountIDParams) ([]FailRunningTasksByAccountIDRow, error)
 	FinalFailTaskRunningWithLease(ctx context.Context, arg FinalFailTaskRunningWithLeaseParams) (int64, error)
@@ -72,8 +70,6 @@ type Querier interface {
 	GetBoardMemberByUserID(ctx context.Context, arg GetBoardMemberByUserIDParams) (BoardMember, error)
 	GetBoardMemberRole(ctx context.Context, arg GetBoardMemberRoleParams) (string, error)
 	GetBoardShareTokenByHash(ctx context.Context, tokenHash string) (BoardShareToken, error)
-	GetFeaturePrompt(ctx context.Context, featureSlug string) (GetFeaturePromptRow, error)
-	GetFeaturePromptForUpdate(ctx context.Context, featureSlug string) (FeaturePrompt, error)
 	GetLineDraftModeByID(ctx context.Context, id int64) (LineDraftMode, error)
 	GetMediaAssetByID(ctx context.Context, id int64) (MediaAsset, error)
 	GetProviderEndpointByID(ctx context.Context, id int64) (ProviderEndpoint, error)
@@ -89,6 +85,7 @@ type Querier interface {
 	GetUserByStorageUID(ctx context.Context, storageUid string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUserIDByStorageUIDForUpdateParams) (int64, error)
+	GetWorkflowFeature(ctx context.Context, featureSlug string) (WorkflowFeature, error)
 	HasActiveStorageProfileSecretVersion(ctx context.Context, arg HasActiveStorageProfileSecretVersionParams) (bool, error)
 	IncrementAccountFailCount(ctx context.Context, id int64) (int64, error)
 	InsertStorageProfileSecretVersion(ctx context.Context, arg InsertStorageProfileSecretVersionParams) (StorageProfileSecretVersion, error)
@@ -104,7 +101,6 @@ type Querier interface {
 	ListDailyStatsByDateRange(ctx context.Context, arg ListDailyStatsByDateRangeParams) ([]ListDailyStatsByDateRangeRow, error)
 	ListEnabledAccounts(ctx context.Context) ([]ListEnabledAccountsRow, error)
 	ListEnabledLineDraftModes(ctx context.Context) ([]LineDraftMode, error)
-	ListFeaturePrompts(ctx context.Context) ([]ListFeaturePromptsRow, error)
 	ListLineDraftModes(ctx context.Context) ([]LineDraftMode, error)
 	ListMediaRefsByBoardID(ctx context.Context, arg ListMediaRefsByBoardIDParams) ([]MediaRef, error)
 	ListMonitorExecutionPressureByRange(ctx context.Context, arg ListMonitorExecutionPressureByRangeParams) ([]ListMonitorExecutionPressureByRangeRow, error)
@@ -128,6 +124,7 @@ type Querier interface {
 	ListTasksByUserID(ctx context.Context, arg ListTasksByUserIDParams) ([]ListTasksByUserIDRow, error)
 	ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUIDsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
+	ListWorkflowFeatures(ctx context.Context) ([]WorkflowFeature, error)
 	LockStorageProfileSecretVersionRotation(ctx context.Context, arg LockStorageProfileSecretVersionRotationParams) (bool, error)
 	MarkStorageProfileDeleted(ctx context.Context, profileID string) (int64, error)
 	MarkTaskCancelled(ctx context.Context, arg MarkTaskCancelledParams) (int64, error)
@@ -148,7 +145,6 @@ type Querier interface {
 	RevokeAccountSecretsForArchive(ctx context.Context, accountID int64) error
 	RevokeBoardShareTokenByID(ctx context.Context, arg RevokeBoardShareTokenByIDParams) (int64, error)
 	SetCurrentStorageProfile(ctx context.Context, arg SetCurrentStorageProfileParams) (int64, error)
-	SetFeaturePromptCurrentRevision(ctx context.Context, arg SetFeaturePromptCurrentRevisionParams) (FeaturePrompt, error)
 	SummarizeTasks(ctx context.Context, arg SummarizeTasksParams) (SummarizeTasksRow, error)
 	SummarizeUsers(ctx context.Context, arg SummarizeUsersParams) (SummarizeUsersRow, error)
 	UpdateAccount(ctx context.Context, arg UpdateAccountParams) (int64, error)
@@ -170,6 +166,7 @@ type Querier interface {
 	UpsertSystemConfig(ctx context.Context, arg UpsertSystemConfigParams) error
 	UpsertTaskDailyStatDelta(ctx context.Context, arg UpsertTaskDailyStatDeltaParams) error
 	UpsertTaskStatEventCorrection(ctx context.Context, arg UpsertTaskStatEventCorrectionParams) (int64, error)
+	UpsertWorkflowFeature(ctx context.Context, arg UpsertWorkflowFeatureParams) (WorkflowFeature, error)
 }
 
 var _ Querier = (*Queries)(nil)
