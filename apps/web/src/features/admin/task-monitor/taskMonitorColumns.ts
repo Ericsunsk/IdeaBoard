@@ -35,7 +35,7 @@ export function getTaskCredentialLabel(row: Task) {
 }
 
 export function getTaskModelLabel(row: Task) {
-  return row.resolved_model || row.requested_model || ''
+  return row.resolved_model || ''
 }
 
 export function getTaskPriorityLabel(row: Task) {

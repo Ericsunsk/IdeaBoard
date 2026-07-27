@@ -32,6 +32,22 @@ func runtimeMaxConcurrent(value int) int {
 	return value
 }
 
+func normalizeCandidateAccountIDs(accountIDs []int64) []int64 {
+	seen := make(map[int64]struct{}, len(accountIDs))
+	ids := make([]int64, 0, len(accountIDs))
+	for _, id := range accountIDs {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	return ids
+}
+
 func (s *PostgresTaskRuntimeStore) GetAccountLoadInfo(ctx context.Context, accountIDs []int64) (map[int64]*tasks.AccountLoad, error) {
 	loads := make(map[int64]*tasks.AccountLoad, len(accountIDs))
 	if s == nil || s.db == nil {

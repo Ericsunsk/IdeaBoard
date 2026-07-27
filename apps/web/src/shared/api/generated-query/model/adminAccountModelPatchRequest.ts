@@ -11,6 +11,5 @@ export interface AdminAccountModelPatchRequest {
   weight?: number
   /** @nullable */
   max_concurrent?: number | null
-  feature_slugs?: string[]
   sort_order?: number
 }

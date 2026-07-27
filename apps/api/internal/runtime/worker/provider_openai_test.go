@@ -702,7 +702,7 @@ func TestCallOpenAIPartialEditNormalizesWebPURLToPNGMultipart(t *testing.T) {
 	}
 }
 
-func TestCallOpenAIUsesFirstModelWhenAccountHasMultipleModels(t *testing.T) {
+func TestCallOpenAIUsesAssignedModelWhenAccountHasMultipleModels(t *testing.T) {
 	var gotBody map[string]interface{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
@@ -723,17 +723,15 @@ func TestCallOpenAIUsesFirstModelWhenAccountHasMultipleModels(t *testing.T) {
 		ApiKey:   "test-key",
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}, {Name: "gpt-image-2", Enabled: true}},
 	}
-	params := map[string]interface{}{"feature": "pattern-gen"}
-
-	resolved, ok := accounts.ResolveAccountModelForParams(account, "", params)
+	resolved, ok := accounts.ResolveAccountModel(account, "gpt-image-2")
 	if !ok {
-		t.Fatalf("expected account model to resolve")
+		t.Fatalf("expected assigned account model to resolve")
 	}
-	if _, err := c.callOpenAIForTest(context.Background(), account, "prompt", 1024, 1024, 2*time.Second, params, resolved.Name); err != nil {
+	if _, err := c.callOpenAIForTest(context.Background(), account, "prompt", 1024, 1024, 2*time.Second, map[string]interface{}{"feature": "pattern-gen"}, resolved.Name); err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
-	if gotBody["model"] != "gpt-image-1" {
-		t.Fatalf("expected first model, got %#v", gotBody["model"])
+	if gotBody["model"] != "gpt-image-2" {
+		t.Fatalf("expected assigned model, got %#v", gotBody["model"])
 	}
 }
 
@@ -760,7 +758,7 @@ func TestCallDrawingAPIResultIncludesResolvedModel(t *testing.T) {
 		Prompt: "prompt",
 		Params: `{"feature":"pattern-gen"}`,
 	}
-	output, err := c.callDrawingAPIForTest(context.Background(), account, task)
+	output, err := c.callDrawingAPIForTest(context.Background(), account, task, "gpt-image-1")
 	if err != nil {
 		t.Fatalf("callDrawingAPI returned error: %v", err)
 	}

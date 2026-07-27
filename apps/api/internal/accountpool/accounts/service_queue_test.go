@@ -161,9 +161,9 @@ WHERE id = $1`, account.ProviderEndpointID).Scan(&apiType, &endpointName, &endpo
 	if _, err := db.ExecContext(ctx, `
 INSERT INTO task_leases (
   task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
-  requested_model, resolved_model, api_type, provider_endpoint_name, provider_endpoint_base_url,
+  resolved_model, api_type, provider_endpoint_name, provider_endpoint_base_url,
   credential_fingerprint, credential_key_version
-) VALUES ($1, $2, 0, $3, $4, $5, 'gpt-image-1', 'gpt-image-1', $6, $7, $8, $9, $10)`,
+) VALUES ($1, $2, 0, $3, $4, $5, 'gpt-image-1', $6, $7, $8, $9, $10)`,
 		taskID, leaseToken, account.ID, account.ProviderEndpointID, credentialID,
 		apiType, endpointName, endpointBaseURL, credentialFingerprint, credentialKeyVersion,
 	); err != nil {
@@ -338,18 +338,13 @@ func TestDeleteAccountDeletesStoppedAccount(t *testing.T) {
 	if modelCount == 0 {
 		t.Fatalf("archived account should retain model snapshot")
 	}
-	featureSlugs, err := json.Marshal([]string{})
-	if err != nil {
-		t.Fatalf("marshal feature slugs failed: %v", err)
-	}
 	if _, err := accountRepo.q.UpsertAccountModel(context.Background(), dbsqlc.UpsertAccountModelParams{
-		AccountID:    acc.ID,
-		ModelName:    "blocked-model",
-		Enabled:      true,
-		Weight:       1,
-		FeatureSlugs: featureSlugs,
-		Metadata:     json.RawMessage("{}"),
-		SortOrder:    99,
+		AccountID: acc.ID,
+		ModelName: "blocked-model",
+		Enabled:   true,
+		Weight:    1,
+		Metadata:  json.RawMessage("{}"),
+		SortOrder: 99,
 	}); err == nil {
 		t.Fatalf("archived account should reject model mutation")
 	}

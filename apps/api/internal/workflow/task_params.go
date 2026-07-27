@@ -44,9 +44,6 @@ func buildProviderTaskParams(params *tasks.WorkflowTaskParams) map[string]interf
 	if text := strings.TrimSpace(params.Feature); text != "" {
 		out[paramkeys.Feature] = text
 	}
-	if text := strings.TrimSpace(params.Model); text != "" {
-		out[paramkeys.Model] = text
-	}
 	flattenWorkflowMediaInputs(out, params.Media)
 	flattenWorkflowControls(out, params.Controls)
 	flattenWorkflowFeatureParams(out, params)

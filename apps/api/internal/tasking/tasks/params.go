@@ -17,7 +17,6 @@ type WorkflowTaskParams struct {
 
 	// Feature routing.
 	Feature string `json:"feature,omitempty"`
-	Model   string `json:"model,omitempty"`
 
 	// Runtime media refs. Provider adapters flatten this object at the edge.
 	Media *MediaInputs `json:"media,omitempty"`

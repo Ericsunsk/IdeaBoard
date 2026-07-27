@@ -3,7 +3,6 @@ package paramkeys
 const (
 	SchemaVersion = "schema_version"
 	Feature       = "feature"
-	Model         = "model"
 	Media         = "media"
 	Controls      = "controls"
 	Variation     = "variation"
@@ -65,7 +64,6 @@ const (
 var canonicalTaskParamKeys = keySet(
 	SchemaVersion,
 	Feature,
-	Model,
 	Media,
 	Controls,
 	Variation,
@@ -78,7 +76,6 @@ var canonicalTaskParamKeys = keySet(
 var providerReservedKeys = keySet(
 	SchemaVersion,
 	Feature,
-	Model,
 	Media,
 	Controls,
 	Variation,
@@ -116,7 +113,6 @@ var providerReservedKeys = keySet(
 
 var submitTaskParamKeys = keySet(
 	Feature,
-	Model,
 	ImageURLs,
 	ReferenceImageURLs,
 	MaskImageURL,

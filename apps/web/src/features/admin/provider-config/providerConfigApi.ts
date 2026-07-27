@@ -180,7 +180,6 @@ function toProviderAccountRecord(account: AdminAccountDto): ProviderAccountRecor
       enabled: model.enabled,
       weight: model.weight,
       maxConcurrent: model.max_concurrent,
-      featureSlugs: model.feature_slugs,
       sortOrder: model.sort_order,
     })),
     secretConfigured: account.secret_configured,

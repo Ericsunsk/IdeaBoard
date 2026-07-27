@@ -143,9 +143,8 @@ func (r *Repository) PatchExecutionSnapshot(ctx context.Context, snapshot tasks.
 		return 0, fmt.Errorf("task_id is required")
 	}
 	return r.q.PatchTaskExecutionSnapshot(ctx, dbsqlc.PatchTaskExecutionSnapshotParams{
-		TaskID:         taskID,
-		FeatureSlug:    strings.TrimSpace(snapshot.FeatureSlug),
-		RequestedModel: strings.TrimSpace(snapshot.RequestedModel),
+		TaskID:      taskID,
+		FeatureSlug: strings.TrimSpace(snapshot.FeatureSlug),
 	})
 }
 

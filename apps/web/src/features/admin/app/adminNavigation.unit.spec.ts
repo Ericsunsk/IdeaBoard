@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { resolveAdminPageTitle } from './adminNavigation'
 import { adminRoutes } from './adminRoutes'
+import { adminNavigationRouteDefs } from './adminNavigationMeta'
 
 describe('resolveAdminPageTitle', () => {
   it('uses the leaf route title for the pricing page', () => {
@@ -9,6 +10,22 @@ describe('resolveAdminPageTitle', () => {
 
   it('falls back to the parent navigation title for a remaining credits route', () => {
     expect(resolveAdminPageTitle('/admin/credits/pricing', undefined)).toBe('积分运营')
+  })
+})
+
+describe('Admin system prompt route', () => {
+  it('publishes the system prompt page at the canonical feature-prompts path', () => {
+    const navigation = adminNavigationRouteDefs.find((item) => item.key === 'feature-prompts')
+    const route = adminRoutes[0]?.children?.find((item) => item.path === 'feature-prompts')
+
+    expect(navigation).toMatchObject({
+      path: '/admin/feature-prompts',
+      childPath: 'feature-prompts',
+      label: '系统提示词',
+      title: '系统提示词',
+      routeName: 'AdminFeaturePrompts',
+    })
+    expect(route?.name).toBe('AdminFeaturePrompts')
   })
 })
 

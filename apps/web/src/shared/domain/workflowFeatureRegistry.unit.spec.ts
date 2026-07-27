@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { WORKFLOW_FEATURE } from './workflowFeatures'
 import {
+  getWorkflowFeaturePromptVariables,
   getWorkflowFeatureImageActionText,
   WORKFLOW_FEATURE_CONFIG_GROUPS,
   WORKFLOW_FEATURE_CONFIG_ITEM_MAP,
@@ -55,6 +56,17 @@ describe('workflowFeatureRegistry projections', () => {
       title: 'Prompt · 图案生成',
       label: '图案生成',
     })
+  })
+
+  it('publishes prompt variables from the workflow code registry', () => {
+    expect(getWorkflowFeaturePromptVariables(WORKFLOW_FEATURE.styleVariation)).toEqual([
+      { key: '{{variation_strength}}', tone: 'control' },
+    ])
+    expect(getWorkflowFeaturePromptVariables(WORKFLOW_FEATURE.styleFusion)).toEqual([
+      { key: '{{user_prompt}}', tone: 'prompt' },
+      { key: '{{fusion_input_weights}}', tone: 'control' },
+    ])
+    expect(getWorkflowFeaturePromptVariables(WORKFLOW_FEATURE.removeBg)).toEqual([])
   })
 
   it('exposes canvas image action text without feature modules rebuilding it', () => {

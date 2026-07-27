@@ -13,9 +13,9 @@ func ApplyFeatureSystemPrompt(basePrompt, userPrompt, featureSlug string, params
 	if err != nil || prompt == "" {
 		return basePrompt
 	}
-	return ApplyFeatureSystemPromptWithConfig(basePrompt, userPrompt, featureSlug, params, WorkflowFeatureRuntimeConfig{
-		SystemPrompt:          prompt,
-		UserPromptMergePolicy: DefaultWorkflowFeaturePromptMergePolicy(featureSlug),
+	return ApplyFeatureSystemPromptWithConfig(basePrompt, userPrompt, featureSlug, params, FeaturePromptRuntimeConfig{
+		Prompt:                prompt,
+		UserPromptMergePolicy: DefaultFeaturePromptMergePolicy(featureSlug),
 	})
 }
 

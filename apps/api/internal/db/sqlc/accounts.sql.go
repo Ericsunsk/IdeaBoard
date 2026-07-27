@@ -459,7 +459,7 @@ func (q *Queries) ListAccountIDs(ctx context.Context) ([]int64, error) {
 }
 
 const listAccountModelsByAccountIDs = `-- name: ListAccountModelsByAccountIDs :many
-SELECT id, account_id, model_name, enabled, weight, max_concurrent, feature_slugs, metadata, sort_order, created_at, updated_at
+SELECT id, account_id, model_name, enabled, weight, max_concurrent, metadata, sort_order, created_at, updated_at
 FROM api_account_models AS m
 WHERE m.account_id = ANY($1::bigint[])
   AND EXISTS (
@@ -487,7 +487,6 @@ func (q *Queries) ListAccountModelsByAccountIDs(ctx context.Context, accountIds 
 			&i.Enabled,
 			&i.Weight,
 			&i.MaxConcurrent,
-			&i.FeatureSlugs,
 			&i.Metadata,
 			&i.SortOrder,
 			&i.CreatedAt,
@@ -791,11 +790,11 @@ func (q *Queries) UpdateAccountStatus(ctx context.Context, arg UpdateAccountStat
 
 const upsertAccountModel = `-- name: UpsertAccountModel :one
 INSERT INTO api_account_models (
-  account_id, model_name, enabled, weight, max_concurrent, feature_slugs, metadata, sort_order
+  account_id, model_name, enabled, weight, max_concurrent, metadata, sort_order
 ) SELECT
   $1, $2, $3, $4,
-  $5, $6::jsonb, $7::jsonb,
-  $8
+  $5, $6::jsonb,
+  $7
 WHERE EXISTS (
   SELECT 1 FROM api_accounts
   WHERE id = $1
@@ -805,7 +804,6 @@ ON CONFLICT (account_id, lower(model_name)) DO UPDATE
 SET enabled = EXCLUDED.enabled,
     weight = EXCLUDED.weight,
     max_concurrent = EXCLUDED.max_concurrent,
-    feature_slugs = EXCLUDED.feature_slugs,
     metadata = EXCLUDED.metadata,
     sort_order = EXCLUDED.sort_order
 RETURNING id
@@ -817,7 +815,6 @@ type UpsertAccountModelParams struct {
 	Enabled       bool            `json:"enabled"`
 	Weight        int32           `json:"weight"`
 	MaxConcurrent sql.NullInt32   `json:"max_concurrent"`
-	FeatureSlugs  json.RawMessage `json:"feature_slugs"`
 	Metadata      json.RawMessage `json:"metadata"`
 	SortOrder     int32           `json:"sort_order"`
 }
@@ -829,7 +826,6 @@ func (q *Queries) UpsertAccountModel(ctx context.Context, arg UpsertAccountModel
 		arg.Enabled,
 		arg.Weight,
 		arg.MaxConcurrent,
-		arg.FeatureSlugs,
 		arg.Metadata,
 		arg.SortOrder,
 	)

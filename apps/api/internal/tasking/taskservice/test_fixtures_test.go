@@ -80,9 +80,9 @@ func createTaskServiceTestTask(t testing.TB, db *sql.DB, repo *taskstore.Reposit
 	if task.Status == tasks.StatusRunning && task.LeaseToken != "" {
 		_, err := db.ExecContext(ctx, `
 INSERT INTO task_leases(task_id,lease_token,river_job_id,account_id,provider_endpoint_id,credential_id,
- feature_slug,requested_model,resolved_model,api_type,provider_endpoint_name,provider_endpoint_base_url,
+ feature_slug,resolved_model,api_type,provider_endpoint_name,provider_endpoint_base_url,
  credential_fingerprint,credential_key_version,acquired_at)
-SELECT $1,$2,1,$3,$4,$5,COALESCE(NULLIF($6,''),'image-generate'),'gpt-image-1','gpt-image-1',
+SELECT $1,$2,1,$3,$4,$5,COALESCE(NULLIF($6,''),'image-generate'),'gpt-image-1',
  pe.api_type,pe.name,pe.base_url,secrets.fingerprint,secrets.key_version,clock_timestamp()
 FROM provider_endpoints pe JOIN api_account_secrets secrets ON secrets.id=$5 WHERE pe.id=$4`,
 			task.TaskID, task.LeaseToken, tasks.IDValue(task.AccountID), tasks.IDValue(task.AssignedProviderEndpointID), tasks.IDValue(task.AssignedCredentialID), task.FeatureSlug)

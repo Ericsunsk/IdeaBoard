@@ -22,7 +22,6 @@ export interface Task {
   user_prompt?: string
   params?: string
   feature_slug?: string
-  requested_model?: string
   /**
    * River-compatible task priority; 1 is highest and 4 is lowest.
    * @minimum 1

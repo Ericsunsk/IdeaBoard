@@ -11,6 +11,5 @@ export interface AdminAccountModel {
   enabled: boolean
   weight: number
   max_concurrent?: number
-  feature_slugs?: string[]
   sort_order: number
 }

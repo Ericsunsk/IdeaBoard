@@ -107,9 +107,9 @@ NATS JetStream 只负责持久领域事件、audit 和 realtime fanout。当前�
 
 不要把 worker implementation 挪进 Tasking。Tasking 拥有任务模型、提交、队列、统计和运行状态语义；worker 拥有执行适配。
 
-### 5. Workflow Feature 是当前执行配置
+### 5. Feature Prompt 只保存当前模板
 
-`workflow_features` 按 `feature_slug` 保存唯一当前配置：canonical model、system prompt、模板变量、merge policy 和 enabled 状态。配置原地更新，不创建 Prompt version、revision 或 history。Admin 配置拥有 canonical model，用户请求不能覆盖；Readiness 与 Submit 通过同一个 Submission Planner 固化 model、prompt、typed params、eligible accounts 和 Billing request。媒体输入、mask、多参考图、multipart 上传、本地重绘窗口和 provider 参数仍由运行时处理。
+`feature_prompts` 按 `feature_slug` 保存唯一当前 Prompt，原地更新，不创建 version、revision 或 history。模板变量和 merge policy 由代码维护，不属于运营配置。Billing 价格是 Workflow 是否可提交的唯一业务开关；Readiness 与 Submit 共用同一套 Prompt、typed params 和 Billing request 规划。任务提交不固化 model 或候选账号，worker 在每次执行时从当前已启用的 Provider Account 与 Model 池中按容量动态分配，并将实际 `resolved_model` 写入 lease。媒体输入、mask、多参考图、multipart 上传、本地重绘窗口和 provider 参数仍由运行时处理。
 
 稳定变量和运营模板见 [docs/runbooks/system-prompts.md](./docs/runbooks/system-prompts.md)。
 

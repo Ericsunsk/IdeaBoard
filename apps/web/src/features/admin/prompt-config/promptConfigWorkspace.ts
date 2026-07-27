@@ -1,243 +1,206 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
-import type { AdminWorkflowFeatureFeedback } from './useAdminPromptConfigFeedback'
+import type { WorkflowFeature } from '../../../shared/domain/workflowFeatures'
 import {
-  createAdminWorkflowFeatureResource,
-  type AdminWorkflowFeatureResource,
-  type WorkflowFeature,
-  type WorkflowFeatureVariable,
+  getWorkflowFeaturePromptVariables,
+  type WorkflowFeaturePromptVariable,
+} from '../../../shared/domain/workflowFeatureRegistry'
+import type { AdminPromptConfigFeedback } from './useAdminPromptConfigFeedback'
+import {
+  createAdminPromptConfigResource,
+  type AdminPromptConfigResource,
+  type FeaturePrompt,
 } from './promptConfigResource'
-import type { WorkflowFeatureMergePolicy } from '../../../shared/api/generated-query/model'
 
+export type { FeaturePrompt } from './promptConfigResource'
 export type {
-  WorkflowFeature,
-  WorkflowFeatureVariable,
-  WorkflowFeatureVariableTone,
-} from './promptConfigResource'
+  WorkflowFeaturePromptVariable as FeaturePromptVariable,
+  WorkflowFeaturePromptVariableTone as FeaturePromptVariableTone,
+} from '../../../shared/domain/workflowFeatureRegistry'
 
 type RunAsyncAction = ReturnType<typeof useAsyncAction>['runAsyncAction']
 
-export type WorkflowFeatureDraft = {
-  canonicalModel: string
-  systemPrompt: string
-  enabled: boolean
-  variables: WorkflowFeatureVariable[]
-  userPromptMergePolicy: WorkflowFeatureMergePolicy
-}
-
-export type WorkflowFeatureDraftValidation = {
+export type PromptDraftValidation = {
   canSave: boolean
   isDirty: boolean
   message: string
   severity: 'neutral' | 'warning' | 'error'
 }
 
-export type AdminWorkflowFeatureWorkspaceOptions = {
-  feedback: AdminWorkflowFeatureFeedback
+export type AdminPromptConfigWorkspaceOptions = {
+  feedback: AdminPromptConfigFeedback
   runAsyncAction: RunAsyncAction
   getFeatureTitle?: (slug: string) => string
-  resource?: AdminWorkflowFeatureResource
+  resource?: AdminPromptConfigResource
 }
 
-export type UseAdminWorkflowFeatureWorkspaceOptions = Omit<
-  AdminWorkflowFeatureWorkspaceOptions,
+export type UseAdminPromptConfigWorkspaceOptions = Omit<
+  AdminPromptConfigWorkspaceOptions,
   'runAsyncAction'
 >
 
-export function useAdminWorkflowFeatureWorkspace(options: UseAdminWorkflowFeatureWorkspaceOptions) {
+export function useAdminPromptConfigWorkspace(options: UseAdminPromptConfigWorkspaceOptions) {
   const { runAsyncAction } = useAsyncAction()
-  const workspace = createAdminWorkflowFeatureWorkspace({
+  const workspace = createAdminPromptConfigWorkspace({
     ...options,
     runAsyncAction,
   })
 
   onMounted(() => {
-    void workspace.loadWorkflowFeatures()
+    void workspace.loadPrompts()
   })
 
   return workspace
 }
 
-export function createAdminWorkflowFeatureWorkspace(options: AdminWorkflowFeatureWorkspaceOptions) {
-  const resource = options.resource ?? createAdminWorkflowFeatureResource()
+export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorkspaceOptions) {
+  const resource = options.resource ?? createAdminPromptConfigResource()
   const loading = ref(false)
   const loadFailed = ref(false)
-  const draftMap = reactive<Record<string, WorkflowFeatureDraft>>({})
-  const savedDraftMap = reactive<Record<string, WorkflowFeatureDraft>>({})
-  const workflowFeatureMap = reactive<Record<string, WorkflowFeature>>({})
+  const promptMap = reactive<Record<string, string>>({})
+  const savedPromptMap = reactive<Record<string, string>>({})
+  const promptConfigMap = reactive<Record<string, FeaturePrompt>>({})
   const saving = reactive<Record<string, boolean>>({})
-  const workflowFeatureList = ref<WorkflowFeature[]>([])
+  const promptList = ref<FeaturePrompt[]>([])
 
-  const validations = computed<Record<string, WorkflowFeatureDraftValidation>>(() => {
-    const slugs = new Set([...Object.keys(workflowFeatureMap), ...Object.keys(draftMap)])
+  const validations = computed<Record<string, PromptDraftValidation>>(() => {
+    const slugs = new Set([...Object.keys(promptConfigMap), ...Object.keys(promptMap)])
     return Object.fromEntries([...slugs].map((slug) => [slug, resolveDraftValidation(slug)]))
   })
 
-  async function loadWorkflowFeatures(input: { preserveDirtyDraft?: boolean } = {}) {
+  async function loadPrompts(input: { preserveDirtyDraft?: boolean } = {}) {
     return options.runAsyncAction(
       async () => {
-        const workflowFeatures = await resource.fetchWorkflowFeatures()
+        const prompts = await resource.fetchPrompts()
         loadFailed.value = false
-        syncWorkflowFeatures(workflowFeatures, {
+        syncPromptConfigs(prompts, {
           preserveDirtyDraft: input.preserveDirtyDraft ?? true,
         })
-        return workflowFeatures
+        return prompts
       },
       {
         loading,
         feedback: {
           error: (error) => {
             loadFailed.value = true
-            options.feedback.loadWorkflowFeaturesFailed(error)
+            options.feedback.loadPromptsFailed(error)
           },
         },
       },
     )
   }
 
-  function refreshWorkflowFeatures() {
-    return loadWorkflowFeatures({ preserveDirtyDraft: true })
+  function refreshPrompts() {
+    return loadPrompts({ preserveDirtyDraft: true })
   }
 
-  function syncWorkflowFeatures(
-    configs: WorkflowFeature[],
+  function syncPromptConfigs(
+    configs: FeaturePrompt[],
     syncOptions: { preserveDirtyDraft: boolean },
   ) {
     const incomingSlugs = new Set(configs.map((config) => config.feature_slug))
-    for (const slug of Object.keys(workflowFeatureMap)) {
+    for (const slug of Object.keys(promptConfigMap)) {
       if (incomingSlugs.has(slug)) continue
-      delete workflowFeatureMap[slug]
-      delete savedDraftMap[slug]
-      delete draftMap[slug]
+      delete promptConfigMap[slug]
+      delete savedPromptMap[slug]
+      delete promptMap[slug]
     }
 
-    workflowFeatureList.value = configs
+    promptList.value = configs
     for (const config of configs) {
-      syncWorkflowFeature(config, syncOptions)
+      syncPromptConfig(config, syncOptions)
     }
   }
 
-  function syncWorkflowFeature(
-    config: WorkflowFeature,
-    syncOptions: { preserveDirtyDraft: boolean },
-  ) {
+  function syncPromptConfig(config: FeaturePrompt, syncOptions: { preserveDirtyDraft: boolean }) {
     const slug = config.feature_slug
-    const nextSavedDraft = toWorkflowFeatureDraft(config)
-    const previousSavedDraft = savedDraftMap[slug]
-    const isDirty = Boolean(
-      draftMap[slug] && previousSavedDraft && !areDraftsEqual(draftMap[slug], previousSavedDraft),
-    )
+    const prompt = config.prompt || ''
+    const previousSavedPrompt = savedPromptMap[slug] || ''
+    const hadPromptDraft = hasOwn(promptMap, slug)
+    const isPromptDirty = hadPromptDraft && (promptMap[slug] || '') !== previousSavedPrompt
+    const shouldPreserveDraft = syncOptions.preserveDirtyDraft && isPromptDirty
 
-    workflowFeatureMap[slug] = config
-    savedDraftMap[slug] = cloneDraft(nextSavedDraft)
+    promptConfigMap[slug] = config
+    savedPromptMap[slug] = prompt
 
-    if (!syncOptions.preserveDirtyDraft || !isDirty) {
-      draftMap[slug] = cloneDraft(nextSavedDraft)
+    if (!shouldPreserveDraft) {
+      promptMap[slug] = prompt
     }
   }
 
-  function updateCanonicalModelDraft(slug: string, canonicalModel: string) {
-    ensureDraft(slug).canonicalModel = canonicalModel
-  }
-
-  function updateSystemPromptDraft(slug: string, systemPrompt: string) {
-    ensureDraft(slug).systemPrompt = systemPrompt
-  }
-
-  function updateEnabledDraft(slug: string, enabled: boolean) {
-    ensureDraft(slug).enabled = enabled
+  function updatePromptDraft(slug: string, prompt: string) {
+    if (promptMap[slug] === prompt) return
+    promptMap[slug] = prompt
   }
 
   function insertVariableIntoDraft(slug: string, variableKey: string, position?: number) {
-    const draft = ensureDraft(slug)
-    const insertAt = normalizeInsertPosition(position, draft.systemPrompt.length)
-    draft.systemPrompt =
-      draft.systemPrompt.slice(0, insertAt) + variableKey + draft.systemPrompt.slice(insertAt)
+    const current = promptMap[slug] || ''
+    const insertAt = normalizeInsertPosition(position, current.length)
+    promptMap[slug] = current.slice(0, insertAt) + variableKey + current.slice(insertAt)
   }
 
   function resetDrafts(slugs: readonly string[]) {
     for (const slug of slugs) {
-      const savedDraft = savedDraftMap[slug]
-      if (savedDraft) draftMap[slug] = cloneDraft(savedDraft)
+      promptMap[slug] = savedPromptMap[slug] || ''
     }
   }
 
-  function getDraft(slug: string): WorkflowFeatureDraft {
-    return draftMap[slug] ?? emptyDraft()
+  function getSavedPrompt(slug: string): string {
+    return savedPromptMap[slug] || ''
   }
 
-  function getSavedWorkflowFeature(slug: string): WorkflowFeature | undefined {
-    return workflowFeatureMap[slug]
+  function getPromptVariables(slug: string): readonly WorkflowFeaturePromptVariable[] {
+    return getWorkflowFeaturePromptVariables(slug as WorkflowFeature)
   }
 
-  function getWorkflowFeatureVariables(slug: string): WorkflowFeatureVariable[] {
-    return workflowFeatureMap[slug]?.variables ?? []
-  }
-
-  function getDraftValidation(slug: string): WorkflowFeatureDraftValidation {
+  function getDraftValidation(slug: string): PromptDraftValidation {
     return validations.value[slug] ?? resolveDraftValidation(slug)
   }
 
-  async function saveWorkflowFeature(slug: string): Promise<WorkflowFeature | null> {
+  async function savePrompt(slug: string): Promise<FeaturePrompt | null> {
     const validation = getDraftValidation(slug)
     if (!validation.canSave) {
-      options.feedback.workflowFeatureDraftInvalid(validation.message)
+      options.feedback.promptDraftInvalid(validation.message)
       return null
     }
     if (saving[slug]) return null
 
-    const draft = draftMap[slug]
-    if (!draft) return null
-
     saving[slug] = true
     try {
-      const config = await resource.saveWorkflowFeature({
+      const config = await resource.savePrompt({
         slug,
-        canonical_model: draft.canonicalModel.trim(),
-        system_prompt: draft.systemPrompt,
-        enabled: draft.enabled,
-        variables: draft.variables.map((variable) => ({ ...variable })),
-        user_prompt_merge_policy: { ...draft.userPromptMergePolicy },
+        prompt: promptMap[slug] || '',
       })
-      syncWorkflowFeature(config, { preserveDirtyDraft: false })
-      options.feedback.workflowFeatureSaved(getFeatureTitle(slug))
-      await refreshWorkflowFeatures()
+      syncPromptConfig(config, { preserveDirtyDraft: false })
+      options.feedback.promptSaved(getFeatureTitle(slug))
+      await refreshPrompts()
       return config
     } catch (error) {
-      options.feedback.saveWorkflowFeatureFailed(error)
+      options.feedback.savePromptFailed(error)
       return null
     } finally {
       saving[slug] = false
     }
   }
 
-  function resolveDraftValidation(slug: string): WorkflowFeatureDraftValidation {
-    const savedDraft = savedDraftMap[slug]
-    const draft = draftMap[slug]
-    if (!workflowFeatureMap[slug] || !savedDraft || !draft) {
+  function resolveDraftValidation(slug: string): PromptDraftValidation {
+    if (!promptConfigMap[slug]) {
       return {
         canSave: false,
         isDirty: false,
-        message: '工作流配置已刷新，请重新选择',
+        message: '提示词配置已刷新，请重新选择',
         severity: 'error',
       }
     }
 
-    const isDirty = !areDraftsEqual(draft, savedDraft)
-    if (!draft.canonicalModel.trim()) {
-      return {
-        canSave: false,
-        isDirty,
-        message: '请输入 Canonical Model',
-        severity: 'error',
-      }
-    }
+    const prompt = promptMap[slug] || ''
+    const isDirty = prompt !== (savedPromptMap[slug] || '')
 
-    if (!draft.systemPrompt.trim()) {
+    if (!prompt.trim()) {
       return {
         canSave: true,
         isDirty,
-        message: 'System Prompt 为空，执行时将不注入系统提示词',
+        message: '提示词为空，保存后将使用空模板',
         severity: 'warning',
       }
     }
@@ -250,70 +213,31 @@ export function createAdminWorkflowFeatureWorkspace(options: AdminWorkflowFeatur
     }
   }
 
-  function ensureDraft(slug: string) {
-    if (!draftMap[slug]) draftMap[slug] = emptyDraft()
-    return draftMap[slug]
-  }
-
   function getFeatureTitle(slug: string) {
     return options.getFeatureTitle?.(slug) ?? slug
   }
 
   return {
-    draftMap,
-    getDraft,
     getDraftValidation,
-    getSavedWorkflowFeature,
-    getWorkflowFeatureVariables,
+    getPromptVariables,
+    getSavedPrompt,
     insertVariableIntoDraft,
     loadFailed,
-    loadWorkflowFeatures,
+    loadPrompts,
     loading,
-    refreshWorkflowFeatures,
+    promptMap,
+    prompts: computed(() => promptList.value),
+    refreshPrompts,
     resetDrafts,
-    saveWorkflowFeature,
+    savePrompt,
     saving,
-    updateCanonicalModelDraft,
-    updateEnabledDraft,
-    updateSystemPromptDraft,
+    updatePromptDraft,
     validationMap: validations,
-    workflowFeatures: computed(() => workflowFeatureList.value),
   }
 }
 
-function toWorkflowFeatureDraft(config: WorkflowFeature): WorkflowFeatureDraft {
-  return {
-    canonicalModel: config.canonical_model,
-    systemPrompt: config.system_prompt,
-    enabled: config.enabled,
-    variables: config.variables.map((variable) => ({ ...variable })),
-    userPromptMergePolicy: { ...config.user_prompt_merge_policy },
-  }
-}
-
-function cloneDraft(draft: WorkflowFeatureDraft): WorkflowFeatureDraft {
-  return {
-    ...draft,
-    variables: draft.variables.map((variable) => ({ ...variable })),
-    userPromptMergePolicy: { ...draft.userPromptMergePolicy },
-  }
-}
-
-function emptyDraft(): WorkflowFeatureDraft {
-  return {
-    canonicalModel: '',
-    systemPrompt: '',
-    enabled: false,
-    variables: [],
-    userPromptMergePolicy: {
-      append_base_prompt_without_template: true,
-      append_user_prompt_when_template_misses_placeholder: true,
-    },
-  }
-}
-
-function areDraftsEqual(left: WorkflowFeatureDraft, right: WorkflowFeatureDraft) {
-  return JSON.stringify(left) === JSON.stringify(right)
+function hasOwn(target: Record<string, unknown>, key: string) {
+  return Object.prototype.hasOwnProperty.call(target, key)
 }
 
 function normalizeInsertPosition(position: number | undefined, fallback: number) {

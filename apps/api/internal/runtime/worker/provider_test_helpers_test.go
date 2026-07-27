@@ -41,6 +41,6 @@ func (c *ProviderExecutor) callGoogleAIForTest(ctx context.Context, account *acc
 	return c.callGoogleAIWithRequest(ctx, account, newProviderRequest(prompt, 0, 0, params, resolvedModel), timeout)
 }
 
-func (c *ProviderExecutor) callDrawingAPIForTest(ctx context.Context, account *accounts.ApiAccount, task *tasks.TaskPayload) (providerCallOutput, error) {
-	return c.callDrawingAPIWithAssignment(ctx, account, task, taskqueue.TaskAssignment{})
+func (c *ProviderExecutor) callDrawingAPIForTest(ctx context.Context, account *accounts.ApiAccount, task *tasks.TaskPayload, assignedModel string) (providerCallOutput, error) {
+	return c.callDrawingAPIWithAssignment(ctx, account, task, taskqueue.TaskAssignment{ResolvedModel: assignedModel})
 }

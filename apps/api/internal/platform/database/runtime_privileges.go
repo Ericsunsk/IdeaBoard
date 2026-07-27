@@ -9,7 +9,7 @@ var apiOwnedTableNames = []string{
 	"board_members",
 	"board_share_tokens",
 	"boards",
-	"workflow_features",
+	"feature_prompts",
 	"line_draft_modes",
 	"media_assets",
 	"media_refs",

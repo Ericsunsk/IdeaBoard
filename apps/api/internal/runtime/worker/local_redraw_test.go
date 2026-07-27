@@ -245,7 +245,7 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 		Params: paramsJSON,
 	}
 
-	output, err := c.callDrawingAPIForTest(context.Background(), account, task)
+	output, err := c.callDrawingAPIForTest(context.Background(), account, task, "gpt-image-1")
 	if err != nil {
 		t.Fatalf("callDrawingAPI: %v", err)
 	}

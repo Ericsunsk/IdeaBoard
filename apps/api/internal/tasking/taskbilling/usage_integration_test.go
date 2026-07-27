@@ -102,14 +102,13 @@ func seedTaskBillingUsageBoundarySnapshots(
 	afterBoundary := time.Date(2026, time.July, 12, 16, 0, 0, 0, time.UTC)
 	if _, err := pool.Exec(ctx, `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, feature_slug, model, sku, display_name, price_version_id, price_version,
+  task_id, user_id, feature_slug, sku, display_name, price_version_id, price_version,
   unit_credits, quantity, total_credits, quoted_at, created_at
 )
 SELECT
   fixture.task_id,
   $1,
   $2,
-  $3,
   price.sku,
   price.display_name,
   price.price_version_id,
@@ -123,14 +122,14 @@ FROM (
   SELECT prices.price_version_id, prices.sku, skus.display_name, prices.version, prices.unit_credits
   FROM billing_price_versions prices
   JOIN billing_skus skus USING (sku)
-  WHERE prices.sku = $4
+  WHERE prices.sku = $3
   ORDER BY version DESC
   LIMIT 1
 ) AS price
 CROSS JOIN (
-  VALUES ($5::varchar, $6::timestamptz), ($7::varchar, $8::timestamptz)
+  VALUES ($4::varchar, $5::timestamptz), ($6::varchar, $7::timestamptz)
 ) AS fixture(task_id, created_at)`,
-		userID, request.Feature, request.Model, string(sku),
+		userID, request.Feature, string(sku),
 		beforeTaskID, beforeBoundary, afterTaskID, afterBoundary,
 	); err != nil {
 		t.Fatalf("seed task snapshots around Shanghai day boundary: %v", err)
@@ -150,7 +149,7 @@ func seedTaskBillingUsageProduct(
 	pool *pgxpool.Pool,
 ) (Request, billing.SKU) {
 	t.Helper()
-	request, err := AIImageRequest(workflow.FeatureSlugPatternGen, "usage-index-model")
+	request, err := AIImageRequest(workflow.FeatureSlugPatternGen)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,14 +177,13 @@ func seedTaskBillingUsageSnapshots(
 	t.Helper()
 	if _, err := pool.Exec(ctx, `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, feature_slug, model, sku, display_name, price_version_id, price_version,
+  task_id, user_id, feature_slug, sku, display_name, price_version_id, price_version,
   unit_credits, quantity, total_credits, quoted_at, created_at
 )
 SELECT
   $3 || '_' || series,
   $1,
   $4,
-  $5,
   price.sku,
   price.display_name,
   price.price_version_id,
@@ -199,12 +197,12 @@ FROM (
   SELECT prices.price_version_id, prices.sku, skus.display_name, prices.version, prices.unit_credits
   FROM billing_price_versions prices
   JOIN billing_skus skus USING (sku)
-  WHERE prices.sku = $6
+  WHERE prices.sku = $5
   ORDER BY version DESC
   LIMIT 1
 ) AS price
 CROSS JOIN generate_series(1, $2::integer) AS series`,
-		userID, count, prefix, request.Feature, request.Model, string(sku)); err != nil {
+		userID, count, prefix, request.Feature, string(sku)); err != nil {
 		t.Fatalf("seed task billing snapshots: %v", err)
 	}
 	if _, err := pool.Exec(ctx, `

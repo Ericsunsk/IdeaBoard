@@ -64,10 +64,10 @@ WITH updated_tasks AS (
       updated_at = now()
   WHERE t.status = 'running'
   RETURNING t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id,
-            t.feature_slug, t.requested_model, t.created_at, t.completed_at, t.cancelled_at
+            t.feature_slug, t.created_at, t.completed_at, t.cancelled_at
 )
 SELECT t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id,
-       t.feature_slug, t.requested_model,
+       t.feature_slug,
        COALESCE(latest_lease.river_job_id, 0)::bigint AS river_job_id,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
@@ -95,7 +95,6 @@ type CancelRunningTasksForStartupRecoveryRow struct {
 	AssignedCredentialID       sql.NullInt64 `json:"assigned_credential_id"`
 	AccountID                  sql.NullInt64 `json:"account_id"`
 	FeatureSlug                string        `json:"feature_slug"`
-	RequestedModel             string        `json:"requested_model"`
 	RiverJobID                 int64         `json:"river_job_id"`
 	ResolvedModel              string        `json:"resolved_model"`
 	ApiType                    string        `json:"api_type"`
@@ -120,7 +119,6 @@ func (q *Queries) CancelRunningTasksForStartupRecovery(ctx context.Context, arg 
 			&i.AssignedCredentialID,
 			&i.AccountID,
 			&i.FeatureSlug,
-			&i.RequestedModel,
 			&i.RiverJobID,
 			&i.ResolvedModel,
 			&i.ApiType,
@@ -238,17 +236,17 @@ func (q *Queries) CountTasksByUserID(ctx context.Context, userID int64) (int64, 
 const createTask = `-- name: CreateTask :one
 INSERT INTO tasks (
   task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-  feature_slug, requested_model, priority,
+  feature_slug, priority,
   status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at,
   cancelled_at, cancelled_by, cancel_reason
 ) VALUES (
   $1, $2, $3, $4, $5, $6,
   $7, $8, $9,
-  $10, $11, COALESCE(NULLIF($12::integer, 0), 2),
-  $13,
-  $14, $15, $16, $17,
-  $18, $19, $20,
-  $21, $22, $23
+  $10, COALESCE(NULLIF($11::integer, 0), 2),
+  $12,
+  $13, $14, $15, $16,
+  $17, $18, $19,
+  $20, $21, $22
 )
 RETURNING id
 `
@@ -264,7 +262,6 @@ type CreateTaskParams struct {
 	UserPrompt                 string        `json:"user_prompt"`
 	Params                     string        `json:"params"`
 	FeatureSlug                string        `json:"feature_slug"`
-	RequestedModel             string        `json:"requested_model"`
 	Priority                   int32         `json:"priority"`
 	Status                     string        `json:"status"`
 	LeaseToken                 string        `json:"lease_token"`
@@ -291,7 +288,6 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (int64, 
 		arg.UserPrompt,
 		arg.Params,
 		arg.FeatureSlug,
-		arg.RequestedModel,
 		arg.Priority,
 		arg.Status,
 		arg.LeaseToken,
@@ -463,10 +459,10 @@ WITH updated_tasks AS (
       completed_at = $2::timestamptz
   WHERE t.account_id = $3 AND t.status = 'running'
   RETURNING t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.result,
-            t.feature_slug, t.requested_model, t.created_at, t.completed_at
+            t.feature_slug, t.created_at, t.completed_at
 )
 SELECT t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.result,
-       t.feature_slug, t.requested_model,
+       t.feature_slug,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        t.created_at, t.completed_at
@@ -494,7 +490,6 @@ type FailRunningTasksByAccountIDRow struct {
 	AccountID                  sql.NullInt64 `json:"account_id"`
 	Result                     string        `json:"result"`
 	FeatureSlug                string        `json:"feature_slug"`
-	RequestedModel             string        `json:"requested_model"`
 	ResolvedModel              string        `json:"resolved_model"`
 	ApiType                    string        `json:"api_type"`
 	CreatedAt                  time.Time     `json:"created_at"`
@@ -518,7 +513,6 @@ func (q *Queries) FailRunningTasksByAccountID(ctx context.Context, arg FailRunni
 			&i.AccountID,
 			&i.Result,
 			&i.FeatureSlug,
-			&i.RequestedModel,
 			&i.ResolvedModel,
 			&i.ApiType,
 			&i.CreatedAt,
@@ -655,7 +649,7 @@ func (q *Queries) FinishTaskAttempt(ctx context.Context, arg FinishTaskAttemptPa
 
 const getActiveTaskLeaseByTaskID = `-- name: GetActiveTaskLeaseByTaskID :one
 SELECT id, task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
-       feature_slug, requested_model, resolved_model, api_type,
+       feature_slug, resolved_model, api_type,
        provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version,
        acquired_at, released_at, release_reason, created_at, updated_at
 FROM task_leases
@@ -675,7 +669,6 @@ func (q *Queries) GetActiveTaskLeaseByTaskID(ctx context.Context, taskID string)
 		&i.ProviderEndpointID,
 		&i.CredentialID,
 		&i.FeatureSlug,
-		&i.RequestedModel,
 		&i.ResolvedModel,
 		&i.ApiType,
 		&i.ProviderEndpointName,
@@ -692,7 +685,7 @@ func (q *Queries) GetActiveTaskLeaseByTaskID(ctx context.Context, taskID string)
 }
 
 const getTaskByTaskID = `-- name: GetTaskByTaskID :one
-SELECT t.id, t.task_id, t.user_id, t.client_action_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.prompt, t.user_prompt, t.params, t.feature_slug, t.requested_model, t.priority, t.status, t.lease_token, t.retry_count, t.attempt_seq, t.error_msg, t.result, t.created_at, t.updated_at, t.completed_at, t.cancelled_at, t.cancelled_by, t.cancel_reason,
+SELECT t.id, t.task_id, t.user_id, t.client_action_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.prompt, t.user_prompt, t.params, t.feature_slug, t.priority, t.status, t.lease_token, t.retry_count, t.attempt_seq, t.error_msg, t.result, t.created_at, t.updated_at, t.completed_at, t.cancelled_at, t.cancelled_by, t.cancel_reason,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
@@ -705,7 +698,8 @@ LEFT JOIN LATERAL (
          credential_fingerprint, credential_key_version
   FROM task_leases
   WHERE task_id = t.task_id
-  ORDER BY (released_at IS NULL) DESC, COALESCE(released_at, acquired_at) DESC, id DESC
+    AND released_at IS NULL
+  ORDER BY acquired_at DESC, id DESC
   LIMIT 1
 ) AS latest_lease ON TRUE
 WHERE t.task_id = $1
@@ -736,7 +730,6 @@ func (q *Queries) GetTaskByTaskID(ctx context.Context, taskID string) (GetTaskBy
 		&i.Task.UserPrompt,
 		&i.Task.Params,
 		&i.Task.FeatureSlug,
-		&i.Task.RequestedModel,
 		&i.Task.Priority,
 		&i.Task.Status,
 		&i.Task.LeaseToken,
@@ -761,7 +754,7 @@ func (q *Queries) GetTaskByTaskID(ctx context.Context, taskID string) (GetTaskBy
 }
 
 const getTaskByTaskIDAndUserID = `-- name: GetTaskByTaskIDAndUserID :one
-SELECT t.id, t.task_id, t.user_id, t.client_action_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.prompt, t.user_prompt, t.params, t.feature_slug, t.requested_model, t.priority, t.status, t.lease_token, t.retry_count, t.attempt_seq, t.error_msg, t.result, t.created_at, t.updated_at, t.completed_at, t.cancelled_at, t.cancelled_by, t.cancel_reason,
+SELECT t.id, t.task_id, t.user_id, t.client_action_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.prompt, t.user_prompt, t.params, t.feature_slug, t.priority, t.status, t.lease_token, t.retry_count, t.attempt_seq, t.error_msg, t.result, t.created_at, t.updated_at, t.completed_at, t.cancelled_at, t.cancelled_by, t.cancel_reason,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
@@ -774,7 +767,8 @@ LEFT JOIN LATERAL (
          credential_fingerprint, credential_key_version
   FROM task_leases
   WHERE task_id = t.task_id
-  ORDER BY (released_at IS NULL) DESC, COALESCE(released_at, acquired_at) DESC, id DESC
+    AND released_at IS NULL
+  ORDER BY acquired_at DESC, id DESC
   LIMIT 1
 ) AS latest_lease ON TRUE
 WHERE t.task_id = $1 AND t.user_id = $2
@@ -810,7 +804,6 @@ func (q *Queries) GetTaskByTaskIDAndUserID(ctx context.Context, arg GetTaskByTas
 		&i.Task.UserPrompt,
 		&i.Task.Params,
 		&i.Task.FeatureSlug,
-		&i.Task.RequestedModel,
 		&i.Task.Priority,
 		&i.Task.Status,
 		&i.Task.LeaseToken,
@@ -1237,7 +1230,7 @@ func (q *Queries) ListTaskIDsByAccountIDAndStatuses(ctx context.Context, arg Lis
 }
 
 const listTasks = `-- name: ListTasks :many
-SELECT t.id, t.task_id, t.user_id, t.client_action_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.prompt, t.user_prompt, t.params, t.feature_slug, t.requested_model, t.priority, t.status, t.lease_token, t.retry_count, t.attempt_seq, t.error_msg, t.result, t.created_at, t.updated_at, t.completed_at, t.cancelled_at, t.cancelled_by, t.cancel_reason,
+SELECT t.id, t.task_id, t.user_id, t.client_action_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.prompt, t.user_prompt, t.params, t.feature_slug, t.priority, t.status, t.lease_token, t.retry_count, t.attempt_seq, t.error_msg, t.result, t.created_at, t.updated_at, t.completed_at, t.cancelled_at, t.cancelled_by, t.cancel_reason,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
@@ -1250,7 +1243,8 @@ LEFT JOIN LATERAL (
          credential_fingerprint, credential_key_version
   FROM task_leases
   WHERE task_id = t.task_id
-  ORDER BY (released_at IS NULL) DESC, COALESCE(released_at, acquired_at) DESC, id DESC
+    AND released_at IS NULL
+  ORDER BY acquired_at DESC, id DESC
   LIMIT 1
 ) AS latest_lease ON TRUE
 WHERE (NOT $1::boolean OR t.user_id = $2)
@@ -1316,7 +1310,6 @@ func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTas
 			&i.Task.UserPrompt,
 			&i.Task.Params,
 			&i.Task.FeatureSlug,
-			&i.Task.RequestedModel,
 			&i.Task.Priority,
 			&i.Task.Status,
 			&i.Task.LeaseToken,
@@ -1351,7 +1344,7 @@ func (q *Queries) ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTas
 }
 
 const listTasksByTaskIDs = `-- name: ListTasksByTaskIDs :many
-SELECT t.id, t.task_id, t.user_id, t.client_action_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.prompt, t.user_prompt, t.params, t.feature_slug, t.requested_model, t.priority, t.status, t.lease_token, t.retry_count, t.attempt_seq, t.error_msg, t.result, t.created_at, t.updated_at, t.completed_at, t.cancelled_at, t.cancelled_by, t.cancel_reason,
+SELECT t.id, t.task_id, t.user_id, t.client_action_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.prompt, t.user_prompt, t.params, t.feature_slug, t.priority, t.status, t.lease_token, t.retry_count, t.attempt_seq, t.error_msg, t.result, t.created_at, t.updated_at, t.completed_at, t.cancelled_at, t.cancelled_by, t.cancel_reason,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
@@ -1364,7 +1357,8 @@ LEFT JOIN LATERAL (
          credential_fingerprint, credential_key_version
   FROM task_leases
   WHERE task_id = t.task_id
-  ORDER BY (released_at IS NULL) DESC, COALESCE(released_at, acquired_at) DESC, id DESC
+    AND released_at IS NULL
+  ORDER BY acquired_at DESC, id DESC
   LIMIT 1
 ) AS latest_lease ON TRUE
 WHERE t.task_id = ANY($1::text[])
@@ -1402,7 +1396,6 @@ func (q *Queries) ListTasksByTaskIDs(ctx context.Context, taskIds []string) ([]L
 			&i.Task.UserPrompt,
 			&i.Task.Params,
 			&i.Task.FeatureSlug,
-			&i.Task.RequestedModel,
 			&i.Task.Priority,
 			&i.Task.Status,
 			&i.Task.LeaseToken,
@@ -1437,7 +1430,7 @@ func (q *Queries) ListTasksByTaskIDs(ctx context.Context, taskIds []string) ([]L
 }
 
 const listTasksByUserID = `-- name: ListTasksByUserID :many
-SELECT t.id, t.task_id, t.user_id, t.client_action_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.prompt, t.user_prompt, t.params, t.feature_slug, t.requested_model, t.priority, t.status, t.lease_token, t.retry_count, t.attempt_seq, t.error_msg, t.result, t.created_at, t.updated_at, t.completed_at, t.cancelled_at, t.cancelled_by, t.cancel_reason,
+SELECT t.id, t.task_id, t.user_id, t.client_action_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.prompt, t.user_prompt, t.params, t.feature_slug, t.priority, t.status, t.lease_token, t.retry_count, t.attempt_seq, t.error_msg, t.result, t.created_at, t.updated_at, t.completed_at, t.cancelled_at, t.cancelled_by, t.cancel_reason,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        COALESCE(latest_lease.provider_endpoint_name, '') AS provider_endpoint_name,
@@ -1450,7 +1443,8 @@ LEFT JOIN LATERAL (
          credential_fingerprint, credential_key_version
   FROM task_leases
   WHERE task_id = t.task_id
-  ORDER BY (released_at IS NULL) DESC, COALESCE(released_at, acquired_at) DESC, id DESC
+    AND released_at IS NULL
+  ORDER BY acquired_at DESC, id DESC
   LIMIT 1
 ) AS latest_lease ON TRUE
 WHERE t.user_id = $1
@@ -1495,7 +1489,6 @@ func (q *Queries) ListTasksByUserID(ctx context.Context, arg ListTasksByUserIDPa
 			&i.Task.UserPrompt,
 			&i.Task.Params,
 			&i.Task.FeatureSlug,
-			&i.Task.RequestedModel,
 			&i.Task.Priority,
 			&i.Task.Status,
 			&i.Task.LeaseToken,
@@ -1751,19 +1744,17 @@ func (q *Queries) PatchTaskExecutionMetrics(ctx context.Context, arg PatchTaskEx
 
 const patchTaskExecutionSnapshot = `-- name: PatchTaskExecutionSnapshot :execrows
 UPDATE tasks
-SET feature_slug = $1,
-    requested_model = $2
-WHERE task_id = $3
+SET feature_slug = $1
+WHERE task_id = $2
 `
 
 type PatchTaskExecutionSnapshotParams struct {
-	FeatureSlug    string `json:"feature_slug"`
-	RequestedModel string `json:"requested_model"`
-	TaskID         string `json:"task_id"`
+	FeatureSlug string `json:"feature_slug"`
+	TaskID      string `json:"task_id"`
 }
 
 func (q *Queries) PatchTaskExecutionSnapshot(ctx context.Context, arg PatchTaskExecutionSnapshotParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, patchTaskExecutionSnapshot, arg.FeatureSlug, arg.RequestedModel, arg.TaskID)
+	result, err := q.db.ExecContext(ctx, patchTaskExecutionSnapshot, arg.FeatureSlug, arg.TaskID)
 	if err != nil {
 		return 0, err
 	}

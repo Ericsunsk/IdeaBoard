@@ -17,7 +17,6 @@ export interface WorkflowTaskParams {
   /** @minimum 1 */
   schema_version?: number
   feature?: WorkflowFeatureSlug
-  model?: string
   media?: WorkflowMediaInputs
   controls?: GenerationControls
   variation?: StyleVariationParams

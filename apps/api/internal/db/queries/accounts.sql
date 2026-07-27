@@ -129,7 +129,7 @@ WHERE account_id = sqlc.arg(account_id)
   );
 
 -- name: ListAccountModelsByAccountIDs :many
-SELECT id, account_id, model_name, enabled, weight, max_concurrent, feature_slugs, metadata, sort_order, created_at, updated_at
+SELECT id, account_id, model_name, enabled, weight, max_concurrent, metadata, sort_order, created_at, updated_at
 FROM api_account_models AS m
 WHERE m.account_id = ANY(sqlc.arg(account_ids)::bigint[])
   AND EXISTS (
@@ -142,10 +142,10 @@ ORDER BY m.account_id ASC, m.sort_order ASC, m.id ASC;
 
 -- name: UpsertAccountModel :one
 INSERT INTO api_account_models (
-  account_id, model_name, enabled, weight, max_concurrent, feature_slugs, metadata, sort_order
+  account_id, model_name, enabled, weight, max_concurrent, metadata, sort_order
 ) SELECT
   sqlc.arg(account_id), sqlc.arg(model_name), sqlc.arg(enabled), sqlc.arg(weight),
-  sqlc.narg(max_concurrent), sqlc.arg(feature_slugs)::jsonb, sqlc.arg(metadata)::jsonb,
+  sqlc.narg(max_concurrent), sqlc.arg(metadata)::jsonb,
   sqlc.arg(sort_order)
 WHERE EXISTS (
   SELECT 1 FROM api_accounts
@@ -156,7 +156,6 @@ ON CONFLICT (account_id, lower(model_name)) DO UPDATE
 SET enabled = EXCLUDED.enabled,
     weight = EXCLUDED.weight,
     max_concurrent = EXCLUDED.max_concurrent,
-    feature_slugs = EXCLUDED.feature_slugs,
     metadata = EXCLUDED.metadata,
     sort_order = EXCLUDED.sort_order
 RETURNING id;

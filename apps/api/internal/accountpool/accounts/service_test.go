@@ -32,21 +32,6 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 	}
 }
 
-func TestNormalizeAccountModelInputsRejectsInvalidFeatureSlug(t *testing.T) {
-	enabled := true
-	_, err := normalizeAccountModelInputs([]AccountModelInput{{
-		Name:         "gpt-image-1",
-		Enabled:      &enabled,
-		FeatureSlugs: []string{"style-fusion", "style fusion"},
-	}})
-	if err == nil {
-		t.Fatal("expected invalid feature slug error")
-	}
-	if !strings.Contains(err.Error(), "feature_slug") {
-		t.Fatalf("error=%q, want feature slug validation context", err.Error())
-	}
-}
-
 func TestApplyFeatureSystemPromptUsesCanonicalKeys(t *testing.T) {
 	params := map[string]interface{}{
 		"hd": map[string]interface{}{
@@ -59,9 +44,9 @@ func TestApplyFeatureSystemPromptUsesCanonicalKeys(t *testing.T) {
 		"user prompt",
 		"hd-upscale",
 		params,
-		prompts.WorkflowFeatureRuntimeConfig{
-			SystemPrompt:          "SYS={{user_prompt}}|{{clarity_strength}}",
-			UserPromptMergePolicy: prompts.DefaultWorkflowFeaturePromptMergePolicy("hd-upscale"),
+		prompts.FeaturePromptRuntimeConfig{
+			Prompt:                "SYS={{user_prompt}}|{{clarity_strength}}",
+			UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy("hd-upscale"),
 		},
 	)
 
@@ -84,9 +69,9 @@ func TestFeatureSystemPromptDoesNotContainHiddenConstraintSnippet(t *testing.T) 
 				"left_percent":   0,
 			},
 		},
-		prompts.WorkflowFeatureRuntimeConfig{
-			SystemPrompt:          "SYS=canvas extend only",
-			UserPromptMergePolicy: prompts.DefaultWorkflowFeaturePromptMergePolicy("image-extend"),
+		prompts.FeaturePromptRuntimeConfig{
+			Prompt:                "SYS=canvas extend only",
+			UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy("image-extend"),
 		},
 	)
 

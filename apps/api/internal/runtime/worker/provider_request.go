@@ -51,18 +51,6 @@ func (p providerTaskParams) featureSlug() string {
 	return ""
 }
 
-func (p providerTaskParams) requestedModel() string {
-	if p.Canonical != nil {
-		if model := strings.TrimSpace(p.Canonical.Model); model != "" {
-			return model
-		}
-	}
-	if model, ok := workflow.ReadWorkflowStringParam(p.Provider, "model"); ok {
-		return strings.TrimSpace(model)
-	}
-	return ""
-}
-
 func (p providerTaskParams) imageSize() (int, int) {
 	return parseSizeFromParams(p.Provider)
 }

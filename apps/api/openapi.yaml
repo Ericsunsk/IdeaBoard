@@ -25,7 +25,7 @@ tags:
   - name: AdminStatistics
   - name: AdminProviderEndpoints
   - name: AdminStorage
-  - name: AdminWorkflowFeatures
+  - name: AdminFeaturePrompts
   - name: UserAssets
   - name: AdminAssets
   - name: UserLineDraftModes
@@ -472,11 +472,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/InsufficientCreditsError'
         '503':
-          description: The authoritative Task price cannot currently be resolved
+          description: The authoritative Task price or transactional submission service is unavailable
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PricingUnavailableError'
+                oneOf:
+                  - $ref: '#/components/schemas/PricingUnavailableError'
+                  - $ref: '#/components/schemas/SubmissionFailedError'
   /user/tasks/submit/readiness:
     post:
       tags: [Tasks]
@@ -1971,21 +1973,21 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseEmpty'
 
-  /admin/workflow-features:
+  /admin/feature-prompts:
     get:
-      tags: [AdminWorkflowFeatures]
-      operationId: listAdminWorkflowFeatures
+      tags: [AdminFeaturePrompts]
+      operationId: listAdminFeaturePrompts
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseWorkflowFeatureList'
-  /admin/workflow-features/{slug}:
+                $ref: '#/components/schemas/ApiResponseFeaturePromptList'
+  /admin/feature-prompts/{slug}:
     get:
-      tags: [AdminWorkflowFeatures]
-      operationId: getAdminWorkflowFeature
+      tags: [AdminFeaturePrompts]
+      operationId: getAdminFeaturePrompt
       parameters:
         - name: slug
           in: path
@@ -1997,10 +1999,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseWorkflowFeature'
+                $ref: '#/components/schemas/ApiResponseFeaturePrompt'
     put:
-      tags: [AdminWorkflowFeatures]
-      operationId: setAdminWorkflowFeature
+      tags: [AdminFeaturePrompts]
+      operationId: setAdminFeaturePrompt
       parameters:
         - name: slug
           in: path
@@ -2013,27 +2015,16 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [canonical_model, system_prompt, enabled]
+              required: [prompt]
               properties:
-                canonical_model:
-                  type: string
-                system_prompt:
-                  type: string
-                enabled:
-                  type: boolean
-                variables:
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/WorkflowFeatureVariable'
-                user_prompt_merge_policy:
-                  $ref: '#/components/schemas/WorkflowFeatureMergePolicy'
+                prompt: { type: string }
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseWorkflowFeature'
+                $ref: '#/components/schemas/ApiResponseFeaturePrompt'
 components:
   securitySchemes:
     cookieAuth:
@@ -2126,6 +2117,16 @@ components:
         code:
           type: string
           enum: [pricing_unavailable]
+        msg:
+          type: string
+
+    SubmissionFailedError:
+      type: object
+      required: [code, msg]
+      properties:
+        code:
+          type: string
+          enum: [submission_failed]
         msg:
           type: string
 
@@ -3016,7 +3017,6 @@ components:
         user_prompt: { type: string }
         params: { type: string }
         feature_slug: { type: string }
-        requested_model: { type: string }
         priority:
           type: integer
           minimum: 1
@@ -3222,7 +3222,6 @@ components:
       type: object
       additionalProperties: false
       properties:
-        model: { type: string }
         original_image_url: { type: string }
         mask_image_url: { type: string }
         reference_image_urls:
@@ -3271,7 +3270,6 @@ components:
           minimum: 1
         feature:
           $ref: '#/components/schemas/WorkflowFeatureSlug'
-        model: { type: string }
         media:
           $ref: '#/components/schemas/WorkflowMediaInputs'
         controls:
@@ -3581,9 +3579,6 @@ components:
         enabled: { type: boolean }
         weight: { type: integer }
         max_concurrent: { type: integer }
-        feature_slugs:
-          type: array
-          items: { type: string }
         sort_order: { type: integer }
 
     AdminAccountModelInput:
@@ -3594,9 +3589,6 @@ components:
         enabled: { type: boolean }
         weight: { type: integer }
         max_concurrent: { type: integer }
-        feature_slugs:
-          type: array
-          items: { type: string }
 
     AdminAccountModelPatchRequest:
       type: object
@@ -3608,9 +3600,6 @@ components:
         max_concurrent:
           type: integer
           nullable: true
-        feature_slugs:
-          type: array
-          items: { type: string }
         sort_order: { type: integer }
 
     AdminAccountCreateRequest:
@@ -4121,40 +4110,15 @@ components:
         sort_order: { type: integer }
         is_enabled: { type: boolean }
 
-    WorkflowFeature:
+    FeaturePrompt:
       type: object
-      required:
-        [feature_slug, canonical_model, system_prompt, variables, user_prompt_merge_policy, enabled]
+      required: [feature_slug, prompt]
       properties:
         feature_slug: { type: string }
-        canonical_model: { type: string }
-        system_prompt: { type: string }
-        variables:
-          type: array
-          items:
-            $ref: '#/components/schemas/WorkflowFeatureVariable'
-        user_prompt_merge_policy:
-          $ref: '#/components/schemas/WorkflowFeatureMergePolicy'
-        enabled: { type: boolean }
+        prompt: { type: string }
         updated_at:
           type: string
           nullable: true
-
-    WorkflowFeatureVariable:
-      type: object
-      required: [key]
-      properties:
-        key: { type: string }
-        tone:
-          type: string
-          enum: [prompt, control, context]
-
-    WorkflowFeatureMergePolicy:
-      type: object
-      required: [append_user_prompt_when_template_misses_placeholder, append_base_prompt_without_template]
-      properties:
-        append_user_prompt_when_template_misses_placeholder: { type: boolean }
-        append_base_prompt_without_template: { type: boolean }
 
     ApiResponseUserInfo:
       allOf:
@@ -4294,7 +4258,7 @@ components:
                 message: { type: string }
                 error_code:
                   type: string
-                  enum: [submission_invalid, workflow_not_configured, workflow_disabled, workflow_configuration_unavailable, workflow_model_unavailable, provider_unavailable]
+                  enum: [submission_invalid, submission_failed, pricing_unavailable, provider_unavailable, prompt_unavailable]
                 feature: { type: string }
                 billing:
                   $ref: '#/components/schemas/TaskBillingReadiness'
@@ -4873,24 +4837,24 @@ components:
                 mode:
                   $ref: '#/components/schemas/LineDraftMode'
 
-    ApiResponseWorkflowFeatureList:
+    ApiResponseFeaturePromptList:
       allOf:
         - $ref: '#/components/schemas/ApiResponseBase'
         - type: object
           properties:
             data:
               type: object
-              required: [workflow_features]
+              required: [prompts]
               properties:
-                workflow_features:
+                prompts:
                   type: array
                   items:
-                    $ref: '#/components/schemas/WorkflowFeature'
+                    $ref: '#/components/schemas/FeaturePrompt'
 
-    ApiResponseWorkflowFeature:
+    ApiResponseFeaturePrompt:
       allOf:
         - $ref: '#/components/schemas/ApiResponseBase'
         - type: object
           properties:
             data:
-              $ref: '#/components/schemas/WorkflowFeature'
+              $ref: '#/components/schemas/FeaturePrompt'

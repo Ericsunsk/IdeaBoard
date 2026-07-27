@@ -48,7 +48,6 @@ export type ProviderAccountModelRecord = {
   enabled: boolean
   weight: number
   maxConcurrent?: number
-  featureSlugs?: string[]
   sortOrder: number
 }
 

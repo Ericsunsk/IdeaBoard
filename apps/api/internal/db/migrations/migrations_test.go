@@ -896,7 +896,7 @@ func TestBaselineMigrationHasCleanSchemaContract(t *testing.T) {
 		"CREATE TABLE task_cancellations",
 		"CREATE TABLE media_assets",
 		"CREATE TABLE storage_profiles",
-		"CREATE TABLE workflow_features",
+		"CREATE TABLE feature_prompts",
 		"CREATE TABLE boards",
 		"CREATE TABLE board_share_tokens",
 		"stat_date DATE NOT NULL",
@@ -928,7 +928,7 @@ func TestBaselineMigrationHasCleanSchemaContract(t *testing.T) {
 	}
 
 	for _, forbidden := range []string{
-		"feature_prompts",
+		"workflow_features",
 		"feature_prompt_revisions",
 		"model_defaults",
 		"ALTER TABLE boards ADD COLUMN",
@@ -986,16 +986,16 @@ func TestBaselineStorageSeedIsLastUpStatement(t *testing.T) {
 	}
 }
 
-func TestSchemaUsesCurrentWorkflowFeatureContract(t *testing.T) {
+func TestSchemaUsesCurrentFeaturePromptContract(t *testing.T) {
 	raw, err := os.ReadFile("../schema/schema.sql")
 	if err != nil {
 		t.Fatalf("read schema failed: %v", err)
 	}
 	schema := string(raw)
-	if !strings.Contains(schema, "CREATE TABLE workflow_features") {
-		t.Fatal("schema must create workflow_features")
+	if !strings.Contains(schema, "CREATE TABLE feature_prompts") {
+		t.Fatal("schema must create feature_prompts")
 	}
-	for _, forbidden := range []string{"feature_prompts", "feature_prompt_revisions", "model_defaults"} {
+	for _, forbidden := range []string{"workflow_features", "feature_prompt_revisions", "model_defaults"} {
 		if strings.Contains(schema, forbidden) {
 			t.Fatalf("schema must not retain legacy Prompt contract: %s", forbidden)
 		}
@@ -1516,10 +1516,10 @@ UPDATE billing_skus SET current_price_version_id = $1 WHERE sku = 'test:snapshot
 	}
 	if _, err := conn.ExecContext(ctx, `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, feature_slug, model, sku, price_version_id, price_version,
+  task_id, user_id, feature_slug, sku, price_version_id, price_version,
   unit_credits, quantity, total_credits, quoted_at
 ) VALUES (
-  'snapshot-backfill-task', 1, 'pattern-gen', 'test-model', 'test:snapshot-backfill', $1, 1,
+  'snapshot-backfill-task', 1, 'pattern-gen', 'test:snapshot-backfill', $1, 1,
   0, 1, 0, clock_timestamp()
 )`, priceVersionID); err != nil {
 		t.Fatal(err)

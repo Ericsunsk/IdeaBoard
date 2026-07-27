@@ -12,7 +12,6 @@ import (
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/tasking/taskstore"
-	"ideaboard/api/internal/workflow"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -88,12 +87,11 @@ func (s *Store) SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tas
 	}
 	var billingRequest taskbilling.Request
 	if task.BillingRequest != nil {
-		if strings.TrimSpace(task.BillingRequest.Feature) != strings.TrimSpace(task.FeatureSlug) ||
-			workflow.NormalizeModelKey(task.BillingRequest.Model) != workflow.NormalizeModelKey(task.RequestedModel) {
+		if strings.TrimSpace(task.BillingRequest.Feature) != strings.TrimSpace(task.FeatureSlug) {
 			return emptyResult, fmt.Errorf("submit task: billing request does not match canonical task product")
 		}
 		billingRequest = taskbilling.Request{
-			Feature: task.BillingRequest.Feature, Model: task.BillingRequest.Model, Quantity: task.BillingRequest.Quantity,
+			Feature: task.BillingRequest.Feature, Quantity: task.BillingRequest.Quantity,
 		}
 		if _, err := taskbilling.RequestFingerprint(billingRequest); err != nil {
 			return emptyResult, fmt.Errorf("submit task: invalid billing request: %w", err)

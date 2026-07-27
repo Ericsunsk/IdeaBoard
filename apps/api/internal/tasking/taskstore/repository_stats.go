@@ -194,9 +194,6 @@ func taskStatModel(task *tasks.Task) string {
 	if model := normalizeStatDimension(task.ResolvedModel); model != "" {
 		return model
 	}
-	if model := normalizeStatDimension(task.RequestedModel); model != "" {
-		return model
-	}
 	return unknownModelName
 }
 
@@ -484,7 +481,6 @@ func taskFromSQLCModel(row dbsqlc.Task, lease taskLeaseSnapshot) tasks.Task {
 		UserPrompt:                 row.UserPrompt,
 		Params:                     row.Params,
 		FeatureSlug:                row.FeatureSlug,
-		RequestedModel:             row.RequestedModel,
 		Priority:                   int(row.Priority),
 		ResolvedModel:              lease.ResolvedModel,
 		APIType:                    lease.APIType,

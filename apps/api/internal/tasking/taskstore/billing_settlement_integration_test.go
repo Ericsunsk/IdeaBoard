@@ -25,7 +25,7 @@ func TestBilledTaskFailureAndCancellationReleaseHold(t *testing.T) {
 		t.Run(status, func(t *testing.T) {
 			db, pool := testdb.OpenWithPool(t)
 			repo, taskBilling, request := newBillingSettlementFixture(t, db, pool, 1, 100, 25)
-			task := &tasks.Task{TaskID: "billing-" + status, UserID: 1, Status: tasks.StatusPending, FeatureSlug: request.Feature, RequestedModel: request.Model}
+			task := &tasks.Task{TaskID: "billing-" + status, UserID: 1, Status: tasks.StatusPending, FeatureSlug: request.Feature}
 			seedTasks(t, repo, t.Context(), task)
 			holdTaskForSettlementTest(t, pool, taskBilling, task, request)
 
@@ -82,7 +82,7 @@ func TestPaidTaskTerminalSettlementMatrix(t *testing.T) {
 			channelID := accountID + 10000
 			credentialID := loadRepositoryTestCredentialID(t, db, accountID)
 			task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-matrix-"+terminal, accountID, channelID, credentialID, "lease-"+terminal, "lease-"+terminal)
-			if _, err := db.ExecContext(t.Context(), `UPDATE tasks SET feature_slug = $2, requested_model = $3 WHERE task_id = $1`, task.TaskID, request.Feature, request.Model); err != nil {
+			if _, err := db.ExecContext(t.Context(), `UPDATE tasks SET feature_slug = $2 WHERE task_id = $1`, task.TaskID, request.Feature, request.Feature); err != nil {
 				t.Fatal(err)
 			}
 			holdTaskForSettlementTest(t, pool, taskBilling, task, request)
@@ -216,7 +216,7 @@ BEFORE UPDATE ON task_billing_settlements FOR EACH ROW EXECUTE FUNCTION fail_tas
 func TestTerminalTransitionRollsBackWhenBillingSettlementIsMissing(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	repo, taskBilling, request := newBillingSettlementFixture(t, db, pool, 1, 0, 0)
-	task := &tasks.Task{TaskID: "billing-integrity-missing-settlement", UserID: 1, Status: tasks.StatusPending, FeatureSlug: request.Feature, RequestedModel: request.Model}
+	task := &tasks.Task{TaskID: "billing-integrity-missing-settlement", UserID: 1, Status: tasks.StatusPending, FeatureSlug: request.Feature}
 	seedTasks(t, repo, t.Context(), task)
 	holdTaskForSettlementTest(t, pool, taskBilling, task, request)
 	if _, err := db.ExecContext(t.Context(), `DROP TRIGGER task_billing_settlements_state_machine ON task_billing_settlements`); err != nil {
@@ -301,7 +301,7 @@ func newBillingSettlementFixtureForFeature(t *testing.T, db *sql.DB, pool *pgxpo
 	billingService := billing.NewService(pool)
 	taskBilling := taskbilling.NewService(billingService, creditService)
 	repo := NewRepository(db)
-	request, err := taskbilling.AIImageRequest(feature, "gpt-image-1")
+	request, err := taskbilling.AIImageRequest(feature)
 	if err != nil {
 		t.Fatal(err)
 	}

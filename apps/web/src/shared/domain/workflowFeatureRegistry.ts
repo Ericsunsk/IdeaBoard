@@ -52,6 +52,14 @@ export interface WorkflowFeatureRegistryItem {
   groupKey: WorkflowFeatureGroupKey
   imageActionLabel?: string
   imageActionTitle?: string
+  promptVariables: readonly WorkflowFeaturePromptVariable[]
+}
+
+export type WorkflowFeaturePromptVariableTone = 'prompt' | 'control' | 'context'
+
+export interface WorkflowFeaturePromptVariable {
+  key: `{{${string}}}`
+  tone: WorkflowFeaturePromptVariableTone
 }
 
 export interface WorkflowFeatureConfigItem {
@@ -72,7 +80,12 @@ export interface WorkflowFeatureImageActionText {
   title: string
 }
 
-type WorkflowFeatureRegistryBaseItem = Omit<WorkflowFeatureRegistryItem, 'title' | 'adminTitle'>
+type WorkflowFeatureRegistryBaseItem = Omit<
+  WorkflowFeatureRegistryItem,
+  'title' | 'adminTitle' | 'promptVariables'
+> & {
+  promptVariables?: readonly WorkflowFeaturePromptVariable[]
+}
 
 const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[] = [
   {
@@ -86,6 +99,7 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
     slug: WORKFLOW_FEATURE.partialEdit,
     label: '局部重绘',
     groupKey: WORKFLOW_FEATURE_GROUP.inpaint,
+    promptVariables: [{ key: '{{user_prompt}}', tone: 'prompt' }],
   },
   {
     slug: WORKFLOW_FEATURE.styleVariation,
@@ -93,11 +107,16 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
     groupKey: WORKFLOW_FEATURE_GROUP.prompt,
     imageActionLabel: '风格延展',
     imageActionTitle: '风格延展',
+    promptVariables: [{ key: '{{variation_strength}}', tone: 'control' }],
   },
   {
     slug: WORKFLOW_FEATURE.styleFusion,
     label: '多图融合',
     groupKey: WORKFLOW_FEATURE_GROUP.fusion,
+    promptVariables: [
+      { key: '{{user_prompt}}', tone: 'prompt' },
+      { key: '{{fusion_input_weights}}', tone: 'control' },
+    ],
   },
   {
     slug: WORKFLOW_FEATURE.removeBg,
@@ -110,6 +129,7 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
     slug: WORKFLOW_FEATURE.patternGen,
     label: '图案生成',
     groupKey: WORKFLOW_FEATURE_GROUP.prompt,
+    promptVariables: [{ key: '{{user_prompt}}', tone: 'prompt' }],
   },
   {
     slug: WORKFLOW_FEATURE.hdUpscale,
@@ -117,6 +137,7 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
     groupKey: WORKFLOW_FEATURE_GROUP.imageTools,
     imageActionLabel: 'HD',
     imageActionTitle: 'HD',
+    promptVariables: [{ key: '{{clarity_strength}}', tone: 'control' }],
   },
   {
     slug: WORKFLOW_FEATURE.imageExtend,
@@ -124,6 +145,13 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
     groupKey: WORKFLOW_FEATURE_GROUP.imageTools,
     imageActionLabel: '扩图',
     imageActionTitle: '扩图',
+    promptVariables: [
+      { key: '{{user_prompt}}', tone: 'prompt' },
+      { key: '{{extend_top_percent}}', tone: 'control' },
+      { key: '{{extend_right_percent}}', tone: 'control' },
+      { key: '{{extend_bottom_percent}}', tone: 'control' },
+      { key: '{{extend_left_percent}}', tone: 'control' },
+    ],
   },
 ] as const
 
@@ -142,6 +170,7 @@ export const WORKFLOW_FEATURE_REGISTRY: readonly WorkflowFeatureRegistryItem[] =
       ...item,
       title,
       adminTitle: title,
+      promptVariables: item.promptVariables ?? [],
     }
   })
 
@@ -227,4 +256,10 @@ export function getWorkflowFeatureImageActionText(
   slug: WorkflowFeature,
 ): WorkflowFeatureImageActionText {
   return WORKFLOW_FEATURE_IMAGE_ACTION_TEXT_MAP[slug]
+}
+
+export function getWorkflowFeaturePromptVariables(
+  slug: WorkflowFeature,
+): readonly WorkflowFeaturePromptVariable[] {
+  return WORKFLOW_FEATURE_REGISTRY_MAP[slug].promptVariables
 }

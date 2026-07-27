@@ -126,7 +126,6 @@ export function accountModelInputsFromValues(
       enabled: existing?.enabled ?? true,
       weight: existing?.weight ?? DEFAULT_ADMIN_ACCOUNT_MODEL_WEIGHT,
       max_concurrent: existing?.maxConcurrent,
-      feature_slugs: existing?.featureSlugs,
     }
   })
 }

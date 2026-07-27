@@ -14,7 +14,7 @@ import (
 const backfillDailyStatsByCreatedRange = `-- name: BackfillDailyStatsByCreatedRange :one
 WITH candidate_tasks AS (
   SELECT t.task_id, t.user_id, t.account_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.status,
-         t.feature_slug, t.requested_model,
+         t.feature_slug,
          COALESCE(latest_lease.resolved_model, '') AS resolved_model,
          COALESCE(latest_lease.api_type, '') AS api_type,
          t.created_at, t.completed_at, t.cancelled_at,
@@ -44,7 +44,6 @@ normalized_events AS (
     LEFT(COALESCE(NULLIF(trim(t.api_type), ''), ''), 50)::varchar(50) AS api_type,
     LEFT(COALESCE(
       NULLIF(trim(t.resolved_model), ''),
-      NULLIF(trim(t.requested_model), ''),
       '未识别模型'
     ), 128)::varchar(128) AS model_name,
     LEFT(COALESCE(NULLIF(t.user_id::text, '0'), 'unknown'), 128)::varchar(128) AS user_key,

@@ -2,15 +2,14 @@ package tasks
 
 // TaskPayload is the durable drawing task payload carried by River.
 type TaskPayload struct {
-	TaskID        string  `json:"task_id"`
-	CorrelationID string  `json:"correlation_id,omitempty"`
-	UserID        int64   `json:"user_id"`
-	Prompt        string  `json:"prompt"`
-	Params        string  `json:"params"`
-	Priority      int     `json:"priority"`
-	AccountIDs    []int64 `json:"account_ids"`
-	RetryCount    int     `json:"retry_count"`
-	CreatedAt     int64   `json:"created_at"`
+	TaskID        string `json:"task_id"`
+	CorrelationID string `json:"correlation_id,omitempty"`
+	UserID        int64  `json:"user_id"`
+	Prompt        string `json:"prompt"`
+	Params        string `json:"params"`
+	Priority      int    `json:"priority"`
+	RetryCount    int    `json:"retry_count"`
+	CreatedAt     int64  `json:"created_at"`
 	// RiverJobID is injected by the worker at runtime and is not persisted in job args.
 	RiverJobID int64 `json:"-"`
 }

@@ -1,7 +1,6 @@
 package prompts
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,53 +13,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type eligibleModelLookupStub struct {
-	eligible bool
-}
-
-func (s eligibleModelLookupStub) HasEligibleModel(context.Context, string, string) (bool, error) {
-	return s.eligible, nil
-}
-
-func newAdminWorkflowFeatureTestRouter(t testing.TB, handler *WorkflowFeatureHandler) *gin.Engine {
+func newAdminFeaturePromptTestRouter(t testing.TB, handler *FeaturePromptHandler) *gin.Engine {
 	t.Helper()
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 7, principal.RoleAdmin)
 		c.Next()
 	})
-	router.PUT("/admin/workflow-features/:slug", handler.Save)
+	router.PUT("/admin/feature-prompts/:slug", handler.Save)
 	return router
 }
 
-func TestSaveWorkflowFeatureRequiresCanonicalModel(t *testing.T) {
-	handler := NewWorkflowFeatureHandler(NewWorkflowFeatureRepository(testdb.Open(t)), eligibleModelLookupStub{eligible: true})
-	router := newAdminWorkflowFeatureTestRouter(t, handler)
-	request := httptest.NewRequest(http.MethodPut, "/admin/workflow-features/style-variation", strings.NewReader(`{"canonical_model":" ","system_prompt":"test","enabled":true}`))
-	request.Header.Set("Content-Type", "application/json")
-	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d body = %s", recorder.Code, recorder.Body.String())
-	}
-}
-
-func TestSaveWorkflowFeatureRequiresEligibleAccountModel(t *testing.T) {
-	handler := NewWorkflowFeatureHandler(NewWorkflowFeatureRepository(testdb.Open(t)), eligibleModelLookupStub{})
-	router := newAdminWorkflowFeatureTestRouter(t, handler)
-	request := httptest.NewRequest(http.MethodPut, "/admin/workflow-features/style-variation", strings.NewReader(`{"canonical_model":"image-a","system_prompt":"test","enabled":true}`))
-	request.Header.Set("Content-Type", "application/json")
-	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d body = %s", recorder.Code, recorder.Body.String())
-	}
-}
-
-func TestSaveDisabledWorkflowFeatureWithoutEligibleAccountModel(t *testing.T) {
-	handler := NewWorkflowFeatureHandler(NewWorkflowFeatureRepository(testdb.Open(t)), eligibleModelLookupStub{})
-	router := newAdminWorkflowFeatureTestRouter(t, handler)
-	request := httptest.NewRequest(http.MethodPut, "/admin/workflow-features/style-variation", strings.NewReader(`{"canonical_model":"image-a","system_prompt":"test","enabled":false}`))
+func TestSaveFeaturePromptAcceptsEmptyPrompt(t *testing.T) {
+	handler := NewFeaturePromptHandler(NewFeaturePromptRepository(testdb.Open(t)))
+	router := newAdminFeaturePromptTestRouter(t, handler)
+	request := httptest.NewRequest(http.MethodPut, "/admin/feature-prompts/style-variation", strings.NewReader(`{"prompt":""}`))
 	request.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, request)
@@ -69,15 +36,14 @@ func TestSaveDisabledWorkflowFeatureWithoutEligibleAccountModel(t *testing.T) {
 	}
 }
 
-func TestSaveWorkflowFeaturePersistsCurrentConfiguration(t *testing.T) {
-	db := testdb.Open(t)
-	handler := NewWorkflowFeatureHandler(NewWorkflowFeatureRepository(db), eligibleModelLookupStub{eligible: true})
-	router := newAdminWorkflowFeatureTestRouter(t, handler)
-	request := httptest.NewRequest(http.MethodPut, "/admin/workflow-features/style-variation", strings.NewReader(`{"canonical_model":"image-a","system_prompt":"test","enabled":true}`))
+func TestSaveFeaturePromptRejectsRuntimePolicyFields(t *testing.T) {
+	handler := NewFeaturePromptHandler(NewFeaturePromptRepository(testdb.Open(t)))
+	router := newAdminFeaturePromptTestRouter(t, handler)
+	request := httptest.NewRequest(http.MethodPut, "/admin/feature-prompts/style-variation", strings.NewReader(`{"prompt":"x","canonical_model":"legacy"}`))
 	request.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusOK {
+	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d body = %s", recorder.Code, recorder.Body.String())
 	}
 }

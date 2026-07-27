@@ -19,7 +19,7 @@ func TestAIImageReadinessReturnsQuoteAndWalletAvailability(t *testing.T) {
 	billingService := billing.NewService(pool)
 	creditService := credits.NewService(pool)
 	service := NewService(billingService, creditService)
-	request, err := AIImageRequest(workflow.FeatureSlugPatternGen, "gpt-image-1")
+	request, err := AIImageRequest(workflow.FeatureSlugPatternGen)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestAllAIImageWorkflowReadinessPricingMatrix(t *testing.T) {
 				_, pool := testdb.OpenWithPool(t)
 				billingService := billing.NewService(pool)
 				creditService := credits.NewService(pool)
-				request, err := AIImageRequest(feature, "gpt-image-1")
+				request, err := AIImageRequest(feature)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -162,7 +162,7 @@ func TestHoldAndPersistFailsClosedForUnavailableFeatureStates(t *testing.T) {
 			db, pool := testdb.OpenWithPool(t)
 			billingService := billing.NewService(pool)
 			creditService := credits.NewService(pool)
-			request, err := AIImageRequest(workflow.FeatureSlugPartialEdit, "gpt-image-1")
+			request, err := AIImageRequest(workflow.FeatureSlugPartialEdit)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -302,7 +302,7 @@ func TestDatabaseRejectsTaskBillingFactMutationAndIllegalSettlement(t *testing.T
 	billingService := billing.NewService(pool)
 	creditService := credits.NewService(pool)
 	service := NewService(billingService, creditService)
-	request, _ := AIImageRequest(workflow.FeatureSlugPatternGen, "gpt-image-1")
+	request, _ := AIImageRequest(workflow.FeatureSlugPatternGen)
 	sku, _ := ResolveSKU(request)
 	if _, err := billingService.PublishPrice(t.Context(), featurePriceInput(sku, "Pattern", 0)); err != nil {
 		t.Fatal(err)
@@ -378,7 +378,7 @@ func seedTaskBillingFacts(t *testing.T, pool *pgxpool.Pool, taskID string, userI
 	billingService := billing.NewService(pool)
 	creditService := credits.NewService(pool)
 	service := NewService(billingService, creditService)
-	request, err := AIImageRequest(workflow.FeatureSlugPatternGen, "gpt-image-1")
+	request, err := AIImageRequest(workflow.FeatureSlugPatternGen)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,8 +454,8 @@ func assertSettlementIntegrityError(t *testing.T, db *sql.DB, taskID string) {
 func insertTerminalSettlementTask(t *testing.T, db *sql.DB, taskID, feature string) {
 	t.Helper()
 	if _, err := db.ExecContext(t.Context(), `
-INSERT INTO tasks (task_id, user_id, prompt, user_prompt, params, feature_slug, requested_model, error_msg, result)
-VALUES ($1, 1, '', '', '{}', $2, 'gpt-image-1', '', '')`, taskID, feature); err != nil {
+INSERT INTO tasks (task_id, user_id, prompt, user_prompt, params, feature_slug, error_msg, result)
+VALUES ($1, 1, '', '', '{}', $2, '', '')`, taskID, feature); err != nil {
 		t.Fatal(err)
 	}
 }

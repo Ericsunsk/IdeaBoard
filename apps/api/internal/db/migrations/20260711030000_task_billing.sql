@@ -7,7 +7,6 @@ CREATE TABLE task_billing_snapshots (
   task_id VARCHAR(64) PRIMARY KEY,
   user_id BIGINT NOT NULL CHECK (user_id > 0),
   feature_slug VARCHAR(64) NOT NULL,
-  model VARCHAR(160) NOT NULL,
   sku VARCHAR(128) NOT NULL REFERENCES billing_skus(sku) ON UPDATE RESTRICT ON DELETE RESTRICT,
   price_version_id BIGINT NOT NULL,
   price_version BIGINT NOT NULL CHECK (price_version > 0),

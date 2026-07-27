@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"testing"
-
-	"ideaboard/api/internal/workflow"
 )
 
 func seedAdminAccountWithTwoModelFixture(t testing.TB, ctx context.Context, repo *AccountRepository, db *sql.DB, suffix string, configure func(*ApiAccount)) *ApiAccount {
@@ -33,7 +31,7 @@ func newAdminAccountWithTwoModelFixture(providerEndpointID int64, suffix string)
 		ApiType:            "openai-compatible",
 		Models: []AccountModel{
 			{Name: "gpt-image-1", Enabled: true, Weight: 7, SortOrder: 0},
-			{Name: "imagen-4", Enabled: true, Weight: 3, MaxConcurrent: &modelMaxConcurrent, FeatureSlugs: []string{workflow.FeatureSlugStyleFusion}, SortOrder: 1},
+			{Name: "imagen-4", Enabled: true, Weight: 3, MaxConcurrent: &modelMaxConcurrent, SortOrder: 1},
 		},
 		ApiKey:        "runtime-secret",
 		ProxyURL:      "https://example.com/" + suffix,
@@ -49,10 +47,9 @@ func adminAccountModelInputsForFullUpdate(models []AccountModel) []AccountModelI
 	for _, model := range models {
 		enabled := model.Enabled
 		input := AccountModelInput{
-			Name:         model.Name,
-			Enabled:      &enabled,
-			Weight:       model.Weight,
-			FeatureSlugs: append([]string(nil), model.FeatureSlugs...),
+			Name:    model.Name,
+			Enabled: &enabled,
+			Weight:  model.Weight,
 		}
 		if model.MaxConcurrent != nil {
 			maxConcurrent := *model.MaxConcurrent

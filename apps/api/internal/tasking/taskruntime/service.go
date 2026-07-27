@@ -108,33 +108,6 @@ func (s *Service) SetTaskStatusPublisher(publisher events.TaskStatusPublisher) {
 	s.taskEvents = publisher
 }
 
-func (s *Service) RefreshTaskAccounts(ctx context.Context, task *tasks.TaskPayload) error {
-	enabledAccounts, err := s.accountRepo.GetAllEnabled(ctx)
-	if err != nil {
-		return err
-	}
-	featureSlug := accounts.ParseFeatureSlugFromParamsJSON(task.Params)
-	enabledAccounts = accounts.FilterAccountsForRequestJSON(enabledAccounts, featureSlug, task.Params)
-
-	hasScopedCandidates := task.AccountIDs != nil
-	scoped := make(map[int64]struct{}, len(task.AccountIDs))
-	for _, id := range task.AccountIDs {
-		scoped[id] = struct{}{}
-	}
-
-	next := make([]int64, 0, len(enabledAccounts))
-	for _, account := range enabledAccounts {
-		if hasScopedCandidates {
-			if _, ok := scoped[account.ID]; !ok {
-				continue
-			}
-		}
-		next = append(next, account.ID)
-	}
-	task.AccountIDs = next
-	return nil
-}
-
 func (s *Service) ConfirmTaskLease(ctx context.Context, assignment taskqueue.TaskAssignment) error {
 	if s.queue == nil {
 		return ErrTaskStateConflict

@@ -24,7 +24,7 @@ func TestRiverWorkerNoCapacitySnoozesJob(t *testing.T) {
 	}))
 
 	err := worker.Work(context.Background(), &river.Job[taskqueue.DrawingTaskArgs]{
-		Args: taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{TaskID: "cap-1", AccountIDs: []int64{1}}},
+		Args: taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{TaskID: "cap-1"}},
 	})
 	var snoozeErr *river.JobSnoozeError
 	if !errors.As(err, &snoozeErr) {
@@ -59,7 +59,6 @@ func TestRiverWorkerPropagatesCorrelationIDToProcessor(t *testing.T) {
 		Args: taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{
 			TaskID:        "trace-task",
 			CorrelationID: "corr-custom",
-			AccountIDs:    []int64{9},
 		}},
 	})
 	if err != nil {
@@ -172,7 +171,7 @@ func TestTaskProcessorProcessesSynchronously(t *testing.T) {
 	})
 
 	start := time.Now()
-	err := processor.Process(context.Background(), &tasks.TaskPayload{TaskID: "sync-1", AccountIDs: []int64{9}})
+	err := processor.Process(context.Background(), &tasks.TaskPayload{TaskID: "sync-1"})
 	if err != nil {
 		t.Fatalf("process task failed: %v", err)
 	}
@@ -192,7 +191,7 @@ func TestTaskProcessorDiscardDoesNotCallProvider(t *testing.T) {
 		return nil
 	})
 
-	if err := processor.Process(context.Background(), &tasks.TaskPayload{TaskID: "discard-1", AccountIDs: []int64{1}}); err != nil {
+	if err := processor.Process(context.Background(), &tasks.TaskPayload{TaskID: "discard-1"}); err != nil {
 		t.Fatalf("process discard task failed: %v", err)
 	}
 }
@@ -206,7 +205,7 @@ func TestRiverWorkerPassesRiverJobIDToProcessor(t *testing.T) {
 
 	err := worker.Work(context.Background(), &river.Job[taskqueue.DrawingTaskArgs]{
 		JobRow: &rivertype.JobRow{ID: 12345},
-		Args:   taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{TaskID: "job-id-1", AccountIDs: []int64{9}}},
+		Args:   taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{TaskID: "job-id-1"}},
 	})
 	if err != nil {
 		t.Fatalf("Work failed: %v", err)
@@ -239,7 +238,7 @@ func TestRiverWorkerFinalFailureSnoozesWithDurableConvergenceMarker(t *testing.T
 	err := worker.Work(ctx, &river.Job[taskqueue.DrawingTaskArgs]{
 		JobRow: &rivertype.JobRow{ID: 9004, Attempt: 2, MaxAttempts: 2},
 		Args: taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{
-			TaskID: "settlement-retry-task", AccountIDs: []int64{9},
+			TaskID: "settlement-retry-task",
 		}},
 	})
 	var snoozeErr *river.JobSnoozeError
@@ -278,7 +277,7 @@ func TestRiverWorkerFallsBackToDedicatedSettlementJobWhenMarkerRecordingFails(t 
 	err := worker.Work(t.Context(), &river.Job[taskqueue.DrawingTaskArgs]{
 		JobRow: &rivertype.JobRow{ID: 9010, Attempt: 2, MaxAttempts: 2},
 		Args: taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{
-			TaskID: "dedicated-settlement-fallback", AccountIDs: []int64{9},
+			TaskID: "dedicated-settlement-fallback",
 		}},
 	})
 	if err == nil || err.Error() != "provider failed" {
@@ -308,7 +307,7 @@ func TestRiverWorkerRetriesPreProviderMarkerFailureWithoutCallingProvider(t *tes
 	job := &river.Job[taskqueue.DrawingTaskArgs]{
 		JobRow: &rivertype.JobRow{ID: 9013, Attempt: 2, MaxAttempts: 2},
 		Args: taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{
-			TaskID: "pre-provider-marker-retry", AccountIDs: []int64{9},
+			TaskID: "pre-provider-marker-retry",
 		}},
 	}
 
@@ -343,7 +342,7 @@ func TestRiverWorkerConvergesTerminallyWhenMarkerResetFails(t *testing.T) {
 	err := worker.Work(t.Context(), &river.Job[taskqueue.DrawingTaskArgs]{
 		JobRow: &rivertype.JobRow{ID: 9015, Attempt: 2, MaxAttempts: 2},
 		Args: taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{
-			TaskID: "marker-reset-terminal-convergence", AccountIDs: []int64{9},
+			TaskID: "marker-reset-terminal-convergence",
 		}},
 	})
 	if err != nil {
@@ -370,7 +369,7 @@ func TestRiverWorkerNoCapacityDoesNotCreateSettlementOnlyMarker(t *testing.T) {
 	job := &river.Job[taskqueue.DrawingTaskArgs]{
 		JobRow: &rivertype.JobRow{ID: 9014, Attempt: 2, MaxAttempts: 2},
 		Args: taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{
-			TaskID: "no-capacity-final-attempt", AccountIDs: []int64{9},
+			TaskID: "no-capacity-final-attempt",
 		}},
 	}
 
@@ -444,7 +443,7 @@ func TestRiverWorkerFinalFailureRetryOnlyConvergesSettlement(t *testing.T) {
 
 	err = worker.Work(t.Context(), &river.Job[taskqueue.DrawingTaskArgs]{
 		JobRow: &rivertype.JobRow{ID: 9005, Attempt: 2, MaxAttempts: 2, Metadata: metadata},
-		Args:   taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{TaskID: "settlement-only-task", AccountIDs: []int64{9}}},
+		Args:   taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{TaskID: "settlement-only-task"}},
 	})
 	if err != nil {
 		t.Fatalf("settlement-only retry failed: %v", err)
@@ -497,7 +496,7 @@ func TestRiverWorkerFinalFailureConvergesAfterWorkContextCancellation(t *testing
 
 	err := worker.Work(ctx, &river.Job[taskqueue.DrawingTaskArgs]{
 		JobRow: &rivertype.JobRow{ID: 9006, Attempt: 2, MaxAttempts: 2},
-		Args:   taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{TaskID: "timed-out-task", AccountIDs: []int64{9}}},
+		Args:   taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{TaskID: "timed-out-task"}},
 	})
 	if err == nil || err.Error() != "job timed out" {
 		t.Fatalf("error=%v, want original terminal error", err)
@@ -524,7 +523,7 @@ func TestRiverWorkerFinalPanicSnoozesWhenConvergenceFails(t *testing.T) {
 
 	err := worker.Work(t.Context(), &river.Job[taskqueue.DrawingTaskArgs]{
 		JobRow: &rivertype.JobRow{ID: 9007, Attempt: 2, MaxAttempts: 2},
-		Args:   taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{TaskID: "panic-settlement-task", AccountIDs: []int64{9}}},
+		Args:   taskqueue.DrawingTaskArgs{Task: tasks.TaskPayload{TaskID: "panic-settlement-task"}},
 	})
 	var snoozeErr *river.JobSnoozeError
 	if !errors.As(err, &snoozeErr) {

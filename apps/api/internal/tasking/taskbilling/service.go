@@ -22,7 +22,6 @@ const imageWorkflowQuantity int64 = 1
 
 var (
 	ErrUnsupportedProduct  = errors.New("task product is not billable")
-	ErrModelRequired       = errors.New("canonical model is required for billing")
 	ErrPricingUnavailable  = errors.New("task pricing is unavailable")
 	ErrInsufficientCredits = errors.New("insufficient credits for task")
 	ErrSettlementConflict  = errors.New("task billing settlement conflict")
@@ -67,7 +66,6 @@ const (
 
 type Request struct {
 	Feature  string
-	Model    string
 	Quantity int64
 }
 
@@ -82,7 +80,6 @@ type Snapshot struct {
 	TaskID            string
 	UserID            int64
 	Feature           string
-	Model             string
 	SKU               billing.SKU
 	DisplayName       string
 	PriceVersionID    int64
@@ -98,16 +95,12 @@ func NewService(quoter Quoter, creditService CreditService) *Service {
 	return &Service{quoter: quoter, credits: creditService}
 }
 
-func AIImageRequest(feature, model string) (Request, error) {
+func AIImageRequest(feature string) (Request, error) {
 	canonicalFeature, ok := workflow.ParseAIImageFeatureSlug(feature)
 	if !ok {
 		return Request{}, ErrUnsupportedProduct
 	}
-	canonicalModel := canonicalizeModel(model)
-	if canonicalModel == "" {
-		return Request{}, ErrModelRequired
-	}
-	return Request{Feature: canonicalFeature, Model: canonicalModel, Quantity: imageWorkflowQuantity}, nil
+	return Request{Feature: canonicalFeature, Quantity: imageWorkflowQuantity}, nil
 }
 
 // RequiresBilling identifies task products whose terminal transition must
@@ -125,34 +118,30 @@ func ResolveSKU(request Request) (billing.SKU, error) {
 }
 
 func RequestFingerprint(request Request) (string, error) {
-	sku, model, err := validateRequest(request)
+	sku, err := validateRequest(request)
 	if err != nil {
 		return "", err
 	}
-	digest := sha256.Sum256([]byte(string(sku) + "\x00" + model + "\x00" + strconv.FormatInt(request.Quantity, 10)))
+	digest := sha256.Sum256([]byte(string(sku) + "\x00" + strconv.FormatInt(request.Quantity, 10)))
 	return hex.EncodeToString(digest[:]), nil
 }
 
-func validateRequest(request Request) (billing.SKU, string, error) {
+func validateRequest(request Request) (billing.SKU, error) {
 	sku, err := ResolveSKU(request)
 	if err != nil {
-		return "", "", err
-	}
-	model := canonicalizeModel(request.Model)
-	if model == "" {
-		return "", "", ErrModelRequired
+		return "", err
 	}
 	if request.Quantity <= 0 {
-		return "", "", billing.ErrInvalidQuantity
+		return "", billing.ErrInvalidQuantity
 	}
-	return sku, model, nil
+	return sku, nil
 }
 
 func (s *Service) Readiness(ctx context.Context, userID int64, request Request) (Readiness, error) {
 	if s == nil || s.quoter == nil || s.credits == nil || userID <= 0 {
 		return Readiness{}, fmt.Errorf("task billing service unavailable")
 	}
-	sku, _, err := validateRequest(request)
+	sku, err := validateRequest(request)
 	if err != nil {
 		return Readiness{}, err
 	}
@@ -174,7 +163,7 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, taskID string, 
 	if s == nil || s.quoter == nil || s.credits == nil || tx == nil || strings.TrimSpace(taskID) == "" || userID <= 0 {
 		return Snapshot{}, fmt.Errorf("task billing service unavailable")
 	}
-	sku, model, err := validateRequest(request)
+	sku, err := validateRequest(request)
 	if err != nil {
 		return Snapshot{}, err
 	}
@@ -184,7 +173,7 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, taskID string, 
 	}
 
 	snapshot := Snapshot{
-		TaskID: taskID, UserID: userID, Feature: request.Feature, Model: model,
+		TaskID: taskID, UserID: userID, Feature: request.Feature,
 		SKU: quote.SKU, DisplayName: quote.DisplayName, PriceVersionID: quote.PriceVersionID, PriceVersion: quote.PriceVersion,
 		UnitCredits: quote.UnitCredits, Quantity: quote.Quantity, TotalCredits: quote.TotalCredits, QuotedAt: quote.QuotedAt,
 	}
@@ -215,10 +204,10 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, taskID string, 
 
 	if _, err := tx.Exec(ctx, `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, feature_slug, model, sku, display_name, price_version_id, price_version,
+  task_id, user_id, feature_slug, sku, display_name, price_version_id, price_version,
   unit_credits, quantity, total_credits, quoted_at, hold_transaction_id
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-		snapshot.TaskID, snapshot.UserID, snapshot.Feature, snapshot.Model, snapshot.SKU,
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+		snapshot.TaskID, snapshot.UserID, snapshot.Feature, snapshot.SKU,
 		snapshot.DisplayName, snapshot.PriceVersionID, snapshot.PriceVersion, snapshot.UnitCredits, snapshot.Quantity,
 		snapshot.TotalCredits, snapshot.QuotedAt, holdTransactionID,
 	); err != nil {
@@ -352,8 +341,4 @@ func taskCommandMetadata(key string, actorType credits.ActorType, actorID, sourc
 		Reason:            reason,
 		BusinessReference: credits.BusinessReference{Type: "task", ID: taskID},
 	}
-}
-
-func canonicalizeModel(raw string) string {
-	return workflow.NormalizeModelKey(raw)
 }

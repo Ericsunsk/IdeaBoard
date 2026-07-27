@@ -303,7 +303,7 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 			ProviderEndpointHandler: providerendpoints.NewProviderEndpointHandler(nil),
 			StorageHandler:          storage.NewStorageHandler(nil),
 			LineDraftHandler:        assets.NewLineDraftHandler(nil),
-			WorkflowFeatureHandler:  prompts.NewWorkflowFeatureHandler(nil, nil),
+			FeaturePromptHandler:    prompts.NewFeaturePromptHandler(nil),
 			UploadSettings:          &fakeMediaUploadSettingsProvider{},
 		},
 		StaticUploads: StaticUploadDeps{Auth: authDeps},

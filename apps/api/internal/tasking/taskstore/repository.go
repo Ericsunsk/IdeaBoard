@@ -57,7 +57,6 @@ type ActiveTaskLease struct {
 	ProviderEndpointID      int64
 	CredentialID            int64
 	FeatureSlug             string
-	RequestedModel          string
 	ResolvedModel           string
 	APIType                 string
 	ProviderEndpointName    string
@@ -164,15 +163,15 @@ const (
 const createTaskPGXSQL = `
 INSERT INTO tasks (
   task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-  feature_slug, requested_model, priority,
+  feature_slug, priority,
   status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at,
   cancelled_at, cancelled_by, cancel_reason
 ) VALUES (
   $1, $2, $3, $4, $5, $6,
   $7, $8, $9,
-  $10, $11, $12,
-  $13, $14, $15, $16, $17, $18, $19, $20,
-  $21, $22, $23
+  $10, $11,
+  $12, $13, $14, $15, $16, $17, $18, $19,
+  $20, $21, $22
 )
 ON CONFLICT (user_id, client_action_id) WHERE client_action_id <> '' DO NOTHING
 RETURNING id, task_id`
@@ -208,7 +207,6 @@ func (r *Repository) CreateWithPGXTx(ctx context.Context, tx pgx.Tx, task *tasks
 		params.UserPrompt,
 		params.Params,
 		params.FeatureSlug,
-		params.RequestedModel,
 		params.Priority,
 		params.Status,
 		params.LeaseToken,
@@ -330,7 +328,6 @@ func createTaskParams(task *tasks.Task) dbsqlc.CreateTaskParams {
 		UserPrompt:                 task.UserPrompt,
 		Params:                     task.Params,
 		FeatureSlug:                task.FeatureSlug,
-		RequestedModel:             task.RequestedModel,
 		Priority:                   int32(task.Priority),
 		Status:                     task.Status,
 		LeaseToken:                 task.LeaseToken,

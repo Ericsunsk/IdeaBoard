@@ -70,6 +70,7 @@ type Querier interface {
 	GetBoardMemberByUserID(ctx context.Context, arg GetBoardMemberByUserIDParams) (BoardMember, error)
 	GetBoardMemberRole(ctx context.Context, arg GetBoardMemberRoleParams) (string, error)
 	GetBoardShareTokenByHash(ctx context.Context, tokenHash string) (BoardShareToken, error)
+	GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error)
 	GetLineDraftModeByID(ctx context.Context, id int64) (LineDraftMode, error)
 	GetMediaAssetByID(ctx context.Context, id int64) (MediaAsset, error)
 	GetProviderEndpointByID(ctx context.Context, id int64) (ProviderEndpoint, error)
@@ -85,7 +86,6 @@ type Querier interface {
 	GetUserByStorageUID(ctx context.Context, storageUid string) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUserIDByStorageUIDForUpdateParams) (int64, error)
-	GetWorkflowFeature(ctx context.Context, featureSlug string) (WorkflowFeature, error)
 	HasActiveStorageProfileSecretVersion(ctx context.Context, arg HasActiveStorageProfileSecretVersionParams) (bool, error)
 	IncrementAccountFailCount(ctx context.Context, id int64) (int64, error)
 	InsertStorageProfileSecretVersion(ctx context.Context, arg InsertStorageProfileSecretVersionParams) (StorageProfileSecretVersion, error)
@@ -101,6 +101,7 @@ type Querier interface {
 	ListDailyStatsByDateRange(ctx context.Context, arg ListDailyStatsByDateRangeParams) ([]ListDailyStatsByDateRangeRow, error)
 	ListEnabledAccounts(ctx context.Context) ([]ListEnabledAccountsRow, error)
 	ListEnabledLineDraftModes(ctx context.Context) ([]LineDraftMode, error)
+	ListFeaturePrompts(ctx context.Context) ([]FeaturePrompt, error)
 	ListLineDraftModes(ctx context.Context) ([]LineDraftMode, error)
 	ListMediaRefsByBoardID(ctx context.Context, arg ListMediaRefsByBoardIDParams) ([]MediaRef, error)
 	ListMonitorExecutionPressureByRange(ctx context.Context, arg ListMonitorExecutionPressureByRangeParams) ([]ListMonitorExecutionPressureByRangeRow, error)
@@ -124,7 +125,6 @@ type Querier interface {
 	ListTasksByUserID(ctx context.Context, arg ListTasksByUserIDParams) ([]ListTasksByUserIDRow, error)
 	ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUIDsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
-	ListWorkflowFeatures(ctx context.Context) ([]WorkflowFeature, error)
 	LockStorageProfileSecretVersionRotation(ctx context.Context, arg LockStorageProfileSecretVersionRotationParams) (bool, error)
 	MarkStorageProfileDeleted(ctx context.Context, profileID string) (int64, error)
 	MarkTaskCancelled(ctx context.Context, arg MarkTaskCancelledParams) (int64, error)
@@ -160,13 +160,13 @@ type Querier interface {
 	UpsertAccountModel(ctx context.Context, arg UpsertAccountModelParams) (int64, error)
 	UpsertBoard(ctx context.Context, arg UpsertBoardParams) (int64, error)
 	UpsertBoardMember(ctx context.Context, arg UpsertBoardMemberParams) error
+	UpsertFeaturePrompt(ctx context.Context, arg UpsertFeaturePromptParams) (FeaturePrompt, error)
 	UpsertMediaAsset(ctx context.Context, arg UpsertMediaAssetParams) (int64, error)
 	UpsertMediaRef(ctx context.Context, arg UpsertMediaRefParams) (int64, error)
 	UpsertStorageProfile(ctx context.Context, arg UpsertStorageProfileParams) error
 	UpsertSystemConfig(ctx context.Context, arg UpsertSystemConfigParams) error
 	UpsertTaskDailyStatDelta(ctx context.Context, arg UpsertTaskDailyStatDeltaParams) error
 	UpsertTaskStatEventCorrection(ctx context.Context, arg UpsertTaskStatEventCorrectionParams) (int64, error)
-	UpsertWorkflowFeature(ctx context.Context, arg UpsertWorkflowFeatureParams) (WorkflowFeature, error)
 }
 
 var _ Querier = (*Queries)(nil)

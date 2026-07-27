@@ -24,7 +24,7 @@ func TestAIImageWorkflowSKUContract(t *testing.T) {
 
 	for _, feature := range workflow.AIImageFeatureSlugs() {
 		t.Run(feature, func(t *testing.T) {
-			request, err := AIImageRequest(feature, " GPT-Image-1 ")
+			request, err := AIImageRequest(feature)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -42,12 +42,12 @@ func TestAIImageWorkflowSKUContract(t *testing.T) {
 	}
 }
 
-func TestAIImagePricingIdentityIgnoresModelButIdempotencyDoesNot(t *testing.T) {
-	first, err := AIImageRequest(workflow.FeatureSlugPartialEdit, "gpt-image-1")
+func TestAIImagePricingIdentityAndFingerprintAreFeatureScoped(t *testing.T) {
+	first, err := AIImageRequest(workflow.FeatureSlugPartialEdit)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := AIImageRequest(workflow.FeatureSlugPartialEdit, "gemini-2.5-flash-image")
+	second, err := AIImageRequest(workflow.FeatureSlugPartialEdit)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,15 +70,15 @@ func TestAIImagePricingIdentityIgnoresModelButIdempotencyDoesNot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if firstFingerprint == secondFingerprint {
-		t.Fatal("different execution models shared an idempotency fingerprint")
+	if firstFingerprint != secondFingerprint {
+		t.Fatal("identical feature requests must share an idempotency fingerprint")
 	}
 }
 
 func TestAIImageWorkflowRequestRejectsNonWorkflowProducts(t *testing.T) {
 	for _, feature := range []string{"", "crop", "color-adjust", "mask-draw", "unknown"} {
 		t.Run(feature, func(t *testing.T) {
-			_, err := AIImageRequest(feature, "gpt-image-1")
+			_, err := AIImageRequest(feature)
 			if !errors.Is(err, ErrUnsupportedProduct) {
 				t.Fatalf("err=%v, want ErrUnsupportedProduct", err)
 			}
@@ -89,24 +89,16 @@ func TestAIImageWorkflowRequestRejectsNonWorkflowProducts(t *testing.T) {
 	}
 }
 
-func TestAIImageWorkflowRequestRequiresCanonicalModel(t *testing.T) {
-	_, err := AIImageRequest(workflow.FeatureSlugSketchToImage, "  ")
-	if !errors.Is(err, ErrModelRequired) {
-		t.Fatalf("err=%v, want ErrModelRequired", err)
-	}
-}
-
 func TestTaskBillingRequestValidationFailsClosed(t *testing.T) {
 	for _, testCase := range []struct {
 		name    string
 		request Request
 		wantErr error
 	}{
-		{name: "blank model", request: Request{Feature: workflow.FeatureSlugPartialEdit, Quantity: 1}, wantErr: ErrModelRequired},
-		{name: "zero quantity", request: Request{Feature: workflow.FeatureSlugPartialEdit, Model: "gpt-image-1"}, wantErr: billing.ErrInvalidQuantity},
+		{name: "zero quantity", request: Request{Feature: workflow.FeatureSlugPartialEdit}, wantErr: billing.ErrInvalidQuantity},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			if _, _, err := validateRequest(testCase.request); !errors.Is(err, testCase.wantErr) {
+			if _, err := validateRequest(testCase.request); !errors.Is(err, testCase.wantErr) {
 				t.Fatalf("validateRequest() error=%v, want %v", err, testCase.wantErr)
 			}
 		})

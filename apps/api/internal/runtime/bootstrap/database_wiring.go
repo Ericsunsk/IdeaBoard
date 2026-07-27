@@ -46,7 +46,7 @@ type appRepositories struct {
 	taskBillingUsage     *taskbilling.UsageStore
 	providerEndpointRepo *providerendpoints.ProviderEndpointRepository
 	systemConfigRepo     *settings.SystemConfigRepository
-	workflowFeatureRepo  *prompts.WorkflowFeatureRepository
+	featurePromptRepo    *prompts.FeaturePromptRepository
 	storageProfileRepo   *storage.StorageProfileRepository
 	lineDraftModeRepo    *assets.LineDraftModeRepository
 	boardRepo            *boards.BoardRepository
@@ -174,7 +174,7 @@ func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error
 		taskBillingUsage:     taskbilling.NewUsageStore(db),
 		providerEndpointRepo: providerendpoints.NewProviderEndpointRepository(db),
 		systemConfigRepo:     settings.NewSystemConfigRepository(db),
-		workflowFeatureRepo:  prompts.NewWorkflowFeatureRepository(db),
+		featurePromptRepo:    prompts.NewFeaturePromptRepository(db),
 		storageProfileRepo:   storage.NewStorageProfileRepository(db),
 		lineDraftModeRepo:    assets.NewLineDraftModeRepository(db),
 		boardRepo:            boards.NewBoardRepository(db),

@@ -10,7 +10,6 @@ import type { StyleFusionParams } from './styleFusionParams'
 import type { StyleVariationParams } from './styleVariationParams'
 
 export interface SubmitTaskRequestParams {
-  model?: string
   original_image_url?: string
   mask_image_url?: string
   reference_image_urls?: string[]

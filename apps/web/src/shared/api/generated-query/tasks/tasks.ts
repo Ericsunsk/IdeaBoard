@@ -26,6 +26,7 @@ import type {
   InsufficientCreditsError,
   ListUserTasksParams,
   PricingUnavailableError,
+  SubmissionFailedError,
   SubmitTaskReadinessRequest,
   SubmitTaskRequest,
 } from '../model'
@@ -59,7 +60,7 @@ export const getSubmitUserTaskQueryKey = (
 
 export const getSubmitUserTaskQueryOptions = <
   TData = Awaited<ReturnType<typeof submitUserTask>>,
-  TError = ErrorType<InsufficientCreditsError | PricingUnavailableError>,
+  TError = ErrorType<InsufficientCreditsError | PricingUnavailableError | SubmissionFailedError>,
 >(
   submitTaskRequest: MaybeRefOrGetter<SubmitTaskRequest>,
   options?: {
@@ -82,11 +83,13 @@ export const getSubmitUserTaskQueryOptions = <
 }
 
 export type SubmitUserTaskQueryResult = NonNullable<Awaited<ReturnType<typeof submitUserTask>>>
-export type SubmitUserTaskQueryError = ErrorType<InsufficientCreditsError | PricingUnavailableError>
+export type SubmitUserTaskQueryError = ErrorType<
+  InsufficientCreditsError | PricingUnavailableError | SubmissionFailedError
+>
 
 export function useSubmitUserTask<
   TData = Awaited<ReturnType<typeof submitUserTask>>,
-  TError = ErrorType<InsufficientCreditsError | PricingUnavailableError>,
+  TError = ErrorType<InsufficientCreditsError | PricingUnavailableError | SubmissionFailedError>,
 >(
   submitTaskRequest: MaybeRefOrGetter<SubmitTaskRequest>,
   options?: {

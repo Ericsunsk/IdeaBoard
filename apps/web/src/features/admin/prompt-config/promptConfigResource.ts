@@ -1,20 +1,16 @@
-import type {
-  WorkflowFeature,
-  WorkflowFeatureVariable,
-  WorkflowFeatureVariableTone,
-} from '../../../shared/api/generated-query/model'
-import { fetchAdminWorkflowFeatures, saveAdminWorkflowFeature } from './promptConfigApi'
+import type { FeaturePrompt } from '../../../shared/api/generated-query/model'
+import { fetchAdminFeaturePrompts, saveAdminFeaturePrompt } from './promptConfigApi'
 
-export type { WorkflowFeature, WorkflowFeatureVariable, WorkflowFeatureVariableTone }
+export type { FeaturePrompt }
 
-export type AdminWorkflowFeatureResource = {
-  fetchWorkflowFeatures: typeof fetchAdminWorkflowFeatures
-  saveWorkflowFeature: typeof saveAdminWorkflowFeature
+export type AdminPromptConfigResource = {
+  fetchPrompts: typeof fetchAdminFeaturePrompts
+  savePrompt: typeof saveAdminFeaturePrompt
 }
 
-export function createAdminWorkflowFeatureResource(): AdminWorkflowFeatureResource {
+export function createAdminPromptConfigResource(): AdminPromptConfigResource {
   return {
-    fetchWorkflowFeatures: fetchAdminWorkflowFeatures,
-    saveWorkflowFeature: saveAdminWorkflowFeature,
+    fetchPrompts: fetchAdminFeaturePrompts,
+    savePrompt: saveAdminFeaturePrompt,
   }
 }

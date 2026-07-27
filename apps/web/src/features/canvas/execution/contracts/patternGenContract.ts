@@ -2,7 +2,7 @@ import type { SubmitTaskData } from '../../../../shared/api/task'
 import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
 import { PROMPT_ASPECT_RATIO_OPTIONS } from '../../../canvas-board/domain'
 
-const PATTERN_GEN_ALLOWED_PARAM_KEYS = new Set(['feature', 'model', 'ratio'])
+const PATTERN_GEN_ALLOWED_PARAM_KEYS = new Set(['feature', 'ratio'])
 const PATTERN_GEN_MEDIA_PARAM_KEYS = new Set([
   'image_urls',
   'original_image_url',
@@ -45,9 +45,6 @@ function assertPatternGenParam(key: string, value: unknown) {
   }
   if (key === 'feature' && `${value ?? ''}`.trim() !== WORKFLOW_FEATURE.patternGen) {
     throw new PatternGenContractError('图案生成任务必须使用 pattern-gen workflow')
-  }
-  if (key === 'model' && value != null && typeof value !== 'string') {
-    throw new PatternGenContractError('图案生成参数 model 必须是字符串')
   }
   if (key === 'ratio') {
     const ratio = `${value ?? ''}`.trim()

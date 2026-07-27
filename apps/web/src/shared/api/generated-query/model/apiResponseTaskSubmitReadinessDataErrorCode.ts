@@ -10,9 +10,8 @@ export type ApiResponseTaskSubmitReadinessDataErrorCode =
 
 export const ApiResponseTaskSubmitReadinessDataErrorCode = {
   submission_invalid: 'submission_invalid',
-  workflow_not_configured: 'workflow_not_configured',
-  workflow_disabled: 'workflow_disabled',
-  workflow_configuration_unavailable: 'workflow_configuration_unavailable',
-  workflow_model_unavailable: 'workflow_model_unavailable',
+  submission_failed: 'submission_failed',
+  pricing_unavailable: 'pricing_unavailable',
   provider_unavailable: 'provider_unavailable',
+  prompt_unavailable: 'prompt_unavailable',
 } as const

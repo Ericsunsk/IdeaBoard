@@ -36,7 +36,6 @@ func TestStoreSubmitTaskCommitsTaskAndRiverJobTransactionally(t *testing.T) {
 
 	task := newTaskSubmissionTask("task_river_tx_commit")
 	queueTask := newTaskSubmissionQueueTask(task)
-	queueTask.AccountIDs = []int64{101, 42}
 	queueTask.RetryCount = 2
 	queueTask.CreatedAt = 1710000000
 	task.Priority = tasks.TaskPriorityInteractive
@@ -82,9 +81,6 @@ func TestStoreSubmitTaskCommitsTaskAndRiverJobTransactionally(t *testing.T) {
 	}
 	if args.Task.UserID != queueTask.UserID || args.Task.Prompt != queueTask.Prompt || args.Task.Params != queueTask.Params {
 		t.Fatalf("river args task=%+v, want submitted task %+v", args.Task, *queueTask)
-	}
-	if !slices.Equal(args.Task.AccountIDs, queueTask.AccountIDs) {
-		t.Fatalf("river args account_ids=%v, want %v", args.Task.AccountIDs, queueTask.AccountIDs)
 	}
 	if args.Task.RetryCount != queueTask.RetryCount || args.Task.CreatedAt != queueTask.CreatedAt {
 		t.Fatalf("river args retry/created=(%d,%d), want (%d,%d)", args.Task.RetryCount, args.Task.CreatedAt, queueTask.RetryCount, queueTask.CreatedAt)
@@ -414,24 +410,22 @@ func discardRiverTestLogger() *slog.Logger {
 
 func newTaskSubmissionTask(taskID string) *tasks.Task {
 	return &tasks.Task{
-		TaskID:         taskID,
-		UserID:         42,
-		Prompt:         "draw a transactional chair",
-		UserPrompt:     "draw a transactional chair",
-		Params:         `{"size":"1024x1024","style":"line"}`,
-		FeatureSlug:    "sketch-to-image",
-		RequestedModel: "gpt-image-1",
-		Status:         tasks.StatusPending,
+		TaskID:      taskID,
+		UserID:      42,
+		Prompt:      "draw a transactional chair",
+		UserPrompt:  "draw a transactional chair",
+		Params:      `{"size":"1024x1024","style":"line"}`,
+		FeatureSlug: "sketch-to-image",
+		Status:      tasks.StatusPending,
 	}
 }
 
 func newTaskSubmissionQueueTask(task *tasks.Task) *tasks.TaskPayload {
 	return &tasks.TaskPayload{
-		TaskID:     task.TaskID,
-		UserID:     task.UserID,
-		Prompt:     task.Prompt,
-		Params:     task.Params,
-		AccountIDs: []int64{101},
+		TaskID: task.TaskID,
+		UserID: task.UserID,
+		Prompt: task.Prompt,
+		Params: task.Params,
 	}
 }
 

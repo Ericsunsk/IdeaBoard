@@ -44,7 +44,7 @@ func TestPostgresTaskAssignerAssignsLowestLoadRatioAccount(t *testing.T) {
 	createAssignerTask(t, db, "running-low", lowRatio, tasks.StatusRunning, "lease-low")
 	createAssignerTask(t, db, "pending-lowest-ratio", 0, tasks.StatusPending, "")
 
-	assignment, err := assigner.Assign(ctx, []int64{highRatio, lowRatio}, &tasks.TaskPayload{
+	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "pending-lowest-ratio",
 		RiverJobID: 101,
 	})
@@ -70,7 +70,7 @@ func TestPostgresTaskAssignerAssignsNextAccountWhenFirstIsFull(t *testing.T) {
 	createAssignerTask(t, db, "running-next-2", next, tasks.StatusRunning, "lease-next-2")
 	createAssignerTask(t, db, "pending-next", 0, tasks.StatusPending, "")
 
-	assignment, err := assigner.Assign(ctx, []int64{full, next}, &tasks.TaskPayload{
+	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "pending-next",
 		RiverJobID: 102,
 	})
@@ -92,7 +92,7 @@ func TestPostgresTaskAssignerIgnoresReleasedLeasesWhenCheckingCapacity(t *testin
 	insertAssignerTaskLease(t, db, "released-capacity-load", accountID, "lease-released", "", true)
 	createAssignerTask(t, db, "pending-released-capacity", 0, tasks.StatusPending, "")
 
-	assignment, err := assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
+	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "pending-released-capacity",
 		RiverJobID: 112,
 	})
@@ -116,7 +116,7 @@ func TestPostgresTaskAssignerAssignReturnsNoCapacityWhenAllAccountsFull(t *testi
 	createAssignerTask(t, db, "running-full-2", second, tasks.StatusRunning, "lease-full-2")
 	createAssignerTask(t, db, "pending-no-capacity", 0, tasks.StatusPending, "")
 
-	assignment, err := assigner.Assign(ctx, []int64{first, second}, &tasks.TaskPayload{
+	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "pending-no-capacity",
 		RiverJobID: 103,
 	})
@@ -136,7 +136,7 @@ func TestPostgresTaskAssignerAssignReturnsNoCapacityWithoutCandidates(t *testing
 
 	createAssignerTask(t, db, "pending-empty-candidates", 0, tasks.StatusPending, "")
 
-	assignment, err := assigner.Assign(ctx, []int64{0, 0}, &tasks.TaskPayload{
+	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "pending-empty-candidates",
 		RiverJobID: 109,
 	})
@@ -157,7 +157,7 @@ func TestPostgresTaskAssignerSkipsDisabledProviderEndpoint(t *testing.T) {
 	setAssignerProviderEndpointStatus(t, db, accountID, 0)
 	createAssignerTask(t, db, "pending-disabled-endpoint", 0, tasks.StatusPending, "")
 
-	assignment, err := assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
+	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "pending-disabled-endpoint",
 		RiverJobID: 110,
 	})
@@ -177,7 +177,7 @@ func TestPostgresTaskAssignerWritesRuntimeAssignmentSnapshot(t *testing.T) {
 	accountID := createAssignerAccount(t, db, "snapshot", 3)
 	createAssignerTask(t, db, "pending-snapshot", 0, tasks.StatusPending, "")
 
-	assignment, err := assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
+	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "pending-snapshot",
 		Params:     `{"feature":"pattern-gen","model":"gpt-image-1"}`,
 		RiverJobID: 111,
@@ -187,6 +187,9 @@ func TestPostgresTaskAssignerWritesRuntimeAssignmentSnapshot(t *testing.T) {
 	}
 	if assignment.Status != AssignStatusAssigned {
 		t.Fatalf("assignment=%+v, want assigned", assignment)
+	}
+	if assignment.AccountID != accountID {
+		t.Fatalf("assignment account_id=%d, want %d", assignment.AccountID, accountID)
 	}
 	assertRuntimeAssignmentSnapshot(t, db, "pending-snapshot", assignment)
 }
@@ -203,9 +206,9 @@ func TestPostgresTaskAssignerHonorsModelMaxConcurrent(t *testing.T) {
 	createAssignerTaskWithModel(t, db, "running-model-full", modelFull, tasks.StatusRunning, "lease-model-full", "gpt-image-1")
 	createAssignerTask(t, db, "pending-model-capacity", 0, tasks.StatusPending, "")
 
-	assignment, err := assigner.Assign(ctx, []int64{modelFull, modelOpen}, &tasks.TaskPayload{
+	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "pending-model-capacity",
-		Params:     `{"model":"gpt-image-1"}`,
+		Params:     `{}`,
 		RiverJobID: 107,
 	})
 	if err != nil {
@@ -240,7 +243,7 @@ func TestPostgresTaskAssignerDefersBusyUserForCompetingUser(t *testing.T) {
 		CreatedAt: time.Now().Add(-time.Minute),
 	})
 
-	assignment, err := assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
+	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "pending-busy-user",
 		UserID:     1,
 		Priority:   tasks.TaskPriorityInteractive,
@@ -254,7 +257,7 @@ func TestPostgresTaskAssignerDefersBusyUserForCompetingUser(t *testing.T) {
 	}
 	assertTaskPendingWithoutLease(t, db, "pending-busy-user")
 
-	assignment, err = assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
+	assignment, err = assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "pending-competing-user",
 		UserID:     3,
 		Priority:   tasks.TaskPriorityInteractive,
@@ -292,7 +295,7 @@ func TestPostgresTaskAssignerDefersBusyTenantForCompetingTenant(t *testing.T) {
 		CreatedAt: time.Now().Add(-time.Minute),
 	})
 
-	assignment, err := assigner.Assign(ctx, []int64{busyTenant, competingTenant}, &tasks.TaskPayload{
+	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "pending-busy-tenant",
 		UserID:     1,
 		Priority:   tasks.TaskPriorityInteractive,
@@ -327,7 +330,7 @@ func TestPostgresTaskAssignerKeepsPriorityOrderBeforeAgeBoost(t *testing.T) {
 		CreatedAt: time.Now().Add(-taskAssignmentAgeBoostAfter / 2),
 	})
 
-	assignment, err := assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
+	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "pending-interactive-before-boost",
 		UserID:     1,
 		Priority:   tasks.TaskPriorityInteractive,
@@ -361,7 +364,7 @@ func TestPostgresTaskAssignerAgeBoostDefersNewerInteractiveForOlderLowerPriority
 		CreatedAt: time.Now().Add(-taskAssignmentAgeBoostAfter - time.Minute),
 	})
 
-	assignment, err := assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
+	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "pending-newer-interactive",
 		UserID:     1,
 		Priority:   tasks.TaskPriorityInteractive,
@@ -374,7 +377,7 @@ func TestPostgresTaskAssignerAgeBoostDefersNewerInteractiveForOlderLowerPriority
 		t.Fatalf("assignment=%+v, want no_capacity for older lower-priority task", assignment)
 	}
 
-	assignment, err = assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
+	assignment, err = assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "pending-older-default",
 		UserID:     3,
 		Priority:   tasks.TaskPriorityDefault,
@@ -387,7 +390,7 @@ func TestPostgresTaskAssignerAgeBoostDefersNewerInteractiveForOlderLowerPriority
 		t.Fatalf("assignment=%+v, want age-boosted lower-priority task assigned", assignment)
 	}
 
-	assignment, err = assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
+	assignment, err = assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "pending-newer-interactive",
 		UserID:     1,
 		Priority:   tasks.TaskPriorityInteractive,
@@ -398,41 +401,6 @@ func TestPostgresTaskAssignerAgeBoostDefersNewerInteractiveForOlderLowerPriority
 	}
 	if assignment.Status != AssignStatusAssigned || assignment.AccountID != accountID {
 		t.Fatalf("assignment=%+v, want retried interactive task assigned after older work", assignment)
-	}
-}
-
-func TestPostgresTaskAssignerDoesNotDeferForCompetingTaskWithoutModelCapacity(t *testing.T) {
-	db := newPostgresAssignerTestDB(t)
-	assigner := NewPostgresTaskAssigner(db)
-	ctx := context.Background()
-
-	accountID := createAssignerAccount(t, db, "fair-capacity", 3)
-	createAssignerTaskWithOptions(t, db, "running-fair-capacity", accountID, tasks.StatusRunning, "lease-fair-capacity", "", assignerTaskOptions{
-		UserID: 1,
-	})
-	createAssignerTaskWithOptions(t, db, "pending-capacity-current", 0, tasks.StatusPending, "", "", assignerTaskOptions{
-		UserID:    1,
-		Priority:  tasks.TaskPriorityInteractive,
-		CreatedAt: time.Now(),
-	})
-	createAssignerTaskWithOptions(t, db, "pending-no-model-capacity", 0, tasks.StatusPending, "", "", assignerTaskOptions{
-		UserID:         3,
-		Priority:       tasks.TaskPriorityInteractive,
-		CreatedAt:      time.Now().Add(-time.Minute),
-		RequestedModel: "missing-model",
-	})
-
-	assignment, err := assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
-		TaskID:     "pending-capacity-current",
-		UserID:     1,
-		Priority:   tasks.TaskPriorityInteractive,
-		RiverJobID: 207,
-	})
-	if err != nil {
-		t.Fatalf("Assign failed: %v", err)
-	}
-	if assignment.Status != AssignStatusAssigned || assignment.AccountID != accountID {
-		t.Fatalf("assignment=%+v, want current task assigned because competing task has no model capacity", assignment)
 	}
 }
 
@@ -447,7 +415,7 @@ func TestPostgresTaskAssignerUsesOpenModelWithinSameAccount(t *testing.T) {
 	createAssignerTaskWithModel(t, db, "running-first-model-full", accountID, tasks.StatusRunning, "lease-first-model-full", "gpt-image-1")
 	createAssignerTask(t, db, "pending-same-account-open-model", 0, tasks.StatusPending, "")
 
-	assignment, err := assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
+	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "pending-same-account-open-model",
 		RiverJobID: 108,
 	})
@@ -471,7 +439,7 @@ func TestPostgresTaskAssignerReusesRunningLeaseForSameRiverJob(t *testing.T) {
 	accountID := createAssignerAccount(t, db, "reuse", 1)
 	createAssignerTask(t, db, "running-reuse", accountID, tasks.StatusRunning, "river:104:existing")
 
-	assignment, err := assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
+	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "running-reuse",
 		RiverJobID: 104,
 	})
@@ -491,7 +459,7 @@ func TestPostgresTaskAssignerDiscardsRunningTaskForDifferentRiverJob(t *testing.
 	accountID := createAssignerAccount(t, db, "discard", 1)
 	createAssignerTask(t, db, "running-discard", accountID, tasks.StatusRunning, "river:105:existing")
 
-	assignment, err := assigner.Assign(ctx, []int64{accountID}, &tasks.TaskPayload{
+	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "running-discard",
 		RiverJobID: 106,
 	})
@@ -709,11 +677,10 @@ func createAssignerTaskWithModel(t *testing.T, db *sql.DB, taskID string, accoun
 }
 
 type assignerTaskOptions struct {
-	UserID         int64
-	Priority       int
-	CreatedAt      time.Time
-	FeatureSlug    string
-	RequestedModel string
+	UserID      int64
+	Priority    int
+	CreatedAt   time.Time
+	FeatureSlug string
 }
 
 func createAssignerTaskWithOptions(t *testing.T, db *sql.DB, taskID string, accountID int64, status string, leaseToken string, resolvedModel string, opts assignerTaskOptions) {
@@ -734,7 +701,7 @@ func createAssignerTaskWithOptions(t *testing.T, db *sql.DB, taskID string, acco
 	INSERT INTO tasks (
 		task_id, user_id, assigned_provider_endpoint_id, assigned_credential_id, account_id,
 		prompt, user_prompt, params, status, lease_token, error_msg, result,
-		feature_slug, requested_model, priority, created_at
+		feature_slug, priority, created_at
 	)
 	VALUES (
 		$1,
@@ -751,8 +718,7 @@ func createAssignerTaskWithOptions(t *testing.T, db *sql.DB, taskID string, acco
 		'',
 		$6,
 		$7,
-		$8,
-		$9
+		$8
 	)`,
 		taskID,
 		accountID,
@@ -760,7 +726,6 @@ func createAssignerTaskWithOptions(t *testing.T, db *sql.DB, taskID string, acco
 		leaseToken,
 		userID,
 		opts.FeatureSlug,
-		opts.RequestedModel,
 		priority,
 		createdAt,
 	)
@@ -783,7 +748,7 @@ func insertAssignerTaskLease(t *testing.T, db *sql.DB, taskID string, accountID 
 	_, err := db.Exec(`
 INSERT INTO task_leases (
   task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
-  feature_slug, requested_model, resolved_model, api_type,
+  feature_slug, resolved_model, api_type,
   provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version,
   acquired_at, released_at, release_reason
 )
@@ -791,7 +756,7 @@ VALUES (
   $1, $2, 1, $3,
   (SELECT provider_endpoint_id FROM api_accounts WHERE id = $3),
   (SELECT id FROM api_account_secrets WHERE account_id = $3 AND status = 'active' ORDER BY rotated_at DESC, id DESC LIMIT 1),
-  'image-generate', '',
+  'image-generate',
   CASE WHEN NULLIF($4, '') IS NOT NULL THEN $4 ELSE 'gpt-image-1' END,
   COALESCE((SELECT pe.api_type FROM provider_endpoints pe JOIN api_accounts a ON a.provider_endpoint_id = pe.id WHERE a.id = $3), ''),
   COALESCE((SELECT pe.name FROM provider_endpoints pe JOIN api_accounts a ON a.provider_endpoint_id = pe.id WHERE a.id = $3), ''),

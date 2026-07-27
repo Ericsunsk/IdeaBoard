@@ -597,11 +597,12 @@ func marshalProviderTaskResult(taskID string, result map[string]interface{}) (st
 	return string(resultJSON), nil
 }
 
-func resolveAccountModelForExecution(account *accounts.ApiAccount, params providerTaskParams, assignedModel string) (accounts.AccountModel, bool) {
-	if model := strings.TrimSpace(assignedModel); model != "" {
-		return accounts.ResolveAccountModel(account, params.featureSlug(), model)
+func resolveAccountModelForExecution(account *accounts.ApiAccount, _ providerTaskParams, assignedModel string) (accounts.AccountModel, bool) {
+	assignedModel = strings.TrimSpace(assignedModel)
+	if assignedModel == "" {
+		return accounts.AccountModel{}, false
 	}
-	return accounts.ResolveAccountModel(account, params.featureSlug(), params.requestedModel())
+	return accounts.ResolveAccountModel(account, assignedModel)
 }
 
 func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, userID int64, taskID string, correlationID string, account *accounts.ApiAccount, imageURLs []string) ([]string, []tasks.TaskOutput, error) {

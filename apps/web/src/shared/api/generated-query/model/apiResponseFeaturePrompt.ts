@@ -5,8 +5,8 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ApiResponseBase } from './apiResponseBase'
-import type { WorkflowFeature } from './workflowFeature'
+import type { FeaturePrompt } from './featurePrompt'
 
-export type ApiResponseWorkflowFeature = ApiResponseBase & {
-  data?: WorkflowFeature
+export type ApiResponseFeaturePrompt = ApiResponseBase & {
+  data?: FeaturePrompt
 }

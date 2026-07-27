@@ -34,7 +34,6 @@ type ApiAccountModel struct {
 	Enabled       bool            `json:"enabled"`
 	Weight        int32           `json:"weight"`
 	MaxConcurrent sql.NullInt32   `json:"max_concurrent"`
-	FeatureSlugs  json.RawMessage `json:"feature_slugs"`
 	Metadata      json.RawMessage `json:"metadata"`
 	SortOrder     int32           `json:"sort_order"`
 	CreatedAt     time.Time       `json:"created_at"`
@@ -234,6 +233,14 @@ type CreditWalletRestriction struct {
 	ReleaseReason       sql.NullString `json:"release_reason"`
 }
 
+type FeaturePrompt struct {
+	FeatureSlug string        `json:"feature_slug"`
+	Prompt      string        `json:"prompt"`
+	UpdatedBy   sql.NullInt64 `json:"updated_by"`
+	CreatedAt   time.Time     `json:"created_at"`
+	UpdatedAt   time.Time     `json:"updated_at"`
+}
+
 type LineDraftMode struct {
 	ID         int64     `json:"id"`
 	Name       string    `json:"name"`
@@ -392,7 +399,6 @@ type Task struct {
 	UserPrompt                 string        `json:"user_prompt"`
 	Params                     string        `json:"params"`
 	FeatureSlug                string        `json:"feature_slug"`
-	RequestedModel             string        `json:"requested_model"`
 	Priority                   int32         `json:"priority"`
 	Status                     string        `json:"status"`
 	LeaseToken                 string        `json:"lease_token"`
@@ -496,7 +502,6 @@ type TaskLease struct {
 	ProviderEndpointID      int64        `json:"provider_endpoint_id"`
 	CredentialID            int64        `json:"credential_id"`
 	FeatureSlug             string       `json:"feature_slug"`
-	RequestedModel          string       `json:"requested_model"`
 	ResolvedModel           string       `json:"resolved_model"`
 	ApiType                 string       `json:"api_type"`
 	ProviderEndpointName    string       `json:"provider_endpoint_name"`
@@ -560,16 +565,4 @@ type UsersUsedUid struct {
 	ID         int64     `json:"id"`
 	StorageUid string    `json:"storage_uid"`
 	CreatedAt  time.Time `json:"created_at"`
-}
-
-type WorkflowFeature struct {
-	FeatureSlug           string          `json:"feature_slug"`
-	CanonicalModel        string          `json:"canonical_model"`
-	SystemPrompt          string          `json:"system_prompt"`
-	Variables             json.RawMessage `json:"variables"`
-	UserPromptMergePolicy json.RawMessage `json:"user_prompt_merge_policy"`
-	Enabled               bool            `json:"enabled"`
-	UpdatedBy             sql.NullInt64   `json:"updated_by"`
-	CreatedAt             time.Time       `json:"created_at"`
-	UpdatedAt             time.Time       `json:"updated_at"`
 }

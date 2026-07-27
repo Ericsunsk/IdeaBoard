@@ -10,7 +10,6 @@ import (
 	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/tasking/tasks"
-	"ideaboard/api/internal/workflow"
 )
 
 var ErrAccountNotFound = errors.New("account not found")
@@ -214,13 +213,6 @@ func (s *AccountService) PatchAccountModel(ctx context.Context, accountID int64,
 			model.MaxConcurrent = nil
 		}
 	}
-	if req.FeatureSlugs != nil {
-		featureSlugs, err := normalizeFeatureSlugs(*req.FeatureSlugs)
-		if err != nil {
-			return nil, err
-		}
-		model.FeatureSlugs = featureSlugs
-	}
 	if req.SortOrder != nil {
 		if *req.SortOrder < 0 {
 			return nil, fmt.Errorf("model sort_order 不能小于 0")
@@ -287,16 +279,11 @@ func normalizeAccountModelInputs(inputs []AccountModelInput) ([]AccountModel, er
 		if weight <= 0 {
 			weight = 1
 		}
-		featureSlugs, err := normalizeFeatureSlugs(input.FeatureSlugs)
-		if err != nil {
-			return nil, err
-		}
 		models = append(models, AccountModel{
 			Name:          name,
 			Enabled:       enabled,
 			Weight:        weight,
 			MaxConcurrent: input.MaxConcurrent,
-			FeatureSlugs:  featureSlugs,
 			SortOrder:     len(models),
 		})
 	}
@@ -304,26 +291,6 @@ func normalizeAccountModelInputs(inputs []AccountModelInput) ([]AccountModel, er
 		return nil, fmt.Errorf("models 不能为空，请先检测并选择模型")
 	}
 	return models, nil
-}
-
-func normalizeFeatureSlugs(slugs []string) ([]string, error) {
-	if len(slugs) == 0 {
-		return nil, nil
-	}
-	seen := make(map[string]struct{}, len(slugs))
-	result := make([]string, 0, len(slugs))
-	for _, slug := range slugs {
-		normalized, err := workflow.ValidateWorkflowFeatureSlug(slug)
-		if err != nil {
-			return nil, fmt.Errorf("feature_slugs 包含不支持的节点: %w", err)
-		}
-		if _, ok := seen[normalized]; ok {
-			continue
-		}
-		seen[normalized] = struct{}{}
-		result = append(result, normalized)
-	}
-	return result, nil
 }
 
 func (s *AccountService) DeleteAccount(ctx context.Context, id int64) error {

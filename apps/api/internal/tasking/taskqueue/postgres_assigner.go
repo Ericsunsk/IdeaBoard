@@ -12,8 +12,6 @@ import (
 
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/workflow"
-
-	"github.com/lib/pq"
 )
 
 type PostgresTaskAssigner struct {
@@ -34,7 +32,7 @@ func commitTaskAssignment(tx *sql.Tx, committed *bool, assignment TaskAssignment
 	return assignment, nil
 }
 
-func (a *PostgresTaskAssigner) Assign(ctx context.Context, accountIDs []int64, task *tasks.TaskPayload) (TaskAssignment, error) {
+func (a *PostgresTaskAssigner) Assign(ctx context.Context, task *tasks.TaskPayload) (TaskAssignment, error) {
 	if a == nil || a.db == nil {
 		return TaskAssignment{}, fmt.Errorf("postgres task assigner: db not configured")
 	}
@@ -65,20 +63,15 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, accountIDs []int64, t
 		return commitTaskAssignment(tx, &committed, decision.assignment)
 	}
 
-	candidates := normalizeCandidateAccountIDs(accountIDs)
-	if decision := policy.decideCandidatePool(task.TaskID, candidates); decision.done {
-		return commitTaskAssignment(tx, &committed, decision.assignment)
-	}
-
-	requestedModel, featureSlug := taskRoutingHints(task.Params)
-	selectedAccount, err := selectLeastLoadedAccountTx(ctx, tx, candidates, requestedModel, featureSlug)
+	featureSlug := taskFeatureSlug(task.Params)
+	selectedAccount, err := selectLeastLoadedAccountTx(ctx, tx)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return commitTaskAssignment(tx, &committed, policy.noCapacity(task.TaskID))
 		}
 		return TaskAssignment{}, err
 	}
-	deferCurrent, err := shouldDeferTaskAssignmentTx(ctx, tx, task.TaskID, taskState, selectedAccount, candidates, time.Now())
+	deferCurrent, err := shouldDeferTaskAssignmentTx(ctx, tx, task.TaskID, taskState, selectedAccount, time.Now())
 	if err != nil {
 		return TaskAssignment{}, err
 	}
@@ -97,7 +90,7 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, accountIDs []int64, t
 	}
 	decision := policy.decideAssignedTask(task.TaskID, selectedAccount, leaseToken, updated)
 	if updated > 0 {
-		if err := acquireTaskLeaseTx(ctx, tx, task.TaskID, task.RiverJobID, featureSlug, requestedModel, selectedAccount, leaseToken, assignedAt); err != nil {
+		if err := acquireTaskLeaseTx(ctx, tx, task.TaskID, task.RiverJobID, featureSlug, selectedAccount, leaseToken, assignedAt); err != nil {
 			return TaskAssignment{}, err
 		}
 		if err := patchTaskAssignmentMetricsTx(ctx, tx, task.TaskID, taskState.CreatedAt, assignedAt); err != nil {
@@ -224,7 +217,7 @@ FOR UPDATE OF t`, taskID).Scan(
 	}, nil
 }
 
-func shouldDeferTaskAssignmentTx(ctx context.Context, tx *sql.Tx, taskID string, current taskAssignmentTaskState, selected taskAssignmentSelectedAccount, accountIDs []int64, now time.Time) (bool, error) {
+func shouldDeferTaskAssignmentTx(ctx context.Context, tx *sql.Tx, taskID string, current taskAssignmentTaskState, selected taskAssignmentSelectedAccount, now time.Time) (bool, error) {
 	activeUser, activeTenant, err := taskAssignmentActiveShareTx(ctx, tx, current.UserID, selected.ProviderEndpointID)
 	if err != nil {
 		return false, err
@@ -240,14 +233,12 @@ WITH pending_candidates AS (
     p.user_id,
     p.created_at,
     CASE
-      WHEN p.created_at <= $4 THEN $5
+      WHEN p.created_at <= $3 THEN $4
       ELSE p.priority
-    END AS effective_priority,
-    btrim(p.requested_model) AS requested_model,
-    btrim(p.feature_slug) AS feature_slug
+    END AS effective_priority
   FROM tasks p
-  WHERE p.status = $11
-    AND p.task_id <> $2
+  WHERE p.status = $10
+    AND p.task_id <> $1
 ),
 eligible_models AS (
   SELECT
@@ -261,8 +252,7 @@ eligible_models AS (
     m.model_name,
     GREATEST(LEAST(COALESCE(m.max_concurrent, a.max_concurrent), 64), 0) AS model_max_concurrent
   FROM pending_candidates pc
-  JOIN api_accounts a ON a.id = ANY($1::bigint[])
-    AND a.status = 1
+  JOIN api_accounts a ON a.status = 1
     AND a.deleted_at IS NULL
   JOIN provider_endpoints pe ON pe.id = a.provider_endpoint_id
     AND pe.status = 1
@@ -278,9 +268,6 @@ eligible_models AS (
   ) AS credential ON TRUE
   JOIN api_account_models m ON m.account_id = a.id
     AND m.enabled = TRUE
-    AND pc.requested_model <> ''
-    AND lower(m.model_name) = lower(pc.requested_model)
-    AND (pc.feature_slug = '' OR jsonb_array_length(m.feature_slugs) = 0 OR m.feature_slugs ? pc.feature_slug)
 ),
 account_load AS (
   SELECT
@@ -295,7 +282,7 @@ account_load AS (
     em.model_max_concurrent,
     COUNT(tl.id) AS running_count,
     COUNT(tl.id) FILTER (
-      WHERE lower(COALESCE(NULLIF(btrim(tl.resolved_model), ''), NULLIF(btrim(tl.requested_model), ''), '')) = lower(em.model_name)
+      WHERE lower(btrim(tl.resolved_model)) = lower(em.model_name)
     ) AS model_running_count
   FROM eligible_models em
   LEFT JOIN task_leases tl ON tl.account_id = em.account_id
@@ -319,19 +306,18 @@ SELECT EXISTS (
   SELECT 1
   FROM eligible_candidates
   WHERE (
-    effective_priority < $6
-    OR (effective_priority = $6 AND created_at < $7)
+    effective_priority < $5
+    OR (effective_priority = $5 AND created_at < $6)
     OR (
-      ($8::boolean OR $9::boolean)
-      AND effective_priority <= $6
+      ($7::boolean OR $8::boolean)
+      AND effective_priority <= $5
       AND (
-        ($8::boolean AND user_id <> $10)
-        OR ($9::boolean AND provider_endpoint_id <> $3)
+        ($7::boolean AND user_id <> $9)
+        OR ($8::boolean AND provider_endpoint_id <> $2)
       )
     )
   )
 )`,
-		pq.Array(accountIDs),
 		taskID,
 		selected.ProviderEndpointID,
 		ageBoostCutoff,
@@ -406,18 +392,18 @@ func markTaskAssignedTx(ctx context.Context, tx *sql.Tx, taskID string, selected
 	return result.RowsAffected()
 }
 
-func acquireTaskLeaseTx(ctx context.Context, tx *sql.Tx, taskID string, riverJobID int64, featureSlug string, requestedModel string, selected taskAssignmentSelectedAccount, leaseToken string, acquiredAt time.Time) error {
+func acquireTaskLeaseTx(ctx context.Context, tx *sql.Tx, taskID string, riverJobID int64, featureSlug string, selected taskAssignmentSelectedAccount, leaseToken string, acquiredAt time.Time) error {
 	result, err := tx.ExecContext(ctx, `
 	INSERT INTO task_leases (
 	  task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
-	  feature_slug, requested_model, resolved_model, api_type,
+	  feature_slug, resolved_model, api_type,
 	  provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version,
 	  acquired_at
 	) VALUES (
 	  $1, $2, $3, $4, $5, $6,
-	  $7, $8, $9, $10,
-	  $11, $12, $13, $14,
-	  $15
+	  $7, $8, $9,
+	  $10, $11, $12, $13,
+	  $14
 	)
 	ON CONFLICT (task_id) WHERE released_at IS NULL DO NOTHING`,
 		taskID,
@@ -427,7 +413,6 @@ func acquireTaskLeaseTx(ctx context.Context, tx *sql.Tx, taskID string, riverJob
 		selected.ProviderEndpointID,
 		selected.CredentialID,
 		strings.TrimSpace(featureSlug),
-		strings.TrimSpace(requestedModel),
 		strings.TrimSpace(selected.ResolvedModel),
 		strings.TrimSpace(selected.APIType),
 		strings.TrimSpace(selected.ProviderEndpointName),
@@ -476,7 +461,7 @@ SET current_stage = EXCLUDED.current_stage,
 	return err
 }
 
-func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx, accountIDs []int64, requestedModel string, featureSlug string) (taskAssignmentSelectedAccount, error) {
+func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx) (taskAssignmentSelectedAccount, error) {
 	var accountID int64
 	var providerEndpointID int64
 	var credentialID int64
@@ -513,7 +498,6 @@ func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx, accountIDs []in
 	  ) AS credential ON TRUE
 	  WHERE a.status = 1
 	    AND a.deleted_at IS NULL
-	    AND a.id = ANY($1::bigint[])
 	  ORDER BY id ASC
 	  FOR UPDATE OF a SKIP LOCKED
 	),
@@ -535,9 +519,6 @@ func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx, accountIDs []in
 	  FROM locked_accounts a
 	  JOIN api_account_models AS m ON m.account_id = a.id
 	    AND m.enabled = TRUE
-	    AND btrim($2) <> ''
-	    AND lower(m.model_name) = lower($2)
-	    AND ($3 = '' OR jsonb_array_length(m.feature_slugs) = 0 OR m.feature_slugs ? $3)
 	),
 	account_load AS (
 	  SELECT
@@ -556,7 +537,7 @@ func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx, accountIDs []in
 	    em.model_id,
 	    COUNT(tl.id) AS running_count,
 	    COUNT(tl.id) FILTER (
-	      WHERE lower(COALESCE(NULLIF(btrim(tl.resolved_model), ''), NULLIF(btrim(tl.requested_model), ''), '')) = lower(em.model_name)
+	      WHERE lower(btrim(tl.resolved_model)) = lower(em.model_name)
 	    ) AS model_running_count
 	  FROM eligible_models em
 	  LEFT JOIN task_leases tl ON tl.account_id = em.id
@@ -578,9 +559,6 @@ func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx, accountIDs []in
 	model_id ASC,
 	id ASC
 	LIMIT 1`,
-		pq.Array(accountIDs),
-		strings.TrimSpace(requestedModel),
-		strings.TrimSpace(featureSlug),
 	).Scan(
 		&accountID,
 		&providerEndpointID,
@@ -608,40 +586,16 @@ func selectLeastLoadedAccountTx(ctx context.Context, tx *sql.Tx, accountIDs []in
 	}, nil
 }
 
-func taskRoutingHints(paramsJSON string) (string, string) {
-	paramsJSON = strings.TrimSpace(paramsJSON)
-	if paramsJSON == "" {
-		return "", ""
-	}
+func taskFeatureSlug(paramsJSON string) string {
 	var params map[string]interface{}
 	if err := json.Unmarshal([]byte(paramsJSON), &params); err != nil {
-		return "", ""
+		return ""
 	}
-	requestedModel := ""
-	if model, ok := workflow.ReadWorkflowStringParam(params, "model"); ok {
-		requestedModel = strings.TrimSpace(model)
+	slug, err := workflow.ResolveWorkflowFeatureSlug(params)
+	if err != nil {
+		return ""
 	}
-	featureSlug := ""
-	if slug, err := workflow.ResolveWorkflowFeatureSlug(params); err == nil {
-		featureSlug = slug
-	}
-	return requestedModel, featureSlug
-}
-
-func normalizeCandidateAccountIDs(accountIDs []int64) []int64 {
-	seen := make(map[int64]struct{}, len(accountIDs))
-	ids := make([]int64, 0, len(accountIDs))
-	for _, id := range accountIDs {
-		if id == 0 {
-			continue
-		}
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		ids = append(ids, id)
-	}
-	return ids
+	return slug
 }
 
 func newTaskLeaseToken(riverJobID int64) (string, error) {

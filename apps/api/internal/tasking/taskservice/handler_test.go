@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -65,9 +66,8 @@ func TestSubmitTaskHandlerReturnsEnvelopeAndSubmitsCanonicalPayload(t *testing.T
 			{
 				ID: 101,
 				Models: []accounts.AccountModel{{
-					Name:         "gpt-image-1",
-					Enabled:      true,
-					FeatureSlugs: []string{workflow.FeatureSlugStyleFusion},
+					Name:    "gpt-image-1",
+					Enabled: true,
 				}},
 			},
 		}},
@@ -147,9 +147,8 @@ func TestSubmitTaskHandlerReturnsStructuredInsufficientCreditsError(t *testing.T
 			{
 				ID: 101,
 				Models: []accounts.AccountModel{{
-					Name:         "gpt-image-1",
-					Enabled:      true,
-					FeatureSlugs: []string{workflow.FeatureSlugPatternGen},
+					Name:    "gpt-image-1",
+					Enabled: true,
 				}},
 			},
 		}},
@@ -190,7 +189,7 @@ func TestSubmitTaskHandlerReturnsStructuredPricingUnavailableError(t *testing.T)
 		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
 			ID: 101,
 			Models: []accounts.AccountModel{{
-				Name: "gpt-image-1", Enabled: true, FeatureSlugs: []string{workflow.FeatureSlugPatternGen},
+				Name: "gpt-image-1", Enabled: true,
 			}},
 		}}},
 		SubmissionStore: &recordingSubmissionStore{err: taskbilling.ErrPricingUnavailable},
@@ -209,6 +208,102 @@ func TestSubmitTaskHandlerReturnsStructuredPricingUnavailableError(t *testing.T)
 	assertMachineErrorResponse(t, rec, http.StatusServiceUnavailable, "pricing_unavailable", "暂时无法获取报价，请重试")
 }
 
+func TestSubmitTaskHandlerHidesSubmissionStoreCause(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const internalCause = "river database connection refused"
+	service := NewService(ServiceDeps{
+		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+			ID: 101,
+			Models: []accounts.AccountModel{{
+				Name: "gpt-image-1", Enabled: true,
+			}},
+		}}},
+		SubmissionStore: &recordingSubmissionStore{err: errors.New(internalCause)},
+		MediaValidator:  testSubmitMediaValidator{},
+	}, ServiceOptions{})
+	router := newSubmitHandlerTestRouter(t, service, 42)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit", map[string]interface{}{
+		"prompt":           "生成图案",
+		"client_action_id": "handler-submission-failed",
+		"feature":          workflow.FeatureSlugPatternGen,
+	}))
+
+	assertMachineErrorResponse(t, rec, http.StatusServiceUnavailable, "submission_failed", "任务提交失败，请稍后重试")
+	if strings.Contains(rec.Body.String(), internalCause) {
+		t.Fatalf("response leaked internal cause: %s", rec.Body.String())
+	}
+}
+
+func TestSubmitTaskHandlerMissingSubmissionStoreReturnsSafeServiceUnavailable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	service := NewService(ServiceDeps{
+		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+			ID: 101,
+			Models: []accounts.AccountModel{{
+				Name: "gpt-image-1", Enabled: true,
+			}},
+		}}},
+		MediaValidator: testSubmitMediaValidator{},
+	}, ServiceOptions{})
+	router := newSubmitHandlerTestRouter(t, service, 42)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit", map[string]interface{}{
+		"prompt":           "生成图案",
+		"client_action_id": "handler-missing-submission-store",
+		"feature":          workflow.FeatureSlugPatternGen,
+	}))
+
+	assertMachineErrorResponse(t, rec, http.StatusServiceUnavailable, "submission_failed", "任务提交失败，请稍后重试")
+	if strings.Contains(rec.Body.String(), "未配置") {
+		t.Fatalf("response leaked internal configuration state: %s", rec.Body.String())
+	}
+}
+
+func TestCheckSubmitTaskReadinessHandlerMissingBillingReturnsStructuredSafeError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	service := NewService(ServiceDeps{
+		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+			ID: 101,
+			Models: []accounts.AccountModel{{
+				Name: "gpt-image-1", Enabled: true,
+			}},
+		}}},
+		MediaValidator: testSubmitMediaValidator{},
+	}, ServiceOptions{})
+	router := newSubmitHandlerTestRouter(t, service, 42)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit/readiness", map[string]interface{}{
+		"prompt":           "生成图案",
+		"client_action_id": "readiness-missing-billing",
+		"feature":          workflow.FeatureSlugPatternGen,
+		"billing_quantity": 1,
+	}))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var body struct {
+		Code int                         `json:"code"`
+		Msg  string                      `json:"msg"`
+		Data submitTaskReadinessResponse `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Code != 0 || body.Msg != "success" || body.Data.Ready ||
+		body.Data.ErrorCode != "submission_failed" ||
+		body.Data.Message != "任务提交检查暂不可用，请稍后重试" {
+		t.Fatalf("unexpected readiness response: %+v", body)
+	}
+	if strings.Contains(rec.Body.String(), "未配置") {
+		t.Fatalf("response leaked internal configuration state: %s", rec.Body.String())
+	}
+}
+
 func TestCheckSubmitTaskReadinessHandlerReturnsFeatureEnvelope(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -217,9 +312,8 @@ func TestCheckSubmitTaskReadinessHandlerReturnsFeatureEnvelope(t *testing.T) {
 			{
 				ID: 101,
 				Models: []accounts.AccountModel{{
-					Name:         "gpt-image-1",
-					Enabled:      true,
-					FeatureSlugs: []string{workflow.FeatureSlugImageExtend},
+					Name:    "gpt-image-1",
+					Enabled: true,
 				}},
 			},
 		}},
@@ -301,8 +395,8 @@ func TestCheckSubmitTaskReadinessHandlerHidesMissingProviderConfiguration(t *tes
 	if body.Code != 0 || body.Msg != "success" || body.Data.Ready {
 		t.Fatalf("unexpected readiness response: %+v", body)
 	}
-	if body.Data.Message != "该功能配置的模型当前不可用" || body.Data.ErrorCode != "workflow_model_unavailable" {
-		t.Fatalf("readiness error=%+v, want structured workflow model unavailable", body.Data)
+	if body.Data.Message != providerUnavailableMessage || body.Data.ErrorCode != "provider_unavailable" {
+		t.Fatalf("readiness error=%+v, want structured provider unavailable", body.Data)
 	}
 }
 
@@ -339,7 +433,7 @@ func TestCheckSubmitTaskReadinessHandlerReturnsStructuredPricingUnavailableError
 				AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
 					ID: 101,
 					Models: []accounts.AccountModel{{
-						Name: "gpt-image-1", Enabled: true, FeatureSlugs: []string{workflow.FeatureSlugPatternGen},
+						Name: "gpt-image-1", Enabled: true,
 					}},
 				}}},
 				SubmissionStore: &recordingSubmissionStore{},
@@ -420,15 +514,15 @@ func assertMachineErrorResponse(t *testing.T, recorder *httptest.ResponseRecorde
 
 func newSubmitHandlerTestRouter(t testing.TB, service *Service, userID int64) *gin.Engine {
 	t.Helper()
-	if service != nil && service.workflowFeatures == nil {
-		configs := make(map[string]prompts.WorkflowFeatureRuntimeConfig)
+	if service != nil && service.promptStore == nil {
+		configs := make(map[string]prompts.FeaturePromptRuntimeConfig)
 		for _, slug := range workflow.SupportedFeatureSlugs() {
-			configs[slug] = prompts.WorkflowFeatureRuntimeConfig{
-				FeatureSlug: slug, CanonicalModel: "gpt-image-1", SystemPrompt: "{{user_prompt}}",
-				UserPromptMergePolicy: prompts.DefaultWorkflowFeaturePromptMergePolicy(slug),
+			configs[slug] = prompts.FeaturePromptRuntimeConfig{
+				Prompt:                "{{user_prompt}}",
+				UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(slug),
 			}
 		}
-		service.workflowFeatures = fakeWorkflowFeatureStore{configs: configs}
+		service.promptStore = fakeFeaturePromptStore{configs: configs}
 	}
 	handler := NewHandler(service)
 	router := gin.New()

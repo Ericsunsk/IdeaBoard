@@ -38,7 +38,7 @@ type fakeAssigner struct {
 	lastRiverJobID        int64
 }
 
-func (f *fakeAssigner) Assign(_ context.Context, _ []int64, task *tasks.TaskPayload) (taskqueue.TaskAssignment, error) {
+func (f *fakeAssigner) Assign(_ context.Context, task *tasks.TaskPayload) (taskqueue.TaskAssignment, error) {
 	if f.assignErr != nil {
 		return taskqueue.TaskAssignment{}, f.assignErr
 	}
@@ -93,7 +93,6 @@ func (f *fakeAssigner) leaseToken() string {
 }
 
 type fakeRuntime struct {
-	refreshFn       func(ctx context.Context, task *tasks.TaskPayload) error
 	failedCalls     int
 	lastFailedTask  string
 	lastFailedCause string
@@ -102,13 +101,6 @@ type fakeRuntime struct {
 	convergeFn      func(context.Context) error
 	resetErr        error
 	resetCalls      int
-}
-
-func (f *fakeRuntime) RefreshTaskAccounts(ctx context.Context, task *tasks.TaskPayload) error {
-	if f.refreshFn != nil {
-		return f.refreshFn(ctx, task)
-	}
-	return nil
 }
 
 func (f *fakeRuntime) FailTask(_ context.Context, input taskruntime.FailTaskInput) error {

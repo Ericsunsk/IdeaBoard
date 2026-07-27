@@ -122,7 +122,6 @@ func TestRiverPayloadCanonicalParamsBecomeProviderRequest(t *testing.T) {
 	raw := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
 		Feature:       "style-fusion",
-		Model:         "gpt-image-1",
 		Media: &tasks.MediaInputs{
 			Inputs: []tasks.MediaRef{
 				{URL: "https://img.example/a.png", Role: "input", Weight: 0.75},
@@ -142,11 +141,10 @@ func TestRiverPayloadCanonicalParamsBecomeProviderRequest(t *testing.T) {
 		},
 	})
 	submitted := &tasks.TaskPayload{
-		TaskID:     "task-river-contract",
-		UserID:     42,
-		Prompt:     "融合两张图",
-		Params:     raw,
-		AccountIDs: []int64{101},
+		TaskID: "task-river-contract",
+		UserID: 42,
+		Prompt: "融合两张图",
+		Params: raw,
 	}
 	decoded := roundTripDrawingTaskForTest(t, submitted)
 
@@ -216,7 +214,6 @@ func TestPrepareProviderExecutionAllowsPatternGenProviderHintsAndControls(t *tes
 	raw := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
 		Feature:       workflow.FeatureSlugPatternGen,
-		Model:         "gpt-image-1",
 		Controls: &tasks.GenerationControls{
 			Ratio:       "4:3",
 			OutputCount: 2,
@@ -232,7 +229,7 @@ func TestPrepareProviderExecutionAllowsPatternGenProviderHintsAndControls(t *tes
 			ApiKey:  "key",
 			ApiType: workflow.ProviderOpenAICompatible,
 			Models: []accounts.AccountModel{
-				{Name: "gpt-image-1", Enabled: true, FeatureSlugs: []string{workflow.FeatureSlugPatternGen}},
+				{Name: "gpt-image-1", Enabled: true},
 			},
 		},
 		&tasks.TaskPayload{
@@ -241,7 +238,7 @@ func TestPrepareProviderExecutionAllowsPatternGenProviderHintsAndControls(t *tes
 			Prompt: "repeatable textile pattern",
 			Params: raw,
 		},
-		taskqueue.TaskAssignment{},
+		taskqueue.TaskAssignment{ResolvedModel: "gpt-image-1"},
 	)
 	if err != nil {
 		t.Fatalf("prepareProviderExecution returned error: %v", err)
@@ -254,24 +251,19 @@ func TestPrepareProviderExecutionAllowsPatternGenProviderHintsAndControls(t *tes
 	}
 }
 
-func TestProviderTaskParamsPreferCanonicalFeatureAndModel(t *testing.T) {
+func TestProviderTaskParamsPreferCanonicalFeature(t *testing.T) {
 	params := newProviderTaskParams(&tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
 		Feature:       "style-fusion",
-		Model:         "gpt-image-1",
 		Extra: map[string]interface{}{
 			"feature": "partial-edit",
-			"model":   "other-model",
 		},
 	})
 
 	if got := params.featureSlug(); got != "style-fusion" {
 		t.Fatalf("featureSlug = %q, want style-fusion", got)
 	}
-	if got := params.requestedModel(); got != "gpt-image-1" {
-		t.Fatalf("requestedModel = %q, want gpt-image-1", got)
-	}
-	if params.Provider["feature"] != "style-fusion" || params.Provider["model"] != "gpt-image-1" {
-		t.Fatalf("provider params should keep canonical feature/model, got %#v", params.Provider)
+	if params.Provider["feature"] != "style-fusion" {
+		t.Fatalf("provider params should keep canonical feature, got %#v", params.Provider)
 	}
 }

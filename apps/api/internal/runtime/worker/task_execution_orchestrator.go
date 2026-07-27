@@ -2,9 +2,7 @@ package worker
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"ideaboard/api/internal/tasking/tasks"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -13,6 +11,7 @@ import (
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/taskruntime"
+	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -246,7 +245,7 @@ func (o *taskExecutionOrchestrator) handleProviderFailure(
 			Category:       failureCategory,
 		},
 		Failover: taskExecutionConvergenceFailover{
-			RemainingAccountCandidates: len(attempt.task.AccountIDs),
+			RemainingAccountCandidates: 1,
 			HasFailoverCapacity:        true,
 		},
 	}
@@ -259,8 +258,6 @@ func (o *taskExecutionOrchestrator) handleProviderFailure(
 		if disabled {
 			slog.Warn("account disabled after too many failures", "account_id", attempt.accountID, "fail_count", failCount)
 		}
-		attempt.task.AccountIDs = removeAccountCandidate(attempt.task.AccountIDs, attempt.accountID)
-		decisionInput.Failover.RemainingAccountCandidates = len(attempt.task.AccountIDs)
 	}
 
 	decision := o.decideTaskExecutionConvergence(decisionInput)
@@ -388,12 +385,6 @@ func (o *taskExecutionOrchestrator) requeueTask(ctx context.Context, task *tasks
 	} else if cancelled {
 		o.skipCancelledTask(cleanupCtx, task, nil)
 		return nil
-	}
-	if err := o.taskRuntime.RefreshTaskAccounts(ctx, task); err != nil {
-		return o.failTask(cleanupCtx, task, reason)
-	}
-	if len(task.AccountIDs) == 0 {
-		return o.failTask(cleanupCtx, task, reason)
 	}
 	if err := o.enqueuer.Enqueue(ctx, task); err != nil {
 		return o.failTask(cleanupCtx, task, reason)
@@ -712,10 +703,6 @@ func taskExecutionSnapshot(task *tasks.TaskPayload, account *accounts.ApiAccount
 	}
 	snapshot.TaskID = task.TaskID
 	snapshot.FeatureSlug = accounts.ParseFeatureSlugFromParamsJSON(task.Params)
-	params := taskParamsMap(task.Params)
-	if requestedModel, ok := workflow.ReadWorkflowStringParam(params, "model"); ok {
-		snapshot.RequestedModel = strings.TrimSpace(requestedModel)
-	}
 	if account == nil {
 		return snapshot
 	}
@@ -728,24 +715,8 @@ func taskExecutionSnapshot(task *tasks.TaskPayload, account *accounts.ApiAccount
 	snapshot.CredentialKeyVersion = strings.TrimSpace(assignment.CredentialKeyVersion)
 	if resolvedModel := strings.TrimSpace(assignment.ResolvedModel); resolvedModel != "" {
 		snapshot.ResolvedModel = resolvedModel
-		return snapshot
-	}
-	if model, ok := accounts.ResolveAccountModelForParams(account, snapshot.FeatureSlug, params); ok {
-		snapshot.ResolvedModel = strings.TrimSpace(model.Name)
 	}
 	return snapshot
-}
-
-func taskParamsMap(paramsJSON string) map[string]interface{} {
-	paramsJSON = strings.TrimSpace(paramsJSON)
-	if paramsJSON == "" {
-		return nil
-	}
-	var params map[string]interface{}
-	if err := json.Unmarshal([]byte(paramsJSON), &params); err != nil {
-		return nil
-	}
-	return params
 }
 
 func classifyProviderFailure(err error, timeline providerCallTimeline) (string, string) {
@@ -848,18 +819,4 @@ func userFacingProviderError(err error) string {
 		}
 	}
 	return "上游图像服务调用失败"
-}
-
-func removeAccountCandidate(accountIDs []int64, accountID int64) []int64 {
-	if len(accountIDs) == 0 {
-		return accountIDs
-	}
-	next := make([]int64, 0, len(accountIDs))
-	for _, id := range accountIDs {
-		if id == accountID {
-			continue
-		}
-		next = append(next, id)
-	}
-	return next
 }

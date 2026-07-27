@@ -36,21 +36,19 @@ type RuntimeCredential struct {
 }
 
 type AccountModel struct {
-	ID            int64    `json:"id,omitempty"`
-	Name          string   `json:"name"`
-	Enabled       bool     `json:"enabled"`
-	Weight        int      `json:"weight"`
-	MaxConcurrent *int     `json:"max_concurrent,omitempty"`
-	FeatureSlugs  []string `json:"feature_slugs,omitempty"`
-	SortOrder     int      `json:"sort_order"`
+	ID            int64  `json:"id,omitempty"`
+	Name          string `json:"name"`
+	Enabled       bool   `json:"enabled"`
+	Weight        int    `json:"weight"`
+	MaxConcurrent *int   `json:"max_concurrent,omitempty"`
+	SortOrder     int    `json:"sort_order"`
 }
 
 type AccountModelInput struct {
-	Name          string   `json:"name"`
-	Enabled       *bool    `json:"enabled,omitempty"`
-	Weight        int      `json:"weight,omitempty"`
-	MaxConcurrent *int     `json:"max_concurrent,omitempty"`
-	FeatureSlugs  []string `json:"feature_slugs,omitempty"`
+	Name          string `json:"name"`
+	Enabled       *bool  `json:"enabled,omitempty"`
+	Weight        int    `json:"weight,omitempty"`
+	MaxConcurrent *int   `json:"max_concurrent,omitempty"`
 }
 
 type NullableIntPatch struct {
@@ -102,7 +100,6 @@ type PatchAccountModelRequest struct {
 	Enabled       *bool            `json:"enabled,omitempty"`
 	Weight        *int             `json:"weight,omitempty"`
 	MaxConcurrent NullableIntPatch `json:"max_concurrent,omitempty"`
-	FeatureSlugs  *[]string        `json:"feature_slugs,omitempty"`
 	SortOrder     *int             `json:"sort_order,omitempty"`
 }
 

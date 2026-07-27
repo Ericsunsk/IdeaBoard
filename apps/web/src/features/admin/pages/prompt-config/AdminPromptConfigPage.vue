@@ -1,17 +1,17 @@
 <template>
-  <AdminManagementFrame :content-class="workflowPanelContentClass">
+  <AdminManagementFrame :content-class="promptPanelContentClass">
     <div
-      v-if="loading && workflowFeatures.length === 0"
+      v-if="loading && prompts.length === 0"
       class="flex min-h-[260px] items-center justify-center rounded-lg border border-admin-border-soft bg-admin-card text-admin-text-2"
     >
-      <span class="text-admin-title font-semibold text-admin-title-color">正在加载工作流配置</span>
+      <span class="text-admin-title font-semibold text-admin-title-color">正在加载系统提示词</span>
     </div>
     <div
-      v-else-if="loadFailed && workflowFeatures.length === 0"
+      v-else-if="loadFailed && prompts.length === 0"
       class="flex min-h-[260px] flex-col items-center justify-center gap-3 rounded-lg border border-admin-border-soft bg-admin-card text-admin-text-2"
     >
-      <span class="text-admin-title font-semibold text-admin-title-color">工作流配置加载失败</span>
-      <Button size="small" label="重新加载" @click="loadWorkflowFeatures()" />
+      <span class="text-admin-title font-semibold text-admin-title-color">系统提示词加载失败</span>
+      <Button size="small" label="重新加载" @click="loadPrompts()" />
     </div>
     <template v-else-if="featureGroups.length > 0">
       <Card v-for="group in featureGroups" :key="group.key" class="!rounded-lg" :pt="adminCardPt">
@@ -25,13 +25,9 @@
             </div>
 
             <div class="flex flex-wrap gap-2">
+              <Tag :value="`${getGroupVariableCount(group)} 个变量`" severity="secondary" rounded />
               <Tag
-                :value="`${getGroupEnabledCount(group)}/${group.items.length} 已启用`"
-                severity="success"
-                rounded
-              />
-              <Tag
-                :value="`${getGroupConfiguredCount(group)}/${group.items.length} 已配置模型`"
+                :value="`${getGroupFilledCount(group)}/${group.items.length} 已配置`"
                 severity="secondary"
                 rounded
               />
@@ -42,7 +38,7 @@
                 v-for="item in group.items"
                 :key="item.slug"
                 :value="item.title"
-                :severity="getSavedWorkflowFeature(item.slug)?.enabled ? 'success' : 'secondary'"
+                severity="secondary"
                 rounded
               />
             </div>
@@ -64,13 +60,13 @@
       v-else
       class="flex min-h-[260px] items-center justify-center rounded-lg border border-admin-border-soft bg-admin-card text-admin-text-2"
     >
-      <span class="text-admin-title font-semibold text-admin-title-color">暂无工作流配置</span>
+      <span class="text-admin-title font-semibold text-admin-title-color">未加载到节点配置</span>
     </div>
   </AdminManagementFrame>
 
   <AdminDialogShell
     :visible="Boolean(activeGroup)"
-    aria-label="编辑工作流配置"
+    aria-label="编辑节点提示词"
     size="wide"
     content-layout="scrollable"
     :busy="isEditorBusy"
@@ -83,13 +79,17 @@
             <Tag :value="activeGroup.title" severity="secondary" rounded />
           </div>
           <h2 :class="adminDialogTitleClass">
-            {{ activeGroup ? `编辑 ${activeGroup.title} 工作流配置` : '' }}
+            {{ activeGroup ? `编辑 ${activeGroup.title} 节点提示词` : '' }}
           </h2>
         </div>
 
         <div v-if="activeGroup" class="flex flex-wrap gap-2">
           <Tag :value="`${activeGroup.items.length} 项配置`" severity="secondary" rounded />
-          <Tag :value="`${getGroupEnabledCount(activeGroup)} 项启用`" severity="success" rounded />
+          <Tag
+            :value="`${getGroupVariableCount(activeGroup)} 个变量`"
+            severity="secondary"
+            rounded
+          />
         </div>
       </div>
     </template>
@@ -108,42 +108,10 @@
               class="!min-w-0 max-w-full font-mono !text-admin-caption"
               :pt="workflowSlugTagPt"
             />
-            <Tag
-              :value="getDraft(item.slug).enabled ? '启用' : '停用'"
-              :severity="getDraft(item.slug).enabled ? 'success' : 'secondary'"
-              rounded
-            />
           </div>
         </template>
 
-        <div class="flex flex-col gap-4">
-          <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-            <label
-              class="flex min-w-0 flex-col gap-2 text-admin-caption font-bold text-admin-text-2"
-            >
-              <span>Canonical Model</span>
-              <InputText
-                :model-value="getDraft(item.slug).canonicalModel"
-                class="w-full font-mono"
-                placeholder="例如：image-alpha"
-                :disabled="saving[item.slug]"
-                @update:model-value="updateCanonicalModelDraft(item.slug, String($event ?? ''))"
-              />
-            </label>
-
-            <div
-              class="flex min-h-10 items-center justify-between gap-4 rounded-md border border-admin-border-soft bg-admin-surface-muted px-3 md:min-w-40"
-            >
-              <span class="text-admin-caption font-bold text-admin-text-2">启用工作流</span>
-              <ToggleSwitch
-                :model-value="getDraft(item.slug).enabled"
-                :disabled="saving[item.slug]"
-                :aria-label="`${item.title}启用状态`"
-                @update:model-value="updateEnabledDraft(item.slug, Boolean($event))"
-              />
-            </div>
-          </div>
-
+        <div class="flex flex-col gap-3">
           <div class="flex flex-col gap-2">
             <div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
               <span class="text-admin-caption font-bold text-admin-text-2">System Prompt</span>
@@ -169,38 +137,31 @@
 
             <Textarea
               :ref="(element: unknown) => bindTextareaRef(item.slug, element)"
-              :model-value="getDraft(item.slug).systemPrompt"
+              v-model="promptMap[item.slug]"
               auto-resize
               class="w-full"
-              rows="5"
-              :placeholder="`为「${item.title}」设置 System Prompt`"
+              rows="4"
+              :placeholder="`为「${item.title}」设置系统提示词，可使用上方变量按钮插入模板变量...`"
               :disabled="saving[item.slug]"
-              @update:model-value="updateSystemPromptDraft(item.slug, String($event ?? ''))"
             />
           </div>
 
           <div class="flex flex-wrap items-center justify-between gap-2.5">
             <div class="flex min-w-0 flex-wrap items-center gap-2">
               <Tag
-                :value="`${getDraft(item.slug).systemPrompt.length} 字`"
+                :value="`${(promptMap[item.slug] || '').length} 字`"
                 severity="secondary"
                 rounded
               />
-              <span
-                class="text-admin-caption font-medium"
-                :class="getValidationMessageClass(item.slug)"
-              >
-                {{ getDraftValidation(item.slug).message }}
-              </span>
             </div>
             <Button
               size="small"
-              label="保存配置"
+              label="保存"
               :loading="saving[item.slug]"
               :disabled="
                 !getDraftValidation(item.slug).canSave || !getDraftValidation(item.slug).isDirty
               "
-              @click="saveWorkflowFeature(item.slug)"
+              @click="savePrompt(item.slug)"
             />
           </div>
         </div>
@@ -224,13 +185,11 @@ import { computed, reactive, ref } from 'vue'
 import Button from 'primevue/button'
 import type { ButtonPassThroughOptions } from 'primevue/button'
 import Card from 'primevue/card'
-import InputText from 'primevue/inputtext'
 import Panel from 'primevue/panel'
 import Tag from 'primevue/tag'
 import type { TagPassThroughOptions } from 'primevue/tag'
 import Textarea from 'primevue/textarea'
-import ToggleSwitch from 'primevue/toggleswitch'
-import { useAdminWorkflowFeatureFeedback } from '../../prompt-config/useAdminPromptConfigFeedback'
+import { useAdminPromptConfigFeedback } from '../../prompt-config/useAdminPromptConfigFeedback'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
@@ -240,10 +199,10 @@ import {
   adminDialogHeaderSplitClass,
   adminDialogTitleClass,
 } from '../../shared/lib/adminUiClasses'
-import { useAdminWorkflowFeatureWorkspace } from '../../prompt-config/promptConfigWorkspace'
+import { useAdminPromptConfigWorkspace } from '../../prompt-config/promptConfigWorkspace'
 import type {
-  WorkflowFeatureVariable,
-  WorkflowFeatureVariableTone,
+  FeaturePromptVariable,
+  FeaturePromptVariableTone,
 } from '../../prompt-config/promptConfigWorkspace'
 import {
   featureMap,
@@ -252,40 +211,33 @@ import {
   type FeatureSlug,
 } from './featurePromptMeta'
 
-const feedback = useAdminWorkflowFeatureFeedback()
-const workflowFeatureWorkspace = useAdminWorkflowFeatureWorkspace({
+const feedback = useAdminPromptConfigFeedback()
+const promptConfigWorkspace = useAdminPromptConfigWorkspace({
   feedback,
   getFeatureTitle: (slug) => featureMap[slug as FeatureSlug]?.title ?? slug,
 })
 const {
-  getDraft,
   getDraftValidation,
-  getSavedWorkflowFeature,
-  getWorkflowFeatureVariables,
+  getPromptVariables,
+  getSavedPrompt,
   insertVariableIntoDraft,
   loadFailed,
-  loadWorkflowFeatures,
+  loadPrompts,
   loading,
-  saveWorkflowFeature,
+  promptMap,
+  prompts,
+  resetDrafts,
+  savePrompt,
   saving,
-  updateCanonicalModelDraft,
-  updateEnabledDraft,
-  updateSystemPromptDraft,
-  workflowFeatures,
-} = workflowFeatureWorkspace
+} = promptConfigWorkspace
 
 type TextareaRefLike = HTMLTextAreaElement | { $el?: Element }
 const textareaRefs = reactive<Record<string, TextareaRefLike>>({})
 const activeGroupKey = ref<string | null>(null)
 const featureGroups = computed<FeatureGroup[]>(() =>
-  groupedFeatureGroups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter((item) => Boolean(getSavedWorkflowFeature(item.slug))),
-    }))
-    .filter((group) => group.items.length > 0),
+  groupedFeatureGroups.filter((group) => group.items.length > 0),
 )
-const workflowPanelContentClass = computed(() =>
+const promptPanelContentClass = computed(() =>
   featureGroups.value.length > 0
     ? 'grid auto-rows-max grid-cols-1 content-start gap-3.5 p-6 lg:grid-cols-2 2xl:grid-cols-3'
     : 'p-6',
@@ -304,17 +256,20 @@ const variableTokenButtonPt = {
 const workflowSlugTagPt = {
   label: { class: 'truncate' },
 } satisfies TagPassThroughOptions
-const variableTokenButtonToneClass: Record<WorkflowFeatureVariableTone, string> = {
+const variableTokenButtonToneClass: Record<FeaturePromptVariableTone, string> = {
   prompt: '!bg-[rgba(71,117,168,0.16)] !text-admin-info hover:!bg-[rgba(71,117,168,0.22)]',
   control: '!bg-[rgba(212,136,48,0.16)] !text-admin-warning hover:!bg-[rgba(212,136,48,0.22)]',
   context: '!bg-admin-surface-muted !text-admin-text-2-strong hover:!bg-admin-surface-hover',
 }
 
 function openEditor(groupKey: string) {
+  const group = featureGroups.value.find((item) => item.key === groupKey)
+  if (group) resetGroupDraftFromSaved(group)
   activeGroupKey.value = groupKey
 }
 
 function closeEditor() {
+  if (activeGroup.value) resetGroupDraftFromSaved(activeGroup.value)
   activeGroupKey.value = null
 }
 
@@ -322,33 +277,24 @@ function handleEditorDialogVisibleUpdate(visible: boolean) {
   if (!visible) closeEditor()
 }
 
-function getGroupEnabledCount(group: FeatureGroup) {
-  return group.items.filter((item) => getSavedWorkflowFeature(item.slug)?.enabled).length
+function getGroupVariableCount(group: FeatureGroup) {
+  return new Set(group.items.flatMap((item) => getVarsForSlug(item.slug).map((v) => v.key))).size
 }
 
-function getGroupConfiguredCount(group: FeatureGroup) {
-  return group.items.filter(
-    (item) => getSavedWorkflowFeature(item.slug)?.canonical_model.trim().length,
-  ).length
+function getGroupFilledCount(group: FeatureGroup) {
+  return group.items.filter((item) => getSavedPrompt(item.slug).trim().length > 0).length
 }
 
-function getVariableTokenButtonClass(tone?: WorkflowFeatureVariableTone) {
+function getVariableTokenButtonClass(tone?: FeaturePromptVariableTone) {
   return [variableTokenButtonClass, variableTokenButtonToneClass[tone || 'context']]
 }
 
-function getVarsForSlug(slug: FeatureSlug): WorkflowFeatureVariable[] {
-  return getWorkflowFeatureVariables(slug)
-}
-
-function getValidationMessageClass(slug: FeatureSlug) {
-  const severity = getDraftValidation(slug).severity
-  if (severity === 'error') return 'text-admin-danger'
-  if (severity === 'warning') return 'text-admin-warning'
-  return 'text-admin-text-3'
+function getVarsForSlug(slug: FeatureSlug): readonly FeaturePromptVariable[] {
+  return getPromptVariables(slug)
 }
 
 function insertVariable(slug: FeatureSlug, variableKey: string) {
-  const currentPrompt = getDraft(slug).systemPrompt
+  const currentPrompt = promptMap[slug] || ''
   const textareaElement = resolveTextareaElement(textareaRefs[slug])
   const position =
     textareaElement instanceof HTMLTextAreaElement
@@ -370,5 +316,9 @@ function bindTextareaRef(slug: FeatureSlug, element: unknown) {
     return
   }
   delete textareaRefs[slug]
+}
+
+function resetGroupDraftFromSaved(group: FeatureGroup) {
+  resetDrafts(group.items.map((item) => item.slug))
 }
 </script>

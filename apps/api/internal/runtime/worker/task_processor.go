@@ -12,7 +12,6 @@ import (
 )
 
 type consumerTaskRuntime interface {
-	RefreshTaskAccounts(ctx context.Context, task *tasks.TaskPayload) error
 	FailTask(ctx context.Context, input taskruntime.FailTaskInput) error
 	ResetRunningTask(ctx context.Context, input taskruntime.ResetRunningTaskInput) error
 }
@@ -54,18 +53,7 @@ func (p *taskProcessor) process(ctx context.Context, task *tasks.TaskPayload, be
 	}
 	correlationID := task.EnsureCorrelationID()
 
-	if err := p.taskRuntime.RefreshTaskAccounts(ctx, task); err != nil {
-		slog.Warn("refresh task accounts failed", "task_id", task.TaskID, "correlation_id", correlationID, "err", err)
-		return err
-	}
-
-	if len(task.AccountIDs) == 0 {
-		slog.Info("no available account for task", "task_id", task.TaskID, "correlation_id", correlationID)
-		p.failTask(ctx, task, "没有可用账号")
-		return nil
-	}
-
-	assignment, err := p.assigner.Assign(ctx, task.AccountIDs, task)
+	assignment, err := p.assigner.Assign(ctx, task)
 	if err != nil {
 		if isContextInterrupted(ctx.Err()) {
 			return ctx.Err()

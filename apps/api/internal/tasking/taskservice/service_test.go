@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -42,9 +41,9 @@ func applyTaskSystemPrompt(basePrompt, userPrompt, featureSlug string, params ma
 	if err != nil || prompt == "" {
 		return basePrompt
 	}
-	return prompts.ApplyFeatureSystemPromptWithConfig(basePrompt, userPrompt, featureSlug, params, prompts.WorkflowFeatureRuntimeConfig{
-		SystemPrompt:          prompt,
-		UserPromptMergePolicy: prompts.DefaultWorkflowFeaturePromptMergePolicy(featureSlug),
+	return prompts.ApplyFeatureSystemPromptWithConfig(basePrompt, userPrompt, featureSlug, params, prompts.FeaturePromptRuntimeConfig{
+		Prompt:                prompt,
+		UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(featureSlug),
 	})
 }
 
@@ -239,7 +238,7 @@ func TestAttachAdminBillingSnapshotsResolvesFeatureExistenceFromCurrentRegistry(
 	}
 }
 
-func TestImageExtendEmptyUserPromptCanStillBuildExecutablePrompt(t *testing.T) {
+func TestImageExtendEmptyUserPromptCanStillBuildConfiguredPrompt(t *testing.T) {
 	fullPrompt := applyTaskSystemPrompt(
 		"",
 		"",
@@ -260,12 +259,9 @@ func TestImageExtendEmptyUserPromptCanStillBuildExecutablePrompt(t *testing.T) {
 	if strings.TrimSpace(fullPrompt) == "" {
 		t.Fatalf("expected non-empty full prompt")
 	}
-	if err := validateExecutablePrompt(fullPrompt); err != nil {
-		t.Fatalf("expected executable prompt, got err: %v", err)
-	}
 }
 
-func TestRemoveBgWithoutConfiguredSystemPromptIsRejected(t *testing.T) {
+func TestRemoveBgWithoutConfiguredSystemPromptAllowsEmptyPrompt(t *testing.T) {
 	fullPrompt := applyTaskSystemPrompt(
 		"",
 		"",
@@ -278,39 +274,28 @@ func TestRemoveBgWithoutConfiguredSystemPromptIsRejected(t *testing.T) {
 		},
 	)
 
-	if err := validateExecutablePrompt(fullPrompt); err == nil {
-		t.Fatalf("expected validation error when remove-bg has no executable prompt")
+	if fullPrompt != "" {
+		t.Fatalf("fullPrompt=%q, want empty prompt", fullPrompt)
 	}
 }
 
-func TestResolveTaskBillingRequestUsesCanonicalAIWorkflowRegistry(t *testing.T) {
+func TestResolveTaskBillingRequestUsesAIWorkflowRegistry(t *testing.T) {
 	for _, feature := range workflow.AIImageFeatureSlugs() {
 		t.Run(feature, func(t *testing.T) {
-			request, err := resolveTaskBillingRequest(feature, " GPT-Image-1 ")
+			request, err := resolveTaskBillingRequest(feature)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if request == nil || request.Feature != feature || request.Model != "gpt-image-1" || request.Quantity != 1 {
+			if request == nil || request.Feature != feature || request.Quantity != 1 {
 				t.Fatalf("request=%+v", request)
 			}
 		})
 	}
 	for _, feature := range []string{"", "crop", "color-adjust", "mask-draw"} {
-		request, err := resolveTaskBillingRequest(feature, "gpt-image-1")
+		request, err := resolveTaskBillingRequest(feature)
 		if err != nil || request != nil {
 			t.Fatalf("local feature %q request=%+v err=%v", feature, request, err)
 		}
-	}
-}
-
-func TestValidateExecutablePromptReturnsExplicitErrorWhenFinalPromptEmpty(t *testing.T) {
-	err := validateExecutablePrompt("   ")
-	if err == nil {
-		t.Fatalf("expected validation error for empty prompt")
-	}
-	want := "缺少提示词，请填写 Prompt 或配置后台 system prompt"
-	if err.Error() != want {
-		t.Fatalf("got %q, want %q", err.Error(), want)
 	}
 }
 
@@ -766,9 +751,9 @@ func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 	submissionStore := &recordingSubmissionStore{}
 	taskEvents := &recordingTaskStatusPublisher{}
 	svc := NewService(ServiceDeps{
-		AccountRepo:      accountRepo,
-		SubmissionStore:  submissionStore,
-		WorkflowFeatures: workflowFeatureStoreForTest(workflow.FeatureSlugSketchToImage, "gpt-image-1"),
+		AccountRepo:     accountRepo,
+		SubmissionStore: submissionStore,
+		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugSketchToImage, "gpt-image-1"),
 	}, ServiceOptions{
 		TaskEvents: taskEvents,
 	})
@@ -801,11 +786,86 @@ func TestSubmitTaskUsesSubmissionStore(t *testing.T) {
 	if call.queueTask.TaskID != taskID || call.queueTask.UserID != 42 {
 		t.Fatalf("unexpected queue task: %+v", call.queueTask)
 	}
-	if !slices.Equal(call.queueTask.AccountIDs, []int64{101, 202}) {
-		t.Fatalf("queue account ids=%v, want [101 202]", call.queueTask.AccountIDs)
-	}
 	if len(taskEvents.events) != 1 || taskEvents.events[0].TaskID != taskID || taskEvents.events[0].Status != tasks.StatusPending {
 		t.Fatalf("unexpected task events: %+v", taskEvents.events)
+	}
+}
+
+func TestSubmitTaskPreservesSubmissionStoreCause(t *testing.T) {
+	ctx := context.Background()
+	cause := errors.New("river insert unavailable")
+	svc := NewService(ServiceDeps{
+		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
+			{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
+		}},
+		SubmissionStore: &recordingSubmissionStore{err: cause},
+		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugPatternGen, ""),
+	}, ServiceOptions{})
+
+	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
+		Prompt:         "draw a pattern",
+		Feature:        workflow.FeatureSlugPatternGen,
+		ClientActionID: "submission-store-cause",
+	})
+	if !errors.Is(err, cause) {
+		t.Fatalf("SubmitTask error=%v, want wrapped cause", err)
+	}
+	var submissionErr *SubmissionError
+	if !errors.As(err, &submissionErr) {
+		t.Fatalf("SubmitTask error=%T, want SubmissionError", err)
+	}
+	if submissionErr.Code != "submission_failed" || submissionErr.SafeMessage != "任务提交失败，请稍后重试" {
+		t.Fatalf("SubmissionError=%+v, want safe submission_failed", submissionErr)
+	}
+}
+
+func TestSubmitTaskMissingSubmissionStoreReturnsTypedSafeError(t *testing.T) {
+	svc := NewService(ServiceDeps{
+		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
+			{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
+		}},
+		PromptStore: featurePromptStoreForTest(workflow.FeatureSlugPatternGen, ""),
+	}, ServiceOptions{})
+
+	_, err := svc.SubmitTask(context.Background(), 42, &tasks.SubmitTaskRequest{
+		Prompt:         "draw a pattern",
+		Feature:        workflow.FeatureSlugPatternGen,
+		ClientActionID: "missing-submission-store",
+	})
+	if !errors.Is(err, errTaskSubmissionStoreUnavailable) {
+		t.Fatalf("SubmitTask error=%v, want submission store sentinel", err)
+	}
+	var submissionErr *SubmissionError
+	if !errors.As(err, &submissionErr) {
+		t.Fatalf("SubmitTask error=%T, want SubmissionError", err)
+	}
+	if submissionErr.Code != "submission_failed" || submissionErr.SafeMessage != "任务提交失败，请稍后重试" {
+		t.Fatalf("SubmissionError=%+v, want safe submission_failed", submissionErr)
+	}
+}
+
+func TestCheckSubmitTaskReadinessMissingBillingReturnsTypedSafeError(t *testing.T) {
+	svc := NewService(ServiceDeps{
+		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
+			{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
+		}},
+		PromptStore: featurePromptStoreForTest(workflow.FeatureSlugPatternGen, ""),
+	}, ServiceOptions{})
+
+	_, err := svc.CheckSubmitTaskReadiness(context.Background(), 42, &tasks.SubmitTaskRequest{
+		Prompt:         "draw a pattern",
+		Feature:        workflow.FeatureSlugPatternGen,
+		ClientActionID: "missing-billing-service",
+	}, 1)
+	if !errors.Is(err, errTaskBillingUnavailable) {
+		t.Fatalf("CheckSubmitTaskReadiness error=%v, want billing service sentinel", err)
+	}
+	var submissionErr *SubmissionError
+	if !errors.As(err, &submissionErr) {
+		t.Fatalf("CheckSubmitTaskReadiness error=%T, want SubmissionError", err)
+	}
+	if submissionErr.Code != "submission_failed" || submissionErr.SafeMessage != "任务提交检查暂不可用，请稍后重试" {
+		t.Fatalf("SubmissionError=%+v, want safe submission_failed readiness error", submissionErr)
 	}
 }
 
@@ -871,9 +931,6 @@ func TestSubmitTaskGoogleNativeGenerationSettingControlsSubmission(t *testing.T)
 				}
 				if len(submissionStore.calls) != 1 {
 					t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
-				}
-				if !slices.Equal(submissionStore.calls[0].queueTask.AccountIDs, []int64{101}) {
-					t.Fatalf("account ids=%v, want only google native account", submissionStore.calls[0].queueTask.AccountIDs)
 				}
 				return
 			}
@@ -960,17 +1017,16 @@ func TestSubmitTaskRejectsInvalidPatternGenContractBeforeSubmission(t *testing.T
 		{
 			ID: 101,
 			Models: []accounts.AccountModel{{
-				Name:         "gpt-image-1",
-				Enabled:      true,
-				FeatureSlugs: []string{workflow.FeatureSlugPatternGen},
+				Name:    "gpt-image-1",
+				Enabled: true,
 			}},
 		},
 	}}
 	submissionStore := &recordingSubmissionStore{}
 	svc := NewService(ServiceDeps{
-		AccountRepo:      accountRepo,
-		SubmissionStore:  submissionStore,
-		WorkflowFeatures: workflowFeatureStoreForTest(workflow.FeatureSlugPatternGen, "gpt-image-1"),
+		AccountRepo:     accountRepo,
+		SubmissionStore: submissionStore,
+		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugPatternGen, "gpt-image-1"),
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
@@ -998,9 +1054,9 @@ func TestSubmitTaskUsesInteractivePriority(t *testing.T) {
 	}}
 	submissionStore := &recordingSubmissionStore{}
 	svc := NewService(ServiceDeps{
-		AccountRepo:      accountRepo,
-		SubmissionStore:  submissionStore,
-		WorkflowFeatures: workflowFeatureStoreForTest(workflow.FeatureSlugSketchToImage, "gpt-image-1"),
+		AccountRepo:     accountRepo,
+		SubmissionStore: submissionStore,
+		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugSketchToImage, "gpt-image-1"),
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
@@ -1046,9 +1102,9 @@ func TestSubmitTaskReturnsExistingTaskWithoutPublishingWhenClientActionRepeats(t
 	}
 	taskEvents := &recordingTaskStatusPublisher{}
 	svc := NewService(ServiceDeps{
-		AccountRepo:      accountRepo,
-		SubmissionStore:  submissionStore,
-		WorkflowFeatures: workflowFeatureStoreForTest(workflow.FeatureSlugSketchToImage, "gpt-image-1"),
+		AccountRepo:     accountRepo,
+		SubmissionStore: submissionStore,
+		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugSketchToImage, "gpt-image-1"),
 	}, ServiceOptions{
 		TaskEvents: taskEvents,
 	})
@@ -1087,204 +1143,23 @@ func TestSubmitTaskRejectsInvalidClientActionID(t *testing.T) {
 	}
 }
 
-func TestSubmitTaskUsesWorkflowCanonicalModelForRouting(t *testing.T) {
-	ctx := context.Background()
-	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
-		{
-			ID: 101,
-			Models: []accounts.AccountModel{{
-				Name:         "gpt-image-1",
-				Enabled:      true,
-				FeatureSlugs: []string{workflow.FeatureSlugPatternGen},
-			}},
-		},
-		{
-			ID: 202,
-			Models: []accounts.AccountModel{{
-				Name:         "image-alpha",
-				Enabled:      true,
-				FeatureSlugs: []string{workflow.FeatureSlugPatternGen},
-			}},
-		},
-	}}
-	submissionStore := &recordingSubmissionStore{}
-	svc := NewService(ServiceDeps{
-		AccountRepo:     accountRepo,
-		SubmissionStore: submissionStore,
-		WorkflowFeatures: fakeWorkflowFeatureStore{configs: map[string]prompts.WorkflowFeatureRuntimeConfig{
-			workflow.FeatureSlugPatternGen: {
-				FeatureSlug:           workflow.FeatureSlugPatternGen,
-				CanonicalModel:        "image-alpha",
-				SystemPrompt:          "{{user_prompt}}",
-				UserPromptMergePolicy: prompts.DefaultWorkflowFeaturePromptMergePolicy(workflow.FeatureSlugPatternGen),
-			},
-		}},
-	}, ServiceOptions{})
-
-	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
-		Prompt:         "draw a chair",
-		Feature:        workflow.FeatureSlugPatternGen,
-		ClientActionID: "pattern-default-model",
-	})
-	if err != nil {
-		t.Fatalf("SubmitTask failed: %v", err)
-	}
-	if len(submissionStore.calls) != 1 {
-		t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
-	}
-	call := submissionStore.calls[0]
-	if call.task.RequestedModel != "image-alpha" {
-		t.Fatalf("requested model=%q, want image-alpha", call.task.RequestedModel)
-	}
-	if !slices.Equal(call.queueTask.AccountIDs, []int64{202}) {
-		t.Fatalf("queue account ids=%v, want [202]", call.queueTask.AccountIDs)
-	}
-	typedParams, err := tasks.UnmarshalParams(call.task.Params)
-	if err != nil {
-		t.Fatalf("unmarshal task params: %v", err)
-	}
-	if typedParams.Model != "image-alpha" {
-		t.Fatalf("typed model=%q, want image-alpha", typedParams.Model)
-	}
-}
-
-func TestStyleVariationResolvesCanonicalModelForReadinessAndSubmit(t *testing.T) {
-	ctx := context.Background()
-	const model = "gemini-3.1-flash-lite-image"
-	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-		ID: 101,
-		Models: []accounts.AccountModel{{
-			Name:         model,
-			Enabled:      true,
-			FeatureSlugs: []string{workflow.FeatureSlugStyleVariation},
-		}},
-	}}}
-	submissionStore := &recordingSubmissionStore{}
-	svc := NewService(ServiceDeps{
-		AccountRepo:     accountRepo,
-		SubmissionStore: submissionStore,
-		WorkflowFeatures: fakeWorkflowFeatureStore{configs: map[string]prompts.WorkflowFeatureRuntimeConfig{
-			workflow.FeatureSlugStyleVariation: {
-				FeatureSlug:           workflow.FeatureSlugStyleVariation,
-				CanonicalModel:        model,
-				SystemPrompt:          "Create a faithful style variation of the input image.",
-				UserPromptMergePolicy: prompts.DefaultWorkflowFeaturePromptMergePolicy(workflow.FeatureSlugStyleVariation),
-			},
-		}},
-		MediaValidator: testSubmitMediaValidator{},
-		TaskBilling:    newHandlerTaskBillingService(),
-	}, ServiceOptions{})
-	newRequest := func(clientActionID string) *tasks.SubmitTaskRequest {
-		return &tasks.SubmitTaskRequest{
-			Feature:        workflow.FeatureSlugStyleVariation,
-			ImageURLs:      []string{"/uploads/style-source.png"},
-			ClientActionID: clientActionID,
-			Params: map[string]interface{}{
-				"variation": map[string]interface{}{"strength": float64(50)},
-			},
-		}
-	}
-
-	readiness, err := svc.CheckSubmitTaskReadiness(ctx, 42, newRequest("canvas:style-variation-readiness"), 1)
-	if err != nil {
-		t.Fatalf("CheckSubmitTaskReadiness failed: %v", err)
-	}
-	if readiness.Feature != workflow.FeatureSlugStyleVariation || readiness.Billing == nil {
-		t.Fatalf("readiness=%+v, want style variation billing quote", readiness)
-	}
-
-	if _, err := svc.SubmitTask(ctx, 42, newRequest("canvas:style-variation-submit")); err != nil {
-		t.Fatalf("SubmitTask failed: %v", err)
-	}
-	if len(submissionStore.calls) != 1 {
-		t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
-	}
-	call := submissionStore.calls[0]
-	if call.task.RequestedModel != model {
-		t.Fatalf("requested model=%q, want %q", call.task.RequestedModel, model)
-	}
-	typedParams, err := tasks.UnmarshalParams(call.task.Params)
-	if err != nil {
-		t.Fatalf("unmarshal task params: %v", err)
-	}
-	if typedParams.Model != model {
-		t.Fatalf("typed model=%q, want %q", typedParams.Model, model)
-	}
-}
-
-func TestSubmitTaskIgnoresClientModelOverride(t *testing.T) {
-	ctx := context.Background()
-	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
-		{
-			ID: 101,
-			Models: []accounts.AccountModel{{
-				Name:         "gpt-image-1",
-				Enabled:      true,
-				FeatureSlugs: []string{workflow.FeatureSlugPatternGen},
-			}},
-		},
-		{
-			ID: 202,
-			Models: []accounts.AccountModel{{
-				Name:         "image-alpha",
-				Enabled:      true,
-				FeatureSlugs: []string{workflow.FeatureSlugPatternGen},
-			}},
-		},
-	}}
-	submissionStore := &recordingSubmissionStore{}
-	svc := NewService(ServiceDeps{
-		AccountRepo:     accountRepo,
-		SubmissionStore: submissionStore,
-		WorkflowFeatures: fakeWorkflowFeatureStore{configs: map[string]prompts.WorkflowFeatureRuntimeConfig{
-			workflow.FeatureSlugPatternGen: {
-				FeatureSlug:           workflow.FeatureSlugPatternGen,
-				CanonicalModel:        "image-alpha",
-				SystemPrompt:          "{{user_prompt}}",
-				UserPromptMergePolicy: prompts.DefaultWorkflowFeaturePromptMergePolicy(workflow.FeatureSlugPatternGen),
-			},
-		}},
-	}, ServiceOptions{})
-
-	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
-		Prompt:         "draw a chair",
-		Feature:        workflow.FeatureSlugPatternGen,
-		ClientActionID: "pattern-explicit-model",
-		Params:         map[string]interface{}{"model": "gpt-image-1"},
-	})
-	if err != nil {
-		t.Fatalf("SubmitTask failed: %v", err)
-	}
-	if len(submissionStore.calls) != 1 {
-		t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
-	}
-	call := submissionStore.calls[0]
-	if call.task.RequestedModel != "image-alpha" {
-		t.Fatalf("requested model=%q, want image-alpha", call.task.RequestedModel)
-	}
-	if !slices.Equal(call.queueTask.AccountIDs, []int64{202}) {
-		t.Fatalf("queue account ids=%v, want [202]", call.queueTask.AccountIDs)
-	}
-}
-
 func TestSubmitTaskNormalizesStyleFusionContract(t *testing.T) {
 	ctx := context.Background()
 	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
 		{
 			ID: 101,
 			Models: []accounts.AccountModel{{
-				Name:         "gpt-image-1",
-				Enabled:      true,
-				FeatureSlugs: []string{workflow.FeatureSlugStyleFusion},
+				Name:    "gpt-image-1",
+				Enabled: true,
 			}},
 		},
 	}}
 	submissionStore := &recordingSubmissionStore{}
 	svc := NewService(ServiceDeps{
-		AccountRepo:      accountRepo,
-		SubmissionStore:  submissionStore,
-		MediaValidator:   testSubmitMediaValidator{},
-		WorkflowFeatures: workflowFeatureStoreForTest(workflow.FeatureSlugStyleFusion, "gpt-image-1"),
+		AccountRepo:     accountRepo,
+		SubmissionStore: submissionStore,
+		MediaValidator:  testSubmitMediaValidator{},
+		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugStyleFusion, "gpt-image-1"),
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
@@ -1376,18 +1251,17 @@ func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
 		{
 			ID: 101,
 			Models: []accounts.AccountModel{{
-				Name:         "gpt-image-1",
-				Enabled:      true,
-				FeatureSlugs: []string{workflow.FeatureSlugImageExtend},
+				Name:    "gpt-image-1",
+				Enabled: true,
 			}},
 		},
 	}}
 	submissionStore := &recordingSubmissionStore{}
 	svc := NewService(ServiceDeps{
-		AccountRepo:      accountRepo,
-		SubmissionStore:  submissionStore,
-		MediaValidator:   testSubmitMediaValidator{},
-		WorkflowFeatures: workflowFeatureStoreForTest(workflow.FeatureSlugImageExtend, "gpt-image-1"),
+		AccountRepo:     accountRepo,
+		SubmissionStore: submissionStore,
+		MediaValidator:  testSubmitMediaValidator{},
+		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugImageExtend, "gpt-image-1"),
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
@@ -1509,20 +1383,19 @@ func newGoogleNativeSubmitTestServiceWithAccounts(generationSettings *testGoogle
 		SubmissionStore:    submissionStore,
 		GenerationSettings: generationSettings,
 		TaskBilling:        newHandlerTaskBillingService(),
-		WorkflowFeatures: fakeWorkflowFeatureStore{configs: map[string]prompts.WorkflowFeatureRuntimeConfig{
+		PromptStore: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
 			workflow.FeatureSlugSketchToImage: {
-				FeatureSlug: workflow.FeatureSlugSketchToImage, CanonicalModel: "gemini-2.5-flash-image",
-				SystemPrompt: "{{user_prompt}}", UserPromptMergePolicy: prompts.DefaultWorkflowFeaturePromptMergePolicy(workflow.FeatureSlugSketchToImage),
+				Prompt: "{{user_prompt}}", UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(workflow.FeatureSlugSketchToImage),
 			},
 		}},
 	}, ServiceOptions{})
 }
 
-func workflowFeatureStoreForTest(slug, model string) fakeWorkflowFeatureStore {
-	return fakeWorkflowFeatureStore{configs: map[string]prompts.WorkflowFeatureRuntimeConfig{
+func featurePromptStoreForTest(slug, _ string) fakeFeaturePromptStore {
+	return fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
 		slug: {
-			FeatureSlug: slug, CanonicalModel: model, SystemPrompt: "{{user_prompt}}",
-			UserPromptMergePolicy: prompts.DefaultWorkflowFeaturePromptMergePolicy(slug),
+			Prompt:                "{{user_prompt}}",
+			UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(slug),
 		},
 	}}
 }
@@ -1534,21 +1407,21 @@ func newGoogleNativeSubmitRequest() *tasks.SubmitTaskRequest {
 	}
 }
 
-type fakeWorkflowFeatureStore struct {
-	configs map[string]prompts.WorkflowFeatureRuntimeConfig
+type fakeFeaturePromptStore struct {
+	configs map[string]prompts.FeaturePromptRuntimeConfig
 	err     error
 }
 
-func (s fakeWorkflowFeatureStore) GetRuntimeConfig(_ context.Context, slug string) (prompts.WorkflowFeatureRuntimeConfig, error) {
+func (s fakeFeaturePromptStore) GetRuntimeConfig(_ context.Context, slug string) (prompts.FeaturePromptRuntimeConfig, error) {
 	if s.err != nil {
-		return prompts.WorkflowFeatureRuntimeConfig{}, s.err
+		return prompts.FeaturePromptRuntimeConfig{}, s.err
 	}
 	if s.configs == nil {
-		return prompts.WorkflowFeatureRuntimeConfig{}, prompts.ErrWorkflowFeatureNotConfigured
+		return prompts.FeaturePromptRuntimeConfig{UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(slug)}, nil
 	}
 	config, ok := s.configs[slug]
 	if !ok {
-		return prompts.WorkflowFeatureRuntimeConfig{}, prompts.ErrWorkflowFeatureNotConfigured
+		return prompts.FeaturePromptRuntimeConfig{UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(slug)}, nil
 	}
 	return config, nil
 }

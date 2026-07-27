@@ -63,6 +63,25 @@ func (q *Queries) GetActiveStorageProfileSecretVersion(ctx context.Context, arg 
 	return i, err
 }
 
+const getFeaturePrompt = `-- name: GetFeaturePrompt :one
+SELECT feature_slug, prompt, updated_by, created_at, updated_at
+FROM feature_prompts
+WHERE feature_slug = $1
+`
+
+func (q *Queries) GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error) {
+	row := q.db.QueryRowContext(ctx, getFeaturePrompt, featureSlug)
+	var i FeaturePrompt
+	err := row.Scan(
+		&i.FeatureSlug,
+		&i.Prompt,
+		&i.UpdatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getSystemConfig = `-- name: GetSystemConfig :one
 SELECT id, config_key, value, created_at, updated_at
 FROM system_configs
@@ -76,30 +95,6 @@ func (q *Queries) GetSystemConfig(ctx context.Context, configKey string) (System
 		&i.ID,
 		&i.ConfigKey,
 		&i.Value,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const getWorkflowFeature = `-- name: GetWorkflowFeature :one
-SELECT feature_slug, canonical_model, system_prompt, variables,
-       user_prompt_merge_policy, enabled, updated_by, created_at, updated_at
-FROM workflow_features
-WHERE feature_slug = $1
-`
-
-func (q *Queries) GetWorkflowFeature(ctx context.Context, featureSlug string) (WorkflowFeature, error) {
-	row := q.db.QueryRowContext(ctx, getWorkflowFeature, featureSlug)
-	var i WorkflowFeature
-	err := row.Scan(
-		&i.FeatureSlug,
-		&i.CanonicalModel,
-		&i.SystemPrompt,
-		&i.Variables,
-		&i.UserPromptMergePolicy,
-		&i.Enabled,
-		&i.UpdatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -215,6 +210,41 @@ func (q *Queries) InsertStorageProfileSecretVersion(ctx context.Context, arg Ins
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listFeaturePrompts = `-- name: ListFeaturePrompts :many
+SELECT feature_slug, prompt, updated_by, created_at, updated_at
+FROM feature_prompts
+ORDER BY feature_slug ASC
+`
+
+func (q *Queries) ListFeaturePrompts(ctx context.Context) ([]FeaturePrompt, error) {
+	rows, err := q.db.QueryContext(ctx, listFeaturePrompts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []FeaturePrompt
+	for rows.Next() {
+		var i FeaturePrompt
+		if err := rows.Scan(
+			&i.FeatureSlug,
+			&i.Prompt,
+			&i.UpdatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listStorageProfileSecretVersions = `-- name: ListStorageProfileSecretVersions :many
@@ -390,46 +420,6 @@ func (q *Queries) ListSystemConfigsByPrefix(ctx context.Context, configKeyLike s
 	return items, nil
 }
 
-const listWorkflowFeatures = `-- name: ListWorkflowFeatures :many
-SELECT feature_slug, canonical_model, system_prompt, variables,
-       user_prompt_merge_policy, enabled, updated_by, created_at, updated_at
-FROM workflow_features
-ORDER BY feature_slug ASC
-`
-
-func (q *Queries) ListWorkflowFeatures(ctx context.Context) ([]WorkflowFeature, error) {
-	rows, err := q.db.QueryContext(ctx, listWorkflowFeatures)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []WorkflowFeature
-	for rows.Next() {
-		var i WorkflowFeature
-		if err := rows.Scan(
-			&i.FeatureSlug,
-			&i.CanonicalModel,
-			&i.SystemPrompt,
-			&i.Variables,
-			&i.UserPromptMergePolicy,
-			&i.Enabled,
-			&i.UpdatedBy,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const lockStorageProfileSecretVersionRotation = `-- name: LockStorageProfileSecretVersionRotation :one
 SELECT TRUE::boolean AS locked
 FROM (
@@ -521,6 +511,34 @@ func (q *Queries) SetCurrentStorageProfile(ctx context.Context, arg SetCurrentSt
 	return result.RowsAffected()
 }
 
+const upsertFeaturePrompt = `-- name: UpsertFeaturePrompt :one
+INSERT INTO feature_prompts (feature_slug, prompt, updated_by)
+VALUES ($1, $2, $3)
+ON CONFLICT (feature_slug) DO UPDATE SET
+  prompt = EXCLUDED.prompt,
+  updated_by = EXCLUDED.updated_by
+RETURNING feature_slug, prompt, updated_by, created_at, updated_at
+`
+
+type UpsertFeaturePromptParams struct {
+	FeatureSlug string        `json:"feature_slug"`
+	Prompt      string        `json:"prompt"`
+	UpdatedBy   sql.NullInt64 `json:"updated_by"`
+}
+
+func (q *Queries) UpsertFeaturePrompt(ctx context.Context, arg UpsertFeaturePromptParams) (FeaturePrompt, error) {
+	row := q.db.QueryRowContext(ctx, upsertFeaturePrompt, arg.FeatureSlug, arg.Prompt, arg.UpdatedBy)
+	var i FeaturePrompt
+	err := row.Scan(
+		&i.FeatureSlug,
+		&i.Prompt,
+		&i.UpdatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const upsertStorageProfile = `-- name: UpsertStorageProfile :exec
 WITH input AS (
   SELECT
@@ -606,59 +624,4 @@ type UpsertSystemConfigParams struct {
 func (q *Queries) UpsertSystemConfig(ctx context.Context, arg UpsertSystemConfigParams) error {
 	_, err := q.db.ExecContext(ctx, upsertSystemConfig, arg.ConfigKey, arg.Value)
 	return err
-}
-
-const upsertWorkflowFeature = `-- name: UpsertWorkflowFeature :one
-INSERT INTO workflow_features (
-  feature_slug, canonical_model, system_prompt, variables,
-  user_prompt_merge_policy, enabled, updated_by
-) VALUES (
-  $1, $2, $3,
-  $4, $5, $6,
-  $7
-)
-ON CONFLICT (feature_slug) DO UPDATE SET
-  canonical_model = EXCLUDED.canonical_model,
-  system_prompt = EXCLUDED.system_prompt,
-  variables = EXCLUDED.variables,
-  user_prompt_merge_policy = EXCLUDED.user_prompt_merge_policy,
-  enabled = EXCLUDED.enabled,
-  updated_by = EXCLUDED.updated_by
-RETURNING feature_slug, canonical_model, system_prompt, variables,
-          user_prompt_merge_policy, enabled, updated_by, created_at, updated_at
-`
-
-type UpsertWorkflowFeatureParams struct {
-	FeatureSlug           string          `json:"feature_slug"`
-	CanonicalModel        string          `json:"canonical_model"`
-	SystemPrompt          string          `json:"system_prompt"`
-	Variables             json.RawMessage `json:"variables"`
-	UserPromptMergePolicy json.RawMessage `json:"user_prompt_merge_policy"`
-	Enabled               bool            `json:"enabled"`
-	UpdatedBy             sql.NullInt64   `json:"updated_by"`
-}
-
-func (q *Queries) UpsertWorkflowFeature(ctx context.Context, arg UpsertWorkflowFeatureParams) (WorkflowFeature, error) {
-	row := q.db.QueryRowContext(ctx, upsertWorkflowFeature,
-		arg.FeatureSlug,
-		arg.CanonicalModel,
-		arg.SystemPrompt,
-		arg.Variables,
-		arg.UserPromptMergePolicy,
-		arg.Enabled,
-		arg.UpdatedBy,
-	)
-	var i WorkflowFeature
-	err := row.Scan(
-		&i.FeatureSlug,
-		&i.CanonicalModel,
-		&i.SystemPrompt,
-		&i.Variables,
-		&i.UserPromptMergePolicy,
-		&i.Enabled,
-		&i.UpdatedBy,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
 }

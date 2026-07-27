@@ -185,19 +185,6 @@ func (r *AccountRepository) GetAllEnabled(ctx context.Context) ([]*ApiAccount, e
 	return accounts, nil
 }
 
-func (r *AccountRepository) HasEligibleModel(ctx context.Context, featureSlug, model string) (bool, error) {
-	accounts, err := r.GetAllEnabled(ctx)
-	if err != nil {
-		return false, err
-	}
-	for _, account := range accounts {
-		if _, ok := ResolveAccountModel(account, featureSlug, model); ok {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 func (r *AccountRepository) ListAccountIDs(ctx context.Context) ([]int64, error) {
 	return r.q.ListAccountIDs(ctx)
 }
@@ -467,19 +454,12 @@ func (r *AccountRepository) attachAccountModels(ctx context.Context, accounts []
 }
 
 func accountModelFromSQLC(row dbsqlc.ApiAccountModel) (AccountModel, error) {
-	var slugs []string
-	if len(row.FeatureSlugs) > 0 {
-		if err := json.Unmarshal(row.FeatureSlugs, &slugs); err != nil {
-			return AccountModel{}, fmt.Errorf("解析账号模型 %q 的 feature_slugs 失败: %w", row.ModelName, err)
-		}
-	}
 	return AccountModel{
 		ID:            row.ID,
 		Name:          row.ModelName,
 		Enabled:       row.Enabled,
 		Weight:        int(row.Weight),
 		MaxConcurrent: intPtr(row.MaxConcurrent),
-		FeatureSlugs:  slugs,
 		SortOrder:     int(row.SortOrder),
 	}, nil
 }
@@ -542,27 +522,15 @@ func accountModelUpsertParams(accountID int64, model AccountModel, fallbackSortO
 	if sortOrder < 0 {
 		sortOrder = fallbackSortOrder
 	}
-	featureSlugs, err := accountModelFeatureSlugsJSON(model.FeatureSlugs)
-	if err != nil {
-		return dbsqlc.UpsertAccountModelParams{}, err
-	}
 	return dbsqlc.UpsertAccountModelParams{
 		AccountID:     accountID,
 		ModelName:     name,
 		Enabled:       model.Enabled,
 		Weight:        int32(weight),
 		MaxConcurrent: nullInt32Ptr(model.MaxConcurrent),
-		FeatureSlugs:  featureSlugs,
 		Metadata:      json.RawMessage("{}"),
 		SortOrder:     int32(sortOrder),
 	}, nil
-}
-
-func accountModelFeatureSlugsJSON(slugs []string) (json.RawMessage, error) {
-	if slugs == nil {
-		slugs = []string{}
-	}
-	return json.Marshal(slugs)
 }
 
 func rotateAccountSecret(ctx context.Context, q *dbsqlc.Queries, accountID int64, apiKey string) error {

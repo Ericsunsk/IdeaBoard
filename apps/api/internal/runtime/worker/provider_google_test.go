@@ -318,7 +318,7 @@ func TestCallDrawingAPIRoutesGooglePlatformToNativeProvider(t *testing.T) {
 		Params: `{"feature":"pattern-gen"}`,
 	}
 
-	output, err := c.callDrawingAPIForTest(context.Background(), account, task)
+	output, err := c.callDrawingAPIForTest(context.Background(), account, task, "gemini-2.5-flash-image")
 	if err != nil {
 		t.Fatalf("callDrawingAPI error: %v", err)
 	}

@@ -41,7 +41,7 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
 	taskBilling := taskbilling.NewService(billingService, creditService)
-	billingRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugSketchToImage, "gpt-image-1")
+	billingRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugSketchToImage)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,9 +85,9 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 	task := newSubmitToRiverWorkerTask("task_submit_worker_converges")
 	task.ClientActionID = "action-task-submit-worker-converges"
 	task.BillingRequest = &tasks.TaskBillingRequest{
-		Feature: billingRequest.Feature, Model: billingRequest.Model, Quantity: billingRequest.Quantity,
+		Feature: billingRequest.Feature, Quantity: billingRequest.Quantity,
 	}
-	queueTask := newSubmitToRiverWorkerQueueTask(task, account.ID)
+	queueTask := newSubmitToRiverWorkerQueueTask(task)
 	if task.Status != tasks.StatusPending {
 		t.Fatalf("new task status=%q, want %q", task.Status, tasks.StatusPending)
 	}
@@ -157,7 +157,7 @@ func TestRiverFinalFailureSettlementRetrySurvivesRestartWithoutProviderRecall(t 
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
 	taskBilling := taskbilling.NewService(billingService, creditService)
-	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen, "gpt-image-1")
+	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +172,7 @@ func TestRiverFinalFailureSettlementRetrySurvivesRestartWithoutProviderRecall(t 
 
 	accountRepo := accounts.NewAccountRepository(db)
 	taskRepo := taskstore.NewRepository(db)
-	account := createRiverTestAccount(t, db, accountRepo, "settlement-restart")
+	createRiverTestAccount(t, db, accountRepo, "settlement-restart")
 	assigner := taskqueue.NewPostgresTaskAssigner(db)
 	innerRuntime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
 	runtime := &failOnceFinalFailureRuntime{inner: innerRuntime}
@@ -214,13 +214,13 @@ func TestRiverFinalFailureSettlementRetrySurvivesRestartWithoutProviderRecall(t 
 		TaskID: taskID, UserID: 42,
 		ClientActionID: "action_" + taskID,
 		Prompt:         "draw a billed pattern", UserPrompt: "draw a billed pattern",
-		Params: `{"model":"gpt-image-1"}`, FeatureSlug: request.Feature,
-		RequestedModel: request.Model, Status: tasks.StatusPending,
-		BillingRequest: &tasks.TaskBillingRequest{Feature: request.Feature, Model: request.Model, Quantity: request.Quantity},
+		Params: `{"feature":"pattern-gen"}`, FeatureSlug: request.Feature,
+		Status:         tasks.StatusPending,
+		BillingRequest: &tasks.TaskBillingRequest{Feature: request.Feature, Quantity: request.Quantity},
 	}
 	queueTask := &tasks.TaskPayload{
 		TaskID: task.TaskID, UserID: task.UserID, Prompt: task.Prompt,
-		Params: task.Params, AccountIDs: []int64{account.ID}, CreatedAt: time.Now().Unix(),
+		Params: task.Params, CreatedAt: time.Now().Unix(),
 	}
 	store := tasksubmission.NewStore(pool, taskRepo, client, queueName, submitToRiverWorkerMaxAttempts, taskBilling)
 	result, err := store.SubmitTask(ctx, task, queueTask)
@@ -289,7 +289,7 @@ func TestFinalAttemptMarkerFailureResetsLeaseBeforeProviderRetry(t *testing.T) {
 	db, _ := testdb.OpenWithPool(t)
 	accountRepo := accounts.NewAccountRepository(db)
 	taskRepo := taskstore.NewRepository(db)
-	account := createRiverTestAccount(t, db, accountRepo, "marker-reset")
+	createRiverTestAccount(t, db, accountRepo, "marker-reset")
 	assigner := taskqueue.NewPostgresTaskAssigner(db)
 	runtime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
 	providerCalls := 0
@@ -301,7 +301,7 @@ func TestFinalAttemptMarkerFailureResetsLeaseBeforeProviderRetry(t *testing.T) {
 	if err := taskRepo.Create(t.Context(), task); err != nil {
 		t.Fatal(err)
 	}
-	payload := newSubmitToRiverWorkerQueueTask(task, account.ID)
+	payload := newSubmitToRiverWorkerQueueTask(task)
 	payload.RiverJobID = 9915
 
 	err := processor.ProcessBeforeExecute(t.Context(), payload, func() error {
@@ -339,10 +339,6 @@ func TestFinalAttemptMarkerFailureResetsLeaseBeforeProviderRetry(t *testing.T) {
 type failOnceFinalFailureRuntime struct {
 	inner         *taskruntime.Service
 	convergeCalls atomic.Int32
-}
-
-func (r *failOnceFinalFailureRuntime) RefreshTaskAccounts(ctx context.Context, task *tasks.TaskPayload) error {
-	return r.inner.RefreshTaskAccounts(ctx, task)
 }
 
 func (r *failOnceFinalFailureRuntime) FailTask(ctx context.Context, input taskruntime.FailTaskInput) error {
@@ -433,26 +429,24 @@ WHERE tasks.task_id = $1`, taskID).Scan(&taskStatus, &settlementState, &availabl
 
 func newSubmitToRiverWorkerTask(taskID string) *tasks.Task {
 	return &tasks.Task{
-		TaskID:         taskID,
-		UserID:         42,
-		Prompt:         "draw a River convergence proof",
-		UserPrompt:     "draw a River convergence proof",
-		Params:         `{"feature":"sketch-to-image","model":"gpt-image-1","size":"1024x1024"}`,
-		FeatureSlug:    "sketch-to-image",
-		RequestedModel: "gpt-image-1",
-		APIType:        "openai-compatible",
-		Status:         tasks.StatusPending,
+		TaskID:      taskID,
+		UserID:      42,
+		Prompt:      "draw a River convergence proof",
+		UserPrompt:  "draw a River convergence proof",
+		Params:      `{"feature":"sketch-to-image","size":"1024x1024"}`,
+		FeatureSlug: "sketch-to-image",
+		APIType:     "openai-compatible",
+		Status:      tasks.StatusPending,
 	}
 }
 
-func newSubmitToRiverWorkerQueueTask(task *tasks.Task, accountID int64) *tasks.TaskPayload {
+func newSubmitToRiverWorkerQueueTask(task *tasks.Task) *tasks.TaskPayload {
 	return &tasks.TaskPayload{
-		TaskID:     task.TaskID,
-		UserID:     task.UserID,
-		Prompt:     task.Prompt,
-		Params:     task.Params,
-		AccountIDs: []int64{accountID},
-		CreatedAt:  time.Now().Unix(),
+		TaskID:    task.TaskID,
+		UserID:    task.UserID,
+		Prompt:    task.Prompt,
+		Params:    task.Params,
+		CreatedAt: time.Now().Unix(),
 	}
 }
 

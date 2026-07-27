@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -174,43 +172,6 @@ SET secret_material_kind = 'external_ref',
 		return
 	}
 	t.Fatal("external_ref account secret material should be rejected")
-}
-
-func TestAccountReadRejectsInvalidModelFeatureSlugsShape(t *testing.T) {
-	ctx := context.Background()
-	db := newAccountServiceTestDB(t)
-	repo := NewAccountRepository(db)
-	channelID := createAccountTestChannel(t, db, "invalid-feature-slugs")
-
-	account := &ApiAccount{
-		Name:               "invalid-feature-slugs",
-		ProviderEndpointID: channelID,
-		ApiType:            "openai-compatible",
-		Models:             []AccountModel{{Name: "gpt-image-1", Enabled: true}},
-		ApiKey:             "runtime-secret",
-		ProxyURL:           "https://example.com/invalid-feature-slugs",
-		MaxConcurrent:      1,
-		Timeout:            30,
-		Weight:             1,
-		Status:             1,
-	}
-	if err := repo.Create(ctx, account); err != nil {
-		t.Fatalf("create account failed: %v", err)
-	}
-	if _, err := db.ExecContext(ctx, `
-UPDATE api_account_models
-SET feature_slugs = '[{"unexpected":"shape"}]'::jsonb
-WHERE account_id = $1`, account.ID); err != nil {
-		t.Fatalf("corrupt account model feature slugs failed: %v", err)
-	}
-
-	_, err := repo.GetByID(ctx, account.ID)
-	if err == nil {
-		t.Fatal("GetByID should reject invalid model feature_slugs shape")
-	}
-	if !strings.Contains(err.Error(), "feature_slugs") {
-		t.Fatalf("error = %v, want feature_slugs context", err)
-	}
 }
 
 func TestUpdateAccountWithoutModelsPreservesModelSettings(t *testing.T) {
@@ -633,8 +594,5 @@ func assertAccountModelEqual(t *testing.T, want AccountModel, got AccountModel) 
 	}
 	if got.MaxConcurrent != nil && *got.MaxConcurrent != *want.MaxConcurrent {
 		t.Fatalf("model max_concurrent=%d, want %d", *got.MaxConcurrent, *want.MaxConcurrent)
-	}
-	if !reflect.DeepEqual(got.FeatureSlugs, want.FeatureSlugs) {
-		t.Fatalf("model feature_slugs=%v, want %v", got.FeatureSlugs, want.FeatureSlugs)
 	}
 }

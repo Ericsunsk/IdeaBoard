@@ -45,7 +45,6 @@ const (
 type TaskExecutionSnapshot struct {
 	TaskID                  string
 	FeatureSlug             string
-	RequestedModel          string
 	ResolvedModel           string
 	APIType                 string
 	ProviderEndpointName    string

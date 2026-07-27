@@ -149,7 +149,7 @@ func newAppTaskRuntime(
 		TaskRepo:            repos.taskRepo,
 		SubmissionStore:     submissionStore,
 		CancelStore:         postgresRuntimeStore,
-		WorkflowFeatures:    repos.workflowFeatureRepo,
+		PromptStore:         repos.featurePromptRepo,
 		MediaValidator:      submitMediaValidator,
 		TaskOutputCleaner:   runtimeTaskMediaStore,
 		GenerationSettings:  services.runtimeSettings,

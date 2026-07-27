@@ -1,13 +1,13 @@
 -- name: CreateTask :one
 INSERT INTO tasks (
   task_id, user_id, client_action_id, assigned_provider_endpoint_id, assigned_credential_id, account_id, prompt, user_prompt, params,
-  feature_slug, requested_model, priority,
+  feature_slug, priority,
   status, lease_token, retry_count, error_msg, result, created_at, updated_at, completed_at,
   cancelled_at, cancelled_by, cancel_reason
 ) VALUES (
   sqlc.arg(task_id), sqlc.arg(user_id), sqlc.arg(client_action_id), sqlc.narg(assigned_provider_endpoint_id), sqlc.narg(assigned_credential_id), sqlc.narg(account_id),
   sqlc.arg(prompt), sqlc.arg(user_prompt), sqlc.arg(params),
-  sqlc.arg(feature_slug), sqlc.arg(requested_model), COALESCE(NULLIF(sqlc.arg(priority)::integer, 0), 2),
+  sqlc.arg(feature_slug), COALESCE(NULLIF(sqlc.arg(priority)::integer, 0), 2),
   sqlc.arg(status),
   sqlc.arg(lease_token), sqlc.arg(retry_count), sqlc.arg(error_msg), sqlc.arg(result),
   sqlc.arg(created_at), sqlc.arg(updated_at), sqlc.arg(completed_at),
@@ -29,7 +29,8 @@ LEFT JOIN LATERAL (
          credential_fingerprint, credential_key_version
   FROM task_leases
   WHERE task_id = t.task_id
-  ORDER BY (released_at IS NULL) DESC, COALESCE(released_at, acquired_at) DESC, id DESC
+    AND released_at IS NULL
+  ORDER BY acquired_at DESC, id DESC
   LIMIT 1
 ) AS latest_lease ON TRUE
 WHERE t.task_id = sqlc.arg(task_id);
@@ -48,7 +49,8 @@ LEFT JOIN LATERAL (
          credential_fingerprint, credential_key_version
   FROM task_leases
   WHERE task_id = t.task_id
-  ORDER BY (released_at IS NULL) DESC, COALESCE(released_at, acquired_at) DESC, id DESC
+    AND released_at IS NULL
+  ORDER BY acquired_at DESC, id DESC
   LIMIT 1
 ) AS latest_lease ON TRUE
 WHERE t.task_id = sqlc.arg(task_id) AND t.user_id = sqlc.arg(user_id);
@@ -67,7 +69,8 @@ LEFT JOIN LATERAL (
          credential_fingerprint, credential_key_version
   FROM task_leases
   WHERE task_id = t.task_id
-  ORDER BY (released_at IS NULL) DESC, COALESCE(released_at, acquired_at) DESC, id DESC
+    AND released_at IS NULL
+  ORDER BY acquired_at DESC, id DESC
   LIMIT 1
 ) AS latest_lease ON TRUE
 WHERE t.task_id = ANY(sqlc.arg(task_ids)::text[])
@@ -102,7 +105,8 @@ LEFT JOIN LATERAL (
          credential_fingerprint, credential_key_version
   FROM task_leases
   WHERE task_id = t.task_id
-  ORDER BY (released_at IS NULL) DESC, COALESCE(released_at, acquired_at) DESC, id DESC
+    AND released_at IS NULL
+  ORDER BY acquired_at DESC, id DESC
   LIMIT 1
 ) AS latest_lease ON TRUE
 WHERE (NOT sqlc.arg(has_user_id)::boolean OR t.user_id = sqlc.arg(user_id))
@@ -214,8 +218,7 @@ SET current_stage = CASE
 
 -- name: PatchTaskExecutionSnapshot :execrows
 UPDATE tasks
-SET feature_slug = sqlc.arg(feature_slug),
-    requested_model = sqlc.arg(requested_model)
+SET feature_slug = sqlc.arg(feature_slug)
 WHERE task_id = sqlc.arg(task_id);
 
 -- name: ReleaseTaskLease :execrows
@@ -248,7 +251,7 @@ WHERE task_id = ANY(sqlc.arg(task_ids)::text[])
 
 -- name: GetActiveTaskLeaseByTaskID :one
 SELECT id, task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
-       feature_slug, requested_model, resolved_model, api_type,
+       feature_slug, resolved_model, api_type,
        provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version,
        acquired_at, released_at, release_reason, created_at, updated_at
 FROM task_leases
@@ -279,10 +282,10 @@ WITH updated_tasks AS (
       updated_at = now()
   WHERE t.status = 'running'
   RETURNING t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id,
-            t.feature_slug, t.requested_model, t.created_at, t.completed_at, t.cancelled_at
+            t.feature_slug, t.created_at, t.completed_at, t.cancelled_at
 )
 SELECT t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id,
-       t.feature_slug, t.requested_model,
+       t.feature_slug,
        COALESCE(latest_lease.river_job_id, 0)::bigint AS river_job_id,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
@@ -474,7 +477,8 @@ LEFT JOIN LATERAL (
          credential_fingerprint, credential_key_version
   FROM task_leases
   WHERE task_id = t.task_id
-  ORDER BY (released_at IS NULL) DESC, COALESCE(released_at, acquired_at) DESC, id DESC
+    AND released_at IS NULL
+  ORDER BY acquired_at DESC, id DESC
   LIMIT 1
 ) AS latest_lease ON TRUE
 WHERE t.user_id = sqlc.arg(user_id)
@@ -631,10 +635,10 @@ WITH updated_tasks AS (
       completed_at = sqlc.narg(completed_at)::timestamptz
   WHERE t.account_id = sqlc.arg(account_id) AND t.status = 'running'
   RETURNING t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.result,
-            t.feature_slug, t.requested_model, t.created_at, t.completed_at
+            t.feature_slug, t.created_at, t.completed_at
 )
 SELECT t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.result,
-       t.feature_slug, t.requested_model,
+       t.feature_slug,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
        t.created_at, t.completed_at

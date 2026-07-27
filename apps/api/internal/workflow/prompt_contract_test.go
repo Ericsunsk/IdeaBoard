@@ -128,7 +128,6 @@ func TestBuildProviderTaskParamsDerivesProviderMapFromCanonicalContract(t *testi
 	useMask := true
 	params := &tasks.WorkflowTaskParams{
 		Feature: FeatureSlugStyleFusion,
-		Model:   "gpt-image-1",
 		Media: &tasks.MediaInputs{
 			Inputs: []tasks.MediaRef{
 				{URL: "https://img.example/a.png", Role: "input", Weight: 0.7},

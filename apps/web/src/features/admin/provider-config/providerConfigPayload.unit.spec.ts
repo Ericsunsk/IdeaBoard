@@ -58,7 +58,6 @@ describe('provider config payload mapping', () => {
             name: 'gemini-2.5-flash',
             enabled: false,
             weight: 3,
-            featureSlugs: ['image'],
           }),
         ],
       }),
@@ -79,16 +78,15 @@ describe('provider config payload mapping', () => {
         enabled: false,
         weight: 3,
         max_concurrent: undefined,
-        feature_slugs: ['image'],
       },
       {
         name: 'imagen-4',
         enabled: true,
         weight: 1,
         max_concurrent: undefined,
-        feature_slugs: undefined,
       },
     ])
+    expect(payload.models.every((model) => !Object.hasOwn(model, 'feature_slugs'))).toBe(true)
   })
 
   it('dedupes model names case-insensitively and keeps existing model settings', () => {
@@ -103,16 +101,15 @@ describe('provider config payload mapping', () => {
         enabled: false,
         weight: 9,
         max_concurrent: 2,
-        feature_slugs: undefined,
       },
       {
         name: 'Gemini',
         enabled: true,
         weight: 1,
         max_concurrent: undefined,
-        feature_slugs: undefined,
       },
     ])
+    expect(models.every((model) => !Object.hasOwn(model, 'feature_slugs'))).toBe(true)
   })
 
   it('infers known provider api types from Base URL', () => {
@@ -174,7 +171,6 @@ function makeModel(
     name: 'model',
     enabled: true,
     weight: 1,
-    featureSlugs: undefined,
     maxConcurrent: undefined,
     sortOrder: 0,
     ...overrides,

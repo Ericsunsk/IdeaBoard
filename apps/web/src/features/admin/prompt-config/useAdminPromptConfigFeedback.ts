@@ -4,26 +4,24 @@ import {
   useAdminToast,
 } from '../shared/lib/adminToast'
 
-export type AdminWorkflowFeatureFeedback = {
-  loadWorkflowFeaturesFailed: (error: unknown) => void
-  workflowFeatureDraftInvalid: (message: string) => void
-  workflowFeatureSaved: (featureTitle: string) => void
-  saveWorkflowFeatureFailed: (error: unknown) => void
+export type AdminPromptConfigFeedback = {
+  loadPromptsFailed: (error: unknown) => void
+  promptDraftInvalid: (message: string) => void
+  promptSaved: (featureTitle: string) => void
+  savePromptFailed: (error: unknown) => void
 }
 
-export function createAdminWorkflowFeatureFeedback(
+export function createAdminPromptConfigFeedback(
   toast: AdminToastPort,
-): AdminWorkflowFeatureFeedback {
+): AdminPromptConfigFeedback {
   return {
-    loadWorkflowFeaturesFailed: (error) =>
-      toast.error(formatAdminDisplayError(error, '加载工作流配置失败')),
-    workflowFeatureDraftInvalid: (message) => toast.warning(message),
-    workflowFeatureSaved: (featureTitle) => toast.success(`「${featureTitle}」配置已保存`),
-    saveWorkflowFeatureFailed: (error) =>
-      toast.error(formatAdminDisplayError(error, '保存工作流配置失败')),
+    loadPromptsFailed: (error) => toast.error(formatAdminDisplayError(error, '加载提示词失败')),
+    promptDraftInvalid: (message) => toast.warning(message),
+    promptSaved: (featureTitle) => toast.success(`「${featureTitle}」提示词已保存`),
+    savePromptFailed: (error) => toast.error(formatAdminDisplayError(error, '保存提示词失败')),
   }
 }
 
-export function useAdminWorkflowFeatureFeedback() {
-  return createAdminWorkflowFeatureFeedback(useAdminToast())
+export function useAdminPromptConfigFeedback() {
+  return createAdminPromptConfigFeedback(useAdminToast())
 }

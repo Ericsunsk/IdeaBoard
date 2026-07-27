@@ -38,7 +38,6 @@ var PatternGenIOContract = PatternGenNodeIOContract{
 
 var patternGenSubmitParamKeys = map[string]struct{}{
 	paramkeys.Feature: {},
-	paramkeys.Model:   {},
 	paramkeys.Ratio:   {},
 }
 
@@ -94,10 +93,6 @@ func validatePatternGenSubmitParam(key string, value interface{}) error {
 		feature, ok := value.(string)
 		if !ok || strings.TrimSpace(feature) != FeatureSlugPatternGen {
 			return fmt.Errorf("图案生成任务必须使用 pattern-gen workflow")
-		}
-	case paramkeys.Model:
-		if _, ok := value.(string); !ok {
-			return fmt.Errorf("图案生成参数 model 必须是字符串")
 		}
 	case paramkeys.Ratio:
 		ratio, ok := value.(string)

@@ -27,11 +27,10 @@ func TestStoreSubmitTaskRollsBackTaskWhenRiverInsertFails(t *testing.T) {
 		Status:     tasks.StatusPending,
 	}
 	queueTask := &tasks.TaskPayload{
-		TaskID:     task.TaskID,
-		UserID:     task.UserID,
-		Prompt:     task.Prompt,
-		Params:     task.Params,
-		AccountIDs: []int64{101},
+		TaskID: task.TaskID,
+		UserID: task.UserID,
+		Prompt: task.Prompt,
+		Params: task.Params,
 	}
 	store := NewStore(pool, taskstore.NewRepository(db), failingRiverTxClient{err: errors.New("river insert failed")}, "drawing_default", 3, nil)
 

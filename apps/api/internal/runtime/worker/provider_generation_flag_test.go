@@ -168,16 +168,13 @@ func googleNativeFlagTestAccount(proxyURL string) *accounts.ApiAccount {
 }
 
 func googleNativeFlagTestTask() *tasks.TaskPayload {
-	params, _ := json.Marshal(map[string]interface{}{
-		"model": "gemini-2.5-flash-image",
-	})
+	params, _ := json.Marshal(map[string]interface{}{"feature": workflow.FeatureSlugPatternGen})
 	return &tasks.TaskPayload{
-		TaskID:     "task-google-native-flag",
-		UserID:     42,
-		Prompt:     "draw a product mockup",
-		Params:     string(params),
-		AccountIDs: []int64{101},
-		CreatedAt:  time.Now().Unix(),
+		TaskID:    "task-google-native-flag",
+		UserID:    42,
+		Prompt:    "draw a product mockup",
+		Params:    string(params),
+		CreatedAt: time.Now().Unix(),
 	}
 }
 

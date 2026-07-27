@@ -184,33 +184,20 @@ WHERE profile_id = sqlc.arg(profile_id)
   AND secret_name = sqlc.arg(secret_name)
 ORDER BY version_number DESC;
 
--- name: GetWorkflowFeature :one
-SELECT feature_slug, canonical_model, system_prompt, variables,
-       user_prompt_merge_policy, enabled, updated_by, created_at, updated_at
-FROM workflow_features
+-- name: GetFeaturePrompt :one
+SELECT feature_slug, prompt, updated_by, created_at, updated_at
+FROM feature_prompts
 WHERE feature_slug = sqlc.arg(feature_slug);
 
--- name: ListWorkflowFeatures :many
-SELECT feature_slug, canonical_model, system_prompt, variables,
-       user_prompt_merge_policy, enabled, updated_by, created_at, updated_at
-FROM workflow_features
+-- name: ListFeaturePrompts :many
+SELECT feature_slug, prompt, updated_by, created_at, updated_at
+FROM feature_prompts
 ORDER BY feature_slug ASC;
 
--- name: UpsertWorkflowFeature :one
-INSERT INTO workflow_features (
-  feature_slug, canonical_model, system_prompt, variables,
-  user_prompt_merge_policy, enabled, updated_by
-) VALUES (
-  sqlc.arg(feature_slug), sqlc.arg(canonical_model), sqlc.arg(system_prompt),
-  sqlc.arg(variables), sqlc.arg(user_prompt_merge_policy), sqlc.arg(enabled),
-  sqlc.narg(updated_by)
-)
+-- name: UpsertFeaturePrompt :one
+INSERT INTO feature_prompts (feature_slug, prompt, updated_by)
+VALUES (sqlc.arg(feature_slug), sqlc.arg(prompt), sqlc.narg(updated_by))
 ON CONFLICT (feature_slug) DO UPDATE SET
-  canonical_model = EXCLUDED.canonical_model,
-  system_prompt = EXCLUDED.system_prompt,
-  variables = EXCLUDED.variables,
-  user_prompt_merge_policy = EXCLUDED.user_prompt_merge_policy,
-  enabled = EXCLUDED.enabled,
+  prompt = EXCLUDED.prompt,
   updated_by = EXCLUDED.updated_by
-RETURNING feature_slug, canonical_model, system_prompt, variables,
-          user_prompt_merge_policy, enabled, updated_by, created_at, updated_at;
+RETURNING feature_slug, prompt, updated_by, created_at, updated_at;

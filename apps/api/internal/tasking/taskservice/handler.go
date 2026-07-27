@@ -32,7 +32,6 @@ type adminTaskDTO struct {
 	UserPrompt                 string                      `json:"user_prompt"`
 	Params                     string                      `json:"params"`
 	FeatureSlug                string                      `json:"feature_slug"`
-	RequestedModel             string                      `json:"requested_model"`
 	Priority                   int                         `json:"priority"`
 	ResolvedModel              string                      `json:"resolved_model"`
 	APIType                    string                      `json:"api_type"`
@@ -125,9 +124,9 @@ func (h *Handler) SubmitTask(c *gin.Context) {
 	if err != nil {
 		var submissionErr *SubmissionError
 		if errors.As(err, &submissionErr) {
-			slog.Warn("task submission planning failed", "user_id", userID, "feature", req.Feature, "error_code", submissionErr.Code, "err", err)
+			slog.Warn("task submission failed", "user_id", userID, "feature", req.Feature, "error_code", submissionErr.Code, "err", err)
 			status := http.StatusConflict
-			if submissionErr.Code == "workflow_configuration_unavailable" || submissionErr.Code == "provider_unavailable" || submissionErr.Code == "workflow_model_unavailable" {
+			if submissionErr.Code == "provider_unavailable" || submissionErr.Code == "prompt_unavailable" || submissionErr.Code == "submission_failed" {
 				status = http.StatusServiceUnavailable
 			}
 			response.MachineError(c, status, submissionErr.Code, submissionErr.SafeMessage)
@@ -358,7 +357,6 @@ func toAdminTaskDTO(task *tasks.Task) adminTaskDTO {
 		UserPrompt:                 task.UserPrompt,
 		Params:                     task.Params,
 		FeatureSlug:                task.FeatureSlug,
-		RequestedModel:             task.RequestedModel,
 		Priority:                   task.Priority,
 		ResolvedModel:              task.ResolvedModel,
 		APIType:                    task.APIType,

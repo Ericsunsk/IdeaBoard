@@ -40,7 +40,7 @@
 - Operational System Settings 分为三个 typed groups：`TaskRuntimeSetting`、`OutboundPolicySetting` 与 `EventRetentionSetting`。River 与 NATS retention 在进程启动时形成 effective snapshot；Admin 更新后通过 `restart_required` 暴露 configured/effective 差异。Egress allowlist 在每次 outbound operation 前从 DB 读取，动态生效且读取失败时 fail closed。
 - Admin operational settings write 必须携带 actor 与 reason，并在同一 PostgreSQL transaction 内更新 `system_configs` 与 append-only `system_settings_admin_actions`；禁止实现通用 env/string settings 编辑器。
 - Worker implementation stays in `internal/runtime/worker` as an execution adapter.
-- Workflow owns executable feature contracts; Workflow Feature configuration owns the current canonical model, enabled state and prompt template. It is updated in place without version or revision history.
+- Workflow owns executable feature contracts; Feature Prompt configuration only owns the current prompt template and is updated in place without version or revision history. Billing availability gates submission, while the worker resolves the current enabled Provider Account and Model at execution time.
 - `tasks.result` may hold a durable result envelope. Successful image tasks keep top-level `image_url`/`image_urls` for Canvas compatibility; workflow-specific parse failures may store `parsed_output_status`, `parsed_output` and a bounded `raw_provider_output_preview` so Admin/Canvas can diagnose retry or failed states without treating them as successful outputs.
 - Unless schema or query contracts change, do not edit migrations or generated sqlc code.
 - Credits Ledger 与 Tasking 共用 PostgreSQL；其他 context 只能通过 `credits.Commands` 写账，禁止直接改 balance projection 或 Ledger。

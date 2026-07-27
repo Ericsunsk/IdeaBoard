@@ -111,7 +111,7 @@ func TestCallDrawingAPIPatternGenStoresParsedOutputEnvelope(t *testing.T) {
 		Params: `{"feature":"pattern-gen"}`,
 	}
 
-	output, err := executor.callDrawingAPIForTest(context.Background(), account, task)
+	output, err := executor.callDrawingAPIForTest(context.Background(), account, task, "gpt-image-1")
 	if err != nil {
 		t.Fatalf("callDrawingAPI returned error: %v", err)
 	}
@@ -171,7 +171,7 @@ func TestCallDrawingAPIPatternGenMalformedOutputFailsWithResultEnvelope(t *testi
 		Params: `{"feature":"pattern-gen"}`,
 	}
 
-	output, err := executor.callDrawingAPIForTest(context.Background(), account, task)
+	output, err := executor.callDrawingAPIForTest(context.Background(), account, task, "gpt-image-1")
 	if err == nil {
 		t.Fatal("expected malformed provider output to fail")
 	}

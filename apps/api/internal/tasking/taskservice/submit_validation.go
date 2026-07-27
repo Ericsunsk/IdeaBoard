@@ -210,7 +210,7 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 		return p, nil
 	}
 	for key, value := range params {
-		if paramkeys.IsKnownSubmitTaskParamKey(key) {
+		if key == "model" || paramkeys.IsKnownSubmitTaskParamKey(key) {
 			continue
 		}
 		if p.Extra == nil {
@@ -221,10 +221,6 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.Feature); ok {
 		p.Feature = v
 	}
-	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.Model); ok {
-		p.Model = strings.TrimSpace(v)
-	}
-
 	if media := workflowMediaInputsFromMap(params, featureSlug); media != nil {
 		p.Media = media
 	}

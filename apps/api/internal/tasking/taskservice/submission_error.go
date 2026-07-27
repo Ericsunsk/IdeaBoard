@@ -8,13 +8,13 @@ type SubmissionError struct {
 	cause       error
 }
 
-func newSubmissionPlanError(code, safeMessage string, cause error) *SubmissionError {
+func newSubmissionError(code, safeMessage string, cause error) *SubmissionError {
 	return &SubmissionError{Code: code, SafeMessage: safeMessage, cause: cause}
 }
 
 func (e *SubmissionError) Error() string {
 	if e == nil {
-		return "submission planning failed"
+		return "submission failed"
 	}
 	if e.cause == nil {
 		return e.SafeMessage

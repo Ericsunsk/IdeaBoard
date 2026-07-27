@@ -63,6 +63,34 @@ func TestTaskAttemptSchemaDefinesExecutionHistoryConstraints(t *testing.T) {
 	}
 }
 
+func TestPublicTaskQueriesOnlyExposeActiveLeaseSnapshot(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "db", "queries", "tasks.sql"))
+	if err != nil {
+		t.Fatalf("read task queries failed: %v", err)
+	}
+	queries := string(raw)
+	for _, name := range []string{
+		"GetTaskByTaskID",
+		"GetTaskByTaskIDAndUserID",
+		"ListTasksByTaskIDs",
+		"ListTasks",
+		"ListTasksByUserID",
+	} {
+		startMarker := "-- name: " + name + " "
+		start := strings.Index(queries, startMarker)
+		if start < 0 {
+			t.Fatalf("missing query %s", name)
+		}
+		section := queries[start:]
+		if next := strings.Index(section[len(startMarker):], "\n-- name: "); next >= 0 {
+			section = section[:len(startMarker)+next]
+		}
+		if !strings.Contains(section, "AND released_at IS NULL") {
+			t.Fatalf("query %s must only expose the active lease snapshot", name)
+		}
+	}
+}
+
 func TestTaskLeaseReleaseLifecycleForCompleteAndRetry(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.Open(t)
@@ -112,6 +140,26 @@ func TestTaskLeaseReleaseLifecycleForCompleteAndRetry(t *testing.T) {
 		t.Fatalf("requeue task rows=%d err=%v, want rows=1 nil err", rows, err)
 	}
 	assertRepositoryActiveLeaseCount(t, db, requeuedTask.TaskID, 0)
+
+	pendingTask, err := repo.GetByTaskID(ctx, requeuedTask.TaskID)
+	if err != nil {
+		t.Fatalf("load requeued task: %v", err)
+	}
+	if pendingTask.Status != tasks.StatusPending || pendingTask.ResolvedModel != "" {
+		t.Fatalf("requeued task status=%q resolved_model=%q, want pending without current model", pendingTask.Status, pendingTask.ResolvedModel)
+	}
+	var historicalModel string
+	if err := db.QueryRow(`
+SELECT resolved_model
+FROM task_leases
+WHERE task_id = $1 AND released_at IS NOT NULL
+ORDER BY released_at DESC, id DESC
+LIMIT 1`, requeuedTask.TaskID).Scan(&historicalModel); err != nil {
+		t.Fatalf("load released lease model history: %v", err)
+	}
+	if historicalModel != "gpt-image-1" {
+		t.Fatalf("released lease resolved_model=%q, want retained attempt history", historicalModel)
+	}
 }
 
 func TestTaskLeasePreciseReleaseSucceedsForRunningTransitions(t *testing.T) {

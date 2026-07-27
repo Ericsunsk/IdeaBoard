@@ -2,7 +2,7 @@
 
 本文是一份面向服装款式设计开发的垂直 system prompt 草案，用于从通用生图产品语义切换到 Fashion Design 工作流语义。
 
-它不替代 [system-prompts.md](./system-prompts.md)，也不改变现有代码合约。运营侧可以按 feature 复制对应模板到 Admin 后台 `workflow_features`。
+它不替代 [system-prompts.md](./system-prompts.md)，也不改变现有代码合约。运营侧可以按 feature 复制对应模板到 Admin 后台 `feature_prompts`。
 
 ## 1. 定位
 

@@ -21,7 +21,6 @@ import (
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/workflow"
-	"ideaboard/api/internal/workflow/paramkeys"
 )
 
 type Service struct {
@@ -29,7 +28,7 @@ type Service struct {
 	taskRepo            TaskStore
 	submissionStore     TaskSubmissionStore
 	cancelStore         taskqueue.TaskCancellationStore
-	workflowFeatures    WorkflowFeatureStore
+	promptStore         FeaturePromptStore
 	mediaValidator      taskmedia.Validator
 	taskOutputCleaner   taskmedia.TaskOutputCleaner
 	generationSettings  settings.GoogleNativeGenerationSettingProvider
@@ -60,8 +59,8 @@ type TaskSubmissionStore interface {
 	SubmitTask(ctx context.Context, task *tasks.Task, queueTask *tasks.TaskPayload) (tasks.TaskSubmissionResult, error)
 }
 
-type WorkflowFeatureStore interface {
-	GetRuntimeConfig(ctx context.Context, slug string) (prompts.WorkflowFeatureRuntimeConfig, error)
+type FeaturePromptStore interface {
+	GetRuntimeConfig(ctx context.Context, slug string) (prompts.FeaturePromptRuntimeConfig, error)
 }
 
 type AdminBillingHistoryStore interface {
@@ -77,7 +76,7 @@ type ServiceDeps struct {
 	TaskRepo            TaskStore
 	SubmissionStore     TaskSubmissionStore
 	CancelStore         taskqueue.TaskCancellationStore
-	WorkflowFeatures    WorkflowFeatureStore
+	PromptStore         FeaturePromptStore
 	MediaValidator      taskmedia.Validator
 	TaskOutputCleaner   taskmedia.TaskOutputCleaner
 	GenerationSettings  settings.GoogleNativeGenerationSettingProvider
@@ -104,7 +103,11 @@ const maxSubmitTaskParamsBytes = 2 * 1024 * 1024
 const maxSubmitTaskParamsDepth = 24
 const providerUnavailableMessage = "生图服务暂不可用，请稍后重试"
 
-var errNoAvailableAPIAccount = errors.New("no available API account")
+var (
+	errNoAvailableAPIAccount          = errors.New("no available API account")
+	errTaskSubmissionStoreUnavailable = errors.New("task submission store not configured")
+	errTaskBillingUnavailable         = errors.New("task billing service not configured")
+)
 
 func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 	return &Service{
@@ -112,7 +115,7 @@ func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 		taskRepo:            deps.TaskRepo,
 		submissionStore:     deps.SubmissionStore,
 		cancelStore:         deps.CancelStore,
-		workflowFeatures:    deps.WorkflowFeatures,
+		promptStore:         deps.PromptStore,
 		mediaValidator:      deps.MediaValidator,
 		taskOutputCleaner:   deps.TaskOutputCleaner,
 		generationSettings:  deps.GenerationSettings,
@@ -150,13 +153,12 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 		UserPrompt:     plan.UserPrompt,
 		Params:         plan.ParamsJSON,
 		FeatureSlug:    plan.FeatureSlug,
-		RequestedModel: plan.CanonicalModel,
 		Priority:       plan.Priority,
 		Status:         tasks.StatusPending,
 	}
 	if plan.BillingRequest != nil {
 		task.BillingRequest = &tasks.TaskBillingRequest{
-			Feature: plan.BillingRequest.Feature, Model: plan.BillingRequest.Model, Quantity: plan.BillingRequest.Quantity,
+			Feature: plan.BillingRequest.Feature, Quantity: plan.BillingRequest.Quantity,
 		}
 	}
 
@@ -167,13 +169,12 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 		Prompt:        plan.FullPrompt,
 		Params:        plan.ParamsJSON,
 		Priority:      plan.Priority,
-		AccountIDs:    plan.EligibleAccountIDs,
 		RetryCount:    0,
 		CreatedAt:     time.Now().Unix(),
 	}
 
 	if s.submissionStore == nil {
-		return "", fmt.Errorf("任务提交服务未配置")
+		return "", newSubmissionError("submission_failed", "任务提交失败，请稍后重试", errTaskSubmissionStoreUnavailable)
 	}
 	result, err := s.submissionStore.SubmitTask(ctx, task, queueTask)
 	if err != nil {
@@ -184,7 +185,7 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 		if errors.Is(err, taskbilling.ErrPricingUnavailable) {
 			return "", taskbilling.ErrPricingUnavailable
 		}
-		return "", fmt.Errorf("任务提交失败，请稍后重试")
+		return "", newSubmissionError("submission_failed", "任务提交失败，请稍后重试", err)
 	}
 
 	if result.Created {
@@ -213,7 +214,11 @@ func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, re
 	billingRequest := *plan.BillingRequest
 	billingRequest.Quantity = billingQuantity
 	if s.taskBilling == nil {
-		return SubmitTaskReadiness{}, fmt.Errorf("Idea计费服务暂不可用")
+		return SubmitTaskReadiness{}, newSubmissionError(
+			"submission_failed",
+			"任务提交检查暂不可用，请稍后重试",
+			errTaskBillingUnavailable,
+		)
 	}
 	readiness, err := s.taskBilling.Readiness(ctx, userID, billingRequest)
 	if err != nil {
@@ -223,11 +228,11 @@ func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, re
 	return result, nil
 }
 
-func resolveTaskBillingRequest(feature, resolvedModel string) (*taskbilling.Request, error) {
+func resolveTaskBillingRequest(feature string) (*taskbilling.Request, error) {
 	if !taskbilling.RequiresBilling(feature) {
 		return nil, nil
 	}
-	request, err := taskbilling.AIImageRequest(feature, resolvedModel)
+	request, err := taskbilling.AIImageRequest(feature)
 	if err != nil {
 		return nil, err
 	}
@@ -263,16 +268,14 @@ func normalizeSubmitTaskClientActionID(raw string) (string, error) {
 }
 
 type SubmissionPlan struct {
-	FeatureSlug        string
-	CanonicalModel     string
-	UserPrompt         string
-	FullPrompt         string
-	TypedParams        *tasks.WorkflowTaskParams
-	ParamsJSON         string
-	ClientActionID     string
-	Priority           int
-	EligibleAccountIDs []int64
-	BillingRequest     *taskbilling.Request
+	FeatureSlug    string
+	UserPrompt     string
+	FullPrompt     string
+	TypedParams    *tasks.WorkflowTaskParams
+	ParamsJSON     string
+	ClientActionID string
+	Priority       int
+	BillingRequest *taskbilling.Request
 }
 
 func (s *Service) PlanSubmission(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (*SubmissionPlan, error) {
@@ -317,22 +320,7 @@ func (s *Service) PlanSubmission(ctx context.Context, userID int64, req *tasks.S
 		return nil, validation.New("feature 不能为空")
 	}
 	params["feature"] = featureSlug
-	if s.workflowFeatures == nil {
-		return nil, newSubmissionPlanError("workflow_configuration_unavailable", "该功能暂不可用", errors.New("workflow feature store is nil"))
-	}
-	runtimeConfig, err := s.workflowFeatures.GetRuntimeConfig(ctx, featureSlug)
-	if err != nil {
-		switch {
-		case errors.Is(err, prompts.ErrWorkflowFeatureNotConfigured):
-			return nil, newSubmissionPlanError("workflow_not_configured", "该功能尚未配置", err)
-		case errors.Is(err, prompts.ErrWorkflowFeatureDisabled):
-			return nil, newSubmissionPlanError("workflow_disabled", "该功能当前未启用", err)
-		default:
-			return nil, newSubmissionPlanError("workflow_configuration_unavailable", "该功能暂不可用", err)
-		}
-	}
-	delete(params, paramkeys.Model)
-	params[paramkeys.Model] = runtimeConfig.CanonicalModel
+	delete(params, "model")
 	if err := workflow.NormalizeStructuredPromptContractParams(params, featureSlug); err != nil {
 		return nil, err
 	}
@@ -353,28 +341,34 @@ func (s *Service) PlanSubmission(ctx context.Context, userID int64, req *tasks.S
 
 	apiAccounts, err := s.accountRepo.GetAllEnabled(ctx)
 	if err != nil {
-		return nil, newSubmissionPlanError("provider_unavailable", providerUnavailableMessage, err)
+		return nil, newSubmissionError("provider_unavailable", providerUnavailableMessage, err)
 	}
-	apiAccounts = accounts.FilterAccountsForRequest(apiAccounts, featureSlug, params)
+	apiAccounts = accounts.FilterAccountsWithEnabledModels(apiAccounts)
 	if len(apiAccounts) == 0 {
-		return nil, newSubmissionPlanError("workflow_model_unavailable", "该功能配置的模型当前不可用", errNoAvailableAPIAccount)
+		return nil, newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
 	}
 	apiAccounts, err = s.filterGoogleNativeAccountsForSubmit(ctx, userID, apiAccounts)
 	if err != nil {
 		return nil, err
 	}
 	if len(apiAccounts) == 0 {
-		return nil, newSubmissionPlanError("workflow_model_unavailable", "该功能配置的模型当前不可用", errNoAvailableAPIAccount)
+		return nil, newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
 	}
 
-	fullPrompt := prompts.ApplyFeatureSystemPromptWithConfig(req.Prompt, req.Prompt, featureSlug, params, runtimeConfig)
-	if err := validateExecutablePrompt(fullPrompt); err != nil {
-		return nil, err
+	promptConfig := prompts.FeaturePromptRuntimeConfig{
+		UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(featureSlug),
 	}
+	if s.promptStore != nil {
+		promptConfig, err = s.promptStore.GetRuntimeConfig(ctx, featureSlug)
+		if err != nil {
+			return nil, newSubmissionError("prompt_unavailable", "系统提示词暂不可用", err)
+		}
+	}
+	fullPrompt := prompts.ApplyFeatureSystemPromptWithConfig(req.Prompt, req.Prompt, featureSlug, params, promptConfig)
 	if err := validateSubmitTaskPrompt(fullPrompt, maxSubmitTaskFinalPromptBytes, "最终提示词"); err != nil {
 		return nil, err
 	}
-	billingRequest, err := resolveTaskBillingRequest(featureSlug, runtimeConfig.CanonicalModel)
+	billingRequest, err := resolveTaskBillingRequest(featureSlug)
 	if err != nil {
 		return nil, err
 	}
@@ -385,14 +379,10 @@ func (s *Service) PlanSubmission(ctx context.Context, userID int64, req *tasks.S
 	if err != nil {
 		return nil, err
 	}
-	accountIDs := make([]int64, len(apiAccounts))
-	for i, account := range apiAccounts {
-		accountIDs[i] = account.ID
-	}
 	return &SubmissionPlan{
-		FeatureSlug: featureSlug, CanonicalModel: runtimeConfig.CanonicalModel,
-		UserPrompt: req.Prompt, FullPrompt: fullPrompt, TypedParams: typedParams, ParamsJSON: paramsJSON,
-		ClientActionID: clientActionID, Priority: priority, EligibleAccountIDs: accountIDs,
+		FeatureSlug: featureSlug,
+		UserPrompt:  req.Prompt, FullPrompt: fullPrompt, TypedParams: typedParams, ParamsJSON: paramsJSON,
+		ClientActionID: clientActionID, Priority: priority,
 		BillingRequest: billingRequest,
 	}, nil
 }
@@ -703,11 +693,4 @@ func generateSecureTaskID(prefix string) string {
 		return fmt.Sprintf("%s_%d", prefix, time.Now().UnixNano())
 	}
 	return fmt.Sprintf("%s_%s", prefix, hex.EncodeToString(b))
-}
-
-func validateExecutablePrompt(fullPrompt string) error {
-	if strings.TrimSpace(fullPrompt) == "" {
-		return fmt.Errorf("缺少提示词，请填写 Prompt 或配置后台 system prompt")
-	}
-	return nil
 }

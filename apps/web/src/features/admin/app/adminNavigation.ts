@@ -30,7 +30,7 @@ const adminNavigationIcons = {
   'provider-endpoints': Link,
   statistics: DashboardSpeed,
   'task-monitor': StatsDownSquare,
-  'workflow-features': ChatBubble,
+  'feature-prompts': ChatBubble,
   'system-settings': Settings,
   'oss-config': Database,
 } satisfies Record<AdminNavigationKey, Component>

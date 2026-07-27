@@ -19,7 +19,6 @@ type Task struct {
 	UserPrompt                 string                `json:"user_prompt"`
 	Params                     string                `json:"params"`
 	FeatureSlug                string                `json:"feature_slug"`
-	RequestedModel             string                `json:"requested_model"`
 	Priority                   int                   `json:"priority"`
 	ResolvedModel              string                `json:"resolved_model"`
 	APIType                    string                `json:"api_type"`
@@ -46,7 +45,6 @@ type Task struct {
 
 type TaskBillingRequest struct {
 	Feature  string
-	Model    string
 	Quantity int64
 }
 

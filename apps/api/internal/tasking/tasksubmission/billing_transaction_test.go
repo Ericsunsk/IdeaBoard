@@ -41,7 +41,7 @@ func TestBilledStyleVariationSubmissionSucceedsAsRuntimeRole(t *testing.T) {
 	db, ownerPool := testdb.OpenWithPool(t)
 	ownerCredits := credits.NewService(ownerPool)
 	ownerBilling := billing.NewService(ownerPool)
-	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugStyleVariation, "gpt-image-1")
+	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugStyleVariation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,7 +451,7 @@ func TestAllAIImageWorkflowSubmissionPricingMatrix(t *testing.T) {
 				db, pool := testdb.OpenWithPool(t)
 				creditService := credits.NewService(pool)
 				billingService := billing.NewService(pool)
-				request, err := taskbilling.AIImageRequest(feature, "gpt-image-1")
+				request, err := taskbilling.AIImageRequest(feature)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -509,7 +509,7 @@ WHERE snapshots.task_id = $1`, result.TaskID).Scan(&snapshotFeature, &snapshotMo
 
 func seedPatternBillingProduct(t *testing.T, service *billing.Service, model string, unitCredits int64) taskbilling.Request {
 	t.Helper()
-	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen, model)
+	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -570,8 +570,7 @@ func newBilledAIImageTask(taskID, clientActionID string, request taskbilling.Req
 	task := newTaskSubmissionTask(taskID)
 	task.ClientActionID = clientActionID
 	task.FeatureSlug = request.Feature
-	task.RequestedModel = request.Model
-	task.BillingRequest = &tasks.TaskBillingRequest{Feature: request.Feature, Model: request.Model, Quantity: request.Quantity}
+	task.BillingRequest = &tasks.TaskBillingRequest{Feature: request.Feature, Quantity: request.Quantity}
 	return task
 }
 
