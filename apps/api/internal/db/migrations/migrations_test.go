@@ -896,7 +896,7 @@ func TestBaselineMigrationHasCleanSchemaContract(t *testing.T) {
 		"CREATE TABLE task_cancellations",
 		"CREATE TABLE media_assets",
 		"CREATE TABLE storage_profiles",
-		"CREATE TABLE feature_prompts",
+		"CREATE TABLE workflow_features",
 		"CREATE TABLE boards",
 		"CREATE TABLE board_share_tokens",
 		"stat_date DATE NOT NULL",
@@ -928,6 +928,9 @@ func TestBaselineMigrationHasCleanSchemaContract(t *testing.T) {
 	}
 
 	for _, forbidden := range []string{
+		"feature_prompts",
+		"feature_prompt_revisions",
+		"model_defaults",
 		"ALTER TABLE boards ADD COLUMN",
 		"UPDATE boards SET",
 		"CREATE TABLE user_boards",
@@ -983,14 +986,19 @@ func TestBaselineStorageSeedIsLastUpStatement(t *testing.T) {
 	}
 }
 
-func TestSchemaDoesNotCreateUpdatedAtTriggerForAppendOnlyPromptRevisions(t *testing.T) {
+func TestSchemaUsesCurrentWorkflowFeatureContract(t *testing.T) {
 	raw, err := os.ReadFile("../schema/schema.sql")
 	if err != nil {
 		t.Fatalf("read schema failed: %v", err)
 	}
 	schema := string(raw)
-	if strings.Contains(schema, "set_feature_prompt_revisions_updated_at") {
-		t.Fatalf("feature_prompt_revisions has no updated_at column; schema must not create an updated_at trigger")
+	if !strings.Contains(schema, "CREATE TABLE workflow_features") {
+		t.Fatal("schema must create workflow_features")
+	}
+	for _, forbidden := range []string{"feature_prompts", "feature_prompt_revisions", "model_defaults"} {
+		if strings.Contains(schema, forbidden) {
+			t.Fatalf("schema must not retain legacy Prompt contract: %s", forbidden)
+		}
 	}
 }
 

@@ -1,8 +1,4 @@
 -- migrate:up
-ALTER TABLE feature_prompt_revisions
-  DROP COLUMN enabled,
-  DROP COLUMN published_at;
-
 ALTER TABLE billing_admin_actions
   DROP CONSTRAINT ck_billing_admin_actions_type,
   DROP CONSTRAINT ck_billing_admin_actions_price_scope;
@@ -100,9 +96,3 @@ REVOKE ALL ON FUNCTION set_billing_item_availability(TEXT, BOOLEAN, BIGINT) FROM
 -- Schema rollback only: append-only availability audit facts are retained.
 -- Restore from a pre-migration database snapshot when exact legacy state is required.
 DROP FUNCTION IF EXISTS set_billing_item_availability(TEXT, BOOLEAN, BIGINT);
-
-ALTER TABLE feature_prompt_revisions
-  ADD COLUMN enabled BOOLEAN NOT NULL DEFAULT TRUE,
-  ADD COLUMN published_at TIMESTAMPTZ(3);
-ALTER TABLE feature_prompt_revisions ALTER COLUMN enabled DROP DEFAULT;
-UPDATE feature_prompt_revisions SET published_at = created_at;
