@@ -84,25 +84,27 @@
           </div>
         </Button>
 
-        <BoardCard
-          v-for="board in visibleBoards"
-          :key="board.id"
-          :board="board"
-          :preview-snapshot-data-url="boardPreviewMap[board.id] || ''"
-          :is-renaming="renamingBoardId === board.id"
-          :rename-draft="renameDraft"
-          :is-menu-open="activeMenuBoardId === board.id"
-          :display-date="formatBoardCatalogDate(board.updatedAt)"
-          @click-board="openBoardFromCard(board)"
-          @toggle-menu="toggleBoardMenu(board.id)"
-          @rename-action="startRename(board)"
-          @duplicate-action="duplicateBoard(board)"
-          @delete-action="requestDelete(board)"
-          @rename-input="updateRenameDraft"
-          @commit-rename="commitRename"
-          @cancel-rename="cancelRename"
-          @menu-hidden="handleBoardMenuHidden(board.id)"
-        />
+        <TransitionGroup name="board-card" appear>
+          <BoardCard
+            v-for="board in visibleBoards"
+            :key="board.id"
+            :board="board"
+            :preview-snapshot-data-url="boardPreviewMap[board.id] || ''"
+            :is-renaming="renamingBoardId === board.id"
+            :rename-draft="renameDraft"
+            :is-menu-open="activeMenuBoardId === board.id"
+            :display-date="formatBoardCatalogDate(board.updatedAt)"
+            @click-board="openBoardFromCard(board)"
+            @toggle-menu="toggleBoardMenu(board.id)"
+            @rename-action="startRename(board)"
+            @duplicate-action="duplicateBoard(board)"
+            @delete-action="requestDelete(board)"
+            @rename-input="updateRenameDraft"
+            @commit-rename="commitRename"
+            @cancel-rename="cancelRename"
+            @menu-hidden="handleBoardMenuHidden(board.id)"
+          />
+        </TransitionGroup>
       </section>
 
       <p

@@ -304,6 +304,24 @@
   --duration-ib-panel: 220ms;
   --duration-ib-dock: 240ms;
   --ease-ib-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --motion-control-duration: var(--duration-ib-fast);
+  --motion-control-easing: var(--ease-ib-standard);
+  --motion-enter-duration: var(--duration-ib-panel);
+  --motion-enter-easing: var(--ease-ib-standard);
+  --motion-exit-duration: var(--duration-ib-panel);
+  --motion-exit-easing: var(--ease-ib-standard);
+  --motion-feedback-duration: var(--duration-ib-fast);
+  --motion-feedback-easing: var(--ease-ib-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-control-duration: 0ms;
+    --motion-enter-duration: 0ms;
+    --motion-exit-duration: 0ms;
+    --motion-feedback-duration: 0ms;
+  }
 }
 
 @utility ib-page-dot-bg {

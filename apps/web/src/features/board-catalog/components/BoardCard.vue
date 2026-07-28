@@ -1,89 +1,87 @@
 <template>
-  <Transition name="board-card" appear>
-    <article
-      class="board-card relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-board-card-border bg-board-card-bg text-left transition-colors hover:border-board-card-border-hover"
-      role="button"
-      tabindex="0"
-      @keydown.enter.self.prevent="emit('click-board')"
-      @keydown.space.self.prevent="emit('click-board')"
-      @click="emit('click-board')"
+  <article
+    class="board-card relative h-[244px] cursor-pointer overflow-hidden rounded-xl border border-board-card-border bg-board-card-bg text-left transition-colors hover:border-board-card-border-hover"
+    role="button"
+    tabindex="0"
+    @keydown.enter.self.prevent="emit('click-board')"
+    @keydown.space.self.prevent="emit('click-board')"
+    @click="emit('click-board')"
+  >
+    <div
+      class="relative z-0 flex h-full w-full items-center justify-center overflow-hidden bg-[linear-gradient(135deg,var(--color-board-card-preview-from)_0%,var(--color-board-card-preview-to)_100%)]"
     >
+      <img
+        v-if="previewSnapshotDataUrl"
+        :src="previewSnapshotDataUrl"
+        class="block h-full w-full object-cover"
+        alt=""
+      />
       <div
-        class="relative z-0 flex h-full w-full items-center justify-center overflow-hidden bg-[linear-gradient(135deg,var(--color-board-card-preview-from)_0%,var(--color-board-card-preview-to)_100%)]"
+        v-else
+        class="h-full w-full"
+        :class="blankBoardPreviewSurfaceClass"
+        aria-hidden="true"
+      ></div>
+      <div
+        class="pointer-events-none absolute inset-x-0 bottom-0 h-[92px] bg-[linear-gradient(to_top,var(--color-board-card-preview-fade)_0%,var(--color-board-card-preview-fade-clear)_100%)]"
+      ></div>
+    </div>
+
+    <div class="pointer-events-none absolute right-14 bottom-3 left-3 z-[2]">
+      <InputText
+        v-if="isRenaming"
+        ref="renameInputEl"
+        :value="renameDraft"
+        unstyled
+        class="pointer-events-auto h-[30px] w-full rounded-lg border border-board-card-input-border bg-board-card-input-bg px-2 text-[13px] text-board-card-action-hover outline-none"
+        maxlength="60"
+        @click.stop
+        @input="onRenameInput"
+        @blur="emit('commit-rename')"
+        @keyup.enter.stop.prevent="emit('commit-rename')"
+        @keyup.esc.stop.prevent="emit('cancel-rename')"
+      />
+      <div v-else class="truncate text-sm font-[650] text-board-card-title">
+        {{ board.name }}
+      </div>
+      <div class="mt-[3px] text-xs text-board-card-text">Edited {{ displayDate }}</div>
+    </div>
+
+    <div class="absolute right-3 bottom-3 z-[3]" @click.stop @pointerdown.stop>
+      <Button
+        unstyled
+        type="button"
+        title="More actions"
+        aria-label="More actions"
+        aria-haspopup="menu"
+        :aria-expanded="isMenuOpen"
+        class="inline-flex size-[34px] cursor-pointer items-center justify-center border-0 bg-transparent text-board-card-action hover:text-board-card-action-hover"
+        @click="toggleMenu"
       >
-        <img
-          v-if="previewSnapshotDataUrl"
-          :src="previewSnapshotDataUrl"
-          class="block h-full w-full object-cover"
-          alt=""
-        />
-        <div
-          v-else
-          class="h-full w-full"
-          :class="blankBoardPreviewSurfaceClass"
-          aria-hidden="true"
-        ></div>
-        <div
-          class="pointer-events-none absolute inset-x-0 bottom-0 h-[92px] bg-[linear-gradient(to_top,var(--color-board-card-preview-fade)_0%,var(--color-board-card-preview-fade-clear)_100%)]"
-        ></div>
-      </div>
-
-      <div class="pointer-events-none absolute right-14 bottom-3 left-3 z-[2]">
-        <InputText
-          v-if="isRenaming"
-          ref="renameInputEl"
-          :value="renameDraft"
-          unstyled
-          class="pointer-events-auto h-[30px] w-full rounded-lg border border-board-card-input-border bg-board-card-input-bg px-2 text-[13px] text-board-card-action-hover outline-none"
-          maxlength="60"
-          @click.stop
-          @input="onRenameInput"
-          @blur="emit('commit-rename')"
-          @keyup.enter.stop.prevent="emit('commit-rename')"
-          @keyup.esc.stop.prevent="emit('cancel-rename')"
-        />
-        <div v-else class="truncate text-sm font-[650] text-board-card-title">
-          {{ board.name }}
-        </div>
-        <div class="mt-[3px] text-xs text-board-card-text">Edited {{ displayDate }}</div>
-      </div>
-
-      <div class="absolute right-3 bottom-3 z-[3]" @click.stop @pointerdown.stop>
-        <Button
-          unstyled
-          type="button"
-          title="More actions"
-          aria-label="More actions"
-          aria-haspopup="menu"
-          :aria-expanded="isMenuOpen"
-          class="inline-flex size-[34px] cursor-pointer items-center justify-center border-0 bg-transparent text-board-card-action hover:text-board-card-action-hover"
-          @click="toggleMenu"
-        >
-          <MoreHoriz class="size-[18px]" />
-        </Button>
-        <Menu
-          ref="menuRef"
-          :model="menuItems"
-          popup
-          append-to="body"
-          :pt="menuPt"
-          @hide="handleMenuHidden"
-        >
-          <template #item="{ item, props: itemProps }">
-            <a
-              v-bind="itemProps.action"
-              :class="[
-                appOverlayMenuItemClass,
-                item.key === 'delete' ? appOverlayMenuDangerItemClass : '',
-              ]"
-            >
-              {{ item.label }}
-            </a>
-          </template>
-        </Menu>
-      </div>
-    </article>
-  </Transition>
+        <MoreHoriz class="size-[18px]" />
+      </Button>
+      <Menu
+        ref="menuRef"
+        :model="menuItems"
+        popup
+        append-to="body"
+        :pt="menuPt"
+        @hide="handleMenuHidden"
+      >
+        <template #item="{ item, props: itemProps }">
+          <a
+            v-bind="itemProps.action"
+            :class="[
+              appOverlayMenuItemClass,
+              item.key === 'delete' ? appOverlayMenuDangerItemClass : '',
+            ]"
+          >
+            {{ item.label }}
+          </a>
+        </template>
+      </Menu>
+    </div>
+  </article>
 </template>
 
 <script setup lang="ts">
@@ -187,8 +185,8 @@ watch(
 <style scoped>
 .board-card {
   transition:
-    border-color var(--duration-ib-fast) ease-out,
-    transform var(--duration-ib-fast) ease-out;
+    border-color var(--motion-control-duration) var(--motion-control-easing),
+    transform var(--motion-control-duration) var(--motion-control-easing);
 }
 
 .board-card:hover,
@@ -199,25 +197,33 @@ watch(
 .board-card-enter-active,
 .board-card-appear-active {
   transition:
-    opacity var(--duration-ib-panel) ease-out,
-    transform var(--duration-ib-panel) ease-out;
+    opacity var(--motion-enter-duration) var(--motion-enter-easing),
+    transform var(--motion-enter-duration) var(--motion-enter-easing);
+}
+
+.board-card-leave-active {
+  transition:
+    opacity var(--motion-exit-duration) var(--motion-exit-easing),
+    transform var(--motion-exit-duration) var(--motion-exit-easing);
 }
 
 .board-card-enter-from,
-.board-card-appear-from {
+.board-card-appear-from,
+.board-card-leave-to {
   opacity: 0;
   transform: translateY(12px) scale(0.985);
 }
 
 .board-card-enter-to,
-.board-card-appear-to {
+.board-card-appear-to,
+.board-card-leave-from {
   opacity: 1;
   transform: translateY(0) scale(1);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .board-card {
-    transition: border-color var(--duration-ib-fast) ease-out;
+    transition: border-color var(--motion-control-duration) var(--motion-control-easing);
   }
 
   .board-card:hover,
@@ -226,8 +232,16 @@ watch(
   }
 
   .board-card-enter-active,
-  .board-card-appear-active {
+  .board-card-appear-active,
+  .board-card-leave-active {
     transition: none;
+  }
+
+  .board-card-enter-from,
+  .board-card-appear-from,
+  .board-card-leave-to {
+    opacity: 1;
+    transform: none;
   }
 }
 </style>
