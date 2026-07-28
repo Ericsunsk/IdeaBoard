@@ -141,16 +141,13 @@
             </div>
           </div>
           <DetailMetric label="优先级" :value="getTaskPriorityLabel(detailTask)" />
-          <DetailMetric label="账号 ID" :value="detailTask.account_id ? String(detailTask.account_id) : '-'" />
+          <DetailMetric label="账号 ID" :value="getDetailExecutionAccountLabel(detailTask)" />
           <DetailMetric
             label="Endpoint"
-            :value="getTaskEndpointLabel(detailTask) || '-'"
-            :title="detailTask.provider_endpoint_base_url || getTaskEndpointLabel(detailTask) || '-'"
+            :value="getDetailExecutionEndpointLabel(detailTask)"
+            :title="getDetailExecutionEndpointLabel(detailTask)"
           />
-          <DetailMetric
-            label="模型 / API Type"
-            :value="getCurrentAssignmentModelLabel(detailTask)"
-          />
+          <DetailMetric label="模型 / API Type" :value="getDetailExecutionModelLabel(detailTask)" />
           <DetailMetric label="创建时间" :value="formatDateTime(detailTask.created_at)" />
           <DetailMetric label="完成时间" :value="formatDateTime(detailTask.completed_at)" />
         </div>
@@ -245,16 +242,16 @@
           <DetailMetric label="SKU" :value="detailTask.billing.sku" />
           <DetailMetric label="单价" :value="formatIdeaAmount(detailTask.billing.unit_credits)" />
           <DetailMetric label="调用数量" :value="String(detailTask.billing.quantity)" />
-          <DetailMetric label="总消耗" :value="formatIdeaAmount(detailTask.billing.total_credits)" />
+          <DetailMetric
+            label="总消耗"
+            :value="formatIdeaAmount(detailTask.billing.total_credits)"
+          />
           <DetailMetric label="报价时间" :value="formatDateTime(detailTask.billing.quoted_at)" />
           <DetailMetric
             label="结算状态"
             :value="getBillingSettlementLabel(detailTask.billing.settlement_state)"
           />
-          <DetailMetric
-            label="结算时间"
-            :value="formatDateTime(detailTask.billing.settled_at)"
-          />
+          <DetailMetric label="结算时间" :value="formatDateTime(detailTask.billing.settled_at)" />
         </div>
       </section>
 
@@ -396,13 +393,12 @@ import Tag from 'primevue/tag'
 import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
 import { adminOverlayDialogRootClass, createAdminDialogPt } from '../shared/lib/adminOverlayPt'
 import { adminTextButtonClass } from '../shared/lib/adminUiClasses'
-import {
-  getTaskEndpointLabel,
-  getTaskModelLabel,
-  getTaskPriorityLabel,
-} from './taskMonitorColumns'
+import { getTaskPriorityLabel } from './taskMonitorColumns'
 import { adminTaskStatuses, getTaskStatusDefinition } from './taskMonitorStatus'
-import type { AdminTask, AdminTaskExecutionAttempt } from './taskMonitorResource'
+import type {
+  AdminTaskMonitorDetailModel,
+  AdminTaskMonitorExecutionAttempt,
+} from './taskMonitorResource'
 import DetailMetric from './TaskResultDetailMetric.vue'
 import { useAdminTaskResultFeedback } from './useAdminTaskMonitorFeedback'
 import { useTaskResultDetail } from './useTaskResultDetail'
@@ -410,7 +406,7 @@ import { useTaskResultDetail } from './useTaskResultDetail'
 const props = withDefaults(
   defineProps<{
     visible: boolean
-    task: AdminTask | null
+    task: AdminTaskMonitorDetailModel | null
     taskId?: string
     loading?: boolean
     errorMessage?: string
@@ -471,14 +467,21 @@ function getTaskStatusDotClass(status: string) {
   return [detailStatusDotBaseClass, getTaskStatusDefinition(status).dotClass]
 }
 
-function getCurrentAssignmentModelLabel(task: AdminTask) {
-  const model = getTaskModelLabel(task)
-  const apiType = task.api_type || ''
-  if (!model && !apiType) return '-'
-  return [model, apiType].filter(Boolean).join(' · ')
+function getDetailExecutionAccountLabel(task: AdminTaskMonitorDetailModel) {
+  return task.latest_execution ? String(task.latest_execution.account_id) : '-'
 }
 
-function getAttemptProviderLabel(attempt: AdminTaskExecutionAttempt) {
+function getDetailExecutionEndpointLabel(task: AdminTaskMonitorDetailModel) {
+  return task.latest_execution?.provider_endpoint_name || '-'
+}
+
+function getDetailExecutionModelLabel(task: AdminTaskMonitorDetailModel) {
+  const execution = task.latest_execution
+  if (!execution) return '-'
+  return [execution.resolved_model, execution.api_type].filter(Boolean).join(' · ') || '-'
+}
+
+function getAttemptProviderLabel(attempt: AdminTaskMonitorExecutionAttempt) {
   return attempt.provider_endpoint_name || `Endpoint ${attempt.provider_endpoint_id}`
 }
 

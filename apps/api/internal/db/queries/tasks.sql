@@ -383,6 +383,7 @@ SELECT
   attempts.status,
   attempts.failure_stage,
   attempts.failure_category,
+  leases.account_id,
   leases.provider_endpoint_id,
   leases.provider_endpoint_name,
   leases.resolved_model,
@@ -400,6 +401,19 @@ FROM task_attempts attempts
 JOIN task_leases leases ON leases.id = attempts.lease_id
 WHERE attempts.task_id = ANY(sqlc.arg(task_ids)::text[])
 ORDER BY attempts.task_id ASC, attempts.attempt_no ASC, attempts.id ASC;
+
+-- name: ListAdminTaskLatestExecutionsByTaskIDs :many
+SELECT DISTINCT ON (attempts.task_id)
+  attempts.task_id,
+  leases.account_id,
+  leases.provider_endpoint_id,
+  leases.provider_endpoint_name,
+  leases.resolved_model,
+  leases.api_type
+FROM task_attempts AS attempts
+JOIN task_leases AS leases ON leases.id = attempts.lease_id
+WHERE attempts.task_id = ANY(sqlc.arg(task_ids)::text[])
+ORDER BY attempts.task_id ASC, attempts.attempt_no DESC, attempts.id DESC;
 
 -- name: FinishRunningTaskAttemptsByTaskIDs :execrows
 UPDATE task_attempts

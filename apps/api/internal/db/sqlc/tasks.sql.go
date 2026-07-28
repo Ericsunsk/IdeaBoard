@@ -909,6 +909,7 @@ SELECT
   attempts.status,
   attempts.failure_stage,
   attempts.failure_category,
+  leases.account_id,
   leases.provider_endpoint_id,
   leases.provider_endpoint_name,
   leases.resolved_model,
@@ -934,6 +935,7 @@ type ListAdminTaskAttemptsByTaskIDsRow struct {
 	Status               string       `json:"status"`
 	FailureStage         string       `json:"failure_stage"`
 	FailureCategory      string       `json:"failure_category"`
+	AccountID            int64        `json:"account_id"`
 	ProviderEndpointID   int64        `json:"provider_endpoint_id"`
 	ProviderEndpointName string       `json:"provider_endpoint_name"`
 	ResolvedModel        string       `json:"resolved_model"`
@@ -964,6 +966,7 @@ func (q *Queries) ListAdminTaskAttemptsByTaskIDs(ctx context.Context, taskIds []
 			&i.Status,
 			&i.FailureStage,
 			&i.FailureCategory,
+			&i.AccountID,
 			&i.ProviderEndpointID,
 			&i.ProviderEndpointName,
 			&i.ResolvedModel,
@@ -977,6 +980,59 @@ func (q *Queries) ListAdminTaskAttemptsByTaskIDs(ctx context.Context, taskIds []
 			&i.ProviderLatencyMs,
 			&i.FinalizeLatencyMs,
 			&i.TotalLatencyMs,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAdminTaskLatestExecutionsByTaskIDs = `-- name: ListAdminTaskLatestExecutionsByTaskIDs :many
+SELECT DISTINCT ON (attempts.task_id)
+  attempts.task_id,
+  leases.account_id,
+  leases.provider_endpoint_id,
+  leases.provider_endpoint_name,
+  leases.resolved_model,
+  leases.api_type
+FROM task_attempts AS attempts
+JOIN task_leases AS leases ON leases.id = attempts.lease_id
+WHERE attempts.task_id = ANY($1::text[])
+ORDER BY attempts.task_id ASC, attempts.attempt_no DESC, attempts.id DESC
+`
+
+type ListAdminTaskLatestExecutionsByTaskIDsRow struct {
+	TaskID               string `json:"task_id"`
+	AccountID            int64  `json:"account_id"`
+	ProviderEndpointID   int64  `json:"provider_endpoint_id"`
+	ProviderEndpointName string `json:"provider_endpoint_name"`
+	ResolvedModel        string `json:"resolved_model"`
+	ApiType              string `json:"api_type"`
+}
+
+func (q *Queries) ListAdminTaskLatestExecutionsByTaskIDs(ctx context.Context, taskIds []string) ([]ListAdminTaskLatestExecutionsByTaskIDsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAdminTaskLatestExecutionsByTaskIDs, pq.Array(taskIds))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAdminTaskLatestExecutionsByTaskIDsRow
+	for rows.Next() {
+		var i ListAdminTaskLatestExecutionsByTaskIDsRow
+		if err := rows.Scan(
+			&i.TaskID,
+			&i.AccountID,
+			&i.ProviderEndpointID,
+			&i.ProviderEndpointName,
+			&i.ResolvedModel,
+			&i.ApiType,
 		); err != nil {
 			return nil, err
 		}

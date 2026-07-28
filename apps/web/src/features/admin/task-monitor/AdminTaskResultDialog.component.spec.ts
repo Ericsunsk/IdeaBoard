@@ -4,7 +4,10 @@ import { primeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen } from '../../../test/render'
 import AdminTaskResultDialog from './AdminTaskResultDialog.vue'
 import { adminTaskStatuses } from './taskMonitorStatus'
-import type { AdminTask } from './taskMonitorResource'
+import type {
+  AdminTaskMonitorDetailModel,
+  AdminTaskMonitorExecutionAttempt,
+} from './taskMonitorResource'
 
 const toast = vi.hoisted(() => ({
   success: vi.fn(),
@@ -16,7 +19,7 @@ vi.mock('../shared/lib/adminToast', () => ({
   useAdminToast: () => toast,
 }))
 
-function renderDialog(task: AdminTask, visible = true) {
+function renderDialog(task: AdminTaskMonitorDetailModel, visible = true) {
   return renderWithUser(AdminTaskResultDialog, {
     props: { task, visible },
     global: {
@@ -48,7 +51,7 @@ describe('AdminTaskResultDialog', () => {
     },
   ] satisfies ReadonlyArray<{
     label: string
-    task: Partial<AdminTask>
+    task: Partial<AdminTaskMonitorDetailModel>
     statusText: string
     detailText?: string
   }>)('renders the $label task state through the shared status definition', async (testCase) => {
@@ -181,6 +184,31 @@ describe('AdminTaskResultDialog', () => {
     expect(screen.queryByText('Credential')).not.toBeInTheDocument()
   })
 
+  it('uses the backend latest execution snapshot for the detail header', async () => {
+    renderDialog(
+      makeTask({
+        latest_execution: {
+          account_id: 99,
+          provider_endpoint_id: 12,
+          provider_endpoint_name: 'Header Endpoint',
+          resolved_model: 'header-model',
+          api_type: 'google-native',
+        },
+        execution_attempts: [
+          makeAttempt({
+            provider_endpoint_name: 'Trace Endpoint',
+            resolved_model: 'trace-model',
+          }),
+        ],
+      }),
+    )
+
+    expect(await screen.findByText('Header Endpoint')).toBeVisible()
+    expect(screen.getByText('header-model · google-native')).toBeVisible()
+    expect(screen.getByText('99')).toBeVisible()
+    expect(screen.getByText('Trace Endpoint')).toBeVisible()
+  })
+
   it('renders explicit loading, error, and empty trace states', async () => {
     const retry = vi.fn()
     const { rerender, user } = renderWithUser(AdminTaskResultDialog, {
@@ -209,8 +237,8 @@ describe('AdminTaskResultDialog', () => {
 })
 
 function makeAttempt(
-  overrides: Partial<NonNullable<AdminTask['execution_attempts']>[number]> = {},
-): NonNullable<AdminTask['execution_attempts']>[number] {
+  overrides: Partial<AdminTaskMonitorExecutionAttempt> = {},
+): AdminTaskMonitorExecutionAttempt {
   return {
     attempt_no: 1,
     status: 'completed',
@@ -233,17 +261,29 @@ function makeAttempt(
   }
 }
 
-function makeTask(overrides: Partial<AdminTask> = {}): AdminTask {
+function makeTask(
+  overrides: Partial<AdminTaskMonitorDetailModel> = {},
+): AdminTaskMonitorDetailModel {
   return {
-    id: 1,
     task_id: 'task_1',
     correlation_id: 'task_1',
     user_id: 1,
     prompt: 'Prompt',
+    user_prompt: '',
+    params: '{}',
+    feature_slug: 'sketch-to-image',
     priority: 2,
     status: adminTaskStatuses.completed,
+    retry_count: 0,
+    error_msg: '',
+    result: '',
     created_at: '2026-07-06T00:00:00Z',
     updated_at: '2026-07-06T00:00:00Z',
+    completed_at: null,
+    cancelled_at: null,
+    cancelled_by: null,
+    cancel_reason: '',
+    execution_attempts: [],
     ...overrides,
   }
 }

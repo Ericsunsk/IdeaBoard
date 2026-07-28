@@ -1,4 +1,3 @@
-import type { Task } from '../../../shared/api/task'
 import { calcDurationSeconds, formatDurationSeconds } from '../../../shared/utils/dateTime'
 import {
   sanitizeApiErrorMessage,
@@ -6,6 +5,10 @@ import {
 } from '../../../shared/utils/errorMessages'
 import { adminTaskStatuses } from './taskMonitorStatus'
 import { getSafeTaskResultImageUrl } from './taskResultImages'
+import type {
+  AdminTaskMonitorDetailModel,
+  AdminTaskMonitorListItemModel,
+} from './taskMonitorResource'
 
 const RESULT_MAX_STRING_LENGTH = 300
 const RESULT_DEBUG_MAX_DEPTH = 4
@@ -23,48 +26,42 @@ export type TaskApiCallInfo = {
   platform: string
 }
 
+type TaskMonitorResultRow = AdminTaskMonitorListItemModel | AdminTaskMonitorDetailModel
+
 const taskApiCallCache = new WeakMap<
-  Task,
+  TaskMonitorResultRow,
   { result: string; apiType: string; value: TaskApiCallInfo | null }
 >()
 
-export function getTaskResultImageUrl(row: Pick<Task, 'status' | 'result'>): string {
+export function getTaskResultImageUrl(
+  row: Pick<TaskMonitorResultRow, 'status' | 'result'>,
+): string {
   if (row.status !== adminTaskStatuses.completed || !row.result) return ''
   return getSafeTaskResultImageUrl(row.result)
 }
 
-export function getTaskResultDetailImageUrl(row: Pick<Task, 'result'> | null | undefined): string {
+export function getTaskResultDetailImageUrl(
+  row: Pick<TaskMonitorResultRow, 'result'> | null | undefined,
+): string {
   if (!row?.result) return ''
   return getSafeTaskResultImageUrl(row.result)
 }
 
-export function getTaskApiCall(row: Task): TaskApiCallInfo | null {
-  if (!row.result && !row.api_type) return null
+export function getTaskApiCall(row: TaskMonitorResultRow): TaskApiCallInfo | null {
+  const apiType = row.latest_execution?.api_type || ''
+  if (!apiType) return null
   const cached = taskApiCallCache.get(row)
   const result = row.result || ''
-  const apiType = row.api_type || ''
   if (cached?.result === result && cached.apiType === apiType) return cached.value
 
-  let value: TaskApiCallInfo | null = apiType
-    ? {
-        platform: apiType,
-      }
-    : null
-  if (!value && result) {
-    const parsed = parseResultSafely(result)
-    if (isRecord(parsed) && parsed.platform) {
-      value = {
-        platform: String(parsed.platform),
-      }
-    }
-  }
+  const value: TaskApiCallInfo = { platform: apiType }
 
   taskApiCallCache.set(row, { result, apiType, value })
   return value
 }
 
 export function getTaskDuration(
-  row: Pick<Task, 'created_at' | 'completed_at'>,
+  row: Pick<TaskMonitorResultRow, 'created_at' | 'completed_at'>,
 ): TaskDurationInfo | null {
   if (!row.completed_at || !row.created_at) return null
   const seconds = calcDurationSeconds(row.created_at, row.completed_at)
@@ -73,17 +70,23 @@ export function getTaskDuration(
   return { seconds, tone }
 }
 
-export function formatTaskDuration(row: Pick<Task, 'created_at' | 'completed_at'>): string {
+export function formatTaskDuration(
+  row: Pick<TaskMonitorResultRow, 'created_at' | 'completed_at'>,
+): string {
   if (!row.completed_at || !row.created_at) return '-'
   return formatDurationSeconds(row.created_at, row.completed_at)
 }
 
-export function getTaskSanitizedError(row: Pick<Task, 'status' | 'error_msg'>): string {
+export function getTaskSanitizedError(
+  row: Pick<TaskMonitorResultRow, 'status' | 'error_msg'>,
+): string {
   if (row.status !== adminTaskStatuses.failed || !row.error_msg) return ''
   return sanitizeTaskErrorMessage(row.error_msg)
 }
 
-export function getTaskErrorReason(row: Pick<Task, 'status' | 'error_msg' | 'result'>): string {
+export function getTaskErrorReason(
+  row: Pick<TaskMonitorResultRow, 'status' | 'error_msg' | 'result'>,
+): string {
   if (row.error_msg) return sanitizeTaskErrorMessage(row.error_msg)
   if (!row.result) return ''
 

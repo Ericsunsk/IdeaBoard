@@ -59,6 +59,34 @@ func TestAdminListTasksRejectsInvalidIDFilters(t *testing.T) {
 	}
 }
 
+func TestAdminGetTaskSerializesEmptyExecutionAttemptsAsArray(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	service := NewService(ServiceDeps{
+		TaskRepo: adminTaskDetailStoreStub{task: &tasks.Task{TaskID: "no-attempt-task", Status: tasks.StatusPending}},
+	}, ServiceOptions{})
+	router := gin.New()
+	router.GET("/admin/tasks/:task_id", NewHandler(service).GetTask)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/admin/tasks/no-attempt-task", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var body struct {
+		Data struct {
+			Task struct {
+				ExecutionAttempts []json.RawMessage `json:"execution_attempts"`
+			} `json:"task"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Data.Task.ExecutionAttempts == nil || len(body.Data.Task.ExecutionAttempts) != 0 {
+		t.Fatalf("execution_attempts=%v, want []", body.Data.Task.ExecutionAttempts)
+	}
+}
+
 func TestSubmitTaskHandlerReturnsEnvelopeAndSubmitsCanonicalPayload(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -538,29 +566,23 @@ func assertMachineErrorResponse(t *testing.T, recorder *httptest.ResponseRecorde
 	}
 }
 
-func TestAdminTaskDTOExposesCurrentAssignmentOnlyWithActiveLeaseSnapshot(t *testing.T) {
-	accountID := int64(7)
-	endpointID := int64(8)
-	credentialID := int64(9)
-	historical := &tasks.Task{
-		TaskID: "terminal-task", AccountID: &accountID,
-		AssignedProviderEndpointID: &endpointID, AssignedCredentialID: &credentialID,
+func TestAdminTaskMonitorReadModelsExposeImmutableExecutionSnapshot(t *testing.T) {
+	task := &tasks.Task{
+		TaskID: "terminal-task",
+	}
+	snapshot := tasks.AdminTaskExecutionSnapshot{AccountID: 11, ProviderEndpointID: 12, ProviderEndpointName: "Immutable Endpoint", ResolvedModel: "immutable-model", APIType: "google-native"}
+
+	listDTO := adminTaskMonitorListItemFromTask(task, snapshot, true)
+	if listDTO.LatestExecution == nil || listDTO.LatestExecution.AccountID != 11 || listDTO.LatestExecution.ProviderEndpointID != 12 {
+		t.Fatalf("list latest execution=%+v, want immutable owner snapshot", listDTO.LatestExecution)
 	}
 
-	terminalDTO := toAdminTaskDTO(historical)
-	if terminalDTO.AccountID != nil ||
-		terminalDTO.AssignedProviderEndpointID != nil ||
-		terminalDTO.AssignedCredentialID != nil {
-		t.Fatalf("terminal Admin assignment leaked historical Task ids: %+v", terminalDTO)
-	}
-
-	active := *historical
-	active.ResolvedModel = "image-model"
-	activeDTO := toAdminTaskDTO(&active)
-	if activeDTO.AccountID == nil || *activeDTO.AccountID != accountID ||
-		activeDTO.AssignedProviderEndpointID == nil || *activeDTO.AssignedProviderEndpointID != endpointID ||
-		activeDTO.AssignedCredentialID == nil || *activeDTO.AssignedCredentialID != credentialID {
-		t.Fatalf("active Admin assignment missing lease-owned ids: %+v", activeDTO)
+	detailDTO := adminTaskMonitorDetailFromTask(task, tasks.AdminBillingSnapshot{}, false, []tasks.AdminTaskAttempt{{
+		AccountID: snapshot.AccountID, ProviderEndpointID: snapshot.ProviderEndpointID, ProviderEndpointName: snapshot.ProviderEndpointName,
+		ResolvedModel: snapshot.ResolvedModel, APIType: snapshot.APIType,
+	}})
+	if detailDTO.LatestExecution == nil || detailDTO.LatestExecution.ProviderEndpointName != "Immutable Endpoint" {
+		t.Fatalf("detail latest execution=%+v, want explicit header snapshot", detailDTO.LatestExecution)
 	}
 }
 

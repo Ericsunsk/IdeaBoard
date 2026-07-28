@@ -40,8 +40,6 @@ type Task struct {
 	Outputs                    []TaskOutput          `json:"outputs,omitempty"`
 	ExecutionMetrics           *TaskExecutionMetrics `json:"execution_metrics,omitempty"`
 	BillingRequest             *TaskBillingRequest   `json:"-"`
-	BillingSnapshot            *AdminBillingSnapshot `json:"-"`
-	ExecutionAttempts          []AdminTaskAttempt    `json:"-"`
 }
 
 type TaskBillingRequest struct {
@@ -65,10 +63,21 @@ type AdminBillingSnapshot struct {
 	FeatureExists   bool       `json:"feature_exists"`
 }
 
+// AdminTaskExecutionSnapshot is the immutable lease snapshot used by Admin
+// Task list projections. It intentionally contains no attempt lifecycle data.
+type AdminTaskExecutionSnapshot struct {
+	AccountID            int64  `json:"account_id"`
+	ProviderEndpointID   int64  `json:"provider_endpoint_id"`
+	ProviderEndpointName string `json:"provider_endpoint_name"`
+	ResolvedModel        string `json:"resolved_model"`
+	APIType              string `json:"api_type"`
+}
+
 // AdminTaskAttempt is the safe, immutable execution history projection for
 // Admin Task details. It intentionally excludes credentials and queue metadata.
 type AdminTaskAttempt struct {
 	AttemptNo            int        `json:"attempt_no"`
+	AccountID            int64      `json:"account_id"`
 	Status               string     `json:"status"`
 	Stage                string     `json:"stage"`
 	FailureCategory      string     `json:"failure_category"`

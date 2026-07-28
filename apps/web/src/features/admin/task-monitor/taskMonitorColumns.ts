@@ -1,50 +1,33 @@
-import type { Task } from '../../../shared/api/task'
 import { formatAdminDateTime } from '../../../shared/utils/dateTime'
+import type { AdminTaskMonitorListItemModel } from './taskMonitorResource'
 
-type MonitorTaskRow = Task & {
-  username?: string
-  email?: string
-  user?: {
-    username?: string
-    email?: string
-  }
-}
-
-export function formatTaskCreatedAt(row: Task) {
+export function formatTaskCreatedAt(row: AdminTaskMonitorListItemModel) {
   return formatAdminDateTime(row.created_at, row.created_at)
 }
 
-export function getTaskUserIdentifier(row: Task) {
-  const taskRow = row as MonitorTaskRow
-  return (
-    taskRow.username ||
-    taskRow.email ||
-    taskRow.user?.username ||
-    taskRow.user?.email ||
-    taskRow.user_id
-  )
+export function getTaskUserIdentifier(row: AdminTaskMonitorListItemModel) {
+  return row.user_id
 }
 
-export function getTaskEndpointLabel(row: Task) {
-  return row.provider_endpoint_name || ''
+export function getTaskAccountLabel(row: AdminTaskMonitorListItemModel) {
+  return row.latest_execution ? String(row.latest_execution.account_id) : ''
 }
 
-export function getTaskCredentialLabel(row: Task) {
-  if (row.credential_fingerprint) return row.credential_fingerprint
-  return formatIDLabel('Credential', row.assigned_credential_id)
+export function getTaskEndpointLabel(row: AdminTaskMonitorListItemModel) {
+  return row.latest_execution?.provider_endpoint_name || ''
 }
 
-export function getTaskModelLabel(row: Task) {
-  return row.resolved_model || ''
+export function getTaskModelLabel(row: AdminTaskMonitorListItemModel) {
+  return row.latest_execution?.resolved_model || ''
 }
 
-export function getTaskPriorityLabel(row: Task) {
+export function getTaskAPITypeLabel(row: AdminTaskMonitorListItemModel) {
+  return row.latest_execution?.api_type || ''
+}
+
+export function getTaskPriorityLabel(row: Pick<AdminTaskMonitorListItemModel, 'priority'>) {
   const priority = Number(row.priority || 2)
   return `P${Number.isFinite(priority) ? priority : 2}`
-}
-
-function formatIDLabel(prefix: string, id: number | null | undefined) {
-  return id ? `${prefix} #${id}` : ''
 }
 
 export {

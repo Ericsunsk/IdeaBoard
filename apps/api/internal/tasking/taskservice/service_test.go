@@ -210,13 +210,53 @@ func (s adminTaskTraceStub) ListAdminTaskAttempts(context.Context, []string) (ma
 	return s.attempts, s.err
 }
 
+type adminTaskListReadStub struct {
+	latest   map[string]tasks.AdminTaskExecutionSnapshot
+	err      error
+	requests *[][]string
+}
+
+func (s adminTaskListReadStub) ListAdminTaskLatestExecutions(_ context.Context, taskIDs []string) (map[string]tasks.AdminTaskExecutionSnapshot, error) {
+	if s.requests != nil {
+		*s.requests = append(*s.requests, append([]string(nil), taskIDs...))
+	}
+	return s.latest, s.err
+}
+
+type adminTaskListStoreStub struct {
+	TaskStore
+	items  []*tasks.Task
+	counts tasks.TaskListCounts
+}
+
+type adminTaskDetailStoreStub struct {
+	TaskStore
+	task *tasks.Task
+}
+
+func (s adminTaskDetailStoreStub) GetByTaskID(context.Context, string) (*tasks.Task, error) {
+	return s.task, nil
+}
+
+func (s adminTaskDetailStoreStub) ListOutputsByTaskIDs(context.Context, []string) (map[string][]tasks.TaskOutput, error) {
+	return map[string][]tasks.TaskOutput{}, nil
+}
+
+func (s adminTaskListStoreStub) List(context.Context, int64, int64, string, string, int, int) ([]*tasks.Task, tasks.TaskListCounts, error) {
+	return s.items, s.counts, nil
+}
+
+func (s adminTaskListStoreStub) ListOutputsByTaskIDs(context.Context, []string) (map[string][]tasks.TaskOutput, error) {
+	return map[string][]tasks.TaskOutput{}, nil
+}
+
 type billableItemLookupStub map[string]bool
 
 func (s billableItemLookupStub) Contains(sku string) bool {
 	return s[sku]
 }
 
-func TestAttachAdminBillingSnapshotsResolvesFeatureExistenceFromCurrentRegistry(t *testing.T) {
+func TestLoadAdminBillingSnapshotsResolvesFeatureExistenceFromCurrentRegistry(t *testing.T) {
 	quotedAt := time.Date(2026, 7, 16, 8, 0, 0, 0, time.UTC)
 	service := NewService(ServiceDeps{
 		AdminBillingHistory: adminBillingHistoryStub{snapshots: map[string]tasks.AdminBillingSnapshot{
@@ -231,40 +271,90 @@ func TestAttachAdminBillingSnapshotsResolvesFeatureExistenceFromCurrentRegistry(
 		}},
 		BillableItems: billableItemLookupStub{"ai-image:partial-edit": true},
 	}, ServiceOptions{})
-	items := []*tasks.Task{{TaskID: "task-existing"}, {TaskID: "task-deleted"}}
-
-	if err := service.attachAdminBillingSnapshots(t.Context(), items); err != nil {
+	snapshots, err := service.loadAdminBillingSnapshots(t.Context(), []string{"task-existing", "task-deleted"})
+	if err != nil {
 		t.Fatal(err)
 	}
-	if items[0].BillingSnapshot == nil || !items[0].BillingSnapshot.FeatureExists {
-		t.Fatalf("existing feature Snapshot = %+v", items[0].BillingSnapshot)
+	if !snapshots["task-existing"].FeatureExists {
+		t.Fatalf("existing feature Snapshot = %+v", snapshots["task-existing"])
 	}
-	if items[1].BillingSnapshot == nil || items[1].BillingSnapshot.FeatureExists {
-		t.Fatalf("deleted feature Snapshot = %+v", items[1].BillingSnapshot)
+	if snapshots["task-deleted"].FeatureExists {
+		t.Fatalf("deleted feature Snapshot = %+v", snapshots["task-deleted"])
 	}
-	if items[1].BillingSnapshot.DisplayName != "已移除功能" {
-		t.Fatalf("immutable Snapshot wording changed: %+v", items[1].BillingSnapshot)
+	if snapshots["task-deleted"].DisplayName != "已移除功能" {
+		t.Fatalf("immutable Snapshot wording changed: %+v", snapshots["task-deleted"])
 	}
 }
 
-func TestAttachAdminTaskAttemptsUsesTaskOwnedOrderedHistory(t *testing.T) {
-	service := NewService(ServiceDeps{
-		AdminTaskTrace: adminTaskTraceStub{attempts: map[string][]tasks.AdminTaskAttempt{
-			"task-failover": {
-				{AttemptNo: 1, Status: tasks.TaskAttemptStatusRequeued, ResolvedModel: "model-a"},
-				{AttemptNo: 2, Status: tasks.TaskAttemptStatusCompleted, ResolvedModel: "model-b"},
-			},
-		}},
-	}, ServiceOptions{})
+func TestAdminTaskMonitorDetailDerivesLatestExecutionFromOrderedTrace(t *testing.T) {
 	task := &tasks.Task{TaskID: "task-failover"}
+	detail := adminTaskMonitorDetailFromTask(task, tasks.AdminBillingSnapshot{}, false, []tasks.AdminTaskAttempt{
+		{AttemptNo: 1, Status: tasks.TaskAttemptStatusRequeued, ResolvedModel: "model-a"},
+		{AttemptNo: 2, Status: tasks.TaskAttemptStatusCompleted, ResolvedModel: "model-b", ProviderEndpointName: "Trace Endpoint"},
+	})
+	if len(detail.ExecutionAttempts) != 2 || detail.LatestExecution == nil || detail.LatestExecution.ResolvedModel != "model-b" {
+		t.Fatalf("detail=%+v, want latest execution from ordered trace", detail)
+	}
+}
 
-	if err := service.attachAdminTaskAttempts(t.Context(), task); err != nil {
+func TestListTasksIncludesOnlyLatestImmutableExecutionProjection(t *testing.T) {
+	requests := [][]string{}
+	service := NewService(ServiceDeps{
+		TaskRepo: adminTaskListStoreStub{
+			items: []*tasks.Task{
+				{TaskID: "terminal-task", Status: tasks.StatusCompleted},
+				{TaskID: "pending-task", Status: tasks.StatusPending},
+			},
+		},
+		AdminTaskListRead: adminTaskListReadStub{latest: map[string]tasks.AdminTaskExecutionSnapshot{
+			"terminal-task": {
+				AccountID:            101,
+				ProviderEndpointID:   202,
+				ProviderEndpointName: "Provider A",
+				ResolvedModel:        "image-model",
+				APIType:              "google-native",
+			},
+		}, requests: &requests},
+	}, ServiceOptions{})
+
+	items, _, err := service.ListTasks(t.Context(), &tasks.TaskListRequest{Page: 1, PageSize: 20})
+	if err != nil {
 		t.Fatal(err)
 	}
-	if len(task.ExecutionAttempts) != 2 ||
-		task.ExecutionAttempts[0].AttemptNo != 1 ||
-		task.ExecutionAttempts[1].ResolvedModel != "model-b" {
-		t.Fatalf("execution attempts=%+v", task.ExecutionAttempts)
+	if len(items) != 2 || items[0].LatestExecution == nil {
+		t.Fatalf("monitor list latest execution=%+v, want immutable snapshot", items)
+	}
+	if got := items[0].LatestExecution.ProviderEndpointName; got != "Provider A" {
+		t.Fatalf("latest execution endpoint=%q, want Provider A", got)
+	}
+	if items[0].LatestExecution.AccountID != 101 || items[0].LatestExecution.ProviderEndpointID != 202 {
+		t.Fatalf("latest execution owner=%+v, want immutable account/Endpoint IDs", items[0].LatestExecution)
+	}
+	if items[1].LatestExecution != nil {
+		t.Fatalf("pending Task latest execution=%+v, want empty", items[1].LatestExecution)
+	}
+	if len(requests) != 1 || len(requests[0]) != 2 {
+		t.Fatalf("latest execution read requests=%+v, want one batched request for two Tasks", requests)
+	}
+}
+
+func TestGetTaskIncludesExplicitLatestExecutionAlongsideOrderedTrace(t *testing.T) {
+	service := NewService(ServiceDeps{
+		TaskRepo: adminTaskDetailStoreStub{task: &tasks.Task{TaskID: "detail-task", Status: tasks.StatusCompleted}},
+		AdminTaskTrace: adminTaskTraceStub{attempts: map[string][]tasks.AdminTaskAttempt{
+			"detail-task": {{AttemptNo: 1, ProviderEndpointName: "Trace Endpoint", ResolvedModel: "trace-model"}},
+		}},
+	}, ServiceOptions{})
+
+	task, err := service.GetTask(t.Context(), "detail-task")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task.LatestExecution == nil || task.LatestExecution.ProviderEndpointName != "Trace Endpoint" {
+		t.Fatalf("latest execution=%+v, want latest trace snapshot", task.LatestExecution)
+	}
+	if len(task.ExecutionAttempts) != 1 || task.ExecutionAttempts[0].ProviderEndpointName != "Trace Endpoint" {
+		t.Fatalf("execution trace=%+v, want ordered detail trace", task.ExecutionAttempts)
 	}
 }
 

@@ -28,9 +28,34 @@ func (r *Repository) ListAdminTaskAttempts(
 	return result, nil
 }
 
+func (r *Repository) ListAdminTaskLatestExecutions(
+	ctx context.Context,
+	taskIDs []string,
+) (map[string]tasks.AdminTaskExecutionSnapshot, error) {
+	result := make(map[string]tasks.AdminTaskExecutionSnapshot)
+	if len(taskIDs) == 0 {
+		return result, nil
+	}
+	rows, err := r.q.ListAdminTaskLatestExecutionsByTaskIDs(ctx, taskIDs)
+	if err != nil {
+		return nil, fmt.Errorf("taskstore: list Admin Task latest executions: %w", err)
+	}
+	for _, row := range rows {
+		result[row.TaskID] = tasks.AdminTaskExecutionSnapshot{
+			AccountID:            row.AccountID,
+			ProviderEndpointID:   row.ProviderEndpointID,
+			ProviderEndpointName: row.ProviderEndpointName,
+			ResolvedModel:        row.ResolvedModel,
+			APIType:              row.ApiType,
+		}
+	}
+	return result, nil
+}
+
 func adminTaskAttemptFromSQLC(row dbsqlc.ListAdminTaskAttemptsByTaskIDsRow) tasks.AdminTaskAttempt {
 	return tasks.AdminTaskAttempt{
 		AttemptNo:            int(row.AttemptNo),
+		AccountID:            row.AccountID,
 		Status:               row.Status,
 		Stage:                adminTaskAttemptStage(row),
 		FailureCategory:      row.FailureCategory,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { Task } from '../../../shared/api/task'
+import type { AdminTaskMonitorListItemModel } from './taskMonitorResource'
 import {
   formatTaskDuration,
   formatTaskResultDebug,
@@ -44,7 +44,7 @@ describe('task result presentation', () => {
     expect(debug.nested.api_key).toBe('[REDACTED]')
   })
 
-  it('derives result metadata used by monitor rows', () => {
+  it('does not infer an API call from mutable result metadata', () => {
     const task = makeTask({
       status: adminTaskStatuses.completed,
       result: JSON.stringify({
@@ -53,13 +53,19 @@ describe('task result presentation', () => {
       }),
     })
 
-    expect(getTaskApiCall(task)).toEqual({ platform: 'google' })
+    expect(getTaskApiCall(task)).toBeNull()
     expect(getTaskResultImageUrl(task)).toBe('/uploads/tasks/1/task/output.png')
   })
 
-  it('prefers assignment api type snapshot over legacy result metadata', () => {
+  it('uses the latest immutable execution API Type over legacy result metadata', () => {
     const task = makeTask({
-      api_type: 'openai-compatible',
+      latest_execution: {
+        account_id: 1,
+        provider_endpoint_id: 2,
+        provider_endpoint_name: 'Provider A',
+        resolved_model: 'model-a',
+        api_type: 'openai-compatible',
+      },
       result: JSON.stringify({
         platform: 'google',
       }),
@@ -125,17 +131,19 @@ describe('task result presentation', () => {
   })
 })
 
-function makeTask(overrides: Partial<Task>): Task {
+function makeTask(
+  overrides: Partial<AdminTaskMonitorListItemModel> = {},
+): AdminTaskMonitorListItemModel {
   return {
-    id: 1,
     task_id: 'task_1',
-    correlation_id: 'task_1',
     user_id: 1,
     prompt: 'Prompt',
     priority: 2,
     status: adminTaskStatuses.completed,
+    error_msg: '',
+    result: '',
     created_at: '2026-07-06T00:00:00Z',
-    updated_at: '2026-07-06T00:00:00Z',
+    completed_at: null,
     ...overrides,
   }
 }

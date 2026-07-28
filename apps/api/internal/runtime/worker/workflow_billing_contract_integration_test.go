@@ -118,6 +118,7 @@ func TestAIImageWorkflowBillingContractUsesCurrentProviderPoolAndConvergesFacts(
 		TaskBilling:         taskBilling,
 		AdminBillingHistory: taskRepo,
 		AdminTaskTrace:      taskRepo,
+		AdminTaskListRead:   taskRepo,
 		BillableItems:       registry,
 	}, taskservice.ServiceOptions{})
 
@@ -187,7 +188,11 @@ func TestAIImageWorkflowBillingContractUsesCurrentProviderPoolAndConvergesFacts(
 	if err != nil {
 		t.Fatalf("load Admin Task detail: %v", err)
 	}
-	assertWorkflowContractTerminalFacts(t, db, adminTask, failedProvider, successfulProvider)
+	coreTask, err := taskRepo.GetByTaskID(ctx, taskID)
+	if err != nil {
+		t.Fatalf("load core Task: %v", err)
+	}
+	assertWorkflowContractTerminalFacts(t, db, coreTask, adminTask, failedProvider, successfulProvider)
 }
 
 type workflowContractMediaValidator struct{}
@@ -343,28 +348,29 @@ WHERE args->'task'->>'task_id' = $1`, taskID).Scan(&riverArgs); err != nil {
 func assertWorkflowContractTerminalFacts(
 	t testing.TB,
 	db *sql.DB,
-	task *tasks.Task,
+	coreTask *tasks.Task,
+	adminTask *taskservice.AdminTaskMonitorDetail,
 	failedProvider *accounts.ApiAccount,
 	successfulProvider *accounts.ApiAccount,
 ) {
 	t.Helper()
-	if task.Status != tasks.StatusCompleted ||
-		task.RetryCount != 1 ||
-		task.ResolvedModel != "" ||
-		task.AccountID == nil ||
-		*task.AccountID != successfulProvider.ID {
-		t.Fatalf("terminal Task=%+v, want completed with execution Account fact and no active model lease", task)
+	if coreTask.Status != tasks.StatusCompleted ||
+		coreTask.RetryCount != 1 ||
+		coreTask.ResolvedModel != "" ||
+		coreTask.AccountID == nil ||
+		*coreTask.AccountID != successfulProvider.ID {
+		t.Fatalf("terminal Task=%+v, want completed with execution Account fact and no active model lease", coreTask)
 	}
-	if task.BillingSnapshot == nil ||
-		task.BillingSnapshot.SettlementState != "captured" ||
-		task.BillingSnapshot.TotalCredits != 5 ||
-		!task.BillingSnapshot.FeatureExists {
-		t.Fatalf("Admin Billing snapshot=%+v", task.BillingSnapshot)
+	if adminTask.Billing == nil ||
+		adminTask.Billing.SettlementState != "captured" ||
+		adminTask.Billing.TotalCredits != 5 ||
+		!adminTask.Billing.FeatureExists {
+		t.Fatalf("Admin Billing snapshot=%+v", adminTask.Billing)
 	}
-	if len(task.ExecutionAttempts) != 2 {
-		t.Fatalf("Admin execution attempts=%d, want 2: %+v", len(task.ExecutionAttempts), task.ExecutionAttempts)
+	if len(adminTask.ExecutionAttempts) != 2 {
+		t.Fatalf("Admin execution attempts=%d, want 2: %+v", len(adminTask.ExecutionAttempts), adminTask.ExecutionAttempts)
 	}
-	failedAttempt := task.ExecutionAttempts[0]
+	failedAttempt := adminTask.ExecutionAttempts[0]
 	if failedAttempt.AttemptNo != 1 ||
 		failedAttempt.Status != tasks.TaskAttemptStatusRequeued ||
 		failedAttempt.ProviderEndpointID != failedProvider.ProviderEndpointID ||
@@ -372,7 +378,7 @@ func assertWorkflowContractTerminalFacts(
 		failedAttempt.FailureCategory != tasks.FailureCategoryTimeout {
 		t.Fatalf("first Admin execution attempt=%+v", failedAttempt)
 	}
-	successfulAttempt := task.ExecutionAttempts[1]
+	successfulAttempt := adminTask.ExecutionAttempts[1]
 	if successfulAttempt.AttemptNo != 2 ||
 		successfulAttempt.Status != tasks.TaskAttemptStatusCompleted ||
 		successfulAttempt.ProviderEndpointID != successfulProvider.ProviderEndpointID ||
@@ -387,13 +393,13 @@ SELECT
   COUNT(*) FILTER (WHERE command_type = 'capture'),
   COUNT(*) FILTER (WHERE command_type = 'release')
 FROM credit_transactions
-WHERE business_reference_id = $1`, task.TaskID).Scan(&holdCount, &captureCount, &releaseCount); err != nil {
+WHERE business_reference_id = $1`, coreTask.TaskID).Scan(&holdCount, &captureCount, &releaseCount); err != nil {
 		t.Fatal(err)
 	}
 	if holdCount != 1 || captureCount != 1 || releaseCount != 0 {
 		t.Fatalf("Ledger hold/capture/release=%d/%d/%d, want 1/1/0", holdCount, captureCount, releaseCount)
 	}
-	assertRiverTaskBillingState(t, db, task.TaskID, tasks.StatusCompleted, "captured", 15, 0)
+	assertRiverTaskBillingState(t, db, coreTask.TaskID, tasks.StatusCompleted, "captured", 15, 0)
 
 	var snapshotTotal int64
 	var settlementState string
@@ -412,7 +418,7 @@ JOIN task_billing_settlements settlements USING (task_id)
 JOIN task_attempts attempts USING (task_id)
 JOIN task_leases leases ON leases.id = attempts.lease_id
 WHERE snapshots.task_id = $1
-GROUP BY snapshots.total_credits, settlements.state`, task.TaskID).Scan(
+GROUP BY snapshots.total_credits, settlements.state`, coreTask.TaskID).Scan(
 		&snapshotTotal,
 		&settlementState,
 		&attemptCount,
@@ -423,8 +429,8 @@ GROUP BY snapshots.total_credits, settlements.state`, task.TaskID).Scan(
 	); err != nil {
 		t.Fatal(err)
 	}
-	if snapshotTotal != task.BillingSnapshot.TotalCredits ||
-		settlementState != task.BillingSnapshot.SettlementState ||
+	if snapshotTotal != adminTask.Billing.TotalCredits ||
+		settlementState != adminTask.Billing.SettlementState ||
 		attemptCount != 2 ||
 		failedAttemptProviderID != failedAttempt.ProviderEndpointID ||
 		failedAttemptModel != failedAttempt.ResolvedModel ||
@@ -433,9 +439,9 @@ GROUP BY snapshots.total_credits, settlements.state`, task.TaskID).Scan(
 		t.Fatalf(
 			"database/Admin facts snapshot=%d/%d settlement=%s/%s attempts=%d failed=%d/%d/%s/%s successful=%d/%d/%s/%s",
 			snapshotTotal,
-			task.BillingSnapshot.TotalCredits,
+			adminTask.Billing.TotalCredits,
 			settlementState,
-			task.BillingSnapshot.SettlementState,
+			adminTask.Billing.SettlementState,
 			attemptCount,
 			failedAttemptProviderID,
 			failedAttempt.ProviderEndpointID,

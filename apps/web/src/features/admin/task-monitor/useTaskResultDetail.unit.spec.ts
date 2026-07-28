@@ -2,7 +2,7 @@ import { nextTick, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { useTaskResultDetail } from './useTaskResultDetail'
 import { getSafeResultImageUrl, getSafeTaskResultImageUrl } from './taskResultImages'
-import type { Task } from '../../../shared/api/task'
+import type { AdminTaskMonitorDetailModel } from './taskMonitorResource'
 
 describe('task result image URL validation', () => {
   it.each([
@@ -40,9 +40,9 @@ describe('task result image URL validation', () => {
   })
 
   it('does not expose unsafe detail image URLs for rendering', () => {
-    const task = ref<Task | null>({
-      result: '{"image_url":"https://example.com/unsafe.png"}',
-    } as unknown as Task)
+    const task = ref<AdminTaskMonitorDetailModel | null>(
+      makeTaskDetail({ result: '{"image_url":"https://example.com/unsafe.png"}' }),
+    )
     const detail = useTaskResultDetail(task, { feedback: createTaskResultFeedback() })
 
     expect(detail.resultImageUrl.value).toBe('')
@@ -51,7 +51,7 @@ describe('task result image URL validation', () => {
   it('does not open rejected URLs', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
     const feedback = createTaskResultFeedback()
-    const detail = useTaskResultDetail(ref<Task | null>(null), { feedback })
+    const detail = useTaskResultDetail(ref<AdminTaskMonitorDetailModel | null>(null), { feedback })
 
     detail.openResultImage('javascript:alert(1)')
 
@@ -63,7 +63,9 @@ describe('task result image URL validation', () => {
 
   it('identifies result image candidates that cannot be rendered safely', () => {
     const detail = useTaskResultDetail(
-      ref<Task | null>({ result: '{"image_url":"javascript:alert(1)"}' } as Task),
+      ref<AdminTaskMonitorDetailModel | null>(
+        makeTaskDetail({ result: '{"image_url":"javascript:alert(1)"}' }),
+      ),
       { feedback: createTaskResultFeedback() },
     )
 
@@ -72,11 +74,11 @@ describe('task result image URL validation', () => {
   })
 
   it('resets debug expansion when the dialog switches tasks', async () => {
-    const task = ref<Task | null>({ task_id: 'first' } as Task)
+    const task = ref<AdminTaskMonitorDetailModel | null>(makeTaskDetail({ task_id: 'first' }))
     const detail = useTaskResultDetail(task, { feedback: createTaskResultFeedback() })
 
     detail.showDebugResult.value = true
-    task.value = { task_id: 'second' } as Task
+    task.value = makeTaskDetail({ task_id: 'second' })
     await nextTick()
 
     expect(detail.showDebugResult.value).toBe(false)
@@ -86,7 +88,7 @@ describe('task result image URL validation', () => {
     const feedback = createTaskResultFeedback()
     const writeText = vi.fn().mockRejectedValue(new Error('denied'))
     vi.stubGlobal('navigator', { clipboard: { writeText } })
-    const detail = useTaskResultDetail(ref<Task | null>(null), { feedback })
+    const detail = useTaskResultDetail(ref<AdminTaskMonitorDetailModel | null>(null), { feedback })
 
     detail.copyToClipboard('task_1')
     await Promise.resolve()
@@ -99,7 +101,7 @@ describe('task result image URL validation', () => {
   it('reports unavailable clipboard access as a copy failure', () => {
     const feedback = createTaskResultFeedback()
     vi.stubGlobal('navigator', { clipboard: undefined })
-    const detail = useTaskResultDetail(ref<Task | null>(null), { feedback })
+    const detail = useTaskResultDetail(ref<AdminTaskMonitorDetailModel | null>(null), { feedback })
 
     detail.copyToClipboard('task_1')
 
@@ -113,5 +115,32 @@ function createTaskResultFeedback() {
     unsafeImageUrlRejected: vi.fn(),
     copiedToClipboard: vi.fn(),
     copyFailed: vi.fn(),
+  }
+}
+
+function makeTaskDetail(
+  overrides: Partial<AdminTaskMonitorDetailModel> = {},
+): AdminTaskMonitorDetailModel {
+  return {
+    task_id: 'task-1',
+    correlation_id: 'task-1',
+    user_id: 1,
+    prompt: '',
+    user_prompt: '',
+    params: '{}',
+    feature_slug: 'sketch-to-image',
+    priority: 2,
+    status: 'completed',
+    retry_count: 0,
+    error_msg: '',
+    result: '',
+    created_at: '2026-07-27T08:00:00Z',
+    updated_at: '2026-07-27T08:00:00Z',
+    completed_at: null,
+    cancelled_at: null,
+    cancelled_by: null,
+    cancel_reason: '',
+    execution_attempts: [],
+    ...overrides,
   }
 }

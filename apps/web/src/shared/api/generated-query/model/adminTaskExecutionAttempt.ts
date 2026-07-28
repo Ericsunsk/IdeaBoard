@@ -11,6 +11,8 @@ import type { AdminTaskExecutionAttemptStatus } from './adminTaskExecutionAttemp
 export interface AdminTaskExecutionAttempt {
   /** @minimum 1 */
   attempt_no: number
+  /** @minimum 1 */
+  account_id: number
   status: AdminTaskExecutionAttemptStatus
   stage: AdminTaskExecutionAttemptStage
   failure_category: AdminTaskExecutionAttemptFailureCategory

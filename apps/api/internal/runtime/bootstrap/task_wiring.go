@@ -158,6 +158,7 @@ func newAppTaskRuntime(
 		TaskBilling:         taskBillingService,
 		AdminBillingHistory: repos.taskRepo,
 		AdminTaskTrace:      repos.taskRepo,
+		AdminTaskListRead:   repos.taskRepo,
 		BillableItems:       services.billableItemRegistry,
 	}, taskservice.ServiceOptions{
 		EventHub:   taskEventHub,

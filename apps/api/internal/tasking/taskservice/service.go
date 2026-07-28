@@ -29,6 +29,7 @@ type Service struct {
 	taskBilling         *taskbilling.Service
 	adminBillingHistory AdminBillingHistoryStore
 	adminTaskTrace      AdminTaskTraceStore
+	adminTaskListRead   AdminTaskListReadStore
 	billableItems       BillableItemLookup
 }
 
@@ -56,6 +57,51 @@ type AdminTaskTraceStore interface {
 	ListAdminTaskAttempts(context.Context, []string) (map[string][]tasks.AdminTaskAttempt, error)
 }
 
+type AdminTaskListReadStore interface {
+	ListAdminTaskLatestExecutions(context.Context, []string) (map[string]tasks.AdminTaskExecutionSnapshot, error)
+}
+
+type AdminTaskMonitorExecutionSnapshot = tasks.AdminTaskExecutionSnapshot
+
+type AdminTaskMonitorListItem struct {
+	TaskID          string                             `json:"task_id"`
+	UserID          int64                              `json:"user_id"`
+	Prompt          string                             `json:"prompt"`
+	Priority        int                                `json:"priority"`
+	Status          string                             `json:"status"`
+	ErrorMsg        string                             `json:"error_msg"`
+	Result          string                             `json:"result"`
+	CreatedAt       time.Time                          `json:"created_at"`
+	CompletedAt     *time.Time                         `json:"completed_at"`
+	LatestExecution *AdminTaskMonitorExecutionSnapshot `json:"latest_execution,omitempty"`
+}
+
+type AdminTaskMonitorDetail struct {
+	TaskID            string                             `json:"task_id"`
+	CorrelationID     string                             `json:"correlation_id"`
+	UserID            int64                              `json:"user_id"`
+	Prompt            string                             `json:"prompt"`
+	UserPrompt        string                             `json:"user_prompt"`
+	Params            string                             `json:"params"`
+	FeatureSlug       string                             `json:"feature_slug"`
+	Priority          int                                `json:"priority"`
+	Status            string                             `json:"status"`
+	RetryCount        int                                `json:"retry_count"`
+	ErrorMsg          string                             `json:"error_msg"`
+	Result            string                             `json:"result"`
+	Outputs           []tasks.TaskOutput                 `json:"outputs,omitempty"`
+	ExecutionMetrics  *tasks.TaskExecutionMetrics        `json:"execution_metrics,omitempty"`
+	CreatedAt         time.Time                          `json:"created_at"`
+	UpdatedAt         time.Time                          `json:"updated_at"`
+	CompletedAt       *time.Time                         `json:"completed_at"`
+	CancelledAt       *time.Time                         `json:"cancelled_at"`
+	CancelledBy       *int64                             `json:"cancelled_by"`
+	CancelReason      string                             `json:"cancel_reason"`
+	Billing           *tasks.AdminBillingSnapshot        `json:"billing,omitempty"`
+	LatestExecution   *AdminTaskMonitorExecutionSnapshot `json:"latest_execution,omitempty"`
+	ExecutionAttempts []tasks.AdminTaskAttempt           `json:"execution_attempts"`
+}
+
 type BillableItemLookup interface {
 	Contains(string) bool
 }
@@ -69,6 +115,7 @@ type ServiceDeps struct {
 	TaskBilling         *taskbilling.Service
 	AdminBillingHistory AdminBillingHistoryStore
 	AdminTaskTrace      AdminTaskTraceStore
+	AdminTaskListRead   AdminTaskListReadStore
 	BillableItems       BillableItemLookup
 }
 
@@ -100,6 +147,7 @@ func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 		taskBilling:         deps.TaskBilling,
 		adminBillingHistory: deps.AdminBillingHistory,
 		adminTaskTrace:      deps.AdminTaskTrace,
+		adminTaskListRead:   deps.AdminTaskListRead,
 		billableItems:       deps.BillableItems,
 	}
 }
@@ -180,19 +228,22 @@ func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, re
 	return result, nil
 }
 
-func (s *Service) GetTask(ctx context.Context, taskID string) (*tasks.Task, error) {
+func (s *Service) GetTask(ctx context.Context, taskID string) (*AdminTaskMonitorDetail, error) {
 	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
 	if err != nil {
 		return nil, err
 	}
 	s.attachOutputsForTasks(ctx, []*tasks.Task{task})
-	if err := s.attachAdminBillingSnapshots(ctx, []*tasks.Task{task}); err != nil {
+	billing, err := s.loadAdminBillingSnapshots(ctx, []string{task.TaskID})
+	if err != nil {
 		return nil, err
 	}
-	if err := s.attachAdminTaskAttempts(ctx, task); err != nil {
+	traces, err := s.loadAdminTaskAttempts(ctx, []string{task.TaskID})
+	if err != nil {
 		return nil, err
 	}
-	return task, nil
+	billingSnapshot, hasBilling := billing[task.TaskID]
+	return adminTaskMonitorDetailFromTask(task, billingSnapshot, hasBilling, traces[task.TaskID]), nil
 }
 
 func (s *Service) GetUserTask(ctx context.Context, taskID string, userID int64) (*tasks.Task, error) {
@@ -204,7 +255,7 @@ func (s *Service) GetUserTask(ctx context.Context, taskID string, userID int64) 
 	return task, nil
 }
 
-func (s *Service) ListTasks(ctx context.Context, req *tasks.TaskListRequest) ([]*tasks.Task, tasks.TaskListCounts, error) {
+func (s *Service) ListTasks(ctx context.Context, req *tasks.TaskListRequest) ([]AdminTaskMonitorListItem, tasks.TaskListCounts, error) {
 	if req.Page < 1 {
 		req.Page = 1
 	}
@@ -221,53 +272,135 @@ func (s *Service) ListTasks(ctx context.Context, req *tasks.TaskListRequest) ([]
 	if err != nil {
 		return nil, tasks.TaskListCounts{}, err
 	}
-	s.attachOutputsForTasks(ctx, items)
-	if err := s.attachAdminBillingSnapshots(ctx, items); err != nil {
+	latest, err := s.loadAdminTaskLatestExecutions(ctx, taskIDsFromTasks(items))
+	if err != nil {
 		return nil, tasks.TaskListCounts{}, err
 	}
-	return items, counts, nil
+	result := make([]AdminTaskMonitorListItem, 0, len(items))
+	for _, item := range items {
+		latestExecution, hasLatestExecution := latest[item.TaskID]
+		result = append(result, adminTaskMonitorListItemFromTask(item, latestExecution, hasLatestExecution))
+	}
+	return result, counts, nil
 }
 
-func (s *Service) attachAdminBillingSnapshots(ctx context.Context, items []*tasks.Task) error {
-	if s.adminBillingHistory == nil || len(items) == 0 {
-		return nil
+func (s *Service) loadAdminTaskLatestExecutions(ctx context.Context, taskIDs []string) (map[string]tasks.AdminTaskExecutionSnapshot, error) {
+	if s.adminTaskListRead == nil || len(taskIDs) == 0 {
+		return map[string]tasks.AdminTaskExecutionSnapshot{}, nil
 	}
-	taskIDs := make([]string, 0, len(items))
-	byTaskID := make(map[string]*tasks.Task, len(items))
-	for _, task := range items {
-		if task == nil || task.TaskID == "" {
-			continue
-		}
-		taskIDs = append(taskIDs, task.TaskID)
-		byTaskID[task.TaskID] = task
+	latestByTaskID, err := s.adminTaskListRead.ListAdminTaskLatestExecutions(ctx, taskIDs)
+	if err != nil {
+		return nil, fmt.Errorf("load Admin Task latest executions: %w", err)
+	}
+	return latestByTaskID, nil
+}
+
+func (s *Service) loadAdminBillingSnapshots(ctx context.Context, taskIDs []string) (map[string]tasks.AdminBillingSnapshot, error) {
+	if s.adminBillingHistory == nil || len(taskIDs) == 0 {
+		return map[string]tasks.AdminBillingSnapshot{}, nil
 	}
 	snapshots, err := s.adminBillingHistory.ListAdminBillingSnapshots(ctx, taskIDs)
 	if err != nil {
-		return fmt.Errorf("load Admin Task Billing history: %w", err)
+		return nil, fmt.Errorf("load Admin Task Billing history: %w", err)
 	}
 	for taskID, snapshot := range snapshots {
 		if s.billableItems != nil {
 			snapshot.FeatureExists = s.billableItems.Contains(snapshot.SKU)
 		}
-		value := snapshot
-		byTaskID[taskID].BillingSnapshot = &value
+		snapshots[taskID] = snapshot
 	}
-	return nil
+	return snapshots, nil
 }
 
-func (s *Service) attachAdminTaskAttempts(ctx context.Context, task *tasks.Task) error {
-	if s.adminTaskTrace == nil || task == nil || task.TaskID == "" {
+func (s *Service) loadAdminTaskAttempts(ctx context.Context, taskIDs []string) (map[string][]tasks.AdminTaskAttempt, error) {
+	if s.adminTaskTrace == nil || len(taskIDs) == 0 {
+		return map[string][]tasks.AdminTaskAttempt{}, nil
+	}
+	attemptsByTaskID, err := s.adminTaskTrace.ListAdminTaskAttempts(ctx, taskIDs)
+	if err != nil {
+		return nil, fmt.Errorf("load Admin Task execution trace: %w", err)
+	}
+	return attemptsByTaskID, nil
+}
+
+func taskIDsFromTasks(items []*tasks.Task) []string {
+	taskIDs := make([]string, 0, len(items))
+	for _, item := range items {
+		if item != nil {
+			taskIDs = append(taskIDs, item.TaskID)
+		}
+	}
+	return taskIDs
+}
+
+func adminTaskMonitorExecutionSnapshotFromAttempt(attempt tasks.AdminTaskAttempt) *AdminTaskMonitorExecutionSnapshot {
+	return &AdminTaskMonitorExecutionSnapshot{
+		AccountID:            attempt.AccountID,
+		ProviderEndpointID:   attempt.ProviderEndpointID,
+		ProviderEndpointName: attempt.ProviderEndpointName,
+		ResolvedModel:        attempt.ResolvedModel,
+		APIType:              attempt.APIType,
+	}
+}
+
+func adminTaskMonitorListItemFromTask(task *tasks.Task, latestExecution tasks.AdminTaskExecutionSnapshot, hasLatestExecution bool) AdminTaskMonitorListItem {
+	if task == nil {
+		return AdminTaskMonitorListItem{}
+	}
+	item := AdminTaskMonitorListItem{
+		TaskID:      task.TaskID,
+		UserID:      task.UserID,
+		Prompt:      task.Prompt,
+		Priority:    task.Priority,
+		Status:      task.Status,
+		ErrorMsg:    task.ErrorMsg,
+		Result:      task.Result,
+		CreatedAt:   task.CreatedAt,
+		CompletedAt: task.CompletedAt,
+	}
+	if hasLatestExecution {
+		item.LatestExecution = &latestExecution
+	}
+	return item
+}
+
+func adminTaskMonitorDetailFromTask(task *tasks.Task, billing tasks.AdminBillingSnapshot, hasBilling bool, attempts []tasks.AdminTaskAttempt) *AdminTaskMonitorDetail {
+	if task == nil {
 		return nil
 	}
-	attemptsByTaskID, err := s.adminTaskTrace.ListAdminTaskAttempts(ctx, []string{task.TaskID})
-	if err != nil {
-		return fmt.Errorf("load Admin Task execution trace: %w", err)
+	if attempts == nil {
+		attempts = []tasks.AdminTaskAttempt{}
 	}
-	task.ExecutionAttempts = attemptsByTaskID[task.TaskID]
-	if task.ExecutionAttempts == nil {
-		task.ExecutionAttempts = []tasks.AdminTaskAttempt{}
+	detail := &AdminTaskMonitorDetail{
+		TaskID:            task.TaskID,
+		CorrelationID:     task.EffectiveCorrelationID(),
+		UserID:            task.UserID,
+		Prompt:            task.Prompt,
+		UserPrompt:        task.UserPrompt,
+		Params:            task.Params,
+		FeatureSlug:       task.FeatureSlug,
+		Priority:          task.Priority,
+		Status:            task.Status,
+		RetryCount:        task.RetryCount,
+		ErrorMsg:          task.ErrorMsg,
+		Result:            task.Result,
+		Outputs:           task.Outputs,
+		ExecutionMetrics:  task.ExecutionMetrics,
+		CreatedAt:         task.CreatedAt,
+		UpdatedAt:         task.UpdatedAt,
+		CompletedAt:       task.CompletedAt,
+		CancelledAt:       task.CancelledAt,
+		CancelledBy:       task.CancelledBy,
+		CancelReason:      task.CancelReason,
+		ExecutionAttempts: attempts,
 	}
-	return nil
+	if hasBilling {
+		detail.Billing = &billing
+	}
+	if len(attempts) > 0 {
+		detail.LatestExecution = adminTaskMonitorExecutionSnapshotFromAttempt(attempts[len(attempts)-1])
+	}
+	return detail
 }
 
 func normalizeTaskListStatus(status string) (string, error) {

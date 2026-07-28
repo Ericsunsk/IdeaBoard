@@ -97,6 +97,7 @@ type Querier interface {
 	ListAccountModelsByAccountIDs(ctx context.Context, accountIds []int64) ([]ApiAccountModel, error)
 	ListAccounts(ctx context.Context, arg ListAccountsParams) ([]ListAccountsRow, error)
 	ListAdminTaskAttemptsByTaskIDs(ctx context.Context, taskIds []string) ([]ListAdminTaskAttemptsByTaskIDsRow, error)
+	ListAdminTaskLatestExecutionsByTaskIDs(ctx context.Context, taskIds []string) ([]ListAdminTaskLatestExecutionsByTaskIDsRow, error)
 	ListBackfilledDatesByRange(ctx context.Context, arg ListBackfilledDatesByRangeParams) ([]time.Time, error)
 	ListBoardMembers(ctx context.Context, boardID string) ([]ListBoardMembersRow, error)
 	ListBoardShareTokens(ctx context.Context, boardID string) ([]BoardShareToken, error)

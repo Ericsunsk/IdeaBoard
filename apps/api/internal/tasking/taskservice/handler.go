@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/response"
@@ -18,41 +17,6 @@ import (
 
 type Handler struct {
 	taskService *Service
-}
-
-type adminTaskDTO struct {
-	ID                         int64                       `json:"id"`
-	TaskID                     string                      `json:"task_id"`
-	CorrelationID              string                      `json:"correlation_id"`
-	UserID                     int64                       `json:"user_id"`
-	AssignedProviderEndpointID *int64                      `json:"assigned_provider_endpoint_id"`
-	AssignedCredentialID       *int64                      `json:"assigned_credential_id"`
-	AccountID                  *int64                      `json:"account_id"`
-	Prompt                     string                      `json:"prompt"`
-	UserPrompt                 string                      `json:"user_prompt"`
-	Params                     string                      `json:"params"`
-	FeatureSlug                string                      `json:"feature_slug"`
-	Priority                   int                         `json:"priority"`
-	ResolvedModel              string                      `json:"resolved_model"`
-	APIType                    string                      `json:"api_type"`
-	ProviderEndpointName       string                      `json:"provider_endpoint_name"`
-	ProviderEndpointBaseURL    string                      `json:"provider_endpoint_base_url"`
-	CredentialFingerprint      string                      `json:"credential_fingerprint"`
-	CredentialKeyVersion       string                      `json:"credential_key_version"`
-	Status                     string                      `json:"status"`
-	RetryCount                 int                         `json:"retry_count"`
-	ErrorMsg                   string                      `json:"error_msg"`
-	Result                     string                      `json:"result"`
-	Outputs                    []tasks.TaskOutput          `json:"outputs,omitempty"`
-	ExecutionMetrics           *tasks.TaskExecutionMetrics `json:"execution_metrics,omitempty"`
-	CreatedAt                  time.Time                   `json:"created_at"`
-	UpdatedAt                  time.Time                   `json:"updated_at"`
-	CompletedAt                *time.Time                  `json:"completed_at"`
-	CancelledAt                *time.Time                  `json:"cancelled_at"`
-	CancelledBy                *int64                      `json:"cancelled_by"`
-	CancelReason               string                      `json:"cancel_reason"`
-	Billing                    *tasks.AdminBillingSnapshot `json:"billing,omitempty"`
-	ExecutionAttempts          []tasks.AdminTaskAttempt    `json:"execution_attempts,omitempty"`
 }
 
 type submitTaskResponse struct {
@@ -68,18 +32,18 @@ type submitTaskReadinessResponse struct {
 }
 
 type adminTaskResponse struct {
-	Task adminTaskDTO `json:"task"`
+	Task AdminTaskMonitorDetail `json:"task"`
 }
 
 type adminTaskListResponse struct {
-	Total          int64          `json:"total"`
-	PendingCount   int64          `json:"pending_count"`
-	RunningCount   int64          `json:"running_count"`
-	CompletedCount int64          `json:"completed_count"`
-	FailedCount    int64          `json:"failed_count"`
-	CancelledCount int64          `json:"cancelled_count"`
-	OtherCount     int64          `json:"other_count"`
-	List           []adminTaskDTO `json:"list"`
+	Total          int64                      `json:"total"`
+	PendingCount   int64                      `json:"pending_count"`
+	RunningCount   int64                      `json:"running_count"`
+	CompletedCount int64                      `json:"completed_count"`
+	FailedCount    int64                      `json:"failed_count"`
+	CancelledCount int64                      `json:"cancelled_count"`
+	OtherCount     int64                      `json:"other_count"`
+	List           []AdminTaskMonitorListItem `json:"list"`
 }
 
 type userTaskListResponse struct {
@@ -187,7 +151,7 @@ func (h *Handler) GetTask(c *gin.Context) {
 		response.Error(c, 404, "任务不存在")
 		return
 	}
-	response.SuccessDTO(c, adminTaskResponse{Task: toAdminTaskDTO(task)})
+	response.SuccessDTO(c, adminTaskResponse{Task: *task})
 }
 
 func (h *Handler) ListTasks(c *gin.Context) {
@@ -217,7 +181,7 @@ func (h *Handler) ListTasks(c *gin.Context) {
 		FailedCount:    counts.FailedCount,
 		CancelledCount: counts.CancelledCount,
 		OtherCount:     counts.OtherCount,
-		List:           toAdminTaskDTOs(taskItems),
+		List:           taskItems,
 	})
 }
 
@@ -331,60 +295,6 @@ func (h *Handler) StreamUserTask(c *gin.Context) {
 	}
 	if err := session.Run(c); errors.Is(err, errTaskStreamConnectionLimit) {
 		response.Error(c, http.StatusTooManyRequests, "SSE 连接数已达上限，请稍后重试")
-	}
-}
-
-func toAdminTaskDTOs(items []*tasks.Task) []adminTaskDTO {
-	result := make([]adminTaskDTO, 0, len(items))
-	for _, item := range items {
-		result = append(result, toAdminTaskDTO(item))
-	}
-	return result
-}
-
-func toAdminTaskDTO(task *tasks.Task) adminTaskDTO {
-	if task == nil {
-		return adminTaskDTO{}
-	}
-	var accountID, providerEndpointID, credentialID *int64
-	if strings.TrimSpace(task.ResolvedModel) != "" {
-		accountID = task.AccountID
-		providerEndpointID = task.AssignedProviderEndpointID
-		credentialID = task.AssignedCredentialID
-	}
-	return adminTaskDTO{
-		ID:                         task.ID,
-		TaskID:                     task.TaskID,
-		CorrelationID:              task.EffectiveCorrelationID(),
-		UserID:                     task.UserID,
-		AssignedProviderEndpointID: providerEndpointID,
-		AssignedCredentialID:       credentialID,
-		AccountID:                  accountID,
-		Prompt:                     task.Prompt,
-		UserPrompt:                 task.UserPrompt,
-		Params:                     task.Params,
-		FeatureSlug:                task.FeatureSlug,
-		Priority:                   task.Priority,
-		ResolvedModel:              task.ResolvedModel,
-		APIType:                    task.APIType,
-		ProviderEndpointName:       task.ProviderEndpointName,
-		ProviderEndpointBaseURL:    task.ProviderEndpointBaseURL,
-		CredentialFingerprint:      task.CredentialFingerprint,
-		CredentialKeyVersion:       task.CredentialKeyVersion,
-		Status:                     task.Status,
-		RetryCount:                 task.RetryCount,
-		ErrorMsg:                   task.ErrorMsg,
-		Result:                     task.Result,
-		Outputs:                    task.Outputs,
-		ExecutionMetrics:           task.ExecutionMetrics,
-		CreatedAt:                  task.CreatedAt,
-		UpdatedAt:                  task.UpdatedAt,
-		CompletedAt:                task.CompletedAt,
-		CancelledAt:                task.CancelledAt,
-		CancelledBy:                task.CancelledBy,
-		CancelReason:               task.CancelReason,
-		Billing:                    task.BillingSnapshot,
-		ExecutionAttempts:          task.ExecutionAttempts,
 	}
 }
 

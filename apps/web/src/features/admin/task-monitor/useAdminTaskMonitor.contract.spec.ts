@@ -2,13 +2,13 @@ import { computed, nextTick, ref, toValue, type MaybeRefOrGetter } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ListAdminTasksStatus,
-  type ApiResponseTaskListData,
+  type ApiResponseAdminTaskListData,
+  type AdminTaskMonitorListItem,
   type ListAdminTasksParams,
   type MonitorData,
   type MonitorResponse,
   type MonitorStats,
   type TaskMonitorSetting,
-  type Task,
 } from '../../../shared/api/generated-query/model'
 import { useAdminTaskList } from './useAdminTaskList'
 import { useAdminTaskRuntimeSnapshot } from './useAdminTaskRuntimeSnapshot'
@@ -81,7 +81,7 @@ beforeEach(() => {
 
 describe('useTaskMonitor polling', () => {
   it('uses aggregate pending/running counts instead of current page rows', async () => {
-    const data = ref<ApiResponseTaskListData>()
+    const data = ref<ApiResponseAdminTaskListData>()
     mockState.listAdminTasksReturn = {
       data,
       error: ref(null),
@@ -113,7 +113,7 @@ describe('useTaskMonitor polling', () => {
   it('exposes task list API errors so the page does not render them as an empty list', () => {
     const error = new Error('task list failed')
     mockState.listAdminTasksReturn = {
-      data: ref<ApiResponseTaskListData>(),
+      data: ref<ApiResponseAdminTaskListData>(),
       error: ref(error),
       isError: ref(true),
       isLoading: ref(false),
@@ -127,7 +127,7 @@ describe('useTaskMonitor polling', () => {
   })
 
   it('uses task monitor settings for page size and refresh interval', () => {
-    const data = ref<ApiResponseTaskListData>()
+    const data = ref<ApiResponseAdminTaskListData>()
     mockState.taskMonitorSettings.value = {
       list_page_size: 24,
       auto_refresh_enabled: true,
@@ -151,7 +151,7 @@ describe('useTaskMonitor polling', () => {
   })
 
   it('uses the shared page boundary for pending navigation, clamp, and filter reset', () => {
-    const data = ref<ApiResponseTaskListData>(makeTaskList([], { pending: 0, running: 0 }, 25))
+    const data = ref<ApiResponseAdminTaskListData>(makeTaskList([], { pending: 0, running: 0 }, 25))
     const isFetching = ref(false)
     mockState.listAdminTasksReturn = {
       data,
@@ -187,7 +187,7 @@ describe('useTaskMonitor polling', () => {
   })
 
   it('keeps the current page when a replacement request fails without data', () => {
-    const data = ref<ApiResponseTaskListData | undefined>(
+    const data = ref<ApiResponseAdminTaskListData | undefined>(
       makeTaskList([], { pending: 0, running: 0 }, 25),
     )
     mockState.listAdminTasksReturn = {
@@ -275,25 +275,25 @@ describe('useTaskRuntimeMonitor SSE fallback', () => {
   })
 })
 
-function makeTask(status: string, id: number): Task {
+function makeTask(status: string, id: number): AdminTaskMonitorListItem {
   return {
-    id,
     task_id: `task-${id}`,
-    correlation_id: `task-${id}`,
     user_id: 1,
     prompt: `prompt-${id}`,
     priority: 2,
     status,
+    error_msg: '',
+    result: '',
     created_at: '2026-06-10T00:00:00.000Z',
-    updated_at: '2026-06-10T00:00:00.000Z',
+    completed_at: null,
   }
 }
 
 function makeTaskList(
-  list: Task[],
+  list: AdminTaskMonitorListItem[],
   counts: { pending: number; running: number },
   total = list.length,
-): ApiResponseTaskListData {
+): ApiResponseAdminTaskListData {
   return {
     list,
     total,

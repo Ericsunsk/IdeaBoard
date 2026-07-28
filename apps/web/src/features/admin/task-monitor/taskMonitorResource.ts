@@ -4,12 +4,15 @@ import {
   deleteAdminTasks,
   getAdminTask,
   getListAdminTasksQueryKey,
+  listAdminTasks,
   useGetAdminTask,
   useListAdminTasks,
 } from '../../../shared/api/generated-query/admin-tasks/admin-tasks'
 import type {
-  AdminTask as AdminTaskModel,
   AdminTaskDeleteResult,
+  AdminTaskExecutionAttempt,
+  AdminTaskMonitorDetail,
+  AdminTaskMonitorListItem,
   ApiResponseAdminTaskData,
   ApiResponseAdminTaskListData,
   ListAdminTasksParams,
@@ -17,15 +20,15 @@ import type {
 import { createApiDataSelector, resolveApiData } from '../../../shared/api/apiResponse'
 
 export type AdminTaskListQueryParams = ListAdminTasksParams
-export type AdminTask = AdminTaskModel
-export type AdminTaskExecutionAttempt = NonNullable<AdminTask['execution_attempts']>[number]
+export type AdminTaskMonitorDetailModel = AdminTaskMonitorDetail
+export type AdminTaskMonitorListItemModel = AdminTaskMonitorListItem
+export type AdminTaskMonitorExecutionAttempt = AdminTaskExecutionAttempt
 
 type UseAdminTaskListResourceOptions = Parameters<
   typeof useListAdminTasks<ApiResponseAdminTaskListData>
 >[1]
 
-const selectAdminTaskList =
-  createApiDataSelector<ApiResponseAdminTaskListData>('加载任务列表失败')
+const selectAdminTaskList = createApiDataSelector<ApiResponseAdminTaskListData>('加载任务列表失败')
 const selectAdminTaskDetail = createApiDataSelector<ApiResponseAdminTaskData>('加载任务详情失败')
 
 export function useAdminTaskListResource(
@@ -43,6 +46,12 @@ export function useAdminTaskListResource(
 
 export function getAdminTaskListQueryKey() {
   return getListAdminTasksQueryKey()
+}
+
+export async function getAdminTaskList(
+  params: AdminTaskListQueryParams,
+): Promise<ApiResponseAdminTaskListData> {
+  return resolveApiData(listAdminTasks(params), '加载任务列表失败')
 }
 
 export function getAdminMonitorQueryKey() {
@@ -66,7 +75,7 @@ export function useAdminTaskDetailResource(
   })
 }
 
-export async function getAdminTaskDetail(taskID: string): Promise<AdminTask> {
+export async function getAdminTaskDetail(taskID: string): Promise<AdminTaskMonitorDetailModel> {
   const data = await resolveApiData(getAdminTask(taskID), '加载任务详情失败')
   return data.task
 }

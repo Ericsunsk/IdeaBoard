@@ -6,7 +6,7 @@ import type {
 import { useAdminPagePagination } from '../shared/composables/useAdminPagePagination'
 import { useAdminQueryPolling } from '../shared/composables/useAdminQueryPolling'
 import { useAdminTaskMonitorSettingQuery } from '../system-settings/taskMonitorSettingsResource'
-import { useAdminTaskListResource, type AdminTask } from './taskMonitorResource'
+import { useAdminTaskListResource, type AdminTaskMonitorListItemModel } from './taskMonitorResource'
 
 type TaskStatusStats = {
   running: number
@@ -17,7 +17,7 @@ type TaskStatusStats = {
   other: number
 }
 
-export type AdminTaskRow = AdminTask
+export type AdminTaskRow = AdminTaskMonitorListItemModel
 
 export function useAdminTaskList() {
   const pageState = ref(1)

@@ -283,7 +283,9 @@
 
         <Column header="账号" :style="{ width: '88px' }">
           <template #body="{ data }">
-            <span class="text-admin-meta text-admin-text-3">{{ data.account_id || '-' }}</span>
+            <span class="text-admin-meta text-admin-text-3">{{
+              getTaskAccountLabel(data) || '-'
+            }}</span>
           </template>
         </Column>
 
@@ -292,12 +294,12 @@
             <div class="flex min-w-0 flex-col gap-0.5">
               <span
                 class="block max-w-[160px] truncate text-admin-meta font-semibold text-admin-text-2-strong"
-                :title="data.provider_endpoint_base_url || getTaskEndpointLabel(data) || '-'"
+                :title="getTaskEndpointLabel(data) || '-'"
               >
                 {{ getTaskEndpointLabel(data) || '-' }}
               </span>
               <span class="block max-w-[160px] truncate text-admin-micro text-admin-text-3">
-                {{ data.api_type || '-' }}
+                {{ getTaskAPITypeLabel(data) || '-' }}
               </span>
             </div>
           </template>
@@ -426,6 +428,8 @@ import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import {
   formatTaskCreatedAt,
+  getTaskAccountLabel,
+  getTaskAPITypeLabel,
   getTaskApiCall,
   getTaskDuration,
   getTaskEndpointLabel,
@@ -464,7 +468,9 @@ const isDetailLoading = computed(
   () => detailModalVisible.value && detailTask.value === null && !detailQuery.isError.value,
 )
 const detailErrorMessage = computed(() =>
-  detailQuery.isError.value ? formatDisplayErrorMessage(detailQuery.error.value, '加载任务详情失败') : '',
+  detailQuery.isError.value
+    ? formatDisplayErrorMessage(detailQuery.error.value, '加载任务详情失败')
+    : '',
 )
 
 const {

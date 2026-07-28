@@ -1,7 +1,7 @@
 import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue'
 import { formatAdminDateTime } from '../../../shared/utils/dateTime'
-import type { Task } from '../../../shared/api/task'
 import type { AdminTaskResultFeedback } from './useAdminTaskMonitorFeedback'
+import type { AdminTaskMonitorDetailModel } from './taskMonitorResource'
 import { getSafeResultImageUrl, hasTaskResultImageCandidate } from './taskResultImages'
 import {
   formatTaskDuration,
@@ -11,8 +11,8 @@ import {
   getTaskResultDetailImageUrl,
 } from './taskResultPresentation'
 
-export function useTaskResultDetail<T extends Task>(
-  task: MaybeRefOrGetter<T | null>,
+export function useTaskResultDetail(
+  task: MaybeRefOrGetter<AdminTaskMonitorDetailModel | null>,
   options: { feedback: AdminTaskResultFeedback },
 ) {
   const detailTask = computed(() => toValue(task))
@@ -71,11 +71,11 @@ export function useTaskResultDetail<T extends Task>(
     return formatAdminDateTime(timeStr, timeStr)
   }
 
-  function getErrorReason(row: Task): string {
+  function getErrorReason(row: AdminTaskMonitorDetailModel): string {
     return getTaskErrorReason(row)
   }
 
-  function calcDuration(row: Task): string {
+  function calcDuration(row: AdminTaskMonitorDetailModel): string {
     return formatTaskDuration(row)
   }
 
