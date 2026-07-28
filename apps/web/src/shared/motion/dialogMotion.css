@@ -1,0 +1,43 @@
+.ib-dialog-motion-enter-active,
+.ib-dialog-motion-appear-active {
+  transition:
+    opacity var(--motion-enter-duration) var(--motion-enter-easing),
+    transform var(--motion-enter-duration) var(--motion-enter-easing);
+}
+
+.ib-dialog-motion-leave-active {
+  transition:
+    opacity var(--motion-exit-duration) var(--motion-exit-easing),
+    transform var(--motion-exit-duration) var(--motion-exit-easing);
+}
+
+.ib-dialog-motion-enter-from,
+.ib-dialog-motion-appear-from,
+.ib-dialog-motion-leave-to {
+  opacity: 0;
+  transform: var(--ib-dialog-motion-from-transform, none);
+}
+
+.ib-dialog-motion-enter-to,
+.ib-dialog-motion-appear-to,
+.ib-dialog-motion-leave-from {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ib-dialog-motion-enter-active,
+  .ib-dialog-motion-appear-active,
+  .ib-dialog-motion-leave-active {
+    transition: none;
+  }
+
+  .ib-dialog-motion-enter-from,
+  .ib-dialog-motion-appear-from,
+  .ib-dialog-motion-leave-to,
+  .ib-dialog-motion-enter-to,
+  .ib-dialog-motion-appear-to,
+  .ib-dialog-motion-leave-from {
+    transform: none;
+  }
+}

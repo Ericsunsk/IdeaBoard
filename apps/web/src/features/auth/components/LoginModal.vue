@@ -11,8 +11,8 @@
     :pt="authDialogPt"
     @update:visible="handleVisibleChange"
   >
-    <Transition name="auth-modal" appear>
-      <div v-if="show" class="relative">
+    <template v-if="show">
+      <div class="relative">
         <div :class="authModalShellClass">
           <div :class="authModalBackdropClass" aria-hidden="true"></div>
           <AuthModalCloseButton :disabled="loading" @click="handleClose" />
@@ -118,7 +118,7 @@
           </div>
         </div>
       </div>
-    </Transition>
+    </template>
   </Dialog>
 </template>
 
@@ -137,7 +137,7 @@ import IbFormField from '../../../shared/components/IbFormField.vue'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import { getRequiredError } from './authFormUtils'
 import {
-  authDialogPt,
+  createAuthDialogPt,
   authButtonPt,
   authFooterClass,
   authInputIconClass,
@@ -166,6 +166,7 @@ const emit = defineEmits<{
   (e: 'login-success'): void
 }>()
 
+const authDialogPt = createAuthDialogPt()
 const { projectName } = useSiteBranding()
 
 type LoginField = 'username' | 'password'
@@ -263,35 +264,3 @@ async function handleLogin() {
   emit('update:show', false)
 }
 </script>
-
-<style scoped>
-.auth-modal-enter-active,
-.auth-modal-leave-active,
-.auth-modal-appear-active {
-  transition:
-    opacity var(--duration-ib-dock) var(--ease-ib-standard),
-    transform var(--duration-ib-dock) var(--ease-ib-standard);
-}
-
-.auth-modal-enter-from,
-.auth-modal-leave-to,
-.auth-modal-appear-from {
-  opacity: 0;
-  transform: translateY(24px) scale(0.96);
-}
-
-.auth-modal-enter-to,
-.auth-modal-leave-from,
-.auth-modal-appear-to {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .auth-modal-enter-active,
-  .auth-modal-leave-active,
-  .auth-modal-appear-active {
-    transition: none;
-  }
-}
-</style>

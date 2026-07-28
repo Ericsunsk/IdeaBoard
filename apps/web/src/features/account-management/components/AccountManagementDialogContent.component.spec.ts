@@ -1,14 +1,11 @@
 /* eslint-disable vue/one-component-per-file -- Local stubs keep the layout contract test focused. */
 import { defineComponent, ref } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen } from '../../../test/render'
 import { useUserStore } from '../../../app/stores/user'
 import type { User } from '../../../shared/api/userSession'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
-import {
-  accountTabRegistry,
-  type AccountManagementTab,
-} from '../accountTabRegistry'
+import { accountTabRegistry, type AccountManagementTab } from '../accountTabRegistry'
 import AccountManagementDialogContent from './AccountManagementDialogContent.vue'
 
 const logoutAndRedirectMock = vi.hoisted(() => vi.fn())
@@ -90,9 +87,24 @@ const MessageStub = defineComponent({
   template: '<p><slot /></p>',
 })
 
-const accountTabCases: Array<{ key: AccountManagementTab; label: string }> = accountTabRegistry.flatMap(
-  ({ tabs }) => tabs.map(({ key, label }) => ({ key, label })),
-)
+const TransitionStub = defineComponent({
+  props: {
+    name: { type: String, default: '' },
+    css: { type: Boolean, default: true },
+  },
+  template: `
+    <div
+      data-testid="account-pane-transition"
+      :data-transition-name="name"
+      :data-transition-css="String(css)"
+    >
+      <slot />
+    </div>
+  `,
+})
+
+const accountTabCases: Array<{ key: AccountManagementTab; label: string }> =
+  accountTabRegistry.flatMap(({ tabs }) => tabs.map(({ key, label }) => ({ key, label })))
 
 function makeUser(): User {
   return {
@@ -121,6 +133,7 @@ function renderAccountManagementDialogContent(initialTab?: AccountManagementTab)
         Message: MessageStub,
         Password: PasswordStub,
         Tag: TagStub,
+        transition: TransitionStub,
         UserBillingRecordsPane: {
           props: ['active'],
           template: '<section aria-label="账单记录">最终收支记录</section>',
@@ -138,7 +151,15 @@ function renderAccountManagementDialogContent(initialTab?: AccountManagementTab)
 }
 
 describe('AccountManagementDialogContent', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   beforeEach(() => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: false })),
+    )
     logoutAndRedirectMock.mockReset()
     logoutAndRedirectMock.mockResolvedValue(true)
     useAvatarUploadWorkflowMock.mockReset()
@@ -148,6 +169,38 @@ describe('AccountManagementDialogContent', () => {
     })
     useUserStore().clearAuth()
     localStorage.clear()
+  })
+
+  it('uses the shared Motion Policy while switching account panes', async () => {
+    const { user } = renderAccountManagementDialogContent()
+
+    expect(screen.getByTestId('account-pane-transition')).toHaveAttribute(
+      'data-transition-name',
+      'account-pane',
+    )
+    expect(screen.getByTestId('account-pane-transition')).toHaveAttribute(
+      'data-transition-css',
+      'true',
+    )
+
+    await user.click(screen.getByRole('button', { name: '账号安全' }))
+    expect(screen.getByRole('heading', { name: '账号安全' })).toBeVisible()
+  })
+
+  it('switches panes immediately under reduced motion', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true })),
+    )
+    const { user } = renderAccountManagementDialogContent()
+
+    expect(screen.getByTestId('account-pane-transition')).toHaveAttribute(
+      'data-transition-css',
+      'false',
+    )
+
+    await user.click(screen.getByRole('button', { name: '账号安全' }))
+    expect(screen.getByRole('heading', { name: '账号安全' })).toBeVisible()
   })
 
   it('renders a left navigation rail with profile content in the right pane', () => {
@@ -217,10 +270,7 @@ describe('AccountManagementDialogContent', () => {
 
       await user.click(screen.getByRole('button', { name: label }))
 
-      expect(screen.getByRole('button', { name: label })).toHaveAttribute(
-        'aria-current',
-        'page',
-      )
+      expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-current', 'page')
     },
   )
 

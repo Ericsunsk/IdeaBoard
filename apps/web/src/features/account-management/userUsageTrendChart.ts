@@ -8,6 +8,7 @@ import {
   type ChartOptions,
 } from '../../shared/lib/chartPrimitives'
 import { shouldShowChartTimeTick, type ChartTimeTickDensity } from '../../shared/lib/chartTimeRange'
+import { resolveMotionTiming } from '../../shared/motion/motionPolicy'
 import { formatIdeaAmount } from '../../shared/utils/ideaCurrency'
 
 export type UserUsageTrendPoint = {
@@ -52,6 +53,7 @@ export function buildUserUsageTrendChart(
   trend: readonly UserUsageTrendPoint[],
   theme: UserUsageChartTheme,
 ): { data: ChartData; options: ChartOptions } {
+  const motionTiming = resolveMotionTiming('enter')
   const labels = trend.map((point) => formatTrendDateLabel(point.date))
   const values = trend.map((point) => normalizeCredits(point.credits))
 
@@ -81,7 +83,7 @@ export function buildUserUsageTrendChart(
       responsive: true,
       maintainAspectRatio: false,
       resizeDelay: 80,
-      animation: { duration: 260 },
+      animation: { duration: motionTiming.durationMs },
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },

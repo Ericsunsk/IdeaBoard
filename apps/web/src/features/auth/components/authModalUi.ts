@@ -1,3 +1,4 @@
+import type { DialogPassThroughOptions } from 'primevue/dialog'
 import {
   createIbPasswordPt,
   ibFormErrorMessagePt,
@@ -6,16 +7,24 @@ import {
   ibFormInputIconClass,
 } from '../../../shared/theme/formControls'
 import { ibDialogMaskPt } from '../../../shared/theme/dialogMask'
+import { createDialogMotionPt } from '../../../shared/motion/dialogMotion'
+import './authModalMotion.css'
 
-export const authDialogPt = {
-  ...ibDialogMaskPt,
-  root: {
-    class: 'm-5 w-[min(460px,calc(100vw-32px))] overflow-visible bg-transparent p-0',
-  },
-  content: {
-    class: 'overflow-visible bg-transparent p-0',
-  },
-} as const
+export function createAuthDialogPt() {
+  return {
+    ...ibDialogMaskPt,
+    root: {
+      class: 'm-5 w-[min(460px,calc(100vw-32px))] overflow-visible bg-transparent p-0',
+      style: {
+        '--ib-dialog-motion-from-transform': 'translateY(12px) scale(0.985)',
+      },
+    },
+    content: {
+      class: 'overflow-visible bg-transparent p-0',
+    },
+    ...createDialogMotionPt(),
+  } satisfies DialogPassThroughOptions
+}
 
 export const authErrorMessagePt = ibFormErrorMessagePt
 
@@ -27,7 +36,7 @@ export const authButtonPt = {
 export const authPasswordPt = createIbPasswordPt('pl-11 pr-12')
 
 const authModalShellBaseClass =
-  'relative overflow-hidden rounded-[24px] border border-[var(--color-ib-auth-shell-border)] bg-[var(--color-ib-auth-shell)] backdrop-blur-xl px-11 text-[var(--color-ib-auth-text)] shadow-[var(--shadow-ib-auth-shell)] max-[520px]:px-7 max-[520px]:py-8 transition-all duration-300'
+  'relative overflow-hidden rounded-[24px] border border-[var(--color-ib-auth-shell-border)] bg-[var(--color-ib-auth-shell)] backdrop-blur-xl px-11 text-[var(--color-ib-auth-text)] shadow-[var(--shadow-ib-auth-shell)] max-[520px]:px-7 max-[520px]:py-8'
 
 export const authModalShellClass = `${authModalShellBaseClass} py-11`
 
@@ -57,13 +66,13 @@ export const authInputClass = ibFormInputClass
 export const authInputErrorClass = ibFormInputErrorClass
 
 export const authPrimaryButtonClass =
-  'mt-2 inline-flex h-[50px] w-full items-center justify-center rounded-[12px] border-0 bg-gradient-to-r from-[var(--color-ib-auth-primary-from)] to-[var(--color-ib-auth-primary-to)] px-8 text-[15px] font-semibold text-[var(--color-ib-auth-primary-text)] shadow-[var(--shadow-ib-auth-primary)] transition-all duration-300 hover:scale-[1.01] hover:shadow-[var(--shadow-ib-auth-primary-hover)] active:scale-[0.99] disabled:scale-100 disabled:cursor-not-allowed disabled:opacity-70'
+  'ib-auth-primary-action mt-2 inline-flex h-[50px] w-full items-center justify-center rounded-[12px] border-0 bg-gradient-to-r from-[var(--color-ib-auth-primary-from)] to-[var(--color-ib-auth-primary-to)] px-8 text-[15px] font-semibold text-[var(--color-ib-auth-primary-text)] shadow-[var(--shadow-ib-auth-primary)] transition-[transform,box-shadow,opacity] duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:scale-[1.01] hover:shadow-[var(--shadow-ib-auth-primary-hover)] active:scale-[0.99] disabled:scale-100 disabled:cursor-not-allowed disabled:opacity-70'
 
 export const authFooterClass =
   'relative z-[1] text-center text-[13px] text-[var(--color-ib-auth-muted)]'
 
 export const authSwitchButtonClass =
-  'ml-1.5 cursor-pointer border-0 bg-transparent p-0 text-[inherit] font-semibold text-[var(--color-ib-auth-link)] transition-colors duration-200 hover:text-[var(--color-ib-auth-link-hover)] hover:underline underline-offset-4'
+  'ml-1.5 cursor-pointer border-0 bg-transparent p-0 text-[inherit] font-semibold text-[var(--color-ib-auth-link)] transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-[var(--color-ib-auth-link-hover)] hover:underline underline-offset-4'
 
 export const authCloseButtonClass =
-  'absolute top-5 right-5 z-[2] inline-flex size-8 items-center justify-center border-0 bg-transparent p-0 text-[var(--color-ib-auth-close)] shadow-none transition-colors duration-200 hover:text-[var(--color-ib-auth-close-hover)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50'
+  'ib-auth-close-action absolute top-5 right-5 z-[2] inline-flex size-8 items-center justify-center border-0 bg-transparent p-0 text-[var(--color-ib-auth-close)] shadow-none transition-[color,transform,opacity] duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:text-[var(--color-ib-auth-close-hover)] active:scale-95 disabled:scale-100 disabled:cursor-not-allowed disabled:opacity-50'

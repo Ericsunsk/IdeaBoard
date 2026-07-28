@@ -1,0 +1,6 @@
+@media (prefers-reduced-motion: reduce) {
+  .ib-auth-primary-action,
+  .ib-auth-close-action {
+    transform: none;
+  }
+}

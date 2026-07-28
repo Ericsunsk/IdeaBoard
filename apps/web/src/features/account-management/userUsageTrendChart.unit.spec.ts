@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { buildUserUsageTrendChart, type UserUsageChartTheme } from './userUsageTrendChart'
 
 const theme: UserUsageChartTheme = {
@@ -13,6 +13,26 @@ const theme: UserUsageChartTheme = {
 }
 
 describe('buildUserUsageTrendChart', () => {
+  afterEach(() => {
+    document.documentElement.style.removeProperty('--motion-enter-duration')
+    document.documentElement.style.removeProperty('--motion-enter-easing')
+    vi.unstubAllGlobals()
+  })
+
+  it('uses Motion Policy timing and disables chart animation under reduced motion', () => {
+    document.documentElement.style.setProperty('--motion-enter-duration', '220ms')
+    document.documentElement.style.setProperty(
+      '--motion-enter-easing',
+      'cubic-bezier(0.2, 0.8, 0.2, 1)',
+    )
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })))
+
+    expect(buildUserUsageTrendChart([], theme).options.animation).toMatchObject({ duration: 220 })
+
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
+    expect(buildUserUsageTrendChart([], theme).options.animation).toMatchObject({ duration: 0 })
+  })
+
   it('keeps all 30 server date keys and a single zero-value dataset', () => {
     const trend = buildThirtyDayTrend(0)
 

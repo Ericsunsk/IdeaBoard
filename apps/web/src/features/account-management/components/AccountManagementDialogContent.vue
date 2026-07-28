@@ -4,7 +4,7 @@
       type="button"
       text
       rounded
-      class="!absolute !top-4 !right-4 !z-20 !flex !h-8 !w-8 !min-w-8 !items-center !justify-center !rounded-[var(--radius-ib-pill)] !border !border-transparent !bg-transparent !p-0 !text-ib-text-muted !shadow-none !transition !duration-[var(--duration-ib-standard)] hover:!border-ib-border-soft hover:!bg-ib-surface-hover hover:!text-ib-text focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]"
+      class="!absolute !top-4 !right-4 !z-20 !flex !h-8 !w-8 !min-w-8 !items-center !justify-center !rounded-[var(--radius-ib-pill)] !border !border-transparent !bg-transparent !p-0 !text-ib-text-muted !shadow-none !transition-[background-color,border-color,color] !duration-[var(--motion-feedback-duration)] !ease-[var(--motion-feedback-easing)] hover:!border-ib-border-soft hover:!bg-ib-surface-hover hover:!text-ib-text focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]"
       aria-label="关闭账户管理"
       @click="emit('close')"
     >
@@ -51,7 +51,7 @@
               :key="item.key"
               type="button"
               text
-              class="!flex !h-11 !w-full !justify-start !gap-2 !rounded-[var(--radius-ib-control)] !border-0 !px-2.5 !text-[14px] !font-semibold !shadow-none focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]"
+              class="!flex !h-11 !w-full !justify-start !gap-2 !rounded-[var(--radius-ib-control)] !border-0 !px-2.5 !text-[14px] !font-semibold !shadow-none !transition-[background-color,color,box-shadow] !duration-[var(--motion-control-duration)] !ease-[var(--motion-control-easing)] focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]"
               :class="
                 activeTab === item.key
                   ? '!bg-ib-creative-accent-soft !text-ib-creative-accent-pressed'
@@ -72,7 +72,7 @@
           type="button"
           text
           :disabled="logoutLoading"
-          class="!flex !h-11 !w-full !justify-start !gap-2 !rounded-[var(--radius-ib-control)] !border-0 !bg-transparent !px-2.5 !text-[14px] !font-semibold !text-ib-danger !shadow-none !transition !duration-[var(--duration-ib-standard)] hover:!bg-ib-danger/5 hover:!text-ib-danger focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)] disabled:!cursor-not-allowed disabled:!opacity-60"
+          class="!flex !h-11 !w-full !justify-start !gap-2 !rounded-[var(--radius-ib-control)] !border-0 !bg-transparent !px-2.5 !text-[14px] !font-semibold !text-ib-danger !shadow-none !transition-[background-color,color,opacity] !duration-[var(--motion-feedback-duration)] !ease-[var(--motion-feedback-easing)] hover:!bg-ib-danger/5 hover:!text-ib-danger focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)] disabled:!cursor-not-allowed disabled:!opacity-60"
           :aria-label="logoutLoading ? '正在退出登录' : '退出登录'"
           @click="handleLogout"
         >
@@ -83,24 +83,18 @@
     </aside>
 
     <main :class="contentPaneClass">
-      <Transition
-        mode="out-in"
-        enter-active-class="transition-opacity duration-150 ease-out"
-        enter-from-class="opacity-0"
-        enter-to-class="opacity-100"
-        leave-active-class="transition-opacity duration-100 ease-in"
-        leave-from-class="opacity-100"
-        leave-to-class="opacity-0"
-      >
+      <Transition name="account-pane" :css="accountPaneMotionEnabled" mode="out-in">
         <KeepAlive include="UserProfilePane">
           <component
             :is="activeTabEntry.tab.pane.component"
             :key="activeTabEntry.tab.key"
-            v-bind="activeTabEntry.tab.pane.props({
-              active: activeTab === activeTabEntry.tab.key,
-              group: activeTabEntry.group,
-              tab: activeTabEntry.tab,
-            })"
+            v-bind="
+              activeTabEntry.tab.pane.props({
+                active: activeTab === activeTabEntry.tab.key,
+                group: activeTabEntry.group,
+                tab: activeTabEntry.tab,
+              })
+            "
           />
         </KeepAlive>
       </Transition>
@@ -118,6 +112,7 @@ import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
 import { brandMarkClasses, createBrandMarkClass } from '../../../shared/lib/brandMark'
+import { getMotionPreference } from '../../../shared/motion/motionPolicy'
 import {
   accountTabRegistry,
   defaultAccountManagementTab,
@@ -155,6 +150,7 @@ const mainContentClass =
 const contentPaneClass =
   'min-h-0 overflow-x-hidden overflow-y-auto rounded-l-[var(--radius-ib-overlay)] bg-ib-surface-muted px-8 py-7 pr-14 [scrollbar-width:none] max-[820px]:rounded-l-none max-[820px]:rounded-t-[var(--radius-ib-overlay)] max-[820px]:px-4 max-[820px]:py-5 max-[820px]:pr-14'
 const accountBrandMarkClass = createBrandMarkClass(brandMarkClasses.sizes.account)
+const accountPaneMotionEnabled = getMotionPreference() !== 'reduce'
 
 async function handleLogout() {
   if (logoutLoading.value) return
@@ -175,3 +171,23 @@ onMounted(() => {
   void userStore.fetchUserInfo()
 })
 </script>
+
+<style scoped>
+.account-pane-enter-active {
+  transition: opacity var(--motion-enter-duration) var(--motion-enter-easing);
+}
+
+.account-pane-leave-active {
+  transition: opacity var(--motion-exit-duration) var(--motion-exit-easing);
+}
+
+.account-pane-enter-from,
+.account-pane-leave-to {
+  opacity: 0;
+}
+
+.account-pane-enter-to,
+.account-pane-leave-from {
+  opacity: 1;
+}
+</style>

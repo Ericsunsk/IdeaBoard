@@ -1,12 +1,9 @@
 /* eslint-disable vue/one-component-per-file -- Local stubs keep the dialog wrapper test focused. */
 import { defineComponent } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import AccountManagementDialog from './AccountManagementDialog.vue'
 import { renderWithUser, screen } from '../../../test/render'
-import {
-  defaultAccountManagementTab,
-  type AccountManagementTab,
-} from '../accountTabRegistry'
+import { defaultAccountManagementTab, type AccountManagementTab } from '../accountTabRegistry'
 
 const DialogStub = defineComponent({
   inheritAttrs: false,
@@ -15,6 +12,7 @@ const DialogStub = defineComponent({
     dismissableMask: { type: Boolean, default: true },
     closeOnEscape: { type: Boolean, default: false },
     showHeader: { type: Boolean, default: true },
+    pt: { type: Object, default: () => ({}) },
   },
   emits: ['update:visible'],
   template: `
@@ -27,6 +25,8 @@ const DialogStub = defineComponent({
       <section
         role="dialog"
         tabindex="-1"
+        :data-transition-name="String(pt.transition?.name ?? '')"
+        :data-transition-css="String(pt.transition?.css ?? '')"
         :data-close-on-escape="String(closeOnEscape)"
         :data-show-header="String(showHeader)"
         @click.stop
@@ -117,6 +117,41 @@ function renderAccountManagementDialogWithStatefulContent(visible: boolean) {
 }
 
 describe('AccountManagementDialog', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('uses the shared Motion Policy for dialog entry and exit', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: false })),
+    )
+    renderAccountManagementDialog(true)
+
+    expect(screen.getByRole('dialog', { name: '账户管理' })).toHaveAttribute(
+      'data-transition-name',
+      'ib-dialog-motion',
+    )
+    expect(screen.getByRole('dialog', { name: '账户管理' })).toHaveAttribute(
+      'data-transition-css',
+      'true',
+    )
+  })
+
+  it('keeps account content visible without CSS transform motion under reduced motion', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true })),
+    )
+    renderAccountManagementDialog(true)
+
+    expect(screen.getByTestId('account-management-dialog-content')).toBeVisible()
+    expect(screen.getByRole('dialog', { name: '账户管理' })).toHaveAttribute(
+      'data-transition-css',
+      'false',
+    )
+  })
+
   it('renders dialog-ready account management content when visible', () => {
     renderAccountManagementDialog(true)
 

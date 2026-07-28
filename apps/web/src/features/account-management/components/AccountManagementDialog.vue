@@ -23,10 +23,8 @@
 import Dialog from 'primevue/dialog'
 import type { DialogPassThroughOptions } from 'primevue/dialog'
 import { ibDialogMaskPt } from '../../../shared/theme/dialogMask'
-import {
-  defaultAccountManagementTab,
-  type AccountManagementTab,
-} from '../accountTabRegistry'
+import { createDialogMotionPt } from '../../../shared/motion/dialogMotion'
+import { defaultAccountManagementTab, type AccountManagementTab } from '../accountTabRegistry'
 import AccountManagementDialogContent from './AccountManagementDialogContent.vue'
 
 withDefaults(
@@ -43,6 +41,7 @@ const emit = defineEmits<{
 
 const accountManagementDialogStyle = {
   width: 'min(1120px, calc(100vw - 32px))',
+  '--ib-dialog-motion-from-transform': 'translateY(8px) scale(0.99)',
 } as const
 
 const accountManagementDialogPt = {
@@ -54,5 +53,6 @@ const accountManagementDialogPt = {
   content: {
     class: '!overflow-hidden !bg-[var(--color-ib-surface)] !p-0',
   },
+  ...createDialogMotionPt(),
 } satisfies DialogPassThroughOptions
 </script>
