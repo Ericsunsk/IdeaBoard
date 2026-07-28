@@ -10,8 +10,8 @@ import {
   type CanvasGroupResizeHandle,
   type CanvasPoint,
 } from '../utils/canvasGroupGeometry'
-import type { CanvasSelectionGroupAction } from './useCanvasGroupRuntime'
-import type { DismissTransientCanvasUi } from './useFlowTransientUiDismissal'
+import type { CanvasSelectionGroupAction } from '../composables/useCanvasGroupRuntime'
+import type { DismissTransientCanvasUi } from '../composables/useFlowTransientUiDismissal'
 
 export type CanvasGroupResizeStartPayload = {
   event: PointerEvent
@@ -42,7 +42,7 @@ type CanvasGroupClosePolicyHandlers = Record<string, CanvasGroupClosePolicyHandl
 type CanvasGroupInteractionViewport =
   ComputedRef<CanvasFlowViewportTransform> | Ref<CanvasFlowViewportTransform>
 
-export type UseCanvasGroupInteractionShellOptions = {
+export type UseCanvasGroupPointerInteractionOptions = {
   canvasWrapRef: Ref<HTMLElement | null>
   nodes: Ref<Node[]>
   groupFrames: ComputedRef<CanvasGroupFrame[]>
@@ -63,7 +63,7 @@ const GROUP_FRAME_RESIZE_HANDLE_SELECTOR = '.canvas-group-frame-resize-handle'
 const FLOW_PANE_CLASS = 'vue-flow__pane'
 const ACTION_BUTTON_SELECTION_GAP_PX = 12
 
-export function useCanvasGroupInteractionShell(options: UseCanvasGroupInteractionShellOptions) {
+export function useCanvasGroupPointerInteraction(options: UseCanvasGroupPointerInteractionOptions) {
   const isSelectionGroupActionMenuOpen = ref(false)
   let activeGroupDragPointerId: number | null = null
   let activeGroupResizePointerId: number | null = null

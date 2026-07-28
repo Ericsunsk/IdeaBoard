@@ -78,7 +78,10 @@
         @pane-context-menu="onPaneContextMenu"
       >
         <template #zoom-pane>
-          <CanvasGroupFramesOverlay :frames="groupFrames" @resize-start="onGroupResizeStart" />
+          <CanvasGroupPresentation
+            :presentation="groupPresentation"
+            :action-target="canvasWrapRef"
+          />
         </template>
         <template #node-canvas="nodeProps">
           <FlowCanvasNode
@@ -139,12 +142,6 @@
           @drag-end="onMiniMapDragEnd"
         />
       </VueFlow>
-      <CanvasSelectionGroupActionButton
-        v-if="isSelectionGroupActionVisible"
-        :action="selectionGroupAction"
-        :position="selectionGroupActionButtonPosition"
-        @activate="onSelectionGroupAction"
-      />
       <CanvasOverlays
         :image-tool-session="imageTools"
         :node-context-menu="nodeContextMenu"
@@ -179,7 +176,10 @@ import {
   useFlowActiveNodePanels,
 } from '../composables/useFlowActiveNodePanels'
 import { useFlowCanvasShellInteractions } from '../composables/useFlowCanvasShellInteractions'
-import { useCanvasGroupInteractionShell } from '../composables/useCanvasGroupInteractionShell'
+import {
+  CanvasGroupPresentation,
+  useCanvasGroupPresentationInteraction,
+} from '../group-presentation'
 import { useFlowExpandInteractionHandlers } from '../composables/useFlowExpandInteractionHandlers'
 import {
   useFlowTransientUiDismissal,
@@ -190,8 +190,6 @@ import { useFlowPaneSelectionAdapter, useVueFlowPaneAdapter } from '../flow-pane
 import { useCanvasWorkspaceRuntime } from '../workspace-runtime'
 import { CANVAS_VIEWPORT_MAX_ZOOM, CANVAS_VIEWPORT_MIN_ZOOM } from '../utils/canvasViewportStorage'
 import FlowCanvasNode from '../components/FlowCanvasNode.vue'
-import CanvasGroupFramesOverlay from '../components/CanvasGroupFramesOverlay.vue'
-import CanvasSelectionGroupActionButton from '../components/CanvasSelectionGroupActionButton.vue'
 import {
   CanvasChrome,
   CanvasChromeMiniMap,
@@ -635,32 +633,32 @@ const {
   onEdgesChange: (changes) => commands.flowPane.onEdgesChange(changes),
 })
 
-const groupInteractionShell = useCanvasGroupInteractionShell({
-  canvasWrapRef,
-  nodes,
-  groupFrames,
-  viewport: flowViewport,
-  selectionGroupAction,
-  isEnabled: isCanvasGroupInteractionEnabled,
-  screenToFlowCoordinate,
-  paneSelectionPointerDownCapture: paneSelectionBindings.onPointerDownCapture,
-  selectGroupAtPoint,
-  groupDrag,
-  groupResize,
-  dismissTransientCanvasUi: (options) => dismissTransientCanvasUi(options),
+const groupPresentation = useCanvasGroupPresentationInteraction({
+  canvas: {
+    host: canvasWrapRef,
+    nodes,
+    viewport: flowViewport,
+    isInteractionEnabled: isCanvasGroupInteractionEnabled,
+  },
+  grouping: {
+    frames: groupFrames,
+    action: selectionGroupAction,
+    selectAtPoint: selectGroupAtPoint,
+    drag: groupDrag,
+    resize: groupResize,
+    onAction: performSelectionGroupAction,
+  },
+  pane: {
+    toFlowPoint: screenToFlowCoordinate,
+    onPointerDownCapture: paneSelectionBindings.onPointerDownCapture,
+    dismiss: (options) => dismissTransientCanvasUi(options),
+  },
 })
 const {
-  isSelectionGroupActionVisible,
-  selectionGroupActionButtonPosition,
   bindClosePolicyHandlers,
   onCanvasContextMenuCapture,
   onCanvasPointerDownCapture,
-  onGroupResizeStart,
-} = groupInteractionShell
-
-onBeforeUnmount(() => {
-  groupInteractionShell.cleanup()
-})
+} = groupPresentation
 
 const { onNodeDragStart: startNodeDragInteraction, onNodeDragStop: stopNodeDragInteraction } =
   useFlowNodeDragInteractions({
@@ -699,7 +697,6 @@ const {
   onMiniMapDragStart,
   onNodeDragStart,
   onCanvasPaneClick,
-  onSelectionGroupAction,
   toggleCanvasMinimap,
   onPaneContextMenu,
   setActiveTool,
@@ -710,7 +707,6 @@ const {
   onMiniMapDragStart: onMiniMapDragStartBase,
   onNodeDragStart: onNodeDragStartBase,
   onCanvasPaneClick: () => handlePaneClick(selectionCommands.onPaneClick),
-  onSelectionGroupAction: performSelectionGroupAction,
   toggleCanvasMinimap: toggleCanvasMinimapBase,
   onPaneContextMenu: onPaneContextMenuBase,
   setActiveTool: setActiveToolBase,

@@ -1,10 +1,10 @@
 import type { Node } from '@vue-flow/core'
-import { computed, nextTick, ref, shallowRef } from 'vue'
+import { computed, effectScope, nextTick, ref, shallowRef } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CanvasGraphGroupId } from '../graph-runtime'
 import type { CanvasFlowViewportTransform, CanvasGroupFrame } from '../utils/canvasGroupGeometry'
-import { useCanvasGroupInteractionShell } from './useCanvasGroupInteractionShell'
-import type { CanvasSelectionGroupAction } from './useCanvasGroupRuntime'
+import { useCanvasGroupPresentationInteraction } from './index'
+import type { CanvasSelectionGroupAction } from '../composables/useCanvasGroupRuntime'
 
 function createPromptNode(id: string, x: number, y: number, width = 280): Node {
   return {
@@ -84,24 +84,37 @@ function createHarness(
     cancel: vi.fn(() => true),
   }
   const dismissTransientCanvasUi = vi.fn()
+  const activateSelectionGroupAction = vi.fn()
 
-  const runtime = useCanvasGroupInteractionShell({
-    canvasWrapRef,
-    nodes,
-    groupFrames,
-    viewport,
-    selectionGroupAction: computed(() => action.value),
-    isEnabled: computed(() => isEnabled.value),
-    screenToFlowCoordinate: (point) => point,
-    paneSelectionPointerDownCapture,
-    selectGroupAtPoint,
-    groupDrag,
-    groupResize,
-    dismissTransientCanvasUi,
-  })
+  const scope = effectScope()
+  const runtime = scope.run(() =>
+    useCanvasGroupPresentationInteraction({
+      canvas: {
+        host: canvasWrapRef,
+        nodes,
+        viewport,
+        isInteractionEnabled: computed(() => isEnabled.value),
+      },
+      grouping: {
+        frames: groupFrames,
+        action: computed(() => action.value),
+        selectAtPoint: selectGroupAtPoint,
+        drag: groupDrag,
+        resize: groupResize,
+        onAction: activateSelectionGroupAction,
+      },
+      pane: {
+        toFlowPoint: (point) => point,
+        onPointerDownCapture: paneSelectionPointerDownCapture,
+        dismiss: dismissTransientCanvasUi,
+      },
+    }),
+  )
+  if (!runtime) throw new Error('Group presentation interaction requires an active Vue scope')
 
   return {
     runtime,
+    dispose: () => scope.stop(),
     action,
     viewport,
     isEnabled,
@@ -110,6 +123,7 @@ function createHarness(
     groupDrag,
     groupResize,
     dismissTransientCanvasUi,
+    activateSelectionGroupAction,
   }
 }
 
@@ -117,7 +131,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('useCanvasGroupInteractionShell', () => {
+describe('useCanvasGroupPresentationInteraction', () => {
   it('resolves the selection group action button position from nodes and viewport', () => {
     const harness = createHarness()
 
@@ -250,7 +264,7 @@ describe('useCanvasGroupInteractionShell', () => {
     expect(harness.runtime.isSelectionGroupActionVisible.value).toBe(false)
   })
 
-  it('closes the action menu and cancels controls during lifecycle cleanup', () => {
+  it('activates the group action through the presentation interface after closing its affordance', () => {
     const harness = createHarness()
     const event = createPointerEvent(document.createElement('div'), {
       clientX: 420,
@@ -260,7 +274,23 @@ describe('useCanvasGroupInteractionShell', () => {
     harness.runtime.onCanvasContextMenuCapture(event)
     expect(harness.runtime.isSelectionGroupActionVisible.value).toBe(true)
 
-    harness.runtime.cleanup()
+    harness.runtime.onSelectionGroupAction()
+
+    expect(harness.activateSelectionGroupAction).toHaveBeenCalledOnce()
+    expect(harness.runtime.isSelectionGroupActionVisible.value).toBe(false)
+  })
+
+  it('closes the action menu and cancels controls when its Vue scope is disposed', () => {
+    const harness = createHarness()
+    const event = createPointerEvent(document.createElement('div'), {
+      clientX: 420,
+      clientY: 120,
+    }) as MouseEvent
+
+    harness.runtime.onCanvasContextMenuCapture(event)
+    expect(harness.runtime.isSelectionGroupActionVisible.value).toBe(true)
+
+    harness.dispose()
 
     expect(harness.runtime.isSelectionGroupActionVisible.value).toBe(false)
     expect(harness.groupDrag.cancel).toHaveBeenCalledOnce()
