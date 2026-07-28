@@ -4,7 +4,6 @@ import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
 import type { CanvasChromeAccountState, CanvasChromeBoardState } from '../components/chrome'
 import type { CanvasGroupPresentationInteraction } from '../group-presentation'
 import type {
-  CanvasNodePresentationIntent,
   FusionNodePresentationBinding,
   ImageNodePresentationBinding,
 } from '../node-presentation'
@@ -62,9 +61,7 @@ type CanvasScreenPresentationOptions = {
         handleRadius: number
         visibilityRefreshToken: Ref<number>
       }
-      onIntent: (intent: CanvasNodePresentationIntent) => void
-      onNodeMouseDown: (nodeId: string, event: MouseEvent) => void
-      onInternalsUpdate: (nodeId: string) => void
+      listeners: CanvasScreenPresentationBinding['canvas']['node']['listeners']
     }
     minimap: {
       enabled: Ref<boolean>
@@ -167,10 +164,8 @@ export function useCanvasScreenPresentation(
                 : null,
             expandHandleRadius: canvas.node.expand.handleRadius,
             handleVisibilityRefreshToken: canvas.node.expand.visibilityRefreshToken.value,
-            onNodeMousedown: canvas.node.onNodeMouseDown,
-            onRequestInternalsUpdate: canvas.node.onInternalsUpdate,
           }),
-          onIntent: canvas.node.onIntent,
+          listeners: canvas.node.listeners,
         },
         minimap: {
           props: {

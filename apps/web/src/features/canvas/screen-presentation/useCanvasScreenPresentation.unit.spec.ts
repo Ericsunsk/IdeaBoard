@@ -101,9 +101,7 @@ function createOptions() {
           handleRadius: 4,
           visibilityRefreshToken: ref(0),
         },
-        onIntent: vi.fn(),
-        onNodeMouseDown: vi.fn(),
-        onInternalsUpdate: vi.fn(),
+        listeners: { intent: vi.fn(), nodeMousedown: vi.fn(), requestInternalsUpdate: vi.fn() },
       },
       minimap: {
         enabled: ref(true),

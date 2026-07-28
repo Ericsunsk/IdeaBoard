@@ -111,7 +111,11 @@ export type CanvasScreenPresentationBinding = {
     }
     node: {
       propsFor: (node: NodeProps<FlowNodeData>) => CanvasFlowNodeProps
-      onIntent: (intent: CanvasNodePresentationIntent) => void
+      listeners: {
+        intent: (intent: CanvasNodePresentationIntent) => void
+        nodeMousedown: (nodeId: string, event: MouseEvent) => void
+        requestInternalsUpdate: (nodeId: string) => void
+      }
     }
     minimap: {
       props: { enabled: boolean; inert: boolean; isHidden: boolean }

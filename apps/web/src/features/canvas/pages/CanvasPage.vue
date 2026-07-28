@@ -685,9 +685,11 @@ const canvasScreenPresentation = useCanvasScreenPresentation({
         handleRadius: flowExpandHandleRadius,
         visibilityRefreshToken: flowHandleVisibilityRefreshToken,
       },
-      onIntent: onCanvasNodePresentationIntent,
-      onNodeMouseDown: selectionCommands.onFlowNodeMouseDown,
-      onInternalsUpdate: onFlowNodeInternalsUpdate,
+      listeners: {
+        intent: onCanvasNodePresentationIntent,
+        nodeMousedown: selectionCommands.onFlowNodeMouseDown,
+        requestInternalsUpdate: onFlowNodeInternalsUpdate,
+      },
     },
     minimap: {
       enabled: isCanvasMinimapEnabled,

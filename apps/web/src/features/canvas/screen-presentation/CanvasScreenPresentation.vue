@@ -61,7 +61,9 @@
         <template #node-canvas="nodeProps">
           <FlowCanvasNode
             v-bind="presentation.canvas.node.propsFor(nodeProps)"
-            @node-intent="presentation.canvas.node.onIntent"
+            @node-intent="presentation.canvas.node.listeners.intent"
+            @node-mousedown="presentation.canvas.node.listeners.nodeMousedown"
+            @request-internals-update="presentation.canvas.node.listeners.requestInternalsUpdate"
           />
         </template>
         <CanvasChromeMiniMap

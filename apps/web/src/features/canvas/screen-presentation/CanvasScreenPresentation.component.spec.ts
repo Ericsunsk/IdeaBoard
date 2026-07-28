@@ -77,6 +77,11 @@ function createPresentation(
       group: { props: {} },
       node: {
         propsFor: () => ({ generationAvailable: overrides.generationAvailable ?? true }),
+        listeners: {
+          intent: vi.fn(),
+          nodeMousedown: vi.fn(),
+          requestInternalsUpdate: vi.fn(),
+        },
       },
       minimap: {
         props: { enabled: true, inert: false, isHidden: false },
@@ -137,12 +142,34 @@ const GroupStub = defineComponent({
 
 const NodeStub = defineComponent({
   props: { generationAvailable: Boolean },
-  setup(props) {
+  emits: ['node-intent', 'node-mousedown', 'request-internals-update'],
+  setup(props, { emit }) {
     return () =>
-      h('section', {
-        'data-testid': 'node-region',
-        'data-generation-available': `${props.generationAvailable}`,
-      })
+      h(
+        'section',
+        {
+          'data-testid': 'node-region',
+          'data-generation-available': `${props.generationAvailable}`,
+        },
+        [
+          h(
+            'button',
+            {
+              type: 'button',
+              onClick: () => {
+                emit('node-intent', {
+                  nodeKind: 'prompt',
+                  type: 'delete-requested',
+                  nodeId: 'node-1',
+                })
+                emit('node-mousedown', 'node-1', new MouseEvent('mousedown'))
+                emit('request-internals-update', 'node-1')
+              },
+            },
+            '触发节点事件',
+          ),
+        ],
+      )
   },
 })
 
@@ -216,5 +243,25 @@ describe('CanvasScreenPresentation', () => {
     expect(view.presentation.canvas.flow.onNodesChange).toHaveBeenCalledWith([
       { id: 'node-1', type: 'remove' },
     ])
+  })
+
+  it('forwards explicit Canvas Node listener payloads', () => {
+    const view = renderPresentation()
+    const mouseEvent = expect.any(MouseEvent)
+
+    view.getByRole('button', { name: '触发节点事件' }).click()
+
+    expect(view.presentation.canvas.node.listeners.intent).toHaveBeenCalledWith({
+      nodeKind: 'prompt',
+      type: 'delete-requested',
+      nodeId: 'node-1',
+    })
+    expect(view.presentation.canvas.node.listeners.nodeMousedown).toHaveBeenCalledWith(
+      'node-1',
+      mouseEvent,
+    )
+    expect(view.presentation.canvas.node.listeners.requestInternalsUpdate).toHaveBeenCalledWith(
+      'node-1',
+    )
   })
 })
