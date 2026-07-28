@@ -21,17 +21,17 @@
         :copy-mode="props.copyMode"
         :ui-state="promptUiState"
         :generation-available="props.generationAvailable"
-        @update:text="onPromptTextUpdate"
-        @update:output-count="emitNodeParam('outputCount', $event)"
-        @update:aspect-ratio="emitNodeParam('aspectRatio', $event)"
-        @update:input-images="emitNodeParam('inputImages', $event)"
-        @update:title="emitNodeParam('title', $event)"
-        @input-image-drop="onMediaInputImageDrop"
-        @input-image-open="onMediaInputImageOpen"
-        @input-image-preview="onMediaInputImagePreview"
-        @input-image-remove="onMediaInputImageRemove"
+        @update:text="onPromptTextEdited"
+        @update:output-count="onPromptParameterChanged('outputCount', $event)"
+        @update:aspect-ratio="onPromptParameterChanged('aspectRatio', $event)"
+        @update:input-images="onPromptParameterChanged('inputImages', $event)"
+        @update:title="onPromptParameterChanged('title', $event)"
+        @input-image-drop="onPromptMediaInputDrop"
+        @input-image-open="onPromptMediaInputOpen"
+        @input-image-preview="onPromptMediaInputPreview"
+        @input-image-remove="onPromptMediaInputRemove"
         @node-mousedown="noopMouse"
-        @delete="onDeleteRequest"
+        @delete="onPromptDeleteRequest"
         @focus="noop"
         @generate="onPromptGenerate"
       >
@@ -173,6 +173,7 @@ import type { ImageActionBinding, ImageToolStageBinding } from '../image-tools'
 import { useFlowCanvasNodeAdapter } from '../composables/useFlowCanvasNodeAdapter'
 import { useFlowCanvasNodeHandleRail } from '../composables/useFlowCanvasNodeHandleRail'
 import type { PromptAspectRatio } from '../../canvas-board/domain'
+import type { PromptNodePresentationIntent } from '../node-presentation'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 import FlowNodeHandles from './FlowNodeHandles.vue'
 import FusionNode from './nodes/FusionNode.vue'
@@ -216,7 +217,7 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
-  (e: 'update-prompt-text', nodeId: string, value: string): void
+  (e: 'prompt-intent', intent: PromptNodePresentationIntent): void
   (e: 'update-node-param', nodeId: string, payload: FlowSnapshotParamPatch): void
   (e: 'delete-node', nodeId: string): void
   (e: 'image-stage-drop', nodeId: string, event: DragEvent): void
@@ -235,13 +236,6 @@ const emit = defineEmits<{
   (e: 'image-expand-submit', nodeId: string, prompt: string, outputCount: number): void
   (
     e: 'fusion-prompt-generate',
-    nodeId: string,
-    prompt: string,
-    outputCount: number,
-    aspectRatio: PromptAspectRatio,
-  ): void
-  (
-    e: 'prompt-generate',
     nodeId: string,
     prompt: string,
     outputCount: number,
@@ -315,8 +309,19 @@ function requestNodeInternalsUpdate() {
   emit('request-internals-update', props.nodeId)
 }
 
-function onPromptTextUpdate(value: string) {
-  emit('update-prompt-text', props.nodeId, value)
+function onPromptTextEdited(text: string) {
+  emit('prompt-intent', { type: 'text-edited', nodeId: props.nodeId, text })
+}
+
+function onPromptParameterChanged<Key extends FlowSnapshotParamPatch['key']>(
+  key: Key,
+  value: Extract<FlowSnapshotParamPatch, { key: Key }>['value'],
+) {
+  emit('prompt-intent', {
+    type: 'parameter-changed',
+    nodeId: props.nodeId,
+    patch: { key, value } as Extract<FlowSnapshotParamPatch, { key: Key }>,
+  })
 }
 
 function emitNodeParam<Key extends FlowSnapshotParamPatch['key']>(
@@ -331,6 +336,10 @@ function emitNodeParam<Key extends FlowSnapshotParamPatch['key']>(
 
 function onDeleteRequest() {
   emit('delete-node', props.nodeId)
+}
+
+function onPromptDeleteRequest() {
+  emit('prompt-intent', { type: 'delete-requested', nodeId: props.nodeId })
 }
 
 function onImageStageDrop(event: DragEvent) {
@@ -364,16 +373,28 @@ function onMediaInputImageDrop(event: DragEvent) {
   emit('media-input-image-drop', props.nodeId, event)
 }
 
-function onMediaInputImageOpen() {
-  emit('media-input-image-open', props.nodeId)
-}
-
-function onMediaInputImagePreview(image: { url: string; ratio: number }) {
-  emit('media-input-image-preview', image)
-}
-
 function onMediaInputImageRemove(image: { id: string }) {
   emit('media-input-image-remove', props.nodeId, image.id)
+}
+
+function onPromptMediaInputDrop(event: DragEvent) {
+  emit('prompt-intent', { type: 'media-input-dropped', nodeId: props.nodeId, event })
+}
+
+function onPromptMediaInputOpen() {
+  emit('prompt-intent', { type: 'media-input-open-requested', nodeId: props.nodeId })
+}
+
+function onPromptMediaInputPreview(image: { url: string; ratio: number }) {
+  emit('prompt-intent', { type: 'media-input-preview-requested', image })
+}
+
+function onPromptMediaInputRemove(image: { id: string }) {
+  emit('prompt-intent', {
+    type: 'media-input-remove-requested',
+    nodeId: props.nodeId,
+    imageId: image.id,
+  })
 }
 
 function onNodeMouseDown(event: MouseEvent) {
@@ -395,13 +416,13 @@ function onFusionPromptGenerate(
 }
 function onPromptGenerate() {
   if (!promptSnapshot.value) return
-  emit(
-    'prompt-generate',
-    props.nodeId,
-    promptSnapshot.value.text,
-    promptSnapshot.value.outputCount ?? 1,
-    promptSnapshot.value.aspectRatio ?? 'auto',
-  )
+  emit('prompt-intent', {
+    type: 'generation-requested',
+    nodeId: props.nodeId,
+    prompt: promptSnapshot.value.text,
+    outputCount: promptSnapshot.value.outputCount ?? 1,
+    aspectRatio: promptSnapshot.value.aspectRatio ?? 'auto',
+  })
 }
 
 function onImageAction(action: ImageNodeAction) {

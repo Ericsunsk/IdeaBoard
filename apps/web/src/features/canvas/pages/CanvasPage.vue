@@ -105,7 +105,7 @@
             :expand-handle-radius="flowExpandHandleRadius"
             :image-tool-stage-binding="imageToolStageBindingFor(nodeProps.id)"
             :handle-visibility-refresh-token="flowHandleVisibilityRefreshToken"
-            @update-prompt-text="onFlowPromptTextUpdate"
+            @prompt-intent="onPromptNodePresentationIntent"
             @update-node-param="onFlowNodeParamUpdate"
             @delete-node="onFlowDeleteNode"
             @image-stage-drop="onFlowImageStageDrop"
@@ -124,7 +124,6 @@
             @image-expand-submit="onFlowImageExpandSubmit"
             @fusion-contextmenu="onFlowFusionContextMenu"
             @fusion-prompt-generate="onFlowFusionPromptGenerate"
-            @prompt-generate="onFlowPromptGenerate"
             @image-action="onFlowImageDirectAction"
             @expand-handle-pointerdown="onFlowExpandHandlePointerDown"
             @expand-handle-pointermove="onFlowExpandHandlePointerMove"
@@ -188,6 +187,7 @@ import {
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
 import { useFlowPaneSelectionAdapter, useVueFlowPaneAdapter } from '../flow-pane'
 import { useCanvasWorkspaceRuntime } from '../workspace-runtime'
+import { createPromptNodePresentationIntentHandler } from '../node-presentation'
 import { CANVAS_VIEWPORT_MAX_ZOOM, CANVAS_VIEWPORT_MIN_ZOOM } from '../utils/canvasViewportStorage'
 import FlowCanvasNode from '../components/FlowCanvasNode.vue'
 import {
@@ -621,6 +621,17 @@ const { onFlowImageExpandSubmit, onFlowExpandHandlePointerDown, onFlowExpandFram
 const { onFlowPromptGenerate } = commands.imageWorkflow.createPromptGenerationHandlers({
   cancelFlowExpandMode,
   cancelFlowMaskEditorMode,
+})
+
+const onPromptNodePresentationIntent = createPromptNodePresentationIntentHandler({
+  onTextEdited: onFlowPromptTextUpdate,
+  onParameterChanged: onFlowNodeParamUpdate,
+  onDeleteRequested: onFlowDeleteNode,
+  onMediaInputDrop: onFlowMediaInputImageDrop,
+  onMediaInputOpen: onFlowMediaInputImageOpen,
+  onMediaInputPreview: onFlowMediaInputImagePreview,
+  onMediaInputRemove: onFlowMediaInputImageRemove,
+  onGenerationRequested: onFlowPromptGenerate,
 })
 
 const {

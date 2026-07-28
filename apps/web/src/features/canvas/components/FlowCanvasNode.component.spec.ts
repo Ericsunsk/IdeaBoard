@@ -1,3 +1,4 @@
+import { fireEvent } from '@testing-library/vue'
 import { describe, expect, it, vi } from 'vitest'
 import FlowCanvasNode from './FlowCanvasNode.vue'
 import type { PromptNodeItem } from '../../canvas-board/domain'
@@ -108,5 +109,31 @@ describe('FlowCanvasNode prompt rendering', () => {
     })
 
     expect(view.getByLabelText('发送')).toBeDisabled()
+  })
+
+  it('emits a semantic presentation intent when prompt text is edited', async () => {
+    const view = renderFlowCanvasNode()
+
+    await fireEvent.update(view.getByPlaceholderText('type your idea...'), '新的提示词')
+
+    expect(view.emitted('prompt-intent')).toContainEqual([
+      { type: 'text-edited', nodeId: 'prompt-1', text: '新的提示词' },
+    ])
+  })
+
+  it('emits a semantic presentation intent when prompt generation is requested', async () => {
+    const view = renderFlowCanvasNode()
+
+    await fireEvent.click(view.getByLabelText('发送'))
+
+    expect(view.emitted('prompt-intent')).toContainEqual([
+      {
+        type: 'generation-requested',
+        nodeId: 'prompt-1',
+        prompt: 'A benchmark prompt',
+        outputCount: 1,
+        aspectRatio: 'auto',
+      },
+    ])
   })
 })
