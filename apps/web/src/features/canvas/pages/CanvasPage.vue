@@ -1,130 +1,5 @@
 <template>
-  <div
-    class="canvas-layout"
-    :class="[
-      `tool-${activeTool}`,
-      {
-        'interaction-lite': isFlowInteractionActive,
-        'viewport-pan-lite': isFlowViewportPanInteractionActive,
-      },
-    ]"
-    @mousedown.self="closeBoardHeaderEditing"
-  >
-    <CanvasChrome
-      :inert="isImageEditorChromeHidden"
-      :is-hidden="isImageEditorChromeHidden"
-      :board="canvasChromeBoard"
-      :account="canvasChromeAccount"
-      :tools="canvasChromeTools"
-      :status="canvasChromeStatus"
-      @update:board-name-draft="boardNameDraft = $event"
-      @toggle-board-menu="toggleBoardMenu"
-      @start-board-rename="startBoardRename"
-      @cancel-board-rename="cancelBoardRename"
-      @confirm-board-rename="onConfirmBoardRename"
-      @reload-board-catalog="reloadCatalog"
-      @select-board="onSelectBoard"
-      @export="onExportSelectedImages"
-      @navigate-back="canvasNavigationAdapter.navigate(USER_BOARDS_PATH)"
-      @select-tool="setActiveTool"
-      @toggle-minimap="toggleCanvasMinimap"
-      @zoom-out="onZoomOut"
-      @zoom-in="onZoomIn"
-    />
-
-    <div
-      ref="canvasWrapRef"
-      class="canvas-flow-wrap ib-page-dot-bg"
-      @dragover.prevent="onCanvasDragOver"
-      @drop.prevent="onCanvasDrop"
-      @pointerdown.capture="onCanvasPointerDownCapture"
-      @contextmenu.capture="onCanvasContextMenuCapture"
-      @wheel="onCanvasWheel"
-    >
-      <VueFlow
-        v-model:nodes="nodes"
-        v-model:edges="edges"
-        :pan-on-drag="!isFlowCanvasLocked && activeTool === 'hand'"
-        :nodes-draggable="!isFlowCanvasLocked && activeTool !== 'hand'"
-        :nodes-connectable="!isFlowCanvasLocked && activeTool !== 'hand'"
-        :elements-selectable="!isFlowCanvasLocked && activeTool !== 'hand'"
-        :select-nodes-on-drag="!isFlowCanvasLocked && activeTool === 'select'"
-        :selection-key-code="!isFlowCanvasLocked && activeTool === 'select'"
-        :multi-selection-key-code="!isFlowCanvasLocked && activeTool === 'select' ? 'Shift' : null"
-        :delete-key-code="nativeDeleteKeyCode"
-        :default-edge-options="{ animated: false, updatable: true }"
-        :apply-default="false"
-        :min-zoom="CANVAS_VIEWPORT_MIN_ZOOM"
-        :max-zoom="CANVAS_VIEWPORT_MAX_ZOOM"
-        :zoom-on-scroll="false"
-        :pan-on-scroll="!isFlowCanvasLocked"
-        :zoom-on-pinch="!isFlowCanvasLocked"
-        :pan-on-scroll-mode="PanOnScrollMode.Free"
-        :only-render-visible-elements="true"
-        v-bind="connectionAdapter.vueFlowBindings"
-        @nodes-change="commands.flowPane.onNodesChange"
-        @edges-change="vueFlowSelectionBindings.onEdgesChange"
-        @connect-end="onFlowConnectEnd"
-        @move-start="onFlowMoveStart"
-        @move="onFlowMove"
-        @move-end="onFlowMoveEnd"
-        @viewport-change-end="onViewportChangeEnd"
-        @node-click="onFlowNodeClick"
-        @node-drag-start="onNodeDragStart"
-        @node-drag-stop="onNodeDragStop"
-        @selection-start="vueFlowSelectionBindings.onSelectionStart"
-        @selection-end="vueFlowSelectionBindings.onSelectionEnd"
-        @pane-click="onCanvasPaneClick"
-        @pane-context-menu="onPaneContextMenu"
-      >
-        <template #zoom-pane>
-          <CanvasGroupPresentation
-            :presentation="groupPresentation"
-            :action-target="canvasWrapRef"
-          />
-        </template>
-        <template #node-canvas="nodeProps">
-          <FlowCanvasNode
-            :node-id="nodeProps.id"
-            :data="nodeProps.data"
-            :selected="!!nodeProps.selected"
-            :dragging="!!nodeProps.dragging"
-            :copy-mode="duplicateModifierPressed"
-            :ui-state="getFlowNodeUiStateCached(nodeProps.id)"
-            :image-presentation="imagePresentationFor(nodeProps.id)"
-            :fusion-presentation="fusionPresentationFor(nodeProps.id)"
-            :generation-available="isGenerationAvailable"
-            :set-image-stage-ref="setImageStageRef"
-            :clear-image-stage-ref="clearImageStageRef"
-            :expand-mode-active="flowExpandNodeId === nodeProps.id"
-            :expand-overlay-style="
-              flowExpandNodeId === nodeProps.id ? flowExpandOverlayStyle : null
-            "
-            :expand-handle-radius="flowExpandHandleRadius"
-            :handle-visibility-refresh-token="flowHandleVisibilityRefreshToken"
-            @node-intent="onCanvasNodePresentationIntent"
-            @node-mousedown="selectionCommands.onFlowNodeMouseDown"
-            @request-internals-update="onFlowNodeInternalsUpdate"
-          />
-        </template>
-        <CanvasChromeMiniMap
-          :enabled="isCanvasMinimapEnabled"
-          :inert="isImageEditorChromeHidden"
-          :is-hidden="isImageEditorChromeHidden"
-          @center-requested="onMiniMapCenterRequested"
-          @drag-start="onMiniMapDragStart"
-          @drag-move="handleMiniMapDragMove"
-          @drag-end="onMiniMapDragEnd"
-        />
-      </VueFlow>
-      <CanvasOverlays
-        :image-tool-session="imageTools"
-        :node-context-menu="nodeContextMenu"
-        :canvas-node-menu-items="canvasNodeMenuItems"
-        @create-node="handleNodeContextMenuCreate"
-      />
-    </div>
-  </div>
+  <CanvasScreenPresentation :presentation="canvasScreenPresentation" />
 </template>
 
 <script setup lang="ts">
@@ -135,7 +10,7 @@ import { uploadApi } from '../../../shared/api/upload'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { useDismissableLayer } from '../../../shared/composables/useDismissableLayer'
 import { USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
-import { PanOnScrollMode, VueFlow, type NodeMouseEvent } from '@vue-flow/core'
+import type { NodeMouseEvent } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import { useFlowKeyboardShortcuts } from '../composables/useFlowKeyboardShortcuts'
@@ -151,10 +26,7 @@ import {
   useFlowActiveNodePanels,
 } from '../composables/useFlowActiveNodePanels'
 import { useFlowCanvasShellInteractions } from '../composables/useFlowCanvasShellInteractions'
-import {
-  CanvasGroupPresentation,
-  useCanvasGroupPresentationInteraction,
-} from '../group-presentation'
+import { useCanvasGroupPresentationInteraction } from '../group-presentation'
 import { useFlowExpandInteractionHandlers } from '../composables/useFlowExpandInteractionHandlers'
 import {
   useFlowTransientUiDismissal,
@@ -171,17 +43,8 @@ import {
   createImageNodePresentationResolver,
   createPromptNodePresentationIntentHandler,
 } from '../node-presentation'
-import { CANVAS_VIEWPORT_MAX_ZOOM, CANVAS_VIEWPORT_MIN_ZOOM } from '../utils/canvasViewportStorage'
-import FlowCanvasNode from '../components/FlowCanvasNode.vue'
-import {
-  CanvasChrome,
-  CanvasChromeMiniMap,
-  type CanvasChromeAccountState,
-  type CanvasChromeBoardState,
-  type CanvasChromeStatusState,
-  type CanvasChromeToolState,
-} from '../components/chrome'
-import CanvasOverlays from '../components/CanvasOverlays.vue'
+import { CanvasScreenPresentation, useCanvasScreenPresentation } from '../screen-presentation'
+import type { CanvasChromeAccountState, CanvasChromeBoardState } from '../components/chrome'
 import {
   useUserAccountControls,
   type UserShellNavigationAdapter,
@@ -244,7 +107,7 @@ const viewModel = workspace.viewModel
 const commands = workspace.commands
 const isGenerationAvailable = computed(() => commands.imageWorkflow.isGenerationAvailable())
 
-const { nodes, edges } = viewModel.flowPane
+const { nodes } = viewModel.flowPane
 const { connectionAdapter } = commands.flowPane
 
 type CanvasBenchmarkConnectDeleteTarget = {
@@ -329,15 +192,7 @@ const canvasChromeAccount = computed<CanvasChromeAccountState>(() => ({
   balance: accountControls.viewModel.balance.value,
   menuItems: accountControls.viewModel.menuItems.value,
 }))
-const canvasChromeTools = computed<CanvasChromeToolState>(() => ({
-  activeTool: activeTool.value,
-  minimapEnabled: isCanvasMinimapEnabled.value,
-}))
 const { history: flowHistory } = viewModel.persistence
-const canvasChromeStatus = computed<CanvasChromeStatusState>(() => ({
-  exportDisabled: !hasSelectedFlowNodes.value,
-  zoomLevel: zoomLevel.value,
-}))
 
 const { flushAutosave, loadCanvasBoardAndProbe, reattachPendingImageResults } = commands.persistence
 
@@ -360,7 +215,6 @@ const {
 provideCanvasViewportContext({ zoomLevel })
 
 const {
-  hasSelectedFlowNodes,
   isFlowInteractionActive,
   isFlowViewportPanInteractionActive,
   isFlowInteractionLocked,
@@ -523,10 +377,6 @@ const fusionPresentationFor = createFusionNodePresentationResolver({
 const isCanvasShortcutSuppressed = computed(
   () => !!flowImageEditorNodeId.value || !!flowMaskEditorNodeId.value,
 )
-const nativeDeleteKeyCode = computed(() =>
-  isFlowCanvasLocked.value || isCanvasShortcutSuppressed.value ? null : ['Backspace', 'Delete'],
-)
-
 const isCanvasGroupInteractionEnabled = computed(
   () =>
     activeTool.value === 'select' &&
@@ -763,6 +613,101 @@ const onCanvasNodePresentationIntent = createCanvasNodePresentationIntentHandler
   }),
 })
 
+const canvasScreenPresentation = useCanvasScreenPresentation({
+  workspace,
+  chrome: {
+    board: canvasChromeBoard,
+    account: canvasChromeAccount,
+    activeTool,
+    minimapEnabled: isCanvasMinimapEnabled,
+    isHidden: isImageEditorChromeHidden,
+    closeBoardHeaderEditing,
+    commands: {
+      updateBoardNameDraft: (value) => {
+        boardNameDraft.value = value
+      },
+      toggleBoardMenu,
+      startBoardRename,
+      cancelBoardRename,
+      confirmBoardRename: () => void onConfirmBoardRename(),
+      reloadBoardCatalog: () => void reloadCatalog(),
+      selectBoard: (boardId) => void onSelectBoard(boardId),
+      exportSelectedImages: () => void onExportSelectedImages(),
+      navigateBack: () => canvasNavigationAdapter.navigate(USER_BOARDS_PATH),
+      selectTool: setActiveTool,
+      toggleMinimap: toggleCanvasMinimap,
+      zoomOut: onZoomOut,
+      zoomIn: onZoomIn,
+    },
+  },
+  canvas: {
+    containerRef: canvasWrapRef,
+    isInteractionActive: isFlowInteractionActive,
+    isViewportPanActive: isFlowViewportPanInteractionActive,
+    isLocked: isFlowCanvasLocked,
+    isShortcutSuppressed: isCanvasShortcutSuppressed,
+    connectionBindings: connectionAdapter.vueFlowBindings,
+    surface: {
+      onDragOver: onCanvasDragOver,
+      onDrop: onCanvasDrop,
+      onPointerDownCapture: onCanvasPointerDownCapture,
+      onContextMenuCapture: onCanvasContextMenuCapture,
+      onWheel: onCanvasWheel,
+    },
+    flow: {
+      onNodesChange: commands.flowPane.onNodesChange,
+      onEdgesChange: vueFlowSelectionBindings.onEdgesChange,
+      onConnectEnd: onFlowConnectEnd,
+      onMoveStart: onFlowMoveStart,
+      onMove: onFlowMove,
+      onMoveEnd: onFlowMoveEnd,
+      onViewportChangeEnd,
+      onNodeClick: onFlowNodeClick,
+      onNodeDragStart,
+      onNodeDragStop,
+      onSelectionStart: vueFlowSelectionBindings.onSelectionStart,
+      onSelectionEnd: vueFlowSelectionBindings.onSelectionEnd,
+      onPaneClick: onCanvasPaneClick,
+      onPaneContextMenu,
+    },
+    group: groupPresentation,
+    node: {
+      copyMode: duplicateModifierPressed,
+      getUiState: getFlowNodeUiStateCached,
+      imagePresentationFor,
+      fusionPresentationFor,
+      generationAvailable: isGenerationAvailable,
+      setImageStageRef,
+      clearImageStageRef,
+      expand: {
+        nodeId: flowExpandNodeId,
+        overlayStyle: flowExpandOverlayStyle,
+        handleRadius: flowExpandHandleRadius,
+        visibilityRefreshToken: flowHandleVisibilityRefreshToken,
+      },
+      onIntent: onCanvasNodePresentationIntent,
+      onNodeMouseDown: selectionCommands.onFlowNodeMouseDown,
+      onInternalsUpdate: onFlowNodeInternalsUpdate,
+    },
+    minimap: {
+      enabled: isCanvasMinimapEnabled,
+      isHidden: isImageEditorChromeHidden,
+      commands: {
+        centerRequested: onMiniMapCenterRequested,
+        dragStart: onMiniMapDragStart,
+        dragMove: handleMiniMapDragMove,
+        dragEnd: onMiniMapDragEnd,
+      },
+    },
+    overlays: {
+      imageToolSession: imageTools,
+      nodeContextMenu,
+      canvasNodeMenuItems,
+      createNode: handleNodeContextMenuCreate,
+    },
+  },
+})
+
 watch(
   () => route.query.boardId,
   async () => {
@@ -801,77 +746,3 @@ onMounted(async () => {
   void reattachPendingImageResults()
 })
 </script>
-
-<style>
-@import '../components/styles/canvas-vue-flow-adapter-skin.css';
-@import '../components/styles/canvas-style-contracts.css';
-</style>
-
-<style scoped>
-:global(html.canvas-overscroll-guard),
-:global(body.canvas-overscroll-guard) {
-  overscroll-behavior: none;
-  overscroll-behavior-x: none;
-}
-
-.canvas-layout {
-  --canvas-control-border-width: 1.2px;
-  --canvas-tool-button-gap: 7px;
-  --canvas-surface-bg: rgba(255, 255, 255, 0.98);
-  --canvas-surface-bg-soft: rgba(255, 255, 255, 0.94);
-  --canvas-surface-muted: #f4f7fb;
-  --canvas-surface-border: #d8ddea;
-  --canvas-surface-border-soft: rgba(34, 42, 54, 0.08);
-  --canvas-minimap-node: #c9ced8;
-  --canvas-minimap-viewport: #c9ced8;
-  --canvas-minimap-mask: rgb(201 206 216 / 0.18);
-  --canvas-surface-shadow: 0 14px 32px rgba(15, 23, 42, 0.13);
-  --canvas-surface-blur: 10px;
-  --canvas-surface-radius: 10px;
-  --canvas-floating-radius: 13px;
-  --canvas-panel-radius: 8px;
-  --canvas-panel-border-width: 1px;
-  --canvas-panel-content-gap: 10px;
-  --canvas-panel-border: rgba(34, 42, 54, 0.14);
-  --canvas-panel-border-soft: rgba(34, 42, 54, 0.1);
-  --canvas-panel-header-from: #f8fafc;
-  --canvas-panel-header-to: #eef2f7;
-  --canvas-text-strong: #111827;
-  --canvas-text-body: #334155;
-  --canvas-text-muted: #64748b;
-  --canvas-text-subtle: #94a3b8;
-  --canvas-accent: #9278e6;
-  --canvas-accent-hover: #7a6bd5;
-  --canvas-accent-strong: #6757c8;
-  --canvas-accent-soft: rgba(146, 120, 230, 0.12);
-  --canvas-accent-soft-strong: rgba(146, 120, 230, 0.16);
-  --canvas-accent-wash: #f8f7ff;
-  --canvas-accent-outline: rgba(122, 107, 213, 0.22);
-  --canvas-motion-fast: 160ms;
-  --canvas-motion-standard: 200ms;
-  --canvas-motion-panel: 220ms;
-  --canvas-motion-dock: 240ms;
-  --canvas-motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --flow-edge-color: rgb(177 177 183 / 50%);
-  --flow-edge-active-color: rgb(146 120 230 / 50%);
-  --flow-edge-selected-color: rgb(123 135 152 / 50%);
-  --flow-edge-width: 2;
-  --flow-edge-dasharray: 5;
-  --flow-edge-running-duration: 0.5s;
-  width: 100%;
-  height: 100vh;
-  background: #ffffff;
-  position: relative;
-  overflow: hidden;
-  overscroll-behavior: none;
-  overscroll-behavior-x: none;
-}
-
-.canvas-flow-wrap {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  overscroll-behavior: none;
-  overscroll-behavior-x: none;
-}
-</style>
