@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createPromptNodePresentationIntentHandler } from './index'
+import { createPromptNodePresentationIntentHandler } from './promptNodePresentation'
 
 describe('Prompt Node presentation seam', () => {
   it('translates a text editing intent into the Canvas command', () => {
@@ -46,7 +46,7 @@ describe('Prompt Node presentation seam', () => {
       nodeId: 'prompt-1',
       prompt: '新的提示词',
       outputCount: 2,
-      aspectRatio: 'square',
+      aspectRatio: '1:1',
     })
 
     expect(onParameterChanged).toHaveBeenCalledWith('prompt-1', {
@@ -54,6 +54,6 @@ describe('Prompt Node presentation seam', () => {
       value: 2,
     })
     expect(onDeleteRequested).toHaveBeenCalledWith('prompt-1')
-    expect(onGenerationRequested).toHaveBeenCalledWith('prompt-1', '新的提示词', 2, 'square')
+    expect(onGenerationRequested).toHaveBeenCalledWith('prompt-1', '新的提示词', 2, '1:1')
   })
 })

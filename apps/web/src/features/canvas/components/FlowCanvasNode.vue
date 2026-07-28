@@ -71,28 +71,28 @@
           :display-image="displayImage"
           :empty-icon-variant="imageEmptyIconVariant"
           :input-locked="imageInputLocked"
-          :action-binding="resolvedActionBinding"
+          :action-binding="props.imagePresentation.actionBinding"
           :expand-mode-active="!!props.expandModeActive"
           :expand-overlay-style="props.expandOverlayStyle ?? null"
           :expand-handle-radius="props.expandHandleRadius ?? 4"
-          :image-tool-stage-binding="resolvedStageBinding"
+          :image-tool-stage-binding="props.imagePresentation.stageBinding"
           @node-mousedown="noopMouse"
-          @update:title="emitNodeParam('title', $event)"
-          @update:output-count="emitNodeParam('outputCount', $event)"
-          @delete="onDeleteRequest"
-          @stage-drop="onImageStageDrop"
-          @open-file="onImageOpenFile"
-          @open-preview="onImageOpenPreview"
-          @append-to-canvas="onImageAppendToCanvas"
-          @reset="onImageReset"
-          @contextmenu="onImageContextMenu"
-          @prompt-generate="onImagePromptGenerate"
-          @expand-submit="onImageExpandSubmit"
-          @action="onImageAction"
-          @expand-handle-pointerdown="onImageExpandHandlePointerDown"
-          @expand-handle-pointermove="onImageExpandHandlePointerMove"
-          @expand-handle-pointerup="onImageExpandHandlePointerUp"
-          @expand-frame-pointerdown="onImageExpandFramePointerDown"
+          @update:title="onImageParameterChanged('title', $event)"
+          @update:output-count="onImageParameterChanged('outputCount', $event)"
+          @delete="onImageDeleteRequest"
+          @stage-drop="onImageStageDropped"
+          @open-file="onImageFileOpenRequest"
+          @open-preview="onImagePreviewRequest"
+          @append-to-canvas="onImageAppendToCanvasRequest"
+          @reset="onImageResetRequest"
+          @contextmenu="onImageContextMenuRequest"
+          @prompt-generate="onImagePromptGenerationRequest"
+          @expand-submit="onImageCanvasExtendSubmit"
+          @action="onImageActionRequest"
+          @expand-handle-pointerdown="onImageCanvasExtendHandlePointerDown"
+          @expand-handle-pointermove="onImageCanvasExtendHandlePointerMove"
+          @expand-handle-pointerup="onImageCanvasExtendHandlePointerUp"
+          @expand-frame-pointerdown="onImageCanvasExtendFramePointerDown"
         >
           <template #handle-rail>
             <div
@@ -167,13 +167,15 @@
 import { computed, ref, watch } from 'vue'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
-import type { ImageNodeAction } from '../config/imageActionRegistry'
 import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
-import type { ImageActionBinding, ImageToolStageBinding } from '../image-tools'
 import { useFlowCanvasNodeAdapter } from '../composables/useFlowCanvasNodeAdapter'
 import { useFlowCanvasNodeHandleRail } from '../composables/useFlowCanvasNodeHandleRail'
 import type { PromptAspectRatio } from '../../canvas-board/domain'
-import type { PromptNodePresentationIntent } from '../node-presentation'
+import type {
+  ImageNodePresentationBinding,
+  ImageNodePresentationIntent,
+  PromptNodePresentationIntent,
+} from '../node-presentation'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 import FlowNodeHandles from './FlowNodeHandles.vue'
 import FusionNode from './nodes/FusionNode.vue'
@@ -190,13 +192,12 @@ const props = withDefaults(
     uiState?: NodeUiState | PromptNodeUiState
     fusionPromptComposerVisible?: boolean
     generationAvailable?: boolean
-    imageActionBinding: ImageActionBinding
+    imagePresentation: ImageNodePresentationBinding
     setImageStageRef?: (nodeId: string, element: Element | null) => void
     clearImageStageRef?: (nodeId: string, element?: Element | null) => void
     expandModeActive?: boolean
     expandOverlayStyle?: Record<string, string> | null
     expandHandleRadius?: number
-    imageToolStageBinding?: ImageToolStageBinding | null
     handleVisibilityRefreshToken?: number
   }>(),
   {
@@ -211,29 +212,21 @@ const props = withDefaults(
     expandModeActive: false,
     expandOverlayStyle: null,
     expandHandleRadius: 4,
-    imageToolStageBinding: null,
     handleVisibilityRefreshToken: 0,
   },
 )
 
 const emit = defineEmits<{
   (e: 'prompt-intent', intent: PromptNodePresentationIntent): void
+  (e: 'image-intent', intent: ImageNodePresentationIntent): void
   (e: 'update-node-param', nodeId: string, payload: FlowSnapshotParamPatch): void
   (e: 'delete-node', nodeId: string): void
-  (e: 'image-stage-drop', nodeId: string, event: DragEvent): void
   (e: 'media-input-image-drop', nodeId: string, event: DragEvent): void
   (e: 'media-input-image-open', nodeId: string): void
   (e: 'media-input-image-preview', image: { url: string; ratio: number }): void
   (e: 'media-input-image-remove', nodeId: string, imageId: string): void
-  (e: 'image-open-file', nodeId: string): void
-  (e: 'image-open-preview', nodeId: string): void
-  (e: 'image-append-to-canvas', nodeId: string): void
-  (e: 'image-reset', nodeId: string): void
   (e: 'node-mousedown', nodeId: string, event: MouseEvent): void
-  (e: 'image-contextmenu', nodeId: string, event: MouseEvent): void
   (e: 'fusion-contextmenu', nodeId: string, event: MouseEvent): void
-  (e: 'image-prompt-generate', nodeId: string, prompt: string, outputCount: number): void
-  (e: 'image-expand-submit', nodeId: string, prompt: string, outputCount: number): void
   (
     e: 'fusion-prompt-generate',
     nodeId: string,
@@ -241,26 +234,12 @@ const emit = defineEmits<{
     outputCount: number,
     aspectRatio: PromptAspectRatio,
   ): void
-  (e: 'image-action', nodeId: string, action: ImageNodeAction): void
-  (
-    e: 'expand-handle-pointerdown',
-    nodeId: string,
-    anchor: CanvasExtendDragAnchor,
-    event: PointerEvent,
-  ): void
-  (e: 'expand-handle-pointermove', event: PointerEvent): void
-  (e: 'expand-handle-pointerup', event: PointerEvent): void
-  (e: 'expand-frame-pointerdown', nodeId: string, event: PointerEvent): void
   (e: 'request-internals-update', nodeId: string): void
 }>()
 
 const showDefaultDragZone = false
 const flowCanvasNodeRef = ref<HTMLElement | null>(null)
-const isImageEditorActive = computed(() => props.imageToolStageBinding?.mode != null)
-const resolvedActionBinding = computed(() => props.imageActionBinding)
-const resolvedStageBinding = computed<ImageToolStageBinding | null>(
-  () => props.imageToolStageBinding ?? null,
-)
+const isImageEditorActive = computed(() => props.imagePresentation.stageBinding?.mode != null)
 
 const {
   disableHandleRailInteraction,
@@ -279,7 +258,7 @@ const {
 } = useFlowCanvasNodeAdapter({
   data: () => props.data,
   uiState: () => props.uiState,
-  imageDirectGenerating: () => resolvedActionBinding.value.directGenerating,
+  imageDirectGenerating: () => props.imagePresentation.actionBinding.directGenerating,
   expandModeActive: () => !!props.expandModeActive,
   isImageEditorActive: () => isImageEditorActive.value,
 })
@@ -338,32 +317,47 @@ function onDeleteRequest() {
   emit('delete-node', props.nodeId)
 }
 
+function onImageParameterChanged<Key extends FlowSnapshotParamPatch['key']>(
+  key: Key,
+  value: Extract<FlowSnapshotParamPatch, { key: Key }>['value'],
+) {
+  emit('image-intent', {
+    type: 'parameter-changed',
+    nodeId: props.nodeId,
+    patch: { key, value } as Extract<FlowSnapshotParamPatch, { key: Key }>,
+  })
+}
+
+function onImageDeleteRequest() {
+  emit('image-intent', { type: 'delete-requested', nodeId: props.nodeId })
+}
+
 function onPromptDeleteRequest() {
   emit('prompt-intent', { type: 'delete-requested', nodeId: props.nodeId })
 }
 
-function onImageStageDrop(event: DragEvent) {
-  emit('image-stage-drop', props.nodeId, event)
+function onImageStageDropped(event: DragEvent) {
+  emit('image-intent', { type: 'stage-dropped', nodeId: props.nodeId, event })
 }
 
-function onImageOpenFile() {
-  emit('image-open-file', props.nodeId)
+function onImageFileOpenRequest() {
+  emit('image-intent', { type: 'file-open-requested', nodeId: props.nodeId })
 }
 
-function onImageOpenPreview() {
-  emit('image-open-preview', props.nodeId)
+function onImagePreviewRequest() {
+  emit('image-intent', { type: 'preview-requested', nodeId: props.nodeId })
 }
 
-function onImageAppendToCanvas() {
-  emit('image-append-to-canvas', props.nodeId)
+function onImageAppendToCanvasRequest() {
+  emit('image-intent', { type: 'append-to-canvas-requested', nodeId: props.nodeId })
 }
 
-function onImageReset() {
-  emit('image-reset', props.nodeId)
+function onImageResetRequest() {
+  emit('image-intent', { type: 'reset-requested', nodeId: props.nodeId })
 }
 
-function onImageContextMenu(event: MouseEvent) {
-  emit('image-contextmenu', props.nodeId, event)
+function onImageContextMenuRequest(event: MouseEvent) {
+  emit('image-intent', { type: 'context-menu-requested', nodeId: props.nodeId, event })
 }
 function onFusionContextMenu(event: MouseEvent) {
   emit('fusion-contextmenu', props.nodeId, event)
@@ -401,11 +395,21 @@ function onNodeMouseDown(event: MouseEvent) {
   emit('node-mousedown', props.nodeId, event)
 }
 
-function onImagePromptGenerate(prompt: string, outputCount: number) {
-  emit('image-prompt-generate', props.nodeId, prompt, outputCount)
+function onImagePromptGenerationRequest(prompt: string, outputCount: number) {
+  emit('image-intent', {
+    type: 'prompt-generation-requested',
+    nodeId: props.nodeId,
+    prompt,
+    outputCount,
+  })
 }
-function onImageExpandSubmit(prompt: string, outputCount: number) {
-  emit('image-expand-submit', props.nodeId, prompt, outputCount)
+function onImageCanvasExtendSubmit(prompt: string, outputCount: number) {
+  emit('image-intent', {
+    type: 'canvas-extend-submitted',
+    nodeId: props.nodeId,
+    prompt,
+    outputCount,
+  })
 }
 function onFusionPromptGenerate(
   prompt: string,
@@ -425,26 +429,37 @@ function onPromptGenerate() {
   })
 }
 
-function onImageAction(action: ImageNodeAction) {
-  emit('image-action', props.nodeId, action)
+type ImageActionRequest = Extract<ImageNodePresentationIntent, { type: 'action-requested' }>
+
+function onImageActionRequest(action: ImageActionRequest['action']) {
+  emit('image-intent', { type: 'action-requested', nodeId: props.nodeId, action })
 }
-function onImageExpandHandlePointerDown(payload: {
+function onImageCanvasExtendHandlePointerDown(payload: {
   anchor: CanvasExtendDragAnchor
   event: PointerEvent
 }) {
-  emit('expand-handle-pointerdown', props.nodeId, payload.anchor, payload.event)
+  emit('image-intent', {
+    type: 'canvas-extend-handle-pointerdown',
+    nodeId: props.nodeId,
+    anchor: payload.anchor,
+    event: payload.event,
+  })
 }
 
-function onImageExpandHandlePointerMove(event: PointerEvent) {
-  emit('expand-handle-pointermove', event)
+function onImageCanvasExtendHandlePointerMove(event: PointerEvent) {
+  emit('image-intent', { type: 'canvas-extend-handle-pointermove', event })
 }
 
-function onImageExpandHandlePointerUp(event: PointerEvent) {
-  emit('expand-handle-pointerup', event)
+function onImageCanvasExtendHandlePointerUp(event: PointerEvent) {
+  emit('image-intent', { type: 'canvas-extend-handle-pointerup', event })
 }
 
-function onImageExpandFramePointerDown(event: PointerEvent) {
-  emit('expand-frame-pointerdown', props.nodeId, event)
+function onImageCanvasExtendFramePointerDown(event: PointerEvent) {
+  emit('image-intent', {
+    type: 'canvas-extend-frame-pointerdown',
+    nodeId: props.nodeId,
+    event,
+  })
 }
 
 function noop() {}

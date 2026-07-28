@@ -91,7 +91,7 @@
             :dragging="!!nodeProps.dragging"
             :copy-mode="duplicateModifierPressed"
             :ui-state="getFlowNodeUiStateCached(nodeProps.id)"
-            :image-action-binding="imageToolActionBindingFor(nodeProps.id)"
+            :image-presentation="imagePresentationFor(nodeProps.id)"
             :generation-available="isGenerationAvailable"
             :fusion-prompt-composer-visible="
               isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.fusionPrompt, nodeProps.id)
@@ -103,32 +103,19 @@
               flowExpandNodeId === nodeProps.id ? flowExpandOverlayStyle : null
             "
             :expand-handle-radius="flowExpandHandleRadius"
-            :image-tool-stage-binding="imageToolStageBindingFor(nodeProps.id)"
             :handle-visibility-refresh-token="flowHandleVisibilityRefreshToken"
             @prompt-intent="onPromptNodePresentationIntent"
+            @image-intent="onImageNodePresentationIntent"
             @update-node-param="onFlowNodeParamUpdate"
             @delete-node="onFlowDeleteNode"
-            @image-stage-drop="onFlowImageStageDrop"
             @media-input-image-drop="onFlowMediaInputImageDrop"
             @media-input-image-open="onFlowMediaInputImageOpen"
             @media-input-image-preview="onFlowMediaInputImagePreview"
             @media-input-image-remove="onFlowMediaInputImageRemove"
-            @image-open-file="onFlowImageOpenFile"
-            @image-open-preview="onFlowImageOpenPreview"
-            @image-append-to-canvas="onFlowImageAppendToCanvas"
-            @image-reset="onFlowImageReset"
             @node-mousedown="selectionCommands.onFlowNodeMouseDown"
             @request-internals-update="onFlowNodeInternalsUpdate"
-            @image-contextmenu="onFlowImageContextMenu"
-            @image-prompt-generate="onFlowImagePromptGenerate"
-            @image-expand-submit="onFlowImageExpandSubmit"
             @fusion-contextmenu="onFlowFusionContextMenu"
             @fusion-prompt-generate="onFlowFusionPromptGenerate"
-            @image-action="onFlowImageDirectAction"
-            @expand-handle-pointerdown="onFlowExpandHandlePointerDown"
-            @expand-handle-pointermove="onFlowExpandHandlePointerMove"
-            @expand-handle-pointerup="onFlowExpandHandlePointerUp"
-            @expand-frame-pointerdown="onFlowExpandFramePointerDown"
           />
         </template>
         <CanvasChromeMiniMap
@@ -187,7 +174,11 @@ import {
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
 import { useFlowPaneSelectionAdapter, useVueFlowPaneAdapter } from '../flow-pane'
 import { useCanvasWorkspaceRuntime } from '../workspace-runtime'
-import { createPromptNodePresentationIntentHandler } from '../node-presentation'
+import {
+  createImageNodePresentationIntentHandler,
+  createImageNodePresentationResolver,
+  createPromptNodePresentationIntentHandler,
+} from '../node-presentation'
 import { CANVAS_VIEWPORT_MAX_ZOOM, CANVAS_VIEWPORT_MIN_ZOOM } from '../utils/canvasViewportStorage'
 import FlowCanvasNode from '../components/FlowCanvasNode.vue'
 import {
@@ -527,6 +518,11 @@ const {
   },
 } = imageTools
 
+const imagePresentationFor = createImageNodePresentationResolver({
+  actionBindingFor: imageToolActionBindingFor,
+  stageBindingFor: imageToolStageBindingFor,
+}).forNode
+
 const isCanvasShortcutSuppressed = computed(
   () => !!flowImageEditorNodeId.value || !!flowMaskEditorNodeId.value,
 )
@@ -665,11 +661,8 @@ const groupPresentation = useCanvasGroupPresentationInteraction({
     dismiss: (options) => dismissTransientCanvasUi(options),
   },
 })
-const {
-  bindClosePolicyHandlers,
-  onCanvasContextMenuCapture,
-  onCanvasPointerDownCapture,
-} = groupPresentation
+const { bindClosePolicyHandlers, onCanvasContextMenuCapture, onCanvasPointerDownCapture } =
+  groupPresentation
 
 const { onNodeDragStart: startNodeDragInteraction, onNodeDragStop: stopNodeDragInteraction } =
   useFlowNodeDragInteractions({
@@ -744,6 +737,24 @@ const {
   focusImageEditorAndShowChrome,
   runImagePromptAction: runFlowImageToolPromptAction,
   getActionStrength,
+})
+
+const onImageNodePresentationIntent = createImageNodePresentationIntentHandler({
+  onParameterChanged: onFlowNodeParamUpdate,
+  onDeleteRequested: onFlowDeleteNode,
+  onStageDrop: onFlowImageStageDrop,
+  onFileOpenRequested: onFlowImageOpenFile,
+  onPreviewRequested: onFlowImageOpenPreview,
+  onAppendToCanvasRequested: onFlowImageAppendToCanvas,
+  onResetRequested: onFlowImageReset,
+  onContextMenuRequested: onFlowImageContextMenu,
+  onPromptGenerationRequested: onFlowImagePromptGenerate,
+  onCanvasExtendSubmitted: onFlowImageExpandSubmit,
+  onImageActionRequested: onFlowImageDirectAction,
+  onCanvasExtendHandlePointerDown: onFlowExpandHandlePointerDown,
+  onCanvasExtendHandlePointerMove: onFlowExpandHandlePointerMove,
+  onCanvasExtendHandlePointerUp: onFlowExpandHandlePointerUp,
+  onCanvasExtendFramePointerDown: onFlowExpandFramePointerDown,
 })
 
 watch(
