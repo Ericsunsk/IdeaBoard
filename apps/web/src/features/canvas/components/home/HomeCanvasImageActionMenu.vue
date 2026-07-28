@@ -6,7 +6,7 @@
     @mousedown.stop
     @click.stop
   >
-    <Transition name="image-action-menu" appear>
+    <Transition v-bind="actionMenuMotion" appear>
       <div class="image-action-menu-inner">
         <div
           v-for="item in IMAGE_ACTION_MENU_ITEMS"
@@ -74,6 +74,7 @@ import type { ImageActionStrengthControl } from '../../image-tools'
 import ImageActionMenuIcon from './ImageActionMenuIcon.vue'
 import NodeToolIconButton from '../nodes/NodeToolIconButton.vue'
 import { useCanvasBillingReadinessStore } from '../../execution'
+import { createPopoverMotionTransition } from '../../../../shared/motion/popoverMotion'
 
 const props = defineProps<{
   strengthMenuStyle?: string | Record<string, string>
@@ -87,6 +88,7 @@ const emit = defineEmits<{
 
 const showStrengthControl = computed(() => props.strengthControl.visible)
 const billingStore = useCanvasBillingReadinessStore()
+const actionMenuMotion = createPopoverMotionTransition()
 
 onMounted(() => {
   if (!billingStore) return
@@ -396,29 +398,4 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
   pointer-events: auto;
 }
 
-.image-action-menu-enter-active,
-.image-action-menu-appear-active {
-  transition:
-    opacity var(--canvas-motion-fast, 160ms) ease-out,
-    transform var(--canvas-motion-fast, 160ms) ease-out;
-}
-
-.image-action-menu-enter-from,
-.image-action-menu-appear-from {
-  opacity: 0;
-  transform: translateY(6px) scale(0.985);
-}
-
-.image-action-menu-enter-to,
-.image-action-menu-appear-to {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .image-action-menu-enter-active,
-  .image-action-menu-appear-active {
-    transition: none;
-  }
-}
 </style>

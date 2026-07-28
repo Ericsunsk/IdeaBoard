@@ -1,5 +1,5 @@
 <template>
-  <Transition name="node-tool-popover">
+  <Transition v-bind="transientOverlayMotion">
     <div v-if="visible" v-bind="$attrs" class="node-tool-output-count-popover" :class="layoutClass">
       <slot />
     </div>
@@ -7,6 +7,8 @@
 </template>
 
 <script setup lang="ts">
+import { createPopoverMotionTransition } from '../../../../shared/motion/popoverMotion'
+
 const props = withDefaults(
   defineProps<{
     visible: boolean
@@ -22,4 +24,5 @@ defineOptions({
 })
 
 const layoutClass = props.layout === 'row' ? 'node-tool-popover-row' : 'node-tool-popover-grid'
+const transientOverlayMotion = createPopoverMotionTransition()
 </script>

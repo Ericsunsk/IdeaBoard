@@ -1,4 +1,5 @@
-.ib-popover-motion-enter-active {
+.ib-popover-motion-enter-active,
+.ib-popover-motion-appear-active {
   transition:
     opacity var(--motion-enter-duration) var(--motion-enter-easing),
     transform var(--motion-enter-duration) var(--motion-enter-easing);
@@ -11,12 +12,14 @@
 }
 
 .ib-popover-motion-enter-from,
+.ib-popover-motion-appear-from,
 .ib-popover-motion-leave-to {
   opacity: 0;
-  transform: translateY(-4px) scale(0.99);
+  transform: var(--ib-popover-motion-from-transform, translateY(-4px) scale(0.99));
 }
 
 .ib-popover-motion-enter-to,
+.ib-popover-motion-appear-to,
 .ib-popover-motion-leave-from {
   opacity: 1;
   transform: none;
@@ -24,13 +27,16 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ib-popover-motion-enter-active,
+  .ib-popover-motion-appear-active,
   .ib-popover-motion-leave-active {
     transition: none;
   }
 
   .ib-popover-motion-enter-from,
+  .ib-popover-motion-appear-from,
   .ib-popover-motion-leave-to,
   .ib-popover-motion-enter-to,
+  .ib-popover-motion-appear-to,
   .ib-popover-motion-leave-from {
     transform: none;
   }

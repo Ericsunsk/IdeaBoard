@@ -43,7 +43,7 @@
         >
           <SquareCursor class="size-4" />
         </button>
-        <Transition name="canvas-chrome-board-menu">
+        <Transition v-bind="boardMenuMotion">
           <div v-if="board.isMenuOpen" class="canvas-chrome-board-menu" @mousedown.stop @click.stop>
             <button
               v-for="option in board.options"
@@ -99,6 +99,7 @@
 <script setup lang="ts">
 import type { ComponentPublicInstance } from 'vue'
 import { ArrowLeft, SquareCursor } from '@iconoir/vue'
+import { createPopoverMotionTransition } from '../../../../shared/motion/popoverMotion'
 import type { CanvasChromeBoardState } from './types'
 
 const props = defineProps<{
@@ -115,6 +116,8 @@ const emit = defineEmits<{
   'select-board': [boardId: string]
   'navigate-back': []
 }>()
+
+const boardMenuMotion = createPopoverMotionTransition()
 
 function bindBoardNameInputRef(element: Element | ComponentPublicInstance | null) {
   props.board.setNameInputRef(element as HTMLElement | null)

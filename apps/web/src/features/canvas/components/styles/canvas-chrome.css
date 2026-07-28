@@ -1,10 +1,9 @@
 .canvas-chrome-region {
   --canvas-chrome-inset: var(--spacing-ib-page-chrome-inset);
   --canvas-chrome-control-gap: 12px;
-  --canvas-chrome-fade-duration: 0.18s;
   --canvas-chrome-icon-size: 19px;
-  --canvas-chrome-slide-duration: 0.28s;
-  --canvas-chrome-slide-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --canvas-chrome-presence-duration: var(--motion-enter-duration);
+  --canvas-chrome-presence-easing: var(--motion-enter-easing);
   --canvas-chrome-active-color: var(--color-canvas-accent);
   --canvas-chrome-z-index: 100;
   z-index: var(--canvas-chrome-z-index);
@@ -12,13 +11,15 @@
   filter: blur(0);
   transform-origin: center;
   transition:
-    opacity var(--canvas-chrome-fade-duration) ease,
-    filter var(--canvas-chrome-slide-duration) var(--canvas-chrome-slide-ease),
-    transform var(--canvas-chrome-slide-duration) var(--canvas-chrome-slide-ease);
+    opacity var(--canvas-chrome-presence-duration) var(--canvas-chrome-presence-easing),
+    filter var(--canvas-chrome-presence-duration) var(--canvas-chrome-presence-easing),
+    transform var(--canvas-chrome-presence-duration) var(--canvas-chrome-presence-easing);
   will-change: transform, opacity, filter;
 }
 
 .canvas-chrome-region.is-hidden {
+  --canvas-chrome-presence-duration: var(--motion-exit-duration);
+  --canvas-chrome-presence-easing: var(--motion-exit-easing);
   opacity: 0;
   filter: blur(5px);
   pointer-events: none;
@@ -118,6 +119,9 @@
   background: transparent;
   padding: 0;
   color: var(--ib-control-icon);
+  transition:
+    background-color var(--motion-control-duration) var(--motion-control-easing),
+    color var(--motion-control-duration) var(--motion-control-easing);
 }
 
 .canvas-chrome-board-icon-button:hover,
@@ -187,6 +191,10 @@
   font-size: 12px;
   line-height: 1;
   font-weight: 600;
+  transition:
+    background-color var(--motion-control-duration) var(--motion-control-easing),
+    color var(--motion-control-duration) var(--motion-control-easing),
+    opacity var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .canvas-chrome-catalog-recovery-action:hover,
@@ -199,25 +207,6 @@
 .canvas-chrome-catalog-recovery-action:disabled {
   cursor: wait;
   opacity: 0.6;
-}
-
-.canvas-chrome-board-menu-enter-active,
-.canvas-chrome-board-menu-leave-active {
-  transition:
-    opacity var(--canvas-motion-fast) ease-out,
-    transform var(--canvas-motion-fast) ease-out;
-}
-
-.canvas-chrome-board-menu-enter-from,
-.canvas-chrome-board-menu-leave-to {
-  opacity: 0;
-  transform: translateY(6px) scale(0.98);
-}
-
-.canvas-chrome-board-menu-enter-to,
-.canvas-chrome-board-menu-leave-from {
-  opacity: 1;
-  transform: translateY(0) scale(1);
 }
 
 .canvas-chrome-control-group {
@@ -256,7 +245,7 @@
 .canvas-chrome-icon-swap .canvas-chrome-icon {
   position: absolute;
   inset: 0;
-  transition: opacity var(--canvas-motion-fast) ease;
+  transition: opacity var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .canvas-chrome-icon-swap-default {
@@ -301,6 +290,9 @@
   background: transparent;
   padding: 0;
   color: var(--ib-control-icon);
+  transition:
+    background-color var(--motion-control-duration) var(--motion-control-easing),
+    color var(--motion-control-duration) var(--motion-control-easing);
 }
 
 .canvas-chrome-status-button:hover,
@@ -310,9 +302,19 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .canvas-chrome-region,
-  .canvas-chrome-board-menu-enter-active,
-  .canvas-chrome-board-menu-leave-active {
-    transition-duration: 1ms;
+  .canvas-chrome-region {
+    filter: none;
+    transition: none;
+    will-change: auto;
+  }
+
+  .canvas-chrome-region--top.is-hidden,
+  .canvas-chrome-region--status.is-hidden,
+  .canvas-chrome-region--minimap.is-hidden {
+    transform: none;
+  }
+
+  .canvas-chrome-region--left.is-hidden {
+    transform: translateY(-50%);
   }
 }

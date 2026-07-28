@@ -1,6 +1,16 @@
+import { defineComponent } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { render } from '../../../test/render'
 import CanvasSelectionGroupActionButton from './CanvasSelectionGroupActionButton.vue'
+
+const TransitionStub = defineComponent({
+  props: {
+    name: { type: String, default: '' },
+    css: { type: Boolean, default: true },
+  },
+  template:
+    '<div data-testid="group-action-transition" :data-transition-name="name" :data-transition-css="String(css)"><slot /></div>',
+})
 
 describe('CanvasSelectionGroupActionButton', () => {
   it('renders the group action as an icon-only accessible button', () => {
@@ -11,6 +21,7 @@ describe('CanvasSelectionGroupActionButton', () => {
         position: { x: 420, y: 88 },
         onActivate,
       },
+      global: { stubs: { transition: TransitionStub } },
     })
 
     const button = container.querySelector('button')
@@ -21,6 +32,10 @@ describe('CanvasSelectionGroupActionButton', () => {
     expect(button?.style.left).toBe('420px')
     expect(button?.style.top).toBe('88px')
     expect(container.querySelector('.node-tool-tooltip')?.textContent).toBe('组合')
+    expect(container.querySelector('[data-testid="group-action-transition"]')).toHaveAttribute(
+      'data-transition-name',
+      'ib-popover-motion',
+    )
 
     button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     expect(onActivate).toHaveBeenCalledOnce()

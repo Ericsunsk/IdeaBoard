@@ -1,5 +1,5 @@
 <template>
-  <Transition name="canvas-node-context-menu">
+  <Transition v-bind="transientOverlayMotion">
     <div
       v-if="visible"
       class="canvas-node-context-menu absolute z-[160] w-40 min-w-40 max-w-40 rounded-[var(--canvas-surface-radius)] bg-[var(--canvas-surface-bg)] p-1.5 backdrop-blur-[var(--canvas-surface-blur)] [border:var(--canvas-control-border-width)_solid_var(--canvas-surface-border)]"
@@ -22,6 +22,7 @@
 
 <script setup lang="ts">
 import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
+import { createPopoverMotionTransition } from '../../../shared/motion/popoverMotion'
 
 const props = defineProps<{
   visible: boolean
@@ -34,33 +35,7 @@ const emit = defineEmits<{
   create: [kind: CanvasCreatableNodeKind]
 }>()
 
+const transientOverlayMotion = createPopoverMotionTransition()
+
 void props
 </script>
-
-<style scoped>
-.canvas-node-context-menu-enter-active,
-.canvas-node-context-menu-leave-active {
-  transition:
-    opacity 150ms ease-out,
-    transform 150ms ease-out;
-}
-
-.canvas-node-context-menu-enter-from,
-.canvas-node-context-menu-leave-to {
-  opacity: 0;
-  transform: translateY(6px) scale(0.985);
-}
-
-.canvas-node-context-menu-enter-to,
-.canvas-node-context-menu-leave-from {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .canvas-node-context-menu-enter-active,
-  .canvas-node-context-menu-leave-active {
-    transition: none;
-  }
-}
-</style>

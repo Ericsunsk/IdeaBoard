@@ -146,6 +146,7 @@
 }
 
 .node-tool-output-count-popover {
+  --ib-popover-motion-from-transform: translateY(4px) scale(0.99);
   position: absolute;
   right: 0;
   bottom: calc(100% + var(--node-tool-button-gap));
@@ -155,26 +156,6 @@
   background: var(--canvas-surface-bg);
   box-shadow: 0 12px 30px rgba(38, 43, 61, 0.14);
   backdrop-filter: blur(var(--canvas-surface-blur));
-}
-
-.node-tool-popover-enter-active,
-.node-tool-popover-leave-active {
-  transition:
-    opacity 150ms ease-out,
-    transform 150ms ease-out;
-  transform-origin: bottom right;
-}
-
-.node-tool-popover-enter-from,
-.node-tool-popover-leave-to {
-  opacity: 0;
-  transform: translateY(6px) scale(0.985);
-}
-
-.node-tool-popover-enter-to,
-.node-tool-popover-leave-from {
-  opacity: 1;
-  transform: translateY(0) scale(1);
 }
 
 .node-tool-popover-grid {
@@ -208,11 +189,4 @@
   border-color: var(--node-tool-button-accent);
   background: var(--color-canvas-accent-soft);
   color: var(--node-tool-button-accent);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .node-tool-popover-enter-active,
-  .node-tool-popover-leave-active {
-    transition: none;
-  }
 }
