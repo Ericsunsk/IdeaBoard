@@ -109,9 +109,9 @@ const resolvedTooltip = computed(() => props.tooltip || '选择尺寸比例')
 .node-aspect-ratio-option,
 .node-aspect-ratio-icon > span {
   transition:
-    background-color var(--canvas-motion-fast) ease,
-    border-color var(--canvas-motion-fast) ease,
-    color var(--canvas-motion-fast) ease;
+    background-color var(--motion-control-duration) var(--motion-control-easing),
+    border-color var(--motion-control-duration) var(--motion-control-easing),
+    color var(--motion-control-duration) var(--motion-control-easing);
 }
 
 .node-aspect-ratio-trigger:hover:not(:disabled),

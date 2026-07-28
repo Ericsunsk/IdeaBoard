@@ -241,7 +241,7 @@ onBeforeUnmount(clearProgressPanelDelay)
   display: block;
   border-radius: inherit;
   background: var(--canvas-accent-hover);
-  transition: width var(--canvas-motion-fast) ease;
+  transition: width var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .image-editor-layer-actions__progress-track.indeterminate

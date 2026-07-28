@@ -22,8 +22,8 @@
   cursor: grab;
   user-select: none;
   transition:
-    background-color var(--canvas-motion-standard) ease,
-    color var(--canvas-motion-standard) ease;
+    background-color var(--motion-control-duration) var(--motion-control-easing),
+    color var(--motion-control-duration) var(--motion-control-easing);
 }
 
 .workflow-node-header.is-active {
@@ -71,6 +71,12 @@
   }
   100% {
     background-position: 0% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workflow-node.running::before {
+    animation: none;
   }
 }
 

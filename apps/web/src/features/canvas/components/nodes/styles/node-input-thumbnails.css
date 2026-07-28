@@ -24,9 +24,9 @@
   background: transparent;
   color: inherit;
   transition:
-    background-color var(--canvas-motion-fast) ease,
-    color var(--canvas-motion-fast) ease,
-    opacity var(--canvas-motion-fast) ease;
+    background-color var(--motion-control-duration) var(--motion-control-easing),
+    color var(--motion-control-duration) var(--motion-control-easing),
+    opacity var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .node-input-thumbnail img {
@@ -62,7 +62,7 @@
   padding: 0;
   opacity: 0;
   line-height: 0;
-  transition: opacity 0.14s ease;
+  transition: opacity var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .node-input-thumbnail-remove:hover,

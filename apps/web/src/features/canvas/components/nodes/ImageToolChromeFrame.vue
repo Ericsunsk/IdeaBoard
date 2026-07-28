@@ -78,8 +78,8 @@ const chromeStyle = computed(() => ({
   flex-direction: column;
   gap: var(--image-tool-button-gap);
   pointer-events: auto;
-  animation: image-tool-chrome-slide-left-in var(--canvas-motion-panel) var(--canvas-motion-ease)
-    both;
+  animation: image-tool-chrome-slide-left-in var(--motion-enter-duration)
+    var(--motion-enter-easing) both;
 }
 
 .image-tool-chrome-frame__right-dock {
@@ -92,8 +92,8 @@ const chromeStyle = computed(() => ({
   flex-direction: column;
   gap: var(--image-tool-stack-gap);
   pointer-events: auto;
-  animation: image-tool-chrome-slide-right-in var(--canvas-motion-dock) var(--canvas-motion-ease)
-    both;
+  animation: image-tool-chrome-slide-right-in var(--motion-enter-duration)
+    var(--motion-enter-easing) both;
 }
 
 @keyframes image-tool-chrome-slide-left-in {

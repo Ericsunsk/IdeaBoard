@@ -311,8 +311,8 @@ function selectOutputCount(value: number) {
   cursor: pointer;
   outline: none;
   transition:
-    background-color var(--canvas-motion-standard) ease,
-    color var(--canvas-motion-standard) ease;
+    background-color var(--motion-control-duration) var(--motion-control-easing),
+    color var(--motion-control-duration) var(--motion-control-easing);
 }
 
 .image-node-stage-empty:hover {
@@ -363,7 +363,7 @@ function selectOutputCount(value: number) {
   gap: 6px;
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--canvas-motion-fast) ease;
+  transition: opacity var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .image-node-stage:hover .image-node-stage-actions,
@@ -391,6 +391,12 @@ function selectOutputCount(value: number) {
   }
   100% {
     transform: rotate(1turn);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-node-stage-loader-logo {
+    animation: none;
   }
 }
 </style>

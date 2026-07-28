@@ -97,8 +97,8 @@ function onSubmit(prompt: string, outputCount: number, aspectRatio: PromptAspect
 
 <style scoped>
 .image-node-prompt-composer {
-  animation: image-node-prompt-rise var(--canvas-motion-fast) ease-out;
-  transition: border-color var(--canvas-motion-fast) ease;
+  animation: image-node-prompt-rise var(--motion-enter-duration) var(--motion-enter-easing);
+  transition: border-color var(--motion-control-duration) var(--motion-control-easing);
 }
 
 .image-node-prompt-composer:focus-within,
@@ -118,6 +118,12 @@ function onSubmit(prompt: string, outputCount: number, aspectRatio: PromptAspect
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-node-prompt-composer {
+    animation: none;
   }
 }
 </style>

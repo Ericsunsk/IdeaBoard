@@ -136,9 +136,9 @@ function assertNever(value: never): never {
   cursor: pointer;
   text-align: left;
   transition:
-    background-color var(--canvas-motion-fast) ease,
-    border-color var(--canvas-motion-fast) ease,
-    color var(--canvas-motion-fast) ease;
+    background-color var(--motion-control-duration) var(--motion-control-easing),
+    border-color var(--motion-control-duration) var(--motion-control-easing),
+    color var(--motion-control-duration) var(--motion-control-easing);
 }
 
 .image-editor-layer-row:hover,

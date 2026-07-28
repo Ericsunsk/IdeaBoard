@@ -113,10 +113,10 @@
   outline: none;
   padding: 0 7px;
   transition:
-    background-color var(--canvas-motion-fast) ease,
-    border-color var(--canvas-motion-fast) ease,
-    color var(--canvas-motion-fast) ease,
-    opacity var(--canvas-motion-fast) ease;
+    background-color var(--motion-control-duration) var(--motion-control-easing),
+    border-color var(--motion-control-duration) var(--motion-control-easing),
+    color var(--motion-control-duration) var(--motion-control-easing),
+    opacity var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .editing-controls-control:hover:not(:disabled) {
@@ -155,10 +155,10 @@
   border-radius: calc(var(--editing-controls-control-radius) - 1px);
   cursor: pointer;
   transition:
-    background-color var(--canvas-motion-fast) ease,
-    border-color var(--canvas-motion-fast) ease,
-    color var(--canvas-motion-fast) ease,
-    opacity var(--canvas-motion-fast) ease;
+    background-color var(--motion-control-duration) var(--motion-control-easing),
+    border-color var(--motion-control-duration) var(--motion-control-easing),
+    color var(--motion-control-duration) var(--motion-control-easing),
+    opacity var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .editing-controls-toggle-button {
@@ -189,9 +189,9 @@
   background: var(--canvas-surface-bg);
   color: var(--color-canvas-text-option);
   transition:
-    background-color var(--canvas-motion-standard) ease,
-    color var(--canvas-motion-standard) ease,
-    opacity var(--canvas-motion-standard) ease;
+    background-color var(--motion-control-duration) var(--motion-control-easing),
+    color var(--motion-control-duration) var(--motion-control-easing),
+    opacity var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .editing-controls-toggle-button:hover:not(:disabled):not([aria-pressed='true']):not(.is-active) {
@@ -275,8 +275,8 @@
   opacity: 0;
   pointer-events: none;
   transition:
-    opacity 0.14s ease,
-    transform 0.14s ease;
+    opacity var(--motion-feedback-duration) var(--motion-feedback-easing),
+    transform var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .editing-controls-range-wrap:hover .editing-controls-range-tooltip,

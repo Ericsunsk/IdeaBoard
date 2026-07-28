@@ -76,11 +76,11 @@ const resolvedAriaLabel = computed(
   background: var(--node-tool-icon-button-bg);
   color: var(--node-tool-icon-button-color);
   transition:
-    border-color var(--canvas-motion-fast) ease,
-    background-color var(--canvas-motion-fast) ease,
-    color var(--canvas-motion-fast) ease,
-    transform 0.18s ease,
-    opacity 0.18s ease;
+    border-color var(--motion-control-duration) var(--motion-control-easing),
+    background-color var(--motion-control-duration) var(--motion-control-easing),
+    color var(--motion-control-duration) var(--motion-control-easing),
+    transform var(--motion-control-duration) var(--motion-control-easing),
+    opacity var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .node-tool-icon-button.active {

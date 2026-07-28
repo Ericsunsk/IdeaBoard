@@ -44,7 +44,7 @@
       var(--canvas-range-fill-color, var(--canvas-accent, var(--color-canvas-accent)))
     );
     box-shadow: none;
-    transition: background-color var(--canvas-motion-fast, 160ms) ease;
+    transition: background-color var(--motion-control-duration) var(--motion-control-easing);
   }
 
   .canvas-range-input::-moz-range-track {

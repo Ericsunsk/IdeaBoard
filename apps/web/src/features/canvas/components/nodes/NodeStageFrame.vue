@@ -77,8 +77,8 @@ defineExpose({ stageElement })
   box-sizing: border-box;
   overflow: hidden;
   transition:
-    border-color var(--canvas-motion-standard) ease,
-    box-shadow var(--canvas-motion-standard) ease;
+    border-color var(--motion-feedback-duration) var(--motion-feedback-easing),
+    box-shadow var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .node-stage-frame--prompt {

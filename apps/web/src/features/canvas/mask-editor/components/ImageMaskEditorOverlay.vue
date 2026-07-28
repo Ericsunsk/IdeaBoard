@@ -166,7 +166,7 @@ onBeforeUnmount(() => {
   opacity: 0;
   pointer-events: none;
   stroke-width: 0.8;
-  transition: opacity 80ms ease;
+  transition: opacity var(--motion-feedback-duration) var(--motion-feedback-easing);
   will-change: transform, width, height;
 }
 

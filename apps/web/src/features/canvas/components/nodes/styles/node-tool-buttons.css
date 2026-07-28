@@ -70,9 +70,9 @@
 .node-tool-output-count,
 .node-tool-output-count-option {
   transition:
-    background-color var(--canvas-motion-fast) ease,
-    border-color var(--canvas-motion-fast) ease,
-    color var(--canvas-motion-fast) ease;
+    background-color var(--motion-control-duration) var(--motion-control-easing),
+    border-color var(--motion-control-duration) var(--motion-control-easing),
+    color var(--motion-control-duration) var(--motion-control-easing);
 }
 
 .node-tool-output-count:hover:not(:disabled),
@@ -111,8 +111,8 @@
   opacity: 0;
   pointer-events: none;
   transition:
-    opacity var(--canvas-motion-fast) ease,
-    transform var(--canvas-motion-fast) ease;
+    opacity var(--motion-feedback-duration) var(--motion-feedback-easing),
+    transform var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .node-tool-tooltip-trigger {
@@ -130,9 +130,9 @@
   color: #ffffff;
   background: var(--node-tool-button-brand);
   transition:
-    transform var(--canvas-motion-fast) ease,
-    opacity var(--canvas-motion-fast) ease,
-    background-color var(--canvas-motion-fast) ease;
+    transform var(--motion-control-duration) var(--motion-control-easing),
+    opacity var(--motion-feedback-duration) var(--motion-feedback-easing),
+    background-color var(--motion-control-duration) var(--motion-control-easing);
 }
 
 .node-tool-send:hover:not(:disabled) {
