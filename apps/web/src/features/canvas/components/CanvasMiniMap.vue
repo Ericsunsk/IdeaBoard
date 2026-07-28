@@ -11,7 +11,7 @@
       :node-border-radius="1.5"
       mask-color="transparent"
       mask-stroke-color="transparent"
-      :mask-stroke-width="1.2"
+      :mask-stroke-width="0"
       :mask-border-radius="CANVAS_MINIMAP_VIEWPORT_RADIUS"
       :offset-scale="CANVAS_MINIMAP_OFFSET_SCALE"
       :pannable="true"
@@ -307,8 +307,6 @@ function resolveOverlayDeltaScale(viewBoxRect: MiniMapRect): MiniMapPoint | null
 
 .canvas-minimap-viewport-fill {
   fill: var(--canvas-minimap-mask);
-  stroke: var(--canvas-minimap-viewport);
-  stroke-width: 1.2;
   cursor: grab;
   pointer-events: auto;
   touch-action: none;

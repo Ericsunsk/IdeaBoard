@@ -12,6 +12,7 @@ type TestFlowItem = {
 
 const vueFlowMocks = vi.hoisted(() => ({
   selectedElements: [] as Array<{ id: string }>,
+  nodesSelectionActive: { value: false },
   removeSelectedElements: vi.fn(),
   addSelectedNodes: vi.fn(),
   findNode: vi.fn(),
@@ -20,6 +21,7 @@ const vueFlowMocks = vi.hoisted(() => ({
 vi.mock('@vue-flow/core', () => ({
   useVueFlow: () => ({
     getSelectedElements: { value: vueFlowMocks.selectedElements },
+    nodesSelectionActive: vueFlowMocks.nodesSelectionActive,
     removeSelectedElements: vueFlowMocks.removeSelectedElements,
     addSelectedNodes: vueFlowMocks.addSelectedNodes,
     findNode: vueFlowMocks.findNode,
@@ -63,6 +65,7 @@ function createPanePointerEvent(options: MouseEventInit = {}) {
 describe('useFlowPaneSelectionAdapter', () => {
   beforeEach(() => {
     vueFlowMocks.selectedElements = []
+    vueFlowMocks.nodesSelectionActive.value = false
     vueFlowMocks.removeSelectedElements.mockReset()
     vueFlowMocks.addSelectedNodes.mockReset()
     vueFlowMocks.findNode.mockReset()
@@ -165,6 +168,32 @@ describe('useFlowPaneSelectionAdapter', () => {
 
     expect(vueFlowMocks.removeSelectedElements).toHaveBeenCalledWith([selectedEdge])
     expect(vueFlowMocks.addSelectedNodes).not.toHaveBeenCalled()
+  })
+
+  it('keeps a marquee-selected node selected without showing a group frame', () => {
+    const harness = createHarness()
+    const selectedNode: TestFlowItem = { id: 'node-a' }
+    setSelectedElements(selectedNode)
+    vueFlowMocks.nodesSelectionActive.value = true
+
+    harness.adapter.vueFlowSelectionBindings.onSelectionEnd(
+      new MouseEvent('mouseup', { clientX: 30, clientY: 30 }),
+    )
+
+    expect(vueFlowMocks.nodesSelectionActive.value).toBe(false)
+    expect(vueFlowMocks.removeSelectedElements).not.toHaveBeenCalled()
+    expect(vueFlowMocks.addSelectedNodes).not.toHaveBeenCalled()
+  })
+
+  it('shows the group frame when marquee selection contains multiple nodes', () => {
+    const harness = createHarness()
+    setSelectedElements({ id: 'node-a' }, { id: 'node-b' })
+
+    harness.adapter.vueFlowSelectionBindings.onSelectionEnd(
+      new MouseEvent('mouseup', { clientX: 30, clientY: 30 }),
+    )
+
+    expect(vueFlowMocks.nodesSelectionActive.value).toBe(true)
   })
 
   it('restores previous nodes outside a Shift marquee', () => {

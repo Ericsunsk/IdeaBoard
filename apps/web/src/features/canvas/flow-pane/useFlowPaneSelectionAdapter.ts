@@ -40,7 +40,13 @@ function isPointerMoved(snapshot: MarqueeSelectionSnapshot, event: MouseEvent): 
 }
 
 export function useFlowPaneSelectionAdapter(options: UseFlowPaneSelectionAdapterOptions) {
-  const { getSelectedElements, removeSelectedElements, addSelectedNodes, findNode } = useVueFlow()
+  const {
+    getSelectedElements,
+    removeSelectedElements,
+    addSelectedNodes,
+    findNode,
+    nodesSelectionActive,
+  } = useVueFlow()
   let marqueeSelectionSnapshot: MarqueeSelectionSnapshot | null = null
   let isMarqueeSelectionActive = false
 
@@ -176,8 +182,11 @@ export function useFlowPaneSelectionAdapter(options: UseFlowPaneSelectionAdapter
       removeSelectedElements(selectedEdges)
     }
 
-    if (!snapshot) return
-    reconcileShiftMarqueeSelection(snapshot, selectedElements.filter(isFlowNodeElement), event)
+    if (snapshot) {
+      reconcileShiftMarqueeSelection(snapshot, selectedElements.filter(isFlowNodeElement), event)
+    }
+
+    nodesSelectionActive.value = readSelectedNodeIds().size > 1
   }
 
   function filterMarqueeEdgeChanges(changes: EdgeChange[]): EdgeChange[] {
