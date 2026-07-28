@@ -70,8 +70,8 @@ export type ImageNodePresentationIntent =
       anchor: CanvasExtendDragAnchor
       event: PointerEvent
     }
-  | { type: 'canvas-extend-handle-pointermove'; event: PointerEvent }
-  | { type: 'canvas-extend-handle-pointerup'; event: PointerEvent }
+  | { type: 'canvas-extend-handle-pointermove'; nodeId: string; event: PointerEvent }
+  | { type: 'canvas-extend-handle-pointerup'; nodeId: string; event: PointerEvent }
   | { type: 'canvas-extend-frame-pointerdown'; nodeId: string; event: PointerEvent }
 
 export type ImageNodePresentationIntentHandlers = {

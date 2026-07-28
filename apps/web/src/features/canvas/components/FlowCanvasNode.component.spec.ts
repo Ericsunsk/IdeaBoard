@@ -1,7 +1,7 @@
 import { fireEvent } from '@testing-library/vue'
 import { describe, expect, it, vi } from 'vitest'
 import FlowCanvasNode from './FlowCanvasNode.vue'
-import type { ImageNodeItem, PromptNodeItem } from '../../canvas-board/domain'
+import type { FusionNodeItem, ImageNodeItem, PromptNodeItem } from '../../canvas-board/domain'
 import type { ImageActionBinding } from '../image-tools'
 import { createImageNodePresentationResolver } from '../node-presentation'
 import type { FlowNodeData } from '../types/flowTypes'
@@ -87,6 +87,34 @@ function createImageData(snapshot: ImageNodeItem): FlowNodeData {
   }
 }
 
+function createFusionData(snapshot: FusionNodeItem): FlowNodeData {
+  return {
+    kind: 'fusion',
+    nodeType: 'fusion',
+    title: snapshot.title ?? 'Fusion',
+    snapshotNode: snapshot,
+  }
+}
+
+function createFusionSnapshot(overrides: Partial<FusionNodeItem> = {}): FusionNodeItem {
+  return {
+    id: 1,
+    type: 'fusion',
+    x: 0,
+    y: 0,
+    width: 280,
+    title: 'Fusion',
+    prompt: '',
+    outputCount: 1,
+    aspectRatio: 'auto',
+    blendPoint: { x: 0.5, y: 0.5 },
+    inputImages: [],
+    outputStatus: 'idle',
+    outputImages: [],
+    ...overrides,
+  }
+}
+
 function renderFlowCanvasNode(
   input: {
     selected?: boolean
@@ -151,8 +179,8 @@ describe('FlowCanvasNode prompt rendering', () => {
 
     await fireEvent.update(view.getByPlaceholderText('type your idea...'), '新的提示词')
 
-    expect(view.emitted('prompt-intent')).toContainEqual([
-      { type: 'text-edited', nodeId: 'prompt-1', text: '新的提示词' },
+    expect(view.emitted('node-intent')).toContainEqual([
+      { nodeKind: 'prompt', type: 'text-edited', nodeId: 'prompt-1', text: '新的提示词' },
     ])
   })
 
@@ -161,8 +189,9 @@ describe('FlowCanvasNode prompt rendering', () => {
 
     await fireEvent.click(view.getByLabelText('发送'))
 
-    expect(view.emitted('prompt-intent')).toContainEqual([
+    expect(view.emitted('node-intent')).toContainEqual([
       {
+        nodeKind: 'prompt',
         type: 'generation-requested',
         nodeId: 'prompt-1',
         prompt: 'A benchmark prompt',
@@ -192,11 +221,11 @@ describe('FlowCanvasNode image presentation', () => {
     await fireEvent.dblClick(view.getByAltText('图片节点预览'))
     await fireEvent.click(view.getByLabelText('清空图片输入'))
 
-    expect(view.emitted('image-intent')).toEqual(
+    expect(view.emitted('node-intent')).toEqual(
       expect.arrayContaining([
-        [{ type: 'preview-requested', nodeId: 'image-1' }],
-        [{ type: 'append-to-canvas-requested', nodeId: 'image-1' }],
-        [{ type: 'reset-requested', nodeId: 'image-1' }],
+        [{ nodeKind: 'image', type: 'preview-requested', nodeId: 'image-1' }],
+        [{ nodeKind: 'image', type: 'append-to-canvas-requested', nodeId: 'image-1' }],
+        [{ nodeKind: 'image', type: 'reset-requested', nodeId: 'image-1' }],
       ]),
     )
   })
@@ -217,8 +246,107 @@ describe('FlowCanvasNode image presentation', () => {
 
     await fireEvent.click(view.getByLabelText('上传图片作为输入'))
 
-    expect(view.emitted('image-intent')).toContainEqual([
-      { type: 'file-open-requested', nodeId: 'image-1' },
+    expect(view.emitted('node-intent')).toContainEqual([
+      { nodeKind: 'image', type: 'file-open-requested', nodeId: 'image-1' },
     ])
+  })
+})
+
+describe('FlowCanvasNode fusion presentation', () => {
+  it('emits the shared presentation intent for Fusion parameter changes', async () => {
+    const view = render(FlowCanvasNode, {
+      props: {
+        nodeId: 'fusion-1',
+        data: createFusionData(createFusionSnapshot()),
+        imagePresentation: createImagePresentation(),
+      },
+      global: {
+        stubs: {
+          FlowNodeHandles: { template: '<div data-testid="flow-node-handles" />' },
+        },
+      },
+    })
+
+    const title = view.getByTitle('单击重命名')
+    await fireEvent.click(title)
+    title.textContent = '新的融合节点'
+    await fireEvent.input(title)
+    await fireEvent.blur(title)
+
+    expect(view.emitted('node-intent')).toContainEqual([
+      {
+        nodeKind: 'fusion',
+        type: 'parameter-changed',
+        nodeId: 'fusion-1',
+        patch: { key: 'title', value: '新的融合节点' },
+      },
+    ])
+  })
+
+  it('emits shared intents for Fusion input, context, and prompt generation', async () => {
+    const view = render(FlowCanvasNode, {
+      props: {
+        nodeId: 'fusion-1',
+        data: createFusionData(
+          createFusionSnapshot({
+            inputImages: [
+              {
+                id: 'image-1',
+                url: 'https://example.com/one.png',
+                ratio: 1,
+                sourceType: 'external',
+                sourceId: 'media-1',
+              },
+              {
+                id: 'image-2',
+                url: 'https://example.com/two.png',
+                ratio: 1,
+                sourceType: 'external',
+                sourceId: 'media-2',
+              },
+            ],
+          }),
+        ),
+        fusionPresentation: { promptComposerVisible: true },
+        imagePresentation: createImagePresentation(),
+      },
+      global: {
+        stubs: {
+          FlowNodeHandles: { template: '<div data-testid="flow-node-handles" />' },
+        },
+      },
+    })
+
+    const stage = view.container.querySelector('.fusion-node-stage')!
+    await fireEvent.drop(stage)
+    await fireEvent.contextMenu(stage)
+    await fireEvent.click(view.getAllByLabelText('移除图片输入')[0]!)
+    await fireEvent.update(view.getByPlaceholderText('输入融合提示词'), '融合两张图片')
+    await fireEvent.click(view.getByLabelText('发送'))
+
+    expect(view.emitted('node-intent')).toEqual(
+      expect.arrayContaining([
+        [expect.objectContaining({ nodeKind: 'fusion', type: 'media-input-dropped' })],
+        [expect.objectContaining({ nodeKind: 'fusion', type: 'context-menu-requested' })],
+        [
+          {
+            nodeKind: 'fusion',
+            type: 'media-input-remove-requested',
+            nodeId: 'fusion-1',
+            imageId: 'image-1',
+          },
+        ],
+        [
+          {
+            nodeKind: 'fusion',
+            type: 'generation-requested',
+            nodeId: 'fusion-1',
+            prompt: '融合两张图片',
+            outputCount: 1,
+            aspectRatio: 'auto',
+          },
+        ],
+      ]),
+    )
   })
 })

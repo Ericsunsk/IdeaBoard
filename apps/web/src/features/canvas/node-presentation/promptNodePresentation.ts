@@ -11,7 +11,11 @@ export type PromptNodePresentationIntent =
   | { type: 'delete-requested'; nodeId: string }
   | { type: 'media-input-dropped'; nodeId: string; event: DragEvent }
   | { type: 'media-input-open-requested'; nodeId: string }
-  | { type: 'media-input-preview-requested'; image: { url: string; ratio: number } }
+  | {
+      type: 'media-input-preview-requested'
+      nodeId: string
+      image: { url: string; ratio: number }
+    }
   | { type: 'media-input-remove-requested'; nodeId: string; imageId: string }
   | {
       type: 'generation-requested'

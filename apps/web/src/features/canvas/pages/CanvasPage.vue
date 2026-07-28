@@ -92,10 +92,8 @@
             :copy-mode="duplicateModifierPressed"
             :ui-state="getFlowNodeUiStateCached(nodeProps.id)"
             :image-presentation="imagePresentationFor(nodeProps.id)"
+            :fusion-presentation="fusionPresentationFor(nodeProps.id)"
             :generation-available="isGenerationAvailable"
-            :fusion-prompt-composer-visible="
-              isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.fusionPrompt, nodeProps.id)
-            "
             :set-image-stage-ref="setImageStageRef"
             :clear-image-stage-ref="clearImageStageRef"
             :expand-mode-active="flowExpandNodeId === nodeProps.id"
@@ -104,18 +102,9 @@
             "
             :expand-handle-radius="flowExpandHandleRadius"
             :handle-visibility-refresh-token="flowHandleVisibilityRefreshToken"
-            @prompt-intent="onPromptNodePresentationIntent"
-            @image-intent="onImageNodePresentationIntent"
-            @update-node-param="onFlowNodeParamUpdate"
-            @delete-node="onFlowDeleteNode"
-            @media-input-image-drop="onFlowMediaInputImageDrop"
-            @media-input-image-open="onFlowMediaInputImageOpen"
-            @media-input-image-preview="onFlowMediaInputImagePreview"
-            @media-input-image-remove="onFlowMediaInputImageRemove"
+            @node-intent="onCanvasNodePresentationIntent"
             @node-mousedown="selectionCommands.onFlowNodeMouseDown"
             @request-internals-update="onFlowNodeInternalsUpdate"
-            @fusion-contextmenu="onFlowFusionContextMenu"
-            @fusion-prompt-generate="onFlowFusionPromptGenerate"
           />
         </template>
         <CanvasChromeMiniMap
@@ -175,6 +164,9 @@ import { useImageStageRegistry } from '../composables/useImageStageRegistry'
 import { useFlowPaneSelectionAdapter, useVueFlowPaneAdapter } from '../flow-pane'
 import { useCanvasWorkspaceRuntime } from '../workspace-runtime'
 import {
+  createCanvasNodePresentationIntentHandler,
+  createFusionNodePresentationIntentHandler,
+  createFusionNodePresentationResolver,
   createImageNodePresentationIntentHandler,
   createImageNodePresentationResolver,
   createPromptNodePresentationIntentHandler,
@@ -523,6 +515,11 @@ const imagePresentationFor = createImageNodePresentationResolver({
   stageBindingFor: imageToolStageBindingFor,
 }).forNode
 
+const fusionPresentationFor = createFusionNodePresentationResolver({
+  promptComposerVisibleFor: (nodeId) =>
+    isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.fusionPrompt, nodeId),
+}).forNode
+
 const isCanvasShortcutSuppressed = computed(
   () => !!flowImageEditorNodeId.value || !!flowMaskEditorNodeId.value,
 )
@@ -617,17 +614,6 @@ const { onFlowImageExpandSubmit, onFlowExpandHandlePointerDown, onFlowExpandFram
 const { onFlowPromptGenerate } = commands.imageWorkflow.createPromptGenerationHandlers({
   cancelFlowExpandMode,
   cancelFlowMaskEditorMode,
-})
-
-const onPromptNodePresentationIntent = createPromptNodePresentationIntentHandler({
-  onTextEdited: onFlowPromptTextUpdate,
-  onParameterChanged: onFlowNodeParamUpdate,
-  onDeleteRequested: onFlowDeleteNode,
-  onMediaInputDrop: onFlowMediaInputImageDrop,
-  onMediaInputOpen: onFlowMediaInputImageOpen,
-  onMediaInputPreview: onFlowMediaInputImagePreview,
-  onMediaInputRemove: onFlowMediaInputImageRemove,
-  onGenerationRequested: onFlowPromptGenerate,
 })
 
 const {
@@ -739,22 +725,42 @@ const {
   getActionStrength,
 })
 
-const onImageNodePresentationIntent = createImageNodePresentationIntentHandler({
-  onParameterChanged: onFlowNodeParamUpdate,
-  onDeleteRequested: onFlowDeleteNode,
-  onStageDrop: onFlowImageStageDrop,
-  onFileOpenRequested: onFlowImageOpenFile,
-  onPreviewRequested: onFlowImageOpenPreview,
-  onAppendToCanvasRequested: onFlowImageAppendToCanvas,
-  onResetRequested: onFlowImageReset,
-  onContextMenuRequested: onFlowImageContextMenu,
-  onPromptGenerationRequested: onFlowImagePromptGenerate,
-  onCanvasExtendSubmitted: onFlowImageExpandSubmit,
-  onImageActionRequested: onFlowImageDirectAction,
-  onCanvasExtendHandlePointerDown: onFlowExpandHandlePointerDown,
-  onCanvasExtendHandlePointerMove: onFlowExpandHandlePointerMove,
-  onCanvasExtendHandlePointerUp: onFlowExpandHandlePointerUp,
-  onCanvasExtendFramePointerDown: onFlowExpandFramePointerDown,
+const onCanvasNodePresentationIntent = createCanvasNodePresentationIntentHandler({
+  prompt: createPromptNodePresentationIntentHandler({
+    onTextEdited: onFlowPromptTextUpdate,
+    onParameterChanged: onFlowNodeParamUpdate,
+    onDeleteRequested: onFlowDeleteNode,
+    onMediaInputDrop: onFlowMediaInputImageDrop,
+    onMediaInputOpen: onFlowMediaInputImageOpen,
+    onMediaInputPreview: onFlowMediaInputImagePreview,
+    onMediaInputRemove: onFlowMediaInputImageRemove,
+    onGenerationRequested: onFlowPromptGenerate,
+  }),
+  image: createImageNodePresentationIntentHandler({
+    onParameterChanged: onFlowNodeParamUpdate,
+    onDeleteRequested: onFlowDeleteNode,
+    onStageDrop: onFlowImageStageDrop,
+    onFileOpenRequested: onFlowImageOpenFile,
+    onPreviewRequested: onFlowImageOpenPreview,
+    onAppendToCanvasRequested: onFlowImageAppendToCanvas,
+    onResetRequested: onFlowImageReset,
+    onContextMenuRequested: onFlowImageContextMenu,
+    onPromptGenerationRequested: onFlowImagePromptGenerate,
+    onCanvasExtendSubmitted: onFlowImageExpandSubmit,
+    onImageActionRequested: onFlowImageDirectAction,
+    onCanvasExtendHandlePointerDown: onFlowExpandHandlePointerDown,
+    onCanvasExtendHandlePointerMove: onFlowExpandHandlePointerMove,
+    onCanvasExtendHandlePointerUp: onFlowExpandHandlePointerUp,
+    onCanvasExtendFramePointerDown: onFlowExpandFramePointerDown,
+  }),
+  fusion: createFusionNodePresentationIntentHandler({
+    onParameterChanged: onFlowNodeParamUpdate,
+    onDeleteRequested: onFlowDeleteNode,
+    onMediaInputDrop: onFlowMediaInputImageDrop,
+    onMediaInputRemove: onFlowMediaInputImageRemove,
+    onContextMenuRequested: onFlowFusionContextMenu,
+    onGenerationRequested: onFlowFusionPromptGenerate,
+  }),
 })
 
 watch(
