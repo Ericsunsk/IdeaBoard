@@ -169,7 +169,7 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
     },
     reason: 'Mask overlay must hide the ImageNodeStage image through a cross-component contract.',
   },
-  'src/features/canvas/pages/CanvasPage.vue': {
+  'src/features/canvas/screen-presentation/CanvasScreenPresentation.vue': {
     counts: {
       'global-selector': 2,
     },
