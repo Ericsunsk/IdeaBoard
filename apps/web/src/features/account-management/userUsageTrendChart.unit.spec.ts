@@ -30,7 +30,7 @@ describe('buildUserUsageTrendChart', () => {
     expect(buildUserUsageTrendChart([], theme).options.animation).toMatchObject({ duration: 220 })
 
     vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
-    expect(buildUserUsageTrendChart([], theme).options.animation).toMatchObject({ duration: 0 })
+    expect(buildUserUsageTrendChart([], theme).options.animation).toBe(false)
   })
 
   it('keeps all 30 server date keys and a single zero-value dataset', () => {

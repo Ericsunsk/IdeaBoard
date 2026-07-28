@@ -307,7 +307,7 @@ const navRailClass =
 const siderBottomClass = 'relative z-[1] ml-[21px] flex w-[84px] flex-col items-center gap-3'
 const focusRingClass = 'focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]'
 const railButtonClass = [
-  '!inline-flex !items-center !justify-center !rounded-[var(--radius-ib-control)] !border !border-transparent !text-ib-text-muted !no-underline !shadow-none !transition-colors !duration-[var(--duration-ib-standard)]',
+  '!ib-motion-control-colors !inline-flex !items-center !justify-center !rounded-[var(--radius-ib-control)] !border !border-transparent !text-ib-text-muted !no-underline !shadow-none',
   railButtonSizeClass,
   focusRingClass,
 ].join(' ')
@@ -319,7 +319,7 @@ const userAvatarImageClass = 'ib-user-avatar-button__image'
 const userAvatarPlaceholderClass = 'ib-user-avatar-button__placeholder'
 const userAvatarIconClass = 'size-[17px]'
 const shellButtonSkinClass = [
-  '!size-[42px] !items-center !justify-center !rounded-[9px] !text-ib-text-muted !transition-colors !duration-[var(--duration-ib-standard)]',
+  '!ib-motion-control-colors !size-[42px] !items-center !justify-center !rounded-[9px] !text-ib-text-muted',
   'hover:!border-ib-border hover:!bg-ib-surface-hover hover:!text-ib-text',
   focusRingClass,
 ].join(' ')
@@ -345,7 +345,7 @@ const headerClass =
 const contentClass =
   'min-h-0 flex-1 overflow-visible bg-ib-surface pr-[42px] pb-[38px] max-[1080px]:px-[22px] max-[1080px]:pb-7 max-[720px]:px-[14px] max-[720px]:pb-5'
 const mobileNavButtonClass = [
-  'flex min-h-12 w-full items-center justify-start gap-3 rounded-xl border border-transparent px-4 text-sm font-bold no-underline transition-colors duration-[var(--duration-ib-standard)]',
+  'ib-motion-control-colors flex min-h-12 w-full items-center justify-start gap-3 rounded-xl border border-transparent px-4 text-sm font-bold no-underline',
   focusRingClass,
 ].join(' ')
 const mobileNavButtonIdleClass =

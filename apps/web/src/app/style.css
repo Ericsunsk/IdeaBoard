@@ -324,6 +324,12 @@
   }
 }
 
+@utility ib-motion-control-colors {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-duration: var(--motion-control-duration);
+  transition-timing-function: var(--motion-control-easing);
+}
+
 @utility ib-page-dot-bg {
   background-image: radial-gradient(circle, var(--color-ib-page-dot) 1px, transparent 1px);
   background-position: center center;

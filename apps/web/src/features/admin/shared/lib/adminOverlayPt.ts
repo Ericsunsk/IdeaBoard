@@ -1,6 +1,8 @@
 import type { DialogPassThroughOptions } from 'primevue/dialog'
 import type { MenuPassThroughOptions } from 'primevue/menu'
 import type { PopoverPassThroughOptions } from 'primevue/popover'
+import { createDialogMotionPt } from '../../../../shared/motion/dialogMotion'
+import { createPopoverMotionPt } from '../../../../shared/motion/popoverMotion'
 import { ibDialogMaskPt } from '../../../../shared/theme/dialogMask'
 
 type OverlayClass = string | undefined
@@ -33,6 +35,7 @@ export function createAdminMenuPt(input: {
   itemLinkClass?: string
 }): MenuPassThroughOptions {
   return {
+    ...createPopoverMotionPt(),
     root: { class: input.rootClass },
     list: { class: input.listClass ?? adminOverlayMenuListClass },
     itemContent: { class: input.itemContentClass ?? adminOverlayMenuItemContentClass },
@@ -47,6 +50,7 @@ export function createAdminPopoverPt(
   } = {},
 ): PopoverPassThroughOptions {
   return {
+    ...createPopoverMotionPt(),
     root: { class: joinOverlayClasses(adminOverlayPopoverRootClass, input.rootClass) },
     ...(input.contentClass ? { content: { class: input.contentClass } } : {}),
   }
@@ -58,6 +62,7 @@ export function createAdminDialogPt(input: {
   contentClass?: string
 }): DialogPassThroughOptions {
   return {
+    ...createDialogMotionPt(),
     ...ibDialogMaskPt,
     ...(input.rootClass ? { root: { class: input.rootClass } } : {}),
     ...(input.headerClass ? { header: { class: input.headerClass } } : {}),

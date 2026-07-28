@@ -8,6 +8,7 @@ import {
   type ChartOptions,
   withAlpha,
 } from '../../../../shared/lib/chartPrimitives'
+import { resolveChartAnimation } from '../../../../shared/motion/chartMotion'
 import { adminThemeTokenFallbacks } from '../../../../shared/theme/adminThemeTokens'
 
 export const adminChartStrokeWidth = 1
@@ -68,10 +69,16 @@ type AdminChartNumericScaleInput = {
 }
 
 export function defineAdminChartOptions(options: ChartOptions): ChartOptions {
-  return defineChartOptions(options, {
-    fontFamily: adminChartFontFamily,
-    hideScaleTitles: true,
-  })
+  return defineChartOptions(
+    {
+      ...options,
+      animation: resolveChartAnimation('enter'),
+    },
+    {
+      fontFamily: adminChartFontFamily,
+      hideScaleTitles: true,
+    },
+  )
 }
 
 export function adminChartLegend(position: 'top' | 'bottom' = 'top') {

@@ -15,7 +15,6 @@ export function baseChartOptions(): ChartOptions {
     responsive: true,
     maintainAspectRatio: false,
     resizeDelay: 80,
-    animation: { duration: 260 },
     plugins: baseChartPlugins(),
   }
 }

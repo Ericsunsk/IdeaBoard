@@ -62,9 +62,8 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
       'raw-color': 1,
       'raw-shadow': 4,
       'raw-z-index': 3,
-      'raw-motion': 3,
     },
-    reason: 'Admin shell owns bespoke rail layering and transition constants.',
+    reason: 'Admin shell owns bespoke rail layering and visual constants.',
   },
   'src/features/admin/pages/login/AdminLoginPage.vue': {
     counts: {
