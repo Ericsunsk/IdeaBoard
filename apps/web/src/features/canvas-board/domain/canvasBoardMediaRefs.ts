@@ -40,26 +40,39 @@ export function rebuildCanvasBoardMediaRefs(
     refs.push(ref)
   }
 
+  function appendImageRef(
+    image: { url: string; mediaAssetId?: number },
+    refId: string,
+    role: string,
+  ) {
+    if (!image.url.trim()) return
+    appendRef(image.mediaAssetId, refId, role)
+  }
+
   snapshot.imageNodes.forEach((node) => {
     const refId = `image-${node.id}`
-    appendRef(node.sourceMediaAssetId, refId, resolveImageNodeMediaRefRole(base, refId))
+    appendImageRef(
+      { url: node.sourceImageUrl, mediaAssetId: node.sourceMediaAssetId },
+      refId,
+      resolveImageNodeMediaRefRole(base, refId),
+    )
     node.outputImages.forEach((output, index) => {
-      appendRef(output.mediaAssetId, refId, `output:${index}`)
+      appendImageRef(output, refId, `output:${index}`)
     })
   })
   snapshot.promptNodes.forEach((node) => {
     const refId = `prompt-${node.id}`
     node.inputImages?.forEach((input, index) => {
-      appendRef(input.mediaAssetId, refId, `input:${index}`)
+      appendImageRef(input, refId, `input:${index}`)
     })
   })
   snapshot.fusionNodes.forEach((node) => {
     const refId = `fusion-${node.id}`
     node.inputImages?.forEach((input, index) => {
-      appendRef(input.mediaAssetId, refId, `input:${index}`)
+      appendImageRef(input, refId, `input:${index}`)
     })
     node.outputImages.forEach((output, index) => {
-      appendRef(output.mediaAssetId, refId, `output:${index}`)
+      appendImageRef(output, refId, `output:${index}`)
     })
   })
 
