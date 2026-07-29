@@ -9,6 +9,7 @@ import type {
 } from '../utils/canvasGroupGeometry'
 import type { CanvasSelectionGroupAction } from '../composables/useCanvasGroupRuntime'
 import type { DismissTransientCanvasUi } from '../composables/useFlowTransientUiDismissal'
+import { useCanvasCustomLayerOverlay } from '../overlay-lifecycle'
 import { useCanvasGroupPointerInteraction } from './useCanvasGroupPointerInteraction'
 
 export type CanvasGroupPresentationDragControls = {
@@ -19,7 +20,11 @@ export type CanvasGroupPresentationDragControls = {
 }
 
 export type CanvasGroupPresentationResizeControls = {
-  begin: (groupId: CanvasGraphGroupId, handle: CanvasGroupResizeHandle, point: CanvasPoint) => boolean
+  begin: (
+    groupId: CanvasGraphGroupId,
+    handle: CanvasGroupResizeHandle,
+    point: CanvasPoint,
+  ) => boolean
   move: (point: CanvasPoint) => boolean
   commit: () => boolean
   cancel: () => boolean
@@ -70,11 +75,25 @@ export function useCanvasGroupPresentationInteraction(
     groupResize: options.grouping.resize,
     dismissTransientCanvasUi: options.pane.dismiss,
   })
+  useCanvasCustomLayerOverlay({
+    visible: interactionShell.isSelectionGroupActionVisible,
+    ignore: ['.canvas-selection-group-action-button'],
+    ownerDocument: () =>
+      options.canvas.host.value?.ownerDocument ??
+      (typeof document === 'undefined' ? null : document),
+    shouldDismiss: (dismissal, event) =>
+      dismissal !== 'outside-pointer' || !(event instanceof PointerEvent) || event.button === 0,
+    onDismiss: interactionShell.closeSelectionGroupAction,
+  })
   const { onAction } = interactionShell.bindClosePolicyHandlers({
     onAction: options.grouping.onAction,
   })
   onScopeDispose(interactionShell.cleanup)
-  const { cleanup: _cleanup, ...presentationInteraction } = interactionShell
+  const {
+    cleanup: _cleanup,
+    closeSelectionGroupAction: _closeSelectionGroupAction,
+    ...presentationInteraction
+  } = interactionShell
 
   return {
     ...presentationInteraction,

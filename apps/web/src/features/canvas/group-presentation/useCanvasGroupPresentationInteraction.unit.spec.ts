@@ -241,6 +241,35 @@ describe('useCanvasGroupPresentationInteraction', () => {
     expect(harness.runtime.isSelectionGroupActionVisible.value).toBe(false)
   })
 
+  it('keeps the group action open on its control and non-primary pointers, then dismisses on primary outside pointerdown', async () => {
+    const harness = createHarness()
+    const actionButton = document.createElement('button')
+    actionButton.className = 'canvas-selection-group-action-button'
+    document.body.appendChild(actionButton)
+    const contextMenuEvent = createPointerEvent(document.createElement('div'), {
+      clientX: 420,
+      clientY: 120,
+    }) as MouseEvent
+
+    try {
+      harness.runtime.onCanvasContextMenuCapture(contextMenuEvent)
+      await nextTick()
+
+      actionButton.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }))
+      expect(harness.runtime.isSelectionGroupActionVisible.value).toBe(true)
+
+      document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 1 }))
+      document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 2 }))
+      expect(harness.runtime.isSelectionGroupActionVisible.value).toBe(true)
+
+      document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }))
+      expect(harness.runtime.isSelectionGroupActionVisible.value).toBe(false)
+    } finally {
+      actionButton.remove()
+      harness.dispose()
+    }
+  })
+
   it('binds close policy around delegated shell handlers', () => {
     const harness = createHarness()
     const event = createPointerEvent(document.createElement('div'), {

@@ -11,6 +11,7 @@ import {
   type CanvasExtendRect,
 } from '../utils/canvasExtendGeometry'
 import { isEditableEventTarget } from '../utils/domEventTargets'
+import { useCanvasCustomLayerOverlay } from '../overlay-lifecycle'
 import { usePointerDragSession } from './usePointerDragSession'
 
 const windowTarget = () => (typeof window === 'undefined' ? null : window)
@@ -245,37 +246,36 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
     const target = event.target as HTMLElement | null
     if (target?.closest('[data-image-extend-composer]')) return
     if (isEditableEventTarget(event.target)) return
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      cancelExpandMode()
-      return
-    }
     if (event.key === 'Enter' && !event.isComposing) {
       event.preventDefault()
       void commitExpandMode()
     }
   }
 
-  function onGlobalPointerDown(event: PointerEvent) {
-    if (!state.value) return
-    if (event.button !== 0) return
-    const target = event.target as HTMLElement | null
-    if (!target) return
-    const stage = options.getImageStageElement(state.value.nodeId)
-    const inImageStage = !!stage?.contains(target)
-    const inOverlayFrame = !!target.closest('[data-image-extend-frame]')
-    const inOverlayComposer = !!target.closest('[data-image-extend-composer]')
-    if (inOverlayComposer) return
-    if (inImageStage && !inOverlayFrame) {
-      options.onBeforePointerCancel?.()
+  useCanvasCustomLayerOverlay({
+    visible: isExpandMode,
+    ignore: ['[data-image-extend-frame]', '[data-image-extend-composer]'],
+    ignoreEscape: [
+      '[data-image-extend-composer]',
+      'textarea',
+      'input:not([type="button"]):not([type="submit"]):not([type="reset"])',
+      '[contenteditable=""]',
+      '[contenteditable="true"]',
+    ],
+    ownerDocument: () => {
+      const nodeId = state.value?.nodeId
+      return (
+        (nodeId ? options.getImageStageElement(nodeId)?.ownerDocument : null) ??
+        (typeof document === 'undefined' ? null : document)
+      )
+    },
+    shouldDismiss: (dismissal, event) =>
+      dismissal !== 'outside-pointer' || !(event instanceof PointerEvent) || event.button === 0,
+    onDismiss: (dismissal) => {
+      if (dismissal === 'outside-pointer') options.onBeforePointerCancel?.()
       cancelExpandMode()
-      return
-    }
-    if (!inImageStage) {
-      options.onBeforePointerCancel?.()
-      cancelExpandMode()
-    }
-  }
+    },
+  })
 
   watch(
     () => options.activeTool.value,
@@ -292,11 +292,7 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
   })
 
   useEventListener<KeyboardEvent>(windowTarget, 'keydown', onGlobalKeydown, true)
-  useEventListener<PointerEvent>(windowTarget, 'pointerdown', onGlobalPointerDown, true)
-  tryOnScopeDispose(() => {
-    stopDragSession()
-    if (state.value) stopExpandInteraction()
-  })
+  tryOnScopeDispose(cancelExpandMode)
 
   return {
     isExpandMode,

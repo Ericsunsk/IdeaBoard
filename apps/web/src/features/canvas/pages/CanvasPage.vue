@@ -8,7 +8,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../../../app/stores/user'
 import { uploadApi } from '../../../shared/api/upload'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
-import { useDismissableLayer } from '../../../shared/composables/useDismissableLayer'
 import { USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
 import type { NodeMouseEvent } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
@@ -44,6 +43,7 @@ import {
   createPromptNodePresentationIntentHandler,
 } from '../node-presentation'
 import { CanvasScreenPresentation, useCanvasScreenPresentation } from '../screen-presentation'
+import { useCanvasCustomLayerOverlay } from '../overlay-lifecycle'
 import type { CanvasChromeAccountState, CanvasChromeBoardState } from '../components/chrome'
 import {
   useUserAccountControls,
@@ -421,8 +421,8 @@ dismissTransientCanvasUi = useFlowTransientUiDismissal({
   hideStrengthControl,
 }).dismissTransientCanvasUi
 
-useDismissableLayer({
-  enabled: hasCanvasDismissableLayer,
+useCanvasCustomLayerOverlay({
+  visible: hasCanvasDismissableLayer,
   ignore: [
     '.node-tool-surface',
     '.canvas-node-context-menu',

@@ -261,9 +261,6 @@ export function useCanvasGroupPointerInteraction(options: UseCanvasGroupPointerI
   }
 
   function onCanvasPointerDownCapture(event: PointerEvent) {
-    if (!isSelectionGroupActionButtonTarget(event.target) && event.button === 0) {
-      closeSelectionGroupAction()
-    }
     if (tryBeginCanvasGroupPointerInteraction(event)) return
     options.paneSelectionPointerDownCapture(event)
   }
@@ -288,6 +285,7 @@ export function useCanvasGroupPointerInteraction(options: UseCanvasGroupPointerI
     isSelectionGroupActionMenuOpen,
     isSelectionGroupActionVisible,
     selectionGroupActionButtonPosition,
+    closeSelectionGroupAction,
     bindClosePolicyHandlers,
     onCanvasContextMenuCapture,
     onCanvasPointerDownCapture,

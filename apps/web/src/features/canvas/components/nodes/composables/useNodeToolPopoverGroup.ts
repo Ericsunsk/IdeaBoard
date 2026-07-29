@@ -1,5 +1,5 @@
-import { computed, ref, watchEffect, type Ref } from 'vue'
-import { useDismissableLayer } from '../../../../../shared/composables/useDismissableLayer'
+import { computed, ref, type Ref } from 'vue'
+import { useCanvasCustomLayerOverlay } from '../../../overlay-lifecycle'
 
 type PopoverRootRef = Ref<HTMLElement | null | undefined>
 
@@ -9,14 +9,10 @@ interface NodeToolPopoverGroupOptions<T extends string> {
   closeOnEscape?: boolean
 }
 
-const POPOVER_GROUP_ATTR = 'data-node-tool-popover-group'
-let popoverGroupId = 0
-
 export function useNodeToolPopoverGroup<T extends string>(options: NodeToolPopoverGroupOptions<T>) {
   const activeKey = ref<T | null>(null)
   const keySet = new Set(options.keys)
   const closeOnEscape = options.closeOnEscape ?? true
-  const groupToken = `node-tool-popover-group-${++popoverGroupId}`
 
   function isOpen(key: T) {
     return computed(() => activeKey.value === key)
@@ -40,31 +36,11 @@ export function useNodeToolPopoverGroup<T extends string>(options: NodeToolPopov
     activeKey.value = activeKey.value === key ? null : key
   }
 
-  watchEffect((onCleanup) => {
-    const roots = options.rootRefs
-      .map((rootRef) => rootRef.value)
-      .filter((root): root is HTMLElement => !!root)
-
-    for (const root of roots) {
-      root.setAttribute(POPOVER_GROUP_ATTR, groupToken)
-    }
-
-    onCleanup(() => {
-      for (const root of roots) {
-        if (root.getAttribute(POPOVER_GROUP_ATTR) === groupToken) {
-          root.removeAttribute(POPOVER_GROUP_ATTR)
-        }
-      }
-    })
-  })
-
-  useDismissableLayer({
-    enabled: computed(() => activeKey.value !== null),
-    ignore: [`[${POPOVER_GROUP_ATTR}="${groupToken}"]`],
-    onDismiss: (event) => {
-      if (event instanceof KeyboardEvent && !closeOnEscape) return
-      close()
-    },
+  useCanvasCustomLayerOverlay({
+    visible: computed(() => activeKey.value !== null),
+    roots: options.rootRefs,
+    dismissibleBy: closeOnEscape ? ['outside-pointer', 'escape'] : ['outside-pointer'],
+    onDismiss: () => close(),
   })
 
   return {

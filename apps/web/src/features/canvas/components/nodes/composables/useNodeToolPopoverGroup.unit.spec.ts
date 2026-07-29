@@ -78,6 +78,30 @@ describe('useNodeToolPopoverGroup', () => {
     }
   })
 
+  it('dismisses only the topmost popover group', async () => {
+    const lower = mountPopoverGroup()
+    const upper = mountPopoverGroup()
+    await nextTick()
+
+    try {
+      lower.popovers.open('aspect-ratio')
+      await nextTick()
+      upper.popovers.open('output-count')
+      await nextTick()
+
+      dispatchPointerDown()
+
+      expect(upper.popovers.activeKey.value).toBeNull()
+      expect(lower.popovers.activeKey.value).toBe('aspect-ratio')
+
+      dispatchEscape()
+      expect(lower.popovers.activeKey.value).toBeNull()
+    } finally {
+      await upper.unmount()
+      await lower.unmount()
+    }
+  })
+
   it('ignores unknown keys', async () => {
     const harness = mountPopoverGroup()
     await nextTick()
