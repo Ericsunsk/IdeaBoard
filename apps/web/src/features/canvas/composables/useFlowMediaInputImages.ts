@@ -10,7 +10,10 @@ import type {
   PromptNodeItem,
 } from '../../canvas-board/domain'
 import { getCanvasNodeImageInputLimit } from '../../canvas-board/domain'
-import { resolveImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
+import {
+  resolveImageNodeDisplayPayload,
+  type ImageNodeDisplayPayload,
+} from '../utils/flowImageNodeSelectors'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
 
@@ -21,12 +24,15 @@ export type MediaInputImage = {
   sourceNodeId?: string
   url: string
   ratio: number
+  mediaAssetId?: number
 }
 
 type UseFlowMediaInputImagesOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  uploadImageToBoard: (file: File) => Promise<{ url: string; ratio: number }>
+  uploadImageToBoard: (
+    file: File,
+  ) => Promise<{ url: string; ratio: number; mediaAssetId: number }>
   updateSnapshotNodeBase: (
     nodeId: string,
     mutate: (snapshotNode: CanvasNodeItem) => CanvasNodeItem,
@@ -34,7 +40,7 @@ type UseFlowMediaInputImagesOptions = {
   ) => void
   graphAdapter: CanvasVueFlowGraphAdapter
   markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
-  getImageNodeDisplayPayload: (nodeId: string) => { url: string; ratio: number } | null
+  getImageNodeDisplayPayload: (nodeId: string) => ImageNodeDisplayPayload | null
   openImageUrlPreview: (src: string, ratio?: number) => Promise<void>
   onWarning: (message: string) => void
 }
@@ -46,6 +52,7 @@ type LinkedNodePreviewImage = {
   sourceNodeId: string
   url: string
   ratio: number
+  mediaAssetId?: number
 }
 
 type MediaInputSnapshotNode = PromptNodeItem | FusionNodeItem
@@ -105,8 +112,16 @@ function createMediaInputSnapshotSignature(snapshotNode: unknown) {
         sourceId?: unknown
         url?: unknown
         ratio?: unknown
+        mediaAssetId?: unknown
       }
-      return [input.id, input.sourceType, input.sourceId, input.url, input.ratio].join(',')
+      return [
+        input.id,
+        input.sourceType,
+        input.sourceId,
+        input.url,
+        input.ratio,
+        input.mediaAssetId,
+      ].join(',')
     })
     .join(';')
 }
@@ -117,13 +132,19 @@ function createSourceImageSignature(node: FlowMediaInputNode) {
   if (!snapshot || typeof snapshot !== 'object') return ''
   if (kind === 'image') {
     const display = resolveImageNodeDisplayPayload(snapshot as ImageNodeItem)
-    return display ? `${display.url},${display.ratio}` : ''
+    return display ? `${display.url},${display.ratio},${display.mediaAssetId ?? ''}` : ''
   }
   const outputImages = Array.isArray((snapshot as { outputImages?: unknown }).outputImages)
-    ? (snapshot as { outputImages: Array<{ url?: unknown; ratio?: unknown }> }).outputImages
+    ? (
+        snapshot as {
+          outputImages: Array<{ url?: unknown; ratio?: unknown; mediaAssetId?: unknown }>
+        }
+      ).outputImages
     : []
   const latest = outputImages[outputImages.length - 1]
-  return latest ? `${latest.url ?? ''},${latest.ratio ?? ''}` : ''
+  return latest
+    ? `${latest.url ?? ''},${latest.ratio ?? ''},${latest.mediaAssetId ?? ''}`
+    : ''
 }
 
 function areMediaInputImagesEqual(current: MediaInputImage[], next: MediaInputImage[]) {
@@ -135,7 +156,8 @@ function areMediaInputImagesEqual(current: MediaInputImage[], next: MediaInputIm
         item.sourceType === next[idx]?.sourceType &&
         item.sourceId === next[idx]?.sourceId &&
         item.url === next[idx]?.url &&
-        item.ratio === next[idx]?.ratio,
+        item.ratio === next[idx]?.ratio &&
+        item.mediaAssetId === next[idx]?.mediaAssetId,
     )
   )
 }
@@ -248,11 +270,14 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
         sourceNodeId: nodeId,
         url: display.url,
         ratio: Number.isFinite(display.ratio) && display.ratio > 0 ? display.ratio : 1,
+        mediaAssetId: display.mediaAssetId,
       }
     }
 
     const outputs = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
-    const latest = outputs[outputs.length - 1] as { url?: string; ratio?: number } | undefined
+    const latest = outputs[outputs.length - 1] as
+      | { url?: string; ratio?: number; mediaAssetId?: number }
+      | undefined
     const url = typeof latest?.url === 'string' ? latest.url.trim() : ''
     if (!url) return null
     const ratio = Number(latest?.ratio)
@@ -263,6 +288,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
       sourceNodeId: nodeId,
       url,
       ratio: Number.isFinite(ratio) && ratio > 0 ? ratio : 1,
+      mediaAssetId: latest?.mediaAssetId,
     }
   }
 
@@ -299,6 +325,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
           sourceId: uploaded.url,
           url: uploaded.url,
           ratio: uploaded.ratio,
+          mediaAssetId: uploaded.mediaAssetId,
         }
         return {
           ...snapshotNode,
@@ -392,6 +419,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
             sourceNodeId?: unknown
             url?: unknown
             ratio?: unknown
+            mediaAssetId?: unknown
           }>
         }
       | undefined
@@ -405,8 +433,17 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
       const sourceNodeId = typeof item.sourceNodeId === 'string' ? item.sourceNodeId : undefined
       const url = typeof item.url === 'string' ? item.url.trim() : ''
       const ratio = Number(item.ratio)
+      const mediaAssetId = Number(item.mediaAssetId)
       if (!id || !sourceType || !sourceId || !url || !Number.isFinite(ratio) || ratio <= 0) return
-      normalized.push({ id, sourceType, sourceId, sourceNodeId, url, ratio })
+      normalized.push({
+        id,
+        sourceType,
+        sourceId,
+        sourceNodeId,
+        url,
+        ratio,
+        ...(Number.isInteger(mediaAssetId) && mediaAssetId > 0 ? { mediaAssetId } : {}),
+      })
     })
     return normalized
   }

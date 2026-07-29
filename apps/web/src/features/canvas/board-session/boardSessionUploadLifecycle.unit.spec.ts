@@ -143,4 +143,86 @@ describe('createBoardSessionUploadLifecycle', () => {
       },
     ])
   })
+
+  it('stabilizes prompt and fusion inputs and rebuilds their media refs', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(new Blob(['image'], { type: 'image/png' }), { status: 200 })),
+    )
+    vi.spyOn(uploadApi, 'upload')
+      .mockResolvedValueOnce({
+        url: '/uploads/canvas/user-uid/board-a/content/prompt-input.png',
+        media_asset_id: 301,
+      })
+      .mockResolvedValueOnce({
+        url: '/uploads/canvas/user-uid/board-a/content/fusion-input.png',
+        media_asset_id: 302,
+      })
+    const snapshot = makeCanvasBoardSnapshot({
+      promptNodes: [
+        {
+          id: 1,
+          type: 'prompt',
+          x: 0,
+          y: 0,
+          width: 280,
+          text: '',
+          outputCount: 1,
+          aspectRatio: 'auto',
+          inputImages: [
+            {
+              id: 'external:prompt',
+              sourceType: 'external',
+              sourceId: 'prompt-input',
+              url: 'https://provider.example/prompt-input.png',
+              ratio: 1,
+            },
+          ],
+        },
+      ],
+      fusionNodes: [
+        {
+          id: 2,
+          type: 'fusion',
+          x: 320,
+          y: 0,
+          width: 280,
+          prompt: '',
+          outputCount: 1,
+          aspectRatio: 'auto',
+          blendPoint: { x: 0.5, y: 0.5 },
+          inputImages: [
+            {
+              id: 'external:fusion',
+              sourceType: 'external',
+              sourceId: 'fusion-input',
+              url: 'https://provider.example/fusion-input.png',
+              ratio: 1,
+            },
+          ],
+          outputStatus: 'idle',
+          outputImages: [],
+        },
+      ],
+    })
+
+    await createBoardSessionUploadLifecycle({
+      userUid: 'user-uid',
+      boardId: 'board-a',
+      warning: vi.fn(),
+    }).stabilizeSnapshotForSave(snapshot)
+
+    expect(snapshot.promptNodes[0]?.inputImages[0]).toMatchObject({
+      url: '/uploads/canvas/user-uid/board-a/content/prompt-input.png',
+      mediaAssetId: 301,
+    })
+    expect(snapshot.fusionNodes[0]?.inputImages[0]).toMatchObject({
+      url: '/uploads/canvas/user-uid/board-a/content/fusion-input.png',
+      mediaAssetId: 302,
+    })
+    expect(snapshot.mediaRefs).toEqual([
+      { mediaAssetId: 301, refType: 'board_node', refId: 'prompt-1', role: 'input:0' },
+      { mediaAssetId: 302, refType: 'board_node', refId: 'fusion-2', role: 'input:0' },
+    ])
+  })
 })

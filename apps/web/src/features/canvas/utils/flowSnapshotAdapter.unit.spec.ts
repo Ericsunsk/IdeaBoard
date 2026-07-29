@@ -9,6 +9,7 @@ import {
   CANVAS_BOARD_STATE_SCHEMA_VERSION,
   createEmptyCanvasBoardSnapshot,
   type CanvasGroup,
+  type PromptNodeInputImage,
 } from '../../canvas-board/domain'
 
 const GROUP_GEOMETRY = {
@@ -93,6 +94,7 @@ function makeFusionFlowNode(params: {
   flowId: string
   id: number
   prompt?: string
+  inputImages?: PromptNodeInputImage[]
   outputImages?: Array<{ url: string; ratio: number; mediaAssetId?: number }>
 }): FlowAdapterNode {
   return {
@@ -114,7 +116,7 @@ function makeFusionFlowNode(params: {
         outputCount: 1,
         aspectRatio: 'auto',
         blendPoint: { x: 0.5, y: 0.5 },
-        inputImages: [],
+        inputImages: params.inputImages ?? [],
         outputStatus: params.outputImages?.length ? 'ready' : 'idle',
         outputImages: params.outputImages ?? [],
       },
@@ -700,7 +702,7 @@ describe('flowSnapshotAdapter', () => {
     expect(snapshot.mediaRefs).not.toBe(base.mediaRefs)
   })
 
-  it('rebuilds image and fusion output media refs and drops refs for removed outputs', () => {
+  it('rebuilds current input and output media refs and drops refs for removed images', () => {
     const current = flowToCanvasBoardSnapshot({
       nodes: [
         makeImageFlowNode({
@@ -716,6 +718,16 @@ describe('flowSnapshotAdapter', () => {
         makeFusionFlowNode({
           flowId: 'fusion-2',
           id: 2,
+          inputImages: [
+            {
+              id: 'external:fusion',
+              sourceType: 'external',
+              sourceId: 'fusion-input',
+              url: 'https://example.com/fusion-input.png',
+              ratio: 1,
+              mediaAssetId: 30,
+            },
+          ],
           outputImages: [
             { url: 'https://example.com/fusion-output.png', ratio: 1, mediaAssetId: 31 },
           ],
@@ -727,6 +739,7 @@ describe('flowSnapshotAdapter', () => {
     expect(current.mediaRefs).toEqual([
       { mediaAssetId: 21, refType: 'board_node', refId: 'image-1', role: 'output:0' },
       { mediaAssetId: 22, refType: 'board_node', refId: 'image-1', role: 'output:1' },
+      { mediaAssetId: 30, refType: 'board_node', refId: 'fusion-2', role: 'input:0' },
       { mediaAssetId: 31, refType: 'board_node', refId: 'fusion-2', role: 'output:0' },
     ])
 

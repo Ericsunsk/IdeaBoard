@@ -60,21 +60,24 @@ function isBoardCanvasUploadPath(path: string, userUid: string, boardId: string)
   return false
 }
 
-function appendOutputImageRefs(
+type StableImageItem = { url: string; mediaAssetId?: number }
+
+function appendImageItemRefs(
   refs: StableRef[],
   prefix: string,
-  nodes: Array<{ outputImages: Array<{ url: string; mediaAssetId?: number }> }>,
+  nodes: Array<Partial<Record<'inputImages' | 'outputImages', StableImageItem[]>>>,
+  collection: 'inputImages' | 'outputImages',
 ) {
   nodes.forEach((node, nodeIndex) => {
-    node.outputImages.forEach((output, outputIndex) => {
+    node[collection]?.forEach((item, itemIndex) => {
       refs.push({
-        path: `${prefix}[${nodeIndex}].outputImages[${outputIndex}].url`,
-        get: () => output.url,
+        path: `${prefix}[${nodeIndex}].${collection}[${itemIndex}].url`,
+        get: () => item.url,
         set: (url) => {
-          output.url = url
+          item.url = url
         },
         setMediaAssetId: (mediaAssetId) => {
-          output.mediaAssetId = mediaAssetId
+          item.mediaAssetId = mediaAssetId
         },
       })
     })
@@ -95,8 +98,10 @@ function collectStableRefs(snapshot: CanvasBoardSnapshot): StableRef[] {
       },
     })
   })
-  appendOutputImageRefs(refs, 'imageNodes', snapshot.imageNodes)
-  appendOutputImageRefs(refs, 'fusionNodes', snapshot.fusionNodes)
+  appendImageItemRefs(refs, 'imageNodes', snapshot.imageNodes, 'outputImages')
+  appendImageItemRefs(refs, 'promptNodes', snapshot.promptNodes, 'inputImages')
+  appendImageItemRefs(refs, 'fusionNodes', snapshot.fusionNodes, 'inputImages')
+  appendImageItemRefs(refs, 'fusionNodes', snapshot.fusionNodes, 'outputImages')
   return refs
 }
 

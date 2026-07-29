@@ -64,6 +64,7 @@ function makeInputImage(id: string): PromptNodeInputImage {
     sourceId: id,
     url: `https://example.com/${id}.png`,
     ratio: 1,
+    mediaAssetId: 301,
   }
 }
 
@@ -110,6 +111,7 @@ describe('patchFlowSnapshotParam', () => {
 
     expect(nextRatio).toMatchObject({ aspectRatio: '16:9' })
     expect((nextImages as PromptNodeItem).inputImages).toHaveLength(promptImageInputLimit)
+    expect((nextImages as PromptNodeItem).inputImages[0]?.mediaAssetId).toBe(301)
   })
 
   it('constrains fusion blend point when input image count changes', () => {

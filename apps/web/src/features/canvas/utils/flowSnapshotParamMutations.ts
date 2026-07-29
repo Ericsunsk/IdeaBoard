@@ -54,7 +54,9 @@ function isPromptNodeInputImage(value: unknown): value is PromptNodeInputImage {
     item.url.trim().length > 0 &&
     typeof item.ratio === 'number' &&
     Number.isFinite(item.ratio) &&
-    item.ratio > 0
+    item.ratio > 0 &&
+    (item.mediaAssetId === undefined ||
+      (Number.isInteger(item.mediaAssetId) && item.mediaAssetId > 0))
   )
 }
 
@@ -69,6 +71,7 @@ function normalizePromptInputImages(value: unknown, inputLimit: number): PromptN
       sourceNodeId: item.sourceNodeId,
       url: item.url.trim(),
       ratio: item.ratio,
+      ...(item.mediaAssetId === undefined ? {} : { mediaAssetId: item.mediaAssetId }),
     }))
     .slice(0, inputLimit)
 }
@@ -88,7 +91,8 @@ function arePromptInputImagesEqual(
         item.sourceId === b[index]?.sourceId &&
         item.sourceNodeId === b[index]?.sourceNodeId &&
         item.url === b[index]?.url &&
-        item.ratio === b[index]?.ratio,
+        item.ratio === b[index]?.ratio &&
+        item.mediaAssetId === b[index]?.mediaAssetId,
     )
   )
 }

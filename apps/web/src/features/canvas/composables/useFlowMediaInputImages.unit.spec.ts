@@ -21,6 +21,7 @@ function makeImageSnapshot(overrides: Partial<ImageNodeItem> = {}): ImageNodeIte
     width: 280,
     title: 'Image',
     sourceImageUrl: 'https://example.com/source.png',
+    sourceMediaAssetId: 101,
     sourceImageRatio: 1,
     outputStatus: 'ready',
     outputImages: [],
@@ -92,10 +93,15 @@ function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
     },
   )
 
+  const uploadImageToBoard = vi.fn(async () => ({
+    url: 'https://example.com/external.png',
+    ratio: 0.75,
+    mediaAssetId: 501,
+  }))
   const api = useFlowMediaInputImages({
     nodes,
     edges,
-    uploadImageToBoard: vi.fn(),
+    uploadImageToBoard,
     updateSnapshotNodeBase,
     graphAdapter,
     markFlowExecutionNodeDirty,
@@ -103,13 +109,23 @@ function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
       const node = nodes.value.find((item) => item.id === nodeId)
       const snapshot = node?.data?.snapshotNode as ImageNodeItem | undefined
       if (!snapshot?.sourceImageUrl) return null
-      return { url: snapshot.sourceImageUrl, ratio: snapshot.sourceImageRatio }
+      return {
+        url: snapshot.sourceImageUrl,
+        ratio: snapshot.sourceImageRatio,
+        mediaAssetId: snapshot.sourceMediaAssetId,
+      }
     },
     openImageUrlPreview: vi.fn(),
     onWarning: vi.fn(),
   })
 
-  return { ...api, updateSnapshotNodeBase, graphActions, markFlowExecutionNodeDirty }
+  return {
+    ...api,
+    uploadImageToBoard,
+    updateSnapshotNodeBase,
+    graphActions,
+    markFlowExecutionNodeDirty,
+  }
 }
 
 describe('useFlowMediaInputImages', () => {
@@ -180,7 +196,30 @@ describe('useFlowMediaInputImages', () => {
         sourceNodeId: 'image-1',
         url: 'https://example.com/source.png',
         ratio: 1,
+        mediaAssetId: 101,
       },
+    ])
+  })
+
+  it('preserves the media asset id for an external input upload', async () => {
+    const nodes: Ref<Node[]> = shallowRef([
+      makeFlowNode('prompt-1', 'prompt', makePromptSnapshot()),
+    ] as Node[])
+    const edges: Ref<Edge[]> = shallowRef([])
+    const { getMediaInputImages, onFlowMediaInputImageDrop } = createHarness(nodes, edges)
+    const file = new File(['image'], 'input.png', { type: 'image/png' })
+
+    await onFlowMediaInputImageDrop('prompt-1', {
+      dataTransfer: { files: [file] },
+    } as unknown as DragEvent)
+
+    expect(getMediaInputImages('prompt-1')).toEqual([
+      expect.objectContaining({
+        sourceType: 'external',
+        url: 'https://example.com/external.png',
+        ratio: 0.75,
+        mediaAssetId: 501,
+      }),
     ])
   })
 
@@ -227,5 +266,43 @@ describe('useFlowMediaInputImages', () => {
     expect(graphActions.setNodes).toHaveBeenCalledOnce()
     expect(graphActions.setEdges).toHaveBeenCalledOnce()
     expect(markFlowExecutionNodeDirty).toHaveBeenCalledWith('prompt-1', { includeSelf: true })
+  })
+
+  it('removes a node-linked media input when its connection disappears', async () => {
+    const nodes: Ref<Node[]> = shallowRef([
+      makeFlowNode('image-1', 'image', makeImageSnapshot()),
+      makeFlowNode(
+        'prompt-1',
+        'prompt',
+        makePromptSnapshot({
+          inputImages: [
+            {
+              id: 'node:image-1',
+              sourceType: 'node',
+              sourceId: 'image-1',
+              sourceNodeId: 'image-1',
+              url: 'https://example.com/source.png',
+              ratio: 1,
+              mediaAssetId: 101,
+            },
+          ],
+        }),
+      ),
+    ] as Node[])
+    const edges: Ref<Edge[]> = shallowRef([
+      {
+        id: 'edge-1',
+        source: 'image-1',
+        sourceHandle: 'out:image',
+        target: 'prompt-1',
+        targetHandle: 'in:image',
+      },
+    ] as Edge[])
+    const { getMediaInputImages } = createHarness(nodes, edges)
+
+    edges.value = []
+    await nextTick()
+
+    expect(getMediaInputImages('prompt-1')).toEqual([])
   })
 })

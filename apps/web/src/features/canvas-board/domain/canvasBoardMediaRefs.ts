@@ -47,8 +47,17 @@ export function rebuildCanvasBoardMediaRefs(
       appendRef(output.mediaAssetId, refId, `output:${index}`)
     })
   })
+  snapshot.promptNodes.forEach((node) => {
+    const refId = `prompt-${node.id}`
+    node.inputImages?.forEach((input, index) => {
+      appendRef(input.mediaAssetId, refId, `input:${index}`)
+    })
+  })
   snapshot.fusionNodes.forEach((node) => {
     const refId = `fusion-${node.id}`
+    node.inputImages?.forEach((input, index) => {
+      appendRef(input.mediaAssetId, refId, `input:${index}`)
+    })
     node.outputImages.forEach((output, index) => {
       appendRef(output.mediaAssetId, refId, `output:${index}`)
     })
