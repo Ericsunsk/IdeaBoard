@@ -45,10 +45,11 @@ const AccountManagementDialogContentStub = defineComponent({
   props: {
     initialTab: { type: String, default: 'profile' },
   },
-  emits: ['close'],
+  emits: ['close', 'update:busy'],
   template: `
     <div data-testid="account-management-dialog-content" :data-initial-tab="initialTab">
       Account management content
+      <button type="button" @click="$emit('update:busy', true)">开始异步操作</button>
       <button type="button" aria-label="关闭账户管理" @click="$emit('close')">
         关闭
       </button>
@@ -202,6 +203,21 @@ describe('AccountManagementDialog', () => {
     dialog.focus()
     await user.keyboard('{Escape}')
     expect(onVisibleUpdate).toHaveBeenCalledWith(false)
+  })
+
+  it('lets canonical pending state lock Escape and the content close control', async () => {
+    const { user, onVisibleUpdate } = renderAccountManagementDialog(true)
+    const dialog = screen.getByRole('dialog', { name: '账户管理' })
+
+    await user.click(screen.getByRole('button', { name: '开始异步操作' }))
+    expect(dialog).toHaveAttribute('aria-busy', 'true')
+    expect(dialog).toHaveAttribute('data-close-on-escape', 'false')
+
+    await user.click(screen.getByRole('button', { name: '关闭账户管理' }))
+    dialog.focus()
+    await user.keyboard('{Escape}')
+
+    expect(onVisibleUpdate).not.toHaveBeenCalled()
   })
 
   it('unmounts panel state so reopening starts from profile without stale password input', async () => {

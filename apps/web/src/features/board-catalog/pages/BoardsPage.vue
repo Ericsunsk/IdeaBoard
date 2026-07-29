@@ -116,17 +116,21 @@
     </main>
 
     <Dialog
+      ref="deleteDialogRef"
       :visible="deleteDialogVisible"
       modal
-      :dismissable-mask="!isDeletePending"
-      :closable="!isDeletePending"
+      :dismissable-mask="canDismissDeleteDialog('mask')"
+      :closable="canDismissDeleteDialog('close-control')"
+      :close-on-escape="canDismissDeleteDialog('escape')"
       :draggable="false"
       :show-header="false"
       :style="boardCatalogDeleteDialogStyle"
       :pt="boardCatalogDeleteDialogPt"
+      :aria-busy="deleteDialogAriaBusy"
       aria-labelledby="board-delete-dialog-title"
-      @update:visible="setDeleteDialogVisible"
-      @hide="handleDeleteDialogHidden"
+      @update:visible="handleDeleteDialogVisibilityChange"
+      @hide="disableDeleteDialogVendorFocusRestore"
+      @after-hide="handleDeleteDialogAfterHide"
     >
       <div :class="boardCatalogClasses.deleteDialogShell">
         <h2 id="board-delete-dialog-title" :class="boardCatalogClasses.deleteDialogTitle">
@@ -143,7 +147,7 @@
             label="取消"
             :disabled="isDeletePending"
             :class="boardCatalogClasses.deleteCancelButton"
-            @click="closeDeleteDialog"
+            @click="requestDeleteDialogClose('close-control')"
           />
           <Button
             unstyled
@@ -172,6 +176,7 @@ import {
   boardCatalogSortSelectPt,
 } from '../lib/boardCatalogSkin'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
+import { usePrimeDialogOverlayLifecycle } from '../../../shared/composables/usePrimeDialogOverlayLifecycle'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { USER_CANVAS_PATH, USER_HOME_PATH } from '../../../shared/constants/routePaths'
 import { useUserStore } from '../../../app/stores/user'
@@ -236,10 +241,34 @@ const {
   openBoardFromCard,
   requestDelete,
   closeDeleteDialog,
-  setDeleteDialogVisible,
   handleDeleteDialogHidden,
   confirmDelete,
 } = boardCatalogController.commands
+
+const {
+  ariaBusy: deleteDialogAriaBusy,
+  canDismiss: canDismissDeleteDialog,
+  completeClose: completeDeleteDialogClose,
+  dialogRef: deleteDialogRef,
+  disableVendorFocusRestore: disableDeleteDialogVendorFocusRestore,
+  handleVisibilityChange: handleDeleteDialogVisibilityChange,
+  requestClose: requestDeleteDialogClose,
+} = usePrimeDialogOverlayLifecycle({
+  visible: deleteDialogVisible,
+  busy: isDeletePending,
+  surface: {
+    dismissibleBy: ['close-control', 'escape', 'mask'],
+    restoreFocus: true,
+  },
+  onVisibilityChange: (visible) => {
+    if (!visible) closeDeleteDialog()
+  },
+})
+
+function handleDeleteDialogAfterHide() {
+  completeDeleteDialogClose()
+  handleDeleteDialogHidden()
+}
 
 const sortOptions = [
   { label: 'Recent', value: 'recent' },

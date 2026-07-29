@@ -1,15 +1,19 @@
 <template>
   <Dialog
+    ref="dialogRef"
     unstyled
     :visible="show"
     modal
-    :dismissable-mask="!loading"
+    :dismissable-mask="canDismiss('mask')"
     :closable="false"
-    :close-on-escape="!loading"
+    :close-on-escape="canDismiss('escape')"
     :draggable="false"
     :show-header="false"
     :pt="authDialogPt"
+    :aria-busy="ariaBusy"
     @update:visible="handleVisibleChange"
+    @hide="disableVendorFocusRestore"
+    @after-hide="completeClose"
   >
     <template v-if="show">
       <div class="relative">
@@ -126,13 +130,14 @@
 
 <script setup lang="ts">
 import { useUserStore } from '../../../app/stores/user'
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import { User as UserIcon, Lock as LockIcon } from '@iconoir/vue'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
+import { usePrimeDialogOverlayLifecycle } from '../../../shared/composables/usePrimeDialogOverlayLifecycle'
 import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { useAuthFeedback } from '../useAuthFeedback'
@@ -215,6 +220,25 @@ function resetForm() {
   resetValidation()
 }
 
+const {
+  ariaBusy,
+  canDismiss,
+  completeClose,
+  dialogRef,
+  disableVendorFocusRestore,
+  handleVisibilityChange,
+  requestClose: requestOverlayClose,
+} = usePrimeDialogOverlayLifecycle({
+  visible: () => props.show,
+  busy: loading,
+  surface: {
+    dismissibleBy: ['close-control', 'escape', 'mask'],
+    restoreFocus: true,
+  },
+  onReset: resetForm,
+  onVisibilityChange: (visible) => emit('update:show', visible),
+})
+
 function validateField(field: LoginField) {
   const value = formValue.value[field].trim()
   errors.value[field] = getRequiredError(value, loginFieldLabels[field])
@@ -234,31 +258,16 @@ function clearFieldError(field: LoginField) {
 }
 
 function handleClose() {
-  if (loading.value) return
-  emit('update:show', false)
-  resetForm()
+  requestOverlayClose('close-control')
 }
 
 function handleVisibleChange(visible: boolean) {
-  if (!visible) {
-    handleClose()
-  }
+  handleVisibilityChange(visible)
 }
 
 function handleSwitchToRegister() {
-  if (loading.value) return
   emit('to-register')
-  resetForm()
 }
-
-watch(
-  () => props.show,
-  (visible) => {
-    if (!visible) {
-      resetForm()
-    }
-  },
-)
 
 async function handleLogin() {
   if (!validateForm()) return
@@ -273,8 +282,7 @@ async function handleLogin() {
     },
   )
   if (!loggedIn) return
-  resetForm()
   emit('login-success')
-  emit('update:show', false)
+  requestOverlayClose('close-control')
 }
 </script>

@@ -32,9 +32,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, useSlots } from 'vue'
+import { computed, useSlots } from 'vue'
 import Dialog from 'primevue/dialog'
-import { useOverlayInteractionLifecycle } from '../../../../shared/composables/useOverlayInteractionLifecycle'
+import { usePrimeDialogOverlayLifecycle } from '../../../../shared/composables/usePrimeDialogOverlayLifecycle'
 import { createAdminDialogPt } from '../lib/adminOverlayPt'
 import {
   adminDialogFooterActionsClass,
@@ -44,10 +44,6 @@ import {
 
 export type AdminDialogSize = 'compact' | 'form' | 'wide'
 export type AdminDialogContentLayout = 'form' | 'scrollable'
-
-type PrimeDialogFocusAdapter = {
-  target: HTMLElement | null
-}
 
 const props = withDefaults(
   defineProps<{
@@ -72,7 +68,6 @@ const emit = defineEmits<{
   reset: []
 }>()
 const slots = useSlots()
-const dialogRef = ref<PrimeDialogFocusAdapter | null>(null)
 const hasCustomHeader = computed(() => Boolean(slots.header))
 const dialogAccessibilityAttrs = computed(() =>
   hasCustomHeader.value
@@ -111,7 +106,9 @@ const {
   completeClose,
   handleVisibilityChange,
   requestClose: requestOverlayClose,
-} = useOverlayInteractionLifecycle({
+  dialogRef,
+  disableVendorFocusRestore,
+} = usePrimeDialogOverlayLifecycle({
   visible: () => props.visible,
   busy: () => props.busy,
   surface: adminDialogSurfaceIntent,
@@ -127,7 +124,4 @@ function requestCloseFromControl() {
   requestOverlayClose('close-control')
 }
 
-function disableVendorFocusRestore() {
-  if (dialogRef.value) dialogRef.value.target = null
-}
 </script>

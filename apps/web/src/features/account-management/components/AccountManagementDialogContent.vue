@@ -4,6 +4,7 @@
       type="button"
       text
       rounded
+      :disabled="logoutLoading"
       class="!absolute !top-4 !right-4 !z-20 !flex !h-8 !w-8 !min-w-8 !items-center !justify-center !rounded-[var(--radius-ib-pill)] !border !border-transparent !bg-transparent !p-0 !text-ib-text-muted !shadow-none !transition-[background-color,border-color,color] !duration-[var(--motion-feedback-duration)] !ease-[var(--motion-feedback-easing)] hover:!border-ib-border-soft hover:!bg-ib-surface-hover hover:!text-ib-text focus-visible:!outline-none focus-visible:!shadow-[var(--shadow-ib-focus)]"
       aria-label="关闭账户管理"
       @click="emit('close')"
@@ -128,12 +129,14 @@ const props = withDefaults(defineProps<{ initialTab?: AccountManagementTab }>(),
 })
 const emit = defineEmits<{
   close: []
+  'update:busy': [busy: boolean]
 }>()
 const userStore = useUserStore()
 const { fallbackText, logoURL, projectName } = useSiteBranding()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const profileFeedback = useProfileFeedback()
 const { isPending: logoutLoading, runAsyncAction: runLogoutAction } = useAsyncAction()
+watch(logoutLoading, (busy) => emit('update:busy', busy), { immediate: true })
 
 const activeTab = ref<AccountManagementTab>(resolveAccountManagementTab(props.initialTab))
 watch(

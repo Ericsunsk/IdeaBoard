@@ -34,6 +34,7 @@ const DialogStub = defineComponent({
   template: `
     <section
       v-if="visible"
+      v-bind="$attrs"
       role="dialog"
       :data-dismissable-mask="String(dismissableMask)"
       :data-close-on-escape="String(closeOnEscape)"
@@ -213,6 +214,7 @@ describe.each(authModalCases)('$action modal motion', (testCase) => {
 
     expect(screen.getByRole('dialog')).toHaveAttribute('data-dismissable-mask', 'false')
     expect(screen.getByRole('dialog')).toHaveAttribute('data-close-on-escape', 'false')
+    expect(screen.getByRole('dialog')).toHaveAttribute('aria-busy', 'true')
     expect(screen.getByRole('button', { name: '关闭' })).toBeDisabled()
     expect(screen.getByRole('button', { name: testCase.switchLabel })).toBeDisabled()
 

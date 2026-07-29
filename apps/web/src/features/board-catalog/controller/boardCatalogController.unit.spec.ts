@@ -174,8 +174,6 @@ describe('createBoardCatalogController', () => {
 
     const pendingConfirmation = harness.controller.commands.confirmDelete()
     expect(harness.controller.viewModel.isDeletePending.value).toBe(true)
-    harness.controller.commands.closeDeleteDialog()
-    expect(harness.controller.viewModel.deleteDialogVisible.value).toBe(true)
 
     const error = new Error('delete failed')
     firstDelete.resolve({ ok: false, reason: 'sync-failed', error })

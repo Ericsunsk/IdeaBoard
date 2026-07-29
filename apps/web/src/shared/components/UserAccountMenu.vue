@@ -29,8 +29,8 @@
       popup
       :append-to="appendTo"
       :pt="resolvedMenuPt"
-      @show="isMenuOpen = true"
-      @hide="isMenuOpen = false"
+      @show="handleShow"
+      @hide="handleHide"
     >
       <template #item="{ item, props: itemProps }">
         <a
@@ -55,16 +55,12 @@ import Button from 'primevue/button'
 import Menu from 'primevue/menu'
 import type { MenuPassThroughOptions } from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
+import { usePrimePopupMenuOverlayLifecycle } from '../composables/usePrimePopupMenuOverlayLifecycle'
 import { appOverlayMenuDangerItemClass, appOverlayMenuItemClass } from '../theme/appOverlayMenu'
 import { pageChromeAccountMenuClasses } from '../lib/pageChrome'
 import { userAccountMenuPt } from '../theme/userAccountMenuSkin'
 import UserCreditBalanceButton from './UserCreditBalanceButton.vue'
 import type { UserAccountMenuItem, UserIdeaBalanceControl } from './userAccountMenu.types'
-
-type PrimePopupMenuRef = {
-  toggle: (event: Event, target?: HTMLElement) => void
-  hide: () => void
-}
 
 type AvatarButtonRef = HTMLElement | { $el?: HTMLElement }
 
@@ -101,16 +97,21 @@ const props = withDefaults(
 )
 
 const avatarButtonRef = ref<AvatarButtonRef | null>(null)
-const menuRef = ref<PrimePopupMenuRef | null>(null)
-const isMenuOpen = ref(false)
+const {
+  popupRef: menuRef,
+  isOpen: isMenuOpen,
+  toggle: toggleMenuOverlay,
+  handleShow,
+  handleHide,
+  select,
+} = usePrimePopupMenuOverlayLifecycle({})
 const resolvedMenuPt = computed(() => props.menuPt ?? userAccountMenuPt)
 
 const primeMenuItems = computed<MenuItem[]>(() =>
   props.items.map((item) => ({
     ...item,
     command: () => {
-      menuRef.value?.hide()
-      item.command()
+      select(item.command)
     },
   })),
 )
@@ -122,6 +123,6 @@ function resolveAvatarButtonElement(): HTMLElement | undefined {
 }
 
 function toggleMenu(event: Event) {
-  menuRef.value?.toggle(event, resolveAvatarButtonElement())
+  toggleMenuOverlay(event, resolveAvatarButtonElement())
 }
 </script>

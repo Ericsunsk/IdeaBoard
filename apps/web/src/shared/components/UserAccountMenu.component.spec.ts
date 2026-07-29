@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, renderWithUser, screen } from '../../test/render'
+import { render, renderWithUser, screen, waitFor } from '../../test/render'
 import UserAccountMenu from './UserAccountMenu.vue'
 import type { UserAccountMenuItem, UserIdeaBalanceControl } from './userAccountMenu.types'
 
@@ -87,6 +87,43 @@ describe('UserAccountMenu', () => {
     expect(logoutItem).not.toBeNull()
     expect(logoutItem).toHaveAttribute('data-control-tone', 'danger')
     await user.click(logoutItem!)
-    expect(logout).toHaveBeenCalledOnce()
+    await waitFor(() => expect(logout).toHaveBeenCalledOnce())
+  })
+
+  it('restores focus and clears open state after Escape before reopening', async () => {
+    const items: UserAccountMenuItem[] = [
+      { key: 'profile', label: '账户管理', command: vi.fn() },
+    ]
+    const { user } = renderWithUser(UserAccountMenu, { props: { items } })
+    const trigger = screen.getByRole('button', { name: '账户菜单' })
+
+    await user.click(trigger)
+    expect(await screen.findByRole('menuitem', { name: '账户管理' })).toBeVisible()
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'))
+    expect(trigger).toHaveFocus()
+
+    await user.click(trigger)
+    expect(await screen.findByRole('menuitem', { name: '账户管理' })).toBeVisible()
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('cleans up outside-click dismissal through the overlay lifecycle', async () => {
+    const items: UserAccountMenuItem[] = [
+      { key: 'profile', label: '账户管理', command: vi.fn() },
+    ]
+    const { user } = renderWithUser(UserAccountMenu, {
+      props: { items },
+    })
+    const trigger = screen.getByRole('button', { name: '账户菜单' })
+
+    await user.click(trigger)
+    expect(await screen.findByRole('menuitem', { name: '账户管理' })).toBeVisible()
+    await user.click(document.body)
+
+    await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'))
+    expect(trigger).toHaveFocus()
   })
 })

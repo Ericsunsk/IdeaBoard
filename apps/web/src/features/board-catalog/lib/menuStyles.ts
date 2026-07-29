@@ -1,9 +1,3 @@
-export type PrimePopupMenuRef = {
-  toggle: (event: Event, target?: HTMLElement) => void
-  hide: () => void
-  container?: HTMLElement | null
-}
-
 function createBoardPopupMenuPt(rootClass: string, itemLinkClass = '!p-0') {
   return {
     root: { class: rootClass },

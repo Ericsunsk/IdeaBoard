@@ -60,7 +60,6 @@ export type BoardCatalogController = {
     openBoardFromCard(board: CanvasBoardMeta): void
     requestDelete(board: CanvasBoardMeta): void
     closeDeleteDialog(): void
-    setDeleteDialogVisible(visible: boolean): void
     handleDeleteDialogHidden(): void
     confirmDelete(): Promise<void>
   }
@@ -286,17 +285,10 @@ export function createBoardCatalogController(
   }
 
   function closeDeleteDialog() {
-    if (isDeletePending.value) return
     deleteDialogVisible.value = false
-  }
-
-  function setDeleteDialogVisible(visible: boolean) {
-    if (visible) return
-    closeDeleteDialog()
   }
 
   function handleDeleteDialogHidden() {
-    deleteDialogVisible.value = false
     if (!isDeletePending.value) {
       pendingDeleteBoard.value = null
     }
@@ -373,7 +365,6 @@ export function createBoardCatalogController(
       openBoardFromCard,
       requestDelete,
       closeDeleteDialog,
-      setDeleteDialogVisible,
       handleDeleteDialogHidden,
       confirmDelete,
     },

@@ -66,7 +66,8 @@
         popup
         append-to="body"
         :pt="menuPt"
-        @hide="handleMenuHidden"
+        @show="handleShow"
+        @hide="handleHide"
       >
         <template #item="{ item, props: itemProps }">
           <a
@@ -91,13 +92,14 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
+import { usePrimePopupMenuOverlayLifecycle } from '../../../shared/composables/usePrimePopupMenuOverlayLifecycle'
 import {
   appOverlayMenuDangerItemClass,
   appOverlayMenuItemClass,
 } from '../../../shared/theme/appOverlayMenu'
 import { blankBoardPreviewSurfaceClass } from '../../canvas-board/preview'
 import type { CanvasBoardMeta } from '../../canvas-board/catalog/canvasBoards'
-import { boardMenuPt, type PrimePopupMenuRef } from '../lib/menuStyles'
+import { boardMenuPt } from '../lib/menuStyles'
 
 type RenameInputRef = HTMLInputElement | { $el?: HTMLInputElement } | null
 
@@ -123,24 +125,36 @@ const emit = defineEmits<{
 }>()
 
 const renameInputEl = ref<RenameInputRef>(null)
-const menuRef = ref<PrimePopupMenuRef | null>(null)
+const {
+  popupRef: menuRef,
+  isOpen: isMenuOverlayOpen,
+  requestClose: requestMenuClose,
+  select: selectMenuItem,
+  toggle: toggleMenuOverlay,
+  handleShow,
+  handleHide,
+} = usePrimePopupMenuOverlayLifecycle({
+  onVisibilityChange: (visible) => {
+    if (!visible) emit('menu-hidden')
+  },
+})
 const menuPt = boardMenuPt
 
 const menuItems = computed<MenuItem[]>(() => [
   {
     key: 'rename',
     label: 'Rename',
-    command: () => emit('rename-action'),
+    command: () => selectMenuItem(() => emit('rename-action')),
   },
   {
     key: 'duplicate',
     label: 'Duplicate',
-    command: () => emit('duplicate-action'),
+    command: () => selectMenuItem(() => emit('duplicate-action')),
   },
   {
     key: 'delete',
     label: 'Delete',
-    command: () => emit('delete-action'),
+    command: () => selectMenuItem(() => emit('delete-action')),
   },
 ])
 
@@ -165,18 +179,14 @@ function onRenameInput(event: Event) {
 
 function toggleMenu(event: Event) {
   emit('toggle-menu')
-  menuRef.value?.toggle(event)
-}
-
-function handleMenuHidden() {
-  emit('menu-hidden')
+  toggleMenuOverlay(event)
 }
 
 watch(
   () => props.isMenuOpen,
   (isMenuOpen) => {
     if (!isMenuOpen) {
-      menuRef.value?.hide()
+      if (isMenuOverlayOpen.value) requestMenuClose('outside-pointer')
     }
   },
 )

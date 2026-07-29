@@ -1,15 +1,19 @@
 <template>
   <Dialog
+    ref="dialogRef"
     unstyled
     :visible="show"
     modal
-    :dismissable-mask="!loading"
+    :dismissable-mask="canDismiss('mask')"
     :closable="false"
-    :close-on-escape="!loading"
+    :close-on-escape="canDismiss('escape')"
     :draggable="false"
     :show-header="false"
     :pt="authDialogPt"
+    :aria-busy="ariaBusy"
     @update:visible="handleVisibleChange"
+    @hide="disableVendorFocusRestore"
+    @after-hide="completeClose"
   >
     <template v-if="show">
       <div class="relative">
@@ -169,13 +173,14 @@
 
 <script setup lang="ts">
 import { useUserStore } from '../../../app/stores/user'
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import { User as UserIcon, Lock as LockIcon, Shield as ShieldIcon } from '@iconoir/vue'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
+import { usePrimeDialogOverlayLifecycle } from '../../../shared/composables/usePrimeDialogOverlayLifecycle'
 import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { useAuthFeedback } from '../useAuthFeedback'
@@ -263,6 +268,25 @@ function resetForm() {
   resetValidation()
 }
 
+const {
+  ariaBusy,
+  canDismiss,
+  completeClose,
+  dialogRef,
+  disableVendorFocusRestore,
+  handleVisibilityChange,
+  requestClose: requestOverlayClose,
+} = usePrimeDialogOverlayLifecycle({
+  visible: () => props.show,
+  busy: loading,
+  surface: {
+    dismissibleBy: ['close-control', 'escape', 'mask'],
+    restoreFocus: true,
+  },
+  onReset: resetForm,
+  onVisibilityChange: (visible) => emit('update:show', visible),
+})
+
 function validateField(field: RegisterField) {
   if (field === 'username') {
     const username = formValue.value.username.trim()
@@ -313,31 +337,16 @@ function handlePasswordInput() {
 }
 
 function handleClose() {
-  if (loading.value) return
-  emit('update:show', false)
-  resetForm()
+  requestOverlayClose('close-control')
 }
 
 function handleVisibleChange(visible: boolean) {
-  if (!visible) {
-    handleClose()
-  }
+  handleVisibilityChange(visible)
 }
 
 function handleSwitchToLogin() {
-  if (loading.value) return
   emit('to-login')
-  resetForm()
 }
-
-watch(
-  () => props.show,
-  (visible) => {
-    if (!visible) {
-      resetForm()
-    }
-  },
-)
 
 async function handleRegister() {
   if (!validateForm()) return
@@ -352,8 +361,7 @@ async function handleRegister() {
     },
   )
   if (!registered) return
-  resetForm()
   emit('register-success')
-  emit('update:show', false)
+  requestOverlayClose('close-control')
 }
 </script>
