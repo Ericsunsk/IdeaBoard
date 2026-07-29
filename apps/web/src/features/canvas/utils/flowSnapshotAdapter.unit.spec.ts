@@ -37,7 +37,7 @@ function makeImageFlowNode(params: {
   sourceImageUrl: string
   sourceMediaAssetId?: number
   pendingTaskId?: string
-  outputImages?: Array<{ url: string; ratio: number }>
+  outputImages?: Array<{ url: string; ratio: number; mediaAssetId?: number }>
 }): FlowAdapterNode {
   const snapshotNode = {
     id: params.id,
@@ -93,6 +93,7 @@ function makeFusionFlowNode(params: {
   flowId: string
   id: number
   prompt?: string
+  outputImages?: Array<{ url: string; ratio: number; mediaAssetId?: number }>
 }): FlowAdapterNode {
   return {
     id: params.flowId,
@@ -114,8 +115,8 @@ function makeFusionFlowNode(params: {
         aspectRatio: 'auto',
         blendPoint: { x: 0.5, y: 0.5 },
         inputImages: [],
-        outputStatus: 'idle',
-        outputImages: [],
+        outputStatus: params.outputImages?.length ? 'ready' : 'idle',
+        outputImages: params.outputImages ?? [],
       },
     },
   }
@@ -697,6 +698,60 @@ describe('flowSnapshotAdapter', () => {
       { mediaAssetId: 12, refType: 'board_node', refId: 'image-1', role: 'result' },
     ])
     expect(snapshot.mediaRefs).not.toBe(base.mediaRefs)
+  })
+
+  it('rebuilds image and fusion output media refs and drops refs for removed outputs', () => {
+    const current = flowToCanvasBoardSnapshot({
+      nodes: [
+        makeImageFlowNode({
+          flowId: 'image-1',
+          id: 1,
+          outputStatus: 'ready',
+          sourceImageUrl: 'https://example.com/source.png',
+          outputImages: [
+            { url: 'https://example.com/image-output-a.png', ratio: 1, mediaAssetId: 21 },
+            { url: 'https://example.com/image-output-b.png', ratio: 1, mediaAssetId: 22 },
+          ],
+        }),
+        makeFusionFlowNode({
+          flowId: 'fusion-2',
+          id: 2,
+          outputImages: [
+            { url: 'https://example.com/fusion-output.png', ratio: 1, mediaAssetId: 31 },
+          ],
+        }),
+      ],
+      edges: [],
+    })
+
+    expect(current.mediaRefs).toEqual([
+      { mediaAssetId: 21, refType: 'board_node', refId: 'image-1', role: 'output:0' },
+      { mediaAssetId: 22, refType: 'board_node', refId: 'image-1', role: 'output:1' },
+      { mediaAssetId: 31, refType: 'board_node', refId: 'fusion-2', role: 'output:0' },
+    ])
+
+    const afterDelete = flowToCanvasBoardSnapshot(
+      {
+        nodes: [
+          makeImageFlowNode({
+            flowId: 'image-1',
+            id: 1,
+            outputStatus: 'ready',
+            sourceImageUrl: 'https://example.com/source.png',
+            outputImages: [
+              { url: 'https://example.com/image-output-b.png', ratio: 1, mediaAssetId: 22 },
+            ],
+          }),
+          makeFusionFlowNode({ flowId: 'fusion-2', id: 2 }),
+        ],
+        edges: [],
+      },
+      current,
+    )
+
+    expect(afterDelete.mediaRefs).toEqual([
+      { mediaAssetId: 22, refType: 'board_node', refId: 'image-1', role: 'output:0' },
+    ])
   })
 
   it('adds stable node dimensions for minimap geometry before nodes are rendered', () => {

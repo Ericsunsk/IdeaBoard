@@ -11,6 +11,7 @@ import (
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/media/reclamation"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/settings"
@@ -120,12 +121,15 @@ func newAppTaskRuntime(
 		MaxRetry:    taskRuntimeSetting.MaxRetry,
 		AdditionalQueues: map[string]river.QueueConfig{
 			credits.ReconciliationQueue: {MaxWorkers: 1},
+			reclamation.QueueName:       {MaxWorkers: 1},
 		},
 		RegisterWorkers: func(workers *river.Workers) {
 			river.AddWorker(workers, credits.NewReconciliationWorker(services.creditService))
 			river.AddWorker(workers, credits.NewReconciliationScheduleWorker(services.creditService))
+			river.AddWorker(workers, reclamation.NewReclaimWorker(dbs.db, services.storageService))
+			river.AddWorker(workers, reclamation.NewScheduleWorker(dbs.db))
 		},
-		PeriodicJobs: credits.ReconciliationPeriodicJobs(),
+		PeriodicJobs: append(credits.ReconciliationPeriodicJobs(), reclamation.PeriodicJobs()...),
 	})
 	if err != nil {
 		if eventBus != nil {

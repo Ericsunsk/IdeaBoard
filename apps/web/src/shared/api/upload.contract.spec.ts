@@ -36,6 +36,7 @@ describe('uploadApi', () => {
           msg: 'ok',
           data: {
             url: '/uploads/boards/board-1/image.png',
+            media_asset_id: 42,
             width: 640,
             height: 480,
             mime: uploadedFile.type,
@@ -47,6 +48,7 @@ describe('uploadApi', () => {
 
     await expect(uploadApi.upload(file, ' board 1 ')).resolves.toEqual({
       url: '/uploads/boards/board-1/image.png',
+      media_asset_id: 42,
       width: 640,
       height: 480,
       mime: 'image/png',
@@ -183,6 +185,22 @@ describe('uploadApi', () => {
     ).rejects.toThrow('上传图片失败')
   })
 
+  it('rejects board uploads that were not registered as media assets', async () => {
+    useMswHandlers(
+      http.post('/api/user/boards/:boardId/uploads', () => {
+        return HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: { url: '/uploads/boards/board-1/unregistered.png' },
+        })
+      }),
+    )
+
+    await expect(
+      uploadApi.upload(new File(['image'], 'image.png', { type: 'image/png' }), 'board-1'),
+    ).rejects.toThrow('缺少媒体资产标识')
+  })
+
   it('adds a contextual fallback to sanitized transport errors without dropping metadata', async () => {
     useMswHandlers(
       http.post('/api/user/boards/:boardId/uploads', () => {
@@ -215,18 +233,4 @@ describe('uploadApi', () => {
     ).rejects.toThrow('头像上传失败，请稍后重试')
   })
 
-  it('recycles a board asset and hides the response envelope', async () => {
-    let receivedBody: unknown
-    useMswHandlers(
-      http.delete('/api/user/boards/:boardId/uploads', async ({ request }) => {
-        receivedBody = await request.json()
-        return HttpResponse.json({ code: 0, msg: 'ok', data: { deleted: true } })
-      }),
-    )
-
-    await expect(
-      uploadApi.recycle('/uploads/canvas/user/board-1/content/image.png', ' board 1 '),
-    ).resolves.toBeUndefined()
-    expect(receivedBody).toEqual({ url: '/uploads/canvas/user/board-1/content/image.png' })
-  })
 })

@@ -10,8 +10,12 @@ import (
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/identity/users"
+	mediaassets "ideaboard/api/internal/media/assets"
+	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/testdb"
+
+	"github.com/google/uuid"
 )
 
 func newBoardRepoTestDB(t *testing.T) *sql.DB {
@@ -159,8 +163,12 @@ func TestBoardRepositoryUpsertReconcilesBoardMediaRefs(t *testing.T) {
 	if assetARefCount != 1 {
 		t.Fatalf("asset A refs = %d, want task_output ref to remain", assetARefCount)
 	}
-	if _, err := q.GetMediaAssetByID(ctx, assetAID); err != nil {
+	assetA, err := q.GetMediaAssetByID(ctx, assetAID)
+	if err != nil {
 		t.Fatalf("asset A should not be deleted: %v", err)
+	}
+	if !assetA.ReclaimAfter.Valid || assetA.ReclaimStartedAt.Valid {
+		t.Fatalf("asset A reclamation state = after:%v started:%v, want scheduled and unclaimed", assetA.ReclaimAfter, assetA.ReclaimStartedAt)
 	}
 
 	reloaded, err := repo.GetByOwnerAndBoardID(ctx, owner.ID, board.BoardID)
@@ -185,8 +193,155 @@ func TestBoardRepositoryUpsertReconcilesBoardMediaRefs(t *testing.T) {
 	if len(refs) != 0 {
 		t.Fatalf("board refs after delete = %#v, want none", refs)
 	}
-	if _, err := q.GetMediaAssetByID(ctx, assetBID); err != nil {
+	assetB, err := q.GetMediaAssetByID(ctx, assetBID)
+	if err != nil {
 		t.Fatalf("asset B should remain after board cleanup: %v", err)
+	}
+	if !assetB.ReclaimAfter.Valid {
+		t.Fatalf("asset B should be scheduled after board cleanup: %#v", assetB)
+	}
+}
+
+func TestBoardRepositoryMediaReclamationWaitsForLastBoardReferenceAndCancelsOnUndo(t *testing.T) {
+	ctx := context.Background()
+	db := newBoardRepoTestDB(t)
+	repo := NewBoardRepository(db)
+	userRepo := users.NewUserRepository(db)
+	q := dbsqlc.New(db)
+
+	owner := &users.User{Username: "shared-media-owner", Status: 1, Role: "user"}
+	if err := userRepo.Create(ctx, owner); err != nil {
+		t.Fatalf("seed owner failed: %v", err)
+	}
+	assetID := seedBoardMediaAsset(t, q, owner.ID, "shared-board-asset", "uploads/tasks/42/shared/output.png")
+	now := time.Now()
+	boardA := &UserBoard{BoardID: "shared-a", OwnerUserID: owner.ID, CreatedBy: owner.ID, Name: "Shared A", State: boardStateWithMediaRefs(t, []BoardStateMediaRef{{MediaAssetID: assetID, RefType: "board_node", RefID: "image-1", Role: "source"}}), StateSchemaVersion: 1, CreatedAt: now, UpdatedAt: now}
+	boardB := &UserBoard{BoardID: "shared-b", OwnerUserID: owner.ID, CreatedBy: owner.ID, Name: "Shared B", State: boardStateWithMediaRefs(t, []BoardStateMediaRef{{MediaAssetID: assetID, RefType: "board_node", RefID: "image-1", Role: "source"}}), StateSchemaVersion: 1, CreatedAt: now, UpdatedAt: now}
+	for _, board := range []*UserBoard{boardA, boardB} {
+		if err := repo.Upsert(ctx, board); err != nil {
+			t.Fatalf("seed board %s failed: %v", board.BoardID, err)
+		}
+	}
+	for _, boardID := range []string{boardA.BoardID, boardB.BoardID} {
+		refs, err := q.ListMediaRefsByBoardID(ctx, dbsqlc.ListMediaRefsByBoardIDParams{OwnerUserID: owner.ID, BoardID: boardID})
+		if err != nil || len(refs) != 1 || refs[0].MediaAssetID != assetID {
+			t.Fatalf("shared board %s refs=%#v err=%v, want independent media ref", boardID, refs, err)
+		}
+	}
+
+	boardA.State = boardStateWithMediaRefs(t, nil)
+	boardA.UpdatedAt = now.Add(time.Second)
+	if err := repo.Upsert(ctx, boardA); err != nil {
+		t.Fatalf("remove first reference failed: %v", err)
+	}
+	asset, err := q.GetMediaAssetByID(ctx, assetID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if asset.ReclaimAfter.Valid {
+		t.Fatalf("asset reclaim_after=%v, want shared board reference to keep it live", asset.ReclaimAfter)
+	}
+
+	boardB.State = boardStateWithMediaRefs(t, nil)
+	boardB.UpdatedAt = now.Add(2 * time.Second)
+	if err := repo.Upsert(ctx, boardB); err != nil {
+		t.Fatalf("remove final reference failed: %v", err)
+	}
+	asset, err = q.GetMediaAssetByID(ctx, assetID)
+	if err != nil || !asset.ReclaimAfter.Valid {
+		t.Fatalf("asset after last remove = %#v err=%v, want scheduled", asset, err)
+	}
+
+	claimNow := time.Now().Add(48 * time.Hour)
+	claimToken := uuid.NullUUID{UUID: uuid.New(), Valid: true}
+	if _, err := q.ClaimDueMediaAssetReclamation(ctx, dbsqlc.ClaimDueMediaAssetReclamationParams{
+		ID:                assetID,
+		ReclaimGeneration: asset.ReclaimGeneration,
+		ClaimedAt:         sql.NullTime{Time: claimNow, Valid: true},
+		ClaimToken:        claimToken,
+		NowAt:             sql.NullTime{Time: claimNow, Valid: true},
+		StaleClaimBefore:  sql.NullTime{Time: claimNow.Add(-48 * time.Hour), Valid: true},
+	}); err != nil {
+		t.Fatalf("claim scheduled asset failed: %v", err)
+	}
+	boardA.State = boardStateWithMediaRefs(t, []BoardStateMediaRef{{MediaAssetID: assetID, RefType: "board_node", RefID: "image-1", Role: "source"}})
+	boardA.UpdatedAt = now.Add(3 * time.Second)
+	if err := repo.Upsert(ctx, boardA); !errors.Is(err, ErrMediaAssetNoLongerAvailable) {
+		t.Fatalf("undo after reclamation claim error=%v, want ErrMediaAssetNoLongerAvailable", err)
+	}
+	if err := q.ReleaseMediaAssetReclamationClaim(ctx, dbsqlc.ReleaseMediaAssetReclamationClaimParams{
+		ID:                assetID,
+		ReclaimGeneration: asset.ReclaimGeneration,
+		ClaimToken:        claimToken,
+	}); err != nil {
+		t.Fatalf("release test reclamation claim: %v", err)
+	}
+	if err := repo.Upsert(ctx, boardA); err != nil {
+		t.Fatalf("undo before deletion failed: %v", err)
+	}
+	asset, err = q.GetMediaAssetByID(ctx, assetID)
+	if err != nil || asset.ReclaimAfter.Valid || asset.ReclaimStartedAt.Valid {
+		t.Fatalf("asset after undo = %#v err=%v, want active unscheduled", asset, err)
+	}
+}
+
+func TestBoardUploadRegistrationConvergesThroughSaveDeleteAndGraceScheduling(t *testing.T) {
+	ctx := context.Background()
+	db := newBoardRepoTestDB(t)
+	repo := NewBoardRepository(db)
+	owner := &users.User{Username: "upload-reclamation-owner", Status: 1, Role: "user"}
+	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
+		t.Fatalf("create owner: %v", err)
+	}
+	assetID, err := mediaassets.NewMediaAssetRegistry(db).RegisterBoardUpload(ctx, mediaassets.BoardUploadAsset{
+		OwnerUserID: owner.ID,
+		BoardID:     "upload-reclamation-board",
+		Stored: storage.StoredUploadRef{
+			URL:            "/uploads/canvas/owner/upload-reclamation-board/content/image.png",
+			StorageKey:     "uploads/canvas/owner/upload-reclamation-board/content/image.png",
+			StorageProfile: "builtin-local",
+			MIMEType:       "image/png",
+			Width:          640,
+			Height:         480,
+			SizeBytes:      2048,
+		},
+	})
+	if err != nil {
+		t.Fatalf("register uploaded media asset: %v", err)
+	}
+	q := dbsqlc.New(db)
+	uploaded, err := q.GetMediaAssetByID(ctx, assetID)
+	if err != nil || !uploaded.ReclaimAfter.Valid || uploaded.ReclaimGeneration != 1 {
+		t.Fatalf("registered upload = %#v err=%v, want initial generation scheduled", uploaded, err)
+	}
+
+	now := time.Now()
+	board := &UserBoard{
+		BoardID:            "upload-reclamation-board",
+		OwnerUserID:        owner.ID,
+		CreatedBy:          owner.ID,
+		Name:               "Upload Reclamation",
+		State:              boardStateWithMediaRefs(t, []BoardStateMediaRef{{MediaAssetID: assetID, RefType: "board_node", RefID: "image-1", Role: "source"}}),
+		StateSchemaVersion: CurrentBoardStateSchemaVersion,
+		CreatedAt:          now,
+		UpdatedAt:          now,
+	}
+	if err := repo.Upsert(ctx, board); err != nil {
+		t.Fatalf("save board with live upload reference: %v", err)
+	}
+	live, err := q.GetMediaAssetByID(ctx, assetID)
+	if err != nil || live.ReclaimAfter.Valid || live.ReclaimGeneration != 1 {
+		t.Fatalf("live upload = %#v err=%v, want initial reclaim cancelled", live, err)
+	}
+
+	board.State = boardStateWithMediaRefs(t, nil)
+	board.UpdatedAt = now.Add(time.Second)
+	if err := repo.Upsert(ctx, board); err != nil {
+		t.Fatalf("save board after node deletion: %v", err)
+	}
+	scheduled, err := q.GetMediaAssetByID(ctx, assetID)
+	if err != nil || !scheduled.ReclaimAfter.Valid || scheduled.ReclaimGeneration != 2 {
+		t.Fatalf("deleted-node upload = %#v err=%v, want new grace generation", scheduled, err)
 	}
 }
 

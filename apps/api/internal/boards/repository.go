@@ -4,10 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"strings"
+	"time"
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/media/reclamation"
 	"ideaboard/api/internal/platform/database"
 )
 
@@ -175,27 +178,15 @@ func (r *BoardRepository) GetMemberRole(ctx context.Context, boardID string, use
 	return role, nil
 }
 
-func (r *BoardRepository) DeleteByBoardID(ctx context.Context, ownerUserID int64, boardID string) error {
-	rows, err := r.q.DeleteBoardByOwnerAndBoardID(ctx, dbsqlc.DeleteBoardByOwnerAndBoardIDParams{OwnerUserID: ownerUserID, BoardID: boardID})
-	if err != nil {
-		return err
-	}
-	if rows == 0 {
-		return database.ErrNotFound
-	}
-	return nil
-}
-
-func (r *BoardRepository) DeleteMembersByBoardID(ctx context.Context, ownerUserID int64, boardID string) error {
-	return r.q.DeleteBoardMembersByBoardID(ctx, boardID)
-}
-
-func (r *BoardRepository) DeleteShareTokensByBoardID(ctx context.Context, ownerUserID int64, boardID string) error {
-	return r.q.DeleteBoardShareTokensByBoardID(ctx, boardID)
-}
-
 func (r *BoardRepository) DeleteBoardCascade(ctx context.Context, ownerUserID int64, boardID string) error {
 	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		previous, err := q.ListMediaRefsByBoardID(ctx, dbsqlc.ListMediaRefsByBoardIDParams{
+			OwnerUserID: ownerUserID,
+			BoardID:     boardID,
+		})
+		if err != nil {
+			return err
+		}
 		if err := q.DeleteBoardMediaRefsByOwnerAndBoardID(ctx, dbsqlc.DeleteBoardMediaRefsByOwnerAndBoardIDParams{OwnerUserID: ownerUserID, BoardID: boardID}); err != nil {
 			return err
 		}
@@ -211,6 +202,18 @@ func (r *BoardRepository) DeleteBoardCascade(ctx context.Context, ownerUserID in
 		}
 		if rows == 0 {
 			return database.ErrNotFound
+		}
+		assetIDs := make([]int64, 0, len(previous))
+		for _, ref := range previous {
+			assetIDs = append(assetIDs, ref.MediaAssetID)
+		}
+		if len(assetIDs) > 0 {
+			if err := q.ScheduleUnreferencedMediaAssetsForReclamation(ctx, dbsqlc.ScheduleUnreferencedMediaAssetsForReclamationParams{
+				ReclaimAfter:  sql.NullTime{Time: time.Now().Add(reclamation.GracePeriod), Valid: true},
+				MediaAssetIds: uniqueMediaAssetIDs(assetIDs),
+			}); err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -413,9 +416,17 @@ func reconcileBoardMediaRefsTx(ctx context.Context, q *dbsqlc.Queries, board *Us
 	if board == nil {
 		return ErrInvalidBoardInput
 	}
+	previous, err := q.ListMediaRefsByBoardID(ctx, dbsqlc.ListMediaRefsByBoardIDParams{
+		OwnerUserID: board.OwnerUserID,
+		BoardID:     board.BoardID,
+	})
+	if err != nil {
+		return err
+	}
 	if err := q.DeleteBoardMediaRefsByOwnerAndBoardID(ctx, dbsqlc.DeleteBoardMediaRefsByOwnerAndBoardIDParams{OwnerUserID: board.OwnerUserID, BoardID: board.BoardID}); err != nil {
 		return err
 	}
+	currentAssetIDs := make([]int64, 0, len(refs))
 	for _, ref := range refs {
 		if _, err := q.UpsertMediaRef(ctx, dbsqlc.UpsertMediaRefParams{
 			MediaAssetID: ref.MediaAssetID,
@@ -429,8 +440,52 @@ func reconcileBoardMediaRefsTx(ctx context.Context, q *dbsqlc.Queries, board *Us
 		}); err != nil {
 			return err
 		}
+		currentAssetIDs = append(currentAssetIDs, ref.MediaAssetID)
+	}
+	if len(currentAssetIDs) > 0 {
+		assetIDs := uniqueMediaAssetIDs(currentAssetIDs)
+		cancelledAssetIDs, err := q.CancelMediaAssetReclamation(ctx, dbsqlc.CancelMediaAssetReclamationParams{
+			MediaAssetIds:    assetIDs,
+			StaleClaimBefore: sql.NullTime{Time: time.Now().Add(-reclamation.ClaimLeaseDuration), Valid: true},
+		})
+		if err != nil {
+			return err
+		}
+		if len(cancelledAssetIDs) != len(assetIDs) {
+			return ErrMediaAssetNoLongerAvailable
+		}
+	}
+	previousAssetIDs := make([]int64, 0, len(previous))
+	for _, ref := range previous {
+		previousAssetIDs = append(previousAssetIDs, ref.MediaAssetID)
+	}
+	if len(previousAssetIDs) > 0 {
+		if err := q.ScheduleUnreferencedMediaAssetsForReclamation(ctx, dbsqlc.ScheduleUnreferencedMediaAssetsForReclamationParams{
+			ReclaimAfter:  sql.NullTime{Time: time.Now().Add(reclamation.GracePeriod), Valid: true},
+			MediaAssetIds: uniqueMediaAssetIDs(previousAssetIDs),
+		}); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+var ErrMediaAssetNoLongerAvailable = errors.New("media asset is no longer available")
+
+func uniqueMediaAssetIDs(ids []int64) []int64 {
+	seen := make(map[int64]struct{}, len(ids))
+	result := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		result = append(result, id)
+	}
+	return result
 }
 
 func IsBoardNameUniqueConstraintError(err error) bool {

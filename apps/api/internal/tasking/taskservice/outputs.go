@@ -2,6 +2,7 @@ package taskservice
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"strings"
 	"time"
@@ -48,5 +49,38 @@ func (s *Service) attachOutputsForTasks(ctx context.Context, items []*tasks.Task
 			continue
 		}
 		item.Outputs = outputsByTaskID[item.TaskID]
+		if hasReclaimedAssetOutput(item.Outputs) {
+			item.Result = taskResultWithoutReclaimedImageURLs(item.Result)
+		}
 	}
+}
+
+func hasReclaimedAssetOutput(outputs []tasks.TaskOutput) bool {
+	for _, output := range outputs {
+		if output.OutputKind == "asset" && output.MediaAssetID != nil && strings.TrimSpace(output.URL) == "" {
+			return true
+		}
+	}
+	return false
+}
+
+// Task results are immutable provider facts in storage. The read projection
+// removes retired URLs so operators cannot be sent to an object the user chose
+// to delete, while retaining the rest of the execution and billing evidence.
+func taskResultWithoutReclaimedImageURLs(raw string) string {
+	if strings.TrimSpace(raw) == "" {
+		return raw
+	}
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(raw), &result); err != nil || result == nil {
+		return raw
+	}
+	delete(result, "image_url")
+	delete(result, "image_urls")
+	result["image_availability"] = "deleted_by_user"
+	normalized, err := json.Marshal(result)
+	if err != nil {
+		return raw
+	}
+	return string(normalized)
 }

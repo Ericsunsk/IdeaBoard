@@ -1,4 +1,5 @@
 export * from './canvasBoardStateSchema'
+export * from './canvasBoardMediaRefs'
 export * from './boardStateEnvelopeContract'
 export * from './latestBoardState'
 export * from './canvasNodeRegistry'

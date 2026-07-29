@@ -18,7 +18,7 @@ export function formatReconciliationRunDuration(run: AdminCreditRun): string {
 export function formatReconciliationRunResult(run: AdminCreditRun): string {
   if (run.status === 'queued') return '等待执行'
   if (run.status === 'running') return '检查中'
-  return `${run.finding_count} 异常 · ${run.critical_count} 严重 · ${run.isolated_wallet_count} Wallet`
+  return `${run.finding_count} 检查发现（含业务追踪） · ${run.critical_count} 严重 Finding · ${run.isolated_wallet_count} Wallet 已受限`
 }
 
 export function getReconciliationTriggerLabel(run: AdminCreditRun): string {

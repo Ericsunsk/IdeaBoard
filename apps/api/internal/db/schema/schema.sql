@@ -756,14 +756,19 @@ BEGIN
   SELECT 'ledger_postings_invalid', 'critical', 'high', transactions.wallet_user_id,
     'transaction', transactions.transaction_id,
     jsonb_build_object('declared_posting_count', transactions.posting_count, 'actual_posting_count', COUNT(postings.id),
-      'asset_count', COUNT(DISTINCT postings.asset_code), 'posting_sum', COALESCE(SUM(postings.amount), 0))
+      'asset_count', COUNT(DISTINCT postings.asset_code), 'posting_sum', COALESCE(SUM(postings.amount), 0),
+      'debit_amount', COALESCE(-SUM(postings.amount) FILTER (WHERE postings.amount < 0), 0),
+      'credit_amount', COALESCE(SUM(postings.amount) FILTER (WHERE postings.amount > 0), 0),
+      'command_amount', transactions.command_amount)
   FROM credit_transactions transactions
   LEFT JOIN credit_postings postings ON postings.transaction_id = transactions.transaction_id
-  GROUP BY transactions.transaction_id, transactions.wallet_user_id, transactions.posting_count
+  GROUP BY transactions.transaction_id, transactions.wallet_user_id, transactions.posting_count, transactions.command_amount
   HAVING COUNT(postings.id) < 2 OR COUNT(postings.id) <> transactions.posting_count
       OR COUNT(DISTINCT postings.asset_code) <> 1
       OR BOOL_OR(postings.asset_code IS DISTINCT FROM transactions.asset_code)
-      OR COALESCE(SUM(postings.amount), 0) <> 0;
+      OR COALESCE(SUM(postings.amount), 0) <> 0
+      OR COALESCE(-SUM(postings.amount) FILTER (WHERE postings.amount < 0), 0) <> transactions.command_amount
+      OR COALESCE(SUM(postings.amount) FILTER (WHERE postings.amount > 0), 0) <> transactions.command_amount;
 
   INSERT INTO reconciliation_scan
   SELECT 'command_shape_invalid', 'critical', 'high', transactions.wallet_user_id, 'transaction', transactions.transaction_id,
@@ -791,23 +796,95 @@ BEGIN
   FROM credit_holds holds WHERE holds.status = 'held' AND holds.created_at < clock_timestamp() - v_stale_after;
 
   INSERT INTO reconciliation_scan
-  SELECT 'task_hold_missing_task', 'critical', 'high', transactions.wallet_user_id,
+  SELECT 'task_hold_missing_billing_snapshot', 'critical', 'high', transactions.wallet_user_id,
     'hold', transactions.transaction_id,
-    jsonb_build_object('task_id', transactions.business_reference_id)
+    jsonb_build_object('task_id', transactions.business_reference_id, 'billing_snapshot_exists', FALSE)
   FROM credit_transactions transactions
-  LEFT JOIN tasks ON tasks.task_id = transactions.business_reference_id
   LEFT JOIN task_billing_snapshots snapshots ON snapshots.hold_transaction_id = transactions.transaction_id
   WHERE transactions.command_type = 'hold' AND transactions.business_reference_type = 'task'
-    AND (tasks.task_id IS NULL OR snapshots.task_id IS NULL);
+    AND snapshots.task_id IS NULL;
+
+  INSERT INTO reconciliation_scan
+  SELECT 'task_trace_missing', 'warning', 'low', snapshots.user_id,
+    'task', snapshots.task_id,
+    jsonb_build_object('hold_transaction_id', snapshots.hold_transaction_id, 'settlement_state', settlements.state)
+  FROM task_billing_snapshots snapshots
+  JOIN credit_transactions transactions ON transactions.transaction_id = snapshots.hold_transaction_id
+    AND transactions.command_type = 'hold' AND transactions.command_amount = snapshots.total_credits
+    AND transactions.wallet_user_id = snapshots.user_id
+    AND transactions.business_reference_type = 'task' AND transactions.business_reference_id = snapshots.task_id
+  JOIN task_billing_settlements settlements ON settlements.task_id = snapshots.task_id
+  JOIN credit_holds holds ON holds.hold_transaction_id = snapshots.hold_transaction_id
+    AND holds.wallet_user_id = snapshots.user_id AND holds.amount = snapshots.total_credits
+    AND holds.status = settlements.state AND holds.terminal_transaction_id IS NOT DISTINCT FROM settlements.settlement_transaction_id
+  LEFT JOIN tasks ON tasks.task_id = snapshots.task_id
+  WHERE snapshots.total_credits > 0 AND tasks.task_id IS NULL
+    AND settlements.state IN ('held', 'captured', 'released')
+    AND (settlements.state = 'held' OR EXISTS (
+      SELECT 1 FROM credit_transactions terminal
+      WHERE terminal.transaction_id = settlements.settlement_transaction_id
+        AND terminal.command_type = CASE settlements.state WHEN 'captured' THEN 'capture' ELSE 'release' END
+        AND terminal.command_amount = snapshots.total_credits
+        AND terminal.wallet_user_id = snapshots.user_id
+        AND terminal.related_transaction_id = snapshots.hold_transaction_id
+        AND terminal.business_reference_type = 'task' AND terminal.business_reference_id = snapshots.task_id
+    ))
+    AND NOT EXISTS (
+      SELECT 1
+      FROM credit_transactions ledger_transactions
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) AS posting_count, COUNT(DISTINCT postings.asset_code) AS asset_count,
+          BOOL_OR(postings.asset_code IS DISTINCT FROM ledger_transactions.asset_code) AS asset_mismatch,
+          COALESCE(SUM(postings.amount), 0) AS posting_sum,
+          COALESCE(-SUM(postings.amount) FILTER (WHERE postings.amount < 0), 0) AS debit_amount,
+          COALESCE(SUM(postings.amount) FILTER (WHERE postings.amount > 0), 0) AS credit_amount
+        FROM credit_postings postings
+        WHERE postings.transaction_id = ledger_transactions.transaction_id
+      ) ledger ON TRUE
+      WHERE ledger_transactions.transaction_id IN (transactions.transaction_id, settlements.settlement_transaction_id)
+        AND (ledger.posting_count < 2 OR ledger.posting_count <> ledger_transactions.posting_count
+          OR ledger.asset_count <> 1 OR ledger.asset_mismatch OR ledger.posting_sum <> 0
+          OR ledger.debit_amount <> ledger_transactions.command_amount
+          OR ledger.credit_amount <> ledger_transactions.command_amount)
+    );
 
   INSERT INTO reconciliation_scan
   SELECT 'task_billing_fact_missing', 'critical', 'high', snapshots.user_id, 'task', snapshots.task_id,
     jsonb_build_object('hold_transaction_id', snapshots.hold_transaction_id, 'hold_exists', holds.hold_transaction_id IS NOT NULL,
-      'settlement_exists', settlements.task_id IS NOT NULL)
+      'settlement_exists', settlements.task_id IS NOT NULL, 'hold_command', hold_transactions.command_type,
+      'hold_command_amount', hold_transactions.command_amount, 'expected_amount', snapshots.total_credits,
+      'hold_wallet_matches', hold_transactions.wallet_user_id = snapshots.user_id,
+      'hold_reference_matches', hold_transactions.business_reference_type = 'task' AND hold_transactions.business_reference_id = snapshots.task_id,
+      'hold_projection_matches', holds.wallet_user_id = snapshots.user_id AND holds.amount = snapshots.total_credits,
+      'settlement_state', settlements.state, 'terminal_command', terminal.command_type,
+      'terminal_command_amount', terminal.command_amount)
   FROM task_billing_snapshots snapshots
+  LEFT JOIN credit_transactions hold_transactions ON hold_transactions.transaction_id = snapshots.hold_transaction_id
   LEFT JOIN credit_holds holds ON holds.hold_transaction_id = snapshots.hold_transaction_id
   LEFT JOIN task_billing_settlements settlements ON settlements.task_id = snapshots.task_id
-  WHERE snapshots.total_credits > 0 AND (holds.hold_transaction_id IS NULL OR settlements.task_id IS NULL);
+  LEFT JOIN credit_transactions terminal ON terminal.transaction_id = settlements.settlement_transaction_id
+  WHERE snapshots.total_credits > 0 AND (
+    holds.hold_transaction_id IS NULL OR settlements.task_id IS NULL
+    OR hold_transactions.command_type IS DISTINCT FROM 'hold'
+    OR hold_transactions.command_amount IS DISTINCT FROM snapshots.total_credits
+    OR hold_transactions.wallet_user_id IS DISTINCT FROM snapshots.user_id
+    OR hold_transactions.business_reference_type IS DISTINCT FROM 'task'
+    OR hold_transactions.business_reference_id IS DISTINCT FROM snapshots.task_id
+    OR holds.wallet_user_id IS DISTINCT FROM snapshots.user_id
+    OR holds.amount IS DISTINCT FROM snapshots.total_credits
+    OR settlements.state NOT IN ('held', 'captured', 'released')
+    OR holds.status IS DISTINCT FROM settlements.state
+    OR holds.terminal_transaction_id IS DISTINCT FROM settlements.settlement_transaction_id
+    OR (settlements.state IN ('captured', 'released') AND (
+      terminal.transaction_id IS NULL
+      OR terminal.command_type IS DISTINCT FROM CASE settlements.state WHEN 'captured' THEN 'capture' ELSE 'release' END
+      OR terminal.command_amount IS DISTINCT FROM snapshots.total_credits
+      OR terminal.wallet_user_id IS DISTINCT FROM snapshots.user_id
+      OR terminal.related_transaction_id IS DISTINCT FROM snapshots.hold_transaction_id
+      OR terminal.business_reference_type IS DISTINCT FROM 'task'
+      OR terminal.business_reference_id IS DISTINCT FROM snapshots.task_id
+    ))
+  );
 
   INSERT INTO reconciliation_scan
   SELECT CASE
@@ -1588,6 +1665,10 @@ CREATE TABLE media_assets (
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   deleted_at TIMESTAMPTZ(3),
+  reclaim_after TIMESTAMPTZ(3),
+  reclaim_started_at TIMESTAMPTZ(3),
+  reclaim_claim_token UUID,
+  reclaim_generation BIGINT NOT NULL DEFAULT 0,
   CONSTRAINT uq_media_assets_asset_id UNIQUE (asset_id),
   CONSTRAINT uq_media_assets_id_owner UNIQUE (id, owner_user_id),
   CONSTRAINT uq_media_assets_storage_key UNIQUE (storage_profile_id, storage_key),
@@ -1605,6 +1686,31 @@ CREATE TABLE media_assets (
 CREATE INDEX idx_media_assets_owner_status ON media_assets (owner_user_id, status, updated_at DESC);
 CREATE INDEX idx_media_assets_owner_active_updated ON media_assets (owner_user_id, updated_at DESC, id DESC) WHERE deleted_at IS NULL;
 CREATE INDEX idx_media_assets_storage_key ON media_assets (storage_profile_id, storage_key);
+CREATE INDEX idx_media_assets_reclamation_due ON media_assets (reclaim_after, id) WHERE deleted_at IS NULL AND reclaim_after IS NOT NULL;
+
+CREATE OR REPLACE FUNCTION prevent_referenced_storage_profile_locator_change()
+RETURNS trigger AS $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM media_assets
+    WHERE storage_profile_id = OLD.profile_id
+  ) AND (
+    NEW.provider IS DISTINCT FROM OLD.provider
+    OR COALESCE(NEW.config->>'endpoint', '') IS DISTINCT FROM COALESCE(OLD.config->>'endpoint', '')
+    OR COALESCE(NEW.config->>'bucket_name', '') IS DISTINCT FROM COALESCE(OLD.config->>'bucket_name', '')
+    OR COALESCE(NEW.config->>'region_id', '') IS DISTINCT FROM COALESCE(OLD.config->>'region_id', '')
+    OR COALESCE(NEW.config->>'force_path_style', 'false') IS DISTINCT FROM COALESCE(OLD.config->>'force_path_style', 'false')
+  ) THEN
+    RAISE EXCEPTION 'referenced storage profile locator is immutable; create a new profile';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER prevent_referenced_storage_profile_locator_change
+BEFORE UPDATE OF provider, config ON storage_profiles
+FOR EACH ROW EXECUTE FUNCTION prevent_referenced_storage_profile_locator_change();
 
 CREATE TABLE media_refs (
   id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
@@ -1618,7 +1724,7 @@ CREATE TABLE media_refs (
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  CONSTRAINT uq_media_refs_ref UNIQUE (media_asset_id, ref_type, ref_id, role),
+  CONSTRAINT uq_media_refs_ref UNIQUE (media_asset_id, ref_type, ref_id, board_id, role),
   CONSTRAINT ck_media_refs_ref_type CHECK (ref_type IN ('upload', 'task_output', 'board', 'board_node', 'user_avatar', 'prompt_reference')),
   CONSTRAINT ck_media_refs_ref_id_not_blank CHECK (btrim(ref_id) <> ''),
   CONSTRAINT ck_media_refs_metadata_object CHECK (jsonb_typeof(metadata) = 'object'),

@@ -3,6 +3,7 @@ import type { ImageNodeItem, ImageNodeOutputItem } from '../../canvas-board/doma
 export type ImageNodeDisplayPayload = {
   url: string
   ratio: number
+  mediaAssetId?: number
 }
 
 export type ImageNodeLayoutAnchor = ImageNodeDisplayPayload & {
@@ -51,13 +52,19 @@ export function resolveImageNodeDisplayRatio(
 }
 
 export function resolveImageNodeDisplayPayload(
-  imageNode: Pick<ImageNodeItem, 'sourceImageUrl' | 'sourceImageRatio' | 'outputImages'>,
+  imageNode: Pick<
+    ImageNodeItem,
+    'sourceImageUrl' | 'sourceMediaAssetId' | 'sourceImageRatio' | 'outputImages'
+  >,
 ): ImageNodeDisplayPayload | null {
   const url = resolveImageNodeDisplayUrl(imageNode)
   if (!url) return null
+  const latestOutput = resolveImageNodeLatestOutput(imageNode)
+  const mediaAssetId = Number(latestOutput ? latestOutput.mediaAssetId : imageNode.sourceMediaAssetId)
   return {
     url,
     ratio: resolveImageNodeDisplayRatio(imageNode),
+    ...(Number.isInteger(mediaAssetId) && mediaAssetId > 0 ? { mediaAssetId } : {}),
   }
 }
 

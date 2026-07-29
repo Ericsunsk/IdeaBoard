@@ -43,6 +43,7 @@ func newAppRouter(
 	}
 	uploadDeps := httpapi.UploadDeps{
 		StorageService: services.storageService,
+		MediaAssets:    repos.mediaAssetRegistry,
 		UserRepo:       repos.userRepo,
 		BoardService:   services.boardService,
 		UploadSettings: services.runtimeSettings,

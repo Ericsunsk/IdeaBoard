@@ -7,6 +7,7 @@
 
 export interface UploadImageMetadata {
   url: string
+  media_asset_id?: number
   width?: number
   height?: number
   mime?: string

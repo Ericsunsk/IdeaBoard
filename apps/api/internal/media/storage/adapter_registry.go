@@ -12,7 +12,7 @@ type storageProviderAdapter interface {
 	IsProfileReady(profile StorageProfile) bool
 	TestProfile(ctx context.Context, profile *StorageProfile) error
 	GetBucketInfo(ctx context.Context, profile *StorageProfile) (map[string]interface{}, error)
-	Upload(ctx context.Context, profile *StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (string, error)
+	UploadRef(ctx context.Context, profile *StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (*StoredUploadRef, error)
 	Delete(ctx context.Context, profile *StorageProfile, objectKey string) error
 	DeleteByPrefix(ctx context.Context, profile *StorageProfile, objectKeyPrefix string) error
 	StoreBytes(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error)

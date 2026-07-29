@@ -49,6 +49,7 @@ type appRepositories struct {
 	featurePromptRepo    *prompts.FeaturePromptRepository
 	storageProfileRepo   *storage.StorageProfileRepository
 	lineDraftModeRepo    *assets.LineDraftModeRepository
+	mediaAssetRegistry   *assets.MediaAssetRegistry
 	boardRepo            *boards.BoardRepository
 }
 
@@ -177,6 +178,7 @@ func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error
 		featurePromptRepo:    prompts.NewFeaturePromptRepository(db),
 		storageProfileRepo:   storage.NewStorageProfileRepository(db),
 		lineDraftModeRepo:    assets.NewLineDraftModeRepository(db),
+		mediaAssetRegistry:   assets.NewMediaAssetRegistry(db),
 		boardRepo:            boards.NewBoardRepository(db),
 	}
 	if err := repos.userRepo.EnsureStorageUIDs(ctx); err != nil {

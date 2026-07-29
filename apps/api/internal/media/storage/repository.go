@@ -20,6 +20,7 @@ import (
 const storageSecretAccessKeyName = "secret_access_key"
 
 var ErrStorageSecretVersionConflict = errors.New("storage secret version rotation conflict: retry the request")
+var ErrStorageProfileLocatorImmutable = errors.New("storage profile locator is immutable after media assets reference it")
 
 type storageProfileSecretPolicy int
 
@@ -167,7 +168,7 @@ func saveProfileTx(ctx context.Context, q *dbsqlc.Queries, profile StorageProfil
 			rotateSecret = false
 		}
 	}
-	if err := q.UpsertStorageProfile(ctx, dbsqlc.UpsertStorageProfileParams{
+	rows, err := q.UpsertStorageProfile(ctx, dbsqlc.UpsertStorageProfileParams{
 		ProfileID: id,
 		Name:      strings.TrimSpace(profile.Name),
 		Provider:  string(canonicalizeStorageProvider(profile.Provider)),
@@ -178,8 +179,12 @@ func saveProfileTx(ctx context.Context, q *dbsqlc.Queries, profile StorageProfil
 		Config:    configJSON,
 		CreatedBy: sql.NullInt64{},
 		UpdatedBy: sql.NullInt64{},
-	}); err != nil {
+	})
+	if err != nil {
 		return err
+	}
+	if rows == 0 {
+		return ErrStorageProfileLocatorImmutable
 	}
 	if !rotateSecret {
 		return nil

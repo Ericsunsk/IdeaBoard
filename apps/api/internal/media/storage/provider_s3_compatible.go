@@ -108,22 +108,22 @@ func ensureS3BucketAccessible(ctx context.Context, client s3BucketExistenceCheck
 	return nil
 }
 
-func (s *S3CompatibleService) UploadWithConfig(ctx context.Context, file *multipart.FileHeader, cfg *S3CompatibleConfig, opts StorageStoreOptions) (string, error) {
+func (s *S3CompatibleService) UploadRefWithConfig(ctx context.Context, file *multipart.FileHeader, cfg *S3CompatibleConfig, opts StorageStoreOptions) (*StoredUploadRef, error) {
 	if err := ctx.Err(); err != nil {
-		return "", err
+		return nil, err
 	}
 	client, err := s.prepareUploadClient(ctx, cfg)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	src, err := file.Open()
 	if err != nil {
-		return "", fmt.Errorf("打开文件失败: %w", err)
+		return nil, fmt.Errorf("打开文件失败: %w", err)
 	}
 	defer src.Close()
 
-	return s.putReaderWithConfig(ctx, client, file.Filename, file.Header.Get("Content-Type"), src, file.Size, cfg, opts)
+	return s.putReaderWithConfigRef(ctx, client, file.Filename, file.Header.Get("Content-Type"), src, file.Size, cfg, opts)
 }
 
 func (s *S3CompatibleService) uploadBytesWithConfig(ctx context.Context, filename string, data []byte, cfg *S3CompatibleConfig, opts StorageStoreOptions) (string, error) {
@@ -227,8 +227,8 @@ func (s *S3CompatibleService) DeleteWithConfig(ctx context.Context, objectKey st
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if !s.IsConfigEnabled(cfg) {
-		return fmt.Errorf("S3 兼容存储配置未启用或不完整")
+	if err := s.validateBaseConfig(ctx, cfg); err != nil {
+		return err
 	}
 	key := strings.TrimSpace(objectKey)
 	if key == "" {

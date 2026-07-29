@@ -37,11 +37,11 @@ func (a *localStorageAdapter) GetBucketInfo(ctx context.Context, profile *Storag
 	return nil, fmt.Errorf("当前存储类型不支持读取 Bucket 信息")
 }
 
-func (a *localStorageAdapter) Upload(ctx context.Context, profile *StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (string, error) {
+func (a *localStorageAdapter) UploadRef(ctx context.Context, profile *StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (*StoredUploadRef, error) {
 	if err := ctx.Err(); err != nil {
-		return "", err
+		return nil, err
 	}
-	return a.service.saveUploadedFileLocal(ctx, file, opts)
+	return a.service.saveUploadedFileLocalRef(ctx, file, opts)
 }
 
 func (a *localStorageAdapter) Delete(ctx context.Context, profile *StorageProfile, objectKey string) error {

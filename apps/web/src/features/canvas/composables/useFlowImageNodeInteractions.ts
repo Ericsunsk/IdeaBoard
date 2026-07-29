@@ -3,7 +3,10 @@ import type { Node } from '@vue-flow/core'
 import { createCanvasNodeAt } from '../utils/canvasNodeFactory'
 import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
 import { resolveImageNodeFrameSize } from '../../canvas-board/domain'
-import { resolveImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
+import {
+  resolveImageNodeDisplayPayload,
+  type ImageNodeDisplayPayload,
+} from '../utils/flowImageNodeSelectors'
 import type { ImageNodeItem } from '../../canvas-board/domain'
 import type { FlowAdapterNode } from '../utils/flowSnapshotAdapter'
 import type { FlowNodeData } from '../types/flowTypes'
@@ -12,7 +15,7 @@ import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffe
 
 type UseFlowImageNodeInteractionsOptions = {
   nodes: Ref<Node[]>
-  getImageNodeDisplayPayload: (nodeId: string) => { url: string; ratio: number } | null
+  getImageNodeDisplayPayload: (nodeId: string) => ImageNodeDisplayPayload | null
   getImageNodeSnapshot: (
     nodeId: string,
   ) => { x: number; y: number; width: number; outputCount?: ImageNodeItem['outputCount'] } | null
@@ -40,10 +43,14 @@ function createImageFlowNode(item: ImageNodeItem): Node {
 function cloneImageOutputs(source: ImageNodeItem): ImageNodeItem['outputImages'] {
   return Array.isArray(source.outputImages)
     ? source.outputImages
-        .map((item) => ({
-          url: `${item?.url ?? ''}`.trim(),
-          ratio: Number.isFinite(item?.ratio) && Number(item.ratio) > 0 ? Number(item.ratio) : 1,
-        }))
+        .map((item) => {
+          const mediaAssetId = Number(item?.mediaAssetId)
+          return {
+            url: `${item?.url ?? ''}`.trim(),
+            ratio: Number.isFinite(item?.ratio) && Number(item.ratio) > 0 ? Number(item.ratio) : 1,
+            ...(Number.isInteger(mediaAssetId) && mediaAssetId > 0 ? { mediaAssetId } : {}),
+          }
+        })
         .filter((item) => item.url)
     : []
 }
@@ -66,6 +73,7 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
       y: sourceNode.y + 18,
     })
     imageNode.sourceImageUrl = payload.url
+    imageNode.sourceMediaAssetId = payload.mediaAssetId
     imageNode.sourceImageRatio = payload.ratio
     imageNode.outputCount = sourceNode.outputCount ?? imageNode.outputCount
     imageNode.width = resolveImageNodeFrameSize(payload.ratio, true).width
@@ -127,6 +135,7 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
         y: Number(source.y ?? 0) + delta.y,
       })
       copied.sourceImageUrl = `${source.sourceImageUrl ?? ''}`.trim()
+      copied.sourceMediaAssetId = source.sourceMediaAssetId
       copied.sourceImageRatio =
         Number.isFinite(source.sourceImageRatio) && Number(source.sourceImageRatio) > 0
           ? Number(source.sourceImageRatio)

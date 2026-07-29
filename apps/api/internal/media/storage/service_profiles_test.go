@@ -3,7 +3,9 @@ package storage
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,10 +13,120 @@ import (
 	"testing"
 	"time"
 
+	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/platform/secrets"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
 )
+
+func TestStorageProfileLocatorIsImmutableAfterMediaAssetRegistration(t *testing.T) {
+	service, repo := newStorageServiceTest(t)
+	ctx := context.Background()
+	const profileID = "s3-immutable-locator"
+	seed := StorageProfile{
+		ID:       profileID,
+		Name:     "Immutable Locator",
+		Provider: StorageProviderS3Compatible,
+		Enabled:  true,
+		Config: map[string]interface{}{
+			"access_key_id":            "ak",
+			storageSecretAccessKeyName: "sk",
+			"bucket_name":              "bucket-a",
+			"endpoint":                 "s3.example.com",
+			"region_id":                "region-a",
+			"access_domain":            "https://cdn-a.example.com",
+			"force_path_style":         false,
+		},
+	}
+	if _, err := service.SaveProfile(ctx, &seed); err != nil {
+		t.Fatalf("seed storage profile: %v", err)
+	}
+	owner := &users.User{Username: "profile-locator-owner", Status: 1, Role: "user"}
+	if err := users.NewUserRepository(repo.db).Create(ctx, owner); err != nil {
+		t.Fatalf("create media owner: %v", err)
+	}
+	if _, err := dbsqlc.New(repo.db).UpsertMediaAsset(ctx, dbsqlc.UpsertMediaAssetParams{
+		AssetID:          "asset-profile-locator",
+		OwnerUserID:      owner.ID,
+		StorageProfileID: profileID,
+		StorageKey:       "uploads/canvas/owner/board/content/image.png",
+		Url:              "https://cdn-a.example.com/image.png",
+		MediaKind:        "image",
+		MimeType:         "image/png",
+		Status:           "ready",
+		Metadata:         []byte(`{}`),
+	}); err != nil {
+		t.Fatalf("seed media asset: %v", err)
+	}
+
+	allowed := seed
+	allowed.Name = "Renamed"
+	allowed.Config = map[string]interface{}{
+		"access_key_id":            "ak-rotated",
+		storageSecretAccessKeyName: "sk-rotated",
+		"bucket_name":              "bucket-a",
+		"endpoint":                 "s3.example.com",
+		"region_id":                "region-a",
+		"access_domain":            "https://cdn-b.example.com",
+		"force_path_style":         false,
+	}
+	if _, err := service.SaveProfile(ctx, &allowed); err != nil {
+		t.Fatalf("safe profile update rejected: %v", err)
+	}
+
+	for name, mutate := range map[string]func(*StorageProfile){
+		"bucket":     func(profile *StorageProfile) { profile.Config["bucket_name"] = "bucket-b" },
+		"endpoint":   func(profile *StorageProfile) { profile.Config["endpoint"] = "other.example.com" },
+		"region":     func(profile *StorageProfile) { profile.Config["region_id"] = "region-b" },
+		"path style": func(profile *StorageProfile) { profile.Config["force_path_style"] = true },
+	} {
+		t.Run(name, func(t *testing.T) {
+			next := allowed
+			next.Config = maps.Clone(allowed.Config)
+			mutate(&next)
+			if _, err := service.SaveProfile(ctx, &next); !errors.Is(err, ErrStorageProfileLocatorImmutable) {
+				t.Fatalf("locator update error = %v, want ErrStorageProfileLocatorImmutable", err)
+			}
+		})
+	}
+}
+
+func TestReclamationLoadsSoftDeletedStorageProfileWithSecret(t *testing.T) {
+	service, _ := newStorageServiceTest(t)
+	ctx := context.Background()
+	const profileID = "s3-deleted-reclamation"
+	if _, err := service.SaveProfile(ctx, &StorageProfile{
+		ID:       profileID,
+		Name:     "Deleted Reclamation",
+		Provider: StorageProviderS3Compatible,
+		Enabled:  true,
+		Config: map[string]interface{}{
+			"access_key_id":            "ak",
+			storageSecretAccessKeyName: "sk-reclaim",
+			"bucket_name":              "bucket",
+			"endpoint":                 "s3.example.com",
+			"access_domain":            "https://cdn.example.com",
+			"force_path_style":         false,
+		},
+	}); err != nil {
+		t.Fatalf("seed profile: %v", err)
+	}
+	if err := service.DeleteProfile(ctx, profileID); err != nil {
+		t.Fatalf("soft-delete profile: %v", err)
+	}
+
+	profile, err := service.loadProfileForReclamation(ctx, profileID)
+	if err != nil {
+		t.Fatalf("load deleted profile for reclamation: %v", err)
+	}
+	if profile.ID != profileID || profile.Enabled {
+		t.Fatalf("reclamation profile = %#v", profile)
+	}
+	if got := configString(profile.Config, storageSecretAccessKeyName); got != "sk-reclaim" {
+		t.Fatalf("reclamation secret = %q, want stored plaintext secret", got)
+	}
+}
 
 func newStorageServiceTest(t *testing.T) (*StorageService, *StorageProfileRepository) {
 	t.Helper()

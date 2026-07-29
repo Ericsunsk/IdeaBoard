@@ -26,25 +26,29 @@ function makeImageNode(overrides: Partial<ImageNodeItem> = {}): ImageNodeItem {
 describe('flowImageNodeSelectors', () => {
   it('prefers the latest output image for display url and ratio', () => {
     const imageNode = makeImageNode({
+      sourceMediaAssetId: 100,
       outputImages: [
         { url: 'https://example.com/old.png', ratio: 1 },
-        { url: 'https://example.com/latest.png', ratio: 1.4 },
+        { url: 'https://example.com/latest.png', ratio: 1.4, mediaAssetId: 200 },
       ],
     })
 
     expect(resolveImageNodeLatestOutput(imageNode)).toEqual({
       url: 'https://example.com/latest.png',
       ratio: 1.4,
+      mediaAssetId: 200,
     })
     expect(resolveImageNodeDisplayPayload(imageNode)).toEqual({
       url: 'https://example.com/latest.png',
       ratio: 1.4,
+      mediaAssetId: 200,
     })
   })
 
   it('falls back to source image data when no output image exists', () => {
     const imageNode = makeImageNode({
       sourceImageUrl: ' https://example.com/source-only.png ',
+      sourceMediaAssetId: 100,
       sourceImageRatio: 0.5,
       outputImages: [],
     })
@@ -52,6 +56,7 @@ describe('flowImageNodeSelectors', () => {
     expect(resolveImageNodeDisplayPayload(imageNode)).toEqual({
       url: 'https://example.com/source-only.png',
       ratio: 0.5,
+      mediaAssetId: 100,
     })
   })
 

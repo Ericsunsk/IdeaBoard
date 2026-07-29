@@ -1,7 +1,5 @@
-import { uploadApi } from '../../../../shared/api/upload'
 import {
   canvasToBlob,
-  isDataUrl,
   resolveFetchUrl,
   uploadCanvasBlob,
 } from '../../services/flowMediaIO'
@@ -26,7 +24,6 @@ export interface FlowLocalInpaintCropResult {
 
 export interface PreparedFlowLocalInpaintMedia {
   crop: FlowLocalInpaintCropResult
-  temporaryMaskUrl?: string
 }
 
 interface PrepareFlowLocalInpaintOptions {
@@ -258,26 +255,6 @@ export async function composeFlowLocalInpaint(
   }
 }
 
-export async function cleanupFlowLocalInpaintAssets(
-  localInpaint: FlowLocalInpaintCropResult | null | undefined,
-  boardId?: string,
-): Promise<void> {
-  const normalizedBoardId = `${boardId ?? ''}`.trim()
-  if (!localInpaint || !normalizedBoardId) return
-  const recycleTargets = [localInpaint.croppedImageUrl, localInpaint.croppedMaskUrl]
-    .map((url) => url.trim())
-    .filter(Boolean)
-  if (recycleTargets.length === 0) return
-  await Promise.allSettled(recycleTargets.map((url) => uploadApi.recycle(url, normalizedBoardId)))
-}
-
-async function recycleUploadedUrl(rawUrl: string | null | undefined, boardId?: string) {
-  const normalizedBoardId = `${boardId ?? ''}`.trim()
-  const url = `${rawUrl ?? ''}`.trim()
-  if (!url || !normalizedBoardId) return
-  await Promise.allSettled([uploadApi.recycle(url, normalizedBoardId)])
-}
-
 export async function prepareFlowLocalInpaintMedia(
   options: PrepareFlowLocalInpaintMediaOptions,
 ): Promise<PreparedFlowLocalInpaintMedia> {
@@ -285,29 +262,11 @@ export async function prepareFlowLocalInpaintMedia(
   const normalizedMaskUrl = await ensureFlowMaskImageUrl(rawMaskDataUrl, {
     boardId: options.boardId,
   })
-  const temporaryMaskUrl = isDataUrl(rawMaskDataUrl) ? normalizedMaskUrl : undefined
-
-  try {
-    const crop = await prepareFlowLocalInpaint({
-      originalImageUrl: options.originalImageUrl,
-      maskUrl: normalizedMaskUrl,
-      boardId: options.boardId,
-      padding: options.padding,
-    })
-    return {
-      crop,
-      ...(temporaryMaskUrl ? { temporaryMaskUrl } : {}),
-    }
-  } catch (error) {
-    await recycleUploadedUrl(temporaryMaskUrl, options.boardId)
-    throw error
-  }
-}
-
-export async function cleanupFlowLocalInpaintMedia(
-  prepared: PreparedFlowLocalInpaintMedia | null | undefined,
-  boardId?: string,
-): Promise<void> {
-  await cleanupFlowLocalInpaintAssets(prepared?.crop, boardId)
-  await recycleUploadedUrl(prepared?.temporaryMaskUrl, boardId)
+  const crop = await prepareFlowLocalInpaint({
+    originalImageUrl: options.originalImageUrl,
+    maskUrl: normalizedMaskUrl,
+    boardId: options.boardId,
+    padding: options.padding,
+  })
+  return { crop }
 }

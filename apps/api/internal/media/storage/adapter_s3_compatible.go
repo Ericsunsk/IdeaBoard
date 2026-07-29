@@ -33,8 +33,8 @@ func (a *s3CompatibleStorageAdapter) GetBucketInfo(ctx context.Context, profile 
 	return a.service.s3CompatibleService.GetBucketInfoWithConfig(ctx, a.service.s3CompatibleConfigFromProfile(profile))
 }
 
-func (a *s3CompatibleStorageAdapter) Upload(ctx context.Context, profile *StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (string, error) {
-	return a.service.s3CompatibleService.UploadWithConfig(ctx, file, a.service.s3CompatibleConfigFromProfile(profile), opts)
+func (a *s3CompatibleStorageAdapter) UploadRef(ctx context.Context, profile *StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	return a.service.s3CompatibleService.UploadRefWithConfig(ctx, file, a.service.s3CompatibleConfigFromProfile(profile), opts)
 }
 
 func (a *s3CompatibleStorageAdapter) Delete(ctx context.Context, profile *StorageProfile, objectKey string) error {

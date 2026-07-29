@@ -130,12 +130,10 @@ export function useCanvasBoardSession(options: CanvasBoardSessionTestOptions): C
     }
 
     const uploadLifecycle = createUploadLifecycle({
-      userId: identity.userId,
       userUid: identity.userUid,
       boardId,
       warning: options.message.warning,
     })
-    const previousSnapshot = uploadLifecycle.readPreviousSnapshot()
     let stabilizedSnapshot: CanvasBoardSnapshot
     try {
       stabilizedSnapshot = await uploadLifecycle.stabilizeSnapshotForSave(snapshot)
@@ -165,7 +163,6 @@ export function useCanvasBoardSession(options: CanvasBoardSessionTestOptions): C
     if (saveOptions.waitForPreview) {
       await previewRefreshTask
     }
-    await uploadLifecycle.recycleRemovedUploadsAfterSave(previousSnapshot, stabilizedSnapshot)
     return { snapshot: stabilizedSnapshot, remoteSync: { ok: true } }
   }
 

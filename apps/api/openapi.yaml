@@ -300,26 +300,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseUploadImage'
-    delete:
-      tags: [UserAssets]
-      operationId: deleteUserBoardUpload
-      security:
-        - cookieAuth: []
-      parameters:
-        - $ref: '#/components/parameters/BoardId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DeleteUploadRequest'
-      responses:
-        '200':
-          description: Deleted board upload
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseDeleted'
   /user/boards/{board_id}/members:
     get:
       tags: [Boards]
@@ -2745,7 +2725,8 @@ components:
         - command_shape_invalid
         - wallet_projection_mismatch
         - stale_hold
-        - task_hold_missing_task
+        - task_hold_missing_billing_snapshot
+        - task_trace_missing
         - task_billing_fact_missing
         - active_task_not_held
         - completed_task_not_captured
@@ -4114,6 +4095,7 @@ components:
       required: [url]
       properties:
         url: { type: string }
+        media_asset_id: { type: integer, format: int64 }
         width: { type: integer }
         height: { type: integer }
         mime: { type: string }
@@ -4128,12 +4110,6 @@ components:
         height: { type: integer }
         mime: { type: string }
         ext: { type: string }
-
-    DeleteUploadRequest:
-      type: object
-      required: [url]
-      properties:
-        url: { type: string }
 
     UserLineDraftMode:
       type: object

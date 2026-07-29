@@ -2,7 +2,11 @@ import { computed, ref, toValue, watch, type MaybeRefOrGetter } from 'vue'
 import { formatAdminDateTime } from '../../../shared/utils/dateTime'
 import type { AdminTaskResultFeedback } from './useAdminTaskMonitorFeedback'
 import type { AdminTaskMonitorDetailModel } from './taskMonitorResource'
-import { getSafeResultImageUrl, hasTaskResultImageCandidate } from './taskResultImages'
+import {
+  getSafeResultImageUrl,
+  hasTaskResultImageCandidate,
+  isTaskResultImageDeletedByUser,
+} from './taskResultImages'
 import {
   formatTaskDuration,
   formatTaskResultDebug,
@@ -33,6 +37,10 @@ export function useTaskResultDetail(
   const hasResultImageCandidate = computed(() => {
     return hasTaskResultImageCandidate(detailTask.value?.result)
   })
+
+  const isResultImageDeletedByUser = computed(() =>
+    isTaskResultImageDeletedByUser(detailTask.value?.result),
+  )
 
   const hasResultPayload = computed(() => Boolean(detailTask.value?.result?.trim()))
 
@@ -86,6 +94,7 @@ export function useTaskResultDetail(
     resultSummaryText,
     resultDebugText,
     hasResultImageCandidate,
+    isResultImageDeletedByUser,
     hasResultPayload,
     openResultImage,
     copyToClipboard,

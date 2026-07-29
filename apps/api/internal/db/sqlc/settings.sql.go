@@ -539,7 +539,7 @@ func (q *Queries) UpsertFeaturePrompt(ctx context.Context, arg UpsertFeatureProm
 	return i, err
 }
 
-const upsertStorageProfile = `-- name: UpsertStorageProfile :exec
+const upsertStorageProfile = `-- name: UpsertStorageProfile :execrows
 WITH input AS (
   SELECT
     $1::varchar(64) AS profile_id,
@@ -578,6 +578,18 @@ SET name = EXCLUDED.name,
     config = EXCLUDED.config,
     updated_by = EXCLUDED.updated_by,
     deleted_at = CASE WHEN EXCLUDED.status = 'deleted' THEN COALESCE(storage_profiles.deleted_at, now()) ELSE NULL END
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM media_assets
+    WHERE media_assets.storage_profile_id = storage_profiles.profile_id
+  )
+  OR (
+    storage_profiles.provider = EXCLUDED.provider
+    AND COALESCE(storage_profiles.config->>'endpoint', '') = COALESCE(EXCLUDED.config->>'endpoint', '')
+    AND COALESCE(storage_profiles.config->>'bucket_name', '') = COALESCE(EXCLUDED.config->>'bucket_name', '')
+    AND COALESCE(storage_profiles.config->>'region_id', '') = COALESCE(EXCLUDED.config->>'region_id', '')
+    AND COALESCE(storage_profiles.config->>'force_path_style', 'false') = COALESCE(EXCLUDED.config->>'force_path_style', 'false')
+  )
 `
 
 type UpsertStorageProfileParams struct {
@@ -593,8 +605,8 @@ type UpsertStorageProfileParams struct {
 	UpdatedBy sql.NullInt64   `json:"updated_by"`
 }
 
-func (q *Queries) UpsertStorageProfile(ctx context.Context, arg UpsertStorageProfileParams) error {
-	_, err := q.db.ExecContext(ctx, upsertStorageProfile,
+func (q *Queries) UpsertStorageProfile(ctx context.Context, arg UpsertStorageProfileParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, upsertStorageProfile,
 		arg.ProfileID,
 		arg.Name,
 		arg.Provider,
@@ -606,7 +618,10 @@ func (q *Queries) UpsertStorageProfile(ctx context.Context, arg UpsertStoragePro
 		arg.CreatedBy,
 		arg.UpdatedBy,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const upsertSystemConfig = `-- name: UpsertSystemConfig :exec

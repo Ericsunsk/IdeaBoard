@@ -57,6 +57,5 @@ func registerUserAssetRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 func registerUserUploadRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	userAPI.POST(RouteUserProfileAvatar, requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), uploadProfileAvatarHandler(h.Uploads))
 	userAPI.POST(RouteUserBoardUploads, requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), uploadBoardAssetHandler(h.Uploads))
-	userAPI.DELETE(RouteUserBoardUploads, deleteBoardUploadHandler(h.Uploads))
 	userAPI.GET(RouteUserDownload, downloadImageHandler())
 }

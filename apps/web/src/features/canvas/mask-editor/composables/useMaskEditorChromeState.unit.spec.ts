@@ -89,7 +89,11 @@ describe('useMaskEditorChromeState', () => {
     })
     const { state, uploadImageToBoard } = createHarness()
     const file = new File(['image'], 'reference.png', { type: 'image/png' })
-    uploadImageToBoard.mockResolvedValue({ url: 'https://example.com/ref.png', ratio: 1.25 })
+    uploadImageToBoard.mockResolvedValue({
+      url: 'https://example.com/ref.png',
+      ratio: 1.25,
+      mediaAssetId: 42,
+    })
 
     state.onMaskEditorReferenceImageOpen()
 

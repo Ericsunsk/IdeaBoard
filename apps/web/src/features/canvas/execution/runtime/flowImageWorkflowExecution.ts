@@ -16,7 +16,6 @@ import {
   buildPromptImageReadinessRequest,
 } from '../commands/flowImageTaskRequests'
 import {
-  cleanupFlowLocalInpaintMedia,
   prepareFlowLocalInpaintMedia,
   type PreparedFlowLocalInpaintMedia,
 } from '../media/flowLocalInpaint'
@@ -266,9 +265,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
           fallbackRatio: plan.source.ratio,
           loadImageSize: loadImageSizeFromUrl,
         })
-      },
-      cleanup: async () => {
-        await cleanupFlowLocalInpaintMedia(localInpaint, boardId)
       },
       persistPendingTaskIds: false,
       fallbackErrorMessage: '局部重绘失败',

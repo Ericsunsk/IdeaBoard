@@ -77,6 +77,7 @@ export type FusionNodeInputImage = PromptNodeInputImage
 export interface ImageNodeOutputItem {
   url: string
   ratio: number
+  mediaAssetId?: number
 }
 
 export interface BoardStateMediaRef {

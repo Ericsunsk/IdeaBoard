@@ -62,24 +62,16 @@ describe('useCanvasBoardSession', () => {
     vi.clearAllMocks()
   })
 
-  it('stabilizes, saves, refreshes preview, recycles removed uploads, and returns the stabilized snapshot', async () => {
+  it('stabilizes, saves, refreshes preview, and returns the stabilized snapshot', async () => {
     const events: string[] = []
     const warning = vi.fn()
     const snapshot = makeSnapshot(100)
-    const previousSnapshot = makeSnapshot(50)
     const stabilizedSnapshot = makeSnapshot(250)
     const lifecycle = {
-      readPreviousSnapshot: vi.fn(() => {
-        events.push('readPrevious')
-        return previousSnapshot
-      }),
       stabilizeSnapshotForSave: vi.fn(async (received: CanvasBoardSnapshot) => {
         events.push('stabilize')
         expect(received).toBe(snapshot)
         return stabilizedSnapshot
-      }),
-      recycleRemovedUploadsAfterSave: vi.fn(async () => {
-        events.push('recycle')
       }),
     }
     const createUploadLifecycle = vi.fn(() => lifecycle)
@@ -132,23 +124,16 @@ describe('useCanvasBoardSession', () => {
     expect(result.snapshot).toBe(stabilizedSnapshot)
     expect(result.remoteSync).toEqual({ ok: true })
     expect(createUploadLifecycle).toHaveBeenCalledWith({
-      userId: 1,
       userUid: 'user-uid',
       boardId: 'board-a',
       warning,
     })
-    expect(lifecycle.recycleRemovedUploadsAfterSave).toHaveBeenCalledWith(
-      previousSnapshot,
-      stabilizedSnapshot,
-    )
     expect(events).toEqual([
-      'readPrevious',
       'stabilize',
       'repository.save',
       'renderer.render',
       'repository.setPreview',
       'repository.sync',
-      'recycle',
     ])
   })
 
@@ -210,11 +195,9 @@ describe('useCanvasBoardSession', () => {
     const snapshot = makeSnapshot(100)
     const uploadError = new Error('upload auth expired')
     const lifecycle = {
-      readPreviousSnapshot: vi.fn(() => makeSnapshot(50)),
       stabilizeSnapshotForSave: vi.fn(async () => {
         throw uploadError
       }),
-      recycleRemovedUploadsAfterSave: vi.fn(async () => undefined),
     }
     const repository = createRepository()
     const session = useCanvasBoardSession({
@@ -233,15 +216,12 @@ describe('useCanvasBoardSession', () => {
 
     expect(repository.saveLocal).toHaveBeenCalledWith('board-a', snapshot)
     expect(repository.save).not.toHaveBeenCalled()
-    expect(lifecycle.recycleRemovedUploadsAfterSave).not.toHaveBeenCalled()
   })
 
   it('waits for preview renderer and repository sync when waitForPreview is enabled', async () => {
     const syncGate = createDeferred<void>()
     const lifecycle = {
-      readPreviousSnapshot: vi.fn(() => makeSnapshot(50)),
       stabilizeSnapshotForSave: vi.fn(async () => makeSnapshot(250)),
-      recycleRemovedUploadsAfterSave: vi.fn(async () => undefined),
     }
     const createUploadLifecycle = vi.fn(() => lifecycle)
     const repository = createRepository({
@@ -268,25 +248,21 @@ describe('useCanvasBoardSession', () => {
 
     expect(previewRenderer.render).toHaveBeenCalledOnce()
     expect(repository.sync).toHaveBeenCalledOnce()
-    expect(lifecycle.recycleRemovedUploadsAfterSave).not.toHaveBeenCalled()
     expect(isResolved).toBe(false)
 
     syncGate.resolve()
     await savePromise
 
-    expect(lifecycle.recycleRemovedUploadsAfterSave).toHaveBeenCalledOnce()
     expect(isResolved).toBe(true)
   })
 
-  it('returns a recoverable remote sync failure without recycling removed uploads', async () => {
+  it('returns a recoverable remote sync failure without refreshing the preview', async () => {
     const snapshot = makeSnapshot(100)
     const stabilizedSnapshot = makeSnapshot(250)
     const savedState = makeState(stabilizedSnapshot)
     const remoteError = new Error('network down')
     const lifecycle = {
-      readPreviousSnapshot: vi.fn(() => makeSnapshot(50)),
       stabilizeSnapshotForSave: vi.fn(async () => stabilizedSnapshot),
-      recycleRemovedUploadsAfterSave: vi.fn(async () => undefined),
     }
     const repository = createRepository({
       save: vi.fn(async () => {
@@ -315,7 +291,6 @@ describe('useCanvasBoardSession', () => {
     })
     expect(previewRenderer.render).not.toHaveBeenCalled()
     expect(repository.sync).not.toHaveBeenCalled()
-    expect(lifecycle.recycleRemovedUploadsAfterSave).not.toHaveBeenCalled()
   })
 
   it('normalizes board ids for load and exists', async () => {

@@ -47,6 +47,7 @@ const canvasGroupNodeIdSchema = v.pipe(
 const imageNodeOutputItemSchema = v.strictObject({
   url: nonEmptyStringSchema,
   ratio: positiveFiniteNumberSchema,
+  mediaAssetId: v.optional(positiveIntegerSchema),
 })
 
 const boardStateMediaRefSchema = v.strictObject({
@@ -59,6 +60,7 @@ const boardStateMediaRefSchema = v.strictObject({
 const promptNodeInputImageSchema = v.strictObject({
   url: nonEmptyStringSchema,
   ratio: positiveFiniteNumberSchema,
+  mediaAssetId: v.optional(positiveIntegerSchema),
   id: nonEmptyStringSchema,
   sourceType: v.picklist(['node', 'external']),
   sourceId: nonEmptyStringSchema,

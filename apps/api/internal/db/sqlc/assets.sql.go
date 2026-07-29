@@ -7,8 +7,125 @@ package dbsqlc
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+
+	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
+
+const cancelMediaAssetReclamation = `-- name: CancelMediaAssetReclamation :many
+UPDATE media_assets
+SET reclaim_after = NULL,
+    reclaim_started_at = NULL,
+    reclaim_claim_token = NULL
+WHERE id = ANY($1::bigint[])
+  AND deleted_at IS NULL
+  AND (
+    reclaim_started_at IS NULL
+    OR reclaim_started_at <= $2
+  )
+RETURNING id
+`
+
+type CancelMediaAssetReclamationParams struct {
+	MediaAssetIds    []int64      `json:"media_asset_ids"`
+	StaleClaimBefore sql.NullTime `json:"stale_claim_before"`
+}
+
+func (q *Queries) CancelMediaAssetReclamation(ctx context.Context, arg CancelMediaAssetReclamationParams) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, cancelMediaAssetReclamation, pq.Array(arg.MediaAssetIds), arg.StaleClaimBefore)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const claimDueMediaAssetReclamation = `-- name: ClaimDueMediaAssetReclamation :one
+UPDATE media_assets AS asset
+SET reclaim_started_at = $1,
+    reclaim_claim_token = $2
+WHERE asset.id = $3
+  AND asset.reclaim_generation = $4
+  AND asset.deleted_at IS NULL
+  AND asset.reclaim_after <= $5
+  AND (
+    asset.reclaim_started_at IS NULL
+    OR asset.reclaim_started_at <= $6
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM media_refs AS ref
+    WHERE ref.media_asset_id = asset.id
+      AND ref.ref_type IN ('board', 'board_node')
+  )
+RETURNING asset.id, asset.asset_id, asset.owner_user_id, asset.storage_profile_id, asset.storage_key,
+  asset.url, asset.source_url, asset.media_kind, asset.mime_type,
+  asset.width, asset.height, asset.size_bytes, asset.checksum_sha256,
+  asset.status, asset.metadata, asset.created_at, asset.updated_at, asset.deleted_at,
+  asset.reclaim_after, asset.reclaim_started_at, asset.reclaim_claim_token, asset.reclaim_generation
+`
+
+type ClaimDueMediaAssetReclamationParams struct {
+	ClaimedAt         sql.NullTime  `json:"claimed_at"`
+	ClaimToken        uuid.NullUUID `json:"claim_token"`
+	ID                int64         `json:"id"`
+	ReclaimGeneration int64         `json:"reclaim_generation"`
+	NowAt             sql.NullTime  `json:"now_at"`
+	StaleClaimBefore  sql.NullTime  `json:"stale_claim_before"`
+}
+
+func (q *Queries) ClaimDueMediaAssetReclamation(ctx context.Context, arg ClaimDueMediaAssetReclamationParams) (MediaAsset, error) {
+	row := q.db.QueryRowContext(ctx, claimDueMediaAssetReclamation,
+		arg.ClaimedAt,
+		arg.ClaimToken,
+		arg.ID,
+		arg.ReclaimGeneration,
+		arg.NowAt,
+		arg.StaleClaimBefore,
+	)
+	var i MediaAsset
+	err := row.Scan(
+		&i.ID,
+		&i.AssetID,
+		&i.OwnerUserID,
+		&i.StorageProfileID,
+		&i.StorageKey,
+		&i.Url,
+		&i.SourceUrl,
+		&i.MediaKind,
+		&i.MimeType,
+		&i.Width,
+		&i.Height,
+		&i.SizeBytes,
+		&i.ChecksumSha256,
+		&i.Status,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.ReclaimAfter,
+		&i.ReclaimStartedAt,
+		&i.ReclaimClaimToken,
+		&i.ReclaimGeneration,
+	)
+	return i, err
+}
 
 const countMediaRefsByAssetID = `-- name: CountMediaRefsByAssetID :one
 SELECT COUNT(*)
@@ -21,6 +138,53 @@ func (q *Queries) CountMediaRefsByAssetID(ctx context.Context, mediaAssetID int6
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const createBoardUploadMediaAsset = `-- name: CreateBoardUploadMediaAsset :one
+INSERT INTO media_assets (
+  asset_id, owner_user_id, storage_profile_id, storage_key,
+  url, media_kind, mime_type, width, height, size_bytes,
+  status, metadata, reclaim_after, reclaim_generation
+)
+VALUES (
+  $1, $2, $3, $4,
+  $5, 'image', $6, $7, $8, $9,
+  'ready', $10, $11, 1
+)
+RETURNING id
+`
+
+type CreateBoardUploadMediaAssetParams struct {
+	AssetID          string          `json:"asset_id"`
+	OwnerUserID      int64           `json:"owner_user_id"`
+	StorageProfileID string          `json:"storage_profile_id"`
+	StorageKey       string          `json:"storage_key"`
+	Url              string          `json:"url"`
+	MimeType         string          `json:"mime_type"`
+	Width            int32           `json:"width"`
+	Height           int32           `json:"height"`
+	SizeBytes        int64           `json:"size_bytes"`
+	Metadata         json.RawMessage `json:"metadata"`
+	ReclaimAfter     sql.NullTime    `json:"reclaim_after"`
+}
+
+func (q *Queries) CreateBoardUploadMediaAsset(ctx context.Context, arg CreateBoardUploadMediaAssetParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, createBoardUploadMediaAsset,
+		arg.AssetID,
+		arg.OwnerUserID,
+		arg.StorageProfileID,
+		arg.StorageKey,
+		arg.Url,
+		arg.MimeType,
+		arg.Width,
+		arg.Height,
+		arg.SizeBytes,
+		arg.Metadata,
+		arg.ReclaimAfter,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
 }
 
 const createLineDraftMode = `-- name: CreateLineDraftMode :one
@@ -115,7 +279,8 @@ SELECT
   id, asset_id, owner_user_id, storage_profile_id, storage_key,
   url, source_url, media_kind, mime_type,
   width, height, size_bytes, checksum_sha256,
-  status, metadata, created_at, updated_at, deleted_at
+  status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
+  reclaim_claim_token, reclaim_generation
 FROM media_assets
 WHERE id = $1
 `
@@ -142,8 +307,65 @@ func (q *Queries) GetMediaAssetByID(ctx context.Context, id int64) (MediaAsset, 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.ReclaimAfter,
+		&i.ReclaimStartedAt,
+		&i.ReclaimClaimToken,
+		&i.ReclaimGeneration,
 	)
 	return i, err
+}
+
+const listDueMediaAssetReclamationIDs = `-- name: ListDueMediaAssetReclamationIDs :many
+SELECT asset.id, asset.reclaim_generation
+FROM media_assets AS asset
+WHERE asset.deleted_at IS NULL
+  AND asset.reclaim_after <= $1
+  AND (
+    asset.reclaim_started_at IS NULL
+    OR asset.reclaim_started_at <= $2
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM media_refs AS ref
+    WHERE ref.media_asset_id = asset.id
+      AND ref.ref_type IN ('board', 'board_node')
+  )
+ORDER BY asset.reclaim_after ASC, asset.id ASC
+LIMIT $3
+`
+
+type ListDueMediaAssetReclamationIDsParams struct {
+	NowAt            sql.NullTime `json:"now_at"`
+	StaleClaimBefore sql.NullTime `json:"stale_claim_before"`
+	RowLimit         int32        `json:"row_limit"`
+}
+
+type ListDueMediaAssetReclamationIDsRow struct {
+	ID                int64 `json:"id"`
+	ReclaimGeneration int64 `json:"reclaim_generation"`
+}
+
+func (q *Queries) ListDueMediaAssetReclamationIDs(ctx context.Context, arg ListDueMediaAssetReclamationIDsParams) ([]ListDueMediaAssetReclamationIDsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listDueMediaAssetReclamationIDs, arg.NowAt, arg.StaleClaimBefore, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDueMediaAssetReclamationIDsRow
+	for rows.Next() {
+		var i ListDueMediaAssetReclamationIDsRow
+		if err := rows.Scan(&i.ID, &i.ReclaimGeneration); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listEnabledLineDraftModes = `-- name: ListEnabledLineDraftModes :many
@@ -272,6 +494,97 @@ func (q *Queries) ListMediaRefsByBoardID(ctx context.Context, arg ListMediaRefsB
 	return items, nil
 }
 
+const markMediaAssetReclaimed = `-- name: MarkMediaAssetReclaimed :execrows
+UPDATE media_assets
+SET status = 'deleted',
+    url = '',
+    reclaim_after = NULL,
+    reclaim_started_at = NULL,
+    reclaim_claim_token = NULL,
+    deleted_at = $1
+WHERE media_assets.id = $2
+  AND media_assets.reclaim_generation = $3
+  AND media_assets.deleted_at IS NULL
+  AND media_assets.reclaim_started_at IS NOT NULL
+  AND media_assets.reclaim_claim_token = $4
+  AND NOT EXISTS (
+    SELECT 1
+    FROM media_refs AS ref
+    WHERE ref.media_asset_id = media_assets.id
+      AND ref.ref_type IN ('board', 'board_node')
+  )
+`
+
+type MarkMediaAssetReclaimedParams struct {
+	DeletedAt         sql.NullTime  `json:"deleted_at"`
+	ID                int64         `json:"id"`
+	ReclaimGeneration int64         `json:"reclaim_generation"`
+	ClaimToken        uuid.NullUUID `json:"claim_token"`
+}
+
+func (q *Queries) MarkMediaAssetReclaimed(ctx context.Context, arg MarkMediaAssetReclaimedParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markMediaAssetReclaimed,
+		arg.DeletedAt,
+		arg.ID,
+		arg.ReclaimGeneration,
+		arg.ClaimToken,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const releaseMediaAssetReclamationClaim = `-- name: ReleaseMediaAssetReclamationClaim :exec
+UPDATE media_assets
+SET reclaim_started_at = NULL,
+    reclaim_claim_token = NULL
+WHERE id = $1
+  AND reclaim_generation = $2
+  AND deleted_at IS NULL
+  AND reclaim_claim_token = $3
+`
+
+type ReleaseMediaAssetReclamationClaimParams struct {
+	ID                int64         `json:"id"`
+	ReclaimGeneration int64         `json:"reclaim_generation"`
+	ClaimToken        uuid.NullUUID `json:"claim_token"`
+}
+
+func (q *Queries) ReleaseMediaAssetReclamationClaim(ctx context.Context, arg ReleaseMediaAssetReclamationClaimParams) error {
+	_, err := q.db.ExecContext(ctx, releaseMediaAssetReclamationClaim, arg.ID, arg.ReclaimGeneration, arg.ClaimToken)
+	return err
+}
+
+const scheduleUnreferencedMediaAssetsForReclamation = `-- name: ScheduleUnreferencedMediaAssetsForReclamation :exec
+UPDATE media_assets AS asset
+SET reclaim_after = COALESCE(asset.reclaim_after, $1),
+    reclaim_started_at = NULL,
+    reclaim_claim_token = NULL,
+    reclaim_generation = CASE
+      WHEN asset.reclaim_after IS NULL THEN asset.reclaim_generation + 1
+      ELSE asset.reclaim_generation
+    END
+WHERE asset.id = ANY($2::bigint[])
+  AND asset.deleted_at IS NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM media_refs AS ref
+    WHERE ref.media_asset_id = asset.id
+      AND ref.ref_type IN ('board', 'board_node')
+  )
+`
+
+type ScheduleUnreferencedMediaAssetsForReclamationParams struct {
+	ReclaimAfter  sql.NullTime `json:"reclaim_after"`
+	MediaAssetIds []int64      `json:"media_asset_ids"`
+}
+
+func (q *Queries) ScheduleUnreferencedMediaAssetsForReclamation(ctx context.Context, arg ScheduleUnreferencedMediaAssetsForReclamationParams) error {
+	_, err := q.db.ExecContext(ctx, scheduleUnreferencedMediaAssetsForReclamation, arg.ReclaimAfter, pq.Array(arg.MediaAssetIds))
+	return err
+}
+
 const updateLineDraftMode = `-- name: UpdateLineDraftMode :exec
 UPDATE line_draft_modes
 SET name = $1,
@@ -327,7 +640,10 @@ SET url = EXCLUDED.url,
     checksum_sha256 = EXCLUDED.checksum_sha256,
     status = EXCLUDED.status,
     metadata = EXCLUDED.metadata,
-    deleted_at = NULL
+    deleted_at = NULL,
+    reclaim_after = NULL,
+    reclaim_started_at = NULL,
+    reclaim_claim_token = NULL
 WHERE media_assets.owner_user_id = EXCLUDED.owner_user_id
 RETURNING id
 `
@@ -380,7 +696,7 @@ VALUES (
   $1, $2, $3, $4,
   $5, $6, $7, $8
 )
-ON CONFLICT (media_asset_id, ref_type, ref_id, role) DO UPDATE
+ON CONFLICT (media_asset_id, ref_type, ref_id, board_id, role) DO UPDATE
 SET board_id = EXCLUDED.board_id,
     task_id = EXCLUDED.task_id,
     metadata = EXCLUDED.metadata

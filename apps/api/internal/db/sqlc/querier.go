@@ -13,8 +13,10 @@ import (
 type Querier interface {
 	ArchiveAccount(ctx context.Context, id int64) (int64, error)
 	BackfillDailyStatsByCreatedRange(ctx context.Context, arg BackfillDailyStatsByCreatedRangeParams) (BackfillDailyStatsByCreatedRangeRow, error)
+	CancelMediaAssetReclamation(ctx context.Context, arg CancelMediaAssetReclamationParams) ([]int64, error)
 	CancelRunningTaskAttemptsByTaskIDs(ctx context.Context, arg CancelRunningTaskAttemptsByTaskIDsParams) (int64, error)
 	CancelRunningTasksForStartupRecovery(ctx context.Context, arg CancelRunningTasksForStartupRecoveryParams) ([]CancelRunningTasksForStartupRecoveryRow, error)
+	ClaimDueMediaAssetReclamation(ctx context.Context, arg ClaimDueMediaAssetReclamationParams) (MediaAsset, error)
 	ClearCurrentStorageProfiles(ctx context.Context) error
 	CompleteTaskWithLease(ctx context.Context, arg CompleteTaskWithLeaseParams) (int64, error)
 	ConsumeBoardShareToken(ctx context.Context, tokenHash string) (BoardShareToken, error)
@@ -31,6 +33,7 @@ type Querier interface {
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (int64, error)
 	CreateAccountSecret(ctx context.Context, arg CreateAccountSecretParams) (int64, error)
 	CreateBoardShareToken(ctx context.Context, arg CreateBoardShareTokenParams) (int64, error)
+	CreateBoardUploadMediaAsset(ctx context.Context, arg CreateBoardUploadMediaAssetParams) (int64, error)
 	CreateLineDraftMode(ctx context.Context, arg CreateLineDraftModeParams) (int64, error)
 	CreateProviderEndpoint(ctx context.Context, arg CreateProviderEndpointParams) (int64, error)
 	CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error)
@@ -97,6 +100,7 @@ type Querier interface {
 	ListBoardMembers(ctx context.Context, boardID string) ([]ListBoardMembersRow, error)
 	ListBoardShareTokens(ctx context.Context, boardID string) ([]BoardShareToken, error)
 	ListDailyStatsByDateRange(ctx context.Context, arg ListDailyStatsByDateRangeParams) ([]ListDailyStatsByDateRangeRow, error)
+	ListDueMediaAssetReclamationIDs(ctx context.Context, arg ListDueMediaAssetReclamationIDsParams) ([]ListDueMediaAssetReclamationIDsRow, error)
 	ListEnabledAccounts(ctx context.Context) ([]ListEnabledAccountsRow, error)
 	ListEnabledLineDraftModes(ctx context.Context) ([]LineDraftMode, error)
 	ListFeaturePrompts(ctx context.Context) ([]FeaturePrompt, error)
@@ -124,6 +128,7 @@ type Querier interface {
 	ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUIDsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	LockStorageProfileSecretVersionRotation(ctx context.Context, arg LockStorageProfileSecretVersionRotationParams) (bool, error)
+	MarkMediaAssetReclaimed(ctx context.Context, arg MarkMediaAssetReclaimedParams) (int64, error)
 	MarkStorageProfileDeleted(ctx context.Context, profileID string) (int64, error)
 	MarkTaskCancelled(ctx context.Context, arg MarkTaskCancelledParams) (int64, error)
 	MarkTaskFailed(ctx context.Context, arg MarkTaskFailedParams) (int64, error)
@@ -133,6 +138,7 @@ type Querier interface {
 	RebuildTaskDailyStatsByEventDateRange(ctx context.Context, arg RebuildTaskDailyStatsByEventDateRangeParams) (RebuildTaskDailyStatsByEventDateRangeRow, error)
 	ReleaseActiveTaskLeaseByTaskID(ctx context.Context, arg ReleaseActiveTaskLeaseByTaskIDParams) (int64, error)
 	ReleaseActiveTaskLeasesByTaskIDs(ctx context.Context, arg ReleaseActiveTaskLeasesByTaskIDsParams) (int64, error)
+	ReleaseMediaAssetReclamationClaim(ctx context.Context, arg ReleaseMediaAssetReclamationClaimParams) error
 	ReleaseTaskLease(ctx context.Context, arg ReleaseTaskLeaseParams) (int64, error)
 	RequeueTaskRunningWithLease(ctx context.Context, arg RequeueTaskRunningWithLeaseParams) (int64, error)
 	ResetAccountFailCount(ctx context.Context, id int64) (int64, error)
@@ -142,6 +148,7 @@ type Querier interface {
 	RetireActiveStorageProfileSecretVersion(ctx context.Context, arg RetireActiveStorageProfileSecretVersionParams) (int64, error)
 	RevokeAccountSecretsForArchive(ctx context.Context, accountID int64) error
 	RevokeBoardShareTokenByID(ctx context.Context, arg RevokeBoardShareTokenByIDParams) (int64, error)
+	ScheduleUnreferencedMediaAssetsForReclamation(ctx context.Context, arg ScheduleUnreferencedMediaAssetsForReclamationParams) error
 	SetCurrentStorageProfile(ctx context.Context, arg SetCurrentStorageProfileParams) (int64, error)
 	SummarizeTasks(ctx context.Context, arg SummarizeTasksParams) (SummarizeTasksRow, error)
 	SummarizeUsers(ctx context.Context, arg SummarizeUsersParams) (SummarizeUsersRow, error)
@@ -161,7 +168,7 @@ type Querier interface {
 	UpsertFeaturePrompt(ctx context.Context, arg UpsertFeaturePromptParams) (FeaturePrompt, error)
 	UpsertMediaAsset(ctx context.Context, arg UpsertMediaAssetParams) (int64, error)
 	UpsertMediaRef(ctx context.Context, arg UpsertMediaRefParams) (int64, error)
-	UpsertStorageProfile(ctx context.Context, arg UpsertStorageProfileParams) error
+	UpsertStorageProfile(ctx context.Context, arg UpsertStorageProfileParams) (int64, error)
 	UpsertSystemConfig(ctx context.Context, arg UpsertSystemConfigParams) error
 	UpsertTaskDailyStatDelta(ctx context.Context, arg UpsertTaskDailyStatDeltaParams) error
 	UpsertTaskStatEventCorrection(ctx context.Context, arg UpsertTaskStatEventCorrectionParams) (int64, error)

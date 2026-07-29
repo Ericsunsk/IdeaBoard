@@ -1,10 +1,8 @@
-import {
-  collectCanvasBoardImageUrls,
-  getCanvasBoardState,
-  isImageUrlReferencedInOtherCanvasBoardStates,
-} from '../../canvas-board/persistence'
 import { uploadApi } from '../../../shared/api/upload'
-import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
+import {
+  rebuildCanvasBoardMediaRefs,
+  type CanvasBoardSnapshot,
+} from '../../canvas-board/domain'
 import { filenameFromImageUrl, isDataUrl, resolveFetchUrl } from '../services/flowMediaIO'
 import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
 import { measureCanvasPerfAsync } from '../utils/canvasPerfProbe'
@@ -13,10 +11,10 @@ interface StableRef {
   path: string
   get: () => string
   set: (url: string) => void
+  setMediaAssetId?: (mediaAssetId: number) => void
 }
 
 interface BoardSessionUploadLifecycleOptions {
-  userId: number
   userUid: string
   boardId: string
   warning: (message: string) => void
@@ -65,7 +63,7 @@ function isBoardCanvasUploadPath(path: string, userUid: string, boardId: string)
 function appendOutputImageRefs(
   refs: StableRef[],
   prefix: string,
-  nodes: Array<{ outputImages: Array<{ url: string }> }>,
+  nodes: Array<{ outputImages: Array<{ url: string; mediaAssetId?: number }> }>,
 ) {
   nodes.forEach((node, nodeIndex) => {
     node.outputImages.forEach((output, outputIndex) => {
@@ -74,6 +72,9 @@ function appendOutputImageRefs(
         get: () => output.url,
         set: (url) => {
           output.url = url
+        },
+        setMediaAssetId: (mediaAssetId) => {
+          output.mediaAssetId = mediaAssetId
         },
       })
     })
@@ -89,6 +90,9 @@ function collectStableRefs(snapshot: CanvasBoardSnapshot): StableRef[] {
       set: (url) => {
         node.sourceImageUrl = url
       },
+      setMediaAssetId: (mediaAssetId) => {
+        node.sourceMediaAssetId = mediaAssetId
+      },
     })
   })
   appendOutputImageRefs(refs, 'imageNodes', snapshot.imageNodes)
@@ -97,8 +101,7 @@ function collectStableRefs(snapshot: CanvasBoardSnapshot): StableRef[] {
 }
 
 export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLifecycleOptions) {
-  const { userId, userUid, boardId, warning } = options
-  const currentUserId = Number(userId)
+  const { userUid, boardId, warning } = options
   const normalizedBoardId = boardId.trim()
   const normalizedUserUid = userUid.trim()
 
@@ -110,7 +113,7 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
     return isBoardCanvasUploadPath(path, normalizedUserUid, normalizedBoardId)
   }
 
-  async function fetchAndUploadStable(raw: string): Promise<string> {
+  async function fetchAndUploadStable(raw: string): Promise<{ url: string; mediaAssetId: number }> {
     const blob = await fetchImageBlob(raw)
     if (!blob.size) {
       throw new Error('下载图片失败：响应为空')
@@ -122,10 +125,14 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
     prepared.warnings.forEach((message) => warning(message))
     const uploaded = await uploadApi.upload(prepared.uploadFile, normalizedBoardId)
     const stableUrl = uploaded.url.trim()
+    const mediaAssetId = Number(uploaded.media_asset_id)
     if (!stableUrl || !isStableCanvasUrl(stableUrl)) {
       throw new Error('上传图片失败：返回链接不是当前 board canvas uploads')
     }
-    return stableUrl
+    if (!Number.isInteger(mediaAssetId) || mediaAssetId <= 0) {
+      throw new Error('上传图片失败：缺少媒体资产标识')
+    }
+    return { url: stableUrl, mediaAssetId }
   }
 
   async function fetchImageBlob(raw: string): Promise<Blob> {
@@ -170,7 +177,7 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
       }),
       async () => {
         const refs = collectStableRefs(snapshot)
-        const tasks = new Map<string, Promise<string>>()
+        const tasks = new Map<string, Promise<{ url: string; mediaAssetId: number }>>()
         for (const ref of refs) {
           const current = ref.get()
           const normalized = current.trim()
@@ -185,7 +192,9 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
             tasks.set(taskKey, task)
           }
           try {
-            ref.set(await task)
+            const uploaded = await task
+            ref.set(uploaded.url)
+            ref.setMediaAssetId?.(uploaded.mediaAssetId)
           } catch (error) {
             const reason = error instanceof Error ? error.message : '未知错误'
             throw new Error(`保存失败：${ref.path} 使用了不稳定图片链接，${reason}`, {
@@ -193,53 +202,14 @@ export function createBoardSessionUploadLifecycle(options: BoardSessionUploadLif
             })
           }
         }
+        rebuildCanvasBoardMediaRefs(snapshot)
         return snapshot
       },
       50,
     )
   }
 
-  function resolveRecyclableUrl(url: string): string | null {
-    const normalized = url.trim()
-    if (!normalized) return null
-    if (!Number.isFinite(currentUserId) || currentUserId <= 0) return null
-    const path = parsePathname(normalized)
-    if (!path) return null
-    if (!isBoardCanvasUploadPath(path, normalizedUserUid, normalizedBoardId)) return null
-    return normalized
-  }
-
-  async function recycleRemovedUploadsAfterSave(
-    previousSnapshot: CanvasBoardSnapshot | null | undefined,
-    nextSnapshot: CanvasBoardSnapshot,
-  ): Promise<void> {
-    const previousUrls = collectCanvasBoardImageUrls(previousSnapshot)
-    const nextUrls = collectCanvasBoardImageUrls(nextSnapshot)
-    const recycleTargets: string[] = []
-    previousUrls.forEach((url) => {
-      if (nextUrls.has(url)) return
-      const recyclable = resolveRecyclableUrl(url)
-      if (!recyclable) return
-      if (isImageUrlReferencedInOtherCanvasBoardStates(recyclable, normalizedBoardId)) return
-      recycleTargets.push(recyclable)
-    })
-    if (!recycleTargets.length) return
-    const results = await Promise.allSettled(
-      recycleTargets.map((url) => uploadApi.recycle(url, normalizedBoardId)),
-    )
-    const failed = results.filter((item) => item.status === 'rejected').length
-    if (failed > 0) {
-      warning(`有 ${failed} 张图片回收失败，已保留文件`)
-    }
-  }
-
-  function readPreviousSnapshot(): CanvasBoardSnapshot | null {
-    return getCanvasBoardState(normalizedBoardId)
-  }
-
   return {
     stabilizeSnapshotForSave,
-    recycleRemovedUploadsAfterSave,
-    readPreviousSnapshot,
   }
 }

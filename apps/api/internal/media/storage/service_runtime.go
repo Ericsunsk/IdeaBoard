@@ -75,11 +75,19 @@ func (s *StorageService) Upload(ctx context.Context, file *multipart.FileHeader)
 }
 
 func (s *StorageService) UploadWithOptions(ctx context.Context, file *multipart.FileHeader, opts StorageStoreOptions) (string, error) {
-	profile, err := s.resolveActiveProfile(ctx)
+	ref, err := s.UploadRefWithOptions(ctx, file, opts)
 	if err != nil {
 		return "", err
 	}
-	return s.uploadWithProfile(ctx, *profile, file, opts)
+	return ref.URL, nil
+}
+
+func (s *StorageService) UploadRefWithOptions(ctx context.Context, file *multipart.FileHeader, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	profile, err := s.resolveActiveProfile(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.uploadRefWithProfile(ctx, *profile, file, opts)
 }
 
 func (s *StorageService) StoreRemote(ctx context.Context, remoteURL string, opts StorageStoreOptions) (string, error) {
@@ -139,20 +147,6 @@ func (s *StorageService) ReadUploadResourceByURL(ctx context.Context, rawURL str
 	return adapter.Read(ctx, profile, key, maxBytes)
 }
 
-func (s *StorageService) DeleteCanvasUploadByURL(ctx context.Context, storageUID string, boardID string, rawURL string) error {
-	expectedPrefix, err := CanvasBoardUploadObjectPrefix(storageUID, boardID)
-	if err != nil {
-		return err
-	}
-
-	return s.deleteUserUploadByURL(ctx, rawURL, func(resource UploadResource) error {
-		if resource.Kind != UploadResourceKindCanvas || resource.Canvas == nil || !strings.HasPrefix(resource.ObjectKey, expectedPrefix) {
-			return fmt.Errorf("仅允许删除当前画布上传文件")
-		}
-		return nil
-	})
-}
-
 func (s *StorageService) DeleteProfileAvatarByURL(ctx context.Context, storageUID string, rawURL string) error {
 	expectedPrefix, err := ProfileAvatarUploadObjectPrefix(storageUID)
 	if err != nil {
@@ -209,6 +203,21 @@ func (s *StorageService) DeleteUserUploads(ctx context.Context, userID int64, st
 
 func (s *StorageService) DeleteObjectByKey(ctx context.Context, objectKey string) error {
 	profile, err := s.resolveActiveProfile(ctx)
+	if err != nil {
+		return err
+	}
+	adapter, err := s.adapterRegistry.get(profile.Provider)
+	if err != nil {
+		return err
+	}
+	return adapter.Delete(ctx, profile, objectKey)
+}
+
+// DeleteObjectByStorageProfile removes an object from the profile recorded with
+// the asset. Reclamation must not follow the current profile because operators
+// can switch storage after an asset is created.
+func (s *StorageService) DeleteObjectByStorageProfile(ctx context.Context, storageProfileID string, objectKey string) error {
+	profile, err := s.loadProfileForReclamation(ctx, strings.TrimSpace(storageProfileID))
 	if err != nil {
 		return err
 	}
@@ -326,12 +335,12 @@ func (s *StorageService) isProfileReady(profile StorageProfile) bool {
 	return adapter.IsProfileReady(profile)
 }
 
-func (s *StorageService) uploadWithProfile(ctx context.Context, profile StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (string, error) {
+func (s *StorageService) uploadRefWithProfile(ctx context.Context, profile StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (*StoredUploadRef, error) {
 	adapter, err := s.adapterRegistry.get(profile.Provider)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return adapter.Upload(ctx, &profile, file, opts)
+	return adapter.UploadRef(ctx, &profile, file, opts)
 }
 
 func (s *StorageService) storeRemoteWithProfile(ctx context.Context, profile StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error) {
@@ -365,14 +374,14 @@ func (s *StorageService) storeRemoteRefWithProfile(ctx context.Context, profile 
 	return adapter.StoreRemoteRef(ctx, &profile, remoteURL, opts)
 }
 
-func (s *StorageService) saveUploadedFileLocal(ctx context.Context, file *multipart.FileHeader, opts StorageStoreOptions) (string, error) {
+func (s *StorageService) saveUploadedFileLocalRef(ctx context.Context, file *multipart.FileHeader, opts StorageStoreOptions) (*StoredUploadRef, error) {
 	src, err := file.Open()
 	if err != nil {
-		return "", fmt.Errorf("打开文件失败: %w", err)
+		return nil, fmt.Errorf("打开文件失败: %w", err)
 	}
 	defer src.Close()
 
-	return s.saveReaderLocal(ctx, file.Filename, src, file.Size, opts)
+	return s.saveReaderLocalRef(ctx, file.Filename, file.Header.Get("Content-Type"), src, file.Size, opts)
 }
 
 func (s *StorageService) saveBytesLocal(ctx context.Context, filename string, data []byte, opts StorageStoreOptions) (string, error) {

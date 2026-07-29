@@ -18,10 +18,8 @@ import { computed, toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
-  ApiResponseDeleted,
   ApiResponseUploadAvatar,
   ApiResponseUploadImage,
-  DeleteUploadRequest,
   DownloadUserImageParams,
   UploadUserBoardAssetBody,
   UploadUserProfileAvatarBody,
@@ -193,91 +191,6 @@ export function useUploadUserBoardAsset<
     uploadUserBoardAssetBody,
     options,
   )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
-}
-
-export const getDeleteUserBoardUploadUrl = (boardId: string) => {
-  return `/user/boards/${encodeURIComponent(String(boardId))}/uploads`
-}
-
-export const deleteUserBoardUpload = async (
-  boardId: string,
-  deleteUploadRequest: DeleteUploadRequest,
-  options?: RequestInit,
-): Promise<ApiResponseDeleted> => {
-  return orvalMutator<ApiResponseDeleted>(getDeleteUserBoardUploadUrl(boardId), {
-    ...options,
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(deleteUploadRequest),
-  })
-}
-
-export const getDeleteUserBoardUploadQueryKey = (
-  boardId: MaybeRefOrGetter<string>,
-  deleteUploadRequest?: MaybeRefOrGetter<DeleteUploadRequest>,
-) => {
-  return ['DELETE', 'user', 'boards', boardId, 'uploads', deleteUploadRequest] as const
-}
-
-export const getDeleteUserBoardUploadQueryOptions = <
-  TData = Awaited<ReturnType<typeof deleteUserBoardUpload>>,
-  TError = ErrorType<unknown>,
->(
-  boardId: MaybeRefOrGetter<string>,
-  deleteUploadRequest: MaybeRefOrGetter<DeleteUploadRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof deleteUserBoardUpload>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getDeleteUserBoardUploadQueryKey(boardId, deleteUploadRequest)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof deleteUserBoardUpload>>> = ({ signal }) =>
-    deleteUserBoardUpload(toValue(boardId), toValue(deleteUploadRequest), {
-      signal,
-      ...requestOptions,
-    })
-
-  return {
-    queryKey,
-    queryFn,
-    enabled: computed(() => toValue(boardId) !== null && toValue(boardId) !== undefined),
-    ...queryOptions,
-  } as UseQueryOptions<Awaited<ReturnType<typeof deleteUserBoardUpload>>, TError, TData>
-}
-
-export type DeleteUserBoardUploadQueryResult = NonNullable<
-  Awaited<ReturnType<typeof deleteUserBoardUpload>>
->
-export type DeleteUserBoardUploadQueryError = ErrorType<unknown>
-
-export function useDeleteUserBoardUpload<
-  TData = Awaited<ReturnType<typeof deleteUserBoardUpload>>,
-  TError = ErrorType<unknown>,
->(
-  boardId: MaybeRefOrGetter<string>,
-  deleteUploadRequest: MaybeRefOrGetter<DeleteUploadRequest>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof deleteUserBoardUpload>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-  queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getDeleteUserBoardUploadQueryOptions(boardId, deleteUploadRequest, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

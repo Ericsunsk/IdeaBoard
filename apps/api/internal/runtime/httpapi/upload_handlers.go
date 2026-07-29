@@ -11,6 +11,7 @@ import (
 
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/response"
@@ -35,16 +36,13 @@ type uploadConcurrencyLimiter struct {
 }
 
 type uploadImageResponse struct {
-	URL    string `json:"url,omitempty"`
-	Avatar string `json:"avatar,omitempty"`
-	Width  int    `json:"width,omitempty"`
-	Height int    `json:"height,omitempty"`
-	Mime   string `json:"mime,omitempty"`
-	Ext    string `json:"ext,omitempty"`
-}
-
-type deleteUploadResponse struct {
-	Deleted bool `json:"deleted"`
+	URL          string `json:"url,omitempty"`
+	Avatar       string `json:"avatar,omitempty"`
+	MediaAssetID int64  `json:"media_asset_id,omitempty"`
+	Width        int    `json:"width,omitempty"`
+	Height       int    `json:"height,omitempty"`
+	Mime         string `json:"mime,omitempty"`
+	Ext          string `json:"ext,omitempty"`
 }
 
 type uploadImageMetadata struct {
@@ -52,6 +50,14 @@ type uploadImageMetadata struct {
 	Height int
 	Mime   string
 	Ext    string
+}
+
+type boardUploadAssetRegistrar interface {
+	RegisterBoardUpload(context.Context, assets.BoardUploadAsset) (int64, error)
+}
+
+type boardUploadObjectCleaner interface {
+	DeleteObjectByStorageProfile(context.Context, string, string) error
 }
 
 func acquireUploadSlot(ctx context.Context, provider settings.MediaUploadSettingProvider) (func(), bool) {
@@ -169,8 +175,8 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 			return
 		}
 		boardID := strings.TrimSpace(c.Param("board_id"))
-		if h.BoardService == nil {
-			response.InternalError(c, 500, "上传失败", fmt.Errorf("board service not configured"))
+		if h.BoardService == nil || h.UserRepo == nil || h.StorageService == nil || h.MediaAssets == nil {
+			response.InternalError(c, 500, "上传失败", fmt.Errorf("board upload dependencies not configured"))
 			return
 		}
 		board, _, err := h.BoardService.ResolveBoardWriteAccess(c.Request.Context(), userID, boardID)
@@ -197,60 +203,60 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 			response.Error(c, 400, err.Error())
 			return
 		}
-		url, err := h.StorageService.UploadWithOptions(c.Request.Context(), file, storage.StorageStoreOptions{
+		stored, err := h.StorageService.UploadRefWithOptions(c.Request.Context(), file, storage.StorageStoreOptions{
 			DirPrefix: dirPrefix,
 		})
 		if err != nil {
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
-		response.SuccessDTO(c, newUploadImageResponse("url", url, file, ext))
+		if meta, ok := decodeUploadImageMetadata(file, ext); ok {
+			stored.Width = meta.Width
+			stored.Height = meta.Height
+			stored.MIMEType = meta.Mime
+		}
+		mediaAssetID, err := registerBoardUploadAsset(c.Request.Context(), h.MediaAssets, h.StorageService, assets.BoardUploadAsset{
+			OwnerUserID: board.OwnerUserID,
+			BoardID:     board.BoardID,
+			Stored:      *stored,
+		})
+		if err != nil {
+			response.InternalError(c, 500, "上传失败", err)
+			return
+		}
+		payload := newUploadImageResponse("url", stored.URL, file, ext)
+		payload.MediaAssetID = mediaAssetID
+		response.SuccessDTO(c, payload)
 	}
 }
 
-func deleteBoardUploadHandler(h UploadDeps) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var req struct {
-			URL string `json:"url"`
-		}
-		if err := c.ShouldBindJSON(&req); err != nil {
-			response.Error(c, 400, "请求参数错误")
-			return
-		}
-		userID, ok := requireAuthenticatedUserID(c)
-		if !ok {
-			return
-		}
-		if h.BoardService == nil {
-			response.InternalError(c, 500, "删除失败", fmt.Errorf("board service not configured"))
-			return
-		}
-		boardID := strings.TrimSpace(c.Param("board_id"))
-		board, _, err := h.BoardService.ResolveBoardWriteAccess(c.Request.Context(), userID, boardID)
-		if err != nil {
-			switch {
-			case errors.Is(err, boards.ErrInvalidBoardInput):
-				response.Error(c, 400, "缺少画布ID")
-			case errors.Is(err, boards.ErrBoardNotFound):
-				response.Error(c, 404, "画布不存在")
-			case errors.Is(err, boards.ErrBoardPermissionDenied):
-				response.Error(c, 403, "无权编辑该画布")
-			default:
-				response.InternalError(c, 500, "删除失败", err)
-			}
-			return
-		}
-		owner, err := h.UserRepo.GetByID(c.Request.Context(), board.OwnerUserID)
-		if err != nil {
-			response.InternalError(c, 500, "删除失败", err)
-			return
-		}
-		if err := h.StorageService.DeleteCanvasUploadByURL(c.Request.Context(), owner.StorageUID, board.BoardID, req.URL); err != nil {
-			response.Error(c, 400, err.Error())
-			return
-		}
-		response.SuccessDTO(c, deleteUploadResponse{Deleted: true})
+func registerBoardUploadAsset(
+	ctx context.Context,
+	registry boardUploadAssetRegistrar,
+	cleaner boardUploadObjectCleaner,
+	upload assets.BoardUploadAsset,
+) (int64, error) {
+	mediaAssetID, err := registry.RegisterBoardUpload(ctx, upload)
+	if err == nil {
+		return mediaAssetID, nil
 	}
+	cleanupCtx := context.WithoutCancel(ctx)
+	cleanupErr := cleaner.DeleteObjectByStorageProfile(
+		cleanupCtx,
+		upload.Stored.StorageProfile,
+		upload.Stored.StorageKey,
+	)
+	if cleanupErr != nil {
+		slog.ErrorContext(cleanupCtx, "cleanup unregistered board upload failed",
+			"board_id", upload.BoardID,
+			"owner_user_id", upload.OwnerUserID,
+			"storage_profile_id", upload.Stored.StorageProfile,
+			"storage_key", upload.Stored.StorageKey,
+			"registration_error", err,
+			"cleanup_error", cleanupErr,
+		)
+	}
+	return 0, err
 }
 
 func adminUploadHandler(storageService *storage.StorageService, uploadSettings settings.MediaUploadSettingProvider) gin.HandlerFunc {

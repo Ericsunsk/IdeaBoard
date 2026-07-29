@@ -373,6 +373,218 @@ func TestReconciliationStaleHoldOnlyReportsWithoutIsolation(t *testing.T) {
 	}
 }
 
+func TestReconciliationSeparatesBillingSnapshotRiskFromTaskTraceAnomaly(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	service := NewService(pool)
+	service.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{})
+	ctx := t.Context()
+	const userID int64 = 96
+	if _, err := service.Grant(ctx, GrantCommand{UserID: userID, Amount: mustCreditAmount(t, 30), Metadata: testMetadata("reconciliation-fact-split:grant", "reconciliation-fact-split-grant")}); err != nil {
+		t.Fatal(err)
+	}
+	var priceID, priceVersion int64
+	if err := db.QueryRowContext(ctx, `SELECT price_version_id, version FROM publish_billing_price('test:reconciliation-fact-split', 'Reconciliation Fact Split', '', 5, 1)`).Scan(&priceID, &priceVersion); err != nil {
+		t.Fatal(err)
+	}
+
+	const missingSnapshotTaskID = "reconcile-missing-billing-snapshot"
+	missingSnapshotHold := createReconciliationTaskFixture(t, db, service, missingSnapshotTaskID, "pending", "", userID, priceID, priceVersion)
+	const missingTaskTraceID = "reconcile-missing-task-trace"
+	createReconciliationTaskFixture(t, db, service, missingTaskTraceID, "pending", "", userID, priceID, priceVersion)
+	const brokenTaskTraceID = "reconcile-broken-task-trace"
+	createReconciliationTaskFixture(t, db, service, brokenTaskTraceID, "pending", "", userID, priceID, priceVersion)
+
+	if _, err := db.ExecContext(ctx, `ALTER TABLE task_billing_snapshots DISABLE TRIGGER task_billing_snapshots_immutable`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM task_billing_snapshots WHERE task_id = $1`, missingSnapshotTaskID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE task_billing_snapshots ENABLE TRIGGER task_billing_snapshots_immutable`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM tasks WHERE task_id = $1`, missingTaskTraceID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM tasks WHERE task_id = $1`, brokenTaskTraceID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_transactions DISABLE TRIGGER prevent_credit_transactions_mutation`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE credit_transactions SET business_reference_id = 'wrong-task-trace' WHERE business_reference_type = 'task' AND business_reference_id = $1 AND command_type = 'hold'`, brokenTaskTraceID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_transactions ENABLE TRIGGER prevent_credit_transactions_mutation`); err != nil {
+		t.Fatal(err)
+	}
+
+	first := executeReconciliationRun(t, service)
+	findings, err := service.ListGlobalReconciliationFindings(ctx, ReconciliationFindingOpen, ListReconciliationInput{Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var billingSnapshotFinding, taskTraceFinding, billingFactFinding ReconciliationFinding
+	brokenTaskWasReportedOnly := false
+	for _, finding := range findings.Findings {
+		switch finding.FindingType {
+		case ReconciliationFindingTaskHoldMissingBillingSnapshot:
+			if finding.SubjectID == missingSnapshotHold {
+				billingSnapshotFinding = finding
+			}
+		case ReconciliationFindingTaskTraceMissing:
+			if finding.SubjectID == missingTaskTraceID {
+				taskTraceFinding = finding
+			}
+			if finding.SubjectID == brokenTaskTraceID {
+				brokenTaskWasReportedOnly = true
+			}
+		case ReconciliationFindingTaskBillingFactMissing:
+			if finding.SubjectID == brokenTaskTraceID {
+				billingFactFinding = finding
+			}
+		}
+	}
+	if billingSnapshotFinding.ID == 0 || billingSnapshotFinding.Risk != ReconciliationRiskHigh || !billingSnapshotFinding.Isolated {
+		t.Fatalf("Billing Snapshot finding = %+v, want isolated high-risk finding", billingSnapshotFinding)
+	}
+	if taskTraceFinding.ID == 0 || taskTraceFinding.Risk != ReconciliationRiskLow || taskTraceFinding.Isolated {
+		t.Fatalf("Task trace finding = %+v, want report-only low-risk finding", taskTraceFinding)
+	}
+	if billingFactFinding.ID == 0 || billingFactFinding.Risk != ReconciliationRiskHigh || !billingFactFinding.Isolated {
+		t.Fatalf("broken Task billing finding = %+v, want isolated high-risk finding", billingFactFinding)
+	}
+	if brokenTaskWasReportedOnly {
+		t.Fatal("broken Task Billing facts must not be reported as a low-risk Task trace anomaly")
+	}
+	if got := countRows(t, db, `
+SELECT COUNT(*) FROM credit_wallet_restrictions
+WHERE wallet_user_id = $1 AND restriction_type = 'ledger_integrity' AND source = 'reconciliation'
+  AND related_object_type = 'finding' AND related_object_id = $2 AND released_at IS NULL`, userID, strconv.FormatInt(billingSnapshotFinding.ID, 10)); got != 1 {
+		t.Fatalf("Billing Snapshot restriction count = %d, want 1", got)
+	}
+	if got := countRows(t, db, `
+SELECT COUNT(*) FROM credit_wallet_restrictions
+WHERE related_object_type = 'finding' AND related_object_id = $1 AND released_at IS NULL`, strconv.FormatInt(taskTraceFinding.ID, 10)); got != 0 {
+		t.Fatalf("Task trace restriction count = %d, want 0", got)
+	}
+
+	second := executeReconciliationRun(t, service)
+	for _, finding := range []ReconciliationFinding{billingSnapshotFinding, taskTraceFinding} {
+		if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_findings WHERE fingerprint = $1`, finding.Fingerprint); got != 1 {
+			t.Fatalf("finding %s count = %d, want one fingerprint", finding.FindingType, got)
+		}
+		if got := countRows(t, db, `SELECT occurrence_count FROM credit_reconciliation_findings WHERE id = $1`, finding.ID); got != 2 {
+			t.Fatalf("finding %s occurrence count = %d, want 2", finding.FindingType, got)
+		}
+		if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_run_findings WHERE finding_id = $1 AND run_id IN ($2, $3)`, finding.ID, first, second); got != 2 {
+			t.Fatalf("finding %s run links = %d, want 2", finding.FindingType, got)
+		}
+	}
+
+	insertReconciliationTaskBillingSnapshot(t, db, missingSnapshotTaskID, userID, priceID, priceVersion, missingSnapshotHold)
+	third := executeReconciliationRun(t, service)
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE related_object_type = 'finding' AND related_object_id = $1 AND released_at IS NULL`, strconv.FormatInt(billingSnapshotFinding.ID, 10)); got != 0 {
+		t.Fatalf("recovered Billing Snapshot restriction count = %d, want 0", got)
+	}
+	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_reconciliation_run_findings WHERE finding_id = $1 AND run_id = $2`, taskTraceFinding.ID, third); got != 1 {
+		t.Fatalf("Task trace finding should remain reported after unrelated recovery, got %d links", got)
+	}
+
+	if _, err := db.ExecContext(ctx, `INSERT INTO tasks (task_id,user_id,prompt,user_prompt,params,status,error_msg,result) VALUES ($1,$2,'p','p','{}','pending','','')`, missingTaskTraceID, userID); err != nil {
+		t.Fatal(err)
+	}
+	executeReconciliationRun(t, service)
+	for _, finding := range []ReconciliationFinding{billingSnapshotFinding, taskTraceFinding} {
+		var status string
+		if err := db.QueryRowContext(ctx, `SELECT status FROM credit_reconciliation_findings WHERE id = $1`, finding.ID).Scan(&status); err != nil {
+			t.Fatal(err)
+		}
+		if status != string(ReconciliationFindingResolved) {
+			t.Fatalf("recovered %s finding status = %q, want resolved", finding.FindingType, status)
+		}
+	}
+}
+
+func TestReconciliationTreatsCorruptTerminalFactsAsHighRiskInsteadOfTaskTrace(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	service := NewService(pool)
+	service.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{})
+	ctx := t.Context()
+	const userID int64 = 97
+	if _, err := service.Grant(ctx, GrantCommand{UserID: userID, Amount: mustCreditAmount(t, 20), Metadata: testMetadata("terminal-fact-risk:grant", "terminal-fact-risk-grant")}); err != nil {
+		t.Fatal(err)
+	}
+	var priceID, priceVersion int64
+	if err := db.QueryRowContext(ctx, `SELECT price_version_id, version FROM publish_billing_price('test:terminal-fact-risk', 'Terminal Fact Risk', '', 5, 1)`).Scan(&priceID, &priceVersion); err != nil {
+		t.Fatal(err)
+	}
+
+	const capturedTaskID = "reconcile-corrupt-captured-terminal"
+	capturedHold := createReconciliationTaskFixture(t, db, service, capturedTaskID, "completed", "", userID, priceID, priceVersion)
+	capture, err := service.Capture(ctx, CaptureCommand{UserID: userID, HoldTransactionID: capturedHold, Metadata: taskReconciliationMetadata("terminal-fact-risk:capture", capturedTaskID)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE task_billing_settlements SET state = 'captured', settlement_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, capturedTaskID, capture.TransactionID); err != nil {
+		t.Fatal(err)
+	}
+
+	const releasedTaskID = "reconcile-corrupt-released-terminal"
+	releasedHold := createReconciliationTaskFixture(t, db, service, releasedTaskID, "failed", "provider failed", userID, priceID, priceVersion)
+	release, err := service.Release(ctx, ReleaseCommand{UserID: userID, HoldTransactionID: releasedHold, Metadata: taskReconciliationMetadata("terminal-fact-risk:release", releasedTaskID)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE task_billing_settlements SET state = 'released', settlement_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, releasedTaskID, release.TransactionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM tasks WHERE task_id IN ($1, $2)`, capturedTaskID, releasedTaskID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_transactions DISABLE TRIGGER prevent_credit_transactions_mutation`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE credit_transactions SET command_amount = 4 WHERE transaction_id = $1`, capture.TransactionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_transactions ENABLE TRIGGER prevent_credit_transactions_mutation`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_postings DISABLE TRIGGER prevent_credit_postings_mutation`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `UPDATE credit_postings SET amount = CASE WHEN amount > 0 THEN 4 ELSE -4 END WHERE transaction_id = $1`, release.TransactionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE credit_postings ENABLE TRIGGER prevent_credit_postings_mutation`); err != nil {
+		t.Fatal(err)
+	}
+
+	executeReconciliationRun(t, service)
+	page, err := service.ListGlobalReconciliationFindings(ctx, ReconciliationFindingOpen, ListReconciliationInput{Limit: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var capturedFactRisk, releasedLedgerRisk ReconciliationFinding
+	for _, finding := range page.Findings {
+		if finding.FindingType == ReconciliationFindingTaskTraceMissing && (finding.SubjectID == capturedTaskID || finding.SubjectID == releasedTaskID) {
+			t.Fatalf("corrupt terminal %q was incorrectly reported as low-risk Task trace", finding.SubjectID)
+		}
+		if finding.FindingType == ReconciliationFindingTaskBillingFactMissing && finding.SubjectID == capturedTaskID {
+			capturedFactRisk = finding
+		}
+		if finding.FindingType == ReconciliationFindingLedgerPostingsInvalid && finding.SubjectID == release.TransactionID {
+			releasedLedgerRisk = finding
+		}
+	}
+	for _, finding := range []ReconciliationFinding{capturedFactRisk, releasedLedgerRisk} {
+		if finding.ID == 0 || finding.Risk != ReconciliationRiskHigh || !finding.Isolated {
+			t.Fatalf("corrupt terminal finding = %+v, want isolated high-risk finding", finding)
+		}
+	}
+}
+
 func TestStartReconciliationIsMutuallyExclusiveAndRollsBackOnEnqueueFailure(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	service := NewService(pool)
@@ -603,7 +815,7 @@ FROM credit_transactions WHERE transaction_id = $1`, illegal.TransactionID); err
 		found[string(finding.FindingType)] = true
 	}
 	for _, expected := range []string{
-		"ledger_postings_invalid", "wallet_projection_mismatch", "task_hold_missing_task",
+		"ledger_postings_invalid", "wallet_projection_mismatch", "task_hold_missing_billing_snapshot",
 		"active_task_not_held", "completed_task_not_captured", "failed_task_not_released",
 		"task_terminal_transaction_count", "idempotency_request_hash_conflict", "duplicate_business_reference",
 		"refund_amount_invalid", "illegal_reference_chain", "hold_state_invalid", "charge_state_invalid",
@@ -851,15 +1063,32 @@ func createReconciliationTaskFixture(t *testing.T, db *sql.DB, service *Service,
 	if _, err := db.ExecContext(t.Context(), query, taskID, userID, status, errorMessage); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(t.Context(), `
-INSERT INTO task_billing_snapshots(task_id,user_id,feature_slug,model,sku,display_name,price_version_id,price_version,unit_credits,quantity,total_credits,quoted_at,hold_transaction_id)
-VALUES ($1,$2,'test','test','test:reconciliation','Reconciliation',$3,$4,5,1,5,clock_timestamp(),$5)`, taskID, userID, priceID, priceVersion, hold.TransactionID); err != nil {
-		t.Fatal(err)
-	}
+	insertReconciliationTaskBillingSnapshot(t, db, taskID, userID, priceID, priceVersion, hold.TransactionID)
 	if _, err := db.ExecContext(t.Context(), `INSERT INTO task_billing_settlements(task_id,state) VALUES ($1,'held')`, taskID); err != nil {
 		t.Fatal(err)
 	}
 	return hold.TransactionID
+}
+
+func insertReconciliationTaskBillingSnapshot(t testing.TB, db *sql.DB, taskID string, userID, priceID, priceVersion int64, holdTransactionID string) {
+	t.Helper()
+	if _, err := db.ExecContext(t.Context(), `
+INSERT INTO task_billing_snapshots(task_id,user_id,feature_slug,model,sku,display_name,price_version_id,price_version,unit_credits,quantity,total_credits,quoted_at,hold_transaction_id)
+VALUES ($1,$2,'test','test','test:reconciliation','Reconciliation',$3,$4,5,1,5,clock_timestamp(),$5)`, taskID, userID, priceID, priceVersion, holdTransactionID); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func executeReconciliationRun(t testing.TB, service *Service) int64 {
+	t.Helper()
+	run, err := service.StartReconciliation(t.Context(), reconciliationStartInput(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ExecuteReconciliation(t.Context(), run.ID); err != nil {
+		t.Fatal(err)
+	}
+	return run.ID
 }
 
 func taskReconciliationMetadata(key, taskID string) CommandMetadata {

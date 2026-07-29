@@ -37,7 +37,6 @@ const localInpaintMocks = vi.hoisted(() => ({
       cropSize: { width: 64, height: 72 },
     },
   })),
-  cleanupFlowLocalInpaintMedia: vi.fn(async () => undefined),
 }))
 
 const localInpaintResultMocks = vi.hoisted(() => ({
@@ -214,7 +213,6 @@ describe('flowImageWorkflowExecution', () => {
     executorMocks.waitExistingOrLiveTaskImageResults.mockReset()
     imageSizeMocks.loadImageSizeFromUrl.mockReset()
     localInpaintMocks.prepareFlowLocalInpaintMedia.mockReset()
-    localInpaintMocks.cleanupFlowLocalInpaintMedia.mockReset()
     localInpaintResultMocks.composeFlowLocalInpaintTaskResult.mockReset()
     executorMocks.assertTaskRequestReady.mockResolvedValue(undefined)
     executorMocks.submitTaskRequest.mockResolvedValue({ taskId: 'task-1' })
@@ -235,7 +233,6 @@ describe('flowImageWorkflowExecution', () => {
         cropSize: { width: 64, height: 72 },
       },
     })
-    localInpaintMocks.cleanupFlowLocalInpaintMedia.mockResolvedValue(undefined)
     localInpaintResultMocks.composeFlowLocalInpaintTaskResult.mockResolvedValue({
       url: 'https://example.com/local-inpaint-final.png',
       ratio: 1,

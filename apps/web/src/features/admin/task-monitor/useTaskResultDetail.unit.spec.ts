@@ -48,6 +48,18 @@ describe('task result image URL validation', () => {
     expect(detail.resultImageUrl.value).toBe('')
   })
 
+  it('identifies a result image retired by the user without treating the task as failed', () => {
+    const detail = useTaskResultDetail(
+      ref<AdminTaskMonitorDetailModel | null>(
+        makeTaskDetail({ result: '{"status":"success","image_availability":"deleted_by_user"}' }),
+      ),
+      { feedback: createTaskResultFeedback() },
+    )
+
+    expect(detail.resultImageUrl.value).toBe('')
+    expect(detail.isResultImageDeletedByUser.value).toBe(true)
+  })
+
   it('does not open rejected URLs', () => {
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null)
     const feedback = createTaskResultFeedback()

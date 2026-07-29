@@ -184,6 +184,14 @@ func (s *StorageService) loadProfilesWithSecrets(ctx context.Context) ([]Storage
 	return s.loadProfilesBySecretPolicy(ctx, storageProfileLoadPlaintext)
 }
 
+func (s *StorageService) loadProfileForReclamation(ctx context.Context, id string) (*StorageProfile, error) {
+	profiles, err := s.profileRepo.ListProfilesWithSecrets(ctx, true)
+	if err != nil {
+		return nil, err
+	}
+	return s.findProfile(normalizeLoadedProfiles(profiles), strings.TrimSpace(id))
+}
+
 func (s *StorageService) loadProfilesBySecretPolicy(ctx context.Context, secretPolicy storageProfileLoadSecretPolicy) ([]StorageProfile, error) {
 	var (
 		profiles []StorageProfile

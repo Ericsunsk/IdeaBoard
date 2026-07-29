@@ -253,24 +253,28 @@ type LineDraftMode struct {
 }
 
 type MediaAsset struct {
-	ID               int64           `json:"id"`
-	AssetID          string          `json:"asset_id"`
-	OwnerUserID      int64           `json:"owner_user_id"`
-	StorageProfileID string          `json:"storage_profile_id"`
-	StorageKey       string          `json:"storage_key"`
-	Url              string          `json:"url"`
-	SourceUrl        string          `json:"source_url"`
-	MediaKind        string          `json:"media_kind"`
-	MimeType         string          `json:"mime_type"`
-	Width            int32           `json:"width"`
-	Height           int32           `json:"height"`
-	SizeBytes        int64           `json:"size_bytes"`
-	ChecksumSha256   string          `json:"checksum_sha256"`
-	Status           string          `json:"status"`
-	Metadata         json.RawMessage `json:"metadata"`
-	CreatedAt        time.Time       `json:"created_at"`
-	UpdatedAt        time.Time       `json:"updated_at"`
-	DeletedAt        sql.NullTime    `json:"deleted_at"`
+	ID                int64           `json:"id"`
+	AssetID           string          `json:"asset_id"`
+	OwnerUserID       int64           `json:"owner_user_id"`
+	StorageProfileID  string          `json:"storage_profile_id"`
+	StorageKey        string          `json:"storage_key"`
+	Url               string          `json:"url"`
+	SourceUrl         string          `json:"source_url"`
+	MediaKind         string          `json:"media_kind"`
+	MimeType          string          `json:"mime_type"`
+	Width             int32           `json:"width"`
+	Height            int32           `json:"height"`
+	SizeBytes         int64           `json:"size_bytes"`
+	ChecksumSha256    string          `json:"checksum_sha256"`
+	Status            string          `json:"status"`
+	Metadata          json.RawMessage `json:"metadata"`
+	CreatedAt         time.Time       `json:"created_at"`
+	UpdatedAt         time.Time       `json:"updated_at"`
+	DeletedAt         sql.NullTime    `json:"deleted_at"`
+	ReclaimAfter      sql.NullTime    `json:"reclaim_after"`
+	ReclaimStartedAt  sql.NullTime    `json:"reclaim_started_at"`
+	ReclaimClaimToken uuid.NullUUID   `json:"reclaim_claim_token"`
+	ReclaimGeneration int64           `json:"reclaim_generation"`
 }
 
 type MediaRef struct {

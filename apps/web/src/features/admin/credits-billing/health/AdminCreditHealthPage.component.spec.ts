@@ -255,7 +255,11 @@ describe('AdminCreditHealthPage', () => {
     expect(within(dialog).getByRole('columnheader', { name: '结果' })).toBeVisible()
     expect(within(dialog).getByRole('columnheader', { name: '耗时' })).toBeVisible()
     expect(await within(dialog).findByText('人工触发')).toBeVisible()
-    expect(within(dialog).getByText('3 异常 · 1 严重 · 1 Wallet')).toBeVisible()
+    expect(
+      within(dialog).getByText(
+        '3 检查发现（含业务追踪） · 1 严重 Finding · 1 Wallet 已受限',
+      ),
+    ).toBeVisible()
 
     const runRow = within(dialog).getByRole('row', { name: /人工触发/ })
     await user.click(within(runRow).getByRole('button'))
@@ -269,7 +273,11 @@ describe('AdminCreditHealthPage', () => {
     await waitFor(() => expect(nextButton).toBeEnabled())
     await user.click(nextButton)
     await waitFor(() => expect(runRequests).toContain('21'))
-    expect(await within(dialog).findByText('0 异常 · 0 严重 · 0 Wallet')).toBeVisible()
+    expect(
+      await within(dialog).findByText(
+        '0 检查发现（含业务追踪） · 0 严重 Finding · 0 Wallet 已受限',
+      ),
+    ).toBeVisible()
     expect(within(dialog).queryByText('人工复核账本')).not.toBeInTheDocument()
   })
 

@@ -11,6 +11,14 @@ describe('reconciliation finding presentation', () => {
       title: 'Wallet 余额投影不一致',
       summary: '账户余额 projection 与不可变 Ledger 汇总结果不一致。',
     })
+    expect(getFindingTypePresentation('task_hold_missing_billing_snapshot')).toEqual({
+      title: 'Task Hold 缺少 Billing Snapshot',
+      summary: 'Task Hold 没有不可变 Billing Snapshot，属于资金事实缺失，已限制 Wallet。',
+    })
+    expect(getFindingTypePresentation('task_trace_missing')).toEqual({
+      title: 'Task 追踪记录缺失',
+      summary: 'Billing Snapshot、Settlement、Hold 与 Ledger 完整，但对应 Task 已缺失，仅报告不限制 Wallet。',
+    })
   })
 
   it('falls back safely when a newer backend finding type is not known yet', () => {

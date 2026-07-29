@@ -1,10 +1,6 @@
-import {
-  deleteUserBoardUpload,
-  uploadUserBoardAsset,
-  uploadUserProfileAvatar,
-} from './generated-query/user-assets/user-assets'
+import { uploadUserBoardAsset, uploadUserProfileAvatar } from './generated-query/user-assets/user-assets'
 import type { UploadAvatarMetadata, UploadImageMetadata } from './generated-query/model'
-import { resolveApiData, resolveApiOk } from './apiResponse'
+import { resolveApiData } from './apiResponse'
 
 export const UPLOAD_OPERATION_TIMEOUT_MS = 5 * 60 * 1000
 
@@ -20,10 +16,11 @@ export const uploadApi = {
       '上传图片失败',
     )
     if (!data.url?.trim()) throw new Error('上传图片失败')
+    const mediaAssetId = Number(data.media_asset_id)
+    if (!Number.isInteger(mediaAssetId) || mediaAssetId <= 0) {
+      throw new Error('上传图片失败：缺少媒体资产标识')
+    }
     return data
-  },
-  recycle: async (url: string, boardId: string): Promise<void> => {
-    await resolveApiOk(deleteUserBoardUpload(boardId.trim(), { url }), '回收图片失败')
   },
   uploadAvatar: async (file: File): Promise<UploadAvatarMetadata> => {
     const data = await resolveApiData(

@@ -62,6 +62,52 @@ describe('canvasBoardStateSchema', () => {
     }
   })
 
+  it('preserves media asset ids on node output images', () => {
+    const state = makeCanvasBoardState({
+      imageNodes: [
+        {
+          id: 1,
+          type: 'image-node',
+          x: 0,
+          y: 0,
+          width: 280,
+          sourceImageUrl: 'https://example.com/source.png',
+          sourceImageRatio: 1,
+          outputStatus: 'ready',
+          outputImages: [
+            { url: 'https://example.com/image-output.png', ratio: 1, mediaAssetId: 201 },
+          ],
+        },
+      ],
+      fusionNodes: [
+        {
+          id: 2,
+          type: 'fusion',
+          x: 320,
+          y: 0,
+          width: 280,
+          prompt: '',
+          outputCount: 1,
+          aspectRatio: 'auto',
+          blendPoint: { x: 0.5, y: 0.5 },
+          inputImages: [],
+          outputStatus: 'ready',
+          outputImages: [
+            { url: 'https://example.com/fusion-output.png', ratio: 1, mediaAssetId: 202 },
+          ],
+        },
+      ],
+    })
+
+    const parsed = v.safeParse(canvasBoardStateSchema, state)
+
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      expect(parsed.output.imageNodes[0]?.outputImages[0]?.mediaAssetId).toBe(201)
+      expect(parsed.output.fusionNodes[0]?.outputImages[0]?.mediaAssetId).toBe(202)
+    }
+  })
+
   it('accepts persistent canvas groups', () => {
     const state = makeCanvasBoardState({
       groups: [

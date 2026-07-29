@@ -46,11 +46,11 @@ func BenchmarkStorageUploadLocalMultipart(b *testing.B) {
 	b.SetBytes(int64(len(payload)))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		url, err := service.uploadWithProfile(context.Background(), profile, file, opts)
+		ref, err := service.uploadRefWithProfile(context.Background(), profile, file, opts)
 		if err != nil {
 			b.Fatalf("UploadWithOptions returned error: %v", err)
 		}
-		removeBenchmarkUpload(b, url)
+		removeBenchmarkUpload(b, ref.URL)
 	}
 }
 

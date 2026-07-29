@@ -311,7 +311,11 @@
           class="rounded-[14px] border border-admin-border-soft bg-admin-surface-muted/65 px-4 py-3 text-admin-body text-admin-text-3"
         >
           {{
-            hasResultImageCandidate ? '结果图片链接不安全，已拒绝预览。' : '没有可预览的图片结果。'
+            isResultImageDeletedByUser
+              ? '图片已由用户删除。'
+              : hasResultImageCandidate
+                ? '结果图片链接不安全，已拒绝预览。'
+                : '没有可预览的图片结果。'
           }}
         </div>
       </section>
@@ -429,6 +433,7 @@ const {
   resultSummaryText,
   resultDebugText,
   hasResultImageCandidate,
+  isResultImageDeletedByUser,
   hasResultPayload,
   openResultImage,
   copyToClipboard,

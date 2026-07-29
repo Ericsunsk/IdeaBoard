@@ -20,7 +20,9 @@ describe('Reconciliation Run presentation', () => {
 
   it('keeps result and Trigger labels compact and deterministic', () => {
     const run = makeRun({ finding_count: 3, critical_count: 1, isolated_wallet_count: 2 })
-    expect(formatReconciliationRunResult(run)).toBe('3 异常 · 1 严重 · 2 Wallet')
+    expect(formatReconciliationRunResult(run)).toBe(
+      '3 检查发现（含业务追踪） · 1 严重 Finding · 2 Wallet 已受限',
+    )
     expect(formatReconciliationRunResult(makeRun({ status: 'queued' }))).toBe('等待执行')
     expect(formatReconciliationRunResult(makeRun({ status: 'running' }))).toBe('检查中')
     expect(getReconciliationTriggerLabel(run)).toBe('自动调度')

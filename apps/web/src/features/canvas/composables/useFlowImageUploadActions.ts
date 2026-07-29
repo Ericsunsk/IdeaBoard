@@ -12,10 +12,11 @@ import { resolveImageNodeFrameSize } from '../../canvas-board/domain'
 import { readCurrentBoardIdRef } from '../utils/currentBoardId'
 import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
 
-type FlowImageUploadResult = { url: string; ratio: number }
+type FlowImageUploadResult = { url: string; ratio: number; mediaAssetId: number }
 
 type UploadedImageData = {
   url: string
+  media_asset_id?: number
   width?: number
   height?: number
   mime?: string
@@ -85,6 +86,10 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
         const prepared = await prepareImageAssetForUpload(file)
         prepared.warnings.forEach((message) => options.onWarning(message))
         const uploaded = await options.uploadApi.upload(prepared.uploadFile, boardId)
+        const mediaAssetId = Number(uploaded.media_asset_id)
+        if (!Number.isInteger(mediaAssetId) || mediaAssetId <= 0) {
+          throw new Error('上传图片失败：缺少媒体资产标识')
+        }
         const width = Number(uploaded.width)
         const height = Number(uploaded.height)
         const serverRatio =
@@ -94,7 +99,7 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
         const preparedRatio = prepared.dimensionsKnown && prepared.ratio > 0 ? prepared.ratio : null
         const resolvedRatio =
           preparedRatio ?? (serverRatio && serverRatio > 0 ? serverRatio : null) ?? 1
-        return { url: uploaded.url, ratio: resolvedRatio }
+        return { url: uploaded.url, ratio: resolvedRatio, mediaAssetId }
       } finally {
         inFlightUploads.delete(cacheKey)
       }
@@ -136,7 +141,7 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
           title: resolveImageFileTitle(file) || prev.title,
           width: resolveImageNodeFrameSize(uploaded.ratio, true).width,
           sourceImageUrl: uploaded.url,
-          sourceMediaAssetId: undefined,
+          sourceMediaAssetId: uploaded.mediaAssetId,
           sourceImageRatio: uploaded.ratio,
           outputStatus: 'ready',
           outputImages: [],
@@ -166,7 +171,7 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
       ...(title ? { title } : {}),
       width: frameSize.width,
       sourceImageUrl: payload.url,
-      sourceMediaAssetId: undefined,
+      sourceMediaAssetId: payload.mediaAssetId,
       sourceImageRatio: payload.ratio,
       outputStatus: 'ready',
       outputImages: [],

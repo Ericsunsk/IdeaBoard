@@ -1,0 +1,175 @@
+package reclamation
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"io/fs"
+	"time"
+
+	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/platform/database"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/riverqueue/river"
+)
+
+const (
+	QueueName         = "media_reclamation"
+	ReclaimJobKind    = "media_asset_reclaim"
+	ScheduleJobKind   = "media_reclamation_schedule"
+	scheduleInterval  = 15 * time.Minute
+	GracePeriod       = 24 * time.Hour
+	reclaimJobTimeout = 2 * time.Minute
+	// The lease outlives this worker's dedicated timeout while still allowing a
+	// crashed process to recover independently of the configurable task timeout.
+	ClaimLeaseDuration       = 5 * time.Minute
+	dueAssetBatchSize  int32 = 100
+)
+
+type ReclaimJobArgs struct {
+	MediaAssetID      int64 `json:"media_asset_id"`
+	ReclaimGeneration int64 `json:"reclaim_generation"`
+}
+
+func (ReclaimJobArgs) Kind() string { return ReclaimJobKind }
+
+type ScheduleJobArgs struct{}
+
+func (ScheduleJobArgs) Kind() string { return ScheduleJobKind }
+
+type ObjectDeleter interface {
+	DeleteObjectByStorageProfile(context.Context, string, string) error
+}
+
+type ReclaimWorker struct {
+	river.WorkerDefaults[ReclaimJobArgs]
+	q       *dbsqlc.Queries
+	storage ObjectDeleter
+	now     func() time.Time
+}
+
+func NewReclaimWorker(db *sql.DB, storage ObjectDeleter) *ReclaimWorker {
+	return &ReclaimWorker{q: dbsqlc.New(db), storage: storage, now: time.Now}
+}
+
+func (*ReclaimWorker) Timeout(*river.Job[ReclaimJobArgs]) time.Duration {
+	return reclaimJobTimeout
+}
+
+func (w *ReclaimWorker) Work(ctx context.Context, job *river.Job[ReclaimJobArgs]) error {
+	if w == nil || w.q == nil || w.storage == nil || job == nil || job.Args.MediaAssetID <= 0 || job.Args.ReclaimGeneration <= 0 {
+		return fmt.Errorf("invalid media reclamation job")
+	}
+	now := w.now()
+	claimToken := uuid.NullUUID{UUID: uuid.New(), Valid: true}
+	asset, err := w.q.ClaimDueMediaAssetReclamation(ctx, dbsqlc.ClaimDueMediaAssetReclamationParams{
+		ID:                job.Args.MediaAssetID,
+		ReclaimGeneration: job.Args.ReclaimGeneration,
+		ClaimedAt:         sql.NullTime{Time: now, Valid: true},
+		ClaimToken:        claimToken,
+		NowAt:             sql.NullTime{Time: now, Valid: true},
+		StaleClaimBefore:  sql.NullTime{Time: now.Add(-ClaimLeaseDuration), Valid: true},
+	})
+	if database.IsNotFound(err) || errors.Is(err, sql.ErrNoRows) {
+		return w.resolveSkippedClaim(ctx, job.Args, now)
+	}
+	if err != nil {
+		return fmt.Errorf("claim media asset %d: %w", job.Args.MediaAssetID, err)
+	}
+	if err := w.storage.DeleteObjectByStorageProfile(ctx, asset.StorageProfileID, asset.StorageKey); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		releaseCtx := context.WithoutCancel(ctx)
+		if releaseErr := w.q.ReleaseMediaAssetReclamationClaim(releaseCtx, dbsqlc.ReleaseMediaAssetReclamationClaimParams{ID: asset.ID, ReclaimGeneration: job.Args.ReclaimGeneration, ClaimToken: claimToken}); releaseErr != nil {
+			return errors.Join(fmt.Errorf("delete media asset %d: %w", asset.ID, err), fmt.Errorf("release media reclamation claim: %w", releaseErr))
+		}
+		return fmt.Errorf("delete media asset %d: %w", asset.ID, err)
+	}
+	rows, err := w.q.MarkMediaAssetReclaimed(ctx, dbsqlc.MarkMediaAssetReclaimedParams{
+		ID:                asset.ID,
+		ReclaimGeneration: job.Args.ReclaimGeneration,
+		ClaimToken:        claimToken,
+		DeletedAt:         sql.NullTime{Time: w.now(), Valid: true},
+	})
+	if err != nil {
+		return fmt.Errorf("mark media asset %d reclaimed: %w", asset.ID, err)
+	}
+	if rows == 0 {
+		return w.resolveSkippedClaim(ctx, job.Args, w.now())
+	}
+	return nil
+}
+
+func (w *ReclaimWorker) resolveSkippedClaim(ctx context.Context, args ReclaimJobArgs, now time.Time) error {
+	asset, err := w.q.GetMediaAssetByID(ctx, args.MediaAssetID)
+	if database.IsNotFound(err) || errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("inspect media asset %d reclamation claim: %w", args.MediaAssetID, err)
+	}
+	if asset.DeletedAt.Valid || asset.ReclaimGeneration != args.ReclaimGeneration || !asset.ReclaimAfter.Valid {
+		return nil
+	}
+	if asset.ReclaimStartedAt.Valid {
+		retryAt := asset.ReclaimStartedAt.Time.Add(ClaimLeaseDuration)
+		if retryAt.After(now) {
+			return river.JobSnooze(retryAt.Sub(now))
+		}
+	}
+	return nil
+}
+
+type ScheduleWorker struct {
+	river.WorkerDefaults[ScheduleJobArgs]
+	q   *dbsqlc.Queries
+	now func() time.Time
+}
+
+func NewScheduleWorker(db *sql.DB) *ScheduleWorker {
+	return &ScheduleWorker{q: dbsqlc.New(db), now: time.Now}
+}
+
+func (w *ScheduleWorker) Work(ctx context.Context, job *river.Job[ScheduleJobArgs]) error {
+	if w == nil || w.q == nil || job == nil {
+		return fmt.Errorf("invalid media reclamation schedule job")
+	}
+	now := w.now()
+	assetIDs, err := w.q.ListDueMediaAssetReclamationIDs(ctx, dbsqlc.ListDueMediaAssetReclamationIDsParams{
+		NowAt:            sql.NullTime{Time: now, Valid: true},
+		StaleClaimBefore: sql.NullTime{Time: now.Add(-ClaimLeaseDuration), Valid: true},
+		RowLimit:         dueAssetBatchSize,
+	})
+	if err != nil {
+		return fmt.Errorf("list due media reclamation assets: %w", err)
+	}
+	if len(assetIDs) == 0 {
+		return nil
+	}
+	client, err := river.ClientFromContextSafely[pgx.Tx](ctx)
+	if err != nil {
+		return fmt.Errorf("get River client for media reclamation: %w", err)
+	}
+	for _, asset := range assetIDs {
+		if _, err := client.Insert(ctx, ReclaimJobArgs{MediaAssetID: asset.ID, ReclaimGeneration: asset.ReclaimGeneration}, &river.InsertOpts{
+			Queue:       QueueName,
+			MaxAttempts: 10,
+			Priority:    4,
+			UniqueOpts:  river.UniqueOpts{ByArgs: true},
+		}); err != nil {
+			return fmt.Errorf("enqueue media reclamation asset %d: %w", asset.ID, err)
+		}
+	}
+	return nil
+}
+
+func PeriodicJobs() []*river.PeriodicJob {
+	return []*river.PeriodicJob{river.NewPeriodicJob(
+		river.PeriodicInterval(scheduleInterval),
+		func() (river.JobArgs, *river.InsertOpts) {
+			return ScheduleJobArgs{}, &river.InsertOpts{Queue: QueueName, MaxAttempts: 10, Priority: 4}
+		},
+		&river.PeriodicJobOpts{ID: "media-reclamation-schedule", RunOnStart: true},
+	)}
+}
