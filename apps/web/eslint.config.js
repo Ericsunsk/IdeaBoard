@@ -99,6 +99,16 @@ export default tseslint.config(
               message:
                 'Route, page, and app layers must use feature/resource/shared API adapters instead of generated-query directly.',
             },
+            {
+              group: ['**/useOverlayInteractionLifecycle'],
+              message:
+                'Route, page, and app layers must use a Prime Overlay adapter or feature-owned public Overlay adapter instead of the base lifecycle directly.',
+            },
+            {
+              group: ['**/overlay-lifecycle/useCanvasCustomLayerOverlay'],
+              message:
+                'Import Canvas Overlay lifecycle through the overlay-lifecycle public barrel instead of its implementation file.',
+            },
           ],
         },
       ],
