@@ -1,4 +1,4 @@
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, toRef } from 'vue'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import type { WorkflowFeature } from '../../../shared/domain/workflowFeatures'
 import {
@@ -68,16 +68,19 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
     return Object.fromEntries([...slugs].map((slug) => [slug, resolveDraftValidation(slug)]))
   })
 
+  async function refreshPromptData(input: { preserveDirtyDraft: boolean }) {
+    const prompts = await resource.fetchPrompts()
+    loadFailed.value = false
+    syncPromptConfigs(prompts, input)
+    return prompts
+  }
+
   async function loadPrompts(input: { preserveDirtyDraft?: boolean } = {}) {
     return options.runAsyncAction(
-      async () => {
-        const prompts = await resource.fetchPrompts()
-        loadFailed.value = false
-        syncPromptConfigs(prompts, {
+      () =>
+        refreshPromptData({
           preserveDirtyDraft: input.preserveDirtyDraft ?? true,
-        })
-        return prompts
-      },
+        }),
       {
         loading,
         feedback: {
@@ -163,24 +166,26 @@ export function createAdminPromptConfigWorkspace(options: AdminPromptConfigWorks
       options.feedback.promptDraftInvalid(validation.message)
       return null
     }
-    if (saving[slug]) return null
 
-    saving[slug] = true
-    try {
-      const config = await resource.savePrompt({
-        slug,
-        prompt: promptMap[slug] || '',
-      })
-      syncPromptConfig(config, { preserveDirtyDraft: false })
-      options.feedback.promptSaved(getFeatureTitle(slug))
-      await refreshPrompts()
-      return config
-    } catch (error) {
-      options.feedback.savePromptFailed(error)
-      return null
-    } finally {
-      saving[slug] = false
-    }
+    const config = await options.runAsyncAction(
+      async () => {
+        const savedConfig = await resource.savePrompt({
+          slug,
+          prompt: promptMap[slug] || '',
+        })
+        syncPromptConfig(savedConfig, { preserveDirtyDraft: false })
+        await refreshPromptData({ preserveDirtyDraft: true })
+        return savedConfig
+      },
+      {
+        loading: toRef(saving, slug),
+        feedback: {
+          success: () => options.feedback.promptSaved(getFeatureTitle(slug)),
+          error: options.feedback.savePromptFailed,
+        },
+      },
+    )
+    return config ?? null
   }
 
   function resolveDraftValidation(slug: string): PromptDraftValidation {

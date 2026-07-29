@@ -86,6 +86,7 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
   const providerEndpointSaveLoading = ref(false)
   const accountSaveLoading = ref(false)
   const detectModelsLoading = ref(false)
+  const modelStatusChangingKeys = ref<ReadonlySet<string>>(new Set())
   const providerEndpoints = ref<ProviderEndpointRecord[]>([])
   const accounts = ref<ProviderAccountRecord[]>([])
   const accountLimits = ref<AdminProviderAccountLimits>(FALLBACK_ADMIN_ACCOUNT_LIMITS)
@@ -135,43 +136,53 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
     accounts.value = nextAccounts
   }
 
+  async function refreshProviderData() {
+    providerEndpoints.value = await resource.fetchProviderEndpoints()
+    await loadAccounts()
+  }
+
   async function loadData() {
-    await options.runAsyncAction(
-      async () => {
-        providerEndpoints.value = await resource.fetchProviderEndpoints()
-        await loadAccounts()
+    await options.runAsyncAction(refreshProviderData, {
+      loading,
+      feedback: {
+        error: options.feedback.loadFailed,
       },
-      {
-        loading,
-        feedback: {
-          error: options.feedback.loadFailed,
-        },
-      },
-    )
+    })
+  }
+
+  async function refreshAfterCommand() {
+    try {
+      await refreshProviderData()
+    } catch (error) {
+      options.feedback.loadFailed(error)
+    }
   }
 
   async function saveProviderEndpoint(command: SaveProviderEndpointCommand) {
-    await options.runAsyncAction(
+    const saved = await options.runAsyncAction(
       async () => {
         await resource.saveProviderEndpoint({
           id: command.id,
           data: { ...command.data },
         })
-        options.feedback.providerEndpointSaved(command.isEditing)
-        command.afterSaved?.()
-        await loadData()
+        return true
       },
       {
         loading: providerEndpointSaveLoading,
         feedback: {
+          success: () => {
+            options.feedback.providerEndpointSaved(command.isEditing)
+            command.afterSaved?.()
+          },
           error: options.feedback.providerEndpointSaveFailed,
         },
       },
     )
+    if (saved) await refreshAfterCommand()
   }
 
   async function saveAccount(command: SaveProviderAccountCommand) {
-    await options.runAsyncAction(
+    const saved = await options.runAsyncAction(
       async () => {
         const existingAccount = command.isEditing
           ? accounts.value.find((account) => account.id === command.accountId)
@@ -188,7 +199,6 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
               secret: command.secret,
             }),
           )
-          options.feedback.accountSaved(true)
         } else {
           await resource.createAccountRecord(
             createAccountCreatePayload({
@@ -198,19 +208,21 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
               secret: command.secret,
             }),
           )
-          options.feedback.accountSaved(false)
         }
-
-        command.afterSaved?.()
-        await loadData()
+        return true
       },
       {
         loading: accountSaveLoading,
         feedback: {
+          success: () => {
+            options.feedback.accountSaved(command.isEditing)
+            command.afterSaved?.()
+          },
           error: options.feedback.accountSaveFailed,
         },
       },
     )
+    if (saved) await refreshAfterCommand()
   }
 
   function deleteProviderEndpoint(target: ProviderEndpointCommandTarget) {
@@ -333,6 +345,7 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
       return
     }
     const nextEnabled = !targetModel.enabled
+    const pending = createModelStatusPendingRef(commandTarget, targetModel.name)
 
     await options.runAsyncAction(
       async () => {
@@ -341,14 +354,45 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
           enabled: nextEnabled,
         })
         accounts.value = accounts.value.map((item) => (item.id === account.id ? nextAccount : item))
-        options.feedback.modelStatusChanged(nextEnabled)
       },
       {
+        loading: pending,
         feedback: {
+          success: () => options.feedback.modelStatusChanged(nextEnabled),
           error: options.feedback.modelStatusChangeFailed,
         },
       },
     )
+  }
+
+  function isAccountModelStatusChanging(
+    commandTarget: ProviderAccountCommandTarget,
+    model: string,
+  ) {
+    return modelStatusChangingKeys.value.has(createModelStatusPendingKey(commandTarget, model))
+  }
+
+  function createModelStatusPendingRef(
+    commandTarget: ProviderAccountCommandTarget,
+    model: string,
+  ) {
+    const key = createModelStatusPendingKey(commandTarget, model)
+    return computed({
+      get: () => modelStatusChangingKeys.value.has(key),
+      set: (isPending) => {
+        const nextKeys = new Set(modelStatusChangingKeys.value)
+        if (isPending) nextKeys.add(key)
+        else nextKeys.delete(key)
+        modelStatusChangingKeys.value = nextKeys
+      },
+    })
+  }
+
+  function createModelStatusPendingKey(
+    commandTarget: ProviderAccountCommandTarget,
+    model: string,
+  ) {
+    return `${commandTarget.id}:${normalizeModelKey(model)}`
   }
 
   function resolveProviderEndpointTarget(target: ProviderEndpointCommandTarget) {
@@ -405,6 +449,7 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
     deleteAccount,
     detectModels,
     toggleAccountModelStatus,
+    isAccountModelStatusChanging,
     resolveProviderEndpointTarget,
     resolveAccountTarget,
     findProviderEndpointById,

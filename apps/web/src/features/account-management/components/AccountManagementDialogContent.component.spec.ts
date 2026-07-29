@@ -1,7 +1,7 @@
 /* eslint-disable vue/one-component-per-file -- Local stubs keep the layout contract test focused. */
 import { defineComponent, ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { renderWithUser, screen } from '../../../test/render'
+import { renderWithUser, screen, waitFor } from '../../../test/render'
 import { useUserStore } from '../../../app/stores/user'
 import type { User } from '../../../shared/api/userSession'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
@@ -10,6 +10,7 @@ import AccountManagementDialogContent from './AccountManagementDialogContent.vue
 
 const logoutAndRedirectMock = vi.hoisted(() => vi.fn())
 const useAvatarUploadWorkflowMock = vi.hoisted(() => vi.fn())
+const toastErrorMock = vi.hoisted(() => vi.fn())
 
 vi.mock('../../../shared/composables/useSiteBranding', () => ({
   useSiteBranding: () => ({
@@ -27,7 +28,7 @@ vi.mock('../../../shared/composables/useLogoutRedirect', () => ({
 
 vi.mock('../../../shared/composables/useAppToast', () => ({
   useAppToast: () => ({
-    error: vi.fn(),
+    error: toastErrorMock,
   }),
 }))
 
@@ -162,6 +163,7 @@ describe('AccountManagementDialogContent', () => {
     )
     logoutAndRedirectMock.mockReset()
     logoutAndRedirectMock.mockResolvedValue(true)
+    toastErrorMock.mockReset()
     useAvatarUploadWorkflowMock.mockReset()
     useAvatarUploadWorkflowMock.mockReturnValue({
       uploading: ref(false),
@@ -325,5 +327,36 @@ describe('AccountManagementDialogContent', () => {
       expect(logoutAndRedirectMock).toHaveBeenCalledWith(USER_HOME_PATH)
     })
     expect(screen.queryByRole('group', { name: '退出登录确认' })).not.toBeInTheDocument()
+  })
+
+  it('keeps logout disabled and ignores duplicate clicks until the request settles', async () => {
+    const logoutRequest = Promise.withResolvers<boolean>()
+    logoutAndRedirectMock.mockReturnValueOnce(logoutRequest.promise)
+    const { user } = renderAccountManagementDialogContent()
+    const logoutButton = screen.getByRole('button', { name: '退出登录' })
+
+    await user.click(logoutButton)
+
+    expect(logoutButton).toBeDisabled()
+    expect(logoutButton).toHaveAccessibleName('正在退出登录')
+    await user.click(logoutButton)
+    expect(logoutAndRedirectMock).toHaveBeenCalledOnce()
+
+    logoutRequest.resolve(false)
+
+    await waitFor(() => expect(logoutButton).toBeEnabled())
+    expect(logoutButton).toHaveAccessibleName('退出登录')
+    expect(toastErrorMock).toHaveBeenCalledWith('退出登录失败，请稍后重试')
+  })
+
+  it('restores logout controls and shows safe feedback after a rejected request', async () => {
+    logoutAndRedirectMock.mockRejectedValueOnce(new Error('sensitive provider failure'))
+    const { user } = renderAccountManagementDialogContent()
+    const logoutButton = screen.getByRole('button', { name: '退出登录' })
+
+    await user.click(logoutButton)
+
+    await waitFor(() => expect(logoutButton).toBeEnabled())
+    expect(toastErrorMock).toHaveBeenCalledWith('退出登录失败，请稍后重试')
   })
 })

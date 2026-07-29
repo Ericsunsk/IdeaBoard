@@ -206,8 +206,10 @@ describe.each(authModalCases)('$action modal motion', (testCase) => {
     const view = renderAuthModal(testCase)
 
     await testCase.fill(view.user)
-    await view.user.click(screen.getByRole('button', { name: testCase.submitLabel }))
+    const submitButton = screen.getByRole('button', { name: testCase.submitLabel })
+    await view.user.click(submitButton)
     await waitFor(() => expect(authAction).toHaveBeenCalledOnce())
+    await view.user.click(submitButton)
 
     expect(screen.getByRole('dialog')).toHaveAttribute('data-dismissable-mask', 'false')
     expect(screen.getByRole('dialog')).toHaveAttribute('data-close-on-escape', 'false')
@@ -216,6 +218,7 @@ describe.each(authModalCases)('$action modal motion', (testCase) => {
 
     await view.user.click(screen.getByRole('button', { name: '模拟遮罩关闭' }))
     expect(view.emitted()['update:show']).toBeUndefined()
+    expect(authAction).toHaveBeenCalledOnce()
 
     resolveRequest(true)
     await waitFor(() => expect(view.emitted()['update:show']).toContainEqual([false]))

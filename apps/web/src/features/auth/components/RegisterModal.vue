@@ -220,9 +220,8 @@ type RegisterField = 'username' | 'password' | 'confirmPassword'
 
 const userStore = useUserStore()
 const authFeedback = useAuthFeedback()
-const { runAsyncAction } = useAsyncAction()
+const { isPending: loading, runAsyncAction } = useAsyncAction()
 
-const loading = ref(false)
 const formValue = ref({
   username: '',
   password: '',
@@ -332,7 +331,6 @@ async function handleRegister() {
       return true
     },
     {
-      loading,
       feedback: authFeedback.register,
     },
   )

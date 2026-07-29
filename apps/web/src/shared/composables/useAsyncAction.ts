@@ -1,4 +1,4 @@
-import type { Ref } from 'vue'
+import { computed, ref, type Ref } from 'vue'
 
 export type AsyncActionLoadingHandle = {
   destroy: () => void
@@ -16,46 +16,88 @@ type AsyncActionOptions<T = unknown> = {
   before?: () => void
   after?: () => void
   feedback?: AsyncActionFeedback<T>
-  rethrow?: boolean
 }
 
 export function useAsyncAction() {
+  const defaultPending = ref(false)
+  const activeActionCount = ref(0)
+  const isPending = computed(() => activeActionCount.value > 0)
+
   async function runAsyncAction<T>(
     action: () => T | Promise<T>,
     options: AsyncActionOptions<T> = {},
   ): Promise<T | undefined> {
-    options.before?.()
-    if (options.loading) {
-      options.loading.value = true
-    }
-    const loadingFeedback = options.feedback?.loading?.()
+    const pending = options.loading ?? defaultPending
+    if (pending.value) return undefined
+
+    pending.value = true
+    activeActionCount.value += 1
+    let loadingFeedback: AsyncActionLoadingHandle | undefined
+    let actionResult: T | undefined
+    let actionSucceeded = false
+    const lifecycleErrors: unknown[] = []
 
     try {
-      const result = await action()
-      options.feedback?.success?.(result)
-      return result
-    } catch (error) {
-      if (options.feedback?.error) {
-        options.feedback.error(error)
-      } else if (!options.rethrow) {
-        console.error('[useAsyncAction] unhandled async action error', error)
+      options.before?.()
+      loadingFeedback = options.feedback?.loading?.()
+
+      try {
+        actionResult = await action()
+        actionSucceeded = true
+      } catch (error) {
+        if (options.feedback?.error) {
+          try {
+            options.feedback.error(error)
+          } catch (feedbackError) {
+            lifecycleErrors.push(error, feedbackError)
+          }
+        } else {
+          lifecycleErrors.push(error)
+        }
       }
 
-      if (options.rethrow) {
-        throw error
+      if (actionSucceeded) {
+        try {
+          options.feedback?.success?.(actionResult as T)
+        } catch (error) {
+          lifecycleErrors.push(error)
+        }
       }
-      return undefined
-    } finally {
-      loadingFeedback?.destroy()
-      if (options.loading) {
-        options.loading.value = false
-      }
-      options.after?.()
-      options.feedback?.finally?.()
+    } catch (error) {
+      lifecycleErrors.push(error)
     }
+
+    runCleanupStep(() => loadingFeedback?.destroy(), lifecycleErrors)
+    runCleanupStep(options.after, lifecycleErrors)
+    runCleanupStep(options.feedback?.finally, lifecycleErrors)
+    activeActionCount.value = Math.max(0, activeActionCount.value - 1)
+    runCleanupStep(() => {
+      pending.value = false
+    }, lifecycleErrors)
+
+    throwLifecycleErrors(lifecycleErrors)
+    return actionSucceeded ? actionResult : undefined
   }
 
   return {
+    isPending,
     runAsyncAction,
+  }
+}
+
+function runCleanupStep(step: (() => void) | undefined, errors: unknown[]) {
+  try {
+    step?.()
+  } catch (error) {
+    errors.push(error)
+  }
+}
+
+function throwLifecycleErrors(errors: unknown[]) {
+  if (errors.length === 1) {
+    throw errors[0]
+  }
+  if (errors.length > 1) {
+    throw new AggregateError(errors, 'Async action lifecycle failed')
   }
 }

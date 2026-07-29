@@ -45,6 +45,8 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
   const loading = ref(false)
   const applyingId = ref<string | null>(null)
   const testingId = ref<string | null>(null)
+  const applyingPending = ref(false)
+  const testingPending = ref(false)
   const providers = ref<StorageProviderMeta[]>([])
   const storages = ref<StorageCard[]>([])
   const searchKeyword = ref('')
@@ -143,6 +145,7 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
         options.feedback.applyCurrentSucceeded(response.message)
       },
       {
+        loading: applyingPending,
         before: () => {
           applyingId.value = storage.id
         },
@@ -166,6 +169,7 @@ export function createAdminStorageWorkspace(options: AdminStorageWorkspaceOption
         options.feedback.testConnectionSucceeded(response.message)
       },
       {
+        loading: testingPending,
         before: () => {
           testingId.value = storage.id
         },

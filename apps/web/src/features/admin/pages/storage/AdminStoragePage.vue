@@ -137,7 +137,7 @@
               severity="contrast"
               outlined
               :loading="testingId === card.storage.id"
-              :disabled="!card.canTest"
+              :disabled="!card.canTest || testingId !== null"
               @click="handleTest(card.storage)"
             />
             <Button
@@ -146,7 +146,7 @@
               label="设为当前"
               severity="contrast"
               :loading="applyingId === card.storage.id"
-              :disabled="!card.canApply"
+              :disabled="!card.canApply || applyingId !== null"
               @click="applyStorage(card.storage)"
             />
             <Button

@@ -57,6 +57,7 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
       deleteProviderEndpoint: workspace.deleteProviderEndpoint,
       deleteAccount: workspace.deleteAccount,
       toggleAccountModelStatus: workspace.toggleAccountModelStatus,
+      isAccountModelStatusChanging: workspace.isAccountModelStatusChanging,
       getApiTypeLabel: workspace.getApiTypeLabel,
       getAccountModelRows: workspace.getAccountModelRows,
       getAccountStatusDotClass: workspace.getAccountStatusDotClass,

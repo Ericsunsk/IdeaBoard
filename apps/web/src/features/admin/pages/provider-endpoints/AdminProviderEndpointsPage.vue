@@ -195,6 +195,12 @@
                           size="small"
                           class="!shrink-0"
                           :aria-label="`${model.name} 模型启用状态`"
+                          :disabled="
+                            commands.isAccountModelStatusChanging(
+                              account.commandTarget,
+                              model.name,
+                            )
+                          "
                           @update:model-value="
                             commands.toggleAccountModelStatus(account.commandTarget, model.name)
                           "

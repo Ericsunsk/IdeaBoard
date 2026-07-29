@@ -108,6 +108,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import { LogOut, Xmark } from '@iconoir/vue'
 import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
+import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
@@ -132,6 +133,7 @@ const userStore = useUserStore()
 const { fallbackText, logoURL, projectName } = useSiteBranding()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const profileFeedback = useProfileFeedback()
+const { isPending: logoutLoading, runAsyncAction: runLogoutAction } = useAsyncAction()
 
 const activeTab = ref<AccountManagementTab>(resolveAccountManagementTab(props.initialTab))
 watch(
@@ -140,8 +142,6 @@ watch(
     activeTab.value = resolveAccountManagementTab(tab)
   },
 )
-const logoutLoading = ref(false)
-
 const navGroups = accountTabRegistry
 const activeTabEntry = computed(() => resolveAccountTab(activeTab.value))
 
@@ -153,17 +153,15 @@ const accountBrandMarkClass = createBrandMarkClass(brandMarkClasses.sizes.accoun
 const accountPaneMotionEnabled = getMotionPreference() !== 'reduce'
 
 async function handleLogout() {
-  if (logoutLoading.value) return
-
-  logoutLoading.value = true
-  try {
-    if (await logoutAndRedirect(USER_HOME_PATH)) {
-      emit('close')
-    } else {
-      profileFeedback.logoutFailed()
-    }
-  } finally {
-    logoutLoading.value = false
+  const loggedOut = await runLogoutAction(() => logoutAndRedirect(USER_HOME_PATH), {
+    feedback: {
+      error: profileFeedback.logoutFailed,
+    },
+  })
+  if (loggedOut) {
+    emit('close')
+  } else if (loggedOut === false) {
+    profileFeedback.logoutFailed()
   }
 }
 

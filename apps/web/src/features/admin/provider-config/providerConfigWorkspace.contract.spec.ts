@@ -125,6 +125,31 @@ describe('provider config workspace facade', () => {
     expect(mockResource.fetchAccountLimits).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps a successful providerEndpoint save successful when the follow-up refresh fails', async () => {
+    const { workspace, feedback } = createWorkspace()
+    const afterSaved = vi.fn()
+    const refreshError = new Error('refresh failed')
+
+    await workspace.loadData()
+    mockResource.fetchProviderEndpoints.mockRejectedValueOnce(refreshError)
+
+    await workspace.saveProviderEndpoint({
+      data: {
+        apiType: 'openai-compatible',
+        name: 'Saved ProviderEndpoint',
+        baseUrl: 'https://api.saved.example/v1',
+        status: 1,
+      },
+      isEditing: false,
+      afterSaved,
+    })
+
+    expect(feedback.providerEndpointSaved).toHaveBeenCalledWith(false)
+    expect(afterSaved).toHaveBeenCalledTimes(1)
+    expect(feedback.providerEndpointSaveFailed).not.toHaveBeenCalled()
+    expect(feedback.loadFailed).toHaveBeenCalledWith(refreshError)
+  })
+
   it('saves an account while preserving existing model settings', async () => {
     const { workspace, feedback } = createWorkspace()
     const afterSaved = vi.fn()
@@ -264,6 +289,54 @@ describe('provider config workspace facade', () => {
     ])
   })
 
+  it('exposes model-scoped pending state and blocks only duplicate toggles', async () => {
+    const firstPatch = createDeferred<ProviderAccountRecord>()
+    const secondPatch = createDeferred<ProviderAccountRecord>()
+    mockResource.fetchAccounts.mockResolvedValueOnce([
+      makeAccount({
+        models: [
+          makeModel({ name: 'gpt-4o', enabled: true }),
+          makeModel({ name: 'imagen-4', enabled: true }),
+        ],
+      }),
+    ])
+    mockResource.patchAccountModelRecord
+      .mockReturnValueOnce(firstPatch.promise)
+      .mockReturnValueOnce(secondPatch.promise)
+    const { workspace } = createWorkspace()
+    const target = { kind: 'account', id: 11 } as const
+
+    await workspace.loadData()
+    const firstRun = workspace.toggleAccountModelStatus(target, 'gpt-4o')
+    const duplicateRun = workspace.toggleAccountModelStatus(target, 'GPT-4O')
+    const independentRun = workspace.toggleAccountModelStatus(target, 'imagen-4')
+
+    expect(workspace.isAccountModelStatusChanging(target, 'gpt-4o')).toBe(true)
+    expect(workspace.isAccountModelStatusChanging(target, 'imagen-4')).toBe(true)
+    expect(mockResource.patchAccountModelRecord).toHaveBeenCalledTimes(2)
+
+    firstPatch.resolve(
+      makeAccount({
+        models: [
+          makeModel({ name: 'gpt-4o', enabled: false }),
+          makeModel({ name: 'imagen-4', enabled: true }),
+        ],
+      }),
+    )
+    secondPatch.resolve(
+      makeAccount({
+        models: [
+          makeModel({ name: 'gpt-4o', enabled: false }),
+          makeModel({ name: 'imagen-4', enabled: false }),
+        ],
+      }),
+    )
+    await Promise.all([firstRun, duplicateRun, independentRun])
+
+    expect(workspace.isAccountModelStatusChanging(target, 'gpt-4o')).toBe(false)
+    expect(workspace.isAccountModelStatusChanging(target, 'imagen-4')).toBe(false)
+  })
+
   it('keeps stale target feedback and delete confirmation in the facade', async () => {
     const { workspace, feedback, confirm } = createWorkspace()
 
@@ -399,4 +472,12 @@ function makeModel(overrides: Partial<ProviderAccountRecord['models'][number]> =
     sortOrder: 0,
     ...overrides,
   }
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
 }

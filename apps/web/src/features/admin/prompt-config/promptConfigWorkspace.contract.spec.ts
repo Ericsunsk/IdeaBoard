@@ -102,6 +102,28 @@ describe('prompt config workspace facade', () => {
     expect(workspace.saving[featureSlug]).toBe(false)
   })
 
+  it('blocks duplicate prompt saves and settles saving state once', async () => {
+    const saveRequest = Promise.withResolvers<FeaturePrompt>()
+    const { workspace, feedback } = createWorkspace()
+
+    await workspace.loadPrompts()
+    workspace.updatePromptDraft(featureSlug, 'Committed prompt')
+    mockResource.savePrompt.mockReturnValueOnce(saveRequest.promise)
+
+    const firstSave = workspace.savePrompt(featureSlug)
+    const duplicateSave = workspace.savePrompt(featureSlug)
+
+    expect(workspace.saving[featureSlug]).toBe(true)
+    expect(mockResource.savePrompt).toHaveBeenCalledOnce()
+    await expect(duplicateSave).resolves.toBeNull()
+
+    saveRequest.resolve(makeFeaturePrompt({ prompt: 'Committed prompt' }))
+
+    await expect(firstSave).resolves.toMatchObject({ prompt: 'Committed prompt' })
+    expect(workspace.saving[featureSlug]).toBe(false)
+    expect(feedback.promptSaved).toHaveBeenCalledOnce()
+  })
+
   it('inserts a code-owned variable at the cursor position', async () => {
     const { workspace } = createWorkspace()
 

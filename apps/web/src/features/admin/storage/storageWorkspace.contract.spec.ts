@@ -100,6 +100,37 @@ describe('admin storage workspace facade', () => {
     expect(workspace.applyingId.value).toBeNull()
   })
 
+  it('keeps test and apply actions in independent pending scopes', async () => {
+    const testRequest = Promise.withResolvers<{ message: string }>()
+    const applyRequest = Promise.withResolvers<{
+      message: string
+      profile: StorageProfile
+    }>()
+    mockResource.testProfile.mockReturnValueOnce(testRequest.promise)
+    mockResource.applyProfile.mockReturnValueOnce(applyRequest.promise)
+    const { workspace } = createWorkspace()
+
+    await workspace.loadData()
+
+    const testRun = workspace.testStorage({ id: 'profile-1', name: '对象存储' })
+    const applyRun = workspace.applyStorage({ id: 'profile-1', name: '对象存储' })
+
+    expect(mockResource.testProfile).toHaveBeenCalledOnce()
+    expect(mockResource.applyProfile).toHaveBeenCalledOnce()
+    expect(workspace.testingId.value).toBe('profile-1')
+    expect(workspace.applyingId.value).toBe('profile-1')
+
+    testRequest.resolve({ message: 'tested' })
+    applyRequest.resolve({
+      message: 'applied',
+      profile: makeProfile({ is_current: true }),
+    })
+    await Promise.all([testRun, applyRun])
+
+    expect(workspace.testingId.value).toBeNull()
+    expect(workspace.applyingId.value).toBeNull()
+  })
+
   it('refreshes after save commands and maps refresh failures without exposing secrets', async () => {
     const { workspace, feedback } = createWorkspace()
     const refreshError = new Error('refresh failed')

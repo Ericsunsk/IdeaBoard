@@ -173,13 +173,12 @@ type LoginField = 'username' | 'password'
 
 const userStore = useUserStore()
 const authFeedback = useAuthFeedback()
-const { runAsyncAction } = useAsyncAction()
+const { isPending: loading, runAsyncAction } = useAsyncAction()
 const loginFieldLabels: Record<LoginField, string> = {
   username: '账号',
   password: '密码',
 }
 
-const loading = ref(false)
 const formValue = ref({
   username: '',
   password: '',
@@ -254,7 +253,6 @@ async function handleLogin() {
       return true
     },
     {
-      loading,
       feedback: authFeedback.login,
     },
   )
