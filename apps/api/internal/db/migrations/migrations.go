@@ -731,16 +731,153 @@ func parseSQLStatements(raw string) []migrationStatement {
 }
 
 func splitSemicolonStatements(raw string) []migrationStatement {
-	parts := strings.Split(raw, ";")
-	statements := make([]migrationStatement, 0, len(parts))
-	for _, part := range parts {
-		stmt := strings.TrimSpace(part)
+	const (
+		sqlCode = iota
+		sqlLineComment
+		sqlBlockComment
+		sqlSingleQuoted
+		sqlDoubleQuoted
+		sqlDollarQuoted
+	)
+
+	statements := make([]migrationStatement, 0)
+	var statement strings.Builder
+	state := sqlCode
+	blockCommentDepth := 0
+	dollarQuoteDelimiter := ""
+
+	appendStatement := func() {
+		stmt := strings.TrimSpace(statement.String())
+		statement.Reset()
 		if meaningfulSQL(stmt) == "" {
-			continue
+			return
 		}
 		statements = append(statements, newMigrationStatement(stmt))
 	}
+
+	for offset := 0; offset < len(raw); {
+		switch state {
+		case sqlCode:
+			switch {
+			case raw[offset] == ';':
+				appendStatement()
+				offset++
+			case strings.HasPrefix(raw[offset:], "--"):
+				statement.WriteString("--")
+				offset += 2
+				state = sqlLineComment
+			case strings.HasPrefix(raw[offset:], "/*"):
+				statement.WriteString("/*")
+				offset += 2
+				blockCommentDepth = 1
+				state = sqlBlockComment
+			case raw[offset] == '\'':
+				statement.WriteByte(raw[offset])
+				offset++
+				state = sqlSingleQuoted
+			case raw[offset] == '"':
+				statement.WriteByte(raw[offset])
+				offset++
+				state = sqlDoubleQuoted
+			default:
+				delimiter, ok := sqlDollarQuoteDelimiter(raw, offset)
+				if ok {
+					statement.WriteString(delimiter)
+					offset += len(delimiter)
+					dollarQuoteDelimiter = delimiter
+					state = sqlDollarQuoted
+					continue
+				}
+				statement.WriteByte(raw[offset])
+				offset++
+			}
+		case sqlLineComment:
+			statement.WriteByte(raw[offset])
+			if raw[offset] == '\n' {
+				state = sqlCode
+			}
+			offset++
+		case sqlBlockComment:
+			switch {
+			case strings.HasPrefix(raw[offset:], "/*"):
+				statement.WriteString("/*")
+				offset += 2
+				blockCommentDepth++
+			case strings.HasPrefix(raw[offset:], "*/"):
+				statement.WriteString("*/")
+				offset += 2
+				blockCommentDepth--
+				if blockCommentDepth == 0 {
+					state = sqlCode
+				}
+			default:
+				statement.WriteByte(raw[offset])
+				offset++
+			}
+		case sqlSingleQuoted:
+			statement.WriteByte(raw[offset])
+			if raw[offset] == '\'' {
+				if offset+1 < len(raw) && raw[offset+1] == '\'' {
+					statement.WriteByte(raw[offset+1])
+					offset += 2
+					continue
+				}
+				state = sqlCode
+			}
+			offset++
+		case sqlDoubleQuoted:
+			statement.WriteByte(raw[offset])
+			if raw[offset] == '"' {
+				if offset+1 < len(raw) && raw[offset+1] == '"' {
+					statement.WriteByte(raw[offset+1])
+					offset += 2
+					continue
+				}
+				state = sqlCode
+			}
+			offset++
+		case sqlDollarQuoted:
+			if strings.HasPrefix(raw[offset:], dollarQuoteDelimiter) {
+				statement.WriteString(dollarQuoteDelimiter)
+				offset += len(dollarQuoteDelimiter)
+				dollarQuoteDelimiter = ""
+				state = sqlCode
+				continue
+			}
+			statement.WriteByte(raw[offset])
+			offset++
+		}
+	}
+
+	appendStatement()
 	return statements
+}
+
+func sqlDollarQuoteDelimiter(raw string, offset int) (string, bool) {
+	if offset >= len(raw) || raw[offset] != '$' {
+		return "", false
+	}
+	end := offset + 1
+	if end < len(raw) && raw[end] == '$' {
+		return "$$", true
+	}
+	if end >= len(raw) || !isSQLIdentifierStart(raw[end]) {
+		return "", false
+	}
+	for end++; end < len(raw) && isSQLIdentifierPart(raw[end]); end++ {
+	}
+	if end >= len(raw) || raw[end] != '$' {
+		return "", false
+	}
+	return raw[offset : end+1], true
+}
+
+func isSQLIdentifierStart(value byte) bool {
+	return value == '_' || value >= 'a' && value <= 'z' || value >= 'A' && value <= 'Z'
+}
+
+func isSQLIdentifierPart(value byte) bool {
+	return isSQLIdentifierStart(value) || value >= '0' && value <= '9'
 }
 
 func newMigrationStatement(stmt string) migrationStatement {

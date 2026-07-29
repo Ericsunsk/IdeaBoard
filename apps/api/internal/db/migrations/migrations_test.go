@@ -46,6 +46,32 @@ CREATE INDEX idx_sample_items_id ON sample_items (id);
 	}
 }
 
+func TestSplitSQLStatementsIgnoresSemicolonsOutsideSQLCode(t *testing.T) {
+	raw := `
+-- Task facts retain their immutable media asset identity; only the stored URL is retired.
+ALTER TABLE media_assets ADD COLUMN reclaim_after TIMESTAMPTZ(3);
+
+INSERT INTO sample_items (label) VALUES ('keep;this');
+
+/* Reclamation is reference-driven; task facts remain immutable. */
+CREATE INDEX idx_media_assets_reclamation_due ON media_assets (reclaim_after);
+`
+
+	statements := splitSQLStatements(raw)
+	if len(statements) != 3 {
+		t.Fatalf("statements len=%d, want 3: %#v", len(statements), statements)
+	}
+	if got := firstSQLLine(statements[0]); got != "ALTER TABLE media_assets ADD COLUMN reclaim_after TIMESTAMPTZ(3)" {
+		t.Fatalf("first statement starts with %q", got)
+	}
+	if !strings.Contains(statements[1], "'keep;this'") {
+		t.Fatalf("string literal was split or altered: %q", statements[1])
+	}
+	if got := firstSQLLine(statements[2]); got != "/* Reclamation is reference-driven; task facts remain immutable. */" {
+		t.Fatalf("third statement starts with %q", got)
+	}
+}
+
 func TestParseSQLStatementsMarksNoTxStatements(t *testing.T) {
 	raw := `
 CREATE TABLE sample_items (id BIGINT PRIMARY KEY);
