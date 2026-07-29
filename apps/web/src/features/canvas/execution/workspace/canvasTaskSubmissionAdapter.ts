@@ -1,7 +1,4 @@
-import type {
-  SubmitTaskData,
-  SubmitTaskReadinessRequestData,
-} from '../../../../shared/api/task'
+import type { SubmitTaskData, SubmitTaskReadinessRequestData } from '../../../../shared/api/task'
 import {
   assertTaskRequestReady,
   submitTaskRequest,

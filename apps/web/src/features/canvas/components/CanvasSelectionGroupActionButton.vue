@@ -13,11 +13,7 @@
         @contextmenu.stop.prevent
         @click.stop="emit('activate')"
       >
-        <component
-          :is="actionIcon"
-          class="canvas-selection-group-action-icon"
-          aria-hidden="true"
-        />
+        <component :is="actionIcon" class="canvas-selection-group-action-icon" aria-hidden="true" />
         <span class="node-tool-tooltip" aria-hidden="true">{{ action.label }}</span>
       </button>
     </Transition>

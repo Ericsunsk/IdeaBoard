@@ -36,7 +36,9 @@ describe('useUserRewardRedemptions', () => {
       .mockResolvedValueOnce(buildPage('新用户奖励'))
     const { user } = renderRewardsHost()
 
-    await waitFor(() => expect(screen.getByTestId('reward-codes')).toHaveTextContent('夏日灵感奖励'))
+    await waitFor(() =>
+      expect(screen.getByTestId('reward-codes')).toHaveTextContent('夏日灵感奖励'),
+    )
     expect(fetchUserRewardRedemptionsMock).toHaveBeenNthCalledWith(
       1,
       { limit: 20 },
@@ -67,7 +69,9 @@ describe('useUserRewardRedemptions', () => {
       expect(screen.getByTestId('initial-error')).toHaveTextContent('首次加载失败'),
     )
     await user.click(screen.getByRole('button', { name: '重新加载' }))
-    await waitFor(() => expect(screen.getByTestId('reward-codes')).toHaveTextContent('夏日灵感奖励'))
+    await waitFor(() =>
+      expect(screen.getByTestId('reward-codes')).toHaveTextContent('夏日灵感奖励'),
+    )
 
     await user.click(screen.getByRole('button', { name: '加载更多' }))
     await waitFor(() =>

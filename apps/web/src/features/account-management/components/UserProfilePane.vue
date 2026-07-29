@@ -13,8 +13,7 @@
             class="flex h-full w-full items-center justify-center overflow-hidden rounded-[var(--radius-ib-pill)]"
             :pt="{
               image: {
-                class:
-                  'h-full w-full rounded-[var(--radius-ib-pill)] object-cover',
+                class: 'h-full w-full rounded-[var(--radius-ib-pill)] object-cover',
               },
             }"
           />
@@ -63,16 +62,8 @@
             {{ userStore.user?.uid || '-' }}
           </p>
           <div class="mt-3 flex min-w-0 flex-wrap items-center gap-2">
-            <Tag
-              :value="userStatusLabel"
-              :severity="userStatusSeverity"
-              rounded
-            />
-            <Tag
-              :value="userRoleLabel"
-              :severity="userRoleSeverity"
-              rounded
-            />
+            <Tag :value="userStatusLabel" :severity="userStatusSeverity" rounded />
+            <Tag :value="userRoleLabel" :severity="userRoleSeverity" rounded />
           </div>
         </div>
       </div>

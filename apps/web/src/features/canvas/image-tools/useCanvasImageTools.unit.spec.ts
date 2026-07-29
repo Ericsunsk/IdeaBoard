@@ -591,16 +591,18 @@ describe('useCanvasImageTools image adjustment final apply', () => {
 
       expect(actionAfter).toBe(actionBefore)
       expect(actionAfter.directGenerating).toBe(false)
-      expect(
-        harness.runtime.viewModel.nodeBindings.actionFor('empty-image').directGenerating,
-      ).toBe(false)
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('empty-image').directGenerating).toBe(
+        false,
+      )
       expect(harness.runtime.viewModel.chrome.value.mask.directGenerating).toBe(false)
 
       harness.directActionRunningNodeIds.value = new Set(['image-1'])
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').directGenerating).toBe(true)
-      expect(
-        harness.runtime.viewModel.nodeBindings.actionFor('empty-image').directGenerating,
-      ).toBe(false)
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').directGenerating).toBe(
+        true,
+      )
+      expect(harness.runtime.viewModel.nodeBindings.actionFor('empty-image').directGenerating).toBe(
+        false,
+      )
       expect(harness.runtime.viewModel.chrome.value.mask.directGenerating).toBe(true)
 
       harness.directActionRunningNodeIds.value = new Set()

@@ -90,8 +90,9 @@ describe('useImageCanvasExtendOverlay', () => {
 
   it('stays active when a later node popover owns the outside pointer dismissal', async () => {
     const harness = createHarness()
-    const popoverRoot = ref<HTMLElement | null>(document.createElement('div'))
-    document.body.appendChild(popoverRoot.value)
+    const popoverElement = document.createElement('div')
+    const popoverRoot = ref<HTMLElement | null>(popoverElement)
+    document.body.appendChild(popoverElement)
     const popoverScope = effectScope()
     const popovers = popoverScope.run(() =>
       useNodeToolPopoverGroup({

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Edge, Node, NodeProps } from '@vue-flow/core'
 import type { CanvasGroupPresentationInteraction } from '../group-presentation'
 import type { ImageNodePresentationBinding } from '../node-presentation'
+import type { ImageToolChromeCommands, ImageToolChromeModel } from '../image-tools'
 import type { FlowNodeData } from '../types/flowTypes'
 import { useCanvasScreenPresentation, type CanvasScreenPresentationOptions } from './index'
 
@@ -10,6 +11,7 @@ function createOptions() {
   const hidden = ref(false)
   const locked = ref(false)
   const selected = ref(false)
+  const zoomLevel = ref(100)
   const generationAvailable = ref(true)
   const nodes = ref<Node<FlowNodeData>[]>([])
   const edges = ref<Edge[]>([])
@@ -20,8 +22,8 @@ function createOptions() {
     workspace: {
       viewModel: {
         flowPane: { nodes, edges },
-        graphEditing: { hasSelectedFlowNodes: selected },
-        viewportControls: { zoomLevel: ref(100) },
+        graphEditing: { hasSelectedFlowNodes: computed(() => selected.value) },
+        viewportControls: { zoomLevel: computed(() => zoomLevel.value) },
       },
     },
     chrome: {
@@ -35,7 +37,16 @@ function createOptions() {
         catalogRecovery: { status: 'idle' as const },
         setNameInputRef: vi.fn(),
       })),
-      account: computed(() => ({ balance: { amount: 0, unit: 'Idea' }, menuItems: [] })),
+      account: computed(() => ({
+        balance: {
+          status: 'ready' as const,
+          displayValue: '0 Idea',
+          ariaLabel: '账户余额 0 Idea',
+          availableIdeas: 0,
+          command: vi.fn(),
+        },
+        menuItems: [],
+      })),
       activeTool: ref<'select' | 'hand'>('select'),
       minimapEnabled: ref(true),
       isHidden: hidden,
@@ -62,7 +73,11 @@ function createOptions() {
       isViewportPanActive: ref(false),
       isLocked: locked,
       isShortcutSuppressed: computed(() => false),
-      connectionBindings: {},
+      connectionBindings: {
+        isValidConnection: vi.fn(),
+        onConnect: vi.fn(),
+        onEdgeUpdate: vi.fn(),
+      },
       surface: {
         onDragOver: vi.fn(),
         onDrop: vi.fn(),
@@ -114,15 +129,24 @@ function createOptions() {
         },
       },
       overlays: {
-        imageToolSession: { viewModel: { chrome: ref({}) }, commands: { chrome: {} } },
+        imageToolSession: {
+          viewModel: { chrome: computed(() => ({}) as ImageToolChromeModel) },
+          commands: { chrome: {} as ImageToolChromeCommands },
+        },
         nodeContextMenu: ref({ visible: false, x: 0, y: 0 }),
         canvasNodeMenuItems: [],
         createNode: vi.fn(),
       },
     },
-  } satisfies CanvasScreenPresentationOptions
+  }
 
-  return { options, hidden, locked, selected, generationAvailable }
+  return {
+    options: options as CanvasScreenPresentationOptions,
+    hidden,
+    locked,
+    selected,
+    generationAvailable,
+  }
 }
 
 describe('useCanvasScreenPresentation', () => {

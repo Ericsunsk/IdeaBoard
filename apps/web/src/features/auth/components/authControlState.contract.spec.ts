@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  authCloseButtonClass,
-  authPrimaryButtonClass,
-  authSwitchButtonClass,
-} from './authModalUi'
+import { authCloseButtonClass, authPrimaryButtonClass, authSwitchButtonClass } from './authModalUi'
 
 describe('Auth Interactive Control State adapter', () => {
   it.each([

@@ -43,9 +43,7 @@ describe('Admin Reward Code routes', () => {
   it('publishes only the remaining Credits routes', () => {
     const creditsRoute = adminRoutes[0]?.children?.find((route) => route.path === 'credits')
     const childPaths = creditsRoute?.children?.map((route) => route.path)
-    const rewardCodeRoute = creditsRoute?.children?.find(
-      (route) => route.path === 'reward-codes',
-    )
+    const rewardCodeRoute = creditsRoute?.children?.find((route) => route.path === 'reward-codes')
 
     expect(creditsRoute?.redirect).toBeUndefined()
     expect(creditsRoute?.children?.[0]).toMatchObject({

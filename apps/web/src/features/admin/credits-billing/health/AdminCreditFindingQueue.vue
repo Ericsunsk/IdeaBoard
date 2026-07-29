@@ -317,5 +317,4 @@ function openFinding(finding: AdminCreditFinding) {
   selectedFinding.value = finding
   drawerVisible.value = true
 }
-
 </script>

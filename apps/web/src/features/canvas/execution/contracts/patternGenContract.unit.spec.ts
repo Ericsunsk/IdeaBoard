@@ -42,11 +42,15 @@ describe('patternGenContract', () => {
       }),
     ).toThrow('图案生成不需要输入图片，请移除图片输入后重试')
 
+    const unsupportedParams: Record<string, unknown> = {
+      ratio: '1:1',
+      model: 'client-selected-model',
+    }
     expect(() =>
       assertPatternGenTaskRequest({
         prompt: 'repeatable textile pattern',
         feature: WORKFLOW_FEATURE.patternGen,
-        params: { ratio: '1:1', model: 'client-selected-model' },
+        params: unsupportedParams,
       }),
     ).toThrow('图案生成暂不支持参数 model')
   })

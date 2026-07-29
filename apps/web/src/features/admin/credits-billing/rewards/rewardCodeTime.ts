@@ -6,13 +6,7 @@ export function shanghaiDateTimeInputToPickerDate(value: string): Date | null {
   const match = DATE_TIME_INPUT_PATTERN.exec(value.trim())
   if (!match) return null
   const [, year, month, day, hour, minute] = match
-  const date = new Date(
-    Number(year),
-    Number(month) - 1,
-    Number(day),
-    Number(hour),
-    Number(minute),
-  )
+  const date = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute))
   return pickerDateToShanghaiDateTimeInput(date) === value.trim() ? date : null
 }
 

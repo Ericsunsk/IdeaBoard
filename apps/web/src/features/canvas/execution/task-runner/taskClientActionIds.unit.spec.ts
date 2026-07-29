@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SubmitTaskData } from '../../../../shared/api/task'
-import {
-  createCanvasActivationId,
-  withTaskClientActionId,
-} from './taskClientActionIds'
+import { createCanvasActivationId, withTaskClientActionId } from './taskClientActionIds'
 
 describe('taskClientActionIds', () => {
   it('adds a normalized client action id to a submit request', () => {

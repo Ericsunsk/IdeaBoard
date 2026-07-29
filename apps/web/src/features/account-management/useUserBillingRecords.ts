@@ -1,10 +1,7 @@
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
 import { useInfiniteQuery } from '@tanstack/vue-query'
 import { useUserCreditsInvalidationBridge } from './useUserCreditsInvalidationBridge'
-import {
-  fetchUserBillingRecords,
-  userBillingRecordsQueryKeys,
-} from './userBillingRecordsResource'
+import { fetchUserBillingRecords, userBillingRecordsQueryKeys } from './userBillingRecordsResource'
 
 const pageSize = 20
 const initialPageParam = 0
@@ -28,18 +25,14 @@ export function useUserBillingRecords(enabled: MaybeRefOrGetter<boolean> = true)
     retry: false,
   })
 
-  const records = computed(
-    () => query.data.value?.pages.flatMap((page) => page.records) ?? [],
-  )
+  const records = computed(() => query.data.value?.pages.flatMap((page) => page.records) ?? [])
   const hasLoadedPage = computed(() => query.data.value !== undefined)
 
   return {
     records,
     isInitialPending: computed(() => query.isPending.value && !hasLoadedPage.value),
     initialError: computed(() => (!hasLoadedPage.value ? query.error.value : null)),
-    loadMoreError: computed(() =>
-      query.isFetchNextPageError.value ? query.error.value : null,
-    ),
+    loadMoreError: computed(() => (query.isFetchNextPageError.value ? query.error.value : null)),
     hasNextPage: query.hasNextPage,
     isFetchingNextPage: query.isFetchingNextPage,
     retryInitial: query.refetch,

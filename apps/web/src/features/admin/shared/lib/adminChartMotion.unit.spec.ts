@@ -9,7 +9,10 @@ afterEach(() => {
 describe('defineAdminChartOptions', () => {
   it('uses Motion Policy timing for every Admin chart', () => {
     document.documentElement.style.setProperty('--motion-enter-duration', '220ms')
-    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })))
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: false })),
+    )
 
     expect(defineAdminChartOptions({ animation: { duration: 999 } }).animation).toEqual({
       duration: 220,
@@ -18,7 +21,10 @@ describe('defineAdminChartOptions', () => {
 
   it('keeps Admin chart data immediately readable under reduced motion', () => {
     document.documentElement.style.setProperty('--motion-enter-duration', '220ms')
-    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true })),
+    )
 
     expect(defineAdminChartOptions({}).animation).toBe(false)
   })

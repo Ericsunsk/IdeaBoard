@@ -1,13 +1,5 @@
 import type { Component } from 'vue'
-import {
-  Coins,
-  CreditCard,
-  Gift,
-  Lock,
-  Page,
-  StatsUpSquare,
-  User,
-} from '@iconoir/vue'
+import { Coins, CreditCard, Gift, Lock, Page, StatsUpSquare, User } from '@iconoir/vue'
 import AccountComingSoonPane from './components/AccountComingSoonPane.vue'
 import UserBillingRecordsPane from './components/UserBillingRecordsPane.vue'
 import UserProfilePane from './components/UserProfilePane.vue'
@@ -60,8 +52,18 @@ export const accountTabRegistry = [
     key: 'account',
     label: '账户设置',
     tabs: [
-      { key: 'profile', label: '个人资料', icon: User, pane: { component: UserProfilePane, props: () => ({}) } },
-      { key: 'security', label: '账号安全', icon: Lock, pane: { component: UserSecurityPane, props: () => ({}) } },
+      {
+        key: 'profile',
+        label: '个人资料',
+        icon: User,
+        pane: { component: UserProfilePane, props: () => ({}) },
+      },
+      {
+        key: 'security',
+        label: '账号安全',
+        icon: Lock,
+        pane: { component: UserSecurityPane, props: () => ({}) },
+      },
     ],
   },
   {
@@ -76,9 +78,24 @@ export const accountTabRegistry = [
     key: 'benefits',
     label: '权益和账单',
     tabs: [
-      { key: 'rewards', label: '奖励中心', icon: Gift, pane: { component: UserRewardsPane, props: () => ({}) } },
-      { key: 'billing', label: '账单记录', icon: Page, pane: activeQueryPane(UserBillingRecordsPane) },
-      { key: 'usage', label: '用量统计', icon: StatsUpSquare, pane: activeQueryPane(UserUsagePane) },
+      {
+        key: 'rewards',
+        label: '奖励中心',
+        icon: Gift,
+        pane: { component: UserRewardsPane, props: () => ({}) },
+      },
+      {
+        key: 'billing',
+        label: '账单记录',
+        icon: Page,
+        pane: activeQueryPane(UserBillingRecordsPane),
+      },
+      {
+        key: 'usage',
+        label: '用量统计',
+        icon: StatsUpSquare,
+        pane: activeQueryPane(UserUsagePane),
+      },
     ],
   },
 ] as const satisfies readonly AccountTabGroupDefinition[]

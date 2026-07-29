@@ -29,7 +29,15 @@
 
           <form class="relative z-[1] flex flex-col gap-5" novalidate @submit.prevent="handleLogin">
             <IbFormField
-              v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+              v-slot="{
+                ariaInvalid,
+                describedbyId,
+                fieldId,
+                inlineError,
+                inlineErrorText,
+                invalid,
+                required,
+              }"
               label="账号"
               :error="errors.username"
               field-id="login-username"
@@ -61,7 +69,15 @@
             </IbFormField>
 
             <IbFormField
-              v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+              v-slot="{
+                ariaInvalid,
+                describedbyId,
+                fieldId,
+                inlineError,
+                inlineErrorText,
+                invalid,
+                required,
+              }"
               label="密码"
               :error="errors.password"
               field-id="login-password"

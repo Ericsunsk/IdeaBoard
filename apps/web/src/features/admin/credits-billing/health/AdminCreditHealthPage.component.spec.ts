@@ -299,7 +299,9 @@ describe('AdminCreditHealthPage', () => {
     expect(screen.queryByRole('button', { name: /忽略|标记解决/ })).not.toBeInTheDocument()
 
     expect(screen.getAllByText('Wallet · User #12')).toHaveLength(2)
-    expect(screen.queryByRole('button', { name: /打开 Wallet|Wallet · User/ })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: /打开 Wallet|Wallet · User/ }),
+    ).not.toBeInTheDocument()
     expect(pushMock).not.toHaveBeenCalled()
   })
 

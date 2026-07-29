@@ -1,5 +1,8 @@
 <template>
-  <CanvasGroupFramesOverlay :frames="presentation.groupFrames.value" @resize-start="presentation.onGroupResizeStart" />
+  <CanvasGroupFramesOverlay
+    :frames="presentation.groupFrames.value"
+    @resize-start="presentation.onGroupResizeStart"
+  />
   <Teleport v-if="actionTarget" :to="actionTarget">
     <CanvasSelectionGroupActionButton
       v-if="presentation.isSelectionGroupActionVisible.value"

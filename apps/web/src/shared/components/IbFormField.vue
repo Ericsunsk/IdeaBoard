@@ -67,12 +67,8 @@ const generatedId = useId()
 const resolvedFieldId = computed(() => props.fieldId || `ib-form-field-${generatedId}`)
 const errorId = computed(() => `${resolvedFieldId.value}-error`)
 const invalid = computed(() => Boolean(props.error))
-const inlineError = computed(
-  () => props.inlineRequired && isRequiredErrorMessage(props.error),
-)
-const shouldShowMessage = computed(
-  () => props.showMessage && invalid.value && !inlineError.value,
-)
+const inlineError = computed(() => props.inlineRequired && isRequiredErrorMessage(props.error))
+const shouldShowMessage = computed(() => props.showMessage && invalid.value && !inlineError.value)
 const describedbyId = computed(() => (invalid.value ? errorId.value : undefined))
 const errorMessage = computed(() => displayErrorMessage(props.error))
 const slotProps = computed<IbFormFieldSlotProps>(() => ({

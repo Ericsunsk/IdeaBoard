@@ -170,7 +170,6 @@
           </Button>
         </template>
       </Column>
-
     </DataTableFrame>
   </AdminTablePanel>
 

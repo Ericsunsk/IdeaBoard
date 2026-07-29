@@ -44,24 +44,14 @@
       <Message v-if="initialError" severity="error" :closable="false">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>兑换记录加载失败，请重试。</span>
-          <Button
-            label="重试加载兑换记录"
-            text
-            :loading="loading"
-            @click="loadRedemptions()"
-          />
+          <Button label="重试加载兑换记录" text :loading="loading" @click="loadRedemptions()" />
         </div>
       </Message>
 
       <Message v-if="backgroundError" severity="secondary" :closable="false">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>刷新兑换记录失败，正在显示上次成功的数据。</span>
-          <Button
-            label="重试刷新兑换记录"
-            text
-            :loading="loading"
-            @click="refreshRedemptions"
-          />
+          <Button label="重试刷新兑换记录" text :loading="loading" @click="refreshRedemptions" />
         </div>
       </Message>
 

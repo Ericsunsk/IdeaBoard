@@ -11,9 +11,7 @@ export type AdminPromptConfigFeedback = {
   savePromptFailed: (error: unknown) => void
 }
 
-export function createAdminPromptConfigFeedback(
-  toast: AdminToastPort,
-): AdminPromptConfigFeedback {
+export function createAdminPromptConfigFeedback(toast: AdminToastPort): AdminPromptConfigFeedback {
   return {
     loadPromptsFailed: (error) => toast.error(formatAdminDisplayError(error, '加载提示词失败')),
     promptDraftInvalid: (message) => toast.warning(message),

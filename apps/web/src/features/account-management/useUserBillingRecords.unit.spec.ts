@@ -35,7 +35,11 @@ describe('useUserBillingRecords', () => {
     const { user } = renderBillingHost()
 
     await waitFor(() => expect(screen.getByTestId('record-titles')).toHaveTextContent('局部重绘'))
-    expect(fetchUserBillingRecordsMock).toHaveBeenNthCalledWith(1, { limit: 20 }, expect.any(AbortSignal))
+    expect(fetchUserBillingRecordsMock).toHaveBeenNthCalledWith(
+      1,
+      { limit: 20 },
+      expect.any(AbortSignal),
+    )
     expect(screen.getByTestId('has-more')).toHaveTextContent('true')
 
     await user.click(screen.getByRole('button', { name: '加载更多' }))

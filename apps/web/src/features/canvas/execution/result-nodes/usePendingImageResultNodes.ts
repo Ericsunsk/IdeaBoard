@@ -228,7 +228,9 @@ export function usePendingImageResultExecution(
     return Number.isFinite(directWidth) && directWidth > 0 ? directWidth : null
   }
 
-  function readNodeBounds(node: Node): { x: number; y: number; width: number; height: number } | null {
+  function readNodeBounds(
+    node: Node,
+  ): { x: number; y: number; width: number; height: number } | null {
     const imageLayout = readImageNodeLayout(node)
     if (imageLayout) {
       const dimensions = (node as { dimensions?: { height?: unknown } }).dimensions
@@ -324,7 +326,9 @@ export function usePendingImageResultExecution(
     }
     const occupiedBounds = Array.from(lookup.nodeById.values())
       .map(readNodeBounds)
-      .filter((bounds): bounds is { x: number; y: number; width: number; height: number } => !!bounds)
+      .filter(
+        (bounds): bounds is { x: number; y: number; width: number; height: number } => !!bounds,
+      )
     const targetHeight = estimateImageNodeHeight(target)
 
     const isCollisionFree = (position: { x: number; y: number }) =>

@@ -1,8 +1,14 @@
 /* eslint-disable vue/one-component-per-file */
-import { defineComponent, h, ref, type PropType } from 'vue'
+import { computed, defineComponent, h, ref, type PropType } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import type { Edge, Node, NodeProps } from '@vue-flow/core'
 import { render } from '../../../test/render'
+import type { CanvasGroupPresentationInteraction } from '../group-presentation'
+import type { ImageToolChromeCommands, ImageToolChromeModel } from '../image-tools'
+import type { ImageNodePresentationBinding } from '../node-presentation'
+import type { FlowNodeData } from '../types/flowTypes'
 import CanvasScreenPresentation from './CanvasScreenPresentation.vue'
+import type { CanvasScreenPresentationBinding } from './screenPresentationContract'
 
 function createPresentation(
   overrides: {
@@ -11,8 +17,14 @@ function createPresentation(
     generationAvailable?: boolean
   } = {},
 ) {
-  const nodes = ref([])
-  const edges = ref([])
+  const nodes = ref<Node<FlowNodeData>[]>([])
+  const edges = ref<Edge[]>([])
+  const imagePresentation = {} as ImageNodePresentationBinding
+  const group = {} as CanvasGroupPresentationInteraction
+  const imageToolSession = {
+    viewModel: { chrome: computed(() => ({}) as ImageToolChromeModel) },
+    commands: { chrome: {} as ImageToolChromeCommands },
+  }
 
   return {
     layout: {
@@ -25,10 +37,28 @@ function createPresentation(
       props: {
         inert: overrides.chromeHidden ?? false,
         isHidden: overrides.chromeHidden ?? false,
-        board: {},
-        account: {},
-        tools: {},
-        status: { exportDisabled: overrides.exportDisabled ?? false },
+        board: {
+          currentName: '',
+          options: [],
+          currentId: null,
+          isMenuOpen: false,
+          isRenaming: false,
+          isRenamePending: false,
+          catalogRecovery: { status: 'idle' },
+          setNameInputRef: vi.fn(),
+        },
+        account: {
+          balance: {
+            status: 'ready',
+            displayValue: '0 Idea',
+            ariaLabel: '账户余额 0 Idea',
+            availableIdeas: 0,
+            command: vi.fn(),
+          },
+          menuItems: [],
+        },
+        tools: { activeTool: 'select', minimapEnabled: true },
+        status: { exportDisabled: overrides.exportDisabled ?? false, zoomLevel: 100 },
       },
       commands: {
         updateBoardNameDraft: vi.fn(),
@@ -74,9 +104,14 @@ function createPresentation(
         onPaneClick: vi.fn(),
         onPaneContextMenu: vi.fn(),
       },
-      group: { props: {} },
+      group: { props: { presentation: group, actionTarget: null } },
       node: {
-        propsFor: () => ({ generationAvailable: overrides.generationAvailable ?? true }),
+        propsFor: (node: NodeProps<FlowNodeData>) => ({
+          nodeId: node.id,
+          data: node.data,
+          generationAvailable: overrides.generationAvailable ?? true,
+          imagePresentation,
+        }),
         listeners: {
           intent: vi.fn(),
           nodeMousedown: vi.fn(),
@@ -92,7 +127,14 @@ function createPresentation(
           dragEnd: vi.fn(),
         },
       },
-      overlays: { props: {}, commands: { createNode: vi.fn() } },
+      overlays: {
+        props: {
+          imageToolSession,
+          nodeContextMenu: { visible: false, x: 0, y: 0 },
+          canvasNodeMenuItems: [],
+        },
+        commands: { createNode: vi.fn() },
+      },
     },
   }
 }
@@ -194,7 +236,7 @@ const OverlaysStub = defineComponent({
 function renderPresentation(input = {}) {
   const presentation = createPresentation(input)
   const view = render(CanvasScreenPresentation, {
-    props: { presentation },
+    props: { presentation: presentation as CanvasScreenPresentationBinding },
     global: {
       stubs: {
         CanvasChrome: ChromeStub,

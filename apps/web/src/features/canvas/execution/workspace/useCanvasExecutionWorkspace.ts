@@ -37,7 +37,9 @@ export type CanvasExecutionWorkspaceState = {
 }
 
 export type CanvasExecutionWorkspaceCommands = {
-  runTextPromptGeneration: (plan: ActivatedImageExecutionPlan & { kind: 'text-prompt' }) => Promise<void>
+  runTextPromptGeneration: (
+    plan: ActivatedImageExecutionPlan & { kind: 'text-prompt' },
+  ) => Promise<void>
   reattachPendingImageResults: () => Promise<void>
 }
 

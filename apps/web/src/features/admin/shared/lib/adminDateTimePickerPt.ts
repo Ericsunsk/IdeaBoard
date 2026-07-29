@@ -85,8 +85,7 @@ export const adminDateTimePickerPt = {
   yearView: { class: 'grid grid-cols-2 gap-2 pt-3' },
   year: selectableChoiceClass,
   timePicker: {
-    class:
-      'mt-3 flex items-center justify-center gap-2 border-t border-admin-border-soft pt-3',
+    class: 'mt-3 flex items-center justify-center gap-2 border-t border-admin-border-soft pt-3',
   },
   hourPicker: { class: 'flex flex-col items-center gap-1' },
   minutePicker: { class: 'flex flex-col items-center gap-1' },

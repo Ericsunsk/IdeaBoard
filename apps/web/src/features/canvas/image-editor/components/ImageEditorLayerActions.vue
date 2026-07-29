@@ -129,7 +129,8 @@ const progressBarStyle = computed(() =>
   progressPercent.value == null ? {} : { width: `${progressPercent.value}%` },
 )
 const showProgressPanel = ref(false)
-let progressPanelDelayId: ReturnType<typeof window.setTimeout> | null = null
+// The delayed disclosure is browser-only, so retain the DOM timer handle type.
+let progressPanelDelayId: number | null = null
 
 function clearProgressPanelDelay() {
   if (progressPanelDelayId == null) return

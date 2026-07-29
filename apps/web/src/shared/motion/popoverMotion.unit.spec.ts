@@ -7,7 +7,10 @@ afterEach(() => {
 
 describe('Popover Motion adapter', () => {
   it('uses semantic CSS presence motion by default', () => {
-    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })))
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: false })),
+    )
 
     expect(createPopoverMotionTransition()).toEqual({
       name: 'ib-popover-motion',
@@ -16,7 +19,10 @@ describe('Popover Motion adapter', () => {
   })
 
   it('renders transient overlays immediately under reduced motion', () => {
-    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true })),
+    )
 
     expect(createPopoverMotionTransition()).toEqual({
       name: 'ib-popover-motion',

@@ -364,16 +364,22 @@ describe('flowImageWorkflowExecution', () => {
     )
     const { execution, nodes } = createExecutionHarness()
 
-    await execution.executeImageWorkflow({ ...imageActionPlan(), activationId: 'canvas:activation-1' })
-    await execution.executeImageWorkflow({ ...imageActionPlan(), activationId: 'canvas:activation-2' })
+    await execution.executeImageWorkflow({
+      ...imageActionPlan(),
+      activationId: 'canvas:activation-1',
+    })
+    await execution.executeImageWorkflow({
+      ...imageActionPlan(),
+      activationId: 'canvas:activation-2',
+    })
 
     const pendingResultNodes = nodes.value.filter(
       (node) => node.id !== 'image-1' && node.data?.kind === 'image',
     )
     expect(pendingResultNodes).toHaveLength(2)
-    expect(pendingResultNodes.map((node) => readImageSnapshot(nodes.value, node.id).pendingTaskId)).toEqual(
-      ['task-first', 'task-second'],
-    )
+    expect(
+      pendingResultNodes.map((node) => readImageSnapshot(nodes.value, node.id).pendingTaskId),
+    ).toEqual(['task-first', 'task-second'])
     expect(executorMocks.submitTaskRequest).toHaveBeenCalledTimes(2)
     const submitCalls = executorMocks.submitTaskRequest.mock.calls as unknown as Array<
       [{ client_action_id?: string }]
@@ -402,7 +408,9 @@ describe('flowImageWorkflowExecution', () => {
       (node) => node.id !== 'image-1' && node.data?.kind === 'image',
     )
     expect(pendingResultNodes).toHaveLength(1)
-    expect(readImageSnapshot(nodes.value, pendingResultNodes[0].id).pendingTaskId).toBe('task-retried')
+    expect(readImageSnapshot(nodes.value, pendingResultNodes[0].id).pendingTaskId).toBe(
+      'task-retried',
+    )
     expect(executorMocks.submitTaskRequest).toHaveBeenCalledTimes(2)
     const submitCalls = executorMocks.submitTaskRequest.mock.calls as unknown as Array<
       [{ client_action_id?: string }]

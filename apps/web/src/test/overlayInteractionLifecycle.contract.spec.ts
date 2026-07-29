@@ -1,7 +1,10 @@
 import { effectScope, nextTick, ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { useCanvasCustomLayerOverlay } from '../features/canvas/overlay-lifecycle'
-import { useOverlayInteractionLifecycle } from '../shared/composables/useOverlayInteractionLifecycle'
+import {
+  useOverlayInteractionLifecycle,
+  type OverlayDismissal,
+} from '../shared/composables/useOverlayInteractionLifecycle'
 import { usePrimeDialogOverlayLifecycle } from '../shared/composables/usePrimeDialogOverlayLifecycle'
 import { usePrimePopupMenuOverlayLifecycle } from '../shared/composables/usePrimePopupMenuOverlayLifecycle'
 
@@ -124,12 +127,14 @@ describe('overlay interaction lifecycle contract', () => {
 
   it('routes Canvas outside-click and Escape through its public adapter and tears listeners down', async () => {
     const visible = ref(false)
-    const root = ref<HTMLElement | null>(document.createElement('div'))
-    const onDismiss = vi.fn((dismissal: 'escape' | 'outside-pointer') => {
-      visible.value = false
-      return dismissal
-    })
-    document.body.appendChild(root.value)
+    const rootElement = document.createElement('div')
+    const root = ref<HTMLElement | null>(rootElement)
+    const onDismiss = vi.fn(
+      (_dismissal: OverlayDismissal, _event: KeyboardEvent | PointerEvent) => {
+        visible.value = false
+      },
+    )
+    document.body.appendChild(rootElement)
     const scope = effectScope()
     scope.run(() =>
       useCanvasCustomLayerOverlay({

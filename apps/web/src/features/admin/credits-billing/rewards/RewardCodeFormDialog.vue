@@ -147,18 +147,10 @@
           fluid
         >
           <template #buttonbar="{ todayCallback, clearCallback }">
-            <button
-              type="button"
-              :class="adminDateTimePickerActionClass"
-              @click="todayCallback"
-            >
+            <button type="button" :class="adminDateTimePickerActionClass" @click="todayCallback">
               今天
             </button>
-            <button
-              type="button"
-              :class="adminDateTimePickerActionClass"
-              @click="clearCallback"
-            >
+            <button type="button" :class="adminDateTimePickerActionClass" @click="clearCallback">
               永久有效
             </button>
           </template>

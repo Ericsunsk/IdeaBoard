@@ -25,11 +25,17 @@ describe('buildUserUsageTrendChart', () => {
       '--motion-enter-easing',
       'cubic-bezier(0.2, 0.8, 0.2, 1)',
     )
-    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })))
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: false })),
+    )
 
     expect(buildUserUsageTrendChart([], theme).options.animation).toMatchObject({ duration: 220 })
 
-    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true })),
+    )
     expect(buildUserUsageTrendChart([], theme).options.animation).toBe(false)
   })
 

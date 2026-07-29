@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ref, watch } from 'vue'
+import { createDeferred } from '../../test/deferred'
 import { useAsyncAction } from './useAsyncAction'
 
 describe('useAsyncAction', () => {
   it('blocks duplicate submissions while the committed action is pending', async () => {
-    const pendingAction = Promise.withResolvers<string>()
+    const pendingAction = createDeferred<string>()
     const action = vi.fn(() => pendingAction.promise)
     const { isPending, runAsyncAction } = useAsyncAction()
 

@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PromptAspectRatio } from '../../../canvas-board/domain'
-import type { ActivatedImageExecutionPlan, ImageExecutionPlan } from '../planning/ImageExecutionPlan'
+import type {
+  ActivatedImageExecutionPlan,
+  ImageExecutionPlan,
+} from '../planning/ImageExecutionPlan'
 import {
   createImageWorkflowCommands,
   type ImageWorkflowExecutionPort,
@@ -69,8 +72,9 @@ describe('imageWorkflowCommandRuntime', () => {
     await commands.runTextPromptGeneration('prompt-1', 'draft', 1, 'auto')
     await commands.runTextPromptGeneration('prompt-1', 'draft', 1, 'auto')
 
-    const [firstPlan, secondPlan] = (workflow.executeImageWorkflow as ReturnType<typeof vi.fn>).mock
-      .calls.map(([plan]) => plan as ActivatedImageExecutionPlan)
+    const [firstPlan, secondPlan] = (
+      workflow.executeImageWorkflow as ReturnType<typeof vi.fn>
+    ).mock.calls.map(([plan]) => plan as ActivatedImageExecutionPlan)
     expect(firstPlan).toMatchObject({ activationId: expect.stringMatching(/^canvas:/) })
     expect(secondPlan).toMatchObject({ activationId: expect.stringMatching(/^canvas:/) })
     expect(firstPlan.activationId).not.toBe(secondPlan.activationId)

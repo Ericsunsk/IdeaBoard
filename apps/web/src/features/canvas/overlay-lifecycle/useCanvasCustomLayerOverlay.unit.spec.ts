@@ -1,11 +1,12 @@
 import { createApp, defineComponent, h, nextTick, ref, type Ref } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi, type Mock } from 'vitest'
 import { useCanvasCustomLayerOverlay } from './useCanvasCustomLayerOverlay'
+import type { OverlayDismissal } from '../../../shared/composables/useOverlayInteractionLifecycle'
 
 type LayerHarness = {
   visible: Ref<boolean>
   root: Ref<HTMLElement | null>
-  onDismiss: ReturnType<typeof vi.fn>
+  onDismiss: Mock<(dismissal: OverlayDismissal, event: KeyboardEvent | PointerEvent) => void>
 }
 
 function mountLayers(
@@ -13,7 +14,7 @@ function mountLayers(
   options: {
     ignore?: readonly string[]
     renderRoots?: boolean
-    shouldDismiss?: (dismissal: string, event: KeyboardEvent | PointerEvent) => boolean
+    shouldDismiss?: (dismissal: OverlayDismissal, event: KeyboardEvent | PointerEvent) => boolean
   } = {},
 ) {
   const host = document.createElement('div')

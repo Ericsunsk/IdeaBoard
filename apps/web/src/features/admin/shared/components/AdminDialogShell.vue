@@ -123,5 +123,4 @@ function handleVisibleUpdate(visible: boolean) {
 function requestCloseFromControl() {
   requestOverlayClose('close-control')
 }
-
 </script>

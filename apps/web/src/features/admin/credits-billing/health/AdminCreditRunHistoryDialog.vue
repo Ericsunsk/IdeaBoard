@@ -181,12 +181,7 @@
     </AdminTablePanel>
 
     <template #footer>
-      <Button
-        label="关闭"
-        severity="secondary"
-        outlined
-        @click="$emit('update:visible', false)"
-      />
+      <Button label="关闭" severity="secondary" outlined @click="$emit('update:visible', false)" />
     </template>
   </AdminDialogShell>
 </template>

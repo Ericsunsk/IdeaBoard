@@ -4,9 +4,7 @@ import { useRouter } from 'vue-router'
 import { useUserStore } from '../../app/stores/user'
 import { type AsyncActionFeedback, useAsyncAction } from '../../shared/composables/useAsyncAction'
 import { USER_LOGIN_PATH } from '../../shared/constants/routePaths'
-import {
-  markRequiredError,
-} from '../../shared/utils/formValidation'
+import { markRequiredError } from '../../shared/utils/formValidation'
 import { type ProfileFeedback, useProfileFeedback } from './useProfileFeedback'
 
 export type PasswordField = 'oldPassword' | 'newPassword' | 'confirmPassword'

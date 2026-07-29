@@ -4,10 +4,7 @@ import type { CanvasBoardCatalog } from '../../canvas-board/catalog/canvasBoardC
 import type { CanvasBoardMeta } from '../../canvas-board/catalog/canvasBoards'
 import type { BoardPreviewRefreshQueue } from '../../canvas-board/preview'
 import type { BoardFeedback } from '../feedback/useBoardFeedback'
-import {
-  createBoardCatalogController,
-  type BoardCatalogNavigation,
-} from './boardCatalogController'
+import { createBoardCatalogController, type BoardCatalogNavigation } from './boardCatalogController'
 
 function makeBoard(id: string, name = id, updatedAt = 1): CanvasBoardMeta {
   return { id, name, createdAt: 1, updatedAt }
@@ -134,10 +131,7 @@ describe('createBoardCatalogController', () => {
     expect(harness.feedback.renameSyncFailed).toHaveBeenCalledOnce()
     expect(harness.controller.viewModel.renamingBoardId.value).toBeNull()
     expect(harness.controller.viewModel.catalogRecoveryBoardId.value).toBe(board.id)
-    expect(harness.warn).toHaveBeenCalledWith(
-      '[boards] failed to sync renamed board',
-      syncError,
-    )
+    expect(harness.warn).toHaveBeenCalledWith('[boards] failed to sync renamed board', syncError)
 
     vi.mocked(harness.catalog.commands.hydrate)
       .mockResolvedValueOnce({ ok: false, error: new Error('still unavailable') })
@@ -161,8 +155,7 @@ describe('createBoardCatalogController', () => {
     const harness = createHarness()
     const board = makeBoard('board-1')
     const firstDelete = deferred<
-      | { ok: true; remoteWasMissing: boolean }
-      | { ok: false; reason: 'sync-failed'; error: unknown }
+      { ok: true; remoteWasMissing: boolean } | { ok: false; reason: 'sync-failed'; error: unknown }
     >()
     vi.mocked(harness.catalog.commands.delete).mockReturnValueOnce(firstDelete.promise)
     harness.controller.commands.toggleBoardMenu(board.id)

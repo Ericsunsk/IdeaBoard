@@ -102,7 +102,8 @@ const viewportOverlaySvg = ref<SVGSVGElement | null>(null)
 const dragViewBoxOverride = ref<MiniMapRect | null>(null)
 let activeOverlayDragPayload: MiniMapOverlayDragPayload | null = null
 let suppressNextOverlayClick = false
-let resetClickSuppressionId: ReturnType<typeof window.setTimeout> | null = null
+// This component only runs in the browser, where timer handles are numeric.
+let resetClickSuppressionId: number | null = null
 
 const viewportOverlay = computed<MiniMapViewportOverlay | null>(() => {
   const zoom = viewport.value.zoom

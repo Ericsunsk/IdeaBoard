@@ -51,7 +51,8 @@ export function createCanvasViewportPersistence(
   let lastCommittedViewportKey: string | null = null
   let lastCommittedIdentityKey: string | null = null
   let pendingDelayed: PendingViewportPersistence | null = null
-  let delayedTimer: ReturnType<typeof window.setTimeout> | null = null
+  // Persistence is browser storage-backed; DOM timers return numeric handles.
+  let delayedTimer: number | null = null
   let isDisposed = false
 
   function capturePending(viewport = options.getViewport()): PendingViewportPersistence {

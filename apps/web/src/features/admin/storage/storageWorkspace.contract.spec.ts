@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
+import { createDeferred } from '../../../test/deferred'
 import { createAdminStorageWorkspace } from './storageWorkspace'
 import type { AdminStorageResource } from './storageResource'
 import type { StorageProfile, StorageProfilePayload, StorageProviderMeta } from './storageHelpers'
@@ -101,8 +102,8 @@ describe('admin storage workspace facade', () => {
   })
 
   it('keeps test and apply actions in independent pending scopes', async () => {
-    const testRequest = Promise.withResolvers<{ message: string }>()
-    const applyRequest = Promise.withResolvers<{
+    const testRequest = createDeferred<{ message: string }>()
+    const applyRequest = createDeferred<{
       message: string
       profile: StorageProfile
     }>()

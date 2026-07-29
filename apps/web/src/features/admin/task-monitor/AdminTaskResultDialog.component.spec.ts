@@ -241,6 +241,7 @@ function makeAttempt(
 ): AdminTaskMonitorExecutionAttempt {
   return {
     attempt_no: 1,
+    account_id: 1,
     status: 'completed',
     stage: 'completed',
     failure_category: '',

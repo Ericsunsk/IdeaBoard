@@ -7,7 +7,10 @@ afterEach(() => {
 
 describe('Admin overlay Motion Policy', () => {
   it('maps shared Dialog and Popover primitives to semantic presence motion', () => {
-    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })))
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: false })),
+    )
 
     expect(createAdminDialogPt({}).transition).toMatchObject({
       name: 'ib-dialog-motion',
@@ -24,7 +27,10 @@ describe('Admin overlay Motion Policy', () => {
   })
 
   it('renders Admin overlays immediately under reduced motion', () => {
-    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true })),
+    )
 
     expect(createAdminDialogPt({}).transition).toMatchObject({ css: false })
     expect(createAdminPopoverPt().transition).toMatchObject({ css: false })

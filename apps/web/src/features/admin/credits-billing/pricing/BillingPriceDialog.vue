@@ -106,7 +106,9 @@ const currentPriceLabel = computed(() =>
   currentPrice.value == null ? '未设置' : formatIdeaAmount(currentPrice.value),
 )
 const newPriceLabel = computed(() =>
-  unitCredits.value == null || validationError.value ? '待输入' : formatIdeaAmount(unitCredits.value),
+  unitCredits.value == null || validationError.value
+    ? '待输入'
+    : formatIdeaAmount(unitCredits.value),
 )
 const priceDeltaLabel = computed(() => {
   if (currentPrice.value == null || unitCredits.value == null || validationError.value) return '—'

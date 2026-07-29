@@ -309,7 +309,9 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     await executionWorkspace.commands.runTextPromptGeneration(plan)
   }
 
-  async function executeFusion(plan: FusionExecutionPlan & { activationId: string }): Promise<void> {
+  async function executeFusion(
+    plan: FusionExecutionPlan & { activationId: string },
+  ): Promise<void> {
     const boardId = readBoardId()
     let targetRatio = plan.source.ratio
     let request: SubmitTaskData | null = null

@@ -8,7 +8,8 @@ import type { RewardCode } from './rewardCodeAdminResource'
 
 describe('RewardCodeRedemptionsDialog', () => {
   it('loads a dense Redemption page through the real feature resource HTTP seam', async () => {
-    const requests: Array<{ rewardCodeId: string; beforeId: string | null; limit: string | null }> = []
+    const requests: Array<{ rewardCodeId: string; beforeId: string | null; limit: string | null }> =
+      []
     useMswHandlers(
       http.get('/api/admin/rewards/codes/:rewardCodeId/redemptions', ({ params, request }) => {
         const query = new URL(request.url).searchParams
@@ -125,9 +126,7 @@ describe('RewardCodeRedemptionsDialog', () => {
     await screen.findByText('用户 #23')
 
     await user.click(screen.getByRole('button', { name: '刷新兑换记录' }))
-    expect(
-      await screen.findByText('刷新兑换记录失败，正在显示上次成功的数据。'),
-    ).toBeVisible()
+    expect(await screen.findByText('刷新兑换记录失败，正在显示上次成功的数据。')).toBeVisible()
     expect(screen.getByText('用户 #23')).toBeVisible()
     await user.click(screen.getByRole('button', { name: '重试刷新兑换记录' }))
 
@@ -247,13 +246,10 @@ describe('RewardCodeRedemptionsDialog', () => {
     })
     useMswHandlers(
       listHandler(),
-      http.get(
-        '/api/admin/rewards/codes/:rewardCodeId/redemptions/:redemptionId',
-        async () => {
-          await detailGate
-          return redemptionDetailResponse()
-        },
-      ),
+      http.get('/api/admin/rewards/codes/:rewardCodeId/redemptions/:redemptionId', async () => {
+        await detailGate
+        return redemptionDetailResponse()
+      }),
     )
     const { rerender, user } = renderDialog()
     await screen.findByText('用户 #23')

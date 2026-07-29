@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
+import { createDeferred } from '../../../test/deferred'
 import type { AdminPromptConfigResource, FeaturePrompt } from './promptConfigResource'
 import { createAdminPromptConfigWorkspace } from './promptConfigWorkspace'
 
@@ -103,7 +104,7 @@ describe('prompt config workspace facade', () => {
   })
 
   it('blocks duplicate prompt saves and settles saving state once', async () => {
-    const saveRequest = Promise.withResolvers<FeaturePrompt>()
+    const saveRequest = createDeferred<FeaturePrompt>()
     const { workspace, feedback } = createWorkspace()
 
     await workspace.loadPrompts()

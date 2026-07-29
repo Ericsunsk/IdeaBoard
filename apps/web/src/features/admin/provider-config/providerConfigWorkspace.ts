@@ -372,10 +372,7 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
     return modelStatusChangingKeys.value.has(createModelStatusPendingKey(commandTarget, model))
   }
 
-  function createModelStatusPendingRef(
-    commandTarget: ProviderAccountCommandTarget,
-    model: string,
-  ) {
+  function createModelStatusPendingRef(commandTarget: ProviderAccountCommandTarget, model: string) {
     const key = createModelStatusPendingKey(commandTarget, model)
     return computed({
       get: () => modelStatusChangingKeys.value.has(key),
@@ -388,10 +385,7 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
     })
   }
 
-  function createModelStatusPendingKey(
-    commandTarget: ProviderAccountCommandTarget,
-    model: string,
-  ) {
+  function createModelStatusPendingKey(commandTarget: ProviderAccountCommandTarget, model: string) {
     return `${commandTarget.id}:${normalizeModelKey(model)}`
   }
 

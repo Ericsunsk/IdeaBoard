@@ -11,15 +11,24 @@
       <span class="sr-only">正在加载价格历史</span>
     </div>
 
-    <div v-else-if="errorMessage" class="flex min-h-40 flex-col items-center justify-center text-center" role="alert">
+    <div
+      v-else-if="errorMessage"
+      class="flex min-h-40 flex-col items-center justify-center text-center"
+      role="alert"
+    >
       <div class="text-admin-title-sm font-semibold text-admin-title-color">价格历史加载失败</div>
       <div class="mt-2 text-admin-meta text-ib-text-muted">{{ errorMessage }}</div>
       <Button class="mt-4" label="重新加载" severity="secondary" outlined @click="emit('retry')" />
     </div>
 
-    <div v-else-if="prices.length === 0" class="flex min-h-40 flex-col items-center justify-center text-center">
+    <div
+      v-else-if="prices.length === 0"
+      class="flex min-h-40 flex-col items-center justify-center text-center"
+    >
       <div class="text-admin-title-sm font-semibold text-admin-title-color">暂无价格历史</div>
-      <div class="mt-2 text-admin-meta text-ib-text-muted">发布首个价格后，价格历史会显示在这里。</div>
+      <div class="mt-2 text-admin-meta text-ib-text-muted">
+        发布首个价格后，价格历史会显示在这里。
+      </div>
     </div>
 
     <div v-else class="flex flex-col gap-2">
@@ -30,7 +39,9 @@
       >
         <div class="min-w-0">
           <div class="flex items-center gap-2">
-            <span class="text-admin-body font-semibold text-admin-title-color">版本 {{ price.version }}</span>
+            <span class="text-admin-body font-semibold text-admin-title-color"
+              >版本 {{ price.version }}</span
+            >
             <Tag
               v-if="price.priceVersionId === item?.currentPrice?.priceVersionId"
               value="当前版本"
@@ -81,7 +92,14 @@ withDefaults(
     hasMore?: boolean
     errorMessage?: string
   }>(),
-  { item: null, prices: () => [], loading: false, loadingMore: false, hasMore: false, errorMessage: '' },
+  {
+    item: null,
+    prices: () => [],
+    loading: false,
+    loadingMore: false,
+    hasMore: false,
+    errorMessage: '',
+  },
 )
 
 const emit = defineEmits<{

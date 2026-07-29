@@ -32,7 +32,11 @@ vi.mock('../../shared/composables/useAdminConfirm', () => ({
 describe('AdminRewardCodesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    resource.search.mockResolvedValue({ rewardCodes: [makeRewardCode()], total: 21, nextBeforeId: 6 })
+    resource.search.mockResolvedValue({
+      rewardCodes: [makeRewardCode()],
+      total: 21,
+      nextBeforeId: 6,
+    })
     resource.create.mockResolvedValue({
       rewardCode: makeRewardCode({ id: 8 }),
       plaintext: 'ABCD12342026',
@@ -58,9 +62,7 @@ describe('AdminRewardCodesPage', () => {
 
     await user.click(screen.getByRole('button', { name: '下一页' }))
     await waitFor(() =>
-      expect(resource.search).toHaveBeenLastCalledWith(
-        expect.objectContaining({ beforeId: 6 }),
-      ),
+      expect(resource.search).toHaveBeenLastCalledWith(expect.objectContaining({ beforeId: 6 })),
     )
   })
 

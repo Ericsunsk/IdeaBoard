@@ -2,10 +2,7 @@ import { existsSync } from 'node:fs'
 import { readdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import {
-  findMotionPolicyViolations,
-  findStaleMotionAllowances,
-} from './motion-policy-guard'
+import { findMotionPolicyViolations, findStaleMotionAllowances } from './motion-policy-guard'
 
 type Violation = {
   file: string

@@ -47,11 +47,7 @@ describe('RewardCodeRedemptionResource', () => {
       ],
       nextBeforeId: 40,
     })
-    expect(generated.list).toHaveBeenCalledWith(
-      7,
-      { before_id: 60, limit: 10 },
-      { signal },
-    )
+    expect(generated.list).toHaveBeenCalledWith(7, { before_id: 60, limit: 10 }, { signal })
   })
 
   it('maps technical detail without exposing Identity PII or Code secrets', async () => {

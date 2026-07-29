@@ -78,8 +78,8 @@ const chromeStyle = computed(() => ({
   flex-direction: column;
   gap: var(--image-tool-button-gap);
   pointer-events: auto;
-  animation: image-tool-chrome-slide-left-in var(--motion-enter-duration)
-    var(--motion-enter-easing) both;
+  animation: image-tool-chrome-slide-left-in var(--motion-enter-duration) var(--motion-enter-easing)
+    both;
 }
 
 .image-tool-chrome-frame__right-dock {

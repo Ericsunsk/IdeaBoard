@@ -40,9 +40,6 @@ describe('UserSecurityPane', () => {
 
     const submitButton = screen.getByRole('button', { name: '确认更新密码' })
     expect(submitButton).not.toHaveClass('p-button')
-    expect(submitButton).toHaveClass(
-      'bg-ib-creative-accent-hover',
-      'text-ib-text-inverse',
-    )
+    expect(submitButton).toHaveClass('bg-ib-creative-accent-hover', 'text-ib-text-inverse')
   })
 })

@@ -46,10 +46,16 @@ describe('Motion Policy', () => {
   })
 
   it('reads the browser reduced-motion preference', () => {
-    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })))
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: false })),
+    )
     expect(getMotionPreference()).toBe('no-preference')
 
-    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true })),
+    )
     expect(getMotionPreference()).toBe('reduce')
   })
 

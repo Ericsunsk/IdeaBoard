@@ -213,7 +213,9 @@ async function setAvailability(item: AdminBillableItemCard, enabled: boolean) {
     item.updatedAt = availability.updatedAt
     toast.success(enabled ? '功能已启用' : '功能已停用')
   } catch (error) {
-    toast.error(formatAdminDisplayError(error, enabled ? '启用功能失败，请重试' : '停用功能失败，请重试'))
+    toast.error(
+      formatAdminDisplayError(error, enabled ? '启用功能失败，请重试' : '停用功能失败，请重试'),
+    )
   } finally {
     availabilityPending[item.sku] = false
   }

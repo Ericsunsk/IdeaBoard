@@ -86,6 +86,9 @@ describe('provider config payload mapping', () => {
         max_concurrent: undefined,
       },
     ])
+    if (!payload.models) {
+      throw new Error('account update payload must include models')
+    }
     expect(payload.models.every((model) => !Object.hasOwn(model, 'feature_slugs'))).toBe(true)
   })
 

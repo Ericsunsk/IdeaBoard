@@ -397,5 +397,4 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
   opacity: 1;
   pointer-events: auto;
 }
-
 </style>

@@ -2,7 +2,15 @@
   <AccountManagementPane title="账号安全">
     <form class="grid gap-5" novalidate @submit.prevent="handleUpdatePassword">
       <IbFormField
-        v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+        v-slot="{
+          ariaInvalid,
+          describedbyId,
+          fieldId,
+          inlineError,
+          inlineErrorText,
+          invalid,
+          required,
+        }"
         label="当前原密码"
         :error="pwdErrors.oldPassword"
         field-id="profile-old-password"
@@ -26,13 +34,8 @@
             'aria-describedby': describedbyId,
           }"
           :invalid="invalid"
-          :input-class="[
-            passwordInputClass,
-            inlineError ? passwordInputErrorClass : '',
-          ]"
-          :placeholder="
-            inlineError ? inlineErrorText : '请输入当前使用的密码'
-          "
+          :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
+          :placeholder="inlineError ? inlineErrorText : '请输入当前使用的密码'"
           toggle-mask
           @blur="validatePasswordField('oldPassword')"
           @update:model-value="clearPasswordFieldError('oldPassword')"
@@ -41,7 +44,15 @@
 
       <div class="grid grid-cols-2 gap-5 max-[720px]:grid-cols-1">
         <IbFormField
-          v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+          v-slot="{
+            ariaInvalid,
+            describedbyId,
+            fieldId,
+            inlineError,
+            inlineErrorText,
+            invalid,
+            required,
+          }"
           label="设置新密码"
           :error="pwdErrors.newPassword"
           field-id="profile-new-password"
@@ -65,13 +76,8 @@
               'aria-describedby': describedbyId,
             }"
             :invalid="invalid"
-            :input-class="[
-              passwordInputClass,
-              inlineError ? passwordInputErrorClass : '',
-            ]"
-            :placeholder="
-              inlineError ? inlineErrorText : '不少于6位字符'
-            "
+            :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
+            :placeholder="inlineError ? inlineErrorText : '不少于6位字符'"
             toggle-mask
             @blur="validatePasswordField('newPassword')"
             @update:model-value="handleNewPasswordInput"
@@ -79,7 +85,15 @@
         </IbFormField>
 
         <IbFormField
-          v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+          v-slot="{
+            ariaInvalid,
+            describedbyId,
+            fieldId,
+            inlineError,
+            inlineErrorText,
+            invalid,
+            required,
+          }"
           label="重复新密码"
           :error="pwdErrors.confirmPassword"
           field-id="profile-confirm-password"
@@ -103,13 +117,8 @@
               'aria-describedby': describedbyId,
             }"
             :invalid="invalid"
-            :input-class="[
-              passwordInputClass,
-              inlineError ? passwordInputErrorClass : '',
-            ]"
-            :placeholder="
-              inlineError ? inlineErrorText : '请再次输入新密码'
-            "
+            :input-class="[passwordInputClass, inlineError ? passwordInputErrorClass : '']"
+            :placeholder="inlineError ? inlineErrorText : '请再次输入新密码'"
             toggle-mask
             @blur="validatePasswordField('confirmPassword')"
             @update:model-value="clearPasswordFieldError('confirmPassword')"

@@ -61,7 +61,9 @@
           />
         </div>
 
-        <div class="flex min-h-8 items-center justify-end gap-2 border-t border-ib-border-soft pt-4">
+        <div
+          class="flex min-h-8 items-center justify-end gap-2 border-t border-ib-border-soft pt-4"
+        >
           <Button
             size="small"
             severity="secondary"

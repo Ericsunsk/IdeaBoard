@@ -2,6 +2,7 @@
 import { defineComponent, ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor } from '../../../test/render'
+import { createDeferred } from '../../../test/deferred'
 import { useUserStore } from '../../../app/stores/user'
 import type { User } from '../../../shared/api/userSession'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
@@ -330,7 +331,7 @@ describe('AccountManagementDialogContent', () => {
   })
 
   it('keeps logout disabled and ignores duplicate clicks until the request settles', async () => {
-    const logoutRequest = Promise.withResolvers<boolean>()
+    const logoutRequest = createDeferred<boolean>()
     logoutAndRedirectMock.mockReturnValueOnce(logoutRequest.promise)
     const { user } = renderAccountManagementDialogContent()
     const logoutButton = screen.getByRole('button', { name: '退出登录' })

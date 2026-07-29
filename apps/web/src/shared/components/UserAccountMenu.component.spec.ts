@@ -91,9 +91,7 @@ describe('UserAccountMenu', () => {
   })
 
   it('restores focus and clears open state after Escape before reopening', async () => {
-    const items: UserAccountMenuItem[] = [
-      { key: 'profile', label: '账户管理', command: vi.fn() },
-    ]
+    const items: UserAccountMenuItem[] = [{ key: 'profile', label: '账户管理', command: vi.fn() }]
     const { user } = renderWithUser(UserAccountMenu, { props: { items } })
     const trigger = screen.getByRole('button', { name: '账户菜单' })
 
@@ -111,9 +109,7 @@ describe('UserAccountMenu', () => {
   })
 
   it('cleans up outside-click dismissal through the overlay lifecycle', async () => {
-    const items: UserAccountMenuItem[] = [
-      { key: 'profile', label: '账户管理', command: vi.fn() },
-    ]
+    const items: UserAccountMenuItem[] = [{ key: 'profile', label: '账户管理', command: vi.fn() }]
     const { user } = renderWithUser(UserAccountMenu, {
       props: { items },
     })

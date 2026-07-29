@@ -60,11 +60,7 @@ export function createRewardCodeRedemptionResource(): RewardCodeRedemptionResour
     },
     get: async (rewardCodeId, redemptionId, { signal } = {}) => {
       const detail: GeneratedRedemptionDetail = await resolveApiData(
-        getAdminRewardCodeRedemption(
-          rewardCodeId,
-          redemptionId,
-          signal ? { signal } : undefined,
-        ),
+        getAdminRewardCodeRedemption(rewardCodeId, redemptionId, signal ? { signal } : undefined),
         '加载兑换详情失败',
       )
       return {

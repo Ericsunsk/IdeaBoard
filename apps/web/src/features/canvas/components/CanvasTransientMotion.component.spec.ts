@@ -26,7 +26,10 @@ afterEach(() => {
 
 describe('Canvas transient overlay motion', () => {
   it('keeps context-menu pointer semantics while disabling CSS motion when reduced', () => {
-    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })))
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: true })),
+    )
     const onCreate = vi.fn()
     render(CanvasNodeContextMenu, {
       props: {
@@ -55,7 +58,10 @@ describe('Canvas transient overlay motion', () => {
   })
 
   it('keeps Node tool Popover layout, attrs, and show/hide behavior', async () => {
-    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })))
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({ matches: false })),
+    )
     const { container, rerender } = render(NodeToolPopover, {
       props: { visible: true, layout: 'row' },
       attrs: { role: 'dialog', 'aria-label': '节点工具' },

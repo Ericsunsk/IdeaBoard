@@ -13,11 +13,7 @@
     >
       <Column field="occurred_at" header="交易时间" :style="{ width: '190px' }">
         <template #body="{ data }">
-          <Skeleton
-            v-if="isSkeletonRow(data)"
-            data-testid="billing-skeleton-row"
-            width="8rem"
-          />
+          <Skeleton v-if="isSkeletonRow(data)" data-testid="billing-skeleton-row" width="8rem" />
           <time v-else class="whitespace-nowrap font-mono text-[13px] text-ib-text-muted">
             {{ formatLocalDateTime(data.occurred_at) }}
           </time>
@@ -89,13 +85,7 @@
           role="alert"
         >
           <span class="text-sm text-ib-danger">{{ errorMessage(loadMoreError) }}</span>
-          <Button
-            label="重试加载"
-            severity="secondary"
-            size="small"
-            text
-            @click="loadMore()"
-          />
+          <Button label="重试加载" severity="secondary" size="small" text @click="loadMore()" />
         </div>
         <div
           v-else-if="hasNextPage"

@@ -47,7 +47,8 @@ const localMotionAllowances: Record<string, LocalMotionAllowance> = {
   },
   'src/features/canvas/components/nodes/FusionStage.vue': {
     animationEasingCount: 1,
-    reason: 'Fusion execution flow reuses the Canvas activity cycle and stops under reduced motion.',
+    reason:
+      'Fusion execution flow reuses the Canvas activity cycle and stops under reduced motion.',
   },
   'src/features/canvas/components/styles/canvas-vue-flow-adapter-skin.css': {
     animationEasingCount: 1,
@@ -60,8 +61,7 @@ const legacyMotionTokenPattern =
   /--(?:canvas-motion-(?:fast|standard|panel|dock|ease)|duration-ib-[\w-]+|ease-ib-[\w-]+)\b/g
 const broadTransitionPattern =
   /\btransition-all\b|\btransition(?:-property)?\s*:\s*all(?:\s|;|!|$)/g
-const nonZeroCssTimeSource =
-  String.raw`(?:[1-9]\d*(?:\.\d+)?|0?\.\d*[1-9]\d*)(?:ms|s)\b`
+const nonZeroCssTimeSource = String.raw`(?:[1-9]\d*(?:\.\d+)?|0?\.\d*[1-9]\d*)(?:ms|s)\b`
 const rawTransitionTimingPattern = new RegExp(
   String.raw`\btransition(?:-(?:duration|delay|timing-function))?\s*:[^;{}]*(?:${nonZeroCssTimeSource}|cubic-bezier\(|\bease(?:-in|-out|-in-out)?\b)[^;{}]*;?`,
   'g',

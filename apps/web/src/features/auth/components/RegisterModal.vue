@@ -33,7 +33,15 @@
             @submit.prevent="handleRegister"
           >
             <IbFormField
-              v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+              v-slot="{
+                ariaInvalid,
+                describedbyId,
+                fieldId,
+                inlineError,
+                inlineErrorText,
+                invalid,
+                required,
+              }"
               label="账号"
               :error="errors.username"
               field-id="register-username"
@@ -65,7 +73,15 @@
             </IbFormField>
 
             <IbFormField
-              v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+              v-slot="{
+                ariaInvalid,
+                describedbyId,
+                fieldId,
+                inlineError,
+                inlineErrorText,
+                invalid,
+                required,
+              }"
               label="密码"
               :error="errors.password"
               field-id="register-password"
@@ -104,7 +120,15 @@
             </IbFormField>
 
             <IbFormField
-              v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+              v-slot="{
+                ariaInvalid,
+                describedbyId,
+                fieldId,
+                inlineError,
+                inlineErrorText,
+                invalid,
+                required,
+              }"
               label="确认密码"
               :error="errors.confirmPassword"
               field-id="register-confirm-password"
