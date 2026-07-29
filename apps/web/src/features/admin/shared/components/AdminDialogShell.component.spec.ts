@@ -1,5 +1,6 @@
 import PrimeVue from 'primevue/config'
 import { describe, expect, it, vi } from 'vitest'
+import { h } from 'vue'
 import { primeVueTestOptions } from '../../../../test/primeVue'
 import { renderWithUser, screen, within } from '../../../../test/render'
 import AdminDialogShell from './AdminDialogShell.vue'
@@ -40,6 +41,28 @@ function renderShell(
 }
 
 describe('AdminDialogShell', () => {
+  it('resets transient state on every open', async () => {
+    const onReset = vi.fn()
+    const result = renderWithUser(AdminDialogShell, {
+      props: {
+        visible: false,
+        header: '编辑配置',
+        onReset,
+      },
+      global: {
+        plugins: [[PrimeVue, primeVueTestOptions]],
+        stubs: { transition: false },
+      },
+    })
+
+    await result.rerender({ visible: true, header: '编辑配置', onReset })
+    expect(onReset).toHaveBeenCalledTimes(1)
+
+    await result.rerender({ visible: false, header: '编辑配置', onReset })
+    await result.rerender({ visible: true, header: '编辑配置', onReset })
+    expect(onReset).toHaveBeenCalledTimes(2)
+  })
+
   it('gives custom headers a stable accessible name', async () => {
     renderShell(
       { header: undefined, ariaLabel: '编辑节点提示词' },
@@ -71,26 +94,96 @@ describe('AdminDialogShell', () => {
     expect(lastButton).toHaveFocus()
   })
 
-  it('closes on Escape while preventing accidental mask dismissal', async () => {
+  it('closes through Escape while preventing mask dismissal', async () => {
     const { user, onVisibleUpdate } = renderShell()
     const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
+    const mask = dialog.parentElement!
 
     expect(dialog).toHaveAttribute('aria-modal', 'true')
+    await user.click(mask)
+    expect(onVisibleUpdate).not.toHaveBeenCalled()
+
     dialog.focus()
     await user.keyboard('{Escape}')
     expect(onVisibleUpdate).toHaveBeenCalledWith(false)
   })
 
-  it('blocks every internal close path while busy', async () => {
-    const { user, onVisibleUpdate } = renderShell({ busy: true })
+  it('routes the header close control through the lifecycle', async () => {
+    const { user, onVisibleUpdate } = renderShell()
     const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
+
+    await user.click(within(dialog).getByRole('button', { name: /close|关闭/i }))
+    expect(onVisibleUpdate).toHaveBeenCalledWith(false)
+  })
+
+  it('blocks every internal close path while busy', async () => {
+    const onVisibleUpdate = vi.fn()
+    const { user } = renderWithUser(AdminDialogShell, {
+      props: {
+        visible: true,
+        header: '编辑配置',
+        busy: true,
+        'onUpdate:visible': onVisibleUpdate,
+      },
+      slots: {
+        footer: ({ requestClose }: { requestClose: () => void }) =>
+          h('button', { type: 'button', onClick: requestClose }, '取消'),
+      },
+      global: {
+        plugins: [[PrimeVue, primeVueTestOptions]],
+        stubs: { transition: false },
+      },
+    })
+    const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
+    const mask = dialog.parentElement!
 
     expect(dialog).toHaveAttribute('aria-busy', 'true')
     expect(within(dialog).queryByRole('button', { name: /close|关闭/i })).not.toBeInTheDocument()
 
+    await user.click(mask)
+    await user.click(within(dialog).getByRole('button', { name: '取消' }))
     dialog.focus()
     await user.keyboard('{Escape}')
     expect(onVisibleUpdate).not.toHaveBeenCalled()
+  })
+
+  it('restores focus to the trigger after the dialog has closed', async () => {
+    const trigger = document.createElement('button')
+    trigger.textContent = '打开配置'
+    document.body.append(trigger)
+    trigger.focus()
+    const result = renderShell()
+
+    try {
+      const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
+      dialog.focus()
+      await result.user.keyboard('{Escape}')
+      await result.rerender({ visible: false, header: '编辑配置' })
+
+      await vi.waitFor(() => expect(trigger).toHaveFocus())
+    } finally {
+      trigger.remove()
+    }
+  })
+
+  it('does not restore focus to a stale trigger when the dialog reopens during leave', async () => {
+    const trigger = document.createElement('button')
+    trigger.textContent = '打开配置'
+    document.body.append(trigger)
+    trigger.focus()
+    const triggerFocus = vi.spyOn(trigger, 'focus')
+    const result = renderShell()
+
+    try {
+      await screen.findByRole('dialog', { name: '编辑配置' })
+      await result.rerender({ visible: false, header: '编辑配置' })
+      await result.rerender({ visible: true, header: '编辑配置' })
+
+      expect(triggerFocus).not.toHaveBeenCalled()
+      expect(await screen.findByRole('dialog', { name: '编辑配置' })).toBeInTheDocument()
+    } finally {
+      trigger.remove()
+    }
   })
 
   it('owns the form scroll viewport', async () => {

@@ -1,16 +1,19 @@
 <template>
   <Dialog
+    ref="dialogRef"
     :visible="visible"
     modal
-    :dismissable-mask="false"
-    :close-on-escape="!busy"
-    :closable="!busy"
+    :dismissable-mask="canDismiss('mask')"
+    :close-on-escape="canDismiss('escape')"
+    :closable="canDismiss('close-control')"
     :draggable="false"
     :header="header"
     :pt="dialogPt"
-    :aria-busy="busy || undefined"
+    :aria-busy="ariaBusy"
     v-bind="dialogAccessibilityAttrs"
     @update:visible="handleVisibleUpdate"
+    @hide="disableVendorFocusRestore"
+    @after-hide="completeClose"
   >
     <template v-if="$slots.header" #header>
       <slot name="header" />
@@ -22,15 +25,16 @@
 
     <template v-if="$slots.footer" #footer>
       <div :class="adminDialogFooterActionsClass" data-admin-dialog-footer>
-        <slot name="footer" />
+        <slot name="footer" :request-close="requestCloseFromControl" />
       </div>
     </template>
   </Dialog>
 </template>
 
 <script setup lang="ts">
-import { computed, useSlots } from 'vue'
+import { computed, ref, useSlots } from 'vue'
 import Dialog from 'primevue/dialog'
+import { useOverlayInteractionLifecycle } from '../../../../shared/composables/useOverlayInteractionLifecycle'
 import { createAdminDialogPt } from '../lib/adminOverlayPt'
 import {
   adminDialogFooterActionsClass,
@@ -40,6 +44,10 @@ import {
 
 export type AdminDialogSize = 'compact' | 'form' | 'wide'
 export type AdminDialogContentLayout = 'form' | 'scrollable'
+
+type PrimeDialogFocusAdapter = {
+  target: HTMLElement | null
+}
 
 const props = withDefaults(
   defineProps<{
@@ -61,8 +69,10 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   'update:visible': [visible: boolean]
+  reset: []
 }>()
 const slots = useSlots()
+const dialogRef = ref<PrimeDialogFocusAdapter | null>(null)
 const hasCustomHeader = computed(() => Boolean(slots.header))
 const dialogAccessibilityAttrs = computed(() =>
   hasCustomHeader.value
@@ -91,9 +101,33 @@ const dialogPt = computed(() =>
   }),
 )
 const contentClass = computed(() => contentLayoutClasses[props.contentLayout])
+const adminDialogSurfaceIntent = {
+  dismissibleBy: ['close-control', 'escape'],
+  restoreFocus: true,
+} as const
+const {
+  ariaBusy,
+  canDismiss,
+  completeClose,
+  handleVisibilityChange,
+  requestClose: requestOverlayClose,
+} = useOverlayInteractionLifecycle({
+  visible: () => props.visible,
+  busy: () => props.busy,
+  surface: adminDialogSurfaceIntent,
+  onReset: () => emit('reset'),
+  onVisibilityChange: (visible) => emit('update:visible', visible),
+})
 
 function handleVisibleUpdate(visible: boolean) {
-  if (!visible && props.busy) return
-  emit('update:visible', visible)
+  handleVisibilityChange(visible)
+}
+
+function requestCloseFromControl() {
+  requestOverlayClose('close-control')
+}
+
+function disableVendorFocusRestore() {
+  if (dialogRef.value) dialogRef.value.target = null
 }
 </script>
