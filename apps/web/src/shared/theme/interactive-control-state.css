@@ -1,0 +1,46 @@
+@layer components {
+  /*
+   * Stable interaction semantics only. Surface adapters own geometry, color,
+   * density, and the concrete hover/selected/danger values through variables.
+   */
+  .ib-control-state {
+    --ib-control-disabled-opacity: 0.62;
+    --ib-control-hover-transform: none;
+    --ib-control-active-transform: none;
+    transition-duration: var(--motion-control-duration);
+    transition-timing-function: var(--motion-control-easing);
+  }
+
+  .ib-control-state:hover:not(:disabled):not([aria-disabled='true']) {
+    transform: var(--ib-control-hover-transform);
+  }
+
+  .ib-control-state:focus-visible {
+    outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
+    outline-offset: var(--ib-focus-outline-offset);
+  }
+
+  .ib-control-state:active:not(:disabled):not([aria-disabled='true']) {
+    transform: var(--ib-control-active-transform);
+  }
+
+  .ib-control-state:is(:disabled, [aria-disabled='true']) {
+    cursor: not-allowed;
+    opacity: var(--ib-control-disabled-opacity);
+  }
+
+  .ib-control-state[data-control-state='loading'] {
+    cursor: wait;
+  }
+
+  .ib-control-state[data-control-tone='danger'] {
+    color: var(--ib-control-danger-color, currentColor);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ib-control-state:hover:not(:disabled):not([aria-disabled='true']),
+    .ib-control-state:active:not(:disabled):not([aria-disabled='true']) {
+      transform: none;
+    }
+  }
+}

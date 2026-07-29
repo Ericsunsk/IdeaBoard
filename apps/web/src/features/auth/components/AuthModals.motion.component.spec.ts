@@ -223,4 +223,31 @@ describe.each(authModalCases)('$action modal motion', (testCase) => {
     resolveRequest(true)
     await waitFor(() => expect(view.emitted()['update:show']).toContainEqual([false]))
   })
+
+  it('maps validation and canonical pending state onto stable control semantics', async () => {
+    let resolveRequest!: (value: boolean) => void
+    const pendingRequest = new Promise<boolean>((resolve) => {
+      resolveRequest = resolve
+    })
+    const store = useUserStore()
+    vi.spyOn(store, testCase.action).mockReturnValue(pendingRequest)
+    const view = renderAuthModal(testCase)
+
+    const submitButton = screen.getByRole('button', { name: testCase.submitLabel })
+    expect(submitButton).toHaveAttribute('data-control-state', 'idle')
+    expect(submitButton).not.toHaveAttribute('aria-busy')
+
+    await view.user.click(submitButton)
+    expect(screen.getByLabelText(/^账号/)).toHaveAttribute('data-control-tone', 'danger')
+
+    await testCase.fill(view.user)
+    await view.user.click(submitButton)
+
+    await waitFor(() => expect(submitButton).toHaveAttribute('data-control-state', 'loading'))
+    expect(submitButton).toHaveAttribute('aria-busy', 'true')
+    expect(submitButton).toBeDisabled()
+    expect(screen.getByLabelText(/^账号/)).toHaveAttribute('data-control-state', 'disabled')
+
+    resolveRequest(true)
+  })
 })

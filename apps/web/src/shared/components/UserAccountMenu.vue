@@ -36,6 +36,8 @@
         <a
           v-bind="itemProps.action"
           :class="[menuItemClass, item.tone === 'danger' ? menuDangerItemClass : '']"
+          data-control-state="idle"
+          :data-control-tone="item.tone"
         >
           <span class="flex min-w-0 flex-1 items-center justify-between gap-4">
             <span class="truncate">{{ item.label }}</span>

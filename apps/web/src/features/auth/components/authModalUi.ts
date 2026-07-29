@@ -66,13 +66,13 @@ export const authInputClass = ibFormInputClass
 export const authInputErrorClass = ibFormInputErrorClass
 
 export const authPrimaryButtonClass =
-  'ib-auth-primary-action mt-2 inline-flex h-[50px] w-full items-center justify-center rounded-[12px] border-0 bg-gradient-to-r from-[var(--color-ib-auth-primary-from)] to-[var(--color-ib-auth-primary-to)] px-8 text-[15px] font-semibold text-[var(--color-ib-auth-primary-text)] shadow-[var(--shadow-ib-auth-primary)] transition-[transform,box-shadow,opacity] duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:scale-[1.01] hover:shadow-[var(--shadow-ib-auth-primary-hover)] active:scale-[0.99] disabled:scale-100 disabled:cursor-not-allowed disabled:opacity-70'
+  'ib-control-state ib-auth-primary-action [--ib-control-hover-transform:scale(1.01)] [--ib-control-active-transform:scale(0.99)] [--ib-control-disabled-opacity:0.7] mt-2 inline-flex h-[50px] w-full items-center justify-center rounded-[12px] border-0 bg-gradient-to-r from-[var(--color-ib-auth-primary-from)] to-[var(--color-ib-auth-primary-to)] px-8 text-[15px] font-semibold text-[var(--color-ib-auth-primary-text)] shadow-[var(--shadow-ib-auth-primary)] transition-[transform,box-shadow,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-[var(--shadow-ib-auth-primary-hover)]'
 
 export const authFooterClass =
   'relative z-[1] text-center text-[13px] text-[var(--color-ib-auth-muted)]'
 
 export const authSwitchButtonClass =
-  'ml-1.5 cursor-pointer border-0 bg-transparent p-0 text-[inherit] font-semibold text-[var(--color-ib-auth-link)] transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-[var(--color-ib-auth-link-hover)] hover:underline underline-offset-4'
+  'ib-control-state [--ib-control-disabled-opacity:0.7] ml-1.5 cursor-pointer border-0 bg-transparent p-0 text-[inherit] font-semibold text-[var(--color-ib-auth-link)] transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-[var(--color-ib-auth-link-hover)] hover:underline underline-offset-4'
 
 export const authCloseButtonClass =
-  'ib-auth-close-action absolute top-5 right-5 z-[2] inline-flex size-8 items-center justify-center border-0 bg-transparent p-0 text-[var(--color-ib-auth-close)] shadow-none transition-[color,transform,opacity] duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:text-[var(--color-ib-auth-close-hover)] active:scale-95 disabled:scale-100 disabled:cursor-not-allowed disabled:opacity-50'
+  'ib-control-state ib-auth-close-action [--ib-control-active-transform:scale(0.95)] [--ib-control-disabled-opacity:0.5] absolute top-5 right-5 z-[2] inline-flex size-8 items-center justify-center border-0 bg-transparent p-0 text-[var(--color-ib-auth-close)] shadow-none transition-[color,transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:text-[var(--color-ib-auth-close-hover)]'

@@ -1,15 +1,13 @@
 <template>
   <button
     type="button"
-    class="node-tool-icon-button inline-grid cursor-pointer place-items-center p-0 shadow-none disabled:cursor-not-allowed disabled:opacity-[0.46]"
+    v-bind="controlStateAttrs"
+    class="ib-control-state node-tool-icon-button inline-grid cursor-pointer place-items-center p-0 shadow-none"
     :class="{
-      active,
       primary,
       'node-tool-tooltip-trigger': !!resolvedTooltip,
     }"
     :style="buttonStyle"
-    :disabled="disabled"
-    :aria-pressed="active ? 'true' : undefined"
     :aria-label="resolvedAriaLabel"
     @click="emit('click', $event)"
   >
@@ -24,6 +22,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { resolveInteractiveControlState } from '../../../../shared/interaction/interactiveControlState'
 
 const props = withDefaults(
   defineProps<{
@@ -65,10 +64,18 @@ const resolvedTooltip = computed(() => props.tooltip ?? '')
 const resolvedAriaLabel = computed(
   () => (props.ariaLabelValue ?? resolvedTooltip.value) || undefined,
 )
+const controlStateAttrs = computed(() =>
+  resolveInteractiveControlState({
+    disabled: props.disabled,
+    selected: props.active,
+  }),
+)
 </script>
 
 <style scoped>
 .node-tool-icon-button {
+  --ib-control-disabled-opacity: 0.46;
+  --ib-control-hover-transform: var(--node-tool-icon-button-hover-transform);
   width: var(--node-tool-icon-button-size);
   height: var(--node-tool-icon-button-size);
   border: var(--node-tool-border-width) solid var(--node-tool-icon-button-border);
@@ -83,7 +90,7 @@ const resolvedAriaLabel = computed(
     opacity var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
-.node-tool-icon-button.active {
+.node-tool-icon-button[aria-pressed='true'] {
   border-color: var(--node-tool-icon-button-active-border);
   color: var(--node-tool-icon-button-active-color);
   background: var(--node-tool-icon-button-active-bg);
@@ -93,7 +100,6 @@ const resolvedAriaLabel = computed(
   border-color: var(--node-tool-icon-button-hover-border);
   color: var(--node-tool-icon-button-hover-color);
   background: var(--node-tool-icon-button-hover-bg);
-  transform: var(--node-tool-icon-button-hover-transform);
 }
 
 .node-tool-icon-button.primary {

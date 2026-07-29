@@ -45,6 +45,7 @@
                 <InputText
                   :id="fieldId"
                   v-model="formValue.username"
+                  v-bind="resolveFieldControlState(invalid)"
                   unstyled
                   autocomplete="username"
                   :required="required"
@@ -81,6 +82,7 @@
                   fluid
                   :pt="authPasswordPt"
                   :input-props="{
+                    ...resolveFieldControlState(invalid),
                     id: fieldId,
                     autocomplete: 'new-password',
                     required,
@@ -119,6 +121,7 @@
                   fluid
                   :pt="authPasswordPt"
                   :input-props="{
+                    ...resolveFieldControlState(invalid),
                     id: fieldId,
                     autocomplete: 'new-password',
                     required,
@@ -142,7 +145,7 @@
               type="submit"
               :label="loading ? '创建中...' : '创建账号'"
               :loading="loading"
-              :disabled="loading"
+              v-bind="submitControlState"
               fluid
             />
           </form>
@@ -152,7 +155,7 @@
             <button
               type="button"
               :class="authSwitchButtonClass"
-              :disabled="loading"
+              v-bind="secondaryControlState"
               @click="handleSwitchToLogin"
             >
               去登录
@@ -166,13 +169,14 @@
 
 <script setup lang="ts">
 import { useUserStore } from '../../../app/stores/user'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import { User as UserIcon, Lock as LockIcon, Shield as ShieldIcon } from '@iconoir/vue'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
+import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { useAuthFeedback } from '../useAuthFeedback'
 import IbFormField from '../../../shared/components/IbFormField.vue'
@@ -221,6 +225,12 @@ type RegisterField = 'username' | 'password' | 'confirmPassword'
 const userStore = useUserStore()
 const authFeedback = useAuthFeedback()
 const { isPending: loading, runAsyncAction } = useAsyncAction()
+const submitControlState = computed(() =>
+  resolveInteractiveControlState({ pending: loading.value }),
+)
+const secondaryControlState = computed(() =>
+  resolveInteractiveControlState({ disabled: loading.value }),
+)
 
 const formValue = ref({
   username: '',
@@ -232,6 +242,13 @@ const errors = ref<Record<RegisterField, string>>({
   password: '',
   confirmPassword: '',
 })
+
+function resolveFieldControlState(invalid: boolean) {
+  return resolveInteractiveControlState({
+    disabled: loading.value,
+    tone: invalid ? 'danger' : 'default',
+  })
+}
 
 function resetValidation() {
   errors.value.username = ''

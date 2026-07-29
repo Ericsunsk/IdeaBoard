@@ -72,4 +72,21 @@ describe('UserAccountMenu', () => {
     await user.click(credits)
     expect(openBilling).toHaveBeenCalledOnce()
   })
+
+  it('keeps destructive menu intent semantic and actionable', async () => {
+    const logout = vi.fn()
+    const items: UserAccountMenuItem[] = [
+      { key: 'logout', label: '退出登录', tone: 'danger', command: logout },
+    ]
+    const { user } = renderWithUser(UserAccountMenu, { props: { items } })
+
+    await user.click(screen.getByRole('button', { name: '账户菜单' }))
+    await screen.findByRole('menuitem', { name: '退出登录' })
+    const logoutItem = screen.getByText('退出登录').closest('a')
+
+    expect(logoutItem).not.toBeNull()
+    expect(logoutItem).toHaveAttribute('data-control-tone', 'danger')
+    await user.click(logoutItem!)
+    expect(logout).toHaveBeenCalledOnce()
+  })
 })
