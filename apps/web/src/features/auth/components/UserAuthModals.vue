@@ -1,23 +1,26 @@
 <template>
   <div aria-live="polite">
-    <LoginModal
-      :show="showLogin"
-      @update:show="onLoginVisibleChange"
-      @to-register="goRegister"
-      @login-success="onLoginSuccess"
-    />
-
-    <RegisterModal
-      :show="showRegister"
-      @update:show="onRegisterVisibleChange"
-      @to-login="goLogin"
-      @register-success="onRegisterSuccess"
-    />
+    <AuthModalHost :busy="busy" @close="closeAuth">
+      <LoginAuthPanel
+        v-if="mode === 'login'"
+        @close="closeAuth"
+        @to-register="goRegister"
+        @login-success="onLoginSuccess"
+        @update:busy="busy = $event"
+      />
+      <RegisterAuthPanel
+        v-else
+        @close="closeAuth"
+        @to-login="goLogin"
+        @register-success="onRegisterSuccess"
+        @update:busy="busy = $event"
+      />
+    </AuthModalHost>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
 import {
@@ -25,25 +28,25 @@ import {
   USER_LOGIN_PATH,
   USER_REGISTER_PATH,
 } from '../../../shared/constants/routePaths'
-import LoginModal from './LoginModal.vue'
-import RegisterModal from './RegisterModal.vue'
+import AuthModalHost from './AuthModalHost.vue'
+import LoginAuthPanel from './LoginAuthPanel.vue'
+import RegisterAuthPanel from './RegisterAuthPanel.vue'
 
-const props = defineProps<{
+defineProps<{
   mode: 'login' | 'register'
 }>()
 
 const router = useRouter()
 const route = useRoute()
-const skipCloseRedirectOnce = ref(false)
-
-const showLogin = computed(() => props.mode === 'login')
-const showRegister = computed(() => props.mode === 'register')
+const busy = ref(false)
 
 function goLogin() {
+  busy.value = false
   void router.replace(USER_LOGIN_PATH)
 }
 
 function goRegister() {
+  busy.value = false
   void router.replace(USER_REGISTER_PATH)
 }
 
@@ -61,31 +64,15 @@ function resolveLoginRedirectPath() {
 }
 
 function onLoginSuccess() {
-  skipCloseRedirectOnce.value = true
   void router.replace(resolveLoginRedirectPath())
 }
 
 function onRegisterSuccess() {
-  skipCloseRedirectOnce.value = true
   void router.replace(resolveLoginRedirectPath())
 }
 
-function onLoginVisibleChange(visible: boolean) {
-  if (visible) return
-  if (skipCloseRedirectOnce.value) {
-    skipCloseRedirectOnce.value = false
-    return
-  }
-  void router.replace(USER_HOME_PATH)
-}
-
-function onRegisterVisibleChange(visible: boolean) {
-  if (visible) return
-  if (skipCloseRedirectOnce.value) {
-    skipCloseRedirectOnce.value = false
-    return
-  }
-  // 关闭注册弹窗时回到公开首页
+function closeAuth() {
+  if (busy.value) return
   void router.replace(USER_HOME_PATH)
 }
 </script>

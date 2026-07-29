@@ -1,10 +1,11 @@
-/* eslint-disable vue/one-component-per-file -- Local stubs expose public modal behavior without PrimeVue portal mechanics. */
+/* eslint-disable vue/one-component-per-file -- Local stubs expose public auth behavior without PrimeVue portal mechanics. */
 import { defineComponent } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useUserStore } from '../../../app/stores/user'
 import { renderWithUser, screen, waitFor } from '../../../test/render'
-import LoginModal from './LoginModal.vue'
-import RegisterModal from './RegisterModal.vue'
+import AuthModalHost from './AuthModalHost.vue'
+import LoginAuthPanel from './LoginAuthPanel.vue'
+import RegisterAuthPanel from './RegisterAuthPanel.vue'
 
 vi.mock('../../../shared/composables/useSiteBranding', () => ({
   useSiteBranding: () => ({ projectName: 'IdeaBoard' }),
@@ -117,18 +118,20 @@ const PasswordStub = defineComponent({
   `,
 })
 
-type AuthModalCase = {
+type AuthPanelCase = {
   action: 'login' | 'register'
-  component: typeof LoginModal | typeof RegisterModal
+  component: typeof LoginAuthPanel | typeof RegisterAuthPanel
+  successEvent: 'login-success' | 'register-success'
   submitLabel: string
   switchLabel: string
   fill: (user: ReturnType<typeof renderWithUser>['user']) => Promise<void>
 }
 
-const authModalCases: AuthModalCase[] = [
+const authPanelCases: AuthPanelCase[] = [
   {
     action: 'login',
-    component: LoginModal,
+    component: LoginAuthPanel,
+    successEvent: 'login-success',
     submitLabel: '登录',
     switchLabel: '立即注册',
     async fill(user) {
@@ -138,7 +141,8 @@ const authModalCases: AuthModalCase[] = [
   },
   {
     action: 'register',
-    component: RegisterModal,
+    component: RegisterAuthPanel,
+    successEvent: 'register-success',
     submitLabel: '创建账号',
     switchLabel: '去登录',
     async fill(user) {
@@ -156,13 +160,23 @@ function stubMotionPreference(reduced: boolean) {
   )
 }
 
-function renderAuthModal(testCase: AuthModalCase) {
+function renderAuthHost(busy = false) {
+  return renderWithUser(AuthModalHost, {
+    props: { busy },
+    slots: { default: '<div>Auth panel</div>' },
+    global: {
+      stubs: {
+        Dialog: DialogStub,
+      },
+    },
+  })
+}
+
+function renderAuthPanel(testCase: AuthPanelCase) {
   return renderWithUser(testCase.component, {
-    props: { show: true },
     global: {
       stubs: {
         Button: ButtonStub,
-        Dialog: DialogStub,
         InputText: InputTextStub,
         Message: { template: '<p><slot /></p>' },
         Password: PasswordStub,
@@ -171,7 +185,7 @@ function renderAuthModal(testCase: AuthModalCase) {
   })
 }
 
-describe.each(authModalCases)('$action modal motion', (testCase) => {
+describe('AuthModalHost motion', () => {
   beforeEach(() => {
     stubMotionPreference(false)
   })
@@ -182,7 +196,7 @@ describe.each(authModalCases)('$action modal motion', (testCase) => {
   })
 
   it('uses the Auth Motion Policy transition by default', () => {
-    renderAuthModal(testCase)
+    renderAuthHost()
 
     expect(screen.getByRole('dialog')).toHaveAttribute('data-transition-name', 'ib-dialog-motion')
     expect(screen.getByRole('dialog')).toHaveAttribute('data-transition-css', 'true')
@@ -191,20 +205,38 @@ describe.each(authModalCases)('$action modal motion', (testCase) => {
   it('keeps the modal visible without CSS transform motion when reduced motion is preferred', () => {
     stubMotionPreference(true)
 
-    renderAuthModal(testCase)
+    renderAuthHost()
 
     expect(screen.getByRole('dialog')).toBeVisible()
     expect(screen.getByRole('dialog')).toHaveAttribute('data-transition-css', 'false')
   })
 
-  it('locks every close path while the auth request is loading', async () => {
+  it('locks overlay close paths while an auth request is loading', async () => {
+    const view = renderAuthHost(true)
+
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-dismissable-mask', 'false')
+    expect(screen.getByRole('dialog')).toHaveAttribute('data-close-on-escape', 'false')
+    expect(screen.getByRole('dialog')).toHaveAttribute('aria-busy', 'true')
+
+    await view.user.click(screen.getByRole('button', { name: '模拟遮罩关闭' }))
+
+    expect(view.emitted().close).toBeUndefined()
+  })
+})
+
+describe.each(authPanelCases)('$action auth panel', (testCase) => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('locks controls and emits success once while the auth request is loading', async () => {
     let resolveRequest!: (value: boolean) => void
     const pendingRequest = new Promise<boolean>((resolve) => {
       resolveRequest = resolve
     })
     const store = useUserStore()
     const authAction = vi.spyOn(store, testCase.action).mockReturnValue(pendingRequest)
-    const view = renderAuthModal(testCase)
+    const view = renderAuthPanel(testCase)
 
     await testCase.fill(view.user)
     const submitButton = screen.getByRole('button', { name: testCase.submitLabel })
@@ -212,18 +244,12 @@ describe.each(authModalCases)('$action modal motion', (testCase) => {
     await waitFor(() => expect(authAction).toHaveBeenCalledOnce())
     await view.user.click(submitButton)
 
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-dismissable-mask', 'false')
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-close-on-escape', 'false')
-    expect(screen.getByRole('dialog')).toHaveAttribute('aria-busy', 'true')
     expect(screen.getByRole('button', { name: '关闭' })).toBeDisabled()
     expect(screen.getByRole('button', { name: testCase.switchLabel })).toBeDisabled()
-
-    await view.user.click(screen.getByRole('button', { name: '模拟遮罩关闭' }))
-    expect(view.emitted()['update:show']).toBeUndefined()
     expect(authAction).toHaveBeenCalledOnce()
 
     resolveRequest(true)
-    await waitFor(() => expect(view.emitted()['update:show']).toContainEqual([false]))
+    await waitFor(() => expect(view.emitted()[testCase.successEvent]).toHaveLength(1))
   })
 
   it('maps validation and canonical pending state onto stable control semantics', async () => {
@@ -233,7 +259,7 @@ describe.each(authModalCases)('$action modal motion', (testCase) => {
     })
     const store = useUserStore()
     vi.spyOn(store, testCase.action).mockReturnValue(pendingRequest)
-    const view = renderAuthModal(testCase)
+    const view = renderAuthPanel(testCase)
 
     const submitButton = screen.getByRole('button', { name: testCase.submitLabel })
     expect(submitButton).toHaveAttribute('data-control-state', 'idle')
