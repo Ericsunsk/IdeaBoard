@@ -352,7 +352,9 @@ function selectOutputCount(value: number) {
 }
 
 .image-node-stage-loader-logo {
-  animation: image-node-logo-spin-cycle 2s linear infinite;
+  /* Pending work needs a continuous loader cycle until the result arrives. */
+  --image-node-loader-cycle: 2s;
+  animation: image-node-logo-spin-cycle var(--image-node-loader-cycle) linear infinite;
 }
 
 .image-node-stage-actions {

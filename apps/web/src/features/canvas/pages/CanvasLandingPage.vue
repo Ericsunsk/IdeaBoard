@@ -37,7 +37,7 @@
           <div class="home-hero-cta-row mt-6 flex gap-4">
             <button
               data-home-hero-safe
-              class="home-hero-cta h-[43px] cursor-pointer rounded-full border-0 bg-[#9278e6] px-10 text-[15px] font-medium text-white shadow-none [transition:transform_0.2s_cubic-bezier(0.2,0.8,0.2,1),background_0.2s] hover:scale-[1.04] hover:bg-[#8065d6]"
+              class="home-hero-cta h-[43px] cursor-pointer rounded-full border-0 bg-[#9278e6] px-10 text-[15px] font-medium text-white shadow-none transition-[transform,background-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-[1.04] hover:bg-[#8065d6]"
               @click="startJourney"
             >
               Get started
@@ -115,7 +115,7 @@ function startJourney() {
 <style scoped>
 .hero-content {
   opacity: 0;
-  animation: fadeUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeUp var(--motion-enter-duration) var(--motion-enter-easing) forwards;
 }
 
 @media (max-width: 720px) {
@@ -258,6 +258,14 @@ function startJourney() {
   .home-hero-tagline {
     max-width: 300px;
     font-size: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-content {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
 

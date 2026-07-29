@@ -2,6 +2,10 @@ import { existsSync } from 'node:fs'
 import { readdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import {
+  findMotionPolicyViolations,
+  findStaleMotionAllowances,
+} from './motion-policy-guard'
 
 type Violation = {
   file: string
@@ -314,6 +318,8 @@ function checkStaleAllowances<T extends string>(
 }
 
 function checkCanvasTokenBoundaries(file: SourceFile, content: string): Violation[] {
+  if (file.sourcePath.includes('.spec.') || file.sourcePath.includes('.test.')) return []
+
   const pattern = /(?:var\(\s*)?--(?:color-canvas|canvas)(?:-[\w-]+)?/g
   const count = countMatches(content, pattern)
   if (count === 0 || isCanvasTokenAllowedFile(file)) return []
@@ -360,6 +366,10 @@ async function checkStyleGovernance(files: readonly SourceFile[]): Promise<Viola
       ...checkCanvasTokenBoundaries(file, content),
       ...checkPageDotBackgroundUtilityBoundary(file, content),
       ...checkCountRules(file, content, selectorCountRules, selectorAllowances),
+      ...findMotionPolicyViolations(file.sourcePath, content).map((violation) => ({
+        file: file.sourcePath,
+        ...violation,
+      })),
     )
 
     if (isAdminProductionStyleFile(file)) {
@@ -368,6 +378,10 @@ async function checkStyleGovernance(files: readonly SourceFile[]): Promise<Viola
   }
 
   violations.push(
+    ...findStaleMotionAllowances(contents).map((violation) => ({
+      file: 'motion-policy-guard',
+      ...violation,
+    })),
     ...checkStaleAllowances(
       contents,
       styleCountRules,

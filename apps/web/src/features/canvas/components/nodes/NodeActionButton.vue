@@ -1,7 +1,7 @@
 <template>
   <button
     type="button"
-    class="node-action-btn inline-flex min-h-7 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border-[length:var(--node-tool-border-width)] border-solid border-[#d6dcec] bg-white px-2.5 text-[11px] leading-none font-medium text-[#5f6877] transition-[background-color,border-color,color,opacity] duration-200 ease-[ease] disabled:cursor-not-allowed disabled:opacity-[0.45]"
+    class="node-action-btn inline-flex min-h-7 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border-[length:var(--node-tool-border-width)] border-solid border-[#d6dcec] bg-white px-2.5 text-[11px] leading-none font-medium text-[#5f6877] transition-[background-color,border-color,color,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] disabled:cursor-not-allowed disabled:opacity-[0.45]"
     :class="[
       variantClass,
       {
@@ -67,6 +67,7 @@ const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant
 <style scoped>
 .node-action-btn {
   --node-tool-border-width: var(--canvas-control-border-width);
+  /* Tooltip dwell prevents accidental activation while crossing compact controls. */
   --node-tool-tooltip-delay: 200ms;
   --node-tool-button-accent: var(--color-canvas-accent);
   --node-tool-button-brand: var(--color-canvas-accent-hover);

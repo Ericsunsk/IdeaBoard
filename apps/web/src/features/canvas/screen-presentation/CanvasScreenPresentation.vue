@@ -139,16 +139,12 @@ defineProps<{
   --canvas-accent-soft-strong: rgba(146, 120, 230, 0.16);
   --canvas-accent-wash: #f8f7ff;
   --canvas-accent-outline: rgba(122, 107, 213, 0.22);
-  --canvas-motion-fast: 160ms;
-  --canvas-motion-standard: 200ms;
-  --canvas-motion-panel: 220ms;
-  --canvas-motion-dock: 240ms;
-  --canvas-motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --flow-edge-color: rgb(177 177 183 / 50%);
   --flow-edge-active-color: rgb(146 120 230 / 50%);
   --flow-edge-selected-color: rgb(123 135 152 / 50%);
   --flow-edge-width: 2;
   --flow-edge-dasharray: 5;
+  /* Execution edges need a continuous cycle rather than a finite interaction duration. */
   --flow-edge-running-duration: 0.5s;
   width: 100%;
   height: 100vh;

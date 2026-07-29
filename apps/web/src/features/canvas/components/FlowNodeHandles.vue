@@ -177,8 +177,8 @@ watch(
   touch-action: none;
   outline: none;
   transition:
-    opacity 0.14s ease,
-    color 0.14s ease;
+    opacity var(--motion-feedback-duration) var(--motion-feedback-easing),
+    color var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .flow-canvas-node__handle-aggregate--output {
@@ -214,8 +214,8 @@ watch(
   transform: translate(-50%, -50%);
   pointer-events: none;
   transition:
-    left 0.18s ease,
-    border-color 0.14s ease;
+    left var(--motion-control-duration) var(--motion-control-easing),
+    border-color var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .flow-canvas-node__handle-plus::before,

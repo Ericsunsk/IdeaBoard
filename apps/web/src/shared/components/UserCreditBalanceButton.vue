@@ -48,9 +48,9 @@ defineProps<{
   cursor: pointer;
   appearance: none;
   transition:
-    background-color var(--duration-ib-standard) var(--ease-ib-standard),
-    border-color var(--duration-ib-standard) var(--ease-ib-standard),
-    color var(--duration-ib-standard) var(--ease-ib-standard);
+    background-color var(--motion-control-duration) var(--motion-control-easing),
+    border-color var(--motion-control-duration) var(--motion-control-easing),
+    color var(--motion-control-duration) var(--motion-control-easing);
 }
 
 .user-credit-pill:hover {

@@ -246,8 +246,11 @@ onBeforeUnmount(clearProgressPanelDelay)
 
 .image-editor-layer-actions__progress-track.indeterminate
   .image-editor-layer-actions__progress-bar {
+  /* Indeterminate progress needs a cycle because completion time is unknown. */
+  --image-editor-progress-cycle: 1.1s;
   width: 42%;
-  animation: image-editor-final-apply-progress 1.1s ease-in-out infinite;
+  animation: image-editor-final-apply-progress var(--image-editor-progress-cycle) ease-in-out
+    infinite;
 }
 
 .image-editor-layer-actions__cancel {

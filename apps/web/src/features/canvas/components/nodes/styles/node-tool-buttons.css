@@ -15,6 +15,7 @@
   --node-tool-button-gap: var(--canvas-tool-button-gap);
   --node-tool-icon-size: 21px;
   --node-tool-popover-option-height: 33px;
+  /* Tooltip dwell prevents accidental activation while crossing node tools. */
   --node-tool-tooltip-delay: 200ms;
   --node-tool-button-border: var(--color-canvas-accent-border);
   --node-tool-button-accent: var(--color-canvas-accent);

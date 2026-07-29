@@ -21,10 +21,10 @@
     box-shadow: var(--ib-brand-mark-shadow);
     text-decoration: none;
     transition:
-      border-color var(--duration-ib-standard) var(--ease-ib-standard),
-      background-color var(--duration-ib-standard) var(--ease-ib-standard),
-      color var(--duration-ib-standard) var(--ease-ib-standard),
-      box-shadow var(--duration-ib-standard) var(--ease-ib-standard);
+      border-color var(--motion-control-duration) var(--motion-control-easing),
+      background-color var(--motion-control-duration) var(--motion-control-easing),
+      color var(--motion-control-duration) var(--motion-control-easing),
+      box-shadow var(--motion-control-duration) var(--motion-control-easing);
   }
 
   .ib-brand-mark__logo {

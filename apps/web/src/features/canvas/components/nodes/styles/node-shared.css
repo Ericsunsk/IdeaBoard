@@ -43,6 +43,8 @@
 }
 
 .workflow-node.running::before {
+  /* Running state needs a continuous cycle, not a finite interaction duration. */
+  --node-running-border-cycle: 2.4s;
   content: '';
   position: absolute;
   inset: -1.5px;
@@ -55,7 +57,7 @@
     var(--color-canvas-running-from) 100%
   );
   background-size: 220% 100%;
-  animation: node-running-border-flow 2.4s linear infinite;
+  animation: node-running-border-flow var(--node-running-border-cycle) linear infinite;
   pointer-events: none;
   z-index: 1;
   -webkit-mask:
