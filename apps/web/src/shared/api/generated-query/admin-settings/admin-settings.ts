@@ -19,7 +19,6 @@ import type { MaybeRefOrGetter } from 'vue'
 
 import type {
   ApiResponseBrandingSetting,
-  ApiResponseGoogleNativeGenerationSetting,
   ApiResponseMediaUploadSetting,
   ApiResponseOperationalSettingsState,
   ApiResponsePublicURLSetting,
@@ -27,7 +26,6 @@ import type {
   ApiResponseRegistrationSetting,
   ApiResponseTaskMonitorSetting,
   BrandingSetting,
-  GoogleNativeGenerationSetting,
   MediaUploadSetting,
   OperationalSettingsUpdateRequest,
   PublicURLSetting,
@@ -626,191 +624,6 @@ export function useUpdateAdminMediaUploadSetting<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getUpdateAdminMediaUploadSettingQueryOptions(mediaUploadSetting, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
-}
-
-export const getGetAdminGoogleNativeGenerationSettingUrl = () => {
-  return `/admin/settings/generation/google-native`
-}
-
-export const getAdminGoogleNativeGenerationSetting = async (
-  options?: RequestInit,
-): Promise<ApiResponseGoogleNativeGenerationSetting> => {
-  return orvalMutator<ApiResponseGoogleNativeGenerationSetting>(
-    getGetAdminGoogleNativeGenerationSettingUrl(),
-    {
-      ...options,
-      method: 'GET',
-    },
-  )
-}
-
-export const getGetAdminGoogleNativeGenerationSettingQueryKey = () => {
-  return ['admin', 'settings', 'generation', 'google-native'] as const
-}
-
-export const getGetAdminGoogleNativeGenerationSettingQueryOptions = <
-  TData = Awaited<ReturnType<typeof getAdminGoogleNativeGenerationSetting>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<
-      Awaited<ReturnType<typeof getAdminGoogleNativeGenerationSetting>>,
-      TError,
-      TData
-    >
-  >
-  request?: SecondParameter<typeof orvalMutator>
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getGetAdminGoogleNativeGenerationSettingQueryKey()
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof getAdminGoogleNativeGenerationSetting>>
-  > = ({ signal }) => getAdminGoogleNativeGenerationSetting({ signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminGoogleNativeGenerationSetting>>,
-    TError,
-    TData
-  >
-}
-
-export type GetAdminGoogleNativeGenerationSettingQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getAdminGoogleNativeGenerationSetting>>
->
-export type GetAdminGoogleNativeGenerationSettingQueryError = ErrorType<unknown>
-
-export function useGetAdminGoogleNativeGenerationSetting<
-  TData = Awaited<ReturnType<typeof getAdminGoogleNativeGenerationSetting>>,
-  TError = ErrorType<unknown>,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof getAdminGoogleNativeGenerationSetting>>,
-        TError,
-        TData
-      >
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-  queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getGetAdminGoogleNativeGenerationSettingQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
-}
-
-export const getUpdateAdminGoogleNativeGenerationSettingUrl = () => {
-  return `/admin/settings/generation/google-native`
-}
-
-export const updateAdminGoogleNativeGenerationSetting = async (
-  googleNativeGenerationSetting: GoogleNativeGenerationSetting,
-  options?: RequestInit,
-): Promise<ApiResponseGoogleNativeGenerationSetting> => {
-  return orvalMutator<ApiResponseGoogleNativeGenerationSetting>(
-    getUpdateAdminGoogleNativeGenerationSettingUrl(),
-    {
-      ...options,
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
-      body: JSON.stringify(googleNativeGenerationSetting),
-    },
-  )
-}
-
-export const getUpdateAdminGoogleNativeGenerationSettingQueryKey = (
-  googleNativeGenerationSetting?: MaybeRefOrGetter<GoogleNativeGenerationSetting>,
-) => {
-  return [
-    'PUT',
-    'admin',
-    'settings',
-    'generation',
-    'google-native',
-    googleNativeGenerationSetting,
-  ] as const
-}
-
-export const getUpdateAdminGoogleNativeGenerationSettingQueryOptions = <
-  TData = Awaited<ReturnType<typeof updateAdminGoogleNativeGenerationSetting>>,
-  TError = ErrorType<unknown>,
->(
-  googleNativeGenerationSetting: MaybeRefOrGetter<GoogleNativeGenerationSetting>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof updateAdminGoogleNativeGenerationSetting>>,
-        TError,
-        TData
-      >
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getUpdateAdminGoogleNativeGenerationSettingQueryKey(
-    googleNativeGenerationSetting,
-  )
-
-  const queryFn: QueryFunction<
-    Awaited<ReturnType<typeof updateAdminGoogleNativeGenerationSetting>>
-  > = ({ signal }) =>
-    updateAdminGoogleNativeGenerationSetting(toValue(googleNativeGenerationSetting), {
-      signal,
-      ...requestOptions,
-    })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof updateAdminGoogleNativeGenerationSetting>>,
-    TError,
-    TData
-  >
-}
-
-export type UpdateAdminGoogleNativeGenerationSettingQueryResult = NonNullable<
-  Awaited<ReturnType<typeof updateAdminGoogleNativeGenerationSetting>>
->
-export type UpdateAdminGoogleNativeGenerationSettingQueryError = ErrorType<unknown>
-
-export function useUpdateAdminGoogleNativeGenerationSetting<
-  TData = Awaited<ReturnType<typeof updateAdminGoogleNativeGenerationSetting>>,
-  TError = ErrorType<unknown>,
->(
-  googleNativeGenerationSetting: MaybeRefOrGetter<GoogleNativeGenerationSetting>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<
-        Awaited<ReturnType<typeof updateAdminGoogleNativeGenerationSetting>>,
-        TError,
-        TData
-      >
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-  queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUpdateAdminGoogleNativeGenerationSettingQueryOptions(
-    googleNativeGenerationSetting,
-    options,
-  )
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

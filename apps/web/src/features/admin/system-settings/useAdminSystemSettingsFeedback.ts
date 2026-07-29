@@ -29,7 +29,6 @@ export type AdminAccessSettingsFeedback = {
 export type AdminTaskMonitorSettingsFeedback = AdminSettingFeedback
 export type AdminPublicURLSettingsFeedback = AdminSettingFeedback
 export type AdminMediaUploadSettingsFeedback = AdminSettingFeedback
-export type AdminGoogleNativeGenerationSettingsFeedback = AdminSettingFeedback
 export type AdminOperationalSettingsFeedback = AdminSettingFeedback
 
 export function createAdminBrandingSettingsFeedback(
@@ -87,17 +86,6 @@ export function createAdminMediaUploadSettingsFeedback(
   return createAdminSettingFeedback(toast, '加载上传设置失败', '上传设置已保存', '保存上传设置失败')
 }
 
-export function createAdminGoogleNativeGenerationSettingsFeedback(
-  toast: AdminToastPort,
-): AdminGoogleNativeGenerationSettingsFeedback {
-  return createAdminSettingFeedback(
-    toast,
-    '加载生成策略灰度失败',
-    '生成策略灰度已保存',
-    '保存生成策略灰度失败',
-  )
-}
-
 export function createAdminOperationalSettingsFeedback(
   toast: AdminToastPort,
 ): AdminOperationalSettingsFeedback {
@@ -122,10 +110,6 @@ export function useAdminPublicURLSettingsFeedback() {
 
 export function useAdminMediaUploadSettingsFeedback() {
   return createAdminMediaUploadSettingsFeedback(useAdminToast())
-}
-
-export function useAdminGoogleNativeGenerationSettingsFeedback() {
-  return createAdminGoogleNativeGenerationSettingsFeedback(useAdminToast())
 }
 
 export function useAdminOperationalSettingsFeedback() {

@@ -1,7 +1,6 @@
 import {
   updateAdminBrandingSetting,
   updateAdminMediaUploadSetting,
-  updateAdminGoogleNativeGenerationSetting,
   updateAdminPublicURLSetting,
   updateAdminRateLimitSettings,
   updateAdminRegistrationSetting,
@@ -10,7 +9,6 @@ import {
 import type {
   ApiResponseRegistrationSettingData,
   BrandingSetting,
-  GoogleNativeGenerationSetting,
   MediaUploadSetting,
   PublicURLSetting,
   RateLimitSetting,
@@ -37,12 +35,6 @@ export async function updateMediaUploadSetting(
   data: MediaUploadSetting,
 ): Promise<MediaUploadSetting> {
   return resolveApiData(updateAdminMediaUploadSetting(data), '保存上传设置失败')
-}
-
-export async function updateGoogleNativeGenerationSetting(
-  data: GoogleNativeGenerationSetting,
-): Promise<GoogleNativeGenerationSetting> {
-  return resolveApiData(updateAdminGoogleNativeGenerationSetting(data), '保存生成策略灰度失败')
 }
 
 export async function updatePublicURLSetting(data: PublicURLSetting): Promise<PublicURLSetting> {

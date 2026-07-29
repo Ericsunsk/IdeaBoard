@@ -16,7 +16,6 @@ import (
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/taskmedia"
@@ -517,12 +516,11 @@ func newHandlerTaskBillingService() *taskbilling.Service {
 }
 
 type submitTestServiceDeps struct {
-	AccountRepo        AccountStore
-	SubmissionStore    TaskSubmissionStore
-	MediaValidator     taskmedia.Validator
-	PromptStore        FeaturePromptStore
-	GenerationSettings settings.GoogleNativeGenerationSettingProvider
-	TaskBilling        *taskbilling.Service
+	AccountRepo     AccountStore
+	SubmissionStore TaskSubmissionStore
+	MediaValidator  taskmedia.Validator
+	PromptStore     FeaturePromptStore
+	TaskBilling     *taskbilling.Service
 }
 
 func newSubmitServiceForTest(deps submitTestServiceDeps, opts ServiceOptions) *Service {
@@ -539,10 +537,9 @@ func newSubmitServiceForTest(deps submitTestServiceDeps, opts ServiceOptions) *S
 	}
 	return NewService(ServiceDeps{
 		TaskIntake: NewTaskIntake(TaskIntakeDeps{
-			Accounts:           deps.AccountRepo,
-			Prompts:            promptStore,
-			Media:              deps.MediaValidator,
-			GenerationSettings: deps.GenerationSettings,
+			Accounts: deps.AccountRepo,
+			Prompts:  promptStore,
+			Media:    deps.MediaValidator,
 		}),
 		SubmissionStore: deps.SubmissionStore,
 		TaskBilling:     deps.TaskBilling,

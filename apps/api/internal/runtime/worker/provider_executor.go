@@ -173,7 +173,6 @@ type ProviderExecutor struct {
 	mediaReader          taskmedia.UploadReader
 	resultMaterializer   taskmedia.ResultMaterializer
 	publicURLs           settings.PublicURLSettingProvider
-	generationSettings   settings.GoogleNativeGenerationSettingProvider
 }
 
 func (c *ProviderExecutor) readRelativeUploadObject(ctx context.Context, ref string, maxBytes int64) (*taskmedia.StoredObject, bool, error) {
@@ -232,10 +231,6 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 	if err != nil {
 		return providerCallOutput{}, err
 	}
-	if err := c.ensureGoogleNativeExecutionAllowed(ctx, task.UserID, exec.APIType); err != nil {
-		return providerCallOutput{}, err
-	}
-
 	localRedrawStored := false
 	output := providerCallOutput{}
 	providerStartedAt := time.Now()
@@ -556,33 +551,6 @@ func (c *ProviderExecutor) callProviderWithRequest(ctx context.Context, account 
 	}
 	// OpenAI-compatible providers use the DALL-E style image endpoints.
 	return c.callOpenAIWithRequest(ctx, account, exec.Request, exec.Timeout)
-}
-
-func (c *ProviderExecutor) ensureGoogleNativeExecutionAllowed(ctx context.Context, userID int64, apiType string) error {
-	if !workflow.IsGoogleNativeAPIType(apiType) || c == nil || c.generationSettings == nil {
-		return nil
-	}
-	setting, err := c.generationSettings.GetGoogleNativeGeneration(ctx)
-	if err != nil {
-		return newExecutionFailureError(
-			tasks.ExecutionStageAssigned,
-			tasks.FailureCategoryInputInvalid,
-			fmt.Errorf("生成策略设置读取失败，请稍后重试"),
-		)
-	}
-	evaluation := settings.EvaluateGoogleNativeGeneration(setting, userID)
-	if evaluation.Allowed {
-		return nil
-	}
-	message := evaluation.Message
-	if message == "" {
-		message = "Google AI 原生生成通道当前不可用，请联系管理员"
-	}
-	return newExecutionFailureError(
-		tasks.ExecutionStageAssigned,
-		tasks.FailureCategoryInputInvalid,
-		fmt.Errorf("%s", message),
-	)
 }
 
 func marshalProviderTaskResult(taskID string, result map[string]interface{}) (string, error) {

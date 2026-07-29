@@ -165,61 +165,6 @@
     </SettingEditorCard>
 
     <SettingEditorCard
-      title="生成策略灰度"
-      :status="googleNativeGenerationStatusLabel"
-      :status-severity="googleNativeGenerationStatusSeverity"
-    >
-      <template #default>
-        <div :class="settingCardBodyClass">
-          <AdminFormField label="Google AI 原生通道">
-            <SelectButton
-              v-model="googleNativeGenerationForm.mode"
-              :options="googleNativeGenerationModeOptions"
-              option-label="label"
-              option-value="value"
-              :allow-empty="false"
-              size="small"
-              :disabled="googleNativeGenerationLoading || googleNativeGenerationSaving"
-            />
-          </AdminFormField>
-
-          <AdminFormField label="灰度比例 (%)">
-            <InputNumber
-              v-model="googleNativeGenerationForm.canary_percent"
-              :min="GOOGLE_NATIVE_GENERATION_CANARY_MIN_PERCENT"
-              :max="GOOGLE_NATIVE_GENERATION_CANARY_MAX_PERCENT"
-              suffix="%"
-              fluid
-              :disabled="
-                googleNativeGenerationLoading ||
-                googleNativeGenerationSaving ||
-                googleNativeGenerationCanaryDisabled
-              "
-            />
-          </AdminFormField>
-        </div>
-      </template>
-      <template #actions>
-        <Button
-          :class="adminActionButtonClass"
-          label="保存"
-          severity="contrast"
-          :disabled="googleNativeGenerationLoading || googleNativeGenerationSaving"
-          :loading="googleNativeGenerationSaving"
-          @click="handleSaveGoogleNativeGenerationSettings"
-        />
-        <Button
-          :class="adminActionButtonClass"
-          label="重置"
-          severity="secondary"
-          outlined
-          :disabled="googleNativeGenerationLoading || googleNativeGenerationSaving"
-          @click="resetGoogleNativeGenerationForm"
-        />
-      </template>
-    </SettingEditorCard>
-
-    <SettingEditorCard
       title="任务监控展示"
       :status="taskMonitorForm.auto_refresh_enabled ? '自动刷新' : '手动刷新'"
     >
@@ -387,7 +332,6 @@ import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
-import SelectButton from 'primevue/selectbutton'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../../shared/constants/media'
 import { isSupportedUploadImageFile } from '../../../../shared/utils/imageUploadSupport'
@@ -402,12 +346,6 @@ import {
   useAdminAccessSettings,
 } from '../../system-settings/useAdminAccessSettings'
 import { useAdminBrandingSettings } from '../../system-settings/useAdminBrandingSettings'
-import {
-  GOOGLE_NATIVE_GENERATION_CANARY_MAX_PERCENT,
-  GOOGLE_NATIVE_GENERATION_CANARY_MIN_PERCENT,
-  googleNativeGenerationModeOptions,
-  useAdminGoogleNativeGenerationSettings,
-} from '../../system-settings/useAdminGoogleNativeGenerationSettings'
 import {
   MEDIA_UPLOAD_MAX_CONCURRENT,
   MEDIA_UPLOAD_MIN_CONCURRENT,
@@ -424,7 +362,6 @@ import { useAdminPublicURLSettings } from '../../system-settings/useAdminPublicU
 import {
   useAdminAccessSettingsFeedback,
   useAdminBrandingSettingsFeedback,
-  useAdminGoogleNativeGenerationSettingsFeedback,
   useAdminMediaUploadSettingsFeedback,
   useAdminPublicURLSettingsFeedback,
   useAdminTaskMonitorSettingsFeedback,
@@ -448,7 +385,6 @@ const brandingLogoButtonClass = createBrandMarkClass(
 
 const accessSettingsFeedback = useAdminAccessSettingsFeedback()
 const brandingSettingsFeedback = useAdminBrandingSettingsFeedback()
-const googleNativeGenerationSettingsFeedback = useAdminGoogleNativeGenerationSettingsFeedback()
 const mediaUploadSettingsFeedback = useAdminMediaUploadSettingsFeedback()
 const publicURLSettingsFeedback = useAdminPublicURLSettingsFeedback()
 const taskMonitorSettingsFeedback = useAdminTaskMonitorSettingsFeedback()
@@ -499,18 +435,6 @@ const {
   resetMediaUploadForm,
   saving: mediaUploadSaving,
 } = useAdminMediaUploadSettings({ feedback: mediaUploadSettingsFeedback })
-const {
-  form: googleNativeGenerationForm,
-  handleSaveGoogleNativeGenerationSettings,
-  loading: googleNativeGenerationLoading,
-  resetGoogleNativeGenerationForm,
-  saving: googleNativeGenerationSaving,
-  statusLabel: googleNativeGenerationStatusLabel,
-  statusSeverity: googleNativeGenerationStatusSeverity,
-} = useAdminGoogleNativeGenerationSettings({
-  feedback: googleNativeGenerationSettingsFeedback,
-})
-
 const publicURLStatusLabel = computed(() => {
   const hasPublicBaseURL = Boolean(publicURLForm.value.public_base_url.trim())
   const hasPublicAssetBaseURL = Boolean(publicURLForm.value.public_asset_base_url.trim())
@@ -518,10 +442,6 @@ const publicURLStatusLabel = computed(() => {
   if (hasPublicBaseURL || hasPublicAssetBaseURL) return '部分配置'
   return '使用默认'
 })
-
-const googleNativeGenerationCanaryDisabled = computed(
-  () => googleNativeGenerationForm.value.mode !== 'canary',
-)
 
 watch(logoCropDialogVisible, (visible) => {
   if (!visible) {

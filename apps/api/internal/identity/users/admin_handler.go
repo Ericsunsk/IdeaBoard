@@ -164,38 +164,6 @@ func (h *AdminHandler) UpdateMediaUploadSettings(c *gin.Context) {
 	response.SuccessDTO(c, updated)
 }
 
-// GetGoogleNativeGenerationSettings 获取 Google AI 原生生成策略设置
-func (h *AdminHandler) GetGoogleNativeGenerationSettings(c *gin.Context) {
-	runtimeSettings, ok := h.requireRuntimeSettings(c)
-	if !ok {
-		return
-	}
-	setting, err := runtimeSettings.GetGoogleNativeGeneration(c.Request.Context())
-	if h.respondRuntimeSettingsReadError(c, err) {
-		return
-	}
-	response.SuccessDTO(c, setting)
-}
-
-// UpdateGoogleNativeGenerationSettings 更新 Google AI 原生生成策略设置
-func (h *AdminHandler) UpdateGoogleNativeGenerationSettings(c *gin.Context) {
-	runtimeSettings, ok := h.requireRuntimeSettings(c)
-	if !ok {
-		return
-	}
-	var req settings.GoogleNativeGenerationSetting
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
-		return
-	}
-
-	updated, err := runtimeSettings.UpdateGoogleNativeGeneration(c.Request.Context(), req)
-	if h.respondRuntimeSettingsWriteError(c, err) {
-		return
-	}
-	response.SuccessDTO(c, updated)
-}
-
 // GetBrandingSettings 获取后台品牌设置
 func (h *AdminHandler) GetBrandingSettings(c *gin.Context) {
 	runtimeSettings, ok := h.requireRuntimeSettings(c)

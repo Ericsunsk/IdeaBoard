@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/accountpool/accounts"
-	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/tasking/taskbilling"
@@ -47,25 +46,22 @@ type AccountStore interface {
 }
 
 type TaskIntakeDeps struct {
-	Accounts           AccountStore
-	Prompts            FeaturePromptStore
-	Media              taskmedia.Validator
-	GenerationSettings settings.GoogleNativeGenerationSettingProvider
+	Accounts AccountStore
+	Prompts  FeaturePromptStore
+	Media    taskmedia.Validator
 }
 
 type taskIntake struct {
-	accounts           AccountStore
-	prompts            FeaturePromptStore
-	media              taskmedia.Validator
-	generationSettings settings.GoogleNativeGenerationSettingProvider
+	accounts AccountStore
+	prompts  FeaturePromptStore
+	media    taskmedia.Validator
 }
 
 func NewTaskIntake(deps TaskIntakeDeps) TaskIntake {
 	return &taskIntake{
-		accounts:           deps.Accounts,
-		prompts:            deps.Prompts,
-		media:              deps.Media,
-		generationSettings: deps.GenerationSettings,
+		accounts: deps.Accounts,
+		prompts:  deps.Prompts,
+		media:    deps.Media,
 	}
 }
 
@@ -129,7 +125,7 @@ func (i *taskIntake) Prepare(ctx context.Context, userID int64, req *tasks.Submi
 	if err != nil {
 		return CanonicalTaskRequest{}, err
 	}
-	if err := i.ensureProviderAvailable(ctx, userID); err != nil {
+	if err := i.ensureProviderAvailable(ctx); err != nil {
 		return CanonicalTaskRequest{}, err
 	}
 
@@ -183,7 +179,7 @@ func (i *taskIntake) validateMediaRef(ctx context.Context, userID int64, raw str
 	return i.media.ValidateSubmitMediaRef(ctx, userID, raw)
 }
 
-func (i *taskIntake) ensureProviderAvailable(ctx context.Context, userID int64) error {
+func (i *taskIntake) ensureProviderAvailable(ctx context.Context) error {
 	if i == nil || i.accounts == nil {
 		return newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
 	}
@@ -195,50 +191,7 @@ func (i *taskIntake) ensureProviderAvailable(ctx context.Context, userID int64) 
 	if len(apiAccounts) == 0 {
 		return newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
 	}
-	apiAccounts, err = i.filterGoogleNativeAccounts(ctx, userID, apiAccounts)
-	if err != nil {
-		return err
-	}
-	if len(apiAccounts) == 0 {
-		return newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
-	}
 	return nil
-}
-
-func (i *taskIntake) filterGoogleNativeAccounts(ctx context.Context, userID int64, apiAccounts []*accounts.ApiAccount) ([]*accounts.ApiAccount, error) {
-	if len(apiAccounts) == 0 || i.generationSettings == nil {
-		return apiAccounts, nil
-	}
-	hasGoogleNative := false
-	for _, account := range apiAccounts {
-		if accountUsesGoogleNativeAPI(account) {
-			hasGoogleNative = true
-			break
-		}
-	}
-	if !hasGoogleNative {
-		return apiAccounts, nil
-	}
-	setting, err := i.generationSettings.GetGoogleNativeGeneration(ctx)
-	if err != nil {
-		return nil, newSubmissionError("provider_unavailable", providerUnavailableMessage, err)
-	}
-	evaluation := settings.EvaluateGoogleNativeGeneration(setting, userID)
-	if evaluation.Allowed {
-		return apiAccounts, nil
-	}
-	if evaluation.Message != "" {
-		return nil, newSubmissionError("provider_unavailable", evaluation.Message, errors.New(evaluation.Message))
-	}
-	return nil, newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
-}
-
-func accountUsesGoogleNativeAPI(account *accounts.ApiAccount) bool {
-	if account == nil {
-		return false
-	}
-	apiType, ok := workflow.ValidateProviderAPIType(account.ApiType, account.ProxyURL)
-	return ok && workflow.IsGoogleNativeAPIType(apiType)
 }
 
 func resolveTaskBillingRequest(feature string) (*taskbilling.Request, error) {

@@ -111,7 +111,6 @@ func newAppTaskRuntime(
 		ResultMaterializer:   runtimeTaskMediaStore,
 		TaskEvents:           taskEvents,
 		PublicURLs:           services.runtimeSettings,
-		GenerationSettings:   services.runtimeSettings,
 	})
 	riverTaskWorker.SetNoCapacityRetryDelay(time.Duration(taskRuntimeSetting.NoCapacityRetrySeconds) * time.Second)
 	riverClient, err := worker.NewRiverClient(dbs.riverPool, riverTaskWorker, worker.RiverServerOptions{
@@ -146,10 +145,9 @@ func newAppTaskRuntime(
 	submissionStore := tasksubmission.NewStore(dbs.riverPool, repos.taskRepo, riverClient, taskqueue.RiverQueueDefault, taskRuntimeSetting.MaxRetry, taskBillingService)
 	taskService := taskservice.NewService(taskservice.ServiceDeps{
 		TaskIntake: taskservice.NewTaskIntake(taskservice.TaskIntakeDeps{
-			Accounts:           repos.accountRepo,
-			Prompts:            repos.featurePromptRepo,
-			Media:              submitMediaValidator,
-			GenerationSettings: services.runtimeSettings,
+			Accounts: repos.accountRepo,
+			Prompts:  repos.featurePromptRepo,
+			Media:    submitMediaValidator,
 		}),
 		TaskRepo:            repos.taskRepo,
 		SubmissionStore:     submissionStore,

@@ -59,18 +59,6 @@ func (p testPublicURLProvider) GetPublicURL(context.Context) (settings.PublicURL
 	return p.setting, nil
 }
 
-type testGoogleNativeGenerationSettings struct {
-	setting settings.GoogleNativeGenerationSetting
-	err     error
-}
-
-func (p *testGoogleNativeGenerationSettings) GetGoogleNativeGeneration(context.Context) (settings.GoogleNativeGenerationSetting, error) {
-	if p.err != nil {
-		return settings.GoogleNativeGenerationSetting{}, p.err
-	}
-	return p.setting, nil
-}
-
 type testSubmitMediaValidator struct{}
 
 func (testSubmitMediaValidator) ValidateSubmitMediaRef(context.Context, int64, string) error {
@@ -989,145 +977,23 @@ func TestCheckSubmitTaskReadinessMissingBillingReturnsTypedSafeError(t *testing.
 	}
 }
 
-func TestSubmitTaskGoogleNativeGenerationSettingControlsSubmission(t *testing.T) {
-	ctx := context.Background()
-
-	tests := []struct {
-		name        string
-		setting     settings.GoogleNativeGenerationSetting
-		wantAllowed bool
-		wantMessage string
-	}{
-		{
-			name: "disabled",
-			setting: settings.GoogleNativeGenerationSetting{
-				Mode:          settings.GoogleNativeGenerationModeDisabled,
-				CanaryPercent: 100,
-			},
-			wantMessage: "Google AI 原生生成通道当前已关闭",
-		},
-		{
-			name: "enabled",
-			setting: settings.GoogleNativeGenerationSetting{
-				Mode:          settings.GoogleNativeGenerationModeEnabled,
-				CanaryPercent: 0,
-			},
-			wantAllowed: true,
-		},
-		{
-			name: "canary included",
-			setting: settings.GoogleNativeGenerationSetting{
-				Mode:          settings.GoogleNativeGenerationModeCanary,
-				CanaryPercent: 100,
-			},
-			wantAllowed: true,
-		},
-		{
-			name: "canary excluded",
-			setting: settings.GoogleNativeGenerationSetting{
-				Mode:          settings.GoogleNativeGenerationModeCanary,
-				CanaryPercent: 0,
-			},
-			wantMessage: "Google AI 原生生成通道当前处于灰度开放",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			submissionStore := &recordingSubmissionStore{}
-			svc := newGoogleNativeSubmitTestService(tt.setting, submissionStore)
-
-			_, readinessErr := svc.CheckSubmitTaskReadiness(ctx, 42, newGoogleNativeSubmitRequest(), 1)
-			taskID, submitErr := svc.SubmitTask(ctx, 42, newGoogleNativeSubmitRequest())
-			if tt.wantAllowed {
-				if readinessErr != nil {
-					t.Fatalf("readiness error = %v, want nil", readinessErr)
-				}
-				if submitErr != nil {
-					t.Fatalf("submit error = %v, want nil", submitErr)
-				}
-				if taskID == "" {
-					t.Fatalf("taskID is empty")
-				}
-				if len(submissionStore.calls) != 1 {
-					t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
-				}
-				return
-			}
-
-			if readinessErr == nil || !strings.Contains(readinessErr.Error(), tt.wantMessage) {
-				t.Fatalf("readiness error = %v, want %q", readinessErr, tt.wantMessage)
-			}
-			if submitErr == nil || !strings.Contains(submitErr.Error(), tt.wantMessage) {
-				t.Fatalf("submit error = %v, want %q", submitErr, tt.wantMessage)
-			}
-			if taskID != "" {
-				t.Fatalf("taskID=%q, want empty", taskID)
-			}
-			if len(submissionStore.calls) != 0 {
-				t.Fatalf("submission calls=%d, want 0", len(submissionStore.calls))
-			}
-		})
-	}
-}
-
-func TestSubmitTaskGoogleNativeGenerationSettingRollbackStopsNewTasks(t *testing.T) {
+func TestSubmitTaskAllowsEnabledGoogleNativeAccount(t *testing.T) {
 	ctx := context.Background()
 	submissionStore := &recordingSubmissionStore{}
-	generationSettings := &testGoogleNativeGenerationSettings{
-		setting: settings.GoogleNativeGenerationSetting{
-			Mode:          settings.GoogleNativeGenerationModeEnabled,
-			CanaryPercent: 0,
-		},
-	}
-	svc := newGoogleNativeSubmitTestServiceWithSettings(generationSettings, submissionStore)
+	svc := newGoogleNativeSubmitTestService(submissionStore)
 
-	if _, err := svc.SubmitTask(ctx, 42, newGoogleNativeSubmitRequest()); err != nil {
-		t.Fatalf("initial submit failed: %v", err)
+	if _, err := svc.CheckSubmitTaskReadiness(ctx, 42, newGoogleNativeSubmitRequest(), 1); err != nil {
+		t.Fatalf("readiness error = %v, want nil", err)
 	}
-	generationSettings.setting = settings.GoogleNativeGenerationSetting{
-		Mode:          settings.GoogleNativeGenerationModeDisabled,
-		CanaryPercent: 0,
+	taskID, err := svc.SubmitTask(ctx, 42, newGoogleNativeSubmitRequest())
+	if err != nil {
+		t.Fatalf("submit error = %v, want nil", err)
 	}
-	if _, err := svc.SubmitTask(ctx, 42, newGoogleNativeSubmitRequest()); err == nil || !strings.Contains(err.Error(), "Google AI 原生生成通道当前已关闭") {
-		t.Fatalf("post-rollback submit error = %v, want disabled gate", err)
+	if taskID == "" {
+		t.Fatal("taskID is empty")
 	}
 	if len(submissionStore.calls) != 1 {
-		t.Fatalf("submission calls=%d, want only pre-rollback task", len(submissionStore.calls))
-	}
-}
-
-func TestSubmitTaskGoogleNativeGenerationSettingDoesNotFallbackToNonGoogleAccount(t *testing.T) {
-	ctx := context.Background()
-	submissionStore := &recordingSubmissionStore{}
-	svc := newGoogleNativeSubmitTestServiceWithAccounts(
-		&testGoogleNativeGenerationSettings{setting: settings.GoogleNativeGenerationSetting{
-			Mode:          settings.GoogleNativeGenerationModeDisabled,
-			CanaryPercent: 0,
-		}},
-		submissionStore,
-		[]*accounts.ApiAccount{
-			{
-				ID:      101,
-				ApiType: workflow.ProviderGoogleAI,
-				Models:  []accounts.AccountModel{{Name: "gemini-2.5-flash-image", Enabled: true}},
-			},
-			{
-				ID:      202,
-				ApiType: workflow.ProviderOpenAICompatible,
-				Models:  []accounts.AccountModel{{Name: "gemini-2.5-flash-image", Enabled: true}},
-			},
-		},
-	)
-
-	if _, err := svc.CheckSubmitTaskReadiness(ctx, 42, newGoogleNativeSubmitRequest(), 1); err == nil || !strings.Contains(err.Error(), "Google AI 原生生成通道当前已关闭") {
-		t.Fatalf("readiness error = %v, want disabled gate", err)
-	}
-	if _, err := svc.SubmitTask(ctx, 42, newGoogleNativeSubmitRequest()); err == nil || !strings.Contains(err.Error(), "Google AI 原生生成通道当前已关闭") {
-		t.Fatalf("submit error = %v, want disabled gate", err)
-	}
-	if len(submissionStore.calls) != 0 {
-		t.Fatalf("submission calls=%d, want 0", len(submissionStore.calls))
+		t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
 	}
 }
 
@@ -1477,26 +1343,17 @@ func (s *fakeSubmitAccountStore) GetAllEnabled(context.Context) ([]*accounts.Api
 	return s.accounts, nil
 }
 
-func newGoogleNativeSubmitTestService(setting settings.GoogleNativeGenerationSetting, submissionStore *recordingSubmissionStore) *Service {
-	return newGoogleNativeSubmitTestServiceWithSettings(&testGoogleNativeGenerationSettings{setting: setting}, submissionStore)
-}
-
-func newGoogleNativeSubmitTestServiceWithSettings(generationSettings *testGoogleNativeGenerationSettings, submissionStore *recordingSubmissionStore) *Service {
-	return newGoogleNativeSubmitTestServiceWithAccounts(generationSettings, submissionStore, []*accounts.ApiAccount{
-		{
-			ID:      101,
-			ApiType: workflow.ProviderGoogleAI,
-			Models:  []accounts.AccountModel{{Name: "gemini-2.5-flash-image", Enabled: true}},
-		},
-	})
-}
-
-func newGoogleNativeSubmitTestServiceWithAccounts(generationSettings *testGoogleNativeGenerationSettings, submissionStore *recordingSubmissionStore, apiAccounts []*accounts.ApiAccount) *Service {
+func newGoogleNativeSubmitTestService(submissionStore *recordingSubmissionStore) *Service {
 	return newSubmitServiceForTest(submitTestServiceDeps{
-		AccountRepo:        &fakeSubmitAccountStore{accounts: apiAccounts},
-		SubmissionStore:    submissionStore,
-		GenerationSettings: generationSettings,
-		TaskBilling:        newHandlerTaskBillingService(),
+		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
+			{
+				ID:      101,
+				ApiType: workflow.ProviderGoogleAI,
+				Models:  []accounts.AccountModel{{Name: "gemini-2.5-flash-image", Enabled: true}},
+			},
+		}},
+		SubmissionStore: submissionStore,
+		TaskBilling:     newHandlerTaskBillingService(),
 		PromptStore: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
 			workflow.FeatureSlugSketchToImage: {
 				Prompt: "{{user_prompt}}", UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(workflow.FeatureSlugSketchToImage),

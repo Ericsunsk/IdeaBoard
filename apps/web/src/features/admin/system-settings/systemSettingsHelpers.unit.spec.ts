@@ -12,13 +12,6 @@ import {
   validateMediaUploadSetting,
 } from './useAdminMediaUploadSettings'
 import {
-  DEFAULT_GOOGLE_NATIVE_GENERATION_SETTING,
-  GOOGLE_NATIVE_GENERATION_CANARY_MAX_PERCENT,
-  getGoogleNativeGenerationStatusLabel,
-  normalizeGoogleNativeGenerationSetting,
-  validateGoogleNativeGenerationSetting,
-} from './useAdminGoogleNativeGenerationSettings'
-import {
   DEFAULT_ADMIN_TASK_MONITOR_SETTING,
   TASK_MONITOR_MAX_PAGE_SIZE,
   TASK_MONITOR_MIN_REFRESH_INTERVAL_SECONDS,
@@ -81,46 +74,6 @@ describe('admin media upload settings helpers', () => {
       validateMediaUploadSetting({ upload_max_concurrent: MEDIA_UPLOAD_MAX_CONCURRENT + 1 }),
     ).toBe(
       `上传并发上限必须在 ${MEDIA_UPLOAD_MIN_CONCURRENT} 到 ${MEDIA_UPLOAD_MAX_CONCURRENT} 之间`,
-    )
-  })
-})
-
-describe('admin google native generation settings helpers', () => {
-  it('normalizes missing and invalid values to defaults', () => {
-    expect(normalizeGoogleNativeGenerationSetting(null)).toEqual(
-      DEFAULT_GOOGLE_NATIVE_GENERATION_SETTING,
-    )
-    expect(
-      normalizeGoogleNativeGenerationSetting({
-        mode: 'unknown',
-        canary_percent: 12.8,
-      } as never),
-    ).toEqual({
-      ...DEFAULT_GOOGLE_NATIVE_GENERATION_SETTING,
-      canary_percent: 12,
-    })
-  })
-
-  it('validates mode and canary percentage', () => {
-    expect(validateGoogleNativeGenerationSetting({ mode: 'enabled', canary_percent: 0 })).toBe('')
-    expect(validateGoogleNativeGenerationSetting({ mode: 'canary', canary_percent: 25 })).toBe('')
-    expect(
-      validateGoogleNativeGenerationSetting({
-        mode: 'disabled',
-        canary_percent: GOOGLE_NATIVE_GENERATION_CANARY_MAX_PERCENT + 1,
-      }),
-    ).toBe('灰度比例必须在 0 到 100 之间')
-  })
-
-  it('labels disabled, enabled, and canary states', () => {
-    expect(getGoogleNativeGenerationStatusLabel({ mode: 'disabled', canary_percent: 0 })).toBe(
-      '已关闭',
-    )
-    expect(getGoogleNativeGenerationStatusLabel({ mode: 'enabled', canary_percent: 0 })).toBe(
-      '全部启用',
-    )
-    expect(getGoogleNativeGenerationStatusLabel({ mode: 'canary', canary_percent: 35 })).toBe(
-      '灰度 35%',
     )
   })
 })

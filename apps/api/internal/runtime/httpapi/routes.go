@@ -90,19 +90,18 @@ const uploadRequestBodyLimitBytes int64 = 64 * 1024 * 1024
 
 // Hand-written route paths that bypass the Orval-generated client.
 const (
-	RouteHealth                              = "/api/health"
-	RoutePublicSettingsBranding              = "/api/settings/branding"
-	RouteUserProfileAvatar                   = "/profile/avatar"
-	RouteUserBoardUploads                    = "/boards/:board_id/uploads"
-	RouteUserDownload                        = "/download"
-	RouteAdminUpload                         = "/upload"
-	RouteAdminSettingsBranding               = "/settings/branding"
-	RouteAdminSettingsMediaUpload            = "/settings/media-upload"
-	RouteAdminSettingsPublicURLs             = "/settings/public-urls"
-	RouteAdminSettingsRateLimit              = "/settings/rate-limit"
-	RouteAdminSettingsTaskMonitor            = "/settings/task-monitor"
-	RouteAdminSettingsGoogleNativeGeneration = "/settings/generation/google-native"
-	RouteAdminSettingsOperational            = "/settings/operational"
+	RouteHealth                   = "/api/health"
+	RoutePublicSettingsBranding   = "/api/settings/branding"
+	RouteUserProfileAvatar        = "/profile/avatar"
+	RouteUserBoardUploads         = "/boards/:board_id/uploads"
+	RouteUserDownload             = "/download"
+	RouteAdminUpload              = "/upload"
+	RouteAdminSettingsBranding    = "/settings/branding"
+	RouteAdminSettingsMediaUpload = "/settings/media-upload"
+	RouteAdminSettingsPublicURLs  = "/settings/public-urls"
+	RouteAdminSettingsRateLimit   = "/settings/rate-limit"
+	RouteAdminSettingsTaskMonitor = "/settings/task-monitor"
+	RouteAdminSettingsOperational = "/settings/operational"
 )
 
 func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, frontendOptions FrontendRouteOptions) {

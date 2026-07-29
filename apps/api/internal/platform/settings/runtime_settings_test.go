@@ -216,14 +216,6 @@ func TestRuntimeSettingsServiceUpdatesAndReadsTypedSettings(t *testing.T) {
 		t.Fatalf("media upload = %+v, want persisted payload", mediaUpload)
 	}
 
-	googleNative, err := service.UpdateGoogleNativeGeneration(ctx, GoogleNativeGenerationSetting{Mode: GoogleNativeGenerationModeCanary, CanaryPercent: 25})
-	if err != nil {
-		t.Fatalf("update google native generation failed: %v", err)
-	}
-	if googleNative != (GoogleNativeGenerationSetting{Mode: GoogleNativeGenerationModeCanary, CanaryPercent: 25}) {
-		t.Fatalf("google native generation = %+v, want persisted payload", googleNative)
-	}
-
 	gotRegistration, err := service.GetRegistration(ctx)
 	if err != nil {
 		t.Fatalf("get registration failed: %v", err)
@@ -272,13 +264,6 @@ func TestRuntimeSettingsServiceUpdatesAndReadsTypedSettings(t *testing.T) {
 		t.Fatalf("media upload readback = %+v, want %+v", gotMediaUpload, mediaUpload)
 	}
 
-	gotGoogleNative, err := service.GetGoogleNativeGeneration(ctx)
-	if err != nil {
-		t.Fatalf("get google native generation failed: %v", err)
-	}
-	if gotGoogleNative != googleNative {
-		t.Fatalf("google native generation readback = %+v, want %+v", gotGoogleNative, googleNative)
-	}
 }
 
 func TestRuntimeSettingsServiceDefaultsWhenConfigsAreMissing(t *testing.T) {
@@ -303,62 +288,6 @@ func TestRuntimeSettingsServiceDefaultsWhenConfigsAreMissing(t *testing.T) {
 	}
 	if got, err := service.GetMediaUpload(ctx); err != nil || got != DefaultMediaUploadSetting() {
 		t.Fatalf("media upload default = %+v, err=%v", got, err)
-	}
-	if got, err := service.GetGoogleNativeGeneration(ctx); err != nil || got != DefaultGoogleNativeGenerationSetting() {
-		t.Fatalf("google native generation default = %+v, err=%v", got, err)
-	}
-}
-
-func TestEvaluateGoogleNativeGenerationModes(t *testing.T) {
-	enabled := EvaluateGoogleNativeGeneration(GoogleNativeGenerationSetting{
-		Mode:          GoogleNativeGenerationModeEnabled,
-		CanaryPercent: 0,
-	}, 42)
-	if !enabled.Allowed {
-		t.Fatalf("enabled evaluation = %+v, want allowed", enabled)
-	}
-
-	disabled := EvaluateGoogleNativeGeneration(GoogleNativeGenerationSetting{
-		Mode:          GoogleNativeGenerationModeDisabled,
-		CanaryPercent: 100,
-	}, 42)
-	if disabled.Allowed || disabled.Message == "" {
-		t.Fatalf("disabled evaluation = %+v, want blocked with message", disabled)
-	}
-
-	canaryZero := EvaluateGoogleNativeGeneration(GoogleNativeGenerationSetting{
-		Mode:          GoogleNativeGenerationModeCanary,
-		CanaryPercent: 0,
-	}, 42)
-	if canaryZero.Allowed {
-		t.Fatalf("canary 0%% evaluation = %+v, want blocked", canaryZero)
-	}
-
-	canaryFull := EvaluateGoogleNativeGeneration(GoogleNativeGenerationSetting{
-		Mode:          GoogleNativeGenerationModeCanary,
-		CanaryPercent: 100,
-	}, 42)
-	if !canaryFull.Allowed {
-		t.Fatalf("canary 100%% evaluation = %+v, want allowed", canaryFull)
-	}
-
-	included, excluded := false, false
-	for userID := int64(1); userID <= 200; userID++ {
-		evaluation := EvaluateGoogleNativeGeneration(GoogleNativeGenerationSetting{
-			Mode:          GoogleNativeGenerationModeCanary,
-			CanaryPercent: 50,
-		}, userID)
-		if evaluation.Bucket < 0 || evaluation.Bucket >= 100 {
-			t.Fatalf("bucket = %d, want [0,100)", evaluation.Bucket)
-		}
-		if evaluation.Allowed != (evaluation.Bucket < 50) {
-			t.Fatalf("evaluation = %+v, want allowed iff bucket < percent", evaluation)
-		}
-		included = included || evaluation.Allowed
-		excluded = excluded || !evaluation.Allowed
-	}
-	if !included || !excluded {
-		t.Fatalf("canary 50%% should include and exclude users, included=%v excluded=%v", included, excluded)
 	}
 }
 
