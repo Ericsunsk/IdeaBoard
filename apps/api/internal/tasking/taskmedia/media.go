@@ -17,10 +17,6 @@ type Validator interface {
 	ValidateSubmitMediaRef(ctx context.Context, userID int64, raw string) error
 }
 
-type TaskOutputCleaner interface {
-	DeleteTaskOutputsByUserTask(ctx context.Context, userID int64, taskID string) error
-}
-
 type UploadReader interface {
 	ReadUploadObject(ctx context.Context, ref string, maxBytes int64) (*StoredObject, error)
 }

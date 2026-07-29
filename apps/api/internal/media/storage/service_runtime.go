@@ -207,14 +207,6 @@ func (s *StorageService) DeleteUserUploads(ctx context.Context, userID int64, st
 	return s.deleteUploadObjectPrefixes(ctx, prefixes)
 }
 
-func (s *StorageService) DeleteTaskOutputsByUserTask(ctx context.Context, userID int64, taskID string) error {
-	prefix, err := TaskOutputUploadObjectPrefix(userID, taskID)
-	if err != nil {
-		return err
-	}
-	return s.deleteUploadObjectPrefix(ctx, prefix)
-}
-
 func (s *StorageService) DeleteObjectByKey(ctx context.Context, objectKey string) error {
 	profile, err := s.resolveActiveProfile(ctx)
 	if err != nil {

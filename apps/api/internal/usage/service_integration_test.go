@@ -11,14 +11,13 @@ import (
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/tasking/taskbilling"
-	"ideaboard/api/internal/tasking/taskstore"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/workflow"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func TestServiceGetCurrentKeepsDurableLogicalTasksAfterTaskDeletion(t *testing.T) {
+func TestServiceGetCurrentReportsDurableLogicalTasks(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	ctx := context.Background()
 	const userID int64 = 901
@@ -82,19 +81,6 @@ func TestServiceGetCurrentKeepsDurableLogicalTasksAfterTaskDeletion(t *testing.T
 		t.Fatalf("trend total = %d, want gross captures 120", trendTotal)
 	}
 
-	repo := taskstore.NewRepository(db)
-	for _, taskID := range taskIDs {
-		if err := repo.DeleteByTaskIDAndUserID(ctx, taskID, userID); err != nil {
-			t.Fatalf("delete task %s: %v", taskID, err)
-		}
-	}
-	afterDelete, err := newUsageService().GetCurrent(ctx, userID, Range30Days)
-	if err != nil {
-		t.Fatalf("GetCurrent() after task deletion error = %v", err)
-	}
-	if afterDelete.Lifetime.TaskCount != beforeDelete.Lifetime.TaskCount || afterDelete.Lifetime.ActiveDays != beforeDelete.Lifetime.ActiveDays {
-		t.Fatalf("durable task usage changed after deletion: before=%+v after=%+v", beforeDelete.Lifetime, afterDelete.Lifetime)
-	}
 }
 
 func seedUsageUser(t *testing.T, ctx context.Context, db *sql.DB, userID int64, storageUID string) {

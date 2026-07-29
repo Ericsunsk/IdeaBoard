@@ -693,18 +693,6 @@ WHERE task_id = sqlc.arg(task_id)
   AND assigned_credential_id = sqlc.arg(assigned_credential_id)
   AND lease_token = sqlc.arg(lease_token);
 
--- name: DeleteTaskByTaskIDAndUserID :exec
-DELETE FROM tasks
-WHERE task_id = sqlc.arg(task_id) AND user_id = sqlc.arg(user_id);
-
--- name: DeleteTasksByTaskIDs :execrows
-DELETE FROM tasks
-WHERE task_id = ANY(sqlc.arg(task_ids)::text[]);
-
--- name: DeleteTasksByUserID :exec
-DELETE FROM tasks
-WHERE user_id = sqlc.arg(user_id);
-
 -- name: FailRunningTasksByAccountID :many
 WITH updated_tasks AS (
   UPDATE tasks t

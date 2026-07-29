@@ -33,7 +33,6 @@ func registerUserTaskRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	userAPI.GET("/tasks/:task_id/events", h.TaskHandler.StreamUserTask)
 	userAPI.POST("/tasks/:task_id/cancel", h.TaskHandler.CancelUserTask)
 	userAPI.GET("/tasks/:task_id", h.TaskHandler.GetUserTask)
-	userAPI.DELETE("/tasks/:task_id", h.TaskHandler.DeleteUserTask)
 	userAPI.GET("/tasks", h.TaskHandler.GetUserTasks)
 }
 

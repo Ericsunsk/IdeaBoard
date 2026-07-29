@@ -406,8 +406,8 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"POST /api/admin/storage/profiles":                            false,
 		"POST /api/admin/storage/profiles/:id/apply":                  false,
 		"POST /api/admin/storage/profiles/:id/test":                   false,
+		"POST /api/admin/tasks/:task_id/cancel":                       false,
 		"POST /api/admin/tasks/submit":                                false,
-		"POST /api/admin/tasks/bulk-delete":                           false,
 		"POST /api/admin/upload":                                      false,
 		"POST /api/admin/users/:id/ban":                               false,
 		"POST /api/admin/users/:id/revoke-sessions":                   false,
@@ -441,6 +441,37 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 	for key, found := range want {
 		if !found {
 			t.Fatalf("expected admin route %s was not registered", key)
+		}
+	}
+}
+
+func TestUserTaskRoutesDoNotExposePhysicalTaskDeletion(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	registerUserTaskRoutes(router.Group("/api/user"), UserRouteDeps{TaskHandler: taskservice.NewHandler(nil)})
+
+	for _, route := range router.Routes() {
+		if route.Method == http.MethodDelete && route.Path == "/api/user/tasks/:task_id" {
+			t.Fatal("user task routes must not expose physical task deletion")
+		}
+	}
+
+	for _, route := range router.Routes() {
+		if route.Method == http.MethodPost && route.Path == "/api/user/tasks/:task_id/cancel" {
+			return
+		}
+	}
+	t.Fatal("user task routes must retain cancellation")
+}
+
+func TestAdminTaskRoutesDoNotExposeBulkTaskDeletion(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	registerAdminTaskRoutes(router.Group("/api/admin"), AdminRouteDeps{TaskHandler: taskservice.NewHandler(nil)})
+
+	for _, route := range router.Routes() {
+		if route.Method == http.MethodPost && route.Path == "/api/admin/tasks/bulk-delete" {
+			t.Fatal("admin task routes must not expose bulk physical task deletion")
 		}
 	}
 }

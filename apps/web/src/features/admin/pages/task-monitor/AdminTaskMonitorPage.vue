@@ -139,23 +139,9 @@
               severity="secondary"
               rounded
             />
-            <Tag v-if="selectedTasks.length > 0" :value="`已选 ${selectedTasks.length}`" rounded />
           </template>
 
           <template #filters>
-            <Button
-              text
-              :class="adminToolbarIconButtonClass"
-              :disabled="!canDeleteSelectedTasks"
-              :loading="isDeletingSelectedTasks"
-              aria-label="删除"
-              title="删除"
-              @click="requestDeleteSelectedTasks"
-            >
-              <template #icon>
-                <Trash class="size-4 text-admin-danger" />
-              </template>
-            </Button>
             <AdminFilterPopover
               :active="hasTaskFilter"
               filter-label="筛选任务"
@@ -192,13 +178,7 @@
           </template>
 
           <template #actions="{ iconButtonClass }">
-            <Button
-              text
-              :class="iconButtonClass"
-              aria-label="刷新任务列表"
-              :disabled="isDeletingSelectedTasks"
-              @click="loadTasks"
-            >
+            <Button text :class="iconButtonClass" aria-label="刷新任务列表" @click="loadTasks">
               <template #icon>
                 <Refresh class="size-4 text-admin-text-2" />
               </template>
@@ -219,7 +199,6 @@
       </template>
 
       <DataTableFrame
-        v-model:selection="selectedTasks"
         :value="tasks"
         :loading="loading"
         data-key="task_id"
@@ -229,8 +208,6 @@
         <template #empty>
           <div class="py-7 text-center text-admin-body text-admin-text-3">暂无任务</div>
         </template>
-
-        <Column selection-mode="multiple" style="width: 3rem" />
 
         <Column header="创建时间" :style="{ width: '156px' }">
           <template #body="{ data }">
@@ -363,20 +340,32 @@
           </template>
         </Column>
 
-        <Column header="操作" :style="{ width: '72px' }">
+        <Column header="操作" :style="{ width: '136px' }">
           <template #body="{ data }">
-            <Button
-              text
-              rounded
-              size="small"
-              severity="secondary"
-              aria-label="查看任务详情"
-              @click="showDetail(data)"
-            >
-              <template #icon>
-                <Eye class="size-4 text-admin-text-2" />
-              </template>
-            </Button>
+            <div class="flex items-center gap-1">
+              <Button
+                v-if="isCancellableTask(data)"
+                text
+                size="small"
+                severity="warn"
+                label="取消"
+                :loading="isCancellingTask(data.task_id)"
+                aria-label="取消任务"
+                @click="requestCancelTask(data)"
+              />
+              <Button
+                text
+                rounded
+                size="small"
+                severity="secondary"
+                aria-label="查看任务详情"
+                @click="showDetail(data)"
+              >
+                <template #icon>
+                  <Eye class="size-4 text-admin-text-2" />
+                </template>
+              </Button>
+            </div>
           </template>
         </Column>
       </DataTableFrame>
@@ -394,7 +383,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import Button from 'primevue/button'
 import Chart from 'primevue/chart'
 import Column from 'primevue/column'
@@ -403,9 +392,9 @@ import Message from 'primevue/message'
 import PrimeImage from 'primevue/image'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
-import { Eye, Refresh, Trash } from '@iconoir/vue'
+import { Eye, Refresh } from '@iconoir/vue'
 import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessages'
-import { useAdminTaskDeletionFeedback } from '../../task-monitor/useAdminTaskMonitorFeedback'
+import { useAdminTaskCancellationFeedback } from '../../task-monitor/useAdminTaskMonitorFeedback'
 import AdminTaskResultDialog from '../../task-monitor/AdminTaskResultDialog.vue'
 import AdminChartCard from '../../shared/components/AdminChartCard.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
@@ -422,9 +411,7 @@ import {
   adminDashboardRootClass,
   adminSummaryGridClass,
   adminTextButtonClass,
-  adminToolbarIconButtonClass,
 } from '../../shared/lib/adminUiClasses'
-import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import {
   formatTaskCreatedAt,
@@ -446,13 +433,18 @@ import {
 } from '../../task-monitor/taskMonitorStatus'
 import { useTaskMonitorCharts } from '../../task-monitor/useTaskMonitorCharts'
 import { type AdminTaskRow, useAdminTaskList } from '../../task-monitor/useAdminTaskList'
+import { useAdminTaskCancel } from '../../task-monitor/useAdminTaskCancel'
 import { useAdminTaskDetailResource } from '../../task-monitor/taskMonitorResource'
-import { useAdminTaskSelectionDelete } from '../../task-monitor/useAdminTaskSelectionDelete'
 import { useAdminTaskRuntimeSnapshot } from '../../task-monitor/useAdminTaskRuntimeSnapshot'
+import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 
-const taskDeletionFeedback = useAdminTaskDeletionFeedback()
-const adminConfirm = useAdminConfirm()
 const taskCards = adminCards.taskMonitor
+const adminConfirm = useAdminConfirm()
+const taskCancellationFeedback = useAdminTaskCancellationFeedback()
+const { isCancellableTask, isCancellingTask, requestCancelTask } = useAdminTaskCancel({
+  confirm: adminConfirm,
+  feedback: taskCancellationFeedback,
+})
 const detailModalVisible = ref(false)
 const selectedDetailTaskID = ref('')
 const detailQuery = useAdminTaskDetailResource(selectedDetailTaskID, {
@@ -500,13 +492,6 @@ const {
   retry: retryMonitorSnapshot,
 } = useAdminTaskRuntimeSnapshot()
 
-const selectedTasks = ref<AdminTaskRow[]>([])
-const { canDeleteSelectedTasks, isDeletingSelectedTasks, requestDeleteSelectedTasks } =
-  useAdminTaskSelectionDelete({
-    selectedTasks,
-    confirm: adminConfirm,
-    feedback: taskDeletionFeedback,
-  })
 const hasTaskFilter = computed(() => Boolean(filterStatus.value || accountIdFilter.value))
 const taskListErrorMessage = computed(() =>
   formatDisplayErrorMessage(taskListError.value, '加载任务列表失败'),
@@ -522,7 +507,6 @@ const taskMonitorSettingsErrorMessage = computed(() =>
 )
 
 function handleTaskSearch() {
-  selectedTasks.value = []
   applyTaskSearch()
 }
 
@@ -530,10 +514,6 @@ function resetTaskFilters() {
   filterStatus.value = null
   accountIdFilter.value = null
 }
-
-watch([currentPage, filterStatus, accountIdFilter], () => {
-  selectedTasks.value = []
-})
 
 const currentPageCount = computed(() => tasks.value.length)
 const {

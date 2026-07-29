@@ -10,10 +10,9 @@ export type AdminTaskResultFeedback = {
   copyFailed: () => void
 }
 
-export type AdminTaskDeletionFeedback = {
-  noTasksSelected: () => void
-  tasksDeleted: (deletedCount: number) => void
-  deleteTasksFailed: (error: unknown) => void
+export type AdminTaskCancellationFeedback = {
+  taskCancelled: () => void
+  cancelTaskFailed: (error: unknown) => void
 }
 
 export function createAdminTaskResultFeedback(toast: AdminToastPort): AdminTaskResultFeedback {
@@ -24,24 +23,14 @@ export function createAdminTaskResultFeedback(toast: AdminToastPort): AdminTaskR
   }
 }
 
-export function createAdminTaskDeletionFeedback(toast: AdminToastPort): AdminTaskDeletionFeedback {
-  return {
-    noTasksSelected: () => toast.warning('请选择要删除的任务'),
-    tasksDeleted: (deletedCount) => {
-      if (deletedCount <= 0) {
-        toast.warning('没有可删除的任务，列表已刷新')
-        return
-      }
-      toast.success(`已删除 ${deletedCount} 个任务`)
-    },
-    deleteTasksFailed: (error) => toast.error(formatAdminDisplayError(error, '删除任务失败')),
-  }
-}
-
 export function useAdminTaskResultFeedback() {
   return createAdminTaskResultFeedback(useAdminToast())
 }
 
-export function useAdminTaskDeletionFeedback() {
-  return createAdminTaskDeletionFeedback(useAdminToast())
+export function useAdminTaskCancellationFeedback(): AdminTaskCancellationFeedback {
+  const toast = useAdminToast()
+  return {
+    taskCancelled: () => toast.success('任务已取消'),
+    cancelTaskFailed: (error) => toast.error(formatAdminDisplayError(error, '取消任务失败')),
+  }
 }

@@ -112,30 +112,6 @@ func (r *UserRepository) Update(ctx context.Context, user *User) error {
 	return requireOneUserRow(updated)
 }
 
-// Delete 删除用户及关联资产
-func (r *UserRepository) Delete(ctx context.Context, id int64) error {
-	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
-		if _, err := q.GetUserByID(ctx, id); err != nil {
-			return err
-		}
-
-		if err := q.DeleteBoardMembersByUserID(ctx, id); err != nil {
-			return err
-		}
-		if err := q.DeleteUserBoardsByUserID(ctx, id); err != nil {
-			return err
-		}
-		if err := q.DeleteTasksByUserID(ctx, id); err != nil {
-			return err
-		}
-		updated, err := q.DeleteUserByID(ctx, id)
-		if err != nil {
-			return err
-		}
-		return requireOneUserRow(updated)
-	})
-}
-
 // List 获取用户列表
 func (r *UserRepository) List(
 	ctx context.Context,

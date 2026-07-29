@@ -104,19 +104,6 @@ DELETE FROM media_refs
 WHERE task_id = sqlc.arg(task_id)
   AND ref_type = 'task_output';
 
--- name: DeleteTaskOutputMediaRefsByTaskIDs :exec
-DELETE FROM media_refs
-WHERE task_id = ANY(sqlc.arg(task_ids)::text[])
-  AND ref_type = 'task_output';
-
--- name: DeleteTaskOutputMediaRefsByUserTaskID :exec
-DELETE FROM media_refs AS mr
-USING tasks AS t
-WHERE mr.task_id = sqlc.arg(task_id)
-  AND mr.ref_type = 'task_output'
-  AND t.task_id = mr.task_id
-  AND t.user_id = sqlc.arg(user_id);
-
 -- name: CountMediaRefsByAssetID :one
 SELECT COUNT(*)
 FROM media_refs

@@ -1,12 +1,27 @@
 import { describe, expect, it } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
-import {
-  deleteAdminTaskSelection,
-  getAdminTaskDetail,
-  getAdminTaskList,
-} from './taskMonitorResource'
+import * as adminTasksApi from '../../../shared/api/generated-query/admin-tasks/admin-tasks'
+import { cancelAdminTaskByID, getAdminTaskDetail, getAdminTaskList } from './taskMonitorResource'
 
 describe('task monitor resource', () => {
+  it('does not expose physical task deletion through the generated admin task contract', () => {
+    expect(adminTasksApi).not.toHaveProperty('deleteAdminTasks')
+    expect(adminTasksApi).not.toHaveProperty('useDeleteAdminTasks')
+  })
+
+  it('cancels one active task through the typed admin task resource seam', async () => {
+    const requests: Array<{ method: string; path: string }> = []
+    useMswHandlers(
+      http.post('/api/admin/tasks/task-a/cancel', ({ request }) => {
+        requests.push({ method: request.method, path: new URL(request.url).pathname })
+        return HttpResponse.json({ code: 0, msg: 'ok', data: { message: '取消成功' } })
+      }),
+    )
+
+    await expect(cancelAdminTaskByID('task-a')).resolves.toBeUndefined()
+    expect(requests).toEqual([{ method: 'POST', path: '/api/admin/tasks/task-a/cancel' }])
+  })
+
   it('loads the lightweight latest execution projection without execution history through the list resource seam', async () => {
     useMswHandlers(
       http.get('/api/admin/tasks', () =>
@@ -130,40 +145,4 @@ describe('task monitor resource', () => {
       provider_endpoint_id: 7,
     })
   })
-
-  it('deletes selected tasks through the admin task monitor resource seam', async () => {
-    const requests: Array<{ method: string; path: string; body?: unknown }> = []
-    useMswHandlers(
-      http.post('/api/admin/tasks/bulk-delete', async ({ request }) => {
-        const url = new URL(request.url)
-        requests.push({
-          method: request.method,
-          path: url.pathname,
-          body: await readRequestJson(request),
-        })
-
-        return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: { deleted_count: 2 },
-        })
-      }),
-    )
-
-    const result = await deleteAdminTaskSelection(['task-a', 'task-b'])
-
-    expect(requests).toEqual([
-      {
-        method: 'POST',
-        path: '/api/admin/tasks/bulk-delete',
-        body: { task_ids: ['task-a', 'task-b'] },
-      },
-    ])
-    expect(result.deleted_count).toBe(2)
-  })
 })
-
-async function readRequestJson(request: Request) {
-  const text = await request.text()
-  return text ? JSON.parse(text) : undefined
-}

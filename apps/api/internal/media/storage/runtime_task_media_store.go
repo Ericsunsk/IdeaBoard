@@ -16,7 +16,6 @@ type RuntimeTaskMediaStore struct {
 }
 
 var _ taskmedia.ResultMaterializer = (*RuntimeTaskMediaStore)(nil)
-var _ taskmedia.TaskOutputCleaner = (*RuntimeTaskMediaStore)(nil)
 var _ taskmedia.UploadReader = (*RuntimeTaskMediaStore)(nil)
 
 func NewRuntimeTaskMediaStore(service *StorageService) *RuntimeTaskMediaStore {
@@ -91,13 +90,6 @@ func (s *RuntimeTaskMediaStore) MaterializeBytesResult(ctx context.Context, user
 			Output:   taskOutputFromStoredUploadRef(taskID, ref, sourceURL, 0),
 		}},
 	}, nil
-}
-
-func (s *RuntimeTaskMediaStore) DeleteTaskOutputsByUserTask(ctx context.Context, userID int64, taskID string) error {
-	if s == nil || s.service == nil {
-		return fmt.Errorf("存储服务未初始化")
-	}
-	return s.service.DeleteTaskOutputsByUserTask(ctx, userID, taskID)
 }
 
 func taskMediaResultStoreOptions(userID int64, taskID string, allowHosts []string) (StorageStoreOptions, error) {

@@ -48,12 +48,7 @@ type Querier interface {
 	DeleteLineDraftMode(ctx context.Context, id int64) error
 	DeleteOutputsByTaskID(ctx context.Context, taskID string) error
 	DeleteProviderEndpoint(ctx context.Context, id int64) (int64, error)
-	DeleteTaskByTaskIDAndUserID(ctx context.Context, arg DeleteTaskByTaskIDAndUserIDParams) error
 	DeleteTaskOutputMediaRefsByTaskID(ctx context.Context, taskID string) error
-	DeleteTaskOutputMediaRefsByTaskIDs(ctx context.Context, taskIds []string) error
-	DeleteTaskOutputMediaRefsByUserTaskID(ctx context.Context, arg DeleteTaskOutputMediaRefsByUserTaskIDParams) error
-	DeleteTasksByTaskIDs(ctx context.Context, taskIds []string) (int64, error)
-	DeleteTasksByUserID(ctx context.Context, userID int64) error
 	DeleteUserBoardsByUserID(ctx context.Context, userID int64) error
 	DeleteUserByID(ctx context.Context, id int64) (int64, error)
 	FailRunningTaskAttemptsByAccountID(ctx context.Context, arg FailRunningTaskAttemptsByAccountIDParams) (int64, error)

@@ -55,12 +55,8 @@ type userTaskResponse struct {
 	Task tasks.TaskUserView `json:"task"`
 }
 
-type taskDeleteResponse struct {
+type taskCancelResponse struct {
 	Message string `json:"message"`
-}
-
-type adminDeleteTasksRequest struct {
-	TaskIDs []string `json:"task_ids"`
 }
 
 func NewHandler(taskService *Service) *Handler {
@@ -185,22 +181,17 @@ func (h *Handler) ListTasks(c *gin.Context) {
 	})
 }
 
-func (h *Handler) DeleteTasks(c *gin.Context) {
-	var req adminDeleteTasksRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
+func (h *Handler) CancelAdminTask(c *gin.Context) {
+	actor, ok := principal.RequireAdmin(c)
+	if !ok {
 		return
 	}
-	result, err := h.taskService.DeleteTasks(c.Request.Context(), req.TaskIDs)
-	if err != nil {
-		if validation.Is(err) {
-			response.Error(c, 400, err.Error())
-			return
-		}
-		response.InternalError(c, 500, "删除任务失败", err)
+	taskID := c.Param("task_id")
+	if err := h.taskService.CancelAdminTask(c.Request.Context(), taskID, actor.UserID()); err != nil {
+		response.InternalError(c, http.StatusInternalServerError, "取消失败", err)
 		return
 	}
-	response.SuccessDTO(c, result)
+	response.SuccessDTO(c, taskCancelResponse{Message: "取消成功"})
 }
 
 func validateTaskListQueryIDs(c *gin.Context, userID int64, accountID int64) error {
@@ -298,19 +289,6 @@ func (h *Handler) StreamUserTask(c *gin.Context) {
 	}
 }
 
-func (h *Handler) DeleteUserTask(c *gin.Context) {
-	userID, ok := requireUserID(c)
-	if !ok {
-		return
-	}
-	taskID := c.Param("task_id")
-	if err := h.taskService.DeleteUserTask(c.Request.Context(), taskID, userID); err != nil {
-		response.Error(c, 500, "删除失败")
-		return
-	}
-	response.SuccessDTO(c, taskDeleteResponse{Message: "删除成功"})
-}
-
 func (h *Handler) CancelUserTask(c *gin.Context) {
 	userID, ok := requireUserID(c)
 	if !ok {
@@ -321,5 +299,5 @@ func (h *Handler) CancelUserTask(c *gin.Context) {
 		response.Error(c, 500, "停止失败")
 		return
 	}
-	response.SuccessDTO(c, taskDeleteResponse{Message: "停止成功"})
+	response.SuccessDTO(c, taskCancelResponse{Message: "停止成功"})
 }

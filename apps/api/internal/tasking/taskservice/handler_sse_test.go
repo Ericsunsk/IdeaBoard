@@ -119,14 +119,6 @@ func (s *streamTaskStore) GetByUserID(context.Context, int64, int, int) ([]*task
 	return nil, 0, errors.New("unexpected GetByUserID call")
 }
 
-func (s *streamTaskStore) DeleteByTaskIDAndUserID(context.Context, string, int64) error {
-	return errors.New("unexpected DeleteByTaskIDAndUserID call")
-}
-
-func (s *streamTaskStore) DeleteByTaskIDs(context.Context, []string) (int64, error) {
-	return 0, errors.New("unexpected DeleteByTaskIDs call")
-}
-
 func (s *streamTaskStore) MarkTaskCancelled(context.Context, tasks.TaskCancellationSnapshot, *tasks.TaskAttemptFinish) (int64, error) {
 	return 0, errors.New("unexpected MarkTaskCancelled call")
 }

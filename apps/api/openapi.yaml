@@ -529,18 +529,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseTask'
-    delete:
-      tags: [Tasks]
-      operationId: deleteUserTask
-      parameters:
-        - $ref: '#/components/parameters/TaskId'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseMessage'
   /user/tasks/{task_id}/cancel:
     post:
       tags: [Tasks]
@@ -1552,23 +1540,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseAdminTaskList'
-  /admin/tasks/bulk-delete:
-    post:
-      tags: [AdminTasks]
-      operationId: deleteAdminTasks
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DeleteAdminTasksRequest'
-      responses:
-        '200':
-          description: Deleted selected admin tasks
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseAdminTaskDeleteResult'
   /admin/tasks/submit:
     post:
       tags: [AdminTasks]
@@ -1586,6 +1557,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseTaskId'
+  /admin/tasks/{task_id}/cancel:
+    post:
+      tags: [AdminTasks]
+      operationId: cancelAdminTask
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseMessage'
   /admin/tasks/{task_id}:
     get:
       tags: [AdminTasks]
@@ -4151,25 +4135,6 @@ components:
       properties:
         url: { type: string }
 
-    DeleteAdminTasksRequest:
-      type: object
-      required: [task_ids]
-      properties:
-        task_ids:
-          type: array
-          minItems: 1
-          maxItems: 200
-          items:
-            type: string
-
-    AdminTaskDeleteResult:
-      type: object
-      required: [deleted_count]
-      properties:
-        deleted_count:
-          type: integer
-          minimum: 0
-
     UserLineDraftMode:
       type: object
       required: [id, name, cover_image]
@@ -4419,14 +4384,6 @@ components:
               properties:
                 task:
                   $ref: '#/components/schemas/AdminTaskMonitorDetail'
-
-    ApiResponseAdminTaskDeleteResult:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              $ref: '#/components/schemas/AdminTaskDeleteResult'
 
     ApiResponseMessage:
       allOf:

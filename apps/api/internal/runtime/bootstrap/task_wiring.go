@@ -152,7 +152,6 @@ func newAppTaskRuntime(
 		TaskRepo:            repos.taskRepo,
 		SubmissionStore:     submissionStore,
 		CancelStore:         postgresRuntimeStore,
-		TaskOutputCleaner:   runtimeTaskMediaStore,
 		TaskBilling:         taskBillingService,
 		AdminBillingHistory: repos.taskRepo,
 		AdminTaskTrace:      repos.taskRepo,

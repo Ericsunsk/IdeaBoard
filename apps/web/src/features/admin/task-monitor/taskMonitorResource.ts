@@ -1,15 +1,15 @@
 import type { MaybeRef } from 'vue'
 import { getGetAdminMonitorQueryKey } from '../../../shared/api/generated-query/admin-monitor/admin-monitor'
 import {
-  deleteAdminTasks,
+  cancelAdminTask,
   getAdminTask,
+  getGetAdminTaskQueryKey,
   getListAdminTasksQueryKey,
   listAdminTasks,
   useGetAdminTask,
   useListAdminTasks,
 } from '../../../shared/api/generated-query/admin-tasks/admin-tasks'
 import type {
-  AdminTaskDeleteResult,
   AdminTaskExecutionAttempt,
   AdminTaskMonitorDetail,
   AdminTaskMonitorListItem,
@@ -48,6 +48,10 @@ export function getAdminTaskListQueryKey() {
   return getListAdminTasksQueryKey()
 }
 
+export function getAdminTaskDetailQueryKey(taskID: string) {
+  return getGetAdminTaskQueryKey(taskID)
+}
+
 export async function getAdminTaskList(
   params: AdminTaskListQueryParams,
 ): Promise<ApiResponseAdminTaskListData> {
@@ -56,6 +60,10 @@ export async function getAdminTaskList(
 
 export function getAdminMonitorQueryKey() {
   return getGetAdminMonitorQueryKey()
+}
+
+export async function cancelAdminTaskByID(taskID: string): Promise<void> {
+  await resolveApiData(cancelAdminTask(taskID), '取消任务失败')
 }
 
 type UseAdminTaskDetailResourceOptions = Parameters<
@@ -78,8 +86,4 @@ export function useAdminTaskDetailResource(
 export async function getAdminTaskDetail(taskID: string): Promise<AdminTaskMonitorDetailModel> {
   const data = await resolveApiData(getAdminTask(taskID), '加载任务详情失败')
   return data.task
-}
-
-export async function deleteAdminTaskSelection(taskIDs: string[]): Promise<AdminTaskDeleteResult> {
-  return resolveApiData(deleteAdminTasks({ task_ids: taskIDs }), '删除任务失败')
 }

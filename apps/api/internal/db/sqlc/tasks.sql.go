@@ -372,44 +372,6 @@ func (q *Queries) CreateTaskAttempt(ctx context.Context, arg CreateTaskAttemptPa
 	return i, err
 }
 
-const deleteTaskByTaskIDAndUserID = `-- name: DeleteTaskByTaskIDAndUserID :exec
-DELETE FROM tasks
-WHERE task_id = $1 AND user_id = $2
-`
-
-type DeleteTaskByTaskIDAndUserIDParams struct {
-	TaskID string `json:"task_id"`
-	UserID int64  `json:"user_id"`
-}
-
-func (q *Queries) DeleteTaskByTaskIDAndUserID(ctx context.Context, arg DeleteTaskByTaskIDAndUserIDParams) error {
-	_, err := q.db.ExecContext(ctx, deleteTaskByTaskIDAndUserID, arg.TaskID, arg.UserID)
-	return err
-}
-
-const deleteTasksByTaskIDs = `-- name: DeleteTasksByTaskIDs :execrows
-DELETE FROM tasks
-WHERE task_id = ANY($1::text[])
-`
-
-func (q *Queries) DeleteTasksByTaskIDs(ctx context.Context, taskIds []string) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteTasksByTaskIDs, pq.Array(taskIds))
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
-}
-
-const deleteTasksByUserID = `-- name: DeleteTasksByUserID :exec
-DELETE FROM tasks
-WHERE user_id = $1
-`
-
-func (q *Queries) DeleteTasksByUserID(ctx context.Context, userID int64) error {
-	_, err := q.db.ExecContext(ctx, deleteTasksByUserID, userID)
-	return err
-}
-
 const failRunningTaskAttemptsByAccountID = `-- name: FailRunningTaskAttemptsByAccountID :execrows
 UPDATE task_attempts
 SET status = 'failed',

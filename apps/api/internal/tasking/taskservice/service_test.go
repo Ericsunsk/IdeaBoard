@@ -21,11 +21,9 @@ import (
 	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/tasking/taskmedia"
-	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/tasking/taskstore"
 	"ideaboard/api/internal/testdb"
-	"ideaboard/api/internal/testsupport/secretstest"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -1485,8 +1483,8 @@ func TestCancelUserTaskMarksRunningTaskCancelledWithoutDeletingRow(t *testing.T)
 	if stopped.CancelledBy == nil || *stopped.CancelledBy != task.UserID {
 		t.Fatalf("cancelled_by=%v, want %d", stopped.CancelledBy, task.UserID)
 	}
-	if stopped.CancelReason != userDeletedTaskCancelReason {
-		t.Fatalf("cancel_reason=%q, want %q", stopped.CancelReason, userDeletedTaskCancelReason)
+	if stopped.CancelReason != userTaskCancelReason {
+		t.Fatalf("cancel_reason=%q, want %q", stopped.CancelReason, userTaskCancelReason)
 	}
 	if len(publisher.events) != 1 || publisher.events[0].TaskID != task.TaskID || publisher.events[0].Status != tasks.StatusCancelled {
 		t.Fatalf("published events=%+v, want one cancelled event", publisher.events)
@@ -1580,241 +1578,77 @@ func TestCancelUserTaskIsIdempotentForTerminalTask(t *testing.T) {
 	}
 }
 
-type recordingTaskOutputCleaner struct {
-	calls []taskOutputCleanerCall
-	err   error
-}
-
-type taskOutputCleanerCall struct {
-	userID int64
-	taskID string
-}
-
-func (c *recordingTaskOutputCleaner) DeleteTaskOutputsByUserTask(_ context.Context, userID int64, taskID string) error {
-	c.calls = append(c.calls, taskOutputCleanerCall{userID: userID, taskID: taskID})
-	if c.err != nil {
-		return c.err
-	}
-	return nil
-}
-
-func TestDeleteUserTaskCleansOutputsAndTaskOutputObjects(t *testing.T) {
-	ctx := context.Background()
-	secretstest.EnableEncryption(t)
-	db := testdb.Open(t)
-	taskRepo := taskstore.NewRepository(db)
-	accountRepo := accounts.NewAccountRepository(db)
-	userRepo := users.NewUserRepository(db)
-	owner := mustCreateTaskUploadUser(t, userRepo, "delete-output-owner", "auth-delete-output-owner", "DTO042")
-	var channelID int64
-	if err := db.QueryRowContext(ctx, `
-INSERT INTO provider_endpoints (api_type, name, base_url, status)
-VALUES ('openai-compatible', 'taskservice-delete-channel', 'https://example.com/taskservice-delete', 1)
-RETURNING id`).Scan(&channelID); err != nil {
-		t.Fatalf("create channel failed: %v", err)
-	}
-	account := &accounts.ApiAccount{
-		Name:               "taskservice-delete-account",
-		ProviderEndpointID: channelID,
-		ApiType:            "openai-compatible",
-		Models:             []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
-		ApiKey:             "test",
-		ProxyURL:           "https://example.com/taskservice-delete",
-		Status:             1,
-	}
-	if err := accountRepo.Create(ctx, account); err != nil {
-		t.Fatalf("create account failed: %v", err)
-	}
-
-	task := &tasks.Task{
-		TaskID:                     "delete-with-outputs",
-		UserID:                     owner.ID,
-		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
-		AccountID:                  tasks.IDPtr(account.ID),
-		Status:                     tasks.StatusRunning,
-		LeaseToken:                 "lease-delete",
-	}
-	if err := createTaskServiceTestTask(t, db, taskRepo, ctx, task); err != nil {
-		t.Fatalf("create task failed: %v", err)
-	}
-
-	taskOutputPath := "uploads/tasks/" + strconv.FormatInt(task.UserID, 10) + "/delete-with-outputs/2026/06/03/result.png"
-	rows, err := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, account.ID, account.ProviderEndpointID, loadTaskServiceCredentialID(t, db, account.ID), task.LeaseToken, `{"status":"success"}`, time.Now(), []tasks.TaskOutput{
-		{
-			Role:       "image",
-			URL:        "/" + taskOutputPath,
-			StorageKey: taskOutputPath,
-			MIMEType:   "image/png",
-			Width:      1024,
-			Height:     1024,
-		},
-	}, nil)
-	if err != nil {
-		t.Fatalf("complete with outputs failed: %v", err)
-	}
-	if rows != 1 {
-		t.Fatalf("complete rows=%d, want 1", rows)
-	}
-
-	cleaner := &recordingTaskOutputCleaner{}
-	svc := NewService(ServiceDeps{
-		TaskRepo:          taskRepo,
-		CancelStore:       &fakeCancelStore{},
-		TaskOutputCleaner: cleaner,
-	}, ServiceOptions{})
-
-	if err := svc.DeleteUserTask(ctx, task.TaskID, task.UserID); err != nil {
-		t.Fatalf("DeleteUserTask failed: %v", err)
-	}
-
-	if len(cleaner.calls) != 1 || cleaner.calls[0].userID != task.UserID || cleaner.calls[0].taskID != task.TaskID {
-		t.Fatalf("cleaner calls=%+v, want one call for user/task", cleaner.calls)
-	}
-	outputsByTask, err := taskRepo.ListOutputsByTaskIDs(ctx, []string{task.TaskID})
-	if err != nil {
-		t.Fatalf("list outputs failed: %v", err)
-	}
-	if len(outputsByTask[task.TaskID]) != 0 {
-		t.Fatalf("outputs after delete=%+v, want none", outputsByTask[task.TaskID])
-	}
-	var mediaRefCount int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_refs WHERE task_id = $1 AND ref_type = 'task_output'`, task.TaskID).Scan(&mediaRefCount); err != nil {
-		t.Fatalf("count task output media refs failed: %v", err)
-	}
-	if mediaRefCount != 0 {
-		t.Fatalf("task output media refs after delete=%d, want 0", mediaRefCount)
-	}
-	if _, err := taskRepo.GetByTaskID(ctx, task.TaskID); err == nil {
-		t.Fatal("deleted task is still queryable")
-	}
-}
-
-func TestDeleteUserTaskSucceedsWhenOutputCleanupFails(t *testing.T) {
+func TestCancelAdminTaskMarksRunningTaskWithAdminActor(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.Open(t)
 	taskRepo := taskstore.NewRepository(db)
-
 	task := &tasks.Task{
-		TaskID:     "task_delete_output_fail",
+		TaskID:     "task_admin_cancel_running",
 		UserID:     42,
 		UserPrompt: "test",
 		Prompt:     "test",
-		Status:     tasks.StatusCompleted,
+		Status:     tasks.StatusRunning,
 		Params:     "{}",
 	}
 	if err := createTaskServiceTestTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("create task: %v", err)
 	}
 
-	failingCleaner := &recordingTaskOutputCleaner{err: errors.New("output cleanup failed")}
-	svc := NewService(ServiceDeps{
-		TaskRepo:          taskRepo,
-		CancelStore:       taskqueue.NewPostgresTaskRuntimeStore(db),
-		TaskOutputCleaner: failingCleaner,
-	}, ServiceOptions{EventHub: NewEventHub()})
+	cancelStore := &fakeCancelStore{}
+	publisher := &recordingTaskStatusPublisher{}
+	svc := NewService(ServiceDeps{TaskRepo: taskRepo, CancelStore: cancelStore}, ServiceOptions{TaskEvents: publisher})
 
-	// Should succeed despite output cleanup failure (best-effort)
-	if err := svc.DeleteUserTask(ctx, "task_delete_output_fail", 42); err != nil {
-		t.Fatalf("DeleteUserTask should succeed even when output cleanup fails: %v", err)
+	const adminID int64 = 99
+	if err := svc.CancelAdminTask(ctx, task.TaskID, adminID); err != nil {
+		t.Fatalf("CancelAdminTask failed: %v", err)
 	}
 
-	if len(failingCleaner.calls) == 0 {
-		t.Fatal("output cleaner should have been called")
+	stopped, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("load stopped task: %v", err)
 	}
-
-	if _, err := taskRepo.GetByTaskID(ctx, "task_delete_output_fail"); err == nil {
-		t.Fatal("task row should be deleted after DeleteUserTask")
+	if stopped.Status != tasks.StatusCancelled {
+		t.Fatalf("status=%q, want cancelled", stopped.Status)
+	}
+	if stopped.CancelledBy == nil || *stopped.CancelledBy != adminID {
+		t.Fatalf("cancelled_by=%v, want %d", stopped.CancelledBy, adminID)
+	}
+	if stopped.CancelReason != adminTaskCancelReason {
+		t.Fatalf("cancel_reason=%q, want %q", stopped.CancelReason, adminTaskCancelReason)
+	}
+	if len(cancelStore.marked) != 1 || cancelStore.marked[0] != task.TaskID {
+		t.Fatalf("cancel markers=%+v, want %q", cancelStore.marked, task.TaskID)
+	}
+	if len(publisher.events) != 1 || publisher.events[0].Status != tasks.StatusCancelled {
+		t.Fatalf("published events=%+v, want one cancelled event", publisher.events)
 	}
 }
 
-func TestDeleteTasksCancelsActiveTasksAndDeletesRows(t *testing.T) {
+func TestCancelAdminTaskIsIdempotentForTerminalTask(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.Open(t)
 	taskRepo := taskstore.NewRepository(db)
-	runningTask := &tasks.Task{
-		TaskID: "admin_delete_running",
-		UserID: 42,
-		Prompt: "running",
-		Status: tasks.StatusRunning,
-		Params: "{}",
-	}
 	completedAt := time.Now()
-	completedTask := &tasks.Task{
-		TaskID:      "admin_delete_completed",
-		UserID:      43,
-		Prompt:      "completed",
+	task := &tasks.Task{
+		TaskID:      "task_admin_cancel_completed",
+		UserID:      42,
+		UserPrompt:  "test",
+		Prompt:      "test",
 		Status:      tasks.StatusCompleted,
 		Params:      "{}",
 		CompletedAt: &completedAt,
-	}
-	for _, task := range []*tasks.Task{runningTask, completedTask} {
-		if err := createTaskServiceTestTask(t, db, taskRepo, ctx, task); err != nil {
-			t.Fatalf("create task %q: %v", task.TaskID, err)
-		}
-	}
-
-	cancelStore := &fakeCancelStore{}
-	cleaner := &recordingTaskOutputCleaner{}
-	svc := NewService(ServiceDeps{
-		TaskRepo:          taskRepo,
-		CancelStore:       cancelStore,
-		TaskOutputCleaner: cleaner,
-	}, ServiceOptions{})
-
-	result, err := svc.DeleteTasks(ctx, []string{" " + runningTask.TaskID + " ", completedTask.TaskID, runningTask.TaskID})
-	if err != nil {
-		t.Fatalf("DeleteTasks failed: %v", err)
-	}
-	if result.DeletedCount != 2 {
-		t.Fatalf("deleted_count=%d, want 2", result.DeletedCount)
-	}
-	if len(cancelStore.marked) != 1 || cancelStore.marked[0] != runningTask.TaskID {
-		t.Fatalf("cancel markers=%+v, want running task only", cancelStore.marked)
-	}
-	if len(cleaner.calls) != 2 {
-		t.Fatalf("cleaner calls=%+v, want both existing tasks", cleaner.calls)
-	}
-	for _, taskID := range []string{runningTask.TaskID, completedTask.TaskID} {
-		if _, err := taskRepo.GetByTaskID(ctx, taskID); err == nil {
-			t.Fatalf("task %q should be deleted", taskID)
-		}
-	}
-}
-
-func TestDeleteTasksDoesNotDeleteWhenCancellationMarkerFails(t *testing.T) {
-	ctx := context.Background()
-	db := testdb.Open(t)
-	taskRepo := taskstore.NewRepository(db)
-	task := &tasks.Task{
-		TaskID: "admin_delete_marker_failed",
-		UserID: 42,
-		Prompt: "running",
-		Status: tasks.StatusRunning,
-		Params: "{}",
 	}
 	if err := createTaskServiceTestTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("create task: %v", err)
 	}
 
-	markerErr := errors.New("marker failed")
-	svc := NewService(ServiceDeps{
-		TaskRepo:    taskRepo,
-		CancelStore: &fakeCancelStore{markErr: markerErr},
-	}, ServiceOptions{})
-
-	if _, err := svc.DeleteTasks(ctx, []string{task.TaskID}); !errors.Is(err, markerErr) {
-		t.Fatalf("DeleteTasks error=%v, want marker error", err)
+	cancelStore := &fakeCancelStore{}
+	svc := NewService(ServiceDeps{TaskRepo: taskRepo, CancelStore: cancelStore}, ServiceOptions{})
+	if err := svc.CancelAdminTask(ctx, task.TaskID, 99); err != nil {
+		t.Fatalf("CancelAdminTask should be idempotent for terminal task: %v", err)
 	}
-	if _, err := taskRepo.GetByTaskID(ctx, task.TaskID); err != nil {
-		t.Fatalf("task should remain after marker failure: %v", err)
-	}
-}
-
-func TestDeleteTasksRejectsEmptySelection(t *testing.T) {
-	svc := NewService(ServiceDeps{}, ServiceOptions{})
-
-	if _, err := svc.DeleteTasks(context.Background(), []string{" "}); !validation.Is(err) {
-		t.Fatalf("DeleteTasks error=%v, want validation error", err)
+	if len(cancelStore.marked) != 0 {
+		t.Fatalf("cancel markers=%+v, want none for terminal task", cancelStore.marked)
 	}
 }
 

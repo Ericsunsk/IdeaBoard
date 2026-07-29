@@ -236,7 +236,7 @@ func TestBilledDuplicateFailsClosedWhenBillingFactsAreIncomplete(t *testing.T) {
 	}
 }
 
-func TestBilledDuplicateReturnsDurableClaimAfterTaskDeletion(t *testing.T) {
+func TestBilledDuplicateReturnsDurableClaimAfterTaskCancellation(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
@@ -254,10 +254,6 @@ func TestBilledDuplicateReturnsDurableClaimAfterTaskDeletion(t *testing.T) {
 	if rows, err := repo.MarkTaskCancelled(t.Context(), tasks.TaskCancellationSnapshot{TaskID: first.TaskID, CancelledAt: time.Now(), Reason: "deleted"}, nil); err != nil || rows != 1 {
 		t.Fatalf("cancel rows=%d err=%v", rows, err)
 	}
-	if err := repo.DeleteByTaskIDAndUserID(t.Context(), first.TaskID, 42); err != nil {
-		t.Fatal(err)
-	}
-
 	duplicate := newBilledPatternTask("task_billed_after_delete", original.ClientActionID, request)
 	replayed, err := store.SubmitTask(t.Context(), canonicalRequestForTest(duplicate))
 	if err != nil {

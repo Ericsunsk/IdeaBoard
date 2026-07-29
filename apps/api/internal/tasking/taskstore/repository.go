@@ -414,21 +414,6 @@ func (r *Repository) GetByTaskIDAndUserID(ctx context.Context, taskID string, us
 	return &task, nil
 }
 
-func (r *Repository) ListByTaskIDs(ctx context.Context, taskIDs []string) ([]*tasks.Task, error) {
-	if len(taskIDs) == 0 {
-		return []*tasks.Task{}, nil
-	}
-	rows, err := r.q.ListTasksByTaskIDs(ctx, taskIDs)
-	if err != nil {
-		return nil, err
-	}
-	items := tasksFromSQLC(rows)
-	if err := r.attachExecutionMetrics(ctx, items); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 func (r *Repository) MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
 	completedAt = terminalTransitionTime(completedAt)
 	return r.runTerminalTransition(ctx, terminalTransitionCommand{
@@ -515,40 +500,6 @@ func (r *Repository) GetByUserID(ctx context.Context, userID int64, page, pageSi
 		return nil, 0, err
 	}
 	return tasksFromSQLC(rows), total, nil
-}
-
-func (r *Repository) DeleteByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) error {
-	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
-		if err := q.DeleteTaskOutputMediaRefsByUserTaskID(ctx, dbsqlc.DeleteTaskOutputMediaRefsByUserTaskIDParams{
-			TaskID: taskID,
-			UserID: userID,
-		}); err != nil {
-			return err
-		}
-		return q.DeleteTaskByTaskIDAndUserID(ctx, dbsqlc.DeleteTaskByTaskIDAndUserIDParams{
-			TaskID: taskID,
-			UserID: userID,
-		})
-	})
-}
-
-func (r *Repository) DeleteByTaskIDs(ctx context.Context, taskIDs []string) (int64, error) {
-	if len(taskIDs) == 0 {
-		return 0, nil
-	}
-	var rowsAffected int64
-	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
-		if err := q.DeleteTaskOutputMediaRefsByTaskIDs(ctx, taskIDs); err != nil {
-			return err
-		}
-		rows, err := q.DeleteTasksByTaskIDs(ctx, taskIDs)
-		if err != nil {
-			return err
-		}
-		rowsAffected = rows
-		return nil
-	})
-	return rowsAffected, err
 }
 
 // FailRunningByAccountID 将指定账号下所有 running 状态的任务标记为 failed

@@ -12,7 +12,6 @@ import (
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/tasking/taskbilling"
-	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/tasking/tasksubmission"
@@ -23,7 +22,6 @@ type Service struct {
 	taskRepo            TaskStore
 	submissionStore     TaskSubmissionStore
 	cancelStore         taskqueue.TaskCancellationStore
-	taskOutputCleaner   taskmedia.TaskOutputCleaner
 	eventHub            *EventHub
 	taskEvents          events.TaskStatusPublisher
 	taskBilling         *taskbilling.Service
@@ -36,11 +34,8 @@ type Service struct {
 type TaskStore interface {
 	GetByTaskID(ctx context.Context, taskID string) (*tasks.Task, error)
 	GetByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) (*tasks.Task, error)
-	ListByTaskIDs(ctx context.Context, taskIDs []string) ([]*tasks.Task, error)
 	List(ctx context.Context, userID int64, accountID int64, status string, keyword string, page, pageSize int) ([]*tasks.Task, tasks.TaskListCounts, error)
 	GetByUserID(ctx context.Context, userID int64, page, pageSize int) ([]*tasks.Task, int64, error)
-	DeleteByTaskIDAndUserID(ctx context.Context, taskID string, userID int64) error
-	DeleteByTaskIDs(ctx context.Context, taskIDs []string) (int64, error)
 	MarkTaskCancelled(ctx context.Context, snapshot tasks.TaskCancellationSnapshot, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
 	ListOutputsByTaskIDs(ctx context.Context, taskIDs []string) (map[string][]tasks.TaskOutput, error)
 }
@@ -111,7 +106,6 @@ type ServiceDeps struct {
 	TaskRepo            TaskStore
 	SubmissionStore     TaskSubmissionStore
 	CancelStore         taskqueue.TaskCancellationStore
-	TaskOutputCleaner   taskmedia.TaskOutputCleaner
 	TaskBilling         *taskbilling.Service
 	AdminBillingHistory AdminBillingHistoryStore
 	AdminTaskTrace      AdminTaskTraceStore
@@ -125,9 +119,9 @@ type ServiceOptions struct {
 }
 
 const taskCancelTTL = 24 * time.Hour
-const userDeletedTaskCancelReason = "用户删除节点"
+const userTaskCancelReason = "用户取消任务"
+const adminTaskCancelReason = "管理员取消任务"
 const maxTaskKeywordLength = 200
-const maxDeleteTaskIDs = 200
 
 var (
 	errTaskIntakeUnavailable          = errors.New("task intake not configured")
@@ -141,7 +135,6 @@ func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 		taskRepo:            deps.TaskRepo,
 		submissionStore:     deps.SubmissionStore,
 		cancelStore:         deps.CancelStore,
-		taskOutputCleaner:   deps.TaskOutputCleaner,
 		eventHub:            opts.EventHub,
 		taskEvents:          opts.TaskEvents,
 		taskBilling:         deps.TaskBilling,
@@ -421,131 +414,38 @@ func normalizeTaskListKeyword(keyword string) string {
 	return string(runes[:maxTaskKeywordLength])
 }
 
-func (s *Service) DeleteUserTask(ctx context.Context, taskID string, userID int64) error {
-	task, err := s.taskRepo.GetByTaskIDAndUserID(ctx, taskID, userID)
-	if err != nil {
-		return err
-	}
-	// Cancel and delete the task row first (idempotent DB operations).
-	// Object-storage cleanup runs best-effort afterward to avoid leaving
-	// a half-deleted task entry when output files cannot be removed.
-	if s.cancelStore == nil {
-		return fmt.Errorf("task cancellation store not configured")
-	}
-	if err := s.cancelStore.MarkCancelled(ctx, taskID, taskCancelTTL); err != nil {
-		return err
-	}
-	if !tasks.IsTerminalStatus(task.Status) {
-		if _, err := s.taskRepo.MarkTaskCancelled(ctx, tasks.TaskCancellationSnapshot{
-			TaskID: taskID, CancelledAt: time.Now(), CancelledBy: &userID, Reason: userDeletedTaskCancelReason,
-		}, nil); err != nil {
-			return err
-		}
-	}
-	if err := s.taskRepo.DeleteByTaskIDAndUserID(ctx, taskID, userID); err != nil {
-		return err
-	}
-	if s.taskOutputCleaner != nil {
-		if err := s.taskOutputCleaner.DeleteTaskOutputsByUserTask(ctx, task.UserID, task.TaskID); err != nil {
-			slog.Warn("delete task outputs after task row deleted", "task_id", taskID, "user_id", userID, "err", err)
-		}
-	}
-	return nil
-}
-
-type DeleteTasksResult struct {
-	DeletedCount int64 `json:"deleted_count"`
-}
-
-func (s *Service) DeleteTasks(ctx context.Context, rawTaskIDs []string) (DeleteTasksResult, error) {
-	taskIDs, err := normalizeDeleteTaskIDs(rawTaskIDs)
-	if err != nil {
-		return DeleteTasksResult{}, err
-	}
-	items, err := s.taskRepo.ListByTaskIDs(ctx, taskIDs)
-	if err != nil {
-		return DeleteTasksResult{}, err
-	}
-	activeTaskIDs := make([]string, 0, len(items))
-	for _, task := range items {
-		if task == nil || tasks.IsTerminalStatus(task.Status) {
-			continue
-		}
-		activeTaskIDs = append(activeTaskIDs, task.TaskID)
-	}
-	if len(activeTaskIDs) > 0 {
-		if s.cancelStore == nil {
-			return DeleteTasksResult{}, fmt.Errorf("task cancellation store not configured")
-		}
-		for _, taskID := range activeTaskIDs {
-			if err := s.cancelStore.MarkCancelled(ctx, taskID, taskCancelTTL); err != nil {
-				return DeleteTasksResult{}, err
-			}
-			if _, err := s.taskRepo.MarkTaskCancelled(ctx, tasks.TaskCancellationSnapshot{
-				TaskID: taskID, CancelledAt: time.Now(), Reason: "管理员删除任务",
-			}, nil); err != nil {
-				return DeleteTasksResult{}, err
-			}
-		}
-	}
-	deletedCount, err := s.taskRepo.DeleteByTaskIDs(ctx, taskIDs)
-	if err != nil {
-		return DeleteTasksResult{}, err
-	}
-	s.cleanupDeletedTaskOutputs(ctx, items)
-	return DeleteTasksResult{DeletedCount: deletedCount}, nil
-}
-
-func normalizeDeleteTaskIDs(rawTaskIDs []string) ([]string, error) {
-	if len(rawTaskIDs) == 0 {
-		return nil, validation.New("请选择要删除的任务")
-	}
-	taskIDs := make([]string, 0, len(rawTaskIDs))
-	seen := make(map[string]struct{}, len(rawTaskIDs))
-	for _, raw := range rawTaskIDs {
-		taskID := strings.TrimSpace(raw)
-		if taskID == "" {
-			continue
-		}
-		if _, exists := seen[taskID]; exists {
-			continue
-		}
-		seen[taskID] = struct{}{}
-		taskIDs = append(taskIDs, taskID)
-	}
-	if len(taskIDs) == 0 {
-		return nil, validation.New("请选择要删除的任务")
-	}
-	if len(taskIDs) > maxDeleteTaskIDs {
-		return nil, validation.New("单次最多删除 200 个任务")
-	}
-	return taskIDs, nil
-}
-
-func (s *Service) cleanupDeletedTaskOutputs(ctx context.Context, items []*tasks.Task) {
-	if s.taskOutputCleaner == nil {
-		return
-	}
-	for _, task := range items {
-		if task == nil {
-			continue
-		}
-		if err := s.taskOutputCleaner.DeleteTaskOutputsByUserTask(ctx, task.UserID, task.TaskID); err != nil {
-			slog.Warn("delete task outputs after task row deleted", "task_id", task.TaskID, "user_id", task.UserID, "err", err)
-		}
-	}
-}
-
 func (s *Service) CancelUserTask(ctx context.Context, taskID string, userID int64) error {
 	taskID = strings.TrimSpace(taskID)
 	task, err := s.taskRepo.GetByTaskIDAndUserID(ctx, taskID, userID)
 	if err != nil {
 		return err
 	}
+	return s.cancelTask(ctx, task, userID, userTaskCancelReason, func() (*tasks.Task, error) {
+		return s.taskRepo.GetByTaskIDAndUserID(ctx, task.TaskID, userID)
+	})
+}
+
+func (s *Service) CancelAdminTask(ctx context.Context, taskID string, adminID int64) error {
+	taskID = strings.TrimSpace(taskID)
+	task, err := s.taskRepo.GetByTaskID(ctx, taskID)
+	if err != nil {
+		return err
+	}
+	return s.cancelTask(ctx, task, adminID, adminTaskCancelReason, func() (*tasks.Task, error) {
+		return s.taskRepo.GetByTaskID(ctx, task.TaskID)
+	})
+}
+
+func (s *Service) cancelTask(
+	ctx context.Context,
+	task *tasks.Task,
+	cancelledBy int64,
+	reason string,
+	reload func() (*tasks.Task, error),
+) error {
 	if tasks.IsTerminalStatus(task.Status) {
 		return nil
 	}
-
 	if s.cancelStore == nil {
 		return fmt.Errorf("task cancellation store not configured")
 	}
@@ -557,8 +457,8 @@ func (s *Service) CancelUserTask(ctx context.Context, taskID string, userID int6
 	rows, err := s.taskRepo.MarkTaskCancelled(ctx, tasks.TaskCancellationSnapshot{
 		TaskID:      task.TaskID,
 		CancelledAt: now,
-		CancelledBy: &userID,
-		Reason:      userDeletedTaskCancelReason,
+		CancelledBy: &cancelledBy,
+		Reason:      reason,
 	}, nil)
 	if err != nil {
 		return err
@@ -568,7 +468,7 @@ func (s *Service) CancelUserTask(ctx context.Context, taskID string, userID int6
 		return nil
 	}
 
-	latest, err := s.taskRepo.GetByTaskIDAndUserID(ctx, task.TaskID, userID)
+	latest, err := reload()
 	if err != nil {
 		return err
 	}

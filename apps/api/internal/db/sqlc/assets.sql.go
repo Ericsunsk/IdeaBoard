@@ -8,8 +8,6 @@ package dbsqlc
 import (
 	"context"
 	"encoding/json"
-
-	"github.com/lib/pq"
 )
 
 const countMediaRefsByAssetID = `-- name: CountMediaRefsByAssetID :one
@@ -87,36 +85,6 @@ WHERE task_id = $1
 
 func (q *Queries) DeleteTaskOutputMediaRefsByTaskID(ctx context.Context, taskID string) error {
 	_, err := q.db.ExecContext(ctx, deleteTaskOutputMediaRefsByTaskID, taskID)
-	return err
-}
-
-const deleteTaskOutputMediaRefsByTaskIDs = `-- name: DeleteTaskOutputMediaRefsByTaskIDs :exec
-DELETE FROM media_refs
-WHERE task_id = ANY($1::text[])
-  AND ref_type = 'task_output'
-`
-
-func (q *Queries) DeleteTaskOutputMediaRefsByTaskIDs(ctx context.Context, taskIds []string) error {
-	_, err := q.db.ExecContext(ctx, deleteTaskOutputMediaRefsByTaskIDs, pq.Array(taskIds))
-	return err
-}
-
-const deleteTaskOutputMediaRefsByUserTaskID = `-- name: DeleteTaskOutputMediaRefsByUserTaskID :exec
-DELETE FROM media_refs AS mr
-USING tasks AS t
-WHERE mr.task_id = $1
-  AND mr.ref_type = 'task_output'
-  AND t.task_id = mr.task_id
-  AND t.user_id = $2
-`
-
-type DeleteTaskOutputMediaRefsByUserTaskIDParams struct {
-	TaskID string `json:"task_id"`
-	UserID int64  `json:"user_id"`
-}
-
-func (q *Queries) DeleteTaskOutputMediaRefsByUserTaskID(ctx context.Context, arg DeleteTaskOutputMediaRefsByUserTaskIDParams) error {
-	_, err := q.db.ExecContext(ctx, deleteTaskOutputMediaRefsByUserTaskID, arg.TaskID, arg.UserID)
 	return err
 }
 

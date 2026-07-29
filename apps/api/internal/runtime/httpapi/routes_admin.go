@@ -101,7 +101,7 @@ func registerAdminAccountRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 
 func registerAdminTaskRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.POST("/tasks/submit", h.TaskHandler.SubmitTask)
-	adminAPI.POST("/tasks/bulk-delete", h.TaskHandler.DeleteTasks)
+	adminAPI.POST("/tasks/:task_id/cancel", h.TaskHandler.CancelAdminTask)
 	adminAPI.GET("/tasks/:task_id", h.TaskHandler.GetTask)
 	adminAPI.GET("/tasks", h.TaskHandler.ListTasks)
 	adminAPI.GET("/monitor", h.TaskStatsHandler.GetMonitor)

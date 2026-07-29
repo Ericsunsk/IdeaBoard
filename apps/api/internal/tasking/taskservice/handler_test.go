@@ -20,6 +20,8 @@ import (
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/tasks"
+	"ideaboard/api/internal/tasking/taskstore"
+	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport"
 	"ideaboard/api/internal/workflow"
 
@@ -83,6 +85,44 @@ func TestAdminGetTaskSerializesEmptyExecutionAttemptsAsArray(t *testing.T) {
 	}
 	if body.Data.Task.ExecutionAttempts == nil || len(body.Data.Task.ExecutionAttempts) != 0 {
 		t.Fatalf("execution_attempts=%v, want []", body.Data.Task.ExecutionAttempts)
+	}
+}
+
+func TestCancelAdminTaskUsesAuthenticatedAdminActor(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctx := context.Background()
+	db := testdb.Open(t)
+	taskRepo := taskstore.NewRepository(db)
+	task := &tasks.Task{
+		TaskID:     "admin-handler-cancel",
+		UserID:     42,
+		UserPrompt: "test",
+		Prompt:     "test",
+		Status:     tasks.StatusRunning,
+		Params:     "{}",
+	}
+	if err := createTaskServiceTestTask(t, db, taskRepo, ctx, task); err != nil {
+		t.Fatalf("create task: %v", err)
+	}
+	service := NewService(ServiceDeps{TaskRepo: taskRepo, CancelStore: &fakeCancelStore{}}, ServiceOptions{})
+	handler := NewHandler(service)
+	router := gin.New()
+	router.POST("/admin/tasks/:task_id/cancel", func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 99, principal.RoleAdmin)
+		handler.CancelAdminTask(c)
+	})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/admin/tasks/"+task.TaskID+"/cancel", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	stopped, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("load task: %v", err)
+	}
+	if stopped.CancelledBy == nil || *stopped.CancelledBy != 99 {
+		t.Fatalf("cancelled_by=%v, want authenticated admin ID", stopped.CancelledBy)
 	}
 }
 
