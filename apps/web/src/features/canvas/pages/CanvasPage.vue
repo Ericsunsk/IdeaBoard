@@ -42,7 +42,7 @@ import {
   createImageNodePresentationResolver,
   createPromptNodePresentationIntentHandler,
 } from '../node-presentation'
-import { CanvasScreenPresentation, useCanvasScreenPresentation } from '../screen-presentation'
+import { CanvasScreenPresentation } from '../screen-presentation'
 import { useCanvasCustomLayerOverlay } from '../overlay-lifecycle'
 import type { CanvasChromeAccountState, CanvasChromeBoardState } from '../components/chrome'
 import {
@@ -613,7 +613,7 @@ const onCanvasNodePresentationIntent = createCanvasNodePresentationIntentHandler
   }),
 })
 
-const canvasScreenPresentation = useCanvasScreenPresentation({
+const canvasScreenPresentation = {
   workspace,
   chrome: {
     board: canvasChromeBoard,
@@ -623,7 +623,7 @@ const canvasScreenPresentation = useCanvasScreenPresentation({
     isHidden: isImageEditorChromeHidden,
     closeBoardHeaderEditing,
     commands: {
-      updateBoardNameDraft: (value) => {
+      updateBoardNameDraft: (value: string) => {
         boardNameDraft.value = value
       },
       toggleBoardMenu,
@@ -631,7 +631,7 @@ const canvasScreenPresentation = useCanvasScreenPresentation({
       cancelBoardRename,
       confirmBoardRename: () => void onConfirmBoardRename(),
       reloadBoardCatalog: () => void reloadCatalog(),
-      selectBoard: (boardId) => void onSelectBoard(boardId),
+      selectBoard: (boardId: string) => void onSelectBoard(boardId),
       exportSelectedImages: () => void onExportSelectedImages(),
       navigateBack: () => canvasNavigationAdapter.navigate(USER_BOARDS_PATH),
       selectTool: setActiveTool,
@@ -708,7 +708,7 @@ const canvasScreenPresentation = useCanvasScreenPresentation({
       createNode: handleNodeContextMenuCreate,
     },
   },
-})
+}
 
 watch(
   () => route.query.boardId,

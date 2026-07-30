@@ -2,97 +2,300 @@
   <div
     class="canvas-layout"
     :class="[
-      `tool-${presentation.layout.activeTool}`,
+      `tool-${activeTool}`,
       {
-        'interaction-lite': presentation.layout.isInteractionActive,
-        'viewport-pan-lite': presentation.layout.isViewportPanActive,
+        'interaction-lite': canvas.isInteractionActive.value,
+        'viewport-pan-lite': canvas.isViewportPanActive.value,
       },
     ]"
-    @mousedown.self="presentation.layout.onBackgroundMouseDown"
+    @mousedown.self="chrome.closeBoardHeaderEditing"
   >
     <CanvasChrome
-      v-bind="presentation.chrome.props"
-      @update:board-name-draft="presentation.chrome.commands.updateBoardNameDraft"
-      @toggle-board-menu="presentation.chrome.commands.toggleBoardMenu"
-      @start-board-rename="presentation.chrome.commands.startBoardRename"
-      @cancel-board-rename="presentation.chrome.commands.cancelBoardRename"
-      @confirm-board-rename="presentation.chrome.commands.confirmBoardRename"
-      @reload-board-catalog="presentation.chrome.commands.reloadBoardCatalog"
-      @select-board="presentation.chrome.commands.selectBoard"
-      @export="presentation.chrome.commands.exportSelectedImages"
-      @navigate-back="presentation.chrome.commands.navigateBack"
-      @select-tool="presentation.chrome.commands.selectTool"
-      @toggle-minimap="presentation.chrome.commands.toggleMinimap"
-      @zoom-out="presentation.chrome.commands.zoomOut"
-      @zoom-in="presentation.chrome.commands.zoomIn"
+      v-bind="chromeProps"
+      @update:board-name-draft="chrome.commands.updateBoardNameDraft"
+      @toggle-board-menu="chrome.commands.toggleBoardMenu"
+      @start-board-rename="chrome.commands.startBoardRename"
+      @cancel-board-rename="chrome.commands.cancelBoardRename"
+      @confirm-board-rename="chrome.commands.confirmBoardRename"
+      @reload-board-catalog="chrome.commands.reloadBoardCatalog"
+      @select-board="chrome.commands.selectBoard"
+      @export="chrome.commands.exportSelectedImages"
+      @navigate-back="chrome.commands.navigateBack"
+      @select-tool="chrome.commands.selectTool"
+      @toggle-minimap="chrome.commands.toggleMinimap"
+      @zoom-out="chrome.commands.zoomOut"
+      @zoom-in="chrome.commands.zoomIn"
     />
 
     <div
-      :ref="presentation.canvas.containerRef"
+      :ref="canvas.containerRef"
       class="canvas-flow-wrap ib-page-dot-bg"
-      @dragover.prevent="presentation.canvas.surface.onDragOver"
-      @drop.prevent="presentation.canvas.surface.onDrop"
-      @pointerdown.capture="presentation.canvas.surface.onPointerDownCapture"
-      @contextmenu.capture="presentation.canvas.surface.onContextMenuCapture"
-      @wheel="presentation.canvas.surface.onWheel"
+      @dragover.prevent="canvas.surface.onDragOver"
+      @drop.prevent="canvas.surface.onDrop"
+      @pointerdown.capture="canvas.surface.onPointerDownCapture"
+      @contextmenu.capture="canvas.surface.onContextMenuCapture"
+      @wheel="canvas.surface.onWheel"
     >
       <VueFlow
-        :nodes="presentation.canvas.nodes.value"
-        :edges="presentation.canvas.edges.value"
-        v-bind="presentation.canvas.props"
-        @nodes-change="presentation.canvas.flow.onNodesChange"
-        @edges-change="presentation.canvas.flow.onEdgesChange"
-        @connect-end="presentation.canvas.flow.onConnectEnd"
-        @move-start="presentation.canvas.flow.onMoveStart"
-        @move="presentation.canvas.flow.onMove"
-        @move-end="presentation.canvas.flow.onMoveEnd"
-        @viewport-change-end="presentation.canvas.flow.onViewportChangeEnd"
-        @node-click="presentation.canvas.flow.onNodeClick"
-        @node-drag-start="presentation.canvas.flow.onNodeDragStart"
-        @node-drag-stop="presentation.canvas.flow.onNodeDragStop"
-        @selection-start="presentation.canvas.flow.onSelectionStart"
-        @selection-end="presentation.canvas.flow.onSelectionEnd"
-        @pane-click="presentation.canvas.flow.onPaneClick"
-        @pane-context-menu="presentation.canvas.flow.onPaneContextMenu"
+        :nodes="workspace.viewModel.flowPane.nodes.value"
+        :edges="workspace.viewModel.flowPane.edges.value"
+        v-bind="vueFlowProps"
+        @nodes-change="canvas.flow.onNodesChange"
+        @edges-change="canvas.flow.onEdgesChange"
+        @connect-end="canvas.flow.onConnectEnd"
+        @move-start="canvas.flow.onMoveStart"
+        @move="canvas.flow.onMove"
+        @move-end="canvas.flow.onMoveEnd"
+        @viewport-change-end="canvas.flow.onViewportChangeEnd"
+        @node-click="canvas.flow.onNodeClick"
+        @node-drag-start="canvas.flow.onNodeDragStart"
+        @node-drag-stop="canvas.flow.onNodeDragStop"
+        @selection-start="canvas.flow.onSelectionStart"
+        @selection-end="canvas.flow.onSelectionEnd"
+        @pane-click="canvas.flow.onPaneClick"
+        @pane-context-menu="canvas.flow.onPaneContextMenu"
       >
         <template #zoom-pane>
-          <CanvasGroupPresentation v-bind="presentation.canvas.group.props" />
+          <CanvasGroupPresentation
+            :presentation="canvas.group"
+            :action-target="canvas.containerRef.value"
+          />
         </template>
         <template #node-canvas="nodeProps">
           <FlowCanvasNode
-            v-bind="presentation.canvas.node.propsFor(nodeProps)"
-            @node-intent="presentation.canvas.node.listeners.intent"
-            @node-mousedown="presentation.canvas.node.listeners.nodeMousedown"
-            @request-internals-update="presentation.canvas.node.listeners.requestInternalsUpdate"
+            v-bind="nodePropsFor(nodeProps)"
+            @node-intent="canvas.node.listeners.intent"
+            @node-mousedown="canvas.node.listeners.nodeMousedown"
+            @request-internals-update="canvas.node.listeners.requestInternalsUpdate"
           />
         </template>
         <CanvasChromeMiniMap
-          v-bind="presentation.canvas.minimap.props"
-          @center-requested="presentation.canvas.minimap.commands.centerRequested"
-          @drag-start="presentation.canvas.minimap.commands.dragStart"
-          @drag-move="presentation.canvas.minimap.commands.dragMove"
-          @drag-end="presentation.canvas.minimap.commands.dragEnd"
+          v-bind="minimapProps"
+          @center-requested="canvas.minimap.commands.centerRequested"
+          @drag-start="canvas.minimap.commands.dragStart"
+          @drag-move="canvas.minimap.commands.dragMove"
+          @drag-end="canvas.minimap.commands.dragEnd"
         />
       </VueFlow>
-      <CanvasOverlays
-        v-bind="presentation.canvas.overlays.props"
-        @create-node="presentation.canvas.overlays.commands.createNode"
-      />
+      <CanvasOverlays v-bind="overlayProps" @create-node="canvas.overlays.createNode" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { VueFlow } from '@vue-flow/core'
+import { computed, type ComputedRef, type Ref } from 'vue'
+import { PanOnScrollMode, VueFlow, type FlowEvents, type NodeProps } from '@vue-flow/core'
+import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
 import FlowCanvasNode from '../components/FlowCanvasNode.vue'
 import CanvasOverlays from '../components/CanvasOverlays.vue'
-import { CanvasGroupPresentation } from '../group-presentation'
-import { CanvasChrome, CanvasChromeMiniMap } from '../components/chrome'
-import type { CanvasScreenPresentationBinding } from './screenPresentationContract'
+import {
+  CanvasChrome,
+  CanvasChromeMiniMap,
+  type CanvasChromeAccountState,
+  type CanvasChromeBoardState,
+} from '../components/chrome'
+import {
+  CanvasGroupPresentation,
+  type CanvasGroupPresentationInteraction,
+} from '../group-presentation'
+import type { CanvasImageTools } from '../image-tools'
+import type {
+  CanvasNodePresentationIntent,
+  FusionNodePresentationBinding,
+  ImageNodePresentationBinding,
+} from '../node-presentation'
+import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
+import type { FlowNodeData } from '../types/flowTypes'
+import type { CanvasWorkspaceRuntime } from '../workspace-runtime'
+import { CANVAS_VIEWPORT_MAX_ZOOM, CANVAS_VIEWPORT_MIN_ZOOM } from '../utils/canvasViewportStorage'
 
-defineProps<{
-  presentation: CanvasScreenPresentationBinding
+type CanvasImageToolSession = {
+  viewModel: Pick<CanvasImageTools['viewModel'], 'chrome'>
+  commands: Pick<CanvasImageTools['commands'], 'chrome'>
+}
+
+type CanvasScreenWorkspace = {
+  viewModel: {
+    flowPane: Pick<CanvasWorkspaceRuntime['viewModel']['flowPane'], 'nodes' | 'edges'>
+    graphEditing: { hasSelectedFlowNodes: Ref<boolean> }
+    viewportControls: { zoomLevel: Ref<number> }
+  }
+}
+
+type CanvasScreenPresentationSource = {
+  workspace: CanvasScreenWorkspace
+  chrome: {
+    board: ComputedRef<CanvasChromeBoardState>
+    account: ComputedRef<CanvasChromeAccountState>
+    activeTool: Ref<'select' | 'hand'>
+    minimapEnabled: Ref<boolean>
+    isHidden: Ref<boolean>
+    closeBoardHeaderEditing: () => void
+    commands: {
+      updateBoardNameDraft: (value: string) => void
+      toggleBoardMenu: () => void
+      startBoardRename: () => void
+      cancelBoardRename: () => void
+      confirmBoardRename: () => void
+      reloadBoardCatalog: () => void
+      selectBoard: (boardId: string) => void
+      exportSelectedImages: () => void
+      navigateBack: () => void
+      selectTool: (tool: 'select' | 'hand') => void
+      toggleMinimap: () => void
+      zoomOut: () => void
+      zoomIn: () => void
+    }
+  }
+  canvas: {
+    containerRef: Ref<HTMLElement | null>
+    isInteractionActive: Ref<boolean>
+    isViewportPanActive: Ref<boolean>
+    isLocked: Ref<boolean>
+    isShortcutSuppressed: ComputedRef<boolean>
+    connectionBindings: CanvasWorkspaceRuntime['commands']['flowPane']['connectionAdapter']['vueFlowBindings']
+    surface: {
+      onDragOver: (event: DragEvent) => void
+      onDrop: (event: DragEvent) => void
+      onPointerDownCapture: (event: PointerEvent) => void
+      onContextMenuCapture: (event: MouseEvent) => void
+      onWheel: (event: WheelEvent) => void
+    }
+    flow: {
+      onNodesChange: (changes: FlowEvents['nodesChange']) => void
+      onEdgesChange: (changes: FlowEvents['edgesChange']) => void
+      onConnectEnd: () => void
+      onMoveStart: () => void
+      onMove: (payload: FlowEvents['move']) => void
+      onMoveEnd: (payload: FlowEvents['moveEnd']) => void
+      onViewportChangeEnd: () => void
+      onNodeClick: (payload: FlowEvents['nodeClick']) => void
+      onNodeDragStart: () => void
+      onNodeDragStop: () => void
+      onSelectionStart: (payload: FlowEvents['selectionStart']) => void
+      onSelectionEnd: (payload: FlowEvents['selectionEnd']) => void
+      onPaneClick: () => void
+      onPaneContextMenu: (payload: FlowEvents['paneContextMenu']) => void
+    }
+    group: CanvasGroupPresentationInteraction
+    node: {
+      copyMode: Ref<boolean>
+      getUiState: (nodeId: string) => NodeUiState | PromptNodeUiState | undefined
+      imagePresentationFor: (nodeId: string) => ImageNodePresentationBinding
+      fusionPresentationFor: (nodeId: string) => FusionNodePresentationBinding
+      generationAvailable: Ref<boolean>
+      setImageStageRef: (nodeId: string, element: Element | null) => void
+      clearImageStageRef: (nodeId: string, element?: Element | null) => void
+      expand: {
+        nodeId: Ref<string | null>
+        overlayStyle: Ref<Record<string, string> | null>
+        handleRadius: number
+        visibilityRefreshToken: Ref<number>
+      }
+      listeners: {
+        intent: (intent: CanvasNodePresentationIntent) => void
+        nodeMousedown: (nodeId: string, event: MouseEvent) => void
+        requestInternalsUpdate: (nodeId: string) => void
+      }
+    }
+    minimap: {
+      enabled: Ref<boolean>
+      isHidden: Ref<boolean>
+      commands: {
+        centerRequested: (payload: { position: { x: number; y: number } }) => void
+        dragStart: () => void
+        dragMove: (payload: { delta: { x: number; y: number } }) => void
+        dragEnd: () => void
+      }
+    }
+    overlays: {
+      imageToolSession: CanvasImageToolSession
+      nodeContextMenu: Ref<{ visible: boolean; x: number; y: number }>
+      canvasNodeMenuItems: ReadonlyArray<{ key: CanvasCreatableNodeKind; label: string }>
+      createNode: (kind: CanvasCreatableNodeKind) => void
+    }
+  }
+}
+
+const props = defineProps<{
+  presentation: CanvasScreenPresentationSource
 }>()
+
+const { workspace, chrome, canvas } = props.presentation
+const activeTool = computed(() => chrome.activeTool.value)
+const chromeProps = computed(() => ({
+  inert: chrome.isHidden.value,
+  isHidden: chrome.isHidden.value,
+  board: chrome.board.value,
+  account: chrome.account.value,
+  tools: {
+    activeTool: chrome.activeTool.value,
+    minimapEnabled: chrome.minimapEnabled.value,
+  },
+  status: {
+    exportDisabled: !workspace.viewModel.graphEditing.hasSelectedFlowNodes.value,
+    zoomLevel: workspace.viewModel.viewportControls.zoomLevel.value,
+  },
+}))
+const vueFlowProps = computed(() => {
+  const isSelectTool = chrome.activeTool.value === 'select'
+  const isHandTool = chrome.activeTool.value === 'hand'
+  const isCanvasLocked = canvas.isLocked.value
+
+  return {
+    panOnDrag: !isCanvasLocked && isHandTool,
+    nodesDraggable: !isCanvasLocked && !isHandTool,
+    nodesConnectable: !isCanvasLocked && !isHandTool,
+    elementsSelectable: !isCanvasLocked && !isHandTool,
+    selectNodesOnDrag: !isCanvasLocked && isSelectTool,
+    selectionKeyCode: !isCanvasLocked && isSelectTool,
+    multiSelectionKeyCode: !isCanvasLocked && isSelectTool ? 'Shift' : null,
+    deleteKeyCode:
+      isCanvasLocked || canvas.isShortcutSuppressed.value ? null : ['Backspace', 'Delete'],
+    defaultEdgeOptions: { animated: false, updatable: true },
+    applyDefault: false,
+    minZoom: CANVAS_VIEWPORT_MIN_ZOOM,
+    maxZoom: CANVAS_VIEWPORT_MAX_ZOOM,
+    zoomOnScroll: false,
+    panOnScroll: !isCanvasLocked,
+    zoomOnPinch: !isCanvasLocked,
+    panOnScrollMode: PanOnScrollMode.Free,
+    onlyRenderVisibleElements: true,
+    ...canvas.connectionBindings,
+  }
+})
+const minimapProps = computed(() => ({
+  enabled: canvas.minimap.enabled.value,
+  inert: canvas.minimap.isHidden.value,
+  isHidden: canvas.minimap.isHidden.value,
+}))
+const overlayProps = computed(() => ({
+  imageToolSession: canvas.overlays.imageToolSession,
+  nodeContextMenu: canvas.overlays.nodeContextMenu.value,
+  canvasNodeMenuItems: canvas.overlays.canvasNodeMenuItems,
+}))
+
+function nodePropsFor(node: NodeProps<FlowNodeData>) {
+  const isExpandModeActive = canvas.node.expand.nodeId.value === node.id
+
+  return {
+    nodeId: node.id,
+    data: node.data,
+    selected: node.selected,
+    dragging: node.dragging,
+    copyMode: canvas.node.copyMode.value,
+    uiState: canvas.node.getUiState(node.id),
+    imagePresentation: canvas.node.imagePresentationFor(node.id),
+    fusionPresentation: canvas.node.fusionPresentationFor(node.id),
+    generationAvailable: canvas.node.generationAvailable.value,
+    setImageStageRef: canvas.node.setImageStageRef,
+    clearImageStageRef: canvas.node.clearImageStageRef,
+    expandModeActive: isExpandModeActive,
+    expandOverlayStyle: isExpandModeActive ? canvas.node.expand.overlayStyle.value : null,
+    expandHandleRadius: canvas.node.expand.handleRadius,
+    handleVisibilityRefreshToken: canvas.node.expand.visibilityRefreshToken.value,
+  }
+}
 </script>
 <style>
 @import '../components/styles/canvas-vue-flow-adapter-skin.css';

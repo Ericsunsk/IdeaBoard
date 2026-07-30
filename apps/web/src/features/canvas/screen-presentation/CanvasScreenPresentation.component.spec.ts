@@ -1,22 +1,27 @@
 /* eslint-disable vue/one-component-per-file */
-import { computed, defineComponent, h, ref, type PropType } from 'vue'
+import { computed, defineComponent, h, nextTick, ref, type Component, type PropType } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import type { Edge, Node, NodeProps } from '@vue-flow/core'
+import type { Edge, Node } from '@vue-flow/core'
 import { render } from '../../../test/render'
 import type { CanvasGroupPresentationInteraction } from '../group-presentation'
 import type { ImageToolChromeCommands, ImageToolChromeModel } from '../image-tools'
 import type { ImageNodePresentationBinding } from '../node-presentation'
 import type { FlowNodeData } from '../types/flowTypes'
 import CanvasScreenPresentation from './CanvasScreenPresentation.vue'
-import type { CanvasScreenPresentationBinding } from './screenPresentationContract'
 
-function createPresentation(
+function createScreen(
   overrides: {
     chromeHidden?: boolean
     exportDisabled?: boolean
     generationAvailable?: boolean
   } = {},
 ) {
+  const hidden = ref(overrides.chromeHidden ?? false)
+  const locked = ref(false)
+  const selected = ref(overrides.exportDisabled === false)
+  const activeTool = ref<'select' | 'hand'>('select')
+  const shortcutSuppressed = ref(false)
+  const generationAvailable = ref(overrides.generationAvailable ?? true)
   const nodes = ref<Node<FlowNodeData>[]>([])
   const edges = ref<Edge[]>([])
   const imagePresentation = {} as ImageNodePresentationBinding
@@ -27,39 +32,46 @@ function createPresentation(
   }
 
   return {
-    layout: {
-      activeTool: 'select' as const,
-      isInteractionActive: false,
-      isViewportPanActive: false,
-      onBackgroundMouseDown: vi.fn(),
+    state: {
+      hidden,
+      locked,
+      selected,
+      activeTool,
+      shortcutSuppressed,
+      generationAvailable,
+    },
+    workspace: {
+      viewModel: {
+        flowPane: { nodes, edges },
+        graphEditing: { hasSelectedFlowNodes: computed(() => selected.value) },
+        viewportControls: { zoomLevel: computed(() => 100) },
+      },
     },
     chrome: {
-      props: {
-        inert: overrides.chromeHidden ?? false,
-        isHidden: overrides.chromeHidden ?? false,
-        board: {
-          currentName: '',
-          options: [],
-          currentId: null,
-          isMenuOpen: false,
-          isRenaming: false,
-          isRenamePending: false,
-          catalogRecovery: { status: 'idle' },
-          setNameInputRef: vi.fn(),
+      board: computed(() => ({
+        currentName: '',
+        options: [],
+        currentId: null,
+        isMenuOpen: false,
+        isRenaming: false,
+        isRenamePending: false,
+        catalogRecovery: { status: 'idle' as const },
+        setNameInputRef: vi.fn(),
+      })),
+      account: computed(() => ({
+        balance: {
+          status: 'ready' as const,
+          displayValue: '0 Idea',
+          ariaLabel: '账户余额 0 Idea',
+          availableIdeas: 0,
+          command: vi.fn(),
         },
-        account: {
-          balance: {
-            status: 'ready',
-            displayValue: '0 Idea',
-            ariaLabel: '账户余额 0 Idea',
-            availableIdeas: 0,
-            command: vi.fn(),
-          },
-          menuItems: [],
-        },
-        tools: { activeTool: 'select', minimapEnabled: true },
-        status: { exportDisabled: overrides.exportDisabled ?? false, zoomLevel: 100 },
-      },
+        menuItems: [],
+      })),
+      activeTool,
+      minimapEnabled: ref(true),
+      isHidden: hidden,
+      closeBoardHeaderEditing: vi.fn(),
       commands: {
         updateBoardNameDraft: vi.fn(),
         toggleBoardMenu: vi.fn(),
@@ -78,9 +90,15 @@ function createPresentation(
     },
     canvas: {
       containerRef: ref<HTMLElement | null>(null),
-      nodes,
-      edges,
-      props: {},
+      isInteractionActive: ref(false),
+      isViewportPanActive: ref(false),
+      isLocked: locked,
+      isShortcutSuppressed: computed(() => shortcutSuppressed.value),
+      connectionBindings: {
+        isValidConnection: vi.fn(),
+        onConnect: vi.fn(),
+        onEdgeUpdate: vi.fn(),
+      },
       surface: {
         onDragOver: vi.fn(),
         onDrop: vi.fn(),
@@ -104,14 +122,21 @@ function createPresentation(
         onPaneClick: vi.fn(),
         onPaneContextMenu: vi.fn(),
       },
-      group: { props: { presentation: group, actionTarget: null } },
+      group,
       node: {
-        propsFor: (node: NodeProps<FlowNodeData>) => ({
-          nodeId: node.id,
-          data: node.data,
-          generationAvailable: overrides.generationAvailable ?? true,
-          imagePresentation,
-        }),
+        copyMode: ref(false),
+        getUiState: vi.fn(),
+        imagePresentationFor: () => imagePresentation,
+        fusionPresentationFor: vi.fn(),
+        generationAvailable,
+        setImageStageRef: vi.fn(),
+        clearImageStageRef: vi.fn(),
+        expand: {
+          nodeId: ref<string | null>(null),
+          overlayStyle: ref<Record<string, string> | null>(null),
+          handleRadius: 4,
+          visibilityRefreshToken: ref(0),
+        },
         listeners: {
           intent: vi.fn(),
           nodeMousedown: vi.fn(),
@@ -119,7 +144,8 @@ function createPresentation(
         },
       },
       minimap: {
-        props: { enabled: true, inert: false, isHidden: false },
+        enabled: ref(true),
+        isHidden: hidden,
         commands: {
           centerRequested: vi.fn(),
           dragStart: vi.fn(),
@@ -128,34 +154,49 @@ function createPresentation(
         },
       },
       overlays: {
-        props: {
-          imageToolSession,
-          nodeContextMenu: { visible: false, x: 0, y: 0 },
-          canvasNodeMenuItems: [],
-        },
-        commands: { createNode: vi.fn() },
+        imageToolSession,
+        nodeContextMenu: ref({ visible: false, x: 0, y: 0 }),
+        canvasNodeMenuItems: [],
+        createNode: vi.fn(),
       },
     },
   }
 }
 
 const VueFlowStub = defineComponent({
+  props: {
+    panOnDrag: Boolean,
+    nodesDraggable: Boolean,
+    deleteKeyCode: {
+      type: [Array, String, null] as PropType<string[] | string | null>,
+      default: null,
+    },
+  },
   emits: ['nodes-change'],
-  setup(_, { emit, slots }) {
+  setup(props, { emit, slots }) {
     return () =>
-      h('section', { 'data-testid': 'flow-region' }, [
-        h(
-          'button',
-          {
-            type: 'button',
-            onClick: () => emit('nodes-change', [{ id: 'node-1', type: 'remove' }]),
-          },
-          '触发节点变更',
-        ),
-        slots['zoom-pane']?.(),
-        slots['node-canvas']?.({ id: 'node-1', data: {}, selected: false, dragging: false }),
-        slots.default?.(),
-      ])
+      h(
+        'section',
+        {
+          'data-testid': 'flow-region',
+          'data-pan-on-drag': `${props.panOnDrag}`,
+          'data-nodes-draggable': `${props.nodesDraggable}`,
+          'data-delete-enabled': `${props.deleteKeyCode !== null}`,
+        },
+        [
+          h(
+            'button',
+            {
+              type: 'button',
+              onClick: () => emit('nodes-change', [{ id: 'node-1', type: 'remove' }]),
+            },
+            '触发节点变更',
+          ),
+          slots['zoom-pane']?.(),
+          slots['node-canvas']?.({ id: 'node-1', data: {}, selected: false, dragging: false }),
+          slots.default?.(),
+        ],
+      )
   },
 })
 
@@ -234,9 +275,9 @@ const OverlaysStub = defineComponent({
 })
 
 function renderPresentation(input = {}) {
-  const presentation = createPresentation(input)
-  const view = render(CanvasScreenPresentation, {
-    props: { presentation: presentation as CanvasScreenPresentationBinding },
+  const presentation = createScreen(input)
+  const view = render(CanvasScreenPresentation as Component, {
+    props: { presentation },
     global: {
       stubs: {
         CanvasChrome: ChromeStub,
@@ -264,17 +305,32 @@ describe('CanvasScreenPresentation', () => {
     expect(view.getByTestId('overlay-region')).toBeInTheDocument()
   })
 
-  it('projects hidden Chrome and disabled generation/export states into their regions', () => {
+  it('reactively presents Chrome, generation, and Vue Flow interaction policy', async () => {
     const view = renderPresentation({
-      chromeHidden: true,
       exportDisabled: true,
-      generationAvailable: false,
     })
+
+    expect(view.getByTestId('chrome-region')).toHaveAttribute('data-hidden', 'false')
+    expect(view.getByTestId('chrome-region')).toHaveAttribute('data-export-disabled', 'true')
+    expect(view.getByTestId('flow-region')).toHaveAttribute('data-pan-on-drag', 'false')
+    expect(view.getByTestId('flow-region')).toHaveAttribute('data-nodes-draggable', 'true')
+    expect(view.getByTestId('flow-region')).toHaveAttribute('data-delete-enabled', 'true')
+
+    view.presentation.state.hidden.value = true
+    view.presentation.state.selected.value = true
+    view.presentation.state.activeTool.value = 'hand'
+    view.presentation.state.shortcutSuppressed.value = true
+    view.presentation.state.generationAvailable.value = false
+    await nextTick()
 
     expect(view.getByTestId('chrome-region')).toHaveAttribute('data-hidden', 'true')
     expect(view.getByTestId('chrome-region')).toHaveAttribute('data-inert', 'true')
-    expect(view.getByTestId('chrome-region')).toHaveAttribute('data-export-disabled', 'true')
+    expect(view.getByTestId('chrome-region')).toHaveAttribute('data-export-disabled', 'false')
+    expect(view.getByTestId('flow-region')).toHaveAttribute('data-pan-on-drag', 'true')
+    expect(view.getByTestId('flow-region')).toHaveAttribute('data-nodes-draggable', 'false')
+    expect(view.getByTestId('flow-region')).toHaveAttribute('data-delete-enabled', 'false')
     expect(view.getByTestId('node-region')).toHaveAttribute('data-generation-available', 'false')
+    expect(view.getByTestId('minimap-region')).toHaveAttribute('data-hidden', 'true')
   })
 
   it('forwards Vue Flow node changes to the semantic flow command', () => {
