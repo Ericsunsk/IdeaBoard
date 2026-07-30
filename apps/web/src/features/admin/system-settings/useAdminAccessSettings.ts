@@ -1,8 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
-import { computed, ref, watch } from 'vue'
+import type { QueryClient } from '@tanstack/vue-query'
+import { computed, ref, toRaw, watch } from 'vue'
+import type { Ref } from 'vue'
 import {
   getGetAdminRateLimitSettingsQueryKey,
   getGetAdminRegistrationSettingQueryKey,
+  updateAdminRateLimitSettings,
+  updateAdminRegistrationSetting,
   useGetAdminRateLimitSettings,
   useGetAdminRegistrationSetting,
 } from '../../../shared/api/generated-query/admin-settings/admin-settings'
@@ -11,10 +15,8 @@ import type {
   ApiResponseRegistrationSettingData,
   RateLimitSetting,
 } from '../../../shared/api/generated-query/model'
-import { createApiDataSelector } from '../../../shared/api/apiResponse'
+import { createApiDataSelector, resolveApiData } from '../../../shared/api/apiResponse'
 import type { AdminAccessSettingsFeedback } from './useAdminSystemSettingsFeedback'
-import { updateRateLimitSettings, updateRegistrationSetting } from './systemSettingsCommands'
-import { useSettingResourceLifecycle } from './useSettingFormLifecycle'
 
 export const RATE_LIMIT_MAX_REQUESTS = 10_000
 export const RATE_LIMIT_MAX_WINDOW_SECONDS = 3_600
@@ -47,6 +49,13 @@ export function useAdminAccessSettings(options: { feedback: AdminAccessSettingsF
   })
   const registrationEnabled = ref(DEFAULT_REGISTRATION_ENABLED)
   const rateLimitSource = computed(() => rateLimitSettingsQuery.data.value)
+  const rateLimitForm = ref<AdminAccessRateLimitForm>(
+    cloneRateLimitForm(DEFAULT_RATE_LIMIT_FORM),
+  ) as Ref<AdminAccessRateLimitForm>
+  const lastSyncedRateLimitForm = ref<AdminAccessRateLimitForm>(
+    cloneRateLimitForm(DEFAULT_RATE_LIMIT_FORM),
+  ) as Ref<AdminAccessRateLimitForm>
+  const rateLimitValidationError = ref('')
 
   function invalidateRegistrationSettingQuery() {
     return queryClient.invalidateQueries({ queryKey: getGetAdminRegistrationSettingQueryKey() })
@@ -64,7 +73,8 @@ export function useAdminAccessSettings(options: { feedback: AdminAccessSettingsF
   }
 
   const updateRegistrationSettingMutation = useMutation({
-    mutationFn: updateRegistrationSetting,
+    mutationFn: (enabled: boolean) =>
+      resolveApiData(updateAdminRegistrationSetting({ enabled }), '更新注册状态失败'),
     onSuccess: async (setting) => {
       registrationEnabled.value = setting.enabled
       writeRegistrationSettingQueryCache(setting)
@@ -77,22 +87,36 @@ export function useAdminAccessSettings(options: { feedback: AdminAccessSettingsF
       registrationSettingQuery.isFetching.value ||
       updateRegistrationSettingMutation.isPending.value,
   )
-  const rateLimitResource = useSettingResourceLifecycle<AdminAccessRateLimitForm>({
-    defaultSetting: DEFAULT_RATE_LIMIT_FORM,
-    feedback: {
-      loadFailed: options.feedback.loadFailed,
-      validationFailed: options.feedback.rateLimitValidationFailed,
-      saved: options.feedback.rateLimitSaved,
-      saveFailed: options.feedback.rateLimitSaveFailed,
+  const saveRateLimitMutation = useMutation({
+    mutationFn: (draft: AdminAccessRateLimitForm) =>
+      resolveApiData(
+        updateAdminRateLimitSettings({
+          window_seconds: Number(draft.window_seconds),
+          max_requests: Number(draft.max_requests),
+        }),
+        '保存访问限流失败',
+      ),
+    onSuccess: async (savedSetting) => {
+      hydrateRateLimit(savedSetting)
+      writeRateLimitSettingQueryCache(queryClient, savedSetting)
+      await queryClient.invalidateQueries({ queryKey: getGetAdminRateLimitSettingsQueryKey() })
+      if (rateLimitSettingsQuery.data.value) hydrateRateLimit(rateLimitSettingsQuery.data.value)
     },
-    isSame: isSameRateLimitSetting,
-    normalize: normalizeRateLimitSetting,
-    query: rateLimitSettingsQuery,
-    queryKey: getGetAdminRateLimitSettingsQueryKey(),
-    save: saveRateLimitSetting,
-    source: rateLimitSource,
-    validate: validateRateLimitSettings,
   })
+  const rateLimitSaving = computed(() => saveRateLimitMutation.isPending.value)
+  const rateLimitLoading = computed(
+    () => rateLimitSettingsQuery.isLoading.value || rateLimitSettingsQuery.isFetching.value,
+  )
+  const rateLimitDirty = computed(
+    () => !isSameRateLimitSetting(rateLimitForm.value, lastSyncedRateLimitForm.value),
+  )
+
+  function hydrateRateLimit(savedSetting: Partial<AdminAccessRateLimitForm> | null | undefined) {
+    const nextForm = normalizeRateLimitSetting(savedSetting)
+    lastSyncedRateLimitForm.value = cloneRateLimitForm(nextForm)
+    rateLimitForm.value = cloneRateLimitForm(nextForm)
+    rateLimitValidationError.value = ''
+  }
 
   watch(
     () => registrationSettingQuery.error.value,
@@ -112,12 +136,26 @@ export function useAdminAccessSettings(options: { feedback: AdminAccessSettingsF
     { immediate: true },
   )
 
-  async function handleSaveRateLimit() {
-    await rateLimitResource.save()
+  async function saveRateLimit(): Promise<boolean> {
+    const validationMessage = validateRateLimitSettings(rateLimitForm.value)
+    if (validationMessage) {
+      rateLimitValidationError.value = validationMessage
+      options.feedback.rateLimitValidationFailed(validationMessage)
+      return false
+    }
+    try {
+      await saveRateLimitMutation.mutateAsync(normalizeRateLimitSetting(rateLimitForm.value))
+      options.feedback.rateLimitSaved()
+      return true
+    } catch (error) {
+      options.feedback.rateLimitSaveFailed(error)
+      return false
+    }
   }
 
-  function resetRateLimitForm() {
-    rateLimitResource.reset()
+  function resetRateLimit() {
+    rateLimitForm.value = cloneRateLimitForm(lastSyncedRateLimitForm.value)
+    rateLimitValidationError.value = ''
   }
 
   async function handleToggleRegistration(newValue: boolean) {
@@ -131,27 +169,37 @@ export function useAdminAccessSettings(options: { feedback: AdminAccessSettingsF
     }
   }
 
+  watch(rateLimitForm, () => (rateLimitValidationError.value = ''), {
+    deep: true,
+    flush: 'sync',
+  })
+  watch(
+    () => rateLimitSettingsQuery.error.value,
+    (error) => {
+      if (error) options.feedback.loadFailed(error)
+    },
+  )
+  watch(
+    rateLimitSource,
+    (savedSetting) => {
+      if (!savedSetting || rateLimitSaving.value || rateLimitDirty.value) return
+      hydrateRateLimit(savedSetting)
+    },
+    { immediate: true },
+  )
+
   return {
-    rateLimitForm: rateLimitResource.form,
-    rateLimitLoading: rateLimitResource.loading,
-    rateLimitSaving: rateLimitResource.saving,
+    rateLimitDirty,
+    rateLimitForm,
+    rateLimitLoading,
+    rateLimitSaving,
+    rateLimitValidationError,
     registrationEnabled,
     registrationSettingLoading,
-    handleSaveRateLimit,
     handleToggleRegistration,
-    resetRateLimitForm,
+    resetRateLimit,
+    saveRateLimit,
   }
-}
-
-async function saveRateLimitSetting(
-  setting: AdminAccessRateLimitForm,
-): Promise<AdminAccessRateLimitForm> {
-  return normalizeRateLimitSetting(
-    await updateRateLimitSettings({
-      window_seconds: Number(setting.window_seconds),
-      max_requests: Number(setting.max_requests),
-    }),
-  )
 }
 
 function normalizeRateLimitSetting(
@@ -194,4 +242,16 @@ function isSameRateLimitSetting(
   return (
     current.window_seconds === synced.window_seconds && current.max_requests === synced.max_requests
   )
+}
+
+function writeRateLimitSettingQueryCache(queryClient: QueryClient, setting: RateLimitSetting) {
+  queryClient.setQueryData(getGetAdminRateLimitSettingsQueryKey(), {
+    code: 0,
+    msg: 'ok',
+    data: setting,
+  })
+}
+
+function cloneRateLimitForm(form: AdminAccessRateLimitForm): AdminAccessRateLimitForm {
+  return structuredClone(toRaw(form))
 }

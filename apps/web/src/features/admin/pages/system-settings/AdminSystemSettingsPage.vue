@@ -67,7 +67,7 @@
                   maxlength="40"
                   placeholder="IdeaBoard"
                   :disabled="brandingLoading || brandingSaving"
-                  @keyup.enter="handleSaveBranding()"
+                  @keyup.enter="saveBranding()"
                 />
               </AdminFormField>
 
@@ -78,7 +78,7 @@
                   maxlength="2048"
                   placeholder="/uploads/site/assets/logo.png"
                   :disabled="brandingLoading || brandingSaving || uploading"
-                  @keyup.enter="handleSaveBranding()"
+                  @keyup.enter="saveBranding()"
                 />
               </AdminFormField>
             </div>
@@ -92,7 +92,7 @@
           severity="contrast"
           :disabled="brandingLoading || brandingSaving || uploading"
           :loading="brandingSaving"
-          @click="handleSaveBranding"
+          @click="saveBranding"
         />
         <Button
           :class="adminActionButtonClass"
@@ -100,7 +100,7 @@
           severity="secondary"
           outlined
           :disabled="brandingLoading || brandingSaving || uploading"
-          @click="resetBrandingForm"
+          @click="resetBranding"
         />
       </template>
     </SettingEditorCard>
@@ -151,7 +151,7 @@
           severity="contrast"
           :disabled="rateLimitLoading || rateLimitSaving"
           :loading="rateLimitSaving"
-          @click="handleSaveRateLimit"
+          @click="saveRateLimit"
         />
         <Button
           :class="adminActionButtonClass"
@@ -159,7 +159,7 @@
           severity="secondary"
           outlined
           :disabled="rateLimitLoading || rateLimitSaving"
-          @click="resetRateLimitForm"
+          @click="resetRateLimit"
         />
       </template>
     </SettingEditorCard>
@@ -220,7 +220,7 @@
           severity="contrast"
           :disabled="taskMonitorLoading || taskMonitorSaving"
           :loading="taskMonitorSaving"
-          @click="handleSaveTaskMonitorSettings"
+          @click="saveTaskMonitor"
         />
         <Button
           :class="adminActionButtonClass"
@@ -228,7 +228,7 @@
           severity="secondary"
           outlined
           :disabled="taskMonitorLoading || taskMonitorSaving"
-          @click="resetTaskMonitorForm"
+          @click="resetTaskMonitor"
         />
       </template>
     </SettingEditorCard>
@@ -244,7 +244,7 @@
                 maxlength="2048"
                 placeholder="https://app.example.com"
                 :disabled="publicURLLoading || publicURLSaving"
-                @keyup.enter="handleSavePublicURLSettings()"
+                @keyup.enter="savePublicURL()"
               />
             </AdminFormField>
 
@@ -255,7 +255,7 @@
                 maxlength="2048"
                 placeholder="https://api.example.com"
                 :disabled="publicURLLoading || publicURLSaving"
-                @keyup.enter="handleSavePublicURLSettings()"
+                @keyup.enter="savePublicURL()"
               />
             </AdminFormField>
           </div>
@@ -268,7 +268,7 @@
           severity="contrast"
           :disabled="publicURLLoading || publicURLSaving"
           :loading="publicURLSaving"
-          @click="handleSavePublicURLSettings"
+          @click="savePublicURL"
         />
         <Button
           :class="adminActionButtonClass"
@@ -276,7 +276,7 @@
           severity="secondary"
           outlined
           :disabled="publicURLLoading || publicURLSaving"
-          @click="resetPublicURLForm"
+          @click="resetPublicURL"
         />
       </template>
     </SettingEditorCard>
@@ -302,7 +302,7 @@
           severity="contrast"
           :disabled="mediaUploadLoading || mediaUploadSaving"
           :loading="mediaUploadSaving"
-          @click="handleSaveMediaUploadSettings"
+          @click="saveMediaUpload"
         />
         <Button
           :class="adminActionButtonClass"
@@ -310,7 +310,7 @@
           severity="secondary"
           outlined
           :disabled="mediaUploadLoading || mediaUploadSaving"
-          @click="resetMediaUploadForm"
+          @click="resetMediaUpload"
         />
       </template>
     </SettingEditorCard>
@@ -396,43 +396,43 @@ const {
   clearLogo: clearBrandingLogo,
   fallbackText: brandingFallbackText,
   form: brandingForm,
-  handleSaveBranding,
+  save: saveBranding,
   handleUploadLogo,
   loading: brandingLoading,
   logoPreviewURL: brandingLogoPreviewURL,
-  resetBrandingForm,
+  reset: resetBranding,
   saving: brandingSaving,
   uploading,
 } = useAdminBrandingSettings({ feedback: brandingSettingsFeedback })
 const {
-  handleSaveRateLimit,
   handleToggleRegistration,
   rateLimitLoading,
   rateLimitForm,
   rateLimitSaving,
   registrationEnabled,
   registrationSettingLoading,
-  resetRateLimitForm,
+  resetRateLimit,
+  saveRateLimit,
 } = useAdminAccessSettings({ feedback: accessSettingsFeedback })
 const {
   form: taskMonitorForm,
-  handleSaveTaskMonitorSettings,
+  save: saveTaskMonitor,
   loading: taskMonitorLoading,
-  resetTaskMonitorForm,
+  reset: resetTaskMonitor,
   saving: taskMonitorSaving,
 } = useAdminTaskMonitorSettings({ feedback: taskMonitorSettingsFeedback })
 const {
   form: publicURLForm,
-  handleSavePublicURLSettings,
+  save: savePublicURL,
   loading: publicURLLoading,
-  resetPublicURLForm,
+  reset: resetPublicURL,
   saving: publicURLSaving,
 } = useAdminPublicURLSettings({ feedback: publicURLSettingsFeedback })
 const {
   form: mediaUploadForm,
-  handleSaveMediaUploadSettings,
+  save: saveMediaUpload,
   loading: mediaUploadLoading,
-  resetMediaUploadForm,
+  reset: resetMediaUpload,
   saving: mediaUploadSaving,
 } = useAdminMediaUploadSettings({ feedback: mediaUploadSettingsFeedback })
 const publicURLStatusLabel = computed(() => {

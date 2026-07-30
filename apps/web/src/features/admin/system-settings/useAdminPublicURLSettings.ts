@@ -1,13 +1,15 @@
-import { computed } from 'vue'
+import { useMutation, useQueryClient } from '@tanstack/vue-query'
+import type { QueryClient } from '@tanstack/vue-query'
+import { computed, ref, toRaw, watch } from 'vue'
+import type { Ref } from 'vue'
 import {
   getGetAdminPublicURLSettingQueryKey,
+  updateAdminPublicURLSetting,
   useGetAdminPublicURLSetting,
 } from '../../../shared/api/generated-query/admin-settings/admin-settings'
 import type { PublicURLSetting } from '../../../shared/api/generated-query/model'
-import { createApiDataSelector } from '../../../shared/api/apiResponse'
+import { createApiDataSelector, resolveApiData } from '../../../shared/api/apiResponse'
 import type { AdminPublicURLSettingsFeedback } from './useAdminSystemSettingsFeedback'
-import { updatePublicURLSetting } from './systemSettingsCommands'
-import { useSettingResourceLifecycle } from './useSettingFormLifecycle'
 
 export const ADMIN_PUBLIC_URL_MAX_LENGTH = 2048
 
@@ -19,36 +21,85 @@ export const DEFAULT_ADMIN_PUBLIC_URL_SETTING: PublicURLSetting = {
 const selectPublicURLSetting = createApiDataSelector<PublicURLSetting>('加载链接与域名失败')
 
 export function useAdminPublicURLSettings(options: { feedback: AdminPublicURLSettingsFeedback }) {
+  const queryClient = useQueryClient()
   const query = useGetAdminPublicURLSetting<PublicURLSetting>({
     query: { select: selectPublicURLSetting },
   })
-  const sourceSetting = computed(() => query.data.value)
-  const resource = useSettingResourceLifecycle<PublicURLSetting>({
-    defaultSetting: DEFAULT_ADMIN_PUBLIC_URL_SETTING,
-    feedback: options.feedback,
-    isSame: isSamePublicURLSetting,
-    normalize: normalizeAdminPublicURLSetting,
-    query,
-    queryKey: getGetAdminPublicURLSettingQueryKey(),
-    save: updatePublicURLSetting,
-    source: sourceSetting,
-    validate: validateAdminPublicURLSetting,
+  const setting = computed(() => query.data.value)
+  const form = ref<PublicURLSetting>(
+    cloneSetting(DEFAULT_ADMIN_PUBLIC_URL_SETTING),
+  ) as Ref<PublicURLSetting>
+  const lastSyncedForm = ref<PublicURLSetting>(
+    cloneSetting(DEFAULT_ADMIN_PUBLIC_URL_SETTING),
+  ) as Ref<PublicURLSetting>
+  const validationError = ref('')
+  const loading = computed(() => query.isLoading.value || query.isFetching.value)
+  const saveMutation = useMutation({
+    mutationFn: (draft: PublicURLSetting) =>
+      resolveApiData(updateAdminPublicURLSetting(draft), '保存链接与域名失败'),
+    onSuccess: async (savedSetting) => {
+      hydrate(savedSetting)
+      writePublicURLQueryCache(queryClient, savedSetting)
+      await queryClient.invalidateQueries({ queryKey: getGetAdminPublicURLSettingQueryKey() })
+      if (query.data.value) hydrate(query.data.value)
+    },
   })
+  const saving = computed(() => saveMutation.isPending.value)
+  const isDirty = computed(() => !isSamePublicURLSetting(form.value, lastSyncedForm.value))
 
-  async function handleSavePublicURLSettings() {
-    await resource.save()
+  function hydrate(savedSetting: Partial<PublicURLSetting> | null | undefined) {
+    const nextForm = normalizeAdminPublicURLSetting(savedSetting)
+    lastSyncedForm.value = cloneSetting(nextForm)
+    form.value = cloneSetting(nextForm)
+    validationError.value = ''
   }
 
-  function resetPublicURLForm() {
-    resource.reset()
+  async function save(): Promise<boolean> {
+    const validationMessage = validateAdminPublicURLSetting(form.value)
+    if (validationMessage) {
+      validationError.value = validationMessage
+      options.feedback.validationFailed(validationMessage)
+      return false
+    }
+    try {
+      await saveMutation.mutateAsync(normalizeAdminPublicURLSetting(form.value))
+      options.feedback.saved()
+      return true
+    } catch (error) {
+      options.feedback.saveFailed(error)
+      return false
+    }
   }
+
+  function reset() {
+    form.value = cloneSetting(lastSyncedForm.value)
+    validationError.value = ''
+  }
+
+  watch(form, () => (validationError.value = ''), { deep: true, flush: 'sync' })
+  watch(
+    () => query.error.value,
+    (error) => {
+      if (error) options.feedback.loadFailed(error)
+    },
+  )
+  watch(
+    setting,
+    (savedSetting) => {
+      if (!savedSetting || saving.value || isDirty.value) return
+      hydrate(savedSetting)
+    },
+    { immediate: true },
+  )
 
   return {
-    form: resource.form,
-    handleSavePublicURLSettings,
-    loading: resource.loading,
-    resetPublicURLForm,
-    saving: resource.saving,
+    form,
+    isDirty,
+    loading,
+    reset,
+    save,
+    saving,
+    validationError,
   }
 }
 
@@ -120,4 +171,16 @@ function normalizePublicURL(value: unknown): string {
   } catch {
     return trimmed
   }
+}
+
+function writePublicURLQueryCache(queryClient: QueryClient, setting: PublicURLSetting) {
+  queryClient.setQueryData(getGetAdminPublicURLSettingQueryKey(), {
+    code: 0,
+    msg: 'ok',
+    data: setting,
+  })
+}
+
+function cloneSetting(setting: PublicURLSetting): PublicURLSetting {
+  return structuredClone(toRaw(setting))
 }
