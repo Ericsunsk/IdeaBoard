@@ -27,11 +27,50 @@ func TestNATSJetStreamTaskEventBridgeSmoke(t *testing.T) {
 	suffix := time.Now().UnixNano()
 	streamName := fmt.Sprintf("IDEABOARD_EVENTS_TEST_%d", suffix)
 	subjectPrefix := fmt.Sprintf("ideaboard.test.%d", suffix)
-	consumerName := fmt.Sprintf("ideaboard-api-events-test-%d", suffix)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
+	t.Cleanup(func() { deleteNATSTestStream(t, natsURL, streamName) })
 
+	originPublisher, originHub := newTestTaskStatusInstance(t, ctx, natsURL, streamName, subjectPrefix, fmt.Sprintf("origin-%d", suffix))
+	_, firstRemoteHub := newTestTaskStatusInstance(t, ctx, natsURL, streamName, subjectPrefix, fmt.Sprintf("remote-a-%d", suffix))
+	_, secondRemoteHub := newTestTaskStatusInstance(t, ctx, natsURL, streamName, subjectPrefix, fmt.Sprintf("remote-b-%d", suffix))
+
+	taskID := "task-nats-smoke"
+	originEvents, unsubscribeOrigin, ok := originHub.Subscribe(taskID, 99)
+	if !ok {
+		t.Fatal("origin hub subscribe rejected unexpectedly")
+	}
+	defer unsubscribeOrigin()
+	firstRemoteEvents, unsubscribeFirstRemote, ok := firstRemoteHub.Subscribe(taskID, 100)
+	if !ok {
+		t.Fatal("first remote hub subscribe rejected unexpectedly")
+	}
+	defer unsubscribeFirstRemote()
+	secondRemoteEvents, unsubscribeSecondRemote, ok := secondRemoteHub.Subscribe(taskID, 101)
+	if !ok {
+		t.Fatal("second remote hub subscribe rejected unexpectedly")
+	}
+	defer unsubscribeSecondRemote()
+
+	if err := originPublisher.PublishTaskStatus(ctx, events.NewTaskStatusEvent(taskID, tasks.StatusRunning)); err != nil {
+		t.Fatalf("PublishTaskStatus failed: %v", err)
+	}
+
+	assertTaskEvent(t, ctx, originEvents, taskID, tasks.StatusRunning, "origin")
+	assertTaskEvent(t, ctx, firstRemoteEvents, taskID, tasks.StatusRunning, "first remote")
+	assertTaskEvent(t, ctx, secondRemoteEvents, taskID, tasks.StatusRunning, "second remote")
+	assertNoTaskEvent(t, originEvents, "origin")
+	assertNoTaskEvent(t, firstRemoteEvents, "first remote")
+	assertNoTaskEvent(t, secondRemoteEvents, "second remote")
+}
+
+func newTestTaskStatusInstance(
+	t *testing.T,
+	ctx context.Context,
+	natsURL, streamName, subjectPrefix, consumerName string,
+) (events.TaskStatusPublisher, *taskservice.EventHub) {
+	t.Helper()
 	hub := taskservice.NewEventHub()
 	publisher, eventBus, err := newTaskStatusEventPublisher(ctx, config.EventBusConfig{
 		Enabled:            true,
@@ -44,36 +83,14 @@ func TestNATSJetStreamTaskEventBridgeSmoke(t *testing.T) {
 		NATSDrainTimeout:   2,
 	}, hub)
 	if err != nil {
-		t.Fatalf("newTaskStatusEventPublisher failed: %v", err)
+		t.Fatalf("new Task status publisher %s failed: %v", consumerName, err)
 	}
 	t.Cleanup(func() {
 		if eventBus != nil {
 			_ = eventBus.Close()
 		}
-		deleteNATSTestStream(t, natsURL, streamName)
 	})
-
-	taskID := "task-nats-smoke"
-	taskEvents, unsubscribe, ok := hub.Subscribe(taskID, 99)
-	if !ok {
-		t.Fatal("hub subscribe rejected unexpectedly")
-	}
-	defer unsubscribe()
-
-	if err := publisher.PublishTaskStatus(ctx, events.NewTaskStatusEvent(taskID, tasks.StatusRunning)); err != nil {
-		t.Fatalf("PublishTaskStatus failed: %v", err)
-	}
-
-	for received := 0; received < 2; received++ {
-		select {
-		case event := <-taskEvents:
-			if event.TaskID != taskID || event.Status != tasks.StatusRunning {
-				t.Fatalf("event=(%s,%s), want=(%s,%s)", event.TaskID, event.Status, taskID, tasks.StatusRunning)
-			}
-		case <-ctx.Done():
-			t.Fatalf("timeout waiting for local and bridged task events after %d events: %v", received, ctx.Err())
-		}
-	}
+	return publisher, hub
 }
 
 func TestCompositeTaskStatusPublisherKeepsLocalHubOnRemoteFailure(t *testing.T) {
@@ -105,10 +122,32 @@ func TestCompositeTaskStatusPublisherKeepsLocalHubOnRemoteFailure(t *testing.T) 
 	case <-time.After(time.Second):
 		t.Fatal("timeout waiting for local fallback event")
 	}
+	assertNoTaskEvent(t, taskEvents, "origin after remote publish failure")
 }
 
 type failingTaskStatusPublisher struct {
 	err error
+}
+
+func assertTaskEvent(t *testing.T, ctx context.Context, taskEvents <-chan taskservice.TaskEvent, taskID, status, instance string) {
+	t.Helper()
+	select {
+	case event := <-taskEvents:
+		if event.TaskID != taskID || event.Status != status {
+			t.Fatalf("%s event=(%s,%s), want=(%s,%s)", instance, event.TaskID, event.Status, taskID, status)
+		}
+	case <-ctx.Done():
+		t.Fatalf("timeout waiting for %s task event: %v", instance, ctx.Err())
+	}
+}
+
+func assertNoTaskEvent(t *testing.T, taskEvents <-chan taskservice.TaskEvent, instance string) {
+	t.Helper()
+	select {
+	case event := <-taskEvents:
+		t.Fatalf("%s received duplicate task event: (%s,%s)", instance, event.TaskID, event.Status)
+	case <-time.After(250 * time.Millisecond):
+	}
 }
 
 func (p failingTaskStatusPublisher) PublishTaskStatus(context.Context, events.TaskStatusEvent) error {

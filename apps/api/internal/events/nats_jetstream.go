@@ -42,7 +42,7 @@ type NATSJetStreamEventBus struct {
 	js                jetstream.JetStream
 	streamName        string
 	taskStatusSubject string
-	consumerName      string
+	instanceID        string
 
 	mu       sync.Mutex
 	consumes []jetstream.ConsumeContext
@@ -92,8 +92,32 @@ func NewNATSJetStreamEventBus(ctx context.Context, cfg NATSJetStreamConfig) (*NA
 		js:                js,
 		streamName:        cfg.StreamName,
 		taskStatusSubject: taskStatusSubject(cfg.SubjectPrefix),
-		consumerName:      cfg.ConsumerName,
+		instanceID:        cfg.ConsumerName,
 	}, nil
+}
+
+type taskStatusEnvelope struct {
+	OriginInstance string          `json:"origin_instance"`
+	Event          TaskStatusEvent `json:"event"`
+}
+
+func decodeTaskStatusForInstance(payload []byte, instanceID string) (TaskStatusEvent, bool, error) {
+	var envelope taskStatusEnvelope
+	if err := json.Unmarshal(payload, &envelope); err != nil {
+		return TaskStatusEvent{}, false, fmt.Errorf("decode task status envelope: %w", err)
+	}
+	envelope.OriginInstance = strings.TrimSpace(envelope.OriginInstance)
+	if envelope.OriginInstance == "" {
+		return TaskStatusEvent{}, false, fmt.Errorf("decode task status envelope: origin_instance is required")
+	}
+	if envelope.OriginInstance == instanceID {
+		return TaskStatusEvent{}, false, nil
+	}
+	event := NormalizeTaskStatusEvent(envelope.Event)
+	if event.TaskID == "" || event.Status == "" {
+		return TaskStatusEvent{}, false, fmt.Errorf("decode task status envelope: task_id and status are required")
+	}
+	return event, true, nil
 }
 
 func (b *NATSJetStreamEventBus) PublishTaskStatus(ctx context.Context, event TaskStatusEvent) error {
@@ -104,7 +128,10 @@ func (b *NATSJetStreamEventBus) PublishTaskStatus(ctx context.Context, event Tas
 	if event.TaskID == "" || event.Status == "" {
 		return fmt.Errorf("publish task status: task_id and status are required")
 	}
-	payload, err := json.Marshal(event)
+	payload, err := json.Marshal(taskStatusEnvelope{
+		OriginInstance: b.instanceID,
+		Event:          event,
+	})
 	if err != nil {
 		return fmt.Errorf("marshal task status event: %w", err)
 	}
@@ -124,8 +151,8 @@ func (b *NATSJetStreamEventBus) SubscribeTaskStatus(ctx context.Context, handler
 	}
 
 	consumer, err := b.js.CreateOrUpdateConsumer(ctx, b.streamName, jetstream.ConsumerConfig{
-		Name:              b.consumerName,
-		Durable:           b.consumerName,
+		Name:              b.instanceID,
+		Durable:           b.instanceID,
 		Description:       "IdeaBoard API task status fanout bridge",
 		DeliverPolicy:     jetstream.DeliverNewPolicy,
 		AckPolicy:         jetstream.AckExplicitPolicy,
@@ -136,7 +163,7 @@ func (b *NATSJetStreamEventBus) SubscribeTaskStatus(ctx context.Context, handler
 		InactiveThreshold: natsConsumerInactivePeriod,
 	})
 	if err != nil {
-		return fmt.Errorf("ensure nats task status consumer %s: %w", b.consumerName, err)
+		return fmt.Errorf("ensure nats task status consumer %s: %w", b.instanceID, err)
 	}
 
 	consume, err := consumer.Consume(func(msg jetstream.Msg) {
@@ -146,16 +173,16 @@ func (b *NATSJetStreamEventBus) SubscribeTaskStatus(ctx context.Context, handler
 				_ = msg.NakWithDelay(time.Second)
 			}
 		}()
-		var event TaskStatusEvent
-		if err := json.Unmarshal(msg.Data(), &event); err != nil {
+		event, shouldDeliver, err := decodeTaskStatusForInstance(msg.Data(), b.instanceID)
+		if err != nil {
 			slog.Warn("discard malformed task status event", "subject", msg.Subject(), "err", err)
 			_ = msg.Term()
 			return
 		}
-		event = NormalizeTaskStatusEvent(event)
-		if event.TaskID == "" || event.Status == "" {
-			slog.Warn("discard incomplete task status event", "subject", msg.Subject(), "task_id", event.TaskID, "status", event.Status)
-			_ = msg.Term()
+		if !shouldDeliver {
+			if err := msg.Ack(); err != nil {
+				slog.Warn("ack local-origin task status event failed", "subject", msg.Subject(), "err", err)
+			}
 			return
 		}
 		handlerCtx, handlerCancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -173,7 +200,7 @@ func (b *NATSJetStreamEventBus) SubscribeTaskStatus(ctx context.Context, handler
 		slog.Warn("task status consumer error", "err", err)
 	}))
 	if err != nil {
-		return fmt.Errorf("start nats task status consumer %s: %w", b.consumerName, err)
+		return fmt.Errorf("start nats task status consumer %s: %w", b.instanceID, err)
 	}
 
 	b.mu.Lock()

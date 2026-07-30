@@ -1,6 +1,9 @@
 package events
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
 
 func TestNormalizeNATSJetStreamConfig(t *testing.T) {
 	cfg := normalizeNATSJetStreamConfig(NATSJetStreamConfig{
@@ -27,5 +30,65 @@ func TestNormalizeNATSJetStreamConfig(t *testing.T) {
 func TestTaskStatusSubject(t *testing.T) {
 	if got := taskStatusSubject(" idea.board "); got != "idea.board.task.status" {
 		t.Fatalf("taskStatusSubject=%q, want idea.board.task.status", got)
+	}
+}
+
+func TestTaskStatusEnvelopeCarriesTransportOriginSeparatelyFromDomainEvent(t *testing.T) {
+	event := NewTaskStatusEvent("task-1", "running")
+	payload, err := json.Marshal(taskStatusEnvelope{
+		OriginInstance: "api-instance-1",
+		Event:          event,
+	})
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+
+	var envelope taskStatusEnvelope
+	if err := json.Unmarshal(payload, &envelope); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+	if envelope.OriginInstance != "api-instance-1" {
+		t.Fatalf("OriginInstance=%q, want api-instance-1", envelope.OriginInstance)
+	}
+	if envelope.Event.TaskID != event.TaskID || envelope.Event.Status != event.Status {
+		t.Fatalf("Event=(%s,%s), want=(%s,%s)", envelope.Event.TaskID, envelope.Event.Status, event.TaskID, event.Status)
+	}
+}
+
+func TestDecodeTaskStatusForInstanceSkipsLocalOriginAndDeliversRemote(t *testing.T) {
+	payload, err := json.Marshal(taskStatusEnvelope{
+		OriginInstance: "api-instance-1",
+		Event:          NewTaskStatusEvent("task-1", "running"),
+	})
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+
+	if _, shouldDeliver, err := decodeTaskStatusForInstance(payload, "api-instance-1"); err != nil {
+		t.Fatalf("decode local-origin event failed: %v", err)
+	} else if shouldDeliver {
+		t.Fatal("local-origin event should not be delivered through NATS")
+	}
+
+	event, shouldDeliver, err := decodeTaskStatusForInstance(payload, "api-instance-2")
+	if err != nil {
+		t.Fatalf("decode remote event failed: %v", err)
+	}
+	if !shouldDeliver {
+		t.Fatal("remote event should be delivered")
+	}
+	if event.TaskID != "task-1" || event.Status != "running" {
+		t.Fatalf("Event=(%s,%s), want=(task-1,running)", event.TaskID, event.Status)
+	}
+}
+
+func TestDecodeTaskStatusForInstanceRejectsPayloadWithoutTransportOrigin(t *testing.T) {
+	payload, err := json.Marshal(NewTaskStatusEvent("task-1", "running"))
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+
+	if _, _, err := decodeTaskStatusForInstance(payload, "api-instance-1"); err == nil {
+		t.Fatal("payload without transport origin should be rejected")
 	}
 }
