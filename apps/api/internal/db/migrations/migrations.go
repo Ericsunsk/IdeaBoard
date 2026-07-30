@@ -161,6 +161,9 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 			return err
 		}
 	}
+	if err := verifySecurityDefinerRoutines(ctx, conn); err != nil {
+		return fmt.Errorf("verify SECURITY DEFINER routines: %w", err)
+	}
 	return nil
 }
 

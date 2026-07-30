@@ -406,6 +406,19 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog;
 
 -- statement:end
 
+-- statement:begin
+DO $$
+DECLARE trusted_schema TEXT := current_schema();
+BEGIN
+  EXECUTE format(
+    'ALTER FUNCTION %I.execute_credit_reconciliation(BIGINT) SET search_path TO %I, pg_catalog, pg_temp',
+    trusted_schema,
+    trusted_schema
+  );
+END;
+$$;
+-- statement:end
+
 REVOKE ALL ON FUNCTION execute_credit_reconciliation(BIGINT) FROM PUBLIC;
 
 -- migrate:down
@@ -737,6 +750,19 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog;
 
+-- statement:end
+
+-- statement:begin
+DO $$
+DECLARE trusted_schema TEXT := current_schema();
+BEGIN
+  EXECUTE format(
+    'ALTER FUNCTION %I.execute_credit_reconciliation(BIGINT) SET search_path TO %I, pg_catalog, pg_temp',
+    trusted_schema,
+    trusted_schema
+  );
+END;
+$$;
 -- statement:end
 
 REVOKE ALL ON FUNCTION execute_credit_reconciliation(BIGINT) FROM PUBLIC;
