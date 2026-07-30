@@ -64,7 +64,7 @@
         <template #node-canvas="nodeProps">
           <FlowCanvasNode
             v-bind="nodePropsFor(nodeProps)"
-            @node-intent="canvas.node.listeners.intent"
+            @node-intent="dispatchNodeIntent"
             @node-mousedown="canvas.node.listeners.nodeMousedown"
             @request-internals-update="canvas.node.listeners.requestInternalsUpdate"
           />
@@ -113,6 +113,11 @@ type CanvasImageToolSession = {
   viewModel: Pick<CanvasImageTools['viewModel'], 'chrome'>
   commands: Pick<CanvasImageTools['commands'], 'chrome'>
 }
+
+type CanvasNodeIntentOf<Type extends CanvasNodePresentationIntent['type']> = Extract<
+  CanvasNodePresentationIntent,
+  { type: Type }
+>
 
 type CanvasScreenWorkspace = {
   viewModel: {
@@ -192,8 +197,52 @@ type CanvasScreenPresentationSource = {
         handleRadius: number
         visibilityRefreshToken: Ref<number>
       }
+      commands: {
+        updatePromptText: (nodeId: string, text: string) => void
+        updateNodeParameter: (
+          nodeId: string,
+          patch: CanvasNodeIntentOf<'parameter-changed'>['patch'],
+        ) => void
+        deleteNode: (nodeId: string) => void
+        dropMediaInput: (nodeId: string, event: DragEvent) => void
+        openMediaInput: (nodeId: string) => void
+        previewMediaInput: (image: { url: string; ratio: number }) => void
+        removeMediaInput: (nodeId: string, imageId: string) => void
+        generateFromPromptNode: (
+          nodeId: string,
+          prompt: string,
+          outputCount: number,
+          aspectRatio: CanvasNodeIntentOf<'prompt-generation-requested'>['aspectRatio'],
+        ) => void
+        dropImageStage: (nodeId: string, event: DragEvent) => void
+        openImageFile: (nodeId: string) => void
+        previewImage: (nodeId: string) => void
+        appendImageToCanvas: (nodeId: string) => void
+        resetImage: (nodeId: string) => void
+        openImageContextMenu: (nodeId: string, event: MouseEvent) => void
+        generateFromImagePrompt: (nodeId: string, prompt: string, outputCount: number) => void
+        submitCanvasExtend: (nodeId: string, prompt: string, outputCount: number) => void
+        runImageAction: (
+          nodeId: string,
+          action: CanvasNodeIntentOf<'action-requested'>['action'],
+        ) => void
+        beginCanvasExtendHandle: (
+          nodeId: string,
+          anchor: CanvasNodeIntentOf<'canvas-extend-handle-pointerdown'>['anchor'],
+          event: PointerEvent,
+        ) => void
+        moveCanvasExtendHandle: (event: PointerEvent) => void
+        endCanvasExtendHandle: (event: PointerEvent) => void
+        beginCanvasExtendFrame: (nodeId: string, event: PointerEvent) => void
+        openFusionContextMenu: (nodeId: string, event: MouseEvent) => void
+        generateFromFusion: (
+          nodeId: string,
+          prompt: string,
+          outputCount: number,
+          aspectRatio: CanvasNodeIntentOf<'fusion-generation-requested'>['aspectRatio'],
+        ) => void
+      }
       listeners: {
-        intent: (intent: CanvasNodePresentationIntent) => void
         nodeMousedown: (nodeId: string, event: MouseEvent) => void
         requestInternalsUpdate: (nodeId: string) => void
       }
@@ -295,6 +344,97 @@ function nodePropsFor(node: NodeProps<FlowNodeData>) {
     expandHandleRadius: canvas.node.expand.handleRadius,
     handleVisibilityRefreshToken: canvas.node.expand.visibilityRefreshToken.value,
   }
+}
+
+function dispatchNodeIntent(intent: CanvasNodePresentationIntent) {
+  const commands = canvas.node.commands
+  switch (intent.type) {
+    case 'text-edited':
+      commands.updatePromptText(intent.nodeId, intent.text)
+      return
+    case 'parameter-changed':
+      commands.updateNodeParameter(intent.nodeId, intent.patch)
+      return
+    case 'delete-requested':
+      commands.deleteNode(intent.nodeId)
+      return
+    case 'media-input-dropped':
+      commands.dropMediaInput(intent.nodeId, intent.event)
+      return
+    case 'media-input-open-requested':
+      commands.openMediaInput(intent.nodeId)
+      return
+    case 'media-input-preview-requested':
+      commands.previewMediaInput(intent.image)
+      return
+    case 'media-input-remove-requested':
+      commands.removeMediaInput(intent.nodeId, intent.imageId)
+      return
+    case 'prompt-generation-requested':
+      commands.generateFromPromptNode(
+        intent.nodeId,
+        intent.prompt,
+        intent.outputCount,
+        intent.aspectRatio,
+      )
+      return
+    case 'stage-dropped':
+      commands.dropImageStage(intent.nodeId, intent.event)
+      return
+    case 'file-open-requested':
+      commands.openImageFile(intent.nodeId)
+      return
+    case 'preview-requested':
+      commands.previewImage(intent.nodeId)
+      return
+    case 'append-to-canvas-requested':
+      commands.appendImageToCanvas(intent.nodeId)
+      return
+    case 'reset-requested':
+      commands.resetImage(intent.nodeId)
+      return
+    case 'image-context-menu-requested':
+      commands.openImageContextMenu(intent.nodeId, intent.event)
+      return
+    case 'image-prompt-generation-requested':
+      commands.generateFromImagePrompt(intent.nodeId, intent.prompt, intent.outputCount)
+      return
+    case 'canvas-extend-submitted':
+      commands.submitCanvasExtend(intent.nodeId, intent.prompt, intent.outputCount)
+      return
+    case 'action-requested':
+      commands.runImageAction(intent.nodeId, intent.action)
+      return
+    case 'canvas-extend-handle-pointerdown':
+      commands.beginCanvasExtendHandle(intent.nodeId, intent.anchor, intent.event)
+      return
+    case 'canvas-extend-handle-pointermove':
+      commands.moveCanvasExtendHandle(intent.event)
+      return
+    case 'canvas-extend-handle-pointerup':
+      commands.endCanvasExtendHandle(intent.event)
+      return
+    case 'canvas-extend-frame-pointerdown':
+      commands.beginCanvasExtendFrame(intent.nodeId, intent.event)
+      return
+    case 'fusion-context-menu-requested':
+      commands.openFusionContextMenu(intent.nodeId, intent.event)
+      return
+    case 'fusion-generation-requested':
+      commands.generateFromFusion(
+        intent.nodeId,
+        intent.prompt,
+        intent.outputCount,
+        intent.aspectRatio,
+      )
+      return
+    default:
+      return assertUnreachable(intent)
+  }
+}
+
+function assertUnreachable(value: never): never {
+  throw new Error(`Unsupported Canvas Node presentation intent: ${JSON.stringify(value)}`)
 }
 </script>
 <style>

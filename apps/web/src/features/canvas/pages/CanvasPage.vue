@@ -35,12 +35,8 @@ import { useImageStageRegistry } from '../composables/useImageStageRegistry'
 import { useFlowPaneSelectionAdapter, useVueFlowPaneAdapter } from '../flow-pane'
 import { useCanvasWorkspaceRuntime } from '../workspace-runtime'
 import {
-  createCanvasNodePresentationIntentHandler,
-  createFusionNodePresentationIntentHandler,
   createFusionNodePresentationResolver,
-  createImageNodePresentationIntentHandler,
   createImageNodePresentationResolver,
-  createPromptNodePresentationIntentHandler,
 } from '../node-presentation'
 import { CanvasScreenPresentation } from '../screen-presentation'
 import { useCanvasCustomLayerOverlay } from '../overlay-lifecycle'
@@ -575,44 +571,6 @@ const {
   getActionStrength,
 })
 
-const onCanvasNodePresentationIntent = createCanvasNodePresentationIntentHandler({
-  prompt: createPromptNodePresentationIntentHandler({
-    onTextEdited: onFlowPromptTextUpdate,
-    onParameterChanged: onFlowNodeParamUpdate,
-    onDeleteRequested: onFlowDeleteNode,
-    onMediaInputDrop: onFlowMediaInputImageDrop,
-    onMediaInputOpen: onFlowMediaInputImageOpen,
-    onMediaInputPreview: onFlowMediaInputImagePreview,
-    onMediaInputRemove: onFlowMediaInputImageRemove,
-    onGenerationRequested: onFlowPromptGenerate,
-  }),
-  image: createImageNodePresentationIntentHandler({
-    onParameterChanged: onFlowNodeParamUpdate,
-    onDeleteRequested: onFlowDeleteNode,
-    onStageDrop: onFlowImageStageDrop,
-    onFileOpenRequested: onFlowImageOpenFile,
-    onPreviewRequested: onFlowImageOpenPreview,
-    onAppendToCanvasRequested: onFlowImageAppendToCanvas,
-    onResetRequested: onFlowImageReset,
-    onContextMenuRequested: onFlowImageContextMenu,
-    onPromptGenerationRequested: onFlowImagePromptGenerate,
-    onCanvasExtendSubmitted: onFlowImageExpandSubmit,
-    onImageActionRequested: onFlowImageDirectAction,
-    onCanvasExtendHandlePointerDown: onFlowExpandHandlePointerDown,
-    onCanvasExtendHandlePointerMove: onFlowExpandHandlePointerMove,
-    onCanvasExtendHandlePointerUp: onFlowExpandHandlePointerUp,
-    onCanvasExtendFramePointerDown: onFlowExpandFramePointerDown,
-  }),
-  fusion: createFusionNodePresentationIntentHandler({
-    onParameterChanged: onFlowNodeParamUpdate,
-    onDeleteRequested: onFlowDeleteNode,
-    onMediaInputDrop: onFlowMediaInputImageDrop,
-    onMediaInputRemove: onFlowMediaInputImageRemove,
-    onContextMenuRequested: onFlowFusionContextMenu,
-    onGenerationRequested: onFlowFusionPromptGenerate,
-  }),
-})
-
 const canvasScreenPresentation = {
   workspace,
   chrome: {
@@ -685,8 +643,32 @@ const canvasScreenPresentation = {
         handleRadius: flowExpandHandleRadius,
         visibilityRefreshToken: flowHandleVisibilityRefreshToken,
       },
+      commands: {
+        updatePromptText: onFlowPromptTextUpdate,
+        updateNodeParameter: onFlowNodeParamUpdate,
+        deleteNode: onFlowDeleteNode,
+        dropMediaInput: onFlowMediaInputImageDrop,
+        openMediaInput: onFlowMediaInputImageOpen,
+        previewMediaInput: onFlowMediaInputImagePreview,
+        removeMediaInput: onFlowMediaInputImageRemove,
+        generateFromPromptNode: onFlowPromptGenerate,
+        dropImageStage: onFlowImageStageDrop,
+        openImageFile: onFlowImageOpenFile,
+        previewImage: onFlowImageOpenPreview,
+        appendImageToCanvas: onFlowImageAppendToCanvas,
+        resetImage: onFlowImageReset,
+        openImageContextMenu: onFlowImageContextMenu,
+        generateFromImagePrompt: onFlowImagePromptGenerate,
+        submitCanvasExtend: onFlowImageExpandSubmit,
+        runImageAction: onFlowImageDirectAction,
+        beginCanvasExtendHandle: onFlowExpandHandlePointerDown,
+        moveCanvasExtendHandle: onFlowExpandHandlePointerMove,
+        endCanvasExtendHandle: onFlowExpandHandlePointerUp,
+        beginCanvasExtendFrame: onFlowExpandFramePointerDown,
+        openFusionContextMenu: onFlowFusionContextMenu,
+        generateFromFusion: onFlowFusionPromptGenerate,
+      },
       listeners: {
-        intent: onCanvasNodePresentationIntent,
         nodeMousedown: selectionCommands.onFlowNodeMouseDown,
         requestInternalsUpdate: onFlowNodeInternalsUpdate,
       },

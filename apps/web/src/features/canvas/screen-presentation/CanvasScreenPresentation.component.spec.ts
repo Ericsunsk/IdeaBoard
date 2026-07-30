@@ -137,8 +137,32 @@ function createScreen(
           handleRadius: 4,
           visibilityRefreshToken: ref(0),
         },
+        commands: {
+          updatePromptText: vi.fn(),
+          updateNodeParameter: vi.fn(),
+          deleteNode: vi.fn(),
+          dropMediaInput: vi.fn(),
+          openMediaInput: vi.fn(),
+          previewMediaInput: vi.fn(),
+          removeMediaInput: vi.fn(),
+          generateFromPromptNode: vi.fn(),
+          dropImageStage: vi.fn(),
+          openImageFile: vi.fn(),
+          previewImage: vi.fn(),
+          appendImageToCanvas: vi.fn(),
+          resetImage: vi.fn(),
+          openImageContextMenu: vi.fn(),
+          generateFromImagePrompt: vi.fn(),
+          submitCanvasExtend: vi.fn(),
+          runImageAction: vi.fn(),
+          beginCanvasExtendHandle: vi.fn(),
+          moveCanvasExtendHandle: vi.fn(),
+          endCanvasExtendHandle: vi.fn(),
+          beginCanvasExtendFrame: vi.fn(),
+          openFusionContextMenu: vi.fn(),
+          generateFromFusion: vi.fn(),
+        },
         listeners: {
-          intent: vi.fn(),
           nodeMousedown: vi.fn(),
           requestInternalsUpdate: vi.fn(),
         },
@@ -241,7 +265,6 @@ const NodeStub = defineComponent({
               type: 'button',
               onClick: () => {
                 emit('node-intent', {
-                  nodeKind: 'prompt',
                   type: 'delete-requested',
                   nodeId: 'node-1',
                 })
@@ -343,17 +366,13 @@ describe('CanvasScreenPresentation', () => {
     ])
   })
 
-  it('forwards explicit Canvas Node listener payloads', () => {
+  it('dispatches Canvas Node intents to semantic commands', () => {
     const view = renderPresentation()
     const mouseEvent = expect.any(MouseEvent)
 
     view.getByRole('button', { name: '触发节点事件' }).click()
 
-    expect(view.presentation.canvas.node.listeners.intent).toHaveBeenCalledWith({
-      nodeKind: 'prompt',
-      type: 'delete-requested',
-      nodeId: 'node-1',
-    })
+    expect(view.presentation.canvas.node.commands.deleteNode).toHaveBeenCalledWith('node-1')
     expect(view.presentation.canvas.node.listeners.nodeMousedown).toHaveBeenCalledWith(
       'node-1',
       mouseEvent,

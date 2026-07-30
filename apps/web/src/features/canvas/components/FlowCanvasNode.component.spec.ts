@@ -180,7 +180,7 @@ describe('FlowCanvasNode prompt rendering', () => {
     await fireEvent.update(view.getByPlaceholderText('type your idea...'), '新的提示词')
 
     expect(view.emitted('node-intent')).toContainEqual([
-      { nodeKind: 'prompt', type: 'text-edited', nodeId: 'prompt-1', text: '新的提示词' },
+      { type: 'text-edited', nodeId: 'prompt-1', text: '新的提示词' },
     ])
   })
 
@@ -191,8 +191,7 @@ describe('FlowCanvasNode prompt rendering', () => {
 
     expect(view.emitted('node-intent')).toContainEqual([
       {
-        nodeKind: 'prompt',
-        type: 'generation-requested',
+        type: 'prompt-generation-requested',
         nodeId: 'prompt-1',
         prompt: 'A benchmark prompt',
         outputCount: 1,
@@ -223,9 +222,9 @@ describe('FlowCanvasNode image presentation', () => {
 
     expect(view.emitted('node-intent')).toEqual(
       expect.arrayContaining([
-        [{ nodeKind: 'image', type: 'preview-requested', nodeId: 'image-1' }],
-        [{ nodeKind: 'image', type: 'append-to-canvas-requested', nodeId: 'image-1' }],
-        [{ nodeKind: 'image', type: 'reset-requested', nodeId: 'image-1' }],
+        [{ type: 'preview-requested', nodeId: 'image-1' }],
+        [{ type: 'append-to-canvas-requested', nodeId: 'image-1' }],
+        [{ type: 'reset-requested', nodeId: 'image-1' }],
       ]),
     )
   })
@@ -247,7 +246,7 @@ describe('FlowCanvasNode image presentation', () => {
     await fireEvent.click(view.getByLabelText('上传图片作为输入'))
 
     expect(view.emitted('node-intent')).toContainEqual([
-      { nodeKind: 'image', type: 'file-open-requested', nodeId: 'image-1' },
+      { type: 'file-open-requested', nodeId: 'image-1' },
     ])
   })
 })
@@ -275,7 +274,6 @@ describe('FlowCanvasNode fusion presentation', () => {
 
     expect(view.emitted('node-intent')).toContainEqual([
       {
-        nodeKind: 'fusion',
         type: 'parameter-changed',
         nodeId: 'fusion-1',
         patch: { key: 'title', value: '新的融合节点' },
@@ -326,11 +324,10 @@ describe('FlowCanvasNode fusion presentation', () => {
 
     expect(view.emitted('node-intent')).toEqual(
       expect.arrayContaining([
-        [expect.objectContaining({ nodeKind: 'fusion', type: 'media-input-dropped' })],
-        [expect.objectContaining({ nodeKind: 'fusion', type: 'context-menu-requested' })],
+        [expect.objectContaining({ type: 'media-input-dropped' })],
+        [expect.objectContaining({ type: 'fusion-context-menu-requested' })],
         [
           {
-            nodeKind: 'fusion',
             type: 'media-input-remove-requested',
             nodeId: 'fusion-1',
             imageId: 'image-1',
@@ -338,8 +335,7 @@ describe('FlowCanvasNode fusion presentation', () => {
         ],
         [
           {
-            nodeKind: 'fusion',
-            type: 'generation-requested',
+            type: 'fusion-generation-requested',
             nodeId: 'fusion-1',
             prompt: '融合两张图片',
             outputCount: 1,

@@ -175,7 +175,6 @@ import type {
   CanvasNodePresentationIntent,
   FusionNodePresentationBinding,
   ImageNodePresentationBinding,
-  ImageNodePresentationIntent,
 } from '../node-presentation'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 import FlowNodeHandles from './FlowNodeHandles.vue'
@@ -275,7 +274,7 @@ function requestNodeInternalsUpdate() {
 }
 
 function onPromptTextEdited(text: string) {
-  emit('node-intent', { nodeKind: 'prompt', type: 'text-edited', nodeId: props.nodeId, text })
+  emit('node-intent', { type: 'text-edited', nodeId: props.nodeId, text })
 }
 
 function onPromptParameterChanged<Key extends FlowSnapshotParamPatch['key']>(
@@ -283,7 +282,6 @@ function onPromptParameterChanged<Key extends FlowSnapshotParamPatch['key']>(
   value: Extract<FlowSnapshotParamPatch, { key: Key }>['value'],
 ) {
   emit('node-intent', {
-    nodeKind: 'prompt',
     type: 'parameter-changed',
     nodeId: props.nodeId,
     patch: { key, value } as Extract<FlowSnapshotParamPatch, { key: Key }>,
@@ -295,7 +293,6 @@ function onImageParameterChanged<Key extends FlowSnapshotParamPatch['key']>(
   value: Extract<FlowSnapshotParamPatch, { key: Key }>['value'],
 ) {
   emit('node-intent', {
-    nodeKind: 'image',
     type: 'parameter-changed',
     nodeId: props.nodeId,
     patch: { key, value } as Extract<FlowSnapshotParamPatch, { key: Key }>,
@@ -303,41 +300,39 @@ function onImageParameterChanged<Key extends FlowSnapshotParamPatch['key']>(
 }
 
 function onImageDeleteRequest() {
-  emit('node-intent', { nodeKind: 'image', type: 'delete-requested', nodeId: props.nodeId })
+  emit('node-intent', { type: 'delete-requested', nodeId: props.nodeId })
 }
 
 function onPromptDeleteRequest() {
-  emit('node-intent', { nodeKind: 'prompt', type: 'delete-requested', nodeId: props.nodeId })
+  emit('node-intent', { type: 'delete-requested', nodeId: props.nodeId })
 }
 
 function onImageStageDropped(event: DragEvent) {
-  emit('node-intent', { nodeKind: 'image', type: 'stage-dropped', nodeId: props.nodeId, event })
+  emit('node-intent', { type: 'stage-dropped', nodeId: props.nodeId, event })
 }
 
 function onImageFileOpenRequest() {
-  emit('node-intent', { nodeKind: 'image', type: 'file-open-requested', nodeId: props.nodeId })
+  emit('node-intent', { type: 'file-open-requested', nodeId: props.nodeId })
 }
 
 function onImagePreviewRequest() {
-  emit('node-intent', { nodeKind: 'image', type: 'preview-requested', nodeId: props.nodeId })
+  emit('node-intent', { type: 'preview-requested', nodeId: props.nodeId })
 }
 
 function onImageAppendToCanvasRequest() {
   emit('node-intent', {
-    nodeKind: 'image',
     type: 'append-to-canvas-requested',
     nodeId: props.nodeId,
   })
 }
 
 function onImageResetRequest() {
-  emit('node-intent', { nodeKind: 'image', type: 'reset-requested', nodeId: props.nodeId })
+  emit('node-intent', { type: 'reset-requested', nodeId: props.nodeId })
 }
 
 function onImageContextMenuRequest(event: MouseEvent) {
   emit('node-intent', {
-    nodeKind: 'image',
-    type: 'context-menu-requested',
+    type: 'image-context-menu-requested',
     nodeId: props.nodeId,
     event,
   })
@@ -345,7 +340,6 @@ function onImageContextMenuRequest(event: MouseEvent) {
 
 function onPromptMediaInputDrop(event: DragEvent) {
   emit('node-intent', {
-    nodeKind: 'prompt',
     type: 'media-input-dropped',
     nodeId: props.nodeId,
     event,
@@ -354,7 +348,6 @@ function onPromptMediaInputDrop(event: DragEvent) {
 
 function onPromptMediaInputOpen() {
   emit('node-intent', {
-    nodeKind: 'prompt',
     type: 'media-input-open-requested',
     nodeId: props.nodeId,
   })
@@ -362,7 +355,6 @@ function onPromptMediaInputOpen() {
 
 function onPromptMediaInputPreview(image: { url: string; ratio: number }) {
   emit('node-intent', {
-    nodeKind: 'prompt',
     type: 'media-input-preview-requested',
     nodeId: props.nodeId,
     image,
@@ -371,7 +363,6 @@ function onPromptMediaInputPreview(image: { url: string; ratio: number }) {
 
 function onPromptMediaInputRemove(image: { id: string }) {
   emit('node-intent', {
-    nodeKind: 'prompt',
     type: 'media-input-remove-requested',
     nodeId: props.nodeId,
     imageId: image.id,
@@ -384,8 +375,7 @@ function onNodeMouseDown(event: MouseEvent) {
 
 function onImagePromptGenerationRequest(prompt: string, outputCount: number) {
   emit('node-intent', {
-    nodeKind: 'image',
-    type: 'prompt-generation-requested',
+    type: 'image-prompt-generation-requested',
     nodeId: props.nodeId,
     prompt,
     outputCount,
@@ -393,7 +383,6 @@ function onImagePromptGenerationRequest(prompt: string, outputCount: number) {
 }
 function onImageCanvasExtendSubmit(prompt: string, outputCount: number) {
   emit('node-intent', {
-    nodeKind: 'image',
     type: 'canvas-extend-submitted',
     nodeId: props.nodeId,
     prompt,
@@ -405,7 +394,6 @@ function onFusionParameterChanged<Key extends FlowSnapshotParamPatch['key']>(
   value: Extract<FlowSnapshotParamPatch, { key: Key }>['value'],
 ) {
   emit('node-intent', {
-    nodeKind: 'fusion',
     type: 'parameter-changed',
     nodeId: props.nodeId,
     patch: { key, value } as Extract<FlowSnapshotParamPatch, { key: Key }>,
@@ -413,12 +401,11 @@ function onFusionParameterChanged<Key extends FlowSnapshotParamPatch['key']>(
 }
 
 function onFusionDeleteRequest() {
-  emit('node-intent', { nodeKind: 'fusion', type: 'delete-requested', nodeId: props.nodeId })
+  emit('node-intent', { type: 'delete-requested', nodeId: props.nodeId })
 }
 
 function onFusionMediaInputDrop(event: DragEvent) {
   emit('node-intent', {
-    nodeKind: 'fusion',
     type: 'media-input-dropped',
     nodeId: props.nodeId,
     event,
@@ -427,7 +414,6 @@ function onFusionMediaInputDrop(event: DragEvent) {
 
 function onFusionMediaInputRemove(image: { id: string }) {
   emit('node-intent', {
-    nodeKind: 'fusion',
     type: 'media-input-remove-requested',
     nodeId: props.nodeId,
     imageId: image.id,
@@ -436,8 +422,7 @@ function onFusionMediaInputRemove(image: { id: string }) {
 
 function onFusionContextMenuRequest(event: MouseEvent) {
   emit('node-intent', {
-    nodeKind: 'fusion',
-    type: 'context-menu-requested',
+    type: 'fusion-context-menu-requested',
     nodeId: props.nodeId,
     event,
   })
@@ -449,8 +434,7 @@ function onFusionGenerationRequest(
   aspectRatio: PromptAspectRatio,
 ) {
   emit('node-intent', {
-    nodeKind: 'fusion',
-    type: 'generation-requested',
+    type: 'fusion-generation-requested',
     nodeId: props.nodeId,
     prompt,
     outputCount,
@@ -460,8 +444,7 @@ function onFusionGenerationRequest(
 function onPromptGenerate() {
   if (!promptSnapshot.value) return
   emit('node-intent', {
-    nodeKind: 'prompt',
-    type: 'generation-requested',
+    type: 'prompt-generation-requested',
     nodeId: props.nodeId,
     prompt: promptSnapshot.value.text,
     outputCount: promptSnapshot.value.outputCount ?? 1,
@@ -469,17 +452,16 @@ function onPromptGenerate() {
   })
 }
 
-type ImageActionRequest = Extract<ImageNodePresentationIntent, { type: 'action-requested' }>
+type ImageActionRequest = Extract<CanvasNodePresentationIntent, { type: 'action-requested' }>
 
 function onImageActionRequest(action: ImageActionRequest['action']) {
-  emit('node-intent', { nodeKind: 'image', type: 'action-requested', nodeId: props.nodeId, action })
+  emit('node-intent', { type: 'action-requested', nodeId: props.nodeId, action })
 }
 function onImageCanvasExtendHandlePointerDown(payload: {
   anchor: CanvasExtendDragAnchor
   event: PointerEvent
 }) {
   emit('node-intent', {
-    nodeKind: 'image',
     type: 'canvas-extend-handle-pointerdown',
     nodeId: props.nodeId,
     anchor: payload.anchor,
@@ -489,7 +471,6 @@ function onImageCanvasExtendHandlePointerDown(payload: {
 
 function onImageCanvasExtendHandlePointerMove(event: PointerEvent) {
   emit('node-intent', {
-    nodeKind: 'image',
     type: 'canvas-extend-handle-pointermove',
     nodeId: props.nodeId,
     event,
@@ -498,7 +479,6 @@ function onImageCanvasExtendHandlePointerMove(event: PointerEvent) {
 
 function onImageCanvasExtendHandlePointerUp(event: PointerEvent) {
   emit('node-intent', {
-    nodeKind: 'image',
     type: 'canvas-extend-handle-pointerup',
     nodeId: props.nodeId,
     event,
@@ -507,7 +487,6 @@ function onImageCanvasExtendHandlePointerUp(event: PointerEvent) {
 
 function onImageCanvasExtendFramePointerDown(event: PointerEvent) {
   emit('node-intent', {
-    nodeKind: 'image',
     type: 'canvas-extend-frame-pointerdown',
     nodeId: props.nodeId,
     event,
