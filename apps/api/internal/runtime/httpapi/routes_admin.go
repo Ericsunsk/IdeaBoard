@@ -72,8 +72,8 @@ func registerAdminSettingsRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.PUT(RouteAdminSettingsPublicURLs, h.AdminHandler.UpdatePublicURLSettings)
 	adminAPI.GET(RouteAdminSettingsTaskMonitor, h.AdminHandler.GetTaskMonitorSettings)
 	adminAPI.PUT(RouteAdminSettingsTaskMonitor, h.AdminHandler.UpdateTaskMonitorSettings)
-	adminAPI.GET(RouteAdminSettingsOperational, h.AdminHandler.GetOperationalSettings)
-	adminAPI.PUT(RouteAdminSettingsOperational, h.AdminHandler.UpdateOperationalSettings)
+	adminAPI.GET(RouteAdminSettingsOutbound, h.AdminHandler.GetOutboundPolicy)
+	adminAPI.PUT(RouteAdminSettingsOutbound, h.AdminHandler.UpdateOutboundPolicy)
 }
 
 func registerAdminUserRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {

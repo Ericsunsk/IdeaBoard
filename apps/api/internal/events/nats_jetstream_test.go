@@ -22,9 +22,6 @@ func TestNormalizeNATSJetStreamConfig(t *testing.T) {
 	if cfg.ConsumerName != "api_instance_1" {
 		t.Fatalf("ConsumerName=%q, want api_instance_1", cfg.ConsumerName)
 	}
-	if cfg.Retention != defaultNATSRetention {
-		t.Fatalf("Retention=%s, want %s", cfg.Retention, defaultNATSRetention)
-	}
 }
 
 func TestTaskStatusSubject(t *testing.T) {

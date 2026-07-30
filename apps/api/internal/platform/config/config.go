@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -16,6 +17,7 @@ type Config struct {
 	Events   EventBusConfig
 	App      AppConfig
 	Auth     AuthServiceConfig
+	Worker   WorkerConfig
 	Credits  CreditsConfig
 	Rewards  RewardsConfig
 }
@@ -47,13 +49,29 @@ type AppConfig struct {
 	CORSAllowedOrigins []string
 }
 
+type WorkerConfig struct {
+	Concurrency int
+}
+
+const (
+	DefaultRiverWorkerConcurrency = 5
+	minRiverWorkerConcurrency     = 1
+	maxRiverWorkerConcurrency     = 64
+)
+
+func (c WorkerConfig) EffectiveConcurrency() int {
+	if c.Concurrency < minRiverWorkerConcurrency || c.Concurrency > maxRiverWorkerConcurrency {
+		return DefaultRiverWorkerConcurrency
+	}
+	return c.Concurrency
+}
+
 type EventBusConfig struct {
 	Enabled            bool
 	NATSURL            string
 	NATSStreamName     string
 	NATSSubjectPrefix  string
 	NATSConsumerName   string
-	NATSRetentionDays  int
 	NATSConnectTimeout int
 	NATSRequestTimeout int
 	NATSDrainTimeout   int
@@ -76,6 +94,7 @@ type envConfig struct {
 	DBSSLMode           string `env:"DB_SSLMODE"`
 	NATSEventBusEnabled string `env:"NATS_EVENT_BUS_ENABLED"`
 	NATSURL             string `env:"NATS_URL"`
+	RiverConcurrency    string `env:"RIVER_WORKER_CONCURRENCY"`
 
 	AppPort               string `env:"APP_PORT"`
 	AppHost               string `env:"APP_HOST"`
@@ -135,6 +154,13 @@ func Load() *Config {
 			InternalAPIKey: strings.TrimSpace(raw.AuthServiceInternalAPIKey),
 			TimeoutSeconds: 5,
 		},
+		Worker: WorkerConfig{Concurrency: boundedIntEnvDefault(
+			"RIVER_WORKER_CONCURRENCY",
+			raw.RiverConcurrency,
+			DefaultRiverWorkerConcurrency,
+			minRiverWorkerConcurrency,
+			maxRiverWorkerConcurrency,
+		)},
 		Credits: CreditsConfig{WelcomeIdentityKey: strings.TrimSpace(raw.CreditsWelcomeIdentityKey)},
 		Rewards: RewardsConfig{CodeHMACKeys: strings.TrimSpace(raw.RewardsCodeHMACKeys)},
 	}
@@ -229,4 +255,17 @@ func parseBoolEnvDefault(key, raw string, defaultValue bool) bool {
 		slog.Warn("invalid boolean env; fallback to default", "key", key, "value", value, "default", defaultValue)
 		return defaultValue
 	}
+}
+
+func boundedIntEnvDefault(key, raw string, defaultValue, minValue, maxValue int) int {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return defaultValue
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < minValue || parsed > maxValue {
+		slog.Warn("invalid integer env; fallback to default", "key", key, "value", value, "default", defaultValue)
+		return defaultValue
+	}
+	return parsed
 }

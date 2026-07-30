@@ -741,33 +741,33 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseTaskMonitorSetting'
 
-  /admin/settings/operational:
+  /admin/settings/outbound-policy:
     get:
       tags: [AdminSettings]
-      operationId: getAdminOperationalSettings
+      operationId: getAdminOutboundPolicy
       responses:
         '200':
-          description: Persisted operational settings and the values effective in the current process
+          description: Outbound hosts allowed in addition to public network destinations
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseOperationalSettingsState'
+                $ref: '#/components/schemas/ApiResponseOutboundPolicySetting'
     put:
       tags: [AdminSettings]
-      operationId: updateAdminOperationalSettings
+      operationId: updateAdminOutboundPolicy
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/OperationalSettingsUpdateRequest'
+              $ref: '#/components/schemas/OutboundPolicyUpdateRequest'
       responses:
         '200':
-          description: Persisted settings; restart_required identifies startup-only changes
+          description: Persisted outbound policy, effective immediately
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseOperationalSettingsState'
+                $ref: '#/components/schemas/ApiResponseOutboundPolicySetting'
 
   /admin/users:
     get:
@@ -3528,16 +3528,6 @@ components:
         result_preview_enabled:
           type: boolean
 
-    TaskRuntimeSetting:
-      type: object
-      additionalProperties: false
-      required: [worker_concurrency, task_timeout_seconds, no_capacity_retry_seconds, max_retry]
-      properties:
-        worker_concurrency: { type: integer, minimum: 1, maximum: 64 }
-        task_timeout_seconds: { type: integer, minimum: 30, maximum: 3600 }
-        no_capacity_retry_seconds: { type: integer, minimum: 1, maximum: 3600 }
-        max_retry: { type: integer, minimum: 1, maximum: 100 }
-
     OutboundPolicySetting:
       type: object
       additionalProperties: false
@@ -3549,56 +3539,16 @@ components:
           uniqueItems: true
           items: { type: string, minLength: 1, maxLength: 255 }
 
-    EventRetentionSetting:
+    OutboundPolicyUpdateRequest:
       type: object
       additionalProperties: false
-      required: [nats_retention_days]
+      required: [allow_hosts]
       properties:
-        nats_retention_days: { type: integer, minimum: 1, maximum: 3650 }
-
-    OperationalSettingsUpdateRequest:
-      type: object
-      additionalProperties: false
-      required: [task_runtime, outbound_policy, event_retention, reason]
-      properties:
-        task_runtime: { $ref: '#/components/schemas/TaskRuntimeSetting' }
-        outbound_policy: { $ref: '#/components/schemas/OutboundPolicySetting' }
-        event_retention: { $ref: '#/components/schemas/EventRetentionSetting' }
-        reason: { $ref: '#/components/schemas/AdminActionReason' }
-
-    TaskRuntimeSettingState:
-      type: object
-      required: [configured, effective, restart_required]
-      properties:
-        configured: { $ref: '#/components/schemas/TaskRuntimeSetting' }
-        effective: { $ref: '#/components/schemas/TaskRuntimeSetting' }
-        restart_required: { type: boolean }
-
-    OutboundPolicySettingState:
-      type: object
-      required: [configured, effective, restart_required]
-      properties:
-        configured: { $ref: '#/components/schemas/OutboundPolicySetting' }
-        effective: { $ref: '#/components/schemas/OutboundPolicySetting' }
-        restart_required:
-          type: boolean
-          description: Always false because the egress allowlist is read dynamically.
-
-    EventRetentionSettingState:
-      type: object
-      required: [configured, effective, restart_required]
-      properties:
-        configured: { $ref: '#/components/schemas/EventRetentionSetting' }
-        effective: { $ref: '#/components/schemas/EventRetentionSetting' }
-        restart_required: { type: boolean }
-
-    OperationalSettingsState:
-      type: object
-      required: [task_runtime, outbound_policy, event_retention]
-      properties:
-        task_runtime: { $ref: '#/components/schemas/TaskRuntimeSettingState' }
-        outbound_policy: { $ref: '#/components/schemas/OutboundPolicySettingState' }
-        event_retention: { $ref: '#/components/schemas/EventRetentionSettingState' }
+        allow_hosts:
+          type: array
+          maxItems: 128
+          uniqueItems: true
+          items: { type: string, minLength: 1, maxLength: 255 }
 
     AdminAccount:
       type: object
@@ -4423,13 +4373,13 @@ components:
             data:
               $ref: '#/components/schemas/TaskMonitorSetting'
 
-    ApiResponseOperationalSettingsState:
+    ApiResponseOutboundPolicySetting:
       allOf:
         - $ref: '#/components/schemas/ApiResponseBase'
         - type: object
           properties:
             data:
-              $ref: '#/components/schemas/OperationalSettingsState'
+              $ref: '#/components/schemas/OutboundPolicySetting'
 
     ApiResponseUserList:
       allOf:

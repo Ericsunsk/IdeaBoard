@@ -29,7 +29,7 @@ export type AdminAccessSettingsFeedback = {
 export type AdminTaskMonitorSettingsFeedback = AdminSettingFeedback
 export type AdminPublicURLSettingsFeedback = AdminSettingFeedback
 export type AdminMediaUploadSettingsFeedback = AdminSettingFeedback
-export type AdminOperationalSettingsFeedback = AdminSettingFeedback
+export type AdminOutboundPolicyFeedback = AdminSettingFeedback
 
 export function createAdminBrandingSettingsFeedback(
   toast: AdminToastPort,
@@ -86,10 +86,15 @@ export function createAdminMediaUploadSettingsFeedback(
   return createAdminSettingFeedback(toast, '加载上传设置失败', '上传设置已保存', '保存上传设置失败')
 }
 
-export function createAdminOperationalSettingsFeedback(
+export function createAdminOutboundPolicyFeedback(
   toast: AdminToastPort,
-): AdminOperationalSettingsFeedback {
-  return createAdminSettingFeedback(toast, '加载运行参数失败', '运行参数已保存', '保存运行参数失败')
+): AdminOutboundPolicyFeedback {
+  return createAdminSettingFeedback(
+    toast,
+    '加载私有地址访问策略失败',
+    '私有地址访问策略已保存',
+    '保存私有地址访问策略失败',
+  )
 }
 
 export function useAdminBrandingSettingsFeedback() {
@@ -112,8 +117,8 @@ export function useAdminMediaUploadSettingsFeedback() {
   return createAdminMediaUploadSettingsFeedback(useAdminToast())
 }
 
-export function useAdminOperationalSettingsFeedback() {
-  return createAdminOperationalSettingsFeedback(useAdminToast())
+export function useAdminOutboundPolicyFeedback() {
+  return createAdminOutboundPolicyFeedback(useAdminToast())
 }
 
 export function useAdminUnsupportedLogoFileFeedback() {

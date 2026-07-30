@@ -564,6 +564,107 @@ func TestRuntimeOperationalSettingsMigrationDeclaresReversibleContract(t *testin
 	}
 }
 
+func TestOutboundPolicySettingsMigrationRemovesRetiredRuntimeKeys(t *testing.T) {
+	raw, err := migrationFS.ReadFile("20260730010000_outbound_policy_settings.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	up := extractUpSQL(string(raw))
+	down := extractDownSQLForTest(string(raw))
+	for _, retiredKey := range []string{
+		"river_worker_concurrency",
+		"river_task_timeout_seconds",
+		"river_no_capacity_retry_seconds",
+		"river_max_retry",
+		"nats_retention_days",
+	} {
+		if !strings.Contains(up, retiredKey) {
+			t.Fatalf("up migration missing retired key %q", retiredKey)
+		}
+		if !strings.Contains(down, retiredKey) {
+			t.Fatalf("down migration missing retired key %q", retiredKey)
+		}
+	}
+	if strings.Contains(up, "'api_outbound_allow_hosts'") {
+		t.Fatal("up migration must preserve the outbound policy config")
+	}
+	if !strings.Contains(up, "update_outbound_policy") {
+		t.Fatal("up migration must allow outbound policy audit records")
+	}
+	if !strings.Contains(up, "action_type IN") {
+		t.Fatal("up migration must preserve historical audit action types")
+	}
+	if strings.Contains(up, "UPDATE system_settings_admin_actions") ||
+		strings.Contains(down, "UPDATE system_settings_admin_actions") {
+		t.Fatal("migration must not rewrite append-only audit records")
+	}
+}
+
+func TestOutboundPolicySettingsMigrationAppliesCleanContract(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	conn := openIsolatedMigrationConn(t, ctx)
+	if err := upWithConn(ctx, conn); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+
+	var retiredCount int
+	if err := conn.QueryRowContext(ctx, `
+SELECT count(*)
+FROM system_configs
+WHERE config_key IN (
+  'river_worker_concurrency',
+  'river_task_timeout_seconds',
+  'river_no_capacity_retry_seconds',
+  'river_max_retry',
+  'nats_retention_days'
+)`).Scan(&retiredCount); err != nil {
+		t.Fatal(err)
+	}
+	if retiredCount != 0 {
+		t.Fatalf("retired runtime config count = %d, want 0", retiredCount)
+	}
+
+	var outboundPolicy string
+	if err := conn.QueryRowContext(ctx, `
+SELECT value
+FROM system_configs
+WHERE config_key = 'api_outbound_allow_hosts'`).Scan(&outboundPolicy); err != nil {
+		t.Fatal(err)
+	}
+	if outboundPolicy != "[]" {
+		t.Fatalf("outbound policy = %q, want []", outboundPolicy)
+	}
+
+	assertColumnExists(t, ctx, conn, "system_settings_admin_actions", "reason", false)
+	if _, err := conn.ExecContext(ctx, `
+INSERT INTO system_settings_admin_actions (action_type, actor_id, metadata)
+VALUES ('update_outbound_policy', 1, '{"allow_hosts": []}'::jsonb)`); err != nil {
+		t.Fatalf("insert outbound policy audit: %v", err)
+	}
+}
+
+func TestOutboundPolicyAuditReasonCleanupMigrationContract(t *testing.T) {
+	raw, err := migrationFS.ReadFile("20260730020000_outbound_policy_audit_reason_cleanup.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	up := extractUpSQL(string(raw))
+	down := extractDownSQLForTest(string(raw))
+	if !strings.Contains(up, "DROP COLUMN reason") {
+		t.Fatal("up migration must remove the obsolete audit reason")
+	}
+	if !strings.Contains(down, "ADD COLUMN reason") {
+		t.Fatal("down migration must restore the previous audit schema")
+	}
+	if err := validateMigrationStatements("outbound policy audit cleanup up", parseSQLStatements(up)); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateMigrationStatements("outbound policy audit cleanup down", parseSQLStatements(down)); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestBaselineMigrationExcludesVersionedRewardsSchema(t *testing.T) {
 	raw, err := migrationFS.ReadFile("20260609000000_baseline.sql")
 	if err != nil {

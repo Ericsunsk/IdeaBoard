@@ -32,7 +32,6 @@ type NATSJetStreamConfig struct {
 	StreamName     string
 	SubjectPrefix  string
 	ConsumerName   string
-	Retention      time.Duration
 	ConnectTimeout time.Duration
 	RequestTimeout time.Duration
 	DrainTimeout   time.Duration
@@ -78,7 +77,7 @@ func NewNATSJetStreamEventBus(ctx context.Context, cfg NATSJetStreamConfig) (*NA
 		MaxConsumers: -1,
 		MaxMsgs:      -1,
 		MaxBytes:     -1,
-		MaxAge:       cfg.Retention,
+		MaxAge:       defaultNATSRetention,
 		Storage:      jetstream.FileStorage,
 		Replicas:     1,
 		Duplicates:   natsDuplicateWindow,
@@ -215,9 +214,6 @@ func normalizeNATSJetStreamConfig(cfg NATSJetStreamConfig) NATSJetStreamConfig {
 	cfg.StreamName = sanitizeJetStreamName(cfg.StreamName, defaultNATSStreamName)
 	cfg.SubjectPrefix = normalizeSubjectPrefix(cfg.SubjectPrefix)
 	cfg.ConsumerName = sanitizeJetStreamName(cfg.ConsumerName, defaultConsumerName())
-	if cfg.Retention <= 0 {
-		cfg.Retention = defaultNATSRetention
-	}
 	if cfg.ConnectTimeout <= 0 {
 		cfg.ConnectTimeout = defaultNATSConnectTimeout
 	}

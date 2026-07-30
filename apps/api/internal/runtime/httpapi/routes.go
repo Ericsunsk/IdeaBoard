@@ -102,7 +102,7 @@ const (
 	RouteAdminSettingsPublicURLs  = "/settings/public-urls"
 	RouteAdminSettingsRateLimit   = "/settings/rate-limit"
 	RouteAdminSettingsTaskMonitor = "/settings/task-monitor"
-	RouteAdminSettingsOperational = "/settings/operational"
+	RouteAdminSettingsOutbound    = "/settings/outbound-policy"
 )
 
 func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, frontendOptions FrontendRouteOptions) {

@@ -9,7 +9,6 @@ import (
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
-	"ideaboard/api/internal/platform/adminaction"
 )
 
 type SystemConfigRepository struct {
@@ -39,9 +38,9 @@ type SystemConfigValue struct {
 	Value string
 }
 
-type SystemConfigAdminAction struct {
+type SystemConfigAdminAudit struct {
 	ActionType string
-	Action     adminaction.Metadata
+	ActorID    int64
 	Metadata   json.RawMessage
 }
 
@@ -99,8 +98,8 @@ func (r *SystemConfigRepository) SetMany(ctx context.Context, values []SystemCon
 	})
 }
 
-// SetManyWithAdminAction keeps the operational configuration and its append-only audit record atomic.
-func (r *SystemConfigRepository) SetManyWithAdminAction(ctx context.Context, values []SystemConfigValue, action SystemConfigAdminAction) error {
+// SetManyWithAdminAudit keeps typed configuration and its append-only audit record atomic.
+func (r *SystemConfigRepository) SetManyWithAdminAudit(ctx context.Context, values []SystemConfigValue, audit SystemConfigAdminAudit) error {
 	if r == nil || r.db == nil || r.q == nil {
 		return ErrRuntimeSettingsRepositoryUnavailable
 	}
@@ -114,8 +113,8 @@ func (r *SystemConfigRepository) SetManyWithAdminAction(ctx context.Context, val
 			}
 		}
 		if _, err := tx.ExecContext(ctx, `
-INSERT INTO system_settings_admin_actions (action_type, actor_id, reason, metadata)
-VALUES ($1, $2, $3, $4::jsonb)`, action.ActionType, action.Action.ActorID(), action.Action.Reason(), action.Metadata); err != nil {
+INSERT INTO system_settings_admin_actions (action_type, actor_id, metadata)
+VALUES ($1, $2, $3::jsonb)`, audit.ActionType, audit.ActorID, audit.Metadata); err != nil {
 			return fmt.Errorf("insert system settings admin action: %w", err)
 		}
 		return nil

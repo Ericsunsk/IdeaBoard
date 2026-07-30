@@ -57,10 +57,10 @@ type adminMediaUploadSettingsResponse struct {
 	Data settings.MediaUploadSetting `json:"data"`
 }
 
-type adminOperationalSettingsResponse struct {
-	Code int                               `json:"code"`
-	Msg  string                            `json:"msg"`
-	Data settings.OperationalSettingsState `json:"data"`
+type adminOutboundPolicyResponse struct {
+	Code int                            `json:"code"`
+	Msg  string                         `json:"msg"`
+	Data settings.OutboundPolicySetting `json:"data"`
 }
 
 func (f *fakeAdminAuthManager) DeleteUser(_ context.Context, authUserID string) error {
@@ -102,7 +102,7 @@ func TestAdminHighRiskHandlersRejectUserPrincipal(t *testing.T) {
 		route  string
 		run    gin.HandlerFunc
 	}{
-		{name: "operational settings", method: http.MethodPut, path: "/settings/operational", route: "/settings/operational", run: handler.UpdateOperationalSettings},
+		{name: "outbound policy", method: http.MethodPut, path: "/settings/outbound-policy", route: "/settings/outbound-policy", run: handler.UpdateOutboundPolicy},
 		{name: "role", method: http.MethodPut, path: "/users/1/role", route: "/users/:id/role", run: handler.UpdateUserRole},
 		{name: "delete", method: http.MethodDelete, path: "/users/1", route: "/users/:id", run: handler.DeleteUser},
 		{name: "ban", method: http.MethodPost, path: "/users/1/ban", route: "/users/:id/ban", run: handler.BanUser},
@@ -528,10 +528,10 @@ func TestAdminRuntimeSettingsGetFailsWhenRepositoryUnavailable(t *testing.T) {
 			},
 		},
 		{
-			name: "operational",
-			path: "/admin/settings/operational",
+			name: "outbound policy",
+			path: "/admin/settings/outbound-policy",
 			register: func(router *gin.Engine) {
-				router.GET("/admin/settings/operational", handler.GetOperationalSettings)
+				router.GET("/admin/settings/outbound-policy", handler.GetOutboundPolicy)
 			},
 		},
 	}
@@ -555,24 +555,18 @@ func TestAdminRuntimeSettingsGetFailsWhenRepositoryUnavailable(t *testing.T) {
 	}
 }
 
-func TestAdminOperationalSettingsUpdateRequiresActorReasonAndReturnsEffectiveState(t *testing.T) {
+func TestAdminOutboundPolicyUpdateRequiresActorAndAppliesImmediately(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	db := newUserRepoTestDB(t)
 	service := settings.NewRuntimeSettingsService(settings.NewSystemConfigRepository(db))
-	service.SetEffectiveOperationalSettings(settings.DefaultTaskRuntimeSetting(), settings.DefaultEventRetentionSetting())
 	handler := NewAdminHandler(nil, service, nil)
 
-	validBody := `{
-  "task_runtime":{"worker_concurrency":12,"task_timeout_seconds":240,"no_capacity_retry_seconds":9,"max_retry":31},
-  "outbound_policy":{"allow_hosts":["internal.example.com:8443"]},
-  "event_retention":{"nats_retention_days":30},
-  "reason":"capacity tuning"
-}`
+	validBody := `{"allow_hosts":["internal.example.com:8443"]}`
 
 	t.Run("missing actor", func(t *testing.T) {
 		router := gin.New()
-		router.PUT("/admin/settings/operational", handler.UpdateOperationalSettings)
-		req := httptest.NewRequest(http.MethodPut, "/admin/settings/operational", strings.NewReader(validBody))
+		router.PUT("/admin/settings/outbound-policy", handler.UpdateOutboundPolicy)
+		req := httptest.NewRequest(http.MethodPut, "/admin/settings/outbound-policy", strings.NewReader(validBody))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
@@ -581,16 +575,15 @@ func TestAdminOperationalSettingsUpdateRequiresActorReasonAndReturnsEffectiveSta
 		}
 	})
 
-	t.Run("missing reason", func(t *testing.T) {
+	t.Run("missing allow_hosts", func(t *testing.T) {
 		router := gin.New()
 		router.Use(func(c *gin.Context) { testsupport.SetPrincipal(t, c, 42, principal.RoleAdmin); c.Next() })
-		router.PUT("/admin/settings/operational", handler.UpdateOperationalSettings)
-		body := strings.Replace(validBody, `"reason":"capacity tuning"`, `"reason":""`, 1)
-		req := httptest.NewRequest(http.MethodPut, "/admin/settings/operational", strings.NewReader(body))
+		router.PUT("/admin/settings/outbound-policy", handler.UpdateOutboundPolicy)
+		req := httptest.NewRequest(http.MethodPut, "/admin/settings/outbound-policy", strings.NewReader(`{}`))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
-		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "reason") {
+		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "allow_hosts") {
 			t.Fatalf("status = %d, body=%s", rec.Code, rec.Body.String())
 		}
 	})
@@ -598,23 +591,24 @@ func TestAdminOperationalSettingsUpdateRequiresActorReasonAndReturnsEffectiveSta
 	t.Run("valid update", func(t *testing.T) {
 		router := gin.New()
 		router.Use(func(c *gin.Context) { testsupport.SetPrincipal(t, c, 42, principal.RoleAdmin); c.Next() })
-		router.PUT("/admin/settings/operational", handler.UpdateOperationalSettings)
-		req := httptest.NewRequest(http.MethodPut, "/admin/settings/operational", strings.NewReader(validBody))
+		router.PUT("/admin/settings/outbound-policy", handler.UpdateOutboundPolicy)
+		req := httptest.NewRequest(http.MethodPut, "/admin/settings/outbound-policy", strings.NewReader(validBody))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status = %d, want 200, body=%s", rec.Code, rec.Body.String())
 		}
-		var payload adminOperationalSettingsResponse
+		var payload adminOutboundPolicyResponse
 		if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 			t.Fatalf("decode response: %v", err)
 		}
-		if !payload.Data.TaskRuntime.RestartRequired || payload.Data.OutboundPolicy.RestartRequired || !payload.Data.EventRetention.RestartRequired {
-			t.Fatalf("operational state = %+v", payload.Data)
+		if len(payload.Data.AllowHosts) != 1 || payload.Data.AllowHosts[0] != "internal.example.com:8443" {
+			t.Fatalf("outbound policy = %+v", payload.Data)
 		}
-		if payload.Data.TaskRuntime.Effective != settings.DefaultTaskRuntimeSetting() {
-			t.Fatalf("effective task runtime = %+v", payload.Data.TaskRuntime.Effective)
+		effective, err := service.GetOutboundPolicy(t.Context())
+		if err != nil || len(effective.AllowHosts) != 1 || effective.AllowHosts[0] != "internal.example.com:8443" {
+			t.Fatalf("effective outbound policy = %+v, err=%v", effective, err)
 		}
 	})
 }

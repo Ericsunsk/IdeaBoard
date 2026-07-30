@@ -20,14 +20,14 @@ import type { MaybeRefOrGetter } from 'vue'
 import type {
   ApiResponseBrandingSetting,
   ApiResponseMediaUploadSetting,
-  ApiResponseOperationalSettingsState,
+  ApiResponseOutboundPolicySetting,
   ApiResponsePublicURLSetting,
   ApiResponseRateLimitSetting,
   ApiResponseRegistrationSetting,
   ApiResponseTaskMonitorSetting,
   BrandingSetting,
   MediaUploadSetting,
-  OperationalSettingsUpdateRequest,
+  OutboundPolicyUpdateRequest,
   PublicURLSetting,
   RateLimitSetting,
   TaskMonitorSetting,
@@ -928,65 +928,64 @@ export function useUpdateAdminTaskMonitorSetting<
   return query
 }
 
-export const getGetAdminOperationalSettingsUrl = () => {
-  return `/admin/settings/operational`
+export const getGetAdminOutboundPolicyUrl = () => {
+  return `/admin/settings/outbound-policy`
 }
 
-export const getAdminOperationalSettings = async (
+export const getAdminOutboundPolicy = async (
   options?: RequestInit,
-): Promise<ApiResponseOperationalSettingsState> => {
-  return orvalMutator<ApiResponseOperationalSettingsState>(getGetAdminOperationalSettingsUrl(), {
+): Promise<ApiResponseOutboundPolicySetting> => {
+  return orvalMutator<ApiResponseOutboundPolicySetting>(getGetAdminOutboundPolicyUrl(), {
     ...options,
     method: 'GET',
   })
 }
 
-export const getGetAdminOperationalSettingsQueryKey = () => {
-  return ['admin', 'settings', 'operational'] as const
+export const getGetAdminOutboundPolicyQueryKey = () => {
+  return ['admin', 'settings', 'outbound-policy'] as const
 }
 
-export const getGetAdminOperationalSettingsQueryOptions = <
-  TData = Awaited<ReturnType<typeof getAdminOperationalSettings>>,
+export const getGetAdminOutboundPolicyQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminOutboundPolicy>>,
   TError = ErrorType<unknown>,
 >(options?: {
   query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof getAdminOperationalSettings>>, TError, TData>
+    UseQueryOptions<Awaited<ReturnType<typeof getAdminOutboundPolicy>>, TError, TData>
   >
   request?: SecondParameter<typeof orvalMutator>
 }) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getGetAdminOperationalSettingsQueryKey()
+  const queryKey = getGetAdminOutboundPolicyQueryKey()
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminOperationalSettings>>> = ({
-    signal,
-  }) => getAdminOperationalSettings({ signal, ...requestOptions })
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminOutboundPolicy>>> = ({ signal }) =>
+    getAdminOutboundPolicy({ signal, ...requestOptions })
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminOperationalSettings>>,
+    Awaited<ReturnType<typeof getAdminOutboundPolicy>>,
     TError,
     TData
   >
 }
 
-export type GetAdminOperationalSettingsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getAdminOperationalSettings>>
+export type GetAdminOutboundPolicyQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminOutboundPolicy>>
 >
-export type GetAdminOperationalSettingsQueryError = ErrorType<unknown>
+export type GetAdminOutboundPolicyQueryError = ErrorType<unknown>
 
-export function useGetAdminOperationalSettings<
-  TData = Awaited<ReturnType<typeof getAdminOperationalSettings>>,
+export function useGetAdminOutboundPolicy<
+  TData = Awaited<ReturnType<typeof getAdminOutboundPolicy>>,
   TError = ErrorType<unknown>,
 >(
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getAdminOperationalSettings>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminOutboundPolicy>>, TError, TData>
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getGetAdminOperationalSettingsQueryOptions(options)
+  const queryOptions = getGetAdminOutboundPolicyQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -997,79 +996,76 @@ export function useGetAdminOperationalSettings<
   return query
 }
 
-export const getUpdateAdminOperationalSettingsUrl = () => {
-  return `/admin/settings/operational`
+export const getUpdateAdminOutboundPolicyUrl = () => {
+  return `/admin/settings/outbound-policy`
 }
 
-export const updateAdminOperationalSettings = async (
-  operationalSettingsUpdateRequest: OperationalSettingsUpdateRequest,
+export const updateAdminOutboundPolicy = async (
+  outboundPolicyUpdateRequest: OutboundPolicyUpdateRequest,
   options?: RequestInit,
-): Promise<ApiResponseOperationalSettingsState> => {
-  return orvalMutator<ApiResponseOperationalSettingsState>(getUpdateAdminOperationalSettingsUrl(), {
+): Promise<ApiResponseOutboundPolicySetting> => {
+  return orvalMutator<ApiResponseOutboundPolicySetting>(getUpdateAdminOutboundPolicyUrl(), {
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(operationalSettingsUpdateRequest),
+    body: JSON.stringify(outboundPolicyUpdateRequest),
   })
 }
 
-export const getUpdateAdminOperationalSettingsQueryKey = (
-  operationalSettingsUpdateRequest?: MaybeRefOrGetter<OperationalSettingsUpdateRequest>,
+export const getUpdateAdminOutboundPolicyQueryKey = (
+  outboundPolicyUpdateRequest?: MaybeRefOrGetter<OutboundPolicyUpdateRequest>,
 ) => {
-  return ['PUT', 'admin', 'settings', 'operational', operationalSettingsUpdateRequest] as const
+  return ['PUT', 'admin', 'settings', 'outbound-policy', outboundPolicyUpdateRequest] as const
 }
 
-export const getUpdateAdminOperationalSettingsQueryOptions = <
-  TData = Awaited<ReturnType<typeof updateAdminOperationalSettings>>,
+export const getUpdateAdminOutboundPolicyQueryOptions = <
+  TData = Awaited<ReturnType<typeof updateAdminOutboundPolicy>>,
   TError = ErrorType<unknown>,
 >(
-  operationalSettingsUpdateRequest: MaybeRefOrGetter<OperationalSettingsUpdateRequest>,
+  outboundPolicyUpdateRequest: MaybeRefOrGetter<OutboundPolicyUpdateRequest>,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminOperationalSettings>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminOutboundPolicy>>, TError, TData>
     >
     request?: SecondParameter<typeof orvalMutator>
   },
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getUpdateAdminOperationalSettingsQueryKey(operationalSettingsUpdateRequest)
+  const queryKey = getUpdateAdminOutboundPolicyQueryKey(outboundPolicyUpdateRequest)
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminOperationalSettings>>> = ({
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminOutboundPolicy>>> = ({
     signal,
   }) =>
-    updateAdminOperationalSettings(toValue(operationalSettingsUpdateRequest), {
-      signal,
-      ...requestOptions,
-    })
+    updateAdminOutboundPolicy(toValue(outboundPolicyUpdateRequest), { signal, ...requestOptions })
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof updateAdminOperationalSettings>>,
+    Awaited<ReturnType<typeof updateAdminOutboundPolicy>>,
     TError,
     TData
   >
 }
 
-export type UpdateAdminOperationalSettingsQueryResult = NonNullable<
-  Awaited<ReturnType<typeof updateAdminOperationalSettings>>
+export type UpdateAdminOutboundPolicyQueryResult = NonNullable<
+  Awaited<ReturnType<typeof updateAdminOutboundPolicy>>
 >
-export type UpdateAdminOperationalSettingsQueryError = ErrorType<unknown>
+export type UpdateAdminOutboundPolicyQueryError = ErrorType<unknown>
 
-export function useUpdateAdminOperationalSettings<
-  TData = Awaited<ReturnType<typeof updateAdminOperationalSettings>>,
+export function useUpdateAdminOutboundPolicy<
+  TData = Awaited<ReturnType<typeof updateAdminOutboundPolicy>>,
   TError = ErrorType<unknown>,
 >(
-  operationalSettingsUpdateRequest: MaybeRefOrGetter<OperationalSettingsUpdateRequest>,
+  outboundPolicyUpdateRequest: MaybeRefOrGetter<OutboundPolicyUpdateRequest>,
   options?: {
     query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminOperationalSettings>>, TError, TData>
+      UseQueryOptions<Awaited<ReturnType<typeof updateAdminOutboundPolicy>>, TError, TData>
     >
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUpdateAdminOperationalSettingsQueryOptions(
-    operationalSettingsUpdateRequest,
+  const queryOptions = getUpdateAdminOutboundPolicyQueryOptions(
+    outboundPolicyUpdateRequest,
     options,
   )
 

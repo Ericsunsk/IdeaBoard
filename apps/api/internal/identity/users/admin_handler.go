@@ -5,7 +5,6 @@ import (
 	"strconv"
 
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/platform/adminaction"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/platform/validation"
@@ -19,11 +18,8 @@ type AdminHandler struct {
 	identityCommands IdentityAdminCommands
 }
 
-type updateOperationalSettingsRequest struct {
-	TaskRuntime    settings.TaskRuntimeSetting    `json:"task_runtime" binding:"required"`
-	OutboundPolicy settings.OutboundPolicySetting `json:"outbound_policy" binding:"required"`
-	EventRetention settings.EventRetentionSetting `json:"event_retention" binding:"required"`
-	Reason         string                         `json:"reason" binding:"required"`
+type updateOutboundPolicyRequest struct {
+	AllowHosts *[]string `json:"allow_hosts" binding:"required"`
 }
 
 func NewAdminHandler(userService *UserService, runtimeSettings *settings.RuntimeSettingsService, identityCommands IdentityAdminCommands) *AdminHandler {
@@ -228,21 +224,19 @@ func (h *AdminHandler) UpdateTaskMonitorSettings(c *gin.Context) {
 	response.SuccessDTO(c, updated)
 }
 
-// GetOperationalSettings returns persisted values alongside the snapshot used by this process.
-func (h *AdminHandler) GetOperationalSettings(c *gin.Context) {
+func (h *AdminHandler) GetOutboundPolicy(c *gin.Context) {
 	runtimeSettings, ok := h.requireRuntimeSettings(c)
 	if !ok {
 		return
 	}
-	setting, err := runtimeSettings.GetOperationalSettings(c.Request.Context())
+	setting, err := runtimeSettings.GetOutboundPolicy(c.Request.Context())
 	if h.respondRuntimeSettingsReadError(c, err) {
 		return
 	}
 	response.SuccessDTO(c, setting)
 }
 
-// UpdateOperationalSettings atomically persists the typed groups and their admin audit record.
-func (h *AdminHandler) UpdateOperationalSettings(c *gin.Context) {
+func (h *AdminHandler) UpdateOutboundPolicy(c *gin.Context) {
 	identityPrincipal, ok := principal.RequireAdmin(c)
 	if !ok {
 		return
@@ -251,25 +245,14 @@ func (h *AdminHandler) UpdateOperationalSettings(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var req updateOperationalSettingsRequest
+	var req updateOutboundPolicyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误，reason 与所有 operational settings 分组均为必填")
+		response.Error(c, 400, "参数错误，allow_hosts 为必填")
 		return
 	}
-	action, err := adminaction.New(identityPrincipal.UserID(), req.Reason)
-	if err != nil {
-		if errors.Is(err, adminaction.ErrInvalidActor) {
-			response.Error(c, 400, "管理员身份无效")
-		} else {
-			response.Error(c, 400, "reason 必须在 1 到 1000 个字符之间")
-		}
-		return
-	}
-	updated, err := runtimeSettings.UpdateOperationalSettings(c.Request.Context(), settings.OperationalSettings{
-		TaskRuntime:    req.TaskRuntime,
-		OutboundPolicy: req.OutboundPolicy,
-		EventRetention: req.EventRetention,
-	}, action)
+	updated, err := runtimeSettings.UpdateOutboundPolicy(c.Request.Context(), settings.OutboundPolicySetting{
+		AllowHosts: *req.AllowHosts,
+	}, identityPrincipal.UserID())
 	if h.respondRuntimeSettingsWriteError(c, err) {
 		return
 	}

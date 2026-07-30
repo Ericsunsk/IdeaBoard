@@ -112,7 +112,6 @@ func TestLoadIgnoresRetiredRuntimeTuningEnv(t *testing.T) {
 		"APP_GIN_MODE":                    "debug",
 		"APP_LOG_FILE":                    "custom.log",
 		"AUTH_SERVICE_TIMEOUT_SECONDS":    "17",
-		"RIVER_WORKER_CONCURRENCY":        "12",
 		"RIVER_TASK_TIMEOUT_SECONDS":      "240",
 		"RIVER_NO_CAPACITY_RETRY_SECONDS": "9",
 		"RIVER_MAX_RETRY":                 "31",
@@ -131,6 +130,27 @@ func TestLoadIgnoresRetiredRuntimeTuningEnv(t *testing.T) {
 	cfg := Load()
 	if !reflect.DeepEqual(cfg, baseline) {
 		t.Fatalf("retired runtime tuning env changed config:\n got=%+v\nwant=%+v", cfg, baseline)
+	}
+}
+
+func TestLoadRiverWorkerConcurrency(t *testing.T) {
+	resetConfigEnv(t)
+	if got := Load().Worker.Concurrency; got != 5 {
+		t.Fatalf("default worker concurrency = %d, want 5", got)
+	}
+
+	resetConfigEnv(t)
+	t.Setenv("RIVER_WORKER_CONCURRENCY", "12")
+	if got := Load().Worker.Concurrency; got != 12 {
+		t.Fatalf("configured worker concurrency = %d, want 12", got)
+	}
+
+	for _, invalid := range []string{"0", "65", "not-an-integer"} {
+		resetConfigEnv(t)
+		t.Setenv("RIVER_WORKER_CONCURRENCY", invalid)
+		if got := Load().Worker.Concurrency; got != 5 {
+			t.Fatalf("invalid %q worker concurrency = %d, want 5", invalid, got)
+		}
 	}
 }
 
@@ -163,7 +183,7 @@ func TestLoadEventBusConfig(t *testing.T) {
 			t.Fatal("expected event bus disabled without NATS_URL")
 		}
 		if cfg.Events.NATSStreamName != "" || cfg.Events.NATSSubjectPrefix != "" || cfg.Events.NATSConsumerName != "" ||
-			cfg.Events.NATSRetentionDays != 0 || cfg.Events.NATSConnectTimeout != 0 || cfg.Events.NATSRequestTimeout != 0 || cfg.Events.NATSDrainTimeout != 0 {
+			cfg.Events.NATSConnectTimeout != 0 || cfg.Events.NATSRequestTimeout != 0 || cfg.Events.NATSDrainTimeout != 0 {
 			t.Fatalf("stable NATS defaults should be owned by events/settings, got %+v", cfg.Events)
 		}
 	})

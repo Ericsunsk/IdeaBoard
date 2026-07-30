@@ -53,7 +53,7 @@ graph LR
 - Docker Compose 管理 API、Auth、PostgreSQL、NATS JetStream 与 `api-uploads` volume。
 - River 任务队列写入 PostgreSQL；JetStream 只承载状态事件、audit 与实时 fanout。
 
-任务 retry 分两层：`taskruntime` 的 `defaultTaskRetryLimit=3` 是 DB/provider failover 的业务 retry 上限；River `MaxAttempts` 是 worker panic、process error、临时基础设施故障的队列层 retry。River 运行参数与 NATS retention 在 Admin System Settings 中管理，修改后页面会标记需要重启 API；River `MaxAttempts` 必须大于等于业务 retry 上限，避免队列层过早进入 final failure convergence。Egress allowlist 按请求读取，保存后动态生效。
+任务 retry 分两层：`taskruntime` 的 `defaultTaskRetryLimit=3` 是 DB/provider failover 的业务 retry 上限；River `MaxAttempts=25` 是 worker panic、process error、临时基础设施故障的队列层 retry。Worker timeout、无容量 backoff 与 `MaxAttempts` 是代码持有的 typed policy；worker concurrency 通过 `RIVER_WORKER_CONCURRENCY` 配置，默认 5、范围 1–64，重启 API/Worker 后生效。NATS retention 固定为 7 天。Admin 只管理 Egress allowlist，按请求读取并在保存后即时生效。
 
 Pages 项目建议配置：
 

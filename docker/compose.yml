@@ -35,6 +35,7 @@ services:
       DB_SSLMODE: disable
       NATS_URL: nats://ideaboard:${NATS_PASSWORD:?Set NATS_PASSWORD}@nats:4222
       NATS_EVENT_BUS_ENABLED: ${NATS_EVENT_BUS_ENABLED:-true}
+      RIVER_WORKER_CONCURRENCY: ${RIVER_WORKER_CONCURRENCY:-5}
     volumes:
       - api-uploads:/app/uploads
     ports:

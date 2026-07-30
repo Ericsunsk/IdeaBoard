@@ -43,11 +43,9 @@ type MediaUploadSetting struct {
 }
 
 type RuntimeSettingsService struct {
-	repo                 *SystemConfigRepository
-	mu                   sync.RWMutex
-	rateLimitCache       *cachedRateLimitSetting
-	operationalMu        sync.RWMutex
-	effectiveOperational *effectiveOperationalSettings
+	repo           *SystemConfigRepository
+	mu             sync.RWMutex
+	rateLimitCache *cachedRateLimitSetting
 }
 
 type PublicURLSettingProvider interface {

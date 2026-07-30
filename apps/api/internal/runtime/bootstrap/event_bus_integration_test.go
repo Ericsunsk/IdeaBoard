@@ -39,7 +39,6 @@ func TestNATSJetStreamTaskEventBridgeSmoke(t *testing.T) {
 		NATSStreamName:     streamName,
 		NATSSubjectPrefix:  subjectPrefix,
 		NATSConsumerName:   consumerName,
-		NATSRetentionDays:  1,
 		NATSConnectTimeout: 5,
 		NATSRequestTimeout: 5,
 		NATSDrainTimeout:   2,

@@ -47,6 +47,8 @@ const (
 	finalFailureRetryOutputKind     = "task_final_failure_convergence"
 	finalFailureExecutionOutputKind = "task_final_attempt_started"
 	defaultFinalFailureRetryDelay   = 5 * time.Second
+	defaultNoCapacityRetryDelay     = 5 * time.Second
+	defaultRiverJobTimeout          = 3 * time.Minute
 	finalFailureConvergeTimeout     = 15 * time.Second
 	riverSchemaLookupTimeout        = 5 * time.Second
 )
@@ -93,17 +95,10 @@ func NewRiverTaskWorker(
 func newRiverTaskWorkerWithProcessor(processor *taskProcessor) *RiverTaskWorker {
 	return &RiverTaskWorker{
 		processor:              processor,
-		noCapacityRetryDelay:   5 * time.Second,
+		noCapacityRetryDelay:   defaultNoCapacityRetryDelay,
 		finalFailureRetryDelay: defaultFinalFailureRetryDelay,
 		recordOutput:           river.RecordOutput,
 	}
-}
-
-func (w *RiverTaskWorker) SetNoCapacityRetryDelay(delay time.Duration) {
-	if w == nil || delay <= 0 {
-		return
-	}
-	w.noCapacityRetryDelay = delay
 }
 
 func (w *RiverTaskWorker) Work(ctx context.Context, job *river.Job[taskqueue.DrawingTaskArgs]) (workErr error) {
@@ -308,11 +303,11 @@ func NewRiverClient(dbPool *pgxpool.Pool, worker *RiverTaskWorker, opts RiverSer
 	}
 	maxRetry := opts.MaxRetry
 	if maxRetry <= 0 {
-		maxRetry = 25
+		maxRetry = taskqueue.RiverMaxAttemptsDefault
 	}
 	jobTimeout := opts.JobTimeout
 	if jobTimeout <= 0 {
-		jobTimeout = 3 * time.Minute
+		jobTimeout = defaultRiverJobTimeout
 	}
 
 	workers := river.NewWorkers()
