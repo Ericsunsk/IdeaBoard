@@ -135,7 +135,7 @@ func TestTaskLeaseReleaseLifecycleForCompleteAndRetry(t *testing.T) {
 	seedTasks(t, repo, ctx, requeuedTask)
 	insertRepositoryActiveTaskLease(t, db, requeuedTask.TaskID, accountID, channelID, credentialID, requeuedTask.LeaseToken)
 
-	rows, err = repo.RequeueTaskRunningWithLease(ctx, requeuedTask.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, requeuedTask.LeaseToken, "retry", "", nil)
+	rows, err = repo.convergeRequeueForTest(ctx, requeuedTask.TaskID, accountID, channelID, credentialID, requeuedTask.LeaseToken, "retry", "", nil)
 	if err != nil || rows != 1 {
 		t.Fatalf("requeue task rows=%d err=%v, want rows=1 nil err", rows, err)
 	}
@@ -188,7 +188,7 @@ func TestTaskLeasePreciseReleaseSucceedsForRunningTransitions(t *testing.T) {
 			wantStatus:    tasks.StatusFailed,
 			wantAccountID: 70,
 			run: func(ctx context.Context, repo *Repository, task *tasks.Task, accountID int64, channelID int64, credentialID int64) (int64, error) {
-				return repo.MarkTaskFailedWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "provider failed", `{"status":"failed"}`, time.Now(), nil)
+				return repo.convergeFailedWithLeaseForTest(ctx, task.TaskID, accountID, channelID, credentialID, task.LeaseToken, "provider failed", `{"status":"failed"}`, time.Now(), nil)
 			},
 		},
 		{
@@ -198,7 +198,7 @@ func TestTaskLeasePreciseReleaseSucceedsForRunningTransitions(t *testing.T) {
 			wantStatus:    tasks.StatusPending,
 			wantAccountID: 0,
 			run: func(ctx context.Context, repo *Repository, task *tasks.Task, accountID int64, channelID int64, credentialID int64) (int64, error) {
-				return repo.ResetTaskRunningToPendingWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "reset for retry", nil)
+				return repo.convergeResetForTest(ctx, task.TaskID, accountID, channelID, credentialID, task.LeaseToken, "reset for retry", nil)
 			},
 		},
 		{
@@ -208,7 +208,7 @@ func TestTaskLeasePreciseReleaseSucceedsForRunningTransitions(t *testing.T) {
 			wantStatus:    tasks.StatusPending,
 			wantAccountID: 0,
 			run: func(ctx context.Context, repo *Repository, task *tasks.Task, accountID int64, channelID int64, credentialID int64) (int64, error) {
-				return repo.RequeueTaskRunningWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "retryable", "", nil)
+				return repo.convergeRequeueForTest(ctx, task.TaskID, accountID, channelID, credentialID, task.LeaseToken, "retryable", "", nil)
 			},
 		},
 		{
@@ -218,7 +218,7 @@ func TestTaskLeasePreciseReleaseSucceedsForRunningTransitions(t *testing.T) {
 			wantStatus:    tasks.StatusFailed,
 			wantAccountID: 70,
 			run: func(ctx context.Context, repo *Repository, task *tasks.Task, accountID int64, channelID int64, credentialID int64) (int64, error) {
-				return repo.FinalFailTaskRunningWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "retry limit", `{"status":"failed"}`, time.Now(), nil)
+				return repo.convergeFinalFailureForTest(ctx, task.TaskID, accountID, channelID, credentialID, task.LeaseToken, "retry limit", `{"status":"failed"}`, time.Now(), nil)
 			},
 		},
 	}
@@ -264,7 +264,7 @@ func TestTaskLeasePreciseReleaseConflictRollsBackRunningTransitions(t *testing.T
 			taskID:     "precise-conflict-fail",
 			leaseToken: "lease-conflict-fail",
 			run: func(ctx context.Context, repo *Repository, task *tasks.Task, accountID int64, channelID int64, credentialID int64) (int64, error) {
-				return repo.MarkTaskFailedWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "provider failed", `{"status":"failed"}`, time.Now(), nil)
+				return repo.convergeFailedWithLeaseForTest(ctx, task.TaskID, accountID, channelID, credentialID, task.LeaseToken, "provider failed", `{"status":"failed"}`, time.Now(), nil)
 			},
 		},
 		{
@@ -272,7 +272,7 @@ func TestTaskLeasePreciseReleaseConflictRollsBackRunningTransitions(t *testing.T
 			taskID:     "precise-conflict-reset",
 			leaseToken: "lease-conflict-reset",
 			run: func(ctx context.Context, repo *Repository, task *tasks.Task, accountID int64, channelID int64, credentialID int64) (int64, error) {
-				return repo.ResetTaskRunningToPendingWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "reset for retry", nil)
+				return repo.convergeResetForTest(ctx, task.TaskID, accountID, channelID, credentialID, task.LeaseToken, "reset for retry", nil)
 			},
 		},
 		{
@@ -280,7 +280,7 @@ func TestTaskLeasePreciseReleaseConflictRollsBackRunningTransitions(t *testing.T
 			taskID:     "precise-conflict-requeue",
 			leaseToken: "lease-conflict-requeue",
 			run: func(ctx context.Context, repo *Repository, task *tasks.Task, accountID int64, channelID int64, credentialID int64) (int64, error) {
-				return repo.RequeueTaskRunningWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "retryable", "", nil)
+				return repo.convergeRequeueForTest(ctx, task.TaskID, accountID, channelID, credentialID, task.LeaseToken, "retryable", "", nil)
 			},
 		},
 		{
@@ -288,7 +288,7 @@ func TestTaskLeasePreciseReleaseConflictRollsBackRunningTransitions(t *testing.T
 			taskID:     "precise-conflict-final-fail",
 			leaseToken: "lease-conflict-final-fail",
 			run: func(ctx context.Context, repo *Repository, task *tasks.Task, accountID int64, channelID int64, credentialID int64) (int64, error) {
-				return repo.FinalFailTaskRunningWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "retry limit", `{"status":"failed"}`, time.Now(), nil)
+				return repo.convergeFinalFailureForTest(ctx, task.TaskID, accountID, channelID, credentialID, task.LeaseToken, "retry limit", `{"status":"failed"}`, time.Now(), nil)
 			},
 		},
 	}

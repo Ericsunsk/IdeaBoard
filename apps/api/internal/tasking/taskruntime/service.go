@@ -37,12 +37,7 @@ type AccountStore interface {
 }
 
 type TaskStore interface {
-	ConvergeCompletedTask(ctx context.Context, intent taskstore.CompletedTaskConvergenceIntent) (int64, error)
-	MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
-	MarkTaskFailedWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
-	ResetTaskRunningToPendingWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
-	RequeueTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, result string, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
-	FinalFailTaskRunningWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
+	ConvergeTask(ctx context.Context, intent taskstore.TaskConvergenceIntent) (int64, error)
 	GetByTaskID(ctx context.Context, taskID string) (*tasks.Task, error)
 	GetActiveTaskLeaseByTaskID(ctx context.Context, taskID string) (*taskstore.ActiveTaskLease, error)
 	PatchExecutionMetrics(ctx context.Context, patch tasks.TaskExecutionMetricsPatch) error
@@ -220,7 +215,14 @@ func (s *Service) failPendingTask(ctx context.Context, input FailTaskInput) erro
 		return ErrTaskStateConflict
 	}
 	now := taskTerminalTime(input.AttemptFinish)
-	rows, err := s.taskRepo.MarkTaskFailed(ctx, taskID, pendingOnly(), input.Reason, resolveTaskFailureResult(taskID, input.Reason, input.Result), now, input.AttemptFinish)
+	rows, err := s.taskRepo.ConvergeTask(ctx, taskstore.TaskConvergenceIntent{
+		Kind:          taskstore.TaskConvergenceFailed,
+		TaskID:        taskID,
+		ErrorMessage:  input.Reason,
+		Result:        resolveTaskFailureResult(taskID, input.Reason, input.Result),
+		OccurredAt:    now,
+		AttemptFinish: input.AttemptFinish,
+	})
 	if err := normalizeTaskTransitionWriteError(err); err != nil {
 		return err
 	}
@@ -240,7 +242,15 @@ func (s *Service) failRunningTaskWithLease(ctx context.Context, input FailTaskIn
 		return err
 	}
 	now := taskTerminalTime(input.AttemptFinish)
-	rows, err := s.taskRepo.MarkTaskFailedWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, input.Reason, resolveTaskFailureResult(assignment.TaskID, input.Reason, input.Result), now, input.AttemptFinish)
+	rows, err := s.taskRepo.ConvergeTask(ctx, taskstore.TaskConvergenceIntent{
+		Kind:          taskstore.TaskConvergenceFailed,
+		TaskID:        assignment.TaskID,
+		Lease:         taskConvergenceLease(assignment),
+		ErrorMessage:  input.Reason,
+		Result:        resolveTaskFailureResult(assignment.TaskID, input.Reason, input.Result),
+		OccurredAt:    now,
+		AttemptFinish: input.AttemptFinish,
+	})
 	if err := normalizeTaskTransitionWriteError(err); err != nil {
 		return err
 	}
@@ -265,7 +275,14 @@ func (s *Service) ResetRunningTask(ctx context.Context, input ResetRunningTaskIn
 		errMsg = input.Reason
 	}
 
-	rows, err := s.taskRepo.ResetTaskRunningToPendingWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, errMsg, input.AttemptFinish)
+	rows, err := s.taskRepo.ConvergeTask(ctx, taskstore.TaskConvergenceIntent{
+		Kind:          taskstore.TaskConvergenceReset,
+		TaskID:        assignment.TaskID,
+		Lease:         taskConvergenceLease(assignment),
+		ErrorMessage:  errMsg,
+		OccurredAt:    taskTerminalTime(input.AttemptFinish),
+		AttemptFinish: input.AttemptFinish,
+	})
 	if err := normalizeTaskTransitionWriteError(err); err != nil {
 		return err
 	}
@@ -300,7 +317,15 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, input RequeueForFa
 	}
 
 	if task.RetryCount < defaultTaskRetryLimit-1 {
-		rows, err := s.taskRepo.RequeueTaskRunningWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, input.Reason, strings.TrimSpace(input.Result), input.RequeuedAttemptFinish)
+		rows, err := s.taskRepo.ConvergeTask(ctx, taskstore.TaskConvergenceIntent{
+			Kind:          taskstore.TaskConvergenceRequeued,
+			TaskID:        assignment.TaskID,
+			Lease:         taskConvergenceLease(assignment),
+			ErrorMessage:  input.Reason,
+			Result:        strings.TrimSpace(input.Result),
+			OccurredAt:    taskTerminalTime(input.RequeuedAttemptFinish),
+			AttemptFinish: input.RequeuedAttemptFinish,
+		})
 		if err := normalizeTaskTransitionWriteError(err); err != nil {
 			return false, err
 		}
@@ -315,7 +340,15 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, input RequeueForFa
 	}
 
 	now := taskTerminalTime(input.FinalFailAttemptFinish)
-	rows, err := s.taskRepo.FinalFailTaskRunningWithLease(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, input.Reason, resolveTaskFailureResult(assignment.TaskID, input.Reason, input.Result), now, input.FinalFailAttemptFinish)
+	rows, err := s.taskRepo.ConvergeTask(ctx, taskstore.TaskConvergenceIntent{
+		Kind:          taskstore.TaskConvergenceFinalFailed,
+		TaskID:        assignment.TaskID,
+		Lease:         taskConvergenceLease(assignment),
+		ErrorMessage:  input.Reason,
+		Result:        resolveTaskFailureResult(assignment.TaskID, input.Reason, input.Result),
+		OccurredAt:    now,
+		AttemptFinish: input.FinalFailAttemptFinish,
+	})
 	if err := normalizeTaskTransitionWriteError(err); err != nil {
 		return false, err
 	}
@@ -330,19 +363,20 @@ func (s *Service) RequeueTaskForFailover(ctx context.Context, input RequeueForFa
 	return true, nil
 }
 
-func pendingOnly() []string {
-	return []string{tasks.StatusPending}
-}
-
-func runningOnly() []string {
-	return []string{tasks.StatusRunning}
-}
-
 func taskTerminalTime(attemptFinish *tasks.TaskAttemptFinish) time.Time {
 	if attemptFinish != nil && !attemptFinish.CompletedAt.IsZero() {
 		return attemptFinish.CompletedAt
 	}
 	return time.Now()
+}
+
+func taskConvergenceLease(assignment taskqueue.TaskAssignment) *taskstore.TaskLeaseIdentity {
+	return &taskstore.TaskLeaseIdentity{
+		AccountID:          assignment.AccountID,
+		ProviderEndpointID: assignment.ProviderEndpointID,
+		CredentialID:       assignment.CredentialID,
+		LeaseToken:         assignment.LeaseToken,
+	}
 }
 
 func (s *Service) RecordAccountFailure(ctx context.Context, accountID int64) (disabled bool, failCount int, err error) {

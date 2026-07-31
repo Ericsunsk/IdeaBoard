@@ -468,7 +468,7 @@ func TestRetryAttemptHistoryUsesReleasedLeaseThenNewLease(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create first attempt failed: %v", err)
 	}
-	rows, err := repo.RequeueTaskRunningWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "retry provider", "", &tasks.TaskAttemptFinish{
+	rows, err := repo.convergeRequeueForTest(ctx, task.TaskID, accountID, channelID, credentialID, task.LeaseToken, "retry provider", "", &tasks.TaskAttemptFinish{
 		ID:              firstRef.ID,
 		Status:          tasks.TaskAttemptStatusRequeued,
 		FailureStage:    tasks.ExecutionStageProvider,
@@ -743,10 +743,9 @@ func TestRequeueWithAttemptRollsBackWhenAttemptFinishFails(t *testing.T) {
 		t.Fatalf("create task failed: %v", err)
 	}
 
-	rows, err := repo.RequeueTaskRunningWithLease(
+	rows, err := repo.convergeRequeueForTest(
 		ctx,
 		task.TaskID,
-		[]string{tasks.StatusRunning},
 		accountID,
 		channelID,
 		loadRepositoryTestCredentialID(t, db, accountID),
@@ -797,7 +796,7 @@ func TestResetRunningTaskClearsAssignedAccountAndChannel(t *testing.T) {
 		t.Fatalf("create task failed: %v", err)
 	}
 	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, loadRepositoryTestCredentialID(t, db, accountID), task.LeaseToken)
-	rows, err := repo.ResetTaskRunningToPendingWithLease(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, loadRepositoryTestCredentialID(t, db, accountID), task.LeaseToken, "retry", nil)
+	rows, err := repo.convergeResetForTest(ctx, task.TaskID, accountID, channelID, loadRepositoryTestCredentialID(t, db, accountID), task.LeaseToken, "retry", nil)
 	if err != nil {
 		t.Fatalf("reset task failed: %v", err)
 	}

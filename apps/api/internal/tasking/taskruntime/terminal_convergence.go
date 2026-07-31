@@ -24,16 +24,14 @@ func (s *Service) CompleteTask(ctx context.Context, input CompleteTaskInput) err
 	if err := validateTaskOutputs(assignment.TaskID, input.Outputs); err != nil {
 		return err
 	}
-	rows, err := s.taskRepo.ConvergeCompletedTask(ctx, taskstore.CompletedTaskConvergenceIntent{
-		TaskID:             assignment.TaskID,
-		AccountID:          assignment.AccountID,
-		ProviderEndpointID: assignment.ProviderEndpointID,
-		CredentialID:       assignment.CredentialID,
-		LeaseToken:         assignment.LeaseToken,
-		Result:             input.Result,
-		CompletedAt:        completedAt,
-		Outputs:            input.Outputs,
-		AttemptFinish:      input.AttemptFinish,
+	rows, err := s.taskRepo.ConvergeTask(ctx, taskstore.TaskConvergenceIntent{
+		Kind:          taskstore.TaskConvergenceCompleted,
+		TaskID:        assignment.TaskID,
+		Lease:         taskConvergenceLease(assignment),
+		Result:        input.Result,
+		OccurredAt:    completedAt,
+		Outputs:       input.Outputs,
+		AttemptFinish: input.AttemptFinish,
 	})
 	if err := normalizeTaskTransitionWriteError(err); err != nil {
 		return err

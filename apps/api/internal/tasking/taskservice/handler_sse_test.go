@@ -424,14 +424,12 @@ func TestStreamUserTaskStreamsRunningThenCompletedEvent(t *testing.T) {
 	go func() {
 		time.Sleep(80 * time.Millisecond)
 		now := time.Now()
-		rows, updateErr := taskRepo.ConvergeCompletedTask(ctx, taskstore.CompletedTaskConvergenceIntent{
-			TaskID:             task.TaskID,
-			AccountID:          account.ID,
-			ProviderEndpointID: account.ProviderEndpointID,
-			CredentialID:       loadTaskServiceSSECredentialID(t, db, account.ID),
-			LeaseToken:         task.LeaseToken,
-			Result:             `{"status":"success","image_url":"https://example.com/live.png","account_id":21,"provider_endpoint_id":99}`,
-			CompletedAt:        now,
+		rows, updateErr := taskRepo.ConvergeTask(ctx, taskstore.TaskConvergenceIntent{
+			Kind:       taskstore.TaskConvergenceCompleted,
+			TaskID:     task.TaskID,
+			Lease:      &taskstore.TaskLeaseIdentity{AccountID: account.ID, ProviderEndpointID: account.ProviderEndpointID, CredentialID: loadTaskServiceSSECredentialID(t, db, account.ID), LeaseToken: task.LeaseToken},
+			Result:     `{"status":"success","image_url":"https://example.com/live.png","account_id":21,"provider_endpoint_id":99}`,
+			OccurredAt: now,
 		})
 		if updateErr != nil {
 			done <- updateErr
@@ -582,7 +580,13 @@ func TestStreamUserTaskHeartbeatSendsLatestSnapshotWhenPublishMissed(t *testing.
 	done := make(chan error, 1)
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		rows, updateErr := taskRepo.MarkTaskFailed(ctx, task.TaskID, []string{tasks.StatusRunning}, "provider timeout", "", time.Now(), nil)
+		rows, updateErr := taskRepo.ConvergeTask(ctx, taskstore.TaskConvergenceIntent{
+			Kind:         taskstore.TaskConvergenceFailed,
+			TaskID:       task.TaskID,
+			Lease:        &taskstore.TaskLeaseIdentity{AccountID: account.ID, ProviderEndpointID: account.ProviderEndpointID, CredentialID: loadTaskServiceSSECredentialID(t, db, account.ID), LeaseToken: task.LeaseToken},
+			ErrorMessage: "provider timeout",
+			OccurredAt:   time.Now(),
+		})
 		if updateErr != nil {
 			done <- updateErr
 			return

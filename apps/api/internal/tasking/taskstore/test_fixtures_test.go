@@ -19,17 +19,15 @@ func completedTaskConvergenceIntent(
 	completedAt time.Time,
 	outputs []tasks.TaskOutput,
 	attemptFinish *tasks.TaskAttemptFinish,
-) CompletedTaskConvergenceIntent {
-	return CompletedTaskConvergenceIntent{
-		TaskID:             taskID,
-		AccountID:          accountID,
-		ProviderEndpointID: providerEndpointID,
-		CredentialID:       credentialID,
-		LeaseToken:         leaseToken,
-		Result:             result,
-		CompletedAt:        completedAt,
-		Outputs:            outputs,
-		AttemptFinish:      attemptFinish,
+) TaskConvergenceIntent {
+	return TaskConvergenceIntent{
+		Kind:          TaskConvergenceCompleted,
+		TaskID:        taskID,
+		Lease:         &TaskLeaseIdentity{AccountID: accountID, ProviderEndpointID: providerEndpointID, CredentialID: credentialID, LeaseToken: leaseToken},
+		Result:        result,
+		OccurredAt:    completedAt,
+		Outputs:       outputs,
+		AttemptFinish: attemptFinish,
 	}
 }
 

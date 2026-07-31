@@ -188,7 +188,7 @@ func TestPaidTaskTerminalSettlementMatrix(t *testing.T) {
 			if terminal == "success" {
 				rows, err = repo.ConvergeCompletedTask(t.Context(), completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, task.LeaseToken, `{"status":"success"}`, time.Now(), nil, nil))
 			} else {
-				rows, err = repo.MarkTaskFailedWithLease(t.Context(), task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "provider failed", `{}`, time.Now(), nil)
+				rows, err = repo.convergeFailedWithLeaseForTest(t.Context(), task.TaskID, accountID, channelID, credentialID, task.LeaseToken, "provider failed", `{}`, time.Now(), nil)
 			}
 			if err != nil || rows != 1 {
 				t.Fatalf("rows=%d err=%v", rows, err)
@@ -218,9 +218,9 @@ func TestBilledTimeoutAndFinalFailureReleaseHold(t *testing.T) {
 				err  error
 			)
 			if path == "timeout" {
-				rows, err = repo.MarkTaskFailedWithLease(t.Context(), task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "provider timeout", `{}`, time.Now(), nil)
+				rows, err = repo.convergeFailedWithLeaseForTest(t.Context(), task.TaskID, accountID, channelID, credentialID, task.LeaseToken, "provider timeout", `{}`, time.Now(), nil)
 			} else {
-				rows, err = repo.FinalFailTaskRunningWithLease(t.Context(), task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "retry limit", `{}`, time.Now(), nil)
+				rows, err = repo.convergeFinalFailureForTest(t.Context(), task.TaskID, accountID, channelID, credentialID, task.LeaseToken, "retry limit", `{}`, time.Now(), nil)
 			}
 			if err != nil || rows != 1 {
 				t.Fatalf("rows=%d err=%v", rows, err)

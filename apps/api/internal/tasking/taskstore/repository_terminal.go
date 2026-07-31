@@ -61,46 +61,187 @@ type terminalTransitionPolicy struct {
 	replacesOutputs bool
 }
 
-type CompletedTaskConvergenceIntent struct {
-	TaskID             string
+type TaskConvergenceKind string
+
+const (
+	TaskConvergenceCompleted   TaskConvergenceKind = "completed"
+	TaskConvergenceFailed      TaskConvergenceKind = "failed"
+	TaskConvergenceFinalFailed TaskConvergenceKind = "final_failed"
+	TaskConvergenceRequeued    TaskConvergenceKind = "requeued"
+	TaskConvergenceReset       TaskConvergenceKind = "reset"
+)
+
+type TaskLeaseIdentity struct {
 	AccountID          int64
 	ProviderEndpointID int64
 	CredentialID       int64
 	LeaseToken         string
-	Result             string
-	CompletedAt        time.Time
-	Outputs            []tasks.TaskOutput
-	AttemptFinish      *tasks.TaskAttemptFinish
 }
 
-func (r *Repository) ConvergeCompletedTask(ctx context.Context, intent CompletedTaskConvergenceIntent) (int64, error) {
-	completedAt := terminalTransitionTime(intent.CompletedAt)
+type TaskConvergenceIntent struct {
+	Kind          TaskConvergenceKind
+	TaskID        string
+	Lease         *TaskLeaseIdentity
+	Result        string
+	ErrorMessage  string
+	OccurredAt    time.Time
+	Outputs       []tasks.TaskOutput
+	AttemptFinish *tasks.TaskAttemptFinish
+}
+
+// ConvergeTask is the single Task runtime write seam. It commits the Task
+// fact, attempt and exact lease release as one database fact; terminal kinds
+// additionally commit metrics, daily stats and Credit settlement.
+func (r *Repository) ConvergeTask(ctx context.Context, intent TaskConvergenceIntent) (int64, error) {
+	switch intent.Kind {
+	case TaskConvergenceCompleted:
+		return r.convergeCompletedTask(ctx, intent)
+	case TaskConvergenceFailed, TaskConvergenceFinalFailed:
+		return r.convergeFailedTask(ctx, intent)
+	case TaskConvergenceRequeued, TaskConvergenceReset:
+		return r.convergePendingTask(ctx, intent)
+	default:
+		return 0, fmt.Errorf("unsupported task convergence kind %q", intent.Kind)
+	}
+}
+
+func (r *Repository) convergeCompletedTask(ctx context.Context, intent TaskConvergenceIntent) (int64, error) {
+	finishedAt := terminalTransitionTime(intent.OccurredAt)
+	lease, err := terminalLeaseReleaseForIdentity(intent.Lease)
+	if err != nil {
+		return 0, err
+	}
 	return r.runTerminalTransition(ctx, terminalTransitionCommand{
 		taskID:        intent.TaskID,
 		kind:          terminalTransitionCompleted,
-		finishedAt:    completedAt,
+		finishedAt:    finishedAt,
 		attemptFinish: intent.AttemptFinish,
 		outputs:       intent.Outputs,
-		lease: terminalLeaseRelease{
-			mode:               terminalLeaseReleaseExact,
-			accountID:          intent.AccountID,
-			providerEndpointID: intent.ProviderEndpointID,
-			credentialID:       intent.CredentialID,
-			leaseToken:         intent.LeaseToken,
-		},
+		lease:         lease,
 		writeTaskFact: func(ctx context.Context, q *dbsqlc.Queries) (int64, error) {
-			return q.CompleteTaskWithLease(ctx, dbsqlc.CompleteTaskWithLeaseParams{
-				Result:                     intent.Result,
-				CompletedAt:                sql.NullTime{Time: completedAt, Valid: true},
-				TaskID:                     intent.TaskID,
-				Statuses:                   []string{tasks.StatusRunning},
-				AccountID:                  sql.NullInt64{Int64: intent.AccountID, Valid: intent.AccountID > 0},
-				AssignedProviderEndpointID: sql.NullInt64{Int64: intent.ProviderEndpointID, Valid: intent.ProviderEndpointID > 0},
-				AssignedCredentialID:       sql.NullInt64{Int64: intent.CredentialID, Valid: intent.CredentialID > 0},
-				LeaseToken:                 intent.LeaseToken,
-			})
+			return q.CompleteTaskWithLease(ctx, completeTaskWithLeaseParams(intent, finishedAt))
 		},
 	})
+}
+
+func (r *Repository) convergeFailedTask(ctx context.Context, intent TaskConvergenceIntent) (int64, error) {
+	finishedAt := terminalTransitionTime(intent.OccurredAt)
+	if intent.Lease == nil {
+		return r.runTerminalTransition(ctx, terminalTransitionCommand{
+			taskID:        intent.TaskID,
+			kind:          terminalTransitionFailed,
+			finishedAt:    finishedAt,
+			errorMessage:  intent.ErrorMessage,
+			attemptFinish: intent.AttemptFinish,
+			writeTaskFact: func(ctx context.Context, q *dbsqlc.Queries) (int64, error) {
+				return q.MarkTaskFailed(ctx, dbsqlc.MarkTaskFailedParams{
+					ErrorMsg:    intent.ErrorMessage,
+					Result:      intent.Result,
+					CompletedAt: sql.NullTime{Time: finishedAt, Valid: true},
+					TaskID:      intent.TaskID,
+					Statuses:    []string{tasks.StatusPending},
+				})
+			},
+		})
+	}
+
+	lease, err := terminalLeaseReleaseForIdentity(intent.Lease)
+	if err != nil {
+		return 0, err
+	}
+	return r.runTerminalTransition(ctx, terminalTransitionCommand{
+		taskID:        intent.TaskID,
+		kind:          terminalTransitionFailed,
+		finishedAt:    finishedAt,
+		errorMessage:  intent.ErrorMessage,
+		attemptFinish: intent.AttemptFinish,
+		lease:         lease,
+		writeTaskFact: func(ctx context.Context, q *dbsqlc.Queries) (int64, error) {
+			if intent.Kind == TaskConvergenceFinalFailed {
+				return q.FinalFailTaskRunningWithLease(ctx, finalFailTaskWithLeaseParams(intent, finishedAt))
+			}
+			return q.MarkTaskFailedWithLease(ctx, failedTaskWithLeaseParams(intent, finishedAt))
+		},
+	})
+}
+
+func (r *Repository) convergePendingTask(ctx context.Context, intent TaskConvergenceIntent) (int64, error) {
+	lease, err := terminalLeaseReleaseForIdentity(intent.Lease)
+	if err != nil {
+		return 0, err
+	}
+	policy, err := resolveNonterminalTransitionPolicy(intent.Kind)
+	if err != nil {
+		return 0, err
+	}
+	return r.runNonterminalTransition(ctx, nonterminalTransitionCommand{
+		taskID:        intent.TaskID,
+		kind:          intent.Kind,
+		occurredAt:    terminalTransitionTime(intent.OccurredAt),
+		errorMessage:  intent.ErrorMessage,
+		result:        intent.Result,
+		attemptFinish: intent.AttemptFinish,
+		lease:         lease,
+		policy:        policy,
+	})
+}
+
+func terminalLeaseReleaseForIdentity(identity *TaskLeaseIdentity) (terminalLeaseRelease, error) {
+	if identity == nil {
+		return terminalLeaseRelease{}, fmt.Errorf("%w: task convergence requires lease identity", ErrTaskLeaseStateConflict)
+	}
+	lease := terminalLeaseRelease{
+		mode:               terminalLeaseReleaseExact,
+		accountID:          identity.AccountID,
+		providerEndpointID: identity.ProviderEndpointID,
+		credentialID:       identity.CredentialID,
+		leaseToken:         identity.LeaseToken,
+	}
+	if lease.accountID <= 0 || lease.providerEndpointID <= 0 || lease.credentialID <= 0 || strings.TrimSpace(lease.leaseToken) == "" {
+		return terminalLeaseRelease{}, fmt.Errorf("%w: task convergence requires lease identity", ErrTaskLeaseStateConflict)
+	}
+	return lease, nil
+}
+
+func completeTaskWithLeaseParams(intent TaskConvergenceIntent, completedAt time.Time) dbsqlc.CompleteTaskWithLeaseParams {
+	return dbsqlc.CompleteTaskWithLeaseParams{
+		Result:                     intent.Result,
+		CompletedAt:                sql.NullTime{Time: completedAt, Valid: true},
+		TaskID:                     intent.TaskID,
+		Statuses:                   []string{tasks.StatusRunning},
+		AccountID:                  sql.NullInt64{Int64: intent.Lease.AccountID, Valid: true},
+		AssignedProviderEndpointID: sql.NullInt64{Int64: intent.Lease.ProviderEndpointID, Valid: true},
+		AssignedCredentialID:       sql.NullInt64{Int64: intent.Lease.CredentialID, Valid: true},
+		LeaseToken:                 intent.Lease.LeaseToken,
+	}
+}
+
+func failedTaskWithLeaseParams(intent TaskConvergenceIntent, completedAt time.Time) dbsqlc.MarkTaskFailedWithLeaseParams {
+	return dbsqlc.MarkTaskFailedWithLeaseParams{
+		ErrorMsg:                   intent.ErrorMessage,
+		Result:                     intent.Result,
+		CompletedAt:                sql.NullTime{Time: completedAt, Valid: true},
+		TaskID:                     intent.TaskID,
+		Statuses:                   []string{tasks.StatusRunning},
+		AccountID:                  sql.NullInt64{Int64: intent.Lease.AccountID, Valid: true},
+		AssignedProviderEndpointID: sql.NullInt64{Int64: intent.Lease.ProviderEndpointID, Valid: true},
+		AssignedCredentialID:       sql.NullInt64{Int64: intent.Lease.CredentialID, Valid: true},
+		LeaseToken:                 intent.Lease.LeaseToken,
+	}
+}
+
+func finalFailTaskWithLeaseParams(intent TaskConvergenceIntent, completedAt time.Time) dbsqlc.FinalFailTaskRunningWithLeaseParams {
+	return dbsqlc.FinalFailTaskRunningWithLeaseParams{
+		ErrorMsg:                   intent.ErrorMessage,
+		Result:                     intent.Result,
+		CompletedAt:                sql.NullTime{Time: completedAt, Valid: true},
+		TaskID:                     intent.TaskID,
+		Statuses:                   []string{tasks.StatusRunning},
+		AccountID:                  sql.NullInt64{Int64: intent.Lease.AccountID, Valid: true},
+		AssignedProviderEndpointID: sql.NullInt64{Int64: intent.Lease.ProviderEndpointID, Valid: true},
+		AssignedCredentialID:       sql.NullInt64{Int64: intent.Lease.CredentialID, Valid: true},
+		LeaseToken:                 intent.Lease.LeaseToken,
+	}
 }
 
 // runTerminalTransition owns the atomic terminal recipe. Repository methods

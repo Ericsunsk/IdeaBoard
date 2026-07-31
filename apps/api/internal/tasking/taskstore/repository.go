@@ -414,26 +414,6 @@ func (r *Repository) GetByTaskIDAndUserID(ctx context.Context, taskID string, us
 	return &task, nil
 }
 
-func (r *Repository) MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
-	completedAt = terminalTransitionTime(completedAt)
-	return r.runTerminalTransition(ctx, terminalTransitionCommand{
-		taskID:        taskID,
-		kind:          terminalTransitionFailed,
-		finishedAt:    completedAt,
-		errorMessage:  errMsg,
-		attemptFinish: attemptFinish,
-		writeTaskFact: func(ctx context.Context, q *dbsqlc.Queries) (int64, error) {
-			return q.MarkTaskFailed(ctx, dbsqlc.MarkTaskFailedParams{
-				ErrorMsg:    errMsg,
-				Result:      result,
-				CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
-				TaskID:      taskID,
-				Statuses:    statuses,
-			})
-		},
-	})
-}
-
 func (r *Repository) List(ctx context.Context, userID int64, accountID int64, status string, keyword string, page, pageSize int) ([]*tasks.Task, tasks.TaskListCounts, error) {
 	hasUserID := userID > 0
 	hasAccountID := accountID > 0

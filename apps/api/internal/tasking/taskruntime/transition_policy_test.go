@@ -236,17 +236,17 @@ func TestCompleteTaskPassesOneConvergenceIntentAndPublishesCompleted(t *testing.
 		t.Fatalf("CompleteTask returned error: %v", err)
 	}
 
-	intent := store.completionIntent
+	intent := store.convergenceIntent
 	if intent == nil {
 		t.Fatal("completion convergence intent was not recorded")
 	}
-	if intent.TaskID != assignment.TaskID || intent.AccountID != assignment.AccountID ||
-		intent.ProviderEndpointID != assignment.ProviderEndpointID || intent.CredentialID != assignment.CredentialID ||
-		intent.LeaseToken != assignment.LeaseToken {
+	if intent.Kind != taskstore.TaskConvergenceCompleted || intent.TaskID != assignment.TaskID || intent.Lease == nil ||
+		intent.Lease.AccountID != assignment.AccountID || intent.Lease.ProviderEndpointID != assignment.ProviderEndpointID ||
+		intent.Lease.CredentialID != assignment.CredentialID || intent.Lease.LeaseToken != assignment.LeaseToken {
 		t.Fatalf("completion lease identity = %+v, want assignment %+v", intent, assignment)
 	}
-	if intent.Result != `{"status":"success"}` || !intent.CompletedAt.Equal(completedAt) {
-		t.Fatalf("completion result/time = %q/%v, want result/%v", intent.Result, intent.CompletedAt, completedAt)
+	if intent.Result != `{"status":"success"}` || !intent.OccurredAt.Equal(completedAt) {
+		t.Fatalf("completion result/time = %q/%v, want result/%v", intent.Result, intent.OccurredAt, completedAt)
 	}
 	if len(intent.Outputs) != 1 || intent.Outputs[0].URL != outputs[0].URL || intent.AttemptFinish != attemptFinish {
 		t.Fatalf("completion outputs/attempt = %+v/%p, want %+v/%p", intent.Outputs, intent.AttemptFinish, outputs, attemptFinish)
@@ -331,39 +331,26 @@ type fakeTaskRuntimeTransitionStore struct {
 	requeueRows        int64
 	finalFailRows      int64
 	cancelRows         int64
-	completionIntent   *taskstore.CompletedTaskConvergenceIntent
+	convergenceIntent  *taskstore.TaskConvergenceIntent
 }
 
-func (f *fakeTaskRuntimeTransitionStore) ConvergeCompletedTask(_ context.Context, intent taskstore.CompletedTaskConvergenceIntent) (int64, error) {
+func (f *fakeTaskRuntimeTransitionStore) ConvergeTask(_ context.Context, intent taskstore.TaskConvergenceIntent) (int64, error) {
 	f.writeCount++
-	f.completionIntent = &intent
-	return f.completeRows, f.writeErr
-}
-
-func (f *fakeTaskRuntimeTransitionStore) MarkTaskFailed(context.Context, string, []string, string, string, time.Time, *tasks.TaskAttemptFinish) (int64, error) {
-	f.writeCount++
-	return f.markFailedRows, f.writeErr
-}
-
-func (f *fakeTaskRuntimeTransitionStore) MarkTaskFailedWithLease(context.Context, string, []string, int64, int64, int64, string, string, string, time.Time, *tasks.TaskAttemptFinish) (int64, error) {
-	f.writeCount++
-	f.markFailedUseLease = true
-	return f.markFailedRows, f.writeErr
-}
-
-func (f *fakeTaskRuntimeTransitionStore) ResetTaskRunningToPendingWithLease(context.Context, string, []string, int64, int64, int64, string, string, *tasks.TaskAttemptFinish) (int64, error) {
-	f.writeCount++
-	return f.resetRows, f.writeErr
-}
-
-func (f *fakeTaskRuntimeTransitionStore) RequeueTaskRunningWithLease(context.Context, string, []string, int64, int64, int64, string, string, string, *tasks.TaskAttemptFinish) (int64, error) {
-	f.writeCount++
-	return f.requeueRows, f.writeErr
-}
-
-func (f *fakeTaskRuntimeTransitionStore) FinalFailTaskRunningWithLease(context.Context, string, []string, int64, int64, int64, string, string, string, time.Time, *tasks.TaskAttemptFinish) (int64, error) {
-	f.writeCount++
-	return f.finalFailRows, f.writeErr
+	f.convergenceIntent = &intent
+	switch intent.Kind {
+	case taskstore.TaskConvergenceCompleted:
+		return f.completeRows, f.writeErr
+	case taskstore.TaskConvergenceFailed:
+		return f.markFailedRows, f.writeErr
+	case taskstore.TaskConvergenceReset:
+		return f.resetRows, f.writeErr
+	case taskstore.TaskConvergenceRequeued:
+		return f.requeueRows, f.writeErr
+	case taskstore.TaskConvergenceFinalFailed:
+		return f.finalFailRows, f.writeErr
+	default:
+		return 0, f.writeErr
+	}
 }
 
 func (f *fakeTaskRuntimeTransitionStore) GetByTaskID(context.Context, string) (*tasks.Task, error) {
