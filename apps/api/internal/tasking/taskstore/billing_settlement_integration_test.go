@@ -335,7 +335,7 @@ func TestTerminalTransitionRollsBackWhenBillingSettlementIsMissing(t *testing.T)
 	}
 }
 
-func TestStartupRecoveryReleasesBilledHolds(t *testing.T) {
+func TestFinalFailureConvergenceReleasesBilledHolds(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	repo, taskBilling, request := newBillingSettlementFixture(t, db, pool, 1, 100, 25)
 	accountID := seedRepositoryTestAccount(t, db, 780)
@@ -344,9 +344,17 @@ func TestStartupRecoveryReleasesBilledHolds(t *testing.T) {
 	task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-startup-recovery", accountID, channelID, credentialID, "lease-bulk", "lease-bulk")
 	holdTaskForSettlementTest(t, pool, taskBilling, task, request)
 
-	ids, err := repo.CancelRunningTasksForStartupRecovery(t.Context(), "startup recovery", time.Now())
-	if err != nil || len(ids) != 1 || ids[0].TaskID != task.TaskID {
-		t.Fatalf("ids=%v err=%v", ids, err)
+	rows, err := repo.ConvergeTask(t.Context(), TaskConvergenceIntent{
+		Kind:   TaskConvergenceFinalFailed,
+		TaskID: task.TaskID,
+		Lease: &TaskLeaseIdentity{
+			AccountID: accountID, ProviderEndpointID: channelID, CredentialID: credentialID, LeaseToken: task.LeaseToken,
+		},
+		ErrorMessage: "startup recovery",
+		OccurredAt:   time.Now(),
+	})
+	if err != nil || rows != 1 {
+		t.Fatalf("rows=%d err=%v", rows, err)
 	}
 	assertTaskBillingSettlement(t, db, task.TaskID, "released", 100, 0)
 	history, err := repo.ListAdminBillingSnapshots(t.Context(), []string{task.TaskID})

@@ -571,6 +571,45 @@ func TestConvergeTaskAfterRiverFinalFailureFailsRunningTaskWithSameRiverLease(t 
 	}
 }
 
+func TestConvergeTaskAfterRiverFinalFailureRecoversRunningTaskWithoutLease(t *testing.T) {
+	ctx := context.Background()
+	db := newTaskRuntimeServiceTestDB(t)
+	taskRepo := taskstore.NewRepository(db)
+	service := NewService(nil, taskRepo, nil, nil)
+	publisher := newRecordingTaskStatusPublisher()
+	service.SetTaskStatusPublisher(publisher)
+
+	task := &tasks.Task{
+		TaskID:     "task-startup-recovery-unleased",
+		UserID:     1,
+		Status:     tasks.StatusRunning,
+		LeaseToken: "",
+	}
+	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
+		t.Fatalf("seed task failed: %v", err)
+	}
+
+	if err := service.ConvergeTaskAfterRiverFinalFailure(ctx, task.TaskID, 0, "startup recovery"); err != nil {
+		t.Fatalf("startup recovery convergence failed: %v", err)
+	}
+
+	updated, err := taskRepo.GetByTaskID(ctx, task.TaskID)
+	if err != nil {
+		t.Fatalf("reload task failed: %v", err)
+	}
+	if updated.Status != tasks.StatusFailed || updated.CompletedAt == nil {
+		t.Fatalf("recovered task=%+v, want failed terminal fact", updated)
+	}
+	select {
+	case event := <-publisher.ch:
+		if event.TaskID != task.TaskID || event.Status != tasks.StatusFailed {
+			t.Fatalf("event=(%s,%s), want=(%s,%s)", event.TaskID, event.Status, task.TaskID, tasks.StatusFailed)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for failed event")
+	}
+}
+
 func TestConvergeTaskAfterRiverFinalFailureRejectsRunningTaskWithDifferentRiverLease(t *testing.T) {
 	ctx := context.Background()
 	db := newTaskRuntimeServiceTestDB(t)

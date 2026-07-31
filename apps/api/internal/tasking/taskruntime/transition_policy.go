@@ -14,13 +14,14 @@ import (
 type taskTransition string
 
 const (
-	taskTransitionComplete    taskTransition = "complete"
-	taskTransitionFailPending taskTransition = "fail_pending"
-	taskTransitionFailRunning taskTransition = "fail_running"
-	taskTransitionReset       taskTransition = "reset"
-	taskTransitionRequeue     taskTransition = "requeue"
-	taskTransitionFinalFail   taskTransition = "final_fail"
-	taskTransitionCancel      taskTransition = "cancel"
+	taskTransitionComplete     taskTransition = "complete"
+	taskTransitionFailPending  taskTransition = "fail_pending"
+	taskTransitionFailRunning  taskTransition = "fail_running"
+	taskTransitionReset        taskTransition = "reset"
+	taskTransitionRequeue      taskTransition = "requeue"
+	taskTransitionFinalFail    taskTransition = "final_fail"
+	taskTransitionRecoveryFail taskTransition = "recovery_fail"
+	taskTransitionCancel       taskTransition = "cancel"
 )
 
 type taskTransitionRule struct {
@@ -69,6 +70,11 @@ var taskTransitionRules = map[taskTransition]taskTransitionRule{
 		idempotent:       []string{tasks.StatusPending},
 		requiresLease:    true,
 		terminalConflict: true,
+	},
+	taskTransitionRecoveryFail: {
+		from:       []string{tasks.StatusPending, tasks.StatusRunning},
+		target:     tasks.StatusFailed,
+		idempotent: []string{tasks.StatusFailed},
 	},
 	taskTransitionCancel: {
 		from:       []string{tasks.StatusPending, tasks.StatusRunning},

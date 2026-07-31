@@ -319,6 +319,46 @@ func TestTaskRuntimeFinalFailureConvergenceIsIdempotentForFailedTask(t *testing.
 	}
 }
 
+func TestTaskRuntimeRiverFinalFailureUsesFinalFailureConvergenceIntent(t *testing.T) {
+	store := &fakeTaskRuntimeTransitionStore{
+		tasks:         []*tasks.Task{taskTransitionTestTask(tasks.StatusPending)},
+		finalFailRows: 1,
+	}
+	service := NewService(nil, store, nil, nil)
+
+	if err := service.ConvergeTaskAfterRiverFinalFailure(t.Context(), "transition-policy-task", 123, "river final failure"); err != nil {
+		t.Fatalf("ConvergeTaskAfterRiverFinalFailure returned error: %v", err)
+	}
+	intent := store.convergenceIntent
+	if intent == nil || intent.Kind != taskstore.TaskConvergenceFinalFailed || intent.TaskID != "transition-policy-task" || intent.Lease != nil {
+		t.Fatalf("convergence intent=%+v, want pending final failure without lease", intent)
+	}
+}
+
+func TestTaskRuntimeRiverFinalFailureTreatsConcurrentFailedWriteAsConverged(t *testing.T) {
+	store := &fakeTaskRuntimeTransitionStore{
+		tasks: []*tasks.Task{
+			taskTransitionTestTask(tasks.StatusPending),
+			taskTransitionTestTask(tasks.StatusFailed),
+		},
+	}
+	service := NewService(nil, store, nil, nil)
+	publisher := newRecordingTaskStatusPublisher()
+	service.SetTaskStatusPublisher(publisher)
+
+	if err := service.ConvergeTaskAfterRiverFinalFailure(t.Context(), "transition-policy-task", 123, "river final failure"); err != nil {
+		t.Fatalf("concurrent convergence returned error: %v", err)
+	}
+	if store.writeCount != 1 {
+		t.Fatalf("writeCount=%d, want one convergence CAS", store.writeCount)
+	}
+	select {
+	case event := <-publisher.ch:
+		t.Fatalf("duplicate terminal event=%+v, want none from idempotent observer", event)
+	default:
+	}
+}
+
 type fakeTaskRuntimeTransitionStore struct {
 	tasks              []*tasks.Task
 	getCalls           int

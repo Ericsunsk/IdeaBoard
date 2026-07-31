@@ -14,8 +14,6 @@ type Querier interface {
 	ArchiveAccount(ctx context.Context, id int64) (int64, error)
 	BackfillDailyStatsByCreatedRange(ctx context.Context, arg BackfillDailyStatsByCreatedRangeParams) (BackfillDailyStatsByCreatedRangeRow, error)
 	CancelMediaAssetReclamation(ctx context.Context, arg CancelMediaAssetReclamationParams) ([]int64, error)
-	CancelRunningTaskAttemptsByTaskIDs(ctx context.Context, arg CancelRunningTaskAttemptsByTaskIDsParams) (int64, error)
-	CancelRunningTasksForStartupRecovery(ctx context.Context, arg CancelRunningTasksForStartupRecoveryParams) ([]CancelRunningTasksForStartupRecoveryRow, error)
 	ClaimDueMediaAssetReclamation(ctx context.Context, arg ClaimDueMediaAssetReclamationParams) (MediaAsset, error)
 	ClearCurrentStorageProfiles(ctx context.Context) error
 	CompleteTaskWithLease(ctx context.Context, arg CompleteTaskWithLeaseParams) (int64, error)
@@ -110,6 +108,7 @@ type Querier interface {
 	ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([]ListOutputsByTaskIDsRow, error)
 	ListProviderEndpoints(ctx context.Context) ([]ProviderEndpoint, error)
 	ListRunningMissingLeaseTaskIDs(ctx context.Context, rowLimit int32) ([]string, error)
+	ListRunningTasksForStartupRecovery(ctx context.Context) ([]ListRunningTasksForStartupRecoveryRow, error)
 	ListRunningTasksMissingLeaseToken(ctx context.Context, rowLimit int32) ([]ListRunningTasksMissingLeaseTokenRow, error)
 	ListStatEventLatencySamplesByDateRange(ctx context.Context, arg ListStatEventLatencySamplesByDateRangeParams) ([]ListStatEventLatencySamplesByDateRangeRow, error)
 	ListStatEventsByOccurredRange(ctx context.Context, arg ListStatEventsByOccurredRangeParams) ([]ListStatEventsByOccurredRangeRow, error)
@@ -133,6 +132,7 @@ type Querier interface {
 	MarkTaskCancelled(ctx context.Context, arg MarkTaskCancelledParams) (int64, error)
 	MarkTaskFailed(ctx context.Context, arg MarkTaskFailedParams) (int64, error)
 	MarkTaskFailedWithLease(ctx context.Context, arg MarkTaskFailedWithLeaseParams) (int64, error)
+	MarkUnleasedTaskFailed(ctx context.Context, arg MarkUnleasedTaskFailedParams) (int64, error)
 	PatchTaskExecutionMetrics(ctx context.Context, arg PatchTaskExecutionMetricsParams) error
 	PatchTaskExecutionSnapshot(ctx context.Context, arg PatchTaskExecutionSnapshotParams) (int64, error)
 	RebuildTaskDailyStatsByEventDateRange(ctx context.Context, arg RebuildTaskDailyStatsByEventDateRangeParams) (RebuildTaskDailyStatsByEventDateRangeRow, error)

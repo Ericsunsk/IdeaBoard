@@ -4,96 +4,132 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
-	"ideaboard/api/internal/events"
-	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/tasking/taskstore"
 )
 
-func TestRecoverRunningTasksAfterStartupCancelsAndPublishesEvents(t *testing.T) {
+func TestRecoverRunningTasksAfterStartupConvergesDurablyBeforeCancellingJobs(t *testing.T) {
 	ctx := context.Background()
-	recoveredAt := time.Date(2026, 7, 9, 12, 0, 0, 0, time.UTC)
 	store := &fakeStartupRecoveryTaskStore{tasks: []taskstore.StartupRecoveredTask{
 		{TaskID: "task-a", RiverJobID: 101},
 		{TaskID: "task-b", RiverJobID: 202},
 	}}
+	finalFailures := &recordingStartupRecoveryFinalFailures{}
 	riverJobs := &recordingStartupRecoveryRiverJobCanceller{}
-	publisher := &recordingStartupRecoveryPublisher{}
 
-	count, err := recoverRunningTasksAfterStartup(ctx, store, riverJobs, publisher, recoveredAt)
+	count, err := recoverRunningTasksAfterStartup(ctx, store, finalFailures, riverJobs)
 	if err != nil {
 		t.Fatalf("recoverRunningTasksAfterStartup failed: %v", err)
 	}
 	if count != 2 {
 		t.Fatalf("count=%d, want 2", count)
 	}
-	if store.reason != startupRecoveryCancelReason {
-		t.Fatalf("reason=%q, want %q", store.reason, startupRecoveryCancelReason)
+	if len(finalFailures.calls) != 2 {
+		t.Fatalf("final failure calls=%d, want 2", len(finalFailures.calls))
 	}
-	if !store.cancelledAt.Equal(recoveredAt) {
-		t.Fatalf("cancelledAt=%v, want %v", store.cancelledAt, recoveredAt)
+	for i, call := range finalFailures.calls {
+		if call.taskID != store.tasks[i].TaskID || call.riverJobID != store.tasks[i].RiverJobID || call.reason != startupRecoveryFinalFailureReason {
+			t.Fatalf("final failure call[%d]=%+v, want task=%+v", i, call, store.tasks[i])
+		}
 	}
 	if len(riverJobs.jobIDs) != 2 || riverJobs.jobIDs[0] != 101 || riverJobs.jobIDs[1] != 202 {
 		t.Fatalf("cancelled river jobs=%v, want [101 202]", riverJobs.jobIDs)
-	}
-	if len(publisher.events) != 2 {
-		t.Fatalf("published events=%d, want 2", len(publisher.events))
-	}
-	for i, event := range publisher.events {
-		if event.TaskID != store.tasks[i].TaskID || event.Status != tasks.StatusCancelled {
-			t.Fatalf("event[%d]=%+v, want task_id=%q status=%q", i, event, store.tasks[i].TaskID, tasks.StatusCancelled)
-		}
 	}
 }
 
 func TestRecoverRunningTasksAfterStartupReturnsStoreError(t *testing.T) {
 	ctx := context.Background()
 	store := &fakeStartupRecoveryTaskStore{err: errors.New("database unavailable")}
-	publisher := &recordingStartupRecoveryPublisher{}
 
-	count, err := recoverRunningTasksAfterStartup(ctx, store, nil, publisher, time.Now())
+	count, err := recoverRunningTasksAfterStartup(ctx, store, nil, nil)
 	if err == nil {
 		t.Fatal("recoverRunningTasksAfterStartup succeeded, want error")
 	}
 	if count != 0 {
 		t.Fatalf("count=%d, want 0", count)
 	}
-	if len(publisher.events) != 0 {
-		t.Fatalf("published events=%d, want 0", len(publisher.events))
+	if store.calls != 1 {
+		t.Fatalf("list calls=%d, want 1", store.calls)
+	}
+}
+
+func TestRecoverRunningTasksAfterStartupOnlyCancelsDurablyConvergedJobs(t *testing.T) {
+	store := &fakeStartupRecoveryTaskStore{tasks: []taskstore.StartupRecoveredTask{
+		{TaskID: "durable", RiverJobID: 301},
+		{TaskID: "not-durable", RiverJobID: 302},
+	}}
+	finalFailures := &recordingStartupRecoveryFinalFailures{
+		errorsByTask: map[string]error{"not-durable": errors.New("database and fallback unavailable")},
+	}
+	riverJobs := &recordingStartupRecoveryRiverJobCanceller{}
+
+	count, err := recoverRunningTasksAfterStartup(t.Context(), store, finalFailures, riverJobs)
+	if err == nil {
+		t.Fatal("recovery succeeded, want durable convergence error")
+	}
+	if count != 1 {
+		t.Fatalf("count=%d, want 1", count)
+	}
+	if len(riverJobs.jobIDs) != 1 || riverJobs.jobIDs[0] != 301 {
+		t.Fatalf("cancelled river jobs=%v, want only durable job 301", riverJobs.jobIDs)
+	}
+}
+
+func TestRecoverRunningTasksAfterStartupDoesNotFailOnBestEffortCleanup(t *testing.T) {
+	store := &fakeStartupRecoveryTaskStore{tasks: []taskstore.StartupRecoveredTask{
+		{TaskID: "durable", RiverJobID: 401},
+	}}
+	finalFailures := &recordingStartupRecoveryFinalFailures{}
+	riverJobs := &recordingStartupRecoveryRiverJobCanceller{err: errors.New("river cleanup unavailable")}
+
+	count, err := recoverRunningTasksAfterStartup(t.Context(), store, finalFailures, riverJobs)
+	if err != nil {
+		t.Fatalf("recovery failed after durable convergence: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("count=%d, want 1", count)
+	}
+	if len(riverJobs.jobIDs) != 1 || riverJobs.jobIDs[0] != 401 {
+		t.Fatalf("cleanup attempts=%v, want [401]", riverJobs.jobIDs)
 	}
 }
 
 type fakeStartupRecoveryTaskStore struct {
-	tasks       []taskstore.StartupRecoveredTask
-	reason      string
-	cancelledAt time.Time
-	err         error
+	tasks []taskstore.StartupRecoveredTask
+	err   error
+	calls int
 }
 
-func (f *fakeStartupRecoveryTaskStore) CancelRunningTasksForStartupRecovery(_ context.Context, reason string, cancelledAt time.Time) ([]taskstore.StartupRecoveredTask, error) {
-	f.reason = reason
-	f.cancelledAt = cancelledAt
+func (f *fakeStartupRecoveryTaskStore) ListRunningTasksForStartupRecovery(context.Context) ([]taskstore.StartupRecoveredTask, error) {
+	f.calls++
 	if f.err != nil {
 		return nil, f.err
 	}
 	return append([]taskstore.StartupRecoveredTask(nil), f.tasks...), nil
 }
 
+type startupRecoveryFinalFailureCall struct {
+	taskID     string
+	riverJobID int64
+	reason     string
+}
+
+type recordingStartupRecoveryFinalFailures struct {
+	calls        []startupRecoveryFinalFailureCall
+	errorsByTask map[string]error
+}
+
+func (f *recordingStartupRecoveryFinalFailures) ConvergeFinalFailureDurably(_ context.Context, taskID string, riverJobID int64, reason string) error {
+	f.calls = append(f.calls, startupRecoveryFinalFailureCall{taskID: taskID, riverJobID: riverJobID, reason: reason})
+	return f.errorsByTask[taskID]
+}
+
 type recordingStartupRecoveryRiverJobCanceller struct {
 	jobIDs []int64
+	err    error
 }
 
 func (c *recordingStartupRecoveryRiverJobCanceller) CancelJob(_ context.Context, jobID int64) error {
 	c.jobIDs = append(c.jobIDs, jobID)
-	return nil
-}
-
-type recordingStartupRecoveryPublisher struct {
-	events []events.TaskStatusEvent
-}
-
-func (p *recordingStartupRecoveryPublisher) PublishTaskStatus(_ context.Context, event events.TaskStatusEvent) error {
-	p.events = append(p.events, events.NormalizeTaskStatusEvent(event))
-	return nil
+	return c.err
 }

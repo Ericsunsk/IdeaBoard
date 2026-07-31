@@ -232,87 +232,17 @@ func (r *Repository) MarkTaskCancelled(ctx context.Context, snapshot tasks.TaskC
 	})
 }
 
-func (r *Repository) CancelRunningTasksForStartupRecovery(ctx context.Context, reason string, cancelledAt time.Time) ([]StartupRecoveredTask, error) {
-	reason = strings.TrimSpace(reason)
-	if reason == "" {
-		return nil, fmt.Errorf("cancel_reason is required")
-	}
-	if cancelledAt.IsZero() {
-		cancelledAt = time.Now()
-	}
-	var taskIDs []string
-	var recoveredTasks []StartupRecoveredTask
-	err := dbutil.WithTxDBTX(ctx, r.db, func(q *dbsqlc.Queries, tx *sql.Tx) error {
-		updated, err := q.CancelRunningTasksForStartupRecovery(ctx, dbsqlc.CancelRunningTasksForStartupRecoveryParams{
-			CancelledAt:  sql.NullTime{Time: cancelledAt, Valid: true},
-			CancelReason: reason,
-		})
-		if err != nil || len(updated) == 0 {
-			return err
-		}
-		taskIDs = make([]string, 0, len(updated))
-		recoveredTasks = make([]StartupRecoveredTask, 0, len(updated))
-		for _, task := range updated {
-			taskIDs = append(taskIDs, task.TaskID)
-			recoveredTasks = append(recoveredTasks, StartupRecoveredTask{
-				TaskID:     task.TaskID,
-				RiverJobID: task.RiverJobID,
-			})
-		}
-		if err := releaseActiveTaskLeasesByTaskIDsTx(ctx, q, taskIDs, tasks.TaskAttemptStatusCancelled, cancelledAt); err != nil {
-			return err
-		}
-		if _, err := q.CancelRunningTaskAttemptsByTaskIDs(ctx, dbsqlc.CancelRunningTaskAttemptsByTaskIDsParams{
-			FailureStage:    tasks.ExecutionStageAssigned,
-			FailureCategory: tasks.FailureCategoryCancelled,
-			ErrorMsg:        reason,
-			CancelledAt:     sql.NullTime{Time: cancelledAt, Valid: true},
-			TaskIds:         taskIDs,
-		}); err != nil {
-			return err
-		}
-		metricsByTaskID, err := listExecutionMetricsByTaskIDsTx(ctx, q, taskIDs)
-		if err != nil {
-			return err
-		}
-		policy, err := resolveTerminalTransitionPolicy(terminalTransitionCancelled)
-		if err != nil {
-			return err
-		}
-		for _, c := range updated {
-			terminalAt := cancelledAt
-			if c.CancelledAt.Valid {
-				terminalAt = c.CancelledAt.Time
-			}
-			task := &tasks.Task{
-				TaskID:                     c.TaskID,
-				UserID:                     c.UserID,
-				AssignedProviderEndpointID: dbutil.Int64Ptr(c.AssignedProviderEndpointID),
-				AssignedCredentialID:       dbutil.Int64Ptr(c.AssignedCredentialID),
-				AccountID:                  dbutil.Int64Ptr(c.AccountID),
-				Status:                     tasks.StatusCancelled,
-				FeatureSlug:                c.FeatureSlug,
-				ResolvedModel:              c.ResolvedModel,
-				APIType:                    c.ApiType,
-				CreatedAt:                  c.CreatedAt,
-				CompletedAt:                &terminalAt,
-				CancelledAt:                &terminalAt,
-			}
-			if err := applyTerminalOutcomeTx(ctx, q, tx, task, metricsByTaskID[c.TaskID], terminalTransitionCommand{
-				taskID:          c.TaskID,
-				kind:            terminalTransitionCancelled,
-				finishedAt:      terminalAt,
-				errorMessage:    reason,
-				failureStage:    tasks.ExecutionStageAssigned,
-				failureCategory: tasks.FailureCategoryCancelled,
-			}, policy); err != nil {
-				return fmt.Errorf("converge terminal outcome for task %s: %w", c.TaskID, err)
-			}
-		}
-		return nil
-	})
+func (r *Repository) ListRunningTasksForStartupRecovery(ctx context.Context) ([]StartupRecoveredTask, error) {
+	rows, err := r.q.ListRunningTasksForStartupRecovery(ctx)
 	if err != nil {
 		return nil, err
+	}
+	recoveredTasks := make([]StartupRecoveredTask, 0, len(rows))
+	for _, task := range rows {
+		recoveredTasks = append(recoveredTasks, StartupRecoveredTask{
+			TaskID:     task.TaskID,
+			RiverJobID: task.RiverJobID,
+		})
 	}
 	return recoveredTasks, nil
 }

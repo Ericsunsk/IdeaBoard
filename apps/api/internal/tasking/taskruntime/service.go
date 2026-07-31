@@ -166,37 +166,84 @@ func (s *Service) ConvergeTaskAfterRiverFinalFailure(ctx context.Context, taskID
 	if tasks.IsTerminalStatus(task.Status) {
 		return ErrTaskTerminal
 	}
+
+	transition := taskTransitionFailPending
+	convergenceKind := taskstore.TaskConvergenceFinalFailed
+	assignment := taskqueue.TaskAssignment{}
+	var leaseIdentity *taskstore.TaskLeaseIdentity
 	if task.Status == tasks.StatusPending {
-		return s.FailTask(ctx, FailTaskInput{TaskID: taskID, Reason: reason})
-	}
-	if task.Status != tasks.StatusRunning {
+		// Pending tasks have no lease to release, but still use the same explicit
+		// final-failure convergence kind as exhausted running attempts.
+	} else if task.Status != tasks.StatusRunning {
 		return ErrTaskStateConflict
+	} else {
+		activeLease, leaseErr := s.taskRepo.GetActiveTaskLeaseByTaskID(ctx, taskID)
+		if leaseErr != nil {
+			if database.IsNotFound(leaseErr) {
+				if riverJobID != 0 {
+					return ErrTaskStateConflict
+				}
+				transition = taskTransitionRecoveryFail
+				convergenceKind = taskstore.TaskConvergenceRecoveredFailed
+			} else {
+				return leaseErr
+			}
+		} else {
+			assignment = taskqueue.TaskAssignment{
+				TaskID:                  activeLease.TaskID,
+				AccountID:               activeLease.AccountID,
+				ProviderEndpointID:      activeLease.ProviderEndpointID,
+				CredentialID:            activeLease.CredentialID,
+				ResolvedModel:           activeLease.ResolvedModel,
+				APIType:                 activeLease.APIType,
+				ProviderEndpointName:    activeLease.ProviderEndpointName,
+				ProviderEndpointBaseURL: activeLease.ProviderEndpointBaseURL,
+				CredentialFingerprint:   activeLease.CredentialFingerprint,
+				CredentialKeyVersion:    activeLease.CredentialKeyVersion,
+				LeaseToken:              activeLease.LeaseToken,
+			}
+			if !assignment.HasLeaseIdentity() || (riverJobID > 0 && !taskqueue.LeaseBelongsToRiverJob(activeLease.LeaseToken, riverJobID)) {
+				return ErrTaskStateConflict
+			}
+			transition = taskTransitionFinalFail
+			leaseIdentity = taskConvergenceLease(assignment)
+		}
 	}
 
-	lease, err := s.taskRepo.GetActiveTaskLeaseByTaskID(ctx, taskID)
-	if err != nil {
-		if database.IsNotFound(err) {
-			return ErrTaskStateConflict
-		}
+	rows, err := s.taskRepo.ConvergeTask(ctx, taskstore.TaskConvergenceIntent{
+		Kind:         convergenceKind,
+		TaskID:       taskID,
+		Lease:        leaseIdentity,
+		ErrorMessage: reason,
+		Result:       resolveTaskFailureResult(taskID, reason, ""),
+		OccurredAt:   time.Now(),
+	})
+	if err := normalizeTaskTransitionWriteError(err); err != nil {
 		return err
 	}
-	assignment := taskqueue.TaskAssignment{
-		TaskID:                  lease.TaskID,
-		AccountID:               lease.AccountID,
-		ProviderEndpointID:      lease.ProviderEndpointID,
-		CredentialID:            lease.CredentialID,
-		ResolvedModel:           lease.ResolvedModel,
-		APIType:                 lease.APIType,
-		ProviderEndpointName:    lease.ProviderEndpointName,
-		ProviderEndpointBaseURL: lease.ProviderEndpointBaseURL,
-		CredentialFingerprint:   lease.CredentialFingerprint,
-		CredentialKeyVersion:    lease.CredentialKeyVersion,
-		LeaseToken:              lease.LeaseToken,
+	if rows == 0 {
+		latest, loadErr := s.taskRepo.GetByTaskID(ctx, taskID)
+		if loadErr != nil {
+			if database.IsNotFound(loadErr) {
+				return ErrTaskNotFound
+			}
+			return loadErr
+		}
+		if latest.Status == tasks.StatusFailed {
+			return nil
+		}
+		if tasks.IsTerminalStatus(latest.Status) {
+			return ErrTaskTerminal
+		}
 	}
-	if !assignment.HasLeaseIdentity() || !taskqueue.LeaseBelongsToRiverJob(lease.LeaseToken, riverJobID) {
-		return ErrTaskStateConflict
+	applied, err := s.resolveTaskTransitionResult(ctx, transition, taskID, assignment, rows)
+	if err != nil {
+		return err
 	}
-	return s.FailTask(ctx, FailTaskInput{Assignment: assignment, Reason: reason})
+	if applied {
+		s.publishTaskStatusEvent(ctx, taskID, tasks.StatusFailed)
+	}
+	return nil
 }
 
 func (s *Service) FailTask(ctx context.Context, input FailTaskInput) error {

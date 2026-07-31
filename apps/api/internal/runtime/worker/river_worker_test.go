@@ -71,7 +71,7 @@ func TestRiverWorkerPropagatesCorrelationIDToProcessor(t *testing.T) {
 
 func TestRiverFinalFailureHandlerConvergesOnlyFinalDrawingAttempts(t *testing.T) {
 	runtime := &fakeRuntime{}
-	handler := newRiverFinalFailureHandler(runtime)
+	handler := newRiverFinalFailureHandler(&finalFailureOrchestrator{taskRuntime: runtime})
 	if handler == nil {
 		t.Fatal("expected final failure handler")
 	}
@@ -114,7 +114,7 @@ func TestRiverFinalFailureHandlerConvergesOnlyFinalDrawingAttempts(t *testing.T)
 
 func TestRiverFinalFailureHandlerConvergesPanicWithSafeReason(t *testing.T) {
 	runtime := &fakeRuntime{}
-	handler := newRiverFinalFailureHandler(runtime)
+	handler := newRiverFinalFailureHandler(&finalFailureOrchestrator{taskRuntime: runtime})
 	if handler == nil {
 		t.Fatal("expected final failure handler")
 	}
@@ -146,7 +146,7 @@ func TestRiverFinalFailureHandlerConvergesPanicWithSafeReason(t *testing.T) {
 
 func TestRiverFinalFailureHandlerIgnoresNonDrawingJobs(t *testing.T) {
 	runtime := &fakeRuntime{}
-	handler := newRiverFinalFailureHandler(runtime)
+	handler := newRiverFinalFailureHandler(&finalFailureOrchestrator{taskRuntime: runtime})
 
 	handler.HandleError(context.Background(), &rivertype.JobRow{
 		ID:          9002,
@@ -390,7 +390,10 @@ func TestRiverWorkerNoCapacityDoesNotCreateSettlementOnlyMarker(t *testing.T) {
 
 func TestRiverFinalFailureWorkerOnlyRetriesTerminalConvergence(t *testing.T) {
 	runtime := &fakeRuntime{convergeErr: errors.New("database unavailable")}
-	worker := &RiverFinalFailureWorker{taskRuntime: runtime, retryDelay: time.Millisecond}
+	worker := &RiverFinalFailureWorker{
+		finalFailures: &finalFailureOrchestrator{taskRuntime: runtime},
+		retryDelay:    time.Millisecond,
+	}
 	job := &river.Job[taskqueue.DrawingFinalFailureArgs]{Args: taskqueue.DrawingFinalFailureArgs{
 		TaskID: "dedicated-settlement-task", RiverJobID: 9011, Reason: finalFailureErrorReason,
 	}}
@@ -412,7 +415,7 @@ func TestRiverFinalFailureWorkerOnlyRetriesTerminalConvergence(t *testing.T) {
 func TestRiverFinalFailureWorkerTreatsAlreadyTerminalOrDeletedTaskAsConverged(t *testing.T) {
 	for _, terminalErr := range []error{taskruntime.ErrTaskTerminal, taskruntime.ErrTaskNotFound} {
 		runtime := &fakeRuntime{convergeErr: terminalErr}
-		worker := &RiverFinalFailureWorker{taskRuntime: runtime}
+		worker := &RiverFinalFailureWorker{finalFailures: &finalFailureOrchestrator{taskRuntime: runtime}}
 		err := worker.Work(t.Context(), &river.Job[taskqueue.DrawingFinalFailureArgs]{Args: taskqueue.DrawingFinalFailureArgs{
 			TaskID: "already-converged-task", RiverJobID: 9012, Reason: finalFailureErrorReason,
 		}})
@@ -455,7 +458,7 @@ func TestRiverWorkerFinalFailureRetryOnlyConvergesSettlement(t *testing.T) {
 
 func TestRiverFinalFailureHandlerLeavesSettlementSnoozeToDurableRetry(t *testing.T) {
 	runtime := &fakeRuntime{}
-	handler := newRiverFinalFailureHandler(runtime)
+	handler := newRiverFinalFailureHandler(&finalFailureOrchestrator{taskRuntime: runtime})
 	encodedArgs, err := json.Marshal(taskqueue.DrawingTaskArgs{
 		Task: tasks.TaskPayload{TaskID: "snoozed-settlement-task"},
 	})
@@ -475,6 +478,66 @@ func TestRiverFinalFailureHandlerLeavesSettlementSnoozeToDurableRetry(t *testing
 		t.Fatalf("snoozed settlement converged through ErrorHandler: %#v", runtime.converged)
 	}
 }
+
+func TestRiverFinalFailureHandlerPersistsFallbackWhenConvergenceFails(t *testing.T) {
+	runtime := &fakeRuntime{convergeErr: errors.New("database unavailable")}
+	var enqueued []taskqueue.DrawingFinalFailureArgs
+	handler := newRiverFinalFailureHandler(&finalFailureOrchestrator{
+		taskRuntime: runtime,
+		enqueueFallback: func(_ context.Context, args taskqueue.DrawingFinalFailureArgs) error {
+			enqueued = append(enqueued, args)
+			return nil
+		},
+	})
+	encodedArgs, err := json.Marshal(taskqueue.DrawingTaskArgs{
+		Task: tasks.TaskPayload{TaskID: "handler-fallback-task"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	handler.HandleError(t.Context(), &rivertype.JobRow{
+		ID:          9016,
+		Kind:        taskqueue.RiverJobKindDrawingGenerate,
+		EncodedArgs: encodedArgs,
+		Attempt:     2,
+		MaxAttempts: 2,
+	}, errors.New("final failure outside worker"))
+
+	if len(enqueued) != 1 || enqueued[0].TaskID != "handler-fallback-task" || enqueued[0].RiverJobID != 9016 {
+		t.Fatalf("enqueued=%+v, want durable handler fallback", enqueued)
+	}
+}
+
+func TestConvergeFinalFailureDurablyOnlyEnqueuesSettlementFallback(t *testing.T) {
+	runtime := &fakeRuntime{convergeErr: errors.New("database unavailable")}
+	worker := newRiverTaskWorkerWithProcessor(newTaskProcessor(
+		&fakeAssigner{assignStatus: taskqueue.AssignStatusAssigned, assignAccount: 9},
+		runtime,
+		func(context.Context, *tasks.TaskPayload, taskqueue.TaskAssignment) error {
+			t.Fatal("provider must not run during durable settlement recovery")
+			return nil
+		},
+	))
+	worker.recordOutput = func(context.Context, any) error {
+		t.Fatal("startup settlement must not write drawing-job metadata")
+		return nil
+	}
+	var enqueued []taskqueue.DrawingFinalFailureArgs
+	worker.enqueueFinalFailure = func(_ context.Context, args taskqueue.DrawingFinalFailureArgs) error {
+		enqueued = append(enqueued, args)
+		return nil
+	}
+
+	if err := worker.ConvergeFinalFailureDurably(t.Context(), "startup-settlement-task", 9017, startupFailureTestReason); err != nil {
+		t.Fatalf("ConvergeFinalFailureDurably returned error: %v", err)
+	}
+	if len(enqueued) != 1 || enqueued[0].TaskID != "startup-settlement-task" || enqueued[0].RiverJobID != 9017 || enqueued[0].Reason != startupFailureTestReason {
+		t.Fatalf("enqueued=%+v, want one settlement-only fallback", enqueued)
+	}
+}
+
+const startupFailureTestReason = "service restart"
 
 func TestRiverWorkerFinalFailureConvergesAfterWorkContextCancellation(t *testing.T) {
 	runtime := &fakeRuntime{convergeFn: func(ctx context.Context) error {

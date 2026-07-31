@@ -35,7 +35,7 @@
 - Task submission is transactional: insert the business task and enqueue the River job in the same PostgreSQL transaction.
 - Task submission idempotency uses `client_action_id` as the user-action boundary: retries of the same user action return the existing Task, while intentional reruns send a new `client_action_id`.
 - River + PostgreSQL are the task queue and task state fact source.
-- API 启动会在 River worker 启动前取消遗留的 `running` tasks；`pending` tasks 保持队列语义，active leases 会释放，旧 River jobs 通过 River public API 做 best-effort cleanup。
+- API 启动会在 River worker 启动前把遗留的 `running` tasks 经 durable final-failure convergence 收敛为 `failed`；`pending` tasks 保持队列语义，active leases 与 Credit Hold 在同一 transaction 释放，旧 River jobs 通过 River public API 做 best-effort cleanup。
 - NATS JetStream is an event layer for task status, audit and realtime fanout; it is not a task queue.
 - Worker concurrency 只读取部署级 `RIVER_WORKER_CONCURRENCY`；retry/timeout policy 由 Worker implementation 持有，NATS retention 由 Events implementation 固定为 7 天。
 - Admin 只管理 typed `OutboundPolicySetting`。Egress allowlist 在每次 outbound operation 前从 DB 读取，动态生效且读取失败时 fail closed；写入必须在同一 PostgreSQL transaction 内更新 `system_configs` 与 append-only actor audit。

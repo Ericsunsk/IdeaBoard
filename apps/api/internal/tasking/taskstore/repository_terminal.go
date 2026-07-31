@@ -64,11 +64,12 @@ type terminalTransitionPolicy struct {
 type TaskConvergenceKind string
 
 const (
-	TaskConvergenceCompleted   TaskConvergenceKind = "completed"
-	TaskConvergenceFailed      TaskConvergenceKind = "failed"
-	TaskConvergenceFinalFailed TaskConvergenceKind = "final_failed"
-	TaskConvergenceRequeued    TaskConvergenceKind = "requeued"
-	TaskConvergenceReset       TaskConvergenceKind = "reset"
+	TaskConvergenceCompleted       TaskConvergenceKind = "completed"
+	TaskConvergenceFailed          TaskConvergenceKind = "failed"
+	TaskConvergenceFinalFailed     TaskConvergenceKind = "final_failed"
+	TaskConvergenceRecoveredFailed TaskConvergenceKind = "recovered_failed"
+	TaskConvergenceRequeued        TaskConvergenceKind = "requeued"
+	TaskConvergenceReset           TaskConvergenceKind = "reset"
 )
 
 type TaskLeaseIdentity struct {
@@ -96,7 +97,7 @@ func (r *Repository) ConvergeTask(ctx context.Context, intent TaskConvergenceInt
 	switch intent.Kind {
 	case TaskConvergenceCompleted:
 		return r.convergeCompletedTask(ctx, intent)
-	case TaskConvergenceFailed, TaskConvergenceFinalFailed:
+	case TaskConvergenceFailed, TaskConvergenceFinalFailed, TaskConvergenceRecoveredFailed:
 		return r.convergeFailedTask(ctx, intent)
 	case TaskConvergenceRequeued, TaskConvergenceReset:
 		return r.convergePendingTask(ctx, intent)
@@ -134,6 +135,15 @@ func (r *Repository) convergeFailedTask(ctx context.Context, intent TaskConverge
 			errorMessage:  intent.ErrorMessage,
 			attemptFinish: intent.AttemptFinish,
 			writeTaskFact: func(ctx context.Context, q *dbsqlc.Queries) (int64, error) {
+				if intent.Kind == TaskConvergenceRecoveredFailed {
+					return q.MarkUnleasedTaskFailed(ctx, dbsqlc.MarkUnleasedTaskFailedParams{
+						ErrorMsg:    intent.ErrorMessage,
+						Result:      intent.Result,
+						CompletedAt: sql.NullTime{Time: finishedAt, Valid: true},
+						TaskID:      intent.TaskID,
+						Statuses:    []string{tasks.StatusPending, tasks.StatusRunning},
+					})
+				}
 				return q.MarkTaskFailed(ctx, dbsqlc.MarkTaskFailedParams{
 					ErrorMsg:    intent.ErrorMessage,
 					Result:      intent.Result,

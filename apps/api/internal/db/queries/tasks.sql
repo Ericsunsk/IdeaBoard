@@ -270,34 +270,19 @@ SET status = 'cancelled',
 WHERE task_id = sqlc.arg(task_id)
   AND status IN ('pending', 'running');
 
--- name: CancelRunningTasksForStartupRecovery :many
-WITH updated_tasks AS (
-  UPDATE tasks t
-  SET status = 'cancelled',
-      lease_token = '',
-      completed_at = sqlc.narg(cancelled_at)::timestamptz,
-      cancelled_at = sqlc.narg(cancelled_at)::timestamptz,
-      cancelled_by = NULL,
-      cancel_reason = sqlc.arg(cancel_reason),
-      updated_at = now()
-  WHERE t.status = 'running'
-  RETURNING t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id,
-            t.feature_slug, t.created_at, t.completed_at, t.cancelled_at
-)
-SELECT t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id,
-       t.feature_slug,
-       COALESCE(latest_lease.river_job_id, 0)::bigint AS river_job_id,
-       COALESCE(latest_lease.resolved_model, '') AS resolved_model,
-       COALESCE(latest_lease.api_type, '') AS api_type,
-       t.created_at, t.completed_at, t.cancelled_at
-FROM updated_tasks t
+-- name: ListRunningTasksForStartupRecovery :many
+SELECT t.task_id,
+       COALESCE(active_lease.river_job_id, 0)::bigint AS river_job_id
+FROM tasks t
 LEFT JOIN LATERAL (
-  SELECT river_job_id, resolved_model, api_type
+  SELECT river_job_id
   FROM task_leases
   WHERE task_id = t.task_id
-  ORDER BY (released_at IS NULL) DESC, COALESCE(released_at, acquired_at) DESC, id DESC
+    AND released_at IS NULL
+  ORDER BY acquired_at DESC, id DESC
   LIMIT 1
-) AS latest_lease ON TRUE
+) AS active_lease ON TRUE
+WHERE t.status = 'running'
 ORDER BY t.created_at ASC, t.task_id ASC;
 
 -- name: CreateTaskAttempt :one
@@ -445,22 +430,6 @@ SET status = sqlc.arg(status),
 WHERE task_id = ANY(sqlc.arg(task_ids)::text[])
   AND status = 'running'
   AND sqlc.arg(status) IN ('completed', 'failed', 'cancelled');
-
--- name: CancelRunningTaskAttemptsByTaskIDs :execrows
-UPDATE task_attempts
-SET status = 'cancelled',
-    failure_stage = sqlc.arg(failure_stage),
-    failure_category = sqlc.arg(failure_category),
-    error_msg = sqlc.arg(error_msg),
-    completed_at = NULL,
-    cancelled_at = sqlc.narg(cancelled_at)::timestamptz,
-    total_latency_ms = GREATEST(
-      EXTRACT(EPOCH FROM (sqlc.narg(cancelled_at)::timestamptz - created_at)) * 1000,
-      0
-    )::bigint,
-    updated_at = now()
-WHERE task_id = ANY(sqlc.arg(task_ids)::text[])
-  AND status = 'running';
 
 -- name: ListMonitorExecutionPressureByRange :many
 WITH pending_tasks AS (
@@ -631,6 +600,22 @@ SET status = 'failed',
     completed_at = sqlc.narg(completed_at)::timestamptz
 WHERE task_id = sqlc.arg(task_id)
   AND status = ANY(sqlc.arg(statuses)::text[]);
+
+-- name: MarkUnleasedTaskFailed :execrows
+UPDATE tasks t
+SET status = 'failed',
+    lease_token = '',
+    error_msg = sqlc.arg(error_msg),
+    result = sqlc.arg(result),
+    completed_at = sqlc.narg(completed_at)::timestamptz
+WHERE t.task_id = sqlc.arg(task_id)
+  AND t.status = ANY(sqlc.arg(statuses)::text[])
+  AND NOT EXISTS (
+    SELECT 1
+    FROM task_leases l
+    WHERE l.task_id = t.task_id
+      AND l.released_at IS NULL
+  );
 
 -- name: MarkTaskFailedWithLease :execrows
 UPDATE tasks

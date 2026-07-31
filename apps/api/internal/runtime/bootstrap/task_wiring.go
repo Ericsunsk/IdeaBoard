@@ -127,7 +127,7 @@ func newAppTaskRuntime(
 		}
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize River client: %w", err)
 	}
-	if _, err := recoverRunningTasksAfterStartup(ctx, repos.taskRepo, riverStartupJobCanceller{client: riverClient}, taskEvents, time.Now()); err != nil {
+	if _, err := recoverRunningTasksAfterStartup(ctx, repos.taskRepo, riverTaskWorker, riverStartupJobCanceller{client: riverClient}); err != nil {
 		if eventBus != nil {
 			_ = eventBus.Close()
 		}

@@ -29,6 +29,7 @@ import (
 type RiverTaskWorker struct {
 	river.WorkerDefaults[taskqueue.DrawingTaskArgs]
 	processor              *taskProcessor
+	finalFailures          *finalFailureOrchestrator
 	noCapacityRetryDelay   time.Duration
 	finalFailureRetryDelay time.Duration
 	recordOutput           func(context.Context, any) error
@@ -37,8 +38,8 @@ type RiverTaskWorker struct {
 
 type RiverFinalFailureWorker struct {
 	river.WorkerDefaults[taskqueue.DrawingFinalFailureArgs]
-	taskRuntime riverFinalFailureRuntime
-	retryDelay  time.Duration
+	finalFailures *finalFailureOrchestrator
+	retryDelay    time.Duration
 }
 
 const (
@@ -93,12 +94,32 @@ func NewRiverTaskWorker(
 }
 
 func newRiverTaskWorkerWithProcessor(processor *taskProcessor) *RiverTaskWorker {
-	return &RiverTaskWorker{
+	worker := &RiverTaskWorker{
 		processor:              processor,
 		noCapacityRetryDelay:   defaultNoCapacityRetryDelay,
 		finalFailureRetryDelay: defaultFinalFailureRetryDelay,
 		recordOutput:           river.RecordOutput,
 	}
+	if processor != nil {
+		if taskRuntime, ok := processor.taskRuntime.(riverFinalFailureRuntime); ok {
+			worker.finalFailures = &finalFailureOrchestrator{
+				taskRuntime: taskRuntime,
+				recordOutput: func(ctx context.Context, output finalFailureRetryOutput) error {
+					if worker.recordOutput == nil {
+						return errors.New("river output recorder is unavailable")
+					}
+					return worker.recordOutput(ctx, output)
+				},
+				enqueueFallback: func(ctx context.Context, args taskqueue.DrawingFinalFailureArgs) error {
+					if worker.enqueueFinalFailure == nil {
+						return errors.New("river final failure enqueuer is unavailable")
+					}
+					return worker.enqueueFinalFailure(ctx, args)
+				},
+			}
+		}
+	}
+	return worker
 }
 
 func (w *RiverTaskWorker) Work(ctx context.Context, job *river.Job[taskqueue.DrawingTaskArgs]) (workErr error) {
@@ -110,32 +131,28 @@ func (w *RiverTaskWorker) Work(ctx context.Context, job *river.Job[taskqueue.Dra
 	if job.JobRow != nil {
 		task.RiverJobID = job.ID
 	}
-	finalFailureRuntime, _ := w.processor.taskRuntime.(riverFinalFailureRuntime)
 	if retry, ok := finalFailureRetryFromJob(job.JobRow, task.TaskID); ok {
-		return w.retryFinalFailureConvergence(ctx, job.JobRow, retry, finalFailureRuntime)
+		return w.retryFinalFailureConvergence(ctx, job.JobRow, retry)
 	}
-	isFinalAttempt := finalFailureRuntime != nil && isFinalRiverAttempt(job.JobRow)
+	isFinalAttempt := w.finalFailures != nil && isFinalRiverAttempt(job.JobRow)
 	if isFinalAttempt {
 		defer func() {
 			panicVal := recover()
 			if panicVal == nil {
 				return
 			}
-			if err := convergeFinalFailure(ctx, finalFailureRuntime, task.TaskID, job.ID, finalFailurePanicReason); err == nil {
+			result := w.finalFailures.convergeDurably(ctx, finalFailureRequest{
+				taskID: task.TaskID, riverJobID: job.ID, reason: finalFailurePanicReason,
+			}, true)
+			switch result.durability {
+			case finalFailureDurabilityConverged, finalFailureDurabilityFallback:
 				panic(panicVal)
-			} else {
-				slog.Warn("converge task after River final panic failed; snoozing for settlement retry", "task_id", task.TaskID, "river_job_id", job.ID, "err", err)
-				if recordErr := w.recordFinalFailureRetry(ctx, task.TaskID, finalFailurePanicReason); recordErr != nil {
-					if enqueueErr := w.enqueueFinalFailureRetry(ctx, task.TaskID, job.ID, finalFailurePanicReason); enqueueErr != nil {
-						slog.Error("durable final failure retry unavailable after panic",
-							"task_id", task.TaskID, "river_job_id", job.ID,
-							"record_err", recordErr, "enqueue_err", enqueueErr,
-						)
-						workErr = river.JobSnooze(w.finalFailureRetryDelay)
-						return
-					}
-					panic(panicVal)
-				}
+			case finalFailureDurabilityMarker:
+				workErr = river.JobSnooze(w.finalFailureRetryDelay)
+			default:
+				slog.Error("durable final failure retry unavailable after panic",
+					"task_id", task.TaskID, "river_job_id", job.ID, "err", result.err,
+				)
 				workErr = river.JobSnooze(w.finalFailureRetryDelay)
 			}
 		}()
@@ -144,16 +161,21 @@ func (w *RiverTaskWorker) Work(ctx context.Context, job *river.Job[taskqueue.Dra
 	if isFinalAttempt {
 		process = func() error {
 			return w.processor.ProcessBeforeExecute(ctx, &task, func() error {
-				return w.recordFinalFailureMode(ctx, finalFailureExecutionOutputKind, task.TaskID, finalFailureErrorReason)
+				return w.finalFailures.prepareFinalAttempt(ctx, finalFailureRequest{
+					taskID: task.TaskID, riverJobID: job.ID, reason: finalFailureErrorReason,
+				})
 			})
 		}
 	}
 	if err := process(); err != nil {
 		if errors.Is(err, errFinalAttemptMarkerResetFailed) {
-			if convergeErr := convergeFinalFailure(ctx, finalFailureRuntime, task.TaskID, job.ID, finalFailureErrorReason); convergeErr == nil {
+			result := w.finalFailures.convergeDurably(ctx, finalFailureRequest{
+				taskID: task.TaskID, riverJobID: job.ID, reason: finalFailureErrorReason,
+			}, false)
+			if result.durability == finalFailureDurabilityConverged {
 				return nil
 			}
-			if enqueueErr := w.enqueueFinalFailureRetry(ctx, task.TaskID, job.ID, finalFailureErrorReason); enqueueErr == nil {
+			if result.durability == finalFailureDurabilityFallback {
 				return err
 			}
 			return river.JobSnooze(w.finalFailureRetryDelay)
@@ -164,19 +186,19 @@ func (w *RiverTaskWorker) Work(ctx context.Context, job *river.Job[taskqueue.Dra
 		if errors.Is(err, taskqueue.ErrNoAccountCapacity) {
 			return river.JobSnooze(w.noCapacityRetryDelay)
 		}
-		if finalFailureRuntime != nil && isFinalRiverAttempt(job.JobRow) {
-			if convergeErr := convergeFinalFailure(ctx, finalFailureRuntime, task.TaskID, job.ID, finalFailureErrorReason); convergeErr != nil {
-				slog.Warn("converge task after River final failure failed; snoozing for settlement retry", "task_id", task.TaskID, "river_job_id", job.ID, "err", convergeErr)
-				if recordErr := w.recordFinalFailureRetry(ctx, task.TaskID, finalFailureErrorReason); recordErr != nil {
-					if enqueueErr := w.enqueueFinalFailureRetry(ctx, task.TaskID, job.ID, finalFailureErrorReason); enqueueErr != nil {
-						slog.Error("durable final failure fallback enqueue failed; retaining original River job",
-							"task_id", task.TaskID, "river_job_id", job.ID,
-							"record_err", recordErr, "enqueue_err", enqueueErr,
-						)
-						return river.JobSnooze(w.finalFailureRetryDelay)
-					}
-					return err
-				}
+		if isFinalAttempt {
+			result := w.finalFailures.convergeDurably(ctx, finalFailureRequest{
+				taskID: task.TaskID, riverJobID: job.ID, reason: finalFailureErrorReason,
+			}, true)
+			switch result.durability {
+			case finalFailureDurabilityConverged, finalFailureDurabilityFallback:
+				return err
+			case finalFailureDurabilityMarker:
+				return river.JobSnooze(w.finalFailureRetryDelay)
+			default:
+				slog.Error("durable final failure retry unavailable; retaining original River job",
+					"task_id", task.TaskID, "river_job_id", job.ID, "err", result.err,
+				)
 				return river.JobSnooze(w.finalFailureRetryDelay)
 			}
 		}
@@ -185,49 +207,17 @@ func (w *RiverTaskWorker) Work(ctx context.Context, job *river.Job[taskqueue.Dra
 	return nil
 }
 
-func (w *RiverTaskWorker) enqueueFinalFailureRetry(ctx context.Context, taskID string, riverJobID int64, reason string) error {
-	if w == nil || w.enqueueFinalFailure == nil {
-		return errors.New("river final failure enqueuer is unavailable")
-	}
-	return w.enqueueFinalFailure(context.WithoutCancel(ctx), taskqueue.DrawingFinalFailureArgs{
-		TaskID: taskID, RiverJobID: riverJobID, Reason: reason,
-	})
-}
-
-func (w *RiverTaskWorker) recordFinalFailureRetry(ctx context.Context, taskID, reason string) error {
-	return w.recordFinalFailureMode(ctx, finalFailureRetryOutputKind, taskID, reason)
-}
-
-func (w *RiverTaskWorker) recordFinalFailureMode(ctx context.Context, kind, taskID, reason string) error {
-	if w == nil || w.recordOutput == nil {
-		return errors.New("river output recorder is unavailable")
-	}
-	return w.recordOutput(context.WithoutCancel(ctx), finalFailureRetryOutput{
-		Kind:   kind,
-		TaskID: taskID,
-		Reason: reason,
-	})
-}
-
-func (w *RiverTaskWorker) retryFinalFailureConvergence(ctx context.Context, job *rivertype.JobRow, retry finalFailureRetryOutput, runtime riverFinalFailureRuntime) error {
-	if runtime == nil || job == nil {
+func (w *RiverTaskWorker) retryFinalFailureConvergence(ctx context.Context, job *rivertype.JobRow, retry finalFailureRetryOutput) error {
+	if w == nil || w.finalFailures == nil || job == nil {
 		return errors.New("task final failure runtime is unavailable")
 	}
-	if err := convergeFinalFailure(ctx, runtime, retry.TaskID, job.ID, retry.Reason); err != nil {
+	if err := w.finalFailures.converge(ctx, finalFailureRequest{
+		taskID: retry.TaskID, riverJobID: job.ID, reason: retry.Reason,
+	}); err != nil {
 		slog.Warn("retry task convergence after River final failure failed; snoozing again", "task_id", retry.TaskID, "river_job_id", job.ID, "err", err)
 		return river.JobSnooze(w.finalFailureRetryDelay)
 	}
 	return nil
-}
-
-func convergeFinalFailure(ctx context.Context, runtime riverFinalFailureRuntime, taskID string, riverJobID int64, reason string) error {
-	convergeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), finalFailureConvergeTimeout)
-	defer cancel()
-	err := runtime.ConvergeTaskAfterRiverFinalFailure(convergeCtx, taskID, riverJobID, reason)
-	if errors.Is(err, taskruntime.ErrTaskTerminal) || errors.Is(err, taskruntime.ErrTaskNotFound) {
-		return nil
-	}
-	return err
 }
 
 func finalFailureRetryFromJob(job *rivertype.JobRow, taskID string) (finalFailureRetryOutput, bool) {
@@ -265,15 +255,13 @@ type RiverServerOptions struct {
 	PeriodicJobs     []*river.PeriodicJob
 }
 
-type riverFinalFailureRuntime interface {
-	ConvergeTaskAfterRiverFinalFailure(ctx context.Context, taskID string, riverJobID int64, reason string) error
-}
-
 func (w *RiverFinalFailureWorker) Work(ctx context.Context, job *river.Job[taskqueue.DrawingFinalFailureArgs]) error {
-	if w == nil || w.taskRuntime == nil || job == nil || strings.TrimSpace(job.Args.TaskID) == "" || job.Args.RiverJobID <= 0 || strings.TrimSpace(job.Args.Reason) == "" {
+	if w == nil || w.finalFailures == nil || job == nil || strings.TrimSpace(job.Args.TaskID) == "" || job.Args.RiverJobID < 0 || strings.TrimSpace(job.Args.Reason) == "" {
 		return errors.New("invalid drawing final failure job")
 	}
-	if err := convergeFinalFailure(ctx, w.taskRuntime, job.Args.TaskID, job.Args.RiverJobID, job.Args.Reason); err != nil {
+	if err := w.finalFailures.converge(ctx, finalFailureRequest{
+		taskID: job.Args.TaskID, riverJobID: job.Args.RiverJobID, reason: job.Args.Reason,
+	}); err != nil {
 		retryDelay := w.retryDelay
 		if retryDelay <= 0 {
 			retryDelay = defaultFinalFailureRetryDelay
@@ -317,26 +305,12 @@ func NewRiverClient(dbPool *pgxpool.Pool, worker *RiverTaskWorker, opts RiverSer
 	}
 	errorHandler := river.ErrorHandler(nil)
 	if worker != nil && worker.processor != nil {
-		if finalFailureRuntime, ok := worker.processor.taskRuntime.(riverFinalFailureRuntime); ok {
+		if worker.finalFailures != nil {
 			river.AddWorker(workers, &RiverFinalFailureWorker{
-				taskRuntime: finalFailureRuntime,
-				retryDelay:  defaultFinalFailureRetryDelay,
+				finalFailures: worker.finalFailures,
+				retryDelay:    defaultFinalFailureRetryDelay,
 			})
-			worker.enqueueFinalFailure = func(ctx context.Context, args taskqueue.DrawingFinalFailureArgs) error {
-				client, err := river.ClientFromContextSafely[pgx.Tx](ctx)
-				if err != nil {
-					return err
-				}
-				_, err = client.Insert(ctx, args, &river.InsertOpts{
-					Queue:       queueName,
-					MaxAttempts: maxRetry,
-					Priority:    tasks.TaskPriorityInteractive,
-					Tags:        []string{args.TaskID},
-					UniqueOpts:  river.UniqueOpts{ByArgs: true},
-				})
-				return err
-			}
-			errorHandler = newRiverFinalFailureHandler(worker.processor.taskRuntime)
+			errorHandler = newRiverFinalFailureHandler(worker.finalFailures)
 		}
 	}
 	queues := map[string]river.QueueConfig{queueName: {MaxWorkers: concurrency}}
@@ -345,7 +319,7 @@ func NewRiverClient(dbPool *pgxpool.Pool, worker *RiverTaskWorker, opts RiverSer
 			queues[name] = queue
 		}
 	}
-	return river.NewClient(riverpgxv5.New(dbPool), &river.Config{
+	client, err := river.NewClient(riverpgxv5.New(dbPool), &river.Config{
 		Queues:       queues,
 		Workers:      workers,
 		MaxAttempts:  maxRetry,
@@ -354,18 +328,33 @@ func NewRiverClient(dbPool *pgxpool.Pool, worker *RiverTaskWorker, opts RiverSer
 		Schema:       schema,
 		PeriodicJobs: opts.PeriodicJobs,
 	})
+	if err != nil {
+		return nil, err
+	}
+	if worker != nil && worker.finalFailures != nil {
+		worker.enqueueFinalFailure = func(ctx context.Context, args taskqueue.DrawingFinalFailureArgs) error {
+			_, err := client.Insert(ctx, args, &river.InsertOpts{
+				Queue:       queueName,
+				MaxAttempts: maxRetry,
+				Priority:    tasks.TaskPriorityInteractive,
+				Tags:        []string{args.TaskID},
+				UniqueOpts:  river.UniqueOpts{ByArgs: true},
+			})
+			return err
+		}
+	}
+	return client, nil
 }
 
 type riverFinalFailureHandler struct {
-	taskRuntime riverFinalFailureRuntime
+	finalFailures *finalFailureOrchestrator
 }
 
-func newRiverFinalFailureHandler(taskRuntime consumerTaskRuntime) river.ErrorHandler {
-	finalFailureRuntime, ok := taskRuntime.(riverFinalFailureRuntime)
-	if !ok {
+func newRiverFinalFailureHandler(finalFailures *finalFailureOrchestrator) river.ErrorHandler {
+	if finalFailures == nil {
 		return nil
 	}
-	return &riverFinalFailureHandler{taskRuntime: finalFailureRuntime}
+	return &riverFinalFailureHandler{finalFailures: finalFailures}
 }
 
 func (h *riverFinalFailureHandler) HandleError(ctx context.Context, job *rivertype.JobRow, err error) *river.ErrorHandlerResult {
@@ -392,15 +381,20 @@ func (h *riverFinalFailureHandler) HandlePanic(ctx context.Context, job *riverty
 }
 
 func (h *riverFinalFailureHandler) handle(ctx context.Context, job *rivertype.JobRow, reason string) {
-	if h == nil || h.taskRuntime == nil || !isFinalRiverAttempt(job) {
+	if h == nil || h.finalFailures == nil || !isFinalRiverAttempt(job) {
 		return
 	}
 	taskID, ok := drawingTaskIDFromJob(job)
 	if !ok {
 		return
 	}
-	if err := h.taskRuntime.ConvergeTaskAfterRiverFinalFailure(ctx, taskID, job.ID, reason); err != nil {
-		slog.Warn("converge task after River final failure failed", "task_id", taskID, "river_job_id", job.ID, "err", err)
+	result := h.finalFailures.convergeDurably(ctx, finalFailureRequest{
+		taskID: taskID, riverJobID: job.ID, reason: reason,
+	}, false)
+	if !result.isDurable() {
+		slog.Error("durable convergence after River final failure failed", "task_id", taskID, "river_job_id", job.ID, "err", result.err)
+	} else if result.durability != finalFailureDurabilityConverged {
+		slog.Warn("River final failure deferred to settlement-only fallback", "task_id", taskID, "river_job_id", job.ID, "err", result.err)
 	}
 }
 

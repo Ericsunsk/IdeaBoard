@@ -13,132 +13,6 @@ import (
 	"github.com/lib/pq"
 )
 
-const cancelRunningTaskAttemptsByTaskIDs = `-- name: CancelRunningTaskAttemptsByTaskIDs :execrows
-UPDATE task_attempts
-SET status = 'cancelled',
-    failure_stage = $1,
-    failure_category = $2,
-    error_msg = $3,
-    completed_at = NULL,
-    cancelled_at = $4::timestamptz,
-    total_latency_ms = GREATEST(
-      EXTRACT(EPOCH FROM ($4::timestamptz - created_at)) * 1000,
-      0
-    )::bigint,
-    updated_at = now()
-WHERE task_id = ANY($5::text[])
-  AND status = 'running'
-`
-
-type CancelRunningTaskAttemptsByTaskIDsParams struct {
-	FailureStage    string       `json:"failure_stage"`
-	FailureCategory string       `json:"failure_category"`
-	ErrorMsg        string       `json:"error_msg"`
-	CancelledAt     sql.NullTime `json:"cancelled_at"`
-	TaskIds         []string     `json:"task_ids"`
-}
-
-func (q *Queries) CancelRunningTaskAttemptsByTaskIDs(ctx context.Context, arg CancelRunningTaskAttemptsByTaskIDsParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, cancelRunningTaskAttemptsByTaskIDs,
-		arg.FailureStage,
-		arg.FailureCategory,
-		arg.ErrorMsg,
-		arg.CancelledAt,
-		pq.Array(arg.TaskIds),
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected()
-}
-
-const cancelRunningTasksForStartupRecovery = `-- name: CancelRunningTasksForStartupRecovery :many
-WITH updated_tasks AS (
-  UPDATE tasks t
-  SET status = 'cancelled',
-      lease_token = '',
-      completed_at = $1::timestamptz,
-      cancelled_at = $1::timestamptz,
-      cancelled_by = NULL,
-      cancel_reason = $2,
-      updated_at = now()
-  WHERE t.status = 'running'
-  RETURNING t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id,
-            t.feature_slug, t.created_at, t.completed_at, t.cancelled_at
-)
-SELECT t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id,
-       t.feature_slug,
-       COALESCE(latest_lease.river_job_id, 0)::bigint AS river_job_id,
-       COALESCE(latest_lease.resolved_model, '') AS resolved_model,
-       COALESCE(latest_lease.api_type, '') AS api_type,
-       t.created_at, t.completed_at, t.cancelled_at
-FROM updated_tasks t
-LEFT JOIN LATERAL (
-  SELECT river_job_id, resolved_model, api_type
-  FROM task_leases
-  WHERE task_id = t.task_id
-  ORDER BY (released_at IS NULL) DESC, COALESCE(released_at, acquired_at) DESC, id DESC
-  LIMIT 1
-) AS latest_lease ON TRUE
-ORDER BY t.created_at ASC, t.task_id ASC
-`
-
-type CancelRunningTasksForStartupRecoveryParams struct {
-	CancelledAt  sql.NullTime `json:"cancelled_at"`
-	CancelReason string       `json:"cancel_reason"`
-}
-
-type CancelRunningTasksForStartupRecoveryRow struct {
-	TaskID                     string        `json:"task_id"`
-	UserID                     int64         `json:"user_id"`
-	AssignedProviderEndpointID sql.NullInt64 `json:"assigned_provider_endpoint_id"`
-	AssignedCredentialID       sql.NullInt64 `json:"assigned_credential_id"`
-	AccountID                  sql.NullInt64 `json:"account_id"`
-	FeatureSlug                string        `json:"feature_slug"`
-	RiverJobID                 int64         `json:"river_job_id"`
-	ResolvedModel              string        `json:"resolved_model"`
-	ApiType                    string        `json:"api_type"`
-	CreatedAt                  time.Time     `json:"created_at"`
-	CompletedAt                sql.NullTime  `json:"completed_at"`
-	CancelledAt                sql.NullTime  `json:"cancelled_at"`
-}
-
-func (q *Queries) CancelRunningTasksForStartupRecovery(ctx context.Context, arg CancelRunningTasksForStartupRecoveryParams) ([]CancelRunningTasksForStartupRecoveryRow, error) {
-	rows, err := q.db.QueryContext(ctx, cancelRunningTasksForStartupRecovery, arg.CancelledAt, arg.CancelReason)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []CancelRunningTasksForStartupRecoveryRow
-	for rows.Next() {
-		var i CancelRunningTasksForStartupRecoveryRow
-		if err := rows.Scan(
-			&i.TaskID,
-			&i.UserID,
-			&i.AssignedProviderEndpointID,
-			&i.AssignedCredentialID,
-			&i.AccountID,
-			&i.FeatureSlug,
-			&i.RiverJobID,
-			&i.ResolvedModel,
-			&i.ApiType,
-			&i.CreatedAt,
-			&i.CompletedAt,
-			&i.CancelledAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const completeTaskWithLease = `-- name: CompleteTaskWithLease :execrows
 UPDATE tasks
 SET status = 'completed',
@@ -1160,6 +1034,50 @@ func (q *Queries) ListRunningMissingLeaseTaskIDs(ctx context.Context, rowLimit i
 	return items, nil
 }
 
+const listRunningTasksForStartupRecovery = `-- name: ListRunningTasksForStartupRecovery :many
+SELECT t.task_id,
+       COALESCE(active_lease.river_job_id, 0)::bigint AS river_job_id
+FROM tasks t
+LEFT JOIN LATERAL (
+  SELECT river_job_id
+  FROM task_leases
+  WHERE task_id = t.task_id
+    AND released_at IS NULL
+  ORDER BY acquired_at DESC, id DESC
+  LIMIT 1
+) AS active_lease ON TRUE
+WHERE t.status = 'running'
+ORDER BY t.created_at ASC, t.task_id ASC
+`
+
+type ListRunningTasksForStartupRecoveryRow struct {
+	TaskID     string `json:"task_id"`
+	RiverJobID int64  `json:"river_job_id"`
+}
+
+func (q *Queries) ListRunningTasksForStartupRecovery(ctx context.Context) ([]ListRunningTasksForStartupRecoveryRow, error) {
+	rows, err := q.db.QueryContext(ctx, listRunningTasksForStartupRecovery)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRunningTasksForStartupRecoveryRow
+	for rows.Next() {
+		var i ListRunningTasksForStartupRecoveryRow
+		if err := rows.Scan(&i.TaskID, &i.RiverJobID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRunningTasksMissingLeaseToken = `-- name: ListRunningTasksMissingLeaseToken :many
 SELECT task_id, account_id, lease_token
 FROM tasks
@@ -1808,6 +1726,45 @@ func (q *Queries) MarkTaskFailedWithLease(ctx context.Context, arg MarkTaskFaile
 		arg.AssignedProviderEndpointID,
 		arg.AssignedCredentialID,
 		arg.LeaseToken,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const markUnleasedTaskFailed = `-- name: MarkUnleasedTaskFailed :execrows
+UPDATE tasks t
+SET status = 'failed',
+    lease_token = '',
+    error_msg = $1,
+    result = $2,
+    completed_at = $3::timestamptz
+WHERE t.task_id = $4
+  AND t.status = ANY($5::text[])
+  AND NOT EXISTS (
+    SELECT 1
+    FROM task_leases l
+    WHERE l.task_id = t.task_id
+      AND l.released_at IS NULL
+  )
+`
+
+type MarkUnleasedTaskFailedParams struct {
+	ErrorMsg    string       `json:"error_msg"`
+	Result      string       `json:"result"`
+	CompletedAt sql.NullTime `json:"completed_at"`
+	TaskID      string       `json:"task_id"`
+	Statuses    []string     `json:"statuses"`
+}
+
+func (q *Queries) MarkUnleasedTaskFailed(ctx context.Context, arg MarkUnleasedTaskFailedParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markUnleasedTaskFailed,
+		arg.ErrorMsg,
+		arg.Result,
+		arg.CompletedAt,
+		arg.TaskID,
+		pq.Array(arg.Statuses),
 	)
 	if err != nil {
 		return 0, err
