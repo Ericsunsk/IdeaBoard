@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -200,7 +201,7 @@ func TestTaskRuntimeTransitionValidWrites(t *testing.T) {
 func TestTaskRuntimeTransitionWriteLeaseConflictIsStateConflict(t *testing.T) {
 	ctx := context.Background()
 	store := &fakeTaskRuntimeTransitionStore{
-		writeErr: taskstore.ErrTaskLeaseStateConflict,
+		writeErr: fmt.Errorf("%w: finish task attempt affected 0 rows, want 1", taskstore.ErrTaskLeaseStateConflict),
 	}
 	service := NewService(nil, store, nil, nil)
 
@@ -214,9 +215,57 @@ func TestTaskRuntimeTransitionWriteLeaseConflictIsStateConflict(t *testing.T) {
 	}
 }
 
+func TestCompleteTaskPassesOneConvergenceIntentAndPublishesCompleted(t *testing.T) {
+	ctx := context.Background()
+	assignment := taskTransitionTestAssignment("completion-intent-task")
+	completedAt := time.Date(2026, time.July, 31, 12, 0, 0, 0, time.UTC)
+	attemptFinish := &tasks.TaskAttemptFinish{ID: 41, CompletedAt: completedAt}
+	outputs := []tasks.TaskOutput{{OutputKind: "remote", Role: "image", URL: "https://provider.example/result.png"}}
+	store := &fakeTaskRuntimeTransitionStore{completeRows: 1}
+	service := NewService(nil, store, nil, nil)
+	publisher := newRecordingTaskStatusPublisher()
+	service.SetTaskStatusPublisher(publisher)
+
+	err := service.CompleteTask(ctx, CompleteTaskInput{
+		Assignment:    assignment,
+		Result:        `{"status":"success"}`,
+		Outputs:       outputs,
+		AttemptFinish: attemptFinish,
+	})
+	if err != nil {
+		t.Fatalf("CompleteTask returned error: %v", err)
+	}
+
+	intent := store.completionIntent
+	if intent == nil {
+		t.Fatal("completion convergence intent was not recorded")
+	}
+	if intent.TaskID != assignment.TaskID || intent.AccountID != assignment.AccountID ||
+		intent.ProviderEndpointID != assignment.ProviderEndpointID || intent.CredentialID != assignment.CredentialID ||
+		intent.LeaseToken != assignment.LeaseToken {
+		t.Fatalf("completion lease identity = %+v, want assignment %+v", intent, assignment)
+	}
+	if intent.Result != `{"status":"success"}` || !intent.CompletedAt.Equal(completedAt) {
+		t.Fatalf("completion result/time = %q/%v, want result/%v", intent.Result, intent.CompletedAt, completedAt)
+	}
+	if len(intent.Outputs) != 1 || intent.Outputs[0].URL != outputs[0].URL || intent.AttemptFinish != attemptFinish {
+		t.Fatalf("completion outputs/attempt = %+v/%p, want %+v/%p", intent.Outputs, intent.AttemptFinish, outputs, attemptFinish)
+	}
+
+	select {
+	case event := <-publisher.ch:
+		if event.TaskID != assignment.TaskID || event.Status != tasks.StatusCompleted {
+			t.Fatalf("event=(%s,%s), want=(%s,%s)", event.TaskID, event.Status, assignment.TaskID, tasks.StatusCompleted)
+		}
+	default:
+		t.Fatal("completed status was not published after convergence")
+	}
+}
+
 func TestTaskRuntimeTransitionMissingLeaseIdentityConflicts(t *testing.T) {
 	ctx := context.Background()
-	service := NewService(nil, &fakeTaskRuntimeTransitionStore{}, nil, nil)
+	store := &fakeTaskRuntimeTransitionStore{}
+	service := NewService(nil, store, nil, nil)
 
 	testCases := []struct {
 		name string
@@ -250,6 +299,9 @@ func TestTaskRuntimeTransitionMissingLeaseIdentityConflicts(t *testing.T) {
 			}
 		})
 	}
+	if store.writeCount != 0 {
+		t.Fatalf("writeCount=%d, want 0 for missing lease identity", store.writeCount)
+	}
 }
 
 func TestTaskRuntimeFinalFailureConvergenceIsIdempotentForFailedTask(t *testing.T) {
@@ -279,10 +331,12 @@ type fakeTaskRuntimeTransitionStore struct {
 	requeueRows        int64
 	finalFailRows      int64
 	cancelRows         int64
+	completionIntent   *taskstore.CompletedTaskConvergenceIntent
 }
 
-func (f *fakeTaskRuntimeTransitionStore) CompleteWithOutputsAndLeaseToken(context.Context, string, []string, int64, int64, int64, string, string, time.Time, []tasks.TaskOutput, *tasks.TaskAttemptFinish) (int64, error) {
+func (f *fakeTaskRuntimeTransitionStore) ConvergeCompletedTask(_ context.Context, intent taskstore.CompletedTaskConvergenceIntent) (int64, error) {
 	f.writeCount++
+	f.completionIntent = &intent
 	return f.completeRows, f.writeErr
 }
 

@@ -120,13 +120,13 @@ func TestBilledTaskCompletionCapturesWithResultAndRejectsWrongLease(t *testing.T
 	task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-complete", accountID, channelID, credentialID, "lease-correct", "lease-correct")
 	holdTaskForSettlementTest(t, pool, taskBilling, task, request)
 
-	rows, err := repo.CompleteWithOutputsAndLeaseToken(t.Context(), task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, "lease-wrong", `{}`, time.Now(), nil, nil)
+	rows, err := repo.ConvergeCompletedTask(t.Context(), completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, "lease-wrong", `{}`, time.Now(), nil, nil))
 	if err != nil || rows != 0 {
 		t.Fatalf("wrong lease rows=%d err=%v", rows, err)
 	}
 	assertTaskBillingSettlement(t, db, task.TaskID, "held", 75, 25)
 
-	rows, err = repo.CompleteWithOutputsAndLeaseToken(t.Context(), task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, "lease-correct", `{"status":"success"}`, time.Now(), nil, nil)
+	rows, err = repo.ConvergeCompletedTask(t.Context(), completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, "lease-correct", `{"status":"success"}`, time.Now(), nil, nil))
 	if err != nil || rows != 1 {
 		t.Fatalf("complete rows=%d err=%v", rows, err)
 	}
@@ -186,7 +186,7 @@ func TestPaidTaskTerminalSettlementMatrix(t *testing.T) {
 			var rows int64
 			var err error
 			if terminal == "success" {
-				rows, err = repo.CompleteWithOutputsAndLeaseToken(t.Context(), task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, `{"status":"success"}`, time.Now(), nil, nil)
+				rows, err = repo.ConvergeCompletedTask(t.Context(), completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, task.LeaseToken, `{"status":"success"}`, time.Now(), nil, nil))
 			} else {
 				rows, err = repo.MarkTaskFailedWithLease(t.Context(), task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, "provider failed", `{}`, time.Now(), nil)
 			}
@@ -248,7 +248,7 @@ func TestConcurrentBilledCompletionCapturesExactlyOnce(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			rows, err := repo.CompleteWithOutputsAndLeaseToken(context.Background(), task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, "lease-concurrent", `{}`, time.Now(), nil, nil)
+			rows, err := repo.ConvergeCompletedTask(context.Background(), completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, "lease-concurrent", `{}`, time.Now(), nil, nil))
 			rowsCh <- rows
 			errCh <- err
 		}()
@@ -295,7 +295,7 @@ BEFORE UPDATE ON task_billing_settlements FOR EACH ROW EXECUTE FUNCTION fail_tas
 		t.Fatal(err)
 	}
 
-	rows, err := repo.CompleteWithOutputsAndLeaseToken(t.Context(), task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, "lease-rollback", `{"status":"success"}`, time.Now(), nil, nil)
+	rows, err := repo.ConvergeCompletedTask(t.Context(), completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, "lease-rollback", `{"status":"success"}`, time.Now(), nil, nil))
 	if err == nil || rows != 0 {
 		t.Fatalf("rows=%d err=%v", rows, err)
 	}

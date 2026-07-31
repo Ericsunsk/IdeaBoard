@@ -37,7 +37,7 @@ type AccountStore interface {
 }
 
 type TaskStore interface {
-	CompleteWithOutputsAndLeaseToken(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, result string, completedAt time.Time, outputs []tasks.TaskOutput, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
+	ConvergeCompletedTask(ctx context.Context, intent taskstore.CompletedTaskConvergenceIntent) (int64, error)
 	MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
 	MarkTaskFailedWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, result string, completedAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
 	ResetTaskRunningToPendingWithLease(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, errMsg string, attemptFinish *tasks.TaskAttemptFinish) (int64, error)
@@ -58,13 +58,6 @@ type Service struct {
 	queue       taskqueue.TaskAssigner
 	cancelStore taskqueue.TaskCancellationStore
 	taskEvents  events.TaskStatusPublisher
-}
-
-type CompleteTaskInput struct {
-	Assignment    taskqueue.TaskAssignment
-	Result        string
-	Outputs       []tasks.TaskOutput
-	AttemptFinish *tasks.TaskAttemptFinish
 }
 
 type FailTaskInput struct {
@@ -162,29 +155,6 @@ func (s *Service) WatchTaskCancellation(parent context.Context, taskID string) (
 
 func (s *Service) publishTaskStatusEvent(ctx context.Context, taskID, status string) {
 	events.PublishTaskStatusLogWarn(ctx, s.taskEvents, taskID, status)
-}
-
-func (s *Service) CompleteTask(ctx context.Context, input CompleteTaskInput) error {
-	assignment := input.Assignment
-	if err := requireTaskTransitionLease(taskTransitionComplete, assignment); err != nil {
-		return err
-	}
-	now := taskTerminalTime(input.AttemptFinish)
-	if err := validateTaskOutputs(assignment.TaskID, input.Outputs); err != nil {
-		return err
-	}
-	rows, err := s.taskRepo.CompleteWithOutputsAndLeaseToken(ctx, assignment.TaskID, runningOnly(), assignment.AccountID, assignment.ProviderEndpointID, assignment.CredentialID, assignment.LeaseToken, input.Result, now, input.Outputs, input.AttemptFinish)
-	if err := normalizeTaskTransitionWriteError(err); err != nil {
-		return err
-	}
-	applied, err := s.resolveTaskTransitionResult(ctx, taskTransitionComplete, assignment.TaskID, assignment, rows)
-	if err != nil {
-		return err
-	}
-	if applied {
-		s.publishTaskStatusEvent(ctx, assignment.TaskID, tasks.StatusCompleted)
-	}
-	return nil
 }
 
 func (s *Service) ConvergeTaskAfterRiverFinalFailure(ctx context.Context, taskID string, riverJobID int64, reason string) error {

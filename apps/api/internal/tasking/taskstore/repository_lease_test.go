@@ -114,7 +114,7 @@ func TestTaskLeaseReleaseLifecycleForCompleteAndRetry(t *testing.T) {
 	seedTasks(t, repo, ctx, completedTask)
 	insertRepositoryActiveTaskLease(t, db, completedTask.TaskID, accountID, channelID, credentialID, completedTask.LeaseToken)
 
-	rows, err := repo.CompleteWithOutputsAndLeaseToken(ctx, completedTask.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, completedTask.LeaseToken, `{"status":"success"}`, time.Now(), nil, nil)
+	rows, err := repo.ConvergeCompletedTask(ctx, completedTaskConvergenceIntent(completedTask.TaskID, accountID, channelID, credentialID, completedTask.LeaseToken, `{"status":"success"}`, time.Now(), nil, nil))
 	if err != nil || rows != 1 {
 		t.Fatalf("complete task rows=%d err=%v, want rows=1 nil err", rows, err)
 	}
@@ -178,7 +178,7 @@ func TestTaskLeasePreciseReleaseSucceedsForRunningTransitions(t *testing.T) {
 			wantStatus:    tasks.StatusCompleted,
 			wantAccountID: 70,
 			run: func(ctx context.Context, repo *Repository, task *tasks.Task, accountID int64, channelID int64, credentialID int64) (int64, error) {
-				return repo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, `{"status":"success"}`, time.Now(), nil, nil)
+				return repo.ConvergeCompletedTask(ctx, completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, task.LeaseToken, `{"status":"success"}`, time.Now(), nil, nil))
 			},
 		},
 		{
@@ -256,7 +256,7 @@ func TestTaskLeasePreciseReleaseConflictRollsBackRunningTransitions(t *testing.T
 			taskID:     "precise-conflict-complete",
 			leaseToken: "lease-conflict-complete",
 			run: func(ctx context.Context, repo *Repository, task *tasks.Task, accountID int64, channelID int64, credentialID int64) (int64, error) {
-				return repo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, `{"status":"success"}`, time.Now(), nil, nil)
+				return repo.ConvergeCompletedTask(ctx, completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, task.LeaseToken, `{"status":"success"}`, time.Now(), nil, nil))
 			},
 		},
 		{
@@ -486,7 +486,7 @@ func TestResetRunningTasksMissingLeaseTokenToPendingHonorsLimit(t *testing.T) {
 	}
 }
 
-func TestCompleteWithOutputsAndLeaseTokenRejectsWrongLeaseToken(t *testing.T) {
+func TestConvergeCompletedTaskRejectsWrongLeaseToken(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.Open(t)
 	repo := NewRepository(db)
@@ -501,17 +501,16 @@ func TestCompleteWithOutputsAndLeaseTokenRejectsWrongLeaseToken(t *testing.T) {
 	}
 	seedTasks(t, repo, ctx, task)
 
-	updated, err := repo.CompleteWithOutputsAndLeaseToken(
-		ctx, "lease-conflict-wrong-token",
-		[]string{tasks.StatusRunning},
+	updated, err := repo.ConvergeCompletedTask(ctx, completedTaskConvergenceIntent(
+		"lease-conflict-wrong-token",
 		accountID, accountID+10000,
 		loadRepositoryTestCredentialID(t, db, accountID),
 		"wrong-token", // wrong lease token
 		"result", time.Now(),
 		nil, nil,
-	)
+	))
 	if err != nil {
-		t.Fatalf("CompleteWithOutputsAndLeaseToken with wrong token errored: %v", err)
+		t.Fatalf("ConvergeCompletedTask with wrong token errored: %v", err)
 	}
 	if updated != 0 {
 		t.Fatalf("updated=%d with wrong lease token, want 0", updated)
@@ -526,7 +525,7 @@ func TestCompleteWithOutputsAndLeaseTokenRejectsWrongLeaseToken(t *testing.T) {
 	}
 }
 
-func TestCompleteWithOutputsAndLeaseTokenConcurrentOnlyOneSucceeds(t *testing.T) {
+func TestConvergeCompletedTaskConcurrentOnlyOneSucceeds(t *testing.T) {
 	ctx := context.Background()
 	db := testdb.Open(t)
 	repo := NewRepository(db)
@@ -545,15 +544,14 @@ func TestCompleteWithOutputsAndLeaseTokenConcurrentOnlyOneSucceeds(t *testing.T)
 	results := make(chan int64, 2)
 	for i := 0; i < 2; i++ {
 		go func() {
-			updated, err := repo.CompleteWithOutputsAndLeaseToken(
-				context.Background(), "lease-conflict-concurrent",
-				[]string{tasks.StatusRunning},
+			updated, err := repo.ConvergeCompletedTask(context.Background(), completedTaskConvergenceIntent(
+				"lease-conflict-concurrent",
 				accountID, accountID+10000,
 				loadRepositoryTestCredentialID(t, db, accountID),
 				"token-a", // both use correct token, but only one should succeed
 				"result", time.Now(),
 				nil, nil,
-			)
+			))
 			if err != nil {
 				results <- -1
 				return

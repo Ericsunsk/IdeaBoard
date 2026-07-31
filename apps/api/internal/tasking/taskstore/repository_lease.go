@@ -152,36 +152,6 @@ func (r *Repository) FinalFailTaskRunningWithLease(ctx context.Context, taskID s
 	})
 }
 
-func (r *Repository) CompleteWithOutputsAndLeaseToken(ctx context.Context, taskID string, statuses []string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, result string, completedAt time.Time, outputs []tasks.TaskOutput, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
-	completedAt = terminalTransitionTime(completedAt)
-	return r.runTerminalTransition(ctx, terminalTransitionCommand{
-		taskID:        taskID,
-		kind:          terminalTransitionCompleted,
-		finishedAt:    completedAt,
-		attemptFinish: attemptFinish,
-		outputs:       outputs,
-		lease: terminalLeaseRelease{
-			mode:               terminalLeaseReleaseExact,
-			accountID:          accountID,
-			providerEndpointID: providerEndpointID,
-			credentialID:       credentialID,
-			leaseToken:         leaseToken,
-		},
-		writeTaskFact: func(ctx context.Context, q *dbsqlc.Queries) (int64, error) {
-			return q.CompleteTaskWithLease(ctx, dbsqlc.CompleteTaskWithLeaseParams{
-				Result:                     result,
-				CompletedAt:                sql.NullTime{Time: completedAt, Valid: true},
-				TaskID:                     taskID,
-				Statuses:                   statuses,
-				AccountID:                  sql.NullInt64{Int64: accountID, Valid: accountID > 0},
-				AssignedProviderEndpointID: sql.NullInt64{Int64: providerEndpointID, Valid: providerEndpointID > 0},
-				AssignedCredentialID:       sql.NullInt64{Int64: credentialID, Valid: credentialID > 0},
-				LeaseToken:                 leaseToken,
-			})
-		},
-	})
-}
-
 func insertTaskOutputs(ctx context.Context, q *dbsqlc.Queries, taskID string, ownerUserID int64, outputs []tasks.TaskOutput) error {
 	for i := range outputs {
 		output := outputs[i]

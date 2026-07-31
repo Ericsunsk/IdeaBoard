@@ -168,7 +168,10 @@ func finishTaskAttemptTx(ctx context.Context, q *dbsqlc.Queries, finish *tasks.T
 	if err != nil {
 		return err
 	}
-	if updated != 1 {
+	if updated == 0 {
+		return fmt.Errorf("%w: finish task attempt affected 0 rows, want 1", ErrTaskLeaseStateConflict)
+	}
+	if updated > 1 {
 		return fmt.Errorf("finish task attempt affected %d rows, want 1", updated)
 	}
 	return nil

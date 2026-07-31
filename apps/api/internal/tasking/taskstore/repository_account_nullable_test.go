@@ -563,10 +563,8 @@ func TestCompleteWithAttemptRollsBackWhenAttemptFinishFails(t *testing.T) {
 		t.Fatalf("create task failed: %v", err)
 	}
 
-	rows, err := repo.CompleteWithOutputsAndLeaseToken(
-		ctx,
+	rows, err := repo.ConvergeCompletedTask(ctx, completedTaskConvergenceIntent(
 		task.TaskID,
-		[]string{tasks.StatusRunning},
 		accountID,
 		channelID,
 		loadRepositoryTestCredentialID(t, db, accountID),
@@ -579,9 +577,9 @@ func TestCompleteWithAttemptRollsBackWhenAttemptFinishFails(t *testing.T) {
 			Status:      tasks.TaskAttemptStatusCompleted,
 			CompletedAt: time.Now(),
 		},
-	)
-	if err == nil {
-		t.Fatal("complete task with missing attempt succeeded")
+	))
+	if !errors.Is(err, ErrTaskLeaseStateConflict) {
+		t.Fatalf("complete task with missing attempt err=%v, want ErrTaskLeaseStateConflict", err)
 	}
 	if rows != 0 {
 		t.Fatalf("rows=%d, want 0 when transaction rolls back", rows)
@@ -623,11 +621,11 @@ func TestCompleteRollsBackWhenAttemptBelongsToAnotherTask(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rows, err := repo.CompleteWithOutputsAndLeaseToken(
-		ctx, taskA.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID,
+	rows, err := repo.ConvergeCompletedTask(ctx, completedTaskConvergenceIntent(
+		taskA.TaskID, accountID, channelID, credentialID,
 		taskA.LeaseToken, `{}`, time.Now(), nil,
 		&tasks.TaskAttemptFinish{ID: attemptB.ID, Status: tasks.TaskAttemptStatusCompleted, CompletedAt: time.Now()},
-	)
+	))
 	if err == nil || rows != 0 {
 		t.Fatalf("cross-task attempt rows=%d err=%v, want rollback", rows, err)
 	}
@@ -665,11 +663,11 @@ WHERE task_id = $1`, task.TaskID); err != nil {
 	}
 	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, "lease-stale-new")
 
-	rows, err := repo.CompleteWithOutputsAndLeaseToken(
-		ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID,
+	rows, err := repo.ConvergeCompletedTask(ctx, completedTaskConvergenceIntent(
+		task.TaskID, accountID, channelID, credentialID,
 		"lease-stale-new", `{}`, time.Now(), nil,
 		&tasks.TaskAttemptFinish{ID: oldAttempt.ID, Status: tasks.TaskAttemptStatusCompleted, CompletedAt: time.Now()},
-	)
+	))
 	if err == nil || rows != 0 {
 		t.Fatalf("stale-lease attempt rows=%d err=%v, want rollback", rows, err)
 	}
@@ -700,11 +698,11 @@ func TestCompleteRollsBackWhenAttemptStatusConflictsWithTerminalPolicy(t *testin
 		t.Fatal(err)
 	}
 
-	rows, err := repo.CompleteWithOutputsAndLeaseToken(
-		ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID,
+	rows, err := repo.ConvergeCompletedTask(ctx, completedTaskConvergenceIntent(
+		task.TaskID, accountID, channelID, credentialID,
 		task.LeaseToken, `{}`, time.Now(), nil,
 		&tasks.TaskAttemptFinish{ID: attempt.ID, Status: tasks.TaskAttemptStatusFailed, CompletedAt: time.Now()},
-	)
+	))
 	if err == nil || rows != 0 {
 		t.Fatalf("attempt status mismatch rows=%d err=%v, want rollback", rows, err)
 	}

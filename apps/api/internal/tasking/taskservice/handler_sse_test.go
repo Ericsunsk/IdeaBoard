@@ -424,7 +424,15 @@ func TestStreamUserTaskStreamsRunningThenCompletedEvent(t *testing.T) {
 	go func() {
 		time.Sleep(80 * time.Millisecond)
 		now := time.Now()
-		rows, updateErr := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, account.ID, account.ProviderEndpointID, loadTaskServiceSSECredentialID(t, db, account.ID), task.LeaseToken, `{"status":"success","image_url":"https://example.com/live.png","account_id":21,"provider_endpoint_id":99}`, now, nil, nil)
+		rows, updateErr := taskRepo.ConvergeCompletedTask(ctx, taskstore.CompletedTaskConvergenceIntent{
+			TaskID:             task.TaskID,
+			AccountID:          account.ID,
+			ProviderEndpointID: account.ProviderEndpointID,
+			CredentialID:       loadTaskServiceSSECredentialID(t, db, account.ID),
+			LeaseToken:         task.LeaseToken,
+			Result:             `{"status":"success","image_url":"https://example.com/live.png","account_id":21,"provider_endpoint_id":99}`,
+			CompletedAt:        now,
+		})
 		if updateErr != nil {
 			done <- updateErr
 			return

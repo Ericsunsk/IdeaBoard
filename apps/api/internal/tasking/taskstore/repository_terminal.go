@@ -61,6 +61,48 @@ type terminalTransitionPolicy struct {
 	replacesOutputs bool
 }
 
+type CompletedTaskConvergenceIntent struct {
+	TaskID             string
+	AccountID          int64
+	ProviderEndpointID int64
+	CredentialID       int64
+	LeaseToken         string
+	Result             string
+	CompletedAt        time.Time
+	Outputs            []tasks.TaskOutput
+	AttemptFinish      *tasks.TaskAttemptFinish
+}
+
+func (r *Repository) ConvergeCompletedTask(ctx context.Context, intent CompletedTaskConvergenceIntent) (int64, error) {
+	completedAt := terminalTransitionTime(intent.CompletedAt)
+	return r.runTerminalTransition(ctx, terminalTransitionCommand{
+		taskID:        intent.TaskID,
+		kind:          terminalTransitionCompleted,
+		finishedAt:    completedAt,
+		attemptFinish: intent.AttemptFinish,
+		outputs:       intent.Outputs,
+		lease: terminalLeaseRelease{
+			mode:               terminalLeaseReleaseExact,
+			accountID:          intent.AccountID,
+			providerEndpointID: intent.ProviderEndpointID,
+			credentialID:       intent.CredentialID,
+			leaseToken:         intent.LeaseToken,
+		},
+		writeTaskFact: func(ctx context.Context, q *dbsqlc.Queries) (int64, error) {
+			return q.CompleteTaskWithLease(ctx, dbsqlc.CompleteTaskWithLeaseParams{
+				Result:                     intent.Result,
+				CompletedAt:                sql.NullTime{Time: completedAt, Valid: true},
+				TaskID:                     intent.TaskID,
+				Statuses:                   []string{tasks.StatusRunning},
+				AccountID:                  sql.NullInt64{Int64: intent.AccountID, Valid: intent.AccountID > 0},
+				AssignedProviderEndpointID: sql.NullInt64{Int64: intent.ProviderEndpointID, Valid: intent.ProviderEndpointID > 0},
+				AssignedCredentialID:       sql.NullInt64{Int64: intent.CredentialID, Valid: intent.CredentialID > 0},
+				LeaseToken:                 intent.LeaseToken,
+			})
+		},
+	})
+}
+
 // runTerminalTransition owns the atomic terminal recipe. Repository methods
 // only adapt their caller-specific task fact command into this invariant.
 func (r *Repository) runTerminalTransition(ctx context.Context, command terminalTransitionCommand) (int64, error) {

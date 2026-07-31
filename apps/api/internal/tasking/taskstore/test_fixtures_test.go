@@ -9,6 +9,30 @@ import (
 	"ideaboard/api/internal/tasking/tasks"
 )
 
+func completedTaskConvergenceIntent(
+	taskID string,
+	accountID int64,
+	providerEndpointID int64,
+	credentialID int64,
+	leaseToken string,
+	result string,
+	completedAt time.Time,
+	outputs []tasks.TaskOutput,
+	attemptFinish *tasks.TaskAttemptFinish,
+) CompletedTaskConvergenceIntent {
+	return CompletedTaskConvergenceIntent{
+		TaskID:             taskID,
+		AccountID:          accountID,
+		ProviderEndpointID: providerEndpointID,
+		CredentialID:       credentialID,
+		LeaseToken:         leaseToken,
+		Result:             result,
+		CompletedAt:        completedAt,
+		Outputs:            outputs,
+		AttemptFinish:      attemptFinish,
+	}
+}
+
 // createRepositoryTestTask keeps generic repository fixtures aligned with the
 // current Task row invariants. Tests that intentionally exercise invalid rows
 // should call Repository.Create directly or disable the specific constraint.

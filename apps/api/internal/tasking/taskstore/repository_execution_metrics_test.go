@@ -273,14 +273,14 @@ func TestCompleteWithOutputsWritesTerminalExecutionMetrics(t *testing.T) {
 		t.Fatalf("create attempt failed: %v", err)
 	}
 	providerFinishedAt := completedAt.Add(-time.Second)
-	rows, err := taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, task.LeaseToken, `{"status":"success"}`, completedAt, nil, &tasks.TaskAttemptFinish{
+	rows, err := taskRepo.ConvergeCompletedTask(ctx, completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, task.LeaseToken, `{"status":"success"}`, completedAt, nil, &tasks.TaskAttemptFinish{
 		ID:                 attempt.ID,
 		Status:             tasks.TaskAttemptStatusCompleted,
 		ProviderFinishedAt: &providerFinishedAt,
 		ProviderLatencyMS:  1000,
 		TotalLatencyMS:     2000,
 		CompletedAt:        completedAt,
-	})
+	}))
 	if err != nil || rows != 1 {
 		t.Fatalf("complete task rows=%d err=%v, want rows=1 nil err", rows, err)
 	}
@@ -592,7 +592,7 @@ WHERE lease_token = $1`, secondLease); err != nil {
 	if err != nil {
 		t.Fatalf("create second attempt failed: %v", err)
 	}
-	rowsUpdated, err = taskRepo.CompleteWithOutputsAndLeaseToken(ctx, task.TaskID, []string{tasks.StatusRunning}, accountID, channelID, credentialID, secondLease, `{"status":"success"}`, completedAt, nil, &tasks.TaskAttemptFinish{
+	rowsUpdated, err = taskRepo.ConvergeCompletedTask(ctx, completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, secondLease, `{"status":"success"}`, completedAt, nil, &tasks.TaskAttemptFinish{
 		ID:                 secondRef.ID,
 		Status:             tasks.TaskAttemptStatusCompleted,
 		ProviderFinishedAt: &secondProviderFinishedAt,
@@ -602,7 +602,7 @@ WHERE lease_token = $1`, secondLease); err != nil {
 		FinalizeLatencyMS:  1000,
 		TotalLatencyMS:     2000,
 		CompletedAt:        completedAt,
-	})
+	}))
 	if err != nil || rowsUpdated != 1 {
 		t.Fatalf("complete second attempt rows=%d err=%v, want rows=1 nil err", rowsUpdated, err)
 	}

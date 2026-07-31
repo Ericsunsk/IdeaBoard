@@ -223,10 +223,8 @@ func TestCompleteWithOutputsRecordsDailyStatsOnTerminalDateAcrossMidnight(t *tes
 	}
 	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, task.LeaseToken)
 
-	rowsAffected, err := taskRepo.CompleteWithOutputsAndLeaseToken(
-		ctx,
+	rowsAffected, err := taskRepo.ConvergeCompletedTask(ctx, completedTaskConvergenceIntent(
 		task.TaskID,
-		[]string{tasks.StatusRunning},
 		accountID,
 		channelID,
 		credentialID,
@@ -235,9 +233,9 @@ func TestCompleteWithOutputsRecordsDailyStatsOnTerminalDateAcrossMidnight(t *tes
 		completedAt,
 		nil,
 		nil,
-	)
+	))
 	if err != nil {
-		t.Fatalf("CompleteWithOutputsAndLeaseToken failed: %v", err)
+		t.Fatalf("ConvergeCompletedTask failed: %v", err)
 	}
 	if rowsAffected != 1 {
 		t.Fatalf("rows=%d, want 1", rowsAffected)
