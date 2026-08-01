@@ -91,4 +91,50 @@ describe('AdminCreditsBillingLayout', () => {
 
     expect(routerMocks.push).toHaveBeenCalledWith(ADMIN_REWARD_CODES_PATH)
   })
+
+  it('opens Stripe settings from the gear left of the billing navigation', async () => {
+    useMswHandlers(
+      http.get('/api/admin/credits/health', () =>
+        HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            status: 'healthy',
+            open_findings: { total: 0, warning: 0, error: 0, critical: 0, high_risk: 0 },
+            restricted_wallet_count: 0,
+          },
+        }),
+      ),
+      http.get('/api/admin/payments/stripe-config', () =>
+        HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            configured: false,
+            api_key_configured: false,
+            webhook_secret_configured: false,
+            charges_enabled: false,
+            product_tax_code: '',
+            product_ready: false,
+            webhook_ready: false,
+            purchases_enabled: false,
+          },
+        }),
+      ),
+    )
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { user } = renderWithUser(AdminCreditsBillingLayout, {
+      global: {
+        plugins: [
+          [PrimeVue, primeVueTestOptions],
+          [VueQueryPlugin, { queryClient }],
+        ],
+        stubs: { RouterView: true, transition: false },
+      },
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Stripe 设置' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Stripe 设置' })).toBeVisible()
+  })
 })

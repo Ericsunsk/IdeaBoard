@@ -16,6 +16,7 @@ import (
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/payments"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
 	dbprivileges "ideaboard/api/internal/platform/database/privileges"
@@ -51,6 +52,7 @@ type appRepositories struct {
 	lineDraftModeRepo    *assets.LineDraftModeRepository
 	mediaAssetRegistry   *assets.MediaAssetRegistry
 	boardRepo            *boards.BoardRepository
+	paymentRepo          *payments.Repository
 }
 
 func openAppDatabases(ctx context.Context, cfg *config.Config) (appDatabases, error) {
@@ -137,6 +139,7 @@ func runtimePrivilegePolicies() []dbprivileges.Policy {
 		taskbilling.RuntimePrivilegePolicy(),
 		worker.RuntimePrivilegePolicy(),
 		rewards.RuntimePrivilegePolicy(),
+		payments.RuntimePrivilegePolicy(),
 	}
 }
 
@@ -180,6 +183,7 @@ func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error
 		lineDraftModeRepo:    assets.NewLineDraftModeRepository(db),
 		mediaAssetRegistry:   assets.NewMediaAssetRegistry(db),
 		boardRepo:            boards.NewBoardRepository(db),
+		paymentRepo:          payments.NewRepository(db),
 	}
 	if err := repos.userRepo.EnsureStorageUIDs(ctx); err != nil {
 		return appRepositories{}, err

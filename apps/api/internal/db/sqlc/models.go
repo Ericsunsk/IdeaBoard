@@ -291,6 +291,49 @@ type MediaRef struct {
 	UpdatedAt    time.Time       `json:"updated_at"`
 }
 
+type PaymentAdminAction struct {
+	ID           int64           `json:"id"`
+	ActionType   string          `json:"action_type"`
+	ActorID      int64           `json:"actor_id"`
+	TargetType   string          `json:"target_type"`
+	TargetID     string          `json:"target_id"`
+	Outcome      string          `json:"outcome"`
+	ErrorCode    string          `json:"error_code"`
+	ErrorSummary string          `json:"error_summary"`
+	Metadata     json.RawMessage `json:"metadata"`
+	CreatedAt    time.Time       `json:"created_at"`
+}
+
+type PaymentStripeConfiguration struct {
+	SingletonID             int16     `json:"singleton_id"`
+	AccountID               string    `json:"account_id"`
+	Mode                    string    `json:"mode"`
+	ChargesEnabled          bool      `json:"charges_enabled"`
+	ProductTaxCode          string    `json:"product_tax_code"`
+	PurchasesEnabled        bool      `json:"purchases_enabled"`
+	StripeProductID         string    `json:"stripe_product_id"`
+	StripeWebhookEndpointID string    `json:"stripe_webhook_endpoint_id"`
+	ApiKeyCiphertext        string    `json:"api_key_ciphertext"`
+	WebhookSecretCiphertext string    `json:"webhook_secret_ciphertext"`
+	SecretMaterialKind      string    `json:"secret_material_kind"`
+	CreatedBy               int64     `json:"created_by"`
+	UpdatedBy               int64     `json:"updated_by"`
+	CreatedAt               time.Time `json:"created_at"`
+	UpdatedAt               time.Time `json:"updated_at"`
+}
+
+type PaymentWebhookEvent struct {
+	StripeEventID    string       `json:"stripe_event_id"`
+	EventType        string       `json:"event_type"`
+	StripeObjectID   string       `json:"stripe_object_id"`
+	Livemode         bool         `json:"livemode"`
+	StripeCreatedAt  time.Time    `json:"stripe_created_at"`
+	ProcessingResult string       `json:"processing_result"`
+	ErrorSummary     string       `json:"error_summary"`
+	ReceivedAt       time.Time    `json:"received_at"`
+	ProcessedAt      sql.NullTime `json:"processed_at"`
+}
+
 type ProviderEndpoint struct {
 	ID        int64     `json:"id"`
 	ApiType   string    `json:"api_type"`

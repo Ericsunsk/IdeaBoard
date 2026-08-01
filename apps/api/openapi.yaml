@@ -19,6 +19,7 @@ tags:
   - name: AdminCredits
   - name: AdminBilling
   - name: AdminRewards
+  - name: AdminPayments
   - name: AdminAccounts
   - name: AdminTasks
   - name: AdminMonitor
@@ -30,6 +31,7 @@ tags:
   - name: AdminAssets
   - name: UserLineDraftModes
   - name: AdminLineDraftModes
+  - name: PaymentWebhooks
 paths:
   /settings/branding:
     get:
@@ -768,6 +770,121 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseOutboundPolicySetting'
+
+  /admin/payments/stripe-config:
+    get:
+      tags: [AdminPayments]
+      operationId: getAdminStripeConfiguration
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Current safe Stripe configuration summary; Secrets are never returned
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseStripeConfigurationSummary'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '403':
+          description: Admin role required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+    put:
+      tags: [AdminPayments]
+      operationId: updateAdminStripeConfiguration
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStripeConfigurationRequest'
+      responses:
+        '200':
+          description: Stripe resources prepared and current configuration atomically replaced
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseStripeConfigurationSummary'
+        '400':
+          description: Invalid API key format, Product Tax Code, or request body
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '403':
+          description: Admin role required or Stripe API key lacks required permissions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '422':
+          description: Stripe account or prepared resources cannot accept purchases
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '503':
+          description: Stripe is temporarily unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+
+  /webhooks/stripe:
+    post:
+      tags: [PaymentWebhooks]
+      operationId: receiveStripeWebhook
+      parameters:
+        - name: Stripe-Signature
+          in: header
+          required: true
+          schema: { type: string, minLength: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Signed event accepted idempotently or ignored after verification
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseStripeWebhookReceipt'
+        '400':
+          description: Invalid signature, expired signature, or malformed event
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '413':
+          description: Request body exceeds the webhook size limit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '503':
+          description: Stripe webhook configuration is unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
 
   /admin/users:
     get:
@@ -3550,6 +3667,61 @@ components:
           uniqueItems: true
           items: { type: string, minLength: 1, maxLength: 255 }
 
+    StripeMode:
+      type: string
+      enum: [test, live]
+
+    StripeConfigurationSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - configured
+        - api_key_configured
+        - webhook_secret_configured
+        - charges_enabled
+        - product_tax_code
+        - product_ready
+        - webhook_ready
+        - purchases_enabled
+      properties:
+        configured: { type: boolean }
+        api_key_configured: { type: boolean }
+        webhook_secret_configured: { type: boolean }
+        account_id: { type: string }
+        mode:
+          $ref: '#/components/schemas/StripeMode'
+        charges_enabled: { type: boolean }
+        product_tax_code: { type: string }
+        product_ready: { type: boolean }
+        webhook_ready: { type: boolean }
+        purchases_enabled: { type: boolean }
+        updated_at: { type: string, format: date-time }
+
+    UpdateStripeConfigurationRequest:
+      type: object
+      additionalProperties: false
+      required: [product_tax_code, purchases_enabled]
+      properties:
+        api_key:
+          type: string
+          minLength: 1
+          maxLength: 512
+          writeOnly: true
+          description: Required for first configuration; omit to retain the current encrypted key
+        product_tax_code:
+          type: string
+          pattern: '^txcd_[0-9]{8}$'
+        purchases_enabled: { type: boolean }
+
+    StripeWebhookReceipt:
+      type: object
+      additionalProperties: false
+      required: [event_id, duplicate, ignored]
+      properties:
+        event_id: { type: string }
+        duplicate: { type: boolean }
+        ignored: { type: boolean }
+
     AdminAccount:
       type: object
       required: [id, name, provider_endpoint_id, provider_endpoint_api_type, provider_endpoint_base_url, models, secret_configured, max_concurrent, fail_count, weight, timeout, extra_config, status, created_at, updated_at]
@@ -4380,6 +4552,22 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/OutboundPolicySetting'
+
+    ApiResponseStripeConfigurationSummary:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/StripeConfigurationSummary'
+
+    ApiResponseStripeWebhookReceipt:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/StripeWebhookReceipt'
 
     ApiResponseUserList:
       allOf:

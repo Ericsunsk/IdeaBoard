@@ -12,6 +12,8 @@ import (
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/payments"
+	"ideaboard/api/internal/payments/stripeadapter"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
@@ -35,6 +37,7 @@ type appDomainServices struct {
 	creditService        *credits.Service
 	usageService         *usage.Service
 	rewardService        *rewards.Service
+	paymentService       *payments.Service
 	userLifecycle        *users.LifecycleService
 }
 
@@ -70,6 +73,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		return appDomainServices{}, err
 	}
 	userService := users.NewUserService(repos.userRepo, userLifecycle, creditService, storageService)
+	stripeAdapter := stripeadapter.New()
 	return appDomainServices{
 		authServiceClient:    auth.NewServiceClient(cfg.Auth),
 		runtimeSettings:      runtimeSettings,
@@ -83,6 +87,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		creditService:        creditService,
 		usageService:         usage.NewService(creditService, repos.taskBillingUsage, usage.ServiceOptions{}),
 		rewardService:        rewardService,
+		paymentService:       payments.NewService(repos.paymentRepo, stripeAdapter, stripeAdapter),
 		userLifecycle:        userLifecycle,
 	}, nil
 }

@@ -13,6 +13,7 @@ import (
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/payments"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/rewards"
@@ -31,6 +32,7 @@ type Dependencies struct {
 	CORSMiddleware gin.HandlerFunc
 	RateLimit      settings.RateLimitSettingProvider
 	Branding       settings.BrandingSettingProvider
+	PaymentWebhook *payments.Handler
 }
 
 type FrontendRouteOptions struct {
@@ -84,6 +86,7 @@ type AdminRouteDeps struct {
 	StorageService          *storage.StorageService
 	UploadSettings          settings.MediaUploadSettingProvider
 	RewardHandler           *rewards.Handler
+	PaymentHandler          *payments.Handler
 }
 
 const globalRequestBodyLimitBytes int64 = 2 * 1024 * 1024
@@ -103,11 +106,14 @@ const (
 	RouteAdminSettingsRateLimit   = "/settings/rate-limit"
 	RouteAdminSettingsTaskMonitor = "/settings/task-monitor"
 	RouteAdminSettingsOutbound    = "/settings/outbound-policy"
+	RouteAdminStripeConfiguration = "/payments/stripe-config"
+	RoutePaymentStripeWebhook     = "/api/webhooks/stripe"
 )
 
 func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, frontendOptions FrontendRouteOptions) {
 	registerGlobalMiddleware(r, deps)
 	registerPublicRoutes(r, deps.Branding)
+	registerPaymentWebhookRoutes(r, deps.PaymentWebhook)
 	registerStaticUploadRoutes(r, deps.StaticUploads)
 	registerAuthenticatedUserRoutes(r, deps.Auth, deps.UserRoutes)
 	registerAuthenticatedAdminRoutes(r, deps.Auth, deps.AdminRoutes)

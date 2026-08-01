@@ -70,6 +70,7 @@ type Querier interface {
 	GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error)
 	GetLineDraftModeByID(ctx context.Context, id int64) (LineDraftMode, error)
 	GetMediaAssetByID(ctx context.Context, id int64) (MediaAsset, error)
+	GetPaymentStripeConfiguration(ctx context.Context) (PaymentStripeConfiguration, error)
 	GetProviderEndpointByID(ctx context.Context, id int64) (ProviderEndpoint, error)
 	GetRuntimeAccountByIDWithSecret(ctx context.Context, id int64) (GetRuntimeAccountByIDWithSecretRow, error)
 	GetRuntimeAccountForAssignment(ctx context.Context, arg GetRuntimeAccountForAssignmentParams) (GetRuntimeAccountForAssignmentRow, error)
@@ -85,6 +86,8 @@ type Querier interface {
 	GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUserIDByStorageUIDForUpdateParams) (int64, error)
 	HasActiveStorageProfileSecretVersion(ctx context.Context, arg HasActiveStorageProfileSecretVersionParams) (bool, error)
 	IncrementAccountFailCount(ctx context.Context, id int64) (int64, error)
+	InsertPaymentAdminAction(ctx context.Context, arg InsertPaymentAdminActionParams) error
+	InsertPaymentWebhookEvent(ctx context.Context, arg InsertPaymentWebhookEventParams) (int64, error)
 	InsertStorageProfileSecretVersion(ctx context.Context, arg InsertStorageProfileSecretVersionParams) (StorageProfileSecretVersion, error)
 	InsertTaskStatEventIgnore(ctx context.Context, arg InsertTaskStatEventIgnoreParams) (int64, error)
 	InsertUsedUIDIgnore(ctx context.Context, storageUid string) (int64, error)
@@ -140,6 +143,7 @@ type Querier interface {
 	ReleaseActiveTaskLeasesByTaskIDs(ctx context.Context, arg ReleaseActiveTaskLeasesByTaskIDsParams) (int64, error)
 	ReleaseMediaAssetReclamationClaim(ctx context.Context, arg ReleaseMediaAssetReclamationClaimParams) error
 	ReleaseTaskLease(ctx context.Context, arg ReleaseTaskLeaseParams) (int64, error)
+	ReplacePaymentStripeConfiguration(ctx context.Context, arg ReplacePaymentStripeConfigurationParams) (PaymentStripeConfiguration, error)
 	RequeueTaskRunningWithLease(ctx context.Context, arg RequeueTaskRunningWithLeaseParams) (int64, error)
 	ResetAccountFailCount(ctx context.Context, id int64) (int64, error)
 	ResetRunningMissingLeaseTasksByIDs(ctx context.Context, taskIds []string) (int64, error)

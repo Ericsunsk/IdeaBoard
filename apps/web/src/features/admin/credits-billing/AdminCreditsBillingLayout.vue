@@ -1,6 +1,20 @@
 <template>
   <div class="flex min-h-0 min-w-0 flex-col gap-4">
-    <div class="flex min-w-0 justify-end">
+    <div class="flex min-w-0 items-center justify-end gap-1.5">
+      <Button
+        v-tooltip.top="'Stripe 设置'"
+        text
+        rounded
+        severity="secondary"
+        size="small"
+        class="!size-8 !p-0"
+        aria-label="Stripe 设置"
+        @click="stripeSettingsVisible = true"
+      >
+        <template #icon>
+          <Settings class="size-4" />
+        </template>
+      </Button>
       <nav aria-label="积分运营">
         <SelectButton
           :model-value="activeNavigationPath"
@@ -28,13 +42,17 @@
       </nav>
     </div>
     <RouterView />
+    <StripeSettingsDialog v-model:visible="stripeSettingsVisible" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
+import { Settings } from '@iconoir/vue'
+import Button from 'primevue/button'
 import SelectButton from 'primevue/selectbutton'
+import Tooltip from 'primevue/tooltip'
 import {
   ADMIN_CREDIT_HEALTH_PATH,
   ADMIN_CREDIT_PRICING_PATH,
@@ -43,6 +61,9 @@ import {
 } from '../../../shared/constants/routePaths'
 import { useAdminCreditHealthResource } from './health/adminCreditHealthResource'
 import { getCreditHealthPresentation } from './health/creditHealthPresentation'
+import StripeSettingsDialog from '../payments/stripe-settings/StripeSettingsDialog.vue'
+
+const vTooltip = Tooltip
 
 type NavigationPath =
   | typeof ADMIN_CREDIT_PRICING_PATH
@@ -57,6 +78,7 @@ const navigationItems: Array<{ key: string; path: NavigationPath; label: string 
 
 const route = useRoute()
 const router = useRouter()
+const stripeSettingsVisible = ref(false)
 const healthResource = useAdminCreditHealthResource()
 const healthBadge = computed(() => {
   const status = healthResource.health.value?.status

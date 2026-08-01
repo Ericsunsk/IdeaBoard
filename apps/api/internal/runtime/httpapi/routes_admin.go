@@ -25,6 +25,12 @@ func registerAdminRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	registerAdminCreditRoutes(adminAPI, h)
 	registerAdminBillingRoutes(adminAPI, h)
 	registerAdminRewardRoutes(adminAPI, h)
+	registerAdminPaymentRoutes(adminAPI, h)
+}
+
+func registerAdminPaymentRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+	adminAPI.GET(RouteAdminStripeConfiguration, h.PaymentHandler.GetStripeConfiguration)
+	adminAPI.PUT(RouteAdminStripeConfiguration, h.PaymentHandler.UpdateStripeConfiguration)
 }
 
 func registerAdminRewardRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {

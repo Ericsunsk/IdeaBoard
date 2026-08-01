@@ -13,6 +13,7 @@ import (
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/payments"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/rewards"
@@ -35,6 +36,7 @@ func newAppRouter(
 	taskHandler := taskservice.NewHandler(taskServices.taskService)
 	taskStatsHandler := taskstats.NewHandler(taskServices.taskStatsService, taskServices.accountService)
 	billingHandler := billing.NewHandler(services.billingCatalog, services.billingCatalog)
+	paymentHandler := payments.NewHandler(services.paymentService, services.runtimeSettings)
 
 	authDeps := httpapi.AuthDeps{
 		AuthServiceClient: services.authServiceClient,
@@ -83,7 +85,9 @@ func newAppRouter(
 			StorageService:          services.storageService,
 			UploadSettings:          services.runtimeSettings,
 			RewardHandler:           rewards.NewHandler(services.rewardService),
+			PaymentHandler:          paymentHandler,
 		},
+		PaymentWebhook: paymentHandler,
 		StaticUploads: httpapi.StaticUploadDeps{
 			Auth:         authDeps,
 			BoardService: services.boardService,

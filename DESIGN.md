@@ -143,7 +143,7 @@ Admin route pages 不直接依赖 generated API。每个 Admin vertical context 
 | `features/admin/storage` | `internal/media/storage` | storage provider/profile、secret masking、bucket test/apply |
 | `features/admin/task-monitor` | `internal/tasking` | task list/detail、runtime monitor、stream/poll fallback |
 | `features/admin/statistics` | `internal/tasking/taskstats` | statistics aggregation、backfill status、range contract |
-| `features/admin/credits-billing` | `internal/billing`, `internal/credits`, `internal/rewards` | Registry-backed 功能定价 Catalog、Wallet/Ledger operations、Credit Health 与 RewardCode 运营 |
+| `features/admin/credits-billing` | `internal/billing`, `internal/credits`, `internal/rewards`, `internal/payments` | Registry-backed 功能定价 Catalog、Wallet/Ledger operations、Credit Health、RewardCode 运营与 Stripe 配置 |
 
 ### 9. Generated code 是边界，不是业务模型
 
@@ -178,6 +178,7 @@ Backend context map 的局部规则见 [apps/api/CONTEXT.md](./apps/api/CONTEXT.
 | Billing Records | `internal/billingrecords` | 用户侧最终 Idea 收支 Read Model；组合 Credits Ledger 与 immutable Task Billing snapshot，不拥有账务写入 |
 | Credits | `internal/credits` | 平台 Credit Wallet（用户展示为 Idea）、Double-entry Ledger、余额 projection、幂等 Credit Commands |
 | Rewards | `internal/rewards` | RewardCode、Redemption、用户 history 与 Credits Grant 编排 |
+| [Payments](./apps/api/internal/payments/CONTEXT.md) | `internal/payments` | Stripe 配置、签名 Webhook Inbox 与支付生命周期；Idea 余额和 Ledger 写入仍由 Credits 独占 |
 | Usage | `internal/usage` | 用户侧用量 Read Model；组合 Credits Capture 与 durable Task Billing snapshot，返回 Lifetime 摘要与每日 Capture Trend，不拥有账务或任务写入 |
 
 Dependency direction:

@@ -97,6 +97,7 @@ func TestRouteConstantsAreGroupRelative(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.GET(RoutePublicSettingsBranding, func(c *gin.Context) {})
+	router.POST(RoutePaymentStripeWebhook, func(c *gin.Context) {})
 	userGroup := router.Group("/api/user")
 	userGroup.POST(RouteUserProfileAvatar, func(c *gin.Context) {})
 	userGroup.POST(RouteUserBoardUploads, func(c *gin.Context) {})
@@ -109,25 +110,29 @@ func TestRouteConstantsAreGroupRelative(t *testing.T) {
 	adminGroup.GET(RouteAdminSettingsPublicURLs, func(c *gin.Context) {})
 	adminGroup.GET(RouteAdminSettingsRateLimit, func(c *gin.Context) {})
 	adminGroup.GET(RouteAdminSettingsTaskMonitor, func(c *gin.Context) {})
+	adminGroup.GET(RouteAdminStripeConfiguration, func(c *gin.Context) {})
 
 	want := map[string]bool{
-		http.MethodGet + " /api/settings/branding":                     false,
-		http.MethodPost + " /api/user/profile/avatar":                  false,
-		http.MethodPost + " /api/user/boards/:board_id/uploads":        false,
-		http.MethodGet + " /api/user/download":                         false,
-		http.MethodPost + " /api/admin/upload":                         false,
-		http.MethodGet + " /api/admin/settings/branding":               false,
-		http.MethodGet + " /api/admin/settings/media-upload":           false,
-		http.MethodGet + " /api/admin/settings/public-urls":            false,
-		http.MethodGet + " /api/admin/settings/rate-limit":             false,
-		http.MethodGet + " /api/admin/settings/task-monitor":           false,
-		http.MethodPost + " /api/user/api/user/profile/avatar":         true,
-		http.MethodPost + " /api/admin/api/admin/upload":               true,
-		http.MethodGet + " /api/admin/api/admin/settings/branding":     true,
-		http.MethodGet + " /api/admin/api/admin/settings/media-upload": true,
-		http.MethodGet + " /api/admin/api/admin/settings/public-urls":  true,
-		http.MethodGet + " /api/admin/api/admin/settings/rate-limit":   true,
-		http.MethodGet + " /api/admin/api/admin/settings/task-monitor": true,
+		http.MethodGet + " /api/settings/branding":                      false,
+		http.MethodPost + " /api/webhooks/stripe":                       false,
+		http.MethodPost + " /api/user/profile/avatar":                   false,
+		http.MethodPost + " /api/user/boards/:board_id/uploads":         false,
+		http.MethodGet + " /api/user/download":                          false,
+		http.MethodPost + " /api/admin/upload":                          false,
+		http.MethodGet + " /api/admin/settings/branding":                false,
+		http.MethodGet + " /api/admin/settings/media-upload":            false,
+		http.MethodGet + " /api/admin/settings/public-urls":             false,
+		http.MethodGet + " /api/admin/settings/rate-limit":              false,
+		http.MethodGet + " /api/admin/settings/task-monitor":            false,
+		http.MethodGet + " /api/admin/payments/stripe-config":           false,
+		http.MethodPost + " /api/user/api/user/profile/avatar":          true,
+		http.MethodPost + " /api/admin/api/admin/upload":                true,
+		http.MethodGet + " /api/admin/api/admin/settings/branding":      true,
+		http.MethodGet + " /api/admin/api/admin/settings/media-upload":  true,
+		http.MethodGet + " /api/admin/api/admin/settings/public-urls":   true,
+		http.MethodGet + " /api/admin/api/admin/settings/rate-limit":    true,
+		http.MethodGet + " /api/admin/api/admin/settings/task-monitor":  true,
+		http.MethodGet + " /api/admin/api/admin/payments/stripe-config": true,
 	}
 	for _, route := range router.Routes() {
 		key := route.Method + " " + route.Path
@@ -374,6 +379,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/line-draft-modes":                             false,
 		"GET /api/admin/monitor":                                      false,
 		"GET /api/admin/monitor/stream":                               false,
+		"GET /api/admin/payments/stripe-config":                       false,
 		"GET /api/admin/settings/branding":                            false,
 		"GET /api/admin/settings/media-upload":                        false,
 		"GET /api/admin/settings/outbound-policy":                     false,
@@ -420,6 +426,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"PUT /api/admin/provider-endpoints/:id":                       false,
 		"PUT /api/admin/workflow-features/:slug":                      false,
 		"PUT /api/admin/line-draft-modes/:id":                         false,
+		"PUT /api/admin/payments/stripe-config":                       false,
 		"PUT /api/admin/settings/branding":                            false,
 		"PUT /api/admin/settings/media-upload":                        false,
 		"PUT /api/admin/settings/outbound-policy":                     false,
