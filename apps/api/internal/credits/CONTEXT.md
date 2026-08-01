@@ -18,13 +18,14 @@ Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示�
 | Capture | User Reserved → System Revenue |
 | Release | User Reserved → User Available |
 | Refund | System Revenue → User Available，累计不得超过原 Charge |
+| Purchase Credit | 已验证外部支付的 `System Issuance → User Available`；由 Payments 以固定 actor/source/reference 调用，不是 discretionary Grant |
 | Reconciliation Run | 由 `manual` 或 `scheduled` Trigger 启动、River 异步执行的全量一致性扫描；manual 持久化真实 Admin/reason，scheduled 持久化 schedule slot 且不伪造 actor |
 | Finding | 由 finding type + Wallet + subject 生成稳定 fingerprint 的可重跑异常事实 |
 | Finding Type | Credits 拥有的稳定 typed anomaly contract；Admin 对已知类型提供统一名称与摘要，未知类型必须安全降级 |
 
 ## Public Seams
 
-- `Commands` 是唯一应用写入入口，统一提供 Grant、Deduct、Hold、Capture、Release 与 Refund；底层只调用 typed `SECURITY DEFINER execute_credit_command_v2`。
+- `Commands` 是唯一应用写入入口，统一提供 Grant、Deduct、Hold、Capture、Release、Refund 与 Purchase；Purchase 使用独立 typed `SECURITY DEFINER execute_credit_purchase_v1`，其余命令通过 `execute_credit_command_v2`。
 - `Service.InTx(pgx.Tx)` 与 transaction-scoped `CommandsInSQLTx(*sql.Tx)` 是同一 `Commands` contract 的 caller-owned transaction adapters：Task/River submission 使用 pgx，`taskbilling.SettleTerminal` 使用 database/sql；caller 都拥有 commit/rollback。Task Repository 不持有 application-lifetime Credits/Billing dependency。
 - `WalletReader` 提供 Wallet balance 与 keyset-paginated Ledger 查询。
 - `WalletRestrictionCommands` 通过 transaction-capable typed seam 幂等创建和精确解除 Restriction；其他 context 不得直接写 Restriction table。
@@ -44,6 +45,7 @@ Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示�
 - API runtime role 对 Credit tables 只有 SELECT，不能直接 DML Ledger/projection，也不能执行内部 trigger functions；migration owner 才拥有 schema。
 - System Issuance、Revenue 与 Sink 使用 `wallet:<user_id>` shard，并保留 role/metadata，避免单个全局 system row 串行化所有 Wallet。
 - 每个 Command 先取得 idempotency-key advisory transaction lock，再比较服务端 canonical SHA-256 request hash。相同 key/相同 hash 返回原结果；不同 hash 返回 conflict。
+- Purchase 仅接受 `service/payments` actor、`stripe_purchase` source 与 `payment_order` business reference；它从不创建 Wallet，也不能由 Admin 或客户端伪造。已验证外部付款是平台既有义务，因此 Purchase 不受 frozen lifecycle 或 active Restriction gate 阻断，必须与 Payments 的 Payment Order terminal fact 原子收敛。
 - Task Hold 不使用 Credits-owned TTL 自动解冻；只有 Task terminal transition 能在同一 transaction 中 Capture 或 Release。
 - actor、source、reason 和 business reference 必填并写入不可变 Transaction。
 - Deduction 是仅限 Admin actor 的新 immutable `user_available → system_sink` transaction，永不消费 reserved。Correction 仅限 authenticated Admin，并以原 Posting 的反向 Posting 追加记录；允许关联原 Admin Grant/Deduction/Refund，或固定 `source=reward_redemption` 的 user-origin Grant，其他非 Admin-origin Grant 仍拒绝。Capture 更正使用 linked Refund。

@@ -471,6 +471,30 @@ func TestUserTaskRoutesDoNotExposePhysicalTaskDeletion(t *testing.T) {
 	t.Fatal("user task routes must retain cancellation")
 }
 
+func TestUserPaymentRoutesAreRegistered(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	registerUserRoutes(router.Group("/api/user"), UserRouteDeps{})
+	want := map[string]bool{
+		"GET /api/user/payments/purchase-options":     false,
+		"POST /api/user/payments/checkout-sessions":   false,
+		"GET /api/user/payments/orders/:public_token": false,
+		"GET /api/user/payments/recharges":            false,
+		"GET /api/user/payments/events":               false,
+	}
+	for _, route := range router.Routes() {
+		key := route.Method + " " + route.Path
+		if _, ok := want[key]; ok {
+			want[key] = true
+		}
+	}
+	for route, registered := range want {
+		if !registered {
+			t.Fatalf("payment route %s was not registered", route)
+		}
+	}
+}
+
 func TestAdminTaskRoutesDoNotExposeBulkTaskDeletion(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()

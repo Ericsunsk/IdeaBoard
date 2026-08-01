@@ -68,8 +68,11 @@ INSERT INTO payment_admin_actions (
 		`UPDATE payment_admin_actions SET outcome = 'succeeded'`,
 		`DELETE FROM payment_admin_actions`,
 		`DELETE FROM payment_stripe_configurations`,
+		`DELETE FROM payment_customers`,
+		`DELETE FROM payment_orders`,
 		`TRUNCATE payment_webhook_events`,
 		`SELECT prevent_payment_admin_action_mutation()`,
+		`SELECT guard_payment_order_lifecycle()`,
 	} {
 		if _, err := conn.ExecContext(ctx, statement); err == nil {
 			t.Fatalf("runtime bypass unexpectedly succeeded: %s", statement)

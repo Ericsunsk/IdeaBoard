@@ -1142,3 +1142,6 @@ func (failingCreditCommands) Release(context.Context, credits.ReleaseCommand) (c
 func (failingCreditCommands) Refund(context.Context, credits.RefundCommand) (credits.CommandResult, error) {
 	return credits.CommandResult{}, fmt.Errorf("unexpected Refund")
 }
+func (failingCreditCommands) Purchase(context.Context, credits.PurchaseCommand) (credits.CommandResult, error) {
+	return credits.CommandResult{}, fmt.Errorf("unexpected Purchase")
+}

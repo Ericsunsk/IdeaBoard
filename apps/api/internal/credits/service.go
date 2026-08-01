@@ -66,6 +66,12 @@ func (s *Service) Grant(ctx context.Context, command GrantCommand) (CommandResul
 	})
 }
 
+func (s *Service) Purchase(ctx context.Context, command PurchaseCommand) (CommandResult, error) {
+	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (CommandResult, error) {
+		return commands.Purchase(ctx, command)
+	})
+}
+
 func (s *Service) Deduct(ctx context.Context, command DeductionCommand) (CommandResult, error) {
 	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (CommandResult, error) {
 		return commands.Deduct(ctx, command)
@@ -138,6 +144,10 @@ func withManagedTransaction(
 
 func (c *transactionCommands) Grant(ctx context.Context, command GrantCommand) (CommandResult, error) {
 	return executeGrant(ctx, command, c.execute)
+}
+
+func (c *transactionCommands) Purchase(ctx context.Context, command PurchaseCommand) (CommandResult, error) {
+	return executePurchase(ctx, command, c.executePurchase)
 }
 
 func (c *transactionCommands) Deduct(ctx context.Context, command DeductionCommand) (CommandResult, error) {
@@ -226,6 +236,10 @@ func (c *sqlTransactionCommands) Grant(ctx context.Context, command GrantCommand
 	return executeGrant(ctx, command, c.execute)
 }
 
+func (c *sqlTransactionCommands) Purchase(ctx context.Context, command PurchaseCommand) (CommandResult, error) {
+	return executePurchase(ctx, command, c.executePurchase)
+}
+
 func (c *sqlTransactionCommands) Deduct(ctx context.Context, command DeductionCommand) (CommandResult, error) {
 	return executeDeduction(ctx, command, c.execute)
 }
@@ -251,6 +265,7 @@ func (c *sqlTransactionCommands) Refund(ctx context.Context, command RefundComma
 }
 
 type commandExecutor func(context.Context, CommandType, int64, int64, string, CommandMetadata) (CommandResult, error)
+type purchaseExecutor func(context.Context, int64, int64, CommandMetadata) (CommandResult, error)
 
 func (c *transactionCommands) execute(ctx context.Context, commandType CommandType, userID, amount int64, relatedID string, metadata CommandMetadata) (CommandResult, error) {
 	return executeCreditCommand(ctx, c.tx, commandType, userID, amount, relatedID, metadata)
@@ -260,12 +275,30 @@ func (c *sqlTransactionCommands) execute(ctx context.Context, commandType Comman
 	return executeSQLCreditCommand(ctx, c.tx, commandType, userID, amount, relatedID, metadata)
 }
 
+func (c *transactionCommands) executePurchase(ctx context.Context, userID, amount int64, metadata CommandMetadata) (CommandResult, error) {
+	return executeCreditPurchase(ctx, c.tx, userID, amount, metadata)
+}
+
+func (c *sqlTransactionCommands) executePurchase(ctx context.Context, userID, amount int64, metadata CommandMetadata) (CommandResult, error) {
+	return executeSQLCreditPurchase(ctx, c.tx, userID, amount, metadata)
+}
+
 func executeGrant(ctx context.Context, command GrantCommand, execute commandExecutor) (CommandResult, error) {
 	metadata, err := normalizeMetadata(command.Metadata)
 	if err != nil || command.UserID <= 0 || !isValidAmount(command.Amount) {
 		return CommandResult{}, ErrInvalidCommand
 	}
 	return execute(ctx, CommandGrant, command.UserID, command.Amount.Int64(), "", metadata)
+}
+
+func executePurchase(ctx context.Context, command PurchaseCommand, execute purchaseExecutor) (CommandResult, error) {
+	metadata, err := normalizeMetadata(command.Metadata)
+	if err != nil || command.UserID <= 0 || !isValidAmount(command.Amount) ||
+		metadata.Actor.Type != ActorService || metadata.Actor.ID != "payments" ||
+		metadata.Source != "stripe_purchase" || metadata.BusinessReference.Type != "payment_order" {
+		return CommandResult{}, ErrInvalidCommand
+	}
+	return execute(ctx, command.UserID, command.Amount.Int64(), metadata)
 }
 
 func executeDeduction(ctx context.Context, command DeductionCommand, execute commandExecutor) (CommandResult, error) {

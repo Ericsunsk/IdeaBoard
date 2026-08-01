@@ -8,11 +8,14 @@ import (
 	"context"
 	"database/sql"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Querier interface {
 	ArchiveAccount(ctx context.Context, id int64) (int64, error)
 	BackfillDailyStatsByCreatedRange(ctx context.Context, arg BackfillDailyStatsByCreatedRangeParams) (BackfillDailyStatsByCreatedRangeRow, error)
+	BindPaymentOrderCheckout(ctx context.Context, arg BindPaymentOrderCheckoutParams) (PaymentOrder, error)
 	CancelMediaAssetReclamation(ctx context.Context, arg CancelMediaAssetReclamationParams) ([]int64, error)
 	ClaimDueMediaAssetReclamation(ctx context.Context, arg ClaimDueMediaAssetReclamationParams) (MediaAsset, error)
 	ClearCurrentStorageProfiles(ctx context.Context) error
@@ -70,6 +73,12 @@ type Querier interface {
 	GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error)
 	GetLineDraftModeByID(ctx context.Context, id int64) (LineDraftMode, error)
 	GetMediaAssetByID(ctx context.Context, id int64) (MediaAsset, error)
+	GetPaymentCustomer(ctx context.Context, userID int64) (PaymentCustomer, error)
+	GetPaymentOrderByCheckoutSession(ctx context.Context, arg GetPaymentOrderByCheckoutSessionParams) (PaymentOrder, error)
+	GetPaymentOrderByCheckoutSessionForUpdate(ctx context.Context, arg GetPaymentOrderByCheckoutSessionForUpdateParams) (PaymentOrder, error)
+	GetPaymentOrderByID(ctx context.Context, id uuid.UUID) (PaymentOrder, error)
+	GetPaymentOrderByIdempotency(ctx context.Context, arg GetPaymentOrderByIdempotencyParams) (PaymentOrder, error)
+	GetPaymentOrderByPublicToken(ctx context.Context, arg GetPaymentOrderByPublicTokenParams) (PaymentOrder, error)
 	GetPaymentStripeConfiguration(ctx context.Context) (PaymentStripeConfiguration, error)
 	GetProviderEndpointByID(ctx context.Context, id int64) (ProviderEndpoint, error)
 	GetRuntimeAccountByIDWithSecret(ctx context.Context, id int64) (GetRuntimeAccountByIDWithSecretRow, error)
@@ -87,6 +96,7 @@ type Querier interface {
 	HasActiveStorageProfileSecretVersion(ctx context.Context, arg HasActiveStorageProfileSecretVersionParams) (bool, error)
 	IncrementAccountFailCount(ctx context.Context, id int64) (int64, error)
 	InsertPaymentAdminAction(ctx context.Context, arg InsertPaymentAdminActionParams) error
+	InsertPaymentOrderIntent(ctx context.Context, arg InsertPaymentOrderIntentParams) (PaymentOrder, error)
 	InsertPaymentWebhookEvent(ctx context.Context, arg InsertPaymentWebhookEventParams) (int64, error)
 	InsertStorageProfileSecretVersion(ctx context.Context, arg InsertStorageProfileSecretVersionParams) (StorageProfileSecretVersion, error)
 	InsertTaskStatEventIgnore(ctx context.Context, arg InsertTaskStatEventIgnoreParams) (int64, error)
@@ -109,6 +119,7 @@ type Querier interface {
 	ListMediaRefsByBoardID(ctx context.Context, arg ListMediaRefsByBoardIDParams) ([]MediaRef, error)
 	ListMonitorExecutionPressureByRange(ctx context.Context, arg ListMonitorExecutionPressureByRangeParams) ([]ListMonitorExecutionPressureByRangeRow, error)
 	ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([]ListOutputsByTaskIDsRow, error)
+	ListPaymentRechargeHistory(ctx context.Context, arg ListPaymentRechargeHistoryParams) ([]ListPaymentRechargeHistoryRow, error)
 	ListProviderEndpoints(ctx context.Context) ([]ProviderEndpoint, error)
 	ListRunningMissingLeaseTaskIDs(ctx context.Context, rowLimit int32) ([]string, error)
 	ListRunningTasksForStartupRecovery(ctx context.Context) ([]ListRunningTasksForStartupRecoveryRow, error)
@@ -127,10 +138,17 @@ type Querier interface {
 	ListTasks(ctx context.Context, arg ListTasksParams) ([]ListTasksRow, error)
 	ListTasksByTaskIDs(ctx context.Context, taskIds []string) ([]ListTasksByTaskIDsRow, error)
 	ListTasksByUserID(ctx context.Context, arg ListTasksByUserIDParams) ([]ListTasksByUserIDRow, error)
+	ListUnsettledPaymentOrders(ctx context.Context) ([]PaymentOrder, error)
 	ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUIDsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	LockStorageProfileSecretVersionRotation(ctx context.Context, arg LockStorageProfileSecretVersionRotationParams) (bool, error)
 	MarkMediaAssetReclaimed(ctx context.Context, arg MarkMediaAssetReclaimedParams) (int64, error)
+	MarkPaymentOrderAsyncPending(ctx context.Context, id uuid.UUID) (PaymentOrder, error)
+	MarkPaymentOrderAsyncPendingBySession(ctx context.Context, arg MarkPaymentOrderAsyncPendingBySessionParams) (PaymentOrder, error)
+	MarkPaymentOrderCredited(ctx context.Context, arg MarkPaymentOrderCreditedParams) (PaymentOrder, error)
+	MarkPaymentOrderFailed(ctx context.Context, id uuid.UUID) (PaymentOrder, error)
+	MarkPaymentOrderFailedBySession(ctx context.Context, arg MarkPaymentOrderFailedBySessionParams) (PaymentOrder, error)
+	MarkPaymentWebhookEventProcessed(ctx context.Context, arg MarkPaymentWebhookEventProcessedParams) (int64, error)
 	MarkStorageProfileDeleted(ctx context.Context, profileID string) (int64, error)
 	MarkTaskCancelled(ctx context.Context, arg MarkTaskCancelledParams) (int64, error)
 	MarkTaskFailed(ctx context.Context, arg MarkTaskFailedParams) (int64, error)
@@ -143,6 +161,7 @@ type Querier interface {
 	ReleaseActiveTaskLeasesByTaskIDs(ctx context.Context, arg ReleaseActiveTaskLeasesByTaskIDsParams) (int64, error)
 	ReleaseMediaAssetReclamationClaim(ctx context.Context, arg ReleaseMediaAssetReclamationClaimParams) error
 	ReleaseTaskLease(ctx context.Context, arg ReleaseTaskLeaseParams) (int64, error)
+	ReplacePaymentCustomer(ctx context.Context, arg ReplacePaymentCustomerParams) (PaymentCustomer, error)
 	ReplacePaymentStripeConfiguration(ctx context.Context, arg ReplacePaymentStripeConfigurationParams) (PaymentStripeConfiguration, error)
 	RequeueTaskRunningWithLease(ctx context.Context, arg RequeueTaskRunningWithLeaseParams) (int64, error)
 	ResetAccountFailCount(ctx context.Context, id int64) (int64, error)

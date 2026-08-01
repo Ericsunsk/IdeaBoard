@@ -32,20 +32,20 @@ function makeUser(): User {
   }
 }
 
-async function createTestRouter(path: string): Promise<Router> {
+async function renderHost(
+  path = '/user/boards',
+  authenticated = true,
+  configureRouter?: (router: Router) => void,
+) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes,
   })
+  configureRouter?.(router)
   await router.push(path)
   await router.isReady()
-  return router
-}
-
-async function renderHost(path = '/user/boards') {
-  const router = await createTestRouter(path)
   const store = useUserStore()
-  store.setAuth(makeUser())
+  if (authenticated) store.setAuth(makeUser())
 
   const view = render(AccountManagementDialogHost, {
     global: {
@@ -55,6 +55,7 @@ async function renderHost(path = '/user/boards') {
           props: {
             visible: { type: Boolean, required: true },
             initialTab: { type: String, default: 'profile' },
+            paymentReturn: { type: Object, default: null },
           },
           emits: ['update:visible'],
           template: `
@@ -63,6 +64,8 @@ async function renderHost(path = '/user/boards') {
               role="dialog"
               aria-label="账户管理"
               :data-initial-tab="initialTab"
+              :data-payment-token="paymentReturn?.publicToken"
+              :data-payment-source="paymentReturn?.source"
             >
               <button type="button" aria-label="关闭账户管理" @click="$emit('update:visible', false)">
                 关闭
@@ -101,6 +104,63 @@ describe('AccountManagementDialogHost', () => {
       'data-initial-tab',
       'billing',
     )
+  })
+
+  it('opens the recharge pane from a valid Checkout return and cleans only payment query keys', async () => {
+    const token = '0198cd29-f457-7e4b-b95e-6cfde41b7222'
+    const { router } = await renderHost(
+      `/user/boards?boardId=board-8&account=recharge&payment_return=${token}&checkout_return=success`,
+    )
+
+    const dialog = await screen.findByRole('dialog', { name: '账户管理' })
+    expect(dialog).toHaveAttribute('data-initial-tab', 'recharge')
+    expect(dialog).toHaveAttribute('data-payment-token', token)
+    expect(dialog).toHaveAttribute('data-payment-source', 'success')
+    await waitFor(() => {
+      expect(router.currentRoute.value.query).toEqual({ boardId: 'board-8' })
+    })
+    expect(dialog).toBeVisible()
+  })
+
+  it('retains a Checkout return until the current user session is restored', async () => {
+    const token = '0198cd29-f457-7e4b-b95e-6cfde41b7222'
+    const { router, store } = await renderHost(
+      `/user/boards?account=recharge&payment_return=${token}&checkout_return=success`,
+      false,
+    )
+
+    expect(screen.queryByRole('dialog', { name: '账户管理' })).not.toBeInTheDocument()
+    store.setAuth(makeUser())
+
+    const dialog = await screen.findByRole('dialog', { name: '账户管理' })
+    expect(dialog).toHaveAttribute('data-payment-token', token)
+    await waitFor(() => expect(router.currentRoute.value.query).toEqual({}))
+  })
+
+  it('ignores malformed Checkout return parameters', async () => {
+    await renderHost('/user/boards?account=recharge&payment_return=short&checkout_return=success')
+
+    expect(screen.queryByRole('dialog', { name: '账户管理' })).not.toBeInTheDocument()
+  })
+
+  it('closes instead of consuming an unrelated navigation while Checkout query cleanup is pending', async () => {
+    const token = '0198cd29-f457-7e4b-b95e-6cfde41b7222'
+    const { router } = await renderHost(
+      `/user/boards?account=recharge&payment_return=${token}&checkout_return=success`,
+      true,
+      (testRouter) => {
+        testRouter.beforeEach((to, from) => {
+          if (from.query.payment_return && !to.query.payment_return && to.path !== '/user/canvas') {
+            return '/user/canvas?source=payment-cleanup'
+          }
+        })
+      },
+    )
+
+    await waitFor(() =>
+      expect(router.currentRoute.value.fullPath).toBe('/user/canvas?source=payment-cleanup'),
+    )
+    expect(screen.queryByRole('dialog', { name: '账户管理' })).not.toBeInTheDocument()
   })
 
   it.each([['/admin/users'], ['/user/login'], ['/user/register']])(

@@ -8,18 +8,51 @@ import (
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/platform/secrets"
 )
 
 type Service struct {
-	repo     *Repository
-	gateway  StripeGateway
-	verifier StripeWebhookVerifier
-	now      func() time.Time
+	repo            *Repository
+	gateway         StripeGateway
+	checkoutGateway CheckoutGateway
+	verifier        StripeWebhookVerifier
+	wallets         credits.WalletReader
+	events          *EventHub
+	now             func() time.Time
 }
 
-func NewService(repo *Repository, gateway StripeGateway, verifier StripeWebhookVerifier) *Service {
-	return &Service{repo: repo, gateway: gateway, verifier: verifier, now: time.Now}
+type ServiceDependencies struct {
+	Repository           *Repository
+	ConfigurationGateway StripeGateway
+	CheckoutGateway      CheckoutGateway
+	WebhookVerifier      StripeWebhookVerifier
+	Wallets              credits.WalletReader
+	Events               *EventHub
+	Now                  func() time.Time
+}
+
+func NewService(dependencies ServiceDependencies) *Service {
+	now := dependencies.Now
+	if now == nil {
+		now = time.Now
+	}
+	events := dependencies.Events
+	if events == nil {
+		events = NewEventHub()
+	}
+	return &Service{
+		repo: dependencies.Repository, gateway: dependencies.ConfigurationGateway,
+		checkoutGateway: dependencies.CheckoutGateway, verifier: dependencies.WebhookVerifier,
+		wallets: dependencies.Wallets, events: events, now: now,
+	}
+}
+
+func (s *Service) EventHub() *EventHub {
+	if s == nil {
+		return nil
+	}
+	return s.events
 }
 
 func (s *Service) GetStripeConfiguration(ctx context.Context) (StripeConfigurationSummary, error) {
@@ -37,6 +70,19 @@ func (s *Service) GetStripeConfiguration(ctx context.Context) (StripeConfigurati
 }
 
 func (s *Service) ConfigureStripe(ctx context.Context, command ConfigureStripeCommand) (StripeConfigurationSummary, error) {
+	if s == nil || s.repo == nil {
+		return StripeConfigurationSummary{}, fmt.Errorf("payments configuration service unavailable")
+	}
+	var result StripeConfigurationSummary
+	err := s.repo.WithStripeConfigurationExclusiveLock(ctx, func(lockedContext context.Context) error {
+		var err error
+		result, err = s.configureStripeLocked(lockedContext, command)
+		return err
+	})
+	return result, err
+}
+
+func (s *Service) configureStripeLocked(ctx context.Context, command ConfigureStripeCommand) (StripeConfigurationSummary, error) {
 	if s == nil || s.repo == nil || s.gateway == nil {
 		return StripeConfigurationSummary{}, fmt.Errorf("payments configuration service unavailable")
 	}
@@ -57,6 +103,11 @@ func (s *Service) ConfigureStripe(ctx context.Context, command ConfigureStripeCo
 		return StripeConfigurationSummary{}, err
 	}
 	apiKey := strings.TrimSpace(command.APIKey)
+	if hasCurrent && apiKey != "" {
+		if err := s.settleOrdersBeforeStripeKeyChange(ctx, current); err != nil {
+			return StripeConfigurationSummary{}, err
+		}
+	}
 	if apiKey == "" {
 		if !hasCurrent {
 			return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "api_key_required", ErrStripeAPIKeyRequired.Error(), nil, ErrStripeAPIKeyRequired)
@@ -122,6 +173,19 @@ func (s *Service) ConfigureStripe(ctx context.Context, command ConfigureStripeCo
 }
 
 func (s *Service) ReceiveStripeWebhook(ctx context.Context, raw []byte, signature string) (StripeWebhookReceipt, error) {
+	if s == nil || s.repo == nil {
+		return StripeWebhookReceipt{}, fmt.Errorf("payments webhook service unavailable")
+	}
+	var receipt StripeWebhookReceipt
+	err := s.repo.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
+		var err error
+		receipt, err = s.receiveStripeWebhookLocked(lockedContext, raw, signature)
+		return err
+	})
+	return receipt, err
+}
+
+func (s *Service) receiveStripeWebhookLocked(ctx context.Context, raw []byte, signature string) (StripeWebhookReceipt, error) {
 	if s == nil || s.repo == nil || s.verifier == nil {
 		return StripeWebhookReceipt{}, fmt.Errorf("payments webhook service unavailable")
 	}
@@ -150,6 +214,9 @@ func (s *Service) ReceiveStripeWebhook(ctx context.Context, raw []byte, signatur
 	if err := validateStripeWebhookEvent(event); err != nil {
 		return StripeWebhookReceipt{}, err
 	}
+	if event.Livemode != (stored.Mode == StripeModeLive) {
+		return StripeWebhookReceipt{}, ErrMalformedWebhookPayload
+	}
 	recognized := isRecognizedStripeWebhookEvent(event.Type)
 	result := "received"
 	var processedAt *time.Time
@@ -161,7 +228,64 @@ func (s *Service) ReceiveStripeWebhook(ctx context.Context, raw []byte, signatur
 	if err != nil {
 		return StripeWebhookReceipt{}, err
 	}
-	return StripeWebhookReceipt{EventID: event.ID, Duplicate: duplicate, Ignored: !recognized}, nil
+	receipt := StripeWebhookReceipt{EventID: event.ID, Duplicate: duplicate, Ignored: !recognized}
+	if !recognized {
+		return receipt, nil
+	}
+	if event.Type == "checkout.session.async_payment_failed" || event.Type == "checkout.session.expired" {
+		failed, changed, err := s.repo.MarkPaymentOrderFailedBySession(ctx, stored.AccountID, event.ObjectID)
+		if err != nil {
+			return StripeWebhookReceipt{}, err
+		}
+		if changed {
+			s.events.Publish(failed.UserID, PaymentEvent{PublicToken: failed.PublicToken, Status: "failed"})
+		}
+		if err := s.repo.MarkStripeWebhookEventProcessed(ctx, event.ID, "processed", "", now); err != nil {
+			return StripeWebhookReceipt{}, err
+		}
+		return receipt, nil
+	}
+	if event.Type != "checkout.session.completed" && event.Type != "checkout.session.async_payment_succeeded" {
+		if err := s.repo.MarkStripeWebhookEventProcessed(ctx, event.ID, "processed", "", now); err != nil {
+			return StripeWebhookReceipt{}, err
+		}
+		return receipt, nil
+	}
+	if s.checkoutGateway == nil {
+		return StripeWebhookReceipt{}, fmt.Errorf("payments Checkout gateway unavailable")
+	}
+	apiKey, err := secrets.DecryptMaterialString(stored.APIKeyCiphertext, stored.SecretMaterialKind)
+	if err != nil {
+		return StripeWebhookReceipt{}, ErrStripeConfigurationInvalid
+	}
+	session, err := s.checkoutGateway.RetrieveCheckoutSession(ctx, RetrieveCheckoutSessionInput{APIKey: apiKey, SessionID: event.ObjectID})
+	if err != nil {
+		return StripeWebhookReceipt{}, checkoutOperationError(err)
+	}
+	if session.ID != event.ObjectID {
+		return StripeWebhookReceipt{}, ErrMalformedWebhookPayload
+	}
+	if session.IsPaid() {
+		converged, err := s.repo.ConvergePaidPaymentOrder(ctx, paidCheckoutFactsFromSession(stored.AccountID, session, now), now)
+		if err != nil {
+			return StripeWebhookReceipt{}, err
+		}
+		if !converged.Replayed {
+			s.events.Publish(converged.Order.UserID, PaymentEvent{PublicToken: converged.Order.PublicToken, Status: "credited"})
+		}
+	} else if event.Type == "checkout.session.completed" {
+		pending, changed, err := s.repo.MarkPaymentOrderAsyncPendingBySession(ctx, stored.AccountID, session.ID)
+		if err != nil {
+			return StripeWebhookReceipt{}, err
+		}
+		if changed {
+			s.events.Publish(pending.UserID, PaymentEvent{PublicToken: pending.PublicToken, Status: "processing"})
+		}
+	}
+	if err := s.repo.MarkStripeWebhookEventProcessed(ctx, event.ID, "processed", "", now); err != nil {
+		return StripeWebhookReceipt{}, err
+	}
+	return receipt, nil
 }
 
 func (s *Service) loadCurrentConfiguration(ctx context.Context) (StoredStripeConfiguration, bool, error) {

@@ -20,7 +20,11 @@ describe('accountTabRegistry', () => {
   it.each(['billing', 'usage'] as const)('passes active state to the %s query pane', (key) => {
     const entry = resolveAccountTab(key)
 
-    expect(entry.tab.pane.props({ active: false, ...entry })).toEqual({ active: false })
-    expect(entry.tab.pane.props({ active: true, ...entry })).toEqual({ active: true })
+    expect(entry.tab.pane.props({ active: false, paymentReturn: null, ...entry })).toEqual({
+      active: false,
+    })
+    expect(entry.tab.pane.props({ active: true, paymentReturn: null, ...entry })).toEqual({
+      active: true,
+    })
   })
 })

@@ -1,0 +1,383 @@
+package payments
+
+import (
+	"context"
+	"database/sql"
+	"errors"
+	"strconv"
+	"testing"
+	"time"
+
+	"ideaboard/api/internal/credits"
+	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport/secretstest"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+func TestCreateCheckoutPersistsIntentBeforeStripeAndReusesCanonicalRequest(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	db, pool := testdb.OpenWithPool(t)
+	seedRechargeableWallet(t, pool, 42)
+	configurationGateway := configuredFakeStripeGateway("acct_checkout", "prod_checkout")
+	checkoutGateway := &fakeCheckoutGateway{}
+	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	checkoutGateway.afterCreateCustomer = func() { now = now.Add(2 * time.Minute) }
+	checkoutGateway.beforeCreateSession = func(input CreateCheckoutSessionInput) {
+		var status string
+		if err := db.QueryRowContext(t.Context(), `SELECT status FROM payment_orders WHERE id = $1`, input.PaymentOrderID).Scan(&status); err != nil {
+			t.Fatalf("Stripe called before durable Payment Order: %v", err)
+		}
+		if status != string(PaymentOrderCreating) {
+			t.Fatalf("Payment Order status before Stripe = %q", status)
+		}
+	}
+	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, credits.NewService(pool))
+	service.now = func() time.Time { return now }
+	command := CreateCheckoutCommand{
+		UserID: 42, ClientIdempotencyKey: "purchase-checkout-request-1", IdeaQuantity: 501,
+		TermsAccepted: true, TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
+		ReturnBaseURL: "https://app.example.com/user/boards",
+	}
+
+	first, err := service.CreateCheckout(t.Context(), command)
+	if err != nil {
+		t.Fatalf("CreateCheckout() error = %v", err)
+	}
+	if first.Reused || first.CheckoutURL == "" || first.PublicToken == "" {
+		t.Fatalf("first Checkout = %+v", first)
+	}
+	if checkoutGateway.customerCalls != 1 || checkoutGateway.sessionCalls != 1 {
+		t.Fatalf("gateway calls customer=%d session=%d", checkoutGateway.customerCalls, checkoutGateway.sessionCalls)
+	}
+	createdInput := checkoutGateway.lastCreateSession
+	if createdInput.IdempotencyKey == "" || createdInput.IdempotencyKey != createdInput.PublicOrderNumber ||
+		createdInput.ExpiresAt.Sub(now) != checkoutSessionLifetime+checkoutSessionTransportMargin {
+		t.Fatalf("Stripe Checkout input = %+v", createdInput)
+	}
+	var storedExpiresAt time.Time
+	if err := db.QueryRowContext(t.Context(), `SELECT expires_at FROM payment_orders WHERE public_token = $1`, first.PublicToken).Scan(&storedExpiresAt); err != nil {
+		t.Fatal(err)
+	}
+	if !storedExpiresAt.Equal(createdInput.ExpiresAt) {
+		t.Fatalf("stored Checkout expiry = %v, want Stripe canonical %v", storedExpiresAt, createdInput.ExpiresAt)
+	}
+
+	replayed, err := service.CreateCheckout(t.Context(), command)
+	if err != nil || !replayed.Reused || replayed.PublicToken != first.PublicToken || replayed.CheckoutURL != first.CheckoutURL {
+		t.Fatalf("replayed Checkout = %+v, %v", replayed, err)
+	}
+	if checkoutGateway.customerCalls != 1 || checkoutGateway.sessionCalls != 1 {
+		t.Fatalf("replay called Stripe: customer=%d session=%d", checkoutGateway.customerCalls, checkoutGateway.sessionCalls)
+	}
+
+	conflict := command
+	conflict.IdeaQuantity = 502
+	if _, err := service.CreateCheckout(t.Context(), conflict); !errors.Is(err, ErrCheckoutIdempotencyConflict) {
+		t.Fatalf("conflicting Checkout error = %v", err)
+	}
+}
+
+func TestActiveOrderQueryCreditsOnlyAValidatedPaidStripeSession(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	db, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	seedRechargeableWallet(t, pool, 42)
+	configurationGateway := configuredFakeStripeGateway("acct_query", "prod_query")
+	checkoutGateway := &fakeCheckoutGateway{}
+	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, creditService)
+	checkout, err := service.CreateCheckout(t.Context(), CreateCheckoutCommand{
+		UserID: 42, ClientIdempotencyKey: "purchase-query-request-1", IdeaQuantity: 501,
+		TermsAccepted: true, TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
+		ReturnBaseURL: "https://app.example.com/user/boards",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkoutGateway.paid = true
+	status, err := service.GetPaymentOrderReturnStatus(t.Context(), 42, checkout.PublicToken)
+	if err != nil {
+		t.Fatalf("GetPaymentOrderReturnStatus() error = %v", err)
+	}
+	if status.Status != "credited" || status.IdeaQuantity != 501 {
+		t.Fatalf("return status = %+v", status)
+	}
+	wallet, err := creditService.GetWallet(t.Context(), 42)
+	if err != nil || wallet.Available != 502 {
+		t.Fatalf("Wallet = %+v, %v", wallet, err)
+	}
+
+	if _, err := service.GetPaymentOrderReturnStatus(t.Context(), 99, checkout.PublicToken); !errors.Is(err, ErrPaymentOrderNotFound) {
+		t.Fatalf("cross-user token error = %v", err)
+	}
+}
+
+func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	db, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	seedRechargeableWallet(t, pool, 42)
+	configurationGateway := configuredFakeStripeGateway("acct_webhook_purchase", "prod_webhook_purchase")
+	checkoutGateway := &fakeCheckoutGateway{}
+	verifiedAt := time.Date(2026, 8, 1, 12, 5, 0, 0, time.UTC)
+	verifier := &fakeWebhookVerifier{event: StripeWebhookEvent{
+		ID: "evt_paid_purchase", Type: "checkout.session.completed", ObjectID: "cs_purchase",
+		CreatedAt: verifiedAt.Add(-time.Minute),
+	}}
+	events := NewEventHub()
+	service := NewService(ServiceDependencies{
+		Repository: NewRepository(db), ConfigurationGateway: configurationGateway,
+		CheckoutGateway: checkoutGateway, WebhookVerifier: verifier, Wallets: creditService,
+		Events: events, Now: func() time.Time { return verifiedAt },
+	})
+	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+		ActorID: 42, APIKey: "sk_test_webhook_purchase", ProductTaxCode: "txcd_10105001",
+		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	checkout, err := service.CreateCheckout(t.Context(), CreateCheckoutCommand{
+		UserID: 42, ClientIdempotencyKey: "signed-webhook-checkout", IdeaQuantity: 501,
+		TermsAccepted: true, TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
+		ReturnBaseURL: "https://app.example.com/user/boards",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	eventChannel, unsubscribe := events.Subscribe(42)
+	defer unsubscribe()
+
+	receipt, err := service.ReceiveStripeWebhook(t.Context(), []byte(`{"id":"evt_paid_purchase"}`), "valid")
+	if err != nil || receipt.Duplicate || receipt.Ignored {
+		t.Fatalf("ReceiveStripeWebhook() = %+v, %v", receipt, err)
+	}
+	select {
+	case event := <-eventChannel:
+		if event.PublicToken != checkout.PublicToken || event.Status != "processing" {
+			t.Fatalf("payment event = %+v", event)
+		}
+	default:
+		t.Fatal("processing user event was not published")
+	}
+	wallet, err := creditService.GetWallet(t.Context(), 42)
+	if err != nil || wallet.Available != 1 {
+		t.Fatalf("unpaid completed webhook changed Wallet = %+v, %v", wallet, err)
+	}
+
+	checkoutGateway.paid = true
+	verifier.event.ID = "evt_paid_purchase_success"
+	verifier.event.Type = "checkout.session.async_payment_succeeded"
+	receipt, err = service.ReceiveStripeWebhook(t.Context(), []byte(`{"id":"evt_paid_purchase_success"}`), "valid")
+	if err != nil || receipt.Duplicate || receipt.Ignored {
+		t.Fatalf("ReceiveStripeWebhook(async success) = %+v, %v", receipt, err)
+	}
+	select {
+	case event := <-eventChannel:
+		if event.PublicToken != checkout.PublicToken || event.Status != "credited" {
+			t.Fatalf("payment event = %+v", event)
+		}
+	default:
+		t.Fatal("credited user event was not published")
+	}
+	wallet, err = creditService.GetWallet(t.Context(), 42)
+	if err != nil || wallet.Available != 502 {
+		t.Fatalf("Wallet = %+v, %v", wallet, err)
+	}
+
+	replay, err := service.ReceiveStripeWebhook(t.Context(), []byte(`{"id":"evt_paid_purchase_success"}`), "valid")
+	if err != nil || !replay.Duplicate {
+		t.Fatalf("replayed webhook = %+v, %v", replay, err)
+	}
+	var purchaseCount int
+	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM credit_transactions WHERE command_type = 'purchase_credit'`).Scan(&purchaseCount); err != nil {
+		t.Fatal(err)
+	}
+	if purchaseCount != 1 {
+		t.Fatalf("purchase transactions = %d, want 1", purchaseCount)
+	}
+}
+
+func TestStripeKeyChangeIsBlockedWhileCheckoutIsUnsettled(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	db, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	seedRechargeableWallet(t, pool, 42)
+	configurationGateway := configuredFakeStripeGateway("acct_original", "prod_original")
+	checkoutGateway := &fakeCheckoutGateway{}
+	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, creditService)
+	if _, err := service.CreateCheckout(t.Context(), CreateCheckoutCommand{
+		UserID: 42, ClientIdempotencyKey: "account-switch-open-order", IdeaQuantity: 501,
+		TermsAccepted: true, TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
+		ReturnBaseURL: "https://app.example.com/user/boards",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	configurationGateway.prepared.AccountID = "acct_replacement"
+	configurationGateway.prepared.ProductID = "prod_replacement"
+	_, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+		ActorID: 42, APIKey: "sk_test_replacement", ProductTaxCode: "txcd_10105001",
+		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
+	})
+	if !errors.Is(err, ErrStripeConfigurationBusy) {
+		t.Fatalf("ConfigureStripe() error = %v, want busy", err)
+	}
+	stored, err := service.GetStripeConfiguration(t.Context())
+	if err != nil || stored.AccountID != "acct_original" {
+		t.Fatalf("Stripe configuration changed with unsettled order: %+v, %v", stored, err)
+	}
+}
+
+func TestStripeKeyChangeCannotRaceAnOldAccountCheckout(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	db, pool := testdb.OpenWithPool(t)
+	creditService := credits.NewService(pool)
+	seedRechargeableWallet(t, pool, 42)
+	configurationGateway := configuredFakeStripeGateway("acct_original", "prod_original")
+	checkoutGateway := &fakeCheckoutGateway{}
+	checkoutStarted := make(chan struct{})
+	releaseCheckout := make(chan struct{})
+	checkoutGateway.beforeCreateSession = func(CreateCheckoutSessionInput) {
+		close(checkoutStarted)
+		<-releaseCheckout
+	}
+	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, creditService)
+
+	checkoutDone := make(chan error, 1)
+	go func() {
+		_, err := service.CreateCheckout(t.Context(), CreateCheckoutCommand{
+			UserID: 42, ClientIdempotencyKey: "account-switch-race-checkout", IdeaQuantity: 501,
+			TermsAccepted: true, TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
+			ReturnBaseURL: "https://app.example.com/user/boards",
+		})
+		checkoutDone <- err
+	}()
+	<-checkoutStarted
+
+	configurationGateway.prepared.AccountID = "acct_replacement"
+	configurationGateway.prepared.ProductID = "prod_replacement"
+	configurationDone := make(chan error, 1)
+	go func() {
+		_, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+			ActorID: 42, APIKey: "sk_test_replacement", ProductTaxCode: "txcd_10105001",
+			PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
+		})
+		configurationDone <- err
+	}()
+	select {
+	case err := <-configurationDone:
+		t.Fatalf("configuration bypassed in-flight Checkout shared lock: %v", err)
+	case <-time.After(150 * time.Millisecond):
+	}
+	close(releaseCheckout)
+	if err := <-checkoutDone; err != nil {
+		t.Fatalf("CreateCheckout() error = %v", err)
+	}
+	if err := <-configurationDone; !errors.Is(err, ErrStripeConfigurationBusy) {
+		t.Fatalf("ConfigureStripe() error = %v, want busy", err)
+	}
+	stored, err := service.GetStripeConfiguration(t.Context())
+	if err != nil || stored.AccountID != "acct_original" {
+		t.Fatalf("Stripe configuration raced Checkout: %+v, %v", stored, err)
+	}
+}
+
+type fakeCheckoutGateway struct {
+	customerCalls       int
+	sessionCalls        int
+	retrieveCalls       int
+	paid                bool
+	lastCreateSession   CreateCheckoutSessionInput
+	createdSession      CheckoutSession
+	afterCreateCustomer func()
+	beforeCreateSession func(CreateCheckoutSessionInput)
+}
+
+func (f *fakeCheckoutGateway) CreateCustomer(_ context.Context, _ CreateCheckoutCustomerInput) (CheckoutCustomer, error) {
+	f.customerCalls++
+	if f.afterCreateCustomer != nil {
+		f.afterCreateCustomer()
+	}
+	return CheckoutCustomer{ID: "cus_purchase"}, nil
+}
+
+func (f *fakeCheckoutGateway) CreateCheckoutSession(_ context.Context, input CreateCheckoutSessionInput) (CheckoutSession, error) {
+	f.sessionCalls++
+	f.lastCreateSession = input
+	if f.beforeCreateSession != nil {
+		f.beforeCreateSession(input)
+	}
+	f.createdSession = CheckoutSession{
+		ID: "cs_purchase", URL: "https://checkout.stripe.test/c/pay/cs_purchase", CustomerID: input.CustomerID,
+		PublicOrderNumber: input.PublicOrderNumber, PaymentOrderID: input.PaymentOrderID,
+		RequestHash: input.RequestHash, IdeaQuantity: input.IdeaQuantity, ExpiresAt: input.ExpiresAt,
+	}
+	return f.createdSession, nil
+}
+
+func (f *fakeCheckoutGateway) RetrieveCheckoutSession(_ context.Context, input RetrieveCheckoutSessionInput) (CheckoutSession, error) {
+	f.retrieveCalls++
+	session := f.createdSession
+	session.ID = input.SessionID
+	if f.paid {
+		session.PaymentStatus = CheckoutPaymentStatusPaid
+		session.PaymentIntentID = "pi_purchase"
+		session.ChargeID = "ch_purchase"
+		session.ReceiptURL = "https://pay.stripe.test/receipts/ch_purchase"
+		session.AmountSubtotalMinor = 501
+		session.AmountTaxMinor = 1
+		session.AmountTotalMinor = 502
+		session.Currency = "usd"
+	} else {
+		session.PaymentStatus = CheckoutPaymentStatusUnpaid
+	}
+	return session, nil
+}
+
+func configuredFakeStripeGateway(accountID, productID string) *fakeStripeGateway {
+	return &fakeStripeGateway{prepared: PreparedStripeConfiguration{
+		AccountID: accountID, Mode: StripeModeTest, ChargesEnabled: true, ProductID: productID,
+		WebhookEndpointID: "we_purchase", WebhookSecret: "whsec_purchase",
+	}}
+}
+
+func newConfiguredPurchaseService(
+	t *testing.T,
+	db *sql.DB,
+	configurationGateway StripeGateway,
+	checkoutGateway CheckoutGateway,
+	wallets credits.WalletReader,
+) *Service {
+	t.Helper()
+	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	service := NewService(ServiceDependencies{
+		Repository: NewRepository(db), ConfigurationGateway: configurationGateway,
+		CheckoutGateway: checkoutGateway, Wallets: wallets, Now: func() time.Time { return now },
+	})
+	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+		ActorID: 42, APIKey: "sk_test_purchase", ProductTaxCode: "txcd_10105001",
+		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
+	}); err != nil {
+		t.Fatalf("configure Stripe: %v", err)
+	}
+	return service
+}
+
+func seedRechargeableWallet(t *testing.T, pool *pgxpool.Pool, userID int64) {
+	t.Helper()
+	amount, err := credits.NewCreditAmount(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = credits.NewService(pool).Grant(t.Context(), credits.GrantCommand{
+		UserID: userID, Amount: amount,
+		Metadata: credits.CommandMetadata{
+			IdempotencyKey: "payment-wallet-seed-" + strconv.FormatInt(userID, 10),
+			Actor:          credits.Actor{Type: credits.ActorAdmin, ID: "42"},
+			Source:         "admin_console", Reason: "seed rechargeable Wallet",
+			BusinessReference: credits.BusinessReference{Type: "admin_adjustment", ID: "payment-wallet-seed"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("seed rechargeable Wallet: %v", err)
+	}
+}

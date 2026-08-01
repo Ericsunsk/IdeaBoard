@@ -94,6 +94,7 @@
                 active: activeTab === activeTabEntry.tab.key,
                 group: activeTabEntry.group,
                 tab: activeTabEntry.tab,
+                paymentReturn,
               })
             "
           />
@@ -123,14 +124,23 @@ import {
   type AccountManagementTab,
 } from '../accountTabRegistry'
 import { useProfileFeedback } from '../useProfileFeedback'
+import type { PaymentReturnContext } from '../paymentReturnRoute'
 
-const props = withDefaults(defineProps<{ initialTab?: AccountManagementTab }>(), {
-  initialTab: defaultAccountManagementTab,
-})
+const props = withDefaults(
+  defineProps<{
+    initialTab?: AccountManagementTab
+    paymentReturn?: PaymentReturnContext | null
+  }>(),
+  {
+    initialTab: defaultAccountManagementTab,
+    paymentReturn: null,
+  },
+)
 const emit = defineEmits<{
   close: []
   'update:busy': [busy: boolean]
 }>()
+const paymentReturn = computed(() => props.paymentReturn)
 const userStore = useUserStore()
 const { fallbackText, logoURL, projectName } = useSiteBranding()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })

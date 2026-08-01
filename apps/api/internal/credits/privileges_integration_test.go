@@ -78,6 +78,17 @@ func TestRuntimeRoleCanUseCreditCommandsButCannotWriteLedgerOrProjection(t *test
 		_ = tx.Rollback(ctx)
 		t.Fatalf("runtime role ReleaseWalletRestriction() error = %v", err)
 	}
+	purchase, err := service.InTx(tx).Purchase(ctx, PurchaseCommand{
+		UserID: 42, Amount: mustCreditAmount(t, 5),
+		Metadata: purchaseMetadata("runtime-role:purchase", "runtime-role-payment-order"),
+	})
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		t.Fatalf("runtime role Purchase() error = %v", err)
+	}
+	if purchase.Wallet.Available != 30 || purchase.CommandType != CommandPurchaseCredit {
+		t.Fatalf("runtime role Purchase() result = %+v", purchase)
+	}
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatalf("runtime role command commit error = %v", err)
 	}
@@ -146,6 +157,7 @@ INSERT INTO credit_wallet_restrictions (
 	var canInsertAPIUser bool
 	var canInsertAuthUser bool
 	var canExecuteCommand bool
+	var canExecutePurchase bool
 	var canCreateRestriction bool
 	var canReleaseRestriction bool
 	var canExecuteLegacyCommand bool
@@ -157,6 +169,11 @@ SELECT has_table_privilege($1, 'credit_transactions', 'INSERT'),
          $1,
          'execute_credit_command_v2(text,bigint,bigint,text,text,text,text,text,text,text,text)',
          'EXECUTE'
+	       ),
+	   has_function_privilege(
+	     $1,
+	     'execute_credit_purchase_v1(bigint,bigint,text,text,text,text,text,text,text)',
+	     'EXECUTE'
 	       ),
        has_function_privilege(
          $1,
@@ -177,20 +194,22 @@ SELECT has_table_privilege($1, 'credit_transactions', 'INSERT'),
 		&canInsertAPIUser,
 		&canInsertAuthUser,
 		&canExecuteCommand,
+		&canExecutePurchase,
 		&canCreateRestriction,
 		&canReleaseRestriction,
 		&canExecuteLegacyCommand,
 	); err != nil {
 		t.Fatalf("read runtime privileges error = %v", err)
 	}
-	if canInsertLedger || !canInsertAPIUser || canInsertAuthUser || !canExecuteCommand ||
+	if canInsertLedger || !canInsertAPIUser || canInsertAuthUser || !canExecuteCommand || !canExecutePurchase ||
 		!canCreateRestriction || !canReleaseRestriction || canExecuteLegacyCommand {
 		t.Fatalf(
-			"runtime privileges insert_ledger=%v insert_api_user=%v insert_auth_user=%v execute_command=%v create_restriction=%v release_restriction=%v legacy_command=%v",
+			"runtime privileges insert_ledger=%v insert_api_user=%v insert_auth_user=%v execute_command=%v execute_purchase=%v create_restriction=%v release_restriction=%v legacy_command=%v",
 			canInsertLedger,
 			canInsertAPIUser,
 			canInsertAuthUser,
 			canExecuteCommand,
+			canExecutePurchase,
 			canCreateRestriction,
 			canReleaseRestriction,
 			canExecuteLegacyCommand,
@@ -208,6 +227,16 @@ WHERE oid = 'execute_credit_command_v2(text,bigint,bigint,text,text,text,text,te
 	}
 	if !securityDefiner || !isTrustedFunctionSearchPath(functionConfig, trustedSchema) {
 		t.Fatalf("command function security_definer=%v config=%v", securityDefiner, functionConfig)
+	}
+	if err := db.QueryRowContext(ctx, `
+SELECT prosecdef, COALESCE(array_to_string(proconfig, ','), '')
+FROM pg_proc
+WHERE oid = 'execute_credit_purchase_v1(bigint,bigint,text,text,text,text,text,text,text)'::regprocedure`,
+	).Scan(&securityDefiner, &functionConfig); err != nil {
+		t.Fatalf("read purchase function security config error = %v", err)
+	}
+	if !securityDefiner || !isTrustedFunctionSearchPath(functionConfig, trustedSchema) {
+		t.Fatalf("purchase function security_definer=%v config=%v", securityDefiner, functionConfig)
 	}
 	for _, functionName := range []string{
 		"create_credit_wallet_restriction(bigint,text,text,text,text,text,text,text)",
@@ -290,7 +319,7 @@ func assertTemporaryCreditTablesCannotShadowLedger(
 	if err != nil {
 		t.Fatalf("Grant() under temp shadow attack error = %v", err)
 	}
-	if result.Wallet.Available != 32 {
+	if result.Wallet.Available != 37 {
 		t.Fatalf("Grant() under temp shadow attack result = %+v", result)
 	}
 	restriction, err := NewService(pool).RestrictionsInTx(tx).RestrictWallet(ctx, RestrictWalletCommand{

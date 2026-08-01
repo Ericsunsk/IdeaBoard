@@ -3,14 +3,17 @@ import { Coins, CreditCard, Gift, Lock, Page, StatsUpSquare, User } from '@icono
 import AccountComingSoonPane from './components/AccountComingSoonPane.vue'
 import UserBillingRecordsPane from './components/UserBillingRecordsPane.vue'
 import UserProfilePane from './components/UserProfilePane.vue'
+import UserRechargePane from './components/UserRechargePane.vue'
 import UserRewardsPane from './components/UserRewardsPane.vue'
 import UserSecurityPane from './components/UserSecurityPane.vue'
 import UserUsagePane from './components/UserUsagePane.vue'
+import type { PaymentReturnContext } from './paymentReturnRoute'
 
 type AccountTabPaneContext = {
   active: boolean
   group: AccountTabGroupDefinition
   tab: AccountTabDefinition
+  paymentReturn: PaymentReturnContext | null
 }
 
 type AccountTabPane = {
@@ -70,7 +73,15 @@ export const accountTabRegistry = [
     key: 'subscription',
     label: '订阅与套餐',
     tabs: [
-      { key: 'recharge', label: '充值积分', icon: Coins, pane: comingSoonPane },
+      {
+        key: 'recharge',
+        label: '充值积分',
+        icon: Coins,
+        pane: {
+          component: UserRechargePane,
+          props: ({ active, paymentReturn }) => ({ active, paymentReturn }),
+        },
+      },
       { key: 'subscriptions', label: '订阅套餐', icon: CreditCard, pane: comingSoonPane },
     ],
   },

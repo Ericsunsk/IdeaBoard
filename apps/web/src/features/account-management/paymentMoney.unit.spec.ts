@@ -1,0 +1,37 @@
+import { describe, expect, it } from 'vitest'
+import { formatCurrencyMinor, formatUsdForIdeas, parseIdeaQuantity } from './paymentMoney'
+
+describe('paymentMoney', () => {
+  it('derives the exact two-decimal USD price from integer Ideas', () => {
+    expect(formatUsdForIdeas(500)).toBe('$5.00 USD')
+    expect(formatUsdForIdeas(501)).toBe('$5.01 USD')
+    expect(formatUsdForIdeas(500_000)).toBe('$5,000.00 USD')
+  })
+
+  it("uses each currency's Intl minor-unit precision without floating point arithmetic", () => {
+    expect(formatCurrencyMinor(12_345, 'usd')).toBe('$123.45 USD')
+    expect(formatCurrencyMinor(500, 'cny')).toBe('CN¥5.00 CNY')
+    expect(formatCurrencyMinor(500, 'hkd')).toBe('HK$5.00 HKD')
+    expect(formatCurrencyMinor(500, 'jpy')).toBe('¥500 JPY')
+  })
+
+  it.each([
+    ['500', 500],
+    ['501', 501],
+    ['500000', 500_000],
+    [' 1001 ', 1001],
+  ])('accepts an in-range integer quantity %s', (value, expected) => {
+    expect(parseIdeaQuantity(value)).toEqual({ ok: true, value: expected })
+  })
+
+  it.each([
+    ['', '请输入充值数量'],
+    ['499', '最少充值 500 Ideas'],
+    ['500001', '最多充值 500,000 Ideas'],
+    ['500.5', '请输入 500–500,000 之间的整数'],
+    ['5e2', '请输入 500–500,000 之间的整数'],
+    ['1,000', '请输入 500–500,000 之间的整数'],
+  ])('rejects invalid quantity %s', (value, error) => {
+    expect(parseIdeaQuantity(value)).toEqual({ ok: false, error })
+  })
+})

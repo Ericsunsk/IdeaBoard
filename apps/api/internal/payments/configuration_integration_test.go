@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
 )
@@ -15,11 +16,14 @@ import (
 func TestConfigureStripePreparesThenAtomicallyPublishesSafeSummary(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
+	// The lifecycle lock and the atomic configuration write must share one
+	// connection; otherwise a single-connection pool deadlocks itself.
+	db.SetMaxOpenConns(1)
 	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
 		AccountID: "acct_test", Mode: StripeModeTest, ChargesEnabled: true,
 		ProductID: "prod_idea", WebhookEndpointID: "we_idea", WebhookSecret: "whsec_test",
 	}}
-	service := NewService(NewRepository(db), gateway, nil)
+	service := NewService(ServiceDependencies{Repository: NewRepository(db), ConfigurationGateway: gateway})
 
 	summary, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_safe_fixture", ProductTaxCode: "txcd_10105001",
@@ -67,6 +71,39 @@ SELECT actor_id, outcome FROM payment_admin_actions ORDER BY id DESC LIMIT 1`).S
 	}
 }
 
+func TestStripeLifecycleTransactionRollsBackAndUnlocksAfterPanic(t *testing.T) {
+	db := testdb.Open(t)
+	db.SetMaxOpenConns(1)
+	repo := NewRepository(db)
+	panicked := false
+	func() {
+		defer func() { panicked = recover() != nil }()
+		_ = repo.WithStripeConfigurationSharedLock(t.Context(), func(lockedContext context.Context) error {
+			return repo.dbWithContext(lockedContext).withTx(func(_ *dbsqlc.Queries, tx *sql.Tx) error {
+				if _, err := tx.ExecContext(lockedContext, `
+INSERT INTO payment_admin_actions (action_type, actor_id, target_type, target_id, outcome, metadata)
+VALUES ('configure_stripe', 42, 'stripe_configuration', 'current', 'failed', '{}'::jsonb)`); err != nil {
+					t.Fatal(err)
+				}
+				panic("injected transaction panic")
+			})
+		})
+	}()
+	if !panicked {
+		t.Fatal("transaction panic did not propagate")
+	}
+	var auditCount int
+	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM payment_admin_actions`).Scan(&auditCount); err != nil {
+		t.Fatal(err)
+	}
+	if auditCount != 0 {
+		t.Fatalf("panic committed %d payment admin actions", auditCount)
+	}
+	if err := repo.WithStripeConfigurationExclusiveLock(t.Context(), func(context.Context) error { return nil }); err != nil {
+		t.Fatalf("lifecycle lock remained held after panic: %v", err)
+	}
+}
+
 func TestConfigureStripeFailurePreservesCurrentConfigurationAndAuditsSanitizedError(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
@@ -74,7 +111,7 @@ func TestConfigureStripeFailurePreservesCurrentConfigurationAndAuditsSanitizedEr
 		AccountID: "acct_original", Mode: StripeModeTest, ChargesEnabled: true,
 		ProductID: "prod_original", WebhookEndpointID: "we_original", WebhookSecret: "whsec_original",
 	}}
-	service := NewService(NewRepository(db), gateway, nil)
+	service := NewService(ServiceDependencies{Repository: NewRepository(db), ConfigurationGateway: gateway})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_original", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",

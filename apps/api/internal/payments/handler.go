@@ -1,15 +1,20 @@
 package payments
 
 import (
+	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/platform/sse"
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,6 +22,8 @@ import (
 const (
 	maxStripeConfigurationRequestBytes int64 = 16 << 10
 	maxStripeWebhookRequestBytes       int64 = 128 << 10
+	maxPaymentCheckoutRequestBytes     int64 = 16 << 10
+	paymentEventsHeartbeatInterval           = 15 * time.Second
 )
 
 type Handler struct {
@@ -30,8 +37,172 @@ type updateStripeConfigurationRequest struct {
 	PurchasesEnabled *bool   `json:"purchases_enabled"`
 }
 
+type createPaymentCheckoutRequest struct {
+	IdempotencyKey      string `json:"idempotency_key"`
+	IdeaQuantity        int64  `json:"idea_quantity"`
+	TermsAccepted       bool   `json:"terms_accepted"`
+	TermsVersion        string `json:"terms_version"`
+	RefundPolicyVersion string `json:"refund_policy_version"`
+}
+
 func NewHandler(service *Service, publicURLs settings.PublicURLSettingProvider) *Handler {
 	return &Handler{service: service, publicURLs: publicURLs}
+}
+
+func (h *Handler) GetPurchaseOptions(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	identityPrincipal, ok := principal.Require(c)
+	if !ok {
+		return
+	}
+	if h == nil || h.service == nil {
+		response.Error(c, http.StatusServiceUnavailable, "充值服务暂不可用")
+		return
+	}
+	options, err := h.service.GetPurchaseOptions(c.Request.Context(), identityPrincipal.UserID())
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "读取充值选项失败")
+		return
+	}
+	response.SuccessDTO(c, options)
+}
+
+func (h *Handler) CreateCheckoutSession(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	identityPrincipal, ok := principal.Require(c)
+	if !ok {
+		return
+	}
+	if h == nil || h.service == nil {
+		response.Error(c, http.StatusServiceUnavailable, "充值服务暂不可用")
+		return
+	}
+	var request createPaymentCheckoutRequest
+	if err := jsonlimit.DecodeStrictRequest(c.Writer, c.Request, maxPaymentCheckoutRequestBytes, &request); err != nil {
+		response.Error(c, http.StatusBadRequest, "充值参数错误")
+		return
+	}
+	returnBaseURL, err := h.checkoutReturnBaseURL(c.Request.Context())
+	if err != nil {
+		response.Error(c, http.StatusServiceUnavailable, "充值服务暂不可用")
+		return
+	}
+	result, err := h.service.CreateCheckout(c.Request.Context(), CreateCheckoutCommand{
+		UserID: identityPrincipal.UserID(), ClientIdempotencyKey: request.IdempotencyKey,
+		IdeaQuantity: request.IdeaQuantity, TermsAccepted: request.TermsAccepted,
+		TermsVersion: request.TermsVersion, RefundPolicyVersion: request.RefundPolicyVersion,
+		ReturnBaseURL: returnBaseURL,
+	})
+	if err != nil {
+		writeCheckoutError(c, err)
+		return
+	}
+	response.SuccessDTO(c, result)
+}
+
+func (h *Handler) GetPaymentOrderReturnStatus(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	identityPrincipal, ok := principal.Require(c)
+	if !ok {
+		return
+	}
+	if h == nil || h.service == nil {
+		response.Error(c, http.StatusServiceUnavailable, "充值服务暂不可用")
+		return
+	}
+	result, err := h.service.GetPaymentOrderReturnStatus(c.Request.Context(), identityPrincipal.UserID(), c.Param("public_token"))
+	if errors.Is(err, ErrPaymentOrderNotFound) {
+		response.Error(c, http.StatusNotFound, "充值订单不存在")
+		return
+	}
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "读取充值订单失败")
+		return
+	}
+	response.SuccessDTO(c, result)
+}
+
+func (h *Handler) ListRecharges(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	identityPrincipal, ok := principal.Require(c)
+	if !ok {
+		return
+	}
+	if h == nil || h.service == nil {
+		response.Error(c, http.StatusServiceUnavailable, "充值服务暂不可用")
+		return
+	}
+	limit := 0
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil {
+			response.Error(c, http.StatusBadRequest, "limit 无效")
+			return
+		}
+		limit = value
+	}
+	page, err := h.service.ListRecharges(c.Request.Context(), identityPrincipal.UserID(), c.Query("cursor"), limit)
+	if errors.Is(err, ErrRechargeHistoryCursor) || errors.Is(err, ErrRechargeHistoryLimit) {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "读取充值记录失败")
+		return
+	}
+	response.SuccessDTO(c, page)
+}
+
+func (h *Handler) StreamUserPaymentEvents(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	identityPrincipal, ok := principal.Require(c)
+	if !ok {
+		return
+	}
+	if h == nil || h.service == nil || h.service.EventHub() == nil {
+		response.Error(c, http.StatusServiceUnavailable, "充值事件服务暂不可用")
+		return
+	}
+	events, unsubscribe := h.service.EventHub().Subscribe(identityPrincipal.UserID())
+	if events == nil {
+		response.Error(c, http.StatusServiceUnavailable, "充值事件服务暂不可用")
+		return
+	}
+	defer unsubscribe()
+	if err := sse.Prepare(c); err != nil {
+		// A write-deadline reset is an optional transport optimization. The stream
+		// remains usable on ResponseWriter implementations that do not expose it.
+		slog.Warn("clear payment SSE write deadline failed", "err", err)
+	}
+	c.Header("Cache-Control", "no-store")
+	heartbeat := time.NewTicker(paymentEventsHeartbeatInterval)
+	defer heartbeat.Stop()
+	for {
+		select {
+		case <-c.Request.Context().Done():
+			return
+		case event := <-events:
+			if err := sse.WriteEvent(c, "payment", event); err != nil {
+				return
+			}
+		case <-heartbeat.C:
+			if _, err := c.Writer.Write([]byte(":keepalive\n\n")); err != nil {
+				return
+			}
+			c.Writer.Flush()
+		}
+	}
+}
+
+func (h *Handler) checkoutReturnBaseURL(ctx context.Context) (string, error) {
+	if h == nil || h.publicURLs == nil {
+		return "", ErrPurchasesUnavailable
+	}
+	setting, err := h.publicURLs.GetPublicURL(ctx)
+	if err != nil || strings.TrimSpace(setting.PublicBaseURL) == "" {
+		return "", ErrPurchasesUnavailable
+	}
+	return strings.TrimRight(strings.TrimSpace(setting.PublicBaseURL), "/") + "/user/boards", nil
 }
 
 func (h *Handler) GetStripeConfiguration(c *gin.Context) {
@@ -121,8 +292,25 @@ func writeStripeConfigurationError(c *gin.Context, err error) {
 		response.Error(c, http.StatusUnprocessableEntity, err.Error())
 	case errors.Is(err, ErrStripeProviderUnavailable):
 		response.Error(c, http.StatusServiceUnavailable, ErrStripeProviderUnavailable.Error())
+	case errors.Is(err, ErrStripeConfigurationBusy):
+		response.Error(c, http.StatusConflict, ErrStripeConfigurationBusy.Error())
 	default:
 		response.Error(c, http.StatusInternalServerError, "保存 Stripe 设置失败")
+	}
+}
+
+func writeCheckoutError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, ErrInvalidIdeaQuantity), errors.Is(err, ErrTermsAcceptanceRequired), errors.Is(err, ErrCheckoutIdempotencyKey):
+		response.Error(c, http.StatusBadRequest, err.Error())
+	case errors.Is(err, ErrCheckoutIdempotencyConflict):
+		response.Error(c, http.StatusConflict, err.Error())
+	case errors.Is(err, ErrWalletNotRechargeable):
+		response.Error(c, http.StatusLocked, err.Error())
+	case errors.Is(err, ErrStripeProviderUnavailable):
+		response.Error(c, http.StatusServiceUnavailable, "支付服务暂不可用")
+	default:
+		response.Error(c, http.StatusServiceUnavailable, "充值服务暂不可用")
 	}
 }
 

@@ -46,10 +46,13 @@ func TestReceiveStripeWebhookVerifiesRawBodyAndStoresOnlyMinimalInboxFact(t *tes
 	}}
 	verifiedAt := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	verifier := &fakeWebhookVerifier{event: StripeWebhookEvent{
-		ID: "evt_1", Type: "checkout.session.completed", ObjectID: "cs_1",
+		ID: "evt_1", Type: "refund.updated", ObjectID: "re_1",
 		Livemode: false, CreatedAt: verifiedAt.Add(-time.Minute),
 	}}
-	service := NewService(NewRepository(db), gateway, verifier)
+	service := NewService(ServiceDependencies{
+		Repository: NewRepository(db), ConfigurationGateway: gateway,
+		WebhookVerifier: verifier,
+	})
 	service.now = func() time.Time { return verifiedAt }
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_webhook", ProductTaxCode: "txcd_10105001",
@@ -80,7 +83,7 @@ SELECT event_type, stripe_object_id, processing_result, stripe_created_at
 FROM payment_webhook_events WHERE stripe_event_id = 'evt_1'`).Scan(&eventType, &objectID, &result, &createdAt); err != nil {
 		t.Fatalf("read webhook inbox: %v", err)
 	}
-	if eventType != "checkout.session.completed" || objectID != "cs_1" || result != "received" || !createdAt.Equal(verifiedAt.Add(-time.Minute)) {
+	if eventType != "refund.updated" || objectID != "re_1" || result != "processed" || !createdAt.Equal(verifiedAt.Add(-time.Minute)) {
 		t.Fatalf("webhook fact = type=%q object=%q result=%q created=%v", eventType, objectID, result, createdAt)
 	}
 
@@ -100,7 +103,7 @@ func TestReceiveStripeWebhookIgnoresVerifiedUnknownEventAndRejectsUnverifiedPayl
 	verifier := &fakeWebhookVerifier{event: StripeWebhookEvent{
 		ID: "evt_unknown", Type: "customer.updated", ObjectID: "cus_1", CreatedAt: time.Now(),
 	}}
-	service := NewService(NewRepository(db), gateway, verifier)
+	service := NewService(ServiceDependencies{Repository: NewRepository(db), ConfigurationGateway: gateway, WebhookVerifier: verifier})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_unknown", ProductTaxCode: "txcd_10105001",
 		WebhookURL: "https://app.example.com/api/webhooks/stripe",

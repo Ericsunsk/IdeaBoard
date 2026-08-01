@@ -20,6 +20,11 @@ func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	userAPI.GET("/usage", h.UsageHandler.GetCurrent)
 	userAPI.POST("/rewards/redeem", h.RewardHandler.Redeem)
 	userAPI.GET("/rewards/redemptions", h.RewardHandler.ListRedemptions)
+	userAPI.GET("/payments/purchase-options", h.PaymentHandler.GetPurchaseOptions)
+	userAPI.POST("/payments/checkout-sessions", h.PaymentHandler.CreateCheckoutSession)
+	userAPI.GET("/payments/orders/:public_token", h.PaymentHandler.GetPaymentOrderReturnStatus)
+	userAPI.GET("/payments/recharges", h.PaymentHandler.ListRecharges)
+	userAPI.GET("/payments/events", h.PaymentHandler.StreamUserPaymentEvents)
 
 	registerUserTaskRoutes(userAPI, h)
 	registerUserBoardRoutes(userAPI, h)

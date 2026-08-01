@@ -87,3 +87,147 @@ INSERT INTO payment_webhook_events (
 )
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (stripe_event_id) DO NOTHING;
+
+-- name: GetPaymentOrderByIdempotency :one
+SELECT *
+FROM payment_orders
+WHERE user_id = $1 AND client_idempotency_key = $2;
+
+-- name: GetPaymentOrderByID :one
+SELECT *
+FROM payment_orders
+WHERE id = $1;
+
+-- name: InsertPaymentOrderIntent :one
+INSERT INTO payment_orders (
+  id,
+  public_order_number,
+  public_token,
+  user_id,
+  client_idempotency_key,
+  request_hash,
+  status,
+  stripe_account_id,
+  stripe_product_id,
+  idea_quantity,
+  base_amount_minor,
+  terms_version,
+  refund_policy_version,
+  expires_at
+)
+VALUES (
+  $1, $2, $3, $4, $5, $6, 'creating', $7, $8, $9, $9, $10, $11, $12
+)
+RETURNING *;
+
+-- name: GetPaymentCustomer :one
+SELECT *
+FROM payment_customers
+WHERE user_id = $1;
+
+-- name: ReplacePaymentCustomer :one
+INSERT INTO payment_customers (user_id, stripe_account_id, stripe_customer_id)
+VALUES ($1, $2, $3)
+ON CONFLICT (user_id) DO UPDATE
+SET stripe_account_id = EXCLUDED.stripe_account_id,
+    stripe_customer_id = EXCLUDED.stripe_customer_id
+RETURNING *;
+
+-- name: BindPaymentOrderCheckout :one
+UPDATE payment_orders
+SET status = 'checkout_open',
+    stripe_customer_id = $2,
+    stripe_checkout_session_id = $3,
+    checkout_url = $4,
+    expires_at = $5
+WHERE id = $1 AND status = 'creating'
+RETURNING *;
+
+-- name: GetPaymentOrderByCheckoutSessionForUpdate :one
+SELECT *
+FROM payment_orders
+WHERE stripe_account_id = $1 AND stripe_checkout_session_id = $2
+FOR UPDATE;
+
+-- name: GetPaymentOrderByCheckoutSession :one
+SELECT *
+FROM payment_orders
+WHERE stripe_account_id = $1 AND stripe_checkout_session_id = $2;
+
+-- name: MarkPaymentOrderAsyncPending :one
+UPDATE payment_orders
+SET status = 'async_payment_pending'
+WHERE id = $1 AND status = 'checkout_open'
+RETURNING *;
+
+-- name: MarkPaymentOrderAsyncPendingBySession :one
+UPDATE payment_orders
+SET status = 'async_payment_pending'
+WHERE stripe_account_id = $1 AND stripe_checkout_session_id = $2 AND status = 'checkout_open'
+RETURNING *;
+
+-- name: MarkPaymentOrderFailed :one
+UPDATE payment_orders
+SET status = 'payment_failed'
+WHERE id = $1 AND status IN ('creating', 'checkout_open', 'async_payment_pending')
+RETURNING *;
+
+-- name: MarkPaymentOrderFailedBySession :one
+UPDATE payment_orders
+SET status = 'payment_failed'
+WHERE stripe_account_id = $1 AND stripe_checkout_session_id = $2
+  AND status IN ('checkout_open', 'async_payment_pending')
+RETURNING *;
+
+-- name: ListUnsettledPaymentOrders :many
+SELECT *
+FROM payment_orders
+WHERE status IN ('creating', 'checkout_open', 'async_payment_pending')
+ORDER BY created_at, id
+LIMIT 1001;
+
+-- name: MarkPaymentOrderCredited :one
+UPDATE payment_orders
+SET status = 'credited',
+    stripe_payment_intent_id = $2,
+    stripe_charge_id = $3,
+    paid_subtotal_minor = $4,
+    paid_tax_minor = $5,
+    paid_total_minor = $6,
+    paid_currency = $7,
+    receipt_url = $8,
+    credit_transaction_id = $9,
+    paid_at = $10,
+    credited_at = $11
+WHERE id = $1 AND status IN ('creating', 'checkout_open', 'async_payment_pending')
+RETURNING *;
+
+-- name: GetPaymentOrderByPublicToken :one
+SELECT *
+FROM payment_orders
+WHERE public_token = $1 AND user_id = $2;
+
+-- name: ListPaymentRechargeHistory :many
+SELECT id,
+       paid_at AS occurred_at,
+       idea_quantity,
+       paid_total_minor,
+       paid_currency,
+       receipt_url
+FROM payment_orders
+WHERE user_id = sqlc.arg(user_id)::BIGINT
+  AND status = 'credited'
+  AND paid_at >= sqlc.arg(cutoff_at)::TIMESTAMPTZ
+  AND (
+    NOT sqlc.arg(cursor_set)::BOOLEAN
+    OR (paid_at, id) < (sqlc.narg(cursor_paid_at)::TIMESTAMPTZ, sqlc.narg(cursor_id)::UUID)
+  )
+ORDER BY paid_at DESC, id DESC
+LIMIT sqlc.arg(page_limit)::INTEGER;
+
+-- name: MarkPaymentWebhookEventProcessed :execrows
+UPDATE payment_webhook_events
+SET processing_result = $2,
+    error_summary = $3,
+    processed_at = $4
+WHERE stripe_event_id = $1;

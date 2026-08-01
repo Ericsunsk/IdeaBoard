@@ -9,13 +9,14 @@ import (
 type CommandType string
 
 const (
-	CommandGrant      CommandType = "grant"
-	CommandHold       CommandType = "hold"
-	CommandCapture    CommandType = "capture"
-	CommandRelease    CommandType = "release"
-	CommandRefund     CommandType = "refund"
-	CommandDeduction  CommandType = "deduction"
-	CommandCorrection CommandType = "correction"
+	CommandGrant          CommandType = "grant"
+	CommandHold           CommandType = "hold"
+	CommandCapture        CommandType = "capture"
+	CommandRelease        CommandType = "release"
+	CommandRefund         CommandType = "refund"
+	CommandDeduction      CommandType = "deduction"
+	CommandCorrection     CommandType = "correction"
+	CommandPurchaseCredit CommandType = "purchase_credit"
 )
 
 type AccountRole string
@@ -77,6 +78,14 @@ type GrantCommand struct {
 	Metadata CommandMetadata
 }
 
+// PurchaseCommand credits a paid external order. Only the Payments service
+// may issue it, and callers should compose it into the Payment Order transaction.
+type PurchaseCommand struct {
+	UserID   int64
+	Amount   CreditAmount
+	Metadata CommandMetadata
+}
+
 // DeductionCommand records a discretionary administrative debit. It can only
 // consume available credits and always creates a new immutable transaction.
 type DeductionCommand struct {
@@ -121,6 +130,7 @@ type RefundCommand struct {
 
 type Commands interface {
 	Grant(context.Context, GrantCommand) (CommandResult, error)
+	Purchase(context.Context, PurchaseCommand) (CommandResult, error)
 	Deduct(context.Context, DeductionCommand) (CommandResult, error)
 	Correct(context.Context, CorrectionCommand) (CommandResult, error)
 	Hold(context.Context, HoldCommand) (CommandResult, error)

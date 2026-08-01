@@ -15,7 +15,9 @@ func RuntimePrivilegePolicy() dbprivileges.Policy {
 		Name: "Payments",
 		Objects: []dbprivileges.ObjectRule{
 			{
-				Kind: dbprivileges.KindTable, Names: []string{"payment_stripe_configurations", "payment_webhook_events"},
+				Kind: dbprivileges.KindTable, Names: []string{
+					"payment_stripe_configurations", "payment_webhook_events", "payment_customers", "payment_orders",
+				},
 				Required:        []dbprivileges.Privilege{dbprivileges.PrivilegeSelect, dbprivileges.PrivilegeInsert, dbprivileges.PrivilegeUpdate},
 				Forbidden:       []dbprivileges.Privilege{dbprivileges.PrivilegeDelete, dbprivileges.PrivilegeTruncate, dbprivileges.PrivilegeReferences, dbprivileges.PrivilegeTrigger},
 				PublicForbidden: allTables,
@@ -31,7 +33,9 @@ func RuntimePrivilegePolicy() dbprivileges.Policy {
 				Required: allSequences, PublicForbidden: allSequences,
 			},
 			{
-				Kind: dbprivileges.KindFunction, Names: []string{"prevent_payment_admin_action_mutation()"},
+				Kind: dbprivileges.KindFunction, Names: []string{
+					"prevent_payment_admin_action_mutation()", "guard_payment_order_lifecycle()",
+				},
 				Forbidden:       []dbprivileges.Privilege{dbprivileges.PrivilegeExecute},
 				PublicForbidden: []dbprivileges.Privilege{dbprivileges.PrivilegeExecute},
 			},

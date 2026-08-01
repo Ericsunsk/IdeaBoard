@@ -140,6 +140,11 @@ function renderAccountManagementDialogContent(initialTab?: AccountManagementTab)
           props: ['active'],
           template: '<section aria-label="账单记录">最终收支记录</section>',
         },
+        UserRechargePane: {
+          props: ['active', 'paymentReturn'],
+          template:
+            '<section aria-label="充值积分">选择充值数量<span v-if="paymentReturn">{{ paymentReturn.publicToken }}</span></section>',
+        },
         UserUsagePane: {
           props: ['active'],
           template: '<section aria-label="用量统计">Lifetime 数据</section>',
@@ -287,17 +292,25 @@ describe('AccountManagementDialogContent', () => {
     expect(screen.getByRole('button', { name: '个人资料' })).toHaveAttribute('aria-current', 'page')
   })
 
-  it.each([
-    ['充值积分', '充值积分即将上线'],
-    ['订阅套餐', '订阅套餐即将上线'],
-  ])('opens the %s roadmap page', async (label, regionName) => {
+  it('opens the recharge workflow', async () => {
     const { user } = renderAccountManagementDialogContent()
 
-    await user.click(screen.getByRole('button', { name: label }))
+    await user.click(screen.getByRole('button', { name: '充值积分' }))
 
-    expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('region', { name: regionName })).toBeVisible()
+    expect(screen.getByRole('region', { name: '充值积分' })).toHaveTextContent('选择充值数量')
   })
+
+  it.each([['订阅套餐', '订阅套餐即将上线']])(
+    'opens the %s roadmap page',
+    async (label, regionName) => {
+      const { user } = renderAccountManagementDialogContent()
+
+      await user.click(screen.getByRole('button', { name: label }))
+
+      expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-current', 'page')
+      expect(screen.getByRole('region', { name: regionName })).toBeVisible()
+    },
+  )
 
   it('opens the rewards redemption pane', async () => {
     const { user } = renderAccountManagementDialogContent()

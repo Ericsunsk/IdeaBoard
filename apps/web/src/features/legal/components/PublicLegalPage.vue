@@ -1,0 +1,75 @@
+<template>
+  <div class="min-h-dvh overflow-y-auto bg-ib-surface-muted text-ib-text">
+    <header class="border-b border-ib-border-soft bg-ib-surface">
+      <div class="mx-auto flex w-full max-w-[860px] items-center justify-between gap-4 px-6 py-5">
+        <RouterLink
+          :to="USER_HOME_PATH"
+          class="rounded-[var(--radius-ib-control)] text-base font-bold text-ib-text no-underline focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]"
+        >
+          {{ projectName }}
+        </RouterLink>
+        <RouterLink
+          :to="USER_HOME_PATH"
+          class="rounded-[var(--radius-ib-control)] px-2 py-1 text-sm font-semibold text-ib-text-muted no-underline transition-colors duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:text-ib-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]"
+        >
+          返回首页
+        </RouterLink>
+      </div>
+    </header>
+
+    <main class="mx-auto w-full max-w-[860px] px-6 py-12 max-[640px]:px-4 max-[640px]:py-8">
+      <article
+        class="rounded-[var(--radius-ib-overlay)] border border-ib-border-soft bg-ib-surface px-10 py-9 shadow-[var(--shadow-ib-control)] max-[640px]:rounded-[var(--radius-ib-panel)] max-[640px]:px-5 max-[640px]:py-6"
+      >
+        <header class="border-b border-ib-border-soft pb-7">
+          <p class="m-0 text-[12px] font-semibold tracking-wide text-ib-text-subtle">
+            {{ projectName }}
+          </p>
+          <h1
+            class="mt-2 mb-0 text-[34px] leading-tight font-bold text-ib-text max-[640px]:text-[28px]"
+          >
+            {{ title }}
+          </h1>
+          <p class="mt-3 mb-0 text-sm text-ib-text-muted">版本：{{ version }}</p>
+        </header>
+
+        <div class="legal-copy pt-7 text-[15px] leading-7 text-ib-text-muted">
+          <slot />
+        </div>
+      </article>
+    </main>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
+import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
+
+defineProps<{ title: string; version: string }>()
+
+const { projectName } = useSiteBranding()
+</script>
+
+<style scoped>
+.legal-copy :slotted(h2) {
+  margin: 1.75rem 0 0.5rem;
+  color: var(--color-ib-text);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.legal-copy :slotted(p),
+.legal-copy :slotted(ul) {
+  margin: 0.5rem 0 0;
+}
+
+.legal-copy :slotted(ul) {
+  padding-left: 1.25rem;
+}
+
+.legal-copy :slotted(a) {
+  color: var(--color-ib-creative-accent-pressed);
+  font-weight: 600;
+}
+</style>

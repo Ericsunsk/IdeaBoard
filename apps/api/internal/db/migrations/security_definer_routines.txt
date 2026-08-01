@@ -5,6 +5,7 @@ create_credit_wallet_restriction(bigint, text, text, text, text, text, text, tex
 delete_archived_billing_item(text, bigint)
 delete_reward_code_v1(bigint, bigint)
 execute_credit_command_v2(text, bigint, bigint, text, text, text, text, text, text, text, text)
+execute_credit_purchase_v1(bigint, bigint, text, text, text, text, text, text, text)
 execute_credit_reconciliation(bigint)
 fail_credit_reconciliation(bigint, text)
 get_auth_runtime_settings()

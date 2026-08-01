@@ -65,6 +65,7 @@ func newAppRouter(
 			CreditHandler:    credits.NewHandler(services.creditService),
 			UsageHandler:     usage.NewHandler(services.usageService),
 			RewardHandler:    rewards.NewHandler(services.rewardService),
+			PaymentHandler:   paymentHandler,
 			Uploads:          uploadDeps,
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{

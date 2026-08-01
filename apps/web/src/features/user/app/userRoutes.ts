@@ -1,6 +1,8 @@
 import type { RouteRecordRaw } from 'vue-router'
 import {
+  REFUND_POLICY_PATH,
   SHARE_JOIN_PATH,
+  TERMS_PATH,
   USER_HOME_PATH,
   USER_LOGIN_PATH as USER_LOGIN_ROUTE_PATH,
   USER_ROOT_PATH,
@@ -10,6 +12,18 @@ export const USER_DEFAULT_PATH = USER_HOME_PATH
 export const USER_LOGIN_PATH = USER_LOGIN_ROUTE_PATH
 
 export const userRoutes: RouteRecordRaw[] = [
+  {
+    path: TERMS_PATH,
+    name: 'Terms',
+    component: () => import('../../legal/pages/TermsPage.vue'),
+    meta: { public: true },
+  },
+  {
+    path: REFUND_POLICY_PATH,
+    name: 'RefundPolicy',
+    component: () => import('../../legal/pages/RefundPolicyPage.vue'),
+    meta: { public: true },
+  },
   {
     path: SHARE_JOIN_PATH,
     name: 'ShareJoin',

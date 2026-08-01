@@ -18,6 +18,7 @@
     <AccountManagementDialogContent
       v-if="visible"
       :initial-tab="initialTab"
+      :payment-return="paymentReturn"
       @close="requestOverlayClose('close-control')"
       @update:busy="busy = $event"
     />
@@ -32,14 +33,16 @@ import { usePrimeDialogOverlayLifecycle } from '../../../shared/composables/useP
 import { ibDialogMaskPt } from '../../../shared/theme/dialogMask'
 import { createDialogMotionPt } from '../../../shared/motion/dialogMotion'
 import { defaultAccountManagementTab, type AccountManagementTab } from '../accountTabRegistry'
+import type { PaymentReturnContext } from '../paymentReturnRoute'
 import AccountManagementDialogContent from './AccountManagementDialogContent.vue'
 
 const props = withDefaults(
   defineProps<{
     visible: boolean
     initialTab?: AccountManagementTab
+    paymentReturn?: PaymentReturnContext | null
   }>(),
-  { initialTab: defaultAccountManagementTab },
+  { initialTab: defaultAccountManagementTab, paymentReturn: null },
 )
 
 const emit = defineEmits<{

@@ -304,6 +304,47 @@ type PaymentAdminAction struct {
 	CreatedAt    time.Time       `json:"created_at"`
 }
 
+type PaymentCustomer struct {
+	UserID           int64     `json:"user_id"`
+	StripeAccountID  string    `json:"stripe_account_id"`
+	StripeCustomerID string    `json:"stripe_customer_id"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
+type PaymentOrder struct {
+	ID                      uuid.UUID      `json:"id"`
+	PublicOrderNumber       string         `json:"public_order_number"`
+	PublicToken             uuid.UUID      `json:"public_token"`
+	UserID                  int64          `json:"user_id"`
+	ClientIdempotencyKey    string         `json:"client_idempotency_key"`
+	RequestHash             string         `json:"request_hash"`
+	Status                  string         `json:"status"`
+	StripeAccountID         string         `json:"stripe_account_id"`
+	StripeCustomerID        string         `json:"stripe_customer_id"`
+	StripeProductID         string         `json:"stripe_product_id"`
+	StripeCheckoutSessionID sql.NullString `json:"stripe_checkout_session_id"`
+	StripePaymentIntentID   string         `json:"stripe_payment_intent_id"`
+	StripeChargeID          string         `json:"stripe_charge_id"`
+	IdeaQuantity            int64          `json:"idea_quantity"`
+	BaseCurrency            string         `json:"base_currency"`
+	BaseAmountMinor         int64          `json:"base_amount_minor"`
+	PaidSubtotalMinor       sql.NullInt64  `json:"paid_subtotal_minor"`
+	PaidTaxMinor            sql.NullInt64  `json:"paid_tax_minor"`
+	PaidTotalMinor          sql.NullInt64  `json:"paid_total_minor"`
+	PaidCurrency            string         `json:"paid_currency"`
+	TermsVersion            string         `json:"terms_version"`
+	RefundPolicyVersion     string         `json:"refund_policy_version"`
+	CheckoutUrl             string         `json:"checkout_url"`
+	ReceiptUrl              string         `json:"receipt_url"`
+	CreditTransactionID     sql.NullString `json:"credit_transaction_id"`
+	ExpiresAt               time.Time      `json:"expires_at"`
+	PaidAt                  sql.NullTime   `json:"paid_at"`
+	CreditedAt              sql.NullTime   `json:"credited_at"`
+	CreatedAt               time.Time      `json:"created_at"`
+	UpdatedAt               time.Time      `json:"updated_at"`
+}
+
 type PaymentStripeConfiguration struct {
 	SingletonID             int16     `json:"singleton_id"`
 	AccountID               string    `json:"account_id"`

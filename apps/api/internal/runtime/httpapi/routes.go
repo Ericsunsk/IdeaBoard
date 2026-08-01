@@ -69,6 +69,7 @@ type UserRouteDeps struct {
 	CreditHandler    *credits.Handler
 	UsageHandler     *usage.Handler
 	RewardHandler    *rewards.Handler
+	PaymentHandler   *payments.Handler
 	Uploads          UploadDeps
 }
 

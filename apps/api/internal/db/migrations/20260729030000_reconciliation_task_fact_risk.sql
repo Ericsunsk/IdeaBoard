@@ -44,8 +44,13 @@ BEGIN
     jsonb_build_object('command_type', transactions.command_type, 'actor_type', transactions.actor_type,
       'related_transaction_id', transactions.related_transaction_id, 'command_amount', transactions.command_amount)
   FROM credit_transactions transactions
-  WHERE transactions.command_type NOT IN ('grant', 'deduction', 'hold', 'capture', 'release', 'refund', 'correction')
+  WHERE transactions.command_type NOT IN ('grant', 'deduction', 'hold', 'capture', 'release', 'refund', 'correction', 'purchase_credit')
     OR (transactions.command_type IN ('deduction', 'correction') AND transactions.actor_type <> 'admin')
+    OR (transactions.command_type = 'purchase_credit' AND (
+      transactions.actor_type <> 'service' OR transactions.actor_id <> 'payments'
+      OR transactions.source <> 'stripe_purchase'
+      OR transactions.business_reference_type <> 'payment_order'
+    ))
     OR transactions.command_amount <= 0;
 
   INSERT INTO reconciliation_scan
@@ -259,7 +264,7 @@ BEGIN
       'related_command_type', related.command_type, 'related_wallet_user_id', related.wallet_user_id)
   FROM credit_transactions transactions
   LEFT JOIN credit_transactions related ON related.transaction_id = transactions.related_transaction_id
-  WHERE (transactions.command_type IN ('grant', 'deduction', 'hold') AND transactions.related_transaction_id IS NOT NULL)
+  WHERE (transactions.command_type IN ('grant', 'deduction', 'hold', 'purchase_credit') AND transactions.related_transaction_id IS NOT NULL)
     OR (transactions.command_type IN ('capture', 'release') AND
       (related.transaction_id IS NULL OR related.command_type <> 'hold' OR related.wallet_user_id <> transactions.wallet_user_id))
     OR (transactions.command_type = 'refund' AND
@@ -462,8 +467,13 @@ BEGIN
     jsonb_build_object('command_type', transactions.command_type, 'actor_type', transactions.actor_type,
       'related_transaction_id', transactions.related_transaction_id, 'command_amount', transactions.command_amount)
   FROM credit_transactions transactions
-  WHERE transactions.command_type NOT IN ('grant', 'deduction', 'hold', 'capture', 'release', 'refund', 'correction')
+  WHERE transactions.command_type NOT IN ('grant', 'deduction', 'hold', 'capture', 'release', 'refund', 'correction', 'purchase_credit')
     OR (transactions.command_type IN ('deduction', 'correction') AND transactions.actor_type <> 'admin')
+    OR (transactions.command_type = 'purchase_credit' AND (
+      transactions.actor_type <> 'service' OR transactions.actor_id <> 'payments'
+      OR transactions.source <> 'stripe_purchase'
+      OR transactions.business_reference_type <> 'payment_order'
+    ))
     OR transactions.command_amount <= 0;
 
   INSERT INTO reconciliation_scan
@@ -605,7 +615,7 @@ BEGIN
       'related_command_type', related.command_type, 'related_wallet_user_id', related.wallet_user_id)
   FROM credit_transactions transactions
   LEFT JOIN credit_transactions related ON related.transaction_id = transactions.related_transaction_id
-  WHERE (transactions.command_type IN ('grant', 'deduction', 'hold') AND transactions.related_transaction_id IS NOT NULL)
+  WHERE (transactions.command_type IN ('grant', 'deduction', 'hold', 'purchase_credit') AND transactions.related_transaction_id IS NOT NULL)
     OR (transactions.command_type IN ('capture', 'release') AND
       (related.transaction_id IS NULL OR related.command_type <> 'hold' OR related.wallet_user_id <> transactions.wallet_user_id))
     OR (transactions.command_type = 'refund' AND

@@ -14,6 +14,7 @@ tags:
   - name: UserCredits
   - name: UserUsage
   - name: UserRewards
+  - name: UserPayments
   - name: AdminSettings
   - name: AdminUsers
   - name: AdminCredits
@@ -210,6 +211,118 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseRewardRedemptionHistoryPage' }
+  /user/payments/purchase-options:
+    get:
+      tags: [UserPayments]
+      operationId: getUserPaymentPurchaseOptions
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Current authenticated user's recharge availability and legal document versions
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponsePaymentPurchaseOptions' }
+  /user/payments/checkout-sessions:
+    post:
+      tags: [UserPayments]
+      operationId: createUserPaymentCheckoutSession
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePaymentCheckoutRequest' }
+      responses:
+        '200':
+          description: A durable Payment Order and its Stripe Checkout URL
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponsePaymentCheckout' }
+        '400':
+          description: Invalid checkout payload or legal acceptance
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '409':
+          description: The idempotency key was previously used for a different request
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '423':
+          description: Current Wallet cannot start a recharge
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+  /user/payments/orders/{public_token}:
+    get:
+      tags: [UserPayments]
+      operationId: getUserPaymentOrderReturnStatus
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: public_token
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Current authenticated user's Payment Order return status
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponsePaymentOrderReturnStatus' }
+        '404':
+          description: Payment Order does not belong to the authenticated user or does not exist
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+  /user/payments/recharges:
+    get:
+      tags: [UserPayments]
+      operationId: listUserPaymentRecharges
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 512 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 20, default: 20 }
+      responses:
+        '200':
+          description: Current authenticated user's last twelve months of final recharge facts
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseRechargeHistoryPage' }
+  /user/payments/events:
+    get:
+      tags: [UserPayments]
+      operationId: streamUserPaymentEvents
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: User-scoped recharge status events
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            text/event-stream:
+              schema: { type: string }
   /user/profile/avatar:
     post:
       tags: [UserAssets]
@@ -833,6 +946,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '409':
+          description: Another Stripe configuration update is already in progress
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
         '422':
           description: Stripe account or prepared resources cannot accept purchases
           content:
@@ -863,9 +981,6 @@ paths:
       responses:
         '200':
           description: Signed event accepted idempotently or ignored after verification
-          headers:
-            Cache-Control:
-              schema: { type: string, enum: [no-store] }
           content:
             application/json:
               schema:
@@ -3671,6 +3786,82 @@ components:
       type: string
       enum: [test, live]
 
+    PaymentLegalDocument:
+      type: object
+      additionalProperties: false
+      required: [version, url]
+      properties:
+        version: { type: string, minLength: 1, maxLength: 40 }
+        url: { type: string, minLength: 1, maxLength: 2048 }
+
+    PaymentPurchaseOptions:
+      type: object
+      additionalProperties: false
+      required: [purchases_available, quick_idea_quantities, min_idea_quantity, max_idea_quantity, ideas_per_usd, terms, refund_policy]
+      properties:
+        purchases_available: { type: boolean }
+        unavailable_reason: { type: string, enum: [payments_not_configured, purchases_disabled, wallet_restricted] }
+        quick_idea_quantities:
+          type: array
+          items: { type: integer, format: int64, minimum: 500, maximum: 500000 }
+        min_idea_quantity: { type: integer, format: int64, minimum: 500, maximum: 500000 }
+        max_idea_quantity: { type: integer, format: int64, minimum: 500, maximum: 500000 }
+        ideas_per_usd: { type: integer, format: int64, enum: [100] }
+        terms: { $ref: '#/components/schemas/PaymentLegalDocument' }
+        refund_policy: { $ref: '#/components/schemas/PaymentLegalDocument' }
+
+    CreatePaymentCheckoutRequest:
+      type: object
+      additionalProperties: false
+      required: [idempotency_key, idea_quantity, terms_accepted, terms_version, refund_policy_version]
+      properties:
+        idempotency_key: { type: string, minLength: 8, maxLength: 160 }
+        idea_quantity: { type: integer, format: int64, minimum: 500, maximum: 500000 }
+        terms_accepted: { type: boolean, enum: [true] }
+        terms_version: { type: string, minLength: 1, maxLength: 40 }
+        refund_policy_version: { type: string, minLength: 1, maxLength: 40 }
+
+    PaymentCheckout:
+      type: object
+      additionalProperties: false
+      required: [checkout_url, public_token, expires_at, reused]
+      properties:
+        checkout_url: { type: string, format: uri }
+        public_token: { type: string, format: uuid }
+        expires_at: { type: string, format: date-time }
+        reused: { type: boolean }
+
+    PaymentOrderReturnStatus:
+      type: object
+      additionalProperties: false
+      required: [idea_quantity, status, updated_at]
+      properties:
+        idea_quantity: { type: integer, format: int64, minimum: 500, maximum: 500000 }
+        status: { type: string, enum: [processing, credited, failed] }
+        updated_at: { type: string, format: date-time }
+
+    RechargeHistoryItem:
+      type: object
+      additionalProperties: false
+      required: [occurred_at, idea_quantity, paid_amount_minor, paid_currency, status]
+      properties:
+        occurred_at: { type: string, format: date-time }
+        idea_quantity: { type: integer, format: int64, minimum: 500, maximum: 500000 }
+        paid_amount_minor: { type: integer, format: int64, minimum: 0 }
+        paid_currency: { type: string, pattern: '^[a-z]{3}$' }
+        status: { type: string, enum: [credited] }
+        receipt_url: { type: string, format: uri }
+
+    RechargeHistoryPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/RechargeHistoryItem' }
+        next_cursor: { type: string }
+
     StripeConfigurationSummary:
       type: object
       additionalProperties: false
@@ -4568,6 +4759,34 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/StripeWebhookReceipt'
+
+    ApiResponsePaymentPurchaseOptions:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/PaymentPurchaseOptions' }
+
+    ApiResponsePaymentCheckout:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/PaymentCheckout' }
+
+    ApiResponsePaymentOrderReturnStatus:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/PaymentOrderReturnStatus' }
+
+    ApiResponseRechargeHistoryPage:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/RechargeHistoryPage' }
 
     ApiResponseUserList:
       allOf:

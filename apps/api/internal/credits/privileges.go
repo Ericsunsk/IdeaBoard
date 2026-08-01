@@ -27,6 +27,7 @@ var creditInternalFunctionSignatures = []string{
 }
 
 const creditCommandFunctionSignature = "execute_credit_command_v2(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
+const creditPurchaseFunctionSignature = "execute_credit_purchase_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
 
 var creditLifecycleFunctionSignatures = []string{
 	"bind_credit_welcome_identity_key(TEXT)",
@@ -47,7 +48,7 @@ var creditReconciliationFunctionSignatures = []string{
 }
 
 func RuntimePrivilegePolicy() dbprivileges.Policy {
-	requiredFunctions := []string{creditCommandFunctionSignature}
+	requiredFunctions := []string{creditCommandFunctionSignature, creditPurchaseFunctionSignature}
 	requiredFunctions = append(requiredFunctions, creditLifecycleFunctionSignatures...)
 	requiredFunctions = append(requiredFunctions, creditRestrictionFunctionSignatures...)
 	requiredFunctions = append(requiredFunctions, creditReconciliationFunctionSignatures...)
