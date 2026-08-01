@@ -7,11 +7,7 @@ import (
 	"ideaboard/api/internal/tasking/tasks"
 )
 
-func (r *Repository) ConvergeCompletedTask(ctx context.Context, intent TaskConvergenceIntent) (int64, error) {
-	return r.ConvergeTask(ctx, intent)
-}
-
-func (r *Repository) MarkTaskFailed(ctx context.Context, taskID string, statuses []string, errorMessage, result string, occurredAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
+func (r *Repository) convergePendingFailureForTest(ctx context.Context, taskID, errorMessage, result string, occurredAt time.Time, attemptFinish *tasks.TaskAttemptFinish) (int64, error) {
 	return r.ConvergeTask(ctx, TaskConvergenceIntent{
 		Kind: TaskConvergenceFailed, TaskID: taskID, ErrorMessage: errorMessage, Result: result, OccurredAt: occurredAt, AttemptFinish: attemptFinish,
 	})

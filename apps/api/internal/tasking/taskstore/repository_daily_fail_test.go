@@ -116,7 +116,7 @@ WHERE task_id = 'acc-fail-1'`,
 	}
 }
 
-func TestMarkTaskFailedUpsertsDailyStats(t *testing.T) {
+func TestConvergePendingFailureUpsertsDailyStats(t *testing.T) {
 	ctx := context.Background()
 	taskRepo, _ := newRepositoryTestDB(t)
 	completedAt := terminalStatsTestTime()
@@ -132,16 +132,16 @@ func TestMarkTaskFailedUpsertsDailyStats(t *testing.T) {
 		t.Fatalf("seed task failed: %v", err)
 	}
 
-	rowsAffected, err := taskRepo.MarkTaskFailed(ctx, task.TaskID, []string{tasks.StatusPending}, "failed", task.Result, completedAt, nil)
+	rowsAffected, err := taskRepo.convergePendingFailureForTest(ctx, task.TaskID, "failed", task.Result, completedAt, nil)
 	if err != nil {
-		t.Fatalf("MarkTaskFailed failed: %v", err)
+		t.Fatalf("ConvergeTask failed: %v", err)
 	}
 	if rowsAffected != 1 {
 		t.Fatalf("rows=%d, want 1", rowsAffected)
 	}
-	rowsAffected, err = taskRepo.MarkTaskFailed(ctx, task.TaskID, []string{tasks.StatusPending}, "failed again", task.Result, completedAt.Add(time.Second), nil)
+	rowsAffected, err = taskRepo.convergePendingFailureForTest(ctx, task.TaskID, "failed again", task.Result, completedAt.Add(time.Second), nil)
 	if err != nil {
-		t.Fatalf("second MarkTaskFailed failed: %v", err)
+		t.Fatalf("second ConvergeTask failed: %v", err)
 	}
 	if rowsAffected != 0 {
 		t.Fatalf("second terminal transition rows=%d, want 0", rowsAffected)
@@ -223,7 +223,7 @@ func TestCompleteWithOutputsRecordsDailyStatsOnTerminalDateAcrossMidnight(t *tes
 	}
 	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, task.LeaseToken)
 
-	rowsAffected, err := taskRepo.ConvergeCompletedTask(ctx, completedTaskConvergenceIntent(
+	rowsAffected, err := taskRepo.ConvergeTask(ctx, completedTaskConvergenceIntent(
 		task.TaskID,
 		accountID,
 		channelID,
@@ -235,7 +235,7 @@ func TestCompleteWithOutputsRecordsDailyStatsOnTerminalDateAcrossMidnight(t *tes
 		nil,
 	))
 	if err != nil {
-		t.Fatalf("ConvergeCompletedTask failed: %v", err)
+		t.Fatalf("ConvergeTask failed: %v", err)
 	}
 	if rowsAffected != 1 {
 		t.Fatalf("rows=%d, want 1", rowsAffected)

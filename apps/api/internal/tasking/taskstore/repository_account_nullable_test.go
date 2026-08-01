@@ -563,7 +563,7 @@ func TestCompleteWithAttemptRollsBackWhenAttemptFinishFails(t *testing.T) {
 		t.Fatalf("create task failed: %v", err)
 	}
 
-	rows, err := repo.ConvergeCompletedTask(ctx, completedTaskConvergenceIntent(
+	rows, err := repo.ConvergeTask(ctx, completedTaskConvergenceIntent(
 		task.TaskID,
 		accountID,
 		channelID,
@@ -621,7 +621,7 @@ func TestCompleteRollsBackWhenAttemptBelongsToAnotherTask(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rows, err := repo.ConvergeCompletedTask(ctx, completedTaskConvergenceIntent(
+	rows, err := repo.ConvergeTask(ctx, completedTaskConvergenceIntent(
 		taskA.TaskID, accountID, channelID, credentialID,
 		taskA.LeaseToken, `{}`, time.Now(), nil,
 		&tasks.TaskAttemptFinish{ID: attemptB.ID, Status: tasks.TaskAttemptStatusCompleted, CompletedAt: time.Now()},
@@ -663,7 +663,7 @@ WHERE task_id = $1`, task.TaskID); err != nil {
 	}
 	insertRepositoryActiveTaskLease(t, db, task.TaskID, accountID, channelID, credentialID, "lease-stale-new")
 
-	rows, err := repo.ConvergeCompletedTask(ctx, completedTaskConvergenceIntent(
+	rows, err := repo.ConvergeTask(ctx, completedTaskConvergenceIntent(
 		task.TaskID, accountID, channelID, credentialID,
 		"lease-stale-new", `{}`, time.Now(), nil,
 		&tasks.TaskAttemptFinish{ID: oldAttempt.ID, Status: tasks.TaskAttemptStatusCompleted, CompletedAt: time.Now()},
@@ -698,7 +698,7 @@ func TestCompleteRollsBackWhenAttemptStatusConflictsWithTerminalPolicy(t *testin
 		t.Fatal(err)
 	}
 
-	rows, err := repo.ConvergeCompletedTask(ctx, completedTaskConvergenceIntent(
+	rows, err := repo.ConvergeTask(ctx, completedTaskConvergenceIntent(
 		task.TaskID, accountID, channelID, credentialID,
 		task.LeaseToken, `{}`, time.Now(), nil,
 		&tasks.TaskAttemptFinish{ID: attempt.ID, Status: tasks.TaskAttemptStatusFailed, CompletedAt: time.Now()},

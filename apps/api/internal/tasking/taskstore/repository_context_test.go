@@ -29,8 +29,8 @@ func TestRepositoryCanceledContextAffectsQueryAndWrite(t *testing.T) {
 		t.Fatalf("GetByTaskID error=%v, want context.Canceled", err)
 	}
 
-	_, err := repo.MarkTaskFailed(ctx, "ctx-cancel-task", []string{tasks.StatusPending}, "context canceled", "", time.Now(), nil)
+	_, err := repo.convergePendingFailureForTest(ctx, "ctx-cancel-task", "context canceled", "", time.Now(), nil)
 	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("MarkTaskFailed error=%v, want context.Canceled", err)
+		t.Fatalf("ConvergeTask error=%v, want context.Canceled", err)
 	}
 }
