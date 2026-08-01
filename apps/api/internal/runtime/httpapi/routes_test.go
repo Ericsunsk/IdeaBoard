@@ -476,11 +476,14 @@ func TestUserPaymentRoutesAreRegistered(t *testing.T) {
 	router := gin.New()
 	registerUserRoutes(router.Group("/api/user"), UserRouteDeps{})
 	want := map[string]bool{
-		"GET /api/user/payments/purchase-options":     false,
-		"POST /api/user/payments/checkout-sessions":   false,
-		"GET /api/user/payments/orders/:public_token": false,
-		"GET /api/user/payments/recharges":            false,
-		"GET /api/user/payments/events":               false,
+		"GET /api/user/payments/purchase-options":                       false,
+		"POST /api/user/payments/checkout-sessions":                     false,
+		"GET /api/user/payments/orders/:public_token":                   false,
+		"GET /api/user/payments/pending-orders":                         false,
+		"POST /api/user/payments/pending-orders/:public_token/continue": false,
+		"POST /api/user/payments/pending-orders/:public_token/abandon":  false,
+		"GET /api/user/payments/recharges":                              false,
+		"GET /api/user/payments/events":                                 false,
 	}
 	for _, route := range router.Routes() {
 		key := route.Method + " " + route.Path

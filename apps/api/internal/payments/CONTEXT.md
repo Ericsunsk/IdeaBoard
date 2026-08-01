@@ -20,7 +20,7 @@ Payments 拥有 Stripe 配置、签名 Webhook 接入与支付生命周期。它
 - `Service.GetStripeConfiguration` 只返回可安全展示的配置摘要，不返回 API Key、Webhook Secret 或其密文。
 - `Service.ConfigureStripe` 先通过 `StripeGateway` 准备并验证 Stripe account、Product 与 Webhook endpoint，再原子发布当前配置和成功 audit；准备失败时保留旧配置。
 - `Service.ReceiveStripeWebhook` 对 raw body 验签、去重并写入最小 Webhook Inbox。后续 payment order、refund 与 dispute lifecycle 继续收口在 Payments context。
-- `Service.GetPurchaseOptions`、`CreateCheckout`、`GetPaymentOrderReturnStatus` 与 `ListRecharges` 是用户充值 boundary。HTTP handler 只能使用 authenticated principal 的 user ID，并为订单、历史和 SSE 设定 user scope。
+- `Service.GetPurchaseOptions`、`CreateCheckout`、`ListPendingOrders`、`ContinuePendingOrder`、`AbandonPendingOrder`、`GetPaymentOrderReturnStatus` 与 `ListRecharges` 是用户充值 boundary。HTTP handler 只能使用 authenticated principal 的 user ID，并为订单、历史和 SSE 设定 user scope。
 - `Service.EventHub` 只发布本实例已提交的用户充值状态提示；前端据此重新读取 Wallet、订单或充值历史，SSE 不是支付事实源。
 - 任何支付结果引起的 Idea 余额变化都必须调用 Credits 的 typed Commands；Payments 不直接写 Ledger 或 balance projection。
 
@@ -32,8 +32,9 @@ Payments 拥有 Stripe 配置、签名 Webhook 接入与支付生命周期。它
 - Webhook Inbox 不保存原始 payload，只保存 Event ID、type、object ID、livemode、Stripe created time、接收/处理状态与时间。
 - 配置与 Webhook Secret 在 request-time 从 PostgreSQL 读取并实时生效，不使用 application-lifetime 配置缓存。
 - 创建 Checkout 前必须先以 `(user_id, client_idempotency_key)` 和 canonical request hash durable 创建或重放 Payment Order；相同 key 的不同请求 fail closed。Stripe Customer、Checkout Session 和其 provider identity 都必须绑定到该 Order。
-- Payment Order 生命周期只允许 `creating → checkout_open|async_payment_pending|credited|payment_failed`、`checkout_open → async_payment_pending|credited|payment_failed`、`async_payment_pending → credited|payment_failed`。终态事实不可变。
-- 仅签名 Webhook 或服务端主动查询取得的、已验证身份绑定的 Stripe paid Checkout Session 可触发到账；浏览器 URL、public token、未支付或失败 Session 均不得到账。Payment Order 更新与 `purchase_credit` 必须在同一 PostgreSQL transaction 中提交，并对 replay/concurrency 幂等。
+- Payment Order 生命周期以 `creating → checkout_open → async_payment_pending` 表达未完成 Checkout，以 `cancelled|expired|payment_failed` 表达未支付终态，以 `paid_pending_credit → credited` 表达已确认支付到 Ledger 到账。已确认的 late paid fact 可以从未支付终态升级到 `paid_pending_credit`，其他终态不得回退；所有 transition 由数据库约束。
+- 同一用户、同一 Idea 数量只允许一个未支付的 active Checkout；创建、继续和放弃 Checkout 按用户串行化，不在 Stripe 网络调用期间持有数据库 transaction。每个用户最多保留 3 笔不同数量的未支付 active Checkout；`paid_pending_credit` 已是支付事实，不占用待支付名额。
+- 仅签名 Webhook 或服务端主动查询取得的、已验证身份绑定的 Stripe paid Checkout Session 可触发到账；浏览器 URL、public token、未支付或失败 Session 均不得到账。Stripe paid fact 先独立 durable 为 `paid_pending_credit`；随后 `purchase_credit` 与 `paid_pending_credit → credited` 在同一 PostgreSQL transaction 中原子提交，并对 replay/concurrency 幂等。
 - 用户充值历史只返回当前用户最近 12 个自然月的 final `credited` 最小事实，以最大 20 条 opaque cursor 分页；不返回 payer PII、provider secret 或内部 Stripe metadata。cursor 必须在解码前限制长度。
-- User SSE 按 user ID 隔离，连接生命周期必须 heartbeat 并 cleanup；它只通知 `credited`/`failed`，不替代 Stripe 或 PostgreSQL 的支付事实。
+- User SSE 按 user ID 隔离，连接生命周期必须 heartbeat 并 cleanup；它只通知 `processing`/`credited`/`failed`，不替代 Stripe 或 PostgreSQL 的支付事实。
 - Payments 不改变任务基础设施 ownership：River + PostgreSQL 仍是 Task queue/state fact source，NATS JetStream 仍只承担 event layer。

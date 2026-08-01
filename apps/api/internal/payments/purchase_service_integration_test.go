@@ -147,6 +147,7 @@ func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testin
 	eventChannel, unsubscribe := events.Subscribe(42)
 	defer unsubscribe()
 
+	checkoutGateway.status = CheckoutSessionStatusComplete
 	receipt, err := service.ReceiveStripeWebhook(t.Context(), []byte(`{"id":"evt_paid_purchase"}`), "valid")
 	if err != nil || receipt.Duplicate || receipt.Ignored {
 		t.Fatalf("ReceiveStripeWebhook() = %+v, %v", receipt, err)
@@ -285,7 +286,11 @@ type fakeCheckoutGateway struct {
 	customerCalls       int
 	sessionCalls        int
 	retrieveCalls       int
+	expireCalls         int
 	paid                bool
+	status              CheckoutSessionStatus
+	expireErr           error
+	expireOutcome       CheckoutSessionExpirationOutcome
 	lastCreateSession   CreateCheckoutSessionInput
 	createdSession      CheckoutSession
 	afterCreateCustomer func()
@@ -310,6 +315,7 @@ func (f *fakeCheckoutGateway) CreateCheckoutSession(_ context.Context, input Cre
 		ID: "cs_purchase", URL: "https://checkout.stripe.test/c/pay/cs_purchase", CustomerID: input.CustomerID,
 		PublicOrderNumber: input.PublicOrderNumber, PaymentOrderID: input.PaymentOrderID,
 		RequestHash: input.RequestHash, IdeaQuantity: input.IdeaQuantity, ExpiresAt: input.ExpiresAt,
+		Status: CheckoutSessionStatusOpen,
 	}
 	return f.createdSession, nil
 }
@@ -318,7 +324,12 @@ func (f *fakeCheckoutGateway) RetrieveCheckoutSession(_ context.Context, input R
 	f.retrieveCalls++
 	session := f.createdSession
 	session.ID = input.SessionID
+	if f.status != "" {
+		session.Status = f.status
+	}
 	if f.paid {
+		session.Status = CheckoutSessionStatusComplete
+		session.URL = ""
 		session.PaymentStatus = CheckoutPaymentStatusPaid
 		session.PaymentIntentID = "pi_purchase"
 		session.ChargeID = "ch_purchase"
@@ -331,6 +342,25 @@ func (f *fakeCheckoutGateway) RetrieveCheckoutSession(_ context.Context, input R
 		session.PaymentStatus = CheckoutPaymentStatusUnpaid
 	}
 	return session, nil
+}
+
+func (f *fakeCheckoutGateway) ExpireCheckoutSession(_ context.Context, input ExpireCheckoutSessionInput) (ExpireCheckoutSessionResult, error) {
+	f.expireCalls++
+	if f.expireErr != nil {
+		return ExpireCheckoutSessionResult{}, f.expireErr
+	}
+	session := f.createdSession
+	session.ID = input.SessionID
+	outcome := f.expireOutcome
+	if outcome == "" {
+		outcome = CheckoutSessionExpirationOutcomeExpired
+	}
+	if f.paid || outcome == CheckoutSessionExpirationOutcomePaid {
+		f.paid = true
+		session, _ = f.RetrieveCheckoutSession(context.Background(), RetrieveCheckoutSessionInput{SessionID: input.SessionID})
+		outcome = CheckoutSessionExpirationOutcomePaid
+	}
+	return ExpireCheckoutSessionResult{Outcome: outcome, Session: session}, nil
 }
 
 func configuredFakeStripeGateway(accountID, productID string) *fakeStripeGateway {

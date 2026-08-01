@@ -17,6 +17,7 @@ import (
 	"ideaboard/api/internal/platform/sse"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 const (
@@ -110,7 +111,11 @@ func (h *Handler) GetPaymentOrderReturnStatus(c *gin.Context) {
 		response.Error(c, http.StatusServiceUnavailable, "充值服务暂不可用")
 		return
 	}
-	result, err := h.service.GetPaymentOrderReturnStatus(c.Request.Context(), identityPrincipal.UserID(), c.Param("public_token"))
+	publicToken, ok := paymentOrderPublicToken(c)
+	if !ok {
+		return
+	}
+	result, err := h.service.GetPaymentOrderReturnStatus(c.Request.Context(), identityPrincipal.UserID(), publicToken)
 	if errors.Is(err, ErrPaymentOrderNotFound) {
 		response.Error(c, http.StatusNotFound, "充值订单不存在")
 		return
@@ -120,6 +125,120 @@ func (h *Handler) GetPaymentOrderReturnStatus(c *gin.Context) {
 		return
 	}
 	response.SuccessDTO(c, result)
+}
+
+func (h *Handler) ListPendingOrders(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	identityPrincipal, ok := principal.Require(c)
+	if !ok {
+		return
+	}
+	if h == nil || h.service == nil {
+		response.Error(c, http.StatusServiceUnavailable, "充值服务暂不可用")
+		return
+	}
+	orders, err := h.service.ListPendingOrders(c.Request.Context(), identityPrincipal.UserID())
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "读取待支付订单失败")
+		return
+	}
+	response.SuccessDTO(c, orders)
+}
+
+func (h *Handler) ContinuePendingOrder(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	identityPrincipal, ok := principal.Require(c)
+	if !ok {
+		return
+	}
+	if h == nil || h.service == nil {
+		response.Error(c, http.StatusServiceUnavailable, "充值服务暂不可用")
+		return
+	}
+	if !requireEmptyPaymentActionBody(c) {
+		return
+	}
+	publicToken, ok := paymentOrderPublicToken(c)
+	if !ok {
+		return
+	}
+	order, err := h.service.ContinuePendingOrder(c.Request.Context(), identityPrincipal.UserID(), publicToken)
+	if errors.Is(err, ErrPaymentOrderNotFound) {
+		response.Error(c, http.StatusNotFound, "充值订单不存在")
+		return
+	}
+	if errors.Is(err, ErrWalletNotRechargeable) {
+		response.Error(c, http.StatusLocked, "当前账户暂不可继续充值")
+		return
+	}
+	if errors.Is(err, ErrStripeProviderUnavailable) || errors.Is(err, ErrPurchasesUnavailable) {
+		response.Error(c, http.StatusServiceUnavailable, "支付服务暂不可用")
+		return
+	}
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "继续充值订单失败")
+		return
+	}
+	response.SuccessDTO(c, order)
+}
+
+func (h *Handler) AbandonPendingOrder(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	identityPrincipal, ok := principal.Require(c)
+	if !ok {
+		return
+	}
+	if h == nil || h.service == nil {
+		response.Error(c, http.StatusServiceUnavailable, "充值服务暂不可用")
+		return
+	}
+	if !requireEmptyPaymentActionBody(c) {
+		return
+	}
+	publicToken, ok := paymentOrderPublicToken(c)
+	if !ok {
+		return
+	}
+	order, err := h.service.AbandonPendingOrder(c.Request.Context(), identityPrincipal.UserID(), publicToken)
+	if errors.Is(err, ErrPaymentOrderNotFound) {
+		response.Error(c, http.StatusNotFound, "充值订单不存在")
+		return
+	}
+	if errors.Is(err, ErrStripeProviderUnavailable) || errors.Is(err, ErrPurchasesUnavailable) {
+		response.Error(c, http.StatusServiceUnavailable, "支付服务暂不可用")
+		return
+	}
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "放弃充值订单失败")
+		return
+	}
+	response.SuccessDTO(c, order)
+}
+
+// paymentOrderPublicToken intentionally maps malformed and inaccessible tokens
+// to the same response, so the public token is never an ownership oracle.
+func paymentOrderPublicToken(c *gin.Context) (string, bool) {
+	publicToken := strings.TrimSpace(c.Param("public_token"))
+	parsed, err := uuid.Parse(publicToken)
+	if err != nil || parsed.String() != strings.ToLower(publicToken) {
+		response.Error(c, http.StatusNotFound, "充值订单不存在")
+		return "", false
+	}
+	return publicToken, true
+}
+
+// Action routes intentionally have no request schema. Reject a body rather
+// than silently accepting undeclared fields and creating a second command API.
+func requireEmptyPaymentActionBody(c *gin.Context) bool {
+	if c == nil || c.Request == nil || c.Request.Body == nil {
+		return true
+	}
+	body, err := io.ReadAll(io.LimitReader(c.Request.Body, maxPaymentCheckoutRequestBytes+1))
+	if err != nil || int64(len(body)) > maxPaymentCheckoutRequestBytes || strings.TrimSpace(string(body)) != "" {
+		response.Error(c, http.StatusBadRequest, "充值操作参数错误")
+		return false
+	}
+	return true
 }
 
 func (h *Handler) ListRecharges(c *gin.Context) {
@@ -303,7 +422,7 @@ func writeCheckoutError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, ErrInvalidIdeaQuantity), errors.Is(err, ErrTermsAcceptanceRequired), errors.Is(err, ErrCheckoutIdempotencyKey):
 		response.Error(c, http.StatusBadRequest, err.Error())
-	case errors.Is(err, ErrCheckoutIdempotencyConflict):
+	case errors.Is(err, ErrCheckoutIdempotencyConflict), errors.Is(err, ErrPendingCheckoutLimit), errors.Is(err, ErrPaymentAlreadyInProgress):
 		response.Error(c, http.StatusConflict, err.Error())
 	case errors.Is(err, ErrWalletNotRechargeable):
 		response.Error(c, http.StatusLocked, err.Error())

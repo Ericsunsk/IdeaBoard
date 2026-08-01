@@ -23,6 +23,9 @@ func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	userAPI.GET("/payments/purchase-options", h.PaymentHandler.GetPurchaseOptions)
 	userAPI.POST("/payments/checkout-sessions", h.PaymentHandler.CreateCheckoutSession)
 	userAPI.GET("/payments/orders/:public_token", h.PaymentHandler.GetPaymentOrderReturnStatus)
+	userAPI.GET("/payments/pending-orders", h.PaymentHandler.ListPendingOrders)
+	userAPI.POST("/payments/pending-orders/:public_token/continue", h.PaymentHandler.ContinuePendingOrder)
+	userAPI.POST("/payments/pending-orders/:public_token/abandon", h.PaymentHandler.AbandonPendingOrder)
 	userAPI.GET("/payments/recharges", h.PaymentHandler.ListRecharges)
 	userAPI.GET("/payments/events", h.PaymentHandler.StreamUserPaymentEvents)
 

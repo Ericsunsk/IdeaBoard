@@ -51,7 +51,10 @@ CREATE TABLE payment_orders (
   CONSTRAINT ck_payment_order_public_number CHECK (public_order_number ~ '^IBP-[0-9]{8}-[A-Z0-9]{12}$'),
   CONSTRAINT ck_payment_order_idempotency CHECK (char_length(client_idempotency_key) BETWEEN 8 AND 160),
   CONSTRAINT ck_payment_order_request_hash CHECK (request_hash ~ '^[0-9a-f]{64}$'),
-  CONSTRAINT ck_payment_order_status CHECK (status IN ('creating', 'checkout_open', 'async_payment_pending', 'credited', 'payment_failed')),
+  CONSTRAINT ck_payment_order_status CHECK (status IN (
+    'creating', 'checkout_open', 'async_payment_pending', 'paid_pending_credit',
+    'credited', 'cancelled', 'expired', 'payment_failed'
+  )),
   CONSTRAINT ck_payment_order_stripe_ids CHECK (
     char_length(stripe_account_id) BETWEEN 1 AND 255
     AND char_length(stripe_customer_id) <= 255
@@ -80,11 +83,15 @@ CREATE TABLE payment_orders (
     OR (status IN ('checkout_open', 'async_payment_pending') AND stripe_customer_id <> ''
       AND stripe_checkout_session_id IS NOT NULL AND checkout_url <> ''
       AND credit_transaction_id IS NULL AND paid_total_minor IS NULL)
+    OR (status = 'paid_pending_credit' AND stripe_customer_id <> '' AND stripe_checkout_session_id IS NOT NULL
+      AND stripe_payment_intent_id <> '' AND credit_transaction_id IS NULL
+      AND paid_subtotal_minor IS NOT NULL AND paid_tax_minor IS NOT NULL AND paid_total_minor IS NOT NULL
+      AND paid_currency <> '' AND paid_at IS NOT NULL AND credited_at IS NULL)
     OR (status = 'credited' AND stripe_customer_id <> '' AND stripe_checkout_session_id IS NOT NULL
       AND stripe_payment_intent_id <> '' AND credit_transaction_id IS NOT NULL
       AND paid_subtotal_minor IS NOT NULL AND paid_tax_minor IS NOT NULL AND paid_total_minor IS NOT NULL
       AND paid_currency <> '' AND paid_at IS NOT NULL AND credited_at IS NOT NULL)
-    OR (status = 'payment_failed' AND stripe_payment_intent_id = '' AND stripe_charge_id = ''
+    OR (status IN ('cancelled', 'expired', 'payment_failed') AND stripe_payment_intent_id = '' AND stripe_charge_id = ''
       AND paid_subtotal_minor IS NULL AND paid_tax_minor IS NULL AND paid_total_minor IS NULL
       AND paid_currency = '' AND receipt_url = '' AND credit_transaction_id IS NULL
       AND paid_at IS NULL AND credited_at IS NULL
@@ -98,6 +105,10 @@ CREATE INDEX idx_payment_orders_user_history
 
 CREATE INDEX idx_payment_orders_open
   ON payment_orders (status, expires_at)
+  WHERE status IN ('creating', 'checkout_open', 'async_payment_pending');
+
+CREATE UNIQUE INDEX uq_payment_orders_user_active_quantity
+  ON payment_orders (user_id, idea_quantity)
   WHERE status IN ('creating', 'checkout_open', 'async_payment_pending');
 
 -- statement:begin
@@ -130,7 +141,10 @@ BEGIN
   IF OLD.checkout_url <> '' AND OLD.checkout_url <> NEW.checkout_url THEN
     RAISE EXCEPTION 'payment order Checkout URL is immutable once assigned';
   END IF;
-  IF OLD.status = 'credited' AND (
+  IF OLD.stripe_checkout_session_id IS NOT NULL AND OLD.expires_at <> NEW.expires_at THEN
+    RAISE EXCEPTION 'payment order Checkout expiry is immutable once assigned';
+  END IF;
+  IF OLD.status IN ('paid_pending_credit', 'credited') AND (
     OLD.stripe_payment_intent_id <> NEW.stripe_payment_intent_id
     OR OLD.stripe_charge_id <> NEW.stripe_charge_id
     OR OLD.paid_subtotal_minor IS DISTINCT FROM NEW.paid_subtotal_minor
@@ -138,13 +152,17 @@ BEGIN
     OR OLD.paid_total_minor IS DISTINCT FROM NEW.paid_total_minor
     OR OLD.paid_currency <> NEW.paid_currency
     OR OLD.receipt_url <> NEW.receipt_url
-    OR OLD.credit_transaction_id IS DISTINCT FROM NEW.credit_transaction_id
     OR OLD.paid_at IS DISTINCT FROM NEW.paid_at
+  ) THEN
+    RAISE EXCEPTION 'paid payment order facts are immutable';
+  END IF;
+  IF OLD.status = 'credited' AND (
+    OLD.credit_transaction_id IS DISTINCT FROM NEW.credit_transaction_id
     OR OLD.credited_at IS DISTINCT FROM NEW.credited_at
   ) THEN
     RAISE EXCEPTION 'credited payment order facts are immutable';
   END IF;
-  IF OLD.status = 'payment_failed' AND (
+  IF OLD.status IN ('cancelled', 'expired', 'payment_failed') AND NEW.status <> 'paid_pending_credit' AND (
     OLD.stripe_customer_id <> NEW.stripe_customer_id
     OR OLD.stripe_checkout_session_id IS DISTINCT FROM NEW.stripe_checkout_session_id
     OR OLD.checkout_url <> NEW.checkout_url
@@ -159,12 +177,14 @@ BEGIN
     OR OLD.paid_at IS DISTINCT FROM NEW.paid_at
     OR OLD.credited_at IS DISTINCT FROM NEW.credited_at
   ) THEN
-    RAISE EXCEPTION 'failed payment order facts are immutable';
+    RAISE EXCEPTION 'terminal unpaid payment order facts are immutable';
   END IF;
   IF OLD.status <> NEW.status AND NOT (
-    (OLD.status = 'creating' AND NEW.status IN ('checkout_open', 'async_payment_pending', 'credited', 'payment_failed'))
-    OR (OLD.status = 'checkout_open' AND NEW.status IN ('async_payment_pending', 'credited', 'payment_failed'))
-    OR (OLD.status = 'async_payment_pending' AND NEW.status IN ('credited', 'payment_failed'))
+    (OLD.status = 'creating' AND NEW.status IN ('checkout_open', 'paid_pending_credit', 'expired', 'payment_failed'))
+    OR (OLD.status = 'checkout_open' AND NEW.status IN ('async_payment_pending', 'paid_pending_credit', 'cancelled', 'expired', 'payment_failed'))
+    OR (OLD.status = 'async_payment_pending' AND NEW.status IN ('paid_pending_credit', 'expired', 'payment_failed'))
+    OR (OLD.status = 'paid_pending_credit' AND NEW.status = 'credited')
+    OR (OLD.status IN ('cancelled', 'expired', 'payment_failed') AND NEW.status = 'paid_pending_credit')
   ) THEN
     RAISE EXCEPTION 'invalid payment order state transition: % -> %', OLD.status, NEW.status;
   END IF;

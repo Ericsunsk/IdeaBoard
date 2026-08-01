@@ -145,6 +145,7 @@ func createBoundPaymentOrder(t *testing.T, repo *Repository) PaymentOrder {
 func paidCheckoutFacts(order PaymentOrder) PaidCheckoutFacts {
 	return PaidCheckoutFacts{
 		StripeAccountID: order.StripeAccountID, StripeSessionID: order.StripeCheckoutSessionID,
+		ExpiresAt:         order.ExpiresAt,
 		PublicOrderNumber: order.PublicOrderNumber, PaymentOrderID: order.ID, RequestHash: order.RequestHash,
 		StripeCustomerID: order.StripeCustomerID, StripePaymentIntentID: "pi_payment", StripeChargeID: "ch_payment",
 		IdeaQuantity: order.IdeaQuantity, PaidSubtotalMinor: 501, PaidTaxMinor: 1, PaidTotalMinor: 502,

@@ -23,9 +23,21 @@ const (
 	checkoutSessionTransportMargin = time.Minute
 )
 
+type checkoutSignal string
+
+const (
+	checkoutSignalObserved     checkoutSignal = "observed"
+	checkoutSignalCompleted    checkoutSignal = "completed"
+	checkoutSignalAsyncSuccess checkoutSignal = "async_succeeded"
+	checkoutSignalAsyncFailed  checkoutSignal = "async_failed"
+	checkoutSignalExpired      checkoutSignal = "expired"
+)
+
 var (
-	ErrPaymentOrderNotFound    = errors.New("充值订单不存在")
-	ErrStripeConfigurationBusy = errors.New("仍有未完成的充值订单，请稍后再更换 Stripe API Key")
+	ErrPaymentOrderNotFound     = errors.New("充值订单不存在")
+	ErrStripeConfigurationBusy  = errors.New("仍有未完成的充值订单，请稍后再更换 Stripe API Key")
+	ErrPendingCheckoutLimit     = errors.New("最多同时保留 3 笔待支付订单，请先完成或放弃一笔")
+	ErrPaymentAlreadyInProgress = errors.New("该数量的支付正在处理中，请等待支付结果")
 )
 
 type PurchaseOptions struct {
@@ -55,6 +67,180 @@ type PaymentOrderReturnStatus struct {
 	IdeaQuantity int64     `json:"idea_quantity"`
 	Status       string    `json:"status"`
 	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type PendingPaymentOrder struct {
+	PublicToken  string    `json:"public_token"`
+	IdeaQuantity int64     `json:"idea_quantity"`
+	CheckoutURL  string    `json:"checkout_url,omitempty"`
+	Status       string    `json:"status"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+type PendingPaymentOrderList struct {
+	Items []PendingPaymentOrder `json:"items"`
+}
+
+func (s *Service) ListPendingOrders(ctx context.Context, userID int64) (PendingPaymentOrderList, error) {
+	result := PendingPaymentOrderList{Items: make([]PendingPaymentOrder, 0)}
+	if s == nil || s.repo == nil || userID <= 0 {
+		return result, ErrPaymentOrderNotFound
+	}
+	orders, err := s.repo.ListUserPendingPaymentOrders(ctx, userID)
+	if err != nil {
+		return result, err
+	}
+	for _, order := range orders {
+		result.Items = append(result.Items, pendingPaymentOrder(order))
+	}
+	return result, nil
+}
+
+func (s *Service) ContinuePendingOrder(ctx context.Context, userID int64, publicToken string) (PendingPaymentOrder, error) {
+	if s == nil || s.repo == nil || userID <= 0 {
+		return PendingPaymentOrder{}, ErrPaymentOrderNotFound
+	}
+	var result PendingPaymentOrder
+	err := s.repo.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
+		return s.repo.WithUserCheckoutLock(lockedContext, userID, func(userLockedContext context.Context) error {
+			order, err := s.repo.GetPaymentOrderByPublicToken(userLockedContext, userID, publicToken)
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrPaymentOrderNotFound
+			}
+			if err != nil {
+				return fmt.Errorf("get pending payment order to continue: %w", err)
+			}
+			if order.Status == PaymentOrderPaidPendingCredit {
+				converged, err := s.repo.CreditPaidPaymentOrder(userLockedContext, order.ID, s.now().UTC())
+				if err != nil {
+					return err
+				}
+				result = pendingPaymentOrder(converged.Order)
+				return nil
+			}
+			if order.Status != PaymentOrderCheckoutOpen {
+				result = pendingPaymentOrder(order)
+				return nil
+			}
+			if s.checkoutGateway == nil || s.wallets == nil {
+				return ErrPurchasesUnavailable
+			}
+			configuration, apiKey, err := s.checkoutConfiguration(userLockedContext)
+			if err != nil {
+				return err
+			}
+			if configuration.AccountID != order.StripeAccountID {
+				return ErrPurchasesUnavailable
+			}
+			if err := s.requireRechargeableWallet(userLockedContext, userID); err != nil {
+				return err
+			}
+			session, err := s.checkoutGateway.RetrieveCheckoutSession(userLockedContext, RetrieveCheckoutSessionInput{
+				APIKey: apiKey, SessionID: order.StripeCheckoutSessionID,
+			})
+			if err != nil {
+				return checkoutOperationError(err)
+			}
+			order, err = s.convergeCheckoutSession(userLockedContext, order, session, checkoutSignalObserved)
+			if err != nil {
+				return err
+			}
+			if order.Status == PaymentOrderCheckoutOpen && !order.ExpiresAt.After(s.now().UTC()) {
+				order, _, err = s.repo.MarkPaymentOrderExpired(userLockedContext, order.ID)
+				if err != nil {
+					return err
+				}
+			}
+			result = pendingPaymentOrder(order)
+			return nil
+		})
+	})
+	return result, err
+}
+
+func (s *Service) AbandonPendingOrder(ctx context.Context, userID int64, publicToken string) (PendingPaymentOrder, error) {
+	if s == nil || s.repo == nil || userID <= 0 {
+		return PendingPaymentOrder{}, ErrPaymentOrderNotFound
+	}
+	var result PendingPaymentOrder
+	err := s.repo.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
+		return s.repo.WithUserCheckoutLock(lockedContext, userID, func(userLockedContext context.Context) error {
+			order, err := s.repo.GetPaymentOrderByPublicToken(userLockedContext, userID, publicToken)
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrPaymentOrderNotFound
+			}
+			if err != nil {
+				return fmt.Errorf("get pending payment order to abandon: %w", err)
+			}
+			if order.Status != PaymentOrderCheckoutOpen {
+				result = pendingPaymentOrder(order)
+				return nil
+			}
+			if s.checkoutGateway == nil {
+				return ErrPurchasesUnavailable
+			}
+			configuration, apiKey, err := s.stripeAccessConfiguration(userLockedContext)
+			if err != nil || configuration.AccountID != order.StripeAccountID {
+				return ErrPurchasesUnavailable
+			}
+			expiration, err := s.checkoutGateway.ExpireCheckoutSession(userLockedContext, ExpireCheckoutSessionInput{
+				APIKey: apiKey, SessionID: order.StripeCheckoutSessionID,
+			})
+			if err != nil {
+				return checkoutOperationError(err)
+			}
+			if err := validateCheckoutSessionIdentity(order, expiration.Session); err != nil {
+				return err
+			}
+			switch expiration.Outcome {
+			case CheckoutSessionExpirationOutcomeExpired:
+				var changed bool
+				order, changed, err = s.repo.MarkPaymentOrderCancelled(userLockedContext, userID, order.ID)
+				if err == nil && changed {
+					s.events.Publish(order.UserID, PaymentEvent{PublicToken: order.PublicToken, Status: "failed"})
+				}
+			case CheckoutSessionExpirationOutcomePaid:
+				var converged PaymentConvergenceResult
+				converged, err = s.repo.ConvergePaidPaymentOrder(
+					userLockedContext,
+					paidCheckoutFactsFromSession(order.StripeAccountID, expiration.Session, s.now().UTC()),
+					s.now().UTC(),
+				)
+				order = converged.Order
+				if err == nil && !converged.Replayed {
+					s.events.Publish(order.UserID, PaymentEvent{PublicToken: order.PublicToken, Status: "credited"})
+				}
+			case CheckoutSessionExpirationOutcomeAsyncPaymentPending:
+				previousStatus := order.Status
+				order, err = s.repo.MarkPaymentOrderAsyncPending(userLockedContext, order.ID)
+				if err == nil && order.Status == PaymentOrderAsyncPaymentPending && order.Status != previousStatus {
+					s.events.Publish(order.UserID, PaymentEvent{PublicToken: order.PublicToken, Status: "processing"})
+				}
+			case CheckoutSessionExpirationOutcomeOpen:
+				return ErrStripeProviderUnavailable
+			default:
+				return ErrPurchasesUnavailable
+			}
+			if err != nil {
+				return err
+			}
+			result = pendingPaymentOrder(order)
+			return nil
+		})
+	})
+	return result, err
+}
+
+func pendingPaymentOrder(order PaymentOrder) PendingPaymentOrder {
+	checkoutURL := ""
+	if order.Status == PaymentOrderCheckoutOpen {
+		checkoutURL = order.CheckoutURL
+	}
+	return PendingPaymentOrder{
+		PublicToken: order.PublicToken, IdeaQuantity: order.IdeaQuantity, CheckoutURL: checkoutURL,
+		Status: string(order.Status), ExpiresAt: order.ExpiresAt, UpdatedAt: order.UpdatedAt,
+	}
 }
 
 func (s *Service) GetPurchaseOptions(ctx context.Context, userID int64) (PurchaseOptions, error) {
@@ -102,9 +288,11 @@ func (s *Service) CreateCheckout(ctx context.Context, command CreateCheckoutComm
 	}
 	var result CheckoutResult
 	err := s.repo.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
-		var err error
-		result, err = s.createCheckoutLocked(lockedContext, command)
-		return err
+		return s.repo.WithUserCheckoutLock(lockedContext, command.UserID, func(userLockedContext context.Context) error {
+			var err error
+			result, err = s.createCheckoutLocked(userLockedContext, command)
+			return err
+		})
 	})
 	return result, err
 }
@@ -134,29 +322,56 @@ func (s *Service) createCheckoutLocked(ctx context.Context, command CreateChecko
 	}
 
 	now := s.now().UTC()
-	orderID, err := uuid.NewV7()
-	if err != nil {
-		return CheckoutResult{}, fmt.Errorf("generate payment order ID: %w", err)
-	}
-	publicToken := uuid.New()
-	publicOrderNumber, err := newPublicOrderNumber(now)
+	activeOrders, err := s.refreshActivePaymentOrders(ctx, apiKey, command.UserID, now)
 	if err != nil {
 		return CheckoutResult{}, err
 	}
-	order, reused, err := s.repo.CreatePaymentOrderIntent(ctx, CreatePaymentOrderIntentInput{
-		ID: orderID.String(), PublicOrderNumber: publicOrderNumber, PublicToken: publicToken.String(),
-		UserID: command.UserID, ClientIdempotencyKey: strings.TrimSpace(command.ClientIdempotencyKey), RequestHash: requestHash,
-		StripeAccountID: configuration.AccountID, StripeProductID: configuration.StripeProductID,
-		IdeaQuantity: quote.IdeaQuantity,
-		TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
-		ExpiresAt: now.Add(checkoutSessionLifetime),
-	})
-	if err != nil {
-		return CheckoutResult{}, err
+	var order PaymentOrder
+	reused := false
+	for _, activeOrder := range activeOrders {
+		if activeOrder.IdeaQuantity != quote.IdeaQuantity {
+			continue
+		}
+		switch activeOrder.Status {
+		case PaymentOrderCheckoutOpen:
+			return checkoutResult(activeOrder, true), nil
+		case PaymentOrderAsyncPaymentPending:
+			return CheckoutResult{}, ErrPaymentAlreadyInProgress
+		case PaymentOrderCreating:
+			order, reused = activeOrder, true
+		}
+		break
+	}
+	if order.ID == "" {
+		if len(activeOrders) >= 3 {
+			return CheckoutResult{}, ErrPendingCheckoutLimit
+		}
+		orderID, err := uuid.NewV7()
+		if err != nil {
+			return CheckoutResult{}, fmt.Errorf("generate payment order ID: %w", err)
+		}
+		publicOrderNumber, err := newPublicOrderNumber(now)
+		if err != nil {
+			return CheckoutResult{}, err
+		}
+		order, reused, err = s.repo.CreatePaymentOrderIntent(ctx, CreatePaymentOrderIntentInput{
+			ID: orderID.String(), PublicOrderNumber: publicOrderNumber, PublicToken: uuid.NewString(),
+			UserID: command.UserID, ClientIdempotencyKey: strings.TrimSpace(command.ClientIdempotencyKey), RequestHash: requestHash,
+			StripeAccountID: configuration.AccountID, StripeProductID: configuration.StripeProductID,
+			IdeaQuantity: quote.IdeaQuantity,
+			TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
+			ExpiresAt: now.Add(checkoutSessionLifetime),
+		})
+		if err != nil {
+			return CheckoutResult{}, err
+		}
 	}
 	if order.Status != PaymentOrderCreating {
-		if order.Status == PaymentOrderFailed {
+		if order.Status != PaymentOrderCheckoutOpen && order.Status != PaymentOrderAsyncPaymentPending {
 			return CheckoutResult{}, ErrPurchasesUnavailable
+		}
+		if order.Status == PaymentOrderAsyncPaymentPending {
+			return CheckoutResult{}, ErrPaymentAlreadyInProgress
 		}
 		if order.CheckoutURL == "" {
 			return CheckoutResult{}, ErrPurchasesUnavailable
@@ -195,6 +410,106 @@ func (s *Service) createCheckoutLocked(ctx context.Context, command CreateChecko
 	return checkoutResult(order, reused), nil
 }
 
+func (s *Service) refreshActivePaymentOrders(ctx context.Context, apiKey string, userID int64, now time.Time) ([]PaymentOrder, error) {
+	orders, err := s.repo.ListActivePaymentOrders(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	active := make([]PaymentOrder, 0, len(orders))
+	for _, order := range orders {
+		if order.Status == PaymentOrderAsyncPaymentPending || order.ExpiresAt.After(now) {
+			active = append(active, order)
+			continue
+		}
+		if order.Status == PaymentOrderCreating {
+			if _, _, err := s.repo.MarkPaymentOrderExpired(ctx, order.ID); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		resolved, err := s.retrieveAndConvergeCheckout(ctx, apiKey, order)
+		if err != nil {
+			return nil, err
+		}
+		if resolved.Status == PaymentOrderCheckoutOpen && !resolved.ExpiresAt.After(now) {
+			resolved, _, err = s.repo.MarkPaymentOrderExpired(ctx, resolved.ID)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if resolved.Status == PaymentOrderCheckoutOpen || resolved.Status == PaymentOrderAsyncPaymentPending {
+			active = append(active, resolved)
+		}
+	}
+	return active, nil
+}
+
+func (s *Service) convergeCheckoutSession(
+	ctx context.Context,
+	order PaymentOrder,
+	session CheckoutSession,
+	signal checkoutSignal,
+) (PaymentOrder, error) {
+	if err := validateCheckoutSessionIdentity(order, session); err != nil {
+		return order, err
+	}
+	if session.IsPaid() {
+		result, err := s.repo.ConvergePaidPaymentOrder(
+			ctx,
+			paidCheckoutFactsFromSession(order.StripeAccountID, session, s.now().UTC()),
+			s.now().UTC(),
+		)
+		if err != nil {
+			return order, err
+		}
+		if !result.Replayed {
+			s.events.Publish(result.Order.UserID, PaymentEvent{PublicToken: result.Order.PublicToken, Status: "credited"})
+		}
+		return result.Order, nil
+	}
+
+	switch session.Status {
+	case CheckoutSessionStatusExpired:
+		expired, changed, err := s.repo.MarkPaymentOrderExpired(ctx, order.ID)
+		if err != nil {
+			return order, err
+		}
+		if changed {
+			s.events.Publish(expired.UserID, PaymentEvent{PublicToken: expired.PublicToken, Status: "failed"})
+		}
+		return expired, nil
+	case CheckoutSessionStatusComplete:
+		if signal == checkoutSignalAsyncSuccess {
+			return order, ErrStripeProviderUnavailable
+		}
+		if signal == checkoutSignalAsyncFailed {
+			failed, err := s.repo.MarkPaymentOrderFailed(ctx, order.ID)
+			if err != nil {
+				return order, err
+			}
+			if failed.Status == PaymentOrderFailed && failed.Status != order.Status {
+				s.events.Publish(failed.UserID, PaymentEvent{PublicToken: failed.PublicToken, Status: "failed"})
+			}
+			return failed, nil
+		}
+		pending, err := s.repo.MarkPaymentOrderAsyncPending(ctx, order.ID)
+		if err != nil {
+			return order, err
+		}
+		if order.Status != pending.Status {
+			s.events.Publish(pending.UserID, PaymentEvent{PublicToken: pending.PublicToken, Status: "processing"})
+		}
+		return pending, nil
+	case CheckoutSessionStatusOpen:
+		if signal == checkoutSignalExpired || signal == checkoutSignalCompleted || signal == checkoutSignalAsyncFailed || signal == checkoutSignalAsyncSuccess {
+			return order, ErrStripeProviderUnavailable
+		}
+		return order, nil
+	default:
+		return order, ErrPurchasesUnavailable
+	}
+}
+
 func (s *Service) GetPaymentOrderReturnStatus(ctx context.Context, userID int64, publicToken string) (PaymentOrderReturnStatus, error) {
 	if s == nil || s.repo == nil {
 		return PaymentOrderReturnStatus{}, ErrPaymentOrderNotFound
@@ -231,7 +546,7 @@ func (s *Service) getPaymentOrderReturnStatusLocked(ctx context.Context, userID 
 			}
 		}
 	}
-	return paymentOrderReturnStatus(order, s.now().UTC()), nil
+	return paymentOrderReturnStatus(order), nil
 }
 
 func (s *Service) checkoutConfiguration(ctx context.Context) (StoredStripeConfiguration, string, error) {
@@ -304,32 +619,7 @@ func (s *Service) retrieveAndConvergeCheckout(ctx context.Context, apiKey string
 	if err != nil {
 		return order, checkoutOperationError(err)
 	}
-	if err := validateCheckoutSessionIdentity(order, session); err != nil {
-		return order, err
-	}
-	if !session.IsPaid() {
-		if !order.ExpiresAt.After(s.now().UTC()) || (!session.ExpiresAt.IsZero() && !session.ExpiresAt.After(s.now().UTC())) {
-			failed, failedErr := s.repo.MarkPaymentOrderFailed(ctx, order.ID)
-			if failedErr == nil {
-				s.events.Publish(failed.UserID, PaymentEvent{PublicToken: failed.PublicToken, Status: "failed"})
-				return failed, nil
-			}
-			return order, failedErr
-		}
-		pending, pendingErr := s.repo.MarkPaymentOrderAsyncPending(ctx, order.ID)
-		if pendingErr == nil {
-			return pending, nil
-		}
-		return order, pendingErr
-	}
-	result, err := s.repo.ConvergePaidPaymentOrder(ctx, paidCheckoutFactsFromSession(order.StripeAccountID, session, s.now().UTC()), s.now().UTC())
-	if err != nil {
-		return order, err
-	}
-	if !result.Replayed {
-		s.events.Publish(result.Order.UserID, PaymentEvent{PublicToken: result.Order.PublicToken, Status: "credited"})
-	}
-	return result.Order, nil
+	return s.convergeCheckoutSession(ctx, order, session, checkoutSignalObserved)
 }
 
 // settleOrdersBeforeStripeKeyChange preserves the single-active-account model:
@@ -357,11 +647,13 @@ func (s *Service) settleOrdersBeforeStripeKeyChange(ctx context.Context, current
 				hasActiveOrder = true
 				continue
 			}
-			failed, err := s.repo.MarkPaymentOrderFailed(ctx, order.ID)
+			expired, changed, err := s.repo.MarkPaymentOrderExpired(ctx, order.ID)
 			if err != nil {
 				return err
 			}
-			s.events.Publish(failed.UserID, PaymentEvent{PublicToken: failed.PublicToken, Status: "failed"})
+			if changed {
+				s.events.Publish(expired.UserID, PaymentEvent{PublicToken: expired.PublicToken, Status: "failed"})
+			}
 			continue
 		}
 		session, err := s.checkoutGateway.RetrieveCheckoutSession(ctx, RetrieveCheckoutSessionInput{
@@ -370,31 +662,13 @@ func (s *Service) settleOrdersBeforeStripeKeyChange(ctx context.Context, current
 		if err != nil {
 			return checkoutOperationError(err)
 		}
-		if session.ID != order.StripeCheckoutSessionID {
-			return ErrStripeConfigurationInvalid
-		}
-		if err := validateCheckoutSessionIdentity(order, session); err != nil {
-			return err
-		}
-		if session.IsPaid() {
-			converged, err := s.repo.ConvergePaidPaymentOrder(ctx, paidCheckoutFactsFromSession(current.AccountID, session, now), now)
-			if err != nil {
-				return err
-			}
-			if !converged.Replayed {
-				s.events.Publish(converged.Order.UserID, PaymentEvent{PublicToken: converged.Order.PublicToken, Status: "credited"})
-			}
-			continue
-		}
-		if order.ExpiresAt.After(now) || (!session.ExpiresAt.IsZero() && session.ExpiresAt.After(now)) {
-			hasActiveOrder = true
-			continue
-		}
-		failed, err := s.repo.MarkPaymentOrderFailed(ctx, order.ID)
+		resolved, err := s.convergeCheckoutSession(ctx, order, session, checkoutSignalObserved)
 		if err != nil {
 			return err
 		}
-		s.events.Publish(failed.UserID, PaymentEvent{PublicToken: failed.PublicToken, Status: "failed"})
+		if resolved.Status == PaymentOrderCheckoutOpen || resolved.Status == PaymentOrderAsyncPaymentPending {
+			hasActiveOrder = true
+		}
 	}
 	if hasActiveOrder {
 		return ErrStripeConfigurationBusy
@@ -421,6 +695,7 @@ func validateCheckoutSessionIdentity(order PaymentOrder, session CheckoutSession
 func paidCheckoutFactsFromSession(accountID string, session CheckoutSession, paidAt time.Time) PaidCheckoutFacts {
 	return PaidCheckoutFacts{
 		StripeAccountID: accountID, StripeSessionID: session.ID, PublicOrderNumber: session.PublicOrderNumber,
+		ExpiresAt:      session.ExpiresAt,
 		PaymentOrderID: session.PaymentOrderID, RequestHash: session.RequestHash, StripeCustomerID: session.CustomerID,
 		StripePaymentIntentID: session.PaymentIntentID, StripeChargeID: session.ChargeID, IdeaQuantity: session.IdeaQuantity,
 		PaidSubtotalMinor: session.AmountSubtotalMinor, PaidTaxMinor: session.AmountTaxMinor,
@@ -432,13 +707,12 @@ func checkoutResult(order PaymentOrder, reused bool) CheckoutResult {
 	return CheckoutResult{CheckoutURL: order.CheckoutURL, PublicToken: order.PublicToken, ExpiresAt: order.ExpiresAt, Reused: reused}
 }
 
-func paymentOrderReturnStatus(order PaymentOrder, now time.Time) PaymentOrderReturnStatus {
+func paymentOrderReturnStatus(order PaymentOrder) PaymentOrderReturnStatus {
 	status := "processing"
-	if order.Status == PaymentOrderCredited {
+	switch order.Status {
+	case PaymentOrderCredited:
 		status = "credited"
-	} else if order.Status == PaymentOrderFailed {
-		status = "failed"
-	} else if !order.ExpiresAt.After(now) {
+	case PaymentOrderCancelled, PaymentOrderExpired, PaymentOrderFailed:
 		status = "failed"
 	}
 	return PaymentOrderReturnStatus{IdeaQuantity: order.IdeaQuantity, Status: status, UpdatedAt: order.UpdatedAt}

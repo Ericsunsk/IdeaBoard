@@ -232,20 +232,8 @@ func (s *Service) receiveStripeWebhookLocked(ctx context.Context, raw []byte, si
 	if !recognized {
 		return receipt, nil
 	}
-	if event.Type == "checkout.session.async_payment_failed" || event.Type == "checkout.session.expired" {
-		failed, changed, err := s.repo.MarkPaymentOrderFailedBySession(ctx, stored.AccountID, event.ObjectID)
-		if err != nil {
-			return StripeWebhookReceipt{}, err
-		}
-		if changed {
-			s.events.Publish(failed.UserID, PaymentEvent{PublicToken: failed.PublicToken, Status: "failed"})
-		}
-		if err := s.repo.MarkStripeWebhookEventProcessed(ctx, event.ID, "processed", "", now); err != nil {
-			return StripeWebhookReceipt{}, err
-		}
-		return receipt, nil
-	}
-	if event.Type != "checkout.session.completed" && event.Type != "checkout.session.async_payment_succeeded" {
+	signal, checkoutLifecycleEvent := checkoutSignalForWebhookEvent(event.Type)
+	if !checkoutLifecycleEvent {
 		if err := s.repo.MarkStripeWebhookEventProcessed(ctx, event.ID, "processed", "", now); err != nil {
 			return StripeWebhookReceipt{}, err
 		}
@@ -265,27 +253,32 @@ func (s *Service) receiveStripeWebhookLocked(ctx context.Context, raw []byte, si
 	if session.ID != event.ObjectID {
 		return StripeWebhookReceipt{}, ErrMalformedWebhookPayload
 	}
-	if session.IsPaid() {
-		converged, err := s.repo.ConvergePaidPaymentOrder(ctx, paidCheckoutFactsFromSession(stored.AccountID, session, now), now)
-		if err != nil {
-			return StripeWebhookReceipt{}, err
-		}
-		if !converged.Replayed {
-			s.events.Publish(converged.Order.UserID, PaymentEvent{PublicToken: converged.Order.PublicToken, Status: "credited"})
-		}
-	} else if event.Type == "checkout.session.completed" {
-		pending, changed, err := s.repo.MarkPaymentOrderAsyncPendingBySession(ctx, stored.AccountID, session.ID)
-		if err != nil {
-			return StripeWebhookReceipt{}, err
-		}
-		if changed {
-			s.events.Publish(pending.UserID, PaymentEvent{PublicToken: pending.PublicToken, Status: "processing"})
-		}
+	order, err := s.repo.GetPaymentOrderByCheckoutSession(ctx, stored.AccountID, session.ID)
+	if err != nil {
+		return StripeWebhookReceipt{}, fmt.Errorf("resolve payment order for Stripe Session: %w", err)
+	}
+	if _, err := s.convergeCheckoutSession(ctx, order, session, signal); err != nil {
+		return StripeWebhookReceipt{}, err
 	}
 	if err := s.repo.MarkStripeWebhookEventProcessed(ctx, event.ID, "processed", "", now); err != nil {
 		return StripeWebhookReceipt{}, err
 	}
 	return receipt, nil
+}
+
+func checkoutSignalForWebhookEvent(eventType string) (checkoutSignal, bool) {
+	switch eventType {
+	case "checkout.session.completed":
+		return checkoutSignalCompleted, true
+	case "checkout.session.async_payment_succeeded":
+		return checkoutSignalAsyncSuccess, true
+	case "checkout.session.async_payment_failed":
+		return checkoutSignalAsyncFailed, true
+	case "checkout.session.expired":
+		return checkoutSignalExpired, true
+	default:
+		return "", false
+	}
 }
 
 func (s *Service) loadCurrentConfiguration(ctx context.Context) (StoredStripeConfiguration, bool, error) {

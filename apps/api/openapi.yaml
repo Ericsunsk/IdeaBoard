@@ -252,7 +252,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseBase' }
         '409':
-          description: The idempotency key was previously used for a different request
+          description: Idempotency conflict, three active pending orders, or the same quantity is already processing
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseBase' }
@@ -283,6 +283,76 @@ paths:
               schema: { $ref: '#/components/schemas/ApiResponsePaymentOrderReturnStatus' }
         '404':
           description: Payment Order does not belong to the authenticated user or does not exist
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+  /user/payments/pending-orders:
+    get:
+      tags: [UserPayments]
+      operationId: listUserPendingPaymentOrders
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Current authenticated user's non-final Payment Orders, separate from recharge history
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponsePendingPaymentOrderList' }
+  /user/payments/pending-orders/{public_token}/continue:
+    post:
+      tags: [UserPayments]
+      operationId: continueUserPendingPaymentOrder
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: public_token
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Current canonical Payment Order after continuing Checkout
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponsePendingPaymentOrder' }
+        '404':
+          description: Payment Order does not belong to the authenticated user, does not exist, or has an invalid public token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '423':
+          description: Current Wallet cannot continue a Checkout
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+  /user/payments/pending-orders/{public_token}/abandon:
+    post:
+      tags: [UserPayments]
+      operationId: abandonUserPendingPaymentOrder
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: public_token
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Current canonical Payment Order after an idempotent abandon attempt
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponsePendingPaymentOrder' }
+        '404':
+          description: Payment Order does not belong to the authenticated user, does not exist, or has an invalid public token
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseBase' }
@@ -3840,6 +3910,32 @@ components:
         status: { type: string, enum: [processing, credited, failed] }
         updated_at: { type: string, format: date-time }
 
+    PendingPaymentOrder:
+      type: object
+      additionalProperties: false
+      required: [public_token, idea_quantity, status, expires_at, updated_at]
+      properties:
+        public_token: { type: string, format: uuid }
+        idea_quantity: { type: integer, format: int64, minimum: 500, maximum: 500000 }
+        checkout_url:
+          type: string
+          format: uri
+          description: Present only while status is checkout_open.
+        status:
+          type: string
+          enum: [checkout_open, async_payment_pending, paid_pending_credit, credited, cancelled, expired, payment_failed]
+        expires_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    PendingPaymentOrderList:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/PendingPaymentOrder' }
+
     RechargeHistoryItem:
       type: object
       additionalProperties: false
@@ -4780,6 +4876,20 @@ components:
         - type: object
           properties:
             data: { $ref: '#/components/schemas/PaymentOrderReturnStatus' }
+
+    ApiResponsePendingPaymentOrder:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/PendingPaymentOrder' }
+
+    ApiResponsePendingPaymentOrderList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/PendingPaymentOrderList' }
 
     ApiResponseRechargeHistoryPage:
       allOf:

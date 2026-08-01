@@ -98,6 +98,26 @@ SELECT *
 FROM payment_orders
 WHERE id = $1;
 
+-- name: GetPaymentOrderByIDForUpdate :one
+SELECT *
+FROM payment_orders
+WHERE id = $1
+FOR UPDATE;
+
+-- name: ListActivePaymentOrders :many
+SELECT *
+FROM payment_orders
+WHERE user_id = $1
+  AND status IN ('creating', 'checkout_open', 'async_payment_pending')
+ORDER BY created_at, id;
+
+-- name: ListUserPendingPaymentOrders :many
+SELECT *
+FROM payment_orders
+WHERE user_id = $1
+  AND status IN ('checkout_open', 'async_payment_pending', 'paid_pending_credit')
+ORDER BY created_at DESC, id DESC;
+
 -- name: InsertPaymentOrderIntent :one
 INSERT INTO payment_orders (
   id,
@@ -160,46 +180,55 @@ SET status = 'async_payment_pending'
 WHERE id = $1 AND status = 'checkout_open'
 RETURNING *;
 
--- name: MarkPaymentOrderAsyncPendingBySession :one
-UPDATE payment_orders
-SET status = 'async_payment_pending'
-WHERE stripe_account_id = $1 AND stripe_checkout_session_id = $2 AND status = 'checkout_open'
-RETURNING *;
-
 -- name: MarkPaymentOrderFailed :one
 UPDATE payment_orders
 SET status = 'payment_failed'
 WHERE id = $1 AND status IN ('creating', 'checkout_open', 'async_payment_pending')
 RETURNING *;
 
--- name: MarkPaymentOrderFailedBySession :one
+-- name: MarkPaymentOrderCancelled :one
 UPDATE payment_orders
-SET status = 'payment_failed'
-WHERE stripe_account_id = $1 AND stripe_checkout_session_id = $2
-  AND status IN ('checkout_open', 'async_payment_pending')
+SET status = 'cancelled'
+WHERE id = $1 AND user_id = $2 AND status = 'checkout_open'
+RETURNING *;
+
+-- name: MarkPaymentOrderExpired :one
+UPDATE payment_orders
+SET status = 'expired'
+WHERE id = $1 AND status IN ('creating', 'checkout_open', 'async_payment_pending')
 RETURNING *;
 
 -- name: ListUnsettledPaymentOrders :many
 SELECT *
 FROM payment_orders
-WHERE status IN ('creating', 'checkout_open', 'async_payment_pending')
+WHERE status IN ('creating', 'checkout_open', 'async_payment_pending', 'paid_pending_credit')
 ORDER BY created_at, id
 LIMIT 1001;
+
+-- name: RecordPaymentOrderPaid :one
+UPDATE payment_orders
+SET status = 'paid_pending_credit',
+    stripe_customer_id = $2,
+    stripe_checkout_session_id = $3,
+    expires_at = CASE WHEN stripe_checkout_session_id IS NULL THEN $4 ELSE expires_at END,
+    stripe_payment_intent_id = $5,
+    stripe_charge_id = $6,
+    paid_subtotal_minor = $7,
+    paid_tax_minor = $8,
+    paid_total_minor = $9,
+    paid_currency = $10,
+    receipt_url = $11,
+    paid_at = $12
+WHERE id = $1
+  AND status IN ('creating', 'checkout_open', 'async_payment_pending', 'cancelled', 'expired', 'payment_failed')
+RETURNING *;
 
 -- name: MarkPaymentOrderCredited :one
 UPDATE payment_orders
 SET status = 'credited',
-    stripe_payment_intent_id = $2,
-    stripe_charge_id = $3,
-    paid_subtotal_minor = $4,
-    paid_tax_minor = $5,
-    paid_total_minor = $6,
-    paid_currency = $7,
-    receipt_url = $8,
-    credit_transaction_id = $9,
-    paid_at = $10,
-    credited_at = $11
-WHERE id = $1 AND status IN ('creating', 'checkout_open', 'async_payment_pending')
+    credit_transaction_id = $2,
+    credited_at = $3
+WHERE id = $1 AND status = 'paid_pending_credit'
 RETURNING *;
 
 -- name: GetPaymentOrderByPublicToken :one

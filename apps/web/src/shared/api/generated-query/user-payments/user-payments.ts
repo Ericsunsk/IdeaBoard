@@ -22,6 +22,8 @@ import type {
   ApiResponsePaymentCheckout,
   ApiResponsePaymentOrderReturnStatus,
   ApiResponsePaymentPurchaseOptions,
+  ApiResponsePendingPaymentOrder,
+  ApiResponsePendingPaymentOrderList,
   ApiResponseRechargeHistoryPage,
   CreatePaymentCheckoutRequest,
   ListUserPaymentRechargesParams,
@@ -256,6 +258,235 @@ export function useGetUserPaymentOrderReturnStatus<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getGetUserPaymentOrderReturnStatusQueryOptions(publicToken, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getListUserPendingPaymentOrdersUrl = () => {
+  return `/user/payments/pending-orders`
+}
+
+export const listUserPendingPaymentOrders = async (
+  options?: RequestInit,
+): Promise<ApiResponsePendingPaymentOrderList> => {
+  return orvalMutator<ApiResponsePendingPaymentOrderList>(getListUserPendingPaymentOrdersUrl(), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getListUserPendingPaymentOrdersQueryKey = () => {
+  return ['user', 'payments', 'pending-orders'] as const
+}
+
+export const getListUserPendingPaymentOrdersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listUserPendingPaymentOrders>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof listUserPendingPaymentOrders>>, TError, TData>
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListUserPendingPaymentOrdersQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listUserPendingPaymentOrders>>> = ({
+    signal,
+  }) => listUserPendingPaymentOrders({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listUserPendingPaymentOrders>>,
+    TError,
+    TData
+  >
+}
+
+export type ListUserPendingPaymentOrdersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listUserPendingPaymentOrders>>
+>
+export type ListUserPendingPaymentOrdersQueryError = ErrorType<unknown>
+
+export function useListUserPendingPaymentOrders<
+  TData = Awaited<ReturnType<typeof listUserPendingPaymentOrders>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listUserPendingPaymentOrders>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListUserPendingPaymentOrdersQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getContinueUserPendingPaymentOrderUrl = (publicToken: string) => {
+  return `/user/payments/pending-orders/${encodeURIComponent(String(publicToken))}/continue`
+}
+
+export const continueUserPendingPaymentOrder = async (
+  publicToken: string,
+  options?: RequestInit,
+): Promise<ApiResponsePendingPaymentOrder> => {
+  return orvalMutator<ApiResponsePendingPaymentOrder>(
+    getContinueUserPendingPaymentOrderUrl(publicToken),
+    {
+      ...options,
+      method: 'POST',
+    },
+  )
+}
+
+export const getContinueUserPendingPaymentOrderQueryKey = (
+  publicToken: MaybeRefOrGetter<string>,
+) => {
+  return ['POST', 'user', 'payments', 'pending-orders', publicToken, 'continue'] as const
+}
+
+export const getContinueUserPendingPaymentOrderQueryOptions = <
+  TData = Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>,
+  TError = ErrorType<ApiResponseBase>,
+>(
+  publicToken: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getContinueUserPendingPaymentOrderQueryKey(publicToken)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>> = ({
+    signal,
+  }) => continueUserPendingPaymentOrder(toValue(publicToken), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(publicToken) !== null && toValue(publicToken) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>, TError, TData>
+}
+
+export type ContinueUserPendingPaymentOrderQueryResult = NonNullable<
+  Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>
+>
+export type ContinueUserPendingPaymentOrderQueryError = ErrorType<ApiResponseBase>
+
+export function useContinueUserPendingPaymentOrder<
+  TData = Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>,
+  TError = ErrorType<ApiResponseBase>,
+>(
+  publicToken: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof continueUserPendingPaymentOrder>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getContinueUserPendingPaymentOrderQueryOptions(publicToken, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getAbandonUserPendingPaymentOrderUrl = (publicToken: string) => {
+  return `/user/payments/pending-orders/${encodeURIComponent(String(publicToken))}/abandon`
+}
+
+export const abandonUserPendingPaymentOrder = async (
+  publicToken: string,
+  options?: RequestInit,
+): Promise<ApiResponsePendingPaymentOrder> => {
+  return orvalMutator<ApiResponsePendingPaymentOrder>(
+    getAbandonUserPendingPaymentOrderUrl(publicToken),
+    {
+      ...options,
+      method: 'POST',
+    },
+  )
+}
+
+export const getAbandonUserPendingPaymentOrderQueryKey = (
+  publicToken: MaybeRefOrGetter<string>,
+) => {
+  return ['POST', 'user', 'payments', 'pending-orders', publicToken, 'abandon'] as const
+}
+
+export const getAbandonUserPendingPaymentOrderQueryOptions = <
+  TData = Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>,
+  TError = ErrorType<ApiResponseBase>,
+>(
+  publicToken: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getAbandonUserPendingPaymentOrderQueryKey(publicToken)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>> = ({
+    signal,
+  }) => abandonUserPendingPaymentOrder(toValue(publicToken), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(publicToken) !== null && toValue(publicToken) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>, TError, TData>
+}
+
+export type AbandonUserPendingPaymentOrderQueryResult = NonNullable<
+  Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>
+>
+export type AbandonUserPendingPaymentOrderQueryError = ErrorType<ApiResponseBase>
+
+export function useAbandonUserPendingPaymentOrder<
+  TData = Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>,
+  TError = ErrorType<ApiResponseBase>,
+>(
+  publicToken: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof abandonUserPendingPaymentOrder>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getAbandonUserPendingPaymentOrderQueryOptions(publicToken, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

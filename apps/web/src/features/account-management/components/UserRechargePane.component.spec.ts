@@ -34,6 +34,9 @@ function makeResource(overrides: Partial<UserPaymentsResource> = {}): UserPaymen
       status: 'processing',
       updated_at: '2026-08-01T00:30:00Z',
     }),
+    listPendingOrders: vi.fn().mockResolvedValue({ items: [] }),
+    continuePendingOrder: vi.fn(),
+    abandonPendingOrder: vi.fn(),
     listRecharges: vi.fn().mockResolvedValue({ items: [] }),
     subscribe: vi.fn(() => () => undefined),
     ...overrides,
@@ -192,6 +195,136 @@ describe('UserRechargePane', () => {
     expect(screen.queryByText(/customer|session|email/i)).not.toBeInTheDocument()
   })
 
+  it('keeps pending Checkout orders above and separate from credited recharge history', async () => {
+    const continuePendingOrder = vi.fn().mockResolvedValue({
+      public_token: 'open-order',
+      idea_quantity: 1000,
+      status: 'checkout_open',
+      checkout_url: 'https://checkout.stripe.com/c/pay/open-order',
+      expires_at: '2026-08-01T01:00:00Z',
+      updated_at: '2026-08-01T00:00:00Z',
+    })
+    const abandonPendingOrder = vi.fn().mockResolvedValue({
+      public_token: 'open-order',
+      idea_quantity: 1000,
+      status: 'cancelled',
+      expires_at: '2026-08-01T01:00:00Z',
+      updated_at: '2026-08-01T00:00:00Z',
+    })
+    const navigate = vi.fn()
+    const { user } = renderPane({
+      navigate,
+      resource: makeResource({
+        continuePendingOrder,
+        abandonPendingOrder,
+        listPendingOrders: vi.fn().mockResolvedValue({
+          items: [
+            {
+              public_token: 'open-order',
+              idea_quantity: 1000,
+              status: 'checkout_open',
+              checkout_url: 'https://checkout.stripe.com/c/pay/open-order',
+              expires_at: '2026-08-01T01:00:00Z',
+              updated_at: '2026-08-01T00:00:00Z',
+            },
+          ],
+        }),
+      }),
+    })
+
+    const pendingOrder = await screen.findByTestId('pending-payment-order-open-order')
+    expect(within(pendingOrder).getByText('1,000 Ideas')).toBeVisible()
+    expect(within(pendingOrder).getByText('待完成支付')).toBeVisible()
+    expect(within(pendingOrder).getByText(/有效至/)).toBeVisible()
+    expect(screen.getByRole('heading', { name: '待支付订单' })).toBeVisible()
+    const historyTable = await screen.findByRole('table', { name: '充值记录表格' })
+    expect(within(historyTable).queryByText('1,000')).not.toBeInTheDocument()
+
+    await user.click(within(pendingOrder).getByRole('button', { name: '继续支付' }))
+    await waitFor(() => expect(continuePendingOrder).toHaveBeenCalledWith('open-order'))
+    expect(navigate).toHaveBeenCalledWith('https://checkout.stripe.com/c/pay/open-order')
+
+    await user.click(within(pendingOrder).getByRole('button', { name: '放弃订单' }))
+    expect(within(pendingOrder).getByText('放弃后需重新创建订单')).toBeVisible()
+    await user.click(within(pendingOrder).getByRole('button', { name: '确认放弃' }))
+    await waitFor(() => expect(abandonPendingOrder).toHaveBeenCalledWith('open-order'))
+    expect(await within(pendingOrder).findByText('订单已放弃')).toBeVisible()
+    expect(within(pendingOrder).queryByRole('button', { name: '继续支付' })).not.toBeInTheDocument()
+  })
+
+  it('renders waiting, delayed credit processing, and expired pending order states', async () => {
+    renderPane({
+      resource: makeResource({
+        listPendingOrders: vi.fn().mockResolvedValue({
+          items: [
+            {
+              public_token: 'async-order',
+              idea_quantity: 2000,
+              status: 'async_payment_pending',
+              expires_at: '2026-08-01T01:00:00Z',
+              updated_at: '2026-08-01T00:00:00Z',
+            },
+            {
+              public_token: 'credit-order',
+              idea_quantity: 3000,
+              status: 'paid_pending_credit',
+              expires_at: '2026-08-01T01:00:00Z',
+              updated_at: new Date(Date.now() - 61_000).toISOString(),
+            },
+            {
+              public_token: 'expired-order',
+              idea_quantity: 5000,
+              status: 'expired',
+              expires_at: '2026-07-31T01:00:00Z',
+              updated_at: '2026-07-31T01:00:00Z',
+            },
+          ],
+        }),
+      }),
+    })
+
+    expect(await screen.findByText('正在等待支付确认')).toBeVisible()
+    expect(screen.getByText('到账处理中')).toBeVisible()
+    expect(screen.getByText('支付链接已过期')).toBeVisible()
+    expect(screen.getByText(/已于 .* 过期/)).toBeVisible()
+  })
+
+  it('makes pending order failures visible and retryable', async () => {
+    const continuePendingOrder = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('待支付订单已达到 3 笔上限，请先完成或放弃现有订单'))
+      .mockResolvedValueOnce({
+        public_token: 'open-order',
+        idea_quantity: 1000,
+        status: 'checkout_open',
+        checkout_url: 'https://checkout.stripe.com/c/pay/open-order',
+        expires_at: '2026-08-01T01:00:00Z',
+        updated_at: '2026-08-01T00:00:00Z',
+      })
+    const { user } = renderPane({
+      resource: makeResource({
+        continuePendingOrder,
+        listPendingOrders: vi.fn().mockResolvedValue({
+          items: [
+            {
+              public_token: 'open-order',
+              idea_quantity: 1000,
+              status: 'checkout_open',
+              expires_at: '2026-08-01T01:00:00Z',
+              updated_at: '2026-08-01T00:00:00Z',
+            },
+          ],
+        }),
+      }),
+    })
+
+    const pendingOrder = await screen.findByTestId('pending-payment-order-open-order')
+    await user.click(within(pendingOrder).getByRole('button', { name: '继续支付' }))
+    expect(await within(pendingOrder).findByRole('alert')).toHaveTextContent('待支付订单已达到 3 笔上限')
+    await user.click(within(pendingOrder).getByRole('button', { name: '重试继续支付' }))
+    await waitFor(() => expect(continuePendingOrder).toHaveBeenCalledTimes(2))
+  })
+
   it('shows the backend-owned processing result after a Checkout return', async () => {
     renderPane({
       paymentReturn: {
@@ -268,6 +401,7 @@ describe('UserRechargePane', () => {
   it('uses the user payment event only to invalidate visible account queries', async () => {
     let paymentListener: Parameters<UserPaymentsResource['subscribe']>[0] | undefined
     const unsubscribe = vi.fn()
+    const listPendingOrders = vi.fn().mockResolvedValue({ items: [] })
     const listRecharges = vi
       .fn()
       .mockResolvedValueOnce({ items: [] })
@@ -286,17 +420,52 @@ describe('UserRechargePane', () => {
       paymentListener = listener
       return unsubscribe
     })
-    const { unmount } = renderPane({ resource: makeResource({ listRecharges, subscribe }) })
+    const { unmount } = renderPane({
+      resource: makeResource({ listPendingOrders, listRecharges, subscribe }),
+    })
     expect(await screen.findByText('暂无充值记录')).toBeVisible()
     expect(listRecharges).toHaveBeenCalledOnce()
 
     paymentListener?.({ status: 'credited' })
 
     await waitFor(() => expect(listRecharges).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(listPendingOrders).toHaveBeenCalledTimes(2))
     const historyTable = await screen.findByRole('table', { name: '充值记录表格' })
     expect(await within(historyTable).findByText('$10.00 USD')).toBeVisible()
     unmount()
     expect(unsubscribe).toHaveBeenCalledOnce()
+  })
+
+  it('retains a failed pending Checkout in the visible cache after its SSE event', async () => {
+    let paymentListener: Parameters<UserPaymentsResource['subscribe']>[0] | undefined
+    const listPendingOrders = vi.fn().mockResolvedValue({
+      items: [
+        {
+          public_token: 'failed-order',
+          idea_quantity: 1000,
+          status: 'checkout_open',
+          checkout_url: 'https://checkout.stripe.com/c/pay/failed-order',
+          expires_at: '2026-08-01T01:00:00Z',
+          updated_at: '2026-08-01T00:00:00Z',
+        },
+      ],
+    })
+    const listRecharges = vi.fn().mockResolvedValue({ items: [] })
+    const subscribe = vi.fn((listener: Parameters<UserPaymentsResource['subscribe']>[0]) => {
+      paymentListener = listener
+      return () => undefined
+    })
+    renderPane({ resource: makeResource({ listPendingOrders, listRecharges, subscribe }) })
+
+    const pendingOrder = await screen.findByTestId('pending-payment-order-failed-order')
+    expect(within(pendingOrder).getByRole('button', { name: '继续支付' })).toBeVisible()
+
+    paymentListener?.({ public_token: 'failed-order', status: 'failed' })
+
+    expect(await within(pendingOrder).findByText('支付未完成')).toBeVisible()
+    expect(within(pendingOrder).queryByRole('button', { name: '继续支付' })).not.toBeInTheDocument()
+    expect(listPendingOrders).toHaveBeenCalledOnce()
+    await waitFor(() => expect(listRecharges).toHaveBeenCalledTimes(2))
   })
 
   it('keeps the form retryable when Checkout creation fails', async () => {

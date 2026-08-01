@@ -89,13 +89,50 @@ func (a *Adapter) RetrieveCheckoutSession(ctx context.Context, input payments.Re
 	if err != nil {
 		return payments.CheckoutSession{}, err
 	}
-	session, err := client.V1CheckoutSessions.Retrieve(ctx, input.SessionID, &stripe.CheckoutSessionRetrieveParams{
-		Expand: []*string{stripe.String("payment_intent.latest_charge")},
-	})
+	session, err := retrieveCheckoutSession(ctx, client, input.SessionID)
 	if err != nil {
 		return payments.CheckoutSession{}, mapStripeError("读取 Stripe Checkout Session", err)
 	}
 	return checkoutSessionFact(session, false)
+}
+
+func (a *Adapter) ExpireCheckoutSession(ctx context.Context, input payments.ExpireCheckoutSessionInput) (payments.ExpireCheckoutSessionResult, error) {
+	client, err := a.checkoutClient(input.APIKey)
+	if err != nil {
+		return payments.ExpireCheckoutSessionResult{}, err
+	}
+	session, err := client.V1CheckoutSessions.Expire(ctx, input.SessionID, &stripe.CheckoutSessionExpireParams{
+		Expand: []*string{stripe.String("payment_intent.latest_charge")},
+	})
+	if err != nil {
+		expireErr := mapStripeError("关闭 Stripe Checkout Session", err)
+		// A payment can complete between the local decision and Stripe's Expire
+		// call. Resolve that provider race from a fresh canonical Session without
+		// allowing a secondary read failure to hide the original operation error.
+		session, err = retrieveCheckoutSession(ctx, client, input.SessionID)
+		if err != nil {
+			return payments.ExpireCheckoutSessionResult{}, expireErr
+		}
+	}
+	return expireCheckoutSessionResult(session)
+}
+
+func retrieveCheckoutSession(ctx context.Context, client *stripe.Client, sessionID string) (*stripe.CheckoutSession, error) {
+	return client.V1CheckoutSessions.Retrieve(ctx, sessionID, &stripe.CheckoutSessionRetrieveParams{
+		Expand: []*string{stripe.String("payment_intent.latest_charge")},
+	})
+}
+
+func expireCheckoutSessionResult(session *stripe.CheckoutSession) (payments.ExpireCheckoutSessionResult, error) {
+	fact, err := checkoutSessionFact(session, false)
+	if err != nil {
+		return payments.ExpireCheckoutSessionResult{}, err
+	}
+	outcome, err := checkoutSessionExpirationOutcome(session)
+	if err != nil {
+		return payments.ExpireCheckoutSessionResult{}, err
+	}
+	return payments.ExpireCheckoutSessionResult{Outcome: outcome, Session: fact}, nil
 }
 
 func (a *Adapter) checkoutClient(apiKey string) (*stripe.Client, error) {
@@ -118,10 +155,15 @@ func checkoutSessionFact(session *stripe.CheckoutSession, requireURL bool) (paym
 	if session == nil || strings.TrimSpace(session.ID) == "" || (requireURL && strings.TrimSpace(session.URL) == "") {
 		return payments.CheckoutSession{}, payments.NewGatewayError(payments.GatewayErrorInvalidResponse, "Stripe Checkout Session 响应无效", nil)
 	}
+	status, ok := checkoutSessionStatus(session.Status)
+	if !ok {
+		return payments.CheckoutSession{}, payments.NewGatewayError(payments.GatewayErrorInvalidResponse, "Stripe Checkout Session 状态无效", nil)
+	}
 
 	fact := payments.CheckoutSession{
 		ID:                  session.ID,
 		URL:                 session.URL,
+		Status:              status,
 		PaymentStatus:       checkoutPaymentStatus(session.PaymentStatus),
 		AmountSubtotalMinor: session.AmountSubtotal,
 		AmountTotalMinor:    session.AmountTotal,
@@ -200,4 +242,39 @@ func checkoutPaymentStatus(status stripe.CheckoutSessionPaymentStatus) payments.
 		return payments.CheckoutPaymentStatusPaid
 	}
 	return payments.CheckoutPaymentStatusUnpaid
+}
+
+func checkoutSessionStatus(status stripe.CheckoutSessionStatus) (payments.CheckoutSessionStatus, bool) {
+	switch status {
+	case stripe.CheckoutSessionStatusOpen:
+		return payments.CheckoutSessionStatusOpen, true
+	case stripe.CheckoutSessionStatusComplete:
+		return payments.CheckoutSessionStatusComplete, true
+	case stripe.CheckoutSessionStatusExpired:
+		return payments.CheckoutSessionStatusExpired, true
+	default:
+		return "", false
+	}
+}
+
+func checkoutSessionExpirationOutcome(session *stripe.CheckoutSession) (payments.CheckoutSessionExpirationOutcome, error) {
+	if session == nil {
+		return "", invalidCheckoutExpirationResponse()
+	}
+	switch {
+	case session.Status == stripe.CheckoutSessionStatusComplete && session.PaymentStatus == stripe.CheckoutSessionPaymentStatusPaid:
+		return payments.CheckoutSessionExpirationOutcomePaid, nil
+	case session.Status == stripe.CheckoutSessionStatusExpired && session.PaymentStatus == stripe.CheckoutSessionPaymentStatusUnpaid:
+		return payments.CheckoutSessionExpirationOutcomeExpired, nil
+	case session.Status == stripe.CheckoutSessionStatusComplete && session.PaymentStatus == stripe.CheckoutSessionPaymentStatusUnpaid:
+		return payments.CheckoutSessionExpirationOutcomeAsyncPaymentPending, nil
+	case session.Status == stripe.CheckoutSessionStatusOpen && session.PaymentStatus == stripe.CheckoutSessionPaymentStatusUnpaid:
+		return payments.CheckoutSessionExpirationOutcomeOpen, nil
+	default:
+		return "", invalidCheckoutExpirationResponse()
+	}
+}
+
+func invalidCheckoutExpirationResponse() error {
+	return payments.NewGatewayError(payments.GatewayErrorInvalidResponse, "Stripe Checkout Session 关闭结果无效", nil)
 }

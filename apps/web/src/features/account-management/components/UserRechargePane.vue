@@ -8,6 +8,17 @@
       :status="returnStatus"
       @retry="retryReturn()"
     />
+    <UserRechargePendingOrders
+      :items="pendingOrders"
+      :pending="pendingOrdersPending"
+      :error="pendingOrdersError"
+      :action-pending="pendingOrderActionPending"
+      :action-target="pendingOrderActionTarget"
+      :action-error="pendingOrderActionError"
+      @retry="retryPendingOrders()"
+      @continue="continuePending"
+      @abandon="abandonPending"
+    />
     <UserRechargePurchaseCard
       :options="purchaseOptions"
       :pending="optionsPending"
@@ -37,6 +48,7 @@ import { useUserRecharge } from '../useUserRecharge'
 import AccountManagementPane from './AccountManagementPane.vue'
 import UserPaymentReturnStatus from './UserPaymentReturnStatus.vue'
 import UserRechargeHistoryTable from './UserRechargeHistoryTable.vue'
+import UserRechargePendingOrders from './UserRechargePendingOrders.vue'
 import UserRechargePurchaseCard from './UserRechargePurchaseCard.vue'
 
 const props = defineProps<{ active: boolean; paymentReturn: PaymentReturnContext | null }>()
@@ -60,6 +72,15 @@ const {
   historyFetchingNextPage,
   retryHistory,
   loadMoreHistory,
+  pendingOrders,
+  pendingOrdersPending,
+  pendingOrdersError,
+  retryPendingOrders,
+  continuePendingOrder,
+  abandonPendingOrder,
+  pendingOrderActionPending,
+  pendingOrderActionTarget,
+  pendingOrderActionError,
 } = useUserRecharge(toRef(props, 'active'), toRef(props, 'paymentReturn'))
 
 async function checkout(ideaQuantity: number) {
@@ -67,6 +88,22 @@ async function checkout(ideaQuantity: number) {
     await createCheckout(ideaQuantity)
   } catch {
     // useMutation retains the failure for the visible, retryable form error state.
+  }
+}
+
+async function continuePending(publicToken: string) {
+  try {
+    await continuePendingOrder(publicToken)
+  } catch {
+    // The pending-order card retains a visible error and retry action.
+  }
+}
+
+async function abandonPending(publicToken: string) {
+  try {
+    await abandonPendingOrder(publicToken)
+  } catch {
+    // The pending-order card retains a visible error and retry action.
   }
 }
 </script>

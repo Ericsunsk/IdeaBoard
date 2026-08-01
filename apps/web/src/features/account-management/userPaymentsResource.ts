@@ -1,9 +1,12 @@
 import { inject, type InjectionKey } from 'vue'
 import { resolveApiData } from '../../shared/api/apiResponse'
 import {
+  abandonUserPendingPaymentOrder,
+  continueUserPendingPaymentOrder,
   createUserPaymentCheckoutSession,
   getUserPaymentOrderReturnStatus,
   getUserPaymentPurchaseOptions,
+  listUserPendingPaymentOrders,
   listUserPaymentRecharges,
 } from '../../shared/api/generated-query/user-payments/user-payments'
 import type {
@@ -12,6 +15,8 @@ import type {
   PaymentOrderReturnStatus,
   PaymentOrderReturnStatusStatus,
   PaymentPurchaseOptions,
+  PendingPaymentOrder,
+  PendingPaymentOrderList,
   RechargeHistoryItem,
   RechargeHistoryPage,
 } from '../../shared/api/generated-query/model'
@@ -22,6 +27,8 @@ export type UserPaymentCheckout = PaymentCheckout
 export type UserPaymentOrderReturnStatus = PaymentOrderReturnStatus
 export type UserPaymentOrderStatus = PaymentOrderReturnStatusStatus
 export type UserPaymentPurchaseOptions = PaymentPurchaseOptions
+export type UserPendingPaymentOrder = PendingPaymentOrder
+export type UserPendingPaymentOrderList = PendingPaymentOrderList
 export type UserRechargeHistoryItem = RechargeHistoryItem
 export type UserRechargeHistoryPage = RechargeHistoryPage
 
@@ -34,6 +41,9 @@ export interface UserPaymentsResource {
   getPurchaseOptions(signal?: AbortSignal): Promise<UserPaymentPurchaseOptions>
   createCheckout(request: UserPaymentCheckoutRequest): Promise<UserPaymentCheckout>
   getReturnStatus(publicToken: string, signal?: AbortSignal): Promise<UserPaymentOrderReturnStatus>
+  listPendingOrders(signal?: AbortSignal): Promise<UserPendingPaymentOrderList>
+  continuePendingOrder(publicToken: string): Promise<UserPendingPaymentOrder>
+  abandonPendingOrder(publicToken: string): Promise<UserPendingPaymentOrder>
   listRecharges(
     params: { cursor?: string; limit: number },
     signal?: AbortSignal,
@@ -56,6 +66,12 @@ const productionResource: UserPaymentsResource = {
     resolveApiData(createUserPaymentCheckoutSession(request), '创建支付页面失败'),
   getReturnStatus: (publicToken, signal) =>
     resolveApiData(getUserPaymentOrderReturnStatus(publicToken, { signal }), '加载订单状态失败'),
+  listPendingOrders: (signal) =>
+    resolveApiData(listUserPendingPaymentOrders({ signal }), '加载待支付订单失败'),
+  continuePendingOrder: (publicToken) =>
+    resolveApiData(continueUserPendingPaymentOrder(publicToken), '继续支付失败'),
+  abandonPendingOrder: (publicToken) =>
+    resolveApiData(abandonUserPendingPaymentOrder(publicToken), '放弃待支付订单失败'),
   listRecharges: (params, signal) =>
     resolveApiData(listUserPaymentRecharges(params, { signal }), '加载充值记录失败'),
   subscribe: (listener) => subscribeToUserPaymentEvents(listener),
@@ -127,6 +143,7 @@ export function useUserPaymentsContext(): UserPaymentsContext {
 export const userPaymentsQueryKeys = {
   all: ['user', 'payments'] as const,
   options: ['user', 'payments', 'purchase-options'] as const,
+  pending: ['user', 'payments', 'pending-orders'] as const,
   history: ['user', 'payments', 'recharges'] as const,
   returnStatus: (publicToken: string) =>
     ['user', 'payments', 'orders', 'return', publicToken] as const,

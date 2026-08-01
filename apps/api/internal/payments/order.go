@@ -15,7 +15,10 @@ const (
 	PaymentOrderCreating            PaymentOrderStatus = "creating"
 	PaymentOrderCheckoutOpen        PaymentOrderStatus = "checkout_open"
 	PaymentOrderAsyncPaymentPending PaymentOrderStatus = "async_payment_pending"
+	PaymentOrderPaidPendingCredit   PaymentOrderStatus = "paid_pending_credit"
 	PaymentOrderCredited            PaymentOrderStatus = "credited"
+	PaymentOrderCancelled           PaymentOrderStatus = "cancelled"
+	PaymentOrderExpired             PaymentOrderStatus = "expired"
 	PaymentOrderFailed              PaymentOrderStatus = "payment_failed"
 )
 
@@ -86,6 +89,7 @@ type BindPaymentOrderCheckoutInput struct {
 type PaidCheckoutFacts struct {
 	StripeAccountID       string
 	StripeSessionID       string
+	ExpiresAt             time.Time
 	PublicOrderNumber     string
 	PaymentOrderID        string
 	RequestHash           string

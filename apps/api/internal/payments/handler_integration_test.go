@@ -172,6 +172,113 @@ func TestUserCheckoutHTTPUsesPrincipalAndTrustedReturnURL(t *testing.T) {
 	}
 }
 
+func TestUserPendingPaymentOrderHTTPBoundaryScopesOwnershipAndRejectsActionBodies(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	db, pool := testdb.OpenWithPool(t)
+	seedRechargeableWallet(t, pool, 42)
+	checkoutGateway := &fakeCheckoutGateway{}
+	service := newConfiguredPurchaseService(
+		t, db, configuredFakeStripeGateway("acct_pending_http", "prod_pending_http"), checkoutGateway, credits.NewService(pool),
+	)
+	handler := NewHandler(service, fixedPublicURLProvider{"https://configured.example.com"})
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		userID := int64(42)
+		if c.GetHeader("X-Test-Other-User") == "true" {
+			userID = 99
+		}
+		testsupport.SetPrincipal(t, c, userID, principal.RoleUser)
+		c.Next()
+	})
+	router.POST("/user/payments/checkout-sessions", handler.CreateCheckoutSession)
+	router.GET("/user/payments/orders/:public_token", handler.GetPaymentOrderReturnStatus)
+	router.GET("/user/payments/pending-orders", handler.ListPendingOrders)
+	router.POST("/user/payments/pending-orders/:public_token/continue", handler.ContinuePendingOrder)
+	router.POST("/user/payments/pending-orders/:public_token/abandon", handler.AbandonPendingOrder)
+
+	checkout := performPaymentRequest(router, http.MethodPost, "/user/payments/checkout-sessions", `{
+"idempotency_key":"user-pending-http-checkout","idea_quantity":500,"terms_accepted":true,"terms_version":"2026-08-01","refund_policy_version":"2026-08-01"}`, nil)
+	if checkout.Code != http.StatusOK {
+		t.Fatalf("checkout=%d %s", checkout.Code, checkout.Body.String())
+	}
+	var created CheckoutResult
+	decodePaymentResponseData(t, checkout.Body.Bytes(), &created)
+
+	pending := performPaymentRequest(router, http.MethodGet, "/user/payments/pending-orders", "", nil)
+	if pending.Code != http.StatusOK || pending.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("pending list=%d %s", pending.Code, pending.Body.String())
+	}
+	var page PendingPaymentOrderList
+	decodePaymentResponseData(t, pending.Body.Bytes(), &page)
+	if len(page.Items) != 1 || page.Items[0].PublicToken != created.PublicToken || page.Items[0].CheckoutURL == "" || page.Items[0].Status != string(PaymentOrderCheckoutOpen) {
+		t.Fatalf("pending page=%+v", page)
+	}
+
+	continued := performPaymentRequest(router, http.MethodPost, "/user/payments/pending-orders/"+created.PublicToken+"/continue", "", nil)
+	if continued.Code != http.StatusOK || continued.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("continue=%d %s", continued.Code, continued.Body.String())
+	}
+	var continuedOrder PendingPaymentOrder
+	decodePaymentResponseData(t, continued.Body.Bytes(), &continuedOrder)
+	if continuedOrder.PublicToken != created.PublicToken || continuedOrder.CheckoutURL == "" || continuedOrder.Status != string(PaymentOrderCheckoutOpen) {
+		t.Fatalf("continued order=%+v", continuedOrder)
+	}
+
+	unknownActionPayload := performPaymentRequest(router, http.MethodPost, "/user/payments/pending-orders/"+created.PublicToken+"/abandon", `{"unknown":true}`, nil)
+	if unknownActionPayload.Code != http.StatusBadRequest {
+		t.Fatalf("unknown action payload=%d %s", unknownActionPayload.Code, unknownActionPayload.Body.String())
+	}
+
+	for _, path := range []string{
+		"/user/payments/orders/not-a-token",
+		"/user/payments/pending-orders/not-a-token/continue",
+		"/user/payments/pending-orders/not-a-token/abandon",
+	} {
+		method := http.MethodGet
+		if strings.HasSuffix(path, "/continue") || strings.HasSuffix(path, "/abandon") {
+			method = http.MethodPost
+		}
+		response := performPaymentRequest(router, method, path, "", nil)
+		if response.Code != http.StatusNotFound {
+			t.Fatalf("invalid token %s=%d %s", path, response.Code, response.Body.String())
+		}
+	}
+
+	for _, path := range []string{
+		"/user/payments/orders/" + created.PublicToken,
+		"/user/payments/pending-orders/" + created.PublicToken + "/continue",
+		"/user/payments/pending-orders/" + created.PublicToken + "/abandon",
+	} {
+		method := http.MethodGet
+		if strings.HasSuffix(path, "/continue") || strings.HasSuffix(path, "/abandon") {
+			method = http.MethodPost
+		}
+		response := performPaymentRequest(router, method, path, "", map[string]string{"X-Test-Other-User": "true"})
+		if response.Code != http.StatusNotFound {
+			t.Fatalf("cross-user %s=%d %s", path, response.Code, response.Body.String())
+		}
+	}
+
+	abandoned := performPaymentRequest(router, http.MethodPost, "/user/payments/pending-orders/"+created.PublicToken+"/abandon", "", nil)
+	if abandoned.Code != http.StatusOK {
+		t.Fatalf("abandon=%d %s", abandoned.Code, abandoned.Body.String())
+	}
+	var abandonedOrder PendingPaymentOrder
+	decodePaymentResponseData(t, abandoned.Body.Bytes(), &abandonedOrder)
+	if abandonedOrder.Status != string(PaymentOrderCancelled) || abandonedOrder.CheckoutURL != "" {
+		t.Fatalf("abandoned order=%+v", abandonedOrder)
+	}
+
+	pending = performPaymentRequest(router, http.MethodGet, "/user/payments/pending-orders", "", nil)
+	if pending.Code != http.StatusOK {
+		t.Fatalf("pending after abandon=%d %s", pending.Code, pending.Body.String())
+	}
+	decodePaymentResponseData(t, pending.Body.Bytes(), &page)
+	if len(page.Items) != 0 {
+		t.Fatalf("pending items after abandon=%+v", page.Items)
+	}
+}
+
 func waitForPaymentSubscriber(t *testing.T, hub *EventHub, userID int64) {
 	t.Helper()
 	deadline := time.Now().Add(time.Second)

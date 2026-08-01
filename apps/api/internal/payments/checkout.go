@@ -11,6 +11,7 @@ type CheckoutGateway interface {
 	CreateCustomer(ctx context.Context, input CreateCheckoutCustomerInput) (CheckoutCustomer, error)
 	CreateCheckoutSession(ctx context.Context, input CreateCheckoutSessionInput) (CheckoutSession, error)
 	RetrieveCheckoutSession(ctx context.Context, input RetrieveCheckoutSessionInput) (CheckoutSession, error)
+	ExpireCheckoutSession(ctx context.Context, input ExpireCheckoutSessionInput) (ExpireCheckoutSessionResult, error)
 }
 
 type CreateCheckoutCustomerInput struct {
@@ -43,11 +44,41 @@ type RetrieveCheckoutSessionInput struct {
 	SessionID string
 }
 
+type ExpireCheckoutSessionInput struct {
+	APIKey    string
+	SessionID string
+}
+
+// CheckoutSessionExpirationOutcome tells the domain which canonical Stripe
+// fact won an expiration race. The gateway reports facts only; the caller owns
+// all order and Credit state transitions.
+type CheckoutSessionExpirationOutcome string
+
+const (
+	CheckoutSessionExpirationOutcomeExpired             CheckoutSessionExpirationOutcome = "expired"
+	CheckoutSessionExpirationOutcomePaid                CheckoutSessionExpirationOutcome = "paid"
+	CheckoutSessionExpirationOutcomeAsyncPaymentPending CheckoutSessionExpirationOutcome = "async_payment_pending"
+	CheckoutSessionExpirationOutcomeOpen                CheckoutSessionExpirationOutcome = "open"
+)
+
+type ExpireCheckoutSessionResult struct {
+	Outcome CheckoutSessionExpirationOutcome
+	Session CheckoutSession
+}
+
 type CheckoutPaymentStatus string
 
 const (
 	CheckoutPaymentStatusPaid   CheckoutPaymentStatus = "paid"
 	CheckoutPaymentStatusUnpaid CheckoutPaymentStatus = "unpaid"
+)
+
+type CheckoutSessionStatus string
+
+const (
+	CheckoutSessionStatusOpen     CheckoutSessionStatus = "open"
+	CheckoutSessionStatusComplete CheckoutSessionStatus = "complete"
+	CheckoutSessionStatusExpired  CheckoutSessionStatus = "expired"
 )
 
 // CheckoutSession is a normalized Stripe fact. A browser return never becomes
@@ -64,6 +95,7 @@ type CheckoutSession struct {
 	PaymentIntentID     string
 	ChargeID            string
 	ReceiptURL          string
+	Status              CheckoutSessionStatus
 	PaymentStatus       CheckoutPaymentStatus
 	AmountSubtotalMinor int64
 	AmountTaxMinor      int64

@@ -16,6 +16,7 @@ import (
 )
 
 const stripeConfigurationLifecycleLockID int64 = 839036782198407216
+const userCheckoutLifecycleLockSeed int64 = 412456873631731953
 
 type Repository struct {
 	db *sql.DB
@@ -111,6 +112,34 @@ func (r *Repository) withStripeConfigurationLifecycleLock(ctx context.Context, e
 	}()
 	lockedContext := context.WithValue(ctx, stripeLifecycleConnectionContextKey{}, connection)
 	return run(lockedContext)
+}
+
+func (r *Repository) WithUserCheckoutLock(ctx context.Context, userID int64, run func(context.Context) error) (resultErr error) {
+	if r == nil || r.db == nil || userID <= 0 || run == nil {
+		return fmt.Errorf("payments repository: invalid user Checkout lock")
+	}
+	connection, ok := ctx.Value(stripeLifecycleConnectionContextKey{}).(*sql.Conn)
+	if !ok {
+		return fmt.Errorf("payments repository: user Checkout lock requires Stripe lifecycle session")
+	}
+	lockKey := fmt.Sprintf("payment-user-checkout:%d", userID)
+	if _, err := connection.ExecContext(ctx, `SELECT pg_advisory_lock(hashtextextended($1, $2))`, lockKey, userCheckoutLifecycleLockSeed); err != nil {
+		return fmt.Errorf("acquire user Checkout lifecycle lock: %w", err)
+	}
+	defer func() {
+		unlockContext, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var unlocked bool
+		unlockErr := connection.QueryRowContext(unlockContext, `SELECT pg_advisory_unlock(hashtextextended($1, $2))`, lockKey, userCheckoutLifecycleLockSeed).Scan(&unlocked)
+		if unlockErr != nil || !unlocked {
+			_ = connection.Raw(func(any) error { return driver.ErrBadConn })
+			if unlockErr == nil {
+				unlockErr = fmt.Errorf("user Checkout lifecycle lock was not held")
+			}
+			resultErr = errors.Join(resultErr, fmt.Errorf("release user Checkout lifecycle lock: %w", unlockErr))
+		}
+	}()
+	return run(ctx)
 }
 
 func (db paymentContextDB) queries() *dbsqlc.Queries {
@@ -339,6 +368,50 @@ func (r *Repository) GetPaymentOrderByPublicToken(ctx context.Context, userID in
 	return paymentOrder(row), nil
 }
 
+func (r *Repository) GetPaymentOrderByCheckoutSession(ctx context.Context, accountID, sessionID string) (PaymentOrder, error) {
+	if r == nil || r.db == nil || strings.TrimSpace(accountID) == "" || strings.TrimSpace(sessionID) == "" {
+		return PaymentOrder{}, sql.ErrNoRows
+	}
+	row, err := r.dbWithContext(ctx).queries().GetPaymentOrderByCheckoutSession(ctx, dbsqlc.GetPaymentOrderByCheckoutSessionParams{
+		StripeAccountID:         accountID,
+		StripeCheckoutSessionID: sql.NullString{String: sessionID, Valid: true},
+	})
+	if err != nil {
+		return PaymentOrder{}, err
+	}
+	return paymentOrder(row), nil
+}
+
+func (r *Repository) ListActivePaymentOrders(ctx context.Context, userID int64) ([]PaymentOrder, error) {
+	if r == nil || r.db == nil || userID <= 0 {
+		return nil, fmt.Errorf("payments repository: invalid active order query")
+	}
+	rows, err := r.dbWithContext(ctx).queries().ListActivePaymentOrders(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list active payment orders: %w", err)
+	}
+	orders := make([]PaymentOrder, 0, len(rows))
+	for _, row := range rows {
+		orders = append(orders, paymentOrder(row))
+	}
+	return orders, nil
+}
+
+func (r *Repository) ListUserPendingPaymentOrders(ctx context.Context, userID int64) ([]PaymentOrder, error) {
+	if r == nil || r.db == nil || userID <= 0 {
+		return nil, fmt.Errorf("payments repository: invalid pending order query")
+	}
+	rows, err := r.dbWithContext(ctx).queries().ListUserPendingPaymentOrders(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list user pending payment orders: %w", err)
+	}
+	orders := make([]PaymentOrder, 0, len(rows))
+	for _, row := range rows {
+		orders = append(orders, paymentOrder(row))
+	}
+	return orders, nil
+}
+
 func (r *Repository) MarkPaymentOrderAsyncPending(ctx context.Context, orderID string) (PaymentOrder, error) {
 	if r == nil || r.db == nil {
 		return PaymentOrder{}, fmt.Errorf("payments repository: database unavailable")
@@ -355,31 +428,6 @@ func (r *Repository) MarkPaymentOrderAsyncPending(ctx context.Context, orderID s
 		return PaymentOrder{}, fmt.Errorf("mark payment order async pending: %w", err)
 	}
 	return paymentOrder(row), nil
-}
-
-func (r *Repository) MarkPaymentOrderAsyncPendingBySession(ctx context.Context, accountID, sessionID string) (PaymentOrder, bool, error) {
-	if r == nil || r.db == nil {
-		return PaymentOrder{}, false, fmt.Errorf("payments repository: database unavailable")
-	}
-	queries := r.dbWithContext(ctx).queries()
-	row, err := queries.MarkPaymentOrderAsyncPendingBySession(ctx, dbsqlc.MarkPaymentOrderAsyncPendingBySessionParams{
-		StripeAccountID:         accountID,
-		StripeCheckoutSessionID: sql.NullString{String: sessionID, Valid: true},
-	})
-	if err == nil {
-		return paymentOrder(row), true, nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return PaymentOrder{}, false, fmt.Errorf("mark payment order async pending by Session: %w", err)
-	}
-	existing, err := queries.GetPaymentOrderByCheckoutSession(ctx, dbsqlc.GetPaymentOrderByCheckoutSessionParams{
-		StripeAccountID:         accountID,
-		StripeCheckoutSessionID: sql.NullString{String: sessionID, Valid: true},
-	})
-	if err != nil {
-		return PaymentOrder{}, false, fmt.Errorf("read payment order after async pending replay: %w", err)
-	}
-	return paymentOrder(existing), false, nil
 }
 
 func (r *Repository) MarkPaymentOrderFailed(ctx context.Context, orderID string) (PaymentOrder, error) {
@@ -400,27 +448,42 @@ func (r *Repository) MarkPaymentOrderFailed(ctx context.Context, orderID string)
 	return paymentOrder(row), nil
 }
 
-func (r *Repository) MarkPaymentOrderFailedBySession(ctx context.Context, accountID, sessionID string) (PaymentOrder, bool, error) {
-	if r == nil || r.db == nil {
-		return PaymentOrder{}, false, fmt.Errorf("payments repository: database unavailable")
+func (r *Repository) MarkPaymentOrderExpired(ctx context.Context, orderID string) (PaymentOrder, bool, error) {
+	id, err := parseOrderUUID(orderID)
+	if err != nil {
+		return PaymentOrder{}, false, ErrPaymentOrderNotFound
 	}
 	queries := r.dbWithContext(ctx).queries()
-	row, err := queries.MarkPaymentOrderFailedBySession(ctx, dbsqlc.MarkPaymentOrderFailedBySessionParams{
-		StripeAccountID:         accountID,
-		StripeCheckoutSessionID: sql.NullString{String: sessionID, Valid: true},
-	})
+	row, err := queries.MarkPaymentOrderExpired(ctx, id)
 	if err == nil {
 		return paymentOrder(row), true, nil
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
-		return PaymentOrder{}, false, fmt.Errorf("mark payment order failed by Session: %w", err)
+		return PaymentOrder{}, false, fmt.Errorf("mark payment order expired: %w", err)
 	}
-	existing, err := queries.GetPaymentOrderByCheckoutSession(ctx, dbsqlc.GetPaymentOrderByCheckoutSessionParams{
-		StripeAccountID:         accountID,
-		StripeCheckoutSessionID: sql.NullString{String: sessionID, Valid: true},
-	})
+	existing, err := queries.GetPaymentOrderByID(ctx, id)
 	if err != nil {
-		return PaymentOrder{}, false, fmt.Errorf("read payment order after failed replay: %w", err)
+		return PaymentOrder{}, false, fmt.Errorf("read payment order after expiry replay: %w", err)
+	}
+	return paymentOrder(existing), false, nil
+}
+
+func (r *Repository) MarkPaymentOrderCancelled(ctx context.Context, userID int64, orderID string) (PaymentOrder, bool, error) {
+	id, err := parseOrderUUID(orderID)
+	if err != nil {
+		return PaymentOrder{}, false, ErrPaymentOrderNotFound
+	}
+	queries := r.dbWithContext(ctx).queries()
+	row, err := queries.MarkPaymentOrderCancelled(ctx, dbsqlc.MarkPaymentOrderCancelledParams{ID: id, UserID: userID})
+	if err == nil {
+		return paymentOrder(row), true, nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return PaymentOrder{}, false, fmt.Errorf("mark payment order cancelled: %w", err)
+	}
+	existing, err := queries.GetPaymentOrderByID(ctx, id)
+	if err != nil || existing.UserID != userID {
+		return PaymentOrder{}, false, ErrPaymentOrderNotFound
 	}
 	return paymentOrder(existing), false, nil
 }
@@ -444,29 +507,81 @@ func (r *Repository) ConvergePaidPaymentOrder(ctx context.Context, facts PaidChe
 	if r == nil || r.db == nil {
 		return PaymentConvergenceResult{}, fmt.Errorf("payments repository: database unavailable")
 	}
-	var result PaymentConvergenceResult
-	err := r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries, tx *sql.Tx) error {
-		row, err := q.GetPaymentOrderByCheckoutSessionForUpdate(ctx, dbsqlc.GetPaymentOrderByCheckoutSessionForUpdateParams{
-			StripeAccountID:         facts.StripeAccountID,
-			StripeCheckoutSessionID: sql.NullString{String: facts.StripeSessionID, Valid: true},
-		})
+	order, replayed, err := r.RecordPaidPaymentOrder(ctx, facts)
+	if err != nil {
+		return PaymentConvergenceResult{}, err
+	}
+	if replayed && order.Status == PaymentOrderCredited {
+		return r.replayedPaymentConvergence(ctx, order)
+	}
+	return r.CreditPaidPaymentOrder(ctx, order.ID, creditedAt)
+}
+
+func (r *Repository) RecordPaidPaymentOrder(ctx context.Context, facts PaidCheckoutFacts) (PaymentOrder, bool, error) {
+	id, err := parseOrderUUID(facts.PaymentOrderID)
+	if err != nil {
+		return PaymentOrder{}, false, ErrCheckoutIdempotencyConflict
+	}
+	var result PaymentOrder
+	var replayed bool
+	err = r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries, _ *sql.Tx) error {
+		row, err := q.GetPaymentOrderByIDForUpdate(ctx, id)
 		if err != nil {
-			return fmt.Errorf("lock payment order for convergence: %w", err)
+			return fmt.Errorf("lock payment order to record paid fact: %w", err)
 		}
 		order := paymentOrder(row)
 		if err := validatePaidCheckoutFacts(order, facts); err != nil {
 			return err
 		}
-		if order.Status == PaymentOrderCredited {
-			result = PaymentConvergenceResult{Order: order, Replayed: true}
-			if order.PaidTotalMinor != nil {
-				var available int64
-				if err := tx.QueryRowContext(ctx, `SELECT available_balance_after FROM credit_transactions WHERE transaction_id = $1`, order.CreditTransactionID).Scan(&available); err != nil {
-					return fmt.Errorf("read replayed purchase balance: %w", err)
-				}
-				result.AvailableIdeas = available
+		if order.Status == PaymentOrderPaidPendingCredit || order.Status == PaymentOrderCredited {
+			if err := validateRecordedPaidCheckoutFacts(order, facts); err != nil {
+				return err
 			}
+			result, replayed = order, true
 			return nil
+		}
+		updated, err := q.RecordPaymentOrderPaid(ctx, dbsqlc.RecordPaymentOrderPaidParams{
+			ID: row.ID, StripeCustomerID: facts.StripeCustomerID,
+			StripeCheckoutSessionID: sql.NullString{String: facts.StripeSessionID, Valid: true},
+			ExpiresAt:               facts.ExpiresAt,
+			StripePaymentIntentID:   facts.StripePaymentIntentID, StripeChargeID: facts.StripeChargeID,
+			PaidSubtotalMinor: sql.NullInt64{Int64: facts.PaidSubtotalMinor, Valid: true},
+			PaidTaxMinor:      sql.NullInt64{Int64: facts.PaidTaxMinor, Valid: true},
+			PaidTotalMinor:    sql.NullInt64{Int64: facts.PaidTotalMinor, Valid: true},
+			PaidCurrency:      strings.ToLower(strings.TrimSpace(facts.PaidCurrency)), ReceiptUrl: facts.ReceiptURL,
+			PaidAt: sql.NullTime{Time: facts.PaidAt, Valid: true},
+		})
+		if err != nil {
+			return fmt.Errorf("record paid payment order: %w", err)
+		}
+		result = paymentOrder(updated)
+		return nil
+	})
+	return result, replayed, err
+}
+
+func (r *Repository) CreditPaidPaymentOrder(ctx context.Context, orderID string, creditedAt time.Time) (PaymentConvergenceResult, error) {
+	id, err := parseOrderUUID(orderID)
+	if err != nil {
+		return PaymentConvergenceResult{}, ErrCheckoutIdempotencyConflict
+	}
+	var result PaymentConvergenceResult
+	err = r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries, tx *sql.Tx) error {
+		row, err := q.GetPaymentOrderByIDForUpdate(ctx, id)
+		if err != nil {
+			return fmt.Errorf("lock paid payment order for credit: %w", err)
+		}
+		order := paymentOrder(row)
+		if order.Status == PaymentOrderCredited {
+			var available int64
+			if err := tx.QueryRowContext(ctx, `SELECT available_balance_after FROM credit_transactions WHERE transaction_id = $1`, order.CreditTransactionID).Scan(&available); err != nil {
+				return fmt.Errorf("read replayed purchase balance: %w", err)
+			}
+			result = PaymentConvergenceResult{Order: order, AvailableIdeas: available, Replayed: true}
+			return nil
+		}
+		if order.Status != PaymentOrderPaidPendingCredit {
+			return fmt.Errorf("payment order is not ready for credit from status %q", order.Status)
 		}
 		amount, err := credits.NewCreditAmount(order.IdeaQuantity)
 		if err != nil {
@@ -489,13 +604,8 @@ func (r *Repository) ConvergePaidPaymentOrder(ctx context.Context, facts PaidChe
 			return fmt.Errorf("credit paid payment order: %w", err)
 		}
 		updated, err := q.MarkPaymentOrderCredited(ctx, dbsqlc.MarkPaymentOrderCreditedParams{
-			ID: row.ID, StripePaymentIntentID: facts.StripePaymentIntentID, StripeChargeID: facts.StripeChargeID,
-			PaidSubtotalMinor: sql.NullInt64{Int64: facts.PaidSubtotalMinor, Valid: true},
-			PaidTaxMinor:      sql.NullInt64{Int64: facts.PaidTaxMinor, Valid: true},
-			PaidTotalMinor:    sql.NullInt64{Int64: facts.PaidTotalMinor, Valid: true},
-			PaidCurrency:      strings.ToLower(facts.PaidCurrency), ReceiptUrl: facts.ReceiptURL,
-			CreditTransactionID: sql.NullString{String: creditResult.TransactionID, Valid: true},
-			PaidAt:              sql.NullTime{Time: facts.PaidAt, Valid: true}, CreditedAt: sql.NullTime{Time: creditedAt, Valid: true},
+			ID: row.ID, CreditTransactionID: sql.NullString{String: creditResult.TransactionID, Valid: true},
+			CreditedAt: sql.NullTime{Time: creditedAt, Valid: true},
 		})
 		if err != nil {
 			return fmt.Errorf("mark payment order credited: %w", err)
@@ -508,21 +618,44 @@ func (r *Repository) ConvergePaidPaymentOrder(ctx context.Context, facts PaidChe
 	return result, err
 }
 
+func (r *Repository) replayedPaymentConvergence(ctx context.Context, order PaymentOrder) (PaymentConvergenceResult, error) {
+	var available int64
+	if err := r.dbWithContext(ctx).executor.QueryRowContext(ctx, `SELECT available_balance_after FROM credit_transactions WHERE transaction_id = $1`, order.CreditTransactionID).Scan(&available); err != nil {
+		return PaymentConvergenceResult{}, fmt.Errorf("read replayed purchase balance: %w", err)
+	}
+	return PaymentConvergenceResult{Order: order, AvailableIdeas: available, Replayed: true}, nil
+}
+
 func validatePaidCheckoutFacts(order PaymentOrder, facts PaidCheckoutFacts) error {
 	currency := strings.ToLower(strings.TrimSpace(facts.PaidCurrency))
-	if order.Status != PaymentOrderCheckoutOpen && order.Status != PaymentOrderAsyncPaymentPending && order.Status != PaymentOrderCredited {
-		return fmt.Errorf("payment order is not convergent from status %q", order.Status)
-	}
-	if facts.StripeAccountID != order.StripeAccountID || facts.StripeSessionID != order.StripeCheckoutSessionID ||
+	if facts.StripeAccountID != order.StripeAccountID ||
 		facts.PublicOrderNumber != order.PublicOrderNumber || facts.PaymentOrderID != order.ID ||
-		facts.RequestHash != order.RequestHash || facts.StripeCustomerID != order.StripeCustomerID ||
+		facts.RequestHash != order.RequestHash ||
 		facts.IdeaQuantity != order.IdeaQuantity {
+		return ErrCheckoutIdempotencyConflict
+	}
+	if order.StripeCheckoutSessionID != "" && facts.StripeSessionID != order.StripeCheckoutSessionID ||
+		order.StripeCustomerID != "" && facts.StripeCustomerID != order.StripeCustomerID ||
+		order.StripeCheckoutSessionID != "" && !facts.ExpiresAt.Equal(order.ExpiresAt) {
 		return ErrCheckoutIdempotencyConflict
 	}
 	if strings.TrimSpace(facts.StripePaymentIntentID) == "" || facts.PaidSubtotalMinor < 0 || facts.PaidTaxMinor < 0 ||
 		facts.PaidTotalMinor <= 0 || facts.PaidSubtotalMinor+facts.PaidTaxMinor != facts.PaidTotalMinor ||
-		len(currency) != 3 || facts.PaidAt.IsZero() {
+		len(currency) != 3 || facts.PaidAt.IsZero() || facts.ExpiresAt.IsZero() || strings.TrimSpace(facts.StripeCustomerID) == "" ||
+		strings.TrimSpace(facts.StripeSessionID) == "" {
 		return fmt.Errorf("invalid paid Checkout facts")
+	}
+	return nil
+}
+
+func validateRecordedPaidCheckoutFacts(order PaymentOrder, facts PaidCheckoutFacts) error {
+	if order.StripePaymentIntentID != facts.StripePaymentIntentID || order.StripeChargeID != facts.StripeChargeID ||
+		order.PaidSubtotalMinor == nil || *order.PaidSubtotalMinor != facts.PaidSubtotalMinor ||
+		order.PaidTaxMinor == nil || *order.PaidTaxMinor != facts.PaidTaxMinor ||
+		order.PaidTotalMinor == nil || *order.PaidTotalMinor != facts.PaidTotalMinor ||
+		order.PaidCurrency != strings.ToLower(strings.TrimSpace(facts.PaidCurrency)) || order.ReceiptURL != facts.ReceiptURL ||
+		!order.ExpiresAt.Equal(facts.ExpiresAt) {
+		return ErrCheckoutIdempotencyConflict
 	}
 	return nil
 }
