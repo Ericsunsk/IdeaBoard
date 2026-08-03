@@ -56,6 +56,7 @@ import Tooltip from 'primevue/tooltip'
 import {
   ADMIN_CREDIT_HEALTH_PATH,
   ADMIN_CREDIT_PRICING_PATH,
+  ADMIN_PAYMENT_ORDERS_PATH,
   ADMIN_REWARD_CODES_PATH,
   isPathUnderRoute,
 } from '../../../shared/constants/routePaths'
@@ -69,11 +70,13 @@ type NavigationPath =
   | typeof ADMIN_CREDIT_PRICING_PATH
   | typeof ADMIN_CREDIT_HEALTH_PATH
   | typeof ADMIN_REWARD_CODES_PATH
+  | typeof ADMIN_PAYMENT_ORDERS_PATH
 
 const navigationItems: Array<{ key: string; path: NavigationPath; label: string }> = [
   { key: 'pricing', path: ADMIN_CREDIT_PRICING_PATH, label: '功能定价' },
   { key: 'health', path: ADMIN_CREDIT_HEALTH_PATH, label: '账本健康' },
   { key: 'rewards', path: ADMIN_REWARD_CODES_PATH, label: '兑换码' },
+  { key: 'payments', path: ADMIN_PAYMENT_ORDERS_PATH, label: '支付订单' },
 ]
 
 const route = useRoute()

@@ -24,7 +24,7 @@ Payments 拥有 Stripe 配置、签名 Webhook 接入与支付生命周期。它
 - `Service.ReceiveStripeWebhook` 对 raw body 验签、去重并写入最小 Webhook Inbox。后续 payment order、refund 与 dispute lifecycle 继续收口在 Payments context。
 - `Service.GetPurchaseOptions`、`CreateCheckout`、`ListPendingOrders`、`ContinuePendingOrder`、`AbandonPendingOrder`、`GetPaymentOrderReturnStatus` 与 `ListRecharges` 是用户充值 boundary。HTTP handler 只能使用 authenticated principal 的 user ID，并为订单、历史和 SSE 设定 user scope。
 - `Service.EventHub` 只发布本实例已提交的用户充值状态提示；前端据此重新读取 Wallet、订单或充值历史，SSE 不是支付事实源。
-- `Service.ReconcileDuePaymentOrders` 是 River recovery seam；`ListPaymentReconciliationAnomalies` 是 Admin read seam，HTTP/Admin presentation 不拥有对账 transition。
+- `Service.ReconcileDuePaymentOrders` 是 River recovery seam；`ListPaymentReconciliationAnomalies`、`ListAdminPaymentOrders` 与 `GetAdminPaymentOrder` 是 Admin read seams，HTTP/Admin presentation 不拥有对账 transition。Admin order list 使用 bounded keyset cursor 与 repeatable-read filtered total；detail 只返回脱敏 Stripe identity 和最小退款/Dispute webhook facts。
 - 任何支付结果引起的 Idea 余额变化都必须调用 Credits 的 typed Commands；Payments 不直接写 Ledger 或 balance projection。
 
 ## Invariants
@@ -44,4 +44,5 @@ Payments 拥有 Stripe 配置、签名 Webhook 接入与支付生命周期。它
 - `creating` Order 持久化经过校验的 immutable return base URL，以及首次 Stripe 请求使用的整秒 expiry。重启或创建 timeout 后必须用原 public order number 和完全相同的参数重放 Stripe Idempotency Key，而不是依据本地 timeout 直接宣告失败。
 - `paid_pending_credit` 只重试 Credits 原子到账，不重复查询或重写 Stripe paid fact。Stripe transient failure 交给 River retry；确定性配置、权限、响应或身份绑定错误记录脱敏 operational failure 并延迟重试，避免 hot loop。
 - 超过 24 小时仍未收敛的 Order 只增加 durable anomaly 标记，不改变支付业务状态；后续 canonical terminal Stripe fact 会清除该异常。
+- Admin order read model 严格校验 canonical public order number、bounded user/status filters 和 opaque cursor；不得返回 public token、idempotency/request hash、return base URL、Secret 或原始 provider payload。
 - Payments 不改变任务基础设施 ownership：River + PostgreSQL 仍是 Task queue/state fact source，NATS JetStream 仍只承担 event layer。

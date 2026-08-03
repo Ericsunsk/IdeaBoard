@@ -6,6 +6,7 @@ import { primeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen } from '../../../test/render'
 import {
   ADMIN_CREDIT_PRICING_PATH,
+  ADMIN_PAYMENT_ORDERS_PATH,
   ADMIN_REWARD_CODES_PATH,
 } from '../../../shared/constants/routePaths'
 import AdminCreditsBillingLayout from './AdminCreditsBillingLayout.vue'
@@ -90,6 +91,36 @@ describe('AdminCreditsBillingLayout', () => {
     await user.click(screen.getByText('兑换码'))
 
     expect(routerMocks.push).toHaveBeenCalledWith(ADMIN_REWARD_CODES_PATH)
+  })
+
+  it('exposes the payment order navigation entry and routes through the Credits layout', async () => {
+    useMswHandlers(
+      http.get('/api/admin/credits/health', () =>
+        HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            status: 'healthy',
+            open_findings: { total: 0, warning: 0, error: 0, critical: 0, high_risk: 0 },
+            restricted_wallet_count: 0,
+          },
+        }),
+      ),
+    )
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const { user } = renderWithUser(AdminCreditsBillingLayout, {
+      global: {
+        plugins: [
+          [PrimeVue, primeVueTestOptions],
+          [VueQueryPlugin, { queryClient }],
+        ],
+        stubs: { RouterView: true },
+      },
+    })
+
+    await user.click(screen.getByText('支付订单'))
+
+    expect(routerMocks.push).toHaveBeenCalledWith(ADMIN_PAYMENT_ORDERS_PATH)
   })
 
   it('opens Stripe settings from the gear left of the billing navigation', async () => {

@@ -75,17 +75,53 @@ func (a *Adapter) Verify(_ context.Context, raw []byte, signature, secret string
 		}
 	}
 	var object struct {
-		ID string `json:"id"`
+		ID            string          `json:"id"`
+		PaymentIntent json.RawMessage `json:"payment_intent"`
+		Charge        json.RawMessage `json:"charge"`
 	}
 	if len(event.Data.Raw) > 0 {
 		if err := json.Unmarshal(event.Data.Raw, &object); err != nil {
 			return payments.StripeWebhookEvent{}, payments.ErrMalformedWebhookPayload
 		}
 	}
+	paymentIntentID, err := stripeObjectReferenceID(object.PaymentIntent)
+	if err != nil {
+		return payments.StripeWebhookEvent{}, payments.ErrMalformedWebhookPayload
+	}
+	chargeID, err := stripeObjectReferenceID(object.Charge)
+	if err != nil {
+		return payments.StripeWebhookEvent{}, payments.ErrMalformedWebhookPayload
+	}
 	return payments.StripeWebhookEvent{
 		ID: event.ID, Type: string(event.Type), ObjectID: object.ID,
+		PaymentIntentID: paymentIntentID, ChargeID: chargeID,
 		Livemode: event.Livemode, CreatedAt: time.Unix(event.Created, 0).UTC(),
 	}, nil
+}
+
+func stripeObjectReferenceID(raw json.RawMessage) (string, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return "", nil
+	}
+	var id string
+	if err := json.Unmarshal(raw, &id); err == nil {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return "", errors.New("empty Stripe object reference")
+		}
+		return id, nil
+	}
+	var object struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(raw, &object); err != nil {
+		return "", fmt.Errorf("decode Stripe object reference: %w", err)
+	}
+	object.ID = strings.TrimSpace(object.ID)
+	if object.ID == "" {
+		return "", errors.New("missing Stripe object reference ID")
+	}
+	return object.ID, nil
 }
 
 func ensureProduct(ctx context.Context, client *stripe.Client, input payments.PrepareStripeConfiguration, accountID string) (*stripe.Product, error) {

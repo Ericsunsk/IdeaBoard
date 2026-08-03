@@ -237,6 +237,152 @@ func (q *Queries) CompletePaymentOrderReconciliationClaim(ctx context.Context, a
 	return result.RowsAffected()
 }
 
+const countAdminPaymentOrders = `-- name: CountAdminPaymentOrders :one
+SELECT COUNT(*)
+FROM payment_orders AS orders
+JOIN users ON users.id = orders.user_id
+LEFT JOIN payment_order_reconciliations AS reconciliation
+  ON reconciliation.payment_order_id = orders.id
+WHERE ($1::TEXT = '' OR orders.public_order_number = $1::TEXT)
+  AND ($2::BIGINT <= 0 OR orders.user_id = $2::BIGINT)
+  AND ($3::TEXT = '' OR STRPOS(LOWER(users.username), LOWER($3::TEXT)) > 0)
+  AND ($4::TEXT = '' OR orders.status = $4::TEXT)
+  AND (NOT $5::BOOLEAN OR reconciliation.anomalous_at IS NOT NULL)
+`
+
+type CountAdminPaymentOrdersParams struct {
+	OrderNumber string `json:"order_number"`
+	UserID      int64  `json:"user_id"`
+	Username    string `json:"username"`
+	Status      string `json:"status"`
+	AnomalyOnly bool   `json:"anomaly_only"`
+}
+
+func (q *Queries) CountAdminPaymentOrders(ctx context.Context, arg CountAdminPaymentOrdersParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countAdminPaymentOrders,
+		arg.OrderNumber,
+		arg.UserID,
+		arg.Username,
+		arg.Status,
+		arg.AnomalyOnly,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const getAdminPaymentOrder = `-- name: GetAdminPaymentOrder :one
+SELECT orders.id,
+       orders.public_order_number,
+       orders.user_id,
+       users.username,
+       orders.status,
+       orders.idea_quantity,
+       orders.base_currency,
+       orders.base_amount_minor,
+       orders.paid_subtotal_minor,
+       orders.paid_tax_minor,
+       orders.paid_total_minor,
+       orders.paid_currency,
+       orders.stripe_account_id,
+       orders.stripe_customer_id,
+       orders.stripe_product_id,
+       orders.stripe_checkout_session_id,
+       orders.stripe_payment_intent_id,
+       orders.stripe_charge_id,
+       orders.terms_version,
+       orders.refund_policy_version,
+       orders.receipt_url,
+       orders.expires_at,
+       orders.paid_at,
+       orders.credited_at,
+       orders.created_at,
+       orders.updated_at,
+       reconciliation.last_error_code,
+       reconciliation.last_error_summary,
+       reconciliation.last_checked_at,
+       reconciliation.next_attempt_at,
+       reconciliation.anomalous_at
+FROM payment_orders AS orders
+JOIN users ON users.id = orders.user_id
+LEFT JOIN payment_order_reconciliations AS reconciliation
+  ON reconciliation.payment_order_id = orders.id
+WHERE orders.public_order_number = $1::TEXT
+`
+
+type GetAdminPaymentOrderRow struct {
+	ID                      uuid.UUID      `json:"id"`
+	PublicOrderNumber       string         `json:"public_order_number"`
+	UserID                  int64          `json:"user_id"`
+	Username                string         `json:"username"`
+	Status                  string         `json:"status"`
+	IdeaQuantity            int64          `json:"idea_quantity"`
+	BaseCurrency            string         `json:"base_currency"`
+	BaseAmountMinor         int64          `json:"base_amount_minor"`
+	PaidSubtotalMinor       sql.NullInt64  `json:"paid_subtotal_minor"`
+	PaidTaxMinor            sql.NullInt64  `json:"paid_tax_minor"`
+	PaidTotalMinor          sql.NullInt64  `json:"paid_total_minor"`
+	PaidCurrency            string         `json:"paid_currency"`
+	StripeAccountID         string         `json:"stripe_account_id"`
+	StripeCustomerID        string         `json:"stripe_customer_id"`
+	StripeProductID         string         `json:"stripe_product_id"`
+	StripeCheckoutSessionID sql.NullString `json:"stripe_checkout_session_id"`
+	StripePaymentIntentID   string         `json:"stripe_payment_intent_id"`
+	StripeChargeID          string         `json:"stripe_charge_id"`
+	TermsVersion            string         `json:"terms_version"`
+	RefundPolicyVersion     string         `json:"refund_policy_version"`
+	ReceiptUrl              string         `json:"receipt_url"`
+	ExpiresAt               time.Time      `json:"expires_at"`
+	PaidAt                  sql.NullTime   `json:"paid_at"`
+	CreditedAt              sql.NullTime   `json:"credited_at"`
+	CreatedAt               time.Time      `json:"created_at"`
+	UpdatedAt               time.Time      `json:"updated_at"`
+	LastErrorCode           sql.NullString `json:"last_error_code"`
+	LastErrorSummary        sql.NullString `json:"last_error_summary"`
+	LastCheckedAt           sql.NullTime   `json:"last_checked_at"`
+	NextAttemptAt           sql.NullTime   `json:"next_attempt_at"`
+	AnomalousAt             sql.NullTime   `json:"anomalous_at"`
+}
+
+func (q *Queries) GetAdminPaymentOrder(ctx context.Context, orderNumber string) (GetAdminPaymentOrderRow, error) {
+	row := q.db.QueryRowContext(ctx, getAdminPaymentOrder, orderNumber)
+	var i GetAdminPaymentOrderRow
+	err := row.Scan(
+		&i.ID,
+		&i.PublicOrderNumber,
+		&i.UserID,
+		&i.Username,
+		&i.Status,
+		&i.IdeaQuantity,
+		&i.BaseCurrency,
+		&i.BaseAmountMinor,
+		&i.PaidSubtotalMinor,
+		&i.PaidTaxMinor,
+		&i.PaidTotalMinor,
+		&i.PaidCurrency,
+		&i.StripeAccountID,
+		&i.StripeCustomerID,
+		&i.StripeProductID,
+		&i.StripeCheckoutSessionID,
+		&i.StripePaymentIntentID,
+		&i.StripeChargeID,
+		&i.TermsVersion,
+		&i.RefundPolicyVersion,
+		&i.ReceiptUrl,
+		&i.ExpiresAt,
+		&i.PaidAt,
+		&i.CreditedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.LastErrorCode,
+		&i.LastErrorSummary,
+		&i.LastCheckedAt,
+		&i.NextAttemptAt,
+		&i.AnomalousAt,
+	)
+	return i, err
+}
+
 const getPaymentCustomer = `-- name: GetPaymentCustomer :one
 SELECT user_id, stripe_account_id, stripe_customer_id, created_at, updated_at
 FROM payment_customers
@@ -724,12 +870,27 @@ INSERT INTO payment_webhook_events (
   stripe_event_id,
   event_type,
   stripe_object_id,
+  payment_order_id,
   livemode,
   stripe_created_at,
   processing_result,
   processed_at
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+VALUES (
+  $1,
+  $2,
+  $3,
+  (
+    SELECT orders.id
+    FROM payment_orders AS orders
+    WHERE ($4::TEXT <> '' AND orders.stripe_payment_intent_id = $4::TEXT)
+       OR ($5::TEXT <> '' AND orders.stripe_charge_id = $5::TEXT)
+  ),
+  $6,
+  $7,
+  $8,
+  $9
+)
 ON CONFLICT (stripe_event_id) DO NOTHING
 `
 
@@ -737,6 +898,8 @@ type InsertPaymentWebhookEventParams struct {
 	StripeEventID    string       `json:"stripe_event_id"`
 	EventType        string       `json:"event_type"`
 	StripeObjectID   string       `json:"stripe_object_id"`
+	PaymentIntentID  string       `json:"payment_intent_id"`
+	ChargeID         string       `json:"charge_id"`
 	Livemode         bool         `json:"livemode"`
 	StripeCreatedAt  time.Time    `json:"stripe_created_at"`
 	ProcessingResult string       `json:"processing_result"`
@@ -748,6 +911,8 @@ func (q *Queries) InsertPaymentWebhookEvent(ctx context.Context, arg InsertPayme
 		arg.StripeEventID,
 		arg.EventType,
 		arg.StripeObjectID,
+		arg.PaymentIntentID,
+		arg.ChargeID,
 		arg.Livemode,
 		arg.StripeCreatedAt,
 		arg.ProcessingResult,
@@ -808,6 +973,182 @@ func (q *Queries) ListActivePaymentOrders(ctx context.Context, userID int64) ([]
 			&i.CreditedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAdminPaymentOrderWebhookEvents = `-- name: ListAdminPaymentOrderWebhookEvents :many
+SELECT event_type,
+       stripe_object_id,
+       processing_result,
+       error_summary,
+       stripe_created_at,
+       received_at,
+       processed_at
+FROM payment_webhook_events
+WHERE payment_order_id = $1::UUID
+  AND event_type IN ('refund.updated', 'refund.failed', 'charge.dispute.created', 'charge.dispute.closed')
+ORDER BY stripe_created_at DESC, stripe_event_id DESC
+LIMIT $2::INTEGER
+`
+
+type ListAdminPaymentOrderWebhookEventsParams struct {
+	PaymentOrderID uuid.UUID `json:"payment_order_id"`
+	RowLimit       int32     `json:"row_limit"`
+}
+
+type ListAdminPaymentOrderWebhookEventsRow struct {
+	EventType        string       `json:"event_type"`
+	StripeObjectID   string       `json:"stripe_object_id"`
+	ProcessingResult string       `json:"processing_result"`
+	ErrorSummary     string       `json:"error_summary"`
+	StripeCreatedAt  time.Time    `json:"stripe_created_at"`
+	ReceivedAt       time.Time    `json:"received_at"`
+	ProcessedAt      sql.NullTime `json:"processed_at"`
+}
+
+func (q *Queries) ListAdminPaymentOrderWebhookEvents(ctx context.Context, arg ListAdminPaymentOrderWebhookEventsParams) ([]ListAdminPaymentOrderWebhookEventsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAdminPaymentOrderWebhookEvents, arg.PaymentOrderID, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAdminPaymentOrderWebhookEventsRow
+	for rows.Next() {
+		var i ListAdminPaymentOrderWebhookEventsRow
+		if err := rows.Scan(
+			&i.EventType,
+			&i.StripeObjectID,
+			&i.ProcessingResult,
+			&i.ErrorSummary,
+			&i.StripeCreatedAt,
+			&i.ReceivedAt,
+			&i.ProcessedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAdminPaymentOrders = `-- name: ListAdminPaymentOrders :many
+SELECT orders.id,
+       orders.public_order_number,
+       orders.user_id,
+       users.username,
+       orders.status,
+       orders.idea_quantity,
+       orders.base_currency,
+       orders.base_amount_minor,
+       orders.paid_total_minor,
+       orders.paid_currency,
+       orders.paid_at,
+       orders.credited_at,
+       orders.created_at,
+       orders.updated_at,
+       reconciliation.anomalous_at,
+       reconciliation.last_checked_at
+FROM payment_orders AS orders
+JOIN users ON users.id = orders.user_id
+LEFT JOIN payment_order_reconciliations AS reconciliation
+  ON reconciliation.payment_order_id = orders.id
+WHERE ($1::TEXT = '' OR orders.public_order_number = $1::TEXT)
+  AND ($2::BIGINT <= 0 OR orders.user_id = $2::BIGINT)
+  AND ($3::TEXT = '' OR STRPOS(LOWER(users.username), LOWER($3::TEXT)) > 0)
+  AND ($4::TEXT = '' OR orders.status = $4::TEXT)
+  AND (NOT $5::BOOLEAN OR reconciliation.anomalous_at IS NOT NULL)
+  AND (
+    NOT $6::BOOLEAN
+    OR (orders.created_at, orders.id) < ($7::TIMESTAMPTZ, $8::UUID)
+  )
+ORDER BY orders.created_at DESC, orders.id DESC
+LIMIT $9::INTEGER
+`
+
+type ListAdminPaymentOrdersParams struct {
+	OrderNumber     string        `json:"order_number"`
+	UserID          int64         `json:"user_id"`
+	Username        string        `json:"username"`
+	Status          string        `json:"status"`
+	AnomalyOnly     bool          `json:"anomaly_only"`
+	CursorSet       bool          `json:"cursor_set"`
+	CursorCreatedAt sql.NullTime  `json:"cursor_created_at"`
+	CursorID        uuid.NullUUID `json:"cursor_id"`
+	PageLimit       int32         `json:"page_limit"`
+}
+
+type ListAdminPaymentOrdersRow struct {
+	ID                uuid.UUID     `json:"id"`
+	PublicOrderNumber string        `json:"public_order_number"`
+	UserID            int64         `json:"user_id"`
+	Username          string        `json:"username"`
+	Status            string        `json:"status"`
+	IdeaQuantity      int64         `json:"idea_quantity"`
+	BaseCurrency      string        `json:"base_currency"`
+	BaseAmountMinor   int64         `json:"base_amount_minor"`
+	PaidTotalMinor    sql.NullInt64 `json:"paid_total_minor"`
+	PaidCurrency      string        `json:"paid_currency"`
+	PaidAt            sql.NullTime  `json:"paid_at"`
+	CreditedAt        sql.NullTime  `json:"credited_at"`
+	CreatedAt         time.Time     `json:"created_at"`
+	UpdatedAt         time.Time     `json:"updated_at"`
+	AnomalousAt       sql.NullTime  `json:"anomalous_at"`
+	LastCheckedAt     sql.NullTime  `json:"last_checked_at"`
+}
+
+func (q *Queries) ListAdminPaymentOrders(ctx context.Context, arg ListAdminPaymentOrdersParams) ([]ListAdminPaymentOrdersRow, error) {
+	rows, err := q.db.QueryContext(ctx, listAdminPaymentOrders,
+		arg.OrderNumber,
+		arg.UserID,
+		arg.Username,
+		arg.Status,
+		arg.AnomalyOnly,
+		arg.CursorSet,
+		arg.CursorCreatedAt,
+		arg.CursorID,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAdminPaymentOrdersRow
+	for rows.Next() {
+		var i ListAdminPaymentOrdersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicOrderNumber,
+			&i.UserID,
+			&i.Username,
+			&i.Status,
+			&i.IdeaQuantity,
+			&i.BaseCurrency,
+			&i.BaseAmountMinor,
+			&i.PaidTotalMinor,
+			&i.PaidCurrency,
+			&i.PaidAt,
+			&i.CreditedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.AnomalousAt,
+			&i.LastCheckedAt,
 		); err != nil {
 			return nil, err
 		}

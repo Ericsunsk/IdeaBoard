@@ -217,6 +217,7 @@ func (r *Repository) InsertStripeWebhookEvent(ctx context.Context, event StripeW
 	}
 	rows, err := r.dbWithContext(ctx).queries().InsertPaymentWebhookEvent(ctx, dbsqlc.InsertPaymentWebhookEventParams{
 		StripeEventID: event.ID, EventType: event.Type, StripeObjectID: event.ObjectID,
+		PaymentIntentID: event.PaymentIntentID, ChargeID: event.ChargeID,
 		Livemode: event.Livemode, StripeCreatedAt: event.CreatedAt, ProcessingResult: result,
 		ProcessedAt: dbutil.NullTime(processedAt),
 	})

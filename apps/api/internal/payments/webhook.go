@@ -41,11 +41,13 @@ func SupportedStripeWebhookEventTypes() []string {
 }
 
 type StripeWebhookEvent struct {
-	ID        string
-	Type      string
-	ObjectID  string
-	Livemode  bool
-	CreatedAt time.Time
+	ID              string
+	Type            string
+	ObjectID        string
+	PaymentIntentID string
+	ChargeID        string
+	Livemode        bool
+	CreatedAt       time.Time
 }
 
 type StripeWebhookReceipt struct {

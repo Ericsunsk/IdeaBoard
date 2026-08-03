@@ -1032,6 +1032,100 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseBase' }
 
+  /admin/payments/orders:
+    get:
+      tags: [AdminPayments]
+      operationId: listAdminPaymentOrders
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: order_number
+          in: query
+          description: Exact canonical public order number.
+          schema: { type: string, pattern: '^IBP-[0-9]{8}-[A-Z0-9]{12}$' }
+        - name: user
+          in: query
+          description: Exact positive user ID or bounded username search.
+          schema: { type: string, maxLength: 50, pattern: '^[A-Za-z0-9._-]+$' }
+        - name: status
+          in: query
+          schema: { type: string, enum: [creating, checkout_open, async_payment_pending, paid_pending_credit, credited, cancelled, expired, payment_failed] }
+        - name: anomaly_only
+          in: query
+          description: When true, only orders unresolved for more than 24 hours.
+          schema: { type: boolean, default: false }
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 512 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Filtered Admin Payment Order page with opaque keyset pagination
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseAdminPaymentOrderPage' }
+        '400':
+          description: Invalid or unbounded filter, cursor, or repeated query parameter
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '403':
+          description: Admin role required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+
+  /admin/payments/orders/{order_number}:
+    get:
+      tags: [AdminPayments]
+      operationId: getAdminPaymentOrder
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: order_number
+          in: path
+          required: true
+          schema: { type: string, pattern: '^IBP-[0-9]{8}-[A-Z0-9]{12}$' }
+      responses:
+        '200':
+          description: Safe Admin Payment Order technical and reconciliation detail
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseAdminPaymentOrderDetail' }
+        '400':
+          description: Invalid canonical public order number
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '403':
+          description: Admin role required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '404':
+          description: Payment Order does not exist
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+
   /webhooks/stripe:
     post:
       tags: [PaymentWebhooks]
@@ -3958,6 +4052,121 @@ components:
           items: { $ref: '#/components/schemas/RechargeHistoryItem' }
         next_cursor: { type: string }
 
+    AdminPaymentOrderUser:
+      type: object
+      additionalProperties: false
+      required: [id, username]
+      properties:
+        id: { type: integer, format: int64, minimum: 1 }
+        username: { type: string, maxLength: 50 }
+
+    AdminPaymentOrderSummary:
+      type: object
+      additionalProperties: false
+      required: [public_order_number, user, idea_quantity, base_amount_minor, base_currency, status, stripe_status, credit_status, created_at]
+      properties:
+        public_order_number: { type: string, pattern: '^IBP-[0-9]{8}-[A-Z0-9]{12}$' }
+        user: { $ref: '#/components/schemas/AdminPaymentOrderUser' }
+        idea_quantity: { type: integer, format: int64, minimum: 500, maximum: 500000 }
+        base_amount_minor: { type: integer, format: int64, minimum: 500, maximum: 500000 }
+        base_currency: { type: string, pattern: '^[a-z]{3}$' }
+        paid_amount_minor: { type: integer, format: int64, minimum: 0 }
+        paid_currency: { type: string, pattern: '^[a-z]{3}$' }
+        status: { type: string, enum: [creating, checkout_open, async_payment_pending, paid_pending_credit, credited, cancelled, expired, payment_failed] }
+        stripe_status: { type: string, enum: [creating, open, async_payment_pending, paid, cancelled, expired, payment_failed, unknown] }
+        credit_status: { type: string, enum: [not_applicable, pending, credited] }
+        created_at: { type: string, format: date-time }
+        paid_at: { type: string, format: date-time }
+        credited_at: { type: string, format: date-time }
+        last_checked_at: { type: string, format: date-time }
+        anomalous_at: { type: string, format: date-time }
+
+    AdminPaymentOrderPage:
+      type: object
+      additionalProperties: false
+      required: [orders, total]
+      properties:
+        orders:
+          type: array
+          items: { $ref: '#/components/schemas/AdminPaymentOrderSummary' }
+        total: { type: integer, format: int64, minimum: 0 }
+        next_cursor: { type: string, maxLength: 512 }
+
+    AdminPaymentStripeSummary:
+      type: object
+      additionalProperties: false
+      description: Truncated Stripe object identifiers. API Key, Webhook Secret, raw provider payload, and payer PII are never returned.
+      properties:
+        account_id: { type: string, maxLength: 16 }
+        customer_id: { type: string, maxLength: 16 }
+        checkout_session_id: { type: string, maxLength: 16 }
+        payment_intent_id: { type: string, maxLength: 16 }
+        charge_id: { type: string, maxLength: 16 }
+
+    AdminPaymentReconciliation:
+      type: object
+      additionalProperties: false
+      required: [anomalous]
+      properties:
+        anomalous: { type: boolean }
+        anomalous_at: { type: string, format: date-time }
+        last_checked_at: { type: string, format: date-time }
+        next_attempt_at: { type: string, format: date-time }
+        last_error_code: { type: string, maxLength: 120 }
+        last_error_summary: { type: string, maxLength: 500 }
+
+    AdminPaymentRefundSummary:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        id: { type: string, maxLength: 16 }
+        status: { type: string, enum: [refund.updated, refund.failed] }
+        updated_at: { type: string, format: date-time }
+
+    AdminPaymentDisputeSummary:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        id: { type: string, maxLength: 16 }
+        status: { type: string, enum: [charge.dispute.created, charge.dispute.closed] }
+        updated_at: { type: string, format: date-time }
+
+    AdminPaymentOrderDetail:
+      type: object
+      additionalProperties: false
+      required: [public_order_number, user, idea_quantity, base_amount_minor, base_currency, status, stripe_status, credit_status, stripe, terms_version, refund_policy_version, expires_at, created_at, updated_at, reconciliation, refunds, disputes]
+      properties:
+        public_order_number: { type: string, pattern: '^IBP-[0-9]{8}-[A-Z0-9]{12}$' }
+        user: { $ref: '#/components/schemas/AdminPaymentOrderUser' }
+        idea_quantity: { type: integer, format: int64, minimum: 500, maximum: 500000 }
+        base_amount_minor: { type: integer, format: int64, minimum: 500, maximum: 500000 }
+        base_currency: { type: string, pattern: '^[a-z]{3}$' }
+        paid_subtotal_minor: { type: integer, format: int64, minimum: 0 }
+        paid_tax_minor: { type: integer, format: int64, minimum: 0 }
+        paid_total_minor: { type: integer, format: int64, minimum: 0 }
+        paid_currency: { type: string, pattern: '^[a-z]{3}$' }
+        status: { type: string, enum: [creating, checkout_open, async_payment_pending, paid_pending_credit, credited, cancelled, expired, payment_failed] }
+        stripe_status: { type: string, enum: [creating, open, async_payment_pending, paid, cancelled, expired, payment_failed, unknown] }
+        credit_status: { type: string, enum: [not_applicable, pending, credited] }
+        stripe: { $ref: '#/components/schemas/AdminPaymentStripeSummary' }
+        terms_version: { type: string, maxLength: 64 }
+        refund_policy_version: { type: string, maxLength: 64 }
+        receipt_url: { type: string, format: uri, maxLength: 4096 }
+        expires_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        paid_at: { type: string, format: date-time }
+        credited_at: { type: string, format: date-time }
+        reconciliation: { $ref: '#/components/schemas/AdminPaymentReconciliation' }
+        refunds:
+          type: array
+          items: { $ref: '#/components/schemas/AdminPaymentRefundSummary' }
+        disputes:
+          type: array
+          items: { $ref: '#/components/schemas/AdminPaymentDisputeSummary' }
+
     StripeConfigurationSummary:
       type: object
       additionalProperties: false
@@ -4847,6 +5056,20 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/StripeConfigurationSummary'
+
+    ApiResponseAdminPaymentOrderPage:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/AdminPaymentOrderPage' }
+
+    ApiResponseAdminPaymentOrderDetail:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/AdminPaymentOrderDetail' }
 
     ApiResponseStripeWebhookReceipt:
       allOf:

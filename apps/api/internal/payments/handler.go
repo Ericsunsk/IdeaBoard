@@ -313,6 +313,90 @@ func (h *Handler) StreamUserPaymentEvents(c *gin.Context) {
 	}
 }
 
+func (h *Handler) ListAdminPaymentOrders(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	if _, ok := principal.RequireAdmin(c); !ok {
+		return
+	}
+	if h == nil || h.service == nil {
+		response.Error(c, http.StatusServiceUnavailable, "支付订单服务暂不可用")
+		return
+	}
+	input, err := adminPaymentOrderListInputFromQuery(c)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "支付订单筛选条件无效")
+		return
+	}
+	page, err := h.service.ListAdminPaymentOrders(c.Request.Context(), input)
+	if errors.Is(err, ErrAdminPaymentOrderFilter) || errors.Is(err, ErrAdminPaymentOrderCursor) {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "读取支付订单失败")
+		return
+	}
+	response.SuccessDTO(c, page)
+}
+
+func (h *Handler) GetAdminPaymentOrder(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	if _, ok := principal.RequireAdmin(c); !ok {
+		return
+	}
+	if h == nil || h.service == nil {
+		response.Error(c, http.StatusServiceUnavailable, "支付订单服务暂不可用")
+		return
+	}
+	detail, err := h.service.GetAdminPaymentOrder(c.Request.Context(), c.Param("order_number"))
+	if errors.Is(err, ErrAdminPaymentOrderFilter) {
+		response.Error(c, http.StatusBadRequest, "支付订单号无效")
+		return
+	}
+	if errors.Is(err, ErrAdminPaymentOrderNotFound) {
+		response.Error(c, http.StatusNotFound, "支付订单不存在")
+		return
+	}
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "读取支付订单失败")
+		return
+	}
+	response.SuccessDTO(c, detail)
+}
+
+func adminPaymentOrderListInputFromQuery(c *gin.Context) (AdminPaymentOrderListInput, error) {
+	if c == nil || c.Request == nil || c.Request.URL == nil {
+		return AdminPaymentOrderListInput{}, ErrAdminPaymentOrderFilter
+	}
+	query := c.Request.URL.Query()
+	allowed := map[string]struct{}{
+		"order_number": {}, "user": {}, "status": {}, "anomaly_only": {}, "cursor": {}, "limit": {},
+	}
+	for key, values := range query {
+		if _, ok := allowed[key]; !ok || len(values) != 1 {
+			return AdminPaymentOrderListInput{}, ErrAdminPaymentOrderFilter
+		}
+	}
+	input := AdminPaymentOrderListInput{
+		OrderNumber: query.Get("order_number"), User: query.Get("user"),
+		Status: PaymentOrderStatus(query.Get("status")), Cursor: query.Get("cursor"),
+	}
+	if raw, ok := query["anomaly_only"]; ok {
+		if raw[0] != "true" && raw[0] != "false" {
+			return AdminPaymentOrderListInput{}, ErrAdminPaymentOrderFilter
+		}
+		input.AnomalyOnly = raw[0] == "true"
+	}
+	if raw, ok := query["limit"]; ok {
+		limit, err := strconv.Atoi(raw[0])
+		if err != nil || limit < 1 || limit > maxAdminPaymentOrderLimit {
+			return AdminPaymentOrderListInput{}, ErrAdminPaymentOrderFilter
+		}
+		input.Limit = limit
+	}
+	return input, nil
+}
+
 func (h *Handler) checkoutReturnBaseURL(ctx context.Context) (string, error) {
 	if h == nil || h.publicURLs == nil {
 		return "", ErrPurchasesUnavailable

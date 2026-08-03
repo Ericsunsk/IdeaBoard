@@ -14,12 +14,15 @@ import type {
   UseQueryReturnType,
 } from '@tanstack/vue-query'
 
-import { toValue, unref } from 'vue'
+import { computed, toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
+  ApiResponseAdminPaymentOrderDetail,
+  ApiResponseAdminPaymentOrderPage,
   ApiResponseBase,
   ApiResponseStripeConfigurationSummary,
+  ListAdminPaymentOrdersParams,
   UpdateStripeConfigurationRequest,
 } from '../model'
 
@@ -175,6 +178,167 @@ export function useUpdateAdminStripeConfiguration<
     updateStripeConfigurationRequest,
     options,
   )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getListAdminPaymentOrdersUrl = (params?: ListAdminPaymentOrdersParams) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/admin/payments/orders?${stringifiedParams}`
+    : `/admin/payments/orders`
+}
+
+export const listAdminPaymentOrders = async (
+  params?: ListAdminPaymentOrdersParams,
+  options?: RequestInit,
+): Promise<ApiResponseAdminPaymentOrderPage> => {
+  return orvalMutator<ApiResponseAdminPaymentOrderPage>(getListAdminPaymentOrdersUrl(params), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getListAdminPaymentOrdersQueryKey = (
+  params?: MaybeRefOrGetter<ListAdminPaymentOrdersParams>,
+) => {
+  return ['admin', 'payments', 'orders', ...(params ? [params] : [])] as const
+}
+
+export const getListAdminPaymentOrdersQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAdminPaymentOrders>>,
+  TError = ErrorType<ApiResponseBase>,
+>(
+  params?: MaybeRefOrGetter<ListAdminPaymentOrdersParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listAdminPaymentOrders>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getListAdminPaymentOrdersQueryKey(params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminPaymentOrders>>> = ({ signal }) =>
+    listAdminPaymentOrders(toValue(params), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAdminPaymentOrders>>,
+    TError,
+    TData
+  >
+}
+
+export type ListAdminPaymentOrdersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAdminPaymentOrders>>
+>
+export type ListAdminPaymentOrdersQueryError = ErrorType<ApiResponseBase>
+
+export function useListAdminPaymentOrders<
+  TData = Awaited<ReturnType<typeof listAdminPaymentOrders>>,
+  TError = ErrorType<ApiResponseBase>,
+>(
+  params?: MaybeRefOrGetter<ListAdminPaymentOrdersParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof listAdminPaymentOrders>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListAdminPaymentOrdersQueryOptions(params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetAdminPaymentOrderUrl = (orderNumber: string) => {
+  return `/admin/payments/orders/${encodeURIComponent(String(orderNumber))}`
+}
+
+export const getAdminPaymentOrder = async (
+  orderNumber: string,
+  options?: RequestInit,
+): Promise<ApiResponseAdminPaymentOrderDetail> => {
+  return orvalMutator<ApiResponseAdminPaymentOrderDetail>(getGetAdminPaymentOrderUrl(orderNumber), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetAdminPaymentOrderQueryKey = (orderNumber: MaybeRefOrGetter<string>) => {
+  return ['admin', 'payments', 'orders', orderNumber] as const
+}
+
+export const getGetAdminPaymentOrderQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminPaymentOrder>>,
+  TError = ErrorType<ApiResponseBase>,
+>(
+  orderNumber: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminPaymentOrder>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminPaymentOrderQueryKey(orderNumber)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminPaymentOrder>>> = ({ signal }) =>
+    getAdminPaymentOrder(toValue(orderNumber), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(orderNumber) !== null && toValue(orderNumber) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getAdminPaymentOrder>>, TError, TData>
+}
+
+export type GetAdminPaymentOrderQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminPaymentOrder>>
+>
+export type GetAdminPaymentOrderQueryError = ErrorType<ApiResponseBase>
+
+export function useGetAdminPaymentOrder<
+  TData = Awaited<ReturnType<typeof getAdminPaymentOrder>>,
+  TError = ErrorType<ApiResponseBase>,
+>(
+  orderNumber: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminPaymentOrder>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetAdminPaymentOrderQueryOptions(orderNumber, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

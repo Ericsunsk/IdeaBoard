@@ -40,17 +40,36 @@ func TestSupportedStripeWebhookEventTypesAreTheExactCanonicalSet(t *testing.T) {
 func TestReceiveStripeWebhookVerifiesRawBodyAndStoresOnlyMinimalInboxFact(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
+	repo := NewRepository(db)
+	order := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-WEBHOOK00001", 501)
+	bound, err := repo.BindPaymentOrderCheckout(t.Context(), BindPaymentOrderCheckoutInput{
+		OrderID: order.ID, StripeCustomerID: "cus_webhook", StripeSessionID: "cs_webhook",
+		CheckoutURL: "https://checkout.stripe.example/webhook", ExpiresAt: order.ExpiresAt,
+	})
+	if err != nil {
+		t.Fatalf("BindPaymentOrderCheckout() error = %v", err)
+	}
+	if _, _, err := repo.RecordPaidPaymentOrder(t.Context(), PaidCheckoutFacts{
+		StripeAccountID: bound.StripeAccountID, StripeSessionID: bound.StripeCheckoutSessionID,
+		ExpiresAt: bound.ExpiresAt, PublicOrderNumber: bound.PublicOrderNumber, PaymentOrderID: bound.ID,
+		RequestHash: bound.RequestHash, StripeCustomerID: bound.StripeCustomerID,
+		StripePaymentIntentID: "pi_webhook", StripeChargeID: "ch_webhook", IdeaQuantity: bound.IdeaQuantity,
+		PaidSubtotalMinor: bound.BaseAmountMinor, PaidTaxMinor: 0, PaidTotalMinor: bound.BaseAmountMinor,
+		PaidCurrency: "usd", PaidAt: time.Now().UTC().Truncate(time.Second),
+	}); err != nil {
+		t.Fatalf("RecordPaidPaymentOrder() error = %v", err)
+	}
 	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
 		AccountID: "acct_webhook", Mode: StripeModeTest, ChargesEnabled: true,
 		ProductID: "prod_webhook", WebhookEndpointID: "we_webhook", WebhookSecret: "whsec_webhook",
 	}}
 	verifiedAt := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	verifier := &fakeWebhookVerifier{event: StripeWebhookEvent{
-		ID: "evt_1", Type: "refund.updated", ObjectID: "re_1",
+		ID: "evt_1", Type: "refund.updated", ObjectID: "re_1", PaymentIntentID: "pi_webhook",
 		Livemode: false, CreatedAt: verifiedAt.Add(-time.Minute),
 	}}
 	service := NewService(ServiceDependencies{
-		Repository: NewRepository(db), ConfigurationGateway: gateway,
+		Repository: repo, ConfigurationGateway: gateway,
 		WebhookVerifier: verifier,
 	})
 	service.now = func() time.Time { return verifiedAt }
@@ -76,15 +95,15 @@ func TestReceiveStripeWebhookVerifiesRawBodyAndStoresOnlyMinimalInboxFact(t *tes
 		t.Fatalf("verifier time contract = tolerance=%v now=%v", verifier.tolerance, verifier.now)
 	}
 
-	var eventType, objectID, result string
+	var eventType, objectID, paymentOrderID, result string
 	var createdAt time.Time
 	if err := db.QueryRowContext(t.Context(), `
-SELECT event_type, stripe_object_id, processing_result, stripe_created_at
-FROM payment_webhook_events WHERE stripe_event_id = 'evt_1'`).Scan(&eventType, &objectID, &result, &createdAt); err != nil {
+SELECT event_type, stripe_object_id, payment_order_id::TEXT, processing_result, stripe_created_at
+FROM payment_webhook_events WHERE stripe_event_id = 'evt_1'`).Scan(&eventType, &objectID, &paymentOrderID, &result, &createdAt); err != nil {
 		t.Fatalf("read webhook inbox: %v", err)
 	}
-	if eventType != "refund.updated" || objectID != "re_1" || result != "processed" || !createdAt.Equal(verifiedAt.Add(-time.Minute)) {
-		t.Fatalf("webhook fact = type=%q object=%q result=%q created=%v", eventType, objectID, result, createdAt)
+	if eventType != "refund.updated" || objectID != "re_1" || paymentOrderID != order.ID || result != "processed" || !createdAt.Equal(verifiedAt.Add(-time.Minute)) {
+		t.Fatalf("webhook fact = type=%q object=%q order=%q result=%q created=%v", eventType, objectID, paymentOrderID, result, createdAt)
 	}
 
 	duplicate, err := service.ReceiveStripeWebhook(t.Context(), raw, "t=123,v1=signature")

@@ -61,6 +61,12 @@ export const adminRoutes: RouteRecordRaw[] = [
             name: 'AdminRewardCodes',
             component: () => import('../credits-billing/rewards/AdminRewardCodesPage.vue'),
           },
+          {
+            path: 'payment-orders',
+            name: 'AdminPaymentOrders',
+            component: () => import('../payments/orders/AdminPaymentOrdersPage.vue'),
+            meta: { requiresAuth: true, title: '支付订单' },
+          },
         ],
       },
     ],
