@@ -13,6 +13,7 @@ import (
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/media/reclamation"
 	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/payments"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/runtime/worker"
 	"ideaboard/api/internal/tasking/taskbilling"
@@ -106,20 +107,29 @@ func newAppTaskRuntime(
 		TaskEvents:           taskEvents,
 		PublicURLs:           services.runtimeSettings,
 	})
+	creditPeriodicJobs := credits.ReconciliationPeriodicJobs()
+	reclamationPeriodicJobs := reclamation.PeriodicJobs()
+	paymentPeriodicJobs := payments.PaymentReconciliationPeriodicJobs()
+	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(reclamationPeriodicJobs)+len(paymentPeriodicJobs))
+	periodicJobs = append(periodicJobs, creditPeriodicJobs...)
+	periodicJobs = append(periodicJobs, reclamationPeriodicJobs...)
+	periodicJobs = append(periodicJobs, paymentPeriodicJobs...)
 	riverClient, err := worker.NewRiverClient(dbs.riverPool, riverTaskWorker, worker.RiverServerOptions{
 		QueueName:   taskqueue.RiverQueueDefault,
 		Concurrency: workerConcurrency,
 		AdditionalQueues: map[string]river.QueueConfig{
-			credits.ReconciliationQueue: {MaxWorkers: 1},
-			reclamation.QueueName:       {MaxWorkers: 1},
+			credits.ReconciliationQueue:         {MaxWorkers: 1},
+			reclamation.QueueName:               {MaxWorkers: 1},
+			payments.PaymentReconciliationQueue: {MaxWorkers: 1},
 		},
 		RegisterWorkers: func(workers *river.Workers) {
 			river.AddWorker(workers, credits.NewReconciliationWorker(services.creditService))
 			river.AddWorker(workers, credits.NewReconciliationScheduleWorker(services.creditService))
 			river.AddWorker(workers, reclamation.NewReclaimWorker(dbs.db, services.storageService))
 			river.AddWorker(workers, reclamation.NewScheduleWorker(dbs.db))
+			river.AddWorker(workers, payments.NewPaymentReconciliationWorker(services.paymentService))
 		},
-		PeriodicJobs: append(credits.ReconciliationPeriodicJobs(), reclamation.PeriodicJobs()...),
+		PeriodicJobs: periodicJobs,
 	})
 	if err != nil {
 		if eventBus != nil {

@@ -280,7 +280,7 @@ func (r *Repository) CreatePaymentOrderIntent(ctx context.Context, input CreateP
 			UserID: input.UserID, ClientIdempotencyKey: input.ClientIdempotencyKey, RequestHash: input.RequestHash,
 			StripeAccountID: input.StripeAccountID, StripeProductID: input.StripeProductID,
 			IdeaQuantity: input.IdeaQuantity, TermsVersion: input.TermsVersion,
-			RefundPolicyVersion: input.RefundPolicyVersion, ExpiresAt: input.ExpiresAt,
+			RefundPolicyVersion: input.RefundPolicyVersion, ReturnBaseUrl: input.ReturnBaseURL, ExpiresAt: input.ExpiresAt,
 		})
 		if err != nil {
 			return fmt.Errorf("insert payment order intent: %w", err)

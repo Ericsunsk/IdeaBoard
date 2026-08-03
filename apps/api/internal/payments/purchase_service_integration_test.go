@@ -34,6 +34,7 @@ func TestCreateCheckoutPersistsIntentBeforeStripeAndReusesCanonicalRequest(t *te
 	}
 	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, credits.NewService(pool))
 	service.now = func() time.Time { return now }
+	requestedAt := now
 	command := CreateCheckoutCommand{
 		UserID: 42, ClientIdempotencyKey: "purchase-checkout-request-1", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
@@ -52,7 +53,7 @@ func TestCreateCheckoutPersistsIntentBeforeStripeAndReusesCanonicalRequest(t *te
 	}
 	createdInput := checkoutGateway.lastCreateSession
 	if createdInput.IdempotencyKey == "" || createdInput.IdempotencyKey != createdInput.PublicOrderNumber ||
-		createdInput.ExpiresAt.Sub(now) != checkoutSessionLifetime+checkoutSessionTransportMargin {
+		!createdInput.ExpiresAt.Equal(requestedAt.Add(checkoutSessionLifetime+checkoutSessionTransportMargin)) {
 		t.Fatalf("Stripe Checkout input = %+v", createdInput)
 	}
 	var storedExpiresAt time.Time
@@ -75,6 +76,47 @@ func TestCreateCheckoutPersistsIntentBeforeStripeAndReusesCanonicalRequest(t *te
 	conflict.IdeaQuantity = 502
 	if _, err := service.CreateCheckout(t.Context(), conflict); !errors.Is(err, ErrCheckoutIdempotencyConflict) {
 		t.Fatalf("conflicting Checkout error = %v", err)
+	}
+}
+
+func TestCreateCheckoutReplaysImmutableSecondPrecisionExpiryAfterProviderTimeout(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	db, pool := testdb.OpenWithPool(t)
+	seedRechargeableWallet(t, pool, 42)
+	checkoutGateway := &fakeCheckoutGateway{createSessionErrors: []error{ErrStripeProviderUnavailable}}
+	service := newConfiguredPurchaseService(t, db, configuredFakeStripeGateway("acct_checkout", "prod_checkout"), checkoutGateway, credits.NewService(pool))
+	now := time.Now().UTC().Truncate(time.Second).Add(987654321)
+	service.now = func() time.Time { return now }
+	command := CreateCheckoutCommand{
+		UserID: 42, ClientIdempotencyKey: "purchase-checkout-timeout-recovery", IdeaQuantity: 501,
+		TermsAccepted: true, TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
+		ReturnBaseURL: "https://app.example.com/user/boards",
+	}
+
+	if _, err := service.CreateCheckout(t.Context(), command); !errors.Is(err, ErrStripeProviderUnavailable) {
+		t.Fatalf("initial Checkout error = %v", err)
+	}
+	if len(checkoutGateway.createSessionInputs) != 1 {
+		t.Fatalf("initial Stripe inputs = %d", len(checkoutGateway.createSessionInputs))
+	}
+	first := checkoutGateway.createSessionInputs[0]
+	if first.ExpiresAt.Nanosecond() != 0 {
+		t.Fatalf("Stripe expiry must be whole-second, got %s", first.ExpiresAt)
+	}
+
+	now = now.Add(3 * time.Minute)
+	if err := service.ReconcileDuePaymentOrders(t.Context()); err != nil {
+		t.Fatalf("timeout recovery = %v", err)
+	}
+	if len(checkoutGateway.createSessionInputs) != 2 {
+		t.Fatalf("replayed Stripe inputs = %d, want 2", len(checkoutGateway.createSessionInputs))
+	}
+	second := checkoutGateway.createSessionInputs[1]
+	if !second.ExpiresAt.Equal(first.ExpiresAt) {
+		t.Fatalf("replayed expiry = %s, want original %s", second.ExpiresAt, first.ExpiresAt)
+	}
+	if second != first {
+		t.Fatalf("replayed Stripe Checkout input changed: first=%+v second=%+v", first, second)
 	}
 }
 
@@ -292,7 +334,9 @@ type fakeCheckoutGateway struct {
 	expireErr           error
 	expireOutcome       CheckoutSessionExpirationOutcome
 	lastCreateSession   CreateCheckoutSessionInput
+	createSessionInputs []CreateCheckoutSessionInput
 	createdSession      CheckoutSession
+	createSessionErrors []error
 	afterCreateCustomer func()
 	beforeCreateSession func(CreateCheckoutSessionInput)
 }
@@ -308,8 +352,12 @@ func (f *fakeCheckoutGateway) CreateCustomer(_ context.Context, _ CreateCheckout
 func (f *fakeCheckoutGateway) CreateCheckoutSession(_ context.Context, input CreateCheckoutSessionInput) (CheckoutSession, error) {
 	f.sessionCalls++
 	f.lastCreateSession = input
+	f.createSessionInputs = append(f.createSessionInputs, input)
 	if f.beforeCreateSession != nil {
 		f.beforeCreateSession(input)
+	}
+	if index := f.sessionCalls - 1; index < len(f.createSessionErrors) && f.createSessionErrors[index] != nil {
+		return CheckoutSession{}, f.createSessionErrors[index]
 	}
 	f.createdSession = CheckoutSession{
 		ID: "cs_purchase", URL: "https://checkout.stripe.test/c/pay/cs_purchase", CustomerID: input.CustomerID,

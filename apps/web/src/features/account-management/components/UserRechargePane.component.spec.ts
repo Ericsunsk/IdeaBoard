@@ -2,6 +2,7 @@ import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithUser, screen, waitFor, within } from '../../../test/render'
 import type { PaymentReturnContext } from '../paymentReturnRoute'
+import { userCreditsQueryKeys } from '../userCreditsResource'
 import {
   userPaymentsContextKey,
   type UserPaymentPurchaseOptions,
@@ -59,6 +60,7 @@ function renderPane(
   }
   return {
     context,
+    queryClient,
     ...renderWithUser(UserRechargePane, {
       props: { active: true, paymentReturn: options.paymentReturn ?? null },
       global: {
@@ -434,6 +436,101 @@ describe('UserRechargePane', () => {
     expect(await within(historyTable).findByText('$10.00 USD')).toBeVisible()
     unmount()
     expect(unsubscribe).toHaveBeenCalledOnce()
+  })
+
+  it('keeps reconciliation processing visible, then refreshes the wallet and history after credit', async () => {
+    let paymentListener: Parameters<UserPaymentsResource['subscribe']>[0] | undefined
+    const processingOrder = {
+      public_token: 'reconciling-order',
+      idea_quantity: 3000,
+      status: 'paid_pending_credit' as const,
+      expires_at: '2026-08-01T01:00:00Z',
+      updated_at: new Date(Date.now() - 61_000).toISOString(),
+    }
+    const listPendingOrders = vi
+      .fn()
+      .mockResolvedValueOnce({ items: [processingOrder] })
+      .mockResolvedValueOnce({ items: [processingOrder] })
+      .mockResolvedValueOnce({ items: [] })
+    const listRecharges = vi
+      .fn()
+      .mockResolvedValueOnce({ items: [] })
+      .mockResolvedValueOnce({ items: [] })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            occurred_at: '2026-08-01T00:30:00Z',
+            idea_quantity: 3000,
+            paid_amount_minor: 3000,
+            paid_currency: 'usd',
+            status: 'credited',
+          },
+        ],
+      })
+    const subscribe = vi.fn((listener: Parameters<UserPaymentsResource['subscribe']>[0]) => {
+      paymentListener = listener
+      return () => undefined
+    })
+    const { queryClient } = renderPane({
+      resource: makeResource({ listPendingOrders, listRecharges, subscribe }),
+    })
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
+
+    expect(await screen.findByText('到账处理中')).toBeVisible()
+
+    paymentListener?.({ public_token: 'reconciling-order', status: 'processing' })
+
+    await waitFor(() => expect(listPendingOrders).toHaveBeenCalledTimes(2))
+    expect(screen.getByText('到账处理中')).toBeVisible()
+
+    paymentListener?.({ public_token: 'reconciling-order', status: 'credited' })
+
+    await waitFor(() => expect(listPendingOrders).toHaveBeenCalledTimes(3))
+    const historyTable = await screen.findByRole('table', { name: '充值记录表格' })
+    expect(await within(historyTable).findByText('$30.00 USD')).toBeVisible()
+    expect(screen.queryByText('到账处理中')).not.toBeInTheDocument()
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: userCreditsQueryKeys.all })
+  })
+
+  it('keeps a final reconciliation failure visible while allowing a replacement purchase', async () => {
+    let paymentListener: Parameters<UserPaymentsResource['subscribe']>[0] | undefined
+    const createCheckout = vi.fn().mockResolvedValue({
+      checkout_url: 'https://checkout.stripe.com/c/pay/replacement-order',
+      public_token: 'replacement-order',
+      expires_at: '2026-08-01T01:00:00Z',
+      reused: false,
+    })
+    const subscribe = vi.fn((listener: Parameters<UserPaymentsResource['subscribe']>[0]) => {
+      paymentListener = listener
+      return () => undefined
+    })
+    const { user } = renderPane({
+      resource: makeResource({
+        createCheckout,
+        subscribe,
+        listPendingOrders: vi.fn().mockResolvedValue({
+          items: [
+            {
+              public_token: 'failed-reconciliation-order',
+              idea_quantity: 2000,
+              status: 'paid_pending_credit',
+              expires_at: '2026-08-01T01:00:00Z',
+              updated_at: new Date(Date.now() - 61_000).toISOString(),
+            },
+          ],
+        }),
+      }),
+    })
+
+    const pendingOrder = await screen.findByTestId('pending-payment-order-failed-reconciliation-order')
+    expect(within(pendingOrder).getByText('到账处理中')).toBeVisible()
+
+    paymentListener?.({ public_token: 'failed-reconciliation-order', status: 'failed' })
+
+    expect(await within(pendingOrder).findByText('支付未完成')).toBeVisible()
+    await user.click(screen.getByRole('checkbox', { name: /服务条款.*退款政策/ }))
+    await user.click(screen.getByRole('button', { name: '前往 Stripe 支付' }))
+    await waitFor(() => expect(createCheckout).toHaveBeenCalledOnce())
   })
 
   it('retains a failed pending Checkout in the visible cache after its SSE event', async () => {

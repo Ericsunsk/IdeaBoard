@@ -18,7 +18,9 @@ type Querier interface {
 	BindPaymentOrderCheckout(ctx context.Context, arg BindPaymentOrderCheckoutParams) (PaymentOrder, error)
 	CancelMediaAssetReclamation(ctx context.Context, arg CancelMediaAssetReclamationParams) ([]int64, error)
 	ClaimDueMediaAssetReclamation(ctx context.Context, arg ClaimDueMediaAssetReclamationParams) (MediaAsset, error)
+	ClaimDuePaymentOrderReconciliations(ctx context.Context, arg ClaimDuePaymentOrderReconciliationsParams) ([]ClaimDuePaymentOrderReconciliationsRow, error)
 	ClearCurrentStorageProfiles(ctx context.Context) error
+	CompletePaymentOrderReconciliationClaim(ctx context.Context, arg CompletePaymentOrderReconciliationClaimParams) (int64, error)
 	CompleteTaskWithLease(ctx context.Context, arg CompleteTaskWithLeaseParams) (int64, error)
 	ConsumeBoardShareToken(ctx context.Context, tokenHash string) (BoardShareToken, error)
 	CountAccounts(ctx context.Context, arg CountAccountsParams) (int64, error)
@@ -122,6 +124,7 @@ type Querier interface {
 	ListMonitorExecutionPressureByRange(ctx context.Context, arg ListMonitorExecutionPressureByRangeParams) ([]ListMonitorExecutionPressureByRangeRow, error)
 	ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([]ListOutputsByTaskIDsRow, error)
 	ListPaymentRechargeHistory(ctx context.Context, arg ListPaymentRechargeHistoryParams) ([]ListPaymentRechargeHistoryRow, error)
+	ListPaymentReconciliationAnomalies(ctx context.Context, rowLimit int32) ([]ListPaymentReconciliationAnomaliesRow, error)
 	ListProviderEndpoints(ctx context.Context) ([]ProviderEndpoint, error)
 	ListRunningMissingLeaseTaskIDs(ctx context.Context, rowLimit int32) ([]string, error)
 	ListRunningTasksForStartupRecovery(ctx context.Context) ([]ListRunningTasksForStartupRecoveryRow, error)

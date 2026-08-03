@@ -360,7 +360,10 @@ func (s *Service) createCheckoutLocked(ctx context.Context, command CreateChecko
 			StripeAccountID: configuration.AccountID, StripeProductID: configuration.StripeProductID,
 			IdeaQuantity: quote.IdeaQuantity,
 			TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
-			ExpiresAt: now.Add(checkoutSessionLifetime),
+			ReturnBaseURL: returnBaseURL,
+			// Stripe accepts expiry with second precision. Persist the exact normalized
+			// request value before the first call so every idempotent replay matches.
+			ExpiresAt: now.UTC().Truncate(time.Second).Add(checkoutSessionLifetime + checkoutSessionTransportMargin),
 		})
 		if err != nil {
 			return CheckoutResult{}, err
@@ -379,31 +382,7 @@ func (s *Service) createCheckoutLocked(ctx context.Context, command CreateChecko
 		return checkoutResult(order, true), nil
 	}
 
-	customer, err := s.ensurePaymentCustomer(ctx, apiKey, order)
-	if err != nil {
-		return CheckoutResult{}, err
-	}
-	successURL := checkoutReturnURL(returnBaseURL, order.PublicToken, "success")
-	cancelURL := checkoutReturnURL(returnBaseURL, order.PublicToken, "cancel")
-	// Stripe validates its 30-minute minimum when it receives the request, so
-	// leave transport headroom and persist the provider's canonical expiry.
-	checkoutExpiresAt := s.now().UTC().Add(checkoutSessionLifetime + checkoutSessionTransportMargin)
-	session, err := s.checkoutGateway.CreateCheckoutSession(ctx, CreateCheckoutSessionInput{
-		APIKey: apiKey, CustomerID: customer.StripeCustomerID, ProductID: order.StripeProductID,
-		PublicOrderNumber: order.PublicOrderNumber, PaymentOrderID: order.ID, RequestHash: order.RequestHash,
-		IdeaQuantity: order.IdeaQuantity, AmountMinor: order.BaseAmountMinor, ExpiresAt: checkoutExpiresAt,
-		SuccessURL: successURL, CancelURL: cancelURL, IdempotencyKey: order.PublicOrderNumber,
-	})
-	if err != nil {
-		return CheckoutResult{}, checkoutOperationError(err)
-	}
-	if err := validateCreatedCheckoutSession(order, customer, session); err != nil {
-		return CheckoutResult{}, err
-	}
-	order, err = s.repo.BindPaymentOrderCheckout(ctx, BindPaymentOrderCheckoutInput{
-		OrderID: order.ID, StripeCustomerID: customer.StripeCustomerID,
-		StripeSessionID: session.ID, CheckoutURL: session.URL, ExpiresAt: session.ExpiresAt,
-	})
+	order, err = s.createCheckoutSessionForOrder(ctx, apiKey, order)
 	if err != nil {
 		return CheckoutResult{}, err
 	}
@@ -612,6 +591,37 @@ func (s *Service) ensurePaymentCustomer(ctx context.Context, apiKey string, orde
 	})
 }
 
+// createCheckoutSessionForOrder replays the immutable Checkout intent. Stripe's
+// public order number is the idempotency key, so a process failure between the
+// provider call and local bind can recover without creating a second Session.
+func (s *Service) createCheckoutSessionForOrder(ctx context.Context, apiKey string, order PaymentOrder) (PaymentOrder, error) {
+	if order.Status != PaymentOrderCreating || strings.TrimSpace(order.ReturnBaseURL) == "" {
+		return PaymentOrder{}, ErrPurchasesUnavailable
+	}
+	customer, err := s.ensurePaymentCustomer(ctx, apiKey, order)
+	if err != nil {
+		return PaymentOrder{}, err
+	}
+	session, err := s.checkoutGateway.CreateCheckoutSession(ctx, CreateCheckoutSessionInput{
+		APIKey: apiKey, CustomerID: customer.StripeCustomerID, ProductID: order.StripeProductID,
+		PublicOrderNumber: order.PublicOrderNumber, PaymentOrderID: order.ID, RequestHash: order.RequestHash,
+		IdeaQuantity: order.IdeaQuantity, AmountMinor: order.BaseAmountMinor, ExpiresAt: order.ExpiresAt,
+		SuccessURL:     checkoutReturnURL(order.ReturnBaseURL, order.PublicToken, "success"),
+		CancelURL:      checkoutReturnURL(order.ReturnBaseURL, order.PublicToken, "cancel"),
+		IdempotencyKey: order.PublicOrderNumber,
+	})
+	if err != nil {
+		return PaymentOrder{}, checkoutOperationError(err)
+	}
+	if err := validateCreatedCheckoutSession(order, customer, session); err != nil {
+		return PaymentOrder{}, err
+	}
+	return s.repo.BindPaymentOrderCheckout(ctx, BindPaymentOrderCheckoutInput{
+		OrderID: order.ID, StripeCustomerID: customer.StripeCustomerID,
+		StripeSessionID: session.ID, CheckoutURL: session.URL, ExpiresAt: session.ExpiresAt,
+	})
+}
+
 func (s *Service) retrieveAndConvergeCheckout(ctx context.Context, apiKey string, order PaymentOrder) (PaymentOrder, error) {
 	session, err := s.checkoutGateway.RetrieveCheckoutSession(ctx, RetrieveCheckoutSessionInput{
 		APIKey: apiKey, SessionID: order.StripeCheckoutSessionID,
@@ -677,7 +687,7 @@ func (s *Service) settleOrdersBeforeStripeKeyChange(ctx context.Context, current
 }
 
 func validateCreatedCheckoutSession(order PaymentOrder, customer PaymentCustomer, session CheckoutSession) error {
-	if strings.TrimSpace(session.URL) == "" || session.CustomerID != customer.StripeCustomerID || session.ExpiresAt.IsZero() {
+	if strings.TrimSpace(session.URL) == "" || session.CustomerID != customer.StripeCustomerID || !session.ExpiresAt.Equal(order.ExpiresAt) {
 		return ErrPurchasesUnavailable
 	}
 	return validateCheckoutSessionIdentity(order, session)
@@ -744,7 +754,9 @@ func newPublicOrderNumber(now time.Time) (string, error) {
 func checkoutOperationError(err error) error {
 	var gatewayErr *GatewayError
 	if errors.As(err, &gatewayErr) && gatewayErr.Code() == GatewayErrorProviderUnavailable {
-		return ErrStripeProviderUnavailable
+		return errors.Join(ErrStripeProviderUnavailable, err)
 	}
-	return ErrPurchasesUnavailable
+	// Keep the safe, typed gateway cause for durable reconciliation while the
+	// browser-facing boundary still receives the stable product error.
+	return errors.Join(ErrPurchasesUnavailable, err)
 }

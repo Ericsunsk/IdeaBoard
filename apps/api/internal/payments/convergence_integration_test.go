@@ -126,7 +126,8 @@ func createBoundPaymentOrder(t *testing.T, repo *Repository) PaymentOrder {
 		ClientIdempotencyKey: "payment-convergence-checkout", RequestHash: "841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
 		StripeAccountID: "acct_payment", StripeProductID: "prod_idea", IdeaQuantity: 501,
 		TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
-		ExpiresAt: time.Date(2026, 8, 1, 12, 30, 0, 0, time.UTC),
+		ReturnBaseURL: "http://localhost:5173",
+		ExpiresAt:     time.Date(2026, 8, 1, 12, 30, 0, 0, time.UTC),
 	}
 	order, _, err := repo.CreatePaymentOrderIntent(t.Context(), input)
 	if err != nil {

@@ -2548,6 +2548,7 @@ CREATE TABLE payment_orders (
   paid_currency TEXT NOT NULL DEFAULT '',
   terms_version TEXT NOT NULL,
   refund_policy_version TEXT NOT NULL,
+  return_base_url TEXT NOT NULL,
   checkout_url TEXT NOT NULL DEFAULT '',
   receipt_url TEXT NOT NULL DEFAULT '',
   credit_transaction_id TEXT UNIQUE REFERENCES credit_transactions(transaction_id) ON DELETE RESTRICT,
@@ -2574,6 +2575,7 @@ CREATE TABLE payment_orders (
     AND char_length(stripe_charge_id) <= 255
   ),
   CONSTRAINT ck_payment_order_urls CHECK (char_length(checkout_url) <= 4096 AND char_length(receipt_url) <= 4096),
+  CONSTRAINT ck_payment_order_return_base_url CHECK (char_length(return_base_url) BETWEEN 1 AND 2048),
   CONSTRAINT ck_payment_order_ideas CHECK (idea_quantity BETWEEN 500 AND 500000),
   CONSTRAINT ck_payment_order_base_amount CHECK (base_currency = 'usd' AND base_amount_minor = idea_quantity),
   CONSTRAINT ck_payment_order_paid_amounts CHECK (
@@ -2637,6 +2639,7 @@ BEGIN
      OR OLD.base_amount_minor <> NEW.base_amount_minor
      OR OLD.terms_version <> NEW.terms_version
      OR OLD.refund_policy_version <> NEW.refund_policy_version
+     OR OLD.return_base_url <> NEW.return_base_url
      OR OLD.created_at <> NEW.created_at THEN
     RAISE EXCEPTION 'payment order identity is immutable';
   END IF;
@@ -2727,6 +2730,56 @@ FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_payment_orders_updated_at
 BEFORE UPDATE ON payment_orders
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE payment_order_reconciliations (
+  payment_order_id UUID PRIMARY KEY REFERENCES payment_orders(id) ON DELETE RESTRICT,
+  claim_token UUID,
+  claim_generation BIGINT NOT NULL DEFAULT 0,
+  claimed_at TIMESTAMPTZ,
+  claimed_until TIMESTAMPTZ,
+  last_checked_at TIMESTAMPTZ,
+  next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_error_code TEXT NOT NULL DEFAULT '',
+  last_error_summary TEXT NOT NULL DEFAULT '',
+  anomalous_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT ck_payment_order_reconciliation_claim
+    CHECK ((claim_token IS NULL AND claimed_at IS NULL AND claimed_until IS NULL)
+      OR (claim_token IS NOT NULL AND claimed_at IS NOT NULL AND claimed_until IS NOT NULL AND claimed_until > claimed_at)),
+  CONSTRAINT ck_payment_order_reconciliation_generation CHECK (claim_generation >= 0),
+  CONSTRAINT ck_payment_order_reconciliation_error CHECK (
+    char_length(last_error_code) <= 64 AND char_length(last_error_summary) <= 500
+  )
+);
+
+CREATE INDEX idx_payment_orders_reconciliation_candidates
+  ON payment_orders (updated_at, id)
+  WHERE status IN ('creating', 'checkout_open', 'async_payment_pending', 'paid_pending_credit');
+
+CREATE INDEX idx_payment_order_reconciliations_due
+  ON payment_order_reconciliations (next_attempt_at, claimed_until, payment_order_id);
+
+CREATE INDEX idx_payment_order_reconciliations_anomaly
+  ON payment_order_reconciliations (anomalous_at DESC, payment_order_id DESC)
+  WHERE anomalous_at IS NOT NULL;
+
+CREATE TRIGGER set_payment_order_reconciliations_updated_at
+BEFORE UPDATE ON payment_order_reconciliations
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE FUNCTION initialize_payment_order_reconciliation()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO payment_order_reconciliations (payment_order_id)
+  VALUES (NEW.id);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER initialize_payment_order_reconciliation
+AFTER INSERT ON payment_orders
+FOR EACH ROW EXECUTE FUNCTION initialize_payment_order_reconciliation();
 
 CREATE FUNCTION execute_credit_purchase_v1(
   p_user_id BIGINT,

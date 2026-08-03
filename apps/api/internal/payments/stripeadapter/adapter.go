@@ -226,7 +226,7 @@ func mapStripeError(operation string, err error) error {
 		code, message = payments.GatewayErrorInvalidKey, "Stripe API Key 无效"
 	case http.StatusForbidden:
 		code, message = payments.GatewayErrorPermissionDenied, "Stripe API Key 权限不足"
-	case http.StatusBadRequest:
+	case http.StatusBadRequest, http.StatusNotFound:
 		code, message = payments.GatewayErrorInvalidResponse, "Stripe 拒绝了当前配置"
 	}
 	return payments.NewGatewayError(code, message, err)

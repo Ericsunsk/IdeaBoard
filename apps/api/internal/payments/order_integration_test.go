@@ -23,6 +23,7 @@ func TestCreatePaymentOrderIntentIsDurableIdempotentAndFailClosed(t *testing.T) 
 		IdeaQuantity:         501,
 		TermsVersion:         CurrentTermsVersion,
 		RefundPolicyVersion:  CurrentRefundPolicyVersion,
+		ReturnBaseURL:        "http://localhost:5173",
 		ExpiresAt:            time.Date(2026, 8, 1, 12, 30, 0, 0, time.UTC),
 	}
 
@@ -42,7 +43,7 @@ func TestCreatePaymentOrderIntentIsDurableIdempotentAndFailClosed(t *testing.T) 
 		RequestHash: input.RequestHash, StripeAccountID: input.StripeAccountID,
 		StripeProductID: input.StripeProductID, IdeaQuantity: input.IdeaQuantity,
 		TermsVersion:        input.TermsVersion,
-		RefundPolicyVersion: input.RefundPolicyVersion, ExpiresAt: input.ExpiresAt,
+		RefundPolicyVersion: input.RefundPolicyVersion, ReturnBaseURL: input.ReturnBaseURL, ExpiresAt: input.ExpiresAt,
 	})
 	if err != nil || !reused || replayed.ID != first.ID || replayed.PublicToken != first.PublicToken {
 		t.Fatalf("replayed order=%+v reused=%t error=%v", replayed, reused, err)

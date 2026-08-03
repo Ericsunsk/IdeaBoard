@@ -335,6 +335,7 @@ type PaymentOrder struct {
 	PaidCurrency            string         `json:"paid_currency"`
 	TermsVersion            string         `json:"terms_version"`
 	RefundPolicyVersion     string         `json:"refund_policy_version"`
+	ReturnBaseUrl           string         `json:"return_base_url"`
 	CheckoutUrl             string         `json:"checkout_url"`
 	ReceiptUrl              string         `json:"receipt_url"`
 	CreditTransactionID     sql.NullString `json:"credit_transaction_id"`
@@ -343,6 +344,21 @@ type PaymentOrder struct {
 	CreditedAt              sql.NullTime   `json:"credited_at"`
 	CreatedAt               time.Time      `json:"created_at"`
 	UpdatedAt               time.Time      `json:"updated_at"`
+}
+
+type PaymentOrderReconciliation struct {
+	PaymentOrderID   uuid.UUID     `json:"payment_order_id"`
+	ClaimToken       uuid.NullUUID `json:"claim_token"`
+	ClaimGeneration  int64         `json:"claim_generation"`
+	ClaimedAt        sql.NullTime  `json:"claimed_at"`
+	ClaimedUntil     sql.NullTime  `json:"claimed_until"`
+	LastCheckedAt    sql.NullTime  `json:"last_checked_at"`
+	NextAttemptAt    time.Time     `json:"next_attempt_at"`
+	LastErrorCode    string        `json:"last_error_code"`
+	LastErrorSummary string        `json:"last_error_summary"`
+	AnomalousAt      sql.NullTime  `json:"anomalous_at"`
+	CreatedAt        time.Time     `json:"created_at"`
+	UpdatedAt        time.Time     `json:"updated_at"`
 }
 
 type PaymentStripeConfiguration struct {

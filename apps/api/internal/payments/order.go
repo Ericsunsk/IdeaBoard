@@ -45,6 +45,7 @@ type PaymentOrder struct {
 	PaidCurrency            string
 	TermsVersion            string
 	RefundPolicyVersion     string
+	ReturnBaseURL           string
 	CheckoutURL             string
 	ReceiptURL              string
 	CreditTransactionID     string
@@ -67,6 +68,7 @@ type CreatePaymentOrderIntentInput struct {
 	IdeaQuantity         int64
 	TermsVersion         string
 	RefundPolicyVersion  string
+	ReturnBaseURL        string
 	ExpiresAt            time.Time
 }
 
@@ -123,7 +125,7 @@ func paymentOrder(row dbsqlc.PaymentOrder) PaymentOrder {
 		PaidSubtotalMinor: nullInt64Pointer(row.PaidSubtotalMinor), PaidTaxMinor: nullInt64Pointer(row.PaidTaxMinor),
 		PaidTotalMinor: nullInt64Pointer(row.PaidTotalMinor), PaidCurrency: row.PaidCurrency,
 		TermsVersion: row.TermsVersion, RefundPolicyVersion: row.RefundPolicyVersion,
-		CheckoutURL: row.CheckoutUrl, ReceiptURL: row.ReceiptUrl,
+		ReturnBaseURL: row.ReturnBaseUrl, CheckoutURL: row.CheckoutUrl, ReceiptURL: row.ReceiptUrl,
 		CreditTransactionID: row.CreditTransactionID.String,
 		ExpiresAt:           row.ExpiresAt, PaidAt: nullTimePointer(row.PaidAt), CreditedAt: nullTimePointer(row.CreditedAt),
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
