@@ -89,12 +89,8 @@ func (s *Service) expireDisputeCheckoutSessions(ctx context.Context, apiKey stri
 		for _, order := range orders {
 			switch order.Status {
 			case PaymentOrderCreating:
-				expired, changed, expireErr := s.repo.MarkPaymentOrderExpired(userLockedContext, order.ID)
-				if expireErr != nil {
+				if _, expireErr := s.orderLifecycle.expireOrder(userLockedContext, order); expireErr != nil {
 					return expireErr
-				}
-				if changed {
-					s.events.Publish(expired.UserID, PaymentEvent{PublicToken: expired.PublicToken, Status: "failed"})
 				}
 			case PaymentOrderCheckoutOpen:
 				expiration, expireErr := s.checkoutGateway.ExpireCheckoutSession(userLockedContext, ExpireCheckoutSessionInput{
@@ -103,10 +99,7 @@ func (s *Service) expireDisputeCheckoutSessions(ctx context.Context, apiKey stri
 				if expireErr != nil {
 					return checkoutOperationError(expireErr)
 				}
-				if err := validateCheckoutSessionIdentity(order, expiration.Session); err != nil {
-					return err
-				}
-				if err := s.convergeCheckoutExpiration(userLockedContext, order, expiration); err != nil {
+				if _, err := s.orderLifecycle.convergeCheckoutExpiration(userLockedContext, order, expiration); err != nil {
 					return err
 				}
 			case PaymentOrderAsyncPaymentPending:
@@ -118,33 +111,4 @@ func (s *Service) expireDisputeCheckoutSessions(ctx context.Context, apiKey stri
 		}
 		return nil
 	})
-}
-
-func (s *Service) convergeCheckoutExpiration(ctx context.Context, order PaymentOrder, expiration ExpireCheckoutSessionResult) error {
-	switch expiration.Outcome {
-	case CheckoutSessionExpirationOutcomeExpired:
-		cancelled, changed, err := s.repo.MarkPaymentOrderCancelled(ctx, order.UserID, order.ID)
-		if err == nil && changed {
-			s.events.Publish(cancelled.UserID, PaymentEvent{PublicToken: cancelled.PublicToken, Status: "failed"})
-		}
-		return err
-	case CheckoutSessionExpirationOutcomePaid:
-		result, err := s.repo.ConvergePaidPaymentOrder(ctx,
-			paidCheckoutFactsFromSession(order.StripeAccountID, expiration.Session, s.now().UTC()), s.now().UTC())
-		if err == nil && !result.Replayed {
-			s.events.Publish(result.Order.UserID, PaymentEvent{PublicToken: result.Order.PublicToken, Status: "credited"})
-		}
-		return err
-	case CheckoutSessionExpirationOutcomeAsyncPaymentPending:
-		previous := order.Status
-		pending, err := s.repo.MarkPaymentOrderAsyncPending(ctx, order.ID)
-		if err == nil && pending.Status != previous {
-			s.events.Publish(pending.UserID, PaymentEvent{PublicToken: pending.PublicToken, Status: "processing"})
-		}
-		return err
-	case CheckoutSessionExpirationOutcomeOpen:
-		return ErrStripeProviderUnavailable
-	default:
-		return ErrPurchasesUnavailable
-	}
 }

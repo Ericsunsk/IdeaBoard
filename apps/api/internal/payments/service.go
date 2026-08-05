@@ -20,6 +20,7 @@ type Service struct {
 	refundGateway    RefundGateway
 	disputeGateway   DisputeGateway
 	checkoutGateway  CheckoutGateway
+	orderLifecycle   *paymentOrderLifecycle
 	verifier         StripeWebhookVerifier
 	wallets          credits.WalletReader
 	events           *EventHub
@@ -52,13 +53,15 @@ func NewService(dependencies ServiceDependencies) *Service {
 	if events == nil {
 		events = NewEventHub()
 	}
-	return &Service{
+	service := &Service{
 		repo: dependencies.Repository, gateway: dependencies.ConfigurationGateway,
 		refundGateway:   dependencies.RefundGateway,
 		disputeGateway:  dependencies.DisputeGateway,
 		checkoutGateway: dependencies.CheckoutGateway, verifier: dependencies.WebhookVerifier,
 		wallets: dependencies.Wallets, events: events, now: now,
 	}
+	service.orderLifecycle = newPaymentOrderLifecycle(service.repo, service.events, service.now)
+	return service
 }
 
 func (s *Service) EventHub() *EventHub {
@@ -321,7 +324,7 @@ func (s *Service) receiveStripeWebhookLocked(ctx context.Context, raw []byte, si
 	if err != nil {
 		return StripeWebhookReceipt{}, fmt.Errorf("resolve payment order for Stripe Session: %w", err)
 	}
-	if _, err := s.convergeCheckoutSession(ctx, order, session, signal); err != nil {
+	if _, err := s.orderLifecycle.convergeCheckoutSession(ctx, order, session, signal); err != nil {
 		return StripeWebhookReceipt{}, err
 	}
 	if err := s.repo.MarkStripeWebhookEventProcessed(ctx, event.ID, "processed", "", now); err != nil {

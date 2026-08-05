@@ -143,23 +143,19 @@ func (s *Service) reconcilePaymentOrderClaim(ctx context.Context, configuration 
 		return paymentReconciliationFailureOutcome(now, order, err, false), err
 	}
 	if order.Status == PaymentOrderCreating && !configuration.PurchasesEnabled {
-		expired, changed, err := s.repo.MarkPaymentOrderExpired(ctx, order.ID)
+		expired, err := s.orderLifecycle.expireOrder(ctx, order)
 		if err != nil {
 			return paymentReconciliationFailureOutcome(now, order, err, true), err
 		}
-		if changed {
-			s.events.Publish(expired.UserID, PaymentEvent{PublicToken: expired.PublicToken, Status: "failed"})
-		}
+		_ = expired
 		return paymentReconciliationTerminal(now), nil
 	}
 	if order.Status == PaymentOrderPaidPendingCredit {
-		result, err := s.repo.CreditPaidPaymentOrder(ctx, order.ID, now)
+		credited, err := s.orderLifecycle.creditPaidOrder(ctx, order, now)
 		if err != nil {
 			return paymentReconciliationFailureOutcome(now, order, err, true), err
 		}
-		if !result.Replayed {
-			s.events.Publish(result.Order.UserID, PaymentEvent{PublicToken: result.Order.PublicToken, Status: "credited"})
-		}
+		_ = credited
 		return paymentReconciliationTerminal(now), nil
 	}
 	if order.Status == PaymentOrderCreating {
@@ -179,12 +175,9 @@ func (s *Service) reconcilePaymentOrderClaim(ctx context.Context, configuration 
 		return paymentReconciliationFailureOutcome(now, order, err, reconciliationFailureIsTransient(err)), err
 	}
 	if resolved.Status == PaymentOrderCheckoutOpen && !resolved.ExpiresAt.After(now) {
-		expired, changed, err := s.repo.MarkPaymentOrderExpired(ctx, resolved.ID)
+		expired, err := s.orderLifecycle.expireOrder(ctx, resolved)
 		if err != nil {
 			return paymentReconciliationFailureOutcome(now, order, err, true), err
-		}
-		if changed {
-			s.events.Publish(expired.UserID, PaymentEvent{PublicToken: expired.PublicToken, Status: "failed"})
 		}
 		resolved = expired
 	}

@@ -82,10 +82,7 @@ func (s *Service) expireCheckoutForShutdown(ctx context.Context, apiKey string, 
 		}
 		switch order.Status {
 		case PaymentOrderCreating:
-			expired, changed, err := s.repo.MarkPaymentOrderExpired(userLockedContext, order.ID)
-			if err == nil && changed {
-				s.events.Publish(expired.UserID, PaymentEvent{PublicToken: expired.PublicToken, Status: "failed"})
-			}
+			_, err := s.orderLifecycle.expireOrder(userLockedContext, order)
 			return err
 		case PaymentOrderCheckoutOpen:
 			expiration, err := s.checkoutGateway.ExpireCheckoutSession(userLockedContext, ExpireCheckoutSessionInput{
@@ -94,10 +91,8 @@ func (s *Service) expireCheckoutForShutdown(ctx context.Context, apiKey string, 
 			if err != nil {
 				return checkoutOperationError(err)
 			}
-			if err := validateCheckoutSessionIdentity(order, expiration.Session); err != nil {
-				return err
-			}
-			return s.convergeCheckoutExpiration(userLockedContext, order, expiration)
+			_, err = s.orderLifecycle.convergeCheckoutExpiration(userLockedContext, order, expiration)
+			return err
 		default:
 			return nil
 		}

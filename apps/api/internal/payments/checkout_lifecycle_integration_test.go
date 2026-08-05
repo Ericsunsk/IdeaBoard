@@ -398,6 +398,89 @@ func TestCheckoutLifecycleReturnStatusIsOwnedByAuthenticatedUser(t *testing.T) {
 	}
 }
 
+func TestCheckoutLifecycleRepeatedReturnCreditsAndPublishesOnce(t *testing.T) {
+	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	checkout := newLifecycleCheckoutGateway()
+	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, nil)
+	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "repeated-return-checkout", 700))
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkout.setPaid(true)
+	events, unsubscribe := service.EventHub().Subscribe(42)
+	defer unsubscribe()
+
+	for attempt := 0; attempt < 2; attempt++ {
+		status, err := service.GetPaymentOrderReturnStatus(t.Context(), 42, created.PublicToken)
+		if err != nil || status.Status != "credited" {
+			t.Fatalf("GetPaymentOrderReturnStatus() attempt %d = %+v, %v", attempt+1, status, err)
+		}
+	}
+
+	select {
+	case event := <-events:
+		if event.PublicToken != created.PublicToken || event.Status != "credited" {
+			t.Fatalf("credited event = %+v", event)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("credited event was not published")
+	}
+	select {
+	case event := <-events:
+		t.Fatalf("repeated Return published duplicate event: %+v", event)
+	case <-time.After(100 * time.Millisecond):
+	}
+	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderCredited)
+	assertLifecyclePurchaseCount(t, db, 1)
+	assertLifecycleWalletAvailable(t, wallets, 42, 701)
+}
+
+func TestCheckoutLifecycleReturnExpiryAllowsVerifiedLatePayment(t *testing.T) {
+	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	checkout := newLifecycleCheckoutGateway()
+	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, nil)
+	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "return-expiry-late-paid", 700))
+	if err != nil {
+		t.Fatal(err)
+	}
+	events, unsubscribe := service.EventHub().Subscribe(42)
+	defer unsubscribe()
+
+	checkout.status = CheckoutSessionStatusExpired
+	status, err := service.GetPaymentOrderReturnStatus(t.Context(), 42, created.PublicToken)
+	if err != nil || status.Status != "failed" {
+		t.Fatalf("expired Return status = %+v, %v", status, err)
+	}
+	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderExpired)
+
+	select {
+	case event := <-events:
+		if event.Status != "failed" {
+			t.Fatalf("expired Return event = %+v", event)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expired Return event was not published")
+	}
+
+	checkout.setPaid(true)
+	status, err = service.GetPaymentOrderReturnStatus(t.Context(), 42, created.PublicToken)
+	if err != nil || status.Status != "credited" {
+		t.Fatalf("late paid Return status = %+v, %v", status, err)
+	}
+	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderCredited)
+	assertLifecyclePurchaseCount(t, db, 1)
+	assertLifecycleWalletAvailable(t, wallets, 42, 701)
+
+	select {
+	case event := <-events:
+		if event.Status != "credited" {
+			t.Fatalf("late paid Return event = %+v", event)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("late paid Return event was not published")
+	}
+}
+
 func newCheckoutLifecycleService(t *testing.T, now *time.Time, checkout CheckoutGateway, verifier StripeWebhookVerifier) (*sql.DB, *Service, *credits.Service) {
 	t.Helper()
 	secretstest.EnableEncryption(t)
