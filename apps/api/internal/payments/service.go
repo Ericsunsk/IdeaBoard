@@ -17,6 +17,7 @@ type Service struct {
 	repo            *Repository
 	gateway         StripeGateway
 	refundGateway   RefundGateway
+	disputeGateway  DisputeGateway
 	checkoutGateway CheckoutGateway
 	verifier        StripeWebhookVerifier
 	wallets         credits.WalletReader
@@ -28,6 +29,7 @@ type ServiceDependencies struct {
 	Repository           *Repository
 	ConfigurationGateway StripeGateway
 	RefundGateway        RefundGateway
+	DisputeGateway       DisputeGateway
 	CheckoutGateway      CheckoutGateway
 	WebhookVerifier      StripeWebhookVerifier
 	Wallets              credits.WalletReader
@@ -47,6 +49,7 @@ func NewService(dependencies ServiceDependencies) *Service {
 	return &Service{
 		repo: dependencies.Repository, gateway: dependencies.ConfigurationGateway,
 		refundGateway:   dependencies.RefundGateway,
+		disputeGateway:  dependencies.DisputeGateway,
 		checkoutGateway: dependencies.CheckoutGateway, verifier: dependencies.WebhookVerifier,
 		wallets: dependencies.Wallets, events: events, now: now,
 	}
@@ -244,6 +247,12 @@ func (s *Service) receiveStripeWebhookLocked(ctx context.Context, raw []byte, si
 				return StripeWebhookReceipt{}, err
 			}
 		}
+		if strings.HasPrefix(event.Type, "charge.dispute.") {
+			if err := s.processDisputeWebhook(ctx, event); err != nil {
+				_ = s.repo.MarkStripeWebhookEventProcessed(ctx, event.ID, "failed", err.Error(), now)
+				return StripeWebhookReceipt{}, err
+			}
+		}
 		if err := s.repo.MarkStripeWebhookEventProcessed(ctx, event.ID, "processed", "", now); err != nil {
 			return StripeWebhookReceipt{}, err
 		}
@@ -274,6 +283,41 @@ func (s *Service) receiveStripeWebhookLocked(ctx context.Context, raw []byte, si
 		return StripeWebhookReceipt{}, err
 	}
 	return receipt, nil
+}
+
+func (s *Service) processDisputeWebhook(ctx context.Context, event StripeWebhookEvent) error {
+	if s == nil || s.repo == nil || s.disputeGateway == nil || strings.TrimSpace(event.ObjectID) == "" {
+		return ErrMalformedWebhookPayload
+	}
+	_, apiKey, err := s.stripeAccessConfiguration(ctx)
+	if err != nil {
+		return err
+	}
+	provider, err := s.disputeGateway.RetrieveDispute(ctx, apiKey, event.ObjectID)
+	if err != nil {
+		return err
+	}
+	if provider.ID != event.ObjectID || (event.ChargeID != "" && provider.ChargeID != event.ChargeID) ||
+		(event.PaymentIntentID != "" && provider.PaymentIntentID != "" && provider.PaymentIntentID != event.PaymentIntentID) {
+		return ErrDisputeProviderConflict
+	}
+	dispute, changed, err := s.repo.ConvergePaymentDispute(ctx, provider, s.now().UTC())
+	if errors.Is(err, ErrDisputeOrderNotEligible) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if changed {
+		s.publishDisputeUpdate(dispute.UserID)
+	}
+	return s.expireDisputeCheckoutSessions(ctx, apiKey, dispute)
+}
+
+func (s *Service) publishDisputeUpdate(userID int64) {
+	if s != nil && s.events != nil {
+		s.events.Publish(userID, PaymentEvent{Status: "dispute_updated"})
+	}
 }
 
 func (s *Service) processRefundWebhook(ctx context.Context, event StripeWebhookEvent) error {

@@ -29,6 +29,7 @@ import type {
   SubmissionFailedError,
   SubmitTaskReadinessRequest,
   SubmitTaskRequest,
+  WalletRestrictedError,
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
@@ -60,7 +61,12 @@ export const getSubmitUserTaskQueryKey = (
 
 export const getSubmitUserTaskQueryOptions = <
   TData = Awaited<ReturnType<typeof submitUserTask>>,
-  TError = ErrorType<InsufficientCreditsError | PricingUnavailableError | SubmissionFailedError>,
+  TError = ErrorType<
+    | InsufficientCreditsError
+    | WalletRestrictedError
+    | PricingUnavailableError
+    | SubmissionFailedError
+  >,
 >(
   submitTaskRequest: MaybeRefOrGetter<SubmitTaskRequest>,
   options?: {
@@ -84,12 +90,17 @@ export const getSubmitUserTaskQueryOptions = <
 
 export type SubmitUserTaskQueryResult = NonNullable<Awaited<ReturnType<typeof submitUserTask>>>
 export type SubmitUserTaskQueryError = ErrorType<
-  InsufficientCreditsError | PricingUnavailableError | SubmissionFailedError
+  InsufficientCreditsError | WalletRestrictedError | PricingUnavailableError | SubmissionFailedError
 >
 
 export function useSubmitUserTask<
   TData = Awaited<ReturnType<typeof submitUserTask>>,
-  TError = ErrorType<InsufficientCreditsError | PricingUnavailableError | SubmissionFailedError>,
+  TError = ErrorType<
+    | InsufficientCreditsError
+    | WalletRestrictedError
+    | PricingUnavailableError
+    | SubmissionFailedError
+  >,
 >(
   submitTaskRequest: MaybeRefOrGetter<SubmitTaskRequest>,
   options?: {

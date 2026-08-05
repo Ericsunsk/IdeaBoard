@@ -137,6 +137,7 @@ func TestIdentityAdminCommandErrorsMapToHTTP(t *testing.T) {
 		{name: "target not found", err: identityAdminError(IdentityAdminTargetNotFound, "target missing", nil), wantStatus: 400, wantBody: "target missing"},
 		{name: "Auth identity not found", err: identityAdminError(IdentityAdminAuthIdentityNotFound, "Auth missing", nil), wantStatus: 400, wantBody: "Auth missing"},
 		{name: "forbidden", err: identityAdminError(IdentityAdminForbidden, "forbidden", nil), wantStatus: 403, wantBody: "forbidden"},
+		{name: "conflict", err: identityAdminError(IdentityAdminConflict, "payment state pending", nil), wantStatus: 409, wantBody: "payment state pending"},
 		{name: "Auth failure", err: identityAdminError(IdentityAdminAuthFailure, "Auth failed", errors.New("dependency failed")), wantStatus: 502, wantBody: "Auth failed"},
 		{name: "business failure", err: identityAdminError(IdentityAdminBusinessFailure, "business failed", errors.New("database failed")), wantStatus: 500, wantBody: "business failed"},
 		{name: "reconciliation required", err: identityAdminError(IdentityAdminReconciliationRequired, "reconcile", errors.New("rollback failed")), wantStatus: 500, wantBody: "reconcile"},

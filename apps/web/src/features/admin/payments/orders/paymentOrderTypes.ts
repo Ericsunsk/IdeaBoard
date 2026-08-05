@@ -71,11 +71,17 @@ export type AdminPaymentRefundSummary = {
 export type AdminPaymentDisputeSummary = {
   id?: string
   status: string
+  providerStatus?: string
   amountMinor?: number
   currency?: string
-  unrecoveredIdeas?: number
+  ratioBasisPoints?: number
+  targetIdeaQuantity?: number
+  debitedIdeaQuantity?: number
+  unrecoveredCredits?: number
+  stripeDashboardUrl?: string
   openedAt?: string
   closedAt?: string
+  updatedAt?: string
 }
 
 export type AdminPaymentOrderDetail = {

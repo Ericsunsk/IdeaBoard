@@ -122,7 +122,18 @@
               :key="dispute.id || index"
               class="rounded-[var(--radius-ib-control)] border border-admin-border-soft p-3 text-admin-meta"
             >
-              <div class="font-bold text-admin-text-1">{{ dispute.status }}</div>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="font-bold text-admin-text-1">{{ dispute.status }}</div>
+                <a
+                  v-if="dispute.stripeDashboardUrl"
+                  :href="dispute.stripeDashboardUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="font-bold text-admin-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                >
+                  Stripe Dashboard
+                </a>
+              </div>
               <div class="mt-1 text-admin-text-3">{{ formatDispute(dispute) }}</div>
             </li>
           </ul>
@@ -346,9 +357,15 @@ function submitRefund() {
 
 function formatDispute(dispute: AdminPaymentDisputeSummary): string {
   const amount = formatPaymentMoney(dispute.amountMinor, dispute.currency)
-  const unrecovered = dispute.unrecoveredIdeas
-    ? ` / 未追回 ${new Intl.NumberFormat('zh-CN').format(dispute.unrecoveredIdeas)} Ideas`
+  const ratio = dispute.ratioBasisPoints !== undefined
+    ? ` / 比例 ${(dispute.ratioBasisPoints / 100).toLocaleString('zh-CN', { maximumFractionDigits: 2 })}%`
     : ''
-  return `${amount}${unrecovered} / ${formatPaymentDateTime(dispute.openedAt)}`
+  const target = formatIdeas(dispute.targetIdeaQuantity ?? 0)
+  const debited = formatIdeas(dispute.debitedIdeaQuantity ?? 0)
+  const unrecovered = formatIdeas(dispute.unrecoveredCredits ?? 0)
+  const provider = dispute.providerStatus ? ` / Stripe ${dispute.providerStatus}` : ''
+  const opened = `开启 ${formatPaymentDateTime(dispute.openedAt)}`
+  const closed = dispute.closedAt ? ` / 关闭 ${formatPaymentDateTime(dispute.closedAt)}` : ''
+  return `${amount}${ratio} / 目标 ${target} Ideas / 已扣回 ${debited} Ideas / 未追回 ${unrecovered} Ideas${provider} / ${opened}${closed}`
 }
 </script>

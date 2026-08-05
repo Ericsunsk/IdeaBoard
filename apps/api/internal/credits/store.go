@@ -106,6 +106,17 @@ SELECT transaction_id,
        created_at
 FROM execute_credit_purchase_refund_v1($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 
+const creditPaymentDisputeDebitSQL = `
+SELECT transaction_id, command_type, command_amount, wallet_user_id,
+       available_balance_after, reserved_balance_after, replayed, created_at,
+       requested_amount, unrecovered_amount
+FROM execute_credit_payment_dispute_debit_v1($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+
+const creditPaymentDisputeRestoreSQL = `
+SELECT transaction_id, command_type, command_amount, wallet_user_id,
+       available_balance_after, reserved_balance_after, replayed, created_at
+FROM execute_credit_payment_dispute_restore_v1($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
+
 func executeCreditPurchaseRefund(ctx context.Context, tx pgx.Tx, userID int64, holdID string, metadata CommandMetadata) (CommandResult, error) {
 	if tx == nil {
 		return CommandResult{}, fmt.Errorf("credits service: transaction not configured")
@@ -118,6 +129,34 @@ func executeSQLCreditPurchaseRefund(ctx context.Context, tx *sql.Tx, userID int6
 		return CommandResult{}, fmt.Errorf("credits service: SQL transaction not configured")
 	}
 	return scanCreditCommand(tx.QueryRowContext(ctx, creditPurchaseRefundSQL, userID, holdID, metadata.IdempotencyKey, metadata.Actor.Type, metadata.Actor.ID, metadata.Source, metadata.Reason, metadata.BusinessReference.Type, metadata.BusinessReference.ID))
+}
+
+func executeCreditPaymentDisputeDebit(ctx context.Context, tx pgx.Tx, userID, requestedAmount int64, metadata CommandMetadata) (PaymentDisputeDebitResult, error) {
+	if tx == nil {
+		return PaymentDisputeDebitResult{}, fmt.Errorf("credits service: transaction not configured")
+	}
+	return scanPaymentDisputeDebit(tx.QueryRow(ctx, creditPaymentDisputeDebitSQL, userID, requestedAmount, metadata.IdempotencyKey, metadata.Actor.Type, metadata.Actor.ID, metadata.Source, metadata.Reason, metadata.BusinessReference.Type, metadata.BusinessReference.ID))
+}
+
+func executeSQLCreditPaymentDisputeDebit(ctx context.Context, tx *sql.Tx, userID, requestedAmount int64, metadata CommandMetadata) (PaymentDisputeDebitResult, error) {
+	if tx == nil {
+		return PaymentDisputeDebitResult{}, fmt.Errorf("credits service: SQL transaction not configured")
+	}
+	return scanPaymentDisputeDebit(tx.QueryRowContext(ctx, creditPaymentDisputeDebitSQL, userID, requestedAmount, metadata.IdempotencyKey, metadata.Actor.Type, metadata.Actor.ID, metadata.Source, metadata.Reason, metadata.BusinessReference.Type, metadata.BusinessReference.ID))
+}
+
+func executeCreditPaymentDisputeRestore(ctx context.Context, tx pgx.Tx, userID int64, originalTransactionID string, amount int64, metadata CommandMetadata) (CommandResult, error) {
+	if tx == nil {
+		return CommandResult{}, fmt.Errorf("credits service: transaction not configured")
+	}
+	return scanCreditCommand(tx.QueryRow(ctx, creditPaymentDisputeRestoreSQL, userID, originalTransactionID, amount, metadata.IdempotencyKey, metadata.Actor.Type, metadata.Actor.ID, metadata.Source, metadata.Reason, metadata.BusinessReference.Type, metadata.BusinessReference.ID))
+}
+
+func executeSQLCreditPaymentDisputeRestore(ctx context.Context, tx *sql.Tx, userID int64, originalTransactionID string, amount int64, metadata CommandMetadata) (CommandResult, error) {
+	if tx == nil {
+		return CommandResult{}, fmt.Errorf("credits service: SQL transaction not configured")
+	}
+	return scanCreditCommand(tx.QueryRowContext(ctx, creditPaymentDisputeRestoreSQL, userID, originalTransactionID, amount, metadata.IdempotencyKey, metadata.Actor.Type, metadata.Actor.ID, metadata.Source, metadata.Reason, metadata.BusinessReference.Type, metadata.BusinessReference.ID))
 }
 
 type rowScanner interface {
@@ -173,6 +212,19 @@ func scanCreditCommand(row rowScanner) (CommandResult, error) {
 	)
 	if err != nil {
 		return CommandResult{}, mapCreditDatabaseError(err)
+	}
+	return result, nil
+}
+
+func scanPaymentDisputeDebit(row rowScanner) (PaymentDisputeDebitResult, error) {
+	var result PaymentDisputeDebitResult
+	err := row.Scan(
+		&result.TransactionID, &result.CommandType, &result.Amount, &result.Wallet.UserID,
+		&result.Wallet.Available, &result.Wallet.Reserved, &result.Replayed, &result.CreatedAt,
+		&result.RequestedAmount, &result.UnrecoveredAmount,
+	)
+	if err != nil {
+		return PaymentDisputeDebitResult{}, mapCreditDatabaseError(err)
 	}
 	return result, nil
 }

@@ -24,6 +24,7 @@ var (
 	ErrUnsupportedProduct  = errors.New("task product is not billable")
 	ErrPricingUnavailable  = errors.New("task pricing is unavailable")
 	ErrInsufficientCredits = errors.New("insufficient credits for task")
+	ErrWalletRestricted    = errors.New("task wallet is restricted")
 	ErrSettlementConflict  = errors.New("task billing settlement conflict")
 	ErrIntegrity           = errors.New("task billing integrity error")
 	ErrIdempotencyConflict = errors.New("task billing idempotency conflict")
@@ -153,6 +154,9 @@ func (s *Service) Readiness(ctx context.Context, userID int64, request Request) 
 	if err != nil {
 		return Readiness{}, err
 	}
+	if len(wallet.ActiveRestrictions) > 0 {
+		return Readiness{}, ErrWalletRestricted
+	}
 	return Readiness{
 		Quote: quote, AvailableCredits: wallet.Available, ReservedCredits: wallet.Reserved,
 		Sufficient: wallet.Available >= quote.TotalCredits,
@@ -192,6 +196,9 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, taskID string, 
 		})
 		if errors.Is(holdErr, credits.ErrInsufficientCredits) {
 			return Snapshot{}, ErrInsufficientCredits
+		}
+		if errors.Is(holdErr, credits.ErrWalletRestricted) {
+			return Snapshot{}, ErrWalletRestricted
 		}
 		if holdErr != nil {
 			return Snapshot{}, holdErr

@@ -10,5 +10,23 @@ export interface AdminPaymentDisputeSummary {
   /** @maxLength 16 */
   id?: string
   status: AdminPaymentDisputeSummaryStatus
+  /** @maxLength 64 */
+  provider_status?: string
+  /** @minimum 1 */
+  amount_minor?: number
+  /** @pattern ^[a-z]{3}$ */
+  currency?: string
+  /** @minimum 0 */
+  ratio_basis_points?: number
+  /** @minimum 0 */
+  target_idea_quantity?: number
+  /** @minimum 0 */
+  debited_idea_quantity?: number
+  /** @minimum 0 */
+  unrecovered_credits?: number
+  /** @maxLength 4096 */
+  stripe_dashboard_url?: string
+  opened_at?: string
+  closed_at?: string
   updated_at?: string
 }

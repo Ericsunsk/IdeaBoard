@@ -80,6 +80,25 @@ describe('AdminPaymentOrdersPage', () => {
   })
 
   it('opens the safe detail dialog with receipt, reconciliation, refund, and Dispute states', async () => {
+    resource.get.mockResolvedValueOnce({
+      ...makeDetail(),
+      disputes: [
+        {
+          id: 'dp_i…7890',
+          status: 'lost',
+          providerStatus: 'lost',
+          amountMinor: 3_750,
+          currency: 'usd',
+          ratioBasisPoints: 2_941,
+          targetIdeaQuantity: 294,
+          debitedIdeaQuantity: 250,
+          unrecoveredCredits: 44,
+          stripeDashboardUrl: 'https://dashboard.stripe.com/test/disputes/dp_idea',
+          openedAt: '2026-08-02T02:00:00Z',
+          closedAt: '2026-08-03T02:00:00Z',
+        },
+      ],
+    })
     const { user } = renderPage()
     await screen.findByText(orderNumber)
 
@@ -89,7 +108,13 @@ describe('AdminPaymentOrdersPage', () => {
     expect(screen.getByText('acct…7890')).toBeVisible()
     expect(screen.getByText('Stripe 暂时不可用')).toBeVisible()
     expect(screen.getByText('暂无退款记录')).toBeVisible()
-    expect(screen.getByText('暂无 Dispute')).toBeVisible()
+    expect(screen.getByText('lost')).toBeVisible()
+    expect(screen.getByText(/目标 294 Ideas \/ 已扣回 250 Ideas \/ 未追回 44 Ideas/)).toBeVisible()
+    expect(screen.getByText(/开启 .*关闭/)).toBeVisible()
+    expect(screen.getByRole('link', { name: 'Stripe Dashboard' })).toHaveAttribute(
+      'href',
+      'https://dashboard.stripe.com/test/disputes/dp_idea',
+    )
     expect(screen.getByRole('link', { name: '打开 Stripe 收据' })).toHaveAttribute(
       'rel',
       'noopener noreferrer',

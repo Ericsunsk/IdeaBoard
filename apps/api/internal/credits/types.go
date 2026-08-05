@@ -9,15 +9,17 @@ import (
 type CommandType string
 
 const (
-	CommandGrant          CommandType = "grant"
-	CommandHold           CommandType = "hold"
-	CommandCapture        CommandType = "capture"
-	CommandRelease        CommandType = "release"
-	CommandRefund         CommandType = "refund"
-	CommandDeduction      CommandType = "deduction"
-	CommandCorrection     CommandType = "correction"
-	CommandPurchaseCredit CommandType = "purchase_credit"
-	CommandPurchaseRefund CommandType = "purchase_refund"
+	CommandGrant                 CommandType = "grant"
+	CommandHold                  CommandType = "hold"
+	CommandCapture               CommandType = "capture"
+	CommandRelease               CommandType = "release"
+	CommandRefund                CommandType = "refund"
+	CommandDeduction             CommandType = "deduction"
+	CommandCorrection            CommandType = "correction"
+	CommandPurchaseCredit        CommandType = "purchase_credit"
+	CommandPurchaseRefund        CommandType = "purchase_refund"
+	CommandPaymentDisputeDebit   CommandType = "payment_dispute_debit"
+	CommandPaymentDisputeRestore CommandType = "payment_dispute_restore"
 )
 
 type AccountRole string
@@ -93,6 +95,29 @@ type PurchaseRefundCommand struct {
 	Metadata          CommandMetadata
 }
 
+// PaymentDisputeDebitCommand is a provider-driven, bounded recovery debit.
+// The database routine caps the actual posting at the current available
+// balance and returns the unrecovered remainder without creating a negative
+// projection.
+type PaymentDisputeDebitCommand struct {
+	UserID          int64
+	RequestedAmount CreditAmount
+	Metadata        CommandMetadata
+}
+
+type PaymentDisputeDebitResult struct {
+	CommandResult
+	RequestedAmount   int64 `json:"requested_amount_credits"`
+	UnrecoveredAmount int64 `json:"unrecovered_credits"`
+}
+
+type PaymentDisputeRestoreCommand struct {
+	UserID                int64
+	OriginalTransactionID string
+	Amount                CreditAmount
+	Metadata              CommandMetadata
+}
+
 // DeductionCommand records a discretionary administrative debit. It can only
 // consume available credits and always creates a new immutable transaction.
 type DeductionCommand struct {
@@ -139,6 +164,8 @@ type Commands interface {
 	Grant(context.Context, GrantCommand) (CommandResult, error)
 	Purchase(context.Context, PurchaseCommand) (CommandResult, error)
 	PurchaseRefund(context.Context, PurchaseRefundCommand) (CommandResult, error)
+	PaymentDisputeDebit(context.Context, PaymentDisputeDebitCommand) (PaymentDisputeDebitResult, error)
+	PaymentDisputeRestore(context.Context, PaymentDisputeRestoreCommand) (CommandResult, error)
 	Deduct(context.Context, DeductionCommand) (CommandResult, error)
 	Correct(context.Context, CorrectionCommand) (CommandResult, error)
 	Hold(context.Context, HoldCommand) (CommandResult, error)

@@ -78,6 +78,18 @@ func (s *Service) PurchaseRefund(ctx context.Context, command PurchaseRefundComm
 	})
 }
 
+func (s *Service) PaymentDisputeDebit(ctx context.Context, command PaymentDisputeDebitCommand) (PaymentDisputeDebitResult, error) {
+	return withManagedTransactionResult(ctx, s, func(commands *transactionCommands) (PaymentDisputeDebitResult, error) {
+		return commands.PaymentDisputeDebit(ctx, command)
+	})
+}
+
+func (s *Service) PaymentDisputeRestore(ctx context.Context, command PaymentDisputeRestoreCommand) (CommandResult, error) {
+	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (CommandResult, error) {
+		return commands.PaymentDisputeRestore(ctx, command)
+	})
+}
+
 func (s *Service) Deduct(ctx context.Context, command DeductionCommand) (CommandResult, error) {
 	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (CommandResult, error) {
 		return commands.Deduct(ctx, command)
@@ -143,6 +155,40 @@ func withManagedTransaction(
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return CommandResult{}, fmt.Errorf("credits service: commit transaction: %w", err)
+	}
+	committed = true
+	return result, nil
+}
+
+func withManagedTransactionResult(
+	ctx context.Context,
+	service *Service,
+	run func(*transactionCommands) (PaymentDisputeDebitResult, error),
+) (PaymentDisputeDebitResult, error) {
+	if service == nil || service.pool == nil {
+		return PaymentDisputeDebitResult{}, fmt.Errorf("credits service: database pool not configured")
+	}
+	tx, err := service.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return PaymentDisputeDebitResult{}, fmt.Errorf("credits service: begin transaction: %w", err)
+	}
+	committed := false
+	defer func() {
+		if committed {
+			return
+		}
+		rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), rollbackTimeout)
+		defer cancel()
+		if rollbackErr := tx.Rollback(rollbackCtx); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+			slog.Warn("failed to roll back Credits transaction", "err", rollbackErr)
+		}
+	}()
+	result, err := run(&transactionCommands{tx: tx})
+	if err != nil {
+		return PaymentDisputeDebitResult{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return PaymentDisputeDebitResult{}, fmt.Errorf("credits service: commit transaction: %w", err)
 	}
 	committed = true
 	return result, nil
@@ -230,6 +276,14 @@ func (c *transactionCommands) PurchaseRefund(ctx context.Context, command Purcha
 	return executePurchaseRefund(ctx, command, c.executePurchaseRefund)
 }
 
+func (c *transactionCommands) PaymentDisputeDebit(ctx context.Context, command PaymentDisputeDebitCommand) (PaymentDisputeDebitResult, error) {
+	return executePaymentDisputeDebit(ctx, command, c.executePaymentDisputeDebit)
+}
+
+func (c *transactionCommands) PaymentDisputeRestore(ctx context.Context, command PaymentDisputeRestoreCommand) (CommandResult, error) {
+	return executePaymentDisputeRestore(ctx, command, c.executePaymentDisputeRestore)
+}
+
 func (c *transactionCommands) Capture(ctx context.Context, command CaptureCommand) (CommandResult, error) {
 	return executeCapture(ctx, command, c.execute)
 }
@@ -266,6 +320,14 @@ func (c *sqlTransactionCommands) PurchaseRefund(ctx context.Context, command Pur
 	return executePurchaseRefund(ctx, command, c.executeSQLPurchaseRefund)
 }
 
+func (c *sqlTransactionCommands) PaymentDisputeDebit(ctx context.Context, command PaymentDisputeDebitCommand) (PaymentDisputeDebitResult, error) {
+	return executePaymentDisputeDebit(ctx, command, c.executePaymentDisputeDebit)
+}
+
+func (c *sqlTransactionCommands) PaymentDisputeRestore(ctx context.Context, command PaymentDisputeRestoreCommand) (CommandResult, error) {
+	return executePaymentDisputeRestore(ctx, command, c.executePaymentDisputeRestore)
+}
+
 func (c *sqlTransactionCommands) Capture(ctx context.Context, command CaptureCommand) (CommandResult, error) {
 	return executeCapture(ctx, command, c.execute)
 }
@@ -281,6 +343,8 @@ func (c *sqlTransactionCommands) Refund(ctx context.Context, command RefundComma
 type commandExecutor func(context.Context, CommandType, int64, int64, string, CommandMetadata) (CommandResult, error)
 type purchaseExecutor func(context.Context, int64, int64, CommandMetadata) (CommandResult, error)
 type purchaseRefundExecutor func(context.Context, int64, string, CommandMetadata) (CommandResult, error)
+type paymentDisputeDebitExecutor func(context.Context, int64, int64, CommandMetadata) (PaymentDisputeDebitResult, error)
+type paymentDisputeRestoreExecutor func(context.Context, int64, string, int64, CommandMetadata) (CommandResult, error)
 
 func (c *transactionCommands) execute(ctx context.Context, commandType CommandType, userID, amount int64, relatedID string, metadata CommandMetadata) (CommandResult, error) {
 	return executeCreditCommand(ctx, c.tx, commandType, userID, amount, relatedID, metadata)
@@ -294,8 +358,24 @@ func (c *transactionCommands) executePurchase(ctx context.Context, userID, amoun
 	return executeCreditPurchase(ctx, c.tx, userID, amount, metadata)
 }
 
+func (c *transactionCommands) executePaymentDisputeDebit(ctx context.Context, userID, requestedAmount int64, metadata CommandMetadata) (PaymentDisputeDebitResult, error) {
+	return executeCreditPaymentDisputeDebit(ctx, c.tx, userID, requestedAmount, metadata)
+}
+
+func (c *transactionCommands) executePaymentDisputeRestore(ctx context.Context, userID int64, originalTransactionID string, amount int64, metadata CommandMetadata) (CommandResult, error) {
+	return executeCreditPaymentDisputeRestore(ctx, c.tx, userID, originalTransactionID, amount, metadata)
+}
+
 func (c *sqlTransactionCommands) executePurchase(ctx context.Context, userID, amount int64, metadata CommandMetadata) (CommandResult, error) {
 	return executeSQLCreditPurchase(ctx, c.tx, userID, amount, metadata)
+}
+
+func (c *sqlTransactionCommands) executePaymentDisputeDebit(ctx context.Context, userID, requestedAmount int64, metadata CommandMetadata) (PaymentDisputeDebitResult, error) {
+	return executeSQLCreditPaymentDisputeDebit(ctx, c.tx, userID, requestedAmount, metadata)
+}
+
+func (c *sqlTransactionCommands) executePaymentDisputeRestore(ctx context.Context, userID int64, originalTransactionID string, amount int64, metadata CommandMetadata) (CommandResult, error) {
+	return executeSQLCreditPaymentDisputeRestore(ctx, c.tx, userID, originalTransactionID, amount, metadata)
 }
 
 func (c *transactionCommands) executePurchaseRefund(ctx context.Context, userID int64, holdID string, metadata CommandMetadata) (CommandResult, error) {
@@ -333,6 +413,27 @@ func executePurchaseRefund(ctx context.Context, command PurchaseRefundCommand, e
 		return CommandResult{}, ErrInvalidCommand
 	}
 	return execute(ctx, command.UserID, holdID, metadata)
+}
+
+func executePaymentDisputeDebit(ctx context.Context, command PaymentDisputeDebitCommand, execute paymentDisputeDebitExecutor) (PaymentDisputeDebitResult, error) {
+	metadata, err := normalizeMetadata(command.Metadata)
+	if err != nil || command.UserID <= 0 || !isValidAmount(command.RequestedAmount) ||
+		metadata.Actor.Type != ActorService || metadata.Actor.ID != "payments" ||
+		metadata.Source != "stripe_dispute" || metadata.BusinessReference.Type != "payment_dispute" {
+		return PaymentDisputeDebitResult{}, ErrInvalidCommand
+	}
+	return execute(ctx, command.UserID, command.RequestedAmount.Int64(), metadata)
+}
+
+func executePaymentDisputeRestore(ctx context.Context, command PaymentDisputeRestoreCommand, execute paymentDisputeRestoreExecutor) (CommandResult, error) {
+	metadata, err := normalizeMetadata(command.Metadata)
+	originalID := strings.TrimSpace(command.OriginalTransactionID)
+	if err != nil || command.UserID <= 0 || originalID == "" || len(originalID) > 64 || !isValidAmount(command.Amount) ||
+		metadata.Actor.Type != ActorService || metadata.Actor.ID != "payments" ||
+		metadata.Source != "stripe_dispute" || metadata.BusinessReference.Type != "payment_dispute" {
+		return CommandResult{}, ErrInvalidCommand
+	}
+	return execute(ctx, command.UserID, originalID, command.Amount.Int64(), metadata)
 }
 
 func executeDeduction(ctx context.Context, command DeductionCommand, execute commandExecutor) (CommandResult, error) {

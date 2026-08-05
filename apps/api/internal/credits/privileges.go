@@ -12,6 +12,7 @@ var creditTableNames = []string{
 	"credit_welcome_claims",
 	"credit_welcome_identity_key_guard",
 	"credit_wallet_restrictions",
+	"payment_dispute_debit_requests",
 	"credit_reconciliation_runs",
 	"credit_reconciliation_findings",
 	"credit_reconciliation_run_findings",
@@ -29,6 +30,8 @@ var creditInternalFunctionSignatures = []string{
 const creditCommandFunctionSignature = "execute_credit_command_v2(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
 const creditPurchaseFunctionSignature = "execute_credit_purchase_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
 const creditPurchaseRefundFunctionSignature = "execute_credit_purchase_refund_v1(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
+const creditPaymentDisputeDebitFunctionSignature = "execute_credit_payment_dispute_debit_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
+const creditPaymentDisputeRestoreFunctionSignature = "execute_credit_payment_dispute_restore_v1(BIGINT, TEXT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
 
 var creditLifecycleFunctionSignatures = []string{
 	"bind_credit_welcome_identity_key(TEXT)",
@@ -53,6 +56,8 @@ func RuntimePrivilegePolicy() dbprivileges.Policy {
 		creditCommandFunctionSignature,
 		creditPurchaseFunctionSignature,
 		creditPurchaseRefundFunctionSignature,
+		creditPaymentDisputeDebitFunctionSignature,
+		creditPaymentDisputeRestoreFunctionSignature,
 	}
 	requiredFunctions = append(requiredFunctions, creditLifecycleFunctionSignatures...)
 	requiredFunctions = append(requiredFunctions, creditRestrictionFunctionSignatures...)

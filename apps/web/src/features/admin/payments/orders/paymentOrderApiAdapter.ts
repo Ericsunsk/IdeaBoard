@@ -62,11 +62,17 @@ export type PaymentOrderApiRefund = {
 export type PaymentOrderApiDispute = {
   id?: string
   status: string
+  provider_status?: string
   amount_minor?: number
   currency?: string
-  unrecovered_ideas?: number
+  ratio_basis_points?: number
+  target_idea_quantity?: number
+  debited_idea_quantity?: number
+  unrecovered_credits?: number
+  stripe_dashboard_url?: string
   opened_at?: string
   closed_at?: string
+  updated_at?: string
 }
 
 export type PaymentOrderApiDetail = {

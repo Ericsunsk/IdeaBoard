@@ -240,7 +240,9 @@ function unavailableMessage(reason?: UserPaymentPurchaseOptions['unavailable_rea
     case 'purchases_disabled':
       return '充值功能暂未开放'
     case 'wallet_restricted':
-      return '当前账户暂时无法充值'
+      return props.options?.restriction_type === 'payment_dispute'
+        ? '银行卡 Dispute 处理中，当前账户暂时无法充值或使用 Idea'
+        : '当前账户暂时无法充值'
     default:
       return '充值服务尚未准备好，请稍后再试'
   }

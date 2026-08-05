@@ -47,8 +47,46 @@ func (s *Service) ReconcileDuePaymentOrders(ctx context.Context) error {
 		if refundErr != nil {
 			retryErr = errors.Join(retryErr, refundErr)
 		}
+		disputeErr := s.reconcileDuePaymentDisputes(lockedContext, apiKey, configurationErr, now)
+		if disputeErr != nil {
+			retryErr = errors.Join(retryErr, disputeErr)
+		}
 		return retryErr
 	})
+}
+
+func (s *Service) reconcileDuePaymentDisputes(ctx context.Context, apiKey string, configurationErr error, now time.Time) error {
+	if s == nil || s.repo == nil || s.disputeGateway == nil {
+		return nil
+	}
+	disputes, err := s.repo.ListDuePaymentDisputes(ctx, now, 100)
+	if err != nil {
+		return err
+	}
+	var retryErr error
+	for _, dispute := range disputes {
+		if configurationErr != nil {
+			retryErr = errors.Join(retryErr, configurationErr)
+			continue
+		}
+		provider, retrieveErr := s.disputeGateway.RetrieveDispute(ctx, apiKey, dispute.StripeDisputeID)
+		if retrieveErr != nil {
+			retryErr = errors.Join(retryErr, retrieveErr)
+			continue
+		}
+		updated, changed, convergeErr := s.repo.ConvergePaymentDispute(ctx, provider, now)
+		if convergeErr != nil {
+			retryErr = errors.Join(retryErr, convergeErr)
+			continue
+		}
+		if changed {
+			s.publishDisputeUpdate(updated.UserID)
+		}
+		if expireErr := s.expireDisputeCheckoutSessions(ctx, apiKey, updated); expireErr != nil {
+			retryErr = errors.Join(retryErr, expireErr)
+		}
+	}
+	return retryErr
 }
 
 func (s *Service) reconcileDuePaymentRefunds(ctx context.Context, apiKey string, configurationErr error, now time.Time) error {

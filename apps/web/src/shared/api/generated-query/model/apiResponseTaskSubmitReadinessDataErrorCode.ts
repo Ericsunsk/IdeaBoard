@@ -14,4 +14,5 @@ export const ApiResponseTaskSubmitReadinessDataErrorCode = {
   pricing_unavailable: 'pricing_unavailable',
   provider_unavailable: 'provider_unavailable',
   prompt_unavailable: 'prompt_unavailable',
+  wallet_restricted: 'wallet_restricted',
 } as const

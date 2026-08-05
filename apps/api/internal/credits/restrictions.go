@@ -2,6 +2,7 @@ package credits
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -12,6 +13,12 @@ import (
 
 func (s *Service) RestrictionsInTx(tx pgx.Tx) WalletRestrictionCommands {
 	return &transactionCommands{tx: tx}
+}
+
+// RestrictionsInSQLTx lets Payments compose restriction changes with its
+// database/sql transaction and the same Credits-owned SECURITY DEFINER seam.
+func RestrictionsInSQLTx(tx *sql.Tx) WalletRestrictionCommands {
+	return &sqlTransactionCommands{tx: tx}
 }
 
 func (s *Service) RestrictWallet(
@@ -63,6 +70,24 @@ FROM create_credit_wallet_restriction($1, $2, $3, $4, $5, $6, $7, $8)`,
 	return result, nil
 }
 
+func (c *sqlTransactionCommands) RestrictWallet(ctx context.Context, command RestrictWalletCommand) (WalletRestrictionChange, error) {
+	command, err := normalizeRestrictWalletCommand(command)
+	if err != nil || c == nil || c.tx == nil {
+		return WalletRestrictionChange{}, errOrRestrictionTransaction(err)
+	}
+	var result WalletRestrictionChange
+	err = c.tx.QueryRowContext(ctx, `
+SELECT restriction_id, replayed
+FROM create_credit_wallet_restriction($1, $2, $3, $4, $5, $6, $7, $8)`,
+		command.UserID, command.Type, command.Source, command.RelatedObject.Type,
+		command.RelatedObject.ID, command.Reason, command.Actor.Type, command.Actor.ID,
+	).Scan(&result.RestrictionID, &result.Replayed)
+	if err != nil {
+		return WalletRestrictionChange{}, mapCreditDatabaseError(err)
+	}
+	return result, nil
+}
+
 func (c *transactionCommands) ReleaseWalletRestriction(
 	ctx context.Context,
 	command ReleaseWalletRestrictionCommand,
@@ -88,6 +113,30 @@ FROM release_credit_wallet_restriction($1, $2, $3, $4)`,
 		return WalletRestrictionChange{}, mapCreditDatabaseError(err)
 	}
 	return result, nil
+}
+
+func (c *sqlTransactionCommands) ReleaseWalletRestriction(ctx context.Context, command ReleaseWalletRestrictionCommand) (WalletRestrictionChange, error) {
+	command, err := normalizeReleaseWalletRestrictionCommand(command)
+	if err != nil || c == nil || c.tx == nil {
+		return WalletRestrictionChange{}, errOrRestrictionTransaction(err)
+	}
+	var result WalletRestrictionChange
+	err = c.tx.QueryRowContext(ctx, `
+SELECT restriction_id, replayed
+FROM release_credit_wallet_restriction($1, $2, $3, $4)`,
+		command.RestrictionID, command.Actor.Type, command.Actor.ID, command.Reason,
+	).Scan(&result.RestrictionID, &result.Replayed)
+	if err != nil {
+		return WalletRestrictionChange{}, mapCreditDatabaseError(err)
+	}
+	return result, nil
+}
+
+func errOrRestrictionTransaction(err error) error {
+	if err != nil {
+		return err
+	}
+	return fmt.Errorf("credits restrictions: transaction not configured")
 }
 
 func withManagedRestrictionTransaction(

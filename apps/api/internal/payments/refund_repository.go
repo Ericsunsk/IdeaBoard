@@ -124,11 +124,15 @@ func (r *Repository) CreateExternalPaymentRefund(ctx context.Context, provider S
 	if qty > order.IdeaQuantity {
 		qty = order.IdeaQuantity
 	}
-	var already, alreadyAmount int64
+	var already, alreadyAmount, disputedIdeas, disputedAmount int64
 	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(idea_quantity), 0), COALESCE(SUM(amount_minor), 0) FROM payment_refunds WHERE payment_order_id = $1::uuid AND status IN ('pending', 'succeeded', 'anomaly')`, order.ID).Scan(&already, &alreadyAmount); err != nil {
 		return PaymentRefund{}, err
 	}
-	if qty <= 0 || order.IdeaQuantity-already <= 0 || provider.AmountMinor > order.PaidTotal-alreadyAmount {
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(target_idea_quantity), 0), COALESCE(SUM(amount_minor), 0) FROM payment_disputes WHERE payment_order_id = $1::uuid AND status IN ('open', 'lost')`, order.ID).Scan(&disputedIdeas, &disputedAmount); err != nil {
+		return PaymentRefund{}, err
+	}
+	already += disputedIdeas
+	if qty <= 0 || order.IdeaQuantity-already <= 0 || provider.AmountMinor > order.PaidTotal-alreadyAmount-disputedAmount {
 		return PaymentRefund{}, ErrRefundAmountExceeds
 	}
 	if qty > order.IdeaQuantity-already {
@@ -236,15 +240,18 @@ FROM payment_orders WHERE public_order_number = $1 FOR UPDATE`, input.OrderNumbe
 	if !input.Now.Before(paidAt.Time.Add(refundEligibilityWindow)) {
 		return PaymentRefund{}, false, ErrRefundExpired
 	}
-	var alreadyRefunded, alreadyAmount int64
-	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(idea_quantity), 0), COALESCE(SUM(amount_minor), 0) FROM payment_refunds WHERE payment_order_id = $1::uuid AND status IN ('pending', 'succeeded', 'anomaly')`, order.ID).Scan(&alreadyRefunded, &alreadyAmount); err != nil {
+	var alreadyRefunded, disputedIdeas int64
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(idea_quantity), 0) FROM payment_refunds WHERE payment_order_id = $1::uuid AND status IN ('pending', 'succeeded', 'anomaly')`, order.ID).Scan(&alreadyRefunded); err != nil {
 		return PaymentRefund{}, false, fmt.Errorf("sum existing refunds: %w", err)
 	}
-	remaining := order.IdeaQuantity - alreadyRefunded
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(target_idea_quantity), 0) FROM payment_disputes WHERE payment_order_id = $1::uuid AND status IN ('open', 'lost')`, order.ID).Scan(&disputedIdeas); err != nil {
+		return PaymentRefund{}, false, fmt.Errorf("sum active Disputes: %w", err)
+	}
+	remaining := order.IdeaQuantity - alreadyRefunded - disputedIdeas
 	if remaining <= 0 || input.IdeaQuantity > remaining {
 		return PaymentRefund{}, false, ErrRefundAmountExceeds
 	}
-	amountMinor := proportionalRefundAmount(paidSubtotal.Int64, order.IdeaQuantity, alreadyRefunded, input.IdeaQuantity)
+	amountMinor := proportionalRefundAmount(paidSubtotal.Int64, order.IdeaQuantity, alreadyRefunded+disputedIdeas, input.IdeaQuantity)
 	if amountMinor <= 0 {
 		amountMinor = 1
 	}

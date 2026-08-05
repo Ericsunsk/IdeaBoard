@@ -1148,3 +1148,9 @@ func (failingCreditCommands) Purchase(context.Context, credits.PurchaseCommand) 
 func (failingCreditCommands) PurchaseRefund(context.Context, credits.PurchaseRefundCommand) (credits.CommandResult, error) {
 	return credits.CommandResult{}, fmt.Errorf("unexpected PurchaseRefund")
 }
+func (failingCreditCommands) PaymentDisputeDebit(context.Context, credits.PaymentDisputeDebitCommand) (credits.PaymentDisputeDebitResult, error) {
+	return credits.PaymentDisputeDebitResult{}, fmt.Errorf("unexpected PaymentDisputeDebit")
+}
+func (failingCreditCommands) PaymentDisputeRestore(context.Context, credits.PaymentDisputeRestoreCommand) (credits.CommandResult, error) {
+	return credits.CommandResult{}, fmt.Errorf("unexpected PaymentDisputeRestore")
+}

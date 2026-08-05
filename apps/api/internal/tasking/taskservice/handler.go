@@ -101,6 +101,10 @@ func (h *Handler) SubmitTask(c *gin.Context) {
 			response.MachineError(c, http.StatusServiceUnavailable, "pricing_unavailable", "暂时无法获取报价，请重试")
 			return
 		}
+		if errors.Is(err, taskbilling.ErrWalletRestricted) {
+			response.MachineError(c, http.StatusConflict, "wallet_restricted", "账户受限，暂时无法使用 Idea")
+			return
+		}
 		response.Error(c, 400, userFacingSubmitError(err))
 		return
 	}
@@ -122,6 +126,10 @@ func (h *Handler) CheckSubmitTaskReadiness(c *gin.Context) {
 		slog.Warn("task submit readiness failed", "user_id", userID, "feature", req.Feature, "err", err)
 		if errors.Is(err, taskbilling.ErrPricingUnavailable) {
 			response.MachineError(c, http.StatusServiceUnavailable, "pricing_unavailable", "暂时无法获取报价，请重试")
+			return
+		}
+		if errors.Is(err, taskbilling.ErrWalletRestricted) {
+			response.SuccessDTO(c, submitTaskReadinessResponse{Ready: false, Message: "账户受限，暂时无法使用 Idea", ErrorCode: "wallet_restricted"})
 			return
 		}
 		var submissionErr *SubmissionError

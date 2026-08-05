@@ -453,6 +453,8 @@ func respondIdentityAdminCommandError(c *gin.Context, err error) {
 	switch commandErr.Kind {
 	case IdentityAdminInvalid, IdentityAdminTargetNotFound, IdentityAdminAuthIdentityNotFound:
 		response.Error(c, 400, commandErr.Message)
+	case IdentityAdminConflict:
+		response.Error(c, 409, commandErr.Message)
 	case IdentityAdminForbidden:
 		response.Error(c, 403, commandErr.Message)
 	case IdentityAdminAuthFailure:

@@ -43,6 +43,7 @@ var (
 type PurchaseOptions struct {
 	PurchasesAvailable  bool                 `json:"purchases_available"`
 	UnavailableReason   string               `json:"unavailable_reason,omitempty"`
+	RestrictionType     string               `json:"restriction_type,omitempty"`
 	QuickIdeaQuantities []int64              `json:"quick_idea_quantities"`
 	MinIdeaQuantity     int64                `json:"min_idea_quantity"`
 	MaxIdeaQuantity     int64                `json:"max_idea_quantity"`
@@ -276,6 +277,12 @@ func (s *Service) GetPurchaseOptions(ctx context.Context, userID int64) (Purchas
 	}
 	if wallet.Status != credits.WalletStatusActive || len(wallet.ActiveRestrictions) > 0 {
 		options.UnavailableReason = "wallet_restricted"
+		for _, restriction := range wallet.ActiveRestrictions {
+			if restriction.Type == "payment_dispute" {
+				options.RestrictionType = restriction.Type
+				break
+			}
+		}
 		return options, nil
 	}
 	options.PurchasesAvailable = true

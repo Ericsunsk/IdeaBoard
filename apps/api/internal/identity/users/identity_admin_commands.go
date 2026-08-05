@@ -15,6 +15,7 @@ type IdentityAdminErrorKind string
 
 const (
 	IdentityAdminInvalid                IdentityAdminErrorKind = "invalid"
+	IdentityAdminConflict               IdentityAdminErrorKind = "conflict"
 	IdentityAdminForbidden              IdentityAdminErrorKind = "forbidden"
 	IdentityAdminTargetNotFound         IdentityAdminErrorKind = "target_not_found"
 	IdentityAdminAuthIdentityNotFound   IdentityAdminErrorKind = "auth_identity_not_found"
@@ -200,6 +201,9 @@ func (commands *identityAdminCommands) Delete(ctx context.Context, actor princip
 	// The durable lifecycle owns Auth identity validation for a new deletion and
 	// must also be able to resume after tombstoning has cleared auth_user_id.
 	if err := commands.users.DeleteUser(ctx, target.ID, commands.auth); err != nil {
+		if errors.Is(err, ErrUserDeletionBlockedByPaymentState) {
+			return identityAdminError(IdentityAdminConflict, "存在未结算的 Payment、Refund 或 Dispute，暂不能注销用户", err)
+		}
 		return identityAdminError(IdentityAdminBusinessFailure, "用户删除流程已安全冻结，可重试以继续收敛", err)
 	}
 	return nil

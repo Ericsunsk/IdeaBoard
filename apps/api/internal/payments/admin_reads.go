@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"regexp"
 	"strconv"
 	"strings"
@@ -32,6 +33,7 @@ var (
 	ErrAdminPaymentOrderCursor   = errors.New("支付订单游标无效")
 	ErrAdminPaymentOrderNotFound = errors.New("支付订单不存在")
 	adminPaymentOrderNumber      = regexp.MustCompile(`^IBP-[0-9]{8}-[A-Z0-9]{12}$`)
+	stripeDisputeIDPattern       = regexp.MustCompile(`^dp_[A-Za-z0-9]+$`)
 )
 
 type AdminPaymentOrderListInput struct {
@@ -132,9 +134,19 @@ type AdminPaymentRefundSummary struct {
 
 // AdminPaymentDisputeSummary follows the same safe event-fact boundary.
 type AdminPaymentDisputeSummary struct {
-	ID        string     `json:"id,omitempty"`
-	Status    string     `json:"status"`
-	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+	ID                  string     `json:"id,omitempty"`
+	Status              string     `json:"status"`
+	ProviderStatus      string     `json:"provider_status,omitempty"`
+	AmountMinor         int64      `json:"amount_minor,omitempty"`
+	Currency            string     `json:"currency,omitempty"`
+	RatioBasisPoints    int64      `json:"ratio_basis_points,omitempty"`
+	TargetIdeaQuantity  int64      `json:"target_idea_quantity,omitempty"`
+	DebitedIdeaQuantity int64      `json:"debited_idea_quantity,omitempty"`
+	UnrecoveredCredits  int64      `json:"unrecovered_credits,omitempty"`
+	StripeDashboardURL  string     `json:"stripe_dashboard_url,omitempty"`
+	OpenedAt            *time.Time `json:"opened_at,omitempty"`
+	ClosedAt            *time.Time `json:"closed_at,omitempty"`
+	UpdatedAt           *time.Time `json:"updated_at,omitempty"`
 }
 
 type adminPaymentOrderCursor struct {
@@ -187,11 +199,44 @@ func (s *Service) GetAdminPaymentOrder(ctx context.Context, orderNumber string) 
 			durableStripeRefundIDs[refund.StripeRefundID] = struct{}{}
 		}
 	}
+	durableDisputes, err := s.repo.ListPaymentDisputesForOrder(ctx, orderNumber)
+	if err != nil {
+		return AdminPaymentOrderDetail{}, err
+	}
+	disputeMode := StripeMode("")
+	if len(durableDisputes) > 0 {
+		configuration, configurationErr := s.repo.GetStripeConfiguration(ctx)
+		if configurationErr == nil {
+			disputeMode = configuration.Mode
+		} else if !isConfigurationNotFound(configurationErr) {
+			return AdminPaymentOrderDetail{}, configurationErr
+		}
+	}
+	durableStripeDisputeIDs := make(map[string]struct{}, len(durableDisputes))
+	for _, dispute := range durableDisputes {
+		updatedAt := dispute.UpdatedAt
+		openedAt := dispute.OpenedAt
+		detail.Disputes = append(detail.Disputes, AdminPaymentDisputeSummary{
+			ID: maskPaymentIdentity(dispute.StripeDisputeID), Status: string(dispute.Status),
+			ProviderStatus: dispute.ProviderStatus, AmountMinor: dispute.AmountMinor, Currency: dispute.Currency,
+			RatioBasisPoints:   paymentDisputeRatioBasisPoints(dispute.AmountMinor, detail.PaidTotalMinor),
+			TargetIdeaQuantity: dispute.TargetIdeaQuantity, DebitedIdeaQuantity: dispute.DebitedIdeaQuantity,
+			UnrecoveredCredits: dispute.UnrecoveredCredits,
+			StripeDashboardURL: stripeDisputeDashboardURL(disputeMode, dispute.StripeDisputeID),
+			OpenedAt:           &openedAt, ClosedAt: dispute.ClosedAt, UpdatedAt: &updatedAt,
+		})
+		durableStripeDisputeIDs[dispute.StripeDisputeID] = struct{}{}
+	}
 	if detail.Status == PaymentOrderCredited && detail.PaidAt != nil && s.now().UTC().Before(detail.PaidAt.Add(refundEligibilityWindow)) && s.wallets != nil {
 		remaining := detail.IdeaQuantity
 		for _, refund := range durableRefunds {
 			if refund.Status == PaymentRefundPending || refund.Status == PaymentRefundSucceeded || refund.Status == PaymentRefundAnomaly {
 				remaining -= refund.IdeaQuantity
+			}
+		}
+		for _, dispute := range durableDisputes {
+			if dispute.Status == PaymentDisputeOpen || dispute.Status == PaymentDisputeLost {
+				remaining -= dispute.TargetIdeaQuantity
 			}
 		}
 		if remaining > 0 {
@@ -218,12 +263,41 @@ func (s *Service) GetAdminPaymentOrder(ctx context.Context, orderNumber string) 
 				ID: maskPaymentIdentity(event.StripeObjectID), Status: event.EventType, UpdatedAt: updatedAt,
 			})
 		case "charge.dispute.created", "charge.dispute.closed":
+			if _, durable := durableStripeDisputeIDs[event.StripeObjectID]; durable {
+				continue
+			}
 			detail.Disputes = append(detail.Disputes, AdminPaymentDisputeSummary{
 				ID: maskPaymentIdentity(event.StripeObjectID), Status: event.EventType, UpdatedAt: updatedAt,
 			})
 		}
 	}
 	return detail, nil
+}
+
+func stripeDisputeDashboardURL(mode StripeMode, disputeID string) string {
+	disputeID = strings.TrimSpace(disputeID)
+	if !stripeDisputeIDPattern.MatchString(disputeID) {
+		return ""
+	}
+	if mode == StripeModeTest {
+		return "https://dashboard.stripe.com/test/disputes/" + disputeID
+	}
+	if mode == StripeModeLive {
+		return "https://dashboard.stripe.com/disputes/" + disputeID
+	}
+	return ""
+}
+
+func paymentDisputeRatioBasisPoints(amountMinor int64, paidTotalMinor *int64) int64 {
+	if amountMinor <= 0 || paidTotalMinor == nil || *paidTotalMinor <= 0 {
+		return 0
+	}
+	ratio := new(big.Int).Mul(big.NewInt(amountMinor), big.NewInt(10_000))
+	ratio.Quo(ratio, big.NewInt(*paidTotalMinor))
+	if !ratio.IsInt64() {
+		return 0
+	}
+	return ratio.Int64()
 }
 
 func normalizeAdminPaymentOrderFilters(input AdminPaymentOrderListInput) (adminPaymentOrderFilters, error) {

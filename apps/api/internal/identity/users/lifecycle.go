@@ -21,6 +21,7 @@ import (
 const welcomeGrantCredits int64 = 100
 
 var ErrUserDeletionInProgress = errors.New("user deletion is already in progress")
+var ErrUserDeletionBlockedByPaymentState = errors.New("user deletion is blocked by unsettled payment state")
 
 type VerifiedIdentity struct {
 	AuthUserID            string `json:"auth_user_id"`
@@ -270,6 +271,13 @@ FOR UPDATE`, userID).Scan(&progress.AuthUserID, &progress.StorageUID, &progress.
 		progress.StorageUID = currentStorageUID
 		if strings.TrimSpace(progress.AuthUserID) == "" {
 			return nil, fmt.Errorf("user deletion requires an auth identity")
+		}
+		var hasUnsettledPaymentState bool
+		if err := tx.QueryRow(ctx, `SELECT has_unsettled_payment_state($1)`, userID).Scan(&hasUnsettledPaymentState); err != nil {
+			return nil, fmt.Errorf("check unsettled payment state before user deletion: %w", err)
+		}
+		if hasUnsettledPaymentState {
+			return nil, ErrUserDeletionBlockedByPaymentState
 		}
 		progress.Phase = DeletionPendingAuth
 		if _, err := tx.Exec(ctx, `

@@ -312,6 +312,45 @@ type PaymentCustomer struct {
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
+type PaymentDispute struct {
+	ID                    uuid.UUID      `json:"id"`
+	PaymentOrderID        uuid.UUID      `json:"payment_order_id"`
+	UserID                int64          `json:"user_id"`
+	StripeDisputeID       string         `json:"stripe_dispute_id"`
+	StripeChargeID        string         `json:"stripe_charge_id"`
+	StripePaymentIntentID string         `json:"stripe_payment_intent_id"`
+	ProviderStatus        string         `json:"provider_status"`
+	Status                string         `json:"status"`
+	AmountMinor           int64          `json:"amount_minor"`
+	Currency              string         `json:"currency"`
+	TargetIdeaQuantity    int64          `json:"target_idea_quantity"`
+	DebitedIdeaQuantity   int64          `json:"debited_idea_quantity"`
+	UnrecoveredCredits    int64          `json:"unrecovered_credits"`
+	RestrictionID         uuid.NullUUID  `json:"restriction_id"`
+	DebitTransactionID    sql.NullString `json:"debit_transaction_id"`
+	RestoreTransactionID  sql.NullString `json:"restore_transaction_id"`
+	OpenedAt              time.Time      `json:"opened_at"`
+	ClosedAt              sql.NullTime   `json:"closed_at"`
+	NextReconciliationAt  time.Time      `json:"next_reconciliation_at"`
+	CreatedAt             time.Time      `json:"created_at"`
+	UpdatedAt             time.Time      `json:"updated_at"`
+}
+
+type PaymentDisputeDebitRequest struct {
+	ID                    uuid.UUID      `json:"id"`
+	WalletUserID          int64          `json:"wallet_user_id"`
+	IdempotencyKey        string         `json:"idempotency_key"`
+	RequestHash           string         `json:"request_hash"`
+	RequestedAmount       int64          `json:"requested_amount"`
+	DebitedAmount         int64          `json:"debited_amount"`
+	AvailableBalanceAfter int64          `json:"available_balance_after"`
+	ReservedBalanceAfter  int64          `json:"reserved_balance_after"`
+	CreditTransactionID   sql.NullString `json:"credit_transaction_id"`
+	BusinessReferenceType string         `json:"business_reference_type"`
+	BusinessReferenceID   string         `json:"business_reference_id"`
+	CreatedAt             time.Time      `json:"created_at"`
+}
+
 type PaymentOrder struct {
 	ID                      uuid.UUID      `json:"id"`
 	PublicOrderNumber       string         `json:"public_order_number"`

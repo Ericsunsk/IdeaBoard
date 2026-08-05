@@ -636,6 +636,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InsufficientCreditsError'
+        '409':
+          description: The user's Wallet is restricted from new consumption
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletRestrictedError'
         '503':
           description: The authoritative Task price or transactional submission service is unavailable
           content:
@@ -2504,6 +2510,16 @@ components:
         msg:
           type: string
 
+    WalletRestrictedError:
+      type: object
+      required: [code, msg]
+      properties:
+        code:
+          type: string
+          enum: [wallet_restricted]
+        msg:
+          type: string
+
     User:
       type: object
       required: [id, uid, username, role, status, created_at, updated_at]
@@ -4006,6 +4022,7 @@ components:
       properties:
         purchases_available: { type: boolean }
         unavailable_reason: { type: string, enum: [payments_not_configured, purchases_disabled, wallet_restricted] }
+        restriction_type: { type: string, enum: [payment_dispute] }
         quick_idea_quantities:
           type: array
           items: { type: integer, format: int64, minimum: 500, maximum: 500000 }
@@ -4200,7 +4217,17 @@ components:
       required: [status]
       properties:
         id: { type: string, maxLength: 16 }
-        status: { type: string, enum: [charge.dispute.created, charge.dispute.closed] }
+        status: { type: string, enum: [open, won, lost, charge.dispute.created, charge.dispute.closed] }
+        provider_status: { type: string, maxLength: 64 }
+        amount_minor: { type: integer, format: int64, minimum: 1 }
+        currency: { type: string, pattern: '^[a-z]{3}$' }
+        ratio_basis_points: { type: integer, format: int64, minimum: 0 }
+        target_idea_quantity: { type: integer, format: int64, minimum: 0 }
+        debited_idea_quantity: { type: integer, format: int64, minimum: 0 }
+        unrecovered_credits: { type: integer, format: int64, minimum: 0 }
+        stripe_dashboard_url: { type: string, format: uri, maxLength: 4096 }
+        opened_at: { type: string, format: date-time }
+        closed_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
     AdminPaymentOrderDetail:
@@ -4979,7 +5006,7 @@ components:
                 message: { type: string }
                 error_code:
                   type: string
-                  enum: [submission_invalid, submission_failed, pricing_unavailable, provider_unavailable, prompt_unavailable]
+                  enum: [submission_invalid, submission_failed, pricing_unavailable, provider_unavailable, prompt_unavailable, wallet_restricted]
                 feature: { type: string }
                 billing:
                   $ref: '#/components/schemas/TaskBillingReadiness'

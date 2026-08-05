@@ -6,11 +6,13 @@
  */
 import type { PaymentLegalDocument } from './paymentLegalDocument'
 import type { PaymentPurchaseOptionsIdeasPerUsd } from './paymentPurchaseOptionsIdeasPerUsd'
+import type { PaymentPurchaseOptionsRestrictionType } from './paymentPurchaseOptionsRestrictionType'
 import type { PaymentPurchaseOptionsUnavailableReason } from './paymentPurchaseOptionsUnavailableReason'
 
 export interface PaymentPurchaseOptions {
   purchases_available: boolean
   unavailable_reason?: PaymentPurchaseOptionsUnavailableReason
+  restriction_type?: PaymentPurchaseOptionsRestrictionType
   /**
    * @items.minimum 500
    * @items.maximum 500000

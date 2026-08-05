@@ -174,6 +174,9 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 		if errors.Is(err, taskbilling.ErrPricingUnavailable) {
 			return "", taskbilling.ErrPricingUnavailable
 		}
+		if errors.Is(err, taskbilling.ErrWalletRestricted) {
+			return "", taskbilling.ErrWalletRestricted
+		}
 		return "", newSubmissionError("submission_failed", "任务提交失败，请稍后重试", err)
 	}
 

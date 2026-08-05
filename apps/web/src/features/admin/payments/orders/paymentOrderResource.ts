@@ -119,10 +119,16 @@ function toDisputeSummary(value: PaymentOrderApiDispute): AdminPaymentDisputeSum
   return {
     id: value.id,
     status: value.status,
+    providerStatus: value.provider_status,
     amountMinor: value.amount_minor,
     currency: value.currency,
-    unrecoveredIdeas: value.unrecovered_ideas,
+    ratioBasisPoints: value.ratio_basis_points,
+    targetIdeaQuantity: value.target_idea_quantity,
+    debitedIdeaQuantity: value.debited_idea_quantity,
+    unrecoveredCredits: value.unrecovered_credits,
+    stripeDashboardUrl: value.stripe_dashboard_url,
     openedAt: value.opened_at,
     closedAt: value.closed_at,
+    updatedAt: value.updated_at,
   }
 }

@@ -9,6 +9,9 @@ export type AdminPaymentDisputeSummaryStatus =
   (typeof AdminPaymentDisputeSummaryStatus)[keyof typeof AdminPaymentDisputeSummaryStatus]
 
 export const AdminPaymentDisputeSummaryStatus = {
+  open: 'open',
+  won: 'won',
+  lost: 'lost',
   chargedisputecreated: 'charge.dispute.created',
   chargedisputeclosed: 'charge.dispute.closed',
 } as const

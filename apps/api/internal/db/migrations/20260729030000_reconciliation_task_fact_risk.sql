@@ -44,7 +44,7 @@ BEGIN
     jsonb_build_object('command_type', transactions.command_type, 'actor_type', transactions.actor_type,
       'related_transaction_id', transactions.related_transaction_id, 'command_amount', transactions.command_amount)
   FROM credit_transactions transactions
-  WHERE transactions.command_type NOT IN ('grant', 'deduction', 'hold', 'capture', 'release', 'refund', 'correction', 'purchase_credit', 'purchase_refund')
+  WHERE transactions.command_type NOT IN ('grant', 'deduction', 'hold', 'capture', 'release', 'refund', 'correction', 'purchase_credit', 'purchase_refund', 'payment_dispute_debit', 'payment_dispute_restore')
     OR (transactions.command_type IN ('deduction', 'correction') AND transactions.actor_type <> 'admin')
     OR (transactions.command_type = 'purchase_credit' AND (
       transactions.actor_type <> 'service' OR transactions.actor_id <> 'payments'
@@ -55,6 +55,16 @@ BEGIN
       transactions.actor_type <> 'service' OR transactions.actor_id <> 'payments'
       OR transactions.source <> 'stripe_refund'
       OR transactions.business_reference_type <> 'payment_refund'
+    ))
+    OR (transactions.command_type = 'payment_dispute_debit' AND (
+      transactions.actor_type <> 'service' OR transactions.actor_id <> 'payments'
+      OR transactions.source <> 'stripe_dispute'
+      OR transactions.business_reference_type <> 'payment_dispute'
+    ))
+    OR (transactions.command_type = 'payment_dispute_restore' AND (
+      transactions.actor_type <> 'service' OR transactions.actor_id <> 'payments'
+      OR transactions.source <> 'stripe_dispute'
+      OR transactions.business_reference_type <> 'payment_dispute'
     ))
     OR transactions.command_amount <= 0;
 
@@ -269,16 +279,34 @@ BEGIN
       'related_command_type', related.command_type, 'related_wallet_user_id', related.wallet_user_id)
   FROM credit_transactions transactions
   LEFT JOIN credit_transactions related ON related.transaction_id = transactions.related_transaction_id
-  WHERE (transactions.command_type IN ('grant', 'deduction', 'hold', 'purchase_credit') AND transactions.related_transaction_id IS NOT NULL)
+  WHERE (transactions.command_type IN ('grant', 'deduction', 'hold', 'purchase_credit', 'payment_dispute_debit') AND transactions.related_transaction_id IS NOT NULL)
     OR (transactions.command_type IN ('capture', 'release') AND
       (related.transaction_id IS NULL OR related.command_type <> 'hold' OR related.wallet_user_id <> transactions.wallet_user_id))
     OR (transactions.command_type = 'refund' AND
       (related.transaction_id IS NULL OR related.command_type <> 'capture' OR related.wallet_user_id <> transactions.wallet_user_id))
     OR (transactions.command_type = 'purchase_refund' AND
       (related.transaction_id IS NULL OR related.command_type <> 'hold' OR related.wallet_user_id <> transactions.wallet_user_id))
+    OR (transactions.command_type = 'payment_dispute_restore' AND
+      (related.transaction_id IS NULL OR related.command_type <> 'payment_dispute_debit' OR related.wallet_user_id <> transactions.wallet_user_id
+       OR related.business_reference_type <> transactions.business_reference_type
+       OR related.business_reference_id <> transactions.business_reference_id))
     OR (transactions.command_type = 'correction' AND
       (related.transaction_id IS NULL OR related.command_type NOT IN ('grant', 'deduction', 'refund')
        OR related.actor_type <> 'admin' OR related.wallet_user_id <> transactions.wallet_user_id));
+
+  INSERT INTO reconciliation_scan
+  SELECT 'payment_dispute_restore_exceeds_debit', 'critical', 'high', debit.wallet_user_id,
+    'transaction', debit.transaction_id,
+    jsonb_build_object('debited_amount', debit.command_amount, 'restored_amount', COALESCE(restores.amount, 0))
+  FROM credit_transactions debit
+  LEFT JOIN LATERAL (
+    SELECT SUM(command_amount) AS amount
+    FROM credit_transactions restore
+    WHERE restore.command_type = 'payment_dispute_restore'
+      AND restore.related_transaction_id = debit.transaction_id
+  ) restores ON TRUE
+  WHERE debit.command_type = 'payment_dispute_debit'
+    AND COALESCE(restores.amount, 0) > debit.command_amount;
 
   INSERT INTO reconciliation_scan
   SELECT 'hold_state_invalid', 'critical', 'high', holds.wallet_user_id, 'hold', holds.hold_transaction_id,

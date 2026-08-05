@@ -305,6 +305,15 @@ func TestIdentityAdminCommandsRevokeSessionsIsRetryable(t *testing.T) {
 	})
 }
 
+func TestIdentityAdminCommandsDeleteReportsUnsettledPaymentConflict(t *testing.T) {
+	commands, users, _, events := newIdentityAdminCommandFixture("user", 1)
+	users.deleteErrors = []error{ErrUserDeletionBlockedByPaymentState}
+
+	err := commands.Delete(context.Background(), identityAdminActor(t), 42)
+	assertIdentityAdminErrorKind(t, err, IdentityAdminConflict)
+	assertIdentityAdminEvents(t, events, "local-delete")
+}
+
 func TestIdentityAdminCommandsOwnTargetPolicy(t *testing.T) {
 	tests := []struct {
 		name   string
