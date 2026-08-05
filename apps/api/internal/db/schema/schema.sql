@@ -3594,7 +3594,8 @@ FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE FUNCTION has_unsettled_payment_state(p_user_id BIGINT)
 RETURNS BOOLEAN
 AS $$
-  SELECT EXISTS (
+BEGIN
+  RETURN EXISTS (
     SELECT 1 FROM payment_orders
     WHERE user_id = p_user_id
       AND status IN ('creating', 'checkout_open', 'async_payment_pending', 'paid_pending_credit')
@@ -3606,8 +3607,11 @@ AS $$
     SELECT 1 FROM payment_disputes
     WHERE user_id = p_user_id
       AND status IN ('open', 'lost')
-  )
-$$ LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = pg_catalog;
+  );
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog;
+
+REVOKE ALL ON FUNCTION has_unsettled_payment_state(BIGINT) FROM PUBLIC;
 
 -- Bind the SECURITY DEFINER function to the Payments schema that owns its tables.
 DO $$

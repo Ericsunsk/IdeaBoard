@@ -27,4 +27,6 @@ WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'auth_user')
 
 SELECT format('ALTER ROLE %I LOGIN PASSWORD %L', :'auth_user', :'auth_password')
 \gexec
+
+ALTER SCHEMA public OWNER TO ideaboard;
 SQL
