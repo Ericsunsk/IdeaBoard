@@ -46,6 +46,7 @@ output/
 !apps/auth/.env.example
 !apps/web/.env.example
 !docker/.env.example
+docker/migration.env
 
 # ===== Release Artifacts =====
 release/

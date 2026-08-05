@@ -13,9 +13,13 @@
 ```bash
 cd docker
 cp .env.example .env
+cp migration.env.example migration.env
+# migration.env 的 DB_MIGRATION_PASSWORD 必须与 .env 的 POSTGRES_PASSWORD 相同。
 # compose.local.yml 仅启动本地开发依赖（PostgreSQL + NATS），不包含应用容器。
 docker compose -f compose.local.yml up -d
 ```
+
+`migration.env` 只供本地 API/Auth migration command 临时加载，已由 Git 忽略，不要把其中的 schema owner credential 复制到长期运行的 API/Auth `.env`。完整迁移顺序与命令见 [DEVELOPMENT.md](../DEVELOPMENT.md)。
 
 查看状态：
 
@@ -142,4 +146,4 @@ docker compose -f compose.local.yml up -d
 2. `apps/api/.env` 使用 API runtime credential，`apps/auth/.env` 使用 Auth runtime credential；两个 migration command 才使用固定 owner `ideaboard` 与 `POSTGRES_PASSWORD`。
 3. owner、API runtime、Auth runtime 三个 roles 必须不同；本地旧 volume 没有 runtime roles 时，重建开发 volume。
 
-> 说明：`APP_BASE_URL` 和 `API_BASE_URL` 是 compose / deploy 层输入；API 容器读取 CORS 与 Auth 内部地址，分享链接和上传素材访问地址在后台「系统设置」里配置，Auth 容器读取由 `API_BASE_URL` 派生的 `BETTER_AUTH_URL`。`DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` 只提供给一次性的 migration command/container，不进入长期运行的 API/Auth container；本地命令所需的 migration-only 示例见 `docker/migration.env.example`。
+> 说明：`APP_BASE_URL` 和 `API_BASE_URL` 是 compose / deploy 层输入；API 容器读取 CORS 与 Auth 内部地址，分享链接和上传素材访问地址在后台「系统设置」里配置，Auth 容器读取由 `API_BASE_URL` 派生的 `BETTER_AUTH_URL`。`DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` 只提供给一次性的 migration command/container，不进入长期运行的 API/Auth container；本地命令从 `docker/migration.env.example` 创建已被 Git 忽略的 `docker/migration.env`。

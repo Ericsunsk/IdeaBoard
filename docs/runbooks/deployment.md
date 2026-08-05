@@ -208,7 +208,7 @@ Migration 前失败会恢复 `.env` snapshot；migration 后失败不会自动 r
 - `ideaboard doctor` 会展示最近 backup 的路径、`checksum=valid|invalid|missing|unchecked`、是否加密，以及最近 release 记录中的 backup 阶段状态。
 - 当前 DB restore 仍需人工确认；脚本不会在 migration 后失败时自动回滚数据库。
 
-当前 Docker stack 只管理 PostgreSQL 数据库。首次部署或切换部署形态前，请先确认目标 PostgreSQL 中已有需要保留的数据，或明确按空库初始化。
+当前 Docker stack 中唯一的关系型数据库是 PostgreSQL；stack 同时管理 API、Auth、NATS JetStream 与 uploads volume。首次部署或切换部署形态前，请先确认目标 PostgreSQL 中已有需要保留的数据，或明确按空库初始化。
 
 <a id="api-database-baseline"></a>
 

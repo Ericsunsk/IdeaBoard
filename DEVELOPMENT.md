@@ -8,7 +8,7 @@
 
 | 组件 | 建议版本 |
 | ---- | -------- |
-| Node.js | `22.18+` |
+| Node.js | `22.22.2` |
 | Go | `1.26.5+` |
 | PostgreSQL | `17+` |
 
@@ -17,7 +17,9 @@
 ```bash
 cd docker
 cp .env.example .env
-# 至少修改 POSTGRES_PASSWORD、API_DB_PASSWORD 与 AUTH_DB_PASSWORD
+cp migration.env.example migration.env
+# 至少修改 POSTGRES_PASSWORD、API_DB_PASSWORD 与 AUTH_DB_PASSWORD；
+# migration.env 的 DB_MIGRATION_PASSWORD 必须与 POSTGRES_PASSWORD 相同。
 docker compose -f compose.local.yml up -d
 ```
 
@@ -26,6 +28,9 @@ docker compose -f compose.local.yml up -d
 ```bash
 cd apps/api
 cp .env.example .env
+set -a
+source ../../docker/migration.env
+set +a
 go run ./cmd migrate
 ```
 
@@ -33,6 +38,9 @@ go run ./cmd migrate
 cd apps/auth
 cp .env.example .env
 npm install
+set -a
+source ../../docker/migration.env
+set +a
 npm run migrate
 ```
 
@@ -60,8 +68,13 @@ npm run dev
 
 ```bash
 cd apps/api
-INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin
+INIT_ADMIN_EMAIL='admin@example.com' \
+INIT_ADMIN_USERNAME='admin' \
+INIT_ADMIN_PASSWORD='your-strong-password' \
+  go run ./cmd init-admin
 ```
+
+`INIT_ADMIN_PASSWORD` 必须为 10–128 个字符；执行命令前 Auth Service 必须已启动。
 
 初始化已有开发身份的 Credit Wallet 时，传入 Auth 导出的 trusted canonical registration identity JSON；该命令幂等，普通 API startup 不会扫描用户。`CREDITS_WELCOME_IDENTITY_KEY` 首次使用后会在数据库绑定 fingerprint，误更换会 fail closed，不能当作普通可轮换 secret：
 
@@ -117,7 +130,7 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 | [CanvasPage.vue](./apps/web/src/features/canvas/pages/CanvasPage.vue) | Canvas route page |
 | [executionContract.ts](./apps/web/src/features/canvas/execution/contracts/executionContract.ts) | 前端 workflow feature contract |
 | [useFlowPromptGenerationOrchestrator.ts](./apps/web/src/features/canvas/composables/useFlowPromptGenerationOrchestrator.ts) | Prompt/node execution orchestration |
-| [useFlowImageDirectActions.ts](./apps/web/src/features/canvas/execution/runtime/useFlowImageDirectActions.ts) | Image node direct actions |
+| [useFlowImageActionOrchestrator.ts](./apps/web/src/features/canvas/composables/useFlowImageActionOrchestrator.ts) | Image node direct actions |
 | [taskEvents.ts](./apps/web/src/shared/api/taskEvents.ts) | Task SSE events |
 | [features.go](./apps/api/internal/workflow/features.go) | 后端 canonical feature contract |
 
@@ -148,7 +161,7 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 | [service_client.go](./apps/api/internal/identity/auth/service_client.go) | Go -> Auth internal client |
 | [index.ts](./apps/auth/src/index.ts) | Auth service routes |
 | [client.ts](./apps/web/src/shared/auth/client.ts) | Web auth client |
-| [user.ts](./apps/web/src/app/stores/user.ts) | User session store |
+| [authSession.ts](./apps/web/src/features/auth/session/authSession.ts) | User session store |
 | [docs/runbooks/auth-operations.md](./docs/runbooks/auth-operations.md) | Auth operation rules |
 
 ### Credits
@@ -217,16 +230,16 @@ sqlc:
 
 | 变量 | 说明 |
 | ---- | ---- |
-| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | API runtime PostgreSQL 连接；runtime role 不拥有 schema |
-| `DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` | 仅 `go run ./cmd migrate` 使用的 schema owner；必须与 `DB_USER` 不同 |
-
-Auth 使用相同的 owner/runtime separation：长期运行的 Auth 读取 `DB_USER=ideaboard_auth`，`npm run migrate` 通过 `DB_MIGRATION_USER` 临时使用 owner，并在完成后只授予 Better Auth tables 权限。
+| `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` / `DB_NAME` | 当前 API/Auth 进程的 runtime PostgreSQL 连接；runtime role 不拥有 schema |
+| `DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` | 仅 API/Auth migration command 使用的 schema owner；必须与 `DB_USER` 不同 |
 | `AUTH_SERVICE_BASE_URL` | Go 调用 Auth service 的地址 |
 | `AUTH_INTERNAL_KEY` | API/Auth internal endpoint 共享密钥 |
 | `APP_SECRETS_ENCRYPTION_KEY` | API key 和 storage secret 静态加密主密钥 |
 | `REWARDS_CODE_HMAC_KEYS` | Rewards Code current/previous keyed-HMAC JSON registry；key 至少 32 bytes，不能放入 Admin settings |
 | `BETTER_AUTH_SECRET` | Better Auth 签名密钥，生产必须高熵 |
 | `BETTER_AUTH_URL` | Auth 对外基准 URL |
+
+Auth 使用相同的 owner/runtime separation：长期运行的 Auth 读取 `DB_USER=ideaboard_auth`，`npm run migrate` 通过 `DB_MIGRATION_USER` 临时使用 owner，并在完成后只授予 Better Auth tables 权限。本地 migration credential 只放在已忽略的 `docker/migration.env`，不要复制进 API/Auth runtime `.env`。
 
 Docker compose / deploy 层的 `APP_BASE_URL` 与 `API_BASE_URL` 是部署输入变量，不是 API runtime 直接读取的公开链接配置。生产部署细节见 [docs/runbooks/deployment.md](./docs/runbooks/deployment.md)。
 
@@ -276,14 +289,17 @@ docs/runbooks/               # deployment, operations, security runbooks
 scripts/                     # packaging, deployment and release scripts
 
 apps/web/src/
-├── app/                      # app startup, router, store wiring
+├── app/                      # app startup, router, theme wiring
 ├── features/                 # business modules
-│   ├── canvas/               # Canvas Workspace
-│   ├── boards/               # board list/preview/sync
+│   ├── account-management/   # user account settings
 │   ├── admin/                # Admin vertical contexts
 │   ├── auth/                 # login/register views
-│   ├── user/                 # user layout shell
-│   └── profile/              # user center
+│   ├── board-catalog/        # board list and previews
+│   ├── canvas/               # Canvas Workspace
+│   ├── canvas-board/         # board domain and persistence
+│   ├── legal/                # legal pages
+│   ├── user/                 # user routes and layout
+│   └── user-shell/           # user navigation and shell controls
 └── shared/                   # cross-feature API/auth/types/utils/assets
 
 apps/api/

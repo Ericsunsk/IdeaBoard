@@ -62,10 +62,17 @@ API_BASE_URL=https://api.example.com
 
 ```text
 apps/web/
-├── src/app/                  # 入口、router、store 装配
+├── src/app/                  # 入口、router、theme 装配
 ├── src/features/             # 领域功能模块
-│   ├── user/pages/           # 用户侧路由级页面容器
-│   └── canvas/            # 画布、节点与执行链路
+│   ├── account-management/   # 用户账号设置
+│   ├── admin/                # Admin vertical contexts
+│   ├── auth/                 # 登录、注册与 session
+│   ├── board-catalog/        # 画板列表与预览
+│   ├── canvas/               # 画布、节点与执行链路
+│   ├── canvas-board/         # 画板 domain 与持久化
+│   ├── legal/                # 法务页面
+│   ├── user/                 # 用户路由与布局
+│   └── user-shell/           # 用户导航与 shell controls
 ├── src/shared/               # 共享 API、auth、composables、types、utils、assets
 │   └── api/generated-query/  # Orval 生成代码，不手动编辑
 └── vite.config.ts            # 开发代理

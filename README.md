@@ -47,7 +47,7 @@ Canvas 节点编排 -> Workflow feature contract -> Task 提交 -> River Worker 
 
 | 层 | 技术 |
 | -- | ---- |
-| Web | Vue 3, Vite, TypeScript, Tailwind CSS v4, PrimeVue v4 unstyled, Pinia, Vue Flow |
+| Web | Vue 3, Vite, TypeScript, Tailwind CSS v4, PrimeVue v4 unstyled, Vue Flow |
 | API | Go, Gin, sqlc, River |
 | Auth | Better Auth, Fastify, TypeScript |
 | Data | PostgreSQL 17 |
@@ -69,7 +69,7 @@ Canvas 节点编排 -> Workflow feature contract -> Task 提交 -> River Worker 
 
 | 组件 | 版本 |
 | ---- | ---- |
-| Node.js | `22.18+` |
+| Node.js | `22.22.2` |
 | Go | `1.26.5+` |
 | PostgreSQL | `17+` |
 
@@ -78,30 +78,44 @@ Canvas 节点编排 -> Workflow feature contract -> Task 提交 -> River Worker 
 ```bash
 cd docker
 cp .env.example .env
-# 至少修改 POSTGRES_PASSWORD、API_DB_PASSWORD 与 AUTH_DB_PASSWORD
+cp migration.env.example migration.env
+# 至少修改 POSTGRES_PASSWORD、API_DB_PASSWORD 与 AUTH_DB_PASSWORD；
+# migration.env 的 DB_MIGRATION_PASSWORD 必须与 POSTGRES_PASSWORD 相同。
 docker compose -f compose.local.yml up -d
 ```
 
-2. 启动 Auth：
+2. 初始化 API schema：
+
+```bash
+cd apps/api
+cp .env.example .env
+set -a
+source ../../docker/migration.env
+set +a
+go run ./cmd migrate
+```
+
+3. 初始化并启动 Auth：
 
 ```bash
 cd apps/auth
 cp .env.example .env
 npm install
+set -a
+source ../../docker/migration.env
+set +a
 npm run migrate
 npm run dev
 ```
 
-3. 启动 Go API：
+4. 启动 Go API：
 
 ```bash
 cd apps/api
-cp .env.example .env
-go run ./cmd migrate
 go run ./cmd
 ```
 
-4. 启动 Web：
+5. 启动 Web：
 
 ```bash
 cd apps/web
@@ -109,12 +123,17 @@ npm install
 npm run dev
 ```
 
-5. 初始化管理员：
+6. 初始化管理员：
 
 ```bash
 cd apps/api
-INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin
+INIT_ADMIN_EMAIL='admin@example.com' \
+INIT_ADMIN_USERNAME='admin' \
+INIT_ADMIN_PASSWORD='your-strong-password' \
+  go run ./cmd init-admin
 ```
+
+`INIT_ADMIN_PASSWORD` 必须为 10–128 个字符；执行命令前 Auth Service 必须已启动。
 
 访问地址：
 
