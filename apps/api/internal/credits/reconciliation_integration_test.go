@@ -379,6 +379,7 @@ func TestReconciliationSeparatesBillingSnapshotRiskFromTaskTraceAnomaly(t *testi
 	service.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{})
 	ctx := t.Context()
 	const userID int64 = 96
+	ensureAdminOperationUser(t, pool, userID)
 	if _, err := service.Grant(ctx, GrantCommand{UserID: userID, Amount: mustCreditAmount(t, 30), Metadata: testMetadata("reconciliation-fact-split:grant", "reconciliation-fact-split-grant")}); err != nil {
 		t.Fatal(err)
 	}
@@ -395,6 +396,15 @@ func TestReconciliationSeparatesBillingSnapshotRiskFromTaskTraceAnomaly(t *testi
 	createReconciliationTaskFixture(t, db, service, brokenTaskTraceID, "pending", "", userID, priceID, priceVersion)
 
 	if _, err := db.ExecContext(ctx, `ALTER TABLE task_billing_snapshots DISABLE TRIGGER task_billing_snapshots_immutable`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE task_billing_settlements DISABLE TRIGGER task_billing_settlements_state_machine`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM task_billing_settlements WHERE task_id = $1`, missingSnapshotTaskID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `ALTER TABLE task_billing_settlements ENABLE TRIGGER task_billing_settlements_state_machine`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.ExecContext(ctx, `DELETE FROM task_billing_snapshots WHERE task_id = $1`, missingSnapshotTaskID); err != nil {
@@ -483,6 +493,9 @@ WHERE related_object_type = 'finding' AND related_object_id = $1 AND released_at
 	}
 
 	insertReconciliationTaskBillingSnapshot(t, db, missingSnapshotTaskID, userID, priceID, priceVersion, missingSnapshotHold)
+	if _, err := db.ExecContext(ctx, `INSERT INTO task_billing_settlements(task_id,state) VALUES ($1,'held')`, missingSnapshotTaskID); err != nil {
+		t.Fatal(err)
+	}
 	third := executeReconciliationRun(t, service)
 	if got := countRows(t, db, `SELECT COUNT(*) FROM credit_wallet_restrictions WHERE related_object_type = 'finding' AND related_object_id = $1 AND released_at IS NULL`, strconv.FormatInt(billingSnapshotFinding.ID, 10)); got != 0 {
 		t.Fatalf("recovered Billing Snapshot restriction count = %d, want 0", got)
@@ -512,6 +525,7 @@ func TestReconciliationTreatsCorruptTerminalFactsAsHighRiskInsteadOfTaskTrace(t 
 	service.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{})
 	ctx := t.Context()
 	const userID int64 = 97
+	ensureAdminOperationUser(t, pool, userID)
 	if _, err := service.Grant(ctx, GrantCommand{UserID: userID, Amount: mustCreditAmount(t, 20), Metadata: testMetadata("terminal-fact-risk:grant", "terminal-fact-risk-grant")}); err != nil {
 		t.Fatal(err)
 	}
@@ -1072,10 +1086,18 @@ func createReconciliationTaskFixture(t *testing.T, db *sql.DB, service *Service,
 
 func insertReconciliationTaskBillingSnapshot(t testing.TB, db *sql.DB, taskID string, userID, priceID, priceVersion int64, holdTransactionID string) {
 	t.Helper()
-	if _, err := db.ExecContext(t.Context(), `
-INSERT INTO task_billing_snapshots(task_id,user_id,feature_slug,model,sku,display_name,price_version_id,price_version,unit_credits,quantity,total_credits,quoted_at,hold_transaction_id)
-VALUES ($1,$2,'test','test','test:reconciliation','Reconciliation',$3,$4,5,1,5,clock_timestamp(),$5)`, taskID, userID, priceID, priceVersion, holdTransactionID); err != nil {
+	result, err := db.ExecContext(t.Context(), `
+INSERT INTO task_billing_snapshots(task_id,user_id,feature_slug,sku,display_name,price_version_id,price_version,unit_credits,quantity,total_credits,quoted_at,hold_transaction_id)
+SELECT $1, $2, 'test', prices.sku, skus.display_name, prices.price_version_id, prices.version,
+       prices.unit_credits, 1, prices.unit_credits, clock_timestamp(), $5
+FROM billing_price_versions prices
+JOIN billing_skus skus ON skus.sku = prices.sku
+WHERE prices.price_version_id = $3 AND prices.version = $4`, taskID, userID, priceID, priceVersion, holdTransactionID)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if rows, err := result.RowsAffected(); err != nil || rows != 1 {
+		t.Fatalf("insert task Billing snapshot rows=%d error=%v", rows, err)
 	}
 }
 

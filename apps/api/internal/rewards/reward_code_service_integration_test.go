@@ -1145,6 +1145,9 @@ func (failingCreditCommands) Refund(context.Context, credits.RefundCommand) (cre
 func (failingCreditCommands) Purchase(context.Context, credits.PurchaseCommand) (credits.CommandResult, error) {
 	return credits.CommandResult{}, fmt.Errorf("unexpected Purchase")
 }
+func (failingCreditCommands) PurchaseRefundHold(context.Context, credits.PurchaseRefundHoldCommand) (credits.CommandResult, error) {
+	return credits.CommandResult{}, fmt.Errorf("unexpected PurchaseRefundHold")
+}
 func (failingCreditCommands) PurchaseRefund(context.Context, credits.PurchaseRefundCommand) (credits.CommandResult, error) {
 	return credits.CommandResult{}, fmt.Errorf("unexpected PurchaseRefund")
 }

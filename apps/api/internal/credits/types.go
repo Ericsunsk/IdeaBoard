@@ -89,6 +89,12 @@ type PurchaseCommand struct {
 	Metadata CommandMetadata
 }
 
+type PurchaseRefundHoldCommand struct {
+	UserID   int64
+	Amount   CreditAmount
+	Metadata CommandMetadata
+}
+
 type PurchaseRefundCommand struct {
 	UserID            int64
 	HoldTransactionID string
@@ -163,6 +169,7 @@ type RefundCommand struct {
 type Commands interface {
 	Grant(context.Context, GrantCommand) (CommandResult, error)
 	Purchase(context.Context, PurchaseCommand) (CommandResult, error)
+	PurchaseRefundHold(context.Context, PurchaseRefundHoldCommand) (CommandResult, error)
 	PurchaseRefund(context.Context, PurchaseRefundCommand) (CommandResult, error)
 	PaymentDisputeDebit(context.Context, PaymentDisputeDebitCommand) (PaymentDisputeDebitResult, error)
 	PaymentDisputeRestore(context.Context, PaymentDisputeRestoreCommand) (CommandResult, error)

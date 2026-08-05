@@ -183,7 +183,7 @@ func seedUsageLoadTaskSnapshots(
 	}
 	if _, err := db.ExecContext(ctx, `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, feature_slug, model, sku, display_name, price_version_id, price_version,
+  task_id, user_id, feature_slug, sku, display_name, price_version_id, price_version,
   unit_credits, quantity, total_credits, quoted_at, created_at
 )
 SELECT
@@ -193,7 +193,6 @@ SELECT
     ELSE $3::bigint + 1 + ((series - $2::bigint - 1) % ($4::bigint - 1))
   END,
   'pattern-gen',
-  'usage-load-model',
   $5,
   'Usage Load Test',
   $6,

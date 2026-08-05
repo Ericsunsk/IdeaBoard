@@ -26,7 +26,7 @@ Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示�
 
 ## Public Seams
 
-- `Commands` 是唯一应用写入入口，统一提供 Grant、Deduct、Hold、Capture、Release、Refund、Purchase、PurchaseRefund、PaymentDisputeDebit 与 PaymentDisputeRestore；外部支付命令使用独立 typed `SECURITY DEFINER` routines，其余命令通过 `execute_credit_command_v2`。
+- `Commands` 是唯一应用写入入口，统一提供 Grant、Deduct、Hold、Capture、Release、Refund、Purchase、PurchaseRefundHold、PurchaseRefund、PaymentDisputeDebit 与 PaymentDisputeRestore；外部支付命令使用独立 typed `SECURITY DEFINER` routines，其余命令通过 `execute_credit_command_v2`。
 - `Service.InTx(pgx.Tx)` 与 transaction-scoped `CommandsInSQLTx(*sql.Tx)` 是同一 `Commands` contract 的 caller-owned transaction adapters：Task/River submission 使用 pgx，`taskbilling.SettleTerminal` 使用 database/sql；caller 都拥有 commit/rollback。Task Repository 不持有 application-lifetime Credits/Billing dependency。
 - `WalletReader` 提供 Wallet balance 与 keyset-paginated Ledger 查询。
 - `WalletRestrictionCommands` 通过 transaction-capable typed seam 幂等创建和精确解除 Restriction；其他 context 不得直接写 Restriction table。
@@ -51,7 +51,7 @@ Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示�
 - actor、source、reason 和 business reference 必填并写入不可变 Transaction。
 - Deduction 是仅限 Admin actor 的新 immutable `user_available → system_sink` transaction，永不消费 reserved。Correction 仅限 authenticated Admin，并以原 Posting 的反向 Posting 追加记录；允许关联原 Admin Grant/Deduction/Refund，或固定 `source=reward_redemption` 的 user-origin Grant，其他非 Admin-origin Grant 仍拒绝。Capture 更正使用 linked Refund。
 - frozen 或匿名化 tombstone Wallet 的历史仍可读。discretionary Grant/Deduction/Hold 被拒绝；既有 Hold 的 Capture/Release 必须继续收敛，authenticated Admin linked Refund/Correction 仍可用于修复，Wallet 不可开始新的消费。
-- Wallet lifecycle status 与 active Restriction 是正交状态。Grant、Deduction、Hold 仅在 lifecycle active 且不存在 active Restriction 时允许；Capture、Release 必须继续收敛既有 Hold，authenticated Admin linked Refund/Correction 继续承担修复职责。Command 的 idempotency replay 在当前 gate 前返回原结果。
+- Wallet lifecycle status 与 active Restriction 是正交状态。Grant、Deduction、Hold 仅在 lifecycle active 且不存在 active Restriction 时允许；Payments typed PurchaseRefundHold 不是消费，在 lifecycle active 时可绕过 Restriction 预留待退 Ideas；Capture、Release 必须继续收敛既有 Hold，authenticated Admin linked Refund/Correction 继续承担修复职责。Command 的 idempotency replay 在当前 gate 前返回原结果。
 - Restriction create/release 先锁 Wallet row，与 Credit Command gate 线性化；同一 `(Wallet, type, source, related object)` 仅允许一个 active row，解除保留历史且不会清除其他来源的 Restriction。
 - Auth public registration 使用 canonical Email、username 和 Password；Email verification 成功后由 `canonical_email` verified identity 触发 Wallet provisioning，不再生成 synthetic Email。
 - Reconciliation scan 使用 MVCC reads，不锁 Ledger/Account 热行；DB advisory lock 与 active-run unique index 双重保证同一时刻仅有一个 active run。

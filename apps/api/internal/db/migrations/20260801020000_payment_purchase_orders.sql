@@ -80,8 +80,11 @@ CREATE TABLE payment_orders (
   CONSTRAINT ck_payment_order_state_facts CHECK (
     (status = 'creating' AND stripe_customer_id = '' AND stripe_checkout_session_id IS NULL
       AND checkout_url = '' AND credit_transaction_id IS NULL AND paid_total_minor IS NULL)
-    OR (status IN ('checkout_open', 'async_payment_pending') AND stripe_customer_id <> ''
+    OR (status = 'checkout_open' AND stripe_customer_id <> ''
       AND stripe_checkout_session_id IS NOT NULL AND checkout_url <> ''
+      AND credit_transaction_id IS NULL AND paid_total_minor IS NULL)
+    OR (status = 'async_payment_pending' AND stripe_customer_id <> ''
+      AND stripe_checkout_session_id IS NOT NULL AND checkout_url = ''
       AND credit_transaction_id IS NULL AND paid_total_minor IS NULL)
     OR (status = 'paid_pending_credit' AND stripe_customer_id <> '' AND stripe_checkout_session_id IS NOT NULL
       AND stripe_payment_intent_id <> '' AND credit_transaction_id IS NULL
@@ -96,7 +99,7 @@ CREATE TABLE payment_orders (
       AND paid_currency = '' AND receipt_url = '' AND credit_transaction_id IS NULL
       AND paid_at IS NULL AND credited_at IS NULL
       AND ((stripe_checkout_session_id IS NULL AND stripe_customer_id = '' AND checkout_url = '')
-        OR (stripe_checkout_session_id IS NOT NULL AND stripe_customer_id <> '' AND checkout_url <> '')))
+        OR (stripe_checkout_session_id IS NOT NULL AND stripe_customer_id <> '' AND checkout_url = '')))
   )
 );
 
@@ -138,7 +141,7 @@ BEGIN
      AND OLD.stripe_checkout_session_id IS DISTINCT FROM NEW.stripe_checkout_session_id THEN
     RAISE EXCEPTION 'payment order Checkout Session is immutable once assigned';
   END IF;
-  IF OLD.checkout_url <> '' AND OLD.checkout_url <> NEW.checkout_url THEN
+  IF OLD.checkout_url <> '' AND NEW.checkout_url <> '' AND OLD.checkout_url <> NEW.checkout_url THEN
     RAISE EXCEPTION 'payment order Checkout URL is immutable once assigned';
   END IF;
   IF OLD.stripe_checkout_session_id IS NOT NULL AND OLD.expires_at <> NEW.expires_at THEN

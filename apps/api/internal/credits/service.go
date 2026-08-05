@@ -72,6 +72,12 @@ func (s *Service) Purchase(ctx context.Context, command PurchaseCommand) (Comman
 	})
 }
 
+func (s *Service) PurchaseRefundHold(ctx context.Context, command PurchaseRefundHoldCommand) (CommandResult, error) {
+	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (CommandResult, error) {
+		return commands.PurchaseRefundHold(ctx, command)
+	})
+}
+
 func (s *Service) PurchaseRefund(ctx context.Context, command PurchaseRefundCommand) (CommandResult, error) {
 	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (CommandResult, error) {
 		return commands.PurchaseRefund(ctx, command)
@@ -272,6 +278,10 @@ func (c *transactionCommands) Hold(ctx context.Context, command HoldCommand) (Co
 	return executeHold(ctx, command, c.execute)
 }
 
+func (c *transactionCommands) PurchaseRefundHold(ctx context.Context, command PurchaseRefundHoldCommand) (CommandResult, error) {
+	return executePurchaseRefundHold(ctx, command, c.executePurchaseRefundHold)
+}
+
 func (c *transactionCommands) PurchaseRefund(ctx context.Context, command PurchaseRefundCommand) (CommandResult, error) {
 	return executePurchaseRefund(ctx, command, c.executePurchaseRefund)
 }
@@ -316,6 +326,10 @@ func (c *sqlTransactionCommands) Hold(ctx context.Context, command HoldCommand) 
 	return executeHold(ctx, command, c.execute)
 }
 
+func (c *sqlTransactionCommands) PurchaseRefundHold(ctx context.Context, command PurchaseRefundHoldCommand) (CommandResult, error) {
+	return executePurchaseRefundHold(ctx, command, c.executeSQLPurchaseRefundHold)
+}
+
 func (c *sqlTransactionCommands) PurchaseRefund(ctx context.Context, command PurchaseRefundCommand) (CommandResult, error) {
 	return executePurchaseRefund(ctx, command, c.executeSQLPurchaseRefund)
 }
@@ -342,6 +356,7 @@ func (c *sqlTransactionCommands) Refund(ctx context.Context, command RefundComma
 
 type commandExecutor func(context.Context, CommandType, int64, int64, string, CommandMetadata) (CommandResult, error)
 type purchaseExecutor func(context.Context, int64, int64, CommandMetadata) (CommandResult, error)
+type purchaseRefundHoldExecutor func(context.Context, int64, int64, CommandMetadata) (CommandResult, error)
 type purchaseRefundExecutor func(context.Context, int64, string, CommandMetadata) (CommandResult, error)
 type paymentDisputeDebitExecutor func(context.Context, int64, int64, CommandMetadata) (PaymentDisputeDebitResult, error)
 type paymentDisputeRestoreExecutor func(context.Context, int64, string, int64, CommandMetadata) (CommandResult, error)
@@ -368,6 +383,14 @@ func (c *transactionCommands) executePaymentDisputeRestore(ctx context.Context, 
 
 func (c *sqlTransactionCommands) executePurchase(ctx context.Context, userID, amount int64, metadata CommandMetadata) (CommandResult, error) {
 	return executeSQLCreditPurchase(ctx, c.tx, userID, amount, metadata)
+}
+
+func (c *transactionCommands) executePurchaseRefundHold(ctx context.Context, userID, amount int64, metadata CommandMetadata) (CommandResult, error) {
+	return executeCreditPurchaseRefundHold(ctx, c.tx, userID, amount, metadata)
+}
+
+func (c *sqlTransactionCommands) executeSQLPurchaseRefundHold(ctx context.Context, userID, amount int64, metadata CommandMetadata) (CommandResult, error) {
+	return executeSQLCreditPurchaseRefundHold(ctx, c.tx, userID, amount, metadata)
 }
 
 func (c *sqlTransactionCommands) executePaymentDisputeDebit(ctx context.Context, userID, requestedAmount int64, metadata CommandMetadata) (PaymentDisputeDebitResult, error) {
@@ -413,6 +436,16 @@ func executePurchaseRefund(ctx context.Context, command PurchaseRefundCommand, e
 		return CommandResult{}, ErrInvalidCommand
 	}
 	return execute(ctx, command.UserID, holdID, metadata)
+}
+
+func executePurchaseRefundHold(ctx context.Context, command PurchaseRefundHoldCommand, execute purchaseRefundHoldExecutor) (CommandResult, error) {
+	metadata, err := normalizeMetadata(command.Metadata)
+	if err != nil || command.UserID <= 0 || !isValidAmount(command.Amount) ||
+		metadata.Actor.Type != ActorService || metadata.Actor.ID != "payments" ||
+		metadata.Source != "stripe_refund_hold" || metadata.BusinessReference.Type != "payment_refund" {
+		return CommandResult{}, ErrInvalidCommand
+	}
+	return execute(ctx, command.UserID, command.Amount.Int64(), metadata)
 }
 
 func executePaymentDisputeDebit(ctx context.Context, command PaymentDisputeDebitCommand, execute paymentDisputeDebitExecutor) (PaymentDisputeDebitResult, error) {

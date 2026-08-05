@@ -263,13 +263,17 @@ func TestPaymentReconciliationFailureSummaryNeverPersistsUnknownProviderBody(t *
 }
 
 func createReconciliationIntent(t *testing.T, repo *Repository, userID, quantity int64, expiresAt time.Time) PaymentOrder {
+	return createReconciliationIntentForStripeAccount(t, repo, userID, quantity, expiresAt, "acct_checkout_lifecycle", "prod_checkout_lifecycle")
+}
+
+func createReconciliationIntentForStripeAccount(t *testing.T, repo *Repository, userID, quantity int64, expiresAt time.Time, accountID, productID string) PaymentOrder {
 	t.Helper()
 	id := uuid.New()
 	order, _, err := repo.CreatePaymentOrderIntent(t.Context(), CreatePaymentOrderIntentInput{
 		ID: id.String(), PublicOrderNumber: fmt.Sprintf("IBP-20260801-%012d", quantity), PublicToken: uuid.NewString(),
 		UserID: userID, ClientIdempotencyKey: fmt.Sprintf("reconciliation-order-%d-%s", quantity, id.String()[:8]),
 		RequestHash:     "841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
-		StripeAccountID: "acct_checkout_lifecycle", StripeProductID: "prod_checkout_lifecycle", IdeaQuantity: quantity,
+		StripeAccountID: accountID, StripeProductID: productID, IdeaQuantity: quantity,
 		TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
 		ReturnBaseURL: "https://app.example.com/user/boards", ExpiresAt: expiresAt,
 	})

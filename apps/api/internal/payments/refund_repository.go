@@ -264,7 +264,7 @@ FROM payment_orders WHERE public_order_number = $1 FOR UPDATE`, input.OrderNumbe
 	if err != nil {
 		return PaymentRefund{}, false, ErrRefundAmountInvalid
 	}
-	hold, err := commands.Hold(ctx, credits.HoldCommand{UserID: order.UserID, Amount: creditAmount, Metadata: credits.CommandMetadata{
+	hold, err := commands.PurchaseRefundHold(ctx, credits.PurchaseRefundHoldCommand{UserID: order.UserID, Amount: creditAmount, Metadata: credits.CommandMetadata{
 		IdempotencyKey: "refund-hold-" + refundID, Actor: credits.Actor{Type: credits.ActorService, ID: "payments"}, Source: "stripe_refund_hold", Reason: input.Reason,
 		BusinessReference: credits.BusinessReference{Type: "payment_refund", ID: refundID},
 	}})
@@ -274,7 +274,7 @@ FROM payment_orders WHERE public_order_number = $1 FOR UPDATE`, input.OrderNumbe
 	if _, err := tx.ExecContext(ctx, `INSERT INTO payment_refunds (id, payment_order_id, user_id, idempotency_key, idea_quantity, amount_minor, currency, status, stripe_charge_id, credit_hold_transaction_id, actor_id, reason, created_at, updated_at) VALUES ($1::uuid, $2::uuid, $3, $4, $5, $6, $7, 'pending', $8, $9, $10, $11, $12, $12)`, refundID, order.ID, order.UserID, input.IdempotencyKey, input.IdeaQuantity, amountMinor, strings.ToLower(paidCurrency.String), order.StripeChargeID, hold.TransactionID, input.ActorID, input.Reason, input.Now); err != nil {
 		return PaymentRefund{}, false, fmt.Errorf("insert payment refund: %w", err)
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO payment_admin_actions (action_type, actor_id, target_type, target_id, outcome, metadata) VALUES ('refund_payment', $1, 'payment_refund', $2, 'succeeded', jsonb_build_object('phase', 'reserved', 'payment_order_id', $3, 'idea_quantity', $4, 'amount_minor', $5, 'currency', $6))`, input.ActorID, refundID, order.ID, input.IdeaQuantity, amountMinor, strings.ToLower(paidCurrency.String)); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO payment_admin_actions (action_type, actor_id, target_type, target_id, outcome, metadata) VALUES ('refund_payment', $1, 'payment_refund', $2, 'succeeded', jsonb_build_object('phase', 'reserved', 'payment_order_id', $3::uuid, 'idea_quantity', $4::bigint, 'amount_minor', $5::bigint, 'currency', $6::text))`, input.ActorID, refundID, order.ID, input.IdeaQuantity, amountMinor, strings.ToLower(paidCurrency.String)); err != nil {
 		return PaymentRefund{}, false, fmt.Errorf("record payment refund audit: %w", err)
 	}
 	refund := PaymentRefund{ID: refundID, PaymentOrderID: order.ID, PublicOrderNumber: order.PublicOrderNumber, UserID: order.UserID, IdeaQuantity: input.IdeaQuantity, AmountMinor: amountMinor, Currency: strings.ToLower(paidCurrency.String), Status: PaymentRefundPending, StripeChargeID: order.StripeChargeID, CreditHoldTransactionID: hold.TransactionID, CreatedAt: input.Now, UpdatedAt: input.Now}
@@ -453,7 +453,7 @@ func (r *Repository) MarkPaymentRefundSucceeded(ctx context.Context, refundID st
 	if err := scanPaymentRefund(tx.QueryRowContext(ctx, `UPDATE payment_refunds SET status = 'succeeded', stripe_status = 'succeeded', credit_transaction_id = $2, succeeded_at = $3, updated_at = $3 WHERE id = $1::uuid RETURNING id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at`, refundID, creditResult.TransactionID, now), &refund); err != nil {
 		return PaymentRefund{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO payment_admin_actions (action_type, actor_id, target_type, target_id, outcome, metadata) SELECT 'refund_payment', actor_id, 'payment_refund', id::text, 'succeeded', jsonb_build_object('phase', 'settled', 'credit_transaction_id', $2) FROM payment_refunds WHERE id = $1::uuid AND actor_id IS NOT NULL`, refundID, creditResult.TransactionID); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO payment_admin_actions (action_type, actor_id, target_type, target_id, outcome, metadata) SELECT 'refund_payment', actor_id, 'payment_refund', id::text, 'succeeded', jsonb_build_object('phase', 'settled', 'credit_transaction_id', $2::text) FROM payment_refunds WHERE id = $1::uuid AND actor_id IS NOT NULL`, refundID, creditResult.TransactionID); err != nil {
 		return PaymentRefund{}, err
 	}
 	if err := tx.Commit(); err != nil {

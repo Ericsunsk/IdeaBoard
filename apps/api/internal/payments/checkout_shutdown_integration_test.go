@@ -63,7 +63,7 @@ func TestDisabledReconciliationDoesNotCreateCheckout(t *testing.T) {
 	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, creditService)
 	repo := NewRepository(db)
 	now := time.Now().UTC()
-	order := createReconciliationIntent(t, repo, 42, 501, now.Add(time.Hour))
+	order := createReconciliationIntentForStripeAccount(t, repo, 42, 501, now.Add(time.Hour), "acct_shutdown_reconciliation", "prod_shutdown_reconciliation")
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{ActorID: 42, PurchasesEnabled: false}); err != nil {
 		t.Fatalf("disable purchases: %v", err)
 	}

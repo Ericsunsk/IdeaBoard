@@ -387,7 +387,10 @@ func TestFailureConvergenceRollsBackAttemptAndSettlementFailures(t *testing.T) {
 			name: "attempt conflict",
 			prepare: func(t *testing.T, db *sql.DB, task *tasks.Task, attemptID int64) {
 				t.Helper()
-				if _, err := db.ExecContext(t.Context(), `UPDATE task_attempts SET lease_token = 'replacement-attempt-lease' WHERE id = $1`, attemptID); err != nil {
+				if _, err := db.ExecContext(t.Context(), `
+UPDATE task_leases
+SET lease_token = 'replacement-attempt-lease'
+WHERE id = (SELECT lease_id FROM task_attempts WHERE id = $1)`, attemptID); err != nil {
 					t.Fatalf("replace attempt lease token: %v", err)
 				}
 			},

@@ -17,6 +17,7 @@ Payments 拥有 Stripe 配置、签名 Webhook 接入与支付生命周期。它
 | Payment Reconciliation | River 定期读取 durable Payment Order 后向 Stripe 主动核验、收敛丢失 Webhook 与短暂故障的恢复流程 |
 | Reconciliation Claim | 一对一的 Payment Order recovery state；token + generation fence 保护短租约，Stripe I/O 永远发生在 claim transaction 之外 |
 | Payment Refund | Admin 或 Stripe Dashboard 发起的 durable 退款事实；本地先预留未消费 Ideas，再由 canonical Stripe status 幂等结算或释放 |
+| Purchase Refund Hold | 独立 Credits typed Command，将未消费 Ideas 从 User Available 预留到 User Reserved；它不是消费，可在 active Restriction 下执行 |
 | Purchase Refund | 独立 Credits typed Command，将退款预留从 User Reserved 结算回 System Issuance，不复用 Admin Refund |
 
 ## Public Seams

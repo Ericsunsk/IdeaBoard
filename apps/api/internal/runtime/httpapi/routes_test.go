@@ -164,7 +164,7 @@ func TestAdminRoutesRequireAuthenticatedAdminAccess(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"code":0,"msg":"success","data":{"session":{"auth_user_id":"` + authUserID + `","username":"route-user","claim_identity":"route-user@example.com","claim_identity_kind":"canonical_email","claim_identity_verified":true}}}`))
+		_, _ = w.Write([]byte(`{"code":0,"msg":"success","data":{"session":{"auth_user_id":"` + authUserID + `","email":"route-user@example.com","username":"route-user","claim_identity":"route-user@example.com","claim_identity_kind":"canonical_email","claim_identity_verified":true}}}`))
 	}))
 	defer authServer.Close()
 
@@ -364,8 +364,8 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/accounts/:id/queue":                           false,
 		"GET /api/admin/accounts/limits":                              false,
 		"GET /api/admin/provider-endpoints":                           false,
-		"GET /api/admin/workflow-features":                            false,
-		"GET /api/admin/workflow-features/:slug":                      false,
+		"GET /api/admin/feature-prompts":                              false,
+		"GET /api/admin/feature-prompts/:slug":                        false,
 		"GET /api/admin/credits/wallets/:user_id":                     false,
 		"GET /api/admin/credits/wallets/:user_id/ledger":              false,
 		"GET /api/admin/credits/health":                               false,
@@ -380,6 +380,8 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/monitor":                                      false,
 		"GET /api/admin/monitor/stream":                               false,
 		"GET /api/admin/payments/stripe-config":                       false,
+		"GET /api/admin/payments/orders":                              false,
+		"GET /api/admin/payments/orders/:order_number":                false,
 		"GET /api/admin/settings/branding":                            false,
 		"GET /api/admin/settings/media-upload":                        false,
 		"GET /api/admin/settings/outbound-policy":                     false,
@@ -401,6 +403,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"POST /api/admin/credits/refunds":                             false,
 		"POST /api/admin/credits/reconciliation/runs":                 false,
 		"POST /api/admin/billing/catalog/:sku/prices":                 false,
+		"POST /api/admin/payments/orders/:order_number/refunds":       false,
 		"POST /api/admin/rewards/codes":                               false,
 		"POST /api/admin/rewards/codes/search":                        false,
 		"POST /api/admin/accounts/:id/start":                          false,
@@ -424,7 +427,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"PUT /api/admin/accounts/:id":                                 false,
 		"PUT /api/admin/billing/catalog/:sku/availability":            false,
 		"PUT /api/admin/provider-endpoints/:id":                       false,
-		"PUT /api/admin/workflow-features/:slug":                      false,
+		"PUT /api/admin/feature-prompts/:slug":                        false,
 		"PUT /api/admin/line-draft-modes/:id":                         false,
 		"PUT /api/admin/payments/stripe-config":                       false,
 		"PUT /api/admin/settings/branding":                            false,

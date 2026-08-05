@@ -240,7 +240,7 @@ func seedDueMediaAsset(t *testing.T, db *sql.DB, q *dbsqlc.Queries) (int64, int6
 		t.Fatalf("create owner: %v", err)
 	}
 	assetID, err := q.UpsertMediaAsset(context.Background(), dbsqlc.UpsertMediaAssetParams{
-		AssetID:          "asset-reclaim-" + t.Name(),
+		AssetID:          "asset-reclaim-" + uuid.NewString(),
 		OwnerUserID:      owner.ID,
 		StorageProfileID: "builtin-local",
 		StorageKey:       "uploads/tasks/1/task/output.png",

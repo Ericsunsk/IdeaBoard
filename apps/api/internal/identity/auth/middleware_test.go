@@ -72,7 +72,7 @@ func TestAuthMiddlewareReturnsServiceUnavailableWhenLocalLookupFails(t *testing.
 
 	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"code":0,"msg":"success","data":{"session":{"auth_user_id":"auth-db-error","username":"alice","claim_identity":"alice@example.com","claim_identity_kind":"canonical_email","claim_identity_verified":true}}}`))
+		_, _ = w.Write([]byte(`{"code":0,"msg":"success","data":{"session":{"auth_user_id":"auth-db-error","email":"alice@example.com","username":"alice","claim_identity":"alice@example.com","claim_identity_kind":"canonical_email","claim_identity_verified":true}}}`))
 	}))
 	defer authServer.Close()
 
@@ -154,7 +154,7 @@ func TestAuthMiddlewareAbortsQuietlyWhenLocalLookupIsCanceled(t *testing.T) {
 			StatusCode: http.StatusOK,
 			Header:     make(http.Header),
 			Body: io.NopCloser(strings.NewReader(
-				`{"code":0,"msg":"success","data":{"session":{"auth_user_id":"auth-canceled","username":"alice","claim_identity":"alice@example.com","claim_identity_kind":"canonical_email","claim_identity_verified":true}}}`,
+				`{"code":0,"msg":"success","data":{"session":{"auth_user_id":"auth-canceled","email":"alice@example.com","username":"alice","claim_identity":"alice@example.com","claim_identity_kind":"canonical_email","claim_identity_verified":true}}}`,
 			)),
 		}, nil
 	})
@@ -197,7 +197,7 @@ func TestAuthMiddlewareSetsOnlyCompletePrincipal(t *testing.T) {
 			wantUsername := strings.TrimSpace(databaseUsername)
 			authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = fmt.Fprintf(w, `{"code":0,"msg":"success","data":{"session":{"auth_user_id":%q,"username":%q,"claim_identity":%q,"claim_identity_kind":"canonical_email","claim_identity_verified":true}}}`, authUserID, role, role+"@example.com")
+				_, _ = fmt.Fprintf(w, `{"code":0,"msg":"success","data":{"session":{"auth_user_id":%q,"email":%q,"username":%q,"claim_identity":%q,"claim_identity_kind":"canonical_email","claim_identity_verified":true}}}`, authUserID, role+"@example.com", role, role+"@example.com")
 			}))
 			defer authServer.Close()
 
@@ -266,7 +266,7 @@ func TestAuthMiddlewareRejectsInvalidLocalPrincipal(t *testing.T) {
 	authUserID := "auth-invalid-role"
 	authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprintf(w, `{"code":0,"msg":"success","data":{"session":{"auth_user_id":%q,"username":"alice","claim_identity":"alice@example.com","claim_identity_kind":"canonical_email","claim_identity_verified":true}}}`, authUserID)
+		_, _ = fmt.Fprintf(w, `{"code":0,"msg":"success","data":{"session":{"auth_user_id":%q,"email":"alice@example.com","username":"alice","claim_identity":"alice@example.com","claim_identity_kind":"canonical_email","claim_identity_verified":true}}}`, authUserID)
 	}))
 	defer authServer.Close()
 

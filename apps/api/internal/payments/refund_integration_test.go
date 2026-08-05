@@ -158,7 +158,7 @@ func TestPaymentRefundTerminalFactsCannotRegress(t *testing.T) {
 func TestPaymentRefundReconciliationRecoversPendingProviderStateExactlyOnce(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	repo := NewRepository(db)
-	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
+	now := time.Now().UTC()
 	order := createCreditedRefundOrder(t, repo, now.Add(-time.Hour))
 	refund, _, err := repo.CreatePendingPaymentRefund(t.Context(), CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 100,
@@ -174,10 +174,10 @@ func TestPaymentRefundReconciliationRecoversPendingProviderStateExactlyOnce(t *t
 		"re_reconcile": {ID: "re_reconcile", Status: "succeeded", ChargeID: "ch_refund", AmountMinor: 100, Currency: "usd"},
 	}}
 	service := NewService(ServiceDependencies{Repository: repo, RefundGateway: gateway, Events: NewEventHub(), Now: func() time.Time { return now }})
-	if err := service.reconcileDuePaymentRefunds(t.Context(), "sk_test_refund", nil, now); err != nil {
+	if err := service.reconcileDuePaymentRefunds(t.Context(), "sk_test_refund", nil, now.Add(3*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	if err := service.reconcileDuePaymentRefunds(t.Context(), "sk_test_refund", nil, now.Add(time.Minute)); err != nil {
+	if err := service.reconcileDuePaymentRefunds(t.Context(), "sk_test_refund", nil, now.Add(4*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	settled, err := repo.GetPaymentRefundByID(t.Context(), refund.ID)
@@ -231,6 +231,9 @@ func TestPaymentRefundConcurrentRequestsCannotExceedOrderOrWallet(t *testing.T) 
 
 func createCreditedRefundOrder(t *testing.T, repo *Repository, paidAt time.Time) PaymentOrder {
 	t.Helper()
+	if _, err := repo.db.ExecContext(t.Context(), `SELECT provision_credit_wallet(42)`); err != nil {
+		t.Fatal(err)
+	}
 	order := createAdminPaymentOrder(t, repo, 42, "IBP-20260804-REFUND000001", 500)
 	bound, err := repo.BindPaymentOrderCheckout(t.Context(), BindPaymentOrderCheckoutInput{
 		OrderID: order.ID, StripeCustomerID: "cus_refund", StripeSessionID: "cs_refund",

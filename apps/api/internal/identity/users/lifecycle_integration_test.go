@@ -586,14 +586,14 @@ func TestUserDeletionIsBlockedByUnsettledPaymentState(t *testing.T) {
 	if _, err := db.ExecContext(ctx, `
 INSERT INTO payment_orders (
   id, public_order_number, public_token, user_id, client_idempotency_key, request_hash,
-  status, stripe_account_id, stripe_product_id, idea_quantity, terms_version,
+  status, stripe_account_id, stripe_product_id, idea_quantity, base_amount_minor, terms_version,
   refund_policy_version, return_base_url, expires_at
 )
 VALUES (
-  '0198cd29-f457-7e4b-b95e-6cfde41b9555', 'IBP-20260805-GUARD123456',
+  '0198cd29-f457-7e4b-b95e-6cfde41b9555', 'IBP-20260805-GUARD1234567',
   '0198cd29-f457-7e4b-b95e-6cfde41b9666', $1, 'delete-payment-guard',
   '841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f',
-  'creating', 'acct_delete_guard', 'prod_delete_guard', 501, 'v1', 'v1',
+  'creating', 'acct_delete_guard', 'prod_delete_guard', 501, 501, 'v1', 'v1',
   'https://app.example.com', now() + interval '30 minutes'
 )`, provisioned.User.ID); err != nil {
 		t.Fatalf("seed unsettled payment order: %v", err)

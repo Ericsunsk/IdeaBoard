@@ -2629,8 +2629,11 @@ CREATE TABLE payment_orders (
   CONSTRAINT ck_payment_order_state_facts CHECK (
     (status = 'creating' AND stripe_customer_id = '' AND stripe_checkout_session_id IS NULL
       AND checkout_url = '' AND credit_transaction_id IS NULL AND paid_total_minor IS NULL)
-    OR (status IN ('checkout_open', 'async_payment_pending') AND stripe_customer_id <> ''
+    OR (status = 'checkout_open' AND stripe_customer_id <> ''
       AND stripe_checkout_session_id IS NOT NULL AND checkout_url <> ''
+      AND credit_transaction_id IS NULL AND paid_total_minor IS NULL)
+    OR (status = 'async_payment_pending' AND stripe_customer_id <> ''
+      AND stripe_checkout_session_id IS NOT NULL AND checkout_url = ''
       AND credit_transaction_id IS NULL AND paid_total_minor IS NULL)
     OR (status = 'paid_pending_credit' AND stripe_customer_id <> '' AND stripe_checkout_session_id IS NOT NULL
       AND stripe_payment_intent_id <> '' AND credit_transaction_id IS NULL
@@ -2645,7 +2648,7 @@ CREATE TABLE payment_orders (
       AND paid_currency = '' AND receipt_url = '' AND credit_transaction_id IS NULL
       AND paid_at IS NULL AND credited_at IS NULL
       AND ((stripe_checkout_session_id IS NULL AND stripe_customer_id = '' AND checkout_url = '')
-        OR (stripe_checkout_session_id IS NOT NULL AND stripe_customer_id <> '' AND checkout_url <> '')))
+        OR (stripe_checkout_session_id IS NOT NULL AND stripe_customer_id <> '' AND checkout_url = '')))
   )
 );
 
@@ -2687,7 +2690,7 @@ BEGIN
      AND OLD.stripe_checkout_session_id IS DISTINCT FROM NEW.stripe_checkout_session_id THEN
     RAISE EXCEPTION 'payment order Checkout Session is immutable once assigned';
   END IF;
-  IF OLD.checkout_url <> '' AND OLD.checkout_url <> NEW.checkout_url THEN
+  IF OLD.checkout_url <> '' AND NEW.checkout_url <> '' AND OLD.checkout_url <> NEW.checkout_url THEN
     RAISE EXCEPTION 'payment order Checkout URL is immutable once assigned';
   END IF;
   IF OLD.stripe_checkout_session_id IS NOT NULL AND OLD.expires_at <> NEW.expires_at THEN
@@ -3025,6 +3028,140 @@ $$;
 
 REVOKE ALL ON FUNCTION execute_credit_purchase_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
 
+CREATE FUNCTION execute_credit_purchase_refund_hold_v1(
+  p_user_id BIGINT,
+  p_amount BIGINT,
+  p_idempotency_key TEXT,
+  p_actor_type TEXT,
+  p_actor_id TEXT,
+  p_source TEXT,
+  p_reason TEXT,
+  p_business_reference_type TEXT,
+  p_business_reference_id TEXT
+)
+RETURNS TABLE (
+  transaction_id VARCHAR(64), command_type VARCHAR(24), command_amount BIGINT,
+  wallet_user_id BIGINT, available_balance_after BIGINT, reserved_balance_after BIGINT,
+  replayed BOOLEAN, created_at TIMESTAMPTZ(3)
+)
+AS $$
+DECLARE
+  v_payload JSONB;
+  v_hash TEXT;
+  v_existing_hash TEXT;
+  v_transaction_id VARCHAR(64);
+  v_wallet_status VARCHAR(20);
+  v_available_id BIGINT;
+  v_reserved_id BIGINT;
+  v_available_balance BIGINT;
+  v_reserved_balance BIGINT;
+BEGIN
+  p_idempotency_key := btrim(p_idempotency_key);
+  p_actor_type := btrim(p_actor_type);
+  p_actor_id := btrim(p_actor_id);
+  p_source := btrim(p_source);
+  p_reason := btrim(p_reason);
+  p_business_reference_type := btrim(p_business_reference_type);
+  p_business_reference_id := btrim(p_business_reference_id);
+  IF p_user_id <= 0 OR p_amount <= 0 OR p_amount > 9000000000000000
+     OR p_idempotency_key = '' OR length(p_idempotency_key) > 160
+     OR p_actor_type <> 'service' OR p_actor_id <> 'payments'
+     OR p_source <> 'stripe_refund_hold' OR p_reason = ''
+     OR p_business_reference_type <> 'payment_refund'
+     OR p_business_reference_id = '' OR length(p_business_reference_id) > 160 THEN
+    RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid credit purchase refund hold command';
+  END IF;
+
+  v_payload := jsonb_build_object(
+    'command_type', 'hold', 'user_id', p_user_id, 'amount', p_amount,
+    'related_transaction_id', '',
+    'actor', jsonb_build_object('type', p_actor_type, 'id', p_actor_id),
+    'source', p_source, 'reason', p_reason,
+    'business_reference', jsonb_build_object('type', p_business_reference_type, 'id', p_business_reference_id)
+  );
+  v_hash := encode(sha256(convert_to(v_payload::TEXT, 'UTF8')), 'hex');
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_idempotency_key, 5283921922134398276));
+  SELECT request_hash INTO v_existing_hash
+  FROM credit_transactions
+  WHERE idempotency_key = p_idempotency_key;
+  IF FOUND THEN
+    IF v_existing_hash <> v_hash THEN
+      RAISE EXCEPTION USING ERRCODE = 'IB001', MESSAGE = 'credit idempotency conflict';
+    END IF;
+    RETURN QUERY SELECT existing.transaction_id, existing.command_type, existing.command_amount,
+      existing.wallet_user_id, existing.available_balance_after, existing.reserved_balance_after,
+      TRUE, existing.created_at
+    FROM credit_transactions existing
+    WHERE existing.idempotency_key = p_idempotency_key;
+    RETURN;
+  END IF;
+
+  SELECT wallets.status INTO v_wallet_status
+  FROM credit_wallets wallets
+  WHERE wallets.user_id = p_user_id
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found';
+  END IF;
+  IF v_wallet_status <> 'active' THEN
+    RAISE EXCEPTION USING ERRCODE = 'IB003', MESSAGE = 'credit wallet frozen';
+  END IF;
+
+  PERFORM accounts.id
+  FROM credit_accounts accounts
+  WHERE accounts.wallet_user_id = p_user_id
+    AND accounts.account_role IN ('user_available', 'user_reserved')
+  ORDER BY accounts.id
+  FOR UPDATE;
+  SELECT MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_available'),
+         MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_reserved'),
+         MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_available'),
+         MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_reserved')
+  INTO v_available_id, v_reserved_id, v_available_balance, v_reserved_balance
+  FROM credit_accounts accounts
+  WHERE accounts.wallet_user_id = p_user_id
+    AND accounts.account_role IN ('user_available', 'user_reserved');
+  IF v_available_id IS NULL OR v_reserved_id IS NULL OR v_available_balance < p_amount THEN
+    RAISE EXCEPTION USING ERRCODE = 'IB004', MESSAGE = 'insufficient credits';
+  END IF;
+
+  v_transaction_id := 'ctx_' || substr(encode(sha256(convert_to(
+    clock_timestamp()::TEXT || random()::TEXT || p_idempotency_key, 'UTF8'
+  )), 'hex'), 1, 32);
+  INSERT INTO credit_transactions (
+    transaction_id, wallet_user_id, command_type, idempotency_key, request_hash,
+    actor_type, actor_id, source, reason, business_reference_type, business_reference_id,
+    command_amount, posting_count, available_balance_after, reserved_balance_after
+  ) VALUES (
+    v_transaction_id, p_user_id, 'hold', p_idempotency_key, v_hash,
+    p_actor_type, p_actor_id, p_source, p_reason, p_business_reference_type, p_business_reference_id,
+    p_amount, 2, v_available_balance - p_amount, v_reserved_balance + p_amount
+  );
+  INSERT INTO credit_postings (transaction_id, account_id, amount)
+  VALUES (v_transaction_id, v_available_id, -p_amount), (v_transaction_id, v_reserved_id, p_amount);
+  INSERT INTO credit_holds (hold_transaction_id, wallet_user_id, amount)
+  VALUES (v_transaction_id, p_user_id, p_amount);
+
+  RETURN QUERY SELECT created.transaction_id, created.command_type, created.command_amount,
+    created.wallet_user_id, created.available_balance_after, created.reserved_balance_after,
+    FALSE, created.created_at
+  FROM credit_transactions created
+  WHERE created.transaction_id = v_transaction_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog;
+
+DO $$
+DECLARE trusted_schema TEXT := current_schema();
+BEGIN
+  EXECUTE format(
+    'ALTER FUNCTION %I.execute_credit_purchase_refund_hold_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
+    trusted_schema, trusted_schema
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION execute_credit_purchase_refund_hold_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+
 CREATE FUNCTION execute_credit_purchase_refund_v1(
   p_user_id BIGINT, p_hold_transaction_id TEXT, p_idempotency_key TEXT,
   p_actor_type TEXT, p_actor_id TEXT, p_source TEXT, p_reason TEXT,
@@ -3272,19 +3409,19 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found';
   END IF;
   v_shard_key := 'wallet:' || p_user_id::TEXT;
-  PERFORM id FROM credit_accounts
-  WHERE (wallet_user_id = p_user_id AND account_role IN ('user_available', 'user_reserved'))
-     OR (wallet_user_id IS NULL AND shard_key = v_shard_key AND account_role = 'system_sink')
-  ORDER BY id FOR UPDATE;
-  SELECT MAX(id) FILTER (WHERE account_role = 'user_available'),
-         MAX(id) FILTER (WHERE account_role = 'user_reserved'),
-         MAX(id) FILTER (WHERE account_role = 'system_sink'),
-         MAX(balance) FILTER (WHERE account_role = 'user_available'),
-         MAX(balance) FILTER (WHERE account_role = 'user_reserved')
+  PERFORM accounts.id FROM credit_accounts accounts
+  WHERE (accounts.wallet_user_id = p_user_id AND accounts.account_role IN ('user_available', 'user_reserved'))
+     OR (accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink')
+  ORDER BY accounts.id FOR UPDATE;
+  SELECT MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_available'),
+         MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_reserved'),
+         MAX(accounts.id) FILTER (WHERE accounts.account_role = 'system_sink'),
+         MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_available'),
+         MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_reserved')
   INTO v_available_id, v_reserved_id, v_sink_id, v_available_balance, v_reserved_balance
-  FROM credit_accounts
-  WHERE (wallet_user_id = p_user_id AND account_role IN ('user_available', 'user_reserved'))
-     OR (wallet_user_id IS NULL AND shard_key = v_shard_key AND account_role = 'system_sink');
+  FROM credit_accounts accounts
+  WHERE (accounts.wallet_user_id = p_user_id AND accounts.account_role IN ('user_available', 'user_reserved'))
+     OR (accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink');
   IF v_available_id IS NULL OR v_reserved_id IS NULL OR v_sink_id IS NULL THEN
     RAISE EXCEPTION 'credit wallet account set is incomplete';
   END IF;
@@ -3299,7 +3436,7 @@ BEGIN
       gen_random_uuid(), p_user_id, p_idempotency_key, v_hash, p_requested_amount, 0,
       v_available_balance, v_reserved_balance,
       p_business_reference_type, p_business_reference_id
-    ) RETURNING created_at INTO v_created_at;
+    ) RETURNING payment_dispute_debit_requests.created_at INTO v_created_at;
     RETURN QUERY SELECT ''::VARCHAR(64), 'payment_dispute_debit'::VARCHAR(24), 0::BIGINT,
       p_user_id, v_available_balance, v_reserved_balance, FALSE, v_created_at, p_requested_amount, p_requested_amount;
     RETURN;
@@ -3327,7 +3464,7 @@ BEGIN
       gen_random_uuid(), p_user_id, p_idempotency_key, v_hash, p_requested_amount, v_debited_amount,
       v_available_balance - v_debited_amount, v_reserved_balance,
       v_transaction_id, p_business_reference_type, p_business_reference_id
-  ) RETURNING created_at INTO v_created_at;
+  ) RETURNING payment_dispute_debit_requests.created_at INTO v_created_at;
   RETURN QUERY SELECT v_transaction_id, 'payment_dispute_debit'::VARCHAR(24), v_debited_amount,
     p_user_id, v_available_balance - v_debited_amount, v_reserved_balance, FALSE, v_created_at,
     p_requested_amount, p_requested_amount - v_debited_amount;
@@ -3410,19 +3547,19 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'IB001', MESSAGE = 'credit idempotency conflict';
   END IF;
 
-  SELECT command_amount INTO v_original_amount
-  FROM credit_transactions
-  WHERE transaction_id = p_original_transaction_id AND wallet_user_id = p_user_id
-    AND command_type = 'payment_dispute_debit' AND actor_type = 'service' AND actor_id = 'payments'
-    AND source = 'stripe_dispute' AND business_reference_type = p_business_reference_type
-    AND business_reference_id = p_business_reference_id
+  SELECT original.command_amount INTO v_original_amount
+  FROM credit_transactions original
+  WHERE original.transaction_id = p_original_transaction_id AND original.wallet_user_id = p_user_id
+    AND original.command_type = 'payment_dispute_debit' AND original.actor_type = 'service' AND original.actor_id = 'payments'
+    AND original.source = 'stripe_dispute' AND original.business_reference_type = p_business_reference_type
+    AND original.business_reference_id = p_business_reference_id
   FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid payment dispute debit reference';
   END IF;
-  SELECT COALESCE(SUM(command_amount), 0) INTO v_restored_amount
-  FROM credit_transactions
-  WHERE related_transaction_id = p_original_transaction_id AND command_type = 'payment_dispute_restore';
+  SELECT COALESCE(SUM(restores.command_amount), 0) INTO v_restored_amount
+  FROM credit_transactions restores
+  WHERE restores.related_transaction_id = p_original_transaction_id AND restores.command_type = 'payment_dispute_restore';
   IF p_amount > v_original_amount - v_restored_amount THEN
     RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'payment dispute restore exceeds debited amount';
   END IF;
@@ -3432,19 +3569,19 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = 'IB002', MESSAGE = 'credit wallet not found';
   END IF;
   v_shard_key := 'wallet:' || p_user_id::TEXT;
-  PERFORM id FROM credit_accounts
-  WHERE (wallet_user_id = p_user_id AND account_role IN ('user_available', 'user_reserved'))
-     OR (wallet_user_id IS NULL AND shard_key = v_shard_key AND account_role = 'system_sink')
-  ORDER BY id FOR UPDATE;
-  SELECT MAX(id) FILTER (WHERE account_role = 'user_available'),
-         MAX(id) FILTER (WHERE account_role = 'user_reserved'),
-         MAX(id) FILTER (WHERE account_role = 'system_sink'),
-         MAX(balance) FILTER (WHERE account_role = 'user_available'),
-         MAX(balance) FILTER (WHERE account_role = 'user_reserved')
+  PERFORM accounts.id FROM credit_accounts accounts
+  WHERE (accounts.wallet_user_id = p_user_id AND accounts.account_role IN ('user_available', 'user_reserved'))
+     OR (accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink')
+  ORDER BY accounts.id FOR UPDATE;
+  SELECT MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_available'),
+         MAX(accounts.id) FILTER (WHERE accounts.account_role = 'user_reserved'),
+         MAX(accounts.id) FILTER (WHERE accounts.account_role = 'system_sink'),
+         MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_available'),
+         MAX(accounts.balance) FILTER (WHERE accounts.account_role = 'user_reserved')
   INTO v_available_id, v_reserved_id, v_sink_id, v_available_balance, v_reserved_balance
-  FROM credit_accounts
-  WHERE (wallet_user_id = p_user_id AND account_role IN ('user_available', 'user_reserved'))
-     OR (wallet_user_id IS NULL AND shard_key = v_shard_key AND account_role = 'system_sink');
+  FROM credit_accounts accounts
+  WHERE (accounts.wallet_user_id = p_user_id AND accounts.account_role IN ('user_available', 'user_reserved'))
+     OR (accounts.wallet_user_id IS NULL AND accounts.shard_key = v_shard_key AND accounts.account_role = 'system_sink');
   IF v_available_id IS NULL OR v_reserved_id IS NULL OR v_sink_id IS NULL THEN
     RAISE EXCEPTION 'credit wallet account set is incomplete';
   END IF;

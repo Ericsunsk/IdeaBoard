@@ -288,6 +288,7 @@ func newUploadStaticAuthServer(t *testing.T) *httptest.Server {
 func trustedTestSessionIdentity(authUserID, username string) auth.SessionIdentity {
 	return auth.SessionIdentity{
 		AuthUserID:            authUserID,
+		Email:                 username + "@example.com",
 		Username:              username,
 		ClaimIdentity:         username + "@example.com",
 		ClaimIdentityKind:     "canonical_email",

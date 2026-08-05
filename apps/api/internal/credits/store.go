@@ -95,6 +95,17 @@ SELECT transaction_id,
        created_at
 FROM execute_credit_purchase_v1($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 
+const creditPurchaseRefundHoldSQL = `
+SELECT transaction_id,
+       command_type,
+       command_amount,
+       wallet_user_id,
+       available_balance_after,
+       reserved_balance_after,
+       replayed,
+       created_at
+FROM execute_credit_purchase_refund_hold_v1($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+
 const creditPurchaseRefundSQL = `
 SELECT transaction_id,
        command_type,
@@ -105,6 +116,20 @@ SELECT transaction_id,
        replayed,
        created_at
 FROM execute_credit_purchase_refund_v1($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+
+func executeCreditPurchaseRefundHold(ctx context.Context, tx pgx.Tx, userID, amount int64, metadata CommandMetadata) (CommandResult, error) {
+	if tx == nil {
+		return CommandResult{}, fmt.Errorf("credits service: transaction not configured")
+	}
+	return scanCreditCommand(tx.QueryRow(ctx, creditPurchaseRefundHoldSQL, userID, amount, metadata.IdempotencyKey, metadata.Actor.Type, metadata.Actor.ID, metadata.Source, metadata.Reason, metadata.BusinessReference.Type, metadata.BusinessReference.ID))
+}
+
+func executeSQLCreditPurchaseRefundHold(ctx context.Context, tx *sql.Tx, userID, amount int64, metadata CommandMetadata) (CommandResult, error) {
+	if tx == nil {
+		return CommandResult{}, fmt.Errorf("credits service: SQL transaction not configured")
+	}
+	return scanCreditCommand(tx.QueryRowContext(ctx, creditPurchaseRefundHoldSQL, userID, amount, metadata.IdempotencyKey, metadata.Actor.Type, metadata.Actor.ID, metadata.Source, metadata.Reason, metadata.BusinessReference.Type, metadata.BusinessReference.ID))
+}
 
 const creditPaymentDisputeDebitSQL = `
 SELECT transaction_id, command_type, command_amount, wallet_user_id,

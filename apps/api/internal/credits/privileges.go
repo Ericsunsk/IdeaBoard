@@ -29,6 +29,7 @@ var creditInternalFunctionSignatures = []string{
 
 const creditCommandFunctionSignature = "execute_credit_command_v2(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
 const creditPurchaseFunctionSignature = "execute_credit_purchase_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
+const creditPurchaseRefundHoldFunctionSignature = "execute_credit_purchase_refund_hold_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
 const creditPurchaseRefundFunctionSignature = "execute_credit_purchase_refund_v1(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
 const creditPaymentDisputeDebitFunctionSignature = "execute_credit_payment_dispute_debit_v1(BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
 const creditPaymentDisputeRestoreFunctionSignature = "execute_credit_payment_dispute_restore_v1(BIGINT, TEXT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"
@@ -55,6 +56,7 @@ func RuntimePrivilegePolicy() dbprivileges.Policy {
 	requiredFunctions := []string{
 		creditCommandFunctionSignature,
 		creditPurchaseFunctionSignature,
+		creditPurchaseRefundHoldFunctionSignature,
 		creditPurchaseRefundFunctionSignature,
 		creditPaymentDisputeDebitFunctionSignature,
 		creditPaymentDisputeRestoreFunctionSignature,

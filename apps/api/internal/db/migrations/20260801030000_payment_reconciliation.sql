@@ -64,7 +64,7 @@ BEGIN
      AND OLD.stripe_checkout_session_id IS DISTINCT FROM NEW.stripe_checkout_session_id THEN
     RAISE EXCEPTION 'payment order Checkout Session is immutable once assigned';
   END IF;
-  IF OLD.checkout_url <> '' AND OLD.checkout_url <> NEW.checkout_url THEN
+  IF OLD.checkout_url <> '' AND NEW.checkout_url <> '' AND OLD.checkout_url <> NEW.checkout_url THEN
     RAISE EXCEPTION 'payment order Checkout URL is immutable once assigned';
   END IF;
   IF OLD.stripe_checkout_session_id IS NOT NULL AND OLD.expires_at <> NEW.expires_at THEN

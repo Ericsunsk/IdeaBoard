@@ -578,12 +578,15 @@ func TestConvergeTaskAfterRiverFinalFailureRecoversRunningTaskWithoutLease(t *te
 	service := NewService(nil, taskRepo, nil, nil)
 	publisher := newRecordingTaskStatusPublisher()
 	service.SetTaskStatusPublisher(publisher)
+	accountID := seedTaskRuntimeAccount(t, db, 61)
 
 	task := &tasks.Task{
-		TaskID:     "task-startup-recovery-unleased",
-		UserID:     1,
-		Status:     tasks.StatusRunning,
-		LeaseToken: "",
+		TaskID:                     "task-startup-recovery-unleased",
+		UserID:                     1,
+		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
+		AccountID:                  tasks.IDPtr(accountID),
+		Status:                     tasks.StatusRunning,
+		LeaseToken:                 "",
 	}
 	if err := seedTaskRuntimeTask(t, db, taskRepo, ctx, task); err != nil {
 		t.Fatalf("seed task failed: %v", err)

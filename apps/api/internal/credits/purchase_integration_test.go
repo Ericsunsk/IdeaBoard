@@ -139,7 +139,14 @@ func TestPurchaseRefundSettlesReservedIdeasToIssuanceIdempotently(t *testing.T) 
 	if _, err := service.Grant(t.Context(), GrantCommand{UserID: 42, Amount: mustCreditAmount(t, 100), Metadata: testMetadata("purchase-refund:seed", "purchase-refund-seed")}); err != nil {
 		t.Fatal(err)
 	}
-	hold, err := service.Hold(t.Context(), HoldCommand{UserID: 42, Amount: mustCreditAmount(t, 40), Metadata: CommandMetadata{
+	if _, err := service.RestrictWallet(t.Context(), RestrictWalletCommand{
+		UserID: 42, Type: "payment_dispute", Source: "stripe_dispute",
+		RelatedObject: BusinessReference{Type: "payment_dispute", ID: "dispute-1"},
+		Reason:        "open payment Dispute", Actor: Actor{Type: ActorService, ID: "payments"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	hold, err := service.PurchaseRefundHold(t.Context(), PurchaseRefundHoldCommand{UserID: 42, Amount: mustCreditAmount(t, 40), Metadata: CommandMetadata{
 		IdempotencyKey: "purchase-refund:hold", Actor: Actor{Type: ActorService, ID: "payments"}, Source: "stripe_refund_hold", Reason: "reserve unused Ideas", BusinessReference: BusinessReference{Type: "payment_refund", ID: "refund-1"},
 	}})
 	if err != nil {

@@ -81,10 +81,12 @@ WHERE conrelid = 'task_attempts'::regclass
 
 func createAdminTraceTask(t *testing.T, repo *Repository, ctx context.Context, taskID string, accountID, credentialID int64, status string) {
 	t.Helper()
-	if err := createRepositoryTestTask(t, repo, ctx, &tasks.Task{
-		TaskID: taskID, UserID: 1, AccountID: tasks.IDPtr(accountID), AssignedCredentialID: tasks.IDPtr(credentialID),
-		FeatureSlug: "image-generate", Status: status, CreatedAt: time.Now().Add(-time.Minute),
-	}); err != nil {
+	task := &tasks.Task{TaskID: taskID, UserID: 1, FeatureSlug: "image-generate", Status: status, CreatedAt: time.Now().Add(-time.Minute)}
+	if status != tasks.StatusPending {
+		task.AccountID = tasks.IDPtr(accountID)
+		task.AssignedCredentialID = tasks.IDPtr(credentialID)
+	}
+	if err := createRepositoryTestTask(t, repo, ctx, task); err != nil {
 		t.Fatalf("create %s: %v", taskID, err)
 	}
 }

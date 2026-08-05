@@ -508,9 +508,9 @@ func testBillableDefinition(sku SKU, displayName string) BillableItemDefinition 
 
 const freeBillingSnapshotInsertSQL = `
 INSERT INTO task_billing_snapshots (
-  task_id, user_id, feature_slug, model, sku, display_name, price_version_id,
+  task_id, user_id, feature_slug, sku, display_name, price_version_id,
   price_version, unit_credits, quantity, total_credits, quoted_at
-) VALUES ($1, 1, 'test-feature', 'test-model', $2, $3, $4, $5, $6, 1, 0, clock_timestamp())`
+) VALUES ($1, 1, 'test-feature', $2, $3, $4, $5, $6, 1, 0, clock_timestamp())`
 
 func publishDeleteCandidate(t *testing.T, service *Service, sku SKU) PriceInfo {
 	t.Helper()
