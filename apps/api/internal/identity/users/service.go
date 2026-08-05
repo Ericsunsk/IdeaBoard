@@ -8,7 +8,6 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"ideaboard/api/internal/identity/autherrors"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/validation"
 )
@@ -24,17 +23,7 @@ type UserService struct {
 
 type UserLifecycle interface {
 	SetUserStatus(context.Context, int64, int16) error
-	BeginUserDeletion(context.Context, int64) (*DeletionProgress, error)
-	AdvanceUserDeletion(context.Context, int64, DeletionPhase, DeletionPhase) error
-	TombstoneUser(context.Context, int64) error
-}
-
-type AuthUserDeleter interface {
-	DeleteUser(context.Context, string) error
-}
-
-type UserUploadCleaner interface {
-	DeleteUserUploads(ctx context.Context, userID int64, storageUID string) error
+	DeleteUser(context.Context, int64, AuthUserDeleter, UserUploadCleaner) error
 }
 
 type UserCreditBalanceReader interface {
@@ -173,41 +162,15 @@ func (s *UserService) UpdateRole(ctx context.Context, userID int64, role string)
 
 // DeleteUser 删除用户
 func (s *UserService) DeleteUser(ctx context.Context, userID int64, authDeleter AuthUserDeleter) error {
-	if s.lifecycle == nil || authDeleter == nil || s.uploadCleaner == nil {
+	if s.lifecycle == nil {
 		return errors.New("用户删除依赖未配置")
 	}
-	progress, err := s.lifecycle.BeginUserDeletion(ctx, userID)
+	err := s.lifecycle.DeleteUser(ctx, userID, authDeleter, s.uploadCleaner)
 	if err != nil {
 		if database.IsNotFound(err) {
 			return errors.New("用户不存在")
 		}
 		return err
-	}
-
-	if progress.Phase == DeletionPendingAuth {
-		if err := authDeleter.DeleteUser(ctx, progress.AuthUserID); err != nil && !errors.Is(err, autherrors.ErrAuthUserNotFound) {
-			return fmt.Errorf("删除 Auth 用户失败: %w", err)
-		}
-		if err := s.lifecycle.AdvanceUserDeletion(ctx, userID, DeletionPendingAuth, DeletionPendingStorage); err != nil {
-			return fmt.Errorf("记录 Auth 用户已删除失败: %w", err)
-		}
-		progress.Phase = DeletionPendingStorage
-	}
-
-	if progress.Phase == DeletionPendingStorage {
-		if err := s.uploadCleaner.DeleteUserUploads(ctx, progress.UserID, progress.StorageUID); err != nil {
-			return fmt.Errorf("删除用户文件失败: %w", err)
-		}
-		if err := s.lifecycle.AdvanceUserDeletion(ctx, userID, DeletionPendingStorage, DeletionPendingTombstone); err != nil {
-			return fmt.Errorf("记录用户文件已清理失败: %w", err)
-		}
-		progress.Phase = DeletionPendingTombstone
-	}
-
-	if progress.Phase == DeletionPendingTombstone {
-		if err := s.lifecycle.TombstoneUser(ctx, userID); err != nil {
-			return fmt.Errorf("匿名化用户失败: %w", err)
-		}
 	}
 	return nil
 }

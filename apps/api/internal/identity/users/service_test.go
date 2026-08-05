@@ -2,7 +2,6 @@ package users
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 
@@ -34,10 +33,10 @@ type userUploadCleanupCall struct {
 }
 
 type recordingUserLifecycle struct {
-	progress       DeletionProgress
-	statusCalls    []int16
-	advanceCalls   [][2]DeletionPhase
-	tombstoneCalls int
+	statusCalls []int16
+	deleteCalls []int64
+	deleteErr   error
+	deleteFn    func(context.Context, int64, AuthUserDeleter, UserUploadCleaner) error
 }
 
 func (l *recordingUserLifecycle) SetUserStatus(_ context.Context, _ int64, status int16) error {
@@ -45,22 +44,12 @@ func (l *recordingUserLifecycle) SetUserStatus(_ context.Context, _ int64, statu
 	return nil
 }
 
-func (l *recordingUserLifecycle) BeginUserDeletion(_ context.Context, userID int64) (*DeletionProgress, error) {
-	l.progress.UserID = userID
-	progress := l.progress
-	return &progress, nil
-}
-
-func (l *recordingUserLifecycle) AdvanceUserDeletion(_ context.Context, _ int64, from, to DeletionPhase) error {
-	l.advanceCalls = append(l.advanceCalls, [2]DeletionPhase{from, to})
-	l.progress.Phase = to
-	return nil
-}
-
-func (l *recordingUserLifecycle) TombstoneUser(_ context.Context, _ int64) error {
-	l.tombstoneCalls++
-	l.progress.Phase = DeletionCompleted
-	return nil
+func (l *recordingUserLifecycle) DeleteUser(ctx context.Context, userID int64, authDeleter AuthUserDeleter, uploadCleaner UserUploadCleaner) error {
+	l.deleteCalls = append(l.deleteCalls, userID)
+	if l.deleteFn != nil {
+		return l.deleteFn(ctx, userID, authDeleter, uploadCleaner)
+	}
+	return l.deleteErr
 }
 
 type recordingAuthUserDeleter struct {
@@ -182,41 +171,19 @@ func TestListUsersReadsOnlyCurrentPageBalancesInOneBatch(t *testing.T) {
 	}
 }
 
-func TestDeleteUserRunsDurablePhasesInOrder(t *testing.T) {
+func TestDeleteUserDelegatesLifecyclePhases(t *testing.T) {
 	ctx := context.Background()
-	cleaner := &recordingUserUploadCleaner{}
-	lifecycle := &recordingUserLifecycle{progress: DeletionProgress{
-		UserID: 42, AuthUserID: "auth-42", StorageUID: "CLN123", Phase: DeletionPendingAuth,
-	}}
+	lifecycle := &recordingUserLifecycle{}
 	authDeleter := &recordingAuthUserDeleter{}
-	service := NewUserService(nil, lifecycle, nil, cleaner)
+	service := NewUserService(nil, lifecycle, nil)
 
 	if err := service.DeleteUser(ctx, 42, authDeleter); err != nil {
 		t.Fatalf("DeleteUser failed: %v", err)
 	}
-	if len(authDeleter.authUserIDs) != 1 || authDeleter.authUserIDs[0] != "auth-42" {
-		t.Fatalf("auth delete calls=%v", authDeleter.authUserIDs)
+	if len(lifecycle.deleteCalls) != 1 || lifecycle.deleteCalls[0] != 42 {
+		t.Fatalf("lifecycle delete calls=%v, want one call for user 42", lifecycle.deleteCalls)
 	}
-	if len(cleaner.calls) != 1 || cleaner.calls[0].userID != 42 || cleaner.calls[0].storageUID != "CLN123" {
-		t.Fatalf("cleaner calls=%+v, want one call for user uploads", cleaner.calls)
-	}
-	if len(lifecycle.advanceCalls) != 2 || lifecycle.tombstoneCalls != 1 {
-		t.Fatalf("advance calls=%v tombstone calls=%d", lifecycle.advanceCalls, lifecycle.tombstoneCalls)
-	}
-}
-
-func TestDeleteUserRetryResumesAtPendingStorage(t *testing.T) {
-	ctx := context.Background()
-	lifecycle := &recordingUserLifecycle{progress: DeletionProgress{
-		UserID: 42, AuthUserID: "auth-42", StorageUID: "FAIL42", Phase: DeletionPendingStorage,
-	}}
-	cleaner := &recordingUserUploadCleaner{err: errors.New("storage down")}
-	authDeleter := &recordingAuthUserDeleter{}
-	service := NewUserService(nil, lifecycle, nil, cleaner)
-	if err := service.DeleteUser(ctx, 42, authDeleter); err == nil {
-		t.Fatal("expected DeleteUser to fail when upload cleanup fails")
-	}
-	if len(authDeleter.authUserIDs) != 0 || lifecycle.progress.Phase != DeletionPendingStorage {
-		t.Fatalf("retry should skip Auth and remain pending storage: auth=%v phase=%s", authDeleter.authUserIDs, lifecycle.progress.Phase)
+	if len(authDeleter.authUserIDs) != 0 {
+		t.Fatalf("UserService must not execute Auth deletion, got calls=%v", authDeleter.authUserIDs)
 	}
 }

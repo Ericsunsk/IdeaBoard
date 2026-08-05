@@ -1064,7 +1064,14 @@ func TestAdminDeleteUserContinuesLocalCleanupWhenAuthUserAlreadyMissing(t *testi
 		t.Fatalf("create target user failed: %v", err)
 	}
 	authManager := &fakeAdminAuthManager{deleteErr: autherrors.ErrAuthUserNotFound}
-	lifecycle := &recordingUserLifecycle{progress: DeletionProgress{UserID: targetUser.ID, AuthUserID: authUserID, StorageUID: targetUser.StorageUID, Phase: DeletionPendingAuth}}
+	lifecycle := &recordingUserLifecycle{}
+	lifecycle.deleteFn = func(ctx context.Context, userID int64, authDeleter AuthUserDeleter, uploadCleaner UserUploadCleaner) error {
+		if err := authDeleter.DeleteUser(ctx, authUserID); err != nil && !errors.Is(err, autherrors.ErrAuthUserNotFound) {
+			return err
+		}
+		lifecycle.deleteErr = nil
+		return uploadCleaner.DeleteUserUploads(ctx, userID, targetUser.StorageUID)
+	}
 	userService := NewUserService(repo, lifecycle, nil, &recordingUserUploadCleaner{})
 	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager))
 	router := gin.New()
@@ -1084,8 +1091,8 @@ func TestAdminDeleteUserContinuesLocalCleanupWhenAuthUserAlreadyMissing(t *testi
 		t.Fatalf("deleted auth user id = %q, want %q", authManager.deletedAuthUserID, authUserID)
 	}
 
-	if lifecycle.tombstoneCalls != 1 {
-		t.Fatalf("tombstone calls = %d, want 1", lifecycle.tombstoneCalls)
+	if len(lifecycle.deleteCalls) != 1 || lifecycle.deleteCalls[0] != targetUser.ID {
+		t.Fatalf("lifecycle delete calls = %v, want one call for user %d", lifecycle.deleteCalls, targetUser.ID)
 	}
 }
 
@@ -1107,7 +1114,13 @@ func TestAdminDeleteUserReportsLocalCleanupFailureAfterAuthDelete(t *testing.T) 
 	}
 
 	authManager := &fakeAdminAuthManager{}
-	lifecycle := &recordingUserLifecycle{progress: DeletionProgress{UserID: targetUser.ID, AuthUserID: authUserID, StorageUID: targetUser.StorageUID, Phase: DeletionPendingAuth}}
+	lifecycle := &recordingUserLifecycle{}
+	lifecycle.deleteFn = func(ctx context.Context, userID int64, authDeleter AuthUserDeleter, uploadCleaner UserUploadCleaner) error {
+		if err := authDeleter.DeleteUser(ctx, authUserID); err != nil && !errors.Is(err, autherrors.ErrAuthUserNotFound) {
+			return err
+		}
+		return uploadCleaner.DeleteUserUploads(ctx, userID, targetUser.StorageUID)
+	}
 	userService := NewUserService(
 		repo,
 		lifecycle,
@@ -1153,7 +1166,10 @@ func TestAdminDeleteUserPreservesLocalUserWhenAuthDeleteFails(t *testing.T) {
 	}
 
 	authManager := &fakeAdminAuthManager{deleteErr: errors.New("auth unavailable")}
-	lifecycle := &recordingUserLifecycle{progress: DeletionProgress{UserID: targetUser.ID, AuthUserID: authUserID, StorageUID: targetUser.StorageUID, Phase: DeletionPendingAuth}}
+	lifecycle := &recordingUserLifecycle{}
+	lifecycle.deleteFn = func(ctx context.Context, _ int64, authDeleter AuthUserDeleter, _ UserUploadCleaner) error {
+		return authDeleter.DeleteUser(ctx, authUserID)
+	}
 	userService := NewUserService(repo, lifecycle, nil, &recordingUserUploadCleaner{})
 	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager))
 	router := gin.New()

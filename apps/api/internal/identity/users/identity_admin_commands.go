@@ -195,14 +195,12 @@ func (commands *identityAdminCommands) Delete(ctx context.Context, actor princip
 	if err != nil {
 		return err
 	}
-	if commands.auth == nil {
-		return identityAdminError(IdentityAdminUnavailable, "认证服务未配置", errors.New("admin auth service client not configured"))
-	}
-	// The durable lifecycle owns Auth identity validation for a new deletion and
-	// must also be able to resume after tombstoning has cleared auth_user_id.
 	if err := commands.users.DeleteUser(ctx, target.ID, commands.auth); err != nil {
 		if errors.Is(err, ErrUserDeletionBlockedByPaymentState) {
 			return identityAdminError(IdentityAdminConflict, "存在未结算的 Payment、Refund 或 Dispute，暂不能注销用户", err)
+		}
+		if errors.Is(err, ErrUserDeletionAuthUnavailable) {
+			return identityAdminError(IdentityAdminUnavailable, "认证服务未配置", err)
 		}
 		return identityAdminError(IdentityAdminBusinessFailure, "用户删除流程已安全冻结，可重试以继续收敛", err)
 	}

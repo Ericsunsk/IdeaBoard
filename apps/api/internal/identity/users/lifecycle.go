@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/credits"
+	"ideaboard/api/internal/identity/autherrors"
 	"ideaboard/api/internal/identity/trust"
 	"ideaboard/api/internal/platform/database"
 
@@ -23,6 +24,8 @@ const welcomeGrantCredits int64 = 100
 
 var ErrUserDeletionInProgress = errors.New("user deletion is already in progress")
 var ErrUserDeletionBlockedByPaymentState = errors.New("user deletion is blocked by unsettled payment state")
+var ErrUserDeletionAuthUnavailable = errors.New("user deletion Auth deleter is not configured")
+var ErrUserDeletionStorageUnavailable = errors.New("user deletion storage cleaner is not configured")
 
 type VerifiedIdentity = trust.ProvisioningIdentity
 
@@ -53,6 +56,14 @@ type DeletionProgress struct {
 	AuthUserID string
 	StorageUID string
 	Phase      DeletionPhase
+}
+
+type AuthUserDeleter interface {
+	DeleteUser(context.Context, string) error
+}
+
+type UserUploadCleaner interface {
+	DeleteUserUploads(ctx context.Context, userID int64, storageUID string) error
 }
 
 type CreditWalletLifecycleService interface {
@@ -229,7 +240,7 @@ func (s *LifecycleService) SetUserStatus(ctx context.Context, userID int64, stat
 	return nil
 }
 
-func (s *LifecycleService) BeginUserDeletion(ctx context.Context, userID int64) (*DeletionProgress, error) {
+func (s *LifecycleService) beginUserDeletion(ctx context.Context, userID int64) (*DeletionProgress, error) {
 	if s == nil || s.pool == nil || s.credits == nil || userID <= 0 {
 		return nil, fmt.Errorf("invalid user deletion command")
 	}
@@ -292,69 +303,116 @@ VALUES ($1, $2, $3, $4)`, userID, progress.AuthUserID, progress.StorageUID, prog
 	return progress, nil
 }
 
-func (s *LifecycleService) AdvanceUserDeletion(ctx context.Context, userID int64, from, to DeletionPhase) error {
+func (s *LifecycleService) DeleteUser(
+	ctx context.Context,
+	userID int64,
+	authDeleter AuthUserDeleter,
+	uploadCleaner UserUploadCleaner,
+) error {
+	progress, err := s.beginUserDeletion(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	for progress.Phase != DeletionCompleted {
+		switch progress.Phase {
+		case DeletionPendingAuth:
+			if authDeleter == nil {
+				return ErrUserDeletionAuthUnavailable
+			}
+			if err := authDeleter.DeleteUser(ctx, progress.AuthUserID); err != nil && !errors.Is(err, autherrors.ErrAuthUserNotFound) {
+				return fmt.Errorf("delete Auth identity: %w", err)
+			}
+			progress.Phase, err = s.advanceDeletion(ctx, progress.UserID, DeletionPendingAuth, DeletionPendingStorage)
+			if err != nil {
+				return fmt.Errorf("record Auth identity deletion: %w", err)
+			}
+		case DeletionPendingStorage:
+			if uploadCleaner == nil {
+				return ErrUserDeletionStorageUnavailable
+			}
+			if err := uploadCleaner.DeleteUserUploads(ctx, progress.UserID, progress.StorageUID); err != nil {
+				return fmt.Errorf("delete user uploads: %w", err)
+			}
+			progress.Phase, err = s.advanceDeletion(ctx, progress.UserID, DeletionPendingStorage, DeletionPendingTombstone)
+			if err != nil {
+				return fmt.Errorf("record user upload cleanup: %w", err)
+			}
+		case DeletionPendingTombstone:
+			progress.Phase, err = s.tombstoneUser(ctx, progress.UserID)
+			if err != nil {
+				return fmt.Errorf("tombstone user: %w", err)
+			}
+		default:
+			return fmt.Errorf("unsupported user deletion phase %q", progress.Phase)
+		}
+	}
+	return nil
+}
+
+func (s *LifecycleService) advanceDeletion(ctx context.Context, userID int64, from, to DeletionPhase) (DeletionPhase, error) {
 	if s == nil || s.pool == nil || userID <= 0 {
-		return fmt.Errorf("invalid user deletion transition")
+		return "", fmt.Errorf("invalid user deletion transition")
 	}
 	if (from != DeletionPendingAuth || to != DeletionPendingStorage) &&
 		(from != DeletionPendingStorage || to != DeletionPendingTombstone) {
-		return fmt.Errorf("invalid user deletion phase transition %s -> %s", from, to)
+		return "", fmt.Errorf("invalid user deletion phase transition %s -> %s", from, to)
 	}
 	result, err := s.pool.Exec(ctx, `
 UPDATE user_deletion_requests
 SET phase = $3, updated_at = now()
 WHERE user_id = $1 AND phase = $2`, userID, from, to)
 	if err != nil {
-		return fmt.Errorf("advance user deletion phase: %w", err)
+		return "", fmt.Errorf("advance user deletion phase: %w", err)
 	}
 	if result.RowsAffected() == 1 {
-		return nil
+		return to, nil
 	}
 	var current DeletionPhase
 	if err := s.pool.QueryRow(ctx, `SELECT phase FROM user_deletion_requests WHERE user_id = $1`, userID).Scan(&current); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return database.ErrNotFound
+			return "", database.ErrNotFound
 		}
-		return fmt.Errorf("load user deletion phase: %w", err)
+		return "", fmt.Errorf("load user deletion phase: %w", err)
 	}
 	if current == to || current == DeletionCompleted {
-		return nil
+		return current, nil
 	}
-	return fmt.Errorf("user deletion phase is %s, expected %s", current, from)
+	return "", fmt.Errorf("user deletion phase is %s, expected %s", current, from)
 }
 
-func (s *LifecycleService) TombstoneUser(ctx context.Context, userID int64) error {
+func (s *LifecycleService) tombstoneUser(ctx context.Context, userID int64) (DeletionPhase, error) {
 	if s == nil || s.pool == nil || s.credits == nil || userID <= 0 {
-		return fmt.Errorf("invalid user tombstone command")
+		return "", fmt.Errorf("invalid user tombstone command")
 	}
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return fmt.Errorf("begin user tombstone transaction: %w", err)
+		return "", fmt.Errorf("begin user tombstone transaction: %w", err)
 	}
 	defer rollbackIdentityTransaction(ctx, tx, "user tombstone")
 	var lockedUserID int64
 	if err := tx.QueryRow(ctx, `SELECT id FROM users WHERE id = $1 FOR UPDATE`, userID).Scan(&lockedUserID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return database.ErrNotFound
+			return "", database.ErrNotFound
 		}
-		return fmt.Errorf("lock user for tombstone: %w", err)
+		return "", fmt.Errorf("lock user for tombstone: %w", err)
 	}
 	var phase DeletionPhase
 	if err := tx.QueryRow(ctx, `SELECT phase FROM user_deletion_requests WHERE user_id = $1 FOR UPDATE`, userID).Scan(&phase); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return database.ErrNotFound
+			return "", database.ErrNotFound
 		}
-		return fmt.Errorf("load user deletion request: %w", err)
+		return "", fmt.Errorf("load user deletion request: %w", err)
 	}
 	if phase == DeletionCompleted {
-		return nil
+		return DeletionCompleted, nil
 	}
 	if phase != DeletionPendingTombstone {
-		return fmt.Errorf("user deletion is not ready for tombstone: %s", phase)
+		return "", fmt.Errorf("user deletion is not ready for tombstone: %s", phase)
 	}
 	tombstoneStorageUID, err := reserveTombstoneStorageUID(ctx, tx)
 	if err != nil {
-		return err
+		return "", err
 	}
 	result, err := tx.Exec(ctx, `
 UPDATE users
@@ -367,13 +425,13 @@ SET username = 'deleted-user-' || lower($2),
     updated_at = now()
 WHERE id = $1`, userID, tombstoneStorageUID)
 	if err != nil {
-		return fmt.Errorf("anonymize user tombstone: %w", err)
+		return "", fmt.Errorf("anonymize user tombstone: %w", err)
 	}
 	if result.RowsAffected() != 1 {
-		return database.ErrNotFound
+		return "", database.ErrNotFound
 	}
 	if err := s.credits.LifecycleInTx(tx).SetWalletFrozen(ctx, userID, true); err != nil {
-		return fmt.Errorf("freeze Credit Wallet: %w", err)
+		return "", fmt.Errorf("freeze Credit Wallet: %w", err)
 	}
 	if _, err := tx.Exec(ctx, `
 UPDATE user_deletion_requests
@@ -383,12 +441,12 @@ SET auth_user_id = NULL,
     completed_at = now(),
     updated_at = now()
 WHERE user_id = $1`, userID); err != nil {
-		return fmt.Errorf("complete user deletion request: %w", err)
+		return "", fmt.Errorf("complete user deletion request: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit user tombstone transaction: %w", err)
+		return "", fmt.Errorf("commit user tombstone transaction: %w", err)
 	}
-	return nil
+	return DeletionCompleted, nil
 }
 
 func reserveTombstoneStorageUID(ctx context.Context, tx pgx.Tx) (string, error) {

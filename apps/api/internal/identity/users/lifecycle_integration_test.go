@@ -269,8 +269,8 @@ func TestSetUserStatusAndTombstoneMissingUserReturnNotFound(t *testing.T) {
 	if err := service.SetUserStatus(context.Background(), 999999, 0); !database.IsNotFound(err) {
 		t.Fatalf("SetUserStatus(missing) error = %v, want not found", err)
 	}
-	if err := service.TombstoneUser(context.Background(), 999999); !database.IsNotFound(err) {
-		t.Fatalf("TombstoneUser(missing) error = %v, want not found", err)
+	if err := service.DeleteUser(context.Background(), 999999, &recordingAuthUserDeleter{}, &recordingUserUploadCleaner{}); !database.IsNotFound(err) {
+		t.Fatalf("DeleteUser(missing) error = %v, want not found", err)
 	}
 }
 
@@ -302,17 +302,8 @@ INSERT INTO users (username, storage_uid, role, status)
 VALUES ($1, 'OLDP01', 'user', 1)`, oldPredictableUsername); err != nil {
 		t.Fatalf("occupy old predictable tombstone username: %v", err)
 	}
-	if _, err := service.BeginUserDeletion(ctx, first.User.ID); err != nil {
-		t.Fatalf("BeginUserDeletion() error = %v", err)
-	}
-	if err := service.AdvanceUserDeletion(ctx, first.User.ID, DeletionPendingAuth, DeletionPendingStorage); err != nil {
-		t.Fatalf("advance auth deletion: %v", err)
-	}
-	if err := service.AdvanceUserDeletion(ctx, first.User.ID, DeletionPendingStorage, DeletionPendingTombstone); err != nil {
-		t.Fatalf("advance storage deletion: %v", err)
-	}
-	if err := service.TombstoneUser(ctx, first.User.ID); err != nil {
-		t.Fatalf("TombstoneUser() error = %v", err)
+	if err := service.DeleteUser(ctx, first.User.ID, &recordingAuthUserDeleter{}, &recordingUserUploadCleaner{}); err != nil {
+		t.Fatalf("DeleteUser() error = %v", err)
 	}
 
 	var username, avatar, walletStatus string
@@ -534,7 +525,7 @@ END $$ LANGUAGE plpgsql`); err != nil {
 FOR EACH ROW EXECUTE FUNCTION fail_user_tombstone_once()`); err != nil {
 		t.Fatalf("install tombstone failure trigger: %v", err)
 	}
-	if err := service.DeleteUser(ctx, provisioned.User.ID, authDeleter); err == nil {
+	if err := service.DeleteUser(ctx, provisioned.User.ID, nil); err == nil {
 		t.Fatal("injected tombstone failure should stop deletion")
 	}
 	assertDeletionState(t, pool, provisioned.User.ID, DeletionPendingTombstone, 0, "frozen")
@@ -545,10 +536,10 @@ FOR EACH ROW EXECUTE FUNCTION fail_user_tombstone_once()`); err != nil {
 		t.Fatalf("remove tombstone failure function: %v", err)
 	}
 
-	if err := service.DeleteUser(ctx, provisioned.User.ID, authDeleter); err != nil {
+	if err := service.DeleteUser(ctx, provisioned.User.ID, nil); err != nil {
 		t.Fatalf("retry deletion to convergence: %v", err)
 	}
-	if err := service.DeleteUser(ctx, provisioned.User.ID, authDeleter); err != nil {
+	if err := service.DeleteUser(ctx, provisioned.User.ID, nil); err != nil {
 		t.Fatalf("completed deletion idempotency retry: %v", err)
 	}
 	assertDeletionState(t, pool, provisioned.User.ID, DeletionCompleted, 0, "frozen")
@@ -608,8 +599,8 @@ VALUES (
 		t.Fatalf("seed unsettled payment order: %v", err)
 	}
 
-	if _, err := lifecycle.BeginUserDeletion(ctx, provisioned.User.ID); !errors.Is(err, ErrUserDeletionBlockedByPaymentState) {
-		t.Fatalf("BeginUserDeletion() error = %v, want ErrUserDeletionBlockedByPaymentState", err)
+	if err := lifecycle.DeleteUser(ctx, provisioned.User.ID, &recordingAuthUserDeleter{}, &recordingUserUploadCleaner{}); !errors.Is(err, ErrUserDeletionBlockedByPaymentState) {
+		t.Fatalf("DeleteUser() error = %v, want ErrUserDeletionBlockedByPaymentState", err)
 	}
 	var deletionRequests int
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM user_deletion_requests WHERE user_id = $1`, provisioned.User.ID).Scan(&deletionRequests); err != nil {
@@ -648,7 +639,7 @@ func TestIdentityAdminCommandsResumeDeletionFromPendingStorage(t *testing.T) {
 	userService := NewUserService(NewUserRepository(db), lifecycle, nil, cleaner)
 	events := &[]string{}
 	authManager := &fakeIdentityAdminAuth{events: events}
-	commands := NewIdentityAdminCommands(userService, authManager)
+	commands := newIdentityAdminCommands(userService, authManager)
 	actor := identityAdminActor(t)
 
 	err = commands.Delete(ctx, actor, provisioned.User.ID)
@@ -656,6 +647,7 @@ func TestIdentityAdminCommandsResumeDeletionFromPendingStorage(t *testing.T) {
 	assertDeletionState(t, pool, provisioned.User.ID, DeletionPendingStorage, 0, "frozen")
 
 	cleaner.err = nil
+	commands.auth = nil
 	if err := commands.Delete(ctx, actor, provisioned.User.ID); err != nil {
 		t.Fatalf("resume deletion from pending storage: %v", err)
 	}
@@ -697,8 +689,7 @@ func TestProvisionConcurrentWithBanOrDeleteNeverLeavesInactiveUserWithActiveWall
 					errs <- lifecycle.SetUserStatus(ctx, created.User.ID, 0)
 					return
 				}
-				_, err := lifecycle.BeginUserDeletion(ctx, created.User.ID)
-				errs <- err
+				errs <- lifecycle.DeleteUser(ctx, created.User.ID, &recordingAuthUserDeleter{}, &recordingUserUploadCleaner{})
 			}()
 			close(start)
 			for range 2 {
