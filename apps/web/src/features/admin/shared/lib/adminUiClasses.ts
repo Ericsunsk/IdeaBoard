@@ -39,7 +39,7 @@ export const adminToolbarMetricClass =
   'flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-admin-border bg-white px-3 py-1.5 text-admin-body font-bold text-admin-text-1 shadow-[0_2px_8px_rgba(45,64,89,0.02)]'
 
 export const adminFramedIconButtonBaseClass =
-  '!h-9 !w-9 !border !border-ib-border !bg-ib-surface hover:!bg-ib-surface-muted transition-colors flex items-center justify-center p-0'
+  '!h-9 !w-9 !border !border-ib-border !bg-ib-surface !text-admin-text-2 hover:!bg-ib-surface-muted hover:!text-admin-text-1 disabled:!text-admin-text-3 transition-colors flex items-center justify-center p-0'
 
 export const adminFramedIconButtonClass = `${adminFramedIconButtonBaseClass} !rounded-lg`
 
@@ -57,7 +57,7 @@ export const adminActionButtonClass = '!h-9 !rounded-lg'
 export const adminTextButtonClass = '!text-ib-text-muted hover:!text-admin-text-1'
 
 export const adminFilterPopoverClass =
-  'flex w-[260px] max-w-[calc(100vw_-_48px)] flex-col gap-4 bg-ib-surface p-4'
+  'flex min-w-0 w-[260px] max-w-[calc(100vw_-_48px)] flex-col gap-4 bg-ib-surface p-4'
 
 export const adminAnomalyPopoverClass =
   'flex max-h-[calc(100dvh_-_24px)] w-[340px] max-w-[calc(100vw_-_28px)] flex-col overflow-hidden bg-ib-surface'

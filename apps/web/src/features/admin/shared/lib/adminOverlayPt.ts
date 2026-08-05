@@ -23,7 +23,10 @@ export const adminOverlayMenuItemLinkClass =
   '!px-3 !py-2.5 !text-admin-body !font-[650] !text-ib-text-muted hover:!text-ib-text'
 
 export const adminOverlayPopoverRootClass =
-  '!rounded-lg !border-ib-border !bg-ib-surface !shadow-none'
+  '!rounded-[var(--radius-ib-overlay)] !border-ib-border !bg-ib-surface !shadow-none'
+
+export const adminOverlayPopoverContentClass =
+  '!overflow-clip !rounded-[calc(var(--radius-ib-overlay)-1px)]'
 
 export const adminOverlayDialogRootClass =
   '!overflow-hidden !rounded-[var(--radius-ib-overlay)] !border !border-ib-border !bg-ib-surface !shadow-[var(--shadow-ib-overlay)]'
@@ -52,7 +55,9 @@ export function createAdminPopoverPt(
   return {
     ...createPopoverMotionPt(),
     root: { class: joinOverlayClasses(adminOverlayPopoverRootClass, input.rootClass) },
-    ...(input.contentClass ? { content: { class: input.contentClass } } : {}),
+    content: {
+      class: joinOverlayClasses(adminOverlayPopoverContentClass, input.contentClass),
+    },
   }
 }
 

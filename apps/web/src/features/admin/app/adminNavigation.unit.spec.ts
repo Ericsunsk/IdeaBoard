@@ -4,12 +4,24 @@ import { adminRoutes } from './adminRoutes'
 import { adminNavigationRouteDefs } from './adminNavigationMeta'
 
 describe('resolveAdminPageTitle', () => {
-  it('uses the leaf route title for the pricing page', () => {
-    expect(resolveAdminPageTitle('/admin/credits/pricing', '功能定价')).toBe('功能定价')
+  it('keeps the Credits page title stable across child navigation', () => {
+    for (const path of [
+      '/admin/credits/pricing',
+      '/admin/credits/health',
+      '/admin/credits/reward-codes',
+      '/admin/credits/payment-orders',
+    ]) {
+      expect(resolveAdminPageTitle(path)).toBe('积分运营')
+    }
   })
 
-  it('falls back to the parent navigation title for a remaining credits route', () => {
-    expect(resolveAdminPageTitle('/admin/credits/pricing', undefined)).toBe('积分运营')
+  it('resolves the canonical title for other top-level pages', () => {
+    expect(resolveAdminPageTitle('/admin/users')).toBe('用户管理')
+    expect(resolveAdminPageTitle('/admin/task-monitor/detail')).toBe('任务监控')
+  })
+
+  it('falls back for unknown paths', () => {
+    expect(resolveAdminPageTitle('/admin/unknown')).toBe('管理后台')
   })
 })
 

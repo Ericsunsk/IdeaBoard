@@ -380,7 +380,7 @@ const activeKey = computed(() => activeItem.value.key)
 const currentMeta = computed(() => {
   return {
     ...activeItem.value,
-    title: resolveAdminPageTitle(route.path, route.meta.title),
+    title: resolveAdminPageTitle(route.path),
   }
 })
 
@@ -431,6 +431,7 @@ async function handleUserAction(key: 'boards' | 'logout') {
 }
 
 function setAdminRouteClass(enabled: boolean) {
+  document.documentElement.classList.toggle('admin-route', enabled)
   document.body.classList.toggle('admin-route', enabled)
 }
 

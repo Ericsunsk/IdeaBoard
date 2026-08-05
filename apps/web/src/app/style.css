@@ -494,6 +494,12 @@ body.admin-route {
   font-feature-settings: 'tnum' 1;
 }
 
+html.admin-route,
+html.admin-route body,
+html.admin-route #app {
+  background: var(--color-ib-surface);
+}
+
 .app-scrollbar {
   scrollbar-gutter: stable;
 }

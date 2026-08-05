@@ -4,10 +4,7 @@
       <Button
         v-tooltip.top="'Stripe 设置'"
         text
-        rounded
-        severity="secondary"
-        size="small"
-        class="!size-8 !p-0"
+        :class="adminToolbarIconButtonClass"
         aria-label="Stripe 设置"
         @click="stripeSettingsVisible = true"
       >
@@ -63,6 +60,7 @@ import {
 import { useAdminCreditHealthResource } from './health/adminCreditHealthResource'
 import { getCreditHealthPresentation } from './health/creditHealthPresentation'
 import StripeSettingsDialog from '../payments/stripe-settings/StripeSettingsDialog.vue'
+import { adminToolbarIconButtonClass } from '../shared/lib/adminUiClasses'
 
 const vTooltip = Tooltip
 

@@ -36,4 +36,18 @@ describe('Admin overlay Motion Policy', () => {
     expect(createAdminPopoverPt().transition).toMatchObject({ css: false })
     expect(createAdminMenuPt({ rootClass: 'menu' }).transition).toMatchObject({ css: false })
   })
+
+  it('keeps Popover radius on the root and clips content inside it', () => {
+    const pt = createAdminPopoverPt({ contentClass: '!p-0' })
+
+    expect(pt.root).toMatchObject({
+      class: expect.stringContaining('!rounded-[var(--radius-ib-overlay)]'),
+    })
+    expect(pt.content).toMatchObject({
+      class: expect.stringContaining(
+        '!overflow-clip !rounded-[calc(var(--radius-ib-overlay)-1px)]',
+      ),
+    })
+    expect(pt.content).toMatchObject({ class: expect.stringContaining('!p-0') })
+  })
 })

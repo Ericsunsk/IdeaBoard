@@ -52,7 +52,6 @@ export function findAdminNavigationItemByPath(path: string) {
   return adminNavigationItems.find((item) => isPathUnderRoute(path, item.path))
 }
 
-export function resolveAdminPageTitle(path: string, routeTitle: unknown) {
-  if (typeof routeTitle === 'string' && routeTitle.trim()) return routeTitle.trim()
+export function resolveAdminPageTitle(path: string) {
   return findAdminNavigationItemByPath(path)?.title ?? '管理后台'
 }

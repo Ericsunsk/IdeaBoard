@@ -35,7 +35,7 @@
             title="订单状态与异常"
             @reset="resetFilters"
           >
-            <div class="flex min-w-64 flex-col gap-4">
+            <div class="flex min-w-0 flex-col gap-4">
               <label class="flex flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
                 <span>订单状态</span>
                 <Select
@@ -53,7 +53,11 @@
                 class="flex items-center justify-between gap-4 text-admin-meta font-[650] text-admin-text-2"
               >
                 <span>仅看 24 小时异常</span>
-                <ToggleSwitch v-model="anomalyOnly" aria-label="仅看 24 小时异常" />
+                <ToggleSwitch
+                  v-model="anomalyOnly"
+                  class="shrink-0"
+                  aria-label="仅看 24 小时异常"
+                />
               </label>
             </div>
           </AdminFilterPopover>
