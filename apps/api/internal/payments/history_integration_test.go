@@ -62,3 +62,41 @@ func TestRechargeHistoryCursorRejectsOversizedRawValue(t *testing.T) {
 		t.Fatalf("decodeRechargeHistoryCursor() error = %v, want invalid cursor", err)
 	}
 }
+
+func TestListRechargesShowsPartialAndFullRefundState(t *testing.T) {
+	db := testdb.Open(t)
+	repo := NewRepository(db)
+	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
+	order := createCreditedRefundOrder(t, repo, now.Add(-time.Hour))
+	service := NewService(ServiceDependencies{Repository: repo, Now: func() time.Time { return now }})
+
+	first, _, err := repo.CreatePendingPaymentRefund(t.Context(), CreatePendingPaymentRefundInput{
+		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 200,
+		IdempotencyKey: "history-partial-refund", Reason: "unused Ideas", Now: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.MarkPaymentRefundSucceeded(t.Context(), first.ID, now); err != nil {
+		t.Fatal(err)
+	}
+	partial, err := service.ListRecharges(t.Context(), 42, "", 20)
+	if err != nil || len(partial.Items) != 1 || partial.Items[0].Status != "credited" || partial.Items[0].RefundedAmountMinor != 200 {
+		t.Fatalf("partial recharge history=%+v error=%v", partial, err)
+	}
+
+	second, _, err := repo.CreatePendingPaymentRefund(t.Context(), CreatePendingPaymentRefundInput{
+		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 300,
+		IdempotencyKey: "history-full-refund", Reason: "unused Ideas", Now: now,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.MarkPaymentRefundSucceeded(t.Context(), second.ID, now); err != nil {
+		t.Fatal(err)
+	}
+	full, err := service.ListRecharges(t.Context(), 42, "", 20)
+	if err != nil || len(full.Items) != 1 || full.Items[0].Status != "refunded" || full.Items[0].RefundedAmountMinor != 500 {
+		t.Fatalf("full recharge history=%+v error=%v", full, err)
+	}
+}

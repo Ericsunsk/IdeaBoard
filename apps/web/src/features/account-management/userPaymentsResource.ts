@@ -34,7 +34,7 @@ export type UserRechargeHistoryPage = RechargeHistoryPage
 
 export type UserPaymentEvent = {
   public_token?: string
-  status: UserPaymentOrderStatus
+  status: UserPaymentOrderStatus | 'refund_updated'
 }
 
 export interface UserPaymentsResource {
@@ -120,7 +120,8 @@ export function parseUserPaymentEvent(raw: string): UserPaymentEvent | null {
     if (
       candidate.status !== 'processing' &&
       candidate.status !== 'credited' &&
-      candidate.status !== 'failed'
+      candidate.status !== 'failed' &&
+      candidate.status !== 'refund_updated'
     ) {
       return null
     }

@@ -89,7 +89,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		rewardService:        rewardService,
 		paymentService: payments.NewService(payments.ServiceDependencies{
 			Repository: repos.paymentRepo, ConfigurationGateway: stripeAdapter,
-			CheckoutGateway: stripeAdapter, WebhookVerifier: stripeAdapter,
+			RefundGateway: stripeAdapter, CheckoutGateway: stripeAdapter, WebhookVerifier: stripeAdapter,
 			Wallets: creditService, Events: payments.NewEventHub(),
 		}),
 		userLifecycle: userLifecycle,

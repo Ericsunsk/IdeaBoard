@@ -37,13 +37,13 @@
           ></template
         >
       </Column>
-      <Column field="status" header="状态" :style="{ width: '110px' }">
+      <Column field="status" header="状态" :style="{ width: '190px' }">
         <template #body="{ data }"
           ><Skeleton v-if="isSkeleton(data)" width="4rem" /><span
             v-else
             class="font-semibold"
             :class="data.status === 'credited' ? 'text-ib-success' : 'text-ib-text-muted'"
-            >{{ data.status === 'credited' ? '已到账' : '已退款' }}</span
+            >{{ rechargeStatusLabel(data) }}</span
           ></template
         >
       </Column>
@@ -132,6 +132,7 @@ import type { UserRechargeHistoryItem } from '../userPaymentsResource'
 
 type SkeletonRow = { occurred_at: string; skeleton: true }
 type TableRow = UserRechargeHistoryItem | SkeletonRow
+
 const props = defineProps<{
   items: UserRechargeHistoryItem[]
   initialPending: boolean
@@ -149,6 +150,13 @@ const skeletonRows: SkeletonRow[] = Array.from({ length: 4 }, (_, index) => ({
 const tableRows = computed<TableRow[]>(() => (props.initialPending ? skeletonRows : props.items))
 function isSkeleton(row: TableRow): row is SkeletonRow {
   return 'skeleton' in row
+}
+function rechargeStatusLabel(item: UserRechargeHistoryItem): string {
+  if (item.status === 'refunded') return '已退款'
+  if (item.refunded_amount_minor) {
+    return `已到账 · 已退 ${formatCurrencyMinor(item.refunded_amount_minor, item.paid_currency)}`
+  }
+  return '已到账'
 }
 function formatDateTime(value: string): string {
   const date = new Date(value)

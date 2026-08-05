@@ -44,12 +44,17 @@ BEGIN
     jsonb_build_object('command_type', transactions.command_type, 'actor_type', transactions.actor_type,
       'related_transaction_id', transactions.related_transaction_id, 'command_amount', transactions.command_amount)
   FROM credit_transactions transactions
-  WHERE transactions.command_type NOT IN ('grant', 'deduction', 'hold', 'capture', 'release', 'refund', 'correction', 'purchase_credit')
+  WHERE transactions.command_type NOT IN ('grant', 'deduction', 'hold', 'capture', 'release', 'refund', 'correction', 'purchase_credit', 'purchase_refund')
     OR (transactions.command_type IN ('deduction', 'correction') AND transactions.actor_type <> 'admin')
     OR (transactions.command_type = 'purchase_credit' AND (
       transactions.actor_type <> 'service' OR transactions.actor_id <> 'payments'
       OR transactions.source <> 'stripe_purchase'
       OR transactions.business_reference_type <> 'payment_order'
+    ))
+    OR (transactions.command_type = 'purchase_refund' AND (
+      transactions.actor_type <> 'service' OR transactions.actor_id <> 'payments'
+      OR transactions.source <> 'stripe_refund'
+      OR transactions.business_reference_type <> 'payment_refund'
     ))
     OR transactions.command_amount <= 0;
 
@@ -269,6 +274,8 @@ BEGIN
       (related.transaction_id IS NULL OR related.command_type <> 'hold' OR related.wallet_user_id <> transactions.wallet_user_id))
     OR (transactions.command_type = 'refund' AND
       (related.transaction_id IS NULL OR related.command_type <> 'capture' OR related.wallet_user_id <> transactions.wallet_user_id))
+    OR (transactions.command_type = 'purchase_refund' AND
+      (related.transaction_id IS NULL OR related.command_type <> 'hold' OR related.wallet_user_id <> transactions.wallet_user_id))
     OR (transactions.command_type = 'correction' AND
       (related.transaction_id IS NULL OR related.command_type NOT IN ('grant', 'deduction', 'refund')
        OR related.actor_type <> 'admin' OR related.wallet_user_id <> transactions.wallet_user_id));
@@ -283,7 +290,7 @@ BEGIN
   WHERE hold_tx.command_type IS DISTINCT FROM 'hold' OR hold_tx.wallet_user_id IS DISTINCT FROM holds.wallet_user_id
     OR hold_tx.command_amount IS DISTINCT FROM holds.amount
     OR (holds.status = 'held' AND holds.terminal_transaction_id IS NOT NULL)
-    OR (holds.status = 'captured' AND (terminal.command_type IS DISTINCT FROM 'capture' OR terminal.related_transaction_id IS DISTINCT FROM holds.hold_transaction_id))
+    OR (holds.status = 'captured' AND ((terminal.command_type IS NULL OR terminal.command_type NOT IN ('capture', 'purchase_refund')) OR terminal.related_transaction_id IS DISTINCT FROM holds.hold_transaction_id))
     OR (holds.status = 'released' AND (terminal.command_type IS DISTINCT FROM 'release' OR terminal.related_transaction_id IS DISTINCT FROM holds.hold_transaction_id));
 
   INSERT INTO reconciliation_scan
@@ -291,7 +298,7 @@ BEGIN
     jsonb_build_object('hold_status', holds.status, 'terminal_transaction_count', COUNT(terminals.transaction_id))
   FROM credit_holds holds
   LEFT JOIN credit_transactions terminals ON terminals.related_transaction_id = holds.hold_transaction_id
-    AND terminals.command_type IN ('capture', 'release')
+    AND terminals.command_type IN ('capture', 'release', 'purchase_refund')
   GROUP BY holds.hold_transaction_id, holds.wallet_user_id, holds.status
   HAVING COUNT(terminals.transaction_id) <> CASE WHEN holds.status = 'held' THEN 0 ELSE 1 END;
 

@@ -43,8 +43,56 @@ func (s *Service) ReconcileDuePaymentOrders(ctx context.Context) error {
 				retryErr = errors.Join(retryErr, processErr)
 			}
 		}
+		refundErr := s.reconcileDuePaymentRefunds(lockedContext, apiKey, configurationErr, now)
+		if refundErr != nil {
+			retryErr = errors.Join(retryErr, refundErr)
+		}
 		return retryErr
 	})
+}
+
+func (s *Service) reconcileDuePaymentRefunds(ctx context.Context, apiKey string, configurationErr error, now time.Time) error {
+	if s == nil || s.repo == nil || s.refundGateway == nil {
+		return nil
+	}
+	refunds, err := s.repo.ListPendingPaymentRefunds(ctx, now.Add(-2*time.Minute), 100)
+	if err != nil {
+		return err
+	}
+	var retryErr error
+	for _, refund := range refunds {
+		if configurationErr != nil {
+			retryErr = errors.Join(retryErr, configurationErr)
+			continue
+		}
+		var providerRefund StripeRefund
+		if refund.StripeRefundID == "" {
+			providerRefund, err = s.refundGateway.CreateRefund(ctx, CreateStripeRefundInput{
+				APIKey: apiKey, ChargeID: refund.StripeChargeID, AmountMinor: refund.AmountMinor,
+				Currency: refund.Currency, IdempotencyKey: "ideaboard-refund-" + refund.ID,
+			})
+			if err != nil {
+				if reconciliationFailureIsTransient(err) {
+					retryErr = errors.Join(retryErr, err)
+					continue
+				}
+				if _, markErr := s.repo.MarkPaymentRefundFailed(ctx, refund.ID, err.Error(), now); markErr != nil {
+					retryErr = errors.Join(retryErr, markErr)
+				}
+				continue
+			}
+		} else {
+			providerRefund, err = s.refundGateway.RetrieveRefund(ctx, apiKey, refund.StripeRefundID)
+			if err != nil {
+				retryErr = errors.Join(retryErr, err)
+				continue
+			}
+		}
+		if _, err := s.convergePaymentRefund(ctx, refund, providerRefund); err != nil {
+			retryErr = errors.Join(retryErr, err)
+		}
+	}
+	return retryErr
 }
 
 func (s *Service) reconcilePaymentOrderClaim(ctx context.Context, configuration StoredStripeConfiguration, apiKey string, configurationErr error, claim PaymentReconciliationClaim, now time.Time) (PaymentReconciliationOutcome, error) {

@@ -29,6 +29,13 @@ export function createAdminPaymentOrderResource(
     },
     get: async (publicOrderNumber, signal) =>
       toPaymentOrderDetail(await adapter.get(publicOrderNumber, signal)),
+    refund: async (publicOrderNumber, input) => {
+      await adapter.refund(publicOrderNumber, {
+        idea_quantity: input.ideaQuantity,
+        idempotency_key: input.idempotencyKey,
+      })
+      return toPaymentOrderDetail(await adapter.get(publicOrderNumber))
+    },
   }
 }
 
@@ -91,6 +98,7 @@ function toPaymentOrderDetail(value: PaymentOrderApiDetail): AdminPaymentOrderDe
     },
     refunds: (value.refunds ?? []).map(toRefundSummary),
     disputes: (value.disputes ?? []).map(toDisputeSummary),
+    refundableIdeaQuantity: value.refundable_idea_quantity,
   }
 }
 
@@ -101,6 +109,7 @@ function toRefundSummary(value: PaymentOrderApiRefund): AdminPaymentRefundSummar
     ideaQuantity: value.idea_quantity,
     amountMinor: value.amount_minor,
     currency: value.currency,
+    stripeStatus: value.stripe_status,
     updatedAt: value.updated_at,
     errorSummary: value.error_summary,
   }

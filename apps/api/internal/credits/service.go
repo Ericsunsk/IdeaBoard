@@ -72,6 +72,12 @@ func (s *Service) Purchase(ctx context.Context, command PurchaseCommand) (Comman
 	})
 }
 
+func (s *Service) PurchaseRefund(ctx context.Context, command PurchaseRefundCommand) (CommandResult, error) {
+	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (CommandResult, error) {
+		return commands.PurchaseRefund(ctx, command)
+	})
+}
+
 func (s *Service) Deduct(ctx context.Context, command DeductionCommand) (CommandResult, error) {
 	return withManagedTransaction(ctx, s, func(commands *transactionCommands) (CommandResult, error) {
 		return commands.Deduct(ctx, command)
@@ -220,6 +226,10 @@ func (c *transactionCommands) Hold(ctx context.Context, command HoldCommand) (Co
 	return executeHold(ctx, command, c.execute)
 }
 
+func (c *transactionCommands) PurchaseRefund(ctx context.Context, command PurchaseRefundCommand) (CommandResult, error) {
+	return executePurchaseRefund(ctx, command, c.executePurchaseRefund)
+}
+
 func (c *transactionCommands) Capture(ctx context.Context, command CaptureCommand) (CommandResult, error) {
 	return executeCapture(ctx, command, c.execute)
 }
@@ -252,6 +262,10 @@ func (c *sqlTransactionCommands) Hold(ctx context.Context, command HoldCommand) 
 	return executeHold(ctx, command, c.execute)
 }
 
+func (c *sqlTransactionCommands) PurchaseRefund(ctx context.Context, command PurchaseRefundCommand) (CommandResult, error) {
+	return executePurchaseRefund(ctx, command, c.executeSQLPurchaseRefund)
+}
+
 func (c *sqlTransactionCommands) Capture(ctx context.Context, command CaptureCommand) (CommandResult, error) {
 	return executeCapture(ctx, command, c.execute)
 }
@@ -266,6 +280,7 @@ func (c *sqlTransactionCommands) Refund(ctx context.Context, command RefundComma
 
 type commandExecutor func(context.Context, CommandType, int64, int64, string, CommandMetadata) (CommandResult, error)
 type purchaseExecutor func(context.Context, int64, int64, CommandMetadata) (CommandResult, error)
+type purchaseRefundExecutor func(context.Context, int64, string, CommandMetadata) (CommandResult, error)
 
 func (c *transactionCommands) execute(ctx context.Context, commandType CommandType, userID, amount int64, relatedID string, metadata CommandMetadata) (CommandResult, error) {
 	return executeCreditCommand(ctx, c.tx, commandType, userID, amount, relatedID, metadata)
@@ -281,6 +296,14 @@ func (c *transactionCommands) executePurchase(ctx context.Context, userID, amoun
 
 func (c *sqlTransactionCommands) executePurchase(ctx context.Context, userID, amount int64, metadata CommandMetadata) (CommandResult, error) {
 	return executeSQLCreditPurchase(ctx, c.tx, userID, amount, metadata)
+}
+
+func (c *transactionCommands) executePurchaseRefund(ctx context.Context, userID int64, holdID string, metadata CommandMetadata) (CommandResult, error) {
+	return executeCreditPurchaseRefund(ctx, c.tx, userID, holdID, metadata)
+}
+
+func (c *sqlTransactionCommands) executeSQLPurchaseRefund(ctx context.Context, userID int64, holdID string, metadata CommandMetadata) (CommandResult, error) {
+	return executeSQLCreditPurchaseRefund(ctx, c.tx, userID, holdID, metadata)
 }
 
 func executeGrant(ctx context.Context, command GrantCommand, execute commandExecutor) (CommandResult, error) {
@@ -299,6 +322,17 @@ func executePurchase(ctx context.Context, command PurchaseCommand, execute purch
 		return CommandResult{}, ErrInvalidCommand
 	}
 	return execute(ctx, command.UserID, command.Amount.Int64(), metadata)
+}
+
+func executePurchaseRefund(ctx context.Context, command PurchaseRefundCommand, execute purchaseRefundExecutor) (CommandResult, error) {
+	metadata, err := normalizeMetadata(command.Metadata)
+	holdID := strings.TrimSpace(command.HoldTransactionID)
+	if err != nil || command.UserID <= 0 || holdID == "" || len(holdID) > 64 ||
+		metadata.Actor.Type != ActorService || metadata.Actor.ID != "payments" ||
+		metadata.Source != "stripe_refund" || metadata.BusinessReference.Type != "payment_refund" {
+		return CommandResult{}, ErrInvalidCommand
+	}
+	return execute(ctx, command.UserID, holdID, metadata)
 }
 
 func executeDeduction(ctx context.Context, command DeductionCommand, execute commandExecutor) (CommandResult, error) {

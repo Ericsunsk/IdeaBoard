@@ -95,6 +95,31 @@ SELECT transaction_id,
        created_at
 FROM execute_credit_purchase_v1($1, $2, $3, $4, $5, $6, $7, $8, $9)`
 
+const creditPurchaseRefundSQL = `
+SELECT transaction_id,
+       command_type,
+       command_amount,
+       wallet_user_id,
+       available_balance_after,
+       reserved_balance_after,
+       replayed,
+       created_at
+FROM execute_credit_purchase_refund_v1($1, $2, $3, $4, $5, $6, $7, $8, $9)`
+
+func executeCreditPurchaseRefund(ctx context.Context, tx pgx.Tx, userID int64, holdID string, metadata CommandMetadata) (CommandResult, error) {
+	if tx == nil {
+		return CommandResult{}, fmt.Errorf("credits service: transaction not configured")
+	}
+	return scanCreditCommand(tx.QueryRow(ctx, creditPurchaseRefundSQL, userID, holdID, metadata.IdempotencyKey, metadata.Actor.Type, metadata.Actor.ID, metadata.Source, metadata.Reason, metadata.BusinessReference.Type, metadata.BusinessReference.ID))
+}
+
+func executeSQLCreditPurchaseRefund(ctx context.Context, tx *sql.Tx, userID int64, holdID string, metadata CommandMetadata) (CommandResult, error) {
+	if tx == nil {
+		return CommandResult{}, fmt.Errorf("credits service: SQL transaction not configured")
+	}
+	return scanCreditCommand(tx.QueryRowContext(ctx, creditPurchaseRefundSQL, userID, holdID, metadata.IdempotencyKey, metadata.Actor.Type, metadata.Actor.ID, metadata.Source, metadata.Reason, metadata.BusinessReference.Type, metadata.BusinessReference.ID))
+}
+
 type rowScanner interface {
 	Scan(...any) error
 }

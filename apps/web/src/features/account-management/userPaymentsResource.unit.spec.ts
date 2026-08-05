@@ -7,6 +7,9 @@ describe('userPaymentsResource payment events', () => {
       public_token: 'token',
       status: 'credited',
     })
+    expect(parseUserPaymentEvent('{"status":"refund_updated"}')).toEqual({
+      status: 'refund_updated',
+    })
     expect(parseUserPaymentEvent('{"status":"unknown"}')).toBeNull()
     expect(parseUserPaymentEvent('{"public_token":42,"status":"failed"}')).toBeNull()
     expect(parseUserPaymentEvent('not-json')).toBeNull()

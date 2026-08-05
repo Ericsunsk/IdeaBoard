@@ -95,7 +95,10 @@
               :key="refund.id || index"
               class="rounded-[var(--radius-ib-control)] border border-admin-border-soft p-3 text-admin-meta"
             >
-              <div class="font-bold text-admin-text-1">{{ refund.status }}</div>
+              <div class="font-bold text-admin-text-1">{{ refundStatusLabel(refund.status) }}</div>
+              <div v-if="refund.stripeStatus" class="mt-1 text-admin-text-3">
+                Stripe: {{ refund.stripeStatus }}
+              </div>
               <div class="mt-1 text-admin-text-3">
                 {{ formatRefund(refund) }} · {{ formatPaymentDateTime(refund.updatedAt) }}
               </div>
@@ -126,6 +129,56 @@
         </div>
       </section>
 
+      <section
+        v-if="canRefund"
+        aria-labelledby="payment-refund-action"
+        class="rounded-[var(--radius-ib-control)] border border-admin-border-soft p-4"
+      >
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 id="payment-refund-action" class="text-admin-body font-bold text-admin-title-color">
+              发起退款
+            </h3>
+            <p class="mt-1 text-admin-caption text-admin-text-3">
+              仅可退回未消费 Idea，最终可退额度由服务端按 Wallet 可用余额再次校验。
+            </p>
+          </div>
+          <Tag :value="`${formatIdeas(refundableIdeas)} 可退`" severity="info" rounded />
+        </div>
+        <form class="mt-3 flex flex-wrap items-end gap-3" novalidate @submit.prevent="submitRefund">
+          <label
+            for="admin-payment-refund-ideas"
+            class="flex min-w-44 flex-1 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+          >
+            <span>退款 Idea 数量</span>
+            <InputNumber
+              v-model="refundIdeaQuantity"
+              input-id="admin-payment-refund-ideas"
+              aria-label="退款 Idea 数量"
+              :min="1"
+              :max="refundableIdeas"
+              :disabled="refunding"
+              :use-grouping="true"
+              fluid
+              :invalid="Boolean(refundValidationError)"
+            />
+            <small v-if="refundValidationError" class="text-admin-danger">{{
+              refundValidationError
+            }}</small>
+          </label>
+          <Button
+            type="submit"
+            label="确认退款"
+            severity="danger"
+            :loading="refunding"
+            :disabled="refunding || !canSubmitRefund"
+          />
+        </form>
+        <Message v-if="refundError" class="mt-3" severity="error" :closable="false">
+          {{ refundError }}
+        </Message>
+      </section>
+
       <div v-if="detail.receiptUrl" class="flex justify-end">
         <Button
           as="a"
@@ -143,8 +196,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
+import InputNumber from 'primevue/inputnumber'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
@@ -166,12 +220,52 @@ const props = defineProps<{
   detail: AdminPaymentOrderDetail | null
   loading: boolean
   error: boolean
+  refunding: boolean
+  refundError: string
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   'update:visible': [visible: boolean]
   retry: []
+  refund: [ideaQuantity: number]
 }>()
+
+const refundIdeaQuantity = ref<number | null>(null)
+watch(
+  () => props.detail?.publicOrderNumber,
+  () => {
+    refundIdeaQuantity.value = null
+  },
+)
+
+const refundableIdeas = computed(() => {
+  const value = props.detail?.refundableIdeaQuantity
+  if (value !== undefined) return Math.max(0, Math.floor(value))
+  const detail = props.detail
+  if (!detail) return 0
+  const refunded = detail.refunds.reduce((sum, item) => sum + (item.ideaQuantity ?? 0), 0)
+  return Math.max(0, detail.ideaQuantity - refunded)
+})
+const canRefund = computed(() => {
+  const detail = props.detail
+  if (!detail?.paidAt || detail.status !== 'credited') return false
+  const paidTime = Date.parse(detail.paidAt)
+  return (
+    Number.isFinite(paidTime) &&
+    Date.now() - paidTime <= 14 * 24 * 60 * 60 * 1000 &&
+    refundableIdeas.value > 0
+  )
+})
+const refundValidationError = computed(() => {
+  const quantity = refundIdeaQuantity.value
+  if (quantity === null || quantity === undefined || !Number.isInteger(quantity) || quantity <= 0) {
+    return '请输入正整数 Idea 数量'
+  }
+  if (quantity > refundableIdeas.value)
+    return `最多可退 ${formatIdeas(refundableIdeas.value)} Ideas`
+  return ''
+})
+const canSubmitRefund = computed(() => canRefund.value && !refundValidationError.value)
 
 const overviewRows = computed(() => {
   const detail = props.detail
@@ -227,6 +321,27 @@ function formatRefund(refund: AdminPaymentRefundSummary): string {
       ? 'Idea 数量未知'
       : `${new Intl.NumberFormat('zh-CN').format(refund.ideaQuantity)} Ideas`
   return `${ideas} / ${formatPaymentMoney(refund.amountMinor, refund.currency)}`
+}
+
+function refundStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    pending: '退款处理中',
+    succeeded: '退款成功',
+    failed: '退款失败',
+    anomaly: '需要人工处理',
+    'refund.updated': 'Stripe 退款更新',
+    'refund.failed': 'Stripe 退款失败',
+  }
+  return labels[status] ?? status
+}
+
+function formatIdeas(value: number): string {
+  return new Intl.NumberFormat('zh-CN').format(value)
+}
+
+function submitRefund() {
+  if (!canSubmitRefund.value || refundIdeaQuantity.value === null) return
+  emit('refund', refundIdeaQuantity.value)
 }
 
 function formatDispute(dispute: AdminPaymentDisputeSummary): string {

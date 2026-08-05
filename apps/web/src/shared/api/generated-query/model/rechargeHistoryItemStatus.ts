@@ -10,4 +10,5 @@ export type RechargeHistoryItemStatus =
 
 export const RechargeHistoryItemStatus = {
   credited: 'credited',
+  refunded: 'refunded',
 } as const

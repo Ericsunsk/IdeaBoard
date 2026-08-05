@@ -176,6 +176,24 @@ describe('UserRechargePane', () => {
             status: 'credited',
             receipt_url: 'https://pay.stripe.com/receipts/demo',
           },
+          {
+            occurred_at: '2026-08-01T08:08:00Z',
+            idea_quantity: 1000,
+            paid_amount_minor: 1000,
+            paid_currency: 'usd',
+            status: 'credited',
+            refunded_idea_quantity: 250,
+            refunded_amount_minor: 250,
+          },
+          {
+            occurred_at: '2026-08-01T07:08:00Z',
+            idea_quantity: 500,
+            paid_amount_minor: 500,
+            paid_currency: 'usd',
+            status: 'refunded',
+            refunded_idea_quantity: 500,
+            refunded_amount_minor: 500,
+          },
         ],
       }),
     })
@@ -190,6 +208,8 @@ describe('UserRechargePane', () => {
     expect(await within(table).findByText('2,000')).toBeVisible()
     expect(within(table).getByText('HK$156.50 HKD')).toBeVisible()
     expect(within(table).getByText('已到账')).toBeVisible()
+    expect(within(table).getByText('已到账 · 已退 $2.50 USD')).toBeVisible()
+    expect(within(table).getByText('已退款')).toBeVisible()
     expect(within(table).getByRole('link', { name: '查看收据' })).toHaveAttribute(
       'href',
       'https://pay.stripe.com/receipts/demo',

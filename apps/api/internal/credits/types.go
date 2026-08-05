@@ -17,6 +17,7 @@ const (
 	CommandDeduction      CommandType = "deduction"
 	CommandCorrection     CommandType = "correction"
 	CommandPurchaseCredit CommandType = "purchase_credit"
+	CommandPurchaseRefund CommandType = "purchase_refund"
 )
 
 type AccountRole string
@@ -86,6 +87,12 @@ type PurchaseCommand struct {
 	Metadata CommandMetadata
 }
 
+type PurchaseRefundCommand struct {
+	UserID            int64
+	HoldTransactionID string
+	Metadata          CommandMetadata
+}
+
 // DeductionCommand records a discretionary administrative debit. It can only
 // consume available credits and always creates a new immutable transaction.
 type DeductionCommand struct {
@@ -131,6 +138,7 @@ type RefundCommand struct {
 type Commands interface {
 	Grant(context.Context, GrantCommand) (CommandResult, error)
 	Purchase(context.Context, PurchaseCommand) (CommandResult, error)
+	PurchaseRefund(context.Context, PurchaseRefundCommand) (CommandResult, error)
 	Deduct(context.Context, DeductionCommand) (CommandResult, error)
 	Correct(context.Context, CorrectionCommand) (CommandResult, error)
 	Hold(context.Context, HoldCommand) (CommandResult, error)

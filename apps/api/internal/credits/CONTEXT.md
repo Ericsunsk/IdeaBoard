@@ -19,13 +19,14 @@ Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示�
 | Release | User Reserved → User Available |
 | Refund | System Revenue → User Available，累计不得超过原 Charge |
 | Purchase Credit | 已验证外部支付的 `System Issuance → User Available`；由 Payments 以固定 actor/source/reference 调用，不是 discretionary Grant |
+| Purchase Refund | 已验证 Stripe Refund 对应的 `User Reserved → System Issuance`；必须关联 Payments 创建的 Refund Hold，幂等终态结算 |
 | Reconciliation Run | 由 `manual` 或 `scheduled` Trigger 启动、River 异步执行的全量一致性扫描；manual 持久化真实 Admin/reason，scheduled 持久化 schedule slot 且不伪造 actor |
 | Finding | 由 finding type + Wallet + subject 生成稳定 fingerprint 的可重跑异常事实 |
 | Finding Type | Credits 拥有的稳定 typed anomaly contract；Admin 对已知类型提供统一名称与摘要，未知类型必须安全降级 |
 
 ## Public Seams
 
-- `Commands` 是唯一应用写入入口，统一提供 Grant、Deduct、Hold、Capture、Release、Refund 与 Purchase；Purchase 使用独立 typed `SECURITY DEFINER execute_credit_purchase_v1`，其余命令通过 `execute_credit_command_v2`。
+- `Commands` 是唯一应用写入入口，统一提供 Grant、Deduct、Hold、Capture、Release、Refund、Purchase 与 PurchaseRefund；Purchase/PurchaseRefund 使用独立 typed `SECURITY DEFINER` routines，其余命令通过 `execute_credit_command_v2`。
 - `Service.InTx(pgx.Tx)` 与 transaction-scoped `CommandsInSQLTx(*sql.Tx)` 是同一 `Commands` contract 的 caller-owned transaction adapters：Task/River submission 使用 pgx，`taskbilling.SettleTerminal` 使用 database/sql；caller 都拥有 commit/rollback。Task Repository 不持有 application-lifetime Credits/Billing dependency。
 - `WalletReader` 提供 Wallet balance 与 keyset-paginated Ledger 查询。
 - `WalletRestrictionCommands` 通过 transaction-capable typed seam 幂等创建和精确解除 Restriction；其他 context 不得直接写 Restriction table。

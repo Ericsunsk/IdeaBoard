@@ -1126,6 +1126,47 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseBase' }
 
+  /admin/payments/orders/{order_number}/refunds:
+    post:
+      tags: [AdminPayments]
+      operationId: createAdminPaymentRefund
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: order_number
+          in: path
+          required: true
+          schema: { type: string, pattern: '^IBP-[0-9]{8}-[A-Z0-9]{12}$' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateAdminPaymentRefundRequest' }
+      responses:
+        '200':
+          description: Durable pending or terminal Payment Refund
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseAdminPaymentRefundResult' }
+        '400':
+          description: Invalid order number, Idea quantity, or idempotency key
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '409':
+          description: Order expired or requested Ideas exceed the refundable limit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '503':
+          description: Stripe is temporarily unavailable; the durable Refund remains pending
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+
   /webhooks/stripe:
     post:
       tags: [PaymentWebhooks]
@@ -4039,7 +4080,9 @@ components:
         idea_quantity: { type: integer, format: int64, minimum: 500, maximum: 500000 }
         paid_amount_minor: { type: integer, format: int64, minimum: 0 }
         paid_currency: { type: string, pattern: '^[a-z]{3}$' }
-        status: { type: string, enum: [credited] }
+        status: { type: string, enum: [credited, refunded] }
+        refunded_idea_quantity: { type: integer, format: int64, minimum: 0 }
+        refunded_amount_minor: { type: integer, format: int64, minimum: 0 }
         receipt_url: { type: string, format: uri }
 
     RechargeHistoryPage:
@@ -4121,7 +4164,34 @@ components:
       required: [status]
       properties:
         id: { type: string, maxLength: 16 }
-        status: { type: string, enum: [refund.updated, refund.failed] }
+        status: { type: string, enum: [pending, succeeded, failed, anomaly, refund.updated, refund.failed] }
+        idea_quantity: { type: integer, format: int64, minimum: 1 }
+        amount_minor: { type: integer, format: int64, minimum: 1 }
+        currency: { type: string, pattern: '^[a-z]{3}$' }
+        stripe_status: { type: string, maxLength: 64 }
+        error_summary: { type: string, maxLength: 500 }
+        updated_at: { type: string, format: date-time }
+
+    CreateAdminPaymentRefundRequest:
+      type: object
+      additionalProperties: false
+      required: [idea_quantity, idempotency_key]
+      properties:
+        idea_quantity: { type: integer, format: int64, minimum: 1 }
+        idempotency_key: { type: string, minLength: 8, maxLength: 160 }
+        reason: { type: string, maxLength: 1000 }
+
+    AdminPaymentRefundResult:
+      type: object
+      additionalProperties: false
+      required: [public_order_number, idea_quantity, amount_minor, currency, status, created_at, updated_at]
+      properties:
+        public_order_number: { type: string, pattern: '^IBP-[0-9]{8}-[A-Z0-9]{12}$' }
+        idea_quantity: { type: integer, format: int64, minimum: 1 }
+        amount_minor: { type: integer, format: int64, minimum: 1 }
+        currency: { type: string, pattern: '^[a-z]{3}$' }
+        status: { type: string, enum: [pending, succeeded, failed, anomaly] }
+        created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
     AdminPaymentDisputeSummary:
@@ -4160,6 +4230,7 @@ components:
         paid_at: { type: string, format: date-time }
         credited_at: { type: string, format: date-time }
         reconciliation: { $ref: '#/components/schemas/AdminPaymentReconciliation' }
+        refundable_idea_quantity: { type: integer, format: int64, minimum: 0 }
         refunds:
           type: array
           items: { $ref: '#/components/schemas/AdminPaymentRefundSummary' }
@@ -5099,6 +5170,13 @@ components:
         - type: object
           properties:
             data: { $ref: '#/components/schemas/PaymentOrderReturnStatus' }
+
+    ApiResponseAdminPaymentRefundResult:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/AdminPaymentRefundResult' }
 
     ApiResponsePendingPaymentOrder:
       allOf:

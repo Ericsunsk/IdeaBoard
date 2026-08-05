@@ -133,6 +133,34 @@ func TestPurchaseCreditsConvergesAfterWalletBecomesRestrictedAndFrozen(t *testin
 	}
 }
 
+func TestPurchaseRefundSettlesReservedIdeasToIssuanceIdempotently(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	service := NewService(pool)
+	if _, err := service.Grant(t.Context(), GrantCommand{UserID: 42, Amount: mustCreditAmount(t, 100), Metadata: testMetadata("purchase-refund:seed", "purchase-refund-seed")}); err != nil {
+		t.Fatal(err)
+	}
+	hold, err := service.Hold(t.Context(), HoldCommand{UserID: 42, Amount: mustCreditAmount(t, 40), Metadata: CommandMetadata{
+		IdempotencyKey: "purchase-refund:hold", Actor: Actor{Type: ActorService, ID: "payments"}, Source: "stripe_refund_hold", Reason: "reserve unused Ideas", BusinessReference: BusinessReference{Type: "payment_refund", ID: "refund-1"},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	command := PurchaseRefundCommand{UserID: 42, HoldTransactionID: hold.TransactionID, Metadata: CommandMetadata{
+		IdempotencyKey: "purchase-refund:settle", Actor: Actor{Type: ActorService, ID: "payments"}, Source: "stripe_refund", Reason: "Stripe refund succeeded", BusinessReference: BusinessReference{Type: "payment_refund", ID: "refund-1"},
+	}}
+	result, err := service.PurchaseRefund(t.Context(), command)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.CommandType != CommandPurchaseRefund || result.Amount != 40 || result.Wallet.Available != 60 || result.Wallet.Reserved != 0 {
+		t.Fatalf("PurchaseRefund() = %+v", result)
+	}
+	replayed, err := service.PurchaseRefund(t.Context(), command)
+	if err != nil || !replayed.Replayed || replayed.TransactionID != result.TransactionID {
+		t.Fatalf("PurchaseRefund() replay=%+v error=%v", replayed, err)
+	}
+}
+
 func purchaseMetadata(idempotencyKey, orderID string) CommandMetadata {
 	return CommandMetadata{
 		IdempotencyKey: idempotencyKey,

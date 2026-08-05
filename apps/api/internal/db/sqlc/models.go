@@ -361,6 +361,29 @@ type PaymentOrderReconciliation struct {
 	UpdatedAt        time.Time     `json:"updated_at"`
 }
 
+type PaymentRefund struct {
+	ID                      uuid.UUID     `json:"id"`
+	PaymentOrderID          uuid.UUID     `json:"payment_order_id"`
+	UserID                  int64         `json:"user_id"`
+	IdempotencyKey          string        `json:"idempotency_key"`
+	IdeaQuantity            int64         `json:"idea_quantity"`
+	AmountMinor             int64         `json:"amount_minor"`
+	Currency                string        `json:"currency"`
+	Status                  string        `json:"status"`
+	StripeStatus            string        `json:"stripe_status"`
+	StripeRefundID          string        `json:"stripe_refund_id"`
+	StripeChargeID          string        `json:"stripe_charge_id"`
+	CreditHoldTransactionID string        `json:"credit_hold_transaction_id"`
+	CreditTransactionID     string        `json:"credit_transaction_id"`
+	ActorID                 sql.NullInt64 `json:"actor_id"`
+	Reason                  string        `json:"reason"`
+	ErrorSummary            string        `json:"error_summary"`
+	CreatedAt               time.Time     `json:"created_at"`
+	UpdatedAt               time.Time     `json:"updated_at"`
+	SucceededAt             sql.NullTime  `json:"succeeded_at"`
+	FailedAt                sql.NullTime  `json:"failed_at"`
+}
+
 type PaymentStripeConfiguration struct {
 	SingletonID             int16     `json:"singleton_id"`
 	AccountID               string    `json:"account_id"`

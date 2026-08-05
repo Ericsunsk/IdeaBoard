@@ -14,6 +14,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"ideaboard/api/internal/credits"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 
 	"github.com/google/uuid"
@@ -72,30 +73,31 @@ type AdminPaymentOrderSummary struct {
 }
 
 type AdminPaymentOrderDetail struct {
-	PublicOrderNumber   string                       `json:"public_order_number"`
-	User                AdminPaymentOrderUser        `json:"user"`
-	IdeaQuantity        int64                        `json:"idea_quantity"`
-	BaseAmountMinor     int64                        `json:"base_amount_minor"`
-	BaseCurrency        string                       `json:"base_currency"`
-	PaidSubtotalMinor   *int64                       `json:"paid_subtotal_minor,omitempty"`
-	PaidTaxMinor        *int64                       `json:"paid_tax_minor,omitempty"`
-	PaidTotalMinor      *int64                       `json:"paid_total_minor,omitempty"`
-	PaidCurrency        string                       `json:"paid_currency,omitempty"`
-	Status              PaymentOrderStatus           `json:"status"`
-	StripeStatus        string                       `json:"stripe_status"`
-	CreditStatus        string                       `json:"credit_status"`
-	Stripe              AdminPaymentStripeSummary    `json:"stripe"`
-	TermsVersion        string                       `json:"terms_version"`
-	RefundPolicyVersion string                       `json:"refund_policy_version"`
-	ReceiptURL          string                       `json:"receipt_url,omitempty"`
-	ExpiresAt           time.Time                    `json:"expires_at"`
-	CreatedAt           time.Time                    `json:"created_at"`
-	UpdatedAt           time.Time                    `json:"updated_at"`
-	PaidAt              *time.Time                   `json:"paid_at,omitempty"`
-	CreditedAt          *time.Time                   `json:"credited_at,omitempty"`
-	Reconciliation      AdminPaymentReconciliation   `json:"reconciliation"`
-	Refunds             []AdminPaymentRefundSummary  `json:"refunds"`
-	Disputes            []AdminPaymentDisputeSummary `json:"disputes"`
+	PublicOrderNumber      string                       `json:"public_order_number"`
+	User                   AdminPaymentOrderUser        `json:"user"`
+	IdeaQuantity           int64                        `json:"idea_quantity"`
+	BaseAmountMinor        int64                        `json:"base_amount_minor"`
+	BaseCurrency           string                       `json:"base_currency"`
+	PaidSubtotalMinor      *int64                       `json:"paid_subtotal_minor,omitempty"`
+	PaidTaxMinor           *int64                       `json:"paid_tax_minor,omitempty"`
+	PaidTotalMinor         *int64                       `json:"paid_total_minor,omitempty"`
+	PaidCurrency           string                       `json:"paid_currency,omitempty"`
+	Status                 PaymentOrderStatus           `json:"status"`
+	StripeStatus           string                       `json:"stripe_status"`
+	CreditStatus           string                       `json:"credit_status"`
+	Stripe                 AdminPaymentStripeSummary    `json:"stripe"`
+	TermsVersion           string                       `json:"terms_version"`
+	RefundPolicyVersion    string                       `json:"refund_policy_version"`
+	ReceiptURL             string                       `json:"receipt_url,omitempty"`
+	ExpiresAt              time.Time                    `json:"expires_at"`
+	CreatedAt              time.Time                    `json:"created_at"`
+	UpdatedAt              time.Time                    `json:"updated_at"`
+	PaidAt                 *time.Time                   `json:"paid_at,omitempty"`
+	CreditedAt             *time.Time                   `json:"credited_at,omitempty"`
+	Reconciliation         AdminPaymentReconciliation   `json:"reconciliation"`
+	Refunds                []AdminPaymentRefundSummary  `json:"refunds"`
+	Disputes               []AdminPaymentDisputeSummary `json:"disputes"`
+	RefundableIdeaQuantity int64                        `json:"refundable_idea_quantity"`
 }
 
 type AdminPaymentStripeSummary struct {
@@ -115,12 +117,17 @@ type AdminPaymentReconciliation struct {
 	LastErrorSummary string     `json:"last_error_summary,omitempty"`
 }
 
-// AdminPaymentRefundSummary exposes only the safe webhook event fact until a
-// durable Refund lifecycle is introduced. It excludes provider payloads and PII.
+// AdminPaymentRefundSummary exposes durable Refund state without provider
+// payloads, internal ledger identities, or payer PII.
 type AdminPaymentRefundSummary struct {
-	ID        string     `json:"id,omitempty"`
-	Status    string     `json:"status"`
-	UpdatedAt *time.Time `json:"updated_at,omitempty"`
+	ID           string     `json:"id,omitempty"`
+	Status       string     `json:"status"`
+	IdeaQuantity int64      `json:"idea_quantity,omitempty"`
+	AmountMinor  int64      `json:"amount_minor,omitempty"`
+	Currency     string     `json:"currency,omitempty"`
+	StripeStatus string     `json:"stripe_status,omitempty"`
+	ErrorSummary string     `json:"error_summary,omitempty"`
+	UpdatedAt    *time.Time `json:"updated_at,omitempty"`
 }
 
 // AdminPaymentDisputeSummary follows the same safe event-fact boundary.
@@ -168,6 +175,35 @@ func (s *Service) GetAdminPaymentOrder(ctx context.Context, orderNumber string) 
 	if err != nil {
 		return AdminPaymentOrderDetail{}, err
 	}
+	durableRefunds, err := s.repo.ListPaymentRefundsForOrder(ctx, orderNumber)
+	if err != nil {
+		return AdminPaymentOrderDetail{}, err
+	}
+	durableStripeRefundIDs := make(map[string]struct{}, len(durableRefunds))
+	for _, refund := range durableRefunds {
+		updatedAt := refund.UpdatedAt
+		detail.Refunds = append(detail.Refunds, AdminPaymentRefundSummary{ID: maskPaymentIdentity(refund.ID), Status: string(refund.Status), IdeaQuantity: refund.IdeaQuantity, AmountMinor: refund.AmountMinor, Currency: refund.Currency, StripeStatus: refund.StripeStatus, ErrorSummary: refund.ErrorSummary, UpdatedAt: &updatedAt})
+		if refund.StripeRefundID != "" {
+			durableStripeRefundIDs[refund.StripeRefundID] = struct{}{}
+		}
+	}
+	if detail.Status == PaymentOrderCredited && detail.PaidAt != nil && s.now().UTC().Before(detail.PaidAt.Add(refundEligibilityWindow)) && s.wallets != nil {
+		remaining := detail.IdeaQuantity
+		for _, refund := range durableRefunds {
+			if refund.Status == PaymentRefundPending || refund.Status == PaymentRefundSucceeded || refund.Status == PaymentRefundAnomaly {
+				remaining -= refund.IdeaQuantity
+			}
+		}
+		if remaining > 0 {
+			wallet, walletErr := s.wallets.GetWallet(ctx, detail.User.ID)
+			if walletErr != nil && !errors.Is(walletErr, credits.ErrWalletNotFound) {
+				return AdminPaymentOrderDetail{}, walletErr
+			}
+			if walletErr == nil {
+				detail.RefundableIdeaQuantity = min(remaining, wallet.Available)
+			}
+		}
+	}
 	for _, event := range events {
 		updatedAt := nullTimePointer(event.ProcessedAt)
 		if updatedAt == nil {
@@ -175,6 +211,9 @@ func (s *Service) GetAdminPaymentOrder(ctx context.Context, orderNumber string) 
 		}
 		switch event.EventType {
 		case "refund.updated", "refund.failed":
+			if _, durable := durableStripeRefundIDs[event.StripeObjectID]; durable {
+				continue
+			}
 			detail.Refunds = append(detail.Refunds, AdminPaymentRefundSummary{
 				ID: maskPaymentIdentity(event.StripeObjectID), Status: event.EventType, UpdatedAt: updatedAt,
 			})

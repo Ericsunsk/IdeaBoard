@@ -10,5 +10,15 @@ export interface AdminPaymentRefundSummary {
   /** @maxLength 16 */
   id?: string
   status: AdminPaymentRefundSummaryStatus
+  /** @minimum 1 */
+  idea_quantity?: number
+  /** @minimum 1 */
+  amount_minor?: number
+  /** @pattern ^[a-z]{3}$ */
+  currency?: string
+  /** @maxLength 64 */
+  stripe_status?: string
+  /** @maxLength 500 */
+  error_summary?: string
   updated_at?: string
 }

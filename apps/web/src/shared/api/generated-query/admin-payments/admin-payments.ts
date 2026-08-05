@@ -20,8 +20,10 @@ import type { MaybeRefOrGetter } from 'vue'
 import type {
   ApiResponseAdminPaymentOrderDetail,
   ApiResponseAdminPaymentOrderPage,
+  ApiResponseAdminPaymentRefundResult,
   ApiResponseBase,
   ApiResponseStripeConfigurationSummary,
+  CreateAdminPaymentRefundRequest,
   ListAdminPaymentOrdersParams,
   UpdateStripeConfigurationRequest,
 } from '../model'
@@ -339,6 +341,108 @@ export function useGetAdminPaymentOrder<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getGetAdminPaymentOrderQueryOptions(orderNumber, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getCreateAdminPaymentRefundUrl = (orderNumber: string) => {
+  return `/admin/payments/orders/${encodeURIComponent(String(orderNumber))}/refunds`
+}
+
+export const createAdminPaymentRefund = async (
+  orderNumber: string,
+  createAdminPaymentRefundRequest: CreateAdminPaymentRefundRequest,
+  options?: RequestInit,
+): Promise<ApiResponseAdminPaymentRefundResult> => {
+  return orvalMutator<ApiResponseAdminPaymentRefundResult>(
+    getCreateAdminPaymentRefundUrl(orderNumber),
+    {
+      ...options,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      body: JSON.stringify(createAdminPaymentRefundRequest),
+    },
+  )
+}
+
+export const getCreateAdminPaymentRefundQueryKey = (
+  orderNumber: MaybeRefOrGetter<string>,
+  createAdminPaymentRefundRequest?: MaybeRefOrGetter<CreateAdminPaymentRefundRequest>,
+) => {
+  return [
+    'POST',
+    'admin',
+    'payments',
+    'orders',
+    orderNumber,
+    'refunds',
+    createAdminPaymentRefundRequest,
+  ] as const
+}
+
+export const getCreateAdminPaymentRefundQueryOptions = <
+  TData = Awaited<ReturnType<typeof createAdminPaymentRefund>>,
+  TError = ErrorType<ApiResponseBase>,
+>(
+  orderNumber: MaybeRefOrGetter<string>,
+  createAdminPaymentRefundRequest: MaybeRefOrGetter<CreateAdminPaymentRefundRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof createAdminPaymentRefund>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getCreateAdminPaymentRefundQueryKey(orderNumber, createAdminPaymentRefundRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof createAdminPaymentRefund>>> = ({
+    signal,
+  }) =>
+    createAdminPaymentRefund(toValue(orderNumber), toValue(createAdminPaymentRefundRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(orderNumber) !== null && toValue(orderNumber) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof createAdminPaymentRefund>>, TError, TData>
+}
+
+export type CreateAdminPaymentRefundQueryResult = NonNullable<
+  Awaited<ReturnType<typeof createAdminPaymentRefund>>
+>
+export type CreateAdminPaymentRefundQueryError = ErrorType<ApiResponseBase>
+
+export function useCreateAdminPaymentRefund<
+  TData = Awaited<ReturnType<typeof createAdminPaymentRefund>>,
+  TError = ErrorType<ApiResponseBase>,
+>(
+  orderNumber: MaybeRefOrGetter<string>,
+  createAdminPaymentRefundRequest: MaybeRefOrGetter<CreateAdminPaymentRefundRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof createAdminPaymentRefund>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getCreateAdminPaymentRefundQueryOptions(
+    orderNumber,
+    createAdminPaymentRefundRequest,
+    options,
+  )
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

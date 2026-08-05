@@ -416,21 +416,30 @@ FROM payment_orders
 WHERE public_token = $1 AND user_id = $2;
 
 -- name: ListPaymentRechargeHistory :many
-SELECT id,
-       paid_at AS occurred_at,
-       idea_quantity,
-       paid_total_minor,
-       paid_currency,
-       receipt_url
-FROM payment_orders
-WHERE user_id = sqlc.arg(user_id)::BIGINT
-  AND status = 'credited'
-  AND paid_at >= sqlc.arg(cutoff_at)::TIMESTAMPTZ
+SELECT orders.id,
+       orders.paid_at AS occurred_at,
+       orders.idea_quantity,
+       orders.paid_total_minor,
+       orders.paid_currency,
+       orders.receipt_url,
+       COALESCE(refunds.idea_quantity, 0)::BIGINT AS refunded_idea_quantity,
+       COALESCE(refunds.amount_minor, 0)::BIGINT AS refunded_amount_minor
+FROM payment_orders orders
+LEFT JOIN LATERAL (
+  SELECT SUM(payment_refunds.idea_quantity)::BIGINT AS idea_quantity,
+         SUM(payment_refunds.amount_minor)::BIGINT AS amount_minor
+  FROM payment_refunds
+  WHERE payment_refunds.payment_order_id = orders.id
+    AND payment_refunds.status = 'succeeded'
+) refunds ON TRUE
+WHERE orders.user_id = sqlc.arg(user_id)::BIGINT
+  AND orders.status = 'credited'
+  AND orders.paid_at >= sqlc.arg(cutoff_at)::TIMESTAMPTZ
   AND (
     NOT sqlc.arg(cursor_set)::BOOLEAN
-    OR (paid_at, id) < (sqlc.narg(cursor_paid_at)::TIMESTAMPTZ, sqlc.narg(cursor_id)::UUID)
+    OR (orders.paid_at, orders.id) < (sqlc.narg(cursor_paid_at)::TIMESTAMPTZ, sqlc.narg(cursor_id)::UUID)
   )
-ORDER BY paid_at DESC, id DESC
+ORDER BY orders.paid_at DESC, orders.id DESC
 LIMIT sqlc.arg(page_limit)::INTEGER;
 
 -- name: MarkPaymentWebhookEventProcessed :execrows

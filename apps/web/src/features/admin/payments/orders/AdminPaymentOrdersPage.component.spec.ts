@@ -7,10 +7,21 @@ import AdminPaymentOrdersPage from './AdminPaymentOrdersPage.vue'
 const resource = vi.hoisted(() => ({
   search: vi.fn(),
   get: vi.fn(),
+  refund: vi.fn(),
 }))
+const confirm = vi.hoisted(() => ({ request: vi.fn() }))
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 
 vi.mock('./paymentOrderResource', () => ({
   createAdminPaymentOrderResource: () => resource,
+}))
+
+vi.mock('../../shared/composables/useAdminConfirm', () => ({
+  useAdminConfirm: () => confirm,
+}))
+
+vi.mock('../../../../shared/composables/useAppToast', () => ({
+  useAppToast: () => toast,
 }))
 
 describe('AdminPaymentOrdersPage', () => {
@@ -97,6 +108,50 @@ describe('AdminPaymentOrdersPage', () => {
     await user.click(screen.getByRole('button', { name: '重试' }))
     expect(await screen.findByText('acct…7890')).toBeVisible()
     expect(resource.get).toHaveBeenCalledTimes(2)
+  })
+
+  it('confirms an eligible partial refund and refreshes the payment read model', async () => {
+    const eligibleDetail = {
+      ...makeDetail(),
+      status: 'credited',
+      creditStatus: 'credited',
+      paidAt: new Date().toISOString(),
+      creditedAt: new Date().toISOString(),
+      refundableIdeaQuantity: 500,
+    }
+    resource.get.mockResolvedValueOnce(eligibleDetail)
+    resource.refund.mockResolvedValueOnce({
+      ...eligibleDetail,
+      refundableIdeaQuantity: 300,
+      refunds: [
+        {
+          id: 'refu…1234',
+          status: 'pending',
+          ideaQuantity: 200,
+          amountMinor: 200,
+          currency: 'hkd',
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+    })
+    const { user } = renderPage()
+    await screen.findByText(orderNumber)
+    await user.click(screen.getAllByRole('button', { name: `查看订单 ${orderNumber}` })[0]!)
+
+    expect(await screen.findByText('发起退款')).toBeVisible()
+    const input = screen.getByLabelText('退款 Idea 数量')
+    await user.type(input, '200')
+    await user.click(screen.getByRole('button', { name: '确认退款' }))
+
+    const confirmation = confirm.request.mock.calls.at(-1)?.[0]
+    expect(confirmation).toEqual(expect.objectContaining({ title: '确认退款' }))
+    await confirmation.onConfirm()
+    expect(resource.refund).toHaveBeenCalledWith(
+      orderNumber,
+      expect.objectContaining({ ideaQuantity: 200, idempotencyKey: expect.any(String) }),
+    )
+    expect(toast.success).toHaveBeenCalledWith('退款已提交，等待 Stripe 最终处理')
+    expect(resource.search).toHaveBeenCalledTimes(2)
   })
 
   it('distinguishes initial and background refresh errors, then recovers without dropping data', async () => {

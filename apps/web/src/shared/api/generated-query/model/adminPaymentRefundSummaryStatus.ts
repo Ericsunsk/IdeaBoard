@@ -9,6 +9,10 @@ export type AdminPaymentRefundSummaryStatus =
   (typeof AdminPaymentRefundSummaryStatus)[keyof typeof AdminPaymentRefundSummaryStatus]
 
 export const AdminPaymentRefundSummaryStatus = {
+  pending: 'pending',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  anomaly: 'anomaly',
   refundupdated: 'refund.updated',
   refundfailed: 'refund.failed',
 } as const

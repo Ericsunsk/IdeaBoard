@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
@@ -24,6 +25,7 @@ const (
 	maxStripeConfigurationRequestBytes int64 = 16 << 10
 	maxStripeWebhookRequestBytes       int64 = 128 << 10
 	maxPaymentCheckoutRequestBytes     int64 = 16 << 10
+	maxPaymentRefundRequestBytes       int64 = 16 << 10
 	paymentEventsHeartbeatInterval           = 15 * time.Second
 )
 
@@ -44,6 +46,12 @@ type createPaymentCheckoutRequest struct {
 	TermsAccepted       bool   `json:"terms_accepted"`
 	TermsVersion        string `json:"terms_version"`
 	RefundPolicyVersion string `json:"refund_policy_version"`
+}
+
+type createPaymentRefundRequest struct {
+	IdeaQuantity   int64  `json:"idea_quantity"`
+	IdempotencyKey string `json:"idempotency_key"`
+	Reason         string `json:"reason"`
 }
 
 func NewHandler(service *Service, publicURLs settings.PublicURLSettingProvider) *Handler {
@@ -362,6 +370,43 @@ func (h *Handler) GetAdminPaymentOrder(c *gin.Context) {
 		return
 	}
 	response.SuccessDTO(c, detail)
+}
+
+func (h *Handler) CreateAdminPaymentRefund(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	admin, ok := principal.RequireAdmin(c)
+	if !ok {
+		return
+	}
+	if h == nil || h.service == nil {
+		response.Error(c, http.StatusServiceUnavailable, "退款服务暂不可用")
+		return
+	}
+	var request createPaymentRefundRequest
+	if err := jsonlimit.DecodeStrictRequest(c.Writer, c.Request, maxPaymentRefundRequestBytes, &request); err != nil {
+		response.Error(c, http.StatusBadRequest, "退款参数错误")
+		return
+	}
+	refund, err := h.service.CreatePaymentRefund(c.Request.Context(), CreatePaymentRefundCommand{
+		ActorID: admin.UserID(), OrderNumber: c.Param("order_number"), IdeaQuantity: request.IdeaQuantity,
+		IdempotencyKey: request.IdempotencyKey, Reason: request.Reason,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, ErrRefundAmountInvalid), errors.Is(err, ErrRefundIdempotency), errors.Is(err, ErrAdminPaymentOrderFilter):
+			response.Error(c, http.StatusBadRequest, err.Error())
+		case errors.Is(err, ErrRefundExpired), errors.Is(err, ErrRefundOrderNotEligible), errors.Is(err, ErrRefundAmountExceeds):
+			response.Error(c, http.StatusConflict, err.Error())
+		case errors.Is(err, credits.ErrInsufficientCredits):
+			response.Error(c, http.StatusConflict, "Wallet 可用 Idea 不足")
+		case errors.Is(err, ErrStripeProviderUnavailable):
+			response.Error(c, http.StatusServiceUnavailable, "Stripe 服务暂不可用")
+		default:
+			response.Error(c, http.StatusInternalServerError, "发起退款失败")
+		}
+		return
+	}
+	response.SuccessDTO(c, newAdminPaymentRefundResult(refund))
 }
 
 func adminPaymentOrderListInputFromQuery(c *gin.Context) (AdminPaymentOrderListInput, error) {

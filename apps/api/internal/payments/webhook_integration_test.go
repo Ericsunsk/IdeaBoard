@@ -70,6 +70,9 @@ func TestReceiveStripeWebhookVerifiesRawBodyAndStoresOnlyMinimalInboxFact(t *tes
 	}}
 	service := NewService(ServiceDependencies{
 		Repository: repo, ConfigurationGateway: gateway,
+		RefundGateway: &refundGatewayFake{retrieve: map[string]StripeRefund{
+			"re_1": {ID: "re_1", Status: "succeeded"},
+		}},
 		WebhookVerifier: verifier,
 	})
 	service.now = func() time.Time { return verifiedAt }

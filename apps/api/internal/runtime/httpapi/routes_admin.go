@@ -33,6 +33,7 @@ func registerAdminPaymentRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.PUT(RouteAdminStripeConfiguration, h.PaymentHandler.UpdateStripeConfiguration)
 	adminAPI.GET("/payments/orders", h.PaymentHandler.ListAdminPaymentOrders)
 	adminAPI.GET("/payments/orders/:order_number", h.PaymentHandler.GetAdminPaymentOrder)
+	adminAPI.POST("/payments/orders/:order_number/refunds", h.PaymentHandler.CreateAdminPaymentRefund)
 }
 
 func registerAdminRewardRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {

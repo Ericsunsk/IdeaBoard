@@ -53,6 +53,8 @@ export interface AdminPaymentOrderDetail {
   paid_at?: string
   credited_at?: string
   reconciliation: AdminPaymentReconciliation
+  /** @minimum 0 */
+  refundable_idea_quantity?: number
   refunds: AdminPaymentRefundSummary[]
   disputes: AdminPaymentDisputeSummary[]
 }

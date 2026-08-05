@@ -54,6 +54,7 @@ export type PaymentOrderApiRefund = {
   idea_quantity?: number
   amount_minor?: number
   currency?: string
+  stripe_status?: string
   updated_at?: string
   error_summary?: string
 }
@@ -93,6 +94,7 @@ export type PaymentOrderApiDetail = {
   reconciliation: PaymentOrderApiReconciliation
   refunds?: PaymentOrderApiRefund[]
   disputes?: PaymentOrderApiDispute[]
+  refundable_idea_quantity?: number
 }
 
 type ApiEnvelope<T> = {
@@ -104,6 +106,10 @@ type ApiEnvelope<T> = {
 export type AdminPaymentOrderApiAdapter = {
   search: (input: SearchAdminPaymentOrdersInput) => Promise<PaymentOrderApiPage>
   get: (publicOrderNumber: string, signal?: AbortSignal) => Promise<PaymentOrderApiDetail>
+  refund: (
+    publicOrderNumber: string,
+    input: { idea_quantity: number; idempotency_key: string },
+  ) => Promise<PaymentOrderApiRefund>
 }
 
 export function createAdminPaymentOrderApiAdapter(): AdminPaymentOrderApiAdapter {
@@ -130,6 +136,14 @@ export function createAdminPaymentOrderApiAdapter(): AdminPaymentOrderApiAdapter
           signal ? { signal } : undefined,
         ),
         '加载支付订单详情失败',
+      ),
+    refund: (publicOrderNumber, input) =>
+      resolveApiData(
+        api.request<ApiEnvelope<PaymentOrderApiRefund>>(
+          `/api/admin/payments/orders/${encodeURIComponent(publicOrderNumber.trim().toUpperCase())}/refunds`,
+          { method: 'POST', body: input },
+        ),
+        '发起退款失败',
       ),
   }
 }

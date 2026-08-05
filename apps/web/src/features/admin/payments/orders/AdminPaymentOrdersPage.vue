@@ -222,7 +222,10 @@
     :detail="detail"
     :loading="detailLoading"
     :error="detailError"
+    :refunding="refundLoading"
+    :refund-error="refundError"
     @retry="retryDetail"
+    @refund="requestRefund"
   />
 </template>
 
@@ -242,6 +245,8 @@ import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.v
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
+import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
+import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminToast'
 import PaymentOrderDetailDialog from './PaymentOrderDetailDialog.vue'
 import {
   formatPaymentDateTime,
@@ -276,7 +281,12 @@ const selectedOrderNumber = ref('')
 const detail = ref<AdminPaymentOrderDetail | null>(null)
 const detailLoading = ref(false)
 const detailError = ref(false)
+const refundLoading = ref(false)
+const refundError = ref('')
 const ideaFormatter = new Intl.NumberFormat('zh-CN')
+const adminConfirm = useAdminConfirm()
+const toast = useAdminToast()
+const refundIdempotencyKeys = new Map<string, string>()
 let listRequestEpoch = 0
 let detailRequestEpoch = 0
 let activeListRequest: AbortController | undefined
@@ -318,6 +328,8 @@ watch(detailVisible, (visible) => {
   detail.value = null
   detailLoading.value = false
   detailError.value = false
+  refundLoading.value = false
+  refundError.value = ''
 })
 
 async function loadOrders({ preserveData = false }: { preserveData?: boolean } = {}) {
@@ -404,6 +416,39 @@ function openDetail(publicOrderNumber: string) {
 
 function retryDetail() {
   void loadDetail()
+}
+
+function requestRefund(ideaQuantity: number) {
+  const publicOrderNumber = selectedOrderNumber.value
+  if (!publicOrderNumber || refundLoading.value) return
+  adminConfirm.request({
+    title: '确认退款',
+    message: `将为订单 ${publicOrderNumber} 发起 ${ideaFormatter.format(ideaQuantity)} Ideas 退款。退款提交后会先预留余额，是否继续？`,
+    confirmLabel: '发起退款',
+    intent: 'danger',
+    onConfirm: () => executeRefund(publicOrderNumber, ideaQuantity),
+  })
+}
+
+async function executeRefund(publicOrderNumber: string, ideaQuantity: number) {
+  const key = `${publicOrderNumber}:${ideaQuantity}`
+  let idempotencyKey = refundIdempotencyKeys.get(key)
+  if (!idempotencyKey) {
+    idempotencyKey = crypto.randomUUID()
+    refundIdempotencyKeys.set(key, idempotencyKey)
+  }
+  refundLoading.value = true
+  refundError.value = ''
+  try {
+    detail.value = await resource.refund(publicOrderNumber, { ideaQuantity, idempotencyKey })
+    refundIdempotencyKeys.delete(key)
+    toast.success('退款已提交，等待 Stripe 最终处理')
+    refreshOrders()
+  } catch (error) {
+    refundError.value = formatAdminDisplayError(error, '发起退款失败，请稍后重试')
+  } finally {
+    refundLoading.value = false
+  }
 }
 
 async function loadDetail() {

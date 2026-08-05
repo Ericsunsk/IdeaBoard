@@ -16,6 +16,8 @@ Payments 拥有 Stripe 配置、签名 Webhook 接入与支付生命周期。它
 | Purchase Credit | 由已验证 Stripe Payment Order 触发的 `System Issuance → User Available` Credits 命令；不是 Admin Grant |
 | Payment Reconciliation | River 定期读取 durable Payment Order 后向 Stripe 主动核验、收敛丢失 Webhook 与短暂故障的恢复流程 |
 | Reconciliation Claim | 一对一的 Payment Order recovery state；token + generation fence 保护短租约，Stripe I/O 永远发生在 claim transaction 之外 |
+| Payment Refund | Admin 或 Stripe Dashboard 发起的 durable 退款事实；本地先预留未消费 Ideas，再由 canonical Stripe status 幂等结算或释放 |
+| Purchase Refund | 独立 Credits typed Command，将退款预留从 User Reserved 结算回 System Issuance，不复用 Admin Refund |
 
 ## Public Seams
 
@@ -39,7 +41,7 @@ Payments 拥有 Stripe 配置、签名 Webhook 接入与支付生命周期。它
 - 同一用户、同一 Idea 数量只允许一个未支付的 active Checkout；创建、继续和放弃 Checkout 按用户串行化，不在 Stripe 网络调用期间持有数据库 transaction。每个用户最多保留 3 笔不同数量的未支付 active Checkout；`paid_pending_credit` 已是支付事实，不占用待支付名额。
 - 仅签名 Webhook 或服务端主动查询取得的、已验证身份绑定的 Stripe paid Checkout Session 可触发到账；浏览器 URL、public token、未支付或失败 Session 均不得到账。Stripe paid fact 先独立 durable 为 `paid_pending_credit`；随后 `purchase_credit` 与 `paid_pending_credit → credited` 在同一 PostgreSQL transaction 中原子提交，并对 replay/concurrency 幂等。
 - 用户充值历史只返回当前用户最近 12 个自然月的 final `credited` 最小事实，以最大 20 条 opaque cursor 分页；不返回 payer PII、provider secret 或内部 Stripe metadata。cursor 必须在解码前限制长度。
-- User SSE 按 user ID 隔离，连接生命周期必须 heartbeat 并 cleanup；它只通知 `processing`/`credited`/`failed`，不替代 Stripe 或 PostgreSQL 的支付事实。
+- User SSE 按 user ID 隔离，连接生命周期必须 heartbeat 并 cleanup；它只通知 `processing`/`credited`/`failed`/`refund_updated`，不替代 Stripe 或 PostgreSQL 的支付事实。
 - 每 5 分钟的 River 对账只 claim 超过 2 分钟未收敛的订单，每批最多 100 条。claim 的 lease 比 worker timeout 更长，token + generation 可阻止 stale worker 覆盖新结果；多 worker 的正确性不依赖队列并发数。
 - `creating` Order 持久化经过校验的 immutable return base URL，以及首次 Stripe 请求使用的整秒 expiry。重启或创建 timeout 后必须用原 public order number 和完全相同的参数重放 Stripe Idempotency Key，而不是依据本地 timeout 直接宣告失败。
 - `paid_pending_credit` 只重试 Credits 原子到账，不重复查询或重写 Stripe paid fact。Stripe transient failure 交给 River retry；确定性配置、权限、响应或身份绑定错误记录脱敏 operational failure 并延迟重试，避免 hot loop。

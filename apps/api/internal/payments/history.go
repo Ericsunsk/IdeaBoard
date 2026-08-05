@@ -29,12 +29,14 @@ var (
 // RechargeHistoryItem is the minimal user-visible payment fact. Stripe remains
 // the receipt source, so no payer data or provider internals cross this boundary.
 type RechargeHistoryItem struct {
-	OccurredAt      time.Time `json:"occurred_at"`
-	IdeaQuantity    int64     `json:"idea_quantity"`
-	PaidAmountMinor int64     `json:"paid_amount_minor"`
-	PaidCurrency    string    `json:"paid_currency"`
-	Status          string    `json:"status"`
-	ReceiptURL      string    `json:"receipt_url,omitempty"`
+	OccurredAt           time.Time `json:"occurred_at"`
+	IdeaQuantity         int64     `json:"idea_quantity"`
+	PaidAmountMinor      int64     `json:"paid_amount_minor"`
+	PaidCurrency         string    `json:"paid_currency"`
+	Status               string    `json:"status"`
+	RefundedIdeaQuantity int64     `json:"refunded_idea_quantity,omitempty"`
+	RefundedAmountMinor  int64     `json:"refunded_amount_minor,omitempty"`
+	ReceiptURL           string    `json:"receipt_url,omitempty"`
 }
 
 type RechargeHistoryPage struct {
@@ -80,10 +82,15 @@ func (s *Service) ListRecharges(ctx context.Context, userID int64, cursor string
 		if !row.OccurredAt.Valid || !row.PaidTotalMinor.Valid {
 			return RechargeHistoryPage{}, fmt.Errorf("invalid credited payment order history row")
 		}
+		status := "credited"
+		if row.RefundedIdeaQuantity >= row.IdeaQuantity {
+			status = "refunded"
+		}
 		page.Items = append(page.Items, RechargeHistoryItem{
 			OccurredAt: row.OccurredAt.Time, IdeaQuantity: row.IdeaQuantity,
 			PaidAmountMinor: row.PaidTotalMinor.Int64, PaidCurrency: strings.ToLower(row.PaidCurrency),
-			Status: "credited", ReceiptURL: row.ReceiptUrl,
+			Status: status, RefundedIdeaQuantity: row.RefundedIdeaQuantity,
+			RefundedAmountMinor: row.RefundedAmountMinor, ReceiptURL: row.ReceiptUrl,
 		})
 	}
 	return page, nil

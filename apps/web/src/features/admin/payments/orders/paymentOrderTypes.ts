@@ -63,6 +63,7 @@ export type AdminPaymentRefundSummary = {
   ideaQuantity?: number
   amountMinor?: number
   currency?: string
+  stripeStatus?: string
   updatedAt?: string
   errorSummary?: string
 }
@@ -102,6 +103,7 @@ export type AdminPaymentOrderDetail = {
   reconciliation: AdminPaymentReconciliation
   refunds: AdminPaymentRefundSummary[]
   disputes: AdminPaymentDisputeSummary[]
+  refundableIdeaQuantity?: number
 }
 
 export type SearchAdminPaymentOrdersInput = {
@@ -117,4 +119,8 @@ export type SearchAdminPaymentOrdersInput = {
 export type AdminPaymentOrderResource = {
   search: (input: SearchAdminPaymentOrdersInput) => Promise<AdminPaymentOrderPage>
   get: (publicOrderNumber: string, signal?: AbortSignal) => Promise<AdminPaymentOrderDetail>
+  refund: (
+    publicOrderNumber: string,
+    input: { ideaQuantity: number; idempotencyKey: string },
+  ) => Promise<AdminPaymentOrderDetail>
 }

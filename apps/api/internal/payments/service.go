@@ -2,6 +2,7 @@ package payments
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 type Service struct {
 	repo            *Repository
 	gateway         StripeGateway
+	refundGateway   RefundGateway
 	checkoutGateway CheckoutGateway
 	verifier        StripeWebhookVerifier
 	wallets         credits.WalletReader
@@ -25,6 +27,7 @@ type Service struct {
 type ServiceDependencies struct {
 	Repository           *Repository
 	ConfigurationGateway StripeGateway
+	RefundGateway        RefundGateway
 	CheckoutGateway      CheckoutGateway
 	WebhookVerifier      StripeWebhookVerifier
 	Wallets              credits.WalletReader
@@ -43,6 +46,7 @@ func NewService(dependencies ServiceDependencies) *Service {
 	}
 	return &Service{
 		repo: dependencies.Repository, gateway: dependencies.ConfigurationGateway,
+		refundGateway:   dependencies.RefundGateway,
 		checkoutGateway: dependencies.CheckoutGateway, verifier: dependencies.WebhookVerifier,
 		wallets: dependencies.Wallets, events: events, now: now,
 	}
@@ -234,6 +238,12 @@ func (s *Service) receiveStripeWebhookLocked(ctx context.Context, raw []byte, si
 	}
 	signal, checkoutLifecycleEvent := checkoutSignalForWebhookEvent(event.Type)
 	if !checkoutLifecycleEvent {
+		if strings.HasPrefix(event.Type, "refund.") {
+			if err := s.processRefundWebhook(ctx, event); err != nil {
+				_ = s.repo.MarkStripeWebhookEventProcessed(ctx, event.ID, "failed", err.Error(), now)
+				return StripeWebhookReceipt{}, err
+			}
+		}
 		if err := s.repo.MarkStripeWebhookEventProcessed(ctx, event.ID, "processed", "", now); err != nil {
 			return StripeWebhookReceipt{}, err
 		}
@@ -264,6 +274,65 @@ func (s *Service) receiveStripeWebhookLocked(ctx context.Context, raw []byte, si
 		return StripeWebhookReceipt{}, err
 	}
 	return receipt, nil
+}
+
+func (s *Service) processRefundWebhook(ctx context.Context, event StripeWebhookEvent) error {
+	if s == nil || s.repo == nil || s.refundGateway == nil || strings.TrimSpace(event.ObjectID) == "" {
+		return ErrMalformedWebhookPayload
+	}
+	refund, err := s.repo.GetPaymentRefundByStripeID(ctx, event.ObjectID)
+	if errors.Is(err, sql.ErrNoRows) {
+		configuration, apiKey, configErr := s.stripeAccessConfiguration(ctx)
+		_ = configuration
+		if configErr != nil {
+			return configErr
+		}
+		providerRefund, retrieveErr := s.refundGateway.RetrieveRefund(ctx, apiKey, event.ObjectID)
+		if retrieveErr != nil {
+			return retrieveErr
+		}
+		if providerRefund.ChargeID == "" {
+			// Keep an unmatched provider event in the inbox for the Admin read
+			// model; without a charge identity it cannot be linked safely.
+			return nil
+		}
+		if _, createErr := s.repo.CreateExternalPaymentRefund(ctx, providerRefund, s.now().UTC()); createErr != nil {
+			if errors.Is(createErr, credits.ErrInsufficientCredits) || errors.Is(createErr, ErrRefundAmountExceeds) {
+				userID, anomalyErr := s.repo.RecordPaymentRefundAnomaly(ctx, providerRefund, "Stripe Dashboard refund requires manual balance recovery", s.now().UTC())
+				if anomalyErr == nil {
+					s.publishRefundUpdate(userID)
+				}
+				return anomalyErr
+			}
+			if errors.Is(createErr, sql.ErrNoRows) || errors.Is(createErr, ErrRefundOrderNotEligible) {
+				return nil
+			}
+			return createErr
+		}
+		refund, err = s.repo.GetPaymentRefundByStripeID(ctx, event.ObjectID)
+		if err != nil {
+			return err
+		}
+		s.publishRefundUpdate(refund.UserID)
+		// The provider has already reached a terminal state. Re-read the
+		// durable row and apply the same Credits transition as Admin refunds.
+		providerRefund.Status = strings.ToLower(strings.TrimSpace(providerRefund.Status))
+		_, err = s.convergePaymentRefund(ctx, refund, providerRefund)
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	_, apiKey, err := s.stripeAccessConfiguration(ctx)
+	if err != nil {
+		return err
+	}
+	providerRefund, err := s.refundGateway.RetrieveRefund(ctx, apiKey, event.ObjectID)
+	if err != nil {
+		return err
+	}
+	_, err = s.convergePaymentRefund(ctx, refund, providerRefund)
+	return err
 }
 
 func checkoutSignalForWebhookEvent(eventType string) (checkoutSignal, bool) {
