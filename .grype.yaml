@@ -1,3 +1,11 @@
 # Vulnerability exceptions live here so every image scan uses the same policy.
 # Keep exceptions narrow, temporary, and tied to a triage note.
-ignore: []
+ignore:
+  - vulnerability: CVE-2026-58043
+    package:
+      name: node
+      version: 22.23.2
+      type: binary
+    reason: >-
+      Not affected: IdeaBoard does not enable Node.js Permission Model, which is
+      the vulnerable code path; remove this exception when upgrading Node.js.

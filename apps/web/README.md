@@ -29,7 +29,7 @@ Pages 构建配置：
 Root directory: apps/web
 Build command: npm run build
 Build output directory: dist
-Environment variable: NODE_VERSION=22.22.2
+Environment variable: NODE_VERSION=22.23.2
 Environment variable: VITE_API_BASE_URL=https://api.example.com/api
 Auth requests derive their public origin from `VITE_API_BASE_URL`.
 ```

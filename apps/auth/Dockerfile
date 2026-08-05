@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-ARG NODE_VERSION=22.22.2
+ARG NODE_VERSION=22.23.2
 
 FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS builder
 
