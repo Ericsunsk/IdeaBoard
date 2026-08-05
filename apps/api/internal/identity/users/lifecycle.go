@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/credits"
+	"ideaboard/api/internal/identity/trust"
 	"ideaboard/api/internal/platform/database"
 
 	"github.com/jackc/pgx/v5"
@@ -23,15 +24,7 @@ const welcomeGrantCredits int64 = 100
 var ErrUserDeletionInProgress = errors.New("user deletion is already in progress")
 var ErrUserDeletionBlockedByPaymentState = errors.New("user deletion is blocked by unsettled payment state")
 
-type VerifiedIdentity struct {
-	AuthUserID            string `json:"auth_user_id"`
-	Username              string `json:"username"`
-	ClaimIdentity         string `json:"claim_identity"`
-	ClaimIdentityKind     string `json:"claim_identity_kind"`
-	ClaimIdentityVerified bool   `json:"claim_identity_verified"`
-	Role                  string `json:"role"`
-	EnsureActive          bool   `json:"-"`
-}
+type VerifiedIdentity = trust.ProvisioningIdentity
 
 type ProvisionResult struct {
 	User           User
@@ -427,19 +420,14 @@ func rollbackIdentityTransaction(ctx context.Context, tx pgx.Tx, operation strin
 }
 
 func (s *LifecycleService) normalizeVerifiedIdentity(identity VerifiedIdentity) (VerifiedIdentity, string, error) {
-	identity.AuthUserID = strings.TrimSpace(identity.AuthUserID)
-	identity.Username = strings.TrimSpace(identity.Username)
-	identity.ClaimIdentity = strings.ToLower(strings.TrimSpace(identity.ClaimIdentity))
-	identity.ClaimIdentityKind = strings.TrimSpace(identity.ClaimIdentityKind)
-	identity.Role = strings.ToLower(strings.TrimSpace(identity.Role))
-	if identity.Role == "" {
-		identity.Role = "user"
+	normalized, err := trust.NormalizeProvisioningIdentity(identity)
+	if err != nil || len(s.welcomeIdentityKey) != 32 {
+		if err != nil {
+			return VerifiedIdentity{}, "", fmt.Errorf("trusted canonical registration identity: %w", err)
+		}
+		return VerifiedIdentity{}, "", fmt.Errorf("a 32-byte Welcome Grant key is required")
 	}
-	if identity.AuthUserID == "" || identity.Username == "" || identity.ClaimIdentity == "" ||
-		identity.ClaimIdentityKind != "canonical_email" || !identity.ClaimIdentityVerified ||
-		(identity.Role != "user" && identity.Role != "admin") || len(s.welcomeIdentityKey) != 32 {
-		return VerifiedIdentity{}, "", fmt.Errorf("trusted canonical registration identity and a 32-byte Welcome Grant key are required")
-	}
+	identity = normalized
 	digest := hmac.New(sha256.New, s.welcomeIdentityKey)
 	_, _ = digest.Write([]byte(identity.ClaimIdentity))
 	return identity, hex.EncodeToString(digest.Sum(nil)), nil

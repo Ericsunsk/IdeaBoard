@@ -2,7 +2,7 @@ import { createRouter, createMemoryHistory } from 'vue-router'
 import type { Router, RouteRecordRaw } from 'vue-router'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { render, screen, waitFor } from '../../../test/render'
-import { useUserStore } from '../../../app/stores/user'
+import { useUserStore } from '../../auth/session/authSession'
 import type { User } from '../../../shared/api/userSession'
 import {
   closeAccountManagementDialog,

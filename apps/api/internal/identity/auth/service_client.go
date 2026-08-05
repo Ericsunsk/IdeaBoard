@@ -12,6 +12,7 @@ import (
 
 	"ideaboard/api/internal/identity/auth/internalcontract"
 	"ideaboard/api/internal/identity/autherrors"
+	"ideaboard/api/internal/identity/trust"
 	"ideaboard/api/internal/platform/config"
 )
 
@@ -23,14 +24,7 @@ var (
 
 const maxAuthServiceResponseBytes int64 = 2 * 1024 * 1024
 
-type SessionIdentity struct {
-	AuthUserID            string `json:"auth_user_id"`
-	Email                 string `json:"email"`
-	Username              string `json:"username"`
-	ClaimIdentity         string `json:"claim_identity"`
-	ClaimIdentityKind     string `json:"claim_identity_kind"`
-	ClaimIdentityVerified bool   `json:"claim_identity_verified"`
-}
+type SessionIdentity = trust.SessionIdentity
 
 type ProvisionedAuthUser struct {
 	AuthUserID            string `json:"auth_user_id"`
@@ -253,23 +247,16 @@ func (c *ServiceClient) ValidateSession(ctx context.Context, cookieHeader string
 		return nil, fmt.Errorf("auth service session rejected: %s", nonEmpty(response.JSON200.Msg, "unknown error"))
 	}
 	contractSession := response.JSON200.Data.Session
-	session := SessionIdentity{
+	session, trustErr := trust.ValidateSessionIdentity(trust.SessionIdentity{
 		AuthUserID:            contractSession.AuthUserID,
 		Email:                 contractSession.Email,
 		Username:              contractSession.Username,
 		ClaimIdentity:         contractSession.ClaimIdentity,
 		ClaimIdentityKind:     string(contractSession.ClaimIdentityKind),
 		ClaimIdentityVerified: contractSession.ClaimIdentityVerified,
-	}
-	if strings.TrimSpace(session.AuthUserID) == "" {
-		return nil, fmt.Errorf("auth service returned empty auth_user_id")
-	}
-	if strings.TrimSpace(session.Email) == "" ||
-		session.Email != strings.ToLower(strings.TrimSpace(session.Email)) ||
-		session.ClaimIdentity != session.Email ||
-		session.ClaimIdentityKind != string(internalcontract.SessionClaimIdentityKindCanonicalEmail) ||
-		!session.ClaimIdentityVerified {
-		return nil, fmt.Errorf("%w: auth service returned an untrusted session identity", ErrSessionUnauthorized)
+	})
+	if trustErr != nil {
+		return nil, fmt.Errorf("%w: auth service returned an untrusted session identity: %v", ErrSessionUnauthorized, trustErr)
 	}
 	return &session, nil
 }
@@ -312,16 +299,25 @@ func (c *ServiceClient) EnsureUser(ctx context.Context, email, username, passwor
 		Role:                  string(contractUser.Role),
 		Existing:              contractUser.Existing,
 	}
-	if strings.TrimSpace(user.AuthUserID) == "" {
-		return nil, fmt.Errorf("auth service returned empty auth_user_id")
+	normalized, trustErr := trust.NormalizeProvisioningIdentity(trust.ProvisioningIdentity{
+		AuthUserID:            user.AuthUserID,
+		Email:                 user.Email,
+		Username:              user.Username,
+		ClaimIdentity:         user.ClaimIdentity,
+		ClaimIdentityKind:     user.ClaimIdentityKind,
+		ClaimIdentityVerified: user.ClaimIdentityVerified,
+		Role:                  user.Role,
+	})
+	if trustErr != nil {
+		return nil, fmt.Errorf("auth service returned an untrusted claim identity: %w", trustErr)
 	}
-	if strings.TrimSpace(user.Email) == "" ||
-		user.Email != strings.ToLower(strings.TrimSpace(user.Email)) ||
-		user.ClaimIdentity != user.Email ||
-		user.ClaimIdentityKind != string(internalcontract.TrustedClaimIdentityKindCanonicalEmail) ||
-		!user.ClaimIdentityVerified {
-		return nil, fmt.Errorf("auth service returned an untrusted claim identity")
-	}
+	user.AuthUserID = normalized.AuthUserID
+	user.Email = normalized.Email
+	user.Username = normalized.Username
+	user.ClaimIdentity = normalized.ClaimIdentity
+	user.ClaimIdentityKind = normalized.ClaimIdentityKind
+	user.ClaimIdentityVerified = normalized.ClaimIdentityVerified
+	user.Role = normalized.Role
 	return &user, nil
 }
 

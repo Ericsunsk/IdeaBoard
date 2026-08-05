@@ -100,7 +100,7 @@ import { Camera } from '@iconoir/vue'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
-import { useUserStore } from '../../../app/stores/user'
+import { useUserStore } from '../../auth/session/authSession'
 import { useAvatarUploadWorkflow } from '../useAvatarUploadWorkflow'
 import AccountManagementPane from './AccountManagementPane.vue'
 

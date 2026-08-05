@@ -5,24 +5,18 @@ const clearAuth = vi.fn(() => events.push('clearAuth'))
 const clearAuthScopedQueryCache = vi.fn(() => events.push('clearQueryCache'))
 const impersonateUser = vi.fn()
 
-vi.mock('../../../app/stores/user', () => ({
+vi.mock('../../auth/session/authSession', () => ({
   useUserStore: () => ({
     clearAuth,
   }),
+  startImpersonation: async (authUserId: string) => {
+    const result = await impersonateUser({ userId: authUserId })
+    if (result?.error) throw result.error
+  },
 }))
 
 vi.mock('../../../shared/query/queryClient', () => ({
   clearAuthScopedQueryCache,
-}))
-
-vi.mock('../../../shared/auth/client', () => ({
-  authClient: {
-    admin: {
-      impersonateUser,
-    },
-  },
-  extractBetterAuthErrorMessage: (error: unknown, fallback: string) =>
-    error instanceof Error ? error.message : fallback,
 }))
 
 describe('admin user session commands', () => {

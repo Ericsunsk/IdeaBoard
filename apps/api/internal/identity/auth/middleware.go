@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/identity/trust"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/response"
@@ -103,10 +104,11 @@ func resolveLocalUserByAuthIdentity(ctx context.Context, userRepo localUserReade
 
 	user, err := userRepo.GetByAuthUserID(ctx, authUserID)
 	if database.IsNotFound(err) && lifecycle != nil {
-		result, provisionErr := lifecycle.ProvisionIdentity(ctx, users.VerifiedIdentity{
-			AuthUserID: authUserID, Username: identity.Username, ClaimIdentity: identity.ClaimIdentity,
-			ClaimIdentityKind: identity.ClaimIdentityKind, ClaimIdentityVerified: identity.ClaimIdentityVerified, Role: "user",
-		})
+		provisioningIdentity, trustErr := trust.ProvisioningIdentityFromSession(*identity, "user")
+		if trustErr != nil {
+			return nil, fmt.Errorf("map authenticated identity for provisioning: %w", trustErr)
+		}
+		result, provisionErr := lifecycle.ProvisionIdentity(ctx, provisioningIdentity)
 		if provisionErr != nil {
 			return nil, provisionErr
 		}

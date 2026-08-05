@@ -105,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { useUserStore } from '../../../app/stores/user'
+import { useUserStore } from '../../auth/session/authSession'
 import { computed, onMounted, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import { LogOut, Xmark } from '@iconoir/vue'

@@ -8,7 +8,7 @@ import { ideaBoardPrimeLocale } from './primeLocale'
 import { ideaBoardPrimePreset } from './primeTheme'
 import router from './router'
 import App from './App.vue'
-import { useUserStore } from './stores/user'
+import { useUserStore } from '../features/auth/session/authSession'
 import './style.css'
 import 'vue-sonner/style.css'
 

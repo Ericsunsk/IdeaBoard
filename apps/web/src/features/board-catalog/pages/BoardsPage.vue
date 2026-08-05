@@ -179,7 +179,7 @@ import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect
 import { usePrimeDialogOverlayLifecycle } from '../../../shared/composables/usePrimeDialogOverlayLifecycle'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { USER_CANVAS_PATH, USER_HOME_PATH } from '../../../shared/constants/routePaths'
-import { useUserStore } from '../../../app/stores/user'
+import { useUserStore } from '../../auth/session/authSession'
 import UserAccountMenu from '../../../shared/components/UserAccountMenu.vue'
 import { Search } from '@iconoir/vue'
 import Button from 'primevue/button'

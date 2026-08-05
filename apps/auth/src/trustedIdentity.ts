@@ -2,6 +2,7 @@ import {
   extractAuthUser,
   isValidCanonicalEmail,
   normalizeCanonicalEmail,
+  normalizeRegistrationUsername,
   type InternalUserShape,
 } from "./authUtils.js";
 import type { AuthRole } from "./generated/auth-internal/types.gen.js";
@@ -18,6 +19,33 @@ export type TrustedIdentityAuthAPI = {
     };
   }): Promise<unknown>;
 };
+
+export type VerifiedSessionIdentity = {
+  auth_user_id: string;
+  email: string;
+  username: string;
+  claim_identity: string;
+  claim_identity_kind: "canonical_email" | "untrusted";
+  claim_identity_verified: boolean;
+};
+
+export function sessionIdentityFromAuthUser(
+  user: InternalUserShape,
+): VerifiedSessionIdentity {
+  const username = normalizeRegistrationUsername(user.username || user.name || "");
+  const claimIdentity = normalizeCanonicalEmail(user.email);
+  const isTrustedClaimIdentity =
+    Boolean(user.emailVerified) && isValidCanonicalEmail(claimIdentity);
+
+  return {
+    auth_user_id: user.id.trim(),
+    email: claimIdentity,
+    username,
+    claim_identity: claimIdentity,
+    claim_identity_kind: isTrustedClaimIdentity ? "canonical_email" : "untrusted",
+    claim_identity_verified: isTrustedClaimIdentity,
+  };
+}
 
 export type TrustedIdentityRepository = {
   findUserByUsernameOrEmail(

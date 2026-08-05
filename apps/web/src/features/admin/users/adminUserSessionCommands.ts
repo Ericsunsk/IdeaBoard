@@ -1,5 +1,4 @@
-import { useUserStore } from '../../../app/stores/user'
-import { authClient, extractBetterAuthErrorMessage } from '../../../shared/auth/client'
+import { useUserStore, startImpersonation } from '../../auth/session/authSession'
 import { clearAuthScopedQueryCache } from '../../../shared/query/queryClient'
 
 export type AdminUserRedirect = {
@@ -27,10 +26,7 @@ export function createAdminUserSessionCommands(
 
   return {
     async startImpersonation(authUserId: string) {
-      const { error } = await authClient.admin.impersonateUser({ userId: authUserId })
-      if (error) {
-        throw new Error(extractBetterAuthErrorMessage(error, '伪装失败'))
-      }
+      await startImpersonation(authUserId)
 
       userStore.clearAuth()
       clearAuthScopedQueryCache()

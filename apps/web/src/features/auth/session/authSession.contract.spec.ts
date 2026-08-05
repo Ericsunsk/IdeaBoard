@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { User } from '../../shared/api/userSession'
+import type { User } from '../../../shared/api/userSession'
 
 function makeUser(overrides: Partial<User> = {}): User {
   const id = overrides.id ?? 1
@@ -31,10 +31,10 @@ async function getFreshUserStore() {
     getSession: vi.fn(),
   }
 
-  vi.doMock('../../shared/api/userSession', () => ({
+  vi.doMock('../../../shared/api/userSession', () => ({
     fetchCurrentUserInfo: getUserInfo,
   }))
-  vi.doMock('../../shared/auth/client', () => ({
+  vi.doMock('../../../shared/auth/client', () => ({
     authClient,
     normalizeCanonicalEmail: (email: string) => email.trim().toLowerCase(),
     extractBetterAuthErrorMessage: (error: unknown, fallback: string) =>
@@ -44,8 +44,8 @@ async function getFreshUserStore() {
   }))
 
   const [{ useUserStore }, { queryClient }] = await Promise.all([
-    import('./user'),
-    import('../../shared/query/queryClient'),
+    import('./authSession'),
+    import('../../../shared/query/queryClient'),
   ])
   return {
     store: useUserStore(),
@@ -99,6 +99,19 @@ describe('useUserStore auth cache handling', () => {
       username: 'alice',
       password: 'secret-password',
     })
+  })
+
+  it('fails closed after login when the business identity projection cannot refresh', async () => {
+    const { store, getUserInfo, authClient } = await getFreshUserStore()
+    store.setAuth(makeUser({ id: 9, role: 'admin' }))
+    vi.mocked(authClient.signIn.email).mockResolvedValue({} as never)
+    vi.mocked(getUserInfo).mockRejectedValue({ status: 500 })
+
+    await expect(store.login('alice@example.com', 'secret-password')).rejects.toThrow(
+      '登录状态恢复失败',
+    )
+    expect(store.user).toBeNull()
+    expect(localStorage.getItem('user')).toBeNull()
   })
 
   it('clears auth state and Vue Query cache after logout succeeds', async () => {

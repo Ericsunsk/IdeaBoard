@@ -72,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import { useUserStore } from '../../../../app/stores/user'
+import { useUserStore } from '../../../auth/session/authSession'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {

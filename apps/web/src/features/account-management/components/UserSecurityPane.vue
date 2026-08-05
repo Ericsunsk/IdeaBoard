@@ -249,7 +249,7 @@ import {
   ibPasswordPt,
 } from '../../../shared/theme/formControls'
 import IbFormField from '../../../shared/components/IbFormField.vue'
-import { useUserStore } from '../../../app/stores/user'
+import { useUserStore } from '../../auth/session/authSession'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { usePasswordChangeWorkflow } from '../usePasswordChangeWorkflow'

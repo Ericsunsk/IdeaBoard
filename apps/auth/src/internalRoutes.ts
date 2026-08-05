@@ -9,12 +9,7 @@ import type {
   AuthInternalCommands,
   InternalAuthAPI,
 } from "./authInternalCommands.js";
-import {
-  extractAuthUser,
-  extractErrorMessage,
-  normalizeCanonicalEmail,
-  normalizeRegistrationUsername,
-} from "./authUtils.js";
+import { extractAuthUser, extractErrorMessage } from "./authUtils.js";
 import type { RouteHandlers } from "./generated/auth-internal/fastify.gen.js";
 import { authInternalRoutes } from "./generated/auth-internal/routes.gen.js";
 import {
@@ -23,6 +18,7 @@ import {
   sendSuccess,
   toHeaders,
 } from "./httpResponse.js";
+import { sessionIdentityFromAuthUser } from "./trustedIdentity.js";
 
 export type InternalRoutesOptions = {
   internalKey: string;
@@ -53,23 +49,8 @@ export function registerInternalRoutes(
           sendError(reply, 401, "unauthorized");
           return;
         }
-        const username = normalizeRegistrationUsername(
-          user.username || user.name || "",
-        );
-        const claimIdentity = normalizeCanonicalEmail(user.email);
-        const isTrustedClaimIdentity =
-          Boolean(user.emailVerified) && Boolean(claimIdentity);
         sendSuccess(reply, {
-          session: {
-            auth_user_id: user.id,
-            email: claimIdentity,
-            username,
-            claim_identity: claimIdentity,
-            claim_identity_kind: isTrustedClaimIdentity
-              ? "canonical_email"
-              : "untrusted",
-            claim_identity_verified: isTrustedClaimIdentity,
-          },
+          session: sessionIdentityFromAuthUser(user),
         });
       } catch (error) {
         sendError(
