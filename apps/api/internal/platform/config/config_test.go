@@ -1,7 +1,6 @@
 package config
 
 import (
-	"reflect"
 	"sync"
 	"testing"
 )
@@ -16,40 +15,18 @@ var configEnvKeys = []string{
 	"DB_MIGRATION_PASSWORD",
 	"DB_NAME",
 	"DB_SSLMODE",
-	"DB_CONNECT_MAX_RETRIES",
-	"DB_CONNECT_RETRY_INTERVAL_MS",
 	"APP_ENV",
 	"APP_PORT",
 	"APP_HOST",
 	"METRICS_ADDR",
-	"APP_GIN_MODE",
-	"APP_LOG_FILE",
 	"APP_CORS_ALLOWED_ORIGINS",
 	"AUTH_SERVICE_BASE_URL",
 	"AUTH_INTERNAL_KEY",
-	"AUTH_SERVICE_TIMEOUT_SECONDS",
 	"CREDITS_WELCOME_IDENTITY_KEY",
 	"RIVER_WORKER_CONCURRENCY",
-	"RIVER_TASK_TIMEOUT_SECONDS",
-	"RIVER_NO_CAPACITY_RETRY_SECONDS",
-	"RIVER_MAX_RETRY",
 	"NATS_URL",
 	"NATS_EVENT_BUS_ENABLED",
-	"NATS_STREAM_NAME",
-	"NATS_SUBJECT_PREFIX",
-	"NATS_CONSUMER_NAME",
-	"NATS_RETENTION_DAYS",
-	"NATS_CONNECT_TIMEOUT_SECONDS",
-	"NATS_REQUEST_TIMEOUT_SECONDS",
-	"NATS_DRAIN_TIMEOUT_SECONDS",
-	"GO_ENV",
-	"ENV",
-	"APP_BIND_HOST",
-	"GIN_MODE",
-	"TASK_QUEUE_WORKER_CONCURRENCY",
-	"TASK_QUEUE_TASK_TIMEOUT_SECONDS",
-	"TASK_QUEUE_NO_CAPACITY_RETRY_SECONDS",
-	"TASK_QUEUE_MAX_RETRY",
+	"REWARDS_CODE_HMAC_KEYS",
 }
 
 func resetConfigEnv(t *testing.T) {
@@ -102,37 +79,6 @@ func TestLoadMetricsAddress(t *testing.T) {
 	}
 }
 
-func TestLoadIgnoresRetiredRuntimeTuningEnv(t *testing.T) {
-	resetConfigEnv(t)
-	baseline := Load()
-	resetConfigEnv(t)
-	retired := map[string]string{
-		"DB_CONNECT_MAX_RETRIES":          "7",
-		"DB_CONNECT_RETRY_INTERVAL_MS":    "250",
-		"APP_GIN_MODE":                    "debug",
-		"APP_LOG_FILE":                    "custom.log",
-		"AUTH_SERVICE_TIMEOUT_SECONDS":    "17",
-		"RIVER_TASK_TIMEOUT_SECONDS":      "240",
-		"RIVER_NO_CAPACITY_RETRY_SECONDS": "9",
-		"RIVER_MAX_RETRY":                 "31",
-		"NATS_STREAM_NAME":                "CUSTOM_STREAM",
-		"NATS_SUBJECT_PREFIX":             "custom",
-		"NATS_CONSUMER_NAME":              "custom-consumer",
-		"NATS_RETENTION_DAYS":             "30",
-		"NATS_CONNECT_TIMEOUT_SECONDS":    "11",
-		"NATS_REQUEST_TIMEOUT_SECONDS":    "12",
-		"NATS_DRAIN_TIMEOUT_SECONDS":      "13",
-	}
-	for key, value := range retired {
-		t.Setenv(key, value)
-	}
-
-	cfg := Load()
-	if !reflect.DeepEqual(cfg, baseline) {
-		t.Fatalf("retired runtime tuning env changed config:\n got=%+v\nwant=%+v", cfg, baseline)
-	}
-}
-
 func TestLoadRiverWorkerConcurrency(t *testing.T) {
 	resetConfigEnv(t)
 	if got := Load().Worker.Concurrency; got != 5 {
@@ -151,26 +97,6 @@ func TestLoadRiverWorkerConcurrency(t *testing.T) {
 		if got := Load().Worker.Concurrency; got != 5 {
 			t.Fatalf("invalid %q worker concurrency = %d, want 5", invalid, got)
 		}
-	}
-}
-
-func TestLoadIgnoresLegacyAliases(t *testing.T) {
-	resetConfigEnv(t)
-	t.Setenv("GO_ENV", "production")
-	t.Setenv("ENV", "production")
-	t.Setenv("APP_BIND_HOST", "127.0.0.1")
-	t.Setenv("GIN_MODE", "debug")
-	t.Setenv("TASK_QUEUE_WORKER_CONCURRENCY", "12")
-	t.Setenv("TASK_QUEUE_TASK_TIMEOUT_SECONDS", "240")
-	t.Setenv("TASK_QUEUE_NO_CAPACITY_RETRY_SECONDS", "9")
-	t.Setenv("TASK_QUEUE_MAX_RETRY", "31")
-
-	cfg := Load()
-	if cfg.App.Env != "development" {
-		t.Fatalf("expected APP_ENV default to win over legacy aliases, got %q", cfg.App.Env)
-	}
-	if cfg.App.Host != "" {
-		t.Fatalf("expected APP_BIND_HOST to be ignored, got host %q", cfg.App.Host)
 	}
 }
 

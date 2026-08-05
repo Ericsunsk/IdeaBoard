@@ -216,7 +216,7 @@ Migration 前失败会恢复 `.env` snapshot；migration 后失败不会自动 r
 
 `ideaboard` 是固定 schema owner；`ideaboard_api` 与 `ideaboard_auth` 是彼此独立的 limited runtime roles。三个 roles 必须使用不同密码；长期运行的 API/Auth 容器只接收各自 runtime credential，只有一次性的 `api-migrate` / `auth-migrate` 容器接收 owner credential。
 
-空 PostgreSQL 库由 API migration 初始化业务 schema 并写入当前 migration 版本；API runtime 不再自动迁移。Docker 部署会先运行 `api-migrate`，授予 runtime 常规业务表 DML，并将 Credits Ledger 收紧为只读 + typed Credit Commands；再运行 Auth migration，为 Auth runtime role 授予 Better Auth tables DML 与 `get_auth_runtime_settings()` 的 `EXECUTE`，最后启动服务。
+空 PostgreSQL 库由 API migration 初始化业务 schema 并写入当前 migration 版本；API runtime 不再自动迁移。Docker 部署会先运行 `api-migrate`，授予 runtime 常规业务表 DML，并将 Credits Ledger 收紧为只读 + typed Credit Commands；再运行 Auth migration，为 Auth runtime role 授予 Better Auth tables DML 与 `get_auth_runtime_settings()` 的 `EXECUTE`，最后启动服务。`DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` 只注入一次性的 migration process，不得进入长期运行的 API/Auth runtime；本地示例见 `docker/migration.env.example`。
 
 非空数据库不能直接套用该 baseline。若你从其他形态迁入数据，标准做法是先导出需要保留的数据，再在空库上初始化当前 baseline，最后用受控脚本导入业务数据；不要手动修改 `schema_migrations` 绕过 baseline 校验。
 

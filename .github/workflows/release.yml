@@ -106,7 +106,6 @@ jobs:
         shell: bash
         env:
           APP_ENV: production
-          APP_LOG_FILE: none
           DB_HOST: 127.0.0.1
           DB_PORT: "5432"
           DB_USER: ideaboard

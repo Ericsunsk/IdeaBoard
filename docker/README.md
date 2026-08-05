@@ -142,4 +142,4 @@ docker compose -f compose.local.yml up -d
 2. `apps/api/.env` 使用 API runtime credential，`apps/auth/.env` 使用 Auth runtime credential；两个 migration command 才使用固定 owner `ideaboard` 与 `POSTGRES_PASSWORD`。
 3. owner、API runtime、Auth runtime 三个 roles 必须不同；本地旧 volume 没有 runtime roles 时，重建开发 volume。
 
-> 说明：`APP_BASE_URL` 和 `API_BASE_URL` 是 compose / deploy 层输入；API 容器读取 CORS 与 Auth 内部地址，分享链接和上传素材访问地址在后台「系统设置」里配置，Auth 容器读取 `BETTER_AUTH_URL`。
+> 说明：`APP_BASE_URL` 和 `API_BASE_URL` 是 compose / deploy 层输入；API 容器读取 CORS 与 Auth 内部地址，分享链接和上传素材访问地址在后台「系统设置」里配置，Auth 容器读取由 `API_BASE_URL` 派生的 `BETTER_AUTH_URL`。`DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` 只提供给一次性的 migration command/container，不进入长期运行的 API/Auth container；本地命令所需的 migration-only 示例见 `docker/migration.env.example`。
