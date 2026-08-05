@@ -369,7 +369,6 @@ validate_env_file() {
   local api_repo
   local auth_repo
   local auth_migrate_repo
-  local nats_user
   local nats_password
   api_image="$(env_value IDEABOARD_API_IMAGE)"
   auth_image="$(env_value IDEABOARD_AUTH_IMAGE)"
