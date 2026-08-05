@@ -75,6 +75,7 @@ export const auth = betterAuth({
       sendVerificationOnSignUp: true,
       overrideDefaultEmailVerification: true,
       changeEmail: { enabled: true, verifyCurrentEmail: false },
+      rateLimit: { window: 60 * 60, max: 5 },
       sendVerificationOTP: async ({ email, otp, type }) => {
         await mailConfigService.send({
           to: email,

@@ -22,6 +22,7 @@ test("native authentication security configuration stays explicit", () => {
           resendStrategy?: string;
           sendVerificationOnSignUp?: boolean;
           changeEmail?: { enabled?: boolean };
+          rateLimit?: { window?: number; max?: number };
         };
       }
     | undefined;
@@ -33,6 +34,7 @@ test("native authentication security configuration stays explicit", () => {
   assert.equal(emailOTP.options?.resendStrategy, "rotate");
   assert.equal(emailOTP.options?.sendVerificationOnSignUp, true);
   assert.equal(emailOTP.options?.changeEmail?.enabled, true);
+  assert.deepEqual(emailOTP.options?.rateLimit, { window: 3600, max: 5 });
 
   const hibp = plugins.find((plugin) => plugin.id === "have-i-been-pwned") as
     | { id: string; options?: { enabled?: boolean } }
