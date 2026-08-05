@@ -240,7 +240,8 @@ func TestRateLimitLargeTimeJumpDoesNotOverflow(t *testing.T) {
 }
 
 func TestRateLimitConcurrentRequestsDontOverflow(t *testing.T) {
-	resetRateLimitStore()
+	now := time.Unix(3_000, 0)
+	resetRateLimitStoreWithClock(func() time.Time { return now })
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
@@ -277,7 +278,7 @@ func TestRateLimitConcurrentRequestsDontOverflow(t *testing.T) {
 	wg.Wait()
 
 	passed := int(ok.Load())
-	if passed > defaultRateLimitBurst+10 {
+	if passed > defaultRateLimitBurst {
 		t.Fatalf("%d requests passed (burst=%d), too many for concurrent access", passed, defaultRateLimitBurst)
 	}
 	t.Logf("passed=%d limited=%d total=%d", ok.Load(), limited.Load(), goroutines*perRoutine)
