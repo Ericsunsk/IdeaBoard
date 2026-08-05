@@ -13,6 +13,8 @@ import (
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+
+	"github.com/google/uuid"
 )
 
 const stripeConfigurationLifecycleLockID int64 = 839036782198407216
@@ -57,6 +59,14 @@ type ConfigurationAudit struct {
 	ErrorCode    string
 	ErrorSummary string
 	Metadata     json.RawMessage
+}
+
+type PaymentCheckoutShutdown struct {
+	ID              string
+	StripeAccountID string
+	CutoffAt        time.Time
+	CreatedAt       time.Time
+	CompletedAt     *time.Time
 }
 
 func NewRepository(db *sql.DB) *Repository {
@@ -179,12 +189,17 @@ func (r *Repository) GetStripeConfiguration(ctx context.Context) (StoredStripeCo
 	return storedStripeConfiguration(row), nil
 }
 
-func (r *Repository) ReplaceStripeConfiguration(ctx context.Context, value StoredStripeConfiguration, audit ConfigurationAudit) (StoredStripeConfiguration, error) {
+func (r *Repository) ReplaceStripeConfiguration(ctx context.Context, value StoredStripeConfiguration, audit ConfigurationAudit) (StoredStripeConfiguration, *PaymentCheckoutShutdown, error) {
 	if r == nil || r.db == nil {
-		return StoredStripeConfiguration{}, fmt.Errorf("payments repository: database unavailable")
+		return StoredStripeConfiguration{}, nil, fmt.Errorf("payments repository: database unavailable")
 	}
 	var stored StoredStripeConfiguration
+	var shutdown *PaymentCheckoutShutdown
 	err := r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries, _ *sql.Tx) error {
+		previous, previousErr := q.GetPaymentStripeConfiguration(ctx)
+		if previousErr != nil && !errors.Is(previousErr, sql.ErrNoRows) {
+			return fmt.Errorf("load previous Stripe configuration: %w", previousErr)
+		}
 		row, err := q.ReplacePaymentStripeConfiguration(ctx, dbsqlc.ReplacePaymentStripeConfigurationParams{
 			AccountID: value.AccountID, Mode: string(value.Mode), ChargesEnabled: value.ChargesEnabled,
 			ProductTaxCode: value.ProductTaxCode, PurchasesEnabled: value.PurchasesEnabled,
@@ -195,13 +210,73 @@ func (r *Repository) ReplaceStripeConfiguration(ctx context.Context, value Store
 		if err != nil {
 			return fmt.Errorf("replace Stripe configuration: %w", err)
 		}
+		if previousErr == nil && previous.PurchasesEnabled && !row.PurchasesEnabled {
+			shutdownRow, err := q.InsertPaymentCheckoutShutdown(ctx, row.AccountID)
+			if err != nil {
+				return fmt.Errorf("create Checkout shutdown: %w", err)
+			}
+			value := paymentCheckoutShutdown(shutdownRow)
+			shutdown = &value
+		}
 		if err := insertConfigurationAudit(ctx, q, audit); err != nil {
 			return err
 		}
 		stored = storedStripeConfiguration(row)
 		return nil
 	})
-	return stored, err
+	return stored, shutdown, err
+}
+
+func (r *Repository) GetPaymentCheckoutShutdown(ctx context.Context, id string) (PaymentCheckoutShutdown, error) {
+	parsed, err := uuid.Parse(id)
+	if err != nil {
+		return PaymentCheckoutShutdown{}, sql.ErrNoRows
+	}
+	row, err := r.dbWithContext(ctx).queries().GetPaymentCheckoutShutdown(ctx, parsed)
+	if err != nil {
+		return PaymentCheckoutShutdown{}, err
+	}
+	return paymentCheckoutShutdown(row), nil
+}
+
+func (r *Repository) ListActivePaymentCheckoutShutdowns(ctx context.Context) ([]PaymentCheckoutShutdown, error) {
+	rows, err := r.dbWithContext(ctx).queries().ListActivePaymentCheckoutShutdowns(ctx)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]PaymentCheckoutShutdown, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, paymentCheckoutShutdown(row))
+	}
+	return items, nil
+}
+
+func (r *Repository) ListPaymentOrdersForCheckoutShutdown(ctx context.Context, shutdown PaymentCheckoutShutdown, limit int32) ([]PaymentOrder, error) {
+	if limit < 1 {
+		return nil, fmt.Errorf("invalid Checkout shutdown batch limit")
+	}
+	rows, err := r.dbWithContext(ctx).queries().ListPaymentOrdersForCheckoutShutdown(ctx, dbsqlc.ListPaymentOrdersForCheckoutShutdownParams{
+		StripeAccountID: shutdown.StripeAccountID, CreatedAt: shutdown.CutoffAt, Limit: limit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list Checkout shutdown orders: %w", err)
+	}
+	items := make([]PaymentOrder, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, paymentOrder(row))
+	}
+	return items, nil
+}
+
+func (r *Repository) CompletePaymentCheckoutShutdown(ctx context.Context, id string, completedAt time.Time) error {
+	parsed, err := uuid.Parse(id)
+	if err != nil {
+		return fmt.Errorf("invalid Checkout shutdown ID")
+	}
+	_, err = r.dbWithContext(ctx).queries().CompletePaymentCheckoutShutdown(ctx, dbsqlc.CompletePaymentCheckoutShutdownParams{
+		ID: parsed, CompletedAt: sql.NullTime{Time: completedAt, Valid: true},
+	})
+	return err
 }
 
 func (r *Repository) RecordConfigurationAudit(ctx context.Context, audit ConfigurationAudit) error {
@@ -363,6 +438,18 @@ func (r *Repository) GetPaymentOrderByPublicToken(ctx context.Context, userID in
 	row, err := r.dbWithContext(ctx).queries().GetPaymentOrderByPublicToken(ctx, dbsqlc.GetPaymentOrderByPublicTokenParams{
 		PublicToken: publicToken, UserID: userID,
 	})
+	if err != nil {
+		return PaymentOrder{}, err
+	}
+	return paymentOrder(row), nil
+}
+
+func (r *Repository) GetPaymentOrderByID(ctx context.Context, orderID string) (PaymentOrder, error) {
+	id, err := parseOrderUUID(orderID)
+	if err != nil {
+		return PaymentOrder{}, sql.ErrNoRows
+	}
+	row, err := r.dbWithContext(ctx).queries().GetPaymentOrderByID(ctx, id)
 	if err != nil {
 		return PaymentOrder{}, err
 	}
@@ -684,6 +771,17 @@ func storedStripeConfiguration(row dbsqlc.PaymentStripeConfiguration) StoredStri
 		SecretMaterialKind: row.SecretMaterialKind, CreatedBy: row.CreatedBy, UpdatedBy: row.UpdatedBy,
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}
+}
+
+func paymentCheckoutShutdown(row dbsqlc.PaymentCheckoutShutdown) PaymentCheckoutShutdown {
+	value := PaymentCheckoutShutdown{
+		ID: row.ID.String(), StripeAccountID: row.StripeAccountID, CutoffAt: row.CutoffAt, CreatedAt: row.CreatedAt,
+	}
+	if row.CompletedAt.Valid {
+		completedAt := row.CompletedAt.Time
+		value.CompletedAt = &completedAt
+	}
+	return value
 }
 
 func isConfigurationNotFound(err error) bool {

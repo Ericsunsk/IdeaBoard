@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -14,15 +15,20 @@ import (
 )
 
 type Service struct {
-	repo            *Repository
-	gateway         StripeGateway
-	refundGateway   RefundGateway
-	disputeGateway  DisputeGateway
-	checkoutGateway CheckoutGateway
-	verifier        StripeWebhookVerifier
-	wallets         credits.WalletReader
-	events          *EventHub
-	now             func() time.Time
+	repo             *Repository
+	gateway          StripeGateway
+	refundGateway    RefundGateway
+	disputeGateway   DisputeGateway
+	checkoutGateway  CheckoutGateway
+	verifier         StripeWebhookVerifier
+	wallets          credits.WalletReader
+	events           *EventHub
+	now              func() time.Time
+	shutdownEnqueuer PaymentCheckoutShutdownEnqueuer
+}
+
+type PaymentCheckoutShutdownEnqueuer interface {
+	EnqueuePaymentCheckoutShutdown(context.Context, string) error
 }
 
 type ServiceDependencies struct {
@@ -62,6 +68,12 @@ func (s *Service) EventHub() *EventHub {
 	return s.events
 }
 
+func (s *Service) SetPaymentCheckoutShutdownEnqueuer(enqueuer PaymentCheckoutShutdownEnqueuer) {
+	if s != nil {
+		s.shutdownEnqueuer = enqueuer
+	}
+}
+
 func (s *Service) GetStripeConfiguration(ctx context.Context) (StripeConfigurationSummary, error) {
 	if s == nil || s.repo == nil {
 		return StripeConfigurationSummary{}, fmt.Errorf("payments service unavailable")
@@ -90,11 +102,33 @@ func (s *Service) ConfigureStripe(ctx context.Context, command ConfigureStripeCo
 }
 
 func (s *Service) configureStripeLocked(ctx context.Context, command ConfigureStripeCommand) (StripeConfigurationSummary, error) {
-	if s == nil || s.repo == nil || s.gateway == nil {
+	if s == nil || s.repo == nil {
 		return StripeConfigurationSummary{}, fmt.Errorf("payments configuration service unavailable")
 	}
 	if command.ActorID <= 0 {
 		return StripeConfigurationSummary{}, fmt.Errorf("invalid payment admin actor")
+	}
+	current, hasCurrent, err := s.loadCurrentConfiguration(ctx)
+	if err != nil {
+		return StripeConfigurationSummary{}, err
+	}
+	if hasCurrent && current.PurchasesEnabled && !command.PurchasesEnabled && strings.TrimSpace(command.APIKey) == "" {
+		metadata := safeAuditMetadata(map[string]any{
+			"account_id": current.AccountID, "mode": current.Mode, "product_tax_code": current.ProductTaxCode,
+			"purchases_enabled": false,
+		})
+		stored, shutdown, err := s.repo.ReplaceStripeConfiguration(ctx, StoredStripeConfiguration{
+			AccountID: current.AccountID, Mode: current.Mode, ChargesEnabled: current.ChargesEnabled,
+			ProductTaxCode: current.ProductTaxCode, PurchasesEnabled: false,
+			StripeProductID: current.StripeProductID, StripeWebhookEndpointID: current.StripeWebhookEndpointID,
+			APIKeyCiphertext: current.APIKeyCiphertext, WebhookSecretCiphertext: current.WebhookSecretCiphertext,
+			SecretMaterialKind: current.SecretMaterialKind, UpdatedBy: command.ActorID,
+		}, ConfigurationAudit{ActorID: command.ActorID, Outcome: "succeeded", Metadata: metadata})
+		if err != nil {
+			return StripeConfigurationSummary{}, fmt.Errorf("disable Stripe purchases: %w", err)
+		}
+		s.enqueuePaymentCheckoutShutdown(ctx, shutdown)
+		return stripeConfigurationSummary(stored), nil
 	}
 	taxCode, err := normalizeProductTaxCode(command.ProductTaxCode)
 	if err != nil {
@@ -104,10 +138,8 @@ func (s *Service) configureStripeLocked(ctx context.Context, command ConfigureSt
 	if err != nil {
 		return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "invalid_webhook_url", err.Error(), nil, err)
 	}
-
-	current, hasCurrent, err := s.loadCurrentConfiguration(ctx)
-	if err != nil {
-		return StripeConfigurationSummary{}, err
+	if s.gateway == nil {
+		return StripeConfigurationSummary{}, fmt.Errorf("payments configuration service unavailable")
 	}
 	apiKey := strings.TrimSpace(command.APIKey)
 	if hasCurrent && apiKey != "" {
@@ -129,7 +161,10 @@ func (s *Service) configureStripeLocked(ctx context.Context, command ConfigureSt
 		return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "invalid_key", err.Error(), map[string]any{"mode": "unknown"}, err)
 	}
 
-	prepare := PrepareStripeConfiguration{APIKey: apiKey, Mode: mode, ProductTaxCode: taxCode, WebhookURL: webhookURL}
+	prepare := PrepareStripeConfiguration{
+		APIKey: apiKey, Mode: mode, PurchasesEnabled: command.PurchasesEnabled,
+		ProductTaxCode: taxCode, WebhookURL: webhookURL,
+	}
 	if hasCurrent {
 		prepare.ExistingAccountID = current.AccountID
 		prepare.ExistingProductID = current.StripeProductID
@@ -166,7 +201,7 @@ func (s *Service) configureStripeLocked(ctx context.Context, command ConfigureSt
 		"account_id": prepared.AccountID, "mode": mode, "product_tax_code": taxCode,
 		"purchases_enabled": command.PurchasesEnabled,
 	})
-	stored, err := s.repo.ReplaceStripeConfiguration(ctx, StoredStripeConfiguration{
+	stored, shutdown, err := s.repo.ReplaceStripeConfiguration(ctx, StoredStripeConfiguration{
 		AccountID: prepared.AccountID, Mode: prepared.Mode, ChargesEnabled: prepared.ChargesEnabled,
 		ProductTaxCode: taxCode, PurchasesEnabled: command.PurchasesEnabled,
 		StripeProductID: prepared.ProductID, StripeWebhookEndpointID: prepared.WebhookEndpointID,
@@ -176,7 +211,17 @@ func (s *Service) configureStripeLocked(ctx context.Context, command ConfigureSt
 	if err != nil {
 		return StripeConfigurationSummary{}, fmt.Errorf("publish Stripe configuration: %w", err)
 	}
+	s.enqueuePaymentCheckoutShutdown(ctx, shutdown)
 	return stripeConfigurationSummary(stored), nil
+}
+
+func (s *Service) enqueuePaymentCheckoutShutdown(ctx context.Context, shutdown *PaymentCheckoutShutdown) {
+	if shutdown == nil || s == nil || s.shutdownEnqueuer == nil {
+		return
+	}
+	if err := s.shutdownEnqueuer.EnqueuePaymentCheckoutShutdown(ctx, shutdown.ID); err != nil {
+		slog.Error("enqueue Checkout shutdown failed; periodic River recovery will retry", "shutdown_id", shutdown.ID, "error", err)
+	}
 }
 
 func (s *Service) ReceiveStripeWebhook(ctx context.Context, raw []byte, signature string) (StripeWebhookReceipt, error) {
@@ -243,13 +288,13 @@ func (s *Service) receiveStripeWebhookLocked(ctx context.Context, raw []byte, si
 	if !checkoutLifecycleEvent {
 		if strings.HasPrefix(event.Type, "refund.") {
 			if err := s.processRefundWebhook(ctx, event); err != nil {
-				_ = s.repo.MarkStripeWebhookEventProcessed(ctx, event.ID, "failed", err.Error(), now)
+				_ = s.repo.MarkStripeWebhookEventProcessed(ctx, event.ID, "failed", operationalErrorSummary(err, "Stripe refund webhook processing failed"), now)
 				return StripeWebhookReceipt{}, err
 			}
 		}
 		if strings.HasPrefix(event.Type, "charge.dispute.") {
 			if err := s.processDisputeWebhook(ctx, event); err != nil {
-				_ = s.repo.MarkStripeWebhookEventProcessed(ctx, event.ID, "failed", err.Error(), now)
+				_ = s.repo.MarkStripeWebhookEventProcessed(ctx, event.ID, "failed", operationalErrorSummary(err, "Stripe dispute webhook processing failed"), now)
 				return StripeWebhookReceipt{}, err
 			}
 		}

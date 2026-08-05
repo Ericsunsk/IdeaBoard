@@ -106,7 +106,7 @@ func (s *Service) expireDisputeCheckoutSessions(ctx context.Context, apiKey stri
 				if err := validateCheckoutSessionIdentity(order, expiration.Session); err != nil {
 					return err
 				}
-				if err := s.convergeDisputeCheckoutExpiration(userLockedContext, order, expiration); err != nil {
+				if err := s.convergeCheckoutExpiration(userLockedContext, order, expiration); err != nil {
 					return err
 				}
 			case PaymentOrderAsyncPaymentPending:
@@ -120,7 +120,7 @@ func (s *Service) expireDisputeCheckoutSessions(ctx context.Context, apiKey stri
 	})
 }
 
-func (s *Service) convergeDisputeCheckoutExpiration(ctx context.Context, order PaymentOrder, expiration ExpireCheckoutSessionResult) error {
+func (s *Service) convergeCheckoutExpiration(ctx context.Context, order PaymentOrder, expiration ExpireCheckoutSessionResult) error {
 	switch expiration.Outcome {
 	case CheckoutSessionExpirationOutcomeExpired:
 		cancelled, changed, err := s.repo.MarkPaymentOrderCancelled(ctx, order.UserID, order.ID)

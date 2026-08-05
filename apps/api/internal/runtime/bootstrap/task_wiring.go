@@ -110,17 +110,20 @@ func newAppTaskRuntime(
 	creditPeriodicJobs := credits.ReconciliationPeriodicJobs()
 	reclamationPeriodicJobs := reclamation.PeriodicJobs()
 	paymentPeriodicJobs := payments.PaymentReconciliationPeriodicJobs()
-	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(reclamationPeriodicJobs)+len(paymentPeriodicJobs))
+	checkoutShutdownPeriodicJobs := payments.PaymentCheckoutShutdownPeriodicJobs()
+	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(reclamationPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs))
 	periodicJobs = append(periodicJobs, creditPeriodicJobs...)
 	periodicJobs = append(periodicJobs, reclamationPeriodicJobs...)
 	periodicJobs = append(periodicJobs, paymentPeriodicJobs...)
+	periodicJobs = append(periodicJobs, checkoutShutdownPeriodicJobs...)
 	riverClient, err := worker.NewRiverClient(dbs.riverPool, riverTaskWorker, worker.RiverServerOptions{
 		QueueName:   taskqueue.RiverQueueDefault,
 		Concurrency: workerConcurrency,
 		AdditionalQueues: map[string]river.QueueConfig{
-			credits.ReconciliationQueue:         {MaxWorkers: 1},
-			reclamation.QueueName:               {MaxWorkers: 1},
-			payments.PaymentReconciliationQueue: {MaxWorkers: 1},
+			credits.ReconciliationQueue:           {MaxWorkers: 1},
+			reclamation.QueueName:                 {MaxWorkers: 1},
+			payments.PaymentReconciliationQueue:   {MaxWorkers: 1},
+			payments.PaymentCheckoutShutdownQueue: {MaxWorkers: 1},
 		},
 		RegisterWorkers: func(workers *river.Workers) {
 			river.AddWorker(workers, credits.NewReconciliationWorker(services.creditService))
@@ -128,6 +131,8 @@ func newAppTaskRuntime(
 			river.AddWorker(workers, reclamation.NewReclaimWorker(dbs.db, services.storageService))
 			river.AddWorker(workers, reclamation.NewScheduleWorker(dbs.db))
 			river.AddWorker(workers, payments.NewPaymentReconciliationWorker(services.paymentService))
+			river.AddWorker(workers, payments.NewPaymentCheckoutShutdownWorker(services.paymentService))
+			river.AddWorker(workers, payments.NewPaymentCheckoutShutdownScheduleWorker(services.paymentService))
 		},
 		PeriodicJobs: periodicJobs,
 	})
@@ -144,6 +149,7 @@ func newAppTaskRuntime(
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to recover running tasks after startup: %w", err)
 	}
 	riverQueue.SetClient(riverClient)
+	services.paymentService.SetPaymentCheckoutShutdownEnqueuer(payments.NewPaymentCheckoutShutdownEnqueuer(riverClient))
 	services.creditService.SetReconciliationEnqueuer(riverClient)
 
 	submissionStore := tasksubmission.NewStore(dbs.riverPool, repos.taskRepo, riverClient, taskqueue.RiverQueueDefault, taskqueue.RiverMaxAttemptsDefault, taskBillingService)

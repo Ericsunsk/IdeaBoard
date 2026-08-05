@@ -132,7 +132,7 @@ func (s *Service) CreatePaymentRefund(ctx context.Context, command CreatePayment
 		if gatewayCode := new(GatewayError); errors.As(err, &gatewayCode) && gatewayCode.Code() == GatewayErrorProviderUnavailable {
 			return refund, err
 		}
-		failed, markErr := s.repo.MarkPaymentRefundFailed(ctx, refund.ID, err.Error(), s.now().UTC())
+		failed, markErr := s.repo.MarkPaymentRefundFailed(ctx, refund.ID, operationalErrorSummary(err, "Stripe refund request failed"), s.now().UTC())
 		if markErr != nil {
 			return PaymentRefund{}, errors.Join(err, markErr)
 		}

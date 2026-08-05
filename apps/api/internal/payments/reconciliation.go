@@ -114,7 +114,7 @@ func (s *Service) reconcileDuePaymentRefunds(ctx context.Context, apiKey string,
 					retryErr = errors.Join(retryErr, err)
 					continue
 				}
-				if _, markErr := s.repo.MarkPaymentRefundFailed(ctx, refund.ID, err.Error(), now); markErr != nil {
+				if _, markErr := s.repo.MarkPaymentRefundFailed(ctx, refund.ID, operationalErrorSummary(err, "Stripe refund request failed"), now); markErr != nil {
 					retryErr = errors.Join(retryErr, markErr)
 				}
 				continue
@@ -141,6 +141,16 @@ func (s *Service) reconcilePaymentOrderClaim(ctx context.Context, configuration 
 			err = configurationErr
 		}
 		return paymentReconciliationFailureOutcome(now, order, err, false), err
+	}
+	if order.Status == PaymentOrderCreating && !configuration.PurchasesEnabled {
+		expired, changed, err := s.repo.MarkPaymentOrderExpired(ctx, order.ID)
+		if err != nil {
+			return paymentReconciliationFailureOutcome(now, order, err, true), err
+		}
+		if changed {
+			s.events.Publish(expired.UserID, PaymentEvent{PublicToken: expired.PublicToken, Status: "failed"})
+		}
+		return paymentReconciliationTerminal(now), nil
 	}
 	if order.Status == PaymentOrderPaidPendingCredit {
 		result, err := s.repo.CreditPaidPaymentOrder(ctx, order.ID, now)

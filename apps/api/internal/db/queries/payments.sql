@@ -75,6 +75,27 @@ INSERT INTO payment_admin_actions (
 )
 VALUES ($1, $2, 'stripe_configuration', 'current', $3, $4, $5, sqlc.arg(metadata)::JSONB);
 
+-- name: InsertPaymentCheckoutShutdown :one
+INSERT INTO payment_checkout_shutdowns (stripe_account_id, cutoff_at)
+VALUES ($1, CURRENT_TIMESTAMP)
+RETURNING *;
+
+-- name: GetPaymentCheckoutShutdown :one
+SELECT *
+FROM payment_checkout_shutdowns
+WHERE id = $1;
+
+-- name: ListActivePaymentCheckoutShutdowns :many
+SELECT *
+FROM payment_checkout_shutdowns
+WHERE completed_at IS NULL
+ORDER BY created_at, id;
+
+-- name: CompletePaymentCheckoutShutdown :execrows
+UPDATE payment_checkout_shutdowns
+SET completed_at = $2
+WHERE id = $1 AND completed_at IS NULL;
+
 -- name: InsertPaymentWebhookEvent :execrows
 INSERT INTO payment_webhook_events (
   stripe_event_id,
@@ -125,6 +146,15 @@ FROM payment_orders
 WHERE user_id = $1
   AND status IN ('creating', 'checkout_open', 'async_payment_pending')
 ORDER BY created_at, id;
+
+-- name: ListPaymentOrdersForCheckoutShutdown :many
+SELECT *
+FROM payment_orders
+WHERE stripe_account_id = $1
+  AND created_at <= $2
+  AND status IN ('creating', 'checkout_open')
+ORDER BY created_at, id
+LIMIT $3;
 
 -- name: ListUserPendingPaymentOrders :many
 SELECT *
@@ -192,25 +222,29 @@ WHERE stripe_account_id = $1 AND stripe_checkout_session_id = $2;
 
 -- name: MarkPaymentOrderAsyncPending :one
 UPDATE payment_orders
-SET status = 'async_payment_pending'
+SET status = 'async_payment_pending',
+    checkout_url = ''
 WHERE id = $1 AND status = 'checkout_open'
 RETURNING *;
 
 -- name: MarkPaymentOrderFailed :one
 UPDATE payment_orders
-SET status = 'payment_failed'
+SET status = 'payment_failed',
+    checkout_url = ''
 WHERE id = $1 AND status IN ('creating', 'checkout_open', 'async_payment_pending')
 RETURNING *;
 
 -- name: MarkPaymentOrderCancelled :one
 UPDATE payment_orders
-SET status = 'cancelled'
+SET status = 'cancelled',
+    checkout_url = ''
 WHERE id = $1 AND user_id = $2 AND status = 'checkout_open'
 RETURNING *;
 
 -- name: MarkPaymentOrderExpired :one
 UPDATE payment_orders
-SET status = 'expired'
+SET status = 'expired',
+    checkout_url = ''
 WHERE id = $1 AND status IN ('creating', 'checkout_open', 'async_payment_pending')
 RETURNING *;
 
@@ -387,6 +421,7 @@ LIMIT sqlc.arg(row_limit)::INTEGER;
 -- name: RecordPaymentOrderPaid :one
 UPDATE payment_orders
 SET status = 'paid_pending_credit',
+    checkout_url = '',
     stripe_customer_id = $2,
     stripe_checkout_session_id = $3,
     expires_at = CASE WHEN stripe_checkout_session_id IS NULL THEN $4 ELSE expires_at END,

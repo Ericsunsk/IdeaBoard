@@ -155,9 +155,9 @@ func TestStripeAPIKeyModePolicy(t *testing.T) {
 		ok   bool
 	}{
 		{name: "test secret", key: "sk_test_value", mode: StripeModeTest, ok: true},
+		{name: "test restricted rejected by product policy", key: "rk_test_value", ok: false},
 		{name: "live restricted", key: "rk_live_value", mode: StripeModeLive, ok: true},
 		{name: "live secret rejected", key: "sk_live_value", ok: false},
-		{name: "test restricted rejected by product policy", key: "rk_test_value", ok: false},
 		{name: "malformed", key: "secret", ok: false},
 	}
 	for _, tt := range tests {

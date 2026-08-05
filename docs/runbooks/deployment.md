@@ -300,6 +300,37 @@ go test ./internal/media/storage -run TestS3CompatibleUploadReadPublicDeleteSmok
 
 该 smoke 会在 `uploads/smoke/s3-compatible/` 下创建临时 PNG object，验证 SDK read、公开访问 URL、重新加载 profile 后读取、删除后不可读，并在失败时尽量清理临时 object。`API_TEST_S3_FORCE_PATH_STYLE` 仅在目标 endpoint 要求 path-style 时设为 `true`。
 
+### 9. Stripe Test Mode smoke
+
+Stripe smoke **默认不运行**，CI 也不得因它依赖真实 Stripe。只允许在隔离的 Stripe Test Mode Account、专用测试用户和可回收的测试订单上显式 opt-in；不要向生产 Account、Live API Key 或真实用户执行该流程。
+
+执行前确认 Test Mode 的 Webhook URL 指向隔离环境，并仅从 shell env 或 CI secret 注入 `sk_test_*` Key。`API_TEST_STRIPE_SMOKE=1` 是唯一的 opt-in 开关；缺少它或缺少任一 Stripe 凭据时，smoke 必须 skip，而不是 fallback 到 Live：
+
+```bash
+cd apps/api
+API_TEST_STRIPE_SMOKE=1 \
+API_TEST_STRIPE_SECRET_KEY='sk_test_...' \
+API_TEST_STRIPE_BASE_URL='https://staging-api.example.com' \
+API_TEST_STRIPE_TAX_CODE='txcd_10105001' \
+go test ./internal/payments -run TestStripeTestModeSmoke -count=1
+```
+
+通过标准：Checkout request 包含 `automatic_tax[enabled]=true`、`adaptive_pricing[enabled]=true`、Product Tax Code、`IDEABOARD` Statement Descriptor suffix，且未声明静态 `payment_method_types`（由 Stripe Dynamic Payment Methods 决定）；Webhook Endpoint 使用当前 API version 并订阅 Payments 支持的事件。验证完成后在 Stripe Dashboard 删除测试 Checkout/Customer，或记录其可回收范围。任何测试失败都保持 `purchases_enabled=false`，先修复配置或切回旧配置后重试。
+
+### 10. Stripe Live launch gate
+
+在首次设置 `purchases_enabled=true` 前，由负责人员逐项确认并留下执行记录。以下任一项不满足时，不得开启充值：
+
+1. Stripe Account 是已验证、可收款的香港个人 Account，`charges_enabled=true`，并确认目标业务、结算币种和地区符合 Stripe 当前要求。
+2. 仅使用 Live **Restricted API Key**；不要把 Secret Key、Webhook Secret 或其明文写入仓库、Issue、日志、截图、浏览器 console 或未加密 artifact。
+3. Live Webhook Endpoint 为公开 HTTPS 的 `/api/webhooks/stripe`，使用当前 API version，已保存其独立 Webhook Secret，并在 Stripe Dashboard 成功投递一次受控测试事件。
+4. Idea Product 已设置经税务确认的 Product Tax Code；Checkout 显示的 Statement Descriptor 与 `IDEABOARD` suffix 一致。
+5. Stripe Tax 已启用，并逐个确认经营/收款地区的 Tax registrations。**当 Live Tax registrations 为 0 时这是硬阻断：保持 `purchases_enabled=false`，不得声称已自动代收税，也不得仅凭 Automatic Tax 参数上线。** 税务结论变化后重新完成本清单。
+6. 在目标客户地区确认 WeChat Pay 在该 Live Account、币种和支付流中可用；它由 Stripe Dynamic Payment Methods 决定，不在应用中硬编码或承诺一定展示。
+7. 用隔离的 Live 前置环境或 Stripe Dashboard 的受控最小金额验证 Checkout、Webhook、paid credit、退款和 Dispute 回收路径；不得用真实客户订单替代验收。
+
+通过后才由管理员保存 Stripe 配置并开启充值。配置准备失败会保留旧配置；如 Live 验收、税务确认或 provider health 出现问题，先关闭充值作为回滚入口，再处理 Stripe Dashboard 与 River 对账。
+
 <a id="operations"></a>
 ## 日常运维
 
@@ -322,6 +353,19 @@ ideaboard delete --yes
 ```
 
 `delete` 默认保留 Docker volumes；同时删除数据加 `--volumes`。
+
+### Payments 事故处理
+
+需要立即停止充值时，在 Admin Payments 设置将 `purchases_enabled` 设为 `false`。新的 Checkout 会被拒绝；River 会异步 Expire 仍有效的待支付 Stripe Checkout Session，重复执行安全幂等。不要删除 Payment Order、Refund、Dispute、Ledger 或 Webhook Inbox 来“取消”支付。
+
+随后按以下顺序恢复：
+
+1. 在 Stripe Dashboard 处理退款、Dispute、Webhook delivery 或账户能力问题，保留 provider object ID 作为关联依据。
+2. 使用 Admin Payment Order/Dispute 读模型查看未收敛订单、退款 anomaly 和 Dispute 状态；不要把 Dashboard 状态手工写入 PostgreSQL。
+3. 保持 River worker 运行，等待其对账重试；必要时重启 API/Worker 后确认 River job、PostgreSQL 和 Stripe 配置都健康。对账以 canonical Stripe Retrieve 收敛，Webhook 和 SSE 都不是支付事实源。
+4. 仅当未结算订单、Refund 与 Dispute 已按预期收敛，并重新完成相关 smoke 后，才重新开启充值。
+
+多实例部署中，Stripe 配置在每次请求时从 PostgreSQL 读取，Webhook 和 River 也通过 durable state/claim 协作；SSE 只提示本实例已提交的变更，客户端必须重新读取订单、Wallet 或历史。不要为此引入 WebSocket、Redis 或新的任务队列。
 
 排障优先顺序：
 

@@ -304,6 +304,14 @@ type PaymentAdminAction struct {
 	CreatedAt    time.Time       `json:"created_at"`
 }
 
+type PaymentCheckoutShutdown struct {
+	ID              uuid.UUID    `json:"id"`
+	StripeAccountID string       `json:"stripe_account_id"`
+	CutoffAt        time.Time    `json:"cutoff_at"`
+	CreatedAt       time.Time    `json:"created_at"`
+	CompletedAt     sql.NullTime `json:"completed_at"`
+}
+
 type PaymentCustomer struct {
 	UserID           int64     `json:"user_id"`
 	StripeAccountID  string    `json:"stripe_account_id"`

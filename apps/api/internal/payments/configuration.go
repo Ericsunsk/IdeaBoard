@@ -59,6 +59,7 @@ type ConfigureStripeCommand struct {
 type PrepareStripeConfiguration struct {
 	APIKey                    string
 	Mode                      StripeMode
+	PurchasesEnabled          bool
 	ProductTaxCode            string
 	WebhookURL                string
 	ExistingAccountID         string

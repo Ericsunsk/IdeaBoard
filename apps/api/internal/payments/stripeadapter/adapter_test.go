@@ -1,7 +1,11 @@
 package stripeadapter
 
 import (
+	"context"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -9,6 +13,37 @@ import (
 
 	"github.com/stripe/stripe-go/v86"
 )
+
+func TestPrepareConfigurationBlocksLivePurchasesWithoutActiveTaxRegistration(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/v1/account":
+			_, _ = io.WriteString(writer, `{"id":"acct_live","charges_enabled":true}`)
+		case "/v1/tax/registrations":
+			if got := request.URL.Query().Get("status"); got != "active" {
+				t.Fatalf("registration status filter = %q", got)
+			}
+			_, _ = io.WriteString(writer, `{"object":"list","data":[],"has_more":false}`)
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer server.Close()
+
+	_, err := newCheckoutTestAdapter(server.URL).PrepareConfiguration(context.Background(), payments.PrepareStripeConfiguration{
+		APIKey: "rk_live_fixture", Mode: payments.StripeModeLive, PurchasesEnabled: true,
+		ProductTaxCode: "txcd_10105001", WebhookURL: "https://app.example.com/api/webhooks/stripe",
+	})
+	var gatewayErr *payments.GatewayError
+	if !errors.As(err, &gatewayErr) || gatewayErr.Code() != payments.GatewayErrorCapabilityMissing {
+		t.Fatalf("PrepareConfiguration() error = %v, want capability missing", err)
+	}
+	if !strings.Contains(gatewayErr.Error(), "Tax Registration") {
+		t.Fatalf("safe error = %q, want Tax Registration guidance", gatewayErr.Error())
+	}
+}
 
 func TestMapStripeErrorTreatsNotFoundAsDeterministicInvalidResponse(t *testing.T) {
 	t.Parallel()
