@@ -234,6 +234,20 @@ docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stack
   api init-admin
 ```
 
+### 6.1 Auth Email 上线门禁
+
+Fresh Database 默认关闭公开注册，且邮件 readiness 为 `not_configured`。按以下顺序上线，不能先开放注册：
+
+1. 保持公开注册关闭，确认 API 与 Auth 使用同一份稳定的 `APP_SECRETS_ENCRYPTION_KEY`。更换该 key 会导致已保存的 Resend API Key 无法解密。
+2. 在 Resend 完成发件 Domain verification，并创建仅通过部署 Secret 注入或 Admin 表单提交的 production API Key；不要把明文写入仓库、Issue 或日志。
+3. 使用 `init-admin` 创建的账号通过 Email + Password 或 Username + Password 登录 Admin。该登录不依赖 Resend readiness。
+4. 在 Admin `系统设置` 保存 Resend API Key、发件人和 Reply-To，然后发送 Test Email。只有配置摘要显示 `readiness=ready` 且收件箱确认收到邮件，才算邮件链路通过。
+5. 依次 smoke 注册 OTP 自动登录、Email 登录、Username 登录、Password reset、Email change 和 Session revoke；最后按运营计划开放公开注册。
+
+邮件未达到 `ready` 时，注册、Password reset 和 Email change 必须返回不可用；已有 Email/Username Password 登录必须继续可用。Test Email 失败时保持公开注册关闭，修正 Domain/API Key 后重新测试。
+
+Auth rollback 不删除身份或业务数据：先关闭公开注册，再清除或替换 Resend 配置。此时 Email workflow fail closed，但已有 Email/Username Password 登录保持可用。恢复时重新保存配置并完成 Test Email，再决定是否开放注册。
+
 ### 7. VPS 反代
 
 生成 Nginx 配置：

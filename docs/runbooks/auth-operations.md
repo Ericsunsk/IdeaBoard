@@ -84,6 +84,14 @@
 5. 任一步失败都保持 Wallet frozen；直接重试同一删除 API 会从持久 phase 继续，不需要手工改数据库。
 6. 完成后保留匿名化 user tombstone，并永久保留 Task、Credit Ledger 与 Welcome Grant claim。只有持续重试仍失败时才依据日志排查对应外部依赖，不要跳过 phase 手工物理删除。
 
+### 场景 E：Resend 配置与回滚
+
+1. 保持公开注册关闭，先完成 Resend 发件 Domain verification。
+2. 确认 API/Auth 使用同一份稳定的 `APP_SECRETS_ENCRYPTION_KEY`，再在 Admin `系统设置` 保存 Resend API Key 与发件人配置。
+3. 发送 Test Email；只有 readiness 为 `ready` 且实际收到邮件后，才开放公开注册。
+4. 上线 smoke 同时覆盖注册 OTP、Password reset、Email change、Email 登录和 Username 登录。邮件 workflow 依赖 readiness，已有 Password 登录不依赖 readiness。
+5. 出现故障时先关闭公开注册，再清除或替换 Resend 配置；不要删除用户、Session 或业务数据。修复后重新完成 Test Email，再恢复公开注册。
+
 
 ## 上线与安全基线
 
@@ -92,6 +100,7 @@
 
 - 生产环境必须设置 `BETTER_AUTH_SECRET`（至少 32 字符高熵随机值）与 `BETTER_AUTH_URL`（正式访问地址），不得使用 `replace-with-*` 或本地开发 fallback。
 - `AUTH_INTERNAL_KEY` 必须在 API 与 Auth Service 中保持一致，并仅在两侧共享；生产环境不得使用占位值。
+- `APP_SECRETS_ENCRYPTION_KEY` 必须同时提供给 API 与 Auth Service，用于静态加密 Resend/API/Storage Secret；生产环境不得临时轮换或使用占位值。
 - Auth Service 与 Go API 建议只监听 `127.0.0.1`，由 Nginx 统一对外暴露，避免绕过可信代理与限流边界。
 - 登录/注册限流依赖可信代理解析后的客户端 IP；不要让公网直接访问 `:6001`。
 - 使用最小权限账号，避免共享管理员口令。
