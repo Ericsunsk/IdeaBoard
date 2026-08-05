@@ -24,9 +24,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
+  generated:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -50,21 +50,104 @@ jobs:
       - name: Check generated API drift
         run: git diff --exit-code -- apps/web/src/shared/api/generated-query
 
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        check:
+          - eslint
+          - styles
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "22.22.2"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci --no-audit --fund=false
+
       - name: Lint
+        if: matrix.check == 'eslint'
         working-directory: apps/web
         run: npm run lint
 
       - name: Lint styles
+        if: matrix.check == 'styles'
         working-directory: apps/web
         run: npm run lint:style
 
-      - name: Test
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - check: unit
+            shard: "1/2"
+          - check: unit
+            shard: "2/2"
+          - check: typecheck
+            shard: none
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "22.22.2"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
         working-directory: apps/web
-        run: npm run test:run
+        run: npm ci --no-audit --fund=false
+
+      - name: Test
+        if: matrix.check == 'unit'
+        working-directory: apps/web
+        env:
+          TEST_SHARD: ${{ matrix.shard }}
+        run: npm run test:run -- --shard="${TEST_SHARD}"
 
       - name: Typecheck tests
+        if: matrix.check == 'typecheck'
         working-directory: apps/web
         run: npm run test:typecheck
+
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "22.22.2"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci --no-audit --fund=false
 
       - name: User route smoke
         working-directory: apps/web
@@ -73,6 +156,48 @@ jobs:
           USER_ROUTE_SMOKE_VERBOSE: "1"
         run: npm run smoke:user
 
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "22.22.2"
+          cache: "npm"
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/web
+        run: npm ci --no-audit --fund=false
+
       - name: Build
         working-directory: apps/web
         run: npm run build
+
+  verify:
+    if: always()
+    needs:
+      - generated
+      - lint
+      - tests
+      - smoke
+      - build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify required checks
+        if: >-
+          ${{
+            needs.generated.result != 'success' ||
+            needs.lint.result != 'success' ||
+            needs.tests.result != 'success' ||
+            needs.smoke.result != 'success' ||
+            needs.build.result != 'success'
+          }}
+        run: exit 1
