@@ -1,5 +1,5 @@
 import { toNodeHandler } from 'better-auth/node'
-import { auth, authDB } from './auth.js'
+import { auth, authDB, mailConfigService } from './auth.js'
 import { createAuthApp } from './authApp.js'
 import { getAuthGuardSettings } from './authGuardSettings.js'
 import { createAuthInternalCommands, type InternalAuthAPI } from './authInternalCommands.js'
@@ -42,6 +42,7 @@ const app = createAuthApp({
   repository,
   internalCommands: createAuthInternalCommands(authApi, repository),
   getAuthGuardSettings,
+  mailConfigService,
 })
 
 try {

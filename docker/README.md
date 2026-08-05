@@ -45,7 +45,7 @@ docker compose -f compose.local.yml logs -f postgres
 | Auth runtime user | `ideaboard_auth` / `${AUTH_DB_PASSWORD}`，仅 Better Auth tables DML |
 
 > [!TIP]
-> compose 初始化不再内置默认管理员账号；若你还会启动完整后端，请先启动 `apps/auth`，再执行 `cd apps/api && INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin`。
+> compose 初始化不再内置默认管理员账号；若你还会启动完整后端，请先启动 `apps/auth`，再执行 `cd apps/api && INIT_ADMIN_EMAIL='admin@example.com' INIT_ADMIN_USERNAME='admin' INIT_ADMIN_PASSWORD='your-strong-password' go run ./cmd init-admin`。
 
 ## 连接信息
 

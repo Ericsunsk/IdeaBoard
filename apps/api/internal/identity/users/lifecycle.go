@@ -436,7 +436,7 @@ func (s *LifecycleService) normalizeVerifiedIdentity(identity VerifiedIdentity) 
 		identity.Role = "user"
 	}
 	if identity.AuthUserID == "" || identity.Username == "" || identity.ClaimIdentity == "" ||
-		identity.ClaimIdentityKind != "trusted_canonical_registration" || !identity.ClaimIdentityVerified ||
+		identity.ClaimIdentityKind != "canonical_email" || !identity.ClaimIdentityVerified ||
 		(identity.Role != "user" && identity.Role != "admin") || len(s.welcomeIdentityKey) != 32 {
 		return VerifiedIdentity{}, "", fmt.Errorf("trusted canonical registration identity and a 32-byte Welcome Grant key are required")
 	}

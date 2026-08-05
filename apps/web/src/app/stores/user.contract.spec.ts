@@ -19,10 +19,13 @@ function makeUser(overrides: Partial<User> = {}): User {
 async function getFreshUserStore() {
   vi.resetModules()
   const getUserInfo = vi.fn()
-  const registerUsername = vi.fn()
   const authClient = {
     signIn: {
+      email: vi.fn(),
       username: vi.fn(),
+    },
+    signUp: {
+      email: vi.fn(),
     },
     signOut: vi.fn(),
     getSession: vi.fn(),
@@ -33,7 +36,7 @@ async function getFreshUserStore() {
   }))
   vi.doMock('../../shared/auth/client', () => ({
     authClient,
-    registerUsername,
+    normalizeCanonicalEmail: (email: string) => email.trim().toLowerCase(),
     extractBetterAuthErrorMessage: (error: unknown, fallback: string) =>
       error && typeof error === 'object' && 'message' in error
         ? String((error as { message?: unknown }).message || fallback)
@@ -49,7 +52,6 @@ async function getFreshUserStore() {
     queryClient,
     getUserInfo,
     authClient,
-    registerUsername,
   }
 }
 
@@ -73,18 +75,30 @@ describe('useUserStore auth cache handling', () => {
   it('logs in and stores the fetched session user', async () => {
     const { store, getUserInfo, authClient } = await getFreshUserStore()
     const loggedInUser = makeUser({ id: 4, uid: 'USER04' })
-    vi.mocked(authClient.signIn.username).mockResolvedValue({} as never)
+    vi.mocked(authClient.signIn.email).mockResolvedValue({} as never)
     vi.mocked(getUserInfo).mockResolvedValue({ user: loggedInUser } as never)
 
-    await expect(store.login('alice', 'secret-password')).resolves.toBe(true)
+    await expect(store.login(' Alice@Example.com ', 'secret-password')).resolves.toBe(true)
 
-    expect(authClient.signIn.username).toHaveBeenCalledWith({
-      username: 'alice',
+    expect(authClient.signIn.email).toHaveBeenCalledWith({
+      email: 'alice@example.com',
       password: 'secret-password',
     })
     expect(store.user).toEqual(loggedInUser)
     expect(localStorage.getItem('user')).toBe(JSON.stringify(loggedInUser))
     expect(store.sessionValidatedAt).toBeGreaterThan(0)
+  })
+
+  it('keeps native username sign-in available', async () => {
+    const { store, getUserInfo, authClient } = await getFreshUserStore()
+    vi.mocked(authClient.signIn.username).mockResolvedValue({} as never)
+    vi.mocked(getUserInfo).mockResolvedValue({ user: makeUser() } as never)
+
+    await expect(store.login(' Alice ', 'secret-password')).resolves.toBe(true)
+    expect(authClient.signIn.username).toHaveBeenCalledWith({
+      username: 'alice',
+      password: 'secret-password',
+    })
   })
 
   it('clears auth state and Vue Query cache after logout succeeds', async () => {
@@ -158,34 +172,30 @@ describe('useUserStore auth cache handling', () => {
   })
 
   it('registers and stores the created session user', async () => {
-    const { store, getUserInfo, authClient, registerUsername } = await getFreshUserStore()
+    const { store, authClient } = await getFreshUserStore()
     const registeredUser = makeUser({ id: 2, uid: 'USER02', username: 'alice' })
-    registerUsername.mockResolvedValue('alice')
-    vi.mocked(authClient.signIn.username).mockResolvedValue({} as never)
-    vi.mocked(getUserInfo).mockResolvedValue({ user: registeredUser } as never)
+    vi.mocked(authClient.signUp.email).mockResolvedValue({
+      data: { user: registeredUser },
+    } as never)
 
-    await store.register(' alice ', 'secret-password')
+    await store.register(' Alice@Example.com ', 'alice', 'secret-password')
 
-    expect(registerUsername).toHaveBeenCalledWith('alice', 'secret-password')
-    expect(authClient.signIn.username).toHaveBeenCalledWith({
+    expect(authClient.signUp.email).toHaveBeenCalledWith({
+      email: 'alice@example.com',
+      name: 'alice',
       username: 'alice',
       password: 'secret-password',
     })
-    expect(store.user).toEqual(registeredUser)
+    expect(store.user).toBeNull()
   })
 
-  it('fails when username registration login cannot restore user info', async () => {
-    const { store, getUserInfo, authClient, registerUsername } = await getFreshUserStore()
-    registerUsername.mockResolvedValue('bob')
-    vi.mocked(authClient.signIn.username).mockResolvedValue({} as never)
-    vi.mocked(getUserInfo).mockRejectedValue(new Error('获取用户信息失败'))
+  it('does not create a session before Email verification', async () => {
+    const { store, authClient } = await getFreshUserStore()
+    vi.mocked(authClient.signUp.email).mockResolvedValue({
+      data: { user: { id: 'auth-bob' } },
+    } as never)
 
-    await expect(store.register('bob', 'secret-password')).rejects.toThrow('登录状态恢复失败')
-
-    expect(authClient.signIn.username).toHaveBeenCalledWith({
-      username: 'bob',
-      password: 'secret-password',
-    })
-    expect(store.user).toBeNull()
+    await expect(store.register('bob@example.com', 'bob', 'secret-password')).resolves.toBe(true)
+    expect(authClient.signIn.email).not.toHaveBeenCalled()
   })
 })

@@ -1,81 +1,103 @@
-import type { FastifyInstance, FastifyReply, preHandlerHookHandler } from 'fastify'
+import type {
+  FastifyInstance,
+  FastifyReply,
+  preHandlerHookHandler,
+} from "fastify";
 import type {
   AuthInternalCommandFailureKind,
   AuthInternalCommandResult,
   AuthInternalCommands,
   InternalAuthAPI,
-} from './authInternalCommands.js'
+} from "./authInternalCommands.js";
 import {
   extractAuthUser,
   extractErrorMessage,
+  normalizeCanonicalEmail,
   normalizeRegistrationUsername,
-} from './authUtils.js'
-import type { RouteHandlers } from './generated/auth-internal/fastify.gen.js'
-import { authInternalRoutes } from './generated/auth-internal/routes.gen.js'
-import { getHeaderValue, sendError, sendSuccess, toHeaders } from './httpResponse.js'
-import { trustedCanonicalClaimIdentity } from './trustedIdentity.js'
+} from "./authUtils.js";
+import type { RouteHandlers } from "./generated/auth-internal/fastify.gen.js";
+import { authInternalRoutes } from "./generated/auth-internal/routes.gen.js";
+import {
+  getHeaderValue,
+  sendError,
+  sendSuccess,
+  toHeaders,
+} from "./httpResponse.js";
 
 export type InternalRoutesOptions = {
-  internalKey: string
-  authApi: Pick<InternalAuthAPI, 'getSession'>
-  commands: AuthInternalCommands
-}
+  internalKey: string;
+  authApi: Pick<InternalAuthAPI, "getSession">;
+  commands: AuthInternalCommands;
+};
 
 const commandFailureStatuses = {
   invalid_input: 400,
   not_found: 404,
   conflict: 409,
   repository_failure: 500,
-} satisfies Record<AuthInternalCommandFailureKind, number>
+} satisfies Record<AuthInternalCommandFailureKind, number>;
 
-export function registerInternalRoutes(app: FastifyInstance, options: InternalRoutesOptions) {
-  const requireInternalKey = createRequireInternalKey(options.internalKey)
+export function registerInternalRoutes(
+  app: FastifyInstance,
+  options: InternalRoutesOptions,
+) {
+  const requireInternalKey = createRequireInternalKey(options.internalKey);
   const handlers: RouteHandlers = {
     validateSession: async (request, reply) => {
       try {
         const session = await options.authApi.getSession({
           headers: toHeaders(request.headers),
-        })
-        const user = extractAuthUser(session)
+        });
+        const user = extractAuthUser(session);
         if (!user) {
-          sendError(reply, 401, 'unauthorized')
-          return
+          sendError(reply, 401, "unauthorized");
+          return;
         }
-        const username = normalizeRegistrationUsername(user.username || user.name || '')
-        const claimIdentity = String(user.email || '').toLowerCase()
+        const username = normalizeRegistrationUsername(
+          user.username || user.name || "",
+        );
+        const claimIdentity = normalizeCanonicalEmail(user.email);
         const isTrustedClaimIdentity =
-          Boolean(user.emailVerified) && claimIdentity === trustedCanonicalClaimIdentity(username)
+          Boolean(user.emailVerified) && Boolean(claimIdentity);
         sendSuccess(reply, {
           session: {
             auth_user_id: user.id,
+            email: claimIdentity,
             username,
             claim_identity: claimIdentity,
             claim_identity_kind: isTrustedClaimIdentity
-              ? 'trusted_canonical_registration'
-              : 'untrusted',
+              ? "canonical_email"
+              : "untrusted",
             claim_identity_verified: isTrustedClaimIdentity,
           },
-        })
+        });
       } catch (error) {
-        sendError(reply, 500, extractErrorMessage(error, 'failed to validate session'))
+        sendError(
+          reply,
+          500,
+          extractErrorMessage(error, "failed to validate session"),
+        );
       }
     },
     ensureUser: async (request, reply) => {
       sendCommandResult(
         reply,
         await options.commands.ensureIdentity({
+          email: request.body?.email,
           username: request.body?.username,
           password: request.body?.password,
           allowExisting: request.body?.allow_existing,
           role: request.body?.role,
         }),
-      )
+      );
     },
     deleteUser: async (request, reply) => {
       sendCommandResult(
         reply,
-        await options.commands.deleteIdentity({ authUserID: request.params?.id }),
-      )
+        await options.commands.deleteIdentity({
+          authUserID: request.params?.id,
+        }),
+      );
     },
     setUserRole: async (request, reply) => {
       sendCommandResult(
@@ -84,7 +106,7 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
           authUserID: request.params?.id,
           role: request.body?.role,
         }),
-      )
+      );
     },
     banUser: async (request, reply) => {
       sendCommandResult(
@@ -94,64 +116,68 @@ export function registerInternalRoutes(app: FastifyInstance, options: InternalRo
           banReason: request.body?.banReason,
           banExpiresIn: request.body?.banExpiresIn,
         }),
-      )
+      );
     },
     unbanUser: async (request, reply) => {
       sendCommandResult(
         reply,
-        await options.commands.unbanIdentity({ authUserID: request.body?.userId }),
-      )
+        await options.commands.unbanIdentity({
+          authUserID: request.body?.userId,
+        }),
+      );
     },
     revokeUserSessions: async (request, reply) => {
       sendCommandResult(
         reply,
-        await options.commands.revokeSessions({ authUserID: request.body?.userId }),
-      )
+        await options.commands.revokeSessions({
+          authUserID: request.body?.userId,
+        }),
+      );
     },
-  }
+  };
 
   app.route({
     method: authInternalRoutes.validateSession.method,
     url: authInternalRoutes.validateSession.fastifyPath,
     preHandler: requireInternalKey,
     handler: handlers.validateSession,
-  })
+  });
   app.route({
     method: authInternalRoutes.ensureUser.method,
     url: authInternalRoutes.ensureUser.fastifyPath,
     preHandler: requireInternalKey,
     handler: handlers.ensureUser,
-  })
+  });
   app.route({
     method: authInternalRoutes.deleteUser.method,
     url: authInternalRoutes.deleteUser.fastifyPath,
     preHandler: requireInternalKey,
     handler: handlers.deleteUser,
-  })
+  });
   app.route({
     method: authInternalRoutes.setUserRole.method,
     url: authInternalRoutes.setUserRole.fastifyPath,
     preHandler: requireInternalKey,
     handler: handlers.setUserRole,
-  })
+  });
   app.route({
     method: authInternalRoutes.banUser.method,
     url: authInternalRoutes.banUser.fastifyPath,
     preHandler: requireInternalKey,
     handler: handlers.banUser,
-  })
+  });
   app.route({
     method: authInternalRoutes.unbanUser.method,
     url: authInternalRoutes.unbanUser.fastifyPath,
     preHandler: requireInternalKey,
     handler: handlers.unbanUser,
-  })
+  });
   app.route({
     method: authInternalRoutes.revokeUserSessions.method,
     url: authInternalRoutes.revokeUserSessions.fastifyPath,
     preHandler: requireInternalKey,
     handler: handlers.revokeUserSessions,
-  })
+  });
 }
 
 function sendCommandResult<TData>(
@@ -159,25 +185,25 @@ function sendCommandResult<TData>(
   result: AuthInternalCommandResult<TData>,
 ) {
   if (!result.ok) {
-    sendError(reply, commandFailureStatuses[result.kind], result.message)
-    return
+    sendError(reply, commandFailureStatuses[result.kind], result.message);
+    return;
   }
-  sendSuccess(reply, result.data)
+  sendSuccess(reply, result.data);
 }
 
 function createRequireInternalKey(internalKey: string): preHandlerHookHandler {
   return (request, reply, done) => {
     if (!internalKey) {
-      sendError(reply, 500, 'internal key is not configured')
-      done()
-      return
+      sendError(reply, 500, "internal key is not configured");
+      done();
+      return;
     }
-    const provided = getHeaderValue(request.headers['x-internal-key']).trim()
+    const provided = getHeaderValue(request.headers["x-internal-key"]).trim();
     if (!provided || provided !== internalKey) {
-      sendError(reply, 401, 'unauthorized internal request')
-      done()
-      return
+      sendError(reply, 401, "unauthorized internal request");
+      done();
+      return;
     }
-    done()
-  }
+    done();
+  };
 }

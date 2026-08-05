@@ -160,14 +160,14 @@ func (e RevokeUserSessionsEnvelopeCode) Valid() bool {
 
 // Defines values for SessionClaimIdentityKind.
 const (
-	SessionClaimIdentityKindTrustedCanonicalRegistration SessionClaimIdentityKind = "trusted_canonical_registration"
-	SessionClaimIdentityKindUntrusted                    SessionClaimIdentityKind = "untrusted"
+	SessionClaimIdentityKindCanonicalEmail SessionClaimIdentityKind = "canonical_email"
+	SessionClaimIdentityKindUntrusted      SessionClaimIdentityKind = "untrusted"
 )
 
 // Valid indicates whether the value is a known member of the SessionClaimIdentityKind enum.
 func (e SessionClaimIdentityKind) Valid() bool {
 	switch e {
-	case SessionClaimIdentityKindTrustedCanonicalRegistration:
+	case SessionClaimIdentityKindCanonicalEmail:
 		return true
 	case SessionClaimIdentityKindUntrusted:
 		return true
@@ -208,13 +208,13 @@ func (e SetUserRoleEnvelopeCode) Valid() bool {
 
 // Defines values for TrustedClaimIdentityKind.
 const (
-	TrustedClaimIdentityKindTrustedCanonicalRegistration TrustedClaimIdentityKind = "trusted_canonical_registration"
+	TrustedClaimIdentityKindCanonicalEmail TrustedClaimIdentityKind = "canonical_email"
 )
 
 // Valid indicates whether the value is a known member of the TrustedClaimIdentityKind enum.
 func (e TrustedClaimIdentityKind) Valid() bool {
 	switch e {
-	case TrustedClaimIdentityKindTrustedCanonicalRegistration:
+	case TrustedClaimIdentityKindCanonicalEmail:
 		return true
 	default:
 		return false
@@ -322,6 +322,7 @@ type EnsureUserEnvelopeCode int
 // EnsureUserRequest defines model for EnsureUserRequest.
 type EnsureUserRequest struct {
 	AllowExisting bool     `json:"allow_existing"`
+	Email         string   `json:"email"`
 	Password      string   `json:"password"`
 	Role          AuthRole `json:"role"`
 	Username      string   `json:"username"`
@@ -388,6 +389,7 @@ type SessionIdentity struct {
 	ClaimIdentity         string                   `json:"claim_identity"`
 	ClaimIdentityKind     SessionClaimIdentityKind `json:"claim_identity_kind"`
 	ClaimIdentityVerified bool                     `json:"claim_identity_verified"`
+	Email                 string                   `json:"email"`
 	Username              string                   `json:"username"`
 }
 

@@ -135,8 +135,8 @@ const authPanelCases: AuthPanelCase[] = [
     submitLabel: '登录',
     switchLabel: '立即注册',
     async fill(user) {
-      await user.type(screen.getByLabelText(/^账号/), 'tester')
-      await user.type(screen.getByLabelText(/^密码/), 'secret')
+      await user.type(screen.getByLabelText(/^Email/), 'tester@example.com')
+      await user.type(screen.getByLabelText(/^密码/), 'secret-pass')
     },
   },
   {
@@ -147,8 +147,9 @@ const authPanelCases: AuthPanelCase[] = [
     switchLabel: '去登录',
     async fill(user) {
       await user.type(screen.getByLabelText(/^账号/), 'tester')
-      await user.type(screen.getByLabelText(/^密码/), 'secret')
-      await user.type(screen.getByLabelText(/^确认密码/), 'secret')
+      await user.type(screen.getByLabelText(/^Email/), 'tester@example.com')
+      await user.type(screen.getByLabelText(/^密码/), 'secret-pass')
+      await user.type(screen.getByLabelText(/^确认密码/), 'secret-pass')
     },
   },
 ]
@@ -249,6 +250,13 @@ describe.each(authPanelCases)('$action auth panel', (testCase) => {
     expect(authAction).toHaveBeenCalledOnce()
 
     resolveRequest(true)
+    if (testCase.action === 'register') {
+      const verifyAction = vi.spyOn(store, 'verifyRegistrationOTP').mockResolvedValue(true)
+      const otpButton = await screen.findByRole('button', { name: '验证并登录' })
+      await view.user.type(screen.getByLabelText(/^Email 验证码/), '123456')
+      await view.user.click(otpButton)
+      await waitFor(() => expect(verifyAction).toHaveBeenCalledOnce())
+    }
     await waitFor(() => expect(view.emitted()[testCase.successEvent]).toHaveLength(1))
   })
 
@@ -266,7 +274,10 @@ describe.each(authPanelCases)('$action auth panel', (testCase) => {
     expect(submitButton).not.toHaveAttribute('aria-busy')
 
     await view.user.click(submitButton)
-    expect(screen.getByLabelText(/^账号/)).toHaveAttribute('data-control-tone', 'danger')
+    expect(screen.getByLabelText(testCase.action === 'login' ? /^Email/ : /^账号/)).toHaveAttribute(
+      'data-control-tone',
+      'danger',
+    )
 
     await testCase.fill(view.user)
     await view.user.click(submitButton)
@@ -274,7 +285,10 @@ describe.each(authPanelCases)('$action auth panel', (testCase) => {
     await waitFor(() => expect(submitButton).toHaveAttribute('data-control-state', 'loading'))
     expect(submitButton).toHaveAttribute('aria-busy', 'true')
     expect(submitButton).toBeDisabled()
-    expect(screen.getByLabelText(/^账号/)).toHaveAttribute('data-control-state', 'disabled')
+    expect(screen.getByLabelText(testCase.action === 'login' ? /^Email/ : /^账号/)).toHaveAttribute(
+      'data-control-state',
+      'disabled',
+    )
 
     resolveRequest(true)
   })

@@ -135,12 +135,20 @@ func runInitAdmin() {
 		fatal("failed to verify Welcome identity key", "err", err)
 	}
 	adminPassword := strings.TrimSpace(os.Getenv("INIT_ADMIN_PASSWORD"))
+	adminEmail := strings.TrimSpace(os.Getenv("INIT_ADMIN_EMAIL"))
+	adminUsername := strings.TrimSpace(os.Getenv("INIT_ADMIN_USERNAME"))
+	if adminEmail == "" {
+		fatal("INIT_ADMIN_EMAIL is required")
+	}
+	if adminUsername == "" {
+		fatal("INIT_ADMIN_USERNAME is required")
+	}
 	if adminPassword == "" {
 		fatal("INIT_ADMIN_PASSWORD is required")
 	}
 
 	authServiceClient := auth.NewServiceClient(cfg.Auth)
-	provisioned, err := authServiceClient.EnsureUser(ctx, "admin", adminPassword, true, "admin")
+	provisioned, err := authServiceClient.EnsureUser(ctx, adminEmail, adminUsername, adminPassword, true, "admin")
 	if err != nil {
 		fatal("failed to ensure Better Auth admin user", "err", err)
 	}

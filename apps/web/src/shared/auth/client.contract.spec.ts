@@ -6,6 +6,7 @@ vi.mock('better-auth/vue', () => ({
 
 vi.mock('better-auth/client/plugins', () => ({
   adminClient: () => ({}),
+  emailOTPClient: () => ({}),
   usernameClient: () => ({}),
 }))
 

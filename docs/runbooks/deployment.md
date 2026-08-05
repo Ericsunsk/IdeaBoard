@@ -228,6 +228,8 @@ PostgreSQL init script 只在空 volume 创建 API/Auth runtime roles。项目�
 
 ```bash
 docker compose -f /opt/stacks/ideaboard/docker/compose.yml --env-file /opt/stacks/ideaboard/docker/.env run --rm \
+  -e INIT_ADMIN_EMAIL='admin@example.com' \
+  -e INIT_ADMIN_USERNAME='admin' \
   -e INIT_ADMIN_PASSWORD='your-strong-password' \
   api init-admin
 ```

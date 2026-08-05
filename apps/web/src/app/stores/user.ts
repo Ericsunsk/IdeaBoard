@@ -3,7 +3,7 @@ import { fetchCurrentUserInfo, type User } from '../../shared/api/userSession'
 import {
   authClient,
   extractBetterAuthErrorMessage,
-  registerUsername,
+  normalizeCanonicalEmail,
 } from '../../shared/auth/client'
 import { getStoredUser, setStoredAuth, clearStoredAuthState } from '../../shared/utils/auth'
 import { clearAuthScopedQueryCache } from '../../shared/query/queryClient'
@@ -17,8 +17,9 @@ export type UserSessionStore = {
   sessionValidatedAt: number
   setAuth: (newUser: User) => void
   clearAuth: () => void
-  login: (username: string, password: string) => Promise<boolean>
-  register: (username: string, password: string) => Promise<boolean>
+  login: (identifier: string, password: string) => Promise<boolean>
+  register: (email: string, username: string, password: string) => Promise<boolean>
+  verifyRegistrationOTP: (email: string, otp: string) => Promise<boolean>
   logout: () => Promise<boolean>
   fetchUserInfo: (
     force?: boolean,
@@ -91,8 +92,17 @@ function createUserSessionStore(): UserSessionStore {
     clearStoredAuthState()
   }
 
-  async function login(username: string, password: string) {
-    const result = await authClient.signIn.username({ username, password })
+  async function login(identifier: string, password: string) {
+    const normalizedIdentifier = identifier.trim()
+    const result = normalizedIdentifier.includes('@')
+      ? await authClient.signIn.email({
+          email: normalizeCanonicalEmail(normalizedIdentifier),
+          password,
+        })
+      : await authClient.signIn.username({
+          username: normalizedIdentifier.toLowerCase(),
+          password,
+        })
     if (result?.error) {
       throw new Error(extractBetterAuthErrorMessage(result.error, '登录失败'))
     }
@@ -104,14 +114,37 @@ function createUserSessionStore(): UserSessionStore {
     return true
   }
 
-  async function register(username: string, password: string) {
+  async function register(email: string, username: string, password: string) {
+    const canonicalEmail = normalizeCanonicalEmail(email)
     const normalizedUsername = username.trim()
-
-    const canonicalUsername = await registerUsername(normalizedUsername, password)
-    await login(canonicalUsername, password)
-    if (!user.value) {
-      throw new Error('注册成功，但登录状态恢复失败')
+    const result = await authClient.signUp.email({
+      email: canonicalEmail,
+      name: normalizedUsername,
+      username: normalizedUsername,
+      password,
+    })
+    if (result?.error) {
+      throw new Error(extractBetterAuthErrorMessage(result.error, '注册失败'))
     }
+    if (!result?.data?.user) {
+      throw new Error('注册成功，但服务端未返回用户身份')
+    }
+    return true
+  }
+
+  async function verifyRegistrationOTP(email: string, otp: string) {
+    const response = await fetch(resolveAuthUrl('/api/auth/email-otp/verify-email'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: normalizeCanonicalEmail(email), otp: otp.trim() }),
+    })
+    const payload: unknown = await response.json().catch(() => null)
+    if (!response.ok) {
+      throw new Error(extractBetterAuthErrorMessage(payload, '验证码无效或已过期'))
+    }
+    await fetchUserInfo(true)
+    if (!user.value) throw new Error('验证成功，但登录状态恢复失败')
     return true
   }
 
@@ -220,6 +253,7 @@ function createUserSessionStore(): UserSessionStore {
     clearAuth: resetAuth,
     login,
     register,
+    verifyRegistrationOTP,
     logout,
     fetchUserInfo,
     ensureSession,

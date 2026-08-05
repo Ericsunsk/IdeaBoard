@@ -27,9 +27,10 @@ func TestServiceClientContractValidateSessionSuccess(t *testing.T) {
 			"data": map[string]any{
 				"session": map[string]any{
 					"auth_user_id":            "auth-123",
+					"email":                   "alice@example.com",
 					"username":                "alice",
-					"claim_identity":          "alice@users.ideaboard.local",
-					"claim_identity_kind":     "trusted_canonical_registration",
+					"claim_identity":          "alice@example.com",
+					"claim_identity_kind":     "canonical_email",
 					"claim_identity_verified": true,
 				},
 			},
@@ -41,7 +42,7 @@ func TestServiceClientContractValidateSessionSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ValidateSession returned error: %v", err)
 	}
-	if session.AuthUserID != "auth-123" || session.Username != "alice" || session.ClaimIdentity != "alice@users.ideaboard.local" || !session.ClaimIdentityVerified {
+	if session.AuthUserID != "auth-123" || session.Username != "alice" || session.ClaimIdentity != "alice@example.com" || !session.ClaimIdentityVerified {
 		t.Fatalf("session = %+v, want trusted claim identity from envelope", session)
 	}
 }
@@ -50,9 +51,10 @@ func TestServiceClientContractValidateSessionRejectsMissingSuccessEnvelopeFields
 	validData := map[string]any{
 		"session": map[string]any{
 			"auth_user_id":            "auth-123",
+			"email":                   "alice@example.com",
 			"username":                "alice",
-			"claim_identity":          "alice@users.ideaboard.local",
-			"claim_identity_kind":     "trusted_canonical_registration",
+			"claim_identity":          "alice@example.com",
+			"claim_identity_kind":     "canonical_email",
 			"claim_identity_verified": true,
 		},
 	}
@@ -121,8 +123,9 @@ func TestServiceClientContractEnsureUserRequestAndSuccess(t *testing.T) {
 		assertContractRequest(t, r, http.MethodPost, "/internal/users/ensure")
 		assertJSONContentType(t, r)
 		body := decodeContractBody(t, r)
+		assertContractField(t, body, "email", "alice@example.com")
 		assertContractField(t, body, "username", "alice")
-		assertContractField(t, body, "password", "secret123")
+		assertContractField(t, body, "password", "secret1234")
 		assertContractField(t, body, "allow_existing", true)
 		assertContractField(t, body, "role", "admin")
 
@@ -133,8 +136,9 @@ func TestServiceClientContractEnsureUserRequestAndSuccess(t *testing.T) {
 				"user": map[string]any{
 					"auth_user_id":            "auth-alice",
 					"username":                "alice",
-					"claim_identity":          "alice@users.ideaboard.local",
-					"claim_identity_kind":     "trusted_canonical_registration",
+					"email":                   "alice@example.com",
+					"claim_identity":          "alice@example.com",
+					"claim_identity_kind":     "canonical_email",
 					"claim_identity_verified": true,
 					"role":                    "admin",
 					"existing":                true,
@@ -144,11 +148,11 @@ func TestServiceClientContractEnsureUserRequestAndSuccess(t *testing.T) {
 	})
 	defer server.Close()
 
-	user, err := newContractClient(server).EnsureUser(context.Background(), " alice ", "secret123", true, "admin")
+	user, err := newContractClient(server).EnsureUser(context.Background(), " Alice@Example.com ", "alice", "secret1234", true, "admin")
 	if err != nil {
 		t.Fatalf("EnsureUser returned error: %v", err)
 	}
-	if user.AuthUserID != "auth-alice" || user.Username != "alice" || user.ClaimIdentity != "alice@users.ideaboard.local" || !user.ClaimIdentityVerified || user.Role != "admin" || !user.Existing {
+	if user.AuthUserID != "auth-alice" || user.Username != "alice" || user.ClaimIdentity != "alice@example.com" || !user.ClaimIdentityVerified || user.Role != "admin" || !user.Existing {
 		t.Fatalf("user = %+v, want provisioned auth user from envelope", user)
 	}
 }
@@ -158,9 +162,9 @@ func TestServiceClientContractEnsureUserRejectsMissingSuccessEnvelopeFields(t *t
 		"user": map[string]any{
 			"auth_user_id":            "auth-alice",
 			"username":                "alice",
-			"email":                   "alice@users.ideaboard.local",
-			"claim_identity":          "alice@users.ideaboard.local",
-			"claim_identity_kind":     "trusted_canonical_registration",
+			"email":                   "alice@example.com",
+			"claim_identity":          "alice@example.com",
+			"claim_identity_kind":     "canonical_email",
 			"claim_identity_verified": true,
 			"role":                    "admin",
 			"existing":                true,
@@ -182,7 +186,7 @@ func TestServiceClientContractEnsureUserRejectsMissingSuccessEnvelopeFields(t *t
 			})
 			defer server.Close()
 
-			_, err := newContractClient(server).EnsureUser(context.Background(), "alice", "secret123", true, "admin")
+			_, err := newContractClient(server).EnsureUser(context.Background(), "alice@example.com", "alice", "secret1234", true, "admin")
 			if err == nil || !strings.Contains(err.Error(), "invalid success envelope") {
 				t.Fatalf("EnsureUser error = %v, want invalid success envelope", err)
 			}
@@ -593,7 +597,7 @@ func TestServiceClientContractRejectsInvalidErrorEnvelope(t *testing.T) {
 			})
 			defer server.Close()
 
-			_, err := newContractClient(server).EnsureUser(context.Background(), "alice", "secret123", false)
+			_, err := newContractClient(server).EnsureUser(context.Background(), "alice@example.com", "alice", "secret1234", false)
 			if err == nil || !strings.Contains(err.Error(), "decode error envelope") {
 				t.Fatalf("EnsureUser err = %v, want error envelope decode failure", err)
 			}

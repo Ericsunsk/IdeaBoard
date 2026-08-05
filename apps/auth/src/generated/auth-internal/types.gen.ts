@@ -6,9 +6,9 @@ export type ClientOptions = {
 
 export type AuthRole = 'admin' | 'user';
 
-export type TrustedClaimIdentityKind = 'trusted_canonical_registration';
+export type TrustedClaimIdentityKind = 'canonical_email';
 
-export type SessionClaimIdentityKind = 'trusted_canonical_registration' | 'untrusted';
+export type SessionClaimIdentityKind = 'canonical_email' | 'untrusted';
 
 export type ErrorEnvelope = {
     code: number;
@@ -17,6 +17,7 @@ export type ErrorEnvelope = {
 
 export type SessionIdentity = {
     auth_user_id: string;
+    email: string;
     username: string;
     claim_identity: string;
     claim_identity_kind: SessionClaimIdentityKind;
@@ -35,6 +36,7 @@ export type ProvisionedAuthUser = {
 };
 
 export type EnsureUserRequest = {
+    email: string;
     username: string;
     password: string;
     allow_existing: boolean;

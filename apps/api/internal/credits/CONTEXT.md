@@ -53,7 +53,7 @@ Credits 是 IdeaBoard 的平台级封闭生态货币。用户文案统一显示�
 - frozen 或匿名化 tombstone Wallet 的历史仍可读。discretionary Grant/Deduction/Hold 被拒绝；既有 Hold 的 Capture/Release 必须继续收敛，authenticated Admin linked Refund/Correction 仍可用于修复，Wallet 不可开始新的消费。
 - Wallet lifecycle status 与 active Restriction 是正交状态。Grant、Deduction、Hold 仅在 lifecycle active 且不存在 active Restriction 时允许；Capture、Release 必须继续收敛既有 Hold，authenticated Admin linked Refund/Correction 继续承担修复职责。Command 的 idempotency replay 在当前 gate 前返回原结果。
 - Restriction create/release 先锁 Wallet row，与 Credit Command gate 线性化；同一 `(Wallet, type, source, related object)` 仅允许一个 active row，解除保留历史且不会清除其他来源的 Restriction。
-- Auth public registration 只接受 username/password，由服务端 canonicalize username、生成 synthetic claim identity，并在受控命令内标记为 `trusted_canonical_registration`；直接 Better Auth email sign-up 被拒绝。
+- Auth public registration 使用 canonical Email、username 和 Password；Email verification 成功后由 `canonical_email` verified identity 触发 Wallet provisioning，不再生成 synthetic Email。
 - Reconciliation scan 使用 MVCC reads，不锁 Ledger/Account 热行；DB advisory lock 与 active-run unique index 双重保证同一时刻仅有一个 active run。
 - Credit Health 状态固定为 `unchecked | healthy | attention | critical | stale | failed`。判定优先级为：open high-risk Finding 或其精确 active `ledger_integrity/reconciliation` Restriction → critical；最新 failed Run 晚于最近成功 Run → failed；从未成功且无 failed → unchecked；最近成功严格超过 48 小时 → stale；其余 open Finding → attention；否则 healthy。active Run 单独返回，不覆盖状态。
 - Reconciliation 的 Stale Hold 策略固定为 24 小时并由 DB per-Run snapshot/constraint 作为事实源；Admin API/UI 不接受阈值，public Run DTO 也不暴露这一内部固定值。

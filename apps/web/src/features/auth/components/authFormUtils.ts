@@ -6,8 +6,8 @@ export const AUTH_USERNAME_LIMIT = {
 } as const
 
 export const AUTH_PASSWORD_LIMIT = {
-  min: 6,
-  max: 50,
+  min: 10,
+  max: 128,
 } as const
 
 export function getRequiredError(value: string, label: string) {

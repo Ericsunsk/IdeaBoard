@@ -1,4 +1,7 @@
 import type { Pool } from 'pg'
+import {
+  configureMailConfigRuntimePrivileges,
+} from './mailConfigSchema.js'
 
 const authTables = ['user', 'session', 'account', 'verification'] as const
 const creditTables = [
@@ -64,6 +67,9 @@ export async function configureAuthRuntimePrivileges(
   } finally {
     client.release()
   }
+  if (typeof (pool as Pool & { query?: unknown }).query === 'function') {
+    await configureMailConfigRuntimePrivileges(pool, normalizedRole)
+  }
 }
 
 export async function verifyAuthRuntimePrivileges(pool: Pool) {
@@ -73,6 +79,9 @@ export async function verifyAuthRuntimePrivileges(pool: Pool) {
     can_read_system_configs: boolean;
     can_write_credits: boolean;
     can_read_auth_users: boolean;
+    can_manage_mail_settings?: boolean;
+    can_insert_mail_audit?: boolean;
+    can_mutate_mail_audit?: boolean;
     current_user: string;
   }>(
     `
@@ -90,7 +99,12 @@ SELECT current_user,
          SELECT 1
          FROM unnest($2::TEXT[]) AS credit_function(function_name)
          WHERE has_function_privilege(current_user, credit_function.function_name, 'EXECUTE')
-       ) AS can_execute_credit_functions
+       ) AS can_execute_credit_functions,
+       has_table_privilege(current_user, 'auth_mail_settings', 'SELECT,INSERT,UPDATE,DELETE') AS can_manage_mail_settings,
+       has_table_privilege(current_user, 'auth_mail_settings_audit', 'SELECT,INSERT') AS can_insert_mail_audit,
+       has_table_privilege(current_user, 'auth_mail_settings_audit', 'UPDATE')
+         OR has_table_privilege(current_user, 'auth_mail_settings_audit', 'DELETE')
+         OR has_table_privilege(current_user, 'auth_mail_settings_audit', 'TRUNCATE') AS can_mutate_mail_audit
 `,
     [creditTables, creditFunctions],
   )
@@ -100,7 +114,11 @@ SELECT current_user,
     !privileges.can_execute_auth_settings ||
     privileges.can_read_system_configs ||
     privileges.can_write_credits ||
-    privileges.can_execute_credit_functions
+    privileges.can_execute_credit_functions ||
+    (privileges.can_manage_mail_settings !== undefined &&
+      (!privileges.can_manage_mail_settings ||
+        !privileges.can_insert_mail_audit ||
+        Boolean(privileges.can_mutate_mail_audit)))
   ) {
     throw new Error(
       `Unsafe Auth runtime database role ${JSON.stringify(privileges?.current_user || '')}: ` +
@@ -108,7 +126,10 @@ SELECT current_user,
         `execute_auth_settings=${Boolean(privileges?.can_execute_auth_settings)} ` +
         `read_system_configs=${Boolean(privileges?.can_read_system_configs)} ` +
         `write_credits=${Boolean(privileges?.can_write_credits)} ` +
-        `execute_credit_functions=${Boolean(privileges?.can_execute_credit_functions)}`,
+        `execute_credit_functions=${Boolean(privileges?.can_execute_credit_functions)} ` +
+        `manage_mail_settings=${String(privileges?.can_manage_mail_settings)} ` +
+        `insert_mail_audit=${String(privileges?.can_insert_mail_audit)} ` +
+        `mutate_mail_audit=${String(privileges?.can_mutate_mail_audit)}`,
     )
   }
 }

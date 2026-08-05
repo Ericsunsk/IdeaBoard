@@ -289,8 +289,8 @@ func trustedTestSessionIdentity(authUserID, username string) auth.SessionIdentit
 	return auth.SessionIdentity{
 		AuthUserID:            authUserID,
 		Username:              username,
-		ClaimIdentity:         username + "@users.ideaboard.local",
-		ClaimIdentityKind:     "trusted_canonical_registration",
+		ClaimIdentity:         username + "@example.com",
+		ClaimIdentityKind:     "canonical_email",
 		ClaimIdentityVerified: true,
 	}
 }

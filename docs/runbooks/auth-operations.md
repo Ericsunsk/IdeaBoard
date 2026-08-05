@@ -48,7 +48,7 @@
 
 3. **生产环境默认建议关闭公开注册。** 可在管理后台 `用户管理` 页的"开放注册"开关控制，仅在明确运营窗口内开启。
 
-4. **公开注册只使用 `/api/auth/register/username`。** Client 只提交 username/password；Auth 服务生成 canonical synthetic claim identity 并标记 trusted。`/api/auth/sign-up/email` 被拒绝，不能作为替代入口。
+4. **公开注册使用 Better Auth `/api/auth/sign-up/email`。** Client 提交 canonical Email、username 和 Password；Email 验证后以 `canonical_email` identity 进入 Go Identity。native username sign-in 仍可用，但旧 synthetic Email registration endpoint 已移除。
 
 5. **高风险动作保留审计记录。** 建议记录操作人、时间、原因、影响用户与回滚策略。
 

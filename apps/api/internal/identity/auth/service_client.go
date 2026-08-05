@@ -25,6 +25,7 @@ const maxAuthServiceResponseBytes int64 = 2 * 1024 * 1024
 
 type SessionIdentity struct {
 	AuthUserID            string `json:"auth_user_id"`
+	Email                 string `json:"email"`
 	Username              string `json:"username"`
 	ClaimIdentity         string `json:"claim_identity"`
 	ClaimIdentityKind     string `json:"claim_identity_kind"`
@@ -33,6 +34,7 @@ type SessionIdentity struct {
 
 type ProvisionedAuthUser struct {
 	AuthUserID            string `json:"auth_user_id"`
+	Email                 string `json:"email"`
 	Username              string `json:"username"`
 	ClaimIdentity         string `json:"claim_identity"`
 	ClaimIdentityKind     string `json:"claim_identity_kind"`
@@ -108,6 +110,7 @@ func (c *ServiceClient) ValidateSession(ctx context.Context, cookieHeader string
 	contractSession := response.JSON200.Data.Session
 	session := SessionIdentity{
 		AuthUserID:            contractSession.AuthUserID,
+		Email:                 contractSession.Email,
 		Username:              contractSession.Username,
 		ClaimIdentity:         contractSession.ClaimIdentity,
 		ClaimIdentityKind:     string(contractSession.ClaimIdentityKind),
@@ -116,21 +119,24 @@ func (c *ServiceClient) ValidateSession(ctx context.Context, cookieHeader string
 	if strings.TrimSpace(session.AuthUserID) == "" {
 		return nil, fmt.Errorf("auth service returned empty auth_user_id")
 	}
-	if strings.TrimSpace(session.ClaimIdentity) == "" ||
-		session.ClaimIdentityKind != string(internalcontract.SessionClaimIdentityKindTrustedCanonicalRegistration) ||
+	if strings.TrimSpace(session.Email) == "" ||
+		session.Email != strings.ToLower(strings.TrimSpace(session.Email)) ||
+		session.ClaimIdentity != session.Email ||
+		session.ClaimIdentityKind != string(internalcontract.SessionClaimIdentityKindCanonicalEmail) ||
 		!session.ClaimIdentityVerified {
 		return nil, fmt.Errorf("%w: auth service returned an untrusted session identity", ErrSessionUnauthorized)
 	}
 	return &session, nil
 }
 
-func (c *ServiceClient) EnsureUser(ctx context.Context, username, password string, allowExisting bool, role ...string) (*ProvisionedAuthUser, error) {
+func (c *ServiceClient) EnsureUser(ctx context.Context, email, username, password string, allowExisting bool, role ...string) (*ProvisionedAuthUser, error) {
 	client, err := c.contractClient()
 	if err != nil {
 		return nil, err
 	}
 	response, err := client.EnsureUserWithResponse(ctx, internalcontract.EnsureUserJSONRequestBody{
 		AllowExisting: allowExisting,
+		Email:         strings.ToLower(strings.TrimSpace(email)),
 		Password:      password,
 		Role:          normalizeEnsureRole(role...),
 		Username:      strings.TrimSpace(username),
@@ -153,6 +159,7 @@ func (c *ServiceClient) EnsureUser(ctx context.Context, username, password strin
 	contractUser := response.JSON200.Data.User
 	user := ProvisionedAuthUser{
 		AuthUserID:            contractUser.AuthUserID,
+		Email:                 contractUser.Email,
 		Username:              contractUser.Username,
 		ClaimIdentity:         contractUser.ClaimIdentity,
 		ClaimIdentityKind:     string(contractUser.ClaimIdentityKind),
@@ -163,8 +170,10 @@ func (c *ServiceClient) EnsureUser(ctx context.Context, username, password strin
 	if strings.TrimSpace(user.AuthUserID) == "" {
 		return nil, fmt.Errorf("auth service returned empty auth_user_id")
 	}
-	if strings.TrimSpace(user.ClaimIdentity) == "" ||
-		user.ClaimIdentityKind != string(internalcontract.TrustedClaimIdentityKindTrustedCanonicalRegistration) ||
+	if strings.TrimSpace(user.Email) == "" ||
+		user.Email != strings.ToLower(strings.TrimSpace(user.Email)) ||
+		user.ClaimIdentity != user.Email ||
+		user.ClaimIdentityKind != string(internalcontract.TrustedClaimIdentityKindCanonicalEmail) ||
 		!user.ClaimIdentityVerified {
 		return nil, fmt.Errorf("auth service returned an untrusted claim identity")
 	}

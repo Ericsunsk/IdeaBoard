@@ -382,13 +382,13 @@
       "TrustedClaimIdentityKind": {
         "type": "string",
         "enum": [
-          "trusted_canonical_registration"
+          "canonical_email"
         ]
       },
       "SessionClaimIdentityKind": {
         "type": "string",
         "enum": [
-          "trusted_canonical_registration",
+          "canonical_email",
           "untrusted"
         ]
       },
@@ -413,6 +413,7 @@
         "additionalProperties": false,
         "required": [
           "auth_user_id",
+          "email",
           "username",
           "claim_identity",
           "claim_identity_kind",
@@ -422,6 +423,9 @@
           "auth_user_id": {
             "type": "string",
             "x-go-name": "AuthUserID"
+          },
+          "email": {
+            "type": "string"
           },
           "username": {
             "type": "string"
@@ -485,12 +489,16 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
+          "email",
           "username",
           "password",
           "allow_existing",
           "role"
         ],
         "properties": {
+          "email": {
+            "type": "string"
+          },
           "username": {
             "type": "string"
           },

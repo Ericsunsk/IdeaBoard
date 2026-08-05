@@ -11,6 +11,7 @@
       </div>
 
       <form
+        v-if="!otpPending"
         class="relative z-[1] flex flex-col gap-4"
         novalidate
         @submit.prevent="handleRegister"
@@ -51,6 +52,44 @@
               :aria-describedby="describedbyId"
               @blur="validateField('username')"
               @update:model-value="clearFieldError('username')"
+            />
+          </div>
+        </IbFormField>
+
+        <IbFormField
+          v-slot="{
+            ariaInvalid,
+            describedbyId,
+            fieldId,
+            inlineError,
+            inlineErrorText,
+            invalid,
+            required,
+          }"
+          label="Email"
+          :error="errors.email"
+          field-id="register-email"
+          required
+          inline-required
+          :field-class="authFieldClass"
+          :message-pt="authErrorMessagePt"
+        >
+          <div class="relative w-full">
+            <span :class="authInputIconClass"><UserIcon class="size-5" /></span>
+            <InputText
+              :id="fieldId"
+              v-model="formValue.email"
+              v-bind="resolveFieldControlState(invalid)"
+              unstyled
+              autocomplete="email"
+              :required="required"
+              :class="[authInputClass, 'pl-11', inlineError ? authInputErrorClass : '']"
+              :invalid="invalid"
+              :placeholder="inlineError ? inlineErrorText : '输入你的 Email'"
+              :aria-invalid="ariaInvalid"
+              :aria-describedby="describedbyId"
+              @blur="validateField('email')"
+              @update:model-value="clearFieldError('email')"
             />
           </div>
         </IbFormField>
@@ -161,6 +200,45 @@
         />
       </form>
 
+      <form v-else class="relative z-[1] flex flex-col gap-4" novalidate @submit.prevent="handleVerifyOTP">
+        <p class="text-sm text-slate-600">验证码已发送到 {{ formValue.email }}，请输入 6 位验证码完成注册。</p>
+        <IbFormField
+          v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+          label="Email 验证码"
+          :error="otpError"
+          field-id="register-otp"
+          required
+          inline-required
+          :field-class="authFieldClass"
+          :message-pt="authErrorMessagePt"
+        >
+          <InputText
+            :id="fieldId"
+            v-model="otp"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="6"
+            :required="required"
+            :class="[authInputClass, inlineError ? authInputErrorClass : '']"
+            :invalid="invalid"
+            :placeholder="inlineError ? inlineErrorText : '输入 6 位验证码'"
+            :aria-invalid="ariaInvalid"
+            :aria-describedby="describedbyId"
+            @update:model-value="otpError = ''"
+          />
+        </IbFormField>
+        <Button
+          unstyled
+          :class="authPrimaryButtonClass"
+          :pt="authButtonPt"
+          type="submit"
+          :label="loading ? '验证中...' : '验证并登录'"
+          :loading="loading"
+          v-bind="submitControlState"
+          fluid
+        />
+      </form>
+
       <div :class="['mt-6', authFooterClass]">
         <span>已经有账号？</span>
         <button
@@ -232,15 +310,20 @@ const secondaryControlState = computed(() =>
   resolveInteractiveControlState({ disabled: loading.value }),
 )
 
-type RegisterField = 'username' | 'password' | 'confirmPassword'
+type RegisterField = 'username' | 'email' | 'password' | 'confirmPassword'
 
 const formValue = ref({
   username: '',
+  email: '',
   password: '',
   confirmPassword: '',
 })
+const otpPending = ref(false)
+const otp = ref('')
+const otpError = ref('')
 const errors = ref<Record<RegisterField, string>>({
   username: '',
+  email: '',
   password: '',
   confirmPassword: '',
 })
@@ -270,6 +353,15 @@ function validateField(field: RegisterField) {
     return !errors.value.password
   }
 
+  if (field === 'email') {
+    const email = formValue.value.email.trim()
+    errors.value.email = getRequiredError(email, 'Email')
+    if (!errors.value.email && (!email.includes('@') || email.endsWith('@'))) {
+      errors.value.email = '请输入有效的 Email'
+    }
+    return !errors.value.email
+  }
+
   const confirmPassword = formValue.value.confirmPassword
   errors.value.confirmPassword =
     getRequiredError(confirmPassword, '密码') ||
@@ -283,9 +375,10 @@ function validateField(field: RegisterField) {
 
 function validateForm() {
   const usernameValid = validateField('username')
+  const emailValid = validateField('email')
   const passwordValid = validateField('password')
   const confirmPasswordValid = validateField('confirmPassword')
-  return usernameValid && passwordValid && confirmPasswordValid
+  return usernameValid && emailValid && passwordValid && confirmPasswordValid
 }
 
 function clearFieldError(field: RegisterField) {
@@ -307,13 +400,32 @@ async function handleRegister() {
 
   const registered = await runAsyncAction(
     async () => {
-      await userStore.register(formValue.value.username.trim(), formValue.value.password)
+      await userStore.register(
+        formValue.value.email,
+        formValue.value.username.trim(),
+        formValue.value.password,
+      )
       return true
     },
     {
       feedback: authFeedback.register,
     },
   )
-  if (registered) emit('register-success')
+  if (registered) {
+    otpPending.value = true
+  }
+}
+
+async function handleVerifyOTP() {
+  const code = otp.value.trim()
+  if (!/^\d{6}$/.test(code)) {
+    otpError.value = '请输入 6 位验证码'
+    return
+  }
+  const verified = await runAsyncAction(
+    () => userStore.verifyRegistrationOTP(formValue.value.email, code),
+    { feedback: authFeedback.register },
+  )
+  if (verified) emit('register-success')
 }
 </script>

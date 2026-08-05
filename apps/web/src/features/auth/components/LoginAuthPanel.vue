@@ -21,9 +21,9 @@
             invalid,
             required,
           }"
-          label="账号"
-          :error="errors.username"
-          field-id="login-username"
+          label="Email 或 username"
+          :error="errors.identifier"
+          field-id="login-identifier"
           required
           inline-required
           :field-class="authFieldClass"
@@ -35,18 +35,18 @@
             </span>
             <InputText
               :id="fieldId"
-              v-model="formValue.username"
+              v-model="formValue.identifier"
               v-bind="resolveFieldControlState(invalid)"
               unstyled
               autocomplete="username"
               :required="required"
               :class="[authInputClass, 'pl-11', inlineError ? authInputErrorClass : '']"
               :invalid="invalid"
-              :placeholder="inlineError ? inlineErrorText : '请输入账号'"
+              :placeholder="inlineError ? inlineErrorText : '请输入 Email 或 username'"
               :aria-invalid="ariaInvalid"
               :aria-describedby="describedbyId"
-              @blur="validateField('username')"
-              @update:model-value="clearFieldError('username')"
+              @blur="validateField('identifier')"
+              @update:model-value="clearFieldError('identifier')"
             />
           </div>
         </IbFormField>
@@ -176,18 +176,18 @@ const secondaryControlState = computed(() =>
   resolveInteractiveControlState({ disabled: loading.value }),
 )
 
-type LoginField = 'username' | 'password'
+type LoginField = 'identifier' | 'password'
 
 const loginFieldLabels: Record<LoginField, string> = {
-  username: '账号',
+  identifier: 'Email 或 username',
   password: '密码',
 }
 const formValue = ref({
-  username: '',
+  identifier: '',
   password: '',
 })
 const errors = ref<Record<LoginField, string>>({
-  username: '',
+  identifier: '',
   password: '',
 })
 
@@ -208,9 +208,9 @@ function validateField(field: LoginField) {
 }
 
 function validateForm() {
-  const usernameValid = validateField('username')
+  const identifierValid = validateField('identifier')
   const passwordValid = validateField('password')
-  return usernameValid && passwordValid
+  return identifierValid && passwordValid
 }
 
 function clearFieldError(field: LoginField) {
@@ -222,7 +222,7 @@ async function handleLogin() {
 
   const loggedIn = await runAsyncAction(
     async () => {
-      await userStore.login(formValue.value.username.trim(), formValue.value.password)
+      await userStore.login(formValue.value.identifier, formValue.value.password)
       return true
     },
     {

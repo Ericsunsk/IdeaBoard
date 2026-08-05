@@ -20,17 +20,17 @@
       <template #content>
         <form class="flex flex-col gap-4" novalidate @submit.prevent="handleLogin">
           <label class="flex flex-col gap-2 text-xs font-bold text-admin-text-2">
-            <span>账号</span>
+            <span>Email 或 username</span>
             <IconField>
               <InputIcon>
                 <User class="h-4 w-4 text-admin-text-3" />
               </InputIcon>
               <InputText
-                v-model="formValue.username"
+                v-model="formValue.identifier"
                 autocomplete="username"
                 class="!min-h-11"
                 fluid
-                placeholder="admin"
+                placeholder="admin@example.com / admin"
               />
             </IconField>
           </label>
@@ -115,7 +115,7 @@ const loginCardClass =
 const loading = ref(false)
 const formError = ref('')
 const formValue = ref({
-  username: '',
+  identifier: '',
   password: '',
 })
 const loginCardPt = {
@@ -155,16 +155,16 @@ function goUserLogin() {
 
 async function handleLogin() {
   formError.value = ''
-  const username = formValue.value.username.trim()
+  const identifier = formValue.value.identifier.trim()
   const password = formValue.value.password
-  if (!username || !password) {
-    formError.value = !username ? '请输入账号' : '请输入密码'
+  if (!identifier || !password) {
+    formError.value = !identifier ? '请输入 Email 或 username' : '请输入密码'
     return
   }
 
   try {
     loading.value = true
-    await userStore.login(username, password)
+    await userStore.login(identifier, password)
     if (userStore.isAdmin) {
       feedback.succeeded()
       await router.replace(resolveAdminRedirectPath())

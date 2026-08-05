@@ -164,7 +164,7 @@ func TestAdminRoutesRequireAuthenticatedAdminAccess(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"code":0,"msg":"success","data":{"session":{"auth_user_id":"` + authUserID + `","username":"route-user","claim_identity":"route-user@users.ideaboard.local","claim_identity_kind":"trusted_canonical_registration","claim_identity_verified":true}}}`))
+		_, _ = w.Write([]byte(`{"code":0,"msg":"success","data":{"session":{"auth_user_id":"` + authUserID + `","username":"route-user","claim_identity":"route-user@example.com","claim_identity_kind":"canonical_email","claim_identity_verified":true}}}`))
 	}))
 	defer authServer.Close()
 

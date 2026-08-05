@@ -35,7 +35,7 @@ func TestServiceClientAgainstFastify(t *testing.T) {
 		t.Fatalf("ValidateSession response = %+v, want trusted contract identity", session)
 	}
 
-	user, err := client.EnsureUser(ctx, " alice ", "secret123", false, "admin")
+	user, err := client.EnsureUser(ctx, "alice@example.com", "alice", "secret1234", false, "admin")
 	if err != nil {
 		t.Fatalf("EnsureUser against Fastify: %v", err)
 	}
