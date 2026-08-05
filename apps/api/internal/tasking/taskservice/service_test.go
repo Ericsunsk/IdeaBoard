@@ -2,7 +2,6 @@ package taskservice
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"math"
@@ -1650,18 +1649,4 @@ func TestCancelAdminTaskIsIdempotentForTerminalTask(t *testing.T) {
 	if len(cancelStore.marked) != 0 {
 		t.Fatalf("cancel markers=%+v, want none for terminal task", cancelStore.marked)
 	}
-}
-
-func loadTaskServiceCredentialID(t testing.TB, db *sql.DB, accountID int64) int64 {
-	t.Helper()
-	var credentialID int64
-	if err := db.QueryRow(`
-SELECT id
-FROM api_account_secrets
-WHERE account_id = $1 AND status = 'active'
-ORDER BY rotated_at DESC, id DESC
-LIMIT 1`, accountID).Scan(&credentialID); err != nil {
-		t.Fatalf("load account %d credential failed: %v", accountID, err)
-	}
-	return credentialID
 }

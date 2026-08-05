@@ -211,6 +211,7 @@ func TestReconciliationCatchUpReusesFailedSlotAndEnqueuesOnceAfterRestart(t *tes
 	}
 	if firstRun == nil {
 		t.Fatal("initial scheduled Run is nil")
+		return
 	}
 	if err := firstService.FailReconciliation(t.Context(), firstRun.ID, errors.New("final scheduled failure")); err != nil {
 		t.Fatal(err)

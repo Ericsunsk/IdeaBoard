@@ -9,10 +9,10 @@ import (
 )
 
 var (
-	ErrDisputeUnavailable      = errors.New("Dispute 服务暂不可用")
-	ErrDisputeOrderNotEligible = errors.New("Dispute 无法关联有效支付订单")
-	ErrDisputeProviderConflict = errors.New("Stripe Dispute identity 冲突")
-	ErrDisputeTransition       = errors.New("Dispute 状态迁移无效")
+	ErrDisputeUnavailable      = errors.New("支付争议服务暂不可用")
+	ErrDisputeOrderNotEligible = errors.New("支付争议无法关联有效支付订单")
+	ErrDisputeProviderConflict = errors.New("检测到 Stripe Dispute identity 冲突")
+	ErrDisputeTransition       = errors.New("无效的 Dispute 状态迁移")
 )
 
 type PaymentDisputeStatus string

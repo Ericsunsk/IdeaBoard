@@ -645,7 +645,9 @@ func normalizeCheckoutReturnBaseURL(raw string) (string, error) {
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return "", ErrPurchasesUnavailable
 	}
-	if parsed.Scheme != "https" && !(parsed.Scheme == "http" && (parsed.Hostname() == "localhost" || parsed.Hostname() == "127.0.0.1")) {
+	hostname := parsed.Hostname()
+	isLoopback := hostname == "localhost" || hostname == "127.0.0.1"
+	if parsed.Scheme != "https" && (parsed.Scheme != "http" || !isLoopback) {
 		return "", ErrPurchasesUnavailable
 	}
 	return strings.TrimRight(parsed.String(), "/"), nil

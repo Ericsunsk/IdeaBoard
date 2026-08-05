@@ -356,9 +356,10 @@ func validAdminPaymentOrderStatus(status PaymentOrderStatus) bool {
 
 func validAdminPaymentOrderUsername(value string) bool {
 	for _, character := range value {
-		if !(character == '-' || character == '_' || character == '.' ||
+		isAllowed := character == '-' || character == '_' || character == '.' ||
 			character >= '0' && character <= '9' ||
-			character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z') {
+			character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z'
+		if !isAllowed {
 			return false
 		}
 	}

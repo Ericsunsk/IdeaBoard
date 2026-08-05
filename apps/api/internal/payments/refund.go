@@ -17,7 +17,7 @@ var (
 	ErrRefundAmountInvalid    = errors.New("退款 Idea 数量无效")
 	ErrRefundAmountExceeds    = errors.New("退款 Idea 数量超过可退余额")
 	ErrRefundIdempotency      = errors.New("退款幂等键无效")
-	ErrRefundProviderConflict = errors.New("Stripe Refund identity 冲突")
+	ErrRefundProviderConflict = errors.New("检测到 Stripe Refund identity 冲突")
 )
 
 type PaymentRefundStatus string
@@ -140,7 +140,7 @@ func (s *Service) CreatePaymentRefund(ctx context.Context, command CreatePayment
 		return failed, err
 	}
 	if strings.TrimSpace(providerRefund.ID) == "" {
-		return refund, fmt.Errorf("Stripe refund response missing ID")
+		return refund, fmt.Errorf("stripe refund response missing ID")
 	}
 	result, err := s.convergePaymentRefund(ctx, refund, providerRefund)
 	result.PublicOrderNumber = refund.PublicOrderNumber

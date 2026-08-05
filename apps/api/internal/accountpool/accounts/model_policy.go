@@ -1,10 +1,6 @@
 package accounts
 
-import (
-	"strings"
-
-	"ideaboard/api/internal/workflow"
-)
+import "ideaboard/api/internal/workflow"
 
 func FilterAccountsWithEnabledModels(accounts []*ApiAccount) []*ApiAccount {
 	result := make([]*ApiAccount, 0, len(accounts))
@@ -33,8 +29,4 @@ func ResolveAccountModel(account *ApiAccount, modelName string) (AccountModel, b
 		return model, true
 	}
 	return AccountModel{}, false
-}
-
-func normalizeModelKey(model string) string {
-	return strings.ToLower(strings.TrimSpace(model))
 }

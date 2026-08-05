@@ -12,7 +12,7 @@ import (
 )
 
 func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t *testing.T) {
-	var intake TaskIntake = NewTaskIntake(TaskIntakeDeps{
+	var intake = NewTaskIntake(TaskIntakeDeps{
 		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
 			ID:     101,
 			Models: []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},

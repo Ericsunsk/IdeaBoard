@@ -102,10 +102,3 @@ func (p *taskProcessor) process(ctx context.Context, task *tasks.TaskPayload, be
 
 	return p.executeTask(ctx, task, assignment)
 }
-
-func (p *taskProcessor) failTask(ctx context.Context, task *tasks.TaskPayload, reason string) {
-	if err := p.taskRuntime.FailTask(ctx, taskruntime.FailTaskInput{TaskID: task.TaskID, Reason: reason}); err != nil {
-		slog.Warn("mark task failed failed", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "err", err)
-	}
-	slog.Warn("task failed", "task_id", task.TaskID, "correlation_id", task.EffectiveCorrelationID(), "reason", reason)
-}

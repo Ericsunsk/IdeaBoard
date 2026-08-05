@@ -18,16 +18,16 @@ const (
 )
 
 var (
-	ErrStripeConfigurationNotFound = errors.New("Stripe 配置尚未完成")
+	ErrStripeConfigurationNotFound = errors.New("尚未完成 Stripe 配置")
 	ErrStripeAPIKeyRequired        = errors.New("请填写 Stripe API Key")
-	ErrInvalidStripeAPIKey         = errors.New("Stripe API Key 格式无效")
-	ErrInvalidProductTaxCode       = errors.New("Stripe Product Tax Code 格式无效")
-	ErrInvalidWebhookURL           = errors.New("Stripe Webhook URL 无效")
-	ErrStripePermissionDenied      = errors.New("Stripe API Key 权限不足")
-	ErrStripeAccountUnavailable    = errors.New("Stripe 账户不可用")
-	ErrStripeCapabilityUnavailable = errors.New("Stripe 账户暂不具备收款能力")
-	ErrStripeProviderUnavailable   = errors.New("Stripe 服务暂时不可用")
-	ErrStripeConfigurationInvalid  = errors.New("Stripe 返回的配置不完整")
+	ErrInvalidStripeAPIKey         = errors.New("无效的 Stripe API Key 格式")
+	ErrInvalidProductTaxCode       = errors.New("无效的 Stripe Product Tax Code 格式")
+	ErrInvalidWebhookURL           = errors.New("无效的 Stripe Webhook URL")
+	ErrStripePermissionDenied      = errors.New("当前 Stripe API Key 权限不足")
+	ErrStripeAccountUnavailable    = errors.New("当前 Stripe 账户不可用")
+	ErrStripeCapabilityUnavailable = errors.New("当前 Stripe 账户暂不具备收款能力")
+	ErrStripeProviderUnavailable   = errors.New("当前 Stripe 服务暂时不可用")
+	ErrStripeConfigurationInvalid  = errors.New("收到的 Stripe 配置不完整")
 )
 
 var productTaxCodePattern = regexp.MustCompile(`^txcd_[0-9]{8}$`)
@@ -150,7 +150,7 @@ func normalizeWebhookURL(raw string) (string, error) {
 	}
 	hostname := strings.ToLower(parsed.Hostname())
 	isLoopback := hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1"
-	if parsed.Scheme != "https" && !(parsed.Scheme == "http" && isLoopback) {
+	if parsed.Scheme != "https" && (parsed.Scheme != "http" || !isLoopback) {
 		return "", ErrInvalidWebhookURL
 	}
 	return parsed.String(), nil
@@ -168,10 +168,10 @@ func validatePreparedConfiguration(prepared PreparedStripeConfiguration, expecte
 	return nil
 }
 
-func gatewayFailure(err error) (error, GatewayErrorCode, string) {
+func gatewayFailure(err error) (GatewayErrorCode, string, error) {
 	var gatewayErr *GatewayError
 	if !errors.As(err, &gatewayErr) {
-		return ErrStripeProviderUnavailable, GatewayErrorProviderUnavailable, "Stripe 服务暂时不可用"
+		return GatewayErrorProviderUnavailable, "Stripe 服务暂时不可用", ErrStripeProviderUnavailable
 	}
 	summary := gatewayErr.Error()
 	if summary == "" {
@@ -179,17 +179,17 @@ func gatewayFailure(err error) (error, GatewayErrorCode, string) {
 	}
 	switch gatewayErr.Code() {
 	case GatewayErrorInvalidKey:
-		return ErrInvalidStripeAPIKey, gatewayErr.Code(), summary
+		return gatewayErr.Code(), summary, ErrInvalidStripeAPIKey
 	case GatewayErrorPermissionDenied:
-		return ErrStripePermissionDenied, gatewayErr.Code(), summary
+		return gatewayErr.Code(), summary, ErrStripePermissionDenied
 	case GatewayErrorAccountUnavailable:
-		return ErrStripeAccountUnavailable, gatewayErr.Code(), summary
+		return gatewayErr.Code(), summary, ErrStripeAccountUnavailable
 	case GatewayErrorCapabilityMissing:
-		return ErrStripeCapabilityUnavailable, gatewayErr.Code(), summary
+		return gatewayErr.Code(), summary, ErrStripeCapabilityUnavailable
 	case GatewayErrorInvalidResponse:
-		return ErrStripeConfigurationInvalid, gatewayErr.Code(), summary
+		return gatewayErr.Code(), summary, ErrStripeConfigurationInvalid
 	default:
-		return ErrStripeProviderUnavailable, GatewayErrorProviderUnavailable, summary
+		return GatewayErrorProviderUnavailable, summary, ErrStripeProviderUnavailable
 	}
 }
 

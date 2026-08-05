@@ -10,7 +10,7 @@ DECLARE
   v_finding RECORD;
   v_restriction_id TEXT;
 BEGIN
-  IF NOT pg_try_advisory_xact_lock(5283921922134398278) THEN
+  IF NOT pg_try_advisory_xact_lock(hashtextextended(current_schema(), 5283921922134398278)) THEN
     RAISE EXCEPTION USING ERRCODE = 'IB302', MESSAGE = 'credit reconciliation already running';
   END IF;
   UPDATE credit_reconciliation_runs SET status = 'running', started_at = clock_timestamp(), completed_at = NULL,
@@ -362,7 +362,7 @@ RETURNS VOID AS $$
 DECLARE
   v_stale_after INTERVAL;
 BEGIN
-  IF NOT pg_try_advisory_xact_lock(5283921922134398278) THEN
+  IF NOT pg_try_advisory_xact_lock(hashtextextended(current_schema(), 5283921922134398278)) THEN
     RAISE EXCEPTION USING ERRCODE = 'IB302', MESSAGE = 'credit reconciliation already running';
   END IF;
   UPDATE credit_reconciliation_runs SET status = 'running', started_at = clock_timestamp(), completed_at = NULL,

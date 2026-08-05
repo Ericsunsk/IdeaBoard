@@ -78,9 +78,7 @@ ORDER BY signature
 		); err != nil {
 			return fmt.Errorf("read database routine security facts: %w", err)
 		}
-		if _, ok := expected[routine.signature]; ok {
-			delete(expected, routine.signature)
-		}
+		delete(expected, routine.signature)
 		if routine.owner != routine.expectedOwner {
 			violations = append(violations, fmt.Sprintf(
 				"%s owner=%q, want schema owner %q",

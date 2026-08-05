@@ -6,7 +6,6 @@ import (
 	"errors"
 	"strings"
 	"testing"
-	"time"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/testdb"
@@ -185,13 +184,4 @@ func (f *fakeStripeGateway) PrepareConfiguration(_ context.Context, input Prepar
 		return PreparedStripeConfiguration{}, f.err
 	}
 	return f.prepared, nil
-}
-
-func readConfigurationUpdatedAt(t *testing.T, db *sql.DB) time.Time {
-	t.Helper()
-	var value time.Time
-	if err := db.QueryRowContext(t.Context(), `SELECT updated_at FROM payment_stripe_configurations WHERE singleton_id = 1`).Scan(&value); err != nil {
-		t.Fatal(err)
-	}
-	return value
 }

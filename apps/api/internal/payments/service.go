@@ -180,7 +180,7 @@ func (s *Service) configureStripeLocked(ctx context.Context, command ConfigureSt
 
 	prepared, err := s.gateway.PrepareConfiguration(ctx, prepare)
 	if err != nil {
-		publicErr, code, summary := gatewayFailure(err)
+		code, summary, publicErr := gatewayFailure(err)
 		return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, string(code), summary, map[string]any{"mode": mode}, wrapPublicError(publicErr, summary))
 	}
 	if err := validatePreparedConfiguration(prepared, mode); err != nil {

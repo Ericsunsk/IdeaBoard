@@ -15,10 +15,6 @@ func lockRewardCodeIdentity(ctx context.Context, tx pgx.Tx, normalized string) e
 	return lockRewardCodeKeys(ctx, tx, "identity", []string{normalized})
 }
 
-func lockRewardCodeIdentities(ctx context.Context, tx pgx.Tx, normalizedCodes []string) error {
-	return lockRewardCodeKeys(ctx, tx, "identity", normalizedCodes)
-}
-
 func lockRewardCodeID(ctx context.Context, tx pgx.Tx, rewardCodeID int64) error {
 	if rewardCodeID <= 0 {
 		return fmt.Errorf("lock reward Code ID: invalid ID")

@@ -643,6 +643,34 @@ func TestStartReconciliationIsMutuallyExclusiveAndRollsBackOnEnqueueFailure(t *t
 	}
 }
 
+func TestReconciliationExecutionLockIsScopedToSchema(t *testing.T) {
+	_, firstPool := testdb.OpenWithPool(t)
+	_, secondPool := testdb.OpenWithPool(t)
+
+	firstTx, err := firstPool.Begin(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = firstTx.Rollback(t.Context()) }()
+	if _, err := firstTx.Exec(t.Context(), `
+SELECT
+  pg_advisory_xact_lock(5283921922134398278),
+  pg_advisory_xact_lock(hashtextextended(current_schema(), 5283921922134398278))
+`); err != nil {
+		t.Fatal(err)
+	}
+
+	service := NewService(secondPool)
+	service.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{})
+	run, err := service.StartReconciliation(t.Context(), reconciliationStartInput(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ExecuteReconciliation(t.Context(), run.ID); err != nil {
+		t.Fatalf("second schema reconciliation was blocked by the first schema: %v", err)
+	}
+}
+
 func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	service := NewService(pool)

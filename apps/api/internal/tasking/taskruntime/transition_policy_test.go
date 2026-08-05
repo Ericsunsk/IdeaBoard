@@ -239,6 +239,7 @@ func TestCompleteTaskPassesOneConvergenceIntentAndPublishesCompleted(t *testing.
 	intent := store.convergenceIntent
 	if intent == nil {
 		t.Fatal("completion convergence intent was not recorded")
+		return
 	}
 	if intent.Kind != taskstore.TaskConvergenceCompleted || intent.TaskID != assignment.TaskID || intent.Lease == nil ||
 		intent.Lease.AccountID != assignment.AccountID || intent.Lease.ProviderEndpointID != assignment.ProviderEndpointID ||

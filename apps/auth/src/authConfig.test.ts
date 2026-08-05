@@ -1,8 +1,22 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { auth } from "./auth.js";
 
-test("native authentication security configuration stays explicit", () => {
+test("native authentication security configuration stays explicit", async (t) => {
+  const originalInternalKey = process.env.AUTH_INTERNAL_KEY;
+  process.env.AUTH_INTERNAL_KEY = "test-internal-key";
+  t.after(() => {
+    if (originalInternalKey === undefined) {
+      delete process.env.AUTH_INTERNAL_KEY;
+    } else {
+      process.env.AUTH_INTERNAL_KEY = originalInternalKey;
+    }
+  });
+
+  const { auth, authDB } = await import("./auth.js");
+  t.after(async () => {
+    await authDB.end();
+  });
+
   const options = auth.options;
   assert.equal(options.emailAndPassword?.enabled, true);
   assert.equal(options.emailAndPassword?.minPasswordLength, 10);

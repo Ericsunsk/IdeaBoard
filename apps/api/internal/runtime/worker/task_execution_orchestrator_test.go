@@ -535,6 +535,7 @@ WHERE task_id = $1`, task.TaskID).Scan(&attemptStatus, &attemptReason, &attemptF
 	metrics := metricsByTaskID[task.TaskID]
 	if metrics == nil {
 		t.Fatal("execution metrics should exist")
+		return
 	}
 	if metrics.CurrentStage != tasks.ExecutionStageFailed {
 		t.Fatalf("metrics current stage = %q, want %q", metrics.CurrentStage, tasks.ExecutionStageFailed)

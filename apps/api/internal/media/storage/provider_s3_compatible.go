@@ -181,14 +181,6 @@ func (s *S3CompatibleService) prepareUploadClient(ctx context.Context, cfg *S3Co
 	return s.clientWithConfig(ctx, cfg)
 }
 
-func (s *S3CompatibleService) putReaderWithConfig(ctx context.Context, client *minio.Client, filename string, contentType string, body io.Reader, size int64, cfg *S3CompatibleConfig, opts StorageStoreOptions) (string, error) {
-	ref, err := s.putReaderWithConfigRef(ctx, client, filename, contentType, body, size, cfg, opts)
-	if err != nil {
-		return "", err
-	}
-	return ref.URL, nil
-}
-
 func (s *S3CompatibleService) putReaderWithConfigRef(ctx context.Context, client *minio.Client, filename string, contentType string, body io.Reader, size int64, cfg *S3CompatibleConfig, opts StorageStoreOptions) (*StoredUploadRef, error) {
 	key, err := buildObjectKey(opts.DirPrefix, filepathExt(filename))
 	if err != nil {

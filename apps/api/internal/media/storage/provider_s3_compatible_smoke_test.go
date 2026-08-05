@@ -154,6 +154,7 @@ func assertStoredSmokeObject(t *testing.T, got *StoredUploadObject, wantKey stri
 	t.Helper()
 	if got == nil {
 		t.Fatal("stored object is nil")
+		return
 	}
 	if got.ObjectKey != wantKey {
 		t.Fatalf("stored object key=%q, want %q", got.ObjectKey, wantKey)

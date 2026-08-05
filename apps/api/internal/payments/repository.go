@@ -112,7 +112,7 @@ func (r *Repository) withStripeConfigurationLifecycleLock(ctx context.Context, e
 		if unlockErr != nil || !unlocked {
 			_ = connection.Raw(func(any) error { return driver.ErrBadConn })
 			if unlockErr == nil {
-				unlockErr = fmt.Errorf("Stripe configuration lifecycle lock was not held")
+				unlockErr = fmt.Errorf("stripe configuration lifecycle lock was not held")
 			}
 			resultErr = errors.Join(resultErr, fmt.Errorf("release Stripe configuration lifecycle lock: %w", unlockErr))
 		}
