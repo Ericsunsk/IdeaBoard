@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AuthGuardSettings } from './authGuardSettings.js'
+import type { MailReadiness } from './mailConfig.js'
 import {
   getAuthSubpath,
   isRateLimitedAuthPath,
@@ -32,6 +33,7 @@ export type AuthEntryGuardOptions = {
   trustedOrigins: string[]
   getAuthGuardSettings: () => Promise<AuthGuardSettings>
   authHandler: AuthNodeHandler
+  getMailReadiness?: () => Promise<MailReadiness>
 }
 
 export type AuthEntryGuard = {
@@ -102,6 +104,21 @@ export function createAuthEntryGuard(options: AuthEntryGuardOptions): AuthEntryG
       }
     }
 
+    if (options.getMailReadiness && requiresMailReadiness(path)) {
+      let readiness: MailReadiness
+      try {
+        readiness = await options.getMailReadiness()
+      } catch (error) {
+        console.error('[auth] Failed to read mail readiness', error)
+        sendNodeJSON(res, 503, { code: 503, msg: '邮件服务暂不可用' })
+        return true
+      }
+      if (readiness !== 'ready') {
+        sendNodeJSON(res, 503, { code: 503, msg: '邮件服务尚未就绪' })
+        return true
+      }
+    }
+
     if (isRateLimitedAuthPath(path)) {
       const limiterKey = buildRateLimitKey(req, path, requestIP)
       const check = checkAndHitRateLimit(limiterKey, settings.windowSeconds, settings.maxRequests)
@@ -133,6 +150,18 @@ export function createAuthEntryGuard(options: AuthEntryGuardOptions): AuthEntryG
       await options.authHandler(req, res)
     },
   }
+}
+
+function requiresMailReadiness(path: string): boolean {
+  return (
+    isSignUpPath(path) ||
+    path === '/request-password-reset' ||
+    path === '/email-otp/request-password-reset' ||
+    path === '/forget-password/email-otp' ||
+    path === '/email-otp/reset-password' ||
+    path === '/email-otp/request-email-change' ||
+    path === '/email-otp/change-email'
+  )
 }
 
 export function isAuthRoute(url: string): boolean {

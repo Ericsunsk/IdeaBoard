@@ -10,7 +10,12 @@
         <p :class="authModalSubtitleClass">登录 {{ projectName }}，继续你的创作</p>
       </div>
 
-      <form class="relative z-[1] flex flex-col gap-5" novalidate @submit.prevent="handleLogin">
+      <form
+        v-if="!resetMode"
+        class="relative z-[1] flex flex-col gap-5"
+        novalidate
+        @submit.prevent="handleLogin"
+      >
         <IbFormField
           v-slot="{
             ariaInvalid,
@@ -108,6 +113,120 @@
           v-bind="submitControlState"
           fluid
         />
+        <button
+          type="button"
+          class="self-end border-0 bg-transparent p-0 text-xs font-semibold text-ib-creative-accent hover:underline"
+          :disabled="loading"
+          @click="resetMode = true"
+        >
+          忘记密码？
+        </button>
+      </form>
+
+      <form v-else class="relative z-[1] flex flex-col gap-5" novalidate @submit.prevent="handleResetPassword">
+        <p class="text-sm text-ib-text-subtle">输入注册 Email，我们会发送一次性验证码。</p>
+        <IbFormField
+          v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+          label="Email"
+          :error="resetErrors.email"
+          field-id="reset-email"
+          required
+          inline-required
+          :field-class="authFieldClass"
+          :message-pt="authErrorMessagePt"
+        >
+          <InputText
+            :id="fieldId"
+            v-model="resetForm.email"
+            unstyled
+            autocomplete="email"
+            :required="required"
+            :class="[authInputClass, inlineError ? authInputErrorClass : '']"
+            :invalid="invalid"
+            :placeholder="inlineError ? inlineErrorText : '输入注册 Email'"
+            :aria-invalid="ariaInvalid"
+            :aria-describedby="describedbyId"
+          />
+        </IbFormField>
+        <Button
+          unstyled
+          :class="authPrimaryButtonClass"
+          :pt="authButtonPt"
+          type="submit"
+          :label="loading ? '发送中...' : '发送验证码'"
+          :loading="loading"
+          v-bind="submitControlState"
+          fluid
+        />
+        <button
+          type="button"
+          class="self-center border-0 bg-transparent p-0 text-sm font-semibold text-ib-creative-accent hover:underline"
+          :disabled="loading"
+          @click="resetMode = false"
+        >
+          返回登录
+        </button>
+      </form>
+
+      <form v-if="resetMode && resetOtpSent" class="relative z-[1] mt-4 flex flex-col gap-5" novalidate @submit.prevent="handleResetPasswordConfirm">
+        <IbFormField
+          v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+          label="Email 验证码"
+          :error="resetErrors.otp"
+          field-id="reset-otp"
+          required
+          inline-required
+          :field-class="authFieldClass"
+          :message-pt="authErrorMessagePt"
+        >
+          <InputText
+            :id="fieldId"
+            v-model="resetForm.otp"
+            unstyled
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="6"
+            :required="required"
+            :class="[authInputClass, inlineError ? authInputErrorClass : '']"
+            :invalid="invalid"
+            :placeholder="inlineError ? inlineErrorText : '输入 6 位验证码'"
+            :aria-invalid="ariaInvalid"
+            :aria-describedby="describedbyId"
+          />
+        </IbFormField>
+        <IbFormField
+          v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+          label="新密码"
+          :error="resetErrors.password"
+          field-id="reset-password"
+          required
+          inline-required
+          :field-class="authFieldClass"
+          :message-pt="authErrorMessagePt"
+        >
+          <Password
+            v-model="resetForm.password"
+            unstyled
+            :feedback="false"
+            fluid
+            :pt="authPasswordPt"
+            :input-props="{ id: fieldId, autocomplete: 'new-password', required, 'aria-invalid': ariaInvalid, 'aria-describedby': describedbyId }"
+            :invalid="invalid"
+            :input-class="[authInputClass, inlineError ? authInputErrorClass : '']"
+            :placeholder="inlineError ? inlineErrorText : '不少于 10 位字符'"
+            toggle-mask
+          />
+        </IbFormField>
+        <Button
+          unstyled
+          :class="authPrimaryButtonClass"
+          :pt="authButtonPt"
+          type="submit"
+          :label="loading ? '更新中...' : '重置密码'"
+          :loading="loading"
+          v-bind="submitControlState"
+          fluid
+        />
       </form>
 
       <div :class="['mt-8', authFooterClass]">
@@ -190,6 +309,10 @@ const errors = ref<Record<LoginField, string>>({
   identifier: '',
   password: '',
 })
+const resetMode = ref(false)
+const resetOtpSent = ref(false)
+const resetForm = ref({ email: '', otp: '', password: '' })
+const resetErrors = ref({ email: '', otp: '', password: '' })
 
 watch(loading, (busy) => emit('update:busy', busy), { immediate: true })
 onBeforeUnmount(() => emit('update:busy', false))
@@ -230,5 +353,33 @@ async function handleLogin() {
     },
   )
   if (loggedIn) emit('login-success')
+}
+
+async function handleResetPassword() {
+  const email = resetForm.value.email.trim()
+  resetErrors.value.email = !email || !email.includes('@') ? '请输入有效的 Email' : ''
+  if (resetErrors.value.email) return
+
+  const sent = await runAsyncAction(
+    () => userStore.requestPasswordResetOTP(email),
+    { feedback: authFeedback.login },
+  )
+  if (sent) resetOtpSent.value = true
+}
+
+async function handleResetPasswordConfirm() {
+  resetErrors.value.otp = /^\d{6}$/.test(resetForm.value.otp.trim()) ? '' : '请输入 6 位验证码'
+  resetErrors.value.password = resetForm.value.password.length >= 10 ? '' : '密码至少 10 个字符'
+  if (resetErrors.value.otp || resetErrors.value.password) return
+
+  const reset = await runAsyncAction(
+    () => userStore.resetPasswordWithOTP(resetForm.value.email, resetForm.value.otp, resetForm.value.password),
+    { feedback: authFeedback.login },
+  )
+  if (reset) {
+    resetMode.value = false
+    resetOtpSent.value = false
+    resetForm.value = { email: '', otp: '', password: '' }
+  }
 }
 </script>

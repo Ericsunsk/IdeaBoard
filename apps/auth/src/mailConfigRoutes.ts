@@ -94,6 +94,7 @@ function serializeSummary(
     from_name: summary.fromName,
     from_email: summary.fromEmail,
     reply_to: summary.replyTo,
+    config_version: summary.configVersion,
     readiness: summary.readiness,
     updated_at: summary.updatedAt,
     last_tested_at: summary.lastTestedAt,

@@ -46,6 +46,9 @@ export function createAuthApp(deps: AuthAppDependencies): FastifyInstance {
     trustedOrigins: deps.config.trustedOrigins,
     getAuthGuardSettings: deps.getAuthGuardSettings,
     authHandler: createAuthDispatchHandler(deps.authHandler),
+    getMailReadiness: deps.mailConfigService
+      ? async () => (await deps.mailConfigService!.getSummary()).readiness
+      : undefined,
   });
 
   app.setErrorHandler((error, _request, reply) => {

@@ -20,6 +20,11 @@ export type UserSessionStore = {
   login: (identifier: string, password: string) => Promise<boolean>
   register: (email: string, username: string, password: string) => Promise<boolean>
   verifyRegistrationOTP: (email: string, otp: string) => Promise<boolean>
+  requestPasswordResetOTP: (email: string) => Promise<boolean>
+  resetPasswordWithOTP: (email: string, otp: string, password: string) => Promise<boolean>
+  verifyCurrentPassword: (password: string) => Promise<boolean>
+  requestEmailChangeOTP: (newEmail: string) => Promise<boolean>
+  changeEmailWithOTP: (newEmail: string, otp: string) => Promise<boolean>
   logout: () => Promise<boolean>
   fetchUserInfo: (
     force?: boolean,
@@ -148,6 +153,86 @@ function createUserSessionStore(): UserSessionStore {
     return true
   }
 
+  async function requestPasswordResetOTP(email: string) {
+    const response = await fetch(resolveAuthUrl('/api/auth/email-otp/request-password-reset'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: normalizeCanonicalEmail(email) }),
+    })
+    const payload: unknown = await response.json().catch(() => null)
+    if (!response.ok) {
+      throw new Error(extractBetterAuthErrorMessage(payload, '无法发送验证码，请稍后重试'))
+    }
+    return true
+  }
+
+  async function resetPasswordWithOTP(email: string, otp: string, password: string) {
+    const response = await fetch(resolveAuthUrl('/api/auth/email-otp/reset-password'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: normalizeCanonicalEmail(email),
+        otp: otp.trim(),
+        password,
+      }),
+    })
+    const payload: unknown = await response.json().catch(() => null)
+    if (!response.ok) {
+      throw new Error(extractBetterAuthErrorMessage(payload, '验证码无效或密码更新失败'))
+    }
+    resetAuth()
+    return true
+  }
+
+  async function verifyCurrentPassword(password: string) {
+    const response = await fetch(resolveAuthUrl('/api/auth/verify-password'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    })
+    const payload: unknown = await response.json().catch(() => null)
+    if (!response.ok) {
+      throw new Error(extractBetterAuthErrorMessage(payload, '当前密码错误'))
+    }
+    return true
+  }
+
+  async function requestEmailChangeOTP(newEmail: string) {
+    const response = await fetch(resolveAuthUrl('/api/auth/email-otp/request-email-change'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newEmail: normalizeCanonicalEmail(newEmail) }),
+    })
+    const payload: unknown = await response.json().catch(() => null)
+    if (!response.ok) {
+      throw new Error(extractBetterAuthErrorMessage(payload, '无法发送 Email 验证码'))
+    }
+    return true
+  }
+
+  async function changeEmailWithOTP(newEmail: string, otp: string) {
+    const response = await fetch(resolveAuthUrl('/api/auth/email-otp/change-email'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newEmail: normalizeCanonicalEmail(newEmail), otp: otp.trim() }),
+    })
+    const payload: unknown = await response.json().catch(() => null)
+    if (!response.ok) {
+      throw new Error(extractBetterAuthErrorMessage(payload, 'Email 验证码无效或已过期'))
+    }
+    await fetch(resolveAuthUrl('/api/auth/revoke-other-sessions'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    })
+    await fetchUserInfo(true)
+    return true
+  }
+
   async function logout() {
     try {
       const result = await authClient.signOut()
@@ -254,6 +339,11 @@ function createUserSessionStore(): UserSessionStore {
     login,
     register,
     verifyRegistrationOTP,
+    requestPasswordResetOTP,
+    resetPasswordWithOTP,
+    verifyCurrentPassword,
+    requestEmailChangeOTP,
+    changeEmailWithOTP,
     logout,
     fetchUserInfo,
     ensureSession,

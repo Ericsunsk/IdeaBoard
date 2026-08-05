@@ -83,6 +83,12 @@ func registerAdminSettingsRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.PUT(RouteAdminSettingsTaskMonitor, h.AdminHandler.UpdateTaskMonitorSettings)
 	adminAPI.GET(RouteAdminSettingsOutbound, h.AdminHandler.GetOutboundPolicy)
 	adminAPI.PUT(RouteAdminSettingsOutbound, h.AdminHandler.UpdateOutboundPolicy)
+	if h.MailConfigHandler != nil {
+		adminAPI.GET(RouteAdminSettingsMail, h.MailConfigHandler.Get)
+		adminAPI.PUT(RouteAdminSettingsMail, h.MailConfigHandler.Update)
+		adminAPI.DELETE(RouteAdminSettingsMail, h.MailConfigHandler.Clear)
+		adminAPI.POST(RouteAdminSettingsMail+"/test", h.MailConfigHandler.Test)
+	}
 }
 
 func registerAdminUserRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {

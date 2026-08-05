@@ -44,9 +44,11 @@ type ProvisionedAuthUser struct {
 }
 
 type ServiceClient struct {
-	contract   *internalcontract.ClientWithResponses
-	httpClient *http.Client
-	initErr    error
+	contract    *internalcontract.ClientWithResponses
+	httpClient  *http.Client
+	baseURL     string
+	internalKey string
+	initErr     error
 }
 
 func NewServiceClient(cfg config.AuthServiceConfig) *ServiceClient {
@@ -77,7 +79,150 @@ func NewServiceClient(cfg config.AuthServiceConfig) *ServiceClient {
 			return nil
 		}),
 	)
-	return &ServiceClient{contract: client, httpClient: httpClient, initErr: err}
+	return &ServiceClient{
+		contract:    client,
+		httpClient:  httpClient,
+		baseURL:     strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"),
+		internalKey: internalKey,
+		initErr:     err,
+	}
+}
+
+type MailConfigSummary struct {
+	Configured        bool    `json:"configured"`
+	APIKeyConfigured  bool    `json:"api_key_configured"`
+	FromName          string  `json:"from_name"`
+	FromEmail         string  `json:"from_email"`
+	ReplyTo           string  `json:"reply_to"`
+	ConfigVersion     int     `json:"config_version"`
+	Readiness         string  `json:"readiness"`
+	UpdatedAt         *string `json:"updated_at"`
+	LastTestedAt      *string `json:"last_tested_at"`
+	LastTestErrorCode *string `json:"last_test_error_code"`
+}
+
+type MailConfigUpdate struct {
+	APIKey    string
+	FromName  string
+	FromEmail string
+	ReplyTo   string
+}
+
+// MailConfigError preserves the Auth service status while keeping provider details
+// behind the Auth boundary. The Admin handler maps only these stable statuses.
+type MailConfigError struct {
+	Status  int
+	Message string
+}
+
+func (e *MailConfigError) Error() string {
+	if strings.TrimSpace(e.Message) == "" {
+		return "auth mail configuration request failed"
+	}
+	return e.Message
+}
+
+func (c *ServiceClient) GetMailConfig(ctx context.Context) (*MailConfigSummary, error) {
+	var summary MailConfigSummary
+	if err := c.mailConfigRequest(ctx, http.MethodGet, "/internal/mail/config", nil, &summary); err != nil {
+		return nil, err
+	}
+	return &summary, nil
+}
+
+func (c *ServiceClient) UpdateMailConfig(ctx context.Context, input MailConfigUpdate, actorID int64) (*MailConfigSummary, error) {
+	var summary MailConfigSummary
+	body := map[string]any{
+		"from_name":  input.FromName,
+		"from_email": input.FromEmail,
+		"actor_id":   actorID,
+	}
+	if strings.TrimSpace(input.APIKey) != "" {
+		body["api_key"] = input.APIKey
+	}
+	if strings.TrimSpace(input.ReplyTo) != "" {
+		body["reply_to"] = input.ReplyTo
+	}
+	if err := c.mailConfigRequest(ctx, http.MethodPut, "/internal/mail/config", body, &summary); err != nil {
+		return nil, err
+	}
+	return &summary, nil
+}
+
+func (c *ServiceClient) ClearMailConfig(ctx context.Context, actorID int64) error {
+	var envelope struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	return c.mailConfigRequest(ctx, http.MethodDelete, "/internal/mail/config", map[string]any{"actor_id": actorID}, &envelope)
+}
+
+func (c *ServiceClient) SendMailConfigTest(ctx context.Context, recipient string, actorID int64) error {
+	var envelope struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	return c.mailConfigRequest(ctx, http.MethodPost, "/internal/mail/config/test", map[string]any{"recipient": recipient, "actor_id": actorID}, &envelope)
+}
+
+func (c *ServiceClient) mailConfigRequest(ctx context.Context, method, path string, body any, result any) error {
+	if _, err := c.contractClient(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(c.baseURL) == "" {
+		return fmt.Errorf("auth service base URL is not configured")
+	}
+	var reader io.Reader
+	if body != nil {
+		payload, err := json.Marshal(body)
+		if err != nil {
+			return fmt.Errorf("encode auth mail configuration request: %w", err)
+		}
+		reader = strings.NewReader(string(payload))
+	}
+	request, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reader)
+	if err != nil {
+		return fmt.Errorf("build auth mail configuration request: %w", err)
+	}
+	if body != nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	if c.internalKey != "" {
+		request.Header.Set("X-Internal-Key", c.internalKey)
+	}
+	response, err := c.httpClient.Do(request)
+	if err != nil {
+		return fmt.Errorf("call auth mail configuration: %w", err)
+	}
+	defer response.Body.Close()
+	payload, err := io.ReadAll(response.Body)
+	if err != nil {
+		return fmt.Errorf("read auth mail configuration response: %w", err)
+	}
+	var envelope struct {
+		Code *int            `json:"code"`
+		Msg  *string         `json:"msg"`
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(payload, &envelope); err != nil {
+		return &MailConfigError{Status: response.StatusCode, Message: "认证服务返回无效响应"}
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 || envelope.Code == nil || envelope.Msg == nil || *envelope.Code != 0 {
+		message := "邮件配置操作失败"
+		if envelope.Msg != nil && strings.TrimSpace(*envelope.Msg) != "" {
+			message = strings.TrimSpace(*envelope.Msg)
+		}
+		return &MailConfigError{Status: response.StatusCode, Message: message}
+	}
+	if result != nil && (len(envelope.Data) == 0 || string(envelope.Data) == "null") {
+		return &MailConfigError{Status: http.StatusBadGateway, Message: "认证服务返回无效响应"}
+	}
+	if result != nil {
+		if err := json.Unmarshal(envelope.Data, result); err != nil {
+			return fmt.Errorf("decode auth mail configuration response: %w", err)
+		}
+	}
+	return nil
 }
 
 func (c *ServiceClient) ValidateSession(ctx context.Context, cookieHeader string) (*SessionIdentity, error) {

@@ -74,6 +74,7 @@ func newAppRouter(
 				services.runtimeSettings,
 				users.NewIdentityAdminCommands(services.userService, services.authServiceClient),
 			),
+			MailConfigHandler:       auth.NewMailConfigAdminHandler(services.authServiceClient),
 			BillingHandler:          billingHandler,
 			CreditHandler:           credits.NewHandler(services.creditService),
 			AccountHandler:          accountHandler,

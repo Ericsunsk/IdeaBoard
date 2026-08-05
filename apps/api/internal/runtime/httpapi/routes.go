@@ -75,6 +75,7 @@ type UserRouteDeps struct {
 
 type AdminRouteDeps struct {
 	AdminHandler            *users.AdminHandler
+	MailConfigHandler       *auth.MailConfigAdminHandler
 	BillingHandler          *billing.Handler
 	CreditHandler           *credits.Handler
 	AccountHandler          *accounts.AccountHandler
@@ -107,6 +108,7 @@ const (
 	RouteAdminSettingsRateLimit   = "/settings/rate-limit"
 	RouteAdminSettingsTaskMonitor = "/settings/task-monitor"
 	RouteAdminSettingsOutbound    = "/settings/outbound-policy"
+	RouteAdminSettingsMail        = "/settings/mail"
 	RouteAdminStripeConfiguration = "/payments/stripe-config"
 	RoutePaymentStripeWebhook     = "/api/webhooks/stripe"
 )

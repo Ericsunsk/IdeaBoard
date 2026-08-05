@@ -13,6 +13,7 @@ import {
 } from './authRepository.js'
 import { env } from './env.js'
 import { verifyAuthRuntimePrivileges } from './runtime-privileges.js'
+import { AUTH_CLEANUP_INTERVAL_MS, cleanupUnverifiedUsers } from './authCleanup.js'
 
 const authApi: InternalAuthAPI = {
   getSession: (input) => auth.api.getSession(input),
@@ -45,6 +46,13 @@ const app = createAuthApp({
   mailConfigService,
 })
 
+const cleanupTimer = setInterval(() => {
+  void cleanupUnverifiedUsers(authDB).catch((error) => {
+    console.error('[auth] Failed to clean up unverified users', error)
+  })
+}, AUTH_CLEANUP_INTERVAL_MS)
+cleanupTimer.unref()
+
 try {
   await verifyAuthRuntimePrivileges(authDB)
   await app.listen({ port: env.auth.port, host: env.auth.host })
@@ -65,7 +73,10 @@ function gracefulShutdown(signal: string) {
 
   app
     .close()
-    .then(() => authDB.end())
+    .then(() => {
+      clearInterval(cleanupTimer)
+      return authDB.end()
+    })
     .then(() => {
       console.log('[auth] Database pool closed')
       process.exit(0)

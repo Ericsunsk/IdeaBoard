@@ -47,6 +47,56 @@ func TestServiceClientContractValidateSessionSuccess(t *testing.T) {
 	}
 }
 
+func TestServiceClientMailConfigProxyUsesInternalContractAndActor(t *testing.T) {
+	server := newContractServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("X-Internal-Key"); got != contractInternalKey {
+			t.Fatalf("X-Internal-Key = %q, want %q", got, contractInternalKey)
+		}
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/internal/mail/config":
+			writeContractJSON(w, http.StatusOK, map[string]any{
+				"code": 0, "msg": "success", "data": map[string]any{
+					"configured": true, "api_key_configured": true, "from_name": "IdeaBoard",
+					"from_email": "noreply@example.com", "reply_to": "support@example.com",
+					"config_version": 2, "readiness": "ready",
+				},
+			})
+		case r.Method == http.MethodPut && r.URL.Path == "/internal/mail/config":
+			body := decodeContractBody(t, r)
+			assertContractField(t, body, "actor_id", float64(42))
+			assertContractField(t, body, "api_key", "re_secret")
+			writeContractJSON(w, http.StatusOK, map[string]any{"code": 0, "msg": "success", "data": map[string]any{"config_version": 3, "readiness": "not_tested"}})
+		case r.Method == http.MethodPost && r.URL.Path == "/internal/mail/config/test":
+			body := decodeContractBody(t, r)
+			assertContractField(t, body, "actor_id", float64(42))
+			assertContractField(t, body, "recipient", "ops@example.com")
+			writeContractJSON(w, http.StatusOK, map[string]any{"code": 0, "msg": "success", "data": map[string]any{"sent": true}})
+		case r.Method == http.MethodDelete && r.URL.Path == "/internal/mail/config":
+			body := decodeContractBody(t, r)
+			assertContractField(t, body, "actor_id", float64(42))
+			writeContractJSON(w, http.StatusOK, map[string]any{"code": 0, "msg": "success", "data": map[string]any{"deleted": true}})
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	defer server.Close()
+
+	client := newContractClient(server)
+	summary, err := client.GetMailConfig(context.Background())
+	if err != nil || summary.ConfigVersion != 2 || summary.Readiness != "ready" {
+		t.Fatalf("GetMailConfig = %+v, err=%v", summary, err)
+	}
+	if _, err := client.UpdateMailConfig(context.Background(), MailConfigUpdate{APIKey: "re_secret", FromName: "IdeaBoard", FromEmail: "noreply@example.com"}, 42); err != nil {
+		t.Fatalf("UpdateMailConfig: %v", err)
+	}
+	if err := client.SendMailConfigTest(context.Background(), "ops@example.com", 42); err != nil {
+		t.Fatalf("SendMailConfigTest: %v", err)
+	}
+	if err := client.ClearMailConfig(context.Background(), 42); err != nil {
+		t.Fatalf("ClearMailConfig: %v", err)
+	}
+}
+
 func TestServiceClientContractValidateSessionRejectsMissingSuccessEnvelopeFields(t *testing.T) {
 	validData := map[string]any{
 		"session": map[string]any{
