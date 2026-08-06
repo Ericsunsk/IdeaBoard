@@ -2,7 +2,7 @@ import type { Pool } from "pg";
 import {
   decryptSecret,
   encryptSecret,
-} from "./secretCipher.js";
+} from "../secretCipher.js";
 
 export const GOOGLE_PROVIDER = "google" as const;
 export type SupportedSocialProvider = typeof GOOGLE_PROVIDER;

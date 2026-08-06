@@ -21,8 +21,8 @@ import { createAuthDispatchHandler } from "./publicRegistration.js";
 import {
   isSocialProviderCapabilitiesRoute,
   registerSocialProviderRoutes,
-} from "./socialProviderRoutes.js";
-import type { SocialProviderSettingsService } from "./socialProviderSettings.js";
+} from "./social-identity/socialProviderRoutes.js";
+import type { SocialProviderSettingsService } from "./social-identity/socialProviderSettings.js";
 
 export type AuthAppConfig = {
   trustProxy: FastifyServerOptions["trustProxy"];

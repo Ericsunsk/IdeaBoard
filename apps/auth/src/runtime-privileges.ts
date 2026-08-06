@@ -2,7 +2,7 @@ import type { Pool } from 'pg'
 import {
   configureMailConfigRuntimePrivileges,
 } from './transactional-mail/mailConfigSchema.js'
-import { configureSocialProviderSettingsRuntimePrivileges } from './socialProviderSchema.js'
+import { configureSocialProviderSettingsRuntimePrivileges } from './social-identity/socialProviderSchema.js'
 
 const authTables = ['user', 'session', 'account', 'verification'] as const
 const creditTables = [

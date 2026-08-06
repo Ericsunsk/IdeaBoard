@@ -10,7 +10,7 @@ import {
 } from "./env.js";
 import { ensureMailConfigSchema } from "./transactional-mail/mailConfigSchema.js";
 import { configureAuthRuntimePrivileges } from "./runtime-privileges.js";
-import { ensureSocialProviderSettingsSchema } from "./socialProviderSchema.js";
+import { ensureSocialProviderSettingsSchema } from "./social-identity/socialProviderSchema.js";
 
 type MigrationDatabase = {
   end(): Promise<void>;

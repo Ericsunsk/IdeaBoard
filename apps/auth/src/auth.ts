@@ -15,13 +15,13 @@ import {
   applyGoogleOAuthRequestPolicy,
   createRegistrationUserCreationGuard,
 } from "./admission/googleOAuthPolicy.js";
-import { createRuntimeAuthRegistry } from "./runtimeAuthRegistry.js";
+import { createRuntimeAuthRegistry } from "./social-identity/runtimeAuthRegistry.js";
 import type { MailConfigService } from "./transactional-mail/mailConfig.js";
 import { createRuntimeMailConfigService } from "./transactional-mail/mailConfigAdapters.js";
 import {
   createRuntimeSocialProviderSettingsService,
   type SocialProviderSettingsService,
-} from "./socialProviderSettings.js";
+} from "./social-identity/socialProviderSettings.js";
 
 const EMAIL_OTP_EXPIRES_IN_SECONDS = 600;
 const EMAIL_OTP_EXPIRES_IN_MINUTES = EMAIL_OTP_EXPIRES_IN_SECONDS / 60;

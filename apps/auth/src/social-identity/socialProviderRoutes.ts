@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { getHeaderValue, sendError, sendSuccess } from "./httpResponse.js";
+import { getHeaderValue, sendError, sendSuccess } from "../httpResponse.js";
 import {
   SocialProviderSettingsError,
   type SocialProviderSettingsService,
