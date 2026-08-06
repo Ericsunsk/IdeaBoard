@@ -1,10 +1,7 @@
-import dotenv from 'dotenv'
 import { isProductionRuntime } from './runtimeEnv.js'
 import { isValidSecretEncryptionKey } from './secretCipher.js'
 
-dotenv.config({ quiet: true })
-
-type EnvSource = Record<string, string | undefined>
+export type EnvSource = Record<string, string | undefined>
 type DatabaseSSLMode = 'disable' | 'require' | 'verify-full'
 
 function getEnv(source: EnvSource, name: string, fallback = ''): string {
@@ -139,4 +136,4 @@ export function loadEnv(source: EnvSource) {
   }
 }
 
-export const env = loadEnv(process.env)
+export type AuthEnvironment = ReturnType<typeof loadEnv>

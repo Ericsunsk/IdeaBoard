@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import Fastify from "fastify";
 import type {
+  AuthSessionAPI,
   AuthInternalCommands,
-  InternalAuthAPI,
 } from "./authInternalCommands.js";
 import { registerInternalRoutes } from "./internalRoutes.js";
 
@@ -33,7 +33,7 @@ test(
   },
 );
 
-function createContractAuthAPI(): Pick<InternalAuthAPI, "getSession"> {
+function createContractAuthAPI(): AuthSessionAPI {
   return {
     getSession: async ({ headers }) => {
       assert.equal(

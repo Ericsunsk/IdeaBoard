@@ -2,40 +2,18 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 describe('getAuthGuardSettings', () => {
-  it('loads only registration settings and keeps auth rate-limit defaults', async (t) => {
-    const originalAuthInternalKey = process.env.AUTH_INTERNAL_KEY
-    const originalAuthHost = process.env.AUTH_HOST
-    process.env.AUTH_INTERNAL_KEY = 'test-internal-key'
-    process.env.AUTH_HOST = '127.0.0.1'
-
-    const { authDB } = await import('./auth.js')
+  it('loads only registration settings and keeps auth rate-limit defaults', async () => {
     const {
+      createAuthGuardSettingsReader,
       DEFAULT_AUTH_RATE_LIMIT_MAX_REQUESTS,
       DEFAULT_AUTH_RATE_LIMIT_WINDOW_SECONDS,
-      getAuthGuardSettings,
     } = await import('./authGuardSettings.js')
-    const originalQuery = authDB.query
     let settingsQuery = ''
-
-    authDB.query = (async (queryText: unknown) => {
-      settingsQuery = String(queryText)
-      return {
-        rows: [{ registration_enabled: true }],
-      }
-    }) as typeof authDB.query
-
-    t.after(() => {
-      authDB.query = originalQuery
-      if (originalAuthInternalKey === undefined) {
-        delete process.env.AUTH_INTERNAL_KEY
-      } else {
-        process.env.AUTH_INTERNAL_KEY = originalAuthInternalKey
-      }
-      if (originalAuthHost === undefined) {
-        delete process.env.AUTH_HOST
-      } else {
-        process.env.AUTH_HOST = originalAuthHost
-      }
+    const getAuthGuardSettings = createAuthGuardSettingsReader({
+      query: async (queryText) => {
+        settingsQuery = queryText
+        return { rows: [{ registration_enabled: true }] }
+      },
     })
 
     const settings = await getAuthGuardSettings()
@@ -47,5 +25,35 @@ describe('getAuthGuardSettings', () => {
       windowSeconds: DEFAULT_AUTH_RATE_LIMIT_WINDOW_SECONDS,
       maxRequests: DEFAULT_AUTH_RATE_LIMIT_MAX_REQUESTS,
     })
+  })
+
+  it('keeps fail-closed cache state isolated per Runtime reader', async () => {
+    const { createAuthGuardSettingsReader } = await import('./authGuardSettings.js')
+    let firstQueries = 0
+    const first = createAuthGuardSettingsReader(
+      {
+        query: async () => {
+          firstQueries += 1
+          throw new Error('database unavailable')
+        },
+      },
+      { now: () => 1_000, onError: () => {} },
+    )
+    let secondQueries = 0
+    const second = createAuthGuardSettingsReader(
+      {
+        query: async () => {
+          secondQueries += 1
+          return { rows: [{ registration_enabled: true }] }
+        },
+      },
+      { now: () => 1_000 },
+    )
+
+    assert.equal((await first()).registrationEnabled, false)
+    assert.equal((await first()).registrationEnabled, false)
+    assert.equal((await second()).registrationEnabled, true)
+    assert.equal(firstQueries, 1)
+    assert.equal(secondQueries, 1)
   })
 })

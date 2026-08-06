@@ -2,13 +2,19 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   createAuthInternalCommands,
-  type AuthInternalCommandRepository,
-  type TrustedIdentityAuthAPI,
+  type AuthIdentityMutationStore,
 } from "./authInternalCommands.js";
+import {
+  createTrustedIdentityProvisioner,
+  type TrustedIdentityAuthAPI,
+  type TrustedIdentityRepository,
+} from "./trustedIdentity.js";
+
+type TestIdentityStore = AuthIdentityMutationStore & TrustedIdentityRepository;
 
 type CommandOverrides = {
   authApi?: Partial<TrustedIdentityAuthAPI>;
-  repository?: Partial<AuthInternalCommandRepository>;
+  repository?: Partial<TestIdentityStore>;
 };
 
 function createTestCommands(overrides: CommandOverrides = {}) {
@@ -22,7 +28,7 @@ function createTestCommands(overrides: CommandOverrides = {}) {
     }),
     ...overrides.authApi,
   };
-  const repository: AuthInternalCommandRepository = {
+  const repository: TestIdentityStore = {
     findUserByEmail: async () => null,
     finalizeTrustedRegistrationIdentity: async () => true,
     removeAuthUserCascade: async () => true,
@@ -31,7 +37,10 @@ function createTestCommands(overrides: CommandOverrides = {}) {
     deleteAuthUserSessions: async () => true,
     ...overrides.repository,
   };
-  return createAuthInternalCommands(authApi, repository);
+  return createAuthInternalCommands(
+    createTrustedIdentityProvisioner(authApi, repository),
+    repository,
+  );
 }
 
 describe("AuthInternalCommands", () => {
@@ -491,7 +500,7 @@ describe("AuthInternalCommands", () => {
       {
         ok: false,
         kind: "repository_failure",
-        message: "failed to locate existing user",
+        message: "failed to ensure user",
       },
     );
   });
@@ -526,5 +535,21 @@ describe("AuthInternalCommands", () => {
       data: { auth_user_id: "auth-user", banned: true },
     });
     assert.deepEqual(calls, ["ban", "revoke", "ban", "revoke"]);
+  });
+
+  it("classifies a ban without session revocation as retryable repository failure", async (t) => {
+    t.mock.method(console, "error", () => {});
+    const commands = createTestCommands({
+      repository: {
+        updateAuthUserBanState: async () => true,
+        deleteAuthUserSessions: async () => false,
+      },
+    });
+
+    assert.deepEqual(await commands.banIdentity({ authUserID: "auth-user" }), {
+      ok: false,
+      kind: "repository_failure",
+      message: "failed to ban auth user",
+    });
   });
 });

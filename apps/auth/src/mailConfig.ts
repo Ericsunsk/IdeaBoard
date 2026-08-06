@@ -1,4 +1,3 @@
-import type { Pool } from "pg";
 import {
   mailConfigurationTest,
   type RenderedEmail,
@@ -62,33 +61,22 @@ export type MailConfigRepository = {
   put: (
     value: Omit<
       StoredMailConfig,
-      "updatedAt" | "lastTestedAt" | "lastTestErrorCode"
+      "configVersion" | "updatedAt" | "lastTestedAt" | "lastTestErrorCode"
     > & { readiness: MailReadiness },
+    expectedConfigVersion: number,
     actorId: number,
     action: string,
-  ) => Promise<StoredMailConfig>;
+  ) => Promise<StoredMailConfig | null>;
   markTest: (
     readiness: Extract<MailReadiness, "ready" | "unavailable">,
     errorCode: string | null,
     actorId: number,
     configVersion: number,
   ) => Promise<boolean>;
-  clear: (actorId: number) => Promise<void>;
+  clear: (expectedConfigVersion: number, actorId: number) => Promise<boolean>;
 };
 
-export const MAIL_SETTINGS_ENCRYPTION_KEY_ENV = "APP_SECRETS_ENCRYPTION_KEY";
-
-export function createRuntimeMailConfigService(
-  pool: Pool,
-  source: Record<string, string | undefined> = process.env,
-  fetchImpl: typeof fetch = fetch,
-) {
-  return new MailConfigService(
-    createPgMailConfigRepository(pool),
-    createResendTransport(fetchImpl),
-    String(source[MAIL_SETTINGS_ENCRYPTION_KEY_ENV] || "").trim(),
-  );
-}
+const MAX_CONFIG_MUTATION_ATTEMPTS = 3;
 
 export class MailConfigService {
   constructor(
@@ -115,45 +103,55 @@ export class MailConfigService {
     ) {
       throw new MailConfigError("invalid_input", "发件人配置无效");
     }
-    const current = await this.repository.get();
-    let encryptedApiKey = current?.encryptedApiKey ?? "";
     const nextAPIKey = input.apiKey?.trim() ?? "";
     const rotatedAPIKey = Boolean(nextAPIKey);
-    if (rotatedAPIKey)
-      encryptedApiKey = encryptSecret(nextAPIKey, this.encryptionKey);
-    const changed =
-      !current ||
-      rotatedAPIKey ||
-      current.fromName !== fromName ||
-      current.fromEmail !== fromEmail ||
-      current.replyTo !== replyTo;
-    const readiness: MailReadiness =
-      !encryptedApiKey || !fromName || !fromEmail
-        ? "not_configured"
-        : changed
-          ? "not_tested"
-          : current.readiness;
-    const configVersion = changed
-      ? (current?.configVersion ?? 0) + 1
-      : current.configVersion;
-    const saved = await this.repository.put(
-      {
-        encryptedApiKey,
-        fromName,
-        fromEmail,
-        replyTo,
-        configVersion,
-        readiness,
-      },
-      input.actorId,
-      current ? "update_mail_config" : "create_mail_config",
-    );
-    return summarize(saved);
+    const rotatedEncryptedAPIKey = rotatedAPIKey
+      ? encryptSecret(nextAPIKey, this.encryptionKey)
+      : "";
+
+    for (let attempt = 0; attempt < MAX_CONFIG_MUTATION_ATTEMPTS; attempt += 1) {
+      const current = await this.repository.get();
+      const encryptedApiKey = rotatedAPIKey
+        ? rotatedEncryptedAPIKey
+        : (current?.encryptedApiKey ?? "");
+      const changed =
+        !current ||
+        rotatedAPIKey ||
+        current.fromName !== fromName ||
+        current.fromEmail !== fromEmail ||
+        current.replyTo !== replyTo;
+      if (!changed && current) return summarize(current);
+
+      const readiness: MailReadiness =
+        !encryptedApiKey || !fromName || !fromEmail
+          ? "not_configured"
+          : "not_tested";
+      const saved = await this.repository.put(
+        {
+          encryptedApiKey,
+          fromName,
+          fromEmail,
+          replyTo,
+          readiness,
+        },
+        current?.configVersion ?? 0,
+        input.actorId,
+        current ? "update_mail_config" : "create_mail_config",
+      );
+      if (saved) return summarize(saved);
+    }
+
+    throw new MailConfigError("config_changed", "邮件配置已变化，请重试");
   }
 
   async clear(actorId: number): Promise<void> {
     if (actorId <= 0) throw new MailConfigError("invalid_input", "操作者无效");
-    await this.repository.clear(actorId);
+    for (let attempt = 0; attempt < MAX_CONFIG_MUTATION_ATTEMPTS; attempt += 1) {
+      const current = await this.repository.get();
+      if (!current) return;
+      if (await this.repository.clear(current.configVersion, actorId)) return;
+    }
+    throw new MailConfigError("config_changed", "邮件配置已变化，请重试");
   }
 
   async sendTest(input: MailTestInput): Promise<void> {
@@ -181,30 +179,43 @@ export class MailConfigService {
         },
         apiKey,
       );
-      const applied = await this.repository.markTest(
+    } catch (deliveryError) {
+      try {
+        await this.repository.markTest(
+          "unavailable",
+          normalizeProviderError(deliveryError),
+          input.actorId,
+          current.configVersion,
+        );
+      } catch (persistenceError) {
+        throw new AggregateError(
+          [deliveryError, persistenceError],
+          "mail test delivery and readiness persistence failed",
+        );
+      }
+      throw new MailConfigError("provider_error", "测试邮件发送失败", {
+        cause: deliveryError,
+      });
+    }
+
+    let applied: boolean;
+    try {
+      applied = await this.repository.markTest(
         "ready",
         null,
         input.actorId,
         current.configVersion,
       );
-      if (!applied) {
-        throw new MailConfigError(
-          "config_changed",
-          "邮件配置已变化，请重新测试",
-        );
-      }
     } catch (error) {
-      if (error instanceof MailConfigError && error.code === "config_changed") {
-        throw error;
-      }
-      const code = normalizeProviderError(error);
-      await this.repository.markTest(
-        "unavailable",
-        code,
-        input.actorId,
-        current.configVersion,
+      throw new MailConfigError("repository_error", "邮件测试状态保存失败", {
+        cause: error,
+      });
+    }
+    if (!applied) {
+      throw new MailConfigError(
+        "config_changed",
+        "邮件配置已变化，请重新测试",
       );
-      throw new MailConfigError("provider_error", "测试邮件发送失败");
     }
   }
 
@@ -225,14 +236,20 @@ export class MailConfigService {
     } catch {
       throw new MailConfigError("unavailable", "邮件服务密钥不可用");
     }
-    await this.transport.send(
-      {
-        ...input,
-        from: input.from ?? `${current.fromName} <${current.fromEmail}>`,
-        replyTo: input.replyTo ?? current.replyTo ?? undefined,
-      },
-      apiKey,
-    );
+    try {
+      await this.transport.send(
+        {
+          ...input,
+          from: input.from ?? `${current.fromName} <${current.fromEmail}>`,
+          replyTo: input.replyTo ?? current.replyTo ?? undefined,
+        },
+        apiKey,
+      );
+    } catch (error) {
+      throw new MailConfigError("provider_error", "邮件发送失败", {
+        cause: error,
+      });
+    }
   }
 }
 
@@ -240,43 +257,11 @@ export class MailConfigError extends Error {
   constructor(
     readonly code: string,
     message: string,
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
     this.name = "MailConfigError";
   }
-}
-
-export function createResendTransport(
-  fetchImpl: typeof fetch = fetch,
-  timeoutMs = 5_000,
-): MailTransport {
-  return {
-    async send(input, apiKey) {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const response = await fetchImpl("https://api.resend.com/emails", {
-          method: "POST",
-          signal: controller.signal,
-          headers: {
-            authorization: `Bearer ${apiKey}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            from: input.from,
-            to: [input.to],
-            subject: input.content.subject,
-            html: input.content.html,
-            text: input.content.text,
-            ...(input.replyTo ? { reply_to: input.replyTo } : {}),
-          }),
-        });
-        if (!response.ok) throw new Error(`resend_${response.status}`);
-      } finally {
-        clearTimeout(timeout);
-      }
-    },
-  };
 }
 
 function emptySummary(): MailConfigSummary {
@@ -318,9 +303,16 @@ function isEmail(value: string): boolean {
   return value.length <= 320 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 function normalizeProviderError(error: unknown): string {
-  return error instanceof Error && /^resend_\d+$/.test(error.message)
-    ? error.message
-    : "provider_unavailable";
+  if (
+    error instanceof Error &&
+    "code" in error &&
+    (error.code === "timeout" ||
+      error.code === "non_2xx" ||
+      error.code === "unavailable")
+  ) {
+    return `provider_${error.code}`;
+  }
+  return "provider_unavailable";
 }
 function encryptSecret(plaintext: string, key: string): string {
   try {
@@ -335,128 +327,4 @@ function encryptSecret(plaintext: string, key: string): string {
 
 function decryptSecret(encoded: string, key: string): string {
   return decryptRuntimeSecret(encoded, key);
-}
-
-export function createPgMailConfigRepository(pool: Pool): MailConfigRepository {
-  return {
-    async get() {
-      const result = await pool.query<MailConfigRow>(
-        "SELECT encrypted_api_key, from_name, from_email, reply_to, config_version, readiness, updated_at, last_tested_at, last_test_error_code FROM auth_mail_settings WHERE id = 1",
-      );
-      const row = result.rows[0];
-      return row
-        ? {
-            encryptedApiKey: row.encrypted_api_key,
-            fromName: row.from_name,
-            fromEmail: row.from_email,
-            replyTo: row.reply_to,
-            configVersion: Number(row.config_version),
-            readiness: row.readiness,
-            updatedAt: row.updated_at,
-            lastTestedAt: row.last_tested_at,
-            lastTestErrorCode: row.last_test_error_code,
-          }
-        : null;
-    },
-    async put(value, actorId, action) {
-      return withMailConfigTransaction(pool, async (client) => {
-        const result = await client.query<MailConfigRow>(
-          "INSERT INTO auth_mail_settings (id, encrypted_api_key, from_name, from_email, reply_to, config_version, readiness, updated_at, last_tested_at, last_test_error_code) VALUES (1, $1, $2, $3, $4, $5, $6, clock_timestamp(), NULL, NULL) ON CONFLICT (id) DO UPDATE SET encrypted_api_key = EXCLUDED.encrypted_api_key, from_name = EXCLUDED.from_name, from_email = EXCLUDED.from_email, reply_to = EXCLUDED.reply_to, config_version = EXCLUDED.config_version, readiness = EXCLUDED.readiness, updated_at = clock_timestamp(), last_tested_at = CASE WHEN auth_mail_settings.config_version = EXCLUDED.config_version THEN auth_mail_settings.last_tested_at ELSE NULL END, last_test_error_code = CASE WHEN auth_mail_settings.config_version = EXCLUDED.config_version THEN auth_mail_settings.last_test_error_code ELSE NULL END RETURNING encrypted_api_key, from_name, from_email, reply_to, config_version, readiness, updated_at, last_tested_at, last_test_error_code",
-          [
-            value.encryptedApiKey,
-            value.fromName,
-            value.fromEmail,
-            value.replyTo,
-            value.configVersion,
-            value.readiness,
-          ],
-        );
-        await client.query(
-          "INSERT INTO auth_mail_settings_audit (actor_id, action, metadata) VALUES ($1, $2, $3)",
-          [actorId, action, JSON.stringify({ readiness: value.readiness })],
-        );
-        const row = result.rows[0];
-        return {
-          encryptedApiKey: row.encrypted_api_key,
-          fromName: row.from_name,
-          fromEmail: row.from_email,
-          replyTo: row.reply_to,
-          configVersion: Number(row.config_version),
-          readiness: row.readiness,
-          updatedAt: row.updated_at,
-          lastTestedAt: row.last_tested_at,
-          lastTestErrorCode: row.last_test_error_code,
-        };
-      });
-    },
-    async markTest(readiness, errorCode, actorId, configVersion) {
-      return withMailConfigTransaction(pool, async (client) => {
-        const result = await client.query(
-          "UPDATE auth_mail_settings SET readiness = $1, last_tested_at = clock_timestamp(), last_test_error_code = $2, updated_at = clock_timestamp() WHERE id = 1 AND config_version = $3",
-          [readiness, errorCode, configVersion],
-        );
-        const applied = (result.rowCount ?? 0) > 0;
-        await client.query(
-          "INSERT INTO auth_mail_settings_audit (actor_id, action, metadata) VALUES ($1, $2, $3)",
-          [
-            actorId,
-            applied && readiness === "ready"
-              ? "test_mail_success"
-              : "test_mail_failure",
-            JSON.stringify({
-              readiness: applied ? readiness : "not_tested",
-              error_code: applied ? errorCode : "config_changed",
-            }),
-          ],
-        );
-        return applied;
-      });
-    },
-    async clear(actorId) {
-      await withMailConfigTransaction(pool, async (client) => {
-        await client.query("DELETE FROM auth_mail_settings WHERE id = 1");
-        await client.query(
-          "INSERT INTO auth_mail_settings_audit (actor_id, action, metadata) VALUES ($1, $2, $3)",
-          [actorId, "delete_mail_config", JSON.stringify({})],
-        );
-      });
-    },
-  };
-}
-
-type MailConfigRow = {
-  encrypted_api_key: string;
-  from_name: string;
-  from_email: string;
-  reply_to: string;
-  config_version: number | string;
-  readiness: MailReadiness;
-  updated_at: Date;
-  last_tested_at: Date | null;
-  last_test_error_code: string | null;
-};
-
-async function withMailConfigTransaction<T>(
-  pool: Pool,
-  run: (client: import("pg").PoolClient) => Promise<T>,
-): Promise<T> {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const result = await run(client);
-    await client.query("COMMIT");
-    return result;
-  } catch (error) {
-    try {
-      await client.query("ROLLBACK");
-    } catch (rollbackError) {
-      throw new AggregateError(
-        [error, rollbackError],
-        "mail config transaction failed",
-      );
-    }
-    throw error;
-  } finally {
-    client.release();
-  }
 }

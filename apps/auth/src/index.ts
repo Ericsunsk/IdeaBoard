@@ -1,99 +1,51 @@
-import { toNodeHandler } from 'better-auth/node'
-import {
-  authDB,
-  mailConfigService,
-  runtimeAuthRegistry,
-  socialProviderSettingsService,
-} from './auth.js'
-import { createAuthApp } from './authApp.js'
-import { getAuthGuardSettings } from './authGuardSettings.js'
-import { createAuthInternalCommands, type InternalAuthAPI } from './authInternalCommands.js'
-import {
-  deleteAuthUserSessions,
-  findUserByEmail,
-  finalizeTrustedRegistrationIdentity,
-  removeAuthUserCascade,
-  updateAuthUserBanState,
-  updateAuthUserRole,
-} from './authRepository.js'
-import { env } from './env.js'
-import { verifyAuthRuntimePrivileges } from './runtime-privileges.js'
-import { AUTH_CLEANUP_INTERVAL_MS, cleanupUnverifiedUsers } from './authCleanup.js'
+import dotenv from "dotenv";
+import { createProductionAuthRuntime } from "./authRuntimeProduction.js";
+import { loadEnv } from "./env.js";
 
-const authApi: InternalAuthAPI = {
-  getSession: (input) => runtimeAuthRegistry.current.api.getSession(input),
-  signUpEmail: (input) => runtimeAuthRegistry.current.api.signUpEmail(input),
-}
+dotenv.config({ quiet: true });
 
-const repository = {
-  findUserByEmail,
-  finalizeTrustedRegistrationIdentity,
-  updateAuthUserRole,
-  updateAuthUserBanState,
-  deleteAuthUserSessions,
-  removeAuthUserCascade,
-}
+const environment = loadEnv(process.env);
+const runtime = createProductionAuthRuntime(environment);
+let shutdownPromise: Promise<void> | undefined;
 
-const app = createAuthApp({
-  config: {
-    trustProxy: env.auth.trustProxy,
-    internalKey: env.auth.internalKey,
-    trustedOrigins: env.auth.trustedOrigins,
-  },
-  healthCheck: async () => {
-    await authDB.query('SELECT 1')
-  },
-  authHandler: (request, response) =>
-    toNodeHandler(runtimeAuthRegistry.current)(request, response),
-  authApi,
-  repository,
-  internalCommands: createAuthInternalCommands(authApi, repository),
-  getAuthGuardSettings,
-  mailConfigService,
-  socialProviderSettingsService,
-})
-
-const cleanupTimer = setInterval(() => {
-  void cleanupUnverifiedUsers(authDB).catch((error) => {
-    console.error('[auth] Failed to clean up unverified users', error)
-  })
-}, AUTH_CLEANUP_INTERVAL_MS)
-cleanupTimer.unref()
+process.once("SIGTERM", () => {
+  void gracefulShutdown("SIGTERM");
+});
+process.once("SIGINT", () => {
+  void gracefulShutdown("SIGINT");
+});
 
 try {
-  await verifyAuthRuntimePrivileges(authDB)
-  await socialProviderSettingsService.initialize()
-  await app.listen({ port: env.auth.port, host: env.auth.host })
-  console.log(`[auth] Better Auth service listening on http://${env.auth.host}:${env.auth.port}`)
+  await runtime.start();
+  console.log(
+    `[auth] Better Auth service listening on http://${environment.auth.host}:${environment.auth.port}`,
+  );
 } catch (error) {
-  console.error('[auth] Failed to start auth service', error)
-  await authDB.end()
-  process.exit(1)
+  console.error("[auth] Failed to start auth service", error);
+  process.exitCode = 1;
 }
 
-function gracefulShutdown(signal: string) {
-  console.log(`[auth] ${signal} received, shutting down gracefully...`)
-  // Force exit after 10s if graceful close hangs
-  setTimeout(() => {
-    console.error('[auth] Graceful shutdown timed out, forcing exit')
-    process.exit(1)
-  }, 10_000).unref()
-
-  app
-    .close()
-    .then(() => {
-      clearInterval(cleanupTimer)
-      return authDB.end()
-    })
-    .then(() => {
-      console.log('[auth] Database pool closed')
-      process.exit(0)
-    })
-    .catch((err) => {
-      console.error('[auth] Error closing auth service', err)
-      process.exit(1)
-    })
+function gracefulShutdown(signal: string): Promise<void> {
+  shutdownPromise ??= shutdown(signal);
+  return shutdownPromise;
 }
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
-process.on('SIGINT', () => gracefulShutdown('SIGINT'))
+async function shutdown(signal: string): Promise<void> {
+  console.log(`[auth] ${signal} received, shutting down gracefully...`);
+  const forceExitTimer = setTimeout(() => {
+    console.error("[auth] Graceful shutdown timed out, forcing exit");
+    process.exit(1);
+  }, 10_000);
+  forceExitTimer.unref();
+
+  try {
+    await runtime.close();
+    clearTimeout(forceExitTimer);
+    console.log("[auth] Auth Runtime closed");
+    process.exit(0);
+  } catch (error) {
+    clearTimeout(forceExitTimer);
+    console.error("[auth] Error closing auth service", error);
+    process.exit(1);
+  }
+}

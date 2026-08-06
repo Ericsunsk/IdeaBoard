@@ -7,10 +7,10 @@ import {
   isAuthRoute,
   type AuthNodeHandler,
 } from "./authEntryGuard.js";
-import type { AuthGuardSettings } from "./authGuardSettings.js";
+import type { AuthAdmissionPolicy } from "./authAdmissionPolicy.js";
 import type {
+  AuthSessionAPI,
   AuthInternalCommands,
-  InternalAuthAPI,
 } from "./authInternalCommands.js";
 import { extractErrorMessage } from "./authUtils.js";
 import { registerInternalRoutes } from "./internalRoutes.js";
@@ -23,7 +23,6 @@ import {
   registerSocialProviderRoutes,
 } from "./socialProviderRoutes.js";
 import type { SocialProviderSettingsService } from "./socialProviderSettings.js";
-import type { TrustedIdentityRepository } from "./trustedIdentity.js";
 
 export type AuthAppConfig = {
   trustProxy: FastifyServerOptions["trustProxy"];
@@ -35,10 +34,9 @@ export type AuthAppDependencies = {
   config: AuthAppConfig;
   healthCheck: () => Promise<void>;
   authHandler: AuthNodeHandler;
-  authApi: InternalAuthAPI;
-  repository: TrustedIdentityRepository;
+  authApi: AuthSessionAPI;
   internalCommands: AuthInternalCommands;
-  getAuthGuardSettings: () => Promise<AuthGuardSettings>;
+  admissionPolicy: AuthAdmissionPolicy;
   mailConfigService?: Pick<MailConfigService, "getSummary" | "update" | "clear" | "sendTest">;
   socialProviderSettingsService?: Pick<
     SocialProviderSettingsService,
@@ -52,12 +50,8 @@ export function createAuthApp(deps: AuthAppDependencies): FastifyInstance {
     trustProxy: deps.config.trustProxy,
   });
   const authEntryGuard = createAuthEntryGuard({
-    trustedOrigins: deps.config.trustedOrigins,
-    getAuthGuardSettings: deps.getAuthGuardSettings,
+    admissionPolicy: deps.admissionPolicy,
     authHandler: createAuthDispatchHandler(deps.authHandler),
-    getMailReadiness: deps.mailConfigService
-      ? async () => (await deps.mailConfigService!.getSummary()).readiness
-      : undefined,
   });
 
   app.setErrorHandler((error, _request, reply) => {

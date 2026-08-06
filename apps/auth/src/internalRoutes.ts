@@ -7,7 +7,7 @@ import type {
   AuthInternalCommandFailureKind,
   AuthInternalCommandResult,
   AuthInternalCommands,
-  InternalAuthAPI,
+  AuthSessionAPI,
 } from "./authInternalCommands.js";
 import { extractAuthUser, extractErrorMessage } from "./authUtils.js";
 import type { RouteHandlers } from "./generated/auth-internal/fastify.gen.js";
@@ -22,7 +22,7 @@ import { sessionIdentityFromAuthUser } from "./trustedIdentity.js";
 
 export type InternalRoutesOptions = {
   internalKey: string;
-  authApi: Pick<InternalAuthAPI, "getSession">;
+  authApi: AuthSessionAPI;
   commands: AuthInternalCommands;
 };
 

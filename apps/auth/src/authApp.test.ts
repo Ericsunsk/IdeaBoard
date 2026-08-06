@@ -3,31 +3,43 @@ import { describe, it } from "node:test";
 import type { AuthAppConfig, AuthAppDependencies } from "./authApp.js";
 import { createAuthApp } from "./authApp.js";
 import {
+  type AuthIdentityMutationStore,
+  type AuthSessionAPI,
   createAuthInternalCommands,
-  type AuthInternalCommandRepository,
   type AuthInternalCommands,
-  type InternalAuthAPI,
 } from "./authInternalCommands.js";
 import { authInternalRoutes } from "./generated/auth-internal/routes.gen.js";
+import { createAuthAdmissionPolicy } from "./authAdmissionPolicy.js";
+import type { AuthGuardSettings } from "./authGuardSettings.js";
+import {
+  createTrustedIdentityProvisioner,
+  type TrustedIdentityAuthAPI,
+  type TrustedIdentityRepository,
+} from "./trustedIdentity.js";
+
+type TestAuthAPI = AuthSessionAPI & TrustedIdentityAuthAPI;
+type TestIdentityStore = AuthIdentityMutationStore & TrustedIdentityRepository;
 
 type TestOverrides = Omit<
   Partial<AuthAppDependencies>,
-  "authApi" | "config" | "internalCommands" | "repository"
+  "authApi" | "config" | "internalCommands"
 > & {
-  authApi?: Partial<InternalAuthAPI>;
+  authApi?: Partial<TestAuthAPI>;
   config?: Partial<AuthAppConfig>;
   internalCommands?: Partial<AuthInternalCommands>;
-  repository?: Partial<AuthInternalCommandRepository>;
+  repository?: Partial<TestIdentityStore>;
+  getAuthGuardSettings?: () => Promise<AuthGuardSettings>;
 };
 
 function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
+  const { getAuthGuardSettings, ...dependencyOverrides } = overrides;
   const config: AuthAppConfig = {
     trustProxy: false,
     internalKey: "test-internal-key",
     trustedOrigins: ["https://app.example.com"],
     ...overrides.config,
   };
-  const authApi: InternalAuthAPI = {
+  const authApi: TestAuthAPI = {
     getSession: async () => ({
       user: {
         id: "auth-user-1",
@@ -44,7 +56,7 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
     }),
     ...overrides.authApi,
   };
-  const repository: AuthInternalCommandRepository = {
+  const repository: TestIdentityStore = {
     findUserByEmail: async () => null,
     finalizeTrustedRegistrationIdentity: async () => true,
     updateAuthUserRole: async () => true,
@@ -54,10 +66,33 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
     ...overrides.repository,
   };
   const internalCommands: AuthInternalCommands = {
-    ...createAuthInternalCommands(authApi, repository),
+    ...createAuthInternalCommands(
+      createTrustedIdentityProvisioner(authApi, repository),
+      repository,
+    ),
     ...overrides.internalCommands,
   };
 
+  const admissionPolicy =
+    overrides.admissionPolicy ??
+    createAuthAdmissionPolicy({
+      trustedOrigins: config.trustedOrigins,
+      getSettings:
+        getAuthGuardSettings ??
+        (async () => ({
+          registrationEnabled: true,
+          windowSeconds: 60,
+          maxRequests: 30,
+        })),
+      getMailReadiness: overrides.mailConfigService
+        ? async () => (await overrides.mailConfigService!.getSummary()).readiness
+        : undefined,
+      getGoogleProviderReadiness: overrides.socialProviderSettingsService
+        ? async () =>
+            (await overrides.socialProviderSettingsService!.getCapabilities())
+              .social.google
+        : undefined,
+    });
   const baseDeps: AuthAppDependencies = {
     config,
     healthCheck: async () => {},
@@ -66,22 +101,16 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
       res.end();
     },
     authApi,
-    repository,
     internalCommands,
-    getAuthGuardSettings: async () => ({
-      registrationEnabled: true,
-      windowSeconds: 60,
-      maxRequests: 30,
-    }),
+    admissionPolicy,
   };
 
   return {
     ...baseDeps,
-    ...overrides,
+    ...dependencyOverrides,
     config,
     authApi,
     internalCommands,
-    repository,
   };
 }
 

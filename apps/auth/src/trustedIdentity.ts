@@ -1,14 +1,14 @@
 import {
   extractAuthUser,
+  isDuplicateUserError,
   isValidCanonicalEmail,
+  normalizeAuthRole,
   normalizeCanonicalEmail,
   normalizeAvatarURL,
   normalizeDisplayName,
   type InternalUserShape,
 } from "./authUtils.js";
 import type { AuthRole } from "./generated/auth-internal/types.gen.js";
-
-export type { AuthRole } from "./generated/auth-internal/types.gen.js";
 
 export type TrustedIdentityAuthAPI = {
   signUpEmail(input: {
@@ -61,76 +61,204 @@ export type TrustedIdentityRepository = {
   removeAuthUserCascade(authUserID: string): Promise<boolean>;
 };
 
-export class TrustedIdentityCleanupError extends Error {}
+export type TrustedIdentityProvisioningInput = {
+  email?: unknown;
+  displayName?: unknown;
+  password?: unknown;
+  role?: unknown;
+  allowExisting?: unknown;
+};
 
-export async function provisionTrustedCanonicalIdentity(
+export type TrustedIdentityProvisioningOutcome =
+  | {
+      kind: "created" | "existing";
+      user: InternalUserShape;
+      identity: {
+        claimIdentity: string;
+        displayName: string;
+        role: AuthRole;
+      };
+    }
+  | {
+      kind: "conflict";
+      reason: "already_exists" | "identity_mismatch";
+    }
+  | {
+      kind: "invalid";
+      message: string;
+    };
+
+export type TrustedIdentityProvisioner = {
+  provision(
+    input: TrustedIdentityProvisioningInput,
+  ): Promise<TrustedIdentityProvisioningOutcome>;
+};
+
+export class TrustedIdentityProvisioningError extends Error {
+  constructor(
+    readonly code: "dependency_failure" | "reconciliation_required",
+    message: string,
+    readonly authUserID?: string,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = "TrustedIdentityProvisioningError";
+  }
+}
+
+export function createTrustedIdentityProvisioner(
   authApi: TrustedIdentityAuthAPI,
   repository: TrustedIdentityRepository,
-  email: string,
-  displayName: string,
-  password: string,
-  role: AuthRole,
-) {
-  const claimIdentity = normalizeCanonicalEmail(email);
-  if (!isValidCanonicalEmail(claimIdentity))
-    throw new Error("a valid email is required");
-  let createdUserID = "";
-  try {
-    const created = await authApi.signUpEmail({
-      body: { email: claimIdentity, password, name: displayName },
-    });
-    const user = extractAuthUser(created);
-    if (!user) {
-      let recovered;
-      try {
-        recovered = await repository.findUserByEmail(claimIdentity);
-      } catch (lookupError) {
-        console.error(
-          "[auth] failed to recover trusted identity after empty sign-up payload",
-          lookupError,
-        );
-        throw new TrustedIdentityCleanupError(
-          "trusted identity provisioning failed and cleanup requires operator attention",
-        );
+): TrustedIdentityProvisioner {
+  return {
+    async provision(input) {
+      const claimIdentity = normalizeCanonicalEmail(input.email);
+      const displayName = normalizeDisplayName(input.displayName);
+      const password = String(input.password || "");
+      const role = normalizeAuthRole(input.role);
+      if (!isValidCanonicalEmail(claimIdentity)) {
+        return { kind: "invalid", message: "a valid email is required" };
       }
-      if (!recovered?.id) {
-        throw new TrustedIdentityCleanupError(
-          "trusted identity sign-up returned an empty payload and cleanup identity could not be recovered",
-        );
+      if (!displayName) {
+        return { kind: "invalid", message: "display name is required" };
       }
-      createdUserID = recovered.id;
-      throw new Error("auth user creation succeeded but user payload is empty");
-    }
-    createdUserID = user.id;
-    if (
-      !(await repository.finalizeTrustedRegistrationIdentity(
-        user.id,
-        claimIdentity,
-        role,
-      ))
-    ) {
-      throw new Error(
-        "failed to finalize trusted canonical registration identity",
-      );
-    }
-    return user;
-  } catch (error) {
-    if (createdUserID) {
+      if (password.length < 10 || password.length > 128) {
+        return {
+          kind: "invalid",
+          message: "password length must be between 10 and 128",
+        };
+      }
+      if (!role) {
+        return {
+          kind: "invalid",
+          message: "role must be admin or user",
+        };
+      }
+
+      const identity = { claimIdentity, displayName, role };
+      let createdUserID = "";
       try {
-        const cleaned = await repository.removeAuthUserCascade(createdUserID);
-        if (!cleaned) {
-          throw new Error("created auth user was not found during cleanup");
+        let created: unknown;
+        try {
+          created = await authApi.signUpEmail({
+            body: { email: claimIdentity, password, name: displayName },
+          });
+        } catch (error) {
+          if (isDuplicateUserError(error)) {
+            return resolveExistingIdentity(
+              repository,
+              claimIdentity,
+              role,
+              identity,
+              input.allowExisting === true,
+            );
+          }
+          throw error;
         }
-      } catch (cleanupError) {
-        console.error(
-          "[auth] failed to roll back incomplete trusted identity",
-          cleanupError,
-        );
-        throw new TrustedIdentityCleanupError(
-          "trusted identity provisioning failed and cleanup requires operator attention",
+
+        const user = extractAuthUser(created);
+        if (!user) {
+          let recovered: InternalUserShape | null;
+          try {
+            recovered = await repository.findUserByEmail(claimIdentity);
+          } catch (lookupError) {
+            throw new TrustedIdentityProvisioningError(
+              "reconciliation_required",
+              "trusted identity sign-up returned no user and recovery failed",
+              undefined,
+              { cause: lookupError },
+            );
+          }
+          if (!recovered?.id) {
+            throw new TrustedIdentityProvisioningError(
+              "reconciliation_required",
+              "trusted identity sign-up returned no recoverable user",
+            );
+          }
+          createdUserID = recovered.id;
+          throw new Error("auth user creation returned an empty payload");
+        }
+
+        createdUserID = user.id;
+        if (
+          !(await repository.finalizeTrustedRegistrationIdentity(
+            user.id,
+            claimIdentity,
+            role,
+          ))
+        ) {
+          throw new Error(
+            "failed to finalize trusted canonical registration identity",
+          );
+        }
+        return { kind: "created", user, identity };
+      } catch (error) {
+        if (
+          error instanceof TrustedIdentityProvisioningError &&
+          error.code === "reconciliation_required" &&
+          !createdUserID
+        ) {
+          throw error;
+        }
+        if (createdUserID) {
+          try {
+            // Missing during cleanup is already the desired converged state.
+            await repository.removeAuthUserCascade(createdUserID);
+          } catch (cleanupError) {
+            throw new TrustedIdentityProvisioningError(
+              "reconciliation_required",
+              "trusted identity provisioning failed and cleanup requires operator attention",
+              createdUserID,
+              { cause: new AggregateError([error, cleanupError]) },
+            );
+          }
+        }
+        if (error instanceof TrustedIdentityProvisioningError) throw error;
+        throw new TrustedIdentityProvisioningError(
+          "dependency_failure",
+          "trusted identity provisioning failed",
+          createdUserID || undefined,
+          { cause: error },
         );
       }
-    }
-    throw error;
+    },
+  };
+}
+
+async function resolveExistingIdentity(
+  repository: TrustedIdentityRepository,
+  claimIdentity: string,
+  role: AuthRole,
+  identity: {
+    claimIdentity: string;
+    displayName: string;
+    role: AuthRole;
+  },
+  allowExisting: boolean,
+): Promise<TrustedIdentityProvisioningOutcome> {
+  if (!allowExisting) {
+    return { kind: "conflict", reason: "already_exists" };
   }
+  let existing: InternalUserShape | null;
+  try {
+    existing = await repository.findUserByEmail(claimIdentity);
+  } catch (error) {
+    throw new TrustedIdentityProvisioningError(
+      "dependency_failure",
+      "failed to locate existing trusted identity",
+      undefined,
+      { cause: error },
+    );
+  }
+  if (!existing) {
+    return { kind: "conflict", reason: "already_exists" };
+  }
+  if (
+    !existing.emailVerified ||
+    normalizeCanonicalEmail(existing.email) !== claimIdentity ||
+    normalizeAuthRole(existing.role) !== role
+  ) {
+    return { kind: "conflict", reason: "identity_mismatch" };
+  }
+  return { kind: "existing", user: existing, identity };
 }

@@ -83,6 +83,7 @@ export async function verifyAuthRuntimePrivileges(pool: Pool) {
     can_read_auth_users: boolean;
     can_manage_mail_settings?: boolean;
     can_insert_mail_audit?: boolean;
+    can_allocate_mail_config_version?: boolean;
     can_mutate_mail_audit?: boolean;
     can_manage_social_provider_settings?: boolean;
     can_delete_social_provider_settings?: boolean;
@@ -106,6 +107,7 @@ SELECT current_user,
        ) AS can_execute_credit_functions,
        has_table_privilege(current_user, 'auth_mail_settings', 'SELECT,INSERT,UPDATE,DELETE') AS can_manage_mail_settings,
        has_table_privilege(current_user, 'auth_mail_settings_audit', 'SELECT,INSERT') AS can_insert_mail_audit,
+       has_sequence_privilege(current_user, 'auth_mail_settings_config_version_seq', 'USAGE,SELECT') AS can_allocate_mail_config_version,
        has_table_privilege(current_user, 'auth_mail_settings_audit', 'UPDATE')
          OR has_table_privilege(current_user, 'auth_mail_settings_audit', 'DELETE')
          OR has_table_privilege(current_user, 'auth_mail_settings_audit', 'TRUNCATE') AS can_mutate_mail_audit,
@@ -126,6 +128,7 @@ SELECT current_user,
     (privileges.can_manage_mail_settings !== undefined &&
       (!privileges.can_manage_mail_settings ||
         !privileges.can_insert_mail_audit ||
+        !privileges.can_allocate_mail_config_version ||
         Boolean(privileges.can_mutate_mail_audit))) ||
     (privileges.can_manage_social_provider_settings !== undefined &&
       (!privileges.can_manage_social_provider_settings ||
@@ -140,6 +143,7 @@ SELECT current_user,
         `execute_credit_functions=${Boolean(privileges?.can_execute_credit_functions)} ` +
         `manage_mail_settings=${String(privileges?.can_manage_mail_settings)} ` +
         `insert_mail_audit=${String(privileges?.can_insert_mail_audit)} ` +
+        `allocate_mail_config_version=${String(privileges?.can_allocate_mail_config_version)} ` +
         `mutate_mail_audit=${String(privileges?.can_mutate_mail_audit)} ` +
         ` manage_social_provider_settings=${String(privileges?.can_manage_social_provider_settings)} ` +
         `delete_social_provider_settings=${String(privileges?.can_delete_social_provider_settings)}`,

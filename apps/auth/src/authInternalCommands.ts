@@ -1,5 +1,5 @@
-import type { InternalUserShape } from "./authUtils.js";
 import type {
+  AuthRole,
   BanUserData,
   DeleteUserData,
   EnsureUserEnvelope,
@@ -8,32 +8,22 @@ import type {
   UnbanUserData,
 } from "./generated/auth-internal/types.gen.js";
 import {
-  isDuplicateUserError,
-  isValidCanonicalEmail,
   normalizeAuthRole,
-  normalizeCanonicalEmail,
   normalizeDisplayName,
   normalizeOptionalPositiveInteger,
   normalizeOptionalText,
 } from "./authUtils.js";
 import {
-  provisionTrustedCanonicalIdentity,
-  type AuthRole,
-  type TrustedIdentityAuthAPI,
-  type TrustedIdentityRepository,
+  type TrustedIdentityProvisioner,
+  type TrustedIdentityProvisioningOutcome,
 } from "./trustedIdentity.js";
 
-export type {
-  AuthRole,
-  TrustedIdentityAuthAPI,
-  TrustedIdentityRepository,
-} from "./trustedIdentity.js";
-
-export type InternalAuthAPI = TrustedIdentityAuthAPI & {
+export type AuthSessionAPI = {
   getSession(input: { headers: Headers }): Promise<unknown>;
 };
 
-export type AuthInternalCommandRepository = TrustedIdentityRepository & {
+export type AuthIdentityMutationStore = {
+  removeAuthUserCascade(authUserID: string): Promise<boolean>;
   updateAuthUserRole(authUserID: string, role: AuthRole): Promise<boolean>;
   updateAuthUserBanState(
     authUserID: string,
@@ -103,103 +93,45 @@ export type AuthInternalCommands = {
 };
 
 export function createAuthInternalCommands(
-  authApi: TrustedIdentityAuthAPI,
-  repository: AuthInternalCommandRepository,
+  provisioner: TrustedIdentityProvisioner,
+  mutationStore: AuthIdentityMutationStore,
 ): AuthInternalCommands {
   return {
-    ensureIdentity: (input) => ensureIdentity(input, authApi, repository),
-    deleteIdentity: (input) => deleteIdentity(input, repository),
-    banIdentity: (input) => banIdentity(input, repository),
-    unbanIdentity: (input) => unbanIdentity(input, repository),
-    revokeSessions: (input) => revokeSessions(input, repository),
-    setRole: (input) => setRole(input, repository),
+    ensureIdentity: (input) => ensureIdentity(input, provisioner),
+    deleteIdentity: (input) => deleteIdentity(input, mutationStore),
+    banIdentity: (input) => banIdentity(input, mutationStore),
+    unbanIdentity: (input) => unbanIdentity(input, mutationStore),
+    revokeSessions: (input) => revokeSessions(input, mutationStore),
+    setRole: (input) => setRole(input, mutationStore),
   };
 }
 
 async function ensureIdentity(
   input: EnsureIdentityCommandInput,
-  authApi: TrustedIdentityAuthAPI,
-  repository: AuthInternalCommandRepository,
+  provisioner: TrustedIdentityProvisioner,
 ): Promise<AuthInternalCommandResult<TrustedIdentityData>> {
-  const email = normalizeCanonicalEmail(input.email);
-  const displayName = normalizeDisplayName(input.displayName);
-  const password = String(input.password || "");
-  const allowExisting = input.allowExisting === true;
-  const role = normalizeAuthRole(input.role);
-
-  if (!isValidCanonicalEmail(email))
-    return commandFailure("invalid_input", "a valid email is required");
-  if (!displayName) return commandFailure("invalid_input", "display name is required");
-  if (password.length < 10 || password.length > 128) {
-    return commandFailure(
-      "invalid_input",
-      "password length must be between 10 and 128",
-    );
-  }
-  if (!role)
-    return commandFailure("invalid_input", "role must be admin or user");
-
-  const claimIdentity = email;
   try {
-    const user = await provisionTrustedCanonicalIdentity(
-      authApi,
-      repository,
-      email,
-      displayName,
-      password,
-      role,
-    );
-    return commandSuccess(
-      trustedIdentityData(
-        user,
-        displayName,
-        claimIdentity,
-        role,
-        false,
-      ),
-    );
-  } catch (error) {
-    if (!isDuplicateUserError(error)) {
-      return repositoryFailure(error, "failed to ensure user");
+    const outcome = await provisioner.provision(input);
+    if (outcome.kind === "invalid") {
+      return commandFailure("invalid_input", outcome.message);
     }
-    if (!allowExisting) {
-      return commandFailure("conflict", "auth identity already exists");
-    }
-  }
-
-  try {
-    const existing = await repository.findUserByEmail(claimIdentity);
-    if (!existing) {
-      return commandFailure("conflict", "auth identity already exists");
-    }
-    const existingEmail = String(existing.email || "").toLowerCase();
-    if (
-      !existing.emailVerified ||
-      existingEmail !== claimIdentity ||
-      existing.role !== role
-    ) {
+    if (outcome.kind === "conflict") {
       return commandFailure(
         "conflict",
-        "existing identity conflicts with requested trusted user",
+        outcome.reason === "identity_mismatch"
+          ? "existing identity conflicts with requested trusted user"
+          : "auth identity already exists",
       );
     }
-    return commandSuccess(
-      trustedIdentityData(
-        existing,
-        displayName,
-        claimIdentity,
-        role,
-        true,
-      ),
-    );
+    return commandSuccess(trustedIdentityData(outcome));
   } catch (error) {
-    return repositoryFailure(error, "failed to locate existing user");
+    return repositoryFailure(error, "failed to ensure user");
   }
 }
 
 async function deleteIdentity(
   input: AuthUserIDCommandInput,
-  repository: AuthInternalCommandRepository,
+  repository: AuthIdentityMutationStore,
 ) {
   return runAuthUserMutation(
     input,
@@ -214,7 +146,7 @@ async function deleteIdentity(
 
 async function banIdentity(
   input: BanIdentityCommandInput,
-  repository: AuthInternalCommandRepository,
+  repository: AuthIdentityMutationStore,
 ): Promise<AuthInternalCommandResult<BanUserData>> {
   const authUserID = validateAuthUserID(input.authUserID);
   if (!authUserID.ok) return authUserID.result;
@@ -229,7 +161,9 @@ async function banIdentity(
     if (!banned) return commandFailure("not_found", "auth user not found");
 
     const revoked = await repository.deleteAuthUserSessions(authUserID.value);
-    if (!revoked) return commandFailure("not_found", "auth user not found");
+    if (!revoked) {
+      throw new Error("auth user sessions were not revoked after ban");
+    }
 
     return commandSuccess({ auth_user_id: authUserID.value, banned: true });
   } catch (error) {
@@ -239,7 +173,7 @@ async function banIdentity(
 
 async function unbanIdentity(
   input: AuthUserIDCommandInput,
-  repository: AuthInternalCommandRepository,
+  repository: AuthIdentityMutationStore,
 ) {
   return runAuthUserMutation(
     input,
@@ -252,7 +186,7 @@ async function unbanIdentity(
 
 async function revokeSessions(
   input: AuthUserIDCommandInput,
-  repository: AuthInternalCommandRepository,
+  repository: AuthIdentityMutationStore,
 ) {
   return runAuthUserMutation(
     input,
@@ -264,7 +198,7 @@ async function revokeSessions(
 
 async function setRole(
   input: SetRoleCommandInput,
-  repository: AuthInternalCommandRepository,
+  repository: AuthIdentityMutationStore,
 ): Promise<AuthInternalCommandResult<SetUserRoleData>> {
   const authUserID = validateAuthUserID(input.authUserID);
   if (!authUserID.ok) return authUserID.result;
@@ -301,22 +235,22 @@ async function runAuthUserMutation<TData>(
 }
 
 function trustedIdentityData(
-  user: InternalUserShape,
-  displayName: string,
-  claimIdentity: string,
-  role: AuthRole,
-  existing: boolean,
+  outcome: Extract<
+    TrustedIdentityProvisioningOutcome,
+    { kind: "created" | "existing" }
+  >,
 ): TrustedIdentityData {
+  const { user, identity } = outcome;
   return {
     user: {
       auth_user_id: user.id,
-      display_name: normalizeDisplayName(user.name || displayName),
-      email: normalizeCanonicalEmail(user.email || claimIdentity),
-      claim_identity: claimIdentity,
+      display_name: normalizeDisplayName(user.name || identity.displayName),
+      email: identity.claimIdentity,
+      claim_identity: identity.claimIdentity,
       claim_identity_kind: "canonical_email",
       claim_identity_verified: true,
-      role,
-      existing,
+      role: identity.role,
+      existing: outcome.kind === "existing",
     },
   };
 }

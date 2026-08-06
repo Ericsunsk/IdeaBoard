@@ -1,23 +1,30 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { createAuthAdmissionPolicy } from "./authAdmissionPolicy.js";
+import { createBetterAuthOptions } from "./auth.js";
+import { loadEnv } from "./env.js";
 
 test("native authentication security configuration stays explicit", async (t) => {
-  const originalInternalKey = process.env.AUTH_INTERNAL_KEY;
-  process.env.AUTH_INTERNAL_KEY = "test-internal-key";
-  t.after(() => {
-    if (originalInternalKey === undefined) {
-      delete process.env.AUTH_INTERNAL_KEY;
-    } else {
-      process.env.AUTH_INTERNAL_KEY = originalInternalKey;
-    }
+  void t;
+  const environment = loadEnv({
+    NODE_ENV: "test",
+    AUTH_INTERNAL_KEY: "test-internal-key",
+    DB_SSLMODE: "disable",
   });
-
-  const { auth, authDB } = await import("./auth.js");
-  t.after(async () => {
-    await authDB.end();
+  const admissionPolicy = createAuthAdmissionPolicy({
+    trustedOrigins: environment.auth.trustedOrigins,
+    getSettings: async () => ({
+      registrationEnabled: false,
+      windowSeconds: 60,
+      maxRequests: 30,
+    }),
   });
-
-  const options = auth.options;
+  const options = createBetterAuthOptions({
+    environment,
+    database: {} as never,
+    mailConfigService: { send: async () => {} },
+    authAdmissionPolicy: admissionPolicy,
+  });
   assert.equal(options.emailAndPassword?.enabled, true);
   assert.equal(options.emailAndPassword?.minPasswordLength, 10);
   assert.equal(options.emailAndPassword?.maxPasswordLength, 128);
