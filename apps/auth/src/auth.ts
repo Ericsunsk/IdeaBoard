@@ -2,9 +2,9 @@ import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { createAuthMiddleware } from "better-auth/api";
 import { admin, emailOTP, haveIBeenPwned } from "better-auth/plugins";
 import { Pool, type PoolConfig } from "pg";
-import type { AuthAdmissionPolicy } from "./authAdmissionPolicy.js";
-import { createAuthAdmissionPolicy } from "./authAdmissionPolicy.js";
-import { createAuthGuardSettingsReader } from "./authGuardSettings.js";
+import type { AuthAdmissionPolicy } from "./admission/authAdmissionPolicy.js";
+import { createAuthAdmissionPolicy } from "./admission/authAdmissionPolicy.js";
+import { createAuthGuardSettingsReader } from "./admission/authGuardSettings.js";
 import { normalizeCanonicalEmail } from "./authUtils.js";
 import type { AuthEnvironment } from "./env.js";
 import {
@@ -14,7 +14,7 @@ import {
 import {
   applyGoogleOAuthRequestPolicy,
   createRegistrationUserCreationGuard,
-} from "./googleOAuthPolicy.js";
+} from "./admission/googleOAuthPolicy.js";
 import { createRuntimeAuthRegistry } from "./runtimeAuthRegistry.js";
 import type { MailConfigService } from "./mailConfig.js";
 import { createRuntimeMailConfigService } from "./mailConfigAdapters.js";

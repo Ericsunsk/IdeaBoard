@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createAuthAdmissionPolicy } from "./authAdmissionPolicy.js";
+import { createAuthAdmissionPolicy } from "./admission/authAdmissionPolicy.js";
 import { createBetterAuthOptions } from "./auth.js";
 import { loadEnv } from "./env.js";
 

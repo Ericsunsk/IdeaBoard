@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { AuthNodeHandler } from "./authEntryGuard.js";
+import type { AuthNodeHandler } from "./admission/authEntryGuard.js";
 
 export function createAuthDispatchHandler(
   betterAuthHandler: AuthNodeHandler,

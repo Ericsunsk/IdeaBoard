@@ -9,8 +9,8 @@ import {
   type AuthInternalCommands,
 } from "./authInternalCommands.js";
 import { authInternalRoutes } from "./generated/auth-internal/routes.gen.js";
-import { createAuthAdmissionPolicy } from "./authAdmissionPolicy.js";
-import type { AuthGuardSettings } from "./authGuardSettings.js";
+import { createAuthAdmissionPolicy } from "./admission/authAdmissionPolicy.js";
+import type { AuthGuardSettings } from "./admission/authGuardSettings.js";
 import {
   createTrustedIdentityProvisioner,
   type TrustedIdentityAuthAPI,

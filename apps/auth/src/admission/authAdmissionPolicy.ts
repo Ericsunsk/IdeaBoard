@@ -1,10 +1,10 @@
 import type { AuthGuardSettings } from "./authGuardSettings.js";
-import type { MailReadiness } from "./mailConfig.js";
+import type { MailReadiness } from "../mailConfig.js";
 import {
   isRateLimitedAuthPath,
   isSignUpPath,
   normalizeAuthPath,
-} from "./authUtils.js";
+} from "../authUtils.js";
 
 type RateLimitEntry = {
   count: number;

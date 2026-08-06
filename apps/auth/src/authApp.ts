@@ -6,8 +6,8 @@ import {
   createAuthEntryGuard,
   isAuthRoute,
   type AuthNodeHandler,
-} from "./authEntryGuard.js";
-import type { AuthAdmissionPolicy } from "./authAdmissionPolicy.js";
+} from "./admission/authEntryGuard.js";
+import type { AuthAdmissionPolicy } from "./admission/authAdmissionPolicy.js";
 import type {
   AuthSessionAPI,
   AuthInternalCommands,

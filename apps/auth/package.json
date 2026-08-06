@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json && node scripts/copy-email-templates.mjs",
     "contract:generate": "node scripts/generate-internal-contract.mjs",
     "contract:check": "node scripts/generate-internal-contract.mjs --check",
-    "test": "npm run contract:check && tsx --test src/**/*.test.ts",
+    "test": "npm run contract:check && tsx --test \"src/**/*.test.ts\"",
     "start": "node dist/index.js",
     "migrate": "tsx src/migrate.ts",
     "migrate:dist": "node dist/migrate.js"
