@@ -3,6 +3,7 @@
     <div class="editing-controls-slider-row__header">
       <span class="editing-controls-slider-row__label">{{ label }}</span>
       <input
+        :name="`${label}-value`"
         class="editing-controls-control editing-controls-number-input editing-controls-slider-row__value"
         type="number"
         :min="min"
@@ -15,6 +16,7 @@
       />
     </div>
     <input
+      :name="`${label}-range`"
       class="canvas-range-input editing-controls-slider-row__range"
       :class="rangeClass"
       type="range"

@@ -86,6 +86,7 @@
           <input
             id="account-recharge-custom"
             v-model="customQuantity"
+            name="custom-recharge-quantity"
             type="text"
             inputmode="numeric"
             autocomplete="off"
@@ -115,7 +116,9 @@
         class="grid cursor-pointer grid-cols-[18px_minmax(0,1fr)] items-start gap-2.5 text-[13px] leading-5 text-ib-text-muted"
       >
         <input
+          id="account-recharge-legal-accepted"
           v-model="legalAccepted"
+          name="legal-accepted"
           type="checkbox"
           :disabled="checkoutPending"
           class="mt-0.5 size-[18px] accent-[var(--color-ib-creative-accent-pressed)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]"

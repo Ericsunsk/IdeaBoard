@@ -3,6 +3,7 @@
     <label class="editing-controls-field">
       <span class="editing-controls-label">阈值</span>
       <input
+        name="image-editor-threshold"
         class="editing-controls-control editing-controls-number-input"
         type="number"
         min="0"

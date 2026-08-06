@@ -90,7 +90,7 @@ export function drawMaskRasterPreviewToCanvas(
   const height = targetCanvas.height
   if (!width || !height) return
   const tempCanvas = createMaskCanvas(width, height)
-  const tempCtx = tempCanvas.getContext('2d')
+  const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true })
   const targetCtx = targetCanvas.getContext('2d')
   if (!tempCtx || !targetCtx) {
     releaseTemporaryCanvas(tempCanvas)
@@ -121,7 +121,7 @@ export function invertMaskPreviewCanvas(canvas: HTMLCanvasElement) {
   const width = canvas.width
   const height = canvas.height
   if (!width || !height) return
-  const ctx = canvas.getContext('2d')
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
   if (!ctx) return
   const sourceCanvas = copyCanvasToTemporaryCanvas(canvas)
   if (!sourceCanvas) return
@@ -191,7 +191,7 @@ export function featherMaskPreviewCanvas(
   const width = canvas.width
   const height = canvas.height
   if (!width || !height) return false
-  const ctx = canvas.getContext('2d')
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
   if (!ctx) return false
   const blurRadius = Math.floor(radius)
   if (blurRadius <= 0) return false
@@ -235,7 +235,7 @@ function hasMaskPaint(data: Uint8ClampedArray): boolean {
 }
 
 export function buildMaskCommitResult(canvas: HTMLCanvasElement): MaskCommitResult | null {
-  const ctx = canvas.getContext('2d')
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
   if (!ctx) return null
   const source = ctx.getImageData(0, 0, canvas.width, canvas.height)
   if (!hasMaskPaint(source.data)) return null

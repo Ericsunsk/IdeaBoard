@@ -18,6 +18,7 @@
         class="editing-controls-field editing-controls-field--compact image-editor-levels-output__field"
       >
         <input
+          name="image-editor-output-black"
           class="editing-controls-control editing-controls-number-input"
           type="number"
           :min="constraints.outputBlack.min"
@@ -35,6 +36,7 @@
         class="editing-controls-field editing-controls-field--compact image-editor-levels-output__field"
       >
         <input
+          name="image-editor-output-white"
           class="editing-controls-control editing-controls-number-input"
           type="number"
           :min="constraints.outputWhite.min"

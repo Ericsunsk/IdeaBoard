@@ -6,6 +6,7 @@
       class="editing-controls-field editing-controls-field--compact image-editor-levels-fields__field"
     >
       <input
+        :name="`image-editor-level-${field.key}`"
         class="editing-controls-control editing-controls-number-input"
         type="number"
         :min="constraints[field.key].min"

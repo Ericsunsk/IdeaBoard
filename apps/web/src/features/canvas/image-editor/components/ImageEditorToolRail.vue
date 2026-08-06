@@ -52,6 +52,7 @@
         <label class="image-editor-tool-settings__control">
           <span>Size</span>
           <input
+            name="image-editor-brush-size-range"
             type="range"
             min="1"
             max="512"
@@ -59,6 +60,7 @@
             @input="updateNumberSetting('size', $event)"
           />
           <input
+            name="image-editor-brush-size"
             class="image-editor-tool-settings__number"
             type="number"
             min="1"
@@ -70,6 +72,7 @@
         <label class="image-editor-tool-settings__control">
           <span>Hardness</span>
           <input
+            name="image-editor-brush-hardness-range"
             type="range"
             min="0"
             max="100"
@@ -77,6 +80,7 @@
             @input="updateNumberSetting('hardness', $event)"
           />
           <input
+            name="image-editor-brush-hardness"
             class="image-editor-tool-settings__number"
             type="number"
             min="0"
@@ -88,6 +92,7 @@
         <label class="image-editor-tool-settings__control">
           <span>Opacity</span>
           <input
+            name="image-editor-brush-opacity-range"
             type="range"
             min="1"
             max="100"
@@ -95,6 +100,7 @@
             @input="updateOpacitySetting($event)"
           />
           <input
+            name="image-editor-brush-opacity"
             class="image-editor-tool-settings__number"
             type="number"
             min="1"
@@ -109,6 +115,7 @@
         >
           <span>Color</span>
           <input
+            name="image-editor-brush-color"
             class="image-editor-tool-settings__color"
             type="color"
             :value="rasterToolSettings.brushColor"

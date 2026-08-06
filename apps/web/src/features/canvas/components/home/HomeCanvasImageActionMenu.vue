@@ -34,6 +34,7 @@
           <input
             v-if="item.strengthAction"
             :ref="(el) => setItemStrengthRangeRef(item, el)"
+            :name="`image-action-strength-${item.label}`"
             class="image-action-strength-range canvas-range-input"
             type="range"
             min="0"

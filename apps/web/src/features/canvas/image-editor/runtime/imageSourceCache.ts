@@ -185,7 +185,7 @@ async function loadImageSourceCanvas(
       try {
         canvas.width = width
         canvas.height = height
-        const context = canvas.getContext('2d')
+        const context = canvas.getContext('2d', { willReadFrequently: true })
         if (!context) throw createCacheError('unsupported-canvas')
         context.drawImage(bitmap, 0, 0, width, height)
         return {

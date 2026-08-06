@@ -36,6 +36,7 @@
 
     <template v-if="rangeMarker">
       <input
+        name="image-editor-histogram-range"
         class="image-editor-histogram-plot__range-input"
         type="range"
         :min="resolveRangeMin(rangeMarker)"

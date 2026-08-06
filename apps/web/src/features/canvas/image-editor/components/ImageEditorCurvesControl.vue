@@ -4,6 +4,7 @@
       <label class="editing-controls-field image-editor-curves__select-label">
         <span class="editing-controls-label">预设</span>
         <select
+          name="image-editor-curve-preset"
           class="editing-controls-control editing-controls-select"
           :value="selectedPresetId"
           aria-label="曲线预设"
@@ -18,6 +19,7 @@
       <label class="editing-controls-field image-editor-curves__select-label">
         <span class="editing-controls-label">通道</span>
         <select
+          name="image-editor-curve-channel"
           class="editing-controls-control editing-controls-select"
           :value="activeChannel"
           aria-label="曲线通道"
@@ -47,6 +49,7 @@
       <label class="editing-controls-field image-editor-curves__field">
         <span class="editing-controls-label">输入</span>
         <input
+          name="image-editor-curve-input"
           class="editing-controls-control editing-controls-number-input"
           type="number"
           min="0"
@@ -60,6 +63,7 @@
       <label class="editing-controls-field image-editor-curves__field">
         <span class="editing-controls-label">输出</span>
         <input
+          name="image-editor-curve-output"
           class="editing-controls-control editing-controls-number-input"
           type="number"
           min="0"

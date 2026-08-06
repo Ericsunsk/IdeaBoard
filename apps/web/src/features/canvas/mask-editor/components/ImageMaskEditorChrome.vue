@@ -90,6 +90,8 @@
                 "
               >
                 <input
+                  id="mask-editor-brush-size"
+                  name="mask-brush-size"
                   class="canvas-range-input"
                   type="range"
                   :min="MASK_EDITOR_MIN_BRUSH_SIZE"
@@ -116,6 +118,8 @@
                 "
               >
                 <input
+                  id="mask-editor-brush-hardness"
+                  name="mask-brush-hardness"
                   class="canvas-range-input"
                   type="range"
                   :min="MASK_EDITOR_MIN_BRUSH_HARDNESS"
@@ -144,6 +148,8 @@
                 "
               >
                 <input
+                  id="mask-editor-layer-opacity"
+                  name="mask-layer-opacity"
                   class="canvas-range-input"
                   type="range"
                   :min="MASK_EDITOR_MIN_LAYER_OPACITY"
@@ -191,7 +197,9 @@
             <CenterAlign />
           </NodeToolIconButton>
           <input
+            id="mask-editor-feather-strength"
             :ref="setFeatherStrengthRangeRef"
+            name="mask-feather-strength"
             class="image-mask-editor-feather-range canvas-range-input"
             type="range"
             :min="MASK_EDITOR_MIN_FEATHER_STRENGTH"

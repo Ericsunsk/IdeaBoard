@@ -35,7 +35,7 @@ export function drawMaskStrokeSegment(
   toX: number,
   toY: number,
 ) {
-  const ctx = canvas.getContext('2d')
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
   if (!ctx) return
   const brushSize = clampMaskBrushSize(node.brushSize)
   const hardness = clampMaskBrushHardness(node.brushHardness)
@@ -84,7 +84,7 @@ function getOrCreateBrushStamp(
   const canvas = document.createElement('canvas')
   canvas.width = brushSize + MASK_EDITOR_BRUSH_STAMP_PADDING * 2
   canvas.height = brushSize + MASK_EDITOR_BRUSH_STAMP_PADDING * 2
-  const ctx = canvas.getContext('2d')
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
   if (!ctx) {
     const fallback = {
       canvas,

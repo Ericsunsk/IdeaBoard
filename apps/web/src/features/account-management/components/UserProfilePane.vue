@@ -41,9 +41,11 @@
             </template>
           </Button>
           <input
+            id="account-avatar-file"
             ref="avatarInputRef"
             class="hidden"
             type="file"
+            name="avatar-file"
             accept="image/*"
             :disabled="avatarUploading"
             @change="onAvatarFileChange"

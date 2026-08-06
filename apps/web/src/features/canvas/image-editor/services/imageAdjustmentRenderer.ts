@@ -133,7 +133,7 @@ async function decodeRasterContentImageData(content: ImageEditorRasterContent): 
     const canvas = document.createElement('canvas')
     canvas.width = content.width || bitmap.width
     canvas.height = content.height || bitmap.height
-    const context = canvas.getContext('2d')
+    const context = canvas.getContext('2d', { willReadFrequently: true })
     if (!context) throw new Error('当前浏览器不支持图像处理')
     context.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
     return context.getImageData(0, 0, canvas.width, canvas.height)

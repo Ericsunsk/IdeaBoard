@@ -109,7 +109,7 @@ async function createPreviewObjectUrl(sourceUrl: string, maxSide: number): Promi
   canvas.width = width
   canvas.height = height
 
-  const ctx = canvas.getContext('2d')
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })
   if (!ctx) {
     bitmap.close()
     return null

@@ -51,17 +51,20 @@
               </div>
 
               <input
+                id="admin-branding-logo-file"
                 ref="logoFileInputRef"
                 class="hidden"
                 type="file"
+                name="branding-logo-file"
                 :accept="IMAGE_UPLOAD_ACCEPT"
                 @change="handleLogoInputChange"
               />
             </div>
 
             <div class="grid content-start gap-4">
-              <AdminFormField label="站点名称">
+              <AdminFormField label="站点名称" for="admin-branding-project-name">
                 <InputText
+                  id="admin-branding-project-name"
                   v-model="brandingForm.project_name"
                   autocomplete="off"
                   maxlength="40"
@@ -71,8 +74,9 @@
                 />
               </AdminFormField>
 
-              <AdminFormField label="Logo 地址">
+              <AdminFormField label="Logo 地址" for="admin-branding-logo-url">
                 <InputText
+                  id="admin-branding-logo-url"
                   v-model="brandingForm.logo_url"
                   autocomplete="off"
                   maxlength="2048"
@@ -115,6 +119,7 @@
             <span class="text-admin-body font-bold text-admin-text-1">开放注册</span>
             <ToggleSwitch
               v-model="registrationEnabled"
+              input-id="admin-registration-enabled"
               :disabled="registrationSettingLoading"
               aria-label="开放注册"
               @update:model-value="handleToggleRegistration"
@@ -122,9 +127,10 @@
           </div>
 
           <div class="grid gap-4 md:grid-cols-2">
-            <AdminFormField label="最大请求 (次)">
+            <AdminFormField label="最大请求 (次)" for="admin-rate-limit-max-requests">
               <InputNumber
                 v-model="rateLimitForm.max_requests"
+                input-id="admin-rate-limit-max-requests"
                 :min="1"
                 :max="RATE_LIMIT_MAX_REQUESTS"
                 fluid
@@ -132,9 +138,10 @@
               />
             </AdminFormField>
 
-            <AdminFormField label="窗口周期 (秒)">
+            <AdminFormField label="窗口周期 (秒)" for="admin-rate-limit-window-seconds">
               <InputNumber
                 v-model="rateLimitForm.window_seconds"
+                input-id="admin-rate-limit-window-seconds"
                 :min="1"
                 :max="RATE_LIMIT_MAX_WINDOW_SECONDS"
                 fluid
@@ -171,9 +178,10 @@
       <template #default>
         <div :class="settingCardBodyClass">
           <div class="grid gap-4 sm:grid-cols-2">
-            <AdminFormField label="任务列表每页数量">
+            <AdminFormField label="任务列表每页数量" for="admin-task-monitor-page-size">
               <InputNumber
                 v-model="taskMonitorForm.list_page_size"
+                input-id="admin-task-monitor-page-size"
                 :min="TASK_MONITOR_MIN_PAGE_SIZE"
                 :max="TASK_MONITOR_MAX_PAGE_SIZE"
                 fluid
@@ -181,9 +189,10 @@
               />
             </AdminFormField>
 
-            <AdminFormField label="刷新间隔 (秒)">
+            <AdminFormField label="刷新间隔 (秒)" for="admin-task-monitor-refresh-interval">
               <InputNumber
                 v-model="taskMonitorForm.refresh_interval_seconds"
+                input-id="admin-task-monitor-refresh-interval"
                 :min="TASK_MONITOR_MIN_REFRESH_INTERVAL_SECONDS"
                 :max="TASK_MONITOR_MAX_REFRESH_INTERVAL_SECONDS"
                 fluid
@@ -197,6 +206,7 @@
               <span class="text-admin-body font-bold text-admin-text-1">自动刷新</span>
               <ToggleSwitch
                 v-model="taskMonitorForm.auto_refresh_enabled"
+                input-id="admin-task-monitor-auto-refresh"
                 :disabled="taskMonitorLoading || taskMonitorSaving"
                 aria-label="自动刷新"
               />
@@ -206,6 +216,7 @@
               <span class="text-admin-body font-bold text-admin-text-1">结果预览</span>
               <ToggleSwitch
                 v-model="taskMonitorForm.result_preview_enabled"
+                input-id="admin-task-monitor-result-preview"
                 :disabled="taskMonitorLoading || taskMonitorSaving"
                 aria-label="结果预览"
               />
@@ -237,8 +248,9 @@
       <template #default>
         <div :class="settingCardBodyClass">
           <div class="grid gap-4">
-            <AdminFormField label="前端访问地址">
+            <AdminFormField label="前端访问地址" for="admin-public-base-url">
               <InputText
+                id="admin-public-base-url"
                 v-model="publicURLForm.public_base_url"
                 autocomplete="off"
                 maxlength="2048"
@@ -248,8 +260,9 @@
               />
             </AdminFormField>
 
-            <AdminFormField label="素材访问地址">
+            <AdminFormField label="素材访问地址" for="admin-public-asset-base-url">
               <InputText
+                id="admin-public-asset-base-url"
                 v-model="publicURLForm.public_asset_base_url"
                 autocomplete="off"
                 maxlength="2048"
@@ -284,9 +297,10 @@
     <SettingEditorCard title="上传并发" :status="`并发 ${mediaUploadForm.upload_max_concurrent}`">
       <template #default>
         <div :class="settingCardBodyClass">
-          <AdminFormField label="上传并发上限">
+          <AdminFormField label="上传并发上限" for="admin-media-upload-max-concurrent">
             <InputNumber
               v-model="mediaUploadForm.upload_max_concurrent"
+              input-id="admin-media-upload-max-concurrent"
               :min="MEDIA_UPLOAD_MIN_CONCURRENT"
               :max="MEDIA_UPLOAD_MAX_CONCURRENT"
               fluid

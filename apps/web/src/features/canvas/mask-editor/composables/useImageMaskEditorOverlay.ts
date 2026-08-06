@@ -103,7 +103,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   }
 
   function captureMaskHistoryEntry(canvas: HTMLCanvasElement): MaskHistoryEntry | null {
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
     if (!ctx || !canvas.width || !canvas.height) return null
     return {
       width: canvas.width,
@@ -113,7 +113,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   }
 
   function restoreMaskHistoryEntry(canvas: HTMLCanvasElement, entry: MaskHistoryEntry) {
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
     if (!ctx) return
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     if (canvas.width === entry.width && canvas.height === entry.height) {
@@ -185,7 +185,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     const canvas = canvasRefs.get(nodeId)
     const committed = committedMaskDataMap.get(nodeId)
     if (!canvas) return
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })
     if (!ctx) return
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     if (!committed?.maskDataUrl) return
@@ -311,7 +311,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     const nodeId = maskEditorNodeId.value
     if (!nodeId) return
     const canvas = canvasRefs.get(nodeId)
-    const ctx = canvas?.getContext('2d')
+    const ctx = canvas?.getContext('2d', { willReadFrequently: true })
     if (!canvas || !ctx) return
     const before = captureMaskHistoryEntry(canvas)
     ctx.clearRect(0, 0, canvas.width, canvas.height)

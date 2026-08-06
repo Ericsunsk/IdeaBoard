@@ -2,6 +2,7 @@
   <textarea
     ref="inputRef"
     v-model="draft"
+    name="canvas-prompt"
     :class="textareaClass"
     :rows="rows"
     :placeholder="placeholder"

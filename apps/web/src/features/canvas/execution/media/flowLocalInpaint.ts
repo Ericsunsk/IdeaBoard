@@ -1,8 +1,4 @@
-import {
-  canvasToBlob,
-  resolveFetchUrl,
-  uploadCanvasBlob,
-} from '../../services/flowMediaIO'
+import { canvasToBlob, resolveFetchUrl, uploadCanvasBlob } from '../../services/flowMediaIO'
 import { ensureFlowMaskImageUrl } from './flowMediaUpload'
 
 export const FLOW_LOCAL_INPAINT_PADDING = 128
@@ -124,7 +120,7 @@ export async function prepareFlowLocalInpaint(
     const maskCanvas = document.createElement('canvas')
     maskCanvas.width = width
     maskCanvas.height = height
-    const maskCtx = maskCanvas.getContext('2d')
+    const maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true })
     if (!maskCtx) throw new Error('初始化蒙版失败')
     maskCtx.drawImage(maskBitmap, 0, 0, width, height)
 
@@ -155,7 +151,7 @@ export async function prepareFlowLocalInpaint(
     const maskCropCanvas = document.createElement('canvas')
     maskCropCanvas.width = bbox.width
     maskCropCanvas.height = bbox.height
-    const maskCropCtx = maskCropCanvas.getContext('2d')
+    const maskCropCtx = maskCropCanvas.getContext('2d', { willReadFrequently: true })
     if (!maskCropCtx) throw new Error('初始化蒙版裁切失败')
     maskCropCtx.drawImage(
       maskCanvas,
