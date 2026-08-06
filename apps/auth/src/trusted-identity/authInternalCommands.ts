@@ -6,13 +6,13 @@ import type {
   RevokeUserSessionsData,
   SetUserRoleData,
   UnbanUserData,
-} from "./generated/auth-internal/types.gen.js";
+} from "../generated/auth-internal/types.gen.js";
 import {
   normalizeAuthRole,
   normalizeDisplayName,
   normalizeOptionalPositiveInteger,
   normalizeOptionalText,
-} from "./authUtils.js";
+} from "../authUtils.js";
 import {
   type TrustedIdentityProvisioner,
   type TrustedIdentityProvisioningOutcome,

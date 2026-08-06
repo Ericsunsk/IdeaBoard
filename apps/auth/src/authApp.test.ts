@@ -7,7 +7,7 @@ import {
   type AuthSessionAPI,
   createAuthInternalCommands,
   type AuthInternalCommands,
-} from "./authInternalCommands.js";
+} from "./trusted-identity/authInternalCommands.js";
 import { authInternalRoutes } from "./generated/auth-internal/routes.gen.js";
 import { createAuthAdmissionPolicy } from "./admission/authAdmissionPolicy.js";
 import type { AuthGuardSettings } from "./admission/authGuardSettings.js";
@@ -15,7 +15,7 @@ import {
   createTrustedIdentityProvisioner,
   type TrustedIdentityAuthAPI,
   type TrustedIdentityRepository,
-} from "./trustedIdentity.js";
+} from "./trusted-identity/trustedIdentity.js";
 
 type TestAuthAPI = AuthSessionAPI & TrustedIdentityAuthAPI;
 type TestIdentityStore = AuthIdentityMutationStore & TrustedIdentityRepository;

@@ -6,8 +6,8 @@ import Fastify from "fastify";
 import type {
   AuthSessionAPI,
   AuthInternalCommands,
-} from "./authInternalCommands.js";
-import { registerInternalRoutes } from "./internalRoutes.js";
+} from "./trusted-identity/authInternalCommands.js";
+import { registerInternalRoutes } from "./trusted-identity/internalRoutes.js";
 
 const internalKey = "contract-test-internal-key";
 const authUserID = "auth-contract-user";

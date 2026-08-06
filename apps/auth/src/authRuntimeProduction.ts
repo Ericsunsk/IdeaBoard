@@ -6,7 +6,7 @@ import { cleanupUnverifiedUsers } from "./authCleanup.js";
 import {
   type AuthSessionAPI,
   createAuthInternalCommands,
-} from "./authInternalCommands.js";
+} from "./trusted-identity/authInternalCommands.js";
 import { createAuthIdentityStore } from "./authRepository.js";
 import {
   createAuthRuntime,
@@ -18,7 +18,7 @@ import { verifyAuthRuntimePrivileges } from "./runtime-privileges.js";
 import {
   createTrustedIdentityProvisioner,
   type TrustedIdentityAuthAPI,
-} from "./trustedIdentity.js";
+} from "./trusted-identity/trustedIdentity.js";
 
 const productionAuthRuntimeFactories: AuthRuntimeFactories = {
   createDatabase: createAuthPool,

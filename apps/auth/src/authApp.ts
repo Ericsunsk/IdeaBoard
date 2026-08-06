@@ -11,9 +11,9 @@ import type { AuthAdmissionPolicy } from "./admission/authAdmissionPolicy.js";
 import type {
   AuthSessionAPI,
   AuthInternalCommands,
-} from "./authInternalCommands.js";
+} from "./trusted-identity/authInternalCommands.js";
 import { extractErrorMessage } from "./authUtils.js";
-import { registerInternalRoutes } from "./internalRoutes.js";
+import { registerInternalRoutes } from "./trusted-identity/internalRoutes.js";
 import { registerMailConfigRoutes } from "./transactional-mail/mailConfigRoutes.js";
 import type { MailConfigService } from "./transactional-mail/mailConfig.js";
 import { getErrorStatus, sendError, sendSuccess } from "./httpResponse.js";
