@@ -48,7 +48,7 @@ export const authModalBackdropClass =
 export const authModalHeaderClass = 'relative z-[1] mb-8 text-center'
 
 export const authModalKickerClass =
-  "mb-2 text-[12px] font-normal uppercase tracking-[0.16em] text-[var(--color-ib-auth-link)] [font-family:'Caveat',cursive,sans-serif]"
+  "mb-2 text-[12px] font-normal uppercase tracking-[0.16em] text-[var(--color-ib-auth-link)] [font-family:'Comic_Sans_MS','Chalkboard_SE','Bradley_Hand','Caveat',cursive,sans-serif]"
 
 export const authModalTitleClass =
   "m-0 text-[32px] font-bold leading-tight tracking-tight text-[var(--color-ib-auth-title)] [font-family:'Satoshi',-apple-system,'SF_Pro_Display',sans-serif] max-[520px]:text-[28px]"
@@ -70,6 +70,9 @@ export const authPrimaryButtonClass =
 
 export const authSecondaryButtonClass =
   'ib-control-state [--ib-control-active-transform:scale(0.99)] [--ib-control-disabled-opacity:0.6] inline-flex h-[48px] w-full items-center justify-center rounded-[12px] border border-[var(--color-ib-auth-shell-border)] bg-[var(--color-ib-auth-shell)] px-6 text-[14px] font-semibold text-[var(--color-ib-auth-text)] transition-[background-color,border-color,transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-[var(--color-ib-border-hover)] hover:bg-[var(--color-ib-surface-hover)]'
+
+export const authSocialIconButtonClass =
+  'ib-control-state [--ib-control-active-transform:scale(0.99)] [--ib-control-disabled-opacity:0.7] inline-flex h-12 w-full items-center justify-center rounded-[var(--radius-ib-control)] border border-ib-border bg-ib-surface-raised p-0 shadow-none outline-none transition-[border-color,background-color,box-shadow,transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-ib-border-hover focus-visible:border-ib-creative-accent focus-visible:bg-ib-surface focus-visible:shadow-[var(--shadow-ib-focus)] disabled:bg-ib-surface-disabled'
 
 export const authFooterClass =
   'relative z-[1] text-center text-[13px] text-[var(--color-ib-auth-muted)]'

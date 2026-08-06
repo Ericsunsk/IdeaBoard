@@ -8,8 +8,12 @@ import {
 
 type SocialProviderRouteService = Pick<
   SocialProviderSettingsService,
-  "getSummary" | "update" | "getCapabilities"
+  "getSummary" | "update"
 >;
+
+type PublicSocialProviderCapabilities = {
+  social: { google: boolean };
+};
 
 export function isSocialProviderCapabilitiesRoute(url: string): boolean {
   return String(url || "").split("?", 1)[0] === "/api/auth/capabilities";
@@ -21,6 +25,7 @@ export function registerSocialProviderRoutes(
     internalKey: string;
     trustedOrigins?: string[];
     service: SocialProviderRouteService;
+    getPublicCapabilities: () => Promise<PublicSocialProviderCapabilities>;
   },
 ) {
   const requireInternalKey = async (
@@ -58,7 +63,7 @@ export function registerSocialProviderRoutes(
     { preHandler: requireTrustedOrigin },
     async (_request, reply) => {
       reply.header("Cache-Control", "no-store");
-      sendSuccess(reply, await options.service.getCapabilities());
+      sendSuccess(reply, await options.getPublicCapabilities());
     },
   );
 

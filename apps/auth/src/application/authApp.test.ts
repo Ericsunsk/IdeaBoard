@@ -271,6 +271,48 @@ describe("createAuthApp", () => {
     assert.equal(authHandlerCalled, false);
   });
 
+  it("hides the Google runtime capability when registration is disabled", async (t) => {
+    let registrationEnabled = false;
+    const app = createAuthApp(
+      createTestDeps({
+        getAuthGuardSettings: async () => ({
+          registrationEnabled,
+          windowSeconds: 60,
+          maxRequests: 30,
+        }),
+        socialProviderSettingsService: {
+          getSummary: async () => {
+            throw new Error("unused");
+          },
+          update: async () => {
+            throw new Error("unused");
+          },
+          getCapabilities: async () => ({ social: { google: true } }),
+        },
+      }),
+    );
+    t.after(() => app.close());
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/auth/capabilities",
+    });
+
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(response.json().data, {
+      social: { google: false },
+    });
+
+    registrationEnabled = true;
+    const enabledResponse = await app.inject({
+      method: "GET",
+      url: "/api/auth/capabilities",
+    });
+    assert.deepEqual(enabledResponse.json().data, {
+      social: { google: true },
+    });
+  });
+
   it("handles trusted CORS preflight before querying guard settings", async (t) => {
     let settingsQueried = false;
     let authHandlerCalled = false;

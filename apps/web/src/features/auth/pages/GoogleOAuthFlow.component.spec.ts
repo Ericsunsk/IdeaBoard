@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
   logout: vi.fn(),
   getCapabilities: vi.fn(),
   signInWithGoogle: vi.fn(),
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
 }))
 
 vi.mock('vue-router', () => ({
@@ -53,7 +55,7 @@ vi.mock('../../../shared/composables/useSiteBranding', () => ({
 }))
 
 vi.mock('../../../shared/composables/useAppToast', () => ({
-  useAppToast: () => ({ success: vi.fn(), error: vi.fn() }),
+  useAppToast: () => ({ success: mocks.toastSuccess, error: mocks.toastError }),
 }))
 
 vi.mock('../../admin/pages/login/useAdminLoginFeedback', () => ({
@@ -151,9 +153,13 @@ describe('Google OAuth entry points', () => {
     const view = renderLoginPanel()
 
     const googleButton = await screen.findByRole('button', { name: '使用 Google 登录' })
+    expect(googleButton).toHaveTextContent('')
+    expect(googleButton.querySelector('img')).toHaveAttribute('alt', '')
+    expect(screen.queryByText('或')).not.toBeInTheDocument()
     await view.user.click(googleButton)
 
     expect(mocks.signInWithGoogle).toHaveBeenCalledOnce()
+    expect(mocks.toastSuccess).not.toHaveBeenCalled()
   })
 
   it('hides the Google button on User Login when the capability is disabled', async () => {
@@ -161,6 +167,18 @@ describe('Google OAuth entry points', () => {
 
     await waitFor(() => expect(mocks.getCapabilities).toHaveBeenCalledOnce())
     expect(screen.queryByRole('button', { name: '使用 Google 登录' })).not.toBeInTheDocument()
+    expect(screen.queryByText('或')).not.toBeInTheDocument()
+  })
+
+  it('shows an error when the Google redirect cannot start', async () => {
+    mocks.getCapabilities.mockResolvedValue({ social: { google: true } })
+    mocks.signInWithGoogle.mockRejectedValue(new Error('Google 登录失败'))
+    const view = renderLoginPanel()
+
+    await view.user.click(await screen.findByRole('button', { name: '使用 Google 登录' }))
+
+    expect(mocks.toastError).toHaveBeenCalledOnce()
+    expect(mocks.toastSuccess).not.toHaveBeenCalled()
   })
 
   it('does not expose Google login on Admin Login', () => {

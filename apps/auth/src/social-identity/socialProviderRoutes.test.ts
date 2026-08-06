@@ -119,10 +119,12 @@ function createApp(
   registerSocialProviderRoutes(app, {
     internalKey,
     trustedOrigins,
+    getPublicCapabilities:
+      overrides.getCapabilities ??
+      (async () => ({ social: { google: true } })),
     service: {
       getSummary: async () => summary,
       update: async () => summary,
-      getCapabilities: async () => ({ social: { google: true } }),
       ...overrides,
     },
   });

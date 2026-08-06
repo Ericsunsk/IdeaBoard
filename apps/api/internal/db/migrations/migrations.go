@@ -60,6 +60,15 @@ var baselineBusinessTableNames = map[string]struct{}{
 	"users_used_uids":                 {},
 }
 
+// These identity sentinels distinguish the canonical baseline from the retired username schema.
+var baselineRequiredColumnNames = map[string][]string{
+	"users": {"display_name", "public_id"},
+}
+
+var baselineRequiredConstraintNames = map[string][]string{
+	"users": {"chk_users_display_name", "uq_users_public_id"},
+}
+
 //go:embed *.sql
 var migrationFS embed.FS
 
@@ -286,7 +295,108 @@ ORDER BY c.relname`)
 			strings.Join(missing, ", "),
 		)
 	}
+
+	missingColumns, err := missingBaselineColumns(ctx, conn)
+	if err != nil {
+		return err
+	}
+	if len(missingColumns) > 0 {
+		return fmt.Errorf(
+			"baseline migration %d is marked applied, but API column(s) are missing: %s; reset the database or restore a backup created for this release",
+			version,
+			strings.Join(missingColumns, ", "),
+		)
+	}
+
+	missingConstraints, err := missingBaselineConstraints(ctx, conn)
+	if err != nil {
+		return err
+	}
+	if len(missingConstraints) > 0 {
+		return fmt.Errorf(
+			"baseline migration %d is marked applied, but API constraint(s) are missing: %s; reset the database or restore a backup created for this release",
+			version,
+			strings.Join(missingConstraints, ", "),
+		)
+	}
 	return nil
+}
+
+func missingBaselineColumns(ctx context.Context, conn *sql.Conn) ([]string, error) {
+	rows, err := conn.QueryContext(ctx, `
+SELECT table_name, column_name
+FROM information_schema.columns
+WHERE table_schema = current_schema()`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	present := make(map[string]map[string]struct{}, len(baselineRequiredColumnNames))
+	for rows.Next() {
+		var tableName, columnName string
+		if err := rows.Scan(&tableName, &columnName); err != nil {
+			return nil, err
+		}
+		if _, required := baselineRequiredColumnNames[tableName]; !required {
+			continue
+		}
+		if present[tableName] == nil {
+			present[tableName] = make(map[string]struct{})
+		}
+		present[tableName][columnName] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return missingQualifiedNames(baselineRequiredColumnNames, present), nil
+}
+
+func missingBaselineConstraints(ctx context.Context, conn *sql.Conn) ([]string, error) {
+	rows, err := conn.QueryContext(ctx, `
+SELECT c.relname, con.conname
+FROM pg_constraint con
+JOIN pg_class c ON c.oid = con.conrelid
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = current_schema()`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	present := make(map[string]map[string]struct{}, len(baselineRequiredConstraintNames))
+	for rows.Next() {
+		var tableName, constraintName string
+		if err := rows.Scan(&tableName, &constraintName); err != nil {
+			return nil, err
+		}
+		if _, required := baselineRequiredConstraintNames[tableName]; !required {
+			continue
+		}
+		if present[tableName] == nil {
+			present[tableName] = make(map[string]struct{})
+		}
+		present[tableName][constraintName] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return missingQualifiedNames(baselineRequiredConstraintNames, present), nil
+}
+
+func missingQualifiedNames(required map[string][]string, present map[string]map[string]struct{}) []string {
+	var missing []string
+	for tableName, names := range required {
+		for _, name := range names {
+			if _, ok := present[tableName][name]; !ok {
+				missing = append(missing, tableName+"."+name)
+			}
+		}
+	}
+	sort.Strings(missing)
+	return missing
 }
 
 func applyMigration(ctx context.Context, conn *sql.Conn, file string, statements []migrationStatement, version int64) error {

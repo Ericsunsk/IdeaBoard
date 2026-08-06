@@ -16,6 +16,19 @@
         novalidate
         @submit.prevent="handleLogin"
       >
+        <Button
+          v-if="googleEnabled"
+          unstyled
+          type="button"
+          :class="authSocialIconButtonClass"
+          :disabled="loading"
+          aria-label="使用 Google 登录"
+          title="使用 Google 登录"
+          @click="handleGoogleLogin"
+        >
+          <img :src="googleLogoUrl" class="size-6" alt="" aria-hidden="true" />
+        </Button>
+
         <IbFormField
           v-slot="{
             ariaInvalid,
@@ -114,20 +127,6 @@
           fluid
         />
 
-        <div v-if="googleEnabled" class="flex items-center gap-3">
-          <div class="h-px flex-1 bg-ib-border-soft" aria-hidden="true"></div>
-          <span class="text-xs text-ib-text-subtle">或</span>
-          <div class="h-px flex-1 bg-ib-border-soft" aria-hidden="true"></div>
-        </div>
-        <Button
-          v-if="googleEnabled"
-          unstyled
-          type="button"
-          label="使用 Google 登录"
-          :class="authSecondaryButtonClass"
-          :disabled="loading"
-          @click="handleGoogleLogin"
-        />
         <button
           type="button"
           class="self-end border-0 bg-transparent p-0 text-xs font-semibold text-ib-creative-accent hover:underline"
@@ -265,6 +264,7 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import { Lock as LockIcon, User as UserIcon } from '@iconoir/vue'
+import googleLogoUrl from '../assets/google.svg'
 import { useUserStore } from '../session/authSession'
 import { authTransport } from '../session/authTransport'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
@@ -290,7 +290,7 @@ import {
   authModalTitleClass,
   authPasswordPt,
   authPrimaryButtonClass,
-  authSecondaryButtonClass,
+  authSocialIconButtonClass,
   authSwitchButtonClass,
 } from './authModalUi'
 
@@ -383,7 +383,7 @@ async function handleGoogleLogin() {
       await authTransport.signInWithGoogle()
       return true
     },
-    { feedback: authFeedback.login },
+    { feedback: { error: authFeedback.login.error } },
   )
 }
 

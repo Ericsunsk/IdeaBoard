@@ -1972,6 +1972,70 @@ CREATE TABLE schema_migrations (
 	}
 }
 
+func TestBaselineSchemaGuardRejectsLegacyUsersColumns(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
+	defer cancel()
+	conn := openIsolatedMigrationConn(t, ctx)
+
+	createMinimalBaselineTables(t, ctx, conn, "id BIGINT PRIMARY KEY, username VARCHAR(100) NOT NULL")
+
+	err := ensureBaselineSchemaIsPresent(ctx, conn, baselineMigrationVersion)
+	if err == nil {
+		t.Fatalf("baseline schema guard accepted legacy users columns")
+	}
+	for _, missingColumn := range []string{"users.display_name", "users.public_id"} {
+		if !strings.Contains(err.Error(), missingColumn) {
+			t.Fatalf("baseline schema guard error=%q, want missing column %s", err.Error(), missingColumn)
+		}
+	}
+}
+
+func TestBaselineSchemaGuardRejectsMissingIdentityConstraints(t *testing.T) {
+	ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
+	defer cancel()
+	conn := openIsolatedMigrationConn(t, ctx)
+
+	createMinimalBaselineTables(
+		t,
+		ctx,
+		conn,
+		"id BIGINT PRIMARY KEY, public_id UUID NOT NULL, display_name VARCHAR(100) NOT NULL",
+	)
+
+	err := ensureBaselineSchemaIsPresent(ctx, conn, baselineMigrationVersion)
+	if err == nil {
+		t.Fatalf("baseline schema guard accepted users without identity constraints")
+	}
+	for _, missingConstraint := range []string{
+		"users.chk_users_display_name",
+		"users.uq_users_public_id",
+	} {
+		if !strings.Contains(err.Error(), missingConstraint) {
+			t.Fatalf(
+				"baseline schema guard error=%q, want missing constraint %s",
+				err.Error(),
+				missingConstraint,
+			)
+		}
+	}
+}
+
+func createMinimalBaselineTables(t *testing.T, ctx context.Context, conn *sql.Conn, usersColumns string) {
+	t.Helper()
+	for tableName := range baselineBusinessTableNames {
+		columns := "id BIGINT PRIMARY KEY"
+		if tableName == "users" {
+			columns = usersColumns
+		}
+		if _, err := conn.ExecContext(
+			ctx,
+			"CREATE TABLE "+quoteIdentifier(tableName)+" ("+columns+")",
+		); err != nil {
+			t.Fatalf("create baseline table %s failed: %v", tableName, err)
+		}
+	}
+}
+
 func TestMigrationsUpRunsWithSingleOpenConnection(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 45*time.Second)
 	defer cancel()
