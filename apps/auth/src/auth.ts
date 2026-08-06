@@ -8,10 +8,11 @@ import {
   applyGoogleOAuthRequestPolicy,
   createVerifiedOAuthUserCreationGuard,
 } from "./googleOAuthPolicy.js";
+import { createRuntimeMailConfigService } from "./mailConfig.js";
 import {
-  createBetterAuthEmailCallbacks,
-  createRuntimeMailConfigService,
-} from "./mailConfig.js";
+  passwordResetOtp,
+  verificationOtp,
+} from "./emailTemplates/index.js";
 import { createRuntimeAuthRegistry } from "./runtimeAuthRegistry.js";
 import { createRuntimeSocialProviderSettingsService } from "./socialProviderSettings.js";
 
@@ -31,7 +32,8 @@ export const authDB = new Pool({
 });
 
 export const mailConfigService = createRuntimeMailConfigService(authDB);
-const mailCallbacks = createBetterAuthEmailCallbacks(mailConfigService);
+const emailOTPExpiresInSeconds = 600;
+const emailOTPExpiresInMinutes = emailOTPExpiresInSeconds / 60;
 const canonicalEmailPaths = new Set([
   "/sign-in/email",
   "/sign-up/email",
@@ -72,11 +74,9 @@ const authBaseOptions = {
     minPasswordLength: 10,
     maxPasswordLength: 128,
     revokeSessionsOnPasswordReset: true,
-    sendResetPassword: mailCallbacks.sendResetPassword,
   },
   emailVerification: {
     autoSignInAfterVerification: true,
-    sendVerificationEmail: mailCallbacks.sendVerificationEmail,
   },
   session: {
     expiresIn: 60 * 60 * 24, // 24 hours — balances security with usability
@@ -85,7 +85,7 @@ const authBaseOptions = {
   plugins: [
     emailOTP({
       otpLength: 6,
-      expiresIn: 600,
+      expiresIn: emailOTPExpiresInSeconds,
       allowedAttempts: 5,
       storeOTP: "hashed",
       resendStrategy: "rotate",
@@ -94,13 +94,19 @@ const authBaseOptions = {
       changeEmail: { enabled: true, verifyCurrentEmail: false },
       rateLimit: { window: 60 * 60, max: 5 },
       sendVerificationOTP: async ({ email, otp, type }) => {
+        const content =
+          type === "forget-password"
+            ? passwordResetOtp({
+                otp,
+                expiresInMinutes: emailOTPExpiresInMinutes,
+              })
+            : verificationOtp({
+                otp,
+                expiresInMinutes: emailOTPExpiresInMinutes,
+              });
         await mailConfigService.send({
           to: email,
-          subject:
-            type === "forget-password"
-              ? "重置你的 IdeaBoard Password"
-              : "你的 IdeaBoard Email 验证码",
-          html: `<p>你的验证码是：</p><p><strong>${otp}</strong></p>`,
+          content,
         });
       },
     }),

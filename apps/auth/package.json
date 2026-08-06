@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/copy-email-templates.mjs",
     "contract:generate": "node scripts/generate-internal-contract.mjs",
     "contract:check": "node scripts/generate-internal-contract.mjs --check",
     "test": "npm run contract:check && tsx --test src/**/*.test.ts",

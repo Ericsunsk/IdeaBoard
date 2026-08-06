@@ -23,6 +23,8 @@ test("native authentication security configuration stays explicit", async (t) =>
   assert.equal(options.emailAndPassword?.maxPasswordLength, 128);
   assert.equal(options.emailAndPassword?.requireEmailVerification, true);
   assert.equal(options.emailVerification?.autoSignInAfterVerification, true);
+  assert.equal(options.emailAndPassword?.sendResetPassword, undefined);
+  assert.equal(options.emailVerification?.sendVerificationEmail, undefined);
 
   const plugins = options.plugins ?? [];
   assert.equal(plugins.some((plugin) => plugin.id === "username"), false);

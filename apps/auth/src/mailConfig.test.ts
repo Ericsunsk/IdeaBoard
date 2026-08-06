@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { describe, it } from "node:test";
 import {
-  createBetterAuthEmailCallbacks,
   createResendTransport,
   MailConfigError,
   MailConfigService,
@@ -119,6 +118,7 @@ describe("MailConfigService", () => {
     assert.equal(repository.value?.readiness, "ready");
     assert.equal(sends[0]?.apiKey, "re_runtime");
     assert.equal(sends[0]?.input.to, "admin@example.com");
+    assert.ok(sends[0]?.input.content.text);
     assert.deepEqual(repository.audits.at(-1), {
       action: "test_mail_success",
       actorId: 2,
@@ -173,7 +173,11 @@ describe("MailConfigService", () => {
     });
 
     await assert.rejects(
-      () => service.send({ to: "user@example.com", subject: "Test", html: "" }),
+      () =>
+        service.send({
+          to: "user@example.com",
+          content: { subject: "Test", html: "<p>Test</p>", text: "Test" },
+        }),
       (error) => error instanceof MailConfigError && error.code === "unavailable",
     );
   });
@@ -226,8 +230,11 @@ it("Resend transport sends the supported HTTP contract without exposing credenti
       from: "IdeaBoard <auth@example.com>",
       to: "admin@example.com",
       replyTo: "support@example.com",
-      subject: "Test",
-      html: "<p>Test</p>",
+      content: {
+        subject: "Test",
+        html: "<p>Test</p>",
+        text: "Test",
+      },
     },
     "re_secret",
   );
@@ -244,29 +251,8 @@ it("Resend transport sends the supported HTTP contract without exposing credenti
     reply_to: "support@example.com",
     subject: "Test",
     html: "<p>Test</p>",
+    text: "Test",
   });
-});
-
-it("Better Auth callbacks use the same runtime sender and escape action URLs", async () => {
-  const sends: MailSendInput[] = [];
-  const callbacks = createBetterAuthEmailCallbacks({
-    send: async (input) => {
-      sends.push(input);
-    },
-  });
-
-  await callbacks.sendVerificationEmail({
-    user: { email: "alice@example.com" },
-    url: "https://example.com/verify?a=1&b=<x>",
-  });
-  await callbacks.sendResetPassword({
-    user: { email: "alice@example.com" },
-    url: "https://example.com/reset?a=1",
-  });
-
-  assert.equal(sends.length, 2);
-  assert.match(sends[0]?.html || "", /a=1&amp;b=&lt;x&gt;/);
-  assert.match(sends[1]?.subject || "", /Password/);
 });
 
 function createFakeRepository() {

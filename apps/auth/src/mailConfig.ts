@@ -1,5 +1,9 @@
 import type { Pool } from "pg";
 import {
+  mailConfigurationTest,
+  type RenderedEmail,
+} from "./emailTemplates/index.js";
+import {
   decryptSecret as decryptRuntimeSecret,
   encryptSecret as encryptRuntimeSecret,
 } from "./secretCipher.js";
@@ -44,8 +48,7 @@ export type StoredMailConfig = {
 
 export type MailSendInput = {
   to: string;
-  subject: string;
-  html: string;
+  content: RenderedEmail;
   from?: string;
   replyTo?: string;
 };
@@ -174,8 +177,7 @@ export class MailConfigService {
           to: recipient,
           from: `${current.fromName} <${current.fromEmail}>`,
           replyTo: current.replyTo || undefined,
-          subject: "IdeaBoard 邮件服务测试",
-          html: "<p>IdeaBoard 邮件服务配置测试成功。</p>",
+          content: mailConfigurationTest(),
         },
         apiKey,
       );
@@ -263,8 +265,9 @@ export function createResendTransport(
           body: JSON.stringify({
             from: input.from,
             to: [input.to],
-            subject: input.subject,
-            html: input.html,
+            subject: input.content.subject,
+            html: input.content.html,
+            text: input.content.text,
             ...(input.replyTo ? { reply_to: input.replyTo } : {}),
           }),
         });
@@ -272,33 +275,6 @@ export function createResendTransport(
       } finally {
         clearTimeout(timeout);
       }
-    },
-  };
-}
-
-export function createBetterAuthEmailCallbacks(
-  service: Pick<MailConfigService, "send">,
-) {
-  return {
-    sendVerificationEmail: async (input: {
-      user: { email: string };
-      url: string;
-    }) => {
-      await service.send({
-        to: input.user.email,
-        subject: "验证你的 IdeaBoard Email",
-        html: `<p>请点击链接验证 Email：</p><p><a href="${escapeHTML(input.url)}">验证 Email</a></p>`,
-      });
-    },
-    sendResetPassword: async (input: {
-      user: { email: string };
-      url: string;
-    }) => {
-      await service.send({
-        to: input.user.email,
-        subject: "重置你的 IdeaBoard Password",
-        html: `<p>请点击链接重置 Password：</p><p><a href="${escapeHTML(input.url)}">重置 Password</a></p>`,
-      });
     },
   };
 }
@@ -346,15 +322,6 @@ function normalizeProviderError(error: unknown): string {
     ? error.message
     : "provider_unavailable";
 }
-function escapeHTML(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
 function encryptSecret(plaintext: string, key: string): string {
   try {
     return encryptRuntimeSecret(plaintext, key);
