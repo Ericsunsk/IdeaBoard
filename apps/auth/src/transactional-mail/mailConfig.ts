@@ -5,7 +5,7 @@ import {
 import {
   decryptSecret as decryptRuntimeSecret,
   encryptSecret as encryptRuntimeSecret,
-} from "./secretCipher.js";
+} from "../secretCipher.js";
 
 export type MailReadiness =
   "not_configured" | "not_tested" | "ready" | "unavailable";

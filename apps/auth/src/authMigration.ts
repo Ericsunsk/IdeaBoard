@@ -8,7 +8,7 @@ import {
   type AuthEnvironment,
   type EnvSource,
 } from "./env.js";
-import { ensureMailConfigSchema } from "./mailConfigSchema.js";
+import { ensureMailConfigSchema } from "./transactional-mail/mailConfigSchema.js";
 import { configureAuthRuntimePrivileges } from "./runtime-privileges.js";
 import { ensureSocialProviderSettingsSchema } from "./socialProviderSchema.js";
 

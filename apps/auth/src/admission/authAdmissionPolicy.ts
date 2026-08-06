@@ -1,5 +1,5 @@
 import type { AuthGuardSettings } from "./authGuardSettings.js";
-import type { MailReadiness } from "../mailConfig.js";
+import type { MailReadiness } from "../transactional-mail/mailConfig.js";
 import {
   isRateLimitedAuthPath,
   isSignUpPath,

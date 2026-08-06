@@ -1,7 +1,7 @@
 import type { Pool } from 'pg'
 import {
   configureMailConfigRuntimePrivileges,
-} from './mailConfigSchema.js'
+} from './transactional-mail/mailConfigSchema.js'
 import { configureSocialProviderSettingsRuntimePrivileges } from './socialProviderSchema.js'
 
 const authTables = ['user', 'session', 'account', 'verification'] as const

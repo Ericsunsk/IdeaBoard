@@ -14,8 +14,8 @@ import type {
 } from "./authInternalCommands.js";
 import { extractErrorMessage } from "./authUtils.js";
 import { registerInternalRoutes } from "./internalRoutes.js";
-import { registerMailConfigRoutes } from "./mailConfigRoutes.js";
-import type { MailConfigService } from "./mailConfig.js";
+import { registerMailConfigRoutes } from "./transactional-mail/mailConfigRoutes.js";
+import type { MailConfigService } from "./transactional-mail/mailConfig.js";
 import { getErrorStatus, sendError, sendSuccess } from "./httpResponse.js";
 import { createAuthDispatchHandler } from "./publicRegistration.js";
 import {

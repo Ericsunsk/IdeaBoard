@@ -10,14 +10,14 @@ import type { AuthEnvironment } from "./env.js";
 import {
   passwordResetOtp,
   verificationOtp,
-} from "./emailTemplates/index.js";
+} from "./transactional-mail/emailTemplates/index.js";
 import {
   applyGoogleOAuthRequestPolicy,
   createRegistrationUserCreationGuard,
 } from "./admission/googleOAuthPolicy.js";
 import { createRuntimeAuthRegistry } from "./runtimeAuthRegistry.js";
-import type { MailConfigService } from "./mailConfig.js";
-import { createRuntimeMailConfigService } from "./mailConfigAdapters.js";
+import type { MailConfigService } from "./transactional-mail/mailConfig.js";
+import { createRuntimeMailConfigService } from "./transactional-mail/mailConfigAdapters.js";
 import {
   createRuntimeSocialProviderSettingsService,
   type SocialProviderSettingsService,
