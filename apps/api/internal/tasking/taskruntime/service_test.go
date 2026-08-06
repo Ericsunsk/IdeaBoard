@@ -315,7 +315,7 @@ INSERT INTO task_leases (
 func seedTaskRuntimeUser(t testing.TB, db *sql.DB, id int64) {
 	t.Helper()
 	if _, err := db.Exec(`
-INSERT INTO users (id, username, storage_uid, role, status)
+INSERT INTO users (id, display_name, storage_uid, role, status)
 VALUES ($1, $2, $3, 'user', 1)
 ON CONFLICT (id) DO NOTHING`,
 		id,

@@ -134,6 +134,7 @@ jobs:
           DB_NAME: ideaboard_test
           DB_SSLMODE: disable
           AUTH_INTERNAL_KEY: 0123456789abcdef0123456789abcdef
+          APP_SECRETS_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
           AUTH_TRUSTED_ORIGINS: https://app.example.com
           BETTER_AUTH_SECRET: abcdef0123456789abcdef0123456789
           BETTER_AUTH_URL: https://api.example.com

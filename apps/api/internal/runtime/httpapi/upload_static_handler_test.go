@@ -285,12 +285,12 @@ func newUploadStaticAuthServer(t *testing.T) *httptest.Server {
 	}))
 }
 
-func trustedTestSessionIdentity(authUserID, username string) auth.SessionIdentity {
+func trustedTestSessionIdentity(authUserID, displayName string) auth.SessionIdentity {
 	return auth.SessionIdentity{
 		AuthUserID:            authUserID,
-		Email:                 username + "@example.com",
-		DisplayName:              username,
-		ClaimIdentity:         username + "@example.com",
+		Email:                 displayName + "@example.com",
+		DisplayName:           displayName,
+		ClaimIdentity:         displayName + "@example.com",
 		ClaimIdentityKind:     "canonical_email",
 		ClaimIdentityVerified: true,
 	}
@@ -306,17 +306,17 @@ func performUploadStaticRequest(router http.Handler, method string, target strin
 	return rec
 }
 
-func mustCreateUploadStaticUser(t *testing.T, repo *users.UserRepository, username string, authUserID string, storageUID string) *users.User {
+func mustCreateUploadStaticUser(t *testing.T, repo *users.UserRepository, displayName string, authUserID string, storageUID string) *users.User {
 	t.Helper()
 	user := &users.User{
-		DisplayName:   username,
-		AuthUserID: &authUserID,
-		StorageUID: storageUID,
-		Role:       "user",
-		Status:     1,
+		DisplayName: displayName,
+		AuthUserID:  &authUserID,
+		StorageUID:  storageUID,
+		Role:        "user",
+		Status:      1,
 	}
 	if err := repo.Create(context.Background(), user); err != nil {
-		t.Fatalf("create user %s failed: %v", username, err)
+		t.Fatalf("create user %s failed: %v", displayName, err)
 	}
 	return user
 }

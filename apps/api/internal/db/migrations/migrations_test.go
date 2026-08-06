@@ -1472,7 +1472,7 @@ CREATE TABLE schema_migrations (
 
 	var userID int64
 	if err := conn.QueryRowContext(ctx, `
-INSERT INTO users (username, storage_uid)
+INSERT INTO users (display_name, storage_uid)
 VALUES ('reward-core-migration-user', 'RCM001')
 RETURNING id`).Scan(&userID); err != nil {
 		t.Fatalf("insert Rewards migration user: %v", err)
@@ -1534,7 +1534,7 @@ func TestRewardCodeCoreMigrationDownRejectsDomainFacts(t *testing.T) {
 
 	var actorID int64
 	if err := conn.QueryRowContext(ctx, `
-INSERT INTO users (username, storage_uid)
+INSERT INTO users (display_name, storage_uid)
 VALUES ('reward-core-down-user', 'RCD001')
 RETURNING id`).Scan(&actorID); err != nil {
 		t.Fatal(err)

@@ -153,8 +153,8 @@ func runInitAdmin() {
 		fatal("failed to ensure Better Auth admin user", "err", err)
 	}
 	result, err := lifecycle.ProvisionIdentity(ctx, users.VerifiedIdentity{
-		AuthUserID: provisioned.AuthUserID,
-		DisplayName: provisioned.DisplayName,
+		AuthUserID:    provisioned.AuthUserID,
+		DisplayName:   provisioned.DisplayName,
 		ClaimIdentity: provisioned.ClaimIdentity, ClaimIdentityKind: provisioned.ClaimIdentityKind,
 		ClaimIdentityVerified: provisioned.ClaimIdentityVerified, Role: "admin", EnsureActive: true,
 	})

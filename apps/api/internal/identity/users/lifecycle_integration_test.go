@@ -3,8 +3,6 @@ package users
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strings"
 	"sync"
 	"testing"
 
@@ -300,28 +298,22 @@ func TestTombstoneUserPreservesAccountingAndPreventsWelcomeReclaim(t *testing.T)
 	if err != nil {
 		t.Fatalf("RestrictWallet(deletion) error = %v", err)
 	}
-	oldPredictableDisplayName := "deleted-user-" + fmt.Sprint(first.User.ID)
-	if _, err := pool.Exec(ctx, `
-INSERT INTO users (username, storage_uid, role, status)
-VALUES ($1, 'OLDP01', 'user', 1)`, oldPredictableDisplayName); err != nil {
-		t.Fatalf("occupy old predictable tombstone username: %v", err)
-	}
 	if err := service.DeleteUser(ctx, first.User.ID, &recordingAuthUserDeleter{}, &recordingUserUploadCleaner{}); err != nil {
 		t.Fatalf("DeleteUser() error = %v", err)
 	}
 
-	var username, avatar, walletStatus string
+	var displayName, avatar, walletStatus string
 	var authUserID *string
 	var status int16
 	if err := pool.QueryRow(ctx, `
-SELECT users.username, users.auth_user_id, users.avatar, users.status, credit_wallets.status
+SELECT users.display_name, users.auth_user_id, users.avatar, users.status, credit_wallets.status
 FROM users JOIN credit_wallets ON credit_wallets.user_id = users.id WHERE users.id = $1`, first.User.ID).Scan(
-		&username, &authUserID, &avatar, &status, &walletStatus,
+		&displayName, &authUserID, &avatar, &status, &walletStatus,
 	); err != nil {
 		t.Fatalf("read tombstone: %v", err)
 	}
-	if !strings.HasPrefix(username, "deleted-user-") || username == oldPredictableDisplayName || authUserID != nil || avatar != "" || status != 0 || walletStatus != "frozen" {
-		t.Fatalf("tombstone username=%q auth=%v avatar=%q status=%d wallet=%q", username, authUserID, avatar, status, walletStatus)
+	if displayName != "已注销用户" || authUserID != nil || avatar != "" || status != 0 || walletStatus != "frozen" {
+		t.Fatalf("tombstone display_name=%q auth=%v avatar=%q status=%d wallet=%q", displayName, authUserID, avatar, status, walletStatus)
 	}
 	tombstoneWallet, err := creditService.GetWallet(ctx, first.User.ID)
 	if err != nil {
@@ -361,7 +353,7 @@ func TestInitializeExistingIdentityProvisionsWalletAndWelcomeGrant(t *testing.T)
 	authUserID := "auth-existing-1"
 	var userID int64
 	if err := pool.QueryRow(ctx, `
-INSERT INTO users (username, auth_user_id, storage_uid, role, status)
+INSERT INTO users (display_name, auth_user_id, storage_uid, role, status)
 VALUES ('existing-user', $1, 'EXST01', 'user', 1)
 RETURNING id`, authUserID).Scan(&userID); err != nil {
 		t.Fatalf("seed existing user: %v", err)
@@ -384,7 +376,7 @@ func TestInitializeExistingBannedIdentityGrantsWelcomeCreditsIntoFrozenWallet(t 
 	authUserID := "auth-existing-banned-1"
 	var userID int64
 	if err := pool.QueryRow(ctx, `
-INSERT INTO users (username, auth_user_id, storage_uid, role, status)
+INSERT INTO users (display_name, auth_user_id, storage_uid, role, status)
 VALUES ('existing-banned-user', $1, 'EXBN01', 'user', 0)
 RETURNING id`, authUserID).Scan(&userID); err != nil {
 		t.Fatalf("seed banned user: %v", err)
@@ -555,9 +547,9 @@ FOR EACH ROW EXECUTE FUNCTION fail_user_tombstone_once()`); err != nil {
 	}
 	var authUserID *string
 	var retainedAuthUserID, retainedStorageUID *string
-	var username, tombstoneStorageUID string
+	var displayName, tombstoneStorageUID string
 	var taskCount, claimCount int
-	if err := pool.QueryRow(ctx, `SELECT auth_user_id, username, storage_uid FROM users WHERE id = $1`, provisioned.User.ID).Scan(&authUserID, &username, &tombstoneStorageUID); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT auth_user_id, display_name, storage_uid FROM users WHERE id = $1`, provisioned.User.ID).Scan(&authUserID, &displayName, &tombstoneStorageUID); err != nil {
 		t.Fatalf("read converged tombstone: %v", err)
 	}
 	if err := pool.QueryRow(ctx, `SELECT auth_user_id, storage_uid FROM user_deletion_requests WHERE user_id = $1`, provisioned.User.ID).Scan(&retainedAuthUserID, &retainedStorageUID); err != nil {
@@ -569,8 +561,8 @@ FOR EACH ROW EXECUTE FUNCTION fail_user_tombstone_once()`); err != nil {
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM credit_welcome_claims WHERE claimed_user_id = $1`, provisioned.User.ID).Scan(&claimCount); err != nil {
 		t.Fatalf("count retained Welcome claim: %v", err)
 	}
-	if authUserID != nil || retainedAuthUserID != nil || retainedStorageUID != nil || username != "deleted-user-"+strings.ToLower(tombstoneStorageUID) || !IsValidStorageUID(tombstoneStorageUID) || tombstoneStorageUID == provisioned.User.StorageUID || taskCount != 1 || claimCount != 1 {
-		t.Fatalf("tombstone auth=%v request_auth=%v request_storage=%v username=%q storage_uid=%q tasks=%d claims=%d", authUserID, retainedAuthUserID, retainedStorageUID, username, tombstoneStorageUID, taskCount, claimCount)
+	if authUserID != nil || retainedAuthUserID != nil || retainedStorageUID != nil || displayName != "已注销用户" || !IsValidStorageUID(tombstoneStorageUID) || tombstoneStorageUID == provisioned.User.StorageUID || taskCount != 1 || claimCount != 1 {
+		t.Fatalf("tombstone auth=%v request_auth=%v request_storage=%v display_name=%q storage_uid=%q tasks=%d claims=%d", authUserID, retainedAuthUserID, retainedStorageUID, displayName, tombstoneStorageUID, taskCount, claimCount)
 	}
 }
 

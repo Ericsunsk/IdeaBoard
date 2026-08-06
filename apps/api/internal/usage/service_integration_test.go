@@ -86,7 +86,7 @@ func TestServiceGetCurrentReportsDurableLogicalTasks(t *testing.T) {
 func seedUsageUser(t *testing.T, ctx context.Context, db *sql.DB, userID int64, storageUID string) {
 	t.Helper()
 	if _, err := db.ExecContext(ctx, `
-INSERT INTO users (id, username, storage_uid, role, status)
+INSERT INTO users (id, display_name, storage_uid, role, status)
 VALUES ($1, $2, $3, 'user', 1)`, userID, fmt.Sprintf("usage-user-%d", userID), storageUID); err != nil {
 		t.Fatalf("seed user %d: %v", userID, err)
 	}

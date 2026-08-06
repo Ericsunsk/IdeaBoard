@@ -31,6 +31,7 @@ const COMMAND_TIMEOUT_MS = 60_000
 const COMMAND_BUFFER_SIZE = 1024 * 1024 * 20
 const ROUTE_BODY_ARG_LIMIT_BYTES = 64 * 1024
 const USE_PROCESS_GROUP = process.platform !== 'win32'
+const PLAYWRIGHT_CLI_PACKAGE = '@playwright/cli@0.1.18'
 const ROUTE_BODY_SERVER_SCRIPT = String.raw`
 const http = require('node:http')
 const fs = require('node:fs')
@@ -109,7 +110,7 @@ function resolvePlaywrightCli(): CommandSpec {
   if (npxCheck.status === 0) {
     return {
       command: npxCommand,
-      args: ['--yes', '--package', '@playwright/cli', 'playwright-cli'],
+      args: ['--yes', '--package', PLAYWRIGHT_CLI_PACKAGE, 'playwright-cli'],
     }
   }
 
@@ -304,7 +305,9 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
   }
 
   function runCommand(spec: CommandSpec, args: string[], runOptions: RunCommandOptions = {}) {
-    const fullArgs = [...spec.args, '--session', sessionName, ...args]
+    const commandArgs =
+      args[0] === 'run-code' ? ['run-code', `async (page) => {\n${args[1] ?? ''}\n}`] : args
+    const fullArgs = [...spec.args, '--session', sessionName, ...commandArgs]
     const timeoutMs = runOptions.timeoutMs ?? COMMAND_TIMEOUT_MS
     if (isVerbose) {
       console.log(`[mock-smoke] ${args.slice(0, 2).join(' ')}`)
@@ -391,8 +394,7 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
 
     const result = runCommand(playwrightCli, [
       'run-code',
-      `async (page) => {
-  await page.route(${JSON.stringify(pattern)}, async (route) => {
+      `await page.route(${JSON.stringify(pattern)}, async (route) => {
     const response = await page.context().request.get(${JSON.stringify(bodyUrl)})
     if (!response.ok()) {
       throw new Error('Route body sidecar failed with status ' + response.status())
@@ -403,8 +405,7 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
       contentType: ${JSON.stringify(options.contentType ?? 'text/plain')},
       body,
     })
-  })
-}`,
+  })`,
     ])
     if (result.stdout.includes('### Error')) {
       throw new Error(result.stdout)

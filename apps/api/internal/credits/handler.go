@@ -455,15 +455,15 @@ func (h *Handler) enrichCommandResult(ctx context.Context, result *CommandResult
 }
 
 func (h *Handler) enrichWallet(ctx context.Context, wallet *WalletDetails) error {
-	if h == nil || h.userResolver == nil || wallet == nil || wallet.WalletBalance.UserID <= 0 {
+	if h == nil || h.userResolver == nil || wallet == nil || wallet.UserID <= 0 {
 		return nil
 	}
-	user, err := h.userResolver.ResolveID(ctx, wallet.WalletBalance.UserID)
+	user, err := h.userResolver.ResolveID(ctx, wallet.UserID)
 	if err != nil {
 		return fmt.Errorf("resolve credit wallet identity: %w", err)
 	}
-	wallet.WalletBalance.PublicID = user.PublicID
-	wallet.WalletBalance.DisplayName = user.DisplayName
+	wallet.PublicID = user.PublicID
+	wallet.DisplayName = user.DisplayName
 	for index := range wallet.ActiveRestrictions {
 		wallet.ActiveRestrictions[index].PublicID = user.PublicID
 		wallet.ActiveRestrictions[index].DisplayName = user.DisplayName

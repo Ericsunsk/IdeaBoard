@@ -68,8 +68,8 @@ func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T)
 	}{
 		{name: "exact order", path: "/admin/payments/orders?order_number=" + first.PublicOrderNumber, want: 1},
 		{name: "user id", path: "/admin/payments/orders?user=42", want: 2},
-		{name: "username", path: "/admin/payments/orders?user=test-fixture-user-99", want: 1},
-		{name: "username underscore literal", path: "/admin/payments/orders?user=test_fixture-user-99", want: 0},
+		{name: "display name", path: "/admin/payments/orders?user=test-fixture-user-99", want: 1},
+		{name: "display name underscore literal", path: "/admin/payments/orders?user=test_fixture-user-99", want: 0},
 		{name: "anomaly", path: "/admin/payments/orders?anomaly_only=true", want: 1},
 	} {
 		response := performPaymentRequest(router, http.MethodGet, testCase.path, "", nil)

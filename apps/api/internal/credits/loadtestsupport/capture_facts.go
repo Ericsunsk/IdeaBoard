@@ -44,7 +44,7 @@ func SeedCaptureFacts(ctx context.Context, db *sql.DB, config CaptureFactsConfig
 func seedUsersAndAccounts(ctx context.Context, db *sql.DB, config CaptureFactsConfig) error {
 	statements := []string{
 		`
-INSERT INTO users (id, username, storage_uid, role, status)
+INSERT INTO users (id, display_name, storage_uid, role, status)
 SELECT $1 + series,
        'usage-load-' || series,
        'UL' || lpad(series::text, 4, '0'),

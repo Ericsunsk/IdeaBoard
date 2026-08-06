@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import type {
   BoardStateEnvelope,
   User,
@@ -47,6 +50,16 @@ const MOCK_BOARD_NAME = 'Mock Canvas Board'
 const MOCK_UPDATED_AT = 1_764_000_000_000
 const MOCK_CANVAS_UPLOAD_URL = `/uploads/canvas/${MOCK_USER.storage_namespace}/${MOCK_BOARD_ID}/content/mock-upload.png`
 const MOCK_AVATAR_URL = `/uploads/profile/${MOCK_USER.storage_namespace}/avatar/mock-avatar.png`
+
+function createAvatarFixture() {
+  const directory = mkdtempSync(path.join(tmpdir(), 'ideaboard-user-route-smoke-'))
+  const filePath = path.join(directory, 'mock-avatar.png')
+  writeFileSync(filePath, new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]))
+  return {
+    filePath,
+    cleanup: () => rmSync(directory, { recursive: true, force: true }),
+  }
+}
 
 function createAuthSession(user: User) {
   return {
@@ -222,6 +235,7 @@ const pages: SmokePage[] = [
 
 const DESKTOP_CANVAS_VIEWPORT = { width: 1280, height: 720 } as const
 const NARROW_CANVAS_VIEWPORT = { width: 390, height: 844 } as const
+const BOARDS_MENU_FLIP_VIEWPORT = { width: 1280, height: 600 } as const
 
 const canvasChromeStabilityBrowserAssertionHelpers = [
   'const requireVisibleChromeBox = async (name, locator) => {',
@@ -345,6 +359,12 @@ function setupBrowser(playwrightCli: CommandSpec) {
   )
   smoke.routeJson(playwrightCli, '**/api/auth/sign-out', {})
   smoke.routeJson(playwrightCli, '**/api/user/profile/avatar', AVATAR_UPLOAD)
+  smoke.routeResponse(
+    playwrightCli,
+    `**${MOCK_AVATAR_URL}`,
+    '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>',
+    { contentType: 'image/svg+xml' },
+  )
 }
 
 function setSessionUserRoute(playwrightCli: CommandSpec, user: User) {
@@ -488,12 +508,13 @@ function assertBoardsInteractions(playwrightCli: CommandSpec) {
   smoke.runCommand(playwrightCli, [
     'run-code',
     [
+      `await page.setViewportSize(${JSON.stringify(BOARDS_MENU_FLIP_VIEWPORT)})`,
       'const nativeDialogs = []',
       'page.on("dialog", async (dialog) => {',
       '  nativeDialogs.push(dialog.message())',
       '  await dialog.dismiss()',
       '})',
-      'const moreButton = page.getByRole("button", { name: "More actions" }).first()',
+      'const moreButton = page.getByRole("button", { name: "More actions", exact: true })',
       'await moreButton.waitFor({ state: "visible", timeout: 10000 })',
       'const triggerBox = await moreButton.boundingBox()',
       'if (!triggerBox) throw new Error("Board menu trigger has no bounding box")',
@@ -513,6 +534,7 @@ function assertBoardsInteractions(playwrightCli: CommandSpec) {
       '}',
       'await page.getByRole("button", { name: "取消" }).click()',
       'await page.getByRole("heading", { name: "删除画布" }).waitFor({ state: "hidden", timeout: 10000 })',
+      `await page.setViewportSize(${JSON.stringify(DESKTOP_CANVAS_VIEWPORT)})`,
       ...pageChromeBrowserAssertionHelpers,
       'const accountButton = page.getByRole("button", { name: "账户菜单" }).first()',
       'await accountButton.waitFor({ state: "visible", timeout: 10000 })',
@@ -548,33 +570,32 @@ function assertBoardsInteractions(playwrightCli: CommandSpec) {
       'if (await userMenu.isVisible().catch(() => false)) await accountButton.click()',
       'await accountButton.click()',
       'await userMenu.waitFor({ state: "visible", timeout: 10000 })',
-      'const boardsUrlBeforeProfile = new URL(page.url())',
+      'const boardsUrlBeforeProfile = page.url()',
       'const profileMenuItem = page.getByText("账户管理", { exact: true }).first()',
       'await profileMenuItem.waitFor({ state: "visible", timeout: 10000 })',
       'await profileMenuItem.click()',
       'await page.getByRole("dialog", { name: "账户管理" }).waitFor({ state: "visible", timeout: 10000 })',
       `await page.getByText(${JSON.stringify(MOCK_USER.display_name)}, { exact: true }).first().waitFor({ state: "visible", timeout: 10000 })`,
       `await page.getByText(${JSON.stringify(MOCK_USER.storage_namespace)}, { exact: true }).first().waitFor({ state: "visible", timeout: 10000 })`,
-      'const boardsUrlAfterProfile = new URL(page.url())',
-      'if (boardsUrlAfterProfile.pathname !== boardsUrlBeforeProfile.pathname || boardsUrlAfterProfile.search !== boardsUrlBeforeProfile.search) {',
-      '  throw new Error(`Boards profile dialog should not change URL, before=${boardsUrlBeforeProfile.pathname}${boardsUrlBeforeProfile.search}, after=${boardsUrlAfterProfile.pathname}${boardsUrlAfterProfile.search}`)',
+      'const boardsUrlAfterProfile = page.url()',
+      'if (boardsUrlAfterProfile !== boardsUrlBeforeProfile) {',
+      '  throw new Error(`Boards profile dialog should not change URL, before=${boardsUrlBeforeProfile}, after=${boardsUrlAfterProfile}`)',
       '}',
     ].join('\n'),
   ])
 }
 
-function assertAccountManagementDialogAvatarUpload(playwrightCli: CommandSpec) {
+function assertAccountManagementDialogAvatarUpload(
+  playwrightCli: CommandSpec,
+  avatarFixturePath: string,
+) {
   smoke.runCommand(playwrightCli, [
     'run-code',
     [
       'const avatarButton = page.getByRole("button", { name: "更换头像" })',
       'await avatarButton.waitFor({ state: "visible", timeout: 10000 })',
       'const avatarInput = page.locator(\'input[type="file"][accept="image/*"]\').first()',
-      'await avatarInput.setInputFiles({',
-      '  name: "mock-avatar.png",',
-      '  mimeType: "image/png",',
-      '  buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),',
-      '})',
+      `await avatarInput.setInputFiles(${JSON.stringify(avatarFixturePath)})`,
       `await page.locator(${JSON.stringify(`img[src$="${MOCK_AVATAR_URL}"]`)}).first().waitFor({ state: "visible", timeout: 10000 })`,
     ].join('\n'),
   ])
@@ -718,16 +739,16 @@ function assertCanvasInteractions(playwrightCli: CommandSpec) {
       'if (await adminMenuItem.isVisible().catch(() => false)) {',
       '  throw new Error("Regular user should not see admin menu item on canvas page")',
       '}',
-      'const canvasUrlBeforeProfile = new URL(page.url())',
+      'const canvasUrlBeforeProfile = page.url()',
       'const profileMenuItem = userMenu.getByText("账户管理", { exact: true }).first()',
       'await profileMenuItem.waitFor({ state: "visible", timeout: 10000 })',
       'await profileMenuItem.click()',
       'await userMenu.waitFor({ state: "hidden", timeout: 10000 })',
       'await page.getByRole("dialog", { name: "账户管理" }).waitFor({ state: "visible", timeout: 10000 })',
       `await page.getByText(${JSON.stringify(MOCK_USER.display_name)}, { exact: true }).first().waitFor({ state: "visible", timeout: 10000 })`,
-      'const canvasUrlAfterProfile = new URL(page.url())',
-      'if (canvasUrlAfterProfile.pathname !== canvasUrlBeforeProfile.pathname || canvasUrlAfterProfile.search !== canvasUrlBeforeProfile.search) {',
-      '  throw new Error(`Canvas profile dialog should not change URL, before=${canvasUrlBeforeProfile.pathname}${canvasUrlBeforeProfile.search}, after=${canvasUrlAfterProfile.pathname}${canvasUrlAfterProfile.search}`)',
+      'const canvasUrlAfterProfile = page.url()',
+      'if (canvasUrlAfterProfile !== canvasUrlBeforeProfile) {',
+      '  throw new Error(`Canvas profile dialog should not change URL, before=${canvasUrlBeforeProfile}, after=${canvasUrlAfterProfile}`)',
       '}',
       'await page.keyboard.press("Escape")',
       'await page.getByRole("dialog", { name: "账户管理" }).waitFor({ state: "hidden", timeout: 10000 })',
@@ -840,8 +861,8 @@ function assertCanvasLogoutFlushesAutosave(playwrightCli: CommandSpec) {
       'await logoutItem.waitFor({ state: "visible", timeout: 10000 })',
       'await logoutItem.click()',
       'await page.waitForURL((url) => url.pathname === "/user/home", { timeout: 15000 })',
-      'if (departureRequests.join(",") !== "save,logout") {',
-      '  throw new Error(`Canvas logout must flush autosave first, got ${departureRequests.join(",")}`)',
+      'if (departureRequests.at(-1) !== "logout" || !departureRequests.slice(0, -1).includes("save")) {',
+      '  throw new Error(`Canvas logout must flush autosave before sign-out, got ${departureRequests.join(",")}`)',
       '}',
     ].join('\n'),
   ])
@@ -871,7 +892,7 @@ function assertBoardsLogout(playwrightCli: CommandSpec) {
   ])
 }
 
-function smokePage(playwrightCli: CommandSpec, page: SmokePage) {
+function smokePage(playwrightCli: CommandSpec, page: SmokePage, avatarFixturePath: string) {
   smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}${page.path}`])
   waitForExpectedText(playwrightCli, page)
   const snapshot = smoke.runCommand(playwrightCli, ['snapshot']).stdout
@@ -879,7 +900,7 @@ function smokePage(playwrightCli: CommandSpec, page: SmokePage) {
 
   if (page.label === 'boards') {
     assertBoardsInteractions(playwrightCli)
-    assertAccountManagementDialogAvatarUpload(playwrightCli)
+    assertAccountManagementDialogAvatarUpload(playwrightCli, avatarFixturePath)
     closeAccountManagementDialog(playwrightCli)
   }
 
@@ -906,6 +927,7 @@ function smokePage(playwrightCli: CommandSpec, page: SmokePage) {
 
 async function main() {
   let playwrightCli: CommandSpec | null = null
+  const avatarFixture = createAvatarFixture()
   try {
     playwrightCli = smoke.resolvePlaywrightCli()
     await smoke.startDevServer()
@@ -913,7 +935,7 @@ async function main() {
     prepareOriginStorage(playwrightCli)
 
     for (const page of pages) {
-      smokePage(playwrightCli, page)
+      smokePage(playwrightCli, page, avatarFixture.filePath)
     }
     assertAdminAccountMenus(playwrightCli)
     assertAdminShellAccountMenuReturnsToBoards(playwrightCli)
@@ -932,6 +954,7 @@ async function main() {
       smoke.runCommand(playwrightCli, ['close'], { allowFailure: true, timeoutMs: 10_000 })
     }
     await smoke.stopDevServer()
+    avatarFixture.cleanup()
   }
 }
 

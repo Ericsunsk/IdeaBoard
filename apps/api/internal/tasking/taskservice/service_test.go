@@ -1313,17 +1313,17 @@ func (r testTaskUploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context
 	return user.StorageUID, nil
 }
 
-func mustCreateTaskUploadUser(t *testing.T, repo *users.UserRepository, username string, authUserID string, storageUID string) *users.User {
+func mustCreateTaskUploadUser(t *testing.T, repo *users.UserRepository, displayName string, authUserID string, storageUID string) *users.User {
 	t.Helper()
 	user := &users.User{
-		DisplayName:   username,
-		AuthUserID: &authUserID,
-		StorageUID: storageUID,
-		Role:       "user",
-		Status:     1,
+		DisplayName: displayName,
+		AuthUserID:  &authUserID,
+		StorageUID:  storageUID,
+		Role:        "user",
+		Status:      1,
 	}
 	if err := repo.Create(context.Background(), user); err != nil {
-		t.Fatalf("create user %s failed: %v", username, err)
+		t.Fatalf("create user %s failed: %v", displayName, err)
 	}
 	return user
 }

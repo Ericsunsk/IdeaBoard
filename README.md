@@ -41,7 +41,7 @@ Canvas 节点编排 -> Workflow feature contract -> Task 提交 -> River Worker 
 | 任务运行时 | PostgreSQL/River 队列、账号池调度、失败重试、SSE 状态推送 |
 | 管理后台 | 用户、账号、渠道、提示词、存储、任务监控、统计仪表盘 |
 | 存储 | Local / S3-compatible object storage |
-| Auth | Better Auth 登录、注册、session、角色、封禁、受控注销 |
+| Auth | Better Auth Email-only Password、OTP 注册、Email verification/reset/change、session、角色、封禁、受控注销、Google OAuth；Public Identity（`public_id` / `display_name`） |
 
 ## 技术栈
 
@@ -72,6 +72,17 @@ Canvas 节点编排 -> Workflow feature contract -> Task 提交 -> River Worker 
 | Node.js | `22.23.2` |
 | Go | `1.26.5+` |
 | PostgreSQL | `17+` |
+
+本地复制 `apps/api/.env.example` 与 `apps/auth/.env.example` 后，至少完成以下 Auth 配置：
+
+| 变量                         | 本地要求                                                                          |
+| ---------------------------- | --------------------------------------------------------------------------------- |
+| `AUTH_INTERNAL_KEY`          | API/Auth 使用同一份稳定随机值，至少 32 个字符                                     |
+| `APP_SECRETS_ENCRYPTION_KEY` | API/Auth 使用同一份稳定的 base64 32-byte key，可用 `openssl rand -base64 32` 生成 |
+| `BETTER_AUTH_SECRET`         | 仅 Auth 使用的高熵签名密钥，至少 32 个字符                                        |
+| `BETTER_AUTH_URL`            | 本地默认设置为 `http://localhost:5173`                                            |
+
+这些密钥不得提交到仓库，也不要在每次启动时重新生成。
 
 1. 启动本地依赖：
 
@@ -128,7 +139,7 @@ npm run dev
 ```bash
 cd apps/api
 INIT_ADMIN_EMAIL='admin@example.com' \
-INIT_ADMIN_USERNAME='admin' \
+INIT_ADMIN_DISPLAY_NAME='Admin' \
 INIT_ADMIN_PASSWORD='your-strong-password' \
   go run ./cmd init-admin
 ```
@@ -143,6 +154,8 @@ INIT_ADMIN_PASSWORD='your-strong-password' \
 | `http://localhost:5173/admin/login` | Admin login |
 | `http://localhost:6000/api/health` | Go API health |
 | `http://localhost:6001/api/health` | Auth health |
+
+Google OAuth 默认关闭。管理员可在 `用户管理` 页面点击筛选 icon 左侧的 settings icon，配置 Google Client ID/Secret 并启用 Provider。Google Console 的 Authorized redirect URI 必须与界面显示一致，格式为 `{BETTER_AUTH_URL}/api/auth/callback/google`；分环境配置和上线 smoke 见 [Auth 运营手册](./docs/runbooks/auth-operations.md#场景-fgoogle-oauth-分环境上线)。
 
 更完整的本地开发、验证和代码入口见 [DEVELOPMENT.md](./DEVELOPMENT.md)。
 

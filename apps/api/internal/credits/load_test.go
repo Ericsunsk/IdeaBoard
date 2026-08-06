@@ -296,7 +296,7 @@ func runCreditMultiWalletThroughput(t *testing.T, ctx context.Context, service *
 	t.Helper()
 	const commandCount = 1000
 	if _, err := db.ExecContext(ctx, `
-INSERT INTO users (id, username, storage_uid, role, status)
+INSERT INTO users (id, display_name, storage_uid, role, status)
 SELECT 10000 + series, 'credits-load-' || series, 'L' || lpad(series::TEXT, 5, '0'), 'user', 1
 FROM generate_series(1, $1::BIGINT) series ON CONFLICT (id) DO NOTHING`, commandCount); err != nil {
 		t.Fatalf("seed throughput users error = %v", err)

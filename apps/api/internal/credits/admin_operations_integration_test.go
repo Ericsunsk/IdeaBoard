@@ -447,7 +447,7 @@ func TestAnonymizedTombstoneRetainsAdminLedgerReadAndLinkedRefundOnly(t *testing
 		t.Fatalf("Capture() error = %v", err)
 	}
 	// This is the canonical completed tombstone state created by Identity: PII
-	// cleared, a deleted username/storage UID, status=0, and frozen wallet.
+	// cleared, an anonymized display name/storage UID, status=0, and frozen wallet.
 	if _, err := pool.Exec(ctx, `
 INSERT INTO user_deletion_requests (user_id, phase, completed_at)
 VALUES ($1, 'completed', now())`, userID); err != nil {
@@ -455,7 +455,7 @@ VALUES ($1, 'completed', now())`, userID); err != nil {
 	}
 	if _, err := pool.Exec(ctx, `
 UPDATE users
-SET username = 'deleted-user-anon01', auth_user_id = NULL, storage_uid = 'ANON01', avatar = '', status = 0
+SET display_name = '已注销用户', auth_user_id = NULL, storage_uid = 'ANON01', avatar = '', status = 0
 WHERE id = $1`, userID); err != nil {
 		t.Fatalf("anonymize user error = %v", err)
 	}
@@ -463,17 +463,17 @@ WHERE id = $1`, userID); err != nil {
 		t.Fatalf("freeze tombstone wallet error = %v", err)
 	}
 
-	var username string
+	var displayName string
 	var authUserID *string
 	var phase string
 	if err := pool.QueryRow(ctx, `
-SELECT users.username, users.auth_user_id, request.phase
+SELECT users.display_name, users.auth_user_id, request.phase
 FROM users JOIN user_deletion_requests request ON request.user_id = users.id
-WHERE users.id = $1`, userID).Scan(&username, &authUserID, &phase); err != nil {
+WHERE users.id = $1`, userID).Scan(&displayName, &authUserID, &phase); err != nil {
 		t.Fatalf("read tombstone state error = %v", err)
 	}
-	if username != "deleted-user-anon01" || authUserID != nil || phase != "completed" {
-		t.Fatalf("tombstone state username=%q auth=%v phase=%q", username, authUserID, phase)
+	if displayName != "已注销用户" || authUserID != nil || phase != "completed" {
+		t.Fatalf("tombstone state display_name=%q auth=%v phase=%q", displayName, authUserID, phase)
 	}
 	wallet, err := service.GetWallet(ctx, userID)
 	if err != nil || wallet.Status != WalletStatusFrozen {
@@ -519,7 +519,7 @@ func ensureAdminOperationUser(t *testing.T, pool *pgxpool.Pool, userIDs ...int64
 	for _, userID := range userIDs {
 		storageUID := fmt.Sprintf("A%05d", userID)
 		if _, err := pool.Exec(t.Context(), `
-INSERT INTO users (id, username, storage_uid, role, status)
+INSERT INTO users (id, display_name, storage_uid, role, status)
 VALUES ($1, $2, $3, 'user', 1)
 ON CONFLICT (id) DO NOTHING`, userID, fmt.Sprintf("admin-operation-user-%d", userID), storageUID); err != nil {
 			t.Fatalf("seed admin operation user %d: %v", userID, err)

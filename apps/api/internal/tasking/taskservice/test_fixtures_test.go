@@ -13,7 +13,7 @@ import (
 
 func createTaskServiceTestTask(t testing.TB, db *sql.DB, repo *taskstore.Repository, ctx context.Context, task *tasks.Task) error {
 	t.Helper()
-	if _, err := db.ExecContext(ctx, `INSERT INTO users(id,username,storage_uid,role,status) VALUES($1,$2,$3,'user',1) ON CONFLICT(id) DO NOTHING`, task.UserID, fmt.Sprintf("taskservice-fixture-user-%d", task.UserID), fmt.Sprintf("TS%04d", task.UserID%10000)); err != nil {
+	if _, err := db.ExecContext(ctx, `INSERT INTO users(id,display_name,storage_uid,role,status) VALUES($1,$2,$3,'user',1) ON CONFLICT(id) DO NOTHING`, task.UserID, fmt.Sprintf("taskservice-fixture-user-%d", task.UserID), fmt.Sprintf("TS%04d", task.UserID%10000)); err != nil {
 		return fmt.Errorf("seed task service fixture user: %w", err)
 	}
 	if task.Status == tasks.StatusRunning && task.AccountID == nil {

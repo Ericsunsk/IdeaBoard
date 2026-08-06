@@ -445,11 +445,11 @@ func assertAdminListUsersResponse(t *testing.T, router *gin.Engine, path string,
 	}
 }
 
-func createAdminListUserWithBalance(t *testing.T, repo *UserRepository, pool *pgxpool.Pool, creditService *credits.Service, username, role string, status int16, balance int64) *User {
+func createAdminListUserWithBalance(t *testing.T, repo *UserRepository, pool *pgxpool.Pool, creditService *credits.Service, displayName, role string, status int16, balance int64) *User {
 	t.Helper()
-	user := &User{DisplayName: username, Role: role, Status: status}
+	user := &User{DisplayName: displayName, Role: role, Status: status}
 	if err := repo.Create(t.Context(), user); err != nil {
-		t.Fatalf("create user %q failed: %v", username, err)
+		t.Fatalf("create user %q failed: %v", displayName, err)
 	}
 	provisionAdminListWallet(t, pool, creditService, user.ID)
 	if balance == 0 {
@@ -470,7 +470,7 @@ func createAdminListUserWithBalance(t *testing.T, repo *UserRepository, pool *pg
 			BusinessReference: credits.BusinessReference{Type: "test", ID: strconv.FormatInt(user.ID, 10)},
 		},
 	}); err != nil {
-		t.Fatalf("grant credits for %q failed: %v", username, err)
+		t.Fatalf("grant credits for %q failed: %v", displayName, err)
 	}
 	return user
 }

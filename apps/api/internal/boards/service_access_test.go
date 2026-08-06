@@ -94,7 +94,7 @@ func TestBoardServiceTenantIsolationAndMemberAccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal members failed: %v", err)
 	}
-	for _, privateField := range []string{"user_id", "member_uid", "username", "storage_uid"} {
+	for _, privateField := range []string{"user_id", "member_uid", "storage_uid"} {
 		if strings.Contains(string(encodedMembers), `"`+privateField+`"`) {
 			t.Fatalf("members expose private field %q: %s", privateField, encodedMembers)
 		}
@@ -256,15 +256,15 @@ func TestBoardServiceShareTokenUsesBoardIdentityForPermissions(t *testing.T) {
 	}
 }
 
-func createBoardTestUser(t *testing.T, repo *users.UserRepository, username string) *users.User {
+func createBoardTestUser(t *testing.T, repo *users.UserRepository, displayName string) *users.User {
 	t.Helper()
 	user := &users.User{
-		DisplayName: username + " display",
+		DisplayName: displayName + " display",
 		Status:      1,
 		Role:        "user",
 	}
 	if err := repo.Create(context.Background(), user); err != nil {
-		t.Fatalf("create test user %s failed: %v", username, err)
+		t.Fatalf("create test user %s failed: %v", displayName, err)
 	}
 	return user
 }

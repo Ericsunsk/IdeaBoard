@@ -154,17 +154,17 @@ func TestCreateTaskOutputEnforcesOutputKindShape(t *testing.T) {
 	}
 }
 
-func createMediaOwnerForTest(t *testing.T, db *sql.DB, username string, storageUID string) *users.User {
+func createMediaOwnerForTest(t *testing.T, db *sql.DB, displayName string, storageUID string) *users.User {
 	t.Helper()
 	repo := users.NewUserRepository(db)
 	user := &users.User{
-		DisplayName:   username,
-		StorageUID: storageUID,
-		Role:       "user",
-		Status:     1,
+		DisplayName: displayName,
+		StorageUID:  storageUID,
+		Role:        "user",
+		Status:      1,
 	}
 	if err := repo.Create(context.Background(), user); err != nil {
-		t.Fatalf("create user %q failed: %v", username, err)
+		t.Fatalf("create user %q failed: %v", displayName, err)
 	}
 	return user
 }

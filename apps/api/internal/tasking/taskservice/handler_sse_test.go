@@ -59,7 +59,7 @@ RETURNING id`,
 func seedTaskServiceSSEUser(t testing.TB, ctx context.Context, db *sql.DB, id int64) {
 	t.Helper()
 	if _, err := db.ExecContext(ctx, `
-INSERT INTO users (id, username, storage_uid, role, status)
+INSERT INTO users (id, display_name, storage_uid, role, status)
 VALUES ($1, $2, $3, 'user', 1)
 ON CONFLICT (id) DO NOTHING`,
 		id,

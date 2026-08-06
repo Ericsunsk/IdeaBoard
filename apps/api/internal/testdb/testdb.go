@@ -163,7 +163,7 @@ func seedTaskFixtureUsers(t testing.TB, db *sql.DB) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_, err := db.ExecContext(ctx, `
-WITH seed_users (id, username, storage_uid) AS (
+WITH seed_users (id, display_name, storage_uid) AS (
   VALUES
     (1, 'test-fixture-user-1', 'T00001'),
     (3, 'test-fixture-user-3', 'T00003'),
@@ -183,8 +183,8 @@ WITH seed_users (id, username, storage_uid) AS (
     (99, 'test-fixture-user-99', 'T00099'),
     (101, 'test-fixture-user-101', 'T00101')
 )
-INSERT INTO users (id, username, storage_uid, role, status)
-SELECT id, username, storage_uid, 'user', 1
+INSERT INTO users (id, display_name, storage_uid, role, status)
+SELECT id, display_name, storage_uid, 'user', 1
 FROM seed_users
 ON CONFLICT (id) DO NOTHING;
 

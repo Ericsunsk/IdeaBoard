@@ -155,13 +155,13 @@ type adminPaymentOrderCursor struct {
 }
 
 type adminPaymentOrderFilters struct {
-	orderNumber string
+	orderNumber  string
 	userPublicID uuid.UUID
 	displayName  string
-	status      string
-	anomalyOnly bool
-	cursor      *adminPaymentOrderCursor
-	limit       int
+	status       string
+	anomalyOnly  bool
+	cursor       *adminPaymentOrderCursor
+	limit        int
 }
 
 func (s *Service) ListAdminPaymentOrders(ctx context.Context, input AdminPaymentOrderListInput) (AdminPaymentOrderPage, error) {
@@ -478,7 +478,7 @@ func adminPaymentOrderSummary(row dbsqlc.ListAdminPaymentOrdersRow) AdminPayment
 func adminPaymentOrderDetail(row dbsqlc.GetAdminPaymentOrderRow) AdminPaymentOrderDetail {
 	status := PaymentOrderStatus(row.Status)
 	return AdminPaymentOrderDetail{
-		internalUserID:       row.UserID,
+		internalUserID:    row.UserID,
 		PublicOrderNumber: row.PublicOrderNumber,
 		User:              AdminPaymentOrderUser{PublicID: row.UserPublicID, DisplayName: row.DisplayName},
 		IdeaQuantity:      row.IdeaQuantity,
