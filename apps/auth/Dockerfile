@@ -10,6 +10,7 @@ COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --omit=optional
 
 COPY tsconfig.json ./
+COPY scripts ./scripts
 COPY src ./src
 RUN npm run build
 

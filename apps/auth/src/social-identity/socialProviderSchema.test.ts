@@ -5,7 +5,7 @@ import {
   configureSocialProviderSettingsRuntimePrivileges,
   ensureSocialProviderSettingsSchema,
 } from "./socialProviderSchema.js";
-import { verifyAuthRuntimePrivileges } from "../runtime-privileges.js";
+import { verifyAuthRuntimePrivileges } from "../infrastructure/runtime-privileges.js";
 
 describe("social provider settings schema", () => {
   it("creates a generic encrypted provider settings table", async () => {

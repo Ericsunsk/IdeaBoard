@@ -6,8 +6,8 @@ import Fastify from "fastify";
 import type {
   AuthSessionAPI,
   AuthInternalCommands,
-} from "./trusted-identity/authInternalCommands.js";
-import { registerInternalRoutes } from "./trusted-identity/internalRoutes.js";
+} from "../trusted-identity/authInternalCommands.js";
+import { registerInternalRoutes } from "../trusted-identity/internalRoutes.js";
 
 const internalKey = "contract-test-internal-key";
 const authUserID = "auth-contract-user";
@@ -110,7 +110,7 @@ function createContractCommands(): AuthInternalCommands {
 }
 
 async function runGoContractTest(baseURL: string): Promise<void> {
-  const apiRoot = fileURLToPath(new URL("../../api/", import.meta.url));
+  const apiRoot = fileURLToPath(new URL("../../../api/", import.meta.url));
   const child = spawn(
     "go",
     [

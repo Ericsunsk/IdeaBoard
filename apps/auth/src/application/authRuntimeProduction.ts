@@ -2,23 +2,23 @@ import { toNodeHandler } from "better-auth/node";
 import type { Pool } from "pg";
 import { createAuthComponents, createAuthPool } from "./auth.js";
 import { createAuthApp } from "./authApp.js";
-import { cleanupUnverifiedUsers } from "./authCleanup.js";
+import { cleanupUnverifiedUsers } from "../infrastructure/authCleanup.js";
 import {
   type AuthSessionAPI,
   createAuthInternalCommands,
-} from "./trusted-identity/authInternalCommands.js";
-import { createAuthIdentityStore } from "./authRepository.js";
+} from "../trusted-identity/authInternalCommands.js";
+import { createAuthIdentityStore } from "../infrastructure/authRepository.js";
 import {
   createAuthRuntime,
   type AuthRuntime,
   type AuthRuntimeFactories,
-} from "./authRuntime.js";
-import type { AuthEnvironment } from "./env.js";
-import { verifyAuthRuntimePrivileges } from "./runtime-privileges.js";
+} from "../infrastructure/authRuntime.js";
+import type { AuthEnvironment } from "../infrastructure/env.js";
+import { verifyAuthRuntimePrivileges } from "../infrastructure/runtime-privileges.js";
 import {
   createTrustedIdentityProvisioner,
   type TrustedIdentityAuthAPI,
-} from "./trusted-identity/trustedIdentity.js";
+} from "../trusted-identity/trustedIdentity.js";
 
 const productionAuthRuntimeFactories: AuthRuntimeFactories = {
   createDatabase: createAuthPool,

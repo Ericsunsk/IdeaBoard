@@ -6,23 +6,23 @@ import {
   createAuthEntryGuard,
   isAuthRoute,
   type AuthNodeHandler,
-} from "./admission/authEntryGuard.js";
-import type { AuthAdmissionPolicy } from "./admission/authAdmissionPolicy.js";
+} from "../admission/authEntryGuard.js";
+import type { AuthAdmissionPolicy } from "../admission/authAdmissionPolicy.js";
 import type {
   AuthSessionAPI,
   AuthInternalCommands,
-} from "./trusted-identity/authInternalCommands.js";
-import { extractErrorMessage } from "./authUtils.js";
-import { registerInternalRoutes } from "./trusted-identity/internalRoutes.js";
-import { registerMailConfigRoutes } from "./transactional-mail/mailConfigRoutes.js";
-import type { MailConfigService } from "./transactional-mail/mailConfig.js";
-import { getErrorStatus, sendError, sendSuccess } from "./httpResponse.js";
+} from "../trusted-identity/authInternalCommands.js";
+import { extractErrorMessage } from "../infrastructure/authUtils.js";
+import { registerInternalRoutes } from "../trusted-identity/internalRoutes.js";
+import { registerMailConfigRoutes } from "../transactional-mail/mailConfigRoutes.js";
+import type { MailConfigService } from "../transactional-mail/mailConfig.js";
+import { getErrorStatus, sendError, sendSuccess } from "../infrastructure/httpResponse.js";
 import { createAuthDispatchHandler } from "./publicRegistration.js";
 import {
   isSocialProviderCapabilitiesRoute,
   registerSocialProviderRoutes,
-} from "./social-identity/socialProviderRoutes.js";
-import type { SocialProviderSettingsService } from "./social-identity/socialProviderSettings.js";
+} from "../social-identity/socialProviderRoutes.js";
+import type { SocialProviderSettingsService } from "../social-identity/socialProviderSettings.js";
 
 export type AuthAppConfig = {
   trustProxy: FastifyServerOptions["trustProxy"];

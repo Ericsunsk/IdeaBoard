@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { describe, it } from "node:test";
+import { createSecretCipher } from "../infrastructure/secretCipher.js";
 import {
   MailConfigError,
   MailConfigService,
@@ -14,7 +15,7 @@ import {
   MailDeliveryError,
 } from "./mailConfigAdapters.js";
 
-const encryptionKey = randomBytes(32).toString("base64");
+const secretCipher = createSecretCipher(randomBytes(32).toString("base64"));
 
 describe("MailConfigService", () => {
   it("encrypts a new API key, never returns it, and resets readiness after configuration changes", async () => {
@@ -22,7 +23,7 @@ describe("MailConfigService", () => {
     const service = new MailConfigService(
       repository.port,
       { send: async () => {} },
-      encryptionKey,
+      secretCipher,
     );
 
     const summary = await service.update({
@@ -47,7 +48,7 @@ describe("MailConfigService", () => {
     const service = new MailConfigService(
       repository.port,
       { send: async () => {} },
-      encryptionKey,
+      secretCipher,
     );
     await service.update({
       apiKey: "re_initial",
@@ -72,7 +73,7 @@ describe("MailConfigService", () => {
     const service = new MailConfigService(
       repository.port,
       { send: async () => {} },
-      encryptionKey,
+      secretCipher,
     );
     await service.update({
       apiKey: "re_initial",
@@ -107,7 +108,7 @@ describe("MailConfigService", () => {
           sends.push({ input, apiKey });
         },
       },
-      encryptionKey,
+      secretCipher,
     );
     await service.update({
       apiKey: "re_runtime",
@@ -138,7 +139,7 @@ describe("MailConfigService", () => {
           throw new Error("api-key=re_do_not_log provider raw payload");
         },
       },
-      encryptionKey,
+      secretCipher,
     );
     await service.update({
       apiKey: "re_runtime",
@@ -166,7 +167,7 @@ describe("MailConfigService", () => {
     const service = new MailConfigService(
       repository.port,
       { send: async () => {} },
-      encryptionKey,
+      secretCipher,
     );
     await service.update({
       apiKey: "re_runtime",
@@ -199,7 +200,7 @@ describe("MailConfigService", () => {
           });
         },
       },
-      encryptionKey,
+      secretCipher,
     );
     await service.update({
       apiKey: "re_runtime",
@@ -228,7 +229,7 @@ describe("MailConfigService", () => {
           testedAPIKey = apiKey;
         },
       },
-      encryptionKey,
+      secretCipher,
     );
     await service.update({
       apiKey: "re_initial",
@@ -277,7 +278,7 @@ describe("MailConfigService", () => {
           });
         },
       },
-      encryptionKey,
+      secretCipher,
     );
     await service.update({
       apiKey: "re_initial",
@@ -302,7 +303,7 @@ describe("MailConfigService", () => {
     const service = new MailConfigService(
       repository.port,
       { send: async () => {} },
-      encryptionKey,
+      secretCipher,
     );
     await service.update({
       apiKey: "re_runtime",
@@ -332,7 +333,7 @@ describe("MailConfigService", () => {
           throw deliveryError;
         },
       },
-      encryptionKey,
+      secretCipher,
     );
     await service.update({
       apiKey: "re_runtime",
@@ -364,7 +365,7 @@ describe("MailConfigService", () => {
           throw new Error("api-key=re_secret raw provider payload");
         },
       },
-      encryptionKey,
+      secretCipher,
     );
     await service.update({
       apiKey: "re_runtime",

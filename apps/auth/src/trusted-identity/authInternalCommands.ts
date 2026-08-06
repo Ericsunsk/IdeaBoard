@@ -12,7 +12,7 @@ import {
   normalizeDisplayName,
   normalizeOptionalPositiveInteger,
   normalizeOptionalText,
-} from "../authUtils.js";
+} from "../infrastructure/authUtils.js";
 import {
   type TrustedIdentityProvisioner,
   type TrustedIdentityProvisioningOutcome,

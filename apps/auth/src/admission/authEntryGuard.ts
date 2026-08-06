@@ -3,13 +3,13 @@ import type {
   AuthAdmissionDecision,
   AuthAdmissionPolicy,
 } from "./authAdmissionPolicy.js";
-import { getAuthSubpath, normalizeURLPath } from "../authUtils.js";
+import { getAuthSubpath, normalizeURLPath } from "../infrastructure/authUtils.js";
 import {
   appendVaryHeader,
   getHeaderValue,
   sendNodeJSON,
   sendNodeStatus,
-} from "../httpResponse.js";
+} from "../infrastructure/httpResponse.js";
 
 export type AuthMiddlewareRequest = IncomingMessage & {
   socket: IncomingMessage["socket"];

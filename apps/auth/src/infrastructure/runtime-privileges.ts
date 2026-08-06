@@ -1,8 +1,4 @@
 import type { Pool } from 'pg'
-import {
-  configureMailConfigRuntimePrivileges,
-} from './transactional-mail/mailConfigSchema.js'
-import { configureSocialProviderSettingsRuntimePrivileges } from './social-identity/socialProviderSchema.js'
 
 const authTables = ['user', 'session', 'account', 'verification'] as const
 const creditTables = [
@@ -67,10 +63,6 @@ export async function configureAuthRuntimePrivileges(
     throw error
   } finally {
     client.release()
-  }
-  if (typeof (pool as Pool & { query?: unknown }).query === 'function') {
-    await configureMailConfigRuntimePrivileges(pool, normalizedRole)
-    await configureSocialProviderSettingsRuntimePrivileges(pool, normalizedRole)
   }
 }
 

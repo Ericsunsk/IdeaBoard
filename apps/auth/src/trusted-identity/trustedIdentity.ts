@@ -7,7 +7,7 @@ import {
   normalizeAvatarURL,
   normalizeDisplayName,
   type InternalUserShape,
-} from "../authUtils.js";
+} from "../infrastructure/authUtils.js";
 import type { AuthRole } from "../generated/auth-internal/types.gen.js";
 
 export type TrustedIdentityAuthAPI = {

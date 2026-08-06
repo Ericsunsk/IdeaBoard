@@ -1,16 +1,9 @@
-import { getAdapter } from "better-auth/db/adapter";
-import { getMigrations } from "better-auth/db/migration";
 import type { BetterAuthOptions } from "better-auth";
-import type { Pool } from "pg";
-import { createAuthComponents, createAuthPool } from "./auth.js";
 import {
   loadEnv,
   type AuthEnvironment,
   type EnvSource,
 } from "./env.js";
-import { ensureMailConfigSchema } from "./transactional-mail/mailConfigSchema.js";
-import { configureAuthRuntimePrivileges } from "./runtime-privileges.js";
-import { ensureSocialProviderSettingsSchema } from "./social-identity/socialProviderSchema.js";
 
 type MigrationDatabase = {
   end(): Promise<void>;
@@ -39,33 +32,9 @@ export type AuthMigrationDependencies = {
   log(message: string): void;
 };
 
-const productionDependencies: AuthMigrationDependencies = {
-  createDatabase(environment) {
-    return createAuthPool(environment.database);
-  },
-  createOptions(environment, database) {
-    return createAuthComponents(environment, database as Pool)
-      .runtimeAuthRegistry.current.options;
-  },
-  getAdapter,
-  getMigrations,
-  ensureMailConfigSchema(database) {
-    return ensureMailConfigSchema(database as Pool);
-  },
-  ensureSocialProviderSettingsSchema(database) {
-    return ensureSocialProviderSettingsSchema(database as Pool);
-  },
-  configureRuntimePrivileges(database, runtimeUser) {
-    return configureAuthRuntimePrivileges(database as Pool, runtimeUser);
-  },
-  log(message) {
-    console.log(message);
-  },
-};
-
 export async function runAuthMigrations(
   source: EnvSource,
-  dependencies: AuthMigrationDependencies = productionDependencies,
+  dependencies: AuthMigrationDependencies,
 ): Promise<void> {
   const runtimeUser = requiredValue(source, "DB_USER");
   const migrationUser = requiredValue(source, "DB_MIGRATION_USER");

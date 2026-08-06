@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from "pg";
+import { createSecretCipher } from "../infrastructure/secretCipher.js";
 import {
   MailConfigService,
   type MailConfigRepository,
@@ -28,7 +29,7 @@ export function createRuntimeMailConfigService(
   return new MailConfigService(
     createPgMailConfigRepository(pool),
     createResendTransport(fetchImpl),
-    encryptionKey.trim(),
+    createSecretCipher(encryptionKey),
   );
 }
 

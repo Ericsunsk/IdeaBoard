@@ -1,5 +1,18 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
+export type SecretCipher = {
+  encrypt(plaintext: string): string;
+  decrypt(encoded: string): string;
+};
+
+export function createSecretCipher(encodedKey: string): SecretCipher {
+  const key = encodedKey.trim();
+  return {
+    encrypt: (plaintext) => encryptSecret(plaintext, key),
+    decrypt: (encoded) => decryptSecret(encoded, key),
+  };
+}
+
 export function encryptSecret(plaintext: string, encodedKey: string): string {
   const iv = randomBytes(12);
   const cipher = createCipheriv("aes-256-gcm", encryptionKeyBytes(encodedKey), iv);

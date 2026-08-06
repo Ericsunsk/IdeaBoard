@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { createSecretCipher } from "../infrastructure/secretCipher.js";
 import {
   GOOGLE_PROVIDER,
   SocialProviderSettingsError,
@@ -8,13 +9,15 @@ import {
   type StoredSocialProviderSettings,
 } from "./socialProviderSettings.js";
 
-const encryptionKey = Buffer.alloc(32, 7).toString("base64");
+const secretCipher = createSecretCipher(
+  Buffer.alloc(32, 7).toString("base64"),
+);
 
 describe("SocialProviderSettingsService", () => {
   it("keeps an unconfigured provider disabled and exposes the fixed callback", async () => {
     const service = new SocialProviderSettingsService(
       memoryRepository(),
-      encryptionKey,
+      secretCipher,
       "https://api.ideaboard.art",
     );
 
@@ -38,7 +41,7 @@ describe("SocialProviderSettingsService", () => {
     const applied: Array<string | null> = [];
     const service = new SocialProviderSettingsService(
       repository,
-      encryptionKey,
+      secretCipher,
       "https://api.ideaboard.art",
       async (config) => {
         applied.push(config?.clientId ?? null);
@@ -89,7 +92,7 @@ describe("SocialProviderSettingsService", () => {
     });
     const service = new SocialProviderSettingsService(
       repository,
-      encryptionKey,
+      secretCipher,
       "https://api.ideaboard.art",
       async (config) => {
         applied.push(config?.clientId ?? null);
@@ -121,7 +124,7 @@ describe("SocialProviderSettingsService", () => {
   it("requires complete credentials before enabling", async () => {
     const service = new SocialProviderSettingsService(
       memoryRepository(),
-      encryptionKey,
+      secretCipher,
       "https://api.ideaboard.art",
     );
 
@@ -149,7 +152,7 @@ describe("SocialProviderSettingsService", () => {
     });
     const service = new SocialProviderSettingsService(
       repository,
-      encryptionKey,
+      secretCipher,
       "https://api.ideaboard.art",
     );
 
@@ -178,7 +181,7 @@ describe("SocialProviderSettingsService", () => {
     });
     const service = new SocialProviderSettingsService(
       repository,
-      encryptionKey,
+      secretCipher,
       "https://api.ideaboard.art",
     );
 
@@ -198,7 +201,7 @@ describe("SocialProviderSettingsService", () => {
     });
     const service = new SocialProviderSettingsService(
       repository,
-      encryptionKey,
+      secretCipher,
       "https://api.ideaboard.art",
     );
 
@@ -219,7 +222,7 @@ describe("SocialProviderSettingsService", () => {
     const repository = memoryRepository();
     const service = new SocialProviderSettingsService(
       repository,
-      encryptionKey,
+      secretCipher,
       "https://api.ideaboard.art",
     );
     await service.update(GOOGLE_PROVIDER, {
@@ -233,7 +236,7 @@ describe("SocialProviderSettingsService", () => {
     const corruptedRepository = memoryRepository(stored);
     const corruptedService = new SocialProviderSettingsService(
       corruptedRepository,
-      encryptionKey,
+      secretCipher,
       "https://api.ideaboard.art",
     );
 
@@ -256,7 +259,7 @@ describe("SocialProviderSettingsService", () => {
     };
     const service = new SocialProviderSettingsService(
       repository,
-      encryptionKey,
+      secretCipher,
       "https://api.ideaboard.art",
       async (config) => {
         applied.push(config?.provider ?? null);
@@ -274,7 +277,7 @@ describe("SocialProviderSettingsService", () => {
   it("rejects providers outside the code allowlist", async () => {
     const service = new SocialProviderSettingsService(
       memoryRepository(),
-      encryptionKey,
+      secretCipher,
       "https://api.ideaboard.art",
     );
 

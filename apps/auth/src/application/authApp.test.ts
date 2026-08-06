@@ -7,15 +7,15 @@ import {
   type AuthSessionAPI,
   createAuthInternalCommands,
   type AuthInternalCommands,
-} from "./trusted-identity/authInternalCommands.js";
-import { authInternalRoutes } from "./generated/auth-internal/routes.gen.js";
-import { createAuthAdmissionPolicy } from "./admission/authAdmissionPolicy.js";
-import type { AuthGuardSettings } from "./admission/authGuardSettings.js";
+} from "../trusted-identity/authInternalCommands.js";
+import { authInternalRoutes } from "../generated/auth-internal/routes.gen.js";
+import { createAuthAdmissionPolicy } from "../admission/authAdmissionPolicy.js";
+import type { AuthGuardSettings } from "../admission/authGuardSettings.js";
 import {
   createTrustedIdentityProvisioner,
   type TrustedIdentityAuthAPI,
   type TrustedIdentityRepository,
-} from "./trusted-identity/trustedIdentity.js";
+} from "../trusted-identity/trustedIdentity.js";
 
 type TestAuthAPI = AuthSessionAPI & TrustedIdentityAuthAPI;
 type TestIdentityStore = AuthIdentityMutationStore & TrustedIdentityRepository;
@@ -84,8 +84,10 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
           windowSeconds: 60,
           maxRequests: 30,
         })),
-      getMailReadiness: overrides.mailConfigService
-        ? async () => (await overrides.mailConfigService!.getSummary()).readiness
+      isMailReady: overrides.mailConfigService
+        ? async () =>
+            (await overrides.mailConfigService!.getSummary()).readiness ===
+            "ready"
         : undefined,
       getGoogleProviderReadiness: overrides.socialProviderSettingsService
         ? async () =>

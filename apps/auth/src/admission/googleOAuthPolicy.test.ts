@@ -19,7 +19,7 @@ function createPolicy(
       windowSeconds: 60,
       maxRequests: 30,
     }),
-    getMailReadiness: async () => "ready",
+    isMailReady: async () => true,
     getGoogleProviderReadiness: async () => providerReady,
   });
 }

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createAuthAdmissionPolicy } from "./admission/authAdmissionPolicy.js";
+import { createAuthAdmissionPolicy } from "../admission/authAdmissionPolicy.js";
 import { createBetterAuthOptions } from "./auth.js";
-import { loadEnv } from "./env.js";
+import { loadEnv } from "../infrastructure/env.js";
 
 test("native authentication security configuration stays explicit", async (t) => {
   void t;

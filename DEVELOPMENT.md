@@ -335,9 +335,14 @@ apps/api/
 └── internal/prompts/         # prompt templates and assembly
 
 apps/auth/
-├── src/auth.ts               # Better Auth config
-├── src/env.ts                # env validation
-└── src/index.ts              # auth and internal routes
+├── src/admission/            # registration, Origin/CORS and Rate Limit policy
+├── src/application/          # Better Auth and production composition
+├── src/infrastructure/       # PostgreSQL, migration, Runtime and env adapters
+├── src/social-identity/      # OAuth Provider settings and runtime registry
+├── src/transactional-mail/   # typed templates, Resend and Mail settings
+├── src/trusted-identity/     # canonical identity and internal commands
+├── src/index.ts              # service entrypoint
+└── src/migrate.ts            # migration entrypoint
 ```
 
 ## 维护规则

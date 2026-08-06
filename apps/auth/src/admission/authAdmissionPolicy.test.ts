@@ -15,9 +15,9 @@ describe("AuthAdmissionPolicy", () => {
           maxRequests: 1,
         };
       },
-      getMailReadiness: async () => {
+      isMailReady: async () => {
         calls.push("mail");
-        return "ready";
+        return true;
       },
       getGoogleProviderReadiness: async () => {
         calls.push("provider");
@@ -52,9 +52,9 @@ describe("AuthAdmissionPolicy", () => {
           maxRequests: 1,
         };
       },
-      getMailReadiness: async () => {
+      isMailReady: async () => {
         calls.push("mail");
-        return "ready";
+        return true;
       },
     });
     const request = {
@@ -81,7 +81,7 @@ describe("AuthAdmissionPolicy", () => {
         windowSeconds: 60,
         maxRequests: 30,
       }),
-      getMailReadiness: async () => "ready",
+      isMailReady: async () => true,
     });
 
     assert.deepEqual(await policy.admitRegistration("email_otp"), {
@@ -96,7 +96,7 @@ describe("AuthAdmissionPolicy", () => {
   });
 
   it("checks Mail readiness and client-IP Rate Limit at the Email OTP request entry", async () => {
-    let mailReadiness: "not_tested" | "ready" = "not_tested";
+    let isMailReady = false;
     const policy = createAuthAdmissionPolicy({
       trustedOrigins: [],
       getSettings: async () => ({
@@ -104,7 +104,7 @@ describe("AuthAdmissionPolicy", () => {
         windowSeconds: 60,
         maxRequests: 1,
       }),
-      getMailReadiness: async () => mailReadiness,
+      isMailReady: async () => isMailReady,
     });
     const request = {
       method: "POST",
@@ -118,7 +118,7 @@ describe("AuthAdmissionPolicy", () => {
       allowed: false,
       reason: "mail_not_ready",
     });
-    mailReadiness = "ready";
+    isMailReady = true;
     assert.deepEqual(await policy.admitRequest(request), { allowed: true });
     const limited = await policy.admitRequest(request);
     assert.ok(!limited.allowed);

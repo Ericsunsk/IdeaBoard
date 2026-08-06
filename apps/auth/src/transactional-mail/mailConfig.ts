@@ -2,10 +2,6 @@ import {
   mailConfigurationTest,
   type RenderedEmail,
 } from "./emailTemplates/index.js";
-import {
-  decryptSecret as decryptRuntimeSecret,
-  encryptSecret as encryptRuntimeSecret,
-} from "../secretCipher.js";
 
 export type MailReadiness =
   "not_configured" | "not_tested" | "ready" | "unavailable";
@@ -56,6 +52,11 @@ export type MailTransport = {
   send: (input: MailSendInput, apiKey: string) => Promise<void>;
 };
 
+export type MailSecretCipher = {
+  encrypt(plaintext: string): string;
+  decrypt(encoded: string): string;
+};
+
 export type MailConfigRepository = {
   get: () => Promise<StoredMailConfig | null>;
   put: (
@@ -82,7 +83,7 @@ export class MailConfigService {
   constructor(
     private readonly repository: MailConfigRepository,
     private readonly transport: MailTransport,
-    private readonly encryptionKey: string,
+    private readonly secretCipher: MailSecretCipher,
   ) {}
 
   async getSummary(): Promise<MailConfigSummary> {
@@ -106,7 +107,7 @@ export class MailConfigService {
     const nextAPIKey = input.apiKey?.trim() ?? "";
     const rotatedAPIKey = Boolean(nextAPIKey);
     const rotatedEncryptedAPIKey = rotatedAPIKey
-      ? encryptSecret(nextAPIKey, this.encryptionKey)
+      ? encryptSecret(nextAPIKey, this.secretCipher)
       : "";
 
     for (let attempt = 0; attempt < MAX_CONFIG_MUTATION_ATTEMPTS; attempt += 1) {
@@ -165,7 +166,7 @@ export class MailConfigService {
     }
     let apiKey: string;
     try {
-      apiKey = decryptSecret(current.encryptedApiKey, this.encryptionKey);
+      apiKey = this.secretCipher.decrypt(current.encryptedApiKey);
     } catch {
       throw new MailConfigError("unavailable", "邮件服务密钥不可用");
     }
@@ -232,7 +233,7 @@ export class MailConfigService {
     }
     let apiKey: string;
     try {
-      apiKey = decryptSecret(current.encryptedApiKey, this.encryptionKey);
+      apiKey = this.secretCipher.decrypt(current.encryptedApiKey);
     } catch {
       throw new MailConfigError("unavailable", "邮件服务密钥不可用");
     }
@@ -314,17 +315,13 @@ function normalizeProviderError(error: unknown): string {
   }
   return "provider_unavailable";
 }
-function encryptSecret(plaintext: string, key: string): string {
+function encryptSecret(plaintext: string, secretCipher: MailSecretCipher): string {
   try {
-    return encryptRuntimeSecret(plaintext, key);
+    return secretCipher.encrypt(plaintext);
   } catch {
     throw new MailConfigError(
       "encryption_unavailable",
       "邮件配置加密密钥未配置",
     );
   }
-}
-
-function decryptSecret(encoded: string, key: string): string {
-  return decryptRuntimeSecret(encoded, key);
 }

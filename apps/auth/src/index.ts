@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
-import { createProductionAuthRuntime } from "./authRuntimeProduction.js";
-import { loadEnv } from "./env.js";
+import { createProductionAuthRuntime } from "./application/authRuntimeProduction.js";
+import { loadEnv } from "./infrastructure/env.js";
 
 dotenv.config({ quiet: true });
 

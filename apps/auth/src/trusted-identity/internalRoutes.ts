@@ -9,7 +9,7 @@ import type {
   AuthInternalCommands,
   AuthSessionAPI,
 } from "./authInternalCommands.js";
-import { extractAuthUser, extractErrorMessage } from "../authUtils.js";
+import { extractAuthUser, extractErrorMessage } from "../infrastructure/authUtils.js";
 import type { RouteHandlers } from "../generated/auth-internal/fastify.gen.js";
 import { authInternalRoutes } from "../generated/auth-internal/routes.gen.js";
 import {
@@ -17,7 +17,7 @@ import {
   sendError,
   sendSuccess,
   toHeaders,
-} from "../httpResponse.js";
+} from "../infrastructure/httpResponse.js";
 import { sessionIdentityFromAuthUser } from "./trustedIdentity.js";
 
 export type InternalRoutesOptions = {

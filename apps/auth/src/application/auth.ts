@@ -2,26 +2,28 @@ import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { createAuthMiddleware } from "better-auth/api";
 import { admin, emailOTP, haveIBeenPwned } from "better-auth/plugins";
 import { Pool, type PoolConfig } from "pg";
-import type { AuthAdmissionPolicy } from "./admission/authAdmissionPolicy.js";
-import { createAuthAdmissionPolicy } from "./admission/authAdmissionPolicy.js";
-import { createAuthGuardSettingsReader } from "./admission/authGuardSettings.js";
-import { normalizeCanonicalEmail } from "./authUtils.js";
-import type { AuthEnvironment } from "./env.js";
+import type { AuthAdmissionPolicy } from "../admission/authAdmissionPolicy.js";
+import { createAuthAdmissionPolicy } from "../admission/authAdmissionPolicy.js";
+import { createAuthGuardSettingsReader } from "../admission/authGuardSettings.js";
+import { normalizeCanonicalEmail } from "../infrastructure/authUtils.js";
+import type { AuthEnvironment } from "../infrastructure/env.js";
 import {
   passwordResetOtp,
   verificationOtp,
-} from "./transactional-mail/emailTemplates/index.js";
+} from "../transactional-mail/emailTemplates/index.js";
 import {
   applyGoogleOAuthRequestPolicy,
   createRegistrationUserCreationGuard,
-} from "./admission/googleOAuthPolicy.js";
-import { createRuntimeAuthRegistry } from "./social-identity/runtimeAuthRegistry.js";
-import type { MailConfigService } from "./transactional-mail/mailConfig.js";
-import { createRuntimeMailConfigService } from "./transactional-mail/mailConfigAdapters.js";
+} from "../admission/googleOAuthPolicy.js";
+import { createRuntimeAuthRegistry } from "../social-identity/runtimeAuthRegistry.js";
+import type { MailConfigService } from "../transactional-mail/mailConfig.js";
+import { createRuntimeMailConfigService } from "../transactional-mail/mailConfigAdapters.js";
 import {
   createRuntimeSocialProviderSettingsService,
+} from "../social-identity/socialProviderSettingsAdapters.js";
+import {
   type SocialProviderSettingsService,
-} from "./social-identity/socialProviderSettings.js";
+} from "../social-identity/socialProviderSettings.js";
 
 const EMAIL_OTP_EXPIRES_IN_SECONDS = 600;
 const EMAIL_OTP_EXPIRES_IN_MINUTES = EMAIL_OTP_EXPIRES_IN_SECONDS / 60;
@@ -79,7 +81,8 @@ export function createAuthComponents(
   const authAdmissionPolicy = createAuthAdmissionPolicy({
     trustedOrigins: environment.auth.trustedOrigins,
     getSettings: getAuthGuardSettings,
-    getMailReadiness: async () => (await mailConfigService.getSummary()).readiness,
+    isMailReady: async () =>
+      (await mailConfigService.getSummary()).readiness === "ready",
     getGoogleProviderReadiness: async () =>
       Boolean(
         socialProviderSettingsService &&

@@ -1,10 +1,9 @@
 import type { AuthGuardSettings } from "./authGuardSettings.js";
-import type { MailReadiness } from "../transactional-mail/mailConfig.js";
 import {
   isRateLimitedAuthPath,
   isSignUpPath,
   normalizeAuthPath,
-} from "../authUtils.js";
+} from "../infrastructure/authUtils.js";
 
 type RateLimitEntry = {
   count: number;
@@ -51,7 +50,7 @@ export type AuthAdmissionPolicy = {
 export type AuthAdmissionPolicyOptions = {
   trustedOrigins: string[];
   getSettings: () => Promise<AuthGuardSettings>;
-  getMailReadiness?: () => Promise<MailReadiness>;
+  isMailReady?: () => Promise<boolean>;
   getGoogleProviderReadiness?: () => Promise<boolean>;
   onDependencyError?: (
     dependency: "settings" | "mail" | "provider",
@@ -188,9 +187,9 @@ async function checkRegistrationDependencies(
 async function checkMailReadiness(
   options: AuthAdmissionPolicyOptions,
 ): Promise<AuthAdmissionDecision | null> {
-  if (!options.getMailReadiness) return null;
+  if (!options.isMailReady) return null;
   try {
-    return (await options.getMailReadiness()) === "ready"
+    return (await options.isMailReady())
       ? null
       : { allowed: false, reason: "mail_not_ready" };
   } catch (error) {
