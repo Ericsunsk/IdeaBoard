@@ -174,9 +174,10 @@
         :field-class="passwordFieldClass"
         :message-pt="ibFormErrorMessagePt"
       >
-        <input
+        <InputText
           :id="fieldId"
           v-model="emailForm.newEmail"
+          unstyled
           type="email"
           autocomplete="email"
           :required="required"
@@ -210,9 +211,10 @@
         :field-class="passwordFieldClass"
         :message-pt="ibFormErrorMessagePt"
       >
-        <input
+        <InputText
           :id="fieldId"
           v-model="emailForm.otp"
+          unstyled
           inputmode="numeric"
           autocomplete="one-time-code"
           maxlength="6"
@@ -240,6 +242,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import {
   ibFormErrorMessagePt,

@@ -5,41 +5,46 @@
         <div
           class="relative size-[88px] shrink-0 overflow-visible rounded-[var(--radius-ib-pill)] bg-ib-surface-raised shadow-[var(--shadow-ib-control)] max-[520px]:size-20"
         >
-          <Avatar
-            v-if="userStore.user?.avatar"
-            :image="userStore.user.avatar"
-            shape="circle"
-            unstyled
-            class="flex h-full w-full items-center justify-center overflow-hidden rounded-[var(--radius-ib-pill)]"
-            :pt="{
-              image: {
-                class: 'h-full w-full rounded-[var(--radius-ib-pill)] object-cover',
-              },
-            }"
-          />
-          <Avatar
-            v-else
-            :label="userInitial"
-            shape="circle"
-            unstyled
-            class="flex h-full w-full items-center justify-center rounded-[var(--radius-ib-pill)] bg-[linear-gradient(135deg,var(--color-ib-creative-accent),var(--color-ib-creative-accent-secondary))] text-[34px] font-bold text-ib-text-inverse max-[520px]:text-[28px]"
-          />
-          <Button
+          <button
             type="button"
-            rounded
-            outlined
-            size="small"
-            severity="secondary"
-            class="absolute right-0 bottom-0"
+            class="group relative flex h-full w-full cursor-pointer items-center justify-center overflow-hidden rounded-[var(--radius-ib-pill)] border-0 bg-transparent p-0 text-ib-text-inverse outline-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] focus-visible:shadow-[var(--shadow-ib-focus)] disabled:cursor-wait"
             :disabled="avatarUploading"
+            :aria-busy="avatarUploading"
             aria-label="更换头像"
             title="更换头像"
             @click="openAvatarPicker"
           >
-            <template #icon>
-              <Camera class="h-4 w-4" />
-            </template>
-          </Button>
+            <Avatar
+              v-if="userStore.user?.avatar"
+              :image="userStore.user.avatar"
+              shape="circle"
+              unstyled
+              class="flex h-full w-full items-center justify-center overflow-hidden rounded-[var(--radius-ib-pill)]"
+              :pt="{
+                image: {
+                  class: 'h-full w-full rounded-[var(--radius-ib-pill)] object-cover',
+                },
+              }"
+            />
+            <Avatar
+              v-else
+              :label="userInitial"
+              shape="circle"
+              unstyled
+              class="flex h-full w-full items-center justify-center rounded-[var(--radius-ib-pill)] bg-[linear-gradient(135deg,var(--color-ib-creative-accent),var(--color-ib-creative-accent-secondary))] text-[34px] font-bold text-ib-text-inverse max-[520px]:text-[28px]"
+            />
+            <span
+              class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[var(--radius-ib-pill)] bg-[color-mix(in_srgb,var(--color-ib-text)_52%,transparent)] transition-opacity duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
+              :class="
+                avatarUploading
+                  ? 'opacity-100'
+                  : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
+              "
+              aria-hidden="true"
+            >
+              <Camera class="size-6" :class="avatarUploading ? 'animate-pulse' : ''" />
+            </span>
+          </button>
           <input
             id="account-avatar-file"
             ref="avatarInputRef"
@@ -100,7 +105,6 @@
 import { computed, ref } from 'vue'
 import { Camera } from '@iconoir/vue'
 import Avatar from 'primevue/avatar'
-import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import { useUserStore } from '../../auth/session/authSession'
 import { useAvatarUploadWorkflow } from '../useAvatarUploadWorkflow'
