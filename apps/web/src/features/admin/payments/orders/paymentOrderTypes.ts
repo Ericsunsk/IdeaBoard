@@ -12,8 +12,8 @@ export const adminPaymentOrderStatuses = [
 export type AdminPaymentOrderStatus = (typeof adminPaymentOrderStatuses)[number]
 
 export type AdminPaymentOrderUser = {
-  id: number
-  username: string
+  publicId: string
+  displayName: string
 }
 
 export type AdminPaymentOrderSummary = {

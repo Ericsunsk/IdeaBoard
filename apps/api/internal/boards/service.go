@@ -176,10 +176,10 @@ func (s *BoardService) ListMembers(ctx context.Context, ownerUserID int64, board
 		return nil, err
 	}
 	result := []BoardMemberWithUser{{
-		UserID:    ownerUser.ID,
-		MemberUID: ownerUser.StorageUID,
-		Username:  ownerUser.Username,
-		Role:      BoardAccessRoleOwner,
+		UserID:      ownerUser.ID,
+		PublicID:    ownerUser.PublicID,
+		DisplayName: ownerUser.DisplayName,
+		Role:        BoardAccessRoleOwner,
 	}}
 	members, err := s.repo.ListMembers(ctx, board.OwnerUserID, board.BoardID)
 	if err != nil {
@@ -194,20 +194,20 @@ func (s *BoardService) ListMembers(ctx context.Context, ownerUserID int64, board
 	return result, nil
 }
 
-func (s *BoardService) InviteMember(ctx context.Context, ownerUserID int64, boardID string, memberUID string, role string) (*BoardMemberWithUser, error) {
+func (s *BoardService) InviteMember(ctx context.Context, ownerUserID int64, boardID string, memberPublicID string, role string) (*BoardMemberWithUser, error) {
 	board, err := s.requireOwnerBoard(ctx, ownerUserID, boardID)
 	if err != nil {
 		return nil, err
 	}
-	normalizedUID := strings.TrimSpace(memberUID)
-	if !users.IsValidStorageUID(normalizedUID) {
+	normalizedPublicID := strings.TrimSpace(memberPublicID)
+	if normalizedPublicID == "" {
 		return nil, ErrInvalidBoardInput
 	}
 	targetRole := normalizeBoardMemberRole(role)
 	if targetRole == "" {
 		return nil, ErrBoardMemberInvalidRole
 	}
-	memberUser, err := s.userRepo.GetByStorageUID(ctx, normalizedUID)
+	memberUser, err := s.userRepo.GetByPublicID(ctx, normalizedPublicID)
 	if err != nil {
 		if database.IsNotFound(err) {
 			return nil, ErrBoardMemberNotFound
@@ -221,27 +221,27 @@ func (s *BoardService) InviteMember(ctx context.Context, ownerUserID int64, boar
 		return nil, err
 	}
 	return &BoardMemberWithUser{
-		UserID:    memberUser.ID,
-		MemberUID: memberUser.StorageUID,
-		Username:  memberUser.Username,
-		Role:      targetRole,
+		UserID:      memberUser.ID,
+		PublicID:    memberUser.PublicID,
+		DisplayName: memberUser.DisplayName,
+		Role:        targetRole,
 	}, nil
 }
 
-func (s *BoardService) UpdateMemberRole(ctx context.Context, ownerUserID int64, boardID string, memberUID string, role string) (*BoardMemberWithUser, error) {
-	return s.InviteMember(ctx, ownerUserID, boardID, memberUID, role)
+func (s *BoardService) UpdateMemberRole(ctx context.Context, ownerUserID int64, boardID string, memberPublicID string, role string) (*BoardMemberWithUser, error) {
+	return s.InviteMember(ctx, ownerUserID, boardID, memberPublicID, role)
 }
 
-func (s *BoardService) RemoveMember(ctx context.Context, ownerUserID int64, boardID string, memberUID string) error {
+func (s *BoardService) RemoveMember(ctx context.Context, ownerUserID int64, boardID string, memberPublicID string) error {
 	board, err := s.requireOwnerBoard(ctx, ownerUserID, boardID)
 	if err != nil {
 		return err
 	}
-	normalizedUID := strings.TrimSpace(memberUID)
-	if !users.IsValidStorageUID(normalizedUID) {
+	normalizedPublicID := strings.TrimSpace(memberPublicID)
+	if normalizedPublicID == "" {
 		return ErrInvalidBoardInput
 	}
-	memberUser, err := s.userRepo.GetByStorageUID(ctx, normalizedUID)
+	memberUser, err := s.userRepo.GetByPublicID(ctx, normalizedPublicID)
 	if err != nil {
 		if database.IsNotFound(err) {
 			return ErrBoardMemberNotFound

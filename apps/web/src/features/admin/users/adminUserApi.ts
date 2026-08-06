@@ -1,6 +1,7 @@
 import {
   banAdminUser as requestBanAdminUser,
   deleteAdminUser as requestDeleteAdminUser,
+  impersonateAdminUser as requestImpersonateAdminUser,
   revokeAdminUserSessions as requestRevokeAdminUserSessions,
   unbanAdminUser as requestUnbanAdminUser,
   updateAdminUserRole as requestUpdateAdminUserRole,
@@ -8,12 +9,12 @@ import {
 import { resolveApiOk } from '../../../shared/api/apiResponse'
 
 export async function banAdminUser(input: {
-  id: number
+  publicId: string
   reason?: string
   expires_in_days?: number
 }): Promise<void> {
   await resolveApiOk(
-    requestBanAdminUser(input.id, {
+    requestBanAdminUser(input.publicId, {
       reason: input.reason,
       expires_in_days: input.expires_in_days,
     }),
@@ -21,21 +22,25 @@ export async function banAdminUser(input: {
   )
 }
 
-export async function unbanAdminUser(id: number): Promise<void> {
-  await resolveApiOk(requestUnbanAdminUser(id), '解封失败')
+export async function unbanAdminUser(publicId: string): Promise<void> {
+  await resolveApiOk(requestUnbanAdminUser(publicId), '解封失败')
 }
 
-export async function revokeAdminUserSessions(id: number): Promise<void> {
-  await resolveApiOk(requestRevokeAdminUserSessions(id), '吊销会话失败')
+export async function revokeAdminUserSessions(publicId: string): Promise<void> {
+  await resolveApiOk(requestRevokeAdminUserSessions(publicId), '吊销会话失败')
 }
 
 export async function updateAdminUserRole(input: {
-  id: number
+  publicId: string
   role: 'admin' | 'user'
 }): Promise<void> {
-  await resolveApiOk(requestUpdateAdminUserRole(input.id, { role: input.role }), '角色更新失败')
+  await resolveApiOk(requestUpdateAdminUserRole(input.publicId, { role: input.role }), '角色更新失败')
 }
 
-export async function deleteAdminUser(id: number): Promise<void> {
-  await resolveApiOk(requestDeleteAdminUser(id), '注销失败')
+export async function deleteAdminUser(publicId: string): Promise<void> {
+  await resolveApiOk(requestDeleteAdminUser(publicId), '注销失败')
+}
+
+export async function impersonateAdminUser(publicId: string): Promise<void> {
+  await resolveApiOk(requestImpersonateAdminUser(publicId), '伪装登录失败')
 }

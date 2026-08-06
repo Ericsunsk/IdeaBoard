@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type CommandType string
@@ -59,7 +61,7 @@ var (
 
 type Actor struct {
 	Type ActorType `json:"type"`
-	ID   string    `json:"id"`
+	ID   string    `json:"-"`
 }
 
 type BusinessReference struct {
@@ -199,9 +201,12 @@ type WalletReader interface {
 }
 
 type WalletBalance struct {
-	UserID    int64 `json:"user_id"`
-	Available int64 `json:"available_credits"`
-	Reserved  int64 `json:"reserved_credits"`
+	// UserID is an internal wallet FK and must never cross the HTTP boundary.
+	UserID      int64     `json:"-"`
+	PublicID    uuid.UUID `json:"public_id"`
+	DisplayName string    `json:"display_name"`
+	Available   int64     `json:"available_credits"`
+	Reserved    int64     `json:"reserved_credits"`
 }
 
 // WalletDetails is the current administrative read model. CommandResult keeps
@@ -221,7 +226,9 @@ const (
 
 type WalletRestriction struct {
 	RestrictionID string            `json:"restriction_id"`
-	UserID        int64             `json:"user_id"`
+	UserID        int64             `json:"-"`
+	PublicID      uuid.UUID         `json:"public_id"`
+	DisplayName   string            `json:"display_name"`
 	Type          string            `json:"type"`
 	Source        string            `json:"source"`
 	RelatedObject BusinessReference `json:"related_object"`

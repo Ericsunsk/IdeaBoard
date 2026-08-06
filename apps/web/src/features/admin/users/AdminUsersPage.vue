@@ -28,6 +28,18 @@
         </template>
 
         <template #filters>
+          <Button
+            v-tooltip.top="'OAuth Provider 设置'"
+            text
+            :class="adminToolbarIconButtonClass"
+            aria-label="OAuth Provider 设置"
+            aria-haspopup="dialog"
+            @click="oauthSettingsVisible = true"
+          >
+            <template #icon>
+              <Settings class="size-4 text-admin-text-2" />
+            </template>
+          </Button>
           <AdminFilterPopover
             :active="hasUserFilter"
             filter-label="筛选用户"
@@ -88,7 +100,7 @@
       v-model:selection="selectedUsers"
       :value="users"
       :loading="loading"
-      data-key="id"
+      data-key="publicId"
       lazy
       scrollable
       scroll-height="flex"
@@ -97,7 +109,7 @@
     >
       <Column selection-mode="multiple" style="width: 3rem" />
 
-      <Column field="username" header="用户" :style="{ minWidth: '260px' }">
+      <Column field="displayName" header="用户" :style="{ minWidth: '260px' }">
         <template #body="{ data: user }">
           <div class="flex min-w-0 items-center gap-3">
             <div class="relative shrink-0">
@@ -126,10 +138,10 @@
             </div>
             <div class="min-w-0">
               <div class="truncate text-admin-content font-bold text-admin-text-1">
-                {{ user.username }}
+                {{ user.displayName }}
               </div>
               <div class="mt-0.5 truncate font-mono text-admin-caption text-admin-text-3">
-                {{ user.uid }}
+                {{ user.publicIdLabel }}
               </div>
             </div>
           </div>
@@ -139,17 +151,6 @@
       <Column field="role" header="角色" :style="{ width: '124px' }">
         <template #body="{ data: user }">
           <Tag :value="user.roleLabel" :severity="user.roleSeverity" rounded />
-        </template>
-      </Column>
-
-      <Column header="认证 ID" :style="{ minWidth: '180px' }">
-        <template #body="{ data: user }">
-          <span
-            class="block max-w-[168px] truncate font-mono text-admin-caption text-admin-text-3"
-            :title="user.authUserIdLabel"
-          >
-            {{ user.authUserIdLabel }}
-          </span>
         </template>
       </Column>
 
@@ -175,7 +176,7 @@
             severity="secondary"
             class="!-ml-2 !justify-start !px-2 font-mono !font-[760]"
             aria-haspopup="dialog"
-            :aria-label="`打开 ${user.username} 的账户详情`"
+            :aria-label="`打开 ${user.displayName} 的账户详情`"
             @click="openWalletDialog(user)"
           >
             {{ user.availableCreditsLabel }}
@@ -191,7 +192,7 @@
             size="small"
             severity="secondary"
             aria-haspopup="dialog"
-            :aria-label="`${user.username} 操作菜单`"
+            :aria-label="`${user.displayName} 操作菜单`"
             @click="toggleUserActionMenu($event, user)"
           >
             <template #icon>
@@ -234,16 +235,19 @@
     :user="walletDialogUser"
     @refresh-users="loadUsers"
   />
+
+  <OAuthProviderSettingsDialog v-model:visible="oauthSettingsVisible" />
 </template>
 
 <script setup lang="ts">
-import { Refresh, Search } from '@iconoir/vue'
+import { Refresh, Search, Settings } from '@iconoir/vue'
 import { computed, ref } from 'vue'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
+import Tooltip from 'primevue/tooltip'
 import AdminFilterPopover from '../shared/components/AdminFilterPopover.vue'
 import AdminPagerControls from '../shared/components/AdminPagerControls.vue'
 import AdminRowActionsPopover from '../shared/components/AdminRowActionsPopover.vue'
@@ -253,11 +257,15 @@ import AdminToolbarSearch from '../shared/components/AdminToolbarSearch.vue'
 import { useAdminConfirm } from '../shared/composables/useAdminConfirm'
 import DataTableFrame from '../../../shared/components/DataTableFrame.vue'
 import AdminUserBanDialog from './AdminUserBanDialog.vue'
+import OAuthProviderSettingsDialog from './OAuthProviderSettingsDialog.vue'
 import { AdminUserWalletDialog } from '../credits-billing/wallets'
 import { banDurationOptions } from './adminUserCommands'
 import { useAdminUsersContext } from './adminUsersContext'
 import type { AdminUserRowView, UserActionKey } from './adminUserView'
 import { useAdminUsersFeedback } from './useAdminUsersFeedback'
+import { adminToolbarIconButtonClass } from '../shared/lib/adminUiClasses'
+
+const vTooltip = Tooltip
 
 type PrimePopupPanel = {
   toggle: (event: Event) => void
@@ -268,6 +276,7 @@ const feedback = useAdminUsersFeedback()
 const adminConfirm = useAdminConfirm()
 const userActionPopoverRef = ref<PrimePopupPanel | null>(null)
 const walletDialogUser = ref<AdminUserRowView | null>(null)
+const oauthSettingsVisible = ref(false)
 const walletDialogVisible = computed({
   get: () => Boolean(walletDialogUser.value),
   set: (visible: boolean) => {

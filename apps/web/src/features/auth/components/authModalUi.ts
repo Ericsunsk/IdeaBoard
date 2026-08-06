@@ -68,6 +68,9 @@ export const authInputErrorClass = ibFormInputErrorClass
 export const authPrimaryButtonClass =
   'ib-control-state ib-auth-primary-action [--ib-control-hover-transform:scale(1.01)] [--ib-control-active-transform:scale(0.99)] [--ib-control-disabled-opacity:0.7] mt-2 inline-flex h-[50px] w-full items-center justify-center rounded-[12px] border-0 bg-gradient-to-r from-[var(--color-ib-auth-primary-from)] to-[var(--color-ib-auth-primary-to)] px-8 text-[15px] font-semibold text-[var(--color-ib-auth-primary-text)] shadow-[var(--shadow-ib-auth-primary)] transition-[transform,box-shadow,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-[var(--shadow-ib-auth-primary-hover)]'
 
+export const authSecondaryButtonClass =
+  'ib-control-state [--ib-control-active-transform:scale(0.99)] [--ib-control-disabled-opacity:0.6] inline-flex h-[48px] w-full items-center justify-center rounded-[12px] border border-[var(--color-ib-auth-shell-border)] bg-[var(--color-ib-auth-shell)] px-6 text-[14px] font-semibold text-[var(--color-ib-auth-text)] transition-[background-color,border-color,transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-[var(--color-ib-border-hover)] hover:bg-[var(--color-ib-surface-hover)]'
+
 export const authFooterClass =
   'relative z-[1] text-center text-[13px] text-[var(--color-ib-auth-muted)]'
 

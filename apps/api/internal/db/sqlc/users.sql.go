@@ -8,39 +8,47 @@ package dbsqlc
 import (
 	"context"
 	"database/sql"
+
+	"github.com/google/uuid"
 )
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (
-  username, auth_user_id, storage_uid, avatar, role, status
+  display_name, auth_user_id, storage_uid, avatar, role, status
 ) VALUES (
   $1, $2, $3,
   $4, $5, $6
 )
-RETURNING id
+RETURNING id, public_id, display_name
 `
 
 type CreateUserParams struct {
-	Username   string         `json:"username"`
-	AuthUserID sql.NullString `json:"auth_user_id"`
-	StorageUid string         `json:"storage_uid"`
-	Avatar     string         `json:"avatar"`
-	Role       string         `json:"role"`
-	Status     int16          `json:"status"`
+	DisplayName string         `json:"display_name"`
+	AuthUserID  sql.NullString `json:"auth_user_id"`
+	StorageUid  string         `json:"storage_uid"`
+	Avatar      string         `json:"avatar"`
+	Role        string         `json:"role"`
+	Status      int16          `json:"status"`
 }
 
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (int64, error) {
+type CreateUserRow struct {
+	ID          int64     `json:"id"`
+	PublicID    uuid.UUID `json:"public_id"`
+	DisplayName string    `json:"display_name"`
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
 	row := q.db.QueryRowContext(ctx, createUser,
-		arg.Username,
+		arg.DisplayName,
 		arg.AuthUserID,
 		arg.StorageUid,
 		arg.Avatar,
 		arg.Role,
 		arg.Status,
 	)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
+	var i CreateUserRow
+	err := row.Scan(&i.ID, &i.PublicID, &i.DisplayName)
+	return i, err
 }
 
 const deleteBoardMembersByUserID = `-- name: DeleteBoardMembersByUserID :exec
@@ -92,7 +100,7 @@ func (q *Queries) GetUsedUIDForUpdate(ctx context.Context, storageUid string) (s
 }
 
 const getUserByAuthUserID = `-- name: GetUserByAuthUserID :one
-SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
 WHERE auth_user_id = $1
 `
@@ -102,7 +110,8 @@ func (q *Queries) GetUserByAuthUserID(ctx context.Context, authUserID sql.NullSt
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.Username,
+		&i.PublicID,
+		&i.DisplayName,
 		&i.AuthUserID,
 		&i.StorageUid,
 		&i.Avatar,
@@ -115,7 +124,7 @@ func (q *Queries) GetUserByAuthUserID(ctx context.Context, authUserID sql.NullSt
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
 WHERE id = $1
 `
@@ -125,7 +134,32 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.Username,
+		&i.PublicID,
+		&i.DisplayName,
+		&i.AuthUserID,
+		&i.StorageUid,
+		&i.Avatar,
+		&i.Role,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserByPublicID = `-- name: GetUserByPublicID :one
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+FROM users
+WHERE public_id = $1
+`
+
+func (q *Queries) GetUserByPublicID(ctx context.Context, publicID uuid.UUID) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserByPublicID, publicID)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.DisplayName,
 		&i.AuthUserID,
 		&i.StorageUid,
 		&i.Avatar,
@@ -138,7 +172,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
 }
 
 const getUserByStorageUID = `-- name: GetUserByStorageUID :one
-SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
 WHERE storage_uid = $1
 `
@@ -148,30 +182,8 @@ func (q *Queries) GetUserByStorageUID(ctx context.Context, storageUid string) (U
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.Username,
-		&i.AuthUserID,
-		&i.StorageUid,
-		&i.Avatar,
-		&i.Role,
-		&i.Status,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
-FROM users
-WHERE username = $1
-`
-
-func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByUsername, username)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.Username,
+		&i.PublicID,
+		&i.DisplayName,
 		&i.AuthUserID,
 		&i.StorageUid,
 		&i.Avatar,
@@ -252,9 +264,9 @@ func (q *Queries) ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUID
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
-WHERE (NOT $1::boolean OR username ILIKE $2)
+WHERE (NOT $1::boolean OR display_name ILIKE $2)
   AND (NOT $3::boolean OR role = $4)
   AND (NOT $5::boolean OR status = $6)
 ORDER BY id DESC
@@ -292,7 +304,8 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 		var i User
 		if err := rows.Scan(
 			&i.ID,
-			&i.Username,
+			&i.PublicID,
+			&i.DisplayName,
 			&i.AuthUserID,
 			&i.StorageUid,
 			&i.Avatar,
@@ -321,7 +334,7 @@ SELECT
   COUNT(*) FILTER (WHERE status = 0) AS banned_count,
   COUNT(*) FILTER (WHERE role = 'admin') AS admin_count
 FROM users
-WHERE (NOT $1::boolean OR username ILIKE $2)
+WHERE (NOT $1::boolean OR display_name ILIKE $2)
   AND (NOT $3::boolean OR role = $4)
   AND (NOT $5::boolean OR status = $6)
 `
@@ -363,7 +376,7 @@ func (q *Queries) SummarizeUsers(ctx context.Context, arg SummarizeUsersParams) 
 
 const updateUser = `-- name: UpdateUser :execrows
 UPDATE users
-SET username = $1,
+SET display_name = $1,
     auth_user_id = $2,
     storage_uid = $3,
     avatar = $4,
@@ -373,18 +386,18 @@ WHERE id = $7
 `
 
 type UpdateUserParams struct {
-	Username   string         `json:"username"`
-	AuthUserID sql.NullString `json:"auth_user_id"`
-	StorageUid string         `json:"storage_uid"`
-	Avatar     string         `json:"avatar"`
-	Role       string         `json:"role"`
-	Status     int16          `json:"status"`
-	ID         int64          `json:"id"`
+	DisplayName string         `json:"display_name"`
+	AuthUserID  sql.NullString `json:"auth_user_id"`
+	StorageUid  string         `json:"storage_uid"`
+	Avatar      string         `json:"avatar"`
+	Role        string         `json:"role"`
+	Status      int16          `json:"status"`
+	ID          int64          `json:"id"`
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, updateUser,
-		arg.Username,
+		arg.DisplayName,
 		arg.AuthUserID,
 		arg.StorageUid,
 		arg.Avatar,

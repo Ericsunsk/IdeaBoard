@@ -412,9 +412,9 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "auth_user_id",
-          "email",
-          "username",
+        "auth_user_id",
+        "email",
+        "display_name",
           "claim_identity",
           "claim_identity_kind",
           "claim_identity_verified"
@@ -427,8 +427,14 @@
           "email": {
             "type": "string"
           },
-          "username": {
-            "type": "string"
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "avatar": {
+            "type": "string",
+            "maxLength": 2048
           },
           "claim_identity": {
             "type": "string"
@@ -445,8 +451,8 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "auth_user_id",
-          "username",
+        "auth_user_id",
+        "display_name",
           "email",
           "claim_identity",
           "claim_identity_kind",
@@ -459,8 +465,10 @@
             "type": "string",
             "x-go-name": "AuthUserID"
           },
-          "username": {
-            "type": "string"
+        "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
           },
           "email": {
             "type": "string"
@@ -489,9 +497,9 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "email",
-          "username",
-          "password",
+        "email",
+        "display_name",
+        "password",
           "allow_existing",
           "role"
         ],
@@ -499,8 +507,10 @@
           "email": {
             "type": "string"
           },
-          "username": {
-            "type": "string"
+        "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
           },
           "password": {
             "type": "string"

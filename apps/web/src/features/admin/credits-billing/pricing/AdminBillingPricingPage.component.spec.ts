@@ -108,7 +108,6 @@ describe('AdminBillingPricingPage', () => {
             price_version_id: 8,
             version: 1,
             unit_credits: 0,
-            created_by: 9,
             created_at: '2026-07-16T09:00:00Z',
           },
         })
@@ -201,7 +200,6 @@ describe('AdminBillingPricingPage', () => {
             price_version_id: 9,
             version: 1,
             unit_credits: 3,
-            created_by: 9,
             created_at: '2026-07-16T09:00:00Z',
           },
         })
@@ -240,7 +238,6 @@ describe('AdminBillingPricingPage', () => {
             price_version_id: 10,
             version: 1,
             unit_credits: 5,
-            created_by: 9,
             created_at: '2026-07-16T09:00:00Z',
           },
         })
@@ -284,7 +281,6 @@ describe('AdminBillingPricingPage', () => {
                 price_version_id: params.sku === 'ai-image:partial-edit' ? 11 : 22,
                 version: params.sku === 'ai-image:partial-edit' ? 11 : 22,
                 unit_credits: params.sku === 'ai-image:partial-edit' ? 11 : 22,
-                created_by: 7,
                 created_at: '2026-07-16T08:00:00Z',
               },
             ],
@@ -359,7 +355,6 @@ function makeCatalogItems() {
     price_version_id: 1,
     version: 1,
     unit_credits: 1,
-    created_by: 7,
     created_at: '2026-07-12T08:00:00Z',
   }
   return [

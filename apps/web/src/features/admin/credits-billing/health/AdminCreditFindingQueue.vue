@@ -107,8 +107,8 @@
       <Column header="影响对象" style="width: 28%; min-width: 190px">
         <template #body="{ data }">
           <div class="flex min-w-0 flex-col gap-1">
-            <span v-if="data.wallet_user_id" class="text-admin-body font-[700] text-admin-text-1">
-              Wallet · User #{{ data.wallet_user_id }}
+            <span v-if="data.wallet_public_id" class="text-admin-body font-[700] text-admin-text-1">
+              Wallet · {{ data.wallet_display_name || data.wallet_public_id }}
             </span>
             <span
               class="max-w-72 truncate text-admin-caption text-admin-text-2"
@@ -185,10 +185,10 @@
         </div>
       </section>
 
-      <section v-if="selectedFinding.wallet_user_id">
+      <section v-if="selectedFinding.wallet_public_id">
         <div class="text-admin-caption font-[700] text-admin-text-3">关联 Wallet</div>
         <div class="mt-2 text-admin-body font-[680] text-admin-text-1">
-          Wallet · User #{{ selectedFinding.wallet_user_id }}
+          Wallet · {{ selectedFinding.wallet_display_name || selectedFinding.wallet_public_id }}
         </div>
       </section>
 

@@ -69,7 +69,7 @@ npm run dev
 ```bash
 cd apps/api
 INIT_ADMIN_EMAIL='admin@example.com' \
-INIT_ADMIN_USERNAME='admin' \
+INIT_ADMIN_DISPLAY_NAME='Admin' \
 INIT_ADMIN_PASSWORD='your-strong-password' \
   go run ./cmd init-admin
 ```

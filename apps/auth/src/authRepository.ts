@@ -3,20 +3,16 @@ import type { InternalUserShape } from './authUtils.js'
 
 type UserRow = {
   id?: unknown
-  username?: unknown
   email?: unknown
   name?: unknown
   role?: unknown
   emailVerified?: unknown
 }
 
-export async function findUserByUsernameOrEmail(
-  username: string,
-  email: string,
-): Promise<InternalUserShape | null> {
+export async function findUserByEmail(email: string): Promise<InternalUserShape | null> {
   const result = await authDB.query(
-    'SELECT id, username, email, name, role, "emailVerified" FROM "user" WHERE username = $1 OR email = $2 LIMIT 1',
-    [username, email],
+    'SELECT id, email, name, role, "emailVerified" FROM "user" WHERE email = $1 LIMIT 1',
+    [email],
   )
   if (result.rows.length === 0) {
     return null
@@ -76,7 +72,7 @@ export async function removeAuthUserCascade(authUserID: string): Promise<boolean
   const conn = await authDB.connect()
   try {
     await conn.query('BEGIN')
-    const result = await conn.query('SELECT id, email, username FROM "user" WHERE id = $1 LIMIT 1', [
+    const result = await conn.query('SELECT id, email FROM "user" WHERE id = $1 LIMIT 1', [
       authUserID,
     ])
     if (result.rows.length === 0) {
@@ -86,12 +82,11 @@ export async function removeAuthUserCascade(authUserID: string): Promise<boolean
 
     const row = result.rows[0] as UserRow
     const email = typeof row?.email === 'string' ? row.email.trim() : ''
-    const username = typeof row?.username === 'string' ? row.username.trim() : ''
 
     await conn.query('DELETE FROM "session" WHERE "userId" = $1', [authUserID])
     await conn.query('DELETE FROM "account" WHERE "userId" = $1', [authUserID])
 
-    const verificationIdentifiers = [email, username, authUserID].filter(Boolean)
+    const verificationIdentifiers = [email, authUserID].filter(Boolean)
     if (verificationIdentifiers.length > 0) {
       await conn.query('DELETE FROM "verification" WHERE identifier = ANY($1::text[])', [
         verificationIdentifiers,
@@ -115,7 +110,6 @@ function normalizeUserRow(row: UserRow): InternalUserShape | null {
   }
   return {
     id: row.id,
-    username: typeof row.username === 'string' ? row.username : null,
     email: typeof row.email === 'string' ? row.email : null,
     name: typeof row.name === 'string' ? row.name : null,
     role: typeof row.role === 'string' ? row.role : null,

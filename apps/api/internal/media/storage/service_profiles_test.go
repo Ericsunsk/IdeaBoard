@@ -42,7 +42,7 @@ func TestStorageProfileLocatorIsImmutableAfterMediaAssetRegistration(t *testing.
 	if _, err := service.SaveProfile(ctx, &seed); err != nil {
 		t.Fatalf("seed storage profile: %v", err)
 	}
-	owner := &users.User{Username: "profile-locator-owner", Status: 1, Role: "user"}
+	owner := &users.User{DisplayName: "profile-locator-owner", Status: 1, Role: "user"}
 	if err := users.NewUserRepository(repo.db).Create(ctx, owner); err != nil {
 		t.Fatalf("create media owner: %v", err)
 	}

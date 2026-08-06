@@ -9,6 +9,8 @@ import (
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/database"
+
+	"github.com/google/uuid"
 )
 
 type UserRepository struct {
@@ -35,18 +37,24 @@ func (r *UserRepository) Create(ctx context.Context, user *User) error {
 		if role == "" {
 			role = "user"
 		}
-		id, err := q.CreateUser(ctx, dbsqlc.CreateUserParams{
-			Username:   user.Username,
-			AuthUserID: dbutil.NullString(user.AuthUserID),
-			StorageUid: user.StorageUID,
-			Avatar:     user.Avatar,
-			Role:       role,
-			Status:     user.Status,
+		displayName := strings.TrimSpace(user.DisplayName)
+		if displayName == "" {
+			displayName = "IdeaBoard User"
+		}
+		created, err := q.CreateUser(ctx, dbsqlc.CreateUserParams{
+			DisplayName: displayName,
+			AuthUserID:  dbutil.NullString(user.AuthUserID),
+			StorageUid:  user.StorageUID,
+			Avatar:      user.Avatar,
+			Role:        role,
+			Status:      user.Status,
 		})
 		if err != nil {
 			return err
 		}
-		user.ID = int64(id)
+		user.ID = created.ID
+		user.PublicID = created.PublicID
+		user.DisplayName = created.DisplayName
 		return nil
 	})
 }
@@ -61,9 +69,13 @@ func (r *UserRepository) GetByID(ctx context.Context, id int64) (*User, error) {
 	return &user, nil
 }
 
-// GetByUsername 根据用户名获取用户
-func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*User, error) {
-	row, err := r.q.GetUserByUsername(ctx, username)
+// GetByPublicID resolves the immutable identifier accepted at public API boundaries.
+func (r *UserRepository) GetByPublicID(ctx context.Context, rawPublicID string) (*User, error) {
+	publicID, err := uuid.Parse(strings.TrimSpace(rawPublicID))
+	if err != nil {
+		return nil, database.ErrNotFound
+	}
+	row, err := r.q.GetUserByPublicID(ctx, publicID)
 	if err != nil {
 		return nil, err
 	}
@@ -98,13 +110,13 @@ func (r *UserRepository) GetByStorageUID(ctx context.Context, storageUID string)
 // Update 更新用户
 func (r *UserRepository) Update(ctx context.Context, user *User) error {
 	updated, err := r.q.UpdateUser(ctx, dbsqlc.UpdateUserParams{
-		Username:   user.Username,
-		AuthUserID: dbutil.NullString(user.AuthUserID),
-		StorageUid: user.StorageUID,
-		Avatar:     user.Avatar,
-		Role:       user.Role,
-		Status:     user.Status,
-		ID:         user.ID,
+		DisplayName: strings.TrimSpace(user.DisplayName),
+		AuthUserID:  dbutil.NullString(user.AuthUserID),
+		StorageUid:  user.StorageUID,
+		Avatar:      user.Avatar,
+		Role:        user.Role,
+		Status:      user.Status,
+		ID:          user.ID,
 	})
 	if err != nil {
 		return err
@@ -330,14 +342,15 @@ func requireOneUserRow(rows int64) error {
 
 func userFromSQLC(row dbsqlc.User) User {
 	return User{
-		ID:         row.ID,
-		Username:   row.Username,
-		AuthUserID: dbutil.StringPtr(row.AuthUserID),
-		StorageUID: row.StorageUid,
-		Avatar:     row.Avatar,
-		Role:       row.Role,
-		Status:     row.Status,
-		CreatedAt:  row.CreatedAt,
-		UpdatedAt:  row.UpdatedAt,
+		ID:          row.ID,
+		PublicID:    row.PublicID,
+		DisplayName: row.DisplayName,
+		AuthUserID:  dbutil.StringPtr(row.AuthUserID),
+		StorageUID:  row.StorageUid,
+		Avatar:      row.Avatar,
+		Role:        row.Role,
+		Status:      row.Status,
+		CreatedAt:   row.CreatedAt,
+		UpdatedAt:   row.UpdatedAt,
 	}
 }

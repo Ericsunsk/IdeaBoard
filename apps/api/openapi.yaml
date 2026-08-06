@@ -517,13 +517,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseBoardMember'
-  /user/boards/{board_id}/members/{member_uid}/role:
+  /user/boards/{board_id}/members/{member_public_id}/role:
     put:
       tags: [Boards]
       operationId: updateBoardMemberRole
       parameters:
         - $ref: '#/components/parameters/BoardId'
-        - $ref: '#/components/parameters/MemberUid'
+        - $ref: '#/components/parameters/MemberPublicID'
       requestBody:
         required: true
         content:
@@ -537,13 +537,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseBoardMember'
-  /user/boards/{board_id}/members/{member_uid}:
+  /user/boards/{board_id}/members/{member_public_id}:
     delete:
       tags: [Boards]
       operationId: removeBoardMember
       parameters:
         - $ref: '#/components/parameters/BoardId'
-        - $ref: '#/components/parameters/MemberUid'
+        - $ref: '#/components/parameters/MemberPublicID'
       responses:
         '200':
           description: OK
@@ -1051,8 +1051,8 @@ paths:
           schema: { type: string, pattern: '^IBP-[0-9]{8}-[A-Z0-9]{12}$' }
         - name: user
           in: query
-          description: Exact positive user ID or bounded username search.
-          schema: { type: string, maxLength: 50, pattern: '^[A-Za-z0-9._-]+$' }
+          description: Exact public user ID or bounded display name search.
+          schema: { type: string, maxLength: 100 }
         - name: status
           in: query
           schema: { type: string, enum: [creating, checkout_open, async_payment_pending, paid_pending_credit, credited, cancelled, expired, payment_failed] }
@@ -1239,12 +1239,126 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseUserList'
-  /admin/users/{id}/ban:
+  /admin/users/oauth-providers/{provider}:
+    parameters:
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [google]
+    get:
+      tags: [AdminUsers]
+      operationId: getAdminOAuthProviderSettings
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: OAuth Provider runtime settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseOAuthProviderSettings' }
+        '404':
+          description: Unsupported provider
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '403':
+          description: Admin role required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '502':
+          description: Auth service unavailable or invalid response
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+    put:
+      tags: [AdminUsers]
+      operationId: updateAdminOAuthProviderSettings
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OAuthProviderSettingsUpdate' }
+      responses:
+        '200':
+          description: OAuth Provider runtime settings updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseOAuthProviderSettings' }
+        '400':
+          description: Invalid configuration
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '404':
+          description: Unsupported provider
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '409':
+          description: Provider state conflicts with the requested update
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '403':
+          description: Admin role required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '502':
+          description: Auth service unavailable or invalid response
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+  /admin/users/oauth-capabilities:
+    get:
+      tags: [AdminUsers]
+      operationId: getAdminOAuthCapabilities
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Runtime OAuth provider availability
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseOAuthCapabilities' }
+        '502':
+          description: Auth service unavailable or invalid response
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '403':
+          description: Admin role required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+  /admin/users/{public_id}/ban:
     post:
       tags: [AdminUsers]
       operationId: banAdminUser
+      security:
+        - cookieAuth: []
       parameters:
-        - $ref: '#/components/parameters/IdPath'
+        - $ref: '#/components/parameters/PublicUserIDPath'
       requestBody:
         required: false
         content:
@@ -1263,12 +1377,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseEmpty'
-  /admin/users/{id}/unban:
+  /admin/users/{public_id}/unban:
     post:
       tags: [AdminUsers]
       operationId: unbanAdminUser
+      security:
+        - cookieAuth: []
       parameters:
-        - $ref: '#/components/parameters/IdPath'
+        - $ref: '#/components/parameters/PublicUserIDPath'
       responses:
         '200':
           description: OK
@@ -1276,12 +1392,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseEmpty'
-  /admin/users/{id}/revoke-sessions:
+  /admin/users/{public_id}/revoke-sessions:
     post:
       tags: [AdminUsers]
       operationId: revokeAdminUserSessions
+      security:
+        - cookieAuth: []
       parameters:
-        - $ref: '#/components/parameters/IdPath'
+        - $ref: '#/components/parameters/PublicUserIDPath'
       responses:
         '200':
           description: OK
@@ -1289,12 +1407,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseEmpty'
-  /admin/users/{id}/role:
+  /admin/users/{public_id}/role:
     put:
       tags: [AdminUsers]
       operationId: updateAdminUserRole
+      security:
+        - cookieAuth: []
       parameters:
-        - $ref: '#/components/parameters/IdPath'
+        - $ref: '#/components/parameters/PublicUserIDPath'
       requestBody:
         required: true
         content:
@@ -1313,12 +1433,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseEmpty'
-  /admin/users/{id}:
+  /admin/users/{public_id}:
     delete:
       tags: [AdminUsers]
       operationId: deleteAdminUser
+      security:
+        - cookieAuth: []
       parameters:
-        - $ref: '#/components/parameters/IdPath'
+        - $ref: '#/components/parameters/PublicUserIDPath'
       responses:
         '200':
           description: OK
@@ -1326,6 +1448,41 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseEmpty'
+
+  /admin/users/{public_id}/impersonate:
+    post:
+      tags: [AdminUsers]
+      operationId: impersonateAdminUser
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PublicUserIDPath'
+      responses:
+        '200':
+          description: Better Auth impersonation session established
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseEmpty' }
+        '400':
+          description: Invalid or unavailable target user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '401':
+          description: Authentication required or upstream rejected session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '403':
+          description: Admin role required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '502':
+          description: Auth service unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
 
   /admin/rewards/codes:
     post:
@@ -1554,17 +1711,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseCreditCommandResult'
 
-  /admin/credits/wallets/{user_id}:
+  /admin/credits/wallets/{public_id}:
     get:
       tags: [AdminCredits]
       operationId: getAdminCreditWallet
       security:
         - cookieAuth: []
       parameters:
-        - name: user_id
+        - name: public_id
           in: path
           required: true
-          schema: { type: integer, format: int64, minimum: 1 }
+          schema: { type: string, format: uuid }
       responses:
         '200':
           description: Credit wallet balance
@@ -1573,17 +1730,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseCreditWallet'
 
-  /admin/credits/wallets/{user_id}/ledger:
+  /admin/credits/wallets/{public_id}/ledger:
     get:
       tags: [AdminCredits]
       operationId: listAdminCreditLedger
       security:
         - cookieAuth: []
       parameters:
-        - name: user_id
+        - name: public_id
           in: path
           required: true
-          schema: { type: integer, format: int64, minimum: 1 }
+          schema: { type: string, format: uuid }
         - name: before_sequence
           in: query
           schema: { type: integer, format: int64, minimum: 1 }
@@ -1941,11 +2098,11 @@ paths:
           schema:
             type: string
             enum: [pending, running, completed, failed, cancelled]
-        - name: user_id
+        - name: user_public_id
           in: query
           schema:
-            type: integer
-            minimum: 1
+            type: string
+            format: uuid
         - name: account_id
           in: query
           schema:
@@ -2428,6 +2585,11 @@ components:
       in: path
       required: true
       schema: { type: integer }
+    PublicUserIDPath:
+      name: public_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     RewardCodeIdPath:
       name: id
       in: path
@@ -2448,11 +2610,11 @@ components:
       in: path
       required: true
       schema: { type: integer }
-    MemberUid:
-      name: member_uid
+    MemberPublicID:
+      name: member_public_id
       in: path
       required: true
-      schema: { type: string }
+      schema: { type: string, format: uuid }
     ShareTokenID:
       name: token_id
       in: path
@@ -2522,12 +2684,11 @@ components:
 
     User:
       type: object
-      required: [id, uid, username, role, status, created_at, updated_at]
+      required: [public_id, display_name, storage_namespace, avatar, role, status, created_at, updated_at]
       properties:
-        id: { type: integer }
-        uid: { type: string }
-        username: { type: string }
-        auth_user_id: { type: string }
+        public_id: { type: string, format: uuid, description: Canonical immutable public user identity. }
+        display_name: { type: string, minLength: 1, maxLength: 100 }
+        storage_namespace: { type: string, description: Stable storage namespace; opaque to clients. }
         avatar: { type: string }
         role: { type: string }
         status: { type: integer }
@@ -2535,23 +2696,86 @@ components:
         updated_at: { type: string }
 
     AdminUserListItem:
-      allOf:
-        - $ref: '#/components/schemas/User'
-        - type: object
-          required: [available_credits]
-          properties:
-            available_credits:
-              type: integer
-              format: int64
-              minimum: 0
-              maximum: 9000000000000000
+      type: object
+      required: [public_id, display_name, role, status, created_at, updated_at, available_credits]
+      properties:
+        public_id: { type: string, format: uuid }
+        display_name: { type: string, minLength: 1, maxLength: 100 }
+        avatar: { type: string }
+        role: { type: string }
+        status: { type: integer }
+        created_at: { type: string }
+        updated_at: { type: string }
+        available_credits:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 9000000000000000
+
+    OAuthProviderSettings:
+      type: object
+      additionalProperties: false
+      required:
+        - provider
+        - enabled
+        - configured
+        - available
+        - client_id
+        - client_secret_configured
+        - scopes
+        - config_version
+        - callback_url
+        - updated_at
+      properties:
+        provider:
+          type: string
+          enum: [google]
+        enabled: { type: boolean }
+        configured: { type: boolean }
+        available: { type: boolean }
+        client_id: { type: string }
+        client_secret_configured: { type: boolean }
+        scopes:
+          type: array
+          items: { type: string }
+        config_version:
+          type: integer
+          minimum: 0
+        callback_url:
+          type: string
+          format: uri
+        updated_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    OAuthProviderSettingsUpdate:
+      type: object
+      additionalProperties: false
+      required: [enabled, client_id]
+      properties:
+        enabled: { type: boolean }
+        client_id: { type: string }
+        client_secret:
+          type: string
+          writeOnly: true
+
+    OAuthCapabilities:
+      type: object
+      additionalProperties: false
+      required: [social]
+      properties:
+        social:
+          type: object
+          additionalProperties:
+            type: boolean
 
     AdminCreditGrantRequest:
       type: object
       additionalProperties: false
-      required: [user_id, amount_credits, idempotency_key, reason, business_reference_id]
+      required: [user_public_id, amount_credits, idempotency_key, reason, business_reference_id]
       properties:
-        user_id: { type: integer, format: int64, minimum: 1 }
+        user_public_id: { type: string, format: uuid }
         amount_credits: { type: integer, format: int64, minimum: 1, maximum: 9000000000000000 }
         idempotency_key: { type: string, minLength: 1, maxLength: 160 }
         reason: { type: string, minLength: 1 }
@@ -2560,9 +2784,9 @@ components:
     AdminCreditDeductionRequest:
       type: object
       additionalProperties: false
-      required: [user_id, amount_credits, idempotency_key, reason, business_reference_id]
+      required: [user_public_id, amount_credits, idempotency_key, reason, business_reference_id]
       properties:
-        user_id: { type: integer, format: int64, minimum: 1 }
+        user_public_id: { type: string, format: uuid }
         amount_credits: { type: integer, format: int64, minimum: 1, maximum: 9000000000000000 }
         idempotency_key: { type: string, minLength: 1, maxLength: 160 }
         reason: { type: string, minLength: 1 }
@@ -2571,9 +2795,9 @@ components:
     AdminCreditRefundRequest:
       type: object
       additionalProperties: false
-      required: [user_id, charge_transaction_id, amount_credits, idempotency_key, reason, business_reference_id]
+      required: [user_public_id, charge_transaction_id, amount_credits, idempotency_key, reason, business_reference_id]
       properties:
-        user_id: { type: integer, format: int64, minimum: 1 }
+        user_public_id: { type: string, format: uuid }
         charge_transaction_id: { type: string, minLength: 1, maxLength: 64 }
         amount_credits: { type: integer, format: int64, minimum: 1, maximum: 9000000000000000 }
         idempotency_key: { type: string, minLength: 1, maxLength: 160 }
@@ -2583,9 +2807,9 @@ components:
     AdminCreditCorrectionRequest:
       type: object
       additionalProperties: false
-      required: [user_id, original_transaction_id, amount_credits, idempotency_key, reason, business_reference_id]
+      required: [user_public_id, original_transaction_id, amount_credits, idempotency_key, reason, business_reference_id]
       properties:
-        user_id: { type: integer, format: int64, minimum: 1 }
+        user_public_id: { type: string, format: uuid }
         original_transaction_id: { type: string, minLength: 1, maxLength: 64 }
         amount_credits: { type: integer, format: int64, minimum: 1, maximum: 9000000000000000 }
         idempotency_key: { type: string, minLength: 1, maxLength: 160 }
@@ -2632,12 +2856,11 @@ components:
 
     BillingPrice:
       type: object
-      required: [price_version_id, version, unit_credits, created_by, created_at]
+      required: [price_version_id, version, unit_credits, created_at]
       properties:
         price_version_id: { type: integer, format: int64, minimum: 1 }
         version: { type: integer, format: int64, minimum: 1 }
         unit_credits: { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }
-        created_by: { type: integer, format: int64, minimum: 1 }
         created_at: { type: string, format: date-time }
 
     BillableItemStatus:
@@ -2720,7 +2943,7 @@ components:
     RewardCode:
       type: object
       additionalProperties: false
-      required: [id, display_name, masked_code_hint, credit_amount, max_redemptions, redemption_count, enabled, status, created_by, created_at, updated_at]
+      required: [id, display_name, masked_code_hint, credit_amount, max_redemptions, redemption_count, enabled, status, created_at, updated_at]
       properties:
         id: { type: integer, format: int64, minimum: 1 }
         display_name: { type: string, minLength: 1, maxLength: 120 }
@@ -2731,7 +2954,6 @@ components:
         expires_at: { type: string, format: date-time }
         enabled: { type: boolean }
         status: { type: string, enum: [disabled, expired, exhausted, enabled] }
-        created_by: { type: integer, format: int64, minimum: 1 }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
@@ -2782,11 +3004,12 @@ components:
     AdminRewardCodeRedemptionSummary:
       type: object
       additionalProperties: false
-      required: [id, reward_code_id, user_id, credited_amount, redeemed_at]
+      required: [id, reward_code_id, user_public_id, display_name, credited_amount, redeemed_at]
       properties:
         id: { type: integer, format: int64, minimum: 1 }
         reward_code_id: { type: integer, format: int64, minimum: 1 }
-        user_id: { type: integer, format: int64, minimum: 1 }
+        user_public_id: { type: string, format: uuid }
+        display_name: { type: string }
         credited_amount: { type: integer, format: int64, minimum: 1, maximum: 9000000000000000 }
         redeemed_at: { type: string, format: date-time }
 
@@ -2803,11 +3026,12 @@ components:
     AdminRewardCodeRedemptionDetail:
       type: object
       additionalProperties: false
-      required: [id, reward_code_id, user_id, credited_amount, redeemed_at, credit_transaction_id, masked_code_hint]
+      required: [id, reward_code_id, user_public_id, display_name, credited_amount, redeemed_at, credit_transaction_id, masked_code_hint]
       properties:
         id: { type: integer, format: int64, minimum: 1 }
         reward_code_id: { type: integer, format: int64, minimum: 1 }
-        user_id: { type: integer, format: int64, minimum: 1 }
+        user_public_id: { type: string, format: uuid }
+        display_name: { type: string }
         credited_amount: { type: integer, format: int64, minimum: 1, maximum: 9000000000000000 }
         redeemed_at: { type: string, format: date-time }
         credit_transaction_id: { type: string, minLength: 1, maxLength: 64 }
@@ -2860,11 +3084,12 @@ components:
     RewardRedemption:
       type: object
       additionalProperties: false
-      required: [id, reward_code_id, user_id, credit_amount, credit_transaction_id, available_balance_after, redeemed_at]
+      required: [id, reward_code_id, user_public_id, display_name, credit_amount, credit_transaction_id, available_balance_after, redeemed_at]
       properties:
         id: { type: integer, format: int64, minimum: 1 }
         reward_code_id: { type: integer, format: int64, minimum: 1 }
-        user_id: { type: integer, format: int64, minimum: 1 }
+        user_public_id: { type: string, format: uuid }
+        display_name: { type: string }
         credit_amount: { type: integer, format: int64, minimum: 1, maximum: 9000000000000000 }
         credit_transaction_id: { type: string }
         available_balance_after: { type: integer, format: int64, minimum: 0 }
@@ -2911,17 +3136,19 @@ components:
 
     CreditWallet:
       type: object
-      required: [user_id, available_credits, reserved_credits]
+      required: [public_id, display_name, available_credits, reserved_credits]
       properties:
-        user_id: { type: integer, format: int64 }
+        public_id: { type: string, format: uuid }
+        display_name: { type: string }
         available_credits: { type: integer, format: int64, minimum: 0 }
         reserved_credits: { type: integer, format: int64, minimum: 0 }
 
     CreditWalletDetails:
       type: object
-      required: [user_id, status, available_credits, reserved_credits, active_restrictions]
+      required: [public_id, display_name, status, available_credits, reserved_credits, active_restrictions]
       properties:
-        user_id: { type: integer, format: int64 }
+        public_id: { type: string, format: uuid }
+        display_name: { type: string }
         status: { type: string, enum: [active, frozen] }
         available_credits: { type: integer, format: int64, minimum: 0 }
         reserved_credits: { type: integer, format: int64, minimum: 0 }
@@ -2931,10 +3158,11 @@ components:
 
     CreditWalletRestriction:
       type: object
-      required: [restriction_id, user_id, type, source, related_object, reason, created_by, created_at]
+      required: [restriction_id, public_id, display_name, type, source, related_object, reason, created_by, created_at]
       properties:
         restriction_id: { type: string, format: uuid }
-        user_id: { type: integer, format: int64 }
+        public_id: { type: string, format: uuid }
+        display_name: { type: string }
         type: { type: string }
         source: { type: string }
         related_object: { $ref: '#/components/schemas/CreditBusinessReference' }
@@ -2944,10 +3172,10 @@ components:
 
     CreditWalletRestrictionActor:
       type: object
-      required: [type, id]
+      additionalProperties: false
+      required: [type]
       properties:
         type: { type: string, enum: [admin, system, service] }
-        id: { type: string }
 
     BillingRecord:
       type: object
@@ -2981,10 +3209,10 @@ components:
 
     CreditActor:
       type: object
-      required: [type, id]
+      additionalProperties: false
+      required: [type]
       properties:
         type: { type: string, enum: [admin, system, service, user] }
-        id: { type: string }
 
     CreditBusinessReference:
       type: object
@@ -3139,7 +3367,8 @@ components:
         id: { type: integer, format: int64 }
         status: { type: string, enum: [queued, running, completed, failed] }
         trigger: { type: string, enum: [manual, scheduled] }
-        requested_by: { type: integer, format: int64 }
+        requested_by_public_id: { type: string, format: uuid }
+        requested_by_display_name: { type: string }
         reason: { $ref: '#/components/schemas/AdminActionReason' }
         scheduled_for: { type: string, format: date-time }
         finding_count: { type: integer, format: int64 }
@@ -3160,7 +3389,8 @@ components:
         finding_type: { $ref: '#/components/schemas/CreditReconciliationFindingType' }
         severity: { type: string, enum: [warning, error, critical] }
         risk: { type: string, enum: [low, high] }
-        wallet_user_id: { type: integer, format: int64 }
+        wallet_public_id: { type: string, format: uuid }
+        wallet_display_name: { type: string }
         subject_type: { type: string }
         subject_id: { type: string }
         details: { type: object, additionalProperties: true }
@@ -3316,11 +3546,10 @@ components:
 
     BoardMemberItem:
       type: object
-      required: [user_id, member_uid, username, role]
+      required: [public_id, display_name, role]
       properties:
-        user_id: { type: integer }
-        member_uid: { type: string }
-        username: { type: string }
+        public_id: { type: string, format: uuid }
+        display_name: { type: string }
         role:
           type: string
           enum: [owner, editor, viewer]
@@ -3355,9 +3584,9 @@ components:
 
     InviteBoardMemberRequest:
       type: object
-      required: [member_uid, role]
+      required: [member_public_id, role]
       properties:
-        member_uid: { type: string }
+        member_public_id: { type: string, format: uuid }
         role:
           type: string
           enum: [editor, viewer]
@@ -3389,44 +3618,20 @@ components:
 
     Task:
       type: object
-      required: [id, task_id, correlation_id, user_id, prompt, status, created_at, updated_at]
+      additionalProperties: false
+      required: [task_id, correlation_id, prompt, status, error_msg, cancel_reason, result, created_at, updated_at, completed_at]
       properties:
-        id: { type: integer }
         task_id: { type: string }
         correlation_id: { type: string }
-        user_id: { type: integer }
-        assigned_provider_endpoint_id:
-          type: integer
-          nullable: true
-        assigned_credential_id:
-          type: integer
-          nullable: true
-        account_id:
-          type: integer
-          nullable: true
         prompt: { type: string }
-        user_prompt: { type: string }
-        params: { type: string }
-        feature_slug: { type: string }
-        priority:
-          type: integer
-          minimum: 1
-          maximum: 4
-          description: River-compatible task priority; 1 is highest and 4 is lowest.
-        resolved_model: { type: string }
-        api_type: { type: string }
-        provider_endpoint_name: { type: string }
-        provider_endpoint_base_url: { type: string }
-        credential_fingerprint: { type: string }
-        credential_key_version: { type: string }
         status: { type: string }
-        retry_count: { type: integer }
         error_msg: { type: string }
+        cancel_reason: { type: string }
         result: { type: string }
         outputs:
           type: array
           items:
-            $ref: '#/components/schemas/TaskOutput'
+            $ref: '#/components/schemas/TaskUserOutput'
         execution_metrics:
           $ref: '#/components/schemas/TaskExecutionMetrics'
         created_at: { type: string }
@@ -3434,13 +3639,24 @@ components:
         completed_at:
           type: string
           nullable: true
-        cancelled_at:
-          type: string
-          nullable: true
-        cancelled_by:
-          type: integer
-          nullable: true
-        cancel_reason: { type: string }
+
+    TaskUserOutput:
+      type: object
+      additionalProperties: false
+      required: [id, task_id, output_kind, role, url, mime_type, width, height, size_bytes, sort_index, created_at, updated_at]
+      properties:
+        id: { type: integer }
+        task_id: { type: string }
+        output_kind: { type: string, enum: [asset, remote] }
+        role: { type: string }
+        url: { type: string }
+        mime_type: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        size_bytes: { type: integer }
+        sort_index: { type: integer }
+        created_at: { type: string }
+        updated_at: { type: string }
 
     AdminTaskBillingSnapshot:
       type: object
@@ -3529,10 +3745,11 @@ components:
 
     AdminTaskMonitorListItem:
       type: object
-      required: [task_id, user_id, prompt, priority, status, error_msg, result, created_at, completed_at]
+      required: [task_id, user_public_id, user_display_name, prompt, priority, status, error_msg, result, created_at, completed_at]
       properties:
         task_id: { type: string }
-        user_id: { type: integer }
+        user_public_id: { type: string, format: uuid }
+        user_display_name: { type: string }
         prompt: { type: string }
         priority: { type: integer, minimum: 1, maximum: 4 }
         status: { type: string }
@@ -3548,7 +3765,8 @@ components:
       required:
         - task_id
         - correlation_id
-        - user_id
+        - user_public_id
+        - user_display_name
         - prompt
         - user_prompt
         - params
@@ -3562,13 +3780,13 @@ components:
         - updated_at
         - completed_at
         - cancelled_at
-        - cancelled_by
         - cancel_reason
         - execution_attempts
       properties:
         task_id: { type: string }
         correlation_id: { type: string }
-        user_id: { type: integer }
+        user_public_id: { type: string, format: uuid }
+        user_display_name: { type: string }
         prompt: { type: string }
         user_prompt: { type: string }
         params: { type: string }
@@ -3587,7 +3805,6 @@ components:
         updated_at: { type: string, format: date-time }
         completed_at: { type: string, format: date-time, nullable: true }
         cancelled_at: { type: string, format: date-time, nullable: true }
-        cancelled_by: { type: integer, nullable: true }
         cancel_reason: { type: string }
         billing:
           $ref: '#/components/schemas/AdminTaskBillingSnapshot'
@@ -4115,10 +4332,10 @@ components:
     AdminPaymentOrderUser:
       type: object
       additionalProperties: false
-      required: [id, username]
+      required: [public_id, display_name]
       properties:
-        id: { type: integer, format: int64, minimum: 1 }
-        username: { type: string, maxLength: 50 }
+        public_id: { type: string, format: uuid }
+        display_name: { type: string, maxLength: 100 }
 
     AdminPaymentOrderSummary:
       type: object
@@ -5018,19 +5235,13 @@ components:
           properties:
             data:
               type: object
-              required: [list, total, pending_count, running_count, completed_count, failed_count, cancelled_count, other_count]
+              required: [list, total]
               properties:
                 list:
                   type: array
                   items:
                     $ref: '#/components/schemas/Task'
                 total: { type: integer }
-                pending_count: { type: integer }
-                running_count: { type: integer }
-                completed_count: { type: integer }
-                failed_count: { type: integer }
-                cancelled_count: { type: integer }
-                other_count: { type: integer }
 
     ApiResponseTask:
       allOf:
@@ -5243,6 +5454,22 @@ components:
                   type: array
                   items:
                     $ref: '#/components/schemas/AdminUserListItem'
+
+    ApiResponseOAuthProviderSettings:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/OAuthProviderSettings'
+
+    ApiResponseOAuthCapabilities:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/OAuthCapabilities'
 
     ApiResponseCreditCommandResult:
       allOf:

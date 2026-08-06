@@ -76,6 +76,7 @@ type UserRouteDeps struct {
 type AdminRouteDeps struct {
 	AdminHandler            *users.AdminHandler
 	MailConfigHandler       *auth.MailConfigAdminHandler
+	SocialProviderHandler   *auth.SocialProviderAdminHandler
 	BillingHandler          *billing.Handler
 	CreditHandler           *credits.Handler
 	AccountHandler          *accounts.AccountHandler
@@ -96,21 +97,23 @@ const uploadRequestBodyLimitBytes int64 = 64 * 1024 * 1024
 
 // Hand-written route paths that bypass the Orval-generated client.
 const (
-	RouteHealth                   = "/api/health"
-	RoutePublicSettingsBranding   = "/api/settings/branding"
-	RouteUserProfileAvatar        = "/profile/avatar"
-	RouteUserBoardUploads         = "/boards/:board_id/uploads"
-	RouteUserDownload             = "/download"
-	RouteAdminUpload              = "/upload"
-	RouteAdminSettingsBranding    = "/settings/branding"
-	RouteAdminSettingsMediaUpload = "/settings/media-upload"
-	RouteAdminSettingsPublicURLs  = "/settings/public-urls"
-	RouteAdminSettingsRateLimit   = "/settings/rate-limit"
-	RouteAdminSettingsTaskMonitor = "/settings/task-monitor"
-	RouteAdminSettingsOutbound    = "/settings/outbound-policy"
-	RouteAdminSettingsMail        = "/settings/mail"
-	RouteAdminStripeConfiguration = "/payments/stripe-config"
-	RoutePaymentStripeWebhook     = "/api/webhooks/stripe"
+	RouteHealth                      = "/api/health"
+	RoutePublicSettingsBranding      = "/api/settings/branding"
+	RouteUserProfileAvatar           = "/profile/avatar"
+	RouteUserBoardUploads            = "/boards/:board_id/uploads"
+	RouteUserDownload                = "/download"
+	RouteAdminUpload                 = "/upload"
+	RouteAdminSettingsBranding       = "/settings/branding"
+	RouteAdminSettingsMediaUpload    = "/settings/media-upload"
+	RouteAdminSettingsPublicURLs     = "/settings/public-urls"
+	RouteAdminSettingsRateLimit      = "/settings/rate-limit"
+	RouteAdminSettingsTaskMonitor    = "/settings/task-monitor"
+	RouteAdminSettingsOutbound       = "/settings/outbound-policy"
+	RouteAdminSettingsMail           = "/settings/mail"
+	RouteAdminUsersOAuthProvider     = "/users/oauth-providers/:provider"
+	RouteAdminUsersOAuthCapabilities = "/users/oauth-capabilities"
+	RouteAdminStripeConfiguration    = "/payments/stripe-config"
+	RoutePaymentStripeWebhook        = "/api/webhooks/stripe"
 )
 
 func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, frontendOptions FrontendRouteOptions) {

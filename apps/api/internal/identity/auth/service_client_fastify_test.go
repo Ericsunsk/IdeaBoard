@@ -31,11 +31,11 @@ func TestServiceClientAgainstFastify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ValidateSession against Fastify: %v", err)
 	}
-	if session.AuthUserID != "auth-contract-user" || session.Username != "alice" || !session.ClaimIdentityVerified {
+	if session.AuthUserID != "auth-contract-user" || session.DisplayName != "Alice" || session.Avatar != "https://lh3.googleusercontent.com/avatar" || !session.ClaimIdentityVerified {
 		t.Fatalf("ValidateSession response = %+v, want trusted contract identity", session)
 	}
 
-	user, err := client.EnsureUser(ctx, "alice@example.com", "alice", "secret1234", false, "admin")
+	user, err := client.EnsureUser(ctx, "alice@example.com", "Alice", "secret1234", false, "admin")
 	if err != nil {
 		t.Fatalf("EnsureUser against Fastify: %v", err)
 	}

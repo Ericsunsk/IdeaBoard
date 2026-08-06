@@ -8,7 +8,8 @@ import type { CreditWalletDetailsStatus } from './creditWalletDetailsStatus'
 import type { CreditWalletRestriction } from './creditWalletRestriction'
 
 export interface CreditWalletDetails {
-  user_id: number
+  public_id: string
+  display_name: string
   status: CreditWalletDetailsStatus
   /** @minimum 0 */
   available_credits: number

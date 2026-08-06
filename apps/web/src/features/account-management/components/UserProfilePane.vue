@@ -56,12 +56,12 @@
           <p
             class="m-0 truncate text-[30px] leading-tight font-bold tracking-normal text-ib-text max-[520px]:text-[24px]"
           >
-            {{ userStore.user?.username }}
+            {{ userStore.user?.display_name }}
           </p>
           <p
             class="mt-1 mb-0 truncate font-mono text-[14px] leading-6 font-semibold text-ib-text-subtle"
           >
-            {{ userStore.user?.uid || '-' }}
+            {{ userStore.user?.public_id || '-' }}
           </p>
           <div class="mt-3 flex min-w-0 flex-wrap items-center gap-2">
             <Tag :value="userStatusLabel" :severity="userStatusSeverity" rounded />
@@ -129,17 +129,17 @@ const userRoleSeverity = computed<TagSeverity>(() =>
   userStore.user?.role === 'admin' ? 'info' : 'secondary',
 )
 const userInitial = computed(() => {
-  const username = userStore.user?.username?.trim()
-  return username?.[0]?.toUpperCase() || 'U'
+  const displayName = userStore.user?.display_name?.trim()
+  return displayName?.[0]?.toUpperCase() || 'U'
 })
 const profileFields = computed<ProfileField[]>(() => [
   {
-    label: '登录账号',
-    value: userStore.user?.username || '-',
+    label: '显示名称',
+    value: userStore.user?.display_name || '-',
   },
   {
-    label: '认证 ID',
-    value: userStore.user?.auth_user_id?.trim() || '-',
+    label: '存储命名空间',
+    value: userStore.user?.storage_namespace || '-',
     mono: true,
   },
   {

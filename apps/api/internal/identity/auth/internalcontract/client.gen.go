@@ -322,10 +322,10 @@ type EnsureUserEnvelopeCode int
 // EnsureUserRequest defines model for EnsureUserRequest.
 type EnsureUserRequest struct {
 	AllowExisting bool     `json:"allow_existing"`
+	DisplayName   string   `json:"display_name"`
 	Email         string   `json:"email"`
 	Password      string   `json:"password"`
 	Role          AuthRole `json:"role"`
-	Username      string   `json:"username"`
 }
 
 // ErrorEnvelope defines model for ErrorEnvelope.
@@ -340,10 +340,10 @@ type ProvisionedAuthUser struct {
 	ClaimIdentity         string                                   `json:"claim_identity"`
 	ClaimIdentityKind     TrustedClaimIdentityKind                 `json:"claim_identity_kind"`
 	ClaimIdentityVerified ProvisionedAuthUserClaimIdentityVerified `json:"claim_identity_verified"`
+	DisplayName           string                                   `json:"display_name"`
 	Email                 string                                   `json:"email"`
 	Existing              bool                                     `json:"existing"`
 	Role                  AuthRole                                 `json:"role"`
-	Username              string                                   `json:"username"`
 }
 
 // ProvisionedAuthUserClaimIdentityVerified defines model for ProvisionedAuthUser.ClaimIdentityVerified.
@@ -386,11 +386,12 @@ type SessionEnvelopeCode int
 // SessionIdentity defines model for SessionIdentity.
 type SessionIdentity struct {
 	AuthUserID            string                   `json:"auth_user_id"`
+	Avatar                *string                  `json:"avatar,omitempty"`
 	ClaimIdentity         string                   `json:"claim_identity"`
 	ClaimIdentityKind     SessionClaimIdentityKind `json:"claim_identity_kind"`
 	ClaimIdentityVerified bool                     `json:"claim_identity_verified"`
+	DisplayName           string                   `json:"display_name"`
 	Email                 string                   `json:"email"`
-	Username              string                   `json:"username"`
 }
 
 // SetUserRoleData defines model for SetUserRoleData.

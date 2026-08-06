@@ -164,7 +164,19 @@ func (h *Handler) ListTasks(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	if err := validateTaskListQueryIDs(c, req.UserID, req.AccountID); err != nil {
+	if c.Query("user_id") != "" {
+		response.Error(c, 400, "user_id 必须大于 0")
+		return
+	}
+	if req.UserPublicID != "" {
+		userID, err := h.taskService.ResolveAdminTaskUserID(c.Request.Context(), req.UserPublicID)
+		if err != nil {
+			response.Error(c, 400, err.Error())
+			return
+		}
+		req.UserID = userID
+	}
+	if err := validateTaskListQueryIDs(c, req.UserPublicID, req.AccountID); err != nil {
 		response.Error(c, 400, err.Error())
 		return
 	}
@@ -202,9 +214,9 @@ func (h *Handler) CancelAdminTask(c *gin.Context) {
 	response.SuccessDTO(c, taskCancelResponse{Message: "取消成功"})
 }
 
-func validateTaskListQueryIDs(c *gin.Context, userID int64, accountID int64) error {
-	if c.Query("user_id") != "" && userID <= 0 {
-		return validation.New("user_id 必须大于 0")
+func validateTaskListQueryIDs(c *gin.Context, userPublicID string, accountID int64) error {
+	if c.Query("user_public_id") != "" && strings.TrimSpace(userPublicID) == "" {
+		return validation.New("user_public_id 无效")
 	}
 	if c.Query("account_id") != "" && accountID <= 0 {
 		return validation.New("account_id 必须大于 0")

@@ -51,8 +51,8 @@ func registerAdminCreditRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.POST("/credits/deductions", h.CreditHandler.Deduct)
 	adminAPI.POST("/credits/corrections", h.CreditHandler.Correct)
 	adminAPI.POST("/credits/refunds", h.CreditHandler.Refund)
-	adminAPI.GET("/credits/wallets/:user_id", h.CreditHandler.GetWallet)
-	adminAPI.GET("/credits/wallets/:user_id/ledger", h.CreditHandler.ListLedger)
+	adminAPI.GET("/credits/wallets/:public_id", h.CreditHandler.GetWallet)
+	adminAPI.GET("/credits/wallets/:public_id/ledger", h.CreditHandler.ListLedger)
 	adminAPI.GET("/credits/health", h.CreditHandler.GetCreditHealth)
 	adminAPI.POST("/credits/reconciliation/runs", h.CreditHandler.StartReconciliation)
 	adminAPI.GET("/credits/reconciliation/runs", h.CreditHandler.ListReconciliationRuns)
@@ -93,11 +93,17 @@ func registerAdminSettingsRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 
 func registerAdminUserRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.GET("/users", h.AdminHandler.ListUsers)
-	adminAPI.POST("/users/:id/ban", h.AdminHandler.BanUser)
-	adminAPI.POST("/users/:id/unban", h.AdminHandler.UnbanUser)
-	adminAPI.POST("/users/:id/revoke-sessions", h.AdminHandler.RevokeUserSessions)
-	adminAPI.PUT("/users/:id/role", h.AdminHandler.UpdateUserRole)
-	adminAPI.DELETE("/users/:id", h.AdminHandler.DeleteUser)
+	if h.SocialProviderHandler != nil {
+		adminAPI.GET(RouteAdminUsersOAuthProvider, h.SocialProviderHandler.Get)
+		adminAPI.PUT(RouteAdminUsersOAuthProvider, h.SocialProviderHandler.Update)
+		adminAPI.GET(RouteAdminUsersOAuthCapabilities, h.SocialProviderHandler.GetCapabilities)
+	}
+	adminAPI.POST("/users/:public_id/ban", h.AdminHandler.BanUser)
+	adminAPI.POST("/users/:public_id/unban", h.AdminHandler.UnbanUser)
+	adminAPI.POST("/users/:public_id/revoke-sessions", h.AdminHandler.RevokeUserSessions)
+	adminAPI.PUT("/users/:public_id/role", h.AdminHandler.UpdateUserRole)
+	adminAPI.DELETE("/users/:public_id", h.AdminHandler.DeleteUser)
+	adminAPI.POST("/users/:public_id/impersonate", h.AdminHandler.ImpersonateUser)
 }
 
 func registerAdminAccountRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {

@@ -15,6 +15,8 @@ import (
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/tasking/tasksubmission"
+
+	"github.com/google/uuid"
 )
 
 type Service struct {
@@ -29,6 +31,7 @@ type Service struct {
 	adminTaskTrace      AdminTaskTraceStore
 	adminTaskListRead   AdminTaskListReadStore
 	billableItems       BillableItemLookup
+	userResolver        AdminTaskUserResolver
 }
 
 type TaskStore interface {
@@ -56,11 +59,16 @@ type AdminTaskListReadStore interface {
 	ListAdminTaskLatestExecutions(context.Context, []string) (map[string]tasks.AdminTaskExecutionSnapshot, error)
 }
 
+type AdminTaskUserResolver interface {
+	ResolveUser(context.Context, int64) (uuid.UUID, string, error)
+}
+
 type AdminTaskMonitorExecutionSnapshot = tasks.AdminTaskExecutionSnapshot
 
 type AdminTaskMonitorListItem struct {
 	TaskID          string                             `json:"task_id"`
-	UserID          int64                              `json:"user_id"`
+	UserPublicID    uuid.UUID                          `json:"user_public_id"`
+	UserDisplayName string                             `json:"user_display_name"`
 	Prompt          string                             `json:"prompt"`
 	Priority        int                                `json:"priority"`
 	Status          string                             `json:"status"`
@@ -69,12 +77,14 @@ type AdminTaskMonitorListItem struct {
 	CreatedAt       time.Time                          `json:"created_at"`
 	CompletedAt     *time.Time                         `json:"completed_at"`
 	LatestExecution *AdminTaskMonitorExecutionSnapshot `json:"latest_execution,omitempty"`
+	internalUserID  int64
 }
 
 type AdminTaskMonitorDetail struct {
 	TaskID            string                             `json:"task_id"`
 	CorrelationID     string                             `json:"correlation_id"`
-	UserID            int64                              `json:"user_id"`
+	UserPublicID      uuid.UUID                          `json:"user_public_id"`
+	UserDisplayName   string                             `json:"user_display_name"`
 	Prompt            string                             `json:"prompt"`
 	UserPrompt        string                             `json:"user_prompt"`
 	Params            string                             `json:"params"`
@@ -90,11 +100,11 @@ type AdminTaskMonitorDetail struct {
 	UpdatedAt         time.Time                          `json:"updated_at"`
 	CompletedAt       *time.Time                         `json:"completed_at"`
 	CancelledAt       *time.Time                         `json:"cancelled_at"`
-	CancelledBy       *int64                             `json:"cancelled_by"`
 	CancelReason      string                             `json:"cancel_reason"`
 	Billing           *tasks.AdminBillingSnapshot        `json:"billing,omitempty"`
 	LatestExecution   *AdminTaskMonitorExecutionSnapshot `json:"latest_execution,omitempty"`
 	ExecutionAttempts []tasks.AdminTaskAttempt           `json:"execution_attempts"`
+	internalUserID    int64
 }
 
 type BillableItemLookup interface {
@@ -111,6 +121,7 @@ type ServiceDeps struct {
 	AdminTaskTrace      AdminTaskTraceStore
 	AdminTaskListRead   AdminTaskListReadStore
 	BillableItems       BillableItemLookup
+	UserResolver        AdminTaskUserResolver
 }
 
 type ServiceOptions struct {
@@ -142,11 +153,37 @@ func NewService(deps ServiceDeps, opts ServiceOptions) *Service {
 		adminTaskTrace:      deps.AdminTaskTrace,
 		adminTaskListRead:   deps.AdminTaskListRead,
 		billableItems:       deps.BillableItems,
+		userResolver:        deps.UserResolver,
 	}
 }
 
 func (s *Service) EventHub() *EventHub {
 	return s.eventHub
+}
+
+func (s *Service) ResolveAdminTaskUserID(ctx context.Context, rawPublicID string) (int64, error) {
+	if s == nil || s.userResolver == nil {
+		return 0, validation.New("user_public_id 无效")
+	}
+	publicID, err := uuid.Parse(strings.TrimSpace(rawPublicID))
+	if err != nil || publicID == uuid.Nil {
+		return 0, validation.New("user_public_id 无效")
+	}
+	// The resolver is intentionally keyed by the internal id for read models;
+	// public-id parsing and lookup stay at the HTTP boundary.
+	return s.resolveUserIDByPublicID(ctx, publicID)
+}
+
+type adminTaskPublicIDResolver interface {
+	ResolvePublicID(context.Context, string) (int64, error)
+}
+
+func (s *Service) resolveUserIDByPublicID(ctx context.Context, publicID uuid.UUID) (int64, error) {
+	resolver, ok := s.userResolver.(adminTaskPublicIDResolver)
+	if !ok {
+		return 0, validation.New("user_public_id 无效")
+	}
+	return resolver.ResolvePublicID(ctx, publicID.String())
 }
 
 func (s *Service) publishTaskStatusEvent(ctx context.Context, taskID, status string) {
@@ -239,7 +276,11 @@ func (s *Service) GetTask(ctx context.Context, taskID string) (*AdminTaskMonitor
 		return nil, err
 	}
 	billingSnapshot, hasBilling := billing[task.TaskID]
-	return adminTaskMonitorDetailFromTask(task, billingSnapshot, hasBilling, traces[task.TaskID]), nil
+	detail := adminTaskMonitorDetailFromTask(task, billingSnapshot, hasBilling, traces[task.TaskID])
+	if err := s.enrichAdminTaskDetail(ctx, detail); err != nil {
+		return nil, err
+	}
+	return detail, nil
 }
 
 func (s *Service) GetUserTask(ctx context.Context, taskID string, userID int64) (*tasks.Task, error) {
@@ -275,7 +316,11 @@ func (s *Service) ListTasks(ctx context.Context, req *tasks.TaskListRequest) ([]
 	result := make([]AdminTaskMonitorListItem, 0, len(items))
 	for _, item := range items {
 		latestExecution, hasLatestExecution := latest[item.TaskID]
-		result = append(result, adminTaskMonitorListItemFromTask(item, latestExecution, hasLatestExecution))
+		row := adminTaskMonitorListItemFromTask(item, latestExecution, hasLatestExecution)
+		if err := s.enrichAdminTaskListItem(ctx, &row); err != nil {
+			return nil, tasks.TaskListCounts{}, err
+		}
+		result = append(result, row)
 	}
 	return result, counts, nil
 }
@@ -344,15 +389,15 @@ func adminTaskMonitorListItemFromTask(task *tasks.Task, latestExecution tasks.Ad
 		return AdminTaskMonitorListItem{}
 	}
 	item := AdminTaskMonitorListItem{
-		TaskID:      task.TaskID,
-		UserID:      task.UserID,
-		Prompt:      task.Prompt,
-		Priority:    task.Priority,
-		Status:      task.Status,
-		ErrorMsg:    task.ErrorMsg,
-		Result:      task.Result,
-		CreatedAt:   task.CreatedAt,
-		CompletedAt: task.CompletedAt,
+		TaskID:         task.TaskID,
+		internalUserID: task.UserID,
+		Prompt:         task.Prompt,
+		Priority:       task.Priority,
+		Status:         task.Status,
+		ErrorMsg:       task.ErrorMsg,
+		Result:         task.Result,
+		CreatedAt:      task.CreatedAt,
+		CompletedAt:    task.CompletedAt,
 	}
 	if hasLatestExecution {
 		item.LatestExecution = &latestExecution
@@ -369,8 +414,8 @@ func adminTaskMonitorDetailFromTask(task *tasks.Task, billing tasks.AdminBilling
 	}
 	detail := &AdminTaskMonitorDetail{
 		TaskID:            task.TaskID,
+		internalUserID:    task.UserID,
 		CorrelationID:     task.EffectiveCorrelationID(),
-		UserID:            task.UserID,
 		Prompt:            task.Prompt,
 		UserPrompt:        task.UserPrompt,
 		Params:            task.Params,
@@ -386,7 +431,6 @@ func adminTaskMonitorDetailFromTask(task *tasks.Task, billing tasks.AdminBilling
 		UpdatedAt:         task.UpdatedAt,
 		CompletedAt:       task.CompletedAt,
 		CancelledAt:       task.CancelledAt,
-		CancelledBy:       task.CancelledBy,
 		CancelReason:      task.CancelReason,
 		ExecutionAttempts: attempts,
 	}
@@ -397,6 +441,43 @@ func adminTaskMonitorDetailFromTask(task *tasks.Task, billing tasks.AdminBilling
 		detail.LatestExecution = adminTaskMonitorExecutionSnapshotFromAttempt(attempts[len(attempts)-1])
 	}
 	return detail
+}
+
+func (s *Service) resolveAdminTaskUser(ctx context.Context, userID int64) (uuid.UUID, string, error) {
+	if s == nil || s.userResolver == nil || userID <= 0 {
+		return uuid.Nil, "", nil
+	}
+	publicID, displayName, err := s.userResolver.ResolveUser(ctx, userID)
+	if err != nil {
+		return uuid.Nil, "", fmt.Errorf("resolve task user identity: %w", err)
+	}
+	return publicID, displayName, nil
+}
+
+func (s *Service) enrichAdminTaskListItem(ctx context.Context, item *AdminTaskMonitorListItem) error {
+	if item == nil {
+		return nil
+	}
+	publicID, displayName, err := s.resolveAdminTaskUser(ctx, item.internalUserID)
+	if err != nil {
+		return err
+	}
+	item.UserPublicID = publicID
+	item.UserDisplayName = displayName
+	return nil
+}
+
+func (s *Service) enrichAdminTaskDetail(ctx context.Context, detail *AdminTaskMonitorDetail) error {
+	if detail == nil {
+		return nil
+	}
+	publicID, displayName, err := s.resolveAdminTaskUser(ctx, detail.internalUserID)
+	if err != nil {
+		return err
+	}
+	detail.UserPublicID = publicID
+	detail.UserDisplayName = displayName
+	return nil
 }
 
 func normalizeTaskListStatus(status string) (string, error) {

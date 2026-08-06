@@ -26,7 +26,7 @@
             invalid,
             required,
           }"
-          label="Email 或 username"
+          label="Email"
           :error="errors.identifier"
           field-id="login-identifier"
           required
@@ -43,11 +43,11 @@
               v-model="formValue.identifier"
               v-bind="resolveFieldControlState(invalid)"
               unstyled
-              autocomplete="username"
+              autocomplete="email"
               :required="required"
               :class="[authInputClass, 'pl-11', inlineError ? authInputErrorClass : '']"
               :invalid="invalid"
-              :placeholder="inlineError ? inlineErrorText : '请输入 Email 或 username'"
+              :placeholder="inlineError ? inlineErrorText : '请输入 Email'"
               :aria-invalid="ariaInvalid"
               :aria-describedby="describedbyId"
               @blur="validateField('identifier')"
@@ -112,6 +112,21 @@
           :loading="loading"
           v-bind="submitControlState"
           fluid
+        />
+
+        <div v-if="googleEnabled" class="flex items-center gap-3">
+          <div class="h-px flex-1 bg-ib-border-soft" aria-hidden="true"></div>
+          <span class="text-xs text-ib-text-subtle">或</span>
+          <div class="h-px flex-1 bg-ib-border-soft" aria-hidden="true"></div>
+        </div>
+        <Button
+          v-if="googleEnabled"
+          unstyled
+          type="button"
+          label="使用 Google 登录"
+          :class="authSecondaryButtonClass"
+          :disabled="loading"
+          @click="handleGoogleLogin"
         />
         <button
           type="button"
@@ -245,12 +260,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import { Lock as LockIcon, User as UserIcon } from '@iconoir/vue'
 import { useUserStore } from '../session/authSession'
+import { authTransport } from '../session/authTransport'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
@@ -274,6 +290,7 @@ import {
   authModalTitleClass,
   authPasswordPt,
   authPrimaryButtonClass,
+  authSecondaryButtonClass,
   authSwitchButtonClass,
 } from './authModalUi'
 
@@ -298,7 +315,7 @@ const secondaryControlState = computed(() =>
 type LoginField = 'identifier' | 'password'
 
 const loginFieldLabels: Record<LoginField, string> = {
-  identifier: 'Email 或 username',
+  identifier: 'Email',
   password: '密码',
 }
 const formValue = ref({
@@ -313,9 +330,14 @@ const resetMode = ref(false)
 const resetOtpSent = ref(false)
 const resetForm = ref({ email: '', otp: '', password: '' })
 const resetErrors = ref({ email: '', otp: '', password: '' })
+const googleEnabled = ref(false)
 
 watch(loading, (busy) => emit('update:busy', busy), { immediate: true })
 onBeforeUnmount(() => emit('update:busy', false))
+
+onMounted(async () => {
+  googleEnabled.value = (await authTransport.getCapabilities()).social.google
+})
 
 function resolveFieldControlState(invalid: boolean) {
   return resolveInteractiveControlState({
@@ -353,6 +375,16 @@ async function handleLogin() {
     },
   )
   if (loggedIn) emit('login-success')
+}
+
+async function handleGoogleLogin() {
+  await runAsyncAction(
+    async () => {
+      await authTransport.signInWithGoogle()
+      return true
+    },
+    { feedback: authFeedback.login },
+  )
 }
 
 async function handleResetPassword() {

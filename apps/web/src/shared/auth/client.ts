@@ -1,10 +1,10 @@
 import { createAuthClient } from 'better-auth/vue'
-import { adminClient, emailOTPClient, usernameClient } from 'better-auth/client/plugins'
+import { adminClient, emailOTPClient } from 'better-auth/client/plugins'
 import { AUTH_BASE_URL } from '../config/runtimeUrls'
 
 export const authClient = createAuthClient({
   baseURL: AUTH_BASE_URL,
-  plugins: [usernameClient(), emailOTPClient(), adminClient()],
+  plugins: [emailOTPClient(), adminClient()],
   fetchOptions: {
     credentials: 'include',
   },

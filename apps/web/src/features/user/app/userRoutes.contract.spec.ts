@@ -61,6 +61,7 @@ describe('userRoutes contract', () => {
       { path: 'home', name: 'UserHome', meta: undefined },
       { path: 'login', name: 'UserLogin', meta: { guest: true } },
       { path: 'register', name: 'UserRegister', meta: { guest: true } },
+      { path: 'auth/callback', name: 'UserAuthCallback', meta: { public: true } },
       { path: 'boards', name: 'UserBoards', meta: { requiresAuth: true } },
       { path: 'canvas', name: 'UserCanvas', meta: { requiresAuth: true } },
     ])

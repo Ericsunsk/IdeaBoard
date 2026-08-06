@@ -8,7 +8,8 @@ import type { AdminTaskMonitorExecutionSnapshot } from './adminTaskMonitorExecut
 
 export interface AdminTaskMonitorListItem {
   task_id: string
-  user_id: number
+  user_public_id: string
+  user_display_name: string
   prompt: string
   /**
    * @minimum 1

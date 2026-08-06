@@ -12,10 +12,9 @@ import {
   isValidCanonicalEmail,
   normalizeAuthRole,
   normalizeCanonicalEmail,
+  normalizeDisplayName,
   normalizeOptionalPositiveInteger,
   normalizeOptionalText,
-  normalizeRegistrationUsername,
-  normalizeUsername,
 } from "./authUtils.js";
 import {
   provisionTrustedCanonicalIdentity,
@@ -61,7 +60,7 @@ export type AuthInternalCommandResult<TData> =
 
 export type EnsureIdentityCommandInput = {
   email?: unknown;
-  username?: unknown;
+  displayName?: unknown;
   password?: unknown;
   allowExisting?: unknown;
   role?: unknown;
@@ -123,14 +122,14 @@ async function ensureIdentity(
   repository: AuthInternalCommandRepository,
 ): Promise<AuthInternalCommandResult<TrustedIdentityData>> {
   const email = normalizeCanonicalEmail(input.email);
-  const username = normalizeRegistrationUsername(input.username);
+  const displayName = normalizeDisplayName(input.displayName);
   const password = String(input.password || "");
   const allowExisting = input.allowExisting === true;
   const role = normalizeAuthRole(input.role);
 
   if (!isValidCanonicalEmail(email))
     return commandFailure("invalid_input", "a valid email is required");
-  if (!username) return commandFailure("invalid_input", "username is required");
+  if (!displayName) return commandFailure("invalid_input", "display name is required");
   if (password.length < 10 || password.length > 128) {
     return commandFailure(
       "invalid_input",
@@ -146,12 +145,18 @@ async function ensureIdentity(
       authApi,
       repository,
       email,
-      username,
+      displayName,
       password,
       role,
     );
     return commandSuccess(
-      trustedIdentityData(user, username, claimIdentity, role, false),
+      trustedIdentityData(
+        user,
+        displayName,
+        claimIdentity,
+        role,
+        false,
+      ),
     );
   } catch (error) {
     if (!isDuplicateUserError(error)) {
@@ -163,20 +168,13 @@ async function ensureIdentity(
   }
 
   try {
-    const existing = await repository.findUserByUsernameOrEmail(
-      username,
-      claimIdentity,
-    );
+    const existing = await repository.findUserByEmail(claimIdentity);
     if (!existing) {
       return commandFailure("conflict", "auth identity already exists");
     }
-    const existingUsername = normalizeRegistrationUsername(
-      existing.username || existing.name || "",
-    );
     const existingEmail = String(existing.email || "").toLowerCase();
     if (
       !existing.emailVerified ||
-      existingUsername !== username ||
       existingEmail !== claimIdentity ||
       existing.role !== role
     ) {
@@ -186,7 +184,13 @@ async function ensureIdentity(
       );
     }
     return commandSuccess(
-      trustedIdentityData(existing, username, claimIdentity, role, true),
+      trustedIdentityData(
+        existing,
+        displayName,
+        claimIdentity,
+        role,
+        true,
+      ),
     );
   } catch (error) {
     return repositoryFailure(error, "failed to locate existing user");
@@ -298,7 +302,7 @@ async function runAuthUserMutation<TData>(
 
 function trustedIdentityData(
   user: InternalUserShape,
-  username: string,
+  displayName: string,
   claimIdentity: string,
   role: AuthRole,
   existing: boolean,
@@ -306,7 +310,7 @@ function trustedIdentityData(
   return {
     user: {
       auth_user_id: user.id,
-      username: normalizeUsername(user.username || user.name || username),
+      display_name: normalizeDisplayName(user.name || displayName),
       email: normalizeCanonicalEmail(user.email || claimIdentity),
       claim_identity: claimIdentity,
       claim_identity_kind: "canonical_email",

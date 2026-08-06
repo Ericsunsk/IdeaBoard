@@ -34,7 +34,8 @@ func TestProvisionIdentityCreatesUserWalletAndWelcomeGrantAtomically(t *testing.
 	service := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	ctx := context.Background()
 	identity := VerifiedIdentity{
-		AuthUserID: "auth-welcome-1", Username: "welcome-user",
+		AuthUserID: "auth-welcome-1", DisplayName: "welcome-user",
+		Avatar:        "https://lh3.googleusercontent.com/avatar",
 		ClaimIdentity: " Welcome.User@example.com ", ClaimIdentityKind: "canonical_email",
 		ClaimIdentityVerified: true, Role: "user",
 	}
@@ -45,6 +46,9 @@ func TestProvisionIdentityCreatesUserWalletAndWelcomeGrantAtomically(t *testing.
 	}
 	if first.User.ID <= 0 || first.User.Status != 1 || !first.WelcomeGranted {
 		t.Fatalf("ProvisionIdentity() result = %+v", first)
+	}
+	if first.User.Avatar != identity.Avatar {
+		t.Fatalf("Avatar = %q, want %q", first.User.Avatar, identity.Avatar)
 	}
 	if first.Wallet.Available != 100 || first.Wallet.Reserved != 0 {
 		t.Fatalf("wallet = %+v, want available=100 reserved=0", first.Wallet)
@@ -77,7 +81,7 @@ func TestProvisionIdentityConcurrentRetriesGrantWelcomeCreditsOnce(t *testing.T)
 	_, pool := testdb.OpenWithPool(t)
 	service := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	identity := VerifiedIdentity{
-		AuthUserID: "auth-concurrent-1", Username: "concurrent-user",
+		AuthUserID: "auth-concurrent-1", DisplayName: "concurrent-user",
 		ClaimIdentity: "concurrent-user@example.com", ClaimIdentityKind: "canonical_email",
 		ClaimIdentityVerified: true, Role: "user",
 	}
@@ -128,7 +132,7 @@ func TestProvisionIdentityDoesNotGrantAgainAfterTrustedClaimIdentityChanges(t *t
 	service := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	ctx := context.Background()
 	identity := VerifiedIdentity{
-		AuthUserID: "auth-email-change-1", Username: "email-change", ClaimIdentity: "first@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user",
+		AuthUserID: "auth-email-change-1", DisplayName: "email-change", ClaimIdentity: "first@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user",
 	}
 
 	first, err := service.ProvisionIdentity(ctx, identity)
@@ -169,12 +173,12 @@ func TestProvisionIdentityFailsClosedWithoutTrustedClaimIdentityOrClaimKey(t *te
 		{
 			name:     "missing claim key",
 			service:  NewLifecycleService(pool, creditService, nil),
-			identity: VerifiedIdentity{AuthUserID: "auth-no-key", Username: "no-key", ClaimIdentity: "no-key@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user"},
+			identity: VerifiedIdentity{AuthUserID: "auth-no-key", DisplayName: "no-key", ClaimIdentity: "no-key@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user"},
 		},
 		{
 			name:     "claim identity not trusted",
 			service:  NewLifecycleService(pool, creditService, []byte("0123456789abcdef0123456789abcdef")),
-			identity: VerifiedIdentity{AuthUserID: "auth-unverified", Username: "unverified", ClaimIdentity: "unverified@example.com", ClaimIdentityKind: "canonical_email", Role: "user", ClaimIdentityVerified: false},
+			identity: VerifiedIdentity{AuthUserID: "auth-unverified", DisplayName: "unverified", ClaimIdentity: "unverified@example.com", ClaimIdentityKind: "canonical_email", Role: "user", ClaimIdentityVerified: false},
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -202,7 +206,7 @@ func TestSetUserStatusFreezesAndRestoresWalletAtomically(t *testing.T) {
 	service := NewLifecycleService(pool, creditService, []byte("0123456789abcdef0123456789abcdef"))
 	ctx := context.Background()
 	result, err := service.ProvisionIdentity(ctx, VerifiedIdentity{
-		AuthUserID: "auth-status-1", Username: "status-user", ClaimIdentity: "status-user@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user",
+		AuthUserID: "auth-status-1", DisplayName: "status-user", ClaimIdentity: "status-user@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user",
 	})
 	if err != nil {
 		t.Fatalf("ProvisionIdentity() error = %v", err)
@@ -280,7 +284,7 @@ func TestTombstoneUserPreservesAccountingAndPreventsWelcomeReclaim(t *testing.T)
 	service := NewLifecycleService(pool, creditService, []byte("0123456789abcdef0123456789abcdef"))
 	ctx := context.Background()
 	first, err := service.ProvisionIdentity(ctx, VerifiedIdentity{
-		AuthUserID: "auth-delete-1", Username: "delete-user", ClaimIdentity: "same@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user",
+		AuthUserID: "auth-delete-1", DisplayName: "delete-user", ClaimIdentity: "same@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user",
 	})
 	if err != nil {
 		t.Fatalf("ProvisionIdentity(first) error = %v", err)
@@ -296,10 +300,10 @@ func TestTombstoneUserPreservesAccountingAndPreventsWelcomeReclaim(t *testing.T)
 	if err != nil {
 		t.Fatalf("RestrictWallet(deletion) error = %v", err)
 	}
-	oldPredictableUsername := "deleted-user-" + fmt.Sprint(first.User.ID)
+	oldPredictableDisplayName := "deleted-user-" + fmt.Sprint(first.User.ID)
 	if _, err := pool.Exec(ctx, `
 INSERT INTO users (username, storage_uid, role, status)
-VALUES ($1, 'OLDP01', 'user', 1)`, oldPredictableUsername); err != nil {
+VALUES ($1, 'OLDP01', 'user', 1)`, oldPredictableDisplayName); err != nil {
 		t.Fatalf("occupy old predictable tombstone username: %v", err)
 	}
 	if err := service.DeleteUser(ctx, first.User.ID, &recordingAuthUserDeleter{}, &recordingUserUploadCleaner{}); err != nil {
@@ -316,7 +320,7 @@ FROM users JOIN credit_wallets ON credit_wallets.user_id = users.id WHERE users.
 	); err != nil {
 		t.Fatalf("read tombstone: %v", err)
 	}
-	if !strings.HasPrefix(username, "deleted-user-") || username == oldPredictableUsername || authUserID != nil || avatar != "" || status != 0 || walletStatus != "frozen" {
+	if !strings.HasPrefix(username, "deleted-user-") || username == oldPredictableDisplayName || authUserID != nil || avatar != "" || status != 0 || walletStatus != "frozen" {
 		t.Fatalf("tombstone username=%q auth=%v avatar=%q status=%d wallet=%q", username, authUserID, avatar, status, walletStatus)
 	}
 	tombstoneWallet, err := creditService.GetWallet(ctx, first.User.ID)
@@ -328,7 +332,7 @@ FROM users JOIN credit_wallets ON credit_wallets.user_id = users.id WHERE users.
 	}
 
 	second, err := service.ProvisionIdentity(ctx, VerifiedIdentity{
-		AuthUserID: "auth-delete-2", Username: "replacement-user", ClaimIdentity: "SAME@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user",
+		AuthUserID: "auth-delete-2", DisplayName: "replacement-user", ClaimIdentity: "SAME@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user",
 	})
 	if err != nil {
 		t.Fatalf("ProvisionIdentity(replacement) error = %v", err)
@@ -364,7 +368,7 @@ RETURNING id`, authUserID).Scan(&userID); err != nil {
 	}
 	service := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	results, err := service.InitializeExistingIdentities(ctx, []VerifiedIdentity{{
-		AuthUserID: authUserID, Username: "existing-user", ClaimIdentity: "existing-user@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user",
+		AuthUserID: authUserID, DisplayName: "existing-user", ClaimIdentity: "existing-user@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user",
 	}})
 	if err != nil {
 		t.Fatalf("InitializeExistingIdentities() error = %v", err)
@@ -388,7 +392,7 @@ RETURNING id`, authUserID).Scan(&userID); err != nil {
 	creditService := credits.NewService(pool)
 	service := NewLifecycleService(pool, creditService, []byte("0123456789abcdef0123456789abcdef"))
 	results, err := service.InitializeExistingIdentities(ctx, []VerifiedIdentity{{
-		AuthUserID: authUserID, Username: "existing-banned-user", ClaimIdentity: "existing-banned-user@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user",
+		AuthUserID: authUserID, DisplayName: "existing-banned-user", ClaimIdentity: "existing-banned-user@example.com", ClaimIdentityKind: "canonical_email", ClaimIdentityVerified: true, Role: "user",
 	}})
 	if err != nil {
 		t.Fatalf("InitializeExistingIdentities() error = %v", err)
@@ -413,7 +417,7 @@ func TestWelcomeIdentityKeyRotationFailsClosedWithoutPartialState(t *testing.T) 
 		t.Fatalf("rotated key error = %v, want ErrWelcomeIdentityKeyMismatch", err)
 	}
 	if _, err := rotated.ProvisionIdentity(ctx, VerifiedIdentity{
-		AuthUserID: "auth-rotated-key", Username: "rotated-key",
+		AuthUserID: "auth-rotated-key", DisplayName: "rotated-key",
 		ClaimIdentity: "rotated-key@example.com", ClaimIdentityKind: "canonical_email",
 		ClaimIdentityVerified: true, Role: "user",
 	}); !errors.Is(err, credits.ErrWelcomeIdentityKeyMismatch) {
@@ -436,7 +440,7 @@ func TestAdminProvisionCreatesAndRepairsLifecycleAtomically(t *testing.T) {
 	ctx := context.Background()
 	service := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	identity := VerifiedIdentity{
-		AuthUserID: "auth-admin-lifecycle", Username: "admin",
+		AuthUserID: "auth-admin-lifecycle", DisplayName: "admin",
 		ClaimIdentity: "admin@example.com", ClaimIdentityKind: "canonical_email",
 		ClaimIdentityVerified: true, Role: "admin", EnsureActive: true,
 	}
@@ -474,7 +478,7 @@ func TestUserDeletionFailuresRemainFrozenAndRetryConverges(t *testing.T) {
 	ctx := context.Background()
 	lifecycle := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	provisioned, err := lifecycle.ProvisionIdentity(ctx, VerifiedIdentity{
-		AuthUserID: "auth-delete-converge", Username: "delete-converge",
+		AuthUserID: "auth-delete-converge", DisplayName: "delete-converge",
 		ClaimIdentity: "delete-converge@example.com", ClaimIdentityKind: "canonical_email",
 		ClaimIdentityVerified: true, Role: "user",
 	})
@@ -495,7 +499,7 @@ VALUES ('delete-convergence-task', $1, '', '', '', 'pending', '', '')`, provisio
 	}
 	assertDeletionState(t, pool, provisioned.User.ID, DeletionPendingAuth, 0, "frozen")
 	if _, err := lifecycle.ProvisionIdentity(ctx, VerifiedIdentity{
-		AuthUserID: *provisioned.User.AuthUserID, Username: "delete-converge",
+		AuthUserID: *provisioned.User.AuthUserID, DisplayName: "delete-converge",
 		ClaimIdentity: "delete-converge@example.com", ClaimIdentityKind: "canonical_email",
 		ClaimIdentityVerified: true, Role: "admin", EnsureActive: true,
 	}); !errors.Is(err, ErrUserDeletionInProgress) {
@@ -575,7 +579,7 @@ func TestUserDeletionIsBlockedByUnsettledPaymentState(t *testing.T) {
 	ctx := context.Background()
 	lifecycle := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	provisioned, err := lifecycle.ProvisionIdentity(ctx, VerifiedIdentity{
-		AuthUserID: "auth-delete-payment-guard", Username: "delete-payment-guard",
+		AuthUserID: "auth-delete-payment-guard", DisplayName: "delete-payment-guard",
 		ClaimIdentity: "delete-payment-guard@example.com", ClaimIdentityKind: "canonical_email",
 		ClaimIdentityVerified: true, Role: "user",
 	})
@@ -627,7 +631,7 @@ func TestIdentityAdminCommandsResumeDeletionFromPendingStorage(t *testing.T) {
 	ctx := context.Background()
 	lifecycle := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 	provisioned, err := lifecycle.ProvisionIdentity(ctx, VerifiedIdentity{
-		AuthUserID: "auth-command-delete-resume", Username: "command-delete-resume",
+		AuthUserID: "auth-command-delete-resume", DisplayName: "command-delete-resume",
 		ClaimIdentity: "command-delete-resume@example.com", ClaimIdentityKind: "canonical_email",
 		ClaimIdentityVerified: true, Role: "user",
 	})
@@ -642,19 +646,19 @@ func TestIdentityAdminCommandsResumeDeletionFromPendingStorage(t *testing.T) {
 	commands := newIdentityAdminCommands(userService, authManager)
 	actor := identityAdminActor(t)
 
-	err = commands.Delete(ctx, actor, provisioned.User.ID)
+	err = commands.Delete(ctx, actor, provisioned.User.PublicID.String())
 	assertIdentityAdminErrorKind(t, err, IdentityAdminBusinessFailure)
 	assertDeletionState(t, pool, provisioned.User.ID, DeletionPendingStorage, 0, "frozen")
 
 	cleaner.err = nil
 	commands.auth = nil
-	if err := commands.Delete(ctx, actor, provisioned.User.ID); err != nil {
+	if err := commands.Delete(ctx, actor, provisioned.User.PublicID.String()); err != nil {
 		t.Fatalf("resume deletion from pending storage: %v", err)
 	}
 	assertDeletionState(t, pool, provisioned.User.ID, DeletionCompleted, 0, "frozen")
 
 	// A lost success response can be retried after tombstoning has cleared auth_user_id.
-	if err := commands.Delete(ctx, actor, provisioned.User.ID); err != nil {
+	if err := commands.Delete(ctx, actor, provisioned.User.PublicID.String()); err != nil {
 		t.Fatalf("retry completed deletion: %v", err)
 	}
 	assertIdentityAdminEvents(t, events, "auth-delete")
@@ -667,7 +671,7 @@ func TestProvisionConcurrentWithBanOrDeleteNeverLeavesInactiveUserWithActiveWall
 			ctx := context.Background()
 			lifecycle := NewLifecycleService(pool, credits.NewService(pool), []byte("0123456789abcdef0123456789abcdef"))
 			identity := VerifiedIdentity{
-				AuthUserID: "auth-concurrent-" + operation, Username: "concurrent-" + operation,
+				AuthUserID: "auth-concurrent-" + operation, DisplayName: "concurrent-" + operation,
 				ClaimIdentity: "concurrent-" + operation + "@example.com", ClaimIdentityKind: "canonical_email",
 				ClaimIdentityVerified: true, Role: "user",
 			}

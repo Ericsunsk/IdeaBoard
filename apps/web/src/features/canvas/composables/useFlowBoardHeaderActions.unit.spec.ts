@@ -228,10 +228,10 @@ describe('useFlowBoardHeaderActions', () => {
 
 function authUser(id: number, uid: string) {
   return {
-    id,
-    uid,
-    username: `user-${id}`,
-    auth_user_id: `auth-${id}`,
+    public_id: `00000000-0000-0000-0000-${String(id).padStart(12, '0')}`,
+    display_name: `user-${id}`,
+    storage_namespace: uid,
+    avatar: '',
     role: 'user' as const,
     status: 1,
     created_at: '2026-01-01T00:00:00Z',

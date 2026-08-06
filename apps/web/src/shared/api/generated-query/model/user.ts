@@ -6,11 +6,16 @@
  */
 
 export interface User {
-  id: number
-  uid: string
-  username: string
-  auth_user_id?: string
-  avatar?: string
+  /** Canonical immutable public user identity. */
+  public_id: string
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  display_name: string
+  /** Stable storage namespace; opaque to clients. */
+  storage_namespace: string
+  avatar: string
   role: string
   status: number
   created_at: string

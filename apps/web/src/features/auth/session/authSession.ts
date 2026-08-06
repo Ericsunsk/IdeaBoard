@@ -17,7 +17,7 @@ export type UserSessionStore = {
   setAuth: (newUser: User) => void
   clearAuth: () => void
   login: (identifier: string, password: string) => Promise<boolean>
-  register: (email: string, username: string, password: string) => Promise<boolean>
+  register: (email: string, displayName: string, password: string) => Promise<boolean>
   verifyRegistrationOTP: (email: string, otp: string) => Promise<boolean>
   requestPasswordResetOTP: (email: string) => Promise<boolean>
   resetPasswordWithOTP: (email: string, otp: string, password: string) => Promise<boolean>
@@ -37,20 +37,8 @@ export type UserSessionStore = {
 function getUserIdentity(authUser: User | null): string | null {
   if (!authUser) return null
 
-  const authUserId = typeof authUser.auth_user_id === 'string' ? authUser.auth_user_id.trim() : ''
-  if (authUserId) return `auth:${authUserId}`
-
-  const uid = typeof authUser.uid === 'string' ? authUser.uid.trim() : ''
-  if (uid) return `uid:${uid}`
-
-  if (typeof authUser.id === 'number' && Number.isFinite(authUser.id)) {
-    return `id:${authUser.id}`
-  }
-
-  const username = typeof authUser.username === 'string' ? authUser.username.trim() : ''
-  if (username) return `username:${username}`
-
-  return null
+  const publicID = typeof authUser.public_id === 'string' ? authUser.public_id.trim() : ''
+  return publicID || null
 }
 
 function getErrorStatusCode(error: unknown): number {
@@ -106,8 +94,8 @@ function createUserSessionStore(): UserSessionStore {
     return true
   }
 
-  async function register(email: string, username: string, password: string) {
-    await authTransport.register(email, username, password)
+  async function register(email: string, displayName: string, password: string) {
+    await authTransport.register(email, displayName, password)
     return true
   }
 

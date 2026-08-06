@@ -76,9 +76,9 @@ describe('boardSync', () => {
     localStorage.clear()
     clearStoredAuth()
     setStoredAuth({
-      id: 1,
-      uid: 'ABC123',
-      username: 'tester',
+      public_id: '00000000-0000-0000-0000-000000000001',
+      display_name: 'tester',
+      storage_namespace: 'ABC123',
       avatar: '',
       role: 'user',
       status: 1,
@@ -255,9 +255,9 @@ describe('boardSync', () => {
     const hydrateTask = hydrateCanvasBoardsFromServer()
 
     setStoredAuth({
-      id: 2,
-      uid: 'XYZ789',
-      username: 'other-user',
+      public_id: '00000000-0000-0000-0000-000000000002',
+      display_name: 'other-user',
+      storage_namespace: 'XYZ789',
       avatar: '',
       role: 'user',
       status: 1,

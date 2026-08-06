@@ -13,7 +13,8 @@ import type { TaskOutput } from './taskOutput'
 export interface AdminTaskMonitorDetail {
   task_id: string
   correlation_id: string
-  user_id: number
+  user_public_id: string
+  user_display_name: string
   prompt: string
   user_prompt: string
   params: string
@@ -35,8 +36,6 @@ export interface AdminTaskMonitorDetail {
   completed_at: string | null
   /** @nullable */
   cancelled_at: string | null
-  /** @nullable */
-  cancelled_by: number | null
   cancel_reason: string
   billing?: AdminTaskBillingSnapshot
   latest_execution?: AdminTaskMonitorExecutionSnapshot

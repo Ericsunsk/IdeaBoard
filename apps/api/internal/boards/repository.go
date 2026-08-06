@@ -231,10 +231,10 @@ func (r *BoardRepository) ListMembers(ctx context.Context, ownerUserID int64, bo
 			continue
 		}
 		result = append(result, BoardMemberWithUser{
-			UserID:    row.UserID,
-			MemberUID: row.MemberUid,
-			Username:  row.Username,
-			Role:      role,
+			UserID:      row.UserID,
+			PublicID:    row.PublicID,
+			DisplayName: row.DisplayName,
+			Role:        role,
 		})
 	}
 	return result, nil

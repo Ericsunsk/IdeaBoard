@@ -328,16 +328,16 @@ JOIN users ON users.id = orders.user_id
 LEFT JOIN payment_order_reconciliations AS reconciliation
   ON reconciliation.payment_order_id = orders.id
 WHERE (sqlc.arg(order_number)::TEXT = '' OR orders.public_order_number = sqlc.arg(order_number)::TEXT)
-  AND (sqlc.arg(user_id)::BIGINT <= 0 OR orders.user_id = sqlc.arg(user_id)::BIGINT)
-  AND (sqlc.arg(username)::TEXT = '' OR STRPOS(LOWER(users.username), LOWER(sqlc.arg(username)::TEXT)) > 0)
+  AND (NOT sqlc.arg(has_user_public_id)::BOOLEAN OR users.public_id = sqlc.arg(user_public_id)::UUID)
+  AND (sqlc.arg(display_name)::TEXT = '' OR STRPOS(LOWER(users.display_name), LOWER(sqlc.arg(display_name)::TEXT)) > 0)
   AND (sqlc.arg(status)::TEXT = '' OR orders.status = sqlc.arg(status)::TEXT)
   AND (NOT sqlc.arg(anomaly_only)::BOOLEAN OR reconciliation.anomalous_at IS NOT NULL);
 
 -- name: ListAdminPaymentOrders :many
 SELECT orders.id,
        orders.public_order_number,
-       orders.user_id,
-       users.username,
+       users.public_id AS user_public_id,
+       users.display_name,
        orders.status,
        orders.idea_quantity,
        orders.base_currency,
@@ -355,8 +355,8 @@ JOIN users ON users.id = orders.user_id
 LEFT JOIN payment_order_reconciliations AS reconciliation
   ON reconciliation.payment_order_id = orders.id
 WHERE (sqlc.arg(order_number)::TEXT = '' OR orders.public_order_number = sqlc.arg(order_number)::TEXT)
-  AND (sqlc.arg(user_id)::BIGINT <= 0 OR orders.user_id = sqlc.arg(user_id)::BIGINT)
-  AND (sqlc.arg(username)::TEXT = '' OR STRPOS(LOWER(users.username), LOWER(sqlc.arg(username)::TEXT)) > 0)
+  AND (NOT sqlc.arg(has_user_public_id)::BOOLEAN OR users.public_id = sqlc.arg(user_public_id)::UUID)
+  AND (sqlc.arg(display_name)::TEXT = '' OR STRPOS(LOWER(users.display_name), LOWER(sqlc.arg(display_name)::TEXT)) > 0)
   AND (sqlc.arg(status)::TEXT = '' OR orders.status = sqlc.arg(status)::TEXT)
   AND (NOT sqlc.arg(anomaly_only)::BOOLEAN OR reconciliation.anomalous_at IS NOT NULL)
   AND (
@@ -370,7 +370,8 @@ LIMIT sqlc.arg(page_limit)::INTEGER;
 SELECT orders.id,
        orders.public_order_number,
        orders.user_id,
-       users.username,
+       users.public_id AS user_public_id,
+       users.display_name,
        orders.status,
        orders.idea_quantity,
        orders.base_currency,

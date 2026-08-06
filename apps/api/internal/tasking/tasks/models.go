@@ -118,10 +118,8 @@ type TaskOutput struct {
 }
 
 type TaskUserView struct {
-	ID               int64                 `json:"id"`
 	TaskID           string                `json:"task_id"`
 	CorrelationID    string                `json:"correlation_id"`
-	UserID           int64                 `json:"user_id"`
 	Prompt           string                `json:"prompt"`
 	Status           string                `json:"status"`
 	ErrorMsg         string                `json:"error_msg"`
@@ -159,10 +157,8 @@ type TaskResultUserView struct {
 
 func (t *Task) ToUserView() TaskUserView {
 	return TaskUserView{
-		ID:               t.ID,
 		TaskID:           t.TaskID,
 		CorrelationID:    t.EffectiveCorrelationID(),
-		UserID:           t.UserID,
 		Prompt:           t.UserPrompt,
 		Status:           t.Status,
 		ErrorMsg:         t.ErrorMsg,
@@ -274,12 +270,13 @@ type TaskSubmissionResult struct {
 }
 
 type TaskListRequest struct {
-	UserID    int64  `form:"user_id"`
-	AccountID int64  `form:"account_id"`
-	Status    string `form:"status"`
-	Keyword   string `form:"keyword"`
-	Page      int    `form:"page,default=1"`
-	PageSize  int    `form:"page_size,default=20"`
+	UserID       int64  `form:"-" json:"-"`
+	UserPublicID string `form:"user_public_id"`
+	AccountID    int64  `form:"account_id"`
+	Status       string `form:"status"`
+	Keyword      string `form:"keyword"`
+	Page         int    `form:"page,default=1"`
+	PageSize     int    `form:"page_size,default=20"`
 }
 
 type TaskListCounts struct {

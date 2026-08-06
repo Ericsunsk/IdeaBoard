@@ -390,7 +390,7 @@ function navIconClassFor(isActive: boolean) {
 
 const userMenuItems = computed<MenuItem[]>(() => [
   {
-    label: userStore.user?.username || 'Admin',
+    label: userStore.user?.display_name || 'Admin',
     disabled: true,
   },
   { separator: true },

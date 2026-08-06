@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -29,7 +30,7 @@ type SessionIdentity = trust.SessionIdentity
 type ProvisionedAuthUser struct {
 	AuthUserID            string `json:"auth_user_id"`
 	Email                 string `json:"email"`
-	Username              string `json:"username"`
+	DisplayName           string `json:"display_name"`
 	ClaimIdentity         string `json:"claim_identity"`
 	ClaimIdentityKind     string `json:"claim_identity_kind"`
 	ClaimIdentityVerified bool   `json:"claim_identity_verified"`
@@ -102,6 +103,60 @@ type MailConfigUpdate struct {
 	ReplyTo   string
 }
 
+type SocialProviderSettingsSummary struct {
+	Provider               string   `json:"provider"`
+	Enabled                bool     `json:"enabled"`
+	Configured             bool     `json:"configured"`
+	Available              bool     `json:"available"`
+	ClientID               string   `json:"client_id"`
+	ClientSecretConfigured bool     `json:"client_secret_configured"`
+	Scopes                 []string `json:"scopes"`
+	ConfigVersion          int      `json:"config_version"`
+	CallbackURL            string   `json:"callback_url"`
+	UpdatedAt              *string  `json:"updated_at"`
+}
+
+type SocialProviderSettingsUpdate struct {
+	Enabled      bool
+	ClientID     string
+	ClientSecret string
+}
+
+type SocialProviderCapabilities struct {
+	Social map[string]bool `json:"social"`
+}
+
+type SocialProviderSettingsError struct {
+	Status  int
+	Message string
+}
+
+type ImpersonationError struct {
+	Status  int
+	Message string
+}
+
+func (e *ImpersonationError) Error() string {
+	if strings.TrimSpace(e.Message) == "" {
+		return "auth impersonation request failed"
+	}
+	return e.Message
+}
+
+func (e *ImpersonationError) StatusCode() int {
+	if e == nil || e.Status <= 0 {
+		return http.StatusBadGateway
+	}
+	return e.Status
+}
+
+func (e *SocialProviderSettingsError) Error() string {
+	if strings.TrimSpace(e.Message) == "" {
+		return "auth social provider settings request failed"
+	}
+	return e.Message
+}
+
 // MailConfigError preserves the Auth service status while keeping provider details
 // behind the Auth boundary. The Admin handler maps only these stable statuses.
 type MailConfigError struct {
@@ -157,6 +212,140 @@ func (c *ServiceClient) SendMailConfigTest(ctx context.Context, recipient string
 		Msg  string `json:"msg"`
 	}
 	return c.mailConfigRequest(ctx, http.MethodPost, "/internal/mail/config/test", map[string]any{"recipient": recipient, "actor_id": actorID}, &envelope)
+}
+
+func (c *ServiceClient) GetSocialProviderSettings(ctx context.Context, provider string) (*SocialProviderSettingsSummary, error) {
+	var summary SocialProviderSettingsSummary
+	path := "/internal/social-providers/" + url.PathEscape(strings.TrimSpace(provider))
+	if err := c.socialProviderRequest(ctx, http.MethodGet, path, nil, &summary, true); err != nil {
+		return nil, err
+	}
+	return &summary, nil
+}
+
+func (c *ServiceClient) UpdateSocialProviderSettings(ctx context.Context, provider string, input SocialProviderSettingsUpdate) (*SocialProviderSettingsSummary, error) {
+	body := map[string]any{
+		"enabled":   input.Enabled,
+		"client_id": input.ClientID,
+	}
+	if strings.TrimSpace(input.ClientSecret) != "" {
+		body["client_secret"] = input.ClientSecret
+	}
+	var summary SocialProviderSettingsSummary
+	path := "/internal/social-providers/" + url.PathEscape(strings.TrimSpace(provider))
+	if err := c.socialProviderRequest(ctx, http.MethodPut, path, body, &summary, true); err != nil {
+		return nil, err
+	}
+	return &summary, nil
+}
+
+func (c *ServiceClient) GetSocialProviderCapabilities(ctx context.Context) (*SocialProviderCapabilities, error) {
+	var capabilities SocialProviderCapabilities
+	if err := c.socialProviderRequest(ctx, http.MethodGet, "/api/auth/capabilities", nil, &capabilities, false); err != nil {
+		return nil, err
+	}
+	return &capabilities, nil
+}
+
+// ImpersonateUser bridges the Admin API session to Better Auth's native
+// impersonation endpoint. The browser Cookie is forwarded; the internal API
+// key is intentionally not sent because this is a public-session route.
+func (c *ServiceClient) ImpersonateUser(ctx context.Context, cookieHeader string, authUserID string) ([]string, error) {
+	if c == nil || c.httpClient == nil || strings.TrimSpace(c.baseURL) == "" {
+		return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: "认证服务未配置"}
+	}
+	normalizedID := strings.TrimSpace(authUserID)
+	if normalizedID == "" {
+		return nil, &ImpersonationError{Status: http.StatusBadRequest, Message: "认证用户 ID 不能为空"}
+	}
+	body, err := json.Marshal(map[string]string{"userId": normalizedID})
+	if err != nil {
+		return nil, fmt.Errorf("encode auth impersonation request: %w", err)
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/auth/admin/impersonate-user", strings.NewReader(string(body)))
+	if err != nil {
+		return nil, fmt.Errorf("build auth impersonation request: %w", err)
+	}
+	request.Header.Set("Content-Type", "application/json")
+	if cookie := strings.TrimSpace(cookieHeader); cookie != "" {
+		request.Header.Set("Cookie", cookie)
+	}
+	upstreamResponse, err := c.httpClient.Do(request)
+	if err != nil {
+		return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: "认证服务不可用"}
+	}
+	defer upstreamResponse.Body.Close()
+	if _, err := io.Copy(io.Discard, upstreamResponse.Body); err != nil {
+		return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: "读取认证服务响应失败"}
+	}
+	if upstreamResponse.StatusCode < http.StatusOK || upstreamResponse.StatusCode >= http.StatusMultipleChoices {
+		return nil, &ImpersonationError{Status: upstreamResponse.StatusCode, Message: "认证服务拒绝伪装登录"}
+	}
+	cookies := upstreamResponse.Header.Values("Set-Cookie")
+	for _, cookie := range cookies {
+		if strings.TrimSpace(cookie) != "" {
+			return append([]string(nil), cookies...), nil
+		}
+	}
+	return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: "认证服务未返回伪装 Session"}
+}
+
+func (c *ServiceClient) socialProviderRequest(ctx context.Context, method, path string, body any, result any, includeInternalKey bool) error {
+	if _, err := c.contractClient(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(c.baseURL) == "" {
+		return fmt.Errorf("auth service base URL is not configured")
+	}
+	var reader io.Reader
+	if body != nil {
+		payload, err := json.Marshal(body)
+		if err != nil {
+			return fmt.Errorf("encode auth social provider request: %w", err)
+		}
+		reader = strings.NewReader(string(payload))
+	}
+	request, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reader)
+	if err != nil {
+		return fmt.Errorf("build auth social provider request: %w", err)
+	}
+	if body != nil {
+		request.Header.Set("Content-Type", "application/json")
+	}
+	if includeInternalKey && c.internalKey != "" {
+		request.Header.Set("X-Internal-Key", c.internalKey)
+	}
+	upstreamResponse, err := c.httpClient.Do(request)
+	if err != nil {
+		return fmt.Errorf("call auth social provider service: %w", err)
+	}
+	defer upstreamResponse.Body.Close()
+	payload, err := io.ReadAll(upstreamResponse.Body)
+	if err != nil {
+		return fmt.Errorf("read auth social provider response: %w", err)
+	}
+	var envelope struct {
+		Code *int            `json:"code"`
+		Msg  *string         `json:"msg"`
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(payload, &envelope); err != nil {
+		return &SocialProviderSettingsError{Status: http.StatusBadGateway, Message: "认证服务返回无效响应"}
+	}
+	if upstreamResponse.StatusCode < 200 || upstreamResponse.StatusCode >= 300 || envelope.Code == nil || envelope.Msg == nil || *envelope.Code != 0 {
+		message := "OAuth Provider 配置操作失败"
+		if envelope.Msg != nil && strings.TrimSpace(*envelope.Msg) != "" {
+			message = strings.TrimSpace(*envelope.Msg)
+		}
+		return &SocialProviderSettingsError{Status: upstreamResponse.StatusCode, Message: message}
+	}
+	if len(envelope.Data) == 0 || string(envelope.Data) == "null" {
+		return &SocialProviderSettingsError{Status: http.StatusBadGateway, Message: "认证服务返回无效响应"}
+	}
+	if err := json.Unmarshal(envelope.Data, result); err != nil {
+		return &SocialProviderSettingsError{Status: http.StatusBadGateway, Message: "认证服务返回无效响应"}
+	}
+	return nil
 }
 
 func (c *ServiceClient) mailConfigRequest(ctx context.Context, method, path string, body any, result any) error {
@@ -247,10 +436,15 @@ func (c *ServiceClient) ValidateSession(ctx context.Context, cookieHeader string
 		return nil, fmt.Errorf("auth service session rejected: %s", nonEmpty(response.JSON200.Msg, "unknown error"))
 	}
 	contractSession := response.JSON200.Data.Session
+	avatar := ""
+	if contractSession.Avatar != nil {
+		avatar = *contractSession.Avatar
+	}
 	session, trustErr := trust.ValidateSessionIdentity(trust.SessionIdentity{
 		AuthUserID:            contractSession.AuthUserID,
 		Email:                 contractSession.Email,
-		Username:              contractSession.Username,
+		DisplayName:           contractSession.DisplayName,
+		Avatar:                avatar,
 		ClaimIdentity:         contractSession.ClaimIdentity,
 		ClaimIdentityKind:     string(contractSession.ClaimIdentityKind),
 		ClaimIdentityVerified: contractSession.ClaimIdentityVerified,
@@ -261,17 +455,17 @@ func (c *ServiceClient) ValidateSession(ctx context.Context, cookieHeader string
 	return &session, nil
 }
 
-func (c *ServiceClient) EnsureUser(ctx context.Context, email, username, password string, allowExisting bool, role ...string) (*ProvisionedAuthUser, error) {
+func (c *ServiceClient) EnsureUser(ctx context.Context, email, displayName, password string, allowExisting bool, role ...string) (*ProvisionedAuthUser, error) {
 	client, err := c.contractClient()
 	if err != nil {
 		return nil, err
 	}
 	response, err := client.EnsureUserWithResponse(ctx, internalcontract.EnsureUserJSONRequestBody{
 		AllowExisting: allowExisting,
+		DisplayName:   strings.TrimSpace(displayName),
 		Email:         strings.ToLower(strings.TrimSpace(email)),
 		Password:      password,
 		Role:          normalizeEnsureRole(role...),
-		Username:      strings.TrimSpace(username),
 	})
 	if err != nil {
 		return nil, err
@@ -292,7 +486,7 @@ func (c *ServiceClient) EnsureUser(ctx context.Context, email, username, passwor
 	user := ProvisionedAuthUser{
 		AuthUserID:            contractUser.AuthUserID,
 		Email:                 contractUser.Email,
-		Username:              contractUser.Username,
+		DisplayName:           contractUser.DisplayName,
 		ClaimIdentity:         contractUser.ClaimIdentity,
 		ClaimIdentityKind:     string(contractUser.ClaimIdentityKind),
 		ClaimIdentityVerified: bool(contractUser.ClaimIdentityVerified),
@@ -302,7 +496,7 @@ func (c *ServiceClient) EnsureUser(ctx context.Context, email, username, passwor
 	normalized, trustErr := trust.NormalizeProvisioningIdentity(trust.ProvisioningIdentity{
 		AuthUserID:            user.AuthUserID,
 		Email:                 user.Email,
-		Username:              user.Username,
+		DisplayName:           user.DisplayName,
 		ClaimIdentity:         user.ClaimIdentity,
 		ClaimIdentityKind:     user.ClaimIdentityKind,
 		ClaimIdentityVerified: user.ClaimIdentityVerified,
@@ -313,7 +507,7 @@ func (c *ServiceClient) EnsureUser(ctx context.Context, email, username, passwor
 	}
 	user.AuthUserID = normalized.AuthUserID
 	user.Email = normalized.Email
-	user.Username = normalized.Username
+	user.DisplayName = normalized.DisplayName
 	user.ClaimIdentity = normalized.ClaimIdentity
 	user.ClaimIdentityKind = normalized.ClaimIdentityKind
 	user.ClaimIdentityVerified = normalized.ClaimIdentityVerified

@@ -1,11 +1,16 @@
 import { toNodeHandler } from 'better-auth/node'
-import { auth, authDB, mailConfigService } from './auth.js'
+import {
+  authDB,
+  mailConfigService,
+  runtimeAuthRegistry,
+  socialProviderSettingsService,
+} from './auth.js'
 import { createAuthApp } from './authApp.js'
 import { getAuthGuardSettings } from './authGuardSettings.js'
 import { createAuthInternalCommands, type InternalAuthAPI } from './authInternalCommands.js'
 import {
   deleteAuthUserSessions,
-  findUserByUsernameOrEmail,
+  findUserByEmail,
   finalizeTrustedRegistrationIdentity,
   removeAuthUserCascade,
   updateAuthUserBanState,
@@ -16,12 +21,12 @@ import { verifyAuthRuntimePrivileges } from './runtime-privileges.js'
 import { AUTH_CLEANUP_INTERVAL_MS, cleanupUnverifiedUsers } from './authCleanup.js'
 
 const authApi: InternalAuthAPI = {
-  getSession: (input) => auth.api.getSession(input),
-  signUpEmail: (input) => auth.api.signUpEmail(input),
+  getSession: (input) => runtimeAuthRegistry.current.api.getSession(input),
+  signUpEmail: (input) => runtimeAuthRegistry.current.api.signUpEmail(input),
 }
 
 const repository = {
-  findUserByUsernameOrEmail,
+  findUserByEmail,
   finalizeTrustedRegistrationIdentity,
   updateAuthUserRole,
   updateAuthUserBanState,
@@ -38,12 +43,14 @@ const app = createAuthApp({
   healthCheck: async () => {
     await authDB.query('SELECT 1')
   },
-  authHandler: toNodeHandler(auth),
+  authHandler: (request, response) =>
+    toNodeHandler(runtimeAuthRegistry.current)(request, response),
   authApi,
   repository,
   internalCommands: createAuthInternalCommands(authApi, repository),
   getAuthGuardSettings,
   mailConfigService,
+  socialProviderSettingsService,
 })
 
 const cleanupTimer = setInterval(() => {
@@ -55,6 +62,7 @@ cleanupTimer.unref()
 
 try {
   await verifyAuthRuntimePrivileges(authDB)
+  await socialProviderSettingsService.initialize()
   await app.listen({ port: env.auth.port, host: env.auth.host })
   console.log(`[auth] Better Auth service listening on http://${env.auth.host}:${env.auth.port}`)
 } catch (error) {

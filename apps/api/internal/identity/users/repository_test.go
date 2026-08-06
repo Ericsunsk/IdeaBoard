@@ -7,11 +7,44 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/testdb"
+
+	"github.com/google/uuid"
 )
 
 func newUserRepoTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 	return testdb.Open(t)
+}
+
+func TestCreateAssignsPublicIdentityAndPersistsDisplayName(t *testing.T) {
+	db := newUserRepoTestDB(t)
+	repo := NewUserRepository(db)
+	user := &User{
+		DisplayName: "画布创作者",
+		Status:      1,
+	}
+
+	if err := repo.Create(context.Background(), user); err != nil {
+		t.Fatalf("create user failed: %v", err)
+	}
+	if user.PublicID == uuid.Nil {
+		t.Fatal("public id is nil")
+	}
+
+	stored, err := repo.GetByID(context.Background(), user.ID)
+	if err != nil {
+		t.Fatalf("get user failed: %v", err)
+	}
+	if stored.PublicID != user.PublicID || stored.DisplayName != "画布创作者" {
+		t.Fatalf("stored public identity = %+v, want public_id=%s display_name=%q", stored, user.PublicID, "画布创作者")
+	}
+	publicUser, err := repo.GetByPublicID(context.Background(), user.PublicID.String())
+	if err != nil {
+		t.Fatalf("get user by public id failed: %v", err)
+	}
+	if publicUser.ID != user.ID {
+		t.Fatalf("public identity resolved internal id = %d, want %d", publicUser.ID, user.ID)
+	}
 }
 
 func TestCreateStorageUIDDoesNotReuseUsedUID(t *testing.T) {
@@ -23,9 +56,9 @@ func TestCreateStorageUIDDoesNotReuseUsedUID(t *testing.T) {
 	}
 
 	user := &User{
-		Username:   "u1",
-		Status:     1,
-		StorageUID: "ABC123",
+		DisplayName: "u1",
+		Status:      1,
+		StorageUID:  "ABC123",
 	}
 	if err := repo.Create(context.Background(), user); err != nil {
 		t.Fatalf("create user failed: %v", err)
@@ -53,15 +86,15 @@ func TestListUsersFiltersRoleAndStatusAcrossTotal(t *testing.T) {
 	repo := NewUserRepository(db)
 
 	seedUsers := []*User{
-		{Username: "filter_full_banned_user_a", Role: "user", Status: 0},
-		{Username: "filter_full_banned_user_b", Role: "user", Status: 0},
-		{Username: "filter_full_active_user", Role: "user", Status: 1},
-		{Username: "filter_full_banned_admin", Role: "admin", Status: 0},
-		{Username: "outside_banned_user", Role: "user", Status: 0},
+		{DisplayName: "filter_full_banned_user_a", Role: "user", Status: 0},
+		{DisplayName: "filter_full_banned_user_b", Role: "user", Status: 0},
+		{DisplayName: "filter_full_active_user", Role: "user", Status: 1},
+		{DisplayName: "filter_full_banned_admin", Role: "admin", Status: 0},
+		{DisplayName: "outside_banned_user", Role: "user", Status: 0},
 	}
 	for _, user := range seedUsers {
 		if err := repo.Create(ctx, user); err != nil {
-			t.Fatalf("create user %q failed: %v", user.Username, err)
+			t.Fatalf("create user %q failed: %v", user.DisplayName, err)
 		}
 	}
 
@@ -78,7 +111,7 @@ func TestListUsersFiltersRoleAndStatusAcrossTotal(t *testing.T) {
 	if len(list) != 1 {
 		t.Fatalf("page list length = %d, want 1", len(list))
 	}
-	if list[0].Role != "user" || list[0].Status != 0 || !strings.Contains(list[0].Username, "filter_full") {
+	if list[0].Role != "user" || list[0].Status != 0 || !strings.Contains(list[0].DisplayName, "filter_full") {
 		t.Fatalf("unexpected filtered user: %+v", list[0])
 	}
 }

@@ -44,7 +44,7 @@ type Querier interface {
 	CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error)
 	CreateTaskAttempt(ctx context.Context, arg CreateTaskAttemptParams) (CreateTaskAttemptRow, error)
 	CreateTaskOutput(ctx context.Context, arg CreateTaskOutputParams) (int64, error)
-	CreateUser(ctx context.Context, arg CreateUserParams) (int64, error)
+	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	DeleteAccountModel(ctx context.Context, arg DeleteAccountModelParams) (int64, error)
 	DeleteAccountModelsByAccountID(ctx context.Context, accountID int64) error
 	DeleteBoardByOwnerAndBoardID(ctx context.Context, arg DeleteBoardByOwnerAndBoardIDParams) (int64, error)
@@ -97,8 +97,8 @@ type Querier interface {
 	GetUsedUIDForUpdate(ctx context.Context, storageUid string) (string, error)
 	GetUserByAuthUserID(ctx context.Context, authUserID sql.NullString) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
+	GetUserByPublicID(ctx context.Context, publicID uuid.UUID) (User, error)
 	GetUserByStorageUID(ctx context.Context, storageUid string) (User, error)
-	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUserIDByStorageUIDForUpdateParams) (int64, error)
 	HasActiveStorageProfileSecretVersion(ctx context.Context, arg HasActiveStorageProfileSecretVersionParams) (bool, error)
 	IncrementAccountFailCount(ctx context.Context, id int64) (int64, error)

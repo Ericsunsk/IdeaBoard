@@ -1,6 +1,7 @@
 package rewards
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -11,6 +12,7 @@ import (
 
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
 
@@ -27,9 +29,10 @@ type RewardService interface {
 }
 
 type Handler struct {
-	service RewardService
-	limiter *redemptionAttemptLimiter
-	metrics redemptionMetrics
+	service  RewardService
+	userRepo *users.UserRepository
+	limiter  *redemptionAttemptLimiter
+	metrics  redemptionMetrics
 }
 
 type redemptionHandlerOptions struct {
@@ -37,8 +40,12 @@ type redemptionHandlerOptions struct {
 	MetricsRecorder redemptionMetricsRecorder
 }
 
-func NewHandler(service RewardService) *Handler {
-	return newHandlerWithOptions(service, redemptionHandlerOptions{})
+func NewHandler(service RewardService, userRepo ...*users.UserRepository) *Handler {
+	handler := newHandlerWithOptions(service, redemptionHandlerOptions{})
+	if len(userRepo) > 0 {
+		handler.userRepo = userRepo[0]
+	}
+	return handler
 }
 
 func newHandlerWithOptions(service RewardService, options redemptionHandlerOptions) *Handler {
@@ -234,6 +241,10 @@ func (h *Handler) ListAdminRedemptions(c *gin.Context) {
 		writeRewardError(c, err)
 		return
 	}
+	if err := h.enrichAdminRedemptionPage(c.Request.Context(), &page); err != nil {
+		writeRewardError(c, err)
+		return
+	}
 	response.SuccessDTO(c, page)
 }
 
@@ -253,6 +264,10 @@ func (h *Handler) GetAdminRedemption(c *gin.Context) {
 		RedemptionID: redemptionID,
 	})
 	if err != nil {
+		writeRewardError(c, err)
+		return
+	}
+	if err := h.enrichAdminRedemption(c.Request.Context(), &detail); err != nil {
 		writeRewardError(c, err)
 		return
 	}
@@ -287,6 +302,11 @@ func (h *Handler) Redeem(c *gin.Context) {
 	if err != nil {
 		finishMetrics(redemptionOutcomeForError(err), 0, err)
 		writeRewardRedeemError(c, err)
+		return
+	}
+	if err := h.enrichRedemptionResult(c.Request.Context(), &result); err != nil {
+		finishMetrics(redemptionOutcomeInternalError, 0, err)
+		writeRewardError(c, err)
 		return
 	}
 	if result.Replayed {
@@ -350,6 +370,10 @@ func (h *Handler) ListRedemptions(c *gin.Context) {
 		writeRewardError(c, err)
 		return
 	}
+	if err := h.enrichHistoryPage(c.Request.Context(), &page, identityPrincipal.UserID()); err != nil {
+		writeRewardError(c, err)
+		return
+	}
 	response.SuccessDTO(c, page)
 }
 
@@ -363,6 +387,60 @@ func (h *Handler) requireAdmin(c *gin.Context) (int64, bool) {
 		return 0, false
 	}
 	return identityPrincipal.UserID(), true
+}
+
+func (h *Handler) enrichAdminRedemptionPage(ctx context.Context, page *AdminRedemptionPage) error {
+	if h == nil || h.userRepo == nil || page == nil {
+		return nil
+	}
+	for index := range page.Redemptions {
+		user, err := h.userRepo.GetByID(ctx, page.Redemptions[index].UserID)
+		if err != nil {
+			return fmt.Errorf("resolve reward redemption identity: %w", err)
+		}
+		page.Redemptions[index].UserPublicID = user.PublicID
+		page.Redemptions[index].DisplayName = user.DisplayName
+	}
+	return nil
+}
+
+func (h *Handler) enrichAdminRedemption(ctx context.Context, detail *AdminRedemptionDetail) error {
+	if h == nil || h.userRepo == nil || detail == nil {
+		return nil
+	}
+	user, err := h.userRepo.GetByID(ctx, detail.UserID)
+	if err != nil {
+		return fmt.Errorf("resolve reward redemption identity: %w", err)
+	}
+	detail.UserPublicID = user.PublicID
+	detail.DisplayName = user.DisplayName
+	return nil
+}
+
+func (h *Handler) enrichRedemptionResult(ctx context.Context, result *RedeemResult) error {
+	if h == nil || h.userRepo == nil || result == nil || result.Redemption.UserID <= 0 {
+		return nil
+	}
+	user, err := h.userRepo.GetByID(ctx, result.Redemption.UserID)
+	if err != nil {
+		return fmt.Errorf("resolve reward redemption identity: %w", err)
+	}
+	result.Redemption.UserPublicID = user.PublicID
+	result.Redemption.DisplayName = user.DisplayName
+	return nil
+}
+
+func (h *Handler) enrichHistoryPage(ctx context.Context, page *RedemptionHistoryPage, userID int64) error {
+	// History items intentionally omit identity fields because they are scoped to
+	// the authenticated user. Resolve the identity once to keep the boundary
+	// explicit and fail closed if the local mapping is inconsistent.
+	if h == nil || h.userRepo == nil || page == nil {
+		return nil
+	}
+	if _, err := h.userRepo.GetByID(ctx, userID); err != nil {
+		return fmt.Errorf("resolve reward history identity: %w", err)
+	}
+	return nil
 }
 
 func (h *Handler) requireAdminRewardCode(c *gin.Context) (int64, int64, bool) {

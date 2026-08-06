@@ -3,6 +3,7 @@ import { getMigrations } from 'better-auth/db/migration'
 import dotenv from 'dotenv'
 import { configureAuthRuntimePrivileges } from './runtime-privileges.js'
 import { ensureMailConfigSchema } from './mailConfigSchema.js'
+import { ensureSocialProviderSettingsSchema } from './socialProviderSchema.js'
 
 dotenv.config({ quiet: true })
 
@@ -45,6 +46,9 @@ async function runAuthMigrations() {
 
     await ensureMailConfigSchema(authDB)
     console.log('Auth mail configuration schema ensured')
+
+    await ensureSocialProviderSettingsSchema(authDB)
+    console.log('Auth social provider settings schema ensured')
 
     await configureAuthRuntimePrivileges(authDB, runtimeUser)
     console.log('Better Auth runtime privileges configured')

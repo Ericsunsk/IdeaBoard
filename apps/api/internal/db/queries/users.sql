@@ -1,35 +1,35 @@
 -- name: CreateUser :one
 INSERT INTO users (
-  username, auth_user_id, storage_uid, avatar, role, status
+  display_name, auth_user_id, storage_uid, avatar, role, status
 ) VALUES (
-  sqlc.arg(username), sqlc.arg(auth_user_id), sqlc.arg(storage_uid),
+  sqlc.arg(display_name), sqlc.arg(auth_user_id), sqlc.arg(storage_uid),
   sqlc.arg(avatar), sqlc.arg(role), sqlc.arg(status)
 )
-RETURNING id;
+RETURNING id, public_id, display_name;
 
 -- name: GetUserByID :one
-SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
 WHERE id = sqlc.arg(id);
 
--- name: GetUserByUsername :one
-SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+-- name: GetUserByPublicID :one
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
-WHERE username = sqlc.arg(username);
+WHERE public_id = sqlc.arg(public_id);
 
 -- name: GetUserByAuthUserID :one
-SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
 WHERE auth_user_id = sqlc.arg(auth_user_id);
 
 -- name: GetUserByStorageUID :one
-SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
 WHERE storage_uid = sqlc.arg(storage_uid);
 
 -- name: UpdateUser :execrows
 UPDATE users
-SET username = sqlc.arg(username),
+SET display_name = sqlc.arg(display_name),
     auth_user_id = sqlc.arg(auth_user_id),
     storage_uid = sqlc.arg(storage_uid),
     avatar = sqlc.arg(avatar),
@@ -48,14 +48,14 @@ SELECT
   COUNT(*) FILTER (WHERE status = 0) AS banned_count,
   COUNT(*) FILTER (WHERE role = 'admin') AS admin_count
 FROM users
-WHERE (NOT sqlc.arg(has_keyword)::boolean OR username ILIKE sqlc.arg(keyword_like))
+WHERE (NOT sqlc.arg(has_keyword)::boolean OR display_name ILIKE sqlc.arg(keyword_like))
   AND (NOT sqlc.arg(has_role)::boolean OR role = sqlc.arg(role))
   AND (NOT sqlc.arg(has_status)::boolean OR status = sqlc.arg(status));
 
 -- name: ListUsers :many
-SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users
-WHERE (NOT sqlc.arg(has_keyword)::boolean OR username ILIKE sqlc.arg(keyword_like))
+WHERE (NOT sqlc.arg(has_keyword)::boolean OR display_name ILIKE sqlc.arg(keyword_like))
   AND (NOT sqlc.arg(has_role)::boolean OR role = sqlc.arg(role))
   AND (NOT sqlc.arg(has_status)::boolean OR status = sqlc.arg(status))
 ORDER BY id DESC

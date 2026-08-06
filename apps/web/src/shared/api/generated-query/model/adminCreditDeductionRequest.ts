@@ -6,8 +6,7 @@
  */
 
 export interface AdminCreditDeductionRequest {
-  /** @minimum 1 */
-  user_id: number
+  user_public_id: string
   /**
    * @minimum 1
    * @maximum 9000000000000000

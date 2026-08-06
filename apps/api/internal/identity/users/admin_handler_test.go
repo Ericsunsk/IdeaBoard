@@ -33,6 +33,19 @@ type fakeAdminAuthManager struct {
 	revokedAuthUserID  string
 }
 
+type fakeAdminUserImpersonator struct {
+	cookieHeader string
+	authUserID   string
+	setCookies   []string
+	err          error
+}
+
+func (f *fakeAdminUserImpersonator) ImpersonateUser(_ context.Context, cookieHeader string, authUserID string) ([]string, error) {
+	f.cookieHeader = cookieHeader
+	f.authUserID = authUserID
+	return f.setCookies, f.err
+}
+
 type adminBrandingSettingsResponse struct {
 	Code int                      `json:"code"`
 	Msg  string                   `json:"msg"`
@@ -103,11 +116,11 @@ func TestAdminHighRiskHandlersRejectUserPrincipal(t *testing.T) {
 		run    gin.HandlerFunc
 	}{
 		{name: "outbound policy", method: http.MethodPut, path: "/settings/outbound-policy", route: "/settings/outbound-policy", run: handler.UpdateOutboundPolicy},
-		{name: "role", method: http.MethodPut, path: "/users/1/role", route: "/users/:id/role", run: handler.UpdateUserRole},
-		{name: "delete", method: http.MethodDelete, path: "/users/1", route: "/users/:id", run: handler.DeleteUser},
-		{name: "ban", method: http.MethodPost, path: "/users/1/ban", route: "/users/:id/ban", run: handler.BanUser},
-		{name: "unban", method: http.MethodPost, path: "/users/1/unban", route: "/users/:id/unban", run: handler.UnbanUser},
-		{name: "revoke sessions", method: http.MethodPost, path: "/users/1/revoke", route: "/users/:id/revoke", run: handler.RevokeUserSessions},
+		{name: "role", method: http.MethodPut, path: "/users/00000000-0000-0000-0000-000000000001/role", route: "/users/:public_id/role", run: handler.UpdateUserRole},
+		{name: "delete", method: http.MethodDelete, path: "/users/00000000-0000-0000-0000-000000000001", route: "/users/:public_id", run: handler.DeleteUser},
+		{name: "ban", method: http.MethodPost, path: "/users/00000000-0000-0000-0000-000000000001/ban", route: "/users/:public_id/ban", run: handler.BanUser},
+		{name: "unban", method: http.MethodPost, path: "/users/00000000-0000-0000-0000-000000000001/unban", route: "/users/:public_id/unban", run: handler.UnbanUser},
+		{name: "revoke sessions", method: http.MethodPost, path: "/users/00000000-0000-0000-0000-000000000001/revoke", route: "/users/:public_id/revoke", run: handler.RevokeUserSessions},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			router := gin.New()
@@ -190,9 +203,9 @@ func TestAdminListUsersIncludesAvailableCreditBalance(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	repo := NewUserRepository(db)
 	user := &User{
-		Username: "admin_balance_user",
-		Role:     "user",
-		Status:   1,
+		DisplayName: "admin_balance_user",
+		Role:        "user",
+		Status:      1,
 	}
 	if err := repo.Create(t.Context(), user); err != nil {
 		t.Fatalf("create user failed: %v", err)
@@ -358,9 +371,9 @@ WHERE wallet_user_id = $1
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			user := &User{
-				Username: "incomplete_wallet_" + tt.usernameSuffix,
-				Role:     "user",
-				Status:   1,
+				DisplayName: "incomplete_wallet_" + tt.usernameSuffix,
+				Role:        "user",
+				Status:      1,
 			}
 			if err := repo.Create(t.Context(), user); err != nil {
 				t.Fatalf("create user failed: %v", err)
@@ -373,7 +386,7 @@ WHERE wallet_user_id = $1
 			recorder := httptest.NewRecorder()
 			router.ServeHTTP(
 				recorder,
-				httptest.NewRequest(http.MethodGet, "/admin/users?keyword="+user.Username, nil),
+				httptest.NewRequest(http.MethodGet, "/admin/users?keyword="+user.DisplayName, nil),
 			)
 
 			if recorder.Code != http.StatusInternalServerError {
@@ -434,7 +447,7 @@ func assertAdminListUsersResponse(t *testing.T, router *gin.Engine, path string,
 
 func createAdminListUserWithBalance(t *testing.T, repo *UserRepository, pool *pgxpool.Pool, creditService *credits.Service, username, role string, status int16, balance int64) *User {
 	t.Helper()
-	user := &User{Username: username, Role: role, Status: status}
+	user := &User{DisplayName: username, Role: role, Status: status}
 	if err := repo.Create(t.Context(), user); err != nil {
 		t.Fatalf("create user %q failed: %v", username, err)
 	}
@@ -1055,10 +1068,10 @@ func TestAdminDeleteUserContinuesLocalCleanupWhenAuthUserAlreadyMissing(t *testi
 	repo := NewUserRepository(db)
 	authUserID := "missing-auth-user"
 	targetUser := &User{
-		Username:   "stale_user",
-		AuthUserID: &authUserID,
-		Role:       "user",
-		Status:     1,
+		DisplayName: "stale_user",
+		AuthUserID:  &authUserID,
+		Role:        "user",
+		Status:      1,
 	}
 	if err := repo.Create(context.Background(), targetUser); err != nil {
 		t.Fatalf("create target user failed: %v", err)
@@ -1075,12 +1088,12 @@ func TestAdminDeleteUserContinuesLocalCleanupWhenAuthUserAlreadyMissing(t *testi
 	userService := NewUserService(repo, lifecycle, nil, &recordingUserUploadCleaner{})
 	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager))
 	router := gin.New()
-	router.DELETE("/admin/users/:id", func(c *gin.Context) {
+	router.DELETE("/admin/users/:public_id", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
 		handler.DeleteUser(c)
 	})
 
-	req := httptest.NewRequest(http.MethodDelete, "/admin/users/"+strconv.FormatInt(targetUser.ID, 10), nil)
+	req := httptest.NewRequest(http.MethodDelete, "/admin/users/"+targetUser.PublicID.String(), nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -1103,11 +1116,11 @@ func TestAdminDeleteUserReportsLocalCleanupFailureAfterAuthDelete(t *testing.T) 
 	repo := NewUserRepository(db)
 	authUserID := "auth-user-kept"
 	targetUser := &User{
-		Username:   "cleanup_fail_user",
-		AuthUserID: &authUserID,
-		StorageUID: "FAIL42",
-		Role:       "user",
-		Status:     1,
+		DisplayName: "cleanup_fail_user",
+		AuthUserID:  &authUserID,
+		StorageUID:  "FAIL42",
+		Role:        "user",
+		Status:      1,
 	}
 	if err := repo.Create(context.Background(), targetUser); err != nil {
 		t.Fatalf("create target user failed: %v", err)
@@ -1129,12 +1142,12 @@ func TestAdminDeleteUserReportsLocalCleanupFailureAfterAuthDelete(t *testing.T) 
 	)
 	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager))
 	router := gin.New()
-	router.DELETE("/admin/users/:id", func(c *gin.Context) {
+	router.DELETE("/admin/users/:public_id", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
 		handler.DeleteUser(c)
 	})
 
-	req := httptest.NewRequest(http.MethodDelete, "/admin/users/"+strconv.FormatInt(targetUser.ID, 10), nil)
+	req := httptest.NewRequest(http.MethodDelete, "/admin/users/"+targetUser.PublicID.String(), nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -1156,10 +1169,10 @@ func TestAdminDeleteUserPreservesLocalUserWhenAuthDeleteFails(t *testing.T) {
 	repo := NewUserRepository(db)
 	authUserID := "auth-delete-fails"
 	targetUser := &User{
-		Username:   "auth_delete_fail_user",
-		AuthUserID: &authUserID,
-		Role:       "user",
-		Status:     1,
+		DisplayName: "auth_delete_fail_user",
+		AuthUserID:  &authUserID,
+		Role:        "user",
+		Status:      1,
 	}
 	if err := repo.Create(context.Background(), targetUser); err != nil {
 		t.Fatalf("create target user failed: %v", err)
@@ -1173,12 +1186,12 @@ func TestAdminDeleteUserPreservesLocalUserWhenAuthDeleteFails(t *testing.T) {
 	userService := NewUserService(repo, lifecycle, nil, &recordingUserUploadCleaner{})
 	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager))
 	router := gin.New()
-	router.DELETE("/admin/users/:id", func(c *gin.Context) {
+	router.DELETE("/admin/users/:public_id", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
 		handler.DeleteUser(c)
 	})
 
-	req := httptest.NewRequest(http.MethodDelete, "/admin/users/"+strconv.FormatInt(targetUser.ID, 10), nil)
+	req := httptest.NewRequest(http.MethodDelete, "/admin/users/"+targetUser.PublicID.String(), nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -1200,10 +1213,10 @@ func TestAdminBanUserOrchestratesAuthBeforeLocalStatus(t *testing.T) {
 	repo := NewUserRepository(db)
 	authUserID := "auth-ban-user"
 	targetUser := &User{
-		Username:   "target_user",
-		AuthUserID: &authUserID,
-		Role:       "user",
-		Status:     1,
+		DisplayName: "target_user",
+		AuthUserID:  &authUserID,
+		Role:        "user",
+		Status:      1,
 	}
 	if err := repo.Create(context.Background(), targetUser); err != nil {
 		t.Fatalf("create target user failed: %v", err)
@@ -1214,12 +1227,12 @@ func TestAdminBanUserOrchestratesAuthBeforeLocalStatus(t *testing.T) {
 	userService := NewUserService(repo, lifecycle, nil)
 	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager))
 	router := gin.New()
-	router.POST("/admin/users/:id/ban", func(c *gin.Context) {
+	router.POST("/admin/users/:public_id/ban", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
 		handler.BanUser(c)
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/admin/users/"+strconv.FormatInt(targetUser.ID, 10)+"/ban", strings.NewReader(`{"reason":"abuse","expires_in_days":7}`))
+	req := httptest.NewRequest(http.MethodPost, "/admin/users/"+targetUser.PublicID.String()+"/ban", strings.NewReader(`{"reason":"abuse","expires_in_days":7}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
@@ -1243,10 +1256,10 @@ func TestAdminRevokeUserSessionsUsesAuthService(t *testing.T) {
 	repo := NewUserRepository(db)
 	authUserID := "auth-revoke-user"
 	targetUser := &User{
-		Username:   "target_user",
-		AuthUserID: &authUserID,
-		Role:       "user",
-		Status:     1,
+		DisplayName: "target_user",
+		AuthUserID:  &authUserID,
+		Role:        "user",
+		Status:      1,
 	}
 	if err := repo.Create(context.Background(), targetUser); err != nil {
 		t.Fatalf("create target user failed: %v", err)
@@ -1256,12 +1269,12 @@ func TestAdminRevokeUserSessionsUsesAuthService(t *testing.T) {
 	userService := NewUserService(repo, nil, nil)
 	handler := NewAdminHandler(userService, nil, NewIdentityAdminCommands(userService, authManager))
 	router := gin.New()
-	router.POST("/admin/users/:id/revoke-sessions", func(c *gin.Context) {
+	router.POST("/admin/users/:public_id/revoke-sessions", func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
 		handler.RevokeUserSessions(c)
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/admin/users/"+strconv.FormatInt(targetUser.ID, 10)+"/revoke-sessions", nil)
+	req := httptest.NewRequest(http.MethodPost, "/admin/users/"+targetUser.PublicID.String()+"/revoke-sessions", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -1270,5 +1283,38 @@ func TestAdminRevokeUserSessionsUsesAuthService(t *testing.T) {
 	}
 	if authManager.revokedAuthUserID != authUserID {
 		t.Fatalf("revoked auth user id = %q, want %q", authManager.revokedAuthUserID, authUserID)
+	}
+}
+
+func TestAdminImpersonateUserUsesPublicIDAndForwardsSession(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := newUserRepoTestDB(t)
+	repo := NewUserRepository(db)
+	authUserID := "auth-impersonated"
+	targetUser := &User{DisplayName: "impersonated user", AuthUserID: &authUserID, Role: "user", Status: 1}
+	if err := repo.Create(context.Background(), targetUser); err != nil {
+		t.Fatalf("create target user failed: %v", err)
+	}
+	impersonator := &fakeAdminUserImpersonator{setCookies: []string{"session=impersonated; Path=/; HttpOnly"}}
+	userService := NewUserService(repo, nil, nil)
+	handler := NewAdminHandler(userService, nil, nil, impersonator)
+	router := gin.New()
+	router.POST("/admin/users/:public_id/impersonate", func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 999, principal.RoleAdmin)
+		handler.ImpersonateUser(c)
+	})
+	req := httptest.NewRequest(http.MethodPost, "/admin/users/"+targetUser.PublicID.String()+"/impersonate", nil)
+	req.Header.Set("Cookie", "session=admin")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200, body=%s", rec.Code, rec.Body.String())
+	}
+	if impersonator.authUserID != authUserID || impersonator.cookieHeader != "session=admin" {
+		t.Fatalf("bridge args = auth=%q cookie=%q", impersonator.authUserID, impersonator.cookieHeader)
+	}
+	if got := rec.Header().Values("Set-Cookie"); len(got) != 1 || got[0] != impersonator.setCookies[0] {
+		t.Fatalf("Set-Cookie = %#v, want %#v", got, impersonator.setCookies)
 	}
 }

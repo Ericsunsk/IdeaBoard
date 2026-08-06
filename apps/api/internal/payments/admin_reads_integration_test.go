@@ -152,7 +152,7 @@ func TestAdminPaymentOrderDetailMasksProviderIdentifiersAndExcludesInternalField
 	}
 	var detail AdminPaymentOrderDetail
 	decodePaymentResponseData(t, response.Body.Bytes(), &detail)
-	if detail.User.ID != 42 || detail.User.Username != "test-fixture-user-42" || detail.Status != PaymentOrderCheckoutOpen ||
+	if detail.internalUserID != 42 || detail.User.DisplayName != "test-fixture-user-42" || detail.Status != PaymentOrderCheckoutOpen ||
 		detail.Stripe.CustomerID == "" || strings.Contains(detail.Stripe.CustomerID, "admin_detail_secret") ||
 		!detail.Reconciliation.Anomalous || detail.Reconciliation.LastErrorSummary != "需要人工检查" {
 		t.Fatalf("detail=%+v", detail)

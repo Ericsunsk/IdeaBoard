@@ -66,7 +66,7 @@ type IdentityAdminBanInput struct {
 }
 
 type identityAdminUsers interface {
-	GetByID(ctx context.Context, id int64) (*User, error)
+	GetByPublicID(ctx context.Context, publicID string) (*User, error)
 	UpdateRole(ctx context.Context, userID int64, role string) error
 	UpdateStatus(ctx context.Context, userID int64, status int16) error
 	DeleteUser(ctx context.Context, userID int64, authDeleter AuthUserDeleter) error
@@ -96,11 +96,11 @@ type authFirstMutation struct {
 
 // IdentityAdminCommands is the complete admin identity mutation surface used by transport adapters.
 type IdentityAdminCommands interface {
-	SetRole(ctx context.Context, actor principal.Principal, targetUserID int64, role string) error
-	Ban(ctx context.Context, actor principal.Principal, targetUserID int64, input IdentityAdminBanInput) error
-	Unban(ctx context.Context, actor principal.Principal, targetUserID int64) error
-	RevokeSessions(ctx context.Context, actor principal.Principal, targetUserID int64) error
-	Delete(ctx context.Context, actor principal.Principal, targetUserID int64) error
+	SetRole(ctx context.Context, actor principal.Principal, targetPublicID string, role string) error
+	Ban(ctx context.Context, actor principal.Principal, targetPublicID string, input IdentityAdminBanInput) error
+	Unban(ctx context.Context, actor principal.Principal, targetPublicID string) error
+	RevokeSessions(ctx context.Context, actor principal.Principal, targetPublicID string) error
+	Delete(ctx context.Context, actor principal.Principal, targetPublicID string) error
 }
 
 // identityAdminCommands owns the cross-system ordering and recovery policy.
@@ -117,12 +117,12 @@ func newIdentityAdminCommands(users identityAdminUsers, authService AuthUserMana
 	return &identityAdminCommands{users: users, auth: authService}
 }
 
-func (commands *identityAdminCommands) SetRole(ctx context.Context, actor principal.Principal, targetUserID int64, role string) error {
+func (commands *identityAdminCommands) SetRole(ctx context.Context, actor principal.Principal, targetPublicID string, role string) error {
 	nextRole := normalizeAdminRole(role)
 	if nextRole == "" {
 		return identityAdminError(IdentityAdminInvalid, "role 仅支持 admin 或 user", nil)
 	}
-	target, err := commands.loadTarget(ctx, actor, targetUserID, identityAdminTargetPolicy{requireAuth: true})
+	target, err := commands.loadTarget(ctx, actor, targetPublicID, identityAdminTargetPolicy{requireAuth: true})
 	if err != nil {
 		return err
 	}
@@ -140,11 +140,11 @@ func (commands *identityAdminCommands) SetRole(ctx context.Context, actor princi
 	return commands.demote(ctx, target.user.ID, target.authUserID)
 }
 
-func (commands *identityAdminCommands) Ban(ctx context.Context, actor principal.Principal, targetUserID int64, input IdentityAdminBanInput) error {
+func (commands *identityAdminCommands) Ban(ctx context.Context, actor principal.Principal, targetPublicID string, input IdentityAdminBanInput) error {
 	if input.ExpiresInDays < 0 {
 		return identityAdminError(IdentityAdminInvalid, "expires_in_days 不能小于 0", nil)
 	}
-	target, err := commands.loadTarget(ctx, actor, targetUserID, identityAdminTargetPolicy{rejectAdmins: true, requireAuth: true})
+	target, err := commands.loadTarget(ctx, actor, targetPublicID, identityAdminTargetPolicy{rejectAdmins: true, requireAuth: true})
 	if err != nil {
 		return err
 	}
@@ -178,8 +178,8 @@ func (commands *identityAdminCommands) Ban(ctx context.Context, actor principal.
 	})
 }
 
-func (commands *identityAdminCommands) Unban(ctx context.Context, actor principal.Principal, targetUserID int64) error {
-	target, err := commands.loadTarget(ctx, actor, targetUserID, identityAdminTargetPolicy{rejectAdmins: true, requireAuth: true})
+func (commands *identityAdminCommands) Unban(ctx context.Context, actor principal.Principal, targetPublicID string) error {
+	target, err := commands.loadTarget(ctx, actor, targetPublicID, identityAdminTargetPolicy{rejectAdmins: true, requireAuth: true})
 	if err != nil {
 		return err
 	}
@@ -208,8 +208,8 @@ func (commands *identityAdminCommands) Unban(ctx context.Context, actor principa
 	})
 }
 
-func (commands *identityAdminCommands) RevokeSessions(ctx context.Context, actor principal.Principal, targetUserID int64) error {
-	target, err := commands.loadTarget(ctx, actor, targetUserID, identityAdminTargetPolicy{rejectAdmins: true, requireAuth: true})
+func (commands *identityAdminCommands) RevokeSessions(ctx context.Context, actor principal.Principal, targetPublicID string) error {
+	target, err := commands.loadTarget(ctx, actor, targetPublicID, identityAdminTargetPolicy{rejectAdmins: true, requireAuth: true})
 	if err != nil {
 		return err
 	}
@@ -219,8 +219,8 @@ func (commands *identityAdminCommands) RevokeSessions(ctx context.Context, actor
 	return nil
 }
 
-func (commands *identityAdminCommands) Delete(ctx context.Context, actor principal.Principal, targetUserID int64) error {
-	target, err := commands.loadTarget(ctx, actor, targetUserID, identityAdminTargetPolicy{rejectAdmins: true})
+func (commands *identityAdminCommands) Delete(ctx context.Context, actor principal.Principal, targetPublicID string) error {
+	target, err := commands.loadTarget(ctx, actor, targetPublicID, identityAdminTargetPolicy{rejectAdmins: true})
 	if err != nil {
 		return err
 	}
@@ -284,23 +284,17 @@ func (commands *identityAdminCommands) reconcileAuthRole(ctx context.Context, au
 	return nil
 }
 
-func (commands *identityAdminCommands) loadTarget(ctx context.Context, actor principal.Principal, targetUserID int64, policy identityAdminTargetPolicy) (*identityAdminTarget, error) {
+func (commands *identityAdminCommands) loadTarget(ctx context.Context, actor principal.Principal, targetPublicID string, policy identityAdminTargetPolicy) (*identityAdminTarget, error) {
 	if !actor.IsValid() {
 		return nil, identityAdminError(IdentityAdminInvalid, "管理员身份无效", nil)
 	}
 	if !actor.IsAdmin() {
 		return nil, identityAdminError(IdentityAdminForbidden, "需要管理员权限", nil)
 	}
-	if targetUserID <= 0 {
-		return nil, identityAdminError(IdentityAdminInvalid, "无效的用户ID", nil)
-	}
-	if actor.UserID() == targetUserID {
-		return nil, identityAdminError(IdentityAdminInvalid, "不能操作当前登录管理员自己", nil)
-	}
 	if commands == nil || commands.users == nil {
 		return nil, identityAdminError(IdentityAdminUnavailable, "用户服务未配置", errors.New("identity admin user service not configured"))
 	}
-	target, err := commands.users.GetByID(ctx, targetUserID)
+	target, err := commands.users.GetByPublicID(ctx, targetPublicID)
 	if err != nil {
 		if database.IsNotFound(err) {
 			return nil, identityAdminError(IdentityAdminTargetNotFound, "用户不存在", err)
@@ -309,6 +303,9 @@ func (commands *identityAdminCommands) loadTarget(ctx context.Context, actor pri
 	}
 	if target == nil || target.ID <= 0 {
 		return nil, identityAdminError(IdentityAdminTargetNotFound, "用户不存在", nil)
+	}
+	if actor.UserID() == target.ID {
+		return nil, identityAdminError(IdentityAdminInvalid, "不能操作当前登录管理员自己", nil)
 	}
 	if policy.rejectAdmins && normalizeAdminRole(target.Role) == principal.RoleAdmin.String() {
 		return nil, identityAdminError(IdentityAdminInvalid, "不能操作管理员账号", nil)

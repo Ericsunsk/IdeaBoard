@@ -43,9 +43,10 @@ function createContractAuthAPI(): Pick<InternalAuthAPI, "getSession"> {
       return {
         user: {
           id: authUserID,
-          username: "alice",
+          name: "Alice",
           email: "alice@example.com",
           emailVerified: true,
+          image: "https://lh3.googleusercontent.com/avatar",
         },
       };
     },
@@ -57,7 +58,7 @@ function createContractCommands(): AuthInternalCommands {
     ensureIdentity: async (input) => {
       assert.deepEqual(input, {
         email: "alice@example.com",
-        username: "alice",
+        displayName: "Alice",
         password: "secret1234",
         allowExisting: false,
         role: "admin",
@@ -67,7 +68,7 @@ function createContractCommands(): AuthInternalCommands {
         data: {
           user: {
             auth_user_id: authUserID,
-            username: "alice",
+            display_name: "Alice",
             email: "alice@example.com",
             claim_identity: "alice@example.com",
             claim_identity_kind: "canonical_email",

@@ -9,6 +9,7 @@ import (
 
 	"ideaboard/api/internal/platform/adminaction"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
@@ -40,7 +41,9 @@ type ReconciliationRun struct {
 	ID                  int64                   `json:"id"`
 	Status              ReconciliationRunStatus `json:"status"`
 	Trigger             ReconciliationTrigger   `json:"trigger"`
-	RequestedBy         *int64                  `json:"requested_by,omitempty"`
+	RequestedBy         *int64                  `json:"-"`
+	RequestedByPublicID *uuid.UUID              `json:"requested_by_public_id,omitempty"`
+	RequestedByName     string                  `json:"requested_by_display_name,omitempty"`
 	Reason              string                  `json:"reason,omitempty"`
 	ScheduledFor        *time.Time              `json:"scheduled_for,omitempty"`
 	FindingCount        int64                   `json:"finding_count"`
@@ -54,21 +57,23 @@ type ReconciliationRun struct {
 }
 
 type ReconciliationFinding struct {
-	ID              int64                       `json:"id"`
-	Fingerprint     string                      `json:"fingerprint"`
-	FindingType     ReconciliationFindingType   `json:"finding_type"`
-	Severity        ReconciliationSeverity      `json:"severity"`
-	Risk            ReconciliationRisk          `json:"risk"`
-	WalletUserID    *int64                      `json:"wallet_user_id,omitempty"`
-	SubjectType     string                      `json:"subject_type"`
-	SubjectID       string                      `json:"subject_id"`
-	Details         map[string]any              `json:"details"`
-	Status          ReconciliationFindingStatus `json:"status"`
-	Isolated        bool                        `json:"isolated"`
-	OccurrenceCount int64                       `json:"occurrence_count"`
-	FirstSeenAt     time.Time                   `json:"first_seen_at"`
-	LastSeenAt      time.Time                   `json:"last_seen_at"`
-	ResolvedAt      *time.Time                  `json:"resolved_at,omitempty"`
+	ID                int64                       `json:"id"`
+	Fingerprint       string                      `json:"fingerprint"`
+	FindingType       ReconciliationFindingType   `json:"finding_type"`
+	Severity          ReconciliationSeverity      `json:"severity"`
+	Risk              ReconciliationRisk          `json:"risk"`
+	WalletUserID      *int64                      `json:"-"`
+	WalletPublicID    *uuid.UUID                  `json:"wallet_public_id,omitempty"`
+	WalletDisplayName string                      `json:"wallet_display_name,omitempty"`
+	SubjectType       string                      `json:"subject_type"`
+	SubjectID         string                      `json:"subject_id"`
+	Details           map[string]any              `json:"details"`
+	Status            ReconciliationFindingStatus `json:"status"`
+	Isolated          bool                        `json:"isolated"`
+	OccurrenceCount   int64                       `json:"occurrence_count"`
+	FirstSeenAt       time.Time                   `json:"first_seen_at"`
+	LastSeenAt        time.Time                   `json:"last_seen_at"`
+	ResolvedAt        *time.Time                  `json:"resolved_at,omitempty"`
 }
 
 type ReconciliationRunStatus string

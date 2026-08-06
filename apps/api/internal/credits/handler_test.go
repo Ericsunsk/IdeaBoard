@@ -2,6 +2,7 @@ package credits
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -123,8 +124,8 @@ func TestAdminCreditHandlersRejectUserPrincipal(t *testing.T) {
 		run    gin.HandlerFunc
 	}{
 		{name: "grant", method: http.MethodPost, path: "/grants", route: "/grants", run: NewHandler(&adminHandlerServiceStub{}).Grant},
-		{name: "wallet", method: http.MethodGet, path: "/wallets/1", route: "/wallets/:user_id", run: NewHandler(&adminHandlerServiceStub{}).GetWallet},
-		{name: "ledger", method: http.MethodGet, path: "/wallets/1/ledger", route: "/wallets/:user_id/ledger", run: NewHandler(&adminHandlerServiceStub{}).ListLedger},
+		{name: "wallet", method: http.MethodGet, path: "/wallets/00000000-0000-4000-8000-000000000001", route: "/wallets/:public_id", run: NewHandler(&adminHandlerServiceStub{}).GetWallet},
+		{name: "ledger", method: http.MethodGet, path: "/wallets/00000000-0000-4000-8000-000000000001/ledger", route: "/wallets/:public_id/ledger", run: NewHandler(&adminHandlerServiceStub{}).ListLedger},
 		{name: "start reconciliation", method: http.MethodPost, path: "/runs", route: "/runs", run: NewHandler(&adminHandlerServiceStub{}).StartReconciliation},
 		{name: "list reconciliation runs", method: http.MethodGet, path: "/runs", route: "/runs", run: NewHandler(&adminHandlerServiceStub{}).ListReconciliationRuns},
 		{name: "get reconciliation run", method: http.MethodGet, path: "/runs/1", route: "/runs/:run_id", run: NewHandler(&adminHandlerServiceStub{}).GetReconciliationRun},
@@ -156,8 +157,8 @@ func TestAdminCreditReadHandlersRejectMissingPrincipal(t *testing.T) {
 		route string
 		run   gin.HandlerFunc
 	}{
-		{name: "wallet", path: "/wallets/1", route: "/wallets/:user_id", run: handler.GetWallet},
-		{name: "ledger", path: "/wallets/1/ledger", route: "/wallets/:user_id/ledger", run: handler.ListLedger},
+		{name: "wallet", path: "/wallets/00000000-0000-4000-8000-000000000001", route: "/wallets/:public_id", run: handler.GetWallet},
+		{name: "ledger", path: "/wallets/00000000-0000-4000-8000-000000000001/ledger", route: "/wallets/:public_id/ledger", run: handler.ListLedger},
 		{name: "list reconciliation runs", path: "/runs", route: "/runs", run: handler.ListReconciliationRuns},
 		{name: "get reconciliation run", path: "/runs/1", route: "/runs/:run_id", run: handler.GetReconciliationRun},
 		{name: "list global reconciliation findings", path: "/findings?status=open", route: "/findings", run: handler.ListGlobalReconciliationFindings},
@@ -214,5 +215,15 @@ func TestWriteCreditErrorUsesIdeaDisplayName(t *testing.T) {
 	}
 	if body := recorder.Body.String(); !strings.Contains(body, `"msg":"Idea不足"`) {
 		t.Fatalf("response=%s, want Idea display name", body)
+	}
+}
+
+func TestCreditActorJSONOmitsInternalIdentity(t *testing.T) {
+	payload, err := json.Marshal(Actor{Type: ActorAdmin, ID: "7"})
+	if err != nil {
+		t.Fatalf("marshal actor: %v", err)
+	}
+	if got := string(payload); got != `{"type":"admin"}` {
+		t.Fatalf("public actor = %s, want type only", got)
 	}
 }

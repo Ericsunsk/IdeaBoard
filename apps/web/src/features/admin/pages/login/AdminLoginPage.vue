@@ -20,17 +20,20 @@
       <template #content>
         <form class="flex flex-col gap-4" novalidate @submit.prevent="handleLogin">
           <label class="flex flex-col gap-2 text-xs font-bold text-admin-text-2">
-            <span>Email 或 username</span>
+            <span>Email</span>
             <IconField>
               <InputIcon>
                 <User class="h-4 w-4 text-admin-text-3" />
               </InputIcon>
               <InputText
-                v-model="formValue.identifier"
-                autocomplete="username"
+                id="admin-login-email"
+                v-model="formValue.email"
+                name="email"
+                type="email"
+                autocomplete="email"
                 class="!min-h-11"
                 fluid
-                placeholder="admin@example.com / admin"
+                placeholder="admin@example.com"
               />
             </IconField>
           </label>
@@ -40,7 +43,11 @@
             <Password
               v-model="formValue.password"
               autocomplete="current-password"
-              :input-props="{ autocomplete: 'current-password' }"
+              :input-props="{
+                id: 'admin-login-password',
+                name: 'password',
+                autocomplete: 'current-password',
+              }"
               toggle-mask
               :feedback="false"
               class="w-full"
@@ -115,7 +122,7 @@ const loginCardClass =
 const loading = ref(false)
 const formError = ref('')
 const formValue = ref({
-  identifier: '',
+  email: '',
   password: '',
 })
 const loginCardPt = {
@@ -155,16 +162,16 @@ function goUserLogin() {
 
 async function handleLogin() {
   formError.value = ''
-  const identifier = formValue.value.identifier.trim()
+  const email = formValue.value.email.trim()
   const password = formValue.value.password
-  if (!identifier || !password) {
-    formError.value = !identifier ? '请输入 Email 或 username' : '请输入密码'
+  if (!email || !password) {
+    formError.value = !email ? '请输入 Email' : '请输入密码'
     return
   }
 
   try {
     loading.value = true
-    await userStore.login(identifier, password)
+    await userStore.login(email, password)
     if (userStore.isAdmin) {
       feedback.succeeded()
       await router.replace(resolveAdminRedirectPath())

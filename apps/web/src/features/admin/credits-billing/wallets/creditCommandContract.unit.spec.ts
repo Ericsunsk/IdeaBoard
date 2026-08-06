@@ -2,18 +2,19 @@ import { describe, expect, it } from 'vitest'
 import { buildAdminCreditCommandRequest, validateAdminCreditCommand } from './creditCommandContract'
 
 describe('Admin Credit command contract', () => {
+  const publicId = '11111111-1111-4111-8111-111111111111'
   it('builds auditable Grant and Deduction requests with independent idempotency identities', () => {
     const grant = buildAdminCreditCommandRequest(
-      { kind: 'grant', userId: 12, amountCredits: 20, reason: ' 活动补偿 ' },
+      { kind: 'grant', userPublicId: publicId, amountCredits: 20, reason: ' 活动补偿 ' },
       () => 'grant-operation',
     )
     const deduction = buildAdminCreditCommandRequest(
-      { kind: 'deduction', userId: 12, amountCredits: 3, reason: '误发回收' },
+      { kind: 'deduction', userPublicId: publicId, amountCredits: 3, reason: '误发回收' },
       () => 'deduct-operation',
     )
 
     expect(grant).toEqual({
-      user_id: 12,
+      user_public_id: publicId,
       amount_credits: 20,
       reason: '活动补偿',
       idempotency_key: 'admin-ui:grant:grant-operation',
@@ -26,7 +27,7 @@ describe('Admin Credit command contract', () => {
     expect(
       validateAdminCreditCommand({
         kind: 'refund',
-        userId: 12,
+        userPublicId: publicId,
         amountCredits: 6,
         reason: '服务失败',
         chargeTransactionId: 'charge-1',
@@ -37,7 +38,7 @@ describe('Admin Credit command contract', () => {
     expect(
       validateAdminCreditCommand({
         kind: 'refund',
-        userId: 12,
+        userPublicId: publicId,
         amountCredits: 5,
         reason: '服务失败',
         remainingRefundableCredits: 5,
@@ -48,7 +49,7 @@ describe('Admin Credit command contract', () => {
       buildAdminCreditCommandRequest(
         {
           kind: 'refund',
-          userId: 12,
+          userPublicId: publicId,
           amountCredits: 5,
           reason: '服务失败',
           chargeTransactionId: 'charge-1',
@@ -66,7 +67,7 @@ describe('Admin Credit command contract', () => {
     expect(
       validateAdminCreditCommand({
         kind: 'grant',
-        userId: 12,
+        userPublicId: publicId,
         amountCredits: 1.5,
         reason: ' ',
       }),

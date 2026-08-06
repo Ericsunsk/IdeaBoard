@@ -71,7 +71,7 @@ describe('resolveAuthFailureAction', () => {
     expect(
       resolveAuthFailureAction({
         status: 401,
-        requestUrl: '/api/auth/sign-in/username',
+        requestUrl: '/api/auth/sign-in/email',
         currentPathname: '/user/login',
         currentFullPath: '/user/login',
       }),

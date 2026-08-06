@@ -4,6 +4,8 @@ import {
   normalizeCanonicalEmail,
 } from '../../../shared/auth/client'
 import { resolveAuthUrl } from '../../../shared/config/runtimeUrls'
+import { USER_AUTH_CALLBACK_PATH } from '../../../shared/constants/routePaths'
+import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
 
 async function requestAuthEndpoint(
   path: string,
@@ -19,29 +21,22 @@ async function requestAuthEndpoint(
 }
 
 export const authTransport = {
-  async login(identifier: string, password: string): Promise<void> {
-    const normalizedIdentifier = identifier.trim()
-    const result = normalizedIdentifier.includes('@')
-      ? await authClient.signIn.email({
-          email: normalizeCanonicalEmail(normalizedIdentifier),
-          password,
-        })
-      : await authClient.signIn.username({
-          username: normalizedIdentifier.toLowerCase(),
-          password,
-        })
+  async login(email: string, password: string): Promise<void> {
+    const result = await authClient.signIn.email({
+      email: normalizeCanonicalEmail(email),
+      password,
+    })
     if (result?.error) {
       throw new Error(extractBetterAuthErrorMessage(result.error, '登录失败'))
     }
   },
 
-  async register(email: string, username: string, password: string): Promise<void> {
+  async register(email: string, displayName: string, password: string): Promise<void> {
     const canonicalEmail = normalizeCanonicalEmail(email)
-    const normalizedUsername = username.trim()
+    const normalizedDisplayName = displayName.trim()
     const result = await authClient.signUp.email({
       email: canonicalEmail,
-      name: normalizedUsername,
-      username: normalizedUsername,
+      name: normalizedDisplayName,
       password,
     })
     if (result?.error) {
@@ -49,6 +44,39 @@ export const authTransport = {
     }
     if (!result?.data?.user) {
       throw new Error('注册成功，但服务端未返回用户身份')
+    }
+  },
+
+  async signInWithGoogle(): Promise<void> {
+    const currentURL = new URL(window.location.href)
+    const callbackURL = new URL(USER_AUTH_CALLBACK_PATH, window.location.origin)
+    const redirectPath = currentURL.searchParams.get('redirect')?.trim() ?? ''
+    if (isSafeInternalRedirectPath(redirectPath)) {
+      callbackURL.searchParams.set('redirect', redirectPath)
+    }
+    const result = await authClient.signIn.social({
+      provider: 'google',
+      callbackURL: callbackURL.toString(),
+      errorCallbackURL: callbackURL.toString(),
+    })
+    if (result?.error) {
+      throw new Error(extractBetterAuthErrorMessage(result.error, 'Google 登录失败'))
+    }
+  },
+
+  async getCapabilities(): Promise<{ social: { google: boolean } }> {
+    try {
+      const response = await fetch(resolveAuthUrl('/api/auth/capabilities'), {
+        credentials: 'include',
+        cache: 'no-store',
+      })
+      if (!response.ok) return { social: { google: false } }
+      const payload = (await response.json().catch(() => null)) as {
+        data?: { social?: { google?: unknown } }
+      } | null
+      return { social: { google: payload?.data?.social?.google === true } }
+    } catch {
+      return { social: { google: false } }
     }
   },
 

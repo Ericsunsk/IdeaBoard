@@ -10,7 +10,11 @@ import (
 	"ideaboard/api/internal/identity/autherrors"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/database"
+
+	"github.com/google/uuid"
 )
+
+const identityAdminTargetPublicID = "00000000-0000-0000-0000-000000000042"
 
 type fakeIdentityAdminUsers struct {
 	target       *User
@@ -22,7 +26,7 @@ type fakeIdentityAdminUsers struct {
 	deleteCalls  int
 }
 
-func (fake *fakeIdentityAdminUsers) GetByID(_ context.Context, _ int64) (*User, error) {
+func (fake *fakeIdentityAdminUsers) GetByPublicID(_ context.Context, _ string) (*User, error) {
 	if fake.getErr != nil {
 		return nil, fake.getErr
 	}
@@ -91,7 +95,7 @@ func TestIdentityAdminCommandsRoleOrderingAndRecovery(t *testing.T) {
 	t.Run("promotion updates Auth before local role", func(t *testing.T) {
 		commands, _, _, events := newIdentityAdminCommandFixture("user", 1)
 
-		if err := commands.SetRole(context.Background(), identityAdminActor(t), 42, "admin"); err != nil {
+		if err := commands.SetRole(context.Background(), identityAdminActor(t), identityAdminTargetPublicID, "admin"); err != nil {
 			t.Fatalf("promote user: %v", err)
 		}
 		assertIdentityAdminEvents(t, events, "auth-role:admin", "local-role:admin")
@@ -101,7 +105,7 @@ func TestIdentityAdminCommandsRoleOrderingAndRecovery(t *testing.T) {
 		commands, _, auth, events := newIdentityAdminCommandFixture("user", 1)
 		auth.roleErrors = []error{autherrors.ErrAuthUserNotFound}
 
-		err := commands.SetRole(context.Background(), identityAdminActor(t), 42, "admin")
+		err := commands.SetRole(context.Background(), identityAdminActor(t), identityAdminTargetPublicID, "admin")
 		assertIdentityAdminErrorKind(t, err, IdentityAdminAuthIdentityNotFound)
 		assertIdentityAdminEvents(t, events, "auth-role:admin")
 	})
@@ -110,7 +114,7 @@ func TestIdentityAdminCommandsRoleOrderingAndRecovery(t *testing.T) {
 		commands, users, _, events := newIdentityAdminCommandFixture("user", 1)
 		users.roleErrors = []error{errors.New("database unavailable")}
 
-		err := commands.SetRole(context.Background(), identityAdminActor(t), 42, "admin")
+		err := commands.SetRole(context.Background(), identityAdminActor(t), identityAdminTargetPublicID, "admin")
 		assertIdentityAdminErrorKind(t, err, IdentityAdminBusinessFailure)
 		assertIdentityAdminEvents(t, events, "auth-role:admin", "local-role:admin", "auth-role:user")
 	})
@@ -120,13 +124,13 @@ func TestIdentityAdminCommandsRoleOrderingAndRecovery(t *testing.T) {
 		users.roleErrors = []error{errors.New("database unavailable"), nil}
 		auth.roleErrors = []error{nil, errors.New("rollback unavailable"), nil}
 
-		err := commands.SetRole(context.Background(), identityAdminActor(t), 42, "admin")
+		err := commands.SetRole(context.Background(), identityAdminActor(t), identityAdminTargetPublicID, "admin")
 		assertIdentityAdminErrorKind(t, err, IdentityAdminReconciliationRequired)
 		var commandErr *IdentityAdminCommandError
 		if !errors.As(err, &commandErr) || commandErr.RollbackCause == nil {
 			t.Fatalf("rollback failure was not retained: %#v", err)
 		}
-		if err := commands.SetRole(context.Background(), identityAdminActor(t), 42, "admin"); err != nil {
+		if err := commands.SetRole(context.Background(), identityAdminActor(t), identityAdminTargetPublicID, "admin"); err != nil {
 			t.Fatalf("retry promotion: %v", err)
 		}
 		assertIdentityAdminEvents(t, events,
@@ -138,7 +142,7 @@ func TestIdentityAdminCommandsRoleOrderingAndRecovery(t *testing.T) {
 	t.Run("demotion updates local role before Auth", func(t *testing.T) {
 		commands, _, _, events := newIdentityAdminCommandFixture("admin", 1)
 
-		if err := commands.SetRole(context.Background(), identityAdminActor(t), 42, "user"); err != nil {
+		if err := commands.SetRole(context.Background(), identityAdminActor(t), identityAdminTargetPublicID, "user"); err != nil {
 			t.Fatalf("demote user: %v", err)
 		}
 		assertIdentityAdminEvents(t, events, "local-role:user", "auth-role:user")
@@ -148,7 +152,7 @@ func TestIdentityAdminCommandsRoleOrderingAndRecovery(t *testing.T) {
 		commands, users, _, events := newIdentityAdminCommandFixture("admin", 1)
 		users.roleErrors = []error{errors.New("database unavailable")}
 
-		err := commands.SetRole(context.Background(), identityAdminActor(t), 42, "user")
+		err := commands.SetRole(context.Background(), identityAdminActor(t), identityAdminTargetPublicID, "user")
 		assertIdentityAdminErrorKind(t, err, IdentityAdminBusinessFailure)
 		assertIdentityAdminEvents(t, events, "local-role:user")
 	})
@@ -157,9 +161,9 @@ func TestIdentityAdminCommandsRoleOrderingAndRecovery(t *testing.T) {
 		commands, _, auth, events := newIdentityAdminCommandFixture("admin", 1)
 		auth.roleErrors = []error{autherrors.ErrAuthUserNotFound, nil}
 
-		err := commands.SetRole(context.Background(), identityAdminActor(t), 42, "user")
+		err := commands.SetRole(context.Background(), identityAdminActor(t), identityAdminTargetPublicID, "user")
 		assertIdentityAdminErrorKind(t, err, IdentityAdminAuthIdentityNotFound)
-		if err := commands.SetRole(context.Background(), identityAdminActor(t), 42, "user"); err != nil {
+		if err := commands.SetRole(context.Background(), identityAdminActor(t), identityAdminTargetPublicID, "user"); err != nil {
 			t.Fatalf("retry demotion: %v", err)
 		}
 		assertIdentityAdminEvents(t, events, "local-role:user", "auth-role:user", "auth-role:user")
@@ -169,9 +173,9 @@ func TestIdentityAdminCommandsRoleOrderingAndRecovery(t *testing.T) {
 		commands, _, auth, events := newIdentityAdminCommandFixture("admin", 1)
 		auth.roleErrors = []error{errors.New("Auth unavailable"), nil}
 
-		err := commands.SetRole(context.Background(), identityAdminActor(t), 42, "user")
+		err := commands.SetRole(context.Background(), identityAdminActor(t), identityAdminTargetPublicID, "user")
 		assertIdentityAdminErrorKind(t, err, IdentityAdminReconciliationRequired)
-		if err := commands.SetRole(context.Background(), identityAdminActor(t), 42, "user"); err != nil {
+		if err := commands.SetRole(context.Background(), identityAdminActor(t), identityAdminTargetPublicID, "user"); err != nil {
 			t.Fatalf("retry demotion: %v", err)
 		}
 		assertIdentityAdminEvents(t, events, "local-role:user", "auth-role:user", "auth-role:user")
@@ -182,7 +186,7 @@ func TestIdentityAdminCommandsBanAndUnbanRecovery(t *testing.T) {
 	t.Run("ban updates Auth before local status", func(t *testing.T) {
 		commands, _, _, events := newIdentityAdminCommandFixture("user", 1)
 
-		if err := commands.Ban(context.Background(), identityAdminActor(t), 42, IdentityAdminBanInput{Reason: "abuse", ExpiresInDays: 7}); err != nil {
+		if err := commands.Ban(context.Background(), identityAdminActor(t), identityAdminTargetPublicID, IdentityAdminBanInput{Reason: "abuse", ExpiresInDays: 7}); err != nil {
 			t.Fatalf("ban user: %v", err)
 		}
 		assertIdentityAdminEvents(t, events, "auth-ban", "local-status:0")
@@ -192,7 +196,7 @@ func TestIdentityAdminCommandsBanAndUnbanRecovery(t *testing.T) {
 		commands, _, auth, events := newIdentityAdminCommandFixture("user", 1)
 		auth.banErrors = []error{autherrors.ErrAuthUserNotFound}
 
-		err := commands.Ban(context.Background(), identityAdminActor(t), 42, IdentityAdminBanInput{})
+		err := commands.Ban(context.Background(), identityAdminActor(t), identityAdminTargetPublicID, IdentityAdminBanInput{})
 		assertIdentityAdminErrorKind(t, err, IdentityAdminAuthIdentityNotFound)
 		assertIdentityAdminEvents(t, events, "auth-ban")
 	})
@@ -201,9 +205,9 @@ func TestIdentityAdminCommandsBanAndUnbanRecovery(t *testing.T) {
 		commands, _, auth, events := newIdentityAdminCommandFixture("user", 1)
 		auth.banErrors = []error{errors.New("Auth unavailable"), nil}
 
-		err := commands.Ban(context.Background(), identityAdminActor(t), 42, IdentityAdminBanInput{})
+		err := commands.Ban(context.Background(), identityAdminActor(t), identityAdminTargetPublicID, IdentityAdminBanInput{})
 		assertIdentityAdminErrorKind(t, err, IdentityAdminAuthFailure)
-		if err := commands.Ban(context.Background(), identityAdminActor(t), 42, IdentityAdminBanInput{}); err != nil {
+		if err := commands.Ban(context.Background(), identityAdminActor(t), identityAdminTargetPublicID, IdentityAdminBanInput{}); err != nil {
 			t.Fatalf("retry ban after Auth failure: %v", err)
 		}
 		assertIdentityAdminEvents(t, events, "auth-ban", "auth-ban", "local-status:0")
@@ -213,9 +217,9 @@ func TestIdentityAdminCommandsBanAndUnbanRecovery(t *testing.T) {
 		commands, users, _, events := newIdentityAdminCommandFixture("user", 1)
 		users.statusErrors = []error{errors.New("wallet freeze failed"), nil}
 
-		err := commands.Ban(context.Background(), identityAdminActor(t), 42, IdentityAdminBanInput{})
+		err := commands.Ban(context.Background(), identityAdminActor(t), identityAdminTargetPublicID, IdentityAdminBanInput{})
 		assertIdentityAdminErrorKind(t, err, IdentityAdminBusinessFailure)
-		if err := commands.Ban(context.Background(), identityAdminActor(t), 42, IdentityAdminBanInput{}); err != nil {
+		if err := commands.Ban(context.Background(), identityAdminActor(t), identityAdminTargetPublicID, IdentityAdminBanInput{}); err != nil {
 			t.Fatalf("retry ban: %v", err)
 		}
 		assertIdentityAdminEvents(t, events, "auth-ban", "local-status:0", "auth-unban", "auth-ban", "local-status:0")
@@ -226,14 +230,14 @@ func TestIdentityAdminCommandsBanAndUnbanRecovery(t *testing.T) {
 		users.statusErrors = []error{errors.New("wallet freeze failed")}
 		auth.unbanErrors = []error{errors.New("Auth unavailable")}
 
-		err := commands.Ban(context.Background(), identityAdminActor(t), 42, IdentityAdminBanInput{})
+		err := commands.Ban(context.Background(), identityAdminActor(t), identityAdminTargetPublicID, IdentityAdminBanInput{})
 		assertIdentityAdminErrorKind(t, err, IdentityAdminReconciliationRequired)
 	})
 
 	t.Run("unban updates Auth before local status", func(t *testing.T) {
 		commands, _, _, events := newIdentityAdminCommandFixture("user", 0)
 
-		if err := commands.Unban(context.Background(), identityAdminActor(t), 42); err != nil {
+		if err := commands.Unban(context.Background(), identityAdminActor(t), identityAdminTargetPublicID); err != nil {
 			t.Fatalf("unban user: %v", err)
 		}
 		assertIdentityAdminEvents(t, events, "auth-unban", "local-status:1")
@@ -243,7 +247,7 @@ func TestIdentityAdminCommandsBanAndUnbanRecovery(t *testing.T) {
 		commands, _, auth, events := newIdentityAdminCommandFixture("user", 0)
 		auth.unbanErrors = []error{autherrors.ErrAuthUserNotFound}
 
-		err := commands.Unban(context.Background(), identityAdminActor(t), 42)
+		err := commands.Unban(context.Background(), identityAdminActor(t), identityAdminTargetPublicID)
 		assertIdentityAdminErrorKind(t, err, IdentityAdminAuthIdentityNotFound)
 		assertIdentityAdminEvents(t, events, "auth-unban")
 	})
@@ -252,9 +256,9 @@ func TestIdentityAdminCommandsBanAndUnbanRecovery(t *testing.T) {
 		commands, _, auth, events := newIdentityAdminCommandFixture("user", 0)
 		auth.unbanErrors = []error{errors.New("Auth unavailable"), nil}
 
-		err := commands.Unban(context.Background(), identityAdminActor(t), 42)
+		err := commands.Unban(context.Background(), identityAdminActor(t), identityAdminTargetPublicID)
 		assertIdentityAdminErrorKind(t, err, IdentityAdminAuthFailure)
-		if err := commands.Unban(context.Background(), identityAdminActor(t), 42); err != nil {
+		if err := commands.Unban(context.Background(), identityAdminActor(t), identityAdminTargetPublicID); err != nil {
 			t.Fatalf("retry unban after Auth failure: %v", err)
 		}
 		assertIdentityAdminEvents(t, events, "auth-unban", "auth-unban", "local-status:1")
@@ -264,9 +268,9 @@ func TestIdentityAdminCommandsBanAndUnbanRecovery(t *testing.T) {
 		commands, users, _, events := newIdentityAdminCommandFixture("user", 0)
 		users.statusErrors = []error{errors.New("wallet unfreeze failed"), nil}
 
-		err := commands.Unban(context.Background(), identityAdminActor(t), 42)
+		err := commands.Unban(context.Background(), identityAdminActor(t), identityAdminTargetPublicID)
 		assertIdentityAdminErrorKind(t, err, IdentityAdminBusinessFailure)
-		if err := commands.Unban(context.Background(), identityAdminActor(t), 42); err != nil {
+		if err := commands.Unban(context.Background(), identityAdminActor(t), identityAdminTargetPublicID); err != nil {
 			t.Fatalf("retry unban: %v", err)
 		}
 		assertIdentityAdminEvents(t, events, "auth-unban", "local-status:1", "auth-ban", "auth-unban", "local-status:1")
@@ -277,7 +281,7 @@ func TestIdentityAdminCommandsBanAndUnbanRecovery(t *testing.T) {
 		users.statusErrors = []error{errors.New("wallet unfreeze failed")}
 		auth.banErrors = []error{errors.New("Auth unavailable")}
 
-		err := commands.Unban(context.Background(), identityAdminActor(t), 42)
+		err := commands.Unban(context.Background(), identityAdminActor(t), identityAdminTargetPublicID)
 		assertIdentityAdminErrorKind(t, err, IdentityAdminReconciliationRequired)
 	})
 }
@@ -287,9 +291,9 @@ func TestIdentityAdminCommandsRevokeSessionsIsRetryable(t *testing.T) {
 		commands, _, auth, events := newIdentityAdminCommandFixture("user", 1)
 		auth.revokeErrors = []error{errors.New("Auth unavailable"), nil}
 
-		err := commands.RevokeSessions(context.Background(), identityAdminActor(t), 42)
+		err := commands.RevokeSessions(context.Background(), identityAdminActor(t), identityAdminTargetPublicID)
 		assertIdentityAdminErrorKind(t, err, IdentityAdminAuthFailure)
-		if err := commands.RevokeSessions(context.Background(), identityAdminActor(t), 42); err != nil {
+		if err := commands.RevokeSessions(context.Background(), identityAdminActor(t), identityAdminTargetPublicID); err != nil {
 			t.Fatalf("retry revoke sessions: %v", err)
 		}
 		assertIdentityAdminEvents(t, events, "auth-revoke", "auth-revoke")
@@ -299,7 +303,7 @@ func TestIdentityAdminCommandsRevokeSessionsIsRetryable(t *testing.T) {
 		commands, _, auth, events := newIdentityAdminCommandFixture("user", 1)
 		auth.revokeErrors = []error{autherrors.ErrAuthUserNotFound}
 
-		err := commands.RevokeSessions(context.Background(), identityAdminActor(t), 42)
+		err := commands.RevokeSessions(context.Background(), identityAdminActor(t), identityAdminTargetPublicID)
 		assertIdentityAdminErrorKind(t, err, IdentityAdminAuthIdentityNotFound)
 		assertIdentityAdminEvents(t, events, "auth-revoke")
 	})
@@ -309,7 +313,7 @@ func TestIdentityAdminCommandsDeleteReportsUnsettledPaymentConflict(t *testing.T
 	commands, users, _, events := newIdentityAdminCommandFixture("user", 1)
 	users.deleteErrors = []error{ErrUserDeletionBlockedByPaymentState}
 
-	err := commands.Delete(context.Background(), identityAdminActor(t), 42)
+	err := commands.Delete(context.Background(), identityAdminActor(t), identityAdminTargetPublicID)
 	assertIdentityAdminErrorKind(t, err, IdentityAdminConflict)
 	assertIdentityAdminEvents(t, events, "local-delete")
 }
@@ -335,7 +339,7 @@ func TestIdentityAdminCommandsOwnTargetPolicy(t *testing.T) {
 			if tt.mutate != nil {
 				tt.mutate(users)
 			}
-			err := commands.Ban(context.Background(), tt.actor(t), 42, IdentityAdminBanInput{})
+			err := commands.Ban(context.Background(), tt.actor(t), identityAdminTargetPublicID, IdentityAdminBanInput{})
 			assertIdentityAdminErrorKind(t, err, tt.kind)
 		})
 	}
@@ -345,7 +349,7 @@ func newIdentityAdminCommandFixture(role string, status int16) (IdentityAdminCom
 	authUserID := "auth-user-42"
 	events := &[]string{}
 	users := &fakeIdentityAdminUsers{
-		target: &User{ID: 42, Username: "target", AuthUserID: &authUserID, Role: role, Status: status},
+		target: &User{ID: 42, PublicID: uuid.MustParse(identityAdminTargetPublicID), DisplayName: "target", AuthUserID: &authUserID, Role: role, Status: status},
 		events: events,
 	}
 	auth := &fakeIdentityAdminAuth{events: events}
@@ -354,7 +358,7 @@ func newIdentityAdminCommandFixture(role string, status int16) (IdentityAdminCom
 
 func identityAdminActor(t *testing.T) principal.Principal {
 	t.Helper()
-	actor, err := principal.New(99, "auth-admin-99", "admin", principal.RoleAdmin.String())
+	actor, err := principal.New(99, "auth-admin-99", principal.RoleAdmin.String())
 	if err != nil {
 		t.Fatalf("create admin principal: %v", err)
 	}
@@ -363,7 +367,7 @@ func identityAdminActor(t *testing.T) principal.Principal {
 
 func identityUserActor(t *testing.T) principal.Principal {
 	t.Helper()
-	actor, err := principal.New(98, "auth-user-98", "user", principal.RoleUser.String())
+	actor, err := principal.New(98, "auth-user-98", principal.RoleUser.String())
 	if err != nil {
 		t.Fatalf("create user principal: %v", err)
 	}
@@ -372,7 +376,7 @@ func identityUserActor(t *testing.T) principal.Principal {
 
 func identitySelfAdminActor(t *testing.T) principal.Principal {
 	t.Helper()
-	actor, err := principal.New(42, "auth-admin-42", "self-admin", principal.RoleAdmin.String())
+	actor, err := principal.New(42, "auth-admin-42", principal.RoleAdmin.String())
 	if err != nil {
 		t.Fatalf("create self admin principal: %v", err)
 	}

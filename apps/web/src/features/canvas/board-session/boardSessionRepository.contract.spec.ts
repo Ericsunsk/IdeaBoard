@@ -62,9 +62,9 @@ describe('createBoardSessionRepository', () => {
     localStorage.clear()
     clearStoredAuth()
     setStoredAuth({
-      id: 1,
-      uid: 'ABC123',
-      username: 'tester',
+      public_id: '00000000-0000-0000-0000-000000000001',
+      display_name: 'tester',
+      storage_namespace: 'ABC123',
       avatar: '',
       role: 'user',
       status: 1,
@@ -190,7 +190,7 @@ describe('createBoardSessionRepository', () => {
   it('rejects older local state instead of normalizing across schema versions', async () => {
     const board = createCanvasBoard('Older Local Snapshot')
     localStorage.setItem(
-      'ideaboard.canvas.boardStates.v2.uid_ABC123',
+      'ideaboard.canvas.boardStates.v2.public_00000000-0000-0000-0000-000000000001',
       JSON.stringify({
         [board.id]: {
           schemaVersion: CANVAS_BOARD_STATE_SCHEMA_VERSION - 1,
@@ -238,7 +238,7 @@ describe('createBoardSessionRepository', () => {
   it('rejects invalid local state with recoverable validation context instead of returning an empty session snapshot', async () => {
     const board = createCanvasBoard('Invalid Local Snapshot')
     localStorage.setItem(
-      'ideaboard.canvas.boardStates.v2.uid_ABC123',
+      'ideaboard.canvas.boardStates.v2.public_00000000-0000-0000-0000-000000000001',
       JSON.stringify({
         [board.id]: {
           ...makeCanvasBoardState(),

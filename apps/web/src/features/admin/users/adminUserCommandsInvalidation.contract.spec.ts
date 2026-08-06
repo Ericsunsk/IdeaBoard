@@ -65,19 +65,19 @@ describe('admin user command query invalidation', () => {
     const harness = createHarness()
     const commands = harness.commands
 
-    commands.openUserActionMenu(makeUser({ id: 1, status: 1, username: 'alice' }))
+    commands.openUserActionMenu(makeUser({ publicId: "user-1", status: 1, displayName: 'alice' }))
     commands.handleActionSelect('status')
     await commands.confirmBanUser()
 
-    commands.openUserActionMenu(makeUser({ id: 2, status: 0, username: 'bob' }))
+    commands.openUserActionMenu(makeUser({ publicId: "user-2", status: 0, displayName: 'bob' }))
     commands.handleActionSelect('status')
     await harness.acceptLastConfirm()
 
-    commands.openUserActionMenu(makeUser({ id: 3, role: 'user', username: 'cara' }))
+    commands.openUserActionMenu(makeUser({ publicId: "user-3", role: 'user', displayName: 'cara' }))
     commands.handleActionSelect('role')
     await harness.acceptLastConfirm()
 
-    commands.openUserActionMenu(makeUser({ id: 4, role: 'user', username: 'dana' }))
+    commands.openUserActionMenu(makeUser({ publicId: "user-4", role: 'user', displayName: 'dana' }))
     commands.handleActionSelect('delete')
     await harness.acceptLastConfirm()
 
@@ -145,12 +145,10 @@ function createAdminUsersFeedback() {
 
 function makeUser(overrides: Partial<AdminUserCommandTarget> = {}): AdminUserCommandTarget {
   return {
-    id: 1,
-    uid: 'user-1',
-    username: 'user',
+    publicId: 'user-1',
+    displayName: 'user',
     role: 'user',
     status: 1,
-    authUserId: 'auth-1',
     ...overrides,
   }
 }

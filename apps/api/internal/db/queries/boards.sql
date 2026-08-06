@@ -86,7 +86,7 @@ DELETE FROM board_share_tokens
 WHERE board_id = sqlc.arg(board_id);
 
 -- name: ListBoardMembers :many
-SELECT m.user_id, u.storage_uid AS member_uid, u.username, m.role
+SELECT m.user_id, u.public_id, u.display_name, m.role
 FROM board_members AS m
 INNER JOIN users AS u ON u.id = m.user_id
 WHERE m.board_id = sqlc.arg(board_id)

@@ -4,9 +4,19 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { User } from './user'
 
-export type AdminUserListItem = User & {
+export interface AdminUserListItem {
+  public_id: string
+  /**
+   * @minLength 1
+   * @maxLength 100
+   */
+  display_name: string
+  avatar?: string
+  role: string
+  status: number
+  created_at: string
+  updated_at: string
   /**
    * @minimum 0
    * @maximum 9000000000000000

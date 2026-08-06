@@ -27,10 +27,10 @@ type AsyncMutation<TInput> = {
 type AdminUserCommandDependencies = {
   mutations?: Partial<{
     banUser: AsyncMutation<BanAdminUserInput>
-    unbanUser: AsyncMutation<number>
-    revokeSessions: AsyncMutation<number>
+    unbanUser: AsyncMutation<string>
+    revokeSessions: AsyncMutation<string>
     updateRole: AsyncMutation<UpdateAdminUserRoleInput>
-    deleteUser: AsyncMutation<number>
+    deleteUser: AsyncMutation<string>
   }>
   sessionCommands?: AdminUserSessionCommands
 }
@@ -38,13 +38,13 @@ type AdminUserCommandDependencies = {
 type AdminUserMutations = Required<NonNullable<AdminUserCommandDependencies['mutations']>>
 
 type BanAdminUserInput = {
-  id: number
+  publicId: string
   reason?: string
   expires_in_days?: number
 }
 
 type UpdateAdminUserRoleInput = {
-  id: number
+  publicId: string
   role: 'admin' | 'user'
 }
 
@@ -118,7 +118,7 @@ export function useAdminUserCommands(
   })
   const banModalDescription = computed(() =>
     banUserContext.value
-      ? `您即将对用户 ${banUserContext.value.username} 实施强制访问限制。`
+      ? `您即将对用户 ${banUserContext.value.displayName} 实施强制访问限制。`
       : '请选择用户后再配置访问限制。',
   )
 
@@ -182,12 +182,12 @@ export function useAdminUserCommands(
 
     options.confirm.request({
       title: '确认解除封禁',
-      message: `确定要恢复用户 ${row.username} 的访问权限吗？`,
+      message: `确定要恢复用户 ${row.displayName} 的访问权限吗？`,
       confirmLabel: '确认解封',
       intent: 'warn',
       onConfirm: async () => {
         try {
-          await unbanUserMutation.mutateAsync(row.id)
+          await unbanUserMutation.mutateAsync(row.publicId)
           options.feedback.unbanSucceeded()
         } catch (error) {
           options.feedback.unbanFailed(error)
@@ -202,11 +202,11 @@ export function useAdminUserCommands(
     banFormLoading.value = true
     try {
       await banUserMutation.mutateAsync({
-        id: row.id,
+        publicId: row.publicId,
         reason: banForm.value.reason || undefined,
         expires_in_days: banForm.value.expiresInDays || undefined,
       })
-      options.feedback.banSucceeded(row.username)
+      options.feedback.banSucceeded(row.displayName)
       showBanModal.value = false
       banUserContext.value = null
     } catch (error) {
@@ -217,18 +217,14 @@ export function useAdminUserCommands(
   }
 
   function handleRevokeSessions(row: AdminUserCommandTarget) {
-    if (!row.authUserId) {
-      options.feedback.missingAuthUserForSessionRevoke()
-      return
-    }
     options.confirm.request({
       title: '确认踢下线',
-      message: `将强制吊销账号 ${row.username} 的所有活跃会话，是否继续？`,
+      message: `将强制吊销账号 ${row.displayName} 的所有活跃会话，是否继续？`,
       confirmLabel: '确认',
       intent: 'warn',
       onConfirm: async () => {
         try {
-          await revokeUserSessionsMutation.mutateAsync(row.id)
+          await revokeUserSessionsMutation.mutateAsync(row.publicId)
           options.feedback.revokeSessionsSucceeded()
         } catch (error) {
           options.feedback.revokeSessionsFailed(error)
@@ -238,13 +234,9 @@ export function useAdminUserCommands(
   }
 
   async function handleImpersonate(row: AdminUserCommandTarget) {
-    if (!row.authUserId) {
-      options.feedback.missingAuthUserForImpersonation()
-      return
-    }
     try {
-      await sessionCommands.startImpersonation(row.authUserId)
-      options.feedback.impersonationStarted(row.username)
+      await sessionCommands.startImpersonation(row.publicId)
+      options.feedback.impersonationStarted(row.displayName)
     } catch (error: unknown) {
       options.feedback.impersonationFailed(error)
     }
@@ -258,12 +250,12 @@ export function useAdminUserCommands(
 
     options.confirm.request({
       title: '危险操作：彻底注销',
-      message: `确定要彻底删除用户 ${row.username} 吗？此操作将清除该用户在 Auth 及业务数据库中的所有数据，不可撤销！`,
+      message: `确定要彻底删除用户 ${row.displayName} 吗？此操作将清除该用户在 Auth 及业务数据库中的所有数据，不可撤销！`,
       confirmLabel: '确定删除',
       intent: 'danger',
       onConfirm: async () => {
         try {
-          await deleteUserMutation.mutateAsync(row.id)
+          await deleteUserMutation.mutateAsync(row.publicId)
           options.feedback.userDeleted()
         } catch (error: unknown) {
           options.feedback.userDeleteFailed(error)
@@ -278,13 +270,13 @@ export function useAdminUserCommands(
       title: nextRole === 'admin' ? '确认设为管理员' : '确认取消管理员',
       message:
         nextRole === 'admin'
-          ? `确定要将用户 ${row.username} 设为管理员吗？该用户将获得后台访问权限。`
-          : `确定要取消用户 ${row.username} 的管理员权限吗？`,
+          ? `确定要将用户 ${row.displayName} 设为管理员吗？该用户将获得后台访问权限。`
+          : `确定要取消用户 ${row.displayName} 的管理员权限吗？`,
       confirmLabel: '确认',
       intent: 'warn',
       onConfirm: async () => {
         try {
-          await updateUserRoleMutation.mutateAsync({ id: row.id, role: nextRole })
+          await updateUserRoleMutation.mutateAsync({ publicId: row.publicId, role: nextRole })
           options.feedback.roleUpdated(nextRole)
         } catch (error: unknown) {
           options.feedback.roleUpdateFailed(error)

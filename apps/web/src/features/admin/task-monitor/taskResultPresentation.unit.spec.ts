@@ -136,7 +136,8 @@ function makeTask(
 ): AdminTaskMonitorListItemModel {
   return {
     task_id: 'task_1',
-    user_id: 1,
+    user_public_id: '00000000-0000-0000-0000-000000000001',
+    user_display_name: 'User 1',
     prompt: 'Prompt',
     priority: 2,
     status: adminTaskStatuses.completed,

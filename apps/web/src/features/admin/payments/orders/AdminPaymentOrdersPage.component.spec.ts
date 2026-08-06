@@ -221,7 +221,10 @@ function renderPage() {
 function makeOrder() {
   return {
     publicOrderNumber: orderNumber,
-    user: { id: 42, username: 'sunshi' },
+    user: {
+      publicId: '00000000-0000-4000-8000-000000000042',
+      displayName: 'Sunshi',
+    },
     ideaQuantity: 12_000,
     baseAmountMinor: 12_000,
     baseCurrency: 'usd',

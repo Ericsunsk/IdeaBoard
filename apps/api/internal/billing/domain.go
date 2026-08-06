@@ -57,7 +57,7 @@ type PriceInfo struct {
 	PriceVersionID int64     `json:"price_version_id"`
 	Version        int64     `json:"version"`
 	UnitCredits    int64     `json:"unit_credits"`
-	CreatedBy      int64     `json:"created_by"`
+	CreatedBy      int64     `json:"-"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 

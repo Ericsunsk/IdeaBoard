@@ -15,7 +15,16 @@ describe('user session API boundary', () => {
   })
 
   it('returns the session data without the transport envelope', async () => {
-    const user = { id: 7, username: 'alice' }
+    const user = {
+      public_id: '00000000-0000-4000-8000-000000000007',
+      display_name: 'Alice',
+      storage_namespace: 'USER0007',
+      avatar: '',
+      role: 'user',
+      status: 1,
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    }
     mocks.getUserInfo.mockResolvedValue({ code: 0, msg: 'ok', data: { user } })
 
     await expect(fetchCurrentUserInfo()).resolves.toEqual({ user })

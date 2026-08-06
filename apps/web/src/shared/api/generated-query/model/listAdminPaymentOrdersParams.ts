@@ -13,9 +13,8 @@ export type ListAdminPaymentOrdersParams = {
    */
   order_number?: string
   /**
-   * Exact positive user ID or bounded username search.
-   * @maxLength 50
-   * @pattern ^[A-Za-z0-9._-]+$
+   * Exact public user ID or bounded display name search.
+   * @maxLength 100
    */
   user?: string
   status?: ListAdminPaymentOrdersStatus

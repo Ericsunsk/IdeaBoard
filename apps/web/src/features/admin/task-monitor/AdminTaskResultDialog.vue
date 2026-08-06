@@ -123,18 +123,18 @@
         </div>
         <div class="grid grid-cols-1 gap-2.5 md:grid-cols-2">
           <div :class="detailMetricClass">
-            <span class="text-admin-caption font-bold text-admin-text-3">用户 ID</span>
+            <span class="text-admin-caption font-bold text-admin-text-3">用户</span>
             <div class="flex min-w-0 items-center justify-between gap-2">
               <span class="min-w-0 truncate text-admin-body font-semibold text-admin-text-1">{{
-                detailTask.user_id
+                detailTask.user_display_name || detailTask.user_public_id
               }}</span>
               <Button
                 text
                 rounded
                 size="small"
                 :class="adminTextButtonClass"
-                aria-label="复制用户 ID"
-                @click="copyToClipboard(String(detailTask.user_id))"
+                aria-label="复制用户 Public ID"
+                @click="copyToClipboard(String(detailTask.user_public_id))"
               >
                 <template #icon><Copy /></template>
               </Button>

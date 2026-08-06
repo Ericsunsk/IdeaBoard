@@ -29,19 +29,20 @@ describe('admin user view model', () => {
         available_credits: 125,
         role: 'admin',
         status: 0,
-        auth_user_id: 'auth-1',
+        public_id: '00000000-0000-0000-0000-000000000001',
+        display_name: 'Alice',
         avatar: '/avatar.png',
         created_at: '2026-06-29T10:20:30Z',
       }),
     )
 
     expect(row).toMatchObject({
-      authUserId: 'auth-1',
-      authUserIdLabel: 'auth-1',
+      publicId: '00000000-0000-0000-0000-000000000001',
+      publicIdLabel: '00000000-0000-0000-0000-000000000001',
       availableCredits: 125,
       availableCreditsLabel: '125 Ideas',
       avatarUrl: '/avatar.png',
-      initial: 'U',
+      initial: 'A',
       isAdmin: true,
       isActive: false,
       roleLabel: 'Admin',
@@ -53,37 +54,35 @@ describe('admin user view model', () => {
   })
 
   it('builds action items with destructive actions disabled for admins', () => {
-    const items = getUserActionItems(makeCommandTarget({ role: 'admin', authUserId: 'auth-1' }))
+    const items = getUserActionItems(makeCommandTarget({ role: 'admin' }))
 
     expect(items.find((item) => item.key === 'status')).toMatchObject({ disabled: true })
     expect(items.find((item) => item.key === 'delete')).toMatchObject({ disabled: true })
     expect(items.find((item) => item.key === 'role')).not.toHaveProperty('disabled')
   })
 
-  it('disables auth-bound actions when auth identity is missing', () => {
-    const items = getUserActionItems(makeCommandTarget({ authUserId: '' }))
+  it('keeps auth-bound actions available because the server resolves auth identity', () => {
+    const items = getUserActionItems(makeCommandTarget())
 
-    expect(items.find((item) => item.key === 'revoke')).toMatchObject({ disabled: true })
-    expect(items.find((item) => item.key === 'impersonate')).toMatchObject({ disabled: true })
+    expect(items.find((item) => item.key === 'revoke')).not.toHaveProperty('disabled')
+    expect(items.find((item) => item.key === 'impersonate')).not.toHaveProperty('disabled')
   })
 
-  it('uses username, uid, then fallback for initials', () => {
-    expect(getUserInitial(makeUser({ username: 'alice', uid: 'u1' }))).toBe('A')
-    expect(getUserInitial(makeUser({ username: '', uid: 'b-user' }))).toBe('B')
-    expect(getUserInitial(makeUser({ username: '', uid: '' }))).toBe('?')
+  it('uses display name, public id, then fallback for initials', () => {
+    expect(getUserInitial({ displayName: 'alice', publicId: 'u1' })).toBe('A')
+    expect(getUserInitial({ displayName: '', publicId: 'b-user' })).toBe('B')
+    expect(getUserInitial({ displayName: '', publicId: '' })).toBe('?')
   })
 })
 
 function makeUser(overrides: Partial<AdminUserListItem> = {}): AdminUserListItem {
   return {
-    id: 1,
-    uid: 'user-1',
-    username: 'user',
+    public_id: '00000000-0000-0000-0000-000000000001',
+    display_name: 'user',
     role: 'user',
     status: 1,
     available_credits: 0,
     avatar: '',
-    auth_user_id: '',
     created_at: '',
     updated_at: '',
     ...overrides,

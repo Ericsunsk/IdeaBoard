@@ -12,7 +12,8 @@ import { resolveApiData } from '../../../../shared/api/apiResponse'
 export type RewardCodeRedemption = {
   id: number
   rewardCodeId: number
-  userId: number
+  userPublicId: string
+  displayName: string
   creditedAmount: number
   redeemedAt: string
 }
@@ -76,7 +77,8 @@ function toRedemption(value: GeneratedRedemption): RewardCodeRedemption {
   return {
     id: value.id,
     rewardCodeId: value.reward_code_id,
-    userId: value.user_id,
+    userPublicId: value.user_public_id,
+    displayName: value.display_name,
     creditedAmount: value.credited_amount,
     redeemedAt: value.redeemed_at,
   }

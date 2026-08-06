@@ -42,6 +42,7 @@ after(() => {
 
 const strongInternalKey = 'a'.repeat(32)
 const strongAuthSecret = 'b'.repeat(32)
+const strongSecretsEncryptionKey = Buffer.alloc(32, 9).toString('base64')
 
 function productionSource(overrides: EnvSource = {}): EnvSource {
   return {
@@ -52,6 +53,7 @@ function productionSource(overrides: EnvSource = {}): EnvSource {
     AUTH_TRUSTED_ORIGINS: 'https://app.example.com',
     DB_PASSWORD: 'db-prod-value-123',
     DB_SSLMODE: 'require',
+    APP_SECRETS_ENCRYPTION_KEY: strongSecretsEncryptionKey,
     ...overrides,
   }
 }
@@ -102,6 +104,15 @@ describe('loadEnv production guard', () => {
       () => loadEnv(productionSource({ BETTER_AUTH_SECRET: 'short-but-safe' })),
       /BETTER_AUTH_SECRET must be at least 32 characters long/,
     )
+  })
+
+  it('requires a valid production APP_SECRETS_ENCRYPTION_KEY', () => {
+    for (const value of ['', 'placeholder', Buffer.alloc(31, 9).toString('base64')]) {
+      assert.throws(
+        () => loadEnv(productionSource({ APP_SECRETS_ENCRYPTION_KEY: value })),
+        /APP_SECRETS_ENCRYPTION_KEY must be base64 that decodes to exactly 32 bytes/,
+      )
+    }
   })
 
   it('requires production BETTER_AUTH_URL to be a valid HTTPS URL', () => {

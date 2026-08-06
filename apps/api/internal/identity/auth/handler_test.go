@@ -57,6 +57,46 @@ func TestGetCurrentUserReturnsNotFoundWhenUserMissing(t *testing.T) {
 	assertAuthResponse(t, rec, http.StatusNotFound, "用户不存在")
 }
 
+func TestGetCurrentUserReturnsPublicIdentity(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	db := testdb.Open(t)
+	repo := users.NewUserRepository(db)
+	user := &users.User{
+		DisplayName: "公开展示名",
+		Role:        "user",
+		Status:      1,
+	}
+	if err := repo.Create(t.Context(), user); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+	handler := NewAuthHandler(users.NewUserService(repo, nil, nil))
+	router := gin.New()
+	router.GET("/api/user/info", func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, user.ID, principal.RoleUser)
+		handler.GetCurrentUser(c)
+	})
+
+	rec := serveAuthRequest(t, router)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200, body=%s", rec.Code, rec.Body.String())
+	}
+	var got struct {
+		Data struct {
+			User struct {
+				PublicID    string `json:"public_id"`
+				DisplayName string `json:"display_name"`
+			} `json:"user"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got.Data.User.PublicID != user.PublicID.String() || got.Data.User.DisplayName != "公开展示名" {
+		t.Fatalf("public identity = %+v, want public_id=%s display_name=%q", got.Data.User, user.PublicID, "公开展示名")
+	}
+}
+
 func serveAuthRequest(t *testing.T, router http.Handler) *httptest.ResponseRecorder {
 	t.Helper()
 

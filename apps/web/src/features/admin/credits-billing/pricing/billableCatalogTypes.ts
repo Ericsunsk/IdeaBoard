@@ -4,7 +4,6 @@ export interface AdminBillableItemPrice {
   priceVersionId: number
   version: number
   unitCredits: number
-  createdBy: number
   createdAt: string
 }
 

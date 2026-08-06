@@ -16,7 +16,6 @@ const item = {
     priceVersionId: 2,
     version: 2,
     unitCredits: 4,
-    createdBy: 7,
     createdAt: '2026-07-16T08:00:00Z',
   },
 }

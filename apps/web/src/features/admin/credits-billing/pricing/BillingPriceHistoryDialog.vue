@@ -51,7 +51,7 @@
             />
           </div>
           <div class="mt-1 text-admin-caption text-ib-text-muted">
-            操作者 {{ price.createdBy }} · {{ formatAdminDateTime(price.createdAt) }}
+            {{ formatAdminDateTime(price.createdAt) }}
           </div>
         </div>
         <div class="self-center text-right text-admin-body font-bold text-admin-title-color">

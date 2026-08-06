@@ -136,7 +136,8 @@ function makeTaskDetail(
   return {
     task_id: 'task-1',
     correlation_id: 'task-1',
-    user_id: 1,
+    user_public_id: '00000000-0000-0000-0000-000000000001',
+    user_display_name: 'User 1',
     prompt: '',
     user_prompt: '',
     params: '{}',
@@ -150,7 +151,6 @@ function makeTaskDetail(
     updated_at: '2026-07-27T08:00:00Z',
     completed_at: null,
     cancelled_at: null,
-    cancelled_by: null,
     cancel_reason: '',
     execution_attempts: [],
     ...overrides,

@@ -52,15 +52,16 @@ class MockEventSource {
 
 function makeTask(status: string, task: Partial<Task> = {}): Task {
   return {
-    id: 1,
     task_id: 'task-1',
     correlation_id: 'task-1',
-    user_id: 1,
     prompt: '',
-    priority: 2,
     status,
+    error_msg: '',
+    cancel_reason: '',
+    result: '',
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
+    completed_at: null,
     ...task,
   }
 }
@@ -72,7 +73,6 @@ function makeImageOutput(url: string): NonNullable<Task['outputs']>[number] {
     output_kind: 'asset',
     role: 'image',
     url,
-    storage_key: 'tasks/task-1/image.png',
     mime_type: 'image/png',
     width: 1024,
     height: 1024,

@@ -1,0 +1,73 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const mocks = vi.hoisted(() => ({
+  signInSocial: vi.fn(),
+}))
+
+vi.mock('../../../shared/auth/client', () => ({
+  authClient: {
+    signIn: {
+      email: vi.fn(),
+      social: mocks.signInSocial,
+    },
+    signUp: { email: vi.fn() },
+    signOut: vi.fn(),
+    getSession: vi.fn(),
+    admin: {
+      impersonateUser: vi.fn(),
+      stopImpersonating: vi.fn(),
+    },
+    useSession: vi.fn(),
+  },
+  extractBetterAuthErrorMessage: (_error: unknown, fallback: string) => fallback,
+  normalizeCanonicalEmail: (email: string) => email.trim().toLowerCase(),
+}))
+
+import { USER_AUTH_CALLBACK_PATH } from '../../../shared/constants/routePaths'
+import { authTransport } from './authTransport'
+
+describe('authTransport Google OAuth', () => {
+  beforeEach(() => {
+    mocks.signInSocial.mockReset().mockResolvedValue({})
+  })
+
+  it('uses Better Auth Google social login with a same-origin callback and safe redirect', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/user/login?redirect=%2Fuser%2Fboards%3Fview%3Drecent%23owned',
+    )
+
+    await authTransport.signInWithGoogle()
+
+    expect(mocks.signInSocial).toHaveBeenCalledOnce()
+    const request = mocks.signInSocial.mock.calls[0]?.[0] as {
+      provider: string
+      callbackURL: string
+      errorCallbackURL: string
+    }
+    const callbackURL = new URL(request.callbackURL)
+    const errorCallbackURL = new URL(request.errorCallbackURL)
+    expect(request.provider).toBe('google')
+    expect(callbackURL.origin).toBe(window.location.origin)
+    expect(callbackURL.pathname).toBe(USER_AUTH_CALLBACK_PATH)
+    expect(callbackURL.searchParams.get('redirect')).toBe('/user/boards?view=recent#owned')
+    expect(errorCallbackURL).toEqual(callbackURL)
+  })
+
+  it.each([
+    'https://attacker.example/user/boards',
+    '//attacker.example/user/boards',
+    '/user/../admin/users',
+  ])('does not forward an unsafe redirect into the callback URL: %s', async (redirect) => {
+    window.history.replaceState({}, '', `/user/login?redirect=${encodeURIComponent(redirect)}`)
+
+    await authTransport.signInWithGoogle()
+
+    const request = mocks.signInSocial.mock.calls[0]?.[0] as { callbackURL: string }
+    const callbackURL = new URL(request.callbackURL)
+    expect(callbackURL.origin).toBe(window.location.origin)
+    expect(callbackURL.pathname).toBe(USER_AUTH_CALLBACK_PATH)
+    expect(callbackURL.searchParams.has('redirect')).toBe(false)
+  })
+})

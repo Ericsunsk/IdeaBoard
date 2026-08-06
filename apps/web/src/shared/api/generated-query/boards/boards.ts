@@ -396,27 +396,30 @@ export function useInviteBoardMember<
   return query
 }
 
-export const getUpdateBoardMemberRoleUrl = (boardId: string, memberUid: string) => {
-  return `/user/boards/${encodeURIComponent(String(boardId))}/members/${encodeURIComponent(String(memberUid))}/role`
+export const getUpdateBoardMemberRoleUrl = (boardId: string, memberPublicId: string) => {
+  return `/user/boards/${encodeURIComponent(String(boardId))}/members/${encodeURIComponent(String(memberPublicId))}/role`
 }
 
 export const updateBoardMemberRole = async (
   boardId: string,
-  memberUid: string,
+  memberPublicId: string,
   updateBoardMemberRoleRequest: UpdateBoardMemberRoleRequest,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseBoardMember> => {
-  return orvalMutator<ApiResponseBoardMember>(getUpdateBoardMemberRoleUrl(boardId, memberUid), {
-    ...options,
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(updateBoardMemberRoleRequest),
-  })
+  return orvalMutator<ApiResponseBoardMember>(
+    getUpdateBoardMemberRoleUrl(boardId, memberPublicId),
+    {
+      ...options,
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      body: JSON.stringify(updateBoardMemberRoleRequest),
+    },
+  )
 }
 
 export const getUpdateBoardMemberRoleQueryKey = (
   boardId: MaybeRefOrGetter<string>,
-  memberUid: MaybeRefOrGetter<string>,
+  memberPublicId: MaybeRefOrGetter<string>,
   updateBoardMemberRoleRequest?: MaybeRefOrGetter<UpdateBoardMemberRoleRequest>,
 ) => {
   return [
@@ -425,7 +428,7 @@ export const getUpdateBoardMemberRoleQueryKey = (
     'boards',
     boardId,
     'members',
-    memberUid,
+    memberPublicId,
     'role',
     updateBoardMemberRoleRequest,
   ] as const
@@ -436,7 +439,7 @@ export const getUpdateBoardMemberRoleQueryOptions = <
   TError = ErrorType<unknown>,
 >(
   boardId: MaybeRefOrGetter<string>,
-  memberUid: MaybeRefOrGetter<string>,
+  memberPublicId: MaybeRefOrGetter<string>,
   updateBoardMemberRoleRequest: MaybeRefOrGetter<UpdateBoardMemberRoleRequest>,
   options?: {
     query?: Partial<
@@ -449,14 +452,14 @@ export const getUpdateBoardMemberRoleQueryOptions = <
 
   const queryKey = getUpdateBoardMemberRoleQueryKey(
     boardId,
-    memberUid,
+    memberPublicId,
     updateBoardMemberRoleRequest,
   )
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof updateBoardMemberRole>>> = ({ signal }) =>
     updateBoardMemberRole(
       toValue(boardId),
-      toValue(memberUid),
+      toValue(memberPublicId),
       toValue(updateBoardMemberRoleRequest),
       { signal, ...requestOptions },
     )
@@ -468,8 +471,8 @@ export const getUpdateBoardMemberRoleQueryOptions = <
       () =>
         toValue(boardId) !== null &&
         toValue(boardId) !== undefined &&
-        toValue(memberUid) !== null &&
-        toValue(memberUid) !== undefined,
+        toValue(memberPublicId) !== null &&
+        toValue(memberPublicId) !== undefined,
     ),
     ...queryOptions,
   } as UseQueryOptions<Awaited<ReturnType<typeof updateBoardMemberRole>>, TError, TData>
@@ -485,7 +488,7 @@ export function useUpdateBoardMemberRole<
   TError = ErrorType<unknown>,
 >(
   boardId: MaybeRefOrGetter<string>,
-  memberUid: MaybeRefOrGetter<string>,
+  memberPublicId: MaybeRefOrGetter<string>,
   updateBoardMemberRoleRequest: MaybeRefOrGetter<UpdateBoardMemberRoleRequest>,
   options?: {
     query?: Partial<
@@ -497,7 +500,7 @@ export function useUpdateBoardMemberRole<
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getUpdateBoardMemberRoleQueryOptions(
     boardId,
-    memberUid,
+    memberPublicId,
     updateBoardMemberRoleRequest,
     options,
   )
@@ -511,16 +514,16 @@ export function useUpdateBoardMemberRole<
   return query
 }
 
-export const getRemoveBoardMemberUrl = (boardId: string, memberUid: string) => {
-  return `/user/boards/${encodeURIComponent(String(boardId))}/members/${encodeURIComponent(String(memberUid))}`
+export const getRemoveBoardMemberUrl = (boardId: string, memberPublicId: string) => {
+  return `/user/boards/${encodeURIComponent(String(boardId))}/members/${encodeURIComponent(String(memberPublicId))}`
 }
 
 export const removeBoardMember = async (
   boardId: string,
-  memberUid: string,
+  memberPublicId: string,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseDeleted> => {
-  return orvalMutator<ApiResponseDeleted>(getRemoveBoardMemberUrl(boardId, memberUid), {
+  return orvalMutator<ApiResponseDeleted>(getRemoveBoardMemberUrl(boardId, memberPublicId), {
     ...options,
     method: 'DELETE',
   })
@@ -528,9 +531,9 @@ export const removeBoardMember = async (
 
 export const getRemoveBoardMemberQueryKey = (
   boardId: MaybeRefOrGetter<string>,
-  memberUid: MaybeRefOrGetter<string>,
+  memberPublicId: MaybeRefOrGetter<string>,
 ) => {
-  return ['DELETE', 'user', 'boards', boardId, 'members', memberUid] as const
+  return ['DELETE', 'user', 'boards', boardId, 'members', memberPublicId] as const
 }
 
 export const getRemoveBoardMemberQueryOptions = <
@@ -538,7 +541,7 @@ export const getRemoveBoardMemberQueryOptions = <
   TError = ErrorType<unknown>,
 >(
   boardId: MaybeRefOrGetter<string>,
-  memberUid: MaybeRefOrGetter<string>,
+  memberPublicId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof removeBoardMember>>, TError, TData>>
     request?: SecondParameter<typeof orvalMutator>
@@ -546,10 +549,10 @@ export const getRemoveBoardMemberQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getRemoveBoardMemberQueryKey(boardId, memberUid)
+  const queryKey = getRemoveBoardMemberQueryKey(boardId, memberPublicId)
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof removeBoardMember>>> = ({ signal }) =>
-    removeBoardMember(toValue(boardId), toValue(memberUid), { signal, ...requestOptions })
+    removeBoardMember(toValue(boardId), toValue(memberPublicId), { signal, ...requestOptions })
 
   return {
     queryKey,
@@ -558,8 +561,8 @@ export const getRemoveBoardMemberQueryOptions = <
       () =>
         toValue(boardId) !== null &&
         toValue(boardId) !== undefined &&
-        toValue(memberUid) !== null &&
-        toValue(memberUid) !== undefined,
+        toValue(memberPublicId) !== null &&
+        toValue(memberPublicId) !== undefined,
     ),
     ...queryOptions,
   } as UseQueryOptions<Awaited<ReturnType<typeof removeBoardMember>>, TError, TData>
@@ -575,14 +578,14 @@ export function useRemoveBoardMember<
   TError = ErrorType<unknown>,
 >(
   boardId: MaybeRefOrGetter<string>,
-  memberUid: MaybeRefOrGetter<string>,
+  memberPublicId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof removeBoardMember>>, TError, TData>>
     request?: SecondParameter<typeof orvalMutator>
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getRemoveBoardMemberQueryOptions(boardId, memberUid, options)
+  const queryOptions = getRemoveBoardMemberQueryOptions(boardId, memberPublicId, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

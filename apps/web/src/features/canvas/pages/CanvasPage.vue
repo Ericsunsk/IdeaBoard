@@ -82,8 +82,8 @@ const workspace = useCanvasWorkspaceRuntime({
   route,
   router,
   getUserIdentity: () => ({
-    userId: Number(userStore.user?.id),
-    userUid: `${userStore.user?.uid ?? ''}`.trim(),
+    userId: stableLocalUserNumber(userStore.user?.public_id),
+    userUid: `${userStore.user?.storage_namespace ?? ''}`.trim(),
   }),
   createNodeKind,
   flowPaneAdapter,
@@ -99,6 +99,17 @@ const workspace = useCanvasWorkspaceRuntime({
   },
   openRecharge,
 })
+
+function stableLocalUserNumber(publicID?: string) {
+  const value = publicID?.trim() || ''
+  if (!value) return 0
+  let hash = 2166136261
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return Math.abs(hash) || 1
+}
 const viewModel = workspace.viewModel
 const commands = workspace.commands
 const isGenerationAvailable = computed(() => commands.imageWorkflow.isGenerationAvailable())

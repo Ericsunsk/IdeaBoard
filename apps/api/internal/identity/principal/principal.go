@@ -25,28 +25,24 @@ const principalContextKey = "ideaboard.auth.principal"
 type Principal struct {
 	userID     int64
 	authUserID string
-	username   string
 	role       Role
 }
 
-func New(userID int64, authUserID, username, role string) (Principal, error) {
+func New(userID int64, authUserID, role string) (Principal, error) {
 	authUserID = strings.TrimSpace(authUserID)
-	username = strings.TrimSpace(username)
 	parsedRole, ok := parseRole(role)
-	if userID <= 0 || authUserID == "" || username == "" || !ok {
+	if userID <= 0 || authUserID == "" || !ok {
 		return Principal{}, ErrInvalid
 	}
 	return Principal{
 		userID:     userID,
 		authUserID: authUserID,
-		username:   username,
 		role:       parsedRole,
 	}, nil
 }
 
 func (p Principal) UserID() int64      { return p.userID }
 func (p Principal) AuthUserID() string { return p.authUserID }
-func (p Principal) Username() string   { return p.username }
 func (p Principal) Role() Role         { return p.role }
 func (p Principal) IsAdmin() bool      { return p.role == RoleAdmin }
 func (p Principal) IsValid() bool      { return isValidPrincipal(p) }
@@ -60,7 +56,6 @@ func parseRole(value string) (Role, bool) {
 func isValidPrincipal(principal Principal) bool {
 	return principal.userID > 0 &&
 		principal.authUserID != "" && principal.authUserID == strings.TrimSpace(principal.authUserID) &&
-		principal.username != "" && principal.username == strings.TrimSpace(principal.username) &&
 		principal.role.IsValid()
 }
 

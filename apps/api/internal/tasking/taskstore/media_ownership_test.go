@@ -158,7 +158,7 @@ func createMediaOwnerForTest(t *testing.T, db *sql.DB, username string, storageU
 	t.Helper()
 	repo := users.NewUserRepository(db)
 	user := &users.User{
-		Username:   username,
+		DisplayName:   username,
 		StorageUID: storageUID,
 		Role:       "user",
 		Status:     1,

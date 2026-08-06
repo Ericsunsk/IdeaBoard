@@ -60,7 +60,6 @@ describe('Admin Billable Catalog resource', () => {
             price_version_id: 9,
             version: 1,
             unit_credits: 0,
-            created_by: 7,
             created_at: '2026-07-16T08:00:00Z',
           },
         })
@@ -71,7 +70,6 @@ describe('Admin Billable Catalog resource', () => {
       priceVersionId: 9,
       version: 1,
       unitCredits: 0,
-      createdBy: 7,
       createdAt: '2026-07-16T08:00:00Z',
     })
     expect(requestBody).toEqual({ unit_credits: 0 })
@@ -117,7 +115,6 @@ describe('Admin Billable Catalog resource', () => {
                 price_version_id: 8,
                 version: 2,
                 unit_credits: 4,
-                created_by: 7,
                 created_at: '2026-07-16T08:00:00Z',
               },
             ],
@@ -135,7 +132,6 @@ describe('Admin Billable Catalog resource', () => {
           priceVersionId: 8,
           version: 2,
           unitCredits: 4,
-          createdBy: 7,
           createdAt: '2026-07-16T08:00:00Z',
         },
       ],

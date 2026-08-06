@@ -278,7 +278,8 @@ describe('useTaskRuntimeMonitor SSE fallback', () => {
 function makeTask(status: string, id: number): AdminTaskMonitorListItem {
   return {
     task_id: `task-${id}`,
-    user_id: 1,
+    user_public_id: '00000000-0000-0000-0000-000000000001',
+    user_display_name: 'User 1',
     prompt: `prompt-${id}`,
     priority: 2,
     status,

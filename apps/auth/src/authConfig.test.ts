@@ -25,6 +25,7 @@ test("native authentication security configuration stays explicit", async (t) =>
   assert.equal(options.emailVerification?.autoSignInAfterVerification, true);
 
   const plugins = options.plugins ?? [];
+  assert.equal(plugins.some((plugin) => plugin.id === "username"), false);
   const emailOTP = plugins.find((plugin) => plugin.id === "email-otp") as
     | {
         id: string;

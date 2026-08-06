@@ -1,13 +1,19 @@
-import { betterAuth } from "better-auth";
+import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { createAuthMiddleware } from "better-auth/api";
-import { admin, emailOTP, haveIBeenPwned, username } from "better-auth/plugins";
+import { admin, emailOTP, haveIBeenPwned } from "better-auth/plugins";
 import { Pool } from "pg";
 import { env } from "./env.js";
 import { normalizeCanonicalEmail } from "./authUtils.js";
 import {
+  applyGoogleOAuthRequestPolicy,
+  createVerifiedOAuthUserCreationGuard,
+} from "./googleOAuthPolicy.js";
+import {
   createBetterAuthEmailCallbacks,
   createRuntimeMailConfigService,
 } from "./mailConfig.js";
+import { createRuntimeAuthRegistry } from "./runtimeAuthRegistry.js";
+import { createRuntimeSocialProviderSettingsService } from "./socialProviderSettings.js";
 
 export const authDB = new Pool({
   host: env.database.host,
@@ -40,7 +46,19 @@ const canonicalEmailPaths = new Set([
   "/email-otp/verify-email",
 ]);
 
-export const auth = betterAuth({
+async function getRegistrationEnabled(): Promise<boolean> {
+  try {
+    const result = await authDB.query(
+      "SELECT registration_enabled FROM get_auth_runtime_settings()",
+    );
+    return result.rows[0]?.registration_enabled === true;
+  } catch (error) {
+    console.error("[auth] Failed to query OAuth registration policy", error);
+    return false;
+  }
+}
+
+const authBaseOptions = {
   database: authDB,
   basePath: "/api/auth",
   appName: "IdeaBoard",
@@ -65,7 +83,6 @@ export const auth = betterAuth({
     updateAge: 60 * 60, // refresh cookie every hour of active use
   },
   plugins: [
-    username({ minUsernameLength: 3, maxUsernameLength: 50 }),
     emailOTP({
       otpLength: 6,
       expiresIn: 600,
@@ -96,8 +113,16 @@ export const auth = betterAuth({
       impersonationSessionDuration: 60 * 60,
     }),
   ],
+  databaseHooks: {
+    user: {
+      create: {
+        before: createVerifiedOAuthUserCreationGuard(getRegistrationEnabled),
+      },
+    },
+  },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      await applyGoogleOAuthRequestPolicy(ctx, getRegistrationEnabled);
       if (canonicalEmailPaths.has(ctx.path)) {
         if (typeof ctx.body?.email === "string") {
           ctx.body.email = normalizeCanonicalEmail(ctx.body.email);
@@ -108,4 +133,19 @@ export const auth = betterAuth({
       }
     }),
   },
+} satisfies BetterAuthOptions;
+
+export const runtimeAuthRegistry = createRuntimeAuthRegistry(betterAuth, {
+  baseOptions: authBaseOptions,
 });
+export const socialProviderSettingsService =
+  createRuntimeSocialProviderSettingsService(
+    authDB,
+    env.auth.baseURL,
+    env.secrets.encryptionKey,
+    (config) => runtimeAuthRegistry.apply(config),
+  );
+
+// Migrations inspect this stable, provider-neutral instance. Runtime requests
+// use runtimeAuthRegistry.current so credential changes apply without restart.
+export const auth = runtimeAuthRegistry.current;

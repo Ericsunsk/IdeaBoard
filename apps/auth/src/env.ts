@@ -1,5 +1,6 @@
 import dotenv from 'dotenv'
 import { isProductionRuntime } from './runtimeEnv.js'
+import { isValidSecretEncryptionKey } from './secretCipher.js'
 
 dotenv.config({ quiet: true })
 
@@ -77,6 +78,7 @@ export function loadEnv(source: EnvSource) {
     getEnv(source, 'BETTER_AUTH_URL', '') ||
     (productionRuntime ? '' : 'http://localhost:5173')
   const dbPassword = getEnv(source, 'DB_PASSWORD', '')
+  const secretsEncryptionKey = getEnv(source, 'APP_SECRETS_ENCRYPTION_KEY', '')
   const dbSSLMode = validateDatabaseSSLMode(getEnv(source, 'DB_SSLMODE', 'disable'))
 
   if (!authInternalKey) {
@@ -98,6 +100,11 @@ export function loadEnv(source: EnvSource) {
     }
     if (isUnsafeProductionSecret(dbPassword)) {
       throw new Error('DB_PASSWORD must be set to a non-placeholder value when NODE_ENV=production')
+    }
+    if (!isValidSecretEncryptionKey(secretsEncryptionKey)) {
+      throw new Error(
+        'APP_SECRETS_ENCRYPTION_KEY must be base64 that decodes to exactly 32 bytes when NODE_ENV=production',
+      )
     }
     if (!authBaseURL) {
       throw new Error('BETTER_AUTH_URL is required when NODE_ENV=production')
@@ -125,6 +132,9 @@ export function loadEnv(source: EnvSource) {
       password: dbPassword,
       database: getEnv(source, 'DB_NAME', 'ideaboard'),
       sslMode: dbSSLMode,
+    },
+    secrets: {
+      encryptionKey: secretsEncryptionKey,
     },
   }
 }

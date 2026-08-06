@@ -92,7 +92,10 @@ describe('paymentOrderResource', () => {
 function makeApiSummary() {
   return {
     public_order_number: orderNumber,
-    user: { id: 42, username: 'sunshi' },
+    user: {
+      public_id: '00000000-0000-4000-8000-000000000042',
+      display_name: 'Sunshi',
+    },
     idea_quantity: 12_000,
     base_amount_minor: 12_000,
     base_currency: 'usd',

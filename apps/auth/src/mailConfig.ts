@@ -1,5 +1,8 @@
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import type { Pool } from "pg";
+import {
+  decryptSecret as decryptRuntimeSecret,
+  encryptSecret as encryptRuntimeSecret,
+} from "./secretCipher.js";
 
 export type MailReadiness =
   "not_configured" | "not_tested" | "ready" | "unavailable";
@@ -352,41 +355,19 @@ function escapeHTML(value: string): string {
     .replaceAll("'", "&#39;");
 }
 
-function encryptionKeyBytes(value: string): Buffer {
-  const raw = Buffer.from(value.trim(), "base64");
-  if (raw.length !== 32)
+function encryptSecret(plaintext: string, key: string): string {
+  try {
+    return encryptRuntimeSecret(plaintext, key);
+  } catch {
     throw new MailConfigError(
       "encryption_unavailable",
       "邮件配置加密密钥未配置",
     );
-  return raw;
-}
-
-function encryptSecret(plaintext: string, key: string): string {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", encryptionKeyBytes(key), iv);
-  const ciphertext = Buffer.concat([
-    cipher.update(plaintext, "utf8"),
-    cipher.final(),
-  ]);
-  return Buffer.concat([iv, cipher.getAuthTag(), ciphertext]).toString(
-    "base64",
-  );
+  }
 }
 
 function decryptSecret(encoded: string, key: string): string {
-  const payload = Buffer.from(encoded, "base64");
-  if (payload.length < 28) throw new Error("invalid ciphertext");
-  const decipher = createDecipheriv(
-    "aes-256-gcm",
-    encryptionKeyBytes(key),
-    payload.subarray(0, 12),
-  );
-  decipher.setAuthTag(payload.subarray(12, 28));
-  return Buffer.concat([
-    decipher.update(payload.subarray(28)),
-    decipher.final(),
-  ]).toString("utf8");
+  return decryptRuntimeSecret(encoded, key);
 }
 
 export function createPgMailConfigRepository(pool: Pool): MailConfigRepository {

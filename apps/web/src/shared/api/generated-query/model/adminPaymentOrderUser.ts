@@ -6,8 +6,7 @@
  */
 
 export interface AdminPaymentOrderUser {
-  /** @minimum 1 */
-  id: number
-  /** @maxLength 50 */
-  username: string
+  public_id: string
+  /** @maxLength 100 */
+  display_name: string
 }

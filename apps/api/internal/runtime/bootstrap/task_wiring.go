@@ -167,6 +167,7 @@ func newAppTaskRuntime(
 		AdminTaskTrace:      repos.taskRepo,
 		AdminTaskListRead:   repos.taskRepo,
 		BillableItems:       services.billableItemRegistry,
+		UserResolver:        taskUserResolver{repo: repos.userRepo},
 	}, taskservice.ServiceOptions{
 		EventHub:   taskEventHub,
 		TaskEvents: taskEvents,

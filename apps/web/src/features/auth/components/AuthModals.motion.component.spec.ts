@@ -146,7 +146,7 @@ const authPanelCases: AuthPanelCase[] = [
     submitLabel: '创建账号',
     switchLabel: '去登录',
     async fill(user) {
-      await user.type(screen.getByLabelText(/^账号/), 'tester')
+      await user.type(screen.getByLabelText(/^显示名称/), 'tester')
       await user.type(screen.getByLabelText(/^Email/), 'tester@example.com')
       await user.type(screen.getByLabelText(/^密码/), 'secret-pass')
       await user.type(screen.getByLabelText(/^确认密码/), 'secret-pass')
@@ -274,7 +274,7 @@ describe.each(authPanelCases)('$action auth panel', (testCase) => {
     expect(submitButton).not.toHaveAttribute('aria-busy')
 
     await view.user.click(submitButton)
-    expect(screen.getByLabelText(testCase.action === 'login' ? /^Email/ : /^账号/)).toHaveAttribute(
+    expect(screen.getByLabelText(testCase.action === 'login' ? /^Email/ : /^显示名称/)).toHaveAttribute(
       'data-control-tone',
       'danger',
     )
@@ -285,7 +285,7 @@ describe.each(authPanelCases)('$action auth panel', (testCase) => {
     await waitFor(() => expect(submitButton).toHaveAttribute('data-control-state', 'loading'))
     expect(submitButton).toHaveAttribute('aria-busy', 'true')
     expect(submitButton).toBeDisabled()
-    expect(screen.getByLabelText(testCase.action === 'login' ? /^Email/ : /^账号/)).toHaveAttribute(
+    expect(screen.getByLabelText(testCase.action === 'login' ? /^Email/ : /^显示名称/)).toHaveAttribute(
       'data-control-state',
       'disabled',
     )

@@ -14,7 +14,7 @@ export type AdminCreditCommandDraft = {
 
 export type AdminCreditCommandInput = AdminCreditCommandDraft & {
   kind: AdminCreditCommandKind
-  userId: number
+  userPublicId: string
   chargeTransactionId?: string
   remainingRefundableCredits?: number
 }
@@ -71,7 +71,7 @@ export function buildAdminCreditCommandRequest(
     .slice(0, 96)
   if (!operationId) throw new Error('无法生成Idea操作标识')
   const common = {
-    user_id: input.userId,
+    user_public_id: input.userPublicId,
     amount_credits: input.amountCredits,
     reason: input.reason.trim(),
     idempotency_key: `admin-ui:${input.kind}:${operationId}`,

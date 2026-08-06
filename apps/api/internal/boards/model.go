@@ -1,6 +1,10 @@
 package boards
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type BoardAccessRole string
 
@@ -62,8 +66,8 @@ func (b BoardWithRole) CanWrite() bool {
 }
 
 type BoardMemberWithUser struct {
-	UserID    int64           `json:"user_id"`
-	MemberUID string          `json:"member_uid"`
-	Username  string          `json:"username"`
-	Role      BoardAccessRole `json:"role"`
+	UserID      int64           `json:"-"`
+	PublicID    uuid.UUID       `json:"public_id"`
+	DisplayName string          `json:"display_name"`
+	Role        BoardAccessRole `json:"role"`
 }

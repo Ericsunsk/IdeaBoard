@@ -5,48 +5,20 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { TaskExecutionMetrics } from './taskExecutionMetrics'
-import type { TaskOutput } from './taskOutput'
+import type { TaskUserOutput } from './taskUserOutput'
 
 export interface Task {
-  id: number
   task_id: string
   correlation_id: string
-  user_id: number
-  /** @nullable */
-  assigned_provider_endpoint_id?: number | null
-  /** @nullable */
-  assigned_credential_id?: number | null
-  /** @nullable */
-  account_id?: number | null
   prompt: string
-  user_prompt?: string
-  params?: string
-  feature_slug?: string
-  /**
-   * River-compatible task priority; 1 is highest and 4 is lowest.
-   * @minimum 1
-   * @maximum 4
-   */
-  priority?: number
-  resolved_model?: string
-  api_type?: string
-  provider_endpoint_name?: string
-  provider_endpoint_base_url?: string
-  credential_fingerprint?: string
-  credential_key_version?: string
   status: string
-  retry_count?: number
-  error_msg?: string
-  result?: string
-  outputs?: TaskOutput[]
+  error_msg: string
+  cancel_reason: string
+  result: string
+  outputs?: TaskUserOutput[]
   execution_metrics?: TaskExecutionMetrics
   created_at: string
   updated_at: string
   /** @nullable */
-  completed_at?: string | null
-  /** @nullable */
-  cancelled_at?: string | null
-  /** @nullable */
-  cancelled_by?: number | null
-  cancel_reason?: string
+  completed_at: string | null
 }

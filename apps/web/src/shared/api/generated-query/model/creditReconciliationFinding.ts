@@ -17,7 +17,8 @@ export interface CreditReconciliationFinding {
   finding_type: CreditReconciliationFindingType
   severity: CreditReconciliationFindingSeverity
   risk: CreditReconciliationFindingRisk
-  wallet_user_id?: number
+  wallet_public_id?: string
+  wallet_display_name?: string
   subject_type: string
   subject_id: string
   details: CreditReconciliationFindingDetails

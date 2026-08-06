@@ -6,7 +6,8 @@
  */
 
 export interface CreditWallet {
-  user_id: number
+  public_id: string
+  display_name: string
   /** @minimum 0 */
   available_credits: number
   /** @minimum 0 */

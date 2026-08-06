@@ -16,14 +16,14 @@ function createTestCommands(overrides: CommandOverrides = {}) {
     signUpEmail: async ({ body }) => ({
       user: {
         id: "auth-created",
-        username: body.username,
+        name: body.name,
         email: body.email,
       },
     }),
     ...overrides.authApi,
   };
   const repository: AuthInternalCommandRepository = {
-    findUserByUsernameOrEmail: async () => null,
+    findUserByEmail: async () => null,
     finalizeTrustedRegistrationIdentity: async () => true,
     removeAuthUserCascade: async () => true,
     updateAuthUserRole: async () => true,
@@ -45,7 +45,7 @@ describe("AuthInternalCommands", () => {
           return {
             user: {
               id: "auth-admin",
-              username: body.username,
+              name: body.name,
               email: body.email,
             },
           };
@@ -65,7 +65,7 @@ describe("AuthInternalCommands", () => {
 
     const result = await commands.ensureIdentity({
       email: "admin@example.com",
-      username: " Admin ",
+      displayName: "  管理员  ",
       password: "secret1234",
       role: "ADMIN",
     });
@@ -74,8 +74,7 @@ describe("AuthInternalCommands", () => {
       {
         email: "admin@example.com",
         password: "secret1234",
-        name: "admin",
-        username: "admin",
+        name: "管理员",
       },
     ]);
     assert.deepEqual(finalized, [
@@ -90,7 +89,7 @@ describe("AuthInternalCommands", () => {
       data: {
         user: {
           auth_user_id: "auth-admin",
-          username: "admin",
+          display_name: "管理员",
           email: "admin@example.com",
           claim_identity: "admin@example.com",
           claim_identity_kind: "canonical_email",
@@ -110,9 +109,9 @@ describe("AuthInternalCommands", () => {
         },
       },
       repository: {
-        findUserByUsernameOrEmail: async () => ({
+        findUserByEmail: async () => ({
           id: "auth-existing",
-          username: "admin",
+          name: "管理员",
           email: "admin@example.com",
           emailVerified: true,
           role: "admin",
@@ -122,7 +121,7 @@ describe("AuthInternalCommands", () => {
 
     const result = await commands.ensureIdentity({
       email: "admin@example.com",
-      username: "admin",
+      displayName: "管理员",
       password: "secret1234",
       role: "admin",
       allowExisting: true,
@@ -142,9 +141,9 @@ describe("AuthInternalCommands", () => {
     const mismatched = createTestCommands({
       authApi: { signUpEmail: duplicate },
       repository: {
-        findUserByUsernameOrEmail: async () => ({
+        findUserByEmail: async () => ({
           id: "auth-attacker",
-          username: "admin",
+          name: "管理员",
           email: "admin@example.com",
           emailVerified: true,
           role: "user",
@@ -155,7 +154,7 @@ describe("AuthInternalCommands", () => {
     assert.deepEqual(
       await withoutReuse.ensureIdentity({
         email: "admin@example.com",
-        username: "admin",
+        displayName: "管理员",
         password: "secret1234",
         role: "admin",
       }),
@@ -164,7 +163,7 @@ describe("AuthInternalCommands", () => {
     assert.deepEqual(
       await mismatched.ensureIdentity({
         email: "admin@example.com",
-        username: "admin",
+        displayName: "管理员",
         password: "secret1234",
         role: "admin",
         allowExisting: true,
@@ -178,7 +177,7 @@ describe("AuthInternalCommands", () => {
     assert.deepEqual(
       await withoutReuse.ensureIdentity({
         email: "admin@example.com",
-        username: "admin",
+        displayName: "管理员",
         password: "secret1234",
         role: "admin",
         allowExisting: "true",
@@ -296,21 +295,21 @@ describe("AuthInternalCommands", () => {
     assert.deepEqual(
       await commands.ensureIdentity({
         email: "admin@example.com",
-        username: "",
+        displayName: "",
         password: "secret1234",
         role: "admin",
       }),
       {
         ok: false,
         kind: "invalid_input",
-        message: "username is required",
+        message: "display name is required",
       },
     );
     for (const password of ["123456789", "x".repeat(129)]) {
       assert.deepEqual(
         await commands.ensureIdentity({
           email: "admin@example.com",
-          username: "admin",
+          displayName: "管理员",
           password,
           role: "admin",
         }),
@@ -414,7 +413,7 @@ describe("AuthInternalCommands", () => {
     assert.deepEqual(
       await throwingCommands.ensureIdentity({
         email: "admin@example.com",
-        username: "admin",
+        displayName: "管理员",
         password: "secret1234",
         role: "admin",
       }),
@@ -475,7 +474,7 @@ describe("AuthInternalCommands", () => {
         },
       },
       repository: {
-        findUserByUsernameOrEmail: async () => {
+        findUserByEmail: async () => {
           throw new Error("lookup unavailable");
         },
       },
@@ -484,7 +483,7 @@ describe("AuthInternalCommands", () => {
     assert.deepEqual(
       await commands.ensureIdentity({
         email: "admin@example.com",
-        username: "admin",
+        displayName: "管理员",
         password: "secret1234",
         role: "admin",
         allowExisting: true,

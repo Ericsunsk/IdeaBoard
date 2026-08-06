@@ -8,5 +8,4 @@ import type { CreditWalletRestrictionActorType } from './creditWalletRestriction
 
 export interface CreditWalletRestrictionActor {
   type: CreditWalletRestrictionActorType
-  id: string
 }

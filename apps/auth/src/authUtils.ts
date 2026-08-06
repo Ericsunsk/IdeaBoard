@@ -1,9 +1,9 @@
 export type InternalUserShape = {
   id: string;
-  username?: string | null;
   email?: string | null;
   emailVerified?: boolean | null;
   name?: string | null;
+  image?: string | null;
   role?: string | null;
 };
 
@@ -61,17 +61,26 @@ export function clampInteger(
   return parsed;
 }
 
-export function normalizeUsername(raw: unknown): string {
-  const text = String(raw || "")
-    .trim()
-    .replace(/[^a-zA-Z0-9_-]/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  return text.slice(0, 50);
+export function normalizeDisplayName(raw: unknown): string {
+  const text = String(raw ?? "")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return Array.from(text).slice(0, 100).join("");
 }
 
-export function normalizeRegistrationUsername(raw: unknown): string {
-  return normalizeUsername(raw).toLowerCase();
+export function normalizeAvatarURL(raw: unknown): string {
+  const value = String(raw ?? "").trim();
+  if (!value || value.length > 2_048) return "";
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password) {
+      return "";
+    }
+    return parsed.toString();
+  } catch {
+    return "";
+  }
 }
 
 export function normalizeCanonicalEmail(raw: unknown): string {
@@ -99,11 +108,6 @@ export function isValidCanonicalEmail(raw: unknown): boolean {
     !domain.startsWith(".") &&
     !domain.endsWith(".")
   );
-}
-
-export function isReservedRegistrationUsername(raw: unknown): boolean {
-  const username = normalizeRegistrationUsername(raw);
-  return username === "admin" || username.startsWith("deleted-user-");
 }
 
 export function normalizeAuthRole(raw: unknown): "admin" | "user" | null {

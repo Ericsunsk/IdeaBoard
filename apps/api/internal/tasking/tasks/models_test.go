@@ -1,6 +1,7 @@
 package tasks
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -83,6 +84,23 @@ func TestTaskUserViewIncludesCancelReason(t *testing.T) {
 	view := task.ToUserView()
 	if got := view.CancelReason; got != "用户取消" {
 		t.Fatalf("cancel_reason = %#v, want 用户取消", got)
+	}
+}
+
+func TestTaskUserViewOmitsInternalIdentity(t *testing.T) {
+	view := (&Task{ID: 1, UserID: 42, TaskID: "task-public"}).ToUserView()
+	payload, err := json.Marshal(view)
+	if err != nil {
+		t.Fatalf("marshal user view: %v", err)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &fields); err != nil {
+		t.Fatalf("decode user view: %v", err)
+	}
+	for _, forbidden := range []string{"id", "user_id"} {
+		if _, exists := fields[forbidden]; exists {
+			t.Fatalf("user view leaked internal field %q: %s", forbidden, payload)
+		}
 	}
 }
 

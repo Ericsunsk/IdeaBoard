@@ -65,7 +65,7 @@ export function registerInternalRoutes(
         reply,
         await options.commands.ensureIdentity({
           email: request.body?.email,
-          username: request.body?.username,
+          displayName: request.body?.display_name,
           password: request.body?.password,
           allowExisting: request.body?.allow_existing,
           role: request.body?.role,

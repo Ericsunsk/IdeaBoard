@@ -24,7 +24,6 @@ export type RewardCode = {
   expiresAt?: string
   enabled: boolean
   status: GeneratedRewardCode['status']
-  createdBy: number
   createdAt: string
   updatedAt: string
 }
@@ -152,7 +151,6 @@ function toRewardCode(value: GeneratedRewardCode): RewardCode {
     expiresAt: value.expires_at,
     enabled: value.enabled,
     status: value.status,
-    createdBy: value.created_by,
     createdAt: value.created_at,
     updatedAt: value.updated_at,
   }

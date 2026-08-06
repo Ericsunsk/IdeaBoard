@@ -14,7 +14,7 @@ import (
 func TestMediaAssetRegistryRegistersBoardUploadForInitialReclamation(t *testing.T) {
 	db := testdb.Open(t)
 	ctx := context.Background()
-	owner := &users.User{Username: "board-upload-owner", Status: 1, Role: "user"}
+	owner := &users.User{DisplayName: "board-upload-owner", Status: 1, Role: "user"}
 	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
 		t.Fatalf("create upload owner: %v", err)
 	}

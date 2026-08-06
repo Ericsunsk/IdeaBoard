@@ -1,5 +1,11 @@
 package users
 
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
+
 type UserListRequest struct {
 	Keyword  string `form:"keyword"`
 	Role     string `form:"role"`
@@ -21,8 +27,14 @@ type UserListResponse struct {
 }
 
 type AdminUserListItem struct {
-	User
-	AvailableCredits int64 `json:"available_credits"`
+	PublicID         uuid.UUID `json:"public_id"`
+	DisplayName      string    `json:"display_name"`
+	Avatar           string    `json:"avatar,omitempty"`
+	Role             string    `json:"role"`
+	Status           int16     `json:"status"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+	AvailableCredits int64     `json:"available_credits"`
 }
 
 type AdminBanUserRequest struct {

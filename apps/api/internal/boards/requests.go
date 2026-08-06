@@ -8,8 +8,8 @@ type UpsertBoardRequest struct {
 }
 
 type InviteBoardMemberRequest struct {
-	MemberUID string `json:"member_uid" binding:"required,uppercase,alphanum,len=6"`
-	Role      string `json:"role" binding:"required"`
+	MemberPublicID string `json:"member_public_id" binding:"required,uuid"`
+	Role           string `json:"role" binding:"required"`
 }
 
 type UpdateBoardMemberRoleRequest struct {

@@ -7,13 +7,15 @@ test("session identity adapter normalizes a verified canonical email", () => {
     id: " auth-1 ",
     email: " Alice@Example.com ",
     emailVerified: true,
-    username: " Alice ",
+    name: "  Alice 设计师  ",
+    image: "https://lh3.googleusercontent.com/avatar",
   });
 
   assert.deepEqual(identity, {
     auth_user_id: "auth-1",
     email: "alice@example.com",
-    username: "alice",
+    display_name: "Alice 设计师",
+    avatar: "https://lh3.googleusercontent.com/avatar",
     claim_identity: "alice@example.com",
     claim_identity_kind: "canonical_email",
     claim_identity_verified: true,
@@ -30,4 +32,5 @@ test("session identity adapter preserves fail-closed state for an untrusted clai
 
   assert.equal(identity.claim_identity_kind, "untrusted");
   assert.equal(identity.claim_identity_verified, false);
+  assert.equal(identity.avatar, "");
 });

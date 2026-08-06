@@ -103,7 +103,6 @@ function normalizeBillableItem(item: BillableItemCatalogCard): AdminBillableItem
           priceVersionId: item.current_price.price_version_id,
           version: item.current_price.version,
           unitCredits: item.current_price.unit_credits,
-          createdBy: item.current_price.created_by,
           createdAt: item.current_price.created_at,
         }
       : undefined,
@@ -116,7 +115,6 @@ function normalizePrice(price: BillingPrice): AdminBillableItemPrice {
     priceVersionId: price.price_version_id,
     version: price.version,
     unitCredits: price.unit_credits,
-    createdBy: price.created_by,
     createdAt: price.created_at,
   }
 }

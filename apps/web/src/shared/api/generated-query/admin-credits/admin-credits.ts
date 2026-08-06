@@ -332,29 +332,29 @@ export function useCorrectAdminCredits<
   return query
 }
 
-export const getGetAdminCreditWalletUrl = (userId: number) => {
-  return `/admin/credits/wallets/${encodeURIComponent(String(userId))}`
+export const getGetAdminCreditWalletUrl = (publicId: string) => {
+  return `/admin/credits/wallets/${encodeURIComponent(String(publicId))}`
 }
 
 export const getAdminCreditWallet = async (
-  userId: number,
+  publicId: string,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseCreditWallet> => {
-  return orvalMutator<ApiResponseCreditWallet>(getGetAdminCreditWalletUrl(userId), {
+  return orvalMutator<ApiResponseCreditWallet>(getGetAdminCreditWalletUrl(publicId), {
     ...options,
     method: 'GET',
   })
 }
 
-export const getGetAdminCreditWalletQueryKey = (userId: MaybeRefOrGetter<number>) => {
-  return ['admin', 'credits', 'wallets', userId] as const
+export const getGetAdminCreditWalletQueryKey = (publicId: MaybeRefOrGetter<string>) => {
+  return ['admin', 'credits', 'wallets', publicId] as const
 }
 
 export const getGetAdminCreditWalletQueryOptions = <
   TData = Awaited<ReturnType<typeof getAdminCreditWallet>>,
   TError = ErrorType<unknown>,
 >(
-  userId: MaybeRefOrGetter<number>,
+  publicId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getAdminCreditWallet>>, TError, TData>
@@ -364,15 +364,15 @@ export const getGetAdminCreditWalletQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getGetAdminCreditWalletQueryKey(userId)
+  const queryKey = getGetAdminCreditWalletQueryKey(publicId)
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminCreditWallet>>> = ({ signal }) =>
-    getAdminCreditWallet(toValue(userId), { signal, ...requestOptions })
+    getAdminCreditWallet(toValue(publicId), { signal, ...requestOptions })
 
   return {
     queryKey,
     queryFn,
-    enabled: computed(() => toValue(userId) !== null && toValue(userId) !== undefined),
+    enabled: computed(() => toValue(publicId) !== null && toValue(publicId) !== undefined),
     ...queryOptions,
   } as UseQueryOptions<Awaited<ReturnType<typeof getAdminCreditWallet>>, TError, TData>
 }
@@ -386,7 +386,7 @@ export function useGetAdminCreditWallet<
   TData = Awaited<ReturnType<typeof getAdminCreditWallet>>,
   TError = ErrorType<unknown>,
 >(
-  userId: MaybeRefOrGetter<number>,
+  publicId: MaybeRefOrGetter<string>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getAdminCreditWallet>>, TError, TData>
@@ -395,7 +395,7 @@ export function useGetAdminCreditWallet<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getGetAdminCreditWalletQueryOptions(userId, options)
+  const queryOptions = getGetAdminCreditWalletQueryOptions(publicId, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>
@@ -407,7 +407,7 @@ export function useGetAdminCreditWallet<
 }
 
 export const getListAdminCreditLedgerUrl = (
-  userId: number,
+  publicId: string,
   params?: ListAdminCreditLedgerParams,
 ) => {
   const normalizedParams = new URLSearchParams()
@@ -421,33 +421,33 @@ export const getListAdminCreditLedgerUrl = (
   const stringifiedParams = normalizedParams.toString()
 
   return stringifiedParams.length > 0
-    ? `/admin/credits/wallets/${encodeURIComponent(String(userId))}/ledger?${stringifiedParams}`
-    : `/admin/credits/wallets/${encodeURIComponent(String(userId))}/ledger`
+    ? `/admin/credits/wallets/${encodeURIComponent(String(publicId))}/ledger?${stringifiedParams}`
+    : `/admin/credits/wallets/${encodeURIComponent(String(publicId))}/ledger`
 }
 
 export const listAdminCreditLedger = async (
-  userId: number,
+  publicId: string,
   params?: ListAdminCreditLedgerParams,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseCreditLedgerPage> => {
-  return orvalMutator<ApiResponseCreditLedgerPage>(getListAdminCreditLedgerUrl(userId, params), {
+  return orvalMutator<ApiResponseCreditLedgerPage>(getListAdminCreditLedgerUrl(publicId, params), {
     ...options,
     method: 'GET',
   })
 }
 
 export const getListAdminCreditLedgerQueryKey = (
-  userId: MaybeRefOrGetter<number>,
+  publicId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListAdminCreditLedgerParams>,
 ) => {
-  return ['admin', 'credits', 'wallets', userId, 'ledger', ...(params ? [params] : [])] as const
+  return ['admin', 'credits', 'wallets', publicId, 'ledger', ...(params ? [params] : [])] as const
 }
 
 export const getListAdminCreditLedgerQueryOptions = <
   TData = Awaited<ReturnType<typeof listAdminCreditLedger>>,
   TError = ErrorType<unknown>,
 >(
-  userId: MaybeRefOrGetter<number>,
+  publicId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListAdminCreditLedgerParams>,
   options?: {
     query?: Partial<
@@ -458,15 +458,15 @@ export const getListAdminCreditLedgerQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {}
 
-  const queryKey = getListAdminCreditLedgerQueryKey(userId, params)
+  const queryKey = getListAdminCreditLedgerQueryKey(publicId, params)
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminCreditLedger>>> = ({ signal }) =>
-    listAdminCreditLedger(toValue(userId), toValue(params), { signal, ...requestOptions })
+    listAdminCreditLedger(toValue(publicId), toValue(params), { signal, ...requestOptions })
 
   return {
     queryKey,
     queryFn,
-    enabled: computed(() => toValue(userId) !== null && toValue(userId) !== undefined),
+    enabled: computed(() => toValue(publicId) !== null && toValue(publicId) !== undefined),
     ...queryOptions,
   } as UseQueryOptions<Awaited<ReturnType<typeof listAdminCreditLedger>>, TError, TData>
 }
@@ -480,7 +480,7 @@ export function useListAdminCreditLedger<
   TData = Awaited<ReturnType<typeof listAdminCreditLedger>>,
   TError = ErrorType<unknown>,
 >(
-  userId: MaybeRefOrGetter<number>,
+  publicId: MaybeRefOrGetter<string>,
   params?: MaybeRefOrGetter<ListAdminCreditLedgerParams>,
   options?: {
     query?: Partial<
@@ -490,7 +490,7 @@ export function useListAdminCreditLedger<
   },
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getListAdminCreditLedgerQueryOptions(userId, params, options)
+  const queryOptions = getListAdminCreditLedgerQueryOptions(publicId, params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

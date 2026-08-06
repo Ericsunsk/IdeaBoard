@@ -10,6 +10,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const consumeBoardShareToken = `-- name: ConsumeBoardShareToken :one
@@ -447,7 +449,7 @@ func (q *Queries) ListAccessibleBoardsByUserID(ctx context.Context, userID int64
 }
 
 const listBoardMembers = `-- name: ListBoardMembers :many
-SELECT m.user_id, u.storage_uid AS member_uid, u.username, m.role
+SELECT m.user_id, u.public_id, u.display_name, m.role
 FROM board_members AS m
 INNER JOIN users AS u ON u.id = m.user_id
 WHERE m.board_id = $1
@@ -455,10 +457,10 @@ ORDER BY m.created_at ASC
 `
 
 type ListBoardMembersRow struct {
-	UserID    int64  `json:"user_id"`
-	MemberUid string `json:"member_uid"`
-	Username  string `json:"username"`
-	Role      string `json:"role"`
+	UserID      int64     `json:"user_id"`
+	PublicID    uuid.UUID `json:"public_id"`
+	DisplayName string    `json:"display_name"`
+	Role        string    `json:"role"`
 }
 
 func (q *Queries) ListBoardMembers(ctx context.Context, boardID string) ([]ListBoardMembersRow, error) {
@@ -472,8 +474,8 @@ func (q *Queries) ListBoardMembers(ctx context.Context, boardID string) ([]ListB
 		var i ListBoardMembersRow
 		if err := rows.Scan(
 			&i.UserID,
-			&i.MemberUid,
-			&i.Username,
+			&i.PublicID,
+			&i.DisplayName,
 			&i.Role,
 		); err != nil {
 			return nil, err

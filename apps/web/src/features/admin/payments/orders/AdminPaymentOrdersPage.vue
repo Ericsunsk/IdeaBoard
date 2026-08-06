@@ -160,9 +160,9 @@
         <template #body="{ data }">
           <div class="min-w-0">
             <div class="truncate text-admin-body font-bold text-admin-text-1">
-              {{ data.user.username }}
+              {{ data.user.displayName }}
             </div>
-            <div class="mt-0.5 text-admin-caption text-admin-text-3">ID {{ data.user.id }}</div>
+            <div class="mt-0.5 text-admin-caption text-admin-text-3">{{ data.user.publicId }}</div>
           </div>
         </template>
       </Column>

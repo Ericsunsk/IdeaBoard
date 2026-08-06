@@ -6,7 +6,7 @@ export function formatTaskCreatedAt(row: AdminTaskMonitorListItemModel) {
 }
 
 export function getTaskUserIdentifier(row: AdminTaskMonitorListItemModel) {
-  return row.user_id
+  return row.user_display_name || row.user_public_id
 }
 
 export function getTaskAccountLabel(row: AdminTaskMonitorListItemModel) {

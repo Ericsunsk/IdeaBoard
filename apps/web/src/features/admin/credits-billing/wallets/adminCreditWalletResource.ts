@@ -19,12 +19,12 @@ const walletQueryRoot = ['admin', 'credits', 'wallets'] as const
 export type AdminCreditLedgerTransaction = CreditLedgerTransaction
 
 interface AdminCreditLedgerCriteria {
-  userId: number
+  userPublicId: string
   beforeSequence?: number
 }
 
 export function useAdminCreditWalletResource(
-  userId: MaybeRefOrGetter<number | null>,
+  userPublicId: MaybeRefOrGetter<string | null>,
   beforeSequence: MaybeRefOrGetter<number | undefined>,
   dependencies: {
     api?: AdminCreditsBillingApi
@@ -33,22 +33,22 @@ export function useAdminCreditWalletResource(
 ) {
   const api = dependencies.api ?? adminCreditsBillingApi
   const queryClient = useQueryClient()
-  const normalizedUserId = computed(() => toValue(userId) ?? 0)
+  const normalizedUserPublicId = computed(() => toValue(userPublicId) ?? '')
   const ledgerCriteria = computed<AdminCreditLedgerCriteria>(() => ({
-    userId: normalizedUserId.value,
+    userPublicId: normalizedUserPublicId.value,
     beforeSequence: toValue(beforeSequence),
   }))
-  const enabled = computed(() => normalizedUserId.value > 0)
+  const enabled = computed(() => normalizedUserPublicId.value.length > 0)
 
   const walletQuery = useQuery({
-    queryKey: computed(() => [...walletQueryRoot, normalizedUserId.value, 'summary']),
-    queryFn: ({ signal }) => api.getWallet(normalizedUserId.value, { signal }),
+    queryKey: computed(() => [...walletQueryRoot, normalizedUserPublicId.value, 'summary']),
+    queryFn: ({ signal }) => api.getWallet(normalizedUserPublicId.value, { signal }),
     enabled,
   })
   const ledgerQuery = useQuery({
     queryKey: computed(() => [
       ...walletQueryRoot,
-      normalizedUserId.value,
+      normalizedUserPublicId.value,
       'ledger',
       ledgerCriteria.value,
     ]),
@@ -60,7 +60,7 @@ export function useAdminCreditWalletResource(
       }
       return {
         criteria,
-        page: await api.listLedger(criteria.userId, params, { signal }),
+        page: await api.listLedger(criteria.userPublicId, params, { signal }),
       }
     },
     enabled,

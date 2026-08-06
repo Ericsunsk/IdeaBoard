@@ -3,8 +3,8 @@ import { resolveApiData } from '../../../../shared/api/apiResponse'
 import type { AdminPaymentOrderStatus, SearchAdminPaymentOrdersInput } from './paymentOrderTypes'
 
 export type PaymentOrderApiUser = {
-  id: number
-  username: string
+  public_id: string
+  display_name: string
 }
 
 export type PaymentOrderApiSummary = {

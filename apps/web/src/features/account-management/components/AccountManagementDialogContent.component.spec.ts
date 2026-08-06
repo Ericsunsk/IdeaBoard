@@ -110,10 +110,9 @@ const accountTabCases: Array<{ key: AccountManagementTab; label: string }> =
 
 function makeUser(): User {
   return {
-    id: 1,
-    uid: 'USM001',
-    username: 'mock-user',
-    auth_user_id: 'auth-user-layout',
+    public_id: '00000000-0000-0000-0000-000000000001',
+    display_name: 'mock-user',
+    storage_namespace: 'USM001',
     avatar: '',
     role: 'user',
     status: 1,
@@ -229,7 +228,7 @@ describe('AccountManagementDialogContent', () => {
     expect(screen.getAllByText('mock-user')[0]).toBeVisible()
     expect(screen.getAllByText('USM001')[0]).toBeVisible()
     expect(screen.getByRole('region', { name: '账户资料概览' })).toBeVisible()
-    expect(screen.getAllByText('auth-user-layout')[0]).toBeVisible()
+    expect(screen.getAllByText('00000000-0000-0000-0000-000000000001')[0]).toBeVisible()
   })
 
   it('switches the right pane from profile to account security', async () => {
@@ -239,7 +238,7 @@ describe('AccountManagementDialogContent', () => {
 
     expect(screen.getByRole('button', { name: '账号安全' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('heading', { name: '账号安全' })).toBeVisible()
-    expect(screen.queryByText('auth-user-layout')).not.toBeInTheDocument()
+    expect(screen.queryByText('00000000-0000-0000-0000-000000000001')).not.toBeInTheDocument()
   })
 
   it('keeps the profile workflow mounted while visiting another account pane', async () => {

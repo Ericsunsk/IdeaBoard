@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
 
@@ -200,11 +199,11 @@ func (h *BoardHandler) InviteMember(c *gin.Context) {
 		return
 	}
 	var req InviteBoardMemberRequest
-	if err := c.ShouldBindJSON(&req); err != nil || !users.IsValidStorageUID(req.MemberUID) {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	member, err := h.service.InviteMember(c.Request.Context(), userID, boardID, req.MemberUID, req.Role)
+	member, err := h.service.InviteMember(c.Request.Context(), userID, boardID, req.MemberPublicID, req.Role)
 	if err != nil {
 		h.respondBoardMemberError(c, err, "邀请成员失败")
 		return
@@ -215,11 +214,11 @@ func (h *BoardHandler) InviteMember(c *gin.Context) {
 func (h *BoardHandler) UpdateMemberRole(c *gin.Context) {
 	userID, ok := requireBoardUserID(c)
 	boardID := strings.TrimSpace(c.Param("board_id"))
-	memberUID := strings.TrimSpace(c.Param("member_uid"))
+	memberPublicID := strings.TrimSpace(c.Param("member_public_id"))
 	if !ok {
 		return
 	}
-	if !users.IsValidStorageUID(memberUID) {
+	if memberPublicID == "" {
 		response.Error(c, 400, "参数错误")
 		return
 	}
@@ -228,7 +227,7 @@ func (h *BoardHandler) UpdateMemberRole(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	member, err := h.service.UpdateMemberRole(c.Request.Context(), userID, boardID, memberUID, req.Role)
+	member, err := h.service.UpdateMemberRole(c.Request.Context(), userID, boardID, memberPublicID, req.Role)
 	if err != nil {
 		h.respondBoardMemberError(c, err, "更新成员角色失败")
 		return
@@ -239,15 +238,15 @@ func (h *BoardHandler) UpdateMemberRole(c *gin.Context) {
 func (h *BoardHandler) RemoveMember(c *gin.Context) {
 	userID, ok := requireBoardUserID(c)
 	boardID := strings.TrimSpace(c.Param("board_id"))
-	memberUID := strings.TrimSpace(c.Param("member_uid"))
+	memberPublicID := strings.TrimSpace(c.Param("member_public_id"))
 	if !ok {
 		return
 	}
-	if !users.IsValidStorageUID(memberUID) {
+	if memberPublicID == "" {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	if err := h.service.RemoveMember(c.Request.Context(), userID, boardID, memberUID); err != nil {
+	if err := h.service.RemoveMember(c.Request.Context(), userID, boardID, memberPublicID); err != nil {
 		h.respondBoardMemberError(c, err, "移除成员失败")
 		return
 	}

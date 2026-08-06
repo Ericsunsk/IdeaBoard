@@ -60,18 +60,9 @@ function normalizeScopePart(value: string): string {
 function resolveAuthStorageUserScope(user: User | null): string | null {
   if (!user) return null
 
-  const uid = typeof user.uid === 'string' ? user.uid.trim() : ''
-  if (/^[A-Z0-9]{6}$/.test(uid)) {
-    return `uid_${uid}`
-  }
-
-  if (typeof user.id === 'number' && Number.isFinite(user.id)) {
-    return `uid_${user.id}`
-  }
-
-  const username = typeof user.username === 'string' ? normalizeScopePart(user.username) : ''
-  if (username) {
-    return `uname_${username}`
+  const publicID = typeof user.public_id === 'string' ? normalizeScopePart(user.public_id) : ''
+  if (publicID) {
+    return `public_${publicID}`
   }
 
   return null

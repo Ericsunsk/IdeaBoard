@@ -1,14 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { User } from '../../../shared/api/userSession'
 
-function makeUser(overrides: Partial<User> = {}): User {
-  const id = overrides.id ?? 1
+type TestUserOverrides = Partial<User> & {
+  ordinal?: number
+}
+
+function makeUser(overrides: TestUserOverrides = {}): User {
+  const ordinal = overrides.ordinal ?? 1
   return {
-    id,
-    uid: overrides.uid ?? `UID${id}`,
-    username: overrides.username ?? `user-${id}`,
-    auth_user_id: overrides.auth_user_id ?? `auth-${id}`,
-    avatar: overrides.avatar,
+    public_id:
+      overrides.public_id ??
+      `00000000-0000-4000-8000-${String(ordinal).padStart(12, '0')}`,
+    display_name: overrides.display_name ?? `User ${ordinal}`,
+    storage_namespace:
+      overrides.storage_namespace ?? `USER${String(ordinal).padStart(4, '0')}`,
+    avatar: overrides.avatar ?? '',
     role: overrides.role ?? 'user',
     status: overrides.status ?? 1,
     created_at: overrides.created_at ?? '2026-01-01T00:00:00.000Z',
@@ -22,7 +28,7 @@ async function getFreshUserStore() {
   const authClient = {
     signIn: {
       email: vi.fn(),
-      username: vi.fn(),
+      social: vi.fn(),
     },
     signUp: {
       email: vi.fn(),
@@ -62,7 +68,7 @@ describe('useUserStore auth cache handling', () => {
   })
 
   it('restores a stored session user on module creation', async () => {
-    const storedUser = makeUser({ id: 7, role: 'admin' })
+    const storedUser = makeUser({ ordinal: 7, role: 'admin' })
     localStorage.setItem('user', JSON.stringify(storedUser))
 
     const { store } = await getFreshUserStore()
@@ -74,7 +80,7 @@ describe('useUserStore auth cache handling', () => {
 
   it('logs in and stores the fetched session user', async () => {
     const { store, getUserInfo, authClient } = await getFreshUserStore()
-    const loggedInUser = makeUser({ id: 4, uid: 'USER04' })
+    const loggedInUser = makeUser({ ordinal: 4, storage_namespace: 'USER04' })
     vi.mocked(authClient.signIn.email).mockResolvedValue({} as never)
     vi.mocked(getUserInfo).mockResolvedValue({ user: loggedInUser } as never)
 
@@ -89,21 +95,22 @@ describe('useUserStore auth cache handling', () => {
     expect(store.sessionValidatedAt).toBeGreaterThan(0)
   })
 
-  it('keeps native username sign-in available', async () => {
+  it('uses Email as the only password login identity', async () => {
     const { store, getUserInfo, authClient } = await getFreshUserStore()
-    vi.mocked(authClient.signIn.username).mockResolvedValue({} as never)
+    vi.mocked(authClient.signIn.email).mockResolvedValue({} as never)
     vi.mocked(getUserInfo).mockResolvedValue({ user: makeUser() } as never)
 
-    await expect(store.login(' Alice ', 'secret-password')).resolves.toBe(true)
-    expect(authClient.signIn.username).toHaveBeenCalledWith({
-      username: 'alice',
+    await expect(store.login(' Alice@Example.com ', 'secret-password')).resolves.toBe(true)
+    expect(authClient.signIn.email).toHaveBeenCalledWith({
+      email: 'alice@example.com',
       password: 'secret-password',
     })
+    expect(authClient.signIn).not.toHaveProperty('username')
   })
 
   it('fails closed after login when the business identity projection cannot refresh', async () => {
     const { store, getUserInfo, authClient } = await getFreshUserStore()
-    store.setAuth(makeUser({ id: 9, role: 'admin' }))
+    store.setAuth(makeUser({ ordinal: 9, role: 'admin' }))
     vi.mocked(authClient.signIn.email).mockResolvedValue({} as never)
     vi.mocked(getUserInfo).mockRejectedValue({ status: 500 })
 
@@ -139,27 +146,27 @@ describe('useUserStore auth cache handling', () => {
 
   it('clears Vue Query cache when the active identity changes', async () => {
     const { store, queryClient } = await getFreshUserStore()
-    store.setAuth(makeUser({ id: 1, uid: 'USER01', auth_user_id: 'auth-1' }))
-    queryClient.setQueryData(['admin', 'users'], [{ id: 1 }])
+    store.setAuth(makeUser({ ordinal: 1, public_id: '00000000-0000-4000-8000-000000000001' }))
+    queryClient.setQueryData(['admin', 'users'], [{ count: 1 }])
 
-    store.setAuth(makeUser({ id: 2, uid: 'USER02', auth_user_id: 'auth-2' }))
+    store.setAuth(makeUser({ ordinal: 2, public_id: '00000000-0000-4000-8000-000000000002' }))
 
     expect(queryClient.getQueryData(['admin', 'users'])).toBeUndefined()
   })
 
   it('keeps Vue Query cache when the same identity is refreshed', async () => {
     const { store, queryClient } = await getFreshUserStore()
-    store.setAuth(makeUser({ id: 1, uid: 'USER01', auth_user_id: 'auth-1' }))
+    store.setAuth(makeUser({ ordinal: 1, public_id: '00000000-0000-4000-8000-000000000001' }))
     queryClient.setQueryData(['user', 'boards'], { owner: 1 })
 
-    store.setAuth(makeUser({ id: 1, uid: 'USER01', auth_user_id: 'auth-1', avatar: '/avatar.png' }))
+    store.setAuth(makeUser({ ordinal: 1, public_id: '00000000-0000-4000-8000-000000000001', avatar: '/avatar.png' }))
 
     expect(queryClient.getQueryData(['user', 'boards'])).toEqual({ owner: 1 })
   })
 
   it('reuses a recently validated session without probing the server', async () => {
     const { store, getUserInfo, authClient } = await getFreshUserStore()
-    const currentUser = makeUser({ id: 5 })
+    const currentUser = makeUser({ ordinal: 5 })
     store.setAuth(currentUser)
 
     await expect(store.ensureSession()).resolves.toEqual(currentUser)
@@ -170,8 +177,8 @@ describe('useUserStore auth cache handling', () => {
 
   it('fails closed for fresh session probes when user info returns a server error', async () => {
     const { store, queryClient, getUserInfo, authClient } = await getFreshUserStore()
-    store.setAuth(makeUser({ id: 1, role: 'admin' }))
-    queryClient.setQueryData(['admin', 'users'], [{ id: 1 }])
+    store.setAuth(makeUser({ ordinal: 1, role: 'admin' }))
+    queryClient.setQueryData(['admin', 'users'], [{ count: 1 }])
     vi.mocked(authClient.getSession).mockResolvedValue({
       data: { session: { id: 'session-1' } },
     } as never)
@@ -186,7 +193,7 @@ describe('useUserStore auth cache handling', () => {
 
   it('registers and stores the created session user', async () => {
     const { store, authClient } = await getFreshUserStore()
-    const registeredUser = makeUser({ id: 2, uid: 'USER02', username: 'alice' })
+    const registeredUser = makeUser({ ordinal: 2, storage_namespace: 'USER02' })
     vi.mocked(authClient.signUp.email).mockResolvedValue({
       data: { user: registeredUser },
     } as never)
@@ -196,7 +203,6 @@ describe('useUserStore auth cache handling', () => {
     expect(authClient.signUp.email).toHaveBeenCalledWith({
       email: 'alice@example.com',
       name: 'alice',
-      username: 'alice',
       password: 'secret-password',
     })
     expect(store.user).toBeNull()

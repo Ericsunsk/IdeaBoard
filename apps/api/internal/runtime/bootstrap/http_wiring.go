@@ -37,6 +37,7 @@ func newAppRouter(
 	taskStatsHandler := taskstats.NewHandler(taskServices.taskStatsService, taskServices.accountService)
 	billingHandler := billing.NewHandler(services.billingCatalog, services.billingCatalog)
 	paymentHandler := payments.NewHandler(services.paymentService, services.runtimeSettings)
+	creditUserResolver := creditsUserResolver{repo: repos.userRepo}
 
 	authDeps := httpapi.AuthDeps{
 		AuthServiceClient: services.authServiceClient,
@@ -62,9 +63,9 @@ func newAppRouter(
 			LineDraftHandler: assets.NewLineDraftHandler(repos.lineDraftModeRepo),
 			BillingHandler:   billingHandler,
 			BillingRecords:   billingrecords.NewHandler(services.billingRecords),
-			CreditHandler:    credits.NewHandler(services.creditService),
+			CreditHandler:    credits.NewHandler(services.creditService, creditUserResolver),
 			UsageHandler:     usage.NewHandler(services.usageService),
-			RewardHandler:    rewards.NewHandler(services.rewardService),
+			RewardHandler:    rewards.NewHandler(services.rewardService, repos.userRepo),
 			PaymentHandler:   paymentHandler,
 			Uploads:          uploadDeps,
 		},
@@ -73,10 +74,12 @@ func newAppRouter(
 				services.userService,
 				services.runtimeSettings,
 				users.NewIdentityAdminCommands(services.userService, services.authServiceClient),
+				services.authServiceClient,
 			),
 			MailConfigHandler:       auth.NewMailConfigAdminHandler(services.authServiceClient),
+			SocialProviderHandler:   auth.NewSocialProviderAdminHandler(services.authServiceClient),
 			BillingHandler:          billingHandler,
-			CreditHandler:           credits.NewHandler(services.creditService),
+			CreditHandler:           credits.NewHandler(services.creditService, creditUserResolver),
 			AccountHandler:          accountHandler,
 			TaskHandler:             taskHandler,
 			TaskStatsHandler:        taskStatsHandler,
@@ -86,7 +89,7 @@ func newAppRouter(
 			FeaturePromptHandler:    prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
 			StorageService:          services.storageService,
 			UploadSettings:          services.runtimeSettings,
-			RewardHandler:           rewards.NewHandler(services.rewardService),
+			RewardHandler:           rewards.NewHandler(services.rewardService, repos.userRepo),
 			PaymentHandler:          paymentHandler,
 		},
 		PaymentWebhook: paymentHandler,

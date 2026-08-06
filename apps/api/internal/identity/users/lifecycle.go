@@ -151,11 +151,11 @@ func (s *LifecycleService) ProvisionIdentity(ctx context.Context, identity Verif
 	}
 	if identity.EnsureActive {
 		if err := tx.QueryRow(ctx, `
-UPDATE users SET username = $2, role = $3, status = 1, updated_at = now()
+UPDATE users SET display_name = $2, role = $3, status = 1, updated_at = now()
 WHERE id = $1
-RETURNING id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at`,
-			user.ID, identity.Username, identity.Role,
-		).Scan(&user.ID, &user.Username, &user.AuthUserID, &user.StorageUID, &user.Avatar,
+RETURNING id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at`,
+			user.ID, identity.DisplayName, identity.Role,
+		).Scan(&user.ID, &user.PublicID, &user.DisplayName, &user.AuthUserID, &user.StorageUID, &user.Avatar,
 			&user.Role, &user.Status, &user.CreatedAt, &user.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("activate provisioned identity: %w", err)
 		}
@@ -416,7 +416,7 @@ func (s *LifecycleService) tombstoneUser(ctx context.Context, userID int64) (Del
 	}
 	result, err := tx.Exec(ctx, `
 UPDATE users
-SET username = 'deleted-user-' || lower($2),
+SET display_name = '已注销用户',
     auth_user_id = NULL,
     storage_uid = $2,
     avatar = '',
@@ -495,10 +495,10 @@ func findOrCreateIdentityUser(ctx context.Context, tx pgx.Tx, identity VerifiedI
 	user := &User{}
 	var authUserID *string
 	err := tx.QueryRow(ctx, `
-SELECT id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users WHERE auth_user_id = $1
 FOR UPDATE`, identity.AuthUserID).Scan(
-		&user.ID, &user.Username, &authUserID, &user.StorageUID, &user.Avatar,
+		&user.ID, &user.PublicID, &user.DisplayName, &authUserID, &user.StorageUID, &user.Avatar,
 		&user.Role, &user.Status, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err == nil {
@@ -516,12 +516,12 @@ FOR UPDATE`, identity.AuthUserID).Scan(
 		return nil, fmt.Errorf("reserve storage uid: %w", err)
 	}
 	err = tx.QueryRow(ctx, `
-INSERT INTO users (username, auth_user_id, storage_uid, role, status)
-VALUES ($1, $2, $3, $4, 1)
-RETURNING id, username, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at`,
-		identity.Username, identity.AuthUserID, storageUID, identity.Role,
+INSERT INTO users (display_name, auth_user_id, storage_uid, avatar, role, status)
+VALUES ($1, $2, $3, $4, $5, 1)
+RETURNING id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at`,
+		identity.DisplayName, identity.AuthUserID, storageUID, identity.Avatar, identity.Role,
 	).Scan(
-		&user.ID, &user.Username, &authUserID, &user.StorageUID, &user.Avatar,
+		&user.ID, &user.PublicID, &user.DisplayName, &authUserID, &user.StorageUID, &user.Avatar,
 		&user.Role, &user.Status, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err != nil {

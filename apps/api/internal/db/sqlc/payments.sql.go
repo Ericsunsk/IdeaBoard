@@ -263,25 +263,27 @@ JOIN users ON users.id = orders.user_id
 LEFT JOIN payment_order_reconciliations AS reconciliation
   ON reconciliation.payment_order_id = orders.id
 WHERE ($1::TEXT = '' OR orders.public_order_number = $1::TEXT)
-  AND ($2::BIGINT <= 0 OR orders.user_id = $2::BIGINT)
-  AND ($3::TEXT = '' OR STRPOS(LOWER(users.username), LOWER($3::TEXT)) > 0)
-  AND ($4::TEXT = '' OR orders.status = $4::TEXT)
-  AND (NOT $5::BOOLEAN OR reconciliation.anomalous_at IS NOT NULL)
+  AND (NOT $2::BOOLEAN OR users.public_id = $3::UUID)
+  AND ($4::TEXT = '' OR STRPOS(LOWER(users.display_name), LOWER($4::TEXT)) > 0)
+  AND ($5::TEXT = '' OR orders.status = $5::TEXT)
+  AND (NOT $6::BOOLEAN OR reconciliation.anomalous_at IS NOT NULL)
 `
 
 type CountAdminPaymentOrdersParams struct {
-	OrderNumber string `json:"order_number"`
-	UserID      int64  `json:"user_id"`
-	Username    string `json:"username"`
-	Status      string `json:"status"`
-	AnomalyOnly bool   `json:"anomaly_only"`
+	OrderNumber     string    `json:"order_number"`
+	HasUserPublicID bool      `json:"has_user_public_id"`
+	UserPublicID    uuid.UUID `json:"user_public_id"`
+	DisplayName     string    `json:"display_name"`
+	Status          string    `json:"status"`
+	AnomalyOnly     bool      `json:"anomaly_only"`
 }
 
 func (q *Queries) CountAdminPaymentOrders(ctx context.Context, arg CountAdminPaymentOrdersParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, countAdminPaymentOrders,
 		arg.OrderNumber,
-		arg.UserID,
-		arg.Username,
+		arg.HasUserPublicID,
+		arg.UserPublicID,
+		arg.DisplayName,
 		arg.Status,
 		arg.AnomalyOnly,
 	)
@@ -294,7 +296,8 @@ const getAdminPaymentOrder = `-- name: GetAdminPaymentOrder :one
 SELECT orders.id,
        orders.public_order_number,
        orders.user_id,
-       users.username,
+       users.public_id AS user_public_id,
+       users.display_name,
        orders.status,
        orders.idea_quantity,
        orders.base_currency,
@@ -333,7 +336,8 @@ type GetAdminPaymentOrderRow struct {
 	ID                      uuid.UUID      `json:"id"`
 	PublicOrderNumber       string         `json:"public_order_number"`
 	UserID                  int64          `json:"user_id"`
-	Username                string         `json:"username"`
+	UserPublicID            uuid.UUID      `json:"user_public_id"`
+	DisplayName             string         `json:"display_name"`
 	Status                  string         `json:"status"`
 	IdeaQuantity            int64          `json:"idea_quantity"`
 	BaseCurrency            string         `json:"base_currency"`
@@ -370,7 +374,8 @@ func (q *Queries) GetAdminPaymentOrder(ctx context.Context, orderNumber string) 
 		&i.ID,
 		&i.PublicOrderNumber,
 		&i.UserID,
-		&i.Username,
+		&i.UserPublicID,
+		&i.DisplayName,
 		&i.Status,
 		&i.IdeaQuantity,
 		&i.BaseCurrency,
@@ -1144,8 +1149,8 @@ func (q *Queries) ListAdminPaymentOrderWebhookEvents(ctx context.Context, arg Li
 const listAdminPaymentOrders = `-- name: ListAdminPaymentOrders :many
 SELECT orders.id,
        orders.public_order_number,
-       orders.user_id,
-       users.username,
+       users.public_id AS user_public_id,
+       users.display_name,
        orders.status,
        orders.idea_quantity,
        orders.base_currency,
@@ -1163,22 +1168,23 @@ JOIN users ON users.id = orders.user_id
 LEFT JOIN payment_order_reconciliations AS reconciliation
   ON reconciliation.payment_order_id = orders.id
 WHERE ($1::TEXT = '' OR orders.public_order_number = $1::TEXT)
-  AND ($2::BIGINT <= 0 OR orders.user_id = $2::BIGINT)
-  AND ($3::TEXT = '' OR STRPOS(LOWER(users.username), LOWER($3::TEXT)) > 0)
-  AND ($4::TEXT = '' OR orders.status = $4::TEXT)
-  AND (NOT $5::BOOLEAN OR reconciliation.anomalous_at IS NOT NULL)
+  AND (NOT $2::BOOLEAN OR users.public_id = $3::UUID)
+  AND ($4::TEXT = '' OR STRPOS(LOWER(users.display_name), LOWER($4::TEXT)) > 0)
+  AND ($5::TEXT = '' OR orders.status = $5::TEXT)
+  AND (NOT $6::BOOLEAN OR reconciliation.anomalous_at IS NOT NULL)
   AND (
-    NOT $6::BOOLEAN
-    OR (orders.created_at, orders.id) < ($7::TIMESTAMPTZ, $8::UUID)
+    NOT $7::BOOLEAN
+    OR (orders.created_at, orders.id) < ($8::TIMESTAMPTZ, $9::UUID)
   )
 ORDER BY orders.created_at DESC, orders.id DESC
-LIMIT $9::INTEGER
+LIMIT $10::INTEGER
 `
 
 type ListAdminPaymentOrdersParams struct {
 	OrderNumber     string        `json:"order_number"`
-	UserID          int64         `json:"user_id"`
-	Username        string        `json:"username"`
+	HasUserPublicID bool          `json:"has_user_public_id"`
+	UserPublicID    uuid.UUID     `json:"user_public_id"`
+	DisplayName     string        `json:"display_name"`
 	Status          string        `json:"status"`
 	AnomalyOnly     bool          `json:"anomaly_only"`
 	CursorSet       bool          `json:"cursor_set"`
@@ -1190,8 +1196,8 @@ type ListAdminPaymentOrdersParams struct {
 type ListAdminPaymentOrdersRow struct {
 	ID                uuid.UUID     `json:"id"`
 	PublicOrderNumber string        `json:"public_order_number"`
-	UserID            int64         `json:"user_id"`
-	Username          string        `json:"username"`
+	UserPublicID      uuid.UUID     `json:"user_public_id"`
+	DisplayName       string        `json:"display_name"`
 	Status            string        `json:"status"`
 	IdeaQuantity      int64         `json:"idea_quantity"`
 	BaseCurrency      string        `json:"base_currency"`
@@ -1209,8 +1215,9 @@ type ListAdminPaymentOrdersRow struct {
 func (q *Queries) ListAdminPaymentOrders(ctx context.Context, arg ListAdminPaymentOrdersParams) ([]ListAdminPaymentOrdersRow, error) {
 	rows, err := q.db.QueryContext(ctx, listAdminPaymentOrders,
 		arg.OrderNumber,
-		arg.UserID,
-		arg.Username,
+		arg.HasUserPublicID,
+		arg.UserPublicID,
+		arg.DisplayName,
 		arg.Status,
 		arg.AnomalyOnly,
 		arg.CursorSet,
@@ -1228,8 +1235,8 @@ func (q *Queries) ListAdminPaymentOrders(ctx context.Context, arg ListAdminPayme
 		if err := rows.Scan(
 			&i.ID,
 			&i.PublicOrderNumber,
-			&i.UserID,
-			&i.Username,
+			&i.UserPublicID,
+			&i.DisplayName,
 			&i.Status,
 			&i.IdeaQuantity,
 			&i.BaseCurrency,

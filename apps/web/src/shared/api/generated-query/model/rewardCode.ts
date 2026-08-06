@@ -32,8 +32,6 @@ export interface RewardCode {
   expires_at?: string
   enabled: boolean
   status: RewardCodeStatus
-  /** @minimum 1 */
-  created_by: number
   created_at: string
   updated_at: string
 }

@@ -13,7 +13,7 @@ type ConfirmRequest = {
 describe('admin user commands', () => {
   it('opens the ban dialog for active users and submits the ban payload', async () => {
     const harness = createHarness()
-    const user = makeUser({ id: 7, username: 'alice', status: 1 })
+    const user = makeUser({ publicId: 'user-7', displayName: 'alice', status: 1 })
     const commands = harness.createCommands()
 
     commands.openUserActionMenu(user)
@@ -23,7 +23,7 @@ describe('admin user commands', () => {
 
     expect(commands.showBanModal.value).toBe(false)
     expect(harness.mutations.banUser.mutateAsync).toHaveBeenCalledWith({
-      id: 7,
+      publicId: 'user-7',
       reason: 'abuse',
       expires_in_days: 7,
     })
@@ -45,7 +45,7 @@ describe('admin user commands', () => {
     const harness = createHarness()
     const commands = harness.createCommands()
 
-    commands.openUserActionMenu(makeUser({ role: 'admin', username: 'root' }))
+    commands.openUserActionMenu(makeUser({ role: 'admin', displayName: 'root' }))
     commands.handleActionSelect('delete')
 
     expect(harness.feedback.adminStatusChangeForbidden).toHaveBeenCalled()
@@ -58,14 +58,14 @@ describe('admin user commands', () => {
     harness.mutations.unbanUser.mutateAsync.mockRejectedValueOnce(new Error('backend denied'))
     const commands = harness.createCommands()
 
-    commands.openUserActionMenu(makeUser({ id: 3, status: 0, username: 'bob' }))
+    commands.openUserActionMenu(makeUser({ publicId: 'user-3', status: 0, displayName: 'bob' }))
     commands.handleActionSelect('status')
     await harness.acceptLastConfirm()
 
     expect(harness.confirm.request).toHaveBeenCalledWith(
       expect.objectContaining({ title: '确认解除封禁', confirmLabel: '确认解封' }),
     )
-    expect(harness.mutations.unbanUser.mutateAsync).toHaveBeenCalledWith(3)
+    expect(harness.mutations.unbanUser.mutateAsync).toHaveBeenCalledWith('user-3')
     expect(harness.feedback.unbanFailed).toHaveBeenCalledWith(expect.any(Error))
   })
 
@@ -73,7 +73,7 @@ describe('admin user commands', () => {
     const harness = createHarness()
     const commands = harness.createCommands()
 
-    commands.openUserActionMenu(makeUser({ id: 4, role: 'user', username: 'cara' }))
+    commands.openUserActionMenu(makeUser({ publicId: 'user-4', role: 'user', displayName: 'cara' }))
     commands.handleActionSelect('role')
     await harness.acceptLastConfirm()
 
@@ -81,7 +81,7 @@ describe('admin user commands', () => {
       expect.objectContaining({ title: '确认设为管理员' }),
     )
     expect(harness.mutations.updateRole.mutateAsync).toHaveBeenCalledWith({
-      id: 4,
+      publicId: 'user-4',
       role: 'admin',
     })
     expect(harness.feedback.roleUpdated).toHaveBeenCalledWith('admin')
@@ -91,55 +91,51 @@ describe('admin user commands', () => {
     const harness = createHarness()
     const commands = harness.createCommands()
 
-    commands.openUserActionMenu(makeUser({ id: 8, role: 'admin', username: 'root' }))
+    commands.openUserActionMenu(makeUser({ publicId: 'user-8', role: 'admin', displayName: 'root' }))
     commands.handleActionSelect('role')
     await harness.acceptLastConfirm()
 
     expect(harness.feedback.adminStatusChangeForbidden).not.toHaveBeenCalled()
     expect(harness.mutations.updateRole.mutateAsync).toHaveBeenCalledWith({
-      id: 8,
+      publicId: 'user-8',
       role: 'user',
     })
     expect(harness.feedback.roleUpdated).toHaveBeenCalledWith('user')
   })
 
-  it('confirms session revoke only when the user has an auth identity', async () => {
+  it('confirms session revoke using the public user identity', async () => {
     const harness = createHarness()
     const commands = harness.createCommands()
 
-    commands.openUserActionMenu(makeUser({ authUserId: '' }))
-    commands.handleActionSelect('revoke')
-    commands.openUserActionMenu(makeUser({ id: 5, authUserId: 'auth-5', username: 'dana' }))
+    commands.openUserActionMenu(makeUser({ publicId: 'user-5', displayName: 'dana' }))
     commands.handleActionSelect('revoke')
     await harness.acceptLastConfirm()
 
-    expect(harness.feedback.missingAuthUserForSessionRevoke).toHaveBeenCalled()
-    expect(harness.mutations.revokeSessions.mutateAsync).toHaveBeenCalledWith(5)
-    expect(harness.feedback.revokeSessionsSucceeded).toHaveBeenCalled()
+    expect(harness.feedback.missingAuthUserForSessionRevoke).not.toHaveBeenCalled()
+    expect(harness.mutations.revokeSessions.mutateAsync).toHaveBeenCalledWith('user-5')
   })
 
   it('delegates impersonation side effects to the session command adapter', async () => {
     const harness = createHarness()
     const commands = harness.createCommands()
 
-    commands.openUserActionMenu(makeUser({ authUserId: 'auth-6', username: 'erin' }))
+    commands.openUserActionMenu(makeUser({ publicId: 'user-6', displayName: 'erin' }))
     commands.handleActionSelect('impersonate')
     await Promise.resolve()
 
-    expect(harness.sessionCommands.startImpersonation).toHaveBeenCalledWith('auth-6')
+    expect(harness.sessionCommands.startImpersonation).toHaveBeenCalledWith('user-6')
     expect(harness.feedback.impersonationStarted).toHaveBeenCalledWith('erin')
   })
 
-  it('shows an impersonation error before adapter work when auth identity is missing', async () => {
+  it('delegates impersonation without checking private auth identity fields', async () => {
     const harness = createHarness()
     const commands = harness.createCommands()
 
-    commands.openUserActionMenu(makeUser({ authUserId: '' }))
+    commands.openUserActionMenu(makeUser({ publicId: 'user-9', displayName: 'fran' }))
     commands.handleActionSelect('impersonate')
     await Promise.resolve()
 
-    expect(harness.sessionCommands.startImpersonation).not.toHaveBeenCalled()
-    expect(harness.feedback.missingAuthUserForImpersonation).toHaveBeenCalled()
+    expect(harness.sessionCommands.startImpersonation).toHaveBeenCalledWith('user-9')
   })
 })
 
@@ -204,12 +200,10 @@ function createAdminUsersFeedback() {
 
 function makeUser(overrides: Partial<AdminUserCommandTarget> = {}): AdminUserCommandTarget {
   return {
-    id: 1,
-    uid: 'user-1',
-    username: 'user',
+    publicId: 'user-1',
+    displayName: 'user',
     role: 'user',
     status: 1,
-    authUserId: 'auth-1',
     ...overrides,
   }
 }

@@ -28,18 +28,18 @@ func (f localUserReaderFunc) GetByAuthUserID(ctx context.Context, authUserID str
 func TestResolveLocalUserByAuthIdentityRequiresExistingLocalUser(t *testing.T) {
 	db := testdb.Open(t)
 	userRepo := users.NewUserRepository(db)
-	if err := userRepo.Create(context.Background(), &users.User{Username: "alice", Status: 1, Role: "user"}); err != nil {
+	if err := userRepo.Create(context.Background(), &users.User{DisplayName: "alice", Status: 1, Role: "user"}); err != nil {
 		t.Fatalf("seed existing user failed: %v", err)
 	}
 
-	resolvedUser := &users.User{Username: "alice_auth", AuthUserID: func() *string { v := "auth-1234567890"; return &v }(), Status: 1, Role: "user"}
+	resolvedUser := &users.User{DisplayName: "alice_auth", AuthUserID: func() *string { v := "auth-1234567890"; return &v }(), Status: 1, Role: "user"}
 	if err := userRepo.Create(context.Background(), resolvedUser); err != nil {
 		t.Fatalf("seed auth-bound user failed: %v", err)
 	}
 
 	resolved, err := resolveLocalUserByAuthIdentity(context.Background(), userRepo, nil, &SessionIdentity{
 		AuthUserID: "auth-1234567890",
-		Username:   "alice",
+		DisplayName:   "alice",
 	})
 	if err != nil {
 		t.Fatalf("resolve local user failed: %v", err)
@@ -53,7 +53,7 @@ func TestResolveLocalUserByAuthIdentityRequiresExistingLocalUser(t *testing.T) {
 
 	_, err = resolveLocalUserByAuthIdentity(context.Background(), userRepo, nil, &SessionIdentity{
 		AuthUserID: "auth-missing-123",
-		Username:   "ghost",
+		DisplayName:   "ghost",
 	})
 	if err == nil {
 		t.Fatal("expected missing local user to be rejected")
@@ -190,19 +190,18 @@ func TestAuthMiddlewareSetsOnlyCompletePrincipal(t *testing.T) {
 	for _, role := range []string{"user", "admin"} {
 		t.Run(role, func(t *testing.T) {
 			authUserID := "auth-" + role
-			databaseUsername := role
+			databaseDisplayName := role
 			if role == "admin" {
-				databaseUsername = " admin "
+				databaseDisplayName = " admin "
 			}
-			wantUsername := strings.TrimSpace(databaseUsername)
 			authServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = fmt.Fprintf(w, `{"code":0,"msg":"success","data":{"session":{"auth_user_id":%q,"email":%q,"username":%q,"claim_identity":%q,"claim_identity_kind":"canonical_email","claim_identity_verified":true}}}`, authUserID, role+"@example.com", role, role+"@example.com")
+				_, _ = fmt.Fprintf(w, `{"code":0,"msg":"success","data":{"session":{"auth_user_id":%q,"email":%q,"display_name":%q,"claim_identity":%q,"claim_identity_kind":"canonical_email","claim_identity_verified":true}}}`, authUserID, role+"@example.com", role, role+"@example.com")
 			}))
 			defer authServer.Close()
 
 			userRepo := users.NewUserRepository(testdb.Open(t))
-			user := &users.User{Username: databaseUsername, AuthUserID: &authUserID, Status: 1, Role: role}
+			user := &users.User{DisplayName: databaseDisplayName, AuthUserID: &authUserID, Status: 1, Role: role}
 			if err := userRepo.Create(t.Context(), user); err != nil {
 				t.Fatal(err)
 			}
@@ -234,7 +233,7 @@ func TestAuthMiddlewareSetsOnlyCompletePrincipal(t *testing.T) {
 			if recorder.Code != http.StatusOK {
 				t.Fatalf("status = %d body = %s", recorder.Code, recorder.Body.String())
 			}
-			if got.UserID() != user.ID || got.AuthUserID() != authUserID || got.Username() != wantUsername || got.Role().String() != role || got.IsAdmin() != (role == "admin") {
+			if got.UserID() != user.ID || got.AuthUserID() != authUserID || got.Role().String() != role || got.IsAdmin() != (role == "admin") {
 				t.Fatalf("Principal = %+v", got)
 			}
 		})
@@ -274,7 +273,7 @@ func TestAuthMiddlewareRejectsInvalidLocalPrincipal(t *testing.T) {
 		if gotAuthUserID != authUserID {
 			t.Fatalf("auth user id = %q, want %q", gotAuthUserID, authUserID)
 		}
-		return &users.User{ID: 1, Username: "alice", AuthUserID: &authUserID, Status: 1, Role: "owner"}, nil
+		return &users.User{ID: 1, DisplayName: "alice", AuthUserID: &authUserID, Status: 1, Role: "owner"}, nil
 	})
 
 	handlerRan := false
@@ -347,7 +346,7 @@ func TestAdminMiddlewareRequiresAdminRole(t *testing.T) {
 				if tt.setInvalid {
 					_ = principal.Set(c, principal.Principal{})
 				} else if tt.setPrincipal {
-					identityPrincipal, err := principal.New(1, "auth-1", "alice", tt.role)
+					identityPrincipal, err := principal.New(1, "auth-1", tt.role)
 					if err != nil || principal.Set(c, identityPrincipal) != nil {
 						t.Fatalf("set test Principal: %v", err)
 					}

@@ -1,33 +1,46 @@
 package users
 
 import (
+	"context"
 	"errors"
-	"strconv"
+	"net/http"
+	"strings"
 
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/platform/validation"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type AdminHandler struct {
 	userService      *UserService
 	runtimeSettings  *settings.RuntimeSettingsService
 	identityCommands IdentityAdminCommands
+	impersonator     AdminUserImpersonator
+}
+
+type AdminUserImpersonator interface {
+	ImpersonateUser(ctx context.Context, cookieHeader string, authUserID string) ([]string, error)
 }
 
 type updateOutboundPolicyRequest struct {
 	AllowHosts *[]string `json:"allow_hosts" binding:"required"`
 }
 
-func NewAdminHandler(userService *UserService, runtimeSettings *settings.RuntimeSettingsService, identityCommands IdentityAdminCommands) *AdminHandler {
-	return &AdminHandler{
+func NewAdminHandler(userService *UserService, runtimeSettings *settings.RuntimeSettingsService, identityCommands IdentityAdminCommands, impersonator ...AdminUserImpersonator) *AdminHandler {
+	handler := &AdminHandler{
 		userService:      userService,
 		runtimeSettings:  runtimeSettings,
 		identityCommands: identityCommands,
 	}
+	if len(impersonator) > 0 {
+		handler.impersonator = impersonator[0]
+	}
+	return handler
 }
 
 // GetRegistrationSetting 获取注册开关状态
@@ -322,11 +335,11 @@ func (h *AdminHandler) BanUser(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	targetUserID, ok := getTargetUserIDParam(c)
+	targetPublicID, ok := getTargetUserPublicIDParam(c)
 	if !ok {
 		return
 	}
-	if err := commands.Ban(c.Request.Context(), identityPrincipal, targetUserID, IdentityAdminBanInput(req)); err != nil {
+	if err := commands.Ban(c.Request.Context(), identityPrincipal, targetPublicID, IdentityAdminBanInput(req)); err != nil {
 		respondIdentityAdminCommandError(c, err)
 		return
 	}
@@ -343,11 +356,11 @@ func (h *AdminHandler) UnbanUser(c *gin.Context) {
 	if !ok {
 		return
 	}
-	targetUserID, ok := getTargetUserIDParam(c)
+	targetPublicID, ok := getTargetUserPublicIDParam(c)
 	if !ok {
 		return
 	}
-	if err := commands.Unban(c.Request.Context(), identityPrincipal, targetUserID); err != nil {
+	if err := commands.Unban(c.Request.Context(), identityPrincipal, targetPublicID); err != nil {
 		respondIdentityAdminCommandError(c, err)
 		return
 	}
@@ -364,11 +377,11 @@ func (h *AdminHandler) RevokeUserSessions(c *gin.Context) {
 	if !ok {
 		return
 	}
-	targetUserID, ok := getTargetUserIDParam(c)
+	targetPublicID, ok := getTargetUserPublicIDParam(c)
 	if !ok {
 		return
 	}
-	if err := commands.RevokeSessions(c.Request.Context(), identityPrincipal, targetUserID); err != nil {
+	if err := commands.RevokeSessions(c.Request.Context(), identityPrincipal, targetPublicID); err != nil {
 		respondIdentityAdminCommandError(c, err)
 		return
 	}
@@ -392,11 +405,11 @@ func (h *AdminHandler) UpdateUserRole(c *gin.Context) {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	targetUserID, ok := getTargetUserIDParam(c)
+	targetPublicID, ok := getTargetUserPublicIDParam(c)
 	if !ok {
 		return
 	}
-	if err := commands.SetRole(c.Request.Context(), identityPrincipal, targetUserID, req.Role); err != nil {
+	if err := commands.SetRole(c.Request.Context(), identityPrincipal, targetPublicID, req.Role); err != nil {
 		respondIdentityAdminCommandError(c, err)
 		return
 	}
@@ -414,11 +427,11 @@ func (h *AdminHandler) DeleteUser(c *gin.Context) {
 	if !ok {
 		return
 	}
-	targetUserID, ok := getTargetUserIDParam(c)
+	targetPublicID, ok := getTargetUserPublicIDParam(c)
 	if !ok {
 		return
 	}
-	if err := commands.Delete(c.Request.Context(), identityPrincipal, targetUserID); err != nil {
+	if err := commands.Delete(c.Request.Context(), identityPrincipal, targetPublicID); err != nil {
 		respondIdentityAdminCommandError(c, err)
 		return
 	}
@@ -426,14 +439,80 @@ func (h *AdminHandler) DeleteUser(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-func getTargetUserIDParam(c *gin.Context) (int64, bool) {
-	userID := c.Param("id")
-	userIDUint, err := strconv.ParseInt(userID, 10, 64)
-	if err != nil || userIDUint <= 0 {
-		response.Error(c, 400, "无效的用户ID")
-		return 0, false
+func getTargetUserPublicIDParam(c *gin.Context) (string, bool) {
+	publicID, err := uuid.Parse(strings.TrimSpace(c.Param("public_id")))
+	if err != nil {
+		response.Error(c, 400, "无效的用户 public_id")
+		return "", false
 	}
-	return userIDUint, true
+	return publicID.String(), true
+}
+
+func (h *AdminHandler) ImpersonateUser(c *gin.Context) {
+	identityPrincipal, authorized := principal.RequireAdmin(c)
+	if !authorized {
+		return
+	}
+	targetPublicID, ok := getTargetUserPublicIDParam(c)
+	if !ok {
+		return
+	}
+	if h == nil || h.userService == nil || h.impersonator == nil {
+		response.InternalError(c, 500, "伪装登录服务未配置", errors.New("admin user impersonation dependencies not configured"))
+		return
+	}
+	target, err := h.userService.GetByPublicID(c.Request.Context(), targetPublicID)
+	if err != nil {
+		if database.IsNotFound(err) {
+			response.Error(c, 400, "用户不存在")
+			return
+		}
+		response.InternalError(c, 500, "读取用户失败", err)
+		return
+	}
+	if target == nil || target.ID <= 0 {
+		response.Error(c, 400, "用户不存在")
+		return
+	}
+	if target.ID == identityPrincipal.UserID() {
+		response.Error(c, 400, "不能伪装为当前登录管理员自己")
+		return
+	}
+	authUserID := strings.TrimSpace(derefString(target.AuthUserID))
+	if authUserID == "" {
+		response.Error(c, 400, "目标用户没有可用的认证身份")
+		return
+	}
+	setCookies, err := h.impersonator.ImpersonateUser(c.Request.Context(), c.GetHeader("Cookie"), authUserID)
+	if err != nil {
+		respondAdminUserImpersonationError(c, err)
+		return
+	}
+	for _, cookie := range setCookies {
+		c.Writer.Header().Add("Set-Cookie", cookie)
+	}
+	response.Success(c, nil)
+}
+
+type impersonationStatusError interface {
+	error
+	StatusCode() int
+}
+
+func respondAdminUserImpersonationError(c *gin.Context, err error) {
+	var statusErr impersonationStatusError
+	if !errors.As(err, &statusErr) {
+		response.InternalError(c, http.StatusBadGateway, "认证服务伪装登录失败", err)
+		return
+	}
+	switch statusErr.StatusCode() {
+	case http.StatusUnauthorized, http.StatusForbidden:
+		response.Error(c, statusErr.StatusCode(), "认证服务拒绝伪装登录")
+	case http.StatusBadRequest, http.StatusNotFound:
+		response.Error(c, http.StatusBadRequest, "目标用户无法进行伪装登录")
+	default:
+		response.InternalError(c, http.StatusBadGateway, "认证服务伪装登录失败", err)
+	}
 }
 
 func (h *AdminHandler) requireIdentityAdminCommands(c *gin.Context) (IdentityAdminCommands, bool) {

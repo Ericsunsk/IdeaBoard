@@ -20,10 +20,9 @@ const routes: RouteRecordRaw[] = [
 
 function makeUser(): User {
   return {
-    id: 1,
-    uid: 'USM001',
-    username: 'mock-user',
-    auth_user_id: 'auth-user-route',
+    public_id: '00000000-0000-0000-0000-000000000001',
+    display_name: 'mock-user',
+    storage_namespace: 'USM001',
     avatar: '',
     role: 'user',
     status: 1,

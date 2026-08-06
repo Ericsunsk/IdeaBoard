@@ -10,7 +10,8 @@ const mocks = vi.hoisted(() => ({
 
 const task = {
   task_id: 'task-running',
-  user_id: 42,
+  user_public_id: '00000000-0000-0000-0000-000000000042',
+  user_display_name: 'User 42',
   prompt: 'prompt',
   priority: 2,
   status: 'running',

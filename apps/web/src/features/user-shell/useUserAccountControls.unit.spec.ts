@@ -33,9 +33,9 @@ vi.mock('../account-management/useAccountManagementDialogController', () => ({
 
 function makeUser(role: 'admin' | 'user' = 'user'): User {
   return {
-    id: 1,
-    uid: 'USR001',
-    username: 'demo-user',
+    public_id: '00000000-0000-0000-0000-000000000001',
+    display_name: 'demo-user',
+    storage_namespace: 'USR001',
     avatar: 'https://example.test/avatar.png',
     role,
     status: 1,

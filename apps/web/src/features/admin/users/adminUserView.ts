@@ -7,10 +7,8 @@ export type AdminUserStatus = 0 | 1
 export type AdminUserTagSeverity = 'danger' | 'secondary' | 'success'
 
 export type AdminUserCommandTarget = {
-  id: number
-  uid: string
-  username: string
-  authUserId: string
+  publicId: string
+  displayName: string
   role: string
   status: number
 }
@@ -20,7 +18,7 @@ export type AdminUserRowView = AdminUserCommandTarget & {
   availableCreditsLabel: string
   avatarUrl: string
   initial: string
-  authUserIdLabel: string
+  publicIdLabel: string
   createdDateLabel: string
   isAdmin: boolean
   isActive: boolean
@@ -65,27 +63,24 @@ export function isActiveUser(user: Pick<AdminUserCommandTarget, 'status'>) {
   return user.status === 1
 }
 
-export function getUserInitial(user: Pick<AdminUserCommandTarget, 'username' | 'uid'>) {
-  return (user.username || user.uid || '?').slice(0, 1).toUpperCase()
+export function getUserInitial(user: Pick<AdminUserCommandTarget, 'displayName' | 'publicId'>) {
+  return (user.displayName || user.publicId || '?').slice(0, 1).toUpperCase()
 }
 
 export function createAdminUserRowView(user: AdminUserListItem): AdminUserRowView {
-  const authUserId = user.auth_user_id || ''
   const isAdmin = isAdminUser(user)
   const isActive = isActiveUser(user)
 
   return {
-    id: user.id,
-    uid: user.uid,
-    username: user.username,
-    authUserId,
+    publicId: user.public_id,
+    displayName: user.display_name,
     role: user.role,
     status: user.status,
     availableCredits: user.available_credits,
     availableCreditsLabel: formatIdeaAmount(user.available_credits),
     avatarUrl: user.avatar || '',
-    initial: getUserInitial(user),
-    authUserIdLabel: authUserId || '-',
+    initial: getUserInitial({ displayName: user.display_name, publicId: user.public_id }),
+    publicIdLabel: user.public_id || '-',
     createdDateLabel: user.created_at ? formatDateOnly(user.created_at) : '-',
     isAdmin,
     isActive,
@@ -98,15 +93,14 @@ export function createAdminUserRowView(user: AdminUserListItem): AdminUserRowVie
 
 export function getUserActionItems(row: AdminUserCommandTarget): UserActionItem[] {
   const isAdmin = isAdminUser(row)
-  const hasAuthIdentity = Boolean(row.authUserId)
   return [
     {
       key: 'status',
       label: isActiveUser(row) ? '用户封禁' : '解除封禁',
       disabled: isAdmin,
     },
-    { key: 'revoke', label: '吊销会话', disabled: !hasAuthIdentity },
-    { key: 'impersonate', label: '伪装登录', disabled: !hasAuthIdentity },
+    { key: 'revoke', label: '吊销会话' },
+    { key: 'impersonate', label: '伪装登录' },
     {
       key: 'role',
       label: isAdmin ? '取消管理' : '设为管理',

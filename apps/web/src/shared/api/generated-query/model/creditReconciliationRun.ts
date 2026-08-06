@@ -12,7 +12,8 @@ export interface CreditReconciliationRun {
   id: number
   status: CreditReconciliationRunStatus
   trigger: CreditReconciliationRunTrigger
-  requested_by?: number
+  requested_by_public_id?: string
+  requested_by_display_name?: string
   reason?: AdminActionReason
   scheduled_for?: string
   finding_count: number

@@ -7,6 +7,6 @@
 import type { InviteBoardMemberRequestRole } from './inviteBoardMemberRequestRole'
 
 export interface InviteBoardMemberRequest {
-  member_uid: string
+  member_public_id: string
   role: InviteBoardMemberRequestRole
 }

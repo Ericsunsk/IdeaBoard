@@ -24,11 +24,10 @@ const MOCK_INITIAL_AVATAR_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mPs6+v7DwAFgwJ/lk5c7wAAAABJRU5ErkJggg=='
 
 const MOCK_USER = {
-  id: 1,
-  uid: 'USM001',
-  username: 'mock-user',
+  public_id: '11111111-1111-4111-8111-111111111111',
+  display_name: 'Mock User',
+  storage_namespace: 'USM001',
   role: 'user',
-  auth_user_id: 'auth-user-route',
   avatar: MOCK_INITIAL_AVATAR_URL,
   status: 1,
   created_at: '2026-01-01T00:00:00Z',
@@ -37,23 +36,22 @@ const MOCK_USER = {
 
 const MOCK_ADMIN = {
   ...MOCK_USER,
-  id: 2,
-  uid: 'ADM001',
-  username: 'mock-admin',
+  public_id: '22222222-2222-4222-8222-222222222222',
+  display_name: 'Mock Admin',
+  storage_namespace: 'ADM001',
   role: 'admin',
-  auth_user_id: 'auth-admin-route',
 } satisfies User
 
 const MOCK_BOARD_ID = 'mock-board-1'
 const MOCK_BOARD_NAME = 'Mock Canvas Board'
 const MOCK_UPDATED_AT = 1_764_000_000_000
-const MOCK_CANVAS_UPLOAD_URL = `/uploads/canvas/${MOCK_USER.uid}/${MOCK_BOARD_ID}/content/mock-upload.png`
-const MOCK_AVATAR_URL = `/uploads/profile/${MOCK_USER.uid}/avatar/mock-avatar.png`
+const MOCK_CANVAS_UPLOAD_URL = `/uploads/canvas/${MOCK_USER.storage_namespace}/${MOCK_BOARD_ID}/content/mock-upload.png`
+const MOCK_AVATAR_URL = `/uploads/profile/${MOCK_USER.storage_namespace}/avatar/mock-avatar.png`
 
 function createAuthSession(user: User) {
   return {
-    session: { id: `user-route-smoke-session-${user.uid}` },
-    user: { id: user.auth_user_id, username: user.username, role: user.role },
+    session: { id: `user-route-smoke-session-${user.public_id}` },
+    user: { id: user.public_id, name: user.display_name, role: user.role },
   }
 }
 
@@ -155,8 +153,8 @@ const CREDIT_WALLET = {
   code: 0,
   msg: 'ok',
   data: {
-    user_id: MOCK_USER.id,
-    status: 'active',
+    public_id: MOCK_USER.public_id,
+    display_name: MOCK_USER.display_name,
     available_credits: 1280,
     reserved_credits: 0,
   },
@@ -555,8 +553,8 @@ function assertBoardsInteractions(playwrightCli: CommandSpec) {
       'await profileMenuItem.waitFor({ state: "visible", timeout: 10000 })',
       'await profileMenuItem.click()',
       'await page.getByRole("dialog", { name: "账户管理" }).waitFor({ state: "visible", timeout: 10000 })',
-      `await page.getByText(${JSON.stringify(MOCK_USER.username)}, { exact: true }).first().waitFor({ state: "visible", timeout: 10000 })`,
-      `await page.getByText(${JSON.stringify(MOCK_USER.uid)}, { exact: true }).first().waitFor({ state: "visible", timeout: 10000 })`,
+      `await page.getByText(${JSON.stringify(MOCK_USER.display_name)}, { exact: true }).first().waitFor({ state: "visible", timeout: 10000 })`,
+      `await page.getByText(${JSON.stringify(MOCK_USER.storage_namespace)}, { exact: true }).first().waitFor({ state: "visible", timeout: 10000 })`,
       'const boardsUrlAfterProfile = new URL(page.url())',
       'if (boardsUrlAfterProfile.pathname !== boardsUrlBeforeProfile.pathname || boardsUrlAfterProfile.search !== boardsUrlBeforeProfile.search) {',
       '  throw new Error(`Boards profile dialog should not change URL, before=${boardsUrlBeforeProfile.pathname}${boardsUrlBeforeProfile.search}, after=${boardsUrlAfterProfile.pathname}${boardsUrlAfterProfile.search}`)',
@@ -726,7 +724,7 @@ function assertCanvasInteractions(playwrightCli: CommandSpec) {
       'await profileMenuItem.click()',
       'await userMenu.waitFor({ state: "hidden", timeout: 10000 })',
       'await page.getByRole("dialog", { name: "账户管理" }).waitFor({ state: "visible", timeout: 10000 })',
-      `await page.getByText(${JSON.stringify(MOCK_USER.username)}, { exact: true }).first().waitFor({ state: "visible", timeout: 10000 })`,
+      `await page.getByText(${JSON.stringify(MOCK_USER.display_name)}, { exact: true }).first().waitFor({ state: "visible", timeout: 10000 })`,
       'const canvasUrlAfterProfile = new URL(page.url())',
       'if (canvasUrlAfterProfile.pathname !== canvasUrlBeforeProfile.pathname || canvasUrlAfterProfile.search !== canvasUrlBeforeProfile.search) {',
       '  throw new Error(`Canvas profile dialog should not change URL, before=${canvasUrlBeforeProfile.pathname}${canvasUrlBeforeProfile.search}, after=${canvasUrlAfterProfile.pathname}${canvasUrlAfterProfile.search}`)',

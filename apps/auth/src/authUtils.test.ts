@@ -15,7 +15,6 @@ import {
   normalizeOptionalPositiveInteger,
   normalizeOptionalText,
   normalizeURLPath,
-  normalizeUsername,
 } from "./authUtils.js";
 
 describe("auth route helpers", () => {
@@ -41,9 +40,7 @@ describe("auth route helpers", () => {
 });
 
 describe("auth input normalization", () => {
-  it("normalizes usernames and roles", () => {
-    assert.equal(normalizeUsername("  Alice 张三!!__ "), "Alice");
-    assert.equal(normalizeUsername("a".repeat(80)), "a".repeat(50));
+  it("normalizes roles", () => {
     assert.equal(normalizeAuthRole("ADMIN"), "admin");
     assert.equal(normalizeAuthRole(undefined), "user");
     assert.equal(normalizeAuthRole("owner"), null);

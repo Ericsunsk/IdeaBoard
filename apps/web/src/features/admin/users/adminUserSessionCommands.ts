@@ -1,12 +1,13 @@
-import { useUserStore, startImpersonation } from '../../auth/session/authSession'
+import { useUserStore } from '../../auth/session/authSession'
 import { clearAuthScopedQueryCache } from '../../../shared/query/queryClient'
+import { impersonateAdminUser } from './adminUserApi'
 
 export type AdminUserRedirect = {
   schedule: (url: string, delayMs: number) => void
 }
 
 export type AdminUserSessionCommands = {
-  startImpersonation: (authUserId: string) => Promise<void>
+  startImpersonation: (publicId: string) => Promise<void>
 }
 
 export function createBrowserRedirect(): AdminUserRedirect {
@@ -25,8 +26,8 @@ export function createAdminUserSessionCommands(
   const userStore = useUserStore()
 
   return {
-    async startImpersonation(authUserId: string) {
-      await startImpersonation(authUserId)
+    async startImpersonation(publicId: string) {
+      await impersonateAdminUser(publicId)
 
       userStore.clearAuth()
       clearAuthScopedQueryCache()

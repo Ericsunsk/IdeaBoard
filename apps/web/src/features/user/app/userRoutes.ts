@@ -2,6 +2,7 @@ import type { RouteRecordRaw } from 'vue-router'
 import {
   REFUND_POLICY_PATH,
   SHARE_JOIN_PATH,
+  USER_AUTH_CALLBACK_PATH,
   TERMS_PATH,
   USER_HOME_PATH,
   USER_LOGIN_PATH as USER_LOGIN_ROUTE_PATH,
@@ -50,6 +51,12 @@ export const userRoutes: RouteRecordRaw[] = [
         name: 'UserRegister',
         component: () => import('../../canvas/pages/CanvasLandingPage.vue'),
         meta: { guest: true },
+      },
+      {
+        path: USER_AUTH_CALLBACK_PATH.slice(USER_ROOT_PATH.length + 1),
+        name: 'UserAuthCallback',
+        component: () => import('../../auth/pages/UserAuthCallbackPage.vue'),
+        meta: { public: true },
       },
       {
         path: 'boards',

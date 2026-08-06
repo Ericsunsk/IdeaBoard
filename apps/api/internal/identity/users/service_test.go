@@ -132,14 +132,14 @@ func TestListUsersReadsOnlyCurrentPageBalancesInOneBatch(t *testing.T) {
 	db := newUserRepoTestDB(t)
 	repo := NewUserRepository(db)
 	seeded := []*User{
-		{Username: "batch-page-first", Role: "user", Status: 1},
-		{Username: "batch-page-second", Role: "user", Status: 1},
-		{Username: "batch-page-third", Role: "user", Status: 1},
+		{DisplayName: "batch-page-first", Role: "user", Status: 1},
+		{DisplayName: "batch-page-second", Role: "user", Status: 1},
+		{DisplayName: "batch-page-third", Role: "user", Status: 1},
 	}
 	balances := make(map[int64]int64, len(seeded))
 	for index, user := range seeded {
 		if err := repo.Create(context.Background(), user); err != nil {
-			t.Fatalf("create user %q failed: %v", user.Username, err)
+			t.Fatalf("create user %q failed: %v", user.DisplayName, err)
 		}
 		balances[user.ID] = int64(index + 1)
 	}
@@ -159,10 +159,8 @@ func TestListUsersReadsOnlyCurrentPageBalancesInOneBatch(t *testing.T) {
 	if len(reader.calls[0]) != len(result.List) {
 		t.Fatalf("batch IDs = %v, want only current page IDs", reader.calls[0])
 	}
-	for index, item := range result.List {
-		if reader.calls[0][index] != item.ID {
-			t.Fatalf("batch IDs = %v, want current page IDs in response order", reader.calls[0])
-		}
+	if result.List[0].PublicID != seeded[0].PublicID || result.List[1].PublicID != seeded[1].PublicID {
+		t.Fatalf("public ids = %v, want current page users in response order", []string{result.List[0].PublicID.String(), result.List[1].PublicID.String()})
 	}
 	for _, userID := range reader.calls[0] {
 		if userID == seeded[0].ID {

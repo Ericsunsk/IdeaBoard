@@ -39,8 +39,8 @@ export function useAdminTaskList() {
       page_size: pageSize.value,
     }
     if (appliedSearchKeyword.value) {
-      if (/^\d+$/.test(appliedSearchKeyword.value))
-        params.user_id = parseInt(appliedSearchKeyword.value, 10)
+      if (/^[0-9a-f-]{36}$/i.test(appliedSearchKeyword.value))
+        params.user_public_id = appliedSearchKeyword.value
       else params.keyword = appliedSearchKeyword.value
     }
     return params

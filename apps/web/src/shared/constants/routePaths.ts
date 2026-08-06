@@ -6,6 +6,7 @@ export const USER_ROOT_PATH = '/user'
 export const USER_HOME_PATH = '/user/home'
 export const USER_LOGIN_PATH = '/user/login'
 export const USER_REGISTER_PATH = '/user/register'
+export const USER_AUTH_CALLBACK_PATH = '/user/auth/callback'
 export const USER_BOARDS_PATH = '/user/boards'
 export const USER_CANVAS_PATH = '/user/canvas'
 

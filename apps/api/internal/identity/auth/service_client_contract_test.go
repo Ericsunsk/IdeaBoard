@@ -28,7 +28,8 @@ func TestServiceClientContractValidateSessionSuccess(t *testing.T) {
 				"session": map[string]any{
 					"auth_user_id":            "auth-123",
 					"email":                   "alice@example.com",
-					"username":                "alice",
+					"display_name":            "Alice 设计师",
+					"avatar":                  "https://lh3.googleusercontent.com/avatar",
 					"claim_identity":          "alice@example.com",
 					"claim_identity_kind":     "canonical_email",
 					"claim_identity_verified": true,
@@ -42,7 +43,7 @@ func TestServiceClientContractValidateSessionSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ValidateSession returned error: %v", err)
 	}
-	if session.AuthUserID != "auth-123" || session.Username != "alice" || session.ClaimIdentity != "alice@example.com" || !session.ClaimIdentityVerified {
+	if session.AuthUserID != "auth-123" || session.DisplayName != "Alice 设计师" || session.Avatar != "https://lh3.googleusercontent.com/avatar" || session.ClaimIdentity != "alice@example.com" || !session.ClaimIdentityVerified {
 		t.Fatalf("session = %+v, want trusted claim identity from envelope", session)
 	}
 }
@@ -97,12 +98,85 @@ func TestServiceClientMailConfigProxyUsesInternalContractAndActor(t *testing.T) 
 	}
 }
 
+func TestServiceClientSocialProviderProxyUsesStableContract(t *testing.T) {
+	var updateCalls int
+	server := newContractServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/internal/social-providers/google":
+			assertContractInternalKey(t, r)
+			writeContractJSON(w, http.StatusOK, socialProviderContractEnvelope(3))
+		case r.Method == http.MethodPut && r.URL.Path == "/internal/social-providers/google":
+			assertContractInternalKey(t, r)
+			updateCalls++
+			body := decodeContractBody(t, r)
+			assertContractField(t, body, "enabled", true)
+			assertContractField(t, body, "client_id", "google-client.apps.googleusercontent.com")
+			_, hasSecret := body["client_secret"]
+			if updateCalls == 1 && hasSecret {
+				t.Fatalf("blank client_secret must be omitted: %#v", body)
+			}
+			if updateCalls == 2 {
+				assertContractField(t, body, "client_secret", "google-secret")
+			}
+			writeContractJSON(w, http.StatusOK, socialProviderContractEnvelope(3+updateCalls))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/auth/capabilities":
+			if got := r.Header.Get("X-Internal-Key"); got != "" {
+				t.Fatalf("public capabilities leaked X-Internal-Key = %q", got)
+			}
+			writeContractJSON(w, http.StatusOK, map[string]any{
+				"code": 0, "msg": "success", "data": map[string]any{"social": map[string]bool{"google": true}},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	})
+	defer server.Close()
+
+	client := newContractClient(server)
+	summary, err := client.GetSocialProviderSettings(context.Background(), "google")
+	if err != nil || summary.Provider != "google" || summary.ConfigVersion != 3 || !summary.ClientSecretConfigured {
+		t.Fatalf("GetSocialProviderSettings = %+v, err=%v", summary, err)
+	}
+	input := SocialProviderSettingsUpdate{Enabled: true, ClientID: "google-client.apps.googleusercontent.com"}
+	if _, err := client.UpdateSocialProviderSettings(context.Background(), "google", input); err != nil {
+		t.Fatalf("UpdateSocialProviderSettings blank secret: %v", err)
+	}
+	input.ClientSecret = "google-secret"
+	if _, err := client.UpdateSocialProviderSettings(context.Background(), "google", input); err != nil {
+		t.Fatalf("UpdateSocialProviderSettings with secret: %v", err)
+	}
+	capabilities, err := client.GetSocialProviderCapabilities(context.Background())
+	if err != nil || !capabilities.Social["google"] {
+		t.Fatalf("GetSocialProviderCapabilities = %+v, err=%v", capabilities, err)
+	}
+}
+
+func TestServiceClientSocialProviderProxyPreservesConflict(t *testing.T) {
+	server := newContractServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		writeContractJSON(w, http.StatusConflict, map[string]any{
+			"code": http.StatusConflict,
+			"msg":  "请先停用 Google 登录再修改 Client ID",
+		})
+	})
+	defer server.Close()
+
+	_, err := newContractClient(server).UpdateSocialProviderSettings(
+		context.Background(),
+		"google",
+		SocialProviderSettingsUpdate{Enabled: true, ClientID: "changed.apps.googleusercontent.com"},
+	)
+	var providerErr *SocialProviderSettingsError
+	if !errors.As(err, &providerErr) || providerErr.Status != http.StatusConflict || !strings.Contains(providerErr.Message, "先停用") {
+		t.Fatalf("UpdateSocialProviderSettings error = %#v, want preserved conflict", err)
+	}
+}
+
 func TestServiceClientContractValidateSessionRejectsMissingSuccessEnvelopeFields(t *testing.T) {
 	validData := map[string]any{
 		"session": map[string]any{
 			"auth_user_id":            "auth-123",
 			"email":                   "alice@example.com",
-			"username":                "alice",
+			"display_name":            "alice",
 			"claim_identity":          "alice@example.com",
 			"claim_identity_kind":     "canonical_email",
 			"claim_identity_verified": true,
@@ -155,7 +229,7 @@ func TestServiceClientContractValidateSessionRejectsUntrustedClaimIdentity(t *te
 			"code": 0,
 			"msg":  "success",
 			"data": map[string]any{"session": map[string]any{
-				"auth_user_id": "auth-untrusted", "username": "alice",
+				"auth_user_id": "auth-untrusted", "display_name": "alice",
 				"claim_identity": "attacker@example.com", "claim_identity_kind": "untrusted",
 				"claim_identity_verified": false,
 			}},
@@ -174,7 +248,7 @@ func TestServiceClientContractEnsureUserRequestAndSuccess(t *testing.T) {
 		assertJSONContentType(t, r)
 		body := decodeContractBody(t, r)
 		assertContractField(t, body, "email", "alice@example.com")
-		assertContractField(t, body, "username", "alice")
+		assertContractField(t, body, "display_name", "alice")
 		assertContractField(t, body, "password", "secret1234")
 		assertContractField(t, body, "allow_existing", true)
 		assertContractField(t, body, "role", "admin")
@@ -185,7 +259,7 @@ func TestServiceClientContractEnsureUserRequestAndSuccess(t *testing.T) {
 			"data": map[string]any{
 				"user": map[string]any{
 					"auth_user_id":            "auth-alice",
-					"username":                "alice",
+					"display_name":            "alice",
 					"email":                   "alice@example.com",
 					"claim_identity":          "alice@example.com",
 					"claim_identity_kind":     "canonical_email",
@@ -202,7 +276,7 @@ func TestServiceClientContractEnsureUserRequestAndSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EnsureUser returned error: %v", err)
 	}
-	if user.AuthUserID != "auth-alice" || user.Username != "alice" || user.ClaimIdentity != "alice@example.com" || !user.ClaimIdentityVerified || user.Role != "admin" || !user.Existing {
+	if user.AuthUserID != "auth-alice" || user.DisplayName != "alice" || user.ClaimIdentity != "alice@example.com" || !user.ClaimIdentityVerified || user.Role != "admin" || !user.Existing {
 		t.Fatalf("user = %+v, want provisioned auth user from envelope", user)
 	}
 }
@@ -211,7 +285,7 @@ func TestServiceClientContractEnsureUserRejectsMissingSuccessEnvelopeFields(t *t
 	validData := map[string]any{
 		"user": map[string]any{
 			"auth_user_id":            "auth-alice",
-			"username":                "alice",
+			"display_name":            "alice",
 			"email":                   "alice@example.com",
 			"claim_identity":          "alice@example.com",
 			"claim_identity_kind":     "canonical_email",
@@ -655,6 +729,46 @@ func TestServiceClientContractRejectsInvalidErrorEnvelope(t *testing.T) {
 	}
 }
 
+func TestServiceClientImpersonationBridgeForwardsSessionCookieWithoutInternalKey(t *testing.T) {
+	server := newContractServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/auth/admin/impersonate-user" {
+			t.Fatalf("request = %s %s, want POST /api/auth/admin/impersonate-user", r.Method, r.URL.Path)
+		}
+		if got := r.Header.Get("Cookie"); got != "session=admin-session" {
+			t.Fatalf("Cookie = %q, want forwarded admin session", got)
+		}
+		if got := r.Header.Get("X-Internal-Key"); got != "" {
+			t.Fatalf("X-Internal-Key = %q, want absent", got)
+		}
+		body := decodeContractBody(t, r)
+		assertContractField(t, body, "userId", "auth-target")
+		w.Header().Add("Set-Cookie", "better-auth.session_token=impersonated; Path=/; HttpOnly")
+		writeContractJSON(w, http.StatusOK, map[string]any{"code": 0, "msg": "success", "data": map[string]any{}})
+	})
+	defer server.Close()
+
+	cookies, err := newContractClient(server).ImpersonateUser(context.Background(), "session=admin-session", " auth-target ")
+	if err != nil {
+		t.Fatalf("ImpersonateUser error: %v", err)
+	}
+	if len(cookies) != 1 || !strings.HasPrefix(cookies[0], "better-auth.session_token=impersonated") {
+		t.Fatalf("Set-Cookie = %#v, want impersonation cookie", cookies)
+	}
+}
+
+func TestServiceClientImpersonationBridgeRejectsSuccessWithoutSessionCookie(t *testing.T) {
+	server := newContractServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		writeContractJSON(w, http.StatusOK, map[string]any{"code": 0, "msg": "success", "data": map[string]any{}})
+	})
+	defer server.Close()
+
+	_, err := newContractClient(server).ImpersonateUser(context.Background(), "session=admin-session", "auth-target")
+	var impersonationErr *ImpersonationError
+	if !errors.As(err, &impersonationErr) || impersonationErr.Status != http.StatusBadGateway {
+		t.Fatalf("ImpersonateUser error = %#v, want 502 contract failure", err)
+	}
+}
+
 func newContractServer(t *testing.T, handler http.HandlerFunc) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(handler))
@@ -676,6 +790,13 @@ func assertContractRequest(t *testing.T, r *http.Request, method, path string) {
 	if r.URL.Path != path {
 		t.Fatalf("path = %s, want %s", r.URL.Path, path)
 	}
+	if got := r.Header.Get("X-Internal-Key"); got != contractInternalKey {
+		t.Fatalf("X-Internal-Key = %q, want %q", got, contractInternalKey)
+	}
+}
+
+func assertContractInternalKey(t *testing.T, r *http.Request) {
+	t.Helper()
 	if got := r.Header.Get("X-Internal-Key"); got != contractInternalKey {
 		t.Fatalf("X-Internal-Key = %q, want %q", got, contractInternalKey)
 	}
@@ -712,4 +833,17 @@ func writeContractJSON(w http.ResponseWriter, status int, payload map[string]any
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func socialProviderContractEnvelope(version int) map[string]any {
+	return map[string]any{
+		"code": 0,
+		"msg":  "success",
+		"data": map[string]any{
+			"provider": "google", "enabled": true, "configured": true, "available": true,
+			"client_id": "google-client.apps.googleusercontent.com", "client_secret_configured": true,
+			"scopes": []string{"openid", "email", "profile"}, "config_version": version,
+			"callback_url": "https://example.com/api/auth/callback/google", "updated_at": "2026-08-06T00:00:00Z",
+		},
+	}
 }

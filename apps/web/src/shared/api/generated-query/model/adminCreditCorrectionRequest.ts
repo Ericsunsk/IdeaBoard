@@ -6,8 +6,7 @@
  */
 
 export interface AdminCreditCorrectionRequest {
-  /** @minimum 1 */
-  user_id: number
+  user_public_id: string
   /**
    * @minLength 1
    * @maxLength 64

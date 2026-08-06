@@ -23,7 +23,8 @@ describe('RewardCodeRedemptionResource', () => {
           {
             id: 51,
             reward_code_id: 7,
-            user_id: 23,
+            user_public_id: '22222222-2222-4222-8222-222222222222',
+            display_name: '兑换用户',
             credited_amount: 80,
             redeemed_at: '2026-07-22T03:04:05Z',
           },
@@ -40,7 +41,8 @@ describe('RewardCodeRedemptionResource', () => {
         {
           id: 51,
           rewardCodeId: 7,
-          userId: 23,
+          userPublicId: '22222222-2222-4222-8222-222222222222',
+          displayName: '兑换用户',
           creditedAmount: 80,
           redeemedAt: '2026-07-22T03:04:05Z',
         },
@@ -57,7 +59,8 @@ describe('RewardCodeRedemptionResource', () => {
       data: {
         id: 51,
         reward_code_id: 7,
-        user_id: 23,
+        user_public_id: '22222222-2222-4222-8222-222222222222',
+        display_name: '兑换用户',
         credited_amount: 80,
         redeemed_at: '2026-07-22T03:04:05Z',
         credit_transaction_id: 'credit-transaction-9001',
@@ -69,7 +72,8 @@ describe('RewardCodeRedemptionResource', () => {
     await expect(createRewardCodeRedemptionResource().get(7, 51, { signal })).resolves.toEqual({
       id: 51,
       rewardCodeId: 7,
-      userId: 23,
+      userPublicId: '22222222-2222-4222-8222-222222222222',
+      displayName: '兑换用户',
       creditedAmount: 80,
       redeemedAt: '2026-07-22T03:04:05Z',
       creditTransactionId: 'credit-transaction-9001',

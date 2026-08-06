@@ -14,7 +14,6 @@ func SetPrincipal(t testing.TB, c *gin.Context, userID int64, role principal.Rol
 	identityPrincipal, err := principal.New(
 		userID,
 		fmt.Sprintf("auth-%d", userID),
-		fmt.Sprintf("user-%d", userID),
 		role.String(),
 	)
 	if err != nil {

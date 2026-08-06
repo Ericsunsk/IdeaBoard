@@ -18,11 +18,12 @@ vi.mock('../../../shared/api/generated-query/admin-credits/admin-credits', () =>
 import { adminCreditsBillingApi } from './creditsBillingApi'
 
 describe('credits billing API adapter', () => {
+  const publicId = '11111111-1111-4111-8111-111111111111'
   beforeEach(() => {
     vi.resetAllMocks()
 
     const command = { transaction_id: 'transaction-1' }
-    const wallet = { user_id: 12, available_credits: 1200 }
+    const wallet = { public_id: publicId, display_name: '测试用户', available_credits: 1200, reserved_credits: 0 }
     const ledger = { transactions: [] }
     const run = { id: 7, status: 'completed' }
     const runs = { runs: [run] }
@@ -46,9 +47,9 @@ describe('credits billing API adapter', () => {
   })
 
   it('keeps every generated Admin Credits call behind the feature-local adapter and returns domain data', async () => {
-    const request = { user_id: 12, amount_credits: 5 }
-    const wallet = await adminCreditsBillingApi.getWallet(12)
-    const ledger = await adminCreditsBillingApi.listLedger(12, { limit: 25 })
+    const request = { user_public_id: publicId, amount_credits: 5 }
+    const wallet = await adminCreditsBillingApi.getWallet(publicId)
+    const ledger = await adminCreditsBillingApi.listLedger(publicId, { limit: 25 })
     const grant = await adminCreditsBillingApi.grant(request as never)
     const deduction = await adminCreditsBillingApi.deduct(request as never)
     const refund = await adminCreditsBillingApi.refund({
@@ -65,7 +66,7 @@ describe('credits billing API adapter', () => {
     })
     const health = await adminCreditsBillingApi.getCreditHealth()
 
-    expect(wallet).toEqual({ user_id: 12, available_credits: 1200 })
+    expect(wallet).toEqual({ public_id: publicId, display_name: '测试用户', available_credits: 1200, reserved_credits: 0 })
     expect(ledger).toEqual({ transactions: [] })
     expect(grant).toEqual({ transaction_id: 'transaction-1' })
     expect(deduction).toEqual({ transaction_id: 'transaction-1' })
@@ -80,8 +81,8 @@ describe('credits billing API adapter', () => {
       restricted_wallet_count: 0,
     })
 
-    expect(apiMocks.getAdminCreditWallet).toHaveBeenCalledWith(12)
-    expect(apiMocks.listAdminCreditLedger).toHaveBeenCalledWith(12, { limit: 25 })
+    expect(apiMocks.getAdminCreditWallet).toHaveBeenCalledWith(publicId)
+    expect(apiMocks.listAdminCreditLedger).toHaveBeenCalledWith(publicId, { limit: 25 })
     expect(apiMocks.grantAdminCredits).toHaveBeenCalledOnce()
     expect(apiMocks.deductAdminCredits).toHaveBeenCalledOnce()
     expect(apiMocks.refundAdminCredits).toHaveBeenCalledOnce()
@@ -101,10 +102,10 @@ describe('credits billing API adapter', () => {
       mock.mockResolvedValue({ code: 503, msg: 'dial tcp 127.0.0.1:5432' })
     }
 
-    const request = { user_id: 12, amount_credits: 5 }
+    const request = { user_public_id: publicId, amount_credits: 5 }
     const cases: Array<[Promise<unknown>, string]> = [
-      [adminCreditsBillingApi.getWallet(12), '加载 Wallet 失败'],
-      [adminCreditsBillingApi.listLedger(12), '加载 Ledger 失败'],
+      [adminCreditsBillingApi.getWallet(publicId), '加载 Wallet 失败'],
+      [adminCreditsBillingApi.listLedger(publicId), '加载 Ledger 失败'],
       [adminCreditsBillingApi.grant(request as never), '赠送Idea失败'],
       [adminCreditsBillingApi.deduct(request as never), '扣减Idea失败'],
       [adminCreditsBillingApi.refund(request as never), '退款Idea失败'],

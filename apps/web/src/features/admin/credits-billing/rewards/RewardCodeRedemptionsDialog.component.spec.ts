@@ -146,7 +146,13 @@ describe('RewardCodeRedemptionsDialog', () => {
         cursors.push(beforeId)
         return beforeId === null
           ? redemptionPageResponse([makeRedemptionSummary()], 40)
-          : redemptionPageResponse([makeRedemptionSummary({ id: 39, user_id: 43 })])
+          : redemptionPageResponse([
+              makeRedemptionSummary({
+                id: 39,
+                user_public_id: '00000000-0000-0000-0000-000000000043',
+                display_name: '用户 #43',
+              }),
+            ])
       }),
     )
     const { user } = renderDialog()
@@ -182,7 +188,11 @@ describe('RewardCodeRedemptionsDialog', () => {
           [
             makeRedemptionSummary({
               reward_code_id: Number(rewardCodeId),
-              user_id: rewardCodeId === '7' ? 23 : 88,
+              user_public_id:
+                rewardCodeId === '7'
+                  ? '00000000-0000-0000-0000-000000000023'
+                  : '00000000-0000-0000-0000-000000000088',
+              display_name: rewardCodeId === '7' ? '用户 #23' : '用户 #88',
             }),
           ],
           rewardCodeId === '7' ? 40 : undefined,
@@ -221,7 +231,11 @@ describe('RewardCodeRedemptionsDialog', () => {
           return redemptionPageResponse([makeRedemptionSummary()])
         }
         return redemptionPageResponse([
-          makeRedemptionSummary({ reward_code_id: Number(params.rewardCodeId), user_id: 88 }),
+          makeRedemptionSummary({
+            reward_code_id: Number(params.rewardCodeId),
+            user_public_id: '00000000-0000-0000-0000-000000000088',
+            display_name: '用户 #88',
+          }),
         ])
       }),
     )
@@ -310,7 +324,6 @@ function makeRewardCode(overrides: Partial<RewardCode> = {}): RewardCode {
     redemptionCount: 12,
     enabled: true,
     status: 'enabled',
-    createdBy: 1,
     createdAt: '2026-07-20T10:00:00Z',
     updatedAt: '2026-07-20T10:00:00Z',
     ...overrides,
@@ -321,7 +334,8 @@ function makeRedemptionSummary(overrides: Record<string, unknown> = {}) {
   return {
     id: 51,
     reward_code_id: 7,
-    user_id: 23,
+    user_public_id: '00000000-0000-0000-0000-000000000023',
+    display_name: '用户 #23',
     credited_amount: 80,
     redeemed_at: '2026-07-22T03:04:05Z',
     ...overrides,

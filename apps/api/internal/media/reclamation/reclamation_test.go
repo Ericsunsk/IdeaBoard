@@ -235,7 +235,7 @@ func TestReclaimWorkerIgnoresCompletedGenerationAfterUndoAndReschedule(t *testin
 
 func seedDueMediaAsset(t *testing.T, db *sql.DB, q *dbsqlc.Queries) (int64, int64) {
 	t.Helper()
-	owner := &users.User{Username: "reclaim-owner", Status: 1, Role: "user"}
+	owner := &users.User{DisplayName: "reclaim-owner", Status: 1, Role: "user"}
 	if err := users.NewUserRepository(db).Create(context.Background(), owner); err != nil {
 		t.Fatalf("create owner: %v", err)
 	}

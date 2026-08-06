@@ -289,7 +289,7 @@ func trustedTestSessionIdentity(authUserID, username string) auth.SessionIdentit
 	return auth.SessionIdentity{
 		AuthUserID:            authUserID,
 		Email:                 username + "@example.com",
-		Username:              username,
+		DisplayName:              username,
 		ClaimIdentity:         username + "@example.com",
 		ClaimIdentityKind:     "canonical_email",
 		ClaimIdentityVerified: true,
@@ -309,7 +309,7 @@ func performUploadStaticRequest(router http.Handler, method string, target strin
 func mustCreateUploadStaticUser(t *testing.T, repo *users.UserRepository, username string, authUserID string, storageUID string) *users.User {
 	t.Helper()
 	user := &users.User{
-		Username:   username,
+		DisplayName:   username,
 		AuthUserID: &authUserID,
 		StorageUID: storageUID,
 		Role:       "user",

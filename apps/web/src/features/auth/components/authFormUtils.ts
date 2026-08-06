@@ -1,8 +1,8 @@
 import { markRequiredError } from '../../../shared/utils/formValidation'
 
-export const AUTH_USERNAME_LIMIT = {
-  min: 3,
-  max: 50,
+export const AUTH_DISPLAY_NAME_LIMIT = {
+  min: 1,
+  max: 100,
 } as const
 
 export const AUTH_PASSWORD_LIMIT = {

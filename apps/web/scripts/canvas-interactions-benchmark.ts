@@ -243,11 +243,10 @@ const DEFAULT_BUDGETS: Record<BenchmarkPath, PathBudget> = {
 }
 
 const MOCK_USER = {
-  id: 1,
-  uid: 'UBM001',
-  username: 'benchmark-user',
+  public_id: '11111111-1111-4111-8111-111111111111',
+  display_name: 'Benchmark User',
+  storage_namespace: 'UBM001',
   role: 'user',
-  auth_user_id: 'auth-canvas-benchmark',
   avatar: '',
   status: 1,
   created_at: '2026-01-01T00:00:00Z',
@@ -663,7 +662,7 @@ async function installMockApiRoutes(context: BrowserContext, fixture: BenchmarkF
     if (pathname === '/api/auth/get-session') {
       await fulfillJson(route, {
         session: { id: 'canvas-benchmark-session' },
-        user: { id: MOCK_USER.auth_user_id, username: MOCK_USER.username, role: MOCK_USER.role },
+        user: { id: MOCK_USER.public_id, name: MOCK_USER.display_name, role: MOCK_USER.role },
       })
       return
     }
@@ -700,7 +699,7 @@ async function installMockApiRoutes(context: BrowserContext, fixture: BenchmarkF
         code: 0,
         msg: 'ok',
         data: {
-          url: `/uploads/canvas/${MOCK_USER.uid}/${BOARD_ID}/content/benchmark-preview.png`,
+          url: `/uploads/canvas/${MOCK_USER.storage_namespace}/${BOARD_ID}/content/benchmark-preview.png`,
           width: 512,
           height: 512,
           size: PNG_1X1.length,

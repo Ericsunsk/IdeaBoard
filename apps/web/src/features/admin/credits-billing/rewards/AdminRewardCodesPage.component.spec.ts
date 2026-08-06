@@ -429,7 +429,6 @@ function makeRewardCode(overrides: Record<string, unknown> = {}) {
     redemptionCount: 12,
     enabled: true,
     status: 'enabled',
-    createdBy: 1,
     createdAt: '2026-07-20T10:00:00Z',
     updatedAt: '2026-07-20T10:00:00Z',
     ...overrides,
@@ -440,7 +439,8 @@ function makeRedemptionSummary(overrides: Record<string, unknown> = {}) {
   return {
     id: 51,
     reward_code_id: 7,
-    user_id: 23,
+    user_public_id: '00000000-0000-0000-0000-000000000023',
+    display_name: '用户 #23',
     credited_amount: 80,
     redeemed_at: '2026-07-22T03:04:05Z',
     ...overrides,

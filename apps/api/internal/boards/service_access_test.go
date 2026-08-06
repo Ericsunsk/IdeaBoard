@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
@@ -63,8 +64,12 @@ func TestBoardServiceTenantIsolationAndMemberAccess(t *testing.T) {
 		t.Fatalf("uninvited access err = %v, want ErrBoardNotFound", err)
 	}
 
-	if _, err := service.InviteMember(ctx, ownerA.ID, boardID, memberC.StorageUID, string(BoardAccessRoleViewer)); err != nil {
+	invited, err := service.InviteMember(ctx, ownerA.ID, boardID, memberC.PublicID.String(), string(BoardAccessRoleViewer))
+	if err != nil {
 		t.Fatalf("invite member failed: %v", err)
+	}
+	if invited.PublicID != memberC.PublicID || invited.DisplayName != memberC.DisplayName || invited.Role != BoardAccessRoleViewer {
+		t.Fatalf("invited member = %+v, want public identity for %s", invited, memberC.PublicID)
 	}
 
 	memberAccess, memberRole, err := service.ResolveBoardAccess(ctx, memberC.ID, boardID)
@@ -85,6 +90,15 @@ func TestBoardServiceTenantIsolationAndMemberAccess(t *testing.T) {
 	if len(members) != 2 {
 		t.Fatalf("members len = %d, want 2", len(members))
 	}
+	encodedMembers, err := json.Marshal(members)
+	if err != nil {
+		t.Fatalf("marshal members failed: %v", err)
+	}
+	for _, privateField := range []string{"user_id", "member_uid", "username", "storage_uid"} {
+		if strings.Contains(string(encodedMembers), `"`+privateField+`"`) {
+			t.Fatalf("members expose private field %q: %s", privateField, encodedMembers)
+		}
+	}
 }
 
 func TestBoardServiceEditorCanUpdateStateButNotRename(t *testing.T) {
@@ -101,7 +115,7 @@ func TestBoardServiceEditorCanUpdateStateButNotRename(t *testing.T) {
 	if _, err := service.UpsertBoard(ctx, owner.ID, boardID, &UpsertBoardRequest{Name: "Design Board", State: validBoardState(CurrentBoardStateSchemaVersion, 100)}); err != nil {
 		t.Fatalf("create board failed: %v", err)
 	}
-	if _, err := service.InviteMember(ctx, owner.ID, boardID, editor.StorageUID, string(BoardAccessRoleEditor)); err != nil {
+	if _, err := service.InviteMember(ctx, owner.ID, boardID, editor.PublicID.String(), string(BoardAccessRoleEditor)); err != nil {
 		t.Fatalf("invite editor failed: %v", err)
 	}
 
@@ -245,9 +259,9 @@ func TestBoardServiceShareTokenUsesBoardIdentityForPermissions(t *testing.T) {
 func createBoardTestUser(t *testing.T, repo *users.UserRepository, username string) *users.User {
 	t.Helper()
 	user := &users.User{
-		Username: username,
-		Status:   1,
-		Role:     "user",
+		DisplayName: username + " display",
+		Status:      1,
+		Role:        "user",
 	}
 	if err := repo.Create(context.Background(), user); err != nil {
 		t.Fatalf("create test user %s failed: %v", username, err)

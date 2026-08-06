@@ -53,6 +53,10 @@ func (s *UserService) GetByID(ctx context.Context, id int64) (*User, error) {
 	return s.repo.GetByID(ctx, id)
 }
 
+func (s *UserService) GetByPublicID(ctx context.Context, publicID string) (*User, error) {
+	return s.repo.GetByPublicID(ctx, publicID)
+}
+
 // ListUsers 获取用户列表
 func (s *UserService) ListUsers(ctx context.Context, req *UserListRequest) (*UserListResponse, error) {
 	req.Keyword = strings.TrimSpace(req.Keyword)
@@ -98,7 +102,13 @@ func (s *UserService) ListUsers(ctx context.Context, req *UserListRequest) (*Use
 				return nil, fmt.Errorf("用户 %d 的Idea余额缺失", user.ID)
 			}
 			list = append(list, &AdminUserListItem{
-				User:             *user,
+				PublicID:         user.PublicID,
+				DisplayName:      user.DisplayName,
+				Avatar:           user.Avatar,
+				Role:             user.Role,
+				Status:           user.Status,
+				CreatedAt:        user.CreatedAt,
+				UpdatedAt:        user.UpdatedAt,
 				AvailableCredits: availableCredits,
 			})
 		}

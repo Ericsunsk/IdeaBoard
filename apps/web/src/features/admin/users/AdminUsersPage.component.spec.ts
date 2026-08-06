@@ -12,6 +12,7 @@ const toastMocks = vi.hoisted(() => ({
   warning: vi.fn(),
   error: vi.fn(),
 }))
+const userPublicID = '00000000-0000-0000-0000-000000000012'
 
 vi.mock('../shared/composables/useAdminConfirm', () => ({
   useAdminConfirm: () => ({ request: confirmRequestMock }),
@@ -43,10 +44,8 @@ describe('AdminUsersPage', () => {
             admin_count: 0,
             list: [
               {
-                id: 12,
-                uid: 'USER12',
-                username: 'admin_balance_user',
-                auth_user_id: 'auth-user-12',
+                public_id: userPublicID,
+                display_name: 'admin_balance_user',
                 avatar: '',
                 role: 'user',
                 status: 1,
@@ -58,12 +57,13 @@ describe('AdminUsersPage', () => {
           },
         })
       }),
-      http.get('/api/admin/credits/wallets/12', () =>
+      http.get(`/api/admin/credits/wallets/${userPublicID}`, () =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',
           data: {
-            user_id: 12,
+            public_id: userPublicID,
+            display_name: 'admin_balance_user',
             status: 'active',
             available_credits: 125,
             reserved_credits: 10,
@@ -81,7 +81,7 @@ describe('AdminUsersPage', () => {
           },
         }),
       ),
-      http.get('/api/admin/credits/wallets/12/ledger', ({ request }) =>
+      http.get(`/api/admin/credits/wallets/${userPublicID}/ledger`, ({ request }) =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',
@@ -94,6 +94,27 @@ describe('AdminUsersPage', () => {
                 },
         }),
       ),
+      http.get('/api/admin/users/oauth-providers/google', () =>
+        HttpResponse.json({
+          code: 0,
+          msg: 'ok',
+          data: {
+            provider: 'google',
+            enabled: false,
+            configured: false,
+            available: false,
+            client_id: '',
+            client_secret_configured: false,
+            scopes: ['openid', 'email', 'profile'],
+            config_version: 0,
+            callback_url: 'https://example.com/api/auth/callback/google',
+            updated_at: null,
+          },
+        }),
+      ),
+      http.get('/api/admin/users/oauth-capabilities', () =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: { social: { google: false } } }),
+      ),
       http.post('/api/admin/credits/grants', async ({ request }) => {
         commandRequests.push((await request.json()) as Record<string, unknown>)
         return HttpResponse.json({
@@ -103,6 +124,20 @@ describe('AdminUsersPage', () => {
         })
       }),
     )
+  })
+
+  it('opens OAuth settings from the settings icon immediately before the filter control', async () => {
+    const { user } = renderPage()
+
+    const settingsButton = await screen.findByRole('button', { name: 'OAuth Provider 设置' })
+    const filterButton = screen.getByRole('button', { name: '筛选用户' })
+    expect(settingsButton).toHaveAttribute('aria-haspopup', 'dialog')
+    expect(
+      settingsButton.compareDocumentPosition(filterButton) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+
+    await user.click(settingsButton)
+    expect(await screen.findByRole('dialog', { name: 'OAuth Provider 设置' })).toBeVisible()
   })
 
   it('opens the operational account overview from the available Idea balance', async () => {
@@ -149,7 +184,7 @@ describe('AdminUsersPage', () => {
 
     await waitFor(() =>
       expect(commandRequests[0]).toMatchObject({
-        user_id: 12,
+        user_public_id: userPublicID,
         amount_credits: 20,
         reason: '运营补偿',
       }),
@@ -172,12 +207,13 @@ describe('AdminUsersPage', () => {
           },
         }),
       ),
-      http.get('/api/admin/credits/wallets/12', () =>
+      http.get(`/api/admin/credits/wallets/${userPublicID}`, () =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',
           data: {
-            user_id: 12,
+            public_id: userPublicID,
+            display_name: 'admin_balance_user',
             status: 'frozen',
             available_credits: 125,
             reserved_credits: 10,
@@ -211,10 +247,8 @@ describe('AdminUsersPage', () => {
             admin_count: 0,
             list: [
               {
-                id: 12,
-                uid: 'USER12',
-                username: 'admin_balance_user',
-                auth_user_id: 'auth-user-12',
+                public_id: userPublicID,
+                display_name: 'admin_balance_user',
                 avatar: '',
                 role: 'user',
                 status: 1,
@@ -256,12 +290,13 @@ describe('AdminUsersPage', () => {
           },
         }),
       ),
-      http.get('/api/admin/credits/wallets/12', () =>
+      http.get(`/api/admin/credits/wallets/${userPublicID}`, () =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',
           data: {
-            user_id: 12,
+            public_id: userPublicID,
+            display_name: 'admin_balance_user',
             status: 'active',
             available_credits: availableCredits,
             reserved_credits: 0,
@@ -269,7 +304,7 @@ describe('AdminUsersPage', () => {
           },
         }),
       ),
-      http.get('/api/admin/credits/wallets/12/ledger', () =>
+      http.get(`/api/admin/credits/wallets/${userPublicID}/ledger`, () =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',
@@ -282,7 +317,7 @@ describe('AdminUsersPage', () => {
       ),
       http.post('/api/admin/credits/deductions', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>
-        expect(body).toMatchObject({ user_id: 12, amount_credits: 25, reason: '运营扣减' })
+        expect(body).toMatchObject({ user_public_id: userPublicID, amount_credits: 25, reason: '运营扣减' })
         availableCredits = 100
         hasDeduction = true
         return HttpResponse.json({
@@ -388,7 +423,7 @@ describe('AdminUsersPage', () => {
   it('only offers Refund for an eligible Charge and validates its remaining amount', async () => {
     let refundRequests = 0
     useMswHandlers(
-      http.get('/api/admin/credits/wallets/12/ledger', () =>
+      http.get(`/api/admin/credits/wallets/${userPublicID}/ledger`, () =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',
@@ -443,12 +478,13 @@ describe('AdminUsersPage', () => {
           },
         }),
       ),
-      http.get('/api/admin/credits/wallets/12', () =>
+      http.get(`/api/admin/credits/wallets/${userPublicID}`, () =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',
           data: {
-            user_id: 12,
+            public_id: userPublicID,
+            display_name: 'admin_balance_user',
             status: 'active',
             available_credits: availableCredits,
             reserved_credits: 0,
@@ -456,7 +492,7 @@ describe('AdminUsersPage', () => {
           },
         }),
       ),
-      http.get('/api/admin/credits/wallets/12/ledger', () =>
+      http.get(`/api/admin/credits/wallets/${userPublicID}/ledger`, () =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',
@@ -473,7 +509,7 @@ describe('AdminUsersPage', () => {
       http.post('/api/admin/credits/refunds', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>
         expect(body).toMatchObject({
-          user_id: 12,
+          user_public_id: userPublicID,
           charge_transaction_id: 'charge-1',
           amount_credits: 10,
           reason: '任务取消退款',
@@ -530,32 +566,33 @@ describe('AdminUsersPage', () => {
             admin_count: 0,
             list: [
               makeUser(125),
-              { ...makeUser(55), id: 13, uid: 'USER13', username: 'another_balance_user' },
+              { ...makeUser(55), public_id: '00000000-0000-0000-0000-000000000013', display_name: 'another_balance_user' },
             ],
           },
         }),
       ),
-      http.get('/api/admin/credits/wallets/:userId', ({ params }) =>
+      http.get('/api/admin/credits/wallets/:publicId', ({ params }) =>
         HttpResponse.json({
           code: 0,
           msg: 'ok',
           data: {
-            user_id: Number(params.userId),
+            public_id: String(params.publicId) === userPublicID ? userPublicID : '00000000-0000-0000-0000-000000000013',
+            display_name: String(params.publicId) === userPublicID ? 'admin_balance_user' : 'another_balance_user',
             status: 'active',
-            available_credits: params.userId === '12' ? 125 : 55,
+            available_credits: params.publicId === userPublicID ? 125 : 55,
             reserved_credits: 0,
             active_restrictions: [],
           },
         }),
       ),
-      http.get('/api/admin/credits/wallets/:userId/ledger', ({ params, request }) => {
+      http.get('/api/admin/credits/wallets/:publicId/ledger', ({ params, request }) => {
         const url = new URL(request.url)
         ledgerRequests.push({
-          userId: String(params.userId),
+          userId: String(params.publicId),
           beforeSequence: url.searchParams.get('before_sequence'),
           limit: url.searchParams.get('limit'),
         })
-        if (params.userId === '13') {
+        if (params.publicId !== userPublicID) {
           return HttpResponse.json({
             code: 0,
             msg: 'ok',
@@ -596,7 +633,7 @@ describe('AdminUsersPage', () => {
 
     expect(
       ledgerRequests
-        .filter((request) => request.userId === '12')
+        .filter((request) => request.userId === userPublicID)
         .every((request) => request.limit === '25'),
     ).toBe(true)
     expect(within(firstDialog).getAllByText('AI image completed')).toHaveLength(1)
@@ -622,14 +659,15 @@ describe('AdminUsersPage', () => {
   it('shows a recoverable read error and retries wallet and Ledger loading', async () => {
     let shouldFail = true
     useMswHandlers(
-      http.get('/api/admin/credits/wallets/12', () =>
+      http.get(`/api/admin/credits/wallets/${userPublicID}`, () =>
         shouldFail
           ? HttpResponse.json({ code: 500, msg: 'wallet unavailable' }, { status: 500 })
           : HttpResponse.json({
               code: 0,
               msg: 'ok',
               data: {
-                user_id: 12,
+                public_id: userPublicID,
+                display_name: 'admin_balance_user',
                 status: 'active',
                 available_credits: 125,
                 reserved_credits: 0,
@@ -637,7 +675,7 @@ describe('AdminUsersPage', () => {
               },
             }),
       ),
-      http.get('/api/admin/credits/wallets/12/ledger', () =>
+      http.get(`/api/admin/credits/wallets/${userPublicID}/ledger`, () =>
         shouldFail
           ? HttpResponse.json({ code: 500, msg: 'ledger unavailable' }, { status: 500 })
           : HttpResponse.json({
@@ -669,10 +707,8 @@ describe('AdminUsersPage', () => {
 
 function makeUser(availableCredits: number) {
   return {
-    id: 12,
-    uid: 'USER12',
-    username: 'admin_balance_user',
-    auth_user_id: 'auth-user-12',
+    public_id: userPublicID,
+    display_name: 'admin_balance_user',
     avatar: '',
     role: 'user',
     status: 1,
@@ -723,7 +759,7 @@ function renderPage() {
         [PrimeVue, primeVueTestOptions],
         [VueQueryPlugin, { queryClient }],
       ],
-      stubs: { Refresh: true, Search: true },
+      stubs: { Refresh: true, Search: true, Settings: true },
     },
   })
 }

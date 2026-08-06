@@ -9,7 +9,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -33,7 +32,28 @@ import (
 	"ideaboard/api/internal/usage"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
+
+type routeCreditUserResolver struct {
+	repo *users.UserRepository
+}
+
+func (r routeCreditUserResolver) ResolvePublicID(ctx context.Context, publicID string) (credits.UserIdentity, error) {
+	user, err := r.repo.GetByPublicID(ctx, publicID)
+	if err != nil {
+		return credits.UserIdentity{}, err
+	}
+	return credits.UserIdentity{ID: user.ID, PublicID: user.PublicID, DisplayName: user.DisplayName}, nil
+}
+
+func (r routeCreditUserResolver) ResolveID(ctx context.Context, id int64) (credits.UserIdentity, error) {
+	user, err := r.repo.GetByID(ctx, id)
+	if err != nil {
+		return credits.UserIdentity{}, err
+	}
+	return credits.UserIdentity{ID: user.ID, PublicID: user.PublicID, DisplayName: user.DisplayName}, nil
+}
 
 type stubBrandingSettingsProvider struct {
 	setting settings.BrandingSetting
@@ -171,10 +191,10 @@ func TestAdminRoutesRequireAuthenticatedAdminAccess(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	userRepo := users.NewUserRepository(db)
 	routeUser := &users.User{
-		Username:   "route-user",
-		AuthUserID: &authUserID,
-		Status:     1,
-		Role:       "user",
+		DisplayName: "route-user",
+		AuthUserID:  &authUserID,
+		Status:      1,
+		Role:        "user",
 	}
 	if err := userRepo.Create(context.Background(), routeUser); err != nil {
 		t.Fatalf("seed local user failed: %v", err)
@@ -212,11 +232,11 @@ func TestAdminRoutesRequireAuthenticatedAdminAccess(t *testing.T) {
 		t.Fatalf("promote route user to admin: %v", err)
 	}
 	adminDeps := newAdminRouteGuardTestDependencies(authDeps)
-	adminDeps.AdminRoutes.CreditHandler = credits.NewHandler(credits.NewService(pool))
+	adminDeps.AdminRoutes.CreditHandler = credits.NewHandler(credits.NewService(pool), routeCreditUserResolver{repo: userRepo})
 	router = gin.New()
 	RegisterRoutes(router, adminDeps, fstest.MapFS{}, FrontendRouteOptions{})
 	adminRecorder := httptest.NewRecorder()
-	adminRequest := httptest.NewRequest(http.MethodPost, "/api/admin/credits/grants", bytes.NewBufferString(`{"user_id":`+strconv.FormatInt(routeUser.ID, 10)+`,"amount_credits":1,"idempotency_key":"route-admin-grant","reason":"route auth test","business_reference_id":"route-admin-grant"}`))
+	adminRequest := httptest.NewRequest(http.MethodPost, "/api/admin/credits/grants", bytes.NewBufferString(`{"user_public_id":"`+routeUser.PublicID.String()+`","amount_credits":1,"idempotency_key":"route-admin-grant","reason":"route auth test","business_reference_id":"route-admin-grant"}`))
 	adminRequest.Header.Set("Content-Type", "application/json")
 	adminRequest.Header.Set("Cookie", "better-auth.session_token=valid")
 	router.ServeHTTP(adminRecorder, adminRequest)
@@ -297,6 +317,7 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 		},
 		AdminRoutes: AdminRouteDeps{
 			AdminHandler:            users.NewAdminHandler(nil, nil, nil),
+			SocialProviderHandler:   auth.NewSocialProviderAdminHandler(authDeps.AuthServiceClient),
 			BillingHandler:          billing.NewHandler(nil, nil),
 			CreditHandler:           credits.NewHandler(nil),
 			AccountHandler:          accounts.NewAccountHandler(nil),
@@ -358,7 +379,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"DELETE /api/admin/rewards/codes/:id":                         false,
 		"DELETE /api/admin/line-draft-modes/:id":                      false,
 		"DELETE /api/admin/storage/profiles/:id":                      false,
-		"DELETE /api/admin/users/:id":                                 false,
+		"DELETE /api/admin/users/:public_id":                          false,
 		"GET /api/admin/accounts":                                     false,
 		"GET /api/admin/accounts/:id":                                 false,
 		"GET /api/admin/accounts/:id/queue":                           false,
@@ -366,8 +387,8 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/provider-endpoints":                           false,
 		"GET /api/admin/feature-prompts":                              false,
 		"GET /api/admin/feature-prompts/:slug":                        false,
-		"GET /api/admin/credits/wallets/:user_id":                     false,
-		"GET /api/admin/credits/wallets/:user_id/ledger":              false,
+		"GET /api/admin/credits/wallets/:public_id":                   false,
+		"GET /api/admin/credits/wallets/:public_id/ledger":            false,
 		"GET /api/admin/credits/health":                               false,
 		"GET /api/admin/credits/reconciliation/runs":                  false,
 		"GET /api/admin/credits/reconciliation/runs/:run_id":          false,
@@ -396,6 +417,8 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/tasks":                                        false,
 		"GET /api/admin/tasks/:task_id":                               false,
 		"GET /api/admin/users":                                        false,
+		"GET /api/admin/users/oauth-capabilities":                     false,
+		"GET /api/admin/users/oauth-providers/:provider":              false,
 		"POST /api/admin/accounts":                                    false,
 		"POST /api/admin/credits/grants":                              false,
 		"POST /api/admin/credits/deductions":                          false,
@@ -418,9 +441,10 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"POST /api/admin/tasks/:task_id/cancel":                       false,
 		"POST /api/admin/tasks/submit":                                false,
 		"POST /api/admin/upload":                                      false,
-		"POST /api/admin/users/:id/ban":                               false,
-		"POST /api/admin/users/:id/revoke-sessions":                   false,
-		"POST /api/admin/users/:id/unban":                             false,
+		"POST /api/admin/users/:public_id/ban":                        false,
+		"POST /api/admin/users/:public_id/impersonate":                false,
+		"POST /api/admin/users/:public_id/revoke-sessions":            false,
+		"POST /api/admin/users/:public_id/unban":                      false,
 		"PATCH /api/admin/accounts/:id/models":                        false,
 		"PATCH /api/admin/rewards/codes/:id":                          false,
 		"PATCH /api/admin/rewards/codes/:id/enabled":                  false,
@@ -438,7 +462,8 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"PUT /api/admin/settings/registration":                        false,
 		"PUT /api/admin/settings/task-monitor":                        false,
 		"PUT /api/admin/storage/profiles/:id":                         false,
-		"PUT /api/admin/users/:id/role":                               false,
+		"PUT /api/admin/users/:public_id/role":                        false,
+		"PUT /api/admin/users/oauth-providers/:provider":              false,
 	}
 
 	for _, route := range routes {
@@ -557,8 +582,8 @@ func sampleAdminRouteParam(name string) string {
 		return "text-to-image"
 	case "task_id":
 		return "task-123"
-	case "user_id":
-		return "42"
+	case "public_id":
+		return uuid.MustParse("00000000-0000-4000-8000-000000000042").String()
 	default:
 		return "sample"
 	}

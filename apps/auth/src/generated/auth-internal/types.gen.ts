@@ -18,7 +18,8 @@ export type ErrorEnvelope = {
 export type SessionIdentity = {
     auth_user_id: string;
     email: string;
-    username: string;
+    display_name: string;
+    avatar?: string;
     claim_identity: string;
     claim_identity_kind: SessionClaimIdentityKind;
     claim_identity_verified: boolean;
@@ -26,7 +27,7 @@ export type SessionIdentity = {
 
 export type ProvisionedAuthUser = {
     auth_user_id: string;
-    username: string;
+    display_name: string;
     email: string;
     claim_identity: string;
     claim_identity_kind: TrustedClaimIdentityKind;
@@ -37,7 +38,7 @@ export type ProvisionedAuthUser = {
 
 export type EnsureUserRequest = {
     email: string;
-    username: string;
+    display_name: string;
     password: string;
     allow_existing: boolean;
     role: AuthRole;

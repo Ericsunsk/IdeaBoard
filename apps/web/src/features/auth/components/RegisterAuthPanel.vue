@@ -26,9 +26,9 @@
             invalid,
             required,
           }"
-          label="账号"
-          :error="errors.username"
-          field-id="register-username"
+          label="显示名称"
+          :error="errors.displayName"
+          field-id="register-display-name"
           required
           inline-required
           :field-class="authFieldClass"
@@ -40,18 +40,18 @@
             </span>
             <InputText
               :id="fieldId"
-              v-model="formValue.username"
+              v-model="formValue.displayName"
               v-bind="resolveFieldControlState(invalid)"
               unstyled
-              autocomplete="username"
+              autocomplete="name"
               :required="required"
               :class="[authInputClass, 'pl-11', inlineError ? authInputErrorClass : '']"
               :invalid="invalid"
-              :placeholder="inlineError ? inlineErrorText : '设置你的账号'"
+              :placeholder="inlineError ? inlineErrorText : '输入你的显示名称'"
               :aria-invalid="ariaInvalid"
               :aria-describedby="describedbyId"
-              @blur="validateField('username')"
-              @update:model-value="clearFieldError('username')"
+              @blur="validateField('displayName')"
+              @update:model-value="clearFieldError('displayName')"
             />
           </div>
         </IbFormField>
@@ -269,7 +269,7 @@ import { useAuthFeedback } from '../useAuthFeedback'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import {
   AUTH_PASSWORD_LIMIT,
-  AUTH_USERNAME_LIMIT,
+  AUTH_DISPLAY_NAME_LIMIT,
   getLengthError,
   getRequiredError,
 } from './authFormUtils'
@@ -310,10 +310,10 @@ const secondaryControlState = computed(() =>
   resolveInteractiveControlState({ disabled: loading.value }),
 )
 
-type RegisterField = 'username' | 'email' | 'password' | 'confirmPassword'
+type RegisterField = 'displayName' | 'email' | 'password' | 'confirmPassword'
 
 const formValue = ref({
-  username: '',
+  displayName: '',
   email: '',
   password: '',
   confirmPassword: '',
@@ -322,7 +322,7 @@ const otpPending = ref(false)
 const otp = ref('')
 const otpError = ref('')
 const errors = ref<Record<RegisterField, string>>({
-  username: '',
+  displayName: '',
   email: '',
   password: '',
   confirmPassword: '',
@@ -339,11 +339,12 @@ function resolveFieldControlState(invalid: boolean) {
 }
 
 function validateField(field: RegisterField) {
-  if (field === 'username') {
-    const username = formValue.value.username.trim()
-    errors.value.username =
-      getRequiredError(username, '账号') || getLengthError(username, AUTH_USERNAME_LIMIT, '账号')
-    return !errors.value.username
+  if (field === 'displayName') {
+    const displayName = formValue.value.displayName.trim()
+    errors.value.displayName =
+      getRequiredError(displayName, '显示名称') ||
+      getLengthError(displayName, AUTH_DISPLAY_NAME_LIMIT, '显示名称')
+    return !errors.value.displayName
   }
 
   if (field === 'password') {
@@ -374,11 +375,11 @@ function validateField(field: RegisterField) {
 }
 
 function validateForm() {
-  const usernameValid = validateField('username')
+  const displayNameValid = validateField('displayName')
   const emailValid = validateField('email')
   const passwordValid = validateField('password')
   const confirmPasswordValid = validateField('confirmPassword')
-  return usernameValid && emailValid && passwordValid && confirmPasswordValid
+  return displayNameValid && emailValid && passwordValid && confirmPasswordValid
 }
 
 function clearFieldError(field: RegisterField) {
@@ -402,7 +403,7 @@ async function handleRegister() {
     async () => {
       await userStore.register(
         formValue.value.email,
-        formValue.value.username.trim(),
+        formValue.value.displayName.trim(),
         formValue.value.password,
       )
       return true

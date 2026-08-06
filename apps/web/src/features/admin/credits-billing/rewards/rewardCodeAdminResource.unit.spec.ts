@@ -26,7 +26,6 @@ const rewardCode = {
   redemption_count: 12,
   enabled: true,
   status: 'enabled' as const,
-  created_by: 1,
   created_at: '2026-07-20T10:00:00Z',
   updated_at: '2026-07-20T10:00:00Z',
 }

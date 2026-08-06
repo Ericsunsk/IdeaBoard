@@ -8,5 +8,4 @@ import type { CreditActorType } from './creditActorType'
 
 export interface CreditActor {
   type: CreditActorType
-  id: string
 }

@@ -7,8 +7,7 @@
 import type { BoardMemberItemRole } from './boardMemberItemRole'
 
 export interface BoardMemberItem {
-  user_id: number
-  member_uid: string
-  username: string
+  public_id: string
+  display_name: string
   role: BoardMemberItemRole
 }

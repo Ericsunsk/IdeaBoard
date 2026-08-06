@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 var (
@@ -36,7 +38,7 @@ type RewardCode struct {
 	ExpiresAt       *time.Time       `json:"expires_at,omitempty"`
 	Enabled         bool             `json:"enabled"`
 	Status          RewardCodeStatus `json:"status"`
-	CreatedBy       int64            `json:"created_by"`
+	CreatedBy       int64            `json:"-"`
 	CreatedAt       time.Time        `json:"created_at"`
 	UpdatedAt       time.Time        `json:"updated_at"`
 }
@@ -104,7 +106,9 @@ type RewardCodePage struct {
 type AdminRedemptionSummary struct {
 	ID             int64     `json:"id"`
 	RewardCodeID   int64     `json:"reward_code_id"`
-	UserID         int64     `json:"user_id"`
+	UserID         int64     `json:"-"`
+	UserPublicID   uuid.UUID `json:"user_public_id"`
+	DisplayName    string    `json:"display_name"`
 	CreditedAmount int64     `json:"credited_amount"`
 	RedeemedAt     time.Time `json:"redeemed_at"`
 }
@@ -128,7 +132,9 @@ type GetAdminRedemptionInput struct {
 type AdminRedemptionDetail struct {
 	ID                  int64     `json:"id"`
 	RewardCodeID        int64     `json:"reward_code_id"`
-	UserID              int64     `json:"user_id"`
+	UserID              int64     `json:"-"`
+	UserPublicID        uuid.UUID `json:"user_public_id"`
+	DisplayName         string    `json:"display_name"`
 	CreditedAmount      int64     `json:"credited_amount"`
 	RedeemedAt          time.Time `json:"redeemed_at"`
 	CreditTransactionID string    `json:"credit_transaction_id"`
@@ -138,7 +144,9 @@ type AdminRedemptionDetail struct {
 type Redemption struct {
 	ID                    int64     `json:"id"`
 	RewardCodeID          int64     `json:"reward_code_id"`
-	UserID                int64     `json:"user_id"`
+	UserID                int64     `json:"-"`
+	UserPublicID          uuid.UUID `json:"user_public_id"`
+	DisplayName           string    `json:"display_name"`
 	RewardCodeDisplayName string    `json:"-"`
 	MaskedCodeHint        string    `json:"-"`
 	CreditAmount          int64     `json:"credit_amount"`

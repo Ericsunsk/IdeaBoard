@@ -42,7 +42,7 @@ export function createAdminPaymentOrderResource(
 function toPaymentOrderSummary(value: PaymentOrderApiSummary): AdminPaymentOrderSummary {
   return {
     publicOrderNumber: value.public_order_number,
-    user: { id: value.user.id, username: value.user.username },
+    user: { publicId: value.user.public_id, displayName: value.user.display_name },
     ideaQuantity: value.idea_quantity,
     baseAmountMinor: value.base_amount_minor,
     baseCurrency: value.base_currency,
@@ -62,7 +62,7 @@ function toPaymentOrderSummary(value: PaymentOrderApiSummary): AdminPaymentOrder
 function toPaymentOrderDetail(value: PaymentOrderApiDetail): AdminPaymentOrderDetail {
   return {
     publicOrderNumber: value.public_order_number,
-    user: { id: value.user.id, username: value.user.username },
+    user: { publicId: value.user.public_id, displayName: value.user.display_name },
     ideaQuantity: value.idea_quantity,
     baseAmountMinor: value.base_amount_minor,
     baseCurrency: value.base_currency,

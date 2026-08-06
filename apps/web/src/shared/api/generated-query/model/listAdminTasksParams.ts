@@ -10,10 +10,7 @@ import type { PageSizeParameter } from './pageSizeParameter'
 
 export type ListAdminTasksParams = {
   status?: ListAdminTasksStatus
-  /**
-   * @minimum 1
-   */
-  user_id?: number
+  user_public_id?: string
   /**
    * @minimum 1
    */

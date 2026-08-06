@@ -10,10 +10,10 @@ import {
 import type { User } from '../api/generated-query/model'
 
 const adminUser: User = {
-  id: 1,
-  uid: 'ADMIN1',
-  username: 'admin',
-  auth_user_id: 'auth-admin',
+  public_id: '00000000-0000-0000-0000-000000000001',
+  display_name: 'admin',
+  storage_namespace: 'ADMIN1',
+  avatar: '',
   role: 'admin',
   status: 1,
   created_at: '2026-01-01T00:00:00Z',
@@ -29,12 +29,14 @@ describe('handleAuthFailure', () => {
   it('keeps the last storage scope available for local draft recovery', () => {
     setStoredAuth(adminUser)
 
-    expect(getAuthStorageUserScope()).toBe('uid_ADMIN1')
+    expect(getAuthStorageUserScope()).toBe('public_00000000-0000-0000-0000-000000000001')
 
     clearStoredAuth()
 
     expect(getAuthStorageUserScope()).toBeNull()
-    expect(getRecoverableAuthStorageUserScope()).toBe('uid_ADMIN1')
+    expect(getRecoverableAuthStorageUserScope()).toBe(
+      'public_00000000-0000-0000-0000-000000000001',
+    )
   })
 
   it('clears stored admin user state after an admin API 403', () => {

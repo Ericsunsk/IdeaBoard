@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"time"
+
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/platform/response"
@@ -13,7 +15,18 @@ type AuthHandler struct {
 }
 
 type currentUserResponse struct {
-	User *users.User `json:"user"`
+	User currentUserPublicInfo `json:"user"`
+}
+
+type currentUserPublicInfo struct {
+	PublicID         string    `json:"public_id"`
+	DisplayName      string    `json:"display_name"`
+	StorageNamespace string    `json:"storage_namespace"`
+	Avatar           string    `json:"avatar,omitempty"`
+	Role             string    `json:"role"`
+	Status           int16     `json:"status"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 func NewAuthHandler(userService *users.UserService) *AuthHandler {
@@ -35,5 +48,8 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	response.SuccessDTO(c, currentUserResponse{User: user})
+	response.SuccessDTO(c, currentUserResponse{User: currentUserPublicInfo{
+		PublicID: user.PublicID.String(), DisplayName: user.DisplayName, StorageNamespace: user.StorageUID,
+		Avatar: user.Avatar, Role: user.Role, Status: user.Status, CreatedAt: user.CreatedAt, UpdatedAt: user.UpdatedAt,
+	}})
 }

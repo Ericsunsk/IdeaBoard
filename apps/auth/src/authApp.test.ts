@@ -31,21 +31,21 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
     getSession: async () => ({
       user: {
         id: "auth-user-1",
-        username: "alice",
+        name: "Alice",
         email: "alice@example.com",
       },
     }),
     signUpEmail: async ({ body }) => ({
       user: {
         id: "auth-user-2",
-        username: body.username,
+        name: body.name,
         email: body.email,
       },
     }),
     ...overrides.authApi,
   };
   const repository: AuthInternalCommandRepository = {
-    findUserByUsernameOrEmail: async () => null,
+    findUserByEmail: async () => null,
     finalizeTrustedRegistrationIdentity: async () => true,
     updateAuthUserRole: async () => true,
     updateAuthUserBanState: async () => true,
@@ -146,7 +146,7 @@ describe("createAuthApp", () => {
       ensureUser: {
         payload: {
           email: "alice@example.com",
-          username: "alice",
+          display_name: "Alice",
           password: "secret1234",
           allow_existing: false,
           role: "user",
@@ -185,7 +185,7 @@ describe("createAuthApp", () => {
           getSession: async () => ({
             user: {
               id: "auth-user-verified",
-              username: "verified-user",
+              name: "Verified User",
               email: "verified-user@example.com",
               emailVerified: true,
             },
@@ -203,35 +203,6 @@ describe("createAuthApp", () => {
 
     assert.equal(response.statusCode, 200);
     assert.equal(response.json().data.session.claim_identity_verified, true);
-  });
-
-  it("keeps native username sign-in and removes synthetic username registration", async (t) => {
-    const calls: string[] = [];
-    const app = createAuthApp(
-      createTestDeps({
-        authHandler: async (req, res) => {
-          calls.push(String(req.url));
-          res.statusCode = 204;
-          res.end();
-        },
-      }),
-    );
-    t.after(() => app.close());
-
-    const signIn = await app.inject({
-      method: "POST",
-      url: "/api/auth/sign-in/username",
-      payload: { username: "alice", password: "secret1234" },
-    });
-    const legacyRegistration = await app.inject({
-      method: "POST",
-      url: "/api/auth/register/username",
-      payload: { username: "alice", password: "secret1234" },
-    });
-
-    assert.equal(signIn.statusCode, 204);
-    assert.equal(legacyRegistration.statusCode, 404);
-    assert.deepEqual(calls, ["/api/auth/sign-in/username"]);
   });
 
   it("blocks sign-up requests when registration is disabled", async (t) => {
@@ -484,7 +455,7 @@ describe("createAuthApp", () => {
               data: {
                 user: {
                   auth_user_id: "auth-admin",
-                  username: "admin",
+                  display_name: "管理员",
                   email: "admin@example.com",
                   claim_identity: "admin@example.com",
                   claim_identity_kind: "canonical_email",
@@ -506,7 +477,7 @@ describe("createAuthApp", () => {
       headers: { "x-internal-key": "test-internal-key" },
       payload: {
         email: "admin@example.com",
-        username: "Admin",
+        display_name: "管理员",
         password: "secret1234",
         role: "admin",
         allow_existing: true,
@@ -517,7 +488,7 @@ describe("createAuthApp", () => {
     assert.deepEqual(inputs, [
       {
         email: "admin@example.com",
-        username: "Admin",
+        displayName: "管理员",
         password: "secret1234",
         role: "admin",
         allowExisting: true,
@@ -551,7 +522,8 @@ describe("createAuthApp", () => {
         url: "/internal/users/ensure",
         headers: { "x-internal-key": "test-internal-key" },
         payload: {
-          username: "admin",
+          email: "admin@example.com",
+          display_name: "管理员",
           password: "secret1234",
           role: "admin",
           allow_existing: true,

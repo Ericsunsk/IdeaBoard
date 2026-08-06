@@ -117,6 +117,8 @@ NATS JetStream 只负责持久领域事件、audit 和 realtime fanout。当前�
 
 Better Auth Service 负责登录、注册、session、身份侧字段和凭据；Go API 负责业务用户档案、角色/status 判定、Admin 操作编排和业务权限。
 
+业务 User identity 必须区分不同职责：`users.id` 仅用于数据库内部 PK/FK 与 Join，`users.public_id` 是不可变的公开 identity，`users.auth_user_id` 仅用于映射 Better Auth identity，`display_name` 是可修改且不唯一的展示资料，`storage_uid` 只用于 Media Storage namespace。Public API 的新引用必须使用 `public_id`，不得新增对内部 `id` 或 `auth_user_id` 的外部依赖。
+
 高风险身份动作必须经由 Go Admin API 编排：
 
 - 角色升降级需要同时同步 Auth Service 与业务侧 `users.role`。

@@ -10,8 +10,8 @@ export interface AdminRewardCodeRedemptionDetail {
   id: number
   /** @minimum 1 */
   reward_code_id: number
-  /** @minimum 1 */
-  user_id: number
+  user_public_id: string
+  display_name: string
   /**
    * @minimum 1
    * @maximum 9000000000000000

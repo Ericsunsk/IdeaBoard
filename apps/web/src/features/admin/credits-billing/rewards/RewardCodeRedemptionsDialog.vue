@@ -71,9 +71,10 @@
         @row-collapse="collapseRedemption"
       >
         <Column expander :style="{ width: '52px' }" />
-        <Column field="userId" header="用户" :style="{ minWidth: '180px' }">
+        <Column field="userPublicId" header="用户" :style="{ minWidth: '240px' }">
           <template #body="{ data }">
-            <span class="font-semibold text-admin-text-1">用户 #{{ data.userId }}</span>
+            <span class="font-semibold text-admin-text-1">{{ data.displayName }}</span>
+            <span class="block text-admin-caption text-admin-text-3">{{ data.userPublicId }}</span>
           </template>
         </Column>
         <Column field="creditedAmount" header="获得 Idea" :style="{ width: '180px' }">

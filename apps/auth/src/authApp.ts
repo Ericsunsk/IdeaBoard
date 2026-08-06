@@ -18,6 +18,11 @@ import { registerMailConfigRoutes } from "./mailConfigRoutes.js";
 import type { MailConfigService } from "./mailConfig.js";
 import { getErrorStatus, sendError, sendSuccess } from "./httpResponse.js";
 import { createAuthDispatchHandler } from "./publicRegistration.js";
+import {
+  isSocialProviderCapabilitiesRoute,
+  registerSocialProviderRoutes,
+} from "./socialProviderRoutes.js";
+import type { SocialProviderSettingsService } from "./socialProviderSettings.js";
 import type { TrustedIdentityRepository } from "./trustedIdentity.js";
 
 export type AuthAppConfig = {
@@ -35,6 +40,10 @@ export type AuthAppDependencies = {
   internalCommands: AuthInternalCommands;
   getAuthGuardSettings: () => Promise<AuthGuardSettings>;
   mailConfigService?: Pick<MailConfigService, "getSummary" | "update" | "clear" | "sendTest">;
+  socialProviderSettingsService?: Pick<
+    SocialProviderSettingsService,
+    "getSummary" | "update" | "getCapabilities"
+  >;
 };
 
 export function createAuthApp(deps: AuthAppDependencies): FastifyInstance {
@@ -61,6 +70,9 @@ export function createAuthApp(deps: AuthAppDependencies): FastifyInstance {
   });
 
   app.addHook("onRequest", async (request, reply) => {
+    if (isSocialProviderCapabilitiesRoute(request.raw.url || "")) {
+      return;
+    }
     if (!isAuthRoute(request.raw.url || "")) {
       return;
     }
@@ -92,6 +104,14 @@ export function createAuthApp(deps: AuthAppDependencies): FastifyInstance {
     registerMailConfigRoutes(app, {
       internalKey: deps.config.internalKey,
       service: deps.mailConfigService,
+    });
+  }
+
+  if (deps.socialProviderSettingsService) {
+    registerSocialProviderRoutes(app, {
+      internalKey: deps.config.internalKey,
+      trustedOrigins: deps.config.trustedOrigins,
+      service: deps.socialProviderSettingsService,
     });
   }
 

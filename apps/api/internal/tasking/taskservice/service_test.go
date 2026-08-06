@@ -1316,7 +1316,7 @@ func (r testTaskUploadOwnerStorageUIDResolver) GetStorageUIDByUserID(ctx context
 func mustCreateTaskUploadUser(t *testing.T, repo *users.UserRepository, username string, authUserID string, storageUID string) *users.User {
 	t.Helper()
 	user := &users.User{
-		Username:   username,
+		DisplayName:   username,
 		AuthUserID: &authUserID,
 		StorageUID: storageUID,
 		Role:       "user",

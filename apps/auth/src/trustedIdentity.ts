@@ -2,7 +2,8 @@ import {
   extractAuthUser,
   isValidCanonicalEmail,
   normalizeCanonicalEmail,
-  normalizeRegistrationUsername,
+  normalizeAvatarURL,
+  normalizeDisplayName,
   type InternalUserShape,
 } from "./authUtils.js";
 import type { AuthRole } from "./generated/auth-internal/types.gen.js";
@@ -15,7 +16,6 @@ export type TrustedIdentityAuthAPI = {
       email: string;
       password: string;
       name: string;
-      username: string;
     };
   }): Promise<unknown>;
 };
@@ -23,7 +23,8 @@ export type TrustedIdentityAuthAPI = {
 export type VerifiedSessionIdentity = {
   auth_user_id: string;
   email: string;
-  username: string;
+  display_name: string;
+  avatar: string;
   claim_identity: string;
   claim_identity_kind: "canonical_email" | "untrusted";
   claim_identity_verified: boolean;
@@ -32,7 +33,7 @@ export type VerifiedSessionIdentity = {
 export function sessionIdentityFromAuthUser(
   user: InternalUserShape,
 ): VerifiedSessionIdentity {
-  const username = normalizeRegistrationUsername(user.username || user.name || "");
+  const displayName = normalizeDisplayName(user.name);
   const claimIdentity = normalizeCanonicalEmail(user.email);
   const isTrustedClaimIdentity =
     Boolean(user.emailVerified) && isValidCanonicalEmail(claimIdentity);
@@ -40,18 +41,18 @@ export function sessionIdentityFromAuthUser(
   return {
     auth_user_id: user.id.trim(),
     email: claimIdentity,
-    username,
+    display_name: displayName,
+    avatar: normalizeAvatarURL(user.image),
     claim_identity: claimIdentity,
-    claim_identity_kind: isTrustedClaimIdentity ? "canonical_email" : "untrusted",
+    claim_identity_kind: isTrustedClaimIdentity
+      ? "canonical_email"
+      : "untrusted",
     claim_identity_verified: isTrustedClaimIdentity,
   };
 }
 
 export type TrustedIdentityRepository = {
-  findUserByUsernameOrEmail(
-    username: string,
-    email: string,
-  ): Promise<InternalUserShape | null>;
+  findUserByEmail(email: string): Promise<InternalUserShape | null>;
   finalizeTrustedRegistrationIdentity(
     authUserID: string,
     claimIdentity: string,
@@ -66,7 +67,7 @@ export async function provisionTrustedCanonicalIdentity(
   authApi: TrustedIdentityAuthAPI,
   repository: TrustedIdentityRepository,
   email: string,
-  username: string,
+  displayName: string,
   password: string,
   role: AuthRole,
 ) {
@@ -76,16 +77,13 @@ export async function provisionTrustedCanonicalIdentity(
   let createdUserID = "";
   try {
     const created = await authApi.signUpEmail({
-      body: { email: claimIdentity, password, name: username, username },
+      body: { email: claimIdentity, password, name: displayName },
     });
     const user = extractAuthUser(created);
     if (!user) {
       let recovered;
       try {
-        recovered = await repository.findUserByUsernameOrEmail(
-          username,
-          claimIdentity,
-        );
+        recovered = await repository.findUserByEmail(claimIdentity);
       } catch (lookupError) {
         console.error(
           "[auth] failed to recover trusted identity after empty sign-up payload",

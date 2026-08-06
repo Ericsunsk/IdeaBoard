@@ -10,7 +10,6 @@ import (
 	"io"
 	"math/big"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -52,8 +51,8 @@ type AdminPaymentOrderPage struct {
 }
 
 type AdminPaymentOrderUser struct {
-	ID       int64  `json:"id"`
-	Username string `json:"username"`
+	PublicID    uuid.UUID `json:"public_id"`
+	DisplayName string    `json:"display_name"`
 }
 
 type AdminPaymentOrderSummary struct {
@@ -75,6 +74,7 @@ type AdminPaymentOrderSummary struct {
 }
 
 type AdminPaymentOrderDetail struct {
+	internalUserID         int64
 	PublicOrderNumber      string                       `json:"public_order_number"`
 	User                   AdminPaymentOrderUser        `json:"user"`
 	IdeaQuantity           int64                        `json:"idea_quantity"`
@@ -156,8 +156,8 @@ type adminPaymentOrderCursor struct {
 
 type adminPaymentOrderFilters struct {
 	orderNumber string
-	userID      int64
-	username    string
+	userPublicID uuid.UUID
+	displayName  string
 	status      string
 	anomalyOnly bool
 	cursor      *adminPaymentOrderCursor
@@ -240,7 +240,7 @@ func (s *Service) GetAdminPaymentOrder(ctx context.Context, orderNumber string) 
 			}
 		}
 		if remaining > 0 {
-			wallet, walletErr := s.wallets.GetWallet(ctx, detail.User.ID)
+			wallet, walletErr := s.wallets.GetWallet(ctx, detail.internalUserID)
 			if walletErr != nil && !errors.Is(walletErr, credits.ErrWalletNotFound) {
 				return AdminPaymentOrderDetail{}, walletErr
 			}
@@ -324,13 +324,10 @@ func normalizeAdminPaymentOrderFilters(input AdminPaymentOrderListInput) (adminP
 		return adminPaymentOrderFilters{}, ErrAdminPaymentOrderFilter
 	}
 	if user != "" {
-		if userID, err := strconv.ParseInt(user, 10, 64); err == nil {
-			if userID <= 0 {
-				return adminPaymentOrderFilters{}, ErrAdminPaymentOrderFilter
-			}
-			filters.userID = userID
-		} else if validAdminPaymentOrderUsername(user) {
-			filters.username = user
+		if publicID, err := uuid.Parse(user); err == nil {
+			filters.userPublicID = publicID
+		} else if validAdminPaymentOrderDisplayName(user) {
+			filters.displayName = user
 		} else {
 			return adminPaymentOrderFilters{}, ErrAdminPaymentOrderFilter
 		}
@@ -354,16 +351,8 @@ func validAdminPaymentOrderStatus(status PaymentOrderStatus) bool {
 	}
 }
 
-func validAdminPaymentOrderUsername(value string) bool {
-	for _, character := range value {
-		isAllowed := character == '-' || character == '_' || character == '.' ||
-			character >= '0' && character <= '9' ||
-			character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z'
-		if !isAllowed {
-			return false
-		}
-	}
-	return value != ""
+func validAdminPaymentOrderDisplayName(value string) bool {
+	return strings.TrimSpace(value) != "" && !strings.ContainsAny(value, "\x00\r\n")
 }
 
 func (r *Repository) listAdminPaymentOrders(ctx context.Context, filters adminPaymentOrderFilters) (AdminPaymentOrderPage, error) {
@@ -374,7 +363,7 @@ func (r *Repository) listAdminPaymentOrders(ctx context.Context, filters adminPa
 	var page AdminPaymentOrderPage
 	err := db.withReadSnapshot(func(q *dbsqlc.Queries) error {
 		params := dbsqlc.CountAdminPaymentOrdersParams{
-			OrderNumber: filters.orderNumber, UserID: filters.userID, Username: filters.username,
+			OrderNumber: filters.orderNumber, HasUserPublicID: filters.userPublicID != uuid.Nil, UserPublicID: filters.userPublicID, DisplayName: filters.displayName,
 			Status: filters.status, AnomalyOnly: filters.anomalyOnly,
 		}
 		total, err := q.CountAdminPaymentOrders(ctx, params)
@@ -382,7 +371,7 @@ func (r *Repository) listAdminPaymentOrders(ctx context.Context, filters adminPa
 			return fmt.Errorf("count admin payment orders: %w", err)
 		}
 		listParams := dbsqlc.ListAdminPaymentOrdersParams{
-			OrderNumber: filters.orderNumber, UserID: filters.userID, Username: filters.username,
+			OrderNumber: filters.orderNumber, HasUserPublicID: filters.userPublicID != uuid.Nil, UserPublicID: filters.userPublicID, DisplayName: filters.displayName,
 			Status: filters.status, AnomalyOnly: filters.anomalyOnly, PageLimit: int32(filters.limit + 1),
 		}
 		if filters.cursor != nil {
@@ -469,7 +458,7 @@ func (r *Repository) getAdminPaymentOrder(ctx context.Context, orderNumber strin
 func adminPaymentOrderSummary(row dbsqlc.ListAdminPaymentOrdersRow) AdminPaymentOrderSummary {
 	return AdminPaymentOrderSummary{
 		PublicOrderNumber: row.PublicOrderNumber,
-		User:              AdminPaymentOrderUser{ID: row.UserID, Username: row.Username},
+		User:              AdminPaymentOrderUser{PublicID: row.UserPublicID, DisplayName: row.DisplayName},
 		IdeaQuantity:      row.IdeaQuantity,
 		BaseAmountMinor:   row.BaseAmountMinor,
 		BaseCurrency:      strings.ToLower(row.BaseCurrency),
@@ -489,8 +478,9 @@ func adminPaymentOrderSummary(row dbsqlc.ListAdminPaymentOrdersRow) AdminPayment
 func adminPaymentOrderDetail(row dbsqlc.GetAdminPaymentOrderRow) AdminPaymentOrderDetail {
 	status := PaymentOrderStatus(row.Status)
 	return AdminPaymentOrderDetail{
+		internalUserID:       row.UserID,
 		PublicOrderNumber: row.PublicOrderNumber,
-		User:              AdminPaymentOrderUser{ID: row.UserID, Username: row.Username},
+		User:              AdminPaymentOrderUser{PublicID: row.UserPublicID, DisplayName: row.DisplayName},
 		IdeaQuantity:      row.IdeaQuantity,
 		BaseAmountMinor:   row.BaseAmountMinor,
 		BaseCurrency:      strings.ToLower(row.BaseCurrency),

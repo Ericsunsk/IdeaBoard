@@ -3,6 +3,7 @@ package trust
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -15,7 +16,8 @@ var ErrUntrustedIdentity = errors.New("untrusted identity")
 type SessionIdentity struct {
 	AuthUserID            string `json:"auth_user_id"`
 	Email                 string `json:"email"`
-	Username              string `json:"username"`
+	DisplayName           string `json:"display_name"`
+	Avatar                string `json:"avatar"`
 	ClaimIdentity         string `json:"claim_identity"`
 	ClaimIdentityKind     string `json:"claim_identity_kind"`
 	ClaimIdentityVerified bool   `json:"claim_identity_verified"`
@@ -25,7 +27,8 @@ type SessionIdentity struct {
 type ProvisioningIdentity struct {
 	AuthUserID            string `json:"auth_user_id"`
 	Email                 string `json:"email"`
-	Username              string `json:"username"`
+	DisplayName           string `json:"display_name"`
+	Avatar                string `json:"avatar"`
 	ClaimIdentity         string `json:"claim_identity"`
 	ClaimIdentityKind     string `json:"claim_identity_kind"`
 	ClaimIdentityVerified bool   `json:"claim_identity_verified"`
@@ -36,15 +39,16 @@ type ProvisioningIdentity struct {
 func ValidateSessionIdentity(input SessionIdentity) (SessionIdentity, error) {
 	input.AuthUserID = strings.TrimSpace(input.AuthUserID)
 	input.Email = normalizeCanonicalEmail(input.Email)
-	input.Username = strings.TrimSpace(input.Username)
+	input.DisplayName = strings.TrimSpace(input.DisplayName)
+	input.Avatar = normalizeAvatarURL(input.Avatar)
 	input.ClaimIdentity = normalizeCanonicalEmail(input.ClaimIdentity)
 	input.ClaimIdentityKind = strings.TrimSpace(input.ClaimIdentityKind)
 
 	if input.AuthUserID == "" {
 		return SessionIdentity{}, fmt.Errorf("%w: auth user id is required", ErrUntrustedIdentity)
 	}
-	if input.Username == "" {
-		return SessionIdentity{}, fmt.Errorf("%w: username is required", ErrUntrustedIdentity)
+	if input.DisplayName == "" {
+		return SessionIdentity{}, fmt.Errorf("%w: display name is required", ErrUntrustedIdentity)
 	}
 	if !isCanonicalEmail(input.Email) || input.ClaimIdentity != input.Email {
 		return SessionIdentity{}, fmt.Errorf("%w: canonical email claim is invalid", ErrUntrustedIdentity)
@@ -63,7 +67,8 @@ func ProvisioningIdentityFromSession(input SessionIdentity, role string) (Provis
 	return NormalizeProvisioningIdentity(ProvisioningIdentity{
 		AuthUserID:            validated.AuthUserID,
 		Email:                 validated.Email,
-		Username:              validated.Username,
+		DisplayName:           validated.DisplayName,
+		Avatar:                validated.Avatar,
 		ClaimIdentity:         validated.ClaimIdentity,
 		ClaimIdentityKind:     validated.ClaimIdentityKind,
 		ClaimIdentityVerified: validated.ClaimIdentityVerified,
@@ -79,7 +84,8 @@ func NormalizeProvisioningIdentity(input ProvisioningIdentity) (ProvisioningIden
 	session, err := ValidateSessionIdentity(SessionIdentity{
 		AuthUserID:            input.AuthUserID,
 		Email:                 email,
-		Username:              input.Username,
+		DisplayName:           input.DisplayName,
+		Avatar:                input.Avatar,
 		ClaimIdentity:         input.ClaimIdentity,
 		ClaimIdentityKind:     input.ClaimIdentityKind,
 		ClaimIdentityVerified: input.ClaimIdentityVerified,
@@ -99,13 +105,26 @@ func NormalizeProvisioningIdentity(input ProvisioningIdentity) (ProvisioningIden
 	return ProvisioningIdentity{
 		AuthUserID:            session.AuthUserID,
 		Email:                 session.Email,
-		Username:              session.Username,
+		DisplayName:           session.DisplayName,
+		Avatar:                session.Avatar,
 		ClaimIdentity:         session.ClaimIdentity,
 		ClaimIdentityKind:     session.ClaimIdentityKind,
 		ClaimIdentityVerified: session.ClaimIdentityVerified,
 		Role:                  role,
 		EnsureActive:          input.EnsureActive,
 	}, nil
+}
+
+func normalizeAvatarURL(raw string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" || len(value) > 2048 {
+		return ""
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" || parsed.User != nil {
+		return ""
+	}
+	return parsed.String()
 }
 
 func normalizeCanonicalEmail(raw string) string {

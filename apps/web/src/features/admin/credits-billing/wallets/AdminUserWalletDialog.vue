@@ -1,7 +1,7 @@
 <template>
   <AdminDialogShell
     :visible="visible"
-    :aria-label="`${user.username} 的Idea账户`"
+    :aria-label="`${user.displayName} 的Idea账户`"
     size="wide"
     content-layout="scrollable"
     :busy="commandPending"
@@ -10,10 +10,10 @@
     <template #header>
       <div>
         <div class="text-admin-modal-title font-[780] text-admin-title-color">
-          {{ user.username }} 的Idea账户
+          {{ user.displayName }} 的Idea账户
         </div>
         <div class="mt-0.5 text-admin-caption text-admin-text-3">
-          User #{{ user.id }} · 余额仅可通过 Ledger command 变更
+          {{ user.publicId }} · 余额仅可通过 Ledger command 变更
         </div>
       </div>
     </template>
@@ -284,8 +284,8 @@ import {
 import { type AdminCreditCommandKind, validateAdminCreditCommand } from './creditCommandContract'
 
 type AdminUserWalletTarget = {
-  id: number
-  username: string
+  publicId: string
+  displayName: string
   status: number
   availableCredits: number
 }
@@ -304,7 +304,7 @@ const amountCredits = ref<number | null>(null)
 const reason = ref('')
 const showErrors = ref(false)
 const resource = useAdminCreditWalletResource(
-  () => (props.visible ? props.user.id : null),
+  () => (props.visible ? props.user.publicId : null),
   beforeSequence,
 )
 const wallet = resource.wallet
@@ -326,7 +326,7 @@ const accountStatus = computed(() => {
 const validation = computed(() =>
   validateAdminCreditCommand({
     kind: activeCommand.value ?? 'grant',
-    userId: props.user.id,
+    userPublicId: props.user.publicId,
     amountCredits: amountCredits.value,
     reason: reason.value,
     chargeTransactionId: refundSource.value?.transaction_id,
@@ -335,7 +335,7 @@ const validation = computed(() =>
 )
 
 watch(
-  [() => props.visible, () => props.user.id],
+  [() => props.visible, () => props.user.publicId],
   ([visible]) => {
     if (visible) resetLedger()
   },
@@ -355,7 +355,7 @@ watch(
       resource.ledgerQuery.isFetching.value ||
       !criteria ||
       !page ||
-      criteria.userId !== props.user.id ||
+      criteria.userPublicId !== props.user.publicId ||
       criteria.beforeSequence !== beforeSequence.value
     )
       return
@@ -426,14 +426,14 @@ function requestCommandConfirmation() {
   const label = kind === 'grant' ? '赠送' : kind === 'deduction' ? '扣减' : '退款'
   confirm.request({
     title: `确认${label}Idea`,
-    message: `将为 ${props.user.username} ${label} ${formatCredits(amountCredits.value)}。原因：${reason.value.trim()}`,
+    message: `将为 ${props.user.displayName} ${label} ${formatCredits(amountCredits.value)}。原因：${reason.value.trim()}`,
     confirmLabel: `确认${label}`,
     intent: kind === 'grant' ? 'warn' : 'danger',
     onConfirm: async () => {
       try {
         const response = await resource.executeCommand({
           kind,
-          userId: props.user.id,
+          userPublicId: props.user.publicId,
           amountCredits: amountCredits.value,
           reason: reason.value,
           chargeTransactionId: refundSource.value?.transaction_id,

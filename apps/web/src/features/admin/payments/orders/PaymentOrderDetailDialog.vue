@@ -26,7 +26,7 @@
               {{ detail.publicOrderNumber }}
             </div>
             <div class="mt-1 text-admin-meta text-admin-text-3">
-              用户 {{ detail.user.username }} · ID {{ detail.user.id }}
+              用户 {{ detail.user.displayName }} · {{ detail.user.publicId }}
             </div>
           </div>
           <Tag

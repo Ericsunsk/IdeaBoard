@@ -136,24 +136,25 @@ func runInitAdmin() {
 	}
 	adminPassword := strings.TrimSpace(os.Getenv("INIT_ADMIN_PASSWORD"))
 	adminEmail := strings.TrimSpace(os.Getenv("INIT_ADMIN_EMAIL"))
-	adminUsername := strings.TrimSpace(os.Getenv("INIT_ADMIN_USERNAME"))
+	adminDisplayName := strings.TrimSpace(os.Getenv("INIT_ADMIN_DISPLAY_NAME"))
 	if adminEmail == "" {
 		fatal("INIT_ADMIN_EMAIL is required")
 	}
-	if adminUsername == "" {
-		fatal("INIT_ADMIN_USERNAME is required")
+	if adminDisplayName == "" {
+		fatal("INIT_ADMIN_DISPLAY_NAME is required")
 	}
 	if adminPassword == "" {
 		fatal("INIT_ADMIN_PASSWORD is required")
 	}
 
 	authServiceClient := auth.NewServiceClient(cfg.Auth)
-	provisioned, err := authServiceClient.EnsureUser(ctx, adminEmail, adminUsername, adminPassword, true, "admin")
+	provisioned, err := authServiceClient.EnsureUser(ctx, adminEmail, adminDisplayName, adminPassword, true, "admin")
 	if err != nil {
 		fatal("failed to ensure Better Auth admin user", "err", err)
 	}
 	result, err := lifecycle.ProvisionIdentity(ctx, users.VerifiedIdentity{
-		AuthUserID: provisioned.AuthUserID, Username: provisioned.Username,
+		AuthUserID: provisioned.AuthUserID,
+		DisplayName: provisioned.DisplayName,
 		ClaimIdentity: provisioned.ClaimIdentity, ClaimIdentityKind: provisioned.ClaimIdentityKind,
 		ClaimIdentityVerified: provisioned.ClaimIdentityVerified, Role: "admin", EnsureActive: true,
 	})

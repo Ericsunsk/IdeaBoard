@@ -9,7 +9,8 @@ import type { CreditWalletRestrictionActor } from './creditWalletRestrictionActo
 
 export interface CreditWalletRestriction {
   restriction_id: string
-  user_id: number
+  public_id: string
+  display_name: string
   type: string
   source: string
   related_object: CreditBusinessReference
