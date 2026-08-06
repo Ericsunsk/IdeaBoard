@@ -22,6 +22,7 @@ func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T)
 	db := testdb.Open(t)
 	repo := NewRepository(db)
 	service := NewService(ServiceDependencies{Repository: repo})
+	user42PublicID := adminPaymentUserPublicID(t, db, 42)
 	first := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-AAA000000001", 501)
 	second := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-BBB000000002", 502)
 	third := createAdminPaymentOrder(t, repo, 99, "IBP-20260801-CCC000000003", 503)
@@ -67,9 +68,11 @@ func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T)
 		want int
 	}{
 		{name: "exact order", path: "/admin/payments/orders?order_number=" + first.PublicOrderNumber, want: 1},
-		{name: "user id", path: "/admin/payments/orders?user=42", want: 2},
+		{name: "user public id", path: "/admin/payments/orders?user=" + user42PublicID.String(), want: 2},
 		{name: "display name", path: "/admin/payments/orders?user=test-fixture-user-99", want: 1},
 		{name: "display name underscore literal", path: "/admin/payments/orders?user=test_fixture-user-99", want: 0},
+		{name: "numeric display name", path: "/admin/payments/orders?user=0", want: 0},
+		{name: "display name with space", path: "/admin/payments/orders?user=unsafe%20name", want: 0},
 		{name: "anomaly", path: "/admin/payments/orders?anomaly_only=true", want: 1},
 	} {
 		response := performPaymentRequest(router, http.MethodGet, testCase.path, "", nil)
@@ -96,7 +99,7 @@ func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T)
 	nonCanonicalCursor := base64.RawURLEncoding.EncodeToString(nonCanonicalCursorPayload)
 	for _, query := range []string{
 		"limit=0", "limit=101", "limit=x", "cursor=bad", "status=paid", "order_number=not-an-order",
-		"user=0", "user=unsafe%20name", "anomaly_only=1", "unexpected=true", "limit=1&limit=2",
+		"user=unsafe%0Aname", "anomaly_only=1", "unexpected=true", "limit=1&limit=2",
 		"cursor=" + nonCanonicalCursor,
 	} {
 		response := performPaymentRequest(router, http.MethodGet, "/admin/payments/orders?"+query, "", nil)
@@ -127,6 +130,7 @@ func TestAdminPaymentOrderDetailMasksProviderIdentifiersAndExcludesInternalField
 	db := testdb.Open(t)
 	repo := NewRepository(db)
 	service := NewService(ServiceDependencies{Repository: repo})
+	userPublicID := adminPaymentUserPublicID(t, db, 42)
 	order := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-DETAIL000001", 501)
 	bound, err := repo.BindPaymentOrderCheckout(t.Context(), BindPaymentOrderCheckoutInput{
 		OrderID: order.ID, StripeCustomerID: "cus_admin_detail_secret", StripeSessionID: "cs_admin_detail_secret",
@@ -152,7 +156,7 @@ func TestAdminPaymentOrderDetailMasksProviderIdentifiersAndExcludesInternalField
 	}
 	var detail AdminPaymentOrderDetail
 	decodePaymentResponseData(t, response.Body.Bytes(), &detail)
-	if detail.internalUserID != 42 || detail.User.DisplayName != "test-fixture-user-42" || detail.Status != PaymentOrderCheckoutOpen ||
+	if detail.User.PublicID != userPublicID || detail.User.DisplayName != "test-fixture-user-42" || detail.Status != PaymentOrderCheckoutOpen ||
 		detail.Stripe.CustomerID == "" || strings.Contains(detail.Stripe.CustomerID, "admin_detail_secret") ||
 		!detail.Reconciliation.Anomalous || detail.Reconciliation.LastErrorSummary != "需要人工检查" {
 		t.Fatalf("detail=%+v", detail)
@@ -168,11 +172,27 @@ func TestAdminPaymentOrderDetailMasksProviderIdentifiersAndExcludesInternalField
 			t.Fatalf("detail exposed internal field %q: %s", field, response.Body.String())
 		}
 	}
+	var publicUser map[string]json.RawMessage
+	if err := json.Unmarshal(payload.Data["user"], &publicUser); err != nil {
+		t.Fatalf("decode public user: %v", err)
+	}
+	if len(publicUser) != 2 || publicUser["public_id"] == nil || publicUser["display_name"] == nil {
+		t.Fatalf("public user fields = %v, body=%s", publicUser, response.Body.String())
+	}
 	for _, forbidden := range []string{"cus_admin_detail_secret", "cs_admin_detail_secret", "checkout.stripe.example"} {
 		if strings.Contains(response.Body.String(), forbidden) {
 			t.Fatalf("detail exposed provider/internal value %q: %s", forbidden, response.Body.String())
 		}
 	}
+}
+
+func adminPaymentUserPublicID(t *testing.T, db *sql.DB, userID int64) uuid.UUID {
+	t.Helper()
+	var publicID uuid.UUID
+	if err := db.QueryRowContext(t.Context(), `SELECT public_id FROM users WHERE id = $1`, userID).Scan(&publicID); err != nil {
+		t.Fatalf("load payment user public identity: %v", err)
+	}
+	return publicID
 }
 
 func TestAdminPaymentOrderDetailAssociatesRefundAndDisputeWebhookFacts(t *testing.T) {

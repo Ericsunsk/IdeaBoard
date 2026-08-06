@@ -8,6 +8,7 @@ import (
 
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport"
 
@@ -15,9 +16,14 @@ import (
 )
 
 func TestAdminListsSafeRedemptionSummariesScopedToRewardCode(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
+	userRepo := users.NewUserRepository(db)
+	redeemingUser, err := userRepo.GetByID(t.Context(), 3)
+	if err != nil {
+		t.Fatalf("load redemption user: %v", err)
+	}
 
 	created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
 		DisplayName: "Admin read target", Code: "ADMIN-READ-TARGET-2026", CreditAmount: 37,
@@ -39,7 +45,7 @@ func TestAdminListsSafeRedemptionSummariesScopedToRewardCode(t *testing.T) {
 		t.Fatalf("Redeem() error = %v", err)
 	}
 
-	handler := NewHandler(service)
+	handler := NewHandler(service, userRepo)
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -57,7 +63,8 @@ func TestAdminListsSafeRedemptionSummariesScopedToRewardCode(t *testing.T) {
 	}
 	item := page.Redemptions[0]
 	if item.ID != redeemed.Redemption.ID || item.RewardCodeID != created.RewardCode.ID ||
-		item.UserID != 3 || item.CreditedAmount != 37 || item.RedeemedAt.IsZero() {
+		item.UserPublicID != redeemingUser.PublicID || item.DisplayName != redeemingUser.DisplayName ||
+		item.CreditedAmount != 37 || item.RedeemedAt.IsZero() {
 		t.Fatalf("summary = %+v", item)
 	}
 	var payload struct {
@@ -69,7 +76,7 @@ func TestAdminListsSafeRedemptionSummariesScopedToRewardCode(t *testing.T) {
 		t.Fatalf("decode response: %v", err)
 	}
 	wantFields := map[string]bool{
-		"id": true, "reward_code_id": true, "user_id": true,
+		"id": true, "reward_code_id": true, "user_public_id": true, "display_name": true,
 		"credited_amount": true, "redeemed_at": true,
 	}
 	if len(payload.Data.Redemptions) != 1 || len(payload.Data.Redemptions[0]) != len(wantFields) {
@@ -91,9 +98,14 @@ func TestAdminListsSafeRedemptionSummariesScopedToRewardCode(t *testing.T) {
 }
 
 func TestAdminGetsRedemptionDetailOnlyWithinRewardCodeScope(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
+	userRepo := users.NewUserRepository(db)
+	redeemingUser, err := userRepo.GetByID(t.Context(), 3)
+	if err != nil {
+		t.Fatalf("load redemption user: %v", err)
+	}
 	targetCode, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
 		DisplayName: "Admin detail target", Code: "ADMIN-DETAIL-TARGET-2026", CreditAmount: 23,
 		IdempotencyKey: "admin-detail-target", ActorUserID: 1,
@@ -119,7 +131,7 @@ func TestAdminGetsRedemptionDetailOnlyWithinRewardCodeScope(t *testing.T) {
 		t.Fatalf("Redeem(other) error = %v", err)
 	}
 
-	handler := NewHandler(service)
+	handler := NewHandler(service, userRepo)
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -134,7 +146,8 @@ func TestAdminGetsRedemptionDetailOnlyWithinRewardCodeScope(t *testing.T) {
 	)
 	if recorder.Header().Get("Cache-Control") != "no-store" ||
 		detail.ID != targetRedemption.Redemption.ID || detail.RewardCodeID != targetCode.RewardCode.ID ||
-		detail.UserID != 3 || detail.CreditedAmount != 23 || detail.RedeemedAt.IsZero() ||
+		detail.UserPublicID != redeemingUser.PublicID || detail.DisplayName != redeemingUser.DisplayName ||
+		detail.CreditedAmount != 23 || detail.RedeemedAt.IsZero() ||
 		detail.CreditTransactionID != targetRedemption.Redemption.CreditTransactionID ||
 		detail.MaskedCodeHint != "•••• 2026" {
 		t.Fatalf("detail = %+v Cache-Control=%q", detail, recorder.Header().Get("Cache-Control"))
@@ -146,7 +159,7 @@ func TestAdminGetsRedemptionDetailOnlyWithinRewardCodeScope(t *testing.T) {
 		t.Fatalf("decode detail response: %v", err)
 	}
 	wantFields := map[string]bool{
-		"id": true, "reward_code_id": true, "user_id": true, "credited_amount": true,
+		"id": true, "reward_code_id": true, "user_public_id": true, "display_name": true, "credited_amount": true,
 		"redeemed_at": true, "credit_transaction_id": true, "masked_code_hint": true,
 	}
 	if len(payload.Data) != len(wantFields) {
@@ -173,9 +186,10 @@ func TestAdminGetsRedemptionDetailOnlyWithinRewardCodeScope(t *testing.T) {
 }
 
 func TestAdminRedemptionListUsesBoundedKeysetPagination(t *testing.T) {
-	_, pool := testdb.OpenWithPool(t)
+	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
+	userRepo := users.NewUserRepository(db)
 	created, err := service.CreateRewardCode(t.Context(), CreateRewardCodeCommand{
 		DisplayName: "Admin pagination", Code: "ADMIN-PAGINATION-2026", CreditAmount: 9,
 		IdempotencyKey: "admin-pagination", ActorUserID: 1,
@@ -194,7 +208,7 @@ func TestAdminRedemptionListUsesBoundedKeysetPagination(t *testing.T) {
 		t.Fatalf("Redeem(newer) error = %v", err)
 	}
 
-	handler := NewHandler(service)
+	handler := NewHandler(service, userRepo)
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {

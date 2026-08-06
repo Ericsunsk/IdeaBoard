@@ -7,6 +7,7 @@ on:
       - "apps/auth/**"
       - "contracts/auth-internal.openapi.json"
       - "docker/**"
+      - "scripts/ci-parity*.sh"
       - ".grype.yaml"
       - ".github/workflows/docker-images.yml"
   push:
@@ -20,6 +21,7 @@ on:
       - "apps/auth/**"
       - "contracts/auth-internal.openapi.json"
       - "docker/**"
+      - "scripts/ci-parity*.sh"
       - ".grype.yaml"
       - ".github/workflows/docker-images.yml"
   workflow_dispatch:
@@ -59,6 +61,9 @@ jobs:
         run: |
           go tool sqlc generate
           git diff --exit-code -- internal/db/sqlc
+
+      - name: Test CI parity entrypoint
+        run: bash scripts/ci-parity-test.sh
 
   api-migrations:
     runs-on: ubuntu-latest
@@ -139,29 +144,11 @@ jobs:
           cache-dependency-path: apps/api/go.sum
 
       - name: Test API (${{ matrix.mode }} shard ${{ matrix.shard }})
-        shell: bash
-        working-directory: apps/api
         env:
           TEST_MODE: ${{ matrix.mode }}
           TEST_SHARD: ${{ matrix.shard }}
           TEST_SHARD_COUNT: "3"
-        run: |
-          mapfile -t packages < <(
-            go list ./... | awk \
-              -v shard="${TEST_SHARD}" \
-              -v total="${TEST_SHARD_COUNT}" \
-              '((NR - 1) % total) == shard'
-          )
-
-          printf 'Running %s tests for shard %s/%s:\n' \
-            "${TEST_MODE}" "${TEST_SHARD}" "${TEST_SHARD_COUNT}"
-          printf '  %s\n' "${packages[@]}"
-
-          if [ "${TEST_MODE}" = "race" ]; then
-            go test -race "${packages[@]}"
-          else
-            go test "${packages[@]}"
-          fi
+        run: ./scripts/ci-parity.sh api-test
 
   api-quality:
     runs-on: ubuntu-latest

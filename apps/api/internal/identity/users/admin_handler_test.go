@@ -262,8 +262,10 @@ func TestAdminListUsersIncludesAvailableCreditBalance(t *testing.T) {
 	var response struct {
 		Data struct {
 			List []struct {
-				ID               int64 `json:"id"`
-				AvailableCredits int64 `json:"available_credits"`
+				PublicID         string          `json:"public_id"`
+				DisplayName      string          `json:"display_name"`
+				InternalID       json.RawMessage `json:"id"`
+				AvailableCredits int64           `json:"available_credits"`
 			} `json:"list"`
 		} `json:"data"`
 	}
@@ -273,8 +275,11 @@ func TestAdminListUsersIncludesAvailableCreditBalance(t *testing.T) {
 	if len(response.Data.List) != 1 {
 		t.Fatalf("list length = %d, want 1; body=%s", len(response.Data.List), recorder.Body.String())
 	}
-	if response.Data.List[0].ID != user.ID {
-		t.Fatalf("user id = %d, want %d", response.Data.List[0].ID, user.ID)
+	if response.Data.List[0].PublicID != user.PublicID.String() || response.Data.List[0].DisplayName != user.DisplayName {
+		t.Fatalf("public identity = (%q, %q), want (%q, %q)", response.Data.List[0].PublicID, response.Data.List[0].DisplayName, user.PublicID, user.DisplayName)
+	}
+	if response.Data.List[0].InternalID != nil {
+		t.Fatalf("response exposed internal user id: %s", recorder.Body.String())
 	}
 	if response.Data.List[0].AvailableCredits != 125 {
 		t.Fatalf(
@@ -304,11 +309,11 @@ func TestAdminListUsersHTTPContractComposesPageBalancesWithFiltersAndCounts(t *t
 
 	assertAdminListUsersResponse(t, router, "/admin/users?keyword=contract&page=1&page_size=2", adminUserListAssertion{
 		Total: 3 + 1, ActiveCount: 3, BannedCount: 1, AdminCount: 1,
-		Balances: map[int64]int64{users[3].ID: 44, users[2].ID: 33},
+		Balances: map[string]int64{users[3].PublicID.String(): 44, users[2].PublicID.String(): 33},
 	})
 	assertAdminListUsersResponse(t, router, "/admin/users?keyword=contract&role=user&status=1&page=2&page_size=1", adminUserListAssertion{
 		Total: 2, ActiveCount: 2, BannedCount: 0, AdminCount: 0,
-		Balances: map[int64]int64{users[1].ID: 22},
+		Balances: map[string]int64{users[1].PublicID.String(): 22},
 	})
 }
 
@@ -406,7 +411,7 @@ type adminUserListAssertion struct {
 	ActiveCount int64
 	BannedCount int64
 	AdminCount  int64
-	Balances    map[int64]int64
+	Balances    map[string]int64
 }
 
 func assertAdminListUsersResponse(t *testing.T, router *gin.Engine, path string, want adminUserListAssertion) {
@@ -423,8 +428,9 @@ func assertAdminListUsersResponse(t *testing.T, router *gin.Engine, path string,
 			BannedCount int64 `json:"banned_count"`
 			AdminCount  int64 `json:"admin_count"`
 			List        []struct {
-				ID               int64 `json:"id"`
-				AvailableCredits int64 `json:"available_credits"`
+				PublicID         string          `json:"public_id"`
+				InternalID       json.RawMessage `json:"id"`
+				AvailableCredits int64           `json:"available_credits"`
 			} `json:"list"`
 		} `json:"data"`
 	}
@@ -438,9 +444,12 @@ func assertAdminListUsersResponse(t *testing.T, router *gin.Engine, path string,
 		t.Fatalf("list length = %d, want %d; body=%s", len(response.Data.List), len(want.Balances), recorder.Body.String())
 	}
 	for _, item := range response.Data.List {
-		wantBalance, ok := want.Balances[item.ID]
+		if item.InternalID != nil {
+			t.Fatalf("response exposed internal user id: %s", recorder.Body.String())
+		}
+		wantBalance, ok := want.Balances[item.PublicID]
 		if !ok || item.AvailableCredits != wantBalance {
-			t.Fatalf("row id=%d balance=%d, want balances=%v", item.ID, item.AvailableCredits, want.Balances)
+			t.Fatalf("row public_id=%q balance=%d, want balances=%v", item.PublicID, item.AvailableCredits, want.Balances)
 		}
 	}
 }

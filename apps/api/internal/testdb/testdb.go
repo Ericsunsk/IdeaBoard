@@ -48,6 +48,9 @@ func createIsolatedEnv(t testing.TB) isolatedEnv {
 
 	raw := strings.TrimSpace(os.Getenv("API_TEST_DATABASE_DSN"))
 	if raw == "" {
+		if isRequiredDatabase() {
+			t.Fatal("API_TEST_DATABASE_DSN is required for PostgreSQL integration tests")
+		}
 		t.Skip("set API_TEST_DATABASE_DSN to run PostgreSQL integration tests")
 	}
 
@@ -80,6 +83,11 @@ func createIsolatedEnv(t testing.TB) isolatedEnv {
 		rawDSN:     raw,
 		schemaName: schemaName,
 	}
+}
+
+func isRequiredDatabase() bool {
+	required, err := strconv.ParseBool(strings.TrimSpace(os.Getenv("API_TEST_DATABASE_REQUIRED")))
+	return err == nil && required
 }
 
 func openIsolatedSQLDB(t testing.TB, env isolatedEnv) *sql.DB {

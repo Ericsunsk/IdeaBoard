@@ -159,7 +159,7 @@ func TestListUsersReadsOnlyCurrentPageBalancesInOneBatch(t *testing.T) {
 	if len(reader.calls[0]) != len(result.List) {
 		t.Fatalf("batch IDs = %v, want only current page IDs", reader.calls[0])
 	}
-	if result.List[0].PublicID != seeded[0].PublicID || result.List[1].PublicID != seeded[1].PublicID {
+	if result.List[0].PublicID != seeded[2].PublicID || result.List[1].PublicID != seeded[1].PublicID {
 		t.Fatalf("public ids = %v, want current page users in response order", []string{result.List[0].PublicID.String(), result.List[1].PublicID.String()})
 	}
 	for _, userID := range reader.calls[0] {

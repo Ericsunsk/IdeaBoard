@@ -111,6 +111,26 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 | Credits million dataset | `cd apps/api && CREDITS_LOAD_TEST=1 go test ./internal/credits -run '^TestCreditMillionTransactionDataset$' -count=1 -v` |
 | Usage million dataset | `cd apps/api && CREDITS_LOAD_TEST=1 go test ./internal/usage -run '^TestUsageMillionTransactionDataset$' -count=1 -v` |
 
+### CI parity gate
+
+Push 前需要复现 GitHub 的真实 PostgreSQL integration tests 与 Linux browser geometry 时，在仓库根目录运行：
+
+```bash
+export API_TEST_DATABASE_DSN='postgres://ideaboard:your-password@127.0.0.1:5432/ideaboard?sslmode=disable'
+./scripts/ci-parity.sh
+```
+
+该入口与 GitHub Workflows 共用 `scripts/ci-parity.sh`：API tests 固定禁用 Go test cache（`-count=1`），缺少 `API_TEST_DATABASE_DSN` 会立即失败，不会静默 `SKIP` PostgreSQL integration tests。Linux 直接运行 Web smoke；macOS 等其他系统通过 Docker 中固定版本的 Playwright Linux image 运行，因此需要 Docker 已启动。container 使用只读源码副本，不会改写宿主的 `node_modules`。
+
+只复现单项时可运行：
+
+```bash
+TEST_MODE=standard TEST_SHARD=0 TEST_SHARD_COUNT=1 ./scripts/ci-parity.sh api-test
+./scripts/ci-parity.sh web-smoke
+```
+
+普通 `go test ./...` 仍允许在未配置测试数据库时跳过 integration tests；严格 fail-closed 仅由 parity/CI mode 启用。完整 lint、build、migration、sqlc drift 和 vulnerability checks 仍由上表与 GitHub 的独立 jobs 执行。
+
 修改 `apps/api/internal/db/queries` 或 schema 后：
 
 ```bash

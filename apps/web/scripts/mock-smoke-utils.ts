@@ -305,8 +305,13 @@ export function createMockSmokeRuntime(options: MockSmokeRuntimeOptions) {
   }
 
   function runCommand(spec: CommandSpec, args: string[], runOptions: RunCommandOptions = {}) {
-    const commandArgs =
+    const rawCommandArgs =
       args[0] === 'run-code' ? ['run-code', `async (page) => {\n${args[1] ?? ''}\n}`] : args
+    const browserOverride = process.env.PLAYWRIGHT_CLI_BROWSER?.trim()
+    const commandArgs =
+      browserOverride && rawCommandArgs[0] === 'open'
+        ? [...rawCommandArgs, '--browser', browserOverride]
+        : rawCommandArgs
     const fullArgs = [...spec.args, '--session', sessionName, ...commandArgs]
     const timeoutMs = runOptions.timeoutMs ?? COMMAND_TIMEOUT_MS
     if (isVerbose) {

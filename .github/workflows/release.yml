@@ -146,8 +146,11 @@ jobs:
           (cd apps/auth && env DB_USER="${AUTH_DB_USER}" DB_PASSWORD="${AUTH_DB_PASSWORD}" npm run migrate:dist)
 
       - name: Test Go API
-        working-directory: apps/api
-        run: go test ./...
+        env:
+          TEST_MODE: standard
+          TEST_SHARD: "0"
+          TEST_SHARD_COUNT: "1"
+        run: ./scripts/ci-parity.sh api-test
 
       - name: Check sqlc generated code
         working-directory: apps/api
@@ -156,8 +159,11 @@ jobs:
           git diff --exit-code -- internal/db/sqlc
 
       - name: Test Go API with race detector
-        working-directory: apps/api
-        run: go test -race ./...
+        env:
+          TEST_MODE: race
+          TEST_SHARD: "0"
+          TEST_SHARD_COUNT: "1"
+        run: ./scripts/ci-parity.sh api-test
 
       - name: Lint Go API
         uses: golangci/golangci-lint-action@63c23d5020da8f97005b6de340504130bdbe42c7
