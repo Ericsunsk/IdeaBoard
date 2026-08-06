@@ -57,6 +57,9 @@ func TestRuntimeRoleCanUsePaymentsTablesWithoutMutatingAuditOrDeletingConfigurat
 	if err := dbprivileges.Verify(ctx, conn, policies...); err != nil {
 		t.Fatalf("verify runtime privilege policies: %v", err)
 	}
+	if _, err := conn.ExecContext(ctx, `SELECT 1 FROM payment_checkout_shutdowns LIMIT 0`); err != nil {
+		t.Fatalf("read payment checkout shutdowns through runtime role: %v", err)
+	}
 
 	if _, err := conn.ExecContext(ctx, `
 INSERT INTO payment_admin_actions (
