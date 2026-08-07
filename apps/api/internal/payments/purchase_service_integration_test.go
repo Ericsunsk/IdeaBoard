@@ -470,6 +470,7 @@ func TestStripeKeyChangeCannotRaceAnOldAccountCheckout(t *testing.T) {
 type fakeCheckoutGateway struct {
 	customerCalls        int
 	sessionCalls         int
+	successfulSessions   int
 	retrieveCalls        int
 	expireCalls          int
 	paid                 bool
@@ -503,8 +504,13 @@ func (f *fakeCheckoutGateway) CreateCheckoutSession(_ context.Context, input Cre
 	if index := f.sessionCalls - 1; index < len(f.createSessionErrors) && f.createSessionErrors[index] != nil {
 		return CheckoutSession{}, f.createSessionErrors[index]
 	}
+	f.successfulSessions++
+	sessionID := "cs_purchase"
+	if f.successfulSessions > 1 {
+		sessionID += "_" + strconv.Itoa(f.successfulSessions)
+	}
 	f.createdSession = CheckoutSession{
-		ID: "cs_purchase", URL: "https://checkout.stripe.test/c/pay/cs_purchase", CustomerID: input.CustomerID,
+		ID: sessionID, URL: "https://checkout.stripe.test/c/pay/" + sessionID, CustomerID: input.CustomerID,
 		PublicOrderNumber: input.PublicOrderNumber, PaymentOrderID: input.PaymentOrderID,
 		RequestHash: input.RequestHash, IdeaQuantity: input.IdeaQuantity, ExpiresAt: input.ExpiresAt,
 		Status: CheckoutSessionStatusOpen,
