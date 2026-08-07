@@ -262,10 +262,13 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseBase' }
         '422':
-          description: Stripe definitively rejected Checkout creation; the client may retry with a new idempotency key
+          description: Stripe definitively rejected Checkout creation, or a recovered Session is already completed or expired; the client may retry with a new idempotency key
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/CheckoutRequestRejectedError' }
+              schema:
+                oneOf:
+                  - { $ref: '#/components/schemas/CheckoutRequestRejectedError' }
+                  - { $ref: '#/components/schemas/CheckoutStateConflictError' }
   /user/payments/orders/{public_token}:
     get:
       tags: [UserPayments]
@@ -2674,6 +2677,16 @@ components:
         code:
           type: string
           enum: [checkout_request_rejected]
+        msg:
+          type: string
+
+    CheckoutStateConflictError:
+      type: object
+      required: [code, msg]
+      properties:
+        code:
+          type: string
+          enum: [checkout_session_expired, payment_already_completed]
         msg:
           type: string
 

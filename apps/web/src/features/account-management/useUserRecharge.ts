@@ -62,7 +62,10 @@ export function useUserRecharge(
 
   const checkoutMutation = useMutation({
     mutationFn: (request: UserPaymentCheckoutRequest) => resource.createCheckout(request),
-    onSuccess: (checkout) => navigateToCheckout(checkout.checkout_url),
+    onSuccess: (checkout) => {
+      checkoutIntent = null
+      navigateToCheckout(checkout.checkout_url)
+    },
   })
 
   const pendingActionTarget = ref<PendingOrderAction | null>(null)
@@ -72,13 +75,18 @@ export function useUserRecharge(
     publicToken: string,
     update: (order: UserPendingPaymentOrder) => UserPendingPaymentOrder,
   ) {
-    queryClient.setQueryData<UserPendingPaymentOrderList>(userPaymentsQueryKeys.pending, (current) => {
-      if (!current) return current
-      return {
-        ...current,
-        items: current.items.map((item) => (item.public_token === publicToken ? update(item) : item)),
-      }
-    })
+    queryClient.setQueryData<UserPendingPaymentOrderList>(
+      userPaymentsQueryKeys.pending,
+      (current) => {
+        if (!current) return current
+        return {
+          ...current,
+          items: current.items.map((item) =>
+            item.public_token === publicToken ? update(item) : item,
+          ),
+        }
+      },
+    )
   }
 
   const pendingActionMutation = useMutation({
@@ -119,7 +127,7 @@ export function useUserRecharge(
       return await checkoutMutation.mutateAsync(request)
     } catch (error) {
       if (
-        isCheckoutRequestRejected(error) &&
+        shouldRotateCheckoutIntent(error) &&
         checkoutIntent?.idempotencyKey === request.idempotency_key
       ) {
         checkoutIntent = null
@@ -207,11 +215,13 @@ export function useUserRecharge(
   }
 }
 
-function isCheckoutRequestRejected(error: unknown): boolean {
+function shouldRotateCheckoutIntent(error: unknown): boolean {
   return (
     typeof error === 'object' &&
     error !== null &&
     'code' in error &&
-    error.code === 'checkout_request_rejected'
+    (error.code === 'checkout_request_rejected' ||
+      error.code === 'checkout_session_expired' ||
+      error.code === 'payment_already_completed')
   )
 }

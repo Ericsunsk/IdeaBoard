@@ -26,6 +26,7 @@ import type {
   ApiResponsePendingPaymentOrderList,
   ApiResponseRechargeHistoryPage,
   CheckoutRequestRejectedError,
+  CheckoutStateConflictError,
   CreatePaymentCheckoutRequest,
   ListUserPaymentRechargesParams,
 } from '../model'
@@ -128,7 +129,7 @@ export const getCreateUserPaymentCheckoutSessionQueryKey = (
 
 export const getCreateUserPaymentCheckoutSessionQueryOptions = <
   TData = Awaited<ReturnType<typeof createUserPaymentCheckoutSession>>,
-  TError = ErrorType<ApiResponseBase | CheckoutRequestRejectedError>,
+  TError = ErrorType<ApiResponseBase | CheckoutRequestRejectedError | CheckoutStateConflictError>,
 >(
   createPaymentCheckoutRequest: MaybeRefOrGetter<CreatePaymentCheckoutRequest>,
   options?: {
@@ -161,12 +162,12 @@ export type CreateUserPaymentCheckoutSessionQueryResult = NonNullable<
   Awaited<ReturnType<typeof createUserPaymentCheckoutSession>>
 >
 export type CreateUserPaymentCheckoutSessionQueryError = ErrorType<
-  ApiResponseBase | CheckoutRequestRejectedError
+  ApiResponseBase | CheckoutRequestRejectedError | CheckoutStateConflictError
 >
 
 export function useCreateUserPaymentCheckoutSession<
   TData = Awaited<ReturnType<typeof createUserPaymentCheckoutSession>>,
-  TError = ErrorType<ApiResponseBase | CheckoutRequestRejectedError>,
+  TError = ErrorType<ApiResponseBase | CheckoutRequestRejectedError | CheckoutStateConflictError>,
 >(
   createPaymentCheckoutRequest: MaybeRefOrGetter<CreatePaymentCheckoutRequest>,
   options?: {

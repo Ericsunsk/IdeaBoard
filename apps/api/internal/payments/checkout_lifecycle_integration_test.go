@@ -63,6 +63,91 @@ func TestCheckoutLifecycleConcurrentSameQuantityReusesOneOrderAndStripeSession(t
 	}
 }
 
+func TestCheckoutLifecyclePaidSessionIsNotReusedBeforeWebhookConverges(t *testing.T) {
+	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	checkout := newLifecycleCheckoutGateway()
+	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, nil)
+
+	first, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "paid-before-webhook-first", 500))
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkout.setPaid(true)
+
+	second, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "paid-before-webhook-second", 500))
+	if err != nil {
+		t.Fatalf("second CreateCheckout() error = %v", err)
+	}
+	if second.Reused || second.PublicToken == first.PublicToken {
+		t.Fatalf("second Checkout reused a paid Stripe Session: first=%+v second=%+v", first, second)
+	}
+	if calls := checkout.createSessionCalls(); calls != 2 {
+		t.Fatalf("Stripe Checkout sessions created = %d, want 2", calls)
+	}
+	assertLifecycleOrderStatus(t, db, first.PublicToken, PaymentOrderCredited)
+	assertLifecycleOrderStatus(t, db, second.PublicToken, PaymentOrderCheckoutOpen)
+	assertLifecyclePurchaseCount(t, db, 1)
+	assertLifecycleWalletAvailable(t, wallets, 42, 501)
+}
+
+func TestCheckoutLifecycleExpiredSessionIsNotReusedBeforeLocalExpiry(t *testing.T) {
+	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	checkout := newLifecycleCheckoutGateway()
+	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, nil)
+
+	first, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "expired-before-local-first", 500))
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkout.status = CheckoutSessionStatusExpired
+
+	second, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "expired-before-local-second", 500))
+	if err != nil {
+		t.Fatalf("second CreateCheckout() error = %v", err)
+	}
+	if second.Reused || second.PublicToken == first.PublicToken {
+		t.Fatalf("second Checkout reused an expired Stripe Session: first=%+v second=%+v", first, second)
+	}
+	if calls := checkout.createSessionCalls(); calls != 2 {
+		t.Fatalf("Stripe Checkout sessions created = %d, want 2", calls)
+	}
+	assertLifecycleOrderStatus(t, db, first.PublicToken, PaymentOrderExpired)
+	assertLifecycleOrderStatus(t, db, second.PublicToken, PaymentOrderCheckoutOpen)
+	assertLifecyclePurchaseCount(t, db, 0)
+	assertLifecycleWalletAvailable(t, wallets, 42, 1)
+}
+
+func TestCheckoutLifecycleRetrieveFailurePreservesExistingSessionAndIntent(t *testing.T) {
+	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	checkout := newLifecycleCheckoutGateway()
+	db, service, _ := newCheckoutLifecycleService(t, &now, checkout, nil)
+
+	first, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "retrieve-failure-first", 500))
+	if err != nil {
+		t.Fatal(err)
+	}
+	checkout.setRetrieveErrorOnce(NewGatewayError(GatewayErrorProviderUnavailable, "Stripe unavailable", nil))
+	retryCommand := lifecycleCheckoutCommand(42, "retrieve-failure-retry", 500)
+	if _, err := service.CreateCheckout(t.Context(), retryCommand); !errors.Is(err, ErrStripeProviderUnavailable) {
+		t.Fatalf("CreateCheckout() error = %v, want ErrStripeProviderUnavailable", err)
+	}
+	if calls := checkout.createSessionCalls(); calls != 1 {
+		t.Fatalf("Stripe Checkout sessions after unknown retrieve result = %d, want 1", calls)
+	}
+
+	retried, err := service.CreateCheckout(t.Context(), retryCommand)
+	if err != nil || !retried.Reused || retried.PublicToken != first.PublicToken {
+		t.Fatalf("retry after Stripe recovery = %+v, %v", retried, err)
+	}
+	var orderCount int
+	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM payment_orders WHERE user_id = $1`, 42).Scan(&orderCount); err != nil {
+		t.Fatal(err)
+	}
+	if orderCount != 1 {
+		t.Fatalf("Payment Orders after retrieve retry = %d, want 1", orderCount)
+	}
+}
+
 func TestCheckoutLifecycleLimitsThreeActiveOrdersAndExpiredOrdersReleaseCapacity(t *testing.T) {
 	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	checkout := newLifecycleCheckoutGateway()
@@ -591,6 +676,7 @@ type lifecycleCheckoutGateway struct {
 	createCalls         int
 	expireCalls         int
 	expireErr           error
+	retrieveErr         error
 	paid                bool
 	status              CheckoutSessionStatus
 	firstSessionStarted chan struct{}
@@ -638,6 +724,11 @@ func (g *lifecycleCheckoutGateway) CreateCheckoutSession(_ context.Context, inpu
 func (g *lifecycleCheckoutGateway) RetrieveCheckoutSession(_ context.Context, input RetrieveCheckoutSessionInput) (CheckoutSession, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	if g.retrieveErr != nil {
+		err := g.retrieveErr
+		g.retrieveErr = nil
+		return CheckoutSession{}, err
+	}
 	session, ok := g.sessions[input.SessionID]
 	if !ok {
 		return CheckoutSession{}, fmt.Errorf("unknown Checkout Session %q", input.SessionID)
@@ -711,6 +802,12 @@ func (g *lifecycleCheckoutGateway) setPaid(value bool) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	g.paid = value
+}
+
+func (g *lifecycleCheckoutGateway) setRetrieveErrorOnce(err error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.retrieveErr = err
 }
 
 func (g *lifecycleCheckoutGateway) setExpireErrorOnce(err error) {

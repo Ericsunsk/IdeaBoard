@@ -84,6 +84,30 @@
           />
         </div>
       </div>
+
+      <nav
+        aria-label="Legal links"
+        class="absolute right-6 bottom-5 z-20 flex max-w-[calc(100%-3rem)] flex-wrap justify-end gap-x-5 gap-y-1 text-[13px] font-medium text-[#5f6368] max-[640px]:right-4 max-[640px]:bottom-4 max-[640px]:gap-x-3 max-[640px]:text-[12px]"
+      >
+        <RouterLink
+          :to="PRIVACY_POLICY_PATH"
+          class="no-underline transition-colors hover:text-[#202124] focus-visible:outline-none focus-visible:underline"
+        >
+          Privacy Policy
+        </RouterLink>
+        <RouterLink
+          :to="TERMS_PATH"
+          class="no-underline transition-colors hover:text-[#202124] focus-visible:outline-none focus-visible:underline"
+        >
+          Terms of Service
+        </RouterLink>
+        <RouterLink
+          :to="REFUND_POLICY_PATH"
+          class="no-underline transition-colors hover:text-[#202124] focus-visible:outline-none focus-visible:underline"
+        >
+          Refund Policy
+        </RouterLink>
+      </nav>
     </div>
   </div>
 </template>
@@ -95,7 +119,12 @@ import portraitAsset from '../assets/home/portrait.svg'
 import socksAsset from '../assets/home/socks.svg'
 import starburstAsset from '../assets/home/starburst.svg'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
-import { USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
+import {
+  PRIVACY_POLICY_PATH,
+  REFUND_POLICY_PATH,
+  TERMS_PATH,
+  USER_BOARDS_PATH,
+} from '../../../shared/constants/routePaths'
 
 const router = useRouter()
 const { projectName } = useSiteBranding()

@@ -173,25 +173,38 @@ func TestUserCheckoutHTTPUsesPrincipalAndTrustedReturnURL(t *testing.T) {
 	}
 }
 
-func TestCheckoutHTTPAllowsANewIntentAfterDefinitiveProviderRejection(t *testing.T) {
-	router := gin.New()
-	router.GET("/checkout-error", func(c *gin.Context) {
-		writeCheckoutError(c, errors.Join(ErrCheckoutRequestRejected, ErrPurchasesUnavailable))
-	})
+func TestCheckoutHTTPIdentifiesResultsThatAllowANewIntent(t *testing.T) {
+	tests := []struct {
+		name    string
+		err     error
+		code    string
+		message string
+	}{
+		{name: "provider rejected creation", err: errors.Join(ErrCheckoutRequestRejected, ErrPurchasesUnavailable), code: "checkout_request_rejected", message: "无法创建支付页面，请重试"},
+		{name: "recovered session expired", err: ErrCheckoutSessionExpired, code: "checkout_session_expired", message: ErrCheckoutSessionExpired.Error()},
+		{name: "recovered payment completed", err: ErrPaymentAlreadyCompleted, code: "payment_already_completed", message: ErrPaymentAlreadyCompleted.Error()},
+	}
 
-	result := performPaymentRequest(router, http.MethodGet, "/checkout-error", "", nil)
-	if result.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("status = %d, want %d", result.Code, http.StatusUnprocessableEntity)
-	}
-	var responseBody struct {
-		Code string `json:"code"`
-		Msg  string `json:"msg"`
-	}
-	if err := json.Unmarshal(result.Body.Bytes(), &responseBody); err != nil {
-		t.Fatal(err)
-	}
-	if responseBody.Code != "checkout_request_rejected" || responseBody.Msg != "无法创建支付页面，请重试" {
-		t.Fatalf("response = %+v", responseBody)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			router := gin.New()
+			router.GET("/checkout-error", func(c *gin.Context) { writeCheckoutError(c, test.err) })
+
+			result := performPaymentRequest(router, http.MethodGet, "/checkout-error", "", nil)
+			if result.Code != http.StatusUnprocessableEntity {
+				t.Fatalf("status = %d, want %d", result.Code, http.StatusUnprocessableEntity)
+			}
+			var responseBody struct {
+				Code string `json:"code"`
+				Msg  string `json:"msg"`
+			}
+			if err := json.Unmarshal(result.Body.Bytes(), &responseBody); err != nil {
+				t.Fatal(err)
+			}
+			if responseBody.Code != test.code || responseBody.Msg != test.message {
+				t.Fatalf("response = %+v", responseBody)
+			}
+		})
 	}
 }
 

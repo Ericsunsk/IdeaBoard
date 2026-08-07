@@ -1,6 +1,7 @@
 export const SHARE_JOIN_PATH = '/share'
 export const TERMS_PATH = '/terms'
 export const REFUND_POLICY_PATH = '/refund-policy'
+export const PRIVACY_POLICY_PATH = '/privacy-policy'
 
 export const USER_ROOT_PATH = '/user'
 export const USER_HOME_PATH = '/user/home'

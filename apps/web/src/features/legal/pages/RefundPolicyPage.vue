@@ -1,38 +1,47 @@
 <template>
-  <PublicLegalPage title="退款政策" :version="REFUND_POLICY_VERSION">
-    <p>本政策适用于通过 IdeaBoard Stripe Checkout 购买的 Idea。</p>
+  <PublicLegalPage title="Refund Policy" :version="REFUND_POLICY_VERSION">
+    <p>This policy applies to Ideas purchased through IdeaBoard Stripe Checkout.</p>
 
-    <h2>1. 申请期限</h2>
+    <h2>1. Request Window</h2>
     <p>
-      退款资格从 Stripe 确认支付的时间起计算 14 天。目前不提供自助退款，请在期限内联系管理员。
+      Refund eligibility lasts for 14 days from the time Stripe confirms payment. Self-service
+      refunds are not currently available; contact the administrator within this period.
     </p>
 
-    <h2>2. 可退数量</h2>
+    <h2>2. Eligible Quantity</h2>
     <p>
-      可退 Idea 不超过该订单尚未退款的数量和当前账户可用余额中的较小值。已经消费的 Idea
-      无法通过该笔订单退款。
+      The refundable quantity is the smaller of the amount not already refunded for the order and
+      the Ideas currently available in your account. Ideas that have already been consumed cannot be
+      refunded from that order.
     </p>
 
-    <h2>3. 退款金额</h2>
+    <h2>3. Refund Amount</h2>
     <p>
-      商品退款金额按原订单 Idea 比例，以原支付币种的最小单位计算。税额退款以 Stripe Tax
-      的最终处理结果为准。
+      The product refund amount is calculated in the smallest unit of the original payment currency,
+      in proportion to the Ideas in the original order. Any taxes or other adjustments handled by
+      the payment provider are included according to the original Stripe transaction.
     </p>
 
-    <h2>4. 处理过程</h2>
+    <h2>4. Processing</h2>
     <p>
-      管理员审核申请后，会通过对应的 Stripe 原支付交易处理退款。退款是否完成以及资金到账时间以
-      Stripe 和支付机构的最终结果为准。
+      After reviewing a request, the administrator processes the refund through the corresponding
+      original Stripe payment. Completion and the time it takes for funds to arrive are determined
+      by Stripe and the payment institution.
     </p>
 
-    <h2>5. 支付争议</h2>
+    <h2>5. Payment Disputes</h2>
     <p>
-      如发现未经授权的支付，请尽快联系我们。直接向发卡机构提出 Dispute
-      可能触发账户支付与消费限制，直至争议收敛。
+      If you notice an unauthorized payment, contact us as soon as possible. Filing a Dispute
+      directly with your card issuer may trigger payment and usage restrictions on your account
+      until the dispute is resolved.
     </p>
 
-    <h2>6. 联系我们</h2>
-    <p>申请时请提供账户信息和充值记录中的交易时间；无需发送银行卡号、验证码或其他敏感支付信息。</p>
+    <h2>6. Contact Us</h2>
+    <p>
+      When contacting us, provide your account information and the transaction time shown in your
+      recharge history. Do not send your card number, verification code, or other sensitive payment
+      information.
+    </p>
   </PublicLegalPage>
 </template>
 

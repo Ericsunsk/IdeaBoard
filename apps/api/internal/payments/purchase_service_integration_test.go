@@ -118,6 +118,101 @@ func TestCreateCheckoutReplaysImmutableSecondPrecisionExpiryAfterProviderTimeout
 	if second != first {
 		t.Fatalf("replayed Stripe Checkout input changed: first=%+v second=%+v", first, second)
 	}
+	var orderCount int
+	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM payment_orders WHERE user_id = $1`, command.UserID).Scan(&orderCount); err != nil {
+		t.Fatal(err)
+	}
+	if orderCount != 1 {
+		t.Fatalf("Payment Orders after unknown provider result = %d, want 1", orderCount)
+	}
+}
+
+func TestCreateCheckoutConvergesPaidSessionRecoveredFromCreatingOrder(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	db, pool := testdb.OpenWithPool(t)
+	seedRechargeableWallet(t, pool, 42)
+	checkoutGateway := &fakeCheckoutGateway{
+		createSessionErrors: []error{ErrStripeProviderUnavailable},
+		mutateCreatedSession: func(call int, session CheckoutSession) CheckoutSession {
+			if call != 2 {
+				return session
+			}
+			session.Status = CheckoutSessionStatusComplete
+			session.PaymentStatus = CheckoutPaymentStatusPaid
+			session.URL = ""
+			session.PaymentIntentID = "pi_recovered_paid"
+			session.ChargeID = "ch_recovered_paid"
+			session.ReceiptURL = "https://pay.stripe.test/receipts/recovered-paid"
+			session.AmountSubtotalMinor = session.IdeaQuantity
+			session.AmountTaxMinor = 0
+			session.AmountTotalMinor = session.IdeaQuantity
+			session.Currency = "usd"
+			return session
+		},
+	}
+	service := newConfiguredPurchaseService(t, db, configuredFakeStripeGateway("acct_checkout", "prod_checkout"), checkoutGateway, credits.NewService(pool))
+	command := CreateCheckoutCommand{
+		UserID: 42, ClientIdempotencyKey: "purchase-checkout-recovered-paid", IdeaQuantity: 501,
+		TermsAccepted: true, TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
+		ReturnBaseURL: "https://app.example.com/user/boards",
+	}
+
+	if _, err := service.CreateCheckout(t.Context(), command); !errors.Is(err, ErrStripeProviderUnavailable) {
+		t.Fatalf("initial Checkout error = %v", err)
+	}
+	if _, err := service.CreateCheckout(t.Context(), command); !errors.Is(err, ErrPaymentAlreadyCompleted) {
+		t.Fatalf("recovered paid Checkout error = %v, want ErrPaymentAlreadyCompleted", err)
+	}
+	assertPurchaseOrderStatusByKey(t, db, command.UserID, command.ClientIdempotencyKey, PaymentOrderCredited)
+	wallet, err := credits.NewService(pool).GetWallet(t.Context(), command.UserID)
+	if err != nil || wallet.Available != 502 {
+		t.Fatalf("Wallet after recovered paid Checkout = %+v, %v", wallet, err)
+	}
+
+	retry := command
+	retry.ClientIdempotencyKey = "purchase-checkout-after-recovered-paid"
+	created, err := service.CreateCheckout(t.Context(), retry)
+	if err != nil || created.Reused || created.CheckoutURL == "" {
+		t.Fatalf("new Checkout after recovered payment = %+v, %v", created, err)
+	}
+}
+
+func TestCreateCheckoutExpiresRecoveredCreatingSessionBeforeNewAttempt(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	db, pool := testdb.OpenWithPool(t)
+	seedRechargeableWallet(t, pool, 42)
+	checkoutGateway := &fakeCheckoutGateway{
+		createSessionErrors: []error{ErrStripeProviderUnavailable},
+		mutateCreatedSession: func(call int, session CheckoutSession) CheckoutSession {
+			if call == 2 {
+				session.Status = CheckoutSessionStatusExpired
+				session.PaymentStatus = CheckoutPaymentStatusUnpaid
+				session.URL = ""
+			}
+			return session
+		},
+	}
+	service := newConfiguredPurchaseService(t, db, configuredFakeStripeGateway("acct_checkout", "prod_checkout"), checkoutGateway, credits.NewService(pool))
+	command := CreateCheckoutCommand{
+		UserID: 42, ClientIdempotencyKey: "purchase-checkout-recovered-expired", IdeaQuantity: 501,
+		TermsAccepted: true, TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
+		ReturnBaseURL: "https://app.example.com/user/boards",
+	}
+
+	if _, err := service.CreateCheckout(t.Context(), command); !errors.Is(err, ErrStripeProviderUnavailable) {
+		t.Fatalf("initial Checkout error = %v", err)
+	}
+	if _, err := service.CreateCheckout(t.Context(), command); !errors.Is(err, ErrCheckoutSessionExpired) {
+		t.Fatalf("recovered expired Checkout error = %v, want ErrCheckoutSessionExpired", err)
+	}
+	assertPurchaseOrderStatusByKey(t, db, command.UserID, command.ClientIdempotencyKey, PaymentOrderExpired)
+
+	retry := command
+	retry.ClientIdempotencyKey = "purchase-checkout-after-recovered-expired"
+	created, err := service.CreateCheckout(t.Context(), retry)
+	if err != nil || created.Reused || created.CheckoutURL == "" {
+		t.Fatalf("new Checkout after recovered expiry = %+v, %v", created, err)
+	}
 }
 
 func TestCreateCheckoutReleasesOrderAfterDefinitiveProviderRejection(t *testing.T) {
@@ -373,20 +468,21 @@ func TestStripeKeyChangeCannotRaceAnOldAccountCheckout(t *testing.T) {
 }
 
 type fakeCheckoutGateway struct {
-	customerCalls       int
-	sessionCalls        int
-	retrieveCalls       int
-	expireCalls         int
-	paid                bool
-	status              CheckoutSessionStatus
-	expireErr           error
-	expireOutcome       CheckoutSessionExpirationOutcome
-	lastCreateSession   CreateCheckoutSessionInput
-	createSessionInputs []CreateCheckoutSessionInput
-	createdSession      CheckoutSession
-	createSessionErrors []error
-	afterCreateCustomer func()
-	beforeCreateSession func(CreateCheckoutSessionInput)
+	customerCalls        int
+	sessionCalls         int
+	retrieveCalls        int
+	expireCalls          int
+	paid                 bool
+	status               CheckoutSessionStatus
+	expireErr            error
+	expireOutcome        CheckoutSessionExpirationOutcome
+	lastCreateSession    CreateCheckoutSessionInput
+	createSessionInputs  []CreateCheckoutSessionInput
+	createdSession       CheckoutSession
+	createSessionErrors  []error
+	mutateCreatedSession func(int, CheckoutSession) CheckoutSession
+	afterCreateCustomer  func()
+	beforeCreateSession  func(CreateCheckoutSessionInput)
 }
 
 func (f *fakeCheckoutGateway) CreateCustomer(_ context.Context, _ CreateCheckoutCustomerInput) (CheckoutCustomer, error) {
@@ -413,7 +509,21 @@ func (f *fakeCheckoutGateway) CreateCheckoutSession(_ context.Context, input Cre
 		RequestHash: input.RequestHash, IdeaQuantity: input.IdeaQuantity, ExpiresAt: input.ExpiresAt,
 		Status: CheckoutSessionStatusOpen,
 	}
+	if f.mutateCreatedSession != nil {
+		f.createdSession = f.mutateCreatedSession(f.sessionCalls, f.createdSession)
+	}
 	return f.createdSession, nil
+}
+
+func assertPurchaseOrderStatusByKey(t *testing.T, db *sql.DB, userID int64, idempotencyKey string, want PaymentOrderStatus) {
+	t.Helper()
+	var status PaymentOrderStatus
+	if err := db.QueryRowContext(t.Context(), `SELECT status FROM payment_orders WHERE user_id = $1 AND client_idempotency_key = $2`, userID, idempotencyKey).Scan(&status); err != nil {
+		t.Fatal(err)
+	}
+	if status != want {
+		t.Fatalf("Payment Order status = %q, want %q", status, want)
+	}
 }
 
 func (f *fakeCheckoutGateway) RetrieveCheckoutSession(_ context.Context, input RetrieveCheckoutSessionInput) (CheckoutSession, error) {

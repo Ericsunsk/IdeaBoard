@@ -1,5 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router'
 import {
+  PRIVACY_POLICY_PATH,
   REFUND_POLICY_PATH,
   SHARE_JOIN_PATH,
   USER_AUTH_CALLBACK_PATH,
@@ -23,6 +24,12 @@ export const userRoutes: RouteRecordRaw[] = [
     path: REFUND_POLICY_PATH,
     name: 'RefundPolicy',
     component: () => import('../../legal/pages/RefundPolicyPage.vue'),
+    meta: { public: true },
+  },
+  {
+    path: PRIVACY_POLICY_PATH,
+    name: 'PrivacyPolicy',
+    component: () => import('../../legal/pages/PrivacyPolicyPage.vue'),
     meta: { public: true },
   },
   {

@@ -38,6 +38,8 @@ var (
 	ErrStripeConfigurationBusy  = errors.New("仍有未完成的充值订单，请稍后再更换 Stripe API Key")
 	ErrPendingCheckoutLimit     = errors.New("最多同时保留 3 笔待支付订单，请先完成或放弃一笔")
 	ErrPaymentAlreadyInProgress = errors.New("该数量的支付正在处理中，请等待支付结果")
+	ErrPaymentAlreadyCompleted  = errors.New("该充值已完成，请勿重复支付")
+	ErrCheckoutSessionExpired   = errors.New("支付页面已过期，请重新发起充值")
 )
 
 type PurchaseOptions struct {
@@ -304,13 +306,25 @@ func (s *Service) createCheckoutLocked(ctx context.Context, command CreateChecko
 	}
 	var order PaymentOrder
 	reused := false
+	activeOrderCount := len(activeOrders)
 	for _, activeOrder := range activeOrders {
 		if activeOrder.IdeaQuantity != quote.IdeaQuantity {
 			continue
 		}
 		switch activeOrder.Status {
 		case PaymentOrderCheckoutOpen:
-			return checkoutResult(activeOrder, true), nil
+			resolved, err := s.retrieveAndConvergeCheckout(ctx, apiKey, activeOrder)
+			if err != nil {
+				return CheckoutResult{}, err
+			}
+			switch resolved.Status {
+			case PaymentOrderCheckoutOpen:
+				return checkoutResult(resolved, true), nil
+			case PaymentOrderAsyncPaymentPending:
+				return CheckoutResult{}, ErrPaymentAlreadyInProgress
+			default:
+				activeOrderCount--
+			}
 		case PaymentOrderAsyncPaymentPending:
 			return CheckoutResult{}, ErrPaymentAlreadyInProgress
 		case PaymentOrderCreating:
@@ -319,7 +333,7 @@ func (s *Service) createCheckoutLocked(ctx context.Context, command CreateChecko
 		break
 	}
 	if order.ID == "" {
-		if len(activeOrders) >= 3 {
+		if activeOrderCount >= 3 {
 			return CheckoutResult{}, ErrPendingCheckoutLimit
 		}
 		orderID, err := uuid.NewV7()
@@ -362,7 +376,18 @@ func (s *Service) createCheckoutLocked(ctx context.Context, command CreateChecko
 	if err != nil {
 		return CheckoutResult{}, err
 	}
-	return checkoutResult(order, reused), nil
+	switch order.Status {
+	case PaymentOrderCheckoutOpen:
+		return checkoutResult(order, reused), nil
+	case PaymentOrderAsyncPaymentPending:
+		return CheckoutResult{}, ErrPaymentAlreadyInProgress
+	case PaymentOrderPaidPendingCredit, PaymentOrderCredited:
+		return CheckoutResult{}, ErrPaymentAlreadyCompleted
+	case PaymentOrderExpired:
+		return CheckoutResult{}, ErrCheckoutSessionExpired
+	default:
+		return CheckoutResult{}, ErrPurchasesUnavailable
+	}
 }
 
 func (s *Service) refreshActivePaymentOrders(ctx context.Context, apiKey string, userID int64, now time.Time) ([]PaymentOrder, error) {
@@ -532,10 +557,17 @@ func (s *Service) createCheckoutSessionForOrder(ctx context.Context, apiKey stri
 	if err := validateCreatedCheckoutSession(order, customer, session); err != nil {
 		return PaymentOrder{}, err
 	}
-	return s.repo.BindPaymentOrderCheckout(ctx, BindPaymentOrderCheckoutInput{
+	if session.IsPaid() || session.Status == CheckoutSessionStatusExpired {
+		return s.orderLifecycle.convergeCheckoutSession(ctx, order, session, checkoutSignalObserved)
+	}
+	bound, err := s.repo.BindPaymentOrderCheckout(ctx, BindPaymentOrderCheckoutInput{
 		OrderID: order.ID, StripeCustomerID: customer.StripeCustomerID,
 		StripeSessionID: session.ID, CheckoutURL: session.URL, ExpiresAt: session.ExpiresAt,
 	})
+	if err != nil {
+		return PaymentOrder{}, err
+	}
+	return s.orderLifecycle.convergeCheckoutSession(ctx, bound, session, checkoutSignalObserved)
 }
 
 func (s *Service) finishRejectedCheckoutCreation(ctx context.Context, order PaymentOrder, err error) error {
@@ -615,7 +647,9 @@ func (s *Service) settleOrdersBeforeStripeKeyChange(ctx context.Context, current
 }
 
 func validateCreatedCheckoutSession(order PaymentOrder, customer PaymentCustomer, session CheckoutSession) error {
-	if strings.TrimSpace(session.URL) == "" || session.CustomerID != customer.StripeCustomerID || !session.ExpiresAt.Equal(order.ExpiresAt) {
+	requiresCheckoutURL := !session.IsPaid() && session.Status != CheckoutSessionStatusExpired
+	if (requiresCheckoutURL && strings.TrimSpace(session.URL) == "") ||
+		session.CustomerID != customer.StripeCustomerID || !session.ExpiresAt.Equal(order.ExpiresAt) {
 		return ErrPurchasesUnavailable
 	}
 	return validateCheckoutSessionIdentity(order, session)

@@ -553,6 +553,10 @@ func writeCheckoutError(c *gin.Context, err error) {
 		response.Error(c, http.StatusBadRequest, err.Error())
 	case errors.Is(err, ErrCheckoutIdempotencyConflict), errors.Is(err, ErrPendingCheckoutLimit), errors.Is(err, ErrPaymentAlreadyInProgress):
 		response.Error(c, http.StatusConflict, err.Error())
+	case errors.Is(err, ErrPaymentAlreadyCompleted):
+		response.MachineError(c, http.StatusUnprocessableEntity, "payment_already_completed", err.Error())
+	case errors.Is(err, ErrCheckoutSessionExpired):
+		response.MachineError(c, http.StatusUnprocessableEntity, "checkout_session_expired", err.Error())
 	case errors.Is(err, ErrWalletNotRechargeable):
 		response.Error(c, http.StatusLocked, err.Error())
 	case errors.Is(err, ErrCheckoutRequestRejected):

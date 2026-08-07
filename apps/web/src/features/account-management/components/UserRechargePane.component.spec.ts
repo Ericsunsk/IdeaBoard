@@ -342,7 +342,9 @@ describe('UserRechargePane', () => {
 
     const pendingOrder = await screen.findByTestId('pending-payment-order-open-order')
     await user.click(within(pendingOrder).getByRole('button', { name: '继续支付' }))
-    expect(await within(pendingOrder).findByRole('alert')).toHaveTextContent('待支付订单已达到 3 笔上限')
+    expect(await within(pendingOrder).findByRole('alert')).toHaveTextContent(
+      '待支付订单已达到 3 笔上限',
+    )
     await user.click(within(pendingOrder).getByRole('button', { name: '重试继续支付' }))
     await waitFor(() => expect(continuePendingOrder).toHaveBeenCalledTimes(2))
   })
@@ -542,7 +544,9 @@ describe('UserRechargePane', () => {
       }),
     })
 
-    const pendingOrder = await screen.findByTestId('pending-payment-order-failed-reconciliation-order')
+    const pendingOrder = await screen.findByTestId(
+      'pending-payment-order-failed-reconciliation-order',
+    )
     expect(within(pendingOrder).getByText('到账处理中')).toBeVisible()
 
     paymentListener?.({ public_token: 'failed-reconciliation-order', status: 'failed' })
@@ -620,10 +624,36 @@ describe('UserRechargePane', () => {
     expect(createCheckout.mock.calls[2]![0].idempotency_key).not.toBe(firstKey)
   })
 
-  it('rotates the idempotency key after Stripe definitively rejects Checkout creation', async () => {
-    const rejectedError = Object.assign(new Error('无法创建支付页面，请重试'), {
-      code: 'checkout_request_rejected',
+  it('rotates the idempotency key after Checkout creation succeeds', async () => {
+    const createCheckout = vi.fn().mockResolvedValue({
+      checkout_url: 'https://checkout.stripe.com/c/pay/cs_test_success',
+      public_token: '0198cd29-f457-7e4b-b95e-6cfde41b7222',
+      expires_at: '2026-08-01T01:00:00Z',
+      reused: false,
     })
+    const navigate = vi.fn()
+    const { user } = renderPane({ resource: makeResource({ createCheckout }), navigate })
+
+    await user.click(await screen.findByRole('checkbox', { name: /服务条款.*退款政策/ }))
+    const checkout = screen.getByRole('button', { name: '立即支付' })
+
+    await user.click(checkout)
+    await waitFor(() => expect(createCheckout).toHaveBeenCalledTimes(1))
+    await user.click(checkout)
+    await waitFor(() => expect(createCheckout).toHaveBeenCalledTimes(2))
+
+    expect(createCheckout.mock.calls[1]![0].idempotency_key).not.toBe(
+      createCheckout.mock.calls[0]![0].idempotency_key,
+    )
+    expect(navigate).toHaveBeenCalledTimes(2)
+  })
+
+  it.each([
+    ['checkout_request_rejected', '无法创建支付页面，请重试'],
+    ['checkout_session_expired', '支付页面已过期，请重新发起充值'],
+    ['payment_already_completed', '该充值已完成，请勿重复支付'],
+  ])('rotates the idempotency key after the server returns %s', async (code, message) => {
+    const rejectedError = Object.assign(new Error(message), { code })
     const createCheckout = vi.fn().mockRejectedValue(rejectedError)
     const { user } = renderPane({ resource: makeResource({ createCheckout }) })
 

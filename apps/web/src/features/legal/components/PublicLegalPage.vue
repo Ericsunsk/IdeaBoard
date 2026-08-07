@@ -12,7 +12,7 @@
           :to="USER_HOME_PATH"
           class="rounded-[var(--radius-ib-control)] px-2 py-1 text-sm font-semibold text-ib-text-muted no-underline transition-colors duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:text-ib-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]"
         >
-          返回首页
+          Back to home
         </RouterLink>
       </div>
     </header>
@@ -30,7 +30,7 @@
           >
             {{ title }}
           </h1>
-          <p class="mt-3 mb-0 text-sm text-ib-text-muted">版本：{{ version }}</p>
+          <p class="mt-3 mb-0 text-sm text-ib-text-muted">Version: {{ version }}</p>
         </header>
 
         <div class="legal-copy pt-7 text-[15px] leading-7 text-ib-text-muted">
