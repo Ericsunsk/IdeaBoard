@@ -1,20 +1,24 @@
-# ===== Frontend =====
-apps/web/node_modules/
+# ===== Node / Frontend =====
+node_modules/
 apps/web/dist/
+apps/web/dist-ssr/
 apps/web/.benchmark-reports/
-apps/web/benchmarks/
-apps/auth/node_modules/
+coverage/
 apps/auth/dist/
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.local
 
 # ===== Backend (Go API) =====
 apps/api/*.exe
-apps/api/*.exe~
-apps/api/ideaboard-server
-apps/api/ideaboard-server~
-apps/api/ideaboard-server-linux
+apps/api/ideaboard-server*
 apps/api/uploads/*
 !apps/api/uploads/.placeholder
-apps/api/*.log
 apps/api/test_upload.png
 apps/api/bin/
 apps/api/web/dist/*
@@ -32,11 +36,15 @@ apps/api/debug.test
 Thumbs.db
 .vscode/
 .idea/
-*.swp
-*.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 *~
 .playwright-cli/
 .playwright-mcp/
+.wrangler/
 output/
 
 # ===== Env / Secrets =====
@@ -49,16 +57,8 @@ output/
 docker/migration.env
 
 # ===== Release Artifacts =====
-release/
-release-temp/
 docker/releases/
 .cache/
 .codebase-memory/
-
-# ===== Temp Files =====
-other review.md
-plan.md
-canvas_migration_audit.md
-apps/api/init_admin.sql
 
 .worktrees/
