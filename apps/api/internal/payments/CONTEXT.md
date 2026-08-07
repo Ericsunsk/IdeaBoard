@@ -35,11 +35,13 @@ Payments 拥有 Stripe 配置、签名 Webhook 接入与支付生命周期。它
 
 - Stripe API Key 与 Webhook Secret 使用平台 Secret material 加密存储，禁止进入 HTTP response、日志、Webhook Inbox 或 Admin audit。
 - Payments 只持久化收敛和审计所需的最小 Stripe IDs、金额、币种、状态、时间、收据 URL、条款版本与受限错误摘要；禁止持久化卡信息、完整账单地址、完整 raw payload、Secret 明文或内部 stack trace。Payment 事实的 retention 由受控运维流程决定，不得手工删除关联 Ledger 或未结算状态。
+- Checkout 不启用 Stripe Automatic Tax，也不主动要求或保存 Customer 地址；Stripe 或具体 Payment Method 因合规要求收集的最少 Billing 信息不属于应用可屏蔽范围。
 - Webhook 必须在业务解析和持久化前使用 raw body、当前 Webhook Secret 与 5 分钟 tolerance 验证签名；无效或过期签名不写 Inbox。
 - Stripe Event ID 在全局唯一。重复投递保持幂等；已签名但未知的事件只记录最小 metadata 并标记 `ignored`。
 - Webhook Inbox 不保存原始 payload，只保存 Event ID、type、object ID、livemode、Stripe created time、接收/处理状态与时间。
 - 配置与 Webhook Secret 在 request-time 从 PostgreSQL 读取并实时生效，不使用 application-lifetime 配置缓存。
 - 创建 Checkout 前必须先以 `(user_id, client_idempotency_key)` 和 canonical request hash durable 创建或重放 Payment Order；相同 key 的不同请求 fail closed。Stripe Customer、Checkout Session 和其 provider identity 都必须绑定到该 Order。
+- Stripe 明确拒绝创建 Customer 或 Checkout Session 时，`creating` Order 必须立即进入 `payment_failed`，允许用户用新 Order 重试；网络中断、限流、provider `5xx`、`idempotency_error` 或响应不完整等结果未知失败必须保留原 Order 与原 Stripe Idempotency Key。
 - Payment Order 生命周期以 `creating → checkout_open → async_payment_pending` 表达未完成 Checkout，以 `cancelled|expired|payment_failed` 表达未支付终态，以 `paid_pending_credit → credited` 表达已确认支付到 Ledger 到账。已确认的 late paid fact 可以从未支付终态升级到 `paid_pending_credit`，其他终态不得回退；所有 transition 由数据库约束。
 - 同一用户、同一 Idea 数量只允许一个未支付的 active Checkout；创建、继续和放弃 Checkout 按用户串行化，不在 Stripe 网络调用期间持有数据库 transaction。每个用户最多保留 3 笔不同数量的未支付 active Checkout；`paid_pending_credit` 已是支付事实，不占用待支付名额。
 - 仅签名 Webhook 或服务端主动查询取得的、已验证身份绑定的 Stripe paid Checkout Session 可触发到账；浏览器 URL、public token、未支付或失败 Session 均不得到账。Stripe paid fact 先独立 durable 为 `paid_pending_credit`；随后 `purchase_credit` 与 `paid_pending_credit → credited` 在同一 PostgreSQL transaction 中原子提交，并对 replay/concurrency 幂等。

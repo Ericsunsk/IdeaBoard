@@ -97,7 +97,7 @@ export function useUserRecharge(
     },
   })
 
-  function createCheckout(ideaQuantity: number) {
+  async function createCheckout(ideaQuantity: number) {
     const options = optionsQuery.data.value
     if (!options) return Promise.reject(new Error('充值选项尚未加载完成'))
 
@@ -108,13 +108,24 @@ export function useUserRecharge(
       checkoutIntent = { fingerprint, idempotencyKey: globalThis.crypto.randomUUID() }
     }
 
-    return checkoutMutation.mutateAsync({
+    const request: UserPaymentCheckoutRequest = {
       idea_quantity: ideaQuantity,
       idempotency_key: checkoutIntent.idempotencyKey,
       terms_version: options.terms.version,
       refund_policy_version: options.refund_policy.version,
       terms_accepted: true,
-    })
+    }
+    try {
+      return await checkoutMutation.mutateAsync(request)
+    } catch (error) {
+      if (
+        isCheckoutRequestRejected(error) &&
+        checkoutIntent?.idempotencyKey === request.idempotency_key
+      ) {
+        checkoutIntent = null
+      }
+      throw error
+    }
   }
 
   async function runPendingOrderAction(action: PendingOrderAction) {
@@ -194,4 +205,13 @@ export function useUserRecharge(
     retryHistory: historyQuery.refetch,
     loadMoreHistory: historyQuery.fetchNextPage,
   }
+}
+
+function isCheckoutRequestRejected(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'checkout_request_rejected'
+  )
 }

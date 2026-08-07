@@ -340,18 +340,17 @@ func assertCheckoutForm(t *testing.T, form url.Values, expiresAt time.Time) {
 	assertFormValue(t, form, "payment_intent_data[metadata][ideaboard_request_hash]", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
 	assertFormValue(t, form, "payment_intent_data[metadata][ideaboard_idea_quantity]", "501")
 	assertFormValue(t, form, "payment_intent_data[statement_descriptor_suffix]", "IDEABOARD")
-	assertFormValue(t, form, "automatic_tax[enabled]", "true")
 	assertFormValue(t, form, "adaptive_pricing[enabled]", "true")
 	assertFormValue(t, form, "line_items[0][price_data][currency]", "usd")
 	assertFormValue(t, form, "line_items[0][price_data][product]", "prod_idea")
 	assertFormValue(t, form, "line_items[0][price_data][unit_amount]", "501")
-	assertFormValue(t, form, "line_items[0][price_data][tax_behavior]", "exclusive")
 	assertFormValue(t, form, "line_items[0][quantity]", "1")
 	assertFormValue(t, form, "expires_at", strconv.FormatInt(expiresAt.Unix(), 10))
 	assertFormValue(t, form, "success_url", "https://app.ideaboard.example/user/boards?checkout_return=success&payment_return=opaque-token")
 	assertFormValue(t, form, "cancel_url", "https://app.ideaboard.example/user/boards?checkout_return=cancel&payment_return=opaque-token")
 	forbidden := []string{
-		"customer_email", "payment_method_types[0]", "line_items[0][adjustable_quantity][enabled]",
+		"customer_email", "billing_address_collection", "customer_update[address]", "automatic_tax[enabled]",
+		"payment_method_types[0]", "line_items[0][adjustable_quantity][enabled]", "line_items[0][price_data][tax_behavior]",
 		"payment_intent_data[setup_future_usage]", "payment_intent_data[receipt_email]", "payment_intent_data[statement_descriptor]",
 		"saved_payment_method_options[payment_method_save]",
 	}

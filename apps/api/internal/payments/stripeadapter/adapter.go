@@ -45,23 +45,6 @@ func (a *Adapter) PrepareConfiguration(ctx context.Context, input payments.Prepa
 	if !account.ChargesEnabled {
 		return payments.PreparedStripeConfiguration{}, payments.NewGatewayError(payments.GatewayErrorCapabilityMissing, "Stripe 账户尚未启用收款", nil)
 	}
-	if input.Mode == payments.StripeModeLive && input.PurchasesEnabled {
-		registrations := client.V1TaxRegistrations.List(ctx, &stripe.TaxRegistrationListParams{
-			ListParams: stripe.ListParams{Limit: stripe.Int64(1), Single: true},
-			Status:     stripe.String(string(stripe.TaxRegistrationStatusActive)),
-		})
-		if err := registrations.Err(); err != nil {
-			return payments.PreparedStripeConfiguration{}, mapStripeError("检查 Stripe Tax registrations", err)
-		}
-		if len(registrations.Data()) == 0 {
-			return payments.PreparedStripeConfiguration{}, payments.NewGatewayError(
-				payments.GatewayErrorCapabilityMissing,
-				"Stripe Live Account 尚无 active Tax Registration，无法开启充值",
-				nil,
-			)
-		}
-	}
-
 	product, err := ensureProduct(ctx, client, input, account.ID)
 	if err != nil {
 		return payments.PreparedStripeConfiguration{}, err
@@ -282,4 +265,24 @@ func mapStripeError(operation string, err error) error {
 		code, message = payments.GatewayErrorInvalidResponse, "Stripe 拒绝了当前配置"
 	}
 	return payments.NewGatewayError(code, message, err)
+}
+
+func mapStripeCreateError(operation string, err error) error {
+	var stripeErr *stripe.Error
+	if !errors.As(err, &stripeErr) {
+		return mapStripeError(operation, err)
+	}
+	if stripeErr.Type == stripe.ErrorTypeIdempotency {
+		return mapStripeError(operation, err)
+	}
+	switch stripeErr.HTTPStatusCode {
+	case http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound:
+		return payments.NewGatewayError(
+			payments.GatewayErrorRequestRejected,
+			operation+" 被 Stripe 拒绝",
+			err,
+		)
+	default:
+		return mapStripeError(operation, err)
+	}
 }

@@ -497,7 +497,7 @@ func (s *Service) ensurePaymentCustomer(ctx context.Context, apiKey string, orde
 		IdempotencyKey: "ideaboard-customer-" + order.StripeAccountID + "-" + strconv.FormatInt(order.UserID, 10),
 	})
 	if err != nil {
-		return PaymentCustomer{}, checkoutOperationError(err)
+		return PaymentCustomer{}, err
 	}
 	if strings.TrimSpace(created.ID) == "" {
 		return PaymentCustomer{}, ErrPurchasesUnavailable
@@ -516,7 +516,7 @@ func (s *Service) createCheckoutSessionForOrder(ctx context.Context, apiKey stri
 	}
 	customer, err := s.ensurePaymentCustomer(ctx, apiKey, order)
 	if err != nil {
-		return PaymentOrder{}, err
+		return PaymentOrder{}, s.finishRejectedCheckoutCreation(ctx, order, err)
 	}
 	session, err := s.checkoutGateway.CreateCheckoutSession(ctx, CreateCheckoutSessionInput{
 		APIKey: apiKey, CustomerID: customer.StripeCustomerID, ProductID: order.StripeProductID,
@@ -527,7 +527,7 @@ func (s *Service) createCheckoutSessionForOrder(ctx context.Context, apiKey stri
 		IdempotencyKey: order.PublicOrderNumber,
 	})
 	if err != nil {
-		return PaymentOrder{}, checkoutOperationError(err)
+		return PaymentOrder{}, s.finishRejectedCheckoutCreation(ctx, order, err)
 	}
 	if err := validateCreatedCheckoutSession(order, customer, session); err != nil {
 		return PaymentOrder{}, err
@@ -536,6 +536,22 @@ func (s *Service) createCheckoutSessionForOrder(ctx context.Context, apiKey stri
 		OrderID: order.ID, StripeCustomerID: customer.StripeCustomerID,
 		StripeSessionID: session.ID, CheckoutURL: session.URL, ExpiresAt: session.ExpiresAt,
 	})
+}
+
+func (s *Service) finishRejectedCheckoutCreation(ctx context.Context, order PaymentOrder, err error) error {
+	operationErr := checkoutOperationError(err)
+	var gatewayErr *GatewayError
+	if !errors.As(err, &gatewayErr) || gatewayErr.Code() != GatewayErrorRequestRejected {
+		return operationErr
+	}
+	failed, markErr := s.repo.MarkPaymentOrderFailed(ctx, order.ID)
+	if markErr != nil {
+		return errors.Join(operationErr, fmt.Errorf("mark rejected Checkout order failed: %w", markErr))
+	}
+	if failed.Status != PaymentOrderFailed {
+		return errors.Join(operationErr, fmt.Errorf("rejected Checkout order remained %s", failed.Status))
+	}
+	return errors.Join(ErrCheckoutRequestRejected, operationErr)
 }
 
 func (s *Service) retrieveAndConvergeCheckout(ctx context.Context, apiKey string, order PaymentOrder) (PaymentOrder, error) {

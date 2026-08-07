@@ -23,6 +23,7 @@ var (
 	ErrTermsAcceptanceRequired     = errors.New("请先同意服务条款与退款政策")
 	ErrCheckoutIdempotencyKey      = errors.New("充值请求标识无效")
 	ErrCheckoutIdempotencyConflict = errors.New("充值请求与原请求不一致")
+	ErrCheckoutRequestRejected     = errors.New("Stripe 拒绝创建支付页面")
 	ErrPurchasesUnavailable        = errors.New("充值服务暂不可用")
 	ErrWalletNotRechargeable       = errors.New("当前账户暂不可充值")
 )

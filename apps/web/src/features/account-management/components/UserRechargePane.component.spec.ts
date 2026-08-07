@@ -107,7 +107,7 @@ describe('UserRechargePane', () => {
     const navigate = vi.fn()
     const { user } = renderPane({ resource: makeResource({ createCheckout }), navigate })
 
-    const checkout = await screen.findByRole('button', { name: '前往 Stripe 支付' })
+    const checkout = await screen.findByRole('button', { name: '立即支付' })
     expect(checkout).toBeDisabled()
     await user.click(screen.getByRole('checkbox', { name: /服务条款.*退款政策/ }))
     expect(checkout).toBeEnabled()
@@ -141,7 +141,7 @@ describe('UserRechargePane', () => {
     await user.type(custom, '501')
     expect(screen.getByText('$5.01 USD')).toBeVisible()
     await user.click(screen.getByRole('checkbox', { name: /服务条款.*退款政策/ }))
-    await user.click(screen.getByRole('button', { name: '前往 Stripe 支付' }))
+    await user.click(screen.getByRole('button', { name: '立即支付' }))
 
     expect(createCheckout).toHaveBeenCalledWith({
       idea_quantity: 501,
@@ -549,7 +549,7 @@ describe('UserRechargePane', () => {
 
     expect(await within(pendingOrder).findByText('支付未完成')).toBeVisible()
     await user.click(screen.getByRole('checkbox', { name: /服务条款.*退款政策/ }))
-    await user.click(screen.getByRole('button', { name: '前往 Stripe 支付' }))
+    await user.click(screen.getByRole('button', { name: '立即支付' }))
     await waitFor(() => expect(createCheckout).toHaveBeenCalledOnce())
   })
 
@@ -591,10 +591,10 @@ describe('UserRechargePane', () => {
     const { user } = renderPane({ resource: makeResource({ createCheckout }), navigate })
 
     await user.click(await screen.findByRole('checkbox', { name: /服务条款.*退款政策/ }))
-    await user.click(screen.getByRole('button', { name: '前往 Stripe 支付' }))
+    await user.click(screen.getByRole('button', { name: '立即支付' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('暂时无法创建支付页面')
-    expect(screen.getByRole('button', { name: '前往 Stripe 支付' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '立即支付' })).toBeEnabled()
     expect(navigate).not.toHaveBeenCalled()
   })
 
@@ -603,7 +603,7 @@ describe('UserRechargePane', () => {
     const { user } = renderPane({ resource: makeResource({ createCheckout }) })
 
     await user.click(await screen.findByRole('checkbox', { name: /服务条款.*退款政策/ }))
-    const checkout = screen.getByRole('button', { name: '前往 Stripe 支付' })
+    const checkout = screen.getByRole('button', { name: '立即支付' })
 
     await user.click(checkout)
     await waitFor(() => expect(createCheckout).toHaveBeenCalledTimes(1))
@@ -618,6 +618,26 @@ describe('UserRechargePane', () => {
     await waitFor(() => expect(createCheckout).toHaveBeenCalledTimes(3))
 
     expect(createCheckout.mock.calls[2]![0].idempotency_key).not.toBe(firstKey)
+  })
+
+  it('rotates the idempotency key after Stripe definitively rejects Checkout creation', async () => {
+    const rejectedError = Object.assign(new Error('无法创建支付页面，请重试'), {
+      code: 'checkout_request_rejected',
+    })
+    const createCheckout = vi.fn().mockRejectedValue(rejectedError)
+    const { user } = renderPane({ resource: makeResource({ createCheckout }) })
+
+    await user.click(await screen.findByRole('checkbox', { name: /服务条款.*退款政策/ }))
+    const checkout = screen.getByRole('button', { name: '立即支付' })
+
+    await user.click(checkout)
+    await waitFor(() => expect(createCheckout).toHaveBeenCalledTimes(1))
+    await user.click(checkout)
+    await waitFor(() => expect(createCheckout).toHaveBeenCalledTimes(2))
+
+    expect(createCheckout.mock.calls[1]![0].idempotency_key).not.toBe(
+      createCheckout.mock.calls[0]![0].idempotency_key,
+    )
   })
 
   it('keeps the narrow-screen history surface keyboard scrollable', async () => {

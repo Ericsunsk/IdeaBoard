@@ -147,7 +147,7 @@
         <Button
           unstyled
           type="submit"
-          label="前往 Stripe 支付"
+          label="立即支付"
           :disabled="!canCheckout"
           :loading="checkoutPending"
           :class="accountPrimaryActionButtonClass"

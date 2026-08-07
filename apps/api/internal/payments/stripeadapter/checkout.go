@@ -37,7 +37,7 @@ func (a *Adapter) CreateCustomer(ctx context.Context, input payments.CreateCheck
 	params.SetIdempotencyKey(input.IdempotencyKey)
 	customer, err := client.V1Customers.Create(ctx, params)
 	if err != nil {
-		return payments.CheckoutCustomer{}, mapStripeError("创建 Stripe Customer", err)
+		return payments.CheckoutCustomer{}, mapStripeCreateError("创建 Stripe Customer", err)
 	}
 	if customer == nil || strings.TrimSpace(customer.ID) == "" {
 		return payments.CheckoutCustomer{}, payments.NewGatewayError(payments.GatewayErrorInvalidResponse, "Stripe Customer 响应无效", nil)
@@ -60,7 +60,6 @@ func (a *Adapter) CreateCheckoutSession(ctx context.Context, input payments.Crea
 		CancelURL:         stripe.String(input.CancelURL),
 		ExpiresAt:         stripe.Int64(input.ExpiresAt.Unix()),
 		Metadata:          metadata,
-		AutomaticTax:      &stripe.CheckoutSessionCreateAutomaticTaxParams{Enabled: stripe.Bool(true)},
 		AdaptivePricing:   &stripe.CheckoutSessionCreateAdaptivePricingParams{Enabled: stripe.Bool(true)},
 		PaymentIntentData: &stripe.CheckoutSessionCreatePaymentIntentDataParams{
 			Metadata:                  metadata,
@@ -69,17 +68,16 @@ func (a *Adapter) CreateCheckoutSession(ctx context.Context, input payments.Crea
 		LineItems: []*stripe.CheckoutSessionCreateLineItemParams{{
 			Quantity: stripe.Int64(1),
 			PriceData: &stripe.CheckoutSessionCreateLineItemPriceDataParams{
-				Currency:    stripe.String(string(stripe.CurrencyUSD)),
-				Product:     stripe.String(input.ProductID),
-				UnitAmount:  stripe.Int64(input.AmountMinor),
-				TaxBehavior: stripe.String("exclusive"),
+				Currency:   stripe.String(string(stripe.CurrencyUSD)),
+				Product:    stripe.String(input.ProductID),
+				UnitAmount: stripe.Int64(input.AmountMinor),
 			},
 		}},
 	}
 	params.SetIdempotencyKey(input.IdempotencyKey)
 	session, err := client.V1CheckoutSessions.Create(ctx, params)
 	if err != nil {
-		return payments.CheckoutSession{}, mapStripeError("创建 Stripe Checkout Session", err)
+		return payments.CheckoutSession{}, mapStripeCreateError("创建 Stripe Checkout Session", err)
 	}
 	return checkoutSessionFact(session, true)
 }

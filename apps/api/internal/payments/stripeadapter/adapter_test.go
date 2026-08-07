@@ -3,9 +3,7 @@ package stripeadapter
 import (
 	"context"
 	"errors"
-	"io"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -13,37 +11,6 @@ import (
 
 	"github.com/stripe/stripe-go/v86"
 )
-
-func TestPrepareConfigurationBlocksLivePurchasesWithoutActiveTaxRegistration(t *testing.T) {
-	t.Parallel()
-
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		switch request.URL.Path {
-		case "/v1/account":
-			_, _ = io.WriteString(writer, `{"id":"acct_live","charges_enabled":true}`)
-		case "/v1/tax/registrations":
-			if got := request.URL.Query().Get("status"); got != "active" {
-				t.Fatalf("registration status filter = %q", got)
-			}
-			_, _ = io.WriteString(writer, `{"object":"list","data":[],"has_more":false}`)
-		default:
-			http.NotFound(writer, request)
-		}
-	}))
-	defer server.Close()
-
-	_, err := newCheckoutTestAdapter(server.URL).PrepareConfiguration(context.Background(), payments.PrepareStripeConfiguration{
-		APIKey: "rk_live_fixture", Mode: payments.StripeModeLive, PurchasesEnabled: true,
-		ProductTaxCode: "txcd_10105001", WebhookURL: "https://app.example.com/api/webhooks/stripe",
-	})
-	var gatewayErr *payments.GatewayError
-	if !errors.As(err, &gatewayErr) || gatewayErr.Code() != payments.GatewayErrorCapabilityMissing {
-		t.Fatalf("PrepareConfiguration() error = %v, want capability missing", err)
-	}
-	if !strings.Contains(gatewayErr.Error(), "Tax Registration") {
-		t.Fatalf("safe error = %q, want Tax Registration guidance", gatewayErr.Error())
-	}
-}
 
 func TestMapStripeErrorTreatsNotFoundAsDeterministicInvalidResponse(t *testing.T) {
 	t.Parallel()
@@ -66,5 +33,63 @@ func TestMapStripeErrorTreatsNotFoundAsDeterministicInvalidResponse(t *testing.T
 	}
 	if strings.Contains(err.Error(), rawProviderBody) || strings.Contains(err.Error(), "sk_live_must_not_escape") {
 		t.Fatalf("gateway error leaked provider body: %q", err)
+	}
+}
+
+func TestMapStripeCheckoutCreateErrorPreservesOutcomeCertainty(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		err      error
+		wantCode payments.GatewayErrorCode
+	}{
+		{
+			name: "invalid request was definitively rejected",
+			err: &stripe.Error{
+				HTTPStatusCode: http.StatusBadRequest,
+				Type:           stripe.ErrorTypeInvalidRequest,
+			},
+			wantCode: payments.GatewayErrorRequestRejected,
+		},
+		{
+			name: "idempotency mismatch has an unknown prior outcome",
+			err: &stripe.Error{
+				HTTPStatusCode: http.StatusBadRequest,
+				Type:           stripe.ErrorTypeIdempotency,
+			},
+			wantCode: payments.GatewayErrorInvalidResponse,
+		},
+		{
+			name:     "transport cancellation has an unknown outcome",
+			err:      context.Canceled,
+			wantCode: payments.GatewayErrorProviderUnavailable,
+		},
+		{
+			name: "rate limit has an unknown outcome",
+			err: &stripe.Error{
+				HTTPStatusCode: http.StatusTooManyRequests,
+				Type:           stripe.ErrorTypeRateLimit,
+			},
+			wantCode: payments.GatewayErrorProviderUnavailable,
+		},
+		{
+			name: "provider failure has an unknown outcome",
+			err: &stripe.Error{
+				HTTPStatusCode: http.StatusInternalServerError,
+				Type:           stripe.ErrorTypeAPI,
+			},
+			wantCode: payments.GatewayErrorProviderUnavailable,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := mapStripeCreateError("创建 Stripe Checkout Session", test.err)
+			var gatewayErr *payments.GatewayError
+			if !errors.As(err, &gatewayErr) || gatewayErr.Code() != test.wantCode {
+				t.Fatalf("gateway error = %v, want code %q", err, test.wantCode)
+			}
+		})
 	}
 }

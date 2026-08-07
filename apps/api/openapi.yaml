@@ -261,6 +261,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '422':
+          description: Stripe definitively rejected Checkout creation; the client may retry with a new idempotency key
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutRequestRejectedError' }
   /user/payments/orders/{public_token}:
     get:
       tags: [UserPayments]
@@ -2659,6 +2664,16 @@ components:
         code:
           type: string
           enum: [pricing_unavailable]
+        msg:
+          type: string
+
+    CheckoutRequestRejectedError:
+      type: object
+      required: [code, msg]
+      properties:
+        code:
+          type: string
+          enum: [checkout_request_rejected]
         msg:
           type: string
 

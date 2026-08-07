@@ -90,6 +90,7 @@ const (
 	GatewayErrorCapabilityMissing   GatewayErrorCode = "capability_missing"
 	GatewayErrorProviderUnavailable GatewayErrorCode = "provider_unavailable"
 	GatewayErrorInvalidResponse     GatewayErrorCode = "invalid_response"
+	GatewayErrorRequestRejected     GatewayErrorCode = "request_rejected"
 )
 
 type GatewayError struct {

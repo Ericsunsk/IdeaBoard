@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -169,6 +170,28 @@ func TestUserCheckoutHTTPUsesPrincipalAndTrustedReturnURL(t *testing.T) {
 	wallet, err := credits.NewService(pool).GetWallet(t.Context(), 42)
 	if err != nil || wallet.Available != 501 {
 		t.Fatalf("credited Wallet=%+v error=%v", wallet, err)
+	}
+}
+
+func TestCheckoutHTTPAllowsANewIntentAfterDefinitiveProviderRejection(t *testing.T) {
+	router := gin.New()
+	router.GET("/checkout-error", func(c *gin.Context) {
+		writeCheckoutError(c, errors.Join(ErrCheckoutRequestRejected, ErrPurchasesUnavailable))
+	})
+
+	result := performPaymentRequest(router, http.MethodGet, "/checkout-error", "", nil)
+	if result.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want %d", result.Code, http.StatusUnprocessableEntity)
+	}
+	var responseBody struct {
+		Code string `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	if err := json.Unmarshal(result.Body.Bytes(), &responseBody); err != nil {
+		t.Fatal(err)
+	}
+	if responseBody.Code != "checkout_request_rejected" || responseBody.Msg != "无法创建支付页面，请重试" {
+		t.Fatalf("response = %+v", responseBody)
 	}
 }
 

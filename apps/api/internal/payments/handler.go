@@ -555,6 +555,8 @@ func writeCheckoutError(c *gin.Context, err error) {
 		response.Error(c, http.StatusConflict, err.Error())
 	case errors.Is(err, ErrWalletNotRechargeable):
 		response.Error(c, http.StatusLocked, err.Error())
+	case errors.Is(err, ErrCheckoutRequestRejected):
+		response.MachineError(c, http.StatusUnprocessableEntity, "checkout_request_rejected", "无法创建支付页面，请重试")
 	case errors.Is(err, ErrStripeProviderUnavailable):
 		response.Error(c, http.StatusServiceUnavailable, "支付服务暂不可用")
 	default:
