@@ -73,6 +73,14 @@ done
 assert_contains "${docker_workflow}" '    uses: ./.github/workflows/backend.yml'
 assert_contains "${docker_workflow}" '          provenance: mode=max'
 assert_contains "${docker_workflow}" '          sbom: true'
+assert_contains "${docker_workflow}" '          tags: ${{ steps.image.outputs.immutable_tag }}'
+assert_contains "${docker_workflow}" '      - name: Publish verified image aliases'
+assert_contains "${docker_workflow}" '          SYFT_PLATFORM: linux/amd64'
+assert_contains "${docker_workflow}" '          SYFT_PLATFORM: linux/arm64'
+if grep -Fq 'SYFT_PLATFORM: all' "${docker_workflow}"; then
+  echo 'Syft requires an explicit operating system and architecture' >&2
+  exit 1
+fi
 for npm_workflow in ci.yml web.yml backend.yml security.yml release.yml; do
   assert_contains "${repo_root}/.github/workflows/${npm_workflow}" 'uses: ./.github/actions/npm-ci'
   if grep -Fq 'run: npm ci' "${repo_root}/.github/workflows/${npm_workflow}"; then

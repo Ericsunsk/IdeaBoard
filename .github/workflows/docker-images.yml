@@ -62,21 +62,18 @@ jobs:
             file: ./apps/api/Dockerfile
             target: runtime
             cache_scope: ideaboard-api
-            sbom_file: api.sbom.cyclonedx.json
           - name: auth
             display: Auth
             context: ./apps/auth
             file: ./apps/auth/Dockerfile
             target: runtime
             cache_scope: ideaboard-auth
-            sbom_file: auth.sbom.cyclonedx.json
           - name: auth-migrate
             display: Auth Migration
             context: ./apps/auth
             file: ./apps/auth/Dockerfile
             target: migrator
             cache_scope: ideaboard-auth-migrate
-            sbom_file: auth-migrate.sbom.cyclonedx.json
 
     steps:
       - name: Checkout
@@ -88,6 +85,7 @@ jobs:
         run: |
           repository="${GITHUB_REPOSITORY,,}"
           echo "name=ghcr.io/${repository}/ideaboard-${{ matrix.image.name }}" >> "${GITHUB_OUTPUT}"
+          echo "immutable_tag=ghcr.io/${repository}/ideaboard-${{ matrix.image.name }}:sha-${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
@@ -121,7 +119,7 @@ jobs:
           target: ${{ matrix.image.target }}
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: ${{ steps.image.outputs.immutable_tag }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.image.cache_scope }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image.cache_scope }}
@@ -131,15 +129,27 @@ jobs:
       - name: Prepare release asset directory
         run: mkdir -p release-assets
 
-      - name: Generate multi-platform SBOM
+      - name: Generate linux/amd64 SBOM
         timeout-minutes: 10
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
         env:
-          SYFT_PLATFORM: all
+          SYFT_PLATFORM: linux/amd64
         with:
           image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
           format: cyclonedx-json
-          output-file: release-assets/${{ matrix.image.sbom_file }}
+          output-file: release-assets/${{ matrix.image.name }}-linux-amd64.sbom.cyclonedx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Generate linux/arm64 SBOM
+        timeout-minutes: 10
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
+        env:
+          SYFT_PLATFORM: linux/arm64
+        with:
+          image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
+          format: cyclonedx-json
+          output-file: release-assets/${{ matrix.image.name }}-linux-arm64.sbom.cyclonedx.json
           upload-artifact: false
           upload-release-assets: false
 
@@ -179,25 +189,56 @@ jobs:
           IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
         run: cosign sign --yes "${IMAGE}"
 
+      - name: Publish verified image aliases
+        timeout-minutes: 5
+        shell: bash
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+
+          mapfile -t tags <<< "${TAGS}"
+          tag_args=()
+          for tag in "${tags[@]}"; do
+            [[ -n "${tag}" ]] && tag_args+=(--tag "${tag}")
+          done
+          ((${#tag_args[@]} > 0))
+
+          for attempt in 1 2 3; do
+            if docker buildx imagetools create "${tag_args[@]}" "${IMAGE}"; then
+              exit 0
+            fi
+            if [[ "${attempt}" == 3 ]]; then
+              exit 1
+            fi
+            sleep $((attempt * 5))
+          done
+
       - name: Write image metadata
         shell: bash
         env:
           IMAGE_NAME: ${{ steps.image.outputs.name }}
           IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
           IMAGE_KEY: ${{ matrix.image.name }}
-          SBOM_FILE: ${{ matrix.image.sbom_file }}
+          SBOM_AMD64_FILE: ${{ matrix.image.name }}-linux-amd64.sbom.cyclonedx.json
+          SBOM_ARM64_FILE: ${{ matrix.image.name }}-linux-arm64.sbom.cyclonedx.json
         run: |
           jq -n \
             --arg name "${IMAGE_KEY}" \
             --arg image "${IMAGE_NAME}" \
             --arg digest "${IMAGE_DIGEST}" \
-            --arg sbom_file "${SBOM_FILE}" \
+            --arg sbom_amd64_file "${SBOM_AMD64_FILE}" \
+            --arg sbom_arm64_file "${SBOM_ARM64_FILE}" \
             '{
               name: $name,
               image: $image,
               digest: $digest,
               ref: ($image + "@" + $digest),
-              sbom_file: $sbom_file
+              sbom_files: {
+                "linux/amd64": $sbom_amd64_file,
+                "linux/arm64": $sbom_arm64_file
+              }
             }' > "release-assets/${IMAGE_KEY}.json"
 
           {
@@ -267,9 +308,9 @@ jobs:
                 "auth-migrate": $auth_migrate[0].ref
               },
               sbom_files: {
-                api: $api[0].sbom_file,
-                auth: $auth[0].sbom_file,
-                "auth-migrate": $auth_migrate[0].sbom_file
+                api: $api[0].sbom_files,
+                auth: $auth[0].sbom_files,
+                "auth-migrate": $auth_migrate[0].sbom_files
               },
               cosign: {
                 certificate_identity: $cosign_identity,
