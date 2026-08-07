@@ -1653,7 +1653,7 @@ verify_image_signature() {
   if [[ -z "$identity_regexp" ]]; then
     source_repo="$(image_source_repo_from_ref "$image_ref")" || die "cannot derive GitHub source repository from image ref: $image_ref"
     source_repo_regexp="${source_repo//./\\.}"
-    identity_regexp="https://github.com/${source_repo_regexp}/\\.github/workflows/docker-images\\.yml@refs/(heads|tags)/.+"
+    identity_regexp="(?i)https://github.com/${source_repo_regexp}/\\.github/workflows/docker-images\\.yml@refs/(heads|tags)/.+"
   fi
   oidc_issuer="$(env_value COSIGN_CERTIFICATE_OIDC_ISSUER)"
   oidc_issuer="${oidc_issuer:-https://token.actions.githubusercontent.com}"
