@@ -123,9 +123,9 @@ VPS
 
 生产部署不要把 VPS 端 bootstrap 绑定到 `main`；请始终使用明确的发布 tag 或 commit SHA。镜像部署值必须使用 GitHub Actions 输出的 digest 引用。
 
-Docker Images workflow 会在发布镜像后上传 `release-manifest` artifact，tag 发布还会把 `release-manifest.json` 附到同一 GitHub Release。该 manifest 是推荐升级输入，记录本次 workflow 的 `tag` / `ref` / `commit` / `run_id`、三张 GHCR digest 镜像引用、SBOM artifact 名称与 Cosign OIDC identity。
+Docker Images workflow 先复用 Backend Verification，通过后才发布镜像。workflow 会上传 `release-manifest` artifact；tag 发布还会把 `release-manifest.json` 和三份 CycloneDX SBOM 附到同一 GitHub Release。该 manifest 是推荐升级输入，记录本次 workflow 的 `tag` / `ref` / `commit` / `run_id`、三张 GHCR digest 镜像引用、SBOM 文件名与 Cosign OIDC identity。
 
-发布路径会为每个镜像生成 CycloneDX SBOM artifact，使用 Grype 拦截 `high` 及以上漏洞，并用 Cosign keyless OIDC 对镜像 digest 签名。Grype 例外统一维护在 [`.grype.yaml`](../../.grype.yaml)，新增例外时只加窄范围规则并记录原因与复查日期。
+发布路径通过 BuildKit 为 multi-arch image 生成 max-mode provenance 和 SBOM attestation，另生成 durable CycloneDX SBOM 文件；Grype 分别扫描 `linux/amd64` 与 `linux/arm64`，拦截 `high` 及以上漏洞；Cosign keyless OIDC 对最终 image digest 签名。Grype 例外统一维护在 [`.grype.yaml`](../../.grype.yaml)，新增例外时只加窄范围规则并记录原因与复查日期。
 
 `ideaboard update` 默认会在 pull 前执行 Cosign keyless 验签。VPS 必须先安装 `cosign`；离线排障时才临时设置 `COSIGN_VERIFY=false`。手动验签示例：
 

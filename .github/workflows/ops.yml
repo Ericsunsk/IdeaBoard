@@ -1,26 +1,7 @@
 name: Ops
 
 on:
-  pull_request:
-    paths:
-      - "scripts/**"
-      - "docker/**"
-      - "deploy/**"
-      - ".github/workflows/**"
-      - "DEPLOYMENT.md"
-      - "docker/README.md"
-  push:
-    branches:
-      - main
-      - master
-    paths:
-      - "scripts/**"
-      - "docker/**"
-      - "deploy/**"
-      - ".github/workflows/**"
-      - "DEPLOYMENT.md"
-      - "docker/README.md"
-  workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read

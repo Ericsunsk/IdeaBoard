@@ -1,22 +1,7 @@
 name: Web
 
 on:
-  pull_request:
-    paths:
-      - "apps/web/**"
-      - "apps/api/openapi.yaml"
-      - "scripts/ci-parity*.sh"
-      - ".github/workflows/web.yml"
-  push:
-    branches:
-      - main
-      - master
-    paths:
-      - "apps/web/**"
-      - "apps/api/openapi.yaml"
-      - "scripts/ci-parity*.sh"
-      - ".github/workflows/web.yml"
-  workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -35,15 +20,14 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: Set up Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: ./.github/actions/setup-node
         with:
-          node-version: "22.23.2"
-          cache: "npm"
           cache-dependency-path: apps/web/package-lock.json
 
       - name: Install dependencies
-        working-directory: apps/web
-        run: npm ci --no-audit --fund=false
+        uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/web
 
       - name: Generate API client
         working-directory: apps/web
@@ -69,15 +53,14 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: Set up Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: ./.github/actions/setup-node
         with:
-          node-version: "22.23.2"
-          cache: "npm"
           cache-dependency-path: apps/web/package-lock.json
 
       - name: Install dependencies
-        working-directory: apps/web
-        run: npm ci --no-audit --fund=false
+        uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/web
 
       - name: Lint
         if: matrix.check == 'eslint'
@@ -110,15 +93,14 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: Set up Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: ./.github/actions/setup-node
         with:
-          node-version: "22.23.2"
-          cache: "npm"
           cache-dependency-path: apps/web/package-lock.json
 
       - name: Install dependencies
-        working-directory: apps/web
-        run: npm ci --no-audit --fund=false
+        uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/web
 
       - name: Test
         if: matrix.check == 'unit'
@@ -141,15 +123,14 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: Set up Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: ./.github/actions/setup-node
         with:
-          node-version: "22.23.2"
-          cache: "npm"
           cache-dependency-path: apps/web/package-lock.json
 
       - name: Install dependencies
-        working-directory: apps/web
-        run: npm ci --no-audit --fund=false
+        uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/web
 
       - name: User route smoke
         timeout-minutes: 10
@@ -166,15 +147,14 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
       - name: Set up Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        uses: ./.github/actions/setup-node
         with:
-          node-version: "22.23.2"
-          cache: "npm"
           cache-dependency-path: apps/web/package-lock.json
 
       - name: Install dependencies
-        working-directory: apps/web
-        run: npm ci --no-audit --fund=false
+        uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/web
 
       - name: Build
         working-directory: apps/web

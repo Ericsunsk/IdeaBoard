@@ -8,4 +8,5 @@ ignore:
       type: binary
     reason: >-
       Not affected: IdeaBoard does not enable Node.js Permission Model, which is
-      the vulnerable code path; remove this exception when upgrading Node.js.
+      the vulnerable code path. Review by 2026-09-07 and remove when upgrading
+      Node.js.

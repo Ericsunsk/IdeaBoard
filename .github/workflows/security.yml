@@ -1,0 +1,86 @@
+name: Security Verification
+
+on:
+  workflow_call:
+    inputs:
+      web:
+        description: Run production Web dependency audit
+        required: false
+        type: boolean
+        default: false
+      services:
+        description: Run Auth and API dependency audits
+        required: false
+        type: boolean
+        default: false
+  schedule:
+    - cron: '17 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  web-audit:
+    if: inputs.web || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+
+      - name: Set up Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install Web dependencies
+        uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/web
+
+      - name: Audit Web production dependencies
+        working-directory: apps/web
+        run: npm audit --omit=dev --audit-level=high
+
+  auth-audit:
+    if: inputs.services || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+
+      - name: Set up Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          cache-dependency-path: apps/auth/package-lock.json
+
+      - name: Install Auth dependencies
+        uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/auth
+          omit-optional: 'true'
+
+      - name: Audit Auth production dependencies
+        working-directory: apps/auth
+        run: npm audit --omit=dev --audit-level=high
+
+  api-audit:
+    if: inputs.services || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+        with:
+          cache-dependency-path: apps/api/go.sum
+
+      - name: Audit API dependencies
+        working-directory: apps/api
+        run: go tool govulncheck ./...

@@ -1,0 +1,26 @@
+name: npm ci
+description: Install a workspace package with the repository dependency policy
+
+inputs:
+  working-directory:
+    description: Package directory containing package-lock.json
+    required: true
+  omit-optional:
+    description: Omit optional dependencies for the Auth runtime contract
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Install locked dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        OMIT_OPTIONAL: ${{ inputs.omit-optional }}
+      run: |
+        npm_args=(--no-audit --fund=false)
+        if [[ "${OMIT_OPTIONAL}" == 'true' ]]; then
+          npm_args+=(--omit=optional)
+        fi
+        npm ci "${npm_args[@]}"

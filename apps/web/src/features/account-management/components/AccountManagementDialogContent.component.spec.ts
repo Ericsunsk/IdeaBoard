@@ -1,6 +1,10 @@
 /* eslint-disable vue/one-component-per-file -- Local stubs keep the layout contract test focused. */
 import { defineComponent, ref } from 'vue'
+import { IconoirProvider } from '@iconoir/vue'
+import PrimeVue from 'primevue/config'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { primeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen, waitFor } from '../../../test/render'
 import { createDeferred } from '../../../test/deferred'
 import { useUserStore } from '../../auth/session/authSession'
@@ -105,6 +109,15 @@ const TransitionStub = defineComponent({
   `,
 })
 
+const TestProviders = defineComponent({
+  components: { AccountManagementDialogContent, IconoirProvider },
+  props: {
+    initialTab: { type: String, default: 'profile' },
+  },
+  template:
+    '<IconoirProvider><AccountManagementDialogContent :initial-tab="initialTab" /></IconoirProvider>',
+})
+
 const accountTabCases: Array<{ key: AccountManagementTab; label: string }> =
   accountTabRegistry.flatMap(({ tabs }) => tabs.map(({ key, label }) => ({ key, label })))
 
@@ -124,10 +137,15 @@ function makeUser(): User {
 function renderAccountManagementDialogContent(initialTab?: AccountManagementTab) {
   const store = useUserStore()
   store.setAuth(makeUser())
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/:pathMatch(.*)*', component: { template: '<div />' } }],
+  })
 
-  return renderWithUser(AccountManagementDialogContent, {
+  return renderWithUser(TestProviders, {
     props: initialTab === undefined ? {} : { initialTab },
     global: {
+      plugins: [[PrimeVue, primeVueTestOptions], router],
       stubs: {
         Avatar: AvatarStub,
         Button: ButtonStub,

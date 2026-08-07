@@ -1,0 +1,219 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+  merge_group:
+    types:
+      - checks_requested
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Classify Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      web: ${{ steps.classify.outputs.web }}
+      api: ${{ steps.classify.outputs.api }}
+      auth: ${{ steps.classify.outputs.auth }}
+      docker: ${{ steps.classify.outputs.docker }}
+      ops: ${{ steps.classify.outputs.ops }}
+      security: ${{ steps.classify.outputs.security }}
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed contexts
+        id: classify
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
+        run: |
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            printf '%s\n' .github/workflows/ci.yml > "${RUNNER_TEMP}/changed-paths.txt"
+          elif [[ -z "${BASE_SHA}" || "${BASE_SHA}" =~ ^0+$ ]]; then
+            git ls-files > "${RUNNER_TEMP}/changed-paths.txt"
+          else
+            git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" > "${RUNNER_TEMP}/changed-paths.txt"
+          fi
+
+          ./scripts/ci-change-classifier.sh \
+            < "${RUNNER_TEMP}/changed-paths.txt" \
+            | tee -a "${GITHUB_OUTPUT}" > "${RUNNER_TEMP}/classification.txt"
+
+          {
+            echo '### CI change classification'
+            echo
+            echo '| Context | Required |'
+            echo '| --- | --- |'
+            while IFS='=' read -r context required; do
+              printf '| `%s` | `%s` |\n' "${context}" "${required}"
+            done < "${RUNNER_TEMP}/classification.txt"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+  web:
+    name: Web Verification
+    if: needs.changes.outputs.web == 'true'
+    needs:
+      - changes
+    uses: ./.github/workflows/web.yml
+
+  backend:
+    name: Backend Verification
+    if: >-
+      ${{
+        needs.changes.outputs.api == 'true' ||
+        needs.changes.outputs.auth == 'true' ||
+        needs.changes.outputs.docker == 'true'
+      }}
+    needs:
+      - changes
+    uses: ./.github/workflows/backend.yml
+    with:
+      build_images: >-
+        ${{
+          github.event_name == 'pull_request' &&
+          (
+            needs.changes.outputs.api == 'true' ||
+            needs.changes.outputs.auth == 'true' ||
+            needs.changes.outputs.docker == 'true'
+          )
+        }}
+
+  backend-browser-smoke:
+    name: Backend Browser Smoke
+    if: >-
+      ${{
+        needs.changes.outputs.api == 'true' ||
+        needs.changes.outputs.auth == 'true' ||
+        needs.changes.outputs.docker == 'true'
+      }}
+    needs:
+      - changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+
+      - name: Set up Node.js
+        uses: ./.github/actions/setup-node
+        with:
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install Web dependencies
+        uses: ./.github/actions/npm-ci
+        with:
+          working-directory: apps/web
+
+      - name: User route smoke
+        timeout-minutes: 10
+        env:
+          USER_ROUTE_SMOKE_VERBOSE: "1"
+        run: ./scripts/ci-parity.sh web-smoke
+
+  security:
+    name: Security Verification
+    if: needs.changes.outputs.security == 'true'
+    needs:
+      - changes
+    uses: ./.github/workflows/security.yml
+    with:
+      web: ${{ needs.changes.outputs.web == 'true' }}
+      services: >-
+        ${{
+          needs.changes.outputs.api == 'true' ||
+          needs.changes.outputs.auth == 'true' ||
+          needs.changes.outputs.docker == 'true'
+        }}
+
+  ops:
+    name: Ops Verification
+    if: needs.changes.outputs.ops == 'true'
+    needs:
+      - changes
+    uses: ./.github/workflows/ops.yml
+
+  ci-gate:
+    name: CI Gate
+    if: always()
+    needs:
+      - changes
+      - web
+      - backend
+      - backend-browser-smoke
+      - security
+      - ops
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Verify required lanes
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          WEB_REQUIRED: ${{ needs.changes.outputs.web }}
+          WEB_RESULT: ${{ needs.web.result }}
+          API_REQUIRED: ${{ needs.changes.outputs.api }}
+          AUTH_REQUIRED: ${{ needs.changes.outputs.auth }}
+          DOCKER_REQUIRED: ${{ needs.changes.outputs.docker }}
+          BACKEND_RESULT: ${{ needs.backend.result }}
+          BROWSER_SMOKE_RESULT: ${{ needs.backend-browser-smoke.result }}
+          SECURITY_REQUIRED: ${{ needs.changes.outputs.security }}
+          SECURITY_RESULT: ${{ needs.security.result }}
+          OPS_REQUIRED: ${{ needs.changes.outputs.ops }}
+          OPS_RESULT: ${{ needs.ops.result }}
+          DOCS_ONLY: ${{ needs.changes.outputs.docs_only }}
+        run: |
+          if [[ "${CHANGES_RESULT}" != "success" ]]; then
+            echo "Change classification finished with ${CHANGES_RESULT}" >&2
+            exit 1
+          fi
+
+          if [[ "${WEB_REQUIRED}" == "true" && "${WEB_RESULT}" != "success" ]]; then
+            echo "Web verification finished with ${WEB_RESULT}" >&2
+            exit 1
+          fi
+
+          if [[ "${API_REQUIRED}" == "true" || "${AUTH_REQUIRED}" == "true" || "${DOCKER_REQUIRED}" == "true" ]]; then
+            if [[ "${BACKEND_RESULT}" != "success" ]]; then
+              echo "Backend verification finished with ${BACKEND_RESULT}" >&2
+              exit 1
+            fi
+
+            if [[ "${BROWSER_SMOKE_RESULT}" != "success" ]]; then
+              echo "Backend browser smoke finished with ${BROWSER_SMOKE_RESULT}" >&2
+              exit 1
+            fi
+          fi
+
+          if [[ "${SECURITY_REQUIRED}" == "true" && "${SECURITY_RESULT}" != "success" ]]; then
+            echo "Security verification finished with ${SECURITY_RESULT}" >&2
+            exit 1
+          fi
+
+          if [[ "${OPS_REQUIRED}" == "true" && "${OPS_RESULT}" != "success" ]]; then
+            echo "Ops verification finished with ${OPS_RESULT}" >&2
+            exit 1
+          fi
+
+          if [[ "${DOCS_ONLY}" == "true" ]]; then
+            echo 'Documentation-only change: no implementation lanes required.' >> "${GITHUB_STEP_SUMMARY}"
+          fi

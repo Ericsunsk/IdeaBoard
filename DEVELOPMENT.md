@@ -113,6 +113,19 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 
 ### CI parity gate
 
+GitHub 只暴露一个稳定的 required check：`CI Gate`。它在 PR、`main` push 和 Merge Queue 的 `merge_group` 上始终创建，先把改动分类为 Web、API、Auth、Docker、Ops 与 Security，再只调用受影响的 reusable workflows；docs-only 改动会明确成功。未知路径采用 fail-safe 分类，执行全部 context，避免新增目录静默绕过 CI。
+
+修改 CI classifier、workflow 或 repo-local setup actions 后，先运行本地 contract tests：
+
+```bash
+bash scripts/ci-change-classifier-test.sh
+bash scripts/ci-workflow-contract-test.sh
+bash scripts/ci-parity-test.sh
+go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
+```
+
+Node 版本只维护在根目录 `.node-version`，Go 版本只维护在 `apps/api/go.mod`。Workflows 通过 `.github/actions/setup-node` 与 `.github/actions/setup-go` 读取版本和 dependency cache contract，不要在 workflow 内复制 runtime version。
+
 Push 前需要复现 GitHub 的真实 PostgreSQL integration tests 与 Linux browser geometry 时，在仓库根目录运行：
 
 ```bash
