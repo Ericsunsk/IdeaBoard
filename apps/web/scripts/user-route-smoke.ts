@@ -585,7 +585,7 @@ function assertBoardsInteractions(playwrightCli: CommandSpec) {
       'await accountButton.click()',
       'await userMenu.waitFor({ state: "visible", timeout: 10000 })',
       'const boardsUrlBeforeProfile = page.url()',
-      'const profileMenuItem = page.getByText("账户管理", { exact: true }).first()',
+      'const profileMenuItem = userMenu.getByText("账户管理", { exact: true }).first()',
       'await profileMenuItem.waitFor({ state: "visible", timeout: 10000 })',
       'await profileMenuItem.click()',
       'await page.getByRole("dialog", { name: "账户管理" }).waitFor({ state: "visible", timeout: 10000 })',

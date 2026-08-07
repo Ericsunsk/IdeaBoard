@@ -44,6 +44,8 @@ assert_contains "${ci_workflow}" '      - ops'
 assert_contains "${ci_workflow}" "needs.changes.outputs.api == 'true'"
 assert_contains "${ci_workflow}" "needs.changes.outputs.auth == 'true'"
 assert_contains "${ci_workflow}" "needs.changes.outputs.docker == 'true'"
+assert_contains "${ci_workflow}" "needs.changes.outputs.web != 'true'"
+assert_contains "${ci_workflow}" '"${WEB_REQUIRED}" != "true" && "${BROWSER_SMOKE_RESULT}" != "success"'
 
 if grep -R -Fq 'secrets: inherit' "${repo_root}/.github/workflows"; then
   echo 'Reusable workflows must not inherit unrelated repository secrets' >&2

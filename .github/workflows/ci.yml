@@ -101,9 +101,12 @@ jobs:
     name: Backend Browser Smoke
     if: >-
       ${{
-        needs.changes.outputs.api == 'true' ||
-        needs.changes.outputs.auth == 'true' ||
-        needs.changes.outputs.docker == 'true'
+        needs.changes.outputs.web != 'true' &&
+        (
+          needs.changes.outputs.api == 'true' ||
+          needs.changes.outputs.auth == 'true' ||
+          needs.changes.outputs.docker == 'true'
+        )
       }}
     needs:
       - changes
@@ -198,7 +201,7 @@ jobs:
               exit 1
             fi
 
-            if [[ "${BROWSER_SMOKE_RESULT}" != "success" ]]; then
+            if [[ "${WEB_REQUIRED}" != "true" && "${BROWSER_SMOKE_RESULT}" != "success" ]]; then
               echo "Backend browser smoke finished with ${BROWSER_SMOKE_RESULT}" >&2
               exit 1
             fi
