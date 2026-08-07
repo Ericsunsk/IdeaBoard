@@ -4,10 +4,18 @@ import {
   DEFAULT_CANVAS_VIEWPORT_ZOOM_LEVEL,
   type CanvasViewportContext,
   provideCanvasViewportContext,
+  resolveCanvasNodeUiScale,
   useCanvasViewportContext,
 } from './useCanvasViewportContext'
 
 describe('useCanvasViewportContext', () => {
+  it('resolves inverse scaling for screen-sized node controls', () => {
+    expect(resolveCanvasNodeUiScale(DEFAULT_CANVAS_VIEWPORT_ZOOM_LEVEL)).toBe(1)
+    expect(resolveCanvasNodeUiScale(50)).toBe(2)
+    expect(resolveCanvasNodeUiScale(200)).toBe(0.5)
+    expect(resolveCanvasNodeUiScale(0)).toBe(1)
+  })
+
   it('uses the default viewport context outside a provider', () => {
     const context = useCanvasViewportContext()
 

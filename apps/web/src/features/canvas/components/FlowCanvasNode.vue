@@ -3,6 +3,7 @@
     ref="flowCanvasNodeRef"
     class="flow-canvas-node"
     :class="[`is-${data.kind}`, { 'is-selected': selected, 'is-running': nodeRunning }]"
+    :style="nodeStyle"
     @mouseenter="onNodeMouseEnter"
     @mouseleave="onNodeMouseLeave"
     @focusin="onNodeFocusIn"
@@ -177,6 +178,10 @@ import type {
   ImageNodePresentationBinding,
 } from '../node-presentation'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
+import {
+  resolveCanvasNodeUiScale,
+  useCanvasViewportContext,
+} from '../composables/useCanvasViewportContext'
 import FlowNodeHandles from './FlowNodeHandles.vue'
 import FusionNode from './nodes/FusionNode.vue'
 import ImageNode from './nodes/ImageNode.vue'
@@ -225,6 +230,10 @@ const emit = defineEmits<{
 const showDefaultDragZone = false
 const flowCanvasNodeRef = ref<HTMLElement | null>(null)
 const isImageEditorActive = computed(() => props.imagePresentation.stageBinding?.mode != null)
+const { zoomLevel } = useCanvasViewportContext()
+const nodeStyle = computed(() => ({
+  '--canvas-node-ui-scale': String(resolveCanvasNodeUiScale(zoomLevel.value)),
+}))
 
 const {
   disableHandleRailInteraction,

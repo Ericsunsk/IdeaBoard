@@ -452,6 +452,7 @@ function assertUnreachable(value: never): never {
 .canvas-layout {
   --canvas-control-border-width: 1.2px;
   --canvas-tool-button-gap: 7px;
+  --canvas-node-floating-ui-width: 287px;
   --canvas-surface-bg: rgba(255, 255, 255, 0.98);
   --canvas-surface-bg-soft: rgba(255, 255, 255, 0.94);
   --canvas-surface-muted: #f4f7fb;

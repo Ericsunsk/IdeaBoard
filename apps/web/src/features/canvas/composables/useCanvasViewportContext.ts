@@ -10,6 +10,11 @@ import {
 
 export const DEFAULT_CANVAS_VIEWPORT_ZOOM_LEVEL = 100
 
+export function resolveCanvasNodeUiScale(zoomLevel: number): number {
+  const normalizedZoom = Number(zoomLevel) / DEFAULT_CANVAS_VIEWPORT_ZOOM_LEVEL
+  return Number.isFinite(normalizedZoom) && normalizedZoom > 0 ? 1 / normalizedZoom : 1
+}
+
 export type CanvasViewportContext = {
   zoomLevel: Readonly<Ref<number>>
 }

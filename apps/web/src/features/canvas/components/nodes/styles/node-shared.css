@@ -141,6 +141,12 @@
   letter-spacing: 0;
 }
 
+/* Interactive node chrome stays screen-sized while graph content remains zoomable. */
+.canvas-node-screen-ui {
+  transform: scale(var(--canvas-node-ui-scale, 1));
+  transform-origin: top center;
+}
+
 .node-inline-range {
   margin: 0;
   height: var(--canvas-range-input-height);

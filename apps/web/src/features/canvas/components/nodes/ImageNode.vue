@@ -60,23 +60,25 @@
         </template>
       </ImageNodeStage>
 
-      <HomeCanvasImageActionMenu
-        v-if="showImageActionMenu"
-        :direct-generating="actionBinding.directGenerating"
-        :strength-control="actionBinding.strengthControl"
-        @action="emit('action', $event)"
-      />
-      <NodePromptComposer
-        v-if="showPromptComposer"
-        v-model="promptDraft"
-        offset="52px"
-        :placeholder="actionBinding.promptPlaceholder"
-        :disabled="actionBinding.directGenerating"
-        :output-count="outputCountValue"
-        :billing-state="partialEditBillingQuote"
-        @update:output-count="selectOutputCount"
-        @submit="submitPrompt"
-      />
+      <NodeFloatingControls v-if="showImageActionMenu || showPromptComposer">
+        <HomeCanvasImageActionMenu
+          v-if="showImageActionMenu"
+          :direct-generating="actionBinding.directGenerating"
+          :strength-control="actionBinding.strengthControl"
+          @action="emit('action', $event)"
+        />
+        <NodePromptComposer
+          v-if="showPromptComposer"
+          v-model="promptDraft"
+          offset="52px"
+          :placeholder="actionBinding.promptPlaceholder"
+          :disabled="actionBinding.directGenerating"
+          :output-count="outputCountValue"
+          :billing-state="partialEditBillingQuote"
+          @update:output-count="selectOutputCount"
+          @submit="submitPrompt"
+        />
+      </NodeFloatingControls>
     </div>
   </NodeShell>
 </template>
@@ -90,6 +92,7 @@ import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExt
 import type { ImageActionBinding, ImageToolStageBinding } from '../../image-tools'
 import HomeCanvasImageActionMenu from '../home/HomeCanvasImageActionMenu.vue'
 import NodePromptComposer from './NodePromptComposer.vue'
+import NodeFloatingControls from './NodeFloatingControls.vue'
 import ImageNodeStage from './ImageNodeStage.vue'
 import NodeShell from './NodeShell.vue'
 import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'

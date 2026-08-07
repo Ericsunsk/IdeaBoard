@@ -34,20 +34,21 @@
           <slot name="handle-rail" />
         </template>
       </FusionStage>
-      <NodePromptComposer
-        v-if="showPromptComposer"
-        v-model="promptDraft"
-        allow-empty
-        offset="8px"
-        placeholder="输入融合提示词"
-        :aspect-ratio="aspectRatio"
-        :output-count="outputCountValue"
-        :submit-disabled="!canGenerate || props.generationAvailable === false"
-        :billing-state="billingQuote"
-        @update:aspect-ratio="emit('update:aspect-ratio', $event)"
-        @update:output-count="selectOutputCount"
-        @submit="submitPrompt"
-      />
+      <NodeFloatingControls v-if="showPromptComposer">
+        <NodePromptComposer
+          v-model="promptDraft"
+          allow-empty
+          offset="8px"
+          placeholder="输入融合提示词"
+          :aspect-ratio="aspectRatio"
+          :output-count="outputCountValue"
+          :submit-disabled="!canGenerate || props.generationAvailable === false"
+          :billing-state="billingQuote"
+          @update:aspect-ratio="emit('update:aspect-ratio', $event)"
+          @update:output-count="selectOutputCount"
+          @submit="submitPrompt"
+        />
+      </NodeFloatingControls>
     </div>
   </NodeShell>
 </template>
@@ -62,6 +63,7 @@ import type { FusionBlendPoint } from '../../../canvas-board/domain'
 import FusionStage from './FusionStage.vue'
 import NodeShell from './NodeShell.vue'
 import NodePromptComposer from './NodePromptComposer.vue'
+import NodeFloatingControls from './NodeFloatingControls.vue'
 import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
 import { buildFusionBillingReadinessRequest, useCanvasBillingQuote } from '../../execution'
 

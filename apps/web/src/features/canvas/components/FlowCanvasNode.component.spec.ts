@@ -53,8 +53,8 @@ function createImageActionBinding(): ImageActionBinding {
   }
 }
 
-function createImagePresentation() {
-  const actionBinding = createImageActionBinding()
+function createImagePresentation(overrides: Partial<ImageActionBinding> = {}) {
+  const actionBinding = { ...createImageActionBinding(), ...overrides }
   return createImageNodePresentationResolver({
     actionBindingFor: () => actionBinding,
     stageBindingFor: () => null,
@@ -146,6 +146,11 @@ describe('FlowCanvasNode prompt rendering', () => {
     const view = renderFlowCanvasNode()
 
     expect(view.container.querySelector('.node-stage-frame--prompt')).not.toBeNull()
+    expect(
+      view.container
+        .querySelector<HTMLElement>('.flow-canvas-node')
+        ?.style.getPropertyValue('--canvas-node-ui-scale'),
+    ).toBe('1')
     expect(view.getByLabelText('发送')).not.toBeDisabled()
   })
 
@@ -202,6 +207,32 @@ describe('FlowCanvasNode prompt rendering', () => {
 })
 
 describe('FlowCanvasNode image presentation', () => {
+  it('anchors the context tools and prompt composer in one screen-sized container', () => {
+    const view = render(FlowCanvasNode, {
+      props: {
+        nodeId: 'image-1',
+        data: createImageData(createImageSnapshot()),
+        imagePresentation: createImagePresentation({
+          actionMenuVisible: true,
+          promptPlaceholder: '输入提示词改造这张图',
+          promptComposerVisible: true,
+        }),
+      },
+      global: {
+        stubs: {
+          FlowNodeHandles: { template: '<div data-testid="flow-node-handles" />' },
+        },
+      },
+    })
+
+    const floatingControls = view.container.querySelector('.node-floating-controls')
+
+    expect(floatingControls?.querySelector('.image-action-menu')).not.toBeNull()
+    expect(floatingControls?.querySelector('.image-node-prompt-composer')).not.toBeNull()
+    expect(view.getByPlaceholderText('输入提示词改造这张图')).toHaveClass('self-center')
+    expect(view.getByLabelText('打开图片预览').closest('.node-floating-controls')).toBeNull()
+  })
+
   it('emits semantic intents for upload, preview, append, and reset', async () => {
     const view = render(FlowCanvasNode, {
       props: {
@@ -316,6 +347,11 @@ describe('FlowCanvasNode fusion presentation', () => {
     })
 
     const stage = view.container.querySelector('.fusion-node-stage')!
+    const floatingControls = view.container.querySelector('.node-floating-controls')
+
+    expect(floatingControls?.querySelector('.image-node-prompt-composer')).not.toBeNull()
+    expect(view.getByPlaceholderText('输入融合提示词')).toHaveClass('self-center')
+
     await fireEvent.drop(stage)
     await fireEvent.contextMenu(stage)
     await fireEvent.click(view.getAllByLabelText('移除图片输入')[0]!)
