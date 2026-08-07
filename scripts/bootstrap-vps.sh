@@ -261,6 +261,7 @@ chmod +x \
   "$DEPLOY_SCRIPT" \
   "$STACK_DIR/scripts/render-cloudflare-real-ip-conf.sh" \
   "$STACK_DIR/scripts/uninstall-vps.sh"
+chmod 755 "$STACK_DIR/docker/postgres/init-runtime-roles.sh"
 if [[ -w "$(dirname "$BIN_PATH")" ]]; then
   ln -sf "$DEPLOY_SCRIPT" "$BIN_PATH"
 else
