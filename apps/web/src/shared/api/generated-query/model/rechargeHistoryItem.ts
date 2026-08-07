@@ -14,9 +14,9 @@ export interface RechargeHistoryItem {
    */
   idea_quantity: number
   /** @minimum 0 */
-  paid_amount_minor: number
+  paid_amount_minor?: number
   /** @pattern ^[a-z]{3}$ */
-  paid_currency: string
+  paid_currency?: string
   status: RechargeHistoryItemStatus
   /** @minimum 0 */
   refunded_idea_quantity?: number

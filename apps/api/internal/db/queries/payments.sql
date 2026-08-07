@@ -453,8 +453,9 @@ WHERE public_token = $1 AND user_id = $2;
 
 -- name: ListPaymentRechargeHistory :many
 SELECT orders.id,
-       orders.paid_at AS occurred_at,
+       COALESCE(orders.paid_at, orders.updated_at) AS occurred_at,
        orders.idea_quantity,
+       orders.status,
        orders.paid_total_minor,
        orders.paid_currency,
        orders.receipt_url,
@@ -469,13 +470,13 @@ LEFT JOIN LATERAL (
     AND payment_refunds.status = 'succeeded'
 ) refunds ON TRUE
 WHERE orders.user_id = sqlc.arg(user_id)::BIGINT
-  AND orders.status = 'credited'
-  AND orders.paid_at >= sqlc.arg(cutoff_at)::TIMESTAMPTZ
+  AND orders.status IN ('credited', 'cancelled')
+  AND COALESCE(orders.paid_at, orders.updated_at) >= sqlc.arg(cutoff_at)::TIMESTAMPTZ
   AND (
     NOT sqlc.arg(cursor_set)::BOOLEAN
-    OR (orders.paid_at, orders.id) < (sqlc.narg(cursor_paid_at)::TIMESTAMPTZ, sqlc.narg(cursor_id)::UUID)
+    OR (COALESCE(orders.paid_at, orders.updated_at), orders.id) < (sqlc.narg(cursor_paid_at)::TIMESTAMPTZ, sqlc.narg(cursor_id)::UUID)
   )
-ORDER BY orders.paid_at DESC, orders.id DESC
+ORDER BY COALESCE(orders.paid_at, orders.updated_at) DESC, orders.id DESC
 LIMIT sqlc.arg(page_limit)::INTEGER;
 
 -- name: MarkPaymentWebhookEventProcessed :execrows

@@ -4,12 +4,9 @@
     class="grid gap-3"
     aria-labelledby="pending-payment-orders-heading"
   >
-    <div class="flex items-center justify-between gap-3">
-      <h3 id="pending-payment-orders-heading" class="m-0 text-lg font-bold text-ib-text">
-        待支付订单
-      </h3>
-      <span class="text-[12px] font-semibold text-ib-text-subtle">不会计入充值记录</span>
-    </div>
+    <h3 id="pending-payment-orders-heading" class="m-0 text-lg font-bold text-ib-text">
+      待支付订单
+    </h3>
 
     <div
       v-if="pending"
@@ -28,7 +25,14 @@
     >
       <p class="m-0 font-semibold text-ib-danger">待支付订单加载失败</p>
       <p class="mt-1 mb-0 text-sm text-ib-text-muted">{{ errorMessage(error) }}</p>
-      <Button label="重新加载" severity="secondary" size="small" text class="mt-2" @click="emit('retry')" />
+      <Button
+        label="重新加载"
+        severity="secondary"
+        size="small"
+        text
+        class="mt-2"
+        @click="emit('retry')"
+      />
     </div>
 
     <div v-else class="grid gap-2">
@@ -53,47 +57,28 @@
 
           <div
             v-if="item.status === 'checkout_open'"
-            class="flex shrink-0 items-center gap-2 max-[640px]:w-full max-[640px]:flex-wrap"
+            class="grid w-36 shrink-0 gap-2 max-[640px]:w-full"
           >
-            <template v-if="abandonConfirmationToken === item.public_token">
-              <span class="text-[12px] font-semibold text-ib-text-muted">放弃后需重新创建订单</span>
-              <Button
-                label="确认放弃"
-                severity="danger"
-                size="small"
-                :loading="isActionPending(item.public_token, 'abandon')"
-                :disabled="actionPending"
-                @click="emit('abandon', item.public_token)"
-              />
-              <Button
-                label="取消"
-                severity="secondary"
-                size="small"
-                text
-                :disabled="actionPending"
-                @click="abandonConfirmationToken = null"
-              />
-            </template>
-            <template v-else>
-              <Button
-                unstyled
-                label="继续支付"
-                size="small"
-                :loading="isActionPending(item.public_token, 'continue')"
-                :disabled="actionPending"
-                :class="accountPrimaryActionButtonClass"
-                :pt="accountButtonPt"
-                @click="emit('continue', item.public_token)"
-              />
-              <Button
-                label="放弃订单"
-                severity="secondary"
-                size="small"
-                outlined
-                :disabled="actionPending"
-                @click="abandonConfirmationToken = item.public_token"
-              />
-            </template>
+            <Button
+              unstyled
+              label="继续支付"
+              size="small"
+              :loading="isActionPending(item.public_token, 'continue')"
+              :disabled="actionPending"
+              :class="[accountPrimaryActionButtonClass, 'w-full']"
+              :pt="accountButtonPt"
+              @click="emit('continue', item.public_token)"
+            />
+            <Button
+              label="放弃订单"
+              severity="secondary"
+              size="small"
+              outlined
+              class="w-full"
+              :loading="isActionPending(item.public_token, 'abandon')"
+              :disabled="actionPending"
+              @click="emit('abandon', item.public_token)"
+            />
           </div>
         </div>
 
@@ -142,7 +127,6 @@ const emit = defineEmits<{
   abandon: [publicToken: string]
 }>()
 
-const abandonConfirmationToken = ref<string | null>(null)
 const now = ref(Date.now())
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 

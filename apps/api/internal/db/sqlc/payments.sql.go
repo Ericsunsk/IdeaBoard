@@ -1336,8 +1336,9 @@ func (q *Queries) ListPaymentOrdersForCheckoutShutdown(ctx context.Context, arg 
 
 const listPaymentRechargeHistory = `-- name: ListPaymentRechargeHistory :many
 SELECT orders.id,
-       orders.paid_at AS occurred_at,
+       COALESCE(orders.paid_at, orders.updated_at) AS occurred_at,
        orders.idea_quantity,
+       orders.status,
        orders.paid_total_minor,
        orders.paid_currency,
        orders.receipt_url,
@@ -1352,13 +1353,13 @@ LEFT JOIN LATERAL (
     AND payment_refunds.status = 'succeeded'
 ) refunds ON TRUE
 WHERE orders.user_id = $1::BIGINT
-  AND orders.status = 'credited'
-  AND orders.paid_at >= $2::TIMESTAMPTZ
+  AND orders.status IN ('credited', 'cancelled')
+  AND COALESCE(orders.paid_at, orders.updated_at) >= $2::TIMESTAMPTZ
   AND (
     NOT $3::BOOLEAN
-    OR (orders.paid_at, orders.id) < ($4::TIMESTAMPTZ, $5::UUID)
+    OR (COALESCE(orders.paid_at, orders.updated_at), orders.id) < ($4::TIMESTAMPTZ, $5::UUID)
   )
-ORDER BY orders.paid_at DESC, orders.id DESC
+ORDER BY COALESCE(orders.paid_at, orders.updated_at) DESC, orders.id DESC
 LIMIT $6::INTEGER
 `
 
@@ -1373,8 +1374,9 @@ type ListPaymentRechargeHistoryParams struct {
 
 type ListPaymentRechargeHistoryRow struct {
 	ID                   uuid.UUID     `json:"id"`
-	OccurredAt           sql.NullTime  `json:"occurred_at"`
+	OccurredAt           time.Time     `json:"occurred_at"`
 	IdeaQuantity         int64         `json:"idea_quantity"`
+	Status               string        `json:"status"`
 	PaidTotalMinor       sql.NullInt64 `json:"paid_total_minor"`
 	PaidCurrency         string        `json:"paid_currency"`
 	ReceiptUrl           string        `json:"receipt_url"`
@@ -1402,6 +1404,7 @@ func (q *Queries) ListPaymentRechargeHistory(ctx context.Context, arg ListPaymen
 			&i.ID,
 			&i.OccurredAt,
 			&i.IdeaQuantity,
+			&i.Status,
 			&i.PaidTotalMinor,
 			&i.PaidCurrency,
 			&i.ReceiptUrl,

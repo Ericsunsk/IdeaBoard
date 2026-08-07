@@ -4336,13 +4336,13 @@ components:
     RechargeHistoryItem:
       type: object
       additionalProperties: false
-      required: [occurred_at, idea_quantity, paid_amount_minor, paid_currency, status]
+      required: [occurred_at, idea_quantity, status]
       properties:
         occurred_at: { type: string, format: date-time }
         idea_quantity: { type: integer, format: int64, minimum: 500, maximum: 500000 }
         paid_amount_minor: { type: integer, format: int64, minimum: 0 }
         paid_currency: { type: string, pattern: '^[a-z]{3}$' }
-        status: { type: string, enum: [credited, refunded] }
+        status: { type: string, enum: [credited, refunded, cancelled] }
         refunded_idea_quantity: { type: integer, format: int64, minimum: 0 }
         refunded_amount_minor: { type: integer, format: int64, minimum: 0 }
         receipt_url: { type: string, format: uri }

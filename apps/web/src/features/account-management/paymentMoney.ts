@@ -20,6 +20,16 @@ export function parseIdeaQuantity(rawValue: string): IdeaQuantityParseResult {
   return { ok: true, value: quantity }
 }
 
+export function normalizeIdeaQuantity(rawValue: string): number | null {
+  const value = rawValue.trim().replaceAll(',', '')
+  if (!value) return null
+
+  const quantity = Number(value)
+  if (!Number.isFinite(quantity)) return null
+
+  return Math.min(MAX_IDEA_QUANTITY, Math.max(MIN_IDEA_QUANTITY, Math.floor(quantity)))
+}
+
 export function formatUsdForIdeas(ideaQuantity: number): string {
   return formatCurrencyMinor(ideaQuantity, 'USD')
 }

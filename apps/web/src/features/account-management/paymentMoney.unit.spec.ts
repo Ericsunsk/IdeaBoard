@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { formatCurrencyMinor, formatUsdForIdeas, parseIdeaQuantity } from './paymentMoney'
+import {
+  formatCurrencyMinor,
+  formatUsdForIdeas,
+  normalizeIdeaQuantity,
+  parseIdeaQuantity,
+} from './paymentMoney'
 
 describe('paymentMoney', () => {
   it('derives the exact two-decimal USD price from integer Ideas', () => {
@@ -33,5 +38,17 @@ describe('paymentMoney', () => {
     ['1,000', '请输入 500–500,000 之间的整数'],
   ])('rejects invalid quantity %s', (value, error) => {
     expect(parseIdeaQuantity(value)).toEqual({ ok: false, error })
+  })
+
+  it.each([
+    ['499', 500],
+    ['500.9', 500],
+    ['501.9', 501],
+    ['500001', 500_000],
+    ['1,000', 1000],
+    ['not-a-number', null],
+    ['', null],
+  ])('normalizes custom quantity %s to %s', (value, expected) => {
+    expect(normalizeIdeaQuantity(value)).toBe(expected)
   })
 })

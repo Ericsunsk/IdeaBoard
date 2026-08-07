@@ -31,10 +31,10 @@
       <Column field="paid_amount_minor" header="实付金额" :style="{ width: '170px' }">
         <template #body="{ data }"
           ><Skeleton v-if="isSkeleton(data)" width="6rem" /><span
-            v-else
+            v-else-if="data.paid_amount_minor !== undefined && data.paid_currency"
             class="whitespace-nowrap font-mono font-semibold text-ib-text-muted"
             >{{ formatCurrencyMinor(data.paid_amount_minor, data.paid_currency) }}</span
-          ></template
+          ><span v-else class="font-semibold text-ib-text-subtle">未支付</span></template
         >
       </Column>
       <Column field="status" header="状态" :style="{ width: '190px' }">
@@ -152,8 +152,9 @@ function isSkeleton(row: TableRow): row is SkeletonRow {
   return 'skeleton' in row
 }
 function rechargeStatusLabel(item: UserRechargeHistoryItem): string {
+  if (item.status === 'cancelled') return '已放弃'
   if (item.status === 'refunded') return '已退款'
-  if (item.refunded_amount_minor) {
+  if (item.refunded_amount_minor && item.paid_currency) {
     return `已到账 · 已退 ${formatCurrencyMinor(item.refunded_amount_minor, item.paid_currency)}`
   }
   return '已到账'

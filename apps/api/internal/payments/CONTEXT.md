@@ -26,7 +26,7 @@ Payments 拥有 Stripe 配置、签名 Webhook 接入与支付生命周期。它
 - `Service.ConfigureStripe` 在启用或变更 Stripe 配置时先通过 `StripeGateway` 准备并验证 Stripe account、Product 与 Webhook endpoint，再原子发布当前配置和成功 audit；准备失败时保留旧配置。
 - `purchases_enabled` 从 true 切为 false 时只提交本地 fast path，并在同一 transaction 写入 durable Checkout shutdown run；River 按数据库 cutoff 幂等 Expire 存量 Session，periodic recovery 负责 enqueue/进程故障后的续跑。
 - `Service.ReceiveStripeWebhook` 对 raw body 验签、去重并写入最小 Webhook Inbox。后续 payment order、refund 与 dispute lifecycle 继续收口在 Payments context。
-- `Service.GetPurchaseOptions`、`CreateCheckout`、`ListPendingOrders`、`ContinuePendingOrder`、`AbandonPendingOrder`、`GetPaymentOrderReturnStatus` 与 `ListRecharges` 是用户充值 boundary。HTTP handler 只能使用 authenticated principal 的 user ID，并为订单、历史和 SSE 设定 user scope。
+- `Service.GetPurchaseOptions`、`CreateCheckout`、`ListPendingOrders`、`ContinuePendingOrder`、`AbandonPendingOrder`、`GetPaymentOrderReturnStatus` 与 `ListRecharges` 是用户充值 boundary。`ListRecharges` 保留已到账、已退款与用户主动放弃的订单事实；HTTP handler 只能使用 authenticated principal 的 user ID，并为订单、历史和 SSE 设定 user scope。
 - `Service.EventHub` 只发布本实例已提交的用户充值状态提示；前端据此重新读取 Wallet、订单或充值历史，SSE 不是支付事实源。
 - `Service.ReconcileDuePaymentOrders` 是 River recovery seam，并收敛 Checkout、Refund 与 durable Dispute；`ListPaymentReconciliationAnomalies`、`ListAdminPaymentOrders` 与 `GetAdminPaymentOrder` 是 Admin read seams，HTTP/Admin presentation 不拥有对账 transition。Admin detail 只返回脱敏 Stripe identity、durable recovery facts 和安全 Dashboard URL。
 - 任何支付结果引起的 Idea 余额变化都必须调用 Credits 的 typed Commands；Payments 不直接写 Ledger 或 balance projection。

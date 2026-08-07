@@ -89,14 +89,26 @@ export function useUserRecharge(
     )
   }
 
+  function removeCachedPendingOrder(publicToken: string) {
+    queryClient.setQueryData<UserPendingPaymentOrderList>(
+      userPaymentsQueryKeys.pending,
+      (current) =>
+        current
+          ? { ...current, items: current.items.filter((item) => item.public_token !== publicToken) }
+          : current,
+    )
+  }
+
   const pendingActionMutation = useMutation({
     mutationFn: (action: PendingOrderAction) =>
       action.kind === 'continue'
         ? resource.continuePendingOrder(action.publicToken)
         : resource.abandonPendingOrder(action.publicToken),
     onSuccess: (order, action) => {
-      if (order.status !== 'checkout_open') {
+      if (isPendingPaymentOrderStatus(order.status)) {
         updateCachedPendingOrder(order.public_token, () => order)
+      } else {
+        removeCachedPendingOrder(order.public_token)
       }
       void queryClient.invalidateQueries({ queryKey: userPaymentsQueryKeys.history })
       void queryClient.invalidateQueries({ queryKey: userCreditsQueryKeys.all })
@@ -213,6 +225,14 @@ export function useUserRecharge(
     retryHistory: historyQuery.refetch,
     loadMoreHistory: historyQuery.fetchNextPage,
   }
+}
+
+function isPendingPaymentOrderStatus(status: UserPendingPaymentOrder['status']): boolean {
+  return (
+    status === 'checkout_open' ||
+    status === 'async_payment_pending' ||
+    status === 'paid_pending_credit'
+  )
 }
 
 function shouldRotateCheckoutIntent(error: unknown): boolean {

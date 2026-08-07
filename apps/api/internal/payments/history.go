@@ -31,8 +31,8 @@ var (
 type RechargeHistoryItem struct {
 	OccurredAt           time.Time `json:"occurred_at"`
 	IdeaQuantity         int64     `json:"idea_quantity"`
-	PaidAmountMinor      int64     `json:"paid_amount_minor"`
-	PaidCurrency         string    `json:"paid_currency"`
+	PaidAmountMinor      int64     `json:"paid_amount_minor,omitempty"`
+	PaidCurrency         string    `json:"paid_currency,omitempty"`
 	Status               string    `json:"status"`
 	RefundedIdeaQuantity int64     `json:"refunded_idea_quantity,omitempty"`
 	RefundedAmountMinor  int64     `json:"refunded_amount_minor,omitempty"`
@@ -72,23 +72,36 @@ func (s *Service) ListRecharges(ctx context.Context, userID int64, cursor string
 	page := RechargeHistoryPage{Items: make([]RechargeHistoryItem, 0, min(limit, len(rows)))}
 	if len(rows) > limit {
 		last := rows[limit-1]
-		page.NextCursor, err = encodeRechargeHistoryCursor(last.OccurredAt.Time, last.ID)
+		page.NextCursor, err = encodeRechargeHistoryCursor(last.OccurredAt, last.ID)
 		if err != nil {
 			return RechargeHistoryPage{}, fmt.Errorf("encode recharge history cursor: %w", err)
 		}
 		rows = rows[:limit]
 	}
 	for _, row := range rows {
-		if !row.OccurredAt.Valid || !row.PaidTotalMinor.Valid {
-			return RechargeHistoryPage{}, fmt.Errorf("invalid credited payment order history row")
-		}
-		status := "credited"
-		if row.RefundedIdeaQuantity >= row.IdeaQuantity {
-			status = "refunded"
+		status := row.Status
+		paidAmountMinor := int64(0)
+		paidCurrency := ""
+		switch row.Status {
+		case string(PaymentOrderCredited):
+			if !row.PaidTotalMinor.Valid || row.PaidCurrency == "" {
+				return RechargeHistoryPage{}, fmt.Errorf("invalid credited payment order history row")
+			}
+			paidAmountMinor = row.PaidTotalMinor.Int64
+			paidCurrency = strings.ToLower(row.PaidCurrency)
+			if row.RefundedIdeaQuantity >= row.IdeaQuantity {
+				status = "refunded"
+			}
+		case string(PaymentOrderCancelled):
+			if row.PaidTotalMinor.Valid || row.PaidCurrency != "" || row.ReceiptUrl != "" {
+				return RechargeHistoryPage{}, fmt.Errorf("invalid cancelled payment order history row")
+			}
+		default:
+			return RechargeHistoryPage{}, fmt.Errorf("invalid payment order history status %q", row.Status)
 		}
 		page.Items = append(page.Items, RechargeHistoryItem{
-			OccurredAt: row.OccurredAt.Time, IdeaQuantity: row.IdeaQuantity,
-			PaidAmountMinor: row.PaidTotalMinor.Int64, PaidCurrency: strings.ToLower(row.PaidCurrency),
+			OccurredAt: row.OccurredAt, IdeaQuantity: row.IdeaQuantity,
+			PaidAmountMinor: paidAmountMinor, PaidCurrency: paidCurrency,
 			Status: status, RefundedIdeaQuantity: row.RefundedIdeaQuantity,
 			RefundedAmountMinor: row.RefundedAmountMinor, ReceiptURL: row.ReceiptUrl,
 		})

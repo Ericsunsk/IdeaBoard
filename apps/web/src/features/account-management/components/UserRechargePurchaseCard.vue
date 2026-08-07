@@ -51,7 +51,7 @@
           <h3 id="recharge-purchase-heading" class="m-0 text-base font-bold text-ib-text">
             选择充值数量
           </h3>
-          <span class="text-[12px] font-semibold text-ib-text-subtle">100 Ideas = $1.00 USD</span>
+          <span class="text-[12px] font-semibold text-ib-text-subtle">$1.00 USD = 100 Ideas</span>
         </div>
         <div
           class="mt-3 grid grid-cols-5 gap-2.5 max-[900px]:grid-cols-3 max-[640px]:grid-cols-2"
@@ -78,13 +78,16 @@
         </div>
       </div>
 
-      <div class="grid gap-2">
-        <label for="account-recharge-custom" class="text-[13px] font-semibold text-ib-text-muted"
-          >自定义数量</label
-        >
+      <IbFormField
+        v-slot="{ fieldId }"
+        label="自定义数量"
+        field-id="account-recharge-custom"
+        field-class="grid gap-2"
+        label-class="text-[13px] font-semibold text-ib-text-muted"
+      >
         <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 max-[640px]:grid-cols-1">
           <input
-            id="account-recharge-custom"
+            :id="fieldId"
             v-model="customQuantity"
             name="custom-recharge-quantity"
             type="text"
@@ -92,56 +95,16 @@
             autocomplete="off"
             :disabled="checkoutPending"
             :class="ibFormInputClass"
-            :aria-invalid="customError ? 'true' : undefined"
-            :aria-describedby="customError ? 'account-recharge-custom-error' : undefined"
             placeholder="500–500,000"
             @focus="selectionMode = 'custom'"
             @input="selectionMode = 'custom'"
+            @blur="normalizeCustomQuantity"
           />
           <span class="whitespace-nowrap font-mono text-sm font-semibold text-ib-text-muted">{{
             selectedPrice
           }}</span>
         </div>
-        <p
-          v-if="customError"
-          id="account-recharge-custom-error"
-          class="m-0 text-[12px] font-semibold text-ib-danger"
-          role="alert"
-        >
-          {{ customError }}
-        </p>
-      </div>
-
-      <label
-        class="grid cursor-pointer grid-cols-[18px_minmax(0,1fr)] items-start gap-2.5 text-[13px] leading-5 text-ib-text-muted"
-      >
-        <input
-          id="account-recharge-legal-accepted"
-          v-model="legalAccepted"
-          name="legal-accepted"
-          type="checkbox"
-          :disabled="checkoutPending"
-          class="mt-0.5 size-[18px] accent-[var(--color-ib-creative-accent-pressed)] focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]"
-        />
-        <span>
-          我已阅读并同意
-          <a
-            :href="options.terms.url"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="font-semibold text-ib-creative-accent-pressed"
-            >服务条款</a
-          >
-          和
-          <a
-            :href="options.refund_policy.url"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="font-semibold text-ib-creative-accent-pressed"
-            >退款政策</a
-          >
-        </span>
-      </label>
+      </IbFormField>
 
       <div>
         <Button
@@ -153,6 +116,24 @@
           :class="accountPrimaryActionButtonClass"
           :pt="accountButtonPt"
         />
+        <p class="mt-2 mb-0 text-center text-[12px] leading-5 text-ib-text-subtle">
+          点击“立即支付”即表示你同意
+          <a
+            :href="options.terms.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="rounded-[var(--radius-ib-control)] font-semibold text-ib-creative-accent-pressed focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]"
+            >服务条款</a
+          >
+          和
+          <a
+            :href="options.refund_policy.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="rounded-[var(--radius-ib-control)] font-semibold text-ib-creative-accent-pressed focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]"
+            >退款政策</a
+          >
+        </p>
         <p
           v-if="checkoutError"
           class="mt-2 mb-0 text-center text-[13px] font-semibold text-ib-danger"
@@ -169,9 +150,10 @@
 import { computed, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Skeleton from 'primevue/skeleton'
+import IbFormField from '../../../shared/components/IbFormField.vue'
 import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
 import { ibFormInputClass } from '../../../shared/theme/formControls'
-import { formatUsdForIdeas, parseIdeaQuantity } from '../paymentMoney'
+import { formatUsdForIdeas, MIN_IDEA_QUANTITY, normalizeIdeaQuantity } from '../paymentMoney'
 import { accountButtonPt, accountPrimaryActionButtonClass } from './accountManagementUi'
 import type { UserPaymentPurchaseOptions } from '../userPaymentsResource'
 
@@ -190,7 +172,6 @@ const emit = defineEmits<{
 const selectionMode = ref<'package' | 'custom'>('package')
 const selectedQuantity = ref(1000)
 const customQuantity = ref('')
-const legalAccepted = ref(false)
 const ideaFormatter = new Intl.NumberFormat('en-US')
 
 watch(
@@ -204,21 +185,15 @@ watch(
   { immediate: true },
 )
 
-const customParseResult = computed(() => parseIdeaQuantity(customQuantity.value))
-const customError = computed(() => {
-  if (selectionMode.value !== 'custom') return ''
-  return customParseResult.value.ok ? '' : customParseResult.value.error
-})
+const normalizedCustomQuantity = computed(() => normalizeIdeaQuantity(customQuantity.value))
 const checkoutQuantity = computed(() => {
   if (selectionMode.value === 'package') return selectedQuantity.value
-  return customParseResult.value.ok ? customParseResult.value.value : null
+  return normalizedCustomQuantity.value
 })
 const selectedPrice = computed(() =>
   checkoutQuantity.value == null ? '—' : formatUsdForIdeas(checkoutQuantity.value),
 )
-const canCheckout = computed(
-  () => legalAccepted.value && checkoutQuantity.value != null && !props.checkoutPending,
-)
+const canCheckout = computed(() => checkoutQuantity.value != null && !props.checkoutPending)
 
 function packageControlState(quantity: number) {
   return resolveInteractiveControlState({
@@ -233,9 +208,16 @@ function selectPackage(quantity: number) {
   customQuantity.value = ''
 }
 
+function normalizeCustomQuantity() {
+  if (selectionMode.value !== 'custom') return
+  customQuantity.value = String(normalizedCustomQuantity.value ?? MIN_IDEA_QUANTITY)
+}
+
 function submitCheckout() {
-  if (!canCheckout.value || checkoutQuantity.value == null) return
-  emit('checkout', checkoutQuantity.value)
+  normalizeCustomQuantity()
+  const quantity = checkoutQuantity.value
+  if (!canCheckout.value || quantity == null) return
+  emit('checkout', quantity)
 }
 
 function unavailableMessage(reason?: UserPaymentPurchaseOptions['unavailable_reason']): string {

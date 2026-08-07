@@ -78,6 +78,7 @@ describe('UserRechargePane', () => {
     renderPane()
 
     expect(await screen.findByRole('heading', { name: '充值积分' })).toBeVisible()
+    expect(await screen.findByText('$1.00 USD = 100 Ideas')).toBeVisible()
     const packages = await screen.findAllByRole('button', { name: /Ideas.*USD/ })
     expect(packages).toHaveLength(5)
     expect(packages[0]).toHaveAccessibleName('1,000 Ideas $10.00 USD')
@@ -97,7 +98,7 @@ describe('UserRechargePane', () => {
     expect(screen.getByRole('status', { name: '正在加载充值选项' })).toBeVisible()
   })
 
-  it('requires explicit legal agreement and redirects once with the integer quantity', async () => {
+  it('uses the payment action as versioned legal acceptance and redirects once', async () => {
     const createCheckout = vi.fn().mockResolvedValue({
       checkout_url: 'https://checkout.stripe.com/c/pay/cs_test_123',
       public_token: '0198cd29-f457-7e4b-b95e-6cfde41b7222',
@@ -108,9 +109,10 @@ describe('UserRechargePane', () => {
     const { user } = renderPane({ resource: makeResource({ createCheckout }), navigate })
 
     const checkout = await screen.findByRole('button', { name: '立即支付' })
-    expect(checkout).toBeDisabled()
-    await user.click(screen.getByRole('checkbox', { name: /服务条款.*退款政策/ }))
     expect(checkout).toBeEnabled()
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '服务条款' })).toHaveAttribute('href', '/terms')
+    expect(screen.getByRole('link', { name: '退款政策' })).toHaveAttribute('href', '/refund-policy')
     await user.click(checkout)
 
     await waitFor(() => {
@@ -140,7 +142,6 @@ describe('UserRechargePane', () => {
 
     await user.type(custom, '501')
     expect(screen.getByText('$5.01 USD')).toBeVisible()
-    await user.click(screen.getByRole('checkbox', { name: /服务条款.*退款政策/ }))
     await user.click(screen.getByRole('button', { name: '立即支付' }))
 
     expect(createCheckout).toHaveBeenCalledWith({
@@ -152,14 +153,23 @@ describe('UserRechargePane', () => {
     })
   })
 
-  it('shows precise custom validation and legal document links', async () => {
+  it('normalizes custom quantities without inline validation errors', async () => {
     const { user } = renderPane()
     const custom = await screen.findByRole('textbox', { name: '自定义数量' })
 
-    await user.type(custom, '500.5')
+    await user.type(custom, '499.9')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(custom).toHaveValue('499.9')
+    expect(screen.getByText('$5.00 USD')).toBeVisible()
+    await user.tab()
 
-    expect(screen.getByRole('alert')).toHaveTextContent('请输入 500–500,000 之间的整数')
-    expect(custom).toHaveAttribute('aria-invalid', 'true')
+    expect(custom).toHaveValue('500')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    await user.clear(custom)
+    await user.type(custom, '501.9')
+    await user.tab()
+    expect(custom).toHaveValue('501')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: '服务条款' })).toHaveAttribute('href', '/terms')
     expect(screen.getByRole('link', { name: '退款政策' })).toHaveAttribute('href', '/refund-policy')
   })
@@ -194,6 +204,11 @@ describe('UserRechargePane', () => {
             refunded_idea_quantity: 500,
             refunded_amount_minor: 500,
           },
+          {
+            occurred_at: '2026-08-01T06:08:00Z',
+            idea_quantity: 750,
+            status: 'cancelled',
+          },
         ],
       }),
     })
@@ -210,6 +225,8 @@ describe('UserRechargePane', () => {
     expect(within(table).getByText('已到账')).toBeVisible()
     expect(within(table).getByText('已到账 · 已退 $2.50 USD')).toBeVisible()
     expect(within(table).getByText('已退款')).toBeVisible()
+    expect(within(table).getByText('未支付')).toBeVisible()
+    expect(within(table).getByText('已放弃')).toBeVisible()
     expect(within(table).getByRole('link', { name: '查看收据' })).toHaveAttribute(
       'href',
       'https://pay.stripe.com/receipts/demo',
@@ -217,7 +234,7 @@ describe('UserRechargePane', () => {
     expect(screen.queryByText(/customer|session|email/i)).not.toBeInTheDocument()
   })
 
-  it('keeps pending Checkout orders above and separate from credited recharge history', async () => {
+  it('moves an abandoned Checkout order from pending orders into recharge history', async () => {
     const continuePendingOrder = vi.fn().mockResolvedValue({
       public_token: 'open-order',
       idea_quantity: 1000,
@@ -233,12 +250,26 @@ describe('UserRechargePane', () => {
       expires_at: '2026-08-01T01:00:00Z',
       updated_at: '2026-08-01T00:00:00Z',
     })
+    const listRecharges = vi
+      .fn()
+      .mockResolvedValueOnce({ items: [] })
+      .mockResolvedValueOnce({ items: [] })
+      .mockResolvedValue({
+        items: [
+          {
+            occurred_at: '2026-08-01T00:10:00Z',
+            idea_quantity: 1000,
+            status: 'cancelled',
+          },
+        ],
+      })
     const navigate = vi.fn()
     const { user } = renderPane({
       navigate,
       resource: makeResource({
         continuePendingOrder,
         abandonPendingOrder,
+        listRecharges,
         listPendingOrders: vi.fn().mockResolvedValue({
           items: [
             {
@@ -267,11 +298,13 @@ describe('UserRechargePane', () => {
     expect(navigate).toHaveBeenCalledWith('https://checkout.stripe.com/c/pay/open-order')
 
     await user.click(within(pendingOrder).getByRole('button', { name: '放弃订单' }))
-    expect(within(pendingOrder).getByText('放弃后需重新创建订单')).toBeVisible()
-    await user.click(within(pendingOrder).getByRole('button', { name: '确认放弃' }))
     await waitFor(() => expect(abandonPendingOrder).toHaveBeenCalledWith('open-order'))
-    expect(await within(pendingOrder).findByText('订单已放弃')).toBeVisible()
-    expect(within(pendingOrder).queryByRole('button', { name: '继续支付' })).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.queryByTestId('pending-payment-order-open-order')).not.toBeInTheDocument(),
+    )
+    expect(screen.queryByRole('button', { name: '确认放弃' })).not.toBeInTheDocument()
+    expect(await within(historyTable).findByText('已放弃')).toBeVisible()
+    expect(within(historyTable).getByText('未支付')).toBeVisible()
   })
 
   it('renders waiting, delayed credit processing, and expired pending order states', async () => {
@@ -552,7 +585,6 @@ describe('UserRechargePane', () => {
     paymentListener?.({ public_token: 'failed-reconciliation-order', status: 'failed' })
 
     expect(await within(pendingOrder).findByText('支付未完成')).toBeVisible()
-    await user.click(screen.getByRole('checkbox', { name: /服务条款.*退款政策/ }))
     await user.click(screen.getByRole('button', { name: '立即支付' }))
     await waitFor(() => expect(createCheckout).toHaveBeenCalledOnce())
   })
@@ -594,8 +626,7 @@ describe('UserRechargePane', () => {
     const navigate = vi.fn()
     const { user } = renderPane({ resource: makeResource({ createCheckout }), navigate })
 
-    await user.click(await screen.findByRole('checkbox', { name: /服务条款.*退款政策/ }))
-    await user.click(screen.getByRole('button', { name: '立即支付' }))
+    await user.click(await screen.findByRole('button', { name: '立即支付' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('暂时无法创建支付页面')
     expect(screen.getByRole('button', { name: '立即支付' })).toBeEnabled()
@@ -606,8 +637,7 @@ describe('UserRechargePane', () => {
     const createCheckout = vi.fn().mockRejectedValue(new Error('暂时无法创建支付页面'))
     const { user } = renderPane({ resource: makeResource({ createCheckout }) })
 
-    await user.click(await screen.findByRole('checkbox', { name: /服务条款.*退款政策/ }))
-    const checkout = screen.getByRole('button', { name: '立即支付' })
+    const checkout = await screen.findByRole('button', { name: '立即支付' })
 
     await user.click(checkout)
     await waitFor(() => expect(createCheckout).toHaveBeenCalledTimes(1))
@@ -634,8 +664,7 @@ describe('UserRechargePane', () => {
     const navigate = vi.fn()
     const { user } = renderPane({ resource: makeResource({ createCheckout }), navigate })
 
-    await user.click(await screen.findByRole('checkbox', { name: /服务条款.*退款政策/ }))
-    const checkout = screen.getByRole('button', { name: '立即支付' })
+    const checkout = await screen.findByRole('button', { name: '立即支付' })
 
     await user.click(checkout)
     await waitFor(() => expect(createCheckout).toHaveBeenCalledTimes(1))
@@ -657,8 +686,7 @@ describe('UserRechargePane', () => {
     const createCheckout = vi.fn().mockRejectedValue(rejectedError)
     const { user } = renderPane({ resource: makeResource({ createCheckout }) })
 
-    await user.click(await screen.findByRole('checkbox', { name: /服务条款.*退款政策/ }))
-    const checkout = screen.getByRole('button', { name: '立即支付' })
+    const checkout = await screen.findByRole('button', { name: '立即支付' })
 
     await user.click(checkout)
     await waitFor(() => expect(createCheckout).toHaveBeenCalledTimes(1))
