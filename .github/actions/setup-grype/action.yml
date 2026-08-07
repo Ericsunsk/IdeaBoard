@@ -1,0 +1,58 @@
+name: Setup Grype
+description: Install the repository Grype version with bounded retries
+
+inputs:
+  version-file:
+    description: Path to the Grype version source of truth
+    required: false
+    default: .grype-version
+
+runs:
+  using: composite
+  steps:
+    - name: Install Grype
+      shell: bash
+      env:
+        VERSION_FILE: ${{ inputs.version-file }}
+      run: |
+        set -euo pipefail
+        : "${RUNNER_TEMP:?RUNNER_TEMP is required}"
+        : "${GITHUB_PATH:?GITHUB_PATH is required}"
+
+        version="$(tr -d '[:space:]' < "${VERSION_FILE}")"
+        if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "Invalid Grype version in ${VERSION_FILE}: ${version}" >&2
+          exit 1
+        fi
+
+        install_dir="${RUNNER_TEMP}/grype-${version}"
+        installer="${RUNNER_TEMP}/install-grype-${version}.sh"
+        installer_url="https://get.anchore.io/grype/v${version}/install.sh"
+
+        for attempt in 1 2 3; do
+          rm -rf "${install_dir}"
+          mkdir -p "${install_dir}"
+
+          if curl \
+            --fail \
+            --silent \
+            --show-error \
+            --location \
+            --retry 3 \
+            --retry-all-errors \
+            --connect-timeout 15 \
+            --max-time 120 \
+            --output "${installer}" \
+            "${installer_url}" && \
+            sh "${installer}" -b "${install_dir}" "v${version}"; then
+            "${install_dir}/grype" version
+            echo "${install_dir}" >> "${GITHUB_PATH}"
+            exit 0
+          fi
+
+          if [[ "${attempt}" == 3 ]]; then
+            echo "Failed to install Grype v${version} after ${attempt} attempts" >&2
+            exit 1
+          fi
+          sleep $((attempt * 5))
+        done

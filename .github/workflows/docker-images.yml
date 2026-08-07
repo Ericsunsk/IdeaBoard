@@ -13,6 +13,7 @@ on:
       - 'contracts/auth-internal.openapi.json'
       - 'docker/**'
       - '.grype.yaml'
+      - '.grype-version'
       - '.github/actions/**'
       - '.github/workflows/backend.yml'
       - '.github/workflows/docker-images.yml'
@@ -153,31 +154,21 @@ jobs:
           upload-artifact: false
           upload-release-assets: false
 
+      - name: Set up Grype
+        timeout-minutes: 5
+        uses: ./.github/actions/setup-grype
+
       - name: Scan linux/amd64 image
         timeout-minutes: 10
-        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2
         env:
-          GRYPE_PLATFORM: linux/amd64
-        with:
-          image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
-          config: .grype.yaml
-          cache-db: true
-          fail-build: true
-          severity-cutoff: high
-          output-format: table
+          IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
+        run: grype "${IMAGE}" --platform linux/amd64 --config .grype.yaml --fail-on high --output table
 
       - name: Scan linux/arm64 image
         timeout-minutes: 10
-        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2
         env:
-          GRYPE_PLATFORM: linux/arm64
-        with:
-          image: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
-          config: .grype.yaml
-          cache-db: true
-          fail-build: true
-          severity-cutoff: high
-          output-format: table
+          IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
+        run: grype "${IMAGE}" --platform linux/arm64 --config .grype.yaml --fail-on high --output table
 
       - name: Install Cosign
         timeout-minutes: 5

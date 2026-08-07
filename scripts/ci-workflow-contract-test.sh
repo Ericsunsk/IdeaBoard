@@ -77,8 +77,15 @@ assert_contains "${docker_workflow}" '          tags: ${{ steps.image.outputs.im
 assert_contains "${docker_workflow}" '      - name: Publish verified image aliases'
 assert_contains "${docker_workflow}" '          SYFT_PLATFORM: linux/amd64'
 assert_contains "${docker_workflow}" '          SYFT_PLATFORM: linux/arm64'
+assert_contains "${docker_workflow}" '        uses: ./.github/actions/setup-grype'
+assert_contains "${docker_workflow}" 'run: grype "${IMAGE}" --platform linux/amd64'
+assert_contains "${docker_workflow}" 'run: grype "${IMAGE}" --platform linux/arm64'
 if grep -Fq 'SYFT_PLATFORM: all' "${docker_workflow}"; then
   echo 'Syft requires an explicit operating system and architecture' >&2
+  exit 1
+fi
+if [[ ! -f "${repo_root}/.grype-version" ]]; then
+  echo 'Expected .grype-version to be the Grype version source of truth' >&2
   exit 1
 fi
 for npm_workflow in ci.yml web.yml backend.yml security.yml release.yml; do
