@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import '../shared/theme/interactive-control-state.css';
 @import '../shared/theme/brand-mark.css';
+@import '../shared/theme/board-page-background.css';
 @import '../shared/theme/round-control.css';
 @import '../shared/theme/page-chrome.css';
 @import '../shared/theme/user-avatar-button.css';

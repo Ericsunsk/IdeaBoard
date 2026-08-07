@@ -1,15 +1,14 @@
 <template>
   <div
-    class="canvas-landing-page ib-page-dot-bg relative h-full w-full overflow-hidden bg-white bg-fixed text-[#1d1d1f] scroll-smooth [font-family:-apple-system,BlinkMacSystemFont,'SF_Pro_Display','Segoe_UI',Roboto,'Helvetica_Neue',sans-serif]"
+    class="canvas-landing-page relative h-full w-full overflow-hidden bg-board-page bg-fixed text-[#1d1d1f] scroll-smooth [font-family:-apple-system,BlinkMacSystemFont,'SF_Pro_Display','Segoe_UI',Roboto,'Helvetica_Neue',sans-serif]"
   >
-    <!-- 轻量背景洗色，文字区排版保持稳定。 -->
-    <div
-      class="pointer-events-none fixed inset-0 z-0 h-screen w-screen overflow-hidden bg-[linear-gradient(115deg,rgba(255,255,255,0)_0%,rgba(245,241,255,0.72)_48%,rgba(255,255,255,0)_100%)]"
+    <header
+      class="absolute top-[var(--spacing-ib-page-chrome-inset)] left-[var(--spacing-ib-page-chrome-inset)] z-20 inline-flex min-w-0 max-w-[calc(100%-64px)] items-center"
     >
-      <div
-        class="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.86)_0%,rgba(255,255,255,0)_38%,rgba(255,255,255,0.7)_100%)]"
-      ></div>
-    </div>
+      <StudioName />
+    </header>
+
+    <div class="ib-board-page-background ib-page-dot-bg"></div>
 
     <!-- 顶部 Hero 区域 -->
     <div
@@ -119,6 +118,7 @@ import portraitAsset from '../assets/home/portrait.svg'
 import socksAsset from '../assets/home/socks.svg'
 import starburstAsset from '../assets/home/starburst.svg'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
+import StudioName from '../../../shared/components/StudioName.vue'
 import {
   PRIVACY_POLICY_PATH,
   REFUND_POLICY_PATH,

@@ -4,7 +4,7 @@
 
     <header :class="boardCatalogClasses.header">
       <div :class="boardCatalogClasses.brand">
-        <span :class="boardCatalogClasses.brandName">{{ projectName }}</span>
+        <StudioName />
       </div>
       <UserAccountMenu
         :avatar-url="accountControls.viewModel.avatarUrl.value"
@@ -181,6 +181,7 @@ import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { USER_CANVAS_PATH, USER_HOME_PATH } from '../../../shared/constants/routePaths'
 import { useUserStore } from '../../auth/session/authSession'
 import UserAccountMenu from '../../../shared/components/UserAccountMenu.vue'
+import StudioName from '../../../shared/components/StudioName.vue'
 import { Search } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'

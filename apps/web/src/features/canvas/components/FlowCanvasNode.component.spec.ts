@@ -229,7 +229,7 @@ describe('FlowCanvasNode image presentation', () => {
 
     expect(floatingControls?.querySelector('.image-action-menu')).not.toBeNull()
     expect(floatingControls?.querySelector('.image-node-prompt-composer')).not.toBeNull()
-    expect(view.getByPlaceholderText('输入提示词改造这张图')).toHaveClass('self-center')
+    expect(view.getByPlaceholderText('输入提示词改造这张图')).toBeVisible()
     expect(view.getByLabelText('打开图片预览').closest('.node-floating-controls')).toBeNull()
   })
 
@@ -350,7 +350,7 @@ describe('FlowCanvasNode fusion presentation', () => {
     const floatingControls = view.container.querySelector('.node-floating-controls')
 
     expect(floatingControls?.querySelector('.image-node-prompt-composer')).not.toBeNull()
-    expect(view.getByPlaceholderText('输入融合提示词')).toHaveClass('self-center')
+    expect(view.getByPlaceholderText('输入融合提示词')).toBeVisible()
 
     await fireEvent.drop(stage)
     await fireEvent.contextMenu(stage)

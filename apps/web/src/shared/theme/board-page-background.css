@@ -1,0 +1,18 @@
+@layer components {
+  .ib-board-page-background {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .ib-board-page-background::before {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      55% 35% at 50% 50%,
+      var(--color-board-page-glow) 0%,
+      var(--color-board-page-glow-clear) 100%
+    );
+    content: '';
+  }
+}
