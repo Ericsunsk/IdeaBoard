@@ -14,6 +14,7 @@ on:
       - 'docker/**'
       - '.grype.yaml'
       - '.grype-version'
+      - '.grype-checksums'
       - '.github/actions/**'
       - '.github/workflows/backend.yml'
       - '.github/workflows/docker-images.yml'
@@ -158,17 +159,42 @@ jobs:
         timeout-minutes: 5
         uses: ./.github/actions/setup-grype
 
+      - name: Prepare Grype database cache key
+        id: grype-cache
+        shell: bash
+        run: echo "date=$(date -u +%F)" >> "${GITHUB_OUTPUT}"
+
+      - name: Cache Grype vulnerability database
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: ${{ runner.temp }}/grype-db
+          key: grype-db-v6-${{ runner.os }}-${{ hashFiles('.grype-version') }}-${{ steps.grype-cache.outputs.date }}
+          restore-keys: grype-db-v6-${{ runner.os }}-${{ hashFiles('.grype-version') }}-
+
+      - name: Update Grype vulnerability database
+        timeout-minutes: 5
+        env:
+          GRYPE_CHECK_FOR_APP_UPDATE: 'false'
+          GRYPE_DB_CACHE_DIR: ${{ runner.temp }}/grype-db
+        run: grype db update
+
       - name: Scan linux/amd64 image
         timeout-minutes: 10
         env:
+          GRYPE_CHECK_FOR_APP_UPDATE: 'false'
+          GRYPE_DB_AUTO_UPDATE: 'false'
+          GRYPE_DB_CACHE_DIR: ${{ runner.temp }}/grype-db
           IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
-        run: grype "${IMAGE}" --platform linux/amd64 --config .grype.yaml --fail-on high --output table
+        run: grype "registry:${IMAGE}" --platform linux/amd64 --config .grype.yaml --fail-on high --output table
 
       - name: Scan linux/arm64 image
         timeout-minutes: 10
         env:
+          GRYPE_CHECK_FOR_APP_UPDATE: 'false'
+          GRYPE_DB_AUTO_UPDATE: 'false'
+          GRYPE_DB_CACHE_DIR: ${{ runner.temp }}/grype-db
           IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
-        run: grype "${IMAGE}" --platform linux/arm64 --config .grype.yaml --fail-on high --output table
+        run: grype "registry:${IMAGE}" --platform linux/arm64 --config .grype.yaml --fail-on high --output table
 
       - name: Install Cosign
         timeout-minutes: 5

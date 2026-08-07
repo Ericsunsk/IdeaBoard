@@ -6,18 +6,34 @@ inputs:
     description: Path to the Grype version source of truth
     required: false
     default: .grype-version
+  checksum-file:
+    description: Path to the trusted Grype archive checksums
+    required: false
+    default: .grype-checksums
 
 runs:
   using: composite
   steps:
+    - name: Cache Grype archive
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+      with:
+        path: ${{ runner.temp }}/grype-downloads
+        key: grype-cli-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(inputs.version-file, inputs.checksum-file) }}
+
     - name: Install Grype
       shell: bash
       env:
         VERSION_FILE: ${{ inputs.version-file }}
+        CHECKSUM_FILE: ${{ inputs.checksum-file }}
       run: |
         set -euo pipefail
         : "${RUNNER_TEMP:?RUNNER_TEMP is required}"
         : "${GITHUB_PATH:?GITHUB_PATH is required}"
+
+        if [[ "${RUNNER_OS}" != "Linux" || "${RUNNER_ARCH}" != "X64" ]]; then
+          echo "Unsupported Grype runner platform: ${RUNNER_OS}/${RUNNER_ARCH}" >&2
+          exit 1
+        fi
 
         version="$(tr -d '[:space:]' < "${VERSION_FILE}")"
         if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -25,34 +41,42 @@ runs:
           exit 1
         fi
 
+        archive_name="grype_${version}_linux_amd64.tar.gz"
+        expected_sha256="$(awk -v archive="${archive_name}" '$2 == archive { print $1 }' "${CHECKSUM_FILE}")"
+        if [[ ! "${expected_sha256}" =~ ^[0-9a-f]{64}$ ]]; then
+          echo "Missing trusted checksum for ${archive_name} in ${CHECKSUM_FILE}" >&2
+          exit 1
+        fi
+
+        archive_dir="${RUNNER_TEMP}/grype-downloads"
+        archive="${archive_dir}/${archive_name}"
         install_dir="${RUNNER_TEMP}/grype-${version}"
-        installer="${RUNNER_TEMP}/install-grype-${version}.sh"
-        installer_url="https://get.anchore.io/grype/v${version}/install.sh"
+        archive_url="https://github.com/anchore/grype/releases/download/v${version}/${archive_name}"
+        mkdir -p "${archive_dir}" "${install_dir}"
 
-        for attempt in 1 2 3; do
-          rm -rf "${install_dir}"
-          mkdir -p "${install_dir}"
-
-          if curl \
+        if [[ ! -f "${archive}" ]] || \
+          ! printf '%s  %s\n' "${expected_sha256}" "${archive}" | sha256sum --check --status; then
+          curl \
             --fail \
             --silent \
             --show-error \
             --location \
-            --retry 3 \
+            --retry 2 \
             --retry-all-errors \
+            --retry-delay 2 \
+            --retry-max-time 240 \
             --connect-timeout 15 \
             --max-time 120 \
-            --output "${installer}" \
-            "${installer_url}" && \
-            sh "${installer}" -b "${install_dir}" "v${version}"; then
-            "${install_dir}/grype" version
-            echo "${install_dir}" >> "${GITHUB_PATH}"
-            exit 0
-          fi
+            --output "${archive}" \
+            "${archive_url}"
+        fi
 
-          if [[ "${attempt}" == 3 ]]; then
-            echo "Failed to install Grype v${version} after ${attempt} attempts" >&2
-            exit 1
-          fi
-          sleep $((attempt * 5))
-        done
+        printf '%s  %s\n' "${expected_sha256}" "${archive}" | sha256sum --check
+        tar -xzf "${archive}" -C "${install_dir}" grype
+
+        actual_version="$("${install_dir}/grype" version | awk '/^Version:/ { print $2 }')"
+        if [[ "${actual_version}" != "${version}" ]]; then
+          echo "Installed Grype version ${actual_version}, expected ${version}" >&2
+          exit 1
+        fi
+        echo "${install_dir}" >> "${GITHUB_PATH}"

@@ -125,7 +125,7 @@ VPS
 
 Docker Images workflow 先复用 Backend Verification，通过后才发布镜像。workflow 会上传 `release-manifest` artifact；tag 发布还会把 `release-manifest.json` 和六份按 `linux/amd64`、`linux/arm64` 拆分的 CycloneDX SBOM 附到同一 GitHub Release。该 manifest 是推荐升级输入，记录本次 workflow 的 `tag` / `ref` / `commit` / `run_id`、三张 GHCR digest 镜像引用、各平台 SBOM 文件名与 Cosign OIDC identity。
 
-发布路径先推送 immutable SHA image，通过 BuildKit 为 multi-arch image 生成 max-mode provenance 和 SBOM attestation，并生成各平台 durable CycloneDX SBOM；固定版本的 Grype 分别扫描 `linux/amd64` 与 `linux/arm64`，拦截 `high` 及以上漏洞；Cosign keyless OIDC 对最终 image digest 签名，全部成功后才推广 mutable aliases。Grype 版本由 [`.grype-version`](../../.grype-version) 统一管理，例外统一维护在 [`.grype.yaml`](../../.grype.yaml)，新增例外时只加窄范围规则并记录原因与复查日期。
+发布路径先推送 immutable SHA image，通过 BuildKit 为 multi-arch image 生成 max-mode provenance 和 SBOM attestation，并生成各平台 durable CycloneDX SBOM；固定版本且经过 repo-local SHA-256 校验的 Grype 分别扫描 `linux/amd64` 与 `linux/arm64`，拦截 `high` 及以上漏洞；Cosign keyless OIDC 对最终 image digest 签名，全部成功后才推广 mutable aliases。Grype 版本与 archive trust anchor 分别由 [`.grype-version`](../../.grype-version) 和 [`.grype-checksums`](../../.grype-checksums) 管理，例外统一维护在 [`.grype.yaml`](../../.grype.yaml)，新增例外时只加窄范围规则并记录原因与复查日期。
 
 `ideaboard update` 默认会在 pull 前执行 Cosign keyless 验签。VPS 必须先安装 `cosign`；离线排障时才临时设置 `COSIGN_VERIFY=false`。手动验签示例：
 

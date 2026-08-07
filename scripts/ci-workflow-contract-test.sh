@@ -78,14 +78,24 @@ assert_contains "${docker_workflow}" '      - name: Publish verified image alias
 assert_contains "${docker_workflow}" '          SYFT_PLATFORM: linux/amd64'
 assert_contains "${docker_workflow}" '          SYFT_PLATFORM: linux/arm64'
 assert_contains "${docker_workflow}" '        uses: ./.github/actions/setup-grype'
-assert_contains "${docker_workflow}" 'run: grype "${IMAGE}" --platform linux/amd64'
-assert_contains "${docker_workflow}" 'run: grype "${IMAGE}" --platform linux/arm64'
+assert_contains "${docker_workflow}" 'run: grype "registry:${IMAGE}" --platform linux/amd64'
+assert_contains "${docker_workflow}" 'run: grype "registry:${IMAGE}" --platform linux/arm64'
 if grep -Fq 'SYFT_PLATFORM: all' "${docker_workflow}"; then
   echo 'Syft requires an explicit operating system and architecture' >&2
   exit 1
 fi
 if [[ ! -f "${repo_root}/.grype-version" ]]; then
   echo 'Expected .grype-version to be the Grype version source of truth' >&2
+  exit 1
+fi
+if [[ ! -f "${repo_root}/.grype-checksums" ]]; then
+  echo 'Expected .grype-checksums to pin the trusted Grype archive' >&2
+  exit 1
+fi
+assert_contains "${repo_root}/.github/actions/setup-grype/action.yml" 'sha256sum --check'
+assert_contains "${repo_root}/.github/actions/setup-grype/action.yml" 'releases/download/v${version}/${archive_name}'
+if grep -Fq 'anchore/scan-action@' "${docker_workflow}"; then
+  echo 'Docker scanning must use the verified repository Grype binary' >&2
   exit 1
 fi
 for npm_workflow in ci.yml web.yml backend.yml security.yml release.yml; do
