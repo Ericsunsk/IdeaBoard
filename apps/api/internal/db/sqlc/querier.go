@@ -39,7 +39,6 @@ type Querier interface {
 	CreateAccountSecret(ctx context.Context, arg CreateAccountSecretParams) (int64, error)
 	CreateBoardShareToken(ctx context.Context, arg CreateBoardShareTokenParams) (int64, error)
 	CreateBoardUploadMediaAsset(ctx context.Context, arg CreateBoardUploadMediaAssetParams) (int64, error)
-	CreateLineDraftMode(ctx context.Context, arg CreateLineDraftModeParams) (int64, error)
 	CreateProviderEndpoint(ctx context.Context, arg CreateProviderEndpointParams) (int64, error)
 	CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error)
 	CreateTaskAttempt(ctx context.Context, arg CreateTaskAttemptParams) (CreateTaskAttemptRow, error)
@@ -53,7 +52,6 @@ type Querier interface {
 	DeleteBoardMembersByBoardID(ctx context.Context, boardID string) error
 	DeleteBoardMembersByUserID(ctx context.Context, userID int64) error
 	DeleteBoardShareTokensByBoardID(ctx context.Context, boardID string) error
-	DeleteLineDraftMode(ctx context.Context, id int64) error
 	DeleteOutputsByTaskID(ctx context.Context, taskID string) error
 	DeleteProviderEndpoint(ctx context.Context, id int64) (int64, error)
 	DeleteTaskOutputMediaRefsByTaskID(ctx context.Context, taskID string) error
@@ -76,7 +74,6 @@ type Querier interface {
 	GetBoardMemberRole(ctx context.Context, arg GetBoardMemberRoleParams) (string, error)
 	GetBoardShareTokenByHash(ctx context.Context, tokenHash string) (BoardShareToken, error)
 	GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error)
-	GetLineDraftModeByID(ctx context.Context, id int64) (LineDraftMode, error)
 	GetMediaAssetByID(ctx context.Context, id int64) (MediaAsset, error)
 	GetPaymentCheckoutShutdown(ctx context.Context, id uuid.UUID) (PaymentCheckoutShutdown, error)
 	GetPaymentCustomer(ctx context.Context, userID int64) (PaymentCustomer, error)
@@ -125,9 +122,7 @@ type Querier interface {
 	ListDailyStatsByDateRange(ctx context.Context, arg ListDailyStatsByDateRangeParams) ([]ListDailyStatsByDateRangeRow, error)
 	ListDueMediaAssetReclamationIDs(ctx context.Context, arg ListDueMediaAssetReclamationIDsParams) ([]ListDueMediaAssetReclamationIDsRow, error)
 	ListEnabledAccounts(ctx context.Context) ([]ListEnabledAccountsRow, error)
-	ListEnabledLineDraftModes(ctx context.Context) ([]LineDraftMode, error)
 	ListFeaturePrompts(ctx context.Context) ([]FeaturePrompt, error)
-	ListLineDraftModes(ctx context.Context) ([]LineDraftMode, error)
 	ListMediaRefsByBoardID(ctx context.Context, arg ListMediaRefsByBoardIDParams) ([]MediaRef, error)
 	ListMonitorExecutionPressureByRange(ctx context.Context, arg ListMonitorExecutionPressureByRangeParams) ([]ListMonitorExecutionPressureByRangeRow, error)
 	ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([]ListOutputsByTaskIDsRow, error)
@@ -194,7 +189,6 @@ type Querier interface {
 	UpdateAccount(ctx context.Context, arg UpdateAccountParams) (int64, error)
 	UpdateAccountModelEnabled(ctx context.Context, arg UpdateAccountModelEnabledParams) (int64, error)
 	UpdateAccountStatus(ctx context.Context, arg UpdateAccountStatusParams) (int64, error)
-	UpdateLineDraftMode(ctx context.Context, arg UpdateLineDraftModeParams) error
 	UpdateProviderEndpoint(ctx context.Context, arg UpdateProviderEndpointParams) (int64, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (int64, error)
 	UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarParams) (int64, error)

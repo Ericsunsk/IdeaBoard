@@ -11,7 +11,6 @@ import (
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/users"
-	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/payments"
 	"ideaboard/api/internal/platform/config"
@@ -57,17 +56,16 @@ func newAppRouter(
 	registerHTTPRoutes(router, httpapi.Dependencies{
 		Auth: authDeps,
 		UserRoutes: httpapi.UserRouteDeps{
-			AuthHandler:      auth.NewAuthHandler(services.userService),
-			TaskHandler:      taskHandler,
-			BoardHandler:     boards.NewBoardHandler(services.boardService, cfg.PublicOrigins),
-			LineDraftHandler: assets.NewLineDraftHandler(repos.lineDraftModeRepo),
-			BillingHandler:   billingHandler,
-			BillingRecords:   billingrecords.NewHandler(services.billingRecords),
-			CreditHandler:    credits.NewHandler(services.creditService, creditUserResolver),
-			UsageHandler:     usage.NewHandler(services.usageService),
-			RewardHandler:    rewards.NewHandler(services.rewardService, repos.userRepo),
-			PaymentHandler:   paymentHandler,
-			Uploads:          uploadDeps,
+			AuthHandler:    auth.NewAuthHandler(services.userService),
+			TaskHandler:    taskHandler,
+			BoardHandler:   boards.NewBoardHandler(services.boardService, cfg.PublicOrigins),
+			BillingHandler: billingHandler,
+			BillingRecords: billingrecords.NewHandler(services.billingRecords),
+			CreditHandler:  credits.NewHandler(services.creditService, creditUserResolver),
+			UsageHandler:   usage.NewHandler(services.usageService),
+			RewardHandler:  rewards.NewHandler(services.rewardService, repos.userRepo),
+			PaymentHandler: paymentHandler,
+			Uploads:        uploadDeps,
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{
 			AdminHandler: users.NewAdminHandler(
@@ -85,7 +83,6 @@ func newAppRouter(
 			TaskStatsHandler:        taskStatsHandler,
 			ProviderEndpointHandler: providerendpoints.NewProviderEndpointHandler(repos.providerEndpointRepo, cfg.App.Env),
 			StorageHandler:          storage.NewStorageHandler(services.storageService),
-			LineDraftHandler:        assets.NewLineDraftHandler(repos.lineDraftModeRepo),
 			FeaturePromptHandler:    prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
 			StorageService:          services.storageService,
 			UploadSettings:          services.runtimeSettings,

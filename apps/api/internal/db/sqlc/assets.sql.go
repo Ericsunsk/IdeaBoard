@@ -187,33 +187,6 @@ func (q *Queries) CreateBoardUploadMediaAsset(ctx context.Context, arg CreateBoa
 	return id, err
 }
 
-const createLineDraftMode = `-- name: CreateLineDraftMode :one
-INSERT INTO line_draft_modes (name, cover_image, prompt, sort_order, is_enabled)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id
-`
-
-type CreateLineDraftModeParams struct {
-	Name       string `json:"name"`
-	CoverImage string `json:"cover_image"`
-	Prompt     string `json:"prompt"`
-	SortOrder  int32  `json:"sort_order"`
-	IsEnabled  bool   `json:"is_enabled"`
-}
-
-func (q *Queries) CreateLineDraftMode(ctx context.Context, arg CreateLineDraftModeParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, createLineDraftMode,
-		arg.Name,
-		arg.CoverImage,
-		arg.Prompt,
-		arg.SortOrder,
-		arg.IsEnabled,
-	)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
-}
-
 const deleteBoardMediaRefsByOwnerAndBoardID = `-- name: DeleteBoardMediaRefsByOwnerAndBoardID :exec
 DELETE FROM media_refs
 WHERE owner_user_id = $1
@@ -231,16 +204,6 @@ func (q *Queries) DeleteBoardMediaRefsByOwnerAndBoardID(ctx context.Context, arg
 	return err
 }
 
-const deleteLineDraftMode = `-- name: DeleteLineDraftMode :exec
-DELETE FROM line_draft_modes
-WHERE id = $1
-`
-
-func (q *Queries) DeleteLineDraftMode(ctx context.Context, id int64) error {
-	_, err := q.db.ExecContext(ctx, deleteLineDraftMode, id)
-	return err
-}
-
 const deleteTaskOutputMediaRefsByTaskID = `-- name: DeleteTaskOutputMediaRefsByTaskID :exec
 DELETE FROM media_refs
 WHERE task_id = $1
@@ -250,28 +213,6 @@ WHERE task_id = $1
 func (q *Queries) DeleteTaskOutputMediaRefsByTaskID(ctx context.Context, taskID string) error {
 	_, err := q.db.ExecContext(ctx, deleteTaskOutputMediaRefsByTaskID, taskID)
 	return err
-}
-
-const getLineDraftModeByID = `-- name: GetLineDraftModeByID :one
-SELECT id, name, cover_image, prompt, sort_order, is_enabled, created_at, updated_at
-FROM line_draft_modes
-WHERE id = $1
-`
-
-func (q *Queries) GetLineDraftModeByID(ctx context.Context, id int64) (LineDraftMode, error) {
-	row := q.db.QueryRowContext(ctx, getLineDraftModeByID, id)
-	var i LineDraftMode
-	err := row.Scan(
-		&i.ID,
-		&i.Name,
-		&i.CoverImage,
-		&i.Prompt,
-		&i.SortOrder,
-		&i.IsEnabled,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
 }
 
 const getMediaAssetByID = `-- name: GetMediaAssetByID :one
@@ -355,83 +296,6 @@ func (q *Queries) ListDueMediaAssetReclamationIDs(ctx context.Context, arg ListD
 	for rows.Next() {
 		var i ListDueMediaAssetReclamationIDsRow
 		if err := rows.Scan(&i.ID, &i.ReclaimGeneration); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listEnabledLineDraftModes = `-- name: ListEnabledLineDraftModes :many
-SELECT id, name, cover_image, prompt, sort_order, is_enabled, created_at, updated_at
-FROM line_draft_modes
-WHERE is_enabled
-ORDER BY sort_order ASC, id ASC
-`
-
-func (q *Queries) ListEnabledLineDraftModes(ctx context.Context) ([]LineDraftMode, error) {
-	rows, err := q.db.QueryContext(ctx, listEnabledLineDraftModes)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []LineDraftMode
-	for rows.Next() {
-		var i LineDraftMode
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.CoverImage,
-			&i.Prompt,
-			&i.SortOrder,
-			&i.IsEnabled,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listLineDraftModes = `-- name: ListLineDraftModes :many
-SELECT id, name, cover_image, prompt, sort_order, is_enabled, created_at, updated_at
-FROM line_draft_modes
-ORDER BY sort_order ASC, id ASC
-`
-
-func (q *Queries) ListLineDraftModes(ctx context.Context) ([]LineDraftMode, error) {
-	rows, err := q.db.QueryContext(ctx, listLineDraftModes)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []LineDraftMode
-	for rows.Next() {
-		var i LineDraftMode
-		if err := rows.Scan(
-			&i.ID,
-			&i.Name,
-			&i.CoverImage,
-			&i.Prompt,
-			&i.SortOrder,
-			&i.IsEnabled,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -582,37 +446,6 @@ type ScheduleUnreferencedMediaAssetsForReclamationParams struct {
 
 func (q *Queries) ScheduleUnreferencedMediaAssetsForReclamation(ctx context.Context, arg ScheduleUnreferencedMediaAssetsForReclamationParams) error {
 	_, err := q.db.ExecContext(ctx, scheduleUnreferencedMediaAssetsForReclamation, arg.ReclaimAfter, pq.Array(arg.MediaAssetIds))
-	return err
-}
-
-const updateLineDraftMode = `-- name: UpdateLineDraftMode :exec
-UPDATE line_draft_modes
-SET name = $1,
-    cover_image = $2,
-    prompt = $3,
-    sort_order = $4,
-    is_enabled = $5
-WHERE id = $6
-`
-
-type UpdateLineDraftModeParams struct {
-	Name       string `json:"name"`
-	CoverImage string `json:"cover_image"`
-	Prompt     string `json:"prompt"`
-	SortOrder  int32  `json:"sort_order"`
-	IsEnabled  bool   `json:"is_enabled"`
-	ID         int64  `json:"id"`
-}
-
-func (q *Queries) UpdateLineDraftMode(ctx context.Context, arg UpdateLineDraftModeParams) error {
-	_, err := q.db.ExecContext(ctx, updateLineDraftMode,
-		arg.Name,
-		arg.CoverImage,
-		arg.Prompt,
-		arg.SortOrder,
-		arg.IsEnabled,
-		arg.ID,
-	)
 	return err
 }
 

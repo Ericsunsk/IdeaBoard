@@ -60,17 +60,16 @@ type StaticUploadDeps struct {
 }
 
 type UserRouteDeps struct {
-	AuthHandler      *auth.AuthHandler
-	TaskHandler      *taskservice.Handler
-	BoardHandler     *boards.BoardHandler
-	LineDraftHandler *assets.LineDraftHandler
-	BillingHandler   *billing.Handler
-	BillingRecords   *billingrecords.Handler
-	CreditHandler    *credits.Handler
-	UsageHandler     *usage.Handler
-	RewardHandler    *rewards.Handler
-	PaymentHandler   *payments.Handler
-	Uploads          UploadDeps
+	AuthHandler    *auth.AuthHandler
+	TaskHandler    *taskservice.Handler
+	BoardHandler   *boards.BoardHandler
+	BillingHandler *billing.Handler
+	BillingRecords *billingrecords.Handler
+	CreditHandler  *credits.Handler
+	UsageHandler   *usage.Handler
+	RewardHandler  *rewards.Handler
+	PaymentHandler *payments.Handler
+	Uploads        UploadDeps
 }
 
 type AdminRouteDeps struct {
@@ -84,7 +83,6 @@ type AdminRouteDeps struct {
 	TaskStatsHandler        *taskstats.Handler
 	ProviderEndpointHandler *providerendpoints.ProviderEndpointHandler
 	StorageHandler          *storage.StorageHandler
-	LineDraftHandler        *assets.LineDraftHandler
 	FeaturePromptHandler    *prompts.FeaturePromptHandler
 	StorageService          *storage.StorageService
 	UploadSettings          settings.MediaUploadSettingProvider

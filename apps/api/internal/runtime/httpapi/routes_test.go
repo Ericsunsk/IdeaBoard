@@ -21,7 +21,6 @@ import (
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/users"
-	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/settings"
@@ -296,14 +295,13 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 	return Dependencies{
 		Auth: authDeps,
 		UserRoutes: UserRouteDeps{
-			AuthHandler:      auth.NewAuthHandler(nil),
-			TaskHandler:      taskservice.NewHandler(nil),
-			BoardHandler:     boards.NewBoardHandler(nil, config.PublicOriginsConfig{}),
-			LineDraftHandler: assets.NewLineDraftHandler(nil),
-			BillingHandler:   billing.NewHandler(nil, nil),
-			BillingRecords:   billingrecords.NewHandler(nil),
-			CreditHandler:    credits.NewHandler(nil),
-			UsageHandler:     usage.NewHandler(nil),
+			AuthHandler:    auth.NewAuthHandler(nil),
+			TaskHandler:    taskservice.NewHandler(nil),
+			BoardHandler:   boards.NewBoardHandler(nil, config.PublicOriginsConfig{}),
+			BillingHandler: billing.NewHandler(nil, nil),
+			BillingRecords: billingrecords.NewHandler(nil),
+			CreditHandler:  credits.NewHandler(nil),
+			UsageHandler:   usage.NewHandler(nil),
 			Uploads: UploadDeps{
 				UserRepo:       authDeps.UserRepo,
 				UploadSettings: &fakeMediaUploadSettingsProvider{},
@@ -319,7 +317,6 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 			TaskStatsHandler:        taskstats.NewHandler(nil, nil),
 			ProviderEndpointHandler: providerendpoints.NewProviderEndpointHandler(nil),
 			StorageHandler:          storage.NewStorageHandler(nil),
-			LineDraftHandler:        assets.NewLineDraftHandler(nil),
 			FeaturePromptHandler:    prompts.NewFeaturePromptHandler(nil),
 			UploadSettings:          &fakeMediaUploadSettingsProvider{},
 		},
@@ -371,7 +368,6 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"DELETE /api/admin/billing/catalog/:sku":                      false,
 		"DELETE /api/admin/provider-endpoints/:id":                    false,
 		"DELETE /api/admin/rewards/codes/:id":                         false,
-		"DELETE /api/admin/line-draft-modes/:id":                      false,
 		"DELETE /api/admin/storage/profiles/:id":                      false,
 		"DELETE /api/admin/users/:public_id":                          false,
 		"GET /api/admin/accounts":                                     false,
@@ -390,7 +386,6 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/billing/catalog":                              false,
 		"GET /api/admin/rewards/codes/:id/redemptions":                false,
 		"GET /api/admin/rewards/codes/:id/redemptions/:redemption_id": false,
-		"GET /api/admin/line-draft-modes":                             false,
 		"GET /api/admin/monitor":                                      false,
 		"GET /api/admin/monitor/stream":                               false,
 		"GET /api/admin/payments/stripe-config":                       false,
@@ -424,7 +419,6 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"POST /api/admin/accounts/:id/stop":                           false,
 		"POST /api/admin/provider-endpoints":                          false,
 		"POST /api/admin/provider-endpoints/detect-models":            false,
-		"POST /api/admin/line-draft-modes":                            false,
 		"POST /api/admin/statistics/backfill":                         false,
 		"POST /api/admin/storage/profiles":                            false,
 		"POST /api/admin/storage/profiles/:id/apply":                  false,
@@ -443,7 +437,6 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"PUT /api/admin/billing/catalog/:sku/availability":            false,
 		"PUT /api/admin/provider-endpoints/:id":                       false,
 		"PUT /api/admin/feature-prompts/:slug":                        false,
-		"PUT /api/admin/line-draft-modes/:id":                         false,
 		"PUT /api/admin/payments/stripe-config":                       false,
 		"PUT /api/admin/settings/branding":                            false,
 		"PUT /api/admin/settings/media-upload":                        false,

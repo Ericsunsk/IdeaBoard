@@ -49,7 +49,6 @@ type appRepositories struct {
 	systemConfigRepo     *settings.SystemConfigRepository
 	featurePromptRepo    *prompts.FeaturePromptRepository
 	storageProfileRepo   *storage.StorageProfileRepository
-	lineDraftModeRepo    *assets.LineDraftModeRepository
 	mediaAssetRegistry   *assets.MediaAssetRegistry
 	boardRepo            *boards.BoardRepository
 	paymentRepo          *payments.Repository
@@ -180,7 +179,6 @@ func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error
 		systemConfigRepo:     settings.NewSystemConfigRepository(db),
 		featurePromptRepo:    prompts.NewFeaturePromptRepository(db),
 		storageProfileRepo:   storage.NewStorageProfileRepository(db),
-		lineDraftModeRepo:    assets.NewLineDraftModeRepository(db),
 		mediaAssetRegistry:   assets.NewMediaAssetRegistry(db),
 		boardRepo:            boards.NewBoardRepository(db),
 		paymentRepo:          payments.NewRepository(db),

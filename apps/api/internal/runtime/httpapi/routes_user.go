@@ -31,7 +31,6 @@ func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 
 	registerUserTaskRoutes(userAPI, h)
 	registerUserBoardRoutes(userAPI, h)
-	registerUserAssetRoutes(userAPI, h)
 	registerUserUploadRoutes(userAPI, h)
 }
 
@@ -56,10 +55,6 @@ func registerUserBoardRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	userAPI.POST("/boards/:board_id/share-tokens", h.BoardHandler.CreateShareToken)
 	userAPI.POST("/boards/:board_id/share-tokens/:token_id/revoke", h.BoardHandler.RevokeShareToken)
 	userAPI.POST("/boards/share-tokens/join", h.BoardHandler.JoinByShareToken)
-}
-
-func registerUserAssetRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
-	userAPI.GET("/line-draft-modes", h.LineDraftHandler.ListEnabled)
 }
 
 func registerUserUploadRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {

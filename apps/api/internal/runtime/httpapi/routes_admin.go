@@ -20,7 +20,6 @@ func registerAdminRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	registerAdminUploadRoutes(adminAPI, h)
 	registerAdminStorageRoutes(adminAPI, h)
 	registerAdminProviderEndpointRoutes(adminAPI, h)
-	registerAdminLineDraftRoutes(adminAPI, h)
 	registerAdminFeaturePromptRoutes(adminAPI, h)
 	registerAdminCreditRoutes(adminAPI, h)
 	registerAdminBillingRoutes(adminAPI, h)
@@ -147,13 +146,6 @@ func registerAdminProviderEndpointRoutes(adminAPI *gin.RouterGroup, h AdminRoute
 	adminAPI.PUT("/provider-endpoints/:id", h.ProviderEndpointHandler.Update)
 	adminAPI.DELETE("/provider-endpoints/:id", h.ProviderEndpointHandler.Delete)
 	adminAPI.POST("/provider-endpoints/detect-models", h.ProviderEndpointHandler.DetectModels)
-}
-
-func registerAdminLineDraftRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
-	adminAPI.GET("/line-draft-modes", h.LineDraftHandler.List)
-	adminAPI.POST("/line-draft-modes", h.LineDraftHandler.Create)
-	adminAPI.PUT("/line-draft-modes/:id", h.LineDraftHandler.Update)
-	adminAPI.DELETE("/line-draft-modes/:id", h.LineDraftHandler.Delete)
 }
 
 func registerAdminFeaturePromptRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {

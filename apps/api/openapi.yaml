@@ -30,8 +30,6 @@ tags:
   - name: AdminFeaturePrompts
   - name: UserAssets
   - name: AdminAssets
-  - name: UserLineDraftModes
-  - name: AdminLineDraftModes
   - name: PaymentWebhooks
 paths:
   /settings/branding:
@@ -759,20 +757,6 @@ paths:
               schema:
                 type: string
                 format: binary
-  /user/line-draft-modes:
-    get:
-      tags: [UserLineDraftModes]
-      operationId: listUserLineDraftModes
-      security:
-        - cookieAuth: []
-      responses:
-        '200':
-          description: Enabled line draft modes without prompt templates
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseUserLineDraftModeList'
-
   /admin/settings/registration:
     get:
       tags: [AdminSettings]
@@ -2376,73 +2360,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ApiResponseStorageBucketInfo'
 
-  /admin/line-draft-modes:
-    get:
-      tags: [AdminLineDraftModes]
-      operationId: listAdminLineDraftModes
-      security:
-        - cookieAuth: []
-      responses:
-        '200':
-          description: All line draft modes
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseAdminLineDraftModeList'
-    post:
-      tags: [AdminLineDraftModes]
-      operationId: createAdminLineDraftMode
-      security:
-        - cookieAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/LineDraftModePayload'
-      responses:
-        '200':
-          description: Created line draft mode
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseLineDraftMode'
-  /admin/line-draft-modes/{id}:
-    put:
-      tags: [AdminLineDraftModes]
-      operationId: updateAdminLineDraftMode
-      security:
-        - cookieAuth: []
-      parameters:
-        - $ref: '#/components/parameters/LineDraftModeId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/LineDraftModePayload'
-      responses:
-        '200':
-          description: Updated line draft mode
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseEmpty'
-    delete:
-      tags: [AdminLineDraftModes]
-      operationId: deleteAdminLineDraftMode
-      security:
-        - cookieAuth: []
-      parameters:
-        - $ref: '#/components/parameters/LineDraftModeId'
-      responses:
-        '200':
-          description: Deleted line draft mode
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseEmpty'
-
   /admin/feature-prompts:
     get:
       tags: [AdminFeaturePrompts]
@@ -2538,11 +2455,6 @@ components:
       in: path
       required: true
       schema: { type: string }
-    LineDraftModeId:
-      name: id
-      in: path
-      required: true
-      schema: { type: integer }
     MemberPublicID:
       name: member_public_id
       in: path
@@ -4960,37 +4872,6 @@ components:
         mime: { type: string }
         ext: { type: string }
 
-    UserLineDraftMode:
-      type: object
-      required: [id, name, cover_image]
-      properties:
-        id: { type: integer }
-        name: { type: string }
-        cover_image: { type: string }
-
-    LineDraftMode:
-      type: object
-      required: [id, name, cover_image, prompt, sort_order, is_enabled, created_at, updated_at]
-      properties:
-        id: { type: integer }
-        name: { type: string }
-        cover_image: { type: string }
-        prompt: { type: string }
-        sort_order: { type: integer }
-        is_enabled: { type: boolean }
-        created_at: { type: string }
-        updated_at: { type: string }
-
-    LineDraftModePayload:
-      type: object
-      required: [name, prompt]
-      properties:
-        name: { type: string }
-        cover_image: { type: string }
-        prompt: { type: string }
-        sort_order: { type: integer }
-        is_enabled: { type: boolean }
-
     FeaturePrompt:
       type: object
       required: [feature_slug, prompt]
@@ -5726,46 +5607,6 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/UploadAvatarMetadata'
-
-    ApiResponseUserLineDraftModeList:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              type: object
-              required: [list]
-              properties:
-                list:
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/UserLineDraftMode'
-
-    ApiResponseAdminLineDraftModeList:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              type: object
-              required: [list]
-              properties:
-                list:
-                  type: array
-                  items:
-                    $ref: '#/components/schemas/LineDraftMode'
-
-    ApiResponseLineDraftMode:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              type: object
-              required: [mode]
-              properties:
-                mode:
-                  $ref: '#/components/schemas/LineDraftMode'
 
     ApiResponseFeaturePromptList:
       allOf:

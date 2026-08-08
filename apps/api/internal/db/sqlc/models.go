@@ -241,17 +241,6 @@ type FeaturePrompt struct {
 	UpdatedAt   time.Time     `json:"updated_at"`
 }
 
-type LineDraftMode struct {
-	ID         int64     `json:"id"`
-	Name       string    `json:"name"`
-	CoverImage string    `json:"cover_image"`
-	Prompt     string    `json:"prompt"`
-	SortOrder  int32     `json:"sort_order"`
-	IsEnabled  bool      `json:"is_enabled"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
-}
-
 type MediaAsset struct {
 	ID                int64           `json:"id"`
 	AssetID           string          `json:"asset_id"`

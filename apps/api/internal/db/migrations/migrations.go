@@ -41,7 +41,6 @@ var baselineBusinessTableNames = map[string]struct{}{
 	"credit_wallets":                  {},
 	"provider_endpoints":              {},
 	"feature_prompts":                 {},
-	"line_draft_modes":                {},
 	"media_assets":                    {},
 	"media_refs":                      {},
 	"storage_profile_secret_versions": {},

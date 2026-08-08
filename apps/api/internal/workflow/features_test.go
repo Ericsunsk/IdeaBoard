@@ -20,7 +20,7 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 		{name: "underscore slug is rejected", raw: "style_fusion", want: "", ok: false},
 		{name: "mixed case is rejected", raw: "  HD_Upscale  ", want: "", ok: false},
 		{name: "unknown feature is not in allowlist", raw: "unknown-feature", want: "", ok: false},
-		{name: "unsupported slug", raw: "line-draft", want: "", ok: false},
+		{name: "unsupported slug", raw: "unknown-workflow", want: "", ok: false},
 		{name: "invalid characters", raw: "style fusion", want: "", ok: false},
 		{name: "empty", raw: "", want: "", ok: false},
 	}
