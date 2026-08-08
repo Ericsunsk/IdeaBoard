@@ -71,9 +71,11 @@ jobs:
 
           successful_gate_count="$(
             gh api \
+              --paginate \
+              --slurp \
               -H 'Accept: application/vnd.github+json' \
-              "/repos/${GITHUB_REPOSITORY}/commits/${source_commit}/check-runs" \
-              --jq '[.check_runs[] | select(.name == "CI Gate" and .conclusion == "success")] | length'
+              "/repos/${GITHUB_REPOSITORY}/commits/${source_commit}/check-runs?per_page=100" |
+              jq '[.[].check_runs[] | select(.name == "CI Gate" and .conclusion == "success")] | length'
           )"
           if [[ "${successful_gate_count}" -lt 1 ]]; then
             echo "Release commit ${source_commit} has no successful CI Gate check" >&2
