@@ -105,6 +105,7 @@ DEPLOY_AUTH_MIGRATE_IMAGE=""
 PREVIOUS_API_IMAGE=""
 PREVIOUS_AUTH_IMAGE=""
 PREVIOUS_AUTH_MIGRATE_IMAGE=""
+DEPLOY_AUTOMATION_RESULT_FILE="${IDEABOARD_DEPLOY_RESULT_FILE:-}"
 
 if [[ "$command" == "delete" || "$command" == "uninstall" ]]; then
   shift || true
@@ -1295,6 +1296,33 @@ print_recovery_hint() {
   fi
 }
 
+write_automation_result() {
+  local result="$1"
+  local recovery_hint="$2"
+  local safe_stage="$DEPLOY_STAGE"
+
+  [[ -n "$DEPLOY_AUTOMATION_RESULT_FILE" ]] || return 0
+  case "$safe_stage" in
+    init|resolve-images|preflight|pull|start-postgres|backup|api-migration|auth-migration|up|smoke|complete) ;;
+    *) safe_stage="unknown" ;;
+  esac
+  case "$recovery_hint" in
+    none|inspect_release_state_and_service_logs_on_vps|inspect_release_state_and_backups_before_manual_recovery) ;;
+    *) recovery_hint="inspect_release_state_and_service_logs_on_vps" ;;
+  esac
+  printf '{"result":"%s","stage":"%s","recovery_hint":"%s"}\n' \
+    "$result" "$safe_stage" "$recovery_hint" > "$DEPLOY_AUTOMATION_RESULT_FILE"
+  chmod 600 "$DEPLOY_AUTOMATION_RESULT_FILE"
+}
+
+automation_recovery_hint() {
+  if (( DEPLOY_MIGRATION_STARTED == 1 )); then
+    printf 'inspect_release_state_and_backups_before_manual_recovery\n'
+    return
+  fi
+  printf 'inspect_release_state_and_service_logs_on_vps\n'
+}
+
 handle_deploy_failure() {
   local exit_code="$1"
   if [[ "$DEPLOY_TRAP_ENABLED" == "1" && "$DEPLOY_SUCCEEDED" == "0" && "$exit_code" != "0" && -n "$DEPLOY_RELEASE_ID" ]]; then
@@ -1305,6 +1333,7 @@ handle_deploy_failure() {
     if [[ -n "$DEPLOY_ENV_SNAPSHOT" ]]; then
       rm -f -- "$DEPLOY_ENV_SNAPSHOT"
     fi
+    write_automation_result "failure" "$(automation_recovery_hint)" || true
     print_recovery_hint
   fi
   exit "$exit_code"
@@ -1319,6 +1348,7 @@ complete_deploy_success() {
   DEPLOY_STAGE="complete"
   DEPLOY_SMOKE_GATE="passed"
   write_release_manifest "active"
+  write_automation_result "success" "none"
   finish_trapped_command_success
 }
 

@@ -77,6 +77,46 @@ assert_contains "${docker_workflow}" '          provenance: mode=max'
 assert_contains "${docker_workflow}" '          sbom: true'
 assert_contains "${docker_workflow}" '          tags: ${{ steps.image.outputs.immutable_tag }}'
 assert_contains "${docker_workflow}" '      - name: Publish verified image aliases'
+assert_contains "${docker_workflow}" '  deploy-production:'
+assert_contains "${docker_workflow}" "    if: needs.aggregate-release-manifest.outputs.is-production-release == 'true'"
+assert_contains "${docker_workflow}" '      - aggregate-release-manifest'
+assert_contains "${docker_workflow}" '    environment: production'
+assert_contains "${docker_workflow}" '      group: production-deployment'
+assert_contains "${docker_workflow}" '      cancel-in-progress: false'
+assert_contains "${docker_workflow}" "  cancel-in-progress: \${{ github.ref_type != 'tag' }}"
+assert_contains "${docker_workflow}" '          name: release-manifest'
+assert_contains "${docker_workflow}" '[[ "${GITHUB_REF_NAME}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]'
+assert_contains "${docker_workflow}" '[[ "${GITHUB_EVENT_NAME}" == "push" ]]'
+assert_contains "${docker_workflow}" '--arg expected_tag "${GITHUB_REF_NAME}"'
+assert_contains "${docker_workflow}" '--arg expected_commit "${GITHUB_SHA}"'
+assert_contains "${docker_workflow}" '--arg repository "${GITHUB_REPOSITORY}"'
+assert_contains "${docker_workflow}" '--arg expected_repository "${GITHUB_REPOSITORY}"'
+assert_contains "${docker_workflow}" '--arg expected_image_repository "ghcr.io/${GITHUB_REPOSITORY,,}"'
+assert_contains "${docker_workflow}" 'StrictHostKeyChecking=yes'
+assert_contains "${docker_workflow}" 'UserKnownHostsFile="${SSH_KNOWN_HOSTS_FILE}"'
+assert_contains "${docker_workflow}" 'PasswordAuthentication=no'
+assert_contains "${docker_workflow}" 'ConnectTimeout=15'
+assert_contains "${docker_workflow}" '< release-assets/release-manifest.json'
+assert_contains "${docker_workflow}" 'production-deploy-result.json'
+assert_contains "${docker_workflow}" 'production-deploy-error.raw'
+assert_contains "${docker_workflow}" 'recovery_hint'
+assert_contains "${docker_workflow}" "jq -c '{result, stage, recovery_hint}'"
+assert_contains "${docker_workflow}" '| Failed stage |'
+assert_contains "${docker_workflow}" '| Recovery hint |'
+assert_contains "${docker_workflow}" 'RESULT: ${{ job.status }}'
+
+deploy_job="$(sed -n '/^  deploy-production:/,$p' "${docker_workflow}")"
+if grep -Fq 'curl ' <<< "${deploy_job}" || grep -Fq 'docker build' <<< "${deploy_job}"; then
+  echo 'Production deployment must consume the same-run manifest without fetching or rebuilding images' >&2
+  exit 1
+fi
+
+manifest_validation_line="$(grep -n -F -- '--arg expected_tag "${GITHUB_REF_NAME}"' "${docker_workflow}" | cut -d: -f1)"
+ssh_deploy_line="$(grep -n -F -- '< release-assets/release-manifest.json' "${docker_workflow}" | cut -d: -f1)"
+if [[ -z "${manifest_validation_line}" || -z "${ssh_deploy_line}" || "${manifest_validation_line}" -ge "${ssh_deploy_line}" ]]; then
+  echo 'Production manifest validation must complete before SSH transport' >&2
+  exit 1
+fi
 assert_contains "${docker_workflow}" '          SYFT_PLATFORM: linux/amd64'
 assert_contains "${docker_workflow}" '          SYFT_PLATFORM: linux/arm64'
 assert_contains "${docker_workflow}" '        uses: ./.github/actions/setup-grype'

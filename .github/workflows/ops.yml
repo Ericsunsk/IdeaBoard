@@ -26,6 +26,8 @@ jobs:
           bash -n scripts/render-cloudflare-real-ip-conf.sh
           bash -n scripts/uninstall-vps.sh
           bash -n scripts/deploy-stack.sh
+          bash -n scripts/production-deploy-entrypoint.sh
+          bash -n scripts/production-deploy-entrypoint-test.sh
 
       - name: Install ShellCheck
         shell: bash
@@ -43,7 +45,13 @@ jobs:
             scripts/render-nginx-template.sh \
             scripts/render-cloudflare-real-ip-conf.sh \
             scripts/uninstall-vps.sh \
-            scripts/deploy-stack.sh
+            scripts/deploy-stack.sh \
+            scripts/production-deploy-entrypoint.sh \
+            scripts/production-deploy-entrypoint-test.sh
+
+      - name: Verify restricted Production deployment contract
+        shell: bash
+        run: bash scripts/production-deploy-entrypoint-test.sh
 
       - name: Validate nginx template rendering
         shell: bash

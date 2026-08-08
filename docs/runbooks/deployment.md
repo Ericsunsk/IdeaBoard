@@ -123,7 +123,48 @@ VPS
 
 生产部署不要把 VPS 端 bootstrap 绑定到 `main`；请始终使用明确的发布 tag 或 commit SHA。镜像部署值必须使用 GitHub Actions 输出的 digest 引用。
 
-Docker Images workflow 先复用 Backend Verification，通过后才发布镜像。workflow 会上传 `release-manifest` artifact；tag 发布还会把 `release-manifest.json` 和六份按 `linux/amd64`、`linux/arm64` 拆分的 CycloneDX SBOM 附到同一 GitHub Release。该 manifest 是推荐升级输入，记录本次 workflow 的 `tag` / `ref` / `commit` / `run_id`、三张 GHCR digest 镜像引用、各平台 SBOM 文件名与 Cosign OIDC identity。
+Docker Images workflow 先复用 Backend Verification，通过后才发布镜像。workflow 会上传 `release-manifest` artifact；tag 发布还会把 `release-manifest.json` 和六份按 `linux/amd64`、`linux/arm64` 拆分的 CycloneDX SBOM 附到同一 GitHub Release。该 manifest 是推荐升级输入，记录本次 workflow 的 `repository` / `tag` / `ref` / `commit` / `run_id`、三张 GHCR digest 镜像引用、各平台 SBOM 文件名与 Cosign OIDC identity。
+
+严格 SemVer tag（例如 `v0.1.0`）还会触发同一 workflow 内的 Production deployment；`main`、`master`、手动 workflow 和不符合 `vMAJOR.MINOR.PATCH` 的 tag 都不会进入该 job。deployment job 只下载本次 workflow 生成的 `release-manifest`，在建立 SSH 连接前验证 manifest 的 tag、commit、ref 和三张 image digest，然后把 manifest 通过 stdin 发送给 VPS 上的 restricted forced command。VPS entrypoint 继续负责 checkout 对应 commit、Cosign 验签、backup、migration、health、smoke 和 release state；GitHub Actions 不重新 build、不解析 mutable image tag，也不读取应用运行时 Secret。
+
+### Production 自动部署通道
+
+先在 VPS 上以 `root` 安装由 root 管理的固定 entrypoint：
+
+```bash
+install -o root -g root -m 0755 \
+  /opt/stacks/ideaboard/scripts/production-deploy-entrypoint.sh \
+  /usr/local/libexec/ideaboard-production-deploy
+```
+
+为 GitHub Actions 创建一把仅用于 Production deployment 的 Ed25519 key。只把 public key 加入 VPS 的 `/root/.ssh/authorized_keys`，并固定 forced command：
+
+```text
+restrict,command="/usr/local/libexec/ideaboard-production-deploy" ssh-ed25519 <public-key> ideaboard-production-deploy
+```
+
+`restrict` 会关闭 PTY、port forwarding、agent forwarding 和 X11 forwarding；entrypoint 还会拒绝任何非空的 `SSH_ORIGINAL_COMMAND`。workflow 的 SSH 调用不发送 remote command，只通过 stdin 传输 `release-manifest.json`。不要把 unrestricted 管理员 key 复用为 deployment key。
+
+在 GitHub repository 中创建名为 `production` 的 Environment，并只配置以下连接值：
+
+| 类型 | 名称 | 用途 |
+| ---- | ---- | ---- |
+| Variable | `VPS_HOST` | VPS 的已验证 hostname 或 IPv4 address |
+| Variable | `VPS_SSH_PORT` | SSH port，例如 `5522` |
+| Variable | `VPS_DEPLOY_USER` | forced command 所属用户；当前部署为 `root` |
+| Secret | `VPS_DEPLOY_PRIVATE_KEY` | 上述专用 Ed25519 private key |
+| Secret | `VPS_KNOWN_HOSTS` | 与 `VPS_HOST`、`VPS_SSH_PORT` 精确匹配的 pinned OpenSSH host-key entry |
+
+`VPS_KNOWN_HOSTS` 必须通过现有可信管理通道核对服务器 host-key fingerprint 后填写；不要在首次 deployment 中盲目信任 `ssh-keyscan` 的结果。数据库密码、Better Auth、Stripe、Resend、OAuth、encryption key 和 GHCR runtime credential 继续只保存在 VPS 的 root-only `.env`，不得复制到 GitHub Environment。
+
+发布时创建并 push 严格 SemVer tag：
+
+```bash
+git tag v0.1.0 <verified-main-commit>
+git push origin v0.1.0
+```
+
+Production deployment 使用固定 concurrency group 串行执行，新的发布不会取消正在进行的发布。SSH connection timeout 为 15 秒，远程 deployment 最长运行 25 分钟；失败时 workflow fail closed，并在 GitHub job summary 中记录 tag、commit、三张 image digest、失败阶段和受控 recovery hint。restricted entrypoint 会丢弃部署过程的原始 stdout/stderr，SSH 只返回 allow-listed JSON 结果；GitHub 不接收未脱敏的容器日志或 inspection output。migration 后失败不会自动 restore PostgreSQL，仍按本 runbook 的人工回滚流程处理。
 
 发布路径先推送 immutable SHA image，通过 BuildKit 为 multi-arch image 生成 max-mode provenance 和 SBOM attestation，并生成各平台 durable CycloneDX SBOM；固定版本且经过 repo-local SHA-256 校验的 Grype 分别扫描 `linux/amd64` 与 `linux/arm64`，拦截 `high` 及以上漏洞；Cosign keyless OIDC 对最终 image digest 签名，全部成功后才推广 mutable aliases。Grype 版本与 archive trust anchor 分别由 [`.grype-version`](../../.grype-version) 和 [`.grype-checksums`](../../.grype-checksums) 管理，例外统一维护在 [`.grype.yaml`](../../.grype.yaml)，新增例外时只加窄范围规则并记录原因与复查日期。
 
