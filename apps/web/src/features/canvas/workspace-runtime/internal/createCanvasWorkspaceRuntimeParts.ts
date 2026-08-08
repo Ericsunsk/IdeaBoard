@@ -11,6 +11,11 @@ import { useCanvasFeedback } from '../../feedback/useCanvasFeedback'
 import type { CanvasFlowPaneAdapter } from '../../flow-pane'
 import { useCanvasImageWorkflow } from '../../image-workflow'
 import { taskApi } from '../../../../shared/api/task'
+import type {
+  CanvasWorkspaceNodeHandlersOptions,
+  CanvasWorkspaceNodeMediaInputsOptions,
+  CanvasWorkspaceRuntime,
+} from '../types'
 
 const STOP_DELETED_TASK_RETRY_DELAYS_MS = [0, 1000, 3000] as const
 
@@ -26,21 +31,6 @@ type CanvasGraphUploadApi = {
     ext?: string
   }>
 }
-
-type CanvasWorkspaceNodeMediaOptions = Omit<
-  Parameters<typeof useFlowNodeMediaInputs>[0],
-  'applyImageFileToImageNode' | 'updateSnapshotNode' | 'markFlowExecutionNodeDirty'
-> & {
-  discardNodeEdits: (nodeId: string) => void
-}
-
-type CanvasWorkspaceNodeHandlersOptions = Omit<
-  Parameters<typeof useFlowCanvasNodeHandlers>[0],
-  | '_onFlowDeleteNode'
-  | '_onFlowPromptTextUpdate'
-  | '_onFlowNodeParamUpdate'
-  | 'markFlowExecutionNodeDirty'
->
 
 export type UseCanvasWorkspaceRuntimeOptions = {
   route: RouteLocationNormalizedLoaded
@@ -182,7 +172,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
   function createNodeMediaInputs({
     discardNodeEdits,
     ...mediaOptions
-  }: CanvasWorkspaceNodeMediaOptions) {
+  }: CanvasWorkspaceNodeMediaInputsOptions) {
     return useFlowNodeMediaInputs({
       ...mediaOptions,
       applyImageFileToImageNode: async (nodeId, file): Promise<boolean> => {
@@ -205,7 +195,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     })
   }
 
-  return {
+  const parts = {
     boardChrome: {
       currentBoardId: board.currentBoardId,
       isBoardMenuOpen: board.isBoardMenuOpen,
@@ -254,10 +244,6 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
       isFlowInteractionActive: graph.isFlowInteractionActive,
       isFlowViewportPanInteractionActive: graph.isFlowViewportPanInteractionActive,
       isFlowInteractionLocked: graph.isFlowInteractionLocked,
-      nodeContextMenu: graph.nodeContextMenu,
-      canvasNodeMenuItems: graph.canvasNodeMenuItems,
-      closeNodeContextMenu: graph.closeNodeContextMenu,
-      openNodeContextMenu: graph.openNodeContextMenu,
       onFlowMediaInputImageDrop: graph.onFlowMediaInputImageDrop,
       onFlowMediaInputImageOpen: graph.onFlowMediaInputImageOpen,
       onFlowMediaInputImagePreview: graph.onFlowMediaInputImagePreview,
@@ -274,4 +260,122 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     createNodeMediaInputs,
     createNodeHandlers,
   }
+
+  return parts
+}
+
+export function createCanvasWorkspaceRuntime(
+  options: UseCanvasWorkspaceRuntimeOptions,
+): CanvasWorkspaceRuntime {
+  return createCanvasWorkspaceRuntimeFacade(createCanvasWorkspaceRuntimeParts(options))
+}
+
+function createCanvasWorkspaceRuntimeFacade(
+  parts: ReturnType<typeof createCanvasWorkspaceRuntimeParts>,
+): CanvasWorkspaceRuntime {
+  const grouping = parts.graphEditing.grouping
+
+  return {
+    viewModel: {
+      boardChrome: {
+        currentBoardId: parts.boardChrome.currentBoardId,
+        isBoardMenuOpen: parts.boardChrome.isBoardMenuOpen,
+        isRenamingBoard: parts.boardChrome.isRenamingBoard,
+        boardNameDraft: parts.boardChrome.boardNameDraft,
+        isRenamePending: parts.boardChrome.isRenamePending,
+        catalogRecovery: parts.boardChrome.catalogRecovery,
+        currentBoardName: parts.boardChrome.currentBoardName,
+        boardOptions: parts.boardChrome.boardOptions,
+      },
+      flowPane: {
+        nodes: parts.flowPane.nodes,
+        edges: parts.flowPane.edges,
+      },
+      persistence: {
+        history: parts.persistence.history,
+      },
+      viewportControls: {
+        zoomLevel: parts.viewportControls.zoomLevel,
+      },
+      graphEditing: {
+        grouping: grouping.view,
+        hasSelectedFlowNodes: parts.graphEditing.hasSelectedFlowNodes,
+        isFlowInteractionActive: parts.graphEditing.isFlowInteractionActive,
+        isFlowViewportPanInteractionActive: parts.graphEditing.isFlowViewportPanInteractionActive,
+        isFlowInteractionLocked: parts.graphEditing.isFlowInteractionLocked,
+      },
+    },
+    commands: {
+      boardSession: {
+        setBoardNameInputRef: parts.boardChrome.setBoardNameInputRef,
+        toggleBoardMenu: parts.boardChrome.toggleBoardMenu,
+        startBoardRename: parts.boardChrome.startBoardRename,
+        cancelBoardRename: parts.boardChrome.cancelBoardRename,
+        closeBoardHeaderEditing: parts.boardChrome.closeBoardHeaderEditing,
+        onConfirmBoardRename: parts.boardChrome.onConfirmBoardRename,
+        reloadCatalog: parts.boardChrome.reloadCatalog,
+        onSelectBoard: parts.boardChrome.onSelectBoard,
+        onNavigateRequest: parts.boardChrome.onNavigateRequest,
+        onLogoutRequest: parts.boardChrome.onLogoutRequest,
+      },
+      flowPane: {
+        onNodesChange: parts.flowPane.onNodesChange,
+        onEdgesChange: parts.flowPane.onEdgesChange,
+        connectionAdapter: parts.flowPane.connectionAdapter,
+        nodeDragTransactions: parts.flowPane.nodeDragTransactions,
+      },
+      persistence: {
+        flushAutosave: parts.persistence.flushAutosave,
+        loadCanvasBoardAndProbe: parts.persistence.loadCanvasBoardAndProbe,
+        reattachPendingImageResults: parts.persistence.reattachPendingImageResults,
+      },
+      viewportControls: {
+        onZoomIn: parts.viewportControls.onZoomIn,
+        onZoomOut: parts.viewportControls.onZoomOut,
+        onPanViewport: parts.viewportControls.onPanViewport,
+        onMiniMapCenterRequested: parts.viewportControls.onMiniMapCenterRequested,
+        onMiniMapDragStart: parts.viewportControls.onMiniMapDragStart,
+        onMiniMapDragMove: parts.viewportControls.onMiniMapDragMove,
+        onMiniMapDragEnd: parts.viewportControls.onMiniMapDragEnd,
+        onViewportChangeEnd: parts.viewportControls.onViewportChangeEnd,
+        onFlowMoveStart: parts.viewportControls.onFlowMoveStart,
+        onFlowMove: parts.viewportControls.onFlowMove,
+        onFlowMoveEnd: parts.viewportControls.onFlowMoveEnd,
+        onNodeDragStart: parts.viewportControls.onNodeDragStart,
+        onNodeDragStop: parts.viewportControls.onNodeDragStop,
+        flushViewportPersistence: parts.viewportControls.flushViewportPersistence,
+        loadCanvasBoardAndProbe: parts.viewportControls.loadCanvasBoardAndProbe,
+      },
+      graphEditing: {
+        grouping: grouping.commands,
+        scheduleFlowNodeInternalsRefresh: parts.graphEditing.scheduleFlowNodeInternalsRefresh,
+        createNodeAtPosition: parts.graphEditing.createNodeAtPosition,
+        onExportSelectedImages: parts.graphEditing.onExportSelectedImages,
+        onFlowMediaInputImageDrop: parts.graphEditing.onFlowMediaInputImageDrop,
+        onFlowMediaInputImageOpen: parts.graphEditing.onFlowMediaInputImageOpen,
+        onFlowMediaInputImagePreview: parts.graphEditing.onFlowMediaInputImagePreview,
+        onFlowMediaInputImageRemove: parts.graphEditing.onFlowMediaInputImageRemove,
+        onCanvasDrop: parts.graphEditing.onCanvasDrop,
+        onCanvasDragOver: parts.graphEditing.onCanvasDragOver,
+        onFlowImageOpenPreview: parts.graphEditing.onFlowImageOpenPreview,
+        onFlowImageAppendToCanvas: parts.graphEditing.onFlowImageAppendToCanvas,
+        beginFlowNodeDragDuplicateTracking: parts.graphEditing.beginFlowNodeDragDuplicateTracking,
+        finishFlowNodeDragDuplicateTracking: parts.graphEditing.finishFlowNodeDragDuplicateTracking,
+        getFlowNodeUiStateCached: parts.graphEditing.getFlowNodeUiStateCached,
+      },
+      imageWorkflow: {
+        isGenerationAvailable: parts.imageWorkflow.isGenerationAvailable,
+        runImageDirectAction: parts.imageWorkflow.runImageDirectAction,
+        runCanvasExtendAction: parts.imageWorkflow.runCanvasExtendAction,
+        createImageTools: parts.imageWorkflow.createImageTools,
+        createImageActionHandlers: parts.imageWorkflow.createImageActionHandlers,
+        createPromptGenerationHandlers: parts.imageWorkflow.createPromptGenerationHandlers,
+        createCanvasExtendOverlay: parts.imageWorkflow.createCanvasExtendOverlay,
+      },
+      nodeInteraction: {
+        createNodeMediaInputs: parts.createNodeMediaInputs,
+        createNodeHandlers: parts.createNodeHandlers,
+      },
+    },
+  } satisfies CanvasWorkspaceRuntime
 }

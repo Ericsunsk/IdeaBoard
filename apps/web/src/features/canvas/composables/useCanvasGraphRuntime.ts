@@ -12,7 +12,6 @@ import { useFlowImageNodeInteractions } from './useFlowImageNodeInteractions'
 import { useFlowImageNodeSnapshots } from './useFlowImageNodeSnapshots'
 import { useFlowImageUploadActions } from './useFlowImageUploadActions'
 import { useFlowMediaInputImages } from './useFlowMediaInputImages'
-import { useFlowNodeContextMenu } from './useFlowNodeContextMenu'
 import { useFlowNodeInternalsRefreshQueue } from './useFlowNodeInternalsRefreshQueue'
 import { useFlowNodeMutations } from './useFlowNodeMutations'
 import { useFlowNodeUiState } from './useFlowNodeUiState'
@@ -115,9 +114,6 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
     stopCanvasInteraction: stopFlowInteraction,
   } = useFlowCanvasInteractionState()
 
-  const { nodeContextMenu, canvasNodeMenuItems, closeNodeContextMenu, openNodeContextMenu } =
-    useFlowNodeContextMenu()
-
   const { getImageNodeSnapshot, getImageNodeDisplayPayload } = useFlowImageNodeSnapshots({
     nodes: options.nodes,
   })
@@ -214,10 +210,6 @@ export function useCanvasGraphRuntime(options: UseCanvasGraphRuntimeOptions) {
     isFlowInteractionLocked,
     startFlowInteraction,
     stopFlowInteraction,
-    nodeContextMenu,
-    canvasNodeMenuItems,
-    closeNodeContextMenu,
-    openNodeContextMenu,
     getImageNodeSnapshot,
     getImageNodeDisplayPayload,
     uploadImageToBoard,

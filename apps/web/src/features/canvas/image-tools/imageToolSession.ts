@@ -9,7 +9,7 @@ import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
 import { useImageEditorMode } from '../image-editor/composables/useImageEditorMode'
 import { useImageEditorRasterOverlay } from '../image-editor/composables/useImageEditorRasterOverlay'
 import { useImageEditorSession } from '../image-editor/composables/useImageEditorSession'
-import { useImageEditorViewportController } from '../image-editor/composables/useImageEditorViewportController'
+import { useImageEditorCoordinateAdapter } from '../image-editor'
 import type { ImageAdjustmentFinalApplyProgress } from '../image-editor/runtime/imageAdjustmentFinalApplyContext'
 import { cancelImageAdjustmentFinalRender } from '../image-editor/services/imageAdjustmentRenderer'
 import type { ImageEditorMode } from '../image-editor/types'
@@ -95,7 +95,6 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
     nodes: options.nodes,
     activeTool: options.activeTool,
     getImageNodeDisplayPayload: options.getImageNodeDisplayPayload,
-    getImageStageElement: options.getImageStageElement,
     onBeforePointerCancel: options.clearSelectedFlowElements,
     onBeforeExit: (state) => confirmImageEditorExit(state),
   })
@@ -106,8 +105,21 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
     exitImageEditorMode,
   } = imageEditor
 
+  const coordinates = useImageEditorCoordinateAdapter({
+    nodes: options.nodes,
+    canvasWrapRef: options.canvasWrapRef,
+    imageEditorState: imageEditor.imageEditorState,
+    getImageNodeDisplayPayload: options.getImageNodeDisplayPayload,
+    getImageStageElement: options.getImageStageElement,
+    screenToFlowCoordinate: options.screenToFlowCoordinate,
+    getViewport: options.getViewport,
+    setViewport: options.setViewport,
+    setCenter: options.setCenter,
+  })
+
   const maskEditor = useImageMaskEditorOverlay({
     inpaintEditorState: createImageToolMaskOverlayState(imageEditor.imageEditorState),
+    imageRect: coordinates.imageEditorImageRect,
     startCanvasInteraction: options.startCanvasInteraction,
     stopCanvasInteraction: options.stopCanvasInteraction,
   })
@@ -115,6 +127,7 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
   const imageEditorSession = useImageEditorSession()
   const imageEditorRasterOverlay = useImageEditorRasterOverlay({
     editorState: imageEditor.imageEditorState,
+    imageRect: coordinates.imageEditorImageRect,
     sourceUrl: computed(() =>
       imageEditorNodeId.value
         ? (options.getImageNodeDisplayPayload(imageEditorNodeId.value)?.url ?? null)
@@ -142,17 +155,6 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
     onReferenceImagePreview: (image) => {
       void options.openImageUrlPreview(image.url, image.ratio)
     },
-  })
-
-  const viewport = useImageEditorViewportController({
-    nodes: options.nodes,
-    canvasWrapRef: options.canvasWrapRef,
-    imageEditorNodeId,
-    getImageStageElement: options.getImageStageElement,
-    screenToFlowCoordinate: options.screenToFlowCoordinate,
-    getViewport: options.getViewport,
-    setViewport: options.setViewport,
-    setCenter: options.setCenter,
   })
 
   function cancelImageAdjustmentFinalTask(nodeId: string | null = imageEditorNodeId.value) {
@@ -208,6 +210,10 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
   function enter(nodeId: string, mode: ImageEditorMode): boolean {
     const entered = enterImageEditorModeBase(nodeId, mode)
     if (!entered) return false
+    if (!coordinates.imageEditorImageRect.value) {
+      exitImageEditorMode({ runBeforeExit: false })
+      return false
+    }
     if (mode === 'adjust') imageEditorSession.resetImageEditorSession()
     return true
   }
@@ -261,7 +267,7 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
     activeImageAdjustmentFinalScopeId,
     maskEditor,
     maskChromeState,
-    viewport,
+    coordinates,
     enter,
     cancel,
     commitMask,

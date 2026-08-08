@@ -4,19 +4,9 @@ import type { Ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { useImageEditorMode } from './useImageEditorMode'
 
-function createStageElement() {
-  const stage = document.createElement('div')
-  Object.defineProperties(stage, {
-    clientWidth: { value: 320 },
-    clientHeight: { value: 240 },
-  })
-  return stage
-}
-
 function mountImageEditorMode(
   options: { nodeKind?: string; onBeforePointerCancel?: () => void } = {},
 ) {
-  const stage = createStageElement()
   const activeTool = ref('select')
   const nodes: Ref<Node[]> = shallowRef([
     { id: 'node-1', data: { kind: options.nodeKind ?? 'image' } },
@@ -33,7 +23,6 @@ function mountImageEditorMode(
           activeTool,
           getImageNodeDisplayPayload: (nodeId) =>
             nodeId === 'node-1' ? { url: 'https://example.com/source.png', ratio: 1 } : null,
-          getImageStageElement: (nodeId) => (nodeId === 'node-1' ? stage : null),
           onBeforePointerCancel: options.onBeforePointerCancel,
           onBeforeExit,
         })
@@ -64,12 +53,7 @@ describe('useImageEditorMode', () => {
 
       expect(harness.editor.imageEditorNodeId.value).toBe('node-1')
       expect(harness.editor.imageEditorMode.value).toBe('adjust')
-      expect(harness.editor.imageEditorState.value?.imageRect).toEqual({
-        left: 40,
-        top: 0,
-        width: 240,
-        height: 240,
-      })
+      expect(harness.editor.imageEditorState.value).toEqual({ nodeId: 'node-1', mode: 'adjust' })
     } finally {
       harness.unmount()
     }

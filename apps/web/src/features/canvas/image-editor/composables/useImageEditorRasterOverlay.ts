@@ -2,6 +2,7 @@ import { computed, onBeforeUnmount, shallowRef, watch, type Ref } from 'vue'
 import type { CanvasInteractionKey } from '../../composables/useFlowCanvasInteractionState'
 import { usePointerDragSession } from '../../composables/usePointerDragSession'
 import type { ImageEditorLayer, ImageEditorRasterContent, ImageEditorTool } from '../types'
+import type { ImageEditorImageRect } from './useImageEditorCoordinateAdapter'
 import type { ImageEditorModeState } from './useImageEditorMode'
 import { createImageSourceCache, readImageSourceImageData } from '../runtime/imageSourceCache'
 import { cloneImageData } from '../utils/imageDataUtils'
@@ -25,6 +26,7 @@ const IMAGE_EDITOR_RASTER_INTERACTION_KEY: CanvasInteractionKey = 'image-editor-
 
 type UseImageEditorRasterOverlayOptions = {
   editorState: Ref<ImageEditorModeState | null>
+  imageRect: Ref<ImageEditorImageRect | null>
   sourceUrl: Ref<string | null>
   layers: Ref<readonly ImageEditorLayer[]>
   selectedLayerId: Ref<string>
@@ -79,13 +81,14 @@ export function useImageEditorRasterOverlay(options: UseImageEditorRasterOverlay
   )
   const hasRasterEdits = computed(() => hasImageEditorRasterEdits(options.layers.value))
   const rasterOverlayStyle = computed<Record<string, string> | null>(() => {
-    const state = options.editorState.value
-    if (!state || state.mode !== 'adjust') return null
+    if (options.editorState.value?.mode !== 'adjust') return null
+    const rect = options.imageRect.value
+    if (!rect) return null
     return {
-      left: `${state.imageRect.left}px`,
-      top: `${state.imageRect.top}px`,
-      width: `${state.imageRect.width}px`,
-      height: `${state.imageRect.height}px`,
+      left: `${rect.left}px`,
+      top: `${rect.top}px`,
+      width: `${rect.width}px`,
+      height: `${rect.height}px`,
     }
   })
   const rasterCanvasWidth = computed(() => Math.max(1, sourceImageData.value?.width ?? 1))

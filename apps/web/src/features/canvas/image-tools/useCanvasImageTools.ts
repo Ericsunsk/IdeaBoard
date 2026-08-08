@@ -57,9 +57,9 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions): Canvas
       },
       editor: {
         apply: commands.applyAdjustments,
-        onCanvasWheel: session.viewport.onCanvasWheel,
-        focusAndShowChrome: session.viewport.focusImageEditorAndShowChrome,
-        scheduleChromeAnchorUpdate: session.viewport.scheduleImageEditorChromeAnchorUpdate,
+        onCanvasWheel: session.coordinates.onCanvasWheel,
+        focusAndShowChrome: session.coordinates.focusImageEditorAndShowChrome,
+        scheduleChromeAnchorUpdate: session.coordinates.scheduleImageEditorChromeAnchorUpdate,
       },
       prompt: {
         runPromptAction: commands.runPromptAction,

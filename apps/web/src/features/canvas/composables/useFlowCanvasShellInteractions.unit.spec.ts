@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
-import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
 import { useFlowCanvasShellInteractions } from './useFlowCanvasShellInteractions'
 
 function createCanvasElement() {
@@ -9,23 +8,26 @@ function createCanvasElement() {
   return element
 }
 
-function createHarness(options: { expandActive?: boolean; boardHeaderActive?: boolean } = {}) {
+function createHarness(
+  options: {
+    expandActive?: boolean
+    boardHeaderActive?: boolean
+    screenToFlowCoordinate?: (point: { x: number; y: number }) => { x: number; y: number }
+  } = {},
+) {
   const canvasWrapRef = ref<HTMLElement | null>(createCanvasElement())
-  const nodeContextMenu = ref({ visible: false, x: 0, y: 0, flowX: 0, flowY: 0 })
   const activeTool = ref<'select' | 'hand'>('select')
   const dismissTransientCanvasUi = vi.fn()
   const clearFlowSelection = vi.fn(() => false)
   const openNodeContextMenu = vi.fn()
-  const createNodeAtPosition = vi.fn()
   const onCanvasDropDragOver = vi.fn()
 
   const shell = useFlowCanvasShellInteractions({
     canvasWrapRef,
-    nodeContextMenu,
     activeTool,
-    screenToFlowCoordinate: ({ x, y }) => ({ x: x + 100, y: y + 200 }),
+    screenToFlowCoordinate:
+      options.screenToFlowCoordinate ?? (({ x, y }) => ({ x: x + 100, y: y + 200 })),
     openNodeContextMenu,
-    createNodeAtPosition,
     dismissTransientCanvasUi,
     clearFlowSelection,
     onCanvasDropDragOver,
@@ -35,12 +37,10 @@ function createHarness(options: { expandActive?: boolean; boardHeaderActive?: bo
 
   return {
     shell,
-    nodeContextMenu,
     activeTool,
     dismissTransientCanvasUi,
     clearFlowSelection,
     openNodeContextMenu,
-    createNodeAtPosition,
     onCanvasDropDragOver,
   }
 }
@@ -58,19 +58,27 @@ describe('useFlowCanvasShellInteractions', () => {
       closeBoardHeader: true,
     })
     expect(harness.clearFlowSelection).toHaveBeenCalledTimes(1)
-    expect(harness.openNodeContextMenu).toHaveBeenCalledWith(32, 44, 142, 264)
+    expect(harness.openNodeContextMenu).toHaveBeenCalledWith({
+      x: 32,
+      y: 44,
+      flowX: 142,
+      flowY: 264,
+    })
   })
 
-  it('creates a node at the stored menu coordinates and closes the menu', () => {
-    const harness = createHarness()
-    harness.nodeContextMenu.value = { visible: true, x: 10, y: 20, flowX: 120, flowY: 180 }
+  it('keeps the surface position independent from the current flow viewport', () => {
+    const harness = createHarness({
+      screenToFlowCoordinate: () => ({ x: -85, y: 439 }),
+    })
+    const event = new MouseEvent('contextmenu', { clientX: 42, clientY: 64, cancelable: true })
 
-    harness.shell.handleNodeContextMenuCreate('prompt' as CanvasCreatableNodeKind)
+    harness.shell.onPaneContextMenu(event)
 
-    expect(harness.createNodeAtPosition).toHaveBeenCalledWith('prompt', 120, 180)
-    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({
-      closeExpand: true,
-      closeContextMenu: true,
+    expect(harness.openNodeContextMenu).toHaveBeenCalledWith({
+      x: 32,
+      y: 44,
+      flowX: -85,
+      flowY: 439,
     })
   })
 
@@ -100,7 +108,7 @@ describe('useFlowCanvasShellInteractions', () => {
 
     expect(harness.shell.onEscapeShortcut()).toBe(true)
 
-    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith()
+    expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ closeContextMenu: true })
     expect(harness.clearFlowSelection).toHaveBeenCalledTimes(1)
   })
 

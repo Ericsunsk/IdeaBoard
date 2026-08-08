@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
-import { createCanvasWorkspaceRuntimeParts } from './createCanvasWorkspaceRuntimeParts'
+import {
+  createCanvasWorkspaceRuntime,
+  createCanvasWorkspaceRuntimeParts,
+} from './createCanvasWorkspaceRuntimeParts'
 
 const mocks = vi.hoisted(() => ({
   feedback: {
@@ -306,6 +309,39 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
         feedback: mocks.feedback.imageTools,
       }),
     )
+  })
+
+  it('projects only the stable Canvas Workspace facade from internal parts', () => {
+    const board = createBoardRuntime()
+    const graph = createGraphRuntime()
+    const task = createTaskRuntime()
+    mocks.useCanvasBoardRuntime.mockReturnValue(board)
+    mocks.useCanvasGraphRuntime.mockReturnValue(graph)
+    mocks.useCanvasTaskRuntime.mockReturnValue(task)
+
+    const runtime = createCanvasWorkspaceRuntime(createWorkspaceOptions())
+
+    expect(Object.keys(runtime).sort()).toEqual(['commands', 'viewModel'])
+    expect(runtime.viewModel.flowPane).toEqual({ nodes: board.nodes, edges: board.edges })
+    expect(runtime.commands.flowPane).toEqual({
+      onNodesChange: board.onNodesChange,
+      onEdgesChange: board.onEdgesChange,
+      connectionAdapter: graph.connectionAdapter,
+      nodeDragTransactions: {
+        begin: board.graphRuntime.nodeDrag.begin,
+        commit: board.graphRuntime.nodeDrag.commit,
+      },
+    })
+    expect(runtime.commands.persistence.reattachPendingImageResults).toBe(
+      task.reattachPendingImageResults,
+    )
+    expect(runtime.commands.imageWorkflow.runImageDirectAction).toBe(task.runImageDirectAction)
+    expect('isDirty' in runtime.viewModel.persistence).toBe(false)
+    expect('connectNodes' in runtime.commands.flowPane).toBe(false)
+    expect('nodeContextMenu' in runtime.viewModel.graphEditing).toBe(false)
+    expect('canvasNodeMenuItems' in runtime.viewModel.graphEditing).toBe(false)
+    expect('closeNodeContextMenu' in runtime.commands.graphEditing).toBe(false)
+    expect('openNodeContextMenu' in runtime.commands.graphEditing).toBe(false)
   })
 
   it('keeps output count mutations in the workspace graph wiring', () => {

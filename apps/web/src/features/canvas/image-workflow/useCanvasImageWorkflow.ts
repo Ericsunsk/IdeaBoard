@@ -1,11 +1,18 @@
 import { useFlowImageActionOrchestrator } from '../composables/useFlowImageActionOrchestrator'
 import { useFlowPromptGenerationOrchestrator } from '../composables/useFlowPromptGenerationOrchestrator'
 import { useImageCanvasExtendOverlay } from '../composables/useImageCanvasExtendOverlay'
-import { useCanvasImageTools } from '../image-tools'
-import type { UseCanvasImageToolsOptions } from '../image-tools/useCanvasImageTools'
+import {
+  useCanvasImageTools,
+  type CanvasImageTools,
+  type UseCanvasImageToolsOptions,
+} from '../image-tools'
 import type { CanvasFlowPaneAdapter } from '../flow-pane'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { CanvasTaskRuntime } from '../composables/useCanvasTaskRuntime'
+import type { ComputedRef } from 'vue'
+import type { PromptAspectRatio } from '../../canvas-board/domain'
+import type { ImageNodeAction } from '../config/imageActionRegistry'
+import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
 
 export type CanvasImageWorkflowToolsOptions = Omit<
   UseCanvasImageToolsOptions,
@@ -93,7 +100,47 @@ export type CanvasImageWorkflowOptions = {
   feedback: CanvasFeedback['imageTools']
 }
 
-export function useCanvasImageWorkflow(options: CanvasImageWorkflowOptions) {
+export type CanvasImageWorkflow = {
+  isGenerationAvailable: CanvasImageWorkflowTaskPort['isGenerationAvailable']
+  runImageDirectAction: CanvasImageWorkflowTaskPort['runImageDirectAction']
+  runCanvasExtendAction: CanvasImageWorkflowTaskPort['runCanvasExtendAction']
+  createImageTools: (options: CanvasImageWorkflowToolsOptions) => CanvasImageTools
+  createImageActionHandlers: (options: CanvasImageWorkflowActionOptions) => {
+    onFlowImageContextMenu: (nodeId: string, event: MouseEvent) => void
+    onFlowFusionContextMenu: (nodeId: string, event: MouseEvent) => void
+    onFlowImageDirectAction: (nodeId: string, action: ImageNodeAction) => void
+    onFlowImagePromptGenerate: (nodeId: string, prompt: string, outputCount: number) => void
+    onFlowFusionPromptGenerate: (
+      nodeId: string,
+      prompt: string,
+      outputCount: number,
+      aspectRatio: PromptAspectRatio,
+    ) => void
+  }
+  createPromptGenerationHandlers: (options: CanvasImageWorkflowPromptGenerationOptions) => {
+    onFlowPromptGenerate: (
+      promptNodeId: string,
+      prompt: string,
+      outputCount: number,
+      aspectRatio: PromptAspectRatio,
+    ) => void
+  }
+  createCanvasExtendOverlay: (options: CanvasImageWorkflowExpandOverlayOptions) => {
+    isExpandMode: ComputedRef<boolean>
+    expandNodeId: ComputedRef<string | null>
+    expandOverlayStyle: ComputedRef<Record<string, string> | null>
+    enterExpandMode: (nodeId: string) => boolean
+    cancelExpandMode: () => void
+    beginHandleResize: (event: PointerEvent, anchor: CanvasExtendDragAnchor) => void
+    beginFrameDrag: (event: PointerEvent) => void
+    onHandlePointerMove: (event: PointerEvent) => void
+    onHandlePointerUp: (event: PointerEvent) => void
+    commitExpandMode: (prompt?: string, outputCount?: number) => Promise<void>
+    handleRadius: number
+  }
+}
+
+export function useCanvasImageWorkflow(options: CanvasImageWorkflowOptions): CanvasImageWorkflow {
   const { graph, task } = options
 
   function markImageWorkflowNodeDirty(

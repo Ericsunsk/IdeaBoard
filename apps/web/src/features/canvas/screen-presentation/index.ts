@@ -1,1 +1,1 @@
-export { default as CanvasScreenPresentation } from './CanvasScreenPresentation.vue'
+export { default as CanvasScreen } from './CanvasScreen.vue'

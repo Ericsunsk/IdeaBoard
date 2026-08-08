@@ -28,6 +28,7 @@ import {
   normalizeMaskBrushShape,
   resolveMaskFeatherRadius,
 } from '../config/maskEditorConstants'
+import type { ImageEditorImageRect } from '../../image-editor'
 
 type MaskHistoryEntry = {
   width: number
@@ -37,16 +38,12 @@ type MaskHistoryEntry = {
 
 type ImageMaskEditorModeState = {
   nodeId: string
-  imageRect: {
-    left: number
-    top: number
-    width: number
-    height: number
-  }
+  mode: 'inpaint'
 }
 
 type UseImageMaskEditorOverlayOptions = {
   inpaintEditorState: Ref<ImageMaskEditorModeState | null>
+  imageRect: Ref<ImageEditorImageRect | null>
   startCanvasInteraction?: (key: MaskEditorInteractionKey) => void
   stopCanvasInteraction?: (key: MaskEditorInteractionKey) => void
 }
@@ -80,7 +77,7 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
 
   const maskEditorNodeId = computed(() => options.inpaintEditorState.value?.nodeId ?? null)
   const maskEditorOverlayStyle = computed<Record<string, string> | null>(() => {
-    const rect = options.inpaintEditorState.value?.imageRect
+    const rect = options.imageRect.value
     if (!rect) return null
     return {
       left: `${rect.left}px`,

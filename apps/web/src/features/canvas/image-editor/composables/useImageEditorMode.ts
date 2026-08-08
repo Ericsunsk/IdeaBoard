@@ -2,7 +2,6 @@ import { useEventListener } from '@vueuse/core'
 import { computed, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
 import type { ImageEditorMode } from '../types'
-import { containImageRect } from '../../utils/canvasExtendGeometry'
 import { isEditableEventTarget } from '../../utils/domEventTargets'
 
 const windowTarget = () => (typeof window === 'undefined' ? null : window)
@@ -12,24 +11,15 @@ type ImageDisplayPayload = {
   ratio: number
 }
 
-export type ImageEditorImageRect = {
-  left: number
-  top: number
-  width: number
-  height: number
-}
-
 export type ImageEditorModeState = {
   nodeId: string
   mode: ImageEditorMode
-  imageRect: ImageEditorImageRect
 }
 
 type UseImageEditorModeOptions = {
   nodes: Ref<Node[]>
   activeTool: Ref<string>
   getImageNodeDisplayPayload: (nodeId: string) => ImageDisplayPayload | null
-  getImageStageElement: (nodeId: string) => HTMLElement | null
   onBeforePointerCancel?: () => void
   onBeforeExit?: (state: ImageEditorModeState) => boolean | void
 }
@@ -65,16 +55,11 @@ export function useImageEditorMode(options: UseImageEditorModeOptions) {
     if (!isEditableImageNode(nodeId)) return false
     const display = options.getImageNodeDisplayPayload(nodeId)
     if (!display?.url) return false
-    const stage = options.getImageStageElement(nodeId)
-    if (!stage) return false
-    const containRect = containImageRect(stage.clientWidth, stage.clientHeight, display.ratio)
-    if (!containRect) return false
 
     if (!exitImageEditorMode()) return false
     state.value = {
       nodeId,
       mode,
-      imageRect: containRect,
     }
     return true
   }

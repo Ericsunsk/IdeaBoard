@@ -1,16 +1,13 @@
 import type { Ref } from 'vue'
-import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
 import type { DismissTransientCanvasUi } from './useFlowTransientUiDismissal'
 
 type FlowTool = 'select' | 'hand'
 
 type UseFlowCanvasShellInteractionsOptions = {
   canvasWrapRef: Ref<HTMLElement | null>
-  nodeContextMenu: Ref<{ visible: boolean; x: number; y: number; flowX: number; flowY: number }>
   activeTool: Ref<FlowTool>
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
-  openNodeContextMenu: (x: number, y: number, flowX: number, flowY: number) => void
-  createNodeAtPosition: (kind: CanvasCreatableNodeKind, flowX: number, flowY: number) => void
+  openNodeContextMenu: (snapshot: { x: number; y: number; flowX: number; flowY: number }) => void
   dismissTransientCanvasUi: DismissTransientCanvasUi
   clearFlowSelection: () => boolean
   onCanvasDropDragOver: (event: DragEvent) => void
@@ -27,16 +24,7 @@ export function useFlowCanvasShellInteractions(options: UseFlowCanvasShellIntera
     const rect = options.canvasWrapRef.value?.getBoundingClientRect()
     const x = rect ? event.clientX - rect.left : event.clientX
     const y = rect ? event.clientY - rect.top : event.clientY
-    options.openNodeContextMenu(x, y, flowPoint.x, flowPoint.y)
-  }
-
-  function handleNodeContextMenuCreate(kind: CanvasCreatableNodeKind) {
-    options.createNodeAtPosition(
-      kind,
-      options.nodeContextMenu.value.flowX,
-      options.nodeContextMenu.value.flowY,
-    )
-    options.dismissTransientCanvasUi({ closeExpand: true, closeContextMenu: true })
+    options.openNodeContextMenu({ x, y, flowX: flowPoint.x, flowY: flowPoint.y })
   }
 
   function setActiveTool(tool: FlowTool) {
@@ -62,7 +50,7 @@ export function useFlowCanvasShellInteractions(options: UseFlowCanvasShellIntera
       })
       return true
     }
-    options.dismissTransientCanvasUi()
+    options.dismissTransientCanvasUi({ closeContextMenu: true })
     return options.clearFlowSelection()
   }
 
@@ -73,7 +61,6 @@ export function useFlowCanvasShellInteractions(options: UseFlowCanvasShellIntera
 
   return {
     onPaneContextMenu,
-    handleNodeContextMenuCreate,
     setActiveTool,
     onEscapeShortcut,
     onCanvasDragOver,

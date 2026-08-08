@@ -22,13 +22,13 @@ function createHarness() {
     activeTool: ref('select'),
     getImageNodeDisplayPayload: (nodeId) =>
       nodeId === 'node-1' ? { url: 'https://example.com/source.png', ratio: 1 } : null,
-    getImageStageElement: (nodeId) => (nodeId === 'node-1' ? stage : null),
   })
   const overlay = useImageMaskEditorOverlay({
     inpaintEditorState: computed(() => {
       const state = editorMode.imageEditorState.value
-      return state?.mode === 'inpaint' ? state : null
+      return state?.mode === 'inpaint' ? { nodeId: state.nodeId, mode: 'inpaint' as const } : null
     }),
+    imageRect: computed(() => ({ left: 40, top: 0, width: stage.clientWidth - 80, height: 240 })),
   })
 
   return { editorMode, overlay }

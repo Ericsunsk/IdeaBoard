@@ -137,31 +137,7 @@ function createScreen(
           handleRadius: 4,
           visibilityRefreshToken: ref(0),
         },
-        commands: {
-          updatePromptText: vi.fn(),
-          updateNodeParameter: vi.fn(),
-          deleteNode: vi.fn(),
-          dropMediaInput: vi.fn(),
-          openMediaInput: vi.fn(),
-          previewMediaInput: vi.fn(),
-          removeMediaInput: vi.fn(),
-          generateFromPromptNode: vi.fn(),
-          dropImageStage: vi.fn(),
-          openImageFile: vi.fn(),
-          previewImage: vi.fn(),
-          appendImageToCanvas: vi.fn(),
-          resetImage: vi.fn(),
-          openImageContextMenu: vi.fn(),
-          generateFromImagePrompt: vi.fn(),
-          submitCanvasExtend: vi.fn(),
-          runImageAction: vi.fn(),
-          beginCanvasExtendHandle: vi.fn(),
-          moveCanvasExtendHandle: vi.fn(),
-          endCanvasExtendHandle: vi.fn(),
-          beginCanvasExtendFrame: vi.fn(),
-          openFusionContextMenu: vi.fn(),
-          generateFromFusion: vi.fn(),
-        },
+        dispatchIntent: vi.fn(),
         listeners: {
           nodeMousedown: vi.fn(),
           requestInternalsUpdate: vi.fn(),
@@ -366,13 +342,16 @@ describe('CanvasScreenPresentation', () => {
     ])
   })
 
-  it('dispatches Canvas Node intents to semantic commands', () => {
+  it('forwards Canvas Node intents to the Screen routing seam', () => {
     const view = renderPresentation()
     const mouseEvent = expect.any(MouseEvent)
 
     view.getByRole('button', { name: '触发节点事件' }).click()
 
-    expect(view.presentation.canvas.node.commands.deleteNode).toHaveBeenCalledWith('node-1')
+    expect(view.presentation.canvas.node.dispatchIntent).toHaveBeenCalledWith({
+      type: 'delete-requested',
+      nodeId: 'node-1',
+    })
     expect(view.presentation.canvas.node.listeners.nodeMousedown).toHaveBeenCalledWith(
       'node-1',
       mouseEvent,

@@ -2,22 +2,34 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } 
 import type { Node } from '@vue-flow/core'
 import { useEventListener, useResizeObserver } from '@vueuse/core'
 import { IMAGE_TOOL_CHROME_LAYOUT } from '../../config/imageToolChrome'
-import { waitForNextAnimationFrame } from '../../utils/animationFrame'
 import { useRafScheduler } from '../../composables/useRafScheduler'
+import { waitForNextAnimationFrame } from '../../utils/animationFrame'
+import { containImageRect } from '../../utils/canvasExtendGeometry'
+import type { ImageEditorModeState } from './useImageEditorMode'
 
 type FlowViewport = { x: number; y: number; zoom: number }
 
-type ImageEditorAnchorRect = {
+type ImageDisplayPayload = {
+  url: string
+  ratio: number
+}
+
+export type ImageEditorImageRect = {
   top: number
   left: number
   width: number
   height: number
 }
 
-type UseImageEditorViewportControllerOptions = {
+export type ImageEditorChromeAnchorRect = ImageEditorImageRect
+
+type ScreenRect = ImageEditorImageRect
+
+type UseImageEditorCoordinateAdapterOptions = {
   nodes: Ref<Node[]>
   canvasWrapRef: Ref<HTMLElement | null>
-  imageEditorNodeId: Ref<string | null>
+  imageEditorState: Ref<ImageEditorModeState | null>
+  getImageNodeDisplayPayload: (nodeId: string) => ImageDisplayPayload | null
   getImageStageElement: (nodeId: string) => HTMLElement | null
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
   getViewport: () => FlowViewport
@@ -32,9 +44,6 @@ type UseImageEditorViewportControllerOptions = {
   ) => Promise<unknown> | unknown
 }
 
-const IMAGE_MASK_EDITOR_OVERLAY_SELECTOR = '[data-image-mask-editor]'
-const MASK_EDITOR_CANVAS_SELECTOR = '.image-mask-editor-canvas'
-const IMAGE_STAGE_IMAGE_SELECTOR = '.image-node-stage-image'
 const IMAGE_EDITOR_FOCUS_MAX_ZOOM = 2
 const IMAGE_EDITOR_FOCUS_MIN_ZOOM = 0.1
 const CANVAS_OVERSCROLL_GUARD_CLASS = 'canvas-overscroll-guard'
@@ -45,27 +54,52 @@ function setCanvasOverscrollGuard(enabled: boolean) {
   document.body.classList.toggle(CANVAS_OVERSCROLL_GUARD_CLASS, enabled)
 }
 
-export function useImageEditorViewportController(options: UseImageEditorViewportControllerOptions) {
-  const imageEditorChromeAnchorRect = ref<ImageEditorAnchorRect | null>(null)
+export function useImageEditorCoordinateAdapter(options: UseImageEditorCoordinateAdapterOptions) {
+  const imageEditorImageRect = ref<ImageEditorImageRect | null>(null)
+  const imageEditorChromeAnchorRect = ref<ImageEditorChromeAnchorRect | null>(null)
   const isImageEditorChromeReady = ref(false)
-  const chromeAnchorScheduler = useRafScheduler()
+  const geometryScheduler = useRafScheduler()
   const windowTarget = typeof window === 'undefined' ? null : window
-  const chromeResizeTarget = computed(() => {
-    const nodeId = options.imageEditorNodeId.value
-    const stage = nodeId ? options.getImageStageElement(nodeId) : null
-    return stage ? resolveImageEditorChromeTarget(stage) : null
+  const imageEditorNodeId = computed(() => options.imageEditorState.value?.nodeId ?? null)
+  const stageResizeTarget = computed(() => {
+    const nodeId = imageEditorNodeId.value
+    return nodeId ? options.getImageStageElement(nodeId) : null
   })
 
   let imageEditorReturnViewport: FlowViewport | null = null
   let imageEditorFocusRequestId = 0
 
-  function resolveFlowNodeCenter(nodeId: string): { x: number; y: number } | null {
+  function measureImageRect(nodeId: string): ImageEditorImageRect | null {
     const stage = options.getImageStageElement(nodeId)
-    if (stage) {
-      const rect = stage.getBoundingClientRect()
+    const display = options.getImageNodeDisplayPayload(nodeId)
+    if (!stage || !display?.url) return null
+    return containImageRect(stage.clientWidth, stage.clientHeight, display.ratio)
+  }
+
+  function measureImageScreenRect(nodeId: string): ScreenRect | null {
+    const stage = options.getImageStageElement(nodeId)
+    const imageRect = measureImageRect(nodeId)
+    if (!stage || !imageRect || stage.clientWidth <= 0 || stage.clientHeight <= 0) return null
+
+    const stageRect = stage.getBoundingClientRect()
+    if (stageRect.width <= 0 || stageRect.height <= 0) return null
+
+    const scaleX = stageRect.width / stage.clientWidth
+    const scaleY = stageRect.height / stage.clientHeight
+    return {
+      top: stageRect.top + imageRect.top * scaleY,
+      left: stageRect.left + imageRect.left * scaleX,
+      width: imageRect.width * scaleX,
+      height: imageRect.height * scaleY,
+    }
+  }
+
+  function resolveFlowNodeCenter(nodeId: string): { x: number; y: number } | null {
+    const imageRect = measureImageScreenRect(nodeId)
+    if (imageRect) {
       return options.screenToFlowCoordinate({
-        x: rect.left + rect.width / 2,
-        y: rect.top + rect.height / 2,
+        x: imageRect.left + imageRect.width / 2,
+        y: imageRect.top + imageRect.height / 2,
       })
     }
 
@@ -94,20 +128,8 @@ export function useImageEditorViewportController(options: UseImageEditorViewport
   }
 
   function resolveImageEditorFocusTarget(nodeId: string): FlowViewport | null {
-    const stage = options.getImageStageElement(nodeId)
-    if (!stage) {
-      const center = resolveFlowNodeCenter(nodeId)
-      return center ? { ...center, zoom: IMAGE_EDITOR_FOCUS_MAX_ZOOM } : null
-    }
-
-    const target = resolveImageEditorChromeTarget(stage)
-    if (!target) {
-      const center = resolveFlowNodeCenter(nodeId)
-      return center ? { ...center, zoom: IMAGE_EDITOR_FOCUS_MAX_ZOOM } : null
-    }
-
-    const rect = target.getBoundingClientRect()
-    if (!rect || rect.width <= 0 || rect.height <= 0) {
+    const screenRect = measureImageScreenRect(nodeId)
+    if (!screenRect) {
       const center = resolveFlowNodeCenter(nodeId)
       return center ? { ...center, zoom: IMAGE_EDITOR_FOCUS_MAX_ZOOM } : null
     }
@@ -118,8 +140,8 @@ export function useImageEditorViewportController(options: UseImageEditorViewport
     }
     const viewport = options.getViewport()
     const currentZoom = Number.isFinite(viewport.zoom) && viewport.zoom > 0 ? viewport.zoom : 1
-    const flowImageWidth = rect.width / currentZoom
-    const flowImageHeight = rect.height / currentZoom
+    const flowImageWidth = screenRect.width / currentZoom
+    const flowImageHeight = screenRect.height / currentZoom
     const viewportRect = getViewportRect()
     const availableWidth = Math.max(
       1,
@@ -142,8 +164,8 @@ export function useImageEditorViewportController(options: UseImageEditorViewport
       ),
     )
     const imageCenter = options.screenToFlowCoordinate({
-      x: rect.left + rect.width / 2,
-      y: rect.top + rect.height / 2,
+      x: screenRect.left + screenRect.width / 2,
+      y: screenRect.top + screenRect.height / 2,
     })
 
     return {
@@ -154,15 +176,14 @@ export function useImageEditorViewportController(options: UseImageEditorViewport
   }
 
   function isImageEditorFocusRequestCurrent(nodeId: string, requestId: number) {
-    return requestId === imageEditorFocusRequestId && options.imageEditorNodeId.value === nodeId
+    return requestId === imageEditorFocusRequestId && imageEditorNodeId.value === nodeId
   }
 
   async function focusImageEditorStage(nodeId: string, requestId: number) {
     await nextTick()
     if (!isImageEditorFocusRequestCurrent(nodeId, requestId)) return
     const target = resolveImageEditorFocusTarget(nodeId)
-    if (!target) return
-    if (!isImageEditorFocusRequestCurrent(nodeId, requestId)) return
+    if (!target || !isImageEditorFocusRequestCurrent(nodeId, requestId)) return
     await options.setCenter(target.x, target.y, {
       zoom: target.zoom,
       duration: 220,
@@ -170,39 +191,28 @@ export function useImageEditorViewportController(options: UseImageEditorViewport
     })
   }
 
-  function measureImageEditorChromeAnchor(nodeId: string): ImageEditorAnchorRect | null {
+  function measureImageEditorChromeAnchor(nodeId: string): ImageEditorChromeAnchorRect | null {
     const wrap = options.canvasWrapRef.value
-    const stage = options.getImageStageElement(nodeId)
-    if (!wrap || !stage) return null
-
-    const target = resolveImageEditorChromeTarget(stage)
-    if (!target) return null
+    const screenRect = measureImageScreenRect(nodeId)
+    if (!wrap || !screenRect) return null
 
     const wrapRect = wrap.getBoundingClientRect()
-    const targetRect = target.getBoundingClientRect()
-    if (targetRect.width <= 0 || targetRect.height <= 0) return null
-
     return {
-      top: targetRect.top - wrapRect.top,
-      left: targetRect.left - wrapRect.left,
-      width: targetRect.width,
-      height: targetRect.height,
+      top: screenRect.top - wrapRect.top,
+      left: screenRect.left - wrapRect.left,
+      width: screenRect.width,
+      height: screenRect.height,
     }
   }
 
-  function updateImageEditorChromeAnchorRect() {
-    const nodeId = options.imageEditorNodeId.value
+  function updateImageEditorGeometry() {
+    const nodeId = imageEditorNodeId.value
+    imageEditorImageRect.value = nodeId ? measureImageRect(nodeId) : null
     imageEditorChromeAnchorRect.value = nodeId ? measureImageEditorChromeAnchor(nodeId) : null
   }
 
-  function resolveImageEditorChromeTarget(stage: HTMLElement): HTMLElement | null {
-    const overlay = stage.querySelector<HTMLElement>(IMAGE_MASK_EDITOR_OVERLAY_SELECTOR)
-    const overlayCanvas = overlay?.querySelector<HTMLElement>(MASK_EDITOR_CANVAS_SELECTOR)
-    return overlayCanvas ?? overlay ?? stage.querySelector<HTMLElement>(IMAGE_STAGE_IMAGE_SELECTOR)
-  }
-
   function scheduleImageEditorChromeAnchorUpdate() {
-    chromeAnchorScheduler.schedule(updateImageEditorChromeAnchorRect)
+    geometryScheduler.schedule(updateImageEditorGeometry)
   }
 
   function restoreImageEditorReturnViewport() {
@@ -223,14 +233,12 @@ export function useImageEditorViewportController(options: UseImageEditorViewport
     if (!isImageEditorFocusRequestCurrent(nodeId, requestId)) return
     await waitForNextAnimationFrame()
     if (!isImageEditorFocusRequestCurrent(nodeId, requestId)) return
-    updateImageEditorChromeAnchorRect()
-    if (imageEditorChromeAnchorRect.value) {
-      isImageEditorChromeReady.value = true
-    }
+    updateImageEditorGeometry()
+    if (imageEditorChromeAnchorRect.value) isImageEditorChromeReady.value = true
   }
 
   function onCanvasWheel(event: WheelEvent) {
-    const isImageEditing = !!options.imageEditorNodeId.value
+    const isImageEditing = !!imageEditorNodeId.value
     const isBrowserGestureCandidate = event.ctrlKey || Math.abs(event.deltaX) > 0
     if (!isImageEditing && !isBrowserGestureCandidate) return
     event.preventDefault()
@@ -238,17 +246,17 @@ export function useImageEditorViewportController(options: UseImageEditorViewport
   }
 
   watch(
-    () => options.imageEditorNodeId.value,
-    (nextNodeId, prevNodeId) => {
-      if (nextNodeId) {
-        isImageEditorChromeReady.value = false
-        imageEditorChromeAnchorRect.value = null
-        return
-      }
+    imageEditorNodeId,
+    (nextNodeId, previousNodeId) => {
       isImageEditorChromeReady.value = false
       imageEditorChromeAnchorRect.value = null
-      if (prevNodeId) restoreImageEditorReturnViewport()
+      imageEditorImageRect.value = nextNodeId ? measureImageRect(nextNodeId) : null
+      if (nextNodeId) {
+        imageEditorChromeAnchorRect.value = measureImageEditorChromeAnchor(nextNodeId)
+      }
+      if (!nextNodeId && previousNodeId) restoreImageEditorReturnViewport()
     },
+    { flush: 'sync', immediate: true },
   )
 
   onMounted(() => {
@@ -261,9 +269,10 @@ export function useImageEditorViewportController(options: UseImageEditorViewport
 
   useEventListener(windowTarget, 'resize', scheduleImageEditorChromeAnchorUpdate)
   useResizeObserver(options.canvasWrapRef, scheduleImageEditorChromeAnchorUpdate)
-  useResizeObserver(chromeResizeTarget, scheduleImageEditorChromeAnchorUpdate)
+  useResizeObserver(stageResizeTarget, scheduleImageEditorChromeAnchorUpdate)
 
   return {
+    imageEditorImageRect,
     imageEditorChromeAnchorRect,
     isImageEditorChromeReady,
     onCanvasWheel,

@@ -34,8 +34,8 @@ export function createImageToolChromeAdapter(
     return {
       nodeId,
       mode: session.imageEditorMode.value,
-      anchorRect: session.viewport.imageEditorChromeAnchorRect.value,
-      isReady: session.viewport.isImageEditorChromeReady.value,
+      anchorRect: session.coordinates.imageEditorChromeAnchorRect.value,
+      isReady: session.coordinates.isImageEditorChromeReady.value,
       mask: {
         drawMode: session.maskEditor.drawMode.value,
         brushShape: session.maskEditor.brushShape.value,
