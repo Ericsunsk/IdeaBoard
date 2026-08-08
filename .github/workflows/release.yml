@@ -20,17 +20,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  backend-verification:
-    name: Backend Verification
-    uses: ./.github/workflows/backend.yml
-    with:
-      ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
-      build_images: false
-
   build-release:
     name: Build Release Bundle
-    needs:
-      - backend-verification
     runs-on: ubicloud-standard-2
     timeout-minutes: 30
     outputs:
@@ -152,11 +143,13 @@ jobs:
           {
             echo "# IdeaBoard ${TAG}"
             echo
-            awk -v tag="${TAG}" '
-              $0 ~ "^## " tag "([[:space:]]|$)" { found=1; print; next }
-              /^## / && found { exit }
-              found { print }
-            ' CHANGELOG.md
+            if [[ -f CHANGELOG.md ]]; then
+              awk -v tag="${TAG}" '
+                $0 ~ "^## " tag "([[:space:]]|$)" { found=1; print; next }
+                /^## / && found { exit }
+                found { print }
+              ' CHANGELOG.md
+            fi
           } > "${notes_file}"
 
           if [[ "$(wc -l < "${notes_file}")" -le 2 ]]; then

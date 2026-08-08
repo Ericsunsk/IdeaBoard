@@ -155,6 +155,12 @@ assert_contains "${release_workflow}" '              --paginate \'
 assert_contains "${release_workflow}" '              --slurp \'
 assert_contains "${release_workflow}" 'check-runs?per_page=100'
 assert_contains "${release_workflow}" 'jq '\''[.[].check_runs[] | select(.name == "CI Gate" and .conclusion == "success")] | length'\'''
+assert_contains "${release_workflow}" '          if [[ -f CHANGELOG.md ]]; then'
+
+if grep -Eq '^  backend-verification:' "${release_workflow}"; then
+  echo 'Release workflow must reuse the successful CI Gate instead of repeating Backend Verification' >&2
+  exit 1
+fi
 
 if sed -n '/^permissions:/,/^[^[:space:]]/p' "${release_workflow}" | grep -Fq 'contents: write'; then
   echo 'Release workflow must grant contents: write only to the publishing job' >&2
