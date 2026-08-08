@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   generated:
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     timeout-minutes: 10
 
     steps:
@@ -37,7 +37,7 @@ jobs:
         run: git diff --exit-code -- apps/web/src/shared/api/generated-query
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     timeout-minutes: 15
 
     strategy:
@@ -73,7 +73,7 @@ jobs:
         run: npm run lint:style
 
   tests:
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     timeout-minutes: 15
 
     strategy:
@@ -115,7 +115,7 @@ jobs:
         run: npm run test:typecheck
 
   smoke:
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     timeout-minutes: 15
 
     steps:
@@ -139,7 +139,7 @@ jobs:
         run: ./scripts/ci-parity.sh web-smoke
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     timeout-minutes: 15
 
     steps:
@@ -168,7 +168,7 @@ jobs:
       - tests
       - smoke
       - build
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     timeout-minutes: 5
 
     steps:

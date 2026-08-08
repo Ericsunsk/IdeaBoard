@@ -31,7 +31,7 @@ jobs:
     name: Build Release Bundle
     needs:
       - backend-verification
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     timeout-minutes: 30
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
@@ -216,7 +216,7 @@ jobs:
     name: Publish GitHub Release
     needs:
       - build-release
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     timeout-minutes: 10
     environment: release
     permissions:

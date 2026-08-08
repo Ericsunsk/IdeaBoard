@@ -47,7 +47,7 @@ jobs:
     name: Publish ${{ matrix.image.display }} Image
     needs:
       - backend-verification
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     timeout-minutes: 40
     permissions:
       contents: read
@@ -277,7 +277,7 @@ jobs:
     name: Build Release Manifest
     needs:
       - publish-images
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     timeout-minutes: 10
     permissions:
       contents: read
@@ -373,7 +373,7 @@ jobs:
     if: needs.aggregate-release-manifest.outputs.is-production-release == 'true'
     needs:
       - aggregate-release-manifest
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     timeout-minutes: 35
     permissions:
       contents: read
@@ -580,7 +580,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     needs:
       - aggregate-release-manifest
-    runs-on: ubuntu-latest
+    runs-on: ubicloud-standard-2
     timeout-minutes: 5
     permissions:
       contents: write
