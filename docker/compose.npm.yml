@@ -1,0 +1,13 @@
+services:
+  api:
+    networks:
+      - npm-network
+
+  auth:
+    networks:
+      - npm-network
+
+networks:
+  npm-network:
+    external: true
+    name: ${NPM_NETWORK_NAME:-npm-nw}

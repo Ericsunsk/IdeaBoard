@@ -402,7 +402,19 @@ validate_env_file() {
 }
 
 docker_compose() {
-  docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
+  local compose_args=("-f" "$COMPOSE_FILE")
+  local override_file
+
+  override_file="$(env_or_file_value IDEABOARD_COMPOSE_OVERRIDE_FILE)"
+  if [[ -n "$override_file" ]]; then
+    if [[ "$override_file" != /* ]]; then
+      override_file="$ROOT_DIR/$override_file"
+    fi
+    [[ -f "$override_file" ]] || die "compose override does not exist: $override_file"
+    compose_args+=("-f" "$override_file")
+  fi
+
+  docker compose "${compose_args[@]}" --env-file "$ENV_FILE" "$@"
 }
 
 need_runtime_command() {

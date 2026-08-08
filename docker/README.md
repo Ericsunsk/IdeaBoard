@@ -4,6 +4,7 @@
 
 - `compose.local.yml`：本地开发用 PostgreSQL + NATS
 - `compose.yml`：生产 VPS 用 `宿主机反代 + API + Auth + PostgreSQL + NATS`
+- `compose.npm.yml`：可选的 Nginx Proxy Manager external network override
 
 生产环境请优先使用 [docs/runbooks/deployment.md](../docs/runbooks/deployment.md) 中的 GHCR + Docker Compose 部署方式。
 
@@ -91,6 +92,7 @@ docker compose -f compose.local.yml restart
 
 ```text
 docker/compose.yml
+docker/compose.npm.yml
 docker/.env.example
 deploy/templates/nginx/ideaboard.conf.template
 ```
@@ -104,6 +106,21 @@ IDEABOARD_STACK_DIR="$PWD" ./scripts/deploy-stack.sh update
 ```
 
 默认生产入口是宿主机反代服务，当前用 `ideaboard nginx-conf /tmp/ideaboard.nginx.conf` 生成 API 域名的 Nginx 配置。默认 upstream 是 `127.0.0.1:6000/6001`，默认 `server_name _` 兼容现有部署；如需明确域名，可在 `docker/.env` 设置 `NGINX_SERVER_NAME=api.example.com` 后重新生成配置。如果宿主机反代服务已能稳定直连 Docker bridge，可在 `docker/.env` 设置 `NGINX_API_UPSTREAM` / `NGINX_AUTH_UPSTREAM` 后重新生成配置。Cloudflare `Proxied` API 域名启用源站 allowlist 后，可用 `ideaboard cloudflare-real-ip-conf /tmp/cloudflare-real-ip.conf` 生成真实客户端 IP include。
+
+使用 Nginx Proxy Manager 时，不要直接修改 `compose.yml`。先确保 external network 已存在：
+
+```bash
+docker network create npm-nw
+```
+
+然后在生产 `docker/.env` 启用正式 override：
+
+```text
+IDEABOARD_COMPOSE_OVERRIDE_FILE=docker/compose.npm.yml
+NPM_NETWORK_NAME=npm-nw
+```
+
+`ideaboard update`、`up`、`restart`、`status`、`doctor` 与卸载流程都会加载该 override。NPM 应使用 Docker DNS 转发到 `ideaboard-api:6000`；仅在确实需要独立代理 Auth 时使用 `ideaboard-auth:6001`。PostgreSQL 与 NATS 不会加入 NPM network。
 
 后端镜像由 GitHub Actions 发布到 GHCR；发布路径会生成 SBOM、执行 Grype 高危漏洞 gate，并用 Cosign keyless 签名。生产 `.env` 必须填写 `IDEABOARD_API_IMAGE`、`IDEABOARD_AUTH_IMAGE` 与 `IDEABOARD_AUTH_MIGRATE_IMAGE` 的完整 digest 引用，`ideaboard update` 会在 pull 前自动验签。
 

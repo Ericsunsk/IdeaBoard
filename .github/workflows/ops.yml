@@ -122,4 +122,6 @@ jobs:
             nginx:1.27-alpine nginx -t
 
       - name: Validate Docker Compose config
-        run: docker compose -f docker/compose.yml --env-file docker/.env.example config
+        run: |
+          docker compose -f docker/compose.yml --env-file docker/.env.example config
+          docker compose -f docker/compose.yml -f docker/compose.npm.yml --env-file docker/.env.example config

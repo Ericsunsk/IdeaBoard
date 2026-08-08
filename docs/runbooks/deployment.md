@@ -250,6 +250,27 @@ Auth rollback 不删除身份或业务数据：先关闭公开注册，再清除
 
 ### 7. VPS 反代
 
+#### Nginx Proxy Manager
+
+Nginx Proxy Manager 与 IdeaBoard 运行在同一 Docker host 时，使用仓库提供的 Compose override，不要修改 canonical `docker/compose.yml`：
+
+```bash
+docker network inspect npm-nw >/dev/null 2>&1 || docker network create npm-nw
+```
+
+在 `/opt/stacks/ideaboard/docker/.env` 设置：
+
+```text
+IDEABOARD_COMPOSE_OVERRIDE_FILE=docker/compose.npm.yml
+NPM_NETWORK_NAME=npm-nw
+```
+
+随后执行 `ideaboard update`。部署脚本会把 `compose.npm.yml` 叠加到 canonical Compose 配置，使 API/Auth 同时保留 IdeaBoard 内网并加入 NPM external network。NPM 的 Forward Hostname / IP 使用 `ideaboard-api`，Forward Port 使用 `6000`；不要使用容器自身的 `127.0.0.1`。PostgreSQL 与 NATS 只保留在 IdeaBoard 内网。
+
+取消 NPM 接入时，先切换反代流量，再从 `.env` 删除上述两个变量并执行 `ideaboard up`。Docker 会按新的目标配置重建 API/Auth，canonical Compose 文件不需要修改。
+
+#### 宿主机 Nginx
+
 生成 Nginx 配置：
 
 ```bash

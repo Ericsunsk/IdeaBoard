@@ -95,6 +95,20 @@ docker_compose_down() {
   fi
 
   local compose_args=("-f" "$COMPOSE_FILE")
+  local override_file="${IDEABOARD_COMPOSE_OVERRIDE_FILE:-}"
+  if [[ -z "$override_file" && -f "$ENV_FILE" ]]; then
+    override_file="$(awk -F= '$1 == "IDEABOARD_COMPOSE_OVERRIDE_FILE" { sub(/^[^=]*=/, ""); print; exit }' "$ENV_FILE")"
+  fi
+  if [[ -n "$override_file" ]]; then
+    if [[ "$override_file" != /* ]]; then
+      override_file="$STACK_DIR/$override_file"
+    fi
+    if [[ -f "$override_file" ]]; then
+      compose_args+=("-f" "$override_file")
+    else
+      echo "Warning: compose override does not exist: $override_file" >&2
+    fi
+  fi
   if [[ -f "$ENV_FILE" ]]; then
     compose_args+=("--env-file" "$ENV_FILE")
   fi
