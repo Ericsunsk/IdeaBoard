@@ -19,7 +19,7 @@ die() {
   exit 1
 }
 
-# shellcheck disable=SC2329 # Invoked by the EXIT trap below.
+# shellcheck disable=SC2317,SC2329 # Invoked indirectly by the EXIT trap below.
 cleanup() {
   if [[ -n "${MANIFEST_FILE}" ]]; then
     rm -f -- "${MANIFEST_FILE}"
