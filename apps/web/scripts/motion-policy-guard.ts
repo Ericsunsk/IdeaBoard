@@ -11,7 +11,7 @@ type LocalMotionAllowance = {
 }
 
 const localMotionAllowances: Record<string, LocalMotionAllowance> = {
-  'src/features/canvas/screen-presentation/CanvasScreenPresentation.vue': {
+  'src/features/canvas/screen-presentation/CanvasScreen.vue': {
     properties: ['--flow-edge-running-duration'],
     reason:
       'Canvas execution edges use a continuous activity cycle; finite Motion Policy intents do not describe cycle speed.',

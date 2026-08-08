@@ -1,23 +1,21 @@
-import { defineComponent, h, ref } from 'vue'
-import { describe, expect, it, vi } from 'vitest'
+/* eslint-disable vue/one-component-per-file */
+import { defineComponent, h, ref, type PropType } from 'vue'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { render } from '../../../test/render'
 import CanvasScreen from './CanvasScreen.vue'
-
-type ScreenPresentationCapture = {
-  chrome: { commands: { exportSelectedImages: () => void; zoomOut: () => void } }
-  canvas: { flow: { onNodesChange: (changes: unknown[]) => void; onPaneClick: () => void } }
-}
 
 type KeyboardOptions = { onSave: () => void }
 type LeaveGuardOptions = { onLeave: () => Promise<unknown> | unknown }
 type GroupOptions = { grouping: { onAction: () => void } }
 
 const mocks = vi.hoisted(() => ({
-  presentation: null as ScreenPresentationCapture | null,
   keyboardOptions: null as KeyboardOptions | null,
   leaveGuardOptions: null as LeaveGuardOptions | null,
   groupOptions: null as GroupOptions | null,
+  nodeIntentDispatch: vi.fn(),
+  createContextMenuNode: vi.fn(),
+  onFlowNodeMouseDown: vi.fn(),
   useCanvasWorkspaceRuntime: vi.fn(),
 }))
 
@@ -40,6 +38,7 @@ vi.mock('../flow-pane', () => ({
     commands: {
       clearSelection: vi.fn(() => true),
       onFlowNodeClick: vi.fn(),
+      onFlowNodeMouseDown: mocks.onFlowNodeMouseDown,
       selectNodeForContextMenu: vi.fn(),
     },
   }),
@@ -108,19 +107,23 @@ vi.mock('../composables/useFlowCanvasShellInteractions', () => ({
   }),
 }))
 
-vi.mock('../group-presentation', () => ({
-  useCanvasGroupPresentationInteraction: (options: GroupOptions) => {
-    mocks.groupOptions = options
-    return {
-      bindClosePolicyHandlers: <T extends Record<string, unknown>>(handlers: T) => ({
-        ...handlers,
-        onCanvasPaneClick: handlers.onCanvasPaneClick,
-      }),
-      onCanvasContextMenuCapture: vi.fn(),
-      onCanvasPointerDownCapture: vi.fn(),
-    }
-  },
-}))
+vi.mock('../group-presentation', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../group-presentation')>()
+  return {
+    ...actual,
+    useCanvasGroupPresentationInteraction: (options: GroupOptions) => {
+      mocks.groupOptions = options
+      return {
+        bindClosePolicyHandlers: <T extends Record<string, unknown>>(handlers: T) => ({
+          ...handlers,
+          onCanvasPaneClick: handlers.onCanvasPaneClick,
+        }),
+        onCanvasContextMenuCapture: vi.fn(),
+        onCanvasPointerDownCapture: vi.fn(),
+      }
+    },
+  }
+})
 
 vi.mock('../composables/useFlowExpandInteractionHandlers', () => ({
   useFlowExpandInteractionHandlers: () => ({
@@ -157,7 +160,7 @@ vi.mock('../../user-shell/useUserAccountControls', () => ({
 }))
 
 vi.mock('./createCanvasNodePresentationIntentRouter', () => ({
-  createCanvasNodePresentationIntentRouter: () => ({ dispatch: vi.fn() }),
+  createCanvasNodePresentationIntentRouter: () => ({ dispatch: mocks.nodeIntentDispatch }),
 }))
 
 vi.mock('./useCanvasNodeContextMenu', () => ({
@@ -166,15 +169,103 @@ vi.mock('./useCanvasNodeContextMenu', () => ({
     canvasNodeMenuItems: [],
     close: vi.fn(),
     open: vi.fn(),
-    createNode: vi.fn(),
+    createNode: mocks.createContextMenuNode,
   }),
 }))
 
-const ScreenPresentationStub = defineComponent({
-  props: { presentation: { type: Object, required: true } },
-  setup(props) {
-    mocks.presentation = props.presentation as ScreenPresentationCapture
-    return () => h('section', { 'data-testid': 'canvas-screen-presentation' })
+const ChromeStub = defineComponent({
+  emits: ['export', 'zoom-out'],
+  setup(_, { emit }) {
+    return () =>
+      h('section', { 'data-testid': 'chrome-region' }, [
+        h('button', { type: 'button', onClick: () => emit('export') }, '导出选中图片'),
+        h('button', { type: 'button', onClick: () => emit('zoom-out') }, '缩小画布'),
+      ])
+  },
+})
+
+const VueFlowStub = defineComponent({
+  emits: ['nodes-change', 'pane-click'],
+  setup(_, { emit, slots }) {
+    return () =>
+      h('section', { 'data-testid': 'flow-region' }, [
+        h(
+          'button',
+          {
+            type: 'button',
+            onClick: () => emit('nodes-change', [{ id: 'node-a', type: 'remove' }]),
+          },
+          '删除节点',
+        ),
+        h('button', { type: 'button', onClick: () => emit('pane-click') }, '点击画布'),
+        slots['zoom-pane']?.(),
+        slots['node-canvas']?.({ id: 'node-a', data: {}, selected: false, dragging: false }),
+        slots.default?.(),
+      ])
+  },
+})
+
+const GroupStub = defineComponent({
+  setup() {
+    return () => h('section', { 'data-testid': 'group-region' })
+  },
+})
+
+const NodeStub = defineComponent({
+  emits: ['node-intent', 'node-mousedown', 'request-internals-update'],
+  setup(_, { emit }) {
+    return () =>
+      h(
+        'button',
+        {
+          type: 'button',
+          'data-testid': 'node-region',
+          onClick: () => {
+            emit('node-intent', { type: 'delete-requested', nodeId: 'node-a' })
+            emit('node-mousedown', 'node-a', new MouseEvent('mousedown'))
+            emit('request-internals-update', 'node-a')
+          },
+        },
+        '触发节点交互',
+      )
+  },
+})
+
+const MiniMapStub = defineComponent({
+  emits: ['center-requested'],
+  setup(_, { emit }) {
+    return () =>
+      h(
+        'button',
+        {
+          type: 'button',
+          'data-testid': 'minimap-region',
+          onClick: () => emit('center-requested', { position: { x: 10, y: 20 } }),
+        },
+        '居中小地图',
+      )
+  },
+})
+
+const OverlaysStub = defineComponent({
+  props: {
+    nodeContextMenu: {
+      type: Object as PropType<{ visible: boolean }>,
+      required: true,
+    },
+  },
+  emits: ['create-node'],
+  setup(_, { emit }) {
+    return () =>
+      h(
+        'button',
+        {
+          type: 'button',
+          'data-testid': 'overlay-region',
+          onClick: () => emit('create-node', 'prompt'),
+        },
+        '创建提示词节点',
+      )
   },
 })
 
@@ -205,6 +296,7 @@ function createRuntime() {
         persistence: { history: { undo: vi.fn(), redo: vi.fn() } },
         viewportControls: { zoomLevel: ref(100) },
         graphEditing: {
+          hasSelectedFlowNodes: ref(false),
           isFlowInteractionActive: ref(false),
           isFlowViewportPanInteractionActive: ref(false),
           isFlowInteractionLocked: ref(false),
@@ -339,32 +431,59 @@ function createRuntime() {
   }
 }
 
-describe('CanvasScreen', () => {
-  it('assembles workspace, chrome, group, keyboard, leave guard, and board lifecycle at the Screen seam', async () => {
-    const harness = createRuntime()
-    mocks.useCanvasWorkspaceRuntime.mockReturnValue(harness.runtime)
+function renderScreen() {
+  const harness = createRuntime()
+  mocks.useCanvasWorkspaceRuntime.mockReturnValue(harness.runtime)
 
-    render(CanvasScreen, {
-      props: {
-        route: { query: {} } as RouteLocationNormalizedLoaded,
-        router: {} as Router,
-        getUserIdentity: () => ({ userId: 1, userUid: 'user-a' }),
-        logoutAndRedirect: vi.fn(),
+  const view = render(CanvasScreen, {
+    props: {
+      route: { query: {} } as RouteLocationNormalizedLoaded,
+      router: {} as Router,
+      getUserIdentity: () => ({ userId: 1, userUid: 'user-a' }),
+      logoutAndRedirect: vi.fn(),
+    },
+    global: {
+      stubs: {
+        CanvasChrome: ChromeStub,
+        VueFlow: VueFlowStub,
+        CanvasGroupPresentation: GroupStub,
+        FlowCanvasNode: NodeStub,
+        CanvasChromeMiniMap: MiniMapStub,
+        CanvasOverlays: OverlaysStub,
       },
-      global: { stubs: { CanvasScreenPresentation: ScreenPresentationStub } },
-    })
+    },
+  })
 
-    await Promise.resolve()
+  return { harness, ...view }
+}
 
-    expect(harness.loadCanvasBoardAndProbe).toHaveBeenCalledTimes(1)
-    expect(harness.reattachPendingImageResults).toHaveBeenCalledTimes(1)
-    mocks.presentation!.chrome.commands.exportSelectedImages()
-    mocks.presentation!.chrome.commands.zoomOut()
-    mocks.presentation!.canvas.flow.onNodesChange([{ id: 'node-a', type: 'remove' }])
-    mocks.presentation!.canvas.flow.onPaneClick()
+describe('CanvasScreen', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.keyboardOptions = null
+    mocks.leaveGuardOptions = null
+    mocks.groupOptions = null
+  })
+
+  it('renders and forwards Canvas interactions through the public Screen seam', () => {
+    const view = renderScreen()
+    const { harness } = view
+
+    expect(view.getByTestId('chrome-region')).toBeInTheDocument()
+    expect(view.getByTestId('flow-region')).toBeInTheDocument()
+    expect(view.getByTestId('node-region')).toBeInTheDocument()
+    expect(view.getByTestId('group-region')).toBeInTheDocument()
+    expect(view.getByTestId('minimap-region')).toBeInTheDocument()
+    expect(view.getByTestId('overlay-region')).toBeInTheDocument()
+
+    view.getByRole('button', { name: '导出选中图片' }).click()
+    view.getByRole('button', { name: '缩小画布' }).click()
+    view.getByRole('button', { name: '删除节点' }).click()
+    view.getByRole('button', { name: '点击画布' }).click()
+    view.getByRole('button', { name: '触发节点交互' }).click()
+    view.getByRole('button', { name: '居中小地图' }).click()
+    view.getByRole('button', { name: '创建提示词节点' }).click()
     mocks.groupOptions!.grouping.onAction()
-    mocks.keyboardOptions!.onSave()
-    await mocks.leaveGuardOptions!.onLeave()
 
     expect(harness.onExportSelectedImages).toHaveBeenCalledTimes(1)
     expect(harness.onZoomOut).toHaveBeenCalledTimes(1)
@@ -372,7 +491,41 @@ describe('CanvasScreen', () => {
       { id: 'node-a', type: 'remove' },
     ])
     expect(harness.handlePaneClick).toHaveBeenCalledTimes(1)
+    expect(mocks.nodeIntentDispatch).toHaveBeenCalledWith({
+      type: 'delete-requested',
+      nodeId: 'node-a',
+    })
+    expect(mocks.onFlowNodeMouseDown).toHaveBeenCalledWith('node-a', expect.any(MouseEvent))
+    expect(
+      harness.runtime.commands.graphEditing.scheduleFlowNodeInternalsRefresh,
+    ).toHaveBeenCalledWith(['node-a'])
+    expect(harness.runtime.commands.viewportControls.onMiniMapCenterRequested).toHaveBeenCalledWith(
+      {
+        position: { x: 10, y: 20 },
+      },
+    )
+    expect(mocks.createContextMenuNode).toHaveBeenCalledWith(
+      'prompt',
+      harness.runtime.commands.graphEditing.createNodeAtPosition,
+    )
     expect(harness.groupSelectedNodes).toHaveBeenCalledTimes(1)
+  })
+
+  it('loads the Board and reattaches pending results on mount', async () => {
+    const { harness } = renderScreen()
+
+    await Promise.resolve()
+
+    expect(harness.loadCanvasBoardAndProbe).toHaveBeenCalledTimes(1)
+    expect(harness.reattachPendingImageResults).toHaveBeenCalledTimes(1)
+  })
+
+  it('saves through keyboard and leave-guard behavior', async () => {
+    const { harness } = renderScreen()
+
+    mocks.keyboardOptions!.onSave()
+    await mocks.leaveGuardOptions!.onLeave()
+
     expect(harness.flushAutosave).toHaveBeenNthCalledWith(1, { silent: false })
     expect(harness.flushAutosave).toHaveBeenNthCalledWith(2)
   })
