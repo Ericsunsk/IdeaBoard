@@ -27,8 +27,6 @@
       </div>
 
       <div v-else-if="health && presentation" class="min-w-0">
-        <div class="h-1 w-full" :class="presentation.stripClass" aria-hidden="true"></div>
-
         <div class="flex flex-col gap-6 px-6 py-6 lg:flex-row lg:items-start lg:justify-between">
           <div class="flex min-w-0 items-start gap-4">
             <span class="mt-0.5 shrink-0" :class="presentation.iconClass" aria-hidden="true">

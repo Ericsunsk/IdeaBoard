@@ -5,12 +5,10 @@ import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import { useAdminAccessSettings } from './useAdminAccessSettings'
 import { useAdminBrandingSettings } from './useAdminBrandingSettings'
 import { useAdminMediaUploadSettings } from './useAdminMediaUploadSettings'
-import { useAdminTaskMonitorSettings } from './useAdminTaskMonitorSettings'
 import type {
   AdminAccessSettingsFeedback,
   AdminBrandingSettingsFeedback,
   AdminMediaUploadSettingsFeedback,
-  AdminTaskMonitorSettingsFeedback,
 } from './useAdminSystemSettingsFeedback'
 
 describe('admin system settings vertical lifecycles', () => {
@@ -115,50 +113,6 @@ describe('admin system settings vertical lifecycles', () => {
       expect(registrationRequests).toEqual([{ enabled: true }])
       expect(harness.value.registrationEnabled.value).toBe(true)
       expect(feedback.registrationUpdated).toHaveBeenCalledWith(true)
-    } finally {
-      await harness.unmount()
-    }
-  })
-
-  it('owns Task Monitor load, validation, reset, save, and feedback', async () => {
-    const updateRequests: unknown[] = []
-    let pageSize = 20
-    useMswHandlers(
-      http.get('/api/admin/settings/task-monitor', () =>
-        HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            list_page_size: pageSize,
-            auto_refresh_enabled: true,
-            refresh_interval_seconds: 5,
-            result_preview_enabled: true,
-          },
-        }),
-      ),
-      http.put('/api/admin/settings/task-monitor', async ({ request }) => {
-        const body = (await request.json()) as { list_page_size: number }
-        updateRequests.push(body)
-        pageSize = body.list_page_size
-        return HttpResponse.json({ code: 0, msg: 'ok', data: body })
-      }),
-    )
-    const feedback = createSettingFeedback() as AdminTaskMonitorSettingsFeedback
-    const harness = mountComposable(() => useAdminTaskMonitorSettings({ feedback }))
-
-    try {
-      await vi.waitFor(() => expect(harness.value.form.value.list_page_size).toBe(20))
-      harness.value.form.value.list_page_size = 100
-      await expect(harness.value.save()).resolves.toBe(false)
-      expect(feedback.validationFailed).toHaveBeenCalledOnce()
-
-      harness.value.reset()
-      expect(harness.value.form.value.list_page_size).toBe(20)
-      harness.value.form.value.list_page_size = 30
-      await expect(harness.value.save()).resolves.toBe(true)
-      expect(updateRequests).toHaveLength(1)
-      expect(harness.value.form.value.list_page_size).toBe(30)
-      expect(feedback.saved).toHaveBeenCalledOnce()
     } finally {
       await harness.unmount()
     }

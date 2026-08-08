@@ -2,17 +2,14 @@ package billing
 
 import (
 	"errors"
-	"fmt"
 	"regexp"
 	"strings"
 	"time"
 )
 
 const (
-	MaxSKULength     = 128
-	MaxQuoteCredits  = int64(9_000_000_000_000_000)
-	DefaultPageLimit = 50
-	MaxPageLimit     = 100
+	MaxSKULength    = 128
+	MaxQuoteCredits = int64(9_000_000_000_000_000)
 )
 
 var (
@@ -73,17 +70,6 @@ type AvailabilityInfo struct {
 	UpdatedAt time.Time          `json:"updated_at"`
 }
 
-type ListPricesInput struct {
-	SKU           string
-	BeforeVersion int64
-	Limit         int
-}
-
-type PricePage struct {
-	Prices            []PriceInfo `json:"prices"`
-	NextBeforeVersion *int64      `json:"next_before_version,omitempty"`
-}
-
 type ArchivedItemDeleteResult struct {
 	SKU SKU `json:"sku"`
 }
@@ -132,14 +118,4 @@ func normalizeDescription(value string) (string, error) {
 		return "", ErrInvalidCatalogEntry
 	}
 	return value, nil
-}
-
-func normalizePageLimit(limit int) (int, error) {
-	if limit == 0 {
-		return DefaultPageLimit, nil
-	}
-	if limit < 1 || limit > MaxPageLimit {
-		return 0, fmt.Errorf("%w: page limit", ErrInvalidCatalogEntry)
-	}
-	return limit, nil
 }

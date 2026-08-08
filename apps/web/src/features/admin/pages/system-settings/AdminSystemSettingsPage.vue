@@ -171,79 +171,6 @@
       </template>
     </SettingEditorCard>
 
-    <SettingEditorCard
-      title="任务监控展示"
-      :status="taskMonitorForm.auto_refresh_enabled ? '自动刷新' : '手动刷新'"
-    >
-      <template #default>
-        <div :class="settingCardBodyClass">
-          <div class="grid gap-4 sm:grid-cols-2">
-            <AdminFormField label="任务列表每页数量" for="admin-task-monitor-page-size">
-              <InputNumber
-                v-model="taskMonitorForm.list_page_size"
-                input-id="admin-task-monitor-page-size"
-                :min="TASK_MONITOR_MIN_PAGE_SIZE"
-                :max="TASK_MONITOR_MAX_PAGE_SIZE"
-                fluid
-                :disabled="taskMonitorLoading || taskMonitorSaving"
-              />
-            </AdminFormField>
-
-            <AdminFormField label="刷新间隔 (秒)" for="admin-task-monitor-refresh-interval">
-              <InputNumber
-                v-model="taskMonitorForm.refresh_interval_seconds"
-                input-id="admin-task-monitor-refresh-interval"
-                :min="TASK_MONITOR_MIN_REFRESH_INTERVAL_SECONDS"
-                :max="TASK_MONITOR_MAX_REFRESH_INTERVAL_SECONDS"
-                fluid
-                :disabled="taskMonitorLoading || taskMonitorSaving"
-              />
-            </AdminFormField>
-          </div>
-
-          <div class="grid gap-3 sm:grid-cols-2">
-            <div :class="settingToggleRowClass">
-              <span class="text-admin-body font-bold text-admin-text-1">自动刷新</span>
-              <ToggleSwitch
-                v-model="taskMonitorForm.auto_refresh_enabled"
-                input-id="admin-task-monitor-auto-refresh"
-                :disabled="taskMonitorLoading || taskMonitorSaving"
-                aria-label="自动刷新"
-              />
-            </div>
-
-            <div :class="settingToggleRowClass">
-              <span class="text-admin-body font-bold text-admin-text-1">结果预览</span>
-              <ToggleSwitch
-                v-model="taskMonitorForm.result_preview_enabled"
-                input-id="admin-task-monitor-result-preview"
-                :disabled="taskMonitorLoading || taskMonitorSaving"
-                aria-label="结果预览"
-              />
-            </div>
-          </div>
-        </div>
-      </template>
-      <template #actions>
-        <Button
-          :class="adminActionButtonClass"
-          label="保存"
-          severity="contrast"
-          :disabled="taskMonitorLoading || taskMonitorSaving"
-          :loading="taskMonitorSaving"
-          @click="saveTaskMonitor"
-        />
-        <Button
-          :class="adminActionButtonClass"
-          label="重置"
-          severity="secondary"
-          outlined
-          :disabled="taskMonitorLoading || taskMonitorSaving"
-          @click="resetTaskMonitor"
-        />
-      </template>
-    </SettingEditorCard>
-
     <SettingEditorCard title="上传并发" :status="`并发 ${mediaUploadForm.upload_max_concurrent}`">
       <template #default>
         <div :class="settingCardBodyClass">
@@ -318,17 +245,9 @@ import {
   useAdminMediaUploadSettings,
 } from '../../system-settings/useAdminMediaUploadSettings'
 import {
-  TASK_MONITOR_MAX_PAGE_SIZE,
-  TASK_MONITOR_MAX_REFRESH_INTERVAL_SECONDS,
-  TASK_MONITOR_MIN_PAGE_SIZE,
-  TASK_MONITOR_MIN_REFRESH_INTERVAL_SECONDS,
-} from '../../system-settings/taskMonitorSettingsResource'
-import { useAdminTaskMonitorSettings } from '../../system-settings/useAdminTaskMonitorSettings'
-import {
   useAdminAccessSettingsFeedback,
   useAdminBrandingSettingsFeedback,
   useAdminMediaUploadSettingsFeedback,
-  useAdminTaskMonitorSettingsFeedback,
   useAdminUnsupportedLogoFileFeedback,
 } from '../../system-settings/useAdminSystemSettingsFeedback'
 import {
@@ -350,7 +269,6 @@ const brandingLogoButtonClass = createBrandMarkClass(
 const accessSettingsFeedback = useAdminAccessSettingsFeedback()
 const brandingSettingsFeedback = useAdminBrandingSettingsFeedback()
 const mediaUploadSettingsFeedback = useAdminMediaUploadSettingsFeedback()
-const taskMonitorSettingsFeedback = useAdminTaskMonitorSettingsFeedback()
 const unsupportedLogoFileFeedback = useAdminUnsupportedLogoFileFeedback()
 const logoFileInputRef = ref<HTMLInputElement | null>(null)
 const logoCropDialogVisible = ref(false)
@@ -377,13 +295,6 @@ const {
   resetRateLimit,
   saveRateLimit,
 } = useAdminAccessSettings({ feedback: accessSettingsFeedback })
-const {
-  form: taskMonitorForm,
-  save: saveTaskMonitor,
-  loading: taskMonitorLoading,
-  reset: resetTaskMonitor,
-  saving: taskMonitorSaving,
-} = useAdminTaskMonitorSettings({ feedback: taskMonitorSettingsFeedback })
 const {
   form: mediaUploadForm,
   save: saveMediaUpload,

@@ -62,17 +62,10 @@
         </div>
 
         <div
+          v-if="item.status === 'archived'"
           class="flex min-h-8 items-center justify-end gap-2 border-t border-ib-border-soft pt-4"
         >
           <Button
-            size="small"
-            severity="secondary"
-            text
-            label="价格历史"
-            @click="emit('history', item)"
-          />
-          <Button
-            v-if="item.status === 'archived'"
             size="small"
             severity="danger"
             text
@@ -106,7 +99,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   publish: [item: AdminBillableItemCard]
   availability: [item: AdminBillableItemCard, enabled: boolean]
-  history: [item: AdminBillableItemCard]
   delete: [item: AdminBillableItemCard]
 }>()
 

@@ -14,7 +14,7 @@ Billing 是平台级商品身份与 Credit pricing context。用户看到的货�
 | local key | namespace 内的 1–95 字符商品 key，可含 `.`, `_`, `-` |
 | Price Version | 某 SKU 的 append-only 单价事实；`version` 在 SKU 内单调递增，`unit_credits` 是不可拆分整数且可显式为 0 |
 | Current Price | SKU 原子指向的最新 Price Version；创建新版本与切换 pointer 在同一 database command 完成 |
-| Archived | 持久化 Catalog item 已不在当前 Registry；不可 Quote 或启用，但仍可读取 immutable Price History |
+| Archived | 持久化 Catalog item 已不在当前 Registry；不可 Quote 或启用，Price Versions 保留到安全删除整个 aggregate |
 | Price Snapshot | Quote 返回并由后续 Billing Command 持久化的 immutable value object |
 | Quote | 服务端以 current Price Snapshot × positive integer quantity 计算的结果 |
 | Admin Action | Admin 对 Catalog/Price 的一次写操作；包含 authenticated actor、target、old/new、outcome 与时间，并以 append-only audit 记录持久化 |
@@ -25,7 +25,6 @@ Billing 是平台级商品身份与 Credit pricing context。用户看到的货�
 - `BillableItemCatalog.List(ctx)` 是 Admin 功能定价页的只读 seam；Registry 中无持久化价格的项目仍显示为 `Unpriced`，持久化项目不在 Registry 时显示为 `Archived`。
 - `BillableItemCatalog.PublishPrice(ctx, sku, unitCredits, actorID)` 是功能价格发布 seam；只接受 Registry 中的 Billable Item，首次发布原子 materialize Catalog item 并转为 `Active`。
 - `BillableItemCatalog.SetAvailability(ctx, sku, enabled, actorID)` 是 Feature availability 写 seam；只接受 Registry 中已有 current price 的项目，`Unpriced` 不可启用，重复命令保持幂等并记录真实 outcome。
-- `BillableItemCatalog.ListPriceHistory(ctx, sku, beforeVersion, limit)` 是只读 immutable Price History seam，支持当前 Registry item 与 Archived item。
 - `BillableItemCatalog.DeleteArchived(ctx, sku, actorID)` 只接受当前 Registry 不存在的 item；database command 在 SKU row lock 内重新检查 Task Billing Snapshot 等 durable references。成功时删除 Catalog aggregate（SKU + Price Versions），保留既有 Admin Audit 并追加 `delete_archived` audit。
 - `BillableItemCatalog.Quote/QuoteInTx` 是 Registry-aware runtime seam；`Unpriced`、`Disabled` 与 `Archived` 统一 fail closed，Task submission 通过 `QuoteInTx` 保持 Snapshot、Hold、Task 与 River enqueue 的单事务边界。
 - `Service.Quote(ctx, sku, quantity)` 是产品读取价格的主要 seam。Caller 只传 SKU 与 quantity，不能传 price。

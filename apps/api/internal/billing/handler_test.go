@@ -30,19 +30,8 @@ type billableCatalogReaderStub struct {
 	availabilitySKU     string
 	availabilityEnabled bool
 	availabilityActorID int64
-	historySKU          string
-	historyBefore       int64
-	historyLimit        int
-	pricePage           PricePage
 	deleted             ArchivedItemDeleteResult
 	deleteActorID       int64
-}
-
-func (s *billableCatalogReaderStub) ListPriceHistory(_ context.Context, sku string, before int64, limit int) (PricePage, error) {
-	s.historySKU = sku
-	s.historyBefore = before
-	s.historyLimit = limit
-	return s.pricePage, s.err
 }
 
 func (s *billableCatalogReaderStub) DeleteArchived(_ context.Context, sku string, actorID int64) (ArchivedItemDeleteResult, error) {
@@ -288,7 +277,6 @@ func TestAdminHandlersRejectUnknownAndInvalidInputs(t *testing.T) {
 		c.Next()
 	})
 	router.POST("/catalog/:sku/prices", handler.PublishPrice)
-	router.GET("/catalog/:sku/prices", handler.ListBillableItemPrices)
 
 	tests := []struct {
 		name   string
@@ -297,7 +285,6 @@ func TestAdminHandlersRejectUnknownAndInvalidInputs(t *testing.T) {
 		body   string
 	}{
 		{name: "publish price cannot use provider routing", method: http.MethodPost, path: "/catalog/test:item/prices", body: `{"unit_credits":1,"provider_account_id":2}`},
-		{name: "price cursor is positive", method: http.MethodGet, path: "/catalog/test:item/prices?before_version=-1"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -314,13 +301,12 @@ func TestAdminHandlersRejectUnknownAndInvalidInputs(t *testing.T) {
 	}
 }
 
-func TestAdminBillableItemHistoryAndDeleteRequireAdmin(t *testing.T) {
+func TestAdminArchivedDeleteRequiresAdmin(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	for _, endpoint := range []struct {
 		name, method, path string
 		handler            func(*Handler) gin.HandlerFunc
 	}{
-		{name: "history", method: http.MethodGet, path: "/catalog/test:item/prices", handler: func(h *Handler) gin.HandlerFunc { return h.ListBillableItemPrices }},
 		{name: "delete", method: http.MethodDelete, path: "/catalog/test:item", handler: func(h *Handler) gin.HandlerFunc { return h.DeleteArchivedItem }},
 	} {
 		for _, identity := range []struct {
@@ -346,40 +332,6 @@ func TestAdminBillableItemHistoryAndDeleteRequireAdmin(t *testing.T) {
 				}
 			})
 		}
-	}
-}
-
-func TestAdminBillableItemPriceHistoryContract(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	catalog := &billableCatalogReaderStub{pricePage: PricePage{
-		Prices: []PriceInfo{{PriceVersionID: 8, Version: 2, UnitCredits: 4, CreatedBy: 9}},
-	}}
-	router := gin.New()
-	router.Use(func(c *gin.Context) {
-		testsupport.SetPrincipal(t, c, 9, principal.RoleAdmin)
-		c.Next()
-	})
-	router.GET("/catalog/:sku/prices", NewHandler(nil, catalog).ListBillableItemPrices)
-
-	recorder := httptest.NewRecorder()
-	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/catalog/legacy:removed/prices?before_version=3&limit=10", nil))
-	if recorder.Code != http.StatusOK || catalog.historySKU != "legacy:removed" || catalog.historyBefore != 3 || catalog.historyLimit != 10 || !strings.Contains(recorder.Body.String(), `"price_version_id":8`) {
-		t.Fatalf("status=%d body=%s history=%+v", recorder.Code, recorder.Body.String(), catalog)
-	}
-
-	for _, query := range []string{"?before_version=-1", "?before_version=bad", "?limit=101", "?limit=bad"} {
-		recorder := httptest.NewRecorder()
-		router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/catalog/legacy:removed/prices"+query, nil))
-		if recorder.Code != http.StatusBadRequest {
-			t.Fatalf("query=%q status=%d body=%s", query, recorder.Code, recorder.Body.String())
-		}
-	}
-
-	catalog.err = ErrSKUNotFound
-	notFound := httptest.NewRecorder()
-	router.ServeHTTP(notFound, httptest.NewRequest(http.MethodGet, "/catalog/missing:item/prices", nil))
-	if notFound.Code != http.StatusNotFound {
-		t.Fatalf("not found status=%d body=%s", notFound.Code, notFound.Body.String())
 	}
 }
 

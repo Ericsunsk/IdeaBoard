@@ -5,8 +5,12 @@ import type {
 } from '../../../shared/api/generated-query/model'
 import { useAdminPagePagination } from '../shared/composables/useAdminPagePagination'
 import { useAdminQueryPolling } from '../shared/composables/useAdminQueryPolling'
-import { useAdminTaskMonitorSettingQuery } from '../system-settings/taskMonitorSettingsResource'
 import { useAdminTaskListResource, type AdminTaskMonitorListItemModel } from './taskMonitorResource'
+import {
+  ADMIN_TASK_MONITOR_PAGE_SIZE,
+  ADMIN_TASK_MONITOR_REFRESH_INTERVAL_MS,
+  ADMIN_TASK_MONITOR_RESULT_PREVIEW_ENABLED,
+} from './taskMonitorDisplayPolicy'
 
 type TaskStatusStats = {
   running: number
@@ -26,10 +30,8 @@ export function useAdminTaskList() {
   const searchKeyword = ref('')
   const appliedSearchKeyword = ref('')
   const hasActiveTasks = ref(true)
-  const { settings: taskMonitorSettings, settingsError: taskMonitorSettingsError } =
-    useAdminTaskMonitorSettingQuery()
-  const pageSize = computed(() => taskMonitorSettings.value.list_page_size)
-  const resultPreviewEnabled = computed(() => taskMonitorSettings.value.result_preview_enabled)
+  const pageSize = computed(() => ADMIN_TASK_MONITOR_PAGE_SIZE)
+  const resultPreviewEnabled = computed(() => ADMIN_TASK_MONITOR_RESULT_PREVIEW_ENABLED)
 
   function resolveParams(): ListAdminTasksParams {
     const params: ListAdminTasksParams = {
@@ -47,10 +49,7 @@ export function useAdminTaskList() {
   }
 
   const polling = useAdminQueryPolling({
-    visibleInterval: () =>
-      taskMonitorSettings.value.auto_refresh_enabled
-        ? taskMonitorSettings.value.refresh_interval_seconds * 1000
-        : false,
+    visibleInterval: ADMIN_TASK_MONITOR_REFRESH_INTERVAL_MS,
     hiddenInterval: false,
     isEnabled: () => hasActiveTasks.value,
   })
@@ -141,7 +140,6 @@ export function useAdminTaskList() {
     pagination,
     pageSize,
     resultPreviewEnabled,
-    taskMonitorSettingsError,
     taskStats,
     filterStatus,
     accountIdFilter,

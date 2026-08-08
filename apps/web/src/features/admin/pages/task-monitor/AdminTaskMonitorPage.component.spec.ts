@@ -37,7 +37,6 @@ vi.mock('../../task-monitor/useAdminTaskList', () => ({
       next: vi.fn(),
     },
     resultPreviewEnabled: ref(false),
-    taskMonitorSettingsError: ref(null),
     taskStats: ref({ pending: 0, running: 1, completed: 0, failed: 0, cancelled: 0, other: 0 }),
     filterStatus: ref(null),
     accountIdFilter: ref(null),

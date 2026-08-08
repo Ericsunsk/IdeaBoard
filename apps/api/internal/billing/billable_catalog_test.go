@@ -115,12 +115,7 @@ type catalogFactReaderStub struct {
 	items        []CatalogItem
 	err          error
 	publishInput PublishPriceInput
-	pricePage    PricePage
 	deleted      ArchivedItemDeleteResult
-}
-
-func (s *catalogFactReaderStub) ListPrices(context.Context, ListPricesInput) (PricePage, error) {
-	return s.pricePage, s.err
 }
 
 func (s *catalogFactReaderStub) DeleteArchived(_ context.Context, sku string, _ int64) (ArchivedItemDeleteResult, error) {
@@ -188,19 +183,5 @@ func TestBillableCatalogOnlyDeletesRegistryAbsentItems(t *testing.T) {
 	result, err := catalog.DeleteArchived(t.Context(), "legacy:removed", 9)
 	if err != nil || result.SKU != "legacy:removed" {
 		t.Fatalf("archived delete result = %+v error = %v", result, err)
-	}
-}
-
-func TestBillableCatalogPriceHistorySupportsRegisteredUnpricedItem(t *testing.T) {
-	registry, err := NewBillableItemRegistry([]BillableItemDefinition{{
-		SKU: "ai-image:partial-edit", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "局部重绘",
-	}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	store := &catalogFactReaderStub{err: ErrSKUNotFound}
-	page, err := NewBillableItemCatalog(registry, store).ListPriceHistory(t.Context(), "ai-image:partial-edit", 0, 20)
-	if err != nil || len(page.Prices) != 0 {
-		t.Fatalf("unpriced history = %+v error = %v", page, err)
 	}
 }

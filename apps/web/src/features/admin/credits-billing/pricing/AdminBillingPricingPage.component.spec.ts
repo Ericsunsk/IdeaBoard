@@ -261,46 +261,6 @@ describe('AdminBillingPricingPage', () => {
     expect(await screen.findByText('5 Ideas')).toBeVisible()
   })
 
-  it('keeps the latest price-history request when switching cards quickly', async () => {
-    let releaseFirst!: () => void
-    const firstGate = new Promise<void>((resolve) => {
-      releaseFirst = resolve
-    })
-    useMswHandlers(
-      http.get('/api/admin/billing/catalog', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
-      ),
-      http.get('/api/admin/billing/catalog/:sku/prices', async ({ params }) => {
-        if (params.sku === 'ai-image:partial-edit') await firstGate
-        return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            prices: [
-              {
-                price_version_id: params.sku === 'ai-image:partial-edit' ? 11 : 22,
-                version: params.sku === 'ai-image:partial-edit' ? 11 : 22,
-                unit_credits: params.sku === 'ai-image:partial-edit' ? 11 : 22,
-                created_at: '2026-07-16T08:00:00Z',
-              },
-            ],
-          },
-        })
-      }),
-    )
-
-    const { user } = renderPricingPage()
-    const historyButtons = await screen.findAllByRole('button', { name: '价格历史' })
-    await user.click(historyButtons[0])
-    await user.click(historyButtons[1])
-
-    expect(await screen.findByText('版本 22')).toBeVisible()
-    expect(screen.getByText('价格历史 · 抠图')).toBeVisible()
-    releaseFirst()
-    await waitFor(() => expect(screen.queryByText('版本 11')).not.toBeInTheDocument())
-    expect(screen.getByText('版本 22')).toBeVisible()
-  })
-
   it('confirms and removes an unreferenced Archived card', async () => {
     useMswHandlers(
       http.get('/api/admin/billing/catalog', () =>

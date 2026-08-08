@@ -153,16 +153,6 @@ func TestRuntimeSettingsServiceUpdatesAndReadsTypedSettings(t *testing.T) {
 		t.Fatalf("branding = %+v, want normalized values", branding)
 	}
 
-	taskMonitor := TaskMonitorSetting{
-		ListPageSize:           24,
-		AutoRefreshEnabled:     false,
-		RefreshIntervalSeconds: 10,
-		ResultPreviewEnabled:   false,
-	}
-	if _, err := service.UpdateTaskMonitor(ctx, taskMonitor); err != nil {
-		t.Fatalf("update task monitor failed: %v", err)
-	}
-
 	mediaUpload, err := service.UpdateMediaUpload(ctx, MediaUploadSetting{UploadMaxConcurrent: 12})
 	if err != nil {
 		t.Fatalf("update media upload failed: %v", err)
@@ -195,14 +185,6 @@ func TestRuntimeSettingsServiceUpdatesAndReadsTypedSettings(t *testing.T) {
 		t.Fatalf("branding readback = %+v, want %+v", gotBranding, branding)
 	}
 
-	gotTaskMonitor, err := service.GetTaskMonitor(ctx)
-	if err != nil {
-		t.Fatalf("get task monitor failed: %v", err)
-	}
-	if gotTaskMonitor != taskMonitor {
-		t.Fatalf("task monitor readback = %+v, want %+v", gotTaskMonitor, taskMonitor)
-	}
-
 	gotMediaUpload, err := service.GetMediaUpload(ctx)
 	if err != nil {
 		t.Fatalf("get media upload failed: %v", err)
@@ -226,9 +208,6 @@ func TestRuntimeSettingsServiceDefaultsWhenConfigsAreMissing(t *testing.T) {
 	}
 	if got, err := service.GetBranding(ctx); err != nil || got != DefaultBrandingSetting() {
 		t.Fatalf("branding default = %+v, err=%v", got, err)
-	}
-	if got, err := service.GetTaskMonitor(ctx); err != nil || got != DefaultTaskMonitorSetting() {
-		t.Fatalf("task monitor default = %+v, err=%v", got, err)
 	}
 	if got, err := service.GetMediaUpload(ctx); err != nil || got != DefaultMediaUploadSetting() {
 		t.Fatalf("media upload default = %+v, err=%v", got, err)

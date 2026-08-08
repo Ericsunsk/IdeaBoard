@@ -129,7 +129,6 @@ type CatalogStore interface {
 	CatalogFactReader
 	CatalogPricePublisher
 	SetAvailability(context.Context, string, bool, int64) (AvailabilityInfo, error)
-	ListPrices(context.Context, ListPricesInput) (PricePage, error)
 	DeleteArchived(context.Context, string, int64) (ArchivedItemDeleteResult, error)
 	Quote(context.Context, string, int64) (Quote, error)
 	QuoteInTx(context.Context, pgx.Tx, string, int64) (Quote, error)
@@ -168,19 +167,6 @@ func (c *BillableItemCatalog) SetAvailability(ctx context.Context, rawSKU string
 		return AvailabilityInfo{}, ErrSKUNotFound
 	}
 	return c.store.SetAvailability(ctx, rawSKU, enabled, actorID)
-}
-
-func (c *BillableItemCatalog) ListPriceHistory(ctx context.Context, rawSKU string, beforeVersion int64, limit int) (PricePage, error) {
-	if c == nil || c.registry == nil || c.store == nil {
-		return PricePage{}, ErrServiceUnavailable
-	}
-	page, err := c.store.ListPrices(ctx, ListPricesInput{SKU: rawSKU, BeforeVersion: beforeVersion, Limit: limit})
-	if errors.Is(err, ErrSKUNotFound) {
-		if _, exists := c.registry.Find(rawSKU); exists {
-			return PricePage{Prices: []PriceInfo{}}, nil
-		}
-	}
-	return page, err
 }
 
 func (c *BillableItemCatalog) DeleteArchived(ctx context.Context, rawSKU string, actorID int64) (ArchivedItemDeleteResult, error) {

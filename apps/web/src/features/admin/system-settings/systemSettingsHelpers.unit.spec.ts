@@ -11,13 +11,6 @@ import {
   normalizeMediaUploadSetting,
   validateMediaUploadSetting,
 } from './useAdminMediaUploadSettings'
-import {
-  DEFAULT_ADMIN_TASK_MONITOR_SETTING,
-  TASK_MONITOR_MAX_PAGE_SIZE,
-  TASK_MONITOR_MIN_REFRESH_INTERVAL_SECONDS,
-  normalizeTaskMonitorSetting,
-} from './taskMonitorSettingsResource'
-import { validateTaskMonitorSetting } from './useAdminTaskMonitorSettings'
 
 describe('admin access settings validation', () => {
   it('accepts valid integer rate limit settings', () => {
@@ -75,53 +68,5 @@ describe('admin media upload settings helpers', () => {
     ).toBe(
       `上传并发上限必须在 ${MEDIA_UPLOAD_MIN_CONCURRENT} 到 ${MEDIA_UPLOAD_MAX_CONCURRENT} 之间`,
     )
-  })
-})
-
-describe('admin task monitor settings helpers', () => {
-  it('normalizes missing and invalid resource values to defaults', () => {
-    expect(normalizeTaskMonitorSetting(null)).toEqual(DEFAULT_ADMIN_TASK_MONITOR_SETTING)
-    expect(
-      normalizeTaskMonitorSetting({
-        list_page_size: 1000,
-        auto_refresh_enabled: false,
-        refresh_interval_seconds: 1,
-        result_preview_enabled: false,
-      }),
-    ).toEqual({
-      ...DEFAULT_ADMIN_TASK_MONITOR_SETTING,
-      auto_refresh_enabled: false,
-      result_preview_enabled: false,
-    })
-  })
-
-  it('accepts valid settings', () => {
-    expect(
-      validateTaskMonitorSetting({
-        list_page_size: 24,
-        auto_refresh_enabled: true,
-        refresh_interval_seconds: 10,
-        result_preview_enabled: true,
-      }),
-    ).toBe('')
-  })
-
-  it('rejects out-of-range settings', () => {
-    expect(
-      validateTaskMonitorSetting({
-        list_page_size: TASK_MONITOR_MAX_PAGE_SIZE + 1,
-        auto_refresh_enabled: true,
-        refresh_interval_seconds: 4,
-        result_preview_enabled: true,
-      }),
-    ).toBe('任务列表每页数量必须在 5 到 50 之间')
-    expect(
-      validateTaskMonitorSetting({
-        list_page_size: 12,
-        auto_refresh_enabled: true,
-        refresh_interval_seconds: TASK_MONITOR_MIN_REFRESH_INTERVAL_SECONDS - 1,
-        result_preview_enabled: true,
-      }),
-    ).toBe('刷新间隔必须在 2 到 60 秒之间')
   })
 })

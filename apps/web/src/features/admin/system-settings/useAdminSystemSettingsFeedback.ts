@@ -26,7 +26,6 @@ export type AdminAccessSettingsFeedback = {
   registrationUpdateFailed: (error: unknown) => void
 }
 
-export type AdminTaskMonitorSettingsFeedback = AdminSettingFeedback
 export type AdminMediaUploadSettingsFeedback = AdminSettingFeedback
 export type AdminOutboundPolicyFeedback = AdminSettingFeedback
 
@@ -57,17 +56,6 @@ export function createAdminAccessSettingsFeedback(
   }
 }
 
-export function createAdminTaskMonitorSettingsFeedback(
-  toast: AdminToastPort,
-): AdminTaskMonitorSettingsFeedback {
-  return createAdminSettingFeedback(
-    toast,
-    '加载任务监控设置失败',
-    '任务监控设置已保存',
-    '保存任务监控设置失败',
-  )
-}
-
 export function createAdminMediaUploadSettingsFeedback(
   toast: AdminToastPort,
 ): AdminMediaUploadSettingsFeedback {
@@ -91,10 +79,6 @@ export function useAdminBrandingSettingsFeedback() {
 
 export function useAdminAccessSettingsFeedback() {
   return createAdminAccessSettingsFeedback(useAdminToast())
-}
-
-export function useAdminTaskMonitorSettingsFeedback() {
-  return createAdminTaskMonitorSettingsFeedback(useAdminToast())
 }
 
 export function useAdminMediaUploadSettingsFeedback() {

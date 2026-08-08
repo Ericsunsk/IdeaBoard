@@ -26,13 +26,6 @@ type BrandingSetting struct {
 	LogoURL     string `json:"logo_url"`
 }
 
-type TaskMonitorSetting struct {
-	ListPageSize           int  `json:"list_page_size"`
-	AutoRefreshEnabled     bool `json:"auto_refresh_enabled"`
-	RefreshIntervalSeconds int  `json:"refresh_interval_seconds"`
-	ResultPreviewEnabled   bool `json:"result_preview_enabled"`
-}
-
 type MediaUploadSetting struct {
 	UploadMaxConcurrent int `json:"upload_max_concurrent"`
 }
@@ -80,20 +73,6 @@ const (
 	maxBrandingProjectNameLen  = 40
 	maxBrandingLogoURLLen      = 2048
 	brandingUploadLogoPrefix   = "/uploads/site/assets/"
-
-	taskMonitorListPageSizeKey           = "task_monitor_list_page_size"
-	taskMonitorAutoRefreshEnabledKey     = "task_monitor_auto_refresh_enabled"
-	taskMonitorRefreshIntervalSecondsKey = "task_monitor_refresh_interval_seconds"
-	taskMonitorResultPreviewEnabledKey   = "task_monitor_result_preview_enabled"
-
-	defaultTaskMonitorListPageSize        = 12
-	defaultTaskMonitorAutoRefreshEnabled  = true
-	defaultTaskMonitorRefreshIntervalSecs = 4
-	defaultTaskMonitorResultPreview       = true
-	minTaskMonitorListPageSize            = 5
-	maxTaskMonitorListPageSize            = 50
-	minTaskMonitorRefreshIntervalSecs     = 2
-	maxTaskMonitorRefreshIntervalSecs     = 60
 )
 
 type cachedRateLimitSetting struct {
@@ -115,15 +94,6 @@ func DefaultRateLimitSetting() RateLimitSetting {
 
 func DefaultBrandingSetting() BrandingSetting {
 	return BrandingSetting{ProjectName: defaultBrandingProjectName, LogoURL: ""}
-}
-
-func DefaultTaskMonitorSetting() TaskMonitorSetting {
-	return TaskMonitorSetting{
-		ListPageSize:           defaultTaskMonitorListPageSize,
-		AutoRefreshEnabled:     defaultTaskMonitorAutoRefreshEnabled,
-		RefreshIntervalSeconds: defaultTaskMonitorRefreshIntervalSecs,
-		ResultPreviewEnabled:   defaultTaskMonitorResultPreview,
-	}
 }
 
 func DefaultMediaUploadSetting() MediaUploadSetting {
@@ -242,51 +212,6 @@ func (s *RuntimeSettingsService) UpdateBranding(ctx context.Context, setting Bra
 		return BrandingSetting{}, err
 	}
 	return normalized, nil
-}
-
-func (s *RuntimeSettingsService) GetTaskMonitor(ctx context.Context) (TaskMonitorSetting, error) {
-	setting := DefaultTaskMonitorSetting()
-	values, err := s.getMany(
-		ctx,
-		taskMonitorListPageSizeKey,
-		taskMonitorAutoRefreshEnabledKey,
-		taskMonitorRefreshIntervalSecondsKey,
-		taskMonitorResultPreviewEnabledKey,
-	)
-	if err != nil {
-		return setting, err
-	}
-	if listPageSize, ok := parseBoundedInt(values[taskMonitorListPageSizeKey], minTaskMonitorListPageSize, maxTaskMonitorListPageSize); ok {
-		setting.ListPageSize = listPageSize
-	}
-	if raw, ok := values[taskMonitorAutoRefreshEnabledKey]; ok {
-		setting.AutoRefreshEnabled = strings.TrimSpace(raw) == "true"
-	}
-	if interval, ok := parseBoundedInt(values[taskMonitorRefreshIntervalSecondsKey], minTaskMonitorRefreshIntervalSecs, maxTaskMonitorRefreshIntervalSecs); ok {
-		setting.RefreshIntervalSeconds = interval
-	}
-	if raw, ok := values[taskMonitorResultPreviewEnabledKey]; ok {
-		setting.ResultPreviewEnabled = strings.TrimSpace(raw) == "true"
-	}
-	return setting, nil
-}
-
-func (s *RuntimeSettingsService) UpdateTaskMonitor(ctx context.Context, setting TaskMonitorSetting) (TaskMonitorSetting, error) {
-	if setting.ListPageSize < minTaskMonitorListPageSize || setting.ListPageSize > maxTaskMonitorListPageSize {
-		return TaskMonitorSetting{}, validation.New("list_page_size 必须在 5 到 50 之间")
-	}
-	if setting.RefreshIntervalSeconds < minTaskMonitorRefreshIntervalSecs || setting.RefreshIntervalSeconds > maxTaskMonitorRefreshIntervalSecs {
-		return TaskMonitorSetting{}, validation.New("refresh_interval_seconds 必须在 2 到 60 秒之间")
-	}
-	if err := s.setMany(ctx, []SystemConfigValue{
-		{Key: taskMonitorListPageSizeKey, Value: strconv.Itoa(setting.ListPageSize)},
-		{Key: taskMonitorAutoRefreshEnabledKey, Value: strconv.FormatBool(setting.AutoRefreshEnabled)},
-		{Key: taskMonitorRefreshIntervalSecondsKey, Value: strconv.Itoa(setting.RefreshIntervalSeconds)},
-		{Key: taskMonitorResultPreviewEnabledKey, Value: strconv.FormatBool(setting.ResultPreviewEnabled)},
-	}); err != nil {
-		return TaskMonitorSetting{}, err
-	}
-	return setting, nil
 }
 
 func (s *RuntimeSettingsService) getMany(ctx context.Context, keys ...string) (map[string]string, error) {

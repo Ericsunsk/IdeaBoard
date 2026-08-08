@@ -24,13 +24,3 @@ export interface AdminBillableItemCard {
   currentPrice?: AdminBillableItemPrice
   updatedAt?: string
 }
-
-export interface AdminBillableItemPricePage {
-  prices: AdminBillableItemPrice[]
-  nextBeforeVersion?: number
-}
-
-export interface AdminBillableItemPriceHistoryParams {
-  beforeVersion?: number
-  limit?: number
-}

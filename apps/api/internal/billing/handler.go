@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strconv"
-	"strings"
 
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/jsonlimit"
@@ -24,7 +22,6 @@ type BillableCatalogService interface {
 	List(context.Context) ([]BillableItemCatalogCard, error)
 	PublishPrice(context.Context, string, int64, int64) (PriceInfo, error)
 	SetAvailability(context.Context, string, bool, int64) (AvailabilityInfo, error)
-	ListPriceHistory(context.Context, string, int64, int) (PricePage, error)
 	DeleteArchived(context.Context, string, int64) (ArchivedItemDeleteResult, error)
 }
 
@@ -131,32 +128,6 @@ func (h *Handler) ListBillableCatalog(c *gin.Context) {
 	response.SuccessDTO(c, gin.H{"items": items})
 }
 
-func (h *Handler) ListBillableItemPrices(c *gin.Context) {
-	if _, ok := principal.RequireAdmin(c); !ok {
-		return
-	}
-	limit, ok := parseOptionalInt(c.Query("limit"))
-	if !ok {
-		response.Error(c, http.StatusBadRequest, "limit 无效")
-		return
-	}
-	beforeVersion, ok := parseOptionalPositiveInt64(c.Query("before_version"))
-	if !ok {
-		response.Error(c, http.StatusBadRequest, "before_version 无效")
-		return
-	}
-	if h == nil || h.catalog == nil {
-		writeError(c, ErrServiceUnavailable)
-		return
-	}
-	page, err := h.catalog.ListPriceHistory(c.Request.Context(), c.Param("sku"), beforeVersion, limit)
-	if err != nil {
-		writeError(c, err)
-		return
-	}
-	response.SuccessDTO(c, page)
-}
-
 func (h *Handler) DeleteArchivedItem(c *gin.Context) {
 	admin, ok := principal.RequireAdmin(c)
 	if !ok {
@@ -176,28 +147,6 @@ func (h *Handler) DeleteArchivedItem(c *gin.Context) {
 
 func decodeStrictJSON(c *gin.Context, destination any) error {
 	return jsonlimit.DecodeStrictRequest(c.Writer, c.Request, maxBillingRequestBytes, destination)
-}
-
-func parseOptionalInt(raw string) (int, bool) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return 0, true
-	}
-	parsed, err := strconv.Atoi(raw)
-	return parsed, err == nil && parsed > 0 && parsed <= MaxPageLimit
-}
-
-func parseOptionalPositiveInt64(raw string) (int64, bool) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return 0, true
-	}
-	return parsePositiveInt64(raw)
-}
-
-func parsePositiveInt64(raw string) (int64, bool) {
-	parsed, err := strconv.ParseInt(strings.TrimSpace(raw), 10, 64)
-	return parsed, err == nil && parsed > 0
 }
 
 func writeError(c *gin.Context, err error) {

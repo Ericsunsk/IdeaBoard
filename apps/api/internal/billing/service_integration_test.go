@@ -62,13 +62,6 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 		t.Fatalf("Quote() with disabled SKU error = %v", err)
 	}
 
-	prices, err := service.ListPrices(ctx, ListPricesInput{SKU: "ai-image:partial-edit", Limit: 10})
-	if err != nil {
-		t.Fatalf("ListPrices() error = %v", err)
-	}
-	if len(prices.Prices) != 2 || prices.Prices[0].Version != 2 || prices.Prices[1].Version != 1 {
-		t.Fatalf("ListPrices() = %+v", prices)
-	}
 	catalog, err := service.ListCatalogFacts(ctx)
 	if err != nil {
 		t.Fatalf("ListCatalogFacts() error = %v", err)

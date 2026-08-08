@@ -8,7 +8,6 @@ import {
   type MonitorData,
   type MonitorResponse,
   type MonitorStats,
-  type TaskMonitorSetting,
 } from '../../../shared/api/generated-query/model'
 import { useAdminTaskList } from './useAdminTaskList'
 import { useAdminTaskRuntimeSnapshot } from './useAdminTaskRuntimeSnapshot'
@@ -20,7 +19,6 @@ const mockState = vi.hoisted(() => ({
   pollingOptions: [] as unknown[],
   streamReturn: undefined as unknown,
   taskListParams: undefined as MaybeRefOrGetter<ListAdminTasksParams> | undefined,
-  taskMonitorSettings: undefined as unknown as { value: TaskMonitorSetting },
 }))
 
 vi.mock('../../../shared/api/generated-query/admin-tasks/admin-tasks', () => ({
@@ -54,12 +52,6 @@ vi.mock('../shared/composables/useAdminQueryPolling', () => ({
   ),
 }))
 
-vi.mock('../system-settings/taskMonitorSettingsResource', () => ({
-  useAdminTaskMonitorSettingQuery: vi.fn(() => ({
-    settings: mockState.taskMonitorSettings,
-  })),
-}))
-
 vi.mock('./useAdminTaskMonitorStream', () => ({
   useAdminTaskMonitorStream: vi.fn(() => mockState.streamReturn),
 }))
@@ -71,12 +63,6 @@ beforeEach(() => {
   mockState.pollingOptions = []
   mockState.streamReturn = undefined
   mockState.taskListParams = undefined
-  mockState.taskMonitorSettings = ref({
-    list_page_size: 12,
-    auto_refresh_enabled: true,
-    refresh_interval_seconds: 4,
-    result_preview_enabled: true,
-  })
 })
 
 describe('useTaskMonitor polling', () => {
@@ -126,14 +112,8 @@ describe('useTaskMonitor polling', () => {
     expect(monitor.error.value).toBe(error)
   })
 
-  it('uses task monitor settings for page size and refresh interval', () => {
+  it('uses the fixed task monitor display policy', () => {
     const data = ref<ApiResponseAdminTaskListData>()
-    mockState.taskMonitorSettings.value = {
-      list_page_size: 24,
-      auto_refresh_enabled: true,
-      refresh_interval_seconds: 10,
-      result_preview_enabled: false,
-    }
     mockState.listAdminTasksReturn = {
       data,
       error: ref(null),
@@ -143,11 +123,11 @@ describe('useTaskMonitor polling', () => {
     }
 
     const monitor = useAdminTaskList()
-    const polling = mockState.pollingOptions[0] as { visibleInterval: () => number | false }
+    const polling = mockState.pollingOptions[0] as { visibleInterval: number | false }
 
-    expect(monitor.pageSize.value).toBe(24)
-    expect(monitor.resultPreviewEnabled.value).toBe(false)
-    expect(polling.visibleInterval()).toBe(10_000)
+    expect(monitor.pageSize.value).toBe(12)
+    expect(monitor.resultPreviewEnabled.value).toBe(true)
+    expect(polling.visibleInterval).toBe(4_000)
   })
 
   it('uses the shared page boundary for pending navigation, clamp, and filter reset', () => {

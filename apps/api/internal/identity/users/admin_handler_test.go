@@ -52,12 +52,6 @@ type adminBrandingSettingsResponse struct {
 	Data settings.BrandingSetting `json:"data"`
 }
 
-type adminTaskMonitorSettingsResponse struct {
-	Code int                         `json:"code"`
-	Msg  string                      `json:"msg"`
-	Data settings.TaskMonitorSetting `json:"data"`
-}
-
 type adminMediaUploadSettingsResponse struct {
 	Code int                         `json:"code"`
 	Msg  string                      `json:"msg"`
@@ -531,13 +525,6 @@ func TestAdminRuntimeSettingsGetFailsWhenRepositoryUnavailable(t *testing.T) {
 			},
 		},
 		{
-			name: "task monitor",
-			path: "/admin/settings/task-monitor",
-			register: func(router *gin.Engine) {
-				router.GET("/admin/settings/task-monitor", handler.GetTaskMonitorSettings)
-			},
-		},
-		{
 			name: "outbound policy",
 			path: "/admin/settings/outbound-policy",
 			register: func(router *gin.Engine) {
@@ -728,111 +715,6 @@ func TestAdminBrandingSettingsRejectsInvalidPayload(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPut, "/admin/settings/branding", strings.NewReader(tt.body))
-			req.Header.Set("Content-Type", "application/json")
-			rec := httptest.NewRecorder()
-			router.ServeHTTP(rec, req)
-
-			if rec.Code != http.StatusBadRequest {
-				t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
-			}
-			if !strings.Contains(rec.Body.String(), tt.want) {
-				t.Fatalf("body = %s, want %q", rec.Body.String(), tt.want)
-			}
-		})
-	}
-}
-
-func TestAdminTaskMonitorSettingsDefaultsWhenConfigMissing(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	db := newUserRepoTestDB(t)
-	handler := newAdminHandlerForRuntimeSettings(db)
-	router := gin.New()
-	router.GET("/admin/settings/task-monitor", handler.GetTaskMonitorSettings)
-
-	req := httptest.NewRequest(http.MethodGet, "/admin/settings/task-monitor", nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
-	}
-	var got adminTaskMonitorSettingsResponse
-	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
-		t.Fatalf("decode response failed: %v", err)
-	}
-	if got.Data != settings.DefaultTaskMonitorSetting() {
-		t.Fatalf("task monitor settings = %+v, want defaults", got.Data)
-	}
-}
-
-func TestAdminTaskMonitorSettingsUpdatePersists(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	db := newUserRepoTestDB(t)
-	handler := newAdminHandlerForRuntimeSettings(db)
-	router := gin.New()
-	router.GET("/admin/settings/task-monitor", handler.GetTaskMonitorSettings)
-	router.PUT("/admin/settings/task-monitor", handler.UpdateTaskMonitorSettings)
-
-	req := httptest.NewRequest(http.MethodPut, "/admin/settings/task-monitor", strings.NewReader(`{"list_page_size":24,"auto_refresh_enabled":false,"refresh_interval_seconds":10,"result_preview_enabled":false}`))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
-	}
-	var updated adminTaskMonitorSettingsResponse
-	if err := json.NewDecoder(rec.Body).Decode(&updated); err != nil {
-		t.Fatalf("decode update response failed: %v", err)
-	}
-	want := settings.TaskMonitorSetting{ListPageSize: 24, AutoRefreshEnabled: false, RefreshIntervalSeconds: 10, ResultPreviewEnabled: false}
-	if updated.Data != want {
-		t.Fatalf("updated task monitor settings = %+v, want %+v", updated.Data, want)
-	}
-
-	getReq := httptest.NewRequest(http.MethodGet, "/admin/settings/task-monitor", nil)
-	getRec := httptest.NewRecorder()
-	router.ServeHTTP(getRec, getReq)
-
-	var got adminTaskMonitorSettingsResponse
-	if err := json.NewDecoder(getRec.Body).Decode(&got); err != nil {
-		t.Fatalf("decode get response failed: %v", err)
-	}
-	if got.Data != want {
-		t.Fatalf("persisted task monitor settings = %+v, want %+v", got.Data, want)
-	}
-}
-
-func TestAdminTaskMonitorSettingsRejectsInvalidPayload(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	db := newUserRepoTestDB(t)
-	handler := newAdminHandlerForRuntimeSettings(db)
-	router := gin.New()
-	router.PUT("/admin/settings/task-monitor", handler.UpdateTaskMonitorSettings)
-
-	tests := []struct {
-		name string
-		body string
-		want string
-	}{
-		{
-			name: "page size too small",
-			body: `{"list_page_size":4,"auto_refresh_enabled":true,"refresh_interval_seconds":4,"result_preview_enabled":true}`,
-			want: "list_page_size 必须在 5 到 50 之间",
-		},
-		{
-			name: "refresh interval too small",
-			body: `{"list_page_size":12,"auto_refresh_enabled":true,"refresh_interval_seconds":1,"result_preview_enabled":true}`,
-			want: "refresh_interval_seconds 必须在 2 到 60 秒之间",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPut, "/admin/settings/task-monitor", strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", "application/json")
 			rec := httptest.NewRecorder()
 			router.ServeHTTP(rec, req)

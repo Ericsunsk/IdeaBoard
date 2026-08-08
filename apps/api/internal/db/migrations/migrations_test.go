@@ -326,6 +326,39 @@ func TestEmbeddedMigrationsKeepBaselineFirst(t *testing.T) {
 	}
 }
 
+func TestRemovePublicURLRuntimeSettingsMigrationUsesCanonicalConfigKey(t *testing.T) {
+	raw, err := migrationFS.ReadFile("20260808010000_remove_public_url_runtime_settings.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	up := extractUpSQL(string(raw))
+	if !strings.Contains(up, "WHERE config_key IN") {
+		t.Fatalf("public URL cleanup must target system_configs.config_key: %q", up)
+	}
+}
+
+func TestRemoveTaskMonitorRuntimeSettingsMigrationUsesCanonicalConfigKey(t *testing.T) {
+	raw, err := migrationFS.ReadFile("20260808020000_remove_task_monitor_runtime_settings.sql")
+	if err != nil {
+		t.Fatalf("read task monitor cleanup migration: %v", err)
+	}
+
+	up := extractUpSQL(string(raw))
+	if !strings.Contains(up, "WHERE config_key IN") {
+		t.Fatalf("task monitor cleanup must target system_configs.config_key: %q", up)
+	}
+	for _, key := range []string{
+		"task_monitor_list_page_size",
+		"task_monitor_auto_refresh_enabled",
+		"task_monitor_refresh_interval_seconds",
+		"task_monitor_result_preview_enabled",
+	} {
+		if !strings.Contains(up, "'"+key+"'") {
+			t.Fatalf("task monitor cleanup is missing key %q: %q", key, up)
+		}
+	}
+}
+
 func TestAdminBillingReasonMigrationDeclaresReversibleContract(t *testing.T) {
 	raw, err := migrationFS.ReadFile("20260712020000_admin_billing_reasons.sql")
 	if err != nil {

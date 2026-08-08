@@ -885,34 +885,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseRateLimitSetting'
-  /admin/settings/task-monitor:
-    get:
-      tags: [AdminSettings]
-      operationId: getAdminTaskMonitorSetting
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseTaskMonitorSetting'
-    put:
-      tags: [AdminSettings]
-      operationId: updateAdminTaskMonitorSetting
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/TaskMonitorSetting'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseTaskMonitorSetting'
-
   /admin/settings/outbound-policy:
     get:
       tags: [AdminSettings]
@@ -1823,26 +1795,6 @@ paths:
                 $ref: '#/components/schemas/ApiResponseBillableItemCatalog'
 
   /admin/billing/catalog/{sku}/prices:
-    get:
-      tags: [AdminBilling]
-      operationId: listAdminBillableItemPrices
-      security:
-        - cookieAuth: []
-      parameters:
-        - $ref: '#/components/parameters/BillingSKUPath'
-        - name: before_version
-          in: query
-          schema: { type: integer, format: int64, minimum: 1 }
-        - name: limit
-          in: query
-          schema: { type: integer, minimum: 1, maximum: 100, default: 50 }
-      responses:
-        '200':
-          description: Read-only immutable price history
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponseBillingPricePage'
     post:
       tags: [AdminBilling]
       operationId: publishAdminBillingPrice
@@ -2919,15 +2871,6 @@ components:
         - type: object
           properties:
             data: { $ref: '#/components/schemas/BillableItemAvailability' }
-
-    BillingPricePage:
-      type: object
-      required: [prices]
-      properties:
-        prices:
-          type: array
-          items: { $ref: '#/components/schemas/BillingPrice' }
-        next_before_version: { type: integer, format: int64, minimum: 1 }
 
     AdminBillingPricePublishRequest:
       type: object
@@ -4171,23 +4114,6 @@ components:
           minimum: 1
           maximum: 64
 
-    TaskMonitorSetting:
-      type: object
-      required: [list_page_size, auto_refresh_enabled, refresh_interval_seconds, result_preview_enabled]
-      properties:
-        list_page_size:
-          type: integer
-          minimum: 5
-          maximum: 50
-        auto_refresh_enabled:
-          type: boolean
-        refresh_interval_seconds:
-          type: integer
-          minimum: 2
-          maximum: 60
-        result_preview_enabled:
-          type: boolean
-
     OutboundPolicySetting:
       type: object
       additionalProperties: false
@@ -5324,14 +5250,6 @@ components:
             data:
               $ref: '#/components/schemas/MediaUploadSetting'
 
-    ApiResponseTaskMonitorSetting:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              $ref: '#/components/schemas/TaskMonitorSetting'
-
     ApiResponseOutboundPolicySetting:
       allOf:
         - $ref: '#/components/schemas/ApiResponseBase'
@@ -5615,14 +5533,6 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/BillingPrice'
-
-    ApiResponseBillingPricePage:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              $ref: '#/components/schemas/BillingPricePage'
 
     ApiResponseArchivedBillingItemDeleteResult:
       allOf:

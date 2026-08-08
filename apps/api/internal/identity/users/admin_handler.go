@@ -173,38 +173,6 @@ func (h *AdminHandler) UpdateBrandingSettings(c *gin.Context) {
 	response.SuccessDTO(c, updated)
 }
 
-// GetTaskMonitorSettings 获取任务监控设置
-func (h *AdminHandler) GetTaskMonitorSettings(c *gin.Context) {
-	runtimeSettings, ok := h.requireRuntimeSettings(c)
-	if !ok {
-		return
-	}
-	setting, err := runtimeSettings.GetTaskMonitor(c.Request.Context())
-	if h.respondRuntimeSettingsReadError(c, err) {
-		return
-	}
-	response.SuccessDTO(c, setting)
-}
-
-// UpdateTaskMonitorSettings 更新任务监控设置
-func (h *AdminHandler) UpdateTaskMonitorSettings(c *gin.Context) {
-	runtimeSettings, ok := h.requireRuntimeSettings(c)
-	if !ok {
-		return
-	}
-	var req settings.TaskMonitorSetting
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
-		return
-	}
-
-	updated, err := runtimeSettings.UpdateTaskMonitor(c.Request.Context(), req)
-	if h.respondRuntimeSettingsWriteError(c, err) {
-		return
-	}
-	response.SuccessDTO(c, updated)
-}
-
 func (h *AdminHandler) GetOutboundPolicy(c *gin.Context) {
 	runtimeSettings, ok := h.requireRuntimeSettings(c)
 	if !ok {

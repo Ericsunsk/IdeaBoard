@@ -23,12 +23,10 @@ import type {
   ApiResponseOutboundPolicySetting,
   ApiResponseRateLimitSetting,
   ApiResponseRegistrationSetting,
-  ApiResponseTaskMonitorSetting,
   BrandingSetting,
   MediaUploadSetting,
   OutboundPolicyUpdateRequest,
   RateLimitSetting,
-  TaskMonitorSetting,
   UpdateAdminRegistrationSettingBody,
 } from '../model'
 
@@ -622,153 +620,6 @@ export function useUpdateAdminRateLimitSettings<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getUpdateAdminRateLimitSettingsQueryOptions(rateLimitSetting, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
-}
-
-export const getGetAdminTaskMonitorSettingUrl = () => {
-  return `/admin/settings/task-monitor`
-}
-
-export const getAdminTaskMonitorSetting = async (
-  options?: Parameters<typeof orvalMutator>[1],
-): Promise<ApiResponseTaskMonitorSetting> => {
-  return orvalMutator<ApiResponseTaskMonitorSetting>(getGetAdminTaskMonitorSettingUrl(), {
-    ...options,
-    method: 'GET',
-  })
-}
-
-export const getGetAdminTaskMonitorSettingQueryKey = () => {
-  return ['admin', 'settings', 'task-monitor'] as const
-}
-
-export const getGetAdminTaskMonitorSettingQueryOptions = <
-  TData = Awaited<ReturnType<typeof getAdminTaskMonitorSetting>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof getAdminTaskMonitorSetting>>, TError, TData>
-  >
-  request?: SecondParameter<typeof orvalMutator>
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getGetAdminTaskMonitorSettingQueryKey()
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminTaskMonitorSetting>>> = ({
-    signal,
-  }) => getAdminTaskMonitorSetting({ signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminTaskMonitorSetting>>,
-    TError,
-    TData
-  >
-}
-
-export type GetAdminTaskMonitorSettingQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getAdminTaskMonitorSetting>>
->
-export type GetAdminTaskMonitorSettingQueryError = ErrorType<unknown>
-
-export function useGetAdminTaskMonitorSetting<
-  TData = Awaited<ReturnType<typeof getAdminTaskMonitorSetting>>,
-  TError = ErrorType<unknown>,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getAdminTaskMonitorSetting>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-  queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getGetAdminTaskMonitorSettingQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
-}
-
-export const getUpdateAdminTaskMonitorSettingUrl = () => {
-  return `/admin/settings/task-monitor`
-}
-
-export const updateAdminTaskMonitorSetting = async (
-  taskMonitorSetting: TaskMonitorSetting,
-  options?: Parameters<typeof orvalMutator>[1],
-): Promise<ApiResponseTaskMonitorSetting> => {
-  return orvalMutator<ApiResponseTaskMonitorSetting>(getUpdateAdminTaskMonitorSettingUrl(), {
-    ...options,
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(taskMonitorSetting),
-  })
-}
-
-export const getUpdateAdminTaskMonitorSettingQueryKey = (
-  taskMonitorSetting?: MaybeRefOrGetter<TaskMonitorSetting>,
-) => {
-  return ['PUT', 'admin', 'settings', 'task-monitor', taskMonitorSetting] as const
-}
-
-export const getUpdateAdminTaskMonitorSettingQueryOptions = <
-  TData = Awaited<ReturnType<typeof updateAdminTaskMonitorSetting>>,
-  TError = ErrorType<unknown>,
->(
-  taskMonitorSetting: MaybeRefOrGetter<TaskMonitorSetting>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminTaskMonitorSetting>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getUpdateAdminTaskMonitorSettingQueryKey(taskMonitorSetting)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminTaskMonitorSetting>>> = ({
-    signal,
-  }) => updateAdminTaskMonitorSetting(toValue(taskMonitorSetting), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof updateAdminTaskMonitorSetting>>,
-    TError,
-    TData
-  >
-}
-
-export type UpdateAdminTaskMonitorSettingQueryResult = NonNullable<
-  Awaited<ReturnType<typeof updateAdminTaskMonitorSetting>>
->
-export type UpdateAdminTaskMonitorSettingQueryError = ErrorType<unknown>
-
-export function useUpdateAdminTaskMonitorSetting<
-  TData = Awaited<ReturnType<typeof updateAdminTaskMonitorSetting>>,
-  TError = ErrorType<unknown>,
->(
-  taskMonitorSetting: MaybeRefOrGetter<TaskMonitorSetting>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminTaskMonitorSetting>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-  queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUpdateAdminTaskMonitorSettingQueryOptions(taskMonitorSetting, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

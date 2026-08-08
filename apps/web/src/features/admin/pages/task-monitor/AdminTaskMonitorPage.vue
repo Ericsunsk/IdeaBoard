@@ -1,9 +1,5 @@
 <template>
   <div :class="adminDashboardRootClass">
-    <Message v-if="taskMonitorSettingsError" severity="warn" :closable="false">
-      {{ taskMonitorSettingsErrorMessage }}
-    </Message>
-
     <Message v-if="isMonitorError" severity="error" :closable="false">
       {{ monitorErrorMessage }}
     </Message>
@@ -473,7 +469,6 @@ const {
   error: taskListError,
   pagination,
   resultPreviewEnabled,
-  taskMonitorSettingsError,
   taskStats,
   filterStatus,
   accountIdFilter,
@@ -499,13 +494,6 @@ const taskListErrorMessage = computed(() =>
 const monitorErrorMessage = computed(() =>
   formatDisplayErrorMessage(monitorError.value, '加载任务运行监控失败'),
 )
-const taskMonitorSettingsErrorMessage = computed(() =>
-  formatDisplayErrorMessage(
-    taskMonitorSettingsError.value,
-    '加载任务监控设置失败，当前使用默认展示配置',
-  ),
-)
-
 function handleTaskSearch() {
   applyTaskSearch()
 }

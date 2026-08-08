@@ -128,7 +128,6 @@ func TestRouteConstantsAreGroupRelative(t *testing.T) {
 	adminGroup.GET(RouteAdminSettingsBranding, func(c *gin.Context) {})
 	adminGroup.GET(RouteAdminSettingsMediaUpload, func(c *gin.Context) {})
 	adminGroup.GET(RouteAdminSettingsRateLimit, func(c *gin.Context) {})
-	adminGroup.GET(RouteAdminSettingsTaskMonitor, func(c *gin.Context) {})
 	adminGroup.GET(RouteAdminStripeConfiguration, func(c *gin.Context) {})
 
 	want := map[string]bool{
@@ -141,14 +140,12 @@ func TestRouteConstantsAreGroupRelative(t *testing.T) {
 		http.MethodGet + " /api/admin/settings/branding":                false,
 		http.MethodGet + " /api/admin/settings/media-upload":            false,
 		http.MethodGet + " /api/admin/settings/rate-limit":              false,
-		http.MethodGet + " /api/admin/settings/task-monitor":            false,
 		http.MethodGet + " /api/admin/payments/stripe-config":           false,
 		http.MethodPost + " /api/user/api/user/profile/avatar":          true,
 		http.MethodPost + " /api/admin/api/admin/upload":                true,
 		http.MethodGet + " /api/admin/api/admin/settings/branding":      true,
 		http.MethodGet + " /api/admin/api/admin/settings/media-upload":  true,
 		http.MethodGet + " /api/admin/api/admin/settings/rate-limit":    true,
-		http.MethodGet + " /api/admin/api/admin/settings/task-monitor":  true,
 		http.MethodGet + " /api/admin/api/admin/payments/stripe-config": true,
 	}
 	for _, route := range router.Routes() {
@@ -391,7 +388,6 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/credits/reconciliation/runs/:run_id":          false,
 		adminCreditReconciliationGlobalFindingQueueRouteUnderContract: false,
 		"GET /api/admin/billing/catalog":                              false,
-		"GET /api/admin/billing/catalog/:sku/prices":                  false,
 		"GET /api/admin/rewards/codes/:id/redemptions":                false,
 		"GET /api/admin/rewards/codes/:id/redemptions/:redemption_id": false,
 		"GET /api/admin/line-draft-modes":                             false,
@@ -405,7 +401,6 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/settings/outbound-policy":                     false,
 		"GET /api/admin/settings/rate-limit":                          false,
 		"GET /api/admin/settings/registration":                        false,
-		"GET /api/admin/settings/task-monitor":                        false,
 		"GET /api/admin/statistics":                                   false,
 		"GET /api/admin/storage/profiles":                             false,
 		"GET /api/admin/storage/profiles/:id/bucket-info":             false,
@@ -455,7 +450,6 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"PUT /api/admin/settings/outbound-policy":                     false,
 		"PUT /api/admin/settings/rate-limit":                          false,
 		"PUT /api/admin/settings/registration":                        false,
-		"PUT /api/admin/settings/task-monitor":                        false,
 		"PUT /api/admin/storage/profiles/:id":                         false,
 		"PUT /api/admin/users/:public_id/role":                        false,
 		"PUT /api/admin/users/oauth-providers/:provider":              false,

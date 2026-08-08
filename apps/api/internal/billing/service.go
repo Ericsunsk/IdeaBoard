@@ -163,63 +163,6 @@ func (s *Service) ListCatalogFacts(ctx context.Context) ([]CatalogItem, error) {
 	return items, nil
 }
 
-func (s *Service) ListPrices(ctx context.Context, input ListPricesInput) (PricePage, error) {
-	sku, err := CanonicalizeSKU(input.SKU)
-	if err != nil {
-		return PricePage{}, err
-	}
-	limit, err := normalizePageLimit(input.Limit)
-	if err != nil {
-		return PricePage{}, err
-	}
-	before := input.BeforeVersion
-	if before < 0 {
-		return PricePage{}, ErrInvalidCatalogEntry
-	}
-	if before == 0 {
-		before = int64(^uint64(0) >> 1)
-	}
-	if err := s.requirePool(); err != nil {
-		return PricePage{}, err
-	}
-	rows, err := s.pool.Query(ctx, `SELECT `+priceInfoColumns+`
-	FROM billing_price_versions prices
-	WHERE prices.sku = $1 AND prices.version < $2
-ORDER BY prices.version DESC
-LIMIT $3`, sku, before, limit+1)
-	if err != nil {
-		return PricePage{}, fmt.Errorf("list billing prices: %w", err)
-	}
-	defer rows.Close()
-	prices := make([]PriceInfo, 0, limit)
-	for rows.Next() {
-		var price PriceInfo
-		if err := rows.Scan(priceInfoScanTargets(&price)...); err != nil {
-			return PricePage{}, fmt.Errorf("scan billing price: %w", err)
-		}
-		prices = append(prices, price)
-	}
-	if err := rows.Err(); err != nil {
-		return PricePage{}, fmt.Errorf("read billing prices: %w", err)
-	}
-	if len(prices) == 0 {
-		var exists bool
-		if err := s.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM billing_skus WHERE sku = $1)`, sku).Scan(&exists); err != nil {
-			return PricePage{}, fmt.Errorf("check billing SKU: %w", err)
-		}
-		if !exists {
-			return PricePage{}, ErrSKUNotFound
-		}
-	}
-	page := PricePage{Prices: prices}
-	if len(prices) > limit {
-		next := prices[limit-1].Version
-		page.Prices = prices[:limit]
-		page.NextBeforeVersion = &next
-	}
-	return page, nil
-}
-
 func (s *Service) DeleteArchived(ctx context.Context, rawSKU string, actorID int64) (ArchivedItemDeleteResult, error) {
 	sku, err := CanonicalizeSKU(rawSKU)
 	if err != nil || actorID <= 0 {

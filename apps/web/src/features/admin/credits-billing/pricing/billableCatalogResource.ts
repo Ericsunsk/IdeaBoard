@@ -1,7 +1,6 @@
 import {
   deleteAdminArchivedBillableItem,
   listAdminBillableItems,
-  listAdminBillableItemPrices,
   publishAdminBillingPrice,
   setAdminBillableItemAvailability,
 } from '../../../../shared/api/generated-query/admin-billing/admin-billing'
@@ -15,18 +14,12 @@ import type {
   AdminBillableItemAvailability,
   AdminBillableItemCard,
   AdminBillableItemPrice,
-  AdminBillableItemPriceHistoryParams,
-  AdminBillableItemPricePage,
 } from './billableCatalogTypes'
 
 export interface AdminBillableCatalogResource {
   list: () => Promise<AdminBillableItemCard[]>
   publishPrice: (sku: string, unitCredits: number) => Promise<AdminBillableItemPrice>
   setAvailability: (sku: string, enabled: boolean) => Promise<AdminBillableItemAvailability>
-  listPriceHistory: (
-    sku: string,
-    params?: AdminBillableItemPriceHistoryParams,
-  ) => Promise<AdminBillableItemPricePage>
   deleteArchived: (sku: string) => Promise<string>
 }
 
@@ -35,25 +28,7 @@ export function createAdminBillableCatalogResource(): AdminBillableCatalogResour
     list: fetchAdminBillableItems,
     publishPrice: publishBillableItemPrice,
     setAvailability: setBillableItemAvailability,
-    listPriceHistory: fetchBillableItemPriceHistory,
     deleteArchived: deleteArchivedBillableItem,
-  }
-}
-
-export async function fetchBillableItemPriceHistory(
-  sku: string,
-  params: AdminBillableItemPriceHistoryParams = { limit: 50 },
-): Promise<AdminBillableItemPricePage> {
-  const data = await resolveApiData(
-    listAdminBillableItemPrices(sku, {
-      before_version: params.beforeVersion,
-      limit: params.limit,
-    }),
-    '加载价格历史失败',
-  )
-  return {
-    prices: data.prices.map(normalizePrice),
-    nextBeforeVersion: data.next_before_version,
   }
 }
 
