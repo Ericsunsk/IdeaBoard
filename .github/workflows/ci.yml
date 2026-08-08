@@ -87,6 +87,7 @@ jobs:
       - changes
     uses: ./.github/workflows/backend.yml
     with:
+      base_sha: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
       build_images: >-
         ${{
           github.event_name == 'pull_request' &&

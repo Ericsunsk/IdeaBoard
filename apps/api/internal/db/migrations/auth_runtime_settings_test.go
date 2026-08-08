@@ -79,43 +79,14 @@ WHERE schemas.nspname = current_schema()
 		}
 	}
 
-	raw, err := migrationFS.ReadFile("20260713010000_auth_runtime_settings.sql")
-	if err != nil {
-		t.Fatalf("read Auth runtime settings migration: %v", err)
-	}
-	tx, err := conn.BeginTx(ctx, nil)
-	if err != nil {
-		t.Fatalf("begin Auth runtime settings rollback: %v", err)
-	}
-	for _, statement := range parseSQLStatements(extractDownSQLForTest(string(raw))) {
-		if _, err := tx.ExecContext(ctx, statement.SQL); err != nil {
-			_ = tx.Rollback()
-			t.Fatalf("roll back Auth runtime settings migration: %v", err)
-		}
-	}
-	if _, err := tx.ExecContext(ctx, `
-DELETE FROM schema_migrations
-WHERE version = 20260713010000
-`); err != nil {
-		_ = tx.Rollback()
-		t.Fatalf("remove Auth runtime settings migration marker: %v", err)
-	}
-	if err := tx.Commit(); err != nil {
-		t.Fatalf("commit Auth runtime settings rollback: %v", err)
-	}
-
-	assertRegprocedureExists(t, ctx, conn, "get_auth_runtime_settings()", false)
 	if err := upWithConn(ctx, conn); err != nil {
-		t.Fatalf("reapply Auth runtime settings migration: %v", err)
+		t.Fatalf("replay after settings update: %v", err)
 	}
-	if err := conn.QueryRowContext(ctx, `
-SELECT registration_enabled
-FROM get_auth_runtime_settings()
-`).Scan(&registrationEnabled); err != nil {
-		t.Fatalf("load reapplied Auth runtime settings: %v", err)
+	if err := conn.QueryRowContext(ctx, `SELECT registration_enabled FROM get_auth_runtime_settings()`).Scan(&registrationEnabled); err != nil {
+		t.Fatalf("load settings after idempotent replay: %v", err)
 	}
 	if !registrationEnabled {
-		t.Fatal("reapplied Auth runtime settings lost the stored value")
+		t.Fatal("idempotent replay lost the stored value")
 	}
 }
 

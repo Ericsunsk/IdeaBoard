@@ -24,7 +24,6 @@ var creditInternalFunctionSignatures = []string{
 	"apply_credit_posting_balances()",
 	"validate_credit_transaction_balance()",
 	"guard_credit_posting_transaction_scope()",
-	"execute_credit_command_v2_before_wallet_restrictions(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)",
 }
 
 const creditCommandFunctionSignature = "execute_credit_command_v2(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT)"

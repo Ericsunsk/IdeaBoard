@@ -55,6 +55,38 @@ type ApiAccountSecret struct {
 	UpdatedAt          time.Time    `json:"updated_at"`
 }
 
+type BillingAdminAction struct {
+	ID             int64           `json:"id"`
+	ActionType     string          `json:"action_type"`
+	Sku            string          `json:"sku"`
+	PriceVersionID sql.NullInt64   `json:"price_version_id"`
+	ActorID        int64           `json:"actor_id"`
+	Reason         string          `json:"reason"`
+	Metadata       json.RawMessage `json:"metadata"`
+	CreatedAt      time.Time       `json:"created_at"`
+}
+
+type BillingPriceVersion struct {
+	PriceVersionID int64     `json:"price_version_id"`
+	Sku            string    `json:"sku"`
+	Version        int64     `json:"version"`
+	UnitCredits    int64     `json:"unit_credits"`
+	CreatedBy      int64     `json:"created_by"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+type BillingSku struct {
+	Sku                   string        `json:"sku"`
+	DisplayName           string        `json:"display_name"`
+	Description           string        `json:"description"`
+	Enabled               bool          `json:"enabled"`
+	CurrentPriceVersionID sql.NullInt64 `json:"current_price_version_id"`
+	CreatedBy             int64         `json:"created_by"`
+	UpdatedBy             int64         `json:"updated_by"`
+	CreatedAt             time.Time     `json:"created_at"`
+	UpdatedAt             time.Time     `json:"updated_at"`
+}
+
 type Board struct {
 	ID                 int64           `json:"id"`
 	BoardID            string          `json:"board_id"`
@@ -231,6 +263,18 @@ type CreditWalletRestriction struct {
 	ReleasedByActorType sql.NullString `json:"released_by_actor_type"`
 	ReleasedByActorID   sql.NullString `json:"released_by_actor_id"`
 	ReleaseReason       sql.NullString `json:"release_reason"`
+}
+
+type CreditWelcomeClaim struct {
+	IdentityFingerprint string    `json:"identity_fingerprint"`
+	ClaimedUserID       int64     `json:"claimed_user_id"`
+	ClaimedAt           time.Time `json:"claimed_at"`
+}
+
+type CreditWelcomeIdentityKeyGuard struct {
+	Singleton      bool      `json:"singleton"`
+	KeyFingerprint string    `json:"key_fingerprint"`
+	BoundAt        time.Time `json:"bound_at"`
 }
 
 type FeaturePrompt struct {
@@ -439,15 +483,16 @@ type PaymentStripeConfiguration struct {
 }
 
 type PaymentWebhookEvent struct {
-	StripeEventID    string       `json:"stripe_event_id"`
-	EventType        string       `json:"event_type"`
-	StripeObjectID   string       `json:"stripe_object_id"`
-	Livemode         bool         `json:"livemode"`
-	StripeCreatedAt  time.Time    `json:"stripe_created_at"`
-	ProcessingResult string       `json:"processing_result"`
-	ErrorSummary     string       `json:"error_summary"`
-	ReceivedAt       time.Time    `json:"received_at"`
-	ProcessedAt      sql.NullTime `json:"processed_at"`
+	StripeEventID    string        `json:"stripe_event_id"`
+	EventType        string        `json:"event_type"`
+	StripeObjectID   string        `json:"stripe_object_id"`
+	Livemode         bool          `json:"livemode"`
+	StripeCreatedAt  time.Time     `json:"stripe_created_at"`
+	ProcessingResult string        `json:"processing_result"`
+	ErrorSummary     string        `json:"error_summary"`
+	ReceivedAt       time.Time     `json:"received_at"`
+	ProcessedAt      sql.NullTime  `json:"processed_at"`
+	PaymentOrderID   uuid.NullUUID `json:"payment_order_id"`
 }
 
 type ProviderEndpoint struct {
@@ -550,6 +595,14 @@ type SystemConfig struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type SystemSettingsAdminAction struct {
+	ID         int64           `json:"id"`
+	ActionType string          `json:"action_type"`
+	ActorID    int64           `json:"actor_id"`
+	Metadata   json.RawMessage `json:"metadata"`
+	CreatedAt  time.Time       `json:"created_at"`
+}
+
 type Task struct {
 	ID                         int64         `json:"id"`
 	TaskID                     string        `json:"task_id"`
@@ -598,6 +651,30 @@ type TaskAttempt struct {
 	CancelledAt        sql.NullTime `json:"cancelled_at"`
 	CreatedAt          time.Time    `json:"created_at"`
 	UpdatedAt          time.Time    `json:"updated_at"`
+}
+
+type TaskBillingSettlement struct {
+	TaskID                  string         `json:"task_id"`
+	State                   string         `json:"state"`
+	SettlementTransactionID sql.NullString `json:"settlement_transaction_id"`
+	SettledAt               sql.NullTime   `json:"settled_at"`
+	UpdatedAt               time.Time      `json:"updated_at"`
+}
+
+type TaskBillingSnapshot struct {
+	TaskID            string         `json:"task_id"`
+	UserID            int64          `json:"user_id"`
+	FeatureSlug       string         `json:"feature_slug"`
+	Sku               string         `json:"sku"`
+	PriceVersionID    int64          `json:"price_version_id"`
+	PriceVersion      int64          `json:"price_version"`
+	UnitCredits       int64          `json:"unit_credits"`
+	Quantity          int64          `json:"quantity"`
+	TotalCredits      int64          `json:"total_credits"`
+	QuotedAt          time.Time      `json:"quoted_at"`
+	HoldTransactionID sql.NullString `json:"hold_transaction_id"`
+	CreatedAt         time.Time      `json:"created_at"`
+	DisplayName       string         `json:"display_name"`
 }
 
 type TaskCancellation struct {
@@ -712,6 +789,14 @@ type TaskStatEvent struct {
 	UpdatedAt          time.Time `json:"updated_at"`
 }
 
+type TaskSubmissionClaim struct {
+	UserID         int64     `json:"user_id"`
+	ClientActionID string    `json:"client_action_id"`
+	TaskID         string    `json:"task_id"`
+	RequestHash    string    `json:"request_hash"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
 type User struct {
 	ID          int64          `json:"id"`
 	PublicID    uuid.UUID      `json:"public_id"`
@@ -723,6 +808,16 @@ type User struct {
 	Status      int16          `json:"status"`
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
+}
+
+type UserDeletionRequest struct {
+	UserID      int64          `json:"user_id"`
+	AuthUserID  sql.NullString `json:"auth_user_id"`
+	StorageUid  sql.NullString `json:"storage_uid"`
+	Phase       string         `json:"phase"`
+	CreatedAt   time.Time      `json:"created_at"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	CompletedAt sql.NullTime   `json:"completed_at"`
 }
 
 type UsersUsedUid struct {

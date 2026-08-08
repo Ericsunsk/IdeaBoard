@@ -79,17 +79,8 @@ func TestReconciliationRoutineRebuildKeepsSecurityInvariant(t *testing.T) {
 		t.Fatalf("apply migrations: %v", err)
 	}
 
-	const (
-		file    = "20260729030000_reconciliation_task_fact_risk.sql"
-		version = 20260729030000
-	)
-	rollbackTxMigrationForTest(t, ctx, conn, file, version)
 	if err := verifySecurityDefinerRoutines(ctx, conn); err != nil {
-		t.Fatalf("rolled-back routine violates security policy: %v", err)
-	}
-
-	if err := upWithConn(ctx, conn); err != nil {
-		t.Fatalf("reapply migration: %v", err)
+		t.Fatalf("baseline routine violates security policy: %v", err)
 	}
 }
 

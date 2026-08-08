@@ -160,7 +160,6 @@ INSERT INTO credit_wallet_restrictions (
 	var canExecutePurchase bool
 	var canCreateRestriction bool
 	var canReleaseRestriction bool
-	var canExecuteLegacyCommand bool
 	if err := db.QueryRowContext(ctx, `
 SELECT has_table_privilege($1, 'credit_transactions', 'INSERT'),
        has_table_privilege($1, 'users', 'INSERT'),
@@ -184,11 +183,6 @@ SELECT has_table_privilege($1, 'credit_transactions', 'INSERT'),
          $1,
          'release_credit_wallet_restriction(text,text,text,text)',
          'EXECUTE'
-       ),
-       has_function_privilege(
-         $1,
-         'execute_credit_command_v2_before_wallet_restrictions(text,bigint,bigint,text,text,text,text,text,text,text,text)',
-         'EXECUTE'
        )`, runtimeRole).Scan(
 		&canInsertLedger,
 		&canInsertAPIUser,
@@ -197,14 +191,13 @@ SELECT has_table_privilege($1, 'credit_transactions', 'INSERT'),
 		&canExecutePurchase,
 		&canCreateRestriction,
 		&canReleaseRestriction,
-		&canExecuteLegacyCommand,
 	); err != nil {
 		t.Fatalf("read runtime privileges error = %v", err)
 	}
 	if canInsertLedger || !canInsertAPIUser || canInsertAuthUser || !canExecuteCommand || !canExecutePurchase ||
-		!canCreateRestriction || !canReleaseRestriction || canExecuteLegacyCommand {
+		!canCreateRestriction || !canReleaseRestriction {
 		t.Fatalf(
-			"runtime privileges insert_ledger=%v insert_api_user=%v insert_auth_user=%v execute_command=%v execute_purchase=%v create_restriction=%v release_restriction=%v legacy_command=%v",
+			"runtime privileges insert_ledger=%v insert_api_user=%v insert_auth_user=%v execute_command=%v execute_purchase=%v create_restriction=%v release_restriction=%v",
 			canInsertLedger,
 			canInsertAPIUser,
 			canInsertAuthUser,
@@ -212,7 +205,6 @@ SELECT has_table_privilege($1, 'credit_transactions', 'INSERT'),
 			canExecutePurchase,
 			canCreateRestriction,
 			canReleaseRestriction,
-			canExecuteLegacyCommand,
 		)
 	}
 	var securityDefiner bool

@@ -106,6 +106,7 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 | Web style lint | `cd apps/web && npm run lint:style` |
 | API tests | `cd apps/api && go test ./...` |
 | API build | `cd apps/api && go build ./...` |
+| Schema assembly drift | `cd apps/api && go run ./cmd/schema-assemble --check --manifest internal/db/schema/manifest.json --output internal/db/schema/schema.sql` |
 | sqlc regeneration | `cd apps/api && go tool sqlc generate` |
 | Auth build | `cd apps/auth && npm run build` |
 | Credits million dataset | `cd apps/api && CREDITS_LOAD_TEST=1 go test ./internal/credits -run '^TestCreditMillionTransactionDataset$' -count=1 -v` |
@@ -256,6 +257,8 @@ sqlc:
 - `apps/api/internal/db/sqlc/*.go` 不手动编辑。
 - SQL schema/query 变更后运行 `go tool sqlc generate`。
 - migrations 位于 `apps/api/internal/db/migrations/`。
+- API migration history 只保留当前 clean-break baseline，后续 migration 必须 append-only；已执行 migration 不得修改、删除或通过手工编辑 `schema_migrations` 绕过 checksum 校验。
+- clean-break release 只支持 Fresh Database。旧数据库必须先导出需要保留的数据，再重建并按当前 baseline 初始化；不能使用旧 migration binary 做跨 baseline 升级或回滚。
 
 ## 环境变量要点
 

@@ -153,6 +153,8 @@ Admin route pages 不直接依赖 generated API。每个 Admin vertical context 
 
 Backend generated sqlc code 不手动编辑。修改 SQL queries/schema 后运行 `go tool sqlc generate`，让 generated code 跟随事实源更新。
 
+API schema source 以 domain fragments 和显式 manifest 组织，`schema.sql` 是 generated snapshot，不能手工编辑。API migration history 从 `20260810000000_baseline.sql` 开始：新 migration 只能 append，`schema_migrations` 保存 filename 与 SHA-256 checksum，并对未知或不一致历史 fail closed。数据库重建属于人工确认的 clean-break operation，不通过 legacy replay 或手工修改 migration history 兼容。
+
 ### 10. Statistics 必须幂等
 
 统计模型以任务为去重边界：

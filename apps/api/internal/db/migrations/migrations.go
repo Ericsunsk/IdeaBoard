@@ -6,10 +6,12 @@ import (
 	"database/sql"
 	"embed"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
 	"path"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -23,41 +25,12 @@ const migrationNoTxLockTimeout = "5s"
 const migrationNoTxStatementTimeout = "2h"
 const statementNoTx = "-- statement:no-tx"
 const statementIndexNamePrefix = "-- statement:index-name="
-const baselineMigrationVersion int64 = 20260609000000
+const baselineMigrationVersion int64 = 20260810000000
 const migrationLockNamespace = "ideaboard:migrations:v1"
 
-var baselineBusinessTableNames = map[string]struct{}{
-	"api_account_models":              {},
-	"api_account_secrets":             {},
-	"api_accounts":                    {},
-	"boards":                          {},
-	"board_members":                   {},
-	"board_share_tokens":              {},
-	"credit_accounts":                 {},
-	"credit_charges":                  {},
-	"credit_holds":                    {},
-	"credit_postings":                 {},
-	"credit_transactions":             {},
-	"credit_wallets":                  {},
-	"provider_endpoints":              {},
-	"feature_prompts":                 {},
-	"media_assets":                    {},
-	"media_refs":                      {},
-	"storage_profile_secret_versions": {},
-	"storage_profiles":                {},
-	"system_configs":                  {},
-	"task_attempts":                   {},
-	"task_cancellations":              {},
-	"task_daily_stat_backfills":       {},
-	"task_daily_stats":                {},
-	"task_execution_metrics":          {},
-	"task_leases":                     {},
-	"task_outputs":                    {},
-	"task_stat_events":                {},
-	"tasks":                           {},
-	"users":                           {},
-	"users_used_uids":                 {},
-}
+const baselineMigrationFile = "20260810000000_baseline.sql"
+
+var createTableNamePattern = regexp.MustCompile(`(?im)^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:[a-zA-Z_][a-zA-Z0-9_$]*\.)?([a-zA-Z_][a-zA-Z0-9_$]*)`)
 
 // These identity sentinels distinguish the canonical baseline from the retired username schema.
 var baselineRequiredColumnNames = map[string][]string{
@@ -75,6 +48,19 @@ type migrationStatement struct {
 	SQL       string
 	NoTx      bool
 	IndexName string
+}
+
+type embeddedMigration struct {
+	File     string
+	Version  int64
+	Raw      []byte
+	Checksum string
+}
+
+type appliedMigration struct {
+	Version  int64
+	File     string
+	Checksum string
 }
 
 func Up(ctx context.Context, db *sql.DB) (err error) {
@@ -110,11 +96,7 @@ func upWithConn(ctx context.Context, conn *sql.Conn) error {
 	if conn == nil {
 		return fmt.Errorf("migration connection is nil")
 	}
-	if _, err := conn.ExecContext(ctx, `
-CREATE TABLE IF NOT EXISTS schema_migrations (
-  version BIGINT NOT NULL PRIMARY KEY,
-  applied_at TIMESTAMPTZ(3) NOT NULL DEFAULT now()
-)`); err != nil {
+	if err := ensureMigrationHistorySchema(ctx, conn); err != nil {
 		return err
 	}
 
@@ -123,51 +105,43 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 		return err
 	}
 	sort.Strings(files)
-	embeddedVersions, err := embeddedMigrationVersions(files)
+	embedded, err := loadEmbeddedMigrations(files)
 	if err != nil {
 		return err
 	}
-	if err := ensureAppliedMigrationsAreEmbedded(ctx, conn, embeddedVersions); err != nil {
+	applied, err := verifyMigrationHistory(ctx, conn, embedded)
+	if err != nil {
 		return err
 	}
 
-	for _, file := range files {
-		version, err := migrationVersion(file)
-		if err != nil {
-			return err
-		}
-		applied, err := migrationApplied(ctx, conn, version)
-		if err != nil {
-			return err
-		}
-		if applied {
-			if version == baselineMigrationVersion {
-				if err := ensureBaselineSchemaIsPresent(ctx, conn, version); err != nil {
+	for _, migration := range embedded {
+		if _, ok := applied[migration.Version]; ok {
+			if migration.Version == baselineMigrationVersion {
+				if err := ensureBaselineSchemaIsPresent(ctx, conn, migration.Version); err != nil {
 					return err
 				}
 			}
 			continue
 		}
-		if version == baselineMigrationVersion {
-			if err := ensureBaselineMigrationCanApply(ctx, conn, version); err != nil {
+		if migration.Version == baselineMigrationVersion {
+			if err := ensureBaselineMigrationCanApply(ctx, conn, migration.Version); err != nil {
 				return err
 			}
 		}
 
-		raw, err := migrationFS.ReadFile(file)
-		if err != nil {
-			return err
-		}
-		statements := parseSQLStatements(extractUpSQL(string(raw)))
+		statements := parseSQLStatements(extractUpSQL(string(migration.Raw)))
 		if len(statements) == 0 {
-			return fmt.Errorf("migration %s has no statements", file)
+			return fmt.Errorf("migration %s has no statements", migration.File)
 		}
-		if err := validateMigrationStatements(file, statements); err != nil {
+		if err := validateMigrationStatements(migration.File, statements); err != nil {
 			return err
 		}
-		if err := applyMigration(ctx, conn, file, statements, version); err != nil {
+		if err := applyMigrationWithChecksum(ctx, conn, migration.File, statements, migration.Version, migration.Checksum); err != nil {
 			return err
 		}
+	}
+	if _, err := verifyMigrationHistory(ctx, conn, embedded); err != nil {
+		return err
 	}
 	if err := verifySecurityDefinerRoutines(ctx, conn); err != nil {
 		return fmt.Errorf("verify SECURITY DEFINER routines: %w", err)
@@ -175,48 +149,185 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 	return nil
 }
 
-func embeddedMigrationVersions(files []string) (map[int64]struct{}, error) {
-	versions := make(map[int64]struct{}, len(files))
+func ensureMigrationHistorySchema(ctx context.Context, conn *sql.Conn) error {
+	if _, err := conn.ExecContext(ctx, `
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  version BIGINT NOT NULL PRIMARY KEY,
+  filename TEXT NOT NULL,
+  checksum CHAR(64) NOT NULL,
+  applied_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  CONSTRAINT chk_schema_migrations_checksum CHECK (checksum ~ '^[0-9a-f]{64}$'),
+  CONSTRAINT uq_schema_migrations_filename UNIQUE (filename)
+)`); err != nil {
+		return fmt.Errorf("create migration history: %w", err)
+	}
+	rows, err := conn.QueryContext(ctx, `
+SELECT column_name
+FROM information_schema.columns
+WHERE table_schema = current_schema() AND table_name = 'schema_migrations'`)
+	if err != nil {
+		return fmt.Errorf("inspect migration history: %w", err)
+	}
+	defer rows.Close()
+	present := map[string]bool{}
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return err
+		}
+		present[name] = true
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, required := range []string{"version", "filename", "checksum", "applied_at"} {
+		if !present[required] {
+			return fmt.Errorf("schema_migrations is legacy or incomplete: missing %s; rebuild the database for the current baseline", required)
+		}
+	}
+	constraints, err := migrationHistoryConstraints(ctx, conn)
+	if err != nil {
+		return err
+	}
+	for _, required := range []string{"schema_migrations_pkey", "chk_schema_migrations_checksum", "uq_schema_migrations_filename"} {
+		if _, ok := constraints[required]; !ok {
+			return fmt.Errorf("schema_migrations is legacy or incomplete: missing constraint %s; rebuild the database for the current baseline", required)
+		}
+	}
+	if _, err := conn.ExecContext(ctx, `
+CREATE OR REPLACE FUNCTION prevent_schema_migrations_mutation()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  RAISE EXCEPTION 'schema_migrations is append-only';
+END;
+$$;
+DROP TRIGGER IF EXISTS schema_migrations_append_only ON schema_migrations;
+CREATE TRIGGER schema_migrations_append_only
+BEFORE UPDATE OR DELETE ON schema_migrations
+FOR EACH ROW EXECUTE FUNCTION prevent_schema_migrations_mutation()`); err != nil {
+		return fmt.Errorf("enforce append-only migration history: %w", err)
+	}
+	return nil
+}
+
+func migrationHistoryConstraints(ctx context.Context, conn *sql.Conn) (map[string]struct{}, error) {
+	rows, err := conn.QueryContext(ctx, `
+SELECT constraint_name
+FROM information_schema.table_constraints
+WHERE table_schema = current_schema() AND table_name = 'schema_migrations'`)
+	if err != nil {
+		return nil, fmt.Errorf("inspect migration history constraints: %w", err)
+	}
+	defer rows.Close()
+	constraints := make(map[string]struct{})
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		constraints[name] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return constraints, nil
+}
+
+func loadEmbeddedMigrations(files []string) ([]embeddedMigration, error) {
+	result := make([]embeddedMigration, 0, len(files))
+	seen := make(map[int64]string, len(files))
 	for _, file := range files {
 		version, err := migrationVersion(file)
 		if err != nil {
 			return nil, err
 		}
-		versions[version] = struct{}{}
+		if previous := seen[version]; previous != "" {
+			return nil, fmt.Errorf("migration version %d is declared by both %s and %s", version, previous, file)
+		}
+		seen[version] = file
+		raw, err := migrationFS.ReadFile(file)
+		if err != nil {
+			return nil, fmt.Errorf("read migration %s: %w", file, err)
+		}
+		result = append(result, embeddedMigration{File: file, Version: version, Raw: raw, Checksum: migrationChecksum(raw)})
 	}
-	return versions, nil
+	return result, nil
 }
 
-func ensureAppliedMigrationsAreEmbedded(ctx context.Context, conn *sql.Conn, embeddedVersions map[int64]struct{}) error {
-	rows, err := conn.QueryContext(ctx, `SELECT version FROM schema_migrations ORDER BY version`)
+func migrationChecksum(raw []byte) string {
+	digest := sha256.Sum256(raw)
+	return hex.EncodeToString(digest[:])
+}
+
+func verifyMigrationHistory(ctx context.Context, conn *sql.Conn, embedded []embeddedMigration) (map[int64]appliedMigration, error) {
+	rows, err := conn.QueryContext(ctx, `SELECT version, filename, checksum FROM schema_migrations ORDER BY version`)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("read migration history: %w", err)
 	}
 	defer rows.Close()
-
-	var unknown []string
+	embeddedByVersion := make(map[int64]embeddedMigration, len(embedded))
+	for _, migration := range embedded {
+		embeddedByVersion[migration.Version] = migration
+	}
+	applied := make(map[int64]appliedMigration)
 	for rows.Next() {
-		var version int64
-		if err := rows.Scan(&version); err != nil {
-			return err
+		var row appliedMigration
+		if err := rows.Scan(&row.Version, &row.File, &row.Checksum); err != nil {
+			return nil, err
 		}
-		if _, ok := embeddedVersions[version]; !ok {
-			unknown = append(unknown, strconv.FormatInt(version, 10))
+		migration, ok := embeddedByVersion[row.Version]
+		if !ok {
+			return nil, fmt.Errorf("database has migration version %d not present in this binary; rebuild the database for the current baseline", row.Version)
 		}
+		if row.File != migration.File || row.Checksum != migration.Checksum {
+			return nil, fmt.Errorf("migration history mismatch for version %d (%s): recorded file/checksum do not match embedded migration", row.Version, migration.File)
+		}
+		applied[row.Version] = row
 	}
 	if err := rows.Err(); err != nil {
-		return err
+		return nil, err
 	}
-	if len(unknown) > 0 {
-		return fmt.Errorf(
-			"database has migration version(s) not present in this binary: %s; reset the database or restore a backup created for this release",
-			strings.Join(unknown, ", "),
-		)
+	seenGap := false
+	for _, migration := range embedded {
+		_, ok := applied[migration.Version]
+		if !ok {
+			seenGap = true
+			continue
+		}
+		if seenGap {
+			return nil, fmt.Errorf("migration history skips an earlier migration before version %d", migration.Version)
+		}
 	}
-	return nil
+	return applied, nil
+}
+
+func baselineBusinessTableNames() (map[string]struct{}, error) {
+	raw, err := migrationFS.ReadFile(baselineMigrationFile)
+	if err != nil {
+		return nil, fmt.Errorf("read baseline migration %s: %w", baselineMigrationFile, err)
+	}
+	matches := createTableNamePattern.FindAllStringSubmatch(extractUpSQL(string(raw)), -1)
+	tables := make(map[string]struct{}, len(matches))
+	for _, match := range matches {
+		tableName := strings.ToLower(match[1])
+		if tableName == "schema_migrations" {
+			continue
+		}
+		tables[tableName] = struct{}{}
+	}
+	if len(tables) == 0 {
+		return nil, fmt.Errorf("baseline migration %s declares no business tables", baselineMigrationFile)
+	}
+	return tables, nil
 }
 
 func ensureBaselineMigrationCanApply(ctx context.Context, conn *sql.Conn, version int64) error {
+	baselineBusinessTableNames, err := baselineBusinessTableNames()
+	if err != nil {
+		return err
+	}
 	rows, err := conn.QueryContext(ctx, `
 SELECT c.relname
 FROM pg_class c
@@ -254,6 +365,10 @@ ORDER BY c.relname`)
 }
 
 func ensureBaselineSchemaIsPresent(ctx context.Context, conn *sql.Conn, version int64) error {
+	baselineBusinessTableNames, err := baselineBusinessTableNames()
+	if err != nil {
+		return err
+	}
 	rows, err := conn.QueryContext(ctx, `
 SELECT c.relname
 FROM pg_class c
@@ -399,25 +514,33 @@ func missingQualifiedNames(required map[string][]string, present map[string]map[
 }
 
 func applyMigration(ctx context.Context, conn *sql.Conn, file string, statements []migrationStatement, version int64) error {
-	if hasNoTxStatements(statements) {
-		return applyNoTxMigration(ctx, conn, file, statements, version)
+	raw, err := migrationFS.ReadFile(path.Base(file))
+	if err != nil {
+		return fmt.Errorf("read migration %s for checksum: %w", file, err)
 	}
-	return applyTransactionalMigration(ctx, conn, file, statements, version)
+	return applyMigrationWithChecksum(ctx, conn, file, statements, version, migrationChecksum(raw))
 }
 
-func applyTransactionalMigration(ctx context.Context, conn *sql.Conn, file string, statements []migrationStatement, version int64) error {
+func applyMigrationWithChecksum(ctx context.Context, conn *sql.Conn, file string, statements []migrationStatement, version int64, checksum string) error {
+	if hasNoTxStatements(statements) {
+		return applyNoTxMigration(ctx, conn, file, statements, version, checksum)
+	}
+	return applyTransactionalMigration(ctx, conn, file, statements, version, checksum)
+}
+
+func applyTransactionalMigration(ctx context.Context, conn *sql.Conn, file string, statements []migrationStatement, version int64, checksum string) error {
 	return withMigrationTx(ctx, conn, file, func(tx *sql.Tx) error {
 		if err := execMigrationStatements(ctx, tx, file, statements); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations (version) VALUES ($1)`, version); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations (version, filename, checksum) VALUES ($1, $2, $3)`, version, path.Base(file), checksum); err != nil {
 			return fmt.Errorf("record migration %s: %w", file, err)
 		}
 		return nil
 	})
 }
 
-func applyNoTxMigration(ctx context.Context, conn *sql.Conn, file string, statements []migrationStatement, version int64) error {
+func applyNoTxMigration(ctx context.Context, conn *sql.Conn, file string, statements []migrationStatement, version int64, checksum string) error {
 	for _, statement := range statements {
 		if !statement.NoTx {
 			return fmt.Errorf("migration %s has transactional statement in no-tx path: %s", file, firstSQLLine(statement.SQL))
@@ -426,7 +549,7 @@ func applyNoTxMigration(ctx context.Context, conn *sql.Conn, file string, statem
 			return err
 		}
 	}
-	return recordMigrationVersion(ctx, conn, file, version)
+	return recordMigrationVersion(ctx, conn, file, version, checksum)
 }
 
 func applyNoTxStatement(ctx context.Context, conn *sql.Conn, file string, statement migrationStatement) error {
@@ -649,9 +772,9 @@ func execMigrationStatements(ctx context.Context, tx *sql.Tx, file string, state
 	return nil
 }
 
-func recordMigrationVersion(ctx context.Context, conn *sql.Conn, file string, version int64) error {
+func recordMigrationVersion(ctx context.Context, conn *sql.Conn, file string, version int64, checksum string) error {
 	return withMigrationTx(ctx, conn, file, func(tx *sql.Tx) error {
-		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations (version) VALUES ($1)`, version); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO schema_migrations (version, filename, checksum) VALUES ($1, $2, $3)`, version, path.Base(file), checksum); err != nil {
 			return fmt.Errorf("record migration %s: %w", file, err)
 		}
 		return nil
@@ -781,14 +904,6 @@ func migrationVersion(file string) (int64, error) {
 		return 0, fmt.Errorf("parse migration version %s: %w", file, err)
 	}
 	return version, nil
-}
-
-func migrationApplied(ctx context.Context, conn *sql.Conn, version int64) (bool, error) {
-	var count int64
-	if err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations WHERE version = $1`, version).Scan(&count); err != nil {
-		return false, err
-	}
-	return count > 0, nil
 }
 
 func extractUpSQL(raw string) string {

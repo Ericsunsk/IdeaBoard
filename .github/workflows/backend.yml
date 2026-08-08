@@ -12,6 +12,10 @@ on:
         required: false
         type: boolean
         default: false
+      base_sha:
+        description: Base commit used for migration immutability checks
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -26,6 +30,7 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
 
       - name: Set up Go
         uses: ./.github/actions/setup-go
@@ -35,6 +40,7 @@ jobs:
       - name: Check sqlc generated code
         working-directory: apps/api
         run: |
+          go run ./cmd/schema-assemble --check --manifest internal/db/schema/manifest.json --output internal/db/schema/schema.sql
           go tool sqlc generate
           git diff --exit-code -- internal/db/sqlc
 
@@ -66,6 +72,7 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
         with:
           ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
 
       - name: Set up Go
         uses: ./.github/actions/setup-go
@@ -74,7 +81,13 @@ jobs:
 
       - name: Test API migrations
         working-directory: apps/api
-        run: go test ./internal/db/migrations -run TestMigrations -count=1
+        run: go test ./internal/db/migrations -count=1
+
+      - name: Check migration history immutability
+        env:
+          BASE_SHA: ${{ inputs.base_sha || github.event.before || github.sha }}
+          HEAD_SHA: ${{ inputs.ref || github.sha }}
+        run: bash scripts/check-migration-history.sh
 
   api-tests:
     runs-on: ubicloud-standard-2
