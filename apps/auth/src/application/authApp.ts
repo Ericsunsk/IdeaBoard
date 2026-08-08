@@ -17,7 +17,6 @@ import { registerInternalRoutes } from "../trusted-identity/internalRoutes.js";
 import { registerMailConfigRoutes } from "../transactional-mail/mailConfigRoutes.js";
 import type { MailConfigService } from "../transactional-mail/mailConfig.js";
 import { getErrorStatus, sendError, sendSuccess } from "../infrastructure/httpResponse.js";
-import { createAuthDispatchHandler } from "./publicRegistration.js";
 import {
   isSocialProviderCapabilitiesRoute,
   registerSocialProviderRoutes,
@@ -51,7 +50,7 @@ export function createAuthApp(deps: AuthAppDependencies): FastifyInstance {
   });
   const authEntryGuard = createAuthEntryGuard({
     admissionPolicy: deps.admissionPolicy,
-    authHandler: createAuthDispatchHandler(deps.authHandler),
+    authHandler: deps.authHandler,
   });
 
   app.setErrorHandler((error, _request, reply) => {

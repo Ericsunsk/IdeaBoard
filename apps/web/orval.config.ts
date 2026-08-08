@@ -2,7 +2,13 @@ import { defineConfig } from 'orval'
 
 export default defineConfig({
   apiQuery: {
-    input: '../api/openapi.yaml',
+    input: {
+      target: '../api/openapi.yaml',
+      filters: {
+        mode: 'exclude',
+        tags: ['PaymentWebhooks'],
+      },
+    },
     output: {
       target: 'src/shared/api/generated-query/endpoints.ts',
       schemas: 'src/shared/api/generated-query/model',
