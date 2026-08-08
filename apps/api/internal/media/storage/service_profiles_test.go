@@ -15,6 +15,7 @@ import (
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/secrets"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
@@ -134,7 +135,7 @@ func newStorageServiceTest(t *testing.T) (*StorageService, *StorageProfileReposi
 
 	db := testdb.Open(t)
 	repo := NewStorageProfileRepository(db)
-	service := NewStorageService(repo, nil)
+	service := NewStorageService(repo, config.PublicOriginsConfig{})
 	if err := service.EnsureDefaultProfiles(context.Background()); err != nil {
 		t.Fatalf("EnsureDefaultProfiles returned error: %v", err)
 	}
@@ -147,7 +148,7 @@ func newStorageServiceTestWithoutDefault(t *testing.T) (*StorageService, *Storag
 
 	db := testdb.Open(t)
 	repo := NewStorageProfileRepository(db)
-	return NewStorageService(repo, nil), repo
+	return NewStorageService(repo, config.PublicOriginsConfig{}), repo
 }
 
 func TestListProfilesStartsWithLocalProfile(t *testing.T) {

@@ -109,38 +109,6 @@ func (h *AdminHandler) UpdateRateLimitSettings(c *gin.Context) {
 	response.SuccessDTO(c, updated)
 }
 
-// GetPublicURLSettings 获取公开链接设置
-func (h *AdminHandler) GetPublicURLSettings(c *gin.Context) {
-	runtimeSettings, ok := h.requireRuntimeSettings(c)
-	if !ok {
-		return
-	}
-	setting, err := runtimeSettings.GetPublicURL(c.Request.Context())
-	if h.respondRuntimeSettingsReadError(c, err) {
-		return
-	}
-	response.SuccessDTO(c, setting)
-}
-
-// UpdatePublicURLSettings 更新公开链接设置
-func (h *AdminHandler) UpdatePublicURLSettings(c *gin.Context) {
-	runtimeSettings, ok := h.requireRuntimeSettings(c)
-	if !ok {
-		return
-	}
-	var req settings.PublicURLSetting
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.Error(c, 400, "参数错误")
-		return
-	}
-
-	updated, err := runtimeSettings.UpdatePublicURL(c.Request.Context(), req)
-	if h.respondRuntimeSettingsWriteError(c, err) {
-		return
-	}
-	response.SuccessDTO(c, updated)
-}
-
 // GetMediaUploadSettings 获取媒体上传设置
 func (h *AdminHandler) GetMediaUploadSettings(c *gin.Context) {
 	runtimeSettings, ok := h.requireRuntimeSettings(c)

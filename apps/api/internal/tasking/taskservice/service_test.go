@@ -16,7 +16,7 @@ import (
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/media/storage"
-	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/tasking/taskmedia"
@@ -25,10 +25,6 @@ import (
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/workflow"
 )
-
-type testPublicURLProvider struct {
-	setting settings.PublicURLSetting
-}
 
 func applyTaskSystemPrompt(basePrompt, userPrompt, featureSlug string, params map[string]interface{}, loadPrompt func(string) (string, error)) string {
 	if loadPrompt == nil {
@@ -50,10 +46,6 @@ func marshalSubmitTaskParams(params map[string]interface{}) (string, error) {
 		return "", err
 	}
 	return marshalWorkflowTaskParams(typed, params)
-}
-
-func (p testPublicURLProvider) GetPublicURL(context.Context) (settings.PublicURLSetting, error) {
-	return p.setting, nil
 }
 
 type testSubmitMediaValidator struct{}
@@ -796,7 +788,7 @@ func TestSubmitTaskCanvasUploadRefsRequireBoardAccess(t *testing.T) {
 			ID: 101, Models: []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
 		}}},
 		Media: taskmedia.NewSubmitMediaValidator(
-			testPublicURLProvider{setting: settings.PublicURLSetting{PublicAssetBaseURL: "https://assets.example.com"}},
+			config.PublicOriginsConfig{API: "https://assets.example.com"},
 			mediaAuthorizer,
 		),
 	})

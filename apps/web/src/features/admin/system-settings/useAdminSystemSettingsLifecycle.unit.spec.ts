@@ -5,13 +5,11 @@ import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import { useAdminAccessSettings } from './useAdminAccessSettings'
 import { useAdminBrandingSettings } from './useAdminBrandingSettings'
 import { useAdminMediaUploadSettings } from './useAdminMediaUploadSettings'
-import { useAdminPublicURLSettings } from './useAdminPublicURLSettings'
 import { useAdminTaskMonitorSettings } from './useAdminTaskMonitorSettings'
 import type {
   AdminAccessSettingsFeedback,
   AdminBrandingSettingsFeedback,
   AdminMediaUploadSettingsFeedback,
-  AdminPublicURLSettingsFeedback,
   AdminTaskMonitorSettingsFeedback,
 } from './useAdminSystemSettingsFeedback'
 
@@ -160,44 +158,6 @@ describe('admin system settings vertical lifecycles', () => {
       await expect(harness.value.save()).resolves.toBe(true)
       expect(updateRequests).toHaveLength(1)
       expect(harness.value.form.value.list_page_size).toBe(30)
-      expect(feedback.saved).toHaveBeenCalledOnce()
-    } finally {
-      await harness.unmount()
-    }
-  })
-
-  it('owns Public URL validation, reset, and normalized save', async () => {
-    const updateRequests: unknown[] = []
-    useMswHandlers(
-      http.get('/api/admin/settings/public-urls', () =>
-        HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: { public_base_url: '', public_asset_base_url: '' },
-        }),
-      ),
-      http.put('/api/admin/settings/public-urls', async ({ request }) => {
-        const body = await request.json()
-        updateRequests.push(body)
-        return HttpResponse.json({ code: 0, msg: 'ok', data: body })
-      }),
-    )
-    const feedback = createSettingFeedback() as AdminPublicURLSettingsFeedback
-    const harness = mountComposable(() => useAdminPublicURLSettings({ feedback }))
-
-    try {
-      await vi.waitFor(() => expect(harness.value.loading.value).toBe(false))
-      harness.value.form.value.public_base_url = '/relative'
-      await expect(harness.value.save()).resolves.toBe(false)
-      expect(feedback.validationFailed).toHaveBeenCalledWith('前端访问地址必须为空或 http(s) URL')
-
-      harness.value.reset()
-      expect(harness.value.form.value.public_base_url).toBe('')
-      harness.value.form.value.public_base_url = ' https://app.example.com/ '
-      await expect(harness.value.save()).resolves.toBe(true)
-      expect(updateRequests).toEqual([
-        { public_base_url: 'https://app.example.com', public_asset_base_url: '' },
-      ])
       expect(feedback.saved).toHaveBeenCalledOnce()
     } finally {
       await harness.unmount()

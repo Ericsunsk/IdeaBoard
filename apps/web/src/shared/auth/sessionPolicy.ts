@@ -3,6 +3,7 @@ import {
   ADMIN_ROOT_PATH,
   SHARE_JOIN_PATH,
   USER_HOME_PATH,
+  USER_BOARDS_PATH,
   USER_LOGIN_PATH,
   USER_REGISTER_PATH,
   USER_ROOT_PATH,
@@ -121,11 +122,12 @@ function isAdminApiRequest(requestUrl: string) {
   return requestUrl.includes('/admin/')
 }
 
-function buildLoginRedirectPath(currentPathname: string, currentFullPath: string) {
-  const loginPath = isPathUnderRoute(currentPathname, ADMIN_ROOT_PATH)
-    ? ADMIN_LOGIN_PATH
-    : USER_LOGIN_PATH
-  return loginPath + '?redirect=' + encodeURIComponent(currentFullPath)
+export function buildLoginRedirectPath(currentPathname: string, currentFullPath: string) {
+  const isAdminPath = isPathUnderRoute(currentPathname, ADMIN_ROOT_PATH)
+  const isUserPath = isPathUnderRoute(currentPathname, USER_ROOT_PATH)
+  const loginPath = isAdminPath ? ADMIN_LOGIN_PATH : USER_LOGIN_PATH
+  const postLoginPath = isUserPath ? USER_BOARDS_PATH : currentFullPath
+  return loginPath + '?redirect=' + encodeURIComponent(postLoginPath)
 }
 
 export function resolveAuthFailureAction(context: AuthFailureContext): AuthFailureAction {

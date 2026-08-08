@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/payments"
+	"ideaboard/api/internal/platform/config"
 
 	"github.com/gin-gonic/gin"
 )
@@ -12,7 +13,7 @@ func TestAdminPaymentRoutesExposeStripeConfigurationAndOrderReads(t *testing.T) 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	registerAdminPaymentRoutes(router.Group("/api/admin"), AdminRouteDeps{
-		PaymentHandler: payments.NewHandler(nil, nil),
+		PaymentHandler: payments.NewHandler(nil, config.PublicOriginsConfig{}),
 	})
 	routes := make(map[string]struct{})
 	for _, route := range router.Routes() {

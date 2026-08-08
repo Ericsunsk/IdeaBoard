@@ -163,14 +163,6 @@ func TestRuntimeSettingsServiceUpdatesAndReadsTypedSettings(t *testing.T) {
 		t.Fatalf("update task monitor failed: %v", err)
 	}
 
-	publicURL, err := service.UpdatePublicURL(ctx, PublicURLSetting{PublicBaseURL: "  https://app.example.com/  ", PublicAssetBaseURL: "  https://api.example.com/uploads/  "})
-	if err != nil {
-		t.Fatalf("update public URL failed: %v", err)
-	}
-	if publicURL != (PublicURLSetting{PublicBaseURL: "https://app.example.com", PublicAssetBaseURL: "https://api.example.com/uploads"}) {
-		t.Fatalf("public URL = %+v, want normalized values", publicURL)
-	}
-
 	mediaUpload, err := service.UpdateMediaUpload(ctx, MediaUploadSetting{UploadMaxConcurrent: 12})
 	if err != nil {
 		t.Fatalf("update media upload failed: %v", err)
@@ -211,14 +203,6 @@ func TestRuntimeSettingsServiceUpdatesAndReadsTypedSettings(t *testing.T) {
 		t.Fatalf("task monitor readback = %+v, want %+v", gotTaskMonitor, taskMonitor)
 	}
 
-	gotPublicURL, err := service.GetPublicURL(ctx)
-	if err != nil {
-		t.Fatalf("get public URL failed: %v", err)
-	}
-	if gotPublicURL != publicURL {
-		t.Fatalf("public URL readback = %+v, want %+v", gotPublicURL, publicURL)
-	}
-
 	gotMediaUpload, err := service.GetMediaUpload(ctx)
 	if err != nil {
 		t.Fatalf("get media upload failed: %v", err)
@@ -246,68 +230,8 @@ func TestRuntimeSettingsServiceDefaultsWhenConfigsAreMissing(t *testing.T) {
 	if got, err := service.GetTaskMonitor(ctx); err != nil || got != DefaultTaskMonitorSetting() {
 		t.Fatalf("task monitor default = %+v, err=%v", got, err)
 	}
-	if got, err := service.GetPublicURL(ctx); err != nil || got != DefaultPublicURLSetting() {
-		t.Fatalf("public URL default = %+v, err=%v", got, err)
-	}
 	if got, err := service.GetMediaUpload(ctx); err != nil || got != DefaultMediaUploadSetting() {
 		t.Fatalf("media upload default = %+v, err=%v", got, err)
-	}
-}
-
-func TestRuntimeSettingsPublicURLUsesBlankDefaultAndDBOverride(t *testing.T) {
-	ctx := context.Background()
-	db := testdb.Open(t)
-	service := NewRuntimeSettingsService(NewSystemConfigRepository(db))
-
-	got, err := service.GetPublicURL(ctx)
-	if err != nil {
-		t.Fatalf("get public URL default failed: %v", err)
-	}
-	if got != DefaultPublicURLSetting() {
-		t.Fatalf("public URL default = %+v, want blank default %+v", got, DefaultPublicURLSetting())
-	}
-
-	updated, err := service.UpdatePublicURL(ctx, PublicURLSetting{
-		PublicBaseURL:      "https://db-app.example.com/",
-		PublicAssetBaseURL: "",
-	})
-	if err != nil {
-		t.Fatalf("update public URL failed: %v", err)
-	}
-	wantUpdated := PublicURLSetting{PublicBaseURL: "https://db-app.example.com", PublicAssetBaseURL: ""}
-	if updated != wantUpdated {
-		t.Fatalf("updated public URL = %+v, want %+v", updated, wantUpdated)
-	}
-
-	got, err = service.GetPublicURL(ctx)
-	if err != nil {
-		t.Fatalf("get public URL override failed: %v", err)
-	}
-	if got != wantUpdated {
-		t.Fatalf("public URL override = %+v, want %+v", got, wantUpdated)
-	}
-}
-
-func TestNormalizePublicURLSettingRejectsNonBaseURLs(t *testing.T) {
-	tests := []PublicURLSetting{
-		{PublicBaseURL: "https://user:pass@app.example.com", PublicAssetBaseURL: ""},
-		{PublicBaseURL: "https://app.example.com?token=1", PublicAssetBaseURL: ""},
-		{PublicBaseURL: "https://app.example.com#section", PublicAssetBaseURL: ""},
-		{PublicBaseURL: "", PublicAssetBaseURL: "https://assets.example.com?token=1"},
-		{PublicBaseURL: "", PublicAssetBaseURL: "https://assets.example.com#uploads"},
-	}
-
-	for _, setting := range tests {
-		if _, err := NormalizePublicURLSetting(setting); err == nil {
-			t.Fatalf("NormalizePublicURLSetting(%+v) succeeded, want error", setting)
-		}
-	}
-}
-
-func TestResolvePublicBaseURLUsesRequestOrigin(t *testing.T) {
-	got := ResolvePublicBaseURL(context.Background(), nil, "http", "request.example")
-	if got != "http://request.example" {
-		t.Fatalf("public base URL = %q, want request origin", got)
 	}
 }
 

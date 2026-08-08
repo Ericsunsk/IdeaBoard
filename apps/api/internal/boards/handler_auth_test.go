@@ -8,13 +8,14 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/platform/config"
 
 	"github.com/gin-gonic/gin"
 )
 
 func TestBoardHandlersRequireTypedPrincipal(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	handler := NewBoardHandler(nil, nil)
+	handler := NewBoardHandler(nil, config.PublicOriginsConfig{})
 	handlers := []struct {
 		name   string
 		method string

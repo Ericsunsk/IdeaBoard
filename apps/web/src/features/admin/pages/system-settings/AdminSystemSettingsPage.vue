@@ -244,56 +244,6 @@
       </template>
     </SettingEditorCard>
 
-    <SettingEditorCard title="链接与域名" :status="publicURLStatusLabel">
-      <template #default>
-        <div :class="settingCardBodyClass">
-          <div class="grid gap-4">
-            <AdminFormField label="前端访问地址" for="admin-public-base-url">
-              <InputText
-                id="admin-public-base-url"
-                v-model="publicURLForm.public_base_url"
-                autocomplete="off"
-                maxlength="2048"
-                placeholder="https://app.example.com"
-                :disabled="publicURLLoading || publicURLSaving"
-                @keyup.enter="savePublicURL()"
-              />
-            </AdminFormField>
-
-            <AdminFormField label="素材访问地址" for="admin-public-asset-base-url">
-              <InputText
-                id="admin-public-asset-base-url"
-                v-model="publicURLForm.public_asset_base_url"
-                autocomplete="off"
-                maxlength="2048"
-                placeholder="https://api.example.com"
-                :disabled="publicURLLoading || publicURLSaving"
-                @keyup.enter="savePublicURL()"
-              />
-            </AdminFormField>
-          </div>
-        </div>
-      </template>
-      <template #actions>
-        <Button
-          :class="adminActionButtonClass"
-          label="保存"
-          severity="contrast"
-          :disabled="publicURLLoading || publicURLSaving"
-          :loading="publicURLSaving"
-          @click="savePublicURL"
-        />
-        <Button
-          :class="adminActionButtonClass"
-          label="重置"
-          severity="secondary"
-          outlined
-          :disabled="publicURLLoading || publicURLSaving"
-          @click="resetPublicURL"
-        />
-      </template>
-    </SettingEditorCard>
-
     <SettingEditorCard title="上传并发" :status="`并发 ${mediaUploadForm.upload_max_concurrent}`">
       <template #default>
         <div :class="settingCardBodyClass">
@@ -343,7 +293,7 @@
 
 <script setup lang="ts">
 import { Xmark } from '@iconoir/vue'
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
@@ -374,12 +324,10 @@ import {
   TASK_MONITOR_MIN_REFRESH_INTERVAL_SECONDS,
 } from '../../system-settings/taskMonitorSettingsResource'
 import { useAdminTaskMonitorSettings } from '../../system-settings/useAdminTaskMonitorSettings'
-import { useAdminPublicURLSettings } from '../../system-settings/useAdminPublicURLSettings'
 import {
   useAdminAccessSettingsFeedback,
   useAdminBrandingSettingsFeedback,
   useAdminMediaUploadSettingsFeedback,
-  useAdminPublicURLSettingsFeedback,
   useAdminTaskMonitorSettingsFeedback,
   useAdminUnsupportedLogoFileFeedback,
 } from '../../system-settings/useAdminSystemSettingsFeedback'
@@ -402,7 +350,6 @@ const brandingLogoButtonClass = createBrandMarkClass(
 const accessSettingsFeedback = useAdminAccessSettingsFeedback()
 const brandingSettingsFeedback = useAdminBrandingSettingsFeedback()
 const mediaUploadSettingsFeedback = useAdminMediaUploadSettingsFeedback()
-const publicURLSettingsFeedback = useAdminPublicURLSettingsFeedback()
 const taskMonitorSettingsFeedback = useAdminTaskMonitorSettingsFeedback()
 const unsupportedLogoFileFeedback = useAdminUnsupportedLogoFileFeedback()
 const logoFileInputRef = ref<HTMLInputElement | null>(null)
@@ -438,27 +385,12 @@ const {
   saving: taskMonitorSaving,
 } = useAdminTaskMonitorSettings({ feedback: taskMonitorSettingsFeedback })
 const {
-  form: publicURLForm,
-  save: savePublicURL,
-  loading: publicURLLoading,
-  reset: resetPublicURL,
-  saving: publicURLSaving,
-} = useAdminPublicURLSettings({ feedback: publicURLSettingsFeedback })
-const {
   form: mediaUploadForm,
   save: saveMediaUpload,
   loading: mediaUploadLoading,
   reset: resetMediaUpload,
   saving: mediaUploadSaving,
 } = useAdminMediaUploadSettings({ feedback: mediaUploadSettingsFeedback })
-const publicURLStatusLabel = computed(() => {
-  const hasPublicBaseURL = Boolean(publicURLForm.value.public_base_url.trim())
-  const hasPublicAssetBaseURL = Boolean(publicURLForm.value.public_asset_base_url.trim())
-  if (hasPublicBaseURL && hasPublicAssetBaseURL) return '已配置'
-  if (hasPublicBaseURL || hasPublicAssetBaseURL) return '部分配置'
-  return '使用默认'
-})
-
 watch(logoCropDialogVisible, (visible) => {
   if (!visible) {
     pendingLogoFile.value = null

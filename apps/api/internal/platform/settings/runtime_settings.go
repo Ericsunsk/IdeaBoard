@@ -33,11 +33,6 @@ type TaskMonitorSetting struct {
 	ResultPreviewEnabled   bool `json:"result_preview_enabled"`
 }
 
-type PublicURLSetting struct {
-	PublicBaseURL      string `json:"public_base_url"`
-	PublicAssetBaseURL string `json:"public_asset_base_url"`
-}
-
 type MediaUploadSetting struct {
 	UploadMaxConcurrent int `json:"upload_max_concurrent"`
 }
@@ -46,10 +41,6 @@ type RuntimeSettingsService struct {
 	repo           *SystemConfigRepository
 	mu             sync.RWMutex
 	rateLimitCache *cachedRateLimitSetting
-}
-
-type PublicURLSettingProvider interface {
-	GetPublicURL(ctx context.Context) (PublicURLSetting, error)
 }
 
 type MediaUploadSettingProvider interface {
@@ -77,9 +68,6 @@ const (
 	defaultRateLimitMax       = 120
 	maxRateLimitWindow        = 3600
 	maxRateLimitRequests      = 10000
-
-	publicBaseURLKey      = "public_base_url"
-	publicAssetBaseURLKey = "public_asset_base_url"
 
 	mediaUploadMaxConcurrentKey = "media_upload_max_concurrent"
 	defaultUploadMaxConcurrent  = 8
@@ -135,13 +123,6 @@ func DefaultTaskMonitorSetting() TaskMonitorSetting {
 		AutoRefreshEnabled:     defaultTaskMonitorAutoRefreshEnabled,
 		RefreshIntervalSeconds: defaultTaskMonitorRefreshIntervalSecs,
 		ResultPreviewEnabled:   defaultTaskMonitorResultPreview,
-	}
-}
-
-func DefaultPublicURLSetting() PublicURLSetting {
-	return PublicURLSetting{
-		PublicBaseURL:      "",
-		PublicAssetBaseURL: "",
 	}
 }
 
@@ -207,35 +188,6 @@ func (s *RuntimeSettingsService) UpdateRateLimit(ctx context.Context, setting Ra
 	}
 	s.writeCachedRateLimit(setting)
 	return setting, nil
-}
-
-func (s *RuntimeSettingsService) GetPublicURL(ctx context.Context) (PublicURLSetting, error) {
-	setting := DefaultPublicURLSetting()
-	values, err := s.getMany(ctx, publicBaseURLKey, publicAssetBaseURLKey)
-	if err != nil {
-		return setting, err
-	}
-	if raw, ok := values[publicBaseURLKey]; ok {
-		setting.PublicBaseURL = normalizeRuntimePublicURL(raw)
-	}
-	if raw, ok := values[publicAssetBaseURLKey]; ok {
-		setting.PublicAssetBaseURL = normalizeRuntimePublicURL(raw)
-	}
-	return setting, nil
-}
-
-func (s *RuntimeSettingsService) UpdatePublicURL(ctx context.Context, setting PublicURLSetting) (PublicURLSetting, error) {
-	normalized, err := NormalizePublicURLSetting(setting)
-	if err != nil {
-		return PublicURLSetting{}, err
-	}
-	if err := s.setMany(ctx, []SystemConfigValue{
-		{Key: publicBaseURLKey, Value: normalized.PublicBaseURL},
-		{Key: publicAssetBaseURLKey, Value: normalized.PublicAssetBaseURL},
-	}); err != nil {
-		return PublicURLSetting{}, err
-	}
-	return normalized, nil
 }
 
 func (s *RuntimeSettingsService) GetMediaUpload(ctx context.Context) (MediaUploadSetting, error) {
@@ -375,58 +327,11 @@ func (s *RuntimeSettingsService) writeCachedRateLimit(setting RateLimitSetting) 
 	}
 }
 
-func NormalizePublicURLSetting(setting PublicURLSetting) (PublicURLSetting, error) {
-	publicBaseURL, err := validateRuntimePublicURL("public_base_url", setting.PublicBaseURL)
-	if err != nil {
-		return PublicURLSetting{}, err
-	}
-	publicAssetBaseURL, err := validateRuntimePublicURL("public_asset_base_url", setting.PublicAssetBaseURL)
-	if err != nil {
-		return PublicURLSetting{}, err
-	}
-	return PublicURLSetting{PublicBaseURL: publicBaseURL, PublicAssetBaseURL: publicAssetBaseURL}, nil
-}
-
 func NormalizeMediaUploadSetting(setting MediaUploadSetting) (MediaUploadSetting, error) {
 	if setting.UploadMaxConcurrent < minUploadMaxConcurrent || setting.UploadMaxConcurrent > maxUploadMaxConcurrent {
 		return MediaUploadSetting{}, validation.New("upload_max_concurrent 必须在 1 到 64 之间")
 	}
 	return setting, nil
-}
-
-func ResolvePublicBaseURL(ctx context.Context, provider PublicURLSettingProvider, requestScheme, requestHost string) string {
-	if setting := publicURLSettingFromProvider(ctx, provider); setting.PublicBaseURL != "" {
-		return setting.PublicBaseURL
-	}
-	host := strings.TrimSpace(requestHost)
-	if host == "" {
-		return ""
-	}
-	scheme := strings.TrimSpace(requestScheme)
-	if scheme == "" {
-		scheme = "http"
-	}
-	return scheme + "://" + host
-}
-
-func ResolvePublicAssetBaseURL(ctx context.Context, provider PublicURLSettingProvider) *url.URL {
-	for _, raw := range publicURLBaseCandidates(ctx, provider) {
-		if parsed := parseRuntimePublicURL(raw); parsed != nil {
-			return parsed
-		}
-	}
-	return nil
-}
-
-func PublicUploadBaseURLs(ctx context.Context, provider PublicURLSettingProvider) []*url.URL {
-	candidates := publicURLBaseCandidates(ctx, provider)
-	out := make([]*url.URL, 0, len(candidates))
-	for _, raw := range candidates {
-		if parsed := parseRuntimePublicURL(raw); parsed != nil {
-			out = append(out, parsed)
-		}
-	}
-	return out
 }
 
 func normalizeBranding(setting BrandingSetting) (BrandingSetting, error) {
@@ -468,56 +373,4 @@ func parseBoundedInt(raw string, min int, max int) (int, bool) {
 		return 0, false
 	}
 	return value, true
-}
-
-func publicURLSettingFromProvider(ctx context.Context, provider PublicURLSettingProvider) PublicURLSetting {
-	if provider == nil {
-		return DefaultPublicURLSetting()
-	}
-	setting, err := provider.GetPublicURL(ctx)
-	if err != nil {
-		return DefaultPublicURLSetting()
-	}
-	return setting
-}
-
-func publicURLBaseCandidates(ctx context.Context, provider PublicURLSettingProvider) []string {
-	setting := publicURLSettingFromProvider(ctx, provider)
-	candidates := make([]string, 0, 2)
-	if setting.PublicAssetBaseURL != "" {
-		candidates = append(candidates, setting.PublicAssetBaseURL)
-	}
-	if setting.PublicBaseURL != "" {
-		candidates = append(candidates, setting.PublicBaseURL)
-	}
-	return candidates
-}
-
-func validateRuntimePublicURL(field string, raw string) (string, error) {
-	normalized := normalizeRuntimePublicURL(raw)
-	if normalized == "" {
-		return "", nil
-	}
-	if parseRuntimePublicURL(normalized) == nil {
-		return "", validation.New(field + " 必须为空或 http(s) URL")
-	}
-	return normalized, nil
-}
-
-func normalizeRuntimePublicURL(raw string) string {
-	return strings.TrimRight(strings.TrimSpace(raw), "/")
-}
-
-func parseRuntimePublicURL(raw string) *url.URL {
-	parsed, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return nil
-	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return nil
-	}
-	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return nil
-	}
-	return parsed
 }

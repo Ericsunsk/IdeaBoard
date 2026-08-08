@@ -78,19 +78,21 @@ describe('resolveAuthFailureAction', () => {
     ).toEqual({ kind: 'ignore' })
   })
 
-  it('redirects non-auth 401 responses to the scoped login route', () => {
+  it('returns users to Boards after a protected user session is revoked', () => {
     expect(
       resolveAuthFailureAction({
         status: 401,
-        requestUrl: '/api/boards',
-        currentPathname: '/user/boards',
-        currentFullPath: '/user/boards?tab=recent#top',
+        requestUrl: '/api/boards/board-1',
+        currentPathname: '/user/canvas',
+        currentFullPath: '/user/canvas?boardId=board-1',
       }),
     ).toEqual({
       kind: 'redirect-login',
-      targetPath: '/user/login?redirect=%2Fuser%2Fboards%3Ftab%3Drecent%23top',
+      targetPath: '/user/login?redirect=%2Fuser%2Fboards',
     })
+  })
 
+  it('preserves the current Admin destination after an admin session is revoked', () => {
     expect(
       resolveAuthFailureAction({
         payload: { code: 401 },
@@ -101,6 +103,20 @@ describe('resolveAuthFailureAction', () => {
     ).toEqual({
       kind: 'redirect-login',
       targetPath: '/admin/login?redirect=%2Fadmin%2Fusers%3Fpage%3D1',
+    })
+  })
+
+  it('preserves a share join destination across login', () => {
+    expect(
+      resolveAuthFailureAction({
+        status: 401,
+        requestUrl: '/api/boards/share-token',
+        currentPathname: '/share',
+        currentFullPath: '/share?token=abc',
+      }),
+    ).toEqual({
+      kind: 'redirect-login',
+      targetPath: '/user/login?redirect=%2Fshare%3Ftoken%3Dabc',
     })
   })
 

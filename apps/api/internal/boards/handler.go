@@ -7,15 +7,15 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/response"
-	"ideaboard/api/internal/platform/settings"
 
 	"github.com/gin-gonic/gin"
 )
 
 type BoardHandler struct {
-	service    *BoardService
-	publicURLs settings.PublicURLSettingProvider
+	service       *BoardService
+	publicOrigins config.PublicOriginsConfig
 }
 
 type boardDTO struct {
@@ -77,8 +77,8 @@ type boardShareTokenRevokeResponse struct {
 	Revoked bool `json:"revoked"`
 }
 
-func NewBoardHandler(service *BoardService, publicURLs settings.PublicURLSettingProvider) *BoardHandler {
-	return &BoardHandler{service: service, publicURLs: publicURLs}
+func NewBoardHandler(service *BoardService, publicOrigins config.PublicOriginsConfig) *BoardHandler {
+	return &BoardHandler{service: service, publicOrigins: publicOrigins}
 }
 
 func requireBoardUserID(c *gin.Context) (int64, bool) {
@@ -269,7 +269,7 @@ func (h *BoardHandler) CreateShareToken(c *gin.Context) {
 		h.respondShareTokenError(c, err, "创建分享链接失败")
 		return
 	}
-	baseURL := settings.ResolvePublicBaseURL(c.Request.Context(), h.publicURLs, requestScheme(c), c.Request.Host)
+	baseURL := h.publicOrigins.Web
 	response.SuccessDTO(c, boardShareTokenResponse{Token: toBoardShareTokenDTO(*shareToken, baseURL)})
 }
 
@@ -284,7 +284,7 @@ func (h *BoardHandler) ListShareTokens(c *gin.Context) {
 		h.respondShareTokenError(c, err, "获取分享链接失败")
 		return
 	}
-	baseURL := settings.ResolvePublicBaseURL(c.Request.Context(), h.publicURLs, requestScheme(c), c.Request.Host)
+	baseURL := h.publicOrigins.Web
 	result := make([]boardShareTokenDTO, 0, len(list))
 	for _, item := range list {
 		result = append(result, toBoardShareTokenDTO(item, baseURL))
@@ -429,17 +429,4 @@ func parseBoardState(raw string) interface{} {
 		return nil
 	}
 	return parsed
-}
-
-func requestScheme(c *gin.Context) string {
-	if c == nil || c.Request == nil {
-		return ""
-	}
-	if c.Request.TLS != nil {
-		return "https"
-	}
-	if proto := strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")); proto != "" {
-		return strings.ToLower(proto)
-	}
-	return "http"
 }

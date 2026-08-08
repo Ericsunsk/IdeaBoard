@@ -19,7 +19,7 @@ import (
 
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/media/storage"
-	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/testdb"
@@ -44,10 +44,7 @@ func TestMaterializeProviderResultImagesUsesResultMaterializer(t *testing.T) {
 	}
 	executor := &ProviderExecutor{
 		resultMaterializer: materializer,
-		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{
-			PublicBaseURL:      "https://app.example.test",
-			PublicAssetBaseURL: "https://assets.example.test",
-		}},
+		publicOrigins:      config.PublicOriginsConfig{Web: "https://app.example.test", API: "https://assets.example.test"},
 	}
 
 	urls, outputs, err := executor.materializeProviderResultImages(context.Background(), 42, "task-owned", "corr-owned", &accounts.ApiAccount{
@@ -267,7 +264,7 @@ func newTestProviderExecutorWithLocalStorage(t *testing.T) *ProviderExecutor {
 	})
 
 	db := testdb.Open(t)
-	storageService := storage.NewStorageService(storage.NewStorageProfileRepository(db), nil)
+	storageService := storage.NewStorageService(storage.NewStorageProfileRepository(db), config.PublicOriginsConfig{})
 	mediaStore := storage.NewRuntimeTaskMediaStore(storageService)
 
 	return &ProviderExecutor{

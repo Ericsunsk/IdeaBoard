@@ -118,11 +118,15 @@ export type AdminPaymentOrderApiAdapter = {
   ) => Promise<PaymentOrderApiRefund>
 }
 
-export function createAdminPaymentOrderApiAdapter(): AdminPaymentOrderApiAdapter {
+type PaymentOrderApiTransport = Pick<typeof api, 'request'>
+
+export function createAdminPaymentOrderApiAdapter(
+  transport: PaymentOrderApiTransport = api,
+): AdminPaymentOrderApiAdapter {
   return {
     search: ({ orderNumber, user, status, anomalyOnly, cursor, limit = 20, signal }) =>
       resolveApiData(
-        api.request<ApiEnvelope<PaymentOrderApiPage>>('/api/admin/payments/orders', {
+        transport.request<ApiEnvelope<PaymentOrderApiPage>>('/admin/payments/orders', {
           query: {
             ...(orderNumber?.trim() ? { order_number: orderNumber.trim().toUpperCase() } : {}),
             ...(user?.trim() ? { user: user.trim() } : {}),
@@ -137,16 +141,16 @@ export function createAdminPaymentOrderApiAdapter(): AdminPaymentOrderApiAdapter
       ),
     get: (publicOrderNumber, signal) =>
       resolveApiData(
-        api.request<ApiEnvelope<PaymentOrderApiDetail>>(
-          `/api/admin/payments/orders/${encodeURIComponent(publicOrderNumber.trim().toUpperCase())}`,
+        transport.request<ApiEnvelope<PaymentOrderApiDetail>>(
+          `/admin/payments/orders/${encodeURIComponent(publicOrderNumber.trim().toUpperCase())}`,
           signal ? { signal } : undefined,
         ),
         '加载支付订单详情失败',
       ),
     refund: (publicOrderNumber, input) =>
       resolveApiData(
-        api.request<ApiEnvelope<PaymentOrderApiRefund>>(
-          `/api/admin/payments/orders/${encodeURIComponent(publicOrderNumber.trim().toUpperCase())}/refunds`,
+        transport.request<ApiEnvelope<PaymentOrderApiRefund>>(
+          `/admin/payments/orders/${encodeURIComponent(publicOrderNumber.trim().toUpperCase())}/refunds`,
           { method: 'POST', body: input },
         ),
         '发起退款失败',

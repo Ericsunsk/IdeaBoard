@@ -77,8 +77,6 @@ func registerAdminSettingsRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.PUT(RouteAdminSettingsBranding, h.AdminHandler.UpdateBrandingSettings)
 	adminAPI.GET(RouteAdminSettingsMediaUpload, h.AdminHandler.GetMediaUploadSettings)
 	adminAPI.PUT(RouteAdminSettingsMediaUpload, h.AdminHandler.UpdateMediaUploadSettings)
-	adminAPI.GET(RouteAdminSettingsPublicURLs, h.AdminHandler.GetPublicURLSettings)
-	adminAPI.PUT(RouteAdminSettingsPublicURLs, h.AdminHandler.UpdatePublicURLSettings)
 	adminAPI.GET(RouteAdminSettingsTaskMonitor, h.AdminHandler.GetTaskMonitorSettings)
 	adminAPI.PUT(RouteAdminSettingsTaskMonitor, h.AdminHandler.UpdateTaskMonitorSettings)
 	adminAPI.GET(RouteAdminSettingsOutbound, h.AdminHandler.GetOutboundPolicy)

@@ -74,6 +74,8 @@ APP_BASE_URL=https://app.example.com
 API_BASE_URL=https://api.example.com
 ```
 
+这两个值必须是没有 path、凭证、query 或 fragment 的 http(s) Origin。它们是唯一事实源：`APP_BASE_URL` 用于浏览器跳转与分享链接，`API_BASE_URL` 用于 Stripe Webhook 和本地上传素材；API 启动时会 fail closed 校验。
+
 Cloudflare DNS 配置：
 
 ```text

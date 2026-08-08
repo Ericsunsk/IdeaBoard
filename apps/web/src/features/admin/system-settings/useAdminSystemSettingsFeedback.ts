@@ -27,7 +27,6 @@ export type AdminAccessSettingsFeedback = {
 }
 
 export type AdminTaskMonitorSettingsFeedback = AdminSettingFeedback
-export type AdminPublicURLSettingsFeedback = AdminSettingFeedback
 export type AdminMediaUploadSettingsFeedback = AdminSettingFeedback
 export type AdminOutboundPolicyFeedback = AdminSettingFeedback
 
@@ -69,17 +68,6 @@ export function createAdminTaskMonitorSettingsFeedback(
   )
 }
 
-export function createAdminPublicURLSettingsFeedback(
-  toast: AdminToastPort,
-): AdminPublicURLSettingsFeedback {
-  return createAdminSettingFeedback(
-    toast,
-    '加载链接与域名失败',
-    '链接与域名已保存',
-    '保存链接与域名失败',
-  )
-}
-
 export function createAdminMediaUploadSettingsFeedback(
   toast: AdminToastPort,
 ): AdminMediaUploadSettingsFeedback {
@@ -107,10 +95,6 @@ export function useAdminAccessSettingsFeedback() {
 
 export function useAdminTaskMonitorSettingsFeedback() {
   return createAdminTaskMonitorSettingsFeedback(useAdminToast())
-}
-
-export function useAdminPublicURLSettingsFeedback() {
-  return createAdminPublicURLSettingsFeedback(useAdminToast())
 }
 
 export function useAdminMediaUploadSettingsFeedback() {

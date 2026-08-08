@@ -15,7 +15,7 @@ import (
 
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport"
 	"ideaboard/api/internal/testsupport/secretstest"
@@ -31,7 +31,7 @@ func TestStripeConfigurationHTTPContractNeverReturnsSecretsAndRejectsUnknownFiel
 		ProductID: "prod_http", WebhookEndpointID: "we_http", WebhookSecret: "whsec_http",
 	}}
 	service := NewService(ServiceDependencies{Repository: NewRepository(db), ConfigurationGateway: gateway, WebhookVerifier: &fakeWebhookVerifier{}})
-	handler := NewHandler(service, fixedPublicURLProvider{"https://app.example.com"})
+	handler := NewHandler(service, testPublicOrigins("https://app.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 42, principal.RoleAdmin)
@@ -47,6 +47,9 @@ func TestStripeConfigurationHTTPContractNeverReturnsSecretsAndRejectsUnknownFiel
 	}
 	if strings.Contains(response.Body.String(), "sk_test_http_secret") || strings.Contains(response.Body.String(), "whsec_http") {
 		t.Fatalf("PUT leaked secret: %s", response.Body.String())
+	}
+	if len(gateway.calls) != 1 || gateway.calls[0].WebhookURL != "https://api.example.com/api/webhooks/stripe" {
+		t.Fatalf("Stripe webhook URL = %q, want API origin", gateway.calls[0].WebhookURL)
 	}
 
 	response = performPaymentRequest(router, http.MethodGet, "/admin/payments/stripe-config", "", nil)
@@ -68,7 +71,7 @@ func TestUserCheckoutHTTPUsesPrincipalAndTrustedReturnURL(t *testing.T) {
 	service := newConfiguredPurchaseService(t, db, configuredFakeStripeGateway("acct_user_http", "prod_user_http"), checkoutGateway, credits.NewService(pool))
 	verifier := &fakeWebhookVerifier{}
 	service.verifier = verifier
-	handler := NewHandler(service, fixedPublicURLProvider{"https://configured.example.com"})
+	handler := NewHandler(service, testPublicOrigins("https://configured.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 42, principal.RoleUser)
@@ -216,7 +219,7 @@ func TestUserPendingPaymentOrderHTTPBoundaryScopesOwnershipAndRejectsActionBodie
 	service := newConfiguredPurchaseService(
 		t, db, configuredFakeStripeGateway("acct_pending_http", "prod_pending_http"), checkoutGateway, credits.NewService(pool),
 	)
-	handler := NewHandler(service, fixedPublicURLProvider{"https://configured.example.com"})
+	handler := NewHandler(service, testPublicOrigins("https://configured.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		userID := int64(42)
@@ -337,7 +340,7 @@ func TestUserCheckoutHTTPRejectsWalletWithoutRechargeEligibility(t *testing.T) {
 		t, db, configuredFakeStripeGateway("acct_locked_http", "prod_locked_http"),
 		&fakeCheckoutGateway{}, credits.NewService(pool),
 	)
-	handler := NewHandler(service, fixedPublicURLProvider{"https://configured.example.com"})
+	handler := NewHandler(service, testPublicOrigins("https://configured.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 88, principal.RoleUser)
@@ -357,7 +360,7 @@ func TestStripeConfigurationHTTPRejectsOversizedAPIKeyBeforeGatewayAndAuditsFail
 	db := testdb.Open(t)
 	gateway := &fakeStripeGateway{}
 	service := NewService(ServiceDependencies{Repository: NewRepository(db), ConfigurationGateway: gateway, WebhookVerifier: &fakeWebhookVerifier{}})
-	handler := NewHandler(service, fixedPublicURLProvider{"https://app.example.com"})
+	handler := NewHandler(service, testPublicOrigins("https://app.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 42, principal.RoleAdmin)
@@ -411,7 +414,7 @@ func TestStripeWebhookHTTPContractUsesUnauthenticatedExactRawBody(t *testing.T) 
 	}); err != nil {
 		t.Fatal(err)
 	}
-	handler := NewHandler(service, fixedPublicURLProvider{"https://app.example.com"})
+	handler := NewHandler(service, testPublicOrigins("https://app.example.com"))
 	router := gin.New()
 	router.POST("/api/webhooks/stripe", handler.ReceiveStripeWebhook)
 
@@ -425,10 +428,8 @@ func TestStripeWebhookHTTPContractUsesUnauthenticatedExactRawBody(t *testing.T) 
 	}
 }
 
-type fixedPublicURLProvider struct{ baseURL string }
-
-func (p fixedPublicURLProvider) GetPublicURL(_ context.Context) (settings.PublicURLSetting, error) {
-	return settings.PublicURLSetting{PublicBaseURL: p.baseURL}, nil
+func testPublicOrigins(webURL string) config.PublicOriginsConfig {
+	return config.PublicOriginsConfig{Web: webURL, API: "https://api.example.com"}
 }
 
 func performPaymentRequest(router http.Handler, method, target, body string, headers map[string]string) *httptest.ResponseRecorder {

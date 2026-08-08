@@ -2,10 +2,11 @@ import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { useUserStore } from '../../features/auth/session/authSession'
 import { dismissAppToasts } from '../../shared/composables/useAppToast'
-import { ADMIN_DEFAULT_PATH, ADMIN_LOGIN_PATH } from '../../features/admin/app/adminNavigationMeta'
+import { ADMIN_DEFAULT_PATH } from '../../features/admin/app/adminNavigationMeta'
 import { adminRoutes } from '../../features/admin/app/adminRoutes'
-import { USER_DEFAULT_PATH, USER_LOGIN_PATH, userRoutes } from '../../features/user/app/userRoutes'
+import { USER_DEFAULT_PATH, userRoutes } from '../../features/user/app/userRoutes'
 import { ADMIN_ROOT_PATH, isPathUnderRoute } from '../../shared/constants/routePaths'
+import { buildLoginRedirectPath } from '../../shared/auth/sessionPolicy'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -37,11 +38,7 @@ router.beforeEach(async (to) => {
   const isLoggedIn = !!user
 
   if (to.meta.requiresAuth && !isLoggedIn) {
-    if (isAdminRoute) {
-      return { path: ADMIN_LOGIN_PATH, query: { redirect: to.fullPath } }
-    } else {
-      return { path: USER_LOGIN_PATH, query: { redirect: to.fullPath } }
-    }
+    return buildLoginRedirectPath(to.path, to.fullPath)
   }
 
   if (to.meta.guest && isLoggedIn) {

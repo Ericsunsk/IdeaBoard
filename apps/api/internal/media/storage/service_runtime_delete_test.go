@@ -13,16 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/platform/config"
 )
-
-type testPublicURLProvider struct {
-	setting settings.PublicURLSetting
-}
-
-func (p testPublicURLProvider) GetPublicURL(context.Context) (settings.PublicURLSetting, error) {
-	return p.setting, nil
-}
 
 func withTempWorkingDir(t *testing.T) {
 	t.Helper()
@@ -66,37 +58,11 @@ func TestDeleteLocalByObjectKeyRemovesFile(t *testing.T) {
 }
 
 func TestPublicUploadURLUsesAssetBaseURL(t *testing.T) {
-	got := publicUploadURLWithProvider(
-		context.Background(),
-		testPublicURLProvider{setting: settings.PublicURLSetting{
-			PublicBaseURL:      "https://app.example.com",
-			PublicAssetBaseURL: "https://api.example.com",
-		}},
+	got := publicUploadURLWithOrigins(
+		config.PublicOriginsConfig{Web: "https://app.example.com", API: "https://api.example.com"},
 		"uploads/canvas/U123/board/content/demo.png",
 	)
 	want := "https://api.example.com/uploads/canvas/U123/board/content/demo.png"
-	if got != want {
-		t.Fatalf("publicUploadURL = %q, want %q", got, want)
-	}
-}
-
-func TestPublicUploadURLPreservesAssetBaseURLPath(t *testing.T) {
-	got := publicUploadURLWithProvider(
-		context.Background(),
-		testPublicURLProvider{setting: settings.PublicURLSetting{
-			PublicAssetBaseURL: "https://cdn.example.com/media",
-		}},
-		"uploads/canvas/U123/board/content/demo.png",
-	)
-	want := "https://cdn.example.com/media/uploads/canvas/U123/board/content/demo.png"
-	if got != want {
-		t.Fatalf("publicUploadURL = %q, want %q", got, want)
-	}
-}
-
-func TestPublicUploadURLFallsBackToRelativePath(t *testing.T) {
-	got := publicUploadURL(context.Background(), "uploads/canvas/U123/board/content/demo.png")
-	want := "/uploads/canvas/U123/board/content/demo.png"
 	if got != want {
 		t.Fatalf("publicUploadURL = %q, want %q", got, want)
 	}

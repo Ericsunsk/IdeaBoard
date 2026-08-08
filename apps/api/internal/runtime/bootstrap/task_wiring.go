@@ -76,7 +76,7 @@ func newAppTaskRuntime(
 		uploadOwnerStorageUIDResolver{repo: repos.userRepo},
 	)
 	runtimeTaskMediaStore := storage.NewRuntimeTaskMediaStore(services.storageService)
-	submitMediaValidator := taskmedia.NewSubmitMediaValidator(services.runtimeSettings, taskMediaAuthorizer)
+	submitMediaValidator := taskmedia.NewSubmitMediaValidator(cfg.PublicOrigins, taskMediaAuthorizer)
 	taskEventHub := taskservice.NewEventHub()
 	taskEvents, eventBus, err := newTaskStatusEventPublisher(ctx, cfg.Events, taskEventHub)
 	if err != nil {
@@ -105,7 +105,7 @@ func newAppTaskRuntime(
 		MediaReader:          runtimeTaskMediaStore,
 		ResultMaterializer:   runtimeTaskMediaStore,
 		TaskEvents:           taskEvents,
-		PublicURLs:           services.runtimeSettings,
+		PublicOrigins:        cfg.PublicOrigins,
 	})
 	creditPeriodicJobs := credits.ReconciliationPeriodicJobs()
 	reclamationPeriodicJobs := reclamation.PeriodicJobs()

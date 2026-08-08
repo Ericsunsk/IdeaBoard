@@ -36,7 +36,7 @@ func newAppRouter(
 	taskHandler := taskservice.NewHandler(taskServices.taskService)
 	taskStatsHandler := taskstats.NewHandler(taskServices.taskStatsService, taskServices.accountService)
 	billingHandler := billing.NewHandler(services.billingCatalog, services.billingCatalog)
-	paymentHandler := payments.NewHandler(services.paymentService, services.runtimeSettings)
+	paymentHandler := payments.NewHandler(services.paymentService, cfg.PublicOrigins)
 	creditUserResolver := creditsUserResolver{repo: repos.userRepo}
 
 	authDeps := httpapi.AuthDeps{
@@ -59,7 +59,7 @@ func newAppRouter(
 		UserRoutes: httpapi.UserRouteDeps{
 			AuthHandler:      auth.NewAuthHandler(services.userService),
 			TaskHandler:      taskHandler,
-			BoardHandler:     boards.NewBoardHandler(services.boardService, services.runtimeSettings),
+			BoardHandler:     boards.NewBoardHandler(services.boardService, cfg.PublicOrigins),
 			LineDraftHandler: assets.NewLineDraftHandler(repos.lineDraftModeRepo),
 			BillingHandler:   billingHandler,
 			BillingRecords:   billingrecords.NewHandler(services.billingRecords),

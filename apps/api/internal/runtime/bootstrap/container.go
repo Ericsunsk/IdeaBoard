@@ -21,6 +21,12 @@ type appContainer struct {
 }
 
 func newAppContainer(cfg *config.Config) (*appContainer, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("application config is required")
+	}
+	if err := cfg.PublicOrigins.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid public origins: %w", err)
+	}
 	if err := secrets.LoadEncryptionKey(); err != nil {
 		return nil, fmt.Errorf("failed to load secrets encryption key: %w", err)
 	}

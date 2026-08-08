@@ -1,6 +1,6 @@
 package storage
 
-import "ideaboard/api/internal/platform/settings"
+import "ideaboard/api/internal/platform/config"
 
 type StorageStoreOptions struct {
 	DirPrefix  string
@@ -29,15 +29,15 @@ type StorageService struct {
 	s3CompatibleService *S3CompatibleService
 	adapterRegistry     *storageAdapterRegistry
 	providerMeta        map[StorageProvider]StorageProviderMeta
-	publicURLs          settings.PublicURLSettingProvider
+	publicOrigins       config.PublicOriginsConfig
 }
 
-func NewStorageService(profileRepo *StorageProfileRepository, publicURLs settings.PublicURLSettingProvider) *StorageService {
+func NewStorageService(profileRepo *StorageProfileRepository, publicOrigins config.PublicOriginsConfig) *StorageService {
 	service := &StorageService{
 		profileRepo:         profileRepo,
 		s3CompatibleService: NewS3CompatibleService(),
 		providerMeta:        make(map[StorageProvider]StorageProviderMeta),
-		publicURLs:          publicURLs,
+		publicOrigins:       publicOrigins,
 	}
 	for _, meta := range []StorageProviderMeta{
 		{

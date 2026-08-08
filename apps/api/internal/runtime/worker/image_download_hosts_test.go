@@ -5,16 +5,8 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/accountpool/accounts"
-	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/platform/config"
 )
-
-type testImageDownloadPublicURLProvider struct {
-	setting settings.PublicURLSetting
-}
-
-func (p testImageDownloadPublicURLProvider) GetPublicURL(context.Context) (settings.PublicURLSetting, error) {
-	return p.setting, nil
-}
 
 func TestTrustedImageDownloadHostsIncludesProxyEnvAndTrustedAssets(t *testing.T) {
 	setTestOutboundAllowHosts(t, "cdn.example.com", "media.example.org:8443")
@@ -22,7 +14,7 @@ func TestTrustedImageDownloadHostsIncludesProxyEnvAndTrustedAssets(t *testing.T)
 	got := trustedImageDownloadHosts(
 		context.Background(),
 		&accounts.ApiAccount{ProxyURL: "https://proxy.example.com/v1"},
-		testImageDownloadPublicURLProvider{setting: settings.PublicURLSetting{PublicAssetBaseURL: "https://assets.example.com"}},
+		config.PublicOriginsConfig{API: "https://assets.example.com"},
 	)
 	if len(got) != 4 {
 		t.Fatalf("got %d hosts, want 4: %#v", len(got), got)

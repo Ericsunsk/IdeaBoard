@@ -58,12 +58,6 @@ type adminTaskMonitorSettingsResponse struct {
 	Data settings.TaskMonitorSetting `json:"data"`
 }
 
-type adminPublicURLSettingsResponse struct {
-	Code int                       `json:"code"`
-	Msg  string                    `json:"msg"`
-	Data settings.PublicURLSetting `json:"data"`
-}
-
 type adminMediaUploadSettingsResponse struct {
 	Code int                         `json:"code"`
 	Msg  string                      `json:"msg"`
@@ -523,13 +517,6 @@ func TestAdminRuntimeSettingsGetFailsWhenRepositoryUnavailable(t *testing.T) {
 			},
 		},
 		{
-			name: "public URLs",
-			path: "/admin/settings/public-urls",
-			register: func(router *gin.Engine) {
-				router.GET("/admin/settings/public-urls", handler.GetPublicURLSettings)
-			},
-		},
-		{
 			name: "media upload",
 			path: "/admin/settings/media-upload",
 			register: func(router *gin.Engine) {
@@ -846,127 +833,6 @@ func TestAdminTaskMonitorSettingsRejectsInvalidPayload(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPut, "/admin/settings/task-monitor", strings.NewReader(tt.body))
-			req.Header.Set("Content-Type", "application/json")
-			rec := httptest.NewRecorder()
-			router.ServeHTTP(rec, req)
-
-			if rec.Code != http.StatusBadRequest {
-				t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
-			}
-			if !strings.Contains(rec.Body.String(), tt.want) {
-				t.Fatalf("body = %s, want %q", rec.Body.String(), tt.want)
-			}
-		})
-	}
-}
-
-func TestAdminPublicURLSettingsDefaultsWhenConfigMissing(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	db := newUserRepoTestDB(t)
-	handler := newAdminHandlerForRuntimeSettings(db)
-	router := gin.New()
-	router.GET("/admin/settings/public-urls", handler.GetPublicURLSettings)
-
-	req := httptest.NewRequest(http.MethodGet, "/admin/settings/public-urls", nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
-	}
-	var got adminPublicURLSettingsResponse
-	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
-		t.Fatalf("decode response failed: %v", err)
-	}
-	want := settings.PublicURLSetting{}
-	if got.Data != want {
-		t.Fatalf("public URL settings = %+v, want %+v", got.Data, want)
-	}
-}
-
-func TestAdminPublicURLSettingsUpdateNormalizesAndPersists(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	db := newUserRepoTestDB(t)
-	handler := newAdminHandlerForRuntimeSettings(db)
-	router := gin.New()
-	router.GET("/admin/settings/public-urls", handler.GetPublicURLSettings)
-	router.PUT("/admin/settings/public-urls", handler.UpdatePublicURLSettings)
-
-	req := httptest.NewRequest(http.MethodPut, "/admin/settings/public-urls", strings.NewReader(`{"public_base_url":"  https://app.example.com/  ","public_asset_base_url":""}`))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d, body=%s", rec.Code, http.StatusOK, rec.Body.String())
-	}
-	var updated adminPublicURLSettingsResponse
-	if err := json.NewDecoder(rec.Body).Decode(&updated); err != nil {
-		t.Fatalf("decode update response failed: %v", err)
-	}
-	want := settings.PublicURLSetting{PublicBaseURL: "https://app.example.com", PublicAssetBaseURL: ""}
-	if updated.Data != want {
-		t.Fatalf("updated public URL settings = %+v, want %+v", updated.Data, want)
-	}
-
-	getReq := httptest.NewRequest(http.MethodGet, "/admin/settings/public-urls", nil)
-	getRec := httptest.NewRecorder()
-	router.ServeHTTP(getRec, getReq)
-
-	var got adminPublicURLSettingsResponse
-	if err := json.NewDecoder(getRec.Body).Decode(&got); err != nil {
-		t.Fatalf("decode get response failed: %v", err)
-	}
-	if got.Data != want {
-		t.Fatalf("persisted public URL settings = %+v, want %+v", got.Data, want)
-	}
-}
-
-func TestAdminPublicURLSettingsRejectsInvalidPayload(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	db := newUserRepoTestDB(t)
-	handler := newAdminHandlerForRuntimeSettings(db)
-	router := gin.New()
-	router.PUT("/admin/settings/public-urls", handler.UpdatePublicURLSettings)
-
-	tests := []struct {
-		name string
-		body string
-		want string
-	}{
-		{
-			name: "invalid public base URL",
-			body: `{"public_base_url":"javascript:alert(1)","public_asset_base_url":""}`,
-			want: "public_base_url 必须为空或 http(s) URL",
-		},
-		{
-			name: "invalid public asset base URL",
-			body: `{"public_base_url":"","public_asset_base_url":"ftp://assets.example.com"}`,
-			want: "public_asset_base_url 必须为空或 http(s) URL",
-		},
-		{
-			name: "public base URL with credentials",
-			body: `{"public_base_url":"https://user:pass@app.example.com","public_asset_base_url":""}`,
-			want: "public_base_url 必须为空或 http(s) URL",
-		},
-		{
-			name: "public base URL with query",
-			body: `{"public_base_url":"https://app.example.com?token=1","public_asset_base_url":""}`,
-			want: "public_base_url 必须为空或 http(s) URL",
-		},
-		{
-			name: "public asset URL with fragment",
-			body: `{"public_base_url":"","public_asset_base_url":"https://assets.example.com#uploads"}`,
-			want: "public_asset_base_url 必须为空或 http(s) URL",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPut, "/admin/settings/public-urls", strings.NewReader(tt.body))
 			req.Header.Set("Content-Type", "application/json")
 			rec := httptest.NewRecorder()
 			router.ServeHTTP(rec, req)

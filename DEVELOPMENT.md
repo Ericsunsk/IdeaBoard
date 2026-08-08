@@ -274,7 +274,7 @@ sqlc:
 
 Auth 使用相同的 owner/runtime separation：长期运行的 Auth 读取 `DB_USER=ideaboard_auth`，`npm run migrate` 通过 `DB_MIGRATION_USER` 临时使用 owner，并在完成后只授予 Better Auth tables 权限。本地 migration credential 只放在已忽略的 `docker/migration.env`，不要复制进 API/Auth runtime `.env`。
 
-Docker compose / deploy 层的 `APP_BASE_URL` 与 `API_BASE_URL` 是部署输入变量，不是 API runtime 直接读取的公开链接配置。生产部署细节见 [docs/runbooks/deployment.md](./docs/runbooks/deployment.md)。
+Docker compose / deploy 层的 `APP_BASE_URL` 与 `API_BASE_URL` 是公开 Origin 的唯一事实源。API runtime 直接读取它们，分别生成 Web 跳转/分享链接与 Stripe Webhook/本地上传素材地址；缺失或无效时拒绝启动。生产部署细节见 [docs/runbooks/deployment.md](./docs/runbooks/deployment.md)。
 
 API 在独立 `METRICS_ADDR` listener 暴露 Prometheus `/metrics`，默认 `127.0.0.1:9091`。该 listener 只用于本机或私有监控网络，不得接入用户 API 反代或 Cloudflare。
 

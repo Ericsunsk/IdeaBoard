@@ -21,14 +21,12 @@ import type {
   ApiResponseBrandingSetting,
   ApiResponseMediaUploadSetting,
   ApiResponseOutboundPolicySetting,
-  ApiResponsePublicURLSetting,
   ApiResponseRateLimitSetting,
   ApiResponseRegistrationSetting,
   ApiResponseTaskMonitorSetting,
   BrandingSetting,
   MediaUploadSetting,
   OutboundPolicyUpdateRequest,
-  PublicURLSetting,
   RateLimitSetting,
   TaskMonitorSetting,
   UpdateAdminRegistrationSettingBody,
@@ -330,153 +328,6 @@ export function useUpdateAdminBrandingSetting<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getUpdateAdminBrandingSettingQueryOptions(brandingSetting, options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
-}
-
-export const getGetAdminPublicURLSettingUrl = () => {
-  return `/admin/settings/public-urls`
-}
-
-export const getAdminPublicURLSetting = async (
-  options?: Parameters<typeof orvalMutator>[1],
-): Promise<ApiResponsePublicURLSetting> => {
-  return orvalMutator<ApiResponsePublicURLSetting>(getGetAdminPublicURLSettingUrl(), {
-    ...options,
-    method: 'GET',
-  })
-}
-
-export const getGetAdminPublicURLSettingQueryKey = () => {
-  return ['admin', 'settings', 'public-urls'] as const
-}
-
-export const getGetAdminPublicURLSettingQueryOptions = <
-  TData = Awaited<ReturnType<typeof getAdminPublicURLSetting>>,
-  TError = ErrorType<unknown>,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof getAdminPublicURLSetting>>, TError, TData>
-  >
-  request?: SecondParameter<typeof orvalMutator>
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getGetAdminPublicURLSettingQueryKey()
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminPublicURLSetting>>> = ({
-    signal,
-  }) => getAdminPublicURLSetting({ signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminPublicURLSetting>>,
-    TError,
-    TData
-  >
-}
-
-export type GetAdminPublicURLSettingQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getAdminPublicURLSetting>>
->
-export type GetAdminPublicURLSettingQueryError = ErrorType<unknown>
-
-export function useGetAdminPublicURLSetting<
-  TData = Awaited<ReturnType<typeof getAdminPublicURLSetting>>,
-  TError = ErrorType<unknown>,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getAdminPublicURLSetting>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-  queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getGetAdminPublicURLSettingQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
-}
-
-export const getUpdateAdminPublicURLSettingUrl = () => {
-  return `/admin/settings/public-urls`
-}
-
-export const updateAdminPublicURLSetting = async (
-  publicURLSetting: PublicURLSetting,
-  options?: Parameters<typeof orvalMutator>[1],
-): Promise<ApiResponsePublicURLSetting> => {
-  return orvalMutator<ApiResponsePublicURLSetting>(getUpdateAdminPublicURLSettingUrl(), {
-    ...options,
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(publicURLSetting),
-  })
-}
-
-export const getUpdateAdminPublicURLSettingQueryKey = (
-  publicURLSetting?: MaybeRefOrGetter<PublicURLSetting>,
-) => {
-  return ['PUT', 'admin', 'settings', 'public-urls', publicURLSetting] as const
-}
-
-export const getUpdateAdminPublicURLSettingQueryOptions = <
-  TData = Awaited<ReturnType<typeof updateAdminPublicURLSetting>>,
-  TError = ErrorType<unknown>,
->(
-  publicURLSetting: MaybeRefOrGetter<PublicURLSetting>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminPublicURLSetting>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getUpdateAdminPublicURLSettingQueryKey(publicURLSetting)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof updateAdminPublicURLSetting>>> = ({
-    signal,
-  }) => updateAdminPublicURLSetting(toValue(publicURLSetting), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof updateAdminPublicURLSetting>>,
-    TError,
-    TData
-  >
-}
-
-export type UpdateAdminPublicURLSettingQueryResult = NonNullable<
-  Awaited<ReturnType<typeof updateAdminPublicURLSetting>>
->
-export type UpdateAdminPublicURLSettingQueryError = ErrorType<unknown>
-
-export function useUpdateAdminPublicURLSetting<
-  TData = Awaited<ReturnType<typeof updateAdminPublicURLSetting>>,
-  TError = ErrorType<unknown>,
->(
-  publicURLSetting: MaybeRefOrGetter<PublicURLSetting>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof updateAdminPublicURLSetting>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-  queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getUpdateAdminPublicURLSettingQueryOptions(publicURLSetting, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

@@ -21,9 +21,9 @@ import (
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/mediarefs"
+	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/safehttp"
-	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -455,7 +455,7 @@ func (c *ProviderExecutor) resolveOpenAIImageBytes(ctx context.Context, ref stri
 		return "", "", nil, fmt.Errorf("不支持的图像引用: %q", ref)
 	}
 
-	allowHosts := trustedRuntimeAssetHosts(ctx, c.publicURLs)
+	allowHosts := trustedRuntimeAssetHosts(c.publicOrigins)
 	resp, doErr := safehttp.GetWithAllowHosts(ctx, ref, timeout, allowHosts...)
 	if doErr != nil {
 		return "", "", nil, fmt.Errorf("拉取图像失败: %w", doErr)
@@ -563,8 +563,8 @@ func finalizeOpenAIRequestBody(reqBody *openAIImageRequestBody, openAIParams ope
 	openAIRequestFinalizer{FeatureSlug: openAIParams.FeatureSlug}.apply(reqBody)
 }
 
-func trustedRuntimeAssetHosts(ctx context.Context, provider settings.PublicURLSettingProvider) []string {
-	base := settings.ResolvePublicAssetBaseURL(ctx, provider)
+func trustedRuntimeAssetHosts(publicOrigins config.PublicOriginsConfig) []string {
+	base := publicOrigins.APIParsedURL()
 	if base == nil || strings.TrimSpace(base.Host) == "" {
 		return nil
 	}

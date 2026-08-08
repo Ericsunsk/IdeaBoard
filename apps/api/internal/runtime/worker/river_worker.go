@@ -12,7 +12,7 @@ import (
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/events"
-	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/taskruntime"
@@ -75,7 +75,7 @@ type RiverTaskWorkerDeps struct {
 	MediaReader          taskmedia.UploadReader
 	ResultMaterializer   taskmedia.ResultMaterializer
 	TaskEvents           events.TaskStatusPublisher
-	PublicURLs           settings.PublicURLSettingProvider
+	PublicOrigins        config.PublicOriginsConfig
 }
 
 func NewRiverTaskWorker(
@@ -85,7 +85,7 @@ func NewRiverTaskWorker(
 		providerEndpointRepo: deps.ProviderEndpointRepo,
 		mediaReader:          deps.MediaReader,
 		resultMaterializer:   deps.ResultMaterializer,
-		publicURLs:           deps.PublicURLs,
+		publicOrigins:        deps.PublicOrigins,
 	}
 	taskRuntime := taskruntime.NewService(deps.AccountRepo, deps.TaskRepo, deps.Assigner, deps.CancelStore)
 	taskRuntime.SetTaskStatusPublisher(deps.TaskEvents)

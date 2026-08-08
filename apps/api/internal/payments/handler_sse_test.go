@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/testsupport"
 
 	"github.com/gin-gonic/gin"
@@ -16,7 +17,7 @@ import (
 func TestUserPaymentEventStreamIsUserScopedNoStoreAndCleansUp(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	hub := NewEventHub()
-	handler := NewHandler(NewService(ServiceDependencies{Events: hub}), nil)
+	handler := NewHandler(NewService(ServiceDependencies{Events: hub}), config.PublicOriginsConfig{})
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 42, principal.RoleUser)

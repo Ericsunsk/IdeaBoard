@@ -127,7 +127,6 @@ func TestRouteConstantsAreGroupRelative(t *testing.T) {
 	adminGroup.POST(RouteAdminUpload, func(c *gin.Context) {})
 	adminGroup.GET(RouteAdminSettingsBranding, func(c *gin.Context) {})
 	adminGroup.GET(RouteAdminSettingsMediaUpload, func(c *gin.Context) {})
-	adminGroup.GET(RouteAdminSettingsPublicURLs, func(c *gin.Context) {})
 	adminGroup.GET(RouteAdminSettingsRateLimit, func(c *gin.Context) {})
 	adminGroup.GET(RouteAdminSettingsTaskMonitor, func(c *gin.Context) {})
 	adminGroup.GET(RouteAdminStripeConfiguration, func(c *gin.Context) {})
@@ -141,7 +140,6 @@ func TestRouteConstantsAreGroupRelative(t *testing.T) {
 		http.MethodPost + " /api/admin/upload":                          false,
 		http.MethodGet + " /api/admin/settings/branding":                false,
 		http.MethodGet + " /api/admin/settings/media-upload":            false,
-		http.MethodGet + " /api/admin/settings/public-urls":             false,
 		http.MethodGet + " /api/admin/settings/rate-limit":              false,
 		http.MethodGet + " /api/admin/settings/task-monitor":            false,
 		http.MethodGet + " /api/admin/payments/stripe-config":           false,
@@ -149,7 +147,6 @@ func TestRouteConstantsAreGroupRelative(t *testing.T) {
 		http.MethodPost + " /api/admin/api/admin/upload":                true,
 		http.MethodGet + " /api/admin/api/admin/settings/branding":      true,
 		http.MethodGet + " /api/admin/api/admin/settings/media-upload":  true,
-		http.MethodGet + " /api/admin/api/admin/settings/public-urls":   true,
 		http.MethodGet + " /api/admin/api/admin/settings/rate-limit":    true,
 		http.MethodGet + " /api/admin/api/admin/settings/task-monitor":  true,
 		http.MethodGet + " /api/admin/api/admin/payments/stripe-config": true,
@@ -304,7 +301,7 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 		UserRoutes: UserRouteDeps{
 			AuthHandler:      auth.NewAuthHandler(nil),
 			TaskHandler:      taskservice.NewHandler(nil),
-			BoardHandler:     boards.NewBoardHandler(nil, nil),
+			BoardHandler:     boards.NewBoardHandler(nil, config.PublicOriginsConfig{}),
 			LineDraftHandler: assets.NewLineDraftHandler(nil),
 			BillingHandler:   billing.NewHandler(nil, nil),
 			BillingRecords:   billingrecords.NewHandler(nil),
@@ -406,7 +403,6 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/settings/branding":                            false,
 		"GET /api/admin/settings/media-upload":                        false,
 		"GET /api/admin/settings/outbound-policy":                     false,
-		"GET /api/admin/settings/public-urls":                         false,
 		"GET /api/admin/settings/rate-limit":                          false,
 		"GET /api/admin/settings/registration":                        false,
 		"GET /api/admin/settings/task-monitor":                        false,
@@ -457,7 +453,6 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"PUT /api/admin/settings/branding":                            false,
 		"PUT /api/admin/settings/media-upload":                        false,
 		"PUT /api/admin/settings/outbound-policy":                     false,
-		"PUT /api/admin/settings/public-urls":                         false,
 		"PUT /api/admin/settings/rate-limit":                          false,
 		"PUT /api/admin/settings/registration":                        false,
 		"PUT /api/admin/settings/task-monitor":                        false,

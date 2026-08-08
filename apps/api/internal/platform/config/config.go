@@ -1,7 +1,9 @@
 package config
 
 import (
+	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -13,13 +15,14 @@ import (
 )
 
 type Config struct {
-	Database DatabaseConfig
-	Events   EventBusConfig
-	App      AppConfig
-	Auth     AuthServiceConfig
-	Worker   WorkerConfig
-	Credits  CreditsConfig
-	Rewards  RewardsConfig
+	Database      DatabaseConfig
+	Events        EventBusConfig
+	App           AppConfig
+	PublicOrigins PublicOriginsConfig
+	Auth          AuthServiceConfig
+	Worker        WorkerConfig
+	Credits       CreditsConfig
+	Rewards       RewardsConfig
 }
 
 type CreditsConfig struct {
@@ -47,6 +50,45 @@ type AppConfig struct {
 	MetricsAddr        string
 	Env                string
 	CORSAllowedOrigins []string
+}
+
+// PublicOriginsConfig is immutable deployment configuration. Web owns browser
+// navigation URLs; API owns webhooks and locally served assets.
+type PublicOriginsConfig struct {
+	Web string
+	API string
+}
+
+func (c PublicOriginsConfig) Validate() error {
+	if err := validatePublicOrigin("APP_BASE_URL", c.Web); err != nil {
+		return err
+	}
+	return validatePublicOrigin("API_BASE_URL", c.API)
+}
+
+func (c PublicOriginsConfig) WebURL(path string) string {
+	if validatePublicOrigin("APP_BASE_URL", c.Web) != nil {
+		return ""
+	}
+	return joinPublicOrigin(c.Web, path)
+}
+
+func (c PublicOriginsConfig) APIURL(path string) string {
+	if validatePublicOrigin("API_BASE_URL", c.API) != nil {
+		return ""
+	}
+	return joinPublicOrigin(c.API, path)
+}
+
+func (c PublicOriginsConfig) APIParsedURL() *url.URL {
+	if validatePublicOrigin("API_BASE_URL", c.API) != nil {
+		return nil
+	}
+	parsed, err := url.Parse(c.API)
+	if err != nil {
+		return nil
+	}
+	return parsed
 }
 
 type WorkerConfig struct {
@@ -101,6 +143,8 @@ type envConfig struct {
 	MetricsAddr           string `env:"METRICS_ADDR"`
 	AppEnv                string `env:"APP_ENV"`
 	AppCORSAllowedOrigins string `env:"APP_CORS_ALLOWED_ORIGINS"`
+	AppBaseURL            string `env:"APP_BASE_URL"`
+	APIBaseURL            string `env:"API_BASE_URL"`
 
 	AuthServiceBaseURL        string `env:"AUTH_SERVICE_BASE_URL"`
 	AuthServiceInternalAPIKey string `env:"AUTH_INTERNAL_KEY"`
@@ -149,6 +193,10 @@ func Load() *Config {
 			Env:                appEnv,
 			CORSAllowedOrigins: detectCORSAllowedOrigins(raw.AppCORSAllowedOrigins, appEnv),
 		},
+		PublicOrigins: PublicOriginsConfig{
+			Web: normalizePublicOrigin(raw.AppBaseURL),
+			API: normalizePublicOrigin(raw.APIBaseURL),
+		},
 		Auth: AuthServiceConfig{
 			BaseURL:        stringEnvDefault(raw.AuthServiceBaseURL, "http://127.0.0.1:6001"),
 			InternalAPIKey: strings.TrimSpace(raw.AuthServiceInternalAPIKey),
@@ -164,6 +212,26 @@ func Load() *Config {
 		Credits: CreditsConfig{WelcomeIdentityKey: strings.TrimSpace(raw.CreditsWelcomeIdentityKey)},
 		Rewards: RewardsConfig{CodeHMACKeys: strings.TrimSpace(raw.RewardsCodeHMACKeys)},
 	}
+}
+
+func validatePublicOrigin(name, raw string) error {
+	if strings.TrimSpace(raw) == "" {
+		return fmt.Errorf("%s is required", name)
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" ||
+		parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || (parsed.Path != "" && parsed.Path != "/") {
+		return fmt.Errorf("%s must be an http(s) origin without path, credentials, query, or fragment", name)
+	}
+	return nil
+}
+
+func normalizePublicOrigin(raw string) string {
+	return strings.TrimRight(strings.TrimSpace(raw), "/")
+}
+
+func joinPublicOrigin(origin, targetPath string) string {
+	return strings.TrimRight(origin, "/") + "/" + strings.TrimLeft(targetPath, "/")
 }
 
 func normalizeAppEnv(raw string) string {

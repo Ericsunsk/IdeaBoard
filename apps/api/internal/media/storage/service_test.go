@@ -5,10 +5,12 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"ideaboard/api/internal/platform/config"
 )
 
 func TestListProviderMetaUsesEmptyFieldSlices(t *testing.T) {
-	service := NewStorageService(nil, nil)
+	service := NewStorageService(nil, config.PublicOriginsConfig{})
 
 	providers := service.ListProviderMeta()
 	for _, provider := range providers {

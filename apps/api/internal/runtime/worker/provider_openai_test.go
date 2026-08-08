@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accountpool/accounts"
-	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -38,14 +38,6 @@ type multipartFilePart struct {
 type multipartRequestCapture struct {
 	Fields map[string][]string
 	Files  map[string][]multipartFilePart
-}
-
-type testPublicURLProvider struct {
-	setting settings.PublicURLSetting
-}
-
-func (p testPublicURLProvider) GetPublicURL(context.Context) (settings.PublicURLSetting, error) {
-	return p.setting, nil
 }
 
 func mustDecodeBase64(t *testing.T, value string) []byte {
@@ -144,7 +136,7 @@ func TestCallOpenAIUsesEditEndpointForImageExtend(t *testing.T) {
 	defer server.Close()
 
 	c := &ProviderExecutor{
-		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: server.URL}},
+		publicOrigins: config.PublicOriginsConfig{API: server.URL},
 	}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
@@ -204,7 +196,7 @@ func TestCallOpenAIRemoveBgForcesTransparentPNGOutput(t *testing.T) {
 	defer server.Close()
 
 	c := &ProviderExecutor{
-		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: server.URL}},
+		publicOrigins: config.PublicOriginsConfig{API: server.URL},
 	}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
@@ -238,7 +230,7 @@ func TestCallOpenAIRemoveBgRejectsModelWithoutTransparentBackground(t *testing.T
 	defer server.Close()
 
 	c := &ProviderExecutor{
-		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: server.URL}},
+		publicOrigins: config.PublicOriginsConfig{API: server.URL},
 	}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
@@ -286,7 +278,7 @@ func TestCallOpenAIRetainsGenerationEndpointForStandardRequests(t *testing.T) {
 	defer server.Close()
 
 	c := &ProviderExecutor{
-		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: server.URL}},
+		publicOrigins: config.PublicOriginsConfig{API: server.URL},
 	}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
@@ -329,7 +321,7 @@ func TestCallOpenAIIgnoresOutputCountAndReturnsMultipleImagesWhenUpstreamDoes(t 
 	defer server.Close()
 
 	c := &ProviderExecutor{
-		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: server.URL}},
+		publicOrigins: config.PublicOriginsConfig{API: server.URL},
 	}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
@@ -377,7 +369,7 @@ func TestCallOpenAIStyleVariationUsesEditEndpointAndMultipartImage(t *testing.T)
 	defer server.Close()
 
 	c := &ProviderExecutor{
-		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: server.URL}},
+		publicOrigins: config.PublicOriginsConfig{API: server.URL},
 	}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
@@ -439,7 +431,7 @@ func TestCallOpenAIStyleFusionUsesEditEndpointAndTwoImageParts(t *testing.T) {
 	defer server.Close()
 
 	c := &ProviderExecutor{
-		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: server.URL}},
+		publicOrigins: config.PublicOriginsConfig{API: server.URL},
 	}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
@@ -479,7 +471,7 @@ func TestCallOpenAIStyleVariationDataURLUsesMultipartWithoutLegacyImageFields(t 
 	defer server.Close()
 
 	c := &ProviderExecutor{
-		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: server.URL}},
+		publicOrigins: config.PublicOriginsConfig{API: server.URL},
 	}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
@@ -664,7 +656,7 @@ func TestCallOpenAIPartialEditNormalizesWebPURLToPNGMultipart(t *testing.T) {
 	defer server.Close()
 
 	c := &ProviderExecutor{
-		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: server.URL}},
+		publicOrigins: config.PublicOriginsConfig{API: server.URL},
 	}
 	account := &accounts.ApiAccount{
 		ProxyURL: server.URL,
@@ -1012,7 +1004,7 @@ func TestNormalizeUpstreamMediaParamsAbsolutizesStructuredUploadPaths(t *testing
 	}
 
 	c := &ProviderExecutor{
-		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: "https://app.example.com"}},
+		publicOrigins: config.PublicOriginsConfig{API: "https://api.example.com"},
 	}
 	c.normalizeUpstreamMediaParams(context.Background(), params)
 
@@ -1020,13 +1012,13 @@ func TestNormalizeUpstreamMediaParamsAbsolutizesStructuredUploadPaths(t *testing
 	if !ok || len(imageURLs) != 1 {
 		t.Fatalf("unexpected image_urls: %#v", params["image_urls"])
 	}
-	if imageURLs[0] != "https://app.example.com/uploads/canvas/OWNR1A/board-1/content/source.png" {
+	if imageURLs[0] != "https://api.example.com/uploads/canvas/OWNR1A/board-1/content/source.png" {
 		t.Fatalf("unexpected normalized image_urls[0]: %#v", imageURLs[0])
 	}
-	if got := params["original_image_url"]; got != "https://app.example.com/uploads/canvas/OWNR1A/board-1/content/source.png" {
+	if got := params["original_image_url"]; got != "https://api.example.com/uploads/canvas/OWNR1A/board-1/content/source.png" {
 		t.Fatalf("unexpected normalized original_image_url: %#v", got)
 	}
-	if got := params["mask_image_url"]; got != "https://app.example.com/uploads/canvas/OWNR1A/board-1/content/mask.png" {
+	if got := params["mask_image_url"]; got != "https://api.example.com/uploads/canvas/OWNR1A/board-1/content/mask.png" {
 		t.Fatalf("unexpected normalized mask_image_url: %#v", got)
 	}
 	if got := params["variation_strength"]; got != 5 {
@@ -1034,17 +1026,14 @@ func TestNormalizeUpstreamMediaParamsAbsolutizesStructuredUploadPaths(t *testing
 	}
 }
 
-func TestNormalizeUpstreamMediaParamsPrefersAssetBaseURLForStructuredUploadPaths(t *testing.T) {
+func TestNormalizeUpstreamMediaParamsUsesAPIOriginInsteadOfWebOrigin(t *testing.T) {
 	params := map[string]interface{}{
 		"feature":            "style-variation",
 		"original_image_url": "/uploads/canvas/OWNR1A/board-1/content/source.png",
 	}
 
 	c := &ProviderExecutor{
-		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{
-			PublicBaseURL:      "https://app.example.com",
-			PublicAssetBaseURL: "https://api.example.com",
-		}},
+		publicOrigins: config.PublicOriginsConfig{Web: "https://app.example.com", API: "https://api.example.com"},
 	}
 	c.normalizeUpstreamMediaParams(context.Background(), params)
 
@@ -1062,7 +1051,7 @@ func TestNormalizeUpstreamMediaParamsRejectsLegacyGenericUploadPaths(t *testing.
 	}
 
 	c := &ProviderExecutor{
-		publicURLs: testPublicURLProvider{setting: settings.PublicURLSetting{PublicBaseURL: "https://app.example.com"}},
+		publicOrigins: config.PublicOriginsConfig{API: "https://api.example.com"},
 	}
 	c.normalizeUpstreamMediaParams(context.Background(), params)
 
@@ -1078,7 +1067,7 @@ func TestNormalizeUpstreamMediaParamsRejectsLegacyGenericUploadPaths(t *testing.
 	}
 }
 
-func TestNormalizeUpstreamMediaParamsDoesNotInlineUploadPathsWithoutPublicBaseURL(t *testing.T) {
+func TestNormalizeUpstreamMediaParamsDoesNotInlineUploadPathsWithoutAPIOrigin(t *testing.T) {
 	tempDir := t.TempDir()
 	previousWD, err := os.Getwd()
 	if err != nil {
@@ -1125,7 +1114,7 @@ func TestNormalizeUpstreamMediaParamsDoesNotInlineUploadPathsWithoutPublicBaseUR
 	}
 }
 
-func TestNormalizeUpstreamMediaParamsDoesNotInlineCanvasUploadWithoutPublicBaseURL(t *testing.T) {
+func TestNormalizeUpstreamMediaParamsDoesNotInlineCanvasUploadWithoutAPIOrigin(t *testing.T) {
 	tempDir := t.TempDir()
 	previousWD, err := os.Getwd()
 	if err != nil {

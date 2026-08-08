@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/media/mediarefs"
+	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/tasking/tasks"
 )
 
@@ -65,8 +65,8 @@ type StoredObject struct {
 }
 
 type SubmitMediaValidator struct {
-	publicURLs settings.PublicURLSettingProvider
-	authorizer UploadAuthorizer
+	publicOrigins config.PublicOriginsConfig
+	authorizer    UploadAuthorizer
 }
 
 type UploadAuthorizer interface {
@@ -75,10 +75,10 @@ type UploadAuthorizer interface {
 
 const canvasUploadPrefix = "/uploads/canvas/"
 
-func NewSubmitMediaValidator(publicURLs settings.PublicURLSettingProvider, authorizer UploadAuthorizer) *SubmitMediaValidator {
+func NewSubmitMediaValidator(publicOrigins config.PublicOriginsConfig, authorizer UploadAuthorizer) *SubmitMediaValidator {
 	return &SubmitMediaValidator{
-		publicURLs: publicURLs,
-		authorizer: authorizer,
+		publicOrigins: publicOrigins,
+		authorizer:    authorizer,
 	}
 }
 
@@ -105,22 +105,22 @@ func (v *SubmitMediaValidator) ValidateSubmitMediaRef(ctx context.Context, userI
 
 func (v *SubmitMediaValidator) CanonicalizePublicUploadRef(ctx context.Context, raw string) string {
 	if v == nil {
-		return CanonicalizeConfiguredPublicUploadRef(raw)
+		return CanonicalizePublicUploadRef(raw)
 	}
-	return CanonicalizeConfiguredPublicUploadRefWithProvider(ctx, v.publicURLs, raw)
+	return CanonicalizePublicUploadRefWithOrigins(v.publicOrigins, raw)
 }
 
 func ValidateSubmitMediaRef(ctx context.Context, raw string) error {
-	return mediarefs.ValidateMediaRef(CanonicalizeConfiguredPublicUploadRef(raw), outbound.AllowHosts(ctx), MaxSubmitTaskMediaDataURLBytes)
+	return mediarefs.ValidateMediaRef(CanonicalizePublicUploadRef(raw), outbound.AllowHosts(ctx), MaxSubmitTaskMediaDataURLBytes)
 }
 
 const MaxSubmitTaskMediaDataURLBytes = 10 * 1024 * 1024
 
-func CanonicalizeConfiguredPublicUploadRef(raw string) string {
-	return CanonicalizeConfiguredPublicUploadRefWithProvider(context.Background(), nil, raw)
+func CanonicalizePublicUploadRef(raw string) string {
+	return CanonicalizePublicUploadRefWithOrigins(config.PublicOriginsConfig{}, raw)
 }
 
-func CanonicalizeConfiguredPublicUploadRefWithProvider(ctx context.Context, provider settings.PublicURLSettingProvider, raw string) string {
+func CanonicalizePublicUploadRefWithOrigins(publicOrigins config.PublicOriginsConfig, raw string) string {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" || strings.HasPrefix(trimmed, "/uploads/") || !strings.Contains(trimmed, "://") {
 		return trimmed
@@ -133,10 +133,9 @@ func CanonicalizeConfiguredPublicUploadRefWithProvider(ctx context.Context, prov
 	if !strings.HasPrefix(cleanedPath, "/uploads/") {
 		return trimmed
 	}
-	for _, base := range settings.PublicUploadBaseURLs(ctx, provider) {
-		if sameURLOrigin(parsed, base) {
-			return cleanedPath
-		}
+	base := publicOrigins.APIParsedURL()
+	if base != nil && sameURLOrigin(parsed, base) {
+		return cleanedPath
 	}
 	return trimmed
 }

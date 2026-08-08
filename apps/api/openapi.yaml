@@ -831,33 +831,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseBrandingSetting'
-  /admin/settings/public-urls:
-    get:
-      tags: [AdminSettings]
-      operationId: getAdminPublicURLSetting
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponsePublicURLSetting'
-    put:
-      tags: [AdminSettings]
-      operationId: updateAdminPublicURLSetting
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PublicURLSetting'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponsePublicURLSetting'
   /admin/settings/media-upload:
     get:
       tags: [AdminSettings]
@@ -4189,17 +4162,6 @@ components:
           minimum: 1
           maximum: 10000
 
-    PublicURLSetting:
-      type: object
-      required: [public_base_url, public_asset_base_url]
-      properties:
-        public_base_url:
-          type: string
-          maxLength: 2048
-        public_asset_base_url:
-          type: string
-          maxLength: 2048
-
     MediaUploadSetting:
       type: object
       required: [upload_max_concurrent]
@@ -5353,14 +5315,6 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/RateLimitSetting'
-
-    ApiResponsePublicURLSetting:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              $ref: '#/components/schemas/PublicURLSetting'
 
     ApiResponseMediaUploadSetting:
       allOf:

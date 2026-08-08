@@ -1,7 +1,6 @@
 package payments
 
 import (
-	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -12,9 +11,9 @@ import (
 
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
-	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/platform/sse"
 
 	"github.com/gin-gonic/gin"
@@ -30,8 +29,8 @@ const (
 )
 
 type Handler struct {
-	service    *Service
-	publicURLs settings.PublicURLSettingProvider
+	service       *Service
+	publicOrigins config.PublicOriginsConfig
 }
 
 type updateStripeConfigurationRequest struct {
@@ -54,8 +53,8 @@ type createPaymentRefundRequest struct {
 	Reason         string `json:"reason"`
 }
 
-func NewHandler(service *Service, publicURLs settings.PublicURLSettingProvider) *Handler {
-	return &Handler{service: service, publicURLs: publicURLs}
+func NewHandler(service *Service, publicOrigins config.PublicOriginsConfig) *Handler {
+	return &Handler{service: service, publicOrigins: publicOrigins}
 }
 
 func (h *Handler) GetPurchaseOptions(c *gin.Context) {
@@ -91,7 +90,7 @@ func (h *Handler) CreateCheckoutSession(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "充值参数错误")
 		return
 	}
-	returnBaseURL, err := h.checkoutReturnBaseURL(c.Request.Context())
+	returnBaseURL, err := h.checkoutReturnBaseURL()
 	if err != nil {
 		response.Error(c, http.StatusServiceUnavailable, "充值服务暂不可用")
 		return
@@ -442,15 +441,11 @@ func adminPaymentOrderListInputFromQuery(c *gin.Context) (AdminPaymentOrderListI
 	return input, nil
 }
 
-func (h *Handler) checkoutReturnBaseURL(ctx context.Context) (string, error) {
-	if h == nil || h.publicURLs == nil {
+func (h *Handler) checkoutReturnBaseURL() (string, error) {
+	if h == nil || strings.TrimSpace(h.publicOrigins.Web) == "" {
 		return "", ErrPurchasesUnavailable
 	}
-	setting, err := h.publicURLs.GetPublicURL(ctx)
-	if err != nil || strings.TrimSpace(setting.PublicBaseURL) == "" {
-		return "", ErrPurchasesUnavailable
-	}
-	return strings.TrimRight(strings.TrimSpace(setting.PublicBaseURL), "/") + "/user/boards", nil
+	return h.publicOrigins.WebURL("/user/boards"), nil
 }
 
 func (h *Handler) GetStripeConfiguration(c *gin.Context) {
@@ -485,7 +480,6 @@ func (h *Handler) UpdateStripeConfiguration(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "Stripe 设置参数错误")
 		return
 	}
-	baseURL := settings.ResolvePublicBaseURL(c.Request.Context(), h.publicURLs, paymentRequestScheme(c), c.Request.Host)
 	apiKey := ""
 	if request.APIKey != nil {
 		apiKey = *request.APIKey
@@ -493,7 +487,7 @@ func (h *Handler) UpdateStripeConfiguration(c *gin.Context) {
 	summary, err := h.service.ConfigureStripe(c.Request.Context(), ConfigureStripeCommand{
 		ActorID: admin.UserID(), APIKey: apiKey, ProductTaxCode: request.ProductTaxCode,
 		PurchasesEnabled: *request.PurchasesEnabled,
-		WebhookURL:       strings.TrimRight(baseURL, "/") + "/api/webhooks/stripe",
+		WebhookURL:       h.publicOrigins.APIURL("/api/webhooks/stripe"),
 	})
 	if err != nil {
 		writeStripeConfigurationError(c, err)
@@ -577,17 +571,4 @@ func writeStripeWebhookError(c *gin.Context, err error) {
 	default:
 		response.Error(c, http.StatusInternalServerError, "Stripe Webhook 处理失败")
 	}
-}
-
-func paymentRequestScheme(c *gin.Context) string {
-	if c == nil || c.Request == nil {
-		return "http"
-	}
-	if c.Request.TLS != nil {
-		return "https"
-	}
-	if proto := strings.TrimSpace(c.GetHeader("X-Forwarded-Proto")); proto != "" {
-		return strings.ToLower(strings.Split(proto, ",")[0])
-	}
-	return "http"
 }

@@ -17,8 +17,8 @@ import (
 
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/mediarefs"
+	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/safehttp"
-	"ideaboard/api/internal/platform/settings"
 )
 
 const (
@@ -482,22 +482,18 @@ func copyExactWithStorageBuffer(dst io.Writer, src io.Reader, size int64) error 
 	return nil
 }
 
-func publicUploadURL(ctx context.Context, objectKey string) string {
-	return publicUploadURLWithProvider(ctx, nil, objectKey)
-}
-
 func (s *StorageService) publicUploadURL(ctx context.Context, objectKey string) string {
 	if s == nil {
-		return publicUploadURL(ctx, objectKey)
+		return ""
 	}
-	return publicUploadURLWithProvider(ctx, s.publicURLs, objectKey)
+	return publicUploadURLWithOrigins(s.publicOrigins, objectKey)
 }
 
-func publicUploadURLWithProvider(ctx context.Context, provider settings.PublicURLSettingProvider, objectKey string) string {
+func publicUploadURLWithOrigins(publicOrigins config.PublicOriginsConfig, objectKey string) string {
 	normalized := "/" + strings.TrimLeft(filepath.ToSlash(objectKey), "/")
-	base := resolvePublicUploadBaseURL(ctx, provider)
+	base := resolvePublicUploadBaseURL(publicOrigins)
 	if base == nil {
-		return normalized
+		return ""
 	}
 	out := *base
 	out.Path = path.Join(base.Path, normalized)
@@ -506,12 +502,12 @@ func publicUploadURLWithProvider(ctx context.Context, provider settings.PublicUR
 	return out.String()
 }
 
-func resolvePublicUploadBaseURL(ctx context.Context, provider settings.PublicURLSettingProvider) *url.URL {
-	parsed := settings.ResolvePublicAssetBaseURL(ctx, provider)
+func resolvePublicUploadBaseURL(publicOrigins config.PublicOriginsConfig) *url.URL {
+	parsed := publicOrigins.APIParsedURL()
 	if parsed != nil {
 		logPublicUploadAuthWarningOnce.Do(func() {
 			if isLikelyObjectStorageHost(parsed.Host) {
-				slog.Warn("系统设置的素材访问地址指向对象存储域名，上传文件可能绕过应用鉴权被直接访问。建议使用应用自身域名或 CDN 地址。",
+				slog.Warn("API_BASE_URL 指向对象存储域名，上传文件可能绕过应用鉴权被直接访问。请使用应用 API 域名。",
 					"host", parsed.Host)
 			}
 		})

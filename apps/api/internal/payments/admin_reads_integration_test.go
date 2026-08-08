@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport"
 
@@ -28,7 +29,7 @@ func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T)
 	third := createAdminPaymentOrder(t, repo, 99, "IBP-20260801-CCC000000003", 503)
 	markAdminPaymentOrderAnomalous(t, db, second.ID)
 
-	handler := NewHandler(service, nil)
+	handler := NewHandler(service, config.PublicOriginsConfig{})
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -141,7 +142,7 @@ func TestAdminPaymentOrderDetailMasksProviderIdentifiersAndExcludesInternalField
 	}
 	markAdminPaymentOrderAnomalous(t, db, bound.ID)
 
-	handler := NewHandler(service, nil)
+	handler := NewHandler(service, config.PublicOriginsConfig{})
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {

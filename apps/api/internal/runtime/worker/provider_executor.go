@@ -14,8 +14,8 @@ import (
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/platform/accountlimits"
+	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
@@ -172,7 +172,7 @@ type ProviderExecutor struct {
 	providerEndpointRepo *providerendpoints.ProviderEndpointRepository
 	mediaReader          taskmedia.UploadReader
 	resultMaterializer   taskmedia.ResultMaterializer
-	publicURLs           settings.PublicURLSettingProvider
+	publicOrigins        config.PublicOriginsConfig
 }
 
 func (c *ProviderExecutor) readRelativeUploadObject(ctx context.Context, ref string, maxBytes int64) (*taskmedia.StoredObject, bool, error) {
@@ -592,7 +592,7 @@ func (c *ProviderExecutor) materializeProviderResultImages(ctx context.Context, 
 	slog.Info("provider result materialization started", "task_id", taskID, "correlation_id", correlationID, "image_count", len(imageURLs))
 
 	materialized, storeErr := c.resultMaterializer.MaterializeRemoteResults(ctx, userID, taskID, imageURLs, taskmedia.ResultMaterializeOptions{
-		AllowHosts: trustedImageDownloadHosts(ctx, account, c.publicURLs),
+		AllowHosts: trustedImageDownloadHosts(ctx, account, c.publicOrigins),
 	})
 	if storeErr != nil {
 		if errors.Is(storeErr, context.Canceled) {

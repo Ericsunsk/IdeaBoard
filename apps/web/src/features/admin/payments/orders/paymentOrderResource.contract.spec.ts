@@ -1,10 +1,40 @@
 import { describe, expect, it } from 'vitest'
 import { HttpResponse, http, useMswHandlers } from '../../../../test/msw'
+import { createAdminPaymentOrderApiAdapter } from './paymentOrderApiAdapter'
 import { createAdminPaymentOrderResource } from './paymentOrderResource'
 
 const orderNumber = 'IBP-20260803-ABCDEF123456'
 
 describe('paymentOrderResource', () => {
+  it('passes canonical paths without duplicating the API base path', async () => {
+    const requests: string[] = []
+    const transport = {
+      request: async <T>(path: string): Promise<T> => {
+        requests.push(path)
+        return {
+          code: 0,
+          msg: 'ok',
+          data: path.endsWith('/refunds')
+            ? { status: 'pending' }
+            : path === '/admin/payments/orders'
+              ? { orders: [], total: 0 }
+              : makeApiDetail(),
+        } as T
+      },
+    }
+    const adapter = createAdminPaymentOrderApiAdapter(transport)
+
+    await adapter.search({})
+    await adapter.get(orderNumber)
+    await adapter.refund(orderNumber, { idea_quantity: 500, idempotency_key: 'refund-1' })
+
+    expect(requests).toEqual([
+      '/admin/payments/orders',
+      `/admin/payments/orders/${orderNumber}`,
+      `/admin/payments/orders/${orderNumber}/refunds`,
+    ])
+  })
+
   it('sends bounded filters and maps the Admin read model without rebuilding status semantics', async () => {
     useMswHandlers(
       http.get('/api/admin/payments/orders', ({ request }) => {

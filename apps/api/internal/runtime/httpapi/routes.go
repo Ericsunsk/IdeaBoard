@@ -105,7 +105,6 @@ const (
 	RouteAdminUpload                 = "/upload"
 	RouteAdminSettingsBranding       = "/settings/branding"
 	RouteAdminSettingsMediaUpload    = "/settings/media-upload"
-	RouteAdminSettingsPublicURLs     = "/settings/public-urls"
 	RouteAdminSettingsRateLimit      = "/settings/rate-limit"
 	RouteAdminSettingsTaskMonitor    = "/settings/task-monitor"
 	RouteAdminSettingsOutbound       = "/settings/outbound-policy"

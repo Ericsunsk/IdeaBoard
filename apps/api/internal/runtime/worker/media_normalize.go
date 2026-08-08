@@ -11,7 +11,6 @@ import (
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/mediarefs"
 	"ideaboard/api/internal/media/storage"
-	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -67,7 +66,7 @@ func (c *ProviderExecutor) normalizeUpstreamMediaParams(ctx context.Context, par
 		return
 	}
 
-	base := settings.ResolvePublicAssetBaseURL(ctx, c.publicURLs)
+	base := c.publicOrigins.APIParsedURL()
 	featureSlug, _ := workflow.ReadWorkflowStringParam(params, "feature")
 	converted := 0
 	unresolvedKeys := map[string]struct{}{}

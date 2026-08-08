@@ -20,6 +20,8 @@ var configEnvKeys = []string{
 	"APP_HOST",
 	"METRICS_ADDR",
 	"APP_CORS_ALLOWED_ORIGINS",
+	"APP_BASE_URL",
+	"API_BASE_URL",
 	"AUTH_SERVICE_BASE_URL",
 	"AUTH_INTERNAL_KEY",
 	"CREDITS_WELCOME_IDENTITY_KEY",
@@ -27,6 +29,59 @@ var configEnvKeys = []string{
 	"NATS_URL",
 	"NATS_EVENT_BUS_ENABLED",
 	"REWARDS_CODE_HMAC_KEYS",
+}
+
+func TestPublicOriginsValidateAndResolveCanonicalURLs(t *testing.T) {
+	t.Run("requires both deployment origins", func(t *testing.T) {
+		for _, origins := range []PublicOriginsConfig{
+			{},
+			{Web: "https://app.example.com"},
+			{API: "https://api.example.com"},
+		} {
+			if err := origins.Validate(); err == nil {
+				t.Fatalf("Validate(%+v) succeeded, want error", origins)
+			}
+		}
+	})
+
+	t.Run("rejects non-origin values", func(t *testing.T) {
+		for _, origins := range []PublicOriginsConfig{
+			{Web: "javascript:alert(1)", API: "https://api.example.com"},
+			{Web: "https://app.example.com/path", API: "https://api.example.com"},
+			{Web: "https://app.example.com", API: "https://user:pass@api.example.com"},
+		} {
+			if err := origins.Validate(); err == nil {
+				t.Fatalf("Validate(%+v) succeeded, want error", origins)
+			}
+		}
+	})
+
+	t.Run("separates Web navigation from API assets", func(t *testing.T) {
+		origins := PublicOriginsConfig{
+			Web: "https://app.example.com",
+			API: "https://api.example.com",
+		}
+		if err := origins.Validate(); err != nil {
+			t.Fatalf("Validate() error = %v", err)
+		}
+		if got := origins.WebURL("/user/boards"); got != "https://app.example.com/user/boards" {
+			t.Fatalf("WebURL() = %q", got)
+		}
+		if got := origins.APIURL("/uploads/canvas/example.png"); got != "https://api.example.com/uploads/canvas/example.png" {
+			t.Fatalf("APIURL() = %q", got)
+		}
+	})
+}
+
+func TestLoadPublicOriginsFromDeploymentEnvironment(t *testing.T) {
+	resetConfigEnv(t)
+	t.Setenv("APP_BASE_URL", " https://app.example.com/ ")
+	t.Setenv("API_BASE_URL", " https://api.example.com/ ")
+
+	got := Load().PublicOrigins
+	if got.Web != "https://app.example.com" || got.API != "https://api.example.com" {
+		t.Fatalf("PublicOrigins = %+v", got)
+	}
 }
 
 func resetConfigEnv(t *testing.T) {

@@ -6,11 +6,11 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/accountpool/accounts"
+	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/outbound"
-	"ideaboard/api/internal/platform/settings"
 )
 
-func trustedImageDownloadHosts(ctx context.Context, account *accounts.ApiAccount, provider settings.PublicURLSettingProvider) []string {
+func trustedImageDownloadHosts(ctx context.Context, account *accounts.ApiAccount, publicOrigins config.PublicOriginsConfig) []string {
 	hosts := map[string]struct{}{}
 	appendHost := func(raw string) {
 		parsed, err := url.Parse(strings.TrimSpace(raw))
@@ -27,7 +27,7 @@ func trustedImageDownloadHosts(ctx context.Context, account *accounts.ApiAccount
 	if account != nil {
 		appendHost(account.ProxyURL)
 	}
-	for _, host := range trustedRuntimeAssetHosts(ctx, provider) {
+	for _, host := range trustedRuntimeAssetHosts(publicOrigins) {
 		appendHost(host)
 	}
 	for _, host := range outbound.AllowHosts(ctx) {
