@@ -551,11 +551,6 @@ const { onFlowImageExpandSubmit, onFlowExpandHandlePointerDown, onFlowExpandFram
     beginFlowExpandFrameDrag,
   })
 
-const { onFlowPromptGenerate } = commands.imageWorkflow.createPromptGenerationHandlers({
-  cancelFlowExpandMode,
-  cancelFlowMaskEditorMode,
-})
-
 const {
   paneSelectionBindings,
   vueFlowSelectionBindings,
@@ -646,6 +641,7 @@ const {
   onFlowImageDirectAction,
   onFlowImagePromptGenerate,
   onFlowFusionPromptGenerate,
+  onFlowPromptGenerate,
 } = commands.imageWorkflow.createImageActionHandlers({
   flowImageEditorNodeId,
   consumeSuppressedStrengthClick,

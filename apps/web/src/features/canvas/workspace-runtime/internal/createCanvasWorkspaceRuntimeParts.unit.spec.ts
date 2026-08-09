@@ -179,7 +179,6 @@ function createImageWorkflowRuntime() {
     reattachPendingImageResults: vi.fn(),
     createImageTools: vi.fn(),
     createImageActionHandlers: vi.fn(),
-    createPromptGenerationHandlers: vi.fn(),
     createCanvasExtendOverlay: vi.fn(),
   }
 }

@@ -338,7 +338,6 @@ function createCanvasWorkspaceRuntimeFacade(
         runCanvasExtendAction: parts.imageWorkflow.runCanvasExtendAction,
         createImageTools: parts.imageWorkflow.createImageTools,
         createImageActionHandlers: parts.imageWorkflow.createImageActionHandlers,
-        createPromptGenerationHandlers: parts.imageWorkflow.createPromptGenerationHandlers,
         createCanvasExtendOverlay: parts.imageWorkflow.createCanvasExtendOverlay,
       },
     },

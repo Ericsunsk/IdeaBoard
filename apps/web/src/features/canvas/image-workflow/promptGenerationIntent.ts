@@ -1,8 +1,8 @@
 import { normalizePromptAspectRatio } from '../../canvas-board/domain'
 import type { PromptAspectRatio } from '../../canvas-board/domain'
-import type { MediaInputImage } from './useFlowMediaInputImages'
+import type { MediaInputImage } from '../composables/useFlowMediaInputImages'
 
-type UseFlowPromptGenerationOrchestratorOptions = {
+export type PromptGenerationIntentOptions = {
   cancelFlowExpandMode: () => void
   cancelFlowMaskEditorMode: () => void
   getMediaInputImages: (nodeId: string) => MediaInputImage[]
@@ -30,9 +30,7 @@ type UseFlowPromptGenerationOrchestratorOptions = {
   ) => Promise<void> | void
 }
 
-export function useFlowPromptGenerationOrchestrator(
-  options: UseFlowPromptGenerationOrchestratorOptions,
-) {
+export function createPromptGenerationIntent(options: PromptGenerationIntentOptions) {
   function onFlowPromptGenerate(
     promptNodeId: string,
     prompt: string,

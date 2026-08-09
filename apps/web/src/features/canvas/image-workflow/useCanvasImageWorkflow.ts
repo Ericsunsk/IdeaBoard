@@ -1,4 +1,3 @@
-import { useFlowPromptGenerationOrchestrator } from '../composables/useFlowPromptGenerationOrchestrator'
 import { useImageCanvasExtendOverlay } from '../composables/useImageCanvasExtendOverlay'
 import {
   useCanvasImageTools,
@@ -20,6 +19,10 @@ import {
   type ImageWorkflowExecution,
   type UseImageWorkflowExecutionOptions,
 } from './useImageWorkflowExecution'
+import {
+  createPromptGenerationIntent,
+  type PromptGenerationIntentOptions,
+} from './promptGenerationIntent'
 
 export type CanvasImageWorkflowToolsOptions = Omit<
   UseCanvasImageToolsOptions,
@@ -49,11 +52,6 @@ export type CanvasImageWorkflowToolsOptions = Omit<
 export type CanvasImageWorkflowActionOptions = Omit<
   ImageActionIntentRouterOptions,
   'runImageDirectAction' | 'runFusionPromptGeneration' | 'onFlowNodeParamUpdate' | 'onWarning'
->
-
-export type CanvasImageWorkflowPromptGenerationOptions = Pick<
-  Parameters<typeof useFlowPromptGenerationOrchestrator>[0],
-  'cancelFlowExpandMode' | 'cancelFlowMaskEditorMode'
 >
 
 export type CanvasImageWorkflowExpandOverlayOptions = Omit<
@@ -88,12 +86,8 @@ type CanvasImageWorkflowGraphPort = Pick<
   | 'startCanvasInteraction'
   | 'stopCanvasInteraction'
 > & {
-  getMediaInputImages: Parameters<
-    typeof useFlowPromptGenerationOrchestrator
-  >[0]['getMediaInputImages']
-  resolvePromptInputImageNodeIds: Parameters<
-    typeof useFlowPromptGenerationOrchestrator
-  >[0]['resolvePromptInputImageNodeIds']
+  getMediaInputImages: PromptGenerationIntentOptions['getMediaInputImages']
+  resolvePromptInputImageNodeIds: PromptGenerationIntentOptions['resolvePromptInputImageNodeIds']
   updateSnapshotNodeParam: ImageActionIntentRouterOptions['onFlowNodeParamUpdate']
   markNodeExecutionDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
 }
@@ -125,8 +119,6 @@ export type CanvasImageWorkflow = {
       outputCount: number,
       aspectRatio: PromptAspectRatio,
     ) => void
-  }
-  createPromptGenerationHandlers: (options: CanvasImageWorkflowPromptGenerationOptions) => {
     onFlowPromptGenerate: (
       promptNodeId: string,
       prompt: string,
@@ -200,26 +192,23 @@ export function useCanvasImageWorkflow(
   }
 
   function createImageActionHandlers(actionOptions: CanvasImageWorkflowActionOptions) {
-    return createImageActionIntentRouter({
+    const imageActions = createImageActionIntentRouter({
       ...actionOptions,
       runImageDirectAction: execution.runImageDirectAction,
       runFusionPromptGeneration: execution.runFusionPromptGeneration,
       onFlowNodeParamUpdate: markImageWorkflowNodeDirty,
       onWarning: options.feedback.imageTools.actionUnavailable,
     })
-  }
-
-  function createPromptGenerationHandlers(
-    promptOptions: CanvasImageWorkflowPromptGenerationOptions,
-  ) {
-    return useFlowPromptGenerationOrchestrator({
-      ...promptOptions,
+    const promptGeneration = createPromptGenerationIntent({
+      cancelFlowExpandMode: actionOptions.cancelFlowExpandMode,
+      cancelFlowMaskEditorMode: actionOptions.cancelFlowMaskEditorMode,
       getMediaInputImages: graph.getMediaInputImages,
       resolvePromptInputImageNodeIds: graph.resolvePromptInputImageNodeIds,
       runTextPromptGeneration: execution.runTextPromptGeneration,
       runImagePromptGeneration: execution.runImagePromptGeneration,
       runImagePromptGenerationFromSource: execution.runImagePromptGenerationFromSource,
     })
+    return { ...imageActions, ...promptGeneration }
   }
 
   function createCanvasExtendOverlay(overlayOptions: CanvasImageWorkflowExpandOverlayOptions) {
@@ -248,7 +237,6 @@ export function useCanvasImageWorkflow(
     reattachPendingImageResults: execution.reattachPendingImageResults,
     createImageTools,
     createImageActionHandlers,
-    createPromptGenerationHandlers,
     createCanvasExtendOverlay,
   }
 }
