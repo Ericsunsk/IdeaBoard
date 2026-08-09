@@ -106,7 +106,7 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 | Web style lint | `cd apps/web && npm run lint:style` |
 | API tests | `cd apps/api && go test ./...` |
 | API build | `cd apps/api && go build ./...` |
-| Schema assembly drift | `cd apps/api && go run ./cmd/schema-assemble --check --manifest internal/db/schema/manifest.json --output internal/db/schema/schema.sql` |
+| Schema Release | `cd apps/api && BASE_SHA="$(git merge-base HEAD origin/main)" API_TEST_DATABASE_DSN='<test-dsn>' go run ./cmd/schema-release` |
 | sqlc regeneration | `cd apps/api && go tool sqlc generate` |
 | Auth build | `cd apps/auth && npm run build` |
 | Credits million dataset | `cd apps/api && CREDITS_LOAD_TEST=1 go test ./internal/credits -run '^TestCreditMillionTransactionDataset$' -count=1 -v` |

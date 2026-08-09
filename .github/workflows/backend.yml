@@ -37,13 +37,6 @@ jobs:
         with:
           cache-dependency-path: apps/api/go.sum
 
-      - name: Check sqlc generated code
-        working-directory: apps/api
-        run: |
-          go run ./cmd/schema-assemble --check --manifest internal/db/schema/manifest.json --output internal/db/schema/schema.sql
-          go tool sqlc generate
-          git diff --exit-code -- internal/db/sqlc
-
       - name: Test CI parity entrypoint
         run: bash scripts/ci-parity-test.sh
 
@@ -83,11 +76,12 @@ jobs:
         working-directory: apps/api
         run: go test ./internal/db/migrations -count=1
 
-      - name: Check migration history immutability
+      - name: Check Schema Release contract
+        working-directory: apps/api
         env:
           BASE_SHA: ${{ inputs.base_sha || github.event.before || github.sha }}
           HEAD_SHA: ${{ inputs.ref || github.sha }}
-        run: bash scripts/check-migration-history.sh
+        run: go run ./cmd/schema-release
 
   api-tests:
     runs-on: ubicloud-standard-2

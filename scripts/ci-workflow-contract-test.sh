@@ -7,6 +7,7 @@ repo_root="$(cd "${script_dir}/.." && pwd)"
 ci_workflow="${repo_root}/.github/workflows/ci.yml"
 docker_workflow="${repo_root}/.github/workflows/docker-images.yml"
 release_workflow="${repo_root}/.github/workflows/release.yml"
+backend_workflow="${repo_root}/.github/workflows/backend.yml"
 
 assert_contains() {
   local file="$1"
@@ -34,9 +35,11 @@ fi
 
 assert_contains "${repo_root}/.github/workflows/web.yml" '  workflow_call:'
 assert_contains "${repo_root}/.github/workflows/ops.yml" '  workflow_call:'
-assert_contains "${repo_root}/.github/workflows/backend.yml" '  workflow_call:'
-assert_contains "${repo_root}/.github/workflows/backend.yml" 'name: Backend Verification'
-assert_contains "${repo_root}/.github/workflows/backend.yml" '          ref: ${{ inputs.ref || github.sha }}'
+assert_contains "${backend_workflow}" '  workflow_call:'
+assert_contains "${backend_workflow}" 'name: Backend Verification'
+assert_contains "${backend_workflow}" '          ref: ${{ inputs.ref || github.sha }}'
+assert_contains "${backend_workflow}" '      - name: Check Schema Release contract'
+assert_contains "${backend_workflow}" '        run: go run ./cmd/schema-release'
 assert_contains "${repo_root}/.github/workflows/security.yml" '  workflow_call:'
 assert_contains "${ci_workflow}" '    name: CI Gate'
 assert_contains "${ci_workflow}" '      - security'
