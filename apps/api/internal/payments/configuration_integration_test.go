@@ -22,7 +22,7 @@ func TestConfigureStripePreparesThenAtomicallyPublishesSafeSummary(t *testing.T)
 		AccountID: "acct_test", Mode: StripeModeTest, ChargesEnabled: true,
 		ProductID: "prod_idea", WebhookEndpointID: "we_idea", WebhookSecret: "whsec_test",
 	}}
-	service := NewService(ServiceDependencies{Repository: NewRepository(db), ConfigurationGateway: gateway})
+	service := NewService(ServiceDependencies{Persistence: NewRepository(db), ConfigurationGateway: gateway})
 
 	summary, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_safe_fixture", ProductTaxCode: "txcd_10105001",
@@ -110,7 +110,7 @@ func TestConfigureStripeFailurePreservesCurrentConfigurationAndAuditsSanitizedEr
 		AccountID: "acct_original", Mode: StripeModeTest, ChargesEnabled: true,
 		ProductID: "prod_original", WebhookEndpointID: "we_original", WebhookSecret: "whsec_original",
 	}}
-	service := NewService(ServiceDependencies{Repository: NewRepository(db), ConfigurationGateway: gateway})
+	service := NewService(ServiceDependencies{Persistence: NewRepository(db), ConfigurationGateway: gateway})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_original", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",

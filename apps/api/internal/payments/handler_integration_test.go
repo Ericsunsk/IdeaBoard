@@ -30,7 +30,7 @@ func TestStripeConfigurationHTTPContractNeverReturnsSecretsAndRejectsUnknownFiel
 		AccountID: "acct_http", Mode: StripeModeTest, ChargesEnabled: true,
 		ProductID: "prod_http", WebhookEndpointID: "we_http", WebhookSecret: "whsec_http",
 	}}
-	service := NewService(ServiceDependencies{Repository: NewRepository(db), ConfigurationGateway: gateway, WebhookVerifier: &fakeWebhookVerifier{}})
+	service := NewService(ServiceDependencies{Persistence: NewRepository(db), ConfigurationGateway: gateway, WebhookVerifier: &fakeWebhookVerifier{}})
 	handler := NewHandler(service, testPublicOrigins("https://app.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -359,7 +359,7 @@ func TestStripeConfigurationHTTPRejectsOversizedAPIKeyBeforeGatewayAndAuditsFail
 	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
 	gateway := &fakeStripeGateway{}
-	service := NewService(ServiceDependencies{Repository: NewRepository(db), ConfigurationGateway: gateway, WebhookVerifier: &fakeWebhookVerifier{}})
+	service := NewService(ServiceDependencies{Persistence: NewRepository(db), ConfigurationGateway: gateway, WebhookVerifier: &fakeWebhookVerifier{}})
 	handler := NewHandler(service, testPublicOrigins("https://app.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -407,7 +407,7 @@ func TestStripeWebhookHTTPContractUsesUnauthenticatedExactRawBody(t *testing.T) 
 	verifier := &fakeWebhookVerifier{event: StripeWebhookEvent{
 		ID: "evt_http", Type: "customer.updated", ObjectID: "cus_http", CreatedAt: time.Now(),
 	}}
-	service := NewService(ServiceDependencies{Repository: NewRepository(db), ConfigurationGateway: gateway, WebhookVerifier: verifier})
+	service := NewService(ServiceDependencies{Persistence: NewRepository(db), ConfigurationGateway: gateway, WebhookVerifier: verifier})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_webhook_http", ProductTaxCode: "txcd_10105001",
 		WebhookURL: "https://app.example.com/api/webhooks/stripe",

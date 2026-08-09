@@ -6,12 +6,12 @@ import (
 )
 
 type paymentOrderLifecycle struct {
-	repo   *Repository
+	repo   PaymentOrderConvergenceStore
 	events *EventHub
 	now    func() time.Time
 }
 
-func newPaymentOrderLifecycle(repo *Repository, events *EventHub, now func() time.Time) *paymentOrderLifecycle {
+func newPaymentOrderLifecycle(repo PaymentOrderConvergenceStore, events *EventHub, now func() time.Time) *paymentOrderLifecycle {
 	if now == nil {
 		now = time.Now
 	}

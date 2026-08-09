@@ -311,7 +311,7 @@ func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testin
 	}}
 	events := NewEventHub()
 	service := NewService(ServiceDependencies{
-		Repository: NewRepository(db), ConfigurationGateway: configurationGateway,
+		Persistence: NewRepository(db), ConfigurationGateway: configurationGateway,
 		CheckoutGateway: checkoutGateway, WebhookVerifier: verifier, Wallets: creditService,
 		Events: events, Now: func() time.Time { return verifiedAt },
 	})
@@ -592,7 +592,7 @@ func newConfiguredPurchaseService(
 	t.Helper()
 	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	service := NewService(ServiceDependencies{
-		Repository: NewRepository(db), ConfigurationGateway: configurationGateway,
+		Persistence: NewRepository(db), ConfigurationGateway: configurationGateway,
 		CheckoutGateway: checkoutGateway, Wallets: wallets, Now: func() time.Time { return now },
 	})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{

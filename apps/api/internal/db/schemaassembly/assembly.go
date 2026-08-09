@@ -26,7 +26,7 @@ type Fragment struct {
 
 var requiredFragmentNames = []string{
 	"identity", "credits", "account_pool", "platform", "tasks", "media", "usage",
-	"workflow", "boards", "rewards", "billing", "payments", "integrity",
+	"workflow", "boards", "rewards", "billing", "payments", "integrity", "bootstrap",
 }
 
 func LoadManifest(path string) (Manifest, error) {

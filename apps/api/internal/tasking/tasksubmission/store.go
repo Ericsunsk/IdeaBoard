@@ -13,7 +13,6 @@ import (
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
-	"ideaboard/api/internal/tasking/taskstore"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,14 +22,21 @@ const rollbackTimeout = 5 * time.Second
 
 type Store struct {
 	pool       *pgxpool.Pool
-	repository *taskstore.Repository
+	repository SubmissionTaskStore
 	client     taskqueue.RiverTxClient
 	queueName  string
 	maxRetry   int
 	billing    *taskbilling.Service
 }
 
-func NewStore(pool *pgxpool.Pool, repository *taskstore.Repository, client taskqueue.RiverTxClient, queueName string, maxRetry int, billingService *taskbilling.Service) *Store {
+// SubmissionTaskStore is the caller-owned persistence seam for atomic task submission.
+// The implementation must use the caller's transaction; Store owns commit/rollback.
+type SubmissionTaskStore interface {
+	CreateWithPGXTx(context.Context, pgx.Tx, *tasks.Task) (bool, error)
+	LockAndFindSubmissionByClientActionWithPGXTx(context.Context, pgx.Tx, int64, string, taskbilling.Request) (tasks.TaskSubmissionResult, bool, error)
+}
+
+func NewStore(pool *pgxpool.Pool, repository SubmissionTaskStore, client taskqueue.RiverTxClient, queueName string, maxRetry int, billingService *taskbilling.Service) *Store {
 	return &Store{
 		pool:       pool,
 		repository: repository,

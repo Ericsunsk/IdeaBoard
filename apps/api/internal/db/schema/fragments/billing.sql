@@ -448,6 +448,16 @@ CREATE TABLE billing_admin_actions (
     CONSTRAINT ck_billing_admin_actions_type CHECK (((action_type)::text = ANY (ARRAY[('create_sku'::character varying)::text, ('update_sku'::character varying)::text, ('create_price'::character varying)::text, ('set_price_enabled'::character varying)::text, ('set_availability'::character varying)::text, ('delete_archived'::character varying)::text])))
 );
 
+-- The imported dump lost the leading space and tab in the trim character set.
+-- Rebind the constraint to the canonical whitespace contract.
+ALTER TABLE billing_admin_actions
+  DROP CONSTRAINT ck_billing_admin_actions_reason;
+ALTER TABLE billing_admin_actions
+  ADD CONSTRAINT ck_billing_admin_actions_reason CHECK (
+    reason = btrim(reason, E' \t\n\r\f')
+    AND char_length(reason) BETWEEN 1 AND 1000
+  );
+
 
 --
 -- Name: billing_admin_actions_id_seq; Type: SEQUENCE; Schema: public; Owner: -

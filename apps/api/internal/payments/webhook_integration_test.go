@@ -69,7 +69,7 @@ func TestReceiveStripeWebhookVerifiesRawBodyAndStoresOnlyMinimalInboxFact(t *tes
 		Livemode: false, CreatedAt: verifiedAt.Add(-time.Minute),
 	}}
 	service := NewService(ServiceDependencies{
-		Repository: repo, ConfigurationGateway: gateway,
+		Persistence: repo, ConfigurationGateway: gateway,
 		RefundGateway: &refundGatewayFake{retrieve: map[string]StripeRefund{
 			"re_1": {ID: "re_1", Status: "succeeded"},
 		}},
@@ -125,7 +125,7 @@ func TestReceiveStripeWebhookIgnoresVerifiedUnknownEventAndRejectsUnverifiedPayl
 	verifier := &fakeWebhookVerifier{event: StripeWebhookEvent{
 		ID: "evt_unknown", Type: "customer.updated", ObjectID: "cus_1", CreatedAt: time.Now(),
 	}}
-	service := NewService(ServiceDependencies{Repository: NewRepository(db), ConfigurationGateway: gateway, WebhookVerifier: verifier})
+	service := NewService(ServiceDependencies{Persistence: NewRepository(db), ConfigurationGateway: gateway, WebhookVerifier: verifier})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_unknown", ProductTaxCode: "txcd_10105001",
 		WebhookURL: "https://app.example.com/api/webhooks/stripe",

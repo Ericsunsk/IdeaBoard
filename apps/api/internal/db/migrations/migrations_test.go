@@ -58,13 +58,13 @@ func TestExtractUpSQLExcludesDownMigration(t *testing.T) {
 	}
 }
 
-func TestEmbeddedMigrationsHaveSingleCleanBaseline(t *testing.T) {
+func TestEmbeddedMigrationsStartWithCleanBaseline(t *testing.T) {
 	files, err := fs.Glob(migrationFS, "*.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) != 1 || files[0] != "20260810000000_baseline.sql" {
-		t.Fatalf("embedded migrations=%v, want only clean baseline", files)
+	if len(files) == 0 || files[0] != "20260810000000_baseline.sql" {
+		t.Fatalf("embedded migrations=%v, want clean baseline first", files)
 	}
 	raw, err := migrationFS.ReadFile(files[0])
 	if err != nil {
@@ -236,12 +236,12 @@ func TestMigrationsFreshDatabaseIsIdempotentAndTamperEvident(t *testing.T) {
 	if err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM schema_migrations`).Scan(&count); err != nil {
 		t.Fatal(err)
 	}
-	if count != 1 {
-		t.Fatalf("migration history rows=%d, want 1", count)
+	if count != embeddedMigrationCount(t) {
+		t.Fatalf("migration history rows=%d, want %d", count, embeddedMigrationCount(t))
 	}
 	var version int64
 	var filename, checksum string
-	if err := conn.QueryRowContext(ctx, `SELECT version, filename, checksum FROM schema_migrations`).Scan(&version, &filename, &checksum); err != nil {
+	if err := conn.QueryRowContext(ctx, `SELECT version, filename, checksum FROM schema_migrations WHERE version = $1`, baselineMigrationVersion).Scan(&version, &filename, &checksum); err != nil {
 		t.Fatal(err)
 	}
 	if version != baselineMigrationVersion || filename != "20260810000000_baseline.sql" || len(checksum) != 64 {

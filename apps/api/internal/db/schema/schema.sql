@@ -3233,6 +3233,16 @@ CREATE TABLE billing_admin_actions (
     CONSTRAINT ck_billing_admin_actions_type CHECK (((action_type)::text = ANY (ARRAY[('create_sku'::character varying)::text, ('update_sku'::character varying)::text, ('create_price'::character varying)::text, ('set_price_enabled'::character varying)::text, ('set_availability'::character varying)::text, ('delete_archived'::character varying)::text])))
 );
 
+-- The imported dump lost the leading space and tab in the trim character set.
+-- Rebind the constraint to the canonical whitespace contract.
+ALTER TABLE billing_admin_actions
+  DROP CONSTRAINT ck_billing_admin_actions_reason;
+ALTER TABLE billing_admin_actions
+  ADD CONSTRAINT ck_billing_admin_actions_reason CHECK (
+    reason = btrim(reason, E' \t\n\r\f')
+    AND char_length(reason) BETWEEN 1 AND 1000
+  );
+
 
 --
 -- Name: billing_admin_actions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
@@ -4885,5 +4895,48 @@ BEGIN
     'ALTER FUNCTION %I.has_unsettled_payment_state(BIGINT) SET search_path TO %I, pg_catalog, pg_temp',
     trusted_schema, trusted_schema
   );
+END;
+$$;
+-- Static platform defaults use column lists and database defaults so every
+-- fresh installation receives the same deterministic builtin records.
+INSERT INTO storage_profiles (profile_id, name, provider, enabled, is_current, builtin, status, config)
+VALUES ('builtin-local', '本地存储', 'local', TRUE, TRUE, TRUE, 'active', '{}'::jsonb)
+ON CONFLICT (profile_id) DO NOTHING;
+
+INSERT INTO system_configs (config_key, value)
+VALUES ('api_outbound_allow_hosts', '[]')
+ON CONFLICT (config_key) DO NOTHING;
+
+-- Bind every privileged routine to its installed schema and keep PUBLIC from
+-- bypassing the runtime privilege model.
+DO $$
+DECLARE
+  routine RECORD;
+  target_schema TEXT := current_schema();
+BEGIN
+  FOR routine IN
+    SELECT
+      schemas.nspname AS schema_name,
+      functions.proname AS function_name,
+      pg_catalog.pg_get_function_identity_arguments(functions.oid) AS arguments
+    FROM pg_catalog.pg_proc AS functions
+    JOIN pg_catalog.pg_namespace AS schemas ON schemas.oid = functions.pronamespace
+    WHERE schemas.nspname = target_schema
+      AND functions.prosecdef
+  LOOP
+    EXECUTE format(
+      'ALTER FUNCTION %I.%I(%s) SET search_path TO %I, pg_catalog, pg_temp',
+      routine.schema_name,
+      routine.function_name,
+      routine.arguments,
+      target_schema
+    );
+    EXECUTE format(
+      'REVOKE ALL ON FUNCTION %I.%I(%s) FROM PUBLIC',
+      routine.schema_name,
+      routine.function_name,
+      routine.arguments
+    );
+  END LOOP;
 END;
 $$;
