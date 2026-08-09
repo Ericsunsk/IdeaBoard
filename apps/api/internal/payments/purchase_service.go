@@ -87,7 +87,7 @@ type PendingPaymentOrderList struct {
 
 func (s *Service) ListPendingOrders(ctx context.Context, userID int64) (PendingPaymentOrderList, error) {
 	result := PendingPaymentOrderList{Items: make([]PendingPaymentOrder, 0)}
-	if s == nil || s.repo == nil || userID <= 0 {
+	if s == nil || s.configuration == nil || s.repo == nil || userID <= 0 {
 		return result, ErrPaymentOrderNotFound
 	}
 	orders, err := s.repo.ListUserPendingPaymentOrders(ctx, userID)
@@ -105,7 +105,7 @@ func (s *Service) ContinuePendingOrder(ctx context.Context, userID int64, public
 		return PendingPaymentOrder{}, ErrPaymentOrderNotFound
 	}
 	var result PendingPaymentOrder
-	err := s.repo.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
+	err := s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
 		return s.repo.WithUserCheckoutLock(lockedContext, userID, func(userLockedContext context.Context) error {
 			order, err := s.repo.GetPaymentOrderByPublicToken(userLockedContext, userID, publicToken)
 			if errors.Is(err, sql.ErrNoRows) {
@@ -163,11 +163,11 @@ func (s *Service) ContinuePendingOrder(ctx context.Context, userID int64, public
 }
 
 func (s *Service) AbandonPendingOrder(ctx context.Context, userID int64, publicToken string) (PendingPaymentOrder, error) {
-	if s == nil || s.repo == nil || userID <= 0 {
+	if s == nil || s.configuration == nil || s.repo == nil || userID <= 0 {
 		return PendingPaymentOrder{}, ErrPaymentOrderNotFound
 	}
 	var result PendingPaymentOrder
-	err := s.repo.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
+	err := s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
 		return s.repo.WithUserCheckoutLock(lockedContext, userID, func(userLockedContext context.Context) error {
 			order, err := s.repo.GetPaymentOrderByPublicToken(userLockedContext, userID, publicToken)
 			if errors.Is(err, sql.ErrNoRows) {
@@ -222,11 +222,11 @@ func (s *Service) GetPurchaseOptions(ctx context.Context, userID int64) (Purchas
 		Terms:        PaymentLegalDocument{Version: CurrentTermsVersion, URL: "/terms"},
 		RefundPolicy: PaymentLegalDocument{Version: CurrentRefundPolicyVersion, URL: "/refund-policy"},
 	}
-	if s == nil || s.repo == nil || s.wallets == nil || userID <= 0 {
+	if s == nil || s.configuration == nil || s.wallets == nil || userID <= 0 {
 		options.UnavailableReason = "payments_not_configured"
 		return options, nil
 	}
-	configuration, err := s.repo.GetStripeConfiguration(ctx)
+	configuration, err := s.configuration.GetStripeConfiguration(ctx)
 	if isConfigurationNotFound(err) {
 		options.UnavailableReason = "payments_not_configured"
 		return options, nil
@@ -261,11 +261,11 @@ func (s *Service) GetPurchaseOptions(ctx context.Context, userID int64) (Purchas
 }
 
 func (s *Service) CreateCheckout(ctx context.Context, command CreateCheckoutCommand) (CheckoutResult, error) {
-	if s == nil || s.repo == nil {
+	if s == nil || s.configuration == nil || s.repo == nil {
 		return CheckoutResult{}, ErrPurchasesUnavailable
 	}
 	var result CheckoutResult
-	err := s.repo.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
+	err := s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
 		return s.repo.WithUserCheckoutLock(lockedContext, command.UserID, func(userLockedContext context.Context) error {
 			var err error
 			result, err = s.createCheckoutLocked(userLockedContext, command)
@@ -429,7 +429,7 @@ func (s *Service) GetPaymentOrderReturnStatus(ctx context.Context, userID int64,
 		return PaymentOrderReturnStatus{}, ErrPaymentOrderNotFound
 	}
 	var result PaymentOrderReturnStatus
-	err := s.repo.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
+	err := s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
 		var err error
 		result, err = s.getPaymentOrderReturnStatusLocked(lockedContext, userID, publicToken)
 		return err
@@ -481,7 +481,7 @@ func (s *Service) checkoutConfiguration(ctx context.Context) (StoredStripeConfig
 }
 
 func (s *Service) stripeAccessConfiguration(ctx context.Context) (StoredStripeConfiguration, string, error) {
-	configuration, err := s.repo.GetStripeConfiguration(ctx)
+	configuration, err := s.configuration.GetStripeConfiguration(ctx)
 	if isConfigurationNotFound(err) {
 		return StoredStripeConfiguration{}, "", ErrPurchasesUnavailable
 	}

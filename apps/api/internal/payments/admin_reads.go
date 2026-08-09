@@ -205,7 +205,7 @@ func (s *Service) GetAdminPaymentOrder(ctx context.Context, orderNumber string) 
 	}
 	disputeMode := StripeMode("")
 	if len(durableDisputes) > 0 {
-		configuration, configurationErr := s.repo.GetStripeConfiguration(ctx)
+		configuration, configurationErr := s.configuration.GetStripeConfiguration(ctx)
 		if configurationErr == nil {
 			disputeMode = configuration.Mode
 		} else if !isConfigurationNotFound(configurationErr) {

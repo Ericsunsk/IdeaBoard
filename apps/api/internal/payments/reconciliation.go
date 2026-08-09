@@ -18,10 +18,10 @@ const (
 // advances an order from canonical Stripe facts, never from redirects or job
 // delivery. Claims are fenced in the repository before provider I/O begins.
 func (s *Service) ReconcileDuePaymentOrders(ctx context.Context) error {
-	if s == nil || s.repo == nil || s.checkoutGateway == nil {
+	if s == nil || s.configuration == nil || s.repo == nil || s.checkoutGateway == nil {
 		return fmt.Errorf("payments reconciliation unavailable")
 	}
-	return s.repo.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
+	return s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
 		configuration, apiKey, configurationErr := s.stripeAccessConfiguration(lockedContext)
 		now := s.now().UTC()
 		claims, err := s.repo.ClaimDuePaymentOrderReconciliations(lockedContext, now)

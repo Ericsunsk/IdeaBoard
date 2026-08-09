@@ -13,11 +13,11 @@ const checkoutShutdownBatchSize int32 = 100
 // administrator disabled purchases. The run cutoff keeps a later re-enable
 // from affecting newly created Sessions.
 func (s *Service) RunPaymentCheckoutShutdown(ctx context.Context, shutdownID string) error {
-	if s == nil || s.repo == nil || s.checkoutGateway == nil {
+	if s == nil || s.configuration == nil || s.checkoutGateway == nil {
 		return fmt.Errorf("payment Checkout shutdown unavailable")
 	}
-	return s.repo.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
-		shutdown, err := s.repo.GetPaymentCheckoutShutdown(lockedContext, shutdownID)
+	return s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
+		shutdown, err := s.configuration.GetPaymentCheckoutShutdown(lockedContext, shutdownID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
@@ -26,12 +26,12 @@ func (s *Service) RunPaymentCheckoutShutdown(ctx context.Context, shutdownID str
 		}
 		var apiKey string
 		for {
-			orders, err := s.repo.ListPaymentOrdersForCheckoutShutdown(lockedContext, shutdown, checkoutShutdownBatchSize)
+			orders, err := s.configuration.ListPaymentOrdersForCheckoutShutdown(lockedContext, shutdown, checkoutShutdownBatchSize)
 			if err != nil {
 				return err
 			}
 			if len(orders) == 0 {
-				return s.repo.CompletePaymentCheckoutShutdown(lockedContext, shutdown.ID, s.now().UTC())
+				return s.configuration.CompletePaymentCheckoutShutdown(lockedContext, shutdown.ID, s.now().UTC())
 			}
 			if apiKey == "" {
 				configuration, resolvedAPIKey, err := s.stripeAccessConfiguration(lockedContext)
@@ -53,10 +53,10 @@ func (s *Service) RunPaymentCheckoutShutdown(ctx context.Context, shutdownID str
 }
 
 func (s *Service) RunActivePaymentCheckoutShutdowns(ctx context.Context) error {
-	if s == nil || s.repo == nil {
+	if s == nil || s.configuration == nil {
 		return fmt.Errorf("payment Checkout shutdown unavailable")
 	}
-	shutdowns, err := s.repo.ListActivePaymentCheckoutShutdowns(ctx)
+	shutdowns, err := s.configuration.ListActivePaymentCheckoutShutdowns(ctx)
 	if err != nil {
 		return err
 	}
