@@ -17,7 +17,7 @@ import {
   createFlowGraphCommandOptions,
   readFlowGraphCommandSideEffects,
 } from './flowGraphAdapterCommandSideEffects'
-import { useCanvasGroupRuntime, type CanvasGroupRuntimeControls } from './useCanvasGroupRuntime'
+import { useCanvasGroupRuntime } from './useCanvasGroupRuntime'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasBoardSession } from '../board-session'
 import {
@@ -38,23 +38,6 @@ type SelectableFlowItem = {
 
 type FlowGraphCommitOptions = {
   preserveSelection?: boolean
-}
-
-export type { CanvasSelectionGroupAction } from './useCanvasGroupRuntime'
-
-export type CanvasFlowGraphRuntimeControls = {
-  captureHistory: () => FlowHistorySnapshot
-  createCurrentCanvasGraphStore: (
-    snapshotOptions?: FlowToCanvasBoardSnapshotOptions,
-  ) => ReturnType<typeof createCanvasGraphStore>
-  deleteNode: (nodeId: string) => boolean
-  markDirty: () => void
-  grouping: CanvasGroupRuntimeControls
-  nodeDrag: {
-    begin: () => void
-    commit: () => void
-    cancel: () => void
-  }
 }
 
 export type UseFlowCanvasRuntimeOptions = {
@@ -172,10 +155,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     graphAdapter.replaceGraph(resolvedGraph)
   }
 
-  function captureFullGraphHistory() {
-    return flowHistory.capture()
-  }
-
   function createRestoreGraphCommandOptions() {
     return createFlowGraphCommandOptions({
       recordHistory: false,
@@ -225,6 +204,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   const currentBoardId = boardPersistence.currentBoardId
   const loadInitialOrRouteBoardBase = boardPersistence.loadInitialOrRouteBoard
   const loadInitialOrRouteBoard: typeof loadInitialOrRouteBoardBase = async (...args) => {
+    nodeDragLifecycle.cancel()
     groupRuntime?.internal.resetTransientSelectionState()
     const result = await loadInitialOrRouteBoardBase(...args)
     groupRuntime?.internal.handleCommittedGroupsChanged()
@@ -347,31 +327,26 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     graphAdapter.applyEdgeChanges(changes)
   }
 
-  const graphRuntime: CanvasFlowGraphRuntimeControls = {
-    captureHistory: captureFullGraphHistory,
-    createCurrentCanvasGraphStore,
-    deleteNode,
-    markDirty: () => {
-      markDirty()
-    },
-    grouping: groupRuntime,
-    nodeDrag: {
-      begin: nodeDragLifecycle.begin,
-      commit: nodeDragLifecycle.commit,
-      cancel: nodeDragLifecycle.cancel,
-    },
-  }
-
   return {
-    currentBoardId,
-    loadInitialOrRouteBoard,
-    flushAutosave,
-    flowHistory,
-    graphRuntime,
-    graphAdapter,
-    onNodesChange,
-    onEdgesChange,
-    fullNodes: options.nodes,
-    fullEdges: options.edges,
+    persistence: {
+      currentBoardId,
+      loadInitialOrRouteBoard,
+      flushAutosave,
+      history: flowHistory,
+    },
+    flowPane: {
+      onNodesChange,
+      onEdgesChange,
+      nodeDragTransactions: {
+        begin: nodeDragLifecycle.begin,
+        commit: nodeDragLifecycle.commit,
+      },
+    },
+    graphEditing: {
+      adapter: graphAdapter,
+      createCurrentCanvasGraphStore,
+      deleteNode,
+      grouping: groupRuntime,
+    },
   }
 }

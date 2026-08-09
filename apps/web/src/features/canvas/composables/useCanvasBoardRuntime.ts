@@ -1,18 +1,12 @@
-import { computed, ref, type ComputedRef, type Ref } from 'vue'
+import { computed, ref, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import type { EdgeChange, NodeChange } from '@vue-flow/core'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
 import { useCanvasBoardSession, type SaveStatus } from '../board-session'
 import { useFlowBoardHeaderActions } from './useFlowBoardHeaderActions'
-import type { CanvasBoardCatalogRecoveryState } from './useFlowBoardHeaderActions'
-import type { FlowHistory } from './useFlowHistory'
-import { useFlowCanvasRuntime, type CanvasFlowGraphRuntimeControls } from './useFlowCanvasRuntime'
-import type {
-  CanvasVueFlowGraphActions,
-  CanvasVueFlowGraphAdapter,
-} from './useCanvasVueFlowGraphAdapter'
+import { useFlowCanvasRuntime } from './useFlowCanvasRuntime'
+import type { CanvasVueFlowGraphActions } from './useCanvasVueFlowGraphAdapter'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 
 type CanvasBoardRuntimeFeedback = CanvasFeedback['boardSession']
@@ -28,51 +22,13 @@ type UseCanvasBoardRuntimeOptions = {
   vueFlowGraphActions?: CanvasVueFlowGraphActions
 }
 
-type BoardOption = { id: string; name: string }
-
 function boardSessionIdentityKey(identity: { userId: number; userUid: string }): string {
   const userUid = typeof identity.userUid === 'string' ? identity.userUid.trim() : ''
   if (!Number.isFinite(identity.userId) || identity.userId <= 0 || !userUid) return ''
   return `${identity.userId}:${userUid}`
 }
 
-type CanvasBoardRuntime = {
-  nodes: Ref<Node[]>
-  edges: Ref<Edge[]>
-  fullNodes: Ref<Node[]>
-  fullEdges: Ref<Edge[]>
-  boardBaseSnapshot: Ref<CanvasBoardSnapshot>
-  currentBoardId: ComputedRef<string | null>
-  isDirty: Ref<boolean>
-  isSavingBoard: Ref<boolean>
-  saveStatus: Ref<SaveStatus>
-  loadInitialOrRouteBoard: () => Promise<void>
-  flushAutosave: (options?: { silent?: boolean }) => Promise<void>
-  flowHistory: FlowHistory
-  graphRuntime: CanvasFlowGraphRuntimeControls
-  graphAdapter: CanvasVueFlowGraphAdapter
-  onNodesChange: (changes: NodeChange[]) => void
-  onEdgesChange: (changes: EdgeChange[]) => void
-  onNavigateRequest: (path: string) => Promise<void>
-  onLogoutRequest: () => Promise<void>
-  isBoardMenuOpen: Ref<boolean>
-  isRenamingBoard: Ref<boolean>
-  boardNameDraft: Ref<string>
-  isRenamePending: Ref<boolean>
-  catalogRecovery: Ref<CanvasBoardCatalogRecoveryState>
-  currentBoardName: ComputedRef<string>
-  boardOptions: ComputedRef<BoardOption[]>
-  setBoardNameInputRef: (el: HTMLElement | null) => void
-  toggleBoardMenu: () => void
-  startBoardRename: () => void
-  cancelBoardRename: () => void
-  closeBoardHeaderEditing: () => void
-  onConfirmBoardRename: () => Promise<void>
-  reloadCatalog: () => Promise<void>
-  onSelectBoard: (boardId: string) => void
-}
-
-export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): CanvasBoardRuntime {
+export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions) {
   const message = {
     warning: options.feedback.warning,
     success: options.feedback.saveSucceeded,
@@ -97,16 +53,7 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
     },
   })
 
-  const {
-    currentBoardId,
-    loadInitialOrRouteBoard,
-    flushAutosave,
-    flowHistory,
-    graphRuntime,
-    graphAdapter,
-    onNodesChange,
-    onEdgesChange,
-  } = useFlowCanvasRuntime({
+  const flowRuntime = useFlowCanvasRuntime({
     nodes,
     edges,
     boardBaseSnapshot,
@@ -125,56 +72,58 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions): Ca
   })
 
   const boardHeader = useFlowBoardHeaderActions({
-    currentBoardId,
+    currentBoardId: flowRuntime.persistence.currentBoardId,
     message,
     router: options.router,
     route: options.route,
-    flushAutosave: () => flushAutosave(),
+    flushAutosave: () => flowRuntime.persistence.flushAutosave(),
   })
 
   async function onNavigateRequest(path: string) {
-    await flushAutosave()
+    await flowRuntime.persistence.flushAutosave()
     await options.router.push(path)
   }
 
   async function onLogoutRequest() {
-    await flushAutosave()
+    await flowRuntime.persistence.flushAutosave()
     await options.logoutAndRedirect(USER_HOME_PATH)
   }
 
   return {
-    nodes,
-    edges,
-    fullNodes,
-    fullEdges,
-    boardBaseSnapshot,
-    currentBoardId,
-    isDirty,
-    isSavingBoard,
-    saveStatus,
-    loadInitialOrRouteBoard,
-    flushAutosave,
-    flowHistory,
-    graphRuntime,
-    graphAdapter,
-    onNodesChange,
-    onEdgesChange,
-    onNavigateRequest,
-    onLogoutRequest,
-    isBoardMenuOpen: boardHeader.isBoardMenuOpen,
-    isRenamingBoard: boardHeader.isRenamingBoard,
-    boardNameDraft: boardHeader.boardNameDraft,
-    isRenamePending: boardHeader.isRenamePending,
-    catalogRecovery: boardHeader.catalogRecovery,
-    currentBoardName: boardHeader.currentBoardName,
-    boardOptions: boardHeader.boardOptions,
-    setBoardNameInputRef: boardHeader.setBoardNameInputRef,
-    toggleBoardMenu: boardHeader.toggleBoardMenu,
-    startBoardRename: boardHeader.startBoardRename,
-    cancelBoardRename: boardHeader.cancelBoardRename,
-    closeBoardHeaderEditing: boardHeader.closeBoardHeaderEditing,
-    onConfirmBoardRename: boardHeader.onConfirmBoardRename,
-    reloadCatalog: boardHeader.reloadCatalog,
-    onSelectBoard: boardHeader.onSelectBoard,
+    boardSession: {
+      boardBaseSnapshot,
+      currentBoardId: flowRuntime.persistence.currentBoardId,
+      isDirty,
+      isSavingBoard,
+      saveStatus,
+      loadInitialOrRouteBoard: flowRuntime.persistence.loadInitialOrRouteBoard,
+      flushAutosave: flowRuntime.persistence.flushAutosave,
+      history: flowRuntime.persistence.history,
+    },
+    flowPane: {
+      nodes,
+      edges,
+      ...flowRuntime.flowPane,
+    },
+    graphEditing: flowRuntime.graphEditing,
+    boardChrome: {
+      isBoardMenuOpen: boardHeader.isBoardMenuOpen,
+      isRenamingBoard: boardHeader.isRenamingBoard,
+      boardNameDraft: boardHeader.boardNameDraft,
+      isRenamePending: boardHeader.isRenamePending,
+      catalogRecovery: boardHeader.catalogRecovery,
+      currentBoardName: boardHeader.currentBoardName,
+      boardOptions: boardHeader.boardOptions,
+      setBoardNameInputRef: boardHeader.setBoardNameInputRef,
+      toggleBoardMenu: boardHeader.toggleBoardMenu,
+      startBoardRename: boardHeader.startBoardRename,
+      cancelBoardRename: boardHeader.cancelBoardRename,
+      closeBoardHeaderEditing: boardHeader.closeBoardHeaderEditing,
+      onConfirmBoardRename: boardHeader.onConfirmBoardRename,
+      reloadCatalog: boardHeader.reloadCatalog,
+      onSelectBoard: boardHeader.onSelectBoard,
+      onNavigateRequest,
+      onLogoutRequest,
+    },
   }
 }

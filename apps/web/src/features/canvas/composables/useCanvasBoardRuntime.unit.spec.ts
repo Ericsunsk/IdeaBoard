@@ -1,7 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, ref } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
-import { createEmptyCanvasBoardSnapshot } from '../../canvas-board/domain'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
 import { useCanvasBoardRuntime } from './useCanvasBoardRuntime'
 
@@ -23,44 +22,27 @@ vi.mock('./useFlowCanvasRuntime', () => ({
   useFlowCanvasRuntime: mocks.useFlowCanvasRuntime,
 }))
 
-function createBoardRuntimeOptions() {
+function createFlowRuntime(flushAutosave: () => Promise<void>) {
   return {
-    route: { query: {} } as RouteLocationNormalizedLoaded,
-    router: {
-      push: vi.fn(async () => undefined),
-    } as unknown as Router,
-    getUserIdentity: () => ({ userId: 1, userUid: 'user-a' }),
-    logoutAndRedirect: vi.fn(async (_path: string) => undefined),
-    feedback: {
-      warning: vi.fn(),
-      saveSucceeded: vi.fn(),
-      saveFailed: vi.fn(),
+    persistence: {
+      currentBoardId: computed(() => 'board-a'),
+      loadInitialOrRouteBoard: vi.fn(),
+      flushAutosave,
+      history: {},
     },
-  }
-}
-
-function createFlowRuntime() {
-  return {
-    currentBoardId: computed(() => 'board-a'),
-    loadInitialOrRouteBoard: vi.fn(),
-    flushAutosave: vi.fn(async () => undefined),
-    flowHistory: {},
-    graphRuntime: {
-      captureHistory: vi.fn(),
-      markDirty: vi.fn(),
-      nodeDrag: {
+    flowPane: {
+      onNodesChange: vi.fn(),
+      onEdgesChange: vi.fn(),
+      nodeDragTransactions: {
         begin: vi.fn(),
         commit: vi.fn(),
-        cancel: vi.fn(),
       },
     },
-    graphAdapter: {},
-    onNodesChange: vi.fn(),
-    onEdgesChange: vi.fn(),
+    graphEditing: {},
   }
 }
 
-function createHeaderRuntime() {
+function createBoardHeaderRuntime() {
   return {
     isBoardMenuOpen: ref(false),
     isRenamingBoard: ref(false),
@@ -70,7 +52,6 @@ function createHeaderRuntime() {
     currentBoardName: computed(() => 'Board A'),
     boardOptions: computed(() => []),
     setBoardNameInputRef: vi.fn(),
-    refreshBoardMetas: vi.fn(),
     toggleBoardMenu: vi.fn(),
     startBoardRename: vi.fn(),
     cancelBoardRename: vi.fn(),
@@ -84,82 +65,80 @@ function createHeaderRuntime() {
 describe('useCanvasBoardRuntime', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
-      callback(0)
-      return 1
-    })
-    mocks.useCanvasBoardSession.mockReturnValue({
-      currentBoardId: computed(() => 'board-a'),
-    })
-    mocks.useFlowBoardHeaderActions.mockReturnValue(createHeaderRuntime())
-    mocks.useFlowCanvasRuntime.mockReturnValue(createFlowRuntime())
+    mocks.useCanvasBoardSession.mockReturnValue({})
+    mocks.useFlowBoardHeaderActions.mockReturnValue(createBoardHeaderRuntime())
   })
 
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
-  it('flushes autosave before navigation and logout requests leave the board', async () => {
-    const options = createBoardRuntimeOptions()
+  it('flushes autosave before navigation and logout leave the board', async () => {
     const events: string[] = []
-    const flowRuntime = createFlowRuntime()
-    flowRuntime.flushAutosave.mockImplementation(async () => {
+    const flushAutosave = vi.fn(async () => {
       events.push('flush')
     })
-    ;(options.router.push as ReturnType<typeof vi.fn>).mockImplementation(async (...args) => {
-      const [path] = args as [string]
-      events.push(`navigate:${path}`)
-    })
-    options.logoutAndRedirect.mockImplementation(async (path: string) => {
+    mocks.useFlowCanvasRuntime.mockReturnValue(createFlowRuntime(flushAutosave))
+    const router = {
+      push: vi.fn(async (path: string) => {
+        events.push(`navigate:${path}`)
+      }),
+    } as unknown as Router
+    const logoutAndRedirect = vi.fn(async (path: string) => {
       events.push(`logout:${path}`)
     })
-    mocks.useFlowCanvasRuntime.mockReturnValue(flowRuntime)
+    const runtime = useCanvasBoardRuntime({
+      route: { query: {} } as RouteLocationNormalizedLoaded,
+      router,
+      getUserIdentity: () => ({ userId: 1, userUid: 'user-a' }),
+      logoutAndRedirect,
+      feedback: {
+        warning: vi.fn(),
+        saveSucceeded: vi.fn(),
+        saveFailed: vi.fn(),
+      },
+    })
 
-    const runtime = useCanvasBoardRuntime(options)
-
-    await runtime.onNavigateRequest('/boards/next')
-    await runtime.onLogoutRequest()
+    await runtime.boardChrome.onNavigateRequest('/boards/next')
+    await runtime.boardChrome.onLogoutRequest()
 
     expect(events).toEqual(['flush', 'navigate:/boards/next', 'flush', `logout:${USER_HOME_PATH}`])
-    expect(flowRuntime.flushAutosave).toHaveBeenCalledTimes(2)
+    expect(flushAutosave).toHaveBeenCalledTimes(2)
   })
 
-  it('passes board session state into the Flow Pane runtime seam', () => {
-    const flowRuntime = createFlowRuntime()
-    mocks.useFlowCanvasRuntime.mockReturnValue(flowRuntime)
-    const options = createBoardRuntimeOptions()
+  it('keeps Board Session ownership explicit and viewport concerns outside Flow persistence', () => {
+    const boardSession = { kind: 'board-session' }
+    mocks.useCanvasBoardSession.mockReturnValue(boardSession)
+    mocks.useFlowCanvasRuntime.mockReturnValue(createFlowRuntime(vi.fn(async () => {})))
+    const feedback = {
+      warning: vi.fn(),
+      saveSucceeded: vi.fn(),
+      saveFailed: vi.fn(),
+    }
 
-    useCanvasBoardRuntime(options)
+    const runtime = useCanvasBoardRuntime({
+      route: { query: {} } as RouteLocationNormalizedLoaded,
+      router: { push: vi.fn() } as unknown as Router,
+      getUserIdentity: () => ({ userId: 7, userUid: 'user-seven' }),
+      logoutAndRedirect: vi.fn(),
+      feedback,
+    })
+    const flowOptions = mocks.useFlowCanvasRuntime.mock.calls[0]?.[0]
 
-    expect(mocks.useFlowCanvasRuntime).toHaveBeenCalledWith(
+    expect(flowOptions).toEqual(
       expect.objectContaining({
-        boardBaseSnapshot: expect.objectContaining({
-          value: createEmptyCanvasBoardSnapshot(),
-        }),
-        onWarning: options.feedback.warning,
-        onSuccess: options.feedback.saveSucceeded,
-        onError: options.feedback.saveFailed,
-        autosaveResumeSignal: expect.objectContaining({
-          value: '1:user-a',
-        }),
+        boardSession,
+        boardBaseSnapshot: expect.objectContaining({ value: expect.any(Object) }),
+        autosaveResumeSignal: expect.objectContaining({ value: '7:user-seven' }),
+        onWarning: feedback.warning,
+        onSuccess: feedback.saveSucceeded,
+        onError: feedback.saveFailed,
       }),
     )
-  })
-
-  it('keeps viewport persistence outside board dirty and autosave inputs', () => {
-    const flowRuntime = createFlowRuntime()
-    mocks.useFlowCanvasRuntime.mockReturnValue(flowRuntime)
-
-    const runtime = useCanvasBoardRuntime(createBoardRuntimeOptions())
-    const flowRuntimeOptions = mocks.useFlowCanvasRuntime.mock.calls[0]?.[0] as Record<
-      string,
-      unknown
-    >
-
-    expect(runtime).not.toHaveProperty('markBoardViewportChanged')
-    expect(runtime).not.toHaveProperty('commitPendingBoardViewportChange')
-    expect(flowRuntimeOptions).not.toHaveProperty('getViewport')
-    expect(flowRuntimeOptions).not.toHaveProperty('setViewport')
-    expect(flowRuntime.graphRuntime.markDirty).not.toHaveBeenCalled()
+    expect(flowOptions).not.toHaveProperty('getViewport')
+    expect(flowOptions).not.toHaveProperty('setViewport')
+    expect(Object.keys(runtime).sort()).toEqual([
+      'boardChrome',
+      'boardSession',
+      'flowPane',
+      'graphEditing',
+    ])
+    expect(runtime).not.toHaveProperty('graphRuntime')
   })
 })

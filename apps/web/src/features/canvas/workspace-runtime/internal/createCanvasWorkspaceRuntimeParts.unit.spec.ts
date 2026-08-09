@@ -61,37 +61,49 @@ vi.mock('../../image-tools', () => ({
 }))
 
 function createBoardRuntime() {
+  const nodes = ref([])
+  const edges = ref([])
+  const currentBoardId = ref('board-a')
+  const flushAutosave = vi.fn()
+  const nodeDragTransactions = {
+    begin: vi.fn(),
+    commit: vi.fn(),
+  }
+  const grouping = {
+    groupFrames: ref([]),
+  }
   return {
-    nodes: ref([]),
-    edges: ref([]),
-    fullNodes: ref([]),
-    fullEdges: ref([]),
-    currentBoardId: ref('board-a'),
-    isDirty: ref(true),
-    isSavingBoard: ref(false),
-    saveStatus: ref('retry' as const),
-    flushAutosave: vi.fn(),
-    graphRuntime: {
-      captureHistory: vi.fn(),
-      markDirty: vi.fn(),
-      grouping: {
-        groupFrames: ref([]),
-      },
-      nodeDrag: {
-        begin: vi.fn(),
-        commit: vi.fn(),
-      },
+    boardSession: {
+      boardBaseSnapshot: ref({ groups: [] }),
+      currentBoardId,
+      isDirty: ref(true),
+      isSavingBoard: ref(false),
+      saveStatus: ref('retry' as const),
+      loadInitialOrRouteBoard: vi.fn(),
+      flushAutosave,
+      history: {},
     },
-    graphAdapter: {},
-    loadInitialOrRouteBoard: vi.fn(),
-    onNodesChange: vi.fn(),
-    onEdgesChange: vi.fn(),
-    closeBoardHeaderEditing: vi.fn(),
-    isRenamePending: ref(false),
-    catalogRecovery: ref({ status: 'idle' as const }),
-    reloadCatalog: vi.fn(),
-    onNavigateRequest: vi.fn(),
-    onLogoutRequest: vi.fn(),
+    flowPane: {
+      nodes,
+      edges,
+      onNodesChange: vi.fn(),
+      onEdgesChange: vi.fn(),
+      nodeDragTransactions,
+    },
+    graphEditing: {
+      adapter: {},
+      createCurrentCanvasGraphStore: vi.fn(),
+      deleteNode: vi.fn(),
+      grouping,
+    },
+    boardChrome: {
+      closeBoardHeaderEditing: vi.fn(),
+      isRenamePending: ref(false),
+      catalogRecovery: ref({ status: 'idle' as const }),
+      reloadCatalog: vi.fn(),
+      onNavigateRequest: vi.fn(),
+      onLogoutRequest: vi.fn(),
+    },
   }
 }
 
@@ -215,7 +227,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
       flushViewportPersistence: vi.fn(() => events.push('viewport')),
       loadCanvasBoardAndProbe: vi.fn(),
     }
-    board.flushAutosave.mockImplementation(async () => {
+    board.boardSession.flushAutosave.mockImplementation(async () => {
       events.push('autosave')
     })
     mocks.useCanvasBoardRuntime.mockReturnValue(board)
@@ -226,36 +238,38 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     const runtimeOptions = createWorkspaceOptions()
     const runtime = createCanvasWorkspaceRuntimeParts(runtimeOptions)
 
-    expect(runtime.flowPane.nodes).toBe(board.nodes)
-    expect(runtime.flowPane.edges).toBe(board.edges)
-    expect(runtime.flowPane.onNodesChange).toBe(board.onNodesChange)
-    expect(runtime.flowPane.onEdgesChange).toBe(board.onEdgesChange)
+    expect(runtime.flowPane.nodes).toBe(board.flowPane.nodes)
+    expect(runtime.flowPane.edges).toBe(board.flowPane.edges)
+    expect(runtime.flowPane.onNodesChange).toBe(board.flowPane.onNodesChange)
+    expect(runtime.flowPane.onEdgesChange).toBe(board.flowPane.onEdgesChange)
     expect(runtime.flowPane.connectionAdapter).toBe(graph.connectionAdapter)
     expect('connectNodes' in runtime.flowPane).toBe(false)
     expect('vueFlowConnectionBindings' in runtime.flowPane).toBe(false)
     expect('onConnect' in runtime.flowPane).toBe(false)
     expect('onEdgeUpdate' in runtime.flowPane).toBe(false)
     expect('isValidConnection' in runtime.flowPane).toBe(false)
-    expect(runtime.flowPane.nodeDragTransactions.begin).toBe(board.graphRuntime.nodeDrag.begin)
-    expect(runtime.boardChrome.currentBoardId).toBe(board.currentBoardId)
-    expect(runtime.boardChrome.isRenamePending).toBe(board.isRenamePending)
-    expect(runtime.boardChrome.catalogRecovery).toBe(board.catalogRecovery)
-    expect(runtime.boardChrome.reloadCatalog).toBe(board.reloadCatalog)
-    expect(runtime.boardChrome.onNavigateRequest).toBe(board.onNavigateRequest)
-    expect(runtime.boardChrome.onLogoutRequest).toBe(board.onLogoutRequest)
+    expect(runtime.flowPane.nodeDragTransactions.begin).toBe(
+      board.flowPane.nodeDragTransactions.begin,
+    )
+    expect(runtime.boardChrome.currentBoardId).toBe(board.boardSession.currentBoardId)
+    expect(runtime.boardChrome.isRenamePending).toBe(board.boardChrome.isRenamePending)
+    expect(runtime.boardChrome.catalogRecovery).toBe(board.boardChrome.catalogRecovery)
+    expect(runtime.boardChrome.reloadCatalog).toBe(board.boardChrome.reloadCatalog)
+    expect(runtime.boardChrome.onNavigateRequest).toBe(board.boardChrome.onNavigateRequest)
+    expect(runtime.boardChrome.onLogoutRequest).toBe(board.boardChrome.onLogoutRequest)
     expect('isDirty' in runtime.persistence).toBe(false)
     expect('isSavingBoard' in runtime.persistence).toBe(false)
     expect('saveStatus' in runtime.persistence).toBe(false)
-    expect(runtime.persistence.flushAutosave).not.toBe(board.flushAutosave)
+    expect(runtime.persistence.flushAutosave).not.toBe(board.boardSession.flushAutosave)
     expect(runtime.persistence.reattachPendingImageResults).toBe(task.reattachPendingImageResults)
-    expect(runtime.graphEditing.grouping).toBe(board.graphRuntime.grouping)
+    expect(runtime.graphEditing.grouping).toBe(board.graphEditing.grouping)
     expect(runtime.imageWorkflow.runImageDirectAction).toBe(task.runImageDirectAction)
     expect(runtime.imageWorkflow.runCanvasExtendAction).toBe(task.runCanvasExtendAction)
 
     await runtime.persistence.flushAutosave({ silent: false })
 
     expect(events).toEqual(['viewport', 'autosave'])
-    expect(board.flushAutosave).toHaveBeenCalledWith({ silent: false })
+    expect(board.boardSession.flushAutosave).toHaveBeenCalledWith({ silent: false })
 
     expect(mocks.useCanvasBoardRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -273,9 +287,9 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect(mocks.useCanvasViewportRuntime.mock.calls[0]?.[0].getUserUid()).toBe('user-a')
     expect(mocks.useCanvasGraphRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
-        nodes: board.fullNodes,
-        edges: board.fullEdges,
-        graphAdapter: board.graphAdapter,
+        nodes: board.flowPane.nodes,
+        edges: board.flowPane.edges,
+        graphAdapter: board.graphEditing.adapter,
         screenToFlowCoordinate: runtimeOptions.flowPaneAdapter.screenToFlowCoordinate,
         getSelectedElements: runtimeOptions.flowPaneAdapter.getSelectedElements,
         feedback: mocks.feedback.graph,
@@ -283,9 +297,9 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     )
     expect(mocks.useCanvasTaskRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
-        nodes: board.fullNodes,
-        edges: board.fullEdges,
-        graphAdapter: board.graphAdapter,
+        nodes: board.flowPane.nodes,
+        edges: board.flowPane.edges,
+        graphAdapter: board.graphEditing.adapter,
         refreshNodeInternals: graph.scheduleFlowNodeInternalsRefresh,
         flushAutosave: runtime.persistence.flushAutosave,
         feedback: mocks.feedback.taskExecution,
@@ -296,8 +310,8 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
 
     expect(mocks.useCanvasImageTools).toHaveBeenCalledWith(
       expect.objectContaining({
-        nodes: board.nodes,
-        currentBoardId: board.currentBoardId,
+        nodes: board.flowPane.nodes,
+        currentBoardId: board.boardSession.currentBoardId,
         getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
         getImageNodeSnapshot: graph.getImageNodeSnapshot,
         connectionAdapter: graph.connectionAdapter,
@@ -322,15 +336,15 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     const runtime = createCanvasWorkspaceRuntime(createWorkspaceOptions())
 
     expect(Object.keys(runtime).sort()).toEqual(['commands', 'viewModel'])
-    expect(runtime.viewModel.flowPane).toEqual({ nodes: board.nodes, edges: board.edges })
+    expect(runtime.viewModel.flowPane).toEqual({
+      nodes: board.flowPane.nodes,
+      edges: board.flowPane.edges,
+    })
     expect(runtime.commands.flowPane).toEqual({
-      onNodesChange: board.onNodesChange,
-      onEdgesChange: board.onEdgesChange,
+      onNodesChange: board.flowPane.onNodesChange,
+      onEdgesChange: board.flowPane.onEdgesChange,
       connectionAdapter: graph.connectionAdapter,
-      nodeDragTransactions: {
-        begin: board.graphRuntime.nodeDrag.begin,
-        commit: board.graphRuntime.nodeDrag.commit,
-      },
+      nodeDragTransactions: board.flowPane.nodeDragTransactions,
     })
     expect(runtime.commands.persistence.reattachPendingImageResults).toBe(
       task.reattachPendingImageResults,

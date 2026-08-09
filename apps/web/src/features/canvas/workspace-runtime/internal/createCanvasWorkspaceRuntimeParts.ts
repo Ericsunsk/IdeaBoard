@@ -87,13 +87,13 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
   })
 
   const graph = useCanvasGraphRuntime({
-    nodes: board.fullNodes,
-    edges: board.fullEdges,
-    boardBaseSnapshot: board.boardBaseSnapshot,
-    currentBoardId: board.currentBoardId,
+    nodes: board.flowPane.nodes,
+    edges: board.flowPane.edges,
+    boardBaseSnapshot: board.boardSession.boardBaseSnapshot,
+    currentBoardId: board.boardSession.currentBoardId,
     createNodeKind: options.createNodeKind,
-    graphAdapter: board.graphAdapter,
-    deleteNode: board.graphRuntime.deleteNode,
+    graphAdapter: board.graphEditing.adapter,
+    deleteNode: board.graphEditing.deleteNode,
     updateNodeInternals: options.flowPaneAdapter.updateNodeInternals,
     screenToFlowCoordinate: options.flowPaneAdapter.screenToFlowCoordinate,
     getSelectedElements: options.flowPaneAdapter.getSelectedElements,
@@ -105,11 +105,11 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
   })
 
   const viewport = useCanvasViewportRuntime({
-    nodes: board.nodes,
-    edges: board.edges,
-    fullNodes: board.fullNodes,
-    fullEdges: board.fullEdges,
-    currentBoardId: board.currentBoardId,
+    nodes: board.flowPane.nodes,
+    edges: board.flowPane.edges,
+    fullNodes: board.flowPane.nodes,
+    fullEdges: board.flowPane.edges,
+    currentBoardId: board.boardSession.currentBoardId,
     getUserUid: () => options.getUserIdentity().userUid,
     viewport: options.flowPaneAdapter.viewport,
     getViewport: options.flowPaneAdapter.getViewport,
@@ -118,8 +118,8 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     zoomIn: options.flowPaneAdapter.zoomIn,
     zoomOut: options.flowPaneAdapter.zoomOut,
     panBy: options.flowPaneAdapter.panBy,
-    loadInitialOrRouteBoard: board.loadInitialOrRouteBoard,
-    closeBoardHeaderEditing: board.closeBoardHeaderEditing,
+    loadInitialOrRouteBoard: board.boardSession.loadInitialOrRouteBoard,
+    closeBoardHeaderEditing: board.boardChrome.closeBoardHeaderEditing,
     startCanvasInteraction: graph.startFlowInteraction,
     stopCanvasInteraction: graph.stopFlowInteraction,
     startNodeDragInteraction: options.startNodeDragInteraction,
@@ -128,28 +128,28 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
   })
 
   async function flushAutosaveWithViewportPersistence(
-    autosaveOptions?: Parameters<typeof board.flushAutosave>[0],
+    autosaveOptions?: Parameters<typeof board.boardSession.flushAutosave>[0],
   ) {
     viewport.flushViewportPersistence()
-    await board.flushAutosave(autosaveOptions)
+    await board.boardSession.flushAutosave(autosaveOptions)
   }
 
   const task = useCanvasTaskRuntime({
-    nodes: board.fullNodes,
-    edges: board.fullEdges,
-    graphAdapter: board.graphAdapter,
-    createCurrentCanvasGraphStore: board.graphRuntime.createCurrentCanvasGraphStore,
-    boardBaseSnapshot: board.boardBaseSnapshot,
+    nodes: board.flowPane.nodes,
+    edges: board.flowPane.edges,
+    graphAdapter: board.graphEditing.adapter,
+    createCurrentCanvasGraphStore: board.graphEditing.createCurrentCanvasGraphStore,
+    boardBaseSnapshot: board.boardSession.boardBaseSnapshot,
     flushAutosave: flushAutosaveWithViewportPersistence,
-    currentBoardId: board.currentBoardId,
+    currentBoardId: board.boardSession.currentBoardId,
     refreshNodeInternals: graph.scheduleFlowNodeInternalsRefresh,
     feedback: feedback.taskExecution,
   })
 
   const imageWorkflow = useCanvasImageWorkflow({
     graph: {
-      nodes: board.nodes,
-      currentBoardId: board.currentBoardId,
+      nodes: board.flowPane.nodes,
+      currentBoardId: board.boardSession.currentBoardId,
       getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
       getImageNodeSnapshot: graph.getImageNodeSnapshot,
       createImageNodeFromFile: graph.createImageNodeFromFile,
@@ -197,46 +197,27 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
 
   const parts = {
     boardChrome: {
-      currentBoardId: board.currentBoardId,
-      isBoardMenuOpen: board.isBoardMenuOpen,
-      isRenamingBoard: board.isRenamingBoard,
-      boardNameDraft: board.boardNameDraft,
-      isRenamePending: board.isRenamePending,
-      catalogRecovery: board.catalogRecovery,
-      currentBoardName: board.currentBoardName,
-      boardOptions: board.boardOptions,
-      setBoardNameInputRef: board.setBoardNameInputRef,
-      toggleBoardMenu: board.toggleBoardMenu,
-      startBoardRename: board.startBoardRename,
-      cancelBoardRename: board.cancelBoardRename,
-      closeBoardHeaderEditing: board.closeBoardHeaderEditing,
-      onConfirmBoardRename: board.onConfirmBoardRename,
-      reloadCatalog: board.reloadCatalog,
-      onSelectBoard: board.onSelectBoard,
-      onNavigateRequest: board.onNavigateRequest,
-      onLogoutRequest: board.onLogoutRequest,
+      currentBoardId: board.boardSession.currentBoardId,
+      ...board.boardChrome,
     },
     flowPane: {
-      nodes: board.nodes,
-      edges: board.edges,
-      onNodesChange: board.onNodesChange,
-      onEdgesChange: board.onEdgesChange,
+      nodes: board.flowPane.nodes,
+      edges: board.flowPane.edges,
+      onNodesChange: board.flowPane.onNodesChange,
+      onEdgesChange: board.flowPane.onEdgesChange,
       connectionAdapter: graph.connectionAdapter,
-      nodeDragTransactions: {
-        begin: board.graphRuntime.nodeDrag.begin,
-        commit: board.graphRuntime.nodeDrag.commit,
-      },
+      nodeDragTransactions: board.flowPane.nodeDragTransactions,
     },
     persistence: {
       flushAutosave: flushAutosaveWithViewportPersistence,
-      history: board.flowHistory,
+      history: board.boardSession.history,
       loadCanvasBoardAndProbe: viewport.loadCanvasBoardAndProbe,
       reattachPendingImageResults: task.reattachPendingImageResults,
     },
     viewportControls: viewport,
     graphEditing: {
-      graphAdapter: board.graphAdapter,
-      grouping: board.graphRuntime.grouping,
+      graphAdapter: board.graphEditing.adapter,
+      grouping: board.graphEditing.grouping,
       scheduleFlowNodeInternalsRefresh: graph.scheduleFlowNodeInternalsRefresh,
       createNodeAtPosition: graph.createNodeAtPosition,
       hasSelectedFlowNodes: graph.hasSelectedFlowNodes,
