@@ -35,7 +35,7 @@ export type CanvasDeleteCommandLifecycleOptions<HistorySnapshot> = {
   scheduleMicrotask: (callback: () => void) => void
   onWarning: (message: string) => void
   onNativeRemove?: () => void
-  stopDeletedRunningTasks?: (taskIds: string[]) => void
+  cancelDeletedRunningTasks: (taskIds: readonly string[]) => void
 }
 
 export type CanvasDeleteCommandLifecycle = {
@@ -114,7 +114,7 @@ export function createCanvasDeleteCommandLifecycle<HistorySnapshot>(
       projectionIndex,
       edgeRemoveChanges: command.edgeRemoveChanges,
       onNativeRemove: options.onNativeRemove,
-      stopDeletedRunningTasks: options.stopDeletedRunningTasks,
+      cancelDeletedRunningTasks: options.cancelDeletedRunningTasks,
     })
     return result?.didChange ?? false
   }

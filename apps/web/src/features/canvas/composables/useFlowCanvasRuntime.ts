@@ -54,7 +54,7 @@ export type UseFlowCanvasRuntimeOptions = {
   onSuccess: (message: string) => void
   onError: (message: string) => void
   onNativeRemove?: () => void
-  stopDeletedRunningTasks?: (taskIds: string[]) => void
+  cancelDeletedRunningTasks: (taskIds: readonly string[]) => void
   scheduleMicrotask?: (callback: () => void) => void
   scheduleAnimationFrame?: (callback: FrameRequestCallback) => number
   cancelAnimationFrame?: (handle: number) => void
@@ -260,7 +260,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     markDirty,
     onWarning: options.onWarning,
     onNativeRemove: options.onNativeRemove,
-    stopDeletedRunningTasks: options.stopDeletedRunningTasks,
+    cancelDeletedRunningTasks: options.cancelDeletedRunningTasks,
   })
 
   const nodeDragLifecycle: CanvasNodeDragLifecycle = createCanvasNodeDragLifecycle({
@@ -304,7 +304,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       ((callback: () => void) => void Promise.resolve().then(callback)),
     onWarning: options.onWarning,
     onNativeRemove: options.onNativeRemove,
-    stopDeletedRunningTasks: options.stopDeletedRunningTasks,
+    cancelDeletedRunningTasks: options.cancelDeletedRunningTasks,
   })
 
   function deleteNode(nodeId: string): boolean {

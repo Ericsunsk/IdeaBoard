@@ -111,6 +111,7 @@ function createHarness() {
     commitGroups,
     markDirty,
     onWarning: vi.fn(),
+    cancelDeletedRunningTasks: vi.fn(),
   })
 
   return {

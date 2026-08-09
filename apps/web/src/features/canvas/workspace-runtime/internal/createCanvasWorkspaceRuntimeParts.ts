@@ -15,10 +15,9 @@ import {
   type CanvasGraphEditingUploadAdapter,
 } from '../../graph-editing'
 import { useCanvasImageWorkflow, type CanvasImageWorkflowUiAdapter } from '../../image-workflow'
+import { createCanvasTaskLifecycle } from '../../task-lifecycle'
 import { taskApi } from '../../../../shared/api/task'
 import type { CanvasWorkspaceRuntime } from '../types'
-
-const STOP_DELETED_TASK_RETRY_DELAYS_MS = [0, 1000, 3000] as const
 
 export type UseCanvasWorkspaceRuntimeOptions = {
   route: RouteLocationNormalizedLoaded
@@ -40,29 +39,7 @@ export type UseCanvasWorkspaceRuntimeOptions = {
 
 export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRuntimeOptions) {
   const feedback = useCanvasFeedback(options.openRecharge)
-
-  function stopDeletedRunningTask(taskId: string, attempt = 0) {
-    void taskApi.cancel(taskId).catch((error: unknown) => {
-      const nextAttempt = attempt + 1
-      const retryDelay = STOP_DELETED_TASK_RETRY_DELAYS_MS[nextAttempt]
-      if (retryDelay !== undefined) {
-        window.setTimeout(() => {
-          stopDeletedRunningTask(taskId, nextAttempt)
-        }, retryDelay)
-        return
-      }
-      console.warn('[canvas] failed to stop deleted task', { taskId, error })
-    })
-  }
-
-  function stopDeletedRunningTasks(taskIds: string[]) {
-    const uniqueTaskIds = Array.from(
-      new Set(taskIds.map((taskId) => taskId.trim()).filter(Boolean)),
-    )
-    if (uniqueTaskIds.length === 0) return
-
-    uniqueTaskIds.forEach((taskId) => stopDeletedRunningTask(taskId))
-  }
+  const taskLifecycle = createCanvasTaskLifecycle({ cancel: taskApi.cancel })
 
   const board = useCanvasBoardRuntime({
     route: options.route,
@@ -71,7 +48,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     logoutAndRedirect: options.logoutAndRedirect,
     feedback: feedback.boardSession,
     onNativeRemove: options.onNativeRemove,
-    stopDeletedRunningTasks,
+    cancelDeletedRunningTasks: taskLifecycle.cancelDeletedRunningTasks,
     vueFlowGraphActions: options.flowPaneAdapter.vueFlowGraphActions,
   })
 

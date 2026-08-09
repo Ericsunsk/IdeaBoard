@@ -25,7 +25,7 @@ type FlowGraphDeleteProjectionOptions = {
   projectionIndex: FlowEdgeProjectionIndex
   edgeRemoveChanges?: readonly EdgeChange[]
   onNativeRemove?: () => void
-  stopDeletedRunningTasks?: (taskIds: string[]) => void
+  cancelDeletedRunningTasks: (taskIds: readonly string[]) => void
 }
 
 function resolveGraphNodeIdForFlowNode(node: Pick<Node, 'id' | 'data'>): CanvasGraphNodeId | null {
@@ -143,7 +143,7 @@ export function applyFlowGraphDeleteProjection(
   if (result.didChange) {
     options.onNativeRemove?.()
     if (runningTaskIds.length > 0) {
-      options.stopDeletedRunningTasks?.(runningTaskIds)
+      options.cancelDeletedRunningTasks(runningTaskIds)
     }
   }
 

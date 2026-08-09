@@ -164,7 +164,7 @@ export type UseCanvasGroupRuntimeOptions = {
   markDirty: () => void
   onWarning: (message: string) => void
   onNativeRemove?: () => void
-  stopDeletedRunningTasks?: (taskIds: string[]) => void
+  cancelDeletedRunningTasks: (taskIds: readonly string[]) => void
 }
 
 export function useCanvasGroupRuntime(
@@ -608,7 +608,7 @@ export function useCanvasGroupRuntime(
       commitPolicy: { summary, historyBefore },
       projectionIndex,
       onNativeRemove: options.onNativeRemove,
-      stopDeletedRunningTasks: options.stopDeletedRunningTasks,
+      cancelDeletedRunningTasks: options.cancelDeletedRunningTasks,
     })
     return result?.didChange ?? false
   }

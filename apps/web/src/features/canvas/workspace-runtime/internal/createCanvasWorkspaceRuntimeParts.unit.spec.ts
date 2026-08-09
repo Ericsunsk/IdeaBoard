@@ -32,6 +32,8 @@ const mocks = vi.hoisted(() => ({
   useCanvasGraphEditing: vi.fn(),
   useCanvasViewportRuntime: vi.fn(),
   useCanvasImageWorkflow: vi.fn(),
+  cancelDeletedRunningTasks: vi.fn(),
+  createCanvasTaskLifecycle: vi.fn(),
 }))
 
 vi.mock('../../feedback/useCanvasFeedback', () => ({
@@ -52,6 +54,10 @@ vi.mock('../../composables/useCanvasViewportRuntime', () => ({
 
 vi.mock('../../image-workflow', () => ({
   useCanvasImageWorkflow: mocks.useCanvasImageWorkflow,
+}))
+
+vi.mock('../../task-lifecycle', () => ({
+  createCanvasTaskLifecycle: mocks.createCanvasTaskLifecycle,
 }))
 
 function createBoardRuntime() {
@@ -257,6 +263,9 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
       flushViewportPersistence: vi.fn(),
       loadCanvasBoardAndProbe: vi.fn(),
     })
+    mocks.createCanvasTaskLifecycle.mockReturnValue({
+      cancelDeletedRunningTasks: mocks.cancelDeletedRunningTasks,
+    })
   })
 
   it('owns feedback selection for board, graph, task, and image tools', async () => {
@@ -317,9 +326,13 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect(mocks.useCanvasBoardRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
         feedback: mocks.feedback.boardSession,
+        cancelDeletedRunningTasks: mocks.cancelDeletedRunningTasks,
         vueFlowGraphActions: runtimeOptions.flowPaneAdapter.vueFlowGraphActions,
       }),
     )
+    expect(mocks.createCanvasTaskLifecycle).toHaveBeenCalledWith({
+      cancel: expect.any(Function),
+    })
     expect(mocks.useCanvasViewportRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
         getUserUid: expect.any(Function),

@@ -93,6 +93,7 @@ describe('useCanvasBoardRuntime', () => {
         saveSucceeded: vi.fn(),
         saveFailed: vi.fn(),
       },
+      cancelDeletedRunningTasks: vi.fn(),
     })
 
     await runtime.boardChrome.onNavigateRequest('/boards/next')
@@ -118,6 +119,7 @@ describe('useCanvasBoardRuntime', () => {
       getUserIdentity: () => ({ userId: 7, userUid: 'user-seven' }),
       logoutAndRedirect: vi.fn(),
       feedback,
+      cancelDeletedRunningTasks: vi.fn(),
     })
     const flowOptions = mocks.useFlowCanvasRuntime.mock.calls[0]?.[0]
 

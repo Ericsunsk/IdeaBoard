@@ -161,7 +161,7 @@ describe('flowGraphDeleteProjection', () => {
     } as Edge
     const { graphAdapter, applyGraphChanges } = createGraphAdapter()
     const onNativeRemove = vi.fn()
-    const stopDeletedRunningTasks = vi.fn()
+    const cancelDeletedRunningTasks = vi.fn()
 
     applyFlowGraphDeleteProjection({
       graphAdapter,
@@ -176,7 +176,7 @@ describe('flowGraphDeleteProjection', () => {
       flowNodeIds: [imageNode.id],
       projectionIndex: createProjectionIndex([generatedEdge]),
       onNativeRemove,
-      stopDeletedRunningTasks,
+      cancelDeletedRunningTasks,
     })
 
     const projectedChanges = applyGraphChanges.mock.calls[0]?.[0]
@@ -190,7 +190,7 @@ describe('flowGraphDeleteProjection', () => {
       }),
     ])
     expect(onNativeRemove).toHaveBeenCalledOnce()
-    expect(stopDeletedRunningTasks).toHaveBeenCalledWith(['task-native'])
+    expect(cancelDeletedRunningTasks).toHaveBeenCalledWith(['task-native'])
   })
 
   it('projects group delete summaries through the same connected-edge and task side effects', () => {
@@ -205,7 +205,7 @@ describe('flowGraphDeleteProjection', () => {
     } as Edge
     const { graphAdapter, applyGraphChanges } = createGraphAdapter()
     const onNativeRemove = vi.fn()
-    const stopDeletedRunningTasks = vi.fn()
+    const cancelDeletedRunningTasks = vi.fn()
 
     applyFlowGraphDeleteProjection({
       graphAdapter,
@@ -220,7 +220,7 @@ describe('flowGraphDeleteProjection', () => {
       },
       projectionIndex: createProjectionIndex([edge]),
       onNativeRemove,
-      stopDeletedRunningTasks,
+      cancelDeletedRunningTasks,
     })
 
     const projectedChanges = applyGraphChanges.mock.calls[0]?.[0]
@@ -237,6 +237,6 @@ describe('flowGraphDeleteProjection', () => {
       }),
     ])
     expect(onNativeRemove).toHaveBeenCalledOnce()
-    expect(stopDeletedRunningTasks).toHaveBeenCalledWith(['task-group'])
+    expect(cancelDeletedRunningTasks).toHaveBeenCalledWith(['task-group'])
   })
 })
