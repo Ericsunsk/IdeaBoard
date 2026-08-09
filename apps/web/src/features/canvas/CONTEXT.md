@@ -202,4 +202,4 @@ Vue Flow 是 interaction/rendering Adapter，不是 graph domain。
 - CanvasPage 向 Canvas Chrome module 传 state/actions，不新增 route-local chrome geometry class，也不复活 legacy chrome positioning variants。
 - Canvas Chrome module 可以拥有 minimap anchoring，但不能接管 minimap internal math、Vue Flow viewport sync 或 graph interaction semantics。
 - Graph domain 规则写在 `canvas-board/domain` 或 `graph-runtime` 语义里；Vue Flow-specific details 只留在 adapter/flow-pane 边界。
-- #74 的 Deferred / Later Work 仍然 out of scope：不要在当前 seam 文档化或实现 Image Tool Session deepening、#72 Pending Result materialization、Vue Flow deeper adapter cleanup（其余 native event/selection/viewport adapter consolidation）或 performance/flicker optimization。
+- #72、#80、#81 已完成。Image Tool Session deepening、Pending Result materialization、Vue Flow deeper adapter cleanup（其余 native event/selection/viewport adapter consolidation）和 performance/flicker optimization 是独立的 post-#74 work，可在各自明确的 Ticket 中继续推进；不得把它们重新并入 #74 或复活旧的 compatibility path。
