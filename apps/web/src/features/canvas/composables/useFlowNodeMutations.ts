@@ -8,7 +8,7 @@ import {
   patchFlowSnapshotParam,
   type FlowSnapshotParamPatch,
 } from '../utils/flowSnapshotParamMutations'
-import { useFlowConnectionMutations } from './useFlowConnectionMutations'
+import { createCanvasConnectionCommandLifecycle } from '../flow-pane'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
@@ -193,10 +193,10 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     return isFlowConnectionAllowed(connection, lookupData)
   }
 
-  const connectionMutations = useFlowConnectionMutations({
-    nodes: options.nodes,
-    edges: options.edges,
-    boardBaseSnapshot: options.boardBaseSnapshot,
+  const connectionAdapter = createCanvasConnectionCommandLifecycle({
+    readNodes: () => options.nodes.value as unknown as Node[],
+    readEdges: () => options.edges.value as unknown as Edge[],
+    readBoardBaseSnapshot: () => options.boardBaseSnapshot?.value,
     isValidConnection,
     normalizeConnection: (connection, existingEdges) =>
       normalizeFlowConnection(connection, lookupData, existingEdges),
@@ -337,7 +337,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   return {
     resolveNodePosition,
     createSnapshotNodeForKind,
-    connectionAdapter: connectionMutations.connectionAdapter,
+    connectionAdapter,
     onAddNode,
     createNodeAtPosition,
     updateSnapshotNode,

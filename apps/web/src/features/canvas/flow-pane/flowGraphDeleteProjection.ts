@@ -9,12 +9,12 @@ import { resolveFlowNodeCanvasRef } from '../utils/flowSnapshotAdapter'
 import {
   applyCanvasGraphCommitPolicy,
   type CanvasGraphCommitPolicy,
-} from './canvasGraphCommitPolicy'
+} from '../composables/canvasGraphCommitPolicy'
 import type { FlowEdgeProjectionIndex } from './flowConnectionIdentity'
 import type {
   CanvasVueFlowGraphAdapter,
   CanvasVueFlowGraphCommandResult,
-} from './useCanvasVueFlowGraphAdapter'
+} from '../composables/useCanvasVueFlowGraphAdapter'
 
 type FlowGraphDeleteProjectionOptions = {
   graphAdapter: Pick<CanvasVueFlowGraphAdapter, 'applyGraphChanges'>

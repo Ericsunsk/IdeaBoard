@@ -1,10 +1,9 @@
-import type { Ref } from 'vue'
 import type { Connection, Edge, EdgeUpdateEvent, Node } from '@vue-flow/core'
-import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
+import type { CanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
 import {
   applyCanvasGraphCommitPolicy,
   type CanvasGraphCommitPolicy,
-} from './canvasGraphCommitPolicy'
+} from '../composables/canvasGraphCommitPolicy'
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
 import {
   canvasConnectionToFlowEdge,
@@ -25,14 +24,12 @@ import {
   resolveFlowEdgeProjectionReplacement,
   type FlowEdgeProjectionIndex,
 } from './flowConnectionIdentity'
-import { createCanvasFlowPaneConnectionAdapter } from '../flow-pane'
+import { createCanvasFlowPaneConnectionAdapter } from './vueFlowConnectionBindings'
 
-type UseFlowConnectionMutationsOptions = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow node data is an open Record; narrowing breaks vue-flow's internal type expectations
-  nodes: Ref<Array<Record<string, any>>>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow edge data is an open Record; narrowing breaks vue-flow's internal type expectations
-  edges: Ref<Array<Record<string, any>>>
-  boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
+export type CanvasConnectionCommandLifecycleOptions = {
+  readNodes: () => Node[]
+  readEdges: () => Edge[]
+  readBoardBaseSnapshot: () => CanvasBoardSnapshot | undefined
   isValidConnection: (connection: Connection) => boolean
   normalizeConnection?: (
     connection: Connection,
@@ -48,7 +45,9 @@ type UseFlowConnectionMutationsOptions = {
   markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
 }
 
-export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOptions) {
+export function createCanvasConnectionCommandLifecycle(
+  options: CanvasConnectionCommandLifecycleOptions,
+) {
   function resolveValidatedConnection(
     connection: Connection,
     existingEdges: readonly Edge[],
@@ -74,17 +73,17 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     return createCanvasGraphStore(
       flowToCanvasBoardSnapshot(
         {
-          nodes: options.nodes.value as unknown as Node[],
-          edges: options.edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
+          nodes: options.readNodes(),
+          edges: options.readEdges() as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
         },
-        options.boardBaseSnapshot?.value,
+        options.readBoardBaseSnapshot(),
       ),
     )
   }
 
   function createNextCanvasConnection(resolvedConnection: Connection, existingEdges: Edge[]) {
     const nextConnectionId = resolveNextCanvasConnectionId(
-      options.boardBaseSnapshot?.value,
+      options.readBoardBaseSnapshot(),
       existingEdges as Parameters<typeof resolveNextCanvasConnectionId>[1],
     )
     return flowConnectionToCanvasConnection(nextConnectionId, resolvedConnection)
@@ -131,8 +130,8 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     return true
   }
 
-  function onConnectTransaction(resolvedConnection: Connection): boolean {
-    const existingEdges = options.edges.value as unknown as Edge[]
+  function commitConnection(resolvedConnection: Connection): boolean {
+    const existingEdges = options.readEdges()
     const nextConnection = createNextCanvasConnection(resolvedConnection, existingEdges)
     if (!nextConnection) {
       options.onWarning('连线未能写入画布，请刷新后重试')
@@ -169,10 +168,10 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
   }
 
   function connect(connection: Connection): boolean {
-    const existingEdges = options.edges.value as unknown as Edge[]
+    const existingEdges = options.readEdges()
     const resolvedConnection = resolveValidatedConnection(connection, existingEdges)
     if (!resolvedConnection) return false
-    return onConnectTransaction(resolvedConnection)
+    return commitConnection(resolvedConnection)
   }
 
   function createEdgeUpdatePatch(nextEdge: Edge): Partial<Edge> {
@@ -242,9 +241,9 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
     return true
   }
 
-  function onEdgeUpdateTransaction(event: EdgeUpdateEvent, resolvedConnection: Connection) {
+  function commitEdgeUpdate(event: EdgeUpdateEvent, resolvedConnection: Connection) {
     const store = createCurrentGraphStore()
-    const existingEdges = options.edges.value as unknown as Edge[]
+    const existingEdges = options.readEdges()
     const projectionIndex = createFlowEdgeProjectionIndex(store, existingEdges)
     const transactionEdgeId = projectionIndex.resolveCanvasEdgeId(event)
     if (!transactionEdgeId) {
@@ -298,21 +297,15 @@ export function useFlowConnectionMutations(options: UseFlowConnectionMutationsOp
 
   function updateEdge(event: EdgeUpdateEvent) {
     const { edge, connection } = event
-    const existingEdges = (options.edges.value as unknown as Edge[]).filter(
-      (item) => item.id !== edge.id,
-    )
+    const existingEdges = options.readEdges().filter((item) => item.id !== edge.id)
     const resolvedConnection = resolveValidatedConnection(connection, existingEdges)
     if (!resolvedConnection) return
-    onEdgeUpdateTransaction(event, resolvedConnection)
+    commitEdgeUpdate(event, resolvedConnection)
   }
 
-  const connectionAdapter = createCanvasFlowPaneConnectionAdapter({
+  return createCanvasFlowPaneConnectionAdapter({
     canConnect: options.isValidConnection,
     connect,
     updateEdge,
   })
-
-  return {
-    connectionAdapter,
-  }
 }

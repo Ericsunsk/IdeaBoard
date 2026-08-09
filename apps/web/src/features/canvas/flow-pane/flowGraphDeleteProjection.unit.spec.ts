@@ -9,7 +9,7 @@ import {
 } from '../graph-runtime'
 import { createFlowEdgeProjectionIndex } from './flowConnectionIdentity'
 import { applyFlowGraphDeleteProjection } from './flowGraphDeleteProjection'
-import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
+import type { CanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
 
 function createDeleteSummary(
   options: {

@@ -17,7 +17,6 @@ import {
   createFlowGraphCommandOptions,
   readFlowGraphCommandSideEffects,
 } from './flowGraphAdapterCommandSideEffects'
-import { applyFlowGraphDeleteProjection } from './flowGraphDeleteProjection'
 import { useCanvasGroupRuntime, type CanvasGroupRuntimeControls } from './useCanvasGroupRuntime'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasBoardSession } from '../board-session'
@@ -25,22 +24,12 @@ import {
   flowToCanvasBoardSnapshot,
   type FlowToCanvasBoardSnapshotOptions,
 } from '../utils/flowSnapshotAdapter'
+import { createCanvasGraphStore } from '../graph-runtime'
 import {
-  commitCanvasGraphDeleteIntent,
-  createCanvasGraphStore,
-  isCanvasGraphNodeId,
-  type CanvasGraphEdgeId,
-} from '../graph-runtime'
-import {
+  createCanvasDeleteCommandLifecycle,
   createCanvasNodeDragLifecycle,
   type CanvasNodeDragLifecycle,
 } from '../flow-pane'
-import {
-  createFlowEdgeProjectionIndex,
-  createFlowEdgeIdentityFromRemoveChange,
-  type FlowEdgeIdentity,
-  type FlowEdgeProjectionIndex,
-} from './flowConnectionIdentity'
 
 type SelectableFlowItem = {
   id: string
@@ -52,8 +41,6 @@ type FlowGraphCommitOptions = {
 }
 
 export type { CanvasSelectionGroupAction } from './useCanvasGroupRuntime'
-
-type EdgeRemoveChange = Extract<EdgeChange, { type: 'remove' }>
 
 export type CanvasFlowGraphRuntimeControls = {
   captureHistory: () => FlowHistorySnapshot
@@ -92,12 +79,6 @@ export type UseFlowCanvasRuntimeOptions = {
 }
 
 export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
-  let nativeRemoveHistoryBefore: FlowHistorySnapshot | null = null
-  let isNativeRemoveCommitScheduled = false
-  let pendingNativeRemoveNodeChanges: NodeChange[] = []
-  let pendingNativeRemoveEdgeChanges: EdgeChange[] = []
-  const scheduleMicrotask =
-    options.scheduleMicrotask ?? ((callback: () => void) => void Promise.resolve().then(callback))
   const localEditVersion = ref(0)
   const historyGroups: { value: unknown[] } = {
     get value() {
@@ -323,172 +304,40 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     cancelAnimationFrame: options.cancelAnimationFrame,
   })
 
+  const deleteLifecycle = createCanvasDeleteCommandLifecycle({
+    readNodes: () => options.nodes.value,
+    readEdges: () => options.edges.value,
+    readBoardBaseSnapshot: () => options.boardBaseSnapshot.value,
+    createGraphStore: createCurrentCanvasGraphStore,
+    graphAdapter,
+    captureHistory: flowHistory.capture,
+    commitGroups: commitHistoryGroups,
+    resolveRemovedFlowNodes: groupRuntime.internal.resolveRemovedFlowNodeChanges,
+    scheduleMicrotask:
+      options.scheduleMicrotask ??
+      ((callback: () => void) => void Promise.resolve().then(callback)),
+    onWarning: options.onWarning,
+    onNativeRemove: options.onNativeRemove,
+    stopDeletedRunningTasks: options.stopDeletedRunningTasks,
+  })
+
   function deleteNode(nodeId: string): boolean {
     if (!options.nodes.value.some((node) => node.id === nodeId)) return false
-    if (!isCanvasGraphNodeId(nodeId)) {
-      options.onWarning('删除操作未能写入画布，请刷新后重试')
-      return false
-    }
-
-    const store = createCurrentCanvasGraphStore()
-    if (!store.getNode(nodeId)) {
-      options.onWarning('删除操作未能写入画布，请刷新后重试')
-      return false
-    }
-
-    const historyBefore = captureFullGraphHistory()
-    const projectionIndex = createFlowEdgeProjectionIndex(store, options.edges.value)
-    const summary = commitCanvasGraphDeleteIntent(store, {
-      nodeIds: [nodeId],
-      removeConnectedEdges: true,
-    })
-    if (!summary.didChange) return false
-
-    const snapshot = store.exportSnapshot(options.boardBaseSnapshot.value)
-    commitHistoryGroups(snapshot.groups)
-    const result = applyFlowGraphDeleteProjection({
-      graphAdapter,
-      nodes: options.nodes.value,
-      edges: options.edges.value,
-      commitPolicy: { summary, historyBefore },
-      flowNodeIds: [nodeId],
-      projectionIndex,
-      onNativeRemove: options.onNativeRemove,
-      stopDeletedRunningTasks: options.stopDeletedRunningTasks,
-    })
-    return result?.didChange ?? false
-  }
-
-  function hasRemoveChange(changes: Array<NodeChange | EdgeChange>): boolean {
-    return changes.some((change) => change.type === 'remove')
-  }
-
-  function dedupeRemoveChanges<T extends NodeChange | EdgeChange>(changes: T[]): T[] {
-    const removedIds = new Set<string>()
-    return changes.filter((change) => {
-      if (change.type !== 'remove') return true
-      if (removedIds.has(change.id)) return false
-      removedIds.add(change.id)
-      return true
-    })
-  }
-
-  function hasApplicableRemoveChanges(nodeChanges: NodeChange[], edgeChanges: EdgeChange[]) {
-    const currentNodeIds = new Set(options.nodes.value.map((node) => node.id))
-    const currentEdgeIds = new Set(options.edges.value.map((edge) => edge.id))
-    return (
-      nodeChanges.some((change) => change.type === 'remove' && currentNodeIds.has(change.id)) ||
-      edgeChanges.some((change) => change.type === 'remove' && currentEdgeIds.has(change.id))
-    )
-  }
-
-  function resolveNativeRemovedEdgeIds(
-    projectionIndex: FlowEdgeProjectionIndex,
-    edgeChanges: EdgeChange[],
-    removedNodeIds: Set<string>,
-  ): CanvasGraphEdgeId[] | null {
-    const edgeIds: CanvasGraphEdgeId[] = []
-    for (const change of edgeChanges) {
-      if (change.type !== 'remove') continue
-      const edge = projectionIndex.getFlowEdge(change.id)
-      if (edge && (removedNodeIds.has(edge.source) || removedNodeIds.has(edge.target))) continue
-      const edgeIdentity: FlowEdgeIdentity =
-        edge ?? createFlowEdgeIdentityFromRemoveChange(change as EdgeRemoveChange)
-      const edgeId = projectionIndex.resolveCanvasEdgeId(edgeIdentity)
-      if (!edgeId) return null
-      edgeIds.push(edgeId)
-    }
-    return Array.from(new Set(edgeIds))
-  }
-
-  function commitNativeRemoveTransaction(
-    historyBefore: FlowHistorySnapshot,
-    nodeChanges: NodeChange[],
-    edgeChanges: EdgeChange[],
-  ): boolean {
-    const removedNodes = groupRuntime?.internal.resolveRemovedFlowNodeChanges(nodeChanges) ?? null
-    if (!removedNodes) return false
-    const nodeIds = removedNodes.graphNodeIds
-    const flowNodeIds = removedNodes.flowNodeIds
-    const removedNodeIds = new Set<string>()
-    flowNodeIds.forEach((flowNodeId) => removedNodeIds.add(flowNodeId))
-    nodeIds.forEach((graphNodeId) => removedNodeIds.add(graphNodeId))
-
-    const store = createCurrentCanvasGraphStore()
-    const projectionIndex = createFlowEdgeProjectionIndex(store, options.edges.value)
-    const edgeIds = resolveNativeRemovedEdgeIds(projectionIndex, edgeChanges, removedNodeIds)
-    if (!edgeIds) return false
-
-    const summary = commitCanvasGraphDeleteIntent(store, {
-      nodeIds,
-      edgeIds,
-      removeConnectedEdges: true,
-    })
-    if (!summary.didChange) return true
-
-    const snapshot = store.exportSnapshot(options.boardBaseSnapshot.value)
-    commitHistoryGroups(snapshot.groups)
-    applyFlowGraphDeleteProjection({
-      graphAdapter,
-      nodes: options.nodes.value,
-      edges: options.edges.value,
-      commitPolicy: { summary, historyBefore },
-      flowNodeIds,
-      projectionIndex,
-      edgeRemoveChanges: edgeChanges,
-      onNativeRemove: options.onNativeRemove,
-      stopDeletedRunningTasks: options.stopDeletedRunningTasks,
-    })
-    return true
-  }
-
-  function commitNativeRemoveOperation() {
-    isNativeRemoveCommitScheduled = false
-    const historyBefore = nativeRemoveHistoryBefore
-    const nodeChanges = dedupeRemoveChanges(pendingNativeRemoveNodeChanges)
-    const edgeChanges = dedupeRemoveChanges(pendingNativeRemoveEdgeChanges)
-    nativeRemoveHistoryBefore = null
-    pendingNativeRemoveNodeChanges = []
-    pendingNativeRemoveEdgeChanges = []
-    if (!historyBefore || !hasApplicableRemoveChanges(nodeChanges, edgeChanges)) return
-
-    if (commitNativeRemoveTransaction(historyBefore, nodeChanges, edgeChanges)) {
-      return
-    }
-    options.onWarning('删除操作未能应用，请刷新画布后重试')
-  }
-
-  function scheduleNativeRemoveCommit() {
-    if (!nativeRemoveHistoryBefore) {
-      nativeRemoveHistoryBefore = flowHistory.capture()
-    }
-    if (isNativeRemoveCommitScheduled) return
-    isNativeRemoveCommitScheduled = true
-    scheduleMicrotask(() => {
-      scheduleMicrotask(commitNativeRemoveOperation)
-    })
+    return deleteLifecycle.deleteNode(nodeId)
   }
 
   function onNodesChange(changes: NodeChange[]) {
     if (changes.length === 0) return
     groupRuntime?.internal.onBeforeNodesChange(changes)
     if (nodeDragLifecycle.handleChanges(changes)) return
-    if (hasRemoveChange(changes)) {
-      pendingNativeRemoveNodeChanges = pendingNativeRemoveNodeChanges.concat(changes)
-      scheduleNativeRemoveCommit()
-      return
-    }
+    if (deleteLifecycle.handleNodeChanges(changes)) return
     graphAdapter.applyNodeChanges(changes)
   }
 
   function onEdgesChange(changes: EdgeChange[]) {
     if (changes.length === 0) return
     groupRuntime?.internal.onBeforeEdgesChange(changes)
-    if (hasRemoveChange(changes)) {
-      pendingNativeRemoveEdgeChanges = pendingNativeRemoveEdgeChanges.concat(changes)
-      scheduleNativeRemoveCommit()
-      return
-    }
+    if (deleteLifecycle.handleEdgeChanges(changes)) return
     graphAdapter.applyEdgeChanges(changes)
   }
 

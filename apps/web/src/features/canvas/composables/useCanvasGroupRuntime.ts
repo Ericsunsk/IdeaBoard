@@ -31,8 +31,8 @@ import {
   type FlowToCanvasBoardSnapshotOptions,
 } from '../utils/flowSnapshotAdapter'
 import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
-import { createFlowEdgeProjectionIndex } from './flowConnectionIdentity'
-import { applyFlowGraphDeleteProjection } from './flowGraphDeleteProjection'
+import { createFlowEdgeProjectionIndex } from '../flow-pane/flowConnectionIdentity'
+import { applyFlowGraphDeleteProjection } from '../flow-pane/flowGraphDeleteProjection'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import type { FlowHistorySnapshot } from './useFlowHistory'
 
