@@ -167,19 +167,30 @@ function createGraphEditingRuntime(graph: ReturnType<typeof createGraphRuntime>)
 
 function createImageWorkflowRuntime() {
   return {
-    runImageInpaintAction: vi.fn(),
-    runImagePromptGeneration: vi.fn(),
-    runImagePromptGenerationFromSource: vi.fn(),
-    runTextPromptGeneration: vi.fn(),
-    runFusionPromptGeneration: vi.fn(),
-    runImageDirectAction: vi.fn(),
-    runCanvasExtendAction: vi.fn(),
-    isGenerationAvailable: vi.fn(() => true),
-    isNodeDirectActionRunning: vi.fn(),
+    viewModel: {
+      tools: {},
+      canvasExtend: { nodeId: ref(null), overlayStyle: ref(null), handleRadius: 4 },
+    },
+    commands: {
+      isGenerationAvailable: vi.fn(() => true),
+      tools: {},
+      interactions: {
+        onFlowImageContextMenu: vi.fn(),
+        onFlowFusionContextMenu: vi.fn(),
+        onFlowImageDirectAction: vi.fn(),
+        onFlowImagePromptGenerate: vi.fn(),
+        onFlowFusionPromptGenerate: vi.fn(),
+        onFlowPromptGenerate: vi.fn(),
+        onFlowImageExpandSubmit: vi.fn(),
+        onFlowExpandHandlePointerDown: vi.fn(),
+        onFlowExpandFramePointerDown: vi.fn(),
+        onFlowExpandHandlePointerMove: vi.fn(),
+        onFlowExpandHandlePointerUp: vi.fn(),
+      },
+      cancelCanvasExtend: vi.fn(),
+      hideStrengthControl: vi.fn(),
+    },
     reattachPendingImageResults: vi.fn(),
-    createImageTools: vi.fn(),
-    createImageActionHandlers: vi.fn(),
-    createCanvasExtendOverlay: vi.fn(),
   }
 }
 
@@ -215,6 +226,21 @@ function createWorkspaceOptions() {
     },
     openNodeImagePreview: vi.fn(),
     openImageUrlPreview: vi.fn(),
+    imageWorkflowUi: {
+      activeTool: ref('select'),
+      canvasWrapRef: ref<HTMLElement | null>(null),
+      isCanvasInteractionLocked: ref(false),
+      getImageStageElement: vi.fn(() => null),
+      panels: {
+        open: vi.fn(),
+        clear: vi.fn(),
+        isActive: vi.fn(() => false),
+        getActiveNodeId: vi.fn(() => null),
+      },
+      selection: {
+        selectNodeForContextMenu: vi.fn(),
+      },
+    },
     logoutAndRedirect: vi.fn(),
     startNodeDragInteraction: vi.fn(),
     stopNodeDragInteraction: vi.fn(),
@@ -359,8 +385,8 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect(runtime.commands.persistence.reattachPendingImageResults).toBe(
       imageWorkflow.reattachPendingImageResults,
     )
-    expect(runtime.commands.imageWorkflow.runImageDirectAction).toBe(
-      imageWorkflow.runImageDirectAction,
+    expect(runtime.commands.imageWorkflow.isGenerationAvailable).toBe(
+      imageWorkflow.commands.isGenerationAvailable,
     )
     expect('isDirty' in runtime.viewModel.persistence).toBe(false)
     expect('connectNodes' in runtime.commands.flowPane).toBe(false)

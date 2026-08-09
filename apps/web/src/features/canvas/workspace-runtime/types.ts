@@ -69,6 +69,7 @@ export type CanvasWorkspaceRuntimeViewModel = {
     isFlowInteractionLocked: ComputedRef<boolean>
     grouping: CanvasGroupRuntimeView
   }
+  imageWorkflow: CanvasImageWorkflow['viewModel']
 }
 
 export type CanvasWorkspaceRuntimeCommands = {
@@ -140,7 +141,7 @@ export type CanvasWorkspaceRuntimeCommands = {
     ) => CanvasGraphEditingNodeInteractions
     grouping: CanvasGroupRuntimeCommands
   }
-  imageWorkflow: CanvasImageWorkflow
+  imageWorkflow: CanvasImageWorkflow['commands']
 }
 
 export type CanvasWorkspaceRuntime = {

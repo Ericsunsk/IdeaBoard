@@ -56,22 +56,6 @@ vi.mock('../composables/useFlowLeaveGuard', () => ({
   },
 }))
 
-vi.mock('../composables/useFlowImageActionStrengthControl', () => ({
-  useFlowImageActionStrengthControl: () => ({
-    activeStrengthAction: ref(null),
-    consumeSuppressedStrengthClick: vi.fn(),
-    setStrengthRangeRef: vi.fn(),
-    setStrengthTriggerRef: vi.fn(),
-    hideStrengthControl: vi.fn(),
-    getActionStrength: vi.fn(),
-    onStrengthRangePointerDown: vi.fn(),
-    onStrengthInput: vi.fn(),
-    onStrengthChange: vi.fn(),
-    onStrengthPointerUp: vi.fn(),
-    onStrengthClick: vi.fn(),
-  }),
-}))
-
 vi.mock('../composables/useFlowNodeDragInteractions', () => ({
   useFlowNodeDragInteractions: () => ({ onNodeDragStart: vi.fn(), onNodeDragStop: vi.fn() }),
 }))
@@ -124,14 +108,6 @@ vi.mock('../group-presentation', async (importOriginal) => {
     },
   }
 })
-
-vi.mock('../composables/useFlowExpandInteractionHandlers', () => ({
-  useFlowExpandInteractionHandlers: () => ({
-    onFlowImageExpandSubmit: vi.fn(),
-    onFlowExpandHandlePointerDown: vi.fn(),
-    onFlowExpandFramePointerDown: vi.fn(),
-  }),
-}))
 
 vi.mock('../composables/useFlowTransientUiDismissal', () => ({
   useFlowTransientUiDismissal: () => ({ dismissTransientCanvasUi: vi.fn() }),
@@ -278,6 +254,35 @@ function createRuntime() {
   const handlePaneClick = vi.fn()
   const groupSelectedNodes = vi.fn()
   const selectionGroupAction = ref({ kind: 'group' as const })
+  const imageToolsViewModel = {
+    active: { nodeId: ref(null), maskNodeId: ref(null) },
+    locks: { isChromeHidden: ref(false), isCanvasLocked: ref(false) },
+    nodeBindings: { stageFor: vi.fn(), actionFor: vi.fn() },
+    chrome: ref({ isReady: false }),
+  }
+  const imageToolCommands = {
+    lifecycle: { enter: vi.fn(), cancel: vi.fn(), discardNodeEdits: vi.fn() },
+    editor: {
+      onCanvasWheel: vi.fn(),
+      focusAndShowChrome: vi.fn(),
+      scheduleChromeAnchorUpdate: vi.fn(),
+    },
+    prompt: { runPromptAction: vi.fn() },
+    chrome: {},
+  }
+  const imageWorkflowInteractions = {
+    onFlowImageContextMenu: vi.fn(),
+    onFlowFusionContextMenu: vi.fn(),
+    onFlowImageDirectAction: vi.fn(),
+    onFlowImagePromptGenerate: vi.fn(),
+    onFlowFusionPromptGenerate: vi.fn(),
+    onFlowPromptGenerate: vi.fn(),
+    onFlowImageExpandSubmit: vi.fn(),
+    onFlowExpandHandlePointerDown: vi.fn(),
+    onFlowExpandFramePointerDown: vi.fn(),
+    onFlowExpandHandlePointerMove: vi.fn(),
+    onFlowExpandHandlePointerUp: vi.fn(),
+  }
 
   return {
     runtime: {
@@ -301,6 +306,10 @@ function createRuntime() {
           isFlowViewportPanInteractionActive: ref(false),
           isFlowInteractionLocked: ref(false),
           grouping: { groupFrames: ref([]), selectionGroupAction },
+        },
+        imageWorkflow: {
+          tools: imageToolsViewModel,
+          canvasExtend: { nodeId: ref(null), overlayStyle: ref(null), handleRadius: 4 },
         },
       },
       commands: {
@@ -374,45 +383,10 @@ function createRuntime() {
         },
         imageWorkflow: {
           isGenerationAvailable: vi.fn(() => true),
-          runImageDirectAction: vi.fn(),
-          createCanvasExtendOverlay: () => ({
-            expandNodeId: ref(null),
-            expandOverlayStyle: ref(null),
-            enterExpandMode: vi.fn(),
-            cancelExpandMode: vi.fn(),
-            beginHandleResize: vi.fn(),
-            beginFrameDrag: vi.fn(),
-            onHandlePointerMove: vi.fn(),
-            onHandlePointerUp: vi.fn(),
-            commitExpandMode: vi.fn(),
-            handleRadius: 4,
-          }),
-          createImageTools: () => ({
-            viewModel: {
-              active: { nodeId: ref(null), maskNodeId: ref(null) },
-              locks: { isChromeHidden: ref(false), isCanvasLocked: ref(false) },
-              nodeBindings: { stageFor: vi.fn(), actionFor: vi.fn() },
-              chrome: ref({ isReady: false }),
-            },
-            commands: {
-              lifecycle: { enter: vi.fn(), cancel: vi.fn(), discardNodeEdits: vi.fn() },
-              editor: {
-                onCanvasWheel: vi.fn(),
-                focusAndShowChrome: vi.fn(),
-                scheduleChromeAnchorUpdate: vi.fn(),
-              },
-              prompt: { runPromptAction: vi.fn() },
-              chrome: {},
-            },
-          }),
-          createImageActionHandlers: () => ({
-            onFlowImageContextMenu: vi.fn(),
-            onFlowFusionContextMenu: vi.fn(),
-            onFlowImageDirectAction: vi.fn(),
-            onFlowImagePromptGenerate: vi.fn(),
-            onFlowFusionPromptGenerate: vi.fn(),
-            onFlowPromptGenerate: vi.fn(),
-          }),
+          tools: imageToolCommands,
+          interactions: imageWorkflowInteractions,
+          cancelCanvasExtend: vi.fn(),
+          hideStrengthControl: vi.fn(),
         },
       },
     },

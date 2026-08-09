@@ -1,19 +1,22 @@
+import type { ComputedRef, Ref } from 'vue'
+import type { PromptAspectRatio } from '../../canvas-board/domain'
+import type { ActiveNodePanel, ActiveNodePanelKind } from '../composables/useFlowActiveNodePanels'
+import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
 import { useImageCanvasExtendOverlay } from '../composables/useImageCanvasExtendOverlay'
+import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
+import type { ImageNodeAction } from '../config/imageActionRegistry'
+import type { CanvasFlowPaneAdapter } from '../flow-pane'
 import {
   useCanvasImageTools,
   type CanvasImageTools,
   type UseCanvasImageToolsOptions,
 } from '../image-tools'
-import type { CanvasFlowPaneAdapter } from '../flow-pane'
-import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
-import type { ComputedRef } from 'vue'
-import type { PromptAspectRatio } from '../../canvas-board/domain'
-import type { ImageNodeAction } from '../config/imageActionRegistry'
-import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
+import { useFlowExpandInteractionHandlers } from './canvasExtendIntent'
 import {
   createImageActionIntentRouter,
   type ImageActionIntentRouterOptions,
 } from './imageActionIntentRouter'
+import { useFlowImageActionStrengthControl } from './imageActionStrengthControl'
 import {
   useImageWorkflowExecution,
   type ImageWorkflowExecution,
@@ -24,40 +27,7 @@ import {
   type PromptGenerationIntentOptions,
 } from './promptGenerationIntent'
 
-export type CanvasImageWorkflowToolsOptions = Omit<
-  UseCanvasImageToolsOptions,
-  | 'nodes'
-  | 'currentBoardId'
-  | 'getImageNodeDisplayPayload'
-  | 'getImageNodeSnapshot'
-  | 'screenToFlowCoordinate'
-  | 'getViewport'
-  | 'setViewport'
-  | 'setCenter'
-  | 'createImageNodeFromFile'
-  | 'connectionAdapter'
-  | 'uploadImageToBoard'
-  | 'openImageUrlPreview'
-  | 'updateOutputCount'
-  | 'runInpaintAction'
-  | 'runPromptGeneration'
-  | 'isGenerationAvailable'
-  | 'isDirectActionRunning'
-  | 'clearSelectedFlowElements'
-  | 'startCanvasInteraction'
-  | 'stopCanvasInteraction'
-  | 'feedback'
->
-
-export type CanvasImageWorkflowActionOptions = Omit<
-  ImageActionIntentRouterOptions,
-  'runImageDirectAction' | 'runFusionPromptGeneration' | 'onFlowNodeParamUpdate' | 'onWarning'
->
-
-export type CanvasImageWorkflowExpandOverlayOptions = Omit<
-  Parameters<typeof useImageCanvasExtendOverlay>[0],
-  'nodes' | 'getImageNodeDisplayPayload' | 'onBeforePointerCancel' | 'onCommit'
->
+type ValueRef<T> = { readonly value: T }
 
 type CanvasImageWorkflowExecutionPort = Pick<
   ImageWorkflowExecution,
@@ -92,11 +62,28 @@ type CanvasImageWorkflowGraphPort = Pick<
   markNodeExecutionDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
 }
 
+export type CanvasImageWorkflowUiAdapter = {
+  activeTool: Ref<string>
+  canvasWrapRef: Ref<HTMLElement | null>
+  isCanvasInteractionLocked: ValueRef<boolean>
+  getImageStageElement: (nodeId: string) => HTMLElement | null
+  panels: {
+    open: (panel: ActiveNodePanel) => void
+    clear: () => void
+    isActive: (kind: ActiveNodePanelKind, nodeId: string) => boolean
+    getActiveNodeId: (kind: ActiveNodePanelKind) => string | null
+  }
+  selection: {
+    selectNodeForContextMenu: (nodeId: string) => void
+  }
+}
+
 export type CanvasImageWorkflowOptions = {
   graph: CanvasImageWorkflowGraphPort
   execution: Omit<UseImageWorkflowExecutionOptions, 'nodes' | 'currentBoardId' | 'feedback'>
   flowPaneAdapter: CanvasFlowPaneAdapter
   openImageUrlPreview: UseCanvasImageToolsOptions['openImageUrlPreview']
+  ui: CanvasImageWorkflowUiAdapter
   feedback: {
     imageTools: CanvasFeedback['imageTools']
     taskExecution: CanvasFeedback['taskExecution']
@@ -104,40 +91,46 @@ export type CanvasImageWorkflowOptions = {
 }
 
 export type CanvasImageWorkflow = {
-  isGenerationAvailable: CanvasImageWorkflowExecutionPort['isGenerationAvailable']
-  runImageDirectAction: CanvasImageWorkflowExecutionPort['runImageDirectAction']
-  runCanvasExtendAction: CanvasImageWorkflowExecutionPort['runCanvasExtendAction']
-  createImageTools: (options: CanvasImageWorkflowToolsOptions) => CanvasImageTools
-  createImageActionHandlers: (options: CanvasImageWorkflowActionOptions) => {
-    onFlowImageContextMenu: (nodeId: string, event: MouseEvent) => void
-    onFlowFusionContextMenu: (nodeId: string, event: MouseEvent) => void
-    onFlowImageDirectAction: (nodeId: string, action: ImageNodeAction) => void
-    onFlowImagePromptGenerate: (nodeId: string, prompt: string, outputCount: number) => void
-    onFlowFusionPromptGenerate: (
-      nodeId: string,
-      prompt: string,
-      outputCount: number,
-      aspectRatio: PromptAspectRatio,
-    ) => void
-    onFlowPromptGenerate: (
-      promptNodeId: string,
-      prompt: string,
-      outputCount: number,
-      aspectRatio: PromptAspectRatio,
-    ) => void
+  viewModel: {
+    tools: CanvasImageTools['viewModel']
+    canvasExtend: {
+      nodeId: ComputedRef<string | null>
+      overlayStyle: ComputedRef<Record<string, string> | null>
+      handleRadius: number
+    }
   }
-  createCanvasExtendOverlay: (options: CanvasImageWorkflowExpandOverlayOptions) => {
-    isExpandMode: ComputedRef<boolean>
-    expandNodeId: ComputedRef<string | null>
-    expandOverlayStyle: ComputedRef<Record<string, string> | null>
-    enterExpandMode: (nodeId: string) => boolean
-    cancelExpandMode: () => void
-    beginHandleResize: (event: PointerEvent, anchor: CanvasExtendDragAnchor) => void
-    beginFrameDrag: (event: PointerEvent) => void
-    onHandlePointerMove: (event: PointerEvent) => void
-    onHandlePointerUp: (event: PointerEvent) => void
-    commitExpandMode: (prompt?: string, outputCount?: number) => Promise<void>
-    handleRadius: number
+  commands: {
+    isGenerationAvailable: CanvasImageWorkflowExecutionPort['isGenerationAvailable']
+    tools: CanvasImageTools['commands']
+    interactions: {
+      onFlowImageContextMenu: (nodeId: string, event: MouseEvent) => void
+      onFlowFusionContextMenu: (nodeId: string, event: MouseEvent) => void
+      onFlowImageDirectAction: (nodeId: string, action: ImageNodeAction) => void
+      onFlowImagePromptGenerate: (nodeId: string, prompt: string, outputCount: number) => void
+      onFlowFusionPromptGenerate: (
+        nodeId: string,
+        prompt: string,
+        outputCount: number,
+        aspectRatio: PromptAspectRatio,
+      ) => void
+      onFlowPromptGenerate: (
+        promptNodeId: string,
+        prompt: string,
+        outputCount: number,
+        aspectRatio: PromptAspectRatio,
+      ) => void
+      onFlowImageExpandSubmit: (nodeId: string, prompt: string, outputCount: number) => void
+      onFlowExpandHandlePointerDown: (
+        nodeId: string,
+        anchor: CanvasExtendDragAnchor,
+        event: PointerEvent,
+      ) => void
+      onFlowExpandFramePointerDown: (nodeId: string, event: PointerEvent) => void
+      onFlowExpandHandlePointerMove: (event: PointerEvent) => void
+      onFlowExpandHandlePointerUp: (event: PointerEvent) => void
+    }
+    cancelCanvasExtend: () => void
+    hideStrengthControl: () => void
   }
 }
 
@@ -148,7 +141,7 @@ type CanvasImageWorkflowRuntime = CanvasImageWorkflow & {
 export function useCanvasImageWorkflow(
   options: CanvasImageWorkflowOptions,
 ): CanvasImageWorkflowRuntime {
-  const { graph } = options
+  const { graph, ui } = options
   const execution = useImageWorkflowExecution({
     ...options.execution,
     nodes: graph.nodes,
@@ -164,79 +157,136 @@ export function useCanvasImageWorkflow(
     graph.markNodeExecutionDirty(nodeId, { includeSelf: true })
   }
 
-  function createImageTools(imageToolOptions: CanvasImageWorkflowToolsOptions) {
-    return useCanvasImageTools({
-      ...imageToolOptions,
-      nodes: graph.nodes,
-      currentBoardId: graph.currentBoardId,
-      getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
-      getImageNodeSnapshot: graph.getImageNodeSnapshot,
-      screenToFlowCoordinate: options.flowPaneAdapter.screenToFlowCoordinate,
-      getViewport: options.flowPaneAdapter.getViewport,
-      setViewport: options.flowPaneAdapter.setViewport,
-      setCenter: options.flowPaneAdapter.setCenter,
-      createImageNodeFromFile: graph.createImageNodeFromFile,
-      connectionAdapter: graph.connectionAdapter,
-      uploadImageToBoard: graph.uploadImageToBoard,
-      openImageUrlPreview: options.openImageUrlPreview,
-      updateOutputCount: markImageWorkflowNodeDirty,
-      runInpaintAction: execution.runImageInpaintAction,
-      runPromptGeneration: execution.runImagePromptGeneration,
-      isGenerationAvailable: execution.isGenerationAvailable,
-      isDirectActionRunning: execution.isNodeDirectActionRunning,
-      clearSelectedFlowElements: graph.clearSelectedFlowElements,
-      startCanvasInteraction: graph.startCanvasInteraction,
-      stopCanvasInteraction: graph.stopCanvasInteraction,
-      feedback: options.feedback.imageTools,
-    })
-  }
+  const strengthControl = useFlowImageActionStrengthControl({
+    onCommit: (action, strength) => {
+      const targetNodeId = ui.panels.getActiveNodeId('image-tools')
+      if (!targetNodeId) return
+      ui.panels.clear()
+      void execution.runImageDirectAction(targetNodeId, action, { strength })
+    },
+    onCancel: ui.panels.clear,
+  })
 
-  function createImageActionHandlers(actionOptions: CanvasImageWorkflowActionOptions) {
-    const imageActions = createImageActionIntentRouter({
-      ...actionOptions,
-      runImageDirectAction: execution.runImageDirectAction,
-      runFusionPromptGeneration: execution.runFusionPromptGeneration,
-      onFlowNodeParamUpdate: markImageWorkflowNodeDirty,
-      onWarning: options.feedback.imageTools.actionUnavailable,
-    })
-    const promptGeneration = createPromptGenerationIntent({
-      cancelFlowExpandMode: actionOptions.cancelFlowExpandMode,
-      cancelFlowMaskEditorMode: actionOptions.cancelFlowMaskEditorMode,
-      getMediaInputImages: graph.getMediaInputImages,
-      resolvePromptInputImageNodeIds: graph.resolvePromptInputImageNodeIds,
-      runTextPromptGeneration: execution.runTextPromptGeneration,
-      runImagePromptGeneration: execution.runImagePromptGeneration,
-      runImagePromptGenerationFromSource: execution.runImagePromptGenerationFromSource,
-    })
-    return { ...imageActions, ...promptGeneration }
-  }
+  const canvasExtend = useImageCanvasExtendOverlay({
+    activeTool: ui.activeTool,
+    getImageStageElement: ui.getImageStageElement,
+    nodes: graph.nodes,
+    getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
+    startCanvasInteraction: graph.startCanvasInteraction,
+    stopCanvasInteraction: graph.stopCanvasInteraction,
+    onBeforePointerCancel: graph.clearSelectedFlowElements,
+    onCommit: async (payload) => {
+      await execution.runCanvasExtendAction(payload.nodeId, {
+        frameRect: payload.frameRect,
+        originalImageRect: payload.originalImageRect,
+        prompt: payload.prompt,
+        outputCount: payload.outputCount,
+      })
+    },
+  })
 
-  function createCanvasExtendOverlay(overlayOptions: CanvasImageWorkflowExpandOverlayOptions) {
-    return useImageCanvasExtendOverlay({
-      ...overlayOptions,
-      nodes: graph.nodes,
-      getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
-      startCanvasInteraction: graph.startCanvasInteraction,
-      stopCanvasInteraction: graph.stopCanvasInteraction,
-      onBeforePointerCancel: graph.clearSelectedFlowElements,
-      onCommit: async (payload) => {
-        await execution.runCanvasExtendAction(payload.nodeId, {
-          frameRect: payload.frameRect,
-          originalImageRect: payload.originalImageRect,
-          prompt: payload.prompt,
-          outputCount: payload.outputCount,
-        })
-      },
-    })
-  }
+  const imageTools = useCanvasImageTools({
+    nodes: graph.nodes,
+    activeTool: ui.activeTool,
+    canvasWrapRef: ui.canvasWrapRef,
+    isCanvasInteractionLocked: ui.isCanvasInteractionLocked,
+    currentBoardId: graph.currentBoardId,
+    getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
+    getImageNodeSnapshot: graph.getImageNodeSnapshot,
+    getImageStageElement: ui.getImageStageElement,
+    screenToFlowCoordinate: options.flowPaneAdapter.screenToFlowCoordinate,
+    getViewport: options.flowPaneAdapter.getViewport,
+    setViewport: options.flowPaneAdapter.setViewport,
+    setCenter: options.flowPaneAdapter.setCenter,
+    createImageNodeFromFile: graph.createImageNodeFromFile,
+    connectionAdapter: graph.connectionAdapter,
+    uploadImageToBoard: graph.uploadImageToBoard,
+    openImageUrlPreview: options.openImageUrlPreview,
+    clearActiveNodePanel: ui.panels.clear,
+    hideStrengthControl: strengthControl.hideStrengthControl,
+    updateOutputCount: markImageWorkflowNodeDirty,
+    runInpaintAction: execution.runImageInpaintAction,
+    runPromptGeneration: execution.runImagePromptGeneration,
+    isImageActionPanelVisible: (nodeId) => ui.panels.isActive('image-tools', nodeId),
+    isImagePromptComposerVisible: (nodeId) => ui.panels.isActive('image-tools', nodeId),
+    isGenerationAvailable: execution.isGenerationAvailable,
+    isDirectActionRunning: execution.isNodeDirectActionRunning,
+    strengthControl: {
+      activeAction: strengthControl.activeStrengthAction,
+      getValue: strengthControl.getActionStrength,
+      setRangeRef: strengthControl.setStrengthRangeRef,
+      setTriggerRef: strengthControl.setStrengthTriggerRef,
+      onRangePointerDown: strengthControl.onStrengthRangePointerDown,
+      onInput: strengthControl.onStrengthInput,
+      onChange: strengthControl.onStrengthChange,
+      onPointerUp: strengthControl.onStrengthPointerUp,
+      onClick: strengthControl.onStrengthClick,
+    },
+    clearSelectedFlowElements: graph.clearSelectedFlowElements,
+    startCanvasInteraction: graph.startCanvasInteraction,
+    stopCanvasInteraction: graph.stopCanvasInteraction,
+    feedback: options.feedback.imageTools,
+  })
+
+  const imageActions = createImageActionIntentRouter({
+    flowImageEditorNodeId: imageTools.viewModel.active.nodeId,
+    consumeSuppressedStrengthClick: strengthControl.consumeSuppressedStrengthClick,
+    openActiveNodePanel: ui.panels.open,
+    clearActiveNodePanel: ui.panels.clear,
+    hideStrengthControl: strengthControl.hideStrengthControl,
+    selectFlowNodeForContextMenu: ui.selection.selectNodeForContextMenu,
+    cancelFlowExpandMode: canvasExtend.cancelExpandMode,
+    cancelFlowMaskEditorMode: imageTools.commands.lifecycle.cancel,
+    enterFlowExpandMode: canvasExtend.enterExpandMode,
+    enterFlowImageEditorMode: imageTools.commands.lifecycle.enter,
+    focusImageEditorAndShowChrome: imageTools.commands.editor.focusAndShowChrome,
+    runImageDirectAction: execution.runImageDirectAction,
+    runImagePromptAction: imageTools.commands.prompt.runPromptAction,
+    runFusionPromptGeneration: execution.runFusionPromptGeneration,
+    onFlowNodeParamUpdate: markImageWorkflowNodeDirty,
+    onWarning: options.feedback.imageTools.actionUnavailable,
+    getActionStrength: strengthControl.getActionStrength,
+  })
+  const promptGeneration = createPromptGenerationIntent({
+    cancelFlowExpandMode: canvasExtend.cancelExpandMode,
+    cancelFlowMaskEditorMode: imageTools.commands.lifecycle.cancel,
+    getMediaInputImages: graph.getMediaInputImages,
+    resolvePromptInputImageNodeIds: graph.resolvePromptInputImageNodeIds,
+    runTextPromptGeneration: execution.runTextPromptGeneration,
+    runImagePromptGeneration: execution.runImagePromptGeneration,
+    runImagePromptGenerationFromSource: execution.runImagePromptGenerationFromSource,
+  })
+  const canvasExtendInteractions = useFlowExpandInteractionHandlers({
+    flowExpandNodeId: canvasExtend.expandNodeId,
+    clearActiveNodePanel: ui.panels.clear,
+    hideStrengthControl: strengthControl.hideStrengthControl,
+    commitFlowExpandMode: canvasExtend.commitExpandMode,
+    beginFlowExpandHandleResize: canvasExtend.beginHandleResize,
+    beginFlowExpandFrameDrag: canvasExtend.beginFrameDrag,
+  })
 
   return {
-    isGenerationAvailable: execution.isGenerationAvailable,
-    runImageDirectAction: execution.runImageDirectAction,
-    runCanvasExtendAction: execution.runCanvasExtendAction,
+    viewModel: {
+      tools: imageTools.viewModel,
+      canvasExtend: {
+        nodeId: canvasExtend.expandNodeId,
+        overlayStyle: canvasExtend.expandOverlayStyle,
+        handleRadius: canvasExtend.handleRadius,
+      },
+    },
+    commands: {
+      isGenerationAvailable: execution.isGenerationAvailable,
+      tools: imageTools.commands,
+      interactions: {
+        ...imageActions,
+        ...promptGeneration,
+        ...canvasExtendInteractions,
+        onFlowExpandHandlePointerMove: canvasExtend.onHandlePointerMove,
+        onFlowExpandHandlePointerUp: canvasExtend.onHandlePointerUp,
+      },
+      cancelCanvasExtend: canvasExtend.cancelExpandMode,
+      hideStrengthControl: strengthControl.hideStrengthControl,
+    },
     reattachPendingImageResults: execution.reattachPendingImageResults,
-    createImageTools,
-    createImageActionHandlers,
-    createCanvasExtendOverlay,
   }
 }

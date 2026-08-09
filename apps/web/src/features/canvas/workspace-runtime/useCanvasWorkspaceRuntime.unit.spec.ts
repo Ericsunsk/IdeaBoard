@@ -31,9 +31,9 @@ describe('workspace-runtime useCanvasWorkspaceRuntime', () => {
     expectTypeOf<CanvasWorkspaceRuntime['viewModel']['flowPane']['nodes']>().toEqualTypeOf<
       Ref<Node[]>
     >()
-    expectTypeOf<
-      CanvasWorkspaceRuntime['commands']['flowPane']['onNodesChange']
-    >().toEqualTypeOf<(changes: NodeChange[]) => void>()
+    expectTypeOf<CanvasWorkspaceRuntime['commands']['flowPane']['onNodesChange']>().toEqualTypeOf<
+      (changes: NodeChange[]) => void
+    >()
     expectTypeOf<
       CanvasWorkspaceRuntime['commands']['flowPane']['connectionAdapter']['vueFlowBindings']
     >().toHaveProperty('onConnect')
@@ -41,7 +41,7 @@ describe('workspace-runtime useCanvasWorkspaceRuntime', () => {
       CanvasWorkspaceRuntime['commands']['graphEditing']['createNodeAtPosition']
     >().toBeFunction()
     expectTypeOf<
-      CanvasWorkspaceRuntime['commands']['imageWorkflow']['runImageDirectAction']
+      CanvasWorkspaceRuntime['commands']['imageWorkflow']['interactions']['onFlowImageDirectAction']
     >().toBeFunction()
   })
 })

@@ -92,7 +92,6 @@ import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import { useFlowKeyboardShortcuts } from '../composables/useFlowKeyboardShortcuts'
 import { useFlowLeaveGuard } from '../composables/useFlowLeaveGuard'
-import { useFlowImageActionStrengthControl } from '../composables/useFlowImageActionStrengthControl'
 import type { CanvasConnectionPort, CanvasCreatableNodeKind } from '../../canvas-board/domain'
 import type { CanvasGraphNodeId } from '../graph-runtime'
 import { useFlowNodeDragInteractions } from '../composables/useFlowNodeDragInteractions'
@@ -107,7 +106,6 @@ import {
   CanvasGroupPresentation,
   useCanvasGroupPresentationInteraction,
 } from '../group-presentation'
-import { useFlowExpandInteractionHandlers } from '../composables/useFlowExpandInteractionHandlers'
 import {
   useFlowTransientUiDismissal,
   type DismissTransientCanvasUi,
@@ -179,6 +177,23 @@ const duplicateModifierPressed = ref(false)
 const { setImageStageRef, clearImageStageRef, getImageStageElement } = useImageStageRegistry()
 const { openNodeImagePreview, openImageUrlPreview } = useFlowImagePreviewLightbox()
 const graphEditingBrowser = createCanvasGraphEditingBrowserAdapter()
+let selectNodeForContextMenu: (nodeId: string) => void = () => {}
+let readCanvasInteractionLocked = () => false
+const imageWorkflowUi = {
+  activeTool: activeTool as Ref<string>,
+  canvasWrapRef,
+  isCanvasInteractionLocked: computed(() => readCanvasInteractionLocked()),
+  getImageStageElement,
+  panels: {
+    open: openActiveNodePanel,
+    clear: clearActiveNodePanel,
+    isActive: isActiveNodePanel,
+    getActiveNodeId: getActiveNodePanelNodeId,
+  },
+  selection: {
+    selectNodeForContextMenu: (nodeId: string) => selectNodeForContextMenu(nodeId),
+  },
+}
 
 const workspace = useCanvasWorkspaceRuntime({
   route,
@@ -189,6 +204,7 @@ const workspace = useCanvasWorkspaceRuntime({
   graphEditingBrowser,
   openNodeImagePreview,
   openImageUrlPreview,
+  imageWorkflowUi,
   logoutAndRedirect,
   startNodeDragInteraction: () => startNodeDragInteraction(),
   stopNodeDragInteraction: () => stopNodeDragInteraction(),
@@ -311,6 +327,7 @@ provideCanvasViewportContext({ zoomLevel })
 
 const { isFlowInteractionActive, isFlowViewportPanInteractionActive, isFlowInteractionLocked } =
   viewModel.graphEditing
+readCanvasInteractionLocked = () => isFlowInteractionLocked.value
 const { groupFrames, selectionGroupAction } = viewModel.graphEditing.grouping
 const {
   scheduleFlowNodeInternalsRefresh,
@@ -365,71 +382,16 @@ const hasCanvasDismissableLayer = computed(
   () => nodeContextMenu.value.visible || activeNodePanel.value !== null,
 )
 
-const { runImageDirectAction } = commands.imageWorkflow
-
+const { hideStrengthControl, cancelCanvasExtend: cancelFlowExpandMode } = commands.imageWorkflow
 const {
-  activeStrengthAction,
-  consumeSuppressedStrengthClick,
-  setStrengthRangeRef,
-  setStrengthTriggerRef,
-  hideStrengthControl,
-  getActionStrength,
-  onStrengthRangePointerDown,
-  onStrengthInput,
-  onStrengthChange,
-  onStrengthPointerUp,
-  onStrengthClick,
-} = useFlowImageActionStrengthControl({
-  onCommit: (action, strength) => {
-    const targetNodeId = getActiveNodePanelNodeId(ACTIVE_NODE_PANEL_KIND.imageTools)
-    if (!targetNodeId) return
-    clearActiveNodePanel()
-    void runImageDirectAction(targetNodeId, action, { strength })
-  },
-  onCancel: () => {
-    clearActiveNodePanel()
-  },
-})
-
-const {
-  expandNodeId: flowExpandNodeId,
-  expandOverlayStyle: flowExpandOverlayStyle,
-  enterExpandMode: enterFlowExpandMode,
-  cancelExpandMode: cancelFlowExpandMode,
-  beginHandleResize: beginFlowExpandHandleResize,
-  beginFrameDrag: beginFlowExpandFrameDrag,
-  onHandlePointerMove: onFlowExpandHandlePointerMove,
-  onHandlePointerUp: onFlowExpandHandlePointerUp,
-  commitExpandMode: commitFlowExpandMode,
+  nodeId: flowExpandNodeId,
+  overlayStyle: flowExpandOverlayStyle,
   handleRadius: flowExpandHandleRadius,
-} = commands.imageWorkflow.createCanvasExtendOverlay({
-  activeTool: activeTool as Ref<string>,
-  getImageStageElement,
-})
-
-const imageTools = commands.imageWorkflow.createImageTools({
-  activeTool: activeTool as Ref<string>,
-  canvasWrapRef,
-  isCanvasInteractionLocked: isFlowInteractionLocked,
-  getImageStageElement,
-  clearActiveNodePanel,
-  hideStrengthControl,
-  isImageActionPanelVisible: (nodeId) =>
-    isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.imageTools, nodeId),
-  isImagePromptComposerVisible: (nodeId) =>
-    isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.imageTools, nodeId),
-  strengthControl: {
-    activeAction: activeStrengthAction,
-    getValue: getActionStrength,
-    setRangeRef: setStrengthRangeRef,
-    setTriggerRef: setStrengthTriggerRef,
-    onRangePointerDown: onStrengthRangePointerDown,
-    onInput: onStrengthInput,
-    onChange: onStrengthChange,
-    onPointerUp: onStrengthPointerUp,
-    onClick: onStrengthClick,
-  },
-})
+} = viewModel.imageWorkflow.canvasExtend
+const imageTools = {
+  viewModel: viewModel.imageWorkflow.tools,
+  commands: commands.imageWorkflow.tools,
+}
 
 const {
   viewModel: {
@@ -438,17 +400,11 @@ const {
     nodeBindings: { stageFor: imageToolStageBindingFor, actionFor: imageToolActionBindingFor },
   },
   commands: {
-    lifecycle: {
-      enter: enterFlowImageEditorMode,
-      cancel: cancelFlowMaskEditorMode,
-      discardNodeEdits: discardFlowImageToolNodeEdits,
-    },
+    lifecycle: { discardNodeEdits: discardFlowImageToolNodeEdits },
     editor: {
       onCanvasWheel: onCanvasWheelBase,
-      focusAndShowChrome: focusImageEditorAndShowChrome,
       scheduleChromeAnchorUpdate: scheduleImageEditorChromeAnchorUpdate,
     },
-    prompt: { runPromptAction: runFlowImageToolPromptAction },
   },
 } = imageTools
 
@@ -541,16 +497,6 @@ const {
   discardNodeEdits: discardFlowImageToolNodeEdits,
 })
 
-const { onFlowImageExpandSubmit, onFlowExpandHandlePointerDown, onFlowExpandFramePointerDown } =
-  useFlowExpandInteractionHandlers({
-    flowExpandNodeId,
-    clearActiveNodePanel,
-    hideStrengthControl,
-    commitFlowExpandMode,
-    beginFlowExpandHandleResize,
-    beginFlowExpandFrameDrag,
-  })
-
 const {
   paneSelectionBindings,
   vueFlowSelectionBindings,
@@ -560,6 +506,7 @@ const {
   dismissTransientCanvasUi,
   onEdgesChange: (changes) => commands.flowPane.onEdgesChange(changes),
 })
+selectNodeForContextMenu = selectionCommands.selectNodeForContextMenu
 
 const groupPresentation = useCanvasGroupPresentationInteraction({
   canvas: {
@@ -642,21 +589,12 @@ const {
   onFlowImagePromptGenerate,
   onFlowFusionPromptGenerate,
   onFlowPromptGenerate,
-} = commands.imageWorkflow.createImageActionHandlers({
-  flowImageEditorNodeId,
-  consumeSuppressedStrengthClick,
-  openActiveNodePanel,
-  clearActiveNodePanel,
-  hideStrengthControl,
-  selectFlowNodeForContextMenu: selectionCommands.selectNodeForContextMenu,
-  cancelFlowExpandMode,
-  cancelFlowMaskEditorMode,
-  enterFlowExpandMode,
-  enterFlowImageEditorMode,
-  focusImageEditorAndShowChrome,
-  runImagePromptAction: runFlowImageToolPromptAction,
-  getActionStrength,
-})
+  onFlowImageExpandSubmit,
+  onFlowExpandHandlePointerDown,
+  onFlowExpandFramePointerDown,
+  onFlowExpandHandlePointerMove,
+  onFlowExpandHandlePointerUp,
+} = commands.imageWorkflow.interactions
 
 const nodePresentationIntentRouter = createCanvasNodePresentationIntentRouter({
   prompt: {

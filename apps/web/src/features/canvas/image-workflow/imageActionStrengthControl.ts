@@ -4,7 +4,7 @@ import {
   DEFAULT_IMAGE_ACTION_STRENGTHS,
   type ImageStrengthAction,
 } from '../execution'
-import { useStrengthRangeEditSession } from './useStrengthRangeEditSession'
+import { useStrengthRangeEditSession } from '../composables/useStrengthRangeEditSession'
 
 const MIN_STRENGTH = 0
 const MAX_STRENGTH = 100

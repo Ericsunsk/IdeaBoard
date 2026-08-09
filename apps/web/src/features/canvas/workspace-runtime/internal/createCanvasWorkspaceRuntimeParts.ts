@@ -14,7 +14,7 @@ import {
   type CanvasGraphEditingBrowserAdapter,
   type CanvasGraphEditingUploadAdapter,
 } from '../../graph-editing'
-import { useCanvasImageWorkflow } from '../../image-workflow'
+import { useCanvasImageWorkflow, type CanvasImageWorkflowUiAdapter } from '../../image-workflow'
 import { taskApi } from '../../../../shared/api/task'
 import type { CanvasWorkspaceRuntime } from '../types'
 
@@ -29,6 +29,7 @@ export type UseCanvasWorkspaceRuntimeOptions = {
   graphEditingBrowser: CanvasGraphEditingBrowserAdapter
   openNodeImagePreview: (snapshot: ImageNodeItem, mode: 'latest-output') => Promise<void>
   openImageUrlPreview: (src: string, ratio?: number) => Promise<void>
+  imageWorkflowUi: CanvasImageWorkflowUiAdapter
   logoutAndRedirect: (path: string) => Promise<unknown> | unknown
   startNodeDragInteraction: () => void
   stopNodeDragInteraction: () => void
@@ -176,6 +177,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     },
     flowPaneAdapter: options.flowPaneAdapter,
     openImageUrlPreview: options.openImageUrlPreview,
+    ui: options.imageWorkflowUi,
     feedback: {
       imageTools: feedback.imageTools,
       taskExecution: feedback.taskExecution,
@@ -272,6 +274,7 @@ function createCanvasWorkspaceRuntimeFacade(
         isFlowViewportPanInteractionActive: parts.graphEditing.isFlowViewportPanInteractionActive,
         isFlowInteractionLocked: parts.graphEditing.isFlowInteractionLocked,
       },
+      imageWorkflow: parts.imageWorkflow.viewModel,
     },
     commands: {
       boardSession: {
@@ -332,14 +335,7 @@ function createCanvasWorkspaceRuntimeFacade(
         getFlowNodeUiStateCached: parts.graphEditing.getFlowNodeUiStateCached,
         createNodeInteractions: parts.graphEditing.createNodeInteractions,
       },
-      imageWorkflow: {
-        isGenerationAvailable: parts.imageWorkflow.isGenerationAvailable,
-        runImageDirectAction: parts.imageWorkflow.runImageDirectAction,
-        runCanvasExtendAction: parts.imageWorkflow.runCanvasExtendAction,
-        createImageTools: parts.imageWorkflow.createImageTools,
-        createImageActionHandlers: parts.imageWorkflow.createImageActionHandlers,
-        createCanvasExtendOverlay: parts.imageWorkflow.createCanvasExtendOverlay,
-      },
+      imageWorkflow: parts.imageWorkflow.commands,
     },
   } satisfies CanvasWorkspaceRuntime
 }

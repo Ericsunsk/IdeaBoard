@@ -78,6 +78,21 @@ function createOptions() {
       insufficientCredits: vi.fn(),
     },
   }
+  const ui = {
+    activeTool: ref('select'),
+    canvasWrapRef: ref<HTMLElement | null>(null),
+    isCanvasInteractionLocked: ref(false),
+    getImageStageElement: vi.fn(() => null),
+    panels: {
+      open: vi.fn(),
+      clear: vi.fn(),
+      isActive: vi.fn(() => false),
+      getActiveNodeId: vi.fn(() => null),
+    },
+    selection: {
+      selectNodeForContextMenu: vi.fn(),
+    },
+  }
   const options = {
     graph,
     execution: {
@@ -95,41 +110,47 @@ function createOptions() {
       setCenter: vi.fn(),
     },
     openImageUrlPreview: vi.fn(),
+    ui,
     feedback,
   }
-  return { options, graph, feedback }
-}
-
-function createActionOptions() {
-  return {
-    flowImageEditorNodeId: ref<string | null>(null),
-    consumeSuppressedStrengthClick: vi.fn(() => false),
-    openActiveNodePanel: vi.fn(),
-    clearActiveNodePanel: vi.fn(),
-    hideStrengthControl: vi.fn(),
-    selectFlowNodeForContextMenu: vi.fn(),
-    cancelFlowExpandMode: vi.fn(),
-    cancelFlowMaskEditorMode: vi.fn(),
-    enterFlowExpandMode: vi.fn(() => true),
-    enterFlowImageEditorMode: vi.fn(() => true),
-    focusImageEditorAndShowChrome: vi.fn(),
-    runImagePromptAction: vi.fn(),
-    getActionStrength: vi.fn(() => 72),
-  }
+  return { options, graph, feedback, ui }
 }
 
 describe('useCanvasImageWorkflow', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.executionOptions = null
-    mocks.useCanvasImageTools.mockReturnValue({ kind: 'image-tools' })
+    mocks.useCanvasImageTools.mockReturnValue({
+      viewModel: {
+        active: { nodeId: ref(null) },
+        locks: { isChromeHidden: ref(false), isCanvasLocked: ref(false) },
+        chrome: ref(null),
+        adjustment: { isApplying: ref(false), finalApplyProgress: ref(null) },
+        nodeBindings: { stageFor: vi.fn(), actionFor: vi.fn() },
+      },
+      commands: {
+        lifecycle: {
+          enter: vi.fn(() => true),
+          cancel: vi.fn(),
+          commit: vi.fn(() => true),
+          discardNodeEdits: vi.fn(),
+        },
+        editor: {
+          apply: vi.fn(async () => undefined),
+          onCanvasWheel: vi.fn(),
+          focusAndShowChrome: vi.fn(),
+          scheduleChromeAnchorUpdate: vi.fn(),
+        },
+        prompt: { runPromptAction: vi.fn() },
+        chrome: {},
+      },
+    })
   })
 
   it('owns direct action planning and execution behind the workflow intent seam', async () => {
     const { options } = createOptions()
     const workflow = useCanvasImageWorkflow(options as never)
-    const actionOptions = createActionOptions()
-    const handlers = workflow.createImageActionHandlers(actionOptions)
+    const handlers = workflow.commands.interactions
 
     handlers.onFlowImageDirectAction('image-1', IMAGE_NODE_ACTION.removeBg)
     await vi.waitFor(() => expect(mocks.execution.executeImageWorkflow).toHaveBeenCalledOnce())
@@ -139,16 +160,13 @@ describe('useCanvasImageWorkflow', () => {
       IMAGE_NODE_ACTION.removeBg,
       undefined,
     )
-    expect(actionOptions.cancelFlowExpandMode).toHaveBeenCalledOnce()
-    expect(actionOptions.cancelFlowMaskEditorMode).toHaveBeenCalledOnce()
-    expect(actionOptions.clearActiveNodePanel).toHaveBeenCalledOnce()
-    expect(actionOptions.hideStrengthControl).toHaveBeenCalledOnce()
+    expect(options.ui.panels.clear).toHaveBeenCalledOnce()
   })
 
   it('passes strength intent through the same direct action workflow path', async () => {
     const { options } = createOptions()
     const workflow = useCanvasImageWorkflow(options as never)
-    const handlers = workflow.createImageActionHandlers(createActionOptions())
+    const handlers = workflow.commands.interactions
 
     handlers.onFlowImageDirectAction('image-1', IMAGE_NODE_ACTION.styleVariation)
     await vi.waitFor(() => expect(mocks.execution.executeImageWorkflow).toHaveBeenCalledOnce())
@@ -156,15 +174,14 @@ describe('useCanvasImageWorkflow', () => {
     expect(mocks.planner.planImageDirectAction).toHaveBeenCalledWith(
       'image-1',
       IMAGE_NODE_ACTION.styleVariation,
-      { strength: 72 },
+      { strength: 50 },
     )
   })
 
   it('routes text Prompt intent through planning and execution with normalized inputs', async () => {
     const { options } = createOptions()
     const workflow = useCanvasImageWorkflow(options as never)
-    const actionOptions = createActionOptions()
-    const handlers = workflow.createImageActionHandlers(actionOptions)
+    const handlers = workflow.commands.interactions
 
     handlers.onFlowPromptGenerate('prompt-1', 'Draw this', 2, 'unsupported' as never)
     await vi.waitFor(() => expect(mocks.execution.executeImageWorkflow).toHaveBeenCalledOnce())
@@ -175,8 +192,6 @@ describe('useCanvasImageWorkflow', () => {
       2,
       'auto',
     )
-    expect(actionOptions.cancelFlowExpandMode).toHaveBeenCalledOnce()
-    expect(actionOptions.cancelFlowMaskEditorMode).toHaveBeenCalledOnce()
   })
 
   it('routes linked and uploaded Prompt inputs through their canonical image paths', async () => {
@@ -200,7 +215,7 @@ describe('useCanvasImageWorkflow', () => {
     ])
     graph.resolvePromptInputImageNodeIds.mockReturnValue(['image-1'])
     const workflow = useCanvasImageWorkflow(options as never)
-    const handlers = workflow.createImageActionHandlers(createActionOptions())
+    const handlers = workflow.commands.interactions
 
     handlers.onFlowPromptGenerate('prompt-1', 'Remix', 3, '16:9')
     await vi.waitFor(() => expect(mocks.execution.executeImageWorkflow).toHaveBeenCalledTimes(2))
@@ -228,7 +243,7 @@ describe('useCanvasImageWorkflow', () => {
       throw new ImageExecutionPlanError('请输入 Prompt')
     })
     const workflow = useCanvasImageWorkflow(options as never)
-    const handlers = workflow.createImageActionHandlers(createActionOptions())
+    const handlers = workflow.commands.interactions
 
     handlers.onFlowPromptGenerate('prompt-1', '', 1, 'auto')
     await vi.waitFor(() =>
@@ -243,7 +258,7 @@ describe('useCanvasImageWorkflow', () => {
     try {
       const { options, feedback } = createOptions()
       const workflow = useCanvasImageWorkflow(options as never)
-      const handlers = workflow.createImageActionHandlers(createActionOptions())
+      const handlers = workflow.commands.interactions
 
       mocks.executionOptions?.onWarning('provider unavailable')
       handlers.onFlowPromptGenerate('prompt-1', 'Keep editing', 1, 'auto')
@@ -260,15 +275,14 @@ describe('useCanvasImageWorkflow', () => {
   it('keeps local editor and canvas-extend intents out of Task submission', () => {
     const { options } = createOptions()
     const workflow = useCanvasImageWorkflow(options as never)
-    const actionOptions = createActionOptions()
-    const handlers = workflow.createImageActionHandlers(actionOptions)
+    const handlers = workflow.commands.interactions
 
     handlers.onFlowImageDirectAction('image-1', IMAGE_NODE_ACTION.localImageEditor)
     handlers.onFlowImageDirectAction('image-1', IMAGE_NODE_ACTION.imageExtend)
 
-    expect(actionOptions.enterFlowImageEditorMode).toHaveBeenCalledWith('image-1', 'adjust')
-    expect(actionOptions.focusImageEditorAndShowChrome).toHaveBeenCalledWith('image-1')
-    expect(actionOptions.enterFlowExpandMode).toHaveBeenCalledWith('image-1')
+    const imageTools = mocks.useCanvasImageTools.mock.results[0]?.value
+    expect(imageTools.commands.lifecycle.enter).toHaveBeenCalledWith('image-1', 'adjust')
+    expect(imageTools.commands.editor.focusAndShowChrome).toHaveBeenCalledWith('image-1')
     expect(mocks.planner.planImageDirectAction).not.toHaveBeenCalled()
     expect(mocks.execution.executeImageWorkflow).not.toHaveBeenCalled()
   })
@@ -277,14 +291,12 @@ describe('useCanvasImageWorkflow', () => {
     const { options, graph, feedback } = createOptions()
     const workflow = useCanvasImageWorkflow(options as never)
 
-    workflow.createImageTools({} as never)
-
     expect(mocks.useCanvasImageTools).toHaveBeenCalledWith(
       expect.objectContaining({
         nodes: graph.nodes,
         currentBoardId: graph.currentBoardId,
         connectionAdapter: graph.connectionAdapter,
-        isGenerationAvailable: workflow.isGenerationAvailable,
+        isGenerationAvailable: workflow.commands.isGenerationAvailable,
         feedback: feedback.imageTools,
       }),
     )
@@ -302,7 +314,7 @@ describe('useCanvasImageWorkflow', () => {
   it('owns fusion mutations and pending-result reattachment on the workflow runtime', () => {
     const { options, graph } = createOptions()
     const workflow = useCanvasImageWorkflow(options as never)
-    const handlers = workflow.createImageActionHandlers(createActionOptions())
+    const handlers = workflow.commands.interactions
 
     handlers.onFlowFusionPromptGenerate('fusion-1', 'Blend', 3, '1:1')
     workflow.reattachPendingImageResults()
