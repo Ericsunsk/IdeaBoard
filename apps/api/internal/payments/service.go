@@ -19,6 +19,7 @@ type Service struct {
 	configuration    StripeConfigurationStore
 	webhookInbox     StripeWebhookInboxStore
 	checkoutStore    PaymentCheckoutStore
+	convergenceStore PaymentConvergenceStore
 	gateway          StripeGateway
 	refundGateway    RefundGateway
 	disputeGateway   DisputeGateway
@@ -41,6 +42,7 @@ type ServiceDependencies struct {
 	WebhookInbox          StripeWebhookInboxStore
 	CheckoutStore         PaymentCheckoutStore
 	OrderConvergenceStore PaymentOrderConvergenceStore
+	ConvergenceStore      PaymentConvergenceStore
 	ConfigurationGateway  StripeGateway
 	RefundGateway         RefundGateway
 	DisputeGateway        DisputeGateway
@@ -63,10 +65,11 @@ func NewService(dependencies ServiceDependencies) *Service {
 	service := &Service{
 		repo: dependencies.Persistence, configuration: dependencies.ConfigurationStore,
 		webhookInbox: dependencies.WebhookInbox, checkoutStore: dependencies.CheckoutStore,
-		gateway:         dependencies.ConfigurationGateway,
-		refundGateway:   dependencies.RefundGateway,
-		disputeGateway:  dependencies.DisputeGateway,
-		checkoutGateway: dependencies.CheckoutGateway, verifier: dependencies.WebhookVerifier,
+		convergenceStore: dependencies.ConvergenceStore,
+		gateway:          dependencies.ConfigurationGateway,
+		refundGateway:    dependencies.RefundGateway,
+		disputeGateway:   dependencies.DisputeGateway,
+		checkoutGateway:  dependencies.CheckoutGateway, verifier: dependencies.WebhookVerifier,
 		wallets: dependencies.Wallets, events: events, now: now,
 	}
 	service.orderLifecycle = newPaymentOrderLifecycle(dependencies.OrderConvergenceStore, service.events, service.now)
@@ -346,7 +349,7 @@ func (s *Service) receiveStripeWebhookLocked(ctx context.Context, raw []byte, si
 }
 
 func (s *Service) processDisputeWebhook(ctx context.Context, event StripeWebhookEvent) error {
-	if s == nil || s.repo == nil || s.disputeGateway == nil || strings.TrimSpace(event.ObjectID) == "" {
+	if s == nil || s.convergenceStore == nil || s.checkoutStore == nil || s.disputeGateway == nil || strings.TrimSpace(event.ObjectID) == "" {
 		return ErrMalformedWebhookPayload
 	}
 	_, apiKey, err := s.stripeAccessConfiguration(ctx)
@@ -361,7 +364,7 @@ func (s *Service) processDisputeWebhook(ctx context.Context, event StripeWebhook
 		(event.PaymentIntentID != "" && provider.PaymentIntentID != "" && provider.PaymentIntentID != event.PaymentIntentID) {
 		return ErrDisputeProviderConflict
 	}
-	dispute, changed, err := s.repo.ConvergePaymentDispute(ctx, provider, s.now().UTC())
+	dispute, changed, err := s.convergenceStore.ConvergePaymentDispute(ctx, provider, s.now().UTC())
 	if errors.Is(err, ErrDisputeOrderNotEligible) {
 		return nil
 	}
@@ -381,10 +384,10 @@ func (s *Service) publishDisputeUpdate(userID int64) {
 }
 
 func (s *Service) processRefundWebhook(ctx context.Context, event StripeWebhookEvent) error {
-	if s == nil || s.repo == nil || s.refundGateway == nil || strings.TrimSpace(event.ObjectID) == "" {
+	if s == nil || s.convergenceStore == nil || s.refundGateway == nil || strings.TrimSpace(event.ObjectID) == "" {
 		return ErrMalformedWebhookPayload
 	}
-	refund, err := s.repo.GetPaymentRefundByStripeID(ctx, event.ObjectID)
+	refund, err := s.convergenceStore.GetPaymentRefundByStripeID(ctx, event.ObjectID)
 	if errors.Is(err, sql.ErrNoRows) {
 		configuration, apiKey, configErr := s.stripeAccessConfiguration(ctx)
 		_ = configuration
@@ -400,9 +403,9 @@ func (s *Service) processRefundWebhook(ctx context.Context, event StripeWebhookE
 			// model; without a charge identity it cannot be linked safely.
 			return nil
 		}
-		if _, createErr := s.repo.CreateExternalPaymentRefund(ctx, providerRefund, s.now().UTC()); createErr != nil {
+		if _, createErr := s.convergenceStore.CreateExternalPaymentRefund(ctx, providerRefund, s.now().UTC()); createErr != nil {
 			if errors.Is(createErr, credits.ErrInsufficientCredits) || errors.Is(createErr, ErrRefundAmountExceeds) {
-				userID, anomalyErr := s.repo.RecordPaymentRefundAnomaly(ctx, providerRefund, "Stripe Dashboard refund requires manual balance recovery", s.now().UTC())
+				userID, anomalyErr := s.convergenceStore.RecordPaymentRefundAnomaly(ctx, providerRefund, "Stripe Dashboard refund requires manual balance recovery", s.now().UTC())
 				if anomalyErr == nil {
 					s.publishRefundUpdate(userID)
 				}
@@ -413,7 +416,7 @@ func (s *Service) processRefundWebhook(ctx context.Context, event StripeWebhookE
 			}
 			return createErr
 		}
-		refund, err = s.repo.GetPaymentRefundByStripeID(ctx, event.ObjectID)
+		refund, err = s.convergenceStore.GetPaymentRefundByStripeID(ctx, event.ObjectID)
 		if err != nil {
 			return err
 		}

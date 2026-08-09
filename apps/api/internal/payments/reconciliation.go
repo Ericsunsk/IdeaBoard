@@ -18,20 +18,20 @@ const (
 // advances an order from canonical Stripe facts, never from redirects or job
 // delivery. Claims are fenced in the repository before provider I/O begins.
 func (s *Service) ReconcileDuePaymentOrders(ctx context.Context) error {
-	if s == nil || s.configuration == nil || s.repo == nil || s.checkoutGateway == nil {
+	if s == nil || s.configuration == nil || s.checkoutStore == nil || s.convergenceStore == nil || s.orderLifecycle == nil || s.checkoutGateway == nil {
 		return fmt.Errorf("payments reconciliation unavailable")
 	}
 	return s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
 		configuration, apiKey, configurationErr := s.stripeAccessConfiguration(lockedContext)
 		now := s.now().UTC()
-		claims, err := s.repo.ClaimDuePaymentOrderReconciliations(lockedContext, now)
+		claims, err := s.convergenceStore.ClaimDuePaymentOrderReconciliations(lockedContext, now)
 		if err != nil {
 			return err
 		}
 		var retryErr error
 		for _, claim := range claims {
 			outcome, processErr := s.reconcilePaymentOrderClaim(lockedContext, configuration, apiKey, configurationErr, claim, now)
-			completed, completeErr := s.repo.CompletePaymentOrderReconciliationClaim(lockedContext, claim, outcome)
+			completed, completeErr := s.convergenceStore.CompletePaymentOrderReconciliationClaim(lockedContext, claim, outcome)
 			if completeErr != nil {
 				retryErr = errors.Join(retryErr, completeErr)
 				continue
@@ -56,10 +56,10 @@ func (s *Service) ReconcileDuePaymentOrders(ctx context.Context) error {
 }
 
 func (s *Service) reconcileDuePaymentDisputes(ctx context.Context, apiKey string, configurationErr error, now time.Time) error {
-	if s == nil || s.repo == nil || s.disputeGateway == nil {
+	if s == nil || s.convergenceStore == nil || s.disputeGateway == nil {
 		return nil
 	}
-	disputes, err := s.repo.ListDuePaymentDisputes(ctx, now, 100)
+	disputes, err := s.convergenceStore.ListDuePaymentDisputes(ctx, now, 100)
 	if err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func (s *Service) reconcileDuePaymentDisputes(ctx context.Context, apiKey string
 			retryErr = errors.Join(retryErr, retrieveErr)
 			continue
 		}
-		updated, changed, convergeErr := s.repo.ConvergePaymentDispute(ctx, provider, now)
+		updated, changed, convergeErr := s.convergenceStore.ConvergePaymentDispute(ctx, provider, now)
 		if convergeErr != nil {
 			retryErr = errors.Join(retryErr, convergeErr)
 			continue
@@ -90,10 +90,10 @@ func (s *Service) reconcileDuePaymentDisputes(ctx context.Context, apiKey string
 }
 
 func (s *Service) reconcileDuePaymentRefunds(ctx context.Context, apiKey string, configurationErr error, now time.Time) error {
-	if s == nil || s.repo == nil || s.refundGateway == nil {
+	if s == nil || s.convergenceStore == nil || s.refundGateway == nil {
 		return nil
 	}
-	refunds, err := s.repo.ListPendingPaymentRefunds(ctx, now.Add(-2*time.Minute), 100)
+	refunds, err := s.convergenceStore.ListPendingPaymentRefunds(ctx, now.Add(-2*time.Minute), 100)
 	if err != nil {
 		return err
 	}
@@ -114,7 +114,7 @@ func (s *Service) reconcileDuePaymentRefunds(ctx context.Context, apiKey string,
 					retryErr = errors.Join(retryErr, err)
 					continue
 				}
-				if _, markErr := s.repo.MarkPaymentRefundFailed(ctx, refund.ID, operationalErrorSummary(err, "Stripe refund request failed"), now); markErr != nil {
+				if _, markErr := s.convergenceStore.MarkPaymentRefundFailed(ctx, refund.ID, operationalErrorSummary(err, "Stripe refund request failed"), now); markErr != nil {
 					retryErr = errors.Join(retryErr, markErr)
 				}
 				continue
@@ -270,8 +270,8 @@ func reconciliationFailureDetail(err error) (string, string) {
 // ListPaymentReconciliationAnomalies is the internal Admin read seam. The HTTP
 // presentation remains a separate Admin vertical concern.
 func (s *Service) ListPaymentReconciliationAnomalies(ctx context.Context, limit int32) ([]PaymentReconciliationAnomaly, error) {
-	if s == nil || s.repo == nil {
+	if s == nil || s.convergenceStore == nil {
 		return nil, fmt.Errorf("payments reconciliation unavailable")
 	}
-	return s.repo.ListPaymentReconciliationAnomalies(ctx, limit)
+	return s.convergenceStore.ListPaymentReconciliationAnomalies(ctx, limit)
 }

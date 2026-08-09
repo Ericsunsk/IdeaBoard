@@ -22,7 +22,7 @@ import (
 func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T) {
 	db := testdb.Open(t)
 	repo := NewRepository(db)
-	service := NewService(ServiceDependencies{Persistence: repo, ConfigurationStore: repo, CheckoutStore: repo, OrderConvergenceStore: repo})
+	service := NewService(ServiceDependencies{Persistence: repo, ConfigurationStore: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConvergenceStore: repo})
 	user42PublicID := adminPaymentUserPublicID(t, db, 42)
 	first := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-AAA000000001", 501)
 	second := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-BBB000000002", 502)
@@ -130,7 +130,7 @@ func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T)
 func TestAdminPaymentOrderDetailMasksProviderIdentifiersAndExcludesInternalFields(t *testing.T) {
 	db := testdb.Open(t)
 	repo := NewRepository(db)
-	service := NewService(ServiceDependencies{Persistence: repo, ConfigurationStore: repo, CheckoutStore: repo, OrderConvergenceStore: repo})
+	service := NewService(ServiceDependencies{Persistence: repo, ConfigurationStore: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConvergenceStore: repo})
 	userPublicID := adminPaymentUserPublicID(t, db, 42)
 	order := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-DETAIL000001", 501)
 	bound, err := repo.BindPaymentOrderCheckout(t.Context(), BindPaymentOrderCheckoutInput{
@@ -199,7 +199,7 @@ func adminPaymentUserPublicID(t *testing.T, db *sql.DB, userID int64) uuid.UUID 
 func TestAdminPaymentOrderDetailAssociatesRefundAndDisputeWebhookFacts(t *testing.T) {
 	db := testdb.Open(t)
 	repo := NewRepository(db)
-	service := NewService(ServiceDependencies{Persistence: repo, ConfigurationStore: repo, CheckoutStore: repo, OrderConvergenceStore: repo})
+	service := NewService(ServiceDependencies{Persistence: repo, ConfigurationStore: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConvergenceStore: repo})
 	order := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-EVENTS000001", 501)
 	bound, err := repo.BindPaymentOrderCheckout(t.Context(), BindPaymentOrderCheckoutInput{
 		OrderID: order.ID, StripeCustomerID: "cus_events", StripeSessionID: "cs_events",

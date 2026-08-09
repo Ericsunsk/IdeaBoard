@@ -579,6 +579,7 @@ func newCheckoutLifecycleService(t *testing.T, now *time.Time, checkout Checkout
 		WebhookInbox:          repo,
 		CheckoutStore:         repo,
 		OrderConvergenceStore: repo,
+		ConvergenceStore:      repo,
 		ConfigurationGateway:  lifecycleStripeGateway{},
 		CheckoutGateway:       checkout,
 		WebhookVerifier:       verifier,

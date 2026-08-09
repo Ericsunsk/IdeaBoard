@@ -215,7 +215,7 @@ func TestPaymentReconciliationRecordsLongLivedOperableAnomaly(t *testing.T) {
 	now = now.Add(paymentReconciliationOperableDelay)
 	recoveryGateway := newLifecycleCheckoutGateway()
 	recovered := NewService(ServiceDependencies{
-		Persistence: repo, ConfigurationStore: repo, CheckoutStore: repo, OrderConvergenceStore: repo,
+		Persistence: repo, ConfigurationStore: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConvergenceStore: repo,
 		CheckoutGateway: recoveryGateway, Wallets: wallets,
 		Now: func() time.Time { return now },
 	})

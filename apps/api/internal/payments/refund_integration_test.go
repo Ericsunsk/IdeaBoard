@@ -173,7 +173,7 @@ func TestPaymentRefundReconciliationRecoversPendingProviderStateExactlyOnce(t *t
 	gateway := &refundGatewayFake{retrieve: map[string]StripeRefund{
 		"re_reconcile": {ID: "re_reconcile", Status: "succeeded", ChargeID: "ch_refund", AmountMinor: 100, Currency: "usd"},
 	}}
-	service := NewService(ServiceDependencies{Persistence: repo, RefundGateway: gateway, Events: NewEventHub(), Now: func() time.Time { return now }})
+	service := NewService(ServiceDependencies{Persistence: repo, ConvergenceStore: repo, RefundGateway: gateway, Events: NewEventHub(), Now: func() time.Time { return now }})
 	if err := service.reconcileDuePaymentRefunds(t.Context(), "sk_test_refund", nil, now.Add(3*time.Minute)); err != nil {
 		t.Fatal(err)
 	}

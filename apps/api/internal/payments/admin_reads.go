@@ -176,7 +176,7 @@ func (s *Service) ListAdminPaymentOrders(ctx context.Context, input AdminPayment
 }
 
 func (s *Service) GetAdminPaymentOrder(ctx context.Context, orderNumber string) (AdminPaymentOrderDetail, error) {
-	if s == nil || s.checkoutStore == nil || s.repo == nil {
+	if s == nil || s.configuration == nil || s.checkoutStore == nil || s.convergenceStore == nil {
 		return AdminPaymentOrderDetail{}, fmt.Errorf("payments admin read service unavailable")
 	}
 	orderNumber = strings.TrimSpace(orderNumber)
@@ -187,7 +187,7 @@ func (s *Service) GetAdminPaymentOrder(ctx context.Context, orderNumber string) 
 	if err != nil {
 		return AdminPaymentOrderDetail{}, err
 	}
-	durableRefunds, err := s.repo.ListPaymentRefundsForOrder(ctx, orderNumber)
+	durableRefunds, err := s.convergenceStore.ListPaymentRefundsForOrder(ctx, orderNumber)
 	if err != nil {
 		return AdminPaymentOrderDetail{}, err
 	}
@@ -199,7 +199,7 @@ func (s *Service) GetAdminPaymentOrder(ctx context.Context, orderNumber string) 
 			durableStripeRefundIDs[refund.StripeRefundID] = struct{}{}
 		}
 	}
-	durableDisputes, err := s.repo.ListPaymentDisputesForOrder(ctx, orderNumber)
+	durableDisputes, err := s.convergenceStore.ListPaymentDisputesForOrder(ctx, orderNumber)
 	if err != nil {
 		return AdminPaymentOrderDetail{}, err
 	}

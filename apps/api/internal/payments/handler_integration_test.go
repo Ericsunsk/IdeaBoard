@@ -31,7 +31,7 @@ func TestStripeConfigurationHTTPContractNeverReturnsSecretsAndRejectsUnknownFiel
 		ProductID: "prod_http", WebhookEndpointID: "we_http", WebhookSecret: "whsec_http",
 	}}
 	repo := NewRepository(db)
-	service := NewService(ServiceDependencies{Persistence: repo, ConfigurationStore: repo, WebhookInbox: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConfigurationGateway: gateway, WebhookVerifier: &fakeWebhookVerifier{}})
+	service := NewService(ServiceDependencies{Persistence: repo, ConfigurationStore: repo, WebhookInbox: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConvergenceStore: repo, ConfigurationGateway: gateway, WebhookVerifier: &fakeWebhookVerifier{}})
 	handler := NewHandler(service, testPublicOrigins("https://app.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -361,7 +361,7 @@ func TestStripeConfigurationHTTPRejectsOversizedAPIKeyBeforeGatewayAndAuditsFail
 	db := testdb.Open(t)
 	gateway := &fakeStripeGateway{}
 	repo := NewRepository(db)
-	service := NewService(ServiceDependencies{Persistence: repo, ConfigurationStore: repo, WebhookInbox: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConfigurationGateway: gateway, WebhookVerifier: &fakeWebhookVerifier{}})
+	service := NewService(ServiceDependencies{Persistence: repo, ConfigurationStore: repo, WebhookInbox: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConvergenceStore: repo, ConfigurationGateway: gateway, WebhookVerifier: &fakeWebhookVerifier{}})
 	handler := NewHandler(service, testPublicOrigins("https://app.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -410,7 +410,7 @@ func TestStripeWebhookHTTPContractUsesUnauthenticatedExactRawBody(t *testing.T) 
 		ID: "evt_http", Type: "customer.updated", ObjectID: "cus_http", CreatedAt: time.Now(),
 	}}
 	repo := NewRepository(db)
-	service := NewService(ServiceDependencies{Persistence: repo, ConfigurationStore: repo, WebhookInbox: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConfigurationGateway: gateway, WebhookVerifier: verifier})
+	service := NewService(ServiceDependencies{Persistence: repo, ConfigurationStore: repo, WebhookInbox: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConvergenceStore: repo, ConfigurationGateway: gateway, WebhookVerifier: verifier})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_webhook_http", ProductTaxCode: "txcd_10105001",
 		WebhookURL: "https://app.example.com/api/webhooks/stripe",
