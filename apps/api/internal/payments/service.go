@@ -15,7 +15,6 @@ import (
 )
 
 type Service struct {
-	repo             paymentPersistence
 	configuration    StripeConfigurationStore
 	webhookInbox     StripeWebhookInboxStore
 	checkoutStore    PaymentCheckoutStore
@@ -37,7 +36,6 @@ type PaymentCheckoutShutdownEnqueuer interface {
 }
 
 type ServiceDependencies struct {
-	Persistence           paymentPersistence
 	ConfigurationStore    StripeConfigurationStore
 	WebhookInbox          StripeWebhookInboxStore
 	CheckoutStore         PaymentCheckoutStore
@@ -63,8 +61,8 @@ func NewService(dependencies ServiceDependencies) *Service {
 		events = NewEventHub()
 	}
 	service := &Service{
-		repo: dependencies.Persistence, configuration: dependencies.ConfigurationStore,
-		webhookInbox: dependencies.WebhookInbox, checkoutStore: dependencies.CheckoutStore,
+		configuration: dependencies.ConfigurationStore,
+		webhookInbox:  dependencies.WebhookInbox, checkoutStore: dependencies.CheckoutStore,
 		convergenceStore: dependencies.ConvergenceStore,
 		gateway:          dependencies.ConfigurationGateway,
 		refundGateway:    dependencies.RefundGateway,

@@ -574,7 +574,6 @@ func newCheckoutLifecycleService(t *testing.T, now *time.Time, checkout Checkout
 	seedCheckoutLifecycleWallet(t, wallets, 42)
 	repo := NewRepository(db)
 	service := NewService(ServiceDependencies{
-		Persistence:           repo,
 		ConfigurationStore:    repo,
 		WebhookInbox:          repo,
 		CheckoutStore:         repo,

@@ -45,7 +45,7 @@ func TestListRechargesReturnsCurrentUsersRecentCreditedAndCancelledOrders(t *tes
 		t.Fatal(err)
 	}
 
-	service := NewService(ServiceDependencies{Persistence: repo, CheckoutStore: repo, OrderConvergenceStore: repo, Wallets: creditService, Now: func() time.Time {
+	service := NewService(ServiceDependencies{CheckoutStore: repo, OrderConvergenceStore: repo, Wallets: creditService, Now: func() time.Time {
 		return now.Add(2 * time.Hour)
 	}})
 	page, err := service.ListRecharges(t.Context(), 42, "", 20)
@@ -74,7 +74,7 @@ func TestListRechargesReturnsCurrentUsersRecentCreditedAndCancelledOrders(t *tes
 	if len(otherPage.Items) != 0 {
 		t.Fatalf("cross-user items = %+v", otherPage.Items)
 	}
-	expiredService := NewService(ServiceDependencies{Persistence: repo, CheckoutStore: repo, OrderConvergenceStore: repo, Wallets: creditService, Now: func() time.Time {
+	expiredService := NewService(ServiceDependencies{CheckoutStore: repo, OrderConvergenceStore: repo, Wallets: creditService, Now: func() time.Time {
 		return now.AddDate(1, 0, 0).Add(24 * time.Hour)
 	}})
 	expiredPage, err := expiredService.ListRecharges(t.Context(), 42, "", 20)
@@ -97,7 +97,7 @@ func TestListRechargesShowsPartialAndFullRefundState(t *testing.T) {
 	repo := NewRepository(db)
 	now := time.Date(2026, 8, 4, 12, 0, 0, 0, time.UTC)
 	order := createCreditedRefundOrder(t, repo, now.Add(-time.Hour))
-	service := NewService(ServiceDependencies{Persistence: repo, CheckoutStore: repo, OrderConvergenceStore: repo, Now: func() time.Time { return now }})
+	service := NewService(ServiceDependencies{CheckoutStore: repo, OrderConvergenceStore: repo, Now: func() time.Time { return now }})
 
 	first, _, err := repo.CreatePendingPaymentRefund(t.Context(), CreatePendingPaymentRefundInput{
 		ActorID: 42, OrderNumber: order.PublicOrderNumber, IdeaQuantity: 200,

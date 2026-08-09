@@ -82,20 +82,10 @@ type PaymentConvergenceStore interface {
 	MarkPaymentRefundSucceeded(context.Context, string, time.Time) (PaymentRefund, error)
 }
 
-// paymentPersistence is only the Service composition root. It composes the
-// workflow contracts without exposing the concrete Postgres Repository.
-type paymentPersistence interface {
-	StripeConfigurationStore
-	StripeWebhookInboxStore
-	PaymentCheckoutStore
-	PaymentConvergenceStore
-}
-
 var (
 	_ StripeConfigurationStore     = (*Repository)(nil)
 	_ StripeWebhookInboxStore      = (*Repository)(nil)
 	_ PaymentCheckoutStore         = (*Repository)(nil)
 	_ PaymentOrderConvergenceStore = (*Repository)(nil)
 	_ PaymentConvergenceStore      = (*Repository)(nil)
-	_ paymentPersistence           = (*Repository)(nil)
 )
