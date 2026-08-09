@@ -104,6 +104,13 @@ func (l *paymentOrderLifecycle) expireOrder(ctx context.Context, order PaymentOr
 	return expired, err
 }
 
+func (l *paymentOrderLifecycle) markFailed(ctx context.Context, order PaymentOrder) (PaymentOrder, error) {
+	if l == nil || l.repo == nil {
+		return order, ErrPurchasesUnavailable
+	}
+	return l.repo.MarkPaymentOrderFailed(ctx, order.ID)
+}
+
 func (l *paymentOrderLifecycle) convergeCheckoutExpiration(ctx context.Context, order PaymentOrder, expiration ExpireCheckoutSessionResult) (PaymentOrder, error) {
 	if l == nil || l.repo == nil {
 		return order, ErrPurchasesUnavailable

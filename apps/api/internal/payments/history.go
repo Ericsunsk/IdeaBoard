@@ -50,7 +50,7 @@ type rechargeHistoryCursor struct {
 }
 
 func (s *Service) ListRecharges(ctx context.Context, userID int64, cursor string, limit int) (RechargeHistoryPage, error) {
-	if s == nil || s.repo == nil || userID <= 0 {
+	if s == nil || s.checkoutStore == nil || userID <= 0 {
 		return RechargeHistoryPage{}, ErrPaymentOrderNotFound
 	}
 	if limit == 0 {
@@ -65,7 +65,7 @@ func (s *Service) ListRecharges(ctx context.Context, userID int64, cursor string
 		return RechargeHistoryPage{}, err
 	}
 	cutoff := s.now().UTC().AddDate(0, -12, 0)
-	rows, err := s.repo.listPaymentRechargeHistory(ctx, userID, cutoff, parsedCursor, limit+1)
+	rows, err := s.checkoutStore.listPaymentRechargeHistory(ctx, userID, cutoff, parsedCursor, limit+1)
 	if err != nil {
 		return RechargeHistoryPage{}, fmt.Errorf("list recharge history: %w", err)
 	}

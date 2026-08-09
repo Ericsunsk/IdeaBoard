@@ -574,14 +574,16 @@ func newCheckoutLifecycleService(t *testing.T, now *time.Time, checkout Checkout
 	seedCheckoutLifecycleWallet(t, wallets, 42)
 	repo := NewRepository(db)
 	service := NewService(ServiceDependencies{
-		Persistence:          repo,
-		ConfigurationStore:   repo,
-		WebhookInbox:         repo,
-		ConfigurationGateway: lifecycleStripeGateway{},
-		CheckoutGateway:      checkout,
-		WebhookVerifier:      verifier,
-		Wallets:              wallets,
-		Now:                  func() time.Time { return now.UTC() },
+		Persistence:           repo,
+		ConfigurationStore:    repo,
+		WebhookInbox:          repo,
+		CheckoutStore:         repo,
+		OrderConvergenceStore: repo,
+		ConfigurationGateway:  lifecycleStripeGateway{},
+		CheckoutGateway:       checkout,
+		WebhookVerifier:       verifier,
+		Wallets:               wallets,
+		Now:                   func() time.Time { return now.UTC() },
 	})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_checkout_lifecycle", ProductTaxCode: "txcd_10105001",

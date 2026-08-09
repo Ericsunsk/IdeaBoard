@@ -165,25 +165,25 @@ type adminPaymentOrderFilters struct {
 }
 
 func (s *Service) ListAdminPaymentOrders(ctx context.Context, input AdminPaymentOrderListInput) (AdminPaymentOrderPage, error) {
-	if s == nil || s.repo == nil {
+	if s == nil || s.checkoutStore == nil {
 		return AdminPaymentOrderPage{}, fmt.Errorf("payments admin read service unavailable")
 	}
 	filters, err := normalizeAdminPaymentOrderFilters(input)
 	if err != nil {
 		return AdminPaymentOrderPage{}, err
 	}
-	return s.repo.listAdminPaymentOrders(ctx, filters)
+	return s.checkoutStore.listAdminPaymentOrders(ctx, filters)
 }
 
 func (s *Service) GetAdminPaymentOrder(ctx context.Context, orderNumber string) (AdminPaymentOrderDetail, error) {
-	if s == nil || s.repo == nil {
+	if s == nil || s.checkoutStore == nil || s.repo == nil {
 		return AdminPaymentOrderDetail{}, fmt.Errorf("payments admin read service unavailable")
 	}
 	orderNumber = strings.TrimSpace(orderNumber)
 	if !adminPaymentOrderNumber.MatchString(orderNumber) {
 		return AdminPaymentOrderDetail{}, ErrAdminPaymentOrderFilter
 	}
-	detail, events, err := s.repo.getAdminPaymentOrder(ctx, orderNumber)
+	detail, events, err := s.checkoutStore.getAdminPaymentOrder(ctx, orderNumber)
 	if err != nil {
 		return AdminPaymentOrderDetail{}, err
 	}

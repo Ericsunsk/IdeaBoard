@@ -13,7 +13,7 @@ const checkoutShutdownBatchSize int32 = 100
 // administrator disabled purchases. The run cutoff keeps a later re-enable
 // from affecting newly created Sessions.
 func (s *Service) RunPaymentCheckoutShutdown(ctx context.Context, shutdownID string) error {
-	if s == nil || s.configuration == nil || s.checkoutGateway == nil {
+	if s == nil || s.configuration == nil || s.checkoutStore == nil || s.orderLifecycle == nil || s.checkoutGateway == nil {
 		return fmt.Errorf("payment Checkout shutdown unavailable")
 	}
 	return s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
@@ -69,8 +69,8 @@ func (s *Service) RunActivePaymentCheckoutShutdowns(ctx context.Context) error {
 }
 
 func (s *Service) expireCheckoutForShutdown(ctx context.Context, apiKey string, shutdown PaymentCheckoutShutdown, candidate PaymentOrder) error {
-	return s.repo.WithUserCheckoutLock(ctx, candidate.UserID, func(userLockedContext context.Context) error {
-		order, err := s.repo.GetPaymentOrderByID(userLockedContext, candidate.ID)
+	return s.checkoutStore.WithUserCheckoutLock(ctx, candidate.UserID, func(userLockedContext context.Context) error {
+		order, err := s.checkoutStore.GetPaymentOrderByID(userLockedContext, candidate.ID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}

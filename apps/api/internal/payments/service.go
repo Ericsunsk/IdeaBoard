@@ -18,6 +18,7 @@ type Service struct {
 	repo             paymentPersistence
 	configuration    StripeConfigurationStore
 	webhookInbox     StripeWebhookInboxStore
+	checkoutStore    PaymentCheckoutStore
 	gateway          StripeGateway
 	refundGateway    RefundGateway
 	disputeGateway   DisputeGateway
@@ -35,17 +36,19 @@ type PaymentCheckoutShutdownEnqueuer interface {
 }
 
 type ServiceDependencies struct {
-	Persistence          paymentPersistence
-	ConfigurationStore   StripeConfigurationStore
-	WebhookInbox         StripeWebhookInboxStore
-	ConfigurationGateway StripeGateway
-	RefundGateway        RefundGateway
-	DisputeGateway       DisputeGateway
-	CheckoutGateway      CheckoutGateway
-	WebhookVerifier      StripeWebhookVerifier
-	Wallets              credits.WalletReader
-	Events               *EventHub
-	Now                  func() time.Time
+	Persistence           paymentPersistence
+	ConfigurationStore    StripeConfigurationStore
+	WebhookInbox          StripeWebhookInboxStore
+	CheckoutStore         PaymentCheckoutStore
+	OrderConvergenceStore PaymentOrderConvergenceStore
+	ConfigurationGateway  StripeGateway
+	RefundGateway         RefundGateway
+	DisputeGateway        DisputeGateway
+	CheckoutGateway       CheckoutGateway
+	WebhookVerifier       StripeWebhookVerifier
+	Wallets               credits.WalletReader
+	Events                *EventHub
+	Now                   func() time.Time
 }
 
 func NewService(dependencies ServiceDependencies) *Service {
@@ -59,13 +62,14 @@ func NewService(dependencies ServiceDependencies) *Service {
 	}
 	service := &Service{
 		repo: dependencies.Persistence, configuration: dependencies.ConfigurationStore,
-		webhookInbox: dependencies.WebhookInbox, gateway: dependencies.ConfigurationGateway,
+		webhookInbox: dependencies.WebhookInbox, checkoutStore: dependencies.CheckoutStore,
+		gateway:         dependencies.ConfigurationGateway,
 		refundGateway:   dependencies.RefundGateway,
 		disputeGateway:  dependencies.DisputeGateway,
 		checkoutGateway: dependencies.CheckoutGateway, verifier: dependencies.WebhookVerifier,
 		wallets: dependencies.Wallets, events: events, now: now,
 	}
-	service.orderLifecycle = newPaymentOrderLifecycle(service.repo, service.events, service.now)
+	service.orderLifecycle = newPaymentOrderLifecycle(dependencies.OrderConvergenceStore, service.events, service.now)
 	return service
 }
 
@@ -314,6 +318,9 @@ func (s *Service) receiveStripeWebhookLocked(ctx context.Context, raw []byte, si
 	if s.checkoutGateway == nil {
 		return StripeWebhookReceipt{}, fmt.Errorf("payments Checkout gateway unavailable")
 	}
+	if s.checkoutStore == nil || s.orderLifecycle == nil {
+		return StripeWebhookReceipt{}, fmt.Errorf("payments Checkout persistence unavailable")
+	}
 	apiKey, err := secrets.DecryptMaterialString(stored.APIKeyCiphertext, stored.SecretMaterialKind)
 	if err != nil {
 		return StripeWebhookReceipt{}, ErrStripeConfigurationInvalid
@@ -325,7 +332,7 @@ func (s *Service) receiveStripeWebhookLocked(ctx context.Context, raw []byte, si
 	if session.ID != event.ObjectID {
 		return StripeWebhookReceipt{}, ErrMalformedWebhookPayload
 	}
-	order, err := s.repo.GetPaymentOrderByCheckoutSession(ctx, stored.AccountID, session.ID)
+	order, err := s.checkoutStore.GetPaymentOrderByCheckoutSession(ctx, stored.AccountID, session.ID)
 	if err != nil {
 		return StripeWebhookReceipt{}, fmt.Errorf("resolve payment order for Stripe Session: %w", err)
 	}

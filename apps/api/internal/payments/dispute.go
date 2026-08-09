@@ -77,12 +77,12 @@ func canonicalPaymentDisputeStatus(providerStatus string) PaymentDisputeStatus {
 // commits. River and webhook retries both re-enter this idempotent convergence
 // path, so transient Stripe failures cannot strand an open Checkout forever.
 func (s *Service) expireDisputeCheckoutSessions(ctx context.Context, apiKey string, dispute PaymentDispute) error {
-	if s == nil || s.repo == nil || s.checkoutGateway == nil ||
+	if s == nil || s.checkoutStore == nil || s.checkoutGateway == nil ||
 		(dispute.Status != PaymentDisputeOpen && dispute.Status != PaymentDisputeLost) {
 		return nil
 	}
-	return s.repo.WithUserCheckoutLock(ctx, dispute.UserID, func(userLockedContext context.Context) error {
-		orders, err := s.repo.ListActivePaymentOrders(userLockedContext, dispute.UserID)
+	return s.checkoutStore.WithUserCheckoutLock(ctx, dispute.UserID, func(userLockedContext context.Context) error {
+		orders, err := s.checkoutStore.ListActivePaymentOrders(userLockedContext, dispute.UserID)
 		if err != nil {
 			return err
 		}

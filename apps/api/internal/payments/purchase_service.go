@@ -87,10 +87,10 @@ type PendingPaymentOrderList struct {
 
 func (s *Service) ListPendingOrders(ctx context.Context, userID int64) (PendingPaymentOrderList, error) {
 	result := PendingPaymentOrderList{Items: make([]PendingPaymentOrder, 0)}
-	if s == nil || s.configuration == nil || s.repo == nil || userID <= 0 {
+	if s == nil || s.checkoutStore == nil || userID <= 0 {
 		return result, ErrPaymentOrderNotFound
 	}
-	orders, err := s.repo.ListUserPendingPaymentOrders(ctx, userID)
+	orders, err := s.checkoutStore.ListUserPendingPaymentOrders(ctx, userID)
 	if err != nil {
 		return result, err
 	}
@@ -101,13 +101,13 @@ func (s *Service) ListPendingOrders(ctx context.Context, userID int64) (PendingP
 }
 
 func (s *Service) ContinuePendingOrder(ctx context.Context, userID int64, publicToken string) (PendingPaymentOrder, error) {
-	if s == nil || s.repo == nil || userID <= 0 {
+	if s == nil || s.configuration == nil || s.checkoutStore == nil || userID <= 0 {
 		return PendingPaymentOrder{}, ErrPaymentOrderNotFound
 	}
 	var result PendingPaymentOrder
 	err := s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
-		return s.repo.WithUserCheckoutLock(lockedContext, userID, func(userLockedContext context.Context) error {
-			order, err := s.repo.GetPaymentOrderByPublicToken(userLockedContext, userID, publicToken)
+		return s.checkoutStore.WithUserCheckoutLock(lockedContext, userID, func(userLockedContext context.Context) error {
+			order, err := s.checkoutStore.GetPaymentOrderByPublicToken(userLockedContext, userID, publicToken)
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrPaymentOrderNotFound
 			}
@@ -163,13 +163,13 @@ func (s *Service) ContinuePendingOrder(ctx context.Context, userID int64, public
 }
 
 func (s *Service) AbandonPendingOrder(ctx context.Context, userID int64, publicToken string) (PendingPaymentOrder, error) {
-	if s == nil || s.configuration == nil || s.repo == nil || userID <= 0 {
+	if s == nil || s.configuration == nil || s.checkoutStore == nil || userID <= 0 {
 		return PendingPaymentOrder{}, ErrPaymentOrderNotFound
 	}
 	var result PendingPaymentOrder
 	err := s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
-		return s.repo.WithUserCheckoutLock(lockedContext, userID, func(userLockedContext context.Context) error {
-			order, err := s.repo.GetPaymentOrderByPublicToken(userLockedContext, userID, publicToken)
+		return s.checkoutStore.WithUserCheckoutLock(lockedContext, userID, func(userLockedContext context.Context) error {
+			order, err := s.checkoutStore.GetPaymentOrderByPublicToken(userLockedContext, userID, publicToken)
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrPaymentOrderNotFound
 			}
@@ -261,12 +261,12 @@ func (s *Service) GetPurchaseOptions(ctx context.Context, userID int64) (Purchas
 }
 
 func (s *Service) CreateCheckout(ctx context.Context, command CreateCheckoutCommand) (CheckoutResult, error) {
-	if s == nil || s.configuration == nil || s.repo == nil {
+	if s == nil || s.configuration == nil || s.checkoutStore == nil {
 		return CheckoutResult{}, ErrPurchasesUnavailable
 	}
 	var result CheckoutResult
 	err := s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
-		return s.repo.WithUserCheckoutLock(lockedContext, command.UserID, func(userLockedContext context.Context) error {
+		return s.checkoutStore.WithUserCheckoutLock(lockedContext, command.UserID, func(userLockedContext context.Context) error {
 			var err error
 			result, err = s.createCheckoutLocked(userLockedContext, command)
 			return err
@@ -276,7 +276,7 @@ func (s *Service) CreateCheckout(ctx context.Context, command CreateCheckoutComm
 }
 
 func (s *Service) createCheckoutLocked(ctx context.Context, command CreateCheckoutCommand) (CheckoutResult, error) {
-	if s == nil || s.repo == nil || s.checkoutGateway == nil || s.wallets == nil {
+	if s == nil || s.checkoutStore == nil || s.checkoutGateway == nil || s.wallets == nil {
 		return CheckoutResult{}, ErrPurchasesUnavailable
 	}
 	requestHash, err := CheckoutRequestFingerprint(command)
@@ -344,7 +344,7 @@ func (s *Service) createCheckoutLocked(ctx context.Context, command CreateChecko
 		if err != nil {
 			return CheckoutResult{}, err
 		}
-		order, reused, err = s.repo.CreatePaymentOrderIntent(ctx, CreatePaymentOrderIntentInput{
+		order, reused, err = s.checkoutStore.CreatePaymentOrderIntent(ctx, CreatePaymentOrderIntentInput{
 			ID: orderID.String(), PublicOrderNumber: publicOrderNumber, PublicToken: uuid.NewString(),
 			UserID: command.UserID, ClientIdempotencyKey: strings.TrimSpace(command.ClientIdempotencyKey), RequestHash: requestHash,
 			StripeAccountID: configuration.AccountID, StripeProductID: configuration.StripeProductID,
@@ -391,7 +391,7 @@ func (s *Service) createCheckoutLocked(ctx context.Context, command CreateChecko
 }
 
 func (s *Service) refreshActivePaymentOrders(ctx context.Context, apiKey string, userID int64, now time.Time) ([]PaymentOrder, error) {
-	orders, err := s.repo.ListActivePaymentOrders(ctx, userID)
+	orders, err := s.checkoutStore.ListActivePaymentOrders(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -425,7 +425,7 @@ func (s *Service) refreshActivePaymentOrders(ctx context.Context, apiKey string,
 }
 
 func (s *Service) GetPaymentOrderReturnStatus(ctx context.Context, userID int64, publicToken string) (PaymentOrderReturnStatus, error) {
-	if s == nil || s.repo == nil {
+	if s == nil || s.configuration == nil || s.checkoutStore == nil {
 		return PaymentOrderReturnStatus{}, ErrPaymentOrderNotFound
 	}
 	var result PaymentOrderReturnStatus
@@ -438,10 +438,10 @@ func (s *Service) GetPaymentOrderReturnStatus(ctx context.Context, userID int64,
 }
 
 func (s *Service) getPaymentOrderReturnStatusLocked(ctx context.Context, userID int64, publicToken string) (PaymentOrderReturnStatus, error) {
-	if s == nil || s.repo == nil || userID <= 0 {
+	if s == nil || s.checkoutStore == nil || userID <= 0 {
 		return PaymentOrderReturnStatus{}, ErrPaymentOrderNotFound
 	}
-	order, err := s.repo.GetPaymentOrderByPublicToken(ctx, userID, publicToken)
+	order, err := s.checkoutStore.GetPaymentOrderByPublicToken(ctx, userID, publicToken)
 	if errors.Is(err, sql.ErrNoRows) {
 		return PaymentOrderReturnStatus{}, ErrPaymentOrderNotFound
 	}
@@ -510,7 +510,7 @@ func (s *Service) requireRechargeableWallet(ctx context.Context, userID int64) e
 }
 
 func (s *Service) ensurePaymentCustomer(ctx context.Context, apiKey string, order PaymentOrder) (PaymentCustomer, error) {
-	stored, err := s.repo.GetPaymentCustomer(ctx, order.UserID)
+	stored, err := s.checkoutStore.GetPaymentCustomer(ctx, order.UserID)
 	if err == nil && stored.StripeAccountID == order.StripeAccountID && stored.StripeCustomerID != "" {
 		return stored, nil
 	}
@@ -527,7 +527,7 @@ func (s *Service) ensurePaymentCustomer(ctx context.Context, apiKey string, orde
 	if strings.TrimSpace(created.ID) == "" {
 		return PaymentCustomer{}, ErrPurchasesUnavailable
 	}
-	return s.repo.ReplacePaymentCustomer(ctx, PaymentCustomer{
+	return s.checkoutStore.ReplacePaymentCustomer(ctx, PaymentCustomer{
 		UserID: order.UserID, StripeAccountID: order.StripeAccountID, StripeCustomerID: created.ID,
 	})
 }
@@ -560,7 +560,7 @@ func (s *Service) createCheckoutSessionForOrder(ctx context.Context, apiKey stri
 	if session.IsPaid() || session.Status == CheckoutSessionStatusExpired {
 		return s.orderLifecycle.convergeCheckoutSession(ctx, order, session, checkoutSignalObserved)
 	}
-	bound, err := s.repo.BindPaymentOrderCheckout(ctx, BindPaymentOrderCheckoutInput{
+	bound, err := s.checkoutStore.BindPaymentOrderCheckout(ctx, BindPaymentOrderCheckoutInput{
 		OrderID: order.ID, StripeCustomerID: customer.StripeCustomerID,
 		StripeSessionID: session.ID, CheckoutURL: session.URL, ExpiresAt: session.ExpiresAt,
 	})
@@ -576,7 +576,7 @@ func (s *Service) finishRejectedCheckoutCreation(ctx context.Context, order Paym
 	if !errors.As(err, &gatewayErr) || gatewayErr.Code() != GatewayErrorRequestRejected {
 		return operationErr
 	}
-	failed, markErr := s.repo.MarkPaymentOrderFailed(ctx, order.ID)
+	failed, markErr := s.orderLifecycle.markFailed(ctx, order)
 	if markErr != nil {
 		return errors.Join(operationErr, fmt.Errorf("mark rejected Checkout order failed: %w", markErr))
 	}
@@ -599,7 +599,7 @@ func (s *Service) retrieveAndConvergeCheckout(ctx context.Context, apiKey string
 // settleOrdersBeforeStripeKeyChange preserves the single-active-account model:
 // every older Checkout is resolved with the current key before that key can be replaced.
 func (s *Service) settleOrdersBeforeStripeKeyChange(ctx context.Context, current StoredStripeConfiguration) error {
-	orders, err := s.repo.ListUnsettledPaymentOrders(ctx)
+	orders, err := s.checkoutStore.ListUnsettledPaymentOrders(ctx)
 	if err != nil {
 		return err
 	}
