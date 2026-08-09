@@ -163,15 +163,12 @@ export type FlowHistory = {
   undo: () => void
   redo: () => void
   clearBaseline: () => void
-  onNodeDragStart: () => void
-  onNodeDragStop: (onChanged?: () => void) => void
 }
 
 export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
   const maxSteps = Math.max(1, options.maxSteps ?? 10)
   const flowHistoryPast = shallowRef<FlowHistoryEntry[]>([])
   const flowHistoryFuture = shallowRef<FlowHistoryEntry[]>([])
-  const dragBeforeSnapshot = shallowRef<FlowHistorySnapshot | null>(null)
 
   function capture(): FlowHistorySnapshot {
     recordCanvasInteractionCount('historyCaptureCount')
@@ -241,7 +238,6 @@ export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
   function clearBaseline() {
     flowHistoryPast.value = []
     flowHistoryFuture.value = []
-    dragBeforeSnapshot.value = null
   }
 
   function push(before: FlowHistorySnapshot, after = capture()): boolean {
@@ -335,26 +331,11 @@ export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
     applyHistoryEntry(entry, 'forward')
   }
 
-  function onNodeDragStart() {
-    dragBeforeSnapshot.value = capture()
-  }
-
-  function onNodeDragStop(onChanged?: () => void) {
-    if (!dragBeforeSnapshot.value) return
-    const before = dragBeforeSnapshot.value
-    const after = capture()
-    dragBeforeSnapshot.value = null
-    if (!push(before, after)) return
-    onChanged?.()
-  }
-
   return {
     capture,
     push,
     undo,
     redo,
     clearBaseline,
-    onNodeDragStart,
-    onNodeDragStop,
   }
 }

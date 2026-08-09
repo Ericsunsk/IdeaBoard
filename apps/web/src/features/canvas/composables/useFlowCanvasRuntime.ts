@@ -29,10 +29,12 @@ import {
   commitCanvasGraphDeleteIntent,
   createCanvasGraphStore,
   isCanvasGraphNodeId,
-  stageCanvasGraphNodeDragIntent,
   type CanvasGraphEdgeId,
-  type CanvasGraphTransaction,
 } from '../graph-runtime'
+import {
+  createCanvasNodeDragLifecycle,
+  type CanvasNodeDragLifecycle,
+} from '../flow-pane'
 import {
   createFlowEdgeProjectionIndex,
   createFlowEdgeIdentityFromRemoveChange,
@@ -50,11 +52,6 @@ type FlowGraphCommitOptions = {
 }
 
 export type { CanvasSelectionGroupAction } from './useCanvasGroupRuntime'
-
-type NodeDragChange = NodeChange & {
-  id: string
-  type: 'position' | 'select'
-}
 
 type EdgeRemoveChange = Extract<EdgeChange, { type: 'remove' }>
 
@@ -95,25 +92,12 @@ export type UseFlowCanvasRuntimeOptions = {
 }
 
 export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
-  let isNodeDragActive = false
-  let activeNodeDrag: {
-    transaction: CanvasGraphTransaction
-  } | null = null
-  let pendingNodeDragChanges: NodeDragChange[] = []
-  let latestNodeDragChanges: NodeDragChange[] = []
-  let pendingNodeDragFrameId: number | null = null
-  let hasAdvancedNodeDragLocalEdit = false
   let nativeRemoveHistoryBefore: FlowHistorySnapshot | null = null
   let isNativeRemoveCommitScheduled = false
   let pendingNativeRemoveNodeChanges: NodeChange[] = []
   let pendingNativeRemoveEdgeChanges: EdgeChange[] = []
   const scheduleMicrotask =
     options.scheduleMicrotask ?? ((callback: () => void) => void Promise.resolve().then(callback))
-  const scheduleAnimationFrame =
-    options.scheduleAnimationFrame ??
-    ((callback: FrameRequestCallback) => window.requestAnimationFrame(callback))
-  const cancelAnimationFrame =
-    options.cancelAnimationFrame ?? ((handle: number) => window.cancelAnimationFrame(handle))
   const localEditVersion = ref(0)
   const historyGroups: { value: unknown[] } = {
     get value() {
@@ -272,7 +256,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     isDirty: options.isDirty,
     isSaving: options.isSavingBoard,
     resumeSignal: options.autosaveResumeSignal,
-    canRun: () => !isNodeDragActive,
+    canRun: () => !nodeDragLifecycle.isActive(),
     save: (autosaveOptions) =>
       saveCurrentBoardSnapshot({ waitForPreview: false, silent: autosaveOptions?.silent }),
   })
@@ -290,14 +274,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   function advanceLocalEditVersion() {
     if (!canSaveBoard.value) return
     localEditVersion.value += 1
-  }
-
-  function isNodeDragChange(change: NodeChange): change is NodeDragChange {
-    return (change.type === 'position' || change.type === 'select') && 'id' in change
-  }
-
-  function canQueueNodeDragChanges(changes: NodeChange[]): changes is NodeDragChange[] {
-    return isNodeDragActive && changes.every(isNodeDragChange)
   }
 
   function createCurrentCanvasGraphStore(snapshotOptions?: FlowToCanvasBoardSnapshotOptions) {
@@ -324,6 +300,27 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     onWarning: options.onWarning,
     onNativeRemove: options.onNativeRemove,
     stopDeletedRunningTasks: options.stopDeletedRunningTasks,
+  })
+
+  const nodeDragLifecycle: CanvasNodeDragLifecycle = createCanvasNodeDragLifecycle({
+    createTransaction: () => createCurrentCanvasGraphStore().beginTransaction('node-drag'),
+    projectChanges: (changes) => graphAdapter.projectNodeChanges(changes),
+    syncChanges: (changes) =>
+      graphAdapter.syncProjectedNodeChanges(
+        changes,
+        createFlowGraphCommandOptions({
+          recordHistory: false,
+          markDirty: false,
+        }),
+      ),
+    captureHistory: flowHistory.capture,
+    commitHistory: flowHistory.push,
+    advanceLocalEditVersion,
+    markDirtyAndScheduleAutosave: markDirty,
+    onBegin: groupRuntime.internal.onNodeDragStart,
+    reconcileMembership: groupRuntime.internal.applyDraggedNodeMembershipChanges,
+    scheduleAnimationFrame: options.scheduleAnimationFrame,
+    cancelAnimationFrame: options.cancelAnimationFrame,
   })
 
   function deleteNode(nodeId: string): boolean {
@@ -360,116 +357,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       stopDeletedRunningTasks: options.stopDeletedRunningTasks,
     })
     return result?.didChange ?? false
-  }
-
-  function createNodeDragTransaction() {
-    return createCurrentCanvasGraphStore().beginTransaction('node-drag')
-  }
-
-  function stageNodeDragChange(change: NodeDragChange) {
-    const transaction = activeNodeDrag?.transaction
-    stageCanvasGraphNodeDragIntent(transaction, {
-      nodeId: change.id,
-      position: change.type === 'position' ? change.position : undefined,
-      selected: change.type === 'select' ? change.selected : undefined,
-    })
-  }
-
-  function getNodeDragChangeKey(change: NodeDragChange) {
-    return `${change.type}:${change.id}`
-  }
-
-  function mergeNodeDragChanges(
-    current: NodeDragChange[],
-    incoming: NodeDragChange[],
-  ): NodeDragChange[] {
-    const nextByKey = new Map<string, NodeDragChange>()
-    current.forEach((change) => {
-      nextByKey.set(getNodeDragChangeKey(change), change)
-    })
-    incoming.forEach((change) => {
-      nextByKey.set(getNodeDragChangeKey(change), change)
-    })
-    return Array.from(nextByKey.values())
-  }
-
-  function clearPendingNodeDragFrame() {
-    if (pendingNodeDragFrameId === null) return
-    cancelAnimationFrame(pendingNodeDragFrameId)
-    pendingNodeDragFrameId = null
-  }
-
-  function flushQueuedNodeDragChanges() {
-    clearPendingNodeDragFrame()
-    if (pendingNodeDragChanges.length === 0) return
-    const changes = pendingNodeDragChanges
-    pendingNodeDragChanges = []
-    graphAdapter.projectNodeChanges(changes)
-  }
-
-  function syncProjectedNodeDragChanges() {
-    if (latestNodeDragChanges.length === 0) return
-    const changes = latestNodeDragChanges
-    latestNodeDragChanges = []
-    graphAdapter.syncProjectedNodeChanges(
-      changes,
-      createFlowGraphCommandOptions({
-        recordHistory: false,
-        markDirty: false,
-      }),
-    )
-  }
-
-  function queueNodeDragChanges(changes: NodeDragChange[]) {
-    if (!hasAdvancedNodeDragLocalEdit && changes.some((change) => change.type === 'position')) {
-      advanceLocalEditVersion()
-      hasAdvancedNodeDragLocalEdit = true
-    }
-    changes.forEach(stageNodeDragChange)
-    pendingNodeDragChanges = mergeNodeDragChanges(pendingNodeDragChanges, changes)
-    latestNodeDragChanges = mergeNodeDragChanges(latestNodeDragChanges, changes)
-    if (pendingNodeDragFrameId !== null) return
-    pendingNodeDragFrameId = scheduleAnimationFrame(() => {
-      pendingNodeDragFrameId = null
-      flushQueuedNodeDragChanges()
-    })
-  }
-
-  function beginNodeDragTransaction() {
-    groupRuntime?.internal.onNodeDragStart()
-    isNodeDragActive = true
-    activeNodeDrag = { transaction: createNodeDragTransaction() }
-    flowHistory.onNodeDragStart()
-  }
-
-  function commitNodeDragTransaction() {
-    try {
-      const draggedChanges = [...pendingNodeDragChanges, ...latestNodeDragChanges]
-      flushQueuedNodeDragChanges()
-      syncProjectedNodeDragChanges()
-      activeNodeDrag?.transaction.commit()
-      groupRuntime?.internal.applyDraggedNodeMembershipChanges(draggedChanges)
-      flowHistory.onNodeDragStop(() => {
-        markDirty()
-      })
-    } finally {
-      pendingNodeDragChanges = []
-      latestNodeDragChanges = []
-      hasAdvancedNodeDragLocalEdit = false
-      clearPendingNodeDragFrame()
-      activeNodeDrag = null
-      isNodeDragActive = false
-    }
-  }
-
-  function cancelNodeDragTransaction() {
-    pendingNodeDragChanges = []
-    latestNodeDragChanges = []
-    hasAdvancedNodeDragLocalEdit = false
-    clearPendingNodeDragFrame()
-    activeNodeDrag?.transaction.cancel()
-    activeNodeDrag = null
-    isNodeDragActive = false
   }
 
   function hasRemoveChange(changes: Array<NodeChange | EdgeChange>): boolean {
@@ -585,12 +472,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   function onNodesChange(changes: NodeChange[]) {
     if (changes.length === 0) return
     groupRuntime?.internal.onBeforeNodesChange(changes)
-    if (canQueueNodeDragChanges(changes)) {
-      queueNodeDragChanges(changes)
-      return
-    }
-    flushQueuedNodeDragChanges()
-    syncProjectedNodeDragChanges()
+    if (nodeDragLifecycle.handleChanges(changes)) return
     if (hasRemoveChange(changes)) {
       pendingNativeRemoveNodeChanges = pendingNativeRemoveNodeChanges.concat(changes)
       scheduleNativeRemoveCommit()
@@ -619,9 +501,9 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     },
     grouping: groupRuntime,
     nodeDrag: {
-      begin: beginNodeDragTransaction,
-      commit: commitNodeDragTransaction,
-      cancel: cancelNodeDragTransaction,
+      begin: nodeDragLifecycle.begin,
+      commit: nodeDragLifecycle.commit,
+      cancel: nodeDragLifecycle.cancel,
     },
   }
 

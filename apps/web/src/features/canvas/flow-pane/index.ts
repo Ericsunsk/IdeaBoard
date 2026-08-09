@@ -3,3 +3,9 @@ export type { CanvasFlowPaneConnectionAdapter } from './vueFlowConnectionBinding
 export { createCanvasFlowPaneConnectionAdapter } from './vueFlowConnectionBindings'
 export { useFlowPaneSelectionAdapter } from './useFlowPaneSelectionAdapter'
 export { useVueFlowPaneAdapter } from './useVueFlowPaneAdapter'
+export {
+  createCanvasNodeDragLifecycle,
+  type CanvasNodeDragChange,
+  type CanvasNodeDragLifecycle,
+  type CanvasNodeDragLifecycleOptions,
+} from './nodeDragLifecycle'

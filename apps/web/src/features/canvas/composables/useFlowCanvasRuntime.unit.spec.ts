@@ -2033,6 +2033,25 @@ describe('useFlowCanvasRuntime', () => {
 
     expect(harness.isDirty.value).toBe(true)
     expect(harness.savedSnapshots).toHaveLength(0)
+
+    harness.runtime.flowHistory.undo()
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position).toEqual({
+      x: 400,
+      y: 40,
+    })
+
+    harness.runtime.flowHistory.redo()
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position).toEqual({
+      x: 620,
+      y: 80,
+    })
+
+    await harness.runtime.flushAutosave({ silent: true })
+    expect(harness.savedSnapshots).toHaveLength(1)
+    expect(harness.savedSnapshots[0]?.promptNodes.find((node) => node.id === 1)).toMatchObject({
+      x: 620,
+      y: 80,
+    })
   })
 
   it('does not commit a stale save snapshot over active node drag progress', async () => {
