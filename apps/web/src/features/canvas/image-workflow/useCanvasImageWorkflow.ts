@@ -1,4 +1,3 @@
-import { useFlowImageActionOrchestrator } from '../composables/useFlowImageActionOrchestrator'
 import { useFlowPromptGenerationOrchestrator } from '../composables/useFlowPromptGenerationOrchestrator'
 import { useImageCanvasExtendOverlay } from '../composables/useImageCanvasExtendOverlay'
 import {
@@ -8,11 +7,19 @@ import {
 } from '../image-tools'
 import type { CanvasFlowPaneAdapter } from '../flow-pane'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
-import type { CanvasTaskRuntime } from '../composables/useCanvasTaskRuntime'
 import type { ComputedRef } from 'vue'
 import type { PromptAspectRatio } from '../../canvas-board/domain'
 import type { ImageNodeAction } from '../config/imageActionRegistry'
 import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
+import {
+  createImageActionIntentRouter,
+  type ImageActionIntentRouterOptions,
+} from './imageActionIntentRouter'
+import {
+  useImageWorkflowExecution,
+  type ImageWorkflowExecution,
+  type UseImageWorkflowExecutionOptions,
+} from './useImageWorkflowExecution'
 
 export type CanvasImageWorkflowToolsOptions = Omit<
   UseCanvasImageToolsOptions,
@@ -40,7 +47,7 @@ export type CanvasImageWorkflowToolsOptions = Omit<
 >
 
 export type CanvasImageWorkflowActionOptions = Omit<
-  Parameters<typeof useFlowImageActionOrchestrator>[0],
+  ImageActionIntentRouterOptions,
   'runImageDirectAction' | 'runFusionPromptGeneration' | 'onFlowNodeParamUpdate' | 'onWarning'
 >
 
@@ -54,8 +61,8 @@ export type CanvasImageWorkflowExpandOverlayOptions = Omit<
   'nodes' | 'getImageNodeDisplayPayload' | 'onBeforePointerCancel' | 'onCommit'
 >
 
-type CanvasImageWorkflowTaskPort = Pick<
-  CanvasTaskRuntime,
+type CanvasImageWorkflowExecutionPort = Pick<
+  ImageWorkflowExecution,
   | 'runImageInpaintAction'
   | 'runImagePromptGeneration'
   | 'runImagePromptGenerationFromSource'
@@ -65,6 +72,7 @@ type CanvasImageWorkflowTaskPort = Pick<
   | 'runCanvasExtendAction'
   | 'isGenerationAvailable'
   | 'isNodeDirectActionRunning'
+  | 'reattachPendingImageResults'
 >
 
 type CanvasImageWorkflowGraphPort = Pick<
@@ -86,24 +94,25 @@ type CanvasImageWorkflowGraphPort = Pick<
   resolvePromptInputImageNodeIds: Parameters<
     typeof useFlowPromptGenerationOrchestrator
   >[0]['resolvePromptInputImageNodeIds']
-  updateSnapshotNodeParam: Parameters<
-    typeof useFlowImageActionOrchestrator
-  >[0]['onFlowNodeParamUpdate']
+  updateSnapshotNodeParam: ImageActionIntentRouterOptions['onFlowNodeParamUpdate']
   markNodeExecutionDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
 }
 
 export type CanvasImageWorkflowOptions = {
   graph: CanvasImageWorkflowGraphPort
-  task: CanvasImageWorkflowTaskPort
+  execution: Omit<UseImageWorkflowExecutionOptions, 'nodes' | 'currentBoardId' | 'feedback'>
   flowPaneAdapter: CanvasFlowPaneAdapter
   openImageUrlPreview: UseCanvasImageToolsOptions['openImageUrlPreview']
-  feedback: CanvasFeedback['imageTools']
+  feedback: {
+    imageTools: CanvasFeedback['imageTools']
+    taskExecution: CanvasFeedback['taskExecution']
+  }
 }
 
 export type CanvasImageWorkflow = {
-  isGenerationAvailable: CanvasImageWorkflowTaskPort['isGenerationAvailable']
-  runImageDirectAction: CanvasImageWorkflowTaskPort['runImageDirectAction']
-  runCanvasExtendAction: CanvasImageWorkflowTaskPort['runCanvasExtendAction']
+  isGenerationAvailable: CanvasImageWorkflowExecutionPort['isGenerationAvailable']
+  runImageDirectAction: CanvasImageWorkflowExecutionPort['runImageDirectAction']
+  runCanvasExtendAction: CanvasImageWorkflowExecutionPort['runCanvasExtendAction']
   createImageTools: (options: CanvasImageWorkflowToolsOptions) => CanvasImageTools
   createImageActionHandlers: (options: CanvasImageWorkflowActionOptions) => {
     onFlowImageContextMenu: (nodeId: string, event: MouseEvent) => void
@@ -140,8 +149,20 @@ export type CanvasImageWorkflow = {
   }
 }
 
-export function useCanvasImageWorkflow(options: CanvasImageWorkflowOptions): CanvasImageWorkflow {
-  const { graph, task } = options
+type CanvasImageWorkflowRuntime = CanvasImageWorkflow & {
+  reattachPendingImageResults: CanvasImageWorkflowExecutionPort['reattachPendingImageResults']
+}
+
+export function useCanvasImageWorkflow(
+  options: CanvasImageWorkflowOptions,
+): CanvasImageWorkflowRuntime {
+  const { graph } = options
+  const execution = useImageWorkflowExecution({
+    ...options.execution,
+    nodes: graph.nodes,
+    currentBoardId: graph.currentBoardId,
+    feedback: options.feedback.taskExecution,
+  })
 
   function markImageWorkflowNodeDirty(
     nodeId: string,
@@ -167,24 +188,24 @@ export function useCanvasImageWorkflow(options: CanvasImageWorkflowOptions): Can
       uploadImageToBoard: graph.uploadImageToBoard,
       openImageUrlPreview: options.openImageUrlPreview,
       updateOutputCount: markImageWorkflowNodeDirty,
-      runInpaintAction: task.runImageInpaintAction,
-      runPromptGeneration: task.runImagePromptGeneration,
-      isGenerationAvailable: task.isGenerationAvailable,
-      isDirectActionRunning: task.isNodeDirectActionRunning,
+      runInpaintAction: execution.runImageInpaintAction,
+      runPromptGeneration: execution.runImagePromptGeneration,
+      isGenerationAvailable: execution.isGenerationAvailable,
+      isDirectActionRunning: execution.isNodeDirectActionRunning,
       clearSelectedFlowElements: graph.clearSelectedFlowElements,
       startCanvasInteraction: graph.startCanvasInteraction,
       stopCanvasInteraction: graph.stopCanvasInteraction,
-      feedback: options.feedback,
+      feedback: options.feedback.imageTools,
     })
   }
 
   function createImageActionHandlers(actionOptions: CanvasImageWorkflowActionOptions) {
-    return useFlowImageActionOrchestrator({
+    return createImageActionIntentRouter({
       ...actionOptions,
-      runImageDirectAction: task.runImageDirectAction,
-      runFusionPromptGeneration: task.runFusionPromptGeneration,
+      runImageDirectAction: execution.runImageDirectAction,
+      runFusionPromptGeneration: execution.runFusionPromptGeneration,
       onFlowNodeParamUpdate: markImageWorkflowNodeDirty,
-      onWarning: options.feedback.actionUnavailable,
+      onWarning: options.feedback.imageTools.actionUnavailable,
     })
   }
 
@@ -195,9 +216,9 @@ export function useCanvasImageWorkflow(options: CanvasImageWorkflowOptions): Can
       ...promptOptions,
       getMediaInputImages: graph.getMediaInputImages,
       resolvePromptInputImageNodeIds: graph.resolvePromptInputImageNodeIds,
-      runTextPromptGeneration: task.runTextPromptGeneration,
-      runImagePromptGeneration: task.runImagePromptGeneration,
-      runImagePromptGenerationFromSource: task.runImagePromptGenerationFromSource,
+      runTextPromptGeneration: execution.runTextPromptGeneration,
+      runImagePromptGeneration: execution.runImagePromptGeneration,
+      runImagePromptGenerationFromSource: execution.runImagePromptGenerationFromSource,
     })
   }
 
@@ -210,7 +231,7 @@ export function useCanvasImageWorkflow(options: CanvasImageWorkflowOptions): Can
       stopCanvasInteraction: graph.stopCanvasInteraction,
       onBeforePointerCancel: graph.clearSelectedFlowElements,
       onCommit: async (payload) => {
-        await task.runCanvasExtendAction(payload.nodeId, {
+        await execution.runCanvasExtendAction(payload.nodeId, {
           frameRect: payload.frameRect,
           originalImageRect: payload.originalImageRect,
           prompt: payload.prompt,
@@ -221,9 +242,10 @@ export function useCanvasImageWorkflow(options: CanvasImageWorkflowOptions): Can
   }
 
   return {
-    isGenerationAvailable: task.isGenerationAvailable,
-    runImageDirectAction: task.runImageDirectAction,
-    runCanvasExtendAction: task.runCanvasExtendAction,
+    isGenerationAvailable: execution.isGenerationAvailable,
+    runImageDirectAction: execution.runImageDirectAction,
+    runCanvasExtendAction: execution.runCanvasExtendAction,
+    reattachPendingImageResults: execution.reattachPendingImageResults,
     createImageTools,
     createImageActionHandlers,
     createPromptGenerationHandlers,

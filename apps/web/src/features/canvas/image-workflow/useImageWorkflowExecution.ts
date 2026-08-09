@@ -11,7 +11,7 @@ import {
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasGraphStore } from '../graph-runtime'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
-import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
+import type { CanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
 import type { FlowToCanvasBoardSnapshotOptions } from '../utils/flowSnapshotAdapter'
 
 type ValueRef<T> = {
@@ -20,7 +20,7 @@ type ValueRef<T> = {
 
 type CanvasTaskExecutionFeedback = CanvasFeedback['taskExecution']
 
-type UseCanvasTaskRuntimeOptions = {
+export type UseImageWorkflowExecutionOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   graphAdapter: CanvasVueFlowGraphAdapter
@@ -34,7 +34,7 @@ type UseCanvasTaskRuntimeOptions = {
   feedback: CanvasTaskExecutionFeedback
 }
 
-export type CanvasTaskRuntime = ImageWorkflowCommands
+export type ImageWorkflowExecution = ImageWorkflowCommands
 
 const DEFAULT_GENERATION_UNAVAILABLE_MESSAGE = '生成服务暂不可用，请稍后重试'
 const GENERATION_UNAVAILABLE_RETRY_MS = 15_000
@@ -49,7 +49,9 @@ function isProviderUnavailableMessage(message: string): boolean {
   )
 }
 
-export function useCanvasTaskRuntime(options: UseCanvasTaskRuntimeOptions): CanvasTaskRuntime {
+export function useImageWorkflowExecution(
+  options: UseImageWorkflowExecutionOptions,
+): ImageWorkflowExecution {
   const generationUnavailableUntilMs = ref(0)
   const generationUnavailableMessage = ref(DEFAULT_GENERATION_UNAVAILABLE_MESSAGE)
   let generationAvailabilityTimer: ReturnType<typeof setTimeout> | null = null

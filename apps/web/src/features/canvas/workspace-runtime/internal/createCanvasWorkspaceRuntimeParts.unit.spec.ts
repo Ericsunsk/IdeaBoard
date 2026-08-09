@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
-import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
 import {
   createCanvasWorkspaceRuntime,
   createCanvasWorkspaceRuntimeParts,
@@ -32,8 +31,7 @@ const mocks = vi.hoisted(() => ({
   useCanvasBoardRuntime: vi.fn(),
   useCanvasGraphEditing: vi.fn(),
   useCanvasViewportRuntime: vi.fn(),
-  useCanvasTaskRuntime: vi.fn(),
-  useCanvasImageTools: vi.fn(),
+  useCanvasImageWorkflow: vi.fn(),
 }))
 
 vi.mock('../../feedback/useCanvasFeedback', () => ({
@@ -52,12 +50,8 @@ vi.mock('../../composables/useCanvasViewportRuntime', () => ({
   useCanvasViewportRuntime: mocks.useCanvasViewportRuntime,
 }))
 
-vi.mock('../../composables/useCanvasTaskRuntime', () => ({
-  useCanvasTaskRuntime: mocks.useCanvasTaskRuntime,
-}))
-
-vi.mock('../../image-tools', () => ({
-  useCanvasImageTools: mocks.useCanvasImageTools,
+vi.mock('../../image-workflow', () => ({
+  useCanvasImageWorkflow: mocks.useCanvasImageWorkflow,
 }))
 
 function createBoardRuntime() {
@@ -171,7 +165,7 @@ function createGraphEditingRuntime(graph: ReturnType<typeof createGraphRuntime>)
   }
 }
 
-function createTaskRuntime() {
+function createImageWorkflowRuntime() {
   return {
     runImageInpaintAction: vi.fn(),
     runImagePromptGeneration: vi.fn(),
@@ -183,6 +177,10 @@ function createTaskRuntime() {
     isGenerationAvailable: vi.fn(() => true),
     isNodeDirectActionRunning: vi.fn(),
     reattachPendingImageResults: vi.fn(),
+    createImageTools: vi.fn(),
+    createImageActionHandlers: vi.fn(),
+    createPromptGenerationHandlers: vi.fn(),
+    createCanvasExtendOverlay: vi.fn(),
   }
 }
 
@@ -226,30 +224,6 @@ function createWorkspaceOptions() {
   }
 }
 
-function createImageToolsOptions() {
-  return {
-    activeTool: ref('select'),
-    canvasWrapRef: ref(null),
-    isCanvasInteractionLocked: ref(false),
-    getImageStageElement: vi.fn(),
-    clearActiveNodePanel: vi.fn(),
-    hideStrengthControl: vi.fn(),
-    isImageActionPanelVisible: vi.fn(),
-    isImagePromptComposerVisible: vi.fn(),
-    strengthControl: {
-      activeAction: ref(null),
-      getValue: vi.fn(),
-      setRangeRef: vi.fn(),
-      setTriggerRef: vi.fn(),
-      onRangePointerDown: vi.fn(),
-      onInput: vi.fn(),
-      onChange: vi.fn(),
-      onPointerUp: vi.fn(),
-      onClick: vi.fn(),
-    },
-  }
-}
-
 describe('createCanvasWorkspaceRuntimeParts', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -258,13 +232,12 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
       flushViewportPersistence: vi.fn(),
       loadCanvasBoardAndProbe: vi.fn(),
     })
-    mocks.useCanvasImageTools.mockReturnValue({ kind: 'image-tools' })
   })
 
   it('owns feedback selection for board, graph, task, and image tools', async () => {
     const board = createBoardRuntime()
     const graph = createGraphRuntime()
-    const task = createTaskRuntime()
+    const imageWorkflow = createImageWorkflowRuntime()
     const events: string[] = []
     const viewportRuntime = {
       zoomLevel: ref(100),
@@ -276,7 +249,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     })
     mocks.useCanvasBoardRuntime.mockReturnValue(board)
     mocks.useCanvasGraphEditing.mockReturnValue(createGraphEditingRuntime(graph))
-    mocks.useCanvasTaskRuntime.mockReturnValue(task)
+    mocks.useCanvasImageWorkflow.mockReturnValue(imageWorkflow)
     mocks.useCanvasViewportRuntime.mockReturnValue(viewportRuntime)
 
     const runtimeOptions = createWorkspaceOptions()
@@ -305,10 +278,11 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect('isSavingBoard' in runtime.persistence).toBe(false)
     expect('saveStatus' in runtime.persistence).toBe(false)
     expect(runtime.persistence.flushAutosave).not.toBe(board.boardSession.flushAutosave)
-    expect(runtime.persistence.reattachPendingImageResults).toBe(task.reattachPendingImageResults)
+    expect(runtime.persistence.reattachPendingImageResults).toBe(
+      imageWorkflow.reattachPendingImageResults,
+    )
     expect(runtime.graphEditing.grouping).toBe(board.graphEditing.grouping)
-    expect(runtime.imageWorkflow.runImageDirectAction).toBe(task.runImageDirectAction)
-    expect(runtime.imageWorkflow.runCanvasExtendAction).toBe(task.runCanvasExtendAction)
+    expect(runtime.imageWorkflow).toBe(imageWorkflow)
 
     await runtime.persistence.flushAutosave({ silent: false })
 
@@ -340,32 +314,24 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
         feedback: mocks.feedback.graph,
       }),
     )
-    expect(mocks.useCanvasTaskRuntime).toHaveBeenCalledWith(
+    expect(mocks.useCanvasImageWorkflow).toHaveBeenCalledWith(
       expect.objectContaining({
-        nodes: board.flowPane.nodes,
-        edges: board.flowPane.edges,
-        graphAdapter: board.graphEditing.adapter,
-        refreshNodeInternals: graph.scheduleFlowNodeInternalsRefresh,
-        flushAutosave: runtime.persistence.flushAutosave,
-        feedback: mocks.feedback.taskExecution,
-      }),
-    )
-
-    runtime.imageWorkflow.createImageTools(createImageToolsOptions())
-
-    expect(mocks.useCanvasImageTools).toHaveBeenCalledWith(
-      expect.objectContaining({
-        nodes: board.flowPane.nodes,
-        currentBoardId: board.boardSession.currentBoardId,
-        getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
-        getImageNodeSnapshot: graph.getImageNodeSnapshot,
-        connectionAdapter: graph.connectionAdapter,
-        runInpaintAction: task.runImageInpaintAction,
-        runPromptGeneration: task.runImagePromptGeneration,
-        isGenerationAvailable: task.isGenerationAvailable,
-        isDirectActionRunning: task.isNodeDirectActionRunning,
-        clearSelectedFlowElements: expect.any(Function),
-        feedback: mocks.feedback.imageTools,
+        graph: expect.objectContaining({
+          nodes: board.flowPane.nodes,
+          currentBoardId: board.boardSession.currentBoardId,
+          getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
+          connectionAdapter: graph.connectionAdapter,
+        }),
+        execution: expect.objectContaining({
+          edges: board.flowPane.edges,
+          graphAdapter: board.graphEditing.adapter,
+          refreshNodeInternals: graph.scheduleFlowNodeInternalsRefresh,
+          flushAutosave: runtime.persistence.flushAutosave,
+        }),
+        feedback: {
+          imageTools: mocks.feedback.imageTools,
+          taskExecution: mocks.feedback.taskExecution,
+        },
       }),
     )
   })
@@ -373,10 +339,10 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
   it('projects only the stable Canvas Workspace facade from internal parts', () => {
     const board = createBoardRuntime()
     const graph = createGraphRuntime()
-    const task = createTaskRuntime()
+    const imageWorkflow = createImageWorkflowRuntime()
     mocks.useCanvasBoardRuntime.mockReturnValue(board)
     mocks.useCanvasGraphEditing.mockReturnValue(createGraphEditingRuntime(graph))
-    mocks.useCanvasTaskRuntime.mockReturnValue(task)
+    mocks.useCanvasImageWorkflow.mockReturnValue(imageWorkflow)
 
     const runtime = createCanvasWorkspaceRuntime(createWorkspaceOptions())
 
@@ -392,119 +358,16 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
       nodeDragTransactions: board.flowPane.nodeDragTransactions,
     })
     expect(runtime.commands.persistence.reattachPendingImageResults).toBe(
-      task.reattachPendingImageResults,
+      imageWorkflow.reattachPendingImageResults,
     )
-    expect(runtime.commands.imageWorkflow.runImageDirectAction).toBe(task.runImageDirectAction)
+    expect(runtime.commands.imageWorkflow.runImageDirectAction).toBe(
+      imageWorkflow.runImageDirectAction,
+    )
     expect('isDirty' in runtime.viewModel.persistence).toBe(false)
     expect('connectNodes' in runtime.commands.flowPane).toBe(false)
     expect('nodeContextMenu' in runtime.viewModel.graphEditing).toBe(false)
     expect('canvasNodeMenuItems' in runtime.viewModel.graphEditing).toBe(false)
     expect('closeNodeContextMenu' in runtime.commands.graphEditing).toBe(false)
     expect('openNodeContextMenu' in runtime.commands.graphEditing).toBe(false)
-  })
-
-  it('keeps output count mutations in the workspace graph wiring', () => {
-    const board = createBoardRuntime()
-    const graph = createGraphRuntime()
-    const task = createTaskRuntime()
-    mocks.useCanvasBoardRuntime.mockReturnValue(board)
-    mocks.useCanvasGraphEditing.mockReturnValue(createGraphEditingRuntime(graph))
-    mocks.useCanvasTaskRuntime.mockReturnValue(task)
-
-    const runtime = createCanvasWorkspaceRuntimeParts(createWorkspaceOptions())
-    runtime.imageWorkflow.createImageTools(createImageToolsOptions())
-    const imageToolOptions = mocks.useCanvasImageTools.mock.calls[0]?.[0]
-    const patch = { key: 'outputCount', value: 2 } as const
-
-    imageToolOptions.updateOutputCount('node-a', patch)
-
-    expect(graph.updateNodeParams).toHaveBeenCalledWith('node-a', patch)
-    expect(graph.markFlowExecutionNodeDirty).toHaveBeenCalledWith('node-a', {
-      includeSelf: true,
-    })
-  })
-
-  it('keeps prompt generation workflow policy inside the workspace runtime', () => {
-    const board = createBoardRuntime()
-    const graph = createGraphRuntime()
-    const task = createTaskRuntime()
-    graph.getMediaInputImages.mockReturnValue([])
-    mocks.useCanvasBoardRuntime.mockReturnValue(board)
-    mocks.useCanvasGraphEditing.mockReturnValue(createGraphEditingRuntime(graph))
-    mocks.useCanvasTaskRuntime.mockReturnValue(task)
-
-    const runtime = createCanvasWorkspaceRuntimeParts(createWorkspaceOptions())
-    const cancelFlowExpandMode = vi.fn()
-    const cancelFlowMaskEditorMode = vi.fn()
-    const { onFlowPromptGenerate } = runtime.imageWorkflow.createPromptGenerationHandlers({
-      cancelFlowExpandMode,
-      cancelFlowMaskEditorMode,
-    })
-
-    onFlowPromptGenerate('prompt-a', 'Draw this', 2, 'auto')
-
-    expect(cancelFlowExpandMode).toHaveBeenCalled()
-    expect(cancelFlowMaskEditorMode).toHaveBeenCalled()
-    expect(graph.getMediaInputImages).toHaveBeenCalledWith('prompt-a')
-    expect(task.runTextPromptGeneration).toHaveBeenCalledWith('prompt-a', 'Draw this', 2, 'auto')
-  })
-
-  it('keeps fusion parameter dirty marking inside the workspace action wiring', () => {
-    const board = createBoardRuntime()
-    const graph = createGraphRuntime()
-    const task = createTaskRuntime()
-    mocks.useCanvasBoardRuntime.mockReturnValue(board)
-    mocks.useCanvasGraphEditing.mockReturnValue(createGraphEditingRuntime(graph))
-    mocks.useCanvasTaskRuntime.mockReturnValue(task)
-
-    const runtime = createCanvasWorkspaceRuntimeParts(createWorkspaceOptions())
-    const { onFlowFusionPromptGenerate } = runtime.imageWorkflow.createImageActionHandlers({
-      flowImageEditorNodeId: ref(null),
-      consumeSuppressedStrengthClick: vi.fn(() => false),
-      openActiveNodePanel: vi.fn(),
-      clearActiveNodePanel: vi.fn(),
-      hideStrengthControl: vi.fn(),
-      selectFlowNodeForContextMenu: vi.fn(),
-      cancelFlowExpandMode: vi.fn(),
-      cancelFlowMaskEditorMode: vi.fn(),
-      enterFlowExpandMode: vi.fn(),
-      enterFlowImageEditorMode: vi.fn(),
-      focusImageEditorAndShowChrome: vi.fn(),
-      runImagePromptAction: vi.fn(),
-      getActionStrength: vi.fn(),
-    })
-
-    onFlowFusionPromptGenerate('fusion-a', 'Blend', 3, '1:1')
-
-    expect(graph.updateNodeParams).toHaveBeenCalledTimes(3)
-    expect(graph.markFlowExecutionNodeDirty).toHaveBeenCalledTimes(3)
-    expect(graph.markFlowExecutionNodeDirty).toHaveBeenCalledWith('fusion-a', {
-      includeSelf: true,
-    })
-    expect(task.runFusionPromptGeneration).toHaveBeenCalledWith('fusion-a', 'Blend', 3, '1:1')
-  })
-
-  it('keeps image workflow entrypoints reachable from the workspace runtime surface', () => {
-    const board = createBoardRuntime()
-    const graph = createGraphRuntime()
-    const task = createTaskRuntime()
-    mocks.useCanvasBoardRuntime.mockReturnValue(board)
-    mocks.useCanvasGraphEditing.mockReturnValue(createGraphEditingRuntime(graph))
-    mocks.useCanvasTaskRuntime.mockReturnValue(task)
-
-    const runtime = createCanvasWorkspaceRuntimeParts(createWorkspaceOptions())
-    const extendPayload = {
-      nodeId: 'image-1',
-      frameRect: { left: 0, top: 0, width: 100, height: 100 },
-      originalImageRect: { left: 10, top: 10, width: 80, height: 80 },
-      prompt: 'extend',
-      outputCount: 1,
-    }
-
-    runtime.imageWorkflow.runImageDirectAction('image-1', IMAGE_NODE_ACTION.hdUpscale)
-    runtime.imageWorkflow.runCanvasExtendAction('image-1', extendPayload)
-
-    expect(task.runImageDirectAction).toHaveBeenCalledWith('image-1', IMAGE_NODE_ACTION.hdUpscale)
-    expect(task.runCanvasExtendAction).toHaveBeenCalledWith('image-1', extendPayload)
   })
 })

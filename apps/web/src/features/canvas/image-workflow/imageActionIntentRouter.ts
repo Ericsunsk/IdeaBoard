@@ -12,7 +12,10 @@ import {
 } from '../execution'
 import type { PromptAspectRatio } from '../../canvas-board/domain'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
-import { ACTIVE_NODE_PANEL_KIND, type ActiveNodePanel } from './useFlowActiveNodePanels'
+import {
+  ACTIVE_NODE_PANEL_KIND,
+  type ActiveNodePanel,
+} from '../composables/useFlowActiveNodePanels'
 import type { ImageEditorMode } from '../image-editor'
 
 type FusionPromptParamPatch = Extract<
@@ -20,7 +23,7 @@ type FusionPromptParamPatch = Extract<
   { key: 'prompt' | 'outputCount' | 'aspectRatio' }
 >
 
-type UseFlowImageActionOrchestratorOptions = {
+export type ImageActionIntentRouterOptions = {
   flowImageEditorNodeId: Ref<string | null>
   consumeSuppressedStrengthClick: (action: ImageStrengthAction) => boolean
   openActiveNodePanel: (panel: ActiveNodePanel) => void
@@ -53,7 +56,7 @@ type UseFlowImageActionOrchestratorOptions = {
   getActionStrength: (action: ImageStrengthAction) => number
 }
 
-export function useFlowImageActionOrchestrator(options: UseFlowImageActionOrchestratorOptions) {
+export function createImageActionIntentRouter(options: ImageActionIntentRouterOptions) {
   function onFlowImageContextMenu(nodeId: string, event: MouseEvent) {
     event.preventDefault()
     if (options.flowImageEditorNodeId.value === nodeId) return

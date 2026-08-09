@@ -3,7 +3,6 @@ import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import type { ImageNodeItem } from '../../../canvas-board/domain'
 import { useCanvasViewportRuntime } from '../../composables/useCanvasViewportRuntime'
 import { useCanvasBoardRuntime } from '../../composables/useCanvasBoardRuntime'
-import { useCanvasTaskRuntime } from '../../composables/useCanvasTaskRuntime'
 import { useFlowCanvasInteractionState } from '../../composables/useFlowCanvasInteractionState'
 import { useFlowImageNodeInteractions } from '../../composables/useFlowImageNodeInteractions'
 import { useFlowNodeUiState } from '../../composables/useFlowNodeUiState'
@@ -150,18 +149,6 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     await board.boardSession.flushAutosave(autosaveOptions)
   }
 
-  const task = useCanvasTaskRuntime({
-    nodes: board.flowPane.nodes,
-    edges: board.flowPane.edges,
-    graphAdapter: board.graphEditing.adapter,
-    createCurrentCanvasGraphStore: board.graphEditing.createCurrentCanvasGraphStore,
-    boardBaseSnapshot: board.boardSession.boardBaseSnapshot,
-    flushAutosave: flushAutosaveWithViewportPersistence,
-    currentBoardId: board.boardSession.currentBoardId,
-    refreshNodeInternals: editing.commands.scheduleNodeInternalsRefresh,
-    feedback: feedback.taskExecution,
-  })
-
   const imageWorkflow = useCanvasImageWorkflow({
     graph: {
       nodes: board.flowPane.nodes,
@@ -179,10 +166,20 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
       updateSnapshotNodeParam: editing.workflowPort.updateNodeParams,
       markNodeExecutionDirty: editing.workflowPort.markNodeExecutionDirty,
     },
-    task,
+    execution: {
+      edges: board.flowPane.edges,
+      graphAdapter: board.graphEditing.adapter,
+      createCurrentCanvasGraphStore: board.graphEditing.createCurrentCanvasGraphStore,
+      boardBaseSnapshot: board.boardSession.boardBaseSnapshot,
+      flushAutosave: flushAutosaveWithViewportPersistence,
+      refreshNodeInternals: editing.commands.scheduleNodeInternalsRefresh,
+    },
     flowPaneAdapter: options.flowPaneAdapter,
     openImageUrlPreview: options.openImageUrlPreview,
-    feedback: feedback.imageTools,
+    feedback: {
+      imageTools: feedback.imageTools,
+      taskExecution: feedback.taskExecution,
+    },
   })
 
   const parts = {
@@ -202,7 +199,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
       flushAutosave: flushAutosaveWithViewportPersistence,
       history: board.boardSession.history,
       loadCanvasBoardAndProbe: viewport.loadCanvasBoardAndProbe,
-      reattachPendingImageResults: task.reattachPendingImageResults,
+      reattachPendingImageResults: imageWorkflow.reattachPendingImageResults,
     },
     viewportControls: viewport,
     graphEditing: {

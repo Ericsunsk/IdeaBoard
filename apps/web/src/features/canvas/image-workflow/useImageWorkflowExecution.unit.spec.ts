@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
-import { useCanvasTaskRuntime } from './useCanvasTaskRuntime'
+import { useImageWorkflowExecution } from './useImageWorkflowExecution'
 import { CanvasBillingPreflightError } from '../execution'
 
 const mocks = vi.hoisted(() => {
@@ -66,11 +66,11 @@ function createRuntime() {
     refreshNodeInternals: vi.fn(),
     feedback,
   }
-  const runtime = useCanvasTaskRuntime(runtimeOptions as never)
+  const runtime = useImageWorkflowExecution(runtimeOptions as never)
   return { runtime, feedback }
 }
 
-describe('useCanvasTaskRuntime', () => {
+describe('useImageWorkflowExecution', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.setSystemTime(0)
