@@ -1,7 +1,6 @@
 import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import { computed, watch } from 'vue'
-import { IMAGE_UPLOAD_ACCEPT } from '../../../shared/constants/media'
 import type {
   CanvasNodeItem,
   FusionNodeItem,
@@ -28,11 +27,13 @@ export type MediaInputImage = {
 }
 
 type UseFlowMediaInputImagesOptions = {
+  browser: {
+    pickImageFile: () => Promise<File | null>
+    readDroppedFile: (event: DragEvent) => File | null
+  }
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  uploadImageToBoard: (
-    file: File,
-  ) => Promise<{ url: string; ratio: number; mediaAssetId: number }>
+  uploadImageToBoard: (file: File) => Promise<{ url: string; ratio: number; mediaAssetId: number }>
   updateSnapshotNodeBase: (
     nodeId: string,
     mutate: (snapshotNode: CanvasNodeItem) => CanvasNodeItem,
@@ -142,9 +143,7 @@ function createSourceImageSignature(node: FlowMediaInputNode) {
       ).outputImages
     : []
   const latest = outputImages[outputImages.length - 1]
-  return latest
-    ? `${latest.url ?? ''},${latest.ratio ?? ''},${latest.mediaAssetId ?? ''}`
-    : ''
+  return latest ? `${latest.url ?? ''},${latest.ratio ?? ''},${latest.mediaAssetId ?? ''}` : ''
 }
 
 function areMediaInputImagesEqual(current: MediaInputImage[], next: MediaInputImage[]) {
@@ -276,8 +275,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
 
     const outputs = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
     const latest = outputs[outputs.length - 1] as
-      | { url?: string; ratio?: number; mediaAssetId?: number }
-      | undefined
+      { url?: string; ratio?: number; mediaAssetId?: number } | undefined
     const url = typeof latest?.url === 'string' ? latest.url.trim() : ''
     if (!url) return null
     const ratio = Number(latest?.ratio)
@@ -301,7 +299,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
     return kind === 'prompt' ? 'Prompt' : '节点'
   }
 
-  async function onFlowMediaInputImageDrop(nodeId: string, event: DragEvent) {
+  async function addMediaInputImageFile(nodeId: string, file: File) {
     const kind = resolveMediaInputNodeKind(nodeId)
     if (!kind) return
     const inputLimit = getCanvasNodeImageInputLimit(kind)
@@ -311,8 +309,6 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
       options.onWarning(`${label} 最多接入 ${inputLimit} 张图片`)
       return
     }
-    const file = event.dataTransfer?.files?.[0]
-    if (!file) return
     try {
       const uploaded = await options.uploadImageToBoard(file)
       options.updateSnapshotNodeBase(nodeId, (snapshotNode) => {
@@ -339,7 +335,12 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
     }
   }
 
-  function onFlowMediaInputImageOpen(nodeId: string) {
+  async function onFlowMediaInputImageDrop(nodeId: string, event: DragEvent) {
+    const file = options.browser.readDroppedFile(event)
+    if (file) await addMediaInputImageFile(nodeId, file)
+  }
+
+  async function onFlowMediaInputImageOpen(nodeId: string) {
     const kind = resolveMediaInputNodeKind(nodeId)
     if (kind !== 'prompt') return
     const inputLimit = getCanvasNodeImageInputLimit(kind)
@@ -349,20 +350,8 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
       options.onWarning(`${label} 最多接入 ${inputLimit} 张图片`)
       return
     }
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = IMAGE_UPLOAD_ACCEPT
-    input.onchange = () => {
-      const file = input.files?.[0]
-      if (!file) return
-      const syntheticDrop = {
-        dataTransfer: { files: [file] },
-        clientX: window.innerWidth / 2,
-        clientY: window.innerHeight / 2,
-      } as unknown as DragEvent
-      void onFlowMediaInputImageDrop(nodeId, syntheticDrop)
-    }
-    input.click()
+    const file = await options.browser.pickImageFile()
+    if (file) await addMediaInputImageFile(nodeId, file)
   }
 
   function onFlowMediaInputImagePreview(image: { url: string; ratio: number }) {

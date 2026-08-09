@@ -1,12 +1,7 @@
 import type { Edge, EdgeUpdateEvent, Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
 import { shallowRef } from 'vue'
-import type {
-  CanvasCreatableNodeKind,
-  FusionNodeItem,
-  ImageNodeItem,
-  PromptNodeItem,
-} from '../../canvas-board/domain'
+import type { FusionNodeItem, ImageNodeItem, PromptNodeItem } from '../../canvas-board/domain'
 import { FLOW_NODE_DRAG_HANDLE } from '../utils/flowNodeDragHandle'
 import { useCanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import { useFlowNodeMutations } from './useFlowNodeMutations'
@@ -112,7 +107,6 @@ function createMutationsHarness(initialNodes: Node[], initialEdges: Edge[]) {
   const mutations = useFlowNodeMutations({
     nodes,
     edges,
-    createNodeKind: shallowRef<CanvasCreatableNodeKind>('prompt'),
     graphAdapter,
     onWarning,
   })

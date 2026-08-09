@@ -1,43 +1,21 @@
 import { ref, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
 import { createCanvasNodeAt } from '../utils/canvasNodeFactory'
-import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
 import { resolveImageNodeFrameSize } from '../../canvas-board/domain'
 import {
   resolveImageNodeDisplayPayload,
   type ImageNodeDisplayPayload,
 } from '../utils/flowImageNodeSelectors'
 import type { ImageNodeItem } from '../../canvas-board/domain'
-import type { FlowAdapterNode } from '../utils/flowSnapshotAdapter'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
+import { createImageFlowNode } from '../utils/flowImageNodeFactory'
 
 type UseFlowImageNodeInteractionsOptions = {
   nodes: Ref<Node[]>
   getImageNodeDisplayPayload: (nodeId: string) => ImageNodeDisplayPayload | null
-  getImageNodeSnapshot: (
-    nodeId: string,
-  ) => { x: number; y: number; width: number; outputCount?: ImageNodeItem['outputCount'] } | null
   graphAdapter: CanvasVueFlowGraphAdapter
-}
-
-function createImageFlowNode(item: ImageNodeItem): Node {
-  const data: FlowNodeData = {
-    kind: 'image',
-    nodeType: 'image',
-    title: `Image #${item.id}`,
-    summary: 'Canvas image node',
-    snapshotNode: item,
-  }
-  const nextNode: FlowAdapterNode = {
-    id: `image-${item.id}`,
-    type: 'canvas',
-    dragHandle: resolveFlowNodeDragHandle('image'),
-    position: { x: item.x, y: item.y },
-    data,
-  }
-  return nextNode as Node
 }
 
 function cloneImageOutputs(source: ImageNodeItem): ImageNodeItem['outputImages'] {
@@ -59,28 +37,6 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
   const flowAltDragDuplicateState = ref<{
     initialPositions: Map<string, { x: number; y: number }>
   } | null>(null)
-
-  function appendImageFlowNode(item: ImageNodeItem) {
-    options.graphAdapter.addNodes(createImageFlowNode(item), createFlowGraphCommandOptions())
-  }
-
-  function onFlowImageAppendToCanvas(nodeId: string) {
-    const payload = options.getImageNodeDisplayPayload(nodeId)
-    const sourceNode = options.getImageNodeSnapshot(nodeId)
-    if (!payload || !sourceNode) return
-    const imageNode = createCanvasNodeAt('image', {
-      x: sourceNode.x + Math.max(240, sourceNode.width + 64),
-      y: sourceNode.y + 18,
-    })
-    imageNode.sourceImageUrl = payload.url
-    imageNode.sourceMediaAssetId = payload.mediaAssetId
-    imageNode.sourceImageRatio = payload.ratio
-    imageNode.outputCount = sourceNode.outputCount ?? imageNode.outputCount
-    imageNode.width = resolveImageNodeFrameSize(payload.ratio, true).width
-    imageNode.outputStatus = 'ready'
-    imageNode.outputImages = []
-    appendImageFlowNode(imageNode)
-  }
 
   function beginFlowNodeDragDuplicateTracking(isDuplicateMode: boolean) {
     if (!isDuplicateMode) {
@@ -166,10 +122,8 @@ export function useFlowImageNodeInteractions(options: UseFlowImageNodeInteractio
   }
 
   return {
-    appendImageFlowNode,
     flowAltDragDuplicateState,
     beginFlowNodeDragDuplicateTracking,
     finishFlowNodeDragDuplicateTracking,
-    onFlowImageAppendToCanvas,
   }
 }

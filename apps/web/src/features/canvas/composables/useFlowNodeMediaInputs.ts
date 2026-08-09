@@ -1,8 +1,9 @@
-import { IMAGE_UPLOAD_ACCEPT } from '../../../shared/constants/media'
 import type { CanvasNodeItem } from '../../canvas-board/domain'
 import { IMAGE_NODE_EMPTY_SIZE } from '../../canvas-board/domain'
 
 type UseFlowNodeMediaInputsOptions = {
+  pickImageFile: () => Promise<File | null>
+  readDroppedFile: (event: DragEvent) => File | null
   applyImageFileToImageNode: (nodeId: string, file: File) => Promise<boolean>
   updateSnapshotNode: (nodeId: string, patcher: (prev: CanvasNodeItem) => CanvasNodeItem) => void
   markFlowExecutionNodeDirty: (nodeId: string) => void
@@ -10,16 +11,10 @@ type UseFlowNodeMediaInputsOptions = {
 
 export function useFlowNodeMediaInputs(options: UseFlowNodeMediaInputsOptions) {
   // --- Image node handlers ---
-  function onFlowImageOpenFile(nodeId: string) {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = IMAGE_UPLOAD_ACCEPT
-    input.onchange = () => {
-      const file = input.files?.[0]
-      if (!file) return
-      void options.applyImageFileToImageNode(nodeId, file)
-    }
-    input.click()
+  async function onFlowImageOpenFile(nodeId: string) {
+    const file = await options.pickImageFile()
+    if (!file) return
+    await options.applyImageFileToImageNode(nodeId, file)
   }
 
   function onFlowImageReset(nodeId: string) {
@@ -41,7 +36,7 @@ export function useFlowNodeMediaInputs(options: UseFlowNodeMediaInputsOptions) {
 
   function onFlowImageStageDrop(nodeId: string, event: DragEvent) {
     event.preventDefault()
-    const file = event.dataTransfer?.files?.[0]
+    const file = options.readDroppedFile(event)
     if (!file) return
     void options.applyImageFileToImageNode(nodeId, file)
   }

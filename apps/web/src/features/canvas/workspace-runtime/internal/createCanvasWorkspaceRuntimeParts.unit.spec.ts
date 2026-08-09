@@ -30,7 +30,7 @@ const mocks = vi.hoisted(() => ({
     },
   },
   useCanvasBoardRuntime: vi.fn(),
-  useCanvasGraphRuntime: vi.fn(),
+  useCanvasGraphEditing: vi.fn(),
   useCanvasViewportRuntime: vi.fn(),
   useCanvasTaskRuntime: vi.fn(),
   useCanvasImageTools: vi.fn(),
@@ -44,8 +44,8 @@ vi.mock('../../composables/useCanvasBoardRuntime', () => ({
   useCanvasBoardRuntime: mocks.useCanvasBoardRuntime,
 }))
 
-vi.mock('../../composables/useCanvasGraphRuntime', () => ({
-  useCanvasGraphRuntime: mocks.useCanvasGraphRuntime,
+vi.mock('../../graph-editing', () => ({
+  useCanvasGraphEditing: mocks.useCanvasGraphEditing,
 }))
 
 vi.mock('../../composables/useCanvasViewportRuntime', () => ({
@@ -122,13 +122,52 @@ function createGraphRuntime() {
       connectIntent: vi.fn(),
     },
     uploadImageToBoard: vi.fn(),
-    _onFlowNodeParamUpdate: vi.fn(),
+    updateNodeParams: vi.fn(),
     markFlowExecutionNodeDirty: vi.fn(),
     clearSelectedFlowElementsSync: vi.fn(),
     startFlowInteraction: vi.fn(),
     stopFlowInteraction: vi.fn(),
     getMediaInputImages: vi.fn(() => []),
     resolvePromptInputImageNodeIds: vi.fn(() => []),
+    createNodeAtPosition: vi.fn(),
+    createNodeInteractions: vi.fn(),
+  }
+}
+
+function createGraphEditingRuntime(graph: ReturnType<typeof createGraphRuntime>) {
+  return {
+    flowPane: {
+      connectionAdapter: graph.connectionAdapter,
+    },
+    commands: {
+      scheduleNodeInternalsRefresh: graph.scheduleFlowNodeInternalsRefresh,
+      createNodeAtPosition: graph.createNodeAtPosition,
+      createNodeInteractions: graph.createNodeInteractions,
+      mediaInputs: {
+        drop: vi.fn(),
+        open: vi.fn(),
+        preview: vi.fn(),
+        remove: vi.fn(),
+      },
+      canvasFiles: {
+        drop: vi.fn(),
+        dragOver: vi.fn(),
+      },
+      imageNodes: {
+        openPreview: vi.fn(),
+        appendToCanvas: vi.fn(),
+      },
+    },
+    workflowPort: {
+      getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
+      getImageNodeSnapshot: graph.getImageNodeSnapshot,
+      createImageNodeFromFile: graph.createImageNodeFromFile,
+      uploadImageToBoard: graph.uploadImageToBoard,
+      getMediaInputImages: graph.getMediaInputImages,
+      resolvePromptInputImageNodeIds: graph.resolvePromptInputImageNodeIds,
+      updateNodeParams: graph.updateNodeParams,
+      markNodeExecutionDirty: graph.markFlowExecutionNodeDirty,
+    },
   }
 }
 
@@ -169,9 +208,14 @@ function createWorkspaceOptions() {
     route: { query: {} } as never,
     router: {} as never,
     getUserIdentity: () => ({ userId: 1, userUid: 'user-a' }),
-    createNodeKind: ref('prompt' as const),
     flowPaneAdapter,
     uploadApi: { upload: vi.fn() },
+    graphEditingBrowser: {
+      pickImageFile: vi.fn(async () => null),
+      readDroppedFile: vi.fn(() => null),
+      readDropScreenPoint: vi.fn(() => ({ x: 0, y: 0 })),
+      markDropAsCopy: vi.fn(),
+    },
     openNodeImagePreview: vi.fn(),
     openImageUrlPreview: vi.fn(),
     logoutAndRedirect: vi.fn(),
@@ -231,7 +275,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
       events.push('autosave')
     })
     mocks.useCanvasBoardRuntime.mockReturnValue(board)
-    mocks.useCanvasGraphRuntime.mockReturnValue(graph)
+    mocks.useCanvasGraphEditing.mockReturnValue(createGraphEditingRuntime(graph))
     mocks.useCanvasTaskRuntime.mockReturnValue(task)
     mocks.useCanvasViewportRuntime.mockReturnValue(viewportRuntime)
 
@@ -285,13 +329,14 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
       }),
     )
     expect(mocks.useCanvasViewportRuntime.mock.calls[0]?.[0].getUserUid()).toBe('user-a')
-    expect(mocks.useCanvasGraphRuntime).toHaveBeenCalledWith(
+    expect(mocks.useCanvasGraphEditing).toHaveBeenCalledWith(
       expect.objectContaining({
         nodes: board.flowPane.nodes,
         edges: board.flowPane.edges,
         graphAdapter: board.graphEditing.adapter,
         screenToFlowCoordinate: runtimeOptions.flowPaneAdapter.screenToFlowCoordinate,
-        getSelectedElements: runtimeOptions.flowPaneAdapter.getSelectedElements,
+        browser: runtimeOptions.graphEditingBrowser,
+        upload: runtimeOptions.uploadApi,
         feedback: mocks.feedback.graph,
       }),
     )
@@ -319,7 +364,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
         runPromptGeneration: task.runImagePromptGeneration,
         isGenerationAvailable: task.isGenerationAvailable,
         isDirectActionRunning: task.isNodeDirectActionRunning,
-        clearSelectedFlowElements: graph.clearSelectedFlowElementsSync,
+        clearSelectedFlowElements: expect.any(Function),
         feedback: mocks.feedback.imageTools,
       }),
     )
@@ -330,7 +375,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     const graph = createGraphRuntime()
     const task = createTaskRuntime()
     mocks.useCanvasBoardRuntime.mockReturnValue(board)
-    mocks.useCanvasGraphRuntime.mockReturnValue(graph)
+    mocks.useCanvasGraphEditing.mockReturnValue(createGraphEditingRuntime(graph))
     mocks.useCanvasTaskRuntime.mockReturnValue(task)
 
     const runtime = createCanvasWorkspaceRuntime(createWorkspaceOptions())
@@ -363,7 +408,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     const graph = createGraphRuntime()
     const task = createTaskRuntime()
     mocks.useCanvasBoardRuntime.mockReturnValue(board)
-    mocks.useCanvasGraphRuntime.mockReturnValue(graph)
+    mocks.useCanvasGraphEditing.mockReturnValue(createGraphEditingRuntime(graph))
     mocks.useCanvasTaskRuntime.mockReturnValue(task)
 
     const runtime = createCanvasWorkspaceRuntimeParts(createWorkspaceOptions())
@@ -373,7 +418,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
 
     imageToolOptions.updateOutputCount('node-a', patch)
 
-    expect(graph._onFlowNodeParamUpdate).toHaveBeenCalledWith('node-a', patch)
+    expect(graph.updateNodeParams).toHaveBeenCalledWith('node-a', patch)
     expect(graph.markFlowExecutionNodeDirty).toHaveBeenCalledWith('node-a', {
       includeSelf: true,
     })
@@ -385,7 +430,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     const task = createTaskRuntime()
     graph.getMediaInputImages.mockReturnValue([])
     mocks.useCanvasBoardRuntime.mockReturnValue(board)
-    mocks.useCanvasGraphRuntime.mockReturnValue(graph)
+    mocks.useCanvasGraphEditing.mockReturnValue(createGraphEditingRuntime(graph))
     mocks.useCanvasTaskRuntime.mockReturnValue(task)
 
     const runtime = createCanvasWorkspaceRuntimeParts(createWorkspaceOptions())
@@ -409,7 +454,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     const graph = createGraphRuntime()
     const task = createTaskRuntime()
     mocks.useCanvasBoardRuntime.mockReturnValue(board)
-    mocks.useCanvasGraphRuntime.mockReturnValue(graph)
+    mocks.useCanvasGraphEditing.mockReturnValue(createGraphEditingRuntime(graph))
     mocks.useCanvasTaskRuntime.mockReturnValue(task)
 
     const runtime = createCanvasWorkspaceRuntimeParts(createWorkspaceOptions())
@@ -431,7 +476,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
 
     onFlowFusionPromptGenerate('fusion-a', 'Blend', 3, '1:1')
 
-    expect(graph._onFlowNodeParamUpdate).toHaveBeenCalledTimes(3)
+    expect(graph.updateNodeParams).toHaveBeenCalledTimes(3)
     expect(graph.markFlowExecutionNodeDirty).toHaveBeenCalledTimes(3)
     expect(graph.markFlowExecutionNodeDirty).toHaveBeenCalledWith('fusion-a', {
       includeSelf: true,
@@ -444,7 +489,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     const graph = createGraphRuntime()
     const task = createTaskRuntime()
     mocks.useCanvasBoardRuntime.mockReturnValue(board)
-    mocks.useCanvasGraphRuntime.mockReturnValue(graph)
+    mocks.useCanvasGraphEditing.mockReturnValue(createGraphEditingRuntime(graph))
     mocks.useCanvasTaskRuntime.mockReturnValue(task)
 
     const runtime = createCanvasWorkspaceRuntimeParts(createWorkspaceOptions())

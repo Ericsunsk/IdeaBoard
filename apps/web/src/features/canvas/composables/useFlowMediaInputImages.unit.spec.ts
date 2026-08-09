@@ -99,6 +99,10 @@ function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
     mediaAssetId: 501,
   }))
   const api = useFlowMediaInputImages({
+    browser: {
+      pickImageFile: vi.fn(async () => null),
+      readDroppedFile: (event) => event.dataTransfer?.files?.[0] ?? null,
+    },
     nodes,
     edges,
     uploadImageToBoard,

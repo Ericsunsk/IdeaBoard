@@ -5,6 +5,11 @@ import {
 import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
 
 type UseFlowCanvasDropOptions = {
+  browser: {
+    markDropAsCopy: (event: DragEvent) => void
+    readDroppedFile: (event: DragEvent) => File | null
+    readDropScreenPoint: (event: DragEvent) => { x: number; y: number }
+  }
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
   onWarning: (msg: string) => void
   createImageNodeFromFile: (
@@ -15,13 +20,12 @@ type UseFlowCanvasDropOptions = {
 
 export function useFlowCanvasDrop(options: UseFlowCanvasDropOptions) {
   function onCanvasDragOver(event: DragEvent) {
-    if (!event.dataTransfer) return
-    event.dataTransfer.dropEffect = 'copy'
+    options.browser.markDropAsCopy(event)
   }
 
   async function onCanvasDrop(event: DragEvent) {
-    const point = options.screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
-    const file = event.dataTransfer?.files?.[0]
+    const point = options.screenToFlowCoordinate(options.browser.readDropScreenPoint(event))
+    const file = options.browser.readDroppedFile(event)
     if (!file) return
     if (!isSupportedUploadImageFile(file)) {
       options.onWarning(unsupportedUploadImageMessage())

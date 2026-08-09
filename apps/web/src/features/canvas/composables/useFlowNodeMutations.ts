@@ -31,7 +31,6 @@ type UseFlowNodeMutationsOptions = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow node/edge data is an open Record; narrowing here breaks vue-flow's internal type expectations
   edges: Ref<Array<Record<string, any>>>
   boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
-  createNodeKind: Ref<CanvasCreatableNodeKind>
   graphAdapter: CanvasVueFlowGraphAdapter
   onWarning: (message: string) => void
 }
@@ -165,23 +164,6 @@ function createSnapshotCommandSideEffects(
 }
 
 export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
-  function resolveNodePosition(baseX = 120, baseY = 100) {
-    if (options.nodes.value.length === 0) return { x: baseX, y: baseY }
-    let maxY = baseY
-    for (const node of options.nodes.value) {
-      if (node.position.y > maxY) maxY = node.position.y
-    }
-    return { x: baseX, y: maxY + 40 }
-  }
-
-  function createSnapshotNodeForKind<T extends CanvasCreatableNodeKind>(
-    kind: T,
-    x: number,
-    y: number,
-  ) {
-    return createCanvasNodeAt(kind, { x, y })
-  }
-
   function lookupData(nodeId: string) {
     const matched = (options.nodes.value as Array<{ id: string; data?: unknown }>).find(
       (node) => node.id === nodeId,
@@ -228,19 +210,13 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     markFlowExecutionNodeDirty,
   })
 
-  function onAddNode() {
-    const kind = options.createNodeKind.value
-    const position = resolveNodePosition()
-    appendNodeAtPosition(kind, position.x, position.y)
-  }
-
   function appendNodeAtPosition<T extends CanvasCreatableNodeKind>(
     kind: T,
     x: number,
     y: number,
     initialSnapshotPatch?: InitialSnapshotPatch<T>,
   ): CanvasGraphNodeIdForKind<T> | null {
-    const baseSnapshotNode = createSnapshotNodeForKind(kind, x, y)
+    const baseSnapshotNode = createCanvasNodeAt(kind, { x, y })
     const snapshotNode = initialSnapshotPatch
       ? { ...baseSnapshotNode, ...initialSnapshotPatch }
       : baseSnapshotNode
@@ -335,10 +311,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   }
 
   return {
-    resolveNodePosition,
-    createSnapshotNodeForKind,
     connectionAdapter,
-    onAddNode,
     createNodeAtPosition,
     updateSnapshotNode,
     onFlowPromptTextUpdate,

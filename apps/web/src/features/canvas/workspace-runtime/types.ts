@@ -8,8 +8,11 @@ import type {
 import type { CanvasFlowPaneConnectionAdapter } from '../flow-pane'
 import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
 import type { CanvasImageWorkflow } from '../image-workflow'
+import type {
+  CanvasGraphEditingNodeInteractions,
+  CanvasGraphEditingNodeInteractionsOptions,
+} from '../graph-editing'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
-import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 
 type CanvasWorkspaceCatalogRecoveryState =
   { status: 'idle' } | { status: 'reload-required' | 'reloading'; boardId: string }
@@ -36,37 +39,6 @@ type CanvasWorkspaceMiniMapDragDelta = {
 type CanvasWorkspaceHistory = {
   undo: () => void
   redo: () => void
-}
-
-type CanvasWorkspaceDismissTransientUi = (options?: {
-  closeExpand?: boolean
-  closeBoardHeader?: boolean
-  closeContextMenu?: boolean
-  clearNodePanel?: boolean
-  hideStrength?: boolean
-}) => void
-
-export type CanvasWorkspaceNodeMediaInputsOptions = {
-  discardNodeEdits: (nodeId: string) => void
-}
-
-export type CanvasWorkspaceNodeMediaInputs = {
-  onFlowImageOpenFile: (nodeId: string) => void
-  onFlowImageReset: (nodeId: string) => void
-  onFlowImageStageDrop: (nodeId: string, event: DragEvent) => void
-}
-
-export type CanvasWorkspaceNodeHandlersOptions = {
-  dismissTransientCanvasUi: CanvasWorkspaceDismissTransientUi
-  discardFlowImageToolNodeEdits: (nodeId: string) => void
-  _onFlowImageReset: (nodeId: string) => void
-}
-
-export type CanvasWorkspaceNodeHandlers = {
-  onFlowDeleteNode: (nodeId: string) => void
-  onFlowPromptTextUpdate: (nodeId: string, value: string) => void
-  onFlowNodeParamUpdate: (nodeId: string, payload: FlowSnapshotParamPatch) => void
-  onFlowImageReset: (nodeId: string) => void
 }
 
 export type CanvasWorkspaceRuntimeViewModel = {
@@ -163,15 +135,12 @@ export type CanvasWorkspaceRuntimeCommands = {
     beginFlowNodeDragDuplicateTracking: (isDuplicateMode: boolean) => void
     finishFlowNodeDragDuplicateTracking: (isDuplicateMode: boolean) => void
     getFlowNodeUiStateCached: (nodeId: string) => NodeUiState | PromptNodeUiState
+    createNodeInteractions: (
+      options: CanvasGraphEditingNodeInteractionsOptions,
+    ) => CanvasGraphEditingNodeInteractions
     grouping: CanvasGroupRuntimeCommands
   }
   imageWorkflow: CanvasImageWorkflow
-  nodeInteraction: {
-    createNodeMediaInputs: (
-      options: CanvasWorkspaceNodeMediaInputsOptions,
-    ) => CanvasWorkspaceNodeMediaInputs
-    createNodeHandlers: (options: CanvasWorkspaceNodeHandlersOptions) => CanvasWorkspaceNodeHandlers
-  }
 }
 
 export type CanvasWorkspaceRuntime = {

@@ -363,6 +363,14 @@ function createRuntime() {
           beginFlowNodeDragDuplicateTracking: vi.fn(),
           finishFlowNodeDragDuplicateTracking: vi.fn(),
           getFlowNodeUiStateCached: vi.fn(),
+          createNodeInteractions: () => ({
+            onFlowDeleteNode: vi.fn(),
+            onFlowPromptTextUpdate: vi.fn(),
+            onFlowNodeParamUpdate: vi.fn(),
+            onFlowImageOpenFile: vi.fn(),
+            onFlowImageReset: vi.fn(),
+            onFlowImageStageDrop: vi.fn(),
+          }),
         },
         imageWorkflow: {
           isGenerationAvailable: vi.fn(() => true),
@@ -404,19 +412,6 @@ function createRuntime() {
             onFlowImageDirectAction: vi.fn(),
             onFlowImagePromptGenerate: vi.fn(),
             onFlowFusionPromptGenerate: vi.fn(),
-          }),
-        },
-        nodeInteraction: {
-          createNodeMediaInputs: () => ({
-            onFlowImageOpenFile: vi.fn(),
-            onFlowImageReset: vi.fn(),
-            onFlowImageStageDrop: vi.fn(),
-          }),
-          createNodeHandlers: () => ({
-            onFlowDeleteNode: vi.fn(),
-            onFlowPromptTextUpdate: vi.fn(),
-            onFlowNodeParamUpdate: vi.fn(),
-            onFlowImageReset: vi.fn(),
           }),
         },
       },

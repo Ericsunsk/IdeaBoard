@@ -8,7 +8,7 @@ import {
   type CanvasBoardSnapshot,
   type CanvasGroup,
 } from '../../canvas-board/domain'
-import { useCanvasGraphRuntime } from './useCanvasGraphRuntime'
+import { useCanvasGraphEditing } from '../graph-editing'
 import { useFlowCanvasRuntime, type UseFlowCanvasRuntimeOptions } from './useFlowCanvasRuntime'
 import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
 
@@ -366,28 +366,41 @@ function createCanvasGraphRuntimeHarness(harness: ReturnType<typeof createRuntim
     }),
     operationLoading: vi.fn(),
   }
-  const graphRuntime = useCanvasGraphRuntime({
+  const editing = useCanvasGraphEditing({
     nodes: harness.fullNodes,
     edges: harness.fullEdges,
     boardBaseSnapshot: harness.boardBaseSnapshot,
     currentBoardId: harness.runtime.persistence.currentBoardId,
-    createNodeKind: ref('prompt'),
     graphAdapter: harness.runtime.graphEditing.adapter,
     deleteNode: harness.runtime.graphEditing.deleteNode,
     updateNodeInternals: vi.fn(),
     screenToFlowCoordinate: (point) => point,
-    getSelectedElements: computed(() => []),
-    removeSelectedElements: vi.fn(),
-    uploadApi: {
+    browser: {
+      pickImageFile: vi.fn(async () => null),
+      readDroppedFile: vi.fn(() => null),
+      readDropScreenPoint: vi.fn(() => ({ x: 0, y: 0 })),
+      markDropAsCopy: vi.fn(),
+    },
+    upload: {
       upload: vi.fn(async () => ({
         url: 'https://example.com/upload.png',
         media_asset_id: 42,
       })),
     },
-    openNodeImagePreview: vi.fn(async () => {}),
-    openImageUrlPreview: vi.fn(async () => {}),
+    preview: {
+      openNodeImage: vi.fn(async () => {}),
+      openImageUrl: vi.fn(async () => {}),
+    },
     feedback: graphFeedback,
   })
+  const nodeInteractions = editing.commands.createNodeInteractions({
+    dismissTransientCanvasUi: vi.fn(),
+    discardNodeEdits: vi.fn(),
+  })
+  const graphRuntime = {
+    connectionAdapter: editing.flowPane.connectionAdapter,
+    onFlowDeleteNode: nodeInteractions.onFlowDeleteNode,
+  }
 
   return { graphRuntime, graphFeedback }
 }

@@ -40,6 +40,8 @@ describe('useFlowNodeMediaInputs', () => {
     )
     const markFlowExecutionNodeDirty = vi.fn()
     const inputs = useFlowNodeMediaInputs({
+      pickImageFile: vi.fn(async () => null),
+      readDroppedFile: vi.fn(() => null),
       applyImageFileToImageNode: vi.fn(async () => true),
       updateSnapshotNode,
       markFlowExecutionNodeDirty,

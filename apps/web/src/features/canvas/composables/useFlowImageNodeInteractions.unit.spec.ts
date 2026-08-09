@@ -21,7 +21,7 @@ describe('useFlowImageNodeInteractions', () => {
       outputImages: [{ url: 'https://example.test/output.png', ratio: 0.75, mediaAssetId: 201 }],
     }
     const nodes = shallowRef<Node[]>([
-      ({
+      {
         id: 'image-10',
         type: 'canvas',
         selected: true,
@@ -32,7 +32,7 @@ describe('useFlowImageNodeInteractions', () => {
           title: 'Image #10',
           snapshotNode: source,
         } satisfies FlowNodeData,
-      } as unknown as Node),
+      } as unknown as Node,
     ])
     const edges = shallowRef<Edge[]>([])
     const graphAdapter = useCanvasVueFlowGraphAdapter({ nodes, edges })
@@ -40,7 +40,6 @@ describe('useFlowImageNodeInteractions', () => {
       nodes,
       graphAdapter,
       getImageNodeDisplayPayload: () => null,
-      getImageNodeSnapshot: () => null,
     })
 
     interactions.beginFlowNodeDragDuplicateTracking(true)
@@ -53,27 +52,5 @@ describe('useFlowImageNodeInteractions', () => {
       { url: 'https://example.test/output.png', ratio: 0.75, mediaAssetId: 201 },
     ])
     expect(copied.sourceMediaAssetId).toBe(101)
-  })
-
-  it('preserves the displayed asset id when appending an output as a new image node', () => {
-    const nodes = shallowRef<Node[]>([])
-    const edges = shallowRef<Edge[]>([])
-    const graphAdapter = useCanvasVueFlowGraphAdapter({ nodes, edges })
-    const interactions = useFlowImageNodeInteractions({
-      nodes,
-      graphAdapter,
-      getImageNodeDisplayPayload: () => ({
-        url: 'https://example.test/output.png',
-        ratio: 0.75,
-        mediaAssetId: 201,
-      }),
-      getImageNodeSnapshot: () => ({ x: 10, y: 20, width: 320 }),
-    })
-
-    interactions.onFlowImageAppendToCanvas('image-10')
-
-    const appended = nodes.value[0]?.data?.snapshotNode as ImageNodeItem
-    expect(appended.sourceImageUrl).toBe('https://example.test/output.png')
-    expect(appended.sourceMediaAssetId).toBe(201)
   })
 })

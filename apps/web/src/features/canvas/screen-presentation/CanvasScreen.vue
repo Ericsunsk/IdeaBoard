@@ -114,6 +114,7 @@ import {
 } from '../composables/useFlowTransientUiDismissal'
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
 import { useFlowPaneSelectionAdapter, useVueFlowPaneAdapter } from '../flow-pane'
+import { createCanvasGraphEditingBrowserAdapter } from '../graph-editing'
 import { useCanvasWorkspaceRuntime } from '../workspace-runtime'
 import {
   createFusionNodePresentationResolver,
@@ -167,8 +168,6 @@ const {
   createNode: createNodeFromContextMenu,
 } = useCanvasNodeContextMenu()
 
-const createNodeKind = ref<CanvasCreatableNodeKind>('prompt')
-
 const {
   activeNodePanel,
   openActiveNodePanel,
@@ -179,14 +178,15 @@ const {
 const duplicateModifierPressed = ref(false)
 const { setImageStageRef, clearImageStageRef, getImageStageElement } = useImageStageRegistry()
 const { openNodeImagePreview, openImageUrlPreview } = useFlowImagePreviewLightbox()
+const graphEditingBrowser = createCanvasGraphEditingBrowserAdapter()
 
 const workspace = useCanvasWorkspaceRuntime({
   route,
   router,
   getUserIdentity,
-  createNodeKind,
   flowPaneAdapter,
   uploadApi,
+  graphEditingBrowser,
   openNodeImagePreview,
   openImageUrlPreview,
   logoutAndRedirect,
@@ -530,19 +530,16 @@ useCanvasCustomLayerOverlay({
 })
 
 const {
+  onFlowDeleteNode,
+  onFlowPromptTextUpdate,
+  onFlowNodeParamUpdate,
   onFlowImageOpenFile,
-  onFlowImageReset: onFlowImageResetBase,
+  onFlowImageReset,
   onFlowImageStageDrop,
-} = commands.nodeInteraction.createNodeMediaInputs({
+} = commands.graphEditing.createNodeInteractions({
+  dismissTransientCanvasUi,
   discardNodeEdits: discardFlowImageToolNodeEdits,
 })
-
-const { onFlowDeleteNode, onFlowPromptTextUpdate, onFlowNodeParamUpdate, onFlowImageReset } =
-  commands.nodeInteraction.createNodeHandlers({
-    dismissTransientCanvasUi,
-    discardFlowImageToolNodeEdits,
-    _onFlowImageReset: onFlowImageResetBase,
-  })
 
 const { onFlowImageExpandSubmit, onFlowExpandHandlePointerDown, onFlowExpandFramePointerDown } =
   useFlowExpandInteractionHandlers({
