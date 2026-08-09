@@ -23,12 +23,13 @@ import (
 )
 
 type Options struct {
-	APIRoot      string
-	ManifestPath string
-	OutputPath   string
-	BaseSHA      string
-	HeadSHA      string
-	DatabaseDSN  string
+	APIRoot       string
+	ManifestPath  string
+	OutputPath    string
+	WriteArtifact bool
+	BaseSHA       string
+	HeadSHA       string
+	DatabaseDSN   string
 }
 
 type commandRunner interface {
@@ -74,21 +75,28 @@ func check(ctx context.Context, options Options, runner commandRunner) error {
 	if !bytes.Equal(assembled, repeated) {
 		return errors.New("schema release deterministic assembly: repeated assembly produced different output")
 	}
-	committed, err := os.ReadFile(outputPath)
-	if err != nil {
-		return fmt.Errorf("schema release artifact drift: read %q: %w", outputPath, err)
-	}
-	if !bytes.Equal(assembled, committed) {
-		return fmt.Errorf("schema release artifact drift: %s does not match manifest assembly", outputPath)
+	if !options.WriteArtifact {
+		committed, err := os.ReadFile(outputPath)
+		if err != nil {
+			return fmt.Errorf("schema release artifact drift: read %q: %w", outputPath, err)
+		}
+		if !bytes.Equal(assembled, committed) {
+			return fmt.Errorf("schema release artifact drift: %s does not match manifest assembly", outputPath)
+		}
 	}
 	if err := checkMigrationImmutability(ctx, runner, apiRoot, options.BaseSHA, options.HeadSHA); err != nil {
 		return fmt.Errorf("schema release migration immutability: %w", err)
 	}
-	if err := checkSQLCGeneration(ctx, runner, apiRoot); err != nil {
+	if err := checkSQLCGeneration(ctx, runner, apiRoot, assembled); err != nil {
 		return fmt.Errorf("schema release sqlc generation: %w", err)
 	}
 	if err := verifyCatalogSemantics(ctx, strings.TrimSpace(options.DatabaseDSN), assembled); err != nil {
 		return fmt.Errorf("schema release semantic verification: %w", err)
+	}
+	if options.WriteArtifact {
+		if err := writeArtifact(outputPath, assembled); err != nil {
+			return fmt.Errorf("schema release artifact generation: %w", err)
+		}
 	}
 	return nil
 }
@@ -168,17 +176,18 @@ func validateMigrationChanges(raw string) error {
 	return nil
 }
 
-func checkSQLCGeneration(ctx context.Context, runner commandRunner, apiRoot string) error {
+func checkSQLCGeneration(ctx context.Context, runner commandRunner, apiRoot string, assembled []byte) error {
 	temporaryRoot, err := os.MkdirTemp("", "ideaboard-schema-release-")
 	if err != nil {
 		return fmt.Errorf("create temporary sqlc workspace: %w", err)
 	}
 	defer os.RemoveAll(temporaryRoot)
 
-	for _, relative := range []string{"sqlc.yaml", "internal/db/schema/schema.sql"} {
-		if err := copyFile(filepath.Join(apiRoot, relative), filepath.Join(temporaryRoot, relative)); err != nil {
-			return err
-		}
+	if err := copyFile(filepath.Join(apiRoot, "sqlc.yaml"), filepath.Join(temporaryRoot, "sqlc.yaml")); err != nil {
+		return err
+	}
+	if err := writeArtifact(filepath.Join(temporaryRoot, "internal/db/schema/schema.sql"), assembled); err != nil {
+		return err
 	}
 	if err := copyTree(filepath.Join(apiRoot, "internal/db/queries"), filepath.Join(temporaryRoot, "internal/db/queries")); err != nil {
 		return err
@@ -188,6 +197,43 @@ func checkSQLCGeneration(ctx context.Context, runner commandRunner, apiRoot stri
 		return fmt.Errorf("generate sqlc output: %w: %s", err, strings.TrimSpace(string(output)))
 	}
 	return compareTrees(filepath.Join(apiRoot, "internal/db/sqlc"), filepath.Join(temporaryRoot, "internal/db/sqlc"))
+}
+
+func writeArtifact(path string, content []byte) (resultErr error) {
+	directory := filepath.Dir(path)
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return fmt.Errorf("create artifact directory %q: %w", directory, err)
+	}
+	temporary, err := os.CreateTemp(directory, ".schema-release-*")
+	if err != nil {
+		return fmt.Errorf("create temporary artifact for %q: %w", path, err)
+	}
+	temporaryPath := temporary.Name()
+	defer func() {
+		if err := os.Remove(temporaryPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			resultErr = errors.Join(resultErr, fmt.Errorf("remove temporary artifact for %q: %w", path, err))
+		}
+	}()
+	if err := temporary.Chmod(0o644); err != nil {
+		return closeArtifactAfterError(temporary, path, fmt.Errorf("set temporary artifact permissions for %q: %w", path, err))
+	}
+	if _, err := temporary.Write(content); err != nil {
+		return closeArtifactAfterError(temporary, path, fmt.Errorf("write temporary artifact for %q: %w", path, err))
+	}
+	if err := temporary.Close(); err != nil {
+		return fmt.Errorf("close temporary artifact for %q: %w", path, err)
+	}
+	if err := os.Rename(temporaryPath, path); err != nil {
+		return fmt.Errorf("publish artifact %q: %w", path, err)
+	}
+	return nil
+}
+
+func closeArtifactAfterError(artifact *os.File, path string, operationErr error) error {
+	if err := artifact.Close(); err != nil {
+		return errors.Join(operationErr, fmt.Errorf("close temporary artifact for %q: %w", path, err))
+	}
+	return operationErr
 }
 
 func copyFile(source, target string) error {

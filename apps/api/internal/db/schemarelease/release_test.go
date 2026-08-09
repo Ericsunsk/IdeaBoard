@@ -54,6 +54,30 @@ func TestCompareTreesAcceptsIdenticalGeneratedOutput(t *testing.T) {
 	}
 }
 
+func TestWriteArtifactReplacesOutputWithoutLeavingTemporaryFiles(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "schema.sql")
+	writeTestFile(t, path, "old")
+
+	if err := writeArtifact(path, []byte("new\n")); err != nil {
+		t.Fatalf("write artifact: %v", err)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(content), "new\n"; got != want {
+		t.Fatalf("artifact=%q, want %q", got, want)
+	}
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "schema.sql" {
+		t.Fatalf("artifact directory entries=%v, want only schema.sql", entries)
+	}
+}
+
 func TestNormalizeOptionsRequiresReleaseInputs(t *testing.T) {
 	_, _, _, err := normalizeOptions(Options{})
 	if err == nil || !strings.Contains(err.Error(), "base SHA is required") {

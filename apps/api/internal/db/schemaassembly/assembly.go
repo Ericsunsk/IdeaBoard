@@ -89,34 +89,6 @@ func validateRegisteredFragments(manifest Manifest, root string) error {
 	return nil
 }
 
-func AssembleFile(manifestPath, outputPath string, check bool) error {
-	manifest, err := LoadManifest(manifestPath)
-	if err != nil {
-		return err
-	}
-	if strings.TrimSpace(outputPath) == "" {
-		outputPath = filepath.Join(filepath.Dir(manifestPath), manifest.Output)
-	}
-	assembled, err := Assemble(manifest, filepath.Dir(manifestPath))
-	if err != nil {
-		return err
-	}
-	if check {
-		existing, err := os.ReadFile(outputPath)
-		if err != nil {
-			return fmt.Errorf("read generated schema %q: %w", outputPath, err)
-		}
-		if string(existing) != string(assembled) {
-			return fmt.Errorf("generated schema drift: %s does not match manifest assembly", outputPath)
-		}
-		return nil
-	}
-	if err := os.WriteFile(outputPath, assembled, 0o644); err != nil {
-		return fmt.Errorf("write generated schema %q: %w", outputPath, err)
-	}
-	return nil
-}
-
 func validateManifest(manifest Manifest) error {
 	if manifest.Version != 1 {
 		return fmt.Errorf("unsupported schema manifest version %d", manifest.Version)

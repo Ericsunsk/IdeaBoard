@@ -19,6 +19,16 @@ assert_contains() {
   fi
 }
 
+assert_not_contains() {
+  local file="$1"
+  local unexpected="$2"
+
+  if grep -Fq -- "${unexpected}" "${file}"; then
+    printf 'Expected %s not to contain %q\n' "${file}" "${unexpected}" >&2
+    exit 1
+  fi
+}
+
 if [[ ! -f "${ci_workflow}" ]]; then
   echo 'Expected an always-on CI workflow at .github/workflows/ci.yml' >&2
   exit 1
@@ -40,6 +50,12 @@ assert_contains "${backend_workflow}" 'name: Backend Verification'
 assert_contains "${backend_workflow}" '          ref: ${{ inputs.ref || github.sha }}'
 assert_contains "${backend_workflow}" '      - name: Check Schema Release contract'
 assert_contains "${backend_workflow}" '        run: go run ./cmd/schema-release'
+assert_not_contains "${backend_workflow}" 'schema-assemble'
+assert_not_contains "${backend_workflow}" 'check-migration-history.sh'
+if [[ -e "${repo_root}/apps/api/cmd/schema-assemble" || -e "${repo_root}/scripts/check-migration-history.sh" ]]; then
+  echo 'Legacy schema verification entrypoints must be removed' >&2
+  exit 1
+fi
 assert_contains "${repo_root}/.github/workflows/security.yml" '  workflow_call:'
 assert_contains "${ci_workflow}" '    name: CI Gate'
 assert_contains "${ci_workflow}" '      - security'
