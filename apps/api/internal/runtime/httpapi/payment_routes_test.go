@@ -13,7 +13,7 @@ func TestAdminPaymentRoutesExposeStripeConfigurationAndOrderReads(t *testing.T) 
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	registerAdminPaymentRoutes(router.Group("/api/admin"), AdminRouteDeps{
-		PaymentHandler: payments.NewHandler(nil, config.PublicOriginsConfig{}),
+		PaymentAdminHandler: payments.NewAdminHandler(nil, config.PublicOriginsConfig{}),
 	})
 	routes := make(map[string]struct{})
 	for _, route := range router.Routes() {

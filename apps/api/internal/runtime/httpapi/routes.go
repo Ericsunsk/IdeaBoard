@@ -32,7 +32,7 @@ type Dependencies struct {
 	CORSMiddleware gin.HandlerFunc
 	RateLimit      settings.RateLimitSettingProvider
 	Branding       settings.BrandingSettingProvider
-	PaymentWebhook *payments.Handler
+	PaymentWebhook *payments.WebhookHandler
 }
 
 type FrontendRouteOptions struct {
@@ -60,34 +60,38 @@ type StaticUploadDeps struct {
 }
 
 type UserRouteDeps struct {
-	AuthHandler    *auth.AuthHandler
-	TaskHandler    *taskservice.Handler
-	BoardHandler   *boards.BoardHandler
-	BillingHandler *billing.Handler
-	BillingRecords *billingrecords.Handler
-	CreditHandler  *credits.Handler
-	UsageHandler   *usage.Handler
-	RewardHandler  *rewards.Handler
-	PaymentHandler *payments.Handler
-	Uploads        UploadDeps
+	AuthHandler               *auth.AuthHandler
+	TaskHandler               *taskservice.Handler
+	BoardHandler              *boards.BoardHandler
+	BillingHandler            *billing.Handler
+	BillingRecords            *billingrecords.Handler
+	CreditUserHandler         *credits.UserHandler
+	UsageHandler              *usage.Handler
+	RewardUserHandler         *rewards.UserHandler
+	PaymentUserHandler        *payments.UserCheckoutHandler
+	PaymentEventStreamHandler *payments.EventStreamHandler
+	Uploads                   UploadDeps
 }
 
 type AdminRouteDeps struct {
-	AdminHandler            *users.AdminHandler
-	MailConfigHandler       *auth.MailConfigAdminHandler
-	SocialProviderHandler   *auth.SocialProviderAdminHandler
-	BillingHandler          *billing.Handler
-	CreditHandler           *credits.Handler
-	AccountHandler          *accounts.AccountHandler
-	TaskHandler             *taskservice.Handler
-	TaskStatsHandler        *taskstats.Handler
-	ProviderEndpointHandler *providerendpoints.ProviderEndpointHandler
-	StorageHandler          *storage.StorageHandler
-	FeaturePromptHandler    *prompts.FeaturePromptHandler
-	StorageService          *storage.StorageService
-	UploadSettings          settings.MediaUploadSettingProvider
-	RewardHandler           *rewards.Handler
-	PaymentHandler          *payments.Handler
+	AdminHandler                *users.AdminHandler
+	MailConfigHandler           *auth.MailConfigAdminHandler
+	SocialProviderHandler       *auth.SocialProviderAdminHandler
+	BillingHandler              *billing.Handler
+	CreditAdminCommandHandler   *credits.AdminCommandHandler
+	CreditAdminReadHandler      *credits.AdminReadHandler
+	CreditReconciliationHandler *credits.ReconciliationHandler
+	AccountHandler              *accounts.AccountHandler
+	TaskHandler                 *taskservice.Handler
+	TaskStatsHandler            *taskstats.Handler
+	ProviderEndpointHandler     *providerendpoints.ProviderEndpointHandler
+	StorageHandler              *storage.StorageHandler
+	FeaturePromptHandler        *prompts.FeaturePromptHandler
+	StorageService              *storage.StorageService
+	UploadSettings              settings.MediaUploadSettingProvider
+	RewardAdminCommandHandler   *rewards.AdminCommandHandler
+	RewardAdminReadHandler      *rewards.AdminReadHandler
+	PaymentAdminHandler         *payments.AdminHandler
 }
 
 const globalRequestBodyLimitBytes int64 = 2 * 1024 * 1024

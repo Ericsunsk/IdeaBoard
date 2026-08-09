@@ -38,7 +38,8 @@ Hash normalization、HMAC candidates、row locking、persistence 和 Credits tra
 - Credit Grant 固定使用 source `reward_redemption`、reason `兑换奖励` 和 Redemption ID business reference。
 - authenticated Admin 可通过 Credits Correction 逆转 Grant 的账务结果；Correction 是新的 Ledger 事实，不删除 Redemption，也不恢复 RewardCode capacity。
 - User Redemption history 只读取已提交 Redemption，并按 `(user_id, id DESC)` 隔离和分页；不 join 或复制 Identity PII、Code digest 或明文。
-- Admin Redemption read 只按 `(reward_code_id, id DESC)` 读取已提交事实；summary 不含技术详情，detail 必须同时匹配 RewardCode ID 与 Redemption ID，且两者都不 join Identity、Journal 或 Code digest/plaintext。
+- User Redeem response 的 `user_public_id` 与 `display_name` 只来自 Auth middleware 已验证的 request `Principal` snapshot；commit 后禁止执行 fallible Identity read。
+- Admin Redemption read 只按 `(reward_code_id, id DESC)` 读取已提交事实；summary 不含技术详情，detail 必须同时匹配 RewardCode ID 与 Redemption ID，且两者都不 join Identity、Journal 或 Code digest/plaintext。HTTP presentation 通过 Runtime Identity projection adapter 组合用户字段：每个 list page 只执行一次 bounded batch read，detail 执行一次 single read，缺失或不一致的 Identity mapping 统一 fail closed。Authenticated Redemption history 不读取 Identity。
 - `reward_admin_actions` 自动记录 actor/action/time/safe metadata，不接收手填 reason，并由 database trigger 与 runtime privileges 双重保证 append-only。Guard 只放行 `ON DELETE SET NULL` 引发的 FK referential nullification：parent 必须已不存在且其他 Journal 字段完全不变。Runtime 不拥有 RewardCode/Alias/Journal 的直接 UPDATE/DELETE，只能执行 transaction-bound Rewards command functions，避免绕过 Journal。
 - `REWARDS_CODE_HMAC_KEYS` 只接受 current 与可选 previous；每个 base64 key 解码后至少 32 bytes，配置无效时 startup fail closed。
 - Code normalization 在任何 Unicode normalization 前执行 128-byte raw bound，再做 NFKC、uppercase、trim 与 Unicode whitespace/hyphen removal；最终 payload 只接受 8–32 个 `A-Z0-9`。

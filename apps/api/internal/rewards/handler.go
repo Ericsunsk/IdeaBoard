@@ -12,7 +12,6 @@ import (
 
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
 
@@ -21,18 +20,28 @@ import (
 
 const maxRewardRequestBytes int64 = 64 << 10
 
-type RewardService interface {
-	AdminCommands
-	AdminReads
+type UserService interface {
 	UserCommands
 	UserReads
 }
 
-type Handler struct {
-	service  RewardService
-	userRepo *users.UserRepository
-	limiter  *redemptionAttemptLimiter
-	metrics  redemptionMetrics
+type AdminCommandService interface {
+	AdminCommands
+}
+
+type UserHandler struct {
+	service UserService
+	limiter *redemptionAttemptLimiter
+	metrics redemptionMetrics
+}
+
+type AdminCommandHandler struct {
+	service AdminCommandService
+}
+
+type AdminReadHandler struct {
+	service            AdminReads
+	identityProjection IdentityProjectionReader
 }
 
 type redemptionHandlerOptions struct {
@@ -40,23 +49,27 @@ type redemptionHandlerOptions struct {
 	MetricsRecorder redemptionMetricsRecorder
 }
 
-func NewHandler(service RewardService, userRepo ...*users.UserRepository) *Handler {
-	handler := newHandlerWithOptions(service, redemptionHandlerOptions{})
-	if len(userRepo) > 0 {
-		handler.userRepo = userRepo[0]
-	}
-	return handler
+func NewUserHandler(service UserService) *UserHandler {
+	return newUserHandlerWithOptions(service, redemptionHandlerOptions{})
 }
 
-func newHandlerWithOptions(service RewardService, options redemptionHandlerOptions) *Handler {
+func newUserHandlerWithOptions(service UserService, options redemptionHandlerOptions) *UserHandler {
 	if options.MetricsRecorder == nil {
 		options.MetricsRecorder = defaultRedemptionMetricsRecorder
 	}
-	return &Handler{
+	return &UserHandler{
 		service: service,
 		limiter: newRedemptionAttemptLimiter(options.Now),
 		metrics: newRedemptionMetrics(options.Now, options.MetricsRecorder),
 	}
+}
+
+func NewAdminCommandHandler(service AdminCommandService) *AdminCommandHandler {
+	return &AdminCommandHandler{service: service}
+}
+
+func NewAdminReadHandler(service AdminReads, identityProjection IdentityProjectionReader) *AdminReadHandler {
+	return &AdminReadHandler{service: service, identityProjection: identityProjection}
 }
 
 type createRewardCodeRequest struct {
@@ -91,9 +104,13 @@ type redeemRequest struct {
 	Code string `json:"code"`
 }
 
-func (h *Handler) CreateRewardCode(c *gin.Context) {
+func (h *AdminCommandHandler) CreateRewardCode(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	actorID, ok := h.requireAdmin(c)
+	if h == nil || h.service == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
+		return
+	}
+	actorID, ok := requireAdmin(c)
 	if !ok {
 		return
 	}
@@ -114,9 +131,13 @@ func (h *Handler) CreateRewardCode(c *gin.Context) {
 	response.SuccessDTO(c, created)
 }
 
-func (h *Handler) UpdateRewardCode(c *gin.Context) {
+func (h *AdminCommandHandler) UpdateRewardCode(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	rewardCodeID, actorID, ok := h.requireAdminRewardCode(c)
+	if h == nil || h.service == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
+		return
+	}
+	rewardCodeID, actorID, ok := requireAdminRewardCode(c)
 	if !ok {
 		return
 	}
@@ -137,9 +158,13 @@ func (h *Handler) UpdateRewardCode(c *gin.Context) {
 	response.SuccessDTO(c, updated)
 }
 
-func (h *Handler) SetRewardCodeEnabled(c *gin.Context) {
+func (h *AdminCommandHandler) SetRewardCodeEnabled(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	rewardCodeID, actorID, ok := h.requireAdminRewardCode(c)
+	if h == nil || h.service == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
+		return
+	}
+	rewardCodeID, actorID, ok := requireAdminRewardCode(c)
 	if !ok {
 		return
 	}
@@ -158,9 +183,13 @@ func (h *Handler) SetRewardCodeEnabled(c *gin.Context) {
 	response.SuccessDTO(c, updated)
 }
 
-func (h *Handler) DeleteRewardCode(c *gin.Context) {
+func (h *AdminCommandHandler) DeleteRewardCode(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	rewardCodeID, actorID, ok := h.requireAdminRewardCode(c)
+	if h == nil || h.service == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
+		return
+	}
+	rewardCodeID, actorID, ok := requireAdminRewardCode(c)
 	if !ok {
 		return
 	}
@@ -174,9 +203,13 @@ func (h *Handler) DeleteRewardCode(c *gin.Context) {
 	response.SuccessDTO(c, deleted)
 }
 
-func (h *Handler) SearchRewardCodes(c *gin.Context) {
+func (h *AdminReadHandler) SearchRewardCodes(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	if _, ok := h.requireAdmin(c); !ok {
+	if h == nil || h.service == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
+		return
+	}
+	if _, ok := requireAdmin(c); !ok {
 		return
 	}
 	if c.Request.URL.RawQuery != "" {
@@ -211,9 +244,13 @@ func (h *Handler) SearchRewardCodes(c *gin.Context) {
 	response.SuccessDTO(c, page)
 }
 
-func (h *Handler) ListAdminRedemptions(c *gin.Context) {
+func (h *AdminReadHandler) ListAdminRedemptions(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	rewardCodeID, _, ok := h.requireAdminRewardCode(c)
+	if h == nil || h.service == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
+		return
+	}
+	rewardCodeID, _, ok := requireAdminRewardCode(c)
 	if !ok {
 		return
 	}
@@ -248,9 +285,13 @@ func (h *Handler) ListAdminRedemptions(c *gin.Context) {
 	response.SuccessDTO(c, page)
 }
 
-func (h *Handler) GetAdminRedemption(c *gin.Context) {
+func (h *AdminReadHandler) GetAdminRedemption(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
-	rewardCodeID, _, ok := h.requireAdminRewardCode(c)
+	if h == nil || h.service == nil {
+		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
+		return
+	}
+	rewardCodeID, _, ok := requireAdminRewardCode(c)
 	if !ok {
 		return
 	}
@@ -274,7 +315,7 @@ func (h *Handler) GetAdminRedemption(c *gin.Context) {
 	response.SuccessDTO(c, detail)
 }
 
-func (h *Handler) Redeem(c *gin.Context) {
+func (h *UserHandler) Redeem(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	if h == nil || h.service == nil {
 		response.Error(c, http.StatusServiceUnavailable, "网络错误，请重试")
@@ -304,11 +345,8 @@ func (h *Handler) Redeem(c *gin.Context) {
 		writeRewardRedeemError(c, err)
 		return
 	}
-	if err := h.enrichRedemptionResult(c.Request.Context(), &result); err != nil {
-		finishMetrics(redemptionOutcomeInternalError, 0, err)
-		writeRewardError(c, err)
-		return
-	}
+	result.Redemption.UserPublicID = identityPrincipal.PublicID()
+	result.Redemption.DisplayName = identityPrincipal.DisplayName()
 	if result.Replayed {
 		finishMetrics(redemptionOutcomeReplayed, 0, nil)
 	} else {
@@ -338,7 +376,7 @@ func writeRewardRedeemError(c *gin.Context, err error) {
 	}
 }
 
-func (h *Handler) ListRedemptions(c *gin.Context) {
+func (h *UserHandler) ListRedemptions(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	if h == nil || h.service == nil {
 		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
@@ -370,18 +408,10 @@ func (h *Handler) ListRedemptions(c *gin.Context) {
 		writeRewardError(c, err)
 		return
 	}
-	if err := h.enrichHistoryPage(c.Request.Context(), &page, identityPrincipal.UserID()); err != nil {
-		writeRewardError(c, err)
-		return
-	}
 	response.SuccessDTO(c, page)
 }
 
-func (h *Handler) requireAdmin(c *gin.Context) (int64, bool) {
-	if h == nil || h.service == nil {
-		response.InternalError(c, http.StatusServiceUnavailable, "奖励服务暂不可用", nil)
-		return 0, false
-	}
+func requireAdmin(c *gin.Context) (int64, bool) {
 	identityPrincipal, ok := principal.RequireAdmin(c)
 	if !ok {
 		return 0, false
@@ -389,62 +419,50 @@ func (h *Handler) requireAdmin(c *gin.Context) (int64, bool) {
 	return identityPrincipal.UserID(), true
 }
 
-func (h *Handler) enrichAdminRedemptionPage(ctx context.Context, page *AdminRedemptionPage) error {
-	if h == nil || h.userRepo == nil || page == nil {
+func (h *AdminReadHandler) enrichAdminRedemptionPage(ctx context.Context, page *AdminRedemptionPage) error {
+	if h == nil || page == nil {
 		return nil
+	}
+	if h.identityProjection == nil {
+		return fmt.Errorf("resolve reward redemption identity: projection unavailable")
+	}
+	userIDs := make([]int64, 0, len(page.Redemptions))
+	for _, redemption := range page.Redemptions {
+		userIDs = append(userIDs, redemption.UserID)
+	}
+	identities, err := h.identityProjection.ResolveIdentities(ctx, userIDs)
+	if err != nil {
+		return fmt.Errorf("resolve reward redemption identities: %w", err)
 	}
 	for index := range page.Redemptions {
-		user, err := h.userRepo.GetByID(ctx, page.Redemptions[index].UserID)
-		if err != nil {
-			return fmt.Errorf("resolve reward redemption identity: %w", err)
+		identity, ok := identities[page.Redemptions[index].UserID]
+		if !ok {
+			return fmt.Errorf("resolve reward redemption identity: user %d not found", page.Redemptions[index].UserID)
 		}
-		page.Redemptions[index].UserPublicID = user.PublicID
-		page.Redemptions[index].DisplayName = user.DisplayName
+		page.Redemptions[index].UserPublicID = identity.PublicID
+		page.Redemptions[index].DisplayName = identity.DisplayName
 	}
 	return nil
 }
 
-func (h *Handler) enrichAdminRedemption(ctx context.Context, detail *AdminRedemptionDetail) error {
-	if h == nil || h.userRepo == nil || detail == nil {
+func (h *AdminReadHandler) enrichAdminRedemption(ctx context.Context, detail *AdminRedemptionDetail) error {
+	if h == nil || detail == nil {
 		return nil
 	}
-	user, err := h.userRepo.GetByID(ctx, detail.UserID)
+	if h.identityProjection == nil {
+		return fmt.Errorf("resolve reward redemption identity: projection unavailable")
+	}
+	identity, err := h.identityProjection.ResolveIdentity(ctx, detail.UserID)
 	if err != nil {
 		return fmt.Errorf("resolve reward redemption identity: %w", err)
 	}
-	detail.UserPublicID = user.PublicID
-	detail.DisplayName = user.DisplayName
+	detail.UserPublicID = identity.PublicID
+	detail.DisplayName = identity.DisplayName
 	return nil
 }
 
-func (h *Handler) enrichRedemptionResult(ctx context.Context, result *RedeemResult) error {
-	if h == nil || h.userRepo == nil || result == nil || result.Redemption.UserID <= 0 {
-		return nil
-	}
-	user, err := h.userRepo.GetByID(ctx, result.Redemption.UserID)
-	if err != nil {
-		return fmt.Errorf("resolve reward redemption identity: %w", err)
-	}
-	result.Redemption.UserPublicID = user.PublicID
-	result.Redemption.DisplayName = user.DisplayName
-	return nil
-}
-
-func (h *Handler) enrichHistoryPage(ctx context.Context, page *RedemptionHistoryPage, userID int64) error {
-	// History items intentionally omit identity fields because they are scoped to
-	// the authenticated user. Resolve the identity once to keep the boundary
-	// explicit and fail closed if the local mapping is inconsistent.
-	if h == nil || h.userRepo == nil || page == nil {
-		return nil
-	}
-	if _, err := h.userRepo.GetByID(ctx, userID); err != nil {
-		return fmt.Errorf("resolve reward history identity: %w", err)
-	}
-	return nil
-}
-
-func (h *Handler) requireAdminRewardCode(c *gin.Context) (int64, int64, bool) {
-	actorID, ok := h.requireAdmin(c)
+func requireAdminRewardCode(c *gin.Context) (int64, int64, bool) {
+	actorID, ok := requireAdmin(c)
 	if !ok {
 		return 0, 0, false
 	}

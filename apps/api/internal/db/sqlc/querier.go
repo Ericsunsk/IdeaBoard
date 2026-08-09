@@ -97,6 +97,7 @@ type Querier interface {
 	GetUserByPublicID(ctx context.Context, publicID uuid.UUID) (User, error)
 	GetUserByStorageUID(ctx context.Context, storageUid string) (User, error)
 	GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUserIDByStorageUIDForUpdateParams) (int64, error)
+	GetUsersByIDs(ctx context.Context, ids []int64) ([]User, error)
 	HasActiveStorageProfileSecretVersion(ctx context.Context, arg HasActiveStorageProfileSecretVersionParams) (bool, error)
 	IncrementAccountFailCount(ctx context.Context, id int64) (int64, error)
 	InsertPaymentAdminAction(ctx context.Context, arg InsertPaymentAdminActionParams) error

@@ -255,6 +255,19 @@ type RiverServerOptions struct {
 	PeriodicJobs     []*river.PeriodicJob
 }
 
+func NewRiverProducer(dbPool *pgxpool.Pool) (*river.Client[pgx.Tx], error) {
+	if dbPool == nil {
+		return nil, errors.New("river db pool is nil")
+	}
+	schemaCtx, cancel := context.WithTimeout(context.Background(), riverSchemaLookupTimeout)
+	defer cancel()
+	schema, err := currentRiverSchema(schemaCtx, dbPool)
+	if err != nil {
+		return nil, err
+	}
+	return river.NewClient(riverpgxv5.New(dbPool), &river.Config{Schema: schema})
+}
+
 func (w *RiverFinalFailureWorker) Work(ctx context.Context, job *river.Job[taskqueue.DrawingFinalFailureArgs]) error {
 	if w == nil || w.finalFailures == nil || job == nil || strings.TrimSpace(job.Args.TaskID) == "" || job.Args.RiverJobID < 0 || strings.TrimSpace(job.Args.Reason) == "" {
 		return errors.New("invalid drawing final failure job")

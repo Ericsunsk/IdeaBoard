@@ -14,16 +14,18 @@ const (
 	paymentReconciliationLease         = 5 * time.Minute
 )
 
+func PaymentReconciliationInterval() time.Duration { return paymentReconciliationInterval }
+
 // ReconcileDuePaymentOrders is the durable recovery seam used by River. It only
 // advances an order from canonical Stripe facts, never from redirects or job
 // delivery. Claims are fenced in the repository before provider I/O begins.
-func (s *Service) ReconcileDuePaymentOrders(ctx context.Context) error {
+func (s *StripeFactsWorkflow) ReconcileDuePaymentOrders(ctx context.Context) error {
 	if s == nil || s.configuration == nil || s.checkoutStore == nil || s.convergenceStore == nil || s.orderLifecycle == nil || s.checkoutGateway == nil {
 		return fmt.Errorf("payments reconciliation unavailable")
 	}
 	return s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
 		configuration, apiKey, configurationErr := s.stripeAccessConfiguration(lockedContext)
-		now := s.now().UTC()
+		now := s.runtime.now().UTC()
 		claims, err := s.convergenceStore.ClaimDuePaymentOrderReconciliations(lockedContext, now)
 		if err != nil {
 			return err
@@ -55,7 +57,7 @@ func (s *Service) ReconcileDuePaymentOrders(ctx context.Context) error {
 	})
 }
 
-func (s *Service) reconcileDuePaymentDisputes(ctx context.Context, apiKey string, configurationErr error, now time.Time) error {
+func (s *StripeFactsWorkflow) reconcileDuePaymentDisputes(ctx context.Context, apiKey string, configurationErr error, now time.Time) error {
 	if s == nil || s.convergenceStore == nil || s.disputeGateway == nil {
 		return nil
 	}
@@ -89,7 +91,7 @@ func (s *Service) reconcileDuePaymentDisputes(ctx context.Context, apiKey string
 	return retryErr
 }
 
-func (s *Service) reconcileDuePaymentRefunds(ctx context.Context, apiKey string, configurationErr error, now time.Time) error {
+func (s *StripeFactsWorkflow) reconcileDuePaymentRefunds(ctx context.Context, apiKey string, configurationErr error, now time.Time) error {
 	if s == nil || s.convergenceStore == nil || s.refundGateway == nil {
 		return nil
 	}
@@ -133,7 +135,7 @@ func (s *Service) reconcileDuePaymentRefunds(ctx context.Context, apiKey string,
 	return retryErr
 }
 
-func (s *Service) reconcilePaymentOrderClaim(ctx context.Context, configuration StoredStripeConfiguration, apiKey string, configurationErr error, claim PaymentReconciliationClaim, now time.Time) (PaymentReconciliationOutcome, error) {
+func (s *StripeFactsWorkflow) reconcilePaymentOrderClaim(ctx context.Context, configuration StoredStripeConfiguration, apiKey string, configurationErr error, claim PaymentReconciliationClaim, now time.Time) (PaymentReconciliationOutcome, error) {
 	order := claim.Order
 	if configurationErr != nil || configuration.AccountID != order.StripeAccountID {
 		err := ErrPurchasesUnavailable
@@ -161,7 +163,7 @@ func (s *Service) reconcilePaymentOrderClaim(ctx context.Context, configuration 
 	if order.Status == PaymentOrderCreating {
 		// A local creation deadline is not proof that Stripe did not accept the
 		// initial request. Replay the public order idempotency key first.
-		if _, err := s.createCheckoutSessionForOrder(ctx, apiKey, order); err != nil {
+		if _, err := s.checkoutRecovery.createCheckoutSessionForOrder(ctx, apiKey, order); err != nil {
 			return paymentReconciliationFailureOutcome(now, order, err, reconciliationFailureIsTransient(err)), err
 		}
 		return paymentReconciliationCheckpoint(now, order), nil
@@ -170,7 +172,7 @@ func (s *Service) reconcilePaymentOrderClaim(ctx context.Context, configuration 
 		err := ErrPurchasesUnavailable
 		return paymentReconciliationFailureOutcome(now, order, err, false), err
 	}
-	resolved, err := s.retrieveAndConvergeCheckout(ctx, apiKey, order)
+	resolved, err := s.checkoutRecovery.retrieveAndConvergeCheckout(ctx, apiKey, order)
 	if err != nil {
 		return paymentReconciliationFailureOutcome(now, order, err, reconciliationFailureIsTransient(err)), err
 	}
@@ -269,7 +271,7 @@ func reconciliationFailureDetail(err error) (string, string) {
 
 // ListPaymentReconciliationAnomalies is the internal Admin read seam. The HTTP
 // presentation remains a separate Admin vertical concern.
-func (s *Service) ListPaymentReconciliationAnomalies(ctx context.Context, limit int32) ([]PaymentReconciliationAnomaly, error) {
+func (s *StripeFactsWorkflow) ListPaymentReconciliationAnomalies(ctx context.Context, limit int32) ([]PaymentReconciliationAnomaly, error) {
 	if s == nil || s.convergenceStore == nil {
 		return nil, fmt.Errorf("payments reconciliation unavailable")
 	}

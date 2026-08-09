@@ -1,13 +1,10 @@
 package credits
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"errors"
-	"log/slog"
 	"strconv"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -17,34 +14,41 @@ import (
 	"ideaboard/api/internal/testsupport"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type reconciliationEnqueuerStub struct {
 	mu    sync.Mutex
-	calls []ReconciliationJobArgs
+	calls []int64
 	err   error
 }
 
-func (e *reconciliationEnqueuerStub) InsertTx(_ context.Context, _ pgx.Tx, args river.JobArgs, _ *river.InsertOpts) (*rivertype.JobInsertResult, error) {
+func (e *reconciliationEnqueuerStub) DispatchReconciliationRun(_ context.Context, _ pgx.Tx, runID int64) error {
 	if e.err != nil {
-		return nil, e.err
-	}
-	typed, ok := args.(ReconciliationJobArgs)
-	if !ok {
-		return nil, errors.New("unexpected reconciliation args")
+		return e.err
 	}
 	e.mu.Lock()
-	e.calls = append(e.calls, typed)
+	e.calls = append(e.calls, runID)
 	e.mu.Unlock()
-	return &rivertype.JobInsertResult{}, nil
+	return nil
+}
+
+func newReconciliationService(
+	t testing.TB,
+	pool *pgxpool.Pool,
+	dispatcher ReconciliationRunDispatcher,
+) *Service {
+	t.Helper()
+	service, err := NewServiceWithReconciliation(pool, dispatcher)
+	if err != nil {
+		t.Fatalf("NewServiceWithReconciliation() error = %v", err)
+	}
+	return service
 }
 
 func TestReconciliationRestrictionsTrackIndependentFindingsAndRecoverCommands(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	service := NewService(pool)
-	service.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{})
+	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
 	ctx := t.Context()
 
 	if _, err := service.Grant(ctx, GrantCommand{UserID: 94, Amount: mustCreditAmount(t, 100), Metadata: testMetadata("reconcile:grant", "reconcile-grant")}); err != nil {
@@ -295,8 +299,7 @@ WHERE run_id = $1 AND finding_id = $2`, run.ID, availableFinding.ID).Scan(&obser
 
 func TestReconciliationStaleHoldOnlyReportsWithoutIsolation(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	service := NewService(pool)
-	service.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{})
+	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
 	ctx := t.Context()
 	if _, err := service.Grant(ctx, GrantCommand{UserID: 95, Amount: mustCreditAmount(t, 20), Metadata: testMetadata("stale:grant", "stale-grant")}); err != nil {
 		t.Fatal(err)
@@ -375,8 +378,7 @@ func TestReconciliationStaleHoldOnlyReportsWithoutIsolation(t *testing.T) {
 
 func TestReconciliationSeparatesBillingSnapshotRiskFromTaskTraceAnomaly(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	service := NewService(pool)
-	service.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{})
+	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
 	ctx := t.Context()
 	const userID int64 = 96
 	ensureAdminOperationUser(t, pool, userID)
@@ -521,8 +523,7 @@ WHERE related_object_type = 'finding' AND related_object_id = $1 AND released_at
 
 func TestReconciliationTreatsCorruptTerminalFactsAsHighRiskInsteadOfTaskTrace(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	service := NewService(pool)
-	service.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{})
+	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
 	ctx := t.Context()
 	const userID int64 = 97
 	ensureAdminOperationUser(t, pool, userID)
@@ -601,9 +602,8 @@ func TestReconciliationTreatsCorruptTerminalFactsAsHighRiskInsteadOfTaskTrace(t 
 
 func TestStartReconciliationIsMutuallyExclusiveAndRollsBackOnEnqueueFailure(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	service := NewService(pool)
 	enqueuer := &reconciliationEnqueuerStub{}
-	service.SetReconciliationEnqueuer(enqueuer)
+	service := newReconciliationService(t, pool, enqueuer)
 	invalid := reconciliationStartInput(t)
 	invalid.Action = adminaction.Metadata{}
 	if _, err := service.StartReconciliation(t.Context(), invalid); !errors.Is(err, ErrInvalidCommand) {
@@ -632,9 +632,8 @@ func TestStartReconciliationIsMutuallyExclusiveAndRollsBackOnEnqueueFailure(t *t
 	if err := service.ExecuteReconciliation(t.Context(), first.ID); err != nil {
 		t.Fatal(err)
 	}
-	failing := NewService(pool)
 	riverErr := errors.New("river unavailable")
-	failing.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{err: riverErr})
+	failing := newReconciliationService(t, pool, &reconciliationEnqueuerStub{err: riverErr})
 	if _, err := failing.StartReconciliation(t.Context(), reconciliationStartInput(t)); !errors.Is(err, riverErr) {
 		t.Fatalf("StartReconciliation() error = %v, want wrapped River error", err)
 	}
@@ -660,8 +659,7 @@ SELECT
 		t.Fatal(err)
 	}
 
-	service := NewService(secondPool)
-	service.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{})
+	service := newReconciliationService(t, secondPool, &reconciliationEnqueuerStub{})
 	run, err := service.StartReconciliation(t.Context(), reconciliationStartInput(t))
 	if err != nil {
 		t.Fatal(err)
@@ -673,8 +671,7 @@ SELECT
 
 func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	service := NewService(pool)
-	service.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{})
+	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
 	ctx := t.Context()
 	if _, err := service.Grant(ctx, GrantCommand{UserID: 93, Amount: mustCreditAmount(t, 500), Metadata: testMetadata("matrix:grant", "matrix-grant")}); err != nil {
 		t.Fatal(err)
@@ -871,8 +868,7 @@ FROM credit_transactions WHERE transaction_id = $1`, illegal.TransactionID); err
 
 func TestReconciliationRequiresPaidActiveTasksToRemainHeld(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
-	service := NewService(pool)
-	service.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{})
+	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
 	ctx := t.Context()
 	if _, err := service.Grant(ctx, GrantCommand{UserID: 93, Amount: mustCreditAmount(t, 50), Metadata: testMetadata("active-held:grant", "active-held-grant")}); err != nil {
 		t.Fatal(err)
@@ -928,137 +924,6 @@ func TestReconciliationRequiresPaidActiveTasksToRemainHeld(t *testing.T) {
 	if foundSubjects["active-held"] {
 		t.Fatal("normally held active task was reported")
 	}
-}
-
-func TestReconciliationWorkerRetriesTransientFailureAndMarksOnlyFinalFailure(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
-	service := NewService(pool)
-	var runID int64
-	if err := db.QueryRowContext(t.Context(), `SELECT run_id FROM start_credit_reconciliation('manual', 1, 'worker execution test', NULL, FALSE)`).Scan(&runID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := db.ExecContext(t.Context(), `DROP TABLE credit_postings CASCADE`); err != nil {
-		t.Fatal(err)
-	}
-	worker := NewReconciliationWorker(service)
-	first := &river.Job[ReconciliationJobArgs]{JobRow: &rivertype.JobRow{Attempt: 1, MaxAttempts: 2}, Args: ReconciliationJobArgs{RunID: runID}}
-	if err := worker.Work(t.Context(), first); err == nil {
-		t.Fatal("transient Work() error = nil")
-	}
-	run, err := service.GetReconciliationRun(t.Context(), runID)
-	if err != nil || run.Status != "queued" {
-		t.Fatalf("transient run = %+v, err = %v", run, err)
-	}
-	final := &river.Job[ReconciliationJobArgs]{JobRow: &rivertype.JobRow{Attempt: 2, MaxAttempts: 2}, Args: ReconciliationJobArgs{RunID: runID}}
-	if err := worker.Work(t.Context(), final); err != nil {
-		t.Fatalf("final Work() error = %v", err)
-	}
-	run, err = service.GetReconciliationRun(t.Context(), runID)
-	if err != nil || run.Status != "failed" || run.ErrorMessage == "" {
-		t.Fatalf("final run = %+v, err = %v", run, err)
-	}
-}
-
-func TestReconciliationWorkerMarksFinalFailureAfterParentCancellation(t *testing.T) {
-	db, pool := testdb.OpenWithPool(t)
-	service := NewService(pool)
-	var runID int64
-	if err := db.QueryRowContext(t.Context(), `SELECT run_id FROM start_credit_reconciliation('manual', 1, 'worker failure test', NULL, FALSE)`).Scan(&runID); err != nil {
-		t.Fatal(err)
-	}
-
-	parent, cancel := context.WithCancel(t.Context())
-	cancel()
-	job := &river.Job[ReconciliationJobArgs]{JobRow: &rivertype.JobRow{Attempt: 1, MaxAttempts: 1}, Args: ReconciliationJobArgs{RunID: runID}}
-	if err := NewReconciliationWorker(service).Work(parent, job); err != nil {
-		t.Fatalf("final Work() error = %v", err)
-	}
-	run, err := service.GetReconciliationRun(t.Context(), runID)
-	if err != nil || run.Status != ReconciliationRunFailed || run.ErrorMessage == "" {
-		t.Fatalf("final run = %+v, err = %v", run, err)
-	}
-}
-
-func TestReconciliationWorkerBoundsFinalFailureContextAndJoinsErrors(t *testing.T) {
-	executeErr := errors.New("execute reconciliation")
-	failErr := errors.New("mark reconciliation failed")
-	service := &reconciliationWorkerServiceStub{executeErr: executeErr, failErr: failErr}
-	parent, cancel := context.WithCancel(t.Context())
-	cancel()
-	job := &river.Job[ReconciliationJobArgs]{JobRow: &rivertype.JobRow{Attempt: 1, MaxAttempts: 1}, Args: ReconciliationJobArgs{RunID: 42}}
-
-	err := NewReconciliationWorker(service).Work(parent, job)
-	if !errors.Is(err, executeErr) || !errors.Is(err, failErr) {
-		t.Fatalf("Work() error = %v, want joined execute and fail errors", err)
-	}
-	if service.failContextErr != nil {
-		t.Fatalf("FailReconciliation() context error = %v", service.failContextErr)
-	}
-	if service.failDeadline.IsZero() {
-		t.Fatal("FailReconciliation() context has no deadline")
-	}
-	remaining := time.Until(service.failDeadline)
-	if remaining <= 0 || remaining > reconciliationFinalFailureTimeout {
-		t.Fatalf("FailReconciliation() deadline remaining = %v", remaining)
-	}
-}
-
-func TestScheduledReconciliationWorkerLogsEveryExecutionFailure(t *testing.T) {
-	executeErr := errors.New("scheduled scan failed")
-	service := &reconciliationWorkerServiceStub{
-		executeErr: executeErr,
-		run: ReconciliationRun{
-			ID:      42,
-			Trigger: ReconciliationTriggerScheduled,
-		},
-	}
-	var logs bytes.Buffer
-	previous := slog.Default()
-	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
-	t.Cleanup(func() { slog.SetDefault(previous) })
-
-	job := &river.Job[ReconciliationJobArgs]{
-		JobRow: &rivertype.JobRow{Attempt: 1, MaxAttempts: 3},
-		Args:   ReconciliationJobArgs{RunID: 42},
-	}
-	if err := NewReconciliationWorker(service).Work(t.Context(), job); !errors.Is(err, executeErr) {
-		t.Fatalf("Work() error = %v, want execute error", err)
-	}
-	logged := logs.String()
-	for _, expected := range []string{
-		"scheduled Credit reconciliation execution failed",
-		"run_id=42",
-		"attempt=1",
-		"max_attempts=3",
-		"scheduled scan failed",
-	} {
-		if !strings.Contains(logged, expected) {
-			t.Fatalf("scheduled failure log missing %q: %s", expected, logged)
-		}
-	}
-}
-
-type reconciliationWorkerServiceStub struct {
-	executeErr     error
-	failErr        error
-	getErr         error
-	run            ReconciliationRun
-	failContextErr error
-	failDeadline   time.Time
-}
-
-func (s *reconciliationWorkerServiceStub) ExecuteReconciliation(context.Context, int64) error {
-	return s.executeErr
-}
-
-func (s *reconciliationWorkerServiceStub) FailReconciliation(ctx context.Context, _ int64, _ error) error {
-	s.failContextErr = ctx.Err()
-	s.failDeadline, _ = ctx.Deadline()
-	return s.failErr
-}
-
-func (s *reconciliationWorkerServiceStub) GetReconciliationRun(context.Context, int64) (ReconciliationRun, error) {
-	return s.run, s.getErr
 }
 
 func TestReconciliationScanDoesNotWaitOnNormalWalletHotRows(t *testing.T) {

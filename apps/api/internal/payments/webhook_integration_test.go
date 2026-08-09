@@ -68,14 +68,8 @@ func TestReceiveStripeWebhookVerifiesRawBodyAndStoresOnlyMinimalInboxFact(t *tes
 		ID: "evt_1", Type: "refund.updated", ObjectID: "re_1", PaymentIntentID: "pi_webhook",
 		Livemode: false, CreatedAt: verifiedAt.Add(-time.Minute),
 	}}
-	service := NewService(ServiceDependencies{
-		ConfigurationStore: repo, WebhookInbox: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConvergenceStore: repo, ConfigurationGateway: gateway,
-		RefundGateway: &refundGatewayFake{retrieve: map[string]StripeRefund{
-			"re_1": {ID: "re_1", Status: "succeeded"},
-		}},
-		WebhookVerifier: verifier,
-	})
-	service.now = func() time.Time { return verifiedAt }
+	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(NewEventHub(), func() time.Time { return verifiedAt }), gateway, testCheckoutGateway{}, testWalletReader{}, verifier,
+		&refundGatewayFake{retrieve: map[string]StripeRefund{"re_1": {ID: "re_1", Status: "succeeded"}}}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_webhook", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
@@ -126,7 +120,7 @@ func TestReceiveStripeWebhookIgnoresVerifiedUnknownEventAndRejectsUnverifiedPayl
 		ID: "evt_unknown", Type: "customer.updated", ObjectID: "cus_1", CreatedAt: time.Now(),
 	}}
 	repo := NewRepository(db)
-	service := NewService(ServiceDependencies{ConfigurationStore: repo, WebhookInbox: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConvergenceStore: repo, ConfigurationGateway: gateway, WebhookVerifier: verifier})
+	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_unknown", ProductTaxCode: "txcd_10105001",
 		WebhookURL: "https://app.example.com/api/webhooks/stripe",

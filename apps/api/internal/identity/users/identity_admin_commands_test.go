@@ -358,7 +358,7 @@ func newIdentityAdminCommandFixture(role string, status int16) (IdentityAdminCom
 
 func identityAdminActor(t *testing.T) principal.Principal {
 	t.Helper()
-	actor, err := principal.New(99, "auth-admin-99", principal.RoleAdmin.String())
+	actor, err := principal.New(99, uuid.New(), "auth-admin-99", "Test Admin", principal.RoleAdmin.String())
 	if err != nil {
 		t.Fatalf("create admin principal: %v", err)
 	}
@@ -367,7 +367,7 @@ func identityAdminActor(t *testing.T) principal.Principal {
 
 func identityUserActor(t *testing.T) principal.Principal {
 	t.Helper()
-	actor, err := principal.New(98, "auth-user-98", principal.RoleUser.String())
+	actor, err := principal.New(98, uuid.New(), "auth-user-98", "Test User", principal.RoleUser.String())
 	if err != nil {
 		t.Fatalf("create user principal: %v", err)
 	}
@@ -376,7 +376,7 @@ func identityUserActor(t *testing.T) principal.Principal {
 
 func identitySelfAdminActor(t *testing.T) principal.Principal {
 	t.Helper()
-	actor, err := principal.New(42, "auth-admin-42", principal.RoleAdmin.String())
+	actor, err := principal.New(42, uuid.New(), "auth-admin-42", "Self Admin", principal.RoleAdmin.String())
 	if err != nil {
 		t.Fatalf("create self admin principal: %v", err)
 	}

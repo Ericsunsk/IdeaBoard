@@ -13,42 +13,53 @@ import (
 	"ideaboard/api/internal/testsupport"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
-type adminHandlerServiceStub struct {
+type adminCommandServiceStub struct{}
+
+func (*adminCommandServiceStub) Grant(context.Context, GrantCommand) (CommandResult, error) {
+	return CommandResult{}, nil
+}
+
+func (*adminCommandServiceStub) Deduct(context.Context, DeductionCommand) (CommandResult, error) {
+	return CommandResult{}, nil
+}
+
+func (*adminCommandServiceStub) Correct(context.Context, CorrectionCommand) (CommandResult, error) {
+	return CommandResult{}, nil
+}
+
+func (*adminCommandServiceStub) Refund(context.Context, RefundCommand) (CommandResult, error) {
+	return CommandResult{}, nil
+}
+
+type userWalletServiceStub struct{}
+
+func (*userWalletServiceStub) GetWallet(context.Context, int64) (WalletDetails, error) {
+	return WalletDetails{}, nil
+}
+
+type adminReadServiceStub struct{}
+
+func (*adminReadServiceStub) GetWallet(context.Context, int64) (WalletDetails, error) {
+	return WalletDetails{}, nil
+}
+
+func (*adminReadServiceStub) ListLedger(context.Context, ListLedgerInput) (LedgerPage, error) {
+	return LedgerPage{}, nil
+}
+
+type reconciliationServiceStub struct {
 	startInput StartManualReconciliationInput
 	startCalls int
 }
 
-func (s *adminHandlerServiceStub) Grant(context.Context, GrantCommand) (CommandResult, error) {
-	return CommandResult{}, nil
-}
-
-func (s *adminHandlerServiceStub) Deduct(context.Context, DeductionCommand) (CommandResult, error) {
-	return CommandResult{}, nil
-}
-
-func (s *adminHandlerServiceStub) Correct(context.Context, CorrectionCommand) (CommandResult, error) {
-	return CommandResult{}, nil
-}
-
-func (s *adminHandlerServiceStub) Refund(context.Context, RefundCommand) (CommandResult, error) {
-	return CommandResult{}, nil
-}
-
-func (s *adminHandlerServiceStub) GetWallet(context.Context, int64) (WalletDetails, error) {
-	return WalletDetails{}, nil
-}
-
-func (s *adminHandlerServiceStub) ListLedger(context.Context, ListLedgerInput) (LedgerPage, error) {
-	return LedgerPage{}, nil
-}
-
-func (s *adminHandlerServiceStub) GetCreditHealth(context.Context) (CreditHealth, error) {
+func (s *reconciliationServiceStub) GetCreditHealth(context.Context) (CreditHealth, error) {
 	return CreditHealth{Status: CreditHealthHealthy}, nil
 }
 
-func (s *adminHandlerServiceStub) StartReconciliation(_ context.Context, input StartManualReconciliationInput) (ReconciliationRun, error) {
+func (s *reconciliationServiceStub) StartReconciliation(_ context.Context, input StartManualReconciliationInput) (ReconciliationRun, error) {
 	s.startInput = input
 	s.startCalls++
 	requestedBy := input.Action.ActorID()
@@ -61,22 +72,82 @@ func (s *adminHandlerServiceStub) StartReconciliation(_ context.Context, input S
 	}, nil
 }
 
-func (s *adminHandlerServiceStub) GetReconciliationRun(context.Context, int64) (ReconciliationRun, error) {
+func (s *reconciliationServiceStub) GetReconciliationRun(context.Context, int64) (ReconciliationRun, error) {
 	return ReconciliationRun{}, nil
 }
 
-func (s *adminHandlerServiceStub) ListReconciliationRuns(context.Context, ListReconciliationInput) (ReconciliationRunPage, error) {
+func (s *reconciliationServiceStub) ListReconciliationRuns(context.Context, ListReconciliationInput) (ReconciliationRunPage, error) {
 	return ReconciliationRunPage{}, nil
 }
 
-func (s *adminHandlerServiceStub) ListGlobalReconciliationFindings(context.Context, ReconciliationFindingStatus, ListReconciliationInput) (ReconciliationFindingPage, error) {
+func (s *reconciliationServiceStub) ListGlobalReconciliationFindings(context.Context, ReconciliationFindingStatus, ListReconciliationInput) (ReconciliationFindingPage, error) {
 	return ReconciliationFindingPage{}, nil
+}
+
+type handlerTestUserResolver struct{}
+
+func (handlerTestUserResolver) ResolvePublicID(context.Context, string) (UserIdentity, error) {
+	return UserIdentity{ID: 94, PublicID: uuid.MustParse("00000000-0000-4000-8000-000000000094"), DisplayName: "User 94"}, nil
+}
+
+func (handlerTestUserResolver) ResolveID(context.Context, int64) (UserIdentity, error) {
+	return UserIdentity{ID: 94, PublicID: uuid.MustParse("00000000-0000-4000-8000-000000000094"), DisplayName: "User 94"}, nil
+}
+
+func TestCreditRoleAdaptersServeTheirPublicHTTPSeams(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	resolver := handlerTestUserResolver{}
+	userHandler := NewUserHandler(&userWalletServiceStub{}, resolver)
+	adminCommandHandler := NewAdminCommandHandler(&adminCommandServiceStub{}, resolver)
+	adminReadHandler := NewAdminReadHandler(&adminReadServiceStub{}, resolver)
+	reconciliationHandler := NewReconciliationHandler(&reconciliationServiceStub{}, resolver)
+
+	userRouter := gin.New()
+	userRouter.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 94, principal.RoleUser)
+		c.Next()
+	})
+	userRouter.GET("/credits/wallet", userHandler.GetCurrentWallet)
+	userResponse := httptest.NewRecorder()
+	userRouter.ServeHTTP(userResponse, httptest.NewRequest(http.MethodGet, "/credits/wallet", nil))
+	if userResponse.Code != http.StatusOK {
+		t.Fatalf("user wallet status = %d, body=%s", userResponse.Code, userResponse.Body.String())
+	}
+
+	adminRouter := gin.New()
+	adminRouter.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 7, principal.RoleAdmin)
+		c.Next()
+	})
+	adminRouter.POST("/credits/grants", adminCommandHandler.Grant)
+	adminRouter.GET("/credits/wallets/:public_id", adminReadHandler.GetWallet)
+	adminRouter.GET("/credits/health", reconciliationHandler.GetCreditHealth)
+
+	grantResponse := httptest.NewRecorder()
+	grantRequest := httptest.NewRequest(http.MethodPost, "/credits/grants", strings.NewReader(`{"user_public_id":"00000000-0000-4000-8000-000000000094","amount_credits":1,"idempotency_key":"handler-role-test","reason":"role adapter test","business_reference_id":"handler-role-test"}`))
+	grantRequest.Header.Set("Content-Type", "application/json")
+	adminRouter.ServeHTTP(grantResponse, grantRequest)
+	if grantResponse.Code != http.StatusOK {
+		t.Fatalf("admin command status = %d, body=%s", grantResponse.Code, grantResponse.Body.String())
+	}
+
+	readResponse := httptest.NewRecorder()
+	adminRouter.ServeHTTP(readResponse, httptest.NewRequest(http.MethodGet, "/credits/wallets/00000000-0000-4000-8000-000000000094", nil))
+	if readResponse.Code != http.StatusOK {
+		t.Fatalf("admin read status = %d, body=%s", readResponse.Code, readResponse.Body.String())
+	}
+
+	reconciliationResponse := httptest.NewRecorder()
+	adminRouter.ServeHTTP(reconciliationResponse, httptest.NewRequest(http.MethodGet, "/credits/health", nil))
+	if reconciliationResponse.Code != http.StatusOK {
+		t.Fatalf("reconciliation status = %d, body=%s", reconciliationResponse.Code, reconciliationResponse.Body.String())
+	}
 }
 
 func TestStartReconciliationHandlerRequiresAndTrimsReason(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	service := &adminHandlerServiceStub{}
-	handler := NewHandler(service)
+	service := &reconciliationServiceStub{}
+	handler := NewReconciliationHandler(service, nil)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 7, principal.RoleAdmin)
@@ -123,13 +194,13 @@ func TestAdminCreditHandlersRejectUserPrincipal(t *testing.T) {
 		route  string
 		run    gin.HandlerFunc
 	}{
-		{name: "grant", method: http.MethodPost, path: "/grants", route: "/grants", run: NewHandler(&adminHandlerServiceStub{}).Grant},
-		{name: "wallet", method: http.MethodGet, path: "/wallets/00000000-0000-4000-8000-000000000001", route: "/wallets/:public_id", run: NewHandler(&adminHandlerServiceStub{}).GetWallet},
-		{name: "ledger", method: http.MethodGet, path: "/wallets/00000000-0000-4000-8000-000000000001/ledger", route: "/wallets/:public_id/ledger", run: NewHandler(&adminHandlerServiceStub{}).ListLedger},
-		{name: "start reconciliation", method: http.MethodPost, path: "/runs", route: "/runs", run: NewHandler(&adminHandlerServiceStub{}).StartReconciliation},
-		{name: "list reconciliation runs", method: http.MethodGet, path: "/runs", route: "/runs", run: NewHandler(&adminHandlerServiceStub{}).ListReconciliationRuns},
-		{name: "get reconciliation run", method: http.MethodGet, path: "/runs/1", route: "/runs/:run_id", run: NewHandler(&adminHandlerServiceStub{}).GetReconciliationRun},
-		{name: "list global reconciliation findings", method: http.MethodGet, path: "/findings?status=open", route: "/findings", run: NewHandler(&adminHandlerServiceStub{}).ListGlobalReconciliationFindings},
+		{name: "grant", method: http.MethodPost, path: "/grants", route: "/grants", run: NewAdminCommandHandler(&adminCommandServiceStub{}, nil).Grant},
+		{name: "wallet", method: http.MethodGet, path: "/wallets/00000000-0000-4000-8000-000000000001", route: "/wallets/:public_id", run: NewAdminReadHandler(&adminReadServiceStub{}, nil).GetWallet},
+		{name: "ledger", method: http.MethodGet, path: "/wallets/00000000-0000-4000-8000-000000000001/ledger", route: "/wallets/:public_id/ledger", run: NewAdminReadHandler(&adminReadServiceStub{}, nil).ListLedger},
+		{name: "start reconciliation", method: http.MethodPost, path: "/runs", route: "/runs", run: NewReconciliationHandler(&reconciliationServiceStub{}, nil).StartReconciliation},
+		{name: "list reconciliation runs", method: http.MethodGet, path: "/runs", route: "/runs", run: NewReconciliationHandler(&reconciliationServiceStub{}, nil).ListReconciliationRuns},
+		{name: "get reconciliation run", method: http.MethodGet, path: "/runs/1", route: "/runs/:run_id", run: NewReconciliationHandler(&reconciliationServiceStub{}, nil).GetReconciliationRun},
+		{name: "list global reconciliation findings", method: http.MethodGet, path: "/findings?status=open", route: "/findings", run: NewReconciliationHandler(&reconciliationServiceStub{}, nil).ListGlobalReconciliationFindings},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			router := gin.New()
@@ -149,7 +220,8 @@ func TestAdminCreditHandlersRejectUserPrincipal(t *testing.T) {
 
 func TestAdminCreditReadHandlersRejectMissingPrincipal(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	handler := NewHandler(&adminHandlerServiceStub{})
+	adminReadHandler := NewAdminReadHandler(&adminReadServiceStub{}, nil)
+	reconciliationHandler := NewReconciliationHandler(&reconciliationServiceStub{}, nil)
 
 	for _, tt := range []struct {
 		name  string
@@ -157,11 +229,11 @@ func TestAdminCreditReadHandlersRejectMissingPrincipal(t *testing.T) {
 		route string
 		run   gin.HandlerFunc
 	}{
-		{name: "wallet", path: "/wallets/00000000-0000-4000-8000-000000000001", route: "/wallets/:public_id", run: handler.GetWallet},
-		{name: "ledger", path: "/wallets/00000000-0000-4000-8000-000000000001/ledger", route: "/wallets/:public_id/ledger", run: handler.ListLedger},
-		{name: "list reconciliation runs", path: "/runs", route: "/runs", run: handler.ListReconciliationRuns},
-		{name: "get reconciliation run", path: "/runs/1", route: "/runs/:run_id", run: handler.GetReconciliationRun},
-		{name: "list global reconciliation findings", path: "/findings?status=open", route: "/findings", run: handler.ListGlobalReconciliationFindings},
+		{name: "wallet", path: "/wallets/00000000-0000-4000-8000-000000000001", route: "/wallets/:public_id", run: adminReadHandler.GetWallet},
+		{name: "ledger", path: "/wallets/00000000-0000-4000-8000-000000000001/ledger", route: "/wallets/:public_id/ledger", run: adminReadHandler.ListLedger},
+		{name: "list reconciliation runs", path: "/runs", route: "/runs", run: reconciliationHandler.ListReconciliationRuns},
+		{name: "get reconciliation run", path: "/runs/1", route: "/runs/:run_id", run: reconciliationHandler.GetReconciliationRun},
+		{name: "list global reconciliation findings", path: "/findings?status=open", route: "/findings", run: reconciliationHandler.ListGlobalReconciliationFindings},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			router := gin.New()
@@ -192,7 +264,7 @@ func TestAdminCreditHandlersAuthenticateBeforeServiceAvailability(t *testing.T) 
 				if tt.setup != nil {
 					tt.setup(c)
 				}
-				NewHandler(nil).Grant(c)
+				NewAdminCommandHandler(nil, nil).Grant(c)
 			})
 			recorder := httptest.NewRecorder()
 			router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/grants", strings.NewReader(`{}`)))

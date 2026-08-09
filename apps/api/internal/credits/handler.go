@@ -17,13 +17,23 @@ import (
 	"github.com/google/uuid"
 )
 
-type AdminService interface {
+type AdminCommandService interface {
 	Grant(context.Context, GrantCommand) (CommandResult, error)
 	Deduct(context.Context, DeductionCommand) (CommandResult, error)
 	Correct(context.Context, CorrectionCommand) (CommandResult, error)
 	Refund(context.Context, RefundCommand) (CommandResult, error)
+}
+
+type UserWalletService interface {
+	GetWallet(context.Context, int64) (WalletDetails, error)
+}
+
+type AdminReadService interface {
 	GetWallet(context.Context, int64) (WalletDetails, error)
 	ListLedger(context.Context, ListLedgerInput) (LedgerPage, error)
+}
+
+type ReconciliationService interface {
 	GetCreditHealth(context.Context) (CreditHealth, error)
 	StartReconciliation(context.Context, StartManualReconciliationInput) (ReconciliationRun, error)
 	GetReconciliationRun(context.Context, int64) (ReconciliationRun, error)
@@ -31,23 +41,46 @@ type AdminService interface {
 	ListGlobalReconciliationFindings(context.Context, ReconciliationFindingStatus, ListReconciliationInput) (ReconciliationFindingPage, error)
 }
 
-type Handler struct {
-	service      AdminService
-	userResolver UserResolver
+type UserHandler struct {
+	service      UserWalletService
+	userResolver UserIDResolver
 }
 
-// UserIdentity is the public identity projection needed by admin credit reads.
-// The resolver boundary keeps the credits package independent from the users
-// lifecycle package (which itself depends on credits for wallet lifecycle).
+type AdminCommandHandler struct {
+	service      AdminCommandService
+	userResolver UserPublicIDResolver
+}
+
+type AdminReadHandler struct {
+	service      AdminReadService
+	userResolver AdminReadIdentityResolver
+}
+
+type ReconciliationHandler struct {
+	service      ReconciliationService
+	userResolver UserIDResolver
+}
+
+// UserIdentity is the HTTP identity projection shared by Credits inbound
+// adapters. The resolver boundary keeps Credits independent from the users
+// lifecycle package (which itself depends on Credits for Wallet lifecycle).
 type UserIdentity struct {
 	ID          int64
 	PublicID    uuid.UUID
 	DisplayName string
 }
 
-type UserResolver interface {
+type UserPublicIDResolver interface {
 	ResolvePublicID(context.Context, string) (UserIdentity, error)
+}
+
+type UserIDResolver interface {
 	ResolveID(context.Context, int64) (UserIdentity, error)
+}
+
+type AdminReadIdentityResolver interface {
+	UserPublicIDResolver
+	UserIDResolver
 }
 
 type adminGrantRequest struct {
@@ -98,118 +131,124 @@ type adminReconciliationRequest struct {
 
 const maxAdminCreditRequestBytes = 16 << 10
 
-func NewHandler(service AdminService, resolver ...UserResolver) *Handler {
-	var userResolver UserResolver
-	if len(resolver) > 0 {
-		userResolver = resolver[0]
-	}
-	return &Handler{service: service, userResolver: userResolver}
+func NewUserHandler(service UserWalletService, resolver UserIDResolver) *UserHandler {
+	return &UserHandler{service: service, userResolver: resolver}
 }
 
-func (h *Handler) Grant(c *gin.Context) {
+func NewAdminCommandHandler(service AdminCommandService, resolver UserPublicIDResolver) *AdminCommandHandler {
+	return &AdminCommandHandler{service: service, userResolver: resolver}
+}
+
+func NewAdminReadHandler(service AdminReadService, resolver AdminReadIdentityResolver) *AdminReadHandler {
+	return &AdminReadHandler{service: service, userResolver: resolver}
+}
+
+func NewReconciliationHandler(service ReconciliationService, resolver UserIDResolver) *ReconciliationHandler {
+	return &ReconciliationHandler{service: service, userResolver: resolver}
+}
+
+func (h *AdminCommandHandler) Grant(c *gin.Context) {
 	var request adminGrantRequest
-	adminID, userID, amount, ok := h.prepareAdminCreditCommand(c, &request)
+	adminID, user, amount, ok := h.prepareAdminCreditCommand(c, &request)
 	if !ok {
 		return
 	}
-	h.writeAdminCreditCommand(c, func(ctx context.Context) (CommandResult, error) {
+	h.writeAdminCreditCommand(c, user, func(ctx context.Context) (CommandResult, error) {
 		return h.service.Grant(ctx, GrantCommand{
-			UserID: userID, Amount: amount,
+			UserID: user.ID, Amount: amount,
 			Metadata: adminCommandMetadata(adminID, request.IdempotencyKey, "admin_grant", request.Reason, request.BusinessReferenceID),
 		})
 	})
 }
 
-func (h *Handler) Deduct(c *gin.Context) {
+func (h *AdminCommandHandler) Deduct(c *gin.Context) {
 	var request adminDeductionRequest
-	adminID, userID, amount, ok := h.prepareAdminCreditCommand(c, &request)
+	adminID, user, amount, ok := h.prepareAdminCreditCommand(c, &request)
 	if !ok {
 		return
 	}
-	h.writeAdminCreditCommand(c, func(ctx context.Context) (CommandResult, error) {
+	h.writeAdminCreditCommand(c, user, func(ctx context.Context) (CommandResult, error) {
 		return h.service.Deduct(ctx, DeductionCommand{
-			UserID: userID, Amount: amount,
+			UserID: user.ID, Amount: amount,
 			Metadata: adminCommandMetadata(adminID, request.IdempotencyKey, "admin_deduction", request.Reason, request.BusinessReferenceID),
 		})
 	})
 }
 
-func (h *Handler) Refund(c *gin.Context) {
+func (h *AdminCommandHandler) Refund(c *gin.Context) {
 	var request adminRefundRequest
-	adminID, userID, amount, ok := h.prepareAdminCreditCommand(c, &request)
+	adminID, user, amount, ok := h.prepareAdminCreditCommand(c, &request)
 	if !ok {
 		return
 	}
-	h.writeAdminCreditCommand(c, func(ctx context.Context) (CommandResult, error) {
+	h.writeAdminCreditCommand(c, user, func(ctx context.Context) (CommandResult, error) {
 		return h.service.Refund(ctx, RefundCommand{
-			UserID: userID, ChargeTransactionID: request.ChargeTransactionID, Amount: amount,
+			UserID: user.ID, ChargeTransactionID: request.ChargeTransactionID, Amount: amount,
 			Metadata: adminCommandMetadata(adminID, request.IdempotencyKey, "admin_refund", request.Reason, request.BusinessReferenceID),
 		})
 	})
 }
 
-func (h *Handler) Correct(c *gin.Context) {
+func (h *AdminCommandHandler) Correct(c *gin.Context) {
 	var request adminCorrectionRequest
-	adminID, userID, amount, ok := h.prepareAdminCreditCommand(c, &request)
+	adminID, user, amount, ok := h.prepareAdminCreditCommand(c, &request)
 	if !ok {
 		return
 	}
-	h.writeAdminCreditCommand(c, func(ctx context.Context) (CommandResult, error) {
+	h.writeAdminCreditCommand(c, user, func(ctx context.Context) (CommandResult, error) {
 		return h.service.Correct(ctx, CorrectionCommand{
-			UserID: userID, OriginalTransactionID: request.OriginalTransactionID, Amount: amount,
+			UserID: user.ID, OriginalTransactionID: request.OriginalTransactionID, Amount: amount,
 			Metadata: adminCommandMetadata(adminID, request.IdempotencyKey, "admin_correction", request.Reason, request.BusinessReferenceID),
 		})
 	})
 }
 
-func (h *Handler) prepareAdminCreditCommand(c *gin.Context, request adminCreditCommandRequest) (int64, int64, CreditAmount, bool) {
-	adminID, ok := h.requireAdmin(c)
+func (h *AdminCommandHandler) prepareAdminCreditCommand(c *gin.Context, request adminCreditCommandRequest) (int64, UserIdentity, CreditAmount, bool) {
+	adminID, ok := requireAdmin(c, h != nil && h.service != nil)
 	if !ok {
-		return 0, 0, 0, false
+		return 0, UserIdentity{}, 0, false
 	}
 	if err := decodeAdminCreditRequest(c, request); err != nil {
 		response.Error(c, http.StatusBadRequest, "参数错误")
-		return 0, 0, 0, false
+		return 0, UserIdentity{}, 0, false
 	}
-	userID, ok := h.resolveUserID(c, request.publicUserID())
+	user, ok := resolveUser(c, h.userResolver, request.publicUserID())
 	if !ok {
-		return 0, 0, 0, false
+		return 0, UserIdentity{}, 0, false
 	}
 	amount, err := NewCreditAmount(request.creditAmount())
 	if err != nil {
 		response.Error(c, http.StatusBadRequest, "Idea数量必须是有效正整数")
-		return 0, 0, 0, false
+		return 0, UserIdentity{}, 0, false
 	}
-	return adminID, userID, amount, true
+	return adminID, user, amount, true
 }
 
-func (h *Handler) writeAdminCreditCommand(c *gin.Context, execute func(context.Context) (CommandResult, error)) {
+func (h *AdminCommandHandler) writeAdminCreditCommand(c *gin.Context, user UserIdentity, execute func(context.Context) (CommandResult, error)) {
 	result, err := execute(c.Request.Context())
 	if err != nil {
 		writeCreditError(c, err)
 		return
 	}
-	if err := h.enrichCommandResult(c.Request.Context(), &result); err != nil {
-		writeCreditError(c, err)
-		return
-	}
+	result.Wallet.PublicID = user.PublicID
+	result.Wallet.DisplayName = user.DisplayName
 	response.SuccessDTO(c, result)
 }
 
-func (h *Handler) requireAdmin(c *gin.Context) (int64, bool) {
+func requireAdmin(c *gin.Context, serviceConfigured bool) (int64, bool) {
 	identityPrincipal, ok := principal.RequireAdmin(c)
 	if !ok {
 		return 0, false
 	}
-	if h == nil || h.service == nil {
+	if !serviceConfigured {
 		response.InternalError(c, http.StatusServiceUnavailable, "Idea服务暂不可用", nil)
 		return 0, false
 	}
 	return identityPrincipal.UserID(), true
 }
 
-func (h *Handler) GetCreditHealth(c *gin.Context) {
-	if _, ok := h.requireAdmin(c); !ok {
+func (h *ReconciliationHandler) GetCreditHealth(c *gin.Context) {
+	if _, ok := requireAdmin(c, h != nil && h.service != nil); !ok {
 		return
 	}
 	health, err := h.service.GetCreditHealth(c.Request.Context())
@@ -233,27 +272,27 @@ func decodeAdminCreditRequest(c *gin.Context, destination any) error {
 	return jsonlimit.DecodeStrictRequest(c.Writer, c.Request, maxAdminCreditRequestBytes, destination)
 }
 
-func (h *Handler) GetWallet(c *gin.Context) {
-	if _, ok := h.requireAdmin(c); !ok {
+func (h *AdminReadHandler) GetWallet(c *gin.Context) {
+	if _, ok := requireAdmin(c, h != nil && h.service != nil); !ok {
 		return
 	}
-	userID, ok := h.resolveUserID(c, c.Param("public_id"))
+	user, ok := resolveUser(c, h.userResolver, c.Param("public_id"))
 	if !ok {
 		return
 	}
-	wallet, err := h.service.GetWallet(c.Request.Context(), userID)
+	wallet, err := h.service.GetWallet(c.Request.Context(), user.ID)
 	if err != nil {
 		writeCreditError(c, err)
 		return
 	}
-	if err := h.enrichWallet(c.Request.Context(), &wallet); err != nil {
+	if err := enrichWallet(c.Request.Context(), h.userResolver, &wallet); err != nil {
 		writeCreditError(c, err)
 		return
 	}
 	response.SuccessDTO(c, wallet)
 }
 
-func (h *Handler) GetCurrentWallet(c *gin.Context) {
+func (h *UserHandler) GetCurrentWallet(c *gin.Context) {
 	if h == nil || h.service == nil {
 		response.InternalError(c, http.StatusServiceUnavailable, "Idea服务暂不可用", nil)
 		return
@@ -267,25 +306,25 @@ func (h *Handler) GetCurrentWallet(c *gin.Context) {
 		writeCreditError(c, err)
 		return
 	}
-	if err := h.enrichWallet(c.Request.Context(), &wallet); err != nil {
+	if err := enrichWallet(c.Request.Context(), h.userResolver, &wallet); err != nil {
 		writeCreditError(c, err)
 		return
 	}
 	response.SuccessDTO(c, wallet.WalletBalance)
 }
 
-func (h *Handler) ListLedger(c *gin.Context) {
-	if _, ok := h.requireAdmin(c); !ok {
+func (h *AdminReadHandler) ListLedger(c *gin.Context) {
+	if _, ok := requireAdmin(c, h != nil && h.service != nil); !ok {
 		return
 	}
-	userID, ok := h.resolveUserID(c, c.Param("public_id"))
+	user, ok := resolveUser(c, h.userResolver, c.Param("public_id"))
 	if !ok {
 		return
 	}
-	h.listLedger(c, userID)
+	h.listLedger(c, user.ID)
 }
 
-func (h *Handler) listLedger(c *gin.Context, userID int64) {
+func (h *AdminReadHandler) listLedger(c *gin.Context, userID int64) {
 	limit := 0
 	if rawLimit := strings.TrimSpace(c.Query("limit")); rawLimit != "" {
 		parsed, err := strconv.Atoi(rawLimit)
@@ -324,8 +363,8 @@ func authenticatedUserID(c *gin.Context) (int64, bool) {
 	return identityPrincipal.UserID(), true
 }
 
-func (h *Handler) StartReconciliation(c *gin.Context) {
-	adminID, ok := h.requireAdmin(c)
+func (h *ReconciliationHandler) StartReconciliation(c *gin.Context) {
+	adminID, ok := requireAdmin(c, h != nil && h.service != nil)
 	if !ok {
 		return
 	}
@@ -346,15 +385,15 @@ func (h *Handler) StartReconciliation(c *gin.Context) {
 		writeCreditError(c, err)
 		return
 	}
-	if err := h.enrichReconciliationRun(c.Request.Context(), &run); err != nil {
+	if err := enrichReconciliationRun(c.Request.Context(), h.userResolver, &run); err != nil {
 		writeCreditError(c, err)
 		return
 	}
 	response.SuccessDTO(c, run)
 }
 
-func (h *Handler) GetReconciliationRun(c *gin.Context) {
-	if _, ok := h.requireAdmin(c); !ok {
+func (h *ReconciliationHandler) GetReconciliationRun(c *gin.Context) {
+	if _, ok := requireAdmin(c, h != nil && h.service != nil); !ok {
 		return
 	}
 	runID, ok := parsePositiveInt64(c.Param("run_id"))
@@ -367,15 +406,15 @@ func (h *Handler) GetReconciliationRun(c *gin.Context) {
 		writeCreditError(c, err)
 		return
 	}
-	if err := h.enrichReconciliationRun(c.Request.Context(), &run); err != nil {
+	if err := enrichReconciliationRun(c.Request.Context(), h.userResolver, &run); err != nil {
 		writeCreditError(c, err)
 		return
 	}
 	response.SuccessDTO(c, run)
 }
 
-func (h *Handler) ListReconciliationRuns(c *gin.Context) {
-	if _, ok := h.requireAdmin(c); !ok {
+func (h *ReconciliationHandler) ListReconciliationRuns(c *gin.Context) {
+	if _, ok := requireAdmin(c, h != nil && h.service != nil); !ok {
 		return
 	}
 	input, ok := parseReconciliationPage(c)
@@ -387,15 +426,15 @@ func (h *Handler) ListReconciliationRuns(c *gin.Context) {
 		writeCreditError(c, err)
 		return
 	}
-	if err := h.enrichReconciliationRuns(c.Request.Context(), &page); err != nil {
+	if err := enrichReconciliationRuns(c.Request.Context(), h.userResolver, &page); err != nil {
 		writeCreditError(c, err)
 		return
 	}
 	response.SuccessDTO(c, page)
 }
 
-func (h *Handler) ListGlobalReconciliationFindings(c *gin.Context) {
-	if _, ok := h.requireAdmin(c); !ok {
+func (h *ReconciliationHandler) ListGlobalReconciliationFindings(c *gin.Context) {
+	if _, ok := requireAdmin(c, h != nil && h.service != nil); !ok {
 		return
 	}
 	input, ok := parseReconciliationPage(c)
@@ -412,7 +451,7 @@ func (h *Handler) ListGlobalReconciliationFindings(c *gin.Context) {
 		writeCreditError(c, err)
 		return
 	}
-	if err := h.enrichReconciliationFindings(c.Request.Context(), &page); err != nil {
+	if err := enrichReconciliationFindings(c.Request.Context(), h.userResolver, &page); err != nil {
 		writeCreditError(c, err)
 		return
 	}
@@ -424,41 +463,28 @@ func parseReconciliationFindingStatus(value string) (ReconciliationFindingStatus
 	return status, status == ReconciliationFindingOpen || status == ReconciliationFindingResolved
 }
 
-func (h *Handler) resolveUserID(c *gin.Context, rawPublicID string) (int64, bool) {
-	if h.userResolver == nil {
+func resolveUser(c *gin.Context, userResolver UserPublicIDResolver, rawPublicID string) (UserIdentity, bool) {
+	if userResolver == nil {
 		response.InternalError(c, http.StatusServiceUnavailable, "Idea服务暂不可用", nil)
-		return 0, false
+		return UserIdentity{}, false
 	}
 	if strings.TrimSpace(rawPublicID) == "" {
 		response.Error(c, http.StatusBadRequest, "用户 public_id 无效")
-		return 0, false
+		return UserIdentity{}, false
 	}
-	user, err := h.userResolver.ResolvePublicID(c.Request.Context(), rawPublicID)
+	user, err := userResolver.ResolvePublicID(c.Request.Context(), rawPublicID)
 	if err != nil || user.ID <= 0 {
 		response.Error(c, http.StatusNotFound, "用户不存在")
-		return 0, false
+		return UserIdentity{}, false
 	}
-	return user.ID, true
+	return user, true
 }
 
-func (h *Handler) enrichCommandResult(ctx context.Context, result *CommandResult) error {
-	if h == nil || h.userResolver == nil || result == nil || result.Wallet.UserID <= 0 {
+func enrichWallet(ctx context.Context, userResolver UserIDResolver, wallet *WalletDetails) error {
+	if userResolver == nil || wallet == nil || wallet.UserID <= 0 {
 		return nil
 	}
-	user, err := h.userResolver.ResolveID(ctx, result.Wallet.UserID)
-	if err != nil {
-		return fmt.Errorf("resolve credit wallet identity: %w", err)
-	}
-	result.Wallet.PublicID = user.PublicID
-	result.Wallet.DisplayName = user.DisplayName
-	return nil
-}
-
-func (h *Handler) enrichWallet(ctx context.Context, wallet *WalletDetails) error {
-	if h == nil || h.userResolver == nil || wallet == nil || wallet.UserID <= 0 {
-		return nil
-	}
-	user, err := h.userResolver.ResolveID(ctx, wallet.UserID)
+	user, err := userResolver.ResolveID(ctx, wallet.UserID)
 	if err != nil {
 		return fmt.Errorf("resolve credit wallet identity: %w", err)
 	}
@@ -471,11 +497,11 @@ func (h *Handler) enrichWallet(ctx context.Context, wallet *WalletDetails) error
 	return nil
 }
 
-func (h *Handler) enrichReconciliationRun(ctx context.Context, run *ReconciliationRun) error {
-	if h == nil || h.userResolver == nil || run == nil || run.RequestedBy == nil {
+func enrichReconciliationRun(ctx context.Context, userResolver UserIDResolver, run *ReconciliationRun) error {
+	if userResolver == nil || run == nil || run.RequestedBy == nil {
 		return nil
 	}
-	identity, err := h.userResolver.ResolveID(ctx, *run.RequestedBy)
+	identity, err := userResolver.ResolveID(ctx, *run.RequestedBy)
 	if err != nil {
 		return fmt.Errorf("resolve reconciliation actor identity: %w", err)
 	}
@@ -485,20 +511,20 @@ func (h *Handler) enrichReconciliationRun(ctx context.Context, run *Reconciliati
 	return nil
 }
 
-func (h *Handler) enrichReconciliationRuns(ctx context.Context, page *ReconciliationRunPage) error {
+func enrichReconciliationRuns(ctx context.Context, userResolver UserIDResolver, page *ReconciliationRunPage) error {
 	if page == nil {
 		return nil
 	}
 	for index := range page.Runs {
-		if err := h.enrichReconciliationRun(ctx, &page.Runs[index]); err != nil {
+		if err := enrichReconciliationRun(ctx, userResolver, &page.Runs[index]); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (h *Handler) enrichReconciliationFindings(ctx context.Context, page *ReconciliationFindingPage) error {
-	if h == nil || h.userResolver == nil || page == nil {
+func enrichReconciliationFindings(ctx context.Context, userResolver UserIDResolver, page *ReconciliationFindingPage) error {
+	if userResolver == nil || page == nil {
 		return nil
 	}
 	for index := range page.Findings {
@@ -506,7 +532,7 @@ func (h *Handler) enrichReconciliationFindings(ctx context.Context, page *Reconc
 		if finding.WalletUserID == nil {
 			continue
 		}
-		identity, err := h.userResolver.ResolveID(ctx, *finding.WalletUserID)
+		identity, err := userResolver.ResolveID(ctx, *finding.WalletUserID)
 		if err != nil {
 			return fmt.Errorf("resolve reconciliation wallet identity: %w", err)
 		}

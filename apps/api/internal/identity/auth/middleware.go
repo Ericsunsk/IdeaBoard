@@ -70,7 +70,7 @@ func AuthMiddleware(authService *ServiceClient, userRepo localUserReader, lifecy
 			return
 		}
 
-		identityPrincipal, err := principal.New(user.ID, identity.AuthUserID, user.Role)
+		identityPrincipal, err := principal.New(user.ID, user.PublicID, identity.AuthUserID, user.DisplayName, user.Role)
 		if err != nil || principal.Set(c, identityPrincipal) != nil {
 			response.Error(c, http.StatusUnauthorized, "用户不存在或已停用")
 			c.Abort()

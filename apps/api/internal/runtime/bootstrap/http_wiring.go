@@ -35,8 +35,19 @@ func newAppRouter(
 	taskHandler := taskservice.NewHandler(taskServices.taskService)
 	taskStatsHandler := taskstats.NewHandler(taskServices.taskStatsService, taskServices.accountService)
 	billingHandler := billing.NewHandler(services.billingCatalog, services.billingCatalog)
-	paymentHandler := payments.NewHandler(services.paymentService, cfg.PublicOrigins)
+	paymentUserHandler := payments.NewUserCheckoutHandler(services.paymentService, cfg.PublicOrigins)
+	paymentEventStreamHandler := payments.NewEventStreamHandler(services.paymentService.EventHub())
+	paymentAdminHandler := payments.NewAdminHandler(services.paymentService, cfg.PublicOrigins)
+	paymentWebhookHandler := payments.NewWebhookHandler(services.paymentService)
 	creditUserResolver := creditsUserResolver{repo: repos.userRepo}
+	creditUserHandler := credits.NewUserHandler(services.creditService, creditUserResolver)
+	creditAdminCommandHandler := credits.NewAdminCommandHandler(services.creditService, creditUserResolver)
+	creditAdminReadHandler := credits.NewAdminReadHandler(services.creditService, creditUserResolver)
+	creditReconciliationHandler := credits.NewReconciliationHandler(services.creditService, creditUserResolver)
+	rewardIdentityProjection := rewardIdentityProjector{repo: repos.userRepo}
+	rewardUserHandler := rewards.NewUserHandler(services.rewardService)
+	rewardAdminCommandHandler := rewards.NewAdminCommandHandler(services.rewardService)
+	rewardAdminReadHandler := rewards.NewAdminReadHandler(services.rewardService, rewardIdentityProjection)
 
 	authDeps := httpapi.AuthDeps{
 		AuthServiceClient: services.authServiceClient,
@@ -56,16 +67,17 @@ func newAppRouter(
 	registerHTTPRoutes(router, httpapi.Dependencies{
 		Auth: authDeps,
 		UserRoutes: httpapi.UserRouteDeps{
-			AuthHandler:    auth.NewAuthHandler(services.userService),
-			TaskHandler:    taskHandler,
-			BoardHandler:   boards.NewBoardHandler(services.boardService, cfg.PublicOrigins),
-			BillingHandler: billingHandler,
-			BillingRecords: billingrecords.NewHandler(services.billingRecords),
-			CreditHandler:  credits.NewHandler(services.creditService, creditUserResolver),
-			UsageHandler:   usage.NewHandler(services.usageService),
-			RewardHandler:  rewards.NewHandler(services.rewardService, repos.userRepo),
-			PaymentHandler: paymentHandler,
-			Uploads:        uploadDeps,
+			AuthHandler:               auth.NewAuthHandler(services.userService),
+			TaskHandler:               taskHandler,
+			BoardHandler:              boards.NewBoardHandler(services.boardService, cfg.PublicOrigins),
+			BillingHandler:            billingHandler,
+			BillingRecords:            billingrecords.NewHandler(services.billingRecords),
+			CreditUserHandler:         creditUserHandler,
+			UsageHandler:              usage.NewHandler(services.usageService),
+			RewardUserHandler:         rewardUserHandler,
+			PaymentUserHandler:        paymentUserHandler,
+			PaymentEventStreamHandler: paymentEventStreamHandler,
+			Uploads:                   uploadDeps,
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{
 			AdminHandler: users.NewAdminHandler(
@@ -74,22 +86,25 @@ func newAppRouter(
 				users.NewIdentityAdminCommands(services.userService, services.authServiceClient),
 				services.authServiceClient,
 			),
-			MailConfigHandler:       auth.NewMailConfigAdminHandler(services.authServiceClient),
-			SocialProviderHandler:   auth.NewSocialProviderAdminHandler(services.authServiceClient),
-			BillingHandler:          billingHandler,
-			CreditHandler:           credits.NewHandler(services.creditService, creditUserResolver),
-			AccountHandler:          accountHandler,
-			TaskHandler:             taskHandler,
-			TaskStatsHandler:        taskStatsHandler,
-			ProviderEndpointHandler: providerendpoints.NewProviderEndpointHandler(repos.providerEndpointRepo, cfg.App.Env),
-			StorageHandler:          storage.NewStorageHandler(services.storageService),
-			FeaturePromptHandler:    prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
-			StorageService:          services.storageService,
-			UploadSettings:          services.runtimeSettings,
-			RewardHandler:           rewards.NewHandler(services.rewardService, repos.userRepo),
-			PaymentHandler:          paymentHandler,
+			MailConfigHandler:           auth.NewMailConfigAdminHandler(services.authServiceClient),
+			SocialProviderHandler:       auth.NewSocialProviderAdminHandler(services.authServiceClient),
+			BillingHandler:              billingHandler,
+			CreditAdminCommandHandler:   creditAdminCommandHandler,
+			CreditAdminReadHandler:      creditAdminReadHandler,
+			CreditReconciliationHandler: creditReconciliationHandler,
+			AccountHandler:              accountHandler,
+			TaskHandler:                 taskHandler,
+			TaskStatsHandler:            taskStatsHandler,
+			ProviderEndpointHandler:     providerendpoints.NewProviderEndpointHandler(repos.providerEndpointRepo, cfg.App.Env),
+			StorageHandler:              storage.NewStorageHandler(services.storageService),
+			FeaturePromptHandler:        prompts.NewFeaturePromptHandler(repos.featurePromptRepo),
+			StorageService:              services.storageService,
+			UploadSettings:              services.runtimeSettings,
+			RewardAdminCommandHandler:   rewardAdminCommandHandler,
+			RewardAdminReadHandler:      rewardAdminReadHandler,
+			PaymentAdminHandler:         paymentAdminHandler,
 		},
-		PaymentWebhook: paymentHandler,
+		PaymentWebhook: paymentWebhookHandler,
 		StaticUploads: httpapi.StaticUploadDeps{
 			Auth:         authDeps,
 			BoardService: services.boardService,

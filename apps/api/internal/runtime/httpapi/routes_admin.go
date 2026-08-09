@@ -28,35 +28,35 @@ func registerAdminRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 }
 
 func registerAdminPaymentRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
-	adminAPI.GET(RouteAdminStripeConfiguration, h.PaymentHandler.GetStripeConfiguration)
-	adminAPI.PUT(RouteAdminStripeConfiguration, h.PaymentHandler.UpdateStripeConfiguration)
-	adminAPI.GET("/payments/orders", h.PaymentHandler.ListAdminPaymentOrders)
-	adminAPI.GET("/payments/orders/:order_number", h.PaymentHandler.GetAdminPaymentOrder)
-	adminAPI.POST("/payments/orders/:order_number/refunds", h.PaymentHandler.CreateAdminPaymentRefund)
+	adminAPI.GET(RouteAdminStripeConfiguration, h.PaymentAdminHandler.GetStripeConfiguration)
+	adminAPI.PUT(RouteAdminStripeConfiguration, h.PaymentAdminHandler.UpdateStripeConfiguration)
+	adminAPI.GET("/payments/orders", h.PaymentAdminHandler.ListAdminPaymentOrders)
+	adminAPI.GET("/payments/orders/:order_number", h.PaymentAdminHandler.GetAdminPaymentOrder)
+	adminAPI.POST("/payments/orders/:order_number/refunds", h.PaymentAdminHandler.CreateAdminPaymentRefund)
 }
 
 func registerAdminRewardRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
-	adminAPI.POST("/rewards/codes/search", h.RewardHandler.SearchRewardCodes)
-	adminAPI.POST("/rewards/codes", h.RewardHandler.CreateRewardCode)
-	adminAPI.GET("/rewards/codes/:id/redemptions", h.RewardHandler.ListAdminRedemptions)
-	adminAPI.GET("/rewards/codes/:id/redemptions/:redemption_id", h.RewardHandler.GetAdminRedemption)
-	adminAPI.PATCH("/rewards/codes/:id", h.RewardHandler.UpdateRewardCode)
-	adminAPI.PATCH("/rewards/codes/:id/enabled", h.RewardHandler.SetRewardCodeEnabled)
-	adminAPI.DELETE("/rewards/codes/:id", h.RewardHandler.DeleteRewardCode)
+	adminAPI.POST("/rewards/codes/search", h.RewardAdminReadHandler.SearchRewardCodes)
+	adminAPI.POST("/rewards/codes", h.RewardAdminCommandHandler.CreateRewardCode)
+	adminAPI.GET("/rewards/codes/:id/redemptions", h.RewardAdminReadHandler.ListAdminRedemptions)
+	adminAPI.GET("/rewards/codes/:id/redemptions/:redemption_id", h.RewardAdminReadHandler.GetAdminRedemption)
+	adminAPI.PATCH("/rewards/codes/:id", h.RewardAdminCommandHandler.UpdateRewardCode)
+	adminAPI.PATCH("/rewards/codes/:id/enabled", h.RewardAdminCommandHandler.SetRewardCodeEnabled)
+	adminAPI.DELETE("/rewards/codes/:id", h.RewardAdminCommandHandler.DeleteRewardCode)
 }
 
 func registerAdminCreditRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
-	adminAPI.POST("/credits/grants", h.CreditHandler.Grant)
-	adminAPI.POST("/credits/deductions", h.CreditHandler.Deduct)
-	adminAPI.POST("/credits/corrections", h.CreditHandler.Correct)
-	adminAPI.POST("/credits/refunds", h.CreditHandler.Refund)
-	adminAPI.GET("/credits/wallets/:public_id", h.CreditHandler.GetWallet)
-	adminAPI.GET("/credits/wallets/:public_id/ledger", h.CreditHandler.ListLedger)
-	adminAPI.GET("/credits/health", h.CreditHandler.GetCreditHealth)
-	adminAPI.POST("/credits/reconciliation/runs", h.CreditHandler.StartReconciliation)
-	adminAPI.GET("/credits/reconciliation/runs", h.CreditHandler.ListReconciliationRuns)
-	adminAPI.GET("/credits/reconciliation/runs/:run_id", h.CreditHandler.GetReconciliationRun)
-	adminAPI.GET("/credits/reconciliation/findings", h.CreditHandler.ListGlobalReconciliationFindings)
+	adminAPI.POST("/credits/grants", h.CreditAdminCommandHandler.Grant)
+	adminAPI.POST("/credits/deductions", h.CreditAdminCommandHandler.Deduct)
+	adminAPI.POST("/credits/corrections", h.CreditAdminCommandHandler.Correct)
+	adminAPI.POST("/credits/refunds", h.CreditAdminCommandHandler.Refund)
+	adminAPI.GET("/credits/wallets/:public_id", h.CreditAdminReadHandler.GetWallet)
+	adminAPI.GET("/credits/wallets/:public_id/ledger", h.CreditAdminReadHandler.ListLedger)
+	adminAPI.GET("/credits/health", h.CreditReconciliationHandler.GetCreditHealth)
+	adminAPI.POST("/credits/reconciliation/runs", h.CreditReconciliationHandler.StartReconciliation)
+	adminAPI.GET("/credits/reconciliation/runs", h.CreditReconciliationHandler.ListReconciliationRuns)
+	adminAPI.GET("/credits/reconciliation/runs/:run_id", h.CreditReconciliationHandler.GetReconciliationRun)
+	adminAPI.GET("/credits/reconciliation/findings", h.CreditReconciliationHandler.ListGlobalReconciliationFindings)
 }
 
 func registerAdminBillingRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {

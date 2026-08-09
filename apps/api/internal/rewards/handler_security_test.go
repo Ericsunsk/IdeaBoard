@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -17,19 +18,71 @@ import (
 	"ideaboard/api/internal/testsupport"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
+func TestRewardRedeemDoesNotFailAfterCommittedResultWhenIdentityIsUnavailable(t *testing.T) {
+	for _, replayed := range []bool{false, true} {
+		t.Run(fmt.Sprintf("replayed=%t", replayed), func(t *testing.T) {
+			handler := NewUserHandler(rewardHandlerServiceStub{redeem: func(context.Context, RedeemCommand) (RedeemResult, error) {
+				return RedeemResult{
+					Redemption:       Redemption{ID: 9, UserID: 41, CreditAmount: 25},
+					CreditedAmount:   25,
+					AvailableBalance: 125,
+					Replayed:         replayed,
+				}, nil
+			}})
+			router := rewardRedeemRouter(t, handler, 41)
+
+			recorder := performRawRewardRedeem(t, router, `{"code":"SECURE01"}`)
+
+			if recorder.Code != http.StatusOK {
+				t.Fatalf("status = %d, want %d; body=%s", recorder.Code, http.StatusOK, recorder.Body.String())
+			}
+		})
+	}
+}
+
 type rewardHandlerServiceStub struct {
-	RewardService
-	redeem func(context.Context, RedeemCommand) (RedeemResult, error)
-	search func(context.Context, SearchRewardCodesInput) (RewardCodePage, error)
-	update func(context.Context, UpdateRewardCodeCommand) (UpdatedRewardCode, error)
+	create          func(context.Context, CreateRewardCodeCommand) (CreatedRewardCode, error)
+	setEnabled      func(context.Context, SetRewardCodeEnabledCommand) (RewardCode, error)
+	delete          func(context.Context, DeleteRewardCodeCommand) (DeletedRewardCode, error)
+	redeem          func(context.Context, RedeemCommand) (RedeemResult, error)
+	search          func(context.Context, SearchRewardCodesInput) (RewardCodePage, error)
+	update          func(context.Context, UpdateRewardCodeCommand) (UpdatedRewardCode, error)
+	listRedemptions func(context.Context, ListAdminRedemptionsInput) (AdminRedemptionPage, error)
+	getRedemption   func(context.Context, GetAdminRedemptionInput) (AdminRedemptionDetail, error)
+	listUser        func(context.Context, ListRedemptionsInput) (RedemptionHistoryPage, error)
+}
+
+func (s rewardHandlerServiceStub) CreateRewardCode(ctx context.Context, input CreateRewardCodeCommand) (CreatedRewardCode, error) {
+	if s.create == nil {
+		return CreatedRewardCode{}, nil
+	}
+	return s.create(ctx, input)
+}
+
+func (s rewardHandlerServiceStub) SetRewardCodeEnabled(ctx context.Context, input SetRewardCodeEnabledCommand) (RewardCode, error) {
+	if s.setEnabled == nil {
+		return RewardCode{}, nil
+	}
+	return s.setEnabled(ctx, input)
+}
+
+func (s rewardHandlerServiceStub) DeleteRewardCode(ctx context.Context, input DeleteRewardCodeCommand) (DeletedRewardCode, error) {
+	if s.delete == nil {
+		return DeletedRewardCode{}, nil
+	}
+	return s.delete(ctx, input)
 }
 
 func (s rewardHandlerServiceStub) SearchRewardCodes(
 	ctx context.Context,
 	input SearchRewardCodesInput,
 ) (RewardCodePage, error) {
+	if s.search == nil {
+		return RewardCodePage{}, nil
+	}
 	return s.search(ctx, input)
 }
 
@@ -37,6 +90,9 @@ func (s rewardHandlerServiceStub) UpdateRewardCode(
 	ctx context.Context,
 	command UpdateRewardCodeCommand,
 ) (UpdatedRewardCode, error) {
+	if s.update == nil {
+		return UpdatedRewardCode{}, nil
+	}
 	return s.update(ctx, command)
 }
 
@@ -44,7 +100,131 @@ func (s rewardHandlerServiceStub) Redeem(
 	ctx context.Context,
 	command RedeemCommand,
 ) (RedeemResult, error) {
+	if s.redeem == nil {
+		return RedeemResult{}, nil
+	}
 	return s.redeem(ctx, command)
+}
+
+func (s rewardHandlerServiceStub) ListAdminRedemptions(
+	ctx context.Context,
+	input ListAdminRedemptionsInput,
+) (AdminRedemptionPage, error) {
+	if s.listRedemptions == nil {
+		return AdminRedemptionPage{}, nil
+	}
+	return s.listRedemptions(ctx, input)
+}
+
+func (s rewardHandlerServiceStub) GetAdminRedemption(ctx context.Context, input GetAdminRedemptionInput) (AdminRedemptionDetail, error) {
+	if s.getRedemption == nil {
+		return AdminRedemptionDetail{}, nil
+	}
+	return s.getRedemption(ctx, input)
+}
+
+func (s rewardHandlerServiceStub) ListRedemptions(ctx context.Context, input ListRedemptionsInput) (RedemptionHistoryPage, error) {
+	if s.listUser == nil {
+		return RedemptionHistoryPage{}, nil
+	}
+	return s.listUser(ctx, input)
+}
+
+type recordingIdentityProjection struct {
+	identities  map[int64]IdentityProjection
+	singleCalls int
+	batchCalls  int
+}
+
+func (p *recordingIdentityProjection) ResolveIdentity(_ context.Context, userID int64) (IdentityProjection, error) {
+	p.singleCalls++
+	identity, ok := p.identities[userID]
+	if !ok {
+		return IdentityProjection{}, errors.New("Identity mapping missing")
+	}
+	return identity, nil
+}
+
+func (p *recordingIdentityProjection) ResolveIdentities(
+	_ context.Context,
+	_ []int64,
+) (map[int64]IdentityProjection, error) {
+	p.batchCalls++
+	return p.identities, nil
+}
+
+func TestAdminRedemptionListUsesOneBatchIdentityProjection(t *testing.T) {
+	identities := map[int64]IdentityProjection{
+		3: {PublicID: uuid.MustParse("00000000-0000-4000-8000-000000000003"), DisplayName: "User 3"},
+		7: {PublicID: uuid.MustParse("00000000-0000-4000-8000-000000000007"), DisplayName: "User 7"},
+		8: {PublicID: uuid.MustParse("00000000-0000-4000-8000-000000000008"), DisplayName: "User 8"},
+	}
+	projection := &recordingIdentityProjection{identities: identities}
+	service := rewardHandlerServiceStub{listRedemptions: func(
+		context.Context,
+		ListAdminRedemptionsInput,
+	) (AdminRedemptionPage, error) {
+		return AdminRedemptionPage{Redemptions: []AdminRedemptionSummary{
+			{ID: 13, RewardCodeID: 5, UserID: 3},
+			{ID: 12, RewardCodeID: 5, UserID: 7},
+			{ID: 11, RewardCodeID: 5, UserID: 8},
+		}}, nil
+	}}
+	handler := NewAdminReadHandler(service, projection)
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 1, principal.RoleAdmin)
+		c.Next()
+	})
+	router.GET("/admin/rewards/codes/:id/redemptions", handler.ListAdminRedemptions)
+
+	page, _ := performRewardRequestWithRecorder[AdminRedemptionPage](
+		t, router, http.MethodGet, "/admin/rewards/codes/5/redemptions", nil, http.StatusOK,
+	)
+
+	if projection.batchCalls != 1 || projection.singleCalls != 0 {
+		t.Fatalf("Identity projection calls: batch=%d single=%d, want 1 and 0",
+			projection.batchCalls, projection.singleCalls)
+	}
+	if len(page.Redemptions) != 3 {
+		t.Fatalf("Redemptions = %d, want 3", len(page.Redemptions))
+	}
+	for index, userID := range []int64{3, 7, 8} {
+		redemption := page.Redemptions[index]
+		identity := identities[userID]
+		if redemption.UserPublicID != identity.PublicID || redemption.DisplayName != identity.DisplayName {
+			t.Fatalf("Redemption projection = %+v, want %+v", redemption, identity)
+		}
+	}
+}
+
+func TestAdminRedemptionListFailsClosedForMissingIdentityMapping(t *testing.T) {
+	projection := &recordingIdentityProjection{identities: map[int64]IdentityProjection{}}
+	service := rewardHandlerServiceStub{listRedemptions: func(
+		context.Context,
+		ListAdminRedemptionsInput,
+	) (AdminRedemptionPage, error) {
+		return AdminRedemptionPage{Redemptions: []AdminRedemptionSummary{{ID: 13, RewardCodeID: 5, UserID: 3}}}, nil
+	}}
+	handler := NewAdminReadHandler(service, projection)
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 1, principal.RoleAdmin)
+		c.Next()
+	})
+	router.GET("/admin/rewards/codes/:id/redemptions", handler.ListAdminRedemptions)
+
+	_, recorder := performRewardRequestWithRecorder[struct{}](
+		t, router, http.MethodGet, "/admin/rewards/codes/5/redemptions", nil, http.StatusInternalServerError,
+	)
+
+	if projection.batchCalls != 1 || projection.singleCalls != 0 ||
+		!strings.Contains(recorder.Body.String(), "奖励操作失败") {
+		t.Fatalf("Identity projection calls: batch=%d single=%d body=%s",
+			projection.batchCalls, projection.singleCalls, recorder.Body.String())
+	}
 }
 
 type captureRedemptionMetrics struct {
@@ -59,7 +239,7 @@ func (c *captureRedemptionMetrics) RecordRedemption(observation redemptionMetric
 }
 
 func TestRewardRedeemRequiresAuthenticationAndDisablesCaching(t *testing.T) {
-	handler := NewHandler(rewardHandlerServiceStub{redeem: func(context.Context, RedeemCommand) (RedeemResult, error) {
+	handler := NewUserHandler(rewardHandlerServiceStub{redeem: func(context.Context, RedeemCommand) (RedeemResult, error) {
 		t.Fatal("unauthenticated request reached Rewards service")
 		return RedeemResult{}, nil
 	}})
@@ -78,7 +258,7 @@ func TestRewardRedeemRequiresAuthenticationAndDisablesCaching(t *testing.T) {
 }
 
 func TestRewardRedeemCannotTargetAnotherUserFromRequestBody(t *testing.T) {
-	handler := NewHandler(rewardHandlerServiceStub{redeem: func(context.Context, RedeemCommand) (RedeemResult, error) {
+	handler := NewUserHandler(rewardHandlerServiceStub{redeem: func(context.Context, RedeemCommand) (RedeemResult, error) {
 		t.Fatal("request containing a target user reached Rewards service")
 		return RedeemResult{}, nil
 	}})
@@ -100,7 +280,7 @@ func TestRewardRedeemLimitsEachAuthenticatedUser(t *testing.T) {
 		serviceCalls++
 		return RedeemResult{CreditedAmount: 1}, nil
 	}}
-	handler := newHandlerWithOptions(service, redemptionHandlerOptions{
+	handler := newUserHandlerWithOptions(service, redemptionHandlerOptions{
 		Now:             func() time.Time { return now },
 		MetricsRecorder: metricsRecorder,
 	})
@@ -148,7 +328,7 @@ func TestRewardRedeemRecordsLowCardinalityOutcomes(t *testing.T) {
 			return RedeemResult{}, errors.New("database unavailable")
 		}
 	}}
-	handler := newHandlerWithOptions(service, redemptionHandlerOptions{
+	handler := newUserHandlerWithOptions(service, redemptionHandlerOptions{
 		Now:             func() time.Time { return now },
 		MetricsRecorder: recorder,
 	})
@@ -194,7 +374,7 @@ func TestRewardRedeemDoesNotLogOrReturnSensitiveCodeMaterial(t *testing.T) {
 	service := rewardHandlerServiceStub{redeem: func(context.Context, RedeemCommand) (RedeemResult, error) {
 		return RedeemResult{}, errors.New("lookup failed code=" + rawCode + " digest=" + fullDigest + " body=" + requestBody)
 	}}
-	handler := NewHandler(service)
+	handler := NewUserHandler(service)
 	router := rewardRedeemRouter(t, handler, 41)
 
 	responseRecorder := performRawRewardRedeem(t, router, requestBody)
@@ -217,7 +397,7 @@ func TestRewardCodeUpdateWithCodeRequiresAdminAndDoesNotExposeSensitiveMaterial(
 		serviceCalls++
 		return UpdatedRewardCode{}, errors.New("rotation failed code=" + rawCode + " digest=" + fullDigest)
 	}}
-	handler := NewHandler(service)
+	handler := NewAdminCommandHandler(service)
 	gin.SetMode(gin.TestMode)
 	unauthenticated := gin.New()
 	unauthenticated.PATCH("/admin/rewards/codes/:id", handler.UpdateRewardCode)
@@ -265,7 +445,7 @@ func TestRewardCodeSearchDoesNotLogOrReturnSensitiveCodeMaterial(t *testing.T) {
 		}
 		return RewardCodePage{}, errors.New("lookup failed code=" + rawCode + " digest=" + fullDigest)
 	}}
-	handler := NewHandler(service)
+	handler := NewAdminReadHandler(service, nil)
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -293,7 +473,7 @@ func TestRewardCodeManagementRejectsUnknownJSONFields(t *testing.T) {
 		t.Fatal("invalid management request reached Rewards service")
 		return UpdatedRewardCode{}, nil
 	}}
-	handler := NewHandler(service)
+	handler := NewAdminCommandHandler(service)
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -306,7 +486,7 @@ func TestRewardCodeManagementRejectsUnknownJSONFields(t *testing.T) {
 	assertRewardErrorResponse(t, recorder, http.StatusBadRequest, "参数错误")
 }
 
-func rewardRedeemRouter(t *testing.T, handler *Handler, userID int64) http.Handler {
+func rewardRedeemRouter(t *testing.T, handler *UserHandler, userID int64) http.Handler {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	router := gin.New()

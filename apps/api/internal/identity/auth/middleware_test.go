@@ -17,6 +17,7 @@ import (
 	"ideaboard/api/internal/testdb"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type localUserReaderFunc func(context.Context, string) (*users.User, error)
@@ -346,7 +347,7 @@ func TestAdminMiddlewareRequiresAdminRole(t *testing.T) {
 				if tt.setInvalid {
 					_ = principal.Set(c, principal.Principal{})
 				} else if tt.setPrincipal {
-					identityPrincipal, err := principal.New(1, "auth-1", tt.role)
+					identityPrincipal, err := principal.New(1, uuid.New(), "auth-1", "Test User", tt.role)
 					if err != nil || principal.Set(c, identityPrincipal) != nil {
 						t.Fatalf("set test Principal: %v", err)
 					}

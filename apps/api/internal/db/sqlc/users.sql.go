@@ -10,6 +10,7 @@ import (
 	"database/sql"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 const createUser = `-- name: CreateUser :one
@@ -213,6 +214,47 @@ func (q *Queries) GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUse
 	var id int64
 	err := row.Scan(&id)
 	return id, err
+}
+
+const getUsersByIDs = `-- name: GetUsersByIDs :many
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+FROM users
+WHERE id = ANY($1::BIGINT[])
+ORDER BY id
+`
+
+func (q *Queries) GetUsersByIDs(ctx context.Context, ids []int64) ([]User, error) {
+	rows, err := q.db.QueryContext(ctx, getUsersByIDs, pq.Array(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.DisplayName,
+			&i.AuthUserID,
+			&i.StorageUid,
+			&i.Avatar,
+			&i.Role,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const insertUsedUIDIgnore = `-- name: InsertUsedUIDIgnore :execrows

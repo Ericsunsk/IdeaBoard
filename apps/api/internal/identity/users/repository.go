@@ -18,8 +18,21 @@ type UserRepository struct {
 	q  *dbsqlc.Queries
 }
 
+type userRepositoryQueryer struct {
+	ctx context.Context
+	q   *dbsqlc.Queries
+}
+
 func NewUserRepository(db *sql.DB) *UserRepository {
 	return &UserRepository{db: db, q: dbsqlc.New(db)}
+}
+
+func (r *UserRepository) dbWithContext(ctx context.Context) userRepositoryQueryer {
+	return userRepositoryQueryer{ctx: ctx, q: r.q}
+}
+
+func (q userRepositoryQueryer) getUsersByIDs(ids []int64) ([]dbsqlc.User, error) {
+	return q.q.GetUsersByIDs(q.ctx, ids)
 }
 
 // Create 创建用户
@@ -67,6 +80,23 @@ func (r *UserRepository) GetByID(ctx context.Context, id int64) (*User, error) {
 	}
 	user := userFromSQLC(row)
 	return &user, nil
+}
+
+// GetByIDs resolves a bounded set of users with one database query.
+func (r *UserRepository) GetByIDs(ctx context.Context, ids []int64) (map[int64]*User, error) {
+	usersByID := make(map[int64]*User, len(ids))
+	if len(ids) == 0 {
+		return usersByID, nil
+	}
+	rows, err := r.dbWithContext(ctx).getUsersByIDs(ids)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		user := userFromSQLC(row)
+		usersByID[user.ID] = &user
+	}
+	return usersByID, nil
 }
 
 // GetByPublicID resolves the immutable identifier accepted at public API boundaries.

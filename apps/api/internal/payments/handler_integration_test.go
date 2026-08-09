@@ -31,8 +31,8 @@ func TestStripeConfigurationHTTPContractNeverReturnsSecretsAndRejectsUnknownFiel
 		ProductID: "prod_http", WebhookEndpointID: "we_http", WebhookSecret: "whsec_http",
 	}}
 	repo := NewRepository(db)
-	service := NewService(ServiceDependencies{ConfigurationStore: repo, WebhookInbox: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConvergenceStore: repo, ConfigurationGateway: gateway, WebhookVerifier: &fakeWebhookVerifier{}})
-	handler := NewHandler(service, testPublicOrigins("https://app.example.com"))
+	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, &fakeWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
+	handler := NewAdminHandler(service, testPublicOrigins("https://app.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 42, principal.RoleAdmin)
@@ -71,19 +71,21 @@ func TestUserCheckoutHTTPUsesPrincipalAndTrustedReturnURL(t *testing.T) {
 	checkoutGateway := &fakeCheckoutGateway{}
 	service := newConfiguredPurchaseService(t, db, configuredFakeStripeGateway("acct_user_http", "prod_user_http"), checkoutGateway, credits.NewService(pool))
 	verifier := &fakeWebhookVerifier{}
-	service.verifier = verifier
-	handler := NewHandler(service, testPublicOrigins("https://configured.example.com"))
+	service.facts.verifier = verifier
+	userHandler := NewUserCheckoutHandler(service, testPublicOrigins("https://configured.example.com"))
+	eventStreamHandler := NewEventStreamHandler(service.EventHub())
+	webhookHandler := NewWebhookHandler(service)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 42, principal.RoleUser)
 		c.Next()
 	})
-	router.GET("/user/payments/purchase-options", handler.GetPurchaseOptions)
-	router.POST("/user/payments/checkout-sessions", handler.CreateCheckoutSession)
-	router.GET("/user/payments/orders/:public_token", handler.GetPaymentOrderReturnStatus)
-	router.GET("/user/payments/recharges", handler.ListRecharges)
-	router.GET("/user/payments/events", handler.StreamUserPaymentEvents)
-	router.POST("/api/webhooks/stripe", handler.ReceiveStripeWebhook)
+	router.GET("/user/payments/purchase-options", userHandler.GetPurchaseOptions)
+	router.POST("/user/payments/checkout-sessions", userHandler.CreateCheckoutSession)
+	router.GET("/user/payments/orders/:public_token", userHandler.GetPaymentOrderReturnStatus)
+	router.GET("/user/payments/recharges", userHandler.ListRecharges)
+	router.GET("/user/payments/events", eventStreamHandler.StreamUserPaymentEvents)
+	router.POST("/api/webhooks/stripe", webhookHandler.ReceiveStripeWebhook)
 
 	options := performPaymentRequest(router, http.MethodGet, "/user/payments/purchase-options", "", nil)
 	if options.Code != http.StatusOK || options.Header().Get("Cache-Control") != "no-store" || !strings.Contains(options.Body.String(), `"purchases_available":true`) {
@@ -150,7 +152,7 @@ func TestUserCheckoutHTTPUsesPrincipalAndTrustedReturnURL(t *testing.T) {
 	checkoutGateway.paid = true
 	verifier.event = StripeWebhookEvent{
 		ID: "evt_user_http_paid", Type: "checkout.session.completed",
-		ObjectID: checkoutGateway.createdSession.ID, CreatedAt: service.now().UTC(),
+		ObjectID: checkoutGateway.createdSession.ID, CreatedAt: service.runtime.now().UTC(),
 	}
 	webhook := performPaymentRequest(router, http.MethodPost, "/api/webhooks/stripe", `{"id":"evt_user_http_paid"}`, map[string]string{"Stripe-Signature": "valid"})
 	if webhook.Code != http.StatusOK {
@@ -220,7 +222,7 @@ func TestUserPendingPaymentOrderHTTPBoundaryScopesOwnershipAndRejectsActionBodie
 	service := newConfiguredPurchaseService(
 		t, db, configuredFakeStripeGateway("acct_pending_http", "prod_pending_http"), checkoutGateway, credits.NewService(pool),
 	)
-	handler := NewHandler(service, testPublicOrigins("https://configured.example.com"))
+	handler := NewUserCheckoutHandler(service, testPublicOrigins("https://configured.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		userID := int64(42)
@@ -341,7 +343,7 @@ func TestUserCheckoutHTTPRejectsWalletWithoutRechargeEligibility(t *testing.T) {
 		t, db, configuredFakeStripeGateway("acct_locked_http", "prod_locked_http"),
 		&fakeCheckoutGateway{}, credits.NewService(pool),
 	)
-	handler := NewHandler(service, testPublicOrigins("https://configured.example.com"))
+	handler := NewUserCheckoutHandler(service, testPublicOrigins("https://configured.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 88, principal.RoleUser)
@@ -361,8 +363,8 @@ func TestStripeConfigurationHTTPRejectsOversizedAPIKeyBeforeGatewayAndAuditsFail
 	db := testdb.Open(t)
 	gateway := &fakeStripeGateway{}
 	repo := NewRepository(db)
-	service := NewService(ServiceDependencies{ConfigurationStore: repo, WebhookInbox: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConvergenceStore: repo, ConfigurationGateway: gateway, WebhookVerifier: &fakeWebhookVerifier{}})
-	handler := NewHandler(service, testPublicOrigins("https://app.example.com"))
+	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, &fakeWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
+	handler := NewAdminHandler(service, testPublicOrigins("https://app.example.com"))
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 42, principal.RoleAdmin)
@@ -410,14 +412,14 @@ func TestStripeWebhookHTTPContractUsesUnauthenticatedExactRawBody(t *testing.T) 
 		ID: "evt_http", Type: "customer.updated", ObjectID: "cus_http", CreatedAt: time.Now(),
 	}}
 	repo := NewRepository(db)
-	service := NewService(ServiceDependencies{ConfigurationStore: repo, WebhookInbox: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConvergenceStore: repo, ConfigurationGateway: gateway, WebhookVerifier: verifier})
+	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_webhook_http", ProductTaxCode: "txcd_10105001",
 		WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	handler := NewHandler(service, testPublicOrigins("https://app.example.com"))
+	handler := NewWebhookHandler(service)
 	router := gin.New()
 	router.POST("/api/webhooks/stripe", handler.ReceiveStripeWebhook)
 

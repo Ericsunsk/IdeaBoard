@@ -97,7 +97,7 @@ type RefundGateway interface {
 	RetrieveRefund(context.Context, string, string) (StripeRefund, error)
 }
 
-func (s *Service) CreatePaymentRefund(ctx context.Context, command CreatePaymentRefundCommand) (PaymentRefund, error) {
+func (s *StripeFactsWorkflow) CreatePaymentRefund(ctx context.Context, command CreatePaymentRefundCommand) (PaymentRefund, error) {
 	if s == nil || s.convergenceStore == nil || s.refundGateway == nil {
 		return PaymentRefund{}, ErrRefundUnavailable
 	}
@@ -113,7 +113,7 @@ func (s *Service) CreatePaymentRefund(ctx context.Context, command CreatePayment
 	}
 	refund, _, err := s.convergenceStore.CreatePendingPaymentRefund(ctx, CreatePendingPaymentRefundInput{
 		ActorID: command.ActorID, OrderNumber: strings.TrimSpace(command.OrderNumber), IdeaQuantity: command.IdeaQuantity,
-		IdempotencyKey: strings.TrimSpace(command.IdempotencyKey), Reason: strings.TrimSpace(command.Reason), Now: s.now().UTC(),
+		IdempotencyKey: strings.TrimSpace(command.IdempotencyKey), Reason: strings.TrimSpace(command.Reason), Now: s.runtime.now().UTC(),
 	})
 	if err != nil {
 		return PaymentRefund{}, err
@@ -132,7 +132,7 @@ func (s *Service) CreatePaymentRefund(ctx context.Context, command CreatePayment
 		if gatewayCode := new(GatewayError); errors.As(err, &gatewayCode) && gatewayCode.Code() == GatewayErrorProviderUnavailable {
 			return refund, err
 		}
-		failed, markErr := s.convergenceStore.MarkPaymentRefundFailed(ctx, refund.ID, operationalErrorSummary(err, "Stripe refund request failed"), s.now().UTC())
+		failed, markErr := s.convergenceStore.MarkPaymentRefundFailed(ctx, refund.ID, operationalErrorSummary(err, "Stripe refund request failed"), s.runtime.now().UTC())
 		if markErr != nil {
 			return PaymentRefund{}, errors.Join(err, markErr)
 		}
@@ -147,7 +147,7 @@ func (s *Service) CreatePaymentRefund(ctx context.Context, command CreatePayment
 	return result, err
 }
 
-func (s *Service) convergePaymentRefund(ctx context.Context, refund PaymentRefund, providerRefund StripeRefund) (PaymentRefund, error) {
+func (s *StripeFactsWorkflow) convergePaymentRefund(ctx context.Context, refund PaymentRefund, providerRefund StripeRefund) (PaymentRefund, error) {
 	if s == nil || s.convergenceStore == nil {
 		return PaymentRefund{}, ErrRefundUnavailable
 	}
@@ -163,19 +163,19 @@ func (s *Service) convergePaymentRefund(ctx context.Context, refund PaymentRefun
 		(providerRefund.Currency != "" && !strings.EqualFold(providerRefund.Currency, refund.Currency)) {
 		return PaymentRefund{}, ErrRefundProviderConflict
 	}
-	updated, err := s.convergenceStore.MarkPaymentRefundProviderResult(ctx, refund.ID, providerID, providerRefund.Status, s.now().UTC())
+	updated, err := s.convergenceStore.MarkPaymentRefundProviderResult(ctx, refund.ID, providerID, providerRefund.Status, s.runtime.now().UTC())
 	if err != nil {
 		return PaymentRefund{}, err
 	}
 	switch strings.ToLower(strings.TrimSpace(providerRefund.Status)) {
 	case "succeeded":
-		settled, settleErr := s.convergenceStore.MarkPaymentRefundSucceeded(ctx, updated.ID, s.now().UTC())
+		settled, settleErr := s.convergenceStore.MarkPaymentRefundSucceeded(ctx, updated.ID, s.runtime.now().UTC())
 		if settleErr == nil && updated.Status == PaymentRefundPending {
 			s.publishRefundUpdate(settled.UserID)
 		}
 		return settled, settleErr
 	case "failed", "canceled":
-		failed, failErr := s.convergenceStore.MarkPaymentRefundFailed(ctx, updated.ID, "Stripe refund failed", s.now().UTC())
+		failed, failErr := s.convergenceStore.MarkPaymentRefundFailed(ctx, updated.ID, "Stripe refund failed", s.runtime.now().UTC())
 		if failErr == nil && updated.Status == PaymentRefundPending {
 			s.publishRefundUpdate(failed.UserID)
 		}
@@ -185,8 +185,8 @@ func (s *Service) convergePaymentRefund(ctx context.Context, refund PaymentRefun
 	}
 }
 
-func (s *Service) publishRefundUpdate(userID int64) {
-	if s != nil && s.events != nil {
-		s.events.Publish(userID, PaymentEvent{Status: "refund_updated"})
+func (s *StripeFactsWorkflow) publishRefundUpdate(userID int64) {
+	if s != nil && s.runtime.events != nil {
+		s.runtime.events.Publish(userID, PaymentEvent{Status: "refund_updated"})
 	}
 }

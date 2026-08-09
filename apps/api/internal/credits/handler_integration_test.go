@@ -20,6 +20,10 @@ import (
 
 type integrationCreditUserResolver struct{}
 
+type failingCommandProjectionResolver struct {
+	resolveIDCalls int
+}
+
 func (integrationCreditUserResolver) ResolvePublicID(_ context.Context, rawPublicID string) (UserIdentity, error) {
 	publicID, err := uuid.Parse(rawPublicID)
 	if err != nil {
@@ -40,6 +44,18 @@ func (integrationCreditUserResolver) ResolveID(_ context.Context, userID int64) 
 	return integrationCreditIdentity(userID), nil
 }
 
+func (r *failingCommandProjectionResolver) ResolvePublicID(_ context.Context, rawPublicID string) (UserIdentity, error) {
+	if rawPublicID != integrationCreditPublicID(94).String() {
+		return UserIdentity{}, fmt.Errorf("test user not found")
+	}
+	return integrationCreditIdentity(94), nil
+}
+
+func (r *failingCommandProjectionResolver) ResolveID(_ context.Context, _ int64) (UserIdentity, error) {
+	r.resolveIDCalls++
+	return UserIdentity{}, fmt.Errorf("identity projection unavailable")
+}
+
 func integrationCreditIdentity(userID int64) UserIdentity {
 	return UserIdentity{
 		ID:          userID,
@@ -54,9 +70,8 @@ func integrationCreditPublicID(userID int64) uuid.UUID {
 
 func TestAdminCreditReconciliationHTTPContractStrictBodyAndPagination(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
-	service := NewService(pool)
-	service.SetReconciliationEnqueuer(&reconciliationEnqueuerStub{})
-	handler := NewHandler(service, integrationCreditUserResolver{})
+	service := newReconciliationService(t, pool, &reconciliationEnqueuerStub{})
+	handler := NewReconciliationHandler(service, integrationCreditUserResolver{})
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 1, principal.RoleAdmin)
@@ -168,7 +183,7 @@ func assertNoPublicStaleHoldThreshold(t testing.TB, body []byte) {
 }
 
 func TestAdminCreditReconciliationReadHandlersReturnServiceUnavailable(t *testing.T) {
-	handler := NewHandler(nil)
+	handler := NewReconciliationHandler(nil, nil)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 1, principal.RoleAdmin)
@@ -190,18 +205,19 @@ func TestAdminCreditReconciliationReadHandlersReturnServiceUnavailable(t *testin
 func TestAdminCreditHTTPContractGrantsAndReadsWallet(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	service := NewService(pool)
-	handler := NewHandler(service, integrationCreditUserResolver{})
+	commandHandler := NewAdminCommandHandler(service, integrationCreditUserResolver{})
+	readHandler := NewAdminReadHandler(service, integrationCreditUserResolver{})
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		testsupport.SetPrincipal(t, c, 7, principal.RoleAdmin)
 		c.Next()
 	})
-	router.POST("/api/admin/credits/grants", handler.Grant)
-	router.POST("/api/admin/credits/deductions", handler.Deduct)
-	router.POST("/api/admin/credits/refunds", handler.Refund)
-	router.GET("/api/admin/credits/wallets/:public_id", handler.GetWallet)
-	router.GET("/api/admin/credits/wallets/:public_id/ledger", handler.ListLedger)
+	router.POST("/api/admin/credits/grants", commandHandler.Grant)
+	router.POST("/api/admin/credits/deductions", commandHandler.Deduct)
+	router.POST("/api/admin/credits/refunds", commandHandler.Refund)
+	router.GET("/api/admin/credits/wallets/:public_id", readHandler.GetWallet)
+	router.GET("/api/admin/credits/wallets/:public_id/ledger", readHandler.ListLedger)
 
 	body := []byte(fmt.Sprintf(`{
   "user_public_id": %q,
@@ -259,6 +275,163 @@ func TestAdminCreditHTTPContractGrantsAndReadsWallet(t *testing.T) {
 	}
 }
 
+func TestAdminCreditCommandsReturnCommittedFactsWhenIdentityProjectionFails(t *testing.T) {
+	tests := []struct {
+		name          string
+		path          string
+		commandType   CommandType
+		wantAvailable int64
+		prepareBody   func(*testing.T, *Service) []byte
+	}{
+		{
+			name:          "grant",
+			path:          "/api/admin/credits/grants",
+			commandType:   CommandGrant,
+			wantAvailable: 10,
+			prepareBody: func(t *testing.T, _ *Service) []byte {
+				return adminCreditCommandBody(t, map[string]any{
+					"amount_credits": 10,
+				})
+			},
+		},
+		{
+			name:          "deduction",
+			path:          "/api/admin/credits/deductions",
+			commandType:   CommandDeduction,
+			wantAvailable: 15,
+			prepareBody: func(t *testing.T, service *Service) []byte {
+				if _, err := service.Grant(t.Context(), GrantCommand{
+					UserID: 94, Amount: mustCreditAmount(t, 20), Metadata: testMetadata("projection-failure:deduction-seed", "projection-failure-deduction-seed"),
+				}); err != nil {
+					t.Fatalf("seed deduction Grant() error = %v", err)
+				}
+				return adminCreditCommandBody(t, map[string]any{
+					"amount_credits": 5,
+				})
+			},
+		},
+		{
+			name:          "refund",
+			path:          "/api/admin/credits/refunds",
+			commandType:   CommandRefund,
+			wantAvailable: 14,
+			prepareBody: func(t *testing.T, service *Service) []byte {
+				if _, err := service.Grant(t.Context(), GrantCommand{
+					UserID: 94, Amount: mustCreditAmount(t, 20), Metadata: testMetadata("projection-failure:refund-seed", "projection-failure-refund-seed"),
+				}); err != nil {
+					t.Fatalf("seed refund Grant() error = %v", err)
+				}
+				hold, err := service.Hold(t.Context(), HoldCommand{
+					UserID: 94, Amount: mustCreditAmount(t, 10), Metadata: testMetadata("projection-failure:refund-hold", "projection-failure-refund-hold"),
+				})
+				if err != nil {
+					t.Fatalf("seed refund Hold() error = %v", err)
+				}
+				capture, err := service.Capture(t.Context(), CaptureCommand{
+					UserID: 94, HoldTransactionID: hold.TransactionID, Metadata: testMetadata("projection-failure:refund-capture", "projection-failure-refund-capture"),
+				})
+				if err != nil {
+					t.Fatalf("seed refund Capture() error = %v", err)
+				}
+				return adminCreditCommandBody(t, map[string]any{
+					"amount_credits":        4,
+					"charge_transaction_id": capture.TransactionID,
+				})
+			},
+		},
+		{
+			name:          "correction",
+			path:          "/api/admin/credits/corrections",
+			commandType:   CommandCorrection,
+			wantAvailable: 16,
+			prepareBody: func(t *testing.T, service *Service) []byte {
+				grant, err := service.Grant(t.Context(), GrantCommand{
+					UserID: 94, Amount: mustCreditAmount(t, 20), Metadata: testMetadata("projection-failure:correction-seed", "projection-failure-correction-seed"),
+				})
+				if err != nil {
+					t.Fatalf("seed correction Grant() error = %v", err)
+				}
+				return adminCreditCommandBody(t, map[string]any{
+					"amount_credits":          4,
+					"original_transaction_id": grant.TransactionID,
+				})
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, pool := testdb.OpenWithPool(t)
+			service := NewService(pool)
+			resolver := &failingCommandProjectionResolver{}
+			handler := NewAdminCommandHandler(service, resolver)
+			gin.SetMode(gin.TestMode)
+			router := gin.New()
+			router.Use(func(c *gin.Context) {
+				testsupport.SetPrincipal(t, c, 7, principal.RoleAdmin)
+				c.Next()
+			})
+			router.POST("/api/admin/credits/grants", handler.Grant)
+			router.POST("/api/admin/credits/deductions", handler.Deduct)
+			router.POST("/api/admin/credits/refunds", handler.Refund)
+			router.POST("/api/admin/credits/corrections", handler.Correct)
+
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, tt.path, bytes.NewReader(tt.prepareBody(t, service)))
+			request.Header.Set("Content-Type", "application/json")
+			router.ServeHTTP(recorder, request)
+
+			if recorder.Code != http.StatusOK {
+				t.Errorf("status = %d, want 200; body=%s", recorder.Code, recorder.Body.String())
+			}
+			var commandResponse struct {
+				Code int           `json:"code"`
+				Data CommandResult `json:"data"`
+			}
+			if err := json.Unmarshal(recorder.Body.Bytes(), &commandResponse); err != nil {
+				t.Errorf("decode command response error = %v", err)
+			} else if commandResponse.Code != 0 ||
+				commandResponse.Data.CommandType != tt.commandType ||
+				commandResponse.Data.Wallet.PublicID != integrationCreditPublicID(94) ||
+				commandResponse.Data.Wallet.DisplayName != "User 94" ||
+				commandResponse.Data.Wallet.Available != tt.wantAvailable {
+				t.Errorf("command response = %+v", commandResponse)
+			}
+
+			wallet, err := service.GetWallet(t.Context(), 94)
+			if err != nil {
+				t.Fatalf("GetWallet() error = %v", err)
+			}
+			if wallet.Available != tt.wantAvailable {
+				t.Errorf("committed Wallet available = %d, want %d", wallet.Available, tt.wantAvailable)
+			}
+			ledger, err := service.ListLedger(t.Context(), ListLedgerInput{UserID: 94, Limit: 1})
+			if err != nil {
+				t.Fatalf("ListLedger() error = %v", err)
+			}
+			if len(ledger.Transactions) != 1 || ledger.Transactions[0].CommandType != tt.commandType {
+				t.Errorf("latest committed Ledger transaction = %+v, want command_type=%s", ledger.Transactions, tt.commandType)
+			}
+			if resolver.resolveIDCalls != 0 {
+				t.Errorf("post-command ResolveID calls = %d, want 0", resolver.resolveIDCalls)
+			}
+		})
+	}
+}
+
+func adminCreditCommandBody(t *testing.T, fields map[string]any) []byte {
+	t.Helper()
+	fields["user_public_id"] = integrationCreditPublicID(94).String()
+	fields["idempotency_key"] = "projection-failure:" + t.Name()
+	fields["reason"] = "verify committed Credits response"
+	fields["business_reference_id"] = t.Name()
+	body, err := json.Marshal(fields)
+	if err != nil {
+		t.Fatalf("marshal admin credit command body error = %v", err)
+	}
+	return body
+}
+
 func TestUserCreditWalletHTTPScopesReadToAuthenticatedUser(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	service := NewService(pool)
@@ -280,7 +453,7 @@ func TestUserCreditWalletHTTPScopesReadToAuthenticatedUser(t *testing.T) {
 		}
 	}
 
-	handler := NewHandler(service, integrationCreditUserResolver{})
+	handler := NewUserHandler(service, integrationCreditUserResolver{})
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -302,7 +475,7 @@ func TestUserCreditWalletHTTPScopesReadToAuthenticatedUser(t *testing.T) {
 func TestAdminCreditHTTPBindsActorAndRejectsUnknownFields(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	service := NewService(pool)
-	handler := NewHandler(service, integrationCreditUserResolver{})
+	handler := NewAdminCommandHandler(service, integrationCreditUserResolver{})
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {

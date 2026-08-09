@@ -12,6 +12,12 @@ SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, sta
 FROM users
 WHERE id = sqlc.arg(id);
 
+-- name: GetUsersByIDs :many
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+FROM users
+WHERE id = ANY(sqlc.arg(ids)::BIGINT[])
+ORDER BY id;
+
 -- name: GetUserByPublicID :one
 SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
 FROM users

@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func registerPaymentWebhookRoutes(r *gin.Engine, handler *payments.Handler) {
+func registerPaymentWebhookRoutes(r *gin.Engine, handler *payments.WebhookHandler) {
 	if handler == nil {
 		return
 	}

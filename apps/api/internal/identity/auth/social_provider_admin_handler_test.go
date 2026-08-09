@@ -12,6 +12,7 @@ import (
 	"ideaboard/api/internal/identity/principal"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type fakeSocialProviderService struct {
@@ -144,7 +145,7 @@ func serveSocialProviderHandler(
 	context.Request = httptest.NewRequest(method, path, body)
 	context.Request.Header.Set("Content-Type", "application/json")
 	if role != "" {
-		identityPrincipal, err := principal.New(1, "auth-admin", role)
+		identityPrincipal, err := principal.New(1, uuid.New(), "auth-admin", "Test Admin", role)
 		if err != nil {
 			t.Fatal(err)
 		}

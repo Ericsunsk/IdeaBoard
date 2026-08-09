@@ -33,7 +33,7 @@ func TestCreateCheckoutPersistsIntentBeforeStripeAndReusesCanonicalRequest(t *te
 		}
 	}
 	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, credits.NewService(pool))
-	service.now = func() time.Time { return now }
+	service.runtime.now = func() time.Time { return now }
 	requestedAt := now
 	command := CreateCheckoutCommand{
 		UserID: 42, ClientIdempotencyKey: "purchase-checkout-request-1", IdeaQuantity: 501,
@@ -86,7 +86,7 @@ func TestCreateCheckoutReplaysImmutableSecondPrecisionExpiryAfterProviderTimeout
 	checkoutGateway := &fakeCheckoutGateway{createSessionErrors: []error{ErrStripeProviderUnavailable}}
 	service := newConfiguredPurchaseService(t, db, configuredFakeStripeGateway("acct_checkout", "prod_checkout"), checkoutGateway, credits.NewService(pool))
 	now := time.Now().UTC().Truncate(time.Second).Add(987654321)
-	service.now = func() time.Time { return now }
+	service.runtime.now = func() time.Time { return now }
 	command := CreateCheckoutCommand{
 		UserID: 42, ClientIdempotencyKey: "purchase-checkout-timeout-recovery", IdeaQuantity: 501,
 		TermsAccepted: true, TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
@@ -311,11 +311,7 @@ func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testin
 	}}
 	events := NewEventHub()
 	repo := NewRepository(db)
-	service := NewService(ServiceDependencies{
-		ConfigurationStore: repo, WebhookInbox: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConvergenceStore: repo, ConfigurationGateway: configurationGateway,
-		CheckoutGateway: checkoutGateway, WebhookVerifier: verifier, Wallets: creditService,
-		Events: events, Now: func() time.Time { return verifiedAt },
-	})
+	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(events, func() time.Time { return verifiedAt }), configurationGateway, checkoutGateway, creditService, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_webhook_purchase", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
@@ -593,10 +589,8 @@ func newConfiguredPurchaseService(
 	t.Helper()
 	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	repo := NewRepository(db)
-	service := NewService(ServiceDependencies{
-		ConfigurationStore: repo, WebhookInbox: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConvergenceStore: repo, ConfigurationGateway: configurationGateway,
-		CheckoutGateway: checkoutGateway, Wallets: wallets, Now: func() time.Time { return now },
-	})
+	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(NewEventHub(), func() time.Time { return now }),
+		configurationGateway, checkoutGateway, wallets, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_purchase", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",

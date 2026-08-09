@@ -11,14 +11,12 @@ import (
 	"ideaboard/api/internal/testdb"
 
 	"github.com/google/uuid"
-	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
 )
 
 func TestPaymentReconciliationRecoversCreatingIntentWithOriginalStripeIdempotencyKey(t *testing.T) {
 	now := time.Now().UTC()
 	checkout := newLifecycleCheckoutGateway()
-	db, service, _ := newCheckoutLifecycleService(t, &now, checkout, nil)
+	db, service, _ := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 	repo := NewRepository(db)
 	// This is a timeout recovery: a local deadline elapsed before the original
 	// provider response could be bound. Stripe idempotency, not that deadline,
@@ -55,7 +53,7 @@ func TestPaymentReconciliationRecoversCreatingIntentWithOriginalStripeIdempotenc
 func TestPaymentReconciliationRetriesPaidPendingCreditWithoutSecondStripeFact(t *testing.T) {
 	now := time.Now().UTC()
 	checkout := newLifecycleCheckoutGateway()
-	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, nil)
+	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "reconciliation-paid-pending", 700))
 	if err != nil {
 		t.Fatal(err)
@@ -96,7 +94,7 @@ WHERE orders.public_token = $1`, created.PublicToken).Scan(&retryAt); err != nil
 func TestPaymentReconciliationRecoversLostWebhookPaidSessionExactlyOnce(t *testing.T) {
 	now := time.Now().UTC()
 	checkout := newLifecycleCheckoutGateway()
-	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, nil)
+	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 	created, err := service.CreateCheckout(t.Context(), lifecycleCheckoutCommand(42, "reconciliation-lost-webhook", 701))
 	if err != nil {
 		t.Fatal(err)
@@ -199,7 +197,7 @@ func TestPaymentReconciliationConcurrentWorkersClaimEachOrderOnce(t *testing.T) 
 func TestPaymentReconciliationRecordsLongLivedOperableAnomaly(t *testing.T) {
 	now := time.Now().UTC().Add(25 * time.Hour)
 	checkout := reconciliationDeterministicFailureGateway{}
-	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, nil)
+	db, service, wallets := newCheckoutLifecycleService(t, &now, checkout, testWebhookVerifier{})
 	repo := NewRepository(db)
 	order := createReconciliationIntent(t, repo, 42, 503, now.Add(time.Hour))
 	if err := service.ReconcileDuePaymentOrders(t.Context()); err != nil {
@@ -214,11 +212,7 @@ func TestPaymentReconciliationRecordsLongLivedOperableAnomaly(t *testing.T) {
 	}
 	now = now.Add(paymentReconciliationOperableDelay)
 	recoveryGateway := newLifecycleCheckoutGateway()
-	recovered := NewService(ServiceDependencies{
-		ConfigurationStore: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConvergenceStore: repo,
-		CheckoutGateway: recoveryGateway, Wallets: wallets,
-		Now: func() time.Time { return now },
-	})
+	recovered := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, func() time.Time { return now }), testStripeGateway{}, recoveryGateway, wallets, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if err := recovered.ReconcileDuePaymentOrders(t.Context()); err != nil {
 		t.Fatalf("operable retry recovery = %v", err)
 	}
@@ -235,21 +229,6 @@ func TestPaymentReconciliationRecordsLongLivedOperableAnomaly(t *testing.T) {
 	}
 	if len(anomalies) != 0 {
 		t.Fatalf("resolved reconciliation anomalies = %+v", anomalies)
-	}
-}
-
-func TestPaymentReconciliationWorkerPropagatesTransientFailureAndSchedulesEveryFiveMinutes(t *testing.T) {
-	worker := NewPaymentReconciliationWorker(reconciliationWorkerStub{err: ErrStripeProviderUnavailable})
-	job := &river.Job[PaymentReconciliationScheduleJobArgs]{JobRow: &rivertype.JobRow{Attempt: 1, MaxAttempts: 8}}
-	if err := worker.Work(context.Background(), job); !errors.Is(err, ErrStripeProviderUnavailable) {
-		t.Fatalf("Work() error = %v", err)
-	}
-	jobs := PaymentReconciliationPeriodicJobs()
-	if len(jobs) != 1 {
-		t.Fatalf("periodic job count = %d, want 1", len(jobs))
-	}
-	if paymentReconciliationWorkerTimeout >= paymentReconciliationLease {
-		t.Fatalf("worker timeout %s must be shorter than claim lease %s", paymentReconciliationWorkerTimeout, paymentReconciliationLease)
 	}
 }
 
@@ -297,10 +276,4 @@ func (reconciliationDeterministicFailureGateway) RetrieveCheckoutSession(context
 }
 func (reconciliationDeterministicFailureGateway) ExpireCheckoutSession(context.Context, ExpireCheckoutSessionInput) (ExpireCheckoutSessionResult, error) {
 	return ExpireCheckoutSessionResult{}, NewGatewayError(GatewayErrorInvalidResponse, "Stripe Checkout Session 响应无效", nil)
-}
-
-type reconciliationWorkerStub struct{ err error }
-
-func (stub reconciliationWorkerStub) ReconcileDuePaymentOrders(context.Context) error {
-	return stub.err
 }

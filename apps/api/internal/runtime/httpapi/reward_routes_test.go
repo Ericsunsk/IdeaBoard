@@ -12,7 +12,8 @@ func TestAdminRewardRoutesExposeOnlyCanonicalRewardCodes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	registerAdminRewardRoutes(router.Group("/api/admin"), AdminRouteDeps{
-		RewardHandler: rewards.NewHandler(nil),
+		RewardAdminCommandHandler: rewards.NewAdminCommandHandler(nil),
+		RewardAdminReadHandler:    rewards.NewAdminReadHandler(nil, nil),
 	})
 	routes := make(map[string]struct{})
 	for _, route := range router.Routes() {

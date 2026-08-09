@@ -11,15 +11,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
-)
-
-const ReconciliationQueue = "credit_reconciliation"
-
-const (
-	reconciliationTriggerLookupTimeout = 2 * time.Second
-	reconciliationFinalFailureTimeout  = 5 * time.Second
 )
 
 var (
@@ -27,14 +18,8 @@ var (
 	ErrReconciliationNotFound    = errors.New("credit reconciliation run not found")
 )
 
-type ReconciliationJobArgs struct {
-	RunID int64 `json:"run_id"`
-}
-
-func (ReconciliationJobArgs) Kind() string { return "credit_reconciliation" }
-
-type ReconciliationEnqueuer interface {
-	InsertTx(context.Context, pgx.Tx, river.JobArgs, *river.InsertOpts) (*rivertype.JobInsertResult, error)
+type ReconciliationRunDispatcher interface {
+	DispatchReconciliationRun(context.Context, pgx.Tx, int64) error
 }
 
 type ReconciliationRun struct {
@@ -178,7 +163,7 @@ func (s *Service) startReconciliation(
 	ctx context.Context,
 	input startReconciliationInput,
 ) (*ReconciliationRun, error) {
-	if s == nil || s.pool == nil || s.reconciliationEnqueuer == nil {
+	if s == nil || s.pool == nil || s.reconciliationDispatcher == nil {
 		return nil, ErrReconciliationUnavailable
 	}
 	var requestedBy any
@@ -222,16 +207,17 @@ func (s *Service) startReconciliation(
 		if runID == nil || *runID <= 0 {
 			return nil, fmt.Errorf("credits reconciliation: enqueue-required run has invalid ID")
 		}
-		if _, err := s.reconciliationEnqueuer.InsertTx(ctx, tx, ReconciliationJobArgs{RunID: *runID}, &river.InsertOpts{
-			Queue: ReconciliationQueue, MaxAttempts: 5, Priority: 4,
-		}); err != nil {
+		if err := s.reconciliationDispatcher.DispatchReconciliationRun(ctx, tx, *runID); err != nil {
 			return nil, fmt.Errorf("credits reconciliation: enqueue run: %w", err)
 		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("credits reconciliation: commit: %w", err)
 	}
-	if runID == nil {
+	// A scheduled tick is a pure trigger. When the database already owns the
+	// slot (active, completed, or otherwise deduplicated), no new work was
+	// created and the runtime scheduler should treat the tick as a no-op.
+	if runID == nil || (input.trigger == ReconciliationTriggerScheduled && !enqueueRequired) {
 		return nil, nil
 	}
 	run, err := s.GetReconciliationRun(ctx, *runID)
@@ -395,64 +381,4 @@ func normalizeReconciliationLimit(limit int) (int, error) {
 		return 0, ErrInvalidCommand
 	}
 	return limit, nil
-}
-
-type ReconciliationWorker struct {
-	river.WorkerDefaults[ReconciliationJobArgs]
-	service reconciliationWorkerService
-}
-
-type reconciliationWorkerService interface {
-	ExecuteReconciliation(context.Context, int64) error
-	FailReconciliation(context.Context, int64, error) error
-	GetReconciliationRun(context.Context, int64) (ReconciliationRun, error)
-}
-
-func NewReconciliationWorker(service reconciliationWorkerService) *ReconciliationWorker {
-	return &ReconciliationWorker{service: service}
-}
-
-func (w *ReconciliationWorker) Work(ctx context.Context, job *river.Job[ReconciliationJobArgs]) error {
-	if w == nil || w.service == nil || job == nil || job.Args.RunID <= 0 {
-		return ErrInvalidCommand
-	}
-	err := w.service.ExecuteReconciliation(ctx, job.Args.RunID)
-	if err == nil {
-		return nil
-	}
-	lookupCtx, cancelLookup := context.WithTimeout(context.WithoutCancel(ctx), reconciliationTriggerLookupTimeout)
-	run, runErr := w.service.GetReconciliationRun(lookupCtx, job.Args.RunID)
-	cancelLookup()
-	if runErr == nil && run.Trigger == ReconciliationTriggerScheduled {
-		slog.Error("scheduled Credit reconciliation execution failed",
-			"run_id", job.Args.RunID,
-			"attempt", job.Attempt,
-			"max_attempts", job.MaxAttempts,
-			"err", err,
-		)
-	} else if runErr != nil {
-		slog.Error("Credit reconciliation trigger lookup failed",
-			"run_id", job.Args.RunID,
-			"attempt", job.Attempt,
-			"max_attempts", job.MaxAttempts,
-			"err", err,
-			"trigger_lookup_err", runErr,
-		)
-	}
-	if job.Attempt < job.MaxAttempts {
-		return err
-	}
-	failCtx, cancelFail := context.WithTimeout(context.WithoutCancel(ctx), reconciliationFinalFailureTimeout)
-	defer cancelFail()
-	if failErr := w.service.FailReconciliation(failCtx, job.Args.RunID, err); failErr != nil {
-		slog.Error("Credit reconciliation final failure persistence failed",
-			"run_id", job.Args.RunID,
-			"attempt", job.Attempt,
-			"max_attempts", job.MaxAttempts,
-			"err", err,
-			"mark_failed_err", failErr,
-		)
-		return errors.Join(err, failErr)
-	}
-	return nil
 }

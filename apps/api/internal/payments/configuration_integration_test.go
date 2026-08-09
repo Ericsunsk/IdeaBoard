@@ -23,7 +23,7 @@ func TestConfigureStripePreparesThenAtomicallyPublishesSafeSummary(t *testing.T)
 		ProductID: "prod_idea", WebhookEndpointID: "we_idea", WebhookSecret: "whsec_test",
 	}}
 	repo := NewRepository(db)
-	service := NewService(ServiceDependencies{ConfigurationStore: repo, WebhookInbox: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConfigurationGateway: gateway})
+	service := newCompleteTestCheckoutWorkflow(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, testShutdownEnqueuer{})
 
 	summary, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_safe_fixture", ProductTaxCode: "txcd_10105001",
@@ -112,7 +112,7 @@ func TestConfigureStripeFailurePreservesCurrentConfigurationAndAuditsSanitizedEr
 		ProductID: "prod_original", WebhookEndpointID: "we_original", WebhookSecret: "whsec_original",
 	}}
 	repo := NewRepository(db)
-	service := NewService(ServiceDependencies{ConfigurationStore: repo, WebhookInbox: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConfigurationGateway: gateway})
+	service := newCompleteTestCheckoutWorkflow(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
 		ActorID: 42, APIKey: "sk_test_original", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",

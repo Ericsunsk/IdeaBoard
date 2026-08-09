@@ -85,7 +85,7 @@ type PendingPaymentOrderList struct {
 	Items []PendingPaymentOrder `json:"items"`
 }
 
-func (s *Service) ListPendingOrders(ctx context.Context, userID int64) (PendingPaymentOrderList, error) {
+func (s *CheckoutWorkflow) ListPendingOrders(ctx context.Context, userID int64) (PendingPaymentOrderList, error) {
 	result := PendingPaymentOrderList{Items: make([]PendingPaymentOrder, 0)}
 	if s == nil || s.checkoutStore == nil || userID <= 0 {
 		return result, ErrPaymentOrderNotFound
@@ -100,7 +100,7 @@ func (s *Service) ListPendingOrders(ctx context.Context, userID int64) (PendingP
 	return result, nil
 }
 
-func (s *Service) ContinuePendingOrder(ctx context.Context, userID int64, publicToken string) (PendingPaymentOrder, error) {
+func (s *CheckoutWorkflow) ContinuePendingOrder(ctx context.Context, userID int64, publicToken string) (PendingPaymentOrder, error) {
 	if s == nil || s.configuration == nil || s.checkoutStore == nil || userID <= 0 {
 		return PendingPaymentOrder{}, ErrPaymentOrderNotFound
 	}
@@ -115,7 +115,7 @@ func (s *Service) ContinuePendingOrder(ctx context.Context, userID int64, public
 				return fmt.Errorf("get pending payment order to continue: %w", err)
 			}
 			if order.Status == PaymentOrderPaidPendingCredit {
-				converged, err := s.orderLifecycle.creditPaidOrder(userLockedContext, order, s.now().UTC())
+				converged, err := s.orderLifecycle.creditPaidOrder(userLockedContext, order, s.runtime.now().UTC())
 				if err != nil {
 					return err
 				}
@@ -149,7 +149,7 @@ func (s *Service) ContinuePendingOrder(ctx context.Context, userID int64, public
 			if err != nil {
 				return err
 			}
-			if order.Status == PaymentOrderCheckoutOpen && !order.ExpiresAt.After(s.now().UTC()) {
+			if order.Status == PaymentOrderCheckoutOpen && !order.ExpiresAt.After(s.runtime.now().UTC()) {
 				order, err = s.orderLifecycle.expireOrder(userLockedContext, order)
 				if err != nil {
 					return err
@@ -162,7 +162,7 @@ func (s *Service) ContinuePendingOrder(ctx context.Context, userID int64, public
 	return result, err
 }
 
-func (s *Service) AbandonPendingOrder(ctx context.Context, userID int64, publicToken string) (PendingPaymentOrder, error) {
+func (s *CheckoutWorkflow) AbandonPendingOrder(ctx context.Context, userID int64, publicToken string) (PendingPaymentOrder, error) {
 	if s == nil || s.configuration == nil || s.checkoutStore == nil || userID <= 0 {
 		return PendingPaymentOrder{}, ErrPaymentOrderNotFound
 	}
@@ -215,7 +215,7 @@ func pendingPaymentOrder(order PaymentOrder) PendingPaymentOrder {
 	}
 }
 
-func (s *Service) GetPurchaseOptions(ctx context.Context, userID int64) (PurchaseOptions, error) {
+func (s *CheckoutWorkflow) GetPurchaseOptions(ctx context.Context, userID int64) (PurchaseOptions, error) {
 	options := PurchaseOptions{
 		QuickIdeaQuantities: append([]int64(nil), QuickPurchaseIdeaQuantities[:]...),
 		MinIdeaQuantity:     MinimumPurchaseIdeas, MaxIdeaQuantity: MaximumPurchaseIdeas, IdeasPerUSD: IdeasPerUSD,
@@ -260,7 +260,7 @@ func (s *Service) GetPurchaseOptions(ctx context.Context, userID int64) (Purchas
 	return options, nil
 }
 
-func (s *Service) CreateCheckout(ctx context.Context, command CreateCheckoutCommand) (CheckoutResult, error) {
+func (s *CheckoutWorkflow) CreateCheckout(ctx context.Context, command CreateCheckoutCommand) (CheckoutResult, error) {
 	if s == nil || s.configuration == nil || s.checkoutStore == nil {
 		return CheckoutResult{}, ErrPurchasesUnavailable
 	}
@@ -275,7 +275,7 @@ func (s *Service) CreateCheckout(ctx context.Context, command CreateCheckoutComm
 	return result, err
 }
 
-func (s *Service) createCheckoutLocked(ctx context.Context, command CreateCheckoutCommand) (CheckoutResult, error) {
+func (s *CheckoutWorkflow) createCheckoutLocked(ctx context.Context, command CreateCheckoutCommand) (CheckoutResult, error) {
 	if s == nil || s.checkoutStore == nil || s.checkoutGateway == nil || s.wallets == nil {
 		return CheckoutResult{}, ErrPurchasesUnavailable
 	}
@@ -299,7 +299,7 @@ func (s *Service) createCheckoutLocked(ctx context.Context, command CreateChecko
 		return CheckoutResult{}, err
 	}
 
-	now := s.now().UTC()
+	now := s.runtime.now().UTC()
 	activeOrders, err := s.refreshActivePaymentOrders(ctx, apiKey, command.UserID, now)
 	if err != nil {
 		return CheckoutResult{}, err
@@ -390,7 +390,7 @@ func (s *Service) createCheckoutLocked(ctx context.Context, command CreateChecko
 	}
 }
 
-func (s *Service) refreshActivePaymentOrders(ctx context.Context, apiKey string, userID int64, now time.Time) ([]PaymentOrder, error) {
+func (s *CheckoutWorkflow) refreshActivePaymentOrders(ctx context.Context, apiKey string, userID int64, now time.Time) ([]PaymentOrder, error) {
 	orders, err := s.checkoutStore.ListActivePaymentOrders(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -424,7 +424,7 @@ func (s *Service) refreshActivePaymentOrders(ctx context.Context, apiKey string,
 	return active, nil
 }
 
-func (s *Service) GetPaymentOrderReturnStatus(ctx context.Context, userID int64, publicToken string) (PaymentOrderReturnStatus, error) {
+func (s *CheckoutWorkflow) GetPaymentOrderReturnStatus(ctx context.Context, userID int64, publicToken string) (PaymentOrderReturnStatus, error) {
 	if s == nil || s.configuration == nil || s.checkoutStore == nil {
 		return PaymentOrderReturnStatus{}, ErrPaymentOrderNotFound
 	}
@@ -437,7 +437,7 @@ func (s *Service) GetPaymentOrderReturnStatus(ctx context.Context, userID int64,
 	return result, err
 }
 
-func (s *Service) getPaymentOrderReturnStatusLocked(ctx context.Context, userID int64, publicToken string) (PaymentOrderReturnStatus, error) {
+func (s *CheckoutWorkflow) getPaymentOrderReturnStatusLocked(ctx context.Context, userID int64, publicToken string) (PaymentOrderReturnStatus, error) {
 	if s == nil || s.checkoutStore == nil || userID <= 0 {
 		return PaymentOrderReturnStatus{}, ErrPaymentOrderNotFound
 	}
@@ -469,7 +469,7 @@ func (s *Service) getPaymentOrderReturnStatusLocked(ctx context.Context, userID 
 	return paymentOrderReturnStatus(order), nil
 }
 
-func (s *Service) checkoutConfiguration(ctx context.Context) (StoredStripeConfiguration, string, error) {
+func (s *CheckoutWorkflow) checkoutConfiguration(ctx context.Context) (StoredStripeConfiguration, string, error) {
 	configuration, apiKey, err := s.stripeAccessConfiguration(ctx)
 	if err != nil {
 		return StoredStripeConfiguration{}, "", err
@@ -480,7 +480,7 @@ func (s *Service) checkoutConfiguration(ctx context.Context) (StoredStripeConfig
 	return configuration, apiKey, nil
 }
 
-func (s *Service) stripeAccessConfiguration(ctx context.Context) (StoredStripeConfiguration, string, error) {
+func (s *CheckoutWorkflow) stripeAccessConfiguration(ctx context.Context) (StoredStripeConfiguration, string, error) {
 	configuration, err := s.configuration.GetStripeConfiguration(ctx)
 	if isConfigurationNotFound(err) {
 		return StoredStripeConfiguration{}, "", ErrPurchasesUnavailable
@@ -495,7 +495,7 @@ func (s *Service) stripeAccessConfiguration(ctx context.Context) (StoredStripeCo
 	return configuration, apiKey, nil
 }
 
-func (s *Service) requireRechargeableWallet(ctx context.Context, userID int64) error {
+func (s *CheckoutWorkflow) requireRechargeableWallet(ctx context.Context, userID int64) error {
 	wallet, err := s.wallets.GetWallet(ctx, userID)
 	if err != nil {
 		if errors.Is(err, credits.ErrWalletNotFound) {
@@ -509,7 +509,7 @@ func (s *Service) requireRechargeableWallet(ctx context.Context, userID int64) e
 	return nil
 }
 
-func (s *Service) ensurePaymentCustomer(ctx context.Context, apiKey string, order PaymentOrder) (PaymentCustomer, error) {
+func (s *CheckoutWorkflow) ensurePaymentCustomer(ctx context.Context, apiKey string, order PaymentOrder) (PaymentCustomer, error) {
 	stored, err := s.checkoutStore.GetPaymentCustomer(ctx, order.UserID)
 	if err == nil && stored.StripeAccountID == order.StripeAccountID && stored.StripeCustomerID != "" {
 		return stored, nil
@@ -535,7 +535,7 @@ func (s *Service) ensurePaymentCustomer(ctx context.Context, apiKey string, orde
 // createCheckoutSessionForOrder replays the immutable Checkout intent. Stripe's
 // public order number is the idempotency key, so a process failure between the
 // provider call and local bind can recover without creating a second Session.
-func (s *Service) createCheckoutSessionForOrder(ctx context.Context, apiKey string, order PaymentOrder) (PaymentOrder, error) {
+func (s *CheckoutWorkflow) createCheckoutSessionForOrder(ctx context.Context, apiKey string, order PaymentOrder) (PaymentOrder, error) {
 	if order.Status != PaymentOrderCreating || strings.TrimSpace(order.ReturnBaseURL) == "" {
 		return PaymentOrder{}, ErrPurchasesUnavailable
 	}
@@ -570,7 +570,7 @@ func (s *Service) createCheckoutSessionForOrder(ctx context.Context, apiKey stri
 	return s.orderLifecycle.convergeCheckoutSession(ctx, bound, session, checkoutSignalObserved)
 }
 
-func (s *Service) finishRejectedCheckoutCreation(ctx context.Context, order PaymentOrder, err error) error {
+func (s *CheckoutWorkflow) finishRejectedCheckoutCreation(ctx context.Context, order PaymentOrder, err error) error {
 	operationErr := checkoutOperationError(err)
 	var gatewayErr *GatewayError
 	if !errors.As(err, &gatewayErr) || gatewayErr.Code() != GatewayErrorRequestRejected {
@@ -586,7 +586,7 @@ func (s *Service) finishRejectedCheckoutCreation(ctx context.Context, order Paym
 	return errors.Join(ErrCheckoutRequestRejected, operationErr)
 }
 
-func (s *Service) retrieveAndConvergeCheckout(ctx context.Context, apiKey string, order PaymentOrder) (PaymentOrder, error) {
+func (s *CheckoutWorkflow) retrieveAndConvergeCheckout(ctx context.Context, apiKey string, order PaymentOrder) (PaymentOrder, error) {
 	session, err := s.checkoutGateway.RetrieveCheckoutSession(ctx, RetrieveCheckoutSessionInput{
 		APIKey: apiKey, SessionID: order.StripeCheckoutSessionID,
 	})
@@ -598,7 +598,7 @@ func (s *Service) retrieveAndConvergeCheckout(ctx context.Context, apiKey string
 
 // settleOrdersBeforeStripeKeyChange preserves the single-active-account model:
 // every older Checkout is resolved with the current key before that key can be replaced.
-func (s *Service) settleOrdersBeforeStripeKeyChange(ctx context.Context, current StoredStripeConfiguration) error {
+func (s *CheckoutWorkflow) settleOrdersBeforeStripeKeyChange(ctx context.Context, current StoredStripeConfiguration) error {
 	orders, err := s.checkoutStore.ListUnsettledPaymentOrders(ctx)
 	if err != nil {
 		return err
@@ -613,7 +613,7 @@ func (s *Service) settleOrdersBeforeStripeKeyChange(ctx context.Context, current
 	if err != nil {
 		return ErrStripeConfigurationInvalid
 	}
-	now := s.now().UTC()
+	now := s.runtime.now().UTC()
 	hasActiveOrder := false
 	for _, order := range orders {
 		if order.StripeCheckoutSessionID == "" {

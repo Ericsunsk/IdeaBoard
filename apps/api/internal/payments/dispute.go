@@ -76,7 +76,7 @@ func canonicalPaymentDisputeStatus(providerStatus string) PaymentDisputeStatus {
 // expireDisputeCheckoutSessions runs only after the restriction transaction
 // commits. River and webhook retries both re-enter this idempotent convergence
 // path, so transient Stripe failures cannot strand an open Checkout forever.
-func (s *Service) expireDisputeCheckoutSessions(ctx context.Context, apiKey string, dispute PaymentDispute) error {
+func (s *StripeFactsWorkflow) expireDisputeCheckoutSessions(ctx context.Context, apiKey string, dispute PaymentDispute) error {
 	if s == nil || s.checkoutStore == nil || s.checkoutGateway == nil ||
 		(dispute.Status != PaymentDisputeOpen && dispute.Status != PaymentDisputeLost) {
 		return nil

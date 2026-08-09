@@ -5,6 +5,7 @@ import (
 
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/rewards"
 
 	"github.com/google/uuid"
 )
@@ -33,6 +34,36 @@ func (r creditsUserResolver) ResolveID(ctx context.Context, id int64) (credits.U
 
 type taskUserResolver struct {
 	repo *users.UserRepository
+}
+
+type rewardIdentityProjector struct {
+	repo *users.UserRepository
+}
+
+func (r rewardIdentityProjector) ResolveIdentity(
+	ctx context.Context,
+	userID int64,
+) (rewards.IdentityProjection, error) {
+	user, err := r.repo.GetByID(ctx, userID)
+	if err != nil {
+		return rewards.IdentityProjection{}, err
+	}
+	return rewards.IdentityProjection{PublicID: user.PublicID, DisplayName: user.DisplayName}, nil
+}
+
+func (r rewardIdentityProjector) ResolveIdentities(
+	ctx context.Context,
+	userIDs []int64,
+) (map[int64]rewards.IdentityProjection, error) {
+	usersByID, err := r.repo.GetByIDs(ctx, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	identities := make(map[int64]rewards.IdentityProjection, len(usersByID))
+	for userID, user := range usersByID {
+		identities[userID] = rewards.IdentityProjection{PublicID: user.PublicID, DisplayName: user.DisplayName}
+	}
+	return identities, nil
 }
 
 func (r taskUserResolver) ResolvePublicID(ctx context.Context, publicID string) (int64, error) {

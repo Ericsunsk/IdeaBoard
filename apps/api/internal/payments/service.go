@@ -15,79 +15,23 @@ import (
 )
 
 type Service struct {
-	configuration    StripeConfigurationStore
-	webhookInbox     StripeWebhookInboxStore
-	checkoutStore    PaymentCheckoutStore
-	convergenceStore PaymentConvergenceStore
-	gateway          StripeGateway
-	refundGateway    RefundGateway
-	disputeGateway   DisputeGateway
-	checkoutGateway  CheckoutGateway
-	orderLifecycle   *paymentOrderLifecycle
-	verifier         StripeWebhookVerifier
-	wallets          credits.WalletReader
-	events           *EventHub
-	now              func() time.Time
-	shutdownEnqueuer PaymentCheckoutShutdownEnqueuer
+	checkout *CheckoutWorkflow
+	facts    *StripeFactsWorkflow
+	runtime  *PaymentRuntime
 }
 
 type PaymentCheckoutShutdownEnqueuer interface {
 	EnqueuePaymentCheckoutShutdown(context.Context, string) error
 }
 
-type ServiceDependencies struct {
-	ConfigurationStore    StripeConfigurationStore
-	WebhookInbox          StripeWebhookInboxStore
-	CheckoutStore         PaymentCheckoutStore
-	OrderConvergenceStore PaymentOrderConvergenceStore
-	ConvergenceStore      PaymentConvergenceStore
-	ConfigurationGateway  StripeGateway
-	RefundGateway         RefundGateway
-	DisputeGateway        DisputeGateway
-	CheckoutGateway       CheckoutGateway
-	WebhookVerifier       StripeWebhookVerifier
-	Wallets               credits.WalletReader
-	Events                *EventHub
-	Now                   func() time.Time
-}
-
-func NewService(dependencies ServiceDependencies) *Service {
-	now := dependencies.Now
-	if now == nil {
-		now = time.Now
-	}
-	events := dependencies.Events
-	if events == nil {
-		events = NewEventHub()
-	}
-	service := &Service{
-		configuration: dependencies.ConfigurationStore,
-		webhookInbox:  dependencies.WebhookInbox, checkoutStore: dependencies.CheckoutStore,
-		convergenceStore: dependencies.ConvergenceStore,
-		gateway:          dependencies.ConfigurationGateway,
-		refundGateway:    dependencies.RefundGateway,
-		disputeGateway:   dependencies.DisputeGateway,
-		checkoutGateway:  dependencies.CheckoutGateway, verifier: dependencies.WebhookVerifier,
-		wallets: dependencies.Wallets, events: events, now: now,
-	}
-	service.orderLifecycle = newPaymentOrderLifecycle(dependencies.OrderConvergenceStore, service.events, service.now)
-	return service
-}
-
 func (s *Service) EventHub() *EventHub {
 	if s == nil {
 		return nil
 	}
-	return s.events
+	return s.runtime.events
 }
 
-func (s *Service) SetPaymentCheckoutShutdownEnqueuer(enqueuer PaymentCheckoutShutdownEnqueuer) {
-	if s != nil {
-		s.shutdownEnqueuer = enqueuer
-	}
-}
-
-func (s *Service) GetStripeConfiguration(ctx context.Context) (StripeConfigurationSummary, error) {
+func (s *CheckoutWorkflow) GetStripeConfiguration(ctx context.Context) (StripeConfigurationSummary, error) {
 	if s == nil || s.configuration == nil {
 		return StripeConfigurationSummary{}, fmt.Errorf("payments service unavailable")
 	}
@@ -101,7 +45,7 @@ func (s *Service) GetStripeConfiguration(ctx context.Context) (StripeConfigurati
 	return stripeConfigurationSummary(stored), nil
 }
 
-func (s *Service) ConfigureStripe(ctx context.Context, command ConfigureStripeCommand) (StripeConfigurationSummary, error) {
+func (s *CheckoutWorkflow) ConfigureStripe(ctx context.Context, command ConfigureStripeCommand) (StripeConfigurationSummary, error) {
 	if s == nil || s.configuration == nil {
 		return StripeConfigurationSummary{}, fmt.Errorf("payments configuration service unavailable")
 	}
@@ -114,7 +58,7 @@ func (s *Service) ConfigureStripe(ctx context.Context, command ConfigureStripeCo
 	return result, err
 }
 
-func (s *Service) configureStripeLocked(ctx context.Context, command ConfigureStripeCommand) (StripeConfigurationSummary, error) {
+func (s *CheckoutWorkflow) configureStripeLocked(ctx context.Context, command ConfigureStripeCommand) (StripeConfigurationSummary, error) {
 	if s == nil || s.configuration == nil {
 		return StripeConfigurationSummary{}, fmt.Errorf("payments configuration service unavailable")
 	}
@@ -151,7 +95,7 @@ func (s *Service) configureStripeLocked(ctx context.Context, command ConfigureSt
 	if err != nil {
 		return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "invalid_webhook_url", err.Error(), nil, err)
 	}
-	if s.gateway == nil {
+	if s.configurationGateway == nil {
 		return StripeConfigurationSummary{}, fmt.Errorf("payments configuration service unavailable")
 	}
 	apiKey := strings.TrimSpace(command.APIKey)
@@ -188,7 +132,7 @@ func (s *Service) configureStripeLocked(ctx context.Context, command ConfigureSt
 		}
 	}
 
-	prepared, err := s.gateway.PrepareConfiguration(ctx, prepare)
+	prepared, err := s.configurationGateway.PrepareConfiguration(ctx, prepare)
 	if err != nil {
 		code, summary, publicErr := gatewayFailure(err)
 		return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, string(code), summary, map[string]any{"mode": mode}, wrapPublicError(publicErr, summary))
@@ -228,7 +172,7 @@ func (s *Service) configureStripeLocked(ctx context.Context, command ConfigureSt
 	return stripeConfigurationSummary(stored), nil
 }
 
-func (s *Service) enqueuePaymentCheckoutShutdown(ctx context.Context, shutdown *PaymentCheckoutShutdown) {
+func (s *CheckoutWorkflow) enqueuePaymentCheckoutShutdown(ctx context.Context, shutdown *PaymentCheckoutShutdown) {
 	if shutdown == nil || s == nil || s.shutdownEnqueuer == nil {
 		return
 	}
@@ -237,7 +181,7 @@ func (s *Service) enqueuePaymentCheckoutShutdown(ctx context.Context, shutdown *
 	}
 }
 
-func (s *Service) ReceiveStripeWebhook(ctx context.Context, raw []byte, signature string) (StripeWebhookReceipt, error) {
+func (s *StripeFactsWorkflow) ReceiveStripeWebhook(ctx context.Context, raw []byte, signature string) (StripeWebhookReceipt, error) {
 	if s == nil || s.configuration == nil || s.webhookInbox == nil {
 		return StripeWebhookReceipt{}, fmt.Errorf("payments webhook service unavailable")
 	}
@@ -250,7 +194,7 @@ func (s *Service) ReceiveStripeWebhook(ctx context.Context, raw []byte, signatur
 	return receipt, err
 }
 
-func (s *Service) receiveStripeWebhookLocked(ctx context.Context, raw []byte, signature string) (StripeWebhookReceipt, error) {
+func (s *StripeFactsWorkflow) receiveStripeWebhookLocked(ctx context.Context, raw []byte, signature string) (StripeWebhookReceipt, error) {
 	if s == nil || s.configuration == nil || s.webhookInbox == nil || s.verifier == nil {
 		return StripeWebhookReceipt{}, fmt.Errorf("payments webhook service unavailable")
 	}
@@ -268,10 +212,7 @@ func (s *Service) receiveStripeWebhookLocked(ctx context.Context, raw []byte, si
 	if err != nil {
 		return StripeWebhookReceipt{}, ErrStripeConfigurationInvalid
 	}
-	now := time.Now()
-	if s.now != nil {
-		now = s.now()
-	}
+	now := s.runtime.now()
 	event, err := s.verifier.Verify(ctx, raw, signature, secret, StripeWebhookTolerance, now)
 	if err != nil {
 		return StripeWebhookReceipt{}, err
@@ -346,7 +287,7 @@ func (s *Service) receiveStripeWebhookLocked(ctx context.Context, raw []byte, si
 	return receipt, nil
 }
 
-func (s *Service) processDisputeWebhook(ctx context.Context, event StripeWebhookEvent) error {
+func (s *StripeFactsWorkflow) processDisputeWebhook(ctx context.Context, event StripeWebhookEvent) error {
 	if s == nil || s.convergenceStore == nil || s.checkoutStore == nil || s.disputeGateway == nil || strings.TrimSpace(event.ObjectID) == "" {
 		return ErrMalformedWebhookPayload
 	}
@@ -362,7 +303,7 @@ func (s *Service) processDisputeWebhook(ctx context.Context, event StripeWebhook
 		(event.PaymentIntentID != "" && provider.PaymentIntentID != "" && provider.PaymentIntentID != event.PaymentIntentID) {
 		return ErrDisputeProviderConflict
 	}
-	dispute, changed, err := s.convergenceStore.ConvergePaymentDispute(ctx, provider, s.now().UTC())
+	dispute, changed, err := s.convergenceStore.ConvergePaymentDispute(ctx, provider, s.runtime.now().UTC())
 	if errors.Is(err, ErrDisputeOrderNotEligible) {
 		return nil
 	}
@@ -375,13 +316,13 @@ func (s *Service) processDisputeWebhook(ctx context.Context, event StripeWebhook
 	return s.expireDisputeCheckoutSessions(ctx, apiKey, dispute)
 }
 
-func (s *Service) publishDisputeUpdate(userID int64) {
-	if s != nil && s.events != nil {
-		s.events.Publish(userID, PaymentEvent{Status: "dispute_updated"})
+func (s *StripeFactsWorkflow) publishDisputeUpdate(userID int64) {
+	if s != nil && s.runtime.events != nil {
+		s.runtime.events.Publish(userID, PaymentEvent{Status: "dispute_updated"})
 	}
 }
 
-func (s *Service) processRefundWebhook(ctx context.Context, event StripeWebhookEvent) error {
+func (s *StripeFactsWorkflow) processRefundWebhook(ctx context.Context, event StripeWebhookEvent) error {
 	if s == nil || s.convergenceStore == nil || s.refundGateway == nil || strings.TrimSpace(event.ObjectID) == "" {
 		return ErrMalformedWebhookPayload
 	}
@@ -401,9 +342,9 @@ func (s *Service) processRefundWebhook(ctx context.Context, event StripeWebhookE
 			// model; without a charge identity it cannot be linked safely.
 			return nil
 		}
-		if _, createErr := s.convergenceStore.CreateExternalPaymentRefund(ctx, providerRefund, s.now().UTC()); createErr != nil {
+		if _, createErr := s.convergenceStore.CreateExternalPaymentRefund(ctx, providerRefund, s.runtime.now().UTC()); createErr != nil {
 			if errors.Is(createErr, credits.ErrInsufficientCredits) || errors.Is(createErr, ErrRefundAmountExceeds) {
-				userID, anomalyErr := s.convergenceStore.RecordPaymentRefundAnomaly(ctx, providerRefund, "Stripe Dashboard refund requires manual balance recovery", s.now().UTC())
+				userID, anomalyErr := s.convergenceStore.RecordPaymentRefundAnomaly(ctx, providerRefund, "Stripe Dashboard refund requires manual balance recovery", s.runtime.now().UTC())
 				if anomalyErr == nil {
 					s.publishRefundUpdate(userID)
 				}
@@ -455,7 +396,7 @@ func checkoutSignalForWebhookEvent(eventType string) (checkoutSignal, bool) {
 	}
 }
 
-func (s *Service) loadCurrentConfiguration(ctx context.Context) (StoredStripeConfiguration, bool, error) {
+func (s *CheckoutWorkflow) loadCurrentConfiguration(ctx context.Context) (StoredStripeConfiguration, bool, error) {
 	stored, err := s.configuration.GetStripeConfiguration(ctx)
 	if isConfigurationNotFound(err) {
 		return StoredStripeConfiguration{}, false, nil
@@ -466,7 +407,7 @@ func (s *Service) loadCurrentConfiguration(ctx context.Context) (StoredStripeCon
 	return stored, true, nil
 }
 
-func (s *Service) recordFailure(ctx context.Context, actorID int64, code, summary string, metadata map[string]any, publicErr error) error {
+func (s *CheckoutWorkflow) recordFailure(ctx context.Context, actorID int64, code, summary string, metadata map[string]any, publicErr error) error {
 	auditErr := s.configuration.RecordConfigurationAudit(ctx, ConfigurationAudit{
 		ActorID: actorID, Outcome: "failed", ErrorCode: boundedText(code, 64),
 		ErrorSummary: boundedText(summary, 500), Metadata: safeAuditMetadata(metadata),
@@ -475,6 +416,21 @@ func (s *Service) recordFailure(ctx context.Context, actorID int64, code, summar
 		return errors.Join(publicErr, auditErr)
 	}
 	return publicErr
+}
+
+func (s *StripeFactsWorkflow) stripeAccessConfiguration(ctx context.Context) (StoredStripeConfiguration, string, error) {
+	configuration, err := s.configuration.GetStripeConfiguration(ctx)
+	if isConfigurationNotFound(err) {
+		return StoredStripeConfiguration{}, "", ErrPurchasesUnavailable
+	}
+	if err != nil {
+		return StoredStripeConfiguration{}, "", fmt.Errorf("load Stripe facts configuration: %w", err)
+	}
+	apiKey, err := secrets.DecryptMaterialString(configuration.APIKeyCiphertext, configuration.SecretMaterialKind)
+	if err != nil {
+		return StoredStripeConfiguration{}, "", ErrPurchasesUnavailable
+	}
+	return configuration, apiKey, nil
 }
 
 func stripeConfigurationSummary(stored StoredStripeConfiguration) StripeConfigurationSummary {

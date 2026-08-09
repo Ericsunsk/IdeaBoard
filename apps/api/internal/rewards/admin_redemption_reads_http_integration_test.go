@@ -1,6 +1,7 @@
 package rewards
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -15,11 +16,54 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type repositoryIdentityProjection struct {
+	repo  *users.UserRepository
+	calls *identityProjectionCalls
+}
+
+type identityProjectionCalls struct {
+	single int
+	batch  int
+}
+
+func (p repositoryIdentityProjection) ResolveIdentity(
+	ctx context.Context,
+	userID int64,
+) (IdentityProjection, error) {
+	if p.calls != nil {
+		p.calls.single++
+	}
+	user, err := p.repo.GetByID(ctx, userID)
+	if err != nil {
+		return IdentityProjection{}, err
+	}
+	return IdentityProjection{PublicID: user.PublicID, DisplayName: user.DisplayName}, nil
+}
+
+func (p repositoryIdentityProjection) ResolveIdentities(
+	ctx context.Context,
+	userIDs []int64,
+) (map[int64]IdentityProjection, error) {
+	if p.calls != nil {
+		p.calls.batch++
+	}
+	usersByID, err := p.repo.GetByIDs(ctx, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	identities := make(map[int64]IdentityProjection, len(usersByID))
+	for userID, user := range usersByID {
+		identities[userID] = IdentityProjection{PublicID: user.PublicID, DisplayName: user.DisplayName}
+	}
+	return identities, nil
+}
+
 func TestAdminListsSafeRedemptionSummariesScopedToRewardCode(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
 	userRepo := users.NewUserRepository(db)
+	projectionCalls := &identityProjectionCalls{}
 	redeemingUser, err := userRepo.GetByID(t.Context(), 3)
 	if err != nil {
 		t.Fatalf("load redemption user: %v", err)
@@ -45,7 +89,7 @@ func TestAdminListsSafeRedemptionSummariesScopedToRewardCode(t *testing.T) {
 		t.Fatalf("Redeem() error = %v", err)
 	}
 
-	handler := NewHandler(service, userRepo)
+	handler := NewAdminReadHandler(service, repositoryIdentityProjection{repo: userRepo, calls: projectionCalls})
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -66,6 +110,9 @@ func TestAdminListsSafeRedemptionSummariesScopedToRewardCode(t *testing.T) {
 		item.UserPublicID != redeemingUser.PublicID || item.DisplayName != redeemingUser.DisplayName ||
 		item.CreditedAmount != 37 || item.RedeemedAt.IsZero() {
 		t.Fatalf("summary = %+v", item)
+	}
+	if projectionCalls.batch != 1 || projectionCalls.single != 0 {
+		t.Fatalf("Identity projection calls = %+v, want one batch and no single reads", *projectionCalls)
 	}
 	var payload struct {
 		Data struct {
@@ -102,6 +149,7 @@ func TestAdminGetsRedemptionDetailOnlyWithinRewardCodeScope(t *testing.T) {
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
 	userRepo := users.NewUserRepository(db)
+	projectionCalls := &identityProjectionCalls{}
 	redeemingUser, err := userRepo.GetByID(t.Context(), 3)
 	if err != nil {
 		t.Fatalf("load redemption user: %v", err)
@@ -131,7 +179,7 @@ func TestAdminGetsRedemptionDetailOnlyWithinRewardCodeScope(t *testing.T) {
 		t.Fatalf("Redeem(other) error = %v", err)
 	}
 
-	handler := NewHandler(service, userRepo)
+	handler := NewAdminReadHandler(service, repositoryIdentityProjection{repo: userRepo, calls: projectionCalls})
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -151,6 +199,9 @@ func TestAdminGetsRedemptionDetailOnlyWithinRewardCodeScope(t *testing.T) {
 		detail.CreditTransactionID != targetRedemption.Redemption.CreditTransactionID ||
 		detail.MaskedCodeHint != "•••• 2026" {
 		t.Fatalf("detail = %+v Cache-Control=%q", detail, recorder.Header().Get("Cache-Control"))
+	}
+	if projectionCalls.single != 1 || projectionCalls.batch != 0 {
+		t.Fatalf("Identity projection calls = %+v, want one single and no batch reads", *projectionCalls)
 	}
 	var payload struct {
 		Data map[string]json.RawMessage `json:"data"`
@@ -208,7 +259,7 @@ func TestAdminRedemptionListUsesBoundedKeysetPagination(t *testing.T) {
 		t.Fatalf("Redeem(newer) error = %v", err)
 	}
 
-	handler := NewHandler(service, userRepo)
+	handler := NewAdminReadHandler(service, repositoryIdentityProjection{repo: userRepo})
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {

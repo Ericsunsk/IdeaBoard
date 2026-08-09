@@ -4,36 +4,44 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
+
+var testPublicID = uuid.MustParse("00000000-0000-0000-0000-000000000007")
 
 func TestNewEnforcesCompleteCanonicalIdentity(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		userID     int64
-		authUserID string
-		role       string
-		wantAuthID string
-		wantRole   Role
-		wantErr    bool
+		name        string
+		userID      int64
+		publicID    uuid.UUID
+		authUserID  string
+		displayName string
+		role        string
+		wantAuthID  string
+		wantRole    Role
+		wantErr     bool
 	}{
-		{name: "user", userID: 1, authUserID: "auth-1", role: "user", wantAuthID: "auth-1", wantRole: RoleUser},
-		{name: "admin trims identity text", userID: 2, authUserID: " auth-2 ", role: "admin", wantAuthID: "auth-2", wantRole: RoleAdmin},
-		{name: "missing user id", authUserID: "auth-1", role: "user", wantErr: true},
-		{name: "missing auth user id", userID: 1, role: "user", wantErr: true},
-		{name: "missing role", userID: 1, authUserID: "auth-1", wantErr: true},
-		{name: "non-canonical role", userID: 1, authUserID: "auth-1", role: "Admin", wantErr: true},
-		{name: "unknown role", userID: 1, authUserID: "auth-1", role: "owner", wantErr: true},
+		{name: "user", userID: 1, publicID: testPublicID, authUserID: "auth-1", displayName: "Alice", role: "user", wantAuthID: "auth-1", wantRole: RoleUser},
+		{name: "admin trims identity text", userID: 2, publicID: testPublicID, authUserID: " auth-2 ", displayName: " Admin ", role: "admin", wantAuthID: "auth-2", wantRole: RoleAdmin},
+		{name: "missing user id", publicID: testPublicID, authUserID: "auth-1", displayName: "Alice", role: "user", wantErr: true},
+		{name: "missing public id", userID: 1, authUserID: "auth-1", displayName: "Alice", role: "user", wantErr: true},
+		{name: "missing auth user id", userID: 1, publicID: testPublicID, displayName: "Alice", role: "user", wantErr: true},
+		{name: "missing display name", userID: 1, publicID: testPublicID, authUserID: "auth-1", role: "user", wantErr: true},
+		{name: "missing role", userID: 1, publicID: testPublicID, authUserID: "auth-1", displayName: "Alice", wantErr: true},
+		{name: "non-canonical role", userID: 1, publicID: testPublicID, authUserID: "auth-1", displayName: "Alice", role: "Admin", wantErr: true},
+		{name: "unknown role", userID: 1, publicID: testPublicID, authUserID: "auth-1", displayName: "Alice", role: "owner", wantErr: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			principal, err := New(tt.userID, tt.authUserID, tt.role)
+			principal, err := New(tt.userID, tt.publicID, tt.authUserID, tt.displayName, tt.role)
 			if tt.wantErr {
 				if !errors.Is(err, ErrInvalid) || principal.IsValid() {
 					t.Fatalf("New() = %+v, %v; want invalid principal", principal, err)
@@ -43,7 +51,7 @@ func TestNewEnforcesCompleteCanonicalIdentity(t *testing.T) {
 			if err != nil || !principal.IsValid() {
 				t.Fatalf("New() = %+v, %v", principal, err)
 			}
-			if principal.UserID() != tt.userID || principal.AuthUserID() != tt.wantAuthID || principal.Role() != tt.wantRole {
+			if principal.UserID() != tt.userID || principal.PublicID() != tt.publicID || principal.AuthUserID() != tt.wantAuthID || principal.DisplayName() != strings.TrimSpace(tt.displayName) || principal.Role() != tt.wantRole {
 				t.Fatalf("principal = %+v", principal)
 			}
 			if tt.wantRole == RoleAdmin && (!principal.IsAdmin()) {
@@ -55,7 +63,7 @@ func TestNewEnforcesCompleteCanonicalIdentity(t *testing.T) {
 
 func TestPrincipalContextAccessorsFailClosed(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	principal, err := New(7, "auth-7", "user")
+	principal, err := New(7, testPublicID, "auth-7", "Test User", "user")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,7 +142,7 @@ func TestRequireAdminUsesTypedRole(t *testing.T) {
 			recorder := httptest.NewRecorder()
 			context, _ := gin.CreateTestContext(recorder)
 			if tt.set {
-				identityPrincipal, err := New(7, "auth-7", tt.role)
+				identityPrincipal, err := New(7, testPublicID, "auth-7", "Test User", tt.role)
 				if err != nil {
 					t.Fatal(err)
 				}

@@ -25,6 +25,7 @@ import (
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
+	"ideaboard/api/internal/rewards"
 	"ideaboard/api/internal/tasking/taskservice"
 	"ideaboard/api/internal/tasking/taskstats"
 	"ideaboard/api/internal/testdb"
@@ -225,7 +226,7 @@ func TestAdminRoutesRequireAuthenticatedAdminAccess(t *testing.T) {
 		t.Fatalf("promote route user to admin: %v", err)
 	}
 	adminDeps := newAdminRouteGuardTestDependencies(authDeps)
-	adminDeps.AdminRoutes.CreditHandler = credits.NewHandler(credits.NewService(pool), routeCreditUserResolver{repo: userRepo})
+	adminDeps.AdminRoutes.CreditAdminCommandHandler = credits.NewAdminCommandHandler(credits.NewService(pool), routeCreditUserResolver{repo: userRepo})
 	router = gin.New()
 	RegisterRoutes(router, adminDeps, fstest.MapFS{}, FrontendRouteOptions{})
 	adminRecorder := httptest.NewRecorder()
@@ -295,30 +296,34 @@ func newAdminRouteGuardTestDependencies(authDeps AuthDeps) Dependencies {
 	return Dependencies{
 		Auth: authDeps,
 		UserRoutes: UserRouteDeps{
-			AuthHandler:    auth.NewAuthHandler(nil),
-			TaskHandler:    taskservice.NewHandler(nil),
-			BoardHandler:   boards.NewBoardHandler(nil, config.PublicOriginsConfig{}),
-			BillingHandler: billing.NewHandler(nil, nil),
-			BillingRecords: billingrecords.NewHandler(nil),
-			CreditHandler:  credits.NewHandler(nil),
-			UsageHandler:   usage.NewHandler(nil),
+			AuthHandler:       auth.NewAuthHandler(nil),
+			TaskHandler:       taskservice.NewHandler(nil),
+			BoardHandler:      boards.NewBoardHandler(nil, config.PublicOriginsConfig{}),
+			BillingHandler:    billing.NewHandler(nil, nil),
+			BillingRecords:    billingrecords.NewHandler(nil),
+			CreditUserHandler: credits.NewUserHandler(nil, nil),
+			UsageHandler:      usage.NewHandler(nil),
 			Uploads: UploadDeps{
 				UserRepo:       authDeps.UserRepo,
 				UploadSettings: &fakeMediaUploadSettingsProvider{},
 			},
 		},
 		AdminRoutes: AdminRouteDeps{
-			AdminHandler:            users.NewAdminHandler(nil, nil, nil),
-			SocialProviderHandler:   auth.NewSocialProviderAdminHandler(authDeps.AuthServiceClient),
-			BillingHandler:          billing.NewHandler(nil, nil),
-			CreditHandler:           credits.NewHandler(nil),
-			AccountHandler:          accounts.NewAccountHandler(nil),
-			TaskHandler:             taskservice.NewHandler(nil),
-			TaskStatsHandler:        taskstats.NewHandler(nil, nil),
-			ProviderEndpointHandler: providerendpoints.NewProviderEndpointHandler(nil),
-			StorageHandler:          storage.NewStorageHandler(nil),
-			FeaturePromptHandler:    prompts.NewFeaturePromptHandler(nil),
-			UploadSettings:          &fakeMediaUploadSettingsProvider{},
+			AdminHandler:                users.NewAdminHandler(nil, nil, nil),
+			SocialProviderHandler:       auth.NewSocialProviderAdminHandler(authDeps.AuthServiceClient),
+			BillingHandler:              billing.NewHandler(nil, nil),
+			CreditAdminCommandHandler:   credits.NewAdminCommandHandler(nil, nil),
+			CreditAdminReadHandler:      credits.NewAdminReadHandler(nil, nil),
+			CreditReconciliationHandler: credits.NewReconciliationHandler(nil, nil),
+			AccountHandler:              accounts.NewAccountHandler(nil),
+			TaskHandler:                 taskservice.NewHandler(nil),
+			TaskStatsHandler:            taskstats.NewHandler(nil, nil),
+			ProviderEndpointHandler:     providerendpoints.NewProviderEndpointHandler(nil),
+			StorageHandler:              storage.NewStorageHandler(nil),
+			FeaturePromptHandler:        prompts.NewFeaturePromptHandler(nil),
+			RewardAdminCommandHandler:   rewards.NewAdminCommandHandler(nil),
+			RewardAdminReadHandler:      rewards.NewAdminReadHandler(nil, nil),
+			UploadSettings:              &fakeMediaUploadSettingsProvider{},
 		},
 		StaticUploads: StaticUploadDeps{Auth: authDeps},
 		CORSMiddleware: func(c *gin.Context) {

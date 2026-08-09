@@ -173,11 +173,30 @@ func TestPaymentRefundReconciliationRecoversPendingProviderStateExactlyOnce(t *t
 	gateway := &refundGatewayFake{retrieve: map[string]StripeRefund{
 		"re_reconcile": {ID: "re_reconcile", Status: "succeeded", ChargeID: "ch_refund", AmountMinor: 100, Currency: "usd"},
 	}}
-	service := NewService(ServiceDependencies{ConvergenceStore: repo, RefundGateway: gateway, Events: NewEventHub(), Now: func() time.Time { return now }})
-	if err := service.reconcileDuePaymentRefunds(t.Context(), "sk_test_refund", nil, now.Add(3*time.Minute)); err != nil {
+	runtime := NewPaymentRuntime(NewEventHub(), func() time.Time { return now })
+	transitions, err := NewPaymentOrderTransitions(repo, runtime)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := service.reconcileDuePaymentRefunds(t.Context(), "sk_test_refund", nil, now.Add(4*time.Minute)); err != nil {
+	checkout, err := NewCheckoutWorkflow(CheckoutWorkflowDependencies{
+		Configuration: repo, ConfigurationGateway: testStripeGateway{}, ShutdownEnqueuer: testShutdownEnqueuer{},
+		Store: repo, CheckoutGateway: testCheckoutGateway{}, Wallets: testWalletReader{}, Convergence: repo, Transitions: transitions,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	facts, err := NewStripeFactsWorkflow(StripeFactsWorkflowDependencies{
+		Configuration: repo, Inbox: repo, Convergence: repo, Verifier: testWebhookVerifier{},
+		RefundGateway: gateway, DisputeGateway: testDisputeGateway{}, CheckoutStore: repo,
+		CheckoutGateway: testCheckoutGateway{}, CheckoutRecovery: checkout, Transitions: transitions,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := facts.reconcileDuePaymentRefunds(t.Context(), "sk_test_refund", nil, now.Add(3*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := facts.reconcileDuePaymentRefunds(t.Context(), "sk_test_refund", nil, now.Add(4*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	settled, err := repo.GetPaymentRefundByID(t.Context(), refund.ID)

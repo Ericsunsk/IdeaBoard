@@ -1,6 +1,7 @@
 package payments
 
 import (
+	"context"
 	"errors"
 	"io"
 	"log/slog"
@@ -28,9 +29,48 @@ const (
 	paymentEventsHeartbeatInterval           = 15 * time.Second
 )
 
-type Handler struct {
-	service       *Service
+type UserCheckoutService interface {
+	GetPurchaseOptions(context.Context, int64) (PurchaseOptions, error)
+	CreateCheckout(context.Context, CreateCheckoutCommand) (CheckoutResult, error)
+	GetPaymentOrderReturnStatus(context.Context, int64, string) (PaymentOrderReturnStatus, error)
+	ListPendingOrders(context.Context, int64) (PendingPaymentOrderList, error)
+	ContinuePendingOrder(context.Context, int64, string) (PendingPaymentOrder, error)
+	AbandonPendingOrder(context.Context, int64, string) (PendingPaymentOrder, error)
+	ListRecharges(context.Context, int64, string, int) (RechargeHistoryPage, error)
+}
+
+type AdminService interface {
+	GetStripeConfiguration(context.Context) (StripeConfigurationSummary, error)
+	ConfigureStripe(context.Context, ConfigureStripeCommand) (StripeConfigurationSummary, error)
+	ListAdminPaymentOrders(context.Context, AdminPaymentOrderListInput) (AdminPaymentOrderPage, error)
+	GetAdminPaymentOrder(context.Context, string) (AdminPaymentOrderDetail, error)
+	CreatePaymentRefund(context.Context, CreatePaymentRefundCommand) (PaymentRefund, error)
+}
+
+type WebhookService interface {
+	ReceiveStripeWebhook(context.Context, []byte, string) (StripeWebhookReceipt, error)
+}
+
+type UserPaymentEventStream interface {
+	Subscribe(int64) (<-chan PaymentEvent, func())
+}
+
+type UserCheckoutHandler struct {
+	service       UserCheckoutService
 	publicOrigins config.PublicOriginsConfig
+}
+
+type AdminHandler struct {
+	service       AdminService
+	publicOrigins config.PublicOriginsConfig
+}
+
+type WebhookHandler struct {
+	service WebhookService
+}
+
+type EventStreamHandler struct {
+	events UserPaymentEventStream
 }
 
 type updateStripeConfigurationRequest struct {
@@ -53,11 +93,23 @@ type createPaymentRefundRequest struct {
 	Reason         string `json:"reason"`
 }
 
-func NewHandler(service *Service, publicOrigins config.PublicOriginsConfig) *Handler {
-	return &Handler{service: service, publicOrigins: publicOrigins}
+func NewUserCheckoutHandler(service UserCheckoutService, publicOrigins config.PublicOriginsConfig) *UserCheckoutHandler {
+	return &UserCheckoutHandler{service: service, publicOrigins: publicOrigins}
 }
 
-func (h *Handler) GetPurchaseOptions(c *gin.Context) {
+func NewAdminHandler(service AdminService, publicOrigins config.PublicOriginsConfig) *AdminHandler {
+	return &AdminHandler{service: service, publicOrigins: publicOrigins}
+}
+
+func NewWebhookHandler(service WebhookService) *WebhookHandler {
+	return &WebhookHandler{service: service}
+}
+
+func NewEventStreamHandler(events UserPaymentEventStream) *EventStreamHandler {
+	return &EventStreamHandler{events: events}
+}
+
+func (h *UserCheckoutHandler) GetPurchaseOptions(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	identityPrincipal, ok := principal.Require(c)
 	if !ok {
@@ -75,7 +127,7 @@ func (h *Handler) GetPurchaseOptions(c *gin.Context) {
 	response.SuccessDTO(c, options)
 }
 
-func (h *Handler) CreateCheckoutSession(c *gin.Context) {
+func (h *UserCheckoutHandler) CreateCheckoutSession(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	identityPrincipal, ok := principal.Require(c)
 	if !ok {
@@ -108,7 +160,7 @@ func (h *Handler) CreateCheckoutSession(c *gin.Context) {
 	response.SuccessDTO(c, result)
 }
 
-func (h *Handler) GetPaymentOrderReturnStatus(c *gin.Context) {
+func (h *UserCheckoutHandler) GetPaymentOrderReturnStatus(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	identityPrincipal, ok := principal.Require(c)
 	if !ok {
@@ -134,7 +186,7 @@ func (h *Handler) GetPaymentOrderReturnStatus(c *gin.Context) {
 	response.SuccessDTO(c, result)
 }
 
-func (h *Handler) ListPendingOrders(c *gin.Context) {
+func (h *UserCheckoutHandler) ListPendingOrders(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	identityPrincipal, ok := principal.Require(c)
 	if !ok {
@@ -152,7 +204,7 @@ func (h *Handler) ListPendingOrders(c *gin.Context) {
 	response.SuccessDTO(c, orders)
 }
 
-func (h *Handler) ContinuePendingOrder(c *gin.Context) {
+func (h *UserCheckoutHandler) ContinuePendingOrder(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	identityPrincipal, ok := principal.Require(c)
 	if !ok {
@@ -189,7 +241,7 @@ func (h *Handler) ContinuePendingOrder(c *gin.Context) {
 	response.SuccessDTO(c, order)
 }
 
-func (h *Handler) AbandonPendingOrder(c *gin.Context) {
+func (h *UserCheckoutHandler) AbandonPendingOrder(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	identityPrincipal, ok := principal.Require(c)
 	if !ok {
@@ -248,7 +300,7 @@ func requireEmptyPaymentActionBody(c *gin.Context) bool {
 	return true
 }
 
-func (h *Handler) ListRecharges(c *gin.Context) {
+func (h *UserCheckoutHandler) ListRecharges(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	identityPrincipal, ok := principal.Require(c)
 	if !ok {
@@ -279,18 +331,22 @@ func (h *Handler) ListRecharges(c *gin.Context) {
 	response.SuccessDTO(c, page)
 }
 
-func (h *Handler) StreamUserPaymentEvents(c *gin.Context) {
+func (h *EventStreamHandler) StreamUserPaymentEvents(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	identityPrincipal, ok := principal.Require(c)
 	if !ok {
 		return
 	}
-	if h == nil || h.service == nil || h.service.EventHub() == nil {
+	var events UserPaymentEventStream
+	if h != nil {
+		events = h.events
+	}
+	if events == nil {
 		response.Error(c, http.StatusServiceUnavailable, "充值事件服务暂不可用")
 		return
 	}
-	events, unsubscribe := h.service.EventHub().Subscribe(identityPrincipal.UserID())
-	if events == nil {
+	eventChannel, unsubscribe := events.Subscribe(identityPrincipal.UserID())
+	if eventChannel == nil {
 		response.Error(c, http.StatusServiceUnavailable, "充值事件服务暂不可用")
 		return
 	}
@@ -307,7 +363,7 @@ func (h *Handler) StreamUserPaymentEvents(c *gin.Context) {
 		select {
 		case <-c.Request.Context().Done():
 			return
-		case event := <-events:
+		case event := <-eventChannel:
 			if err := sse.WriteEvent(c, "payment", event); err != nil {
 				return
 			}
@@ -320,7 +376,7 @@ func (h *Handler) StreamUserPaymentEvents(c *gin.Context) {
 	}
 }
 
-func (h *Handler) ListAdminPaymentOrders(c *gin.Context) {
+func (h *AdminHandler) ListAdminPaymentOrders(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	if _, ok := principal.RequireAdmin(c); !ok {
 		return
@@ -346,7 +402,7 @@ func (h *Handler) ListAdminPaymentOrders(c *gin.Context) {
 	response.SuccessDTO(c, page)
 }
 
-func (h *Handler) GetAdminPaymentOrder(c *gin.Context) {
+func (h *AdminHandler) GetAdminPaymentOrder(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	if _, ok := principal.RequireAdmin(c); !ok {
 		return
@@ -371,7 +427,7 @@ func (h *Handler) GetAdminPaymentOrder(c *gin.Context) {
 	response.SuccessDTO(c, detail)
 }
 
-func (h *Handler) CreateAdminPaymentRefund(c *gin.Context) {
+func (h *AdminHandler) CreateAdminPaymentRefund(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	admin, ok := principal.RequireAdmin(c)
 	if !ok {
@@ -441,14 +497,14 @@ func adminPaymentOrderListInputFromQuery(c *gin.Context) (AdminPaymentOrderListI
 	return input, nil
 }
 
-func (h *Handler) checkoutReturnBaseURL() (string, error) {
+func (h *UserCheckoutHandler) checkoutReturnBaseURL() (string, error) {
 	if h == nil || strings.TrimSpace(h.publicOrigins.Web) == "" {
 		return "", ErrPurchasesUnavailable
 	}
 	return h.publicOrigins.WebURL("/user/boards"), nil
 }
 
-func (h *Handler) GetStripeConfiguration(c *gin.Context) {
+func (h *AdminHandler) GetStripeConfiguration(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	if _, ok := principal.RequireAdmin(c); !ok {
 		return
@@ -465,7 +521,7 @@ func (h *Handler) GetStripeConfiguration(c *gin.Context) {
 	response.SuccessDTO(c, summary)
 }
 
-func (h *Handler) UpdateStripeConfiguration(c *gin.Context) {
+func (h *AdminHandler) UpdateStripeConfiguration(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	admin, ok := principal.RequireAdmin(c)
 	if !ok {
@@ -496,7 +552,7 @@ func (h *Handler) UpdateStripeConfiguration(c *gin.Context) {
 	response.SuccessDTO(c, summary)
 }
 
-func (h *Handler) ReceiveStripeWebhook(c *gin.Context) {
+func (h *WebhookHandler) ReceiveStripeWebhook(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	if h == nil || h.service == nil {
 		response.Error(c, http.StatusServiceUnavailable, "Stripe Webhook 暂不可用")

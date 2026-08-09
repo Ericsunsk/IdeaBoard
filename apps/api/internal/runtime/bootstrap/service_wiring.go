@@ -19,6 +19,7 @@ import (
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/rewards"
 	"ideaboard/api/internal/runtime/billingregistry"
+	"ideaboard/api/internal/runtime/worker"
 	"ideaboard/api/internal/usage"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -53,7 +54,18 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 	if err != nil || len(welcomeIdentityKey) != 32 {
 		return appDomainServices{}, fmt.Errorf("CREDITS_WELCOME_IDENTITY_KEY must be base64 encoded 32 bytes")
 	}
-	creditService := credits.NewService(appPool)
+	riverProducer, err := worker.NewRiverProducer(appPool)
+	if err != nil {
+		return appDomainServices{}, fmt.Errorf("initialize River producer: %w", err)
+	}
+	creditReconciliationDispatcher, err := worker.NewCreditReconciliationDispatcher(riverProducer)
+	if err != nil {
+		return appDomainServices{}, err
+	}
+	creditService, err := credits.NewServiceWithReconciliation(appPool, creditReconciliationDispatcher)
+	if err != nil {
+		return appDomainServices{}, err
+	}
 	rewardKeys, err := rewards.ParseCodeKeyring(cfg.Rewards.CodeHMACKeys)
 	if err != nil {
 		return appDomainServices{}, err
@@ -74,6 +86,34 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 	}
 	userService := users.NewUserService(repos.userRepo, userLifecycle, creditService, storageService)
 	stripeAdapter := stripeadapter.New()
+	paymentCheckoutShutdownDispatcher, err := worker.NewPaymentCheckoutShutdownDispatcher(riverProducer)
+	if err != nil {
+		return appDomainServices{}, err
+	}
+	paymentRuntime := payments.NewPaymentRuntime(payments.NewEventHub(), nil)
+	paymentTransitions, err := payments.NewPaymentOrderTransitions(repos.paymentRepo, paymentRuntime)
+	if err != nil {
+		return appDomainServices{}, fmt.Errorf("initialize payment order transitions: %w", err)
+	}
+	paymentCheckout, err := payments.NewCheckoutWorkflow(payments.CheckoutWorkflowDependencies{
+		Configuration: repos.paymentRepo, ConfigurationGateway: stripeAdapter, ShutdownEnqueuer: paymentCheckoutShutdownDispatcher,
+		Store: repos.paymentRepo, CheckoutGateway: stripeAdapter, Wallets: creditService,
+		Convergence: repos.paymentRepo, Transitions: paymentTransitions,
+	})
+	if err != nil {
+		return appDomainServices{}, fmt.Errorf("initialize payment Checkout workflow: %w", err)
+	}
+	paymentFacts, err := payments.NewStripeFactsWorkflow(payments.StripeFactsWorkflowDependencies{
+		Configuration: repos.paymentRepo, Inbox: repos.paymentRepo, Convergence: repos.paymentRepo, Verifier: stripeAdapter, RefundGateway: stripeAdapter,
+		DisputeGateway: stripeAdapter, CheckoutStore: repos.paymentRepo, CheckoutGateway: stripeAdapter, CheckoutRecovery: paymentCheckout, Transitions: paymentTransitions,
+	})
+	if err != nil {
+		return appDomainServices{}, fmt.Errorf("initialize Stripe facts workflow: %w", err)
+	}
+	paymentService, err := payments.NewService(paymentCheckout, paymentFacts)
+	if err != nil {
+		return appDomainServices{}, fmt.Errorf("initialize payments service: %w", err)
+	}
 	return appDomainServices{
 		authServiceClient:    auth.NewServiceClient(cfg.Auth),
 		runtimeSettings:      runtimeSettings,
@@ -87,13 +127,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		creditService:        creditService,
 		usageService:         usage.NewService(creditService, repos.taskBillingUsage, usage.ServiceOptions{}),
 		rewardService:        rewardService,
-		paymentService: payments.NewService(payments.ServiceDependencies{
-			ConfigurationStore: repos.paymentRepo, WebhookInbox: repos.paymentRepo,
-			CheckoutStore: repos.paymentRepo, OrderConvergenceStore: repos.paymentRepo, ConvergenceStore: repos.paymentRepo,
-			ConfigurationGateway: stripeAdapter,
-			RefundGateway:        stripeAdapter, DisputeGateway: stripeAdapter, CheckoutGateway: stripeAdapter, WebhookVerifier: stripeAdapter,
-			Wallets: creditService, Events: payments.NewEventHub(),
-		}),
-		userLifecycle: userLifecycle,
+		paymentService:       paymentService,
+		userLifecycle:        userLifecycle,
 	}, nil
 }

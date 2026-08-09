@@ -22,14 +22,14 @@ import (
 func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T) {
 	db := testdb.Open(t)
 	repo := NewRepository(db)
-	service := NewService(ServiceDependencies{ConfigurationStore: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConvergenceStore: repo})
+	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), testStripeGateway{}, testCheckoutGateway{}, testWalletReader{}, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	user42PublicID := adminPaymentUserPublicID(t, db, 42)
 	first := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-AAA000000001", 501)
 	second := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-BBB000000002", 502)
 	third := createAdminPaymentOrder(t, repo, 99, "IBP-20260801-CCC000000003", 503)
 	markAdminPaymentOrderAnomalous(t, db, second.ID)
 
-	handler := NewHandler(service, config.PublicOriginsConfig{})
+	handler := NewAdminHandler(service, config.PublicOriginsConfig{})
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -130,7 +130,7 @@ func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T)
 func TestAdminPaymentOrderDetailMasksProviderIdentifiersAndExcludesInternalFields(t *testing.T) {
 	db := testdb.Open(t)
 	repo := NewRepository(db)
-	service := NewService(ServiceDependencies{ConfigurationStore: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConvergenceStore: repo})
+	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), testStripeGateway{}, testCheckoutGateway{}, testWalletReader{}, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	userPublicID := adminPaymentUserPublicID(t, db, 42)
 	order := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-DETAIL000001", 501)
 	bound, err := repo.BindPaymentOrderCheckout(t.Context(), BindPaymentOrderCheckoutInput{
@@ -142,7 +142,7 @@ func TestAdminPaymentOrderDetailMasksProviderIdentifiersAndExcludesInternalField
 	}
 	markAdminPaymentOrderAnomalous(t, db, bound.ID)
 
-	handler := NewHandler(service, config.PublicOriginsConfig{})
+	handler := NewAdminHandler(service, config.PublicOriginsConfig{})
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -199,7 +199,7 @@ func adminPaymentUserPublicID(t *testing.T, db *sql.DB, userID int64) uuid.UUID 
 func TestAdminPaymentOrderDetailAssociatesRefundAndDisputeWebhookFacts(t *testing.T) {
 	db := testdb.Open(t)
 	repo := NewRepository(db)
-	service := NewService(ServiceDependencies{ConfigurationStore: repo, CheckoutStore: repo, OrderConvergenceStore: repo, ConvergenceStore: repo})
+	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), testStripeGateway{}, testCheckoutGateway{}, testWalletReader{}, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	order := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-EVENTS000001", 501)
 	bound, err := repo.BindPaymentOrderCheckout(t.Context(), BindPaymentOrderCheckoutInput{
 		OrderID: order.ID, StripeCustomerID: "cus_events", StripeSessionID: "cs_events",

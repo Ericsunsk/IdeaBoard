@@ -21,7 +21,9 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
 	service := newTestRewardService(t, pool, creditService)
-	handler := NewHandler(service)
+	userHandler := NewUserHandler(service)
+	adminCommandHandler := NewAdminCommandHandler(service)
+	adminReadHandler := NewAdminReadHandler(service, nil)
 	gin.SetMode(gin.TestMode)
 
 	adminRouter := gin.New()
@@ -29,11 +31,11 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 		testsupport.SetPrincipal(t, c, 1, principal.RoleAdmin)
 		c.Next()
 	})
-	adminRouter.POST("/admin/rewards/codes", handler.CreateRewardCode)
-	adminRouter.POST("/admin/rewards/codes/search", handler.SearchRewardCodes)
-	adminRouter.PATCH("/admin/rewards/codes/:id", handler.UpdateRewardCode)
-	adminRouter.PATCH("/admin/rewards/codes/:id/enabled", handler.SetRewardCodeEnabled)
-	adminRouter.DELETE("/admin/rewards/codes/:id", handler.DeleteRewardCode)
+	adminRouter.POST("/admin/rewards/codes", adminCommandHandler.CreateRewardCode)
+	adminRouter.POST("/admin/rewards/codes/search", adminReadHandler.SearchRewardCodes)
+	adminRouter.PATCH("/admin/rewards/codes/:id", adminCommandHandler.UpdateRewardCode)
+	adminRouter.PATCH("/admin/rewards/codes/:id/enabled", adminCommandHandler.SetRewardCodeEnabled)
+	adminRouter.DELETE("/admin/rewards/codes/:id", adminCommandHandler.DeleteRewardCode)
 
 	request := map[string]any{
 		"display_name":    "HTTP 新用户奖励",
@@ -209,8 +211,8 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 		testsupport.SetPrincipal(t, c, 3, principal.RoleUser)
 		c.Next()
 	})
-	userRouter.POST("/user/rewards/redeem", handler.Redeem)
-	userRouter.GET("/user/rewards/redemptions", handler.ListRedemptions)
+	userRouter.POST("/user/rewards/redeem", userHandler.Redeem)
+	userRouter.GET("/user/rewards/redemptions", userHandler.ListRedemptions)
 	redeemed, redeemRecorder := performRewardRequestWithRecorder[RedeemResult](
 		t, userRouter, http.MethodPost, "/user/rewards/redeem", map[string]any{"code": "HTTP-ROTATED-2026"}, http.StatusOK,
 	)
@@ -224,6 +226,11 @@ func TestRewardCodeAdminAndUserHTTPContract(t *testing.T) {
 	}
 	if err := json.Unmarshal(redeemRecorder.Body.Bytes(), &redeemPayload); err != nil {
 		t.Fatalf("decode redeem response: %v", err)
+	}
+	for _, field := range []string{"user_public_id", "display_name"} {
+		if _, found := redeemPayload.Data.Redemption[field]; !found {
+			t.Fatalf("redeem redemption omitted contract field %q", field)
+		}
 	}
 	for _, field := range []string{"reward_code_display_name", "masked_code_hint"} {
 		if _, found := redeemPayload.Data.Redemption[field]; found {

@@ -164,7 +164,7 @@ type adminPaymentOrderFilters struct {
 	limit        int
 }
 
-func (s *Service) ListAdminPaymentOrders(ctx context.Context, input AdminPaymentOrderListInput) (AdminPaymentOrderPage, error) {
+func (s *CheckoutWorkflow) ListAdminPaymentOrders(ctx context.Context, input AdminPaymentOrderListInput) (AdminPaymentOrderPage, error) {
 	if s == nil || s.checkoutStore == nil {
 		return AdminPaymentOrderPage{}, fmt.Errorf("payments admin read service unavailable")
 	}
@@ -175,7 +175,7 @@ func (s *Service) ListAdminPaymentOrders(ctx context.Context, input AdminPayment
 	return s.checkoutStore.listAdminPaymentOrders(ctx, filters)
 }
 
-func (s *Service) GetAdminPaymentOrder(ctx context.Context, orderNumber string) (AdminPaymentOrderDetail, error) {
+func (s *CheckoutWorkflow) GetAdminPaymentOrder(ctx context.Context, orderNumber string) (AdminPaymentOrderDetail, error) {
 	if s == nil || s.configuration == nil || s.checkoutStore == nil || s.convergenceStore == nil {
 		return AdminPaymentOrderDetail{}, fmt.Errorf("payments admin read service unavailable")
 	}
@@ -227,7 +227,7 @@ func (s *Service) GetAdminPaymentOrder(ctx context.Context, orderNumber string) 
 		})
 		durableStripeDisputeIDs[dispute.StripeDisputeID] = struct{}{}
 	}
-	if detail.Status == PaymentOrderCredited && detail.PaidAt != nil && s.now().UTC().Before(detail.PaidAt.Add(refundEligibilityWindow)) && s.wallets != nil {
+	if detail.Status == PaymentOrderCredited && detail.PaidAt != nil && s.runtime.now().UTC().Before(detail.PaidAt.Add(refundEligibilityWindow)) && s.wallets != nil {
 		remaining := detail.IdeaQuantity
 		for _, refund := range durableRefunds {
 			if refund.Status == PaymentRefundPending || refund.Status == PaymentRefundSucceeded || refund.Status == PaymentRefundAnomaly {

@@ -8,6 +8,7 @@ import (
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type Role string
@@ -23,31 +24,38 @@ const principalContextKey = "ideaboard.auth.principal"
 
 // Principal is the complete, validated identity of an authenticated request.
 type Principal struct {
-	userID     int64
-	authUserID string
-	role       Role
+	userID      int64
+	publicID    uuid.UUID
+	authUserID  string
+	displayName string
+	role        Role
 }
 
-func New(userID int64, authUserID, role string) (Principal, error) {
+func New(userID int64, publicID uuid.UUID, authUserID, displayName, role string) (Principal, error) {
 	authUserID = strings.TrimSpace(authUserID)
+	displayName = strings.TrimSpace(displayName)
 	parsedRole, ok := parseRole(role)
-	if userID <= 0 || authUserID == "" || !ok {
+	if userID <= 0 || publicID == uuid.Nil || authUserID == "" || displayName == "" || !ok {
 		return Principal{}, ErrInvalid
 	}
 	return Principal{
-		userID:     userID,
-		authUserID: authUserID,
-		role:       parsedRole,
+		userID:      userID,
+		publicID:    publicID,
+		authUserID:  authUserID,
+		displayName: displayName,
+		role:        parsedRole,
 	}, nil
 }
 
-func (p Principal) UserID() int64      { return p.userID }
-func (p Principal) AuthUserID() string { return p.authUserID }
-func (p Principal) Role() Role         { return p.role }
-func (p Principal) IsAdmin() bool      { return p.role == RoleAdmin }
-func (p Principal) IsValid() bool      { return isValidPrincipal(p) }
-func (role Role) IsValid() bool        { return role == RoleUser || role == RoleAdmin }
-func (role Role) String() string       { return string(role) }
+func (p Principal) UserID() int64       { return p.userID }
+func (p Principal) PublicID() uuid.UUID { return p.publicID }
+func (p Principal) AuthUserID() string  { return p.authUserID }
+func (p Principal) DisplayName() string { return p.displayName }
+func (p Principal) Role() Role          { return p.role }
+func (p Principal) IsAdmin() bool       { return p.role == RoleAdmin }
+func (p Principal) IsValid() bool       { return isValidPrincipal(p) }
+func (role Role) IsValid() bool         { return role == RoleUser || role == RoleAdmin }
+func (role Role) String() string        { return string(role) }
 func parseRole(value string) (Role, bool) {
 	role := Role(value)
 	return role, role.IsValid()
@@ -55,7 +63,9 @@ func parseRole(value string) (Role, bool) {
 
 func isValidPrincipal(principal Principal) bool {
 	return principal.userID > 0 &&
+		principal.publicID != uuid.Nil &&
 		principal.authUserID != "" && principal.authUserID == strings.TrimSpace(principal.authUserID) &&
+		principal.displayName != "" && principal.displayName == strings.TrimSpace(principal.displayName) &&
 		principal.role.IsValid()
 }
 

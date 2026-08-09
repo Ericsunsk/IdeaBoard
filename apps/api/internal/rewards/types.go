@@ -141,6 +141,16 @@ type AdminRedemptionDetail struct {
 	MaskedCodeHint      string    `json:"masked_code_hint"`
 }
 
+type IdentityProjection struct {
+	PublicID    uuid.UUID
+	DisplayName string
+}
+
+type IdentityProjectionReader interface {
+	ResolveIdentity(context.Context, int64) (IdentityProjection, error)
+	ResolveIdentities(context.Context, []int64) (map[int64]IdentityProjection, error)
+}
+
 type Redemption struct {
 	ID                    int64     `json:"id"`
 	RewardCodeID          int64     `json:"reward_code_id"`
