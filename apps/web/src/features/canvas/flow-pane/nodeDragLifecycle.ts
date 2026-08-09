@@ -1,12 +1,12 @@
 import type { NodeChange } from '@vue-flow/core'
 import {
   stageCanvasGraphNodeDragIntent,
+  type CanvasGraphStore,
   type CanvasGraphTransaction,
 } from '../graph-runtime'
 
 export type CanvasNodeDragChange =
-  | Extract<NodeChange, { type: 'position' }>
-  | Extract<NodeChange, { type: 'select' }>
+  Extract<NodeChange, { type: 'position' }> | Extract<NodeChange, { type: 'select' }>
 
 export type CanvasNodeDragLifecycle = {
   begin: () => void
@@ -17,7 +17,10 @@ export type CanvasNodeDragLifecycle = {
 }
 
 export type CanvasNodeDragLifecycleOptions<HistorySnapshot> = {
-  createTransaction: () => CanvasGraphTransaction
+  createCommand: () => {
+    store: CanvasGraphStore
+    transaction: CanvasGraphTransaction
+  }
   projectChanges: (changes: CanvasNodeDragChange[]) => void
   syncChanges: (changes: CanvasNodeDragChange[]) => void
   captureHistory: () => HistorySnapshot
@@ -25,7 +28,7 @@ export type CanvasNodeDragLifecycleOptions<HistorySnapshot> = {
   advanceLocalEditVersion: () => void
   markDirtyAndScheduleAutosave: () => void
   onBegin: () => void
-  reconcileMembership: (changes: CanvasNodeDragChange[]) => void
+  reconcileMembership: (store: CanvasGraphStore, changes: CanvasNodeDragChange[]) => void
   scheduleAnimationFrame?: (callback: FrameRequestCallback) => number
   cancelAnimationFrame?: (handle: number) => void
 }
@@ -53,6 +56,7 @@ export function createCanvasNodeDragLifecycle<HistorySnapshot>(
     options.cancelAnimationFrame ?? ((handle) => window.cancelAnimationFrame(handle))
 
   let activeDrag: {
+    store: CanvasGraphStore
     transaction: CanvasGraphTransaction
     historyBefore: HistorySnapshot
   } | null = null
@@ -107,15 +111,15 @@ export function createCanvasNodeDragLifecycle<HistorySnapshot>(
   function begin() {
     if (activeDrag) cancel()
     options.onBegin()
-    const transaction = options.createTransaction()
+    const command = options.createCommand()
     try {
       activeDrag = {
-        transaction,
+        ...command,
         historyBefore: options.captureHistory(),
       }
     } catch (error) {
       try {
-        transaction.cancel()
+        command.transaction.cancel()
       } finally {
         reset()
       }
@@ -165,7 +169,7 @@ export function createCanvasNodeDragLifecycle<HistorySnapshot>(
       syncProjection()
       drag.transaction.commit()
       didCommitTransaction = true
-      options.reconcileMembership(committedChanges)
+      options.reconcileMembership(drag.store, committedChanges)
       if (options.commitHistory(drag.historyBefore)) {
         options.markDirtyAndScheduleAutosave()
       }

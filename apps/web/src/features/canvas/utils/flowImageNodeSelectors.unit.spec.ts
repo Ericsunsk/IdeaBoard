@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import type { ImageNodeItem } from '../../canvas-board/domain'
+import { resolveImageNodeLatestOutput, type ImageNodeItem } from '../../canvas-board/domain'
 import {
   DEFAULT_IMAGE_NODE_LAYOUT_WIDTH,
   resolveImageNodeDisplayPayload,
   resolveImageNodeLayoutAnchor,
-  resolveImageNodeLatestOutput,
 } from './flowImageNodeSelectors'
 
 function makeImageNode(overrides: Partial<ImageNodeItem> = {}): ImageNodeItem {

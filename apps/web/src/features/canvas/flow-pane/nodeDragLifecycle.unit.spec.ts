@@ -28,7 +28,7 @@ function createHarness() {
   let nextFrameId = 1
 
   const lifecycle = createCanvasNodeDragLifecycle({
-    createTransaction: () => store.beginTransaction('node-drag'),
+    createCommand: () => ({ store, transaction: store.beginTransaction('node-drag') }),
     projectChanges: (changes) => projectedChanges.push(changes),
     syncChanges: (changes) => syncedChanges.push(changes),
     captureHistory: () => {
@@ -43,7 +43,8 @@ function createHarness() {
     advanceLocalEditVersion: () => lifecycleOrder.push('local-edit'),
     markDirtyAndScheduleAutosave: () => lifecycleOrder.push('dirty'),
     onBegin: () => lifecycleOrder.push('begin'),
-    reconcileMembership: (changes) => {
+    reconcileMembership: (committedStore, changes) => {
+      expect(committedStore).toBe(store)
       committedMembershipChanges.push(changes)
       lifecycleOrder.push(`membership:${store.getNode('prompt-1')?.snapshot.x}`)
     },

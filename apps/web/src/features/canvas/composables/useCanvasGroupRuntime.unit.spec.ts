@@ -147,7 +147,7 @@ describe('useCanvasGroupRuntime', () => {
         x: 30,
         y: 30,
         width: 660,
-        height: 300,
+        height: 322,
       },
     ])
     expect(harness.runtime.internal.selectedGroupId.value).toBe('group-1')

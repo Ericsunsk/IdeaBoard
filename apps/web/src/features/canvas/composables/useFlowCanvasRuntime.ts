@@ -284,7 +284,13 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   })
 
   const nodeDragLifecycle: CanvasNodeDragLifecycle = createCanvasNodeDragLifecycle({
-    createTransaction: () => createCurrentCanvasGraphStore().beginTransaction('node-drag'),
+    createCommand: () => {
+      const store = createCurrentCanvasGraphStore()
+      return {
+        store,
+        transaction: store.beginTransaction('node-drag'),
+      }
+    },
     projectChanges: (changes) => graphAdapter.projectNodeChanges(changes),
     syncChanges: (changes) =>
       graphAdapter.syncProjectedNodeChanges(

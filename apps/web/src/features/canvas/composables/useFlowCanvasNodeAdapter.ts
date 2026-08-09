@@ -1,12 +1,14 @@
 import { computed } from 'vue'
-import type { FusionNodeItem, ImageNodeItem, PromptNodeItem } from '../../canvas-board/domain'
+import {
+  resolveImageNodeDisplayRatio,
+  resolveImageNodeStageHeight,
+  type FusionNodeItem,
+  type ImageNodeItem,
+  type PromptNodeItem,
+} from '../../canvas-board/domain'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
-import { resolveImageNodeStageHeight } from '../../canvas-board/domain'
-import {
-  resolveImageNodeDisplayPayload,
-  resolveImageNodeDisplayRatio,
-} from '../utils/flowImageNodeSelectors'
+import { resolveImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
 
 interface UseFlowCanvasNodeAdapterOptions {
   data: () => FlowNodeData

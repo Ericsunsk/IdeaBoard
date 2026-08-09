@@ -1357,6 +1357,79 @@ describe('useFlowCanvasRuntime', () => {
     expect(readNodePosition(harness.fullNodes.value, 'prompt-1')).toEqual({ x: 400, y: 40 })
   })
 
+  it('keeps group drag and resize transient until commit and discards them on cancel', async () => {
+    const snapshot = createSnapshot()
+    const originalGroup = createGroup('group-1', ['image-1', 'prompt-1'])
+    snapshot.groups = [originalGroup]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    const grouping = harness.runtime.graphRuntime.grouping
+
+    expect(grouping.commands.groupDrag.begin({ x: 350, y: 80 })).toBe(true)
+    expect(grouping.commands.groupDrag.move({ x: 450, y: 120 })).toBe(true)
+    expect(grouping.view.groupFrames.value[0]?.bounds.left).toBe(SAMPLE_GROUP_GEOMETRY.x + 100)
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([originalGroup])
+    expect(grouping.commands.groupDrag.cancel()).toBe(true)
+
+    expect(readNodePosition(harness.fullNodes.value, 'image-1')).toEqual({ x: 40, y: 40 })
+    expect(readNodePosition(harness.fullNodes.value, 'prompt-1')).toEqual({ x: 400, y: 40 })
+    expect(grouping.view.groupFrames.value[0]?.bounds.left).toBe(SAMPLE_GROUP_GEOMETRY.x)
+
+    expect(
+      grouping.commands.groupResize.begin('group-1', 'e', {
+        x: 720,
+        y: 80,
+      }),
+    ).toBe(true)
+    expect(grouping.commands.groupResize.move({ x: 920, y: 80 })).toBe(true)
+    expect(grouping.view.groupFrames.value[0]?.bounds.width).toBe(SAMPLE_GROUP_GEOMETRY.width + 200)
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([originalGroup])
+    expect(grouping.commands.groupResize.cancel()).toBe(true)
+
+    expect(grouping.view.groupFrames.value[0]?.bounds.width).toBe(SAMPLE_GROUP_GEOMETRY.width)
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([originalGroup])
+    expect(harness.isDirty.value).toBe(false)
+    await harness.runtime.flushAutosave({ silent: true })
+    expect(harness.savedSnapshots).toEqual([])
+  })
+
+  it('treats gestures that return to their origin as no-ops and owns gesture cleanup', async () => {
+    const snapshot = createSnapshot()
+    snapshot.groups = [createGroup('group-1', ['image-1', 'prompt-1'])]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    const grouping = harness.runtime.graphRuntime.grouping
+
+    expect(grouping.commands.groupDrag.begin({ x: 350, y: 80 })).toBe(true)
+    expect(grouping.commands.groupDrag.begin({ x: 350, y: 80 })).toBe(false)
+    expect(grouping.commands.groupResize.begin('group-1', 'e', { x: 720, y: 80 })).toBe(false)
+    expect(grouping.commands.groupDrag.move({ x: 450, y: 120 })).toBe(true)
+    expect(grouping.commands.groupDrag.move({ x: 350, y: 80 })).toBe(true)
+    expect(grouping.commands.groupDrag.commit()).toBe(false)
+
+    expect(readNodePosition(harness.fullNodes.value, 'image-1')).toEqual({ x: 40, y: 40 })
+    expect(readNodePosition(harness.fullNodes.value, 'prompt-1')).toEqual({ x: 400, y: 40 })
+    expect(grouping.commands.groupResize.begin('group-1', 'e', { x: 720, y: 80 })).toBe(true)
+    expect(grouping.commands.groupResize.move({ x: 920, y: 80 })).toBe(true)
+    expect(grouping.commands.groupResize.move({ x: 720, y: 80 })).toBe(true)
+    expect(grouping.commands.groupResize.commit()).toBe(false)
+
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1', 'prompt-1']),
+    ])
+    expect(harness.isDirty.value).toBe(false)
+    await harness.runtime.flushAutosave({ silent: true })
+    expect(harness.savedSnapshots).toEqual([])
+
+    expect(grouping.commands.groupDrag.begin({ x: 350, y: 80 })).toBe(true)
+    grouping.internal.resetTransientSelectionState()
+    expect(grouping.commands.groupDrag.commit()).toBe(false)
+    expect(grouping.commands.groupResize.begin('group-1', 'e', { x: 720, y: 80 })).toBe(true)
+    expect(grouping.commands.groupResize.cancel()).toBe(true)
+  })
+
   it('does not auto-join covered external nodes on group drag and joins a pending node only after click', async () => {
     const snapshot = createSnapshot()
     snapshot.groups = [createGroup('group-1', ['image-1', 'prompt-1'])]
@@ -1550,6 +1623,31 @@ describe('useFlowCanvasRuntime', () => {
     ])
     expect(readNodePosition(harness.fullNodes.value, 'image-1')).toEqual({ x: 40, y: 40 })
     expect(readNodePosition(harness.fullNodes.value, 'prompt-1')).toEqual({ x: 400, y: 40 })
+  })
+
+  it('uses the Graph snapshot rather than a divergent Flow projection for resize membership', async () => {
+    const snapshot = createSnapshot()
+    snapshot.groups = [createGroup('group-1', ['image-1', 'prompt-1'])]
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.loadInitialOrRouteBoard()
+    await nextTick()
+    const grouping = harness.runtime.graphRuntime.grouping
+
+    expect(grouping.commands.groupResize.begin('group-1', 'e', { x: 720, y: 80 })).toBe(true)
+    const promptNode = harness.fullNodes.value.find((node) => node.id === 'prompt-1')
+    expect(promptNode).toBeDefined()
+    if (promptNode) promptNode.position = { x: 40, y: 40 }
+    expect(grouping.commands.groupResize.move({ x: 350, y: 80 })).toBe(true)
+    expect(grouping.commands.groupResize.commit()).toBe(true)
+
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([
+      createGroup('group-1', ['image-1'], {
+        x: SAMPLE_GROUP_GEOMETRY.x,
+        y: SAMPLE_GROUP_GEOMETRY.y,
+        width: SAMPLE_GROUP_GEOMETRY.width - 370,
+        height: SAMPLE_GROUP_GEOMETRY.height,
+      }),
+    ])
   })
 
   it('updates group membership when a node is dragged out or in', async () => {

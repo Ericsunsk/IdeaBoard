@@ -1,4 +1,8 @@
-import type { ImageNodeItem, ImageNodeOutputItem } from '../../canvas-board/domain'
+import {
+  resolveImageNodeDisplayRatio,
+  resolveImageNodeLatestOutput,
+  type ImageNodeItem,
+} from '../../canvas-board/domain'
 
 export type ImageNodeDisplayPayload = {
   url: string
@@ -26,29 +30,11 @@ type ResolveImageNodeLayoutAnchorOptions = {
 
 export const DEFAULT_IMAGE_NODE_LAYOUT_WIDTH = 280
 
-export function resolveImageNodeLatestOutput(
-  imageNode: Pick<ImageNodeItem, 'outputImages'>,
-): ImageNodeOutputItem | null {
-  const outputs = Array.isArray(imageNode.outputImages) ? imageNode.outputImages : []
-  return outputs.length > 0 ? outputs[outputs.length - 1] : null
-}
-
 export function resolveImageNodeDisplayUrl(
   imageNode: Pick<ImageNodeItem, 'sourceImageUrl' | 'outputImages'>,
 ): string {
   const latestOutput = resolveImageNodeLatestOutput(imageNode)
   return `${latestOutput?.url || imageNode.sourceImageUrl || ''}`.trim()
-}
-
-export function resolveImageNodeDisplayRatio(
-  imageNode: Pick<ImageNodeItem, 'sourceImageRatio' | 'outputImages'>,
-): number {
-  const latestOutput = resolveImageNodeLatestOutput(imageNode)
-  const outputRatio = Number(latestOutput?.ratio)
-  if (Number.isFinite(outputRatio) && outputRatio > 0) return outputRatio
-
-  const sourceRatio = Number(imageNode.sourceImageRatio)
-  return Number.isFinite(sourceRatio) && sourceRatio > 0 ? sourceRatio : 1
 }
 
 export function resolveImageNodeDisplayPayload(
@@ -60,7 +46,9 @@ export function resolveImageNodeDisplayPayload(
   const url = resolveImageNodeDisplayUrl(imageNode)
   if (!url) return null
   const latestOutput = resolveImageNodeLatestOutput(imageNode)
-  const mediaAssetId = Number(latestOutput ? latestOutput.mediaAssetId : imageNode.sourceMediaAssetId)
+  const mediaAssetId = Number(
+    latestOutput ? latestOutput.mediaAssetId : imageNode.sourceMediaAssetId,
+  )
   return {
     url,
     ratio: resolveImageNodeDisplayRatio(imageNode),

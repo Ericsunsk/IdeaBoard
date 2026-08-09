@@ -955,9 +955,10 @@ export class CanvasGraphTransaction {
 
   commit(): CanvasGraphTransactionSummary {
     this.assertOpen()
-    this.status = 'committed'
+    const summary = createSummary(this.reason, this.options, this.draft, this.changes)
     this.store._commitDraftState(this.draft)
-    return createSummary(this.reason, this.options, this.draft, this.changes)
+    this.status = 'committed'
+    return summary
   }
 
   cancel(): CanvasGraphTransactionSummary {

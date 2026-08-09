@@ -1,11 +1,12 @@
 import {
   isCanvasConnectionNodeType,
   isCanvasImageInputSourceNodeType,
+  resolveImageNodeDisplayRatio,
   type CanvasConnectionNodeType,
   type ImageNodeItem,
   type ImageNodeOutputItem,
 } from '../../canvas-board/domain'
-import { resolveImageNodeDisplayRatio, resolveImageNodeDisplayUrl } from './flowImageNodeSelectors'
+import { resolveImageNodeDisplayUrl } from './flowImageNodeSelectors'
 
 export interface FlowExecutionGraphOptions {
   nodes: Array<{

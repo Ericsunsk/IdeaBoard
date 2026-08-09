@@ -8,6 +8,22 @@ export type ImageNodeFrameSize = {
   height: number
 }
 
+export function resolveImageNodeLatestOutput(
+  imageNode: Pick<ImageNodeItem, 'outputImages'>,
+): ImageNodeOutputItem | null {
+  const outputs = Array.isArray(imageNode.outputImages) ? imageNode.outputImages : []
+  return outputs.length > 0 ? outputs[outputs.length - 1] : null
+}
+
+export function resolveImageNodeDisplayRatio(
+  imageNode: Pick<ImageNodeItem, 'sourceImageRatio' | 'outputImages'>,
+): number {
+  const latestOutput = resolveImageNodeLatestOutput(imageNode)
+  const outputRatio = Number(latestOutput?.ratio)
+  if (Number.isFinite(outputRatio) && outputRatio > 0) return outputRatio
+  return normalizeImageNodeRatio(imageNode.sourceImageRatio)
+}
+
 export function normalizeImageNodeRatio(value: unknown): number {
   const ratio = Number(value)
   return Number.isFinite(ratio) && ratio > 0 ? ratio : 1
@@ -56,3 +72,4 @@ export function resolveImageNodeStageHeight(
   const safeWidth = Number.isFinite(width) && width > 0 ? width : IMAGE_NODE_EMPTY_SIZE
   return Math.max(1, Math.round(safeWidth * normalizeImageNodeRatio(ratioValue)))
 }
+import type { ImageNodeItem, ImageNodeOutputItem } from './canvasNodes'
