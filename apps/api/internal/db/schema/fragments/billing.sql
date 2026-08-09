@@ -65,7 +65,6 @@ $_$;
 
 CREATE FUNCTION guard_task_billing_settlement_transition() RETURNS trigger
     LANGUAGE plpgsql
-    SET search_path TO 'public', 'pg_catalog', 'pg_temp'
     AS $$
 DECLARE
   snapshot_total BIGINT;
@@ -121,7 +120,6 @@ $$;
 
 CREATE FUNCTION guard_task_submission_claim() RETURNS trigger
     LANGUAGE plpgsql
-    SET search_path TO 'public', 'pg_catalog', 'pg_temp'
     AS $$
 DECLARE
   valid_claim BOOLEAN;
@@ -389,7 +387,6 @@ $_$;
 
 CREATE FUNCTION validate_task_billing_snapshot_insert() RETURNS trigger
     LANGUAGE plpgsql
-    SET search_path TO 'public', 'pg_catalog', 'pg_temp'
     AS $$
 DECLARE
   valid_hold BOOLEAN;

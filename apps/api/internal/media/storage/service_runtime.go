@@ -493,7 +493,9 @@ func publicUploadURLWithOrigins(publicOrigins config.PublicOriginsConfig, object
 	normalized := "/" + strings.TrimLeft(filepath.ToSlash(objectKey), "/")
 	base := resolvePublicUploadBaseURL(publicOrigins)
 	if base == nil {
-		return ""
+		// Local storage remains addressable in development and same-origin
+		// deployments even when an absolute API origin is not configured.
+		return normalized
 	}
 	out := *base
 	out.Path = path.Join(base.Path, normalized)
