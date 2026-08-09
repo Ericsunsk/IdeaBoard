@@ -152,6 +152,8 @@ func inspectBuiltinSeed(ctx context.Context, conn *sql.Conn, contract schemaCont
 
 var (
 	catalogArrayComparisonPattern       = regexp.MustCompile(`\b(ANY|ALL) \(\(ARRAY\[([^]]*)\]\)\)`)
+	catalogArrayTextCast                = regexp.MustCompile(`(\(?\s*ARRAY\[[^]]*\]\s*\)?)::text\[\]`)
+	catalogVarcharLiteralCast           = regexp.MustCompile(`('(?:''|[^'])*')::character varying(?:::text)?`)
 	catalogParenthesizedTextLiteralCast = regexp.MustCompile(`\(('(?:''|[^'])*')\)::text`)
 )
 
@@ -176,9 +178,8 @@ func normalizeCatalogExpression(property catalogProperty, value string) string {
 	// varchar-to-text cast either on each element or on the array. Normalize
 	// only that known PostgreSQL representation difference; operators, values,
 	// grouping, and all other casts remain part of the compared contract.
-	value = strings.ReplaceAll(value, "::character varying::text", "")
-	value = strings.ReplaceAll(value, "::character varying", "")
-	value = strings.ReplaceAll(value, "::text[]", "")
+	value = catalogVarcharLiteralCast.ReplaceAllString(value, "$1")
+	value = catalogArrayTextCast.ReplaceAllString(value, "$1")
 	value = catalogParenthesizedTextLiteralCast.ReplaceAllString(value, "$1")
 	return catalogArrayComparisonPattern.ReplaceAllString(value, "$1 (ARRAY[$2])")
 }
