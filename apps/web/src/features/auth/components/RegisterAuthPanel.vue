@@ -198,12 +198,47 @@
           v-bind="submitControlState"
           fluid
         />
+
+        <p class="m-0 text-center text-[12px] leading-5 text-[var(--color-ib-auth-subtle)]">
+          创建账号即表示你已年满 18 岁。请先阅读
+          <RouterLink
+            :to="TERMS_PATH"
+            target="_blank"
+            class="rounded-[var(--radius-ib-control)] font-semibold text-[var(--color-ib-auth-link)] no-underline focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-auth-focus)]"
+          >
+            Terms
+          </RouterLink>
+          和
+          <RouterLink
+            :to="PRIVACY_POLICY_PATH"
+            target="_blank"
+            class="rounded-[var(--radius-ib-control)] font-semibold text-[var(--color-ib-auth-link)] no-underline focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-auth-focus)]"
+          >
+            Privacy Policy
+          </RouterLink>
+          。
+        </p>
       </form>
 
-      <form v-else class="relative z-[1] flex flex-col gap-4" novalidate @submit.prevent="handleVerifyOTP">
-        <p class="text-sm text-slate-600">验证码已发送到 {{ formValue.email }}，请输入 6 位验证码完成注册。</p>
+      <form
+        v-else
+        class="relative z-[1] flex flex-col gap-4"
+        novalidate
+        @submit.prevent="handleVerifyOTP"
+      >
+        <p class="text-sm text-slate-600">
+          验证码已发送到 {{ formValue.email }}，请输入 6 位验证码完成注册。
+        </p>
         <IbFormField
-          v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
+          v-slot="{
+            ariaInvalid,
+            describedbyId,
+            fieldId,
+            inlineError,
+            inlineErrorText,
+            invalid,
+            required,
+          }"
           label="Email 验证码"
           :error="otpError"
           field-id="register-otp"
@@ -264,6 +299,7 @@ import { useUserStore } from '../session/authSession'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
+import { PRIVACY_POLICY_PATH, TERMS_PATH } from '../../../shared/constants/routePaths'
 import IbFormField from '../../../shared/components/IbFormField.vue'
 import { useAuthFeedback } from '../useAuthFeedback'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'

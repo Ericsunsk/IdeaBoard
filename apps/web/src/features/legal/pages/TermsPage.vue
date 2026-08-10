@@ -1,15 +1,18 @@
 <template>
-  <PublicLegalPage title="Terms of Service" :version="TERMS_VERSION">
+  <PublicLegalPage title="Terms of Service" :version="LEGAL_DOCUMENT_VERSIONS.terms">
     <p>
-      By using IdeaBoard, you agree to these Terms of Service. Please read them before purchasing or
-      using Ideas.
+      These Terms of Service govern your access to and use of IdeaBoard. IdeaBoard is operated by
+      Shikang Sun under the trade name Eric Studio. By accessing or using IdeaBoard, you agree to
+      these Terms. Please read them before purchasing or using Ideas.
     </p>
 
-    <h2>1. Service and Accounts</h2>
+    <h2>1. Eligibility, Service, and Accounts</h2>
     <p>
-      You are responsible for keeping your account secure and for activity performed through it. You
-      may not use the service to violate another person's rights, bypass security measures, or
-      engage in unlawful activity.
+      You must be at least 18 years old. You are responsible for keeping your account secure and for
+      activity performed through it. Boards are private by default. An owner may enable an unlisted
+      share link; anyone with that link may view the shared content, but editing requires an
+      authenticated invitation. You may not use the service to violate another person's rights,
+      bypass security measures, or engage in unlawful activity.
     </p>
 
     <h2>2. Ideas and Purchases</h2>
@@ -27,11 +30,14 @@
       payment succeeded. Ideas are credited only after the system confirms the Stripe payment.
     </p>
 
-    <h2>4. AI Content</h2>
+    <h2>4. User Content and AI Content</h2>
     <p>
-      AI output may be inaccurate or unsuitable for a particular purpose. You must review output
-      before using, publishing, or relying on it, and ensure that your inputs and use comply with
-      applicable law and third-party rights.
+      You retain your rights in your inputs and outputs to the extent provided by applicable law.
+      You grant IdeaBoard only the limited license needed to host, process, transmit, render, and
+      share content at your direction. User content is not sold or used to train AI models unless a
+      future separate opt-in explicitly says otherwise. AI output may be inaccurate or unsuitable
+      for a particular purpose. You must review output before using, publishing, or relying on it,
+      and ensure that your inputs and use comply with applicable law and third-party rights.
     </p>
 
     <h2>5. Service Restrictions</h2>
@@ -49,14 +55,16 @@
 
     <h2>7. Contact Us</h2>
     <p>
-      If you have questions about your account, a purchase, or these Terms, contact the
-      administrator through the in-product support channel.
+      For account and purchase support, contact
+      <a :href="`mailto:${LEGAL_CONTACTS.support}`">{{ LEGAL_CONTACTS.support }}</a
+      >. Legal notices may be sent to
+      <a :href="`mailto:${LEGAL_CONTACTS.legal}`">{{ LEGAL_CONTACTS.legal }}</a
+      >.
     </p>
   </PublicLegalPage>
 </template>
 
 <script setup lang="ts">
 import PublicLegalPage from '../components/PublicLegalPage.vue'
-
-const TERMS_VERSION = '2026-08-01'
+import { LEGAL_CONTACTS, LEGAL_DOCUMENT_VERSIONS } from '../legalDocuments'
 </script>

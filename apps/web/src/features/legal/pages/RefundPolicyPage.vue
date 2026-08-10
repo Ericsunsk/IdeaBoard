@@ -1,5 +1,5 @@
 <template>
-  <PublicLegalPage title="Refund Policy" :version="REFUND_POLICY_VERSION">
+  <PublicLegalPage title="Refund Policy" :version="LEGAL_DOCUMENT_VERSIONS.refund">
     <p>This policy applies to Ideas purchased through IdeaBoard Stripe Checkout.</p>
 
     <h2>1. Request Window</h2>
@@ -40,13 +40,13 @@
     <p>
       When contacting us, provide your account information and the transaction time shown in your
       recharge history. Do not send your card number, verification code, or other sensitive payment
-      information.
+      information. Contact
+      <a :href="`mailto:${LEGAL_CONTACTS.support}`">{{ LEGAL_CONTACTS.support }}</a> for support.
     </p>
   </PublicLegalPage>
 </template>
 
 <script setup lang="ts">
 import PublicLegalPage from '../components/PublicLegalPage.vue'
-
-const REFUND_POLICY_VERSION = '2026-08-01'
+import { LEGAL_CONTACTS, LEGAL_DOCUMENT_VERSIONS } from '../legalDocuments'
 </script>

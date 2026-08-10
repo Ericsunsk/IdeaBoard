@@ -1,5 +1,5 @@
 <template>
-  <PublicLegalPage title="Privacy Policy" :version="PRIVACY_POLICY_VERSION">
+  <PublicLegalPage title="Privacy Policy" :version="LEGAL_DOCUMENT_VERSIONS.privacy">
     <p>
       IdeaBoard takes your privacy seriously. This policy explains how we collect, use, store, and
       protect your personal information.
@@ -75,14 +75,16 @@
 
     <h2>6. Contact Us</h2>
     <p>
-      If you have questions about this Privacy Policy or a data-privacy request, contact the
-      administrator through the in-product support channel or official email address.
+      For privacy and data-rights requests, contact
+      <a :href="`mailto:${LEGAL_CONTACTS.privacy}`">{{ LEGAL_CONTACTS.privacy }}</a
+      >. For general support, contact
+      <a :href="`mailto:${LEGAL_CONTACTS.support}`">{{ LEGAL_CONTACTS.support }}</a
+      >.
     </p>
   </PublicLegalPage>
 </template>
 
 <script setup lang="ts">
 import PublicLegalPage from '../components/PublicLegalPage.vue'
-
-const PRIVACY_POLICY_VERSION = '2026-08-01'
+import { LEGAL_CONTACTS, LEGAL_DOCUMENT_VERSIONS } from '../legalDocuments'
 </script>

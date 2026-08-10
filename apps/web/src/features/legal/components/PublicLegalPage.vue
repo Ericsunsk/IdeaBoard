@@ -30,13 +30,27 @@
           >
             {{ title }}
           </h1>
-          <p class="mt-3 mb-0 text-sm text-ib-text-muted">Version: {{ version }}</p>
+          <p class="mt-3 mb-0 text-sm text-ib-text-muted">Effective date: {{ version }}</p>
         </header>
 
         <div class="legal-copy pt-7 text-[15px] leading-7 text-ib-text-muted">
           <slot />
         </div>
       </article>
+
+      <nav
+        aria-label="Legal links"
+        class="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-2 text-[13px] font-medium text-ib-text-muted"
+      >
+        <RouterLink
+          v-for="link in legalLinks"
+          :key="link.to"
+          :to="link.to"
+          class="rounded-[var(--radius-ib-control)] no-underline transition-colors hover:text-ib-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]"
+        >
+          {{ link.label }}
+        </RouterLink>
+      </nav>
     </main>
   </div>
 </template>
@@ -44,10 +58,13 @@
 <script setup lang="ts">
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
+import { PUBLIC_LEGAL_LINKS } from '../../../shared/constants/legalLinks'
 
 defineProps<{ title: string; version: string }>()
 
 const { projectName } = useSiteBranding()
+
+const legalLinks = PUBLIC_LEGAL_LINKS
 </script>
 
 <style scoped>

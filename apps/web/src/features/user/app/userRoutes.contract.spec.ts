@@ -31,6 +31,7 @@ describe('userRoutes contract', () => {
   it('preserves route paths, names, and access metadata', () => {
     const termsRoute = requireRoute(userRoutes, '/terms')
     const refundPolicyRoute = requireRoute(userRoutes, '/refund-policy')
+    const acceptableUseRoute = requireRoute(userRoutes, '/acceptable-use')
     const shareRoute = requireRoute(userRoutes, '/share')
     const userRootRoute = requireRoute(userRoutes, '/user')
 
@@ -49,6 +50,10 @@ describe('userRoutes contract', () => {
     })
     expect({ name: refundPolicyRoute.name, meta: refundPolicyRoute.meta }).toEqual({
       name: 'RefundPolicy',
+      meta: { public: true },
+    })
+    expect({ name: acceptableUseRoute.name, meta: acceptableUseRoute.meta }).toEqual({
+      name: 'AcceptableUse',
       meta: { public: true },
     })
     expect(
@@ -70,6 +75,9 @@ describe('userRoutes contract', () => {
   it('lazy-loads the real User layout and route page modules', async () => {
     const loadedTerms = await loadRouteComponent(requireRoute(userRoutes, '/terms'))
     const loadedRefundPolicy = await loadRouteComponent(requireRoute(userRoutes, '/refund-policy'))
+    const loadedAcceptableUse = await loadRouteComponent(
+      requireRoute(userRoutes, '/acceptable-use'),
+    )
     const userRootRoute = requireRoute(userRoutes, '/user')
     const children = userRootRoute.children ?? []
 
@@ -83,6 +91,9 @@ describe('userRoutes contract', () => {
     expect(loadedLayout).toBe(routeComponents.layout)
     expect((loadedTerms as Component & { __name?: string }).__name).toBe('TermsPage')
     expect((loadedRefundPolicy as Component & { __name?: string }).__name).toBe('RefundPolicyPage')
+    expect((loadedAcceptableUse as Component & { __name?: string }).__name).toBe(
+      'AcceptableUsePage',
+    )
     expect(loadedHome).toBe(routeComponents.home)
     expect(loadedLogin).toBe(routeComponents.home)
     expect(loadedRegister).toBe(routeComponents.home)
