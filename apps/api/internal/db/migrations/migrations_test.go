@@ -214,10 +214,13 @@ func TestMigrationLocksAreScopedPerSchema(t *testing.T) {
 }
 
 func TestMigrationLockKeyIsStableAndScoped(t *testing.T) {
-	if deriveMigrationLockKey("db", "schema") != deriveMigrationLockKey("db", "schema") {
+	databaseName, schemaName := "db", "schema"
+	first := deriveMigrationLockKey(databaseName, schemaName)
+	second := deriveMigrationLockKey(databaseName, schemaName)
+	if first != second {
 		t.Fatal("migration lock key is not stable")
 	}
-	if deriveMigrationLockKey("db", "schema") == deriveMigrationLockKey("db", "other") {
+	if first == deriveMigrationLockKey(databaseName, "other") {
 		t.Fatal("migration lock key ignores schema")
 	}
 }
@@ -406,39 +409,6 @@ func assertTableExists(t *testing.T, ctx context.Context, conn *sql.Conn, tableN
 	}
 }
 
-func assertRegprocedureExists(t *testing.T, ctx context.Context, conn *sql.Conn, signature string, want bool) {
-	t.Helper()
-	var exists bool
-	if err := conn.QueryRowContext(ctx, `SELECT to_regprocedure(format('%I.%s', current_schema(), $1::text)) IS NOT NULL`, signature).Scan(&exists); err != nil {
-		t.Fatal(err)
-	}
-	if exists != want {
-		t.Fatalf("function %s exists=%v, want %v", signature, exists, want)
-	}
-}
-
-func assertFunctionSearchPath(t *testing.T, ctx context.Context, conn *sql.Conn, signature string) {
-	t.Helper()
-	var schemaName, configured string
-	if err := conn.QueryRowContext(ctx, `SELECT current_schema(), COALESCE(array_to_string(proconfig, ','), '') FROM pg_proc WHERE oid = to_regprocedure(format('%I.%s', current_schema(), $1::text))`, signature).Scan(&schemaName, &configured); err != nil {
-		t.Fatal(err)
-	}
-	if configured != "search_path="+schemaName+", pg_catalog, pg_temp" {
-		t.Fatalf("function %s search_path=%q", signature, configured)
-	}
-}
-
-func assertTriggerExists(t *testing.T, ctx context.Context, conn *sql.Conn, tableName, triggerName string) {
-	t.Helper()
-	var exists bool
-	if err := conn.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM pg_trigger tr JOIN pg_class c ON c.oid = tr.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = current_schema() AND c.relname = $1 AND tr.tgname = $2 AND NOT tr.tgisinternal)`, tableName, triggerName).Scan(&exists); err != nil {
-		t.Fatal(err)
-	}
-	if !exists {
-		t.Fatalf("trigger %s.%s is missing", tableName, triggerName)
-	}
-}
-
 func quoteIdentifier(identifier string) string {
 	return `"` + strings.ReplaceAll(identifier, `"`, `""`) + `"`
 }
@@ -450,15 +420,4 @@ func embeddedMigrationCount(t *testing.T) int {
 		t.Fatal(err)
 	}
 	return len(files)
-}
-
-func assertStorageProfileSeed(t *testing.T, ctx context.Context, conn *sql.Conn) {
-	t.Helper()
-	var count int
-	if err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM storage_profiles WHERE profile_id = 'builtin-local' AND provider = 'local' AND enabled AND is_current AND builtin AND status = 'active'`).Scan(&count); err != nil {
-		t.Fatal(err)
-	}
-	if count != 1 {
-		t.Fatalf("builtin storage profile rows=%d, want 1", count)
-	}
 }

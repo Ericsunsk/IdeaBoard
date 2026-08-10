@@ -160,6 +160,9 @@ func (s *creditReconciliationWorkerServiceStub) GetReconciliationRun(context.Con
 
 func TestCreditReconciliationDispatcherUsesCallerTransaction(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
+	if err := MigrateRiver(t.Context(), pool); err != nil {
+		t.Fatalf("MigrateRiver() error = %v", err)
+	}
 	producer, err := NewRiverProducer(pool)
 	if err != nil {
 		t.Fatalf("NewRiverProducer() error = %v", err)

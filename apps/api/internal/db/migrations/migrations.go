@@ -513,14 +513,6 @@ func missingQualifiedNames(required map[string][]string, present map[string]map[
 	return missing
 }
 
-func applyMigration(ctx context.Context, conn *sql.Conn, file string, statements []migrationStatement, version int64) error {
-	raw, err := migrationFS.ReadFile(path.Base(file))
-	if err != nil {
-		return fmt.Errorf("read migration %s for checksum: %w", file, err)
-	}
-	return applyMigrationWithChecksum(ctx, conn, file, statements, version, migrationChecksum(raw))
-}
-
 func applyMigrationWithChecksum(ctx context.Context, conn *sql.Conn, file string, statements []migrationStatement, version int64, checksum string) error {
 	if hasNoTxStatements(statements) {
 		return applyNoTxMigration(ctx, conn, file, statements, version, checksum)

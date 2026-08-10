@@ -78,10 +78,10 @@ type CheckoutWorkflow struct {
 
 func NewCheckoutWorkflow(deps CheckoutWorkflowDependencies) (*CheckoutWorkflow, error) {
 	if deps.Configuration == nil || deps.ConfigurationGateway == nil || deps.ShutdownEnqueuer == nil || deps.Store == nil || deps.CheckoutGateway == nil || deps.Wallets == nil || deps.Convergence == nil {
-		return nil, fmt.Errorf("Checkout workflow requires configuration, configuration gateway, shutdown enqueuer, store, Checkout gateway, wallet reader, and convergence store")
+		return nil, fmt.Errorf("checkout workflow requires configuration, configuration gateway, shutdown enqueuer, store, Checkout gateway, wallet reader, and convergence store")
 	}
 	if deps.Transitions == nil || deps.Transitions.orderLifecycle == nil || deps.Transitions.runtime == nil {
-		return nil, fmt.Errorf("Checkout workflow requires shared payment order transitions")
+		return nil, fmt.Errorf("checkout workflow requires shared payment order transitions")
 	}
 	return &CheckoutWorkflow{
 		configuration: deps.Configuration, configurationGateway: deps.ConfigurationGateway, shutdownEnqueuer: deps.ShutdownEnqueuer,
@@ -121,10 +121,10 @@ type StripeFactsWorkflow struct {
 
 func NewStripeFactsWorkflow(deps StripeFactsWorkflowDependencies) (*StripeFactsWorkflow, error) {
 	if deps.Configuration == nil || deps.Inbox == nil || deps.Convergence == nil || deps.Verifier == nil || deps.RefundGateway == nil || deps.DisputeGateway == nil || deps.CheckoutStore == nil || deps.CheckoutGateway == nil || deps.CheckoutRecovery == nil {
-		return nil, fmt.Errorf("Stripe facts workflow requires configuration, inbox, convergence store, verifier, refund gateway, dispute gateway, Checkout store, Checkout gateway, and Checkout recovery")
+		return nil, fmt.Errorf("stripe facts workflow requires configuration, inbox, convergence store, verifier, refund gateway, dispute gateway, Checkout store, Checkout gateway, and Checkout recovery")
 	}
 	if deps.Transitions == nil || deps.Transitions.orderLifecycle == nil || deps.Transitions.runtime == nil {
-		return nil, fmt.Errorf("Stripe facts workflow requires shared payment order transitions")
+		return nil, fmt.Errorf("stripe facts workflow requires shared payment order transitions")
 	}
 	return &StripeFactsWorkflow{configuration: deps.Configuration, webhookInbox: deps.Inbox, convergenceStore: deps.Convergence, refundGateway: deps.RefundGateway, disputeGateway: deps.DisputeGateway, checkoutStore: deps.CheckoutStore, checkoutGateway: deps.CheckoutGateway, orderLifecycle: deps.Transitions.orderLifecycle, checkoutRecovery: deps.CheckoutRecovery, verifier: deps.Verifier, runtime: deps.Transitions.runtime}, nil
 }
