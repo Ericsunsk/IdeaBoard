@@ -61,6 +61,10 @@ func newAppRouter(
 		BoardService:   services.boardService,
 		UploadSettings: services.runtimeSettings,
 	}
+	uploadReadAccess := storage.NewReadableUploadAccess(
+		uploadBoardAccessResolver{service: services.boardService},
+		uploadOwnerStorageUIDResolver{repo: repos.userRepo},
+	)
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -78,6 +82,10 @@ func newAppRouter(
 			PaymentUserHandler:        paymentUserHandler,
 			PaymentEventStreamHandler: paymentEventStreamHandler,
 			Uploads:                   uploadDeps,
+			UploadDownloads: httpapi.UploadDownloadDeps{
+				Reader:     services.storageService,
+				ReadAccess: uploadReadAccess,
+			},
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{
 			AdminHandler: users.NewAdminHandler(
@@ -108,10 +116,7 @@ func newAppRouter(
 		StaticUploads: httpapi.StaticUploadDeps{
 			Auth:         authDeps,
 			BoardService: services.boardService,
-			ReadAccess: storage.NewReadableUploadAccess(
-				uploadBoardAccessResolver{service: services.boardService},
-				uploadOwnerStorageUIDResolver{repo: repos.userRepo},
-			),
+			ReadAccess:   uploadReadAccess,
 		},
 		CORSMiddleware: buildCORSMiddleware(cfg.App.Env, cfg.App.CORSAllowedOrigins),
 		RateLimit:      services.runtimeSettings,

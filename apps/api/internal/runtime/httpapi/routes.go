@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	iofs "io/fs"
 
 	"ideaboard/api/internal/accountpool/accounts"
@@ -53,6 +54,15 @@ type UploadDeps struct {
 	UploadSettings settings.MediaUploadSettingProvider
 }
 
+type UploadResourceReader interface {
+	ReadUploadResourceByURL(context.Context, string, int64) (*storage.StoredUploadObject, error)
+}
+
+type UploadDownloadDeps struct {
+	Reader     UploadResourceReader
+	ReadAccess storage.ReadableUploadAccess
+}
+
 type StaticUploadDeps struct {
 	Auth         AuthDeps
 	BoardService *boards.BoardService
@@ -71,6 +81,7 @@ type UserRouteDeps struct {
 	PaymentUserHandler        *payments.UserCheckoutHandler
 	PaymentEventStreamHandler *payments.EventStreamHandler
 	Uploads                   UploadDeps
+	UploadDownloads           UploadDownloadDeps
 }
 
 type AdminRouteDeps struct {

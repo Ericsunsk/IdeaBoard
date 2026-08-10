@@ -30,6 +30,8 @@ func uploadStaticHandler(deps StaticUploadDeps) gin.HandlerFunc {
 			serveLocalUploadFile(c, resource.ObjectKey)
 			return
 		}
+		c.Header("Cache-Control", "private, no-store")
+		c.Header("Vary", "Cookie")
 
 		if !authorizeUploadRead(c, deps.Auth) {
 			return

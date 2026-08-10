@@ -59,6 +59,9 @@ func TestUploadStaticHandlerCanvasAllowsMember(t *testing.T) {
 	if strings.TrimSpace(rec.Body.String()) != "canvas content" {
 		t.Fatalf("body = %q, want canvas content", rec.Body.String())
 	}
+	if got := rec.Header().Get("Cache-Control"); got != "private, no-store" {
+		t.Fatalf("cache control = %q, want private, no-store", got)
+	}
 }
 
 func TestUploadStaticHandlerCanvasRejectsOwnerSegmentMismatch(t *testing.T) {
