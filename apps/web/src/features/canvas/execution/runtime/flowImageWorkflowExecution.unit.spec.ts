@@ -130,6 +130,7 @@ function createExecutionHarness(
   const flushAutosave = vi.fn(async () => undefined)
   const onSuccess = vi.fn()
   const onWarning = vi.fn()
+  const currentBoardId = shallowRef('board-a')
   const execution = useFlowImageWorkflowExecution({
     nodes,
     edges,
@@ -148,7 +149,7 @@ function createExecutionHarness(
     flushAutosave,
     onSuccess,
     onWarning,
-    getCurrentBoardId: () => 'board-a',
+    getCurrentBoardId: () => currentBoardId.value,
   })
 
   return {
@@ -157,6 +158,7 @@ function createExecutionHarness(
     flushAutosave,
     onSuccess,
     onWarning,
+    currentBoardId,
     execution,
   }
 }
@@ -246,7 +248,8 @@ describe('flowImageWorkflowExecution', () => {
     executorMocks.waitExistingOrLiveTaskImageResults.mockImplementationOnce(
       () => taskResult.promise,
     )
-    const { execution, nodes, flushAutosave, onSuccess, onWarning } = createExecutionHarness()
+    const { execution, nodes, edges, flushAutosave, onSuccess, onWarning } =
+      createExecutionHarness()
 
     const run = execution.executeImageWorkflow(imageActionPlan())
     await flushPromises()
@@ -254,12 +257,18 @@ describe('flowImageWorkflowExecution', () => {
     const resultNode = nodes.value.find((node) => node.id !== 'image-1')
     expect(resultNode?.data?.kind).toBe('image')
     expect(execution.isNodeDirectActionRunning(resultNode!.id)).toBe(true)
+    expect(execution.getNodeExecutionState(resultNode!.id)).toEqual({ status: 'submitting' })
+    expect(edges.value.find((edge) => edge.target === resultNode!.id)?.animated).toBe(true)
 
     submitTask.resolve({ taskId: 'task-1' })
     await flushPromises()
 
     expect(flushAutosave).toHaveBeenCalledWith({ silent: true })
     expect(readImageSnapshot(nodes.value, resultNode!.id).pendingTaskId).toBe('task-1')
+    expect(execution.getNodeExecutionState(resultNode!.id)).toEqual({
+      status: 'running',
+      taskId: 'task-1',
+    })
 
     taskResult.resolve([
       {
@@ -291,6 +300,67 @@ describe('flowImageWorkflowExecution', () => {
     })
     expect(snapshot.pendingTaskId).toBeUndefined()
     expect(execution.isNodeDirectActionRunning(resultNode!.id)).toBe(false)
+    expect(execution.getNodeExecutionState(resultNode!.id)).toEqual({
+      status: 'succeeded',
+      taskId: 'task-1',
+    })
+    expect(edges.value.find((edge) => edge.target === resultNode!.id)?.animated).toBe(false)
+  })
+
+  it('cancels active execution state when the board changes before a result resolves', async () => {
+    const taskResult = createDeferred<Array<{ url: string; width: number; height: number }>>()
+    executorMocks.waitExistingOrLiveTaskImageResults.mockImplementationOnce(
+      () => taskResult.promise,
+    )
+    const { execution, nodes, currentBoardId } = createExecutionHarness()
+
+    const run = execution.executeImageWorkflow(imageActionPlan())
+    await flushPromises()
+
+    const resultNode = nodes.value.find((node) => node.id !== 'image-1')
+    await vi.waitFor(() => {
+      expect(execution.getNodeExecutionState(resultNode!.id)?.status).toBe('running')
+    })
+
+    currentBoardId.value = 'board-b'
+    taskResult.resolve([
+      {
+        url: 'https://example.com/task-1.png',
+        width: 400,
+        height: 200,
+      },
+    ])
+    await run
+
+    expect(execution.getNodeExecutionState(resultNode!.id)).toEqual({
+      status: 'cancelled',
+      taskId: 'task-1',
+    })
+  })
+
+  it('cancels active execution state when a result rejects after the board changes', async () => {
+    const taskResult = createDeferred<Array<{ url: string; width: number; height: number }>>()
+    executorMocks.waitExistingOrLiveTaskImageResults.mockImplementationOnce(
+      () => taskResult.promise,
+    )
+    const { execution, nodes, currentBoardId } = createExecutionHarness()
+
+    const run = execution.executeImageWorkflow(imageActionPlan())
+    await flushPromises()
+
+    const resultNode = nodes.value.find((node) => node.id !== 'image-1')
+    await vi.waitFor(() => {
+      expect(execution.getNodeExecutionState(resultNode!.id)?.status).toBe('running')
+    })
+
+    currentBoardId.value = 'board-b'
+    taskResult.reject(new Error('provider failed after navigation'))
+    await run
+
+    expect(execution.getNodeExecutionState(resultNode!.id)).toEqual({
+      status: 'cancelled',
+      taskId: 'task-1',
+    })
   })
 
   it('keeps local inpaint result nodes alive across pending result timeouts', async () => {
@@ -349,7 +419,11 @@ describe('flowImageWorkflowExecution', () => {
       pendingTaskId: 'task-1',
       outputStatus: 'running',
     })
-    expect(execution.isNodeDirectActionRunning(resultNode!.id)).toBe(false)
+    expect(execution.isNodeDirectActionRunning(resultNode!.id)).toBe(true)
+    expect(execution.getNodeExecutionState(resultNode!.id)).toEqual({
+      status: 'running',
+      taskId: 'task-1',
+    })
   })
 
   it('keeps identical activations as distinct pending tasks and idempotency requests', async () => {

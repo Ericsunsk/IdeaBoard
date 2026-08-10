@@ -8,9 +8,15 @@ export type CanvasNodeExecutionState = Readonly<{
   taskId?: string
 }>
 
+export type CanvasExecutionStateChange = {
+  nodeId: string
+  state: CanvasNodeExecutionState
+}
+
 export type CanvasExecutionRuntime = {
   readonly nodeStates: Readonly<Ref<ReadonlyMap<string, CanvasNodeExecutionState>>>
   getNodeState: (nodeId: string) => CanvasNodeExecutionState | null
+  isNodeActive: (nodeId: string) => boolean
   transitionNode: (nodeId: string, state: CanvasNodeExecutionState) => CanvasNodeExecutionState
   clearNode: (nodeId: string) => void
   clear: () => void
@@ -71,6 +77,10 @@ export function createCanvasExecutionRuntime(): CanvasExecutionRuntime {
     return nextState
   }
 
+  function isNodeActive(nodeId: string): boolean {
+    return isExecutionActive(getNodeState(nodeId) ?? undefined)
+  }
+
   function clearNode(nodeId: string): void {
     const normalizedNodeId = nodeId.trim()
     if (!normalizedNodeId || !nodeStates.value.has(normalizedNodeId)) return
@@ -87,6 +97,7 @@ export function createCanvasExecutionRuntime(): CanvasExecutionRuntime {
   return {
     nodeStates,
     getNodeState,
+    isNodeActive,
     transitionNode,
     clearNode,
     clear,
@@ -96,10 +107,17 @@ export function createCanvasExecutionRuntime(): CanvasExecutionRuntime {
 export function projectCanvasExecutionEdgeAnimation(
   edges: Edge[],
   nodeStates: ReadonlyMap<string, CanvasNodeExecutionState>,
+  targetNodeIds?: Iterable<string>,
 ): CanvasExecutionEdgeProjection {
+  const targetNodeIdSet = targetNodeIds ? new Set(targetNodeIds) : null
   let didChange = false
   const nextEdges = edges.map((edge) => {
-    if (edge.targetHandle !== 'in:image') return edge
+    if (
+      edge.targetHandle !== 'in:image' ||
+      (targetNodeIdSet && !targetNodeIdSet.has(edge.target))
+    ) {
+      return edge
+    }
     const shouldAnimate = isExecutionActive(nodeStates.get(edge.target))
     if (edge.animated === shouldAnimate) return edge
     didChange = true

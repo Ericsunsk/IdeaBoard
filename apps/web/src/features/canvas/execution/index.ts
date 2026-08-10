@@ -18,6 +18,7 @@ export {
   type CanvasExecutionEdgeProjection,
   type CanvasExecutionRuntime,
   type CanvasExecutionStatus,
+  type CanvasExecutionStateChange,
   type CanvasNodeExecutionState,
 } from './runtime/CanvasExecutionRuntime'
 export {

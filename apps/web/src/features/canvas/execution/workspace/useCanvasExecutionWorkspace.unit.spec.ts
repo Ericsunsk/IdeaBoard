@@ -194,7 +194,15 @@ describe('useCanvasExecutionWorkspace', () => {
         runPendingResults: async (params) => {
           params.onReserved?.(['image-2'])
           const { taskId } = await params.submitTask('image-2')
+          params.onExecutionStateChange?.({
+            nodeId: 'image-2',
+            state: { status: 'running', taskId },
+          })
           await params.resolveResult(taskId, 'image-2')
+          params.onExecutionStateChange?.({
+            nodeId: 'image-2',
+            state: { status: 'succeeded', taskId },
+          })
           return makeRunSummary()
         },
       })
@@ -214,6 +222,10 @@ describe('useCanvasExecutionWorkspace', () => {
     expect(waitTaskImageResults).toHaveBeenCalledWith('task-1')
     expect(onSuccess).toHaveBeenCalledWith('生成完成')
     expect(onWarning).not.toHaveBeenCalled()
+    expect(workspace.state.executionRuntime.getNodeState('image-2')).toEqual({
+      status: 'succeeded',
+      taskId: 'task-1',
+    })
   })
 
   it('reports pattern-gen preflight errors without submitting a task', async () => {

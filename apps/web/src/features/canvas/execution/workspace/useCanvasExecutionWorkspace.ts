@@ -30,8 +30,16 @@ import {
   createCanvasTaskSubmissionCallbacks,
   type CanvasTaskSubmissionAdapter,
 } from './canvasTaskSubmissionAdapter'
+import {
+  createCanvasExecutionRuntime,
+  projectCanvasExecutionEdgeAnimation,
+  type CanvasExecutionRuntime,
+  type CanvasExecutionStateChange,
+} from '../runtime/CanvasExecutionRuntime'
+import { createFlowGraphCommandOptions } from '../../composables/flowGraphAdapterCommandSideEffects'
 
 export type CanvasExecutionWorkspaceState = {
+  readonly executionRuntime: CanvasExecutionRuntime
   readonly runningNodeIds: Readonly<Ref<ReadonlySet<string>>>
   isNodeRunning: (nodeId: string) => boolean
 }
@@ -64,6 +72,7 @@ export type UseCanvasExecutionWorkspaceOptions = {
   waitTaskImageResults?: (taskId: string) => Promise<TaskImageResult[]>
   loadImageSize?: ImageSizeLoader
   createClientActionId?: ClientActionIdFactory
+  executionRuntime?: CanvasExecutionRuntime
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
   onError?: (error: unknown) => boolean
@@ -76,6 +85,7 @@ function isCanvasGraphNodeId(nodeId: string): nodeId is CanvasGraphNodeId {
 export function useCanvasExecutionWorkspace(
   options: UseCanvasExecutionWorkspaceOptions,
 ): CanvasExecutionWorkspace {
+  const executionRuntime = options.executionRuntime ?? createCanvasExecutionRuntime()
   const runningNodeIds = ref<Set<string>>(new Set())
   const activeReattachKeys = new Set<string>()
   const waitTaskImageResults = options.waitTaskImageResults ?? waitExistingOrLiveTaskImageResults
@@ -91,7 +101,20 @@ export function useCanvasExecutionWorkspace(
   const pendingResults = options.pendingResults ?? ownedPendingResults
 
   function isNodeRunning(nodeId: string): boolean {
-    return runningNodeIds.value.has(nodeId)
+    return executionRuntime.isNodeActive(nodeId) || runningNodeIds.value.has(nodeId)
+  }
+
+  function syncExecutionEdgeProjection(change: CanvasExecutionStateChange) {
+    const projection = projectCanvasExecutionEdgeAnimation(
+      options.edges.value,
+      executionRuntime.nodeStates.value,
+      [change.nodeId],
+    )
+    if (!projection.didChange) return
+    options.graphAdapter.replaceEdges(
+      projection.edges,
+      createFlowGraphCommandOptions({ recordHistory: false, markDirty: false }),
+    )
   }
 
   function isImageNodeSnapshotRunning(nodeId: string): boolean {
@@ -151,7 +174,8 @@ export function useCanvasExecutionWorkspace(
   const workflowRunner = createPendingImageWorkflowRunner({
     pendingResults,
     isBoardCurrent: isBoardStillCurrent,
-    setNodeRunning,
+    executionRuntime,
+    onExecutionStateChange: syncExecutionEdgeProjection,
     afterTaskIdAttached: flushPendingTaskSnapshot,
     createClientActionId: options.createClientActionId,
     onSuccess: options.onSuccess,
@@ -249,6 +273,7 @@ export function useCanvasExecutionWorkspace(
 
   return {
     state: {
+      executionRuntime,
       runningNodeIds,
       isNodeRunning,
     },

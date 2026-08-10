@@ -1,4 +1,4 @@
-import { isTaskResultPendingError } from '../../../../shared/api/taskEvents'
+import { isTaskResultPendingError, TaskCancelledError } from '../../../../shared/api/taskEvents'
 import type {
   ImageExecutionInput,
   ImageExecutionResultOptions,
@@ -13,6 +13,7 @@ import {
   type ClientActionIdFactory,
 } from '../task-runner/taskClientActionIds'
 import { isCanvasBillingPreflightError } from '../task-runner/canvasBillingPreflight'
+import type { CanvasExecutionRuntime, CanvasExecutionStateChange } from './CanvasExecutionRuntime'
 
 type PendingImageResultOptions = ImageExecutionResultOptions
 
@@ -48,7 +49,8 @@ export type PendingImageWorkflowRunner = {
 export type PendingImageWorkflowRunnerOptions = {
   pendingResults: Pick<PendingImageResultExecution, 'runPendingResults'>
   isBoardCurrent: (boardId: string) => boolean
-  setNodeRunning: (nodeId: string, running: boolean) => void
+  executionRuntime: CanvasExecutionRuntime
+  onExecutionStateChange?: (change: CanvasExecutionStateChange) => void
   afterTaskIdAttached?: (params: { resultNodeId: string; taskId: string }) => Promise<void>
   createClientActionId?: ClientActionIdFactory
   onSuccess: (message: string) => void
@@ -118,10 +120,35 @@ export function createPendingImageWorkflowRunner(
     if (options.isBoardCurrent(boardId)) options.onWarning(message)
   }
 
+  function transitionExecution(change: CanvasExecutionStateChange, project = true) {
+    options.executionRuntime.transitionNode(change.nodeId, change.state)
+    if (project) options.onExecutionStateChange?.(change)
+  }
+
+  function transitionActiveResults(
+    resultNodeIds: string[],
+    status: 'failed' | 'cancelled',
+    project = true,
+  ) {
+    resultNodeIds.forEach((nodeId) => {
+      const current = options.executionRuntime.getNodeState(nodeId)
+      if (!current || !options.executionRuntime.isNodeActive(nodeId)) return
+      transitionExecution(
+        {
+          nodeId,
+          state: { status, taskId: current.taskId },
+        },
+        project,
+      )
+    })
+  }
+
   async function run(params: PendingImageWorkflowBatchParams): Promise<void> {
     let resultNodeIds: string[] = []
     const clientActionIdsByResultNodeId = new Map<string, string>()
     const createClientActionId = options.createClientActionId ?? createCanvasTaskClientActionId
+    const transitionCurrentExecution = (change: CanvasExecutionStateChange) =>
+      transitionExecution(change, options.isBoardCurrent(params.boardId))
 
     async function submitWithTransportRetry(resultNodeId: string) {
       const clientActionId =
@@ -154,9 +181,12 @@ export function createPendingImageWorkflowRunner(
         isCurrent: () => options.isBoardCurrent(params.boardId),
         isPendingError: isTaskResultPendingError,
         afterTaskIdAttached: options.afterTaskIdAttached,
+        onExecutionStateChange: transitionCurrentExecution,
         onReserved: (ids) => {
           resultNodeIds = ids
-          ids.forEach((resultNodeId) => options.setNodeRunning(resultNodeId, true))
+          ids.forEach((resultNodeId) =>
+            transitionCurrentExecution({ nodeId: resultNodeId, state: { status: 'submitting' } }),
+          )
         },
       })
       if (!options.isBoardCurrent(params.boardId)) return
@@ -170,13 +200,20 @@ export function createPendingImageWorkflowRunner(
       if (typedFailureHandled) return
       reportPendingImageRunSummary(summary, params, options.onSuccess, options.onWarning)
     } catch (error) {
+      transitionActiveResults(
+        resultNodeIds,
+        error instanceof TaskCancelledError ? 'cancelled' : 'failed',
+        options.isBoardCurrent(params.boardId),
+      )
       const handled = options.isBoardCurrent(params.boardId) && options.onError?.(error) === true
       if (!handled) {
         warnIfBoardCurrent(params.boardId, resolvePendingRunErrorMessage(error, params))
       }
     } finally {
       await params.cleanup?.()
-      for (const resultNodeId of resultNodeIds) options.setNodeRunning(resultNodeId, false)
+      if (!options.isBoardCurrent(params.boardId)) {
+        transitionActiveResults(resultNodeIds, 'cancelled', false)
+      }
     }
   }
 

@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue'
+import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import type { SubmitTaskData } from '../../../../shared/api/task'
 import { isTaskResultPendingError } from '../../../../shared/api/taskEvents'
@@ -31,9 +31,7 @@ import {
   type TextPromptExecutionPlan,
 } from '../planning/ImageExecutionPlan'
 import { resolveFirstTaskImageResultDisplay } from '../result-nodes/flowImageDirectActionTaskResult'
-import { readPendingImageSnapshot } from '../result-nodes/flowPendingImageTaskSnapshot'
 import { composeFlowLocalInpaintTaskResult } from '../result-nodes/flowLocalInpaintTaskResult'
-import { syncImageInputEdgeAnimation } from '../flowEdgeAnimation'
 import { usePendingImageResultExecution } from '../result-nodes/usePendingImageResultNodes'
 import { waitExistingOrLiveTaskImageResults } from '../task-runner/flowImageDirectActionExecutor'
 import { createCanvasTaskSubmissionCallbacks } from '../workspace/canvasTaskSubmissionAdapter'
@@ -42,6 +40,11 @@ import {
   useCanvasExecutionWorkspace,
 } from '../workspace/useCanvasExecutionWorkspace'
 import { createPendingImageWorkflowRunner } from './pendingImageWorkflowRunner'
+import {
+  projectCanvasExecutionEdgeAnimation,
+  type CanvasExecutionStateChange,
+} from './CanvasExecutionRuntime'
+import { createFlowGraphCommandOptions } from '../../composables/flowGraphAdapterCommandSideEffects'
 
 export type FlowImageWorkflowExecutionPlan = ActivatedImageExecutionPlan
 
@@ -71,7 +74,6 @@ function requirePreparedTaskRequest(
 }
 
 export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecutionOptions) {
-  const runningNodeIds = ref<Set<string>>(new Set())
   const pendingResults = usePendingImageResultExecution({
     nodes: options.nodes,
     edges: options.edges,
@@ -80,30 +82,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     boardBaseSnapshot: options.boardBaseSnapshot,
     refreshNodeInternals: options.refreshNodeInternals,
   })
-
-  function isImageNodeSnapshotRunning(nodeId: string): boolean {
-    return readPendingImageSnapshot(options.nodes.value, nodeId)?.outputStatus === 'running'
-  }
-
-  function syncRunningInputEdgeAnimation(nodeId: string, running: boolean) {
-    syncImageInputEdgeAnimation({
-      edges: options.edges.value,
-      graphAdapter: options.graphAdapter,
-      targetNodeIds: [nodeId],
-      shouldAnimate: running || isImageNodeSnapshotRunning(nodeId),
-    })
-  }
-
-  function setNodeRunning(nodeId: string, running: boolean) {
-    const next = new Set(runningNodeIds.value)
-    if (running) {
-      next.add(nodeId)
-    } else {
-      next.delete(nodeId)
-    }
-    runningNodeIds.value = next
-    syncRunningInputEdgeAnimation(nodeId, running)
-  }
 
   function isBoardStillCurrent(boardId: string): boolean {
     return !boardId || readCurrentBoardId(options.getCurrentBoardId) === boardId
@@ -126,15 +104,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     )
   }
 
-  const workflowRunner = createPendingImageWorkflowRunner({
-    pendingResults,
-    isBoardCurrent: isBoardStillCurrent,
-    setNodeRunning,
-    afterTaskIdAttached: flushPendingTaskSnapshot,
-    onSuccess: options.onSuccess,
-    onWarning: options.onWarning,
-    onError: options.onError,
-  })
   const executionWorkspace =
     options.executionWorkspace ??
     useCanvasExecutionWorkspace({
@@ -149,9 +118,34 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       onSuccess: options.onSuccess,
       onWarning: options.onWarning,
     })
+  const executionRuntime = executionWorkspace.state.executionRuntime
+
+  function syncExecutionEdgeProjection(change: CanvasExecutionStateChange) {
+    const projection = projectCanvasExecutionEdgeAnimation(
+      options.edges.value,
+      executionRuntime.nodeStates.value,
+      [change.nodeId],
+    )
+    if (!projection.didChange) return
+    options.graphAdapter.replaceEdges(
+      projection.edges,
+      createFlowGraphCommandOptions({ recordHistory: false, markDirty: false }),
+    )
+  }
+
+  const workflowRunner = createPendingImageWorkflowRunner({
+    pendingResults,
+    isBoardCurrent: isBoardStillCurrent,
+    executionRuntime,
+    onExecutionStateChange: syncExecutionEdgeProjection,
+    afterTaskIdAttached: flushPendingTaskSnapshot,
+    onSuccess: options.onSuccess,
+    onWarning: options.onWarning,
+    onError: options.onError,
+  })
 
   function isNodeDirectActionRunning(nodeId: string): boolean {
-    return runningNodeIds.value.has(nodeId) || executionWorkspace.state.isNodeRunning(nodeId)
+    return executionWorkspace.state.isNodeRunning(nodeId)
   }
 
   function readBoardId(): string {
@@ -363,6 +357,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
   return {
     executeImageWorkflow,
     isNodeDirectActionRunning,
+    getNodeExecutionState: executionRuntime.getNodeState,
     reattachPendingImageResults: executionWorkspace.commands.reattachPendingImageResults,
   }
 }

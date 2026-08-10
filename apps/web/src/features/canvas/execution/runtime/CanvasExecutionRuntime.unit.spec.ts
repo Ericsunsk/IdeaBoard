@@ -22,6 +22,7 @@ describe('CanvasExecutionRuntime', () => {
 
     runtime.transitionNode('image-2', { status: 'submitting' })
     expect(runtime.getNodeState('image-2')).toEqual({ status: 'submitting' })
+    expect(runtime.isNodeActive('image-2')).toBe(true)
 
     runtime.transitionNode('image-2', { status: 'running', taskId: ' task-1 ' })
     expect(runtime.getNodeState('image-2')).toEqual({ status: 'running', taskId: 'task-1' })
@@ -29,6 +30,7 @@ describe('CanvasExecutionRuntime', () => {
     for (const status of ['succeeded', 'failed', 'cancelled'] as const) {
       runtime.transitionNode('image-2', { status, taskId: 'task-1' })
       expect(runtime.getNodeState('image-2')).toEqual({ status, taskId: 'task-1' })
+      expect(runtime.isNodeActive('image-2')).toBe(false)
     }
   })
 
@@ -118,5 +120,27 @@ describe('projectCanvasExecutionEdgeAnimation', () => {
     expect(result.edges).toBe(edges)
     expect(result.edges[0]).toBe(imageEdge)
     expect(result.edges[1]).toBe(promptEdge)
+  })
+
+  it('scopes an incremental projection to the execution node that changed', () => {
+    const runtime = createCanvasExecutionRuntime()
+    runtime.transitionNode('image-2', { status: 'succeeded', taskId: 'task-1' })
+    const completedEdge = makeEdge({ id: 'completed-edge', target: 'image-2', animated: true })
+    const legacyReattachEdge = makeEdge({
+      id: 'reattach-edge',
+      target: 'image-3',
+      animated: true,
+    })
+
+    const result = projectCanvasExecutionEdgeAnimation(
+      [completedEdge, legacyReattachEdge],
+      runtime.nodeStates.value,
+      ['image-2'],
+    )
+
+    expect(result.edges).toEqual([
+      expect.objectContaining({ id: 'completed-edge', animated: false }),
+      legacyReattachEdge,
+    ])
   })
 })

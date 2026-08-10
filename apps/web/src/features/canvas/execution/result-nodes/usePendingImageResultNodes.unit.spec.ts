@@ -2,7 +2,11 @@ import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import { shallowRef } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { TaskResultPendingError, isTaskResultPendingError } from '../../../../shared/api/taskEvents'
+import {
+  TaskCancelledError,
+  TaskResultPendingError,
+  isTaskResultPendingError,
+} from '../../../../shared/api/taskEvents'
 import type { ImageNodeItem } from '../../../canvas-board/domain'
 import type { FlowNodeData } from '../../types/flowTypes'
 import { readFlowGraphCommandSideEffects } from '../../composables/flowGraphAdapterCommandSideEffects'
@@ -13,6 +17,7 @@ import {
 import { createCanvasGraphStore } from '../../graph-runtime'
 import { flowToCanvasBoardSnapshot } from '../../utils/flowSnapshotAdapter'
 import { usePendingImageResultExecution } from './usePendingImageResultNodes'
+import type { CanvasExecutionStateChange } from '../runtime/CanvasExecutionRuntime'
 
 const animationFrameMocks = vi.hoisted(() => ({
   waitForNextRenderFrame: vi.fn<() => Promise<void>>(async () => undefined),
@@ -557,6 +562,7 @@ describe('usePendingImageResultExecution', () => {
   it('batch materializes completed run pending results with one graph replacement', async () => {
     const harness = createHarness([makePromptNode('prompt-1')])
     let reservedNodeIds: string[] = []
+    const executionChanges: CanvasExecutionStateChange[] = []
 
     const summary = await harness.actions.runPendingResults({
       source: { url: 'https://example.com/source.png', ratio: 1 },
@@ -575,6 +581,7 @@ describe('usePendingImageResultExecution', () => {
       onReserved: (ids) => {
         reservedNodeIds = ids
       },
+      onExecutionStateChange: (change) => executionChanges.push(change),
     })
     await flushPromises()
 
@@ -601,6 +608,12 @@ describe('usePendingImageResultExecution', () => {
     )
     reservedNodeIds.forEach((nodeId) => {
       expect(readImageSnapshot(harness.nodes.value, nodeId).pendingTaskId).toBeUndefined()
+      expect(
+        executionChanges.filter((change) => change.nodeId === nodeId).map((change) => change.state),
+      ).toEqual([
+        { status: 'running', taskId: `task-${nodeId}` },
+        { status: 'succeeded', taskId: `task-${nodeId}` },
+      ])
     })
   })
 
@@ -608,6 +621,7 @@ describe('usePendingImageResultExecution', () => {
     const harness = createHarness([makeAnchorNode()])
     const pendingError = new Error('任务进度推送超时，请稍后查看结果')
     let reservedNodeIds: string[] = []
+    const executionChanges: CanvasExecutionStateChange[] = []
 
     const summary = await harness.actions.runPendingResults({
       source: { url: 'https://example.com/source.png', ratio: 1 },
@@ -622,6 +636,7 @@ describe('usePendingImageResultExecution', () => {
       onReserved: (ids) => {
         reservedNodeIds = ids
       },
+      onExecutionStateChange: (change) => executionChanges.push(change),
     })
 
     const resultNodeId = reservedNodeIds[0]
@@ -636,6 +651,9 @@ describe('usePendingImageResultExecution', () => {
       outputStatus: 'running',
       pendingTaskId: 'task-1',
     })
+    expect(executionChanges).toEqual([
+      { nodeId: resultNodeId, state: { status: 'running', taskId: 'task-1' } },
+    ])
   })
 
   it('reuses the same task without a second submit when retrying one activation', async () => {
@@ -729,6 +747,7 @@ describe('usePendingImageResultExecution', () => {
     const harness = createHarness([makeAnchorNode()])
     const pendingError = new Error('任务仍在处理中')
     let reservedNodeIds: string[] = []
+    const executionChanges: CanvasExecutionStateChange[] = []
 
     const summary = await harness.actions.runPendingResults({
       source: { url: 'https://example.com/source.png', ratio: 1 },
@@ -744,6 +763,7 @@ describe('usePendingImageResultExecution', () => {
       onReserved: (ids) => {
         reservedNodeIds = ids
       },
+      onExecutionStateChange: (change) => executionChanges.push(change),
     })
 
     expect(summary).toMatchObject({
@@ -752,6 +772,43 @@ describe('usePendingImageResultExecution', () => {
       failureCount: 0,
     })
     expect(harness.nodes.value.some((node) => node.id === reservedNodeIds[0])).toBe(false)
+    expect(executionChanges).toEqual([
+      { nodeId: reservedNodeIds[0], state: { status: 'running', taskId: 'task-1' } },
+      { nodeId: reservedNodeIds[0], state: { status: 'cancelled', taskId: 'task-1' } },
+    ])
+  })
+
+  it('reports a cancelled task as a cancelled execution terminal state', async () => {
+    const harness = createHarness([makeAnchorNode()])
+    const executionChanges: CanvasExecutionStateChange[] = []
+    let resultNodeId = ''
+
+    await harness.actions.runPendingResults({
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'anchor',
+      outputCount: 1,
+      submitTask: async () => ({ taskId: 'task-cancelled' }),
+      resolveResult: async () => {
+        throw new TaskCancelledError('用户取消')
+      },
+      isCurrent: () => true,
+      isPendingError: () => false,
+      onReserved: ([nodeId]) => {
+        resultNodeId = nodeId
+      },
+      onExecutionStateChange: (change) => executionChanges.push(change),
+    })
+
+    expect(executionChanges).toEqual([
+      {
+        nodeId: resultNodeId,
+        state: { status: 'running', taskId: 'task-cancelled' },
+      },
+      {
+        nodeId: resultNodeId,
+        state: { status: 'cancelled', taskId: 'task-cancelled' },
+      },
+    ])
   })
 
   it('does not materialize a resolved result when the board is no longer current', async () => {

@@ -6,6 +6,7 @@ import type {
 } from '../result-nodes/usePendingImageResultNodes'
 import { createPendingImageWorkflowRunner } from './pendingImageWorkflowRunner'
 import { CanvasBillingPreflightError } from '../task-runner/canvasBillingPreflight'
+import { createCanvasExecutionRuntime } from './CanvasExecutionRuntime'
 
 function makeRunSummary(
   overrides: Partial<PendingImageResultRunSummary> = {},
@@ -44,7 +45,7 @@ describe('pendingImageWorkflowRunner', () => {
     const runner = createPendingImageWorkflowRunner({
       pendingResults,
       isBoardCurrent: () => true,
-      setNodeRunning: vi.fn(),
+      executionRuntime: createCanvasExecutionRuntime(),
       createClientActionId: vi.fn().mockReturnValueOnce('client-action-1'),
       onSuccess: vi.fn(),
       onWarning: vi.fn(),
@@ -85,7 +86,7 @@ describe('pendingImageWorkflowRunner', () => {
     const runner = createPendingImageWorkflowRunner({
       pendingResults,
       isBoardCurrent: () => true,
-      setNodeRunning: vi.fn(),
+      executionRuntime: createCanvasExecutionRuntime(),
       onSuccess: vi.fn(),
       onWarning: vi.fn(),
     })
@@ -106,13 +107,13 @@ describe('pendingImageWorkflowRunner', () => {
 
   it('does not reserve or mutate result nodes when provider readiness fails', async () => {
     const pendingResults = createPendingResults(async () => makeRunSummary())
-    const setNodeRunning = vi.fn()
+    const executionRuntime = createCanvasExecutionRuntime()
     const onWarning = vi.fn()
     const submitTask = vi.fn(async () => ({ taskId: 'task-1' }))
     const runner = createPendingImageWorkflowRunner({
       pendingResults,
       isBoardCurrent: () => true,
-      setNodeRunning,
+      executionRuntime,
       onSuccess: vi.fn(),
       onWarning,
     })
@@ -133,11 +134,11 @@ describe('pendingImageWorkflowRunner', () => {
 
     expect(pendingResults.runPendingResults).not.toHaveBeenCalled()
     expect(submitTask).not.toHaveBeenCalled()
-    expect(setNodeRunning).not.toHaveBeenCalled()
+    expect(executionRuntime.nodeStates.value.size).toBe(0)
     expect(onWarning).toHaveBeenCalledWith('生图服务暂不可用，请稍后重试')
   })
 
-  it('runs the prepared pending workflow lifecycle and always clears running state', async () => {
+  it('runs the prepared pending workflow through typed execution states', async () => {
     const events: string[] = []
     const afterTaskIdAttached = vi.fn(async ({ resultNodeId, taskId }) => {
       events.push(`after:${resultNodeId}:${taskId}`)
@@ -155,14 +156,23 @@ describe('pendingImageWorkflowRunner', () => {
       expect(params.isCurrent()).toBe(true)
 
       params.onReserved?.(['image-2'])
+      params.onExecutionStateChange?.({
+        nodeId: 'image-2',
+        state: { status: 'running', taskId: 'task-1' },
+      })
       await params.afterTaskIdAttached?.({ resultNodeId: 'image-2', taskId: 'task-1' })
+      params.onExecutionStateChange?.({
+        nodeId: 'image-2',
+        state: { status: 'succeeded', taskId: 'task-1' },
+      })
       return makeRunSummary({ resultNodeIds: ['image-2'], totalCount: 2, successCount: 2 })
     })
     const runner = createPendingImageWorkflowRunner({
       pendingResults,
       isBoardCurrent: () => true,
-      setNodeRunning: (nodeId, running) => {
-        events.push(`running:${nodeId}:${running}`)
+      executionRuntime: createCanvasExecutionRuntime(),
+      onExecutionStateChange: ({ nodeId, state }) => {
+        events.push(`state:${nodeId}:${state.status}:${state.taskId ?? ''}`)
       },
       afterTaskIdAttached,
       onSuccess,
@@ -206,11 +216,12 @@ describe('pendingImageWorkflowRunner', () => {
       'prepare',
       'assertReady',
       'run',
-      'running:image-2:true',
+      'state:image-2:submitting:',
+      'state:image-2:running:task-1',
       'after:image-2:task-1',
+      'state:image-2:succeeded:task-1',
       'success:生成完成（2 张）',
       'cleanup',
-      'running:image-2:false',
     ])
     expect(onWarning).not.toHaveBeenCalled()
   })
@@ -219,7 +230,7 @@ describe('pendingImageWorkflowRunner', () => {
     let isCurrent = true
     const onSuccess = vi.fn()
     const onWarning = vi.fn()
-    const setNodeRunning = vi.fn()
+    const executionRuntime = createCanvasExecutionRuntime()
     const pendingResults = createPendingResults(async (params) => {
       expect(params.isCurrent()).toBe(true)
       params.onReserved?.(['image-2'])
@@ -229,7 +240,7 @@ describe('pendingImageWorkflowRunner', () => {
     const runner = createPendingImageWorkflowRunner({
       pendingResults,
       isBoardCurrent: () => isCurrent,
-      setNodeRunning,
+      executionRuntime,
       onSuccess,
       onWarning,
     })
@@ -247,8 +258,65 @@ describe('pendingImageWorkflowRunner', () => {
 
     expect(onSuccess).not.toHaveBeenCalled()
     expect(onWarning).not.toHaveBeenCalled()
-    expect(setNodeRunning).toHaveBeenCalledWith('image-2', true)
-    expect(setNodeRunning).toHaveBeenCalledWith('image-2', false)
+    expect(executionRuntime.getNodeState('image-2')).toEqual({ status: 'cancelled' })
+  })
+
+  it('keeps multi-output execution states independent through mixed terminal outcomes', async () => {
+    const executionRuntime = createCanvasExecutionRuntime()
+    const pendingResults = createPendingResults(async (params) => {
+      params.onReserved?.(['image-2', 'image-3'])
+      params.onExecutionStateChange?.({
+        nodeId: 'image-2',
+        state: { status: 'running', taskId: 'task-2' },
+      })
+      params.onExecutionStateChange?.({
+        nodeId: 'image-3',
+        state: { status: 'running', taskId: 'task-3' },
+      })
+      params.onExecutionStateChange?.({
+        nodeId: 'image-2',
+        state: { status: 'succeeded', taskId: 'task-2' },
+      })
+      params.onExecutionStateChange?.({
+        nodeId: 'image-3',
+        state: { status: 'failed', taskId: 'task-3' },
+      })
+      return makeRunSummary({
+        resultNodeIds: ['image-2', 'image-3'],
+        totalCount: 2,
+        successCount: 1,
+        failureCount: 1,
+        firstFailure: new Error('output 2 failed'),
+        failures: [new Error('output 2 failed')],
+      })
+    })
+    const runner = createPendingImageWorkflowRunner({
+      pendingResults,
+      isBoardCurrent: () => true,
+      executionRuntime,
+      onSuccess: vi.fn(),
+      onWarning: vi.fn(),
+    })
+
+    await runner.run({
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'image-1',
+      boardId: 'board-a',
+      activationId: 'canvas:activation-multi-output',
+      outputCount: 2,
+      submitTask: vi.fn(async () => ({ taskId: 'unused' })),
+      resolveResult: vi.fn(async () => ({ url: 'https://example.com/result.png', ratio: 1 })),
+      fallbackErrorMessage: '生成失败',
+    })
+
+    expect(executionRuntime.getNodeState('image-2')).toEqual({
+      status: 'succeeded',
+      taskId: 'task-2',
+    })
+    expect(executionRuntime.getNodeState('image-3')).toEqual({
+      status: 'failed',
+      taskId: 'task-3',
+    })
   })
 
   it('reports pending task summaries with the underlying single-task message', async () => {
@@ -265,7 +333,7 @@ describe('pendingImageWorkflowRunner', () => {
     const runner = createPendingImageWorkflowRunner({
       pendingResults,
       isBoardCurrent: () => true,
-      setNodeRunning: vi.fn(),
+      executionRuntime: createCanvasExecutionRuntime(),
       onSuccess,
       onWarning,
     })
@@ -294,7 +362,7 @@ describe('pendingImageWorkflowRunner', () => {
     const runner = createPendingImageWorkflowRunner({
       pendingResults,
       isBoardCurrent: () => true,
-      setNodeRunning: vi.fn(),
+      executionRuntime: createCanvasExecutionRuntime(),
       onSuccess: vi.fn(),
       onWarning,
       onError,
@@ -332,7 +400,7 @@ describe('pendingImageWorkflowRunner', () => {
     const runner = createPendingImageWorkflowRunner({
       pendingResults,
       isBoardCurrent: () => true,
-      setNodeRunning: vi.fn(),
+      executionRuntime: createCanvasExecutionRuntime(),
       onSuccess: vi.fn(),
       onWarning,
       onError,

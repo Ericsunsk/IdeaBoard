@@ -37,6 +37,8 @@ import {
   type ResultMaterializerImageResult,
   type ResultMaterializerResult,
 } from './resultMaterializer'
+import type { CanvasExecutionStateChange } from '../runtime/CanvasExecutionRuntime'
+import { TaskCancelledError } from '../../../../shared/api/taskEvents'
 
 type UsePendingImageResultNodesOptions = {
   nodes: Ref<Node[]>
@@ -78,6 +80,7 @@ export type RunPendingImageResultsParams = PendingImageResultReservationParams &
   persistPendingTaskIds?: boolean
   afterTaskIdAttached?: (params: { resultNodeId: string; taskId: string }) => Promise<void>
   onReserved?: (resultNodeIds: string[]) => void
+  onExecutionStateChange?: (change: CanvasExecutionStateChange) => void
 }
 
 export type MaterializeResolvedAttachedPendingImageResultsParams = {
@@ -715,11 +718,17 @@ export function usePendingImageResultExecution(
 
     await Promise.allSettled(
       resultNodeIds.map(async (resultNodeId, index) => {
+        let taskId: string | undefined
         try {
           const existingTaskId = persistPendingTaskIds ? readPendingTaskId(resultNodeId) : null
-          const { taskId } = existingTaskId
+          const submission = existingTaskId
             ? { taskId: existingTaskId }
             : await params.submitTask(resultNodeId)
+          taskId = submission.taskId
+          params.onExecutionStateChange?.({
+            nodeId: resultNodeId,
+            state: { status: 'running', taskId },
+          })
           if (!existingTaskId && persistPendingTaskIds && params.isCurrent()) {
             attachPendingTaskId({ resultNodeId, taskId })
             await params.afterTaskIdAttached?.({ resultNodeId, taskId })
@@ -733,6 +742,13 @@ export function usePendingImageResultExecution(
             }
           }
           successCount += 1
+          params.onExecutionStateChange?.({
+            nodeId: resultNodeId,
+            state: {
+              status: params.isCurrent() ? 'succeeded' : 'cancelled',
+              taskId,
+            },
+          })
         } catch (error) {
           firstFailure ??= error
           failures.push(error)
@@ -740,10 +756,22 @@ export function usePendingImageResultExecution(
             pendingCount += 1
             if (!persistPendingTaskIds && params.isCurrent()) {
               cancelPendingResult({ resultNodeId })
+              params.onExecutionStateChange?.({
+                nodeId: resultNodeId,
+                state: { status: 'cancelled', taskId },
+              })
             }
             return
           }
           failureCount += 1
+          params.onExecutionStateChange?.({
+            nodeId: resultNodeId,
+            state: {
+              status:
+                !params.isCurrent() || error instanceof TaskCancelledError ? 'cancelled' : 'failed',
+              taskId: taskId ?? readPendingTaskId(resultNodeId) ?? undefined,
+            },
+          })
           if (params.isCurrent()) {
             cancelPendingResult({ resultNodeId })
           }
