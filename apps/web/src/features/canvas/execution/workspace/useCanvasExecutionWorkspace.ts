@@ -3,9 +3,9 @@ import { ref, type Ref } from 'vue'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
 import type { SubmitTaskData } from '../../../../shared/api/task'
 import type { TaskImageResult } from '../../../../shared/query/taskResult'
+import { TaskCancelledError } from '../../../../shared/api/taskEvents'
 import type { CanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
 import type { CanvasGraphNodeId, CanvasGraphStore } from '../../graph-runtime'
-import { syncImageInputEdgeAnimation } from '../flowEdgeAnimation'
 import { loadImageSizeFromUrl } from '../media/imageSize'
 import type { ActivatedImageExecutionPlan } from '../planning/ImageExecutionPlan'
 import { resolveFirstTaskImageResultDisplay } from '../result-nodes/flowImageDirectActionTaskResult'
@@ -82,6 +82,13 @@ function isCanvasGraphNodeId(nodeId: string): nodeId is CanvasGraphNodeId {
   return /^(?:image|prompt|fusion)-\d+(?:\.\d+)?$/.test(nodeId)
 }
 
+type ReattachResolvedAttempt = {
+  reattachKey: string
+  nodeId: CanvasGraphNodeId
+  taskId: string
+  resolved: ResultMaterializerImageResult
+}
+
 export function useCanvasExecutionWorkspace(
   options: UseCanvasExecutionWorkspaceOptions,
 ): CanvasExecutionWorkspace {
@@ -117,28 +124,24 @@ export function useCanvasExecutionWorkspace(
     )
   }
 
-  function isImageNodeSnapshotRunning(nodeId: string): boolean {
-    return readPendingImageSnapshot(options.nodes.value, nodeId)?.outputStatus === 'running'
-  }
-
-  function syncRunningInputEdgeAnimation(nodeId: string, running: boolean) {
-    syncImageInputEdgeAnimation({
-      edges: options.edges.value,
-      graphAdapter: options.graphAdapter,
-      targetNodeIds: [nodeId],
-      shouldAnimate: running || isImageNodeSnapshotRunning(nodeId),
-    })
-  }
-
-  function setNodeRunning(nodeId: string, running: boolean) {
-    const next = new Set(runningNodeIds.value)
-    if (running) {
-      next.add(nodeId)
-    } else {
-      next.delete(nodeId)
+  function transitionOwnedReattachExecution(
+    nodeId: string,
+    taskId: string,
+    status: Extract<
+      CanvasExecutionStateChange['state']['status'],
+      'succeeded' | 'failed' | 'cancelled'
+    >,
+    project: boolean,
+  ): boolean {
+    const current = executionRuntime.getNodeState(nodeId)
+    if (current?.taskId !== taskId || !executionRuntime.isNodeActive(nodeId)) return false
+    const change: CanvasExecutionStateChange = {
+      nodeId,
+      state: { status, taskId },
     }
-    runningNodeIds.value = next
-    syncRunningInputEdgeAnimation(nodeId, running)
+    executionRuntime.transitionNode(change.nodeId, change.state)
+    if (project) syncExecutionEdgeProjection(change)
+    return true
   }
 
   function readBoardId(): string {
@@ -220,45 +223,94 @@ export function useCanvasExecutionWorkspace(
     const pendingTasks = collectPendingImageTasks(options.nodes.value)
     if (pendingTasks.length === 0) return
     let failureCount = 0
-    const resolvedResults: ResultMaterializerImageResult[] = []
-    await Promise.allSettled(
+    const resolvedAttempts: ReattachResolvedAttempt[] = []
+    await Promise.all(
       pendingTasks.map(async ({ nodeId, taskId, fallbackRatio }) => {
         const reattachKey = `${boardId}:${nodeId}:${taskId}`
-        if (activeReattachKeys.has(reattachKey) || runningNodeIds.value.has(nodeId)) return
+        if (activeReattachKeys.has(reattachKey)) return
+        if (!isCanvasGraphNodeId(nodeId)) return
         activeReattachKeys.add(reattachKey)
-        setNodeRunning(nodeId, true)
+        const runningChange: CanvasExecutionStateChange = {
+          nodeId,
+          state: { status: 'running', taskId },
+        }
         try {
+          executionRuntime.transitionNode(runningChange.nodeId, runningChange.state)
+          syncExecutionEdgeProjection(runningChange)
           const resolved = await resolveFirstTaskImageResult(taskId, fallbackRatio)
-          if (!isBoardStillCurrent(boardId) || !isPendingImageTaskStillCurrent(nodeId, taskId)) {
+          const isCurrentBoard = isBoardStillCurrent(boardId)
+          const isAttached = isPendingImageTaskStillCurrent(nodeId, taskId)
+          if (!isCurrentBoard || !isAttached) {
+            transitionOwnedReattachExecution(nodeId, taskId, 'cancelled', isCurrentBoard)
+            activeReattachKeys.delete(reattachKey)
             return
           }
-          if (!isCanvasGraphNodeId(nodeId)) return
-          resolvedResults.push({
-            ...resolved,
-            resultNodeId: nodeId,
+          resolvedAttempts.push({
+            reattachKey,
+            nodeId,
             taskId,
+            resolved: { ...resolved, resultNodeId: nodeId, taskId },
           })
         } catch (error) {
-          if (!isBoardStillCurrent(boardId) || !isPendingImageTaskStillCurrent(nodeId, taskId)) {
-            return
+          const isCurrentBoard = isBoardStillCurrent(boardId)
+          const isAttached = isPendingImageTaskStillCurrent(nodeId, taskId)
+          const status =
+            !isCurrentBoard || !isAttached || error instanceof TaskCancelledError
+              ? 'cancelled'
+              : 'failed'
+          transitionOwnedReattachExecution(nodeId, taskId, status, isCurrentBoard)
+          if (status === 'failed') {
+            console.warn('[canvas] reattach pending image task failed', error)
+            failureCount += 1
           }
-          console.warn('[canvas] reattach pending image task failed', error)
-          failureCount += 1
-        } finally {
           activeReattachKeys.delete(reattachKey)
-          setNodeRunning(nodeId, false)
         }
       }),
     )
-    if (!isBoardStillCurrent(boardId)) return
-    const materialized =
-      resolvedResults.length > 0
-        ? pendingResults.materializeResolvedAttachedPendingResults({
-            results: resolvedResults,
-            isAttached: (result) =>
-              !!result.taskId && isPendingImageTaskStillCurrent(result.resultNodeId, result.taskId),
-          })
-        : null
+    if (!isBoardStillCurrent(boardId)) {
+      resolvedAttempts.forEach((attempt) => {
+        transitionOwnedReattachExecution(attempt.nodeId, attempt.taskId, 'cancelled', false)
+        activeReattachKeys.delete(attempt.reattachKey)
+      })
+      return
+    }
+
+    let materialized: ReturnType<
+      PendingImageResultExecution['materializeResolvedAttachedPendingResults']
+    > | null = null
+    try {
+      materialized =
+        resolvedAttempts.length > 0
+          ? pendingResults.materializeResolvedAttachedPendingResults({
+              results: resolvedAttempts.map((attempt) => attempt.resolved),
+              isAttached: (result) =>
+                !!result.taskId &&
+                isPendingImageTaskStillCurrent(result.resultNodeId, result.taskId),
+            })
+          : null
+    } catch (error) {
+      console.warn('[canvas] materialize reattached image task failed', error)
+      failureCount += resolvedAttempts.length
+      resolvedAttempts.forEach((attempt) => {
+        transitionOwnedReattachExecution(attempt.nodeId, attempt.taskId, 'failed', true)
+        activeReattachKeys.delete(attempt.reattachKey)
+      })
+    }
+
+    const materializedNodeIds = new Set(materialized?.materializedNodeIds ?? [])
+    resolvedAttempts.forEach((attempt) => {
+      if (materializedNodeIds.has(attempt.nodeId)) {
+        transitionOwnedReattachExecution(attempt.nodeId, attempt.taskId, 'succeeded', true)
+      } else if (!materialized) {
+        // The materializer failure path already assigned failed above.
+        activeReattachKeys.delete(attempt.reattachKey)
+        return
+      } else {
+        transitionOwnedReattachExecution(attempt.nodeId, attempt.taskId, 'cancelled', true)
+      }
+      activeReattachKeys.delete(attempt.reattachKey)
+    })
+
     const successCount = materialized?.materializedNodeIds.length ?? 0
     if (successCount > 0) {
       options.onSuccess(successCount > 1 ? `已恢复 ${successCount} 个生成结果` : '已恢复生成结果')
