@@ -388,7 +388,6 @@ function createCanvasGraphRuntimeHarness(harness: ReturnType<typeof createRuntim
       })),
     },
     preview: {
-      openNodeImage: vi.fn(async () => {}),
       openImageUrl: vi.fn(async () => {}),
     },
     feedback: graphFeedback,

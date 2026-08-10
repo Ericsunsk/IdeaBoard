@@ -681,6 +681,45 @@ async function installMockApiRoutes(context: BrowserContext, fixture: BenchmarkF
       return
     }
 
+    if (pathname === '/api/user/credits/wallet') {
+      await fulfillJson(route, {
+        code: 0,
+        msg: 'ok',
+        data: {
+          public_id: MOCK_USER.public_id,
+          display_name: MOCK_USER.display_name,
+          available_credits: 1280,
+          reserved_credits: 0,
+        },
+      })
+      return
+    }
+
+    if (pathname === '/api/user/tasks/submit/readiness') {
+      await fulfillJson(route, {
+        code: 0,
+        msg: 'ok',
+        data: {
+          ready: true,
+          feature: 'sketch-to-image',
+          billing: {
+            sku: 'ai.image.sketch-to-image',
+            display_name: 'Sketch to image',
+            price_version_id: 1,
+            price_version: 1,
+            unit_credits: 4,
+            quantity: 1,
+            total_credits: 4,
+            quoted_at: '2026-07-12T00:00:00.000Z',
+            available_credits: 1280,
+            reserved_credits: 0,
+            sufficient: true,
+          },
+        },
+      })
+      return
+    }
+
     if (pathname === '/api/user/boards') {
       await fulfillJson(route, { code: 0, msg: 'ok', data: { list: [currentBoard] } })
       return

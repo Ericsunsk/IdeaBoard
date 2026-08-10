@@ -1,17 +1,14 @@
-import { computed } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import type { ImageNodeItem } from '../../../canvas-board/domain'
 import { useCanvasViewportRuntime } from '../../composables/useCanvasViewportRuntime'
 import { useCanvasBoardRuntime } from '../../composables/useCanvasBoardRuntime'
-import { useFlowCanvasInteractionState } from '../../composables/useFlowCanvasInteractionState'
-import { useFlowImageNodeInteractions } from '../../composables/useFlowImageNodeInteractions'
-import { useFlowNodeUiState } from '../../composables/useFlowNodeUiState'
-import { useFlowSelectionExport } from '../../composables/useFlowSelectionExport'
 import { useCanvasFeedback } from '../../feedback/useCanvasFeedback'
 import type { CanvasFlowPaneAdapter } from '../../flow-pane'
 import {
   useCanvasGraphEditing,
+  useCanvasGraphInteractions,
   type CanvasGraphEditingBrowserAdapter,
+  type CanvasGraphInteractionBrowserAdapter,
   type CanvasGraphEditingUploadAdapter,
 } from '../../graph-editing'
 import { useCanvasImageWorkflow, type CanvasImageWorkflowUiAdapter } from '../../image-workflow'
@@ -26,6 +23,7 @@ export type UseCanvasWorkspaceRuntimeOptions = {
   flowPaneAdapter: CanvasFlowPaneAdapter
   uploadApi: CanvasGraphEditingUploadAdapter
   graphEditingBrowser: CanvasGraphEditingBrowserAdapter
+  graphInteractionBrowser: CanvasGraphInteractionBrowserAdapter
   openNodeImagePreview: (snapshot: ImageNodeItem, mode: 'latest-output') => Promise<void>
   openImageUrlPreview: (src: string, ratio?: number) => Promise<void>
   imageWorkflowUi: CanvasImageWorkflowUiAdapter
@@ -64,37 +62,23 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     browser: options.graphEditingBrowser,
     upload: options.uploadApi,
     preview: {
-      openNodeImage: options.openNodeImagePreview,
       openImageUrl: options.openImageUrlPreview,
     },
     feedback: feedback.graph,
   })
 
-  function clearSelectedFlowElementsSync() {
-    const selectedElements = [...options.flowPaneAdapter.getSelectedElements.value]
-    if (selectedElements.length > 0) {
-      options.flowPaneAdapter.removeSelectedElements(selectedElements)
-    }
-  }
-
-  const selectionExport = useFlowSelectionExport({
-    nodes: board.flowPane.nodes,
-    message: {
-      success: feedback.graph.operationSucceeded,
-      warning: feedback.graph.operationWarning,
-      loading: feedback.graph.operationLoading,
-    },
-  })
-  const hasSelectedFlowNodes = computed(() => selectionExport.hasSelectedNodes())
-  const interaction = useFlowCanvasInteractionState()
-  const imageNodeInteractions = useFlowImageNodeInteractions({
-    nodes: board.flowPane.nodes,
-    getImageNodeDisplayPayload: editing.workflowPort.getImageNodeDisplayPayload,
-    graphAdapter: board.graphEditing.adapter,
-  })
-  const nodeUiState = useFlowNodeUiState({
+  const graphInteractions = useCanvasGraphInteractions({
     nodes: board.flowPane.nodes,
     edges: board.flowPane.edges,
+    graphAdapter: board.graphEditing.adapter,
+    createCurrentCanvasGraphStore: board.graphEditing.createCurrentCanvasGraphStore,
+    selection: {
+      selectedElements: options.flowPaneAdapter.getSelectedElements,
+      clear: options.flowPaneAdapter.removeSelectedElements,
+    },
+    browser: options.graphInteractionBrowser,
+    preview: { openNodeImage: options.openNodeImagePreview },
+    feedback: feedback.graph,
   })
 
   const viewport = useCanvasViewportRuntime({
@@ -113,8 +97,8 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     panBy: options.flowPaneAdapter.panBy,
     loadInitialOrRouteBoard: board.boardSession.loadInitialOrRouteBoard,
     closeBoardHeaderEditing: board.boardChrome.closeBoardHeaderEditing,
-    startCanvasInteraction: interaction.startCanvasInteraction,
-    stopCanvasInteraction: interaction.stopCanvasInteraction,
+    startCanvasInteraction: graphInteractions.runtimePort.startInteraction,
+    stopCanvasInteraction: graphInteractions.runtimePort.stopInteraction,
     startNodeDragInteraction: options.startNodeDragInteraction,
     stopNodeDragInteraction: options.stopNodeDragInteraction,
     refreshFlowHandleVisibility: options.refreshFlowHandleVisibility,
@@ -136,9 +120,9 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
       createImageNodeFromFile: editing.workflowPort.createImageNodeFromFile,
       connectionAdapter: editing.flowPane.connectionAdapter,
       uploadImageToBoard: editing.workflowPort.uploadImageToBoard,
-      clearSelectedFlowElements: clearSelectedFlowElementsSync,
-      startCanvasInteraction: interaction.startCanvasInteraction,
-      stopCanvasInteraction: interaction.stopCanvasInteraction,
+      clearSelectedFlowElements: graphInteractions.commands.clearSelection,
+      startCanvasInteraction: graphInteractions.runtimePort.startInteraction,
+      stopCanvasInteraction: graphInteractions.runtimePort.stopInteraction,
       getMediaInputImages: editing.workflowPort.getMediaInputImages,
       resolvePromptInputImageNodeIds: editing.workflowPort.resolvePromptInputImageNodeIds,
       updateSnapshotNodeParam: editing.workflowPort.updateNodeParams,
@@ -187,23 +171,24 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
       scheduleFlowNodeInternalsRefresh: editing.commands.scheduleNodeInternalsRefresh,
       createNodeAtPosition: editing.commands.createNodeAtPosition,
       createNodeInteractions: editing.commands.createNodeInteractions,
-      hasSelectedFlowNodes,
-      onExportSelectedImages: selectionExport.exportSelectedImages,
-      isFlowInteractionActive: interaction.isCanvasInteractionActive,
-      isFlowViewportPanInteractionActive: interaction.isViewportPanInteractionActive,
-      isFlowInteractionLocked: interaction.isCanvasInteractionLocked,
+      hasSelectedFlowNodes: graphInteractions.viewModel.hasSelectedNodes,
+      onExportSelectedImages: graphInteractions.commands.exportSelectedImages,
+      isFlowInteractionActive: graphInteractions.viewModel.isInteractionActive,
+      isFlowViewportPanInteractionActive:
+        graphInteractions.viewModel.isViewportPanInteractionActive,
+      isFlowInteractionLocked: graphInteractions.viewModel.isInteractionLocked,
       onFlowMediaInputImageDrop: editing.commands.mediaInputs.drop,
       onFlowMediaInputImageOpen: editing.commands.mediaInputs.open,
       onFlowMediaInputImagePreview: editing.commands.mediaInputs.preview,
       onFlowMediaInputImageRemove: editing.commands.mediaInputs.remove,
       onCanvasDrop: editing.commands.canvasFiles.drop,
       onCanvasDragOver: editing.commands.canvasFiles.dragOver,
-      onFlowImageOpenPreview: editing.commands.imageNodes.openPreview,
-      onFlowImageAppendToCanvas: editing.commands.imageNodes.appendToCanvas,
-      beginFlowNodeDragDuplicateTracking: imageNodeInteractions.beginFlowNodeDragDuplicateTracking,
+      onFlowImageOpenPreview: graphInteractions.commands.openImagePreview,
+      onFlowImageAppendToCanvas: graphInteractions.commands.appendImageToCanvas,
+      beginFlowNodeDragDuplicateTracking: graphInteractions.commands.beginNodeDragDuplicateTracking,
       finishFlowNodeDragDuplicateTracking:
-        imageNodeInteractions.finishFlowNodeDragDuplicateTracking,
-      getFlowNodeUiStateCached: nodeUiState.getFlowNodeUiStateCached,
+        graphInteractions.commands.finishNodeDragDuplicateTracking,
+      getFlowNodeUiStateCached: graphInteractions.commands.getNodeUiState,
     },
     imageWorkflow,
   }

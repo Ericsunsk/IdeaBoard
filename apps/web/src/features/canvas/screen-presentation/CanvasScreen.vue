@@ -112,7 +112,10 @@ import {
 } from '../composables/useFlowTransientUiDismissal'
 import { useImageStageRegistry } from '../composables/useImageStageRegistry'
 import { useFlowPaneSelectionAdapter, useVueFlowPaneAdapter } from '../flow-pane'
-import { createCanvasGraphEditingBrowserAdapter } from '../graph-editing'
+import {
+  createCanvasGraphEditingBrowserAdapter,
+  createCanvasGraphInteractionBrowserAdapter,
+} from '../graph-editing'
 import { useCanvasWorkspaceRuntime } from '../workspace-runtime'
 import {
   createFusionNodePresentationResolver,
@@ -177,6 +180,7 @@ const duplicateModifierPressed = ref(false)
 const { setImageStageRef, clearImageStageRef, getImageStageElement } = useImageStageRegistry()
 const { openNodeImagePreview, openImageUrlPreview } = useFlowImagePreviewLightbox()
 const graphEditingBrowser = createCanvasGraphEditingBrowserAdapter()
+const graphInteractionBrowser = createCanvasGraphInteractionBrowserAdapter()
 let selectNodeForContextMenu: (nodeId: string) => void = () => {}
 let readCanvasInteractionLocked = () => false
 const imageWorkflowUi = {
@@ -202,6 +206,7 @@ const workspace = useCanvasWorkspaceRuntime({
   flowPaneAdapter,
   uploadApi,
   graphEditingBrowser,
+  graphInteractionBrowser,
   openNodeImagePreview,
   openImageUrlPreview,
   imageWorkflowUi,

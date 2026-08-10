@@ -50,7 +50,6 @@ function createHarness(initialNodes: Node[] = []) {
     width: 200,
     height: 100,
   }))
-  const openNodeImage = vi.fn(async () => {})
   const openImageUrl = vi.fn(async () => {})
   const feedback = {
     operationSucceeded: vi.fn(),
@@ -74,7 +73,7 @@ function createHarness(initialNodes: Node[] = []) {
       markDropAsCopy: vi.fn(),
     },
     upload: { upload },
-    preview: { openNodeImage, openImageUrl },
+    preview: { openImageUrl },
     feedback,
   })
 
@@ -84,7 +83,6 @@ function createHarness(initialNodes: Node[] = []) {
     pickedFile,
     droppedFile,
     upload,
-    openNodeImage,
     openImageUrl,
     feedback,
   }
@@ -119,7 +117,7 @@ describe('useCanvasGraphEditing', () => {
     ])
   })
 
-  it('owns file picking, upload, image mutation, and preview outcomes', async () => {
+  it('owns file picking, upload, and image mutation outcomes', async () => {
     const image: ImageNodeItem = {
       id: 1,
       type: 'image-node',
@@ -140,10 +138,7 @@ describe('useCanvasGraphEditing', () => {
     })
 
     await interactions.onFlowImageOpenFile('image-1')
-    harness.editing.commands.imageNodes.openPreview('image-1')
-
     const snapshot = harness.nodes.value[0]?.data?.snapshotNode as ImageNodeItem
-    harness.editing.commands.imageNodes.appendToCanvas('image-1')
     expect(harness.upload).toHaveBeenCalledWith(expect.any(File), 'board-a')
     expect(snapshot).toMatchObject({
       title: 'picked.png',
@@ -153,11 +148,6 @@ describe('useCanvasGraphEditing', () => {
       outputStatus: 'ready',
     })
     expect(discardNodeEdits).toHaveBeenCalledWith('image-1')
-    expect(harness.openNodeImage).toHaveBeenCalledWith(snapshot, 'latest-output')
-    expect(harness.nodes.value[1]?.data?.snapshotNode).toMatchObject({
-      sourceImageUrl: 'https://example.com/uploaded.png',
-      sourceMediaAssetId: 42,
-    })
     expect(harness.feedback.operationSucceeded).toHaveBeenCalledWith('Image 节点输入已更新')
   })
 

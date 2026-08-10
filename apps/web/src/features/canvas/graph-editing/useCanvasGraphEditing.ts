@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
-import type { CanvasBoardSnapshot, CanvasNodeItem, ImageNodeItem } from '../../canvas-board/domain'
+import type { CanvasBoardSnapshot, CanvasNodeItem } from '../../canvas-board/domain'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { CanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
 import { useFlowCanvasDrop } from '../composables/useFlowCanvasDrop'
@@ -13,7 +13,6 @@ import { useFlowNodeMediaInputs } from '../composables/useFlowNodeMediaInputs'
 import { useFlowNodeMutations } from '../composables/useFlowNodeMutations'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 import type { CanvasGraphEditingBrowserAdapter } from './browserAdapter'
-import { useFlowImageAppendToCanvas } from './useFlowImageAppendToCanvas'
 
 type ValueRef<T> = { readonly value: T }
 type SnapshotNodeMutator = (snapshotNode: CanvasNodeItem) => CanvasNodeItem
@@ -58,7 +57,6 @@ type UseCanvasGraphEditingOptions = {
   browser: CanvasGraphEditingBrowserAdapter
   upload: CanvasGraphEditingUploadAdapter
   preview: {
-    openNodeImage: (snapshot: ImageNodeItem, mode: 'latest-output') => Promise<void>
     openImageUrl: (src: string, ratio?: number) => Promise<void>
   }
   feedback: CanvasFeedback['graph']
@@ -117,17 +115,6 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
     onWarning: options.feedback.operationWarning,
     createImageNodeFromFile,
   })
-  const imageAppend = useFlowImageAppendToCanvas({
-    getImageNodeDisplayPayload,
-    getImageNodeSnapshot,
-    graphAdapter: options.graphAdapter,
-  })
-
-  function openImageNodePreview(nodeId: string) {
-    const snapshot = getImageNodeSnapshot(nodeId)
-    if (snapshot) void options.preview.openNodeImage(snapshot, 'latest-output')
-  }
-
   function createNodeInteractions(
     interactionOptions: CanvasGraphEditingNodeInteractionsOptions,
   ): CanvasGraphEditingNodeInteractions {
@@ -178,10 +165,6 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
       canvasFiles: {
         drop: canvasDrop.onCanvasDrop,
         dragOver: canvasDrop.onCanvasDragOver,
-      },
-      imageNodes: {
-        openPreview: openImageNodePreview,
-        appendToCanvas: imageAppend.appendImageToCanvas,
       },
     },
     workflowPort: {

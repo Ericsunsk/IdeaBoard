@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   },
   useCanvasBoardRuntime: vi.fn(),
   useCanvasGraphEditing: vi.fn(),
+  useCanvasGraphInteractions: vi.fn(),
   useCanvasViewportRuntime: vi.fn(),
   useCanvasImageWorkflow: vi.fn(),
   cancelDeletedRunningTasks: vi.fn(),
@@ -46,6 +47,7 @@ vi.mock('../../composables/useCanvasBoardRuntime', () => ({
 
 vi.mock('../../graph-editing', () => ({
   useCanvasGraphEditing: mocks.useCanvasGraphEditing,
+  useCanvasGraphInteractions: mocks.useCanvasGraphInteractions,
 }))
 
 vi.mock('../../composables/useCanvasViewportRuntime', () => ({
@@ -153,10 +155,6 @@ function createGraphEditingRuntime(graph: ReturnType<typeof createGraphRuntime>)
         drop: vi.fn(),
         dragOver: vi.fn(),
       },
-      imageNodes: {
-        openPreview: vi.fn(),
-        appendToCanvas: vi.fn(),
-      },
     },
     workflowPort: {
       getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
@@ -167,6 +165,30 @@ function createGraphEditingRuntime(graph: ReturnType<typeof createGraphRuntime>)
       resolvePromptInputImageNodeIds: graph.resolvePromptInputImageNodeIds,
       updateNodeParams: graph.updateNodeParams,
       markNodeExecutionDirty: graph.markFlowExecutionNodeDirty,
+    },
+  }
+}
+
+function createGraphInteractionRuntime(graph: ReturnType<typeof createGraphRuntime>) {
+  return {
+    viewModel: {
+      hasSelectedNodes: ref(false),
+      isInteractionActive: ref(false),
+      isViewportPanInteractionActive: ref(false),
+      isInteractionLocked: ref(false),
+    },
+    commands: {
+      clearSelection: graph.clearSelectedFlowElementsSync,
+      exportSelectedImages: vi.fn(),
+      openImagePreview: vi.fn(),
+      appendImageToCanvas: vi.fn(),
+      beginNodeDragDuplicateTracking: vi.fn(),
+      finishNodeDragDuplicateTracking: vi.fn(),
+      getNodeUiState: vi.fn(),
+    },
+    runtimePort: {
+      startInteraction: graph.startFlowInteraction,
+      stopInteraction: graph.stopFlowInteraction,
     },
   }
 }
@@ -230,6 +252,9 @@ function createWorkspaceOptions() {
       readDropScreenPoint: vi.fn(() => ({ x: 0, y: 0 })),
       markDropAsCopy: vi.fn(),
     },
+    graphInteractionBrowser: {
+      downloadImage: vi.fn(),
+    },
     openNodeImagePreview: vi.fn(),
     openImageUrlPreview: vi.fn(),
     imageWorkflowUi: {
@@ -283,6 +308,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     })
     mocks.useCanvasBoardRuntime.mockReturnValue(board)
     mocks.useCanvasGraphEditing.mockReturnValue(createGraphEditingRuntime(graph))
+    mocks.useCanvasGraphInteractions.mockReturnValue(createGraphInteractionRuntime(graph))
     mocks.useCanvasImageWorkflow.mockReturnValue(imageWorkflow)
     mocks.useCanvasViewportRuntime.mockReturnValue(viewportRuntime)
 
@@ -352,6 +378,15 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
         feedback: mocks.feedback.graph,
       }),
     )
+    expect(mocks.useCanvasGraphInteractions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nodes: board.flowPane.nodes,
+        edges: board.flowPane.edges,
+        graphAdapter: board.graphEditing.adapter,
+        browser: runtimeOptions.graphInteractionBrowser,
+        feedback: mocks.feedback.graph,
+      }),
+    )
     expect(mocks.useCanvasImageWorkflow).toHaveBeenCalledWith(
       expect.objectContaining({
         graph: expect.objectContaining({
@@ -380,6 +415,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     const imageWorkflow = createImageWorkflowRuntime()
     mocks.useCanvasBoardRuntime.mockReturnValue(board)
     mocks.useCanvasGraphEditing.mockReturnValue(createGraphEditingRuntime(graph))
+    mocks.useCanvasGraphInteractions.mockReturnValue(createGraphInteractionRuntime(graph))
     mocks.useCanvasImageWorkflow.mockReturnValue(imageWorkflow)
 
     const runtime = createCanvasWorkspaceRuntime(createWorkspaceOptions())
