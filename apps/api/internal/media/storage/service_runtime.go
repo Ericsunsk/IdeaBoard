@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"mime/multipart"
 	"net/url"
 	"os"
@@ -17,7 +16,6 @@ import (
 
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/media/mediarefs"
-	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/safehttp"
 )
 
@@ -486,47 +484,12 @@ func (s *StorageService) publicUploadURL(ctx context.Context, objectKey string) 
 	if s == nil {
 		return ""
 	}
-	return publicUploadURLWithOrigins(s.publicOrigins, objectKey)
+	return publicUploadURL(objectKey)
 }
 
-func publicUploadURLWithOrigins(publicOrigins config.PublicOriginsConfig, objectKey string) string {
+func publicUploadURL(objectKey string) string {
 	normalized := "/" + strings.TrimLeft(filepath.ToSlash(objectKey), "/")
-	base := resolvePublicUploadBaseURL(publicOrigins)
-	if base == nil {
-		// Local storage remains addressable in development and same-origin
-		// deployments even when an absolute API origin is not configured.
-		return normalized
-	}
-	out := *base
-	out.Path = path.Join(base.Path, normalized)
-	out.RawQuery = ""
-	out.Fragment = ""
-	return out.String()
-}
-
-func resolvePublicUploadBaseURL(publicOrigins config.PublicOriginsConfig) *url.URL {
-	parsed := publicOrigins.APIParsedURL()
-	if parsed != nil {
-		logPublicUploadAuthWarningOnce.Do(func() {
-			if isLikelyObjectStorageHost(parsed.Host) {
-				slog.Warn("API_BASE_URL 指向对象存储域名，上传文件可能绕过应用鉴权被直接访问。请使用应用 API 域名。",
-					"host", parsed.Host)
-			}
-		})
-	}
-	return parsed
-}
-
-var logPublicUploadAuthWarningOnce sync.Once
-
-func isLikelyObjectStorageHost(host string) bool {
-	host = strings.ToLower(host)
-	for _, pattern := range []string{".s3.", ".amazonaws.com", ".digitaloceanspaces.com", ".storage.googleapis.com", ".blob.core.windows.net", ".r2.cloudflarestorage.com"} {
-		if strings.Contains(host, pattern) {
-			return true
-		}
-	}
-	return false
+	return normalized
 }
 
 func (s *StorageService) deleteLocalByObjectKey(objectKey string) error {

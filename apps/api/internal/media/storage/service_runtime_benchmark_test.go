@@ -11,8 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"ideaboard/api/internal/platform/config"
 )
 
 func BenchmarkStorageStoreBytesLocal(b *testing.B) {
@@ -97,7 +95,7 @@ func newBenchmarkStorageService(b *testing.B) *StorageService {
 		_ = os.Chdir(originalWD)
 	})
 
-	return NewStorageService(nil, config.PublicOriginsConfig{})
+	return NewStorageService(nil)
 }
 
 func benchmarkLocalProfile() StorageProfile {

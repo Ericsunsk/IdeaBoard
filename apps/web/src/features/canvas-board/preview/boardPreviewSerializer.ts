@@ -8,7 +8,11 @@ import {
   normalizeFusionBlendPoint,
   resolveImageNodeStageHeight,
 } from '../domain'
-import { resolveApiUrl, resolveAssetUrl } from '../../../shared/config/runtimeUrls'
+import {
+  canonicalizeRuntimeUploadRef,
+  resolveApiUrl,
+  resolveAssetUrl,
+} from '../../../shared/config/runtimeUrls'
 import {
   BLANK_BOARD_PREVIEW_BACKGROUND,
   BLANK_BOARD_PREVIEW_DOT_COLOR,
@@ -112,7 +116,7 @@ function withAlpha(hex: string, alpha: number): string {
 }
 
 function toAbsolutePreviewUrl(url: string): string {
-  const normalized = resolveAssetUrl(url.trim())
+  const normalized = resolveAssetUrl(canonicalizeRuntimeUploadRef(url.trim()).trim())
   if (!normalized) return ''
   if (
     normalized.startsWith('http://') ||

@@ -12,8 +12,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"ideaboard/api/internal/platform/config"
 )
 
 func withTempWorkingDir(t *testing.T) {
@@ -29,6 +27,13 @@ func withTempWorkingDir(t *testing.T) {
 	t.Cleanup(func() {
 		_ = os.Chdir(originalWD)
 	})
+}
+
+func TestPublicUploadURLUsesCanonicalRelativePath(t *testing.T) {
+	got := publicUploadURL("uploads/canvas/U123/board/content/demo.png")
+	if got != "/uploads/canvas/U123/board/content/demo.png" {
+		t.Fatalf("publicUploadURL = %q", got)
+	}
 }
 
 func TestDeleteLocalByObjectKeyRemovesFile(t *testing.T) {
@@ -54,17 +59,6 @@ func TestDeleteLocalByObjectKeyRemovesFile(t *testing.T) {
 	}
 	if _, err := os.Stat(localPath); !os.IsNotExist(err) {
 		t.Fatalf("expected file to be removed, stat err = %v", err)
-	}
-}
-
-func TestPublicUploadURLUsesAssetBaseURL(t *testing.T) {
-	got := publicUploadURLWithOrigins(
-		config.PublicOriginsConfig{Web: "https://app.example.com", API: "https://api.example.com"},
-		"uploads/canvas/U123/board/content/demo.png",
-	)
-	want := "https://api.example.com/uploads/canvas/U123/board/content/demo.png"
-	if got != want {
-		t.Fatalf("publicUploadURL = %q, want %q", got, want)
 	}
 }
 

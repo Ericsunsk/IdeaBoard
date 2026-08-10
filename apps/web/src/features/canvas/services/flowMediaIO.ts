@@ -1,6 +1,6 @@
 /** Shared media URL/Blob/Canvas utilities used across canvas services. */
 import { USER_DOWNLOAD_ENDPOINT } from '../../../shared/constants/media'
-import { resolveAssetUrl } from '../../../shared/config/runtimeUrls'
+import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../shared/config/runtimeUrls'
 import { uploadApi } from '../../../shared/api/upload'
 
 /**
@@ -16,7 +16,7 @@ export function isDataUrl(value: string): boolean {
  * Returns null for invalid or empty input.
  */
 export function toAbsoluteUrl(raw: string): URL | null {
-  const normalized = resolveAssetUrl(raw.trim())
+  const normalized = resolveAssetUrl(canonicalizeRuntimeUploadRef(raw.trim()).trim())
   if (!normalized) return null
   try {
     return new URL(normalized, window.location.origin)
@@ -37,7 +37,7 @@ export function resolveFetchUrl(
   raw: string,
   options?: { allowSameOriginUploads?: boolean; blockExternal?: boolean },
 ): string {
-  const trimmed = resolveAssetUrl(raw.trim())
+  const trimmed = resolveAssetUrl(canonicalizeRuntimeUploadRef(raw.trim()).trim())
   if (!trimmed) return ''
   if (/^data:/i.test(trimmed)) return trimmed
   const url = toAbsoluteUrl(trimmed)

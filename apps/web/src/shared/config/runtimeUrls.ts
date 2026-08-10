@@ -12,6 +12,16 @@ function normalizeBaseURL(value: string | undefined, fallback: string): string {
   return trimTrailingSlashes(trimmed)
 }
 
+function isLoopbackHostname(hostname: string): boolean {
+  const normalized = hostname.trim().toLowerCase()
+  return (
+    normalized === 'localhost' ||
+    normalized === '127.0.0.1' ||
+    normalized === '[::1]' ||
+    normalized === '::1'
+  )
+}
+
 function defaultAuthBaseURL(): string {
   if (typeof window !== 'undefined') return window.location.origin
   return 'http://localhost:5173'
@@ -84,7 +94,7 @@ export function canonicalizeRuntimeUploadRef(raw: string): string {
     const isPublicAssetOrigin = assetBase
       ? url.origin === assetBase.origin
       : typeof window !== 'undefined' && url.origin === window.location.origin
-    if (!isPublicAssetOrigin) return raw
+    if (!isPublicAssetOrigin && !isLoopbackHostname(url.hostname)) return raw
     return `${url.pathname}${url.search}`
   } catch {
     return raw
@@ -97,7 +107,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 export function normalizeRuntimeMediaRefs<T>(value: T): T {
   if (typeof value === 'string') {
-    return resolveAssetUrl(value) as T
+    return resolveAssetUrl(canonicalizeRuntimeUploadRef(value)) as T
   }
   if (Array.isArray(value)) {
     return value.map((item) => normalizeRuntimeMediaRefs(item)) as T

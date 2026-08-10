@@ -264,7 +264,7 @@ func newTestProviderExecutorWithLocalStorage(t *testing.T) *ProviderExecutor {
 	})
 
 	db := testdb.Open(t)
-	storageService := storage.NewStorageService(storage.NewStorageProfileRepository(db), config.PublicOriginsConfig{})
+	storageService := storage.NewStorageService(storage.NewStorageProfileRepository(db))
 	mediaStore := storage.NewRuntimeTaskMediaStore(storageService)
 
 	return &ProviderExecutor{

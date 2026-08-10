@@ -15,7 +15,6 @@ import (
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/identity/users"
-	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/secrets"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
@@ -135,7 +134,7 @@ func newStorageServiceTest(t *testing.T) (*StorageService, *StorageProfileReposi
 
 	db := testdb.Open(t)
 	repo := NewStorageProfileRepository(db)
-	service := NewStorageService(repo, config.PublicOriginsConfig{})
+	service := NewStorageService(repo)
 	if err := service.EnsureDefaultProfiles(context.Background()); err != nil {
 		t.Fatalf("EnsureDefaultProfiles returned error: %v", err)
 	}
@@ -148,7 +147,7 @@ func newStorageServiceTestWithoutDefault(t *testing.T) (*StorageService, *Storag
 
 	db := testdb.Open(t)
 	repo := NewStorageProfileRepository(db)
-	return NewStorageService(repo, config.PublicOriginsConfig{}), repo
+	return NewStorageService(repo), repo
 }
 
 func TestListProfilesStartsWithLocalProfile(t *testing.T) {
@@ -993,15 +992,6 @@ func TestListProfilesWithSecretsFailsOnWrongEncryptionKey(t *testing.T) {
 	}
 	if _, err := repo.ListProfilesWithSecrets(ctx, false); err == nil {
 		t.Fatal("ListProfilesWithSecrets should fail when ciphertext was encrypted with another key")
-	}
-}
-
-func TestLikelyObjectStorageHostIncludesCloudflareR2(t *testing.T) {
-	if !isLikelyObjectStorageHost("account.r2.cloudflarestorage.com") {
-		t.Fatal("Cloudflare R2 host should be treated as object storage")
-	}
-	if isLikelyObjectStorageHost("api.example.com") {
-		t.Fatal("application API host should not be treated as object storage")
 	}
 }
 

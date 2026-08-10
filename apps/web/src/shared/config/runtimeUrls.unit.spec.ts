@@ -35,4 +35,22 @@ describe('runtime URL helpers', () => {
       'https://api.example.com/api/auth/get-session',
     )
   })
+
+  it('canonicalizes local API upload URLs for the Vite proxy', async () => {
+    vi.resetModules()
+
+    const { canonicalizeRuntimeUploadRef, normalizeRuntimeMediaRefs } =
+      await import('./runtimeUrls')
+
+    expect(
+      canonicalizeRuntimeUploadRef(
+        'http://localhost:6000/uploads/canvas/U123/board/content/image.png',
+      ),
+    ).toBe('/uploads/canvas/U123/board/content/image.png')
+    expect(
+      normalizeRuntimeMediaRefs({
+        sourceImageUrl: 'http://localhost:6000/uploads/canvas/U123/board/content/image.png',
+      }),
+    ).toEqual({ sourceImageUrl: '/uploads/canvas/U123/board/content/image.png' })
+  })
 })

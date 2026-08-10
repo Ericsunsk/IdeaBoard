@@ -8,6 +8,7 @@ import {
   unsupportedUploadImageMessage,
 } from '../../../shared/utils/imageUploadSupport'
 import { prepareImageAssetForUpload } from '../../../shared/media/imageAssetPipeline'
+import { canonicalizeRuntimeUploadRef } from '../../../shared/config/runtimeUrls'
 import { resolveImageNodeFrameSize } from '../../canvas-board/domain'
 import { readCurrentBoardIdRef } from '../utils/currentBoardId'
 import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
@@ -99,7 +100,11 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
         const preparedRatio = prepared.dimensionsKnown && prepared.ratio > 0 ? prepared.ratio : null
         const resolvedRatio =
           preparedRatio ?? (serverRatio && serverRatio > 0 ? serverRatio : null) ?? 1
-        return { url: uploaded.url, ratio: resolvedRatio, mediaAssetId }
+        return {
+          url: canonicalizeRuntimeUploadRef(uploaded.url),
+          ratio: resolvedRatio,
+          mediaAssetId,
+        }
       } finally {
         inFlightUploads.delete(cacheKey)
       }
