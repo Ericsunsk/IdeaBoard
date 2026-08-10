@@ -13,6 +13,14 @@ export {
 export { createImageExecutionPlanner } from './planning/ImageExecutionPlan'
 export { useFlowImageWorkflowExecution } from './runtime/flowImageWorkflowExecution'
 export {
+  createCanvasExecutionRuntime,
+  projectCanvasExecutionEdgeAnimation,
+  type CanvasExecutionEdgeProjection,
+  type CanvasExecutionRuntime,
+  type CanvasExecutionStatus,
+  type CanvasNodeExecutionState,
+} from './runtime/CanvasExecutionRuntime'
+export {
   createImageWorkflowCommands,
   type ImageWorkflowCommands,
 } from './runtime/imageWorkflowCommandRuntime'
