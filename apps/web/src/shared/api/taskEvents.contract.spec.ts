@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ApiResponseTaskData, Task } from './generated-query/model'
-import { TaskResultPendingError, waitTaskImageResultsWithSse } from './taskEvents'
+import {
+  TaskCancelledError,
+  TaskResultPendingError,
+  waitTaskImageResultsWithSse,
+} from './taskEvents'
 import { subscribeUserCreditsInvalidation } from '../query/userCreditsInvalidation'
 
 const mocks = vi.hoisted(() => ({
@@ -281,6 +285,7 @@ describe('waitTaskImageResultsWithSse', () => {
       cancel_reason: '用户取消',
     })
 
+    await expect(result).rejects.toThrow(TaskCancelledError)
     await expect(result).rejects.toThrow('用户取消')
     expect(mocks.getTask).not.toHaveBeenCalled()
   })
@@ -293,7 +298,9 @@ describe('waitTaskImageResultsWithSse', () => {
       }),
     )
 
-    await expect(waitTaskImageResultsWithSse('task-1')).rejects.toThrow('账号已停用')
+    const result = waitTaskImageResultsWithSse('task-1')
+    await expect(result).rejects.toThrow(TaskCancelledError)
+    await expect(result).rejects.toThrow('账号已停用')
   })
 
   it('treats storage materialization failures from polling as pending retry', async () => {

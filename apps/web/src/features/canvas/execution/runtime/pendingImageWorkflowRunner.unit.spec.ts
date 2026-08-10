@@ -230,6 +230,7 @@ describe('pendingImageWorkflowRunner', () => {
     let isCurrent = true
     const onSuccess = vi.fn()
     const onWarning = vi.fn()
+    const onExecutionStateChange = vi.fn()
     const executionRuntime = createCanvasExecutionRuntime()
     const pendingResults = createPendingResults(async (params) => {
       expect(params.isCurrent()).toBe(true)
@@ -241,6 +242,7 @@ describe('pendingImageWorkflowRunner', () => {
       pendingResults,
       isBoardCurrent: () => isCurrent,
       executionRuntime,
+      onExecutionStateChange,
       onSuccess,
       onWarning,
     })
@@ -258,6 +260,11 @@ describe('pendingImageWorkflowRunner', () => {
 
     expect(onSuccess).not.toHaveBeenCalled()
     expect(onWarning).not.toHaveBeenCalled()
+    expect(onExecutionStateChange).toHaveBeenCalledOnce()
+    expect(onExecutionStateChange).toHaveBeenCalledWith({
+      nodeId: 'image-2',
+      state: { status: 'submitting' },
+    })
     expect(executionRuntime.getNodeState('image-2')).toEqual({ status: 'cancelled' })
   })
 

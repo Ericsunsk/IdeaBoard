@@ -29,6 +29,13 @@ export class TaskResultPendingError extends Error {
   }
 }
 
+export class TaskCancelledError extends Error {
+  constructor(message = '任务已取消') {
+    super(message)
+    this.name = 'TaskCancelledError'
+  }
+}
+
 export function isTaskResultPendingError(error: unknown): error is TaskResultPendingError {
   return error instanceof TaskResultPendingError
 }
@@ -227,9 +234,11 @@ function isTaskNotFoundError(error: unknown): boolean {
   return code === 404
 }
 
-export function createTaskCancelledError(task?: Pick<Task, 'error_msg' | 'cancel_reason'>): Error {
+export function createTaskCancelledError(
+  task?: Pick<Task, 'error_msg' | 'cancel_reason'>,
+): TaskCancelledError {
   const msg = task?.cancel_reason?.trim() || task?.error_msg?.trim() || '任务已取消'
-  return new Error(sanitizeApiErrorMessage(msg, '任务已取消'))
+  return new TaskCancelledError(sanitizeApiErrorMessage(msg, '任务已取消'))
 }
 
 function extractImageResultsFromTaskEvent(task: TaskEventPayload): TaskImageResult[] {
