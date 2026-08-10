@@ -76,11 +76,35 @@ jobs:
         working-directory: apps/api
         run: go test ./internal/db/migrations -count=1
 
+      - name: Resolve Schema Release commits
+        id: schema-release-commits
+        shell: bash
+        env:
+          REQUESTED_BASE_SHA: ${{ inputs.base_sha }}
+          EVENT_BASE_SHA: ${{ github.event.before }}
+          REQUESTED_HEAD_SHA: ${{ inputs.ref || github.sha }}
+        run: |
+          head_sha="$(git rev-parse --verify "${REQUESTED_HEAD_SHA}^{commit}")"
+          base_sha="${REQUESTED_BASE_SHA}"
+
+          if [[ -z "${base_sha}" || "${base_sha}" =~ ^0+$ ]]; then
+            base_sha="${EVENT_BASE_SHA}"
+          fi
+          if [[ -z "${base_sha}" || "${base_sha}" =~ ^0+$ ]]; then
+            base_sha="${head_sha}^1"
+          fi
+
+          base_sha="$(git rev-parse --verify "${base_sha}^{commit}")"
+          {
+            echo "base_sha=${base_sha}"
+            echo "head_sha=${head_sha}"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Check Schema Release contract
         working-directory: apps/api
         env:
-          BASE_SHA: ${{ inputs.base_sha || github.event.before || github.sha }}
-          HEAD_SHA: ${{ inputs.ref || github.sha }}
+          BASE_SHA: ${{ steps.schema-release-commits.outputs.base_sha }}
+          HEAD_SHA: ${{ steps.schema-release-commits.outputs.head_sha }}
         run: go run ./cmd/schema-release
 
   api-tests:

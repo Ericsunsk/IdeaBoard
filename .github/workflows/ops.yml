@@ -19,6 +19,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
 
+      - name: Set up Go
+        uses: ./.github/actions/setup-go
+
+      - name: Lint GitHub Actions workflows
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
+
       - name: Check shell syntax
         shell: bash
         run: |
@@ -26,6 +32,7 @@ jobs:
           bash -n scripts/render-cloudflare-real-ip-conf.sh
           bash -n scripts/uninstall-vps.sh
           bash -n scripts/deploy-stack.sh
+          bash -n scripts/deploy-stack-test.sh
           bash -n scripts/production-deploy-entrypoint.sh
           bash -n scripts/production-deploy-entrypoint-test.sh
 
@@ -46,8 +53,13 @@ jobs:
             scripts/render-cloudflare-real-ip-conf.sh \
             scripts/uninstall-vps.sh \
             scripts/deploy-stack.sh \
+            scripts/deploy-stack-test.sh \
             scripts/production-deploy-entrypoint.sh \
             scripts/production-deploy-entrypoint-test.sh
+
+      - name: Verify manifest-only deployment contract
+        shell: bash
+        run: bash scripts/deploy-stack-test.sh
 
       - name: Verify restricted Production deployment contract
         shell: bash
@@ -76,7 +88,7 @@ jobs:
           for rendered_conf in "$default_conf" "$docker_conf" "$real_ip_conf"; do
             grep -F 'location /api/user/tasks/' "$rendered_conf"
             grep -F 'proxy_set_header Connection "";' "$rendered_conf"
-            if grep -F '${' "$rendered_conf"; then
+            if grep -F "\${" "$rendered_conf"; then
               echo "Unrendered template variable in $rendered_conf" >&2
               exit 1
             fi
@@ -86,7 +98,7 @@ jobs:
             fi
           done
 
-          grep -F 'try_files $uri $uri/ /index.html;' "$default_conf"
+          grep -F "try_files \$uri \$uri/ /index.html;" "$default_conf"
           grep -F 'return 404;' "$docker_conf"
           grep -F 'include /etc/nginx/cloudflare-real-ip.conf;' "$real_ip_conf"
 

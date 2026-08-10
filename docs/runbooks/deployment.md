@@ -170,7 +170,7 @@ Production deployment 使用固定 concurrency group 串行执行，新的发布
 
 发布路径先推送 immutable SHA image，通过 BuildKit 为 multi-arch image 生成 max-mode provenance 和 SBOM attestation，并生成各平台 durable CycloneDX SBOM；固定版本且经过 repo-local SHA-256 校验的 Grype 分别扫描 `linux/amd64` 与 `linux/arm64`，拦截 `high` 及以上漏洞；Cosign keyless OIDC 对最终 image digest 签名，全部成功后才推广 mutable aliases。Grype 版本与 archive trust anchor 分别由 [`.grype-version`](../../.grype-version) 和 [`.grype-checksums`](../../.grype-checksums) 管理，例外统一维护在 [`.grype.yaml`](../../.grype.yaml)，新增例外时只加窄范围规则并记录原因与复查日期。
 
-`ideaboard update` 默认会在 pull 前执行 Cosign keyless 验签。VPS 必须先安装 `cosign`；离线排障时才临时设置 `COSIGN_VERIFY=false`。手动验签示例：
+`ideaboard update --manifest ...` 默认会在 pull 前执行 Cosign keyless 验签。VPS 必须先安装 `cosign`；离线排障时才临时设置 `COSIGN_VERIFY=false`。手动验签示例：
 
 ```bash
 cosign verify \
@@ -181,34 +181,28 @@ cosign verify \
 
 ### 2. 首次 VPS 初始化
 
-快捷初始化：
-
-```bash
-export GITHUB_TOKEN="your-github-token" && curl -fsSL -H "Authorization: token ${GITHUB_TOKEN}" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/Ericsunsk/IdeaBoard/contents/scripts/bootstrap-vps.sh" -o /tmp/bootstrap-vps.sh && bash /tmp/bootstrap-vps.sh
-```
-
-部署特定版本：
+先从目标 GitHub Release 下载同一批次的 `release-manifest.json`，再用明确的 tag 或 commit 初始化：
 
 ```bash
 TOKEN="your-github-token"
 REF="v0.1.0" # 改为目标 tag 或 commit SHA
+MANIFEST="/tmp/release-manifest.json"
 curl -fsSL \
   -H "Authorization: token ${TOKEN}" \
   -H "Accept: application/vnd.github.raw" \
   "https://api.github.com/repos/Ericsunsk/IdeaBoard/contents/scripts/bootstrap-vps.sh?ref=${REF}" \
   -o /tmp/bootstrap-vps.sh
-GITHUB_TOKEN="${TOKEN}" bash /tmp/bootstrap-vps.sh --ref "${REF}"
+GITHUB_TOKEN="${TOKEN}" bash /tmp/bootstrap-vps.sh \
+  --ref "${REF}" \
+  --manifest "${MANIFEST}"
 ```
 
-把 `REF` 换成明确的发布 tag 或 commit SHA。强制重装可加 `IDEABOARD_FORCE=1`；脚本会备份旧目录并恢复 `docker/.env`。Bootstrap 会在部署前检查 `cosign`，除非你已经在 `docker/.env` 里显式设置 `COSIGN_VERIFY=false`。
+`REF` 与 manifest 必须来自同一发布批次。Bootstrap 不接受隐式默认分支或 latest release；缺少 `--ref` 或 `--manifest` 会在 clone、配置写入和部署前直接失败。强制重装可加 `IDEABOARD_FORCE=1`；脚本会备份旧目录并恢复 `docker/.env`。Bootstrap 会在部署前检查 `cosign`，除非你已经在 `docker/.env` 里显式设置 `COSIGN_VERIFY=false`。
 
 至少修改 `/opt/stacks/ideaboard/docker/.env`：
 
 - `APP_BASE_URL`
 - `API_BASE_URL`
-- `IDEABOARD_API_IMAGE`
-- `IDEABOARD_AUTH_IMAGE`
-- `IDEABOARD_AUTH_MIGRATE_IMAGE`
 - `POSTGRES_PASSWORD`
 - `API_DB_PASSWORD`
 - `AUTH_DB_PASSWORD`
@@ -219,27 +213,23 @@ GITHUB_TOKEN="${TOKEN}" bash /tmp/bootstrap-vps.sh --ref "${REF}"
 
 ### 3. 后续部署 / 升级
 
-优先使用同一发布批次的 manifest：
+只允许使用同一发布批次的 manifest：
 
 ```bash
 ideaboard update --manifest release-manifest.json
 ```
 
-没有 manifest 时可使用 fallback：
+`ideaboard update --manifest ...` 会执行：
 
-```bash
-ideaboard update
-```
-
-`ideaboard update` 会执行：
-
-1. 自动拉取部署目录中的配置、脚本和数据库迁移文件。
-2. 写入三张镜像 digest；manifest 优先，自动解析 tag/latest 作为 fallback。
+1. 读取 manifest 中的三张 immutable image digest 并写入 `.env`；缺少 manifest 会 fail closed。
+2. 校验当前 stack checkout 与 manifest 的完整 commit SHA 一致；拒绝 mutable tag/latest，不从 registry tag 反查 digest。
 3. 创建 `.env` snapshot 与 `docker/releases/history/*.json` 发布记录。
 4. 执行 preflight、Cosign 验签、pull、backup、migration、重启与 smoke gate。
 5. 成功后写入 `docker/releases/current.json`，并把上一版保存为 `docker/releases/previous.json`。
 
 Migration 前失败会恢复 `.env` snapshot；migration 后失败不会自动 restore DB，但会输出 release id、失败阶段、backup 路径和 previous digest。
+
+自动 Production entrypoint 会先 checkout manifest commit。手动更新时也必须先让 `/opt/stacks/ideaboard` 指向同一 commit；不一致时部署会在 pull、backup 和 migration 前失败。需要重新铺设 checkout 时，使用同一 `REF` 与 manifest 重新运行 `bootstrap-vps.sh --force`，不要让部署脚本在执行过程中自更新。
 
 ### 4. Backup Hardening
 
@@ -310,7 +300,7 @@ IDEABOARD_COMPOSE_OVERRIDE_FILE=docker/compose.npm.yml
 NPM_NETWORK_NAME=npm-nw
 ```
 
-随后执行 `ideaboard update`。部署脚本会把 `compose.npm.yml` 叠加到 canonical Compose 配置，使 API/Auth 同时保留 IdeaBoard 内网并加入 NPM external network。NPM 的 Forward Hostname / IP 使用 `ideaboard-api`，Forward Port 使用 `6000`；不要使用容器自身的 `127.0.0.1`。PostgreSQL 与 NATS 只保留在 IdeaBoard 内网。
+随后使用目标 release manifest 执行 `ideaboard update --manifest release-manifest.json`。部署脚本会把 `compose.npm.yml` 叠加到 canonical Compose 配置，使 API/Auth 同时保留 IdeaBoard 内网并加入 NPM external network。NPM 的 Forward Hostname / IP 使用 `ideaboard-api`，Forward Port 使用 `6000`；不要使用容器自身的 `127.0.0.1`。PostgreSQL 与 NATS 只保留在 IdeaBoard 内网。
 
 取消 NPM 接入时，先切换反代流量，再从 `.env` 删除上述两个变量并执行 `ideaboard up`。Docker 会按新的目标配置重建 API/Auth，canonical Compose 文件不需要修改。
 

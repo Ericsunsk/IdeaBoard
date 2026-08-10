@@ -64,7 +64,7 @@ jobs:
             echo '| Context | Required |'
             echo '| --- | --- |'
             while IFS='=' read -r context required; do
-              printf '| `%s` | `%s` |\n' "${context}" "${required}"
+              printf "| \`%s\` | \`%s\` |\n" "${context}" "${required}"
             done < "${RUNNER_TEMP}/classification.txt"
           } >> "${GITHUB_STEP_SUMMARY}"
 

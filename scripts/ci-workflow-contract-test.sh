@@ -8,6 +8,7 @@ ci_workflow="${repo_root}/.github/workflows/ci.yml"
 docker_workflow="${repo_root}/.github/workflows/docker-images.yml"
 release_workflow="${repo_root}/.github/workflows/release.yml"
 backend_workflow="${repo_root}/.github/workflows/backend.yml"
+ops_workflow="${repo_root}/.github/workflows/ops.yml"
 
 assert_contains() {
   local file="$1"
@@ -44,10 +45,22 @@ if grep -Fq '    paths:' "${ci_workflow}"; then
 fi
 
 assert_contains "${repo_root}/.github/workflows/web.yml" '  workflow_call:'
-assert_contains "${repo_root}/.github/workflows/ops.yml" '  workflow_call:'
+assert_contains "${ops_workflow}" '  workflow_call:'
+assert_contains "${ops_workflow}" 'uses: ./.github/actions/setup-go'
+assert_contains "${ops_workflow}" 'run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml'
+assert_contains "${ops_workflow}" 'run: bash scripts/deploy-stack-test.sh'
 assert_contains "${backend_workflow}" '  workflow_call:'
 assert_contains "${backend_workflow}" 'name: Backend Verification'
 assert_contains "${backend_workflow}" '          ref: ${{ inputs.ref || github.sha }}'
+assert_contains "${backend_workflow}" '      - name: Resolve Schema Release commits'
+assert_contains "${backend_workflow}" '          REQUESTED_BASE_SHA: ${{ inputs.base_sha }}'
+assert_contains "${backend_workflow}" '          EVENT_BASE_SHA: ${{ github.event.before }}'
+assert_contains "${backend_workflow}" '          if [[ -z "${base_sha}" || "${base_sha}" =~ ^0+$ ]]; then'
+assert_contains "${backend_workflow}" '            base_sha="${head_sha}^1"'
+assert_contains "${backend_workflow}" '          base_sha="$(git rev-parse --verify "${base_sha}^{commit}")"'
+assert_contains "${backend_workflow}" '          BASE_SHA: ${{ steps.schema-release-commits.outputs.base_sha }}'
+assert_contains "${backend_workflow}" '          HEAD_SHA: ${{ steps.schema-release-commits.outputs.head_sha }}'
+assert_not_contains "${backend_workflow}" 'inputs.base_sha || github.event.before || github.sha'
 assert_contains "${backend_workflow}" '      - name: Check Schema Release contract'
 assert_contains "${backend_workflow}" '        run: go run ./cmd/schema-release'
 assert_not_contains "${backend_workflow}" 'schema-assemble'
@@ -92,6 +105,7 @@ for legacy_job in api-generated api-migrations api-tests api-quality auth verify
 done
 
 assert_contains "${docker_workflow}" '    uses: ./.github/workflows/backend.yml'
+assert_contains "${docker_workflow}" '      base_sha: ${{ github.event.before }}'
 assert_contains "${docker_workflow}" '          provenance: mode=max'
 assert_contains "${docker_workflow}" '          sbom: true'
 assert_contains "${docker_workflow}" '          tags: ${{ steps.image.outputs.immutable_tag }}'

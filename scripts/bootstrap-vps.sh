@@ -4,7 +4,8 @@ set -euo pipefail
 
 STACK_DIR="${IDEABOARD_STACK_DIR:-/opt/stacks/ideaboard}"
 REPO_URL="${IDEABOARD_REPO_URL:-https://github.com/Ericsunsk/IdeaBoard.git}"
-BRANCH="${IDEABOARD_BRANCH:-}"
+RELEASE_REF="${IDEABOARD_RELEASE_REF:-}"
+MANIFEST_SOURCE="${IDEABOARD_RELEASE_MANIFEST:-}"
 EDITOR_BIN="${EDITOR:-nano}"
 BIN_PATH="${IDEABOARD_BIN_PATH:-/usr/local/bin/ideaboard}"
 GIT_TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
@@ -14,23 +15,33 @@ DEPLOY_SCRIPT="$STACK_DIR/scripts/deploy-stack.sh"
 
 usage() {
   cat <<EOF
-Usage: bootstrap-vps.sh --ref <tag-or-commit> [--force]
+Usage: bootstrap-vps.sh --ref <tag-or-commit> --manifest <path-or-url> [--force]
 
 Options:
-  --ref, --branch  Git tag, branch, or commit to deploy. Can also be set with IDEABOARD_BRANCH.
-  --force, -f    Move any existing stack directory to a backup, clone again, and restore docker/.env if present.
+  --ref            Strict SemVer tag or full Git commit SHA. Can also be set with IDEABOARD_RELEASE_REF.
+  --manifest       Release manifest path or URL. Can also be set with IDEABOARD_RELEASE_MANIFEST.
+  --force, -f      Move any existing stack directory to a backup, clone again, and restore docker/.env if present.
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --ref|--branch)
+    --ref)
       [[ $# -ge 2 ]] || {
         echo "Missing value for $1" >&2
         usage >&2
         exit 1
       }
-      BRANCH="$2"
+      RELEASE_REF="$2"
+      shift
+      ;;
+    --manifest)
+      [[ $# -ge 2 ]] || {
+        echo "Missing value for $1" >&2
+        usage >&2
+        exit 1
+      }
+      MANIFEST_SOURCE="$2"
       shift
       ;;
     --force|-f)
@@ -48,6 +59,22 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
+
+if [[ -z "$RELEASE_REF" ]]; then
+  echo "Error: --ref <tag-or-commit> is required; mutable branches are not supported for bootstrap." >&2
+  usage >&2
+  exit 1
+fi
+if ! [[ "$RELEASE_REF" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ || "$RELEASE_REF" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Error: --ref must be a strict SemVer tag or full Git commit SHA; mutable branches are not supported." >&2
+  usage >&2
+  exit 1
+fi
+if [[ -z "$MANIFEST_SOURCE" ]]; then
+  echo "Error: --manifest <path-or-url> is required; mutable image tags are not supported." >&2
+  usage >&2
+  exit 1
+fi
 
 cleanup() {
   if [[ -n "$ASKPASS_FILE" && -f "$ASKPASS_FILE" ]]; then
@@ -96,11 +123,7 @@ checkout_ref() {
   local dir="$1"
 
   git_with_auth -C "$dir" fetch --tags --prune origin
-  if git -C "$dir" rev-parse --verify --quiet "origin/$BRANCH^{commit}" >/dev/null; then
-    git_with_auth -C "$dir" checkout -B "$BRANCH" "origin/$BRANCH"
-    return
-  fi
-  git_with_auth -C "$dir" checkout --detach "$BRANCH"
+  git_with_auth -C "$dir" checkout --detach "$RELEASE_REF"
 }
 
 need_command() {
@@ -171,47 +194,6 @@ install_cosign() {
 need_command git
 need_command docker
 
-get_latest_release_tag() {
-  local repo_url="$1"
-  local tags_output
-  tags_output=$(git_with_auth ls-remote --tags --refs "$repo_url" 2>/dev/null || true)
-  if [[ -n "$tags_output" ]]; then
-    local latest
-    latest=$(echo "$tags_output" | awk '{ sub(/^refs\/tags\//, "", $2); print $2 }' | grep '^v[0-9]' | sort -V | tail -n 1)
-    if [[ -n "$latest" ]]; then
-      echo "$latest"
-      return 0
-    fi
-  fi
-  return 1
-}
-
-get_remote_default_branch() {
-  local repo_url="$1"
-  local ref_output
-  ref_output=$(git_with_auth ls-remote --symref "$repo_url" HEAD 2>/dev/null || true)
-  if [[ -n "$ref_output" ]]; then
-    local branch
-    branch=$(echo "$ref_output" | awk '/^ref:[[:space:]]*refs\/heads\// { sub(/^ref:[[:space:]]*refs\/heads\//, ""); sub(/[[:space:]]+HEAD$/, ""); print; exit }')
-    if [[ -n "$branch" ]]; then
-      echo "$branch"
-      return 0
-    fi
-  fi
-  echo "main"
-}
-
-if [[ -z "$BRANCH" ]]; then
-  echo "No --ref or IDEABOARD_BRANCH specified. Detecting latest release tag..."
-  if BRANCH=$(get_latest_release_tag "$REPO_URL"); then
-    echo "Detected latest release tag: $BRANCH"
-  else
-    echo "No release tags found. Querying remote default branch..."
-    BRANCH=$(get_remote_default_branch "$REPO_URL")
-    echo "Using remote default branch: $BRANCH"
-  fi
-fi
-
 if ! docker compose version >/dev/null 2>&1; then
   echo "Missing command: docker compose" >&2
   exit 1
@@ -281,7 +263,7 @@ if ! command -v cosign >/dev/null 2>&1 && ! cosign_verify_disabled; then
 fi
 
 if [[ -n "$GIT_TOKEN" && -z "${GHCR_TOKEN:-}" ]]; then
-  GHCR_TOKEN="$GIT_TOKEN" "$DEPLOY_SCRIPT"
+  GHCR_TOKEN="$GIT_TOKEN" "$DEPLOY_SCRIPT" update --manifest "$MANIFEST_SOURCE"
 else
-  "$DEPLOY_SCRIPT"
+  "$DEPLOY_SCRIPT" update --manifest "$MANIFEST_SOURCE"
 fi
