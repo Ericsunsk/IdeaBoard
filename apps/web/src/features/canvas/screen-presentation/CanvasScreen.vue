@@ -1,6 +1,6 @@
 <template>
   <div
-    class="canvas-layout"
+    class="canvas-layout canvas-surface-skin"
     :class="[
       `tool-${activeTool}`,
       {
@@ -778,6 +778,7 @@ onMounted(async () => {
 </script>
 
 <style>
+@import '../components/styles/canvas-surface-skin.css';
 @import '../components/styles/canvas-vue-flow-adapter-skin.css';
 @import '../components/styles/canvas-style-contracts.css';
 </style>
@@ -790,49 +791,8 @@ onMounted(async () => {
 }
 
 .canvas-layout {
-  --canvas-control-border-width: 1.2px;
-  --canvas-tool-button-gap: 7px;
-  --canvas-node-floating-ui-width: 287px;
-  --canvas-surface-bg: rgba(255, 255, 255, 0.98);
-  --canvas-surface-bg-soft: rgba(255, 255, 255, 0.94);
-  --canvas-surface-muted: #f4f7fb;
-  --canvas-surface-border: #d8ddea;
-  --canvas-surface-border-soft: rgba(34, 42, 54, 0.08);
-  --canvas-minimap-node: #c9ced8;
-  --canvas-minimap-viewport: #c9ced8;
-  --canvas-minimap-mask: rgb(201 206 216 / 0.18);
-  --canvas-surface-shadow: 0 14px 32px rgba(15, 23, 42, 0.13);
-  --canvas-surface-blur: 10px;
-  --canvas-surface-radius: 10px;
-  --canvas-floating-radius: 13px;
-  --canvas-panel-radius: 8px;
-  --canvas-panel-border-width: 1px;
-  --canvas-panel-content-gap: 10px;
-  --canvas-panel-border: rgba(34, 42, 54, 0.14);
-  --canvas-panel-border-soft: rgba(34, 42, 54, 0.1);
-  --canvas-panel-header-from: #f8fafc;
-  --canvas-panel-header-to: #eef2f7;
-  --canvas-text-strong: #111827;
-  --canvas-text-body: #334155;
-  --canvas-text-muted: #64748b;
-  --canvas-text-subtle: #94a3b8;
-  --canvas-accent: #9278e6;
-  --canvas-accent-hover: #7a6bd5;
-  --canvas-accent-strong: #6757c8;
-  --canvas-accent-soft: rgba(146, 120, 230, 0.12);
-  --canvas-accent-soft-strong: rgba(146, 120, 230, 0.16);
-  --canvas-accent-wash: #f8f7ff;
-  --canvas-accent-outline: rgba(122, 107, 213, 0.22);
-  --flow-edge-color: rgb(177 177 183 / 50%);
-  --flow-edge-active-color: rgb(146 120 230 / 50%);
-  --flow-edge-selected-color: rgb(123 135 152 / 50%);
-  --flow-edge-width: 2;
-  --flow-edge-dasharray: 5;
-  /* Execution edges need a continuous cycle rather than a finite interaction duration. */
-  --flow-edge-running-duration: 0.5s;
   width: 100%;
   height: 100vh;
-  background: #ffffff;
   position: relative;
   overflow: hidden;
   overscroll-behavior: none;

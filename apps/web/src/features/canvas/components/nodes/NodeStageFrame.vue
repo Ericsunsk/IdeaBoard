@@ -63,11 +63,11 @@ defineExpose({ stageElement })
 
 <style scoped>
 .node-stage-frame {
-  --node-stage-frame-bg: var(--color-canvas-node-bg);
-  --node-stage-frame-border: var(--color-canvas-node-border-alt);
-  --node-stage-frame-active-border: var(--color-canvas-accent);
+  --node-stage-frame-bg: var(--canvas-node-bg);
+  --node-stage-frame-border: var(--canvas-node-border-alt);
+  --node-stage-frame-active-border: var(--canvas-accent);
   --node-stage-frame-loading-shadow-warm: rgba(239, 68, 68, 0.2);
-  --node-stage-frame-loading-shadow-accent: var(--color-canvas-accent-glow);
+  --node-stage-frame-loading-shadow-accent: var(--canvas-accent-glow);
 
   position: relative;
   width: 100%;

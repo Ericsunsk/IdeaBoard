@@ -1,0 +1,69 @@
+/*
+ * Canvas Workspace's stable surface contract. Canvas Screen mounts this class;
+ * Canvas Chrome, nodes, Vue Flow, Image Editing, Image Mask Editing, and the
+ * minimap consume its named variables without depending on Screen CSS.
+ */
+.canvas-surface-skin {
+  --canvas-control-border-width: 1.2px;
+  --canvas-tool-button-gap: 7px;
+  --canvas-node-floating-ui-width: 287px;
+  --canvas-surface-page-bg: var(--color-ib-surface);
+  --canvas-surface-bg: color-mix(in srgb, var(--color-ib-surface) 98%, transparent);
+  --canvas-surface-bg-soft: color-mix(in srgb, var(--color-ib-surface) 94%, transparent);
+  --canvas-surface-muted: #f4f7fb;
+  --canvas-surface-border: #d8ddea;
+  --canvas-surface-border-soft: rgba(34, 42, 54, 0.08);
+  --canvas-minimap-node: #c9ced8;
+  --canvas-minimap-viewport: #c9ced8;
+  --canvas-minimap-mask: rgb(201 206 216 / 0.18);
+  --canvas-surface-shadow: 0 14px 32px rgba(15, 23, 42, 0.13);
+  --canvas-floating-shadow: var(--canvas-surface-shadow);
+  --canvas-surface-blur: 10px;
+  --canvas-surface-radius: 10px;
+  --canvas-floating-radius: 13px;
+  --canvas-panel-radius: 8px;
+  --canvas-panel-border-width: 1px;
+  --canvas-panel-content-gap: 10px;
+  --canvas-panel-border: rgba(34, 42, 54, 0.14);
+  --canvas-panel-border-soft: rgba(34, 42, 54, 0.1);
+  --canvas-panel-header-from: #f8fafc;
+  --canvas-panel-header-to: #eef2f7;
+  --canvas-text-strong: #111827;
+  --canvas-text-body: #334155;
+  --canvas-text-muted: var(--color-canvas-text-secondary);
+  --canvas-text-subtle: #94a3b8;
+  --canvas-node-text-primary: var(--color-canvas-text-primary);
+  --canvas-node-text-muted: var(--color-canvas-text-muted);
+  --canvas-text-control: var(--color-canvas-text-control);
+  --canvas-text-option: var(--color-canvas-text-option);
+  --canvas-tooltip-bg: var(--color-canvas-tooltip-bg);
+  --canvas-tooltip-text: var(--color-canvas-tooltip-text);
+  --canvas-node-bg: var(--color-canvas-node-bg);
+  --canvas-node-border: var(--color-canvas-node-border);
+  --canvas-node-border-alt: var(--color-canvas-node-border-alt);
+  --canvas-track-bg: var(--color-canvas-track-bg);
+  --canvas-accent: var(--color-canvas-accent);
+  --canvas-accent-hover: var(--color-canvas-accent-hover);
+  --canvas-accent-strong: #6757c8;
+  --canvas-node-accent-soft: var(--color-canvas-accent-soft);
+  --canvas-accent-border: var(--color-canvas-accent-border);
+  --canvas-accent-border-soft: var(--color-canvas-accent-border-soft);
+  --canvas-accent-tooltip-border: var(--color-canvas-accent-tooltip-border);
+  --canvas-accent-shadow: var(--color-canvas-accent-shadow);
+  --canvas-accent-glow: var(--color-canvas-accent-glow);
+  --canvas-accent-soft: color-mix(in srgb, var(--color-canvas-accent) 12%, transparent);
+  --canvas-accent-soft-strong: color-mix(in srgb, var(--color-canvas-accent) 16%, transparent);
+  --canvas-accent-wash: #f8f7ff;
+  --canvas-accent-outline: rgba(122, 107, 213, 0.22);
+  --canvas-running-from: var(--color-canvas-running-from);
+  --canvas-running-to: var(--color-canvas-running-to);
+  --flow-edge-color: rgb(177 177 183 / 50%);
+  --flow-edge-active-color: rgb(146 120 230 / 50%);
+  --flow-edge-selected-color: rgb(123 135 152 / 50%);
+  --flow-edge-width: 2;
+  --flow-edge-dasharray: 5;
+  /* Execution edges need a continuous cycle rather than a finite interaction duration. */
+  --flow-edge-running-duration: 0.5s;
+
+  background: var(--canvas-surface-page-bg);
+}

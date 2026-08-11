@@ -16,7 +16,7 @@
   font-weight: 700;
   text-transform: none;
   letter-spacing: 0.04em;
-  color: var(--color-canvas-text-secondary);
+  color: var(--canvas-text-muted);
   background: transparent;
   border-bottom: 0;
   cursor: grab;
@@ -27,7 +27,7 @@
 }
 
 .workflow-node-header.is-active {
-  color: var(--color-canvas-accent);
+  color: var(--canvas-accent);
 }
 
 .workflow-node-header.is-copy-mode {
@@ -52,9 +52,9 @@
   padding: 1.5px;
   background: linear-gradient(
     120deg,
-    var(--color-canvas-running-from) 0%,
-    var(--color-canvas-running-to) 50%,
-    var(--color-canvas-running-from) 100%
+    var(--canvas-running-from) 0%,
+    var(--canvas-running-to) 50%,
+    var(--canvas-running-from) 100%
   );
   background-size: 220% 100%;
   animation: node-running-border-flow var(--node-running-border-cycle) linear infinite;
@@ -90,8 +90,8 @@
 
 .node-execution-body {
   --node-tool-border-width: var(--canvas-control-border-width);
-  --node-tool-button-accent: var(--color-canvas-accent);
-  --node-tool-button-brand: var(--color-canvas-accent-hover);
+  --node-tool-button-accent: var(--canvas-accent);
+  --node-tool-button-brand: var(--canvas-accent-hover);
   padding: 8px;
   display: flex;
   flex-direction: column;
@@ -116,9 +116,9 @@
   flex-direction: column;
   gap: 6px;
   padding: 7px 8px;
-  border: var(--node-tool-border-width) solid var(--color-canvas-node-border);
+  border: var(--node-tool-border-width) solid var(--canvas-node-border);
   border-radius: 10px;
-  background: var(--color-canvas-node-bg);
+  background: var(--canvas-node-bg);
 }
 
 .node-control-head {
@@ -137,7 +137,7 @@
 .node-control-label {
   font-size: 11px;
   font-weight: 600;
-  color: var(--color-canvas-text-muted);
+  color: var(--canvas-node-text-muted);
   letter-spacing: 0;
 }
 
@@ -155,7 +155,7 @@
   background: transparent;
   cursor: pointer;
   /* accent-color provides cross-browser slider fill without moz-range-progress */
-  accent-color: var(--color-canvas-accent);
+  accent-color: var(--canvas-accent);
 }
 
 .node-inline-range::-webkit-slider-runnable-track {
@@ -163,10 +163,10 @@
   border-radius: 999px;
   background: linear-gradient(
     90deg,
-    var(--color-canvas-accent) 0%,
-    var(--color-canvas-accent) var(--slider-pct),
-    var(--color-canvas-track-bg) var(--slider-pct),
-    var(--color-canvas-track-bg) 100%
+    var(--canvas-accent) 0%,
+    var(--canvas-accent) var(--slider-pct),
+    var(--canvas-track-bg) var(--slider-pct),
+    var(--canvas-track-bg) 100%
   );
 }
 
@@ -178,7 +178,7 @@
   margin-top: var(--canvas-range-thumb-offset);
   border: 0;
   border-radius: 999px;
-  background: var(--color-canvas-accent);
+  background: var(--canvas-accent);
   box-shadow: none;
 }
 
@@ -186,7 +186,7 @@
   height: var(--canvas-range-track-height);
   border: 0;
   border-radius: 999px;
-  background: var(--color-canvas-track-bg);
+  background: var(--canvas-track-bg);
 }
 
 .node-inline-range::-moz-range-thumb {
@@ -194,7 +194,7 @@
   height: var(--canvas-range-thumb-size);
   border: 0;
   border-radius: 999px;
-  background: var(--color-canvas-accent);
+  background: var(--canvas-accent);
   box-shadow: none;
 }
 

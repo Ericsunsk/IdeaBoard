@@ -1,7 +1,8 @@
-export const blankBoardPreviewSurfaceClass =
-  'bg-[radial-gradient(circle,#dfe4ef_1px,transparent_1px),linear-gradient(#fbfcff,#fbfcff)] [background-size:12px_12px,cover]'
+import { blankBoardPreviewSurfaceClass } from '../../canvas-board/preview'
 import { pageChromeAccountMenuClasses } from '../../../shared/lib/pageChrome'
 import { ibDialogMaskPt } from '../../../shared/theme/dialogMask'
+
+export { blankBoardPreviewSurfaceClass }
 
 export const boardCatalogClasses = {
   page: 'app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain bg-board-page px-[var(--spacing-ib-page-chrome-inset)] pt-[var(--spacing-ib-page-chrome-inset)] pb-16 text-board-page-text [box-sizing:border-box] [-webkit-overflow-scrolling:touch] max-[860px]:pb-10',

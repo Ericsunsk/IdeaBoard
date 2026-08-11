@@ -17,9 +17,9 @@
   --node-tool-popover-option-height: 33px;
   /* Tooltip dwell prevents accidental activation while crossing node tools. */
   --node-tool-tooltip-delay: 200ms;
-  --node-tool-button-border: var(--color-canvas-accent-border);
-  --node-tool-button-accent: var(--color-canvas-accent);
-  --node-tool-button-brand: var(--color-canvas-accent-hover);
+  --node-tool-button-border: var(--canvas-accent-border);
+  --node-tool-button-accent: var(--canvas-accent);
+  --node-tool-button-brand: var(--canvas-accent-hover);
   --node-tool-icon-button-size: var(--node-tool-button-size);
   --node-tool-icon-button-radius: var(--node-tool-button-radius);
   --node-tool-icon-button-border: var(--node-tool-button-border);
@@ -60,8 +60,8 @@
 
 .node-tool-output-count {
   border: var(--node-tool-border-width) solid var(--node-tool-button-border);
-  background: var(--color-canvas-node-bg);
-  color: var(--color-canvas-text-control);
+  background: var(--canvas-node-bg);
+  color: var(--canvas-text-control);
   font-size: 12px;
   font-weight: 700;
   line-height: 1;
@@ -79,9 +79,9 @@
 .node-tool-output-count:hover:not(:disabled),
 .node-tool-output-count:focus-visible,
 .node-tool-output-count.active {
-  background: var(--color-canvas-accent-soft);
+  background: var(--canvas-node-accent-soft);
   border-color: var(--node-tool-button-accent);
-  color: var(--color-canvas-text-primary);
+  color: var(--canvas-node-text-primary);
 }
 
 .node-tool-output-count:disabled {
@@ -101,9 +101,9 @@
   bottom: calc(100% + 8px);
   transform: translate(-50%, 2px);
   white-space: nowrap;
-  background: var(--color-canvas-tooltip-bg);
-  color: var(--color-canvas-tooltip-text);
-  border: var(--node-tool-border-width) solid var(--color-canvas-accent-tooltip-border);
+  background: var(--canvas-tooltip-bg);
+  color: var(--canvas-tooltip-text);
+  border: var(--node-tool-border-width) solid var(--canvas-accent-tooltip-border);
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 11px;
@@ -152,7 +152,7 @@
   right: 0;
   bottom: calc(100% + var(--node-tool-button-gap));
   z-index: 43;
-  border: var(--node-tool-border-width) solid var(--color-canvas-accent-border-soft);
+  border: var(--node-tool-border-width) solid var(--canvas-accent-border-soft);
   border-radius: var(--canvas-floating-radius);
   background: var(--canvas-surface-bg);
   box-shadow: 0 12px 30px rgba(38, 43, 61, 0.14);
@@ -175,10 +175,10 @@
 .node-tool-output-count-option {
   width: var(--node-tool-button-size);
   height: var(--node-tool-popover-option-height);
-  border: var(--node-tool-border-width) solid var(--color-canvas-node-border);
+  border: var(--node-tool-border-width) solid var(--canvas-node-border);
   border-radius: 9px;
-  background: var(--color-canvas-node-bg);
-  color: var(--color-canvas-text-option);
+  background: var(--canvas-node-bg);
+  color: var(--canvas-text-option);
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
@@ -188,6 +188,6 @@
 .node-tool-output-count-option:focus-visible,
 .node-tool-output-count-option.active {
   border-color: var(--node-tool-button-accent);
-  background: var(--color-canvas-accent-soft);
+  background: var(--canvas-node-accent-soft);
   color: var(--node-tool-button-accent);
 }

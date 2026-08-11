@@ -5,7 +5,6 @@
       class="image-node-stage"
       :data-image-node-id="nodeId"
       :data-flow-node-id="flowNodeId || undefined"
-      :data-image-editor="isImageToolActive ? '' : undefined"
       :class="{
         'is-expand-mode': !!expandModeActive,
         'is-image-editor-active': isImageToolActive,
@@ -23,30 +22,22 @@
       @contextmenu.prevent.stop="onStageContextMenu"
     >
       <template v-if="displayImage">
-        <img
-          :src="stageDisplayUrl"
-          class="image-node-stage-image"
-          :class="{ 'is-dragging': dragging, 'has-rendered-preview': !!renderedImagePreview }"
-          alt="图片节点预览"
-          draggable="false"
-          role="button"
-          tabindex="0"
-          aria-label="图片节点预览，按 Enter 打开预览，按 Space 添加到画布"
-          @dblclick="emit('append-to-canvas')"
-          @keydown.enter.prevent="emit('open-preview')"
-          @keydown.space.prevent="emit('append-to-canvas')"
-        />
-        <RenderedImagePreviewCanvas v-if="renderedImagePreview" :preview="renderedImagePreview" />
-        <ImageEditorRasterOverlay
-          v-if="isRasterOverlayVisible && imageToolStageBinding?.rasterOverlayStyle"
-          :style="imageToolStageBinding.rasterOverlayStyle"
-          :canvas-width="imageToolStageBinding.rasterCanvasWidth"
-          :canvas-height="imageToolStageBinding.rasterCanvasHeight"
-          :brush-size="imageToolStageBinding.rasterBrushSize"
-          :raster-tool-enabled="imageToolStageBinding.rasterToolEnabled"
-          :set-canvas-ref="imageToolStageBinding.setRasterCanvasRef"
-          @canvas-pointerdown="imageToolStageBinding.onRasterCanvasPointerDown"
-        />
+        <ImageToolStagePresentation v-if="imageToolStageBinding" :binding="imageToolStageBinding">
+          <img
+            :src="stageDisplayUrl"
+            class="image-node-stage-image image-tool-stage-media"
+            :class="{ 'is-dragging': dragging }"
+            alt="图片节点预览"
+            draggable="false"
+            role="button"
+            tabindex="0"
+            aria-label="图片节点预览，按 Enter 打开预览，按 Space 添加到画布"
+            @dblclick="emit('append-to-canvas')"
+            @keydown.enter.prevent="emit('open-preview')"
+            @keydown.space.prevent="emit('append-to-canvas')"
+          />
+        </ImageToolStagePresentation>
+        <img v-else :src="stageDisplayUrl" class="image-node-stage-image" alt="图片节点预览" />
         <ImageCanvasExtendOverlay
           v-if="expandModeActive && expandOverlayStyle"
           :overlay-style="expandOverlayStyle"
@@ -59,18 +50,6 @@
           @handle-pointermove="emit('expand-handle-pointermove', $event)"
           @handle-pointerup="emit('expand-handle-pointerup', $event)"
           @frame-pointerdown="emit('expand-frame-pointerdown', $event)"
-        />
-        <ImageMaskEditorOverlay
-          v-if="isMaskEditorActive && imageToolStageBinding?.maskOverlayStyle"
-          :style="imageToolStageBinding.maskOverlayStyle"
-          :canvas-width="imageToolStageBinding.maskCanvasWidth"
-          :canvas-height="imageToolStageBinding.maskCanvasHeight"
-          :mask-layer-opacity="imageToolStageBinding.maskLayerOpacity"
-          :image-layer-visible="imageToolStageBinding.imageLayerVisible"
-          :brush-size="imageToolStageBinding.maskBrushSize"
-          :brush-shape="imageToolStageBinding.maskBrushShape"
-          :set-canvas-ref="imageToolStageBinding.setMaskCanvasRef"
-          @canvas-pointerdown="imageToolStageBinding.onMaskCanvasPointerDown"
         />
         <div class="image-node-stage-actions">
           <NodeActionButton
@@ -128,13 +107,11 @@ import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExt
 import type { ImageToolStageBinding } from '../../image-tools'
 import { useCanvasImagePreviewQuality } from '../../composables/useCanvasImagePreviewQuality'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
-import { ImageEditorRasterOverlay } from '../../image-editor'
-import { ImageMaskEditorOverlay } from '../../mask-editor'
+import ImageToolStagePresentation from '../../image-tools/components/ImageToolStagePresentation.vue'
 import ImageCanvasExtendOverlay from './ImageCanvasExtendOverlay.vue'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeEmptyStateIcon from './NodeEmptyStateIcon.vue'
 import NodeStageFrame from './NodeStageFrame.vue'
-import RenderedImagePreviewCanvas from './RenderedImagePreviewCanvas.vue'
 
 const props = defineProps<{
   nodeId: string | number
@@ -173,8 +150,7 @@ const emit = defineEmits<{
 }>()
 
 const sourceDisplayUrl = computed(() => props.displayImage?.url ?? null)
-const isImageToolActive = computed(() => props.imageToolStageBinding?.mode != null)
-const isMaskEditorActive = computed(() => props.imageToolStageBinding?.mode === 'inpaint')
+const isImageToolActive = computed(() => !!props.imageToolStageBinding?.active)
 const forceFullPreviewQuality = computed(() => !!props.expandModeActive || isImageToolActive.value)
 const canvasViewport = useCanvasViewportContext()
 const { maxSide: previewMaxSide } = useCanvasImagePreviewQuality({
@@ -186,12 +162,6 @@ const { maxSide: previewMaxSide } = useCanvasImagePreviewQuality({
 const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl, {
   maxSide: previewMaxSide,
 })
-const renderedImagePreview = computed(() => props.imageToolStageBinding?.renderedPreview ?? null)
-const isRasterOverlayVisible = computed(
-  () =>
-    props.imageToolStageBinding?.mode === 'adjust' &&
-    !!props.imageToolStageBinding.rasterOverlayVisible,
-)
 const emptyStateLabel = computed(() =>
   props.inputLocked ? 'Waiting...' : '上传或拖拽图片作为输入',
 )

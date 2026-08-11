@@ -69,8 +69,8 @@ const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant
   --node-tool-border-width: var(--canvas-control-border-width);
   /* Tooltip dwell prevents accidental activation while crossing compact controls. */
   --node-tool-tooltip-delay: 200ms;
-  --node-tool-button-accent: var(--color-canvas-accent);
-  --node-tool-button-brand: var(--color-canvas-accent-hover);
+  --node-tool-button-accent: var(--canvas-accent);
+  --node-tool-button-brand: var(--canvas-accent-hover);
 }
 
 .node-action-btn.variant-stage-ghost {

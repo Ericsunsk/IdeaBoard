@@ -18,7 +18,7 @@
     margin: 0;
     background: transparent;
     cursor: pointer;
-    accent-color: var(--canvas-range-fill-color, var(--canvas-accent, var(--color-canvas-accent)));
+    accent-color: var(--canvas-range-fill-color, var(--canvas-accent));
   }
 
   .canvas-range-input::-webkit-slider-runnable-track {
@@ -27,7 +27,7 @@
     border-radius: 999px;
     background: var(
       --canvas-range-track-background,
-      var(--canvas-range-track-color, var(--canvas-surface-muted, var(--color-canvas-track-bg)))
+      var(--canvas-range-track-color, var(--canvas-surface-muted))
     );
   }
 
@@ -41,7 +41,7 @@
     border-radius: 999px;
     background: var(
       --canvas-range-thumb-color,
-      var(--canvas-range-fill-color, var(--canvas-accent, var(--color-canvas-accent)))
+      var(--canvas-range-fill-color, var(--canvas-accent))
     );
     box-shadow: none;
     transition: background-color var(--motion-control-duration) var(--motion-control-easing);
@@ -53,7 +53,7 @@
     border-radius: 999px;
     background: var(
       --canvas-range-track-background,
-      var(--canvas-range-track-color, var(--canvas-surface-muted, var(--color-canvas-track-bg)))
+      var(--canvas-range-track-color, var(--canvas-surface-muted))
     );
   }
 
@@ -64,14 +64,14 @@
     border-radius: 999px;
     background: var(
       --canvas-range-thumb-color,
-      var(--canvas-range-fill-color, var(--canvas-accent, var(--color-canvas-accent)))
+      var(--canvas-range-fill-color, var(--canvas-accent))
     );
     box-shadow: none;
   }
 
   .canvas-range-input:focus-visible {
     outline: var(--ib-focus-outline-width) solid
-      var(--canvas-range-focus-color, var(--canvas-accent, var(--color-canvas-accent)));
+      var(--canvas-range-focus-color, var(--canvas-accent));
     outline-offset: var(--ib-focus-outline-offset);
     border-radius: 999px;
   }

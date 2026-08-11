@@ -454,7 +454,7 @@ function onSubmit(prompt: string, outputCount: number) {
   align-items: center;
   justify-content: center;
   font-weight: 500;
-  color: var(--color-canvas-text-option);
+  color: var(--canvas-text-option);
   text-align: center;
 }
 </style>

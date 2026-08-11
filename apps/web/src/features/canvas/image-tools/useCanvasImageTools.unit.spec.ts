@@ -287,6 +287,26 @@ afterEach(() => {
 })
 
 describe('useCanvasImageTools image adjustment final apply', () => {
+  it('releases the presentation session across no-tool, mode switch, node switch, reset, and unmount', () => {
+    const harness = mountCanvasImageTools()
+    const session = harness.runtime.viewModel.nodeBindings.stageFor('image-1').session
+    const canvas = document.createElement('canvas')
+    try {
+      expect(harness.runtime.viewModel.active.mode.value).toBeNull()
+      expect(harness.runtime.commands.lifecycle.enter('image-1', 'adjust')).toBe(true)
+      session.imageEditorRasterOverlay.setRasterCanvasRef('image-1', canvas)
+      expect(harness.runtime.commands.lifecycle.enter('image-1', 'inpaint')).toBe(true)
+      session.maskEditor.setMaskCanvasRef('image-1', canvas)
+      expect(harness.runtime.commands.lifecycle.enter('image-2', 'inpaint')).toBe(true)
+      expect(harness.runtime.viewModel.active.nodeId.value).toBe('image-2')
+      harness.runtime.commands.lifecycle.cancel()
+      expect(harness.runtime.viewModel.active.mode.value).toBeNull()
+      expect(harness.runtime.viewModel.active.nodeId.value).toBeNull()
+    } finally {
+      harness.unmount()
+    }
+  })
+
   it('exposes image tools through viewModel and commands buckets only', () => {
     const harness = mountCanvasImageTools()
 
@@ -509,15 +529,15 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       const stageBinding = harness.runtime.viewModel.nodeBindings.stageFor('image-1')
       const actionBinding = harness.runtime.viewModel.nodeBindings.actionFor('image-1')
 
+      expect(stageBinding.active).toBe(true)
       expect(stageBinding.mode).toBe('inpaint')
-      expect(stageBinding.maskOverlayStyle).toEqual({
+      expect(stageBinding.nodeId).toBe('image-1')
+      expect(stageBinding.session.maskEditor.maskEditorOverlayStyle.value).toEqual({
         left: '40px',
         top: '0px',
         width: '240px',
         height: '240px',
       })
-      expect(stageBinding.maskCanvasWidth).toBe(240)
-      expect(stageBinding.maskCanvasHeight).toBe(240)
       expect(actionBinding.actionMenuVisible).toBe(true)
       expect(actionBinding.promptPlaceholder).toBe('输入提示词改造这张图')
     } finally {
@@ -539,6 +559,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(harness.runtime.viewModel.nodeBindings.stageFor('image-1')).toBe(stageBinding)
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1')).toBe(actionBinding)
       expect(harness.runtime.viewModel.nodeBindings.stageFor('image-2')).toBe(inactiveStageBinding)
+      expect(inactiveStageBinding.active).toBe(false)
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-2')).toBe(
         inactiveActionBinding,
       )
@@ -557,8 +578,8 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       harness.runtime.commands.chrome.setMaskBrushSize(48)
       const stageAfter = harness.runtime.viewModel.nodeBindings.stageFor('image-1')
 
-      expect(stageAfter).not.toBe(stageBefore)
-      expect(stageAfter.maskBrushSize).toBe(48)
+      expect(stageAfter).toBe(stageBefore)
+      expect(stageAfter.session.maskEditor.brushSize.value).toBe(48)
       expect(harness.runtime.viewModel.nodeBindings.stageFor('image-1')).toBe(stageAfter)
 
       const actionBefore = harness.runtime.viewModel.nodeBindings.actionFor('image-1')
@@ -625,20 +646,18 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       const node1StageBindingAgain = harness.runtime.viewModel.nodeBindings.stageFor('image-1')
       const node2StageBinding = harness.runtime.viewModel.nodeBindings.stageFor('image-2')
 
-      expect(node1StageBindingAgain.setMaskCanvasRef).toBe(node1StageBinding.setMaskCanvasRef)
-      expect(node1StageBindingAgain.setRasterCanvasRef).toBe(node1StageBinding.setRasterCanvasRef)
-      expect(node2StageBinding.setMaskCanvasRef).not.toBe(node1StageBinding.setMaskCanvasRef)
-      expect(node2StageBinding.setRasterCanvasRef).not.toBe(node1StageBinding.setRasterCanvasRef)
+      expect(node1StageBindingAgain).toBe(node1StageBinding)
+      expect(node2StageBinding.nodeId).toBe('image-2')
 
       const rasterCanvas = document.createElement('canvas')
-      node2StageBinding.setRasterCanvasRef(rasterCanvas)
+      node2StageBinding.session.imageEditorRasterOverlay.setRasterCanvasRef('image-2', rasterCanvas)
       expect(rasterOverlayMocks.setRasterCanvasRef).toHaveBeenCalledWith('image-2', rasterCanvas)
 
       expect(harness.runtime.commands.lifecycle.enter('image-2', 'inpaint')).toBe(true)
       const maskCanvas = document.createElement('canvas')
       maskCanvas.width = 4
       maskCanvas.height = 4
-      node2StageBinding.setMaskCanvasRef(maskCanvas)
+      node2StageBinding.session.maskEditor.setMaskCanvasRef('image-2', maskCanvas)
       harness.runtime.commands.chrome.submitMaskPrompt('重绘 image-2', 1)
 
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-2').promptPlaceholder).toBe(
@@ -661,7 +680,9 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       const canvas = document.createElement('canvas')
       canvas.width = 4
       canvas.height = 4
-      harness.runtime.viewModel.nodeBindings.stageFor('image-1').setMaskCanvasRef(canvas)
+      harness.runtime.viewModel.nodeBindings
+        .stageFor('image-1')
+        .session.maskEditor.setMaskCanvasRef('image-1', canvas)
 
       harness.runtime.commands.chrome.submitMaskPrompt('重绘这块区域', 2)
 
@@ -716,8 +737,8 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(chromeModel.mask.brushShape).toBe('square')
       expect(chromeModel.mask.brushSize).toBe(36)
       expect(chromeModel.mask.layerOpacity).toBe(40)
-      expect(stageBinding.maskBrushShape).toBe('square')
-      expect(stageBinding.maskBrushSize).toBe(36)
+      expect(stageBinding.session.maskEditor.brushShape.value).toBe('square')
+      expect(stageBinding.session.maskEditor.brushSize.value).toBe(36)
       expect(actionBinding.promptComposerVisible).toBe(true)
       expect(harness.updateOutputCount).toHaveBeenCalledWith('image-1', {
         key: 'outputCount',

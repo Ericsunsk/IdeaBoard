@@ -11,16 +11,14 @@ import type {
   ImageEditorTool,
 } from '../image-editor/types'
 import type { ImageAdjustmentFinalApplyProgress } from '../image-editor/runtime/imageAdjustmentFinalApplyContext'
-import type {
-  ImageEditorRasterTool,
-  ImageEditorRasterToolSettings,
-} from '../image-editor/utils/imageEditorRasterTools'
+import type { ImageEditorRasterToolSettings } from '../image-editor/utils/imageEditorRasterTools'
 import type {
   ImageMaskBrushShape,
   ImageMaskDrawMode,
   MaskEditorReferenceImage,
 } from '../mask-editor/types'
 import type { ImageStrengthAction } from '../execution'
+import type { ImageToolSession } from './imageToolSession'
 
 export type ImageToolAnchorRect = {
   top: number
@@ -30,26 +28,11 @@ export type ImageToolAnchorRect = {
 }
 
 export type ImageToolStageBinding = {
+  nodeId: string
+  active: boolean
   mode: ImageEditorMode | null
   renderedPreview: ImageEditorRenderedPreview | null
-  maskOverlayStyle: Record<string, string> | null
-  maskCanvasWidth: number
-  maskCanvasHeight: number
-  maskLayerOpacity: number
-  imageLayerVisible: boolean
-  maskBrushSize: number
-  maskBrushShape: ImageMaskBrushShape
-  setMaskCanvasRef: (element: Element | null) => void
-  onMaskCanvasPointerDown: (event: PointerEvent) => void
-  rasterOverlayStyle: Record<string, string> | null
-  rasterCanvasWidth: number
-  rasterCanvasHeight: number
-  rasterBrushSize: number
-  rasterTool: ImageEditorRasterTool | null
-  rasterToolEnabled: boolean
-  rasterOverlayVisible: boolean
-  setRasterCanvasRef: (element: Element | null) => void
-  onRasterCanvasPointerDown: (event: PointerEvent) => void
+  session: ImageToolSession
 }
 
 type ImageActionStrengthControlHandlers = {

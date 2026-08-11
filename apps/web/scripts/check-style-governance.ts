@@ -163,12 +163,6 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
     },
     reason: 'Central adapter skin owns Vue Flow vendor DOM styling.',
   },
-  'src/features/canvas/mask-editor/components/ImageMaskEditorOverlay.vue': {
-    counts: {
-      'global-selector': 1,
-    },
-    reason: 'Mask overlay must hide the ImageNodeStage image through a cross-component contract.',
-  },
   'src/features/canvas/screen-presentation/CanvasScreen.vue': {
     counts: {
       'global-selector': 2,

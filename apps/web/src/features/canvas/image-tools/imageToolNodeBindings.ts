@@ -5,17 +5,6 @@ import type {
 } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
 
-type CssStyleRecord = Record<string, string> | null
-
-function areCssStyleRecordsEqual(left: CssStyleRecord, right: CssStyleRecord) {
-  if (left === right) return true
-  if (!left || !right) return false
-  const leftKeys = Object.keys(left)
-  const rightKeys = Object.keys(right)
-  if (leftKeys.length !== rightKeys.length) return false
-  return leftKeys.every((key) => left[key] === right[key])
-}
-
 function areBindingObjectsEqual<T extends object>(
   left: T,
   right: T,
@@ -30,17 +19,6 @@ function areBindingObjectsEqual<T extends object>(
     const rightValue = right[key]
     return isCustomValueEqual?.(key, leftValue, rightValue) ?? Object.is(leftValue, rightValue)
   })
-}
-
-function areStageBindingValuesEqual(
-  key: keyof ImageToolStageBinding,
-  leftValue: ImageToolStageBinding[keyof ImageToolStageBinding],
-  rightValue: ImageToolStageBinding[keyof ImageToolStageBinding],
-) {
-  if (key === 'maskOverlayStyle' || key === 'rasterOverlayStyle') {
-    return areCssStyleRecordsEqual(leftValue as CssStyleRecord, rightValue as CssStyleRecord)
-  }
-  return Object.is(leftValue, rightValue)
 }
 
 function areStrengthControlsEqual(
@@ -83,72 +61,20 @@ export function createImageToolNodeBindings(
   const { options } = session
   const stageBindingCache = new Map<string, ImageToolStageBinding>()
   const actionBindingCache = new Map<string, ImageActionBinding>()
-  const maskCanvasRefCache = new Map<string, ImageToolStageBinding['setMaskCanvasRef']>()
-  const rasterCanvasRefCache = new Map<string, ImageToolStageBinding['setRasterCanvasRef']>()
-
-  function readMaskCanvasSize(style: Record<string, string> | null, key: 'width' | 'height') {
-    const parsed = style?.[key] ? parseFloat(style[key]) : 0
-    return Math.max(1, Math.round(Number.isFinite(parsed) ? parsed : 0))
-  }
-
-  function setMaskCanvasRefFor(nodeId: string) {
-    const cached = maskCanvasRefCache.get(nodeId)
-    if (cached) return cached
-    const callback: ImageToolStageBinding['setMaskCanvasRef'] = (element) => {
-      session.maskEditor.setMaskCanvasRef(nodeId, element)
-    }
-    maskCanvasRefCache.set(nodeId, callback)
-    return callback
-  }
-
-  function setRasterCanvasRefFor(nodeId: string) {
-    const cached = rasterCanvasRefCache.get(nodeId)
-    if (cached) return cached
-    const callback: ImageToolStageBinding['setRasterCanvasRef'] = (element) => {
-      session.imageEditorRasterOverlay.setRasterCanvasRef(nodeId, element)
-    }
-    rasterCanvasRefCache.set(nodeId, callback)
-    return callback
-  }
-
   function stageBindingFor(nodeId: string): ImageToolStageBinding {
     const mode = session.imageEditorNodeId.value === nodeId ? session.imageEditorMode.value : null
-    const maskOverlayStyle =
-      session.maskEditor.maskEditorNodeId.value === nodeId
-        ? session.maskEditor.maskEditorOverlayStyle.value
-        : null
     const nextBinding: ImageToolStageBinding = {
+      nodeId,
+      active: mode != null,
       mode,
       renderedPreview:
         session.imageEditorNodeId.value === nodeId && session.imageEditorMode.value === 'adjust'
           ? renderedPreview.value
           : null,
-      maskOverlayStyle,
-      maskCanvasWidth: readMaskCanvasSize(maskOverlayStyle, 'width'),
-      maskCanvasHeight: readMaskCanvasSize(maskOverlayStyle, 'height'),
-      maskLayerOpacity: session.maskChromeState.maskEditorLayerOpacity.value,
-      imageLayerVisible: true,
-      maskBrushSize: session.maskEditor.brushSize.value,
-      maskBrushShape: session.maskEditor.brushShape.value,
-      setMaskCanvasRef: setMaskCanvasRefFor(nodeId),
-      onMaskCanvasPointerDown: session.maskEditor.onCanvasPointerDown,
-      rasterOverlayStyle:
-        session.imageEditorNodeId.value === nodeId && session.imageEditorMode.value === 'adjust'
-          ? session.imageEditorRasterOverlay.rasterOverlayStyle.value
-          : null,
-      rasterCanvasWidth: session.imageEditorRasterOverlay.rasterCanvasWidth.value,
-      rasterCanvasHeight: session.imageEditorRasterOverlay.rasterCanvasHeight.value,
-      rasterBrushSize: session.imageEditorRasterOverlay.rasterBrushSize.value,
-      rasterTool: session.imageEditorRasterOverlay.rasterTool.value,
-      rasterToolEnabled: session.imageEditorRasterOverlay.rasterToolEnabled.value,
-      rasterOverlayVisible:
-        session.imageEditorRasterOverlay.hasRasterEdits.value ||
-        session.imageEditorRasterOverlay.rasterTool.value != null,
-      setRasterCanvasRef: setRasterCanvasRefFor(nodeId),
-      onRasterCanvasPointerDown: session.imageEditorRasterOverlay.onRasterCanvasPointerDown,
+      session,
     }
     return reuseCachedBinding(stageBindingCache, nodeId, nextBinding, (left, right) =>
-      areBindingObjectsEqual(left, right, areStageBindingValuesEqual),
+      areBindingObjectsEqual(left, right),
     )
   }
 

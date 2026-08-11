@@ -173,11 +173,4 @@ onBeforeUnmount(() => {
 .image-mask-editor-brush-cursor.is-visible {
   opacity: 1;
 }
-
-/* Feature contract: mask overlay must hide the stage image rendered by ImageNodeStage. */
-:global(
-  .image-node-stage:has(.image-mask-editor-overlay.is-image-layer-hidden) .image-node-stage-image
-) {
-  opacity: 0;
-}
 </style>

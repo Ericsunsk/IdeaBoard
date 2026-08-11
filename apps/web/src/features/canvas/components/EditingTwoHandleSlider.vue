@@ -228,13 +228,13 @@ function clampUnit(value: number) {
 .editing-two-handle-slider {
   --editing-two-handle-slider-track-background-default: var(
     --canvas-range-track-background,
-    var(--canvas-range-track-color, var(--canvas-surface-muted, var(--color-canvas-track-bg)))
+    var(--canvas-range-track-color, var(--canvas-surface-muted))
   );
   --editing-two-handle-slider-track-height: var(--canvas-range-track-height, 4px);
   --editing-two-handle-slider-handle-size: var(--canvas-range-thumb-size, 9px);
   --editing-two-handle-slider-handle-color-default: var(
     --canvas-range-thumb-color,
-    var(--canvas-range-fill-color, var(--canvas-accent, var(--color-canvas-accent)))
+    var(--canvas-range-fill-color, var(--canvas-accent))
   );
   position: relative;
   height: var(--canvas-range-input-height, 22px);
@@ -282,8 +282,7 @@ function clampUnit(value: number) {
 }
 
 .editing-two-handle-slider__handle:focus-visible {
-  outline: var(--ib-focus-outline-width) solid
-    var(--canvas-range-focus-color, var(--canvas-accent, var(--color-canvas-accent)));
+  outline: var(--ib-focus-outline-width) solid var(--canvas-range-focus-color, var(--canvas-accent));
   outline-offset: var(--ib-focus-outline-offset);
 }
 </style>
