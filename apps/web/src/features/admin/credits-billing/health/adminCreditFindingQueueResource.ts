@@ -1,5 +1,3 @@
-import { computed, toValue, type MaybeRefOrGetter } from 'vue'
-import { useQuery } from '@tanstack/vue-query'
 import type {
   CreditReconciliationFinding,
   ListAdminCreditReconciliationFindingQueueParams,
@@ -9,55 +7,26 @@ import { adminCreditsBillingApi, type AdminCreditsBillingApi } from '../creditsB
 export type AdminCreditFindingStatus = 'open' | 'resolved'
 export type AdminCreditFinding = CreditReconciliationFinding
 
-interface FindingQueueCriteria {
-  status: AdminCreditFindingStatus
-  beforeId?: number
-}
-
-export function useAdminCreditFindingQueueResource(
-  input: {
-    status: MaybeRefOrGetter<AdminCreditFindingStatus>
-    beforeId: MaybeRefOrGetter<number | undefined>
-  },
-  dependencies: { api?: AdminCreditsBillingApi } = {},
+export function createAdminCreditFindingQueueResource(
+  api: Pick<AdminCreditsBillingApi, 'listReconciliationFindingQueue'> = adminCreditsBillingApi,
 ) {
-  const api = dependencies.api ?? adminCreditsBillingApi
-  const criteria = computed<FindingQueueCriteria>(() => ({
-    status: toValue(input.status),
-    beforeId: toValue(input.beforeId),
-  }))
-  const query = useQuery({
-    queryKey: computed(() => ['admin', 'credits', 'reconciliation', 'findings', criteria.value]),
-    queryFn: async ({ queryKey, signal }) => {
-      const requestCriteria = queryKey.at(-1) as FindingQueueCriteria
-      const params: ListAdminCreditReconciliationFindingQueueParams = {
-        status: requestCriteria.status,
-        before_id: requestCriteria.beforeId,
-        limit: 25,
-      }
-      return {
-        criteria: requestCriteria,
-        page: await api.listReconciliationFindingQueue(params, { signal }),
-      }
-    },
-    placeholderData: (previous) => previous,
-    refetchInterval: (query) => {
-      const requestCriteria = query.queryKey.at(-1) as FindingQueueCriteria
-      return requestCriteria.status === 'open' ? 5_000 : 30_000
-    },
-  })
-
-  const currentPage = computed(() => {
-    const data = query.data.value
-    return data?.criteria.status === criteria.value.status &&
-      data.criteria.beforeId === criteria.value.beforeId
-      ? data.page
-      : undefined
-  })
-
   return {
-    query,
-    page: currentPage,
-    dataCriteria: computed(() => query.data.value?.criteria),
+    list: ({
+      status,
+      beforeId,
+      signal,
+    }: {
+      status: AdminCreditFindingStatus
+      beforeId?: number
+      signal: AbortSignal
+    }) =>
+      api.listReconciliationFindingQueue(
+        {
+          status,
+          before_id: beforeId,
+          limit: 25,
+        } satisfies ListAdminCreditReconciliationFindingQueueParams,
+        { signal },
+      ),
   }
 }

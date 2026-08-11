@@ -170,6 +170,13 @@ describe('AdminRewardCodesPage', () => {
     expect(screen.getByText('新用户奖励')).toBeVisible()
   })
 
+  it('keeps the table frame mounted while the initial collection request is pending', async () => {
+    resource.search.mockReturnValueOnce(new Promise(() => {}))
+    renderPage()
+
+    expect(await screen.findByRole('table', { name: '兑换码列表' })).toBeVisible()
+  })
+
   it('creates from the focused Dialog and shows the one-time plaintext result', async () => {
     const { user } = renderPage()
     await screen.findByText('新用户奖励')

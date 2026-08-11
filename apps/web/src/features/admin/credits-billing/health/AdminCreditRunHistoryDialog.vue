@@ -25,7 +25,7 @@
               text
               aria-label="刷新检查记录"
               :loading="runsLoading"
-              @click="resource.runsQuery.refetch()"
+              @click="refreshRuns"
             >
               <template #icon><Refresh class="size-4" /></template>
             </Button>
@@ -52,7 +52,7 @@
             size="small"
             text
             :loading="runsLoading"
-            @click="resource.runsQuery.refetch()"
+            @click="refreshRuns"
           />
         </div>
       </Message>
@@ -65,7 +65,7 @@
             severity="secondary"
             outlined
             :loading="runsLoading"
-            @click="resource.runsQuery.refetch()"
+            @click="loadRuns()"
           />
         </div>
       </Message>
@@ -142,7 +142,7 @@
                   label="重试 Run 详情"
                   text
                   :loading="runDetailLoading"
-                  @click="resource.runQuery.refetch()"
+                  @click="runDetail.refresh()"
                 />
               </div>
             </Message>
@@ -187,7 +187,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
@@ -200,6 +200,7 @@ import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
+import { useAdminCollectionState } from '../../shared/composables/useAdminCollectionState'
 import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
 import {
   formatAdminDateTime,
@@ -208,7 +209,7 @@ import {
   getRunStatusSeverity,
 } from '../creditsBillingFormat'
 import {
-  useAdminCreditRunHistoryResource,
+  createAdminCreditRunHistoryResource,
   type AdminCreditRun,
 } from './adminCreditRunHistoryResource'
 import {
@@ -216,77 +217,77 @@ import {
   formatReconciliationRunResult,
   getReconciliationTriggerLabel,
 } from './reconciliationRunPresentation'
+import { useAdminCreditRunDetail } from './useAdminCreditRunDetail'
 
 const props = defineProps<{ visible: boolean }>()
 defineEmits<{ 'update:visible': [visible: boolean] }>()
 
-const selectedRunId = ref<number | null>(null)
 const expandedRows = ref<Record<string, boolean>>({})
-const pagination = useAdminCursorPagination<number>({
-  pending: () => resource.runsQuery.isLoading.value || resource.runsQuery.isFetching.value,
+const resource = createAdminCreditRunHistoryResource()
+let pagination: ReturnType<typeof useAdminCursorPagination<number>>
+const collection = useAdminCollectionState({
+  load: (signal) => resource.list({ beforeId: pagination.cursor.value, signal }),
+  isEmpty: (page) => page.runs.length === 0,
 })
-const beforeId = pagination.cursor
-const resource = useAdminCreditRunHistoryResource({
-  enabled: () => props.visible,
-  beforeId,
-  selectedRunId,
-})
-const runs = computed(() => resource.page.value?.runs ?? [])
-const selectedRun = computed(() => {
-  const run = resource.selectedRun.value
-  return run?.id === selectedRunId.value ? run : undefined
-})
-const runsLoading = computed(
-  () => resource.runsQuery.isLoading.value || resource.runsQuery.isFetching.value,
-)
-const runDetailLoading = computed(
-  () => resource.runQuery.isLoading.value || resource.runQuery.isFetching.value,
-)
-const initialError = computed(() => resource.runsQuery.isError.value && !resource.page.value)
-const backgroundError = computed(
-  () => resource.runsQuery.isError.value && Boolean(resource.page.value),
-)
-const runDetailError = computed(() => resource.runQuery.isError.value)
+const { data: runPage, loading: runsLoading, initialError, backgroundError } = collection
+pagination = useAdminCursorPagination<number>({ pending: runsLoading })
+const runs = computed(() => runPage.value?.runs ?? [])
+const runDetail = useAdminCreditRunDetail<AdminCreditRun>(resource.get)
+const selectedRunId = runDetail.selectedRunId
+const selectedRun = runDetail.run
+const runDetailLoading = runDetail.loading
+const runDetailError = runDetail.error
 const currentPage = pagination.currentPage
 const knownPageCount = pagination.knownPageCount
 const canAdvance = pagination.canAdvance
 const canRetreat = pagination.canRetreat
 
 watch(
-  [
-    () => resource.runsQuery.dataUpdatedAt.value,
-    () => resource.runsQuery.isFetching.value,
-    () => resource.runsQuery.isPlaceholderData.value,
-    () => resource.dataCriteria.value,
-    () => beforeId.value,
-  ],
-  () => {
-    const criteria = resource.dataCriteria.value
-    if (
-      resource.runsQuery.isFetching.value ||
-      resource.runsQuery.isPlaceholderData.value ||
-      !criteria ||
-      criteria.beforeId !== beforeId.value
-    ) {
-      return
-    }
-    pagination.setNextCursor(resource.page.value?.next_before_id)
-  },
-  { immediate: true },
-)
-
-watch(
   () => props.visible,
   (visible) => {
-    if (!visible) return
+    stopRefreshTimer()
+    if (!visible) {
+      collection.reset()
+      clearExpansion()
+      return
+    }
     pagination.reset()
     clearExpansion()
+    void loadRuns()
+    scheduleRefresh()
   },
 )
 
+onBeforeUnmount(() => {
+  collection.cancel()
+  runDetail.close()
+  stopRefreshTimer()
+})
+
+async function loadRuns({ preserveData = false }: { preserveData?: boolean } = {}) {
+  const page = await collection.reload({ preserveData })
+  if (page) pagination.setNextCursor(page.next_before_id)
+}
+
+function refreshRuns() {
+  void loadRuns({ preserveData: true })
+}
+
+let refreshTimer: number | undefined
+
+function scheduleRefresh() {
+  refreshTimer = window.setInterval(refreshRuns, 5_000)
+}
+
+function stopRefreshTimer() {
+  if (refreshTimer === undefined) return
+  window.clearInterval(refreshTimer)
+  refreshTimer = undefined
+}
+
 function expandRun(event: DataTableRowExpandEvent<AdminCreditRun>) {
-  selectedRunId.value = event.data.id
   expandedRows.value = { [String(event.data.id)]: true }
+  void runDetail.open(event.data.id)
 }
 
 function collapseRun(event: DataTableRowCollapseEvent) {
@@ -296,15 +297,17 @@ function collapseRun(event: DataTableRowCollapseEvent) {
 function nextPage() {
   if (!pagination.advance()) return
   clearExpansion()
+  void loadRuns()
 }
 
 function previousPage() {
   if (!pagination.retreat()) return
   clearExpansion()
+  void loadRuns()
 }
 
 function clearExpansion() {
-  selectedRunId.value = null
+  runDetail.close()
   expandedRows.value = {}
 }
 </script>

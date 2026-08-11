@@ -248,6 +248,7 @@ import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
+import { useAdminCollectionState } from '../../shared/composables/useAdminCollectionState'
 import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminToast'
@@ -260,26 +261,16 @@ import {
   paymentOrderStatusOptions,
 } from './paymentOrderPresentation'
 import { createAdminPaymentOrderResource } from './paymentOrderResource'
-import type {
-  AdminPaymentOrderDetail,
-  AdminPaymentOrderStatus,
-  AdminPaymentOrderSummary,
-} from './paymentOrderTypes'
+import type { AdminPaymentOrderDetail, AdminPaymentOrderStatus } from './paymentOrderTypes'
 
 const resource = createAdminPaymentOrderResource()
-const orders = ref<AdminPaymentOrderSummary[]>([])
-const total = ref(0)
-const loading = ref(true)
-const initialError = ref(false)
-const backgroundError = ref(false)
-const hasLoadedResult = ref(false)
 const orderNumberSearch = ref('')
 const appliedOrderNumber = ref('')
 const userSearch = ref('')
 const appliedUser = ref('')
 const statusFilter = ref<AdminPaymentOrderStatus>()
 const anomalyOnly = ref(false)
-const pagination = useAdminCursorPagination<string>({ pending: loading })
+let pagination: ReturnType<typeof useAdminCursorPagination<string>>
 const detailVisible = ref(false)
 const selectedOrderNumber = ref('')
 const detail = ref<AdminPaymentOrderDetail | null>(null)
@@ -291,10 +282,25 @@ const ideaFormatter = new Intl.NumberFormat('zh-CN')
 const adminConfirm = useAdminConfirm()
 const toast = useAdminToast()
 const refundIdempotencyKeys = new Map<string, string>()
-let listRequestEpoch = 0
 let detailRequestEpoch = 0
-let activeListRequest: AbortController | undefined
 let activeDetailRequest: AbortController | undefined
+
+const collection = useAdminCollectionState({
+  load: (signal) =>
+    resource.search({
+      orderNumber: appliedOrderNumber.value,
+      user: appliedUser.value,
+      status: statusFilter.value,
+      anomalyOnly: anomalyOnly.value,
+      cursor: pagination.cursor.value,
+      signal,
+    }),
+  isEmpty: (page) => page.orders.length === 0,
+})
+const { data: orderPage, loading, initialError, backgroundError, hasLoadedResult } = collection
+pagination = useAdminCursorPagination<string>({ pending: loading })
+const orders = computed(() => orderPage.value?.orders ?? [])
+const total = computed(() => orderPage.value?.total ?? 0)
 
 const totalLabel = computed(() => `${ideaFormatter.format(total.value)} 笔`)
 const hasFilters = computed(() => Boolean(statusFilter.value || anomalyOnly.value))
@@ -307,7 +313,7 @@ const hasCriteria = computed(() =>
   ),
 )
 const showEmptyState = computed(
-  () => hasLoadedResult.value && !loading.value && !initialError.value && orders.value.length === 0,
+  () => hasLoadedResult.value && !loading.value && !initialError.value && collection.isEmpty.value,
 )
 const emptyTitle = computed(() => (hasCriteria.value ? '未找到匹配的支付订单' : '暂无支付订单'))
 
@@ -316,7 +322,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  activeListRequest?.abort()
+  collection.cancel()
   activeDetailRequest?.abort()
 })
 
@@ -337,39 +343,8 @@ watch(detailVisible, (visible) => {
 })
 
 async function loadOrders({ preserveData = false }: { preserveData?: boolean } = {}) {
-  const epoch = ++listRequestEpoch
-  activeListRequest?.abort()
-  const controller = new AbortController()
-  activeListRequest = controller
-  if (!preserveData) {
-    orders.value = []
-    total.value = 0
-    hasLoadedResult.value = false
-  }
-  loading.value = true
-  initialError.value = false
-  backgroundError.value = false
-  try {
-    const page = await resource.search({
-      orderNumber: appliedOrderNumber.value,
-      user: appliedUser.value,
-      status: statusFilter.value,
-      anomalyOnly: anomalyOnly.value,
-      cursor: pagination.cursor.value,
-      signal: controller.signal,
-    })
-    if (controller.signal.aborted || epoch !== listRequestEpoch) return
-    orders.value = page.orders
-    total.value = page.total
-    hasLoadedResult.value = true
-    pagination.setNextCursor(page.nextCursor)
-  } catch {
-    if (controller.signal.aborted || epoch !== listRequestEpoch) return
-    if (hasLoadedResult.value && preserveData) backgroundError.value = true
-    else initialError.value = true
-  } finally {
-    if (!controller.signal.aborted && epoch === listRequestEpoch) loading.value = false
-  }
+  const page = await collection.reload({ preserveData })
+  if (page) pagination.setNextCursor(page.nextCursor)
 }
 
 function applySearch() {

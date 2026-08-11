@@ -1,83 +1,23 @@
-import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
-import { defineComponent, ref } from 'vue'
-import { describe, expect, it } from 'vitest'
-import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
-import { renderWithUser, screen, waitFor } from '../../../../test/render'
-import { useAdminCreditRunHistoryResource } from './adminCreditRunHistoryResource'
+import { describe, expect, it, vi } from 'vitest'
+import { createAdminCreditRunHistoryResource } from './adminCreditRunHistoryResource'
 
 describe('Admin Credit Run history resource', () => {
-  it('loads only while enabled and keeps list and detail requests behind one resource boundary', async () => {
-    const listRequests: Array<string | null> = []
-    const detailRequests: string[] = []
-    useMswHandlers(
-      http.get('/api/admin/credits/reconciliation/runs', ({ request }) => {
-        const beforeId = new URL(request.url).searchParams.get('before_id')
-        listRequests.push(beforeId)
-        return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: {
-            runs: [makeRun({ id: beforeId ? 20 : 21 })],
-            next_before_id: beforeId ? undefined : 21,
-          },
-        })
-      }),
-      http.get('/api/admin/credits/reconciliation/runs/:runId', ({ params }) => {
-        detailRequests.push(String(params.runId))
-        return HttpResponse.json({
-          code: 0,
-          msg: 'ok',
-          data: makeRun({ id: Number(params.runId), reason: '人工复核' }),
-        })
-      }),
+  it('keeps run list and detail requests behind the feature resource adapter', async () => {
+    const listReconciliationRuns = vi.fn().mockResolvedValue({ runs: [makeRun()] })
+    const getReconciliationRun = vi.fn().mockResolvedValue(makeRun({ reason: '人工复核' }))
+    const resource = createAdminCreditRunHistoryResource({
+      listReconciliationRuns,
+      getReconciliationRun,
+    } as never)
+
+    await resource.list({ beforeId: 21, signal: new AbortController().signal })
+    await resource.get(21, new AbortController().signal)
+
+    expect(listReconciliationRuns).toHaveBeenCalledWith(
+      { before_id: 21, limit: 20 },
+      { signal: expect.any(AbortSignal) },
     )
-    const Harness = defineComponent({
-      setup() {
-        const enabled = ref(false)
-        const beforeId = ref<number>()
-        const selectedRunId = ref<number | null>(null)
-        const resource = useAdminCreditRunHistoryResource({ enabled, beforeId, selectedRunId })
-        return {
-          page: resource.page,
-          selectedRun: resource.selectedRun,
-          open: () => {
-            enabled.value = true
-          },
-          next: () => {
-            beforeId.value = 21
-          },
-          select: () => {
-            selectedRunId.value = 21
-          },
-        }
-      },
-      template: `
-        <button @click="open">open</button>
-        <button @click="next">next</button>
-        <button @click="select">select</button>
-        <span data-testid="page-run">{{ page?.runs[0]?.id }}</span>
-        <span data-testid="detail-reason">{{ selectedRun?.reason }}</span>
-      `,
-    })
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    })
-    const { user } = renderWithUser(Harness, {
-      global: { plugins: [[VueQueryPlugin, { queryClient }]] },
-    })
-
-    expect(listRequests).toHaveLength(0)
-    await user.click(screen.getByRole('button', { name: 'open' }))
-    await waitFor(() => expect(screen.getByTestId('page-run')).toHaveTextContent('21'))
-    expect(listRequests).toEqual([null])
-
-    await user.click(screen.getByRole('button', { name: 'select' }))
-    await waitFor(() => expect(screen.getByTestId('detail-reason')).toHaveTextContent('人工复核'))
-    expect(detailRequests).toEqual(['21'])
-
-    await user.click(screen.getByRole('button', { name: 'next' }))
-    await waitFor(() => expect(screen.getByTestId('page-run')).toHaveTextContent('20'))
-    expect(listRequests).toEqual([null, '21'])
+    expect(getReconciliationRun).toHaveBeenCalledWith(21, { signal: expect.any(AbortSignal) })
   })
 })
 

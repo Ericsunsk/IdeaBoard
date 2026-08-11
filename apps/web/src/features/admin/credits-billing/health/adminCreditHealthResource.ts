@@ -5,7 +5,6 @@ import type {
   CreditReconciliationRequest,
 } from '../../../../shared/api/generated-query/model'
 import { adminCreditsBillingApi, type AdminCreditsBillingApi } from '../creditsBillingApi'
-import { adminCreditRunHistoryQueryRoot } from './adminCreditRunHistoryResource'
 
 export const adminCreditHealthQueryKey = ['admin', 'credits', 'health'] as const
 
@@ -29,7 +28,6 @@ export function useAdminCreditHealthResource(
         current ? { ...current, active_run: run } : current,
       )
       void queryClient.invalidateQueries({ queryKey: adminCreditHealthQueryKey })
-      void queryClient.invalidateQueries({ queryKey: adminCreditRunHistoryQueryRoot })
     },
   })
 

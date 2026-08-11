@@ -147,7 +147,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
@@ -160,6 +160,7 @@ import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
+import { useAdminCollectionState } from '../../shared/composables/useAdminCollectionState'
 import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
 import { formatAdminDateTime } from '../creditsBillingFormat'
 import type { RewardCode } from './rewardCodeAdminResource'
@@ -179,21 +180,25 @@ const emit = defineEmits<{
 }>()
 
 const resource = createRewardCodeRedemptionResource()
-const redemptions = ref<RewardCodeRedemption[]>([])
-const loading = ref(false)
-const initialError = ref(false)
-const backgroundError = ref(false)
-const hasLoadedPage = ref(false)
 const expandedRows = ref<Record<string, boolean>>({})
 const selectedRedemptionId = ref<number | null>(null)
 const selectedDetail = ref<RewardCodeRedemptionDetail | null>(null)
 const detailLoading = ref(false)
 const detailError = ref(false)
-const pagination = useAdminCursorPagination<number>({ pending: loading })
-let activeRequest: AbortController | undefined
 let activeDetailRequest: AbortController | undefined
-let pageRequestEpoch = 0
 let detailRequestEpoch = 0
+let pagination: ReturnType<typeof useAdminCursorPagination<number>>
+const collection = useAdminCollectionState({
+  load: (signal) =>
+    resource.list(props.rewardCode.id, {
+      beforeId: pagination.cursor.value,
+      signal,
+    }),
+  isEmpty: (page) => page.redemptions.length === 0,
+})
+const { data: redemptionPage, loading, initialError, backgroundError } = collection
+pagination = useAdminCursorPagination<number>({ pending: loading })
+const redemptions = computed(() => redemptionPage.value?.redemptions ?? [])
 
 watch(
   [() => props.visible, () => props.rewardCode.id],
@@ -206,41 +211,13 @@ watch(
 )
 
 onBeforeUnmount(() => {
-  activeRequest?.abort()
+  collection.cancel()
   activeDetailRequest?.abort()
 })
 
 async function loadRedemptions({ preserveData = false }: { preserveData?: boolean } = {}) {
-  const epoch = ++pageRequestEpoch
-  activeRequest?.abort()
-  const controller = new AbortController()
-  activeRequest = controller
-  if (!preserveData) {
-    redemptions.value = []
-    hasLoadedPage.value = false
-  }
-  loading.value = true
-  initialError.value = false
-  backgroundError.value = false
-  try {
-    const page = await resource.list(props.rewardCode.id, {
-      beforeId: pagination.cursor.value,
-      signal: controller.signal,
-    })
-    if (controller.signal.aborted || epoch !== pageRequestEpoch) return
-    redemptions.value = page.redemptions
-    hasLoadedPage.value = true
-    pagination.setNextCursor(page.nextBeforeId)
-  } catch {
-    if (controller.signal.aborted || epoch !== pageRequestEpoch) return
-    if (hasLoadedPage.value && preserveData) {
-      backgroundError.value = true
-    } else {
-      initialError.value = true
-    }
-  } finally {
-    if (!controller.signal.aborted && epoch === pageRequestEpoch) loading.value = false
-  }
+  const page = await collection.reload({ preserveData })
+  if (page) pagination.setNextCursor(page.nextBeforeId)
 }
 
 function previousPage() {
@@ -319,13 +296,7 @@ function clearExpansion() {
 }
 
 function resetDialogState() {
-  pageRequestEpoch += 1
-  activeRequest?.abort()
-  loading.value = false
-  initialError.value = false
-  backgroundError.value = false
-  hasLoadedPage.value = false
-  redemptions.value = []
+  collection.reset()
   pagination.reset()
   clearExpansion()
 }

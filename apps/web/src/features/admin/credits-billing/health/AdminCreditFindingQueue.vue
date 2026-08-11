@@ -27,7 +27,7 @@
             :class="adminRoundIconButtonClass"
             aria-label="刷新异常队列"
             :loading="loading"
-            @click="resource.query.refetch()"
+            @click="refreshFindings"
           >
             <template #icon><Refresh class="size-4" /></template>
           </Button>
@@ -38,8 +38,8 @@
             :total-pages="knownPageCount"
             :prev-disabled="!canRetreat"
             :next-disabled="!canAdvance"
-            @prev="pagination.retreat()"
-            @next="pagination.advance()"
+            @prev="previousPage"
+            @next="nextPage"
           />
         </template>
       </AdminResourceToolbar>
@@ -54,7 +54,7 @@
           size="small"
           text
           :loading="loading"
-          @click="resource.query.refetch()"
+          @click="refreshFindings"
         />
       </div>
     </Message>
@@ -67,7 +67,7 @@
           severity="secondary"
           outlined
           :loading="loading"
-          @click="resource.query.refetch()"
+          @click="loadFindings()"
         />
       </div>
     </Message>
@@ -224,7 +224,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
@@ -236,11 +236,12 @@ import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
+import { useAdminCollectionState } from '../../shared/composables/useAdminCollectionState'
 import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
 import { adminCompactTagClass, adminRoundIconButtonClass } from '../../shared/lib/adminUiClasses'
 import { formatAdminDateTime } from '../creditsBillingFormat'
 import {
-  useAdminCreditFindingQueueResource,
+  createAdminCreditFindingQueueResource,
   type AdminCreditFinding,
   type AdminCreditFindingStatus,
 } from './adminCreditFindingQueueResource'
@@ -258,15 +259,16 @@ const statusOptions = [
 const status = ref<AdminCreditFindingStatus>('open')
 const selectedFinding = ref<AdminCreditFinding | null>(null)
 const drawerVisible = ref(false)
-const pagination = useAdminCursorPagination<number>({
-  pending: () => resource.query.isLoading.value || resource.query.isFetching.value,
+let pagination: ReturnType<typeof useAdminCursorPagination<number>>
+const resource = createAdminCreditFindingQueueResource()
+const collection = useAdminCollectionState({
+  load: (signal) =>
+    resource.list({ status: status.value, beforeId: pagination.cursor.value, signal }),
+  isEmpty: (page) => page.findings.length === 0,
 })
-const beforeId = pagination.cursor
-const resource = useAdminCreditFindingQueueResource({ status, beforeId })
-const findings = computed(() => resource.page.value?.findings ?? [])
-const loading = computed(() => resource.query.isLoading.value || resource.query.isFetching.value)
-const initialError = computed(() => resource.query.isError.value && !resource.page.value)
-const backgroundError = computed(() => resource.query.isError.value && Boolean(resource.page.value))
+const { data: findingPage, loading, initialError, backgroundError } = collection
+pagination = useAdminCursorPagination<number>({ pending: loading })
+const findings = computed(() => findingPage.value?.findings ?? [])
 const currentPage = pagination.currentPage
 const knownPageCount = pagination.knownPageCount
 const canAdvance = pagination.canAdvance
@@ -282,36 +284,55 @@ const drawerPt = {
   content: { class: 'p-0' },
 } as const
 
-watch(
-  [
-    () => resource.query.dataUpdatedAt.value,
-    () => resource.query.isFetching.value,
-    () => resource.query.isPlaceholderData.value,
-    () => resource.dataCriteria.value,
-    () => status.value,
-    () => beforeId.value,
-  ],
-  () => {
-    const criteria = resource.dataCriteria.value
-    if (
-      resource.query.isFetching.value ||
-      resource.query.isPlaceholderData.value ||
-      !criteria ||
-      criteria.status !== status.value ||
-      criteria.beforeId !== beforeId.value
-    ) {
-      return
-    }
-    pagination.setNextCursor(resource.page.value?.next_before_id)
-  },
-  { immediate: true },
-)
-
 watch(status, () => {
   pagination.reset()
   drawerVisible.value = false
   selectedFinding.value = null
+  void loadFindings()
+  scheduleRefresh()
 })
+
+let refreshTimer: number | undefined
+
+onMounted(() => {
+  void loadFindings()
+  scheduleRefresh()
+})
+
+onBeforeUnmount(() => {
+  collection.cancel()
+  if (refreshTimer !== undefined) window.clearTimeout(refreshTimer)
+})
+
+async function loadFindings({ preserveData = false }: { preserveData?: boolean } = {}) {
+  const page = await collection.reload({ preserveData })
+  if (page) pagination.setNextCursor(page.next_before_id)
+}
+
+function refreshFindings() {
+  void loadFindings({ preserveData: true })
+}
+
+function scheduleRefresh() {
+  if (refreshTimer !== undefined) window.clearTimeout(refreshTimer)
+  refreshTimer = window.setTimeout(
+    () => {
+      refreshFindings()
+      scheduleRefresh()
+    },
+    status.value === 'open' ? 5_000 : 30_000,
+  )
+}
+
+function nextPage() {
+  if (!pagination.advance()) return
+  void loadFindings()
+}
+
+function previousPage() {
+  if (!pagination.retreat()) return
+  void loadFindings()
+}
 
 function openFinding(finding: AdminCreditFinding) {
   selectedFinding.value = finding

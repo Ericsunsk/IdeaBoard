@@ -201,6 +201,13 @@ describe('AdminPaymentOrdersPage', () => {
     expect(screen.getByText(orderNumber)).toBeVisible()
   })
 
+  it('keeps the table frame mounted while the initial collection request is pending', async () => {
+    resource.search.mockReturnValueOnce(new Promise(() => {}))
+    renderPage()
+
+    expect(await screen.findByRole('table', { name: '支付订单列表' })).toBeVisible()
+  })
+
   it('renders the compact filtered empty state without a table shell', async () => {
     resource.search.mockResolvedValueOnce({ orders: [], total: 0 })
     renderPage()

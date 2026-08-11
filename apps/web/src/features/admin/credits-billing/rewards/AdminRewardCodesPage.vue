@@ -217,6 +217,7 @@ import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.v
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
+import { useAdminCollectionState } from '../../shared/composables/useAdminCollectionState'
 import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminToast'
@@ -231,15 +232,9 @@ import {
 
 const resource = createAdminRewardCodeResource()
 const toast = useAdminToast()
-const rewardCodes = ref<RewardCode[]>([])
-const loading = ref(true)
-const initialError = ref(false)
-const backgroundError = ref(false)
-const totalRewardCodes = ref(0)
 const searchKeyword = ref('')
 const appliedSearchKeyword = ref('')
 const statusFilter = ref<RewardCodeStatus>()
-const hasLoadedResult = ref(false)
 const saving = ref(false)
 const saveError = ref('')
 const createDialogVisible = ref(false)
@@ -263,11 +258,26 @@ const rewardCodeActionItems = computed(() => [
     disabled: Boolean(deletePending[activeRewardCode.value?.id ?? 0]),
   },
 ])
-const pagination = useAdminCursorPagination<number>({ pending: loading })
 const confirm = useAdminConfirm()
+let pagination: ReturnType<typeof useAdminCursorPagination<number>>
+const collection = useAdminCollectionState({
+  load: (signal) =>
+    resource.search({
+      query: appliedSearchKeyword.value,
+      status: statusFilter.value,
+      beforeId: pagination.cursor.value,
+      signal,
+    }),
+  isEmpty: (page) => page.rewardCodes.length === 0,
+  onInitialError: (error) => toast.error(formatAdminDisplayError(error, '兑换码加载失败')),
+})
+const { data: rewardCodePage, loading, initialError, backgroundError, updateData } = collection
+pagination = useAdminCursorPagination<number>({ pending: loading })
+const rewardCodes = computed(() => rewardCodePage.value?.rewardCodes ?? [])
+const totalRewardCodes = computed(() => rewardCodePage.value?.total ?? 0)
 const totalRewardCodesLabel = computed(() => '共 ' + totalRewardCodes.value + ' 个兑换码')
 const showEmptyState = computed(
-  () => !loading.value && !initialError.value && rewardCodes.value.length === 0,
+  () => !loading.value && !initialError.value && collection.isEmpty.value,
 )
 const emptyTitle = computed(() =>
   appliedSearchKeyword.value.trim() || statusFilter.value ? '未找到匹配的兑换码' : '暂无兑换码',
@@ -278,57 +288,21 @@ const statusOptions = [
   { label: '已过期', value: 'expired' },
   { label: '已耗尽', value: 'exhausted' },
 ] satisfies Array<{ label: string; value: RewardCodeStatus }>
-let requestEpoch = 0
-let activeRequest: AbortController | undefined
-
 type PrimePopupPanel = { toggle: (event: Event) => void; hide?: () => void }
 
 onMounted(() => {
   void loadRewardCodes()
 })
 
-onBeforeUnmount(() => activeRequest?.abort())
+onBeforeUnmount(() => collection.cancel())
 
 watch(statusFilter, () => {
   resetCriteriaAndLoad()
 })
 
 async function loadRewardCodes({ preserveData = false }: { preserveData?: boolean } = {}) {
-  const epoch = ++requestEpoch
-  activeRequest?.abort()
-  const controller = new AbortController()
-  activeRequest = controller
-  if (!preserveData) {
-    rewardCodes.value = []
-    totalRewardCodes.value = 0
-    hasLoadedResult.value = false
-  }
-  loading.value = true
-  initialError.value = false
-  backgroundError.value = false
-  try {
-    const page = await resource.search({
-      query: appliedSearchKeyword.value,
-      status: statusFilter.value,
-      beforeId: pagination.cursor.value,
-      signal: controller.signal,
-    })
-    if (epoch !== requestEpoch) return
-    rewardCodes.value = page.rewardCodes
-    totalRewardCodes.value = page.total
-    hasLoadedResult.value = true
-    pagination.setNextCursor(page.nextBeforeId)
-  } catch (error) {
-    if (epoch !== requestEpoch || controller.signal.aborted) return
-    if (hasLoadedResult.value && preserveData) {
-      backgroundError.value = true
-    } else {
-      initialError.value = true
-      toast.error(formatAdminDisplayError(error, '兑换码加载失败'))
-    }
-  } finally {
-    if (epoch === requestEpoch) loading.value = false
-  }
+  const page = await collection.reload({ preserveData })
+  if (page) pagination.setNextCursor(page.nextBeforeId)
 }
 
 function refreshRewardCodes() {
@@ -441,7 +415,10 @@ async function deleteRewardCode(rewardCode: RewardCode) {
   deletePending[rewardCode.id] = true
   try {
     await resource.delete(rewardCode.id)
-    rewardCodes.value = rewardCodes.value.filter((candidate) => candidate.id !== rewardCode.id)
+    updateData((page) => ({
+      ...page,
+      rewardCodes: page.rewardCodes.filter((candidate) => candidate.id !== rewardCode.id),
+    }))
     toast.success('兑换码已删除')
     void loadRewardCodes({ preserveData: true })
   } catch (error) {
@@ -466,8 +443,12 @@ async function setRewardCodeEnabled(rewardCode: RewardCode, enabled: boolean) {
 }
 
 function replaceRewardCode(updated: RewardCode) {
-  const index = rewardCodes.value.findIndex((candidate) => candidate.id === updated.id)
-  if (index >= 0) rewardCodes.value[index] = updated
+  updateData((page) => ({
+    ...page,
+    rewardCodes: page.rewardCodes.map((candidate) =>
+      candidate.id === updated.id ? updated : candidate,
+    ),
+  }))
 }
 
 function previousPage() {
