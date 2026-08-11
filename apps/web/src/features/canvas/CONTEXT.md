@@ -194,6 +194,16 @@ Vue Flow 是 interaction/rendering Adapter，不是 graph domain。
 - Vue Flow 细节可以存在于 `flow-pane`、adapter composables 和页面 `<VueFlow>` binding，但不能泄漏到 `graph-runtime`、`canvas-board/domain` 或页面业务规则。
 - 新增 graph domain rule 时，先表达为 Canvas Board/Graph Runtime 语义，再由 adapter 投影到 Vue Flow。
 
+### Execution Projection Contract
+
+`CanvasExecutionRuntime` 是 Canvas Task runtime projection 的唯一 owner。每次 Board open、switch 或 reload 都创建新的 opaque attachment epoch；每个 node execution 使用 lease/CAS transition，旧 attachment 或被 supersede 的 lease 不得修改当前 graph。
+
+- `CanvasBoardSnapshot` 只保存 persistence facts，永不保存 Flow Edge `animated`。
+- 只有 Hydration 可以从 persisted `pendingTaskId` 建立 reattach lease；reattach driver 只能复用该 lease，save reconciliation 和重复 reattach 都不得从 snapshot 反推或复活 running state。
+- Whole-graph hydrate、save reconciliation、history restore 和 execution transition 最终都由 Flow runtime 使用当前 Runtime state 重算所有 image-input edge animation。
+- Save 捕获 graph revision；revision 已推进时必须把 upload stabilization 作为有 precondition 的 media patch rebase 到最新 semantic snapshot，不能用旧 snapshot 覆盖当前 groups/media refs。Save reconciliation 只叠加 active lease 拥有、被 serializer 明确排除的 runtime overlay。
+- Board attachment 或 execution lease 失效后，旧 async completion 必须被拒绝，不能 materialize、cancel 或投影到新的 Board session。
+
 ### `canvas-board` Independence
 
 `features/canvas-board` 保持独立共享 domain module，因为 `CanvasBoardSnapshot` 是 workspace runtime、board catalog、persistence、preview serialization 和 tests 共同使用的 document contract。

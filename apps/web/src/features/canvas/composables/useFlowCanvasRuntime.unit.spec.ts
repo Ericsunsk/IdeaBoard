@@ -11,6 +11,7 @@ import {
 import { useCanvasGraphEditing } from '../graph-editing'
 import { useFlowCanvasRuntime, type UseFlowCanvasRuntimeOptions } from './useFlowCanvasRuntime'
 import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
+import { createCanvasExecutionRuntime } from '../execution/runtime/CanvasExecutionRuntime'
 
 type MutableHarnessNode = Node & {
   selected?: boolean
@@ -260,6 +261,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
   const isDirty = ref(false)
   const saveStatus = ref<SaveStatus>('idle')
   const cancelDeletedRunningTasks = vi.fn()
+  const executionRuntime = createCanvasExecutionRuntime()
   const boardSession: CanvasBoardSession = {
     currentBoardId: computed(() => 'board-a'),
     exists: vi.fn(() => true),
@@ -281,6 +283,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     isLoadingBoardSnapshot: ref(false),
     isSavingBoard: ref(false),
     boardSession,
+    executionRuntime,
     onWarning,
     onSuccess: vi.fn(),
     onError,
@@ -351,6 +354,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     graphActions,
     isDirty,
     saveStatus,
+    executionRuntime,
     flushAnimationFrames,
     flushNativeGraphChanges,
     applyNativeNodeChanges,
@@ -513,6 +517,182 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-3'])
     expect(harness.nodes.value.map((node) => node.id)).toEqual(['image-1', 'prompt-1', 'prompt-2'])
     expect(harness.edges.value.map((edge) => edge.id)).toEqual(['connection-3'])
+  })
+
+  it('hydrates persisted pending tasks into Runtime before the first graph projection', async () => {
+    const snapshot = createSnapshot()
+    snapshot.imageNodes[0] = {
+      ...snapshot.imageNodes[0]!,
+      sourceImageUrl: '',
+      outputStatus: 'running',
+      pendingTaskId: 'task-1',
+      outputImages: [],
+    }
+    snapshot.connections = [
+      {
+        id: 4,
+        fromNodeType: 'prompt',
+        fromNodeId: 1,
+        fromPort: 'prompt',
+        toNodeType: 'image',
+        toNodeId: 1,
+        toPort: 'image',
+      },
+    ]
+    const harness = createRuntimeHarness(snapshot)
+
+    await harness.runtime.persistence.loadInitialOrRouteBoard()
+
+    expect(harness.executionRuntime.getNodeState('image-1')).toEqual({
+      status: 'running',
+      taskId: 'task-1',
+    })
+    expect(harness.edges.value).toEqual([
+      expect.objectContaining({ id: 'connection-4', animated: true }),
+    ])
+  })
+
+  it('keeps runtime edge projection active when a deferred save reconciles', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.persistence.loadInitialOrRouteBoard()
+    const executionEdge: Edge = {
+      id: 'connection-4',
+      source: 'prompt-1',
+      sourceHandle: 'out:prompt',
+      target: 'image-1',
+      targetHandle: 'in:image',
+      animated: false,
+    }
+    harness.runtime.graphEditing.adapter.replaceEdges(
+      [executionEdge],
+      createFlowGraphCommandOptions(),
+    )
+    const attachment = harness.executionRuntime.attachment.value!
+    const lease = harness.executionRuntime.startNode(attachment, 'image-1', {
+      status: 'running',
+      taskId: 'task-1',
+    })!
+    expect(harness.edges.value[0]?.animated).toBe(true)
+
+    let resolveSave!: () => void
+    vi.mocked(harness.boardSession.save).mockImplementationOnce(
+      (snapshot) =>
+        new Promise((resolve) => {
+          resolveSave = () => resolve({ snapshot, remoteSync: { ok: true as const } })
+        }),
+    )
+    const save = harness.runtime.persistence.flushAutosave({ silent: true })
+    await vi.waitFor(() => expect(harness.boardSession.save).toHaveBeenCalled())
+    resolveSave()
+    await save
+
+    expect(harness.executionRuntime.getNodeLease('image-1')).toBe(lease)
+    expect(harness.edges.value[0]?.animated).toBe(true)
+    expect(JSON.stringify(vi.mocked(harness.boardSession.save).mock.calls[0]?.[0])).not.toContain(
+      'animated',
+    )
+  })
+
+  it('does not revive stale animation when execution finishes during a deferred save', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.persistence.loadInitialOrRouteBoard()
+    harness.runtime.graphEditing.adapter.replaceEdges(
+      [
+        {
+          id: 'connection-4',
+          source: 'prompt-1',
+          sourceHandle: 'out:prompt',
+          target: 'image-1',
+          targetHandle: 'in:image',
+          animated: false,
+        },
+      ],
+      createFlowGraphCommandOptions(),
+    )
+    const attachment = harness.executionRuntime.attachment.value!
+    const lease = harness.executionRuntime.startNode(attachment, 'image-1', {
+      status: 'running',
+      taskId: 'task-1',
+    })!
+
+    let resolveSave!: () => void
+    vi.mocked(harness.boardSession.save).mockImplementationOnce(
+      (snapshot) =>
+        new Promise((resolve) => {
+          resolveSave = () => resolve({ snapshot, remoteSync: { ok: true as const } })
+        }),
+    )
+    const save = harness.runtime.persistence.flushAutosave({ silent: true })
+    await vi.waitFor(() => expect(harness.boardSession.save).toHaveBeenCalled())
+    expect(
+      harness.executionRuntime.transitionNode(lease, {
+        status: 'succeeded',
+        taskId: 'task-1',
+      }),
+    ).toBe(true)
+    expect(harness.edges.value[0]?.animated).toBe(false)
+    resolveSave()
+    await save
+
+    expect(harness.executionRuntime.getNodeState('image-1')).toEqual({
+      status: 'succeeded',
+      taskId: 'task-1',
+    })
+    expect(harness.edges.value[0]?.animated).toBe(false)
+  })
+
+  it('preserves only lease-owned serializer omissions during save reconciliation', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.persistence.loadInitialOrRouteBoard()
+    const templateNode = harness.nodes.value.find((node) => node.id === 'image-1')!
+    const makeRuntimeOnlyNode = (id: number): Node => ({
+      ...templateNode,
+      id: `image-${id}`,
+      data: {
+        ...templateNode.data,
+        snapshotNode: {
+          ...templateNode.data.snapshotNode,
+          id,
+          sourceImageUrl: '',
+          outputStatus: 'running',
+          outputImages: [],
+          pendingTaskId: undefined,
+        },
+      },
+    })
+    harness.runtime.graphEditing.adapter.addNodes(
+      [makeRuntimeOnlyNode(9), makeRuntimeOnlyNode(10)],
+      createFlowGraphCommandOptions(),
+    )
+    harness.runtime.graphEditing.adapter.addEdges(
+      [
+        {
+          id: 'runtime-edge-9',
+          source: 'prompt-1',
+          sourceHandle: 'out:prompt',
+          target: 'image-9',
+          targetHandle: 'in:image',
+        },
+        {
+          id: 'runtime-edge-10',
+          source: 'prompt-1',
+          sourceHandle: 'out:prompt',
+          target: 'image-10',
+          targetHandle: 'in:image',
+        },
+      ],
+      createFlowGraphCommandOptions(),
+    )
+    const attachment = harness.executionRuntime.attachment.value!
+    harness.executionRuntime.startNode(attachment, 'image-9', { status: 'submitting' })
+
+    await harness.runtime.persistence.flushAutosave({ silent: true })
+
+    expect(harness.nodes.value.map((node) => node.id)).toContain('image-9')
+    expect(harness.nodes.value.map((node) => node.id)).not.toContain('image-10')
+    expect(harness.edges.value.map((edge) => edge.id)).toContain('runtime-edge-9')
+    expect(harness.edges.value.map((edge) => edge.id)).not.toContain('runtime-edge-10')
+    expect(harness.edges.value.find((edge) => edge.id === 'runtime-edge-9')?.animated).toBe(true)
   })
 
   it('uses graph adapter command side effects as the history and dirty boundary', async () => {

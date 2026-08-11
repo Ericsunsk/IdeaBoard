@@ -17,7 +17,7 @@ import {
 import { createCanvasGraphStore } from '../../graph-runtime'
 import { flowToCanvasBoardSnapshot } from '../../utils/flowSnapshotAdapter'
 import { usePendingImageResultExecution } from './usePendingImageResultNodes'
-import type { CanvasExecutionStateChange } from '../runtime/CanvasExecutionRuntime'
+import type { CanvasNodeExecutionChange } from '../runtime/CanvasExecutionRuntime'
 
 const animationFrameMocks = vi.hoisted(() => ({
   waitForNextRenderFrame: vi.fn<() => Promise<void>>(async () => undefined),
@@ -481,7 +481,7 @@ describe('usePendingImageResultExecution', () => {
     })
   })
 
-  it('animates reused and appended pending result edges while a batch is running', async () => {
+  it('leaves reused and appended edge projection to CanvasExecutionRuntime', async () => {
     const reusableNode = makeImageNode('image-1', {
       id: 1,
       sourceImageUrl: '',
@@ -516,8 +516,8 @@ describe('usePendingImageResultExecution', () => {
     const animatedByTarget = new Map(
       harness.edges.value.map((edge) => [edge.target, edge.animated]),
     )
-    expect(animatedByTarget.get('image-1')).toBe(true)
-    expect(animatedByTarget.get(reservedNodeIds[1])).toBe(true)
+    expect(animatedByTarget.get('image-1')).toBe(false)
+    expect(animatedByTarget.get(reservedNodeIds[1])).toBeUndefined()
 
     pendingResult.reject(new Error('pending'))
     await run
@@ -562,7 +562,7 @@ describe('usePendingImageResultExecution', () => {
   it('batch materializes completed run pending results with one graph replacement', async () => {
     const harness = createHarness([makePromptNode('prompt-1')])
     let reservedNodeIds: string[] = []
-    const executionChanges: CanvasExecutionStateChange[] = []
+    const executionChanges: CanvasNodeExecutionChange[] = []
 
     const summary = await harness.actions.runPendingResults({
       source: { url: 'https://example.com/source.png', ratio: 1 },
@@ -621,7 +621,7 @@ describe('usePendingImageResultExecution', () => {
     const harness = createHarness([makeAnchorNode()])
     const pendingError = new Error('任务进度推送超时，请稍后查看结果')
     let reservedNodeIds: string[] = []
-    const executionChanges: CanvasExecutionStateChange[] = []
+    const executionChanges: CanvasNodeExecutionChange[] = []
 
     const summary = await harness.actions.runPendingResults({
       source: { url: 'https://example.com/source.png', ratio: 1 },
@@ -747,7 +747,7 @@ describe('usePendingImageResultExecution', () => {
     const harness = createHarness([makeAnchorNode()])
     const pendingError = new Error('任务仍在处理中')
     let reservedNodeIds: string[] = []
-    const executionChanges: CanvasExecutionStateChange[] = []
+    const executionChanges: CanvasNodeExecutionChange[] = []
 
     const summary = await harness.actions.runPendingResults({
       source: { url: 'https://example.com/source.png', ratio: 1 },
@@ -780,7 +780,7 @@ describe('usePendingImageResultExecution', () => {
 
   it('reports a cancelled task as a cancelled execution terminal state', async () => {
     const harness = createHarness([makeAnchorNode()])
-    const executionChanges: CanvasExecutionStateChange[] = []
+    const executionChanges: CanvasNodeExecutionChange[] = []
     let resultNodeId = ''
 
     await harness.actions.runPendingResults({
@@ -945,7 +945,7 @@ describe('usePendingImageResultExecution', () => {
     expect(harness.edges.value.map((edge) => [edge.id, edge.animated])).toEqual([
       ['connection-1', false],
       ['connection-2', false],
-      ['connection-3', true],
+      ['connection-3', false],
     ])
   })
 })

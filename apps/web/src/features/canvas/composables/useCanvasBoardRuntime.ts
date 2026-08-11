@@ -8,6 +8,7 @@ import { useFlowBoardHeaderActions } from './useFlowBoardHeaderActions'
 import { useFlowCanvasRuntime } from './useFlowCanvasRuntime'
 import type { CanvasVueFlowGraphActions } from './useCanvasVueFlowGraphAdapter'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
+import type { CanvasExecutionRuntime } from '../execution/runtime/CanvasExecutionRuntime'
 
 type CanvasBoardRuntimeFeedback = CanvasFeedback['boardSession']
 
@@ -19,6 +20,7 @@ type UseCanvasBoardRuntimeOptions = {
   feedback: CanvasBoardRuntimeFeedback
   onNativeRemove?: () => void
   cancelDeletedRunningTasks: (taskIds: readonly string[]) => void
+  executionRuntime: CanvasExecutionRuntime
   vueFlowGraphActions?: CanvasVueFlowGraphActions
 }
 
@@ -63,6 +65,7 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions) {
     isSavingBoard,
     autosaveResumeSignal,
     boardSession,
+    executionRuntime: options.executionRuntime,
     onWarning: options.feedback.warning,
     onSuccess: options.feedback.saveSucceeded,
     onError: options.feedback.saveFailed,

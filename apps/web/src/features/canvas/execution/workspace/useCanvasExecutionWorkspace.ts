@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@vue-flow/core'
-import { ref, type Ref } from 'vue'
+import type { Ref } from 'vue'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
 import type { SubmitTaskData } from '../../../../shared/api/task'
 import type { TaskImageResult } from '../../../../shared/query/taskResult'
@@ -23,7 +23,6 @@ import { waitExistingOrLiveTaskImageResults } from '../task-runner/flowImageDire
 import type { ClientActionIdFactory } from '../task-runner/taskClientActionIds'
 import { buildImageExecutionTaskRequest } from '../commands/flowImageTaskRequests'
 import type { FlowToCanvasBoardSnapshotOptions } from '../../utils/flowSnapshotAdapter'
-import { readCurrentBoardId } from '../../utils/currentBoardId'
 import { createPendingImageWorkflowRunner } from '../runtime/pendingImageWorkflowRunner'
 import type { ImageSizeLoader } from '../result-nodes/flowImageDirectActionTaskResult'
 import {
@@ -31,16 +30,13 @@ import {
   type CanvasTaskSubmissionAdapter,
 } from './canvasTaskSubmissionAdapter'
 import {
-  createCanvasExecutionRuntime,
-  projectCanvasExecutionEdgeAnimation,
+  type CanvasExecutionAttachment,
+  type CanvasExecutionLease,
   type CanvasExecutionRuntime,
-  type CanvasExecutionStateChange,
 } from '../runtime/CanvasExecutionRuntime'
-import { createFlowGraphCommandOptions } from '../../composables/flowGraphAdapterCommandSideEffects'
 
 export type CanvasExecutionWorkspaceState = {
   readonly executionRuntime: CanvasExecutionRuntime
-  readonly runningNodeIds: Readonly<Ref<ReadonlySet<string>>>
   isNodeRunning: (nodeId: string) => boolean
 }
 
@@ -66,13 +62,12 @@ export type UseCanvasExecutionWorkspaceOptions = {
   boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
   refreshNodeInternals?: (nodeIds: string[]) => void
   flushAutosave?: (options?: { silent?: boolean }) => Promise<void>
-  getCurrentBoardId?: () => string
   pendingResults?: PendingImageResultExecution
   taskAdapter?: CanvasTaskSubmissionAdapter
   waitTaskImageResults?: (taskId: string) => Promise<TaskImageResult[]>
   loadImageSize?: ImageSizeLoader
   createClientActionId?: ClientActionIdFactory
-  executionRuntime?: CanvasExecutionRuntime
+  executionRuntime: CanvasExecutionRuntime
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
   onError?: (error: unknown) => boolean
@@ -86,14 +81,14 @@ type ReattachResolvedAttempt = {
   reattachKey: string
   nodeId: CanvasGraphNodeId
   taskId: string
+  lease: CanvasExecutionLease
   resolved: ResultMaterializerImageResult
 }
 
 export function useCanvasExecutionWorkspace(
   options: UseCanvasExecutionWorkspaceOptions,
 ): CanvasExecutionWorkspace {
-  const executionRuntime = options.executionRuntime ?? createCanvasExecutionRuntime()
-  const runningNodeIds = ref<Set<string>>(new Set())
+  const executionRuntime = options.executionRuntime
   const activeReattachKeys = new Set<string>()
   const waitTaskImageResults = options.waitTaskImageResults ?? waitExistingOrLiveTaskImageResults
   const loadImageSize = options.loadImageSize ?? loadImageSizeFromUrl
@@ -108,48 +103,23 @@ export function useCanvasExecutionWorkspace(
   const pendingResults = options.pendingResults ?? ownedPendingResults
 
   function isNodeRunning(nodeId: string): boolean {
-    return executionRuntime.isNodeActive(nodeId) || runningNodeIds.value.has(nodeId)
-  }
-
-  function syncExecutionEdgeProjection(change: CanvasExecutionStateChange) {
-    const projection = projectCanvasExecutionEdgeAnimation(
-      options.edges.value,
-      executionRuntime.nodeStates.value,
-      [change.nodeId],
-    )
-    if (!projection.didChange) return
-    options.graphAdapter.replaceEdges(
-      projection.edges,
-      createFlowGraphCommandOptions({ recordHistory: false, markDirty: false }),
-    )
+    return executionRuntime.isNodeActive(nodeId)
   }
 
   function transitionOwnedReattachExecution(
-    nodeId: string,
+    lease: CanvasExecutionLease,
     taskId: string,
-    status: Extract<
-      CanvasExecutionStateChange['state']['status'],
-      'succeeded' | 'failed' | 'cancelled'
-    >,
-    project: boolean,
+    status: 'succeeded' | 'failed' | 'cancelled',
   ): boolean {
-    const current = executionRuntime.getNodeState(nodeId)
-    if (current?.taskId !== taskId || !executionRuntime.isNodeActive(nodeId)) return false
-    const change: CanvasExecutionStateChange = {
-      nodeId,
-      state: { status, taskId },
-    }
-    executionRuntime.transitionNode(change.nodeId, change.state)
-    if (project) syncExecutionEdgeProjection(change)
-    return true
+    const current = executionRuntime.getNodeState(lease.nodeId)
+    if (current?.taskId !== taskId || !executionRuntime.isNodeActive(lease.nodeId)) return false
+    return executionRuntime.transitionNode(lease, { status, taskId })
   }
 
-  function readBoardId(): string {
-    return readCurrentBoardId(options.getCurrentBoardId)
-  }
-
-  function isBoardStillCurrent(boardId: string): boolean {
-    return !boardId || readBoardId() === boardId
+  function requireCurrentAttachment(): CanvasExecutionAttachment {
+    const attachment = executionRuntime.attachment.value
+    if (!attachment) throw new Error('Canvas execution requires an active Board attachment')
+    return attachment
   }
 
   async function flushPendingTaskSnapshot() {
@@ -176,9 +146,7 @@ export function useCanvasExecutionWorkspace(
 
   const workflowRunner = createPendingImageWorkflowRunner({
     pendingResults,
-    isBoardCurrent: isBoardStillCurrent,
     executionRuntime,
-    onExecutionStateChange: syncExecutionEdgeProjection,
     afterTaskIdAttached: flushPendingTaskSnapshot,
     createClientActionId: options.createClientActionId,
     onSuccess: options.onSuccess,
@@ -189,7 +157,7 @@ export function useCanvasExecutionWorkspace(
   async function runTextPromptGeneration(
     plan: ActivatedImageExecutionPlan & { kind: 'text-prompt' },
   ): Promise<void> {
-    const boardId = readBoardId()
+    const attachment = requireCurrentAttachment()
     let taskRequest: SubmitTaskData | null = null
     const buildTaskRequest = () => {
       taskRequest ??= buildImageExecutionTaskRequest(plan)
@@ -204,7 +172,7 @@ export function useCanvasExecutionWorkspace(
     await workflowRunner.run({
       source: plan.source,
       sourceNodeId: plan.sourceNodeId,
-      boardId,
+      attachment,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
       activationId: plan.activationId,
@@ -219,29 +187,34 @@ export function useCanvasExecutionWorkspace(
   }
 
   async function reattachPendingImageResults(): Promise<void> {
-    const boardId = readBoardId()
+    const attachment = requireCurrentAttachment()
     const pendingTasks = collectPendingImageTasks(options.nodes.value)
     if (pendingTasks.length === 0) return
     let failureCount = 0
     const resolvedAttempts: ReattachResolvedAttempt[] = []
     await Promise.all(
       pendingTasks.map(async ({ nodeId, taskId, fallbackRatio }) => {
-        const reattachKey = `${boardId}:${nodeId}:${taskId}`
+        const reattachKey = `${attachment.epoch}:${nodeId}:${taskId}`
         if (activeReattachKeys.has(reattachKey)) return
         if (!isCanvasGraphNodeId(nodeId)) return
         activeReattachKeys.add(reattachKey)
-        const runningChange: CanvasExecutionStateChange = {
-          nodeId,
-          state: { status: 'running', taskId },
+        const hydratedState = executionRuntime.getNodeState(nodeId)
+        const hydratedLease = executionRuntime.getNodeLease(nodeId)
+        if (
+          hydratedState?.status !== 'running' ||
+          hydratedState.taskId !== taskId ||
+          hydratedLease?.attachment !== attachment
+        ) {
+          activeReattachKeys.delete(reattachKey)
+          return
         }
+        const lease = hydratedLease
         try {
-          executionRuntime.transitionNode(runningChange.nodeId, runningChange.state)
-          syncExecutionEdgeProjection(runningChange)
           const resolved = await resolveFirstTaskImageResult(taskId, fallbackRatio)
-          const isCurrentBoard = isBoardStillCurrent(boardId)
+          const isCurrentBoard = executionRuntime.isAttachmentCurrent(attachment)
           const isAttached = isPendingImageTaskStillCurrent(nodeId, taskId)
           if (!isCurrentBoard || !isAttached) {
-            transitionOwnedReattachExecution(nodeId, taskId, 'cancelled', isCurrentBoard)
+            transitionOwnedReattachExecution(lease, taskId, 'cancelled')
             activeReattachKeys.delete(reattachKey)
             return
           }
@@ -249,16 +222,17 @@ export function useCanvasExecutionWorkspace(
             reattachKey,
             nodeId,
             taskId,
+            lease,
             resolved: { ...resolved, resultNodeId: nodeId, taskId },
           })
         } catch (error) {
-          const isCurrentBoard = isBoardStillCurrent(boardId)
+          const isCurrentBoard = executionRuntime.isAttachmentCurrent(attachment)
           const isAttached = isPendingImageTaskStillCurrent(nodeId, taskId)
           const status =
             !isCurrentBoard || !isAttached || error instanceof TaskCancelledError
               ? 'cancelled'
               : 'failed'
-          transitionOwnedReattachExecution(nodeId, taskId, status, isCurrentBoard)
+          transitionOwnedReattachExecution(lease, taskId, status)
           if (status === 'failed') {
             console.warn('[canvas] reattach pending image task failed', error)
             failureCount += 1
@@ -267,9 +241,9 @@ export function useCanvasExecutionWorkspace(
         }
       }),
     )
-    if (!isBoardStillCurrent(boardId)) {
+    if (!executionRuntime.isAttachmentCurrent(attachment)) {
       resolvedAttempts.forEach((attempt) => {
-        transitionOwnedReattachExecution(attempt.nodeId, attempt.taskId, 'cancelled', false)
+        transitionOwnedReattachExecution(attempt.lease, attempt.taskId, 'cancelled')
         activeReattachKeys.delete(attempt.reattachKey)
       })
       return
@@ -292,7 +266,7 @@ export function useCanvasExecutionWorkspace(
       console.warn('[canvas] materialize reattached image task failed', error)
       failureCount += resolvedAttempts.length
       resolvedAttempts.forEach((attempt) => {
-        transitionOwnedReattachExecution(attempt.nodeId, attempt.taskId, 'failed', true)
+        transitionOwnedReattachExecution(attempt.lease, attempt.taskId, 'failed')
         activeReattachKeys.delete(attempt.reattachKey)
       })
     }
@@ -300,13 +274,13 @@ export function useCanvasExecutionWorkspace(
     const materializedNodeIds = new Set(materialized?.materializedNodeIds ?? [])
     resolvedAttempts.forEach((attempt) => {
       if (materializedNodeIds.has(attempt.nodeId)) {
-        transitionOwnedReattachExecution(attempt.nodeId, attempt.taskId, 'succeeded', true)
+        transitionOwnedReattachExecution(attempt.lease, attempt.taskId, 'succeeded')
       } else if (!materialized) {
         // The materializer failure path already assigned failed above.
         activeReattachKeys.delete(attempt.reattachKey)
         return
       } else {
-        transitionOwnedReattachExecution(attempt.nodeId, attempt.taskId, 'cancelled', true)
+        transitionOwnedReattachExecution(attempt.lease, attempt.taskId, 'cancelled')
       }
       activeReattachKeys.delete(attempt.reattachKey)
     })
@@ -326,7 +300,6 @@ export function useCanvasExecutionWorkspace(
   return {
     state: {
       executionRuntime,
-      runningNodeIds,
       isNodeRunning,
     },
     commands: {

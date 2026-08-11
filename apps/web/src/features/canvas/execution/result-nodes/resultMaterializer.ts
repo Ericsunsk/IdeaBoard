@@ -1,6 +1,5 @@
 import { resolveImageNodeFrameSize, type ImageNodeItem } from '../../../canvas-board/domain'
 import {
-  type CanvasGraphEdgeId,
   type CanvasGraphNodeId,
   type CanvasGraphStore,
   type CanvasGraphTransactionSummary,
@@ -20,18 +19,10 @@ export type ResultMaterializerSkippedResult = {
   reason: ResultMaterializerSkipReason
 }
 
-export type ResultMaterializerProjectionIntent = {
-  updatedEdges: Array<{
-    id: CanvasGraphEdgeId
-    animated: false
-  }>
-}
-
 export type ResultMaterializerResult = {
   summary: CanvasGraphTransactionSummary
   materializedNodeIds: CanvasGraphNodeId[]
   skipped: ResultMaterializerSkippedResult[]
-  projection: ResultMaterializerProjectionIntent
 }
 
 export type MaterializeResolvedImageResultsOptions = {
@@ -84,7 +75,6 @@ export function materializeResolvedImageResults(
   })
   const materializedNodeIds: CanvasGraphNodeId[] = []
   const skipped: ResultMaterializerSkippedResult[] = []
-  const animatedEdgeIds = new Set<CanvasGraphEdgeId>()
 
   for (const result of options.results) {
     const node = options.store.getNode(result.resultNodeId)
@@ -117,18 +107,11 @@ export function materializeResolvedImageResults(
       outputImages: [],
     })
     materializedNodeIds.push(result.resultNodeId)
-    options.store.getIncomingEdgeIds(result.resultNodeId).forEach((edgeId) => {
-      const edge = options.store.getEdge(edgeId)
-      if (edge?.connection.toPort === 'image') animatedEdgeIds.add(edgeId)
-    })
   }
 
   return {
     summary: transaction.commit(),
     materializedNodeIds,
     skipped,
-    projection: {
-      updatedEdges: Array.from(animatedEdgeIds).map((id) => ({ id, animated: false })),
-    },
   }
 }

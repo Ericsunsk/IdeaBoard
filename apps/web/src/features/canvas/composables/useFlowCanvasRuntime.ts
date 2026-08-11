@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue'
+import { ref, watch, type Ref } from 'vue'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import { useFlowHistory, type FlowHistorySnapshot } from './useFlowHistory'
 import {
@@ -30,6 +30,10 @@ import {
   createCanvasNodeDragLifecycle,
   type CanvasNodeDragLifecycle,
 } from '../flow-pane'
+import {
+  projectCanvasExecutionEdgeAnimation,
+  type CanvasExecutionRuntime,
+} from '../execution/runtime/CanvasExecutionRuntime'
 
 type SelectableFlowItem = {
   id: string
@@ -37,7 +41,7 @@ type SelectableFlowItem = {
 }
 
 type FlowGraphCommitOptions = {
-  preserveSelection?: boolean
+  source: 'hydrate-replace' | 'save-reconcile'
 }
 
 export type UseFlowCanvasRuntimeOptions = {
@@ -50,6 +54,7 @@ export type UseFlowCanvasRuntimeOptions = {
   isSavingBoard: Ref<boolean>
   autosaveResumeSignal?: Ref<unknown>
   boardSession: CanvasBoardSession
+  executionRuntime: CanvasExecutionRuntime
   onWarning: (message: string) => void
   onSuccess: (message: string) => void
   onError: (message: string) => void
@@ -140,18 +145,72 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     afterCommand: commitGraphCommandSideEffects,
   })
 
+  function rebaseSavedFlowProjection(savedGraph: { nodes: Node[]; edges: Edge[] }) {
+    const savedNodesById = new Map(savedGraph.nodes.map((node) => [node.id, node] as const))
+    const savedEdgesById = new Map(savedGraph.edges.map((edge) => [edge.id, edge] as const))
+    return {
+      nodes: [
+        ...savedGraph.nodes,
+        ...options.nodes.value.filter(
+          (node) => !savedNodesById.has(node.id) && options.executionRuntime.isNodeActive(node.id),
+        ),
+      ],
+      edges: [
+        ...savedGraph.edges,
+        ...options.edges.value.filter(
+          (edge) =>
+            !savedEdgesById.has(edge.id) && options.executionRuntime.isNodeActive(edge.target),
+        ),
+      ],
+    }
+  }
+
+  function projectExecutionEdges(edges: Edge[]): Edge[] {
+    return projectCanvasExecutionEdgeAnimation(edges, options.executionRuntime.nodeStates.value)
+      .edges
+  }
+
+  function hydratePendingExecutionLeases(nodes: Node[]) {
+    const attachment = options.executionRuntime.attachment.value
+    if (!attachment) return
+    nodes.forEach((node) => {
+      const snapshotNode = node.data?.snapshotNode as
+        { type?: unknown; outputStatus?: unknown; pendingTaskId?: unknown } | undefined
+      const taskId =
+        typeof snapshotNode?.pendingTaskId === 'string' ? snapshotNode.pendingTaskId.trim() : ''
+      if (
+        snapshotNode?.type !== 'image-node' ||
+        snapshotNode.outputStatus !== 'running' ||
+        !taskId
+      ) {
+        return
+      }
+      options.executionRuntime.startNode(attachment, node.id, {
+        status: 'running',
+        taskId,
+      })
+    })
+  }
+
   function commitFlowGraph(
     nextGraph: { nodes: Node[]; edges: Edge[] },
-    commitOptions: FlowGraphCommitOptions = {},
+    commitOptions: FlowGraphCommitOptions,
   ) {
+    if (commitOptions.source === 'hydrate-replace') {
+      hydratePendingExecutionLeases(nextGraph.nodes)
+    }
+    const semanticGraph =
+      commitOptions.source === 'save-reconcile' ? rebaseSavedFlowProjection(nextGraph) : nextGraph
     const projectedGraph = {
       nodes:
-        groupRuntime?.internal.projectCurrentGroupNodeLayers(nextGraph.nodes) ?? nextGraph.nodes,
-      edges: nextGraph.edges,
+        groupRuntime?.internal.projectCurrentGroupNodeLayers(semanticGraph.nodes) ??
+        semanticGraph.nodes,
+      edges: projectExecutionEdges(semanticGraph.edges),
     }
-    const resolvedGraph = commitOptions.preserveSelection
-      ? preserveCurrentSelection(projectedGraph)
-      : projectedGraph
+    const resolvedGraph =
+      commitOptions.source === 'save-reconcile'
+        ? preserveCurrentSelection(projectedGraph)
+        : projectedGraph
     graphAdapter.replaceGraph(resolvedGraph)
   }
 
@@ -161,6 +220,16 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       markDirty: false,
     })
   }
+
+  watch(
+    [options.edges, options.executionRuntime.nodeStates],
+    () => {
+      const projectedEdges = projectExecutionEdges(options.edges.value)
+      if (projectedEdges === options.edges.value) return
+      graphAdapter.replaceEdges(projectedEdges, createRestoreGraphCommandOptions())
+    },
+    { flush: 'sync' },
+  )
 
   const flowHistory = useFlowHistory({
     nodes: options.nodes,
@@ -183,10 +252,11 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     boardBaseSnapshot: options.boardBaseSnapshot,
     isDirty: options.isDirty,
     saveStatus: options.saveStatus,
-    localEditVersion,
+    graphRevision: localEditVersion,
     isLoadingBoardSnapshot: options.isLoadingBoardSnapshot,
     isSavingBoard: options.isSavingBoard,
     boardSession: options.boardSession,
+    readBoardAttachmentEpoch: () => options.executionRuntime.attachment.value?.epoch ?? 0,
     onWarning: options.onWarning,
     onSuccess: options.onSuccess,
     onError: options.onError,
@@ -206,6 +276,9 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   const loadInitialOrRouteBoard: typeof loadInitialOrRouteBoardBase = async (...args) => {
     nodeDragLifecycle.cancel()
     groupRuntime?.internal.resetTransientSelectionState()
+    const boardId = options.boardSession.currentBoardId.value
+    if (boardId) options.executionRuntime.attachBoard(boardId)
+    else options.executionRuntime.detachBoard()
     const result = await loadInitialOrRouteBoardBase(...args)
     groupRuntime?.internal.handleCommittedGroupsChanged()
     return result

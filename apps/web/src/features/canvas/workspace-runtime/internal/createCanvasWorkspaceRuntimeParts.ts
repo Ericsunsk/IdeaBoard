@@ -17,6 +17,7 @@ import { createCanvasWorkspaceAutosave } from './createCanvasWorkspaceAutosave'
 import { createCanvasWorkspaceGraphRuntime } from './createCanvasWorkspaceGraphRuntime'
 import { createCanvasWorkspaceImageWorkflow } from './createCanvasWorkspaceImageWorkflow'
 import { createCanvasWorkspaceRuntimeFacade } from './createCanvasWorkspaceRuntimeFacade'
+import { createCanvasExecutionRuntime } from '../../execution/runtime/CanvasExecutionRuntime'
 
 export type UseCanvasWorkspaceRuntimeOptions = {
   route: RouteLocationNormalizedLoaded
@@ -40,6 +41,7 @@ export type UseCanvasWorkspaceRuntimeOptions = {
 export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRuntimeOptions) {
   const feedback = useCanvasFeedback(options.openRecharge)
   const taskLifecycle = createCanvasTaskLifecycle({ cancel: taskApi.cancel })
+  const executionRuntime = createCanvasExecutionRuntime()
 
   const board = useCanvasBoardRuntime({
     route: options.route,
@@ -49,6 +51,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     feedback: feedback.boardSession,
     onNativeRemove: options.onNativeRemove,
     cancelDeletedRunningTasks: taskLifecycle.cancelDeletedRunningTasks,
+    executionRuntime,
     vueFlowGraphActions: options.flowPaneAdapter.vueFlowGraphActions,
   })
 
@@ -104,6 +107,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
       imageTools: feedback.imageTools,
       taskExecution: feedback.taskExecution,
     },
+    executionRuntime,
   })
 
   return {

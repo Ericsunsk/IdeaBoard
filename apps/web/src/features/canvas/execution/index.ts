@@ -16,9 +16,11 @@ export {
   createCanvasExecutionRuntime,
   projectCanvasExecutionEdgeAnimation,
   type CanvasExecutionEdgeProjection,
+  type CanvasExecutionAttachment,
+  type CanvasExecutionLease,
   type CanvasExecutionRuntime,
   type CanvasExecutionStatus,
-  type CanvasExecutionStateChange,
+  type CanvasNodeExecutionChange,
   type CanvasNodeExecutionState,
 } from './runtime/CanvasExecutionRuntime'
 export {

@@ -10,6 +10,8 @@ import { useCanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlow
 import { createCanvasGraphStore } from '../../graph-runtime'
 import { flowToCanvasBoardSnapshot } from '../../utils/flowSnapshotAdapter'
 import { useFlowImageWorkflowExecution } from './flowImageWorkflowExecution'
+import { createCanvasExecutionRuntime } from './CanvasExecutionRuntime'
+import { useCanvasExecutionWorkspace } from '../workspace/useCanvasExecutionWorkspace'
 
 const executorMocks = vi.hoisted(() => ({
   assertTaskRequestReady: vi.fn(async () => undefined),
@@ -131,25 +133,48 @@ function createExecutionHarness(
   const onSuccess = vi.fn()
   const onWarning = vi.fn()
   const currentBoardId = shallowRef('board-a')
+  const executionRuntime = createCanvasExecutionRuntime()
+  const attachment = executionRuntime.attachBoard(currentBoardId.value)
+  nodes.value.forEach((node) => {
+    const snapshot = node.data?.snapshotNode as ImageNodeItem | undefined
+    const taskId = snapshot?.pendingTaskId?.trim()
+    if (snapshot?.type === 'image-node' && snapshot.outputStatus === 'running' && taskId) {
+      executionRuntime.startNode(attachment, node.id, { status: 'running', taskId })
+    }
+  })
+  const createCurrentCanvasGraphStore = (
+    snapshotOptions?: Parameters<typeof flowToCanvasBoardSnapshot>[2],
+  ) =>
+    createCanvasGraphStore(
+      flowToCanvasBoardSnapshot(
+        {
+          nodes: nodes.value,
+          edges: edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
+        },
+        undefined,
+        snapshotOptions,
+      ),
+    )
+  const executionWorkspace = useCanvasExecutionWorkspace({
+    nodes,
+    edges,
+    graphAdapter,
+    createCurrentCanvasGraphStore,
+    flushAutosave,
+    executionRuntime,
+    onSuccess,
+    onWarning,
+  })
   const execution = useFlowImageWorkflowExecution({
     nodes,
     edges,
     graphAdapter,
-    createCurrentCanvasGraphStore: (snapshotOptions) =>
-      createCanvasGraphStore(
-        flowToCanvasBoardSnapshot(
-          {
-            nodes: nodes.value,
-            edges: edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
-          },
-          undefined,
-          snapshotOptions,
-        ),
-      ),
+    createCurrentCanvasGraphStore,
     flushAutosave,
     onSuccess,
     onWarning,
     getCurrentBoardId: () => currentBoardId.value,
+    executionWorkspace,
   })
 
   return {
@@ -159,6 +184,7 @@ function createExecutionHarness(
     onSuccess,
     onWarning,
     currentBoardId,
+    executionRuntime,
     execution,
   }
 }
@@ -258,7 +284,7 @@ describe('flowImageWorkflowExecution', () => {
     expect(resultNode?.data?.kind).toBe('image')
     expect(execution.isNodeDirectActionRunning(resultNode!.id)).toBe(true)
     expect(execution.getNodeExecutionState(resultNode!.id)).toEqual({ status: 'submitting' })
-    expect(edges.value.find((edge) => edge.target === resultNode!.id)?.animated).toBe(true)
+    expect(edges.value.find((edge) => edge.target === resultNode!.id)?.animated).toBeUndefined()
 
     submitTask.resolve({ taskId: 'task-1' })
     await flushPromises()
@@ -312,7 +338,7 @@ describe('flowImageWorkflowExecution', () => {
     executorMocks.waitExistingOrLiveTaskImageResults.mockImplementationOnce(
       () => taskResult.promise,
     )
-    const { execution, nodes, currentBoardId } = createExecutionHarness()
+    const { execution, nodes, currentBoardId, executionRuntime } = createExecutionHarness()
 
     const run = execution.executeImageWorkflow(imageActionPlan())
     await flushPromises()
@@ -323,6 +349,7 @@ describe('flowImageWorkflowExecution', () => {
     })
 
     currentBoardId.value = 'board-b'
+    executionRuntime.attachBoard('board-b')
     taskResult.resolve([
       {
         url: 'https://example.com/task-1.png',
@@ -332,10 +359,7 @@ describe('flowImageWorkflowExecution', () => {
     ])
     await run
 
-    expect(execution.getNodeExecutionState(resultNode!.id)).toEqual({
-      status: 'cancelled',
-      taskId: 'task-1',
-    })
+    expect(execution.getNodeExecutionState(resultNode!.id)).toBeNull()
   })
 
   it('cancels active execution state when a result rejects after the board changes', async () => {
@@ -343,7 +367,7 @@ describe('flowImageWorkflowExecution', () => {
     executorMocks.waitExistingOrLiveTaskImageResults.mockImplementationOnce(
       () => taskResult.promise,
     )
-    const { execution, nodes, currentBoardId } = createExecutionHarness()
+    const { execution, nodes, currentBoardId, executionRuntime } = createExecutionHarness()
 
     const run = execution.executeImageWorkflow(imageActionPlan())
     await flushPromises()
@@ -354,13 +378,11 @@ describe('flowImageWorkflowExecution', () => {
     })
 
     currentBoardId.value = 'board-b'
+    executionRuntime.attachBoard('board-b')
     taskResult.reject(new Error('provider failed after navigation'))
     await run
 
-    expect(execution.getNodeExecutionState(resultNode!.id)).toEqual({
-      status: 'cancelled',
-      taskId: 'task-1',
-    })
+    expect(execution.getNodeExecutionState(resultNode!.id)).toBeNull()
   })
 
   it('keeps local inpaint result nodes alive across pending result timeouts', async () => {
@@ -552,7 +574,7 @@ describe('flowImageWorkflowExecution', () => {
     expect(execution.isNodeDirectActionRunning('image-2.25')).toBe(false)
   })
 
-  it('animates pending image input edges while reattaching running nodes', async () => {
+  it('restores pending execution state while reattaching running nodes', async () => {
     const taskResult = createDeferred<Array<{ url: string; width: number; height: number }>>()
     executorMocks.waitExistingOrLiveTaskImageResults.mockImplementationOnce(
       () => taskResult.promise,
@@ -575,7 +597,6 @@ describe('flowImageWorkflowExecution', () => {
     await flushPromises()
 
     expect(execution.isNodeDirectActionRunning('image-1')).toBe(true)
-    expect(edges.value.find((edge) => edge.id === 'connection-1')?.animated).toBe(true)
 
     taskResult.resolve([
       {

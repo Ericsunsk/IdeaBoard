@@ -24,6 +24,7 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
   const saveStatus = ref<SaveStatus>('idle')
   const isLoadingBoardSnapshot = ref(false)
   const isSavingBoard = ref(false)
+  const graphRevision = ref(0)
   const commitGraph = vi.fn((nextGraph: { nodes: unknown[]; edges: unknown[] }) => {
     fullNodes.value = nextGraph.nodes
     fullEdges.value = nextGraph.edges
@@ -49,9 +50,11 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
     boardBaseSnapshot,
     isDirty,
     saveStatus,
+    graphRevision,
     isLoadingBoardSnapshot,
     isSavingBoard,
     boardSession,
+    readBoardAttachmentEpoch: () => 1,
     onWarning,
     onSuccess,
     onError,
@@ -180,7 +183,7 @@ describe('useCanvasBoardPersistence', () => {
         nodes: expect.any(Array),
         edges: expect.any(Array),
       }),
-      { preserveSelection: true },
+      { source: 'save-reconcile' },
     )
     expect(harness.isDirty.value).toBe(false)
     expect(harness.saveStatus.value).toBe('saved')
@@ -323,7 +326,7 @@ describe('useCanvasBoardPersistence', () => {
         nodes: expect.any(Array),
         edges: expect.any(Array),
       }),
-      { preserveSelection: false },
+      { source: 'hydrate-replace' },
     )
   })
 })

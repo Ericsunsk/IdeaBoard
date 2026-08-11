@@ -28,7 +28,7 @@ Baseline 证据来自 `apps/web/.benchmark-reports/` 的本地 report，汇总�
 ## Non-Goals
 
 - 不迁移 `CanvasBoardSnapshot` schema。
-- 不改变 route、Board Session、保存语义或 workflow execution contract。
+- 不改变 route 或持久化 schema；Board Session 与 workflow execution 通过 attachment/lease contract 协作。
 - 不承诺 `10000 nodes + media-heavy` 60fps；`5000/10000` 是 torture/ceiling probes。
 - 不把 progressive/degraded rendering 作为默认体验。
 
@@ -36,7 +36,7 @@ Baseline 证据来自 `apps/web/.benchmark-reports/` 的本地 report，汇总�
 
 - `CanvasBoardSnapshot` 继续是 persistence schema 和 import/export contract。
 - Canvas route 和用户可见行为保持不变：打开 board、拖拽节点、连线、删除、undo/redo、autosave、运行 workflow 的交互语义不变。
-- Workflow execution contract 不变：Execution Plan、Task submission、Pending Result Node materialization 仍使用现有 feature contracts。
+- Execution Plan、Task submission 与 Pending Result materialization 继续使用现有 feature boundaries；runtime state 由单一 `CanvasExecutionRuntime` attachment/lease seam 拥有。
 - `features/canvas-board/domain` 继续拥有 shared snapshot schema/core module。
 - Benchmark report artifacts 继续只写入 ignored local directory，不能进入 git。
 
@@ -88,6 +88,22 @@ Projection strategy:
 - Replace arrays only when order, visibility, add/remove, or Vue Flow limitations require it.
 - For single-node position updates, patch only the changed Flow Node record when practical.
 - Keep Flow Node UI-only fields separate from Canvas Node domain fields when possible.
+
+### `CanvasExecutionRuntime`
+
+Execution Runtime owns transient Task lifecycle projection, not persistence facts.
+
+Responsibilities:
+
+- create a new opaque attachment epoch for every Board open, switch, or reload
+- issue per-node execution leases and reject stale attachment/lease transitions with CAS semantics
+- expose the current attachment's node execution states as the only image-input animation source
+- establish running leases from persisted pending tasks only during hydration
+- allow the reattach driver to reuse, but never recreate, hydration leases
+- retain serializer-omitted nodes and edges only while an active execution lease owns them
+- keep animation out of `CanvasBoardSnapshot` and graph dirty/history accounting
+
+Flow runtime applies execution projection synchronously after semantic graph reconciliation and before replacing Vue Flow arrays. Save reconciliation is revision-gated; upload stabilization rebases only media fields whose captured values are still current, preserves newer groups/media refs, and never treats saved `outputStatus` as live execution state.
 
 ### Commit Side Effects
 

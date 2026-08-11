@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
 import { useCanvasBoardRuntime } from './useCanvasBoardRuntime'
+import { createCanvasExecutionRuntime } from '../execution/runtime/CanvasExecutionRuntime'
 
 const mocks = vi.hoisted(() => ({
   useCanvasBoardSession: vi.fn(),
@@ -94,6 +95,7 @@ describe('useCanvasBoardRuntime', () => {
         saveFailed: vi.fn(),
       },
       cancelDeletedRunningTasks: vi.fn(),
+      executionRuntime: createCanvasExecutionRuntime(),
     })
 
     await runtime.boardChrome.onNavigateRequest('/boards/next')
@@ -120,6 +122,7 @@ describe('useCanvasBoardRuntime', () => {
       logoutAndRedirect: vi.fn(),
       feedback,
       cancelDeletedRunningTasks: vi.fn(),
+      executionRuntime: createCanvasExecutionRuntime(),
     })
     const flowOptions = mocks.useFlowCanvasRuntime.mock.calls[0]?.[0]
 

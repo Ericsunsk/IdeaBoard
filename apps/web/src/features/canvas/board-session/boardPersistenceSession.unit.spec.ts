@@ -49,6 +49,31 @@ function makePendingImageFlowNode(): FlowAdapterNode {
   }
 }
 
+function makeReadyImageFlowNode(sourceImageUrl: string): FlowAdapterNode {
+  const snapshotNode: ImageNodeItem = {
+    id: 1,
+    type: 'image-node',
+    x: 0,
+    y: 0,
+    width: 280,
+    sourceImageUrl,
+    sourceImageRatio: 1,
+    outputStatus: 'ready',
+    outputImages: [],
+  }
+  return {
+    id: 'image-1',
+    type: 'canvas',
+    position: { x: 0, y: 0 },
+    data: {
+      kind: 'image',
+      nodeType: 'image',
+      title: 'Image',
+      snapshotNode,
+    },
+  }
+}
+
 function createSessionHarness(initialBoardId = 'board-a') {
   const routeBoardId = ref(initialBoardId)
   const fullNodes = ref<unknown[]>([])
@@ -60,6 +85,7 @@ function createSessionHarness(initialBoardId = 'board-a') {
   const isLoadingBoardSnapshot = ref(false)
   const isSavingBoard = ref(false)
   const canSaveBoard = ref(true)
+  const boardAttachmentEpoch = ref(1)
   const commitGraph = vi.fn((nextGraph: { nodes: unknown[]; edges: unknown[] }) => {
     fullNodes.value = nextGraph.nodes
     fullEdges.value = nextGraph.edges
@@ -68,7 +94,6 @@ function createSessionHarness(initialBoardId = 'board-a') {
   const onSuccess = vi.fn()
   const onError = vi.fn()
   const clearFlowHistoryBaseline = vi.fn()
-  const onGraphCommitted = vi.fn()
   const boardSession: CanvasBoardSession = {
     currentBoardId: computed(() => {
       const boardId = routeBoardId.value.trim()
@@ -88,17 +113,17 @@ function createSessionHarness(initialBoardId = 'board-a') {
     boardBaseSnapshot,
     isDirty,
     saveStatus,
-    localEditVersion,
+    graphRevision: localEditVersion,
     isLoadingBoardSnapshot,
     isSavingBoard,
     boardSession,
+    readBoardAttachmentEpoch: () => boardAttachmentEpoch.value,
     canSaveBoard: () => canSaveBoard.value,
     onWarning,
     onSuccess,
     onError,
     clearFlowHistoryBaseline,
     commitGraph,
-    onGraphCommitted,
   })
 
   return {
@@ -118,8 +143,8 @@ function createSessionHarness(initialBoardId = 'board-a') {
     onSuccess,
     onError,
     clearFlowHistoryBaseline,
-    onGraphCommitted,
     boardSession,
+    boardAttachmentEpoch,
   }
 }
 
@@ -155,7 +180,7 @@ describe('boardPersistenceSession', () => {
         nodes: expect.any(Array),
         edges: expect.any(Array),
       }),
-      { preserveSelection: false },
+      { source: 'hydrate-replace' },
     )
     expect(harness.boardBaseSnapshot.value).toMatchObject({
       promptNodes: snapshot.promptNodes,
@@ -163,7 +188,6 @@ describe('boardPersistenceSession', () => {
     expect(harness.isDirty.value).toBe(false)
     expect(harness.saveStatus.value).toBe('saved')
     expect(harness.clearFlowHistoryBaseline).toHaveBeenCalledOnce()
-    expect(harness.onGraphCommitted).toHaveBeenCalledOnce()
     expect(harness.isLoadingBoardSnapshot.value).toBe(false)
   })
 
@@ -179,7 +203,7 @@ describe('boardPersistenceSession', () => {
         nodes: expect.any(Array),
         edges: expect.any(Array),
       }),
-      { preserveSelection: false },
+      { source: 'hydrate-replace' },
     )
     expect(harness.isDirty.value).toBe(false)
     expect(harness.saveStatus.value).toBe('idle')
@@ -211,7 +235,7 @@ describe('boardPersistenceSession', () => {
     expect(harness.isLoadingBoardSnapshot.value).toBe(false)
   })
 
-  it('does not replace the graph baseline when saving while unresolved pending result nodes exist', async () => {
+  it('delegates runtime overlay preservation to save reconciliation', async () => {
     const harness = createSessionHarness()
     harness.fullNodes.value = [makePendingImageFlowNode()]
 
@@ -219,12 +243,14 @@ describe('boardPersistenceSession', () => {
 
     expect(saved).toBe(true)
     expect(harness.boardSession.save).toHaveBeenCalledOnce()
-    expect(harness.commitGraph).not.toHaveBeenCalled()
-    expect(harness.clearFlowHistoryBaseline).not.toHaveBeenCalled()
+    expect(harness.commitGraph).toHaveBeenCalledWith(
+      expect.objectContaining({ nodes: expect.any(Array), edges: expect.any(Array) }),
+      { source: 'save-reconcile' },
+    )
+    expect(harness.clearFlowHistoryBaseline).toHaveBeenCalledOnce()
     expect(harness.isDirty.value).toBe(false)
     expect(harness.saveStatus.value).toBe('saved')
     expect(harness.onSuccess).toHaveBeenCalledWith('已保存')
-    expect(harness.onGraphCommitted).toHaveBeenCalledOnce()
     expect(harness.isSavingBoard.value).toBe(false)
   })
 
@@ -250,7 +276,6 @@ describe('boardPersistenceSession', () => {
     expect(harness.clearFlowHistoryBaseline).not.toHaveBeenCalled()
     expect(harness.onWarning).toHaveBeenCalledWith('已保存到本地，远端同步失败，将在网络恢复后重试')
     expect(harness.onSuccess).not.toHaveBeenCalled()
-    expect(harness.onGraphCommitted).toHaveBeenCalledOnce()
     expect(harness.isSavingBoard.value).toBe(false)
   })
 
@@ -504,9 +529,135 @@ describe('boardPersistenceSession', () => {
     const saved = await savePromise
 
     expect(saved).toBe(true)
-    expect(harness.commitGraph).not.toHaveBeenCalled()
-    expect(harness.fullNodes.value).toEqual([draftNode])
+    expect(harness.commitGraph).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nodes: [expect.objectContaining({ id: 'prompt-2' })],
+      }),
+      { source: 'save-reconcile' },
+    )
+    expect(harness.fullNodes.value).toEqual([expect.objectContaining({ id: draftNode.id })])
     expect(harness.isDirty.value).toBe(true)
     expect(harness.saveStatus.value).toBe('pending')
+  })
+
+  it('rebases stabilized media without rolling back newer base-only group edits', async () => {
+    const harness = createSessionHarness()
+    const capturedGroup = {
+      id: 'group-1' as const,
+      nodeIds: ['image-1' as const],
+      x: 0,
+      y: 0,
+      width: 320,
+      height: 320,
+    }
+    const currentGroup = { ...capturedGroup, x: 480 }
+    harness.boardBaseSnapshot.value = {
+      ...harness.boardBaseSnapshot.value,
+      groups: [capturedGroup],
+    }
+    harness.fullNodes.value = [makeReadyImageFlowNode('blob:captured-source')]
+    let resolveSave!: () => void
+    vi.mocked(harness.boardSession.save).mockImplementationOnce(
+      (snapshot) =>
+        new Promise<CanvasBoardSessionSaveResult>((resolve) => {
+          const stabilized = structuredClone(snapshot)
+          stabilized.imageNodes[0]!.sourceImageUrl = '/uploads/canvas/stable-source.png'
+          stabilized.imageNodes[0]!.sourceMediaAssetId = 42
+          stabilized.mediaRefs = [
+            {
+              mediaAssetId: 42,
+              refType: 'board_node',
+              refId: 'image-1',
+              role: 'source',
+            },
+          ]
+          resolveSave = () => resolve({ snapshot: stabilized, remoteSync: { ok: true } })
+        }),
+    )
+
+    const save = harness.session.saveCurrentBoardSnapshot()
+    await Promise.resolve()
+    harness.boardBaseSnapshot.value = {
+      ...harness.boardBaseSnapshot.value,
+      groups: [currentGroup],
+    }
+    harness.localEditVersion.value += 1
+    resolveSave()
+
+    expect(await save).toBe(true)
+    expect(harness.boardBaseSnapshot.value.groups).toEqual([currentGroup])
+    expect(harness.boardBaseSnapshot.value.imageNodes[0]).toMatchObject({
+      sourceImageUrl: '/uploads/canvas/stable-source.png',
+      sourceMediaAssetId: 42,
+    })
+    expect(harness.boardBaseSnapshot.value.mediaRefs).toEqual([
+      {
+        mediaAssetId: 42,
+        refType: 'board_node',
+        refId: 'image-1',
+        role: 'source',
+      },
+    ])
+    const committedNode = harness.fullNodes.value[0] as
+      | { data?: { snapshotNode?: ImageNodeItem } }
+      | undefined
+    expect(committedNode?.data?.snapshotNode).toMatchObject({
+      sourceImageUrl: '/uploads/canvas/stable-source.png',
+      sourceMediaAssetId: 42,
+    })
+    expect(harness.isDirty.value).toBe(true)
+    expect(harness.saveStatus.value).toBe('pending')
+  })
+
+  it('rejects an older overlapping save after a newer save commits', async () => {
+    const harness = createSessionHarness()
+    const firstSnapshot = createEmptyCanvasBoardSnapshot()
+    firstSnapshot.promptNodes = [makePromptSnapshot(1)]
+    const secondSnapshot = createEmptyCanvasBoardSnapshot()
+    secondSnapshot.promptNodes = [makePromptSnapshot(2)]
+    const saveResolvers: Array<(result: CanvasBoardSessionSaveResult) => void> = []
+    vi.mocked(harness.boardSession.save).mockImplementation(
+      () =>
+        new Promise<CanvasBoardSessionSaveResult>((resolve) => {
+          saveResolvers.push(resolve)
+        }),
+    )
+
+    const firstSave = harness.session.saveCurrentBoardSnapshot()
+    await Promise.resolve()
+    const secondSave = harness.session.saveCurrentBoardSnapshot()
+    await Promise.resolve()
+
+    saveResolvers[1]?.({ snapshot: secondSnapshot, remoteSync: { ok: true } })
+    expect(await secondSave).toBe(true)
+    saveResolvers[0]?.({ snapshot: firstSnapshot, remoteSync: { ok: true } })
+    expect(await firstSave).toBe(true)
+
+    expect(harness.commitGraph).toHaveBeenCalledTimes(1)
+    expect(harness.boardBaseSnapshot.value).toStrictEqual(secondSnapshot)
+    expect(harness.saveStatus.value).toBe('saved')
+  })
+
+  it('rejects a deferred save commit after the same Board opens a new attachment epoch', async () => {
+    const harness = createSessionHarness()
+    harness.fullNodes.value = [makePromptFlowNode(1, 40)]
+    const savedSnapshot = createEmptyCanvasBoardSnapshot()
+    savedSnapshot.promptNodes = [makePromptSnapshot(1)]
+    let resolveSave!: () => void
+    vi.mocked(harness.boardSession.save).mockImplementationOnce(
+      () =>
+        new Promise<CanvasBoardSessionSaveResult>((resolve) => {
+          resolveSave = () => resolve({ snapshot: savedSnapshot, remoteSync: { ok: true } })
+        }),
+    )
+
+    const save = harness.session.saveCurrentBoardSnapshot()
+    await Promise.resolve()
+    harness.boardAttachmentEpoch.value += 1
+    resolveSave()
+
+    expect(await save).toBe(true)
+    expect(harness.commitGraph).not.toHaveBeenCalled()
+    expect(harness.boardBaseSnapshot.value).not.toBe(savedSnapshot)
   })
 })

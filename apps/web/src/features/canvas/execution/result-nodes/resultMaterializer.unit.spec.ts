@@ -6,7 +6,7 @@ import {
   type ImageNodeItem,
   type PromptNodeItem,
 } from '../../../canvas-board/domain'
-import { CanvasGraphStore, toCanvasGraphEdgeId, toCanvasGraphNodeId } from '../../graph-runtime'
+import { CanvasGraphStore, toCanvasGraphNodeId } from '../../graph-runtime'
 import { materializeResolvedImageResults } from './resultMaterializer'
 
 function createPromptNode(id: number): PromptNodeItem {
@@ -104,10 +104,6 @@ describe('result materializer', () => {
       toCanvasGraphNodeId('image', 2),
     ])
     expect(result.skipped).toEqual([])
-    expect(result.projection.updatedEdges).toEqual([
-      { id: toCanvasGraphEdgeId(1), animated: false },
-      { id: toCanvasGraphEdgeId(2), animated: false },
-    ])
 
     const snapshot = store.exportSnapshot()
     expect(snapshot.imageNodes[0]).toMatchObject({
@@ -195,9 +191,6 @@ describe('result materializer', () => {
       shouldRecordHistory: false,
       shouldMarkDirty: true,
     })
-    expect(result.projection.updatedEdges).toEqual([
-      { id: toCanvasGraphEdgeId(1), animated: false },
-    ])
 
     const exported = store.exportSnapshot()
     expect(exported.imageNodes.find((node) => node.id === 1)).toMatchObject({
@@ -235,7 +228,6 @@ describe('result materializer', () => {
 
     expect(result.materializedNodeIds).toEqual([toCanvasGraphNodeId('image', 4)])
     expect(result.skipped).toEqual([])
-    expect(result.projection.updatedEdges).toEqual([])
     expect(store.exportSnapshot().imageNodes.find((node) => node.id === 4)).toMatchObject({
       sourceImageUrl: 'https://example.com/edge-later.png',
       outputStatus: 'ready',

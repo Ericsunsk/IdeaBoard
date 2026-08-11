@@ -35,16 +35,9 @@ import { composeFlowLocalInpaintTaskResult } from '../result-nodes/flowLocalInpa
 import { usePendingImageResultExecution } from '../result-nodes/usePendingImageResultNodes'
 import { waitExistingOrLiveTaskImageResults } from '../task-runner/flowImageDirectActionExecutor'
 import { createCanvasTaskSubmissionCallbacks } from '../workspace/canvasTaskSubmissionAdapter'
-import {
-  type CanvasExecutionWorkspace,
-  useCanvasExecutionWorkspace,
-} from '../workspace/useCanvasExecutionWorkspace'
+import { type CanvasExecutionWorkspace } from '../workspace/useCanvasExecutionWorkspace'
 import { createPendingImageWorkflowRunner } from './pendingImageWorkflowRunner'
-import {
-  projectCanvasExecutionEdgeAnimation,
-  type CanvasExecutionStateChange,
-} from './CanvasExecutionRuntime'
-import { createFlowGraphCommandOptions } from '../../composables/flowGraphAdapterCommandSideEffects'
+import type { CanvasExecutionAttachment } from './CanvasExecutionRuntime'
 
 export type FlowImageWorkflowExecutionPlan = ActivatedImageExecutionPlan
 
@@ -62,7 +55,7 @@ export type UseFlowImageWorkflowExecutionOptions = {
   onWarning: (message: string) => void
   onError?: (error: unknown) => boolean
   getCurrentBoardId?: () => string
-  executionWorkspace?: CanvasExecutionWorkspace
+  executionWorkspace: CanvasExecutionWorkspace
 }
 
 function requirePreparedTaskRequest(
@@ -83,10 +76,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     refreshNodeInternals: options.refreshNodeInternals,
   })
 
-  function isBoardStillCurrent(boardId: string): boolean {
-    return !boardId || readCurrentBoardId(options.getCurrentBoardId) === boardId
-  }
-
   async function flushPendingTaskSnapshot() {
     try {
       await options.flushAutosave?.({ silent: true })
@@ -104,40 +93,12 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     )
   }
 
-  const executionWorkspace =
-    options.executionWorkspace ??
-    useCanvasExecutionWorkspace({
-      nodes: options.nodes,
-      edges: options.edges,
-      graphAdapter: options.graphAdapter,
-      createCurrentCanvasGraphStore: options.createCurrentCanvasGraphStore,
-      boardBaseSnapshot: options.boardBaseSnapshot,
-      refreshNodeInternals: options.refreshNodeInternals,
-      flushAutosave: options.flushAutosave,
-      getCurrentBoardId: options.getCurrentBoardId,
-      onSuccess: options.onSuccess,
-      onWarning: options.onWarning,
-    })
+  const executionWorkspace = options.executionWorkspace
   const executionRuntime = executionWorkspace.state.executionRuntime
-
-  function syncExecutionEdgeProjection(change: CanvasExecutionStateChange) {
-    const projection = projectCanvasExecutionEdgeAnimation(
-      options.edges.value,
-      executionRuntime.nodeStates.value,
-      [change.nodeId],
-    )
-    if (!projection.didChange) return
-    options.graphAdapter.replaceEdges(
-      projection.edges,
-      createFlowGraphCommandOptions({ recordHistory: false, markDirty: false }),
-    )
-  }
 
   const workflowRunner = createPendingImageWorkflowRunner({
     pendingResults,
-    isBoardCurrent: isBoardStillCurrent,
     executionRuntime,
-    onExecutionStateChange: syncExecutionEdgeProjection,
     afterTaskIdAttached: flushPendingTaskSnapshot,
     onSuccess: options.onSuccess,
     onWarning: options.onWarning,
@@ -152,10 +113,18 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     return readCurrentBoardId(options.getCurrentBoardId)
   }
 
+  function requireCurrentAttachment(): CanvasExecutionAttachment {
+    const attachment = executionRuntime.attachment.value
+    if (!attachment || attachment.boardId !== readBoardId()) {
+      throw new Error('Canvas execution requires the current Board attachment')
+    }
+    return attachment
+  }
+
   async function executeImageAction(
     plan: ImageActionExecutionPlan & { activationId: string },
   ): Promise<void> {
-    const boardId = readBoardId()
+    const attachment = requireCurrentAttachment()
     const taskSubmission = createCanvasTaskSubmissionCallbacks({
       readinessRequest: () => buildImageActionReadinessRequest(plan.action),
       buildRequest: async () =>
@@ -166,7 +135,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       source: plan.source,
       sourceNodeId: plan.sourceNodeId,
       resultOptions: plan.resultOptions,
-      boardId,
+      attachment,
       outputCount: 1,
       activationId: plan.activationId,
       assertReady: taskSubmission.assertReady,
@@ -180,7 +149,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
   async function executeCanvasExtend(
     plan: CanvasExtendExecutionPlan & { activationId: string },
   ): Promise<void> {
-    const boardId = readBoardId()
+    const attachment = requireCurrentAttachment()
     const taskSubmission = createCanvasTaskSubmissionCallbacks({
       readinessRequest: buildCanvasExtendReadinessRequest,
       buildRequest: async () =>
@@ -190,7 +159,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     await workflowRunner.run({
       source: plan.source,
       sourceNodeId: plan.sourceNodeId,
-      boardId,
+      attachment,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
       activationId: plan.activationId,
@@ -206,7 +175,8 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
   ): Promise<void> {
     let localInpaint: PreparedFlowLocalInpaintMedia | null = null
     let request: SubmitTaskData | null = null
-    const boardId = readBoardId()
+    const attachment = requireCurrentAttachment()
+    const boardId = attachment.boardId
     const readinessSubmission = createCanvasTaskSubmissionCallbacks({
       readinessRequest: buildPromptImageReadinessRequest,
       buildRequest: buildPromptImageReadinessRequest,
@@ -219,7 +189,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     await workflowRunner.run({
       source: plan.source,
       sourceNodeId: plan.sourceNodeId,
-      boardId,
+      attachment,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
       activationId: plan.activationId,
@@ -245,7 +215,10 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
             try {
               return await waitExistingOrLiveTaskImageResults(taskId)
             } catch (error) {
-              if (!isTaskResultPendingError(error) || !isBoardStillCurrent(boardId)) {
+              if (
+                !isTaskResultPendingError(error) ||
+                !executionRuntime.isAttachmentCurrent(attachment)
+              ) {
                 throw error
               }
             }
@@ -272,7 +245,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
   async function executeImagePrompt(
     plan: ImagePromptExecutionPlan & { activationId: string },
   ): Promise<void> {
-    const boardId = readBoardId()
+    const attachment = requireCurrentAttachment()
     const taskSubmission = createCanvasTaskSubmissionCallbacks({
       readinessRequest: buildPromptImageReadinessRequest,
       buildRequest: async () =>
@@ -282,7 +255,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     await workflowRunner.run({
       source: plan.source,
       sourceNodeId: plan.sourceNodeId,
-      boardId,
+      attachment,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
       activationId: plan.activationId,
@@ -302,7 +275,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
   async function executeFusion(
     plan: FusionExecutionPlan & { activationId: string },
   ): Promise<void> {
-    const boardId = readBoardId()
+    const attachment = requireCurrentAttachment()
     let targetRatio = plan.source.ratio
     let request: SubmitTaskData | null = null
     const taskSubmission = createCanvasTaskSubmissionCallbacks({
@@ -314,7 +287,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     await workflowRunner.run({
       source: plan.source,
       sourceNodeId: plan.sourceNodeId,
-      boardId,
+      attachment,
       outputCount: plan.outputCount,
       activationId: plan.activationId,
       prepare: async () => {

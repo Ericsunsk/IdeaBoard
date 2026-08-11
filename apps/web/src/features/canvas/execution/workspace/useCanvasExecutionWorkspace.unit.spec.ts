@@ -15,6 +15,7 @@ import type {
 } from '../result-nodes/usePendingImageResultNodes'
 import type { CanvasTaskSubmissionAdapter } from './canvasTaskSubmissionAdapter'
 import { useCanvasExecutionWorkspace } from './useCanvasExecutionWorkspace'
+import { createCanvasExecutionRuntime } from '../runtime/CanvasExecutionRuntime'
 
 function makeRunSummary(
   overrides: Partial<PendingImageResultRunSummary> = {},
@@ -38,9 +39,6 @@ function makeMaterializerResult(
     summary: {} as ResultMaterializerResult['summary'],
     materializedNodeIds: materializedNodeIds as ResultMaterializerResult['materializedNodeIds'],
     skipped: [],
-    projection: {
-      updatedEdges: [],
-    },
   }
 }
 
@@ -173,13 +171,27 @@ function createWorkspaceHarness(options: {
   const flushAutosave = vi.fn(async () => undefined)
   const onSuccess = vi.fn()
   const onWarning = vi.fn()
+  const executionRuntime = createCanvasExecutionRuntime()
+  const attachment = executionRuntime.attachBoard(currentBoardId.value)
+  nodes.value.forEach((node) => {
+    const snapshot = node.data?.snapshotNode as ImageNodeItem | undefined
+    const taskId = snapshot?.pendingTaskId?.trim()
+    if (
+      /^image-\d+(?:\.\d+)?$/.test(node.id) &&
+      snapshot?.type === 'image-node' &&
+      snapshot.outputStatus === 'running' &&
+      taskId
+    ) {
+      executionRuntime.startNode(attachment, node.id, { status: 'running', taskId })
+    }
+  })
   const workspace = useCanvasExecutionWorkspace({
     nodes,
     edges,
     graphAdapter,
     createCurrentCanvasGraphStore: vi.fn(() => ({})) as never,
     flushAutosave,
-    getCurrentBoardId: () => currentBoardId.value,
+    executionRuntime,
     pendingResults,
     taskAdapter,
     waitTaskImageResults,
@@ -360,14 +372,14 @@ describe('useCanvasExecutionWorkspace', () => {
     expect(edges.value[0]?.animated).toBe(false)
   })
 
-  it('projects a saved pending task as running while reattaching', async () => {
+  it('restores a saved pending task as running while reattaching', async () => {
     let resolveTask!: (results: Array<{ url: string; width: number; height: number }>) => void
     const taskResults = new Promise<Array<{ url: string; width: number; height: number }>>(
       (resolve) => {
         resolveTask = resolve
       },
     )
-    const { workspace, edges, waitTaskImageResults } = createWorkspaceHarness({
+    const { workspace, waitTaskImageResults } = createWorkspaceHarness({
       nodes: [makePendingImageNode('image-2', 'task-1')],
       edges: [
         {
@@ -389,15 +401,13 @@ describe('useCanvasExecutionWorkspace', () => {
       status: 'running',
       taskId: 'task-1',
     })
-    expect(workspace.state.runningNodeIds.value).toEqual(new Set())
-    expect(edges.value[0]?.animated).toBe(true)
 
     resolveTask([{ url: 'https://example.com/result.png', width: 400, height: 200 }])
     await reattach
   })
 
-  it('marks a saved pending task as failed when reattach resolution fails', async () => {
-    const { workspace, onWarning } = createWorkspaceHarness({
+  it('marks a saved pending task as failed without reviving it on a second reattach', async () => {
+    const { workspace, onWarning, waitTaskImageResults } = createWorkspaceHarness({
       nodes: [makePendingImageNode('image-2', 'task-1')],
       waitTaskImageResults: async () => {
         throw new Error('provider unavailable')
@@ -413,6 +423,14 @@ describe('useCanvasExecutionWorkspace', () => {
     })
     expect(workspace.state.isNodeRunning('image-2')).toBe(false)
     expect(onWarning).toHaveBeenCalledWith('生成任务恢复失败')
+
+    await workspace.commands.reattachPendingImageResults()
+
+    expect(waitTaskImageResults).toHaveBeenCalledTimes(1)
+    expect(workspace.state.executionRuntime.getNodeState('image-2')).toEqual({
+      status: 'failed',
+      taskId: 'task-1',
+    })
   })
 
   it('marks a saved pending task as cancelled when the task is cancelled', async () => {
@@ -461,6 +479,7 @@ describe('useCanvasExecutionWorkspace', () => {
     const reattach = workspace.commands.reattachPendingImageResults()
     await vi.waitFor(() => expect(waitTaskImageResults).toHaveBeenCalledWith('task-1'))
     currentBoardId.value = 'board-b'
+    workspace.state.executionRuntime.attachBoard('board-b')
     edges.value = [
       {
         id: 'edge-board-b',
@@ -473,10 +492,7 @@ describe('useCanvasExecutionWorkspace', () => {
     resolveTask([{ url: 'https://example.com/result.png', width: 400, height: 200 }])
     await reattach
 
-    expect(workspace.state.executionRuntime.getNodeState('image-2')).toEqual({
-      status: 'cancelled',
-      taskId: 'task-1',
-    })
+    expect(workspace.state.executionRuntime.getNodeState('image-2')).toBeNull()
     expect(edges.value[0]?.animated).toBe(true)
   })
 
@@ -552,7 +568,7 @@ describe('useCanvasExecutionWorkspace', () => {
         resolveSecondTask = resolve
       },
     )
-    const { workspace, edges, waitTaskImageResults } = createWorkspaceHarness({
+    const { workspace, waitTaskImageResults } = createWorkspaceHarness({
       nodes: [makePendingImageNode('image-2', 'task-1'), makePendingImageNode('image-3', 'task-2')],
       edges: [
         {
@@ -577,7 +593,6 @@ describe('useCanvasExecutionWorkspace', () => {
 
     const reattach = workspace.commands.reattachPendingImageResults()
     await vi.waitFor(() => expect(waitTaskImageResults).toHaveBeenCalledTimes(2))
-    expect(edges.value.map((edge) => edge.animated)).toEqual([true, true])
 
     rejectFirstTask!(new Error('provider unavailable'))
     await vi.waitFor(() =>
@@ -590,7 +605,6 @@ describe('useCanvasExecutionWorkspace', () => {
       status: 'running',
       taskId: 'task-2',
     })
-    expect(edges.value.map((edge) => edge.animated)).toEqual([false, true])
 
     resolveSecondTask!([{ url: 'https://example.com/result-2.png', width: 400, height: 200 }])
     await reattach
@@ -599,7 +613,6 @@ describe('useCanvasExecutionWorkspace', () => {
       status: 'succeeded',
       taskId: 'task-2',
     })
-    expect(edges.value.map((edge) => edge.animated)).toEqual([false, false])
   })
 
   it('cancels a reattach when the resolved result is not materialized', async () => {

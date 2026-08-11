@@ -7,7 +7,10 @@ import {
 import {
   createEmptyCanvasBoardSnapshot,
   InvalidBoardStateError,
+  rebuildCanvasBoardMediaRefs,
   type CanvasBoardSnapshot,
+  type ImageNodeOutputItem,
+  type PromptNodeInputImage,
 } from '../../canvas-board/domain'
 import type { CanvasBoardSession } from './useCanvasBoardSession'
 import { measureCanvasPerf, measureCanvasPerfAsync } from '../utils/canvasPerfProbe'
@@ -18,25 +21,13 @@ type SaveFailureKind = 'sync-failed' | 'conflict' | 'save-failed'
 export type ValueRef<T> = { value: T }
 export type ArrayRef = { value: unknown[] }
 
-type FlowNodeLike = {
-  data?: {
-    snapshotNode?: {
-      type?: unknown
-      sourceImageUrl?: unknown
-      pendingTaskId?: unknown
-      outputStatus?: unknown
-      outputImages?: unknown
-    }
-  }
-}
-
 export type SaveCurrentBoardSnapshotOptions = {
   waitForPreview?: boolean
   silent?: boolean
 }
 
 export type FlowGraphCommitOptions = {
-  preserveSelection?: boolean
+  source: 'hydrate-replace' | 'save-reconcile'
 }
 
 export type BoardPersistenceSessionOptions = {
@@ -45,10 +36,11 @@ export type BoardPersistenceSessionOptions = {
   boardBaseSnapshot: ValueRef<CanvasBoardSnapshot>
   isDirty: ValueRef<boolean>
   saveStatus: ValueRef<SaveStatus>
-  localEditVersion?: ValueRef<number>
+  graphRevision: ValueRef<number>
   isLoadingBoardSnapshot: ValueRef<boolean>
   isSavingBoard: ValueRef<boolean>
   boardSession: CanvasBoardSession
+  readBoardAttachmentEpoch: () => number
   canSaveBoard: () => boolean
   onWarning: (text: string) => void
   onSuccess: (text: string) => void
@@ -56,9 +48,8 @@ export type BoardPersistenceSessionOptions = {
   clearFlowHistoryBaseline: () => void
   commitGraph: (
     graph: { nodes: unknown[]; edges: unknown[] },
-    options?: FlowGraphCommitOptions,
+    options: FlowGraphCommitOptions,
   ) => void
-  onGraphCommitted?: () => void
 }
 
 export type BoardPersistenceSession = {
@@ -66,24 +57,132 @@ export type BoardPersistenceSession = {
   saveCurrentBoardSnapshot: (options?: SaveCurrentBoardSnapshotOptions) => Promise<boolean>
 }
 
-function hasPendingImageResultNode(nodes: unknown[]): boolean {
-  return nodes.some((node) => {
-    const snapshotNode = (node as FlowNodeLike)?.data?.snapshotNode
-    if (!snapshotNode || snapshotNode.type !== 'image-node') return false
-    const sourceUrl =
-      typeof snapshotNode.sourceImageUrl === 'string' ? snapshotNode.sourceImageUrl.trim() : ''
-    const outputImages = Array.isArray(snapshotNode.outputImages) ? snapshotNode.outputImages : []
-    const hasOutputImage = outputImages.some(
-      (item) =>
-        typeof (item as { url?: unknown })?.url === 'string' &&
-        ((item as { url: string }).url ?? '').trim().length > 0,
-    )
-    const pendingTaskId =
-      typeof snapshotNode.pendingTaskId === 'string' ? snapshotNode.pendingTaskId.trim() : ''
-    return (
-      snapshotNode.outputStatus === 'running' && !sourceUrl && !hasOutputImage && !pendingTaskId
-    )
+type MediaAssetReference = Pick<ImageNodeOutputItem, 'url' | 'mediaAssetId'>
+
+function hasSameMediaAsset(left: MediaAssetReference, right: MediaAssetReference): boolean {
+  return left.url === right.url && left.mediaAssetId === right.mediaAssetId
+}
+
+function applyStabilizedMediaAsset<T extends MediaAssetReference>(
+  current: T,
+  captured: MediaAssetReference,
+  stabilized: MediaAssetReference,
+): T {
+  if (!hasSameMediaAsset(current, captured) || hasSameMediaAsset(captured, stabilized)) {
+    return current
+  }
+  const next = { ...current, url: stabilized.url }
+  if (stabilized.mediaAssetId === undefined) delete next.mediaAssetId
+  else next.mediaAssetId = stabilized.mediaAssetId
+  return next
+}
+
+function rebaseIndexedMediaAssets<T extends MediaAssetReference>(
+  current: T[],
+  captured: MediaAssetReference[],
+  stabilized: MediaAssetReference[],
+): T[] {
+  return current.map((item, index) => {
+    const capturedItem = captured[index]
+    const stabilizedItem = stabilized[index]
+    return capturedItem && stabilizedItem
+      ? applyStabilizedMediaAsset(item, capturedItem, stabilizedItem)
+      : item
   })
+}
+
+function rebaseInputMediaAssets(
+  current: PromptNodeInputImage[],
+  captured: PromptNodeInputImage[],
+  stabilized: PromptNodeInputImage[],
+): PromptNodeInputImage[] {
+  const capturedById = new Map(captured.map((item) => [item.id, item] as const))
+  const stabilizedById = new Map(stabilized.map((item) => [item.id, item] as const))
+  return current.map((item) => {
+    const capturedItem = capturedById.get(item.id)
+    const stabilizedItem = stabilizedById.get(item.id)
+    return capturedItem && stabilizedItem
+      ? applyStabilizedMediaAsset(item, capturedItem, stabilizedItem)
+      : item
+  })
+}
+
+function rebaseStabilizedMedia(
+  captured: CanvasBoardSnapshot,
+  current: CanvasBoardSnapshot,
+  stabilized: CanvasBoardSnapshot,
+): CanvasBoardSnapshot {
+  const capturedImageNodes = new Map(captured.imageNodes.map((node) => [node.id, node] as const))
+  const stabilizedImageNodes = new Map(
+    stabilized.imageNodes.map((node) => [node.id, node] as const),
+  )
+  const capturedPromptNodes = new Map(captured.promptNodes.map((node) => [node.id, node] as const))
+  const stabilizedPromptNodes = new Map(
+    stabilized.promptNodes.map((node) => [node.id, node] as const),
+  )
+  const capturedFusionNodes = new Map(captured.fusionNodes.map((node) => [node.id, node] as const))
+  const stabilizedFusionNodes = new Map(
+    stabilized.fusionNodes.map((node) => [node.id, node] as const),
+  )
+  const rebased: CanvasBoardSnapshot = {
+    ...current,
+    imageNodes: current.imageNodes.map((node) => {
+      const capturedNode = capturedImageNodes.get(node.id)
+      const stabilizedNode = stabilizedImageNodes.get(node.id)
+      if (!capturedNode || !stabilizedNode) return node
+      const source = applyStabilizedMediaAsset(
+        { url: node.sourceImageUrl, mediaAssetId: node.sourceMediaAssetId },
+        { url: capturedNode.sourceImageUrl, mediaAssetId: capturedNode.sourceMediaAssetId },
+        { url: stabilizedNode.sourceImageUrl, mediaAssetId: stabilizedNode.sourceMediaAssetId },
+      )
+      return {
+        ...node,
+        sourceImageUrl: source.url,
+        sourceMediaAssetId: source.mediaAssetId,
+        outputImages: rebaseIndexedMediaAssets(
+          node.outputImages,
+          capturedNode.outputImages,
+          stabilizedNode.outputImages,
+        ),
+      }
+    }),
+    promptNodes: current.promptNodes.map((node) => {
+      const capturedNode = capturedPromptNodes.get(node.id)
+      const stabilizedNode = stabilizedPromptNodes.get(node.id)
+      return capturedNode && stabilizedNode
+        ? {
+            ...node,
+            inputImages: rebaseInputMediaAssets(
+              node.inputImages,
+              capturedNode.inputImages,
+              stabilizedNode.inputImages,
+            ),
+          }
+        : node
+    }),
+    fusionNodes: current.fusionNodes.map((node) => {
+      const capturedNode = capturedFusionNodes.get(node.id)
+      const stabilizedNode = stabilizedFusionNodes.get(node.id)
+      return capturedNode && stabilizedNode
+        ? {
+            ...node,
+            inputImages: rebaseInputMediaAssets(
+              node.inputImages,
+              capturedNode.inputImages,
+              stabilizedNode.inputImages,
+            ),
+            outputImages: rebaseIndexedMediaAssets(
+              node.outputImages,
+              capturedNode.outputImages,
+              stabilizedNode.outputImages,
+            ),
+          }
+        : node
+    }),
+    mediaRefs: current.mediaRefs?.map((ref) => ({ ...ref })),
+  }
+  rebuildCanvasBoardMediaRefs(rebased, current)
+  return rebased
 }
 
 function isRecoverableSaveStatus(status: SaveStatus): boolean {
@@ -130,11 +229,10 @@ export function createBoardPersistenceSession(
     const flow = canvasBoardSnapshotToFlow(snapshot)
     options.boardBaseSnapshot.value = snapshot
     options.commitGraph(flow as { nodes: unknown[]; edges: unknown[] }, {
-      preserveSelection: false,
+      source: 'hydrate-replace',
     })
     clearDirtyAfterImport()
     options.clearFlowHistoryBaseline()
-    options.onGraphCommitted?.()
   }
 
   function importEmptyBoardSnapshot() {
@@ -208,8 +306,8 @@ export function createBoardPersistenceSession(
     )
   }
 
-  function readLocalEditVersion(): number {
-    return Number(options.localEditVersion?.value ?? 0)
+  function readGraphRevision(): number {
+    return Number(options.graphRevision.value)
   }
 
   function notifyRemoteSyncFailure(reason: 'sync-failed' | 'conflict') {
@@ -229,8 +327,12 @@ export function createBoardPersistenceSession(
       return false
     }
     const saveToken = ++saveSequence
-    const isSaveStillCurrent = () => options.boardSession.currentBoardId.value === boardId
-    const saveEditVersion = readLocalEditVersion()
+    const saveAttachmentEpoch = options.readBoardAttachmentEpoch()
+    const isSaveStillCurrent = () =>
+      saveToken === saveSequence &&
+      options.boardSession.currentBoardId.value === boardId &&
+      options.readBoardAttachmentEpoch() === saveAttachmentEpoch
+    const saveGraphRevision = readGraphRevision()
     const previousSaveStatus = options.saveStatus.value
     options.isSavingBoard.value = true
     options.saveStatus.value = isRecoverableSaveStatus(options.saveStatus.value)
@@ -238,6 +340,7 @@ export function createBoardPersistenceSession(
       : 'pending'
     try {
       const snapshot = buildCurrentBoardSnapshot()
+      const capturedSnapshot = structuredClone(snapshot)
       const { snapshot: stabilizedSnapshot, remoteSync } = await measureCanvasPerfAsync(
         'board.save.session',
         () => ({
@@ -258,17 +361,19 @@ export function createBoardPersistenceSession(
       }
       const shouldCommitToCurrentGraph = isSaveStillCurrent()
       if (shouldCommitToCurrentGraph) {
-        const hasLocalDraftAdvanced = readLocalEditVersion() > saveEditVersion
-        options.boardBaseSnapshot.value = stabilizedSnapshot
-        const nextFlow = canvasBoardSnapshotToFlow(stabilizedSnapshot)
+        const hasLocalDraftAdvanced = readGraphRevision() !== saveGraphRevision
+        const currentSnapshot = hasLocalDraftAdvanced ? buildCurrentBoardSnapshot() : null
+        const committedSnapshot = currentSnapshot
+          ? rebaseStabilizedMedia(capturedSnapshot, currentSnapshot, stabilizedSnapshot)
+          : stabilizedSnapshot
+        options.boardBaseSnapshot.value = committedSnapshot
+        const nextFlow = canvasBoardSnapshotToFlow(committedSnapshot)
         const isRemoteSynced = remoteSync.ok
-        if (!hasLocalDraftAdvanced && !hasPendingImageResultNode(options.fullNodes.value)) {
-          options.commitGraph(nextFlow as { nodes: unknown[]; edges: unknown[] }, {
-            preserveSelection: true,
-          })
-          if (isRemoteSynced) {
-            options.clearFlowHistoryBaseline()
-          }
+        options.commitGraph(nextFlow as { nodes: unknown[]; edges: unknown[] }, {
+          source: 'save-reconcile',
+        })
+        if (isRemoteSynced && !hasLocalDraftAdvanced) {
+          options.clearFlowHistoryBaseline()
         }
         if (isRemoteSynced) {
           options.isDirty.value = hasLocalDraftAdvanced
@@ -289,9 +394,6 @@ export function createBoardPersistenceSession(
         (options.saveStatus.value === 'pending' || options.saveStatus.value === 'recover')
       ) {
         options.saveStatus.value = previousSaveStatus
-      }
-      if (isSaveStillCurrent()) {
-        options.onGraphCommitted?.()
       }
       return remoteSync.ok
     } catch (error) {
