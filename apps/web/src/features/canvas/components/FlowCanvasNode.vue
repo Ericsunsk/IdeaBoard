@@ -2,6 +2,7 @@
   <div
     ref="flowCanvasNodeRef"
     class="flow-canvas-node"
+    :data-flow-node-id="props.nodeId"
     :class="[`is-${data.kind}`, { 'is-selected': selected, 'is-running': nodeRunning }]"
     :style="nodeStyle"
   >

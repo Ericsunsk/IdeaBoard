@@ -177,14 +177,11 @@ describe('FlowCanvasNodeHandleRail', () => {
     expect(outputHandle).toBeDefined()
     expect(inputHandle).toHaveAttribute('aria-hidden', 'true')
     expect(inputHandle).toHaveAttribute('tabindex', '-1')
+    expect(inputHandle).toHaveAttribute('connectable-end', 'false')
     expect(inputHandle).toHaveStyle({
       left: '0',
-      right: '0',
-      top: '0',
-      bottom: '0',
-      width: 'auto',
-      height: 'auto',
-      transform: 'none',
+      top: '50%',
+      transform: 'translateY(-50%)',
     })
     expect(outputHandle).toHaveAttribute('aria-hidden', 'true')
     expect(outputHandle).toHaveAttribute('tabindex', '-1')
@@ -226,7 +223,7 @@ describe('FlowCanvasNodeHandleRail', () => {
           type: 'target',
           connectable: 'true',
           connectableStart: 'false',
-          connectableEnd: 'true',
+          connectableEnd: 'false',
         },
         {
           id: 'out:image',
@@ -259,7 +256,7 @@ describe('FlowCanvasNodeHandleRail', () => {
           type: 'target',
           connectable: 'true',
           connectableStart: 'false',
-          connectableEnd: 'true',
+          connectableEnd: 'false',
         },
         {
           id: 'out:image',
@@ -292,7 +289,7 @@ describe('FlowCanvasNodeHandleRail', () => {
           type: 'target',
           connectable: 'true',
           connectableStart: 'false',
-          connectableEnd: 'true',
+          connectableEnd: 'false',
         },
         {
           id: 'out:image',

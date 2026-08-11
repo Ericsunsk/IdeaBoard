@@ -47,6 +47,7 @@
         @move-end="onFlowMoveEnd"
         @viewport-change-end="onViewportChangeEnd"
         @node-click="onFlowNodeClick"
+        @connect-end="onFlowConnectEnd"
         @node-drag-start="onNodeDragStart"
         @node-drag-stop="onNodeDragStop"
         @selection-start="vueFlowSelectionBindings.onSelectionStart"
@@ -99,7 +100,7 @@ import { useFlowImagePreviewLightbox } from '../composables/useFlowImagePreviewL
 import { provideCanvasHandleProximityCoordinator } from '../composables/useCanvasHandleProximity'
 import { provideCanvasViewportContext } from '../composables/useCanvasViewportContext'
 import { CanvasGroupPresentation } from '../group-presentation'
-import { useVueFlowPaneAdapter } from '../flow-pane'
+import { createCanvasConnectionDropLifecycle, useVueFlowPaneAdapter } from '../flow-pane'
 import {
   createCanvasGraphEditingBrowserAdapter,
   createCanvasGraphInteractionBrowserAdapter,
@@ -174,6 +175,14 @@ const commands = workspace.commands
 
 const { nodes, edges } = viewModel.flowPane
 const { connectionAdapter } = commands.flowPane
+const connectionDropLifecycle = createCanvasConnectionDropLifecycle({
+  document,
+  connect: connectionAdapter.vueFlowBindings.onConnect,
+})
+
+function onFlowConnectEnd(event: MouseEvent | TouchEvent | undefined) {
+  connectionDropLifecycle.onConnectEnd(event, connectionStartHandle.value)
+}
 
 const {
   currentBoardId,
