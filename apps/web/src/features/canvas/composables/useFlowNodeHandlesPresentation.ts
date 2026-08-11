@@ -102,6 +102,8 @@ const HANDLE_DIRECTION_POLICIES: Record<FlowNodeHandleDirection, HandleDirection
   },
 }
 
+const HANDLE_HIT_TARGET_SCREEN_SIZE = 52
+
 function resolveHandleElement(value: FlowNodeHandleElement): HTMLElement | null {
   if (value instanceof HTMLElement) return value
   if (!value || value instanceof Element) return null
@@ -117,11 +119,21 @@ function createFollowStyle(
   const x = point.x * localScale
   const y = point.y * localScale
   return {
-    ...centeredStyle,
+    ...createScreenSizedHandleStyle(centeredStyle, localScale),
     '--handle-plus-x': `${x}px`,
     '--handle-plus-y': `${y}px`,
     '--handle-plus-hit-x': `${x}px`,
     '--handle-plus-hit-y': `${y}px`,
+  }
+}
+
+function createScreenSizedHandleStyle(
+  centeredStyle: CSSProperties,
+  localScale: number,
+): CSSProperties {
+  return {
+    ...centeredStyle,
+    '--handle-hit-size': `${HANDLE_HIT_TARGET_SCREEN_SIZE * localScale}px`,
   }
 }
 
@@ -188,7 +200,7 @@ function useHandleDirectionPresentation(
       disabled: options.disabled(),
       style: proximity.isActive.value && !isConnectionDragging()
         ? createFollowStyle(policy.centeredStyle, proximity.point.value, localScale())
-        : policy.centeredStyle,
+        : createScreenSizedHandleStyle(policy.centeredStyle, localScale()),
       ariaLabel: `${nodeKindLabel()}${policy.ariaDirectionLabel}连接点，拖拽创建连接`,
       title: policy.title,
       setElement,

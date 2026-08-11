@@ -243,11 +243,11 @@ describe('FlowCanvasNodeHandleRail', () => {
   )
 
   it.each([
-    { zoomLevel: 50, expectedX: 59 },
-    { zoomLevel: 200, expectedX: 14.75 },
+    { zoomLevel: 50, expectedX: 59, expectedLocalHitSize: 104 },
+    { zoomLevel: 200, expectedX: 14.75, expectedLocalHitSize: 26 },
   ])(
-    'keeps the visual center under the pointer at $zoomLevel% zoom',
-    async ({ zoomLevel, expectedX }) => {
+    'keeps the visual center and hit area screen-sized at $zoomLevel% zoom',
+    async ({ zoomLevel, expectedX, expectedLocalHitSize }) => {
       const view = renderHandles({ kind: 'prompt', zoomLevel })
       const outputHandle = view.getByLabelText(
         '提示词节点输出连接点，拖拽创建连接',
@@ -260,6 +260,11 @@ describe('FlowCanvasNodeHandleRail', () => {
       expect(Number.parseFloat(outputHandle.style.getPropertyValue('--handle-plus-x'))).toBeCloseTo(
         expectedX,
       )
+      const localHitSize = Number.parseFloat(
+        outputHandle.style.getPropertyValue('--handle-hit-size'),
+      )
+      expect(localHitSize).toBeCloseTo(expectedLocalHitSize)
+      expect(localHitSize * (zoomLevel / 100)).toBeCloseTo(52)
       expect(outputHandle.style.right).toBe('0px')
     },
   )

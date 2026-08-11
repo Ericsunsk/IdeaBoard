@@ -100,8 +100,8 @@ const props = defineProps<{
   position: absolute;
   left: var(--handle-plus-hit-x);
   top: calc(50% + var(--handle-plus-hit-y));
-  width: 52px;
-  height: 52px;
+  width: var(--handle-hit-size);
+  height: var(--handle-hit-size);
   border-radius: 999px;
   transform: translate(-50%, -50%);
   pointer-events: auto;
