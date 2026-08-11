@@ -1,3 +1,18 @@
+/
+  Content-Signal: ai-train=no, search=yes, ai-input=yes
+
+/terms
+  Content-Signal: ai-train=no, search=yes, ai-input=yes
+
+/privacy-policy
+  Content-Signal: ai-train=no, search=yes, ai-input=yes
+
+/refund-policy
+  Content-Signal: ai-train=no, search=yes, ai-input=yes
+
+/acceptable-use
+  Content-Signal: ai-train=no, search=yes, ai-input=yes
+
 /user
   X-Robots-Tag: noindex, nofollow
 

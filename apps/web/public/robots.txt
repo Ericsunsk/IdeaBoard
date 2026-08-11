@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
+Content-Signal: ai-train=no, search=yes, ai-input=yes
 Disallow: /user
 Disallow: /admin
 Disallow: /api
@@ -9,6 +10,7 @@ Disallow: /share
 # Search and answer-engine crawlers may discover the public legal documents.
 User-agent: Googlebot
 Allow: /
+Content-Signal: ai-train=no, search=yes, ai-input=yes
 Disallow: /user
 Disallow: /admin
 Disallow: /api
@@ -17,6 +19,7 @@ Disallow: /share
 
 User-agent: Bingbot
 Allow: /
+Content-Signal: ai-train=no, search=yes, ai-input=yes
 Disallow: /user
 Disallow: /admin
 Disallow: /api
@@ -25,6 +28,7 @@ Disallow: /share
 
 User-agent: OAI-SearchBot
 Allow: /
+Content-Signal: ai-train=no, search=yes, ai-input=yes
 Disallow: /user
 Disallow: /admin
 Disallow: /api
@@ -33,6 +37,7 @@ Disallow: /share
 
 User-agent: PerplexityBot
 Allow: /
+Content-Signal: ai-train=no, search=yes, ai-input=yes
 Disallow: /user
 Disallow: /admin
 Disallow: /api
@@ -47,6 +52,27 @@ User-agent: Google-Extended
 Disallow: /
 
 User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: Amazonbot
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: meta-externalagent
 Disallow: /
 
 Sitemap: https://ideaboard.art/sitemap.xml

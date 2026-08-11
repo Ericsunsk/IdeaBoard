@@ -119,6 +119,14 @@ Disallow: /
 
 以上不会阻止 Google Search 或 Bing Search，也不会让私有 URL 安全；各 bot 的真实性须用其公布 IP/验证流程和 Cloudflare 日志核验，不能仅信任可伪造的 `User-Agent`。[Googlebot verification](https://developers.google.com/search/docs/crawling-indexing/verifying-googlebot) [OpenAI bots](https://platform.openai.com/docs/bots) [Anthropic crawler](https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler)
 
+### Cloudflare Content Signals 与 Markdown negotiation
+
+Cloudflare AI Crawl Control 的 Directives 会检测 `robots.txt` 是否包含 Content Signals；当前产品策略为 `ai-train=no, search=yes, ai-input=yes`，允许公开内容用于 search、RAG、grounding 和实时生成式回答，但拒绝用于模型训练。该语法来自 Content Signals / AIPREF 提案，不属于 RFC 9309 的标准 robots 指令，因此它是 crawler policy 的补充声明，不替代 `Allow`、`Disallow`、`noindex` 或 authorization。[Cloudflare AI Crawl Control directives](https://developers.cloudflare.com/ai-crawl-control/features/track-robots-txt/) [Content Signals](https://contentsignals.org/) [Expired AIPREF draft](https://datatracker.ietf.org/doc/draft-romm-aipref-contentsignals/)
+
+Cloudflare Markdown for Agents 在 Zone 或 Configuration Rule 启用后，会根据 `Accept: text/markdown` 在 edge 将原始 HTML 转换为 Markdown，并自动设置 `Content-Type: text/markdown`、`Vary: Accept`、`x-markdown-tokens` 和 `x-original-tokens`。它会保留源站的 `Content-Signal` header；若源站没有该 header，Cloudflare 默认声明 `ai-train=yes, search=yes, ai-input=yes`。因此代码侧应给公开 HTML 设置与 robots policy 一致的 `Content-Signal` header，Markdown negotiation 则在 Cloudflare Dashboard 开启，不应在 Vue SPA 中重复实现 converter。[Cloudflare Markdown for Agents](https://developers.cloudflare.com/fundamentals/reference/markdown-for-agents/)
+
+线上验证必须直接请求生产边界：`/robots.txt` 和 `/sitemap.xml` 应返回 `200` 且分别为 `text/plain` 与 XML；公开页面带有 `Content-Signal` header；对 `Accept: text/markdown` 的请求应返回 Markdown。若这些请求返回 SPA `index.html`，说明静态产物尚未部署或 Pages fallback 覆盖了静态文件，不能用本地文件存在替代生产验证。
+
 ### `llms.txt` 的证据边界
 
 `llms.txt` 的维护者将其定义为“为 LLM-friendly content 提供 Markdown 文件”的提案格式。它**不是** IETF/W3C robots 标准，也不是 Google、Bing、OpenAI 或 Anthropic 在上述官方 crawler 文档承诺解析的指令。因此：
