@@ -135,7 +135,7 @@ function renderFlowCanvasNode(
     },
     global: {
       stubs: {
-        FlowNodeHandles: { template: '<div data-testid="flow-node-handles" />' },
+        FlowCanvasNodeHandleRail: { template: '<div data-testid="flow-node-handles" />' },
       },
     },
   })
@@ -220,7 +220,7 @@ describe('FlowCanvasNode image presentation', () => {
       },
       global: {
         stubs: {
-          FlowNodeHandles: { template: '<div data-testid="flow-node-handles" />' },
+          FlowCanvasNodeHandleRail: { template: '<div data-testid="flow-node-handles" />' },
         },
       },
     })
@@ -242,7 +242,7 @@ describe('FlowCanvasNode image presentation', () => {
       },
       global: {
         stubs: {
-          FlowNodeHandles: { template: '<div data-testid="flow-node-handles" />' },
+          FlowCanvasNodeHandleRail: { template: '<div data-testid="flow-node-handles" />' },
         },
       },
     })
@@ -269,7 +269,7 @@ describe('FlowCanvasNode image presentation', () => {
       },
       global: {
         stubs: {
-          FlowNodeHandles: { template: '<div data-testid="flow-node-handles" />' },
+          FlowCanvasNodeHandleRail: { template: '<div data-testid="flow-node-handles" />' },
         },
       },
     })
@@ -292,7 +292,7 @@ describe('FlowCanvasNode fusion presentation', () => {
       },
       global: {
         stubs: {
-          FlowNodeHandles: { template: '<div data-testid="flow-node-handles" />' },
+          FlowCanvasNodeHandleRail: { template: '<div data-testid="flow-node-handles" />' },
         },
       },
     })
@@ -341,7 +341,7 @@ describe('FlowCanvasNode fusion presentation', () => {
       },
       global: {
         stubs: {
-          FlowNodeHandles: { template: '<div data-testid="flow-node-handles" />' },
+          FlowCanvasNodeHandleRail: { template: '<div data-testid="flow-node-handles" />' },
         },
       },
     })

@@ -4,11 +4,6 @@
     class="flow-canvas-node"
     :class="[`is-${data.kind}`, { 'is-selected': selected, 'is-running': nodeRunning }]"
     :style="nodeStyle"
-    @mouseenter="onNodeMouseEnter"
-    @mouseleave="onNodeMouseLeave"
-    @focusin="onNodeFocusIn"
-    @focusout="onNodeFocusOut"
-    @pointerdown.capture="onNodePointerDown"
   >
     <div
       v-if="showDefaultDragZone"
@@ -37,19 +32,14 @@
         @generate="onPromptGenerate"
       >
         <template #handle-rail>
-          <div
-            class="flow-canvas-node__handle-rail"
-            :class="{ 'is-disabled': disableHandleRailInteraction }"
-          >
-            <FlowNodeHandles
-              :kind="data.kind"
-              :snapshot-node="data.snapshotNode"
-              :ui-state="props.uiState"
-              :show-handles="showHandleControlsGated"
-              :disabled="disableHandleRailInteraction"
-              @request-internals-update="requestNodeInternalsUpdate"
-            />
-          </div>
+          <FlowCanvasNodeHandleRail
+            :kind="data.kind"
+            :interaction-root="flowCanvasNodeRef"
+            :visibility-refresh-token="props.handleVisibilityRefreshToken"
+            :selected="selected"
+            :disabled="disableHandleRailInteraction"
+            @request-internals-update="requestNodeInternalsUpdate"
+          />
         </template>
       </PromptNode>
     </template>
@@ -96,19 +86,14 @@
           @expand-frame-pointerdown="onImageCanvasExtendFramePointerDown"
         >
           <template #handle-rail>
-            <div
-              class="flow-canvas-node__handle-rail"
-              :class="{ 'is-disabled': disableHandleRailInteraction }"
-            >
-              <FlowNodeHandles
-                :kind="data.kind"
-                :snapshot-node="data.snapshotNode"
-                :ui-state="props.uiState"
-                :show-handles="showHandleControlsGated"
-                :disabled="disableHandleRailInteraction"
-                @request-internals-update="requestNodeInternalsUpdate"
-              />
-            </div>
+            <FlowCanvasNodeHandleRail
+              :kind="data.kind"
+              :interaction-root="flowCanvasNodeRef"
+              :visibility-refresh-token="props.handleVisibilityRefreshToken"
+              :selected="selected"
+              :disabled="disableHandleRailInteraction"
+              @request-internals-update="requestNodeInternalsUpdate"
+            />
           </template>
         </ImageNode>
       </div>
@@ -141,19 +126,14 @@
           @prompt-generate="onFusionGenerationRequest"
         >
           <template #handle-rail>
-            <div
-              class="flow-canvas-node__handle-rail"
-              :class="{ 'is-disabled': disableHandleRailInteraction }"
-            >
-              <FlowNodeHandles
-                :kind="data.kind"
-                :snapshot-node="data.snapshotNode"
-                :ui-state="props.uiState"
-                :show-handles="showHandleControlsGated"
-                :disabled="disableHandleRailInteraction"
-                @request-internals-update="requestNodeInternalsUpdate"
-              />
-            </div>
+            <FlowCanvasNodeHandleRail
+              :kind="data.kind"
+              :interaction-root="flowCanvasNodeRef"
+              :visibility-refresh-token="props.handleVisibilityRefreshToken"
+              :selected="selected"
+              :disabled="disableHandleRailInteraction"
+              @request-internals-update="requestNodeInternalsUpdate"
+            />
           </template>
         </FusionNode>
       </div>
@@ -165,12 +145,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
 import { useFlowCanvasNodeAdapter } from '../composables/useFlowCanvasNodeAdapter'
-import { useFlowCanvasNodeHandleRail } from '../composables/useFlowCanvasNodeHandleRail'
 import type { PromptAspectRatio } from '../../canvas-board/domain'
 import type {
   CanvasNodePresentationIntent,
@@ -182,7 +161,7 @@ import {
   resolveCanvasNodeUiScale,
   useCanvasViewportContext,
 } from '../composables/useCanvasViewportContext'
-import FlowNodeHandles from './FlowNodeHandles.vue'
+import FlowCanvasNodeHandleRail from './FlowCanvasNodeHandleRail.vue'
 import FusionNode from './nodes/FusionNode.vue'
 import ImageNode from './nodes/ImageNode.vue'
 import PromptNode from './nodes/PromptNode.vue'
@@ -256,27 +235,6 @@ const {
   expandModeActive: () => !!props.expandModeActive,
   isImageEditorActive: () => isImageEditorActive.value,
 })
-
-const {
-  showHandleControls,
-  refreshTransientHandleVisibility,
-  onNodeMouseEnter,
-  onNodeMouseLeave,
-  onNodeFocusIn,
-  onNodeFocusOut,
-  onNodePointerDown,
-} = useFlowCanvasNodeHandleRail(flowCanvasNodeRef)
-
-watch(
-  () => props.handleVisibilityRefreshToken,
-  () => {
-    refreshTransientHandleVisibility()
-  },
-)
-
-const showHandleControlsGated = computed(
-  () => !disableHandleRailInteraction.value && showHandleControls.value,
-)
 
 function requestNodeInternalsUpdate() {
   emit('request-internals-update', props.nodeId)
@@ -556,11 +514,4 @@ function noopMouse() {}
   font-size: 12px;
 }
 
-.flow-canvas-node__handle-rail {
-  position: absolute;
-  inset: 0;
-  z-index: 24;
-  pointer-events: none;
-  overflow: visible;
-}
 </style>

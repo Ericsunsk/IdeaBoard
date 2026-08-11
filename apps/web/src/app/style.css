@@ -102,6 +102,8 @@
   --color-canvas-node-bg: #ffffff;
   --color-canvas-node-border: #e8ecf4;
   --color-canvas-node-border-alt: #e2e8f0;
+  --color-canvas-handle-border: #d8e0ea;
+  --color-canvas-handle-border-active: #c4ccd8;
   --color-canvas-track-bg: #eef2f5;
   --color-canvas-text-primary: #272932;
   --color-canvas-text-secondary: #64748b;

@@ -98,6 +98,7 @@ import { PanOnScrollMode, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import { useFlowImagePreviewLightbox } from '../composables/useFlowImagePreviewLightbox'
+import { provideCanvasHandleProximityCoordinator } from '../composables/useCanvasHandleProximity'
 import { provideCanvasViewportContext } from '../composables/useCanvasViewportContext'
 import { CanvasGroupPresentation } from '../group-presentation'
 import { useVueFlowPaneAdapter } from '../flow-pane'
@@ -139,6 +140,7 @@ function openRecharge() {
 }
 
 const flowPaneAdapter = useVueFlowPaneAdapter()
+provideCanvasHandleProximityCoordinator()
 
 const canvasWrapRef = ref<HTMLElement | null>(null)
 const activeTool = ref<'select' | 'hand'>('select')

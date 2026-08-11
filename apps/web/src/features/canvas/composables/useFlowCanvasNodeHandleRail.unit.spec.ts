@@ -58,10 +58,10 @@ describe('useFlowCanvasNodeHandleRail', () => {
     try {
       expect(harness.rail.showHandleControls.value).toBe(false)
 
-      harness.rail.onNodeMouseEnter()
+      root.dispatchEvent(new MouseEvent('mouseenter'))
       expect(harness.rail.showHandleControls.value).toBe(true)
 
-      harness.rail.onNodeMouseLeave()
+      root.dispatchEvent(new MouseEvent('mouseleave'))
       expect(harness.rail.showHandleControls.value).toBe(false)
     } finally {
       harness.unmount()
@@ -77,11 +77,11 @@ describe('useFlowCanvasNodeHandleRail', () => {
         selector === ':focus-visible' ? handle : null,
       )
 
-      harness.rail.onNodeFocusIn()
+      root.dispatchEvent(new FocusEvent('focusin'))
 
       expect(harness.rail.showHandleControls.value).toBe(true)
 
-      harness.rail.onNodeFocusOut(new FocusEvent('focusout', { relatedTarget: document.body }))
+      root.dispatchEvent(new FocusEvent('focusout', { relatedTarget: document.body }))
       expect(harness.rail.showHandleControls.value).toBe(false)
     } finally {
       harness.unmount()
@@ -99,7 +99,7 @@ describe('useFlowCanvasNodeHandleRail', () => {
         selector === ':focus-visible' ? handle : null,
       )
 
-      harness.rail.onNodeFocusOut(new FocusEvent('focusout', { relatedTarget: nextFocusedElement }))
+      root.dispatchEvent(new FocusEvent('focusout', { relatedTarget: nextFocusedElement }))
       expect(harness.rail.showHandleControls.value).toBe(true)
     } finally {
       harness.unmount()
@@ -111,7 +111,7 @@ describe('useFlowCanvasNodeHandleRail', () => {
     const { root } = createRootWithFocusableHandle()
     const harness = mountHandleRail(root)
 
-    harness.rail.onNodePointerDown({ pointerType: 'touch' } as PointerEvent)
+    root.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'touch' }))
 
     expect(harness.rail.showHandleControls.value).toBe(true)
     expect(vi.getTimerCount()).toBe(1)
@@ -122,6 +122,18 @@ describe('useFlowCanvasNodeHandleRail', () => {
     expect(vi.getTimerCount()).toBe(0)
     vi.runOnlyPendingTimers()
     expect(harness.rail.showHandleControls.value).toBe(false)
+  })
+
+  it('preserves the transient handle hint for pen input', () => {
+    vi.useFakeTimers()
+    const { root } = createRootWithFocusableHandle()
+    const harness = mountHandleRail(root)
+
+    root.dispatchEvent(new PointerEvent('pointerdown', { pointerType: 'pen' }))
+
+    expect(harness.rail.showHandleControls.value).toBe(true)
+    expect(vi.getTimerCount()).toBe(1)
+    harness.unmount()
   })
 
   it('refreshes transient visibility and blurs a focused aggregate handle', () => {

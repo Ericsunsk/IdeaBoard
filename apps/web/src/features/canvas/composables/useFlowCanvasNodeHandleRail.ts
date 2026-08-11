@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 import { tryOnScopeDispose, useTimeoutFn } from '@vueuse/core'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 /**
  * Tracks transient handle visibility for handles rendered inside the node frame.
@@ -9,11 +9,11 @@ import { computed, ref } from 'vue'
 export function useFlowCanvasNodeHandleRail(flowNodeRef: Ref<HTMLElement | null>) {
   const isPointerOverNode = ref(false)
   const isKeyboardFocusWithinNode = ref(false)
-  const isTouchHandleHintActive = ref(false)
+  const isTransientHandleHintActive = ref(false)
 
-  const touchHintTimer = useTimeoutFn(
+  const transientHintTimer = useTimeoutFn(
     () => {
-      isTouchHandleHintActive.value = false
+      isTransientHandleHintActive.value = false
     },
     2400,
     { immediate: false },
@@ -21,7 +21,9 @@ export function useFlowCanvasNodeHandleRail(flowNodeRef: Ref<HTMLElement | null>
 
   const showHandleControls = computed(
     () =>
-      isPointerOverNode.value || isKeyboardFocusWithinNode.value || isTouchHandleHintActive.value,
+      isPointerOverNode.value ||
+      isKeyboardFocusWithinNode.value ||
+      isTransientHandleHintActive.value,
   )
 
   function syncKeyboardFocus() {
@@ -29,13 +31,13 @@ export function useFlowCanvasNodeHandleRail(flowNodeRef: Ref<HTMLElement | null>
     isKeyboardFocusWithinNode.value = !!root?.querySelector(':focus-visible')
   }
 
-  function clearTouchHint() {
-    isTouchHandleHintActive.value = false
-    touchHintTimer.stop()
+  function clearTransientHint() {
+    isTransientHandleHintActive.value = false
+    transientHintTimer.stop()
   }
 
   function refreshTransientHandleVisibility() {
-    clearTouchHint()
+    clearTransientHint()
 
     const activeEl = document.activeElement
     if (
@@ -74,19 +76,42 @@ export function useFlowCanvasNodeHandleRail(flowNodeRef: Ref<HTMLElement | null>
 
   function onNodePointerDown(event: PointerEvent) {
     if (event.pointerType === 'mouse') return
-    isTouchHandleHintActive.value = true
-    touchHintTimer.start()
+    isTransientHandleHintActive.value = true
+    transientHintTimer.start()
   }
 
-  tryOnScopeDispose(clearTouchHint)
+  watch(
+    flowNodeRef,
+    (root, _, onCleanup) => {
+      isPointerOverNode.value = false
+      isKeyboardFocusWithinNode.value = false
+      if (!root) return
+
+      root.addEventListener('mouseenter', onNodeMouseEnter)
+      root.addEventListener('mouseleave', onNodeMouseLeave)
+      root.addEventListener('focusin', onNodeFocusIn)
+      root.addEventListener('focusout', onNodeFocusOut)
+      root.addEventListener('pointerdown', onNodePointerDown, true)
+
+      onCleanup(() => {
+        root.removeEventListener('mouseenter', onNodeMouseEnter)
+        root.removeEventListener('mouseleave', onNodeMouseLeave)
+        root.removeEventListener('focusin', onNodeFocusIn)
+        root.removeEventListener('focusout', onNodeFocusOut)
+        root.removeEventListener('pointerdown', onNodePointerDown, true)
+      })
+    },
+    { immediate: true, flush: 'sync' },
+  )
+
+  tryOnScopeDispose(() => {
+    isPointerOverNode.value = false
+    isKeyboardFocusWithinNode.value = false
+    clearTransientHint()
+  })
 
   return {
     showHandleControls,
     refreshTransientHandleVisibility,
-    onNodeMouseEnter,
-    onNodeMouseLeave,
-    onNodeFocusIn,
-    onNodeFocusOut,
-    onNodePointerDown,
   }
 }

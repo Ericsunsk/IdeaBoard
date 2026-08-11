@@ -1,5 +1,6 @@
 import { computed, type MaybeRefOrGetter, toValue } from 'vue'
 import { IMAGE_NODE_EMPTY_SIZE } from '../../canvas-board/domain'
+import { resolveCanvasViewportZoomScale } from './useCanvasViewportContext'
 
 export const CANVAS_IMAGE_PREVIEW_MAX_SIDE = {
   compact: 320,
@@ -44,7 +45,7 @@ export function resolveCanvasImagePreviewMaxSide(
 
   const stageWidth = normalizePositiveNumber(options.stageWidth, IMAGE_NODE_EMPTY_SIZE)
   const stageHeight = normalizePositiveNumber(options.stageHeight, stageWidth)
-  const zoomScale = normalizePositiveNumber(options.zoomLevel, 100) / 100
+  const zoomScale = resolveCanvasViewportZoomScale(options.zoomLevel)
   const devicePixelRatio = normalizePositiveNumber(options.devicePixelRatio, 1)
   const longestRenderedSide = Math.max(stageWidth, stageHeight) * zoomScale * devicePixelRatio
 
