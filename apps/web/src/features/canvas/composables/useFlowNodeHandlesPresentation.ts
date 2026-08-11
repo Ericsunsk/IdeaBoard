@@ -1,13 +1,11 @@
 import {
   computed,
-  onBeforeUnmount,
-  ref,
   shallowRef,
   watch,
   type ComponentPublicInstance,
   type CSSProperties,
 } from 'vue'
-import { Position } from '@vue-flow/core'
+import { Position, useVueFlow } from '@vue-flow/core'
 import {
   getCanvasNodeVisibleInputPorts,
   getCanvasNodeVisibleOutputPorts,
@@ -36,6 +34,7 @@ type FlowNodeAggregateHandlePresentation = {
   position: Position
   connectable: boolean
   visible: boolean
+  connectionDragging: boolean
   proximityActive: boolean
   returning: boolean
   disabled: boolean
@@ -43,7 +42,6 @@ type FlowNodeAggregateHandlePresentation = {
   ariaLabel: string
   title: string
   setElement: (value: FlowNodeHandleElement) => void
-  onPointerDown: (event: PointerEvent) => void
 }
 
 export type FlowNodeHandlesPresentation = {
@@ -102,8 +100,6 @@ const HANDLE_DIRECTION_POLICIES: Record<FlowNodeHandleDirection, HandleDirection
   },
 }
 
-const HANDLE_HIT_TARGET_SCREEN_SIZE = 52
-
 function resolveHandleElement(value: FlowNodeHandleElement): HTMLElement | null {
   if (value instanceof HTMLElement) return value
   if (!value || value instanceof Element) return null
@@ -119,21 +115,11 @@ function createFollowStyle(
   const x = point.x * localScale
   const y = point.y * localScale
   return {
-    ...createScreenSizedHandleStyle(centeredStyle, localScale),
+    ...centeredStyle,
     '--handle-plus-x': `${x}px`,
     '--handle-plus-y': `${y}px`,
     '--handle-plus-hit-x': `${x}px`,
     '--handle-plus-hit-y': `${y}px`,
-  }
-}
-
-function createScreenSizedHandleStyle(
-  centeredStyle: CSSProperties,
-  localScale: number,
-): CSSProperties {
-  return {
-    ...centeredStyle,
-    '--handle-hit-size': `${HANDLE_HIT_TARGET_SCREEN_SIZE * localScale}px`,
   }
 }
 
@@ -152,7 +138,6 @@ function useHandleDirectionPresentation(
   localScale: () => number,
   nodeKindLabel: () => string,
   isConnectionDragging: () => boolean,
-  onConnectionPointerDown: (event: PointerEvent) => void,
 ) {
   const policy = HANDLE_DIRECTION_POLICIES[direction]
   const element = shallowRef<FlowNodeHandleElement>(null)
@@ -162,13 +147,14 @@ function useHandleDirectionPresentation(
   const proximity = useCanvasHandleProximity({
     direction,
     getAnchorRect: () => resolveHandleElement(element.value)?.getBoundingClientRect() ?? null,
-    enabled: computed(() => portIds.value.length > 0 && !options.disabled()),
+    enabled: computed(
+      () => portIds.value.length > 0 && !options.disabled() && !isConnectionDragging(),
+    ),
   })
   const visible = computed(
     () =>
       !options.disabled() &&
       (options.showHandles() ||
-        isConnectionDragging() ||
         proximity.isActive.value ||
         proximity.isReturning.value),
   )
@@ -193,18 +179,18 @@ function useHandleDirectionPresentation(
       direction,
       handleType: policy.handleType,
       position: policy.position,
-      connectable: visible.value,
+      connectable: !options.disabled(),
       visible: visible.value,
+      connectionDragging: isConnectionDragging(),
       proximityActive: !isConnectionDragging() && proximity.isActive.value,
       returning: !isConnectionDragging() && proximity.isReturning.value,
       disabled: options.disabled(),
       style: proximity.isActive.value && !isConnectionDragging()
         ? createFollowStyle(policy.centeredStyle, proximity.point.value, localScale())
-        : createScreenSizedHandleStyle(policy.centeredStyle, localScale()),
+        : policy.centeredStyle,
       ariaLabel: `${nodeKindLabel()}${policy.ariaDirectionLabel}连接点，拖拽创建连接`,
       title: policy.title,
       setElement,
-      onPointerDown: onConnectionPointerDown,
     }
   })
 
@@ -218,34 +204,10 @@ function useHandleDirectionPresentation(
 
 export function useFlowNodeHandlesPresentation(options: UseFlowNodeHandlesPresentationOptions) {
   const { zoomLevel } = useCanvasViewportContext()
+  const { connectionStartHandle } = useVueFlow()
   const localScale = computed(() => resolveCanvasNodeUiScale(zoomLevel.value))
   const nodeKindLabel = computed(() => getNodeKindLabel(options.kind()))
-  const isConnectionDragging = ref(false)
-  let refreshCoordinator: () => void = () => undefined
-
-  function finishConnectionDrag(shouldRefresh = true) {
-    if (!isConnectionDragging.value) return
-    isConnectionDragging.value = false
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('pointerup', onConnectionPointerEnd, true)
-      window.removeEventListener('pointercancel', onConnectionPointerEnd, true)
-      window.removeEventListener('blur', onConnectionPointerEnd)
-    }
-    if (shouldRefresh) refreshCoordinator()
-  }
-
-  function onConnectionPointerEnd() {
-    finishConnectionDrag()
-  }
-
-  function onConnectionPointerDown(event: PointerEvent) {
-    if ((event.pointerType === 'mouse' || event.pointerType === 'pen') && event.button !== 0) return
-    isConnectionDragging.value = true
-    if (typeof window === 'undefined') return
-    window.addEventListener('pointerup', onConnectionPointerEnd, true)
-    window.addEventListener('pointercancel', onConnectionPointerEnd, true)
-    window.addEventListener('blur', onConnectionPointerEnd)
-  }
+  const isConnectionDragging = computed(() => connectionStartHandle.value !== null)
 
   const input = useHandleDirectionPresentation(
     'input',
@@ -253,7 +215,6 @@ export function useFlowNodeHandlesPresentation(options: UseFlowNodeHandlesPresen
     () => localScale.value,
     () => nodeKindLabel.value,
     () => isConnectionDragging.value,
-    onConnectionPointerDown,
   )
   const output = useHandleDirectionPresentation(
     'output',
@@ -261,11 +222,7 @@ export function useFlowNodeHandlesPresentation(options: UseFlowNodeHandlesPresen
     () => localScale.value,
     () => nodeKindLabel.value,
     () => isConnectionDragging.value,
-    onConnectionPointerDown,
   )
-  refreshCoordinator = input.refreshCoordinator
-
-  onBeforeUnmount(() => finishConnectionDrag(false))
 
   watch(
     zoomLevel,

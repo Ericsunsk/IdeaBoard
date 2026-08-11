@@ -21,17 +21,17 @@
       `flow-canvas-node__handle-aggregate--${aggregate.direction}`,
       {
         'is-visible': aggregate.visible,
+        'is-connection-dragging': aggregate.connectionDragging,
         'is-proximity-active': aggregate.proximityActive,
         'is-returning': aggregate.returning,
         'is-disabled': aggregate.disabled,
       },
     ]"
     :style="aggregate.style"
-    :aria-hidden="aggregate.visible ? undefined : 'true'"
+    :aria-hidden="aggregate.visible && !aggregate.connectionDragging ? undefined : 'true'"
     :aria-label="aggregate.ariaLabel"
-    :tabindex="aggregate.visible ? 0 : -1"
+    :tabindex="aggregate.visible && !aggregate.connectionDragging ? 0 : -1"
     :title="aggregate.title"
-    @pointerdown="aggregate.onPointerDown"
   >
     <span class="flow-canvas-node__handle-plus" aria-hidden="true" />
   </Handle>
@@ -100,8 +100,8 @@ const props = defineProps<{
   position: absolute;
   left: var(--handle-plus-hit-x);
   top: calc(50% + var(--handle-plus-hit-y));
-  width: var(--handle-hit-size);
-  height: var(--handle-hit-size);
+  width: calc(52px * var(--canvas-node-ui-scale, 1));
+  height: calc(52px * var(--canvas-node-ui-scale, 1));
   border-radius: 999px;
   transform: translate(-50%, -50%);
   pointer-events: auto;
@@ -124,6 +124,11 @@ const props = defineProps<{
     left var(--motion-control-duration) var(--motion-control-easing),
     top var(--motion-control-duration) var(--motion-control-easing),
     border-color var(--motion-feedback-duration) var(--motion-feedback-easing);
+}
+
+.flow-canvas-node__handle-aggregate.is-connection-dragging .flow-canvas-node__handle-plus {
+  opacity: 0;
+  visibility: hidden;
 }
 
 .flow-canvas-node__handle-plus::before,

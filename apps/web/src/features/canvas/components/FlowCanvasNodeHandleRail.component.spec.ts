@@ -1,4 +1,3 @@
-/* eslint-disable vue/one-component-per-file */
 import { h, defineComponent, nextTick, reactive, ref } from 'vue'
 import { cleanup } from '@testing-library/vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -8,15 +7,41 @@ import { provideCanvasHandleProximityCoordinator } from '../composables/useCanva
 import { provideCanvasViewportContext } from '../composables/useCanvasViewportContext'
 import FlowCanvasNodeHandleRail from './FlowCanvasNodeHandleRail.vue'
 
-vi.mock('@vue-flow/core', () => ({
-  Handle: defineComponent({
-    inheritAttrs: false,
-    setup(_, { attrs, slots }) {
-      return () => h('div', attrs, slots.default?.())
-    },
-  }),
-  Position: { Left: 'left', Right: 'right' },
+const vueFlowMock = vi.hoisted(() => ({
+  connectionStartHandle: null as { value: unknown } | null,
 }))
+
+vi.mock('@vue-flow/core', async () => {
+  const { defineComponent: defineVueComponent, h: renderElement, ref: createRef } =
+    await import('vue')
+  const connectionStartHandle = createRef(null)
+  vueFlowMock.connectionStartHandle = connectionStartHandle
+
+  return {
+    Handle: defineVueComponent({
+      inheritAttrs: false,
+      setup(_, { attrs, slots }) {
+        return () => renderElement('div', attrs, slots.default?.())
+      },
+    }),
+    Position: { Left: 'left', Right: 'right' },
+    useVueFlow: () => ({ connectionStartHandle }),
+  }
+})
+
+type MockConnectingHandle = {
+  id: string
+  nodeId: string
+  type: 'source' | 'target'
+  position: 'left' | 'right'
+  x: number
+  y: number
+}
+
+function setConnectionStartHandle(value: MockConnectingHandle | null) {
+  if (!vueFlowMock.connectionStartHandle) throw new Error('Vue Flow mock is not initialized')
+  vueFlowMock.connectionStartHandle.value = value
+}
 
 function setAnchorRect(element: HTMLElement, left: number) {
   let currentLeft = left
@@ -39,18 +64,15 @@ function setAnchorRect(element: HTMLElement, left: number) {
 function renderHandles(props: {
   kind: 'prompt' | 'image' | 'fusion'
   disabled?: boolean
-  selected?: boolean
   zoomLevel?: number
 }) {
   const coordinator = createCanvasHandleProximityCoordinator()
   const currentProps = reactive<{
     kind: 'prompt' | 'image' | 'fusion'
     disabled: boolean
-    selected: boolean
   }>({
     kind: props.kind,
     disabled: props.disabled ?? false,
-    selected: props.selected ?? false,
   })
   const interactionRoot = ref<HTMLElement | null>(null)
   const zoomLevel = ref(props.zoomLevel ?? 100)
@@ -89,10 +111,11 @@ describe('FlowCanvasNodeHandleRail', () => {
     cleanup()
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+    setConnectionStartHandle(null)
     document.body.innerHTML = ''
   })
 
-  it('keeps handles hidden without node hover, selection, or proximity activation', () => {
+  it('keeps handles hidden without node hover or proximity activation', () => {
     const view = renderHandles({
       kind: 'prompt',
     })
@@ -106,25 +129,35 @@ describe('FlowCanvasNodeHandleRail', () => {
     expect(outputHandle).toHaveAttribute('tabindex', '-1')
   })
 
-  it('keeps handles visible for a selected node after the pointer leaves', () => {
-    const view = renderHandles({ kind: 'prompt', selected: true })
+  it('shows handles only while the pointer is over the node', async () => {
+    const view = renderHandles({ kind: 'prompt' })
 
     const inputHandle = view.getByLabelText('提示词节点输入连接点，拖拽创建连接')
     const outputHandle = view.getByLabelText('提示词节点输出连接点，拖拽创建连接')
 
+    await nextTick()
+    view.interactionRoot.dispatchEvent(new MouseEvent('mouseenter'))
+    await nextTick()
     expect(inputHandle).not.toHaveAttribute('aria-hidden')
     expect(outputHandle).not.toHaveAttribute('aria-hidden')
     expect(inputHandle).toHaveAttribute('tabindex', '0')
     expect(outputHandle).toHaveAttribute('tabindex', '0')
+
+    view.interactionRoot.dispatchEvent(new MouseEvent('mouseleave'))
+    await nextTick()
+    expect(inputHandle).toHaveAttribute('aria-hidden', 'true')
+    expect(outputHandle).toHaveAttribute('aria-hidden', 'true')
   })
 
-  it('keeps disabled handles hidden even when the node is selected or in range', async () => {
-    const view = renderHandles({ kind: 'prompt', selected: true, disabled: true })
+  it('keeps disabled handles hidden even when the node is hovered or in range', async () => {
+    const view = renderHandles({ kind: 'prompt', disabled: true })
     const outputHandle = view.getByLabelText(
       '提示词节点输出连接点，拖拽创建连接',
     ) as HTMLElement
     setAnchorRect(outputHandle, 100)
 
+    await nextTick()
+    view.interactionRoot.dispatchEvent(new MouseEvent('mouseenter'))
     view.coordinator.movePointer({ x: 130, y: 100 })
     await nextTick()
 
@@ -178,28 +211,47 @@ describe('FlowCanvasNodeHandleRail', () => {
     )
   })
 
-  it('freezes follow movement while Vue Flow owns a connection drag', async () => {
+  it('keeps both handles mounted but hides their presentation during a connection drag', async () => {
     const view = renderHandles({ kind: 'prompt' })
+    const inputHandle = view.getByLabelText(
+      '提示词节点输入连接点，拖拽创建连接',
+    ) as HTMLElement
     const outputHandle = view.getByLabelText(
       '提示词节点输出连接点，拖拽创建连接',
     ) as HTMLElement
     setAnchorRect(outputHandle, 100)
 
+    await nextTick()
+    view.interactionRoot.dispatchEvent(new MouseEvent('mouseenter'))
     view.coordinator.movePointer({ x: 130, y: 100 })
     await nextTick()
     expect(outputHandle.style.getPropertyValue('--handle-plus-x')).toBe('29.5px')
-
-    outputHandle.dispatchEvent(
-      new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' }),
-    )
+    setConnectionStartHandle({
+      id: 'out:prompt',
+      nodeId: 'node-1',
+      type: 'source',
+      position: 'right',
+      x: 100,
+      y: 100,
+    })
     view.coordinator.movePointer({ x: 136, y: 106 })
     await nextTick()
 
-    expect(outputHandle).not.toHaveAttribute('aria-hidden')
+    expect(outputHandle).toHaveAttribute('aria-hidden', 'true')
+    expect(outputHandle).toHaveAttribute('tabindex', '-1')
+    expect(inputHandle).toHaveAttribute('aria-hidden', 'true')
+    expect(inputHandle).toHaveAttribute('tabindex', '-1')
+    expect(outputHandle.querySelector('.flow-canvas-node__handle-plus')).toBeInTheDocument()
+    expect(inputHandle.querySelector('.flow-canvas-node__handle-plus')).toBeInTheDocument()
     expect(outputHandle.style.getPropertyValue('--handle-plus-x')).toBe('')
     expect(outputHandle.style.getPropertyValue('--handle-plus-y')).toBe('')
 
-    window.dispatchEvent(new PointerEvent('pointerup', { pointerType: 'mouse' }))
+    setConnectionStartHandle(null)
+    await nextTick()
+    expect(outputHandle).not.toHaveAttribute('aria-hidden')
+    expect(outputHandle).toHaveAttribute('tabindex', '0')
+    expect(inputHandle).not.toHaveAttribute('aria-hidden')
+    expect(inputHandle).toHaveAttribute('tabindex', '0')
   })
 
   it('keeps the original handle positions while the node itself is hovered', async () => {
@@ -243,11 +295,11 @@ describe('FlowCanvasNodeHandleRail', () => {
   )
 
   it.each([
-    { zoomLevel: 50, expectedX: 59, expectedLocalHitSize: 104 },
-    { zoomLevel: 200, expectedX: 14.75, expectedLocalHitSize: 26 },
+    { zoomLevel: 50, expectedX: 59 },
+    { zoomLevel: 200, expectedX: 14.75 },
   ])(
-    'keeps the visual center and hit area screen-sized at $zoomLevel% zoom',
-    async ({ zoomLevel, expectedX, expectedLocalHitSize }) => {
+    'keeps the followed visual center screen-aligned at $zoomLevel% zoom',
+    async ({ zoomLevel, expectedX }) => {
       const view = renderHandles({ kind: 'prompt', zoomLevel })
       const outputHandle = view.getByLabelText(
         '提示词节点输出连接点，拖拽创建连接',
@@ -260,11 +312,6 @@ describe('FlowCanvasNodeHandleRail', () => {
       expect(Number.parseFloat(outputHandle.style.getPropertyValue('--handle-plus-x'))).toBeCloseTo(
         expectedX,
       )
-      const localHitSize = Number.parseFloat(
-        outputHandle.style.getPropertyValue('--handle-hit-size'),
-      )
-      expect(localHitSize).toBeCloseTo(expectedLocalHitSize)
-      expect(localHitSize * (zoomLevel / 100)).toBeCloseTo(52)
       expect(outputHandle.style.right).toBe('0px')
     },
   )

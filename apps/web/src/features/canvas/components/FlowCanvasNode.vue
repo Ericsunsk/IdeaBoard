@@ -36,7 +36,6 @@
             :kind="data.kind"
             :interaction-root="flowCanvasNodeRef"
             :visibility-refresh-token="props.handleVisibilityRefreshToken"
-            :selected="selected"
             :disabled="disableHandleRailInteraction"
             @request-internals-update="requestNodeInternalsUpdate"
           />
@@ -90,7 +89,6 @@
               :kind="data.kind"
               :interaction-root="flowCanvasNodeRef"
               :visibility-refresh-token="props.handleVisibilityRefreshToken"
-              :selected="selected"
               :disabled="disableHandleRailInteraction"
               @request-internals-update="requestNodeInternalsUpdate"
             />
@@ -130,7 +128,6 @@
               :kind="data.kind"
               :interaction-root="flowCanvasNodeRef"
               :visibility-refresh-token="props.handleVisibilityRefreshToken"
-              :selected="selected"
               :disabled="disableHandleRailInteraction"
               @request-internals-update="requestNodeInternalsUpdate"
             />

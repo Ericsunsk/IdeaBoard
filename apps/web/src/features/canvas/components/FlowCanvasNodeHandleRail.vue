@@ -15,7 +15,6 @@ const props = defineProps<{
   kind: FlowNodeData['kind']
   interactionRoot: HTMLElement | null
   visibilityRefreshToken?: number
-  selected?: boolean
   disabled?: boolean
 }>()
 
@@ -28,7 +27,7 @@ const { showHandleControls, refreshTransientHandleVisibility } =
   useFlowCanvasNodeHandleRail(interactionRoot)
 const { handleLayoutIdentity, presentation } = useFlowNodeHandlesPresentation({
   kind: () => props.kind,
-  showHandles: () => props.selected === true || showHandleControls.value,
+  showHandles: () => showHandleControls.value,
   disabled: () => props.disabled === true,
 })
 
