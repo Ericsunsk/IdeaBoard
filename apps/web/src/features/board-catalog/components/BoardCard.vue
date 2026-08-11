@@ -97,14 +97,14 @@ import {
   appOverlayMenuDangerItemClass,
   appOverlayMenuItemClass,
 } from '../../../shared/theme/appOverlayMenu'
-import { blankBoardPreviewSurfaceClass } from '../../canvas-board/preview'
-import type { CanvasBoardMeta } from '../../canvas-board/catalog/canvasBoards'
+import type { BoardCatalogEntry } from '../boardCatalogContract'
+import { blankBoardPreviewSurfaceClass } from '../lib/boardCatalogSkin'
 import { boardMenuPt } from '../lib/menuStyles'
 
 type RenameInputRef = HTMLInputElement | { $el?: HTMLInputElement } | null
 
 const props = defineProps<{
-  board: CanvasBoardMeta
+  board: BoardCatalogEntry
   previewSnapshotDataUrl: string
   isRenaming: boolean
   renameDraft: string

@@ -1,74 +1,25 @@
-import {
-  computed,
-  onMounted,
-  onScopeDispose,
-  readonly,
-  ref,
-  watch,
-  type ComputedRef,
-  type Ref,
-} from 'vue'
+import { computed, readonly, ref, watch } from 'vue'
 import type { CanvasBoardCatalog } from '../../canvas-board/catalog/canvasBoardCatalog'
-import type { CanvasBoardMeta } from '../../canvas-board/catalog/canvasBoards'
 import type { BoardPreviewRefreshQueue } from '../../canvas-board/preview'
+import type {
+  BoardCatalogEntry,
+  BoardCatalogSortMode,
+  BoardsCatalog,
+  BoardsCatalogNavigation,
+} from '../boardCatalogContract'
 import type { BoardFeedback } from '../feedback/useBoardFeedback'
 
-export type BoardCatalogNavigation = {
-  openBoard(boardId: string): void
-}
-
-export type BoardCatalogSortMode = 'recent' | 'name'
-
-export type BoardCatalogControllerDependencies = {
+type BoardCatalogControllerDependencies = {
   catalog: CanvasBoardCatalog
   preview: BoardPreviewRefreshQueue
-  navigation: BoardCatalogNavigation
+  navigation: BoardsCatalogNavigation
   feedback: BoardFeedback
   warn: (...data: unknown[]) => void
 }
 
-export type BoardCatalogController = {
-  viewModel: {
-    boards: Readonly<Ref<readonly CanvasBoardMeta[]>>
-    visibleBoards: ComputedRef<readonly CanvasBoardMeta[]>
-    previewMap: Readonly<Ref<Record<string, string>>>
-    isBoardsLoading: Readonly<Ref<boolean>>
-    searchKeyword: Readonly<Ref<string>>
-    sortMode: Readonly<Ref<BoardCatalogSortMode>>
-    activeMenuBoardId: Readonly<Ref<string | null>>
-    renamingBoardId: Readonly<Ref<string | null>>
-    renameDraft: Readonly<Ref<string>>
-    catalogRecoveryBoardId: Readonly<Ref<string | null>>
-    isCatalogReloadPending: Readonly<Ref<boolean>>
-    deleteDialogVisible: Readonly<Ref<boolean>>
-    pendingDeleteBoard: Readonly<Ref<CanvasBoardMeta | null>>
-    isDeletePending: Readonly<Ref<boolean>>
-  }
-  commands: {
-    initialize(): Promise<void>
-    setSearchKeyword(value: string | undefined): void
-    setSortMode(mode: BoardCatalogSortMode): void
-    toggleBoardMenu(boardId: string): void
-    handleBoardMenuHidden(boardId: string): void
-    createAndOpenBoard(): Promise<void>
-    duplicateBoard(board: CanvasBoardMeta): Promise<void>
-    startRename(board: CanvasBoardMeta): void
-    updateRenameDraft(nextName: string): void
-    commitRename(): Promise<void>
-    cancelRename(): void
-    reloadCatalog(): Promise<void>
-    openBoardFromCard(board: CanvasBoardMeta): void
-    requestDelete(board: CanvasBoardMeta): void
-    closeDeleteDialog(): void
-    handleDeleteDialogHidden(): void
-    confirmDelete(): Promise<void>
-  }
-  dispose(): void
-}
-
 export function createBoardCatalogController(
   dependencies: BoardCatalogControllerDependencies,
-): BoardCatalogController {
+): BoardsCatalog {
   const activeMenuBoardId = ref<string | null>(null)
   const isBoardsLoading = ref(true)
   const searchKeyword = ref('')
@@ -78,12 +29,14 @@ export function createBoardCatalogController(
   const catalogRecoveryBoardId = ref<string | null>(null)
   const isCatalogReloadPending = ref(false)
   const deleteDialogVisible = ref(false)
-  const pendingDeleteBoard = ref<CanvasBoardMeta | null>(null)
+  const pendingDeleteBoard = ref<BoardCatalogEntry | null>(null)
   const isDeletePending = ref(false)
   let suppressNextBoardOpen = false
   let initializePromise: Promise<void> | null = null
 
-  const boards = dependencies.catalog.viewModel.boards
+  const boards = computed<readonly BoardCatalogEntry[]>(
+    () => dependencies.catalog.viewModel.boards.value,
+  )
   const visibleBoards = computed(() => {
     const keyword = searchKeyword.value.toLowerCase()
     const filtered = boards.value.filter((board) => {
@@ -107,6 +60,7 @@ export function createBoardCatalogController(
   )
 
   const stopScopeWatch = watch(dependencies.catalog.viewModel.scope, () => {
+    dependencies.preview.invalidate()
     activeMenuBoardId.value = null
     clearRename(false)
     catalogRecoveryBoardId.value = null
@@ -166,10 +120,10 @@ export function createBoardCatalogController(
     }
   }
 
-  async function duplicateBoard(board: CanvasBoardMeta) {
+  async function duplicateBoard(boardId: string) {
     activeMenuBoardId.value = null
     try {
-      const result = await dependencies.catalog.commands.duplicate({ sourceBoardId: board.id })
+      const result = await dependencies.catalog.commands.duplicate({ sourceBoardId: boardId })
       if (!result.ok) {
         if (result.reason === 'scope-changed') return
         dependencies.feedback.copyFailed(result)
@@ -185,7 +139,7 @@ export function createBoardCatalogController(
     }
   }
 
-  function startRename(board: CanvasBoardMeta) {
+  function startRename(board: BoardCatalogEntry) {
     activeMenuBoardId.value = null
     renamingBoardId.value = board.id
     renameDraft.value = board.name
@@ -266,7 +220,7 @@ export function createBoardCatalogController(
     }
   }
 
-  function openBoardFromCard(board: CanvasBoardMeta) {
+  function openBoardFromCard(boardId: string) {
     if (activeMenuBoardId.value) {
       activeMenuBoardId.value = null
       return
@@ -275,10 +229,10 @@ export function createBoardCatalogController(
       suppressNextBoardOpen = false
       return
     }
-    dependencies.navigation.openBoard(board.id)
+    dependencies.navigation.openBoard(boardId)
   }
 
-  function requestDelete(board: CanvasBoardMeta) {
+  function requestDelete(board: BoardCatalogEntry) {
     activeMenuBoardId.value = null
     pendingDeleteBoard.value = board
     deleteDialogVisible.value = true
@@ -334,7 +288,6 @@ export function createBoardCatalogController(
 
   return {
     viewModel: {
-      boards,
       visibleBoards,
       previewMap: readonly(dependencies.preview.previewMap),
       isBoardsLoading: readonly(isBoardsLoading),
@@ -374,19 +327,6 @@ export function createBoardCatalogController(
       dependencies.preview.dispose()
     },
   }
-}
-
-export function useBoardCatalogController(
-  dependencies: BoardCatalogControllerDependencies,
-): BoardCatalogController {
-  const controller = createBoardCatalogController(dependencies)
-  onMounted(() => {
-    void controller.commands.initialize()
-  })
-  onScopeDispose(() => {
-    controller.dispose()
-  })
-  return controller
 }
 
 export function formatBoardCatalogDate(timestamp: number): string {

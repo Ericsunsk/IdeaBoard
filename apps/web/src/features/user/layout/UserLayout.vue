@@ -54,12 +54,26 @@ import {
 import { useAuthFeedback } from '../../auth/useAuthFeedback'
 import UserAuthModals from '../../auth/components/UserAuthModals.vue'
 import AccountManagementDialogHost from '../../account-management/components/AccountManagementDialogHost.vue'
+import {
+  createAccountManagementOverlay,
+  provideAccountManagementOverlay,
+} from '../../account-management/accountManagementOverlay'
 
 const router = useRouter()
 const route = useRoute()
 const authFeedback = useAuthFeedback()
 const { runAsyncAction } = useAsyncAction()
 const userStore = useUserStore()
+const accountManagementOverlay = createAccountManagementOverlay({
+  currentUser: computed(() => userStore.user),
+  reportError: (error) => console.warn('[account-management] payment-return cleanup failed', error),
+  navigation: {
+    replace: (location) => router.replace(location),
+    resolve: (location) => router.resolve(location),
+  },
+  route,
+})
+provideAccountManagementOverlay(accountManagementOverlay)
 
 const stopImpersonatingLoading = ref(false)
 const authSession = useAuthSession()

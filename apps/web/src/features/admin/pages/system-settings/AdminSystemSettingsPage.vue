@@ -236,20 +236,12 @@ import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFra
 import {
   RATE_LIMIT_MAX_REQUESTS,
   RATE_LIMIT_MAX_WINDOW_SECONDS,
-  useAdminAccessSettings,
 } from '../../system-settings/useAdminAccessSettings'
-import { useAdminBrandingSettings } from '../../system-settings/useAdminBrandingSettings'
 import {
   MEDIA_UPLOAD_MAX_CONCURRENT,
   MEDIA_UPLOAD_MIN_CONCURRENT,
-  useAdminMediaUploadSettings,
 } from '../../system-settings/useAdminMediaUploadSettings'
-import {
-  useAdminAccessSettingsFeedback,
-  useAdminBrandingSettingsFeedback,
-  useAdminMediaUploadSettingsFeedback,
-  useAdminUnsupportedLogoFileFeedback,
-} from '../../system-settings/useAdminSystemSettingsFeedback'
+import { useAdminSystemSettings } from '../../system-settings/useAdminSystemSettings'
 import {
   adminActionButtonClass,
   adminTwoColumnMasonryGridClass,
@@ -266,10 +258,7 @@ const brandingLogoButtonClass = createBrandMarkClass(
   'hover:border-admin-border-hover hover:bg-admin-surface-muted focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_var(--color-admin-focus-ring)] disabled:cursor-not-allowed disabled:opacity-60',
 )
 
-const accessSettingsFeedback = useAdminAccessSettingsFeedback()
-const brandingSettingsFeedback = useAdminBrandingSettingsFeedback()
-const mediaUploadSettingsFeedback = useAdminMediaUploadSettingsFeedback()
-const unsupportedLogoFileFeedback = useAdminUnsupportedLogoFileFeedback()
+const { access, branding, mediaUpload, unsupportedLogoFileFeedback } = useAdminSystemSettings()
 const logoFileInputRef = ref<HTMLInputElement | null>(null)
 const logoCropDialogVisible = ref(false)
 const pendingLogoFile = ref<File | null>(null)
@@ -284,7 +273,7 @@ const {
   reset: resetBranding,
   saving: brandingSaving,
   uploading,
-} = useAdminBrandingSettings({ feedback: brandingSettingsFeedback })
+} = branding
 const {
   handleToggleRegistration,
   rateLimitLoading,
@@ -294,14 +283,14 @@ const {
   registrationSettingLoading,
   resetRateLimit,
   saveRateLimit,
-} = useAdminAccessSettings({ feedback: accessSettingsFeedback })
+} = access
 const {
   form: mediaUploadForm,
   save: saveMediaUpload,
   loading: mediaUploadLoading,
   reset: resetMediaUpload,
   saving: mediaUploadSaving,
-} = useAdminMediaUploadSettings({ feedback: mediaUploadSettingsFeedback })
+} = mediaUpload
 watch(logoCropDialogVisible, (visible) => {
   if (!visible) {
     pendingLogoFile.value = null

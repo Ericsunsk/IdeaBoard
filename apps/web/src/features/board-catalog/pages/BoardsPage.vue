@@ -94,10 +94,10 @@
             :rename-draft="renameDraft"
             :is-menu-open="activeMenuBoardId === board.id"
             :display-date="formatBoardCatalogDate(board.updatedAt)"
-            @click-board="openBoardFromCard(board)"
+            @click-board="openBoardFromCard(board.id)"
             @toggle-menu="toggleBoardMenu(board.id)"
             @rename-action="startRename(board)"
-            @duplicate-action="duplicateBoard(board)"
+            @duplicate-action="duplicateBoard(board.id)"
             @delete-action="requestDelete(board)"
             @rename-input="updateRenameDraft"
             @commit-rename="commitRename"
@@ -165,10 +165,7 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { useCanvasBoardCatalog } from '../../canvas-board/catalog/canvasBoardCatalog'
 import BoardCard from '../components/BoardCard.vue'
-import { useBoardFeedback } from '../feedback/useBoardFeedback'
-import { createBoardPreviewRefreshQueue } from '../../canvas-board/preview'
 import {
   boardCatalogClasses,
   boardCatalogDeleteDialogPt,
@@ -189,28 +186,18 @@ import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
 import { useUserAccountControls } from '../../user-shell/useUserAccountControls'
-import {
-  formatBoardCatalogDate,
-  useBoardCatalogController,
-} from '../controller/boardCatalogController'
+import { formatBoardCatalogDate, useBoardsCatalog } from '../boardsCatalog'
 
 const router = useRouter()
-const boardFeedback = useBoardFeedback()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const { projectName } = useSiteBranding()
-const boardCatalog = useCanvasBoardCatalog()
-const boardPreviewRefresh = createBoardPreviewRefreshQueue()
-const boardCatalogController = useBoardCatalogController({
-  catalog: boardCatalog,
-  preview: boardPreviewRefresh,
+const boardCatalogController = useBoardsCatalog({
   navigation: {
     openBoard(boardId) {
       void router.push({ path: USER_CANVAS_PATH, query: { boardId } })
     },
   },
-  feedback: boardFeedback,
-  warn: console.warn,
 })
 const {
   visibleBoards,

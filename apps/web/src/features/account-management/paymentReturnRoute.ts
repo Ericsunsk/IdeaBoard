@@ -5,7 +5,7 @@ export type PaymentReturnContext = {
   source: PaymentReturnSource
 }
 
-type QueryValue = string | null | undefined | readonly (string | null)[]
+type QueryValue = string | null | undefined | (string | null)[]
 export type PaymentReturnQuery = Record<string, QueryValue>
 
 const publicTokenPattern =

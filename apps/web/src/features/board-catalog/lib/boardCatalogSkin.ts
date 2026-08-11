@@ -1,4 +1,5 @@
-import { blankBoardPreviewSurfaceClass } from '../../canvas-board/preview'
+export const blankBoardPreviewSurfaceClass =
+  'bg-[radial-gradient(circle,#dfe4ef_1px,transparent_1px),linear-gradient(#fbfcff,#fbfcff)] [background-size:12px_12px,cover]'
 import { pageChromeAccountMenuClasses } from '../../../shared/lib/pageChrome'
 import { ibDialogMaskPt } from '../../../shared/theme/dialogMask'
 

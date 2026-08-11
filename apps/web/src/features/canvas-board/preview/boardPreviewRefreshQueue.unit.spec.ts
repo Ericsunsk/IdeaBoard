@@ -157,6 +157,33 @@ describe('boardPreviewRefreshQueue', () => {
     expect(queue.previewMap.value.boardA).toBe('deduped-preview')
   })
 
+  it('drops a stale render after the Boards Catalog invalidates the prior scope', async () => {
+    const gate = deferred<string>()
+    const states = {
+      sharedBoardId: makeState({ updatedAt: 100 }),
+    }
+    const deps = makeDeps(states)
+    vi.mocked(deps.renderPreview).mockReturnValueOnce(gate.promise)
+    const queue = createBoardPreviewRefreshQueue(deps)
+
+    queue.schedule([makeBoard('sharedBoardId')])
+    await nextTick()
+    queue.invalidate()
+    states.sharedBoardId = makeState({
+      updatedAt: 200,
+      previewSnapshotDataUrl: 'new-scope-preview',
+      previewSnapshotUpdatedAt: 250,
+      previewSnapshotVersion: 8,
+    })
+    queue.reloadFromLocal([makeBoard('sharedBoardId')])
+    gate.resolve('old-scope-preview')
+    await flushPromises()
+
+    expect(deps.setPreviewSnapshot).not.toHaveBeenCalled()
+    expect(deps.syncBoard).not.toHaveBeenCalled()
+    expect(queue.previewMap.value.sharedBoardId).toBe('new-scope-preview')
+  })
+
   it('re-enqueues when updatedAt changes during render and writes the latest render', async () => {
     const states = {
       boardA: makeState({ updatedAt: 100 }),

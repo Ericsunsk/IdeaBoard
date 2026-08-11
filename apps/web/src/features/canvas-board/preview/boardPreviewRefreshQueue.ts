@@ -26,6 +26,7 @@ export interface BoardPreviewRefreshQueue {
   previewMap: Ref<Record<string, string>>
   reloadFromLocal: (boards: CanvasBoardMeta[]) => void
   schedule: (boards: CanvasBoardMeta[]) => void
+  invalidate: () => void
   dispose: () => void
 }
 
@@ -49,6 +50,7 @@ export function createBoardPreviewRefreshQueue(
   const queuedBoardIds = new Set<string>()
   let isInFlight = false
   let isDisposed = false
+  let generation = 0
 
   function readLatestBoardState(boardId: string, boundary: string): CanvasBoardState | null {
     const state = deps.getBoardState(boardId)
@@ -87,7 +89,7 @@ export function createBoardPreviewRefreshQueue(
     queue.push(boardId)
   }
 
-  async function refreshInBackground(boardId: string) {
+  async function refreshInBackground(boardId: string, activeGeneration: number) {
     const startState = readLatestBoardState(boardId, 'preview-render')
     if (!startState || !isPreviewStaleState(startState)) return
     const baseUpdatedAt = startState.updatedAt
@@ -95,6 +97,7 @@ export function createBoardPreviewRefreshQueue(
     let snapshotUpdatedAt: number | undefined
     try {
       const renderedDataUrl = await deps.renderPreview(startState)
+      if (isDisposed || generation !== activeGeneration) return
       snapshotDataUrl = renderedDataUrl || undefined
       snapshotUpdatedAt = renderedDataUrl ? deps.now() : undefined
     } catch (error) {
@@ -103,7 +106,7 @@ export function createBoardPreviewRefreshQueue(
     }
 
     const latestState = readLatestBoardState(boardId, 'preview-write')
-    if (!latestState) return
+    if (isDisposed || generation !== activeGeneration || !latestState) return
     if (latestState.updatedAt !== baseUpdatedAt) {
       enqueue(boardId)
       return
@@ -135,7 +138,7 @@ export function createBoardPreviewRefreshQueue(
         if (!boardId) continue
         queuedBoardIds.delete(boardId)
         if (!isPreviewStale(boardId)) continue
-        await refreshInBackground(boardId)
+        await refreshInBackground(boardId, generation)
       }
     } finally {
       isInFlight = false
@@ -155,16 +158,22 @@ export function createBoardPreviewRefreshQueue(
     void runQueue()
   }
 
-  function dispose() {
-    isDisposed = true
+  function invalidate() {
+    generation += 1
     queue.length = 0
     queuedBoardIds.clear()
+  }
+
+  function dispose() {
+    isDisposed = true
+    invalidate()
   }
 
   return {
     previewMap,
     reloadFromLocal,
     schedule,
+    invalidate,
     dispose,
   }
 }

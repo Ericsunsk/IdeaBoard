@@ -11,7 +11,7 @@ import {
   defaultAccountManagementTab,
   type AccountManagementTab,
 } from '../account-management/accountTabRegistry'
-import { openAccountManagementDialog } from '../account-management/useAccountManagementDialogController'
+import { useAccountManagementOverlay } from '../account-management/accountManagementOverlay'
 import { useUserCreditWalletSummary } from '../account-management/useUserCreditWalletSummary'
 
 export type UserShellNavigationAdapter = {
@@ -31,9 +31,10 @@ function formatIdeaValue(value: number): string {
 export function useUserAccountControls(options: UseUserAccountControlsOptions) {
   const userStore = useUserStore()
   const wallet = useUserCreditWalletSummary(() => Boolean(userStore.user))
+  const accountManagement = useAccountManagementOverlay()
 
   function openAccount(tab: AccountManagementTab = defaultAccountManagementTab) {
-    openAccountManagementDialog(tab)
+    accountManagement.commands.open(tab)
   }
 
   function goAdmin() {

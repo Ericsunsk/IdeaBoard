@@ -3,8 +3,9 @@ import { describe, expect, it, vi } from 'vitest'
 import type { CanvasBoardCatalog } from '../../canvas-board/catalog/canvasBoardCatalog'
 import type { CanvasBoardMeta } from '../../canvas-board/catalog/canvasBoards'
 import type { BoardPreviewRefreshQueue } from '../../canvas-board/preview'
+import type { BoardsCatalogNavigation } from '../boardCatalogContract'
 import type { BoardFeedback } from '../feedback/useBoardFeedback'
-import { createBoardCatalogController, type BoardCatalogNavigation } from './boardCatalogController'
+import { createBoardCatalogController } from './boardCatalogController'
 
 function makeBoard(id: string, name = id, updatedAt = 1): CanvasBoardMeta {
   return { id, name, createdAt: 1, updatedAt }
@@ -45,9 +46,10 @@ function createHarness(initialBoards: CanvasBoardMeta[] = [makeBoard('board-1')]
     previewMap: ref({}),
     reloadFromLocal: vi.fn(),
     schedule: vi.fn(),
+    invalidate: vi.fn(),
     dispose: vi.fn(),
   }
-  const navigation: BoardCatalogNavigation = {
+  const navigation: BoardsCatalogNavigation = {
     openBoard: vi.fn(),
   }
   const feedback: BoardFeedback = {
@@ -103,10 +105,10 @@ describe('createBoardCatalogController', () => {
     })
     expect(harness.feedback.renamed).toHaveBeenCalledOnce()
 
-    harness.controller.commands.openBoardFromCard(board)
+    harness.controller.commands.openBoardFromCard(board.id)
     expect(harness.navigation.openBoard).not.toHaveBeenCalled()
 
-    harness.controller.commands.openBoardFromCard(board)
+    harness.controller.commands.openBoardFromCard(board.id)
     expect(harness.navigation.openBoard).toHaveBeenCalledWith(board.id)
   })
 
@@ -257,7 +259,7 @@ describe('createBoardCatalogController', () => {
       return { ok: true, board: makeBoard('copy') }
     })
 
-    await harness.controller.commands.duplicateBoard(source)
+    await harness.controller.commands.duplicateBoard(source.id)
 
     expect(harness.catalog.commands.duplicate).toHaveBeenCalledWith({
       sourceBoardId: source.id,
@@ -290,5 +292,6 @@ describe('createBoardCatalogController', () => {
     expect(harness.controller.viewModel.catalogRecoveryBoardId.value).toBeNull()
     expect(harness.controller.viewModel.deleteDialogVisible.value).toBe(false)
     expect(harness.controller.viewModel.pendingDeleteBoard.value).toBeNull()
+    expect(harness.preview.invalidate).toHaveBeenCalledOnce()
   })
 })

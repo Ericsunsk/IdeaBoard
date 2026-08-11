@@ -1,18 +1,115 @@
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import { describe, expect, it, vi } from 'vitest'
-import { createApp, defineComponent } from 'vue'
+import { createApp, defineComponent, nextTick, ref } from 'vue'
 import { http, HttpResponse, useMswHandlers } from '../../../test/msw'
 import { useAdminAccessSettings } from './useAdminAccessSettings'
 import { useAdminBrandingSettings } from './useAdminBrandingSettings'
 import { useAdminMediaUploadSettings } from './useAdminMediaUploadSettings'
+import { useAdminSystemSettingsLifecycle } from './useAdminSystemSettingsLifecycle'
 import type {
   AdminAccessSettingsFeedback,
   AdminBrandingSettingsFeedback,
   AdminMediaUploadSettingsFeedback,
 } from './useAdminSystemSettingsFeedback'
 
-describe('admin system settings vertical lifecycles', () => {
-  it('owns Branding load, dirty, reset, save, cache refresh, and feedback', async () => {
+type ExampleSetting = { value: number }
+
+describe('Admin System Settings lifecycle', () => {
+  it('keeps one deterministic loading, draft, save, reset, failure, and background-refresh contract', async () => {
+    const remote = ref<ExampleSetting | undefined>()
+    const loadError = ref<unknown>()
+    const loading = ref(true)
+    const saving = ref(false)
+    const cacheSaved = vi.fn<() => Promise<void>>().mockResolvedValue()
+    const feedback = {
+      loadFailed: vi.fn(),
+      validationFailed: vi.fn(),
+      saved: vi.fn(),
+      saveFailed: vi.fn(),
+    }
+    let failNextSave = false
+    let resolveSave: ((saved: ExampleSetting) => void) | undefined
+    const lifecycle = useAdminSystemSettingsLifecycle({
+      defaultValue: { value: 8 },
+      source: remote,
+      loadError,
+      loading,
+      saving,
+      normalize: (setting) => ({ value: setting?.value ?? 8 }),
+      isSame: (left, right) => left.value === right.value,
+      validate: (draft) => (draft.value > 0 ? '' : '值必须大于 0'),
+      save: (_draft) => {
+        saving.value = true
+        return new Promise<ExampleSetting>((resolve, reject) => {
+          resolveSave = (saved) => {
+            saving.value = false
+            if (failNextSave) {
+              reject(new Error('save failed'))
+              return
+            }
+            resolve(saved)
+          }
+        })
+      },
+      synchronizeCache: cacheSaved,
+      feedback,
+    })
+
+    expect(lifecycle.loading.value).toBe(true)
+    expect(lifecycle.isDirty.value).toBe(false)
+
+    loading.value = false
+    remote.value = { value: 12 }
+    await nextTick()
+    expect(lifecycle.form.value).toEqual({ value: 12 })
+    expect(lifecycle.isDirty.value).toBe(false)
+
+    lifecycle.form.value.value = 16
+    expect(lifecycle.isDirty.value).toBe(true)
+    remote.value = { value: 20 }
+    await nextTick()
+    expect(lifecycle.form.value).toEqual({ value: 16 })
+
+    const saveResult = lifecycle.save()
+    expect(lifecycle.saving.value).toBe(true)
+    resolveSave?.({ value: 16 })
+    await expect(saveResult).resolves.toBe(true)
+    expect(cacheSaved).toHaveBeenCalledWith({ value: 16 })
+    expect(lifecycle.form.value).toEqual({ value: 16 })
+    expect(lifecycle.isDirty.value).toBe(false)
+    expect(feedback.saved).toHaveBeenCalledOnce()
+
+    lifecycle.form.value.value = 0
+    await expect(lifecycle.save()).resolves.toBe(false)
+    expect(lifecycle.validationError.value).toBe('值必须大于 0')
+    expect(feedback.validationFailed).toHaveBeenCalledWith('值必须大于 0')
+
+    lifecycle.form.value.value = 24
+    failNextSave = true
+    const failedSaveResult = lifecycle.save()
+    expect(lifecycle.saving.value).toBe(true)
+    resolveSave?.({ value: 24 })
+    await expect(failedSaveResult).resolves.toBe(false)
+    expect(lifecycle.form.value).toEqual({ value: 24 })
+    expect(lifecycle.isDirty.value).toBe(true)
+    expect(feedback.saveFailed).toHaveBeenCalledOnce()
+
+    lifecycle.reset()
+    expect(lifecycle.form.value).toEqual({ value: 16 })
+    expect(lifecycle.isDirty.value).toBe(false)
+
+    remote.value = { value: 32 }
+    await nextTick()
+    expect(lifecycle.form.value).toEqual({ value: 32 })
+
+    loadError.value = new Error('load failed')
+    await nextTick()
+    expect(feedback.loadFailed).toHaveBeenCalledOnce()
+  })
+})
+
+describe('Admin System Settings adapters', () => {
+  it('preserves Branding load, dirty, reset, save, cache refresh, and feedback', async () => {
     const updateRequests: unknown[] = []
     let saved = false
     useMswHandlers(
@@ -63,7 +160,7 @@ describe('admin system settings vertical lifecycles', () => {
     }
   })
 
-  it('owns Access rate-limit validation/save and registration toggle sequencing', async () => {
+  it('preserves Access rate-limit validation/save and registration toggle sequencing', async () => {
     const rateLimitRequests: unknown[] = []
     const registrationRequests: unknown[] = []
     let registrationEnabled = false

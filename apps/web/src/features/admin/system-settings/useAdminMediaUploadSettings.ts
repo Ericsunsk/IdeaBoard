@@ -1,7 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/vue-query'
 import type { QueryClient } from '@tanstack/vue-query'
-import { computed, ref, toRaw, watch } from 'vue'
-import type { Ref } from 'vue'
+import { computed } from 'vue'
 import {
   getGetAdminMediaUploadSettingQueryKey,
   updateAdminMediaUploadSetting,
@@ -10,6 +9,7 @@ import {
 import type { MediaUploadSetting } from '../../../shared/api/generated-query/model'
 import { createApiDataSelector, resolveApiData } from '../../../shared/api/apiResponse'
 import type { AdminMediaUploadSettingsFeedback } from './useAdminSystemSettingsFeedback'
+import { useAdminSystemSettingsLifecycle } from './useAdminSystemSettingsLifecycle'
 
 export const DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING: MediaUploadSetting = {
   upload_max_concurrent: 8,
@@ -28,80 +28,37 @@ export function useAdminMediaUploadSettings(options: {
     query: { select: selectMediaUploadSetting },
   })
   const setting = computed(() => query.data.value)
-  const form = ref<MediaUploadSetting>(
-    cloneSetting(DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING),
-  ) as Ref<MediaUploadSetting>
-  const lastSyncedForm = ref<MediaUploadSetting>(
-    cloneSetting(DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING),
-  ) as Ref<MediaUploadSetting>
-  const validationError = ref('')
   const loading = computed(() => query.isLoading.value || query.isFetching.value)
   const saveMutation = useMutation({
     mutationFn: (draft: MediaUploadSetting) =>
       resolveApiData(updateAdminMediaUploadSetting(draft), '保存上传设置失败'),
-    onSuccess: async (savedSetting) => {
-      hydrate(savedSetting)
-      writeMediaUploadQueryCache(queryClient, savedSetting)
-      await queryClient.invalidateQueries({ queryKey: getGetAdminMediaUploadSettingQueryKey() })
-      if (query.data.value) hydrate(query.data.value)
-    },
   })
   const saving = computed(() => saveMutation.isPending.value)
-  const isDirty = computed(() => !isSameMediaUploadSetting(form.value, lastSyncedForm.value))
-
-  function hydrate(savedSetting: Partial<MediaUploadSetting> | null | undefined) {
-    const nextForm = normalizeMediaUploadSetting(savedSetting)
-    lastSyncedForm.value = cloneSetting(nextForm)
-    form.value = cloneSetting(nextForm)
-    validationError.value = ''
-  }
-
-  async function save(): Promise<boolean> {
-    const validationMessage = validateMediaUploadSetting(form.value)
-    if (validationMessage) {
-      validationError.value = validationMessage
-      options.feedback.validationFailed(validationMessage)
-      return false
-    }
-    try {
-      await saveMutation.mutateAsync(normalizeMediaUploadSetting(form.value))
-      options.feedback.saved()
-      return true
-    } catch (error) {
-      options.feedback.saveFailed(error)
-      return false
-    }
-  }
-
-  function reset() {
-    form.value = cloneSetting(lastSyncedForm.value)
-    validationError.value = ''
-  }
-
-  watch(form, () => (validationError.value = ''), { deep: true, flush: 'sync' })
-  watch(
-    () => query.error.value,
-    (error) => {
-      if (error) options.feedback.loadFailed(error)
+  const lifecycle = useAdminSystemSettingsLifecycle({
+    defaultValue: DEFAULT_ADMIN_MEDIA_UPLOAD_SETTING,
+    source: setting,
+    loadError: query.error,
+    loading,
+    saving,
+    normalize: normalizeMediaUploadSetting,
+    isSame: isSameMediaUploadSetting,
+    validate: validateMediaUploadSetting,
+    save: (draft) => saveMutation.mutateAsync(draft),
+    synchronizeCache: async (savedSetting) => {
+      writeMediaUploadQueryCache(queryClient, savedSetting)
+      await queryClient.invalidateQueries({ queryKey: getGetAdminMediaUploadSettingQueryKey() })
     },
-  )
-  watch(
-    setting,
-    (savedSetting) => {
-      if (!savedSetting || saving.value || isDirty.value) return
-      hydrate(savedSetting)
-    },
-    { immediate: true },
-  )
+    feedback: options.feedback,
+  })
 
   return {
-    form,
-    isDirty,
-    loading,
-    reset,
-    save,
-    saving,
-    validationError,
+    form: lifecycle.form,
+    isDirty: lifecycle.isDirty,
+    loading: lifecycle.loading,
+    reset: lifecycle.reset,
+    save: lifecycle.save,
+    saving: lifecycle.saving,
+    validationError: lifecycle.validationError,
   }
 }
 
@@ -146,8 +103,4 @@ function writeMediaUploadQueryCache(queryClient: QueryClient, setting: MediaUplo
     msg: 'ok',
     data: setting,
   })
-}
-
-function cloneSetting(setting: MediaUploadSetting): MediaUploadSetting {
-  return structuredClone(toRaw(setting))
 }

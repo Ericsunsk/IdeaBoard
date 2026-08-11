@@ -1,13 +1,16 @@
 import { createRouter, createMemoryHistory } from 'vue-router'
 import type { Router, RouteRecordRaw } from 'vue-router'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { computed, defineComponent, h } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '../../../test/render'
 import { useUserStore } from '../../auth/session/authSession'
 import type { User } from '../../../shared/api/userSession'
 import {
-  closeAccountManagementDialog,
-  openAccountManagementDialog,
-} from '../useAccountManagementDialogController'
+  createAccountManagementOverlay,
+  provideAccountManagementOverlay,
+  type AccountManagementOverlay,
+} from '../accountManagementOverlay'
 import AccountManagementDialogHost from './AccountManagementDialogHost.vue'
 
 const routes: RouteRecordRaw[] = [
@@ -45,8 +48,26 @@ async function renderHost(
   await router.isReady()
   const store = useUserStore()
   if (authenticated) store.setAuth(makeUser())
+  let overlay: AccountManagementOverlay | undefined
+  const HostHarness = defineComponent({
+    setup() {
+      const currentRoute = useRoute()
+      const currentRouter = useRouter()
+      overlay = createAccountManagementOverlay({
+        currentUser: computed(() => store.user),
+        reportError: vi.fn(),
+        navigation: {
+          replace: (location) => currentRouter.replace(location),
+          resolve: (location) => currentRouter.resolve(location),
+        },
+        route: currentRoute,
+      })
+      provideAccountManagementOverlay(overlay)
+      return () => h(AccountManagementDialogHost)
+    },
+  })
 
-  const view = render(AccountManagementDialogHost, {
+  const view = render(HostHarness, {
     global: {
       plugins: [router],
       stubs: {
@@ -76,30 +97,28 @@ async function renderHost(
     },
   })
 
-  return { router, store, ...view }
+  if (!overlay) throw new Error('Account Management overlay was not installed')
+  return { overlay, router, store, ...view }
 }
 
 describe('AccountManagementDialogHost', () => {
   beforeEach(() => {
-    closeAccountManagementDialog()
     useUserStore().clearAuth()
     localStorage.clear()
   })
 
   it('shows the global dialog on authenticated user surfaces', async () => {
-    openAccountManagementDialog()
+    const { overlay } = await renderHost()
+    overlay.commands.open()
 
-    await renderHost()
-
-    expect(screen.getByRole('dialog', { name: '账户管理' })).toBeVisible()
+    expect(await screen.findByRole('dialog', { name: '账户管理' })).toBeVisible()
   })
 
   it('forwards the controller initial tab to the global dialog', async () => {
-    openAccountManagementDialog('billing')
+    const { overlay } = await renderHost()
+    overlay.commands.open('billing')
 
-    await renderHost()
-
-    expect(screen.getByRole('dialog', { name: '账户管理' })).toHaveAttribute(
+    expect(await screen.findByRole('dialog', { name: '账户管理' })).toHaveAttribute(
       'data-initial-tab',
       'billing',
     )
@@ -165,18 +184,17 @@ describe('AccountManagementDialogHost', () => {
   it.each([['/admin/users'], ['/user/login'], ['/user/register']])(
     'does not host the dialog on excluded route %s',
     async (path) => {
-      openAccountManagementDialog()
-
-      await renderHost(path)
+      const { overlay } = await renderHost(path)
+      overlay.commands.open()
 
       expect(screen.queryByRole('dialog', { name: '账户管理' })).not.toBeInTheDocument()
     },
   )
 
   it('does not host the dialog without a current user', async () => {
-    const { store } = await renderHost()
+    const { overlay, store } = await renderHost()
     store.clearAuth()
-    openAccountManagementDialog()
+    overlay.commands.open()
 
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: '账户管理' })).not.toBeInTheDocument()
@@ -184,9 +202,9 @@ describe('AccountManagementDialogHost', () => {
   })
 
   it('closes the dialog on route changes', async () => {
-    openAccountManagementDialog()
-    const { router } = await renderHost()
-    expect(screen.getByRole('dialog', { name: '账户管理' })).toBeVisible()
+    const { overlay, router } = await renderHost()
+    overlay.commands.open()
+    expect(await screen.findByRole('dialog', { name: '账户管理' })).toBeVisible()
 
     await router.push('/user/canvas?boardId=demo')
 
@@ -196,9 +214,9 @@ describe('AccountManagementDialogHost', () => {
   })
 
   it('closes the dialog when the current user becomes unavailable', async () => {
-    openAccountManagementDialog()
-    const { store } = await renderHost()
-    expect(screen.getByRole('dialog', { name: '账户管理' })).toBeVisible()
+    const { overlay, store } = await renderHost()
+    overlay.commands.open()
+    expect(await screen.findByRole('dialog', { name: '账户管理' })).toBeVisible()
 
     store.clearAuth()
 
