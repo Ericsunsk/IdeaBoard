@@ -24,70 +24,112 @@ type UseCanvasHandleProximityOptions = {
   enabled: MaybeRef<boolean>
 }
 
-const COORDINATOR_KEY: InjectionKey<CanvasHandleProximityCoordinator> = Symbol(
+type CanvasHandleProximitySurface = {
+  coordinator: CanvasHandleProximityCoordinator
+  requestRefresh: () => void
+}
+
+const COORDINATOR_KEY: InjectionKey<CanvasHandleProximitySurface> = Symbol(
   'canvas:handle-proximity-coordinator',
 )
 
 function installPointerAdapter(coordinator: CanvasHandleProximityCoordinator) {
-  if (typeof window === 'undefined') return () => undefined
+  if (typeof window === 'undefined') {
+    return {
+      dispose: () => undefined,
+      requestRefresh: coordinator.refresh,
+    }
+  }
 
   let evaluationFrame: number | null = null
   let pendingPointer: CanvasHandleProximityPoint | null = null
+  let hasPendingPointer = false
+  let isRefreshPending = false
 
-  function evaluatePendingPointer() {
+  function evaluatePendingState() {
     evaluationFrame = null
-    coordinator.movePointer(pendingPointer)
+    const shouldMovePointer = hasPendingPointer
+    const pointer = pendingPointer
+    const shouldRefresh = isRefreshPending
+    hasPendingPointer = false
+    isRefreshPending = false
+
+    if (shouldMovePointer) {
+      coordinator.movePointer(pointer)
+    } else if (shouldRefresh) {
+      coordinator.refresh()
+    }
   }
 
-  function schedule(pointer: CanvasHandleProximityPoint | null) {
-    pendingPointer = pointer
+  function scheduleEvaluation() {
     if (evaluationFrame !== null) return
-    evaluationFrame = window.requestAnimationFrame(evaluatePendingPointer)
+    evaluationFrame = window.requestAnimationFrame(evaluatePendingState)
+  }
+
+  function schedulePointer(pointer: CanvasHandleProximityPoint | null) {
+    pendingPointer = pointer
+    hasPendingPointer = true
+    scheduleEvaluation()
+  }
+
+  function requestRefresh() {
+    isRefreshPending = true
+    scheduleEvaluation()
   }
 
   function onPointerMove(event: PointerEvent) {
-    schedule(event.pointerType === 'touch' ? null : { x: event.clientX, y: event.clientY })
+    schedulePointer(event.pointerType === 'touch' ? null : { x: event.clientX, y: event.clientY })
   }
 
   function onPointerLeave() {
-    schedule(null)
+    schedulePointer(null)
   }
 
   window.addEventListener('pointermove', onPointerMove, true)
   window.addEventListener('pointerleave', onPointerLeave, true)
   window.addEventListener('blur', onPointerLeave)
 
-  return () => {
-    window.removeEventListener('pointermove', onPointerMove, true)
-    window.removeEventListener('pointerleave', onPointerLeave, true)
-    window.removeEventListener('blur', onPointerLeave)
-    if (evaluationFrame !== null) window.cancelAnimationFrame(evaluationFrame)
-    evaluationFrame = null
-    pendingPointer = null
-    coordinator.clear()
+  return {
+    requestRefresh,
+    dispose: () => {
+      window.removeEventListener('pointermove', onPointerMove, true)
+      window.removeEventListener('pointerleave', onPointerLeave, true)
+      window.removeEventListener('blur', onPointerLeave)
+      if (evaluationFrame !== null) window.cancelAnimationFrame(evaluationFrame)
+      evaluationFrame = null
+      pendingPointer = null
+      hasPendingPointer = false
+      isRefreshPending = false
+      coordinator.clear()
+    },
   }
 }
 
 export function provideCanvasHandleProximityCoordinator(
   coordinator = createCanvasHandleProximityCoordinator(),
 ) {
-  const disposePointerAdapter = installPointerAdapter(coordinator)
-  provide(COORDINATOR_KEY, coordinator)
-  onScopeDispose(disposePointerAdapter)
-  return coordinator
+  const pointerAdapter = installPointerAdapter(coordinator)
+  provide(COORDINATOR_KEY, {
+    coordinator,
+    requestRefresh: pointerAdapter.requestRefresh,
+  })
+  onScopeDispose(pointerAdapter.dispose)
+  return {
+    requestRefresh: pointerAdapter.requestRefresh,
+    setSuspended: coordinator.setSuspended,
+  }
 }
 
 export function useCanvasHandleProximity(options: UseCanvasHandleProximityOptions) {
-  const coordinator = inject(COORDINATOR_KEY)
-  if (!coordinator) {
+  const surface = inject(COORDINATOR_KEY)
+  if (!surface) {
     throw new Error('Canvas handle proximity requires a Canvas surface coordinator')
   }
+  const { coordinator } = surface
 
   const isActive = ref(false)
-  const isReturning = ref(false)
   const point = ref<CanvasHandleProximityPoint>({ x: 0, y: 0 })
   let unregister: (() => void) | null = null
-  let isUnmounting = false
 
   onMounted(() => {
     unregister = coordinator.register({
@@ -95,9 +137,7 @@ export function useCanvasHandleProximity(options: UseCanvasHandleProximityOption
       getAnchorRect: options.getAnchorRect,
       isEnabled: () => unref(options.enabled),
       onStateChange: (state) => {
-        if (isUnmounting) return
         isActive.value = state.isActive
-        isReturning.value = state.isReturning
         point.value = state.point
       },
     })
@@ -105,23 +145,17 @@ export function useCanvasHandleProximity(options: UseCanvasHandleProximityOption
 
   watch(
     () => unref(options.enabled),
-    () => coordinator.refresh(),
+    () => surface.requestRefresh(),
     { flush: 'sync' },
   )
 
   onBeforeUnmount(() => {
-    isUnmounting = true
     unregister?.()
     unregister = null
-    isActive.value = false
-    isReturning.value = false
-    point.value = { x: 0, y: 0 }
   })
 
   return {
     isActive,
-    isReturning,
     point,
-    refreshCoordinator: coordinator.refresh,
   }
 }

@@ -119,7 +119,6 @@ const VueFlowStub = defineComponent({
     'nodes-change',
     'pane-click',
     'pane-context-menu',
-    'connect-end',
     'node-drag-start',
     'node-drag-stop',
   ],
@@ -135,7 +134,6 @@ const VueFlowStub = defineComponent({
           '删除节点',
         ),
         h('button', { type: 'button', onClick: () => emit('pane-click') }, '点击画布'),
-        h('button', { type: 'button', onClick: () => emit('connect-end') }, '完成连接'),
         h(
           'button',
           {
@@ -164,20 +162,17 @@ const GroupStub = defineComponent({
 })
 
 const NodeStub = defineComponent({
-  props: { handleVisibilityRefreshToken: { type: Number, required: true } },
-  emits: ['node-intent', 'node-mousedown', 'request-internals-update'],
-  setup(props, { emit }) {
+  emits: ['node-intent', 'node-mousedown'],
+  setup(_, { emit }) {
     return () =>
       h(
         'button',
         {
           type: 'button',
           'data-testid': 'node-region',
-          'data-handle-refresh-token': String(props.handleVisibilityRefreshToken),
           onClick: () => {
             emit('node-intent', { type: 'delete-requested', nodeId: 'node-a' })
             emit('node-mousedown', 'node-a', new MouseEvent('mousedown'))
-            emit('request-internals-update', 'node-a')
           },
         },
         '触发节点交互',
@@ -354,7 +349,6 @@ function createRuntime() {
             groupDrag: vi.fn(),
             groupResize: vi.fn(),
           },
-          scheduleFlowNodeInternalsRefresh: vi.fn(),
           createNodeAtPosition: vi.fn(),
           onExportSelectedImages,
           onFlowMediaInputImageDrop: vi.fn(),
@@ -448,7 +442,6 @@ describe('CanvasScreen', () => {
     expect(view.getByTestId('chrome-region')).toBeInTheDocument()
     expect(view.getByTestId('flow-region')).toBeInTheDocument()
     expect(view.getByTestId('node-region')).toBeInTheDocument()
-    expect(view.getByTestId('node-region')).toHaveAttribute('data-handle-refresh-token', '0')
     expect(view.getByTestId('group-region')).toBeInTheDocument()
     expect(view.getByTestId('minimap-region')).toBeInTheDocument()
     expect(view.getByTestId('image-tool-presentation')).toBeInTheDocument()
@@ -459,10 +452,6 @@ describe('CanvasScreen', () => {
     view.getByRole('button', { name: '缩小画布' }).click()
     view.getByRole('button', { name: '点击画布' }).click()
     view.getByRole('button', { name: '居中小地图' }).click()
-    view.getByRole('button', { name: '完成连接' }).click()
-    await vi.waitFor(() =>
-      expect(view.getByTestId('node-region')).toHaveAttribute('data-handle-refresh-token', '1'),
-    )
     view.getByRole('button', { name: '打开节点菜单' }).click()
     await vi.waitFor(() => expect(view.getByTestId('node-context-menu')).toBeInTheDocument())
     view.getByRole('button', { name: '创建提示词节点' }).click()
@@ -479,9 +468,6 @@ describe('CanvasScreen', () => {
     await vi.waitFor(() => expect(view.queryByTestId('node-context-menu')).not.toBeInTheDocument())
     view.getByRole('button', { name: '开始拖动节点' }).click()
     view.getByRole('button', { name: '结束拖动节点' }).click()
-    await vi.waitFor(() =>
-      expect(view.getByTestId('node-region')).toHaveAttribute('data-handle-refresh-token', '2'),
-    )
     mocks.groupOptions!.grouping.onAction()
 
     expect(harness.onExportSelectedImages).toHaveBeenCalledTimes(1)
@@ -492,9 +478,6 @@ describe('CanvasScreen', () => {
     expect(harness.handlePaneClick).toHaveBeenCalledTimes(1)
     expect(harness.onFlowDeleteNode).toHaveBeenCalledWith('node-a')
     expect(mocks.onFlowNodeMouseDown).toHaveBeenCalledWith('node-a', expect.any(MouseEvent))
-    expect(
-      harness.runtime.commands.graphEditing.scheduleFlowNodeInternalsRefresh,
-    ).toHaveBeenCalledWith(['node-a'])
     expect(harness.runtime.commands.viewportControls.onMiniMapCenterRequested).toHaveBeenCalledWith(
       {
         position: { x: 10, y: 20 },

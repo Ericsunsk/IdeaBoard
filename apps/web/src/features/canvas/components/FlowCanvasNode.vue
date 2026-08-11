@@ -33,11 +33,11 @@
       >
         <template #handle-rail>
           <FlowCanvasNodeHandleRail
+            :node-id="props.nodeId"
             :kind="data.kind"
             :interaction-root="flowCanvasNodeRef"
-            :visibility-refresh-token="props.handleVisibilityRefreshToken"
+            :dragging="props.dragging"
             :disabled="disableHandleRailInteraction"
-            @request-internals-update="requestNodeInternalsUpdate"
           />
         </template>
       </PromptNode>
@@ -86,11 +86,11 @@
         >
           <template #handle-rail>
             <FlowCanvasNodeHandleRail
+              :node-id="props.nodeId"
               :kind="data.kind"
               :interaction-root="flowCanvasNodeRef"
-              :visibility-refresh-token="props.handleVisibilityRefreshToken"
+              :dragging="props.dragging"
               :disabled="disableHandleRailInteraction"
-              @request-internals-update="requestNodeInternalsUpdate"
             />
           </template>
         </ImageNode>
@@ -125,11 +125,11 @@
         >
           <template #handle-rail>
             <FlowCanvasNodeHandleRail
+              :node-id="props.nodeId"
               :kind="data.kind"
               :interaction-root="flowCanvasNodeRef"
-              :visibility-refresh-token="props.handleVisibilityRefreshToken"
+              :dragging="props.dragging"
               :disabled="disableHandleRailInteraction"
-              @request-internals-update="requestNodeInternalsUpdate"
             />
           </template>
         </FusionNode>
@@ -179,7 +179,6 @@ const props = withDefaults(
     expandModeActive?: boolean
     expandOverlayStyle?: Record<string, string> | null
     expandHandleRadius?: number
-    handleVisibilityRefreshToken?: number
   }>(),
   {
     selected: false,
@@ -193,14 +192,12 @@ const props = withDefaults(
     expandModeActive: false,
     expandOverlayStyle: null,
     expandHandleRadius: 4,
-    handleVisibilityRefreshToken: 0,
   },
 )
 
 const emit = defineEmits<{
   (e: 'node-intent', intent: CanvasNodePresentationIntent): void
   (e: 'node-mousedown', nodeId: string, event: MouseEvent): void
-  (e: 'request-internals-update', nodeId: string): void
 }>()
 
 const showDefaultDragZone = false
@@ -232,10 +229,6 @@ const {
   expandModeActive: () => !!props.expandModeActive,
   isImageEditorActive: () => isImageEditorActive.value,
 })
-
-function requestNodeInternalsUpdate() {
-  emit('request-internals-update', props.nodeId)
-}
 
 function onPromptTextEdited(text: string) {
   emit('node-intent', { type: 'text-edited', nodeId: props.nodeId, text })

@@ -21,7 +21,6 @@ export function createCanvasScreenNodePresentation(options: {
   activePanels: ActivePanels
   imageStages: ImageStages
   duplicateModifierPressed: Ref<boolean>
-  handleVisibilityRefreshToken: Ref<number>
   nodeInteractions: ReturnType<
     CanvasWorkspaceRuntime['commands']['graphEditing']['createNodeInteractions']
   >
@@ -82,10 +81,6 @@ export function createCanvasScreenNodePresentation(options: {
     },
   })
 
-  function onFlowNodeInternalsUpdate(nodeId: string) {
-    commands.graphEditing.scheduleFlowNodeInternalsRefresh([nodeId])
-  }
-
   function nodePropsFor(node: NodeProps<FlowNodeData>) {
     const canvasExtend = viewModel.imageWorkflow.canvasExtend
     const isExpandModeActive = canvasExtend.nodeId.value === node.id
@@ -105,14 +100,12 @@ export function createCanvasScreenNodePresentation(options: {
       expandModeActive: isExpandModeActive,
       expandOverlayStyle: isExpandModeActive ? canvasExtend.overlayStyle.value : null,
       expandHandleRadius: canvasExtend.handleRadius,
-      handleVisibilityRefreshToken: options.handleVisibilityRefreshToken.value,
     }
   }
 
   return {
     nodePresentationIntentRouter,
     nodePropsFor,
-    onFlowNodeInternalsUpdate,
     isCanvasShortcutSuppressed,
   }
 }

@@ -42,7 +42,6 @@
         v-bind="vueFlowProps"
         @nodes-change="onNodesChange"
         @edges-change="vueFlowSelectionBindings.onEdgesChange"
-        @connect-end="onFlowConnectEnd"
         @move-start="onFlowMoveStart"
         @move="onFlowMove"
         @move-end="onFlowMoveEnd"
@@ -66,7 +65,6 @@
             v-bind="nodePropsFor(nodeProps)"
             @node-intent="nodePresentationIntentRouter.dispatch"
             @node-mousedown="onFlowNodeMouseDown"
-            @request-internals-update="onFlowNodeInternalsUpdate"
           />
         </template>
         <CanvasChromeMiniMap
@@ -90,11 +88,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { uploadApi } from '../../../shared/api/upload'
 import { USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
-import { PanOnScrollMode, VueFlow } from '@vue-flow/core'
+import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import { useFlowImagePreviewLightbox } from '../composables/useFlowImagePreviewLightbox'
@@ -140,7 +138,13 @@ function openRecharge() {
 }
 
 const flowPaneAdapter = useVueFlowPaneAdapter()
-provideCanvasHandleProximityCoordinator()
+const { connectionStartHandle } = useVueFlow()
+const handleProximitySurface = provideCanvasHandleProximityCoordinator()
+watch(
+  connectionStartHandle,
+  (handle) => handleProximitySurface.setSuspended(handle !== null),
+  { immediate: true, flush: 'sync' },
+)
 
 const canvasWrapRef = ref<HTMLElement | null>(null)
 const activeTool = ref<'select' | 'hand'>('select')
@@ -230,6 +234,7 @@ const {
   onMiniMapDragEnd,
 } = commands.viewportControls
 provideCanvasViewportContext({ zoomLevel })
+watch(zoomLevel, handleProximitySurface.requestRefresh, { flush: 'post' })
 
 const imageTools = {
   viewModel: viewModel.imageWorkflow.tools,
@@ -259,7 +264,6 @@ const {
   onFlowNodeClick,
   onDeleteInlineSelection,
   onNodeDragStop,
-  onFlowConnectEnd,
   onFlowMove,
   onNodesChange,
   handleNodeContextMenuCreate,
@@ -282,13 +286,11 @@ const nodePresentation = createCanvasScreenNodePresentation({
   activePanels: imageToolUi.activePanels,
   imageStages: imageToolUi.imageStages,
   duplicateModifierPressed,
-  handleVisibilityRefreshToken: surface.flowHandleVisibilityRefreshToken,
   nodeInteractions: surface.nodeInteractions,
 })
 const {
   nodePresentationIntentRouter,
   nodePropsFor,
-  onFlowNodeInternalsUpdate,
   isCanvasShortcutSuppressed,
 } = nodePresentation
 const onCanvasDrop = commands.graphEditing.onCanvasDrop

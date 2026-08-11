@@ -117,7 +117,6 @@ export type CanvasWorkspaceRuntimeCommands = {
     loadCanvasBoardAndProbe: () => Promise<void>
   }
   graphEditing: {
-    scheduleFlowNodeInternalsRefresh: (nodeIds: string[]) => void
     createNodeAtPosition: <T extends CanvasCreatableNodeKind>(
       kind: T,
       x: number,

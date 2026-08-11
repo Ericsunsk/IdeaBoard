@@ -71,7 +71,6 @@ export function createCanvasWorkspaceGraphRuntime(
     },
     commands: {
       grouping: board.graphEditing.grouping.commands,
-      scheduleFlowNodeInternalsRefresh: editing.commands.scheduleNodeInternalsRefresh,
       createNodeAtPosition: editing.commands.createNodeAtPosition,
       createNodeInteractions: editing.commands.createNodeInteractions,
       onExportSelectedImages: interactions.commands.exportSelectedImages,

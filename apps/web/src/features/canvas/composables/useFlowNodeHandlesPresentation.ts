@@ -1,11 +1,10 @@
 import {
   computed,
   shallowRef,
-  watch,
   type ComponentPublicInstance,
   type CSSProperties,
 } from 'vue'
-import { Position, useVueFlow } from '@vue-flow/core'
+import { Position } from '@vue-flow/core'
 import {
   getCanvasNodeVisibleInputPorts,
   getCanvasNodeVisibleOutputPorts,
@@ -34,17 +33,14 @@ type FlowNodeAggregateHandlePresentation = {
   position: Position
   connectable: boolean
   visible: boolean
-  connectionDragging: boolean
   proximityActive: boolean
-  returning: boolean
-  disabled: boolean
   style: CSSProperties
   ariaLabel: string
   title: string
   setElement: (value: FlowNodeHandleElement) => void
 }
 
-export type FlowNodeHandlesPresentation = {
+type FlowNodeHandlesPresentation = {
   anchors: FlowNodeAnchorHandlePresentation[]
   aggregates: FlowNodeAggregateHandlePresentation[]
 }
@@ -137,7 +133,6 @@ function useHandleDirectionPresentation(
   options: UseFlowNodeHandlesPresentationOptions,
   localScale: () => number,
   nodeKindLabel: () => string,
-  isConnectionDragging: () => boolean,
 ) {
   const policy = HANDLE_DIRECTION_POLICIES[direction]
   const element = shallowRef<FlowNodeHandleElement>(null)
@@ -147,16 +142,10 @@ function useHandleDirectionPresentation(
   const proximity = useCanvasHandleProximity({
     direction,
     getAnchorRect: () => resolveHandleElement(element.value)?.getBoundingClientRect() ?? null,
-    enabled: computed(
-      () => portIds.value.length > 0 && !options.disabled() && !isConnectionDragging(),
-    ),
+    enabled: computed(() => portIds.value.length > 0 && !options.disabled()),
   })
   const visible = computed(
-    () =>
-      !options.disabled() &&
-      (options.showHandles() ||
-        proximity.isActive.value ||
-        proximity.isReturning.value),
+    () => !options.disabled() && (options.showHandles() || proximity.isActive.value),
   )
   const setElement = (value: FlowNodeHandleElement) => {
     element.value = value
@@ -181,11 +170,8 @@ function useHandleDirectionPresentation(
       position: policy.position,
       connectable: !options.disabled(),
       visible: visible.value,
-      connectionDragging: isConnectionDragging(),
-      proximityActive: !isConnectionDragging() && proximity.isActive.value,
-      returning: !isConnectionDragging() && proximity.isReturning.value,
-      disabled: options.disabled(),
-      style: proximity.isActive.value && !isConnectionDragging()
+      proximityActive: proximity.isActive.value,
+      style: proximity.isActive.value
         ? createFollowStyle(policy.centeredStyle, proximity.point.value, localScale())
         : policy.centeredStyle,
       ariaLabel: `${nodeKindLabel()}${policy.ariaDirectionLabel}连接点，拖拽创建连接`,
@@ -197,49 +183,31 @@ function useHandleDirectionPresentation(
   return {
     aggregate,
     anchors,
-    portIds,
-    refreshCoordinator: proximity.refreshCoordinator,
   }
 }
 
 export function useFlowNodeHandlesPresentation(options: UseFlowNodeHandlesPresentationOptions) {
   const { zoomLevel } = useCanvasViewportContext()
-  const { connectionStartHandle } = useVueFlow()
   const localScale = computed(() => resolveCanvasNodeUiScale(zoomLevel.value))
   const nodeKindLabel = computed(() => getNodeKindLabel(options.kind()))
-  const isConnectionDragging = computed(() => connectionStartHandle.value !== null)
 
   const input = useHandleDirectionPresentation(
     'input',
     options,
     () => localScale.value,
     () => nodeKindLabel.value,
-    () => isConnectionDragging.value,
   )
   const output = useHandleDirectionPresentation(
     'output',
     options,
     () => localScale.value,
     () => nodeKindLabel.value,
-    () => isConnectionDragging.value,
   )
 
-  watch(
-    zoomLevel,
-    input.refreshCoordinator,
-    { flush: 'post' },
-  )
-
-  const presentation = computed<FlowNodeHandlesPresentation>(() => ({
+  return computed<FlowNodeHandlesPresentation>(() => ({
     anchors: [...input.anchors.value, ...output.anchors.value],
     aggregates: [input.aggregate.value, output.aggregate.value].filter(
       (aggregate): aggregate is FlowNodeAggregateHandlePresentation => aggregate !== null,
     ),
   }))
-  // Vue Flow internals refresh only when the rendered Handle identity set changes.
-  const handleLayoutIdentity = computed(
-    () => `${options.kind()}|${input.portIds.value.join(',')}|${output.portIds.value.join(',')}`,
-  )
-
-  return { handleLayoutIdentity, presentation }
 }

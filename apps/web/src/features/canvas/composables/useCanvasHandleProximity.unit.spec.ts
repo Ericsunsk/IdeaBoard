@@ -5,6 +5,7 @@ import {
   provideCanvasHandleProximityCoordinator,
   useCanvasHandleProximity,
 } from './useCanvasHandleProximity'
+import { createCanvasHandleProximityCoordinator } from './canvasHandleProximityCoordinator'
 
 function createAnchor(left = 100, top = 100) {
   const anchor = document.createElement('div')
@@ -27,8 +28,10 @@ function mountProximity(
   anchor: HTMLElement,
   direction: 'input' | 'output' = 'output',
   enabled = ref(true),
+  coordinator = createCanvasHandleProximityCoordinator(),
 ) {
   let proximity!: ReturnType<typeof useCanvasHandleProximity>
+  let surface!: ReturnType<typeof provideCanvasHandleProximityCoordinator>
   const host = document.createElement('div')
   document.body.append(host)
   const Consumer = defineComponent({
@@ -43,7 +46,7 @@ function mountProximity(
   })
   const Provider = defineComponent({
     setup() {
-      provideCanvasHandleProximityCoordinator()
+      surface = provideCanvasHandleProximityCoordinator(coordinator)
       return () => h(Consumer)
     },
   })
@@ -53,6 +56,7 @@ function mountProximity(
   return {
     enabled,
     proximity,
+    surface,
     unmount: () => {
       app.unmount()
       host.remove()
@@ -74,7 +78,12 @@ describe('useCanvasHandleProximity', () => {
 
   function movePointer(clientX: number, clientY: number, pointerType = 'mouse') {
     window.dispatchEvent(new PointerEvent('pointermove', { clientX, clientY, pointerType }))
+    flushFrame()
+  }
+
+  function flushFrame() {
     const pendingFrame = frameCallback as FrameRequestCallback | null
+    frameCallback = null
     pendingFrame?.(0)
   }
 
@@ -116,28 +125,25 @@ describe('useCanvasHandleProximity', () => {
     harness.unmount()
   })
 
-  it('keeps the handle in a short return state after leaving the sector', () => {
-    vi.useFakeTimers()
+  it('coalesces repeated surface refresh requests into one frame', () => {
     frameCallback = null
-    vi.stubGlobal(
-      'requestAnimationFrame',
-      vi.fn((callback: FrameRequestCallback) => {
-        frameCallback = callback
-        return 1
-      }),
-    )
+    const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+      frameCallback = callback
+      return 1
+    })
+    vi.stubGlobal('requestAnimationFrame', requestAnimationFrame)
     vi.stubGlobal('cancelAnimationFrame', vi.fn())
-    const harness = mountProximity(createAnchor())
+    const coordinator = createCanvasHandleProximityCoordinator()
+    const refresh = vi.spyOn(coordinator, 'refresh')
+    const harness = mountProximity(createAnchor(), 'output', ref(true), coordinator)
 
-    movePointer(130, 100)
-    movePointer(200, 100)
+    harness.surface.requestRefresh()
+    harness.surface.requestRefresh()
+    harness.surface.requestRefresh()
 
-    expect(harness.proximity.isActive.value).toBe(false)
-    expect(harness.proximity.isReturning.value).toBe(true)
-    vi.advanceTimersByTime(160)
-    expect(harness.proximity.isReturning.value).toBe(true)
-    vi.advanceTimersByTime(20)
-    expect(harness.proximity.isReturning.value).toBe(false)
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(1)
+    flushFrame()
+    expect(refresh).toHaveBeenCalledTimes(1)
 
     harness.unmount()
   })
@@ -156,8 +162,30 @@ describe('useCanvasHandleProximity', () => {
 
     movePointer(130, 100)
     harness.enabled.value = false
+    flushFrame()
 
     expect(harness.proximity.isActive.value).toBe(false)
+    harness.unmount()
+  })
+
+  it('exposes one surface suspension control for all registrations', () => {
+    frameCallback = null
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((callback: FrameRequestCallback) => {
+        frameCallback = callback
+        return 1
+      }),
+    )
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+    const harness = mountProximity(createAnchor())
+
+    movePointer(130, 100)
+    harness.surface.setSuspended(true)
+    expect(harness.proximity.isActive.value).toBe(false)
+
+    harness.surface.setSuspended(false)
+    expect(harness.proximity.isActive.value).toBe(true)
     harness.unmount()
   })
 
@@ -197,8 +225,7 @@ describe('useCanvasHandleProximity', () => {
     window.dispatchEvent(
       new PointerEvent('pointermove', { clientX: 135, clientY: 105, pointerType: 'pen' }),
     )
-    const pendingFrame = frameCallback as FrameRequestCallback | null
-    pendingFrame?.(0)
+    flushFrame()
 
     expect(harness.proximity.point.value).toEqual({ x: 34.5, y: 4.5 })
     harness.unmount()

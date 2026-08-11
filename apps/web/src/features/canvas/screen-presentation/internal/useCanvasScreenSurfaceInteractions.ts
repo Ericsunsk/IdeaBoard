@@ -1,4 +1,4 @@
-import { computed, ref, type Ref } from 'vue'
+import { computed, type Ref } from 'vue'
 import type { NodeChange, NodeMouseEvent } from '@vue-flow/core'
 import type { CanvasCreatableNodeKind } from '../../../canvas-board/domain'
 import { useFlowNodeDragInteractions } from '../../composables/useFlowNodeDragInteractions'
@@ -24,7 +24,6 @@ export function useCanvasScreenSurfaceInteractions(options: {
 }) {
   const { workspace, flowPaneAdapter } = options
   const { viewModel, commands } = workspace
-  const flowHandleVisibilityRefreshToken = ref(0)
   const contextMenu = useCanvasNodeContextMenu()
   const imageTools = {
     viewModel: viewModel.imageWorkflow.tools,
@@ -137,10 +136,6 @@ export function useCanvasScreenSurfaceInteractions(options: {
     },
   })
 
-  function refreshFlowHandleVisibility() {
-    flowHandleVisibilityRefreshToken.value += 1
-  }
-
   const dragInteractions = useFlowNodeDragInteractions({
     beginNodeDragTransaction: commands.flowPane.nodeDragTransactions.begin,
     commitNodeDragTransaction: commands.flowPane.nodeDragTransactions.commit,
@@ -166,12 +161,7 @@ export function useCanvasScreenSurfaceInteractions(options: {
       dragInteractions.onNodeDragStop()
     } finally {
       commands.viewportControls.onNodeDragStop()
-      refreshFlowHandleVisibility()
     }
-  }
-
-  function onFlowConnectEnd() {
-    refreshFlowHandleVisibility()
   }
 
   function onFlowMove(payload: Parameters<typeof commands.viewportControls.onFlowMove>[0]) {
@@ -223,7 +213,6 @@ export function useCanvasScreenSurfaceInteractions(options: {
   }
 
   return {
-    flowHandleVisibilityRefreshToken,
     nodeContextMenu: contextMenu.nodeContextMenu,
     canvasNodeMenuItems: contextMenu.canvasNodeMenuItems,
     nodeInteractions,
@@ -233,7 +222,6 @@ export function useCanvasScreenSurfaceInteractions(options: {
     onFlowNodeClick,
     onDeleteInlineSelection,
     onNodeDragStop,
-    onFlowConnectEnd,
     onFlowMove,
     onNodesChange,
     handleNodeContextMenuCreate,
