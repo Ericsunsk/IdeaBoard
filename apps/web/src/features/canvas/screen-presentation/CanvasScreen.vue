@@ -331,6 +331,7 @@ const vueFlowProps = computed(() => {
     deleteKeyCode:
       isCanvasLocked || isCanvasShortcutSuppressed.value ? null : ['Backspace', 'Delete'],
     edgesUpdatable: false,
+    connectOnClick: false,
     defaultEdgeOptions: { animated: false, updatable: false },
     applyDefault: false,
     minZoom: CANVAS_VIEWPORT_MIN_ZOOM,

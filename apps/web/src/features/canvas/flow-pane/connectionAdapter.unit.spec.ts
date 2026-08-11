@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createCanvasFlowPaneConnectionAdapter } from './index'
+import { normalizeFlowConnection } from '../utils/flowConnectionAdapter'
+import type { FlowNodeData } from '../types/flowTypes'
+
+function createLookup(nodes: Record<string, FlowNodeData>) {
+  return (nodeId: string) => nodes[nodeId]
+}
 
 describe('flow-pane connection public seam', () => {
   it('keeps Vue Flow bindings and programmatic intent behind one adapter', () => {
@@ -32,6 +38,52 @@ describe('flow-pane connection public seam', () => {
       target: 'image-2',
       sourceHandle: 'out:prompt',
       targetHandle: 'in:image',
+    })
+  })
+
+  it('normalizes the aggregate input handle to the compatible semantic port', () => {
+    const normalized = normalizeFlowConnection(
+      {
+        source: 'image-1',
+        target: 'fusion-2',
+        sourceHandle: 'out:image',
+        targetHandle: 'in:__auto',
+      },
+      createLookup({
+        'image-1': { kind: 'image', nodeType: 'image', title: 'Image' },
+        'fusion-2': { kind: 'fusion', nodeType: 'fusion', title: 'Fusion' },
+      }),
+    )
+
+    expect(normalized).toMatchObject({
+      sourceHandle: 'out:image',
+      targetHandle: 'in:image',
+    })
+  })
+
+  it('chooses the next compatible open port when an aggregate target is reused', () => {
+    const normalized = normalizeFlowConnection(
+      {
+        source: 'prompt-2',
+        target: 'fusion-1',
+        sourceHandle: 'out:prompt',
+        targetHandle: 'in:__auto',
+      },
+      createLookup({
+        'prompt-2': { kind: 'prompt', nodeType: 'prompt', title: 'Prompt' },
+        'fusion-1': { kind: 'fusion', nodeType: 'fusion', title: 'Fusion' },
+      }),
+      [
+        {
+          target: 'fusion-1',
+          targetHandle: 'in:image',
+        },
+      ],
+    )
+
+    expect(normalized).toMatchObject({
+      sourceHandle: 'out:prompt',
+      targetHandle: 'in:prompt',
     })
   })
 })

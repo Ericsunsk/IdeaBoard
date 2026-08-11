@@ -54,6 +54,7 @@ describe('Canvas Screen architecture contract', () => {
 
   it('keeps connection endpoints immutable in the Vue Flow surface', () => {
     expect(canvasScreen).toContain('edgesUpdatable: false')
+    expect(canvasScreen).toContain('connectOnClick: false')
     expect(canvasScreen).toContain('defaultEdgeOptions: { animated: false, updatable: false }')
   })
 })
