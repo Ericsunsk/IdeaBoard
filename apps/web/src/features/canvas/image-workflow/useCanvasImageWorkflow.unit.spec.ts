@@ -62,6 +62,7 @@ function createOptions() {
     clearSelectedFlowElements: vi.fn(),
     startCanvasInteraction: vi.fn(),
     stopCanvasInteraction: vi.fn(),
+    isCanvasInteractionLocked: ref(false),
     getMediaInputImages: vi.fn(() => [] as MediaInputImage[]),
     resolvePromptInputImageNodeIds: vi.fn(() => [] as string[]),
     updateSnapshotNodeParam: vi.fn(),
@@ -82,16 +83,12 @@ function createOptions() {
   const ui = {
     activeTool: ref('select'),
     canvasWrapRef: ref<HTMLElement | null>(null),
-    isCanvasInteractionLocked: ref(false),
     getImageStageElement: vi.fn(() => null),
     panels: {
       open: vi.fn(),
       clear: vi.fn(),
       isActive: vi.fn(() => false),
       getActiveNodeId: vi.fn(() => null),
-    },
-    selection: {
-      selectNodeForContextMenu: vi.fn(),
     },
   }
   const options = {
@@ -111,6 +108,7 @@ function createOptions() {
       getViewport: vi.fn(() => ({ x: 0, y: 0, zoom: 1 })),
       setViewport: vi.fn(),
       setCenter: vi.fn(),
+      selectOnlyNode: vi.fn(() => true),
     },
     openImageUrlPreview: vi.fn(),
     ui,
@@ -299,10 +297,13 @@ describe('useCanvasImageWorkflow', () => {
         nodes: graph.nodes,
         currentBoardId: graph.currentBoardId,
         connectionAdapter: graph.connectionAdapter,
+        isCanvasInteractionLocked: graph.isCanvasInteractionLocked,
         isGenerationAvailable: workflow.commands.isGenerationAvailable,
         feedback: feedback.imageTools,
       }),
     )
+    workflow.commands.interactions.onFlowImageContextMenu('image-1', new MouseEvent('contextmenu'))
+    expect(options.flowPaneAdapter.selectOnlyNode).toHaveBeenCalledWith('image-1')
     const imageToolOptions = mocks.useCanvasImageTools.mock.calls[0]?.[0]
     const patch = { key: 'outputCount', value: 2 } as const
 

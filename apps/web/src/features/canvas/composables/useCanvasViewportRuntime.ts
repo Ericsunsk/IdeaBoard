@@ -68,9 +68,6 @@ export type UseCanvasViewportRuntimeOptions = {
   closeBoardHeaderEditing: () => void
   startCanvasInteraction: (key: CanvasViewportRuntimeInteraction) => void
   stopCanvasInteraction: (key: CanvasViewportRuntimeInteraction) => void
-  startNodeDragInteraction: () => void
-  stopNodeDragInteraction: () => void
-  refreshFlowHandleVisibility: () => void
   viewportPersistence?: CanvasViewportPersistence
 }
 
@@ -409,28 +406,15 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
     activeNodeDragFrameProbe = beginCanvasFrameProbe('node-drag', () =>
       getCanvasFrameProbeMetadata(),
     )
-    try {
-      options.startNodeDragInteraction()
-    } catch (error) {
-      activeNodeDragFrameProbe?.cleanup()
-      activeNodeDragFrameProbe = null
-      options.stopCanvasInteraction('node-drag')
-      throw error
-    }
   }
 
   function onNodeDragStop() {
-    try {
-      options.stopNodeDragInteraction()
-    } finally {
-      activeNodeDragFrameProbe?.end(() => ({
-        ...getCanvasFrameProbeMetadata(),
-        reason: 'node-drag-stop',
-      }))
-      activeNodeDragFrameProbe = null
-      options.stopCanvasInteraction('node-drag')
-      options.refreshFlowHandleVisibility()
-    }
+    activeNodeDragFrameProbe?.end(() => ({
+      ...getCanvasFrameProbeMetadata(),
+      reason: 'node-drag-stop',
+    }))
+    activeNodeDragFrameProbe = null
+    options.stopCanvasInteraction('node-drag')
   }
 
   function cleanupFrameProbes() {

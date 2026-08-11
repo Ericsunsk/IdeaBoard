@@ -27,8 +27,6 @@ import {
   type PromptGenerationIntentOptions,
 } from './promptGenerationIntent'
 
-type ValueRef<T> = { readonly value: T }
-
 type CanvasImageWorkflowExecutionPort = Pick<
   ImageWorkflowExecution,
   | 'runImageInpaintAction'
@@ -55,6 +53,7 @@ type CanvasImageWorkflowGraphPort = Pick<
   | 'clearSelectedFlowElements'
   | 'startCanvasInteraction'
   | 'stopCanvasInteraction'
+  | 'isCanvasInteractionLocked'
 > & {
   getMediaInputImages: PromptGenerationIntentOptions['getMediaInputImages']
   resolvePromptInputImageNodeIds: PromptGenerationIntentOptions['resolvePromptInputImageNodeIds']
@@ -65,16 +64,12 @@ type CanvasImageWorkflowGraphPort = Pick<
 export type CanvasImageWorkflowUiAdapter = {
   activeTool: Ref<string>
   canvasWrapRef: Ref<HTMLElement | null>
-  isCanvasInteractionLocked: ValueRef<boolean>
   getImageStageElement: (nodeId: string) => HTMLElement | null
   panels: {
     open: (panel: ActiveNodePanel) => void
     clear: () => void
     isActive: (kind: ActiveNodePanelKind, nodeId: string) => boolean
     getActiveNodeId: (kind: ActiveNodePanelKind) => string | null
-  }
-  selection: {
-    selectNodeForContextMenu: (nodeId: string) => void
   }
 }
 
@@ -188,7 +183,7 @@ export function useCanvasImageWorkflow(
     nodes: graph.nodes,
     activeTool: ui.activeTool,
     canvasWrapRef: ui.canvasWrapRef,
-    isCanvasInteractionLocked: ui.isCanvasInteractionLocked,
+    isCanvasInteractionLocked: graph.isCanvasInteractionLocked,
     currentBoardId: graph.currentBoardId,
     getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
     getImageNodeSnapshot: graph.getImageNodeSnapshot,
@@ -233,7 +228,7 @@ export function useCanvasImageWorkflow(
     openActiveNodePanel: ui.panels.open,
     clearActiveNodePanel: ui.panels.clear,
     hideStrengthControl: strengthControl.hideStrengthControl,
-    selectFlowNodeForContextMenu: ui.selection.selectNodeForContextMenu,
+    selectFlowNodeForContextMenu: options.flowPaneAdapter.selectOnlyNode,
     cancelFlowExpandMode: canvasExtend.cancelExpandMode,
     cancelFlowMaskEditorMode: imageTools.commands.lifecycle.cancel,
     enterFlowExpandMode: canvasExtend.enterExpandMode,

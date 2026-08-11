@@ -17,6 +17,11 @@ function renderImageStage(toolActive: boolean) {
     global: {
       stubs: {
         ImageToolStagePresentation: { template: '<div><slot /></div>' },
+        NodeStageFrame: {
+          props: ['transparent'],
+          template:
+            '<div data-testid="node-stage-frame" :data-transparent="String(transparent)"><slot /></div>',
+        },
       },
     },
   })
@@ -50,13 +55,15 @@ describe('ImageNodeStage image tool presentation', () => {
   it('keeps the stage transparent and hides stage actions only while the tool binding is active', () => {
     const activeTool = renderImageStage(true)
     const noTool = renderImageStage(false)
-    const activeFrame = activeTool.container.querySelector('.node-stage-frame')
-    const inactiveFrame = noTool.container.querySelector('.node-stage-frame')
-
-    expect(activeFrame).toHaveClass('image-node-stage', 'is-image-editor-active', 'is-transparent')
+    expect(activeTool.container.querySelector('[data-testid="node-stage-frame"]')).toHaveAttribute(
+      'data-transparent',
+      'true',
+    )
     expect(activeTool.container.querySelector('.image-node-stage-actions')).toBeTruthy()
-    expect(inactiveFrame).toHaveClass('image-node-stage')
-    expect(inactiveFrame).not.toHaveClass('is-image-editor-active', 'is-transparent')
+    expect(noTool.container.querySelector('[data-testid="node-stage-frame"]')).toHaveAttribute(
+      'data-transparent',
+      'false',
+    )
     expect(noTool.container.querySelector('.image-node-stage-actions')).toBeTruthy()
   })
 })

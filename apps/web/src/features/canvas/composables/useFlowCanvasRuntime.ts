@@ -59,7 +59,6 @@ export type UseFlowCanvasRuntimeOptions = {
   onWarning: (message: string) => void
   onSuccess: (message: string) => void
   onError: (message: string) => void
-  onNativeRemove?: () => void
   cancelTasks: (taskIds: readonly string[]) => void
   scheduleMicrotask?: (callback: () => void) => void
   scheduleAnimationFrame?: (callback: FrameRequestCallback) => number
@@ -334,7 +333,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     commitGroups: commitHistoryGroups,
     markDirty,
     onWarning: options.onWarning,
-    onNativeRemove: options.onNativeRemove,
     captureActiveNodeExecutions: options.executionRuntime.captureActiveNodeExecutions,
     cancelNodeExecutions,
   })
@@ -379,7 +377,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       options.scheduleMicrotask ??
       ((callback: () => void) => void Promise.resolve().then(callback)),
     onWarning: options.onWarning,
-    onNativeRemove: options.onNativeRemove,
     captureActiveNodeExecutions: options.executionRuntime.captureActiveNodeExecutions,
     cancelNodeExecutions,
   })

@@ -24,7 +24,6 @@ type FlowGraphDeleteProjectionOptions = {
   flowNodeIds?: readonly string[]
   projectionIndex: FlowEdgeProjectionIndex
   edgeRemoveChanges?: readonly EdgeChange[]
-  onNativeRemove?: () => void
   captureActiveNodeExecutions: (nodeIds: readonly string[]) => CanvasExecutionLease[]
   cancelNodeExecutions: (leases: readonly CanvasExecutionLease[]) => void
 }
@@ -142,7 +141,6 @@ export function applyFlowGraphDeleteProjection(
   )
 
   if (result.didChange) {
-    options.onNativeRemove?.()
     options.cancelNodeExecutions(executionLeases)
   }
 

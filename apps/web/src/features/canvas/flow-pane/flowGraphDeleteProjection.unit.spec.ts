@@ -161,7 +161,6 @@ describe('flowGraphDeleteProjection', () => {
       data: undefined,
     } as Edge
     const { graphAdapter, applyGraphChanges } = createGraphAdapter()
-    const onNativeRemove = vi.fn()
     const executionLease = { nodeId: imageNode.id } as CanvasExecutionLease
     const captureActiveNodeExecutions = vi.fn(() => [executionLease])
     const cancelNodeExecutions = vi.fn()
@@ -178,7 +177,6 @@ describe('flowGraphDeleteProjection', () => {
       },
       flowNodeIds: [imageNode.id],
       projectionIndex: createProjectionIndex([generatedEdge]),
-      onNativeRemove,
       captureActiveNodeExecutions,
       cancelNodeExecutions,
     })
@@ -193,7 +191,6 @@ describe('flowGraphDeleteProjection', () => {
         target: promptNode.id,
       }),
     ])
-    expect(onNativeRemove).toHaveBeenCalledOnce()
     expect(captureActiveNodeExecutions).toHaveBeenCalledWith(['node-image-1'])
     expect(cancelNodeExecutions).toHaveBeenCalledWith([executionLease])
     expect(captureActiveNodeExecutions.mock.invocationCallOrder[0]).toBeLessThan(
@@ -215,7 +212,6 @@ describe('flowGraphDeleteProjection', () => {
       targetHandle: 'in:image',
     } as Edge
     const { graphAdapter, applyGraphChanges } = createGraphAdapter()
-    const onNativeRemove = vi.fn()
     const executionLease = { nodeId: imageNode.id } as CanvasExecutionLease
     const captureActiveNodeExecutions = vi.fn(() => [executionLease])
     const cancelNodeExecutions = vi.fn()
@@ -232,7 +228,6 @@ describe('flowGraphDeleteProjection', () => {
         }),
       },
       projectionIndex: createProjectionIndex([edge]),
-      onNativeRemove,
       captureActiveNodeExecutions,
       cancelNodeExecutions,
     })
@@ -250,7 +245,6 @@ describe('flowGraphDeleteProjection', () => {
         target: promptNode.id,
       }),
     ])
-    expect(onNativeRemove).toHaveBeenCalledOnce()
     expect(captureActiveNodeExecutions).toHaveBeenCalledWith(['image-1', 'prompt-1'])
     expect(cancelNodeExecutions).toHaveBeenCalledWith([executionLease])
     expect(captureActiveNodeExecutions.mock.invocationCallOrder[0]).toBeLessThan(

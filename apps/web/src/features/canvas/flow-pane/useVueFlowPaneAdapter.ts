@@ -14,6 +14,8 @@ export function useVueFlowPaneAdapter(): CanvasFlowPaneAdapter {
     setCenter,
     getSelectedElements,
     removeSelectedElements,
+    addSelectedNodes,
+    findNode,
     setNodes,
     setEdges,
     addNodes,
@@ -24,6 +26,19 @@ export function useVueFlowPaneAdapter(): CanvasFlowPaneAdapter {
     applyNodeChanges,
     applyEdgeChanges,
   } = useVueFlow()
+
+  function selectOnlyNode(nodeId: string): boolean {
+    const node = findNode(nodeId)
+    if (!node) return false
+
+    const selectedElements = [...getSelectedElements.value]
+    const isOnlySelected = selectedElements.length === 1 && selectedElements[0]?.id === nodeId
+    if (isOnlySelected) return true
+
+    if (selectedElements.length > 0) removeSelectedElements(selectedElements)
+    addSelectedNodes([node])
+    return true
+  }
 
   return {
     viewport,
@@ -37,6 +52,7 @@ export function useVueFlowPaneAdapter(): CanvasFlowPaneAdapter {
     screenToFlowCoordinate,
     getSelectedElements,
     removeSelectedElements,
+    selectOnlyNode,
     vueFlowGraphActions: {
       setNodes,
       setEdges,

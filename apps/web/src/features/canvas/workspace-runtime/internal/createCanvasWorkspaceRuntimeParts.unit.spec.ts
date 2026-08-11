@@ -236,6 +236,7 @@ function createWorkspaceOptions() {
     screenToFlowCoordinate: vi.fn((point: { x: number; y: number }) => point),
     getSelectedElements: ref([]),
     removeSelectedElements: vi.fn(),
+    selectOnlyNode: vi.fn(() => true),
     vueFlowGraphActions: {
       setNodes: vi.fn(),
     },
@@ -261,7 +262,6 @@ function createWorkspaceOptions() {
     imageWorkflowUi: {
       activeTool: ref('select'),
       canvasWrapRef: ref<HTMLElement | null>(null),
-      isCanvasInteractionLocked: ref(false),
       getImageStageElement: vi.fn(() => null),
       panels: {
         open: vi.fn(),
@@ -269,14 +269,8 @@ function createWorkspaceOptions() {
         isActive: vi.fn(() => false),
         getActiveNodeId: vi.fn(() => null),
       },
-      selection: {
-        selectNodeForContextMenu: vi.fn(),
-      },
     },
     logoutAndRedirect: vi.fn(),
-    startNodeDragInteraction: vi.fn(),
-    stopNodeDragInteraction: vi.fn(),
-    refreshFlowHandleVisibility: vi.fn(),
     openRecharge: vi.fn(),
   }
 }
@@ -408,7 +402,9 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
           currentBoardId: board.boardSession.currentBoardId,
           getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
           connectionAdapter: graph.connectionAdapter,
+          isCanvasInteractionLocked: expect.objectContaining({ value: false }),
         }),
+        flowPaneAdapter: runtimeOptions.flowPaneAdapter,
         execution: expect.objectContaining({
           edges: board.flowPane.edges,
           graphAdapter: board.graphEditing.adapter,

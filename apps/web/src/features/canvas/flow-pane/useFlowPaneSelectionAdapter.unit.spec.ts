@@ -107,41 +107,6 @@ describe('useFlowPaneSelectionAdapter', () => {
     expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ closeExpand: true })
   })
 
-  it('clears existing Vue Flow selection before selecting a context-menu target', () => {
-    const harness = createHarness()
-    const previousNode: TestFlowItem = { id: 'node-a' }
-    const mountedNode: TestFlowItem = { id: 'node-b' }
-    vueFlowMocks.selectedElements.push(previousNode)
-    vueFlowMocks.findNode.mockReturnValue(mountedNode)
-
-    harness.adapter.commands.selectNodeForContextMenu('node-b')
-
-    expect(vueFlowMocks.removeSelectedElements).toHaveBeenCalledWith([previousNode])
-    expect(vueFlowMocks.addSelectedNodes).toHaveBeenCalledWith([mountedNode])
-  })
-
-  it('selects a context-menu target through Vue Flow', () => {
-    const harness = createHarness()
-    const mountedNode: TestFlowItem = { id: 'node-b' }
-    vueFlowMocks.findNode.mockReturnValue(mountedNode)
-
-    harness.adapter.commands.selectNodeForContextMenu('node-b')
-
-    expect(vueFlowMocks.addSelectedNodes).toHaveBeenCalledWith([mountedNode])
-  })
-
-  it('keeps native selection stable when the context-menu target is already selected', () => {
-    const harness = createHarness()
-    const mountedNode: TestFlowItem = { id: 'node-a' }
-    vueFlowMocks.selectedElements.push(mountedNode)
-    vueFlowMocks.findNode.mockReturnValue(mountedNode)
-
-    harness.adapter.commands.selectNodeForContextMenu('node-a')
-
-    expect(vueFlowMocks.addSelectedNodes).not.toHaveBeenCalled()
-    expect(vueFlowMocks.removeSelectedElements).not.toHaveBeenCalled()
-  })
-
   it('does not select a node while the hand tool is active but still dismisses transient UI', () => {
     const activeTool = ref('hand')
     const harness = createHarness(activeTool)

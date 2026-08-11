@@ -82,9 +82,6 @@ function createViewportRuntimeHarness(
       closeBoardHeaderEditing: vi.fn(),
       startCanvasInteraction,
       stopCanvasInteraction,
-      startNodeDragInteraction: vi.fn(),
-      stopNodeDragInteraction: vi.fn(),
-      refreshFlowHandleVisibility: vi.fn(),
       viewportPersistence: options.viewportPersistence,
     }),
   )

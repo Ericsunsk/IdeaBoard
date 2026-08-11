@@ -66,34 +66,6 @@ export function useFlowPaneSelectionAdapter(options: UseFlowPaneSelectionAdapter
     return new Set(elements.filter(isFlowNodeElement).map((element) => element.id))
   }
 
-  function selectNode(nodeId: string, selectionOptions?: { keepExisting?: boolean }): boolean {
-    const targetNode = findNode(nodeId)
-    if (!targetNode) return false
-    const selectedElements = readSelectedElements()
-    const keepExisting = selectionOptions?.keepExisting ?? false
-    const isAlreadySelected = selectedElements.some((element) => element.id === nodeId)
-
-    if (!keepExisting) {
-      const selectedElementsToClear = isAlreadySelected
-        ? selectedElements.filter((element) => element.id !== nodeId)
-        : selectedElements
-      if (selectedElementsToClear.length > 0) {
-        removeSelectedElements(selectedElementsToClear)
-      }
-      if (isAlreadySelected) {
-        return true
-      }
-    }
-    if (!isAlreadySelected) {
-      addSelectedNodes([targetNode])
-    }
-    return true
-  }
-
-  function selectNodeForContextMenu(nodeId: string): boolean {
-    return selectNode(nodeId, { keepExisting: false })
-  }
-
   function onPaneClick() {
     clearSelection()
     options.dismissTransientCanvasUi({
@@ -211,7 +183,6 @@ export function useFlowPaneSelectionAdapter(options: UseFlowPaneSelectionAdapter
     },
     commands: {
       clearSelection,
-      selectNodeForContextMenu,
       onPaneClick,
       onFlowNodeClick,
       onFlowNodeMouseDown,

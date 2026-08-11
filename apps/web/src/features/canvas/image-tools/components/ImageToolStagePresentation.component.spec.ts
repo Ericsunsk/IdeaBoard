@@ -11,6 +11,7 @@ import {
   type PropType,
 } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
+import { cleanup } from '@testing-library/vue'
 import { render, waitFor } from '../../../../test/render'
 import type { ImageToolStageBinding } from '../imageToolBindings'
 import ImageToolStagePresentation from './ImageToolStagePresentation.vue'
@@ -145,7 +146,7 @@ describe('ImageToolStagePresentation', () => {
     expect(view.container.querySelector('.image-editor-raster-overlay')).toBeNull()
     expect(view.container.querySelector('.image-mask-editor-overlay')).toBeNull()
 
-    view.unmount()
+    cleanup()
 
     expect(current.setMaskCanvasRef).toHaveBeenCalledExactlyOnceWith('node-1', null)
     expect(current.setRasterCanvasRef).toHaveBeenCalledExactlyOnceWith('node-1', null)

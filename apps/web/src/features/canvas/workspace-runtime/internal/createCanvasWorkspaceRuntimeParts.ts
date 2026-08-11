@@ -31,10 +31,6 @@ export type UseCanvasWorkspaceRuntimeOptions = {
   openImageUrlPreview: (src: string, ratio?: number) => Promise<void>
   imageWorkflowUi: CanvasImageWorkflowUiAdapter
   logoutAndRedirect: (path: string) => Promise<unknown> | unknown
-  startNodeDragInteraction: () => void
-  stopNodeDragInteraction: () => void
-  refreshFlowHandleVisibility: () => void
-  onNativeRemove?: () => void
   openRecharge: () => void
 }
 
@@ -49,7 +45,6 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     getUserIdentity: options.getUserIdentity,
     logoutAndRedirect: options.logoutAndRedirect,
     feedback: feedback.boardSession,
-    onNativeRemove: options.onNativeRemove,
     cancelTasks: taskLifecycle.cancelTasks,
     executionRuntime,
     vueFlowGraphActions: options.flowPaneAdapter.vueFlowGraphActions,
@@ -87,9 +82,6 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     closeBoardHeaderEditing: board.boardChrome.closeBoardHeaderEditing,
     startCanvasInteraction: graph.interactionPort.startInteraction,
     stopCanvasInteraction: graph.interactionPort.stopInteraction,
-    startNodeDragInteraction: options.startNodeDragInteraction,
-    stopNodeDragInteraction: options.stopNodeDragInteraction,
-    refreshFlowHandleVisibility: options.refreshFlowHandleVisibility,
   })
 
   const flushAutosaveWithViewportPersistence = createCanvasWorkspaceAutosave({

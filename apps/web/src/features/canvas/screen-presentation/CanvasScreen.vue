@@ -40,7 +40,7 @@
         :nodes="nodes"
         :edges="edges"
         v-bind="vueFlowProps"
-        @nodes-change="commands.flowPane.onNodesChange"
+        @nodes-change="onNodesChange"
         @edges-change="vueFlowSelectionBindings.onEdgesChange"
         @connect-end="onFlowConnectEnd"
         @move-start="onFlowMoveStart"
@@ -65,7 +65,7 @@
           <FlowCanvasNode
             v-bind="nodePropsFor(nodeProps)"
             @node-intent="nodePresentationIntentRouter.dispatch"
-            @node-mousedown="selectionCommands.onFlowNodeMouseDown"
+            @node-mousedown="onFlowNodeMouseDown"
             @request-internals-update="onFlowNodeInternalsUpdate"
           />
         </template>
@@ -90,47 +90,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { uploadApi } from '../../../shared/api/upload'
 import { USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
-import { PanOnScrollMode, VueFlow, type NodeMouseEvent, type NodeProps } from '@vue-flow/core'
+import { PanOnScrollMode, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
-import { useFlowKeyboardShortcuts } from '../composables/useFlowKeyboardShortcuts'
-import { useFlowLeaveGuard } from '../composables/useFlowLeaveGuard'
-import type { CanvasConnectionPort, CanvasCreatableNodeKind } from '../../canvas-board/domain'
-import type { CanvasGraphNodeId } from '../graph-runtime'
-import { useFlowNodeDragInteractions } from '../composables/useFlowNodeDragInteractions'
 import { useFlowImagePreviewLightbox } from '../composables/useFlowImagePreviewLightbox'
 import { provideCanvasViewportContext } from '../composables/useCanvasViewportContext'
-import {
-  ACTIVE_NODE_PANEL_KIND,
-  useFlowActiveNodePanels,
-} from '../composables/useFlowActiveNodePanels'
-import { useFlowCanvasShellInteractions } from '../composables/useFlowCanvasShellInteractions'
-import {
-  CanvasGroupPresentation,
-  useCanvasGroupPresentationInteraction,
-} from '../group-presentation'
-import {
-  useFlowTransientUiDismissal,
-  type DismissTransientCanvasUi,
-} from '../composables/useFlowTransientUiDismissal'
-import { useImageStageRegistry } from '../composables/useImageStageRegistry'
-import { useFlowPaneSelectionAdapter, useVueFlowPaneAdapter } from '../flow-pane'
+import { CanvasGroupPresentation } from '../group-presentation'
+import { useVueFlowPaneAdapter } from '../flow-pane'
 import {
   createCanvasGraphEditingBrowserAdapter,
   createCanvasGraphInteractionBrowserAdapter,
 } from '../graph-editing'
 import { useCanvasWorkspaceRuntime } from '../workspace-runtime'
-import {
-  createFusionNodePresentationResolver,
-  createImageNodePresentationResolver,
-} from '../node-presentation'
-import { createCanvasNodePresentationIntentRouter } from './createCanvasNodePresentationIntentRouter'
-import { useCanvasNodeContextMenu } from './useCanvasNodeContextMenu'
-import { useCanvasCustomLayerOverlay } from '../overlay-lifecycle'
 import FlowCanvasNode from '../components/FlowCanvasNode.vue'
 import CanvasNodeContextMenu from '../components/CanvasNodeContextMenu.vue'
 import { ImageToolPresentation } from '../image-tools'
@@ -140,12 +115,15 @@ import {
   type CanvasChromeAccountState,
   type CanvasChromeBoardState,
 } from '../components/chrome'
-import type { FlowNodeData } from '../types/flowTypes'
 import { CANVAS_VIEWPORT_MAX_ZOOM, CANVAS_VIEWPORT_MIN_ZOOM } from '../utils/canvasViewportStorage'
 import {
   useUserAccountControls,
   type UserShellNavigationAdapter,
 } from '../../user-shell/useUserAccountControls'
+import { useCanvasScreenImageToolUi } from './internal/useCanvasScreenImageToolUi'
+import { useCanvasScreenSurfaceInteractions } from './internal/useCanvasScreenSurfaceInteractions'
+import { createCanvasScreenNodePresentation } from './internal/createCanvasScreenNodePresentation'
+import { useCanvasScreenLifecycle } from './internal/useCanvasScreenLifecycle'
 
 const props = defineProps<{
   route: RouteLocationNormalizedLoaded
@@ -161,51 +139,15 @@ function openRecharge() {
 }
 
 const flowPaneAdapter = useVueFlowPaneAdapter()
-const { screenToFlowCoordinate, viewport: flowViewport } = flowPaneAdapter
 
 const canvasWrapRef = ref<HTMLElement | null>(null)
-const flowHandleVisibilityRefreshToken = ref(0)
-
 const activeTool = ref<'select' | 'hand'>('select')
 const isCanvasMinimapEnabled = ref(false)
-let dismissTransientCanvasUi: DismissTransientCanvasUi = () => {}
-const {
-  nodeContextMenu,
-  canvasNodeMenuItems,
-  close: closeNodeContextMenu,
-  open: openNodeContextMenu,
-  createNode: createNodeFromContextMenu,
-} = useCanvasNodeContextMenu()
-
-const {
-  activeNodePanel,
-  openActiveNodePanel,
-  clearActiveNodePanel,
-  isActiveNodePanel,
-  getActiveNodePanelNodeId,
-} = useFlowActiveNodePanels()
 const duplicateModifierPressed = ref(false)
-const { setImageStageRef, clearImageStageRef, getImageStageElement } = useImageStageRegistry()
+const imageToolUi = useCanvasScreenImageToolUi({ activeTool, canvasWrapRef })
 const { openNodeImagePreview, openImageUrlPreview } = useFlowImagePreviewLightbox()
 const graphEditingBrowser = createCanvasGraphEditingBrowserAdapter()
 const graphInteractionBrowser = createCanvasGraphInteractionBrowserAdapter()
-let selectNodeForContextMenu: (nodeId: string) => void = () => {}
-let readCanvasInteractionLocked = () => false
-const imageWorkflowUi = {
-  activeTool: activeTool as Ref<string>,
-  canvasWrapRef,
-  isCanvasInteractionLocked: computed(() => readCanvasInteractionLocked()),
-  getImageStageElement,
-  panels: {
-    open: openActiveNodePanel,
-    clear: clearActiveNodePanel,
-    isActive: isActiveNodePanel,
-    getActiveNodeId: getActiveNodePanelNodeId,
-  },
-  selection: {
-    selectNodeForContextMenu: (nodeId: string) => selectNodeForContextMenu(nodeId),
-  },
-}
 
 const workspace = useCanvasWorkspaceRuntime({
   route,
@@ -217,57 +159,15 @@ const workspace = useCanvasWorkspaceRuntime({
   graphInteractionBrowser,
   openNodeImagePreview,
   openImageUrlPreview,
-  imageWorkflowUi,
+  imageWorkflowUi: imageToolUi.imageWorkflowUi,
   logoutAndRedirect,
-  startNodeDragInteraction: () => startNodeDragInteraction(),
-  stopNodeDragInteraction: () => stopNodeDragInteraction(),
-  refreshFlowHandleVisibility: () => refreshFlowHandleVisibility(),
-  onNativeRemove: () => {
-    dismissTransientCanvasUi({ closeExpand: true, closeContextMenu: true })
-  },
   openRecharge,
 })
 const viewModel = workspace.viewModel
 const commands = workspace.commands
-const isGenerationAvailable = computed(() => commands.imageWorkflow.isGenerationAvailable())
 
 const { nodes, edges } = viewModel.flowPane
 const { connectionAdapter } = commands.flowPane
-
-type CanvasBenchmarkConnectDeleteTarget = {
-  sourceNodeId: CanvasGraphNodeId
-  targetNodeId: CanvasGraphNodeId
-  sourcePort: CanvasConnectionPort
-  targetPort: CanvasConnectionPort
-  deleteNodeId: CanvasGraphNodeId
-}
-
-type CanvasBenchmarkWindow = Window & {
-  __ideaboardCanvasBenchmarkActions?: {
-    connectDelete: (target: CanvasBenchmarkConnectDeleteTarget) => void
-  }
-}
-
-const isCanvasBenchmarkActionsEnabled = computed(() => route.query.canvasBenchmarkActions === '1')
-
-if (import.meta.env.DEV && isCanvasBenchmarkActionsEnabled.value) {
-  const benchmarkWindow = window as CanvasBenchmarkWindow
-  benchmarkWindow.__ideaboardCanvasBenchmarkActions = {
-    connectDelete: (target) => {
-      connectionAdapter.connectIntent({
-        sourceNodeId: target.sourceNodeId,
-        targetNodeId: target.targetNodeId,
-        sourcePort: target.sourcePort,
-        targetPort: target.targetPort,
-      })
-      commands.flowPane.onNodesChange([{ id: target.deleteNodeId, type: 'remove' }])
-    },
-  }
-}
-
-onBeforeUnmount(() => {
-  delete (window as CanvasBenchmarkWindow).__ideaboardCanvasBenchmarkActions
-})
 
 const {
   currentBoardId,
@@ -316,334 +216,85 @@ const canvasChromeAccount = computed<CanvasChromeAccountState>(() => ({
   balance: accountControls.viewModel.balance.value,
   menuItems: accountControls.viewModel.menuItems.value,
 }))
-const { history: flowHistory } = viewModel.persistence
-
-const { flushAutosave, loadCanvasBoardAndProbe, reattachPendingImageResults } = commands.persistence
-
 const { zoomLevel } = viewModel.viewportControls
 const {
   onZoomIn,
   onZoomOut,
   onPanViewport,
-  onFlowMoveStart: onFlowMoveStartBase,
-  onFlowMove: syncFlowMove,
   onFlowMoveEnd,
   onViewportChangeEnd,
   onMiniMapCenterRequested,
-  onMiniMapDragStart: onMiniMapDragStartBase,
   onMiniMapDragMove,
   onMiniMapDragEnd,
-  onNodeDragStart: onNodeDragStartBase,
-  onNodeDragStop,
 } = commands.viewportControls
 provideCanvasViewportContext({ zoomLevel })
 
-const { isFlowInteractionActive, isFlowViewportPanInteractionActive, isFlowInteractionLocked } =
-  viewModel.graphEditing
-readCanvasInteractionLocked = () => isFlowInteractionLocked.value
-const { groupFrames, selectionGroupAction } = viewModel.graphEditing.grouping
-const {
-  scheduleFlowNodeInternalsRefresh,
-  createNodeAtPosition,
-  onExportSelectedImages,
-  onFlowMediaInputImageDrop,
-  onFlowMediaInputImageOpen,
-  onFlowMediaInputImagePreview,
-  onFlowMediaInputImageRemove,
-  onCanvasDrop,
-  onCanvasDragOver: onFlowCanvasDropDragOver,
-  onFlowImageOpenPreview,
-  onFlowImageAppendToCanvas,
-  beginFlowNodeDragDuplicateTracking,
-  finishFlowNodeDragDuplicateTracking,
-  getFlowNodeUiStateCached,
-} = commands.graphEditing
-const {
-  selectGroupAtPoint,
-  handlePaneClick,
-  handleNodeClick,
-  groupSelectedNodes,
-  ungroupSelectedGroup,
-  deleteSelectedGroup,
-  groupDrag,
-  groupResize,
-} = commands.graphEditing.grouping
-
-function onFlowConnectEnd() {
-  refreshFlowHandleVisibility()
-}
-
-function onFlowMove(payload: Parameters<typeof syncFlowMove>[0]) {
-  syncFlowMove(payload)
-  if (!payload.flowTransform || !imageTools.viewModel.chrome.value.isReady) return
-  scheduleImageEditorChromeAnchorUpdate()
-}
-
-function handleMiniMapDragMove(payload: { delta: Parameters<typeof onMiniMapDragMove>[0] }) {
-  onMiniMapDragMove(payload.delta)
-}
-
-function refreshFlowHandleVisibility() {
-  flowHandleVisibilityRefreshToken.value += 1
-}
-
-function onFlowNodeInternalsUpdate(nodeId: string) {
-  scheduleFlowNodeInternalsRefresh([nodeId])
-}
-
-const hasCanvasDismissableLayer = computed(
-  () => nodeContextMenu.value.visible || activeNodePanel.value !== null,
-)
-
-const { hideStrengthControl, cancelCanvasExtend: cancelFlowExpandMode } = commands.imageWorkflow
-const {
-  nodeId: flowExpandNodeId,
-  overlayStyle: flowExpandOverlayStyle,
-  handleRadius: flowExpandHandleRadius,
-} = viewModel.imageWorkflow.canvasExtend
 const imageTools = {
   viewModel: viewModel.imageWorkflow.tools,
   commands: commands.imageWorkflow.tools,
 }
-
 const {
   viewModel: {
-    active: { nodeId: flowImageEditorNodeId, maskNodeId: flowMaskEditorNodeId },
     locks: { isChromeHidden: isImageEditorChromeHidden, isCanvasLocked: isFlowCanvasLocked },
-    nodeBindings: { stageFor: imageToolStageBindingFor, actionFor: imageToolActionBindingFor },
-  },
-  commands: {
-    lifecycle: { discardNodeEdits: discardFlowImageToolNodeEdits },
-    editor: {
-      onCanvasWheel: onCanvasWheelBase,
-      scheduleChromeAnchorUpdate: scheduleImageEditorChromeAnchorUpdate,
-    },
   },
 } = imageTools
-
-const imagePresentationFor = createImageNodePresentationResolver({
-  actionBindingFor: imageToolActionBindingFor,
-  stageBindingFor: imageToolStageBindingFor,
-}).forNode
-
-const fusionPresentationFor = createFusionNodePresentationResolver({
-  promptComposerVisibleFor: (nodeId) =>
-    isActiveNodePanel(ACTIVE_NODE_PANEL_KIND.fusionPrompt, nodeId),
-}).forNode
-
-const isCanvasShortcutSuppressed = computed(
-  () => !!flowImageEditorNodeId.value || !!flowMaskEditorNodeId.value,
-)
-const isCanvasGroupInteractionEnabled = computed(
-  () =>
-    activeTool.value === 'select' &&
-    !isFlowCanvasLocked.value &&
-    !flowImageEditorNodeId.value &&
-    !flowMaskEditorNodeId.value &&
-    !flowExpandNodeId.value,
-)
-
-function onFlowNodeClick(payload: NodeMouseEvent) {
-  handleNodeClick({
-    node: payload.node,
-    selectNode: () => selectionCommands.onFlowNodeClick(),
-  })
-}
-
-function onDeleteInlineSelection() {
-  if (!isCanvasGroupInteractionEnabled.value) return false
-  return deleteSelectedGroup()
-}
-
-function performSelectionGroupAction() {
-  const action = selectionGroupAction.value
-  if (action?.kind === 'group') {
-    groupSelectedNodes()
-    return
-  }
-  if (action?.kind === 'ungroup') {
-    ungroupSelectedGroup()
-  }
-}
-
-function toggleCanvasMinimapBase() {
-  isCanvasMinimapEnabled.value = !isCanvasMinimapEnabled.value
-}
-
-function handleNodeContextMenuCreate(kind: CanvasCreatableNodeKind) {
-  createNodeFromContextMenu(kind, createNodeAtPosition)
-  dismissTransientCanvasUi({ closeExpand: true })
-}
-
-dismissTransientCanvasUi = useFlowTransientUiDismissal({
-  cancelFlowExpandMode,
-  closeBoardHeaderEditing,
-  closeNodeContextMenu,
-  clearActiveNodePanel,
-  hideStrengthControl,
-}).dismissTransientCanvasUi
-
-useCanvasCustomLayerOverlay({
-  visible: hasCanvasDismissableLayer,
-  ignore: [
-    '.node-tool-surface',
-    '.canvas-node-context-menu',
-    '[data-image-mask-editor]',
-    '[data-image-editor]',
-  ],
-  ownerDocument: () =>
-    canvasWrapRef.value?.ownerDocument ?? (typeof document === 'undefined' ? null : document),
-  onDismiss: () => {
-    dismissTransientCanvasUi({ closeContextMenu: true })
-  },
-})
-
-const {
-  onFlowDeleteNode,
-  onFlowPromptTextUpdate,
-  onFlowNodeParamUpdate,
-  onFlowImageOpenFile,
-  onFlowImageReset,
-  onFlowImageStageDrop,
-} = commands.graphEditing.createNodeInteractions({
-  dismissTransientCanvasUi,
-  discardNodeEdits: discardFlowImageToolNodeEdits,
-})
-
-const {
-  paneSelectionBindings,
-  vueFlowSelectionBindings,
-  commands: selectionCommands,
-} = useFlowPaneSelectionAdapter({
-  activeTool: activeTool as Ref<string>,
-  dismissTransientCanvasUi,
-  onEdgesChange: (changes) => commands.flowPane.onEdgesChange(changes),
-})
-selectNodeForContextMenu = selectionCommands.selectNodeForContextMenu
-
-const groupPresentation = useCanvasGroupPresentationInteraction({
-  canvas: {
-    host: canvasWrapRef,
-    nodes,
-    viewport: flowViewport,
-    isInteractionEnabled: isCanvasGroupInteractionEnabled,
-  },
-  grouping: {
-    frames: groupFrames,
-    action: selectionGroupAction,
-    selectAtPoint: selectGroupAtPoint,
-    drag: groupDrag,
-    resize: groupResize,
-    onAction: performSelectionGroupAction,
-  },
-  pane: {
-    toFlowPoint: screenToFlowCoordinate,
-    onPointerDownCapture: paneSelectionBindings.onPointerDownCapture,
-    dismiss: (options) => dismissTransientCanvasUi(options),
-  },
-})
-const { bindClosePolicyHandlers, onCanvasContextMenuCapture, onCanvasPointerDownCapture } =
-  groupPresentation
-
-const { onNodeDragStart: startNodeDragInteraction, onNodeDragStop: stopNodeDragInteraction } =
-  useFlowNodeDragInteractions({
-    beginNodeDragTransaction: commands.flowPane.nodeDragTransactions.begin,
-    commitNodeDragTransaction: commands.flowPane.nodeDragTransactions.commit,
-    duplicateModifierPressed,
-    beginFlowNodeDragDuplicateTracking,
-    finishFlowNodeDragDuplicateTracking,
-    dismissTransientCanvasUi,
-    isNodeDragLocked: () => isFlowCanvasLocked.value,
-  })
-
-const {
-  onPaneContextMenu: onPaneContextMenuBase,
-  setActiveTool: setActiveToolBase,
-  onEscapeShortcut,
-  onCanvasDragOver: onCanvasDragOverBase,
-} = useFlowCanvasShellInteractions({
+const { isFlowInteractionActive, isFlowViewportPanInteractionActive } = viewModel.graphEditing
+const surface = useCanvasScreenSurfaceInteractions({
+  workspace,
+  flowPaneAdapter,
   canvasWrapRef,
   activeTool,
-  screenToFlowCoordinate,
-  openNodeContextMenu,
-  dismissTransientCanvasUi,
-  clearFlowSelection: selectionCommands.clearSelection,
-  onCanvasDropDragOver: onFlowCanvasDropDragOver,
-  isFlowExpandActive: () => !!flowExpandNodeId.value,
-  isBoardHeaderEditingActive: () => isBoardMenuOpen.value || isRenamingBoard.value,
+  isCanvasMinimapEnabled,
+  duplicateModifierPressed,
+  activePanels: imageToolUi.activePanels,
 })
-
 const {
-  onCanvasWheel,
-  onFlowMoveStart,
-  onMiniMapDragStart,
-  onNodeDragStart,
-  onCanvasPaneClick,
-  toggleCanvasMinimap,
-  onPaneContextMenu,
-  setActiveTool,
-  onCanvasDragOver,
-} = bindClosePolicyHandlers({
-  onCanvasWheel: onCanvasWheelBase,
-  onFlowMoveStart: onFlowMoveStartBase,
-  onMiniMapDragStart: onMiniMapDragStartBase,
-  onNodeDragStart: onNodeDragStartBase,
-  onCanvasPaneClick: () => handlePaneClick(selectionCommands.onPaneClick),
-  toggleCanvasMinimap: toggleCanvasMinimapBase,
-  onPaneContextMenu: onPaneContextMenuBase,
-  setActiveTool: setActiveToolBase,
-  onCanvasDragOver: onCanvasDragOverBase,
+  nodeContextMenu,
+  canvasNodeMenuItems,
+  vueFlowSelectionBindings,
+  onFlowNodeMouseDown,
+  groupPresentation,
+  onFlowNodeClick,
+  onDeleteInlineSelection,
+  onNodeDragStop,
+  onFlowConnectEnd,
+  onFlowMove,
+  onNodesChange,
+  handleNodeContextMenuCreate,
+  shell: {
+    onCanvasWheel,
+    onFlowMoveStart,
+    onMiniMapDragStart,
+    onNodeDragStart,
+    onCanvasPaneClick,
+    toggleCanvasMinimap,
+    onPaneContextMenu,
+    setActiveTool,
+    onCanvasDragOver,
+    onEscapeShortcut,
+  },
+} = surface
+const { onCanvasContextMenuCapture, onCanvasPointerDownCapture } = groupPresentation
+const nodePresentation = createCanvasScreenNodePresentation({
+  workspace,
+  activePanels: imageToolUi.activePanels,
+  imageStages: imageToolUi.imageStages,
+  duplicateModifierPressed,
+  handleVisibilityRefreshToken: surface.flowHandleVisibilityRefreshToken,
+  nodeInteractions: surface.nodeInteractions,
 })
-
 const {
-  onFlowImageContextMenu,
-  onFlowFusionContextMenu,
-  onFlowImageDirectAction,
-  onFlowImagePromptGenerate,
-  onFlowFusionPromptGenerate,
-  onFlowPromptGenerate,
-  onFlowImageExpandSubmit,
-  onFlowExpandHandlePointerDown,
-  onFlowExpandFramePointerDown,
-  onFlowExpandHandlePointerMove,
-  onFlowExpandHandlePointerUp,
-} = commands.imageWorkflow.interactions
+  nodePresentationIntentRouter,
+  nodePropsFor,
+  onFlowNodeInternalsUpdate,
+  isCanvasShortcutSuppressed,
+} = nodePresentation
+const onCanvasDrop = commands.graphEditing.onCanvasDrop
+const onExportSelectedImages = commands.graphEditing.onExportSelectedImages
 
-const nodePresentationIntentRouter = createCanvasNodePresentationIntentRouter({
-  prompt: {
-    updateText: onFlowPromptTextUpdate,
-    updateParameters: onFlowNodeParamUpdate,
-    generate: onFlowPromptGenerate,
-  },
-  node: { delete: onFlowDeleteNode },
-  mediaInput: {
-    drop: onFlowMediaInputImageDrop,
-    open: onFlowMediaInputImageOpen,
-    preview: onFlowMediaInputImagePreview,
-    remove: onFlowMediaInputImageRemove,
-  },
-  image: {
-    dropStage: onFlowImageStageDrop,
-    openFile: onFlowImageOpenFile,
-    preview: onFlowImageOpenPreview,
-    appendToCanvas: onFlowImageAppendToCanvas,
-    reset: onFlowImageReset,
-    openContextMenu: onFlowImageContextMenu,
-    generateFromPrompt: onFlowImagePromptGenerate,
-    runAction: onFlowImageDirectAction,
-  },
-  canvasExtend: {
-    submit: onFlowImageExpandSubmit,
-    beginHandle: onFlowExpandHandlePointerDown,
-    moveHandle: onFlowExpandHandlePointerMove,
-    endHandle: onFlowExpandHandlePointerUp,
-    beginFrame: onFlowExpandFramePointerDown,
-  },
-  fusion: {
-    openContextMenu: onFlowFusionContextMenu,
-    generate: onFlowFusionPromptGenerate,
-  },
-})
+function handleMiniMapDragMove(payload: { delta: Parameters<typeof onMiniMapDragMove>[0] }) {
+  onMiniMapDragMove(payload.delta)
+}
 
 const chromeProps = computed(() => ({
   inert: isImageEditorChromeHidden.value,
@@ -694,28 +345,6 @@ const minimapProps = computed(() => ({
   isHidden: isImageEditorChromeHidden.value,
 }))
 
-function nodePropsFor(node: NodeProps<FlowNodeData>) {
-  const isExpandModeActive = flowExpandNodeId.value === node.id
-
-  return {
-    nodeId: node.id,
-    data: node.data,
-    selected: node.selected,
-    dragging: node.dragging,
-    copyMode: duplicateModifierPressed.value,
-    uiState: getFlowNodeUiStateCached(node.id),
-    imagePresentation: imagePresentationFor(node.id),
-    fusionPresentation: fusionPresentationFor(node.id),
-    generationAvailable: isGenerationAvailable.value,
-    setImageStageRef,
-    clearImageStageRef,
-    expandModeActive: isExpandModeActive,
-    expandOverlayStyle: isExpandModeActive ? flowExpandOverlayStyle.value : null,
-    expandHandleRadius: flowExpandHandleRadius,
-    handleVisibilityRefreshToken: flowHandleVisibilityRefreshToken.value,
-  }
-}
-
 function updateBoardNameDraft(value: string) {
   boardNameDraft.value = value
 }
@@ -740,42 +369,22 @@ function navigateBack() {
   canvasNavigationAdapter.navigate(USER_BOARDS_PATH)
 }
 
-watch(
-  () => route.query.boardId,
-  async () => {
-    await loadCanvasBoardAndProbe()
-    void reattachPendingImageResults()
+useCanvasScreenLifecycle({
+  route,
+  persistence: commands.persistence,
+  history: viewModel.persistence.history,
+  duplicateModifierPressed,
+  keyboard: {
+    onDeleteInlineSelection,
+    isShortcutSuppressed: () => isCanvasShortcutSuppressed.value,
+    onEscape: onEscapeShortcut,
+    onPanViewport,
+    setActiveTool,
   },
-)
-
-useFlowKeyboardShortcuts({
-  onSave: () => {
-    void flushAutosave({ silent: false })
+  benchmark: {
+    connectIntent: connectionAdapter.connectIntent,
+    onNodesChange: commands.flowPane.onNodesChange,
   },
-  onUndo: flowHistory.undo,
-  onRedo: flowHistory.redo,
-  onDeleteInlineSelection,
-  isCanvasShortcutSuppressed: () => isCanvasShortcutSuppressed.value,
-  onEscape: onEscapeShortcut,
-  onPanViewport,
-  onToolSelect: () => {
-    setActiveTool('select')
-  },
-  onToolHand: () => {
-    setActiveTool('hand')
-  },
-  onDuplicateModifierChange: (pressed) => {
-    duplicateModifierPressed.value = pressed
-  },
-})
-
-useFlowLeaveGuard({
-  onLeave: () => flushAutosave(),
-})
-
-onMounted(async () => {
-  await loadCanvasBoardAndProbe()
-  void reattachPendingImageResults()
 })
 </script>
 

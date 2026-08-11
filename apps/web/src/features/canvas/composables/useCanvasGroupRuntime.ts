@@ -164,7 +164,6 @@ export type UseCanvasGroupRuntimeOptions = {
   commitGroups: (groups: CanvasBoardSnapshot['groups']) => void
   markDirty: () => void
   onWarning: (message: string) => void
-  onNativeRemove?: () => void
   captureActiveNodeExecutions: (nodeIds: readonly string[]) => CanvasExecutionLease[]
   cancelNodeExecutions: (leases: readonly CanvasExecutionLease[]) => void
 }
@@ -609,7 +608,6 @@ export function useCanvasGroupRuntime(
       edges: options.edges.value,
       commitPolicy: { summary, historyBefore },
       projectionIndex,
-      onNativeRemove: options.onNativeRemove,
       captureActiveNodeExecutions: options.captureActiveNodeExecutions,
       cancelNodeExecutions: options.cancelNodeExecutions,
     })

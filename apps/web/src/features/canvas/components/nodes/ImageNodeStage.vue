@@ -37,7 +37,19 @@
             @keydown.space.prevent="emit('append-to-canvas')"
           />
         </ImageToolStagePresentation>
-        <img v-else :src="stageDisplayUrl" class="image-node-stage-image" alt="图片节点预览" />
+        <img
+          v-else
+          :src="stageDisplayUrl"
+          class="image-node-stage-image"
+          alt="图片节点预览"
+          draggable="false"
+          role="button"
+          tabindex="0"
+          aria-label="图片节点预览，按 Enter 打开预览，按 Space 添加到画布"
+          @dblclick="emit('append-to-canvas')"
+          @keydown.enter.prevent="emit('open-preview')"
+          @keydown.space.prevent="emit('append-to-canvas')"
+        />
         <ImageCanvasExtendOverlay
           v-if="expandModeActive && expandOverlayStyle"
           :overlay-style="expandOverlayStyle"

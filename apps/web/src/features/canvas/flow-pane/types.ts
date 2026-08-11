@@ -40,5 +40,6 @@ export type CanvasFlowPaneAdapter = {
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
   getSelectedElements: ValueRef<Array<Node | Edge>>
   removeSelectedElements: (elements: Array<Node | Edge>) => void
+  selectOnlyNode: (nodeId: string) => boolean
   vueFlowGraphActions: CanvasFlowPaneGraphActions
 }

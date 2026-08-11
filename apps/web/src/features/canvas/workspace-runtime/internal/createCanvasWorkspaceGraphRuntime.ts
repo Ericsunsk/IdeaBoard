@@ -102,6 +102,7 @@ export function createCanvasWorkspaceGraphRuntime(
       clearSelectedFlowElements: interactions.commands.clearSelection,
       startCanvasInteraction: interactions.runtimePort.startInteraction,
       stopCanvasInteraction: interactions.runtimePort.stopInteraction,
+      isCanvasInteractionLocked: interactions.viewModel.isInteractionLocked,
       getMediaInputImages: editing.workflowPort.getMediaInputImages,
       resolvePromptInputImageNodeIds: editing.workflowPort.resolvePromptInputImageNodeIds,
       updateSnapshotNodeParam: editing.workflowPort.updateNodeParams,

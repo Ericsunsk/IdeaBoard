@@ -243,7 +243,6 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
   let nextAnimationFrameId = 1
   const onWarning = vi.fn()
   const onError = vi.fn()
-  const onNativeRemove = vi.fn()
   const graphActions = {
     addNodes: vi.fn(),
     setNodes: vi.fn(),
@@ -287,7 +286,6 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     onWarning,
     onSuccess: vi.fn(),
     onError,
-    onNativeRemove,
     cancelTasks,
     scheduleMicrotask: (callback) => {
       scheduledMicrotasks.push(callback)
@@ -349,7 +347,6 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     boardSession,
     onWarning,
     onError,
-    onNativeRemove,
     cancelTasks,
     graphActions,
     isDirty,
@@ -1415,7 +1412,6 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.fullEdges.value).toEqual([])
     expect(harness.boardBaseSnapshot.value.groups).toEqual([])
     expect(harness.cancelTasks).toHaveBeenCalledWith(['task-running-1'])
-    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.isDirty.value).toBe(true)
 
     harness.runtime.persistence.history.undo()
@@ -1456,7 +1452,6 @@ describe('useFlowCanvasRuntime', () => {
       'prompt-2',
     ])
     expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-3'])
-    expect(harness.onNativeRemove).not.toHaveBeenCalled()
     expect(harness.isDirty.value).toBe(true)
     expect(historyPush).toHaveBeenCalledOnce()
     expect(harness.saveStatus.value).toBe('pending')
@@ -2232,7 +2227,6 @@ describe('useFlowCanvasRuntime', () => {
     expect(readEdgeSelected(harness.fullEdges.value, 'connection-3')).toBe(true)
     expect(readEdgeSelected(harness.edges.value, 'connection-3')).toBe(true)
     expect(harness.savedSnapshots).toHaveLength(0)
-    expect(harness.onNativeRemove).not.toHaveBeenCalled()
   })
 
   it('accepts Vue Flow position changes without saving before drag transaction commits', async () => {
@@ -2525,7 +2519,6 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toEqual([])
     expect(harness.boardBaseSnapshot.value.groups).toEqual([createGroup('group-1', ['prompt-1'])])
-    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.cancelTasks).toHaveBeenCalledWith(['task-ui-delete'])
     expect(harness.isDirty.value).toBe(true)
 
@@ -2568,7 +2561,6 @@ describe('useFlowCanvasRuntime', () => {
 
     expect(harness.onWarning).toHaveBeenCalledWith('删除操作未能写入画布，请刷新后重试')
     expect(exportCurrentBoardSnapshot(harness)).toEqual(graphBefore)
-    expect(harness.onNativeRemove).not.toHaveBeenCalled()
     expect(harness.cancelTasks).not.toHaveBeenCalled()
     expect(harness.isDirty.value).toBe(false)
   })
@@ -2609,7 +2601,6 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.fullNodes.value).toBe(nodesBefore)
     expect(harness.fullEdges.value).toBe(edgesBefore)
     expect(harness.boardBaseSnapshot.value.groups).toBe(groupsBefore)
-    expect(harness.onNativeRemove).not.toHaveBeenCalled()
     expect(harness.cancelTasks).not.toHaveBeenCalled()
     expect(harness.isDirty.value).toBe(false)
     expect(harness.saveStatus.value).toBe(saveStatusBefore)
@@ -2641,7 +2632,6 @@ describe('useFlowCanvasRuntime', () => {
     ])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.graphActions.applyNodeChanges).toHaveBeenCalledOnce()
     expect(harness.graphActions.applyEdgeChanges).toHaveBeenCalledOnce()
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
@@ -2660,7 +2650,6 @@ describe('useFlowCanvasRuntime', () => {
 
     await harness.applyNativeNodeChanges([{ id: 'image-1', type: 'remove' }])
 
-    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toHaveLength(0)
     expect(harness.isDirty.value).toBe(true)
@@ -2715,7 +2704,6 @@ describe('useFlowCanvasRuntime', () => {
     harness.runtime.flowPane.onNodesChange([{ id: 'image-1', type: 'remove' }])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toHaveLength(0)
   })
@@ -2737,7 +2725,6 @@ describe('useFlowCanvasRuntime', () => {
     ])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.graphActions.applyEdgeChanges).toHaveBeenCalledOnce()
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual([
       'image-1',
@@ -2779,7 +2766,6 @@ describe('useFlowCanvasRuntime', () => {
     ])
 
     expect(harness.onWarning).not.toHaveBeenCalledWith('删除操作未能应用，请刷新画布后重试')
-    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.fullEdges.value).toHaveLength(0)
   })
 
@@ -2815,7 +2801,6 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.onWarning).toHaveBeenCalledWith('删除操作未能应用，请刷新画布后重试')
     expect(readEdgeProjection(harness.fullEdges.value)).toEqual(edgeProjectionBefore)
     expect(harness.graphActions.applyEdgeChanges).not.toHaveBeenCalled()
-    expect(harness.onNativeRemove).not.toHaveBeenCalled()
     expect(harness.isDirty.value).toBe(false)
     expect(harness.saveStatus.value).toBe(saveStatusBefore)
     expect(harness.savedSnapshots).toHaveLength(0)
@@ -2849,7 +2834,6 @@ describe('useFlowCanvasRuntime', () => {
     await harness.flushNativeGraphChanges()
 
     expect(harness.onWarning).not.toHaveBeenCalledWith('删除操作未能应用，请刷新画布后重试')
-    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toHaveLength(0)
   })
@@ -2882,7 +2866,6 @@ describe('useFlowCanvasRuntime', () => {
     await harness.flushNativeGraphChanges()
 
     expect(harness.onWarning).not.toHaveBeenCalledWith('删除操作未能应用，请刷新画布后重试')
-    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toHaveLength(0)
   })
@@ -2916,7 +2899,6 @@ describe('useFlowCanvasRuntime', () => {
     await harness.flushNativeGraphChanges()
 
     expect(harness.onWarning).not.toHaveBeenCalledWith('删除操作未能应用，请刷新画布后重试')
-    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toHaveLength(0)
   })
@@ -2942,7 +2924,6 @@ describe('useFlowCanvasRuntime', () => {
     ])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.graphActions.applyNodeChanges).toHaveBeenCalledOnce()
     expect(harness.graphActions.applyEdgeChanges).toHaveBeenCalledOnce()
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1'])
