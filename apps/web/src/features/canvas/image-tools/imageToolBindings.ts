@@ -167,3 +167,8 @@ export type CanvasImageTools = {
     chrome: ImageToolChromeCommands
   }
 }
+
+export type ImageToolPresentationBinding = {
+  viewModel: Pick<CanvasImageTools['viewModel'], 'chrome'>
+  commands: Pick<CanvasImageTools['commands'], 'chrome'>
+}

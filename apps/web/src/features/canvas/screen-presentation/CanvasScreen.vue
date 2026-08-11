@@ -77,7 +77,14 @@
           @drag-end="onMiniMapDragEnd"
         />
       </VueFlow>
-      <CanvasOverlays v-bind="overlayProps" @create-node="handleNodeContextMenuCreate" />
+      <ImageToolPresentation :image-tools="imageTools" />
+      <CanvasNodeContextMenu
+        :visible="nodeContextMenu.visible"
+        :x="nodeContextMenu.x"
+        :y="nodeContextMenu.y"
+        :items="canvasNodeMenuItems"
+        @create="handleNodeContextMenuCreate"
+      />
     </div>
   </div>
 </template>
@@ -125,7 +132,8 @@ import { createCanvasNodePresentationIntentRouter } from './createCanvasNodePres
 import { useCanvasNodeContextMenu } from './useCanvasNodeContextMenu'
 import { useCanvasCustomLayerOverlay } from '../overlay-lifecycle'
 import FlowCanvasNode from '../components/FlowCanvasNode.vue'
-import CanvasOverlays from '../components/CanvasOverlays.vue'
+import CanvasNodeContextMenu from '../components/CanvasNodeContextMenu.vue'
+import { ImageToolPresentation } from '../image-tools'
 import {
   CanvasChrome,
   CanvasChromeMiniMap,
@@ -684,12 +692,6 @@ const minimapProps = computed(() => ({
   enabled: isCanvasMinimapEnabled.value,
   inert: isImageEditorChromeHidden.value,
   isHidden: isImageEditorChromeHidden.value,
-}))
-
-const overlayProps = computed(() => ({
-  imageToolSession: imageTools,
-  nodeContextMenu: nodeContextMenu.value,
-  canvasNodeMenuItems,
 }))
 
 function nodePropsFor(node: NodeProps<FlowNodeData>) {

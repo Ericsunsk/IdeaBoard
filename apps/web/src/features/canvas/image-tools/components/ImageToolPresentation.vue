@@ -67,38 +67,16 @@
     @redo-raster-stroke="chromeCommands.redoEditorRasterStroke"
     @apply-adjustments="chromeCommands.applyAdjustments"
   />
-  <CanvasNodeContextMenu
-    :visible="nodeContextMenu.visible"
-    :x="nodeContextMenu.x"
-    :y="nodeContextMenu.y"
-    :items="canvasNodeMenuItems"
-    @create="emit('create-node', $event)"
-  />
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { CanvasCreatableNodeKind } from '../../canvas-board/domain'
-import { ImageEditorChrome } from '../image-editor'
-import { ImageMaskEditorChrome } from '../mask-editor'
-import type { CanvasImageTools } from '../image-tools'
-import CanvasNodeContextMenu from './CanvasNodeContextMenu.vue'
+import { ImageEditorChrome } from '../../image-editor'
+import { ImageMaskEditorChrome } from '../../mask-editor'
+import type { ImageToolPresentationBinding } from '../imageToolBindings'
 
-type ImageToolChromeSession = {
-  viewModel: Pick<CanvasImageTools['viewModel'], 'chrome'>
-  commands: Pick<CanvasImageTools['commands'], 'chrome'>
-}
+const props = defineProps<{ imageTools: ImageToolPresentationBinding }>()
 
-const props = defineProps<{
-  imageToolSession: ImageToolChromeSession
-  nodeContextMenu: { visible: boolean; x: number; y: number }
-  canvasNodeMenuItems: ReadonlyArray<{ key: CanvasCreatableNodeKind; label: string }>
-}>()
-
-const emit = defineEmits<{
-  'create-node': [kind: CanvasCreatableNodeKind]
-}>()
-
-const chromeModel = computed(() => props.imageToolSession.viewModel.chrome.value)
-const chromeCommands = computed(() => props.imageToolSession.commands.chrome)
+const chromeModel = computed(() => props.imageTools.viewModel.chrome.value)
+const chromeCommands = computed(() => props.imageTools.commands.chrome)
 </script>

@@ -223,22 +223,33 @@ const MiniMapStub = defineComponent({
   },
 })
 
-const OverlaysStub = defineComponent({
-  props: {
-    nodeContextMenu: {
-      type: Object as PropType<{ visible: boolean }>,
-      required: true,
-    },
+const ImageToolPresentationStub = defineComponent({
+  props: { imageTools: { type: Object, required: true } },
+  setup(_, { attrs }) {
+    return () =>
+      h('section', {
+        'data-testid': 'image-tool-presentation',
+        'data-forwarded-attrs': Object.keys(attrs).join(','),
+      })
   },
-  emits: ['create-node'],
+})
+
+const ContextMenuStub = defineComponent({
+  props: {
+    visible: { type: Boolean, required: true },
+    x: { type: Number, required: true },
+    y: { type: Number, required: true },
+    items: { type: Array as PropType<Array<{ key: string }>>, required: true },
+  },
+  emits: ['create'],
   setup(_, { emit }) {
     return () =>
       h(
         'button',
         {
           type: 'button',
-          'data-testid': 'overlay-region',
-          onClick: () => emit('create-node', 'prompt'),
+          'data-testid': 'node-context-menu',
+          onClick: () => emit('create', 'prompt'),
         },
         '创建提示词节点',
       )
@@ -418,7 +429,8 @@ function renderScreen() {
         CanvasGroupPresentation: GroupStub,
         FlowCanvasNode: NodeStub,
         CanvasChromeMiniMap: MiniMapStub,
-        CanvasOverlays: OverlaysStub,
+        ImageToolPresentation: ImageToolPresentationStub,
+        CanvasNodeContextMenu: ContextMenuStub,
       },
     },
   })
@@ -443,7 +455,9 @@ describe('CanvasScreen', () => {
     expect(view.getByTestId('node-region')).toBeInTheDocument()
     expect(view.getByTestId('group-region')).toBeInTheDocument()
     expect(view.getByTestId('minimap-region')).toBeInTheDocument()
-    expect(view.getByTestId('overlay-region')).toBeInTheDocument()
+    expect(view.getByTestId('image-tool-presentation')).toBeInTheDocument()
+    expect(view.getByTestId('image-tool-presentation')).toHaveAttribute('data-forwarded-attrs', '')
+    expect(view.getByTestId('node-context-menu')).toBeInTheDocument()
 
     view.getByRole('button', { name: '导出选中图片' }).click()
     view.getByRole('button', { name: '缩小画布' }).click()

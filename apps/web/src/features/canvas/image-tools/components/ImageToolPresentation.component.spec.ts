@@ -1,25 +1,17 @@
-/* eslint-disable vue/one-component-per-file -- Local chrome stubs keep the overlay contract test focused. */
-import { computed, defineComponent, type ComputedRef } from 'vue'
+/* eslint-disable vue/one-component-per-file -- Local chrome stubs keep the presentation contract test focused. */
+import { computed, defineComponent, nextTick, shallowRef, type ComputedRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import CanvasOverlays from './CanvasOverlays.vue'
-import { render, screen } from '../../../test/render'
+import { render, screen } from '../../../../test/render'
 import type {
-  CanvasImageTools,
   ImageToolChromeCommands,
   ImageToolChromeModel,
-} from '../image-tools'
-
-type ImageToolChromeSession = {
-  viewModel: Pick<CanvasImageTools['viewModel'], 'chrome'>
-  commands: Pick<CanvasImageTools['commands'], 'chrome'>
-}
+  ImageToolPresentationBinding,
+} from '../imageToolBindings'
+import ImageToolPresentation from './ImageToolPresentation.vue'
 
 const MaskChromeStub = defineComponent({
   name: 'ImageMaskEditorChrome',
-  props: {
-    anchorRect: { type: Object, required: true },
-    brushSize: { type: Number, required: true },
-  },
+  props: { brushSize: { type: Number, required: true } },
   emits: ['set-brush-size'],
   template: `
     <button data-testid="mask-chrome" @click="$emit('set-brush-size', 48)">
@@ -30,9 +22,7 @@ const MaskChromeStub = defineComponent({
 
 const EditorChromeStub = defineComponent({
   name: 'ImageEditorChrome',
-  props: {
-    activeTool: { type: String, required: true },
-  },
+  props: { activeTool: { type: String, required: true } },
   emits: ['select-tool'],
   template: `
     <button data-testid="editor-chrome" @click="$emit('select-tool', 'brush')">
@@ -116,66 +106,66 @@ function createChromeModel(overrides: Partial<ImageToolChromeModel> = {}): Image
   }
 }
 
-function createImageToolSession(
-  model: ImageToolChromeModel,
-  commands = createChromeCommands(),
-): { session: ImageToolChromeSession; commands: ImageToolChromeCommands } {
+function renderPresentation(model: ImageToolChromeModel, commands = createChromeCommands()) {
+  const activeModel = shallowRef(model)
   return {
-    session: {
-      viewModel: {
-        chrome: computed(() => model) as ComputedRef<ImageToolChromeModel>,
+    ...render(ImageToolPresentation, {
+      props: {
+        imageTools: {
+          viewModel: {
+            chrome: computed(() => activeModel.value) as ComputedRef<ImageToolChromeModel>,
+          },
+          commands: { chrome: commands },
+        } satisfies ImageToolPresentationBinding,
       },
-      commands: {
-        chrome: commands,
+      global: {
+        stubs: { ImageMaskEditorChrome: MaskChromeStub, ImageEditorChrome: EditorChromeStub },
       },
-    },
+    }),
     commands,
+    async setModel(nextModel: ImageToolChromeModel) {
+      activeModel.value = nextModel
+      await nextTick()
+    },
   }
 }
 
-function renderOverlays(session: ImageToolChromeSession) {
-  return render(CanvasOverlays, {
-    props: {
-      imageToolSession: session,
-      nodeContextMenu: { visible: false, x: 0, y: 0 },
-      canvasNodeMenuItems: [],
-    },
-    global: {
-      stubs: {
-        ImageMaskEditorChrome: MaskChromeStub,
-        ImageEditorChrome: EditorChromeStub,
-        CanvasNodeContextMenu: { template: '<div data-testid="node-context-menu" />' },
-      },
-    },
-  })
-}
-
-describe('CanvasOverlays image tool chrome wiring', () => {
-  it('routes mask chrome model and commands through the image tool session seam', async () => {
-    const { session, commands } = createImageToolSession(createChromeModel())
-
-    renderOverlays(session)
+describe('ImageToolPresentation', () => {
+  it('renders Mask chrome and dispatches its command through the Image Tool session', async () => {
+    const view = renderPresentation(createChromeModel())
 
     expect(screen.getByTestId('mask-chrome')).toHaveTextContent('Mask 24')
-
     await screen.getByTestId('mask-chrome').click()
-
-    expect(commands.setMaskBrushSize).toHaveBeenCalledWith(48)
+    expect(view.commands.setMaskBrushSize).toHaveBeenCalledWith(48)
   })
 
-  it('routes editor chrome model and commands through the image tool session seam', async () => {
-    const { session, commands } = createImageToolSession(
-      createChromeModel({
-        mode: 'adjust',
-      }),
-    )
-
-    renderOverlays(session)
+  it('renders Editor chrome and dispatches its command through the Image Tool session', async () => {
+    const view = renderPresentation(createChromeModel({ mode: 'adjust' }))
 
     expect(screen.getByTestId('editor-chrome')).toHaveTextContent('Editor move')
-
     await screen.getByTestId('editor-chrome').click()
+    expect(view.commands.selectEditorTool).toHaveBeenCalledWith('brush')
+  })
 
-    expect(commands.selectEditorTool).toHaveBeenCalledWith('brush')
+  it('renders no chrome when Image Tool is inactive or not ready', () => {
+    renderPresentation(createChromeModel({ nodeId: null }))
+    expect(screen.queryByTestId('mask-chrome')).toBeNull()
+    expect(screen.queryByTestId('editor-chrome')).toBeNull()
+
+    renderPresentation(createChromeModel({ isReady: false }))
+    expect(screen.queryByTestId('mask-chrome')).toBeNull()
+    expect(screen.queryByTestId('editor-chrome')).toBeNull()
+  })
+
+  it('switches chrome mode without retaining the previous tool surface', async () => {
+    const view = renderPresentation(createChromeModel())
+
+    expect(screen.getByTestId('mask-chrome')).toBeInTheDocument()
+    expect(screen.queryByTestId('editor-chrome')).toBeNull()
+
+    await view.setModel(createChromeModel({ mode: 'adjust' }))
+
+    expect(screen.queryByTestId('mask-chrome')).toBeNull()
+    expect(screen.getByTestId('editor-chrome')).toBeInTheDocument()
   })
 })
