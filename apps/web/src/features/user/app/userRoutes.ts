@@ -5,14 +5,13 @@ import {
   REFUND_POLICY_PATH,
   SHARE_JOIN_PATH,
   USER_AUTH_CALLBACK_PATH,
-  PUBLIC_HOME_PATH,
   TERMS_PATH,
   USER_HOME_PATH,
   USER_LOGIN_PATH as USER_LOGIN_ROUTE_PATH,
   USER_ROOT_PATH,
 } from '../../../shared/constants/routePaths'
 
-export const USER_DEFAULT_PATH = PUBLIC_HOME_PATH
+export const USER_DEFAULT_PATH = USER_HOME_PATH
 export const USER_LOGIN_PATH = USER_LOGIN_ROUTE_PATH
 
 export const userRoutes: RouteRecordRaw[] = [
@@ -47,15 +46,14 @@ export const userRoutes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
-    path: USER_HOME_PATH,
-    name: 'LegacyUserHome',
-    redirect: PUBLIC_HOME_PATH,
-    meta: { public: true },
-  },
-  {
     path: USER_ROOT_PATH,
     component: () => import('../layout/UserLayout.vue'),
     children: [
+      {
+        path: 'home',
+        name: 'UserHome',
+        component: () => import('../../canvas/pages/CanvasLandingPage.vue'),
+      },
       {
         path: 'login',
         name: 'UserLogin',

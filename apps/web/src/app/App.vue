@@ -19,10 +19,12 @@
 <script setup lang="ts">
 import { IconoirProvider } from '@iconoir/vue'
 import { watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { Toaster } from 'vue-sonner'
 import { useSiteBranding } from '../shared/composables/useSiteBranding'
 
 const { logoURL, projectName } = useSiteBranding()
+const route = useRoute()
 const iconoirProps = {
   color: 'currentColor',
   width: '1.5em',
@@ -72,10 +74,10 @@ function updateSiteIcon(nextLogoURL: string) {
 }
 
 watch(
-  projectName,
-  (value) => {
+  [projectName, () => route.path],
+  ([value, path]) => {
     // Keep the public canonical title from the build-time document intact.
-    if (window.location.pathname !== '/') {
+    if (path !== '/') {
       document.title = value
     }
   },

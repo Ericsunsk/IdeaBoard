@@ -8,7 +8,7 @@ export const PUBLIC_HOME_STATIC_MARKUP = `
   <div class="public-home-static">
     <header class="public-home-static__nav">
       <a class="public-home-static__brand" href="/" aria-label="IdeaBoard home">IdeaBoard</a>
-      <a class="public-home-static__nav-link" href="/user/boards">Open workspace</a>
+      <a class="public-home-static__nav-link" href="/user/home">Open workspace</a>
     </header>
     <main>
       <section class="public-home-static__hero" aria-labelledby="public-home-heading">
@@ -16,7 +16,7 @@ export const PUBLIC_HOME_STATIC_MARKUP = `
           <p class="public-home-static__eyebrow">AI Canvas for Visual Designers</p>
           <h1 id="public-home-heading">Shape visual ideas before they become finished work.</h1>
           <p class="public-home-static__lede">Explore, compare, and refine image directions in one connected workspace built for Visual Designers and Pattern Designers.</p>
-          <a class="public-home-static__cta" href="/user/boards">Open the workspace</a>
+          <a class="public-home-static__cta" href="/user/home">Open the workspace</a>
           <p class="public-home-static__note">No setup tour required. Start with a direction and keep the thread visible.</p>
         </div>
         <div class="public-home-static__canvas" aria-label="Connected AI canvas preview" role="img">
@@ -45,7 +45,7 @@ export const PUBLIC_HOME_STATIC_MARKUP = `
       </section>
       <section class="public-home-static__activation" aria-labelledby="public-home-activation-heading">
         <div><p class="public-home-static__eyebrow">Workspace Activation</p><h2 id="public-home-activation-heading">Give the next idea somewhere to move.</h2><p>Open a working Canvas Board and keep exploring from there.</p></div>
-        <a class="public-home-static__cta public-home-static__cta--dark" href="/user/boards">Open the workspace</a>
+        <a class="public-home-static__cta public-home-static__cta--dark" href="/user/home">Open the workspace</a>
       </section>
     </main>
     <footer class="public-home-static__footer"><span>IdeaBoard AI Canvas</span><nav aria-label="Legal"><a href="/terms">Terms</a><a href="/privacy-policy">Privacy</a><a href="/refund-policy">Refunds</a><a href="/acceptable-use">Acceptable Use</a></nav></footer>
