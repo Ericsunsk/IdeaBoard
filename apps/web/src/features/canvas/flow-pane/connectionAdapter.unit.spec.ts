@@ -5,8 +5,7 @@ describe('flow-pane connection public seam', () => {
   it('keeps Vue Flow bindings and programmatic intent behind one adapter', () => {
     const canConnect = vi.fn(() => true)
     const connect = vi.fn(() => true)
-    const updateEdge = vi.fn()
-    const adapter = createCanvasFlowPaneConnectionAdapter({ canConnect, connect, updateEdge })
+    const adapter = createCanvasFlowPaneConnectionAdapter({ canConnect, connect })
 
     const connection = {
       source: 'prompt-1',
@@ -14,7 +13,6 @@ describe('flow-pane connection public seam', () => {
       sourceHandle: 'out:prompt',
       targetHandle: 'in:image',
     }
-    const edgeUpdate = { edge: { id: 'connection-1' }, connection }
     const intent = {
       sourceNodeId: 'prompt-1' as const,
       targetNodeId: 'image-2' as const,
@@ -22,9 +20,9 @@ describe('flow-pane connection public seam', () => {
       targetPort: 'image' as const,
     }
 
+    expect(Object.keys(adapter.vueFlowBindings)).toEqual(['isValidConnection', 'onConnect'])
     expect(adapter.vueFlowBindings.isValidConnection(connection)).toBe(true)
     adapter.vueFlowBindings.onConnect(connection)
-    adapter.vueFlowBindings.onEdgeUpdate(edgeUpdate as never)
     expect(adapter.connectIntent(intent)).toBe(true)
 
     expect(canConnect).toHaveBeenCalledWith(connection)
@@ -35,6 +33,5 @@ describe('flow-pane connection public seam', () => {
       sourceHandle: 'out:prompt',
       targetHandle: 'in:image',
     })
-    expect(updateEdge).toHaveBeenCalledWith(edgeUpdate)
   })
 })

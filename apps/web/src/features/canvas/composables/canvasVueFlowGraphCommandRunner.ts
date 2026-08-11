@@ -15,7 +15,6 @@ export type CanvasVueFlowGraphCommandName =
   | 'removeNodes'
   | 'removeEdges'
   | 'updateNode'
-  | 'updateEdge'
   | 'applyGraphChanges'
   | 'applyNodeChanges'
   | 'applyEdgeChanges'

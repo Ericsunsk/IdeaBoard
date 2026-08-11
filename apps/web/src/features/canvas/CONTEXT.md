@@ -70,7 +70,7 @@ Vue Flow 提供的 graph interaction plane，负责节点布局、viewport movem
 _Avoid_: Canvas, board
 
 **Canvas Flow Pane connection adapter**:
-`commands.flowPane.connectionAdapter` 暴露的单一 connection seam。它把 Vue Flow `isValidConnection` / `onConnect` / `onEdgeUpdate` bindings 与 programmatic `connectIntent` 聚合；页面只绑定 adapter 的 `vueFlowBindings`，programmatic action 只传由 `CanvasGraphNodeId` 和 `CanvasConnectionPort` 组成的 normalized intent。
+`commands.flowPane.connectionAdapter` 暴露的单一 connection seam。它把 Vue Flow `isValidConnection` / `onConnect` bindings 与 programmatic `connectIntent` 聚合；页面只绑定 adapter 的 `vueFlowBindings`，programmatic action 只传由 `CanvasGraphNodeId` 和 `CanvasConnectionPort` 组成的 normalized intent。已创建 connection 的 endpoints 不可变；需要调整位置时必须先删除再创建。
 _Avoid_: page-level connection commands, Vue Flow event policy
 
 **HTMLCanvasElement**:
@@ -218,7 +218,7 @@ Vue Flow 是 interaction/rendering Adapter，不是 graph domain。
 ## Rules
 
 - `viewModel.flowPane.nodes` / `viewModel.flowPane.edges` 只允许用于 Vue Flow binding，例如 `CanvasPage.vue` 中的 `const { nodes, edges } = viewModel.flowPane`；不要用它们做业务决策。
-- #236 已完成 native Vue Flow connection event binding 的收口；#239 将 bindings 与 programmatic intent 合并为 `commands.flowPane.connectionAdapter`。页面不得恢复 `isValidConnection`、`onConnect`、`onEdgeUpdate`、`connectNodes` 等独立 connection command。
+- #236 已完成 native Vue Flow connection event binding 的收口；#239 将 bindings 与 programmatic intent 合并为 `commands.flowPane.connectionAdapter`。页面只能通过 adapter 使用 `isValidConnection` / `onConnect`，不得恢复独立 connection command。
 - Canvas submodule 协作时只能从 `flow-pane/index.ts` import connection adapter public contract；不得 deep-import `flow-pane` implementation。
 - Vue Flow native events 和 interaction handlers 放在 `commands.flowPane`，例如 `onNodesChange`、`onEdgesChange`、`connectionAdapter` 和 `nodeDragTransactions`；connection event shape 不作为 direct page command 暴露。
 - 页面层访问 Canvas runtime 能力必须通过 `useCanvasWorkspaceRuntime()` 的 `viewModel` / `commands` Facade；新增页面逻辑不要绕过 Facade 直接依赖 runtime internal module。

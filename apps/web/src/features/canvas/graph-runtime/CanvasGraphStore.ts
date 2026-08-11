@@ -65,7 +65,6 @@ export type CanvasGraphProjectionPatch = {
   }
   edges: {
     added: CanvasGraphEdgeRecord[]
-    updated: CanvasGraphEdgeRecord[]
     removedIds: CanvasGraphEdgeId[]
     selectionChanged: Array<{ id: CanvasGraphEdgeId; selected: boolean }>
   }
@@ -106,9 +105,6 @@ export type CanvasGraphNodeUpdate =
   | Partial<Omit<FusionNodeItem, 'id' | 'type'>>
   | ((node: CanvasNodeItem) => CanvasNodeItem)
 
-export type CanvasGraphEdgeUpdate =
-  Partial<Omit<CanvasConnection, 'id'>> | ((connection: CanvasConnection) => CanvasConnection)
-
 export type CanvasGraphRemoveNodeOptions = {
   removeConnectedEdges?: boolean
 }
@@ -138,7 +134,6 @@ type TransactionChangeSet = {
   removedNodeIds: Set<CanvasGraphNodeId>
   selectedNodeIds: Set<CanvasGraphNodeId>
   addedEdgeIds: Set<CanvasGraphEdgeId>
-  updatedEdgeIds: Set<CanvasGraphEdgeId>
   removedEdgeIds: Set<CanvasGraphEdgeId>
   selectedEdgeIds: Set<CanvasGraphEdgeId>
   addedGroupIds: Set<CanvasGraphGroupId>
@@ -411,7 +406,6 @@ function createChangeSet(): TransactionChangeSet {
     removedNodeIds: new Set(),
     selectedNodeIds: new Set(),
     addedEdgeIds: new Set(),
-    updatedEdgeIds: new Set(),
     removedEdgeIds: new Set(),
     selectedEdgeIds: new Set(),
     addedGroupIds: new Set(),
@@ -457,7 +451,7 @@ function markNodeChanged(
 function markEdgeChanged(
   changes: TransactionChangeSet,
   edgeId: CanvasGraphEdgeId,
-  type: 'added' | 'updated' | 'removed' | 'selected',
+  type: 'added' | 'removed' | 'selected',
 ) {
   if (type === 'selected') {
     changes.selectedEdgeIds.add(edgeId)
@@ -466,7 +460,6 @@ function markEdgeChanged(
   setDomainChanged(changes)
   if (type === 'removed') {
     changes.addedEdgeIds.delete(edgeId)
-    changes.updatedEdgeIds.delete(edgeId)
     changes.removedEdgeIds.add(edgeId)
     changes.didChangeEdgeOrder = true
     return
@@ -477,7 +470,6 @@ function markEdgeChanged(
     changes.didChangeEdgeOrder = true
     return
   }
-  if (!changes.addedEdgeIds.has(edgeId)) changes.updatedEdgeIds.add(edgeId)
 }
 
 function markGroupChanged(
@@ -510,18 +502,6 @@ function applyNodeUpdate(current: CanvasNodeItem, update: CanvasGraphNodeUpdate)
     id: current.id,
     type: current.type,
   } as CanvasNodeItem
-}
-
-function applyEdgeUpdate(
-  current: CanvasConnection,
-  update: CanvasGraphEdgeUpdate,
-): CanvasConnection {
-  if (typeof update === 'function') return cloneJson(update(cloneJson(current)))
-  return {
-    ...cloneJson(current),
-    ...update,
-    id: current.id,
-  }
 }
 
 function normalizeGroupGeometry(geometry: CanvasGraphGroupGeometry): CanvasGraphGroupGeometry {
@@ -560,7 +540,6 @@ function createSummary(
   const addedNodeIds = Array.from(changes.addedNodeIds)
   const updatedNodeIds = Array.from(changes.updatedNodeIds)
   const addedEdgeIds = Array.from(changes.addedEdgeIds)
-  const updatedEdgeIds = Array.from(changes.updatedEdgeIds)
   const addedGroupIds = Array.from(changes.addedGroupIds)
   const updatedGroupIds = Array.from(changes.updatedGroupIds)
   const selectedNodeIds = Array.from(changes.selectedNodeIds)
@@ -569,7 +548,7 @@ function createSummary(
   const removedEdgeIds = Array.from(changes.removedEdgeIds)
   const removedGroupIds = Array.from(changes.removedGroupIds)
   const changedNodeIds = [...addedNodeIds, ...updatedNodeIds]
-  const changedEdgeIds = [...addedEdgeIds, ...updatedEdgeIds]
+  const changedEdgeIds = addedEdgeIds
   const changedGroupIds = [...addedGroupIds, ...updatedGroupIds]
   const didChange =
     changes.hasDomainChanges || selectedNodeIds.length > 0 || selectedEdgeIds.length > 0
@@ -609,10 +588,6 @@ function createSummary(
       },
       edges: {
         added: addedEdgeIds
-          .map((id) => state.edgesById.get(id))
-          .filter((record): record is CanvasGraphEdgeRecord => !!record)
-          .map(cloneEdgeRecord),
-        updated: updatedEdgeIds
           .map((id) => state.edgesById.get(id))
           .filter((record): record is CanvasGraphEdgeRecord => !!record)
           .map(cloneEdgeRecord),
@@ -894,24 +869,6 @@ export class CanvasGraphTransaction {
     })
     this.draft.edgeOrder.push(id)
     markEdgeChanged(this.changes, id, 'added')
-    this.rebuildDraftIndexes()
-    return this
-  }
-
-  updateEdge(edgeId: CanvasGraphEdgeId, update: CanvasGraphEdgeUpdate): this {
-    this.assertOpen()
-    const current = this.draft.edgesById.get(edgeId)
-    if (!current) return this
-    const nextConnection = applyEdgeUpdate(current.connection, update)
-    if (nextConnection.id !== current.connection.id) {
-      throw new Error(`CanvasGraphStore cannot change edge identity: ${edgeId}`)
-    }
-    this.assertConnectionEndpointsExist(nextConnection)
-    this.draft.edgesById.set(edgeId, {
-      ...current,
-      connection: nextConnection,
-    })
-    markEdgeChanged(this.changes, edgeId, 'updated')
     this.rebuildDraftIndexes()
     return this
   }

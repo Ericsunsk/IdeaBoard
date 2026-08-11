@@ -126,29 +126,6 @@ describe('useCanvasVueFlowGraphAdapter', () => {
     expect(afterCommand).toHaveBeenCalledOnce()
   })
 
-  it('updates an edge through the Vue Flow setEdges action', () => {
-    const nodes = shallowRef<Node[]>([
-      { id: 'node-1', position: { x: 0, y: 0 }, data: {} },
-      { id: 'node-2', position: { x: 20, y: 0 }, data: {} },
-    ])
-    const edges = shallowRef<Edge[]>([
-      { id: 'edge-1', source: 'node-1', target: 'node-2', animated: false },
-    ])
-    const setEdges = vi.fn()
-    const adapter = useCanvasVueFlowGraphAdapter({
-      nodes,
-      edges,
-      actions: { setEdges },
-    })
-
-    const result = adapter.updateEdge('edge-1', { animated: true })
-
-    expect(result).toMatchObject({ command: 'updateEdge', didChange: true })
-    expect(edges.value[0]).toMatchObject({ id: 'edge-1', animated: true })
-    expect(setEdges).toHaveBeenCalledOnce()
-    expect(setEdges).toHaveBeenCalledWith(edges.value)
-  })
-
   it('applies native node selection as a visual-only command result', () => {
     const nodes = shallowRef<Node[]>([{ id: 'node-1', position: { x: 0, y: 0 }, data: {} }])
     const edges = shallowRef<Edge[]>([])

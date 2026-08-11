@@ -17,7 +17,6 @@ import {
   commitCanvasGraphConnectIntent,
   commitCanvasGraphDeleteGroupIntent,
   commitCanvasGraphDeleteIntent,
-  commitCanvasGraphEdgeUpdateIntent,
   findCanvasGraphEdgeIdByEndpoint,
   isSameCanvasConnectionEndpoint,
   stageCanvasGraphNodeDragIntent,
@@ -544,23 +543,6 @@ describe('CanvasGraphStore', () => {
       shouldRecordHistory: true,
       shouldMarkDirty: true,
     })
-    expect(store.exportSnapshot().connections).toEqual([createConnection(2, 2, 1)])
-  })
-
-  it('commits edge update intents while replacing conflicting target inputs', () => {
-    const snapshot = createSampleSnapshot()
-    snapshot.imageNodes.push(createImageNode(2, 80, 120))
-    snapshot.connections.push(createConnection(2, 2, 2))
-    const store = CanvasGraphStore.fromSnapshot(snapshot)
-
-    const summary = commitCanvasGraphEdgeUpdateIntent(store, {
-      edgeId: toCanvasGraphEdgeId(2),
-      connection: createConnection(2, 2, 1),
-      allowsMultipleTargetConnections: false,
-    })
-
-    expect(summary.changedEdgeIds).toEqual([toCanvasGraphEdgeId(2)])
-    expect(summary.removedEdgeIds).toEqual([toCanvasGraphEdgeId(1)])
     expect(store.exportSnapshot().connections).toEqual([createConnection(2, 2, 1)])
   })
 

@@ -52,7 +52,6 @@ describe('flowConnectionIdentity', () => {
     const canvasEdgeId = toCanvasGraphEdgeId(42)
 
     expect(projectionIndex.resolveCanvasEdgeId(generatedEdge)).toBe(canvasEdgeId)
-    expect(projectionIndex.resolveFlowEdgeId(canvasEdgeId)).toBe(generatedEdge.id)
   })
 
   it('maps restored id collisions to the connections materialized for each endpoint', () => {
@@ -136,7 +135,6 @@ describe('flowConnectionIdentity', () => {
 
     expect(projectionIndex.resolveCanvasEdgeId(firstEdge)).toBe(toCanvasGraphEdgeId(7))
     expect(projectionIndex.resolveCanvasEdgeId(collidingEdge)).toBe(toCanvasGraphEdgeId(43))
-    expect(projectionIndex.resolveFlowEdgeId(toCanvasGraphEdgeId(43))).toBe(collidingEdge.id)
     expect(projectionIndex.getFlowEdge(collidingEdge.id)).toBe(collidingEdge)
   })
 })

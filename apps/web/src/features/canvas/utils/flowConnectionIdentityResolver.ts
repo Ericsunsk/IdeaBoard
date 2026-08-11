@@ -15,7 +15,6 @@ export type FlowConnectionClaimCandidate<TFlowEdge extends FlowEdgeIdentityRecor
 
 export type FlowConnectionClaimIndex<TFlowEdge extends FlowEdgeIdentityRecord> = {
   resolveConnectionId: (candidate: FlowConnectionClaimCandidate<TFlowEdge>) => number | null
-  resolveFlowEdgeId: (connectionId: number) => string | null
   getFlowEdge: (flowEdgeId: string) => TFlowEdge | null
 }
 
@@ -94,7 +93,6 @@ export function createFlowConnectionClaimIndex<TFlowEdge extends FlowEdgeIdentit
 
   const connectionIdByFlowEdge = new Map<TFlowEdge, number | null>()
   const connectionIdByFlowEdgeId = new Map<string, number | null>()
-  const flowEdgeIdByConnectionId = new Map<number, string>()
   const flowEdgeById = new Map<string, TFlowEdge>()
   const claimedConnectionIds = new Set<number>()
   let nextGeneratedConnectionId = resolveNextFlowConnectionId(
@@ -107,9 +105,6 @@ export function createFlowConnectionClaimIndex<TFlowEdge extends FlowEdgeIdentit
     const endpointKey = endpointByBaseConnectionId.get(connectionId)
     if (endpointKey) {
       availableBaseConnectionIdsByEndpoint.get(endpointKey)?.delete(connectionId)
-    }
-    if (!flowEdgeIdByConnectionId.has(connectionId)) {
-      flowEdgeIdByConnectionId.set(connectionId, edge.id)
     }
   }
 
@@ -174,9 +169,6 @@ export function createFlowConnectionClaimIndex<TFlowEdge extends FlowEdgeIdentit
         ? (firstBaseConnectionIdByEndpoint.get(toCanvasConnectionEndpointKey(candidate.endpoint)) ??
             null)
         : null
-    },
-    resolveFlowEdgeId(connectionId) {
-      return flowEdgeIdByConnectionId.get(connectionId) ?? null
     },
     getFlowEdge(flowEdgeId) {
       return flowEdgeById.get(flowEdgeId) ?? null

@@ -1,4 +1,4 @@
-import type { Edge, EdgeUpdateEvent, Node } from '@vue-flow/core'
+import type { Edge, Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
 import { shallowRef } from 'vue'
 import type { FusionNodeItem, ImageNodeItem, PromptNodeItem } from '../../canvas-board/domain'
@@ -328,46 +328,6 @@ describe('useFlowNodeMutations', () => {
     )
   })
 
-  it('updates a generated edge without consuming a later explicit connection id', () => {
-    const generatedEdge = makeEdge(
-      'vueflow__edge-image-1out:image-prompt-1in:image',
-      'image-1',
-      'prompt-1',
-    )
-    const explicitEdge = {
-      ...makeEdge('edge-explicit', 'image-2', 'prompt-1'),
-      data: { connectionSnapshot: { id: 1 } },
-    } as Edge
-    const { edges, onWarning, mutations } = createMutationsHarness(
-      [
-        makeFlowNode('image-1', 'image', makeImageSnapshot(1)),
-        makeFlowNode('image-2', 'image', makeImageSnapshot(2)),
-        makeFlowNode('prompt-1', 'prompt', makePromptSnapshot(1)),
-        makeFlowNode('prompt-2', 'prompt', makePromptSnapshot(2)),
-      ],
-      [generatedEdge, explicitEdge],
-    )
-
-    mutations.connectionAdapter.vueFlowBindings.onEdgeUpdate({
-      edge: generatedEdge,
-      connection: {
-        source: 'image-1',
-        target: 'prompt-2',
-        sourceHandle: 'out:image',
-        targetHandle: 'in:image',
-      },
-    } as EdgeUpdateEvent)
-
-    expect(onWarning).not.toHaveBeenCalled()
-    expect(edges.value.map((edge) => edge.id)).toEqual(['connection-2', 'edge-explicit'])
-    expect(edges.value[0]).toMatchObject({
-      source: 'image-1',
-      target: 'prompt-2',
-      data: { connectionSnapshot: { id: 2 } },
-    })
-    expect(edges.value[1]).toBe(explicitEdge)
-  })
-
   it('keeps single-input connections last-write-wins', () => {
     const { edges, graphActions, mutations } = createMutationsHarness(
       [
@@ -438,58 +398,5 @@ describe('useFlowNodeMutations', () => {
     expect(graphActions.addEdges).not.toHaveBeenCalled()
     expect(graphActions.setEdges).not.toHaveBeenCalled()
     expect(onWarning).toHaveBeenCalledWith('该连线不符合当前连接语义')
-  })
-
-  it('updates existing edge connections through the graph adapter', () => {
-    const { edges, graphActions, graphCommand, mutations } = createMutationsHarness(
-      [
-        makeFlowNode('image-1', 'image', makeImageSnapshot(1)),
-        makeFlowNode('image-2', 'image', makeImageSnapshot(2)),
-        makeFlowNode('fusion-1', 'fusion', makeFusionSnapshot(1, 'idle')),
-      ],
-      [
-        {
-          id: 'connection-1',
-          source: 'image-1',
-          target: 'fusion-1',
-          sourceHandle: 'out:image',
-          targetHandle: 'in:image',
-          data: {
-            connectionSnapshot: {
-              id: 1,
-              fromNodeType: 'image',
-              fromNodeId: 1,
-              fromPort: 'image',
-              toNodeType: 'fusion',
-              toNodeId: 1,
-              toPort: 'image',
-            },
-          },
-        },
-      ],
-    )
-
-    mutations.connectionAdapter.vueFlowBindings.onEdgeUpdate({
-      edge: edges.value[0]!,
-      connection: {
-        source: 'image-2',
-        target: 'fusion-1',
-        sourceHandle: 'out:image',
-        targetHandle: 'in:image',
-      },
-    } as EdgeUpdateEvent)
-
-    expect(edges.value[0]).toMatchObject({
-      id: 'connection-1',
-      source: 'image-2',
-      target: 'fusion-1',
-      sourceHandle: 'out:image',
-      targetHandle: 'in:image',
-    })
-    expect(graphActions.setEdges).toHaveBeenCalledOnce()
-    expect(graphCommand).toHaveBeenCalledWith(
-      expect.objectContaining({ command: 'updateEdge', didChange: true }),
-      undefined,
-    )
   })
 })

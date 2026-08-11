@@ -51,4 +51,9 @@ describe('Canvas Screen architecture contract', () => {
       'selectFlowNodeForContextMenu: options.flowPaneAdapter.selectOnlyNode',
     )
   })
+
+  it('keeps connection endpoints immutable in the Vue Flow surface', () => {
+    expect(canvasScreen).toContain('edgesUpdatable: false')
+    expect(canvasScreen).toContain('defaultEdgeOptions: { animated: false, updatable: false }')
+  })
 })

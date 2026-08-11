@@ -46,7 +46,6 @@ function createDeleteSummary(
       },
       edges: {
         added: [],
-        updated: [],
         removedIds: removedEdgeIds,
         selectionChanged: [],
       },

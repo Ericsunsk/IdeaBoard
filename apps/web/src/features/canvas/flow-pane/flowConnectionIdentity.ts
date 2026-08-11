@@ -1,4 +1,4 @@
-import type { Edge, EdgeUpdateEvent } from '@vue-flow/core'
+import type { Edge } from '@vue-flow/core'
 import type { CanvasConnection, CanvasConnectionEndpoint } from '../../canvas-board/domain'
 import {
   shouldReplaceCanvasConnection,
@@ -13,14 +13,8 @@ import { createFlowConnectionClaimIndex } from '../utils/flowConnectionIdentityR
 export type FlowEdgeIdentity = Pick<Edge, 'id' | 'data'> &
   Partial<Pick<Edge, 'source' | 'target' | 'sourceHandle' | 'targetHandle'>>
 
-export type FlowEdgeIdentitySource = FlowEdgeIdentity | Pick<EdgeUpdateEvent, 'edge'>
-
 type FlowEdgeRemoveChangeIdentity = Pick<Edge, 'id'> &
   Partial<Pick<Edge, 'data' | 'source' | 'target' | 'sourceHandle' | 'targetHandle'>>
-
-function resolveFlowEdgeFromIdentitySource(input: FlowEdgeIdentitySource): FlowEdgeIdentity {
-  return 'edge' in input ? input.edge : input
-}
 
 function flowEdgeIdentityToCanvasConnectionEndpoint(
   edge: FlowEdgeIdentity,
@@ -57,11 +51,10 @@ export function createFlowEdgeIdentityFromRemoveChange(
 }
 
 export type FlowEdgeProjectionIndex = {
-  resolveCanvasEdgeId: (input: FlowEdgeIdentitySource) => CanvasGraphEdgeId | null
-  resolveFlowEdgeId: (canvasEdgeId: CanvasGraphEdgeId) => string
+  resolveCanvasEdgeId: (edge: FlowEdgeIdentity) => CanvasGraphEdgeId | null
   getFlowEdge: (flowEdgeId: string) => Edge | null
   classifyReplacement: (
-    input: FlowEdgeIdentitySource,
+    edge: FlowEdgeIdentity,
     nextConnection: CanvasConnectionEndpoint,
     policy: CanvasGraphConnectionTargetPolicy,
   ) => 'replace' | 'retain' | 'unresolved'
@@ -71,13 +64,6 @@ export function createFlowEdgeProjectionIndex(
   store: CanvasGraphStore,
   existingEdges: readonly Edge[],
 ): FlowEdgeProjectionIndex {
-  const connectionIdByCanvasEdgeId = new Map<CanvasGraphEdgeId, number>()
-  for (const canvasEdgeId of store.getEdgeIds()) {
-    const connectionId = store.getEdge(canvasEdgeId)?.connection.id
-    if (connectionId !== undefined) {
-      connectionIdByCanvasEdgeId.set(canvasEdgeId, connectionId)
-    }
-  }
   const claimIndex = createFlowConnectionClaimIndex({
     candidates: existingEdges.map((edge) => ({
       edge,
@@ -88,28 +74,19 @@ export function createFlowEdgeProjectionIndex(
   })
 
   return {
-    resolveCanvasEdgeId(input) {
-      const edge = resolveFlowEdgeFromIdentitySource(input) as Edge
+    resolveCanvasEdgeId(edge) {
       const connectionId = claimIndex.resolveConnectionId({
-        edge,
+        edge: edge as Edge,
         endpoint: flowEdgeIdentityToCanvasConnectionEndpoint(edge),
       })
       if (connectionId === null) return null
       return toCanvasGraphEdgeId(connectionId)
     },
-    resolveFlowEdgeId(canvasEdgeId) {
-      const connectionId = connectionIdByCanvasEdgeId.get(canvasEdgeId)
-      return connectionId === undefined
-        ? canvasEdgeId
-        : (claimIndex.resolveFlowEdgeId(connectionId) ?? canvasEdgeId)
-    },
     getFlowEdge(flowEdgeId) {
       return claimIndex.getFlowEdge(flowEdgeId)
     },
-    classifyReplacement(input, nextConnection, policy) {
-      const endpoint = flowEdgeIdentityToCanvasConnectionEndpoint(
-        resolveFlowEdgeFromIdentitySource(input),
-      )
+    classifyReplacement(edge, nextConnection, policy) {
+      const endpoint = flowEdgeIdentityToCanvasConnectionEndpoint(edge)
       if (!endpoint) return 'unresolved'
       return shouldReplaceCanvasConnection(endpoint, nextConnection, policy) ? 'replace' : 'retain'
     },
@@ -122,17 +99,11 @@ export function resolveFlowEdgeProjectionReplacement(options: {
   removedEdgeIds: ReadonlySet<CanvasGraphEdgeId>
   nextConnection: CanvasConnectionEndpoint
   policy: CanvasGraphConnectionTargetPolicy
-  preserveFlowEdgeId?: string
 }): { retainedEdges: Edge[]; didReplace: boolean } | null {
   const retainedEdges: Edge[] = []
   let didReplace = false
 
   for (const edge of options.edges) {
-    if (edge.id === options.preserveFlowEdgeId) {
-      retainedEdges.push(edge)
-      continue
-    }
-
     const projectionEdgeId = options.projectionIndex.resolveCanvasEdgeId(edge)
     if (projectionEdgeId !== null && options.removedEdgeIds.has(projectionEdgeId)) {
       didReplace = true

@@ -24,10 +24,6 @@ export type CanvasVueFlowGraphNodeUpdateOptions = CanvasVueFlowGraphCommandOptio
   replace?: boolean
 }
 
-export type CanvasVueFlowGraphEdgeUpdateOptions = CanvasVueFlowGraphCommandOptions & {
-  replace?: boolean
-}
-
 export type CanvasVueFlowGraphRemoveNodesOptions = CanvasVueFlowGraphCommandOptions & {
   removeConnectedEdges?: boolean
   removeChildren?: boolean
@@ -50,7 +46,6 @@ type EdgeTargetInput = EdgeTarget | EdgeTarget[]
 type NodeTargetResolver = NodeTargetInput | ((nodes: Node[]) => NodeTargetInput)
 type EdgeTargetResolver = EdgeTargetInput | ((edges: Edge[]) => EdgeTargetInput)
 type NodeUpdate = Partial<Node> | ((node: Node) => Partial<Node>)
-type EdgeUpdate = Partial<Edge> | ((edge: Edge) => Partial<Edge>)
 
 function resolveValue<TCurrent, TResult>(
   valueOrResolver: TResult | ((current: TCurrent) => TResult),
@@ -289,33 +284,6 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
     })
   }
 
-  function updateEdge(
-    edgeId: string,
-    update: EdgeUpdate,
-    commandOptions: CanvasVueFlowGraphEdgeUpdateOptions = {},
-  ): CanvasVueFlowGraphCommandResult {
-    const edgeIndex = options.edges.value.findIndex((edge) => edge.id === edgeId)
-    if (edgeIndex < 0) {
-      return commandRunner.noOp('updateEdge', commandOptions)
-    }
-    const currentEdge = options.edges.value[edgeIndex]
-    const patch = typeof update === 'function' ? update(currentEdge) : update
-    const nextEdge = commandOptions.replace
-      ? ({ id: currentEdge.id, ...patch } as Edge)
-      : ({ ...currentEdge, ...patch } as Edge)
-    const nextEdges = options.edges.value.slice()
-    nextEdges[edgeIndex] = nextEdge
-    return commandRunner.run({
-      command: 'updateEdge',
-      nextGraph: createGraph(options.nodes.value, nextEdges),
-      commit: () => {
-        options.actions?.setEdges?.(nextEdges)
-        syncEdges(nextEdges)
-      },
-      commandOptions,
-    })
-  }
-
   return {
     replaceGraph,
     replaceNodes,
@@ -325,7 +293,6 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
     removeNodes,
     removeEdges,
     updateNode,
-    updateEdge,
     ...nativeChangeAdapter,
   }
 }

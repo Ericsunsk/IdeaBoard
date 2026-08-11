@@ -129,30 +129,6 @@ export function commitCanvasGraphConnectIntent(
   }
 }
 
-export function commitCanvasGraphEdgeUpdateIntent(
-  store: CanvasGraphStore,
-  intent: {
-    edgeId: CanvasGraphEdgeId
-    connection: CanvasConnection
-    allowsMultipleTargetConnections: boolean
-  },
-): CanvasGraphTransactionSummary {
-  const transaction = store.beginTransaction('connect')
-  try {
-    removeTransactionEdgesMatching(store, transaction, (current, edgeId) => {
-      if (edgeId === intent.edgeId) return false
-      return shouldReplaceCanvasConnection(current, intent.connection, {
-        allowsMultipleTargetConnections: intent.allowsMultipleTargetConnections,
-      })
-    })
-    transaction.updateEdge(intent.edgeId, intent.connection)
-    return transaction.commit()
-  } catch (error) {
-    transaction.cancel()
-    throw error
-  }
-}
-
 export function resolveCanvasGraphDeleteReason(
   nodeIds: readonly CanvasGraphNodeId[],
   extraEdgeIds: readonly CanvasGraphEdgeId[],

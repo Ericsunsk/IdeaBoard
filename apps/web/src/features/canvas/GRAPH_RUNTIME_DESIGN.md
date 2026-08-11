@@ -22,7 +22,7 @@ Baseline 证据来自 `apps/web/.benchmark-reports/` 的本地 report，汇总�
 - 用 normalized `CanvasGraphStore` 作为 Canvas graph mutation 的 fact source。
 - 用 `CanvasGraphTransaction` 表达 interaction boundary，让 history/autosave 订阅 transaction commit，而不是响应 raw change floods。
 - 让 Vue Flow 成为 interaction plane 和 rendering projection adapter，不拥有 domain mutation semantics。
-- 让 `node-drag`、connect、edge update、disconnect、delete 和 batch delete 都走 canonical transaction path。
+- 让 `node-drag`、connect、disconnect、delete 和 batch delete 都走 canonical transaction path。
 - 对不可写入 canonical graph 的 corrupt/non-canonical data 显式 warning，要求刷新或重新 hydrate，不再静默回落到旧 mutation path。
 
 ## Non-Goals
@@ -35,7 +35,7 @@ Baseline 证据来自 `apps/web/.benchmark-reports/` 的本地 report，汇总�
 ## Preserved Contracts
 
 - `CanvasBoardSnapshot` 继续是 persistence schema 和 import/export contract。
-- Canvas route 和用户可见行为保持不变：打开 board、拖拽节点、连线、删除、undo/redo、autosave、运行 workflow 的交互语义不变。
+- Canvas route 保持不变；支持打开 board、拖拽节点、创建/删除连线、undo/redo、autosave 和运行 workflow。已创建连线的 endpoints 不可变，调整位置必须删除后重新创建。
 - Execution Plan、Task submission 与 Pending Result materialization 继续使用现有 feature boundaries；runtime state 由单一 `CanvasExecutionRuntime` attachment/lease seam 拥有。
 - `features/canvas-board/domain` 继续拥有 shared snapshot schema/core module。
 - Benchmark report artifacts 继续只写入 ignored local directory，不能进入 git。
@@ -63,7 +63,7 @@ Responsibilities:
 
 Responsibilities:
 
-- stage node/edge add, update, remove, connect, disconnect, selection and drag updates
+- stage node add/update/remove、edge add/remove、connect/disconnect、selection 和 drag updates
 - expose cancel without mutating committed store
 - commit atomically and return `CanvasGraphTransactionSummary`
 - report dirty scope: changed node ids, changed edge ids, removed ids, order changes, history intent and autosave intent
@@ -127,9 +127,10 @@ Responsibilities:
 
 - `node-drag`: queue native position/select changes, project per frame, commit one `node-drag` transaction.
 - connect: normalize connection, compute canonical `connection-*` id, commit one `connect` transaction.
-- edge update: resolve canonical graph edge id from `connectionSnapshot` or canonical edge id, commit one `connect` transaction.
 - native disconnect/delete/batch delete: coalesce native remove changes, commit one `disconnect` / `delete` / `batch-delete` transaction.
 - node delete command: remove canonical graph node and connected edges via one `delete` transaction.
+
+Connection endpoints are immutable. Repositioning a connection is modeled as an explicit delete followed by a new connect, producing independent transaction and history boundaries.
 
 Non-canonical node ids, non-canonical edge ids, or corrupt edge snapshots are not mutated through a legacy path. The UI must surface a warning and leave the current graph untouched.
 
@@ -138,10 +139,10 @@ Non-canonical node ids, non-canonical edge ids, or corrupt edge snapshots are no
 Required coverage:
 
 - `CanvasGraphStore` hydrate/export roundtrip against `CanvasBoardSnapshot`
-- add/update/remove/connect/disconnect and batch delete transaction tests
+- node add/update/remove、edge add/remove、connect/disconnect 和 batch delete transaction tests
 - transaction cancel/commit and dirty summary tests
 - node-drag commit and cancel tests
-- connection and edge update tests using canonical connection ids
+- connection tests using canonical connection ids
 - native disconnect/delete/batch delete tests asserting one undoable transaction
 - before/after benchmark for `structure-heavy 1000 node-drag`
 - torture signal for `structure-heavy 5000 node-drag`, reported as ceiling evidence

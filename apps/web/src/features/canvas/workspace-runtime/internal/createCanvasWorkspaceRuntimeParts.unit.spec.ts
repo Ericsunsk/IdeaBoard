@@ -120,7 +120,6 @@ function createGraphRuntime() {
       vueFlowBindings: {
         isValidConnection: vi.fn(() => true),
         onConnect: vi.fn(),
-        onEdgeUpdate: vi.fn(),
       },
       connectIntent: vi.fn(),
     },
@@ -325,7 +324,6 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect('connectNodes' in runtime.graph.flowPane).toBe(false)
     expect('vueFlowConnectionBindings' in runtime.graph.flowPane).toBe(false)
     expect('onConnect' in runtime.graph.flowPane).toBe(false)
-    expect('onEdgeUpdate' in runtime.graph.flowPane).toBe(false)
     expect('isValidConnection' in runtime.graph.flowPane).toBe(false)
     expect(runtime.board.flowPane.nodeDragTransactions.begin).toBe(
       board.flowPane.nodeDragTransactions.begin,

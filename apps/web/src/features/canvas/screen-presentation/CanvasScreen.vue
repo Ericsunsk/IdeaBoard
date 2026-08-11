@@ -326,7 +326,8 @@ const vueFlowProps = computed(() => {
     multiSelectionKeyCode: !isCanvasLocked && isSelectTool ? 'Shift' : null,
     deleteKeyCode:
       isCanvasLocked || isCanvasShortcutSuppressed.value ? null : ['Backspace', 'Delete'],
-    defaultEdgeOptions: { animated: false, updatable: true },
+    edgesUpdatable: false,
+    defaultEdgeOptions: { animated: false, updatable: false },
     applyDefault: false,
     minZoom: CANVAS_VIEWPORT_MIN_ZOOM,
     maxZoom: CANVAS_VIEWPORT_MAX_ZOOM,

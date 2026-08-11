@@ -1,4 +1,4 @@
-import type { Connection, EdgeUpdateEvent } from '@vue-flow/core'
+import type { Connection } from '@vue-flow/core'
 import type { CanvasConnectionPort } from '../../canvas-board/domain'
 import type { CanvasGraphNodeId } from '../graph-runtime'
 
@@ -12,13 +12,11 @@ export type CanvasFlowPaneConnectIntent = {
 type CanvasFlowPaneConnectionHandlers = {
   canConnect: (connection: Connection) => boolean
   connect: (connection: Connection) => boolean
-  updateEdge: (event: EdgeUpdateEvent) => void
 }
 
 export type CanvasFlowPaneConnectionBindings = {
   isValidConnection: (connection: Connection) => boolean
   onConnect: (connection: Connection) => void
-  onEdgeUpdate: (event: EdgeUpdateEvent) => void
 }
 
 export type CanvasFlowPaneConnectionAdapter = {
@@ -35,7 +33,6 @@ export function createCanvasFlowPaneConnectionAdapter(
       onConnect: (connection) => {
         void handlers.connect(connection)
       },
-      onEdgeUpdate: handlers.updateEdge,
     },
     connectIntent: (intent) =>
       handlers.connect({

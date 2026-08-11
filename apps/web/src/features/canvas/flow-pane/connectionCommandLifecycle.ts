@@ -1,4 +1,4 @@
-import type { Connection, Edge, EdgeUpdateEvent, Node } from '@vue-flow/core'
+import type { Connection, Edge, Node } from '@vue-flow/core'
 import type { CanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
 import {
   applyCanvasGraphCommitPolicy,
@@ -12,9 +12,7 @@ import {
 } from '../utils/flowSnapshotAdapter'
 import {
   commitCanvasGraphConnectIntent,
-  commitCanvasGraphEdgeUpdateIntent,
   createCanvasGraphStore,
-  type CanvasGraphEdgeId,
   type CanvasGraphStore,
   type CanvasGraphTransactionSummary,
 } from '../graph-runtime'
@@ -174,137 +172,8 @@ export function createCanvasConnectionCommandLifecycle(
     return commitConnection(resolvedConnection)
   }
 
-  function createEdgeUpdatePatch(nextEdge: Edge): Partial<Edge> {
-    return {
-      id: nextEdge.id,
-      source: nextEdge.source,
-      target: nextEdge.target,
-      sourceHandle: nextEdge.sourceHandle ?? null,
-      targetHandle: nextEdge.targetHandle ?? null,
-      data: nextEdge.data,
-    }
-  }
-
-  function resolveUpdatedEdge(
-    summary: CanvasGraphTransactionSummary,
-    nextConnection: CanvasConnection,
-  ) {
-    const updatedConnection = summary.projectionPatch.edges.updated[0]?.connection ?? nextConnection
-    return canvasConnectionToFlowEdge(updatedConnection) as Edge
-  }
-
-  function commitEdgeUpdateProjection(
-    existingEdges: Edge[],
-    projectionIndex: FlowEdgeProjectionIndex,
-    updatedEdgeId: CanvasGraphEdgeId,
-    updatedFlowEdgeId: string,
-    nextConnection: CanvasConnection,
-    allowsMultipleTargetConnections: boolean,
-    commitPolicy: CanvasGraphCommitPolicy,
-  ) {
-    const { summary } = commitPolicy
-    const nextEdge = resolveUpdatedEdge(summary, nextConnection)
-    const removedEdgeIds = new Set(summary.projectionPatch.edges.removedIds)
-    const replacement = resolveFlowEdgeProjectionReplacement({
-      edges: existingEdges,
-      projectionIndex,
-      removedEdgeIds,
-      nextConnection,
-      policy: { allowsMultipleTargetConnections },
-      preserveFlowEdgeId: updatedFlowEdgeId,
-    })
-    if (!replacement) {
-      options.onWarning('连线更新未能写入画布，请刷新后重试')
-      return false
-    }
-
-    applyCanvasGraphCommitPolicy(commitPolicy, (commandOptions) => {
-      if (!replacement.didReplace) {
-        options.graphAdapter.updateEdge(
-          projectionIndex.resolveFlowEdgeId(updatedEdgeId),
-          createEdgeUpdatePatch(nextEdge),
-          commandOptions,
-        )
-        return
-      }
-
-      options.graphAdapter.replaceEdges(
-        replacement.retainedEdges.map((edge) =>
-          projectionIndex.resolveCanvasEdgeId(edge) === updatedEdgeId
-            ? ({ ...edge, ...nextEdge } as Edge)
-            : edge,
-        ),
-        commandOptions,
-      )
-    })
-    return true
-  }
-
-  function commitEdgeUpdate(event: EdgeUpdateEvent, resolvedConnection: Connection) {
-    const store = createCurrentGraphStore()
-    const existingEdges = options.readEdges()
-    const projectionIndex = createFlowEdgeProjectionIndex(store, existingEdges)
-    const transactionEdgeId = projectionIndex.resolveCanvasEdgeId(event)
-    if (!transactionEdgeId) {
-      options.onWarning('连线更新未能写入画布，请刷新后重试')
-      return
-    }
-
-    const currentConnection = store.getEdge(transactionEdgeId)?.connection
-    if (!currentConnection) {
-      options.onWarning('连线更新未能写入画布，请刷新后重试')
-      return
-    }
-    const nextConnection = flowConnectionToCanvasConnection(
-      currentConnection.id,
-      resolvedConnection,
-    )
-    if (!nextConnection) {
-      options.onWarning('连线更新未能写入画布，请刷新后重试')
-      return
-    }
-
-    const allowsMultipleTargetConnections =
-      options.allowsMultipleTargetConnections?.(resolvedConnection) ?? false
-
-    let summary: CanvasGraphTransactionSummary
-    try {
-      summary = commitCanvasGraphEdgeUpdateIntent(store, {
-        edgeId: transactionEdgeId,
-        connection: nextConnection,
-        allowsMultipleTargetConnections,
-      })
-    } catch (error) {
-      console.error('[Canvas] Failed to commit edge update transaction', error)
-      options.onWarning('连线更新未能写入画布，请刷新后重试')
-      return
-    }
-    if (!summary.didChange) return
-
-    const didCommitProjection = commitEdgeUpdateProjection(
-      existingEdges,
-      projectionIndex,
-      transactionEdgeId,
-      event.edge.id,
-      nextConnection,
-      allowsMultipleTargetConnections,
-      { summary },
-    )
-    if (!didCommitProjection) return
-    options.markFlowExecutionNodeDirty(resolvedConnection.target, { includeSelf: true })
-  }
-
-  function updateEdge(event: EdgeUpdateEvent) {
-    const { edge, connection } = event
-    const existingEdges = options.readEdges().filter((item) => item.id !== edge.id)
-    const resolvedConnection = resolveValidatedConnection(connection, existingEdges)
-    if (!resolvedConnection) return
-    commitEdgeUpdate(event, resolvedConnection)
-  }
-
   return createCanvasFlowPaneConnectionAdapter({
     canConnect: options.isValidConnection,
     connect,
-    updateEdge,
   })
 }
