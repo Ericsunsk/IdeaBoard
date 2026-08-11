@@ -4,7 +4,6 @@ export const REFUND_POLICY_PATH = '/refund-policy'
 export const PRIVACY_POLICY_PATH = '/privacy-policy'
 export const ACCEPTABLE_USE_PATH = '/acceptable-use'
 
-export const PUBLIC_HOME_PATH = '/'
 export const USER_ROOT_PATH = '/user'
 export const USER_HOME_PATH = '/user/home'
 export const USER_LOGIN_PATH = '/user/login'

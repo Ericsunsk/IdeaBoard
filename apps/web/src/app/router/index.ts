@@ -11,8 +11,7 @@ import { buildLoginRedirectPath } from '../../shared/auth/sessionPolicy'
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    name: 'PublicHome',
-    component: () => import('../../features/public-site/pages/PublicHomePage.vue'),
+    redirect: USER_DEFAULT_PATH,
   },
   ...userRoutes,
   ...adminRoutes,
