@@ -1,0 +1,52 @@
+User-agent: *
+Allow: /
+Disallow: /user
+Disallow: /admin
+Disallow: /api
+Disallow: /uploads
+Disallow: /share
+
+# Search and answer-engine crawlers may discover the public legal documents.
+User-agent: Googlebot
+Allow: /
+Disallow: /user
+Disallow: /admin
+Disallow: /api
+Disallow: /uploads
+Disallow: /share
+
+User-agent: Bingbot
+Allow: /
+Disallow: /user
+Disallow: /admin
+Disallow: /api
+Disallow: /uploads
+Disallow: /share
+
+User-agent: OAI-SearchBot
+Allow: /
+Disallow: /user
+Disallow: /admin
+Disallow: /api
+Disallow: /uploads
+Disallow: /share
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /user
+Disallow: /admin
+Disallow: /api
+Disallow: /uploads
+Disallow: /share
+
+# Do not grant training-crawl access while public product content is deferred.
+User-agent: GPTBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+Sitemap: https://ideaboard.art/sitemap.xml

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, ref } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
-import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
+import { HOME_PATH } from '../../../shared/constants/routePaths'
 import { useCanvasBoardRuntime } from './useCanvasBoardRuntime'
 import { createCanvasExecutionRuntime } from '../execution/runtime/CanvasExecutionRuntime'
 
@@ -101,7 +101,7 @@ describe('useCanvasBoardRuntime', () => {
     await runtime.boardChrome.onNavigateRequest('/boards/next')
     await runtime.boardChrome.onLogoutRequest()
 
-    expect(events).toEqual(['flush', 'navigate:/boards/next', 'flush', `logout:${USER_HOME_PATH}`])
+    expect(events).toEqual(['flush', 'navigate:/boards/next', 'flush', `logout:${HOME_PATH}`])
     expect(flushAutosave).toHaveBeenCalledTimes(2)
   })
 

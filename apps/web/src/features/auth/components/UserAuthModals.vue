@@ -24,7 +24,8 @@ import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
 import {
-  USER_HOME_PATH,
+  HOME_PATH,
+  USER_BOARDS_PATH,
   USER_LOGIN_PATH,
   USER_REGISTER_PATH,
 } from '../../../shared/constants/routePaths'
@@ -55,10 +56,10 @@ function resolveLoginRedirectPath() {
   const redirectPath = Array.isArray(redirect) ? redirect[0] : redirect
   const normalizedPath = typeof redirectPath === 'string' ? redirectPath.trim() : ''
   if (!normalizedPath) {
-    return USER_HOME_PATH
+    return USER_BOARDS_PATH
   }
   if (!isSafeInternalRedirectPath(normalizedPath)) {
-    return USER_HOME_PATH
+    return USER_BOARDS_PATH
   }
   return normalizedPath
 }
@@ -73,6 +74,6 @@ function onRegisterSuccess() {
 
 function closeAuth() {
   if (busy.value) return
-  void router.replace(USER_HOME_PATH)
+  void router.replace(HOME_PATH)
 }
 </script>

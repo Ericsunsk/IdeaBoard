@@ -1,8 +1,8 @@
 import {
   ADMIN_LOGIN_PATH,
   ADMIN_ROOT_PATH,
+  HOME_PATH,
   SHARE_JOIN_PATH,
-  USER_HOME_PATH,
   USER_BOARDS_PATH,
   USER_LOGIN_PATH,
   USER_REGISTER_PATH,
@@ -20,7 +20,7 @@ export type AuthFailureAction =
   | { kind: 'ignore' }
   | { kind: 'clear-only' }
   | { kind: 'redirect-login'; targetPath: string }
-  | { kind: 'redirect-home'; targetPath: typeof USER_HOME_PATH }
+  | { kind: 'redirect-home'; targetPath: typeof HOME_PATH }
 
 export type AuthFailureContext = {
   status?: number
@@ -136,7 +136,7 @@ export function resolveAuthFailureAction(context: AuthFailureContext): AuthFailu
   const isOnAdminPage = isPathUnderRoute(currentPathname, ADMIN_ROOT_PATH)
 
   if (code === 403 && isAdminApiRequest(requestUrl) && isOnAdminPage) {
-    return { kind: 'redirect-home', targetPath: USER_HOME_PATH }
+    return { kind: 'redirect-home', targetPath: HOME_PATH }
   }
 
   if (code === 401 && isSessionProbeRequest(requestUrl)) {

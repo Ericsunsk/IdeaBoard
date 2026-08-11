@@ -211,12 +211,12 @@ describe('UserAuthCallbackPage', () => {
     expect(mocks.clearAuth).not.toHaveBeenCalled()
   })
 
-  it('rejects an external redirect and falls back to the User home', async () => {
+  it('rejects an external redirect and falls back to User Boards', async () => {
     mocks.route.query = { redirect: 'https://attacker.example/steal-session' }
 
     renderCallbackPage()
 
-    await waitFor(() => expect(mocks.routerReplace).toHaveBeenCalledWith('/user/home'))
+    await waitFor(() => expect(mocks.routerReplace).toHaveBeenCalledWith('/user/boards'))
     expect(mocks.routerReplace).not.toHaveBeenCalledWith(
       expect.stringContaining('attacker.example'),
     )

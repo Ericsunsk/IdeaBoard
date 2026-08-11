@@ -2,7 +2,7 @@ import { defineComponent, h, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render } from '../../test/render'
 import type { User } from '../../shared/api/userSession'
-import { ADMIN_ROOT_PATH, USER_HOME_PATH } from '../../shared/constants/routePaths'
+import { ADMIN_ROOT_PATH, HOME_PATH } from '../../shared/constants/routePaths'
 import {
   createAccountManagementOverlay,
   provideAccountManagementOverlay,
@@ -157,7 +157,7 @@ describe('useUserAccountControls', () => {
     expect(overlay.viewModel.initialTab.value).toBe('profile')
     expect(overlay.viewModel.visible.value).toBe(true)
     expect(navigate).toHaveBeenCalledWith(ADMIN_ROOT_PATH)
-    expect(navigate).toHaveBeenCalledWith(USER_HOME_PATH)
+    expect(navigate).toHaveBeenCalledWith(HOME_PATH)
     expect(logout).toHaveBeenCalledOnce()
   })
 })

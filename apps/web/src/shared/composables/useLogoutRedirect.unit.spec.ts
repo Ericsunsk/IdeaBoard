@@ -21,10 +21,10 @@ describe('useLogoutRedirect', () => {
     const logout = vi.fn(async () => true)
     const { logoutAndRedirect } = useLogoutRedirect({ logout })
 
-    await expect(logoutAndRedirect('/user/home')).resolves.toBe(true)
+    await expect(logoutAndRedirect('/')).resolves.toBe(true)
 
     expect(logout).toHaveBeenCalledOnce()
-    expect(router.push).toHaveBeenCalledWith('/user/home')
+    expect(router.push).toHaveBeenCalledWith('/')
     expect(router.replace).not.toHaveBeenCalled()
   })
 
@@ -42,7 +42,7 @@ describe('useLogoutRedirect', () => {
     const logout = vi.fn(async () => false)
     const { logoutAndRedirect } = useLogoutRedirect({ logout })
 
-    await expect(logoutAndRedirect('/user/home')).resolves.toBe(false)
+    await expect(logoutAndRedirect('/')).resolves.toBe(false)
 
     expect(router.push).not.toHaveBeenCalled()
     expect(router.replace).not.toHaveBeenCalled()

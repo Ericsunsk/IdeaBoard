@@ -113,7 +113,7 @@ import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
-import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
+import { HOME_PATH } from '../../../shared/constants/routePaths'
 import { brandMarkClasses, createBrandMarkClass } from '../../../shared/lib/brandMark'
 import { getMotionPreference } from '../../../shared/motion/motionPolicy'
 import {
@@ -166,7 +166,7 @@ const accountBrandMarkClass = createBrandMarkClass(brandMarkClasses.sizes.accoun
 const accountPaneMotionEnabled = getMotionPreference() !== 'reduce'
 
 async function handleLogout() {
-  const loggedOut = await runLogoutAction(() => logoutAndRedirect(USER_HOME_PATH), {
+  const loggedOut = await runLogoutAction(() => logoutAndRedirect(HOME_PATH), {
     feedback: {
       error: profileFeedback.logoutFailed,
     },

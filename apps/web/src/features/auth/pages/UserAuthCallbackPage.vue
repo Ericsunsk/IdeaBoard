@@ -22,7 +22,7 @@ import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useUserStore } from '../session/authSession'
 import { authTransport } from '../session/authTransport'
-import { USER_HOME_PATH, USER_LOGIN_PATH } from '../../../shared/constants/routePaths'
+import { USER_BOARDS_PATH, USER_LOGIN_PATH } from '../../../shared/constants/routePaths'
 import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
 
 const route = useRoute()
@@ -37,7 +37,7 @@ const message = computed(() =>
 function safeRedirectPath() {
   const raw = Array.isArray(route.query.redirect) ? route.query.redirect[0] : route.query.redirect
   const path = typeof raw === 'string' ? raw.trim() : ''
-  return isSafeInternalRedirectPath(path) ? path : USER_HOME_PATH
+  return isSafeInternalRedirectPath(path) ? path : USER_BOARDS_PATH
 }
 
 async function returnToLogin() {

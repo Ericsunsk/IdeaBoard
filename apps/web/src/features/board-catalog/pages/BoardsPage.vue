@@ -175,7 +175,7 @@ import {
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import { usePrimeDialogOverlayLifecycle } from '../../../shared/composables/usePrimeDialogOverlayLifecycle'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
-import { USER_CANVAS_PATH, USER_HOME_PATH } from '../../../shared/constants/routePaths'
+import { HOME_PATH, USER_CANVAS_PATH } from '../../../shared/constants/routePaths'
 import { useUserStore } from '../../auth/session/authSession'
 import UserAccountMenu from '../../../shared/components/UserAccountMenu.vue'
 import StudioName from '../../../shared/components/StudioName.vue'
@@ -266,7 +266,7 @@ const sortOptions = [
 const accountControls = useUserAccountControls({
   navigation: {
     navigate: (path) => router.push(path),
-    logout: () => logoutAndRedirect(USER_HOME_PATH),
+    logout: () => logoutAndRedirect(HOME_PATH),
   },
 })
 </script>

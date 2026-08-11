@@ -5,13 +5,15 @@ import { dismissAppToasts } from '../../shared/composables/useAppToast'
 import { ADMIN_DEFAULT_PATH } from '../../features/admin/app/adminNavigationMeta'
 import { adminRoutes } from '../../features/admin/app/adminRoutes'
 import { USER_DEFAULT_PATH, userRoutes } from '../../features/user/app/userRoutes'
-import { ADMIN_ROOT_PATH, isPathUnderRoute } from '../../shared/constants/routePaths'
+import { ADMIN_ROOT_PATH, HOME_PATH, isPathUnderRoute } from '../../shared/constants/routePaths'
 import { buildLoginRedirectPath } from '../../shared/auth/sessionPolicy'
 
 const routes: RouteRecordRaw[] = [
   {
-    path: '/',
-    redirect: USER_DEFAULT_PATH,
+    path: HOME_PATH,
+    name: 'Home',
+    component: () => import('../../features/canvas/pages/CanvasLandingPage.vue'),
+    meta: { public: true },
   },
   ...userRoutes,
   ...adminRoutes,

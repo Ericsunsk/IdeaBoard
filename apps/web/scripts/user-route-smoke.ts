@@ -218,7 +218,7 @@ const allowedUserApiRequestPatterns = [
 const pages: SmokePage[] = [
   {
     label: 'home',
-    path: '/user/home',
+    path: '/',
     expectedText: ['IdeaBoard', 'EXPLORE, EXPAND, AND REFINE YOUR IDEAS', 'Get started'],
   },
   {
@@ -395,7 +395,7 @@ function setSessionUserRoute(playwrightCli: CommandSpec, user: User) {
 }
 
 function prepareOriginStorage(playwrightCli: CommandSpec) {
-  smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}/user/home`])
+  smoke.runCommand(playwrightCli, ['goto', `${smoke.baseUrl}/`])
   smoke.runCommand(playwrightCli, [
     'run-code',
     [
@@ -874,7 +874,7 @@ function assertCanvasLogoutFlushesAutosave(playwrightCli: CommandSpec) {
       'const logoutItem = page.getByText("退出登录", { exact: true }).first()',
       'await logoutItem.waitFor({ state: "visible", timeout: 10000 })',
       'await logoutItem.click()',
-      'await page.waitForURL((url) => url.pathname === "/user/home", { timeout: 15000 })',
+      'await page.waitForURL((url) => url.pathname === "/", { timeout: 15000 })',
       'if (departureRequests.at(-1) !== "logout" || !departureRequests.slice(0, -1).includes("save")) {',
       '  throw new Error(`Canvas logout must flush autosave before sign-out, got ${departureRequests.join(",")}`)',
       '}',
@@ -900,7 +900,7 @@ function assertBoardsLogout(playwrightCli: CommandSpec) {
       'const logoutItem = page.getByText("退出登录", { exact: true }).first()',
       'await logoutItem.waitFor({ state: "visible", timeout: 10000 })',
       'await logoutItem.click()',
-      'await page.waitForURL((url) => url.pathname === "/user/home", { timeout: 15000 })',
+      'await page.waitForURL((url) => url.pathname === "/", { timeout: 15000 })',
       'if (!signOutRequested) throw new Error("Boards logout did not call the auth sign-out endpoint")',
     ].join('\n'),
   ])

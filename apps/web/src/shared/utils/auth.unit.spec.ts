@@ -22,7 +22,7 @@ const adminUser: User = {
 
 beforeEach(() => {
   localStorage.clear()
-  window.history.pushState({}, '', '/user/home')
+  window.history.pushState({}, '', '/')
 })
 
 describe('handleAuthFailure', () => {
@@ -50,7 +50,7 @@ describe('handleAuthFailure', () => {
 
     expect(handled).toBe(true)
     expect(getStoredUser()).toBeNull()
-    expect(window.location.pathname).toBe('/user/home')
+    expect(window.location.pathname).toBe('/')
   })
 
   it('clears stored auth without redirecting after a session probe 401', () => {

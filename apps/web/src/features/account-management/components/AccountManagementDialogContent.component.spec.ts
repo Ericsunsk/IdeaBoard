@@ -9,7 +9,7 @@ import { renderWithUser, screen, waitFor } from '../../../test/render'
 import { createDeferred } from '../../../test/deferred'
 import { useUserStore } from '../../auth/session/authSession'
 import type { User } from '../../../shared/api/userSession'
-import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
+import { HOME_PATH } from '../../../shared/constants/routePaths'
 import { accountTabRegistry, type AccountManagementTab } from '../accountTabRegistry'
 import AccountManagementDialogContent from './AccountManagementDialogContent.vue'
 
@@ -355,7 +355,7 @@ describe('AccountManagementDialogContent', () => {
     await user.click(screen.getByRole('button', { name: '退出登录' }))
 
     await vi.waitFor(() => {
-      expect(logoutAndRedirectMock).toHaveBeenCalledWith(USER_HOME_PATH)
+      expect(logoutAndRedirectMock).toHaveBeenCalledWith(HOME_PATH)
     })
     expect(screen.queryByRole('group', { name: '退出登录确认' })).not.toBeInTheDocument()
   })

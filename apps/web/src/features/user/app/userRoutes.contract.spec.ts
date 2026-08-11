@@ -5,11 +5,9 @@ import { userRoutes } from './userRoutes'
 
 const routeComponents = vi.hoisted(() => ({
   layout: { name: 'UserLayoutRouteTarget' },
-  home: { name: 'UserHomeRouteTarget' },
 }))
 
 vi.mock('../layout/UserLayout.vue', () => ({ default: routeComponents.layout }))
-vi.mock('../../canvas/pages/CanvasLandingPage.vue', () => ({ default: routeComponents.home }))
 
 type LazyRouteModule = {
   default: Component
@@ -63,7 +61,6 @@ describe('userRoutes contract', () => {
         meta: route.meta,
       })),
     ).toEqual([
-      { path: 'home', name: 'UserHome', meta: undefined },
       { path: 'login', name: 'UserLogin', meta: { guest: true } },
       { path: 'register', name: 'UserRegister', meta: { guest: true } },
       { path: 'auth/callback', name: 'UserAuthCallback', meta: { public: true } },
@@ -82,7 +79,6 @@ describe('userRoutes contract', () => {
     const children = userRootRoute.children ?? []
 
     const loadedLayout = await loadRouteComponent(userRootRoute)
-    const loadedHome = await loadRouteComponent(requireRoute(children, 'home'))
     const loadedLogin = await loadRouteComponent(requireRoute(children, 'login'))
     const loadedRegister = await loadRouteComponent(requireRoute(children, 'register'))
     const loadedBoards = await loadRouteComponent(requireRoute(children, 'boards'))
@@ -94,9 +90,8 @@ describe('userRoutes contract', () => {
     expect((loadedAcceptableUse as Component & { __name?: string }).__name).toBe(
       'AcceptableUsePage',
     )
-    expect(loadedHome).toBe(routeComponents.home)
-    expect(loadedLogin).toBe(routeComponents.home)
-    expect(loadedRegister).toBe(routeComponents.home)
+    expect((loadedLogin as Component & { __name?: string }).__name).toBe('CanvasLandingPage')
+    expect((loadedRegister as Component & { __name?: string }).__name).toBe('CanvasLandingPage')
     expect((loadedBoards as Component & { __name?: string }).__name).toBe('BoardsPage')
     expect((loadedCanvas as Component & { __name?: string }).__name).toBe('CanvasPage')
   }, 15_000)

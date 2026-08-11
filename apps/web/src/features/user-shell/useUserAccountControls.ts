@@ -5,7 +5,7 @@ import type {
   UserAccountMenuItem,
   UserIdeaBalanceControl,
 } from '../../shared/components/userAccountMenu.types'
-import { ADMIN_ROOT_PATH, USER_HOME_PATH } from '../../shared/constants/routePaths'
+import { ADMIN_ROOT_PATH, HOME_PATH } from '../../shared/constants/routePaths'
 import { formatIdeaAmount } from '../../shared/utils/ideaCurrency'
 import {
   defaultAccountManagementTab,
@@ -42,7 +42,7 @@ export function useUserAccountControls(options: UseUserAccountControlsOptions) {
   }
 
   function goHome() {
-    return options.navigation.navigate(USER_HOME_PATH)
+    return options.navigation.navigate(HOME_PATH)
   }
 
   function logout() {

@@ -2,7 +2,7 @@ import { computed, ref, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
-import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
+import { HOME_PATH } from '../../../shared/constants/routePaths'
 import { useCanvasBoardSession, type SaveStatus } from '../board-session'
 import { useFlowBoardHeaderActions } from './useFlowBoardHeaderActions'
 import { useFlowCanvasRuntime } from './useFlowCanvasRuntime'
@@ -87,7 +87,7 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions) {
 
   async function onLogoutRequest() {
     await flowRuntime.persistence.flushAutosave()
-    await options.logoutAndRedirect(USER_HOME_PATH)
+    await options.logoutAndRedirect(HOME_PATH)
   }
 
   return {

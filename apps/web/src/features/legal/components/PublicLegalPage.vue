@@ -3,13 +3,13 @@
     <header class="border-b border-ib-border-soft bg-ib-surface">
       <div class="mx-auto flex w-full max-w-[860px] items-center justify-between gap-4 px-6 py-5">
         <RouterLink
-          :to="USER_HOME_PATH"
+          :to="HOME_PATH"
           class="rounded-[var(--radius-ib-control)] text-base font-bold text-ib-text no-underline focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]"
         >
           {{ projectName }}
         </RouterLink>
         <RouterLink
-          :to="USER_HOME_PATH"
+          :to="HOME_PATH"
           class="rounded-[var(--radius-ib-control)] px-2 py-1 text-sm font-semibold text-ib-text-muted no-underline transition-colors duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:text-ib-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-focus)]"
         >
           Back to home
@@ -57,7 +57,7 @@
 
 <script setup lang="ts">
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
-import { USER_HOME_PATH } from '../../../shared/constants/routePaths'
+import { HOME_PATH } from '../../../shared/constants/routePaths'
 import { PUBLIC_LEGAL_LINKS } from '../../../shared/constants/legalLinks'
 
 defineProps<{ title: string; version: string }>()

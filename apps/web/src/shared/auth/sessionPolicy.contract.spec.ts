@@ -31,8 +31,8 @@ describe('redirect safety policy', () => {
   })
 
   it('rejects paths that would change route scope after URL normalization', () => {
-    expect(isSafeInternalRedirectPath('/admin/../user/home')).toBe(false)
-    expect(isSafeInternalRedirectPath('/admin/%2e%2e/user/home')).toBe(false)
+    expect(isSafeInternalRedirectPath('/admin/../user/boards')).toBe(false)
+    expect(isSafeInternalRedirectPath('/admin/%2e%2e/user/boards')).toBe(false)
     expect(isSafeInternalRedirectPath('/admin/./users')).toBe(false)
   })
 
@@ -53,7 +53,7 @@ describe('resolveAuthFailureAction', () => {
         currentPathname: '/admin/task-monitor',
         currentFullPath: '/admin/task-monitor',
       }),
-    ).toEqual({ kind: 'redirect-home', targetPath: '/user/home' })
+    ).toEqual({ kind: 'redirect-home', targetPath: '/' })
   })
 
   it('clears auth without redirecting for session probe 401', () => {
