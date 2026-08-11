@@ -54,11 +54,7 @@
         @expand-handle-pointermove="emit('expand-handle-pointermove', $event)"
         @expand-handle-pointerup="emit('expand-handle-pointerup', $event)"
         @expand-frame-pointerdown="emit('expand-frame-pointerdown', $event)"
-      >
-        <template #handle-rail>
-          <slot name="handle-rail" />
-        </template>
-      </ImageNodeStage>
+      />
 
       <NodeFloatingControls v-if="showImageActionMenu || showPromptComposer">
         <HomeCanvasImageActionMenu

@@ -14,61 +14,58 @@
     <template #icon>
       <ChatLines />
     </template>
-    <div class="node-stage-handle-wrap">
-      <NodeStageFrame variant="prompt" :active="active">
-        <div class="box-border flex min-h-[280px] flex-col gap-3 p-5">
-          <div
-            ref="thumbsRef"
-            class="node-tool-surface node-input-thumbnail-contract variant-standard relative z-[3] grid justify-between gap-[var(--prompt-thumb-gap)] overflow-visible [--node-tool-button-radius:8px] [--node-tool-button-size:var(--node-input-thumbnail-size)] [--prompt-thumb-gap:6px] [grid-template-columns:repeat(4,var(--node-input-thumbnail-size))]"
-          >
-            <NodeInputThumbnail
-              v-for="item in sortableInputImages"
-              :key="item.id"
-              class="prompt-node-thumb-item aspect-square h-[var(--node-input-thumbnail-size)] w-[var(--node-input-thumbnail-size)] flex-none cursor-grab"
-              :src="item.url"
-              removable
-              :data-image-id="item.id"
-              @mousedown.stop
-              @contextmenu.stop.prevent="emit('input-image-preview', item)"
-              @remove="removeInputImage(item.id)"
-            />
-            <button
-              v-if="canAcceptMoreImages"
-              class="prompt-node-thumb-add node-input-thumbnail-add node-tool-output-count node-tool-button node-tool-tooltip-trigger"
-              :class="{
-                'is-drag-over': addSlotDragOver,
-              }"
-              type="button"
-              aria-label="添加图片输入"
-              @mousedown.stop
-              @pointerdown.stop
-              @click.stop="emit('input-image-open')"
-              @dragenter.stop.prevent="onAddSlotDragOver"
-              @dragover.stop.prevent="onAddSlotDragOver"
-              @dragleave.stop="onAddSlotDragLeave"
-              @drop.stop.prevent="onAddSlotDrop"
-            >
-              <Plus class="size-4" />
-              <span class="node-tool-tooltip" aria-hidden="true">添加图片输入</span>
-            </button>
-          </div>
-          <PromptTextComposer
-            :model-value="node.text"
-            :output-count="outputCount"
-            :aspect-ratio="aspectRatio"
-            :submit-disabled="!canGenerate || props.generationAvailable === false"
-            :billing-state="billingQuote"
-            class="flex-auto"
-            @update:model-value="emit('update:text', $event)"
-            @update:output-count="emit('update:output-count', $event)"
-            @update:aspect-ratio="emit('update:aspect-ratio', $event)"
-            @focus="emit('focus')"
-            @submit="emit('generate')"
+    <NodeStageFrame variant="prompt" :active="active">
+      <div class="box-border flex min-h-[280px] flex-col gap-3 p-5">
+        <div
+          ref="thumbsRef"
+          class="node-tool-surface node-input-thumbnail-contract variant-standard relative z-[3] grid justify-between gap-[var(--prompt-thumb-gap)] overflow-visible [--node-tool-button-radius:8px] [--node-tool-button-size:var(--node-input-thumbnail-size)] [--prompt-thumb-gap:6px] [grid-template-columns:repeat(4,var(--node-input-thumbnail-size))]"
+        >
+          <NodeInputThumbnail
+            v-for="item in sortableInputImages"
+            :key="item.id"
+            class="prompt-node-thumb-item aspect-square h-[var(--node-input-thumbnail-size)] w-[var(--node-input-thumbnail-size)] flex-none cursor-grab"
+            :src="item.url"
+            removable
+            :data-image-id="item.id"
+            @mousedown.stop
+            @contextmenu.stop.prevent="emit('input-image-preview', item)"
+            @remove="removeInputImage(item.id)"
           />
+          <button
+            v-if="canAcceptMoreImages"
+            class="prompt-node-thumb-add node-input-thumbnail-add node-tool-output-count node-tool-button node-tool-tooltip-trigger"
+            :class="{
+              'is-drag-over': addSlotDragOver,
+            }"
+            type="button"
+            aria-label="添加图片输入"
+            @mousedown.stop
+            @pointerdown.stop
+            @click.stop="emit('input-image-open')"
+            @dragenter.stop.prevent="onAddSlotDragOver"
+            @dragover.stop.prevent="onAddSlotDragOver"
+            @dragleave.stop="onAddSlotDragLeave"
+            @drop.stop.prevent="onAddSlotDrop"
+          >
+            <Plus class="size-4" />
+            <span class="node-tool-tooltip" aria-hidden="true">添加图片输入</span>
+          </button>
         </div>
-      </NodeStageFrame>
-      <slot name="handle-rail" />
-    </div>
+        <PromptTextComposer
+          :model-value="node.text"
+          :output-count="outputCount"
+          :aspect-ratio="aspectRatio"
+          :submit-disabled="!canGenerate || props.generationAvailable === false"
+          :billing-state="billingQuote"
+          class="flex-auto"
+          @update:model-value="emit('update:text', $event)"
+          @update:output-count="emit('update:output-count', $event)"
+          @update:aspect-ratio="emit('update:aspect-ratio', $event)"
+          @focus="emit('focus')"
+          @submit="emit('generate')"
+        />
+      </div>
+    </NodeStageFrame>
   </NodeShell>
 </template>
 
@@ -136,10 +133,3 @@ const {
   onRemove: (item) => emit('input-image-remove', item),
 })
 </script>
-
-<style scoped>
-.node-stage-handle-wrap {
-  position: relative;
-  overflow: visible;
-}
-</style>

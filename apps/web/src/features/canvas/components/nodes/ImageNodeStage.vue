@@ -1,46 +1,31 @@
 <template>
-  <div class="node-stage-handle-wrap">
-    <NodeStageFrame
-      ref="stageFrameRef"
-      class="image-node-stage"
-      :data-image-node-id="nodeId"
-      :data-flow-node-id="flowNodeId || undefined"
-      :class="{
-        'is-expand-mode': !!expandModeActive,
-        'is-image-editor-active': isImageToolActive,
-      }"
-      layout="center"
-      :height="stageHeight"
-      :active="active && !expandModeActive"
-      :loading="!!directGenerating && !displayImage"
-      :running="!!directGenerating"
-      :transparent="!!expandModeActive || isImageToolActive"
-      :aria-busy="!!directGenerating"
-      aria-label="图片节点输入与预览区域"
-      @dragover.stop="onStageDragOver"
-      @drop.stop="onStageDrop"
-      @contextmenu.prevent.stop="onStageContextMenu"
-    >
-      <template v-if="displayImage">
-        <ImageToolStagePresentation v-if="imageToolStageBinding" :binding="imageToolStageBinding">
-          <img
-            :src="stageDisplayUrl"
-            class="image-node-stage-image image-tool-stage-media"
-            :class="{ 'is-dragging': dragging }"
-            alt="图片节点预览"
-            draggable="false"
-            role="button"
-            tabindex="0"
-            aria-label="图片节点预览，按 Enter 打开预览，按 Space 添加到画布"
-            @dblclick="emit('append-to-canvas')"
-            @keydown.enter.prevent="emit('open-preview')"
-            @keydown.space.prevent="emit('append-to-canvas')"
-          />
-        </ImageToolStagePresentation>
+  <NodeStageFrame
+    ref="stageFrameRef"
+    class="image-node-stage"
+    :data-image-node-id="nodeId"
+    :data-flow-node-id="flowNodeId || undefined"
+    :class="{
+      'is-expand-mode': !!expandModeActive,
+      'is-image-editor-active': isImageToolActive,
+    }"
+    layout="center"
+    :height="stageHeight"
+    :active="active && !expandModeActive"
+    :loading="!!directGenerating && !displayImage"
+    :running="!!directGenerating"
+    :transparent="!!expandModeActive || isImageToolActive"
+    :aria-busy="!!directGenerating"
+    aria-label="图片节点输入与预览区域"
+    @dragover.stop="onStageDragOver"
+    @drop.stop="onStageDrop"
+    @contextmenu.prevent.stop="onStageContextMenu"
+  >
+    <template v-if="displayImage">
+      <ImageToolStagePresentation v-if="imageToolStageBinding" :binding="imageToolStageBinding">
         <img
-          v-else
           :src="stageDisplayUrl"
-          class="image-node-stage-image"
+          class="image-node-stage-image image-tool-stage-media"
+          :class="{ 'is-dragging': dragging }"
           alt="图片节点预览"
           draggable="false"
           role="button"
@@ -50,60 +35,72 @@
           @keydown.enter.prevent="emit('open-preview')"
           @keydown.space.prevent="emit('append-to-canvas')"
         />
-        <ImageCanvasExtendOverlay
-          v-if="expandModeActive && expandOverlayStyle"
-          :overlay-style="expandOverlayStyle"
-          :handle-radius="expandHandleRadius ?? 4"
-          :direct-generating="!!directGenerating"
-          :output-count="outputCountValue"
-          @submit="submitExpand"
-          @update:output-count="selectOutputCount"
-          @handle-pointerdown="emit('expand-handle-pointerdown', $event)"
-          @handle-pointermove="emit('expand-handle-pointermove', $event)"
-          @handle-pointerup="emit('expand-handle-pointerup', $event)"
-          @frame-pointerdown="emit('expand-frame-pointerdown', $event)"
-        />
-        <div class="image-node-stage-actions">
-          <NodeActionButton
-            variant="stage-ghost"
-            aria-label="打开图片预览"
-            @click="emit('open-preview')"
-            >预览</NodeActionButton
-          >
-          <NodeActionButton
-            v-if="!inputLocked"
-            variant="stage-ghost"
-            aria-label="清空图片输入"
-            @click="emit('reset')"
-          >
-            清空
-          </NodeActionButton>
-        </div>
-      </template>
-      <button
-        v-if="!displayImage && !emptyStateDisabled"
-        type="button"
-        class="image-node-stage-empty"
-        :aria-label="emptyStageAriaLabel"
-        @click="onEmptyStateClick"
-      >
-        <NodeEmptyStateIcon :variant="emptyIconVariantComputed" />
-        <span>{{ emptyStateLabel }}</span>
-      </button>
-      <div
-        v-else-if="!displayImage"
-        class="image-node-stage-empty is-readonly"
-        :class="{ 'is-loading': directGenerating }"
-        role="status"
-        :aria-label="emptyStageAriaLabel"
-      >
-        <ComposingOrb v-if="directGenerating" />
-        <NodeEmptyStateIcon v-else :variant="emptyIconVariantComputed" />
-        <span v-if="!directGenerating">{{ emptyStateLabel }}</span>
+      </ImageToolStagePresentation>
+      <img
+        v-else
+        :src="stageDisplayUrl"
+        class="image-node-stage-image"
+        alt="图片节点预览"
+        draggable="false"
+        role="button"
+        tabindex="0"
+        aria-label="图片节点预览，按 Enter 打开预览，按 Space 添加到画布"
+        @dblclick="emit('append-to-canvas')"
+        @keydown.enter.prevent="emit('open-preview')"
+        @keydown.space.prevent="emit('append-to-canvas')"
+      />
+      <ImageCanvasExtendOverlay
+        v-if="expandModeActive && expandOverlayStyle"
+        :overlay-style="expandOverlayStyle"
+        :handle-radius="expandHandleRadius ?? 4"
+        :direct-generating="!!directGenerating"
+        :output-count="outputCountValue"
+        @submit="submitExpand"
+        @update:output-count="selectOutputCount"
+        @handle-pointerdown="emit('expand-handle-pointerdown', $event)"
+        @handle-pointermove="emit('expand-handle-pointermove', $event)"
+        @handle-pointerup="emit('expand-handle-pointerup', $event)"
+        @frame-pointerdown="emit('expand-frame-pointerdown', $event)"
+      />
+      <div class="image-node-stage-actions">
+        <NodeActionButton
+          variant="stage-ghost"
+          aria-label="打开图片预览"
+          @click="emit('open-preview')"
+          >预览</NodeActionButton
+        >
+        <NodeActionButton
+          v-if="!inputLocked"
+          variant="stage-ghost"
+          aria-label="清空图片输入"
+          @click="emit('reset')"
+        >
+          清空
+        </NodeActionButton>
       </div>
-    </NodeStageFrame>
-    <slot name="handle-rail" />
-  </div>
+    </template>
+    <button
+      v-if="!displayImage && !emptyStateDisabled"
+      type="button"
+      class="image-node-stage-empty"
+      :aria-label="emptyStageAriaLabel"
+      @click="onEmptyStateClick"
+    >
+      <NodeEmptyStateIcon :variant="emptyIconVariantComputed" />
+      <span>{{ emptyStateLabel }}</span>
+    </button>
+    <div
+      v-else-if="!displayImage"
+      class="image-node-stage-empty is-readonly"
+      :class="{ 'is-loading': directGenerating }"
+      role="status"
+      :aria-label="emptyStageAriaLabel"
+    >
+      <ComposingOrb v-if="directGenerating" />
+      <NodeEmptyStateIcon v-else :variant="emptyIconVariantComputed" />
+      <span v-if="!directGenerating">{{ emptyStateLabel }}</span>
+    </div>
+  </NodeStageFrame>
 </template>
 
 <script setup lang="ts">
@@ -221,11 +218,6 @@ function selectOutputCount(value: number) {
 </script>
 
 <style scoped>
-.node-stage-handle-wrap {
-  position: relative;
-  overflow: visible;
-}
-
 .image-node-stage-image {
   width: 100%;
   height: 100%;

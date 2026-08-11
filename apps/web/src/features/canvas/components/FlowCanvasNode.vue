@@ -30,17 +30,7 @@
         @delete="onPromptDeleteRequest"
         @focus="noop"
         @generate="onPromptGenerate"
-      >
-        <template #handle-rail>
-          <FlowCanvasNodeHandleRail
-            :node-id="props.nodeId"
-            :kind="data.kind"
-            :interaction-root="flowCanvasNodeRef"
-            :dragging="props.dragging"
-            :disabled="disableHandleRailInteraction"
-          />
-        </template>
-      </PromptNode>
+      />
     </template>
     <template v-else-if="isImageNode && imageSnapshot">
       <div
@@ -83,17 +73,7 @@
           @expand-handle-pointermove="onImageCanvasExtendHandlePointerMove"
           @expand-handle-pointerup="onImageCanvasExtendHandlePointerUp"
           @expand-frame-pointerdown="onImageCanvasExtendFramePointerDown"
-        >
-          <template #handle-rail>
-            <FlowCanvasNodeHandleRail
-              :node-id="props.nodeId"
-              :kind="data.kind"
-              :interaction-root="flowCanvasNodeRef"
-              :dragging="props.dragging"
-              :disabled="disableHandleRailInteraction"
-            />
-          </template>
-        </ImageNode>
+        />
       </div>
     </template>
     <template v-else-if="isFusionNode && fusionSnapshot">
@@ -122,22 +102,20 @@
           @input-image-remove="onFusionMediaInputRemove"
           @contextmenu="onFusionContextMenuRequest"
           @prompt-generate="onFusionGenerationRequest"
-        >
-          <template #handle-rail>
-            <FlowCanvasNodeHandleRail
-              :node-id="props.nodeId"
-              :kind="data.kind"
-              :interaction-root="flowCanvasNodeRef"
-              :dragging="props.dragging"
-              :disabled="disableHandleRailInteraction"
-            />
-          </template>
-        </FusionNode>
+        />
       </div>
     </template>
     <template v-else>
       <div class="flow-canvas-node__unsupported">Unsupported node</div>
     </template>
+    <FlowCanvasNodeHandleRail
+      v-if="hasRenderedNode"
+      :node-id="props.nodeId"
+      :kind="data.kind"
+      :interaction-root="flowCanvasNodeRef"
+      :dragging="props.dragging"
+      :disabled="disableHandleRailInteraction"
+    />
   </div>
 </template>
 
@@ -229,6 +207,10 @@ const {
   expandModeActive: () => !!props.expandModeActive,
   isImageEditorActive: () => isImageEditorActive.value,
 })
+const hasRenderedNode = computed(
+  () =>
+    promptSnapshot.value !== null || imageSnapshot.value !== null || fusionSnapshot.value !== null,
+)
 
 function onPromptTextEdited(text: string) {
   emit('node-intent', { type: 'text-edited', nodeId: props.nodeId, text })
@@ -503,5 +485,4 @@ function noopMouse() {}
   color: #6b7280;
   font-size: 12px;
 }
-
 </style>

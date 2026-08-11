@@ -9,6 +9,7 @@
       :key="`canvas-${anchor.direction}-anchor:${anchor.id}`"
       :type="anchor.handleType"
       :position="anchor.position"
+      :connectable="false"
       class="flow-canvas-node__handle-anchor"
       :style="anchor.style"
     />
@@ -20,15 +21,21 @@
       :type="aggregate.handleType"
       :position="aggregate.position"
       :connectable="aggregate.connectable"
+      :connectable-start="aggregate.direction === 'output' && aggregate.connectable"
+      :connectable-end="aggregate.direction === 'input' && aggregate.connectable"
       :class="[
         'flow-canvas-node__handle-aggregate',
         `flow-canvas-node__handle-aggregate--${aggregate.direction}`,
         {
           'is-visible': aggregate.visible,
           'is-proximity-active': aggregate.proximityActive,
+          'is-node-drop-target': isConnectionDragging && aggregate.direction === 'input',
         },
       ]"
-      :style="aggregate.style"
+      :style="[
+        aggregate.style,
+        isConnectionDragging && aggregate.direction === 'input' ? nodeDropTargetStyle : undefined,
+      ]"
       :aria-hidden="aggregate.visible && !isConnectionDragging ? undefined : 'true'"
       :aria-label="aggregate.ariaLabel"
       :tabindex="aggregate.visible && !isConnectionDragging ? 0 : -1"
@@ -41,7 +48,7 @@
 
 <script setup lang="ts">
 import { Handle, useVueFlow } from '@vue-flow/core'
-import { computed, watch } from 'vue'
+import { computed, watch, type CSSProperties } from 'vue'
 import type { FlowNodeData } from '../types/flowTypes'
 import { useFlowCanvasNodeHandleRail } from '../composables/useFlowCanvasNodeHandleRail'
 import { useFlowNodeHandlesPresentation } from '../composables/useFlowNodeHandlesPresentation'
@@ -59,6 +66,15 @@ const { showHandleControls, refreshTransientHandleVisibility } =
   useFlowCanvasNodeHandleRail(interactionRoot)
 const { connectionStartHandle } = useVueFlow()
 const isConnectionDragging = computed(() => connectionStartHandle.value !== null)
+const nodeDropTargetStyle = {
+  left: '0',
+  right: '0',
+  top: '0',
+  bottom: '0',
+  width: 'auto',
+  height: 'auto',
+  transform: 'none',
+} satisfies CSSProperties
 const presentation = useFlowNodeHandlesPresentation({
   kind: () => props.kind,
   showHandles: () => showHandleControls.value,
@@ -90,6 +106,10 @@ watch(
   z-index: 24;
   pointer-events: none;
   overflow: visible;
+}
+
+.flow-canvas-node__handle-rail.is-connection-dragging {
+  z-index: 50;
 }
 
 .flow-canvas-node__handle-anchor {
@@ -225,10 +245,15 @@ watch(
   transition: border-color var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
-.flow-canvas-node__handle-rail.is-connection-dragging
-  .flow-canvas-node__handle-aggregate {
+.flow-canvas-node__handle-rail.is-connection-dragging .flow-canvas-node__handle-aggregate {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+}
+
+.flow-canvas-node__handle-rail.is-connection-dragging
+  .flow-canvas-node__handle-aggregate--input.is-node-drop-target {
+  visibility: visible;
+  pointer-events: auto;
 }
 </style>

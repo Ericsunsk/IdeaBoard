@@ -29,11 +29,7 @@
         @input-image-drop="emit('input-image-drop', $event)"
         @input-image-remove="emit('input-image-remove', $event)"
         @contextmenu="emit('contextmenu', $event)"
-      >
-        <template #handle-rail>
-          <slot name="handle-rail" />
-        </template>
-      </FusionStage>
+      />
       <NodeFloatingControls v-if="showPromptComposer">
         <NodePromptComposer
           v-model="promptDraft"

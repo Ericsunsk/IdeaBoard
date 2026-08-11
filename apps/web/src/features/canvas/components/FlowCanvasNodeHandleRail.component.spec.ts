@@ -12,8 +12,11 @@ const vueFlowMock = vi.hoisted(() => ({
 }))
 
 vi.mock('@vue-flow/core', async () => {
-  const { defineComponent: defineVueComponent, h: renderElement, ref: createRef } =
-    await import('vue')
+  const {
+    defineComponent: defineVueComponent,
+    h: renderElement,
+    ref: createRef,
+  } = await import('vue')
   const connectionStartHandle = createRef(null)
   vueFlowMock.connectionStartHandle = connectionStartHandle
 
@@ -132,9 +135,7 @@ describe('FlowCanvasNodeHandleRail', () => {
 
   it('keeps disabled handles hidden and non-connectable', async () => {
     const view = renderHandles({ kind: 'prompt', disabled: true })
-    const outputHandle = view.getByLabelText(
-      '提示词节点输出连接点，拖拽创建连接',
-    ) as HTMLElement
+    const outputHandle = view.getByLabelText('提示词节点输出连接点，拖拽创建连接') as HTMLElement
     setAnchorRect(outputHandle, 100)
 
     view.interactionRoot.dispatchEvent(new MouseEvent('mouseenter'))
@@ -169,10 +170,26 @@ describe('FlowCanvasNodeHandleRail', () => {
 
     const handles = getAggregateHandles(view.container)
     expect(handles).toHaveLength(2)
+    const inputHandle = view.container.querySelector<HTMLElement>('#in\\:__auto')
+    const outputHandle = view.container.querySelector<HTMLElement>('#out\\:image')
+
+    expect(inputHandle).toBeDefined()
+    expect(outputHandle).toBeDefined()
+    expect(inputHandle).toHaveAttribute('aria-hidden', 'true')
+    expect(inputHandle).toHaveAttribute('tabindex', '-1')
+    expect(inputHandle).toHaveStyle({
+      left: '0',
+      right: '0',
+      top: '0',
+      bottom: '0',
+      width: 'auto',
+      height: 'auto',
+      transform: 'none',
+    })
+    expect(outputHandle).toHaveAttribute('aria-hidden', 'true')
+    expect(outputHandle).toHaveAttribute('tabindex', '-1')
     for (const handle of handles) {
       expect(handle.querySelector('.flow-canvas-node__handle-plus')).toBeInTheDocument()
-      expect(handle).toHaveAttribute('aria-hidden', 'true')
-      expect(handle).toHaveAttribute('tabindex', '-1')
     }
 
     setConnectionStartHandle(null)
@@ -186,32 +203,104 @@ describe('FlowCanvasNodeHandleRail', () => {
 
   it.each<{
     kind: NodeKind
-    expected: Array<{ id: string; type: string; connectable: string | null }>
+    expected: Array<{
+      id: string
+      type: string
+      connectable: string | null
+      connectableStart: string | null
+      connectableEnd: string | null
+    }>
   }>([
     {
       kind: 'image',
       expected: [
-        { id: 'in:image', type: 'target', connectable: null },
-        { id: 'in:__auto', type: 'target', connectable: 'true' },
-        { id: 'out:image', type: 'source', connectable: 'true' },
+        {
+          id: 'in:image',
+          type: 'target',
+          connectable: 'false',
+          connectableStart: null,
+          connectableEnd: null,
+        },
+        {
+          id: 'in:__auto',
+          type: 'target',
+          connectable: 'true',
+          connectableStart: 'false',
+          connectableEnd: 'true',
+        },
+        {
+          id: 'out:image',
+          type: 'source',
+          connectable: 'true',
+          connectableStart: 'true',
+          connectableEnd: 'false',
+        },
       ],
     },
     {
       kind: 'prompt',
       expected: [
-        { id: 'in:image', type: 'target', connectable: null },
-        { id: 'out:prompt', type: 'source', connectable: null },
-        { id: 'in:__auto', type: 'target', connectable: 'true' },
-        { id: 'out:image', type: 'source', connectable: 'true' },
+        {
+          id: 'in:image',
+          type: 'target',
+          connectable: 'false',
+          connectableStart: null,
+          connectableEnd: null,
+        },
+        {
+          id: 'out:prompt',
+          type: 'source',
+          connectable: 'false',
+          connectableStart: null,
+          connectableEnd: null,
+        },
+        {
+          id: 'in:__auto',
+          type: 'target',
+          connectable: 'true',
+          connectableStart: 'false',
+          connectableEnd: 'true',
+        },
+        {
+          id: 'out:image',
+          type: 'source',
+          connectable: 'true',
+          connectableStart: 'true',
+          connectableEnd: 'false',
+        },
       ],
     },
     {
       kind: 'fusion',
       expected: [
-        { id: 'in:image', type: 'target', connectable: null },
-        { id: 'in:prompt', type: 'target', connectable: null },
-        { id: 'in:__auto', type: 'target', connectable: 'true' },
-        { id: 'out:image', type: 'source', connectable: 'true' },
+        {
+          id: 'in:image',
+          type: 'target',
+          connectable: 'false',
+          connectableStart: null,
+          connectableEnd: null,
+        },
+        {
+          id: 'in:prompt',
+          type: 'target',
+          connectable: 'false',
+          connectableStart: null,
+          connectableEnd: null,
+        },
+        {
+          id: 'in:__auto',
+          type: 'target',
+          connectable: 'true',
+          connectableStart: 'false',
+          connectableEnd: 'true',
+        },
+        {
+          id: 'out:image',
+          type: 'source',
+          connectable: 'true',
+          connectableStart: 'true',
+          connectableEnd: 'false',
+        },
       ],
     },
   ])('projects the canonical $kind handle set', ({ kind, expected }) => {
@@ -223,6 +312,8 @@ describe('FlowCanvasNodeHandleRail', () => {
         id: handle.id,
         type: handle.getAttribute('type'),
         connectable: handle.getAttribute('connectable'),
+        connectableStart: handle.getAttribute('connectable-start'),
+        connectableEnd: handle.getAttribute('connectable-end'),
       })),
     ).toEqual(expected)
   })

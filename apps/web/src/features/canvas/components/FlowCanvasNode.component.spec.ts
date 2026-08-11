@@ -145,6 +145,7 @@ describe('FlowCanvasNode prompt rendering', () => {
   it('renders the full prompt body for non-interactive nodes', () => {
     const view = renderFlowCanvasNode()
 
+    expect(view.getAllByTestId('flow-node-handles')).toHaveLength(1)
     expect(view.container.querySelector('.node-stage-frame--prompt')).not.toBeNull()
     expect(
       view.container
