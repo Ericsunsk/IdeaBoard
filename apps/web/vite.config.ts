@@ -1,9 +1,10 @@
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
+import { publicSiteVitePlugin } from './src/features/public-site/publicSiteVitePlugin'
 
 export default defineConfig({
-  plugins: [vue(), tailwindcss()],
+  plugins: [vue(), tailwindcss(), publicSiteVitePlugin()],
   test: {
     environment: 'happy-dom',
     include: ['src/**/*.unit.spec.ts', 'src/**/*.component.spec.ts', 'src/**/*.contract.spec.ts'],

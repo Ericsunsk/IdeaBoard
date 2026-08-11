@@ -74,7 +74,10 @@ function updateSiteIcon(nextLogoURL: string) {
 watch(
   projectName,
   (value) => {
-    document.title = value
+    // Keep the public canonical title from the build-time document intact.
+    if (window.location.pathname !== '/') {
+      document.title = value
+    }
   },
   { immediate: true },
 )

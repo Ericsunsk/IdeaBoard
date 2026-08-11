@@ -2,6 +2,7 @@ import type { Component } from 'vue'
 import type { RouteRecordRaw } from 'vue-router'
 import { describe, expect, it, vi } from 'vitest'
 import { userRoutes } from './userRoutes'
+import { PUBLIC_HOME_PATH, USER_HOME_PATH } from '../../../shared/constants/routePaths'
 
 const routeComponents = vi.hoisted(() => ({
   layout: { name: 'UserLayoutRouteTarget' },
@@ -33,6 +34,7 @@ describe('userRoutes contract', () => {
     const refundPolicyRoute = requireRoute(userRoutes, '/refund-policy')
     const acceptableUseRoute = requireRoute(userRoutes, '/acceptable-use')
     const shareRoute = requireRoute(userRoutes, '/share')
+    const legacyHomeRoute = requireRoute(userRoutes, USER_HOME_PATH)
     const userRootRoute = requireRoute(userRoutes, '/user')
 
     expect({
@@ -54,6 +56,15 @@ describe('userRoutes contract', () => {
     })
     expect({ name: acceptableUseRoute.name, meta: acceptableUseRoute.meta }).toEqual({
       name: 'AcceptableUse',
+      meta: { public: true },
+    })
+    expect({
+      name: legacyHomeRoute.name,
+      redirect: legacyHomeRoute.redirect,
+      meta: legacyHomeRoute.meta,
+    }).toEqual({
+      name: 'LegacyUserHome',
+      redirect: PUBLIC_HOME_PATH,
       meta: { public: true },
     })
     expect(
@@ -95,8 +106,8 @@ describe('userRoutes contract', () => {
       'AcceptableUsePage',
     )
     expect(loadedHome).toBe(routeComponents.home)
-    expect(loadedLogin).toBe(routeComponents.home)
-    expect(loadedRegister).toBe(routeComponents.home)
+    expect((loadedLogin as Component & { __name?: string }).__name).toBe('CanvasLandingPage')
+    expect((loadedRegister as Component & { __name?: string }).__name).toBe('CanvasLandingPage')
     expect((loadedBoards as Component & { __name?: string }).__name).toBe('BoardsPage')
     expect((loadedCanvas as Component & { __name?: string }).__name).toBe('CanvasPage')
   }, 15_000)
