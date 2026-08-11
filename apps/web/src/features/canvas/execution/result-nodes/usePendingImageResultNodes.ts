@@ -32,7 +32,6 @@ import {
   type ResultMaterializerImageResult,
   type ResultMaterializerResult,
 } from './resultMaterializer'
-import type { CanvasNodeExecutionChange } from '../runtime/CanvasExecutionRuntime'
 import { TaskCancelledError } from '../../../../shared/api/taskEvents'
 
 type UsePendingImageResultNodesOptions = {
@@ -44,6 +43,7 @@ type UsePendingImageResultNodesOptions = {
   ) => CanvasGraphStore
   boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
   refreshNodeInternals?: (nodeIds: string[]) => void
+  isNodeExecutionActive: (nodeId: string) => boolean
 }
 
 export type PendingImageResultOptions = ImageExecutionResultOptions
@@ -53,11 +53,16 @@ export type PendingImageResultReservationParams = {
   sourceNodeId: string
   outputCount: number
   resultOptions?: PendingImageResultOptions
-  clientActionKey?: string
 }
 
 export type PendingImageResultExecution = {
-  runPendingResults: (params: RunPendingImageResultsParams) => Promise<PendingImageResultRunSummary>
+  reservePendingResults: (
+    params: PendingImageResultReservationParams,
+  ) => PendingImageResultReservation
+  runReservedPendingResults: (
+    params: RunReservedPendingImageResultsParams,
+  ) => Promise<PendingImageResultRunSummary>
+  cancelPendingResults: (resultNodeIds: readonly string[]) => void
   materializeResolvedAttachedPendingResults: (
     params: MaterializeResolvedAttachedPendingImageResultsParams,
   ) => ResultMaterializerResult
@@ -67,15 +72,18 @@ export type PendingImageResultTaskSubmission = {
   taskId: string
 }
 
-export type RunPendingImageResultsParams = PendingImageResultReservationParams & {
+export type PendingImageResultReservation = {
+  resultNodeIds: string[]
+}
+
+export type RunReservedPendingImageResultsParams = {
+  resultNodeIds: readonly string[]
   submitTask: (resultNodeId: string) => Promise<PendingImageResultTaskSubmission>
   resolveResult: (taskId: string, resultNodeId: string) => Promise<ResolvedTaskImageResult>
   isCurrent: () => boolean
   isPendingError: (error: unknown) => boolean
   persistPendingTaskIds?: boolean
   afterTaskIdAttached?: (params: { resultNodeId: string; taskId: string }) => Promise<void>
-  onReserved?: (resultNodeIds: string[]) => void
-  onExecutionStateChange?: (change: CanvasNodeExecutionChange) => void
 }
 
 export type MaterializeResolvedAttachedPendingImageResultsParams = {
@@ -91,6 +99,13 @@ export type PendingImageResultRunSummary = {
   failureCount: number
   firstFailure: unknown
   failures: unknown[]
+  outcomes: PendingImageResultOutcome[]
+}
+
+export type PendingImageResultOutcome = {
+  resultNodeId: string
+  taskId?: string
+  status: 'pending' | 'succeeded' | 'failed' | 'cancelled'
 }
 
 type ImageResultLayout = ImageResultAnchor & {
@@ -106,7 +121,7 @@ type PendingImageResultMutationOptions = {
   recordHistory?: boolean
 }
 
-type PendingImageResultPlacementOptions = PendingImageResultMutationOptions & {
+type PendingImageResultPlacementOptions = {
   anchor?: ImageResultAnchor
   targetRatio?: number
   targetWidth?: number
@@ -265,17 +280,7 @@ export function usePendingImageResultExecution(
     if (!snapshot || typeof snapshot !== 'object') return false
     const sourceUrl = `${snapshot.sourceImageUrl ?? ''}`.trim()
     const outputImages = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
-    return !sourceUrl && outputImages.length === 0 && snapshot.outputStatus !== 'running'
-  }
-
-  function isRunningPendingImageNodeForAction(node: Node, clientActionKey: string): boolean {
-    if (node.data?.kind !== 'image') return false
-    if (node.data.pendingClientActionKey !== clientActionKey) return false
-    const snapshot = node.data.snapshotNode as ImageNodeItem | undefined
-    if (!snapshot || typeof snapshot !== 'object') return false
-    const sourceUrl = `${snapshot.sourceImageUrl ?? ''}`.trim()
-    const outputImages = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
-    return !sourceUrl && outputImages.length === 0 && snapshot.outputStatus === 'running'
+    return !sourceUrl && outputImages.length === 0 && !options.isNodeExecutionActive(node.id)
   }
 
   function findReusableOutputImageNodeId(
@@ -288,25 +293,6 @@ export function usePendingImageResultExecution(
       if (node && isEmptyReusableImageNode(node)) return candidateId
     }
     return null
-  }
-
-  function findRunningPendingOutputImageNodeIds(
-    anchorNodeId: string,
-    lookup: PendingImageResultLookup,
-    clientActionKey: string | undefined,
-    count: number,
-  ): string[] {
-    const normalizedKey = `${clientActionKey ?? ''}`.trim()
-    if (!normalizedKey) return []
-    const candidateIds = lookup.imageChildIdsBySource.get(anchorNodeId) ?? []
-    const result: string[] = []
-    for (const candidateId of candidateIds) {
-      const node = lookup.nodeById.get(candidateId)
-      if (!node || !isRunningPendingImageNodeForAction(node, normalizedKey)) continue
-      result.push(candidateId)
-      if (result.length >= count) break
-    }
-    return result
   }
 
   function resolvePendingImageResultPosition(
@@ -363,14 +349,14 @@ export function usePendingImageResultExecution(
 
   function buildPendingImageNodeSnapshot(
     base: ImageNodeItem,
-    params: { sourceImageRatio: number; width: number; preservePendingTaskId?: boolean },
+    params: { sourceImageRatio: number; width: number },
   ): ImageNodeItem {
     return {
       ...base,
       sourceImageUrl: '',
       sourceImageRatio: params.sourceImageRatio,
       width: params.width,
-      pendingTaskId: params.preservePendingTaskId ? base.pendingTaskId : undefined,
+      pendingTaskId: undefined,
       outputStatus: 'running',
       outputImages: [],
     }
@@ -423,7 +409,6 @@ export function usePendingImageResultExecution(
     lookup: PendingImageResultLookup,
     optionsOverride?: PendingImageResultPlacementOptions,
     preferredNodeId?: string | null,
-    clientActionKey?: string,
   ): PendingImageResultReservationPlan {
     const sourceRatio = source.ratio > 0 ? source.ratio : 1
     const fallbackAnchor: ImageResultLayout = {
@@ -469,13 +454,9 @@ export function usePendingImageResultExecution(
             ...currentNode,
             data: {
               ...currentNode.data,
-              pendingClientActionKey: clientActionKey,
               snapshotNode: buildPendingImageNodeSnapshot(currentSnapshot, {
                 sourceImageRatio: pendingImageNode.sourceImageRatio,
                 width: pendingImageNode.width,
-                preservePendingTaskId:
-                  currentSnapshot.outputStatus === 'running' &&
-                  currentNode.data.pendingClientActionKey === clientActionKey,
               }),
             },
           }
@@ -502,7 +483,6 @@ export function usePendingImageResultExecution(
         nodeType: 'image',
         title: `Image #${pendingImageNode.id}`,
         summary: 'Canvas image node',
-        pendingClientActionKey: clientActionKey,
         snapshotNode: pendingImageNode,
       },
     }
@@ -522,17 +502,13 @@ export function usePendingImageResultExecution(
     }
   }
 
-  function reservePendingResults(params: PendingImageResultReservationParams): string[] {
+  function reservePendingResults(
+    params: PendingImageResultReservationParams,
+  ): PendingImageResultReservation {
     const count = clampImageNodeOutputCount(params.outputCount)
     const resultOptions = params.resultOptions ?? {}
     const anchorNodeId = resultOptions.anchor?.outputAnchorNodeId ?? params.sourceNodeId
     const lookup = buildPendingResultLookup()
-    const runningNodeIds = findRunningPendingOutputImageNodeIds(
-      anchorNodeId,
-      lookup,
-      params.clientActionKey,
-      count,
-    )
     const reusableNodeId = findReusableOutputImageNodeId(anchorNodeId, lookup)
     const plans = Array.from({ length: count }, (_, index) =>
       planPendingImageResultNodeWithLookup(
@@ -540,13 +516,11 @@ export function usePendingImageResultExecution(
         anchorNodeId,
         lookup,
         {
-          recordHistory: index === 0,
           anchor: resultOptions.anchor,
           targetRatio: resultOptions.targetRatio,
           targetWidth: resultOptions.targetWidth,
         },
-        runningNodeIds[index] ?? (index === 0 ? reusableNodeId : null),
-        params.clientActionKey,
+        index === 0 ? reusableNodeId : null,
       ),
     )
     const plannedNodesById = new Map(plans.map((plan) => [plan.resultNodeId, plan.nextNode]))
@@ -563,7 +537,7 @@ export function usePendingImageResultExecution(
         nodes: nextNodes,
         edges: options.edges.value,
       },
-      createPendingResultCommandOptions({ recordHistory: true }),
+      createPendingResultCommandOptions({ recordHistory: false }),
     )
     options.refreshNodeInternals?.([anchorNodeId, ...resultNodeIds])
     void appendPendingImageResultEdges(
@@ -571,7 +545,7 @@ export function usePendingImageResultExecution(
       resultNodeIds,
       plans.flatMap((plan) => (plan.edgeToAppend ? [plan.edgeToAppend] : [])),
     )
-    return resultNodeIds
+    return { resultNodeIds }
   }
 
   function attachPendingTaskId(params: { resultNodeId: string; taskId: string }) {
@@ -594,15 +568,6 @@ export function usePendingImageResultExecution(
       },
       createPendingResultCommandOptions({ recordHistory: false }),
     )
-  }
-
-  function readPendingTaskId(resultNodeId: string): string | null {
-    const targetNode = options.nodes.value.find((item) => item.id === resultNodeId)
-    if (targetNode?.data?.kind !== 'image') return null
-    const snapshot = targetNode.data.snapshotNode
-    if (!snapshot || typeof snapshot !== 'object') return null
-    const taskId = `${(snapshot as ImageNodeItem).pendingTaskId ?? ''}`.trim()
-    return taskId || null
   }
 
   function applyResultMaterializerGraph(store: CanvasGraphStore, result: ResultMaterializerResult) {
@@ -645,17 +610,20 @@ export function usePendingImageResultExecution(
     })
   }
 
-  async function runPendingResults(
-    params: RunPendingImageResultsParams,
+  function cancelPendingResults(resultNodeIds: readonly string[]) {
+    resultNodeIds.forEach((resultNodeId) => cancelPendingResult({ resultNodeId }))
+  }
+
+  async function runReservedPendingResults(
+    params: RunReservedPendingImageResultsParams,
   ): Promise<PendingImageResultRunSummary> {
     const persistPendingTaskIds = params.persistPendingTaskIds ?? true
-    const resultNodeIds = reservePendingResults(params)
-    params.onReserved?.(resultNodeIds)
+    const resultNodeIds = [...params.resultNodeIds]
     const resolvedResults = new Array<ResultMaterializerImageResult | null>(
       resultNodeIds.length,
     ).fill(null)
+    const outcomes = new Array<PendingImageResultOutcome | null>(resultNodeIds.length).fill(null)
 
-    let successCount = 0
     let pendingCount = 0
     let failureCount = 0
     let firstFailure: unknown = null
@@ -665,16 +633,9 @@ export function usePendingImageResultExecution(
       resultNodeIds.map(async (resultNodeId, index) => {
         let taskId: string | undefined
         try {
-          const existingTaskId = persistPendingTaskIds ? readPendingTaskId(resultNodeId) : null
-          const submission = existingTaskId
-            ? { taskId: existingTaskId }
-            : await params.submitTask(resultNodeId)
+          const submission = await params.submitTask(resultNodeId)
           taskId = submission.taskId
-          params.onExecutionStateChange?.({
-            nodeId: resultNodeId,
-            state: { status: 'running', taskId },
-          })
-          if (!existingTaskId && persistPendingTaskIds && params.isCurrent()) {
+          if (persistPendingTaskIds && params.isCurrent()) {
             attachPendingTaskId({ resultNodeId, taskId })
             await params.afterTaskIdAttached?.({ resultNodeId, taskId })
           }
@@ -686,14 +647,11 @@ export function usePendingImageResultExecution(
               taskId: persistPendingTaskIds ? taskId : undefined,
             }
           }
-          successCount += 1
-          params.onExecutionStateChange?.({
-            nodeId: resultNodeId,
-            state: {
-              status: params.isCurrent() ? 'succeeded' : 'cancelled',
-              taskId,
-            },
-          })
+          outcomes[index] = {
+            resultNodeId,
+            status: 'cancelled',
+            taskId,
+          }
         } catch (error) {
           firstFailure ??= error
           failures.push(error)
@@ -701,22 +659,21 @@ export function usePendingImageResultExecution(
             pendingCount += 1
             if (!persistPendingTaskIds && params.isCurrent()) {
               cancelPendingResult({ resultNodeId })
-              params.onExecutionStateChange?.({
-                nodeId: resultNodeId,
-                state: { status: 'cancelled', taskId },
-              })
+            }
+            outcomes[index] = {
+              resultNodeId,
+              status: persistPendingTaskIds && params.isCurrent() ? 'pending' : 'cancelled',
+              taskId,
             }
             return
           }
           failureCount += 1
-          params.onExecutionStateChange?.({
-            nodeId: resultNodeId,
-            state: {
-              status:
-                !params.isCurrent() || error instanceof TaskCancelledError ? 'cancelled' : 'failed',
-              taskId: taskId ?? readPendingTaskId(resultNodeId) ?? undefined,
-            },
-          })
+          outcomes[index] = {
+            resultNodeId,
+            status:
+              !params.isCurrent() || error instanceof TaskCancelledError ? 'cancelled' : 'failed',
+            taskId,
+          }
           if (params.isCurrent()) {
             cancelPendingResult({ resultNodeId })
           }
@@ -728,25 +685,42 @@ export function usePendingImageResultExecution(
       (result): result is ResultMaterializerImageResult => !!result,
     )
     if (materializableResults.length > 0 && params.isCurrent()) {
-      materializeResolvedAttachedPendingResults({
+      const materialized = materializeResolvedAttachedPendingResults({
         results: materializableResults,
         isAttached: () => params.isCurrent(),
       })
+      const materializedNodeIds = new Set<string>(materialized.materializedNodeIds)
+      materializableResults.forEach((result) => {
+        const index = resultNodeIds.indexOf(result.resultNodeId)
+        if (index < 0) return
+        outcomes[index] = {
+          resultNodeId: result.resultNodeId,
+          status: materializedNodeIds.has(result.resultNodeId) ? 'succeeded' : 'cancelled',
+          taskId: outcomes[index]?.taskId,
+        }
+      })
     }
+
+    const completedOutcomes = outcomes.filter(
+      (outcome): outcome is PendingImageResultOutcome => !!outcome,
+    )
 
     return {
       resultNodeIds,
       totalCount: resultNodeIds.length,
-      successCount,
+      successCount: completedOutcomes.filter((outcome) => outcome.status === 'succeeded').length,
       pendingCount,
       failureCount,
       firstFailure,
       failures,
+      outcomes: completedOutcomes,
     }
   }
 
   return {
-    runPendingResults,
+    reservePendingResults,
+    runReservedPendingResults,
+    cancelPendingResults,
     materializeResolvedAttachedPendingResults,
   }
 }

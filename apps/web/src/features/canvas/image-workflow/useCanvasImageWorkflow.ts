@@ -39,7 +39,7 @@ type CanvasImageWorkflowExecutionPort = Pick<
   | 'runImageDirectAction'
   | 'runCanvasExtendAction'
   | 'isGenerationAvailable'
-  | 'isNodeDirectActionRunning'
+  | 'isNodeExecutionActive'
   | 'reattachPendingImageResults'
 >
 
@@ -145,7 +145,6 @@ export function useCanvasImageWorkflow(
   const execution = useImageWorkflowExecution({
     ...options.execution,
     nodes: graph.nodes,
-    currentBoardId: graph.currentBoardId,
     feedback: options.feedback.taskExecution,
   })
 
@@ -210,7 +209,7 @@ export function useCanvasImageWorkflow(
     isImageActionPanelVisible: (nodeId) => ui.panels.isActive('image-tools', nodeId),
     isImagePromptComposerVisible: (nodeId) => ui.panels.isActive('image-tools', nodeId),
     isGenerationAvailable: execution.isGenerationAvailable,
-    isDirectActionRunning: execution.isNodeDirectActionRunning,
+    isNodeExecutionActive: execution.isNodeExecutionActive,
     strengthControl: {
       activeAction: strengthControl.activeStrengthAction,
       getValue: strengthControl.getActionStrength,

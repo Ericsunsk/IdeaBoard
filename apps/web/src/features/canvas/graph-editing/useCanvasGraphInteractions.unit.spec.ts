@@ -68,6 +68,7 @@ function createHarness() {
     browser: { downloadImage },
     preview: { openNodeImage },
     feedback,
+    isNodeExecutionActive: vi.fn(() => false),
   })
   return {
     interactions,

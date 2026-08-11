@@ -14,6 +14,7 @@ type CreateCanvasWorkspaceImageWorkflowOptions = {
   ui: CanvasImageWorkflowUiAdapter
   feedback: Pick<CanvasFeedback, 'imageTools' | 'taskExecution'>
   executionRuntime: CanvasExecutionRuntime
+  cancelTasks: (taskIds: readonly string[]) => void
 }
 
 export function createCanvasWorkspaceImageWorkflow(
@@ -29,6 +30,7 @@ export function createCanvasWorkspaceImageWorkflow(
       flushAutosave: options.flushAutosave,
       refreshNodeInternals: options.graph.executionPort.refreshNodeInternals,
       executionRuntime: options.executionRuntime,
+      cancelTasks: options.cancelTasks,
     },
     flowPaneAdapter: options.flowPaneAdapter,
     openImageUrlPreview: options.openImageUrlPreview,

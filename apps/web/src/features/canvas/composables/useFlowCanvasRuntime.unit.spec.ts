@@ -260,7 +260,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
   }
   const isDirty = ref(false)
   const saveStatus = ref<SaveStatus>('idle')
-  const cancelDeletedRunningTasks = vi.fn()
+  const cancelTasks = vi.fn()
   const executionRuntime = createCanvasExecutionRuntime()
   const boardSession: CanvasBoardSession = {
     currentBoardId: computed(() => 'board-a'),
@@ -288,7 +288,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     onSuccess: vi.fn(),
     onError,
     onNativeRemove,
-    cancelDeletedRunningTasks,
+    cancelTasks,
     scheduleMicrotask: (callback) => {
       scheduledMicrotasks.push(callback)
     },
@@ -350,7 +350,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     onWarning,
     onError,
     onNativeRemove,
-    cancelDeletedRunningTasks,
+    cancelTasks,
     graphActions,
     isDirty,
     saveStatus,
@@ -568,10 +568,7 @@ describe('useFlowCanvasRuntime', () => {
       createFlowGraphCommandOptions(),
     )
     const attachment = harness.executionRuntime.attachment.value!
-    const lease = harness.executionRuntime.startNode(attachment, 'image-1', {
-      status: 'running',
-      taskId: 'task-1',
-    })!
+    const lease = harness.executionRuntime.hydratePending(attachment, 'image-1', 'task-1')!
     expect(harness.edges.value[0]?.animated).toBe(true)
 
     let resolveSave!: () => void
@@ -610,10 +607,7 @@ describe('useFlowCanvasRuntime', () => {
       createFlowGraphCommandOptions(),
     )
     const attachment = harness.executionRuntime.attachment.value!
-    const lease = harness.executionRuntime.startNode(attachment, 'image-1', {
-      status: 'running',
-      taskId: 'task-1',
-    })!
+    const lease = harness.executionRuntime.hydratePending(attachment, 'image-1', 'task-1')!
 
     let resolveSave!: () => void
     vi.mocked(harness.boardSession.save).mockImplementationOnce(
@@ -684,7 +678,7 @@ describe('useFlowCanvasRuntime', () => {
       createFlowGraphCommandOptions(),
     )
     const attachment = harness.executionRuntime.attachment.value!
-    harness.executionRuntime.startNode(attachment, 'image-9', { status: 'submitting' })
+    harness.executionRuntime.beginSubmission(attachment, 'image-9')
 
     await harness.runtime.persistence.flushAutosave({ silent: true })
 
@@ -1420,7 +1414,7 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-2'])
     expect(harness.fullEdges.value).toEqual([])
     expect(harness.boardBaseSnapshot.value.groups).toEqual([])
-    expect(harness.cancelDeletedRunningTasks).toHaveBeenCalledWith(['task-running-1'])
+    expect(harness.cancelTasks).toHaveBeenCalledWith(['task-running-1'])
     expect(harness.onNativeRemove).toHaveBeenCalledOnce()
     expect(harness.isDirty.value).toBe(true)
 
@@ -2532,7 +2526,7 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.fullEdges.value).toEqual([])
     expect(harness.boardBaseSnapshot.value.groups).toEqual([createGroup('group-1', ['prompt-1'])])
     expect(harness.onNativeRemove).toHaveBeenCalledOnce()
-    expect(harness.cancelDeletedRunningTasks).toHaveBeenCalledWith(['task-ui-delete'])
+    expect(harness.cancelTasks).toHaveBeenCalledWith(['task-ui-delete'])
     expect(harness.isDirty.value).toBe(true)
 
     harness.runtime.persistence.history.undo()
@@ -2575,7 +2569,7 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.onWarning).toHaveBeenCalledWith('删除操作未能写入画布，请刷新后重试')
     expect(exportCurrentBoardSnapshot(harness)).toEqual(graphBefore)
     expect(harness.onNativeRemove).not.toHaveBeenCalled()
-    expect(harness.cancelDeletedRunningTasks).not.toHaveBeenCalled()
+    expect(harness.cancelTasks).not.toHaveBeenCalled()
     expect(harness.isDirty.value).toBe(false)
   })
 
@@ -2616,7 +2610,7 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.fullEdges.value).toBe(edgesBefore)
     expect(harness.boardBaseSnapshot.value.groups).toBe(groupsBefore)
     expect(harness.onNativeRemove).not.toHaveBeenCalled()
-    expect(harness.cancelDeletedRunningTasks).not.toHaveBeenCalled()
+    expect(harness.cancelTasks).not.toHaveBeenCalled()
     expect(harness.isDirty.value).toBe(false)
     expect(harness.saveStatus.value).toBe(saveStatusBefore)
 
@@ -2700,7 +2694,7 @@ describe('useFlowCanvasRuntime', () => {
 
     await harness.applyNativeNodeChanges([{ id: 'image-1', type: 'remove' }])
 
-    expect(harness.cancelDeletedRunningTasks).toHaveBeenCalledWith(['task-native-delete'])
+    expect(harness.cancelTasks).toHaveBeenCalledWith(['task-native-delete'])
   })
 
   it('records native edge remove before node remove as one cleanup', async () => {

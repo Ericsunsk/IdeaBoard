@@ -7,7 +7,6 @@ import type { CanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFl
 import type { CanvasGraphStore } from '../../graph-runtime'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
 import type { FlowToCanvasBoardSnapshotOptions } from '../../utils/flowSnapshotAdapter'
-import { readCurrentBoardId } from '../../utils/currentBoardId'
 import {
   buildCanvasExtendReadinessRequest,
   buildImageActionReadinessRequest,
@@ -54,8 +53,8 @@ export type UseFlowImageWorkflowExecutionOptions = {
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
   onError?: (error: unknown) => boolean
-  getCurrentBoardId?: () => string
   executionWorkspace: CanvasExecutionWorkspace
+  cancelTasks: (taskIds: readonly string[]) => void
 }
 
 function requirePreparedTaskRequest(
@@ -74,6 +73,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     createCurrentCanvasGraphStore: options.createCurrentCanvasGraphStore,
     boardBaseSnapshot: options.boardBaseSnapshot,
     refreshNodeInternals: options.refreshNodeInternals,
+    isNodeExecutionActive: options.executionWorkspace.state.isNodeRunning,
   })
 
   async function flushPendingTaskSnapshot() {
@@ -99,23 +99,20 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
   const workflowRunner = createPendingImageWorkflowRunner({
     pendingResults,
     executionRuntime,
+    cancelTasks: options.cancelTasks,
     afterTaskIdAttached: flushPendingTaskSnapshot,
     onSuccess: options.onSuccess,
     onWarning: options.onWarning,
     onError: options.onError,
   })
 
-  function isNodeDirectActionRunning(nodeId: string): boolean {
+  function isNodeExecutionActive(nodeId: string): boolean {
     return executionWorkspace.state.isNodeRunning(nodeId)
-  }
-
-  function readBoardId(): string {
-    return readCurrentBoardId(options.getCurrentBoardId)
   }
 
   function requireCurrentAttachment(): CanvasExecutionAttachment {
     const attachment = executionRuntime.attachment.value
-    if (!attachment || attachment.boardId !== readBoardId()) {
+    if (!attachment) {
       throw new Error('Canvas execution requires the current Board attachment')
     }
     return attachment
@@ -137,7 +134,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       resultOptions: plan.resultOptions,
       attachment,
       outputCount: 1,
-      activationId: plan.activationId,
       assertReady: taskSubmission.assertReady,
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, plan.source.ratio),
@@ -162,7 +158,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       attachment,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
-      activationId: plan.activationId,
       assertReady: taskSubmission.assertReady,
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, plan.targetRatio),
@@ -192,7 +187,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       attachment,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
-      activationId: plan.activationId,
       preflight: readinessSubmission.assertReady,
       prepare: async () => {
         localInpaint = await prepareFlowLocalInpaintMedia({
@@ -258,7 +252,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       attachment,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
-      activationId: plan.activationId,
       assertReady: taskSubmission.assertReady,
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, plan.source.ratio),
@@ -289,7 +282,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       sourceNodeId: plan.sourceNodeId,
       attachment,
       outputCount: plan.outputCount,
-      activationId: plan.activationId,
       prepare: async () => {
         const imageSizes = await Promise.all(
           plan.inputImages.map((input) => loadImageSizeFromUrl(input.url)),
@@ -329,8 +321,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
 
   return {
     executeImageWorkflow,
-    isNodeDirectActionRunning,
-    getNodeExecutionState: executionRuntime.getNodeState,
+    isNodeExecutionActive,
     reattachPendingImageResults: executionWorkspace.commands.reattachPendingImageResults,
   }
 }

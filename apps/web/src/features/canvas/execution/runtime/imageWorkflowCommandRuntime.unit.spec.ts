@@ -32,7 +32,7 @@ function createCommandHarness(isGenerationAvailable = () => true) {
   }
   const workflow: ImageWorkflowExecutionPort = {
     executeImageWorkflow: vi.fn(async () => undefined),
-    isNodeDirectActionRunning: vi.fn(() => false),
+    isNodeExecutionActive: vi.fn(() => false),
     reattachPendingImageResults: vi.fn(),
   }
   const onWarning = vi.fn()
@@ -62,8 +62,8 @@ describe('imageWorkflowCommandRuntime', () => {
     expect(workflow.executeImageWorkflow).not.toHaveBeenCalled()
     expect(onWarning).toHaveBeenCalledWith('生成服务暂不可用，请稍后重试')
 
-    expect(commands.isNodeDirectActionRunning('image-1')).toBe(false)
-    expect(workflow.isNodeDirectActionRunning).toHaveBeenCalledWith('image-1')
+    expect(commands.isNodeExecutionActive('image-1')).toBe(false)
+    expect(workflow.isNodeExecutionActive).toHaveBeenCalledWith('image-1')
   })
 
   it('assigns a distinct activation identity to each deliberate prompt generation', async () => {

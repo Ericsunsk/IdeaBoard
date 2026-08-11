@@ -79,7 +79,7 @@ export type UseCanvasImageToolsOptions = {
   isImageActionPanelVisible: (nodeId: string) => boolean
   isImagePromptComposerVisible: (nodeId: string) => boolean
   isGenerationAvailable: () => boolean
-  isDirectActionRunning: (nodeId: string) => boolean
+  isNodeExecutionActive: (nodeId: string) => boolean
   strengthControl: ImageActionStrengthControlSource
   clearSelectedFlowElements: () => void
   startCanvasInteraction: (key: CanvasInteractionKey) => void

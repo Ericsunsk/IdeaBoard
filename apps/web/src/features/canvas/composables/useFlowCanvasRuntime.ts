@@ -32,6 +32,7 @@ import {
 } from '../flow-pane'
 import {
   projectCanvasExecutionEdgeAnimation,
+  type CanvasExecutionLease,
   type CanvasExecutionRuntime,
 } from '../execution/runtime/CanvasExecutionRuntime'
 
@@ -59,7 +60,7 @@ export type UseFlowCanvasRuntimeOptions = {
   onSuccess: (message: string) => void
   onError: (message: string) => void
   onNativeRemove?: () => void
-  cancelDeletedRunningTasks: (taskIds: readonly string[]) => void
+  cancelTasks: (taskIds: readonly string[]) => void
   scheduleMicrotask?: (callback: () => void) => void
   scheduleAnimationFrame?: (callback: FrameRequestCallback) => number
   cancelAnimationFrame?: (handle: number) => void
@@ -68,6 +69,10 @@ export type UseFlowCanvasRuntimeOptions = {
 
 export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   const localEditVersion = ref(0)
+  const cancelNodeExecutions = (leases: readonly CanvasExecutionLease[]) => {
+    const taskIds = options.executionRuntime.cancelNodeExecutions(leases)
+    if (taskIds.length > 0) options.cancelTasks(taskIds)
+  }
   const historyGroups: { value: unknown[] } = {
     get value() {
       return options.boardBaseSnapshot.value.groups
@@ -185,10 +190,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       ) {
         return
       }
-      options.executionRuntime.startNode(attachment, node.id, {
-        status: 'running',
-        taskId,
-      })
+      options.executionRuntime.hydratePending(attachment, node.id, taskId)
     })
   }
 
@@ -333,7 +335,8 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     markDirty,
     onWarning: options.onWarning,
     onNativeRemove: options.onNativeRemove,
-    cancelDeletedRunningTasks: options.cancelDeletedRunningTasks,
+    captureActiveNodeExecutions: options.executionRuntime.captureActiveNodeExecutions,
+    cancelNodeExecutions,
   })
 
   const nodeDragLifecycle: CanvasNodeDragLifecycle = createCanvasNodeDragLifecycle({
@@ -377,7 +380,8 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       ((callback: () => void) => void Promise.resolve().then(callback)),
     onWarning: options.onWarning,
     onNativeRemove: options.onNativeRemove,
-    cancelDeletedRunningTasks: options.cancelDeletedRunningTasks,
+    captureActiveNodeExecutions: options.executionRuntime.captureActiveNodeExecutions,
+    cancelNodeExecutions,
   })
 
   function deleteNode(nodeId: string): boolean {

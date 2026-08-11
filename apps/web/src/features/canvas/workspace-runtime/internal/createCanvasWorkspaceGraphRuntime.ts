@@ -9,6 +9,7 @@ import {
   type CanvasGraphEditingUploadAdapter,
   type CanvasGraphInteractionBrowserAdapter,
 } from '../../graph-editing'
+import type { CanvasExecutionRuntime } from '../../execution/runtime/CanvasExecutionRuntime'
 
 type CanvasWorkspaceBoardRuntime = ReturnType<typeof useCanvasBoardRuntime>
 
@@ -23,6 +24,7 @@ type CreateCanvasWorkspaceGraphRuntimeOptions = {
     openNodeImage: (snapshot: ImageNodeItem, mode: 'latest-output') => Promise<void>
   }
   feedback: CanvasFeedback['graph']
+  executionRuntime: CanvasExecutionRuntime
 }
 
 export function createCanvasWorkspaceGraphRuntime(
@@ -56,6 +58,7 @@ export function createCanvasWorkspaceGraphRuntime(
     browser: options.interactionBrowser,
     preview: { openNodeImage: options.preview.openNodeImage },
     feedback: options.feedback,
+    isNodeExecutionActive: options.executionRuntime.isNodeActive,
   })
 
   return {

@@ -170,6 +170,12 @@ export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
   const flowHistoryPast = shallowRef<FlowHistoryEntry[]>([])
   const flowHistoryFuture = shallowRef<FlowHistoryEntry[]>([])
 
+  function stripExecutionProjection(edge: unknown): unknown {
+    if (!edge || typeof edge !== 'object' || Array.isArray(edge)) return edge
+    const { animated: _animated, ...semanticEdge } = edge as Record<string, unknown>
+    return semanticEdge
+  }
+
   function capture(): FlowHistorySnapshot {
     recordCanvasInteractionCount('historyCaptureCount')
     return measureCanvasPerf(
@@ -181,7 +187,7 @@ export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
       }),
       () => {
         const nodes = options.nodes.value as unknown[]
-        const edges = options.edges.value as unknown[]
+        const edges = (options.edges.value as unknown[]).map(stripExecutionProjection)
         const groups = (options.groups?.value ?? []) as unknown[]
         return createFlowHistorySnapshot(nodes, edges, groups)
       },

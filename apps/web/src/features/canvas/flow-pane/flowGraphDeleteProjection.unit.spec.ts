@@ -10,6 +10,7 @@ import {
 import { createFlowEdgeProjectionIndex } from './flowConnectionIdentity'
 import { applyFlowGraphDeleteProjection } from './flowGraphDeleteProjection'
 import type { CanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
+import type { CanvasExecutionLease } from '../execution/runtime/CanvasExecutionRuntime'
 
 function createDeleteSummary(
   options: {
@@ -161,7 +162,9 @@ describe('flowGraphDeleteProjection', () => {
     } as Edge
     const { graphAdapter, applyGraphChanges } = createGraphAdapter()
     const onNativeRemove = vi.fn()
-    const cancelDeletedRunningTasks = vi.fn()
+    const executionLease = { nodeId: imageNode.id } as CanvasExecutionLease
+    const captureActiveNodeExecutions = vi.fn(() => [executionLease])
+    const cancelNodeExecutions = vi.fn()
 
     applyFlowGraphDeleteProjection({
       graphAdapter,
@@ -176,7 +179,8 @@ describe('flowGraphDeleteProjection', () => {
       flowNodeIds: [imageNode.id],
       projectionIndex: createProjectionIndex([generatedEdge]),
       onNativeRemove,
-      cancelDeletedRunningTasks,
+      captureActiveNodeExecutions,
+      cancelNodeExecutions,
     })
 
     const projectedChanges = applyGraphChanges.mock.calls[0]?.[0]
@@ -190,7 +194,14 @@ describe('flowGraphDeleteProjection', () => {
       }),
     ])
     expect(onNativeRemove).toHaveBeenCalledOnce()
-    expect(cancelDeletedRunningTasks).toHaveBeenCalledWith(['task-native'])
+    expect(captureActiveNodeExecutions).toHaveBeenCalledWith(['node-image-1'])
+    expect(cancelNodeExecutions).toHaveBeenCalledWith([executionLease])
+    expect(captureActiveNodeExecutions.mock.invocationCallOrder[0]).toBeLessThan(
+      applyGraphChanges.mock.invocationCallOrder[0]!,
+    )
+    expect(applyGraphChanges.mock.invocationCallOrder[0]).toBeLessThan(
+      cancelNodeExecutions.mock.invocationCallOrder[0]!,
+    )
   })
 
   it('projects group delete summaries through the same connected-edge and task side effects', () => {
@@ -205,7 +216,9 @@ describe('flowGraphDeleteProjection', () => {
     } as Edge
     const { graphAdapter, applyGraphChanges } = createGraphAdapter()
     const onNativeRemove = vi.fn()
-    const cancelDeletedRunningTasks = vi.fn()
+    const executionLease = { nodeId: imageNode.id } as CanvasExecutionLease
+    const captureActiveNodeExecutions = vi.fn(() => [executionLease])
+    const cancelNodeExecutions = vi.fn()
 
     applyFlowGraphDeleteProjection({
       graphAdapter,
@@ -220,7 +233,8 @@ describe('flowGraphDeleteProjection', () => {
       },
       projectionIndex: createProjectionIndex([edge]),
       onNativeRemove,
-      cancelDeletedRunningTasks,
+      captureActiveNodeExecutions,
+      cancelNodeExecutions,
     })
 
     const projectedChanges = applyGraphChanges.mock.calls[0]?.[0]
@@ -237,6 +251,13 @@ describe('flowGraphDeleteProjection', () => {
       }),
     ])
     expect(onNativeRemove).toHaveBeenCalledOnce()
-    expect(cancelDeletedRunningTasks).toHaveBeenCalledWith(['task-group'])
+    expect(captureActiveNodeExecutions).toHaveBeenCalledWith(['image-1', 'prompt-1'])
+    expect(cancelNodeExecutions).toHaveBeenCalledWith([executionLease])
+    expect(captureActiveNodeExecutions.mock.invocationCallOrder[0]).toBeLessThan(
+      applyGraphChanges.mock.invocationCallOrder[0]!,
+    )
+    expect(applyGraphChanges.mock.invocationCallOrder[0]).toBeLessThan(
+      cancelNodeExecutions.mock.invocationCallOrder[0]!,
+    )
   })
 })

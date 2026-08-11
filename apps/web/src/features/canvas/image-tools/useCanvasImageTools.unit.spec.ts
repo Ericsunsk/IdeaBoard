@@ -215,7 +215,7 @@ function mountCanvasImageTools() {
           isImageActionPanelVisible: (nodeId) => nodeId === 'image-1',
           isImagePromptComposerVisible: (nodeId) => nodeId === 'image-1',
           isGenerationAvailable: () => generationAvailable.value,
-          isDirectActionRunning: (nodeId) => directActionRunningNodeIds.value.has(nodeId),
+          isNodeExecutionActive: (nodeId) => directActionRunningNodeIds.value.has(nodeId),
           strengthControl: {
             activeAction: activeStrengthAction,
             getValue: () => 50,

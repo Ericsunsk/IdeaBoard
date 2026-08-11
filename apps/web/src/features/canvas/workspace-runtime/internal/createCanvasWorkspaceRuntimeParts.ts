@@ -50,7 +50,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     logoutAndRedirect: options.logoutAndRedirect,
     feedback: feedback.boardSession,
     onNativeRemove: options.onNativeRemove,
-    cancelDeletedRunningTasks: taskLifecycle.cancelDeletedRunningTasks,
+    cancelTasks: taskLifecycle.cancelTasks,
     executionRuntime,
     vueFlowGraphActions: options.flowPaneAdapter.vueFlowGraphActions,
   })
@@ -66,6 +66,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
       openNodeImage: options.openNodeImagePreview,
     },
     feedback: feedback.graph,
+    executionRuntime,
   })
 
   const viewport = useCanvasViewportRuntime({
@@ -108,6 +109,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
       taskExecution: feedback.taskExecution,
     },
     executionRuntime,
+    cancelTasks: taskLifecycle.cancelTasks,
   })
 
   return {

@@ -278,7 +278,6 @@ describe('useFlowNodeMutations', () => {
       target: 'fusion-1',
       sourceHandle: 'out:image',
       targetHandle: 'in:image',
-      animated: false,
     })
     expect(graphActions.addEdges).toHaveBeenCalledWith(
       expect.objectContaining({ source: 'image-1' }),

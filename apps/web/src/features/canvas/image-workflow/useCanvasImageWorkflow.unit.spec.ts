@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { IMAGE_NODE_ACTION } from '../config/imageActionRegistry'
 import type { MediaInputImage } from '../composables/useFlowMediaInputImages'
 import { ImageExecutionPlanError } from '../execution/planning/ImageExecutionPlan'
+import { createCanvasExecutionRuntime } from '../execution/runtime/CanvasExecutionRuntime'
 import { useCanvasImageWorkflow } from './useCanvasImageWorkflow'
 
 const mocks = vi.hoisted(() => {
@@ -25,7 +26,7 @@ const mocks = vi.hoisted(() => {
     },
     execution: {
       executeImageWorkflow: vi.fn(async () => undefined),
-      isNodeDirectActionRunning: vi.fn(() => false),
+      isNodeExecutionActive: vi.fn(() => false),
       reattachPendingImageResults: vi.fn(),
     },
     executionOptions: null as null | { onWarning: (message: string) => void },
@@ -102,6 +103,8 @@ function createOptions() {
       boardBaseSnapshot: ref({ groups: [] }),
       flushAutosave: vi.fn(async () => undefined),
       refreshNodeInternals: vi.fn(),
+      executionRuntime: createCanvasExecutionRuntime(),
+      cancelTasks: vi.fn(),
     },
     flowPaneAdapter: {
       screenToFlowCoordinate: vi.fn((point) => point),

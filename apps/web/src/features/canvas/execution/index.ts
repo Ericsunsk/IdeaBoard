@@ -20,7 +20,6 @@ export {
   type CanvasExecutionLease,
   type CanvasExecutionRuntime,
   type CanvasExecutionStatus,
-  type CanvasNodeExecutionChange,
   type CanvasNodeExecutionState,
 } from './runtime/CanvasExecutionRuntime'
 export {

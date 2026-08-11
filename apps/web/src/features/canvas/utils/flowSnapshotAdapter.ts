@@ -216,7 +216,6 @@ export function canvasConnectionToFlowEdge(connection: CanvasConnection): FlowAd
     sourceHandle: `out:${connection.fromPort}`,
     target: toFlowNodeId(connection.toNodeType, connection.toNodeId),
     targetHandle: `in:${connection.toPort}`,
-    animated: false,
     data: { connectionSnapshot: clone(connection) },
   }
 }

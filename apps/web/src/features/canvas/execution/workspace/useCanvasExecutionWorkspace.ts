@@ -68,6 +68,7 @@ export type UseCanvasExecutionWorkspaceOptions = {
   loadImageSize?: ImageSizeLoader
   createClientActionId?: ClientActionIdFactory
   executionRuntime: CanvasExecutionRuntime
+  cancelTasks: (taskIds: readonly string[]) => void
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
   onError?: (error: unknown) => boolean
@@ -99,6 +100,7 @@ export function useCanvasExecutionWorkspace(
     createCurrentCanvasGraphStore: options.createCurrentCanvasGraphStore,
     boardBaseSnapshot: options.boardBaseSnapshot,
     refreshNodeInternals: options.refreshNodeInternals,
+    isNodeExecutionActive: executionRuntime.isNodeActive,
   })
   const pendingResults = options.pendingResults ?? ownedPendingResults
 
@@ -147,6 +149,7 @@ export function useCanvasExecutionWorkspace(
   const workflowRunner = createPendingImageWorkflowRunner({
     pendingResults,
     executionRuntime,
+    cancelTasks: options.cancelTasks,
     afterTaskIdAttached: flushPendingTaskSnapshot,
     createClientActionId: options.createClientActionId,
     onSuccess: options.onSuccess,
@@ -175,7 +178,6 @@ export function useCanvasExecutionWorkspace(
       attachment,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
-      activationId: plan.activationId,
       preflight: async () => {
         buildTaskRequest()
       },

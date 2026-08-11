@@ -11,7 +11,7 @@ import type {
   PendingImageResultExecution,
   PendingImageResultRunSummary,
   MaterializeResolvedAttachedPendingImageResultsParams,
-  RunPendingImageResultsParams,
+  RunReservedPendingImageResultsParams,
 } from '../result-nodes/usePendingImageResultNodes'
 import type { CanvasTaskSubmissionAdapter } from './canvasTaskSubmissionAdapter'
 import { useCanvasExecutionWorkspace } from './useCanvasExecutionWorkspace'
@@ -20,7 +20,7 @@ import { createCanvasExecutionRuntime } from '../runtime/CanvasExecutionRuntime'
 function makeRunSummary(
   overrides: Partial<PendingImageResultRunSummary> = {},
 ): PendingImageResultRunSummary {
-  return {
+  const summary: PendingImageResultRunSummary = {
     resultNodeIds: ['image-2'],
     totalCount: 1,
     successCount: 1,
@@ -28,8 +28,19 @@ function makeRunSummary(
     failureCount: 0,
     firstFailure: null,
     failures: [],
+    outcomes: [],
     ...overrides,
   }
+  if (!overrides.outcomes) {
+    const status =
+      summary.pendingCount > 0 ? 'pending' : summary.failureCount > 0 ? 'failed' : 'succeeded'
+    summary.outcomes = summary.resultNodeIds.map((resultNodeId) => ({
+      resultNodeId,
+      status,
+      taskId: 'task-1',
+    }))
+  }
+  return summary
 }
 
 function makeMaterializerResult(
@@ -103,12 +114,14 @@ function createGraphAdapter(edges: Ref<Edge[]>): CanvasVueFlowGraphAdapter {
 }
 
 function createPendingResults(
-  runPendingResults: (
-    params: RunPendingImageResultsParams,
+  runReservedPendingResults: (
+    params: RunReservedPendingImageResultsParams,
   ) => Promise<PendingImageResultRunSummary>,
 ): PendingImageResultExecution {
   return {
-    runPendingResults: vi.fn(runPendingResults),
+    reservePendingResults: vi.fn(() => ({ resultNodeIds: ['image-2'] })),
+    runReservedPendingResults: vi.fn(runReservedPendingResults),
+    cancelPendingResults: vi.fn(),
     materializeResolvedAttachedPendingResults: vi.fn(
       (params: MaterializeResolvedAttachedPendingImageResultsParams) =>
         makeMaterializerResult(params.results.map((result) => result.resultNodeId)),
@@ -128,7 +141,9 @@ function createTaskAdapter(
 function createWorkspaceHarness(options: {
   nodes?: Node[]
   edges?: Edge[]
-  runPendingResults: (params: RunPendingImageResultsParams) => Promise<PendingImageResultRunSummary>
+  runReservedPendingResults: (
+    params: RunReservedPendingImageResultsParams,
+  ) => Promise<PendingImageResultRunSummary>
   submitTaskRequest?: CanvasTaskSubmissionAdapter['submitTaskRequest']
   createClientActionId?: () => string
   currentBoardId?: Ref<string>
@@ -151,7 +166,7 @@ function createWorkspaceHarness(options: {
   const edges = shallowRef<Edge[]>(options.edges ?? [])
   const currentBoardId = options.currentBoardId ?? shallowRef('board-a')
   const graphAdapter = createGraphAdapter(edges)
-  const pendingResults = createPendingResults(options.runPendingResults)
+  const pendingResults = createPendingResults(options.runReservedPendingResults)
   if (options.materializerResult) {
     vi.mocked(pendingResults.materializeResolvedAttachedPendingResults).mockReturnValue(
       options.materializerResult,
@@ -171,6 +186,7 @@ function createWorkspaceHarness(options: {
   const flushAutosave = vi.fn(async () => undefined)
   const onSuccess = vi.fn()
   const onWarning = vi.fn()
+  const cancelTasks = vi.fn()
   const executionRuntime = createCanvasExecutionRuntime()
   const attachment = executionRuntime.attachBoard(currentBoardId.value)
   nodes.value.forEach((node) => {
@@ -182,7 +198,7 @@ function createWorkspaceHarness(options: {
       snapshot.outputStatus === 'running' &&
       taskId
     ) {
-      executionRuntime.startNode(attachment, node.id, { status: 'running', taskId })
+      executionRuntime.hydratePending(attachment, node.id, taskId)
     }
   })
   const workspace = useCanvasExecutionWorkspace({
@@ -192,6 +208,7 @@ function createWorkspaceHarness(options: {
     createCurrentCanvasGraphStore: vi.fn(() => ({})) as never,
     flushAutosave,
     executionRuntime,
+    cancelTasks,
     pendingResults,
     taskAdapter,
     waitTaskImageResults,
@@ -227,19 +244,12 @@ describe('useCanvasExecutionWorkspace', () => {
           submittedRequests.push(request)
           return { taskId: 'task-1' }
         }),
-        runPendingResults: async (params) => {
-          params.onReserved?.(['image-2'])
+        runReservedPendingResults: async (params) => {
           const { taskId } = await params.submitTask('image-2')
-          params.onExecutionStateChange?.({
-            nodeId: 'image-2',
-            state: { status: 'running', taskId },
-          })
           await params.resolveResult(taskId, 'image-2')
-          params.onExecutionStateChange?.({
-            nodeId: 'image-2',
-            state: { status: 'succeeded', taskId },
+          return makeRunSummary({
+            outcomes: [{ resultNodeId: 'image-2', status: 'succeeded', taskId }],
           })
-          return makeRunSummary()
         },
       })
 
@@ -267,7 +277,7 @@ describe('useCanvasExecutionWorkspace', () => {
   it('reports pattern-gen preflight errors without submitting a task', async () => {
     const { workspace, pendingResults, taskAdapter, onSuccess, onWarning } = createWorkspaceHarness(
       {
-        runPendingResults: async () => makeRunSummary(),
+        runReservedPendingResults: async () => makeRunSummary(),
       },
     )
 
@@ -275,7 +285,8 @@ describe('useCanvasExecutionWorkspace', () => {
       makeTextPromptPlan({ aspectRatio: '2:1' as never }),
     )
 
-    expect(pendingResults.runPendingResults).not.toHaveBeenCalled()
+    expect(pendingResults.reservePendingResults).not.toHaveBeenCalled()
+    expect(pendingResults.runReservedPendingResults).not.toHaveBeenCalled()
     expect(taskAdapter.submitTaskRequest).not.toHaveBeenCalled()
     expect(onWarning).toHaveBeenCalledWith(
       '图案生成参数错误：图案生成尺寸比例仅支持 auto、1:1、3:4、4:3、9:16、16:9',
@@ -295,8 +306,7 @@ describe('useCanvasExecutionWorkspace', () => {
         submittedClientActionIds.push(request.client_action_id)
         return { taskId: 'task-1' }
       }),
-      runPendingResults: async (params) => {
-        params.onReserved?.(['image-2'])
+      runReservedPendingResults: async (params) => {
         await params.submitTask('image-2')
         return makeRunSummary()
       },
@@ -312,8 +322,7 @@ describe('useCanvasExecutionWorkspace', () => {
   it('flushes the board snapshot after a pending task id attaches', async () => {
     const { workspace, flushAutosave, onWarning } = createWorkspaceHarness({
       createClientActionId: vi.fn(() => 'client-action-1'),
-      runPendingResults: async (params) => {
-        params.onReserved?.(['image-2'])
+      runReservedPendingResults: async (params) => {
         const { taskId } = await params.submitTask('image-2')
         await params.afterTaskIdAttached?.({ resultNodeId: 'image-2', taskId })
         return makeRunSummary({
@@ -343,7 +352,7 @@ describe('useCanvasExecutionWorkspace', () => {
             animated: false,
           },
         ],
-        runPendingResults: async () => makeRunSummary(),
+        runReservedPendingResults: async () => makeRunSummary(),
       })
 
     await workspace.commands.reattachPendingImageResults()
@@ -391,7 +400,7 @@ describe('useCanvasExecutionWorkspace', () => {
         },
       ],
       waitTaskImageResults: () => taskResults,
-      runPendingResults: async () => makeRunSummary(),
+      runReservedPendingResults: async () => makeRunSummary(),
     })
 
     const reattach = workspace.commands.reattachPendingImageResults()
@@ -412,7 +421,7 @@ describe('useCanvasExecutionWorkspace', () => {
       waitTaskImageResults: async () => {
         throw new Error('provider unavailable')
       },
-      runPendingResults: async () => makeRunSummary(),
+      runReservedPendingResults: async () => makeRunSummary(),
     })
 
     await workspace.commands.reattachPendingImageResults()
@@ -439,7 +448,7 @@ describe('useCanvasExecutionWorkspace', () => {
       waitTaskImageResults: async () => {
         throw new TaskCancelledError('用户取消')
       },
-      runPendingResults: async () => makeRunSummary(),
+      runReservedPendingResults: async () => makeRunSummary(),
     })
 
     await workspace.commands.reattachPendingImageResults()
@@ -473,7 +482,7 @@ describe('useCanvasExecutionWorkspace', () => {
       ],
       currentBoardId,
       waitTaskImageResults: () => taskResults,
-      runPendingResults: async () => makeRunSummary(),
+      runReservedPendingResults: async () => makeRunSummary(),
     })
 
     const reattach = workspace.commands.reattachPendingImageResults()
@@ -506,7 +515,7 @@ describe('useCanvasExecutionWorkspace', () => {
     const { workspace, nodes, pendingResults, waitTaskImageResults } = createWorkspaceHarness({
       nodes: [makePendingImageNode('image-2', 'task-1')],
       waitTaskImageResults: () => taskResults,
-      runPendingResults: async () => makeRunSummary(),
+      runReservedPendingResults: async () => makeRunSummary(),
     })
 
     const reattach = workspace.commands.reattachPendingImageResults()
@@ -533,7 +542,7 @@ describe('useCanvasExecutionWorkspace', () => {
     const { workspace, waitTaskImageResults, onSuccess } = createWorkspaceHarness({
       nodes: [makePendingImageNode('image-2', 'task-1')],
       waitTaskImageResults: () => taskResults,
-      runPendingResults: async () => makeRunSummary(),
+      runReservedPendingResults: async () => makeRunSummary(),
     })
 
     const firstReattach = workspace.commands.reattachPendingImageResults()
@@ -588,7 +597,7 @@ describe('useCanvasExecutionWorkspace', () => {
       ],
       waitTaskImageResults: (taskId) =>
         taskId === 'task-1' ? firstTaskResults : secondTaskResults,
-      runPendingResults: async () => makeRunSummary(),
+      runReservedPendingResults: async () => makeRunSummary(),
     })
 
     const reattach = workspace.commands.reattachPendingImageResults()
@@ -621,7 +630,7 @@ describe('useCanvasExecutionWorkspace', () => {
     const { workspace } = createWorkspaceHarness({
       nodes: [makePendingImageNode('image-2', 'task-1')],
       materializerResult: skippedResult,
-      runPendingResults: async () => makeRunSummary(),
+      runReservedPendingResults: async () => makeRunSummary(),
     })
 
     await workspace.commands.reattachPendingImageResults()
@@ -636,7 +645,7 @@ describe('useCanvasExecutionWorkspace', () => {
   it('does not start a reattach for an invalid Canvas node id', async () => {
     const { workspace, waitTaskImageResults, pendingResults } = createWorkspaceHarness({
       nodes: [makePendingImageNode('image-invalid', 'task-1')],
-      runPendingResults: async () => makeRunSummary(),
+      runReservedPendingResults: async () => makeRunSummary(),
     })
 
     await workspace.commands.reattachPendingImageResults()
@@ -648,8 +657,7 @@ describe('useCanvasExecutionWorkspace', () => {
 
   it('reports task failures through workspace feedback', async () => {
     const { workspace, onWarning, onSuccess } = createWorkspaceHarness({
-      runPendingResults: async (params) => {
-        params.onReserved?.(['image-2'])
+      runReservedPendingResults: async () => {
         return makeRunSummary({
           successCount: 0,
           failureCount: 1,

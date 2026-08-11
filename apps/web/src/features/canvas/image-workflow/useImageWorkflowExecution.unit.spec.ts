@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { useImageWorkflowExecution } from './useImageWorkflowExecution'
-import { CanvasBillingPreflightError } from '../execution'
+import { CanvasBillingPreflightError, createCanvasExecutionRuntime } from '../execution'
 
 const mocks = vi.hoisted(() => {
   const plan = {
@@ -25,7 +25,7 @@ const mocks = vi.hoisted(() => {
     },
     workflow: {
       executeImageWorkflow: vi.fn(async () => undefined),
-      isNodeDirectActionRunning: vi.fn(() => false),
+      isNodeExecutionActive: vi.fn(() => false),
       reattachPendingImageResults: vi.fn(),
     },
     executionOptions: null as null | {
@@ -62,8 +62,9 @@ function createRuntime() {
     graphAdapter: {},
     createCurrentCanvasGraphStore: vi.fn(() => ({})),
     flushAutosave: vi.fn(async () => undefined),
-    currentBoardId: ref('board-a'),
     refreshNodeInternals: vi.fn(),
+    executionRuntime: createCanvasExecutionRuntime(),
+    cancelTasks: vi.fn(),
     feedback,
   }
   const runtime = useImageWorkflowExecution(runtimeOptions as never)

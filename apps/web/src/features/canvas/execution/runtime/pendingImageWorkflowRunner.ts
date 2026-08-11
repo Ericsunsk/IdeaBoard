@@ -17,7 +17,6 @@ import type {
   CanvasExecutionAttachment,
   CanvasExecutionLease,
   CanvasExecutionRuntime,
-  CanvasNodeExecutionChange,
 } from './CanvasExecutionRuntime'
 
 type PendingImageResultOptions = ImageExecutionResultOptions
@@ -33,7 +32,6 @@ export type PendingImageWorkflowBatchParams = {
   sourceNodeId: string
   attachment: CanvasExecutionAttachment
   outputCount: number
-  activationId: string
   resultOptions?: PendingImageResultOptions
   preflight?: () => Promise<void>
   assertReady?: () => Promise<void>
@@ -52,8 +50,12 @@ export type PendingImageWorkflowRunner = {
 }
 
 export type PendingImageWorkflowRunnerOptions = {
-  pendingResults: Pick<PendingImageResultExecution, 'runPendingResults'>
+  pendingResults: Pick<
+    PendingImageResultExecution,
+    'reservePendingResults' | 'runReservedPendingResults' | 'cancelPendingResults'
+  >
   executionRuntime: CanvasExecutionRuntime
+  cancelTasks: (taskIds: readonly string[]) => void
   afterTaskIdAttached?: (params: { resultNodeId: string; taskId: string }) => Promise<void>
   createClientActionId?: ClientActionIdFactory
   onSuccess: (message: string) => void
@@ -129,10 +131,6 @@ export function createPendingImageWorkflowRunner(
     const clientActionIdsByResultNodeId = new Map<string, string>()
     const createClientActionId = options.createClientActionId ?? createCanvasTaskClientActionId
     const isCurrent = () => options.executionRuntime.isAttachmentCurrent(params.attachment)
-    const transitionCurrentExecution = (change: CanvasNodeExecutionChange) => {
-      const lease = leasesByResultNodeId.get(change.nodeId)
-      if (lease) options.executionRuntime.transitionNode(lease, change.state)
-    }
     const transitionActiveResults = (status: 'failed' | 'cancelled') => {
       resultNodeIds.forEach((nodeId) => {
         const lease = leasesByResultNodeId.get(nodeId)
@@ -146,12 +144,26 @@ export function createPendingImageWorkflowRunner(
     }
 
     async function submitWithTransportRetry(resultNodeId: string) {
+      if (!isCurrent()) throw new TaskCancelledError('Canvas execution is no longer attached')
       const clientActionId =
         clientActionIdsByResultNodeId.get(resultNodeId) ?? createClientActionId()
       clientActionIdsByResultNodeId.set(resultNodeId, clientActionId)
       for (let attempt = 0; attempt < 2; attempt += 1) {
+        if (!isCurrent()) throw new TaskCancelledError('Canvas execution is no longer attached')
         try {
-          return await params.submitTask(resultNodeId, clientActionId)
+          const submission = await params.submitTask(resultNodeId, clientActionId)
+          const lease = leasesByResultNodeId.get(resultNodeId)
+          const didAttachTask =
+            !!lease &&
+            options.executionRuntime.transitionNode(lease, {
+              status: 'running',
+              taskId: submission.taskId,
+            })
+          if (!didAttachTask) {
+            options.cancelTasks([submission.taskId])
+            throw new TaskCancelledError('Canvas execution is no longer attached')
+          }
+          return submission
         } catch (error) {
           if (attempt === 0 && isCanvasBillingPreflightError(error, 'network')) continue
           throw error
@@ -164,28 +176,40 @@ export function createPendingImageWorkflowRunner(
       await params.preflight?.()
       const prepared = await params.prepare?.()
       await params.assertReady?.()
-      const summary = await options.pendingResults.runPendingResults({
+      if (!isCurrent()) return
+      const reservation = options.pendingResults.reservePendingResults({
         source: prepared?.source ?? params.source,
         sourceNodeId: prepared?.sourceNodeId ?? params.sourceNodeId,
         outputCount: params.outputCount,
-        clientActionKey: params.activationId,
         resultOptions: prepared?.resultOptions ?? params.resultOptions,
+      })
+      resultNodeIds = reservation.resultNodeIds
+      for (const resultNodeId of resultNodeIds) {
+        const lease = options.executionRuntime.beginSubmission(params.attachment, resultNodeId)
+        if (!lease) {
+          transitionActiveResults('cancelled')
+          options.pendingResults.cancelPendingResults(resultNodeIds)
+          return
+        }
+        leasesByResultNodeId.set(resultNodeId, lease)
+      }
+      const summary = await options.pendingResults.runReservedPendingResults({
+        resultNodeIds,
         submitTask: submitWithTransportRetry,
         resolveResult: params.resolveResult,
         persistPendingTaskIds: params.persistPendingTaskIds,
         isCurrent,
         isPendingError: isTaskResultPendingError,
         afterTaskIdAttached: options.afterTaskIdAttached,
-        onExecutionStateChange: transitionCurrentExecution,
-        onReserved: (ids) => {
-          resultNodeIds = ids
-          ids.forEach((resultNodeId) => {
-            const lease = options.executionRuntime.startNode(params.attachment, resultNodeId, {
-              status: 'submitting',
-            })
-            if (lease) leasesByResultNodeId.set(resultNodeId, lease)
-          })
-        },
+      })
+      summary.outcomes.forEach((outcome) => {
+        if (outcome.status === 'pending') return
+        const lease = leasesByResultNodeId.get(outcome.resultNodeId)
+        if (!lease) return
+        options.executionRuntime.transitionNode(lease, {
+          status: outcome.status,
+          taskId: outcome.taskId,
+        })
       })
       if (!isCurrent()) return
       let typedFailureHandled = false

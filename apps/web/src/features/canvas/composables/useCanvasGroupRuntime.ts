@@ -1,6 +1,7 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
+import type { CanvasExecutionLease } from '../execution/runtime/CanvasExecutionRuntime'
 import {
   commitCanvasGraphDeleteGroupIntent,
   createCanvasGraphStore,
@@ -164,7 +165,8 @@ export type UseCanvasGroupRuntimeOptions = {
   markDirty: () => void
   onWarning: (message: string) => void
   onNativeRemove?: () => void
-  cancelDeletedRunningTasks: (taskIds: readonly string[]) => void
+  captureActiveNodeExecutions: (nodeIds: readonly string[]) => CanvasExecutionLease[]
+  cancelNodeExecutions: (leases: readonly CanvasExecutionLease[]) => void
 }
 
 export function useCanvasGroupRuntime(
@@ -608,7 +610,8 @@ export function useCanvasGroupRuntime(
       commitPolicy: { summary, historyBefore },
       projectionIndex,
       onNativeRemove: options.onNativeRemove,
-      cancelDeletedRunningTasks: options.cancelDeletedRunningTasks,
+      captureActiveNodeExecutions: options.captureActiveNodeExecutions,
+      cancelNodeExecutions: options.cancelNodeExecutions,
     })
     return result?.didChange ?? false
   }

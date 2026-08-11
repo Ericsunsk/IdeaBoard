@@ -18,7 +18,7 @@ export type CanvasTaskLifecycleOptions = {
 }
 
 export type CanvasTaskLifecycle = {
-  cancelDeletedRunningTasks: (taskIds: readonly string[]) => void
+  cancelTasks: (taskIds: readonly string[]) => void
 }
 
 function defaultScheduleRetry(callback: () => void, delayMs: number) {
@@ -26,7 +26,7 @@ function defaultScheduleRetry(callback: () => void, delayMs: number) {
 }
 
 function defaultOnFinalFailure(failure: CanvasTaskFinalFailure) {
-  console.warn('[canvas] failed to stop deleted task', failure)
+  console.warn('[canvas] failed to cancel task', failure)
 }
 
 export function createCanvasTaskLifecycle(
@@ -46,12 +46,12 @@ export function createCanvasTaskLifecycle(
     })
   }
 
-  function cancelDeletedRunningTasks(taskIds: readonly string[]) {
+  function cancelTasks(taskIds: readonly string[]) {
     const uniqueTaskIds = Array.from(
       new Set(taskIds.map((taskId) => taskId.trim()).filter(Boolean)),
     )
     uniqueTaskIds.forEach((taskId) => cancelWithRetry(taskId))
   }
 
-  return { cancelDeletedRunningTasks }
+  return { cancelTasks }
 }

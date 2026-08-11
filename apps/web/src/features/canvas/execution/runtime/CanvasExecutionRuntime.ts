@@ -11,11 +11,6 @@ export type CanvasNodeExecutionState = Readonly<{
   taskId?: string
 }>
 
-export type CanvasNodeExecutionChange = {
-  nodeId: string
-  state: CanvasNodeExecutionState
-}
-
 export type CanvasExecutionAttachment = Readonly<{
   boardId: string
   epoch: number
@@ -35,17 +30,21 @@ export type CanvasExecutionRuntime = {
   attachBoard: (boardId: string) => CanvasExecutionAttachment
   detachBoard: () => void
   isAttachmentCurrent: (attachment: CanvasExecutionAttachment) => boolean
-  startNode: (
+  beginSubmission: (
     attachment: CanvasExecutionAttachment,
     nodeId: string,
-    state: CanvasNodeExecutionState,
+  ) => CanvasExecutionLease | null
+  hydratePending: (
+    attachment: CanvasExecutionAttachment,
+    nodeId: string,
+    taskId: string,
   ) => CanvasExecutionLease | null
   transitionNode: (lease: CanvasExecutionLease, state: CanvasNodeExecutionState) => boolean
   getNodeState: (nodeId: string) => CanvasNodeExecutionState | null
   getNodeLease: (nodeId: string) => CanvasExecutionLease | null
   isNodeActive: (nodeId: string) => boolean
-  clearNode: (lease: CanvasExecutionLease) => boolean
-  clear: () => void
+  captureActiveNodeExecutions: (nodeIds: readonly string[]) => CanvasExecutionLease[]
+  cancelNodeExecutions: (leases: readonly CanvasExecutionLease[]) => string[]
 }
 
 export type CanvasExecutionEdgeProjection = {
@@ -136,6 +135,21 @@ export function createCanvasExecutionRuntime(): CanvasExecutionRuntime {
     return lease
   }
 
+  function beginSubmission(
+    targetAttachment: CanvasExecutionAttachment,
+    nodeId: string,
+  ): CanvasExecutionLease | null {
+    return startNode(targetAttachment, nodeId, { status: 'submitting' })
+  }
+
+  function hydratePending(
+    targetAttachment: CanvasExecutionAttachment,
+    nodeId: string,
+    taskId: string,
+  ): CanvasExecutionLease | null {
+    return startNode(targetAttachment, nodeId, { status: 'running', taskId })
+  }
+
   function transitionNode(lease: CanvasExecutionLease, state: CanvasNodeExecutionState): boolean {
     if (!isAttachmentCurrent(lease.attachment) || leasesByNodeId.get(lease.nodeId) !== lease) {
       return false
@@ -166,19 +180,40 @@ export function createCanvasExecutionRuntime(): CanvasExecutionRuntime {
     return isExecutionActive(getNodeState(nodeId) ?? undefined)
   }
 
-  function clearNode(lease: CanvasExecutionLease): boolean {
-    if (!isAttachmentCurrent(lease.attachment) || leasesByNodeId.get(lease.nodeId) !== lease) {
-      return false
-    }
-    leasesByNodeId.delete(lease.nodeId)
-    const nextNodeStates = new Map(nodeStates.value)
-    nextNodeStates.delete(lease.nodeId)
-    nodeStates.value = nextNodeStates
-    return true
+  function captureActiveNodeExecutions(nodeIds: readonly string[]): CanvasExecutionLease[] {
+    const normalizedNodeIds = new Set(nodeIds.map((nodeId) => nodeId.trim()).filter(Boolean))
+    return Array.from(normalizedNodeIds).flatMap((nodeId) => {
+      const lease = leasesByNodeId.get(nodeId)
+      const current = nodeStates.value.get(nodeId)
+      return lease && isAttachmentCurrent(lease.attachment) && isExecutionActive(current)
+        ? [lease]
+        : []
+    })
   }
 
-  function clear(): void {
-    resetNodeState()
+  function cancelNodeExecutions(leases: readonly CanvasExecutionLease[]): string[] {
+    if (leases.length === 0) return []
+    const nextNodeStates = new Map(nodeStates.value)
+    const taskIds = new Set<string>()
+    let didChange = false
+    new Set(leases).forEach((lease) => {
+      const current = nextNodeStates.get(lease.nodeId)
+      if (
+        leasesByNodeId.get(lease.nodeId) !== lease ||
+        !isAttachmentCurrent(lease.attachment) ||
+        !isExecutionActive(current)
+      ) {
+        return
+      }
+      nextNodeStates.set(
+        lease.nodeId,
+        current?.taskId ? { status: 'cancelled', taskId: current.taskId } : { status: 'cancelled' },
+      )
+      if (current?.taskId) taskIds.add(current.taskId)
+      didChange = true
+    })
+    if (didChange) nodeStates.value = nextNodeStates
+    return [...taskIds]
   }
 
   return {
@@ -187,13 +222,14 @@ export function createCanvasExecutionRuntime(): CanvasExecutionRuntime {
     attachBoard,
     detachBoard,
     isAttachmentCurrent,
-    startNode,
+    beginSubmission,
+    hydratePending,
     transitionNode,
     getNodeState,
     getNodeLease,
     isNodeActive,
-    clearNode,
-    clear,
+    captureActiveNodeExecutions,
+    cancelNodeExecutions,
   }
 }
 

@@ -139,9 +139,10 @@ function createExecutionHarness(
     const snapshot = node.data?.snapshotNode as ImageNodeItem | undefined
     const taskId = snapshot?.pendingTaskId?.trim()
     if (snapshot?.type === 'image-node' && snapshot.outputStatus === 'running' && taskId) {
-      executionRuntime.startNode(attachment, node.id, { status: 'running', taskId })
+      executionRuntime.hydratePending(attachment, node.id, taskId)
     }
   })
+  const cancelTasks = vi.fn()
   const createCurrentCanvasGraphStore = (
     snapshotOptions?: Parameters<typeof flowToCanvasBoardSnapshot>[2],
   ) =>
@@ -162,6 +163,7 @@ function createExecutionHarness(
     createCurrentCanvasGraphStore,
     flushAutosave,
     executionRuntime,
+    cancelTasks,
     onSuccess,
     onWarning,
   })
@@ -173,8 +175,8 @@ function createExecutionHarness(
     flushAutosave,
     onSuccess,
     onWarning,
-    getCurrentBoardId: () => currentBoardId.value,
     executionWorkspace,
+    cancelTasks,
   })
 
   return {
@@ -274,7 +276,7 @@ describe('flowImageWorkflowExecution', () => {
     executorMocks.waitExistingOrLiveTaskImageResults.mockImplementationOnce(
       () => taskResult.promise,
     )
-    const { execution, nodes, edges, flushAutosave, onSuccess, onWarning } =
+    const { execution, executionRuntime, nodes, edges, flushAutosave, onSuccess, onWarning } =
       createExecutionHarness()
 
     const run = execution.executeImageWorkflow(imageActionPlan())
@@ -282,8 +284,8 @@ describe('flowImageWorkflowExecution', () => {
 
     const resultNode = nodes.value.find((node) => node.id !== 'image-1')
     expect(resultNode?.data?.kind).toBe('image')
-    expect(execution.isNodeDirectActionRunning(resultNode!.id)).toBe(true)
-    expect(execution.getNodeExecutionState(resultNode!.id)).toEqual({ status: 'submitting' })
+    expect(execution.isNodeExecutionActive(resultNode!.id)).toBe(true)
+    expect(executionRuntime.getNodeState(resultNode!.id)).toEqual({ status: 'submitting' })
     expect(edges.value.find((edge) => edge.target === resultNode!.id)?.animated).toBeUndefined()
 
     submitTask.resolve({ taskId: 'task-1' })
@@ -291,7 +293,7 @@ describe('flowImageWorkflowExecution', () => {
 
     expect(flushAutosave).toHaveBeenCalledWith({ silent: true })
     expect(readImageSnapshot(nodes.value, resultNode!.id).pendingTaskId).toBe('task-1')
-    expect(execution.getNodeExecutionState(resultNode!.id)).toEqual({
+    expect(executionRuntime.getNodeState(resultNode!.id)).toEqual({
       status: 'running',
       taskId: 'task-1',
     })
@@ -325,12 +327,12 @@ describe('flowImageWorkflowExecution', () => {
       outputImages: [],
     })
     expect(snapshot.pendingTaskId).toBeUndefined()
-    expect(execution.isNodeDirectActionRunning(resultNode!.id)).toBe(false)
-    expect(execution.getNodeExecutionState(resultNode!.id)).toEqual({
+    expect(execution.isNodeExecutionActive(resultNode!.id)).toBe(false)
+    expect(executionRuntime.getNodeState(resultNode!.id)).toEqual({
       status: 'succeeded',
       taskId: 'task-1',
     })
-    expect(edges.value.find((edge) => edge.target === resultNode!.id)?.animated).toBe(false)
+    expect(edges.value.find((edge) => edge.target === resultNode!.id)?.animated).toBeUndefined()
   })
 
   it('cancels active execution state when the board changes before a result resolves', async () => {
@@ -345,7 +347,7 @@ describe('flowImageWorkflowExecution', () => {
 
     const resultNode = nodes.value.find((node) => node.id !== 'image-1')
     await vi.waitFor(() => {
-      expect(execution.getNodeExecutionState(resultNode!.id)?.status).toBe('running')
+      expect(executionRuntime.getNodeState(resultNode!.id)?.status).toBe('running')
     })
 
     currentBoardId.value = 'board-b'
@@ -359,7 +361,7 @@ describe('flowImageWorkflowExecution', () => {
     ])
     await run
 
-    expect(execution.getNodeExecutionState(resultNode!.id)).toBeNull()
+    expect(executionRuntime.getNodeState(resultNode!.id)).toBeNull()
   })
 
   it('cancels active execution state when a result rejects after the board changes', async () => {
@@ -374,7 +376,7 @@ describe('flowImageWorkflowExecution', () => {
 
     const resultNode = nodes.value.find((node) => node.id !== 'image-1')
     await vi.waitFor(() => {
-      expect(execution.getNodeExecutionState(resultNode!.id)?.status).toBe('running')
+      expect(executionRuntime.getNodeState(resultNode!.id)?.status).toBe('running')
     })
 
     currentBoardId.value = 'board-b'
@@ -382,7 +384,7 @@ describe('flowImageWorkflowExecution', () => {
     taskResult.reject(new Error('provider failed after navigation'))
     await run
 
-    expect(execution.getNodeExecutionState(resultNode!.id)).toBeNull()
+    expect(executionRuntime.getNodeState(resultNode!.id)).toBeNull()
   })
 
   it('keeps local inpaint result nodes alive across pending result timeouts', async () => {
@@ -422,14 +424,14 @@ describe('flowImageWorkflowExecution', () => {
     })
     expect(onSuccess).toHaveBeenCalledWith('生成完成')
     expect(onWarning).not.toHaveBeenCalled()
-    expect(execution.isNodeDirectActionRunning(resultNode!.id)).toBe(false)
+    expect(execution.isNodeExecutionActive(resultNode!.id)).toBe(false)
   })
 
   it('keeps single-image pending timeout copy from the underlying pending error', async () => {
     executorMocks.waitExistingOrLiveTaskImageResults.mockRejectedValueOnce(
       new TaskResultPendingError('任务进度推送超时，请稍后查看结果'),
     )
-    const { execution, nodes, onSuccess, onWarning } = createExecutionHarness()
+    const { execution, executionRuntime, nodes, onSuccess, onWarning } = createExecutionHarness()
 
     await execution.executeImageWorkflow(imageActionPlan())
 
@@ -441,8 +443,8 @@ describe('flowImageWorkflowExecution', () => {
       pendingTaskId: 'task-1',
       outputStatus: 'running',
     })
-    expect(execution.isNodeDirectActionRunning(resultNode!.id)).toBe(true)
-    expect(execution.getNodeExecutionState(resultNode!.id)).toEqual({
+    expect(execution.isNodeExecutionActive(resultNode!.id)).toBe(true)
+    expect(executionRuntime.getNodeState(resultNode!.id)).toEqual({
       status: 'running',
       taskId: 'task-1',
     })
@@ -570,8 +572,8 @@ describe('flowImageWorkflowExecution', () => {
     expect(onSuccess).toHaveBeenCalledWith('已恢复 2 个生成结果')
     expect(onWarning).not.toHaveBeenCalled()
     expect(flushAutosave).toHaveBeenCalledWith({ silent: true })
-    expect(execution.isNodeDirectActionRunning('image-1')).toBe(false)
-    expect(execution.isNodeDirectActionRunning('image-2.25')).toBe(false)
+    expect(execution.isNodeExecutionActive('image-1')).toBe(false)
+    expect(execution.isNodeExecutionActive('image-2.25')).toBe(false)
   })
 
   it('restores pending execution state while reattaching running nodes', async () => {
@@ -596,7 +598,7 @@ describe('flowImageWorkflowExecution', () => {
     const run = execution.reattachPendingImageResults()
     await flushPromises()
 
-    expect(execution.isNodeDirectActionRunning('image-1')).toBe(true)
+    expect(execution.isNodeExecutionActive('image-1')).toBe(true)
 
     taskResult.resolve([
       {
@@ -607,7 +609,7 @@ describe('flowImageWorkflowExecution', () => {
     ])
     await run
 
-    expect(execution.isNodeDirectActionRunning('image-1')).toBe(false)
-    expect(edges.value.find((edge) => edge.id === 'connection-1')?.animated).toBe(false)
+    expect(execution.isNodeExecutionActive('image-1')).toBe(false)
+    expect(edges.value.find((edge) => edge.id === 'connection-1')?.animated).toBeUndefined()
   })
 })

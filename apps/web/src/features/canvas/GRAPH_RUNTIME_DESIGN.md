@@ -105,6 +105,13 @@ Responsibilities:
 
 Flow runtime applies execution projection synchronously after semantic graph reconciliation and before replacing Vue Flow arrays. Save reconciliation is revision-gated; upload stabilization rebases only media fields whose captured values are still current, preserves newer groups/media refs, and never treats saved `outputStatus` as live execution state.
 
+Clean-break constraints:
+
+- `CanvasExecutionRuntime` state/lease is the only live running fact. Presentation, Task cancellation, and delete lifecycle consume Runtime capability directly; they must not own shadow running `Ref`/`Set` state or relay running state through optional callbacks.
+- Snapshot `outputStatus: 'running'` and `pendingTaskId` are hydration facts only. Outside Hydration, code must not infer live execution, animation, or deletion cancellation from them.
+- Flow Edge `animated` is an ephemeral Runtime projection. Snapshot serialization, history capture, and undo/redo restore exclude it; every semantic graph replacement reprojects it from the current Runtime state.
+- Deleting an active execution node resolves Task identity from the current Runtime lease/state, never from snapshot running fields.
+
 ### Commit Side Effects
 
 History, autosave, viewport persistence, and frame probes subscribe to graph command side effects derived from transaction summaries.

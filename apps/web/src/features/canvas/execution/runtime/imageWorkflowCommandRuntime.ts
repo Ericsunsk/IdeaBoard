@@ -70,13 +70,13 @@ export type ImageWorkflowPlanner = {
 
 export type ImageWorkflowExecutionPort = {
   executeImageWorkflow: (plan: ActivatedImageExecutionPlan) => Promise<void>
-  isNodeDirectActionRunning: (nodeId: string) => boolean
+  isNodeExecutionActive: (nodeId: string) => boolean
   reattachPendingImageResults: () => Promise<void> | void
 }
 
 export type ImageWorkflowCommands = {
   isGenerationAvailable: () => boolean
-  isNodeDirectActionRunning: ImageWorkflowExecutionPort['isNodeDirectActionRunning']
+  isNodeExecutionActive: ImageWorkflowExecutionPort['isNodeExecutionActive']
   reattachPendingImageResults: ImageWorkflowExecutionPort['reattachPendingImageResults']
   runImageDirectAction: (
     nodeId: string,
@@ -232,7 +232,7 @@ export function createImageWorkflowCommands(options: {
 
   return {
     isGenerationAvailable,
-    isNodeDirectActionRunning: options.workflow.isNodeDirectActionRunning,
+    isNodeExecutionActive: options.workflow.isNodeExecutionActive,
     reattachPendingImageResults: options.workflow.reattachPendingImageResults,
     runImageDirectAction,
     runCanvasExtendAction,

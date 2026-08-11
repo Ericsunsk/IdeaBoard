@@ -41,6 +41,7 @@ type UseCanvasGraphInteractionsOptions = {
     openNodeImage: (snapshot: ImageNodeItem, mode: 'latest-output') => Promise<void>
   }
   feedback: CanvasFeedback['graph']
+  isNodeExecutionActive: (nodeId: string) => boolean
 }
 
 type ExportImageEntry = { url: string; title: string }
@@ -114,7 +115,11 @@ function cloneImageOutputs(source: ImageNodeItem): ImageNodeItem['outputImages']
 
 export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOptions) {
   const interaction = useFlowCanvasInteractionState()
-  const nodeUiState = useFlowNodeUiState({ nodes: options.nodes, edges: options.edges })
+  const nodeUiState = useFlowNodeUiState({
+    nodes: options.nodes,
+    edges: options.edges,
+    isNodeExecutionActive: options.isNodeExecutionActive,
+  })
   let exportLoading: MessageLoadingHandle | null = null
   const duplicateDrag = ref<
     Map<string, { graphNodeId: CanvasGraphNodeId; x: number; y: number }> | undefined

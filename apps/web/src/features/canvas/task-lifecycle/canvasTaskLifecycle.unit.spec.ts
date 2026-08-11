@@ -13,7 +13,7 @@ describe('createCanvasTaskLifecycle', () => {
     const cancel = vi.fn(async () => undefined)
     const lifecycle = createCanvasTaskLifecycle({ cancel })
 
-    lifecycle.cancelDeletedRunningTasks([' task-1 ', 'task-1', '', 'task-2'])
+    lifecycle.cancelTasks([' task-1 ', 'task-1', '', 'task-2'])
     await flushRejection()
 
     expect(cancel).toHaveBeenCalledTimes(2)
@@ -31,7 +31,7 @@ describe('createCanvasTaskLifecycle', () => {
     })
     const lifecycle = createCanvasTaskLifecycle({ cancel, scheduleRetry })
 
-    lifecycle.cancelDeletedRunningTasks(['task-1'])
+    lifecycle.cancelTasks(['task-1'])
     await flushRejection()
     await flushRejection()
 
@@ -51,7 +51,7 @@ describe('createCanvasTaskLifecycle', () => {
     const onFinalFailure = vi.fn()
     const lifecycle = createCanvasTaskLifecycle({ cancel, scheduleRetry, onFinalFailure })
 
-    lifecycle.cancelDeletedRunningTasks(['task-1'])
+    lifecycle.cancelTasks(['task-1'])
     await flushRejection()
     await flushRejection()
     await flushRejection()
@@ -78,12 +78,12 @@ describe('createCanvasTaskLifecycle', () => {
       scheduleRetry: (callback) => callback(),
     })
 
-    lifecycle.cancelDeletedRunningTasks(['task-1'])
+    lifecycle.cancelTasks(['task-1'])
     await flushRejection()
     await flushRejection()
     await flushRejection()
 
-    expect(warning).toHaveBeenCalledWith('[canvas] failed to stop deleted task', {
+    expect(warning).toHaveBeenCalledWith('[canvas] failed to cancel task', {
       taskId: 'task-1',
       error,
     })

@@ -191,6 +191,27 @@ describe('useFlowHistory', () => {
     expect(edges.value.map((edge) => (edge as { id: string }).id)).toEqual(['e2'])
   })
 
+  it('excludes runtime edge animation from history snapshots and restores', () => {
+    const { edges, history, onRestore } = createHistoryHarness(
+      [],
+      [{ id: 'e1', source: 'n1', target: 'n2', animated: false, label: 'before' }],
+    )
+
+    const projectionOnlyBefore = history.capture()
+    edges.value = [{ id: 'e1', source: 'n1', target: 'n2', animated: true, label: 'before' }]
+    expect(history.push(projectionOnlyBefore)).toBe(false)
+
+    const semanticBefore = history.capture()
+    edges.value = [{ id: 'e1', source: 'n1', target: 'n2', animated: true, label: 'after' }]
+    expect(history.push(semanticBefore)).toBe(true)
+
+    history.undo()
+    expect(edges.value).toEqual([{ id: 'e1', source: 'n1', target: 'n2', label: 'before' }])
+    history.redo()
+    expect(edges.value).toEqual([{ id: 'e1', source: 'n1', target: 'n2', label: 'after' }])
+    expect(onRestore).toHaveBeenCalledTimes(2)
+  })
+
   it('tracks optional groups as a history sidecar', () => {
     const { groups, history, onRestore } = createHistoryHarness(
       [{ id: 'n1' }, { id: 'n2' }],

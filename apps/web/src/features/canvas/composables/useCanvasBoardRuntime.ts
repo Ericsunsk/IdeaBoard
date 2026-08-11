@@ -19,7 +19,7 @@ type UseCanvasBoardRuntimeOptions = {
   logoutAndRedirect: (path: string) => Promise<unknown> | unknown
   feedback: CanvasBoardRuntimeFeedback
   onNativeRemove?: () => void
-  cancelDeletedRunningTasks: (taskIds: readonly string[]) => void
+  cancelTasks: (taskIds: readonly string[]) => void
   executionRuntime: CanvasExecutionRuntime
   vueFlowGraphActions?: CanvasVueFlowGraphActions
 }
@@ -70,7 +70,7 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions) {
     onSuccess: options.feedback.saveSucceeded,
     onError: options.feedback.saveFailed,
     onNativeRemove: options.onNativeRemove,
-    cancelDeletedRunningTasks: options.cancelDeletedRunningTasks,
+    cancelTasks: options.cancelTasks,
     vueFlowGraphActions: options.vueFlowGraphActions,
   })
 

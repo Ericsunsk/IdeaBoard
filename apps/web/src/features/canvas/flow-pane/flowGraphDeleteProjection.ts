@@ -4,7 +4,6 @@ import {
   type CanvasGraphEdgeId,
   type CanvasGraphNodeId,
 } from '../graph-runtime'
-import { collectDeletedRunningTaskIds } from '../utils/flowDeletedRunningTasks'
 import { resolveFlowNodeCanvasRef } from '../utils/flowSnapshotAdapter'
 import {
   applyCanvasGraphCommitPolicy,
@@ -15,6 +14,7 @@ import type {
   CanvasVueFlowGraphAdapter,
   CanvasVueFlowGraphCommandResult,
 } from '../composables/useCanvasVueFlowGraphAdapter'
+import type { CanvasExecutionLease } from '../execution/runtime/CanvasExecutionRuntime'
 
 type FlowGraphDeleteProjectionOptions = {
   graphAdapter: Pick<CanvasVueFlowGraphAdapter, 'applyGraphChanges'>
@@ -25,7 +25,8 @@ type FlowGraphDeleteProjectionOptions = {
   projectionIndex: FlowEdgeProjectionIndex
   edgeRemoveChanges?: readonly EdgeChange[]
   onNativeRemove?: () => void
-  cancelDeletedRunningTasks: (taskIds: readonly string[]) => void
+  captureActiveNodeExecutions: (nodeIds: readonly string[]) => CanvasExecutionLease[]
+  cancelNodeExecutions: (leases: readonly CanvasExecutionLease[]) => void
 }
 
 function resolveGraphNodeIdForFlowNode(node: Pick<Node, 'id' | 'data'>): CanvasGraphNodeId | null {
@@ -123,7 +124,7 @@ export function applyFlowGraphDeleteProjection(
     summary.removedNodeIds,
     options.flowNodeIds,
   )
-  const runningTaskIds = collectDeletedRunningTaskIds(options.nodes, removedFlowNodeIds)
+  const executionLeases = options.captureActiveNodeExecutions(removedFlowNodeIds)
   const result = applyCanvasGraphCommitPolicy(options.commitPolicy, (commandOptions) =>
     options.graphAdapter.applyGraphChanges(
       {
@@ -142,9 +143,7 @@ export function applyFlowGraphDeleteProjection(
 
   if (result.didChange) {
     options.onNativeRemove?.()
-    if (runningTaskIds.length > 0) {
-      options.cancelDeletedRunningTasks(runningTaskIds)
-    }
+    options.cancelNodeExecutions(executionLeases)
   }
 
   return result

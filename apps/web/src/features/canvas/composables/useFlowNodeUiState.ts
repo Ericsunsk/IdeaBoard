@@ -37,7 +37,7 @@ type IndexedFlowEdge = FlowEdgeLike & {
 type UseFlowNodeUiStateOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  isFlowExecutionNodeRunning?: (nodeType: CanvasExecutionOutputNodeType, nodeId: string) => boolean
+  isNodeExecutionActive: (nodeId: string) => boolean
 }
 type FlowNodeUiState = NodeUiState | PromptNodeUiState
 
@@ -166,15 +166,8 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       const snapshotNode = node.data.snapshotNode as Record<string, unknown>
       const nodeType = getNodeType(nodeId)
       if (nodeType === 'image') {
-        const outputImages = Array.isArray(snapshotNode.outputImages)
-          ? snapshotNode.outputImages
-          : []
-        const outputStatus = resolveWorkflowNodeOutputStatus(
-          snapshotNode.outputStatus,
-          outputImages,
-        )
         const outputUrl = resolveSourceImageFromNode(nodeType, snapshotNode).trim()
-        return outputStatus !== 'running' && !!outputUrl
+        return !options.isNodeExecutionActive(nodeId) && !!outputUrl
       }
       if (!nodeType || !isCanvasExecutionOutputNodeType(nodeType)) return false
       const outputUrl = resolveSourceImageFromNode(nodeType, snapshotNode).trim()
@@ -312,7 +305,7 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
       }
 
       const executionNode = snapshotNode as CanvasExecutionOutputNodeItem
-      const isRunning = options.isFlowExecutionNodeRunning?.(nodeType, node.id) ?? false
+      const isRunning = options.isNodeExecutionActive(node.id)
       setFlowNodeUiState(node.id, {
         connection,
         primaryAction: buildPrimaryAction(nodeType, node.id, status, isRunning),

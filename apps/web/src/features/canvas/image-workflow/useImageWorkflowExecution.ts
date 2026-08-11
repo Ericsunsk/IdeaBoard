@@ -15,10 +15,6 @@ import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { CanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
 import type { FlowToCanvasBoardSnapshotOptions } from '../utils/flowSnapshotAdapter'
 
-type ValueRef<T> = {
-  readonly value: T
-}
-
 type CanvasTaskExecutionFeedback = CanvasFeedback['taskExecution']
 
 export type UseImageWorkflowExecutionOptions = {
@@ -30,10 +26,10 @@ export type UseImageWorkflowExecutionOptions = {
   ) => CanvasGraphStore
   boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
   flushAutosave: (options?: { silent?: boolean }) => Promise<void>
-  currentBoardId: ValueRef<string | null | undefined>
   refreshNodeInternals: (nodeIds: string[]) => void
   feedback: CanvasTaskExecutionFeedback
   executionRuntime: CanvasExecutionRuntime
+  cancelTasks: (taskIds: readonly string[]) => void
 }
 
 export type ImageWorkflowExecution = ImageWorkflowCommands
@@ -116,6 +112,7 @@ export function useImageWorkflowExecution(
     flushAutosave: options.flushAutosave,
     refreshNodeInternals: options.refreshNodeInternals,
     executionRuntime: options.executionRuntime,
+    cancelTasks: options.cancelTasks,
     onSuccess: options.feedback.succeeded,
     onWarning: handleWorkflowWarning,
     onError: handleWorkflowError,
@@ -128,11 +125,11 @@ export function useImageWorkflowExecution(
     boardBaseSnapshot: options.boardBaseSnapshot,
     flushAutosave: options.flushAutosave,
     refreshNodeInternals: options.refreshNodeInternals,
-    getCurrentBoardId: () => options.currentBoardId.value ?? '',
     onSuccess: options.feedback.succeeded,
     onWarning: handleWorkflowWarning,
     onError: handleWorkflowError,
     executionWorkspace,
+    cancelTasks: options.cancelTasks,
   })
 
   return createImageWorkflowCommands({

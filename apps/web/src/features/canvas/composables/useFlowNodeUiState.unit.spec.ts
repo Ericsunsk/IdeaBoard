@@ -83,7 +83,11 @@ describe('useFlowNodeUiState', () => {
       },
     ] as Edge[])
 
-    const { getFlowNodeUiStateCached } = useFlowNodeUiState({ nodes, edges })
+    const { getFlowNodeUiStateCached } = useFlowNodeUiState({
+      nodes,
+      edges,
+      isNodeExecutionActive: () => false,
+    })
     const fusionState = getFlowNodeUiStateCached('fusion-1')
     const pendingInputs = fusionState.connection.pending as
       Record<string, boolean | undefined> | undefined
@@ -131,7 +135,11 @@ describe('useFlowNodeUiState', () => {
       },
     ] as Edge[])
 
-    const { getFlowNodeUiStateCached } = useFlowNodeUiState({ nodes, edges })
+    const { getFlowNodeUiStateCached } = useFlowNodeUiState({
+      nodes,
+      edges,
+      isNodeExecutionActive: (nodeId) => nodeId === 'image-running',
+    })
     const fusionState = getFlowNodeUiStateCached('fusion-1')
     const pendingInputs = fusionState.connection.pending as
       Record<string, boolean | undefined> | undefined
@@ -157,7 +165,11 @@ describe('useFlowNodeUiState', () => {
       },
     ] as Edge[])
 
-    const { getFlowNodeUiStateCached } = useFlowNodeUiState({ nodes, edges })
+    const { getFlowNodeUiStateCached } = useFlowNodeUiState({
+      nodes,
+      edges,
+      isNodeExecutionActive: () => false,
+    })
     const imageState = getFlowNodeUiStateCached('image-1')
     const fusionState = getFlowNodeUiStateCached('fusion-1')
 
@@ -188,7 +200,11 @@ describe('useFlowNodeUiState', () => {
     ] as Node[])
     const edges: Ref<Edge[]> = shallowRef([] as Edge[])
 
-    const { getFlowNodeUiStateCached } = useFlowNodeUiState({ nodes, edges })
+    const { getFlowNodeUiStateCached } = useFlowNodeUiState({
+      nodes,
+      edges,
+      isNodeExecutionActive: (nodeId) => nodeId === 'image-running',
+    })
     const disconnectedFusionState = getFlowNodeUiStateCached('fusion-1')
 
     edges.value = [
@@ -220,7 +236,11 @@ describe('useFlowNodeUiState', () => {
     ] as Node[])
     const edges: Ref<Edge[]> = shallowRef([] as Edge[])
 
-    const { getFlowNodeUiStateCached } = useFlowNodeUiState({ nodes, edges })
+    const { getFlowNodeUiStateCached } = useFlowNodeUiState({
+      nodes,
+      edges,
+      isNodeExecutionActive: () => false,
+    })
     const disconnectedFusionState = getFlowNodeUiStateCached('fusion-1')
 
     edges.value.push({

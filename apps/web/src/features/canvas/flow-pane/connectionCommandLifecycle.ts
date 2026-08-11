@@ -181,7 +181,6 @@ export function createCanvasConnectionCommandLifecycle(
       target: nextEdge.target,
       sourceHandle: nextEdge.sourceHandle ?? null,
       targetHandle: nextEdge.targetHandle ?? null,
-      animated: nextEdge.animated,
       data: nextEdge.data,
     }
   }

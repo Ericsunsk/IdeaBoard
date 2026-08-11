@@ -18,7 +18,7 @@ describe('CanvasExecutionRuntime', () => {
   it('owns typed execution state through an attachment-scoped lease', () => {
     const runtime = createCanvasExecutionRuntime()
     const attachment = runtime.attachBoard('board-a')
-    const lease = runtime.startNode(attachment, 'image-2', { status: 'submitting' })
+    const lease = runtime.beginSubmission(attachment, 'image-2')
 
     expect(lease).not.toBeNull()
     expect(runtime.getNodeState('image-2')).toEqual({ status: 'submitting' })
@@ -34,12 +34,9 @@ describe('CanvasExecutionRuntime', () => {
   it('invalidates an old attachment even when the same Board is reopened', () => {
     const runtime = createCanvasExecutionRuntime()
     const firstAttachment = runtime.attachBoard('board-a')
-    const oldLease = runtime.startNode(firstAttachment, 'image-2', { status: 'running' })!
+    const oldLease = runtime.hydratePending(firstAttachment, 'image-2', 'task-old')!
     const nextAttachment = runtime.attachBoard('board-a')
-    const nextLease = runtime.startNode(nextAttachment, 'image-2', {
-      status: 'running',
-      taskId: 'task-new',
-    })!
+    const nextLease = runtime.hydratePending(nextAttachment, 'image-2', 'task-new')!
 
     expect(nextAttachment.epoch).toBeGreaterThan(firstAttachment.epoch)
     expect(runtime.transitionNode(oldLease, { status: 'cancelled' })).toBe(false)
@@ -52,14 +49,8 @@ describe('CanvasExecutionRuntime', () => {
   it('uses lease CAS so an old execution cannot overwrite a newer execution on the same node', () => {
     const runtime = createCanvasExecutionRuntime()
     const attachment = runtime.attachBoard('board-a')
-    const oldLease = runtime.startNode(attachment, 'image-2', {
-      status: 'running',
-      taskId: 'task-old',
-    })!
-    const nextLease = runtime.startNode(attachment, 'image-2', {
-      status: 'running',
-      taskId: 'task-new',
-    })!
+    const oldLease = runtime.hydratePending(attachment, 'image-2', 'task-old')!
+    const nextLease = runtime.hydratePending(attachment, 'image-2', 'task-new')!
 
     expect(runtime.transitionNode(oldLease, { status: 'failed', taskId: 'task-old' })).toBe(false)
     expect(runtime.getNodeState('image-2')).toEqual({ status: 'running', taskId: 'task-new' })
@@ -75,15 +66,45 @@ describe('CanvasExecutionRuntime', () => {
     expect(() => runtime.attachBoard('  ')).toThrow('Canvas execution boardId is required')
 
     const attachment = runtime.attachBoard('board-a')
-    expect(() => runtime.startNode(attachment, '  ', { status: 'submitting' })).toThrow(
+    expect(() => runtime.beginSubmission(attachment, '  ')).toThrow(
       'Canvas execution nodeId is required',
     )
-    const lease = runtime.startNode(attachment, 'image-2', { status: 'running' })!
+    const lease = runtime.beginSubmission(attachment, 'image-2')!
 
     expect(runtime.nodeStates.value).not.toBe(initialStates)
     expect(initialStates.size).toBe(0)
-    expect(runtime.clearNode(lease)).toBe(true)
-    expect(runtime.nodeStates.value.size).toBe(0)
+    expect(runtime.cancelNodeExecutions([lease])).toEqual([])
+    expect(runtime.getNodeState('image-2')).toEqual({ status: 'cancelled' })
+  })
+
+  it('cancels only the current requested leases and returns their exact task ids', () => {
+    const runtime = createCanvasExecutionRuntime()
+    const attachment = runtime.attachBoard('board-a')
+    const staleLease = runtime.hydratePending(attachment, 'image-2', 'task-stale')!
+    const currentLease = runtime.hydratePending(attachment, 'image-2', 'task-current')!
+    const terminalLease = runtime.hydratePending(attachment, 'image-3', 'task-terminal')!
+    runtime.transitionNode(terminalLease, { status: 'succeeded', taskId: 'task-terminal' })
+
+    expect(runtime.captureActiveNodeExecutions([' image-2 ', 'image-2', 'image-3'])).toEqual([
+      currentLease,
+    ])
+    expect(
+      runtime.cancelNodeExecutions([staleLease, currentLease, terminalLease, currentLease]),
+    ).toEqual(['task-current'])
+    expect(runtime.getNodeState('image-2')).toEqual({
+      status: 'cancelled',
+      taskId: 'task-current',
+    })
+    expect(runtime.getNodeState('image-3')).toEqual({
+      status: 'succeeded',
+      taskId: 'task-terminal',
+    })
+    expect(runtime.transitionNode(staleLease, { status: 'failed', taskId: 'task-stale' })).toBe(
+      false,
+    )
+    expect(runtime.transitionNode(currentLease, { status: 'failed', taskId: 'task-current' })).toBe(
+      false,
+    )
   })
 })
 
@@ -93,7 +114,8 @@ describe('projectCanvasExecutionEdgeAnimation', () => {
     (status) => {
       const runtime = createCanvasExecutionRuntime()
       const attachment = runtime.attachBoard('board-a')
-      runtime.startNode(attachment, 'image-2', { status })
+      if (status === 'submitting') runtime.beginSubmission(attachment, 'image-2')
+      else runtime.hydratePending(attachment, 'image-2', 'task-1')
 
       const result = projectCanvasExecutionEdgeAnimation([makeEdge()], runtime.nodeStates.value)
 
@@ -107,7 +129,8 @@ describe('projectCanvasExecutionEdgeAnimation', () => {
     (status) => {
       const runtime = createCanvasExecutionRuntime()
       const attachment = runtime.attachBoard('board-a')
-      runtime.startNode(attachment, 'image-2', { status, taskId: 'task-1' })
+      const lease = runtime.hydratePending(attachment, 'image-2', 'task-1')!
+      runtime.transitionNode(lease, { status, taskId: 'task-1' })
 
       const result = projectCanvasExecutionEdgeAnimation(
         [makeEdge({ animated: true })],

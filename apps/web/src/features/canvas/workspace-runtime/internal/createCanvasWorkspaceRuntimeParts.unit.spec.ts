@@ -33,7 +33,7 @@ const mocks = vi.hoisted(() => ({
   useCanvasGraphInteractions: vi.fn(),
   useCanvasViewportRuntime: vi.fn(),
   useCanvasImageWorkflow: vi.fn(),
-  cancelDeletedRunningTasks: vi.fn(),
+  cancelTasks: vi.fn(),
   createCanvasTaskLifecycle: vi.fn(),
 }))
 
@@ -290,7 +290,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
       loadCanvasBoardAndProbe: vi.fn(),
     })
     mocks.createCanvasTaskLifecycle.mockReturnValue({
-      cancelDeletedRunningTasks: mocks.cancelDeletedRunningTasks,
+      cancelTasks: mocks.cancelTasks,
     })
   })
 
@@ -361,7 +361,11 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect(mocks.useCanvasBoardRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
         feedback: mocks.feedback.boardSession,
-        cancelDeletedRunningTasks: mocks.cancelDeletedRunningTasks,
+        cancelTasks: mocks.cancelTasks,
+        executionRuntime: expect.objectContaining({
+          beginSubmission: expect.any(Function),
+          hydratePending: expect.any(Function),
+        }),
         vueFlowGraphActions: runtimeOptions.flowPaneAdapter.vueFlowGraphActions,
       }),
     )
@@ -394,6 +398,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
         graphAdapter: board.graphEditing.adapter,
         browser: runtimeOptions.graphInteractionBrowser,
         feedback: mocks.feedback.graph,
+        isNodeExecutionActive: expect.any(Function),
       }),
     )
     expect(mocks.useCanvasImageWorkflow).toHaveBeenCalledWith(
@@ -409,6 +414,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
           graphAdapter: board.graphEditing.adapter,
           refreshNodeInternals: graph.scheduleFlowNodeInternalsRefresh,
           flushAutosave: runtime.persistence.flushAutosave,
+          executionRuntime: expect.any(Object),
         }),
         feedback: {
           imageTools: mocks.feedback.imageTools,

@@ -62,9 +62,7 @@ export function useFlowCanvasNodeAdapter({
     return payload ? { url: payload.url } : null
   })
 
-  const imageGenerating = computed(
-    () => imageDirectGenerating() || imageSnapshot.value?.outputStatus === 'running',
-  )
+  const imageGenerating = computed(() => imageDirectGenerating())
   const nodeRunning = computed(() => imageGenerating.value || !!uiState()?.isRunning)
   const imageInputLocked = computed(() => imageGenerating.value && !displayImage.value)
   const imageEmptyIconVariant = computed<'image' | 'fusion'>(() => {
@@ -74,8 +72,7 @@ export function useFlowCanvasNodeAdapter({
 
   const stageHeight = computed(() => {
     if (!imageSnapshot.value) return 280
-    const hasRunningOutput = imageSnapshot.value.outputStatus === 'running'
-    const hasImageFrame = !!displayImage.value || hasRunningOutput
+    const hasImageFrame = !!displayImage.value || imageGenerating.value
     const ratio = resolveImageNodeDisplayRatio(imageSnapshot.value)
     return resolveImageNodeStageHeight(imageSnapshot.value.width, ratio, hasImageFrame)
   })
