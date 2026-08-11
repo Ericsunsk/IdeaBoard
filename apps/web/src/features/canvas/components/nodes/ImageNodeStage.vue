@@ -87,10 +87,7 @@
         :aria-label="emptyStageAriaLabel"
         @click="onEmptyStateClick"
       >
-        <NodeEmptyStateIcon
-          :variant="emptyIconVariantComputed"
-          :class="{ 'image-node-stage-loader-logo': directGenerating }"
-        />
+        <NodeEmptyStateIcon :variant="emptyIconVariantComputed" />
         <span>{{ emptyStateLabel }}</span>
       </button>
       <div
@@ -100,10 +97,8 @@
         role="status"
         :aria-label="emptyStageAriaLabel"
       >
-        <NodeEmptyStateIcon
-          :variant="emptyIconVariantComputed"
-          :class="{ 'image-node-stage-loader-logo': directGenerating }"
-        />
+        <ComposingOrb v-if="directGenerating" />
+        <NodeEmptyStateIcon v-else :variant="emptyIconVariantComputed" />
         <span v-if="!directGenerating">{{ emptyStateLabel }}</span>
       </div>
     </NodeStageFrame>
@@ -121,6 +116,7 @@ import { useCanvasImagePreviewQuality } from '../../composables/useCanvasImagePr
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 import ImageToolStagePresentation from '../../image-tools/components/ImageToolStagePresentation.vue'
 import ImageCanvasExtendOverlay from './ImageCanvasExtendOverlay.vue'
+import ComposingOrb from './ComposingOrb.vue'
 import NodeActionButton from './NodeActionButton.vue'
 import NodeEmptyStateIcon from './NodeEmptyStateIcon.vue'
 import NodeStageFrame from './NodeStageFrame.vue'
@@ -333,12 +329,6 @@ function selectOutputCount(value: number) {
   cursor: default;
 }
 
-.image-node-stage-loader-logo {
-  /* Pending work needs a continuous loader cycle until the result arrives. */
-  --image-node-loader-cycle: 2s;
-  animation: image-node-logo-spin-cycle var(--image-node-loader-cycle) linear infinite;
-}
-
 .image-node-stage-actions {
   position: absolute;
   right: 8px;
@@ -364,23 +354,5 @@ function selectOutputCount(value: number) {
 .image-node-stage.is-image-editor-active .image-node-stage-actions {
   opacity: 0;
   pointer-events: none;
-}
-
-@keyframes image-node-logo-spin-cycle {
-  0% {
-    transform: rotate(0deg);
-  }
-  50% {
-    transform: rotate(1turn);
-  }
-  100% {
-    transform: rotate(1turn);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .image-node-stage-loader-logo {
-    animation: none;
-  }
 }
 </style>

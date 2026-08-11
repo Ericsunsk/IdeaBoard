@@ -66,8 +66,8 @@ defineExpose({ stageElement })
   --node-stage-frame-bg: var(--canvas-node-bg);
   --node-stage-frame-border: var(--canvas-node-border-alt);
   --node-stage-frame-active-border: var(--canvas-accent);
-  --node-stage-frame-loading-shadow-warm: rgba(239, 68, 68, 0.2);
-  --node-stage-frame-loading-shadow-accent: var(--canvas-accent-glow);
+  --node-stage-frame-loading-shadow-primary: var(--canvas-accent-shadow);
+  --node-stage-frame-loading-shadow-secondary: var(--canvas-accent-glow);
 
   position: relative;
   width: 100%;
@@ -112,7 +112,7 @@ defineExpose({ stageElement })
 .node-stage-frame.is-loading {
   border-color: var(--node-stage-frame-border);
   box-shadow:
-    0 0 30px var(--node-stage-frame-loading-shadow-warm),
-    0 0 48px var(--node-stage-frame-loading-shadow-accent);
+    0 0 30px var(--node-stage-frame-loading-shadow-primary),
+    0 0 48px var(--node-stage-frame-loading-shadow-secondary);
 }
 </style>
