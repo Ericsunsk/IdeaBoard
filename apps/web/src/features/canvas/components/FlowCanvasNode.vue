@@ -14,6 +14,7 @@
       <PromptNode
         :node="promptSnapshot"
         :active="selected"
+        :connection-drop-target="props.connectionDropTarget"
         :dragging="props.dragging"
         :copy-mode="props.copyMode"
         :ui-state="promptUiState"
@@ -46,6 +47,7 @@
           :set-image-stage-ref="props.setImageStageRef"
           :clear-image-stage-ref="props.clearImageStageRef"
           :active="selected"
+          :connection-drop-target="props.connectionDropTarget"
           :dragging="props.dragging"
           :copy-mode="props.copyMode"
           :stage-height="stageHeight"
@@ -87,6 +89,7 @@
         <FusionNode
           :node="fusionSnapshot"
           :active="selected"
+          :connection-drop-target="props.connectionDropTarget"
           :dragging="props.dragging"
           :copy-mode="props.copyMode"
           :prompt-composer-visible="props.fusionPresentation?.promptComposerVisible ?? false"
@@ -147,6 +150,7 @@ const props = withDefaults(
     nodeId: string
     data: FlowNodeData
     selected?: boolean
+    connectionDropTarget?: boolean
     dragging?: boolean
     copyMode?: boolean
     uiState?: NodeUiState | PromptNodeUiState
@@ -161,6 +165,7 @@ const props = withDefaults(
   }>(),
   {
     selected: false,
+    connectionDropTarget: false,
     dragging: false,
     copyMode: false,
     uiState: undefined,

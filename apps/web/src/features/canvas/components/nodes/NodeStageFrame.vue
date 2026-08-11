@@ -8,6 +8,7 @@
       {
         'is-active': active,
         'is-drop-target': dropTarget,
+        'is-connection-drop-target': connectionDropTarget,
         'is-loading': loading,
         'is-running': running,
         'is-transparent': transparent,
@@ -30,6 +31,7 @@ const props = withDefaults(
     layout?: 'block' | 'center'
     active?: boolean
     dropTarget?: boolean
+    connectionDropTarget?: boolean
     loading?: boolean
     running?: boolean
     transparent?: boolean
@@ -42,6 +44,7 @@ const props = withDefaults(
     layout: 'block',
     active: false,
     dropTarget: false,
+    connectionDropTarget: false,
     loading: false,
     running: false,
     transparent: false,
@@ -66,8 +69,8 @@ defineExpose({ stageElement })
   --node-stage-frame-bg: var(--canvas-node-bg);
   --node-stage-frame-border: var(--canvas-node-border-alt);
   --node-stage-frame-active-border: var(--canvas-accent);
-  --node-stage-frame-loading-shadow-primary: var(--canvas-accent-shadow);
-  --node-stage-frame-loading-shadow-secondary: var(--canvas-accent-glow);
+  --node-stage-frame-emphasis-shadow-primary: var(--canvas-accent-shadow);
+  --node-stage-frame-emphasis-shadow-secondary: var(--canvas-accent-glow);
 
   position: relative;
   width: 100%;
@@ -109,10 +112,11 @@ defineExpose({ stageElement })
   overflow: visible;
 }
 
-.node-stage-frame.is-loading {
+.node-stage-frame.is-loading,
+.node-stage-frame.is-connection-drop-target {
   border-color: var(--node-stage-frame-border);
   box-shadow:
-    0 0 30px var(--node-stage-frame-loading-shadow-primary),
-    0 0 48px var(--node-stage-frame-loading-shadow-secondary);
+    0 0 30px var(--node-stage-frame-emphasis-shadow-primary),
+    0 0 48px var(--node-stage-frame-emphasis-shadow-secondary);
 }
 </style>

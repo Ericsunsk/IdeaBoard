@@ -63,16 +63,23 @@ describe('connection drop target', () => {
     })
     vi.spyOn(document, 'elementFromPoint').mockReturnValue(node)
     const connect = vi.fn()
-    const lifecycle = createCanvasConnectionDropLifecycle({ document, connect })
+    const onTargetChange = vi.fn()
+    const lifecycle = createCanvasConnectionDropLifecycle({ document, connect, onTargetChange })
 
-    expect(connect).not.toHaveBeenCalled()
     expect(
-      lifecycle.onConnectEnd(new MouseEvent('mouseup', { clientX: 100, clientY: 120 }), {
-        id: 'out:image',
+      lifecycle.onConnectStart({
         nodeId: 'image-1',
-        type: 'source',
+        handleId: 'out:image',
+        handleType: 'source',
       }),
     ).toBe(true)
+    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 100, clientY: 120 }))
+    expect(connect).not.toHaveBeenCalled()
+    expect(onTargetChange).toHaveBeenLastCalledWith('fusion-2')
+
+    expect(lifecycle.onConnectEnd(new MouseEvent('mouseup', { clientX: 100, clientY: 120 }))).toBe(
+      true,
+    )
     expect(connect).toHaveBeenCalledOnce()
     expect(connect).toHaveBeenCalledWith({
       source: 'image-1',
@@ -80,5 +87,82 @@ describe('connection drop target', () => {
       target: 'fusion-2',
       targetHandle: 'in:__auto',
     })
+    expect(onTargetChange).toHaveBeenLastCalledWith(null)
+  })
+
+  it('clears feedback when the pointer leaves a node or the drag is cancelled', () => {
+    const node = document.createElement('div')
+    node.dataset.flowNodeId = 'prompt-2'
+    document.body.append(node)
+    vi.spyOn(node, 'getBoundingClientRect').mockReturnValue({
+      bottom: 200,
+      height: 200,
+      left: 0,
+      right: 200,
+      top: 0,
+      width: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => undefined,
+    })
+    const elementFromPoint = vi
+      .spyOn(document, 'elementFromPoint')
+      .mockReturnValueOnce(node)
+      .mockReturnValue(null)
+    const onTargetChange = vi.fn()
+    const lifecycle = createCanvasConnectionDropLifecycle({
+      document,
+      connect: vi.fn(),
+      onTargetChange,
+    })
+
+    lifecycle.onConnectStart({
+      nodeId: 'image-1',
+      handleId: 'out:image',
+      handleType: 'source',
+    })
+    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 100, clientY: 120 }))
+    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 240, clientY: 120 }))
+
+    expect(onTargetChange.mock.calls).toEqual([['prompt-2'], [null]])
+
+    lifecycle.cancel()
+    elementFromPoint.mockReturnValue(node)
+    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 100, clientY: 120 }))
+    expect(onTargetChange.mock.calls).toEqual([['prompt-2'], [null]])
+  })
+
+  it('does not present the source node as its own drop target', () => {
+    const node = document.createElement('div')
+    node.dataset.flowNodeId = 'image-1'
+    document.body.append(node)
+    vi.spyOn(node, 'getBoundingClientRect').mockReturnValue({
+      bottom: 200,
+      height: 200,
+      left: 0,
+      right: 200,
+      top: 0,
+      width: 200,
+      x: 0,
+      y: 0,
+      toJSON: () => undefined,
+    })
+    vi.spyOn(document, 'elementFromPoint').mockReturnValue(node)
+    const connect = vi.fn()
+    const onTargetChange = vi.fn()
+    const lifecycle = createCanvasConnectionDropLifecycle({ document, connect, onTargetChange })
+
+    lifecycle.onConnectStart({
+      nodeId: 'image-1',
+      handleId: 'out:image',
+      handleType: 'source',
+    })
+    document.dispatchEvent(new MouseEvent('mousemove', { clientX: 100, clientY: 120 }))
+
+    expect(onTargetChange).not.toHaveBeenCalled()
+    expect(lifecycle.onConnectEnd(new MouseEvent('mouseup', { clientX: 100, clientY: 120 }))).toBe(
+      false,
+    )
+    expect(connect).not.toHaveBeenCalled()
   })
 })

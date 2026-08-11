@@ -21,6 +21,7 @@
     >
       <FusionStage
         :active="active"
+        :connection-drop-target="connectionDropTarget"
         :blend-point="node.blendPoint"
         :input-images="node.inputImages"
         :width="node.width"
@@ -66,6 +67,7 @@ import { buildFusionBillingReadinessRequest, useCanvasBillingQuote } from '../..
 const props = defineProps<{
   node: FusionNodeItem
   active: boolean
+  connectionDropTarget?: boolean
   dragging: boolean
   copyMode: boolean
   promptComposerVisible?: boolean

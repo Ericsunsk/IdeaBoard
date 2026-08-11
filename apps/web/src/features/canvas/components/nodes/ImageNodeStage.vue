@@ -11,6 +11,7 @@
     layout="center"
     :height="stageHeight"
     :active="active && !expandModeActive"
+    :connection-drop-target="connectionDropTarget"
     :loading="!!directGenerating && !displayImage"
     :running="!!directGenerating"
     :transparent="!!expandModeActive || isImageToolActive"
@@ -133,6 +134,7 @@ const props = defineProps<{
   imageToolStageBinding?: ImageToolStageBinding | null
   outputCount?: number
   active: boolean
+  connectionDropTarget?: boolean
   dragging: boolean
 }>()
 

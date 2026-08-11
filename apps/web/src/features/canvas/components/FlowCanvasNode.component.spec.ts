@@ -120,6 +120,7 @@ function renderFlowCanvasNode(
     selected?: boolean
     dragging?: boolean
     generationAvailable?: boolean
+    connectionDropTarget?: boolean
   } = {},
 ) {
   const snapshot = createPromptSnapshot()
@@ -131,6 +132,7 @@ function renderFlowCanvasNode(
       dragging: input.dragging ?? false,
       copyMode: false,
       generationAvailable: input.generationAvailable ?? true,
+      connectionDropTarget: input.connectionDropTarget ?? false,
       imagePresentation: createImagePresentation(),
     },
     global: {
@@ -170,6 +172,32 @@ describe('FlowCanvasNode prompt rendering', () => {
     })
 
     expect(view.container.querySelector('.node-stage-frame--prompt')).not.toBeNull()
+  })
+
+  it('presents a node-wide connection drop target on the stage frame', () => {
+    const view = render(FlowCanvasNode, {
+      props: {
+        nodeId: 'prompt-1',
+        data: createPromptData(createPromptSnapshot()),
+        connectionDropTarget: true,
+        imagePresentation: createImagePresentation(),
+      },
+      global: {
+        stubs: {
+          FlowCanvasNodeHandleRail: { template: '<div data-testid="flow-node-handles" />' },
+          NodeStageFrame: {
+            props: ['connectionDropTarget'],
+            template:
+              '<div data-testid="node-stage-frame" :data-connection-drop-target="String(connectionDropTarget)"><slot /></div>',
+          },
+        },
+      },
+    })
+
+    expect(view.getByTestId('node-stage-frame')).toHaveAttribute(
+      'data-connection-drop-target',
+      'true',
+    )
   })
 
   it('disables prompt submission while generation is unavailable', () => {

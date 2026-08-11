@@ -47,6 +47,7 @@
         @move-end="onFlowMoveEnd"
         @viewport-change-end="onViewportChangeEnd"
         @node-click="onFlowNodeClick"
+        @connect-start="connectionDropLifecycle.onConnectStart"
         @connect-end="onFlowConnectEnd"
         @node-drag-start="onNodeDragStart"
         @node-drag-stop="onNodeDragStop"
@@ -64,6 +65,7 @@
         <template #node-canvas="nodeProps">
           <FlowCanvasNode
             v-bind="nodePropsFor(nodeProps)"
+            :connection-drop-target="connectionDropTargetNodeId === nodeProps.id"
             @node-intent="nodePresentationIntentRouter.dispatch"
             @node-mousedown="onFlowNodeMouseDown"
           />
@@ -89,7 +91,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { uploadApi } from '../../../shared/api/upload'
 import { USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
@@ -141,11 +143,6 @@ function openRecharge() {
 const flowPaneAdapter = useVueFlowPaneAdapter()
 const { connectionStartHandle } = useVueFlow()
 const handleProximitySurface = provideCanvasHandleProximityCoordinator()
-watch(
-  connectionStartHandle,
-  (handle) => handleProximitySurface.setSuspended(handle !== null),
-  { immediate: true, flush: 'sync' },
-)
 
 const canvasWrapRef = ref<HTMLElement | null>(null)
 const activeTool = ref<'select' | 'hand'>('select')
@@ -175,14 +172,28 @@ const commands = workspace.commands
 
 const { nodes, edges } = viewModel.flowPane
 const { connectionAdapter } = commands.flowPane
+const connectionDropTargetNodeId = ref<string | null>(null)
 const connectionDropLifecycle = createCanvasConnectionDropLifecycle({
   document,
   connect: connectionAdapter.vueFlowBindings.onConnect,
+  onTargetChange: (nodeId) => {
+    connectionDropTargetNodeId.value = nodeId
+  },
 })
 
 function onFlowConnectEnd(event: MouseEvent | TouchEvent | undefined) {
-  connectionDropLifecycle.onConnectEnd(event, connectionStartHandle.value)
+  connectionDropLifecycle.onConnectEnd(event)
 }
+
+watch(
+  connectionStartHandle,
+  (handle) => {
+    handleProximitySurface.setSuspended(handle !== null)
+    if (handle === null) connectionDropLifecycle.cancel()
+  },
+  { immediate: true, flush: 'sync' },
+)
+onBeforeUnmount(connectionDropLifecycle.dispose)
 
 const {
   currentBoardId,
@@ -297,11 +308,7 @@ const nodePresentation = createCanvasScreenNodePresentation({
   duplicateModifierPressed,
   nodeInteractions: surface.nodeInteractions,
 })
-const {
-  nodePresentationIntentRouter,
-  nodePropsFor,
-  isCanvasShortcutSuppressed,
-} = nodePresentation
+const { nodePresentationIntentRouter, nodePropsFor, isCanvasShortcutSuppressed } = nodePresentation
 const onCanvasDrop = commands.graphEditing.onCanvasDrop
 const onExportSelectedImages = commands.graphEditing.onExportSelectedImages
 

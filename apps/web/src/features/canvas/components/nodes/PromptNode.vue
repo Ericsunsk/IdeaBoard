@@ -14,7 +14,11 @@
     <template #icon>
       <ChatLines />
     </template>
-    <NodeStageFrame variant="prompt" :active="active">
+    <NodeStageFrame
+      variant="prompt"
+      :active="active"
+      :connection-drop-target="connectionDropTarget"
+    >
       <div class="box-border flex min-h-[280px] flex-col gap-3 p-5">
         <div
           ref="thumbsRef"
@@ -86,6 +90,7 @@ import { useCanvasBillingQuote } from '../../execution'
 const props = defineProps<{
   node: PromptNodeItem
   active: boolean
+  connectionDropTarget?: boolean
   dragging: boolean
   copyMode: boolean
   generationAvailable?: boolean

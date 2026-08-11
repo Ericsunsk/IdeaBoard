@@ -41,6 +41,7 @@
         :image-tool-stage-binding="imageToolStageBinding"
         :output-count="node.outputCount"
         :active="active"
+        :connection-drop-target="connectionDropTarget"
         :dragging="dragging"
         @stage-drop="emit('stage-drop', $event)"
         @open-file="emit('open-file')"
@@ -100,6 +101,7 @@ const props = defineProps<{
   setImageStageRef?: (nodeId: string, element: Element | null) => void
   clearImageStageRef?: (nodeId: string, element?: Element | null) => void
   active: boolean
+  connectionDropTarget?: boolean
   dragging: boolean
   copyMode: boolean
   stageHeight: number

@@ -26,6 +26,12 @@ vi.mock('../workspace-runtime', () => ({
 }))
 
 vi.mock('../flow-pane', () => ({
+  createCanvasConnectionDropLifecycle: () => ({
+    onConnectStart: vi.fn(),
+    onConnectEnd: vi.fn(),
+    cancel: vi.fn(),
+    dispose: vi.fn(),
+  }),
   useVueFlowPaneAdapter: () => ({
     screenToFlowCoordinate: vi.fn((point: { x: number; y: number }) => point),
     viewport: ref({ x: 0, y: 0, zoom: 1 }),
@@ -115,13 +121,7 @@ const ChromeStub = defineComponent({
 })
 
 const VueFlowStub = defineComponent({
-  emits: [
-    'nodes-change',
-    'pane-click',
-    'pane-context-menu',
-    'node-drag-start',
-    'node-drag-stop',
-  ],
+  emits: ['nodes-change', 'pane-click', 'pane-context-menu', 'node-drag-start', 'node-drag-stop'],
   setup(_, { emit, slots }) {
     return () =>
       h('section', { 'data-testid': 'flow-region' }, [

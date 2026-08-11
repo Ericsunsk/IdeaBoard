@@ -1,19 +1,18 @@
-import type { Connection, HandleType } from '@vue-flow/core'
+import type { Connection, OnConnectStartParams } from '@vue-flow/core'
 
 export type ConnectionEndPoint = {
   clientX: number
   clientY: number
 }
 
-export type ConnectionStartHandle = {
-  id?: string | null
-  nodeId: string
-  type: HandleType | null
+export type CanvasConnectionStartEvent = OnConnectStartParams & {
+  event?: MouseEvent | TouchEvent
 }
 
 type CanvasConnectionDropLifecycleOptions = {
   document: Document
   connect: (connection: Connection) => void
+  onTargetChange: (nodeId: string | null) => void
 }
 
 export function getConnectionEndPoint(
@@ -48,26 +47,78 @@ export function resolveCanvasNodeIdAtPoint(
 }
 
 export function createCanvasConnectionDropLifecycle(options: CanvasConnectionDropLifecycleOptions) {
+  let sourceHandle: {
+    nodeId: string
+    handleId: string | null
+  } | null = null
+  let targetNodeId: string | null = null
+
+  function setTargetNodeId(nodeId: string | null) {
+    if (targetNodeId === nodeId) return
+    targetNodeId = nodeId
+    options.onTargetChange(nodeId)
+  }
+
+  function resolveTargetNodeId(point: ConnectionEndPoint) {
+    const nodeId = resolveCanvasNodeIdAtPoint(options.document, point)
+    return nodeId && nodeId !== sourceHandle?.nodeId ? nodeId : null
+  }
+
+  function updateTarget(event: MouseEvent | TouchEvent) {
+    if (!sourceHandle) return
+    const point = getConnectionEndPoint(event)
+    setTargetNodeId(point ? resolveTargetNodeId(point) : null)
+  }
+
+  function onMouseMove(event: MouseEvent) {
+    updateTarget(event)
+  }
+
+  function onTouchMove(event: TouchEvent) {
+    updateTarget(event)
+  }
+
+  function stopTracking() {
+    options.document.removeEventListener('mousemove', onMouseMove)
+    options.document.removeEventListener('touchmove', onTouchMove)
+    sourceHandle = null
+    setTargetNodeId(null)
+  }
+
+  function onConnectStart(event: CanvasConnectionStartEvent) {
+    stopTracking()
+    if (!event.nodeId || event.handleType !== 'source') return false
+
+    sourceHandle = {
+      nodeId: event.nodeId,
+      handleId: event.handleId,
+    }
+    options.document.addEventListener('mousemove', onMouseMove)
+    options.document.addEventListener('touchmove', onTouchMove, { passive: true })
+    return true
+  }
+
+  function onConnectEnd(event: MouseEvent | TouchEvent | undefined) {
+    const activeSourceHandle = sourceHandle
+    const point = getConnectionEndPoint(event)
+    const releasedTargetNodeId = point ? resolveTargetNodeId(point) : null
+    stopTracking()
+
+    if (!activeSourceHandle || !releasedTargetNodeId) return false
+
+    options.connect({
+      source: activeSourceHandle.nodeId,
+      sourceHandle: activeSourceHandle.handleId,
+      target: releasedTargetNodeId,
+      targetHandle: 'in:__auto',
+    })
+    return true
+  }
+
   return {
-    onConnectEnd(
-      event: MouseEvent | TouchEvent | undefined,
-      sourceHandle: ConnectionStartHandle | null,
-    ) {
-      if (!sourceHandle || sourceHandle.type !== 'source') return false
-
-      const point = getConnectionEndPoint(event)
-      if (!point) return false
-
-      const targetNodeId = resolveCanvasNodeIdAtPoint(options.document, point)
-      if (!targetNodeId) return false
-
-      options.connect({
-        source: sourceHandle.nodeId,
-        sourceHandle: sourceHandle.id ?? null,
-        target: targetNodeId,
-        targetHandle: 'in:__auto',
-      })
-      return true
-    },
+    onConnectStart,
+    onConnectEnd,
+    cancel: stopTracking,
+    dispose: stopTracking,
   }
 }

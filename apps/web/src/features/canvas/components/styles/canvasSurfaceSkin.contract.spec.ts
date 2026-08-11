@@ -77,6 +77,8 @@ describe('Canvas surface skin contract', () => {
     expect(nodeToolSkin).toContain('.node-tool-output-count.active')
     expect(nodeToolSkin).toContain('.node-tool-output-count:disabled')
     expect(nodeStageFrame).toContain('.node-stage-frame.is-loading')
+    expect(nodeStageFrame).toContain('.node-stage-frame.is-connection-drop-target')
+    expect(nodeStageFrame).toContain('--node-stage-frame-emphasis-shadow-primary')
     expect(imageEditorToolRail).toContain("'is-disabled': getToolState(item.tool).disabled")
     expect(imageEditorLayerActions).toContain('@media (prefers-reduced-motion: reduce)')
     expect(maskEditorChrome).toContain(':disabled="directGenerating"')

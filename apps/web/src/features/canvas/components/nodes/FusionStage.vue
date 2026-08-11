@@ -4,6 +4,7 @@
     class="fusion-node-stage node-tool-surface node-input-thumbnail-contract variant-standard"
     variant="square"
     :active="active"
+    :connection-drop-target="connectionDropTarget"
     :drop-target="addSlotDragOver"
     :class="{
       'is-blend-dragging': blendDragging,
@@ -103,6 +104,7 @@ import { useImageInputSlots } from './composables/useImageInputSlots'
 
 const props = defineProps<{
   active: boolean
+  connectionDropTarget?: boolean
   blendPoint: FusionBlendPoint
   inputImages: FusionNodeItem['inputImages']
   width: number
