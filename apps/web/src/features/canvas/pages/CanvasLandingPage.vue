@@ -31,7 +31,7 @@
             data-home-hero-safe
             class="home-hero-tagline mt-4 text-[15px] font-normal uppercase tracking-[0.1em] text-[#202124] [font-family:'Comic_Sans_MS','Chalkboard_SE','Bradley_Hand','Caveat',cursive,sans-serif]"
           >
-            EXPLORE, EXPAND, AND REFINE YOUR IDEAS
+            AI CANVAS FOR VISUAL DESIGNERS
           </p>
           <div class="home-hero-cta-row mt-6 flex gap-4">
             <button
@@ -50,8 +50,8 @@
             data-home-hero-safe
             class="home-hero-note absolute left-[20%] top-[16.9%] w-[228px] rotate-[5deg] overflow-hidden rounded-[18px] bg-[#e6ded5] px-8 py-7 text-[12px] leading-[1.5] text-[#202124] shadow-[0_18px_48px_rgba(78,70,58,0.08)] [font-family:-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,sans-serif]"
           >
-            {{ projectName }} is an AI-powered concepting board that helps you explore, expand, and
-            refine your ideas.
+            {{ projectName }} is an AI Canvas for Visual Designers to explore, compare, and refine
+            image directions in one connected workspace.
           </div>
           <img
             :src="homeHeroAssets.starburst"

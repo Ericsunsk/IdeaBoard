@@ -22,7 +22,7 @@ import { watch } from 'vue'
 import { Toaster } from 'vue-sonner'
 import { useSiteBranding } from '../shared/composables/useSiteBranding'
 
-const { logoURL, projectName } = useSiteBranding()
+const { logoURL } = useSiteBranding()
 const iconoirProps = {
   color: 'currentColor',
   width: '1.5em',
@@ -70,14 +70,6 @@ function updateSiteIcon(nextLogoURL: string) {
     icon.removeAttribute('type')
   }
 }
-
-watch(
-  projectName,
-  (value) => {
-    document.title = value
-  },
-  { immediate: true },
-)
 
 watch(
   logoURL,

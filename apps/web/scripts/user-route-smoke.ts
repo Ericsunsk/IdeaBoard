@@ -219,7 +219,7 @@ const pages: SmokePage[] = [
   {
     label: 'home',
     path: '/',
-    expectedText: ['IdeaBoard', 'EXPLORE, EXPAND, AND REFINE YOUR IDEAS', 'Get started'],
+    expectedText: ['IdeaBoard', 'AI CANVAS FOR VISUAL DESIGNERS', 'Get started'],
   },
   {
     label: 'boards',

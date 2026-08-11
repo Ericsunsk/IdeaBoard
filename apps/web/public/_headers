@@ -1,0 +1,29 @@
+/user
+  X-Robots-Tag: noindex, nofollow
+
+/user/*
+  X-Robots-Tag: noindex, nofollow
+
+/admin
+  X-Robots-Tag: noindex, nofollow
+
+/admin/*
+  X-Robots-Tag: noindex, nofollow
+
+/share
+  X-Robots-Tag: noindex, nofollow
+
+/share*
+  X-Robots-Tag: noindex, nofollow
+
+/api
+  X-Robots-Tag: noindex, nofollow
+
+/api/*
+  X-Robots-Tag: noindex, nofollow
+
+/uploads
+  X-Robots-Tag: noindex, nofollow
+
+/uploads/*
+  X-Robots-Tag: noindex, nofollow

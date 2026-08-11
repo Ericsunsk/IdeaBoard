@@ -7,13 +7,14 @@ import { adminRoutes } from '../../features/admin/app/adminRoutes'
 import { USER_DEFAULT_PATH, userRoutes } from '../../features/user/app/userRoutes'
 import { ADMIN_ROOT_PATH, HOME_PATH, isPathUnderRoute } from '../../shared/constants/routePaths'
 import { buildLoginRedirectPath } from '../../shared/auth/sessionPolicy'
+import { applyRouteSeo } from '../../shared/seo/routeSeo'
 
 const routes: RouteRecordRaw[] = [
   {
     path: HOME_PATH,
     name: 'Home',
     component: () => import('../../features/canvas/pages/CanvasLandingPage.vue'),
-    meta: { public: true },
+    meta: { public: true, seoKey: 'home' },
   },
   ...userRoutes,
   ...adminRoutes,
@@ -59,6 +60,7 @@ router.beforeEach(async (to) => {
 })
 
 router.afterEach((to, from) => {
+  applyRouteSeo(to)
   if (to.fullPath !== from.fullPath) {
     dismissAppToasts()
   }

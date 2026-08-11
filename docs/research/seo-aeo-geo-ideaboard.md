@@ -1,6 +1,6 @@
 # IdeaBoard SEO / AEO / GEO 基线研究
 
-> 范围：`ideaboard.art` 的 Vue 3 + Vite SPA、Cloudflare Pages，以及公开 Landing 目前位于 `/user/home`。本文把**厂商明确说明**、**基于说明的工程推论**和**证据不足**分开；外部事实只引用一手资料。调研日期：2026-08-12。
+> 范围：`ideaboard.art` 的 Vue 3 + Vite SPA、Cloudflare Pages，以及调研开始时位于 `/user/home` 的公开 Landing。本文把**厂商明确说明**、**基于说明的工程推论**和**证据不足**分开；外部事实只引用一手资料。调研日期：2026-08-12。
 
 ## 结论与优先级
 
@@ -13,7 +13,7 @@
 | P1     | 通过 Search Console、Bing Webmaster Tools、Rich Results Test、部署后的 HTTP 响应和已验证 crawler 日志闭环。                              | **厂商明确说明**：Google 提供 URL Inspection、Crawl Stats 和 Rich Results Test；OpenAI/Anthropic/Perplexity 公布 bot IP 来源以供验证。[Google URL Inspection](https://support.google.com/webmasters/answer/9012289) [Google Crawl Stats](https://support.google.com/webmasters/answer/9679690) [Rich Results Test](https://search.google.com/test/rich-results) [OpenAI bots](https://platform.openai.com/docs/bots) [Anthropic crawler](https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler) [Perplexity crawlers](https://docs.perplexity.ai/docs/resources/perplexity-crawlers) |
 | P2     | 经产品确认后设置 AI crawler 的 allow/block policy；不把 `llms.txt` 当作收录、训练或访问控制。                                            | **厂商明确说明 / 证据不足**：各厂商把各自 bot 的 `robots.txt` 规则作为控制面；`llms.txt` 仓库本身只是提案，未见 Google、Bing、OpenAI 或 Anthropic 在其 crawler 文档中声明支持它。[OpenAI bots](https://platform.openai.com/docs/bots) [Google crawler overview](https://developers.google.com/search/docs/crawling-indexing/overview-google-crawlers) [Anthropic crawler](https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler) [llms.txt proposal](https://github.com/AnswerDotAI/llms-txt)                                                                                        |
 
-## 当前仓库审计
+## 实施前仓库审计（研究快照）
 
 以下为仓库事实，不是外部规则：
 
