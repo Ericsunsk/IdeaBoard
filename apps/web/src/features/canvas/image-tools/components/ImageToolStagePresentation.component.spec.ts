@@ -49,6 +49,14 @@ function createCanvasOverlayStub(className: string) {
 
 const RasterOverlayStub = createCanvasOverlayStub('image-editor-raster-overlay')
 const MaskOverlayStub = createCanvasOverlayStub('image-mask-editor-overlay')
+const RenderedPreviewStub = defineComponent({
+  props: {
+    preview: { type: Object, required: true },
+  },
+  setup() {
+    return () => h('canvas', { 'data-rendered-preview': '' })
+  },
+})
 
 function createBinding(
   mode: ImageToolStageBinding['mode'],
@@ -58,6 +66,7 @@ function createBinding(
     maskEditorNodeId?: string
     maskOverlayStyle?: Record<string, string>
     rasterTool?: string | null
+    renderedPreview?: ImageToolStageBinding['renderedPreview']
   } = {},
 ) {
   const setMaskCanvasRef = vi.fn()
@@ -70,7 +79,7 @@ function createBinding(
     binding: {
       nodeId,
       mode,
-      renderedPreview: null,
+      renderedPreview: options.renderedPreview ?? null,
       session: {
         maskEditor: {
           maskEditorNodeId: ref(maskEditorNodeId),
@@ -123,7 +132,7 @@ function renderPresentation(binding: ImageToolStageBinding) {
       stubs: {
         ImageEditorRasterOverlay: RasterOverlayStub,
         ImageMaskEditorOverlay: MaskOverlayStub,
-        RenderedImagePreviewCanvas: true,
+        RenderedImagePreviewCanvas: RenderedPreviewStub,
       },
     },
   })
@@ -150,6 +159,30 @@ describe('ImageToolStagePresentation', () => {
 
     expect(current.setMaskCanvasRef).toHaveBeenCalledExactlyOnceWith('node-1', null)
     expect(current.setRasterCanvasRef).toHaveBeenCalledExactlyOnceWith('node-1', null)
+  })
+
+  it('replaces source media with the rendered adjustment preview', () => {
+    const source = createBinding('adjust', 'node-1', {
+      hasRasterEdits: false,
+      rasterTool: null,
+    })
+    const rendered = createBinding('adjust', 'node-2', {
+      hasRasterEdits: false,
+      rasterTool: null,
+      renderedPreview: {
+        type: 'rendered-image',
+        imageData: new ImageData(2, 2),
+        width: 2,
+        height: 2,
+      },
+    })
+    const sourceView = renderPresentation(source.binding)
+    const renderedView = renderPresentation(rendered.binding)
+
+    expect(sourceView.container.querySelector('[data-stage-image]')).toBeTruthy()
+    expect(sourceView.container.querySelector('[data-rendered-preview]')).toBeNull()
+    expect(renderedView.container.querySelector('[data-stage-image]')).toBeNull()
+    expect(renderedView.container.querySelector('[data-rendered-preview]')).toBeTruthy()
   })
 
   it('renders the adjustment canvas from presentation props and forwards its pointer event', () => {

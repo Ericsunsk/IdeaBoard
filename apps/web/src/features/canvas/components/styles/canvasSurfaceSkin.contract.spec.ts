@@ -13,6 +13,10 @@ const chromeSkin = readSource('components/styles/canvas-chrome.css')
 const nodeSkin = readSource('components/nodes/styles/node-shared.css')
 const nodeToolSkin = readSource('components/nodes/styles/node-tool-buttons.css')
 const nodeStageFrame = readSource('components/nodes/NodeStageFrame.vue')
+const renderedImagePreviewCanvas = readSource('components/nodes/RenderedImagePreviewCanvas.vue')
+const imageToolStagePresentation = readSource(
+  'image-tools/components/ImageToolStagePresentation.vue',
+)
 const vueFlowAdapterSkin = readSource('components/styles/canvas-vue-flow-adapter-skin.css')
 const canvasMiniMap = readSource('components/CanvasMiniMap.vue')
 const imageEditorToolRail = readSource('image-editor/components/ImageEditorToolRail.vue')
@@ -82,5 +86,24 @@ describe('Canvas surface skin contract', () => {
     expect(imageEditorToolRail).toContain("'is-disabled': getToolState(item.tool).disabled")
     expect(imageEditorLayerActions).toContain('@media (prefers-reduced-motion: reduce)')
     expect(maskEditorChrome).toContain(':disabled="directGenerating"')
+  })
+
+  it('contains rendered adjustment previews within the existing image stage geometry', () => {
+    const previewRule = renderedImagePreviewCanvas.match(
+      /\.image-node-stage-image--preview\s*\{([\s\S]*?)\}/,
+    )?.[1]
+
+    expect(previewRule).toBeDefined()
+    expect(previewRule).toContain('display: block')
+    expect(previewRule).toContain('width: 100%')
+    expect(previewRule).toContain('height: 100%')
+    expect(previewRule).toContain('object-fit: contain')
+    expect(previewRule).toContain('pointer-events: none')
+    expect(imageToolStagePresentation).toContain(
+      '<RenderedImagePreviewCanvas v-if="binding.renderedPreview"',
+    )
+    expect(imageToolStagePresentation).toContain('<slot v-else />')
+    expect(imageToolStagePresentation).not.toContain('has-rendered-preview')
+    expect(imageToolStagePresentation).not.toContain('visibility: hidden')
   })
 })

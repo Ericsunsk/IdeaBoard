@@ -35,3 +35,13 @@ watch(
   { immediate: true },
 )
 </script>
+
+<style scoped>
+.image-node-stage-image--preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+</style>

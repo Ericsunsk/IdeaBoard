@@ -1,11 +1,8 @@
 <template>
-  <div
-    class="image-tool-stage-presentation"
-    :class="{ 'has-rendered-preview': !!binding.renderedPreview }"
-  >
-    <slot />
+  <div class="image-tool-stage-presentation">
+    <RenderedImagePreviewCanvas v-if="binding.renderedPreview" :preview="binding.renderedPreview" />
+    <slot v-else />
   </div>
-  <RenderedImagePreviewCanvas v-if="binding.renderedPreview" :preview="binding.renderedPreview" />
   <ImageEditorRasterOverlay
     v-if="isRasterOverlayVisible && rasterOverlayStyle"
     :key="`raster:${binding.nodeId}`"
@@ -104,8 +101,5 @@ function readMaskCanvasSize(style: Record<string, string> | null, key: 'width' |
 .image-tool-stage-presentation :slotted(.image-tool-stage-media) {
   width: 100%;
   height: 100%;
-}
-.image-tool-stage-presentation.has-rendered-preview :slotted(.image-tool-stage-media) {
-  visibility: hidden;
 }
 </style>
