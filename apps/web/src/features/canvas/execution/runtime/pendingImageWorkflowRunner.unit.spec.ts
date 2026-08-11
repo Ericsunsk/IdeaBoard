@@ -262,18 +262,54 @@ describe('pendingImageWorkflowRunner', () => {
     expect(onWarning).toHaveBeenCalledWith('Canvas execution is no longer attached')
   })
 
+  it('drops a late completion after delete cancels its exact lease', async () => {
+    const completion = createDeferred<void>()
+    const pendingResults = createPendingResults(async (params) => {
+      await params.submitTask('image-2')
+      await completion.promise
+      const isCurrent = params.isResultExecutionCurrent('image-2', 'task-1')
+      return makeRunSummary({
+        successCount: isCurrent ? 1 : 0,
+        outcomes: [
+          {
+            resultNodeId: 'image-2',
+            status: isCurrent ? 'succeeded' : 'cancelled',
+            taskId: 'task-1',
+          },
+        ],
+      })
+    })
+    const { attachment, executionRuntime, onSuccess, onWarning, runner } =
+      createRunner(pendingResults)
+
+    const run = runner.run(makeRunParams(attachment))
+    await flushPromises()
+    const leases = executionRuntime.captureActiveNodeExecutions(['image-2'])
+    expect(executionRuntime.cancelNodeExecutions(leases)).toEqual(['task-1'])
+    completion.resolve(undefined)
+    await run
+
+    expect(executionRuntime.getNodeState('image-2')).toEqual({
+      status: 'cancelled',
+      taskId: 'task-1',
+    })
+    expect(onSuccess).not.toHaveBeenCalled()
+    expect(onWarning).not.toHaveBeenCalled()
+  })
+
   it('routes typed billing failures from outcomes through the error port', async () => {
     const insufficient = new CanvasBillingPreflightError('insufficient-credits', 'Idea不足')
     const onError = vi.fn(() => true)
-    const pendingResults = createPendingResults(async () =>
-      makeRunSummary({
+    const pendingResults = createPendingResults(async (params) => {
+      await params.submitTask('image-2')
+      return makeRunSummary({
         totalCount: 2,
         successCount: 1,
         failureCount: 1,
         firstFailure: insufficient,
         failures: [insufficient],
-      }),
-    )
+      })
+    })
     const { attachment, onWarning, runner } = createRunner(pendingResults, { onError })
 
     await runner.run(makeRunParams(attachment, { outputCount: 2 }))

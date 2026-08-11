@@ -190,7 +190,9 @@ function readRecordHistory(result: CanvasVueFlowGraphCommandResult): boolean | u
 }
 
 type PendingResultTestRunParams = PendingImageResultReservationParams &
-  Omit<RunReservedPendingImageResultsParams, 'resultNodeIds'>
+  Omit<RunReservedPendingImageResultsParams, 'resultNodeIds' | 'isResultExecutionCurrent'> & {
+    isResultExecutionCurrent?: RunReservedPendingImageResultsParams['isResultExecutionCurrent']
+  }
 
 function startPendingResultRun(
   actions: PendingImageResultExecution,
@@ -208,6 +210,7 @@ function startPendingResultRun(
     run: actions.runReservedPendingResults({
       ...runParams,
       resultNodeIds: reservation.resultNodeIds,
+      isResultExecutionCurrent: runParams.isResultExecutionCurrent ?? (() => true),
     }),
   }
 }
@@ -809,6 +812,35 @@ describe('usePendingImageResultExecution', () => {
       sourceImageUrl: '',
       outputStatus: 'running',
       pendingTaskId: 'task-1',
+    })
+  })
+
+  it('does not materialize a resolved result after its exact execution lease is cancelled', async () => {
+    const harness = createHarness([makeAnchorNode()])
+    let isLeaseCurrent = true
+
+    const { resultNodeIds: reservedNodeIds, run } = startPendingResultRun(harness.actions, {
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'anchor',
+      outputCount: 1,
+      submitTask: async () => ({ taskId: 'task-lease' }),
+      resolveResult: async () => {
+        isLeaseCurrent = false
+        return { url: 'https://example.com/stale.png', ratio: 1 }
+      },
+      isCurrent: () => true,
+      isResultExecutionCurrent: () => isLeaseCurrent,
+      isPendingError: () => false,
+    })
+    const summary = await run
+
+    const resultNodeId = reservedNodeIds[0]
+    expect(summary.successCount).toBe(0)
+    expect(summary.outcomes).toEqual([{ resultNodeId, status: 'cancelled', taskId: 'task-lease' }])
+    expect(readImageSnapshot(harness.nodes.value, resultNodeId)).toMatchObject({
+      sourceImageUrl: '',
+      outputStatus: 'running',
+      pendingTaskId: 'task-lease',
     })
   })
 

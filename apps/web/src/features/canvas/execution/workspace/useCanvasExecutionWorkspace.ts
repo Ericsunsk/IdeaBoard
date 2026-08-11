@@ -146,6 +146,16 @@ export function useCanvasExecutionWorkspace(
     return !!snapshot && isPendingImageTaskSnapshot(snapshot, taskId)
   }
 
+  function isReattachExecutionCurrent(lease: CanvasExecutionLease, taskId: string): boolean {
+    const current = executionRuntime.getNodeState(lease.nodeId)
+    return (
+      executionRuntime.getNodeLease(lease.nodeId) === lease &&
+      executionRuntime.isAttachmentCurrent(lease.attachment) &&
+      executionRuntime.isNodeActive(lease.nodeId) &&
+      current?.taskId === taskId
+    )
+  }
+
   const workflowRunner = createPendingImageWorkflowRunner({
     pendingResults,
     executionRuntime,
@@ -214,7 +224,9 @@ export function useCanvasExecutionWorkspace(
         try {
           const resolved = await resolveFirstTaskImageResult(taskId, fallbackRatio)
           const isCurrentBoard = executionRuntime.isAttachmentCurrent(attachment)
-          const isAttached = isPendingImageTaskStillCurrent(nodeId, taskId)
+          const isAttached =
+            isReattachExecutionCurrent(lease, taskId) &&
+            isPendingImageTaskStillCurrent(nodeId, taskId)
           if (!isCurrentBoard || !isAttached) {
             transitionOwnedReattachExecution(lease, taskId, 'cancelled')
             activeReattachKeys.delete(reattachKey)
@@ -229,7 +241,9 @@ export function useCanvasExecutionWorkspace(
           })
         } catch (error) {
           const isCurrentBoard = executionRuntime.isAttachmentCurrent(attachment)
-          const isAttached = isPendingImageTaskStillCurrent(nodeId, taskId)
+          const isAttached =
+            isReattachExecutionCurrent(lease, taskId) &&
+            isPendingImageTaskStillCurrent(nodeId, taskId)
           const status =
             !isCurrentBoard || !isAttached || error instanceof TaskCancelledError
               ? 'cancelled'
@@ -261,7 +275,13 @@ export function useCanvasExecutionWorkspace(
               results: resolvedAttempts.map((attempt) => attempt.resolved),
               isAttached: (result) =>
                 !!result.taskId &&
-                isPendingImageTaskStillCurrent(result.resultNodeId, result.taskId),
+                isPendingImageTaskStillCurrent(result.resultNodeId, result.taskId) &&
+                resolvedAttempts.some(
+                  (attempt) =>
+                    attempt.nodeId === result.resultNodeId &&
+                    attempt.taskId === result.taskId &&
+                    isReattachExecutionCurrent(attempt.lease, attempt.taskId),
+                ),
             })
           : null
     } catch (error) {

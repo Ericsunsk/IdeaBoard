@@ -81,6 +81,7 @@ export type RunReservedPendingImageResultsParams = {
   submitTask: (resultNodeId: string) => Promise<PendingImageResultTaskSubmission>
   resolveResult: (taskId: string, resultNodeId: string) => Promise<ResolvedTaskImageResult>
   isCurrent: () => boolean
+  isResultExecutionCurrent: (resultNodeId: string, taskId?: string) => boolean
   isPendingError: (error: unknown) => boolean
   persistPendingTaskIds?: boolean
   afterTaskIdAttached?: (params: { resultNodeId: string; taskId: string }) => Promise<void>
@@ -628,6 +629,8 @@ export function usePendingImageResultExecution(
     let failureCount = 0
     let firstFailure: unknown = null
     const failures: unknown[] = []
+    const isResultCurrent = (resultNodeId: string, taskId?: string) =>
+      params.isCurrent() && params.isResultExecutionCurrent(resultNodeId, taskId)
 
     await Promise.allSettled(
       resultNodeIds.map(async (resultNodeId, index) => {
@@ -635,12 +638,15 @@ export function usePendingImageResultExecution(
         try {
           const submission = await params.submitTask(resultNodeId)
           taskId = submission.taskId
-          if (persistPendingTaskIds && params.isCurrent()) {
+          if (persistPendingTaskIds && isResultCurrent(resultNodeId, taskId)) {
             attachPendingTaskId({ resultNodeId, taskId })
             await params.afterTaskIdAttached?.({ resultNodeId, taskId })
           }
+          if (!isResultCurrent(resultNodeId, taskId)) {
+            throw new TaskCancelledError('Canvas execution lease is no longer current')
+          }
           const resolved = await params.resolveResult(taskId, resultNodeId)
-          if (params.isCurrent() && isCanvasGraphNodeId(resultNodeId)) {
+          if (isResultCurrent(resultNodeId, taskId) && isCanvasGraphNodeId(resultNodeId)) {
             resolvedResults[index] = {
               ...resolved,
               resultNodeId,
@@ -653,28 +659,35 @@ export function usePendingImageResultExecution(
             taskId,
           }
         } catch (error) {
-          firstFailure ??= error
-          failures.push(error)
+          const hasCurrentExecution = !!taskId && isResultCurrent(resultNodeId, taskId)
           if (params.isPendingError(error)) {
+            firstFailure ??= error
+            failures.push(error)
             pendingCount += 1
-            if (!persistPendingTaskIds && params.isCurrent()) {
+            if (!persistPendingTaskIds && hasCurrentExecution) {
               cancelPendingResult({ resultNodeId })
             }
             outcomes[index] = {
               resultNodeId,
-              status: persistPendingTaskIds && params.isCurrent() ? 'pending' : 'cancelled',
+              status: persistPendingTaskIds && hasCurrentExecution ? 'pending' : 'cancelled',
               taskId,
             }
             return
           }
-          failureCount += 1
+          const ownsReservation =
+            params.isCurrent() && params.isResultExecutionCurrent(resultNodeId, taskId)
+          const isCancelled = !ownsReservation || error instanceof TaskCancelledError
+          if (!isCancelled) {
+            firstFailure ??= error
+            failures.push(error)
+            failureCount += 1
+          }
           outcomes[index] = {
             resultNodeId,
-            status:
-              !params.isCurrent() || error instanceof TaskCancelledError ? 'cancelled' : 'failed',
+            status: isCancelled ? 'cancelled' : 'failed',
             taskId,
           }
-          if (params.isCurrent()) {
+          if (ownsReservation) {
             cancelPendingResult({ resultNodeId })
           }
         }
@@ -687,7 +700,10 @@ export function usePendingImageResultExecution(
     if (materializableResults.length > 0 && params.isCurrent()) {
       const materialized = materializeResolvedAttachedPendingResults({
         results: materializableResults,
-        isAttached: () => params.isCurrent(),
+        isAttached: (result) => {
+          const taskId = outcomes[resultNodeIds.indexOf(result.resultNodeId)]?.taskId
+          return !!taskId && isResultCurrent(result.resultNodeId, taskId)
+        },
       })
       const materializedNodeIds = new Set<string>(materialized.materializedNodeIds)
       materializableResults.forEach((result) => {

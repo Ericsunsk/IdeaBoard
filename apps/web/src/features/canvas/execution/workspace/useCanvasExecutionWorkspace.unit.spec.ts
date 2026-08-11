@@ -642,6 +642,34 @@ describe('useCanvasExecutionWorkspace', () => {
     expect(workspace.state.isNodeRunning('image-2')).toBe(false)
   })
 
+  it('does not materialize a reattach after delete cancels its exact lease', async () => {
+    let resolveTask!: (results: Array<{ url: string; width: number; height: number }>) => void
+    const taskResults = new Promise<Array<{ url: string; width: number; height: number }>>(
+      (resolve) => {
+        resolveTask = resolve
+      },
+    )
+    const { workspace, pendingResults, waitTaskImageResults, onSuccess } = createWorkspaceHarness({
+      nodes: [makePendingImageNode('image-2', 'task-1')],
+      waitTaskImageResults: () => taskResults,
+      runReservedPendingResults: async () => makeRunSummary(),
+    })
+
+    const reattach = workspace.commands.reattachPendingImageResults()
+    await vi.waitFor(() => expect(waitTaskImageResults).toHaveBeenCalledWith('task-1'))
+    const leases = workspace.state.executionRuntime.captureActiveNodeExecutions(['image-2'])
+    expect(workspace.state.executionRuntime.cancelNodeExecutions(leases)).toEqual(['task-1'])
+    resolveTask([{ url: 'https://example.com/stale.png', width: 400, height: 200 }])
+    await reattach
+
+    expect(pendingResults.materializeResolvedAttachedPendingResults).not.toHaveBeenCalled()
+    expect(workspace.state.executionRuntime.getNodeState('image-2')).toEqual({
+      status: 'cancelled',
+      taskId: 'task-1',
+    })
+    expect(onSuccess).not.toHaveBeenCalled()
+  })
+
   it('does not start a reattach for an invalid Canvas node id', async () => {
     const { workspace, waitTaskImageResults, pendingResults } = createWorkspaceHarness({
       nodes: [makePendingImageNode('image-invalid', 'task-1')],
@@ -657,7 +685,8 @@ describe('useCanvasExecutionWorkspace', () => {
 
   it('reports task failures through workspace feedback', async () => {
     const { workspace, onWarning, onSuccess } = createWorkspaceHarness({
-      runReservedPendingResults: async () => {
+      runReservedPendingResults: async (params) => {
+        await params.submitTask(params.resultNodeIds[0]!)
         return makeRunSummary({
           successCount: 0,
           failureCount: 1,

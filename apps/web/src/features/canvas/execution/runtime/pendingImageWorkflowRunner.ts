@@ -131,6 +131,16 @@ export function createPendingImageWorkflowRunner(
     const clientActionIdsByResultNodeId = new Map<string, string>()
     const createClientActionId = options.createClientActionId ?? createCanvasTaskClientActionId
     const isCurrent = () => options.executionRuntime.isAttachmentCurrent(params.attachment)
+    const isResultExecutionCurrent = (resultNodeId: string, taskId?: string) => {
+      const lease = leasesByResultNodeId.get(resultNodeId)
+      const state = options.executionRuntime.getNodeState(resultNodeId)
+      return (
+        !!lease &&
+        options.executionRuntime.getNodeLease(resultNodeId) === lease &&
+        options.executionRuntime.isNodeActive(resultNodeId) &&
+        (!taskId || state?.taskId === taskId)
+      )
+    }
     const transitionActiveResults = (status: 'failed' | 'cancelled') => {
       resultNodeIds.forEach((nodeId) => {
         const lease = leasesByResultNodeId.get(nodeId)
@@ -199,9 +209,14 @@ export function createPendingImageWorkflowRunner(
         resolveResult: params.resolveResult,
         persistPendingTaskIds: params.persistPendingTaskIds,
         isCurrent,
+        isResultExecutionCurrent,
         isPendingError: isTaskResultPendingError,
         afterTaskIdAttached: options.afterTaskIdAttached,
       })
+      const hasCurrentOutcome = summary.outcomes.some(
+        (outcome) =>
+          !!outcome.taskId && isResultExecutionCurrent(outcome.resultNodeId, outcome.taskId),
+      )
       summary.outcomes.forEach((outcome) => {
         if (outcome.status === 'pending') return
         const lease = leasesByResultNodeId.get(outcome.resultNodeId)
@@ -211,6 +226,7 @@ export function createPendingImageWorkflowRunner(
           taskId: outcome.taskId,
         })
       })
+      if (!hasCurrentOutcome) return
       if (!isCurrent()) return
       let typedFailureHandled = false
       if (summary.successCount > 0) {
