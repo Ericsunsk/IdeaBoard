@@ -202,6 +202,7 @@ Dependency direction:
 Frontend context rules:
 
 - `apps/web/src/app` owns startup, router and store wiring.
+- `features/public-site` owns anonymous English Public Site routes, Public Fact Registry, Editorial Content and build-time static HTML output; it does not own authenticated Workspace rendering.
 - `apps/web/src/features` owns business modules, route pages, feature-local UI and adapters.
 - `apps/web/src/shared` only contains cross-feature API helpers, auth, types, utils and assets.
 - `shared` must not depend on concrete feature modules.
