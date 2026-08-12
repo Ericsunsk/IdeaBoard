@@ -303,18 +303,20 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
   --node-tool-icon-button-size: var(--node-tool-button-size);
   --node-tool-icon-button-radius: var(--node-tool-button-radius);
   --node-tool-icon-button-border: var(--node-tool-button-border);
+  --node-tool-icon-button-bg: var(--canvas-control-bg);
   --node-tool-icon-button-color: #6f61c6;
-  --node-tool-icon-button-active-border: #7a6bd5;
-  --node-tool-icon-button-active-color: #7a6bd5;
-  --node-tool-icon-button-active-bg: #ffffff;
+  --node-tool-icon-button-active-border: var(--canvas-control-border-color);
+  --node-tool-icon-button-active-color: var(--canvas-accent-hover);
+  --node-tool-icon-button-active-bg: var(--canvas-control-bg);
+  --node-tool-icon-button-hover-bg: var(--canvas-control-bg);
   position: relative;
   overflow: visible;
 }
 
 .image-action-icon-btn:hover:not(:disabled) {
-  border-color: #7a6bd5;
-  background: #ffffff;
-  color: #7a6bd5;
+  border-color: var(--canvas-control-border-color);
+  background: var(--canvas-control-bg);
+  color: var(--canvas-accent-hover);
   transform: scale(1.06);
 }
 

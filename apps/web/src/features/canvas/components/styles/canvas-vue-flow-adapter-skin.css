@@ -147,9 +147,9 @@
   margin: 0;
   padding: 4px;
   overflow: hidden;
-  border: 1px solid var(--canvas-surface-border);
+  border: 1px solid var(--canvas-control-border-color);
   border-radius: 6px;
-  background: rgb(255 255 255 / 72%);
+  background: color-mix(in srgb, var(--canvas-surface-bg) 72%, transparent);
   box-shadow: none;
 }
 

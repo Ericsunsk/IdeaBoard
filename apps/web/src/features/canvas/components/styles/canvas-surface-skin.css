@@ -5,17 +5,29 @@
  */
 .canvas-surface-skin {
   --canvas-control-border-width: 1.2px;
+  --canvas-control-border-color: var(--color-canvas-neutral-line);
   --canvas-tool-button-gap: 7px;
   --canvas-node-floating-ui-width: 287px;
-  --canvas-surface-page-bg: var(--color-ib-surface);
-  --canvas-surface-bg: color-mix(in srgb, var(--color-ib-surface) 98%, transparent);
-  --canvas-surface-bg-soft: color-mix(in srgb, var(--color-ib-surface) 94%, transparent);
+  --canvas-surface-page-bg: var(--color-canvas-workspace-bg);
+  --canvas-surface-bg: var(--color-canvas-surface-bg);
+  --canvas-surface-bg-soft: color-mix(
+    in srgb,
+    var(--color-canvas-surface-bg) 94%,
+    transparent
+  );
+  --canvas-control-bg: var(--canvas-surface-bg-soft);
+  --canvas-control-accent-bg: color-mix(in srgb, var(--color-canvas-accent) 94%, transparent);
+  --canvas-control-accent-bg-hover: color-mix(
+    in srgb,
+    var(--color-canvas-accent-hover) 94%,
+    transparent
+  );
   --canvas-surface-muted: #f4f7fb;
   --canvas-surface-border: #d8ddea;
   --canvas-surface-border-soft: rgba(34, 42, 54, 0.08);
-  --canvas-minimap-node: #c9ced8;
+  --canvas-minimap-node: #b8bec9;
   --canvas-minimap-viewport: #c9ced8;
-  --canvas-minimap-mask: rgb(201 206 216 / 0.18);
+  --canvas-minimap-mask: rgb(201 206 216 / 0.26);
   --canvas-surface-shadow: 0 14px 32px rgba(15, 23, 42, 0.13);
   --canvas-floating-shadow: var(--canvas-surface-shadow);
   --canvas-surface-blur: 10px;
@@ -40,7 +52,6 @@
   --canvas-tooltip-text: var(--color-canvas-tooltip-text);
   --canvas-node-bg: var(--color-canvas-node-bg);
   --canvas-node-border: var(--color-canvas-node-border);
-  --canvas-node-border-alt: var(--color-canvas-node-border-alt);
   --canvas-track-bg: var(--color-canvas-track-bg);
   --canvas-accent: var(--color-canvas-accent);
   --canvas-accent-hover: var(--color-canvas-accent-hover);
@@ -57,7 +68,7 @@
   --canvas-accent-outline: rgba(122, 107, 213, 0.22);
   --canvas-running-from: var(--color-canvas-running-from);
   --canvas-running-to: var(--color-canvas-running-to);
-  --flow-edge-color: rgb(177 177 183 / 50%);
+  --flow-edge-color: var(--color-canvas-neutral-line);
   --flow-edge-active-color: rgb(146 120 230 / 50%);
   --flow-edge-selected-color: rgb(123 135 152 / 50%);
   --flow-edge-width: 2;

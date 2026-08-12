@@ -67,21 +67,30 @@ defineExpose({ stageElement })
 <style scoped>
 .node-stage-frame {
   --node-stage-frame-bg: var(--canvas-node-bg);
-  --node-stage-frame-border: var(--canvas-node-border-alt);
   --node-stage-frame-active-border: var(--canvas-accent);
   --node-stage-frame-emphasis-shadow-primary: var(--canvas-accent-shadow);
   --node-stage-frame-emphasis-shadow-secondary: var(--canvas-accent-glow);
 
   position: relative;
   width: 100%;
-  border: 1.5px solid var(--node-stage-frame-border);
+  border: 0;
   border-radius: 11px;
   background: var(--node-stage-frame-bg);
   box-sizing: border-box;
   overflow: hidden;
-  transition:
-    border-color var(--motion-feedback-duration) var(--motion-feedback-easing),
-    box-shadow var(--motion-feedback-duration) var(--motion-feedback-easing);
+  transition: box-shadow var(--motion-feedback-duration) var(--motion-feedback-easing);
+}
+
+.node-stage-frame::after {
+  position: absolute;
+  z-index: 10;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1.5px var(--node-stage-frame-active-border);
+  content: '';
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .node-stage-frame--prompt {
@@ -103,18 +112,22 @@ defineExpose({ stageElement })
 
 .node-stage-frame.is-active,
 .node-stage-frame.is-drop-target {
-  border-color: var(--node-stage-frame-active-border);
+  &::after {
+    opacity: 1;
+  }
 }
 
 .node-stage-frame.is-transparent {
-  border-color: transparent;
   background: transparent;
   overflow: visible;
+
+  &::after {
+    opacity: 0;
+  }
 }
 
 .node-stage-frame.is-loading,
 .node-stage-frame.is-connection-drop-target {
-  border-color: var(--node-stage-frame-border);
   box-shadow:
     0 0 30px var(--node-stage-frame-emphasis-shadow-primary),
     0 0 48px var(--node-stage-frame-emphasis-shadow-secondary);

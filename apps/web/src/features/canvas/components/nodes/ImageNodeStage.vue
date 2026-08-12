@@ -255,7 +255,7 @@ function selectOutputCount(value: number) {
   height: 100%;
   border: 0;
   border-radius: 11px;
-  background: #ffffff;
+  background: var(--canvas-node-bg);
   color: #a8b3be;
   gap: 0;
   display: flex;
@@ -270,7 +270,7 @@ function selectOutputCount(value: number) {
 }
 
 .image-node-stage-empty:hover {
-  background: #ffffff;
+  background: var(--canvas-node-bg);
   color: #8894a5;
 }
 

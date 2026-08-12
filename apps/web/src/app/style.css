@@ -85,6 +85,9 @@
   --leading-admin-body: 1.5;
 
   /* ── Canvas / node tokens ─────────────────────────────── */
+  --color-canvas-workspace-bg: #e7e7e7;
+  --color-canvas-surface-bg: #f7f7f7;
+  --color-canvas-neutral-line: rgb(177 177 183 / 65%);
   --color-canvas-accent: #9278e6;
   --color-canvas-accent-hover: #7a6bd5;
   --color-canvas-accent-pressed: #6d5fd0;
@@ -99,9 +102,8 @@
   --color-canvas-accent-ring: rgba(146, 120, 230, 0.1);
   --color-canvas-accent-wash: rgba(122, 107, 213, 0.08);
   --color-canvas-accent-clear: rgba(122, 107, 213, 0);
-  --color-canvas-node-bg: #ffffff;
+  --color-canvas-node-bg: var(--color-canvas-surface-bg);
   --color-canvas-node-border: #e8ecf4;
-  --color-canvas-node-border-alt: #e2e8f0;
   --color-canvas-handle-border: #d8e0ea;
   --color-canvas-handle-border-active: #c4ccd8;
   --color-canvas-track-bg: #eef2f5;

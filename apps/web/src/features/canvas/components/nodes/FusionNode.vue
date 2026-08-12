@@ -16,7 +16,7 @@
       <Keyframes />
     </template>
     <div
-      class="relative box-border flex flex-col gap-2 overflow-visible rounded-[11px] bg-white p-0"
+      class="relative box-border flex flex-col gap-2 overflow-visible rounded-[11px] bg-[var(--canvas-node-bg)] p-0"
       @contextmenu.stop
     >
       <FusionStage

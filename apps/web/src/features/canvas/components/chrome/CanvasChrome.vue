@@ -18,7 +18,7 @@
     />
 
     <div class="canvas-chrome-control-group canvas-chrome-action-group">
-      <UserCreditBalanceButton :balance="account.balance" />
+      <UserCreditBalanceButton class="canvas-chrome-credit-control" :balance="account.balance" />
       <button
         type="button"
         :class="canvasChromeActionControlClass"
@@ -137,7 +137,6 @@ import UserCreditBalanceButton from '../../../../shared/components/UserCreditBal
 import {
   createPageChromeAccountAvatarButtonClass,
   createPageChromeRoundControlClass,
-  pageChromeRoundControlVariants,
 } from '../../../../shared/lib/pageChrome'
 import type {
   CanvasChromeAccountState,
@@ -173,12 +172,10 @@ const emit = defineEmits<{
 
 const canvasChromeRoundControlClass = createPageChromeRoundControlClass('canvas-chrome-icon-button')
 const canvasChromeActionControlClass = createPageChromeRoundControlClass(
-  pageChromeRoundControlVariants.borderless,
-  'canvas-chrome-icon-button',
+  'canvas-chrome-icon-button canvas-chrome-bordered-control',
 )
 const canvasChromeExportControlClass = createPageChromeRoundControlClass(
-  pageChromeRoundControlVariants.borderless,
-  'canvas-chrome-icon-button enabled:!bg-[var(--canvas-accent)] enabled:!text-white enabled:hover:!bg-[var(--canvas-accent-hover)] enabled:hover:!text-white',
+  'canvas-chrome-icon-button canvas-chrome-bordered-control enabled:!bg-[var(--canvas-control-accent-bg)] enabled:!text-white enabled:hover:!bg-[var(--canvas-control-accent-bg-hover)] enabled:hover:!text-white',
 )
 const canvasChromeAvatarButtonClass = createPageChromeAccountAvatarButtonClass(
   'canvas-user-avatar-button',

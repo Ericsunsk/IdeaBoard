@@ -487,7 +487,7 @@ function noopMouse() {}
   padding: 8px 10px;
   border: 1px dashed #d0d7de;
   border-radius: 8px;
-  background: #fff;
+  background: var(--canvas-node-bg);
   color: #6b7280;
   font-size: 12px;
 }

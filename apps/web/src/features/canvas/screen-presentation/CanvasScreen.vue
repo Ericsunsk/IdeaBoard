@@ -433,6 +433,7 @@ useCanvasScreenLifecycle({
 }
 
 .canvas-flow-wrap {
+  --color-ib-page-dot: #c9ced8;
   position: absolute;
   inset: 0;
   z-index: 2;

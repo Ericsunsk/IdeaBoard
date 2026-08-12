@@ -102,9 +102,9 @@
   height: 39px;
   align-items: center;
   gap: 8px;
-  border: var(--canvas-control-border-width) solid var(--canvas-surface-border);
+  border: var(--canvas-control-border-width) solid var(--canvas-control-border-color);
   border-radius: 999px;
-  background: var(--canvas-surface-bg-soft);
+  background: var(--canvas-control-bg);
   padding: 4px;
 }
 
@@ -218,14 +218,32 @@
   pointer-events: auto;
 }
 
+.canvas-chrome-credit-control {
+  --user-credit-pill-border: var(--canvas-control-border-color);
+  --user-credit-pill-border-hover: var(--canvas-control-border-color);
+  --user-credit-pill-border-active: var(--canvas-control-border-color);
+  --user-credit-pill-bg: var(--canvas-control-bg);
+}
+
 .canvas-chrome-icon-button {
+  --ib-round-control-border: var(--canvas-control-border-color);
+  --ib-round-control-border-hover: var(--canvas-control-border-color);
+  --ib-round-control-bg: var(--canvas-control-bg);
+  --ib-round-control-bg-disabled: var(--canvas-control-bg);
+
   position: relative;
   margin: 0;
   cursor: pointer;
 }
 
+.canvas-chrome-bordered-control {
+  --ib-round-control-border-width: var(--canvas-control-border-width);
+  --ib-round-control-border: var(--canvas-control-border-color);
+  --ib-round-control-border-hover: var(--canvas-control-border-color);
+}
+
 .canvas-chrome-icon-button.is-active {
-  border-color: var(--canvas-surface-border);
+  border-color: var(--canvas-control-border-color);
   background: var(--canvas-surface-muted);
   color: var(--canvas-chrome-active-color);
 }
@@ -272,9 +290,9 @@
   height: 33px;
   align-items: center;
   gap: 9px;
-  border: var(--canvas-control-border-width) solid var(--canvas-surface-border);
+  border: var(--canvas-control-border-width) solid var(--canvas-control-border-color);
   border-radius: 999px;
-  background: var(--canvas-surface-bg-soft);
+  background: var(--canvas-control-bg);
   padding: 4px;
   color: var(--canvas-text-strong);
 }

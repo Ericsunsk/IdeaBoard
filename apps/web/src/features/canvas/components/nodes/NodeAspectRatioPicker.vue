@@ -3,7 +3,7 @@
     class="node-aspect-ratio-wrap relative h-[var(--node-tool-button-size)] w-[var(--node-tool-button-size)]"
   >
     <button
-      class="node-aspect-ratio-trigger node-tool-tooltip-trigger inline-flex h-[var(--node-tool-button-size)] w-[var(--node-tool-button-size)] flex-[0_0_var(--node-tool-button-size)] cursor-pointer items-center justify-center rounded-[var(--node-tool-button-radius)] border-[length:var(--node-tool-border-width)] border-solid border-[color:var(--node-tool-button-border)] bg-white p-0 text-xs leading-none font-bold text-[#505766] outline-none disabled:cursor-wait disabled:opacity-[0.55]"
+      class="node-aspect-ratio-trigger node-tool-tooltip-trigger inline-flex h-[var(--node-tool-button-size)] w-[var(--node-tool-button-size)] flex-[0_0_var(--node-tool-button-size)] cursor-pointer items-center justify-center rounded-[var(--node-tool-button-radius)] border-[length:var(--node-tool-border-width)] border-solid border-[color:var(--node-tool-button-border)] bg-[var(--canvas-node-bg)] p-0 text-xs leading-none font-bold text-[#505766] outline-none disabled:cursor-wait disabled:opacity-[0.55]"
       type="button"
       :class="{ active: visible }"
       :disabled="disabled"

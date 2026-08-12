@@ -22,7 +22,11 @@
     </template>
     <div
       class="relative flex flex-col gap-2 overflow-visible rounded-[11px] p-0"
-      :class="expandModeActive || isImageEditorActive ? 'bg-transparent' : 'bg-white'"
+      :class="
+        expandModeActive || isImageEditorActive
+          ? 'bg-transparent'
+          : 'bg-[var(--canvas-node-bg)]'
+      "
       @contextmenu.stop
     >
       <ImageNodeStage

@@ -35,9 +35,13 @@ describe('Canvas surface skin contract', () => {
   })
 
   it('maps Canvas surface semantics to app tokens while keeping the named Canvas contract stable', () => {
+    expect(surfaceSkin).toContain('--canvas-surface-bg: var(--color-canvas-surface-bg)')
     expect(surfaceSkin).toContain(
-      '--canvas-surface-bg: color-mix(in srgb, var(--color-ib-surface) 98%, transparent)',
+      '--canvas-control-border-color: var(--color-canvas-neutral-line)',
     )
+    expect(surfaceSkin).toContain('--canvas-control-bg: var(--canvas-surface-bg-soft)')
+    expect(surfaceSkin).toContain('--canvas-control-accent-bg:')
+    expect(surfaceSkin).toContain('--flow-edge-color: var(--color-canvas-neutral-line)')
     expect(surfaceSkin).toContain('--canvas-accent: var(--color-canvas-accent)')
     expect(surfaceSkin).toContain('--canvas-accent-hover: var(--color-canvas-accent-hover)')
     expect(surfaceSkin).toContain('--canvas-text-muted: var(--color-canvas-text-secondary)')
@@ -71,10 +75,18 @@ describe('Canvas surface skin contract', () => {
 
   it('retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts', () => {
     expect(chromeSkin).toContain('.canvas-chrome-board-icon-button:focus-visible')
+    expect(chromeSkin).toContain('--ib-round-control-border: var(--canvas-control-border-color)')
+    expect(chromeSkin).toContain('.canvas-chrome-bordered-control')
+    expect(chromeSkin).toContain(
+      '--ib-round-control-border-width: var(--canvas-control-border-width)',
+    )
     expect(chromeSkin).toContain('@media (prefers-reduced-motion: reduce)')
     expect(chromeSkin).toContain('max-width: calc(100vw - 32px)')
     expect(vueFlowAdapterSkin).toContain('edge.selected')
     expect(vueFlowAdapterSkin).toContain('edge:focus-visible')
+    expect(vueFlowAdapterSkin).toContain(
+      'border: 1px solid var(--canvas-control-border-color)',
+    )
     expect(canvasMiniMap).toContain('var(--canvas-minimap-node)')
     expect(nodeSkin).toContain('.workflow-node.running::before')
     expect(nodeSkin).toContain('animation: none;')
@@ -82,6 +94,9 @@ describe('Canvas surface skin contract', () => {
     expect(nodeToolSkin).toContain('.node-tool-output-count:disabled')
     expect(nodeStageFrame).toContain('.node-stage-frame.is-loading')
     expect(nodeStageFrame).toContain('.node-stage-frame.is-connection-drop-target')
+    expect(nodeStageFrame).toContain('border: 0')
+    expect(nodeStageFrame).toContain('.node-stage-frame::after')
+    expect(nodeStageFrame).toContain('.node-stage-frame.is-active')
     expect(nodeStageFrame).toContain('--node-stage-frame-emphasis-shadow-primary')
     expect(imageEditorToolRail).toContain("'is-disabled': getToolState(item.tool).disabled")
     expect(imageEditorLayerActions).toContain('@media (prefers-reduced-motion: reduce)')

@@ -40,9 +40,9 @@ defineProps<{
   padding: 0 13px 0 11px;
   flex: none;
   overflow: hidden;
-  border: 1px solid var(--color-ib-border-soft);
+  border: 1px solid var(--user-credit-pill-border, var(--color-ib-border-soft));
   border-radius: 999px;
-  background: var(--color-ib-surface);
+  background: var(--user-credit-pill-bg, var(--color-ib-surface));
   color: var(--color-ib-text);
   box-shadow: var(--shadow-ib-control);
   cursor: pointer;
@@ -54,12 +54,12 @@ defineProps<{
 }
 
 .user-credit-pill:hover {
-  border-color: var(--color-ib-border-hover);
+  border-color: var(--user-credit-pill-border-hover, var(--color-ib-border-hover));
   background: var(--color-ib-surface-hover);
 }
 
 .user-credit-pill:active {
-  border-color: var(--color-ib-border-pressed);
+  border-color: var(--user-credit-pill-border-active, var(--color-ib-border-pressed));
   background: var(--color-ib-surface-pressed);
 }
 
