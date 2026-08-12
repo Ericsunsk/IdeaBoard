@@ -193,7 +193,7 @@ func (c *ProviderExecutor) callGoogleProviderWithRequest(ctx context.Context, ac
 	googleParams := readGoogleProviderParams(providerReq)
 	if googleParams.UseImagen {
 		if !contract.SupportsImagen {
-			return providerCallResult{}, errors.New("Google Cloud API Key 模式仅支持 Gemini 模型，请选择 Gemini 图像模型")
+			return providerCallResult{}, errors.New("API Key 模式仅支持 Gemini 模型，请选择 Gemini 图像模型")
 		}
 		if len(googleParams.ImageRefs) > 0 {
 			return providerCallResult{}, errors.New("google imagen 当前不支持图像参考输入，请选择 gemini 图像模型")
