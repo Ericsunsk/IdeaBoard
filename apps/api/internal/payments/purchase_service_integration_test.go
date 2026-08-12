@@ -79,6 +79,79 @@ func TestCreateCheckoutPersistsIntentBeforeStripeAndReusesCanonicalRequest(t *te
 	}
 }
 
+func TestCreateCheckoutCreatesCustomerPerStripeMode(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	db, pool := testdb.OpenWithPool(t)
+	seedRechargeableWallet(t, pool, 42)
+	configurationGateway := configuredFakeStripeGateway("acct_checkout", "prod_test")
+	checkoutGateway := &fakeCheckoutGateway{}
+	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, credits.NewService(pool))
+
+	first := CreateCheckoutCommand{
+		UserID: 42, ClientIdempotencyKey: "purchase-customer-test-generation", IdeaQuantity: 501,
+		TermsAccepted: true, TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
+		ReturnBaseURL: "https://app.example.com/user/boards",
+	}
+	if _, err := service.CreateCheckout(t.Context(), first); err != nil {
+		t.Fatalf("create test-mode Checkout: %v", err)
+	}
+
+	configurationGateway.prepared = PreparedStripeConfiguration{
+		AccountID: "acct_checkout", Mode: StripeModeLive, ChargesEnabled: true, ProductID: "prod_live",
+		WebhookEndpointID: "we_live", WebhookSecret: "whsec_live",
+	}
+	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+		ActorID: 42, APIKey: "sk_live_purchase", ProductTaxCode: "txcd_10105001",
+		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
+	}); err != nil {
+		t.Fatalf("configure live Stripe generation: %v", err)
+	}
+
+	second := first
+	second.ClientIdempotencyKey = "purchase-customer-live-generation"
+	second.IdeaQuantity = 502
+	if _, err := service.CreateCheckout(t.Context(), second); err != nil {
+		t.Fatalf("create live-mode Checkout: %v", err)
+	}
+	if checkoutGateway.customerCalls != 2 {
+		t.Fatalf("Stripe Customer calls = %d, want one per Stripe mode", checkoutGateway.customerCalls)
+	}
+}
+
+func TestCreateCheckoutReusesCustomerAfterKeyRotationWithinStripeMode(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	db, pool := testdb.OpenWithPool(t)
+	seedRechargeableWallet(t, pool, 42)
+	configurationGateway := configuredFakeStripeGateway("acct_checkout", "prod_test")
+	checkoutGateway := &fakeCheckoutGateway{}
+	service := newConfiguredPurchaseService(t, db, configurationGateway, checkoutGateway, credits.NewService(pool))
+
+	first := CreateCheckoutCommand{
+		UserID: 42, ClientIdempotencyKey: "purchase-customer-mode-key-a", IdeaQuantity: 501,
+		TermsAccepted: true, TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
+		ReturnBaseURL: "https://app.example.com/user/boards",
+	}
+	if _, err := service.CreateCheckout(t.Context(), first); err != nil {
+		t.Fatalf("create Checkout with first key: %v", err)
+	}
+	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+		ActorID: 42, APIKey: "sk_test_purchase_rotated", ProductTaxCode: "txcd_10105001",
+		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
+	}); err != nil {
+		t.Fatalf("rotate Stripe key within test mode: %v", err)
+	}
+
+	second := first
+	second.ClientIdempotencyKey = "purchase-customer-mode-key-b"
+	second.IdeaQuantity = 502
+	if _, err := service.CreateCheckout(t.Context(), second); err != nil {
+		t.Fatalf("create Checkout with rotated key: %v", err)
+	}
+	if checkoutGateway.customerCalls != 1 {
+		t.Fatalf("Stripe Customer calls = %d, want reuse within one Stripe mode", checkoutGateway.customerCalls)
+	}
+}
+
 func TestCreateCheckoutReplaysImmutableSecondPrecisionExpiryAfterProviderTimeout(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db, pool := testdb.OpenWithPool(t)

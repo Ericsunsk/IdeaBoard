@@ -205,14 +205,15 @@ RETURNING *;
 -- name: GetPaymentCustomer :one
 SELECT *
 FROM payment_customers
-WHERE user_id = $1;
+WHERE user_id = $1
+  AND stripe_account_id = $2
+  AND stripe_mode = $3;
 
--- name: ReplacePaymentCustomer :one
-INSERT INTO payment_customers (user_id, stripe_account_id, stripe_customer_id)
-VALUES ($1, $2, $3)
-ON CONFLICT (user_id) DO UPDATE
-SET stripe_account_id = EXCLUDED.stripe_account_id,
-    stripe_customer_id = EXCLUDED.stripe_customer_id
+-- name: UpsertPaymentCustomer :one
+INSERT INTO payment_customers (user_id, stripe_account_id, stripe_mode, stripe_customer_id)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (user_id, stripe_account_id, stripe_mode) DO UPDATE
+SET stripe_customer_id = EXCLUDED.stripe_customer_id
 RETURNING *;
 
 -- name: BindPaymentOrderCheckout :one

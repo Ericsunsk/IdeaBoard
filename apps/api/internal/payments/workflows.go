@@ -47,7 +47,7 @@ func NewPaymentOrderTransitions(store PaymentOrderConvergenceStore, runtime *Pay
 }
 
 type PaymentCheckoutRecovery interface {
-	createCheckoutSessionForOrder(context.Context, string, PaymentOrder) (PaymentOrder, error)
+	createCheckoutSessionForOrder(context.Context, StoredStripeConfiguration, string, PaymentOrder) (PaymentOrder, error)
 	retrieveAndConvergeCheckout(context.Context, string, PaymentOrder) (PaymentOrder, error)
 }
 

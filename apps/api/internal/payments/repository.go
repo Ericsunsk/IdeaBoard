@@ -420,32 +420,35 @@ func (r *Repository) CreatePaymentOrderIntent(ctx context.Context, input CreateP
 	return order, reused, err
 }
 
-func (r *Repository) GetPaymentCustomer(ctx context.Context, userID int64) (PaymentCustomer, error) {
+func (r *Repository) GetPaymentCustomer(ctx context.Context, userID int64, accountID string, mode StripeMode) (PaymentCustomer, error) {
 	if r == nil || r.db == nil {
 		return PaymentCustomer{}, fmt.Errorf("payments repository: database unavailable")
 	}
-	row, err := r.dbWithContext(ctx).queries().GetPaymentCustomer(ctx, userID)
+	row, err := r.dbWithContext(ctx).queries().GetPaymentCustomer(ctx, dbsqlc.GetPaymentCustomerParams{
+		UserID: userID, StripeAccountID: accountID, StripeMode: string(mode),
+	})
 	if err != nil {
 		return PaymentCustomer{}, err
 	}
 	return PaymentCustomer{
-		UserID: row.UserID, StripeAccountID: row.StripeAccountID, StripeCustomerID: row.StripeCustomerID,
+		UserID: row.UserID, StripeAccountID: row.StripeAccountID, StripeMode: StripeMode(row.StripeMode), StripeCustomerID: row.StripeCustomerID,
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}, nil
 }
 
-func (r *Repository) ReplacePaymentCustomer(ctx context.Context, customer PaymentCustomer) (PaymentCustomer, error) {
+func (r *Repository) UpsertPaymentCustomer(ctx context.Context, customer PaymentCustomer) (PaymentCustomer, error) {
 	if r == nil || r.db == nil {
 		return PaymentCustomer{}, fmt.Errorf("payments repository: database unavailable")
 	}
-	row, err := r.dbWithContext(ctx).queries().ReplacePaymentCustomer(ctx, dbsqlc.ReplacePaymentCustomerParams{
-		UserID: customer.UserID, StripeAccountID: customer.StripeAccountID, StripeCustomerID: customer.StripeCustomerID,
+	row, err := r.dbWithContext(ctx).queries().UpsertPaymentCustomer(ctx, dbsqlc.UpsertPaymentCustomerParams{
+		UserID: customer.UserID, StripeAccountID: customer.StripeAccountID,
+		StripeMode: string(customer.StripeMode), StripeCustomerID: customer.StripeCustomerID,
 	})
 	if err != nil {
-		return PaymentCustomer{}, fmt.Errorf("replace payment customer: %w", err)
+		return PaymentCustomer{}, fmt.Errorf("upsert payment customer: %w", err)
 	}
 	return PaymentCustomer{
-		UserID: row.UserID, StripeAccountID: row.StripeAccountID, StripeCustomerID: row.StripeCustomerID,
+		UserID: row.UserID, StripeAccountID: row.StripeAccountID, StripeMode: StripeMode(row.StripeMode), StripeCustomerID: row.StripeCustomerID,
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}, nil
 }

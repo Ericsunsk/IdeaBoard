@@ -365,7 +365,7 @@ func (s *CheckoutWorkflow) createCheckoutLocked(ctx context.Context, command Cre
 		return checkoutResult(order, true), nil
 	}
 
-	order, err = s.createCheckoutSessionForOrder(ctx, apiKey, order)
+	order, err = s.createCheckoutSessionForOrder(ctx, configuration, apiKey, order)
 	if err != nil {
 		return CheckoutResult{}, err
 	}
@@ -518,9 +518,17 @@ func (s *CheckoutWorkflow) requireRechargeableWallet(ctx context.Context, userID
 	return nil
 }
 
-func (s *CheckoutWorkflow) ensurePaymentCustomer(ctx context.Context, apiKey string, order PaymentOrder) (PaymentCustomer, error) {
-	stored, err := s.checkoutStore.GetPaymentCustomer(ctx, order.UserID)
-	if err == nil && stored.StripeAccountID == order.StripeAccountID && stored.StripeCustomerID != "" {
+func (s *CheckoutWorkflow) ensurePaymentCustomer(
+	ctx context.Context,
+	configuration StoredStripeConfiguration,
+	apiKey string,
+	order PaymentOrder,
+) (PaymentCustomer, error) {
+	if configuration.AccountID != order.StripeAccountID || configuration.Mode == "" {
+		return PaymentCustomer{}, ErrPurchasesUnavailable
+	}
+	stored, err := s.checkoutStore.GetPaymentCustomer(ctx, order.UserID, order.StripeAccountID, configuration.Mode)
+	if err == nil && stored.StripeCustomerID != "" {
 		return stored, nil
 	}
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -528,7 +536,7 @@ func (s *CheckoutWorkflow) ensurePaymentCustomer(ctx context.Context, apiKey str
 	}
 	created, err := s.checkoutGateway.CreateCustomer(ctx, CreateCheckoutCustomerInput{
 		APIKey: apiKey, UserID: order.UserID,
-		IdempotencyKey: "ideaboard-customer-" + order.StripeAccountID + "-" + strconv.FormatInt(order.UserID, 10),
+		IdempotencyKey: "ideaboard-customer-" + order.StripeAccountID + "-" + string(configuration.Mode) + "-" + strconv.FormatInt(order.UserID, 10),
 	})
 	if err != nil {
 		return PaymentCustomer{}, err
@@ -536,19 +544,25 @@ func (s *CheckoutWorkflow) ensurePaymentCustomer(ctx context.Context, apiKey str
 	if strings.TrimSpace(created.ID) == "" {
 		return PaymentCustomer{}, ErrPurchasesUnavailable
 	}
-	return s.checkoutStore.ReplacePaymentCustomer(ctx, PaymentCustomer{
-		UserID: order.UserID, StripeAccountID: order.StripeAccountID, StripeCustomerID: created.ID,
+	return s.checkoutStore.UpsertPaymentCustomer(ctx, PaymentCustomer{
+		UserID: order.UserID, StripeAccountID: order.StripeAccountID,
+		StripeMode: configuration.Mode, StripeCustomerID: created.ID,
 	})
 }
 
 // createCheckoutSessionForOrder replays the immutable Checkout intent. Stripe's
 // public order number is the idempotency key, so a process failure between the
 // provider call and local bind can recover without creating a second Session.
-func (s *CheckoutWorkflow) createCheckoutSessionForOrder(ctx context.Context, apiKey string, order PaymentOrder) (PaymentOrder, error) {
+func (s *CheckoutWorkflow) createCheckoutSessionForOrder(
+	ctx context.Context,
+	configuration StoredStripeConfiguration,
+	apiKey string,
+	order PaymentOrder,
+) (PaymentOrder, error) {
 	if order.Status != PaymentOrderCreating || strings.TrimSpace(order.ReturnBaseURL) == "" {
 		return PaymentOrder{}, ErrPurchasesUnavailable
 	}
-	customer, err := s.ensurePaymentCustomer(ctx, apiKey, order)
+	customer, err := s.ensurePaymentCustomer(ctx, configuration, apiKey, order)
 	if err != nil {
 		return PaymentOrder{}, s.finishRejectedCheckoutCreation(ctx, order, err)
 	}

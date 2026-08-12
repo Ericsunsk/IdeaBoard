@@ -76,7 +76,7 @@ type Querier interface {
 	GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error)
 	GetMediaAssetByID(ctx context.Context, id int64) (MediaAsset, error)
 	GetPaymentCheckoutShutdown(ctx context.Context, id uuid.UUID) (PaymentCheckoutShutdown, error)
-	GetPaymentCustomer(ctx context.Context, userID int64) (PaymentCustomer, error)
+	GetPaymentCustomer(ctx context.Context, arg GetPaymentCustomerParams) (PaymentCustomer, error)
 	GetPaymentOrderByCheckoutSession(ctx context.Context, arg GetPaymentOrderByCheckoutSessionParams) (PaymentOrder, error)
 	GetPaymentOrderByCheckoutSessionForUpdate(ctx context.Context, arg GetPaymentOrderByCheckoutSessionForUpdateParams) (PaymentOrder, error)
 	GetPaymentOrderByID(ctx context.Context, id uuid.UUID) (PaymentOrder, error)
@@ -178,7 +178,6 @@ type Querier interface {
 	ReleaseActiveTaskLeasesByTaskIDs(ctx context.Context, arg ReleaseActiveTaskLeasesByTaskIDsParams) (int64, error)
 	ReleaseMediaAssetReclamationClaim(ctx context.Context, arg ReleaseMediaAssetReclamationClaimParams) error
 	ReleaseTaskLease(ctx context.Context, arg ReleaseTaskLeaseParams) (int64, error)
-	ReplacePaymentCustomer(ctx context.Context, arg ReplacePaymentCustomerParams) (PaymentCustomer, error)
 	ReplacePaymentStripeConfiguration(ctx context.Context, arg ReplacePaymentStripeConfigurationParams) (PaymentStripeConfiguration, error)
 	RequeueTaskRunningWithLease(ctx context.Context, arg RequeueTaskRunningWithLeaseParams) (int64, error)
 	ResetAccountFailCount(ctx context.Context, id int64) (int64, error)
@@ -207,6 +206,7 @@ type Querier interface {
 	UpsertFeaturePrompt(ctx context.Context, arg UpsertFeaturePromptParams) (FeaturePrompt, error)
 	UpsertMediaAsset(ctx context.Context, arg UpsertMediaAssetParams) (int64, error)
 	UpsertMediaRef(ctx context.Context, arg UpsertMediaRefParams) (int64, error)
+	UpsertPaymentCustomer(ctx context.Context, arg UpsertPaymentCustomerParams) (PaymentCustomer, error)
 	UpsertStorageProfile(ctx context.Context, arg UpsertStorageProfileParams) (int64, error)
 	UpsertSystemConfig(ctx context.Context, arg UpsertSystemConfigParams) error
 	UpsertTaskDailyStatDelta(ctx context.Context, arg UpsertTaskDailyStatDeltaParams) error

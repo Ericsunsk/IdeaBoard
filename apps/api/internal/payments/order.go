@@ -77,6 +77,7 @@ type CreatePaymentOrderIntentInput struct {
 type PaymentCustomer struct {
 	UserID           int64
 	StripeAccountID  string
+	StripeMode       StripeMode
 	StripeCustomerID string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time

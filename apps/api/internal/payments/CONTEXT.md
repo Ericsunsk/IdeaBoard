@@ -42,6 +42,7 @@ Payments 拥有 Stripe 配置、签名 Webhook 接入与支付生命周期。它
 - Webhook Inbox 不保存原始 payload，只保存 Event ID、type、object ID、livemode、Stripe created time、接收/处理状态与时间。
 - 配置与 Webhook Secret 在 request-time 从 PostgreSQL 读取并实时生效，不使用 application-lifetime 配置缓存。Payment Order、Refund、Dispute、Checkout shutdown 与 Reconciliation 必须按订单引用的 immutable Credential Generation 访问 Stripe；切换 active generation 不扫描旧订单，也不在 provider I/O 期间持有全局配置锁。
 - 创建 Checkout 前必须先以 `(user_id, client_idempotency_key)` 和 canonical request hash durable 创建或重放 Payment Order；相同 key 的不同请求 fail closed。Stripe Customer、Checkout Session 和其 provider identity 都必须绑定到该 Order。
+- Stripe Customer 按 `(user_id, stripe_account_id, mode)` namespace 复用；test/live 必须隔离，同一 mode 内的 API key rotation 不得重复创建 Customer。
 - Stripe 明确拒绝创建 Customer 或 Checkout Session 时，`creating` Order 必须立即进入 `payment_failed`，允许用户用新 Order 重试；网络中断、限流、provider `5xx`、`idempotency_error` 或响应不完整等结果未知失败必须保留原 Order 与原 Stripe Idempotency Key。
 - Payment Order 生命周期以 `creating → checkout_open → async_payment_pending` 表达未完成 Checkout，以 `cancelled|expired|payment_failed` 表达未支付终态，以 `paid_pending_credit → credited` 表达已确认支付到 Ledger 到账。已确认的 late paid fact 可以从未支付终态升级到 `paid_pending_credit`，其他终态不得回退；所有 transition 由数据库约束。
 - 同一用户、同一 Idea 数量只允许一个未支付的 active Checkout；复用 `checkout_open` 或恢复 `creating` 前必须读取或收敛 Stripe canonical state，禁止返回已完成或已过期的旧 Checkout URL。确定已完成或已过期后，客户端才可轮换 Idempotency Key；结果未知的 provider failure 必须保留原 key。创建、继续和放弃 Checkout 按用户串行化，不在 Stripe 网络调用期间持有数据库 transaction。每个用户最多保留 3 笔不同数量的未支付 active Checkout；`paid_pending_credit` 已是支付事实，不占用待支付名额。

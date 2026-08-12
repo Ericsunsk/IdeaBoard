@@ -430,17 +430,26 @@ func (q *Queries) GetPaymentCheckoutShutdown(ctx context.Context, id uuid.UUID) 
 }
 
 const getPaymentCustomer = `-- name: GetPaymentCustomer :one
-SELECT user_id, stripe_account_id, stripe_customer_id, created_at, updated_at
+SELECT user_id, stripe_account_id, stripe_mode, stripe_customer_id, created_at, updated_at
 FROM payment_customers
 WHERE user_id = $1
+  AND stripe_account_id = $2
+  AND stripe_mode = $3
 `
 
-func (q *Queries) GetPaymentCustomer(ctx context.Context, userID int64) (PaymentCustomer, error) {
-	row := q.db.QueryRowContext(ctx, getPaymentCustomer, userID)
+type GetPaymentCustomerParams struct {
+	UserID          int64  `json:"user_id"`
+	StripeAccountID string `json:"stripe_account_id"`
+	StripeMode      string `json:"stripe_mode"`
+}
+
+func (q *Queries) GetPaymentCustomer(ctx context.Context, arg GetPaymentCustomerParams) (PaymentCustomer, error) {
+	row := q.db.QueryRowContext(ctx, getPaymentCustomer, arg.UserID, arg.StripeAccountID, arg.StripeMode)
 	var i PaymentCustomer
 	err := row.Scan(
 		&i.UserID,
 		&i.StripeAccountID,
+		&i.StripeMode,
 		&i.StripeCustomerID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -2177,34 +2186,6 @@ func (q *Queries) RecordPaymentOrderPaid(ctx context.Context, arg RecordPaymentO
 	return i, err
 }
 
-const replacePaymentCustomer = `-- name: ReplacePaymentCustomer :one
-INSERT INTO payment_customers (user_id, stripe_account_id, stripe_customer_id)
-VALUES ($1, $2, $3)
-ON CONFLICT (user_id) DO UPDATE
-SET stripe_account_id = EXCLUDED.stripe_account_id,
-    stripe_customer_id = EXCLUDED.stripe_customer_id
-RETURNING user_id, stripe_account_id, stripe_customer_id, created_at, updated_at
-`
-
-type ReplacePaymentCustomerParams struct {
-	UserID           int64  `json:"user_id"`
-	StripeAccountID  string `json:"stripe_account_id"`
-	StripeCustomerID string `json:"stripe_customer_id"`
-}
-
-func (q *Queries) ReplacePaymentCustomer(ctx context.Context, arg ReplacePaymentCustomerParams) (PaymentCustomer, error) {
-	row := q.db.QueryRowContext(ctx, replacePaymentCustomer, arg.UserID, arg.StripeAccountID, arg.StripeCustomerID)
-	var i PaymentCustomer
-	err := row.Scan(
-		&i.UserID,
-		&i.StripeAccountID,
-		&i.StripeCustomerID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const replacePaymentStripeConfiguration = `-- name: ReplacePaymentStripeConfiguration :one
 INSERT INTO payment_stripe_configurations (
   singleton_id,
@@ -2256,6 +2237,40 @@ func (q *Queries) ReplacePaymentStripeConfiguration(ctx context.Context, arg Rep
 		&i.PurchasesEnabled,
 		&i.Revision,
 		&i.UpdatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const upsertPaymentCustomer = `-- name: UpsertPaymentCustomer :one
+INSERT INTO payment_customers (user_id, stripe_account_id, stripe_mode, stripe_customer_id)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (user_id, stripe_account_id, stripe_mode) DO UPDATE
+SET stripe_customer_id = EXCLUDED.stripe_customer_id
+RETURNING user_id, stripe_account_id, stripe_mode, stripe_customer_id, created_at, updated_at
+`
+
+type UpsertPaymentCustomerParams struct {
+	UserID           int64  `json:"user_id"`
+	StripeAccountID  string `json:"stripe_account_id"`
+	StripeMode       string `json:"stripe_mode"`
+	StripeCustomerID string `json:"stripe_customer_id"`
+}
+
+func (q *Queries) UpsertPaymentCustomer(ctx context.Context, arg UpsertPaymentCustomerParams) (PaymentCustomer, error) {
+	row := q.db.QueryRowContext(ctx, upsertPaymentCustomer,
+		arg.UserID,
+		arg.StripeAccountID,
+		arg.StripeMode,
+		arg.StripeCustomerID,
+	)
+	var i PaymentCustomer
+	err := row.Scan(
+		&i.UserID,
+		&i.StripeAccountID,
+		&i.StripeMode,
+		&i.StripeCustomerID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

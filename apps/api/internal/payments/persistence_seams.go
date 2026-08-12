@@ -36,8 +36,8 @@ type StripeWebhookInboxStore interface {
 type PaymentCheckoutStore interface {
 	WithUserCheckoutLock(context.Context, int64, func(context.Context) error) error
 	CreatePaymentOrderIntent(context.Context, CreatePaymentOrderIntentInput) (PaymentOrder, bool, error)
-	GetPaymentCustomer(context.Context, int64) (PaymentCustomer, error)
-	ReplacePaymentCustomer(context.Context, PaymentCustomer) (PaymentCustomer, error)
+	GetPaymentCustomer(context.Context, int64, string, StripeMode) (PaymentCustomer, error)
+	UpsertPaymentCustomer(context.Context, PaymentCustomer) (PaymentCustomer, error)
 	BindPaymentOrderCheckout(context.Context, BindPaymentOrderCheckoutInput) (PaymentOrder, error)
 	GetPaymentOrderByPublicToken(context.Context, int64, string) (PaymentOrder, error)
 	GetPaymentOrderByID(context.Context, string) (PaymentOrder, error)

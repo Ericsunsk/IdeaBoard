@@ -349,6 +349,7 @@ type PaymentCheckoutShutdown struct {
 type PaymentCustomer struct {
 	UserID           int64     `json:"user_id"`
 	StripeAccountID  string    `json:"stripe_account_id"`
+	StripeMode       string    `json:"stripe_mode"`
 	StripeCustomerID string    `json:"stripe_customer_id"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`

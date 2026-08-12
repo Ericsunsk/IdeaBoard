@@ -188,7 +188,7 @@ func (s *StripeFactsWorkflow) reconcilePaymentOrderClaim(
 	if order.Status == PaymentOrderCreating {
 		// A local creation deadline is not proof that Stripe did not accept the
 		// initial request. Replay the public order idempotency key first.
-		if _, err := s.checkoutRecovery.createCheckoutSessionForOrder(ctx, apiKey, order); err != nil {
+		if _, err := s.checkoutRecovery.createCheckoutSessionForOrder(ctx, credential, apiKey, order); err != nil {
 			return paymentReconciliationFailureOutcome(now, order, err, reconciliationFailureIsTransient(err)), err
 		}
 		return paymentReconciliationCheckpoint(now, order), nil

@@ -100,13 +100,16 @@ ALTER TABLE credit_transactions
     CHECK (command_type IN ('grant', 'deduction', 'hold', 'capture', 'release', 'refund', 'correction', 'purchase_credit', 'purchase_refund', 'payment_dispute_debit', 'payment_dispute_restore'));
 
 CREATE TABLE payment_customers (
-  user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE RESTRICT,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   stripe_account_id TEXT NOT NULL,
+  stripe_mode TEXT NOT NULL,
   stripe_customer_id TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT payment_customers_pkey PRIMARY KEY (user_id, stripe_account_id, stripe_mode),
   CONSTRAINT ck_payment_customer_account_id CHECK (char_length(stripe_account_id) BETWEEN 1 AND 255),
-  CONSTRAINT uq_payment_customer_account UNIQUE (stripe_account_id, stripe_customer_id),
+  CONSTRAINT ck_payment_customer_mode CHECK (stripe_mode IN ('test', 'live')),
+  CONSTRAINT uq_payment_customer_namespace UNIQUE (stripe_account_id, stripe_mode, stripe_customer_id),
   CONSTRAINT ck_payment_customer_id CHECK (char_length(stripe_customer_id) BETWEEN 1 AND 255)
 );
 
