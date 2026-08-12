@@ -44,12 +44,13 @@ func absolutizeAssetURL(base *url.URL, raw string) (string, bool, bool) {
 	}
 	if strings.HasPrefix(trimmed, "/uploads/") {
 		cleaned := path.Clean(trimmed)
-		if !strings.HasPrefix(cleaned, "/uploads/") {
+		if cleaned != trimmed || !strings.HasPrefix(cleaned, "/uploads/") {
 			return trimmed, false, true
 		}
 		if _, err := storage.ParseUploadResource(cleaned); err != nil {
 			return trimmed, false, true
 		}
+		return trimmed, false, false
 	}
 	if base == nil {
 		return trimmed, false, true

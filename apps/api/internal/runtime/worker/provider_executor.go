@@ -547,7 +547,7 @@ func (c *ProviderExecutor) parseAndNormalizeTaskParams(ctx context.Context, task
 
 func (c *ProviderExecutor) callProviderWithRequest(ctx context.Context, account *accounts.ApiAccount, exec providerExecutionConfig) (providerCallResult, error) {
 	if workflow.IsGoogleNativeAPIType(exec.APIType) {
-		return c.callGoogleAIWithRequest(ctx, account, exec.Request, exec.Timeout)
+		return c.callGoogleProviderWithRequest(ctx, account, exec.APIType, exec.Request, exec.Timeout)
 	}
 	// OpenAI-compatible providers use the DALL-E style image endpoints.
 	return c.callOpenAIWithRequest(ctx, account, exec.Request, exec.Timeout)

@@ -994,7 +994,7 @@ func TestCollectOpenAIEditImageRefsIncludesReferenceImageURLs(t *testing.T) {
 	}
 }
 
-func TestNormalizeUpstreamMediaParamsAbsolutizesStructuredUploadPaths(t *testing.T) {
+func TestNormalizeUpstreamMediaParamsPreservesStructuredUploadRefs(t *testing.T) {
 	params := map[string]interface{}{
 		"feature":            "style-variation",
 		"image_urls":         []interface{}{"/uploads/canvas/OWNR1A/board-1/content/source.png"},
@@ -1012,13 +1012,13 @@ func TestNormalizeUpstreamMediaParamsAbsolutizesStructuredUploadPaths(t *testing
 	if !ok || len(imageURLs) != 1 {
 		t.Fatalf("unexpected image_urls: %#v", params["image_urls"])
 	}
-	if imageURLs[0] != "https://api.example.com/uploads/canvas/OWNR1A/board-1/content/source.png" {
+	if imageURLs[0] != "/uploads/canvas/OWNR1A/board-1/content/source.png" {
 		t.Fatalf("unexpected normalized image_urls[0]: %#v", imageURLs[0])
 	}
-	if got := params["original_image_url"]; got != "https://api.example.com/uploads/canvas/OWNR1A/board-1/content/source.png" {
+	if got := params["original_image_url"]; got != "/uploads/canvas/OWNR1A/board-1/content/source.png" {
 		t.Fatalf("unexpected normalized original_image_url: %#v", got)
 	}
-	if got := params["mask_image_url"]; got != "https://api.example.com/uploads/canvas/OWNR1A/board-1/content/mask.png" {
+	if got := params["mask_image_url"]; got != "/uploads/canvas/OWNR1A/board-1/content/mask.png" {
 		t.Fatalf("unexpected normalized mask_image_url: %#v", got)
 	}
 	if got := params["variation_strength"]; got != 5 {
@@ -1026,10 +1026,10 @@ func TestNormalizeUpstreamMediaParamsAbsolutizesStructuredUploadPaths(t *testing
 	}
 }
 
-func TestNormalizeUpstreamMediaParamsUsesAPIOriginInsteadOfWebOrigin(t *testing.T) {
+func TestNormalizeUpstreamMediaParamsUsesAPIOriginForNonUploadAssets(t *testing.T) {
 	params := map[string]interface{}{
 		"feature":            "style-variation",
-		"original_image_url": "/uploads/canvas/OWNR1A/board-1/content/source.png",
+		"original_image_url": "/assets/examples/source.png",
 	}
 
 	c := &ProviderExecutor{
@@ -1037,7 +1037,7 @@ func TestNormalizeUpstreamMediaParamsUsesAPIOriginInsteadOfWebOrigin(t *testing.
 	}
 	c.normalizeUpstreamMediaParams(context.Background(), params)
 
-	if got := params["original_image_url"]; got != "https://api.example.com/uploads/canvas/OWNR1A/board-1/content/source.png" {
+	if got := params["original_image_url"]; got != "https://api.example.com/assets/examples/source.png" {
 		t.Fatalf("unexpected normalized original_image_url: %#v", got)
 	}
 }

@@ -275,6 +275,7 @@ func newTestProviderExecutorWithLocalStorage(t *testing.T) *ProviderExecutor {
 
 func TestGoogleGeminiReadsRelativeCanvasUploadFromStorage(t *testing.T) {
 	executor := newTestProviderExecutorWithLocalStorage(t)
+	executor.publicOrigins = config.PublicOriginsConfig{API: "https://api.example.com"}
 	source := buildTinyPNGBytes(t)
 	sourcePath := filepath.Join("uploads", "canvas", "OWNR1A", "board-1", "content", "source.png")
 	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
@@ -294,12 +295,16 @@ func TestGoogleGeminiReadsRelativeCanvasUploadFromStorage(t *testing.T) {
 	}))
 	defer server.Close()
 
-	params := map[string]interface{}{
-		"feature":            "style-variation",
-		"image_urls":         []interface{}{"/uploads/canvas/OWNR1A/board-1/content/source.png"},
-		"original_image_url": "/uploads/canvas/OWNR1A/board-1/content/source.png",
-	}
-	providerReq := newProviderRequest("prompt", 64, 64, params, "gemini-3.1-flash-image-preview")
+	rawParams := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
+		SchemaVersion: tasks.CurrentParamsSchemaVersion,
+		Feature:       "style-variation",
+		Media: &tasks.MediaInputs{
+			Inputs:   []tasks.MediaRef{{URL: "/uploads/canvas/OWNR1A/board-1/content/source.png", Role: "input"}},
+			Original: &tasks.MediaRef{URL: "/uploads/canvas/OWNR1A/board-1/content/source.png", Role: "original"},
+		},
+	})
+	task := &tasks.TaskPayload{TaskID: "task-google-storage-input", Prompt: "prompt", Params: rawParams}
+	providerReq := executor.parseAndNormalizeTaskParams(context.Background(), task).providerRequest(task.Prompt, "gemini-3.1-flash-image")
 	_, err := executor.callGoogleGeminiGenerateContent(context.Background(), &accounts.ApiAccount{ApiKey: "key"}, server.URL, providerReq, 5*time.Second, readGoogleProviderParams(providerReq))
 	if err != nil {
 		t.Fatalf("callGoogleGeminiGenerateContent returned error: %v", err)

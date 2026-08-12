@@ -1,4 +1,4 @@
-export type ProviderApiTypeValue = 'openai-compatible' | 'google-ai'
+export type ProviderApiTypeValue = 'openai-compatible' | 'google-ai' | 'google-cloud'
 
 export type AdminProviderAccountLimitRange = {
   min: number

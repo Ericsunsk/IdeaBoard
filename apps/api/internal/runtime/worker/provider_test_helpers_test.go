@@ -41,6 +41,10 @@ func (c *ProviderExecutor) callGoogleAIForTest(ctx context.Context, account *acc
 	return c.callGoogleAIWithRequest(ctx, account, newProviderRequest(prompt, 0, 0, params, resolvedModel), timeout)
 }
 
+func (c *ProviderExecutor) callGoogleCloudForTest(ctx context.Context, account *accounts.ApiAccount, prompt string, timeout time.Duration, params map[string]interface{}, resolvedModel string) (providerCallResult, error) {
+	return c.callGoogleProviderWithRequest(ctx, account, "google-cloud", newProviderRequest(prompt, 0, 0, params, resolvedModel), timeout)
+}
+
 func (c *ProviderExecutor) callDrawingAPIForTest(ctx context.Context, account *accounts.ApiAccount, task *tasks.TaskPayload, assignedModel string) (providerCallOutput, error) {
 	return c.callDrawingAPIWithAssignment(ctx, account, task, taskqueue.TaskAssignment{ResolvedModel: assignedModel})
 }

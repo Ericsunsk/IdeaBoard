@@ -1,6 +1,8 @@
 import { api, type ApiClientError, type ApiRequestConfig } from './client'
 
-export type OrvalRequestConfig = RequestInit
+export type OrvalRequestConfig = RequestInit & {
+  timeout?: number
+}
 
 function toApiRequestConfig(options?: OrvalRequestConfig): ApiRequestConfig | undefined {
   if (!options) return undefined

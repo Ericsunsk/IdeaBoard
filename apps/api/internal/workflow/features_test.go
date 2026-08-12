@@ -298,7 +298,9 @@ func TestValidateProviderAPIType(t *testing.T) {
 	}{
 		{name: "openai compatible", apiType: ProviderOpenAICompatible, want: ProviderOpenAICompatible, wantOK: true},
 		{name: "google ai", apiType: ProviderGoogleAI, want: ProviderGoogleAI, wantOK: true},
+		{name: "google cloud", apiType: ProviderGoogleCloud, want: ProviderGoogleCloud, wantOK: true},
 		{name: "infer google", baseURL: "https://generativelanguage.googleapis.com", want: ProviderGoogleAI, wantOK: true},
+		{name: "infer google cloud", baseURL: "https://aiplatform.googleapis.com", want: ProviderGoogleCloud, wantOK: true},
 		{name: "infer openai compatible", baseURL: "https://api.example.com/v1", want: ProviderOpenAICompatible, wantOK: true},
 		{name: "reject empty without base url", wantOK: false},
 		{name: "reject unsupported explicit type", apiType: "unsupported-provider", baseURL: "https://api.example.com/v1", wantOK: false},

@@ -119,6 +119,9 @@ describe('provider config payload mapping', () => {
     expect(
       inferProviderEndpointApiTypeFromUrl('https://generativelanguage.googleapis.com/v1beta'),
     ).toBe('google-ai')
+    expect(inferProviderEndpointApiTypeFromUrl('https://aiplatform.googleapis.com')).toBe(
+      'google-cloud',
+    )
     expect(inferProviderEndpointApiTypeFromUrl('https://api.openai.com/v1')).toBe(
       'openai-compatible',
     )

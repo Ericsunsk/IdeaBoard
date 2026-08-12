@@ -40,6 +40,7 @@ type SaveAdminProviderEndpointInput = {
 }
 
 const ADMIN_ACCOUNT_LIST_PAGE_SIZE = 100
+const PROVIDER_MODEL_DETECTION_TIMEOUT_MS = 20_000
 
 export async function fetchAdminProviderEndpoints(): Promise<ProviderEndpointRecord[]> {
   const data = await resolveApiData(listAdminProviderEndpoints(), '加载供应商端点失败')
@@ -65,7 +66,9 @@ export async function detectAdminProviderEndpointModels(
   input: ProviderModelDetectionInput,
 ): Promise<string[]> {
   const data = await resolveApiData(
-    detectAdminProviderEndpointModelsRequest(toDetectModelsRequest(input)),
+    detectAdminProviderEndpointModelsRequest(toDetectModelsRequest(input), {
+      timeout: PROVIDER_MODEL_DETECTION_TIMEOUT_MS,
+    }),
     '自动检测模型失败',
   )
   return data.models ?? []

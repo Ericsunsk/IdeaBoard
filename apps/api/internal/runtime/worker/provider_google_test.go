@@ -103,6 +103,74 @@ func TestCallGoogleGeminiGenerateContentAcceptsVersionedBaseURL(t *testing.T) {
 	}
 }
 
+func TestCallGoogleCloudGeminiGenerateContent(t *testing.T) {
+	var gotPath string
+	var gotAPIKey string
+	var gotQueryKey string
+	var gotBody googleGeminiRequest
+	outputData := base64.StdEncoding.EncodeToString(buildTinyPNGBytes(t))
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAPIKey = r.Header.Get("x-goog-api-key")
+		gotQueryKey = r.URL.Query().Get("key")
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/png","data":"` + outputData + `"}}]}}]}`))
+	}))
+	defer server.Close()
+
+	c := &ProviderExecutor{}
+	account := &accounts.ApiAccount{ProxyURL: server.URL, ApiKey: "google-cloud-key"}
+	got, err := c.callGoogleCloudForTest(
+		context.Background(),
+		account,
+		"draw a poster",
+		2*time.Second,
+		nil,
+		"gemini-3.1-flash-image",
+	)
+	if err != nil {
+		t.Fatalf("callGoogleCloud error: %v", err)
+	}
+	if gotPath != "/v1/publishers/google/models/gemini-3.1-flash-image:generateContent" {
+		t.Fatalf("path = %q", gotPath)
+	}
+	if gotAPIKey != "" {
+		t.Fatalf("x-goog-api-key = %q, want empty", gotAPIKey)
+	}
+	if gotQueryKey != "google-cloud-key" {
+		t.Fatalf("key query = %q", gotQueryKey)
+	}
+	if len(gotBody.Contents) != 1 || gotBody.Contents[0].Role != "user" {
+		t.Fatalf("unexpected contents: %#v", gotBody.Contents)
+	}
+	if strings.Join(gotBody.GenerationConfig.ResponseModalities, ",") != "TEXT,IMAGE" {
+		t.Fatalf("response modalities = %#v", gotBody.GenerationConfig.ResponseModalities)
+	}
+	if len(got.ImageURLs) != 1 || !strings.HasPrefix(got.ImageURLs[0], "data:image/png;base64,") {
+		t.Fatalf("image urls = %#v", got.ImageURLs)
+	}
+}
+
+func TestGoogleCloudRejectsImagenModel(t *testing.T) {
+	c := &ProviderExecutor{}
+	account := &accounts.ApiAccount{ProxyURL: "https://aiplatform.googleapis.com", ApiKey: "google-cloud-key"}
+	_, err := c.callGoogleCloudForTest(
+		context.Background(),
+		account,
+		"draw a poster",
+		2*time.Second,
+		nil,
+		"imagen-4.0-generate-001",
+	)
+	if err == nil || !strings.Contains(err.Error(), "仅支持 Gemini 模型") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestBuildGoogleModelEndpoint(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -333,5 +401,54 @@ func TestCallDrawingAPIRoutesGooglePlatformToNativeProvider(t *testing.T) {
 	}
 	if !strings.Contains(output.Result, `"/uploads/tasks/42/task-google-native/`) {
 		t.Fatalf("expected google image_urls result, got %s", output.Result)
+	}
+}
+
+func TestCallDrawingAPIRoutesGoogleCloudToNativeProvider(t *testing.T) {
+	var gotPath string
+	var gotAPIKey string
+	var gotQueryKey string
+	outputData := base64.StdEncoding.EncodeToString(buildTinyPNGBytes(t))
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAPIKey = r.Header.Get("x-goog-api-key")
+		gotQueryKey = r.URL.Query().Get("key")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/png","data":"` + outputData + `"}}]}}]}`))
+	}))
+	defer server.Close()
+
+	c := newTestProviderExecutorWithLocalStorage(t)
+	account := &accounts.ApiAccount{
+		ID:       1,
+		Name:     "google-cloud",
+		ApiType:  workflow.ProviderGoogleCloud,
+		ProxyURL: server.URL,
+		ApiKey:   "google-cloud-key",
+		Models:   []accounts.AccountModel{{Name: "gemini-3.1-flash-image", Enabled: true}},
+	}
+	task := &tasks.TaskPayload{
+		TaskID: "task-google-cloud",
+		UserID: 42,
+		Prompt: "draw a poster",
+		Params: `{"feature":"pattern-gen"}`,
+	}
+
+	output, err := c.callDrawingAPIForTest(context.Background(), account, task, "gemini-3.1-flash-image")
+	if err != nil {
+		t.Fatalf("callDrawingAPI error: %v", err)
+	}
+	if gotPath != "/v1/publishers/google/models/gemini-3.1-flash-image:generateContent" {
+		t.Fatalf("path = %q", gotPath)
+	}
+	if gotAPIKey != "" {
+		t.Fatalf("x-goog-api-key = %q, want empty", gotAPIKey)
+	}
+	if gotQueryKey != "google-cloud-key" {
+		t.Fatalf("key query = %q", gotQueryKey)
+	}
+	if !strings.Contains(output.Result, `"/uploads/tasks/42/task-google-cloud/`) {
+		t.Fatalf("expected materialized image result, got %s", output.Result)
 	}
 }

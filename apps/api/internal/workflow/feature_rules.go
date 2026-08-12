@@ -5,11 +5,12 @@ import "strings"
 const (
 	ProviderOpenAICompatible = "openai-compatible"
 	ProviderGoogleAI         = "google-ai"
+	ProviderGoogleCloud      = "google-cloud"
 )
 
 func IsSupportedProviderAPIType(apiType string) bool {
 	switch strings.ToLower(strings.TrimSpace(apiType)) {
-	case ProviderOpenAICompatible, ProviderGoogleAI:
+	case ProviderOpenAICompatible, ProviderGoogleAI, ProviderGoogleCloud:
 		return true
 	default:
 		return false
@@ -32,11 +33,22 @@ func InferProviderAPITypeFromBaseURL(rawBaseURL string) string {
 	switch {
 	case strings.Contains(normalized, "generativelanguage.googleapis.com"):
 		return ProviderGoogleAI
+	case strings.Contains(normalized, "aiplatform.googleapis.com"):
+		return ProviderGoogleCloud
 	default:
 		return ProviderOpenAICompatible
 	}
 }
 
 func IsGoogleNativeAPIType(apiType string) bool {
-	return strings.ToLower(strings.TrimSpace(apiType)) == ProviderGoogleAI
+	switch strings.ToLower(strings.TrimSpace(apiType)) {
+	case ProviderGoogleAI, ProviderGoogleCloud:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsGoogleCloudAPIType(apiType string) bool {
+	return strings.ToLower(strings.TrimSpace(apiType)) == ProviderGoogleCloud
 }

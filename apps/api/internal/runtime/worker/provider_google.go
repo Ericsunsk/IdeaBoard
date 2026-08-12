@@ -25,8 +25,30 @@ import (
 const (
 	maxGoogleInlineImageBytes = 10 * 1024 * 1024
 	maxGoogleDataURLBytes     = maxGoogleInlineImageBytes
-	googleAPIVersionPath      = "/v1beta"
 )
+
+type googleAPIContract struct {
+	DefaultBaseURL  string
+	VersionPath     string
+	ModelCollection string
+	SupportsImagen  bool
+}
+
+func googleContract(apiType string) googleAPIContract {
+	if workflow.IsGoogleCloudAPIType(apiType) {
+		return googleAPIContract{
+			DefaultBaseURL:  "https://aiplatform.googleapis.com",
+			VersionPath:     "/v1",
+			ModelCollection: "/v1/publishers/google/models",
+		}
+	}
+	return googleAPIContract{
+		DefaultBaseURL:  "https://generativelanguage.googleapis.com",
+		VersionPath:     "/v1beta",
+		ModelCollection: "/v1beta/models",
+		SupportsImagen:  true,
+	}
+}
 
 type googleGeminiRequest struct {
 	Contents         []googleGeminiContent        `json:"contents"`
@@ -34,6 +56,7 @@ type googleGeminiRequest struct {
 }
 
 type googleGeminiContent struct {
+	Role  string             `json:"role,omitempty"`
 	Parts []googleGeminiPart `json:"parts"`
 }
 
@@ -152,7 +175,12 @@ func resolveGoogleProviderModel(params map[string]interface{}, resolvedModel str
 }
 
 func (c *ProviderExecutor) callGoogleAIWithRequest(ctx context.Context, account *accounts.ApiAccount, providerReq providerRequest, timeout time.Duration) (providerCallResult, error) {
-	baseURL := "https://generativelanguage.googleapis.com"
+	return c.callGoogleProviderWithRequest(ctx, account, workflow.ProviderGoogleAI, providerReq, timeout)
+}
+
+func (c *ProviderExecutor) callGoogleProviderWithRequest(ctx context.Context, account *accounts.ApiAccount, apiType string, providerReq providerRequest, timeout time.Duration) (providerCallResult, error) {
+	contract := googleContract(apiType)
+	baseURL := contract.DefaultBaseURL
 	if strings.TrimSpace(account.ProxyURL) != "" {
 		baseURL = strings.TrimRight(strings.TrimSpace(account.ProxyURL), "/")
 	}
@@ -164,12 +192,15 @@ func (c *ProviderExecutor) callGoogleAIWithRequest(ctx context.Context, account 
 
 	googleParams := readGoogleProviderParams(providerReq)
 	if googleParams.UseImagen {
+		if !contract.SupportsImagen {
+			return providerCallResult{}, errors.New("Google Cloud API Key 模式仅支持 Gemini 模型，请选择 Gemini 图像模型")
+		}
 		if len(googleParams.ImageRefs) > 0 {
 			return providerCallResult{}, errors.New("google imagen 当前不支持图像参考输入，请选择 gemini 图像模型")
 		}
 		return c.callGoogleImagenPredict(ctx, account, baseURL, providerReq, timeout, googleParams)
 	}
-	return c.callGoogleGeminiGenerateContent(ctx, account, baseURL, providerReq, timeout, googleParams)
+	return c.callGoogleGeminiGenerateContentForAPIType(ctx, account, apiType, baseURL, providerReq, timeout, googleParams)
 }
 
 func normalizeGoogleModelName(model string) string {
@@ -183,22 +214,36 @@ func isGoogleImagenModel(model string) bool {
 }
 
 func buildGoogleModelEndpoint(baseURL, model, method string) string {
-	trimmedBaseURL := strings.TrimRight(strings.TrimSpace(baseURL), "/")
-	if hasGoogleAPIVersionPath(trimmedBaseURL) {
-		return fmt.Sprintf("%s/models/%s:%s", trimmedBaseURL, url.PathEscape(model), method)
-	}
-	return fmt.Sprintf("%s%s/models/%s:%s", trimmedBaseURL, googleAPIVersionPath, url.PathEscape(model), method)
+	return buildGoogleProviderModelEndpoint(baseURL, workflow.ProviderGoogleAI, model, method)
 }
 
-func hasGoogleAPIVersionPath(baseURL string) bool {
-	parsed, err := url.Parse(baseURL)
+func buildGoogleProviderModelEndpoint(baseURL, apiType, model, method string) string {
+	collectionURL := buildGoogleModelCollectionURL(baseURL, apiType)
+	return fmt.Sprintf("%s/%s:%s", collectionURL, url.PathEscape(model), method)
+}
+
+func buildGoogleModelCollectionURL(baseURL, apiType string) string {
+	trimmedBaseURL := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	contract := googleContract(apiType)
+	parsed, err := url.Parse(trimmedBaseURL)
 	if err != nil {
-		return false
+		return trimmedBaseURL + contract.ModelCollection
 	}
-	return strings.HasSuffix(strings.TrimRight(parsed.EscapedPath(), "/"), googleAPIVersionPath)
+	basePath := strings.TrimRight(parsed.EscapedPath(), "/")
+	if strings.HasSuffix(basePath, contract.ModelCollection) {
+		return trimmedBaseURL
+	}
+	if strings.HasSuffix(basePath, contract.VersionPath) {
+		return trimmedBaseURL + strings.TrimPrefix(contract.ModelCollection, contract.VersionPath)
+	}
+	return trimmedBaseURL + contract.ModelCollection
 }
 
 func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, account *accounts.ApiAccount, baseURL string, providerReq providerRequest, timeout time.Duration, googleParams googleProviderParams) (providerCallResult, error) {
+	return c.callGoogleGeminiGenerateContentForAPIType(ctx, account, workflow.ProviderGoogleAI, baseURL, providerReq, timeout, googleParams)
+}
+
+func (c *ProviderExecutor) callGoogleGeminiGenerateContentForAPIType(ctx context.Context, account *accounts.ApiAccount, apiType, baseURL string, providerReq providerRequest, timeout time.Duration, googleParams googleProviderParams) (providerCallResult, error) {
 	model := strings.TrimSpace(googleParams.Model)
 
 	parts := []googleGeminiPart{{Text: providerReq.Prompt}}
@@ -210,14 +255,14 @@ func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, 
 
 	reqBody := googleGeminiRequest{
 		Contents: []googleGeminiContent{
-			{Parts: parts},
+			{Role: "user", Parts: parts},
 		},
 		GenerationConfig: googleGeminiGenerationConfig{
-			ResponseModalities: []string{"IMAGE", "TEXT"},
+			ResponseModalities: []string{"TEXT", "IMAGE"},
 		},
 	}
 
-	endpoint := buildGoogleModelEndpoint(baseURL, model, "generateContent")
+	endpoint := buildGoogleProviderModelEndpoint(baseURL, apiType, model, "generateContent")
 	bodyJSON, marshalErr := json.Marshal(reqBody)
 	if marshalErr != nil {
 		return providerCallResult{}, fmt.Errorf("序列化 Google Gemini 请求失败: %w", marshalErr)
@@ -227,7 +272,7 @@ func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, 
 		return providerCallResult{}, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-goog-api-key", account.ApiKey)
+	setGoogleAPIKey(req, apiType, account.ApiKey)
 
 	slog.Info("Google Gemini request", "endpoint", redactLogURL(endpoint), "model", model, "inline_images", len(inlineParts))
 	resp, err := safehttp.DoRequestWithAllowHosts(ctx, req, timeout, outbound.AllowHosts(ctx)...)
@@ -266,6 +311,16 @@ func (c *ProviderExecutor) callGoogleGeminiGenerateContent(ctx context.Context, 
 		ParsedOutputKind:  "image-results",
 		ParsedOutputCount: len(imageURLs),
 	}, nil
+}
+
+func setGoogleAPIKey(req *http.Request, apiType, apiKey string) {
+	if workflow.IsGoogleCloudAPIType(apiType) {
+		query := req.URL.Query()
+		query.Set("key", apiKey)
+		req.URL.RawQuery = query.Encode()
+		return
+	}
+	req.Header.Set("x-goog-api-key", apiKey)
 }
 
 func (c *ProviderExecutor) collectGoogleInlineImageParts(ctx context.Context, refs []string, timeout time.Duration) ([]googleGeminiPart, error) {

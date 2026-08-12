@@ -15,6 +15,7 @@ import type {
 
 export const DEFAULT_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['openai-compatible']
 export const GOOGLE_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['google-ai']
+export const GOOGLE_CLOUD_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['google-cloud']
 export const DEFAULT_ADMIN_ACCOUNT_EXTRA_CONFIG = '{}'
 export const DEFAULT_ADMIN_ACCOUNT_WEIGHT = 100
 export const DEFAULT_ADMIN_ACCOUNT_MODEL_WEIGHT = 1
@@ -24,7 +25,11 @@ export const ADMIN_PROVIDER_ENDPOINT_API_TYPE_OPTIONS: Array<{
   value: ProviderApiTypeValue
 }> = [
   { label: 'OpenAI Compatible', value: DEFAULT_ADMIN_PROVIDER_ENDPOINT_API_TYPE },
-  { label: 'Google', value: GOOGLE_ADMIN_PROVIDER_ENDPOINT_API_TYPE },
+  { label: 'Google AI Studio', value: GOOGLE_ADMIN_PROVIDER_ENDPOINT_API_TYPE },
+  {
+    label: 'Gemini Enterprise Agent Platform',
+    value: GOOGLE_CLOUD_ADMIN_PROVIDER_ENDPOINT_API_TYPE,
+  },
 ]
 
 const adminProviderEndpointApiTypeLabelByValue = new Map(
@@ -62,6 +67,9 @@ export function inferProviderEndpointApiTypeFromUrl(
   const normalized = apiUrl.trim().toLowerCase()
   if (normalized.includes('generativelanguage.googleapis.com')) {
     return GOOGLE_ADMIN_PROVIDER_ENDPOINT_API_TYPE
+  }
+  if (normalized.includes('aiplatform.googleapis.com')) {
+    return GOOGLE_CLOUD_ADMIN_PROVIDER_ENDPOINT_API_TYPE
   }
   if (normalized.includes('api.openai.com')) {
     return DEFAULT_ADMIN_PROVIDER_ENDPOINT_API_TYPE

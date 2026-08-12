@@ -4764,7 +4764,7 @@ components:
 
     ProviderAPIType:
       type: string
-      enum: [openai-compatible, google-ai]
+      enum: [openai-compatible, google-ai, google-cloud]
 
     DetectModelsRequest:
       type: object
