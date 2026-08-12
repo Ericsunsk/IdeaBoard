@@ -171,7 +171,11 @@ func (h *Handler) ListTasks(c *gin.Context) {
 	if req.UserPublicID != "" {
 		userID, err := h.taskService.ResolveAdminTaskUserID(c.Request.Context(), req.UserPublicID)
 		if err != nil {
-			response.Error(c, 400, err.Error())
+			if validation.Is(err) {
+				response.Error(c, 400, err.Error())
+			} else {
+				response.InternalError(c, 500, "解析用户失败", err)
+			}
 			return
 		}
 		req.UserID = userID

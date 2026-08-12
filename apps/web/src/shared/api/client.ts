@@ -1,7 +1,6 @@
 import { ofetch, type FetchError, type FetchOptions } from 'ofetch'
 import { handleAuthFailure } from '../utils/auth'
 import { API_BASE_URL, normalizeRuntimeMediaRefs } from '../config/runtimeUrls'
-import { sanitizeApiErrorMessage } from '../utils/errorMessages'
 
 export type ApiClientError = Error & {
   code?: number | string
@@ -18,6 +17,7 @@ function toObject(value: unknown): Record<string, unknown> | null {
 }
 
 function getPayloadMessage(payload: unknown, data: Record<string, unknown> | null): string {
+  if (data?.message_safe !== true) return ''
   if (typeof data?.msg === 'string' && data.msg) return data.msg
   if (typeof data?.message === 'string' && data.message) return data.message
   if (payload instanceof Error && payload.message) return payload.message
@@ -27,7 +27,7 @@ function getPayloadMessage(payload: unknown, data: Record<string, unknown> | nul
 
 export function createApiError(payload?: unknown, status?: number): ApiClientError {
   const data = toObject(payload)
-  const safeMessage = sanitizeApiErrorMessage(getPayloadMessage(payload, data), '')
+  const safeMessage = getPayloadMessage(payload, data)
   const message = safeMessage || '请求失败'
   const error = new Error(message) as ApiClientError
   error.code =

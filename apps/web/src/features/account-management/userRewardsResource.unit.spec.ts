@@ -50,6 +50,7 @@ describe('userRewardsResource', () => {
     generated.listUserRewardRedemptions.mockResolvedValue({
       code: 500,
       msg: '奖励服务暂不可用',
+      message_safe: true,
     })
 
     await expect(fetchUserRewardRedemptions({ limit: 20 })).rejects.toThrow('奖励服务暂不可用')

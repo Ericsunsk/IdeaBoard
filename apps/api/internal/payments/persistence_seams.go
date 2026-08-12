@@ -7,14 +7,16 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 )
 
-// StripeConfigurationStore owns the configuration lifecycle and its session-bound
-// advisory lock. Implementations must preserve the locked context for every
-// callback operation so a Stripe configuration change cannot race Checkout work.
+// StripeConfigurationStore owns active settings and immutable credential generations.
+// Orders resolve provider access by generation, so publication never serializes
+// unrelated Stripe work behind a process-wide lock.
 type StripeConfigurationStore interface {
-	WithStripeConfigurationSharedLock(context.Context, func(context.Context) error) error
-	WithStripeConfigurationExclusiveLock(context.Context, func(context.Context) error) error
 	GetStripeConfiguration(context.Context) (StoredStripeConfiguration, error)
-	ReplaceStripeConfiguration(context.Context, StoredStripeConfiguration, ConfigurationAudit) (StoredStripeConfiguration, *PaymentCheckoutShutdown, error)
+	GetStripeCredential(context.Context, string) (StoredStripeConfiguration, error)
+	GetStripeCredentialForOrder(context.Context, string) (StoredStripeConfiguration, error)
+	GetStripeCredentialForOrderNumber(context.Context, string) (StoredStripeConfiguration, error)
+	ListStripeCredentials(context.Context) ([]StoredStripeConfiguration, error)
+	ReplaceStripeConfiguration(context.Context, int64, StoredStripeConfiguration, ConfigurationAudit) (StoredStripeConfiguration, *PaymentCheckoutShutdown, error)
 	GetPaymentCheckoutShutdown(context.Context, string) (PaymentCheckoutShutdown, error)
 	ListActivePaymentCheckoutShutdowns(context.Context) ([]PaymentCheckoutShutdown, error)
 	ListPaymentOrdersForCheckoutShutdown(context.Context, PaymentCheckoutShutdown, int32) ([]PaymentOrder, error)

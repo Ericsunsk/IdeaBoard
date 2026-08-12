@@ -130,7 +130,11 @@ describe('credits billing API adapter', () => {
   })
 
   it('preserves a safe business error from the generated response', async () => {
-    apiMocks.grantAdminCredits.mockResolvedValue({ code: 409, msg: 'Wallet 已停用' })
+    apiMocks.grantAdminCredits.mockResolvedValue({
+      code: 409,
+      msg: 'Wallet 已停用',
+      message_safe: true,
+    })
 
     await expect(adminCreditsBillingApi.grant({} as never)).rejects.toThrow('Wallet 已停用')
   })

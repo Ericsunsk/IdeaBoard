@@ -40,7 +40,11 @@ describe('userUsageResource', () => {
   })
 
   it('surfaces API feedback instead of manufacturing an empty trend', async () => {
-    generated.getUserUsage.mockResolvedValue({ code: 500, msg: '用量统计暂不可用' })
+    generated.getUserUsage.mockResolvedValue({
+      code: 500,
+      msg: '用量统计暂不可用',
+      message_safe: true,
+    })
 
     await expect(fetchUserUsage('30d')).rejects.toThrow('用量统计暂不可用')
   })

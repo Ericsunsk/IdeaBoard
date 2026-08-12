@@ -15,9 +15,9 @@ import (
 )
 
 type Service struct {
-	checkout *CheckoutWorkflow
-	facts    *StripeFactsWorkflow
-	runtime  *PaymentRuntime
+	*CheckoutWorkflow
+	*StripeFactsWorkflow
+	runtime *PaymentRuntime
 }
 
 type PaymentCheckoutShutdownEnqueuer interface {
@@ -49,16 +49,10 @@ func (s *CheckoutWorkflow) ConfigureStripe(ctx context.Context, command Configur
 	if s == nil || s.configuration == nil {
 		return StripeConfigurationSummary{}, fmt.Errorf("payments configuration service unavailable")
 	}
-	var result StripeConfigurationSummary
-	err := s.configuration.WithStripeConfigurationExclusiveLock(ctx, func(lockedContext context.Context) error {
-		var err error
-		result, err = s.configureStripeLocked(lockedContext, command)
-		return err
-	})
-	return result, err
+	return s.configureStripe(ctx, command)
 }
 
-func (s *CheckoutWorkflow) configureStripeLocked(ctx context.Context, command ConfigureStripeCommand) (StripeConfigurationSummary, error) {
+func (s *CheckoutWorkflow) configureStripe(ctx context.Context, command ConfigureStripeCommand) (StripeConfigurationSummary, error) {
 	if s == nil || s.configuration == nil {
 		return StripeConfigurationSummary{}, fmt.Errorf("payments configuration service unavailable")
 	}
@@ -69,20 +63,22 @@ func (s *CheckoutWorkflow) configureStripeLocked(ctx context.Context, command Co
 	if err != nil {
 		return StripeConfigurationSummary{}, err
 	}
-	if hasCurrent && current.PurchasesEnabled && !command.PurchasesEnabled && strings.TrimSpace(command.APIKey) == "" {
+	if hasCurrent && current.ProductTaxCode == strings.TrimSpace(command.ProductTaxCode) &&
+		current.PurchasesEnabled != command.PurchasesEnabled && strings.TrimSpace(command.APIKey) == "" {
 		metadata := safeAuditMetadata(map[string]any{
 			"account_id": current.AccountID, "mode": current.Mode, "product_tax_code": current.ProductTaxCode,
-			"purchases_enabled": false,
+			"purchases_enabled": command.PurchasesEnabled,
 		})
-		stored, shutdown, err := s.configuration.ReplaceStripeConfiguration(ctx, StoredStripeConfiguration{
-			AccountID: current.AccountID, Mode: current.Mode, ChargesEnabled: current.ChargesEnabled,
-			ProductTaxCode: current.ProductTaxCode, PurchasesEnabled: false,
+		stored, shutdown, err := s.configuration.ReplaceStripeConfiguration(ctx, current.Revision, StoredStripeConfiguration{
+			CredentialID: current.CredentialID,
+			AccountID:    current.AccountID, Mode: current.Mode, ChargesEnabled: current.ChargesEnabled,
+			ProductTaxCode: current.ProductTaxCode, PurchasesEnabled: command.PurchasesEnabled,
 			StripeProductID: current.StripeProductID, StripeWebhookEndpointID: current.StripeWebhookEndpointID,
 			APIKeyCiphertext: current.APIKeyCiphertext, WebhookSecretCiphertext: current.WebhookSecretCiphertext,
 			SecretMaterialKind: current.SecretMaterialKind, UpdatedBy: command.ActorID,
 		}, ConfigurationAudit{ActorID: command.ActorID, Outcome: "succeeded", Metadata: metadata})
 		if err != nil {
-			return StripeConfigurationSummary{}, fmt.Errorf("disable Stripe purchases: %w", err)
+			return StripeConfigurationSummary{}, fmt.Errorf("update Stripe purchase availability: %w", err)
 		}
 		s.enqueuePaymentCheckoutShutdown(ctx, shutdown)
 		return stripeConfigurationSummary(stored), nil
@@ -98,20 +94,23 @@ func (s *CheckoutWorkflow) configureStripeLocked(ctx context.Context, command Co
 	if s.configurationGateway == nil {
 		return StripeConfigurationSummary{}, fmt.Errorf("payments configuration service unavailable")
 	}
-	apiKey := strings.TrimSpace(command.APIKey)
-	if hasCurrent && apiKey != "" {
-		if err := s.settleOrdersBeforeStripeKeyChange(ctx, current); err != nil {
-			return StripeConfigurationSummary{}, err
+	var currentAPIKey, currentWebhookSecret string
+	if hasCurrent {
+		currentAPIKey, err = secrets.DecryptMaterialString(current.APIKeyCiphertext, current.SecretMaterialKind)
+		if err != nil {
+			return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "secret_unavailable", "已保存的 Stripe API Key 无法读取", nil, ErrStripeConfigurationInvalid)
+		}
+		currentWebhookSecret, err = secrets.DecryptMaterialString(current.WebhookSecretCiphertext, current.SecretMaterialKind)
+		if err != nil {
+			return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "secret_unavailable", "已保存的 Stripe Webhook Secret 无法读取", nil, ErrStripeConfigurationInvalid)
 		}
 	}
+	apiKey := strings.TrimSpace(command.APIKey)
 	if apiKey == "" {
 		if !hasCurrent {
 			return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "api_key_required", ErrStripeAPIKeyRequired.Error(), nil, ErrStripeAPIKeyRequired)
 		}
-		apiKey, err = secrets.DecryptMaterialString(current.APIKeyCiphertext, current.SecretMaterialKind)
-		if err != nil {
-			return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "secret_unavailable", "已保存的 Stripe API Key 无法读取", nil, ErrStripeConfigurationInvalid)
-		}
+		apiKey = currentAPIKey
 	}
 	mode, err := ClassifyStripeAPIKey(apiKey)
 	if err != nil {
@@ -126,10 +125,7 @@ func (s *CheckoutWorkflow) configureStripeLocked(ctx context.Context, command Co
 		prepare.ExistingAccountID = current.AccountID
 		prepare.ExistingProductID = current.StripeProductID
 		prepare.ExistingWebhookEndpointID = current.StripeWebhookEndpointID
-		prepare.ExistingWebhookSecret, err = secrets.DecryptMaterialString(current.WebhookSecretCiphertext, current.SecretMaterialKind)
-		if err != nil {
-			return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "secret_unavailable", "已保存的 Stripe Webhook Secret 无法读取", map[string]any{"mode": mode}, ErrStripeConfigurationInvalid)
-		}
+		prepare.ExistingWebhookSecret = currentWebhookSecret
 	}
 
 	prepared, err := s.configurationGateway.PrepareConfiguration(ctx, prepare)
@@ -145,21 +141,36 @@ func (s *CheckoutWorkflow) configureStripeLocked(ctx context.Context, command Co
 		return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, code, err.Error(), map[string]any{"mode": mode}, err)
 	}
 
-	encryptedAPIKey, err := secrets.EncryptString(apiKey)
-	if err != nil {
-		return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "encryption_failed", "Stripe API Key 加密失败", map[string]any{"mode": mode}, ErrStripeConfigurationInvalid)
-	}
-	encryptedWebhookSecret, err := secrets.EncryptString(prepared.WebhookSecret)
-	if err != nil {
-		return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "encryption_failed", "Stripe Webhook Secret 加密失败", map[string]any{"mode": mode}, ErrStripeConfigurationInvalid)
+	credentialChanged := !hasCurrent || apiKey != currentAPIKey || prepared.AccountID != current.AccountID ||
+		prepared.Mode != current.Mode || prepared.ChargesEnabled != current.ChargesEnabled ||
+		prepared.ProductID != current.StripeProductID || prepared.WebhookEndpointID != current.StripeWebhookEndpointID ||
+		prepared.WebhookSecret != currentWebhookSecret
+	credentialID := ""
+	encryptedAPIKey := current.APIKeyCiphertext
+	encryptedWebhookSecret := current.WebhookSecretCiphertext
+	if !credentialChanged {
+		credentialID = current.CredentialID
+	} else {
+		encryptedAPIKey, err = secrets.EncryptString(apiKey)
+		if err != nil {
+			return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "encryption_failed", "Stripe API Key 加密失败", map[string]any{"mode": mode}, ErrStripeConfigurationInvalid)
+		}
+		encryptedWebhookSecret, err = secrets.EncryptString(prepared.WebhookSecret)
+		if err != nil {
+			return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "encryption_failed", "Stripe Webhook Secret 加密失败", map[string]any{"mode": mode}, ErrStripeConfigurationInvalid)
+		}
 	}
 
 	metadata := safeAuditMetadata(map[string]any{
 		"account_id": prepared.AccountID, "mode": mode, "product_tax_code": taxCode,
 		"purchases_enabled": command.PurchasesEnabled,
 	})
-	stored, shutdown, err := s.configuration.ReplaceStripeConfiguration(ctx, StoredStripeConfiguration{
-		AccountID: prepared.AccountID, Mode: prepared.Mode, ChargesEnabled: prepared.ChargesEnabled,
+	expectedRevision := int64(0)
+	if hasCurrent {
+		expectedRevision = current.Revision
+	}
+	stored, shutdown, err := s.configuration.ReplaceStripeConfiguration(ctx, expectedRevision, StoredStripeConfiguration{
+		CredentialID: credentialID, AccountID: prepared.AccountID, Mode: prepared.Mode, ChargesEnabled: prepared.ChargesEnabled,
 		ProductTaxCode: taxCode, PurchasesEnabled: command.PurchasesEnabled,
 		StripeProductID: prepared.ProductID, StripeWebhookEndpointID: prepared.WebhookEndpointID,
 		APIKeyCiphertext: encryptedAPIKey, WebhookSecretCiphertext: encryptedWebhookSecret,
@@ -185,37 +196,41 @@ func (s *StripeFactsWorkflow) ReceiveStripeWebhook(ctx context.Context, raw []by
 	if s == nil || s.configuration == nil || s.webhookInbox == nil {
 		return StripeWebhookReceipt{}, fmt.Errorf("payments webhook service unavailable")
 	}
-	var receipt StripeWebhookReceipt
-	err := s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
-		var err error
-		receipt, err = s.receiveStripeWebhookLocked(lockedContext, raw, signature)
-		return err
-	})
-	return receipt, err
+	return s.receiveStripeWebhook(ctx, raw, signature)
 }
 
-func (s *StripeFactsWorkflow) receiveStripeWebhookLocked(ctx context.Context, raw []byte, signature string) (StripeWebhookReceipt, error) {
+func (s *StripeFactsWorkflow) receiveStripeWebhook(ctx context.Context, raw []byte, signature string) (StripeWebhookReceipt, error) {
 	if s == nil || s.configuration == nil || s.webhookInbox == nil || s.verifier == nil {
 		return StripeWebhookReceipt{}, fmt.Errorf("payments webhook service unavailable")
 	}
 	if len(raw) == 0 || strings.TrimSpace(signature) == "" {
 		return StripeWebhookReceipt{}, ErrMalformedWebhookPayload
 	}
-	stored, err := s.configuration.GetStripeConfiguration(ctx)
-	if isConfigurationNotFound(err) {
+	credentials, err := s.configuration.ListStripeCredentials(ctx)
+	if err != nil {
+		return StripeWebhookReceipt{}, fmt.Errorf("load Stripe webhook credentials: %w", err)
+	}
+	if len(credentials) == 0 {
 		return StripeWebhookReceipt{}, ErrStripeConfigurationNotFound
 	}
-	if err != nil {
-		return StripeWebhookReceipt{}, fmt.Errorf("load Stripe webhook configuration: %w", err)
-	}
-	secret, err := secrets.DecryptMaterialString(stored.WebhookSecretCiphertext, stored.SecretMaterialKind)
-	if err != nil {
-		return StripeWebhookReceipt{}, ErrStripeConfigurationInvalid
-	}
 	now := s.runtime.now()
-	event, err := s.verifier.Verify(ctx, raw, signature, secret, StripeWebhookTolerance, now)
-	if err != nil {
-		return StripeWebhookReceipt{}, err
+	var stored StoredStripeConfiguration
+	var event StripeWebhookEvent
+	var verifyErr error
+	for _, credential := range credentials {
+		secret, decryptErr := secrets.DecryptMaterialString(credential.WebhookSecretCiphertext, credential.SecretMaterialKind)
+		if decryptErr != nil {
+			return StripeWebhookReceipt{}, ErrStripeConfigurationInvalid
+		}
+		candidate, candidateErr := s.verifier.Verify(ctx, raw, signature, secret, StripeWebhookTolerance, now)
+		if candidateErr == nil {
+			stored, event, verifyErr = credential, candidate, nil
+			break
+		}
+		verifyErr = candidateErr
+	}
+	if stored.CredentialID == "" {
+		return StripeWebhookReceipt{}, verifyErr
 	}
 	if err := validateStripeWebhookEvent(event); err != nil {
 		return StripeWebhookReceipt{}, err
@@ -241,13 +256,13 @@ func (s *StripeFactsWorkflow) receiveStripeWebhookLocked(ctx context.Context, ra
 	signal, checkoutLifecycleEvent := checkoutSignalForWebhookEvent(event.Type)
 	if !checkoutLifecycleEvent {
 		if strings.HasPrefix(event.Type, "refund.") {
-			if err := s.processRefundWebhook(ctx, event); err != nil {
+			if err := s.processRefundWebhook(ctx, event, stored.CredentialID); err != nil {
 				_ = s.webhookInbox.MarkStripeWebhookEventProcessed(ctx, event.ID, "failed", operationalErrorSummary(err, "Stripe refund webhook processing failed"), now)
 				return StripeWebhookReceipt{}, err
 			}
 		}
 		if strings.HasPrefix(event.Type, "charge.dispute.") {
-			if err := s.processDisputeWebhook(ctx, event); err != nil {
+			if err := s.processDisputeWebhook(ctx, event, stored.CredentialID); err != nil {
 				_ = s.webhookInbox.MarkStripeWebhookEventProcessed(ctx, event.ID, "failed", operationalErrorSummary(err, "Stripe dispute webhook processing failed"), now)
 				return StripeWebhookReceipt{}, err
 			}
@@ -287,11 +302,11 @@ func (s *StripeFactsWorkflow) receiveStripeWebhookLocked(ctx context.Context, ra
 	return receipt, nil
 }
 
-func (s *StripeFactsWorkflow) processDisputeWebhook(ctx context.Context, event StripeWebhookEvent) error {
+func (s *StripeFactsWorkflow) processDisputeWebhook(ctx context.Context, event StripeWebhookEvent, credentialID string) error {
 	if s == nil || s.convergenceStore == nil || s.checkoutStore == nil || s.disputeGateway == nil || strings.TrimSpace(event.ObjectID) == "" {
 		return ErrMalformedWebhookPayload
 	}
-	_, apiKey, err := s.stripeAccessConfiguration(ctx)
+	_, apiKey, err := s.stripeCredentialAccess(ctx, credentialID)
 	if err != nil {
 		return err
 	}
@@ -313,7 +328,7 @@ func (s *StripeFactsWorkflow) processDisputeWebhook(ctx context.Context, event S
 	if changed {
 		s.publishDisputeUpdate(dispute.UserID)
 	}
-	return s.expireDisputeCheckoutSessions(ctx, apiKey, dispute)
+	return s.expireDisputeCheckoutSessions(ctx, dispute)
 }
 
 func (s *StripeFactsWorkflow) publishDisputeUpdate(userID int64) {
@@ -322,14 +337,13 @@ func (s *StripeFactsWorkflow) publishDisputeUpdate(userID int64) {
 	}
 }
 
-func (s *StripeFactsWorkflow) processRefundWebhook(ctx context.Context, event StripeWebhookEvent) error {
+func (s *StripeFactsWorkflow) processRefundWebhook(ctx context.Context, event StripeWebhookEvent, credentialID string) error {
 	if s == nil || s.convergenceStore == nil || s.refundGateway == nil || strings.TrimSpace(event.ObjectID) == "" {
 		return ErrMalformedWebhookPayload
 	}
 	refund, err := s.convergenceStore.GetPaymentRefundByStripeID(ctx, event.ObjectID)
 	if errors.Is(err, sql.ErrNoRows) {
-		configuration, apiKey, configErr := s.stripeAccessConfiguration(ctx)
-		_ = configuration
+		_, apiKey, configErr := s.stripeCredentialAccess(ctx, credentialID)
 		if configErr != nil {
 			return configErr
 		}
@@ -369,7 +383,7 @@ func (s *StripeFactsWorkflow) processRefundWebhook(ctx context.Context, event St
 	if err != nil {
 		return err
 	}
-	_, apiKey, err := s.stripeAccessConfiguration(ctx)
+	_, apiKey, err := s.stripeOrderAccess(ctx, refund.PaymentOrderID)
 	if err != nil {
 		return err
 	}
@@ -418,17 +432,26 @@ func (s *CheckoutWorkflow) recordFailure(ctx context.Context, actorID int64, cod
 	return publicErr
 }
 
-func (s *StripeFactsWorkflow) stripeAccessConfiguration(ctx context.Context) (StoredStripeConfiguration, string, error) {
-	configuration, err := s.configuration.GetStripeConfiguration(ctx)
-	if isConfigurationNotFound(err) {
-		return StoredStripeConfiguration{}, "", ErrPurchasesUnavailable
-	}
+func (s *StripeFactsWorkflow) stripeCredentialAccess(ctx context.Context, credentialID string) (StoredStripeConfiguration, string, error) {
+	configuration, err := s.configuration.GetStripeCredential(ctx, credentialID)
 	if err != nil {
-		return StoredStripeConfiguration{}, "", fmt.Errorf("load Stripe facts configuration: %w", err)
+		return StoredStripeConfiguration{}, "", ErrStripeConfigurationInvalid
 	}
 	apiKey, err := secrets.DecryptMaterialString(configuration.APIKeyCiphertext, configuration.SecretMaterialKind)
 	if err != nil {
-		return StoredStripeConfiguration{}, "", ErrPurchasesUnavailable
+		return StoredStripeConfiguration{}, "", ErrStripeConfigurationInvalid
+	}
+	return configuration, apiKey, nil
+}
+
+func (s *StripeFactsWorkflow) stripeOrderAccess(ctx context.Context, orderID string) (StoredStripeConfiguration, string, error) {
+	configuration, err := s.configuration.GetStripeCredentialForOrder(ctx, orderID)
+	if err != nil {
+		return StoredStripeConfiguration{}, "", ErrStripeConfigurationInvalid
+	}
+	apiKey, err := secrets.DecryptMaterialString(configuration.APIKeyCiphertext, configuration.SecretMaterialKind)
+	if err != nil {
+		return StoredStripeConfiguration{}, "", ErrStripeConfigurationInvalid
 	}
 	return configuration, apiKey, nil
 }

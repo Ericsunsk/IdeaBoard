@@ -17,14 +17,13 @@ import (
 	"github.com/google/uuid"
 )
 
-const stripeConfigurationLifecycleLockID int64 = 839036782198407216
 const userCheckoutLifecycleLockSeed int64 = 412456873631731953
 
 type Repository struct {
 	db *sql.DB
 }
 
-type stripeLifecycleConnectionContextKey struct{}
+type userCheckoutConnectionContextKey struct{}
 
 type sqlTransactionStarter interface {
 	BeginTx(context.Context, *sql.TxOptions) (*sql.Tx, error)
@@ -37,6 +36,8 @@ type paymentContextDB struct {
 }
 
 type StoredStripeConfiguration struct {
+	Revision                int64
+	CredentialID            string
 	AccountID               string
 	Mode                    StripeMode
 	ChargesEnabled          bool
@@ -62,11 +63,12 @@ type ConfigurationAudit struct {
 }
 
 type PaymentCheckoutShutdown struct {
-	ID              string
-	StripeAccountID string
-	CutoffAt        time.Time
-	CreatedAt       time.Time
-	CompletedAt     *time.Time
+	ID                 string
+	StripeCredentialID string
+	StripeAccountID    string
+	CutoffAt           time.Time
+	CreatedAt          time.Time
+	CompletedAt        *time.Time
 }
 
 func NewRepository(db *sql.DB) *Repository {
@@ -74,64 +76,25 @@ func NewRepository(db *sql.DB) *Repository {
 }
 
 func (r *Repository) dbWithContext(ctx context.Context) paymentContextDB {
-	if connection, ok := ctx.Value(stripeLifecycleConnectionContextKey{}).(*sql.Conn); ok {
+	if connection, ok := ctx.Value(userCheckoutConnectionContextKey{}).(*sql.Conn); ok {
 		return paymentContextDB{ctx: ctx, executor: connection, transactionStarter: connection}
 	}
 	return paymentContextDB{ctx: ctx, executor: r.db, transactionStarter: r.db}
-}
-
-func (r *Repository) WithStripeConfigurationSharedLock(ctx context.Context, run func(context.Context) error) error {
-	return r.withStripeConfigurationLifecycleLock(ctx, false, run)
-}
-
-func (r *Repository) WithStripeConfigurationExclusiveLock(ctx context.Context, run func(context.Context) error) error {
-	return r.withStripeConfigurationLifecycleLock(ctx, true, run)
-}
-
-func (r *Repository) withStripeConfigurationLifecycleLock(ctx context.Context, exclusive bool, run func(context.Context) error) (resultErr error) {
-	if r == nil || r.db == nil || run == nil {
-		return fmt.Errorf("payments repository: database unavailable")
-	}
-	connection, err := r.db.Conn(ctx)
-	if err != nil {
-		return fmt.Errorf("open Stripe configuration lifecycle lock connection: %w", err)
-	}
-	lockFunction, unlockFunction := "pg_advisory_lock_shared", "pg_advisory_unlock_shared"
-	if exclusive {
-		lockFunction, unlockFunction = "pg_advisory_lock", "pg_advisory_unlock"
-	}
-	if _, err := connection.ExecContext(ctx, "SELECT "+lockFunction+"($1)", stripeConfigurationLifecycleLockID); err != nil {
-		_ = connection.Close()
-		return fmt.Errorf("acquire Stripe configuration lifecycle lock: %w", err)
-	}
-	defer func() {
-		unlockContext, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		var unlocked bool
-		unlockErr := connection.QueryRowContext(unlockContext, "SELECT "+unlockFunction+"($1)", stripeConfigurationLifecycleLockID).Scan(&unlocked)
-		if unlockErr != nil || !unlocked {
-			_ = connection.Raw(func(any) error { return driver.ErrBadConn })
-			if unlockErr == nil {
-				unlockErr = fmt.Errorf("stripe configuration lifecycle lock was not held")
-			}
-			resultErr = errors.Join(resultErr, fmt.Errorf("release Stripe configuration lifecycle lock: %w", unlockErr))
-		}
-		if closeErr := connection.Close(); closeErr != nil {
-			resultErr = errors.Join(resultErr, fmt.Errorf("close Stripe configuration lifecycle lock connection: %w", closeErr))
-		}
-	}()
-	lockedContext := context.WithValue(ctx, stripeLifecycleConnectionContextKey{}, connection)
-	return run(lockedContext)
 }
 
 func (r *Repository) WithUserCheckoutLock(ctx context.Context, userID int64, run func(context.Context) error) (resultErr error) {
 	if r == nil || r.db == nil || userID <= 0 || run == nil {
 		return fmt.Errorf("payments repository: invalid user Checkout lock")
 	}
-	connection, ok := ctx.Value(stripeLifecycleConnectionContextKey{}).(*sql.Conn)
-	if !ok {
-		return fmt.Errorf("payments repository: user Checkout lock requires Stripe lifecycle session")
+	connection, err := r.db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("open user Checkout lock connection: %w", err)
 	}
+	defer func() {
+		if closeErr := connection.Close(); closeErr != nil {
+			resultErr = errors.Join(resultErr, fmt.Errorf("close user Checkout lock connection: %w", closeErr))
+		}
+	}()
 	lockKey := fmt.Sprintf("payment-user-checkout:%d", userID)
 	if _, err := connection.ExecContext(ctx, `SELECT pg_advisory_lock(hashtextextended($1, $2))`, lockKey, userCheckoutLifecycleLockSeed); err != nil {
 		return fmt.Errorf("acquire user Checkout lifecycle lock: %w", err)
@@ -149,7 +112,7 @@ func (r *Repository) WithUserCheckoutLock(ctx context.Context, userID int64, run
 			resultErr = errors.Join(resultErr, fmt.Errorf("release user Checkout lifecycle lock: %w", unlockErr))
 		}
 	}()
-	return run(ctx)
+	return run(context.WithValue(ctx, userCheckoutConnectionContextKey{}, connection))
 }
 
 func (db paymentContextDB) queries() *dbsqlc.Queries {
@@ -182,14 +145,63 @@ func (r *Repository) GetStripeConfiguration(ctx context.Context) (StoredStripeCo
 	if r == nil || r.db == nil {
 		return StoredStripeConfiguration{}, fmt.Errorf("payments repository: database unavailable")
 	}
-	row, err := r.dbWithContext(ctx).queries().GetPaymentStripeConfiguration(ctx)
+	q := r.dbWithContext(ctx).queries()
+	settings, err := q.GetPaymentStripeConfiguration(ctx)
 	if err != nil {
 		return StoredStripeConfiguration{}, err
 	}
-	return storedStripeConfiguration(row), nil
+	credential, err := q.GetPaymentStripeCredential(ctx, settings.ActiveCredentialID)
+	if err != nil {
+		return StoredStripeConfiguration{}, err
+	}
+	return storedStripeConfiguration(settings, credential), nil
 }
 
-func (r *Repository) ReplaceStripeConfiguration(ctx context.Context, value StoredStripeConfiguration, audit ConfigurationAudit) (StoredStripeConfiguration, *PaymentCheckoutShutdown, error) {
+func (r *Repository) GetStripeCredential(ctx context.Context, credentialID string) (StoredStripeConfiguration, error) {
+	id, err := uuid.Parse(credentialID)
+	if err != nil {
+		return StoredStripeConfiguration{}, sql.ErrNoRows
+	}
+	credential, err := r.dbWithContext(ctx).queries().GetPaymentStripeCredential(ctx, id)
+	if err != nil {
+		return StoredStripeConfiguration{}, err
+	}
+	return storedStripeCredential(credential), nil
+}
+
+func (r *Repository) GetStripeCredentialForOrder(ctx context.Context, orderID string) (StoredStripeConfiguration, error) {
+	id, err := uuid.Parse(orderID)
+	if err != nil {
+		return StoredStripeConfiguration{}, sql.ErrNoRows
+	}
+	credential, err := r.dbWithContext(ctx).queries().GetPaymentStripeCredentialForOrder(ctx, id)
+	if err != nil {
+		return StoredStripeConfiguration{}, err
+	}
+	return storedStripeCredential(credential), nil
+}
+
+func (r *Repository) GetStripeCredentialForOrderNumber(ctx context.Context, orderNumber string) (StoredStripeConfiguration, error) {
+	credential, err := r.dbWithContext(ctx).queries().GetPaymentStripeCredentialForOrderNumber(ctx, orderNumber)
+	if err != nil {
+		return StoredStripeConfiguration{}, err
+	}
+	return storedStripeCredential(credential), nil
+}
+
+func (r *Repository) ListStripeCredentials(ctx context.Context) ([]StoredStripeConfiguration, error) {
+	rows, err := r.dbWithContext(ctx).queries().ListPaymentStripeCredentials(ctx)
+	if err != nil {
+		return nil, err
+	}
+	credentials := make([]StoredStripeConfiguration, 0, len(rows))
+	for _, row := range rows {
+		credentials = append(credentials, storedStripeCredential(row))
+	}
+	return credentials, nil
+}
+
+func (r *Repository) ReplaceStripeConfiguration(ctx context.Context, expectedRevision int64, value StoredStripeConfiguration, audit ConfigurationAudit) (StoredStripeConfiguration, *PaymentCheckoutShutdown, error) {
 	if r == nil || r.db == nil {
 		return StoredStripeConfiguration{}, nil, fmt.Errorf("payments repository: database unavailable")
 	}
@@ -200,18 +212,46 @@ func (r *Repository) ReplaceStripeConfiguration(ctx context.Context, value Store
 		if previousErr != nil && !errors.Is(previousErr, sql.ErrNoRows) {
 			return fmt.Errorf("load previous Stripe configuration: %w", previousErr)
 		}
+		if previousErr == nil && previous.Revision != expectedRevision {
+			return ErrStripeConfigurationChanged
+		}
+		if errors.Is(previousErr, sql.ErrNoRows) && expectedRevision != 0 {
+			return ErrStripeConfigurationChanged
+		}
+		credentialID, err := uuid.Parse(value.CredentialID)
+		if err != nil {
+			credentialID = uuid.New()
+			credential, insertErr := q.InsertPaymentStripeCredential(ctx, dbsqlc.InsertPaymentStripeCredentialParams{
+				ID: credentialID, AccountID: value.AccountID, Mode: string(value.Mode), ChargesEnabled: value.ChargesEnabled,
+				StripeProductID: value.StripeProductID, StripeWebhookEndpointID: value.StripeWebhookEndpointID,
+				ApiKeyCiphertext: value.APIKeyCiphertext, WebhookSecretCiphertext: value.WebhookSecretCiphertext,
+				SecretMaterialKind: value.SecretMaterialKind, CreatedBy: value.UpdatedBy,
+			})
+			if insertErr != nil {
+				return fmt.Errorf("insert Stripe credential generation: %w", insertErr)
+			}
+			value.CredentialID = credential.ID.String()
+			value.CreatedBy = credential.CreatedBy
+			value.CreatedAt = credential.CreatedAt
+		}
 		row, err := q.ReplacePaymentStripeConfiguration(ctx, dbsqlc.ReplacePaymentStripeConfigurationParams{
-			AccountID: value.AccountID, Mode: string(value.Mode), ChargesEnabled: value.ChargesEnabled,
-			ProductTaxCode: value.ProductTaxCode, PurchasesEnabled: value.PurchasesEnabled,
-			StripeProductID: value.StripeProductID, StripeWebhookEndpointID: value.StripeWebhookEndpointID,
-			ApiKeyCiphertext: value.APIKeyCiphertext, WebhookSecretCiphertext: value.WebhookSecretCiphertext,
-			SecretMaterialKind: value.SecretMaterialKind, CreatedBy: value.UpdatedBy,
+			ActiveCredentialID: credentialID, ProductTaxCode: value.ProductTaxCode,
+			PurchasesEnabled: value.PurchasesEnabled, UpdatedBy: value.UpdatedBy, ExpectedRevision: expectedRevision,
 		})
 		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrStripeConfigurationChanged
+			}
 			return fmt.Errorf("replace Stripe configuration: %w", err)
 		}
 		if previousErr == nil && previous.PurchasesEnabled && !row.PurchasesEnabled {
-			shutdownRow, err := q.InsertPaymentCheckoutShutdown(ctx, row.AccountID)
+			previousCredential, err := q.GetPaymentStripeCredential(ctx, previous.ActiveCredentialID)
+			if err != nil {
+				return fmt.Errorf("load previous Stripe credential for Checkout shutdown: %w", err)
+			}
+			shutdownRow, err := q.InsertPaymentCheckoutShutdown(ctx, dbsqlc.InsertPaymentCheckoutShutdownParams{
+				StripeCredentialID: previous.ActiveCredentialID, StripeAccountID: previousCredential.AccountID,
+			})
 			if err != nil {
 				return fmt.Errorf("create Checkout shutdown: %w", err)
 			}
@@ -221,7 +261,12 @@ func (r *Repository) ReplaceStripeConfiguration(ctx context.Context, value Store
 		if err := insertConfigurationAudit(ctx, q, audit); err != nil {
 			return err
 		}
-		stored = storedStripeConfiguration(row)
+		stored = value
+		stored.ProductTaxCode = row.ProductTaxCode
+		stored.PurchasesEnabled = row.PurchasesEnabled
+		stored.UpdatedBy = row.UpdatedBy
+		stored.Revision = row.Revision
+		stored.UpdatedAt = row.UpdatedAt
 		return nil
 	})
 	return stored, shutdown, err
@@ -256,7 +301,8 @@ func (r *Repository) ListPaymentOrdersForCheckoutShutdown(ctx context.Context, s
 		return nil, fmt.Errorf("invalid Checkout shutdown batch limit")
 	}
 	rows, err := r.dbWithContext(ctx).queries().ListPaymentOrdersForCheckoutShutdown(ctx, dbsqlc.ListPaymentOrdersForCheckoutShutdownParams{
-		StripeAccountID: shutdown.StripeAccountID, CreatedAt: shutdown.CutoffAt, Limit: limit,
+		StripeAccountID: shutdown.StripeAccountID, StripeCredentialID: uuid.MustParse(shutdown.StripeCredentialID),
+		CreatedAt: shutdown.CutoffAt, Limit: limit,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("list Checkout shutdown orders: %w", err)
@@ -354,11 +400,14 @@ func (r *Repository) CreatePaymentOrderIntent(ctx context.Context, input CreateP
 		created, err := q.InsertPaymentOrderIntent(ctx, dbsqlc.InsertPaymentOrderIntentParams{
 			ID: id, PublicOrderNumber: input.PublicOrderNumber, PublicToken: publicToken,
 			UserID: input.UserID, ClientIdempotencyKey: input.ClientIdempotencyKey, RequestHash: input.RequestHash,
-			StripeAccountID: input.StripeAccountID, StripeProductID: input.StripeProductID,
+			StripeCredentialID: uuid.MustParse(input.StripeCredentialID), StripeAccountID: input.StripeAccountID, StripeProductID: input.StripeProductID,
 			IdeaQuantity: input.IdeaQuantity, TermsVersion: input.TermsVersion,
 			RefundPolicyVersion: input.RefundPolicyVersion, ReturnBaseUrl: input.ReturnBaseURL, ExpiresAt: input.ExpiresAt,
 		})
 		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrPurchasesUnavailable
+			}
 			return fmt.Errorf("insert payment order intent: %w", err)
 		}
 		order = paymentOrder(created)
@@ -762,20 +811,29 @@ func insertConfigurationAudit(ctx context.Context, q *dbsqlc.Queries, audit Conf
 	return nil
 }
 
-func storedStripeConfiguration(row dbsqlc.PaymentStripeConfiguration) StoredStripeConfiguration {
+func storedStripeConfiguration(settings dbsqlc.PaymentStripeConfiguration, credential dbsqlc.PaymentStripeCredential) StoredStripeConfiguration {
+	stored := storedStripeCredential(credential)
+	stored.ProductTaxCode = settings.ProductTaxCode
+	stored.PurchasesEnabled = settings.PurchasesEnabled
+	stored.Revision = settings.Revision
+	stored.UpdatedBy = settings.UpdatedBy
+	stored.UpdatedAt = settings.UpdatedAt
+	return stored
+}
+
+func storedStripeCredential(row dbsqlc.PaymentStripeCredential) StoredStripeConfiguration {
 	return StoredStripeConfiguration{
-		AccountID: row.AccountID, Mode: StripeMode(row.Mode), ChargesEnabled: row.ChargesEnabled,
-		ProductTaxCode: row.ProductTaxCode, PurchasesEnabled: row.PurchasesEnabled,
+		CredentialID: row.ID.String(), AccountID: row.AccountID, Mode: StripeMode(row.Mode), ChargesEnabled: row.ChargesEnabled,
 		StripeProductID: row.StripeProductID, StripeWebhookEndpointID: row.StripeWebhookEndpointID,
 		APIKeyCiphertext: row.ApiKeyCiphertext, WebhookSecretCiphertext: row.WebhookSecretCiphertext,
-		SecretMaterialKind: row.SecretMaterialKind, CreatedBy: row.CreatedBy, UpdatedBy: row.UpdatedBy,
-		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+		SecretMaterialKind: row.SecretMaterialKind, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt,
 	}
 }
 
 func paymentCheckoutShutdown(row dbsqlc.PaymentCheckoutShutdown) PaymentCheckoutShutdown {
 	value := PaymentCheckoutShutdown{
-		ID: row.ID.String(), StripeAccountID: row.StripeAccountID, CutoffAt: row.CutoffAt, CreatedAt: row.CreatedAt,
+		ID: row.ID.String(), StripeCredentialID: row.StripeCredentialID.String(),
+		StripeAccountID: row.StripeAccountID, CutoffAt: row.CutoffAt, CreatedAt: row.CreatedAt,
 	}
 	if row.CompletedAt.Valid {
 		completedAt := row.CompletedAt.Time

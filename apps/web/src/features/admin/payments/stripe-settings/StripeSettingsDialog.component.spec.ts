@@ -64,6 +64,11 @@ describe('StripeSettingsDialog', () => {
     expect(apiKey.value).toBe('')
     expect(apiKey).toHaveAttribute('type', 'password')
     expect(apiKey).toHaveAttribute('placeholder', '已配置，留空则保持不变')
+    expect(
+      screen.getByText(
+        '为保护 Secret，不会回显当前 API Key。支持对应环境的 Secret key（sk_）或 Restricted key（rk_），建议优先使用最小权限的 Restricted key。',
+      ),
+    ).toBeVisible()
     expect(screen.queryByDisplayValue('sk_test_secret')).not.toBeInTheDocument()
   })
 
@@ -108,15 +113,23 @@ describe('StripeSettingsDialog', () => {
     expect(toast.success).toHaveBeenCalledWith('Stripe 设置已保存')
   })
 
-  it('keeps the dialog open and clears the API Key when saving fails', async () => {
-    vi.mocked(resource.save).mockRejectedValueOnce(new Error('Stripe 无法验证此 API Key'))
+  it('shows a safe Stripe validation error, keeps the dialog open, and clears the API Key', async () => {
+    vi.mocked(resource.save).mockRejectedValueOnce(
+      new Error(
+        '无效的 Stripe API Key：请使用 sk_ 或 rk_ 开头的对应环境 Key',
+      ),
+    )
     const { user, emitted } = renderDialog()
     await screen.findByText('acct_123')
 
     await user.type(screen.getByLabelText('Stripe API Key'), 'sk_test_secret')
     await user.click(screen.getByRole('button', { name: '保存设置' }))
 
-    expect(await screen.findByText('保存 Stripe 设置失败，请重试')).toBeVisible()
+    expect(
+      await screen.findByText(
+        '无效的 Stripe API Key：请使用 sk_ 或 rk_ 开头的对应环境 Key',
+      ),
+    ).toBeVisible()
     expect(emitted()['update:visible']).toBeUndefined()
     expect((screen.getByLabelText('Stripe API Key') as HTMLInputElement).value).toBe('')
   })

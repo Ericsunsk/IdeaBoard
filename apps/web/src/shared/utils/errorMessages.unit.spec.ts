@@ -11,11 +11,27 @@ describe('error message helpers', () => {
       '服务暂时不可用',
     )
     expect(extractSafeApiErrorMessage({ msg: '保存失败' }, '默认错误')).toBe('保存失败')
+    expect(
+      formatDisplayErrorMessage(
+        new Error(
+          '无效的 Stripe API Key：请使用 sk_ 或 rk_ 开头的对应环境 Key',
+        ),
+        '默认错误',
+      ),
+    ).toBe('无效的 Stripe API Key：请使用 sk_ 或 rk_ 开头的对应环境 Key')
+    expect(
+      formatDisplayErrorMessage(
+        new Error('仍有未完成的充值订单，请稍后再更换 Stripe API Key'),
+        '默认错误',
+      ),
+    ).toBe('仍有未完成的充值订单，请稍后再更换 Stripe API Key')
   })
 
   it('falls back for blank, sensitive, or internal messages', () => {
     expect(sanitizeApiErrorMessage(' ', '默认错误')).toBe('默认错误')
-    expect(formatDisplayErrorMessage(new Error('api key invalid'), '默认错误')).toBe('默认错误')
+    expect(formatDisplayErrorMessage(new Error('sk_live_exposed'), '默认错误')).toBe('默认错误')
+    expect(formatDisplayErrorMessage(new Error('rk_live_exposed'), '默认错误')).toBe('默认错误')
+    expect(formatDisplayErrorMessage(new Error('api_key=exposed'), '默认错误')).toBe('默认错误')
     expect(extractSafeApiErrorMessage({ msg: 'dial tcp 127.0.0.1:5432' }, '默认错误')).toBe(
       '默认错误',
     )

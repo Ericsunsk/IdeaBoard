@@ -1,5 +1,5 @@
 import type { ApiResponseBase } from './generated-query/model'
-import { formatDisplayErrorMessage, sanitizeApiErrorMessage } from '../utils/errorMessages'
+import { formatDisplayErrorMessage } from '../utils/errorMessages'
 
 type ApiResponseWithData<T> = ApiResponseBase & {
   data?: T | null
@@ -7,7 +7,7 @@ type ApiResponseWithData<T> = ApiResponseBase & {
 
 export function requireApiData<T>(response: ApiResponseWithData<T>, fallback: string): T {
   if (response.code !== 0) {
-    throw new Error(sanitizeApiErrorMessage(response.msg, fallback))
+    throw new Error(response.message_safe ? response.msg : fallback)
   }
   if (response.data == null) throw new Error(fallback)
   return response.data
@@ -19,7 +19,7 @@ export function createApiDataSelector<T>(fallback: string) {
 
 export function assertApiOk(response: ApiResponseBase, fallback: string): void {
   if (response.code !== 0) {
-    throw new Error(sanitizeApiErrorMessage(response.msg, fallback))
+    throw new Error(response.message_safe ? response.msg : fallback)
   }
 }
 

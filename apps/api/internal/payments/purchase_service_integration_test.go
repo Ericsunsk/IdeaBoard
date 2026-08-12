@@ -380,7 +380,7 @@ func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testin
 	}
 }
 
-func TestStripeKeyChangeIsBlockedWhileCheckoutIsUnsettled(t *testing.T) {
+func TestStripeKeyChangePreservesUnsettledOrderCredential(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
@@ -401,16 +401,24 @@ func TestStripeKeyChangeIsBlockedWhileCheckoutIsUnsettled(t *testing.T) {
 		ActorID: 42, APIKey: "sk_test_replacement", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	})
-	if !errors.Is(err, ErrStripeConfigurationBusy) {
-		t.Fatalf("ConfigureStripe() error = %v, want busy", err)
+	if err != nil {
+		t.Fatalf("ConfigureStripe() error = %v", err)
 	}
 	stored, err := service.GetStripeConfiguration(t.Context())
-	if err != nil || stored.AccountID != "acct_original" {
-		t.Fatalf("Stripe configuration changed with unsettled order: %+v, %v", stored, err)
+	if err != nil || stored.AccountID != "acct_replacement" {
+		t.Fatalf("Stripe configuration did not rotate: %+v, %v", stored, err)
+	}
+	orders, err := service.CheckoutWorkflow.checkoutStore.ListActivePaymentOrders(t.Context(), 42)
+	if err != nil || len(orders) != 1 {
+		t.Fatalf("active orders = %+v, %v", orders, err)
+	}
+	credential, _, err := service.CheckoutWorkflow.stripeOrderConfiguration(t.Context(), orders[0])
+	if err != nil || credential.AccountID != "acct_original" {
+		t.Fatalf("order credential = %+v, %v", credential, err)
 	}
 }
 
-func TestStripeKeyChangeCannotRaceAnOldAccountCheckout(t *testing.T) {
+func TestStripeKeyChangeDoesNotWaitForProviderIO(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db, pool := testdb.OpenWithPool(t)
 	creditService := credits.NewService(pool)
@@ -448,19 +456,19 @@ func TestStripeKeyChangeCannotRaceAnOldAccountCheckout(t *testing.T) {
 	}()
 	select {
 	case err := <-configurationDone:
-		t.Fatalf("configuration bypassed in-flight Checkout shared lock: %v", err)
+		if err != nil {
+			t.Fatalf("ConfigureStripe() error = %v", err)
+		}
 	case <-time.After(150 * time.Millisecond):
+		t.Fatal("configuration waited for in-flight Stripe I/O")
 	}
 	close(releaseCheckout)
 	if err := <-checkoutDone; err != nil {
 		t.Fatalf("CreateCheckout() error = %v", err)
 	}
-	if err := <-configurationDone; !errors.Is(err, ErrStripeConfigurationBusy) {
-		t.Fatalf("ConfigureStripe() error = %v, want busy", err)
-	}
 	stored, err := service.GetStripeConfiguration(t.Context())
-	if err != nil || stored.AccountID != "acct_original" {
-		t.Fatalf("Stripe configuration raced Checkout: %+v, %v", stored, err)
+	if err != nil || stored.AccountID != "acct_replacement" {
+		t.Fatalf("Stripe configuration did not rotate: %+v, %v", stored, err)
 	}
 }
 

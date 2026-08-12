@@ -9,6 +9,7 @@ import (
 
 	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/platform/validation"
 	"ideaboard/api/internal/tasking/tasks"
 )
 
@@ -114,7 +115,7 @@ func (s *AccountService) ListAccounts(ctx context.Context, req *AccountListReque
 
 func (s *AccountService) UpdateAccount(ctx context.Context, id int64, req *UpdateAccountRequest) error {
 	if req == nil {
-		return fmt.Errorf("请求参数错误")
+		return validation.New("请求参数错误")
 	}
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
@@ -124,7 +125,7 @@ func (s *AccountService) UpdateAccount(ctx context.Context, id int64, req *Updat
 	if req.Name != nil {
 		name := strings.TrimSpace(*req.Name)
 		if name == "" {
-			return fmt.Errorf("name 不能为空")
+			return validation.New("name 不能为空")
 		}
 		account.Name = name
 	}
@@ -180,7 +181,7 @@ func (s *AccountService) PatchAccountModel(ctx context.Context, accountID int64,
 	}
 	modelName := strings.TrimSpace(req.Name)
 	if modelName == "" {
-		return nil, fmt.Errorf("model name 不能为空")
+		return nil, validation.New("model name 不能为空")
 	}
 
 	model, exists := findAccountModelByName(account.Models, modelName)
@@ -198,14 +199,14 @@ func (s *AccountService) PatchAccountModel(ctx context.Context, accountID int64,
 	}
 	if req.Weight != nil {
 		if *req.Weight <= 0 {
-			return nil, fmt.Errorf("model weight 必须大于 0")
+			return nil, validation.New("model weight 必须大于 0")
 		}
 		model.Weight = *req.Weight
 	}
 	if req.MaxConcurrent.Set {
 		if req.MaxConcurrent.Valid {
 			if req.MaxConcurrent.Value <= 0 {
-				return nil, fmt.Errorf("model max_concurrent 必须大于 0")
+				return nil, validation.New("model max_concurrent 必须大于 0")
 			}
 			value := req.MaxConcurrent.Value
 			model.MaxConcurrent = &value
@@ -215,7 +216,7 @@ func (s *AccountService) PatchAccountModel(ctx context.Context, accountID int64,
 	}
 	if req.SortOrder != nil {
 		if *req.SortOrder < 0 {
-			return nil, fmt.Errorf("model sort_order 不能小于 0")
+			return nil, validation.New("model sort_order 不能小于 0")
 		}
 		model.SortOrder = *req.SortOrder
 	}
@@ -234,7 +235,7 @@ func (s *AccountService) DeleteAccountModel(ctx context.Context, accountID int64
 		return nil, fmt.Errorf("%w", ErrAccountNotFound)
 	}
 	if strings.TrimSpace(modelName) == "" {
-		return nil, fmt.Errorf("model name 不能为空")
+		return nil, validation.New("model name 不能为空")
 	}
 	if err := s.accountRepo.DeleteModel(ctx, accountID, modelName); err != nil {
 		if database.IsNotFound(err) {
@@ -257,7 +258,7 @@ func findAccountModelByName(models []AccountModel, modelName string) (AccountMod
 
 func normalizeAccountModelInputs(inputs []AccountModelInput) ([]AccountModel, error) {
 	if len(inputs) == 0 {
-		return nil, fmt.Errorf("models 不能为空，请先检测并选择模型")
+		return nil, validation.New("models 不能为空，请先检测并选择模型")
 	}
 	seen := make(map[string]struct{}, len(inputs))
 	models := make([]AccountModel, 0, len(inputs))
@@ -288,7 +289,7 @@ func normalizeAccountModelInputs(inputs []AccountModelInput) ([]AccountModel, er
 		})
 	}
 	if len(models) == 0 {
-		return nil, fmt.Errorf("models 不能为空，请先检测并选择模型")
+		return nil, validation.New("models 不能为空，请先检测并选择模型")
 	}
 	return models, nil
 }

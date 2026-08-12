@@ -82,7 +82,7 @@ describe('joinSharedCanvasBoardByToken', () => {
   })
 
   it('replaces unsafe API errors with the workflow fallback', async () => {
-    mocks.request.mockRejectedValueOnce(new Error('invalid share token'))
+    mocks.request.mockRejectedValueOnce(new Error('token=exposed'))
 
     await expect(joinSharedCanvasBoardByToken('share-token')).rejects.toThrow('加入共享画布失败')
 
@@ -90,7 +90,11 @@ describe('joinSharedCanvasBoardByToken', () => {
   })
 
   it('rejects a business failure before hydrating the catalog', async () => {
-    mocks.request.mockResolvedValueOnce({ code: 410, msg: '分享链接已失效' })
+    mocks.request.mockResolvedValueOnce({
+      code: 410,
+      msg: '分享链接已失效',
+      message_safe: true,
+    })
 
     await expect(joinSharedCanvasBoardByToken('share-token')).rejects.toThrow('分享链接已失效')
 

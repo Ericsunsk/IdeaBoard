@@ -8,4 +8,5 @@
 export interface ApiResponseBase {
   code: number
   msg: string
+  message_safe?: boolean
 }

@@ -193,10 +193,10 @@ func TestPaymentRefundReconciliationRecoversPendingProviderStateExactlyOnce(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := facts.reconcileDuePaymentRefunds(t.Context(), "sk_test_refund", nil, now.Add(3*time.Minute)); err != nil {
+	if err := facts.reconcileDuePaymentRefunds(t.Context(), now.Add(3*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
-	if err := facts.reconcileDuePaymentRefunds(t.Context(), "sk_test_refund", nil, now.Add(4*time.Minute)); err != nil {
+	if err := facts.reconcileDuePaymentRefunds(t.Context(), now.Add(4*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	settled, err := repo.GetPaymentRefundByID(t.Context(), refund.ID)

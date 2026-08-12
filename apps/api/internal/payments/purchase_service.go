@@ -35,7 +35,6 @@ const (
 
 var (
 	ErrPaymentOrderNotFound     = errors.New("充值订单不存在")
-	ErrStripeConfigurationBusy  = errors.New("仍有未完成的充值订单，请稍后再更换 Stripe API Key")
 	ErrPendingCheckoutLimit     = errors.New("最多同时保留 3 笔待支付订单，请先完成或放弃一笔")
 	ErrPaymentAlreadyInProgress = errors.New("该数量的支付正在处理中，请等待支付结果")
 	ErrPaymentAlreadyCompleted  = errors.New("该充值已完成，请勿重复支付")
@@ -105,59 +104,57 @@ func (s *CheckoutWorkflow) ContinuePendingOrder(ctx context.Context, userID int6
 		return PendingPaymentOrder{}, ErrPaymentOrderNotFound
 	}
 	var result PendingPaymentOrder
-	err := s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
-		return s.checkoutStore.WithUserCheckoutLock(lockedContext, userID, func(userLockedContext context.Context) error {
-			order, err := s.checkoutStore.GetPaymentOrderByPublicToken(userLockedContext, userID, publicToken)
-			if errors.Is(err, sql.ErrNoRows) {
-				return ErrPaymentOrderNotFound
-			}
-			if err != nil {
-				return fmt.Errorf("get pending payment order to continue: %w", err)
-			}
-			if order.Status == PaymentOrderPaidPendingCredit {
-				converged, err := s.orderLifecycle.creditPaidOrder(userLockedContext, order, s.runtime.now().UTC())
-				if err != nil {
-					return err
-				}
-				result = pendingPaymentOrder(converged)
-				return nil
-			}
-			if order.Status != PaymentOrderCheckoutOpen {
-				result = pendingPaymentOrder(order)
-				return nil
-			}
-			if s.checkoutGateway == nil || s.wallets == nil {
-				return ErrPurchasesUnavailable
-			}
-			configuration, apiKey, err := s.checkoutConfiguration(userLockedContext)
+	err := s.checkoutStore.WithUserCheckoutLock(ctx, userID, func(userLockedContext context.Context) error {
+		order, err := s.checkoutStore.GetPaymentOrderByPublicToken(userLockedContext, userID, publicToken)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrPaymentOrderNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("get pending payment order to continue: %w", err)
+		}
+		if order.Status == PaymentOrderPaidPendingCredit {
+			converged, err := s.orderLifecycle.creditPaidOrder(userLockedContext, order, s.runtime.now().UTC())
 			if err != nil {
 				return err
 			}
-			if configuration.AccountID != order.StripeAccountID {
-				return ErrPurchasesUnavailable
-			}
-			if err := s.requireRechargeableWallet(userLockedContext, userID); err != nil {
-				return err
-			}
-			session, err := s.checkoutGateway.RetrieveCheckoutSession(userLockedContext, RetrieveCheckoutSessionInput{
-				APIKey: apiKey, SessionID: order.StripeCheckoutSessionID,
-			})
-			if err != nil {
-				return checkoutOperationError(err)
-			}
-			order, err = s.orderLifecycle.convergeCheckoutSession(userLockedContext, order, session, checkoutSignalObserved)
-			if err != nil {
-				return err
-			}
-			if order.Status == PaymentOrderCheckoutOpen && !order.ExpiresAt.After(s.runtime.now().UTC()) {
-				order, err = s.orderLifecycle.expireOrder(userLockedContext, order)
-				if err != nil {
-					return err
-				}
-			}
+			result = pendingPaymentOrder(converged)
+			return nil
+		}
+		if order.Status != PaymentOrderCheckoutOpen {
 			result = pendingPaymentOrder(order)
 			return nil
+		}
+		if s.checkoutGateway == nil || s.wallets == nil {
+			return ErrPurchasesUnavailable
+		}
+		configuration, apiKey, err := s.stripeOrderConfiguration(userLockedContext, order)
+		if err != nil {
+			return err
+		}
+		if configuration.AccountID != order.StripeAccountID {
+			return ErrPurchasesUnavailable
+		}
+		if err := s.requireRechargeableWallet(userLockedContext, userID); err != nil {
+			return err
+		}
+		session, err := s.checkoutGateway.RetrieveCheckoutSession(userLockedContext, RetrieveCheckoutSessionInput{
+			APIKey: apiKey, SessionID: order.StripeCheckoutSessionID,
 		})
+		if err != nil {
+			return checkoutOperationError(err)
+		}
+		order, err = s.orderLifecycle.convergeCheckoutSession(userLockedContext, order, session, checkoutSignalObserved)
+		if err != nil {
+			return err
+		}
+		if order.Status == PaymentOrderCheckoutOpen && !order.ExpiresAt.After(s.runtime.now().UTC()) {
+			order, err = s.orderLifecycle.expireOrder(userLockedContext, order)
+			if err != nil {
+				return err
+			}
+		}
+		result = pendingPaymentOrder(order)
+		return nil
 	})
 	return result, err
 }
@@ -167,39 +164,37 @@ func (s *CheckoutWorkflow) AbandonPendingOrder(ctx context.Context, userID int64
 		return PendingPaymentOrder{}, ErrPaymentOrderNotFound
 	}
 	var result PendingPaymentOrder
-	err := s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
-		return s.checkoutStore.WithUserCheckoutLock(lockedContext, userID, func(userLockedContext context.Context) error {
-			order, err := s.checkoutStore.GetPaymentOrderByPublicToken(userLockedContext, userID, publicToken)
-			if errors.Is(err, sql.ErrNoRows) {
-				return ErrPaymentOrderNotFound
-			}
-			if err != nil {
-				return fmt.Errorf("get pending payment order to abandon: %w", err)
-			}
-			if order.Status != PaymentOrderCheckoutOpen {
-				result = pendingPaymentOrder(order)
-				return nil
-			}
-			if s.checkoutGateway == nil {
-				return ErrPurchasesUnavailable
-			}
-			configuration, apiKey, err := s.stripeAccessConfiguration(userLockedContext)
-			if err != nil || configuration.AccountID != order.StripeAccountID {
-				return ErrPurchasesUnavailable
-			}
-			expiration, err := s.checkoutGateway.ExpireCheckoutSession(userLockedContext, ExpireCheckoutSessionInput{
-				APIKey: apiKey, SessionID: order.StripeCheckoutSessionID,
-			})
-			if err != nil {
-				return checkoutOperationError(err)
-			}
-			order, err = s.orderLifecycle.convergeCheckoutExpiration(userLockedContext, order, expiration)
-			if err != nil {
-				return err
-			}
+	err := s.checkoutStore.WithUserCheckoutLock(ctx, userID, func(userLockedContext context.Context) error {
+		order, err := s.checkoutStore.GetPaymentOrderByPublicToken(userLockedContext, userID, publicToken)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrPaymentOrderNotFound
+		}
+		if err != nil {
+			return fmt.Errorf("get pending payment order to abandon: %w", err)
+		}
+		if order.Status != PaymentOrderCheckoutOpen {
 			result = pendingPaymentOrder(order)
 			return nil
+		}
+		if s.checkoutGateway == nil {
+			return ErrPurchasesUnavailable
+		}
+		configuration, apiKey, err := s.stripeOrderConfiguration(userLockedContext, order)
+		if err != nil || configuration.AccountID != order.StripeAccountID {
+			return ErrPurchasesUnavailable
+		}
+		expiration, err := s.checkoutGateway.ExpireCheckoutSession(userLockedContext, ExpireCheckoutSessionInput{
+			APIKey: apiKey, SessionID: order.StripeCheckoutSessionID,
 		})
+		if err != nil {
+			return checkoutOperationError(err)
+		}
+		order, err = s.orderLifecycle.convergeCheckoutExpiration(userLockedContext, order, expiration)
+		if err != nil {
+			return err
+		}
+		result = pendingPaymentOrder(order)
+		return nil
 	})
 	return result, err
 }
@@ -265,12 +260,10 @@ func (s *CheckoutWorkflow) CreateCheckout(ctx context.Context, command CreateChe
 		return CheckoutResult{}, ErrPurchasesUnavailable
 	}
 	var result CheckoutResult
-	err := s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
-		return s.checkoutStore.WithUserCheckoutLock(lockedContext, command.UserID, func(userLockedContext context.Context) error {
-			var err error
-			result, err = s.createCheckoutLocked(userLockedContext, command)
-			return err
-		})
+	err := s.checkoutStore.WithUserCheckoutLock(ctx, command.UserID, func(userLockedContext context.Context) error {
+		var err error
+		result, err = s.createCheckoutLocked(userLockedContext, command)
+		return err
 	})
 	return result, err
 }
@@ -300,7 +293,7 @@ func (s *CheckoutWorkflow) createCheckoutLocked(ctx context.Context, command Cre
 	}
 
 	now := s.runtime.now().UTC()
-	activeOrders, err := s.refreshActivePaymentOrders(ctx, apiKey, command.UserID, now)
+	activeOrders, err := s.refreshActivePaymentOrders(ctx, command.UserID, now)
 	if err != nil {
 		return CheckoutResult{}, err
 	}
@@ -347,7 +340,7 @@ func (s *CheckoutWorkflow) createCheckoutLocked(ctx context.Context, command Cre
 		order, reused, err = s.checkoutStore.CreatePaymentOrderIntent(ctx, CreatePaymentOrderIntentInput{
 			ID: orderID.String(), PublicOrderNumber: publicOrderNumber, PublicToken: uuid.NewString(),
 			UserID: command.UserID, ClientIdempotencyKey: strings.TrimSpace(command.ClientIdempotencyKey), RequestHash: requestHash,
-			StripeAccountID: configuration.AccountID, StripeProductID: configuration.StripeProductID,
+			StripeCredentialID: configuration.CredentialID, StripeAccountID: configuration.AccountID, StripeProductID: configuration.StripeProductID,
 			IdeaQuantity: quote.IdeaQuantity,
 			TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
 			ReturnBaseURL: returnBaseURL,
@@ -390,7 +383,7 @@ func (s *CheckoutWorkflow) createCheckoutLocked(ctx context.Context, command Cre
 	}
 }
 
-func (s *CheckoutWorkflow) refreshActivePaymentOrders(ctx context.Context, apiKey string, userID int64, now time.Time) ([]PaymentOrder, error) {
+func (s *CheckoutWorkflow) refreshActivePaymentOrders(ctx context.Context, userID int64, now time.Time) ([]PaymentOrder, error) {
 	orders, err := s.checkoutStore.ListActivePaymentOrders(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -407,7 +400,11 @@ func (s *CheckoutWorkflow) refreshActivePaymentOrders(ctx context.Context, apiKe
 			}
 			continue
 		}
-		resolved, err := s.retrieveAndConvergeCheckout(ctx, apiKey, order)
+		_, orderAPIKey, accessErr := s.stripeOrderConfiguration(ctx, order)
+		if accessErr != nil {
+			return nil, accessErr
+		}
+		resolved, err := s.retrieveAndConvergeCheckout(ctx, orderAPIKey, order)
 		if err != nil {
 			return nil, err
 		}
@@ -429,7 +426,7 @@ func (s *CheckoutWorkflow) GetPaymentOrderReturnStatus(ctx context.Context, user
 		return PaymentOrderReturnStatus{}, ErrPaymentOrderNotFound
 	}
 	var result PaymentOrderReturnStatus
-	err := s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
+	err := s.checkoutStore.WithUserCheckoutLock(ctx, userID, func(lockedContext context.Context) error {
 		var err error
 		result, err = s.getPaymentOrderReturnStatusLocked(lockedContext, userID, publicToken)
 		return err
@@ -449,7 +446,7 @@ func (s *CheckoutWorkflow) getPaymentOrderReturnStatusLocked(ctx context.Context
 		return PaymentOrderReturnStatus{}, fmt.Errorf("get payment order return status: %w", err)
 	}
 	if order.Status != PaymentOrderCredited && order.StripeCheckoutSessionID != "" && s.checkoutGateway != nil {
-		configuration, apiKey, configErr := s.stripeAccessConfiguration(ctx)
+		configuration, apiKey, configErr := s.stripeOrderConfiguration(ctx, order)
 		if configErr != nil {
 			return PaymentOrderReturnStatus{}, configErr
 		}
@@ -487,6 +484,18 @@ func (s *CheckoutWorkflow) stripeAccessConfiguration(ctx context.Context) (Store
 	}
 	if err != nil {
 		return StoredStripeConfiguration{}, "", fmt.Errorf("load Stripe checkout configuration: %w", err)
+	}
+	apiKey, err := secrets.DecryptMaterialString(configuration.APIKeyCiphertext, configuration.SecretMaterialKind)
+	if err != nil {
+		return StoredStripeConfiguration{}, "", ErrPurchasesUnavailable
+	}
+	return configuration, apiKey, nil
+}
+
+func (s *CheckoutWorkflow) stripeOrderConfiguration(ctx context.Context, order PaymentOrder) (StoredStripeConfiguration, string, error) {
+	configuration, err := s.configuration.GetStripeCredential(ctx, order.StripeCredentialID)
+	if err != nil {
+		return StoredStripeConfiguration{}, "", ErrPurchasesUnavailable
 	}
 	apiKey, err := secrets.DecryptMaterialString(configuration.APIKeyCiphertext, configuration.SecretMaterialKind)
 	if err != nil {
@@ -594,56 +603,6 @@ func (s *CheckoutWorkflow) retrieveAndConvergeCheckout(ctx context.Context, apiK
 		return order, checkoutOperationError(err)
 	}
 	return s.orderLifecycle.convergeCheckoutSession(ctx, order, session, checkoutSignalObserved)
-}
-
-// settleOrdersBeforeStripeKeyChange preserves the single-active-account model:
-// every older Checkout is resolved with the current key before that key can be replaced.
-func (s *CheckoutWorkflow) settleOrdersBeforeStripeKeyChange(ctx context.Context, current StoredStripeConfiguration) error {
-	orders, err := s.checkoutStore.ListUnsettledPaymentOrders(ctx)
-	if err != nil {
-		return err
-	}
-	if len(orders) == 0 {
-		return nil
-	}
-	if len(orders) > 1000 || s.checkoutGateway == nil {
-		return ErrStripeConfigurationBusy
-	}
-	currentAPIKey, err := secrets.DecryptMaterialString(current.APIKeyCiphertext, current.SecretMaterialKind)
-	if err != nil {
-		return ErrStripeConfigurationInvalid
-	}
-	now := s.runtime.now().UTC()
-	hasActiveOrder := false
-	for _, order := range orders {
-		if order.StripeCheckoutSessionID == "" {
-			if order.ExpiresAt.After(now) {
-				hasActiveOrder = true
-				continue
-			}
-			if _, err := s.orderLifecycle.expireOrder(ctx, order); err != nil {
-				return err
-			}
-			continue
-		}
-		session, err := s.checkoutGateway.RetrieveCheckoutSession(ctx, RetrieveCheckoutSessionInput{
-			APIKey: currentAPIKey, SessionID: order.StripeCheckoutSessionID,
-		})
-		if err != nil {
-			return checkoutOperationError(err)
-		}
-		resolved, err := s.orderLifecycle.convergeCheckoutSession(ctx, order, session, checkoutSignalObserved)
-		if err != nil {
-			return err
-		}
-		if resolved.Status == PaymentOrderCheckoutOpen || resolved.Status == PaymentOrderAsyncPaymentPending {
-			hasActiveOrder = true
-		}
-	}
-	if hasActiveOrder {
-		return ErrStripeConfigurationBusy
-	}
-	return nil
 }
 
 func validateCreatedCheckoutSession(order PaymentOrder, customer PaymentCustomer, session CheckoutSession) error {

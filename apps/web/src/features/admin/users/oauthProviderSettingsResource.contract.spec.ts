@@ -73,7 +73,9 @@ describe('OAuth Provider settings resource', () => {
 
   it('propagates API envelope errors with operation context', async () => {
     const resource = createOAuthProviderSettingsResource({
-      getSettings: vi.fn().mockResolvedValue({ code: 502, msg: 'auth unavailable' }),
+      getSettings: vi
+        .fn()
+        .mockResolvedValue({ code: 502, msg: 'auth unavailable', message_safe: true }),
       updateSettings: vi.fn(),
       getCapabilities: vi.fn(),
     })

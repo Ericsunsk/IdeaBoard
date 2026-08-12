@@ -139,5 +139,5 @@ func NewService(checkout *CheckoutWorkflow, facts *StripeFactsWorkflow) (*Servic
 	if runtime == nil || facts.runtime != runtime {
 		return nil, fmt.Errorf("payments workflows must share one runtime")
 	}
-	return &Service{checkout: checkout, facts: facts, runtime: runtime}, nil
+	return &Service{CheckoutWorkflow: checkout, StripeFactsWorkflow: facts, runtime: runtime}, nil
 }

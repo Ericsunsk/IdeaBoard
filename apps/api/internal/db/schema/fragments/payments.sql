@@ -1,23 +1,36 @@
-CREATE TABLE payment_stripe_configurations (
-  singleton_id SMALLINT PRIMARY KEY DEFAULT 1,
+CREATE TABLE payment_stripe_credentials (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id TEXT NOT NULL,
   mode TEXT NOT NULL,
   charges_enabled BOOLEAN NOT NULL,
-  product_tax_code TEXT NOT NULL,
-  purchases_enabled BOOLEAN NOT NULL DEFAULT FALSE,
   stripe_product_id TEXT NOT NULL,
   stripe_webhook_endpoint_id TEXT NOT NULL,
   api_key_ciphertext TEXT NOT NULL,
   webhook_secret_ciphertext TEXT NOT NULL,
   secret_material_kind TEXT NOT NULL,
   created_by BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT ck_payment_stripe_credential_mode CHECK (mode IN ('test', 'live')),
+  CONSTRAINT ck_payment_stripe_credential_material CHECK (secret_material_kind = 'encrypted'),
+  CONSTRAINT ck_payment_stripe_credential_ids CHECK (
+    char_length(account_id) BETWEEN 1 AND 255
+    AND char_length(stripe_product_id) BETWEEN 1 AND 255
+    AND char_length(stripe_webhook_endpoint_id) BETWEEN 1 AND 255
+  )
+);
+
+CREATE TABLE payment_stripe_configurations (
+  singleton_id SMALLINT PRIMARY KEY DEFAULT 1,
+  active_credential_id UUID NOT NULL REFERENCES payment_stripe_credentials(id) ON DELETE RESTRICT,
+  product_tax_code TEXT NOT NULL,
+  purchases_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  revision BIGINT NOT NULL DEFAULT 1,
   updated_by BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT ck_payment_stripe_configuration_singleton CHECK (singleton_id = 1),
-  CONSTRAINT ck_payment_stripe_configuration_mode CHECK (mode IN ('test', 'live')),
-  CONSTRAINT ck_payment_stripe_configuration_tax_code CHECK (product_tax_code ~ '^txcd_[0-9]{8}$'),
-  CONSTRAINT ck_payment_stripe_configuration_material CHECK (secret_material_kind = 'encrypted')
+  CONSTRAINT ck_payment_stripe_configuration_revision CHECK (revision > 0),
+  CONSTRAINT ck_payment_stripe_configuration_tax_code CHECK (product_tax_code ~ '^txcd_[0-9]{8}$')
 );
 
 CREATE TABLE payment_admin_actions (
@@ -105,6 +118,7 @@ CREATE TABLE payment_orders (
   client_idempotency_key TEXT NOT NULL,
   request_hash TEXT NOT NULL,
   status TEXT NOT NULL,
+  stripe_credential_id UUID NOT NULL REFERENCES payment_stripe_credentials(id) ON DELETE RESTRICT,
   stripe_account_id TEXT NOT NULL,
   stripe_customer_id TEXT NOT NULL DEFAULT '',
   stripe_product_id TEXT NOT NULL,
@@ -411,6 +425,7 @@ CREATE TABLE payment_order_reconciliations (
 
 CREATE TABLE payment_checkout_shutdowns (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  stripe_credential_id UUID NOT NULL REFERENCES payment_stripe_credentials(id) ON DELETE RESTRICT,
   stripe_account_id TEXT NOT NULL,
   cutoff_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -16,7 +16,7 @@ func RuntimePrivilegePolicy() dbprivileges.Policy {
 		Objects: []dbprivileges.ObjectRule{
 			{
 				Kind: dbprivileges.KindTable, Names: []string{
-					"payment_stripe_configurations", "payment_webhook_events", "payment_customers", "payment_orders", "payment_order_reconciliations", "payment_refunds", "payment_disputes", "payment_checkout_shutdowns",
+					"payment_stripe_credentials", "payment_stripe_configurations", "payment_webhook_events", "payment_customers", "payment_orders", "payment_order_reconciliations", "payment_refunds", "payment_disputes", "payment_checkout_shutdowns",
 				},
 				Required:        []dbprivileges.Privilege{dbprivileges.PrivilegeSelect, dbprivileges.PrivilegeInsert, dbprivileges.PrivilegeUpdate},
 				Forbidden:       []dbprivileges.Privilege{dbprivileges.PrivilegeDelete, dbprivileges.PrivilegeTruncate, dbprivileges.PrivilegeReferences, dbprivileges.PrivilegeTrigger},

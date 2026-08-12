@@ -67,11 +67,11 @@ func TestDisabledReconciliationDoesNotCreateCheckout(t *testing.T) {
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{ActorID: 42, PurchasesEnabled: false}); err != nil {
 		t.Fatalf("disable purchases: %v", err)
 	}
-	configuration, apiKey, err := service.checkout.stripeAccessConfiguration(t.Context())
+	configuration, apiKey, err := service.CheckoutWorkflow.stripeAccessConfiguration(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = service.facts.reconcilePaymentOrderClaim(t.Context(), configuration, apiKey, nil, PaymentReconciliationClaim{Order: order}, now)
+	_, err = service.StripeFactsWorkflow.reconcilePaymentOrderClaim(t.Context(), configuration, apiKey, nil, PaymentReconciliationClaim{Order: order}, now)
 	if err != nil {
 		t.Fatalf("reconcile disabled creating order: %v", err)
 	}

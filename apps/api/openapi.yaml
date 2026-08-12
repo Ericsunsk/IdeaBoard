@@ -2486,6 +2486,7 @@ components:
       properties:
         code: { type: integer }
         msg: { type: string }
+        message_safe: { type: boolean }
 
     InsufficientCreditsError:
       type: object

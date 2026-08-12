@@ -200,7 +200,7 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 		}
 		dirPrefix, err := storage.CanvasContentUploadDirPrefix(owner.StorageUID, board.BoardID)
 		if err != nil {
-			response.Error(c, 400, err.Error())
+			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
 		stored, err := h.StorageService.UploadRefWithOptions(c.Request.Context(), file, storage.StorageStoreOptions{

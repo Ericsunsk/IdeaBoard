@@ -43,7 +43,11 @@ describe('userBillingRecordsResource', () => {
   })
 
   it('surfaces API feedback instead of manufacturing an empty page', async () => {
-    generated.listUserBillingRecords.mockResolvedValue({ code: 500, msg: '账单服务暂不可用' })
+    generated.listUserBillingRecords.mockResolvedValue({
+      code: 500,
+      msg: '账单服务暂不可用',
+      message_safe: true,
+    })
 
     await expect(fetchUserBillingRecords({ limit: 20 })).rejects.toThrow('账单服务暂不可用')
   })
@@ -51,7 +55,7 @@ describe('userBillingRecordsResource', () => {
   it('uses the resource fallback when API feedback contains credential details', async () => {
     generated.listUserBillingRecords.mockResolvedValue({
       code: 500,
-      msg: 'credential rejected by upstream',
+      msg: 'credential=exposed',
     })
 
     await expect(fetchUserBillingRecords({ limit: 20 })).rejects.toThrow('加载账单记录失败')

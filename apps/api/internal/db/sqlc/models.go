@@ -338,11 +338,12 @@ type PaymentAdminAction struct {
 }
 
 type PaymentCheckoutShutdown struct {
-	ID              uuid.UUID    `json:"id"`
-	StripeAccountID string       `json:"stripe_account_id"`
-	CutoffAt        time.Time    `json:"cutoff_at"`
-	CreatedAt       time.Time    `json:"created_at"`
-	CompletedAt     sql.NullTime `json:"completed_at"`
+	ID                 uuid.UUID    `json:"id"`
+	StripeCredentialID uuid.UUID    `json:"stripe_credential_id"`
+	StripeAccountID    string       `json:"stripe_account_id"`
+	CutoffAt           time.Time    `json:"cutoff_at"`
+	CreatedAt          time.Time    `json:"created_at"`
+	CompletedAt        sql.NullTime `json:"completed_at"`
 }
 
 type PaymentCustomer struct {
@@ -400,6 +401,7 @@ type PaymentOrder struct {
 	ClientIdempotencyKey    string         `json:"client_idempotency_key"`
 	RequestHash             string         `json:"request_hash"`
 	Status                  string         `json:"status"`
+	StripeCredentialID      uuid.UUID      `json:"stripe_credential_id"`
 	StripeAccountID         string         `json:"stripe_account_id"`
 	StripeCustomerID        string         `json:"stripe_customer_id"`
 	StripeProductID         string         `json:"stripe_product_id"`
@@ -465,21 +467,28 @@ type PaymentRefund struct {
 }
 
 type PaymentStripeConfiguration struct {
-	SingletonID             int16     `json:"singleton_id"`
+	SingletonID        int16     `json:"singleton_id"`
+	ActiveCredentialID uuid.UUID `json:"active_credential_id"`
+	ProductTaxCode     string    `json:"product_tax_code"`
+	PurchasesEnabled   bool      `json:"purchases_enabled"`
+	Revision           int64     `json:"revision"`
+	UpdatedBy          int64     `json:"updated_by"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
+}
+
+type PaymentStripeCredential struct {
+	ID                      uuid.UUID `json:"id"`
 	AccountID               string    `json:"account_id"`
 	Mode                    string    `json:"mode"`
 	ChargesEnabled          bool      `json:"charges_enabled"`
-	ProductTaxCode          string    `json:"product_tax_code"`
-	PurchasesEnabled        bool      `json:"purchases_enabled"`
 	StripeProductID         string    `json:"stripe_product_id"`
 	StripeWebhookEndpointID string    `json:"stripe_webhook_endpoint_id"`
 	ApiKeyCiphertext        string    `json:"api_key_ciphertext"`
 	WebhookSecretCiphertext string    `json:"webhook_secret_ciphertext"`
 	SecretMaterialKind      string    `json:"secret_material_kind"`
 	CreatedBy               int64     `json:"created_by"`
-	UpdatedBy               int64     `json:"updated_by"`
 	CreatedAt               time.Time `json:"created_at"`
-	UpdatedAt               time.Time `json:"updated_at"`
 }
 
 type PaymentWebhookEvent struct {

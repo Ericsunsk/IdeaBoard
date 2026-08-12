@@ -96,7 +96,7 @@ describe('createAdminStorageResource', () => {
     useMswHandlers(
       ...storageQueryHandlers(),
       http.post('/api/admin/storage/profiles', () => {
-        return HttpResponse.json({ code: 409, msg: '存储名称已存在' })
+        return HttpResponse.json({ code: 409, msg: '存储名称已存在', message_safe: true })
       }),
     )
     const resource = createAdminStorageResource()

@@ -164,7 +164,7 @@ describe('uploadApi', () => {
   it('surfaces upload API failures from the HTTP response body', async () => {
     useMswHandlers(
       http.post('/api/user/boards/:boardId/uploads', () => {
-        return HttpResponse.json({ code: 413, msg: 'upload too large' })
+        return HttpResponse.json({ code: 413, msg: 'upload too large', message_safe: true })
       }),
     )
 
@@ -205,7 +205,11 @@ describe('uploadApi', () => {
     useMswHandlers(
       http.post('/api/user/boards/:boardId/uploads', () => {
         return HttpResponse.json(
-          { code: 'upstream_failure', msg: 'authorization token leaked', data: { retry: true } },
+          {
+            code: 'upstream_failure',
+            msg: 'authorization=Bearer exposed-token',
+            data: { retry: true },
+          },
           { status: 503 },
         )
       }),

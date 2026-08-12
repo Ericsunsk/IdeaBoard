@@ -24,13 +24,17 @@ describe('userCreditsResource', () => {
   })
 
   it('surfaces API feedback instead of returning an empty wallet', async () => {
-    generated.getUserCreditWallet.mockResolvedValue({ code: 404, msg: 'Idea钱包不存在' })
+    generated.getUserCreditWallet.mockResolvedValue({
+      code: 404,
+      msg: 'Idea钱包不存在',
+      message_safe: true,
+    })
 
     await expect(fetchUserCreditWallet()).rejects.toThrow('Idea钱包不存在')
   })
 
   it('uses the resource fallback when API feedback contains sensitive details', async () => {
-    generated.getUserCreditWallet.mockResolvedValue({ code: 500, msg: 'api key invalid' })
+    generated.getUserCreditWallet.mockResolvedValue({ code: 500, msg: 'api_key=exposed' })
 
     await expect(fetchUserCreditWallet()).rejects.toThrow('加载Idea余额失败')
   })

@@ -22,7 +22,7 @@ SET status = 'checkout_open',
     checkout_url = $4,
     expires_at = $5
 WHERE id = $1 AND status = 'creating'
-RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
 type BindPaymentOrderCheckoutParams struct {
@@ -50,6 +50,7 @@ func (q *Queries) BindPaymentOrderCheckout(ctx context.Context, arg BindPaymentO
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
+		&i.StripeCredentialID,
 		&i.StripeAccountID,
 		&i.StripeCustomerID,
 		&i.StripeProductID,
@@ -105,7 +106,7 @@ WITH candidates AS (
       claimed_until = EXCLUDED.claimed_until
   RETURNING payment_order_id, claim_token, claim_generation
 )
-SELECT orders.id, orders.public_order_number, orders.public_token, orders.user_id, orders.client_idempotency_key, orders.request_hash, orders.status, orders.stripe_account_id, orders.stripe_customer_id, orders.stripe_product_id, orders.stripe_checkout_session_id, orders.stripe_payment_intent_id, orders.stripe_charge_id, orders.idea_quantity, orders.base_currency, orders.base_amount_minor, orders.paid_subtotal_minor, orders.paid_tax_minor, orders.paid_total_minor, orders.paid_currency, orders.terms_version, orders.refund_policy_version, orders.return_base_url, orders.checkout_url, orders.receipt_url, orders.credit_transaction_id, orders.expires_at, orders.paid_at, orders.credited_at, orders.created_at, orders.updated_at, claimed.claim_token, claimed.claim_generation
+SELECT orders.id, orders.public_order_number, orders.public_token, orders.user_id, orders.client_idempotency_key, orders.request_hash, orders.status, orders.stripe_credential_id, orders.stripe_account_id, orders.stripe_customer_id, orders.stripe_product_id, orders.stripe_checkout_session_id, orders.stripe_payment_intent_id, orders.stripe_charge_id, orders.idea_quantity, orders.base_currency, orders.base_amount_minor, orders.paid_subtotal_minor, orders.paid_tax_minor, orders.paid_total_minor, orders.paid_currency, orders.terms_version, orders.refund_policy_version, orders.return_base_url, orders.checkout_url, orders.receipt_url, orders.credit_transaction_id, orders.expires_at, orders.paid_at, orders.credited_at, orders.created_at, orders.updated_at, claimed.claim_token, claimed.claim_generation
 FROM claimed
 JOIN payment_orders AS orders ON orders.id = claimed.payment_order_id
 ORDER BY orders.id
@@ -148,6 +149,7 @@ func (q *Queries) ClaimDuePaymentOrderReconciliations(ctx context.Context, arg C
 			&i.PaymentOrder.ClientIdempotencyKey,
 			&i.PaymentOrder.RequestHash,
 			&i.PaymentOrder.Status,
+			&i.PaymentOrder.StripeCredentialID,
 			&i.PaymentOrder.StripeAccountID,
 			&i.PaymentOrder.StripeCustomerID,
 			&i.PaymentOrder.StripeProductID,
@@ -408,7 +410,7 @@ func (q *Queries) GetAdminPaymentOrder(ctx context.Context, orderNumber string) 
 }
 
 const getPaymentCheckoutShutdown = `-- name: GetPaymentCheckoutShutdown :one
-SELECT id, stripe_account_id, cutoff_at, created_at, completed_at
+SELECT id, stripe_credential_id, stripe_account_id, cutoff_at, created_at, completed_at
 FROM payment_checkout_shutdowns
 WHERE id = $1
 `
@@ -418,6 +420,7 @@ func (q *Queries) GetPaymentCheckoutShutdown(ctx context.Context, id uuid.UUID) 
 	var i PaymentCheckoutShutdown
 	err := row.Scan(
 		&i.ID,
+		&i.StripeCredentialID,
 		&i.StripeAccountID,
 		&i.CutoffAt,
 		&i.CreatedAt,
@@ -446,7 +449,7 @@ func (q *Queries) GetPaymentCustomer(ctx context.Context, userID int64) (Payment
 }
 
 const getPaymentOrderByCheckoutSession = `-- name: GetPaymentOrderByCheckoutSession :one
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 FROM payment_orders
 WHERE stripe_account_id = $1 AND stripe_checkout_session_id = $2
 `
@@ -467,6 +470,7 @@ func (q *Queries) GetPaymentOrderByCheckoutSession(ctx context.Context, arg GetP
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
+		&i.StripeCredentialID,
 		&i.StripeAccountID,
 		&i.StripeCustomerID,
 		&i.StripeProductID,
@@ -496,7 +500,7 @@ func (q *Queries) GetPaymentOrderByCheckoutSession(ctx context.Context, arg GetP
 }
 
 const getPaymentOrderByCheckoutSessionForUpdate = `-- name: GetPaymentOrderByCheckoutSessionForUpdate :one
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 FROM payment_orders
 WHERE stripe_account_id = $1 AND stripe_checkout_session_id = $2
 FOR UPDATE
@@ -518,6 +522,7 @@ func (q *Queries) GetPaymentOrderByCheckoutSessionForUpdate(ctx context.Context,
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
+		&i.StripeCredentialID,
 		&i.StripeAccountID,
 		&i.StripeCustomerID,
 		&i.StripeProductID,
@@ -547,7 +552,7 @@ func (q *Queries) GetPaymentOrderByCheckoutSessionForUpdate(ctx context.Context,
 }
 
 const getPaymentOrderByID = `-- name: GetPaymentOrderByID :one
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 FROM payment_orders
 WHERE id = $1
 `
@@ -563,6 +568,7 @@ func (q *Queries) GetPaymentOrderByID(ctx context.Context, id uuid.UUID) (Paymen
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
+		&i.StripeCredentialID,
 		&i.StripeAccountID,
 		&i.StripeCustomerID,
 		&i.StripeProductID,
@@ -592,7 +598,7 @@ func (q *Queries) GetPaymentOrderByID(ctx context.Context, id uuid.UUID) (Paymen
 }
 
 const getPaymentOrderByIDForUpdate = `-- name: GetPaymentOrderByIDForUpdate :one
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 FROM payment_orders
 WHERE id = $1
 FOR UPDATE
@@ -609,6 +615,7 @@ func (q *Queries) GetPaymentOrderByIDForUpdate(ctx context.Context, id uuid.UUID
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
+		&i.StripeCredentialID,
 		&i.StripeAccountID,
 		&i.StripeCustomerID,
 		&i.StripeProductID,
@@ -638,7 +645,7 @@ func (q *Queries) GetPaymentOrderByIDForUpdate(ctx context.Context, id uuid.UUID
 }
 
 const getPaymentOrderByIdempotency = `-- name: GetPaymentOrderByIdempotency :one
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 FROM payment_orders
 WHERE user_id = $1 AND client_idempotency_key = $2
 `
@@ -659,6 +666,7 @@ func (q *Queries) GetPaymentOrderByIdempotency(ctx context.Context, arg GetPayme
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
+		&i.StripeCredentialID,
 		&i.StripeAccountID,
 		&i.StripeCustomerID,
 		&i.StripeProductID,
@@ -688,7 +696,7 @@ func (q *Queries) GetPaymentOrderByIdempotency(ctx context.Context, arg GetPayme
 }
 
 const getPaymentOrderByPublicToken = `-- name: GetPaymentOrderByPublicToken :one
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 FROM payment_orders
 WHERE public_token = $1 AND user_id = $2
 `
@@ -709,6 +717,7 @@ func (q *Queries) GetPaymentOrderByPublicToken(ctx context.Context, arg GetPayme
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
+		&i.StripeCredentialID,
 		&i.StripeAccountID,
 		&i.StripeCustomerID,
 		&i.StripeProductID,
@@ -739,17 +748,10 @@ func (q *Queries) GetPaymentOrderByPublicToken(ctx context.Context, arg GetPayme
 
 const getPaymentStripeConfiguration = `-- name: GetPaymentStripeConfiguration :one
 SELECT singleton_id,
-       account_id,
-       mode,
-       charges_enabled,
+       active_credential_id,
        product_tax_code,
        purchases_enabled,
-       stripe_product_id,
-       stripe_webhook_endpoint_id,
-       api_key_ciphertext,
-       webhook_secret_ciphertext,
-       secret_material_kind,
-       created_by,
+       revision,
        updated_by,
        created_at,
        updated_at
@@ -762,20 +764,90 @@ func (q *Queries) GetPaymentStripeConfiguration(ctx context.Context) (PaymentStr
 	var i PaymentStripeConfiguration
 	err := row.Scan(
 		&i.SingletonID,
+		&i.ActiveCredentialID,
+		&i.ProductTaxCode,
+		&i.PurchasesEnabled,
+		&i.Revision,
+		&i.UpdatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getPaymentStripeCredential = `-- name: GetPaymentStripeCredential :one
+SELECT id, account_id, mode, charges_enabled, stripe_product_id, stripe_webhook_endpoint_id, api_key_ciphertext, webhook_secret_ciphertext, secret_material_kind, created_by, created_at
+FROM payment_stripe_credentials
+WHERE id = $1
+`
+
+func (q *Queries) GetPaymentStripeCredential(ctx context.Context, id uuid.UUID) (PaymentStripeCredential, error) {
+	row := q.db.QueryRowContext(ctx, getPaymentStripeCredential, id)
+	var i PaymentStripeCredential
+	err := row.Scan(
+		&i.ID,
 		&i.AccountID,
 		&i.Mode,
 		&i.ChargesEnabled,
-		&i.ProductTaxCode,
-		&i.PurchasesEnabled,
 		&i.StripeProductID,
 		&i.StripeWebhookEndpointID,
 		&i.ApiKeyCiphertext,
 		&i.WebhookSecretCiphertext,
 		&i.SecretMaterialKind,
 		&i.CreatedBy,
-		&i.UpdatedBy,
 		&i.CreatedAt,
-		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getPaymentStripeCredentialForOrder = `-- name: GetPaymentStripeCredentialForOrder :one
+SELECT credentials.id, credentials.account_id, credentials.mode, credentials.charges_enabled, credentials.stripe_product_id, credentials.stripe_webhook_endpoint_id, credentials.api_key_ciphertext, credentials.webhook_secret_ciphertext, credentials.secret_material_kind, credentials.created_by, credentials.created_at
+FROM payment_orders orders
+JOIN payment_stripe_credentials credentials ON credentials.id = orders.stripe_credential_id
+WHERE orders.id = $1
+`
+
+func (q *Queries) GetPaymentStripeCredentialForOrder(ctx context.Context, id uuid.UUID) (PaymentStripeCredential, error) {
+	row := q.db.QueryRowContext(ctx, getPaymentStripeCredentialForOrder, id)
+	var i PaymentStripeCredential
+	err := row.Scan(
+		&i.ID,
+		&i.AccountID,
+		&i.Mode,
+		&i.ChargesEnabled,
+		&i.StripeProductID,
+		&i.StripeWebhookEndpointID,
+		&i.ApiKeyCiphertext,
+		&i.WebhookSecretCiphertext,
+		&i.SecretMaterialKind,
+		&i.CreatedBy,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getPaymentStripeCredentialForOrderNumber = `-- name: GetPaymentStripeCredentialForOrderNumber :one
+SELECT credentials.id, credentials.account_id, credentials.mode, credentials.charges_enabled, credentials.stripe_product_id, credentials.stripe_webhook_endpoint_id, credentials.api_key_ciphertext, credentials.webhook_secret_ciphertext, credentials.secret_material_kind, credentials.created_by, credentials.created_at
+FROM payment_orders orders
+JOIN payment_stripe_credentials credentials ON credentials.id = orders.stripe_credential_id
+WHERE orders.public_order_number = $1
+`
+
+func (q *Queries) GetPaymentStripeCredentialForOrderNumber(ctx context.Context, publicOrderNumber string) (PaymentStripeCredential, error) {
+	row := q.db.QueryRowContext(ctx, getPaymentStripeCredentialForOrderNumber, publicOrderNumber)
+	var i PaymentStripeCredential
+	err := row.Scan(
+		&i.ID,
+		&i.AccountID,
+		&i.Mode,
+		&i.ChargesEnabled,
+		&i.StripeProductID,
+		&i.StripeWebhookEndpointID,
+		&i.ApiKeyCiphertext,
+		&i.WebhookSecretCiphertext,
+		&i.SecretMaterialKind,
+		&i.CreatedBy,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -816,16 +888,22 @@ func (q *Queries) InsertPaymentAdminAction(ctx context.Context, arg InsertPaymen
 }
 
 const insertPaymentCheckoutShutdown = `-- name: InsertPaymentCheckoutShutdown :one
-INSERT INTO payment_checkout_shutdowns (stripe_account_id, cutoff_at)
-VALUES ($1, CURRENT_TIMESTAMP)
-RETURNING id, stripe_account_id, cutoff_at, created_at, completed_at
+INSERT INTO payment_checkout_shutdowns (stripe_credential_id, stripe_account_id, cutoff_at)
+VALUES ($1, $2, CURRENT_TIMESTAMP)
+RETURNING id, stripe_credential_id, stripe_account_id, cutoff_at, created_at, completed_at
 `
 
-func (q *Queries) InsertPaymentCheckoutShutdown(ctx context.Context, stripeAccountID string) (PaymentCheckoutShutdown, error) {
-	row := q.db.QueryRowContext(ctx, insertPaymentCheckoutShutdown, stripeAccountID)
+type InsertPaymentCheckoutShutdownParams struct {
+	StripeCredentialID uuid.UUID `json:"stripe_credential_id"`
+	StripeAccountID    string    `json:"stripe_account_id"`
+}
+
+func (q *Queries) InsertPaymentCheckoutShutdown(ctx context.Context, arg InsertPaymentCheckoutShutdownParams) (PaymentCheckoutShutdown, error) {
+	row := q.db.QueryRowContext(ctx, insertPaymentCheckoutShutdown, arg.StripeCredentialID, arg.StripeAccountID)
 	var i PaymentCheckoutShutdown
 	err := row.Scan(
 		&i.ID,
+		&i.StripeCredentialID,
 		&i.StripeAccountID,
 		&i.CutoffAt,
 		&i.CreatedAt,
@@ -843,6 +921,7 @@ INSERT INTO payment_orders (
   client_idempotency_key,
   request_hash,
   status,
+  stripe_credential_id,
   stripe_account_id,
   stripe_product_id,
   idea_quantity,
@@ -852,10 +931,12 @@ INSERT INTO payment_orders (
   return_base_url,
   expires_at
 )
-VALUES (
-  $1, $2, $3, $4, $5, $6, 'creating', $7, $8, $9, $9, $10, $11, $12, $13
-)
-RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+SELECT $1, $2, $3, $4, $5, $6, 'creating', $7, $8, $9, $10, $10, $11, $12, $13, $14
+FROM payment_stripe_configurations configuration
+WHERE configuration.singleton_id = 1
+  AND configuration.active_credential_id = $7
+  AND configuration.purchases_enabled
+RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
 type InsertPaymentOrderIntentParams struct {
@@ -865,6 +946,7 @@ type InsertPaymentOrderIntentParams struct {
 	UserID               int64     `json:"user_id"`
 	ClientIdempotencyKey string    `json:"client_idempotency_key"`
 	RequestHash          string    `json:"request_hash"`
+	StripeCredentialID   uuid.UUID `json:"stripe_credential_id"`
 	StripeAccountID      string    `json:"stripe_account_id"`
 	StripeProductID      string    `json:"stripe_product_id"`
 	IdeaQuantity         int64     `json:"idea_quantity"`
@@ -882,6 +964,7 @@ func (q *Queries) InsertPaymentOrderIntent(ctx context.Context, arg InsertPaymen
 		arg.UserID,
 		arg.ClientIdempotencyKey,
 		arg.RequestHash,
+		arg.StripeCredentialID,
 		arg.StripeAccountID,
 		arg.StripeProductID,
 		arg.IdeaQuantity,
@@ -899,6 +982,7 @@ func (q *Queries) InsertPaymentOrderIntent(ctx context.Context, arg InsertPaymen
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
+		&i.StripeCredentialID,
 		&i.StripeAccountID,
 		&i.StripeCustomerID,
 		&i.StripeProductID,
@@ -923,6 +1007,66 @@ func (q *Queries) InsertPaymentOrderIntent(ctx context.Context, arg InsertPaymen
 		&i.CreditedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const insertPaymentStripeCredential = `-- name: InsertPaymentStripeCredential :one
+INSERT INTO payment_stripe_credentials (
+  id,
+  account_id,
+  mode,
+  charges_enabled,
+  stripe_product_id,
+  stripe_webhook_endpoint_id,
+  api_key_ciphertext,
+  webhook_secret_ciphertext,
+  secret_material_kind,
+  created_by
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+RETURNING id, account_id, mode, charges_enabled, stripe_product_id, stripe_webhook_endpoint_id, api_key_ciphertext, webhook_secret_ciphertext, secret_material_kind, created_by, created_at
+`
+
+type InsertPaymentStripeCredentialParams struct {
+	ID                      uuid.UUID `json:"id"`
+	AccountID               string    `json:"account_id"`
+	Mode                    string    `json:"mode"`
+	ChargesEnabled          bool      `json:"charges_enabled"`
+	StripeProductID         string    `json:"stripe_product_id"`
+	StripeWebhookEndpointID string    `json:"stripe_webhook_endpoint_id"`
+	ApiKeyCiphertext        string    `json:"api_key_ciphertext"`
+	WebhookSecretCiphertext string    `json:"webhook_secret_ciphertext"`
+	SecretMaterialKind      string    `json:"secret_material_kind"`
+	CreatedBy               int64     `json:"created_by"`
+}
+
+func (q *Queries) InsertPaymentStripeCredential(ctx context.Context, arg InsertPaymentStripeCredentialParams) (PaymentStripeCredential, error) {
+	row := q.db.QueryRowContext(ctx, insertPaymentStripeCredential,
+		arg.ID,
+		arg.AccountID,
+		arg.Mode,
+		arg.ChargesEnabled,
+		arg.StripeProductID,
+		arg.StripeWebhookEndpointID,
+		arg.ApiKeyCiphertext,
+		arg.WebhookSecretCiphertext,
+		arg.SecretMaterialKind,
+		arg.CreatedBy,
+	)
+	var i PaymentStripeCredential
+	err := row.Scan(
+		&i.ID,
+		&i.AccountID,
+		&i.Mode,
+		&i.ChargesEnabled,
+		&i.StripeProductID,
+		&i.StripeWebhookEndpointID,
+		&i.ApiKeyCiphertext,
+		&i.WebhookSecretCiphertext,
+		&i.SecretMaterialKind,
+		&i.CreatedBy,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -987,7 +1131,7 @@ func (q *Queries) InsertPaymentWebhookEvent(ctx context.Context, arg InsertPayme
 }
 
 const listActivePaymentCheckoutShutdowns = `-- name: ListActivePaymentCheckoutShutdowns :many
-SELECT id, stripe_account_id, cutoff_at, created_at, completed_at
+SELECT id, stripe_credential_id, stripe_account_id, cutoff_at, created_at, completed_at
 FROM payment_checkout_shutdowns
 WHERE completed_at IS NULL
 ORDER BY created_at, id
@@ -1004,6 +1148,7 @@ func (q *Queries) ListActivePaymentCheckoutShutdowns(ctx context.Context) ([]Pay
 		var i PaymentCheckoutShutdown
 		if err := rows.Scan(
 			&i.ID,
+			&i.StripeCredentialID,
 			&i.StripeAccountID,
 			&i.CutoffAt,
 			&i.CreatedAt,
@@ -1023,7 +1168,7 @@ func (q *Queries) ListActivePaymentCheckoutShutdowns(ctx context.Context) ([]Pay
 }
 
 const listActivePaymentOrders = `-- name: ListActivePaymentOrders :many
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 FROM payment_orders
 WHERE user_id = $1
   AND status IN ('creating', 'checkout_open', 'async_payment_pending')
@@ -1047,6 +1192,7 @@ func (q *Queries) ListActivePaymentOrders(ctx context.Context, userID int64) ([]
 			&i.ClientIdempotencyKey,
 			&i.RequestHash,
 			&i.Status,
+			&i.StripeCredentialID,
 			&i.StripeAccountID,
 			&i.StripeCustomerID,
 			&i.StripeProductID,
@@ -1264,23 +1410,30 @@ func (q *Queries) ListAdminPaymentOrders(ctx context.Context, arg ListAdminPayme
 }
 
 const listPaymentOrdersForCheckoutShutdown = `-- name: ListPaymentOrdersForCheckoutShutdown :many
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 FROM payment_orders
 WHERE stripe_account_id = $1
-  AND created_at <= $2
+  AND stripe_credential_id = $2
+  AND created_at <= $3
   AND status IN ('creating', 'checkout_open')
 ORDER BY created_at, id
-LIMIT $3
+LIMIT $4
 `
 
 type ListPaymentOrdersForCheckoutShutdownParams struct {
-	StripeAccountID string    `json:"stripe_account_id"`
-	CreatedAt       time.Time `json:"created_at"`
-	Limit           int32     `json:"limit"`
+	StripeAccountID    string    `json:"stripe_account_id"`
+	StripeCredentialID uuid.UUID `json:"stripe_credential_id"`
+	CreatedAt          time.Time `json:"created_at"`
+	Limit              int32     `json:"limit"`
 }
 
 func (q *Queries) ListPaymentOrdersForCheckoutShutdown(ctx context.Context, arg ListPaymentOrdersForCheckoutShutdownParams) ([]PaymentOrder, error) {
-	rows, err := q.db.QueryContext(ctx, listPaymentOrdersForCheckoutShutdown, arg.StripeAccountID, arg.CreatedAt, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, listPaymentOrdersForCheckoutShutdown,
+		arg.StripeAccountID,
+		arg.StripeCredentialID,
+		arg.CreatedAt,
+		arg.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -1296,6 +1449,7 @@ func (q *Queries) ListPaymentOrdersForCheckoutShutdown(ctx context.Context, arg 
 			&i.ClientIdempotencyKey,
 			&i.RequestHash,
 			&i.Status,
+			&i.StripeCredentialID,
 			&i.StripeAccountID,
 			&i.StripeCustomerID,
 			&i.StripeProductID,
@@ -1486,8 +1640,49 @@ func (q *Queries) ListPaymentReconciliationAnomalies(ctx context.Context, rowLim
 	return items, nil
 }
 
+const listPaymentStripeCredentials = `-- name: ListPaymentStripeCredentials :many
+SELECT id, account_id, mode, charges_enabled, stripe_product_id, stripe_webhook_endpoint_id, api_key_ciphertext, webhook_secret_ciphertext, secret_material_kind, created_by, created_at
+FROM payment_stripe_credentials
+ORDER BY created_at DESC, id DESC
+`
+
+func (q *Queries) ListPaymentStripeCredentials(ctx context.Context) ([]PaymentStripeCredential, error) {
+	rows, err := q.db.QueryContext(ctx, listPaymentStripeCredentials)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PaymentStripeCredential
+	for rows.Next() {
+		var i PaymentStripeCredential
+		if err := rows.Scan(
+			&i.ID,
+			&i.AccountID,
+			&i.Mode,
+			&i.ChargesEnabled,
+			&i.StripeProductID,
+			&i.StripeWebhookEndpointID,
+			&i.ApiKeyCiphertext,
+			&i.WebhookSecretCiphertext,
+			&i.SecretMaterialKind,
+			&i.CreatedBy,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUnsettledPaymentOrders = `-- name: ListUnsettledPaymentOrders :many
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 FROM payment_orders
 WHERE status IN ('creating', 'checkout_open', 'async_payment_pending', 'paid_pending_credit')
 ORDER BY created_at, id
@@ -1511,6 +1706,7 @@ func (q *Queries) ListUnsettledPaymentOrders(ctx context.Context) ([]PaymentOrde
 			&i.ClientIdempotencyKey,
 			&i.RequestHash,
 			&i.Status,
+			&i.StripeCredentialID,
 			&i.StripeAccountID,
 			&i.StripeCustomerID,
 			&i.StripeProductID,
@@ -1550,7 +1746,7 @@ func (q *Queries) ListUnsettledPaymentOrders(ctx context.Context) ([]PaymentOrde
 }
 
 const listUserPendingPaymentOrders = `-- name: ListUserPendingPaymentOrders :many
-SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+SELECT id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 FROM payment_orders
 WHERE user_id = $1
   AND status IN ('checkout_open', 'async_payment_pending', 'paid_pending_credit')
@@ -1574,6 +1770,7 @@ func (q *Queries) ListUserPendingPaymentOrders(ctx context.Context, userID int64
 			&i.ClientIdempotencyKey,
 			&i.RequestHash,
 			&i.Status,
+			&i.StripeCredentialID,
 			&i.StripeAccountID,
 			&i.StripeCustomerID,
 			&i.StripeProductID,
@@ -1617,7 +1814,7 @@ UPDATE payment_orders
 SET status = 'async_payment_pending',
     checkout_url = ''
 WHERE id = $1 AND status = 'checkout_open'
-RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
 func (q *Queries) MarkPaymentOrderAsyncPending(ctx context.Context, id uuid.UUID) (PaymentOrder, error) {
@@ -1631,6 +1828,7 @@ func (q *Queries) MarkPaymentOrderAsyncPending(ctx context.Context, id uuid.UUID
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
+		&i.StripeCredentialID,
 		&i.StripeAccountID,
 		&i.StripeCustomerID,
 		&i.StripeProductID,
@@ -1664,7 +1862,7 @@ UPDATE payment_orders
 SET status = 'cancelled',
     checkout_url = ''
 WHERE id = $1 AND user_id = $2 AND status = 'checkout_open'
-RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
 type MarkPaymentOrderCancelledParams struct {
@@ -1683,6 +1881,7 @@ func (q *Queries) MarkPaymentOrderCancelled(ctx context.Context, arg MarkPayment
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
+		&i.StripeCredentialID,
 		&i.StripeAccountID,
 		&i.StripeCustomerID,
 		&i.StripeProductID,
@@ -1717,7 +1916,7 @@ SET status = 'credited',
     credit_transaction_id = $2,
     credited_at = $3
 WHERE id = $1 AND status = 'paid_pending_credit'
-RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
 type MarkPaymentOrderCreditedParams struct {
@@ -1737,6 +1936,7 @@ func (q *Queries) MarkPaymentOrderCredited(ctx context.Context, arg MarkPaymentO
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
+		&i.StripeCredentialID,
 		&i.StripeAccountID,
 		&i.StripeCustomerID,
 		&i.StripeProductID,
@@ -1770,7 +1970,7 @@ UPDATE payment_orders
 SET status = 'expired',
     checkout_url = ''
 WHERE id = $1 AND status IN ('creating', 'checkout_open', 'async_payment_pending')
-RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
 func (q *Queries) MarkPaymentOrderExpired(ctx context.Context, id uuid.UUID) (PaymentOrder, error) {
@@ -1784,6 +1984,7 @@ func (q *Queries) MarkPaymentOrderExpired(ctx context.Context, id uuid.UUID) (Pa
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
+		&i.StripeCredentialID,
 		&i.StripeAccountID,
 		&i.StripeCustomerID,
 		&i.StripeProductID,
@@ -1817,7 +2018,7 @@ UPDATE payment_orders
 SET status = 'payment_failed',
     checkout_url = ''
 WHERE id = $1 AND status IN ('creating', 'checkout_open', 'async_payment_pending')
-RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
 func (q *Queries) MarkPaymentOrderFailed(ctx context.Context, id uuid.UUID) (PaymentOrder, error) {
@@ -1831,6 +2032,7 @@ func (q *Queries) MarkPaymentOrderFailed(ctx context.Context, id uuid.UUID) (Pay
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
+		&i.StripeCredentialID,
 		&i.StripeAccountID,
 		&i.StripeCustomerID,
 		&i.StripeProductID,
@@ -1904,7 +2106,7 @@ SET status = 'paid_pending_credit',
     paid_at = $12
 WHERE id = $1
   AND status IN ('creating', 'checkout_open', 'async_payment_pending', 'cancelled', 'expired', 'payment_failed')
-RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
+RETURNING id, public_order_number, public_token, user_id, client_idempotency_key, request_hash, status, stripe_credential_id, stripe_account_id, stripe_customer_id, stripe_product_id, stripe_checkout_session_id, stripe_payment_intent_id, stripe_charge_id, idea_quantity, base_currency, base_amount_minor, paid_subtotal_minor, paid_tax_minor, paid_total_minor, paid_currency, terms_version, refund_policy_version, return_base_url, checkout_url, receipt_url, credit_transaction_id, expires_at, paid_at, credited_at, created_at, updated_at
 `
 
 type RecordPaymentOrderPaidParams struct {
@@ -1946,6 +2148,7 @@ func (q *Queries) RecordPaymentOrderPaid(ctx context.Context, arg RecordPaymentO
 		&i.ClientIdempotencyKey,
 		&i.RequestHash,
 		&i.Status,
+		&i.StripeCredentialID,
 		&i.StripeAccountID,
 		&i.StripeCustomerID,
 		&i.StripeProductID,
@@ -2005,91 +2208,53 @@ func (q *Queries) ReplacePaymentCustomer(ctx context.Context, arg ReplacePayment
 const replacePaymentStripeConfiguration = `-- name: ReplacePaymentStripeConfiguration :one
 INSERT INTO payment_stripe_configurations (
   singleton_id,
-  account_id,
-  mode,
-  charges_enabled,
+  active_credential_id,
   product_tax_code,
   purchases_enabled,
-  stripe_product_id,
-  stripe_webhook_endpoint_id,
-  api_key_ciphertext,
-  webhook_secret_ciphertext,
-  secret_material_kind,
-  created_by,
+  revision,
   updated_by
 )
-VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)
+VALUES (1, $1, $2, $3, 1, $4)
 ON CONFLICT (singleton_id) DO UPDATE
-SET account_id = EXCLUDED.account_id,
-    mode = EXCLUDED.mode,
-    charges_enabled = EXCLUDED.charges_enabled,
+SET active_credential_id = EXCLUDED.active_credential_id,
     product_tax_code = EXCLUDED.product_tax_code,
     purchases_enabled = EXCLUDED.purchases_enabled,
-    stripe_product_id = EXCLUDED.stripe_product_id,
-    stripe_webhook_endpoint_id = EXCLUDED.stripe_webhook_endpoint_id,
-    api_key_ciphertext = EXCLUDED.api_key_ciphertext,
-    webhook_secret_ciphertext = EXCLUDED.webhook_secret_ciphertext,
-    secret_material_kind = EXCLUDED.secret_material_kind,
+    revision = payment_stripe_configurations.revision + 1,
     updated_by = EXCLUDED.updated_by
+WHERE payment_stripe_configurations.revision = $5::BIGINT
 RETURNING singleton_id,
-          account_id,
-          mode,
-          charges_enabled,
+          active_credential_id,
           product_tax_code,
           purchases_enabled,
-          stripe_product_id,
-          stripe_webhook_endpoint_id,
-          api_key_ciphertext,
-          webhook_secret_ciphertext,
-          secret_material_kind,
-          created_by,
+          revision,
           updated_by,
           created_at,
           updated_at
 `
 
 type ReplacePaymentStripeConfigurationParams struct {
-	AccountID               string `json:"account_id"`
-	Mode                    string `json:"mode"`
-	ChargesEnabled          bool   `json:"charges_enabled"`
-	ProductTaxCode          string `json:"product_tax_code"`
-	PurchasesEnabled        bool   `json:"purchases_enabled"`
-	StripeProductID         string `json:"stripe_product_id"`
-	StripeWebhookEndpointID string `json:"stripe_webhook_endpoint_id"`
-	ApiKeyCiphertext        string `json:"api_key_ciphertext"`
-	WebhookSecretCiphertext string `json:"webhook_secret_ciphertext"`
-	SecretMaterialKind      string `json:"secret_material_kind"`
-	CreatedBy               int64  `json:"created_by"`
+	ActiveCredentialID uuid.UUID `json:"active_credential_id"`
+	ProductTaxCode     string    `json:"product_tax_code"`
+	PurchasesEnabled   bool      `json:"purchases_enabled"`
+	UpdatedBy          int64     `json:"updated_by"`
+	ExpectedRevision   int64     `json:"expected_revision"`
 }
 
 func (q *Queries) ReplacePaymentStripeConfiguration(ctx context.Context, arg ReplacePaymentStripeConfigurationParams) (PaymentStripeConfiguration, error) {
 	row := q.db.QueryRowContext(ctx, replacePaymentStripeConfiguration,
-		arg.AccountID,
-		arg.Mode,
-		arg.ChargesEnabled,
+		arg.ActiveCredentialID,
 		arg.ProductTaxCode,
 		arg.PurchasesEnabled,
-		arg.StripeProductID,
-		arg.StripeWebhookEndpointID,
-		arg.ApiKeyCiphertext,
-		arg.WebhookSecretCiphertext,
-		arg.SecretMaterialKind,
-		arg.CreatedBy,
+		arg.UpdatedBy,
+		arg.ExpectedRevision,
 	)
 	var i PaymentStripeConfiguration
 	err := row.Scan(
 		&i.SingletonID,
-		&i.AccountID,
-		&i.Mode,
-		&i.ChargesEnabled,
+		&i.ActiveCredentialID,
 		&i.ProductTaxCode,
 		&i.PurchasesEnabled,
-		&i.StripeProductID,
-		&i.StripeWebhookEndpointID,
-		&i.ApiKeyCiphertext,
-		&i.WebhookSecretCiphertext,
-		&i.SecretMaterialKind,
-		&i.CreatedBy,
+		&i.Revision,
 		&i.UpdatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,

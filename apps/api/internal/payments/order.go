@@ -30,6 +30,7 @@ type PaymentOrder struct {
 	ClientIdempotencyKey    string
 	RequestHash             string
 	Status                  PaymentOrderStatus
+	StripeCredentialID      string
 	StripeAccountID         string
 	StripeCustomerID        string
 	StripeProductID         string
@@ -63,6 +64,7 @@ type CreatePaymentOrderIntentInput struct {
 	UserID               int64
 	ClientIdempotencyKey string
 	RequestHash          string
+	StripeCredentialID   string
 	StripeAccountID      string
 	StripeProductID      string
 	IdeaQuantity         int64
@@ -117,7 +119,7 @@ func paymentOrder(row dbsqlc.PaymentOrder) PaymentOrder {
 	return PaymentOrder{
 		ID: row.ID.String(), PublicOrderNumber: row.PublicOrderNumber, PublicToken: row.PublicToken.String(),
 		UserID: row.UserID, ClientIdempotencyKey: row.ClientIdempotencyKey, RequestHash: row.RequestHash,
-		Status: PaymentOrderStatus(row.Status), StripeAccountID: row.StripeAccountID,
+		Status: PaymentOrderStatus(row.Status), StripeCredentialID: row.StripeCredentialID.String(), StripeAccountID: row.StripeAccountID,
 		StripeCustomerID: row.StripeCustomerID, StripeProductID: row.StripeProductID,
 		StripeCheckoutSessionID: row.StripeCheckoutSessionID.String,
 		StripePaymentIntentID:   row.StripePaymentIntentID, StripeChargeID: row.StripeChargeID,

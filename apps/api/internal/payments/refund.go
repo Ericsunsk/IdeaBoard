@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"ideaboard/api/internal/platform/secrets"
 )
 
 const refundEligibilityWindow = 14 * 24 * time.Hour
@@ -107,9 +109,13 @@ func (s *StripeFactsWorkflow) CreatePaymentRefund(ctx context.Context, command C
 	if len(strings.TrimSpace(command.IdempotencyKey)) < 8 || len(strings.TrimSpace(command.IdempotencyKey)) > 160 {
 		return PaymentRefund{}, ErrRefundIdempotency
 	}
-	_, apiKey, err := s.stripeAccessConfiguration(ctx)
+	credential, err := s.configuration.GetStripeCredentialForOrderNumber(ctx, strings.TrimSpace(command.OrderNumber))
 	if err != nil {
-		return PaymentRefund{}, err
+		return PaymentRefund{}, ErrRefundOrderNotEligible
+	}
+	apiKey, err := secrets.DecryptMaterialString(credential.APIKeyCiphertext, credential.SecretMaterialKind)
+	if err != nil {
+		return PaymentRefund{}, ErrStripeConfigurationInvalid
 	}
 	refund, _, err := s.convergenceStore.CreatePendingPaymentRefund(ctx, CreatePendingPaymentRefundInput{
 		ActorID: command.ActorID, OrderNumber: strings.TrimSpace(command.OrderNumber), IdeaQuantity: command.IdeaQuantity,

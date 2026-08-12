@@ -8,17 +8,19 @@ import (
 )
 
 type Response struct {
-	Code int         `json:"code"`
-	Msg  string      `json:"msg"`
-	Data interface{} `json:"data,omitempty"`
+	Code        int         `json:"code"`
+	Msg         string      `json:"msg"`
+	MessageSafe bool        `json:"message_safe"`
+	Data        interface{} `json:"data,omitempty"`
 }
 
 // MachineErrorResponse carries a stable machine-readable error code for the
 // narrow HTTP contracts that need callers to branch without matching copy.
 // Generic responses retain the established numeric transport contract.
 type MachineErrorResponse struct {
-	Code string `json:"code"`
-	Msg  string `json:"msg"`
+	Code        string `json:"code"`
+	Msg         string `json:"msg"`
+	MessageSafe bool   `json:"message_safe"`
 }
 
 func Success(c *gin.Context, data interface{}) {
@@ -29,15 +31,16 @@ func Success(c *gin.Context, data interface{}) {
 	})
 }
 
+// Error is a trust boundary: msg must be intentionally safe for public display.
+// Unexpected I/O, database, provider, or wrapped errors must use InternalError.
 func Error(c *gin.Context, code int, msg string) {
 	c.JSON(code, Response{
-		Code: code,
-		Msg:  msg,
+		Code: code, Msg: msg, MessageSafe: true,
 	})
 }
 
 func MachineError(c *gin.Context, httpStatus int, code, msg string) {
-	c.JSON(httpStatus, MachineErrorResponse{Code: code, Msg: msg})
+	c.JSON(httpStatus, MachineErrorResponse{Code: code, Msg: msg, MessageSafe: true})
 }
 
 // SuccessDTO is a typed variant of Success for callers that already have a

@@ -147,6 +147,46 @@ func TestReceiveStripeWebhookIgnoresVerifiedUnknownEventAndRejectsUnverifiedPayl
 	}
 }
 
+func TestReceiveStripeWebhookAcceptsARetainedCredentialSecret(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	db := testdb.Open(t)
+	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
+		AccountID: "acct_webhook_old", Mode: StripeModeTest, ChargesEnabled: true,
+		ProductID: "prod_webhook_old", WebhookEndpointID: "we_webhook_old", WebhookSecret: "whsec_webhook_old",
+	}}
+	verifier := &secretSelectingWebhookVerifier{
+		acceptedSecret: "whsec_webhook_old",
+		event: StripeWebhookEvent{
+			ID: "evt_retained", Type: "customer.updated", ObjectID: "cus_retained", CreatedAt: time.Now(),
+		},
+	}
+	repo := NewRepository(db)
+	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
+	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+		ActorID: 42, APIKey: "sk_test_webhook_old", ProductTaxCode: "txcd_10105001",
+		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	gateway.prepared = PreparedStripeConfiguration{
+		AccountID: "acct_webhook_new", Mode: StripeModeTest, ChargesEnabled: true,
+		ProductID: "prod_webhook_new", WebhookEndpointID: "we_webhook_new", WebhookSecret: "whsec_webhook_new",
+	}
+	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+		ActorID: 42, APIKey: "sk_test_webhook_new", ProductTaxCode: "txcd_10105001",
+		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	receipt, err := service.ReceiveStripeWebhook(t.Context(), []byte(`{"id":"evt_retained"}`), "valid")
+	if err != nil || !receipt.Ignored || receipt.EventID != "evt_retained" {
+		t.Fatalf("retained credential receipt = %+v, %v", receipt, err)
+	}
+	if !slices.Contains(verifier.secrets, "whsec_webhook_new") || !slices.Contains(verifier.secrets, "whsec_webhook_old") {
+		t.Fatalf("verified secrets = %q, want active and retained generations", verifier.secrets)
+	}
+}
+
 type fakeWebhookVerifier struct {
 	event     StripeWebhookEvent
 	err       error
@@ -155,6 +195,20 @@ type fakeWebhookVerifier struct {
 	secret    string
 	tolerance time.Duration
 	now       time.Time
+}
+
+type secretSelectingWebhookVerifier struct {
+	acceptedSecret string
+	event          StripeWebhookEvent
+	secrets        []string
+}
+
+func (v *secretSelectingWebhookVerifier) Verify(_ context.Context, _ []byte, _ string, secret string, _ time.Duration, _ time.Time) (StripeWebhookEvent, error) {
+	v.secrets = append(v.secrets, secret)
+	if secret != v.acceptedSecret {
+		return StripeWebhookEvent{}, ErrInvalidWebhookSignature
+	}
+	return v.event, nil
 }
 
 func (f *fakeWebhookVerifier) Verify(_ context.Context, raw []byte, signature, secret string, tolerance time.Duration, now time.Time) (StripeWebhookEvent, error) {

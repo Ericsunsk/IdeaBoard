@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"ideaboard/api/internal/platform/response"
+	"ideaboard/api/internal/platform/validation"
 
 	"github.com/gin-gonic/gin"
 )
@@ -95,7 +96,11 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 			response.Error(c, 409, "同一 ProviderEndpoint 下已存在同名 APIKey")
 			return
 		}
-		response.Error(c, 400, err.Error())
+		if validation.Is(err) {
+			response.Error(c, 400, err.Error())
+			return
+		}
+		response.InternalError(c, 500, "创建 APIKey 失败", err)
 		return
 	}
 	response.SuccessDTO(c, accountResponse{Account: account})
@@ -121,7 +126,11 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 			response.Error(c, 409, "同一 ProviderEndpoint 下已存在同名 APIKey")
 			return
 		}
-		response.Error(c, 400, err.Error())
+		if validation.Is(err) {
+			response.Error(c, 400, err.Error())
+			return
+		}
+		response.InternalError(c, 500, "更新 APIKey 失败", err)
 		return
 	}
 	response.Success(c, nil)
@@ -144,7 +153,11 @@ func (h *AccountHandler) PatchAccountModel(c *gin.Context) {
 			response.Error(c, 404, "账号不存在")
 			return
 		}
-		response.Error(c, 400, err.Error())
+		if validation.Is(err) {
+			response.Error(c, 400, err.Error())
+			return
+		}
+		response.InternalError(c, 500, "更新模型配置失败", err)
 		return
 	}
 	response.SuccessDTO(c, accountResponse{Account: account})
@@ -167,7 +180,11 @@ func (h *AccountHandler) DeleteAccountModel(c *gin.Context) {
 			response.Error(c, 404, "模型不存在")
 			return
 		}
-		response.Error(c, 400, err.Error())
+		if validation.Is(err) {
+			response.Error(c, 400, err.Error())
+			return
+		}
+		response.InternalError(c, 500, "删除模型配置失败", err)
 		return
 	}
 	response.SuccessDTO(c, accountResponse{Account: account})

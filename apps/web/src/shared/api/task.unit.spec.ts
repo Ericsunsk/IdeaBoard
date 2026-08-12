@@ -32,7 +32,7 @@ describe('task API boundary', () => {
   })
 
   it('rejects business failures and malformed successful responses', async () => {
-    mocks.submitUserTask.mockResolvedValue({ code: 503, msg: 'api key leaked' })
+    mocks.submitUserTask.mockResolvedValue({ code: 503, msg: 'api_key=exposed' })
     mocks.getUserTask.mockResolvedValue({ code: 0, msg: 'ok', data: {} })
 
     await expect(taskApi.submit({ prompt: 'test' })).rejects.toThrow('提交任务失败')

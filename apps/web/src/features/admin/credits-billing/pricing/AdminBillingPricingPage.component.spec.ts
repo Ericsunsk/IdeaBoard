@@ -191,7 +191,10 @@ describe('AdminBillingPricingPage', () => {
       http.post('/api/admin/billing/catalog/:sku/prices', () => {
         requests += 1
         if (requests === 1) {
-          return HttpResponse.json({ code: 500, msg: 'publish unavailable' }, { status: 500 })
+          return HttpResponse.json(
+            { code: 500, msg: 'publish unavailable', message_safe: true },
+            { status: 500 },
+          )
         }
         return HttpResponse.json({
           code: 0,
@@ -287,7 +290,10 @@ describe('AdminBillingPricingPage', () => {
         HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
       ),
       http.delete('/api/admin/billing/catalog/:sku', () =>
-        HttpResponse.json({ code: 409, msg: '功能已有历史计费记录，无法删除' }, { status: 409 }),
+        HttpResponse.json(
+          { code: 409, msg: '功能已有历史计费记录，无法删除', message_safe: true },
+          { status: 409 },
+        ),
       ),
     )
 

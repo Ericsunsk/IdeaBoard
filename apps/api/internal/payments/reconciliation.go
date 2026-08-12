@@ -23,41 +23,39 @@ func (s *StripeFactsWorkflow) ReconcileDuePaymentOrders(ctx context.Context) err
 	if s == nil || s.configuration == nil || s.checkoutStore == nil || s.convergenceStore == nil || s.orderLifecycle == nil || s.checkoutGateway == nil {
 		return fmt.Errorf("payments reconciliation unavailable")
 	}
-	return s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
-		configuration, apiKey, configurationErr := s.stripeAccessConfiguration(lockedContext)
-		now := s.runtime.now().UTC()
-		claims, err := s.convergenceStore.ClaimDuePaymentOrderReconciliations(lockedContext, now)
-		if err != nil {
-			return err
+	now := s.runtime.now().UTC()
+	claims, err := s.convergenceStore.ClaimDuePaymentOrderReconciliations(ctx, now)
+	if err != nil {
+		return err
+	}
+	var retryErr error
+	for _, claim := range claims {
+		configuration, apiKey, configurationErr := s.stripeCredentialAccess(ctx, claim.Order.StripeCredentialID)
+		outcome, processErr := s.reconcilePaymentOrderClaim(ctx, configuration, apiKey, configurationErr, claim, now)
+		completed, completeErr := s.convergenceStore.CompletePaymentOrderReconciliationClaim(ctx, claim, outcome)
+		if completeErr != nil {
+			retryErr = errors.Join(retryErr, completeErr)
+			continue
 		}
-		var retryErr error
-		for _, claim := range claims {
-			outcome, processErr := s.reconcilePaymentOrderClaim(lockedContext, configuration, apiKey, configurationErr, claim, now)
-			completed, completeErr := s.convergenceStore.CompletePaymentOrderReconciliationClaim(lockedContext, claim, outcome)
-			if completeErr != nil {
-				retryErr = errors.Join(retryErr, completeErr)
-				continue
-			}
-			if !completed {
-				continue
-			}
-			if processErr != nil && reconciliationFailureIsTransient(processErr) {
-				retryErr = errors.Join(retryErr, processErr)
-			}
+		if !completed {
+			continue
 		}
-		refundErr := s.reconcileDuePaymentRefunds(lockedContext, apiKey, configurationErr, now)
-		if refundErr != nil {
-			retryErr = errors.Join(retryErr, refundErr)
+		if processErr != nil && reconciliationFailureIsTransient(processErr) {
+			retryErr = errors.Join(retryErr, processErr)
 		}
-		disputeErr := s.reconcileDuePaymentDisputes(lockedContext, apiKey, configurationErr, now)
-		if disputeErr != nil {
-			retryErr = errors.Join(retryErr, disputeErr)
-		}
-		return retryErr
-	})
+	}
+	refundErr := s.reconcileDuePaymentRefunds(ctx, now)
+	if refundErr != nil {
+		retryErr = errors.Join(retryErr, refundErr)
+	}
+	disputeErr := s.reconcileDuePaymentDisputes(ctx, now)
+	if disputeErr != nil {
+		retryErr = errors.Join(retryErr, disputeErr)
+	}
+	return retryErr
 }
 
-func (s *StripeFactsWorkflow) reconcileDuePaymentDisputes(ctx context.Context, apiKey string, configurationErr error, now time.Time) error {
+func (s *StripeFactsWorkflow) reconcileDuePaymentDisputes(ctx context.Context, now time.Time) error {
 	if s == nil || s.convergenceStore == nil || s.disputeGateway == nil {
 		return nil
 	}
@@ -67,6 +65,7 @@ func (s *StripeFactsWorkflow) reconcileDuePaymentDisputes(ctx context.Context, a
 	}
 	var retryErr error
 	for _, dispute := range disputes {
+		_, apiKey, configurationErr := s.stripeOrderAccess(ctx, dispute.PaymentOrderID)
 		if configurationErr != nil {
 			retryErr = errors.Join(retryErr, configurationErr)
 			continue
@@ -84,14 +83,14 @@ func (s *StripeFactsWorkflow) reconcileDuePaymentDisputes(ctx context.Context, a
 		if changed {
 			s.publishDisputeUpdate(updated.UserID)
 		}
-		if expireErr := s.expireDisputeCheckoutSessions(ctx, apiKey, updated); expireErr != nil {
+		if expireErr := s.expireDisputeCheckoutSessions(ctx, updated); expireErr != nil {
 			retryErr = errors.Join(retryErr, expireErr)
 		}
 	}
 	return retryErr
 }
 
-func (s *StripeFactsWorkflow) reconcileDuePaymentRefunds(ctx context.Context, apiKey string, configurationErr error, now time.Time) error {
+func (s *StripeFactsWorkflow) reconcileDuePaymentRefunds(ctx context.Context, now time.Time) error {
 	if s == nil || s.convergenceStore == nil || s.refundGateway == nil {
 		return nil
 	}
@@ -101,6 +100,7 @@ func (s *StripeFactsWorkflow) reconcileDuePaymentRefunds(ctx context.Context, ap
 	}
 	var retryErr error
 	for _, refund := range refunds {
+		_, apiKey, configurationErr := s.stripeOrderAccess(ctx, refund.PaymentOrderID)
 		if configurationErr != nil {
 			retryErr = errors.Join(retryErr, configurationErr)
 			continue

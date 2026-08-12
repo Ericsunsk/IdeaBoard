@@ -20,7 +20,7 @@ const (
 var (
 	ErrStripeConfigurationNotFound = errors.New("尚未完成 Stripe 配置")
 	ErrStripeAPIKeyRequired        = errors.New("请填写 Stripe API Key")
-	ErrInvalidStripeAPIKey         = errors.New("无效的 Stripe API Key 格式")
+	ErrInvalidStripeAPIKey         = errors.New("无效的 Stripe API Key：请使用 sk_ 或 rk_ 开头的对应环境 Key")
 	ErrInvalidProductTaxCode       = errors.New("无效的 Stripe Product Tax Code 格式")
 	ErrInvalidWebhookURL           = errors.New("无效的 Stripe Webhook URL")
 	ErrStripePermissionDenied      = errors.New("当前 Stripe API Key 权限不足")
@@ -28,6 +28,7 @@ var (
 	ErrStripeCapabilityUnavailable = errors.New("当前 Stripe 账户暂不具备收款能力")
 	ErrStripeProviderUnavailable   = errors.New("当前 Stripe 服务暂时不可用")
 	ErrStripeConfigurationInvalid  = errors.New("收到的 Stripe 配置不完整")
+	ErrStripeConfigurationChanged  = errors.New("Stripe 配置已被其他操作更新，请重试")
 )
 
 var productTaxCodePattern = regexp.MustCompile(`^txcd_[0-9]{8}$`)
@@ -123,13 +124,17 @@ func ClassifyStripeAPIKey(raw string) (StripeMode, error) {
 		return "", ErrInvalidStripeAPIKey
 	}
 	switch {
-	case strings.HasPrefix(key, "sk_test_") && len(key) > len("sk_test_"):
+	case hasStripeKeyPrefix(key, "sk_test_"), hasStripeKeyPrefix(key, "rk_test_"):
 		return StripeModeTest, nil
-	case strings.HasPrefix(key, "rk_live_") && len(key) > len("rk_live_"):
+	case hasStripeKeyPrefix(key, "sk_live_"), hasStripeKeyPrefix(key, "rk_live_"):
 		return StripeModeLive, nil
 	default:
 		return "", ErrInvalidStripeAPIKey
 	}
+}
+
+func hasStripeKeyPrefix(key, prefix string) bool {
+	return strings.HasPrefix(key, prefix) && len(key) > len(prefix)
 }
 
 func normalizeProductTaxCode(raw string) (string, error) {

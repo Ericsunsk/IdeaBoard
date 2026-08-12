@@ -6,7 +6,8 @@ Payments 拥有 Stripe 配置、签名 Webhook 接入与支付生命周期。它
 
 | Term | Meaning |
 | ---- | ------- |
-| Current Stripe Configuration | 当前唯一生效的 Stripe account、Product Tax Code、购买开关与 provider resource references；Secret 只保存密文 |
+| Current Stripe Configuration | 当前生效的 Stripe Credential Generation、Product Tax Code 与购买开关；发布只执行短事务 |
+| Stripe Credential Generation | immutable Stripe account、Secret 密文与 provider resource references；Payment Order 永久引用创建时使用的 generation |
 | Stripe Gateway | Payments 调用 Stripe API 的 adapter seam；domain service 不依赖 Stripe SDK 类型 |
 | Webhook Inbox | 以 Stripe Event ID 全局去重的最小接收事实，只保存路由与处理所需 metadata，不保存原始 payload |
 | Ignored Event | 签名有效但当前 Payments 不识别的事件；记录为 `ignored` 并成功确认，不触发业务状态变更 |
@@ -23,7 +24,7 @@ Payments 拥有 Stripe 配置、签名 Webhook 接入与支付生命周期。它
 ## Public Seams
 
 - `Service.GetStripeConfiguration` 只返回可安全展示的配置摘要，不返回 API Key、Webhook Secret 或其密文。
-- `Service.ConfigureStripe` 在启用或变更 Stripe 配置时先通过 `StripeGateway` 准备并验证 Stripe account、Product 与 Webhook endpoint，再原子发布当前配置和成功 audit；准备失败时保留旧配置。
+- `Service.ConfigureStripe` 在启用或变更 Stripe 配置时先通过 `StripeGateway` 准备并验证 Stripe account、Product 与 Webhook endpoint，再以 compare-and-swap 短事务原子发布 active generation、settings 和成功 audit；准备失败或并发发布冲突时保留旧配置。
 - `purchases_enabled` 从 true 切为 false 时只提交本地 fast path，并在同一 transaction 写入 durable Checkout shutdown run；River 按数据库 cutoff 幂等 Expire 存量 Session，periodic recovery 负责 enqueue/进程故障后的续跑。
 - `Service.ReceiveStripeWebhook` 对 raw body 验签、去重并写入最小 Webhook Inbox。后续 payment order、refund 与 dispute lifecycle 继续收口在 Payments context。
 - `Service.GetPurchaseOptions`、`CreateCheckout`、`ListPendingOrders`、`ContinuePendingOrder`、`AbandonPendingOrder`、`GetPaymentOrderReturnStatus` 与 `ListRecharges` 是用户充值 boundary。`ListRecharges` 保留已到账、已退款与用户主动放弃的订单事实；HTTP handler 只能使用 authenticated principal 的 user ID，并为订单、历史和 SSE 设定 user scope。
@@ -36,10 +37,10 @@ Payments 拥有 Stripe 配置、签名 Webhook 接入与支付生命周期。它
 - Stripe API Key 与 Webhook Secret 使用平台 Secret material 加密存储，禁止进入 HTTP response、日志、Webhook Inbox 或 Admin audit。
 - Payments 只持久化收敛和审计所需的最小 Stripe IDs、金额、币种、状态、时间、收据 URL、条款版本与受限错误摘要；禁止持久化卡信息、完整账单地址、完整 raw payload、Secret 明文或内部 stack trace。Payment 事实的 retention 由受控运维流程决定，不得手工删除关联 Ledger 或未结算状态。
 - Checkout 不启用 Stripe Automatic Tax，也不主动要求或保存 Customer 地址；Stripe 或具体 Payment Method 因合规要求收集的最少 Billing 信息不属于应用可屏蔽范围。
-- Webhook 必须在业务解析和持久化前使用 raw body、当前 Webhook Secret 与 5 分钟 tolerance 验证签名；无效或过期签名不写 Inbox。
+- Webhook 必须在业务解析和持久化前使用 raw body、retained Credential Generations 的 Webhook Secret 与 5 分钟 tolerance 验证签名；无效或过期签名不写 Inbox。
 - Stripe Event ID 在全局唯一。重复投递保持幂等；已签名但未知的事件只记录最小 metadata 并标记 `ignored`。
 - Webhook Inbox 不保存原始 payload，只保存 Event ID、type、object ID、livemode、Stripe created time、接收/处理状态与时间。
-- 配置与 Webhook Secret 在 request-time 从 PostgreSQL 读取并实时生效，不使用 application-lifetime 配置缓存。
+- 配置与 Webhook Secret 在 request-time 从 PostgreSQL 读取并实时生效，不使用 application-lifetime 配置缓存。Payment Order、Refund、Dispute、Checkout shutdown 与 Reconciliation 必须按订单引用的 immutable Credential Generation 访问 Stripe；切换 active generation 不扫描旧订单，也不在 provider I/O 期间持有全局配置锁。
 - 创建 Checkout 前必须先以 `(user_id, client_idempotency_key)` 和 canonical request hash durable 创建或重放 Payment Order；相同 key 的不同请求 fail closed。Stripe Customer、Checkout Session 和其 provider identity 都必须绑定到该 Order。
 - Stripe 明确拒绝创建 Customer 或 Checkout Session 时，`creating` Order 必须立即进入 `payment_failed`，允许用户用新 Order 重试；网络中断、限流、provider `5xx`、`idempotency_error` 或响应不完整等结果未知失败必须保留原 Order 与原 Stripe Idempotency Key。
 - Payment Order 生命周期以 `creating → checkout_open → async_payment_pending` 表达未完成 Checkout，以 `cancelled|expired|payment_failed` 表达未支付终态，以 `paid_pending_credit → credited` 表达已确认支付到 Ledger 到账。已确认的 late paid fact 可以从未支付终态升级到 `paid_pending_credit`，其他终态不得回退；所有 transition 由数据库约束。

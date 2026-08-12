@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
+	"ideaboard/api/internal/platform/secrets"
 )
 
 const checkoutShutdownBatchSize int32 = 100
@@ -16,40 +18,41 @@ func (s *CheckoutWorkflow) RunPaymentCheckoutShutdown(ctx context.Context, shutd
 	if s == nil || s.configuration == nil || s.checkoutStore == nil || s.orderLifecycle == nil || s.checkoutGateway == nil {
 		return fmt.Errorf("payment Checkout shutdown unavailable")
 	}
-	return s.configuration.WithStripeConfigurationSharedLock(ctx, func(lockedContext context.Context) error {
-		shutdown, err := s.configuration.GetPaymentCheckoutShutdown(lockedContext, shutdownID)
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil
-		}
-		if err != nil || shutdown.CompletedAt != nil {
+	shutdown, err := s.configuration.GetPaymentCheckoutShutdown(ctx, shutdownID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil || shutdown.CompletedAt != nil {
+		return err
+	}
+	var apiKey string
+	for {
+		orders, err := s.configuration.ListPaymentOrdersForCheckoutShutdown(ctx, shutdown, checkoutShutdownBatchSize)
+		if err != nil {
 			return err
 		}
-		var apiKey string
-		for {
-			orders, err := s.configuration.ListPaymentOrdersForCheckoutShutdown(lockedContext, shutdown, checkoutShutdownBatchSize)
+		if len(orders) == 0 {
+			return s.configuration.CompletePaymentCheckoutShutdown(ctx, shutdown.ID, s.runtime.now().UTC())
+		}
+		if apiKey == "" {
+			configuration, err := s.configuration.GetStripeCredential(ctx, shutdown.StripeCredentialID)
 			if err != nil {
 				return err
 			}
-			if len(orders) == 0 {
-				return s.configuration.CompletePaymentCheckoutShutdown(lockedContext, shutdown.ID, s.runtime.now().UTC())
+			if configuration.AccountID != shutdown.StripeAccountID {
+				return ErrPurchasesUnavailable
 			}
-			if apiKey == "" {
-				configuration, resolvedAPIKey, err := s.stripeAccessConfiguration(lockedContext)
-				if err != nil {
-					return err
-				}
-				if configuration.AccountID != shutdown.StripeAccountID {
-					return ErrPurchasesUnavailable
-				}
-				apiKey = resolvedAPIKey
-			}
-			for _, order := range orders {
-				if err := s.expireCheckoutForShutdown(lockedContext, apiKey, shutdown, order); err != nil {
-					return err
-				}
+			apiKey, err = secrets.DecryptMaterialString(configuration.APIKeyCiphertext, configuration.SecretMaterialKind)
+			if err != nil {
+				return ErrStripeConfigurationInvalid
 			}
 		}
-	})
+		for _, order := range orders {
+			if err := s.expireCheckoutForShutdown(ctx, apiKey, shutdown, order); err != nil {
+				return err
+			}
+		}
+	}
 }
 
 func (s *CheckoutWorkflow) RunActivePaymentCheckoutShutdowns(ctx context.Context) error {
@@ -77,7 +80,7 @@ func (s *CheckoutWorkflow) expireCheckoutForShutdown(ctx context.Context, apiKey
 		if err != nil {
 			return err
 		}
-		if order.StripeAccountID != shutdown.StripeAccountID || order.CreatedAt.After(shutdown.CutoffAt) {
+		if order.StripeCredentialID != shutdown.StripeCredentialID || order.StripeAccountID != shutdown.StripeAccountID || order.CreatedAt.After(shutdown.CutoffAt) {
 			return nil
 		}
 		switch order.Status {

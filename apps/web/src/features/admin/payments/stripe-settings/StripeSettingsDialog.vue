@@ -175,9 +175,13 @@ const isBusy = computed(() => isLoading.value || isSaving.value)
 const apiKeyPlaceholder = computed(() =>
   summary.value?.apiKeyConfigured ? '已配置，留空则保持不变' : '输入 Stripe API Key',
 )
-const apiKeyHint = computed(() =>
-  summary.value?.apiKeyConfigured ? '为保护 Secret，不会回显当前 API Key。' : undefined,
-)
+const apiKeyHint = computed(() => {
+  const acceptedFormats =
+    '支持对应环境的 Secret key（sk_）或 Restricted key（rk_），建议优先使用最小权限的 Restricted key。'
+  return summary.value?.apiKeyConfigured
+    ? `为保护 Secret，不会回显当前 API Key。${acceptedFormats}`
+    : acceptedFormats
+})
 const modeLabel = computed(() =>
   summary.value?.mode === 'live' ? 'Live Mode' : summary.value?.mode === 'test' ? 'Test Mode' : '—',
 )

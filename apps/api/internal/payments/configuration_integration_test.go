@@ -2,12 +2,10 @@ package payments
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"strings"
 	"testing"
 
-	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
 )
@@ -15,8 +13,6 @@ import (
 func TestConfigureStripePreparesThenAtomicallyPublishesSafeSummary(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
-	// The lifecycle lock and the atomic configuration write must share one
-	// connection; otherwise a single-connection pool deadlocks itself.
 	db.SetMaxOpenConns(1)
 	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
 		AccountID: "acct_test", Mode: StripeModeTest, ChargesEnabled: true,
@@ -48,7 +44,9 @@ func TestConfigureStripePreparesThenAtomicallyPublishesSafeSummary(t *testing.T)
 	var encryptedKey, encryptedWebhookSecret, materialKind string
 	if err := db.QueryRowContext(t.Context(), `
 SELECT api_key_ciphertext, webhook_secret_ciphertext, secret_material_kind
-FROM payment_stripe_configurations WHERE singleton_id = 1`).Scan(&encryptedKey, &encryptedWebhookSecret, &materialKind); err != nil {
+	FROM payment_stripe_credentials credentials
+	JOIN payment_stripe_configurations configuration ON configuration.active_credential_id = credentials.id
+	WHERE configuration.singleton_id = 1`).Scan(&encryptedKey, &encryptedWebhookSecret, &materialKind); err != nil {
 		t.Fatalf("read stored configuration: %v", err)
 	}
 	if encryptedKey == "sk_test_safe_fixture" || encryptedWebhookSecret == "whsec_test" || materialKind != "encrypted" {
@@ -68,39 +66,6 @@ SELECT actor_id, outcome FROM payment_admin_actions ORDER BY id DESC LIMIT 1`).S
 	loaded, err := service.GetStripeConfiguration(t.Context())
 	if err != nil || loaded != summary {
 		t.Fatalf("GetStripeConfiguration() = %+v, %v; want %+v", loaded, err, summary)
-	}
-}
-
-func TestStripeLifecycleTransactionRollsBackAndUnlocksAfterPanic(t *testing.T) {
-	db := testdb.Open(t)
-	db.SetMaxOpenConns(1)
-	repo := NewRepository(db)
-	panicked := false
-	func() {
-		defer func() { panicked = recover() != nil }()
-		_ = repo.WithStripeConfigurationSharedLock(t.Context(), func(lockedContext context.Context) error {
-			return repo.dbWithContext(lockedContext).withTx(func(_ *dbsqlc.Queries, tx *sql.Tx) error {
-				if _, err := tx.ExecContext(lockedContext, `
-INSERT INTO payment_admin_actions (action_type, actor_id, target_type, target_id, outcome, metadata)
-VALUES ('configure_stripe', 42, 'stripe_configuration', 'current', 'failed', '{}'::jsonb)`); err != nil {
-					t.Fatal(err)
-				}
-				panic("injected transaction panic")
-			})
-		})
-	}()
-	if !panicked {
-		t.Fatal("transaction panic did not propagate")
-	}
-	var auditCount int
-	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM payment_admin_actions`).Scan(&auditCount); err != nil {
-		t.Fatal(err)
-	}
-	if auditCount != 0 {
-		t.Fatalf("panic committed %d payment admin actions", auditCount)
-	}
-	if err := repo.WithStripeConfigurationExclusiveLock(t.Context(), func(context.Context) error { return nil }); err != nil {
-		t.Fatalf("lifecycle lock remained held after panic: %v", err)
 	}
 }
 
@@ -148,6 +113,125 @@ FROM payment_admin_actions ORDER BY id DESC LIMIT 1`).Scan(&outcome, &errorCode,
 	}
 }
 
+func TestConfigureStripeReusesOnlyAnUnchangedCredentialGeneration(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	db := testdb.Open(t)
+	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
+		AccountID: "acct_stable", Mode: StripeModeTest, ChargesEnabled: true,
+		ProductID: "prod_stable", WebhookEndpointID: "we_stable", WebhookSecret: "whsec_stable",
+	}}
+	repo := NewRepository(db)
+	service := newCompleteTestCheckoutWorkflow(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, testShutdownEnqueuer{})
+	command := ConfigureStripeCommand{
+		ActorID: 42, APIKey: "sk_test_stable", ProductTaxCode: "txcd_10105001",
+		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
+	}
+	if _, err := service.ConfigureStripe(t.Context(), command); err != nil {
+		t.Fatalf("initial ConfigureStripe() error = %v", err)
+	}
+	initial, err := repo.GetStripeConfiguration(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ConfigureStripe(t.Context(), command); err != nil {
+		t.Fatalf("repeated ConfigureStripe() error = %v", err)
+	}
+	repeated, err := repo.GetStripeConfiguration(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repeated.CredentialID != initial.CredentialID {
+		t.Fatalf("unchanged credential rotated from %q to %q", initial.CredentialID, repeated.CredentialID)
+	}
+
+	command.APIKey = "sk_test_rotated"
+	if _, err := service.ConfigureStripe(t.Context(), command); err != nil {
+		t.Fatalf("rotated ConfigureStripe() error = %v", err)
+	}
+	rotated, err := repo.GetStripeConfiguration(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rotated.CredentialID == initial.CredentialID {
+		t.Fatal("changed API Key reused the previous credential generation")
+	}
+	var credentialCount int
+	if err := db.QueryRowContext(t.Context(), `SELECT COUNT(*) FROM payment_stripe_credentials`).Scan(&credentialCount); err != nil {
+		t.Fatal(err)
+	}
+	if credentialCount != 2 {
+		t.Fatalf("credential generations = %d, want 2", credentialCount)
+	}
+}
+
+func TestReplaceStripeConfigurationRejectsAStaleRevision(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	db := testdb.Open(t)
+	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
+		AccountID: "acct_revision", Mode: StripeModeTest, ChargesEnabled: true,
+		ProductID: "prod_revision", WebhookEndpointID: "we_revision", WebhookSecret: "whsec_revision",
+	}}
+	repo := NewRepository(db)
+	service := newCompleteTestCheckoutWorkflow(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, testShutdownEnqueuer{})
+	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+		ActorID: 42, APIKey: "sk_test_revision", ProductTaxCode: "txcd_10105001",
+		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	current, err := repo.GetStripeConfiguration(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := current
+	updated.UpdatedBy = 43
+	if _, _, err := repo.ReplaceStripeConfiguration(t.Context(), current.Revision, updated, ConfigurationAudit{ActorID: 43, Outcome: "succeeded"}); err != nil {
+		t.Fatalf("first ReplaceStripeConfiguration() error = %v", err)
+	}
+	updated.UpdatedBy = 44
+	if _, _, err := repo.ReplaceStripeConfiguration(t.Context(), current.Revision, updated, ConfigurationAudit{ActorID: 44, Outcome: "succeeded"}); !errors.Is(err, ErrStripeConfigurationChanged) {
+		t.Fatalf("stale ReplaceStripeConfiguration() error = %v, want ErrStripeConfigurationChanged", err)
+	}
+}
+
+func TestDisablingPurchasesShutsDownThePreviousCredentialAccount(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	db := testdb.Open(t)
+	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
+		AccountID: "acct_previous", Mode: StripeModeTest, ChargesEnabled: true,
+		ProductID: "prod_previous", WebhookEndpointID: "we_previous", WebhookSecret: "whsec_previous",
+	}}
+	repo := NewRepository(db)
+	service := newCompleteTestCheckoutWorkflow(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, testShutdownEnqueuer{})
+	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+		ActorID: 42, APIKey: "sk_test_previous", ProductTaxCode: "txcd_10105001",
+		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	previous, err := repo.GetStripeConfiguration(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	gateway.prepared = PreparedStripeConfiguration{
+		AccountID: "acct_next", Mode: StripeModeTest, ChargesEnabled: true,
+		ProductID: "prod_next", WebhookEndpointID: "we_next", WebhookSecret: "whsec_next",
+	}
+	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+		ActorID: 42, APIKey: "sk_test_next", ProductTaxCode: "txcd_10105001",
+		PurchasesEnabled: false, WebhookURL: "https://app.example.com/api/webhooks/stripe",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	shutdowns, err := repo.ListActivePaymentCheckoutShutdowns(t.Context())
+	if err != nil || len(shutdowns) != 1 {
+		t.Fatalf("Checkout shutdowns = %+v, %v", shutdowns, err)
+	}
+	if shutdowns[0].StripeCredentialID != previous.CredentialID || shutdowns[0].StripeAccountID != previous.AccountID {
+		t.Fatalf("Checkout shutdown identity = %+v, want credential=%q account=%q", shutdowns[0], previous.CredentialID, previous.AccountID)
+	}
+}
+
 func TestStripeAPIKeyModePolicy(t *testing.T) {
 	tests := []struct {
 		name string
@@ -156,9 +240,10 @@ func TestStripeAPIKeyModePolicy(t *testing.T) {
 		ok   bool
 	}{
 		{name: "test secret", key: "sk_test_value", mode: StripeModeTest, ok: true},
-		{name: "test restricted rejected by product policy", key: "rk_test_value", ok: false},
+		{name: "test restricted", key: "rk_test_value", mode: StripeModeTest, ok: true},
+		{name: "live secret", key: "sk_live_value", mode: StripeModeLive, ok: true},
 		{name: "live restricted", key: "rk_live_value", mode: StripeModeLive, ok: true},
-		{name: "live secret rejected", key: "sk_live_value", ok: false},
+		{name: "publishable rejected", key: "pk_live_value", ok: false},
 		{name: "malformed", key: "secret", ok: false},
 	}
 	for _, tt := range tests {

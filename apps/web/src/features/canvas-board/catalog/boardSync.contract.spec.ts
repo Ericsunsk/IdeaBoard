@@ -298,7 +298,12 @@ describe('boardSync', () => {
 
   it('rejects a board save with a failed business code', async () => {
     replaceCanvasBoards([{ id: 'board-1', name: 'Board', createdAt: 100, updatedAt: 2_000 }])
-    mocks.state.upsertResponse = { code: 409, msg: '画布名称已存在', data: null }
+    mocks.state.upsertResponse = {
+      code: 409,
+      msg: '画布名称已存在',
+      message_safe: true,
+      data: null,
+    }
 
     await expect(syncCanvasBoardToServer('board-1')).rejects.toThrow('画布名称已存在')
   })
