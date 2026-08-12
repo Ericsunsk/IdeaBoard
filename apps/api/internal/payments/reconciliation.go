@@ -28,10 +28,23 @@ func (s *StripeFactsWorkflow) ReconcileDuePaymentOrders(ctx context.Context) err
 	if err != nil {
 		return err
 	}
+	activeConfiguration, activeConfigurationErr := s.configuration.GetStripeConfiguration(ctx)
+	if isConfigurationNotFound(activeConfigurationErr) {
+		activeConfigurationErr = ErrStripeConfigurationNotFound
+	}
 	var retryErr error
 	for _, claim := range claims {
-		configuration, apiKey, configurationErr := s.stripeCredentialAccess(ctx, claim.Order.StripeCredentialID)
-		outcome, processErr := s.reconcilePaymentOrderClaim(ctx, configuration, apiKey, configurationErr, claim, now)
+		credential, apiKey, credentialErr := s.stripeCredentialAccess(ctx, claim.Order.StripeCredentialID)
+		outcome, processErr := s.reconcilePaymentOrderClaim(
+			ctx,
+			credential,
+			apiKey,
+			credentialErr,
+			activeConfigurationErr == nil && activeConfiguration.PurchasesEnabled,
+			activeConfigurationErr,
+			claim,
+			now,
+		)
 		completed, completeErr := s.convergenceStore.CompletePaymentOrderReconciliationClaim(ctx, claim, outcome)
 		if completeErr != nil {
 			retryErr = errors.Join(retryErr, completeErr)
@@ -135,16 +148,28 @@ func (s *StripeFactsWorkflow) reconcileDuePaymentRefunds(ctx context.Context, no
 	return retryErr
 }
 
-func (s *StripeFactsWorkflow) reconcilePaymentOrderClaim(ctx context.Context, configuration StoredStripeConfiguration, apiKey string, configurationErr error, claim PaymentReconciliationClaim, now time.Time) (PaymentReconciliationOutcome, error) {
+func (s *StripeFactsWorkflow) reconcilePaymentOrderClaim(
+	ctx context.Context,
+	credential StoredStripeConfiguration,
+	apiKey string,
+	credentialErr error,
+	purchasesEnabled bool,
+	purchasePolicyErr error,
+	claim PaymentReconciliationClaim,
+	now time.Time,
+) (PaymentReconciliationOutcome, error) {
 	order := claim.Order
-	if configurationErr != nil || configuration.AccountID != order.StripeAccountID {
+	if credentialErr != nil || credential.AccountID != order.StripeAccountID {
 		err := ErrPurchasesUnavailable
-		if configurationErr != nil {
-			err = configurationErr
+		if credentialErr != nil {
+			err = credentialErr
 		}
 		return paymentReconciliationFailureOutcome(now, order, err, false), err
 	}
-	if order.Status == PaymentOrderCreating && !configuration.PurchasesEnabled {
+	if order.Status == PaymentOrderCreating && purchasePolicyErr != nil {
+		return paymentReconciliationFailureOutcome(now, order, purchasePolicyErr, false), purchasePolicyErr
+	}
+	if order.Status == PaymentOrderCreating && !purchasesEnabled {
 		expired, err := s.orderLifecycle.expireOrder(ctx, order)
 		if err != nil {
 			return paymentReconciliationFailureOutcome(now, order, err, true), err

@@ -21,7 +21,7 @@ func TestPaymentReconciliationRecoversCreatingIntentWithOriginalStripeIdempotenc
 	// This is a timeout recovery: a local deadline elapsed before the original
 	// provider response could be bound. Stripe idempotency, not that deadline,
 	// decides whether a Session exists.
-	order := createReconciliationIntent(t, repo, 42, 501, now.Add(time.Minute))
+	order := createReconciliationIntent(t, repo, 42, 501, now.Add(time.Hour))
 
 	now = now.Add(3 * time.Minute)
 	if err := service.ReconcileDuePaymentOrders(t.Context()); err != nil {
@@ -48,6 +48,32 @@ func TestPaymentReconciliationRecoversCreatingIntentWithOriginalStripeIdempotenc
 	if calls := checkout.createSessionCalls(); calls != 1 {
 		t.Fatalf("replayed Stripe CreateCheckoutSession calls = %d, want 1", calls)
 	}
+}
+
+func TestPaymentReconciliationPreservesCreatingOrderWhenPurchasePolicyIsUnavailable(t *testing.T) {
+	db := testdb.Open(t)
+	repo := NewRepository(db)
+	configuration := publishTestStripeConfiguration(t, repo, "acct_checkout_lifecycle", "prod_checkout_lifecycle")
+	now := time.Now().UTC().Add(3 * time.Minute)
+	order := createReconciliationIntent(t, repo, 42, 504, now.Add(time.Hour))
+
+	outcome, err := (&StripeFactsWorkflow{}).reconcilePaymentOrderClaim(
+		t.Context(),
+		configuration,
+		"sk_test_fixture",
+		nil,
+		false,
+		ErrStripeConfigurationNotFound,
+		PaymentReconciliationClaim{Order: order},
+		now,
+	)
+	if !errors.Is(err, ErrStripeConfigurationNotFound) {
+		t.Fatalf("reconcilePaymentOrderClaim() error = %v, want ErrStripeConfigurationNotFound", err)
+	}
+	if outcome.ClearAnomaly || outcome.NextAttemptAt.Before(now.Add(paymentReconciliationOperableDelay)) {
+		t.Fatalf("reconciliation outcome = %+v, want delayed retry", outcome)
+	}
+	assertLifecycleOrderStatus(t, db, order.PublicToken, PaymentOrderCreating)
 }
 
 func TestPaymentReconciliationRetriesPaidPendingCreditWithoutSecondStripeFact(t *testing.T) {
@@ -117,6 +143,7 @@ func TestPaymentReconciliationRecoversLostWebhookPaidSessionExactlyOnce(t *testi
 func TestPaymentReconciliationClaimsAtMostOneHundredAndFencesStaleWorkers(t *testing.T) {
 	db := testdb.Open(t)
 	repo := NewRepository(db)
+	publishTestStripeConfiguration(t, repo, "acct_checkout_lifecycle", "prod_checkout_lifecycle")
 	now := time.Now().UTC()
 	for index := int64(0); index < 101; index++ {
 		createReconciliationIntent(t, repo, 42, 500+index, now.Add(time.Hour))
@@ -163,6 +190,7 @@ WHERE payment_order_id = $1`, first[0].Order.ID, now.Add(-2*time.Minute), now.Ad
 func TestPaymentReconciliationConcurrentWorkersClaimEachOrderOnce(t *testing.T) {
 	db := testdb.Open(t)
 	repo := NewRepository(db)
+	publishTestStripeConfiguration(t, repo, "acct_checkout_lifecycle", "prod_checkout_lifecycle")
 	now := time.Now().UTC()
 	for index := int64(0); index < 12; index++ {
 		createReconciliationIntent(t, repo, 42, 800+index, now.Add(time.Hour))
@@ -248,12 +276,16 @@ func createReconciliationIntent(t *testing.T, repo *Repository, userID, quantity
 
 func createReconciliationIntentForStripeAccount(t *testing.T, repo *Repository, userID, quantity int64, expiresAt time.Time, accountID, productID string) PaymentOrder {
 	t.Helper()
+	configuration := activeTestStripeConfiguration(t, repo)
+	if configuration.AccountID != accountID || configuration.StripeProductID != productID {
+		t.Fatalf("active Stripe configuration = %q/%q, want %q/%q", configuration.AccountID, configuration.StripeProductID, accountID, productID)
+	}
 	id := uuid.New()
 	order, _, err := repo.CreatePaymentOrderIntent(t.Context(), CreatePaymentOrderIntentInput{
 		ID: id.String(), PublicOrderNumber: fmt.Sprintf("IBP-20260801-%012d", quantity), PublicToken: uuid.NewString(),
 		UserID: userID, ClientIdempotencyKey: fmt.Sprintf("reconciliation-order-%d-%s", quantity, id.String()[:8]),
-		RequestHash:     "841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
-		StripeAccountID: accountID, StripeProductID: productID, IdeaQuantity: quantity,
+		RequestHash:        "841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
+		StripeCredentialID: configuration.CredentialID, StripeAccountID: accountID, StripeProductID: productID, IdeaQuantity: quantity,
 		TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
 		ReturnBaseURL: "https://app.example.com/user/boards", ExpiresAt: expiresAt,
 	})

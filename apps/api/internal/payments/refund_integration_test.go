@@ -250,6 +250,7 @@ func TestPaymentRefundConcurrentRequestsCannotExceedOrderOrWallet(t *testing.T) 
 
 func createCreditedRefundOrder(t *testing.T, repo *Repository, paidAt time.Time) PaymentOrder {
 	t.Helper()
+	publishTestStripeConfiguration(t, repo, "acct_admin_read", "prod_admin_read")
 	if _, err := repo.db.ExecContext(t.Context(), `SELECT provision_credit_wallet(42)`); err != nil {
 		t.Fatal(err)
 	}

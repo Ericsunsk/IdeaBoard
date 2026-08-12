@@ -120,11 +120,12 @@ func TestPaidPaymentOrderFactConflictRollsBackWithoutCredit(t *testing.T) {
 
 func createBoundPaymentOrder(t *testing.T, repo *Repository) PaymentOrder {
 	t.Helper()
+	configuration := publishTestStripeConfiguration(t, repo, "acct_payment", "prod_idea")
 	input := CreatePaymentOrderIntentInput{
 		ID: "0198cd29-f457-7e4b-b95e-6cfde41b8111", PublicOrderNumber: "IBP-20260801-ABC123DEF456",
 		PublicToken: "0198cd29-f457-7e4b-b95e-6cfde41b8222", UserID: 42,
 		ClientIdempotencyKey: "payment-convergence-checkout", RequestHash: "841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
-		StripeAccountID: "acct_payment", StripeProductID: "prod_idea", IdeaQuantity: 501,
+		StripeCredentialID: configuration.CredentialID, StripeAccountID: "acct_payment", StripeProductID: "prod_idea", IdeaQuantity: 501,
 		TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
 		ReturnBaseURL: "http://localhost:5173",
 		ExpiresAt:     time.Date(2026, 8, 1, 12, 30, 0, 0, time.UTC),

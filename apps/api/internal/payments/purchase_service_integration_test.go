@@ -412,7 +412,7 @@ func TestStripeKeyChangePreservesUnsettledOrderCredential(t *testing.T) {
 	if err != nil || len(orders) != 1 {
 		t.Fatalf("active orders = %+v, %v", orders, err)
 	}
-	credential, _, err := service.CheckoutWorkflow.stripeOrderConfiguration(t.Context(), orders[0])
+	credential, _, err := service.stripeOrderConfiguration(t.Context(), orders[0])
 	if err != nil || credential.AccountID != "acct_original" {
 		t.Fatalf("order credential = %+v, %v", credential, err)
 	}

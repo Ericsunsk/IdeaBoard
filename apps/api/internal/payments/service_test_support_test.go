@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"ideaboard/api/internal/credits"
+	"ideaboard/api/internal/platform/secrets"
+	"ideaboard/api/internal/testsupport/secretstest"
 )
 
 func mustNewCheckoutWorkflow(t *testing.T, deps CheckoutWorkflowDependencies) *CheckoutWorkflow {
@@ -84,6 +86,39 @@ func newCompleteTestCheckoutWorkflow(
 		Configuration: repo, ConfigurationGateway: configurationGateway, ShutdownEnqueuer: shutdownEnqueuer,
 		Store: repo, CheckoutGateway: checkoutGateway, Wallets: wallets, Convergence: repo, Transitions: transitions,
 	})
+}
+
+func publishTestStripeConfiguration(t *testing.T, repo *Repository, accountID, productID string) StoredStripeConfiguration {
+	t.Helper()
+	secretstest.EnableEncryption(t)
+	apiKeyCiphertext, err := secrets.EncryptString("sk_test_fixture")
+	if err != nil {
+		t.Fatalf("encrypt test Stripe API key: %v", err)
+	}
+	webhookSecretCiphertext, err := secrets.EncryptString("whsec_test_fixture")
+	if err != nil {
+		t.Fatalf("encrypt test Stripe webhook secret: %v", err)
+	}
+	configuration, _, err := repo.ReplaceStripeConfiguration(t.Context(), 0, StoredStripeConfiguration{
+		AccountID: accountID, Mode: StripeModeTest, ChargesEnabled: true,
+		ProductTaxCode: "txcd_10105001", PurchasesEnabled: true, StripeProductID: productID,
+		StripeWebhookEndpointID: "we_test_fixture", APIKeyCiphertext: apiKeyCiphertext,
+		WebhookSecretCiphertext: webhookSecretCiphertext, SecretMaterialKind: secrets.MaterialKindEncrypted,
+		UpdatedBy: 42,
+	}, ConfigurationAudit{ActorID: 42, Outcome: "succeeded"})
+	if err != nil {
+		t.Fatalf("publish test Stripe configuration: %v", err)
+	}
+	return configuration
+}
+
+func activeTestStripeConfiguration(t *testing.T, repo *Repository) StoredStripeConfiguration {
+	t.Helper()
+	configuration, err := repo.GetStripeConfiguration(t.Context())
+	if err != nil {
+		t.Fatalf("load active test Stripe configuration: %v", err)
+	}
+	return configuration
 }
 
 type testStripeGateway struct{}

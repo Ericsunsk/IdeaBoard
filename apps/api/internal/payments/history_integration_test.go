@@ -17,6 +17,7 @@ func TestListRechargesReturnsCurrentUsersRecentCreditedAndCancelledOrders(t *tes
 	repo := NewRepository(db)
 	now := time.Now().UTC()
 	order := createBoundPaymentOrder(t, repo)
+	configuration := activeTestStripeConfiguration(t, repo)
 	paidFacts := paidCheckoutFacts(order)
 	paidFacts.PaidAt = now.Add(-2 * time.Hour)
 	if _, err := repo.ConvergePaidPaymentOrder(t.Context(), paidFacts, now.Add(-time.Hour)); err != nil {
@@ -26,7 +27,7 @@ func TestListRechargesReturnsCurrentUsersRecentCreditedAndCancelledOrders(t *tes
 		ID: "0198cd29-f457-7e4b-b95e-6cfde41b8333", PublicOrderNumber: "IBP-20260801-ABC123DEF457",
 		PublicToken: "0198cd29-f457-7e4b-b95e-6cfde41b8444", UserID: 42,
 		ClientIdempotencyKey: "payment-history-cancelled", RequestHash: "941d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
-		StripeAccountID: "acct_payment", StripeProductID: "prod_idea", IdeaQuantity: 1000,
+		StripeCredentialID: configuration.CredentialID, StripeAccountID: "acct_payment", StripeProductID: "prod_idea", IdeaQuantity: 1000,
 		TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
 		ReturnBaseURL: "http://localhost:5173", ExpiresAt: now.Add(time.Hour),
 	}

@@ -28,7 +28,7 @@ var (
 	ErrStripeCapabilityUnavailable = errors.New("当前 Stripe 账户暂不具备收款能力")
 	ErrStripeProviderUnavailable   = errors.New("当前 Stripe 服务暂时不可用")
 	ErrStripeConfigurationInvalid  = errors.New("收到的 Stripe 配置不完整")
-	ErrStripeConfigurationChanged  = errors.New("Stripe 配置已被其他操作更新，请重试")
+	ErrStripeConfigurationChanged  = errors.New("stripe configuration changed")
 )
 
 var productTaxCodePattern = regexp.MustCompile(`^txcd_[0-9]{8}$`)

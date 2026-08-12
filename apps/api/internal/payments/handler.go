@@ -591,7 +591,7 @@ func writeStripeConfigurationError(c *gin.Context, err error) {
 	case errors.Is(err, ErrStripeProviderUnavailable):
 		response.Error(c, http.StatusServiceUnavailable, ErrStripeProviderUnavailable.Error())
 	case errors.Is(err, ErrStripeConfigurationChanged):
-		response.Error(c, http.StatusConflict, ErrStripeConfigurationChanged.Error())
+		response.Error(c, http.StatusConflict, "Stripe 配置已被其他操作更新，请重试")
 	default:
 		response.Error(c, http.StatusInternalServerError, "保存 Stripe 设置失败")
 	}

@@ -22,6 +22,7 @@ import (
 func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T) {
 	db := testdb.Open(t)
 	repo := NewRepository(db)
+	publishTestStripeConfiguration(t, repo, "acct_admin_read", "prod_admin_read")
 	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), testStripeGateway{}, testCheckoutGateway{}, testWalletReader{}, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	user42PublicID := adminPaymentUserPublicID(t, db, 42)
 	first := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-AAA000000001", 501)
@@ -130,6 +131,7 @@ func TestAdminPaymentOrderHTTPReadModelUsesFiltersAndBoundedKeyset(t *testing.T)
 func TestAdminPaymentOrderDetailMasksProviderIdentifiersAndExcludesInternalFields(t *testing.T) {
 	db := testdb.Open(t)
 	repo := NewRepository(db)
+	publishTestStripeConfiguration(t, repo, "acct_admin_read", "prod_admin_read")
 	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), testStripeGateway{}, testCheckoutGateway{}, testWalletReader{}, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	userPublicID := adminPaymentUserPublicID(t, db, 42)
 	order := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-DETAIL000001", 501)
@@ -199,6 +201,7 @@ func adminPaymentUserPublicID(t *testing.T, db *sql.DB, userID int64) uuid.UUID 
 func TestAdminPaymentOrderDetailAssociatesRefundAndDisputeWebhookFacts(t *testing.T) {
 	db := testdb.Open(t)
 	repo := NewRepository(db)
+	publishTestStripeConfiguration(t, repo, "acct_admin_read", "prod_admin_read")
 	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), testStripeGateway{}, testCheckoutGateway{}, testWalletReader{}, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	order := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-EVENTS000001", 501)
 	bound, err := repo.BindPaymentOrderCheckout(t.Context(), BindPaymentOrderCheckoutInput{
@@ -244,10 +247,12 @@ func TestAdminPaymentOrderDetailAssociatesRefundAndDisputeWebhookFacts(t *testin
 
 func createAdminPaymentOrder(t *testing.T, repo *Repository, userID int64, publicOrderNumber string, quantity int64) PaymentOrder {
 	t.Helper()
+	configuration := activeTestStripeConfiguration(t, repo)
 	order, _, err := repo.CreatePaymentOrderIntent(t.Context(), CreatePaymentOrderIntentInput{
 		ID: uuid.NewString(), PublicOrderNumber: publicOrderNumber, PublicToken: uuid.NewString(), UserID: userID,
 		ClientIdempotencyKey: "admin-read-" + strings.ToLower(publicOrderNumber[len(publicOrderNumber)-12:]),
 		RequestHash:          "841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
+		StripeCredentialID:   configuration.CredentialID,
 		StripeAccountID:      "acct_admin_read", StripeProductID: "prod_admin_read", IdeaQuantity: quantity,
 		TermsVersion: CurrentTermsVersion, RefundPolicyVersion: CurrentRefundPolicyVersion,
 		ReturnBaseURL: "https://app.example.com/user/boards", ExpiresAt: time.Now().UTC().Add(30 * time.Minute),

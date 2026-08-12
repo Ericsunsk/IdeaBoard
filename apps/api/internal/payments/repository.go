@@ -377,6 +377,10 @@ func (r *Repository) CreatePaymentOrderIntent(ctx context.Context, input CreateP
 	if err != nil {
 		return PaymentOrder{}, false, fmt.Errorf("parse payment order public token: %w", err)
 	}
+	stripeCredentialID, err := parseOrderUUID(input.StripeCredentialID)
+	if err != nil {
+		return PaymentOrder{}, false, fmt.Errorf("parse Stripe credential ID: %w", err)
+	}
 	var order PaymentOrder
 	var reused bool
 	err = r.dbWithContext(ctx).withTx(func(q *dbsqlc.Queries, tx *sql.Tx) error {
@@ -400,7 +404,7 @@ func (r *Repository) CreatePaymentOrderIntent(ctx context.Context, input CreateP
 		created, err := q.InsertPaymentOrderIntent(ctx, dbsqlc.InsertPaymentOrderIntentParams{
 			ID: id, PublicOrderNumber: input.PublicOrderNumber, PublicToken: publicToken,
 			UserID: input.UserID, ClientIdempotencyKey: input.ClientIdempotencyKey, RequestHash: input.RequestHash,
-			StripeCredentialID: uuid.MustParse(input.StripeCredentialID), StripeAccountID: input.StripeAccountID, StripeProductID: input.StripeProductID,
+			StripeCredentialID: stripeCredentialID, StripeAccountID: input.StripeAccountID, StripeProductID: input.StripeProductID,
 			IdeaQuantity: input.IdeaQuantity, TermsVersion: input.TermsVersion,
 			RefundPolicyVersion: input.RefundPolicyVersion, ReturnBaseUrl: input.ReturnBaseURL, ExpiresAt: input.ExpiresAt,
 		})

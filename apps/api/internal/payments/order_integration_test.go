@@ -2,6 +2,7 @@ package payments
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 func TestCreatePaymentOrderIntentIsDurableIdempotentAndFailClosed(t *testing.T) {
 	db := testdb.Open(t)
 	repo := NewRepository(db)
+	configuration := publishTestStripeConfiguration(t, repo, "acct_order", "prod_idea")
 	input := CreatePaymentOrderIntentInput{
 		ID:                   "0198cd29-f457-7e4b-b95e-6cfde41b7111",
 		PublicOrderNumber:    "IBP-20260801-ABC123DEF456",
@@ -18,6 +20,7 @@ func TestCreatePaymentOrderIntentIsDurableIdempotentAndFailClosed(t *testing.T) 
 		UserID:               42,
 		ClientIdempotencyKey: "checkout-request-1",
 		RequestHash:          "841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f",
+		StripeCredentialID:   configuration.CredentialID,
 		StripeAccountID:      "acct_order",
 		StripeProductID:      "prod_idea",
 		IdeaQuantity:         501,
@@ -40,7 +43,7 @@ func TestCreatePaymentOrderIntentIsDurableIdempotentAndFailClosed(t *testing.T) 
 		PublicOrderNumber: "IBP-20260801-XYZ123DEF456",
 		PublicToken:       "0198cd29-f457-7e4b-b95e-6cfde41b7444",
 		UserID:            input.UserID, ClientIdempotencyKey: input.ClientIdempotencyKey,
-		RequestHash: input.RequestHash, StripeAccountID: input.StripeAccountID,
+		RequestHash: input.RequestHash, StripeCredentialID: input.StripeCredentialID, StripeAccountID: input.StripeAccountID,
 		StripeProductID: input.StripeProductID, IdeaQuantity: input.IdeaQuantity,
 		TermsVersion:        input.TermsVersion,
 		RefundPolicyVersion: input.RefundPolicyVersion, ReturnBaseURL: input.ReturnBaseURL, ExpiresAt: input.ExpiresAt,
@@ -61,5 +64,15 @@ func TestCreatePaymentOrderIntentIsDurableIdempotentAndFailClosed(t *testing.T) 
 	}
 	if count != 1 {
 		t.Fatalf("payment order count=%d, want 1", count)
+	}
+}
+
+func TestCreatePaymentOrderIntentRejectsInvalidStripeCredentialID(t *testing.T) {
+	repo := NewRepository(testdb.Open(t))
+	_, _, err := repo.CreatePaymentOrderIntent(t.Context(), CreatePaymentOrderIntentInput{
+		ID: "0198cd29-f457-7e4b-b95e-6cfde41b7111", PublicToken: "0198cd29-f457-7e4b-b95e-6cfde41b7222",
+	})
+	if err == nil || !strings.Contains(err.Error(), "parse Stripe credential ID") {
+		t.Fatalf("CreatePaymentOrderIntent() error = %v, want invalid Stripe credential ID", err)
 	}
 }

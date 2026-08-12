@@ -184,12 +184,12 @@ func TestReplaceStripeConfigurationRejectsAStaleRevision(t *testing.T) {
 		t.Fatal(err)
 	}
 	updated := current
-	updated.UpdatedBy = 43
-	if _, _, err := repo.ReplaceStripeConfiguration(t.Context(), current.Revision, updated, ConfigurationAudit{ActorID: 43, Outcome: "succeeded"}); err != nil {
+	updated.UpdatedBy = 99
+	if _, _, err := repo.ReplaceStripeConfiguration(t.Context(), current.Revision, updated, ConfigurationAudit{ActorID: 99, Outcome: "succeeded"}); err != nil {
 		t.Fatalf("first ReplaceStripeConfiguration() error = %v", err)
 	}
-	updated.UpdatedBy = 44
-	if _, _, err := repo.ReplaceStripeConfiguration(t.Context(), current.Revision, updated, ConfigurationAudit{ActorID: 44, Outcome: "succeeded"}); !errors.Is(err, ErrStripeConfigurationChanged) {
+	updated.UpdatedBy = 42
+	if _, _, err := repo.ReplaceStripeConfiguration(t.Context(), current.Revision, updated, ConfigurationAudit{ActorID: 42, Outcome: "succeeded"}); !errors.Is(err, ErrStripeConfigurationChanged) {
 		t.Fatalf("stale ReplaceStripeConfiguration() error = %v, want ErrStripeConfigurationChanged", err)
 	}
 }

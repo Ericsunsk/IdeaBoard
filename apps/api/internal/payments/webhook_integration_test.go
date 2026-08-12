@@ -41,6 +41,7 @@ func TestReceiveStripeWebhookVerifiesRawBodyAndStoresOnlyMinimalInboxFact(t *tes
 	secretstest.EnableEncryption(t)
 	db := testdb.Open(t)
 	repo := NewRepository(db)
+	publishTestStripeConfiguration(t, repo, "acct_admin_read", "prod_admin_read")
 	order := createAdminPaymentOrder(t, repo, 42, "IBP-20260801-WEBHOOK00001", 501)
 	bound, err := repo.BindPaymentOrderCheckout(t.Context(), BindPaymentOrderCheckoutInput{
 		OrderID: order.ID, StripeCustomerID: "cus_webhook", StripeSessionID: "cs_webhook",

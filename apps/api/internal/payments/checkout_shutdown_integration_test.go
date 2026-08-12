@@ -24,7 +24,9 @@ func TestDisablePurchasesFastPathExpiresExistingCheckout(t *testing.T) {
 		t.Fatal(err)
 	}
 	prepareCalls := len(configurationGateway.calls)
-	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{ActorID: 42, PurchasesEnabled: false}); err != nil {
+	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+		ActorID: 42, ProductTaxCode: "txcd_10105001", PurchasesEnabled: false,
+	}); err != nil {
 		t.Fatalf("disable purchases: %v", err)
 	}
 	if len(configurationGateway.calls) != prepareCalls {
@@ -64,14 +66,16 @@ func TestDisabledReconciliationDoesNotCreateCheckout(t *testing.T) {
 	repo := NewRepository(db)
 	now := time.Now().UTC()
 	order := createReconciliationIntentForStripeAccount(t, repo, 42, 501, now.Add(time.Hour), "acct_shutdown_reconciliation", "prod_shutdown_reconciliation")
-	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{ActorID: 42, PurchasesEnabled: false}); err != nil {
+	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
+		ActorID: 42, ProductTaxCode: "txcd_10105001", PurchasesEnabled: false,
+	}); err != nil {
 		t.Fatalf("disable purchases: %v", err)
 	}
-	configuration, apiKey, err := service.CheckoutWorkflow.stripeAccessConfiguration(t.Context())
+	configuration, apiKey, err := service.stripeAccessConfiguration(t.Context())
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = service.StripeFactsWorkflow.reconcilePaymentOrderClaim(t.Context(), configuration, apiKey, nil, PaymentReconciliationClaim{Order: order}, now)
+	_, err = service.reconcilePaymentOrderClaim(t.Context(), configuration, apiKey, nil, false, nil, PaymentReconciliationClaim{Order: order}, now)
 	if err != nil {
 		t.Fatalf("reconcile disabled creating order: %v", err)
 	}

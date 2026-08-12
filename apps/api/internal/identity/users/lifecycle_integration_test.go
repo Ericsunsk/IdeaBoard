@@ -8,7 +8,9 @@ import (
 
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/platform/secrets"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport/secretstest"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -578,18 +580,39 @@ func TestUserDeletionIsBlockedByUnsettledPaymentState(t *testing.T) {
 	if err != nil {
 		t.Fatalf("provision deletion user: %v", err)
 	}
+	secretstest.EnableEncryption(t)
+	apiKeyCiphertext, err := secrets.EncryptString("sk_test_delete_guard")
+	if err != nil {
+		t.Fatalf("encrypt payment API key fixture: %v", err)
+	}
+	webhookSecretCiphertext, err := secrets.EncryptString("whsec_test_delete_guard")
+	if err != nil {
+		t.Fatalf("encrypt payment webhook secret fixture: %v", err)
+	}
+
+	if _, err := db.ExecContext(ctx, `
+INSERT INTO payment_stripe_credentials (
+  id, account_id, mode, charges_enabled, stripe_product_id, stripe_webhook_endpoint_id,
+  api_key_ciphertext, webhook_secret_ciphertext, secret_material_kind, created_by
+)
+VALUES (
+  '0198cd29-f457-7e4b-b95e-6cfde41b9777', 'acct_delete_guard', 'test', true,
+	  'prod_delete_guard', 'we_delete_guard', $1, $2, 'encrypted', 42
+)`, apiKeyCiphertext, webhookSecretCiphertext); err != nil {
+		t.Fatalf("seed payment credential generation: %v", err)
+	}
 
 	if _, err := db.ExecContext(ctx, `
 INSERT INTO payment_orders (
   id, public_order_number, public_token, user_id, client_idempotency_key, request_hash,
-  status, stripe_account_id, stripe_product_id, idea_quantity, base_amount_minor, terms_version,
+  status, stripe_credential_id, stripe_account_id, stripe_product_id, idea_quantity, base_amount_minor, terms_version,
   refund_policy_version, return_base_url, expires_at
 )
 VALUES (
   '0198cd29-f457-7e4b-b95e-6cfde41b9555', 'IBP-20260805-GUARD1234567',
   '0198cd29-f457-7e4b-b95e-6cfde41b9666', $1, 'delete-payment-guard',
   '841d10f63301091e4b0f299da7e4af59556c425ecb3d22b1b08a4a2ee0ef159f',
-  'creating', 'acct_delete_guard', 'prod_delete_guard', 501, 501, 'v1', 'v1',
+  'creating', '0198cd29-f457-7e4b-b95e-6cfde41b9777', 'acct_delete_guard', 'prod_delete_guard', 501, 501, 'v1', 'v1',
   'https://app.example.com', now() + interval '30 minutes'
 )`, provisioned.User.ID); err != nil {
 		t.Fatalf("seed unsettled payment order: %v", err)

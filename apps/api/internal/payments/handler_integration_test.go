@@ -71,7 +71,7 @@ func TestUserCheckoutHTTPUsesPrincipalAndTrustedReturnURL(t *testing.T) {
 	checkoutGateway := &fakeCheckoutGateway{}
 	service := newConfiguredPurchaseService(t, db, configuredFakeStripeGateway("acct_user_http", "prod_user_http"), checkoutGateway, credits.NewService(pool))
 	verifier := &fakeWebhookVerifier{}
-	service.StripeFactsWorkflow.verifier = verifier
+	service.verifier = verifier
 	userHandler := NewUserCheckoutHandler(service, testPublicOrigins("https://configured.example.com"))
 	eventStreamHandler := NewEventStreamHandler(service.EventHub())
 	webhookHandler := NewWebhookHandler(service)
