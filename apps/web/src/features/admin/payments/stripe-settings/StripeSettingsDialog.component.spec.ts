@@ -19,6 +19,7 @@ const configuredSummary: StripeConfigurationSummary = {
   accountId: 'acct_123',
   mode: 'test',
   chargesEnabled: true,
+  paymentMethodConfigurationId: 'pmc_ideaboard',
   productTaxCode: 'txcd_10105001',
   productReady: true,
   webhookReady: true,
@@ -59,6 +60,7 @@ describe('StripeSettingsDialog', () => {
     expect(screen.getByText('Test Mode')).toBeVisible()
     expect(screen.getByText('Product 已就绪')).toBeVisible()
     expect(screen.getByText('Webhook 已就绪')).toBeVisible()
+    expect(screen.getByLabelText('Payment Method Configuration ID')).toHaveValue('pmc_ideaboard')
 
     const apiKey = screen.getByLabelText('Stripe API Key') as HTMLInputElement
     expect(apiKey.value).toBe('')
@@ -104,6 +106,7 @@ describe('StripeSettingsDialog', () => {
     await waitFor(() =>
       expect(resource.save).toHaveBeenCalledWith({
         apiKey: 'sk_test_secret',
+        paymentMethodConfigurationId: 'pmc_ideaboard',
         productTaxCode: 'txcd_10105001',
         purchasesEnabled: true,
       }),

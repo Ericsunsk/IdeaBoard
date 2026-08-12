@@ -301,7 +301,6 @@ describe('boardSync', () => {
     mocks.state.upsertResponse = {
       code: 409,
       msg: '画布名称已存在',
-      message_safe: true,
       data: null,
     }
 

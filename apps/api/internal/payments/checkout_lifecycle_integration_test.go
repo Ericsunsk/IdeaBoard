@@ -576,7 +576,7 @@ func newCheckoutLifecycleService(t *testing.T, now *time.Time, checkout Checkout
 	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(NewEventHub(), func() time.Time { return now.UTC() }),
 		lifecycleStripeGateway{}, checkout, wallets, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
-		ActorID: 42, APIKey: "sk_test_checkout_lifecycle", ProductTaxCode: "txcd_10105001",
+		ActorID: 42, APIKey: "sk_test_checkout_lifecycle", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	}); err != nil {
 		t.Fatalf("configure Stripe: %v", err)
@@ -649,7 +649,7 @@ type lifecycleStripeGateway struct{}
 func (lifecycleStripeGateway) PrepareConfiguration(context.Context, PrepareStripeConfiguration) (PreparedStripeConfiguration, error) {
 	return PreparedStripeConfiguration{
 		AccountID: "acct_checkout_lifecycle", Mode: StripeModeTest, ChargesEnabled: true,
-		ProductID: "prod_checkout_lifecycle", WebhookEndpointID: "we_checkout_lifecycle", WebhookSecret: "whsec_checkout_lifecycle",
+		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_checkout_lifecycle", WebhookEndpointID: "we_checkout_lifecycle", WebhookSecret: "whsec_checkout_lifecycle",
 	}, nil
 }
 

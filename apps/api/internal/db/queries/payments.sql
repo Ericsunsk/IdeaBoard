@@ -38,6 +38,7 @@ INSERT INTO payment_stripe_credentials (
   account_id,
   mode,
   charges_enabled,
+  payment_method_configuration_id,
   stripe_product_id,
   stripe_webhook_endpoint_id,
   api_key_ciphertext,
@@ -45,7 +46,7 @@ INSERT INTO payment_stripe_credentials (
   secret_material_kind,
   created_by
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 RETURNING *;
 
 -- name: ReplacePaymentStripeConfiguration :one

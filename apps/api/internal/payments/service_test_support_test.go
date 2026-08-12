@@ -101,7 +101,7 @@ func publishTestStripeConfiguration(t *testing.T, repo *Repository, accountID, p
 	}
 	configuration, _, err := repo.ReplaceStripeConfiguration(t.Context(), 0, StoredStripeConfiguration{
 		AccountID: accountID, Mode: StripeModeTest, ChargesEnabled: true,
-		ProductTaxCode: "txcd_10105001", PurchasesEnabled: true, StripeProductID: productID,
+		PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001", PurchasesEnabled: true, StripeProductID: productID,
 		StripeWebhookEndpointID: "we_test_fixture", APIKeyCiphertext: apiKeyCiphertext,
 		WebhookSecretCiphertext: webhookSecretCiphertext, SecretMaterialKind: secrets.MaterialKindEncrypted,
 		UpdatedBy: 42,

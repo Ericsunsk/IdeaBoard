@@ -3,6 +3,7 @@ CREATE TABLE payment_stripe_credentials (
   account_id TEXT NOT NULL,
   mode TEXT NOT NULL,
   charges_enabled BOOLEAN NOT NULL,
+  payment_method_configuration_id TEXT,
   stripe_product_id TEXT NOT NULL,
   stripe_webhook_endpoint_id TEXT NOT NULL,
   api_key_ciphertext TEXT NOT NULL,
@@ -16,6 +17,13 @@ CREATE TABLE payment_stripe_credentials (
     char_length(account_id) BETWEEN 1 AND 255
     AND char_length(stripe_product_id) BETWEEN 1 AND 255
     AND char_length(stripe_webhook_endpoint_id) BETWEEN 1 AND 255
+  ),
+  CONSTRAINT ck_payment_stripe_credential_payment_method_configuration CHECK (
+    payment_method_configuration_id IS NULL
+    OR (
+      char_length(payment_method_configuration_id) <= 255
+      AND payment_method_configuration_id ~ '^pmc_[A-Za-z0-9]+$'
+    )
   )
 );
 

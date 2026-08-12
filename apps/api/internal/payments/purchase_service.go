@@ -229,7 +229,8 @@ func (s *CheckoutWorkflow) GetPurchaseOptions(ctx context.Context, userID int64)
 	if err != nil {
 		return PurchaseOptions{}, fmt.Errorf("get purchase configuration: %w", err)
 	}
-	if !configuration.PurchasesEnabled || !configuration.ChargesEnabled || configuration.StripeProductID == "" {
+	if !configuration.PurchasesEnabled || !configuration.ChargesEnabled || configuration.StripeProductID == "" ||
+		configuration.PaymentMethodConfigurationID == "" {
 		options.UnavailableReason = "purchases_disabled"
 		return options, nil
 	}
@@ -471,7 +472,8 @@ func (s *CheckoutWorkflow) checkoutConfiguration(ctx context.Context) (StoredStr
 	if err != nil {
 		return StoredStripeConfiguration{}, "", err
 	}
-	if !configuration.PurchasesEnabled || !configuration.ChargesEnabled || configuration.StripeProductID == "" {
+	if !configuration.PurchasesEnabled || !configuration.ChargesEnabled || configuration.StripeProductID == "" ||
+		configuration.PaymentMethodConfigurationID == "" {
 		return StoredStripeConfiguration{}, "", ErrPurchasesUnavailable
 	}
 	return configuration, apiKey, nil
@@ -567,7 +569,8 @@ func (s *CheckoutWorkflow) createCheckoutSessionForOrder(
 		return PaymentOrder{}, s.finishRejectedCheckoutCreation(ctx, order, err)
 	}
 	session, err := s.checkoutGateway.CreateCheckoutSession(ctx, CreateCheckoutSessionInput{
-		APIKey: apiKey, CustomerID: customer.StripeCustomerID, ProductID: order.StripeProductID,
+		APIKey: apiKey, PaymentMethodConfigurationID: configuration.PaymentMethodConfigurationID,
+		CustomerID: customer.StripeCustomerID, ProductID: order.StripeProductID,
 		PublicOrderNumber: order.PublicOrderNumber, PaymentOrderID: order.ID, RequestHash: order.RequestHash,
 		IdeaQuantity: order.IdeaQuantity, AmountMinor: order.BaseAmountMinor, ExpiresAt: order.ExpiresAt,
 		SuccessURL:     checkoutReturnURL(order.ReturnBaseURL, order.PublicToken, "success"),

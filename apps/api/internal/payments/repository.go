@@ -36,22 +36,23 @@ type paymentContextDB struct {
 }
 
 type StoredStripeConfiguration struct {
-	Revision                int64
-	CredentialID            string
-	AccountID               string
-	Mode                    StripeMode
-	ChargesEnabled          bool
-	ProductTaxCode          string
-	PurchasesEnabled        bool
-	StripeProductID         string
-	StripeWebhookEndpointID string
-	APIKeyCiphertext        string
-	WebhookSecretCiphertext string
-	SecretMaterialKind      string
-	CreatedBy               int64
-	UpdatedBy               int64
-	CreatedAt               time.Time
-	UpdatedAt               time.Time
+	Revision                     int64
+	CredentialID                 string
+	AccountID                    string
+	Mode                         StripeMode
+	ChargesEnabled               bool
+	PaymentMethodConfigurationID string
+	ProductTaxCode               string
+	PurchasesEnabled             bool
+	StripeProductID              string
+	StripeWebhookEndpointID      string
+	APIKeyCiphertext             string
+	WebhookSecretCiphertext      string
+	SecretMaterialKind           string
+	CreatedBy                    int64
+	UpdatedBy                    int64
+	CreatedAt                    time.Time
+	UpdatedAt                    time.Time
 }
 
 type ConfigurationAudit struct {
@@ -223,7 +224,8 @@ func (r *Repository) ReplaceStripeConfiguration(ctx context.Context, expectedRev
 			credentialID = uuid.New()
 			credential, insertErr := q.InsertPaymentStripeCredential(ctx, dbsqlc.InsertPaymentStripeCredentialParams{
 				ID: credentialID, AccountID: value.AccountID, Mode: string(value.Mode), ChargesEnabled: value.ChargesEnabled,
-				StripeProductID: value.StripeProductID, StripeWebhookEndpointID: value.StripeWebhookEndpointID,
+				PaymentMethodConfigurationID: sql.NullString{String: value.PaymentMethodConfigurationID, Valid: true},
+				StripeProductID:              value.StripeProductID, StripeWebhookEndpointID: value.StripeWebhookEndpointID,
 				ApiKeyCiphertext: value.APIKeyCiphertext, WebhookSecretCiphertext: value.WebhookSecretCiphertext,
 				SecretMaterialKind: value.SecretMaterialKind, CreatedBy: value.UpdatedBy,
 			})
@@ -831,7 +833,8 @@ func storedStripeConfiguration(settings dbsqlc.PaymentStripeConfiguration, crede
 func storedStripeCredential(row dbsqlc.PaymentStripeCredential) StoredStripeConfiguration {
 	return StoredStripeConfiguration{
 		CredentialID: row.ID.String(), AccountID: row.AccountID, Mode: StripeMode(row.Mode), ChargesEnabled: row.ChargesEnabled,
-		StripeProductID: row.StripeProductID, StripeWebhookEndpointID: row.StripeWebhookEndpointID,
+		PaymentMethodConfigurationID: row.PaymentMethodConfigurationID.String,
+		StripeProductID:              row.StripeProductID, StripeWebhookEndpointID: row.StripeWebhookEndpointID,
 		APIKeyCiphertext: row.ApiKeyCiphertext, WebhookSecretCiphertext: row.WebhookSecretCiphertext,
 		SecretMaterialKind: row.SecretMaterialKind, CreatedBy: row.CreatedBy, CreatedAt: row.CreatedAt,
 	}

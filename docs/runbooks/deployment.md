@@ -384,6 +384,7 @@ API_TEST_STRIPE_SMOKE=1 \
 API_TEST_STRIPE_SECRET_KEY='sk_test_...' \
 API_TEST_STRIPE_BASE_URL='https://staging-api.example.com' \
 API_TEST_STRIPE_TAX_CODE='txcd_10105001' \
+API_TEST_STRIPE_PAYMENT_METHOD_CONFIGURATION_ID='pmc_...' \
 go test ./internal/payments -run TestStripeTestModeSmoke -count=1
 ```
 

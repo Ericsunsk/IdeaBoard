@@ -479,17 +479,18 @@ type PaymentStripeConfiguration struct {
 }
 
 type PaymentStripeCredential struct {
-	ID                      uuid.UUID `json:"id"`
-	AccountID               string    `json:"account_id"`
-	Mode                    string    `json:"mode"`
-	ChargesEnabled          bool      `json:"charges_enabled"`
-	StripeProductID         string    `json:"stripe_product_id"`
-	StripeWebhookEndpointID string    `json:"stripe_webhook_endpoint_id"`
-	ApiKeyCiphertext        string    `json:"api_key_ciphertext"`
-	WebhookSecretCiphertext string    `json:"webhook_secret_ciphertext"`
-	SecretMaterialKind      string    `json:"secret_material_kind"`
-	CreatedBy               int64     `json:"created_by"`
-	CreatedAt               time.Time `json:"created_at"`
+	ID                           uuid.UUID      `json:"id"`
+	AccountID                    string         `json:"account_id"`
+	Mode                         string         `json:"mode"`
+	ChargesEnabled               bool           `json:"charges_enabled"`
+	PaymentMethodConfigurationID sql.NullString `json:"payment_method_configuration_id"`
+	StripeProductID              string         `json:"stripe_product_id"`
+	StripeWebhookEndpointID      string         `json:"stripe_webhook_endpoint_id"`
+	ApiKeyCiphertext             string         `json:"api_key_ciphertext"`
+	WebhookSecretCiphertext      string         `json:"webhook_secret_ciphertext"`
+	SecretMaterialKind           string         `json:"secret_material_kind"`
+	CreatedBy                    int64          `json:"created_by"`
+	CreatedAt                    time.Time      `json:"created_at"`
 }
 
 type PaymentWebhookEvent struct {

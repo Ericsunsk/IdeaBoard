@@ -4331,6 +4331,9 @@ components:
         mode:
           $ref: '#/components/schemas/StripeMode'
         charges_enabled: { type: boolean }
+        payment_method_configuration_id:
+          type: string
+          pattern: '^pmc_[A-Za-z0-9]+$'
         product_tax_code: { type: string }
         product_ready: { type: boolean }
         webhook_ready: { type: boolean }
@@ -4340,7 +4343,7 @@ components:
     UpdateStripeConfigurationRequest:
       type: object
       additionalProperties: false
-      required: [product_tax_code, purchases_enabled]
+      required: [payment_method_configuration_id, product_tax_code, purchases_enabled]
       properties:
         api_key:
           type: string
@@ -4348,6 +4351,10 @@ components:
           maxLength: 512
           writeOnly: true
           description: Required for first configuration; omit to retain the current encrypted key
+        payment_method_configuration_id:
+          type: string
+          pattern: '^pmc_[A-Za-z0-9]+$'
+          maxLength: 255
         product_tax_code:
           type: string
           pattern: '^txcd_[0-9]{8}$'

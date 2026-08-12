@@ -13,6 +13,8 @@ export interface StripeConfigurationSummary {
   account_id?: string
   mode?: StripeMode
   charges_enabled: boolean
+  /** @pattern ^pmc_[A-Za-z0-9]+$ */
+  payment_method_configuration_id?: string
   product_tax_code: string
   product_ready: boolean
   webhook_ready: boolean

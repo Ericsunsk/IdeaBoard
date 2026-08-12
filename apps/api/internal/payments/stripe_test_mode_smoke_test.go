@@ -17,25 +17,28 @@ func TestStripeTestModeSmoke(t *testing.T) {
 	apiKey := strings.TrimSpace(os.Getenv("API_TEST_STRIPE_SECRET_KEY"))
 	baseURL := strings.TrimRight(strings.TrimSpace(os.Getenv("API_TEST_STRIPE_BASE_URL")), "/")
 	taxCode := strings.TrimSpace(os.Getenv("API_TEST_STRIPE_TAX_CODE"))
-	if apiKey == "" || baseURL == "" || taxCode == "" {
-		t.Fatal("API_TEST_STRIPE_SECRET_KEY, API_TEST_STRIPE_BASE_URL, and API_TEST_STRIPE_TAX_CODE are required")
+	paymentMethodConfigurationID := strings.TrimSpace(os.Getenv("API_TEST_STRIPE_PAYMENT_METHOD_CONFIGURATION_ID"))
+	if apiKey == "" || baseURL == "" || taxCode == "" || paymentMethodConfigurationID == "" {
+		t.Fatal("API_TEST_STRIPE_SECRET_KEY, API_TEST_STRIPE_BASE_URL, API_TEST_STRIPE_TAX_CODE, and API_TEST_STRIPE_PAYMENT_METHOD_CONFIGURATION_ID are required")
 	}
 	mode, err := payments.ClassifyStripeAPIKey(apiKey)
 	if err != nil || mode != payments.StripeModeTest {
-		t.Fatal("API_TEST_STRIPE_SECRET_KEY must be an sk_test_* Test Mode Key")
+		t.Fatal("API_TEST_STRIPE_SECRET_KEY must be a Test Mode sk_test_* or rk_test_* Key")
 	}
 
 	adapter := stripeadapter.New()
 	prepared, err := adapter.PrepareConfiguration(t.Context(), payments.PrepareStripeConfiguration{
 		APIKey: apiKey, Mode: payments.StripeModeTest, PurchasesEnabled: true,
-		ProductTaxCode: taxCode, WebhookURL: baseURL + "/api/webhooks/stripe",
+		ProductTaxCode: taxCode, PaymentMethodConfigurationID: paymentMethodConfigurationID,
+		WebhookURL: baseURL + "/api/webhooks/stripe",
 	})
 	if err != nil {
 		t.Fatalf("prepare Stripe Test Mode configuration: %v", err)
 	}
-	if prepared.AccountID == "" || prepared.ProductID == "" || prepared.WebhookEndpointID == "" || prepared.WebhookSecret == "" {
-		t.Fatalf("Stripe Test Mode configuration is incomplete: account=%t product=%t webhook=%t secret=%t",
-			prepared.AccountID != "", prepared.ProductID != "", prepared.WebhookEndpointID != "", prepared.WebhookSecret != "")
+	if prepared.AccountID == "" || prepared.PaymentMethodConfigurationID != paymentMethodConfigurationID || prepared.ProductID == "" || prepared.WebhookEndpointID == "" || prepared.WebhookSecret == "" {
+		t.Fatalf("Stripe Test Mode configuration is incomplete: account=%t payment_method_configuration=%t product=%t webhook=%t secret=%t",
+			prepared.AccountID != "", prepared.PaymentMethodConfigurationID == paymentMethodConfigurationID,
+			prepared.ProductID != "", prepared.WebhookEndpointID != "", prepared.WebhookSecret != "")
 	}
 
 	const paymentOrderID = "1db90f9a-c836-4ef7-b449-6f58457d8f79"
@@ -48,7 +51,8 @@ func TestStripeTestModeSmoke(t *testing.T) {
 	}
 	expiresAt := time.Now().UTC().Truncate(time.Second).Add(31 * time.Minute)
 	session, err := adapter.CreateCheckoutSession(t.Context(), payments.CreateCheckoutSessionInput{
-		APIKey: apiKey, CustomerID: customer.ID, ProductID: prepared.ProductID,
+		APIKey: apiKey, PaymentMethodConfigurationID: prepared.PaymentMethodConfigurationID,
+		CustomerID: customer.ID, ProductID: prepared.ProductID,
 		PublicOrderNumber: "IBP-SMOKE-TEST-MODE", PaymentOrderID: paymentOrderID,
 		RequestHash: requestHash, IdeaQuantity: 100, AmountMinor: 100,
 		ExpiresAt: expiresAt, SuccessURL: baseURL + "/user/boards?stripe_smoke=success",

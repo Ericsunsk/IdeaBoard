@@ -72,7 +72,7 @@ func TestCheckoutAdapterCreatesCustomerWithoutEmailAndCreatesFixedCheckoutSessio
 
 	expiresAt := time.Unix(1760001800, 0).UTC()
 	session, err := adapter.CreateCheckoutSession(context.Background(), payments.CreateCheckoutSessionInput{
-		APIKey: "sk_test_not_a_real_secret", CustomerID: customer.ID, ProductID: "prod_idea",
+		APIKey: "sk_test_not_a_real_secret", PaymentMethodConfigurationID: "pmc_testfixture", CustomerID: customer.ID, ProductID: "prod_idea",
 		PublicOrderNumber: "IBP-20260801-R4ND0M", PaymentOrderID: "a21ef307-075d-48dd-b7b7-2db3cce963ad",
 		RequestHash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", IdeaQuantity: 501, AmountMinor: 501,
 		ExpiresAt:      expiresAt,
@@ -329,6 +329,7 @@ func newCheckoutTestAdapter(serverURL string) *Adapter {
 func assertCheckoutForm(t *testing.T, form url.Values, expiresAt time.Time) {
 	t.Helper()
 	assertFormValue(t, form, "mode", "payment")
+	assertFormValue(t, form, "payment_method_configuration", "pmc_testfixture")
 	assertFormValue(t, form, "customer", "cus_idea_user")
 	assertFormValue(t, form, "client_reference_id", "IBP-20260801-R4ND0M")
 	assertFormValue(t, form, "metadata[ideaboard_public_order_number]", "IBP-20260801-R4ND0M")

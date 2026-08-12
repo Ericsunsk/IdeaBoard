@@ -45,6 +45,14 @@ func (a *Adapter) PrepareConfiguration(ctx context.Context, input payments.Prepa
 	if !account.ChargesEnabled {
 		return payments.PreparedStripeConfiguration{}, payments.NewGatewayError(payments.GatewayErrorCapabilityMissing, "Stripe 账户尚未启用收款", nil)
 	}
+	paymentMethodConfiguration, err := client.V1PaymentMethodConfigurations.Retrieve(ctx, input.PaymentMethodConfigurationID, nil)
+	if err != nil {
+		return payments.PreparedStripeConfiguration{}, mapStripeError("读取 Stripe Payment Method Configuration", err)
+	}
+	if paymentMethodConfiguration == nil || paymentMethodConfiguration.ID != input.PaymentMethodConfigurationID ||
+		paymentMethodConfiguration.Livemode != (input.Mode == payments.StripeModeLive) || !paymentMethodConfiguration.Active {
+		return payments.PreparedStripeConfiguration{}, payments.NewGatewayError(payments.GatewayErrorInvalidResponse, "Stripe Payment Method Configuration 无效或未启用", nil)
+	}
 	product, err := ensureProduct(ctx, client, input, account.ID)
 	if err != nil {
 		return payments.PreparedStripeConfiguration{}, err
@@ -55,7 +63,8 @@ func (a *Adapter) PrepareConfiguration(ctx context.Context, input payments.Prepa
 	}
 	return payments.PreparedStripeConfiguration{
 		AccountID: account.ID, Mode: input.Mode, ChargesEnabled: account.ChargesEnabled,
-		ProductID: product.ID, WebhookEndpointID: endpoint.ID, WebhookSecret: secret,
+		PaymentMethodConfigurationID: paymentMethodConfiguration.ID,
+		ProductID:                    product.ID, WebhookEndpointID: endpoint.ID, WebhookSecret: secret,
 	}, nil
 }
 

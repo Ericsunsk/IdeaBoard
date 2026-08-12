@@ -9,6 +9,7 @@ const responseData = {
   account_id: 'acct_123',
   mode: 'live',
   charges_enabled: true,
+  payment_method_configuration_id: 'pmc_ideaboard',
   product_tax_code: 'txcd_10105001',
   product_ready: true,
   webhook_ready: true,
@@ -31,6 +32,7 @@ describe('stripeSettingsResource', () => {
       accountId: 'acct_123',
       mode: 'live',
       chargesEnabled: true,
+      paymentMethodConfigurationId: 'pmc_ideaboard',
       productTaxCode: 'txcd_10105001',
       productReady: true,
       webhookReady: true,
@@ -43,6 +45,7 @@ describe('stripeSettingsResource', () => {
     useMswHandlers(
       http.put('/api/admin/payments/stripe-config', async ({ request }) => {
         expect(await request.json()).toEqual({
+          payment_method_configuration_id: 'pmc_ideaboard',
           product_tax_code: 'txcd_10105001',
           purchases_enabled: true,
         })
@@ -53,6 +56,7 @@ describe('stripeSettingsResource', () => {
     await expect(
       saveStripeConfiguration({
         apiKey: '   ',
+        paymentMethodConfigurationId: ' pmc_ideaboard ',
         productTaxCode: ' txcd_10105001 ',
         purchasesEnabled: true,
       }),

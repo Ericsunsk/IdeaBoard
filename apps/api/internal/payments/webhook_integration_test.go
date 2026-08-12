@@ -62,7 +62,7 @@ func TestReceiveStripeWebhookVerifiesRawBodyAndStoresOnlyMinimalInboxFact(t *tes
 	}
 	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
 		AccountID: "acct_webhook", Mode: StripeModeTest, ChargesEnabled: true,
-		ProductID: "prod_webhook", WebhookEndpointID: "we_webhook", WebhookSecret: "whsec_webhook",
+		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_webhook", WebhookEndpointID: "we_webhook", WebhookSecret: "whsec_webhook",
 	}}
 	verifiedAt := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	verifier := &fakeWebhookVerifier{event: StripeWebhookEvent{
@@ -72,7 +72,7 @@ func TestReceiveStripeWebhookVerifiesRawBodyAndStoresOnlyMinimalInboxFact(t *tes
 	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(NewEventHub(), func() time.Time { return verifiedAt }), gateway, testCheckoutGateway{}, testWalletReader{}, verifier,
 		&refundGatewayFake{retrieve: map[string]StripeRefund{"re_1": {ID: "re_1", Status: "succeeded"}}}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
-		ActorID: 42, APIKey: "sk_test_webhook", ProductTaxCode: "txcd_10105001",
+		ActorID: 42, APIKey: "sk_test_webhook", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	}); err != nil {
 		t.Fatalf("seed configuration: %v", err)
@@ -115,7 +115,7 @@ func TestReceiveStripeWebhookIgnoresVerifiedUnknownEventAndRejectsUnverifiedPayl
 	db := testdb.Open(t)
 	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
 		AccountID: "acct_webhook_unknown", Mode: StripeModeTest, ChargesEnabled: true,
-		ProductID: "prod_webhook_unknown", WebhookEndpointID: "we_webhook_unknown", WebhookSecret: "whsec_unknown",
+		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_webhook_unknown", WebhookEndpointID: "we_webhook_unknown", WebhookSecret: "whsec_unknown",
 	}}
 	verifier := &fakeWebhookVerifier{event: StripeWebhookEvent{
 		ID: "evt_unknown", Type: "customer.updated", ObjectID: "cus_1", CreatedAt: time.Now(),
@@ -123,7 +123,7 @@ func TestReceiveStripeWebhookIgnoresVerifiedUnknownEventAndRejectsUnverifiedPayl
 	repo := NewRepository(db)
 	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
-		ActorID: 42, APIKey: "sk_test_unknown", ProductTaxCode: "txcd_10105001",
+		ActorID: 42, APIKey: "sk_test_unknown", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	}); err != nil {
 		t.Fatal(err)
@@ -153,7 +153,7 @@ func TestReceiveStripeWebhookAcceptsARetainedCredentialSecret(t *testing.T) {
 	db := testdb.Open(t)
 	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
 		AccountID: "acct_webhook_old", Mode: StripeModeTest, ChargesEnabled: true,
-		ProductID: "prod_webhook_old", WebhookEndpointID: "we_webhook_old", WebhookSecret: "whsec_webhook_old",
+		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_webhook_old", WebhookEndpointID: "we_webhook_old", WebhookSecret: "whsec_webhook_old",
 	}}
 	verifier := &secretSelectingWebhookVerifier{
 		acceptedSecret: "whsec_webhook_old",
@@ -164,17 +164,17 @@ func TestReceiveStripeWebhookAcceptsARetainedCredentialSecret(t *testing.T) {
 	repo := NewRepository(db)
 	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
-		ActorID: 42, APIKey: "sk_test_webhook_old", ProductTaxCode: "txcd_10105001",
+		ActorID: 42, APIKey: "sk_test_webhook_old", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	}); err != nil {
 		t.Fatal(err)
 	}
 	gateway.prepared = PreparedStripeConfiguration{
 		AccountID: "acct_webhook_new", Mode: StripeModeTest, ChargesEnabled: true,
-		ProductID: "prod_webhook_new", WebhookEndpointID: "we_webhook_new", WebhookSecret: "whsec_webhook_new",
+		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_webhook_new", WebhookEndpointID: "we_webhook_new", WebhookSecret: "whsec_webhook_new",
 	}
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
-		ActorID: 42, APIKey: "sk_test_webhook_new", ProductTaxCode: "txcd_10105001",
+		ActorID: 42, APIKey: "sk_test_webhook_new", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	}); err != nil {
 		t.Fatal(err)

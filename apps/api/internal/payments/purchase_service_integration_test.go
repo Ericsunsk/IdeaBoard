@@ -101,7 +101,7 @@ func TestCreateCheckoutCreatesCustomerPerStripeMode(t *testing.T) {
 		WebhookEndpointID: "we_live", WebhookSecret: "whsec_live",
 	}
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
-		ActorID: 42, APIKey: "sk_live_purchase", ProductTaxCode: "txcd_10105001",
+		ActorID: 42, APIKey: "sk_live_purchase", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	}); err != nil {
 		t.Fatalf("configure live Stripe generation: %v", err)
@@ -135,7 +135,7 @@ func TestCreateCheckoutReusesCustomerAfterKeyRotationWithinStripeMode(t *testing
 		t.Fatalf("create Checkout with first key: %v", err)
 	}
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
-		ActorID: 42, APIKey: "sk_test_purchase_rotated", ProductTaxCode: "txcd_10105001",
+		ActorID: 42, APIKey: "sk_test_purchase_rotated", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	}); err != nil {
 		t.Fatalf("rotate Stripe key within test mode: %v", err)
@@ -386,7 +386,7 @@ func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testin
 	repo := NewRepository(db)
 	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(events, func() time.Time { return verifiedAt }), configurationGateway, checkoutGateway, creditService, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
-		ActorID: 42, APIKey: "sk_test_webhook_purchase", ProductTaxCode: "txcd_10105001",
+		ActorID: 42, APIKey: "sk_test_webhook_purchase", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	}); err != nil {
 		t.Fatal(err)
@@ -471,7 +471,7 @@ func TestStripeKeyChangePreservesUnsettledOrderCredential(t *testing.T) {
 	configurationGateway.prepared.AccountID = "acct_replacement"
 	configurationGateway.prepared.ProductID = "prod_replacement"
 	_, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
-		ActorID: 42, APIKey: "sk_test_replacement", ProductTaxCode: "txcd_10105001",
+		ActorID: 42, APIKey: "sk_test_replacement", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	})
 	if err != nil {
@@ -522,7 +522,7 @@ func TestStripeKeyChangeDoesNotWaitForProviderIO(t *testing.T) {
 	configurationDone := make(chan error, 1)
 	go func() {
 		_, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
-			ActorID: 42, APIKey: "sk_test_replacement", ProductTaxCode: "txcd_10105001",
+			ActorID: 42, APIKey: "sk_test_replacement", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 			PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 		})
 		configurationDone <- err
@@ -655,7 +655,7 @@ func (f *fakeCheckoutGateway) ExpireCheckoutSession(_ context.Context, input Exp
 
 func configuredFakeStripeGateway(accountID, productID string) *fakeStripeGateway {
 	return &fakeStripeGateway{prepared: PreparedStripeConfiguration{
-		AccountID: accountID, Mode: StripeModeTest, ChargesEnabled: true, ProductID: productID,
+		AccountID: accountID, Mode: StripeModeTest, ChargesEnabled: true, PaymentMethodConfigurationID: "pmc_testfixture", ProductID: productID,
 		WebhookEndpointID: "we_purchase", WebhookSecret: "whsec_purchase",
 	}}
 }
@@ -673,7 +673,7 @@ func newConfiguredPurchaseService(
 	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(NewEventHub(), func() time.Time { return now }),
 		configurationGateway, checkoutGateway, wallets, testWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
-		ActorID: 42, APIKey: "sk_test_purchase", ProductTaxCode: "txcd_10105001",
+		ActorID: 42, APIKey: "sk_test_purchase", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		PurchasesEnabled: true, WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	}); err != nil {
 		t.Fatalf("configure Stripe: %v", err)

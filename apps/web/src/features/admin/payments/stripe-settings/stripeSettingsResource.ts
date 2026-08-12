@@ -30,6 +30,7 @@ export async function saveStripeConfiguration(
 ): Promise<StripeConfigurationSummary> {
   const body: UpdateStripeConfigurationRequest = {
     ...(input.apiKey?.trim() ? { api_key: input.apiKey.trim() } : {}),
+    payment_method_configuration_id: input.paymentMethodConfigurationId.trim(),
     product_tax_code: input.productTaxCode.trim(),
     purchases_enabled: input.purchasesEnabled,
   }
@@ -47,6 +48,7 @@ function normalizeStripeConfiguration(
     accountId: configuration.account_id,
     mode: configuration.mode,
     chargesEnabled: configuration.charges_enabled,
+    paymentMethodConfigurationId: configuration.payment_method_configuration_id ?? '',
     productTaxCode: configuration.product_tax_code,
     productReady: configuration.product_ready,
     webhookReady: configuration.webhook_ready,

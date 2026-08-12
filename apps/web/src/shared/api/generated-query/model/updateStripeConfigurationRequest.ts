@@ -12,6 +12,11 @@ export interface UpdateStripeConfigurationRequest {
    * @maxLength 512
    */
   api_key?: string
+  /**
+   * @maxLength 255
+   * @pattern ^pmc_[A-Za-z0-9]+$
+   */
+  payment_method_configuration_id: string
   /** @pattern ^txcd_[0-9]{8}$ */
   product_tax_code: string
   purchases_enabled: boolean

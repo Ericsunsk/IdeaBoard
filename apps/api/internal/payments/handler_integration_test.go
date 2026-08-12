@@ -28,7 +28,7 @@ func TestStripeConfigurationHTTPContractNeverReturnsSecretsAndRejectsUnknownFiel
 	db := testdb.Open(t)
 	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
 		AccountID: "acct_http", Mode: StripeModeTest, ChargesEnabled: true,
-		ProductID: "prod_http", WebhookEndpointID: "we_http", WebhookSecret: "whsec_http",
+		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_http", WebhookEndpointID: "we_http", WebhookSecret: "whsec_http",
 	}}
 	repo := NewRepository(db)
 	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, &fakeWebhookVerifier{}, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
@@ -41,8 +41,18 @@ func TestStripeConfigurationHTTPContractNeverReturnsSecretsAndRejectsUnknownFiel
 	router.GET("/admin/payments/stripe-config", handler.GetStripeConfiguration)
 	router.PUT("/admin/payments/stripe-config", handler.UpdateStripeConfiguration)
 
-	requestBody := `{"api_key":"sk_test_http_secret","product_tax_code":"txcd_10105001","purchases_enabled":true}`
-	response := performPaymentRequest(router, http.MethodPut, "/admin/payments/stripe-config", requestBody, nil)
+	response := performPaymentRequest(router, http.MethodGet, "/admin/payments/stripe-config", "", nil)
+	if response.Code != http.StatusOK || strings.Contains(response.Body.String(), "payment_method_configuration_id") {
+		t.Fatalf("unconfigured GET response=%d %s", response.Code, response.Body.String())
+	}
+
+	response = performPaymentRequest(router, http.MethodPut, "/admin/payments/stripe-config", `{"api_key":"sk_test_http_secret","product_tax_code":"txcd_10105001","purchases_enabled":true}`, nil)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("missing Payment Method Configuration status=%d body=%s", response.Code, response.Body.String())
+	}
+
+	requestBody := `{"api_key":"sk_test_http_secret","payment_method_configuration_id":"pmc_testfixture","product_tax_code":"txcd_10105001","purchases_enabled":true}`
+	response = performPaymentRequest(router, http.MethodPut, "/admin/payments/stripe-config", requestBody, nil)
 	if response.Code != http.StatusOK {
 		t.Fatalf("PUT status=%d body=%s", response.Code, response.Body.String())
 	}
@@ -406,7 +416,7 @@ func TestStripeWebhookHTTPContractUsesUnauthenticatedExactRawBody(t *testing.T) 
 	db := testdb.Open(t)
 	gateway := &fakeStripeGateway{prepared: PreparedStripeConfiguration{
 		AccountID: "acct_webhook_http", Mode: StripeModeTest, ChargesEnabled: true,
-		ProductID: "prod_webhook_http", WebhookEndpointID: "we_webhook_http", WebhookSecret: "whsec_webhook_http",
+		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_webhook_http", WebhookEndpointID: "we_webhook_http", WebhookSecret: "whsec_webhook_http",
 	}}
 	verifier := &fakeWebhookVerifier{event: StripeWebhookEvent{
 		ID: "evt_http", Type: "customer.updated", ObjectID: "cus_http", CreatedAt: time.Now(),
@@ -414,7 +424,7 @@ func TestStripeWebhookHTTPContractUsesUnauthenticatedExactRawBody(t *testing.T) 
 	repo := NewRepository(db)
 	service := newCompleteTestPaymentsService(t, repo, NewPaymentRuntime(nil, nil), gateway, testCheckoutGateway{}, testWalletReader{}, verifier, testRefundGateway{}, testDisputeGateway{}, testShutdownEnqueuer{})
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
-		ActorID: 42, APIKey: "sk_test_webhook_http", ProductTaxCode: "txcd_10105001",
+		ActorID: 42, APIKey: "sk_test_webhook_http", PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001",
 		WebhookURL: "https://app.example.com/api/webhooks/stripe",
 	}); err != nil {
 		t.Fatal(err)

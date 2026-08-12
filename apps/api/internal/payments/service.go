@@ -63,16 +63,20 @@ func (s *CheckoutWorkflow) configureStripe(ctx context.Context, command Configur
 	if err != nil {
 		return StripeConfigurationSummary{}, err
 	}
-	if hasCurrent && current.ProductTaxCode == strings.TrimSpace(command.ProductTaxCode) &&
+	if hasCurrent && current.PaymentMethodConfigurationID != "" &&
+		current.ProductTaxCode == strings.TrimSpace(command.ProductTaxCode) &&
+		current.PaymentMethodConfigurationID == strings.TrimSpace(command.PaymentMethodConfigurationID) &&
 		current.PurchasesEnabled != command.PurchasesEnabled && strings.TrimSpace(command.APIKey) == "" {
 		metadata := safeAuditMetadata(map[string]any{
 			"account_id": current.AccountID, "mode": current.Mode, "product_tax_code": current.ProductTaxCode,
-			"purchases_enabled": command.PurchasesEnabled,
+			"payment_method_configuration_id": current.PaymentMethodConfigurationID,
+			"purchases_enabled":               command.PurchasesEnabled,
 		})
 		stored, shutdown, err := s.configuration.ReplaceStripeConfiguration(ctx, current.Revision, StoredStripeConfiguration{
 			CredentialID: current.CredentialID,
 			AccountID:    current.AccountID, Mode: current.Mode, ChargesEnabled: current.ChargesEnabled,
-			ProductTaxCode: current.ProductTaxCode, PurchasesEnabled: command.PurchasesEnabled,
+			PaymentMethodConfigurationID: current.PaymentMethodConfigurationID,
+			ProductTaxCode:               current.ProductTaxCode, PurchasesEnabled: command.PurchasesEnabled,
 			StripeProductID: current.StripeProductID, StripeWebhookEndpointID: current.StripeWebhookEndpointID,
 			APIKeyCiphertext: current.APIKeyCiphertext, WebhookSecretCiphertext: current.WebhookSecretCiphertext,
 			SecretMaterialKind: current.SecretMaterialKind, UpdatedBy: command.ActorID,
@@ -86,6 +90,10 @@ func (s *CheckoutWorkflow) configureStripe(ctx context.Context, command Configur
 	taxCode, err := normalizeProductTaxCode(command.ProductTaxCode)
 	if err != nil {
 		return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "invalid_tax_code", err.Error(), nil, err)
+	}
+	paymentMethodConfigurationID, err := normalizePaymentMethodConfigurationID(command.PaymentMethodConfigurationID)
+	if err != nil {
+		return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, "invalid_payment_method_configuration", err.Error(), nil, err)
 	}
 	webhookURL, err := normalizeWebhookURL(command.WebhookURL)
 	if err != nil {
@@ -119,7 +127,7 @@ func (s *CheckoutWorkflow) configureStripe(ctx context.Context, command Configur
 
 	prepare := PrepareStripeConfiguration{
 		APIKey: apiKey, Mode: mode, PurchasesEnabled: command.PurchasesEnabled,
-		ProductTaxCode: taxCode, WebhookURL: webhookURL,
+		ProductTaxCode: taxCode, PaymentMethodConfigurationID: paymentMethodConfigurationID, WebhookURL: webhookURL,
 	}
 	if hasCurrent {
 		prepare.ExistingAccountID = current.AccountID
@@ -133,7 +141,7 @@ func (s *CheckoutWorkflow) configureStripe(ctx context.Context, command Configur
 		code, summary, publicErr := gatewayFailure(err)
 		return StripeConfigurationSummary{}, s.recordFailure(ctx, command.ActorID, string(code), summary, map[string]any{"mode": mode}, wrapPublicError(publicErr, summary))
 	}
-	if err := validatePreparedConfiguration(prepared, mode); err != nil {
+	if err := validatePreparedConfiguration(prepared, mode, paymentMethodConfigurationID); err != nil {
 		code := "invalid_response"
 		if errors.Is(err, ErrStripeCapabilityUnavailable) {
 			code = "capability_missing"
@@ -143,6 +151,7 @@ func (s *CheckoutWorkflow) configureStripe(ctx context.Context, command Configur
 
 	credentialChanged := !hasCurrent || apiKey != currentAPIKey || prepared.AccountID != current.AccountID ||
 		prepared.Mode != current.Mode || prepared.ChargesEnabled != current.ChargesEnabled ||
+		prepared.PaymentMethodConfigurationID != current.PaymentMethodConfigurationID ||
 		prepared.ProductID != current.StripeProductID || prepared.WebhookEndpointID != current.StripeWebhookEndpointID ||
 		prepared.WebhookSecret != currentWebhookSecret
 	credentialID := ""
@@ -163,7 +172,8 @@ func (s *CheckoutWorkflow) configureStripe(ctx context.Context, command Configur
 
 	metadata := safeAuditMetadata(map[string]any{
 		"account_id": prepared.AccountID, "mode": mode, "product_tax_code": taxCode,
-		"purchases_enabled": command.PurchasesEnabled,
+		"payment_method_configuration_id": prepared.PaymentMethodConfigurationID,
+		"purchases_enabled":               command.PurchasesEnabled,
 	})
 	expectedRevision := int64(0)
 	if hasCurrent {
@@ -171,7 +181,8 @@ func (s *CheckoutWorkflow) configureStripe(ctx context.Context, command Configur
 	}
 	stored, shutdown, err := s.configuration.ReplaceStripeConfiguration(ctx, expectedRevision, StoredStripeConfiguration{
 		CredentialID: credentialID, AccountID: prepared.AccountID, Mode: prepared.Mode, ChargesEnabled: prepared.ChargesEnabled,
-		ProductTaxCode: taxCode, PurchasesEnabled: command.PurchasesEnabled,
+		PaymentMethodConfigurationID: prepared.PaymentMethodConfigurationID,
+		ProductTaxCode:               taxCode, PurchasesEnabled: command.PurchasesEnabled,
 		StripeProductID: prepared.ProductID, StripeWebhookEndpointID: prepared.WebhookEndpointID,
 		APIKeyCiphertext: encryptedAPIKey, WebhookSecretCiphertext: encryptedWebhookSecret,
 		SecretMaterialKind: secrets.MaterialKindEncrypted, UpdatedBy: command.ActorID,
@@ -461,7 +472,8 @@ func stripeConfigurationSummary(stored StoredStripeConfiguration) StripeConfigur
 		Configured: true, APIKeyConfigured: stored.APIKeyCiphertext != "",
 		WebhookSecretConfigured: stored.WebhookSecretCiphertext != "", AccountID: stored.AccountID,
 		Mode: stored.Mode, ChargesEnabled: stored.ChargesEnabled, ProductTaxCode: stored.ProductTaxCode,
-		ProductReady: stored.StripeProductID != "", WebhookReady: stored.StripeWebhookEndpointID != "",
+		PaymentMethodConfigurationID: stored.PaymentMethodConfigurationID,
+		ProductReady:                 stored.StripeProductID != "", WebhookReady: stored.StripeWebhookEndpointID != "",
 		PurchasesEnabled: stored.PurchasesEnabled, UpdatedAt: stored.UpdatedAt,
 	}
 }

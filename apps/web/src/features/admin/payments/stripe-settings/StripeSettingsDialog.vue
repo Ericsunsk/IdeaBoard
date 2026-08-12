@@ -61,6 +61,28 @@
       <form class="flex flex-col gap-4" novalidate @submit.prevent="submit">
         <AdminFormField
           v-slot="{ describedbyId, invalid }"
+          label="Payment Method Configuration ID"
+          for="admin-stripe-payment-method-configuration-id"
+          :error="errors.paymentMethodConfigurationId"
+          hint="来自当前 Stripe Account 和当前 Mode，例如 pmc_...。保存前会由 Stripe 验证。"
+          required
+        >
+          <InputText
+            id="admin-stripe-payment-method-configuration-id"
+            v-model="form.paymentMethodConfigurationId"
+            class="w-full"
+            placeholder="pmc_..."
+            maxlength="255"
+            aria-label="Payment Method Configuration ID"
+            :disabled="isBusy"
+            :invalid="invalid"
+            :aria-describedby="describedbyId"
+            @update:model-value="clearError('paymentMethodConfigurationId')"
+          />
+        </AdminFormField>
+
+        <AdminFormField
+          v-slot="{ describedbyId, invalid }"
           label="Stripe API Key"
           for="admin-stripe-api-key"
           :error="errors.apiKey"
@@ -167,14 +189,16 @@ const loadError = ref('')
 const saveError = ref('')
 const form = reactive({
   apiKey: '',
+  paymentMethodConfigurationId: '',
   productTaxCode: '',
   purchasesEnabled: false,
 })
-const errors = reactive({ apiKey: '', productTaxCode: '' })
+const errors = reactive({ apiKey: '', paymentMethodConfigurationId: '', productTaxCode: '' })
 const isBusy = computed(() => isLoading.value || isSaving.value)
 const apiKeyPlaceholder = computed(() =>
   summary.value?.apiKeyConfigured ? '已配置，留空则保持不变' : '输入 Stripe API Key',
 )
+const paymentMethodConfigurationIdPattern = /^pmc_[A-Za-z0-9]+$/
 const apiKeyHint = computed(() => {
   const acceptedFormats =
     '支持对应环境的 Secret key（sk_）或 Restricted key（rk_），建议优先使用最小权限的 Restricted key。'
@@ -204,6 +228,7 @@ async function load() {
   try {
     const nextSummary = await activeResource().get()
     summary.value = nextSummary
+    form.paymentMethodConfigurationId = nextSummary.paymentMethodConfigurationId
     form.productTaxCode = nextSummary.productTaxCode
     form.purchasesEnabled = nextSummary.purchasesEnabled
   } catch (error) {
@@ -216,11 +241,17 @@ async function load() {
 function validate() {
   errors.apiKey =
     !summary.value?.apiKeyConfigured && !form.apiKey.trim() ? '请输入 Stripe API Key' : ''
+  const paymentMethodConfigurationId = form.paymentMethodConfigurationId.trim()
+  errors.paymentMethodConfigurationId = !paymentMethodConfigurationId
+    ? '请输入 Payment Method Configuration ID'
+    : paymentMethodConfigurationIdPattern.test(paymentMethodConfigurationId)
+      ? ''
+      : '请输入有效的 pmc_... ID'
   errors.productTaxCode = form.productTaxCode.trim() ? '' : '请输入 Product Tax Code'
-  return !errors.apiKey && !errors.productTaxCode
+  return !errors.apiKey && !errors.paymentMethodConfigurationId && !errors.productTaxCode
 }
 
-function clearError(field: 'apiKey' | 'productTaxCode') {
+function clearError(field: 'apiKey' | 'paymentMethodConfigurationId' | 'productTaxCode') {
   errors[field] = ''
 }
 
@@ -231,10 +262,12 @@ async function submit() {
   try {
     const nextSummary = await activeResource().save({
       ...(form.apiKey.trim() ? { apiKey: form.apiKey.trim() } : {}),
+      paymentMethodConfigurationId: form.paymentMethodConfigurationId.trim(),
       productTaxCode: form.productTaxCode.trim(),
       purchasesEnabled: form.purchasesEnabled,
     })
     summary.value = nextSummary
+    form.paymentMethodConfigurationId = nextSummary.paymentMethodConfigurationId
     form.productTaxCode = nextSummary.productTaxCode
     form.purchasesEnabled = nextSummary.purchasesEnabled
     clearSensitiveState()
@@ -251,6 +284,7 @@ async function submit() {
 function clearSensitiveState() {
   form.apiKey = ''
   errors.apiKey = ''
+  errors.paymentMethodConfigurationId = ''
   errors.productTaxCode = ''
 }
 </script>

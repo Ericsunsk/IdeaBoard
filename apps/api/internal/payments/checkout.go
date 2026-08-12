@@ -25,18 +25,19 @@ type CheckoutCustomer struct {
 }
 
 type CreateCheckoutSessionInput struct {
-	APIKey            string
-	CustomerID        string
-	ProductID         string
-	PublicOrderNumber string
-	PaymentOrderID    string
-	RequestHash       string
-	IdeaQuantity      int64
-	AmountMinor       int64
-	ExpiresAt         time.Time
-	SuccessURL        string
-	CancelURL         string
-	IdempotencyKey    string
+	APIKey                       string
+	PaymentMethodConfigurationID string
+	CustomerID                   string
+	ProductID                    string
+	PublicOrderNumber            string
+	PaymentOrderID               string
+	RequestHash                  string
+	IdeaQuantity                 int64
+	AmountMinor                  int64
+	ExpiresAt                    time.Time
+	SuccessURL                   string
+	CancelURL                    string
+	IdempotencyKey               string
 }
 
 type RetrieveCheckoutSessionInput struct {

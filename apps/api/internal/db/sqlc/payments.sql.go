@@ -785,7 +785,7 @@ func (q *Queries) GetPaymentStripeConfiguration(ctx context.Context) (PaymentStr
 }
 
 const getPaymentStripeCredential = `-- name: GetPaymentStripeCredential :one
-SELECT id, account_id, mode, charges_enabled, stripe_product_id, stripe_webhook_endpoint_id, api_key_ciphertext, webhook_secret_ciphertext, secret_material_kind, created_by, created_at
+SELECT id, account_id, mode, charges_enabled, payment_method_configuration_id, stripe_product_id, stripe_webhook_endpoint_id, api_key_ciphertext, webhook_secret_ciphertext, secret_material_kind, created_by, created_at
 FROM payment_stripe_credentials
 WHERE id = $1
 `
@@ -798,6 +798,7 @@ func (q *Queries) GetPaymentStripeCredential(ctx context.Context, id uuid.UUID) 
 		&i.AccountID,
 		&i.Mode,
 		&i.ChargesEnabled,
+		&i.PaymentMethodConfigurationID,
 		&i.StripeProductID,
 		&i.StripeWebhookEndpointID,
 		&i.ApiKeyCiphertext,
@@ -810,7 +811,7 @@ func (q *Queries) GetPaymentStripeCredential(ctx context.Context, id uuid.UUID) 
 }
 
 const getPaymentStripeCredentialForOrder = `-- name: GetPaymentStripeCredentialForOrder :one
-SELECT credentials.id, credentials.account_id, credentials.mode, credentials.charges_enabled, credentials.stripe_product_id, credentials.stripe_webhook_endpoint_id, credentials.api_key_ciphertext, credentials.webhook_secret_ciphertext, credentials.secret_material_kind, credentials.created_by, credentials.created_at
+SELECT credentials.id, credentials.account_id, credentials.mode, credentials.charges_enabled, credentials.payment_method_configuration_id, credentials.stripe_product_id, credentials.stripe_webhook_endpoint_id, credentials.api_key_ciphertext, credentials.webhook_secret_ciphertext, credentials.secret_material_kind, credentials.created_by, credentials.created_at
 FROM payment_orders orders
 JOIN payment_stripe_credentials credentials ON credentials.id = orders.stripe_credential_id
 WHERE orders.id = $1
@@ -824,6 +825,7 @@ func (q *Queries) GetPaymentStripeCredentialForOrder(ctx context.Context, id uui
 		&i.AccountID,
 		&i.Mode,
 		&i.ChargesEnabled,
+		&i.PaymentMethodConfigurationID,
 		&i.StripeProductID,
 		&i.StripeWebhookEndpointID,
 		&i.ApiKeyCiphertext,
@@ -836,7 +838,7 @@ func (q *Queries) GetPaymentStripeCredentialForOrder(ctx context.Context, id uui
 }
 
 const getPaymentStripeCredentialForOrderNumber = `-- name: GetPaymentStripeCredentialForOrderNumber :one
-SELECT credentials.id, credentials.account_id, credentials.mode, credentials.charges_enabled, credentials.stripe_product_id, credentials.stripe_webhook_endpoint_id, credentials.api_key_ciphertext, credentials.webhook_secret_ciphertext, credentials.secret_material_kind, credentials.created_by, credentials.created_at
+SELECT credentials.id, credentials.account_id, credentials.mode, credentials.charges_enabled, credentials.payment_method_configuration_id, credentials.stripe_product_id, credentials.stripe_webhook_endpoint_id, credentials.api_key_ciphertext, credentials.webhook_secret_ciphertext, credentials.secret_material_kind, credentials.created_by, credentials.created_at
 FROM payment_orders orders
 JOIN payment_stripe_credentials credentials ON credentials.id = orders.stripe_credential_id
 WHERE orders.public_order_number = $1
@@ -850,6 +852,7 @@ func (q *Queries) GetPaymentStripeCredentialForOrderNumber(ctx context.Context, 
 		&i.AccountID,
 		&i.Mode,
 		&i.ChargesEnabled,
+		&i.PaymentMethodConfigurationID,
 		&i.StripeProductID,
 		&i.StripeWebhookEndpointID,
 		&i.ApiKeyCiphertext,
@@ -1026,6 +1029,7 @@ INSERT INTO payment_stripe_credentials (
   account_id,
   mode,
   charges_enabled,
+  payment_method_configuration_id,
   stripe_product_id,
   stripe_webhook_endpoint_id,
   api_key_ciphertext,
@@ -1033,21 +1037,22 @@ INSERT INTO payment_stripe_credentials (
   secret_material_kind,
   created_by
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, account_id, mode, charges_enabled, stripe_product_id, stripe_webhook_endpoint_id, api_key_ciphertext, webhook_secret_ciphertext, secret_material_kind, created_by, created_at
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING id, account_id, mode, charges_enabled, payment_method_configuration_id, stripe_product_id, stripe_webhook_endpoint_id, api_key_ciphertext, webhook_secret_ciphertext, secret_material_kind, created_by, created_at
 `
 
 type InsertPaymentStripeCredentialParams struct {
-	ID                      uuid.UUID `json:"id"`
-	AccountID               string    `json:"account_id"`
-	Mode                    string    `json:"mode"`
-	ChargesEnabled          bool      `json:"charges_enabled"`
-	StripeProductID         string    `json:"stripe_product_id"`
-	StripeWebhookEndpointID string    `json:"stripe_webhook_endpoint_id"`
-	ApiKeyCiphertext        string    `json:"api_key_ciphertext"`
-	WebhookSecretCiphertext string    `json:"webhook_secret_ciphertext"`
-	SecretMaterialKind      string    `json:"secret_material_kind"`
-	CreatedBy               int64     `json:"created_by"`
+	ID                           uuid.UUID      `json:"id"`
+	AccountID                    string         `json:"account_id"`
+	Mode                         string         `json:"mode"`
+	ChargesEnabled               bool           `json:"charges_enabled"`
+	PaymentMethodConfigurationID sql.NullString `json:"payment_method_configuration_id"`
+	StripeProductID              string         `json:"stripe_product_id"`
+	StripeWebhookEndpointID      string         `json:"stripe_webhook_endpoint_id"`
+	ApiKeyCiphertext             string         `json:"api_key_ciphertext"`
+	WebhookSecretCiphertext      string         `json:"webhook_secret_ciphertext"`
+	SecretMaterialKind           string         `json:"secret_material_kind"`
+	CreatedBy                    int64          `json:"created_by"`
 }
 
 func (q *Queries) InsertPaymentStripeCredential(ctx context.Context, arg InsertPaymentStripeCredentialParams) (PaymentStripeCredential, error) {
@@ -1056,6 +1061,7 @@ func (q *Queries) InsertPaymentStripeCredential(ctx context.Context, arg InsertP
 		arg.AccountID,
 		arg.Mode,
 		arg.ChargesEnabled,
+		arg.PaymentMethodConfigurationID,
 		arg.StripeProductID,
 		arg.StripeWebhookEndpointID,
 		arg.ApiKeyCiphertext,
@@ -1069,6 +1075,7 @@ func (q *Queries) InsertPaymentStripeCredential(ctx context.Context, arg InsertP
 		&i.AccountID,
 		&i.Mode,
 		&i.ChargesEnabled,
+		&i.PaymentMethodConfigurationID,
 		&i.StripeProductID,
 		&i.StripeWebhookEndpointID,
 		&i.ApiKeyCiphertext,
@@ -1650,7 +1657,7 @@ func (q *Queries) ListPaymentReconciliationAnomalies(ctx context.Context, rowLim
 }
 
 const listPaymentStripeCredentials = `-- name: ListPaymentStripeCredentials :many
-SELECT id, account_id, mode, charges_enabled, stripe_product_id, stripe_webhook_endpoint_id, api_key_ciphertext, webhook_secret_ciphertext, secret_material_kind, created_by, created_at
+SELECT id, account_id, mode, charges_enabled, payment_method_configuration_id, stripe_product_id, stripe_webhook_endpoint_id, api_key_ciphertext, webhook_secret_ciphertext, secret_material_kind, created_by, created_at
 FROM payment_stripe_credentials
 ORDER BY created_at DESC, id DESC
 `
@@ -1669,6 +1676,7 @@ func (q *Queries) ListPaymentStripeCredentials(ctx context.Context) ([]PaymentSt
 			&i.AccountID,
 			&i.Mode,
 			&i.ChargesEnabled,
+			&i.PaymentMethodConfigurationID,
 			&i.StripeProductID,
 			&i.StripeWebhookEndpointID,
 			&i.ApiKeyCiphertext,

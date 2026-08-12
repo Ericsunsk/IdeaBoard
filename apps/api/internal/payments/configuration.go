@@ -18,64 +18,72 @@ const (
 )
 
 var (
-	ErrStripeConfigurationNotFound = errors.New("尚未完成 Stripe 配置")
-	ErrStripeAPIKeyRequired        = errors.New("请填写 Stripe API Key")
-	ErrInvalidStripeAPIKey         = errors.New("无效的 Stripe API Key：请使用 sk_ 或 rk_ 开头的对应环境 Key")
-	ErrInvalidProductTaxCode       = errors.New("无效的 Stripe Product Tax Code 格式")
-	ErrInvalidWebhookURL           = errors.New("无效的 Stripe Webhook URL")
-	ErrStripePermissionDenied      = errors.New("当前 Stripe API Key 权限不足")
-	ErrStripeAccountUnavailable    = errors.New("当前 Stripe 账户不可用")
-	ErrStripeCapabilityUnavailable = errors.New("当前 Stripe 账户暂不具备收款能力")
-	ErrStripeProviderUnavailable   = errors.New("当前 Stripe 服务暂时不可用")
-	ErrStripeConfigurationInvalid  = errors.New("收到的 Stripe 配置不完整")
-	ErrStripeConfigurationChanged  = errors.New("stripe configuration changed")
+	ErrStripeConfigurationNotFound       = errors.New("尚未完成 Stripe 配置")
+	ErrStripeAPIKeyRequired              = errors.New("请填写 Stripe API Key")
+	ErrInvalidStripeAPIKey               = errors.New("无效的 Stripe API Key：请使用 sk_ 或 rk_ 开头的对应环境 Key")
+	ErrInvalidPaymentMethodConfiguration = errors.New("无效的 Stripe Payment Method Configuration ID")
+	ErrInvalidProductTaxCode             = errors.New("无效的 Stripe Product Tax Code 格式")
+	ErrInvalidWebhookURL                 = errors.New("无效的 Stripe Webhook URL")
+	ErrStripePermissionDenied            = errors.New("当前 Stripe API Key 权限不足")
+	ErrStripeAccountUnavailable          = errors.New("当前 Stripe 账户不可用")
+	ErrStripeCapabilityUnavailable       = errors.New("当前 Stripe 账户暂不具备收款能力")
+	ErrStripeProviderUnavailable         = errors.New("当前 Stripe 服务暂时不可用")
+	ErrStripeConfigurationInvalid        = errors.New("收到的 Stripe 配置不完整")
+	ErrStripeConfigurationChanged        = errors.New("stripe configuration changed")
 )
 
-var productTaxCodePattern = regexp.MustCompile(`^txcd_[0-9]{8}$`)
+var (
+	productTaxCodePattern               = regexp.MustCompile(`^txcd_[0-9]{8}$`)
+	paymentMethodConfigurationIDPattern = regexp.MustCompile(`^pmc_[A-Za-z0-9]+$`)
+)
 
 const maxStripeAPIKeyLength = 512
 
 type StripeConfigurationSummary struct {
-	Configured              bool       `json:"configured"`
-	APIKeyConfigured        bool       `json:"api_key_configured"`
-	WebhookSecretConfigured bool       `json:"webhook_secret_configured"`
-	AccountID               string     `json:"account_id,omitempty"`
-	Mode                    StripeMode `json:"mode,omitempty"`
-	ChargesEnabled          bool       `json:"charges_enabled"`
-	ProductTaxCode          string     `json:"product_tax_code"`
-	ProductReady            bool       `json:"product_ready"`
-	WebhookReady            bool       `json:"webhook_ready"`
-	PurchasesEnabled        bool       `json:"purchases_enabled"`
-	UpdatedAt               time.Time  `json:"updated_at,omitempty"`
+	Configured                   bool       `json:"configured"`
+	APIKeyConfigured             bool       `json:"api_key_configured"`
+	WebhookSecretConfigured      bool       `json:"webhook_secret_configured"`
+	AccountID                    string     `json:"account_id,omitempty"`
+	Mode                         StripeMode `json:"mode,omitempty"`
+	ChargesEnabled               bool       `json:"charges_enabled"`
+	PaymentMethodConfigurationID string     `json:"payment_method_configuration_id,omitempty"`
+	ProductTaxCode               string     `json:"product_tax_code"`
+	ProductReady                 bool       `json:"product_ready"`
+	WebhookReady                 bool       `json:"webhook_ready"`
+	PurchasesEnabled             bool       `json:"purchases_enabled"`
+	UpdatedAt                    time.Time  `json:"updated_at,omitempty"`
 }
 
 type ConfigureStripeCommand struct {
-	ActorID          int64
-	APIKey           string
-	ProductTaxCode   string
-	PurchasesEnabled bool
-	WebhookURL       string
+	ActorID                      int64
+	APIKey                       string
+	PaymentMethodConfigurationID string
+	ProductTaxCode               string
+	PurchasesEnabled             bool
+	WebhookURL                   string
 }
 
 type PrepareStripeConfiguration struct {
-	APIKey                    string
-	Mode                      StripeMode
-	PurchasesEnabled          bool
-	ProductTaxCode            string
-	WebhookURL                string
-	ExistingAccountID         string
-	ExistingProductID         string
-	ExistingWebhookEndpointID string
-	ExistingWebhookSecret     string
+	APIKey                       string
+	Mode                         StripeMode
+	PurchasesEnabled             bool
+	ProductTaxCode               string
+	PaymentMethodConfigurationID string
+	WebhookURL                   string
+	ExistingAccountID            string
+	ExistingProductID            string
+	ExistingWebhookEndpointID    string
+	ExistingWebhookSecret        string
 }
 
 type PreparedStripeConfiguration struct {
-	AccountID         string
-	Mode              StripeMode
-	ChargesEnabled    bool
-	ProductID         string
-	WebhookEndpointID string
-	WebhookSecret     string
+	AccountID                    string
+	Mode                         StripeMode
+	ChargesEnabled               bool
+	PaymentMethodConfigurationID string
+	ProductID                    string
+	WebhookEndpointID            string
+	WebhookSecret                string
 }
 
 type StripeGateway interface {
@@ -145,6 +153,14 @@ func normalizeProductTaxCode(raw string) (string, error) {
 	return value, nil
 }
 
+func normalizePaymentMethodConfigurationID(raw string) (string, error) {
+	value := strings.TrimSpace(raw)
+	if len(value) > 255 || !paymentMethodConfigurationIDPattern.MatchString(value) {
+		return "", ErrInvalidPaymentMethodConfiguration
+	}
+	return value, nil
+}
+
 func normalizeWebhookURL(raw string) (string, error) {
 	value := strings.TrimSpace(raw)
 	parsed, err := url.Parse(value)
@@ -162,8 +178,9 @@ func normalizeWebhookURL(raw string) (string, error) {
 	return parsed.String(), nil
 }
 
-func validatePreparedConfiguration(prepared PreparedStripeConfiguration, expectedMode StripeMode) error {
+func validatePreparedConfiguration(prepared PreparedStripeConfiguration, expectedMode StripeMode, expectedPaymentMethodConfigurationID string) error {
 	if strings.TrimSpace(prepared.AccountID) == "" || prepared.Mode != expectedMode ||
+		prepared.PaymentMethodConfigurationID != expectedPaymentMethodConfigurationID ||
 		strings.TrimSpace(prepared.ProductID) == "" || strings.TrimSpace(prepared.WebhookEndpointID) == "" ||
 		strings.TrimSpace(prepared.WebhookSecret) == "" {
 		return ErrStripeConfigurationInvalid

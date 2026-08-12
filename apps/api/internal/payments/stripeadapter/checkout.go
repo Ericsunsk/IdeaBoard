@@ -46,6 +46,9 @@ func (a *Adapter) CreateCustomer(ctx context.Context, input payments.CreateCheck
 }
 
 func (a *Adapter) CreateCheckoutSession(ctx context.Context, input payments.CreateCheckoutSessionInput) (payments.CheckoutSession, error) {
+	if strings.TrimSpace(input.PaymentMethodConfigurationID) == "" {
+		return payments.CheckoutSession{}, payments.NewGatewayError(payments.GatewayErrorInvalidResponse, "Stripe Payment Method Configuration 未配置", nil)
+	}
 	client, err := a.checkoutClient(input.APIKey)
 	if err != nil {
 		return payments.CheckoutSession{}, err
@@ -53,14 +56,15 @@ func (a *Adapter) CreateCheckoutSession(ctx context.Context, input payments.Crea
 
 	metadata := checkoutMetadata(input)
 	params := &stripe.CheckoutSessionCreateParams{
-		Mode:              stripe.String(string(stripe.CheckoutSessionModePayment)),
-		Customer:          stripe.String(input.CustomerID),
-		ClientReferenceID: stripe.String(input.PublicOrderNumber),
-		SuccessURL:        stripe.String(input.SuccessURL),
-		CancelURL:         stripe.String(input.CancelURL),
-		ExpiresAt:         stripe.Int64(input.ExpiresAt.Unix()),
-		Metadata:          metadata,
-		AdaptivePricing:   &stripe.CheckoutSessionCreateAdaptivePricingParams{Enabled: stripe.Bool(true)},
+		Mode:                       stripe.String(string(stripe.CheckoutSessionModePayment)),
+		PaymentMethodConfiguration: stripe.String(input.PaymentMethodConfigurationID),
+		Customer:                   stripe.String(input.CustomerID),
+		ClientReferenceID:          stripe.String(input.PublicOrderNumber),
+		SuccessURL:                 stripe.String(input.SuccessURL),
+		CancelURL:                  stripe.String(input.CancelURL),
+		ExpiresAt:                  stripe.Int64(input.ExpiresAt.Unix()),
+		Metadata:                   metadata,
+		AdaptivePricing:            &stripe.CheckoutSessionCreateAdaptivePricingParams{Enabled: stripe.Bool(true)},
 		PaymentIntentData: &stripe.CheckoutSessionCreatePaymentIntentDataParams{
 			Metadata:                  metadata,
 			StatementDescriptorSuffix: stripe.String(checkoutStatementSuffix),

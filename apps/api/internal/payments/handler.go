@@ -74,9 +74,10 @@ type EventStreamHandler struct {
 }
 
 type updateStripeConfigurationRequest struct {
-	APIKey           *string `json:"api_key"`
-	ProductTaxCode   string  `json:"product_tax_code"`
-	PurchasesEnabled *bool   `json:"purchases_enabled"`
+	APIKey                       *string `json:"api_key"`
+	PaymentMethodConfigurationID string  `json:"payment_method_configuration_id"`
+	ProductTaxCode               string  `json:"product_tax_code"`
+	PurchasesEnabled             *bool   `json:"purchases_enabled"`
 }
 
 type createPaymentCheckoutRequest struct {
@@ -542,8 +543,9 @@ func (h *AdminHandler) UpdateStripeConfiguration(c *gin.Context) {
 	}
 	summary, err := h.service.ConfigureStripe(c.Request.Context(), ConfigureStripeCommand{
 		ActorID: admin.UserID(), APIKey: apiKey, ProductTaxCode: request.ProductTaxCode,
-		PurchasesEnabled: *request.PurchasesEnabled,
-		WebhookURL:       h.publicOrigins.APIURL("/api/webhooks/stripe"),
+		PaymentMethodConfigurationID: request.PaymentMethodConfigurationID,
+		PurchasesEnabled:             *request.PurchasesEnabled,
+		WebhookURL:                   h.publicOrigins.APIURL("/api/webhooks/stripe"),
 	})
 	if err != nil {
 		writeStripeConfigurationError(c, err)
@@ -582,7 +584,7 @@ func (h *WebhookHandler) ReceiveStripeWebhook(c *gin.Context) {
 func writeStripeConfigurationError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, ErrStripeAPIKeyRequired), errors.Is(err, ErrInvalidStripeAPIKey),
-		errors.Is(err, ErrInvalidProductTaxCode), errors.Is(err, ErrInvalidWebhookURL):
+		errors.Is(err, ErrInvalidPaymentMethodConfiguration), errors.Is(err, ErrInvalidProductTaxCode), errors.Is(err, ErrInvalidWebhookURL):
 		response.Error(c, http.StatusBadRequest, err.Error())
 	case errors.Is(err, ErrStripePermissionDenied):
 		response.Error(c, http.StatusForbidden, ErrStripePermissionDenied.Error())

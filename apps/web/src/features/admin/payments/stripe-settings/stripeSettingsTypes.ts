@@ -7,6 +7,7 @@ export type StripeConfigurationSummary = {
   accountId?: string
   mode?: StripeConfigurationMode
   chargesEnabled: boolean
+  paymentMethodConfigurationId: string
   productTaxCode: string
   productReady: boolean
   webhookReady: boolean
@@ -16,6 +17,7 @@ export type StripeConfigurationSummary = {
 
 export type SaveStripeConfigurationInput = {
   apiKey?: string
+  paymentMethodConfigurationId: string
   productTaxCode: string
   purchasesEnabled: boolean
 }
