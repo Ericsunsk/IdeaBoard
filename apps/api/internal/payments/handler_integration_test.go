@@ -384,7 +384,8 @@ func TestStripeConfigurationHTTPRejectsOversizedAPIKeyBeforeGatewayAndAuditsFail
 
 	oversizedKey := "sk_test_" + strings.Repeat("x", maxStripeAPIKeyLength-len("sk_test_")+1)
 	requestBody, err := json.Marshal(map[string]any{
-		"api_key": oversizedKey, "product_tax_code": "txcd_10105001", "purchases_enabled": true,
+		"api_key": oversizedKey, "payment_method_configuration_id": "pmc_testfixture",
+		"product_tax_code": "txcd_10105001", "purchases_enabled": true,
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -25,7 +25,7 @@ func TestDisablePurchasesFastPathExpiresExistingCheckout(t *testing.T) {
 	}
 	prepareCalls := len(configurationGateway.calls)
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
-		ActorID: 42, ProductTaxCode: "txcd_10105001", PurchasesEnabled: false,
+		ActorID: 42, PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001", PurchasesEnabled: false,
 	}); err != nil {
 		t.Fatalf("disable purchases: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestDisabledReconciliationDoesNotCreateCheckout(t *testing.T) {
 	now := time.Now().UTC()
 	order := createReconciliationIntentForStripeAccount(t, repo, 42, 501, now.Add(time.Hour), "acct_shutdown_reconciliation", "prod_shutdown_reconciliation")
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{
-		ActorID: 42, ProductTaxCode: "txcd_10105001", PurchasesEnabled: false,
+		ActorID: 42, PaymentMethodConfigurationID: "pmc_testfixture", ProductTaxCode: "txcd_10105001", PurchasesEnabled: false,
 	}); err != nil {
 		t.Fatalf("disable purchases: %v", err)
 	}

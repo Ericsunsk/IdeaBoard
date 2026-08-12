@@ -97,7 +97,8 @@ func TestCreateCheckoutCreatesCustomerPerStripeMode(t *testing.T) {
 	}
 
 	configurationGateway.prepared = PreparedStripeConfiguration{
-		AccountID: "acct_checkout", Mode: StripeModeLive, ChargesEnabled: true, ProductID: "prod_live",
+		AccountID: "acct_checkout", Mode: StripeModeLive, ChargesEnabled: true,
+		PaymentMethodConfigurationID: "pmc_testfixture", ProductID: "prod_live",
 		WebhookEndpointID: "we_live", WebhookSecret: "whsec_live",
 	}
 	if _, err := service.ConfigureStripe(t.Context(), ConfigureStripeCommand{

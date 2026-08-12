@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { UserBoardItem } from '../../../shared/api/generated-query/model'
+import type { ApiResponseBase, UserBoardItem } from '../../../shared/api/generated-query/model'
 import type { CanvasBoardState } from '../domain'
 import { CANVAS_BOARD_STATE_SCHEMA_VERSION } from '../domain'
 import { makeCanvasBoardState } from '../testing'
@@ -12,10 +12,10 @@ const mocks = vi.hoisted(() => {
   const request = vi.fn()
   const state: {
     listResponse: { code?: number; msg?: string; data: { list: UserBoardItem[] } }
-    upsertResponse: { code: number; msg?: string; data: null }
+    upsertResponse: ApiResponseBase & { data: null }
   } = {
     listResponse: { data: { list: [] as UserBoardItem[] } },
-    upsertResponse: { code: 0, data: null },
+    upsertResponse: { code: 0, msg: '', data: null },
   }
   return { request, state }
 })
@@ -87,7 +87,7 @@ describe('boardSync', () => {
     })
     vi.clearAllMocks()
     mocks.state.listResponse = { data: { list: [] } }
-    mocks.state.upsertResponse = { code: 0, data: null }
+    mocks.state.upsertResponse = { code: 0, msg: '', data: null }
     mocks.request.mockImplementation(mockBoardApiRequest)
   })
 
@@ -301,6 +301,7 @@ describe('boardSync', () => {
     mocks.state.upsertResponse = {
       code: 409,
       msg: '画布名称已存在',
+      message_safe: true,
       data: null,
     }
 
