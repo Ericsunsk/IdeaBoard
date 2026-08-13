@@ -2,28 +2,13 @@ name: Docker Images
 
 on:
   push:
-    branches:
-      - main
-      - master
     tags:
       - 'v*'
-    paths:
-      - 'apps/api/**'
-      - 'apps/auth/**'
-      - 'contracts/auth-internal.openapi.json'
-      - 'docker/**'
-      - '.grype.yaml'
-      - '.grype-version'
-      - '.grype-checksums'
-      - '.github/actions/**'
-      - '.github/workflows/backend.yml'
-      - '.github/workflows/docker-images.yml'
-      - '.node-version'
   workflow_dispatch:
     inputs:
-      image_tag:
-        description: Optional extra image tag, for example prod or v0.1.0
-        required: false
+      ref:
+        description: Commit SHA or strict SemVer tag to build
+        required: true
         type: string
 
 permissions:
@@ -37,17 +22,44 @@ concurrency:
   cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 jobs:
-  backend-verification:
-    name: Backend Verification
-    uses: ./.github/workflows/backend.yml
-    with:
-      base_sha: ${{ github.event.before }}
-      build_images: false
+  preflight:
+    name: Release Eligibility
+    runs-on: ubicloud-standard-2
+    permissions:
+      contents: read
+      checks: read
+    outputs:
+      source_commit: ${{ steps.validate.outputs.source_commit }}
+    steps:
+      - name: Checkout requested ref
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+          fetch-depth: 0
+      - name: Verify source commit and CI Gate
+        id: validate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref_name }}
+        run: |
+          set -euo pipefail
+          source_commit="$(git rev-parse 'HEAD^{commit}')"
+          if [[ "${REQUESTED_REF}" =~ ^v ]]; then
+            [[ "${REQUESTED_REF}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+            [[ "$(git rev-parse "refs/tags/${REQUESTED_REF}^{commit}")" == "${source_commit}" ]]
+          else
+            [[ "${REQUESTED_REF}" =~ ^[0-9a-f]{40}$ ]]
+          fi
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "${source_commit}" origin/main
+          successful_gate_count="$(gh api --paginate --slurp -H 'Accept: application/vnd.github+json' "/repos/${GITHUB_REPOSITORY}/commits/${source_commit}/check-runs?per_page=100" | jq '[.[].check_runs[] | select(.name == "CI Gate" and .conclusion == "success")] | length')"
+          [[ "${successful_gate_count}" -ge 1 ]]
+          echo "source_commit=${source_commit}" >> "${GITHUB_OUTPUT}"
 
   publish-images:
     name: Publish ${{ matrix.image.display }} Image
     needs:
-      - backend-verification
+      - preflight
     runs-on: ubicloud-standard-2
     timeout-minutes: 40
     permissions:
@@ -81,6 +93,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ needs.preflight.outputs.source_commit }}
 
       - name: Prepare image name
         id: image
@@ -88,7 +102,7 @@ jobs:
         run: |
           repository="${GITHUB_REPOSITORY,,}"
           echo "name=ghcr.io/${repository}/ideaboard-${{ matrix.image.name }}" >> "${GITHUB_OUTPUT}"
-          echo "immutable_tag=ghcr.io/${repository}/ideaboard-${{ matrix.image.name }}:sha-${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+          echo "immutable_tag=ghcr.io/${repository}/ideaboard-${{ matrix.image.name }}:sha-${{ needs.preflight.outputs.source_commit }}" >> "${GITHUB_OUTPUT}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
@@ -99,18 +113,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Generate image metadata
-        id: meta
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051
-        with:
-          images: ${{ steps.image.outputs.name }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=tag
-            type=sha,prefix=sha-
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ inputs.image_tag }},enable=${{ github.event_name == 'workflow_dispatch' && inputs.image_tag != '' }}
 
       - name: Build and push image
         id: build
@@ -123,7 +125,6 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.image.outputs.immutable_tag }}
-          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.image.cache_scope }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image.cache_scope }}
           provenance: mode=max
@@ -207,32 +208,6 @@ jobs:
           IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
         run: cosign sign --yes "${IMAGE}"
 
-      - name: Publish verified image aliases
-        timeout-minutes: 5
-        shell: bash
-        env:
-          IMAGE: ${{ steps.image.outputs.name }}@${{ steps.build.outputs.digest }}
-          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
-        run: |
-          set -euo pipefail
-
-          mapfile -t tags <<< "${IMAGE_TAGS}"
-          tag_args=()
-          for tag in "${tags[@]}"; do
-            [[ -n "${tag}" ]] && tag_args+=(--tag "${tag}")
-          done
-          ((${#tag_args[@]} > 0))
-
-          for attempt in 1 2 3; do
-            if docker buildx imagetools create "${tag_args[@]}" "${IMAGE}"; then
-              exit 0
-            fi
-            if [[ "${attempt}" == 3 ]]; then
-              exit 1
-            fi
-            sleep $((attempt * 5))
-          done
-
       - name: Write image metadata
         shell: bash
         env:
@@ -278,6 +253,7 @@ jobs:
     name: Build Release Manifest
     needs:
       - publish-images
+      - preflight
     runs-on: ubicloud-standard-2
     timeout-minutes: 10
     permissions:
@@ -307,7 +283,7 @@ jobs:
             --arg repository "${GITHUB_REPOSITORY}" \
             --arg tag "${GITHUB_REF_NAME}" \
             --arg ref "${GITHUB_REF}" \
-            --arg commit "${GITHUB_SHA}" \
+            --arg commit "${{ needs.preflight.outputs.source_commit }}" \
             --arg run_id "${GITHUB_RUN_ID}" \
             --arg workflow "docker-images.yml" \
             --arg cosign_identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/docker-images.yml@${GITHUB_REF}" \
@@ -374,6 +350,7 @@ jobs:
     if: needs.aggregate-release-manifest.outputs.is-production-release == 'true'
     needs:
       - aggregate-release-manifest
+      - preflight
     runs-on: ubicloud-standard-2
     timeout-minutes: 35
     permissions:
@@ -399,7 +376,7 @@ jobs:
           test -s "${manifest}"
           jq -e \
             --arg expected_tag "${GITHUB_REF_NAME}" \
-            --arg expected_commit "${GITHUB_SHA}" \
+            --arg expected_commit "${{ needs.preflight.outputs.source_commit }}" \
             --arg expected_ref "${GITHUB_REF}" \
             --arg expected_repository "${GITHUB_REPOSITORY}" \
             --arg expected_image_repository "ghcr.io/${GITHUB_REPOSITORY,,}" \
@@ -578,7 +555,7 @@ jobs:
 
   publish-release-assets:
     name: Publish Image Release Assets
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     needs:
       - aggregate-release-manifest
     runs-on: ubicloud-standard-2

@@ -115,7 +115,7 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 
 ### CI parity gate
 
-GitHub 只暴露一个稳定的 required check：`CI Gate`。它在 PR、`main` push 和 Merge Queue 的 `merge_group` 上始终创建，先把改动分类为 Web、API、Auth、Docker、Ops 与 Security，再只调用受影响的 reusable workflows；docs-only 改动会明确成功。未知路径采用 fail-safe 分类，执行全部 context，避免新增目录静默绕过 CI。
+GitHub 只暴露一个稳定的 required check：`CI Gate`。它在 PR、`main` push 和手动运行上始终创建，先把改动分类为 Web、API、Auth、Schema、Migration Integration、Docker 与 Ops，再只调用受影响的 reusable workflows；docs-only 改动会明确成功。Dependency audit 由 Web/Auth quality 与 API quality 各自负责，周一 schedule 的 `security.yml` 做全量 audit。未知路径采用 fail-safe 分类，执行全部 context，避免新增目录静默绕过 CI。
 
 修改 CI classifier、workflow 或 repo-local setup actions 后，先运行本地 contract tests：
 

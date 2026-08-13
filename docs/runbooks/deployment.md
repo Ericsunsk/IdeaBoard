@@ -119,15 +119,14 @@ VPS
 
 仓库已内置 [docker-images.yml](../../.github/workflows/docker-images.yml)。触发方式：
 
-- push 到 `main` / `master`
-- push `v*` tag
-- 在 GitHub Actions 手动运行 workflow，并可填写额外 `image_tag`
+- push strict SemVer `vMAJOR.MINOR.PATCH` tag
+- 在 GitHub Actions 手动运行 workflow，并填写明确的 commit SHA 或 strict SemVer tag `ref`
 
 生产部署不要把 VPS 端 bootstrap 绑定到 `main`；请始终使用明确的发布 tag 或 commit SHA。镜像部署值必须使用 GitHub Actions 输出的 digest 引用。
 
-Docker Images workflow 先复用 Backend Verification，通过后才发布镜像。workflow 会上传 `release-manifest` artifact；tag 发布还会把 `release-manifest.json` 和六份按 `linux/amd64`、`linux/arm64` 拆分的 CycloneDX SBOM 附到同一 GitHub Release。该 manifest 是推荐升级输入，记录本次 workflow 的 `repository` / `tag` / `ref` / `commit` / `run_id`、三张 GHCR digest 镜像引用、各平台 SBOM 文件名与 Cosign OIDC identity。
+Docker Images workflow 只消费目标 commit 已成功的 `CI Gate`，然后构建、扫描、签名并发布 immutable `sha-<commit>` images。workflow 会上传 `release-manifest` artifact；strict SemVer tag 发布还会把 `release-manifest.json` 和六份按 `linux/amd64`、`linux/arm64` 拆分的 CycloneDX SBOM 附到同一 GitHub Release。该 manifest 是推荐升级输入，记录本次 workflow 的 `repository` / `tag` / `ref` / `commit` / `run_id`、三张 GHCR digest 镜像引用、各平台 SBOM 文件名与 Cosign OIDC identity。
 
-严格 SemVer tag（例如 `v0.1.0`）还会触发同一 workflow 内的 Production deployment；`main`、`master`、手动 workflow 和不符合 `vMAJOR.MINOR.PATCH` 的 tag 都不会进入该 job。deployment job 只下载本次 workflow 生成的 `release-manifest`，在建立 SSH 连接前验证 manifest 的 tag、commit、ref 和三张 image digest，然后把 manifest 通过 stdin 发送给 VPS 上的 restricted forced command。VPS entrypoint 继续负责 checkout 对应 commit、Cosign 验签、backup、migration、health、smoke 和 release state；GitHub Actions 不重新 build、不解析 mutable image tag，也不读取应用运行时 Secret。
+严格 SemVer tag（例如 `v0.1.0`）还会触发同一 workflow 内的 Production deployment；手动 workflow 可以构建、扫描、签名 artifact，但不会自动进入 Production deployment。deployment job 只下载本次 workflow 生成的 `release-manifest`，在建立 SSH 连接前验证 manifest 的 tag、commit、ref 和三张 image digest，然后把 manifest 通过 stdin 发送给 VPS 上的 restricted forced command。VPS entrypoint 继续负责 checkout 对应 commit、Cosign 验签、backup、migration、health、smoke 和 release state；GitHub Actions 不重新 build、不解析 mutable image tag，也不读取应用运行时 Secret。
 
 ### Production 自动部署通道
 

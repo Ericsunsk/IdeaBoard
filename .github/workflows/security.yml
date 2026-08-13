@@ -1,18 +1,6 @@
 name: Security Verification
 
 on:
-  workflow_call:
-    inputs:
-      web:
-        description: Run production Web dependency audit
-        required: false
-        type: boolean
-        default: false
-      services:
-        description: Run Auth and API dependency audits
-        required: false
-        type: boolean
-        default: false
   schedule:
     - cron: '17 3 * * 1'
 
@@ -21,7 +9,7 @@ permissions:
 
 jobs:
   web-audit:
-    if: inputs.web || github.event_name == 'schedule'
+    if: github.event_name == 'schedule'
     runs-on: ubicloud-standard-2
     timeout-minutes: 10
 
@@ -44,7 +32,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
   auth-audit:
-    if: inputs.services || github.event_name == 'schedule'
+    if: github.event_name == 'schedule'
     runs-on: ubicloud-standard-2
     timeout-minutes: 10
 
@@ -68,7 +56,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
   api-audit:
-    if: inputs.services || github.event_name == 'schedule'
+    if: github.event_name == 'schedule'
     runs-on: ubicloud-standard-2
     timeout-minutes: 10
 

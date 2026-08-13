@@ -22,7 +22,8 @@ assert_output_line "${docs_output}" 'api=false'
 assert_output_line "${docs_output}" 'auth=false'
 assert_output_line "${docs_output}" 'docker=false'
 assert_output_line "${docs_output}" 'ops=false'
-assert_output_line "${docs_output}" 'security=false'
+assert_output_line "${docs_output}" 'schema=false'
+assert_output_line "${docs_output}" 'migration_integration=false'
 assert_output_line "${docs_output}" 'docs_only=true'
 
 web_output="$(printf '%s\n' apps/web/src/main.ts | "${classifier}")"
@@ -57,7 +58,8 @@ assert_output_line "${ci_output}" 'api=true'
 assert_output_line "${ci_output}" 'auth=true'
 assert_output_line "${ci_output}" 'docker=true'
 assert_output_line "${ci_output}" 'ops=true'
-assert_output_line "${ci_output}" 'security=true'
+assert_output_line "${ci_output}" 'schema=true'
+assert_output_line "${ci_output}" 'migration_integration=true'
 assert_output_line "${ci_output}" 'docs_only=false'
 
 openapi_output="$(printf '%s\n' apps/api/openapi.yaml | "${classifier}")"
@@ -70,17 +72,17 @@ docker_output="$(printf '%s\n' docker/compose.yml | "${classifier}")"
 
 assert_output_line "${docker_output}" 'api=false'
 assert_output_line "${docker_output}" 'auth=false'
-assert_output_line "${docker_output}" 'docker=true'
+assert_output_line "${docker_output}" 'docker=false'
 assert_output_line "${docker_output}" 'ops=true'
-assert_output_line "${docker_output}" 'security=true'
+assert_output_line "${docker_output}" 'migration_integration=true'
 
 dependency_output="$(printf '%s\n' apps/web/package-lock.json apps/api/go.sum | "${classifier}")"
 
 assert_output_line "${dependency_output}" 'web=true'
 assert_output_line "${dependency_output}" 'api=true'
 assert_output_line "${dependency_output}" 'auth=false'
-assert_output_line "${dependency_output}" 'docker=false'
-assert_output_line "${dependency_output}" 'security=true'
+assert_output_line "${dependency_output}" 'docker=true'
+assert_output_line "${dependency_output}" 'schema=false'
 
 parity_output="$(printf '%s\n' scripts/ci-parity.sh | "${classifier}")"
 
@@ -97,7 +99,8 @@ assert_output_line "${runtime_output}" 'api=true'
 assert_output_line "${runtime_output}" 'auth=true'
 assert_output_line "${runtime_output}" 'docker=true'
 assert_output_line "${runtime_output}" 'ops=true'
-assert_output_line "${runtime_output}" 'security=true'
+assert_output_line "${runtime_output}" 'schema=true'
+assert_output_line "${runtime_output}" 'migration_integration=true'
 
 api_dockerfile_output="$(printf '%s\n' apps/api/Dockerfile | "${classifier}")"
 

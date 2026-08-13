@@ -1,0 +1,142 @@
+name: API
+
+on:
+  workflow_call:
+    inputs:
+      run_schema:
+        required: false
+        type: boolean
+        default: false
+      build_images:
+        required: false
+        type: boolean
+        default: false
+      audit_dependencies:
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: API Quality
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: ./.github/actions/setup-go
+        with:
+          cache-dependency-path: apps/api/go.sum
+      - name: Test CI parity entrypoint
+        run: bash scripts/ci-parity-test.sh
+      - name: Lint API
+        uses: golangci/golangci-lint-action@63c23d5020da8f97005b6de340504130bdbe42c7
+        with:
+          version: v2.12.2
+          working-directory: apps/api
+          args: ./...
+      - name: Go vulnerability check
+        if: inputs.audit_dependencies
+        working-directory: apps/api
+        run: go tool govulncheck ./...
+      - name: Production compile
+        working-directory: apps/api
+        env:
+          CGO_ENABLED: "0"
+        run: go build ./...
+
+  schema:
+    name: API Schema Release
+    if: inputs.run_schema
+    needs: [quality]
+    runs-on: ubicloud-standard-2
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: ideaboard_test
+          POSTGRES_USER: ideaboard
+          POSTGRES_PASSWORD: ideaboard_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U ideaboard -d ideaboard_test -h 127.0.0.1"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      API_TEST_DATABASE_DSN: postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with: { fetch-depth: 0 }
+      - uses: ./.github/actions/setup-go
+        with: { cache-dependency-path: apps/api/go.sum }
+      - name: Test API migrations
+        working-directory: apps/api
+        run: go test ./internal/db/migrations -count=1
+      - name: Resolve Schema Release commits
+        id: commits
+        env:
+          REQUESTED_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          head_sha="$(git rev-parse --verify 'HEAD^{commit}')"
+          base_sha="${REQUESTED_BASE_SHA}"
+          [[ -n "${base_sha}" && ! "${base_sha}" =~ ^0+$ ]] || base_sha="${head_sha}^1"
+          printf 'base_sha=%s\nhead_sha=%s\n' "$(git rev-parse --verify "${base_sha}^{commit}")" "${head_sha}" >> "${GITHUB_OUTPUT}"
+      - name: Check Schema Release contract
+        working-directory: apps/api
+        env:
+          BASE_SHA: ${{ steps.commits.outputs.base_sha }}
+          HEAD_SHA: ${{ steps.commits.outputs.head_sha }}
+        run: go run ./cmd/schema-release
+
+  tests:
+    name: API Race (${{ matrix.shard }})
+    runs-on: ubicloud-standard-2
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        shard: [0, 1, 2]
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: ideaboard_test
+          POSTGRES_USER: ideaboard
+          POSTGRES_PASSWORD: ideaboard_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U ideaboard -d ideaboard_test -h 127.0.0.1"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      API_TEST_DATABASE_DSN: postgres://ideaboard:ideaboard_test@127.0.0.1:5432/ideaboard_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: ./.github/actions/setup-go
+        with: { cache-dependency-path: apps/api/go.sum }
+      - name: Test race shard
+        env:
+          TEST_MODE: race
+          TEST_SHARD: ${{ matrix.shard }}
+          TEST_SHARD_COUNT: "3"
+        run: ./scripts/ci-parity.sh api-test
+
+  image:
+    name: API PR Image
+    if: inputs.build_images
+    needs: [quality, tests]
+    runs-on: ubicloud-standard-2
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: ./apps/api
+          file: ./apps/api/Dockerfile
+          target: runtime
+          platforms: linux/amd64
+          push: false
+          tags: ideaboard-api:pr
+          cache-from: type=gha,scope=ideaboard-api
+          cache-to: type=gha,mode=max,scope=ideaboard-api

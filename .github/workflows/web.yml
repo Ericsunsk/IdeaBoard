@@ -2,183 +2,77 @@ name: Web
 
 on:
   workflow_call:
+    inputs:
+      audit_dependencies:
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
-concurrency:
-  group: web-${{ github.ref_name }}
-  cancel-in-progress: true
-
 jobs:
-  generated:
+  quality:
+    name: Web Quality
     runs-on: ubicloud-standard-2
-    timeout-minutes: 10
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-
-      - name: Set up Node.js
-        uses: ./.github/actions/setup-node
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: ./.github/actions/setup-node
         with:
           cache-dependency-path: apps/web/package-lock.json
-
-      - name: Install dependencies
-        uses: ./.github/actions/npm-ci
+      - uses: ./.github/actions/npm-ci
         with:
           working-directory: apps/web
-
-      - name: Generate API client
+      - name: Generated API drift
         working-directory: apps/web
-        run: npm run api:generate
-
-      - name: Check generated API drift
-        run: git diff --exit-code -- apps/web/src/shared/api/generated-query
-
-  lint:
+        run: npm run api:generate && git diff --exit-code -- src/shared/api/generated-query
+      - name: ESLint
+        working-directory: apps/web
+        run: npm run lint
+      - name: Stylelint
+        working-directory: apps/web
+        run: npm run lint:style
+      - name: Test typecheck
+        working-directory: apps/web
+        run: npm run test:typecheck
+      - name: Production dependency audit
+        if: inputs.audit_dependencies
+        working-directory: apps/web
+        run: npm audit --omit=dev --audit-level=high
+      - name: Build
+        working-directory: apps/web
+        run: npm run build
+  unit:
+    name: Web Unit (${{ matrix.shard }})
     runs-on: ubicloud-standard-2
-    timeout-minutes: 15
-
     strategy:
       fail-fast: false
       max-parallel: 2
       matrix:
-        check:
-          - eslint
-          - styles
-
+        shard: ["1/2", "2/2"]
     steps:
-      - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-
-      - name: Set up Node.js
-        uses: ./.github/actions/setup-node
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: ./.github/actions/setup-node
         with:
           cache-dependency-path: apps/web/package-lock.json
-
-      - name: Install dependencies
-        uses: ./.github/actions/npm-ci
+      - uses: ./.github/actions/npm-ci
         with:
           working-directory: apps/web
-
-      - name: Lint
-        if: matrix.check == 'eslint'
-        working-directory: apps/web
-        run: npm run lint
-
-      - name: Lint styles
-        if: matrix.check == 'styles'
-        working-directory: apps/web
-        run: npm run lint:style
-
-  tests:
-    runs-on: ubicloud-standard-2
-    timeout-minutes: 15
-
-    strategy:
-      fail-fast: false
-      max-parallel: 3
-      matrix:
-        include:
-          - check: unit
-            shard: "1/2"
-          - check: unit
-            shard: "2/2"
-          - check: typecheck
-            shard: none
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-
-      - name: Set up Node.js
-        uses: ./.github/actions/setup-node
-        with:
-          cache-dependency-path: apps/web/package-lock.json
-
-      - name: Install dependencies
-        uses: ./.github/actions/npm-ci
-        with:
-          working-directory: apps/web
-
-      - name: Test
-        if: matrix.check == 'unit'
+      - name: Unit tests
         working-directory: apps/web
         env:
           TEST_SHARD: ${{ matrix.shard }}
         run: npm run test:run -- --shard="${TEST_SHARD}"
-
-      - name: Typecheck tests
-        if: matrix.check == 'typecheck'
-        working-directory: apps/web
-        run: npm run test:typecheck
-
   smoke:
+    name: Web Browser Smoke
     runs-on: ubicloud-standard-2
-    timeout-minutes: 15
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-
-      - name: Set up Node.js
-        uses: ./.github/actions/setup-node
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: ./.github/actions/setup-node
         with:
           cache-dependency-path: apps/web/package-lock.json
-
-      - name: Install dependencies
-        uses: ./.github/actions/npm-ci
+      - uses: ./.github/actions/npm-ci
         with:
           working-directory: apps/web
-
-      - name: User route smoke
-        timeout-minutes: 10
-        env:
-          USER_ROUTE_SMOKE_VERBOSE: "1"
+      - name: Browser smoke
         run: ./scripts/ci-parity.sh web-smoke
-
-  build:
-    runs-on: ubicloud-standard-2
-    timeout-minutes: 15
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-
-      - name: Set up Node.js
-        uses: ./.github/actions/setup-node
-        with:
-          cache-dependency-path: apps/web/package-lock.json
-
-      - name: Install dependencies
-        uses: ./.github/actions/npm-ci
-        with:
-          working-directory: apps/web
-
-      - name: Build
-        working-directory: apps/web
-        run: npm run build
-
-  verify:
-    if: always()
-    needs:
-      - generated
-      - lint
-      - tests
-      - smoke
-      - build
-    runs-on: ubicloud-standard-2
-    timeout-minutes: 5
-
-    steps:
-      - name: Verify required checks
-        if: >-
-          ${{
-            needs.generated.result != 'success' ||
-            needs.lint.result != 'success' ||
-            needs.tests.result != 'success' ||
-            needs.smoke.result != 'success' ||
-            needs.build.result != 'success'
-          }}
-        run: exit 1
