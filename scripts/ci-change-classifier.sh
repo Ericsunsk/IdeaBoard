@@ -7,7 +7,8 @@ mark_all_contexts() { web=true; api=true; auth=true; schema=true; migration_inte
 while IFS= read -r changed_path; do
   [[ -n "${changed_path}" ]] || continue
   case "${changed_path}" in
-    .github/workflows/* | .github/actions/* | .node-version | scripts/ci-change-classifier*) mark_all_contexts; has_non_docs_change=true ;;
+    .github/workflows/* | .github/actions/* | .node-version | scripts/ci-change-classifier* | scripts/ci-gate*) mark_all_contexts; has_non_docs_change=true ;;
+    scripts/ci-migration-integration*) api=true; auth=true; migration_integration=true; ops=true; has_non_docs_change=true ;;
     apps/api/openapi.yaml) web=true; api=true; has_non_docs_change=true ;;
     apps/api/internal/db/migrations/* | apps/api/internal/db/schema/*) api=true; schema=true; migration_integration=true; has_non_docs_change=true ;;
     apps/api/cmd/schema-release/* | apps/api/internal/db/schemarelease/* | apps/api/internal/db/schemaassembly/*) api=true; schema=true; has_non_docs_change=true ;;

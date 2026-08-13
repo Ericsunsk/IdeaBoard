@@ -92,6 +92,24 @@ assert_output_line "${parity_output}" 'auth=true'
 assert_output_line "${parity_output}" 'docker=false'
 assert_output_line "${parity_output}" 'ops=true'
 
+migration_integration_output="$(printf '%s\n' scripts/ci-migration-integration.sh | "${classifier}")"
+
+assert_output_line "${migration_integration_output}" 'web=false'
+assert_output_line "${migration_integration_output}" 'api=true'
+assert_output_line "${migration_integration_output}" 'auth=true'
+assert_output_line "${migration_integration_output}" 'migration_integration=true'
+assert_output_line "${migration_integration_output}" 'ops=true'
+
+gate_output="$(printf '%s\n' scripts/ci-gate.sh | "${classifier}")"
+
+assert_output_line "${gate_output}" 'web=true'
+assert_output_line "${gate_output}" 'api=true'
+assert_output_line "${gate_output}" 'auth=true'
+assert_output_line "${gate_output}" 'schema=true'
+assert_output_line "${gate_output}" 'migration_integration=true'
+assert_output_line "${gate_output}" 'docker=true'
+assert_output_line "${gate_output}" 'ops=true'
+
 runtime_output="$(printf '%s\n' .node-version | "${classifier}")"
 
 assert_output_line "${runtime_output}" 'web=true'

@@ -123,12 +123,18 @@ GitHub 只暴露一个稳定的 required check：`CI Gate`。它在 PR、`main` 
 
 ```bash
 bash scripts/ci-change-classifier-test.sh
+bash scripts/ci-gate-test.sh
 bash scripts/ci-workflow-contract-test.sh
 bash scripts/ci-parity-test.sh
+bash scripts/ci-migration-integration-test.sh
 go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
 ```
 
 Node 版本只维护在根目录 `.node-version`，Go 版本只维护在 `apps/api/go.mod`。Workflows 通过 `.github/actions/setup-node` 与 `.github/actions/setup-go` 读取版本和 dependency cache contract，不要在 workflow 内复制 runtime version。
+
+Migration Integration 的 Auth build、runtime role 初始化与 API/Auth 两轮幂等迁移统一由 `scripts/ci-migration-integration.sh` 编排；workflow 只负责准备 PostgreSQL、Node、Go 与 locked dependencies，不复制迁移顺序。
+
+`scripts/ci-gate.sh` 统一生成 lane summary 并验证 required results；`scripts/ci-workflow-contract-test.sh` 使用结构化 YAML checker 验证 workflow semantics，避免把 YAML 格式当作 contract。
 
 Push 前需要复现 GitHub 的真实 PostgreSQL integration tests 与 Linux browser geometry 时，在仓库根目录运行：
 

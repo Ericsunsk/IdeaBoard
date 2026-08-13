@@ -25,6 +25,12 @@ jobs:
       - name: Lint GitHub Actions workflows
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.7 .github/workflows/*.yml
 
+      - name: Verify CI orchestration contracts
+        run: |
+          bash scripts/ci-change-classifier-test.sh
+          bash scripts/ci-gate-test.sh
+          bash scripts/ci-workflow-contract-test.sh
+
       - name: Check shell syntax
         shell: bash
         run: |
@@ -35,6 +41,11 @@ jobs:
           bash -n scripts/deploy-stack-test.sh
           bash -n scripts/production-deploy-entrypoint.sh
           bash -n scripts/production-deploy-entrypoint-test.sh
+          bash -n scripts/ci-change-classifier.sh
+          bash -n scripts/ci-change-classifier-test.sh
+          bash -n scripts/ci-gate.sh
+          bash -n scripts/ci-gate-test.sh
+          bash -n scripts/ci-workflow-contract-test.sh
 
       - name: Install ShellCheck
         shell: bash
@@ -55,7 +66,12 @@ jobs:
             scripts/deploy-stack.sh \
             scripts/deploy-stack-test.sh \
             scripts/production-deploy-entrypoint.sh \
-            scripts/production-deploy-entrypoint-test.sh
+            scripts/production-deploy-entrypoint-test.sh \
+            scripts/ci-change-classifier.sh \
+            scripts/ci-change-classifier-test.sh \
+            scripts/ci-gate.sh \
+            scripts/ci-gate-test.sh \
+            scripts/ci-workflow-contract-test.sh
 
       - name: Verify manifest-only deployment contract
         shell: bash

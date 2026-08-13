@@ -109,38 +109,10 @@ jobs:
     needs: [changes, web, api, auth, migration-integration, backend-browser-smoke, ops]
     runs-on: ubicloud-standard-2
     steps:
-      - name: Summarize verification lanes
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - name: Summarize and verify required lanes
         if: always()
-        env:
-          CHANGES_RESULT: ${{ needs.changes.result }}
-          WEB_REQUIRED: ${{ needs.changes.outputs.web }}
-          WEB_RESULT: ${{ needs.web.result }}
-          API_REQUIRED: ${{ needs.changes.outputs.api }}
-          API_RESULT: ${{ needs.api.result }}
-          AUTH_REQUIRED: ${{ needs.changes.outputs.auth }}
-          AUTH_RESULT: ${{ needs.auth.result }}
-          MIGRATION_REQUIRED: ${{ needs.changes.outputs.migration_integration }}
-          MIGRATION_RESULT: ${{ needs.migration-integration.result }}
-          BROWSER_SMOKE_RESULT: ${{ needs.backend-browser-smoke.result }}
-          OPS_REQUIRED: ${{ needs.changes.outputs.ops }}
-          OPS_RESULT: ${{ needs.ops.result }}
-        run: |
-          {
-            echo '## CI verification lanes'
-            echo
-            echo '| Lane | Required | Result |'
-            echo '| --- | --- | --- |'
-            echo "| Change classification | yes | ${CHANGES_RESULT} |"
-            echo "| Web | ${WEB_REQUIRED:-false} | ${WEB_RESULT} |"
-            echo "| API | ${API_REQUIRED:-false} | ${API_RESULT} |"
-            echo "| Auth | ${AUTH_REQUIRED:-false} | ${AUTH_RESULT} |"
-            echo "| Migration integration | ${MIGRATION_REQUIRED:-false} | ${MIGRATION_RESULT} |"
-            echo "| Backend browser smoke | derived | ${BROWSER_SMOKE_RESULT} |"
-            echo "| Ops | ${OPS_REQUIRED:-false} | ${OPS_RESULT} |"
-            echo
-            echo 'Job durations remain available in the native GitHub Actions timing view.'
-          } >> "${GITHUB_STEP_SUMMARY}"
-      - name: Verify required lanes
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
           WEB_REQUIRED: ${{ needs.changes.outputs.web }}
@@ -155,13 +127,4 @@ jobs:
           BROWSER_SMOKE_RESULT: ${{ needs.backend-browser-smoke.result }}
           OPS_REQUIRED: ${{ needs.changes.outputs.ops }}
           OPS_RESULT: ${{ needs.ops.result }}
-        run: |
-          [[ "${CHANGES_RESULT}" == success ]] || exit 1
-          [[ "${WEB_REQUIRED}" != true || "${WEB_RESULT}" == success ]] || exit 1
-          [[ "${API_REQUIRED}" != true || "${API_RESULT}" == success ]] || exit 1
-          [[ "${AUTH_REQUIRED}" != true || "${AUTH_RESULT}" == success ]] || exit 1
-          [[ "${MIGRATION_REQUIRED}" != true || "${MIGRATION_RESULT}" == success ]] || exit 1
-          if [[ "${API_REQUIRED}" == true || "${AUTH_REQUIRED}" == true || "${DOCKER_REQUIRED}" == true ]]; then
-            [[ "${WEB_REQUIRED}" == true || "${BROWSER_SMOKE_RESULT}" == success ]] || exit 1
-          fi
-          [[ "${OPS_REQUIRED}" != true || "${OPS_RESULT}" == success ]] || exit 1
+        run: ./scripts/ci-gate.sh
