@@ -304,7 +304,7 @@ func TestCallOpenAIRetainsGenerationEndpointForStandardRequests(t *testing.T) {
 	}
 }
 
-func TestCallOpenAIIgnoresOutputCountAndReturnsMultipleImagesWhenUpstreamDoes(t *testing.T) {
+func TestCallOpenAIRequestsOutputCountAndReturnsMultipleImages(t *testing.T) {
 	var gotBody map[string]interface{}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -337,8 +337,8 @@ func TestCallOpenAIIgnoresOutputCountAndReturnsMultipleImagesWhenUpstreamDoes(t 
 	if err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
-	if _, exists := gotBody["n"]; exists {
-		t.Fatalf("did not expect n field, got %#v", gotBody["n"])
+	if gotBody["n"] != float64(2) {
+		t.Fatalf("expected n=2, got %#v", gotBody["n"])
 	}
 	if gotResult.ImageURL != "https://cdn.example/a.png" {
 		t.Fatalf("unexpected first image url: %s", gotResult.ImageURL)

@@ -4,6 +4,7 @@ import type { ImageNodeItem } from '../../../canvas-board/domain'
 export type PendingImageTaskSnapshot = {
   nodeId: string
   taskId: string
+  resultIndex?: number
   fallbackRatio: number
 }
 
@@ -41,6 +42,10 @@ export function collectPendingImageTasks(nodes: Node[]): PendingImageTaskSnapsho
       {
         nodeId: node.id,
         taskId: imageSnapshot.pendingTaskId!.trim(),
+        ...(Number.isInteger(imageSnapshot.pendingResultIndex) &&
+        (imageSnapshot.pendingResultIndex as number) >= 0
+          ? { resultIndex: imageSnapshot.pendingResultIndex }
+          : {}),
         fallbackRatio: Number.isFinite(fallbackRatio) && fallbackRatio > 0 ? fallbackRatio : 1,
       },
     ]

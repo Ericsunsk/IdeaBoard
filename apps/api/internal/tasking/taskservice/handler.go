@@ -116,12 +116,12 @@ func (h *Handler) CheckSubmitTaskReadiness(c *gin.Context) {
 	if !ok {
 		return
 	}
-	var req tasks.SubmitTaskReadinessRequest
+	var req tasks.SubmitTaskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, 400, "参数错误")
 		return
 	}
-	readiness, err := h.taskService.CheckSubmitTaskReadiness(c.Request.Context(), userID, &req.SubmitTaskRequest, req.BillingQuantity)
+	readiness, err := h.taskService.CheckSubmitTaskReadiness(c.Request.Context(), userID, &req)
 	if err != nil {
 		slog.Warn("task submit readiness failed", "user_id", userID, "feature", req.Feature, "err", err)
 		if errors.Is(err, taskbilling.ErrPricingUnavailable) {

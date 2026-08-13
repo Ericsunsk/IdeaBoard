@@ -235,7 +235,7 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 	output := providerCallOutput{}
 	providerStartedAt := time.Now()
 	output.Timeline.ProviderStartedAt = &providerStartedAt
-	callResult, err := c.callProviderWithRequest(ctx, account, exec)
+	callResult, err := c.callProviderBatchWithRequest(ctx, account, exec)
 	providerFinishedAt := time.Now()
 	output.Timeline.ProviderFinishedAt = &providerFinishedAt
 	featureSlug := providerRequestFeatureSlug(exec.Request)
@@ -551,6 +551,15 @@ func (c *ProviderExecutor) callProviderWithRequest(ctx context.Context, account 
 	}
 	// OpenAI-compatible providers use the DALL-E style image endpoints.
 	return c.callOpenAIWithRequest(ctx, account, exec.Request, exec.Timeout)
+}
+
+func (c *ProviderExecutor) callProviderBatchWithRequest(ctx context.Context, account *accounts.ApiAccount, exec providerExecutionConfig) (providerCallResult, error) {
+	orchestrator := newProviderBatchOrchestrator(func(callCtx context.Context, request providerRequest) (providerCallResult, error) {
+		current := exec
+		current.Request = request
+		return c.callProviderWithRequest(callCtx, account, current)
+	})
+	return orchestrator.run(ctx, exec.Request)
 }
 
 func marshalProviderTaskResult(taskID string, result map[string]interface{}) (string, error) {

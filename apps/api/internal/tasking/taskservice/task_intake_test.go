@@ -56,11 +56,15 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 
 	for _, tt := range tests {
 		t.Run(tt.feature, func(t *testing.T) {
+			requestParams := map[string]interface{}{"output_count": 2}
+			for key, value := range tt.params {
+				requestParams[key] = value
+			}
 			canonical, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 				Prompt:         "保留主体",
 				Feature:        tt.feature,
 				ImageURLs:      tt.images,
-				Params:         tt.params,
+				Params:         requestParams,
 				ClientActionID: "intake-" + tt.feature,
 			})
 			if err != nil {
@@ -73,10 +77,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 				t.Fatalf("UserID() = %d, want authorized user 42", canonical.UserID())
 			}
 
-			billingRequest, err := canonical.BillingRequest(2)
-			if err != nil {
-				t.Fatalf("BillingRequest() error = %v", err)
-			}
+			billingRequest := canonical.BillingRequest()
 			if billingRequest == nil || billingRequest.Feature != tt.feature || billingRequest.Quantity != 2 {
 				t.Fatalf("BillingRequest() = %#v", billingRequest)
 			}

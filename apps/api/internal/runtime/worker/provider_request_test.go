@@ -49,6 +49,15 @@ func TestNewProviderRequestCollectsProviderMediaRefs(t *testing.T) {
 	}
 }
 
+func TestNewProviderRequestMarksInvalidOutputCount(t *testing.T) {
+	req := newProviderRequest("prompt", 640, 480, map[string]interface{}{
+		"output_count": 5,
+	}, "gpt-image-1")
+	if req.OutputCount != 0 {
+		t.Fatalf("output count = %d, want invalid marker 0", req.OutputCount)
+	}
+}
+
 func TestProviderRequestAfterLocalRedrawKeepsOpenAIROIInput(t *testing.T) {
 	params := map[string]interface{}{
 		"image_urls": []interface{}{

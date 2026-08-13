@@ -102,6 +102,7 @@ const billingQuote = useCanvasBillingQuote(
     buildFusionBillingReadinessRequest({
       imageUrls: visibleInputImages.value.map((image) => image.url),
       aspectRatio: aspectRatio.value,
+      outputCount: outputCountValue.value,
     }) ?? undefined,
 )
 

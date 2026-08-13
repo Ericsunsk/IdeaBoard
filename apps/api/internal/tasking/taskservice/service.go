@@ -231,7 +231,7 @@ type SubmitTaskReadiness struct {
 	Billing *taskbilling.Readiness
 }
 
-func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest, billingQuantity int64) (SubmitTaskReadiness, error) {
+func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (SubmitTaskReadiness, error) {
 	if s == nil || s.taskIntake == nil {
 		return SubmitTaskReadiness{}, newSubmissionError(
 			"submission_failed", "任务提交检查暂不可用，请稍后重试", errTaskIntakeUnavailable,
@@ -242,10 +242,7 @@ func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, re
 		return SubmitTaskReadiness{}, err
 	}
 	result := SubmitTaskReadiness{Feature: canonical.Feature()}
-	billingRequest, err := canonical.BillingRequest(billingQuantity)
-	if err != nil {
-		return SubmitTaskReadiness{}, err
-	}
+	billingRequest := canonical.BillingRequest()
 	if billingRequest == nil {
 		return result, nil
 	}

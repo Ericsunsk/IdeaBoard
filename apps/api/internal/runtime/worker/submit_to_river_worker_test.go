@@ -457,15 +457,14 @@ func newSubmitToRiverWorkerCanonicalRequest(t testing.TB, task *tasks.Task) task
 		}
 	}
 	request, err := tasksubmission.NewCanonicalRequest(tasksubmission.CanonicalRequestInput{
-		UserID:             task.UserID,
-		UserPrompt:         task.UserPrompt,
-		Prompt:             task.Prompt,
-		Params:             task.Params,
-		ClientActionID:     task.ClientActionID,
-		Feature:            task.FeatureSlug,
-		Priority:           task.Priority,
-		BillingRequest:     billingRequest,
-		MaxBillingQuantity: 4,
+		UserID:         task.UserID,
+		UserPrompt:     task.UserPrompt,
+		Prompt:         task.Prompt,
+		Params:         task.Params,
+		ClientActionID: task.ClientActionID,
+		Feature:        task.FeatureSlug,
+		Priority:       task.Priority,
+		BillingRequest: billingRequest,
 	})
 	if err != nil {
 		t.Fatalf("build canonical task request: %v", err)

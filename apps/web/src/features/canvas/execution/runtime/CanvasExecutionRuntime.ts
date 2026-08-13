@@ -194,9 +194,10 @@ export function createCanvasExecutionRuntime(): CanvasExecutionRuntime {
   function cancelNodeExecutions(leases: readonly CanvasExecutionLease[]): string[] {
     if (leases.length === 0) return []
     const nextNodeStates = new Map(nodeStates.value)
-    const taskIds = new Set<string>()
+    const cancelledTaskIds = new Set<string>()
     let didChange = false
-    new Set(leases).forEach((lease) => {
+    const uniqueLeases = new Set(leases)
+    uniqueLeases.forEach((lease) => {
       const current = nextNodeStates.get(lease.nodeId)
       if (
         leasesByNodeId.get(lease.nodeId) !== lease ||
@@ -209,11 +210,18 @@ export function createCanvasExecutionRuntime(): CanvasExecutionRuntime {
         lease.nodeId,
         current?.taskId ? { status: 'cancelled', taskId: current.taskId } : { status: 'cancelled' },
       )
-      if (current?.taskId) taskIds.add(current.taskId)
+      if (current?.taskId) cancelledTaskIds.add(current.taskId)
       didChange = true
     })
     if (didChange) nodeStates.value = nextNodeStates
-    return [...taskIds]
+
+    // A shared Task can own multiple result nodes. Cancelling one slot must not
+    // cancel the provider Task while another slot with the same task is active.
+    const remainingActiveTaskIds = new Set<string>()
+    nextNodeStates.forEach((state) => {
+      if (isExecutionActive(state) && state.taskId) remainingActiveTaskIds.add(state.taskId)
+    })
+    return [...cancelledTaskIds].filter((taskId) => !remainingActiveTaskIds.has(taskId))
   }
 
   return {

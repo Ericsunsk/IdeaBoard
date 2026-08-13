@@ -58,11 +58,10 @@ func TestNewCanonicalRequestRejectsMissingBillingForBillableWorkflow(t *testing.
 func TestCanonicalRequestOwnsBillingFacts(t *testing.T) {
 	inputBilling := &taskbilling.Request{Feature: "style-variation", Quantity: 1}
 	request, err := NewCanonicalRequest(CanonicalRequestInput{
-		UserID:             42,
-		Feature:            inputBilling.Feature,
-		ClientActionID:     "action-1",
-		BillingRequest:     inputBilling,
-		MaxBillingQuantity: 16,
+		UserID:         42,
+		Feature:        inputBilling.Feature,
+		ClientActionID: "action-1",
+		BillingRequest: inputBilling,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -70,11 +69,22 @@ func TestCanonicalRequestOwnsBillingFacts(t *testing.T) {
 
 	inputBilling.Feature = "pattern-gen"
 	inputBilling.Quantity = 9
-	billingRequest, err := request.BillingRequest(3)
-	if err != nil {
-		t.Fatal(err)
+	billingRequest := request.BillingRequest()
+	if billingRequest == nil || billingRequest.Feature != "style-variation" || billingRequest.Quantity != 1 {
+		t.Fatalf("Billing request=%+v, want immutable style-variation quantity 1", billingRequest)
 	}
-	if billingRequest == nil || billingRequest.Feature != "style-variation" || billingRequest.Quantity != 3 {
-		t.Fatalf("Billing request=%+v, want immutable style-variation quantity 3", billingRequest)
+}
+
+func TestNewCanonicalRequestRejectsBillingQuantityMismatchedWithGeneration(t *testing.T) {
+	count := 2
+	_, err := NewCanonicalRequest(CanonicalRequestInput{
+		UserID: 42, Feature: "style-variation", ClientActionID: "action-1",
+		BillingRequest: &taskbilling.Request{Feature: "style-variation", Quantity: 1},
+		Generation: &tasks.GenerationRequestSnapshot{
+			Feature: "style-variation", Primitive: "text-to-image", TemplateFingerprint: "fp", RequestedOutputCount: count,
+		},
+	})
+	if err == nil {
+		t.Fatal("expected billing quantity to match generation output count")
 	}
 }

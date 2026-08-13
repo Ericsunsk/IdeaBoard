@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { resolveTaskImageResultDisplay } from './flowImageDirectActionTaskResult'
+import {
+  resolveTaskImageResultAtIndexDisplay,
+  resolveTaskImageResultDisplay,
+} from './flowImageDirectActionTaskResult'
 
 describe('flowImageDirectActionTaskResult', () => {
   it('keeps resolved task image dimensions for display sizing', async () => {
@@ -45,5 +48,33 @@ describe('flowImageDirectActionTaskResult', () => {
       ratio: 1.25,
     })
     expect(loadImageSize).toHaveBeenCalledWith('https://example.com/output.png')
+  })
+
+  it('resolves a stable batch slot by result index', async () => {
+    await expect(
+      resolveTaskImageResultAtIndexDisplay(
+        [
+          { url: 'https://example.com/second.png', resultIndex: 1 },
+          { url: 'https://example.com/first.png', resultIndex: 0 },
+        ],
+        0,
+        1,
+        vi.fn(async () => ({ width: 100, height: 100 })),
+      ),
+    ).resolves.toMatchObject({ url: 'https://example.com/first.png', resultIndex: 0 })
+  })
+
+  it('fails a missing batch slot instead of falling through to another result', async () => {
+    await expect(
+      resolveTaskImageResultAtIndexDisplay(
+        [
+          { url: 'https://example.com/first.png', resultIndex: 0 },
+          { url: 'https://example.com/third.png', resultIndex: 2 },
+        ],
+        1,
+        1,
+        vi.fn(async () => ({ width: 100, height: 100 })),
+      ),
+    ).rejects.toThrow('任务完成但未返回对应图片')
   })
 })

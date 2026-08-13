@@ -14,31 +14,29 @@ import (
 // CanonicalRequestInput is the single representation accepted from Task
 // Intake. It contains no Task identity or River-specific fields.
 type CanonicalRequestInput struct {
-	UserID             int64
-	UserPrompt         string
-	Prompt             string
-	Params             string
-	ClientActionID     string
-	Feature            string
-	Priority           int
-	BillingRequest     *taskbilling.Request
-	MaxBillingQuantity int64
-	Generation         *tasks.GenerationRequestSnapshot
+	UserID         int64
+	UserPrompt     string
+	Prompt         string
+	Params         string
+	ClientActionID string
+	Feature        string
+	Priority       int
+	BillingRequest *taskbilling.Request
+	Generation     *tasks.GenerationRequestSnapshot
 }
 
 // CanonicalRequest is immutable after construction. Only this package can
 // derive the paired Task persistence fact and River payload from it.
 type CanonicalRequest struct {
-	userID             int64
-	userPrompt         string
-	prompt             string
-	params             string
-	clientActionID     string
-	feature            string
-	priority           int
-	billingRequest     *taskbilling.Request
-	maxBillingQuantity int64
-	generation         *tasks.GenerationRequestSnapshot
+	userID         int64
+	userPrompt     string
+	prompt         string
+	params         string
+	clientActionID string
+	feature        string
+	priority       int
+	billingRequest *taskbilling.Request
+	generation     *tasks.GenerationRequestSnapshot
 }
 
 func NewCanonicalRequest(input CanonicalRequestInput) (CanonicalRequest, error) {
@@ -78,11 +76,14 @@ func NewCanonicalRequest(input CanonicalRequestInput) (CanonicalRequest, error) 
 		}
 		generation = &copySnapshot
 	}
+	if billingRequest != nil && generation != nil && billingRequest.Quantity != int64(generation.RequestedOutputCount) {
+		return CanonicalRequest{}, fmt.Errorf("canonical submission billing quantity does not match generation output count")
+	}
 	return CanonicalRequest{
 		userID: input.UserID, userPrompt: input.UserPrompt, prompt: input.Prompt, params: input.Params,
 		clientActionID: strings.TrimSpace(input.ClientActionID), feature: feature,
 		priority: priority, billingRequest: billingRequest,
-		maxBillingQuantity: input.MaxBillingQuantity, generation: generation,
+		generation: generation,
 	}, nil
 }
 
@@ -143,16 +144,12 @@ func (r CanonicalRequest) ClientActionID() string {
 	return r.clientActionID
 }
 
-func (r CanonicalRequest) BillingRequest(quantity int64) (*taskbilling.Request, error) {
+func (r CanonicalRequest) BillingRequest() *taskbilling.Request {
 	if r.billingRequest == nil {
-		return nil, nil
-	}
-	if quantity <= 0 || r.maxBillingQuantity > 0 && quantity > r.maxBillingQuantity {
-		return nil, fmt.Errorf("billing quantity is invalid")
+		return nil
 	}
 	request := *r.billingRequest
-	request.Quantity = quantity
-	return &request, nil
+	return &request
 }
 
 func (r CanonicalRequest) valid() bool {

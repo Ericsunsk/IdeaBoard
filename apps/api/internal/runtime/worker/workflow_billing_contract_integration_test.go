@@ -127,7 +127,7 @@ func TestAIImageWorkflowBillingContractUsesCurrentProviderPoolAndConvergesFacts(
 		Feature:        workflow.FeatureSlugPatternGen,
 		ClientActionID: fmt.Sprintf("workflow-contract-%d", runID),
 	}
-	if _, err := taskService.CheckSubmitTaskReadiness(ctx, 42, request, 1); err == nil {
+	if _, err := taskService.CheckSubmitTaskReadiness(ctx, 42, request); err == nil {
 		t.Fatal("readiness accepted a Workflow with no enabled Provider")
 	} else {
 		var submissionErr *taskservice.SubmissionError
@@ -139,7 +139,7 @@ func TestAIImageWorkflowBillingContractUsesCurrentProviderPoolAndConvergesFacts(
 	submissionProvider := createRiverTestAccount(t, db, accountRepo, fmt.Sprintf("contract-before-submit-%d", runID))
 	saturateWorkflowContractProvider(t, db, taskRepo, assigner, submissionProvider, runID)
 
-	readiness, err := taskService.CheckSubmitTaskReadiness(ctx, 42, request, 1)
+	readiness, err := taskService.CheckSubmitTaskReadiness(ctx, 42, request)
 	if err != nil {
 		t.Fatalf("readiness: %v", err)
 	}

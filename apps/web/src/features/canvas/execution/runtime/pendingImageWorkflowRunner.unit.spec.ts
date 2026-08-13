@@ -237,6 +237,43 @@ describe('pendingImageWorkflowRunner', () => {
     })
   })
 
+  it('submits one shared task for all output slots', async () => {
+    const submitted: Array<[string, string, number]> = []
+    const pendingResults = createPendingResults(
+      async (params) => {
+        await Promise.all(params.resultNodeIds.map((nodeId) => params.submitTask(nodeId)))
+        return makeRunSummary({
+          resultNodeIds: ['image-2', 'image-3', 'image-4', 'image-5'],
+          totalCount: 4,
+          successCount: 4,
+          outcomes: [
+            { resultNodeId: 'image-2', status: 'succeeded', taskId: 'task-shared' },
+            { resultNodeId: 'image-3', status: 'succeeded', taskId: 'task-shared' },
+            { resultNodeId: 'image-4', status: 'succeeded', taskId: 'task-shared' },
+            { resultNodeId: 'image-5', status: 'succeeded', taskId: 'task-shared' },
+          ],
+        })
+      },
+      ['image-2', 'image-3', 'image-4', 'image-5'],
+    )
+    const { attachment, runner } = createRunner(pendingResults)
+
+    await runner.run(
+      makeRunParams(attachment, {
+        outputCount: 4,
+        submissionMode: 'shared-task',
+        submitTask: vi.fn(async (resultNodeId: string, clientActionId: string, resultIndex: number) => {
+          submitted.push([resultNodeId, clientActionId, resultIndex])
+          return { taskId: 'task-shared' }
+        }),
+      }),
+    )
+
+    expect(submitted).toHaveLength(1)
+    expect(submitted[0]?.[0]).toBe('image-2')
+    expect(submitted[0]?.[2]).toBe(0)
+  })
+
   it('cancels a late submitted task when its lease was superseded', async () => {
     const submission = createDeferred<{ taskId: string }>()
     const pendingResults = createPendingResults(async (params) => {

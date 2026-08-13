@@ -106,6 +106,19 @@ describe('CanvasExecutionRuntime', () => {
       false,
     )
   })
+
+  it('keeps a shared task alive while another output slot remains active', () => {
+    const runtime = createCanvasExecutionRuntime()
+    const attachment = runtime.attachBoard('board-a')
+    const firstLease = runtime.hydratePending(attachment, 'image-2', 'task-shared')!
+    const secondLease = runtime.hydratePending(attachment, 'image-3', 'task-shared')!
+
+    expect(runtime.cancelNodeExecutions([firstLease])).toEqual([])
+    expect(runtime.getNodeState('image-2')).toEqual({ status: 'cancelled', taskId: 'task-shared' })
+    expect(runtime.getNodeState('image-3')).toEqual({ status: 'running', taskId: 'task-shared' })
+
+    expect(runtime.cancelNodeExecutions([secondLease])).toEqual(['task-shared'])
+  })
 })
 
 describe('projectCanvasExecutionEdgeAnimation', () => {

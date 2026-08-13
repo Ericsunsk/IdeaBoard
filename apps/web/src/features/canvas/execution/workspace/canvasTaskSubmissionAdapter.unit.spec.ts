@@ -8,9 +8,12 @@ describe('canvas task submission billing contract', () => {
       submitTaskRequest: vi.fn(async () => ({ taskId: 'task-1' })),
     }
     const callbacks = createCanvasTaskSubmissionCallbacks({
-      readinessRequest: () => ({ prompt: 'submit readiness', feature: 'pattern-gen' }),
+      readinessRequest: () => ({
+        prompt: 'submit readiness',
+        feature: 'pattern-gen',
+        params: { output_count: 2 },
+      }),
       buildRequest: () => ({ prompt: 'final prompt', feature: 'pattern-gen' }),
-      outputCount: () => 2,
       taskAdapter,
     })
 
@@ -23,7 +26,7 @@ describe('canvas task submission billing contract', () => {
       expect.objectContaining({
         prompt: 'submit readiness',
         feature: 'pattern-gen',
-        billing_quantity: 2,
+        params: { output_count: 2 },
         client_action_id: expect.stringMatching(/^canvas:/),
       }),
       undefined,
@@ -56,9 +59,12 @@ describe('canvas task submission billing contract', () => {
       submitTaskRequest: vi.fn(async () => ({ taskId: 'task-1' })),
     }
     const callbacks = createCanvasTaskSubmissionCallbacks({
-      readinessRequest: () => ({ prompt: 'submit readiness', feature: 'pattern-gen' }),
+      readinessRequest: () => ({
+        prompt: 'submit readiness',
+        feature: 'pattern-gen',
+        params: { output_count: 4 },
+      }),
       buildRequest: () => ({ prompt: 'final prompt', feature: 'pattern-gen' }),
-      outputCount: () => 4,
       taskAdapter,
     })
 
@@ -75,30 +81,17 @@ describe('canvas task submission billing contract', () => {
       submitTaskRequest: vi.fn(async () => ({ taskId: 'task-free' })),
     }
     const callbacks = createCanvasTaskSubmissionCallbacks({
-      readinessRequest: () => ({ prompt: 'submit readiness', feature: 'pattern-gen' }),
+      readinessRequest: () => ({
+        prompt: 'submit readiness',
+        feature: 'pattern-gen',
+        params: { output_count: 4 },
+      }),
       buildRequest: () => ({ prompt: 'free prompt', feature: 'pattern-gen' }),
-      outputCount: () => 4,
       taskAdapter,
     })
 
     await expect(callbacks.assertReady?.()).resolves.toBeUndefined()
     expect(taskAdapter.assertTaskRequestReady).toHaveBeenCalledOnce()
-  })
-
-  it('rejects an output count outside the generation contract before readiness', async () => {
-    const taskAdapter = {
-      assertTaskRequestReady: vi.fn(async () => undefined),
-      submitTaskRequest: vi.fn(async () => ({ taskId: 'task-invalid' })),
-    }
-    const callbacks = createCanvasTaskSubmissionCallbacks({
-      readinessRequest: () => ({ prompt: 'submit readiness', feature: 'pattern-gen' }),
-      buildRequest: () => ({ prompt: 'invalid prompt', feature: 'pattern-gen' }),
-      outputCount: () => 8,
-      taskAdapter,
-    })
-
-    await expect(callbacks.assertReady?.()).rejects.toThrow('生成数量无效')
-    expect(taskAdapter.assertTaskRequestReady).not.toHaveBeenCalled()
   })
 
   it('does not consult stale cached balance after a successful server preflight', async () => {
@@ -107,16 +100,19 @@ describe('canvas task submission billing contract', () => {
       submitTaskRequest: vi.fn(async () => ({ taskId: 'task-1' })),
     }
     const callbacks = createCanvasTaskSubmissionCallbacks({
-      readinessRequest: () => ({ prompt: 'submit readiness', feature: 'pattern-gen' }),
+      readinessRequest: () => ({
+        prompt: 'submit readiness',
+        feature: 'pattern-gen',
+        params: { output_count: 4 },
+      }),
       buildRequest: () => ({ prompt: 'final prompt', feature: 'pattern-gen' }),
-      outputCount: () => 4,
       taskAdapter,
     })
 
     await expect(callbacks.assertReady?.()).resolves.toBeUndefined()
     expect(taskAdapter.assertTaskRequestReady).toHaveBeenCalledOnce()
     expect(taskAdapter.assertTaskRequestReady).toHaveBeenCalledWith(
-      expect.objectContaining({ billing_quantity: 4 }),
+      expect.objectContaining({ params: { output_count: 4 } }),
       undefined,
     )
   })

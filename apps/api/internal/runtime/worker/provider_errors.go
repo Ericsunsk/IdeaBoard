@@ -7,11 +7,15 @@ import (
 	"ideaboard/api/internal/tasking/tasks"
 	"net"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 )
 
 type upstreamHTTPError struct {
 	statusCode int
 	body       string
+	retryAfter time.Duration
 }
 
 func newUpstreamHTTPError(statusCode int, body string) error {
@@ -19,6 +23,34 @@ func newUpstreamHTTPError(statusCode int, body string) error {
 		statusCode: statusCode,
 		body:       body,
 	}
+}
+
+func newUpstreamHTTPErrorFromResponse(resp *http.Response, body string) error {
+	if resp == nil {
+		return newUpstreamHTTPError(0, body)
+	}
+	return &upstreamHTTPError{
+		statusCode: resp.StatusCode,
+		body:       body,
+		retryAfter: parseRetryAfter(resp.Header.Get("Retry-After")),
+	}
+}
+
+func parseRetryAfter(raw string) time.Duration {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0
+	}
+	if seconds, err := strconv.ParseFloat(raw, 64); err == nil && seconds >= 0 {
+		return time.Duration(seconds * float64(time.Second))
+	}
+	if when, err := http.ParseTime(raw); err == nil {
+		delay := time.Until(when)
+		if delay > 0 {
+			return delay
+		}
+	}
+	return 0
 }
 
 func (e *upstreamHTTPError) Error() string {

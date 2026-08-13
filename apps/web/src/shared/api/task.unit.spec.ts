@@ -24,9 +24,7 @@ describe('task API boundary', () => {
     mocks.cancelUserTask.mockResolvedValue({ code: 0, msg: 'ok' })
 
     await expect(taskApi.submit({ prompt: 'test' })).resolves.toEqual({ task_id: 'task-1' })
-    await expect(
-      taskApi.checkSubmitReadiness({ prompt: 'test', billing_quantity: 1 }),
-    ).resolves.toBe(readiness)
+    await expect(taskApi.checkSubmitReadiness({ prompt: 'test' })).resolves.toBe(readiness)
     await expect(taskApi.get('task-1')).resolves.toEqual({ task })
     await expect(taskApi.cancel('task-1')).resolves.toBeUndefined()
   })

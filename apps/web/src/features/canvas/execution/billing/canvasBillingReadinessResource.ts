@@ -41,13 +41,13 @@ export async function fetchCanvasBillingReadiness(
       request ?? buildCanvasBillingReadinessRequest(feature),
       createCanvasTaskClientActionId(),
     ),
-    billing_quantity: 1,
   })
 }
 
 export function buildFusionBillingReadinessRequest(input: {
   imageUrls: string[]
   aspectRatio: Parameters<typeof buildFusionTaskRequest>[0]['aspectRatio']
+  outputCount?: Parameters<typeof buildFusionTaskRequest>[0]['outputCount']
 }): SubmitTaskData | null {
   const imageUrls = input.imageUrls
     .map((url) => url.trim())
@@ -58,6 +58,7 @@ export function buildFusionBillingReadinessRequest(input: {
     prompt: '[style-fusion] submit readiness',
     imageUrls,
     inputWeights: imageUrls.map(() => 1 / imageUrls.length),
+    outputCount: input.outputCount,
     sizeSource: null,
     targetSize: null,
     aspectRatio: input.aspectRatio,

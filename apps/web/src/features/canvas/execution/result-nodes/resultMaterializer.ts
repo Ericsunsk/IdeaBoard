@@ -103,6 +103,7 @@ export function materializeResolvedImageResults(
       sourceMediaAssetId: result.mediaAssetId,
       sourceImageRatio: resolved.ratio,
       pendingTaskId: undefined,
+      pendingResultIndex: undefined,
       outputStatus: 'ready',
       outputImages: [],
     })

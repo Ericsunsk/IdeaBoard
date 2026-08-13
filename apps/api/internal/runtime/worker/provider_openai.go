@@ -43,6 +43,7 @@ type openAIImageRequestBody struct {
 	ImageURLs []string
 	Images    []openAIImageURLRef
 	Mask      *openAIImageURLRef
+	N         int
 	Extra     map[string]interface{}
 }
 
@@ -167,6 +168,7 @@ func newOpenAIImageRequestBody(providerReq providerRequest) openAIImageRequestBo
 		Prompt: providerReq.Prompt,
 		Size:   providerReq.Size,
 		Extra:  map[string]interface{}{},
+		N:      providerReq.OutputCount,
 	}
 }
 
@@ -199,6 +201,9 @@ func (b openAIImageRequestBody) toMap() map[string]interface{} {
 	}
 	if b.Mask != nil && strings.TrimSpace(b.Mask.ImageURL) != "" {
 		out["mask"] = b.Mask
+	}
+	if b.N > 1 {
+		out["n"] = b.N
 	}
 	return out
 }
@@ -297,7 +302,7 @@ func (c *ProviderExecutor) callOpenAIWithRequest(ctx context.Context, account *a
 	}
 
 	if resp.StatusCode != 200 {
-		return providerCallResult{}, newUpstreamHTTPError(resp.StatusCode, truncateErrorBody(string(respBody)))
+		return providerCallResult{}, newUpstreamHTTPErrorFromResponse(resp, truncateErrorBody(string(respBody)))
 	}
 
 	imageURLs, err := extractOpenAIImageResponses(respBody, providerReq.Params)

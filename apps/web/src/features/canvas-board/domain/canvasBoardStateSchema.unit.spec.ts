@@ -53,12 +53,15 @@ describe('canvasBoardStateSchema', () => {
 
   it('accepts pending task metadata on image nodes', () => {
     const state = makeCanvasBoardState({
-      imageNodes: [makePendingImageNodeSnapshot({ pendingTaskId: 'task_pending_2' })],
+      imageNodes: [
+        makePendingImageNodeSnapshot({ pendingTaskId: 'task_pending_2', pendingResultIndex: 2 }),
+      ],
     })
     const parsed = v.safeParse(canvasBoardStateSchema, state)
     expect(parsed.success).toBe(true)
     if (parsed.success) {
       expect(parsed.output.imageNodes[0]?.pendingTaskId).toBe('task_pending_2')
+      expect(parsed.output.imageNodes[0]?.pendingResultIndex).toBe(2)
     }
   })
 

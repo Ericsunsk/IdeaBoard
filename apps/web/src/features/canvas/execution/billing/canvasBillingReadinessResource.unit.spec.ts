@@ -17,7 +17,7 @@ describe('canvas billing readiness request contracts', () => {
     vi.clearAllMocks()
   })
 
-  it('uses quantity one for presentation quote refreshes', async () => {
+  it('uses the request output count for presentation quote refreshes', async () => {
     const readiness = { ready: true, feature: 'pattern-gen' } as const
     mocks.checkSubmitReadiness.mockResolvedValue(readiness)
 
@@ -25,11 +25,12 @@ describe('canvas billing readiness request contracts', () => {
       fetchCanvasBillingReadiness('pattern-gen', {
         prompt: 'presentation quote',
         feature: 'pattern-gen',
+        params: { output_count: 1 },
       }),
     ).resolves.toEqual(readiness)
 
     expect(mocks.checkSubmitReadiness).toHaveBeenCalledWith(
-      expect.objectContaining({ billing_quantity: 1 }),
+      expect.objectContaining({ params: { output_count: 1 } }),
     )
   })
 
@@ -51,6 +52,24 @@ describe('canvas billing readiness request contracts', () => {
         },
       },
     })
+  })
+
+  it('quotes Fusion at the selected output count', async () => {
+    const readiness = { ready: true, feature: 'style-fusion' } as const
+    mocks.checkSubmitReadiness.mockResolvedValue(readiness)
+    const request = buildFusionBillingReadinessRequest({
+      imageUrls: ['/uploads/a.png', '/uploads/b.png'],
+      aspectRatio: '1:1',
+      outputCount: 3,
+    })
+
+    await fetchCanvasBillingReadiness('style-fusion', request ?? undefined)
+
+    expect(mocks.checkSubmitReadiness).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.objectContaining({ output_count: 3 }),
+      }),
+    )
   })
 
   it('does not issue a Fusion readiness request before two images are available', () => {

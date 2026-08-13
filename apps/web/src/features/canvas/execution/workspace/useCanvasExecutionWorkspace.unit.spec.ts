@@ -79,7 +79,7 @@ function makeTextPromptPlan(
   }
 }
 
-function makePendingImageNode(nodeId: string, taskId: string): Node {
+function makePendingImageNode(nodeId: string, taskId: string, resultIndex?: number): Node {
   const snapshot: ImageNodeItem = {
     id: Number(nodeId.slice(nodeId.indexOf('-') + 1)) || 1,
     type: 'image-node',
@@ -89,6 +89,7 @@ function makePendingImageNode(nodeId: string, taskId: string): Node {
     sourceImageUrl: '',
     sourceImageRatio: 1,
     pendingTaskId: taskId,
+    ...(resultIndex === undefined ? {} : { pendingResultIndex: resultIndex }),
     outputStatus: 'running',
     outputImages: [],
   }
@@ -150,7 +151,7 @@ function createWorkspaceHarness(options: {
   materializerResult?: ResultMaterializerResult
   waitTaskImageResults?: (
     taskId: string,
-  ) => Promise<Array<{ url: string; width?: number; height?: number }>>
+  ) => Promise<Array<{ url: string; width?: number; height?: number; result_index?: number }>>
 }): {
   workspace: ReturnType<typeof useCanvasExecutionWorkspace>
   nodes: Ref<Node[]>
@@ -379,6 +380,31 @@ describe('useCanvasExecutionWorkspace', () => {
       taskId: 'task-1',
     })
     expect(edges.value[0]?.animated).toBe(false)
+  })
+
+  it('reattaches a shared-task slot by its persisted result index', async () => {
+    const { workspace, pendingResults } = createWorkspaceHarness({
+      nodes: [makePendingImageNode('image-2', 'task-shared', 1)],
+      waitTaskImageResults: async () => [
+        { url: 'https://example.com/slot-0.png', width: 100, height: 100, result_index: 0 },
+        { url: 'https://example.com/slot-1.png', width: 200, height: 100, result_index: 1 },
+      ],
+      runReservedPendingResults: async () => makeRunSummary(),
+    })
+
+    await workspace.commands.reattachPendingImageResults()
+
+    expect(pendingResults.materializeResolvedAttachedPendingResults).toHaveBeenCalledWith(
+      expect.objectContaining({
+        results: [
+          expect.objectContaining({
+            resultNodeId: 'image-2',
+            url: 'https://example.com/slot-1.png',
+            resultIndex: 1,
+          }),
+        ],
+      }),
+    )
   })
 
   it('restores a saved pending task as running while reattaching', async () => {

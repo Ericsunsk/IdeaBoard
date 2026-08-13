@@ -3798,16 +3798,7 @@ components:
           $ref: '#/components/schemas/SubmitTaskRequestParams'
 
     SubmitTaskReadinessRequest:
-      allOf:
-        - $ref: '#/components/schemas/SubmitTaskRequest'
-        - type: object
-          required: [billing_quantity]
-          properties:
-            billing_quantity:
-              allOf:
-                - $ref: '#/components/schemas/RequestedOutputCount'
-              format: int64
-              description: Readiness-only number of independently billed Task submissions in this activation.
+      $ref: '#/components/schemas/SubmitTaskRequest'
 
     WorkflowFeatureSlug:
       type: string

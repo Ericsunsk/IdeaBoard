@@ -8,7 +8,10 @@ import type { CanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFl
 import type { CanvasGraphNodeId, CanvasGraphStore } from '../../graph-runtime'
 import { loadImageSizeFromUrl } from '../media/imageSize'
 import type { ActivatedImageExecutionPlan } from '../planning/ImageExecutionPlan'
-import { resolveFirstTaskImageResultDisplay } from '../result-nodes/flowImageDirectActionTaskResult'
+import {
+  resolveFirstTaskImageResultDisplay,
+  resolveTaskImageResultAtIndexDisplay,
+} from '../result-nodes/flowImageDirectActionTaskResult'
 import {
   collectPendingImageTasks,
   isPendingImageTaskSnapshot,
@@ -180,7 +183,6 @@ export function useCanvasExecutionWorkspace(
       readinessRequest: buildTaskRequest,
       buildRequest: buildTaskRequest,
       taskAdapter: options.taskAdapter,
-      outputCount: () => plan.outputCount,
     })
     await workflowRunner.run({
       source: plan.source,
@@ -205,7 +207,7 @@ export function useCanvasExecutionWorkspace(
     let failureCount = 0
     const resolvedAttempts: ReattachResolvedAttempt[] = []
     await Promise.all(
-      pendingTasks.map(async ({ nodeId, taskId, fallbackRatio }) => {
+      pendingTasks.map(async ({ nodeId, taskId, resultIndex, fallbackRatio }) => {
         const reattachKey = `${attachment.epoch}:${nodeId}:${taskId}`
         if (activeReattachKeys.has(reattachKey)) return
         if (!isCanvasGraphNodeId(nodeId)) return
@@ -222,7 +224,16 @@ export function useCanvasExecutionWorkspace(
         }
         const lease = hydratedLease
         try {
-          const resolved = await resolveFirstTaskImageResult(taskId, fallbackRatio)
+          const results = await waitTaskImageResults(taskId)
+          const resolved =
+            resultIndex === undefined
+              ? await resolveFirstTaskImageResultDisplay(results, fallbackRatio, loadImageSize)
+              : await resolveTaskImageResultAtIndexDisplay(
+                  results,
+                  resultIndex,
+                  fallbackRatio,
+                  loadImageSize,
+                )
           const isCurrentBoard = executionRuntime.isAttachmentCurrent(attachment)
           const isAttached =
             isReattachExecutionCurrent(lease, taskId) &&

@@ -135,6 +135,7 @@ describe('waitTaskImageResultsWithSse', () => {
         width: 1024,
         height: 1024,
         mimeType: 'image/png',
+        resultIndex: 0,
       },
     ])
     expect(mocks.getTask).toHaveBeenCalledWith('task-1')
@@ -158,6 +159,7 @@ describe('waitTaskImageResultsWithSse', () => {
         width: 1024,
         height: 1024,
         mimeType: 'image/png',
+        resultIndex: 0,
       },
     ])
     expect(mocks.getTask).not.toHaveBeenCalled()
@@ -270,6 +272,7 @@ describe('waitTaskImageResultsWithSse', () => {
         width: 1024,
         height: 1024,
         mimeType: 'image/png',
+        resultIndex: 0,
       },
     ])
     expect(mocks.getTask).toHaveBeenCalledTimes(1)

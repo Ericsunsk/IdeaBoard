@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"math"
 	"net/http"
 	"net/http/httptest"
@@ -152,7 +151,8 @@ func TestSubmitTaskHandlerReturnsEnvelopeAndSubmitsCanonicalPayload(t *testing.T
 		"feature":          workflow.FeatureSlugStyleFusion,
 		"image_urls":       []string{"https://example.com/a.png", "https://example.com/b.png"},
 		"params": map[string]interface{}{
-			"model": "gpt-image-1",
+			"model":        "gpt-image-1",
+			"output_count": 4,
 			"fusion": map[string]interface{}{
 				"input_weights": []float64{3, 1},
 			},
@@ -340,7 +340,6 @@ func TestCheckSubmitTaskReadinessHandlerMissingBillingReturnsStructuredSafeError
 		"prompt":           "生成图案",
 		"client_action_id": "readiness-missing-billing",
 		"feature":          workflow.FeatureSlugPatternGen,
-		"billing_quantity": 1,
 	}))
 
 	if rec.Code != http.StatusOK {
@@ -387,11 +386,11 @@ func TestCheckSubmitTaskReadinessHandlerReturnsFeatureEnvelope(t *testing.T) {
 	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit/readiness", map[string]interface{}{
 		"prompt":           "向右扩展为工作室背景",
 		"client_action_id": "handler-image-extend",
-		"billing_quantity": 4,
 		"feature":          workflow.FeatureSlugImageExtend,
 		"image_urls":       []string{"https://example.com/source.png"},
 		"params": map[string]interface{}{
-			"model": "gpt-image-1",
+			"model":        "gpt-image-1",
+			"output_count": 4,
 			"extend": map[string]interface{}{
 				"top_percent":    0,
 				"right_percent":  25,
@@ -437,7 +436,6 @@ func TestCheckSubmitTaskReadinessHandlerHidesMissingProviderConfiguration(t *tes
 	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit/readiness", map[string]interface{}{
 		"prompt":           "生成海报",
 		"client_action_id": "handler-provider-unavailable",
-		"billing_quantity": 1,
 		"feature":          workflow.FeatureSlugPatternGen,
 	}))
 
@@ -457,30 +455,6 @@ func TestCheckSubmitTaskReadinessHandlerHidesMissingProviderConfiguration(t *tes
 	}
 	if body.Data.Message != providerUnavailableMessage || body.Data.ErrorCode != "provider_unavailable" {
 		t.Fatalf("readiness error=%+v, want structured provider unavailable", body.Data)
-	}
-}
-
-func TestCheckSubmitTaskReadinessHandlerRequiresValidBillingQuantity(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	service := NewService(ServiceDeps{}, ServiceOptions{})
-	router := newSubmitHandlerTestRouter(t, service, 42)
-	for _, billingQuantity := range []interface{}{nil, 0, 5, 17} {
-		t.Run(fmt.Sprint(billingQuantity), func(t *testing.T) {
-			body := map[string]interface{}{
-				"prompt":           "生成海报",
-				"client_action_id": "handler-invalid-quantity",
-				"feature":          workflow.FeatureSlugPatternGen,
-			}
-			if billingQuantity != nil {
-				body["billing_quantity"] = billingQuantity
-			}
-			rec := httptest.NewRecorder()
-			router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit/readiness", body))
-			if rec.Code != http.StatusBadRequest {
-				t.Fatalf("status=%d, want %d, body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
-			}
-		})
 	}
 }
 
@@ -508,7 +482,6 @@ func TestCheckSubmitTaskReadinessHandlerReturnsStructuredPricingUnavailableError
 			router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit/readiness", map[string]interface{}{
 				"prompt":           "生成海报",
 				"client_action_id": "handler-pricing-unavailable",
-				"billing_quantity": 1,
 				"feature":          workflow.FeatureSlugPatternGen,
 				"params":           map[string]interface{}{"model": "gpt-image-1"},
 			}))

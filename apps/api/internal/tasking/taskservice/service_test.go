@@ -964,7 +964,7 @@ func TestCheckSubmitTaskReadinessMissingBillingReturnsTypedSafeError(t *testing.
 		Prompt:         "draw a pattern",
 		Feature:        workflow.FeatureSlugPatternGen,
 		ClientActionID: "missing-billing-service",
-	}, 1)
+	})
 	if !errors.Is(err, errTaskBillingUnavailable) {
 		t.Fatalf("CheckSubmitTaskReadiness error=%v, want billing service sentinel", err)
 	}
@@ -982,7 +982,7 @@ func TestSubmitTaskAllowsEnabledGoogleNativeAccount(t *testing.T) {
 	submissionStore := &recordingSubmissionStore{}
 	svc := newGoogleNativeSubmitTestService(submissionStore)
 
-	if _, err := svc.CheckSubmitTaskReadiness(ctx, 42, newGoogleNativeSubmitRequest(), 1); err != nil {
+	if _, err := svc.CheckSubmitTaskReadiness(ctx, 42, newGoogleNativeSubmitRequest()); err != nil {
 		t.Fatalf("readiness error = %v, want nil", err)
 	}
 	taskID, err := svc.SubmitTask(ctx, 42, newGoogleNativeSubmitRequest())
@@ -1013,7 +1013,7 @@ func TestReadinessDoesNotPrepareMediaButSubmitDoes(t *testing.T) {
 		Prompt: "draw from reference", Feature: workflow.FeatureSlugSketchToImage,
 		ImageURLs: []string{"https://example.com/reference.png"}, ClientActionID: "media-boundary",
 	}
-	if _, err := svc.CheckSubmitTaskReadiness(context.Background(), 42, req, 1); err != nil {
+	if _, err := svc.CheckSubmitTaskReadiness(context.Background(), 42, req); err != nil {
 		t.Fatalf("readiness error = %v", err)
 	}
 	if preparer.calls != 0 {

@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -159,7 +158,7 @@ func readGoogleProviderParams(providerReq providerRequest) googleProviderParams 
 		Model:       model,
 		UseImagen:   isGoogleImagenModel(model),
 		ImageRefs:   providerReq.MediaRefs.GoogleImages,
-		SampleCount: parseGoogleSampleCount(providerReq.Params),
+		SampleCount: providerReq.OutputCount,
 		AspectRatio: parseGoogleAspectRatioValue(providerReq.Params),
 	}
 }
@@ -292,7 +291,7 @@ func (c *ProviderExecutor) callGoogleGeminiGenerateContentForAPIType(ctx context
 		return providerCallResult{}, fmt.Errorf("读取 API 响应失败: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return providerCallResult{}, newUpstreamHTTPError(resp.StatusCode, truncateErrorBody(string(respBody)))
+		return providerCallResult{}, newUpstreamHTTPErrorFromResponse(resp, truncateErrorBody(string(respBody)))
 	}
 
 	imageURLs, extractErr := extractGoogleGeminiImageResponses(respBody)
@@ -482,7 +481,7 @@ func (c *ProviderExecutor) callGoogleImagenPredict(ctx context.Context, account 
 		return providerCallResult{}, fmt.Errorf("读取 API 响应失败: %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return providerCallResult{}, newUpstreamHTTPError(resp.StatusCode, truncateErrorBody(string(respBody)))
+		return providerCallResult{}, newUpstreamHTTPErrorFromResponse(resp, truncateErrorBody(string(respBody)))
 	}
 
 	imageURLs, err := extractGoogleImagenResponses(respBody)
@@ -501,46 +500,6 @@ func (c *ProviderExecutor) callGoogleImagenPredict(ctx context.Context, account 
 		ParsedOutputKind:  "image-results",
 		ParsedOutputCount: len(imageURLs),
 	}, nil
-}
-
-func parseGoogleSampleCount(params map[string]interface{}) int {
-	if params == nil {
-		return 1
-	}
-	parseCount := func(key string) (int, bool) {
-		raw, ok := params[key]
-		if !ok {
-			return 0, false
-		}
-		switch typed := raw.(type) {
-		case int:
-			return typed, true
-		case float64:
-			return int(typed), true
-		case float32:
-			return int(typed), true
-		case int64:
-			return int(typed), true
-		case int32:
-			return int(typed), true
-		case json.Number:
-			n, err := strconv.Atoi(strings.TrimSpace(string(typed)))
-			if err == nil {
-				return n, true
-			}
-		case string:
-			n, err := strconv.Atoi(strings.TrimSpace(typed))
-			if err == nil {
-				return n, true
-			}
-		}
-		return 0, false
-	}
-
-	if count, ok := parseCount("output_count"); ok && count >= 1 && count <= 4 {
-		return count
-	}
-	return 1
 }
 
 func parseGoogleAspectRatioValue(params map[string]interface{}) string {

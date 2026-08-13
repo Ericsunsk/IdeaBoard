@@ -23,6 +23,7 @@ import {
   type ExecutionImageSize,
 } from '../contracts/executionSizeParams'
 import { buildPromptAspectRatioTaskParams } from '../contracts/promptAspectRatioTaskParams'
+import { assertRequestedOutputCount } from '../../../../shared/domain/generationContract'
 import {
   normalizePromptReferenceImageUrls,
   type PromptAspectRatio,
@@ -56,6 +57,7 @@ export type FusionTaskRequestInput = {
   prompt: string
   imageUrls: string[]
   inputWeights: number[]
+  outputCount?: number
   sizeSource: ExecutionImageSize | null
   targetSize: ExecutionImageSize | null
   aspectRatio: PromptAspectRatio
@@ -254,11 +256,14 @@ export function buildHdUpscaleTaskRequest(input: {
 }
 
 export function buildFusionTaskRequest(input: FusionTaskRequestInput): SubmitTaskData {
+  const outputCount =
+    input.outputCount === undefined ? undefined : assertRequestedOutputCount(input.outputCount)
   return buildExecutionTaskRequest({
     prompt: input.prompt,
     feature: EXECUTION_FUSION_META.feature,
     imageUrls: input.imageUrls,
     params: {
+      ...(outputCount ? { output_count: outputCount } : {}),
       ...buildExecutionSizeParams(input.sizeSource, input.targetSize),
       ...buildPromptAspectRatioTaskParams(input.aspectRatio),
       fusion: {
@@ -322,6 +327,7 @@ export function buildImageExecutionTaskRequest(
         prompt: plan.taskPrompt,
         imageUrls: plan.imageUrls,
         inputWeights: plan.inputWeights,
+        outputCount: plan.outputCount,
         sizeSource: plan.sizeSource,
         targetSize: plan.targetSize,
         aspectRatio: plan.aspectRatio,

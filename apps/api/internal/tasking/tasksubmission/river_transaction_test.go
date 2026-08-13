@@ -417,7 +417,7 @@ func canonicalRequestForTest(task *tasks.Task) CanonicalRequest {
 	request, err := NewCanonicalRequest(CanonicalRequestInput{
 		UserID: task.UserID, UserPrompt: task.UserPrompt, Prompt: task.Prompt, Params: task.Params,
 		ClientActionID: task.ClientActionID, Feature: task.FeatureSlug, Priority: task.Priority,
-		BillingRequest: billingRequest, MaxBillingQuantity: 16,
+		BillingRequest: billingRequest,
 	})
 	if err != nil {
 		panic(err)

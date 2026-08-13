@@ -258,11 +258,6 @@ type SubmitTaskRequest struct {
 	Params         map[string]interface{} `json:"params"`
 }
 
-type SubmitTaskReadinessRequest struct {
-	SubmitTaskRequest
-	BillingQuantity int64 `json:"billing_quantity" binding:"required,min=1,max=4"`
-}
-
 type TaskSubmissionResult struct {
 	TaskID            string
 	HoldTransactionID string

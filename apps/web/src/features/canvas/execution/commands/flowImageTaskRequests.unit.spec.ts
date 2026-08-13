@@ -213,6 +213,7 @@ describe('flowImageTaskRequests', () => {
       prompt: '[style-fusion] blend references',
       imageUrls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
       inputWeights: [0.35, 0.65],
+      outputCount: 3,
       sizeSource: null,
       targetSize: null,
       aspectRatio: 'auto',
@@ -223,6 +224,7 @@ describe('flowImageTaskRequests', () => {
       feature: EXECUTION_FEATURE.styleFusion,
       image_urls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
       params: {
+        output_count: 3,
         fusion: {
           mode: 'weighted_reference',
           input_weights: [0.35, 0.65],

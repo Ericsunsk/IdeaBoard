@@ -184,7 +184,7 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 		UserID: userID, Feature: featureSlug, UserPrompt: req.Prompt, Prompt: fullPrompt,
 		Params: paramsJSON, ClientActionID: clientActionID, Priority: priority,
 		Generation:     &generationSnapshot,
-		BillingRequest: billingRequest, MaxBillingQuantity: int64(workflow.MaxRequestedOutputCount),
+		BillingRequest: billingRequest,
 	})
 }
 

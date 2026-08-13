@@ -5,4 +5,5 @@ export type ResolvedTaskImageResult = {
   height?: number
   mimeType?: string
   mediaAssetId?: number
+  resultIndex?: number
 }

@@ -6,6 +6,7 @@ export type TaskImageResult = {
   height?: number
   mimeType?: string
   mediaAssetId?: number
+  resultIndex?: number
 }
 
 type TaskImageResultInput = {
@@ -14,6 +15,8 @@ type TaskImageResultInput = {
   height?: unknown
   mimeType?: unknown
   mediaAssetId?: unknown
+  result_index?: unknown
+  resultIndex?: unknown
 }
 
 type TaskResultPayloadLike = {
@@ -24,6 +27,7 @@ type TaskResultPayloadLike = {
     height?: unknown
     mime_type?: unknown
     media_asset_id?: unknown
+    result_index?: unknown
   }>
   result?: string | null
 }
@@ -74,13 +78,16 @@ export function normalizeTaskImageResult(result: TaskImageResultInput): TaskImag
   const height = toPositiveNumber(result?.height)
   const mimeType = `${result?.mimeType ?? ''}`.trim()
   const mediaAssetId = toPositiveInteger(result?.mediaAssetId)
-  return {
+  const resultIndex = Number(result?.result_index ?? result?.resultIndex)
+  const normalized: TaskImageResult = {
     url,
     ...(width ? { width } : {}),
     ...(height ? { height } : {}),
     ...(mimeType ? { mimeType } : {}),
     ...(mediaAssetId ? { mediaAssetId } : {}),
+    ...(Number.isInteger(resultIndex) && resultIndex >= 0 ? { resultIndex } : {}),
   }
+  return normalized
 }
 
 export function normalizeTaskImageResults(results: TaskImageResultInput[]): TaskImageResult[] {
@@ -100,6 +107,7 @@ export function extractImageResultsFromTaskPayload(task: TaskResultPayloadLike):
             height: output.height,
             mimeType: output.mime_type,
             mediaAssetId: output.media_asset_id,
+            result_index: output.result_index,
           }),
         )
         .filter((result): result is TaskImageResult => result !== null)

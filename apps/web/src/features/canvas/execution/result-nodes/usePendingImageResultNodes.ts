@@ -358,6 +358,7 @@ export function usePendingImageResultExecution(
       sourceImageRatio: params.sourceImageRatio,
       width: params.width,
       pendingTaskId: undefined,
+      pendingResultIndex: undefined,
       outputStatus: 'running',
       outputImages: [],
     }
@@ -549,7 +550,7 @@ export function usePendingImageResultExecution(
     return { resultNodeIds }
   }
 
-  function attachPendingTaskId(params: { resultNodeId: string; taskId: string }) {
+  function attachPendingTaskId(params: { resultNodeId: string; taskId: string; resultIndex: number }) {
     const normalizedTaskId = params.taskId.trim()
     if (!normalizedTaskId) return
     const targetNode = options.nodes.value.find((item) => item.id === params.resultNodeId)
@@ -564,6 +565,7 @@ export function usePendingImageResultExecution(
           snapshotNode: {
             ...(snapshot as ImageNodeItem),
             pendingTaskId: normalizedTaskId,
+            pendingResultIndex: params.resultIndex,
           },
         },
       },
@@ -639,7 +641,7 @@ export function usePendingImageResultExecution(
           const submission = await params.submitTask(resultNodeId)
           taskId = submission.taskId
           if (persistPendingTaskIds && isResultCurrent(resultNodeId, taskId)) {
-            attachPendingTaskId({ resultNodeId, taskId })
+            attachPendingTaskId({ resultNodeId, taskId, resultIndex: index })
             await params.afterTaskIdAttached?.({ resultNodeId, taskId })
           }
           if (!isResultCurrent(resultNodeId, taskId)) {

@@ -46,6 +46,20 @@ export async function resolveFirstTaskImageResultDisplay(
   return resolved
 }
 
+export async function resolveTaskImageResultAtIndexDisplay(
+  results: TaskImageResult[],
+  resultIndex: number,
+  fallbackRatio: number,
+  loadImageSize: ImageSizeLoader,
+): Promise<ResolvedTaskImageResult> {
+  const normalized = normalizeTaskImageResults(results)
+  const result = normalized.find((candidate) => candidate.resultIndex === resultIndex)
+  if (!result) throw new Error('任务完成但未返回对应图片')
+  const resolved = await resolveTaskImageResultDisplay(result, fallbackRatio, loadImageSize)
+  if (!resolved) throw new Error('任务完成但未返回对应图片')
+  return { ...resolved, resultIndex }
+}
+
 export async function resolveTaskImageRatio(
   url: string,
   fallbackRatio: number,

@@ -27,6 +27,7 @@ export function useFlowNodeMediaInputs(options: UseFlowNodeMediaInputsOptions) {
         sourceMediaAssetId: undefined,
         sourceImageRatio: 1,
         pendingTaskId: undefined,
+        pendingResultIndex: undefined,
         outputStatus: 'idle',
         outputImages: [],
       }

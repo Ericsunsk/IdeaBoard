@@ -44,7 +44,7 @@ describe('task readiness billing updates', () => {
         prompt: 'final prompt',
         feature: 'pattern-gen',
         client_action_id: 'canvas:action-1',
-        billing_quantity: 4,
+        params: { output_count: 4 },
       }),
     ).rejects.toThrow('Idea不足')
 
@@ -76,7 +76,7 @@ describe('task readiness billing updates', () => {
         prompt: 'free prompt',
         feature: 'pattern-gen',
         client_action_id: 'canvas:free-action',
-        billing_quantity: 4,
+        params: { output_count: 4 },
       }),
     ).resolves.toEqual(readiness)
   })
@@ -88,7 +88,7 @@ describe('task readiness billing updates', () => {
       assertTaskSubmitReady({
         prompt: 'network prompt',
         feature: 'pattern-gen',
-        billing_quantity: 1,
+        params: { output_count: 1 },
       }),
     ).rejects.toMatchObject({ kind: 'network', message: '网络错误，请重试' })
 
@@ -103,7 +103,7 @@ describe('task readiness billing updates', () => {
       assertTaskSubmitReady({
         prompt: 'quote prompt',
         feature: 'pattern-gen',
-        billing_quantity: 1,
+        params: { output_count: 1 },
       }),
     ).rejects.toMatchObject({
       kind: 'pricing-unavailable',

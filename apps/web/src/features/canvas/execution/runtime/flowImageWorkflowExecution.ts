@@ -29,7 +29,10 @@ import {
   type ImagePromptExecutionPlan,
   type TextPromptExecutionPlan,
 } from '../planning/ImageExecutionPlan'
-import { resolveFirstTaskImageResultDisplay } from '../result-nodes/flowImageDirectActionTaskResult'
+import {
+  resolveFirstTaskImageResultDisplay,
+  resolveTaskImageResultAtIndexDisplay,
+} from '../result-nodes/flowImageDirectActionTaskResult'
 import { composeFlowLocalInpaintTaskResult } from '../result-nodes/flowLocalInpaintTaskResult'
 import { usePendingImageResultExecution } from '../result-nodes/usePendingImageResultNodes'
 import { waitExistingOrLiveTaskImageResults } from '../task-runner/flowImageDirectActionExecutor'
@@ -126,7 +129,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       readinessRequest: () => buildImageActionReadinessRequest(plan.action),
       buildRequest: async () =>
         buildImageExecutionTaskRequest(plan, await loadImageSizeFromUrl(plan.source.url)),
-      outputCount: () => 1,
     })
     await workflowRunner.run({
       source: plan.source,
@@ -150,7 +152,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       readinessRequest: buildCanvasExtendReadinessRequest,
       buildRequest: async () =>
         buildImageExecutionTaskRequest(plan, await loadImageSizeFromUrl(plan.source.url)),
-      outputCount: () => plan.outputCount,
     })
     await workflowRunner.run({
       source: plan.source,
@@ -175,7 +176,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     const readinessSubmission = createCanvasTaskSubmissionCallbacks({
       readinessRequest: buildPromptImageReadinessRequest,
       buildRequest: buildPromptImageReadinessRequest,
-      outputCount: () => plan.outputCount,
     })
     const taskSubmission = createCanvasTaskSubmissionCallbacks({
       buildRequest: () => requirePreparedTaskRequest(request, '局部重绘任务未准备完成'),
@@ -244,7 +244,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       readinessRequest: buildPromptImageReadinessRequest,
       buildRequest: async () =>
         buildImageExecutionTaskRequest(plan, await loadImageSizeFromUrl(plan.source.url)),
-      outputCount: () => plan.outputCount,
     })
     await workflowRunner.run({
       source: plan.source,
@@ -271,17 +270,18 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     const attachment = requireCurrentAttachment()
     let targetRatio = plan.source.ratio
     let request: SubmitTaskData | null = null
+    let taskResultsPromise: ReturnType<typeof waitExistingOrLiveTaskImageResults> | null = null
     const taskSubmission = createCanvasTaskSubmissionCallbacks({
       readinessRequest: () => requirePreparedTaskRequest(request, 'Fusion 任务未准备完成'),
       buildRequest: () => requirePreparedTaskRequest(request, 'Fusion 任务未准备完成'),
       fallbackMessage: '提交 Fusion 任务失败',
-      outputCount: () => plan.outputCount,
     })
     await workflowRunner.run({
       source: plan.source,
       sourceNodeId: plan.sourceNodeId,
       attachment,
       outputCount: plan.outputCount,
+      submissionMode: 'shared-task',
       prepare: async () => {
         const imageSizes = await Promise.all(
           plan.inputImages.map((input) => loadImageSizeFromUrl(input.url)),
@@ -296,7 +296,15 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       },
       assertReady: taskSubmission.assertReady,
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
-      resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, targetRatio),
+      resolveResult: async (taskId, _resultNodeId, resultIndex) => {
+        taskResultsPromise ??= waitExistingOrLiveTaskImageResults(taskId)
+        return resolveTaskImageResultAtIndexDisplay(
+          await taskResultsPromise,
+          resultIndex,
+          targetRatio,
+          loadImageSizeFromUrl,
+        )
+      },
       fallbackErrorMessage: 'Fusion 生成失败',
       formatErrorMessage: (error) => sanitizeApiErrorMessage(error.message, 'Fusion 生成失败'),
     })
