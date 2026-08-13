@@ -42,6 +42,19 @@ VALUES (
 )
 RETURNING id;
 
+-- name: CreatePreparedMediaAsset :one
+INSERT INTO media_assets (
+  asset_id, owner_user_id, storage_profile_id, storage_key, url, source_url,
+  media_kind, mime_type, width, height, size_bytes, status, metadata,
+  reclaim_after, reclaim_generation
+)
+VALUES (
+  sqlc.arg(asset_id), sqlc.arg(owner_user_id), sqlc.arg(storage_profile_id), sqlc.arg(storage_key),
+  sqlc.arg(url), sqlc.arg(source_url), 'image', sqlc.arg(mime_type), sqlc.arg(width), sqlc.arg(height),
+  sqlc.arg(size_bytes), 'ready', sqlc.arg(metadata), sqlc.arg(reclaim_after), 1
+)
+RETURNING id;
+
 -- name: GetMediaAssetByID :one
 SELECT
   id, asset_id, owner_user_id, storage_profile_id, storage_key,
@@ -55,15 +68,16 @@ WHERE id = sqlc.arg(id);
 -- name: UpsertMediaRef :one
 INSERT INTO media_refs (
   media_asset_id, owner_user_id, ref_type, ref_id,
-  board_id, task_id, role, metadata
+  board_id, task_id, role, input_index, metadata
 )
 VALUES (
   sqlc.arg(media_asset_id), sqlc.arg(owner_user_id), sqlc.arg(ref_type), sqlc.arg(ref_id),
-  sqlc.arg(board_id), sqlc.arg(task_id), sqlc.arg(role), sqlc.arg(metadata)
+  sqlc.arg(board_id), sqlc.arg(task_id), sqlc.arg(role), sqlc.arg(input_index), sqlc.arg(metadata)
 )
 ON CONFLICT (media_asset_id, ref_type, ref_id, board_id, role) DO UPDATE
 SET board_id = EXCLUDED.board_id,
     task_id = EXCLUDED.task_id,
+    input_index = EXCLUDED.input_index,
     metadata = EXCLUDED.metadata
 WHERE media_refs.owner_user_id = EXCLUDED.owner_user_id
 RETURNING id;
@@ -71,10 +85,45 @@ RETURNING id;
 -- name: ListMediaRefsByBoardID :many
 SELECT
   id, media_asset_id, owner_user_id, ref_type, ref_id,
-  board_id, task_id, role, metadata, created_at, updated_at
+  board_id, task_id, role, input_index, metadata, created_at, updated_at
 FROM media_refs
 WHERE owner_user_id = sqlc.arg(owner_user_id) AND board_id = sqlc.arg(board_id)
 ORDER BY created_at ASC, id ASC;
+
+-- name: ClaimPromptReferenceMediaRef :one
+UPDATE media_refs
+SET task_id = sqlc.arg(task_id), updated_at = now()
+WHERE owner_user_id = sqlc.arg(owner_user_id)
+  AND media_asset_id = sqlc.arg(media_asset_id)
+  AND ref_type = 'prompt_reference'
+  AND ref_id = sqlc.arg(ref_id)
+  AND role = sqlc.arg(role)
+  AND input_index = sqlc.arg(input_index)
+  AND task_id = ''
+RETURNING id, media_asset_id, owner_user_id, ref_type, ref_id,
+  board_id, task_id, role, input_index, metadata, created_at, updated_at;
+
+-- name: FindPreparedGenerationMedia :one
+SELECT asset.id, asset.storage_profile_id, asset.storage_key, asset.url,
+  asset.source_url, asset.mime_type, asset.width, asset.height, asset.size_bytes
+FROM media_refs AS ref
+JOIN media_assets AS asset ON asset.id = ref.media_asset_id AND asset.owner_user_id = ref.owner_user_id
+WHERE ref.owner_user_id = sqlc.arg(owner_user_id)
+  AND ref.ref_type = 'prompt_reference'
+  AND ref.ref_id = sqlc.arg(ref_id)
+  AND ref.role = sqlc.arg(role)
+  AND ref.input_index = sqlc.arg(input_index)
+  AND asset.deleted_at IS NULL
+LIMIT 1;
+
+-- name: DeleteUnclaimedPreparedMediaAsset :execrows
+DELETE FROM media_assets AS asset
+WHERE asset.id = sqlc.arg(id)
+  AND asset.owner_user_id = sqlc.arg(owner_user_id)
+  AND NOT EXISTS (
+    SELECT 1 FROM media_refs AS ref
+    WHERE ref.media_asset_id = asset.id AND ref.task_id <> ''
+  );
 
 -- name: DeleteBoardMediaRefsByOwnerAndBoardID :exec
 DELETE FROM media_refs

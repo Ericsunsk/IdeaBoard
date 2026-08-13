@@ -19,6 +19,7 @@ type Querier interface {
 	CancelMediaAssetReclamation(ctx context.Context, arg CancelMediaAssetReclamationParams) ([]int64, error)
 	ClaimDueMediaAssetReclamation(ctx context.Context, arg ClaimDueMediaAssetReclamationParams) (MediaAsset, error)
 	ClaimDuePaymentOrderReconciliations(ctx context.Context, arg ClaimDuePaymentOrderReconciliationsParams) ([]ClaimDuePaymentOrderReconciliationsRow, error)
+	ClaimPromptReferenceMediaRef(ctx context.Context, arg ClaimPromptReferenceMediaRefParams) (MediaRef, error)
 	ClearCurrentStorageProfiles(ctx context.Context) error
 	CompletePaymentCheckoutShutdown(ctx context.Context, arg CompletePaymentCheckoutShutdownParams) (int64, error)
 	CompletePaymentOrderReconciliationClaim(ctx context.Context, arg CompletePaymentOrderReconciliationClaimParams) (int64, error)
@@ -39,6 +40,7 @@ type Querier interface {
 	CreateAccountSecret(ctx context.Context, arg CreateAccountSecretParams) (int64, error)
 	CreateBoardShareToken(ctx context.Context, arg CreateBoardShareTokenParams) (int64, error)
 	CreateBoardUploadMediaAsset(ctx context.Context, arg CreateBoardUploadMediaAssetParams) (int64, error)
+	CreatePreparedMediaAsset(ctx context.Context, arg CreatePreparedMediaAssetParams) (int64, error)
 	CreateProviderEndpoint(ctx context.Context, arg CreateProviderEndpointParams) (int64, error)
 	CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error)
 	CreateTaskAttempt(ctx context.Context, arg CreateTaskAttemptParams) (CreateTaskAttemptRow, error)
@@ -55,11 +57,13 @@ type Querier interface {
 	DeleteOutputsByTaskID(ctx context.Context, taskID string) error
 	DeleteProviderEndpoint(ctx context.Context, id int64) (int64, error)
 	DeleteTaskOutputMediaRefsByTaskID(ctx context.Context, taskID string) error
+	DeleteUnclaimedPreparedMediaAsset(ctx context.Context, arg DeleteUnclaimedPreparedMediaAssetParams) (int64, error)
 	DeleteUserBoardsByUserID(ctx context.Context, userID int64) error
 	DeleteUserByID(ctx context.Context, id int64) (int64, error)
 	FailRunningTaskAttemptsByAccountID(ctx context.Context, arg FailRunningTaskAttemptsByAccountIDParams) (int64, error)
 	FailRunningTasksByAccountID(ctx context.Context, arg FailRunningTasksByAccountIDParams) ([]FailRunningTasksByAccountIDRow, error)
 	FinalFailTaskRunningWithLease(ctx context.Context, arg FinalFailTaskRunningWithLeaseParams) (int64, error)
+	FindPreparedGenerationMedia(ctx context.Context, arg FindPreparedGenerationMediaParams) (FindPreparedGenerationMediaRow, error)
 	FinishRunningTaskAttemptsByTaskIDs(ctx context.Context, arg FinishRunningTaskAttemptsByTaskIDsParams) (int64, error)
 	FinishTaskAttempt(ctx context.Context, arg FinishTaskAttemptParams) (int64, error)
 	GetAccessibleBoardByBoardID(ctx context.Context, arg GetAccessibleBoardByBoardIDParams) (GetAccessibleBoardByBoardIDRow, error)

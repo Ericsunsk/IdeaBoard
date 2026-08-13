@@ -24,6 +24,11 @@ type WorkflowTaskParams struct {
 	// Generation controls shared by multiple providers.
 	Controls *GenerationControls `json:"controls,omitempty"`
 
+	// Generation is the immutable, provider-independent request snapshot
+	// captured before Task submission. Provider adapters must treat it as a
+	// fact snapshot and derive their own request at the runtime boundary.
+	Generation *GenerationRequestSnapshot `json:"generation,omitempty"`
+
 	// Feature-specific canonical prompt contracts. Keep these in sync with
 	// workflow/prompt_contract.go and SYSTEM_PROMPT.md.
 	Variation *StyleVariationParams `json:"variation,omitempty"`
@@ -36,6 +41,32 @@ type WorkflowTaskParams struct {
 	// first-class typed field. Consumers MUST NOT rely on Extra keys
 	// for security or correctness — only for provider API shaping.
 	Extra map[string]interface{} `json:"extra,omitempty"`
+}
+
+// GenerationRequestSnapshot records the user intent and resolved workflow
+// inputs used to create a Task. It deliberately contains no provider model,
+// account, or endpoint selection.
+type GenerationRequestSnapshot struct {
+	SchemaVersion        int                     `json:"schema_version"`
+	Feature              string                  `json:"feature"`
+	Primitive            string                  `json:"primitive"`
+	UserPrompt           string                  `json:"user_prompt"`
+	CompiledPrompt       string                  `json:"compiled_prompt"`
+	TemplateVersion      string                  `json:"template_version,omitempty"`
+	TemplateFingerprint  string                  `json:"template_fingerprint"`
+	Controls             *GenerationControls     `json:"controls,omitempty"`
+	Media                []GenerationMediaIntent `json:"media,omitempty"`
+	RequestedOutputCount int                     `json:"requested_output_count"`
+}
+
+// GenerationMediaIntent is an ordered, role-aware media input intent. The
+// Ref is resolved to a controlled media reference before Task persistence.
+type GenerationMediaIntent struct {
+	InputIndex int     `json:"input_index"`
+	Role       string  `json:"role"`
+	Ref        string  `json:"ref"`
+	AssetID    int64   `json:"asset_id,omitempty"`
+	Weight     float64 `json:"weight,omitempty"`
 }
 
 type MediaInputs struct {

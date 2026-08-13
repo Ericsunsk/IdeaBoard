@@ -132,10 +132,10 @@ describe('ImageExecutionPlan', () => {
       ],
     }))
 
-    const plan = planner.planFusionPromptGeneration('fusion-1', '', 9, '16:9')
+    const plan = planner.planFusionPromptGeneration('fusion-1', '', 4, '16:9')
 
     expect(plan.kind).toBe('fusion')
-    expect(plan.outputCount).toBe(8)
+    expect(plan.outputCount).toBe(4)
     expect(plan.aspectRatio).toBe('16:9')
     expect(plan.imageUrls).toEqual([
       'https://example.com/b.png',
@@ -150,6 +150,10 @@ describe('ImageExecutionPlan', () => {
       width: 360,
       outputAnchorNodeId: 'fusion-1',
     })
+
+    expect(() => planner.planFusionPromptGeneration('fusion-1', '', 9, '16:9')).toThrow(
+      '生成数量无效',
+    )
   })
 
   it('keeps execution input separate from result anchor when planning image actions', () => {

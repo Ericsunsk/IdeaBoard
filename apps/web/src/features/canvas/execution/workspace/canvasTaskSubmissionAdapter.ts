@@ -1,5 +1,9 @@
 import type { SubmitTaskData, SubmitTaskReadinessRequestData } from '../../../../shared/api/task'
 import {
+  assertRequestedOutputCount,
+  type RequestedOutputCount,
+} from '../../../../shared/domain/generationContract'
+import {
   assertTaskRequestReady,
   submitTaskRequest,
 } from '../task-runner/flowImageDirectActionExecutor'
@@ -48,11 +52,12 @@ type CanvasTaskSubmissionOptions = {
     }
 )
 
-function requireBillingQuantity(outputCount: number): number {
-  if (!Number.isInteger(outputCount) || outputCount < 1 || outputCount > 16) {
+function requireBillingQuantity(outputCount: number): RequestedOutputCount {
+  try {
+    return assertRequestedOutputCount(outputCount)
+  } catch {
     throw new Error('生成数量无效')
   }
-  return outputCount
 }
 
 export function createCanvasTaskSubmissionCallbacks(

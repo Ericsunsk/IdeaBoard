@@ -78,11 +78,11 @@ describe('patchFlowSnapshotParam', () => {
     expect(patchFlowSnapshotParam(imageNode, { key: 'title', value: '   ' })).toBe(imageNode)
   })
 
-  it('clamps output count on nodes that support it', () => {
+  it('rejects output counts outside the domain contract', () => {
     const promptNode = makePromptNode({ outputCount: 1 })
-    const next = patchFlowSnapshotParam(promptNode, { key: 'outputCount', value: 99 })
-
-    expect(next).toMatchObject({ outputCount: 8 })
+    expect(() => patchFlowSnapshotParam(promptNode, { key: 'outputCount', value: 99 })).toThrow(
+      'requested output count must be an integer between 1 and 4',
+    )
   })
 
   it('applies prompt text only to fusion nodes and allows an empty fusion prompt', () => {

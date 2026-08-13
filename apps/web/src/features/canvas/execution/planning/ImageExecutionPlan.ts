@@ -1,5 +1,4 @@
 import {
-  clampImageNodeOutputCount,
   getCanvasNodeImageInputLimit,
   normalizePromptReferenceImageUrls,
   normalizePromptAspectRatio,
@@ -9,6 +8,7 @@ import {
   type ImageNodeItem,
   type PromptAspectRatio,
 } from '../../../canvas-board/domain'
+import { parseRequestedOutputCount } from '../../../../shared/domain/generationContract'
 import { EXECUTION_FUSION_META } from '../contracts/executionContract'
 import type { ImageTaskAction } from '../contracts/imageActionExecution'
 import {
@@ -139,6 +139,12 @@ export function isImageExecutionPlanError(error: unknown): error is ImageExecuti
 
 function failPlanning(message: string): never {
   throw new ImageExecutionPlanError(message)
+}
+
+function requireRequestedOutputCount(value: unknown): number {
+  const outputCount = parseRequestedOutputCount(value)
+  if (outputCount === null) failPlanning('生成数量无效')
+  return outputCount
 }
 
 function normalizeExecutionRatio(value: unknown): number {
@@ -335,7 +341,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       sourceNodeId: nodeId,
       source: source.input,
       prompt: `${intent.prompt ?? ''}`.trim(),
-      outputCount: clampImageNodeOutputCount(intent.outputCount ?? 1),
+      outputCount: requireRequestedOutputCount(intent.outputCount ?? 1),
       extendPercent,
       targetRatio,
       targetWidth,
@@ -367,7 +373,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       source: source.input,
       prompt,
       rawMaskDataUrl,
-      outputCount: clampImageNodeOutputCount(inpaint.outputCount),
+      outputCount: requireRequestedOutputCount(inpaint.outputCount),
       referenceImageUrls: normalizePromptReferenceImageUrls(inpaint.referenceImageUrls),
       resultOptions: {
         anchor: withOutputAnchorNodeId(source.resultAnchor, nodeId),
@@ -415,7 +421,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       source,
       sourceNodeId,
       prompt: normalizedPrompt,
-      outputCount: clampImageNodeOutputCount(outputCount),
+      outputCount: requireRequestedOutputCount(outputCount),
       aspectRatio: normalizePromptAspectRatio(aspectRatio),
       resultOptions: {
         ...(options.anchor
@@ -445,7 +451,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       sourceNodeId: anchorNodeId,
       source,
       prompt: normalizedPrompt,
-      outputCount: clampImageNodeOutputCount(outputCount),
+      outputCount: requireRequestedOutputCount(outputCount),
       aspectRatio: normalizePromptAspectRatio(aspectRatio),
       resultOptions: {
         anchor: resolveGraphNodeResultAnchor(graph, anchorNodeId),
@@ -503,7 +509,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
         ratio: firstInput.ratio,
       },
       taskPrompt,
-      outputCount: clampImageNodeOutputCount(outputCount),
+      outputCount: requireRequestedOutputCount(outputCount),
       aspectRatio: normalizedAspectRatio,
       inputImages: fusionInputs,
       imageUrls,

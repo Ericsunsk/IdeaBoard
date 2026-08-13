@@ -1,7 +1,7 @@
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import { createCanvasNodeAt } from '../../utils/canvasNodeFactory'
-import { clampImageNodeOutputCount, type ImageNodeItem } from '../../../canvas-board/domain'
+import { requireImageNodeOutputCount, type ImageNodeItem } from '../../../canvas-board/domain'
 import type { FlowNodeData } from '../../types/flowTypes'
 import { resolveFlowNodeDragHandle } from '../../utils/flowNodeDragHandle'
 import {
@@ -506,7 +506,7 @@ export function usePendingImageResultExecution(
   function reservePendingResults(
     params: PendingImageResultReservationParams,
   ): PendingImageResultReservation {
-    const count = clampImageNodeOutputCount(params.outputCount)
+    const count = requireImageNodeOutputCount(params.outputCount)
     const resultOptions = params.resultOptions ?? {}
     const anchorNodeId = resultOptions.anchor?.outputAnchorNodeId ?? params.sourceNodeId
     const lookup = buildPendingResultLookup()

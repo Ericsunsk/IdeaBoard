@@ -1,12 +1,14 @@
 package tasksubmission
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/tasks"
+	"ideaboard/api/internal/workflow"
 )
 
 // CanonicalRequestInput is the single representation accepted from Task
@@ -21,6 +23,7 @@ type CanonicalRequestInput struct {
 	Priority           int
 	BillingRequest     *taskbilling.Request
 	MaxBillingQuantity int64
+	Generation         *tasks.GenerationRequestSnapshot
 }
 
 // CanonicalRequest is immutable after construction. Only this package can
@@ -35,6 +38,7 @@ type CanonicalRequest struct {
 	priority           int
 	billingRequest     *taskbilling.Request
 	maxBillingQuantity int64
+	generation         *tasks.GenerationRequestSnapshot
 }
 
 func NewCanonicalRequest(input CanonicalRequestInput) (CanonicalRequest, error) {
@@ -66,11 +70,19 @@ func NewCanonicalRequest(input CanonicalRequestInput) (CanonicalRequest, error) 
 		}
 		billingRequest = &request
 	}
+	var generation *tasks.GenerationRequestSnapshot
+	if input.Generation != nil {
+		copySnapshot := cloneGenerationSnapshot(*input.Generation)
+		if err := validateGenerationSnapshot(copySnapshot); err != nil {
+			return CanonicalRequest{}, err
+		}
+		generation = &copySnapshot
+	}
 	return CanonicalRequest{
 		userID: input.UserID, userPrompt: input.UserPrompt, prompt: input.Prompt, params: input.Params,
 		clientActionID: strings.TrimSpace(input.ClientActionID), feature: feature,
 		priority: priority, billingRequest: billingRequest,
-		maxBillingQuantity: input.MaxBillingQuantity,
+		maxBillingQuantity: input.MaxBillingQuantity, generation: generation,
 	}, nil
 }
 
@@ -86,8 +98,41 @@ func (r CanonicalRequest) Prompt() string {
 	return r.prompt
 }
 
+func (r CanonicalRequest) UserPrompt() string     { return r.userPrompt }
+func (r CanonicalRequest) CompiledPrompt() string { return r.prompt }
+func (r CanonicalRequest) GenerationSnapshot() *tasks.GenerationRequestSnapshot {
+	if r.generation == nil {
+		return nil
+	}
+	copySnapshot := cloneGenerationSnapshot(*r.generation)
+	return &copySnapshot
+}
+
 func (r CanonicalRequest) Params() string {
 	return r.params
+}
+
+func (r CanonicalRequest) WithGenerationSnapshot(snapshot tasks.GenerationRequestSnapshot) (CanonicalRequest, error) {
+	copySnapshot := cloneGenerationSnapshot(snapshot)
+	if err := validateGenerationSnapshot(copySnapshot); err != nil {
+		return CanonicalRequest{}, err
+	}
+	params := map[string]json.RawMessage{}
+	if err := json.Unmarshal([]byte(r.params), &params); err != nil {
+		return CanonicalRequest{}, fmt.Errorf("update canonical generation snapshot: %w", err)
+	}
+	generationJSON, err := json.Marshal(copySnapshot)
+	if err != nil {
+		return CanonicalRequest{}, fmt.Errorf("encode canonical generation snapshot: %w", err)
+	}
+	params["generation"] = generationJSON
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return CanonicalRequest{}, fmt.Errorf("encode canonical params: %w", err)
+	}
+	r.generation = &copySnapshot
+	r.params = string(paramsJSON)
+	return r, nil
 }
 
 func (r CanonicalRequest) Priority() int {
@@ -120,7 +165,39 @@ func (r CanonicalRequest) valid() bool {
 	if r.billingRequest != nil && strings.TrimSpace(r.billingRequest.Feature) != strings.TrimSpace(r.feature) {
 		return false
 	}
+	if r.generation != nil && validateGenerationSnapshot(*r.generation) != nil {
+		return false
+	}
 	return true
+}
+
+func cloneGenerationSnapshot(snapshot tasks.GenerationRequestSnapshot) tasks.GenerationRequestSnapshot {
+	copySnapshot := snapshot
+	copySnapshot.Media = append([]tasks.GenerationMediaIntent(nil), snapshot.Media...)
+	if snapshot.Controls != nil {
+		controls := *snapshot.Controls
+		copySnapshot.Controls = &controls
+	}
+	return copySnapshot
+}
+
+func validateGenerationSnapshot(snapshot tasks.GenerationRequestSnapshot) error {
+	if strings.TrimSpace(snapshot.Feature) == "" || snapshot.TemplateFingerprint == "" {
+		return fmt.Errorf("canonical generation snapshot is invalid")
+	}
+	if _, err := workflow.ParseGenerationPrimitive(snapshot.Primitive); err != nil {
+		return err
+	}
+	count, err := workflow.ParseRequestedOutputCount(snapshot.RequestedOutputCount)
+	if err != nil || count.Int() != snapshot.RequestedOutputCount {
+		return fmt.Errorf("canonical generation snapshot output count is invalid")
+	}
+	for index, media := range snapshot.Media {
+		if media.InputIndex != index || strings.TrimSpace(media.Ref) == "" || strings.TrimSpace(media.Role) == "" {
+			return fmt.Errorf("canonical generation snapshot media order is invalid")
+		}
+	}
+	return nil
 }
 
 func (r CanonicalRequest) materialize(taskID string, createdAt time.Time) (*tasks.Task, *tasks.TaskPayload) {

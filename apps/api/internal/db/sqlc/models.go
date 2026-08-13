@@ -319,6 +319,7 @@ type MediaRef struct {
 	BoardID      string          `json:"board_id"`
 	TaskID       string          `json:"task_id"`
 	Role         string          `json:"role"`
+	InputIndex   int32           `json:"input_index"`
 	Metadata     json.RawMessage `json:"metadata"`
 	CreatedAt    time.Time       `json:"created_at"`
 	UpdatedAt    time.Time       `json:"updated_at"`

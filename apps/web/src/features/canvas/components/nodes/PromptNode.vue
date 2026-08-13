@@ -76,7 +76,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ChatLines, Plus } from '@iconoir/vue'
-import { clampImageNodeOutputCount, type PromptNodeItem } from '../../../canvas-board/domain'
+import { requireImageNodeOutputCount, type PromptNodeItem } from '../../../canvas-board/domain'
 import type { PromptNodeUiState } from '../../types/canvasNodeUi'
 import NodeInputThumbnail from './NodeInputThumbnail.vue'
 import NodeShell from './NodeShell.vue'
@@ -115,7 +115,7 @@ const emit = defineEmits<{
 
 const thumbsRef = ref<HTMLElement | null>(null)
 const maxInputImages = 4
-const outputCount = computed(() => clampImageNodeOutputCount(props.node.outputCount))
+const outputCount = computed(() => requireImageNodeOutputCount(props.node.outputCount))
 const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectRatio))
 const canGenerate = computed(() => props.node.text.trim().length > 0)
 const billingQuote = useCanvasBillingQuote(() => WORKFLOW_FEATURE.patternGen)

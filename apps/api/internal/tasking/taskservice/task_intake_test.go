@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 
 	"ideaboard/api/internal/accountpool/accounts"
@@ -54,7 +56,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 
 	for _, tt := range tests {
 		t.Run(tt.feature, func(t *testing.T) {
-			canonical, err := intake.Prepare(context.Background(), 42, &tasks.SubmitTaskRequest{
+			canonical, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 				Prompt:         "保留主体",
 				Feature:        tt.feature,
 				ImageURLs:      tt.images,
@@ -93,6 +95,63 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 	}
 }
 
+func TestTaskIntakeRejectsOutputCountOutsideCanonicalContract(t *testing.T) {
+	intake := NewTaskIntake(TaskIntakeDeps{
+		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+			ID:     101,
+			Models: []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
+		}}},
+		Media: testSubmitMediaValidator{},
+	})
+
+	for _, outputCount := range []interface{}{0, 5, 8, 1.5, "2"} {
+		t.Run(fmt.Sprint(outputCount), func(t *testing.T) {
+			_, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
+				Prompt:         "generate",
+				Feature:        workflow.FeatureSlugPatternGen,
+				ClientActionID: "invalid-output-count",
+				Params:         map[string]interface{}{"output_count": outputCount},
+			})
+			if err == nil || !strings.Contains(err.Error(), "output_count 仅支持整数 1-4") {
+				t.Fatalf("output_count=%v error=%v", outputCount, err)
+			}
+		})
+	}
+}
+
+func TestTaskIntakePersistsProviderIndependentGenerationSnapshot(t *testing.T) {
+	intake := NewTaskIntake(TaskIntakeDeps{
+		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+			ID: 101, Models: []accounts.AccountModel{{Name: "runtime-model", Enabled: true}},
+		}}},
+		Media: testSubmitMediaValidator{},
+	})
+	canonical, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
+		Prompt: "draw a chair", Feature: workflow.FeatureSlugSketchToImage,
+		ClientActionID: "snapshot-intake", Params: map[string]interface{}{"output_count": 2},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	params, err := tasks.UnmarshalParams(canonical.Params())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if params.Generation == nil {
+		t.Fatal("expected generation snapshot in canonical params")
+	}
+	snapshot := params.Generation
+	if snapshot.Feature != workflow.FeatureSlugSketchToImage || snapshot.UserPrompt != "draw a chair" || snapshot.CompiledPrompt != canonical.Prompt() {
+		t.Fatalf("generation snapshot=%+v canonical prompt=%q", snapshot, canonical.Prompt())
+	}
+	if snapshot.RequestedOutputCount != 2 || snapshot.TemplateFingerprint == "" || snapshot.TemplateVersion != "" {
+		t.Fatalf("generation snapshot missing frozen facts=%+v", snapshot)
+	}
+	if canonical.GenerationSnapshot() == nil {
+		t.Fatal("expected canonical request generation snapshot")
+	}
+}
+
 func TestTaskIntakeAllowsMissingSystemPrompt(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
 		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
@@ -102,7 +161,7 @@ func TestTaskIntakeAllowsMissingSystemPrompt(t *testing.T) {
 		Media: testSubmitMediaValidator{},
 	})
 
-	canonical, err := intake.Prepare(context.Background(), 42, &tasks.SubmitTaskRequest{
+	canonical, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 		Prompt:         "repeatable textile pattern",
 		Feature:        workflow.FeatureSlugPatternGen,
 		ClientActionID: "missing-system-prompt",
@@ -126,7 +185,7 @@ func TestTaskIntakePreservesPromptCauseBehindStableError(t *testing.T) {
 		Media:   testSubmitMediaValidator{},
 	})
 
-	_, err := intake.Prepare(context.Background(), 42, &tasks.SubmitTaskRequest{
+	_, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 		Prompt:         "repeatable textile pattern",
 		Feature:        workflow.FeatureSlugPatternGen,
 		ClientActionID: "prompt-cause",

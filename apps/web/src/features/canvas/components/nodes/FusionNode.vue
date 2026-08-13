@@ -53,7 +53,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Keyframes } from '@iconoir/vue'
-import { clampImageNodeOutputCount, type FusionNodeItem } from '../../../canvas-board/domain'
+import { requireImageNodeOutputCount, type FusionNodeItem } from '../../../canvas-board/domain'
 import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../canvas-board/domain'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 import type { FusionBlendPoint } from '../../../canvas-board/domain'
@@ -94,7 +94,7 @@ const visibleInputImages = computed(() => props.node.inputImages)
 const canGenerate = computed(() => visibleInputImages.value.length >= 2)
 const showPromptComposer = computed(() => !!props.promptComposerVisible)
 const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectRatio))
-const outputCountValue = computed(() => clampImageNodeOutputCount(props.node.outputCount))
+const outputCountValue = computed(() => requireImageNodeOutputCount(props.node.outputCount))
 const billingQuote = useCanvasBillingQuote(
   () => WORKFLOW_FEATURE.styleFusion,
   () => showPromptComposer.value && canGenerate.value,
@@ -120,6 +120,6 @@ function submitPrompt(prompt: string, outputCount: number, aspectRatio: PromptAs
 }
 
 function selectOutputCount(value: number) {
-  emit('update:output-count', clampImageNodeOutputCount(value))
+  emit('update:output-count', requireImageNodeOutputCount(value))
 }
 </script>

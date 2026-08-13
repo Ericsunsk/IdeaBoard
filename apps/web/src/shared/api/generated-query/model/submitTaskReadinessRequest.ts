@@ -4,13 +4,10 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { RequestedOutputCount } from './requestedOutputCount'
 import type { SubmitTaskRequest } from './submitTaskRequest'
 
 export type SubmitTaskReadinessRequest = SubmitTaskRequest & {
-  /**
-   * Readiness-only number of independently billed Task submissions in this activation.
-   * @minimum 1
-   * @maximum 16
-   */
-  billing_quantity: number
+  /** Readiness-only number of independently billed Task submissions in this activation. */
+  billing_quantity: RequestedOutputCount
 }

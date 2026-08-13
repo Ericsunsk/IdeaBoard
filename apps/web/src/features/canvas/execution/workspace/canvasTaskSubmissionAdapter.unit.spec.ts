@@ -77,12 +77,28 @@ describe('canvas task submission billing contract', () => {
     const callbacks = createCanvasTaskSubmissionCallbacks({
       readinessRequest: () => ({ prompt: 'submit readiness', feature: 'pattern-gen' }),
       buildRequest: () => ({ prompt: 'free prompt', feature: 'pattern-gen' }),
-      outputCount: () => 8,
+      outputCount: () => 4,
       taskAdapter,
     })
 
     await expect(callbacks.assertReady?.()).resolves.toBeUndefined()
     expect(taskAdapter.assertTaskRequestReady).toHaveBeenCalledOnce()
+  })
+
+  it('rejects an output count outside the generation contract before readiness', async () => {
+    const taskAdapter = {
+      assertTaskRequestReady: vi.fn(async () => undefined),
+      submitTaskRequest: vi.fn(async () => ({ taskId: 'task-invalid' })),
+    }
+    const callbacks = createCanvasTaskSubmissionCallbacks({
+      readinessRequest: () => ({ prompt: 'submit readiness', feature: 'pattern-gen' }),
+      buildRequest: () => ({ prompt: 'invalid prompt', feature: 'pattern-gen' }),
+      outputCount: () => 8,
+      taskAdapter,
+    })
+
+    await expect(callbacks.assertReady?.()).rejects.toThrow('生成数量无效')
+    expect(taskAdapter.assertTaskRequestReady).not.toHaveBeenCalled()
   })
 
   it('does not consult stale cached balance after a successful server preflight', async () => {

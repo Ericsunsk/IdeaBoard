@@ -5,7 +5,7 @@ import { useMaskEditorChromeState } from './useMaskEditorChromeState'
 function createHarness() {
   const imageEditorNodeId = ref<string | null>('node-1')
   const getImageNodeSnapshot = vi.fn((nodeId: string) =>
-    nodeId === 'node-1' ? { outputCount: 99 } : null,
+    nodeId === 'node-1' ? { outputCount: 4 } : null,
   )
   const uploadImageToBoard = vi.fn()
   const onWarning = vi.fn()
@@ -33,10 +33,10 @@ describe('useMaskEditorChromeState', () => {
     vi.restoreAllMocks()
   })
 
-  it('normalizes active output count from the current image node', () => {
+  it('uses the current image node output count', () => {
     const { state } = createHarness()
 
-    expect(state.activeMaskEditorOutputCount.value).toBe(8)
+    expect(state.activeMaskEditorOutputCount.value).toBe(4)
   })
 
   it('clamps mask layer opacity', () => {

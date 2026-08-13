@@ -6,6 +6,7 @@
  */
 import type { HDUpscaleParams } from './hDUpscaleParams'
 import type { ImageExtendParams } from './imageExtendParams'
+import type { RequestedOutputCount } from './requestedOutputCount'
 import type { StyleFusionParams } from './styleFusionParams'
 import type { StyleVariationParams } from './styleVariationParams'
 
@@ -24,12 +25,7 @@ export interface SubmitTaskRequestParams {
   original_image_height?: number
   ratio?: string
   quality?: string
-  /** @minimum 1 */
-  sample_count?: number
-  /** @minimum 1 */
-  output_count?: number
-  /** @minimum 1 */
-  image_count?: number
+  output_count?: RequestedOutputCount
   prompt_upsampling?: boolean
   variation?: StyleVariationParams
   extend?: ImageExtendParams

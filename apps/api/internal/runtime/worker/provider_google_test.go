@@ -253,7 +253,7 @@ func TestReadGoogleProviderParamsDerivesModelRefsAndImagenControls(t *testing.T)
 	}
 
 	imagenReq := newProviderRequest("prompt", 0, 0, map[string]interface{}{
-		"output_count": 9,
+		"output_count": 4,
 		"ratio":        "16:9",
 	}, "models/imagen-4.0-generate-001")
 	imagenParams := readGoogleProviderParams(imagenReq)
@@ -297,7 +297,7 @@ func TestCallGoogleImagenPredict(t *testing.T) {
 	account := &accounts.ApiAccount{ProxyURL: server.URL, ApiKey: "google-key"}
 	params := map[string]interface{}{
 		"model":        "imagen-4.0-generate-001",
-		"output_count": 9,
+		"output_count": 4,
 		"ratio":        "16:9",
 	}
 

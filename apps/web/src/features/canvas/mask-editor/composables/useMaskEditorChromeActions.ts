@@ -1,4 +1,4 @@
-import { clampImageNodeOutputCount } from '../../../canvas-board/domain'
+import { requireImageNodeOutputCount } from '../../../canvas-board/domain'
 import type { ImageMaskEditorCommittedData, MaskEditorReferenceImage } from '../types'
 
 type ValueRef<T> = {
@@ -52,7 +52,7 @@ export function useMaskEditorChromeActions(options: UseMaskEditorChromeActionsOp
   function onMaskEditorChromeOutputCountUpdate(value: number) {
     const nodeId = options.maskEditorNodeId.value
     if (!nodeId) return
-    options.updateOutputCount(nodeId, clampImageNodeOutputCount(value))
+    options.updateOutputCount(nodeId, requireImageNodeOutputCount(value))
   }
 
   return {

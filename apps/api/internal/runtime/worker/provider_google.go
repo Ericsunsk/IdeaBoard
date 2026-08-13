@@ -537,16 +537,8 @@ func parseGoogleSampleCount(params map[string]interface{}) int {
 		return 0, false
 	}
 
-	for _, key := range []string{"output_count", "sample_count"} {
-		if count, ok := parseCount(key); ok {
-			if count < 1 {
-				return 1
-			}
-			if count > 4 {
-				return 4
-			}
-			return count
-		}
+	if count, ok := parseCount("output_count"); ok && count >= 1 && count <= 4 {
+		return count
 	}
 	return 1
 }

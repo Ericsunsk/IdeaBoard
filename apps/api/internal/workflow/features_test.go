@@ -57,6 +57,33 @@ func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 	}
 }
 
+func TestCanonicalFeatureRegistryExpandsWithoutChangingProductionRouting(t *testing.T) {
+	newFeatures := []string{
+		FeatureSlugPromptGeneration,
+		FeatureSlugImageEdit,
+		FeatureSlugLocalInpaint,
+	}
+	canonical := CanonicalFeatureSlugs()
+	for _, removedSlug := range []string{FeatureSlugPartialEdit, FeatureSlugPatternGen} {
+		if slices.Contains(canonical, removedSlug) {
+			t.Fatalf("legacy production feature %q must not enter the canonical registry", removedSlug)
+		}
+	}
+	for _, slug := range newFeatures {
+		t.Run(slug, func(t *testing.T) {
+			if !slices.Contains(canonical, slug) {
+				t.Fatalf("canonical registry does not include %q", slug)
+			}
+			if _, ok := ParseWorkflowFeatureSlug(slug); ok {
+				t.Fatalf("expand-phase feature %q must not enter production routing", slug)
+			}
+			if IsAIImageFeature(slug) {
+				t.Fatalf("expand-phase feature %q must not enter production Billing routing", slug)
+			}
+		})
+	}
+}
+
 func TestAIImageFeatureSlugsAreTheCanonicalWorkflowContract(t *testing.T) {
 	got := AIImageFeatureSlugs()
 	want := []string{
@@ -86,13 +113,6 @@ func TestAIImageFeatureSlugsAreTheCanonicalWorkflowContract(t *testing.T) {
 			t.Fatalf("local operation %q must not be classified as AI image", slug)
 		}
 	}
-
-	definitions := append([]featureDefinition(nil), workflowFeatureDefinitions...)
-	definitions = append(definitions, featureDefinition{Slug: "local-crop", UsesAIProvider: false})
-	got = featureSlugs(definitions, func(definition featureDefinition) bool { return definition.UsesAIProvider })
-	if slices.Contains(got, "local-crop") {
-		t.Fatalf("supported local workflow was included in AI billing registry: %v", got)
-	}
 }
 
 func TestSupportedFeatureSlugsMatchFrontendOpenAPIAndAdminContracts(t *testing.T) {
@@ -112,6 +132,18 @@ func TestSupportedFeatureSlugsMatchFrontendOpenAPIAndAdminContracts(t *testing.T
 		t.Fatalf("read OpenAPI: %v", err)
 	}
 	assertSameFeatureSlugs(t, "OpenAPI", backendSlugs, extractOpenAPIWorkflowFeatureSlugs(t, string(openAPIRaw)))
+	assertSameFeatureSlugs(
+		t,
+		"frontend canonical contract",
+		CanonicalFeatureSlugs(),
+		extractFrontendCanonicalWorkflowFeatureSlugs(t, string(raw)),
+	)
+	assertSameFeatureSlugs(
+		t,
+		"OpenAPI canonical contract",
+		CanonicalFeatureSlugs(),
+		extractOpenAPIStringEnum(t, string(openAPIRaw), "CanonicalWorkflowFeatureSlug"),
+	)
 
 	featureKeys := extractFrontendWorkflowFeatureKeys(t, string(raw))
 	for label, relativePath := range map[string]string{
@@ -124,6 +156,29 @@ func TestSupportedFeatureSlugsMatchFrontendOpenAPIAndAdminContracts(t *testing.T
 		}
 		assertSameFeatureSlugs(t, label, backendSlugs, extractWorkflowFeatureReferences(t, label, string(contractRaw), featureKeys))
 	}
+}
+
+func extractFrontendCanonicalWorkflowFeatureSlugs(t *testing.T, source string) []string {
+	t.Helper()
+	if !regexp.MustCompile(`export\s+const\s+CANONICAL_WORKFLOW_FEATURE_SLUGS\s*=\s*Object\.values\(`).MatchString(source) {
+		t.Fatal("CANONICAL_WORKFLOW_FEATURE_SLUGS must be derived from Object.values(CANONICAL_WORKFLOW_FEATURE)")
+	}
+	objectRe := regexp.MustCompile(`(?s)export\s+const\s+CANONICAL_WORKFLOW_FEATURE\s*=\s*\{(?P<body>.*?)\}\s+as\s+const`)
+	match := objectRe.FindStringSubmatch(source)
+	if match == nil {
+		t.Fatal("CANONICAL_WORKFLOW_FEATURE object not found")
+	}
+	body := match[objectRe.SubexpIndex("body")]
+	entryRe := regexp.MustCompile(`(?m)[A-Za-z_][A-Za-z0-9_]*\s*:\s*'([^']+)'\s*,?`)
+	entries := entryRe.FindAllStringSubmatch(body, -1)
+	if len(entries) == 0 {
+		t.Fatal("CANONICAL_WORKFLOW_FEATURE has no string literal values")
+	}
+	slugs := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		slugs = append(slugs, entry[1])
+	}
+	return slugs
 }
 
 func assertSameFeatureSlugs(t *testing.T, label string, want, got []string) {
@@ -253,6 +308,22 @@ func extractOpenAPIWorkflowFeatureSlugs(t *testing.T, source string) []string {
 		slugs = append(slugs, entry[1])
 	}
 	return slugs
+}
+
+func extractOpenAPIStringEnum(t *testing.T, source, schemaName string) []string {
+	t.Helper()
+	blockRe := regexp.MustCompile(`(?m)^    ` + regexp.QuoteMeta(schemaName) + `:\n      type: string\n      enum:\n((?:        - [a-z0-9-]+\n)+)`)
+	match := blockRe.FindStringSubmatch(source)
+	if match == nil {
+		t.Fatalf("OpenAPI %s enum not found", schemaName)
+	}
+	entryRe := regexp.MustCompile(`(?m)^        - ([a-z0-9-]+)$`)
+	entries := entryRe.FindAllStringSubmatch(match[1], -1)
+	values := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		values = append(values, entry[1])
+	}
+	return values
 }
 
 func extractWorkflowFeatureReferences(t *testing.T, label, source string, featureKeys map[string]string) []string {

@@ -194,13 +194,16 @@ func (s *Service) SubmitTask(ctx context.Context, userID int64, req *tasks.Submi
 	if s == nil || s.taskIntake == nil {
 		return "", newSubmissionError("submission_failed", "任务提交失败，请稍后重试", errTaskIntakeUnavailable)
 	}
-	canonical, err := s.taskIntake.Prepare(ctx, userID, req)
+	canonical, err := s.taskIntake.Compile(ctx, userID, req)
 	if err != nil {
 		return "", err
 	}
-
 	if s.submissionStore == nil {
 		return "", newSubmissionError("submission_failed", "任务提交失败，请稍后重试", errTaskSubmissionStoreUnavailable)
+	}
+	canonical, err = s.taskIntake.PrepareMedia(ctx, userID, canonical)
+	if err != nil {
+		return "", err
 	}
 	result, err := s.submissionStore.SubmitTask(ctx, canonical)
 	if err != nil {
@@ -234,7 +237,7 @@ func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, re
 			"submission_failed", "任务提交检查暂不可用，请稍后重试", errTaskIntakeUnavailable,
 		)
 	}
-	canonical, err := s.taskIntake.Prepare(ctx, userID, req)
+	canonical, err := s.taskIntake.Compile(ctx, userID, req)
 	if err != nil {
 		return SubmitTaskReadiness{}, err
 	}

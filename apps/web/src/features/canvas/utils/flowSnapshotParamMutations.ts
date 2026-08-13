@@ -8,7 +8,7 @@ import type {
 } from '../../canvas-board/domain'
 import {
   areFusionBlendPointsEqual,
-  clampImageNodeOutputCount,
+  requireImageNodeOutputCount,
   constrainFusionBlendPoint,
   getCanvasNodeImageInputLimit,
   normalizePromptAspectRatio,
@@ -109,7 +109,7 @@ export function patchFlowSnapshotParam(
     }
     case 'outputCount': {
       if (!hasOutputCount(snapshotNode)) return snapshotNode
-      const nextOutputCount = clampImageNodeOutputCount(value)
+      const nextOutputCount = requireImageNodeOutputCount(value)
       if (snapshotNode.outputCount === nextOutputCount) return snapshotNode
       return { ...snapshotNode, outputCount: nextOutputCount }
     }

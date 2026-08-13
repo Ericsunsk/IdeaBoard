@@ -1,7 +1,7 @@
 import { computed, ref, watch } from 'vue'
 import { useFileDialog } from '@vueuse/core'
 import { IMAGE_UPLOAD_ACCEPT } from '../../../../shared/constants/media'
-import { clampImageNodeOutputCount } from '../../../canvas-board/domain'
+import { requireImageNodeOutputCount } from '../../../canvas-board/domain'
 import {
   clampMaskLayerOpacity,
   MASK_EDITOR_DEFAULT_LAYER_OPACITY,
@@ -34,7 +34,7 @@ export function useMaskEditorChromeState(options: UseMaskEditorChromeStateOption
     const nodeId = options.imageEditorNodeId.value
     if (!nodeId) return 1
     const snapshot = options.getImageNodeSnapshot(nodeId)
-    return snapshot ? clampImageNodeOutputCount(snapshot.outputCount) : 1
+    return snapshot ? requireImageNodeOutputCount(snapshot.outputCount) : 1
   })
 
   function setMaskEditorLayerOpacity(value: number) {

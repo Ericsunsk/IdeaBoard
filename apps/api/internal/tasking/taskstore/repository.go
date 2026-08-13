@@ -25,6 +25,24 @@ type Repository struct {
 	q  *dbsqlc.Queries
 }
 
+func (r *Repository) ClaimPromptReferenceMediaRef(ctx context.Context, tx pgx.Tx, taskID string, ownerUserID, mediaAssetID int64, refID, role string, inputIndex int) error {
+	if tx == nil {
+		return fmt.Errorf("taskstore: pgx tx is nil")
+	}
+	var id int64
+	err := tx.QueryRow(ctx, `
+UPDATE media_refs
+SET task_id = $1, updated_at = now()
+WHERE owner_user_id = $2 AND media_asset_id = $3
+  AND ref_type = 'prompt_reference' AND ref_id = $4
+  AND role = $5 AND input_index = $6 AND task_id = ''
+	RETURNING id`, taskID, ownerUserID, mediaAssetID, refID, role, inputIndex).Scan(&id)
+	if err != nil {
+		return fmt.Errorf("claim prompt reference media ref: %w", err)
+	}
+	return nil
+}
+
 type repositoryContextDB struct {
 	ctx context.Context
 	db  *sql.DB

@@ -1,7 +1,7 @@
 import { tryOnScopeDispose, useEventListener } from '@vueuse/core'
 import { computed, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
-import { clampImageNodeOutputCount } from '../../canvas-board/domain'
+import { requireImageNodeOutputCount } from '../../canvas-board/domain'
 import type { CanvasInteractionKey } from './useFlowCanvasInteractionState'
 import {
   containImageRect,
@@ -235,7 +235,7 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
       frameRect: { ...state.value.frameRect },
       originalImageRect: { ...state.value.imageRect },
       prompt: `${prompt}`.trim(),
-      outputCount: clampImageNodeOutputCount(outputCount),
+      outputCount: requireImageNodeOutputCount(outputCount),
     }
     cancelExpandMode()
     await options.onCommit(payload)

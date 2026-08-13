@@ -70,11 +70,13 @@ describe('useMaskEditorChromeActions', () => {
     })
   })
 
-  it('normalizes output count before delegating updates', () => {
+  it('rejects output counts outside the domain contract', () => {
     const harness = createHarness()
 
-    harness.actions.onMaskEditorChromeOutputCountUpdate(99)
+    expect(() => harness.actions.onMaskEditorChromeOutputCountUpdate(99)).toThrow(
+      'requested output count must be an integer between 1 and 4',
+    )
 
-    expect(harness.updateOutputCount).toHaveBeenCalledWith('node-1', 8)
+    expect(harness.updateOutputCount).not.toHaveBeenCalled()
   })
 })

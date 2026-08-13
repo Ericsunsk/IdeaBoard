@@ -26,6 +26,12 @@ type ResultMaterializer interface {
 	MaterializeBytesResult(ctx context.Context, userID int64, taskID string, filename string, sourceURL string, data []byte, opts ResultMaterializeOptions) (MaterializedResults, error)
 }
 
+// GenerationMediaPreparer materializes external or temporary inputs before
+// Task submission. It must not use the Task/Billing/River transaction.
+type GenerationMediaPreparer interface {
+	PrepareGenerationMedia(context.Context, int64, string, *tasks.GenerationRequestSnapshot) (tasks.GenerationRequestSnapshot, error)
+}
+
 type ResultMaterializeOptions struct {
 	AllowHosts []string
 }

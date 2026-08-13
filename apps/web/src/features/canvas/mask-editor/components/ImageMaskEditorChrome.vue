@@ -275,7 +275,7 @@ import {
   Undo,
 } from '@iconoir/vue'
 import type { ImageMaskBrushShape, ImageMaskDrawMode, MaskEditorReferenceImage } from '../types'
-import { clampImageNodeOutputCount } from '../../../canvas-board/domain'
+import { requireImageNodeOutputCount } from '../../../canvas-board/domain'
 import {
   clampMaskBrushHardness,
   clampMaskBrushSize,
@@ -371,7 +371,7 @@ function rangeTooltipStyle(value: number, min: number, max: number) {
 }
 
 function onSubmit(prompt: string, outputCount: number) {
-  emit('submit', prompt, clampImageNodeOutputCount(outputCount))
+  emit('submit', prompt, requireImageNodeOutputCount(outputCount))
   promptDraft.value = ''
 }
 </script>

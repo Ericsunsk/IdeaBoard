@@ -1,7 +1,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import type { PromptAspectRatio } from '../../../../canvas-board/domain'
 import { normalizePromptAspectRatio } from '../../../../canvas-board/domain'
-import { clampImageNodeOutputCount } from '../../../../canvas-board/domain'
+import { requireImageNodeOutputCount } from '../../../../canvas-board/domain'
 import { useAutoResizeTextarea } from './useAutoResizeTextarea'
 import { useNodeToolPopoverGroup } from './useNodeToolPopoverGroup'
 
@@ -33,7 +33,7 @@ export function usePromptComposerControls(options: UsePromptComposerControlsOpti
     get: () => options.modelValue(),
     set: (value) => options.onTextUpdate(value),
   })
-  const outputCountValue = computed(() => clampImageNodeOutputCount(options.outputCount()))
+  const outputCountValue = computed(() => requireImageNodeOutputCount(options.outputCount()))
   const shouldRenderAspectRatio = computed(
     () => (options.showAspectRatio?.() ?? true) && options.aspectRatio() !== undefined,
   )
@@ -94,7 +94,7 @@ export function usePromptComposerControls(options: UsePromptComposerControlsOpti
   }
 
   function selectOutputCount(value: number) {
-    options.onOutputCountUpdate(clampImageNodeOutputCount(value))
+    options.onOutputCountUpdate(requireImageNodeOutputCount(value))
     toolPopovers.close('output-count')
   }
 

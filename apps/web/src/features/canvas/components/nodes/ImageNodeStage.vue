@@ -106,7 +106,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { clampImageNodeOutputCount } from '../../../canvas-board/domain'
+import { requireImageNodeOutputCount } from '../../../canvas-board/domain'
 import { useCanvasViewportContext } from '../../composables/useCanvasViewportContext'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import type { ImageToolStageBinding } from '../../image-tools'
@@ -179,7 +179,7 @@ const emptyStageAriaLabel = computed(() => {
   return '上传图片作为输入'
 })
 const emptyIconVariantComputed = computed(() => props.emptyIconVariant ?? 'image')
-const outputCountValue = computed(() => clampImageNodeOutputCount(props.outputCount))
+const outputCountValue = computed(() => requireImageNodeOutputCount(props.outputCount))
 type NodeStageFrameExpose = { stageElement: HTMLElement | null }
 const stageFrameRef = ref<NodeStageFrameExpose | null>(null)
 
@@ -215,7 +215,7 @@ function submitExpand(prompt: string, outputCount: number) {
 }
 
 function selectOutputCount(value: number) {
-  emit('update:output-count', clampImageNodeOutputCount(value))
+  emit('update:output-count', requireImageNodeOutputCount(value))
 }
 </script>
 

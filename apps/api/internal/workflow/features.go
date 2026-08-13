@@ -12,6 +12,10 @@ import (
 var workflowFeatureSlugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 
 const (
+	FeatureSlugPromptGeneration = "prompt-generation"
+	FeatureSlugImageEdit        = "image-edit"
+	FeatureSlugLocalInpaint     = "local-inpaint"
+
 	FeatureSlugSketchToImage  = "sketch-to-image"
 	FeatureSlugStyleVariation = "style-variation"
 	FeatureSlugPartialEdit    = "partial-edit"
@@ -22,45 +26,37 @@ const (
 	FeatureSlugImageExtend    = "image-extend"
 )
 
-type featureDefinition struct {
-	Slug           string
-	UsesAIProvider bool
+var canonicalWorkflowFeatureSlugs = []string{
+	FeatureSlugPromptGeneration,
+	FeatureSlugImageEdit,
+	FeatureSlugLocalInpaint,
+	FeatureSlugSketchToImage,
+	FeatureSlugStyleVariation,
+	FeatureSlugRemoveBg,
+	FeatureSlugStyleFusion,
+	FeatureSlugHDUpscale,
+	FeatureSlugImageExtend,
 }
 
-var workflowFeatureDefinitions = []featureDefinition{
-	{Slug: FeatureSlugSketchToImage, UsesAIProvider: true},
-	{Slug: FeatureSlugStyleVariation, UsesAIProvider: true},
-	{Slug: FeatureSlugPartialEdit, UsesAIProvider: true},
-	{Slug: FeatureSlugRemoveBg, UsesAIProvider: true},
-	{Slug: FeatureSlugStyleFusion, UsesAIProvider: true},
-	{Slug: FeatureSlugPatternGen, UsesAIProvider: true},
-	{Slug: FeatureSlugHDUpscale, UsesAIProvider: true},
-	{Slug: FeatureSlugImageExtend, UsesAIProvider: true},
+var supportedWorkflowFeatureSlugs = []string{
+	FeatureSlugSketchToImage,
+	FeatureSlugStyleVariation,
+	FeatureSlugPartialEdit,
+	FeatureSlugRemoveBg,
+	FeatureSlugStyleFusion,
+	FeatureSlugPatternGen,
+	FeatureSlugHDUpscale,
+	FeatureSlugImageExtend,
 }
-
-var supportedWorkflowFeatureSlugs = featureSlugs(workflowFeatureDefinitions, func(featureDefinition) bool { return true })
 var supportedTaskFeatureSlugs = supportedFeatureSlugSet(supportedWorkflowFeatureSlugs)
-var aiImageWorkflowFeatureSlugs = featureSlugs(workflowFeatureDefinitions, func(definition featureDefinition) bool {
-	return definition.UsesAIProvider
-})
-var aiImageWorkflowFeatures = supportedFeatureSlugSet(aiImageWorkflowFeatureSlugs)
-
-func featureSlugs(definitions []featureDefinition, include func(featureDefinition) bool) []string {
-	slugs := make([]string, 0, len(definitions))
-	for _, definition := range definitions {
-		if include(definition) {
-			slugs = append(slugs, definition.Slug)
-		}
-	}
-	return slugs
-}
+var aiImageWorkflowFeatures = supportedFeatureSlugSet(supportedWorkflowFeatureSlugs)
 
 // AIImageFeatureSlugs is the canonical product registry for workflows that
 // invoke an external AI image provider. Local editor operations never enter
 // this registry and therefore cannot acquire Task Billing facts.
 func AIImageFeatureSlugs() []string {
-	slugs := make([]string, len(aiImageWorkflowFeatureSlugs))
-	copy(slugs, aiImageWorkflowFeatureSlugs)
+	slugs := make([]string, len(supportedWorkflowFeatureSlugs))
+	copy(slugs, supportedWorkflowFeatureSlugs)
 	return slugs
 }
 
@@ -84,6 +80,14 @@ func ParseAIImageFeatureSlug(raw string) (string, bool) {
 func SupportedFeatureSlugs() []string {
 	slugs := make([]string, len(supportedWorkflowFeatureSlugs))
 	copy(slugs, supportedWorkflowFeatureSlugs)
+	return slugs
+}
+
+// CanonicalFeatureSlugs is the clean target registry. Legacy production-only
+// features stay outside it while their vertical migrations remove them.
+func CanonicalFeatureSlugs() []string {
+	slugs := make([]string, len(canonicalWorkflowFeatureSlugs))
+	copy(slugs, canonicalWorkflowFeatureSlugs)
 	return slugs
 }
 

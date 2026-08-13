@@ -10,6 +10,7 @@ import (
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/media/preparation"
 	"ideaboard/api/internal/media/reclamation"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
@@ -74,6 +75,7 @@ func newAppTaskRuntime(
 		uploadOwnerStorageUIDResolver{repo: repos.userRepo},
 	)
 	runtimeTaskMediaStore := storage.NewRuntimeTaskMediaStore(services.storageService)
+	generationMediaPreparer := preparation.NewService(services.storageService, repos.mediaAssetRegistry)
 	submitMediaValidator := taskmedia.NewSubmitMediaValidator(cfg.PublicOrigins, taskMediaAuthorizer)
 	taskEventHub := taskservice.NewEventHub()
 	taskEvents, eventBus, err := newTaskStatusEventPublisher(ctx, cfg.Events, taskEventHub)
@@ -151,9 +153,10 @@ func newAppTaskRuntime(
 	submissionStore := tasksubmission.NewStore(dbs.riverPool, repos.taskRepo, riverClient, taskqueue.RiverQueueDefault, taskqueue.RiverMaxAttemptsDefault, taskBillingService)
 	taskService := taskservice.NewService(taskservice.ServiceDeps{
 		TaskIntake: taskservice.NewTaskIntake(taskservice.TaskIntakeDeps{
-			Accounts: repos.accountRepo,
-			Prompts:  repos.featurePromptRepo,
-			Media:    submitMediaValidator,
+			Accounts:      repos.accountRepo,
+			Prompts:       repos.featurePromptRepo,
+			Media:         submitMediaValidator,
+			MediaPreparer: generationMediaPreparer,
 		}),
 		TaskRepo:            repos.taskRepo,
 		SubmissionStore:     submissionStore,

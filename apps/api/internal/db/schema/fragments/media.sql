@@ -73,12 +73,14 @@ CREATE TABLE media_refs (
   board_id VARCHAR(100) NOT NULL DEFAULT '',
   task_id VARCHAR(64) NOT NULL DEFAULT '',
   role VARCHAR(32) NOT NULL DEFAULT '',
+  input_index INTEGER NOT NULL DEFAULT 0,
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   CONSTRAINT uq_media_refs_ref UNIQUE (media_asset_id, ref_type, ref_id, board_id, role),
   CONSTRAINT ck_media_refs_ref_type CHECK (ref_type IN ('upload', 'task_output', 'board', 'board_node', 'user_avatar', 'prompt_reference')),
   CONSTRAINT ck_media_refs_ref_id_not_blank CHECK (btrim(ref_id) <> ''),
+  CONSTRAINT ck_media_refs_input_index CHECK (input_index >= 0),
   CONSTRAINT ck_media_refs_metadata_object CHECK (jsonb_typeof(metadata) = 'object'),
   CONSTRAINT ck_media_refs_target_fields CHECK (
     (ref_type = 'task_output' AND btrim(task_id) <> '')
@@ -87,6 +89,14 @@ CREATE TABLE media_refs (
   ),
   CONSTRAINT fk_media_refs_asset_owner FOREIGN KEY (media_asset_id, owner_user_id) REFERENCES media_assets(id, owner_user_id) ON DELETE CASCADE
 );
+
+CREATE UNIQUE INDEX uq_media_refs_prepared_input
+  ON media_refs (owner_user_id, ref_id, input_index, role)
+  WHERE ref_type = 'prompt_reference' AND task_id = '';
+
+CREATE UNIQUE INDEX uq_media_refs_task_input
+  ON media_refs (task_id, input_index, role)
+  WHERE ref_type = 'prompt_reference' AND task_id <> '';
 
 CREATE INDEX idx_media_refs_owner_ref ON media_refs (owner_user_id, ref_type, ref_id);
 CREATE INDEX idx_media_refs_owner_board_created ON media_refs (owner_user_id, board_id, created_at, id);

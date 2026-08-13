@@ -465,7 +465,7 @@ func newSubmitToRiverWorkerCanonicalRequest(t testing.TB, task *tasks.Task) task
 		Feature:            task.FeatureSlug,
 		Priority:           task.Priority,
 		BillingRequest:     billingRequest,
-		MaxBillingQuantity: 16,
+		MaxBillingQuantity: 4,
 	})
 	if err != nil {
 		t.Fatalf("build canonical task request: %v", err)

@@ -36,6 +36,10 @@ type SubmissionTaskStore interface {
 	LockAndFindSubmissionByClientActionWithPGXTx(context.Context, pgx.Tx, int64, string, taskbilling.Request) (tasks.TaskSubmissionResult, bool, error)
 }
 
+type promptReferenceClaimer interface {
+	ClaimPromptReferenceMediaRef(context.Context, pgx.Tx, string, int64, int64, string, string, int) error
+}
+
 func NewStore(pool *pgxpool.Pool, repository SubmissionTaskStore, client taskqueue.RiverTxClient, queueName string, maxRetry int, billingService *taskbilling.Service) *Store {
 	return &Store{
 		pool:       pool,
@@ -126,6 +130,18 @@ func (s *Store) SubmitTask(ctx context.Context, canonical CanonicalRequest) (tas
 		}
 		committed = true
 		return tasks.TaskSubmissionResult{TaskID: task.TaskID, Created: false}, nil
+	}
+	if claimer, ok := s.repository.(promptReferenceClaimer); ok {
+		if snapshot := canonical.GenerationSnapshot(); snapshot != nil {
+			for _, media := range snapshot.Media {
+				if media.AssetID <= 0 {
+					continue
+				}
+				if err := claimer.ClaimPromptReferenceMediaRef(ctx, tx, task.TaskID, task.UserID, media.AssetID, task.ClientActionID, media.Role, media.InputIndex); err != nil {
+					return emptyResult, fmt.Errorf("submit task: claim prepared media: %w", err)
+				}
+			}
+		}
 	}
 	if task.BillingRequest != nil {
 		if s.billing == nil {

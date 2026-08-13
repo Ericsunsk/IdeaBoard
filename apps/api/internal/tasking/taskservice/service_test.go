@@ -54,6 +54,21 @@ func (testSubmitMediaValidator) ValidateSubmitMediaRef(context.Context, int64, s
 	return nil
 }
 
+type recordingGenerationMediaPreparer struct {
+	calls int
+}
+
+func (p *recordingGenerationMediaPreparer) PrepareGenerationMedia(_ context.Context, _ int64, _ string, snapshot *tasks.GenerationRequestSnapshot) (tasks.GenerationRequestSnapshot, error) {
+	p.calls++
+	prepared := *snapshot
+	prepared.Media = append([]tasks.GenerationMediaIntent(nil), snapshot.Media...)
+	for index := range prepared.Media {
+		prepared.Media[index].AssetID = int64(index + 1)
+		prepared.Media[index].Ref = "/uploads/prepared/reference.png"
+	}
+	return prepared, nil
+}
+
 func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -710,9 +725,7 @@ func TestWorkflowTaskParamsFromMapDoesNotPreserveKnownContractKeysInExtra(t *tes
 		"original_image_height":   768,
 		"ratio":                   "4:3",
 		"quality":                 "high",
-		"sample_count":            1,
 		"output_count":            2,
-		"image_count":             2,
 		"prompt_upsampling":       false,
 		"extend":                  map[string]interface{}{"top_percent": 0, "right_percent": 25, "bottom_percent": 0, "left_percent": 0},
 		"provider_specific_param": "keep-me",
@@ -742,9 +755,7 @@ func TestWorkflowTaskParamsFromMapDoesNotPreserveKnownContractKeysInExtra(t *tes
 		"original_image_height",
 		"ratio",
 		"quality",
-		"sample_count",
 		"output_count",
-		"image_count",
 		"prompt_upsampling",
 		"extend",
 	} {
@@ -793,7 +804,7 @@ func TestSubmitTaskCanvasUploadRefsRequireBoardAccess(t *testing.T) {
 		),
 	})
 	prepare := func(userID int64, ref string) error {
-		_, err := intake.Prepare(ctx, userID, &tasks.SubmitTaskRequest{
+		_, err := intake.Compile(ctx, userID, &tasks.SubmitTaskRequest{
 			Prompt: "image", Feature: workflow.FeatureSlugSketchToImage,
 			ImageURLs: []string{ref}, ClientActionID: "media-access",
 		})
@@ -830,7 +841,7 @@ func TestSubmitTaskMediaRefValidationFailsClosedWithoutServiceValidator(t *testi
 	want := "任务媒体校验服务未配置"
 
 	intake := NewTaskIntake(TaskIntakeDeps{})
-	_, err := intake.Prepare(ctx, 42, &tasks.SubmitTaskRequest{
+	_, err := intake.Compile(ctx, 42, &tasks.SubmitTaskRequest{
 		Prompt: "image", Feature: workflow.FeatureSlugSketchToImage,
 		ImageURLs: []string{allowedByFormat}, ClientActionID: "missing-media-validator",
 	})
@@ -983,6 +994,36 @@ func TestSubmitTaskAllowsEnabledGoogleNativeAccount(t *testing.T) {
 	}
 	if len(submissionStore.calls) != 1 {
 		t.Fatalf("submission calls=%d, want 1", len(submissionStore.calls))
+	}
+}
+
+func TestReadinessDoesNotPrepareMediaButSubmitDoes(t *testing.T) {
+	preparer := &recordingGenerationMediaPreparer{}
+	submissionStore := &recordingSubmissionStore{}
+	svc := newSubmitServiceForTest(submitTestServiceDeps{
+		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+			ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
+		}}},
+		SubmissionStore: submissionStore,
+		MediaValidator:  testSubmitMediaValidator{},
+		MediaPreparer:   preparer,
+		TaskBilling:     newHandlerTaskBillingService(),
+	}, ServiceOptions{})
+	req := &tasks.SubmitTaskRequest{
+		Prompt: "draw from reference", Feature: workflow.FeatureSlugSketchToImage,
+		ImageURLs: []string{"https://example.com/reference.png"}, ClientActionID: "media-boundary",
+	}
+	if _, err := svc.CheckSubmitTaskReadiness(context.Background(), 42, req, 1); err != nil {
+		t.Fatalf("readiness error = %v", err)
+	}
+	if preparer.calls != 0 {
+		t.Fatalf("readiness media preparation calls = %d, want 0", preparer.calls)
+	}
+	if _, err := svc.SubmitTask(context.Background(), 42, req); err != nil {
+		t.Fatalf("submit error = %v", err)
+	}
+	if preparer.calls != 1 {
+		t.Fatalf("submit media preparation calls = %d, want 1", preparer.calls)
 	}
 }
 

@@ -465,7 +465,7 @@ func TestCheckSubmitTaskReadinessHandlerRequiresValidBillingQuantity(t *testing.
 
 	service := NewService(ServiceDeps{}, ServiceOptions{})
 	router := newSubmitHandlerTestRouter(t, service, 42)
-	for _, billingQuantity := range []interface{}{nil, 0, 17} {
+	for _, billingQuantity := range []interface{}{nil, 0, 5, 17} {
 		t.Run(fmt.Sprint(billingQuantity), func(t *testing.T) {
 			body := map[string]interface{}{
 				"prompt":           "生成海报",
@@ -559,6 +559,7 @@ type submitTestServiceDeps struct {
 	AccountRepo     AccountStore
 	SubmissionStore TaskSubmissionStore
 	MediaValidator  taskmedia.Validator
+	MediaPreparer   taskmedia.GenerationMediaPreparer
 	PromptStore     FeaturePromptStore
 	TaskBilling     *taskbilling.Service
 }
@@ -577,9 +578,10 @@ func newSubmitServiceForTest(deps submitTestServiceDeps, opts ServiceOptions) *S
 	}
 	return NewService(ServiceDeps{
 		TaskIntake: NewTaskIntake(TaskIntakeDeps{
-			Accounts: deps.AccountRepo,
-			Prompts:  promptStore,
-			Media:    deps.MediaValidator,
+			Accounts:      deps.AccountRepo,
+			Prompts:       promptStore,
+			Media:         deps.MediaValidator,
+			MediaPreparer: deps.MediaPreparer,
 		}),
 		SubmissionStore: deps.SubmissionStore,
 		TaskBilling:     deps.TaskBilling,

@@ -10,6 +10,7 @@ const (
 	HD            = "hd"
 	Fusion        = "fusion"
 	Extra         = "extra"
+	Generation    = "generation"
 
 	ImageURL           = "image_url"
 	ImageURLs          = "image_urls"
@@ -71,6 +72,7 @@ var canonicalTaskParamKeys = keySet(
 	HD,
 	Fusion,
 	Extra,
+	Generation,
 )
 
 var providerReservedKeys = keySet(
@@ -83,6 +85,7 @@ var providerReservedKeys = keySet(
 	HD,
 	Fusion,
 	Extra,
+	Generation,
 	ImageURL,
 	ImageURLs,
 	ReferenceImageURLs,
@@ -96,9 +99,7 @@ var providerReservedKeys = keySet(
 	OriginalImageHeight,
 	Ratio,
 	Quality,
-	SampleCount,
 	OutputCount,
-	ImageCount,
 	PromptUpsampling,
 	VariationStrength,
 	ExtendTop,
@@ -125,9 +126,7 @@ var submitTaskParamKeys = keySet(
 	OriginalImageHeight,
 	Ratio,
 	Quality,
-	SampleCount,
 	OutputCount,
-	ImageCount,
 	PromptUpsampling,
 	Variation,
 	Extend,

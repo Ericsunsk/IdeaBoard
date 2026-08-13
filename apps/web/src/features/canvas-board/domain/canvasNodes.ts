@@ -1,5 +1,11 @@
 import { DEFAULT_PROMPT_ASPECT_RATIO, type PromptAspectRatio } from './promptAspectRatio'
 import { DEFAULT_FUSION_BLEND_POINT, type FusionBlendPoint } from './fusionBlend'
+import {
+  assertRequestedOutputCount,
+  MAX_REQUESTED_OUTPUT_COUNT,
+  MIN_REQUESTED_OUTPUT_COUNT,
+  REQUESTED_OUTPUT_COUNT_OPTIONS,
+} from '../../../shared/domain/generationContract'
 
 export interface CanvasPoint {
   x: number
@@ -14,10 +20,10 @@ export const WORKFLOW_NODE_OUTPUT_STATUSES: readonly WorkflowNodeOutputStatus[] 
   'ready',
   'stale',
 ]
-export const MIN_IMAGE_NODE_OUTPUT_COUNT = 1
-export const MAX_IMAGE_NODE_OUTPUT_COUNT = 8
+export const MIN_IMAGE_NODE_OUTPUT_COUNT = MIN_REQUESTED_OUTPUT_COUNT
+export const MAX_IMAGE_NODE_OUTPUT_COUNT = MAX_REQUESTED_OUTPUT_COUNT
 export const DEFAULT_IMAGE_NODE_OUTPUT_COUNT = 1
-export const IMAGE_OUTPUT_COUNT_PRESET_OPTIONS = [1, 2, 4, 8] as const
+export const IMAGE_OUTPUT_COUNT_PRESET_OPTIONS = REQUESTED_OUTPUT_COUNT_OPTIONS
 export const DEFAULT_PROMPT_NODE_OUTPUT_COUNT = 1
 export const DEFAULT_FUSION_NODE_OUTPUT_COUNT = 1
 export const CANVAS_BOARD_STATE_SCHEMA_VERSION = 3
@@ -41,16 +47,8 @@ export function resolveWorkflowNodeOutputStatus(
   return (outputImages?.length ?? 0) > 0 ? 'ready' : 'idle'
 }
 
-export function clampImageNodeOutputCount(value: unknown): number {
-  const normalized = typeof value === 'string' ? Number(value.trim()) : value
-  const count =
-    typeof normalized === 'number' && Number.isFinite(normalized)
-      ? Math.round(normalized)
-      : normalized
-  if (typeof count !== 'number' || !Number.isFinite(count)) {
-    return DEFAULT_IMAGE_NODE_OUTPUT_COUNT
-  }
-  return Math.max(MIN_IMAGE_NODE_OUTPUT_COUNT, Math.min(MAX_IMAGE_NODE_OUTPUT_COUNT, count))
+export function requireImageNodeOutputCount(value: unknown): number {
+  return assertRequestedOutputCount(value)
 }
 
 export interface PromptNodeItem {

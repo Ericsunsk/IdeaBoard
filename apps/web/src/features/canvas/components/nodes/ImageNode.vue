@@ -87,7 +87,7 @@
 <script setup lang="ts">
 import { computed, ref, watchPostEffect } from 'vue'
 import { MediaImage } from '@iconoir/vue'
-import { clampImageNodeOutputCount, type ImageNodeItem } from '../../../canvas-board/domain'
+import { requireImageNodeOutputCount, type ImageNodeItem } from '../../../canvas-board/domain'
 import type { ImageNodeAction } from '../../config/imageActionRegistry'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import type { ImageActionBinding, ImageToolStageBinding } from '../../image-tools'
@@ -155,7 +155,7 @@ const showPromptComposer = computed(
 type StageExpose = { stageElement: HTMLElement | null }
 const imageStageRef = ref<StageExpose | null>(null)
 const promptDraft = ref('')
-const outputCountValue = computed(() => clampImageNodeOutputCount(props.node.outputCount))
+const outputCountValue = computed(() => requireImageNodeOutputCount(props.node.outputCount))
 const partialEditBillingQuote = useCanvasBillingQuote(
   () => WORKFLOW_FEATURE.partialEdit,
   () => showPromptComposer.value,
@@ -184,7 +184,7 @@ function submitExpand(prompt: string, outputCount: number) {
 }
 
 function selectOutputCount(value: number) {
-  emit('update:output-count', clampImageNodeOutputCount(value))
+  emit('update:output-count', requireImageNodeOutputCount(value))
 }
 
 function onImageStageContextMenu(event: MouseEvent) {

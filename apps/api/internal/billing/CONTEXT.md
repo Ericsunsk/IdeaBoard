@@ -33,7 +33,7 @@ Billing 是平台级商品身份与 Credit pricing context。用户看到的货�
 - Admin 功能定价只发布新的 immutable Price Version；不提供 Price Version enable/disable command，也不要求 Admin 手填 reason。Database command 自动记录 actor、target、old/new 与 outcome。
 - `create_sku`、`update_sku`、`set_price_enabled` 仅作为既有 append-only Admin Audit 的 historical vocabulary 保留，不是 runtime 或 Admin command contract。
 - Registry 中的 SKU identity 没有 rename/delete contract；停用使用 `enabled=false`。只有 Registry 已移除且无 durable reference 的 Archived aggregate 可 hard delete。
-- Admin Catalog、Quote 与 Task Billing 统一使用 feature-level identity `ai-image:<feature>`。Provider Model 只属于 execution/idempotency contract，不参与用户价格 identity；切换模型不会改变功能价格。计费资格来自 Workflow registry 的 `UsesAIProvider` product contract，不来自 Provider Account。
+- Admin Catalog、Quote 与 Task Billing 统一使用 feature-level identity `ai-image:<feature>`。Provider Model 只属于 execution/idempotency contract，不参与用户价格 identity；切换模型不会改变功能价格。计费资格来自 Workflow registry 的 AI image product list，不来自 Provider Account。
 
 ## Invariants
 

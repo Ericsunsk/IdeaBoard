@@ -127,6 +127,56 @@ func (q *Queries) ClaimDueMediaAssetReclamation(ctx context.Context, arg ClaimDu
 	return i, err
 }
 
+const claimPromptReferenceMediaRef = `-- name: ClaimPromptReferenceMediaRef :one
+UPDATE media_refs
+SET task_id = $1, updated_at = now()
+WHERE owner_user_id = $2
+  AND media_asset_id = $3
+  AND ref_type = 'prompt_reference'
+  AND ref_id = $4
+  AND role = $5
+  AND input_index = $6
+  AND task_id = ''
+RETURNING id, media_asset_id, owner_user_id, ref_type, ref_id,
+  board_id, task_id, role, input_index, metadata, created_at, updated_at
+`
+
+type ClaimPromptReferenceMediaRefParams struct {
+	TaskID       string `json:"task_id"`
+	OwnerUserID  int64  `json:"owner_user_id"`
+	MediaAssetID int64  `json:"media_asset_id"`
+	RefID        string `json:"ref_id"`
+	Role         string `json:"role"`
+	InputIndex   int32  `json:"input_index"`
+}
+
+func (q *Queries) ClaimPromptReferenceMediaRef(ctx context.Context, arg ClaimPromptReferenceMediaRefParams) (MediaRef, error) {
+	row := q.db.QueryRowContext(ctx, claimPromptReferenceMediaRef,
+		arg.TaskID,
+		arg.OwnerUserID,
+		arg.MediaAssetID,
+		arg.RefID,
+		arg.Role,
+		arg.InputIndex,
+	)
+	var i MediaRef
+	err := row.Scan(
+		&i.ID,
+		&i.MediaAssetID,
+		&i.OwnerUserID,
+		&i.RefType,
+		&i.RefID,
+		&i.BoardID,
+		&i.TaskID,
+		&i.Role,
+		&i.InputIndex,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const countMediaRefsByAssetID = `-- name: CountMediaRefsByAssetID :one
 SELECT COUNT(*)
 FROM media_refs
@@ -187,6 +237,55 @@ func (q *Queries) CreateBoardUploadMediaAsset(ctx context.Context, arg CreateBoa
 	return id, err
 }
 
+const createPreparedMediaAsset = `-- name: CreatePreparedMediaAsset :one
+INSERT INTO media_assets (
+  asset_id, owner_user_id, storage_profile_id, storage_key, url, source_url,
+  media_kind, mime_type, width, height, size_bytes, status, metadata,
+  reclaim_after, reclaim_generation
+)
+VALUES (
+  $1, $2, $3, $4,
+  $5, $6, 'image', $7, $8, $9,
+  $10, 'ready', $11, $12, 1
+)
+RETURNING id
+`
+
+type CreatePreparedMediaAssetParams struct {
+	AssetID          string          `json:"asset_id"`
+	OwnerUserID      int64           `json:"owner_user_id"`
+	StorageProfileID string          `json:"storage_profile_id"`
+	StorageKey       string          `json:"storage_key"`
+	Url              string          `json:"url"`
+	SourceUrl        string          `json:"source_url"`
+	MimeType         string          `json:"mime_type"`
+	Width            int32           `json:"width"`
+	Height           int32           `json:"height"`
+	SizeBytes        int64           `json:"size_bytes"`
+	Metadata         json.RawMessage `json:"metadata"`
+	ReclaimAfter     sql.NullTime    `json:"reclaim_after"`
+}
+
+func (q *Queries) CreatePreparedMediaAsset(ctx context.Context, arg CreatePreparedMediaAssetParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, createPreparedMediaAsset,
+		arg.AssetID,
+		arg.OwnerUserID,
+		arg.StorageProfileID,
+		arg.StorageKey,
+		arg.Url,
+		arg.SourceUrl,
+		arg.MimeType,
+		arg.Width,
+		arg.Height,
+		arg.SizeBytes,
+		arg.Metadata,
+		arg.ReclaimAfter,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const deleteBoardMediaRefsByOwnerAndBoardID = `-- name: DeleteBoardMediaRefsByOwnerAndBoardID :exec
 DELETE FROM media_refs
 WHERE owner_user_id = $1
@@ -213,6 +312,84 @@ WHERE task_id = $1
 func (q *Queries) DeleteTaskOutputMediaRefsByTaskID(ctx context.Context, taskID string) error {
 	_, err := q.db.ExecContext(ctx, deleteTaskOutputMediaRefsByTaskID, taskID)
 	return err
+}
+
+const deleteUnclaimedPreparedMediaAsset = `-- name: DeleteUnclaimedPreparedMediaAsset :execrows
+DELETE FROM media_assets AS asset
+WHERE asset.id = $1
+  AND asset.owner_user_id = $2
+  AND NOT EXISTS (
+    SELECT 1 FROM media_refs AS ref
+    WHERE ref.media_asset_id = asset.id AND ref.task_id <> ''
+  )
+`
+
+type DeleteUnclaimedPreparedMediaAssetParams struct {
+	ID          int64 `json:"id"`
+	OwnerUserID int64 `json:"owner_user_id"`
+}
+
+func (q *Queries) DeleteUnclaimedPreparedMediaAsset(ctx context.Context, arg DeleteUnclaimedPreparedMediaAssetParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteUnclaimedPreparedMediaAsset, arg.ID, arg.OwnerUserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const findPreparedGenerationMedia = `-- name: FindPreparedGenerationMedia :one
+SELECT asset.id, asset.storage_profile_id, asset.storage_key, asset.url,
+  asset.source_url, asset.mime_type, asset.width, asset.height, asset.size_bytes
+FROM media_refs AS ref
+JOIN media_assets AS asset ON asset.id = ref.media_asset_id AND asset.owner_user_id = ref.owner_user_id
+WHERE ref.owner_user_id = $1
+  AND ref.ref_type = 'prompt_reference'
+  AND ref.ref_id = $2
+  AND ref.role = $3
+  AND ref.input_index = $4
+  AND asset.deleted_at IS NULL
+LIMIT 1
+`
+
+type FindPreparedGenerationMediaParams struct {
+	OwnerUserID int64  `json:"owner_user_id"`
+	RefID       string `json:"ref_id"`
+	Role        string `json:"role"`
+	InputIndex  int32  `json:"input_index"`
+}
+
+type FindPreparedGenerationMediaRow struct {
+	ID               int64  `json:"id"`
+	StorageProfileID string `json:"storage_profile_id"`
+	StorageKey       string `json:"storage_key"`
+	Url              string `json:"url"`
+	SourceUrl        string `json:"source_url"`
+	MimeType         string `json:"mime_type"`
+	Width            int32  `json:"width"`
+	Height           int32  `json:"height"`
+	SizeBytes        int64  `json:"size_bytes"`
+}
+
+func (q *Queries) FindPreparedGenerationMedia(ctx context.Context, arg FindPreparedGenerationMediaParams) (FindPreparedGenerationMediaRow, error) {
+	row := q.db.QueryRowContext(ctx, findPreparedGenerationMedia,
+		arg.OwnerUserID,
+		arg.RefID,
+		arg.Role,
+		arg.InputIndex,
+	)
+	var i FindPreparedGenerationMediaRow
+	err := row.Scan(
+		&i.ID,
+		&i.StorageProfileID,
+		&i.StorageKey,
+		&i.Url,
+		&i.SourceUrl,
+		&i.MimeType,
+		&i.Width,
+		&i.Height,
+		&i.SizeBytes,
+	)
+	return i, err
 }
 
 const getMediaAssetByID = `-- name: GetMediaAssetByID :one
@@ -312,7 +489,7 @@ func (q *Queries) ListDueMediaAssetReclamationIDs(ctx context.Context, arg ListD
 const listMediaRefsByBoardID = `-- name: ListMediaRefsByBoardID :many
 SELECT
   id, media_asset_id, owner_user_id, ref_type, ref_id,
-  board_id, task_id, role, metadata, created_at, updated_at
+  board_id, task_id, role, input_index, metadata, created_at, updated_at
 FROM media_refs
 WHERE owner_user_id = $1 AND board_id = $2
 ORDER BY created_at ASC, id ASC
@@ -341,6 +518,7 @@ func (q *Queries) ListMediaRefsByBoardID(ctx context.Context, arg ListMediaRefsB
 			&i.BoardID,
 			&i.TaskID,
 			&i.Role,
+			&i.InputIndex,
 			&i.Metadata,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -523,15 +701,16 @@ func (q *Queries) UpsertMediaAsset(ctx context.Context, arg UpsertMediaAssetPara
 const upsertMediaRef = `-- name: UpsertMediaRef :one
 INSERT INTO media_refs (
   media_asset_id, owner_user_id, ref_type, ref_id,
-  board_id, task_id, role, metadata
+  board_id, task_id, role, input_index, metadata
 )
 VALUES (
   $1, $2, $3, $4,
-  $5, $6, $7, $8
+  $5, $6, $7, $8, $9
 )
 ON CONFLICT (media_asset_id, ref_type, ref_id, board_id, role) DO UPDATE
 SET board_id = EXCLUDED.board_id,
     task_id = EXCLUDED.task_id,
+    input_index = EXCLUDED.input_index,
     metadata = EXCLUDED.metadata
 WHERE media_refs.owner_user_id = EXCLUDED.owner_user_id
 RETURNING id
@@ -545,6 +724,7 @@ type UpsertMediaRefParams struct {
 	BoardID      string          `json:"board_id"`
 	TaskID       string          `json:"task_id"`
 	Role         string          `json:"role"`
+	InputIndex   int32           `json:"input_index"`
 	Metadata     json.RawMessage `json:"metadata"`
 }
 
@@ -557,6 +737,7 @@ func (q *Queries) UpsertMediaRef(ctx context.Context, arg UpsertMediaRefParams) 
 		arg.BoardID,
 		arg.TaskID,
 		arg.Role,
+		arg.InputIndex,
 		arg.Metadata,
 	)
 	var id int64

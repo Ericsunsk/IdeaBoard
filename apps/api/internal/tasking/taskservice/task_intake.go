@@ -14,6 +14,7 @@ import (
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/tasking/tasksubmission"
 	"ideaboard/api/internal/workflow"
+	"ideaboard/api/internal/workflow/paramkeys"
 )
 
 const (
@@ -32,7 +33,8 @@ var errNoAvailableAPIAccount = errors.New("no available API account")
 // TaskIntake is the single public seam that turns an HTTP submission request
 // into the canonical Tasking request shared by Readiness and Submit.
 type TaskIntake interface {
-	Prepare(context.Context, int64, *tasks.SubmitTaskRequest) (CanonicalTaskRequest, error)
+	Compile(context.Context, int64, *tasks.SubmitTaskRequest) (CanonicalTaskRequest, error)
+	PrepareMedia(context.Context, int64, CanonicalTaskRequest) (CanonicalTaskRequest, error)
 }
 
 type CanonicalTaskRequest = tasksubmission.CanonicalRequest
@@ -46,26 +48,29 @@ type AccountStore interface {
 }
 
 type TaskIntakeDeps struct {
-	Accounts AccountStore
-	Prompts  FeaturePromptStore
-	Media    taskmedia.Validator
+	Accounts      AccountStore
+	Prompts       FeaturePromptStore
+	Media         taskmedia.Validator
+	MediaPreparer taskmedia.GenerationMediaPreparer
 }
 
 type taskIntake struct {
-	accounts AccountStore
-	prompts  FeaturePromptStore
-	media    taskmedia.Validator
+	accounts      AccountStore
+	prompts       FeaturePromptStore
+	media         taskmedia.Validator
+	mediaPreparer taskmedia.GenerationMediaPreparer
 }
 
 func NewTaskIntake(deps TaskIntakeDeps) TaskIntake {
 	return &taskIntake{
-		accounts: deps.Accounts,
-		prompts:  deps.Prompts,
-		media:    deps.Media,
+		accounts:      deps.Accounts,
+		prompts:       deps.Prompts,
+		media:         deps.Media,
+		mediaPreparer: deps.MediaPreparer,
 	}
 }
 
-func (i *taskIntake) Prepare(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (CanonicalTaskRequest, error) {
+func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (CanonicalTaskRequest, error) {
 	if req == nil {
 		return CanonicalTaskRequest{}, validation.New("请求参数错误")
 	}
@@ -121,6 +126,17 @@ func (i *taskIntake) Prepare(ctx context.Context, userID int64, req *tasks.Submi
 			return CanonicalTaskRequest{}, err
 		}
 	}
+	if rawOutputCount, ok := params[paramkeys.OutputCount]; ok {
+		outputCount, ok := readExactIntParam(rawOutputCount)
+		if !ok {
+			return CanonicalTaskRequest{}, validation.New("output_count 仅支持整数 1-4")
+		}
+		requestedOutputCount, err := workflow.ParseRequestedOutputCount(outputCount)
+		if err != nil {
+			return CanonicalTaskRequest{}, validation.New("output_count 仅支持整数 1-4")
+		}
+		params[paramkeys.OutputCount] = requestedOutputCount.Int()
+	}
 	typedParams, err := workflowTaskParamsFromMap(params, featureSlug)
 	if err != nil {
 		return CanonicalTaskRequest{}, err
@@ -149,6 +165,17 @@ func (i *taskIntake) Prepare(ctx context.Context, userID int64, req *tasks.Submi
 	if billingRequest != nil && clientActionID == "" {
 		return CanonicalTaskRequest{}, validation.New("AI 生图任务必须提供 client_action_id")
 	}
+	generationSnapshot, err := tasksubmission.CompileGenerationSnapshot(tasksubmission.GenerationCompilerInput{
+		Feature:             featureSlug,
+		UserPrompt:          req.Prompt,
+		CompiledPrompt:      fullPrompt,
+		TemplateFingerprint: tasksubmission.TemplateFingerprint("", promptConfig.Prompt),
+		Params:              typedParams,
+	})
+	if err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+	typedParams.Generation = &generationSnapshot
 	paramsJSON, err := marshalWorkflowTaskParams(typedParams, params)
 	if err != nil {
 		return CanonicalTaskRequest{}, err
@@ -156,8 +183,24 @@ func (i *taskIntake) Prepare(ctx context.Context, userID int64, req *tasks.Submi
 	return tasksubmission.NewCanonicalRequest(tasksubmission.CanonicalRequestInput{
 		UserID: userID, Feature: featureSlug, UserPrompt: req.Prompt, Prompt: fullPrompt,
 		Params: paramsJSON, ClientActionID: clientActionID, Priority: priority,
-		BillingRequest: billingRequest, MaxBillingQuantity: int64(maxSubmitTaskImageURLs),
+		Generation:     &generationSnapshot,
+		BillingRequest: billingRequest, MaxBillingQuantity: int64(workflow.MaxRequestedOutputCount),
 	})
+}
+
+func (i *taskIntake) PrepareMedia(ctx context.Context, userID int64, canonical CanonicalTaskRequest) (CanonicalTaskRequest, error) {
+	if userID <= 0 || canonical.UserID() != userID {
+		return CanonicalTaskRequest{}, validation.New("请求用户与任务不匹配")
+	}
+	snapshot := canonical.GenerationSnapshot()
+	if snapshot == nil || len(snapshot.Media) == 0 || i.mediaPreparer == nil {
+		return canonical, nil
+	}
+	prepared, err := i.mediaPreparer.PrepareGenerationMedia(ctx, userID, canonical.ClientActionID(), snapshot)
+	if err != nil {
+		return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", err)
+	}
+	return canonical.WithGenerationSnapshot(prepared)
 }
 
 func (i *taskIntake) validateImageURLs(ctx context.Context, userID int64, imageURLs []string) error {

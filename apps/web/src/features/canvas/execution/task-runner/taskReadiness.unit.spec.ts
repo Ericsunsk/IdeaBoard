@@ -76,7 +76,7 @@ describe('task readiness billing updates', () => {
         prompt: 'free prompt',
         feature: 'pattern-gen',
         client_action_id: 'canvas:free-action',
-        billing_quantity: 8,
+        billing_quantity: 4,
       }),
     ).resolves.toEqual(readiness)
   })

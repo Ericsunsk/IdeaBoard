@@ -27,6 +27,8 @@ var unsupportedSubmitTaskParamKeys = []string{
 	paramkeys.UpscaleFactor,
 	paramkeys.OutputFormat,
 	paramkeys.OutputQuality,
+	paramkeys.SampleCount,
+	paramkeys.ImageCount,
 }
 
 func normalizeSubmitTaskMediaParams(params map[string]interface{}) {
@@ -231,16 +233,8 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 		controls.Quality = v
 		hasControls = true
 	}
-	if v, ok := readIntParam(params, paramkeys.SampleCount); ok {
-		controls.SampleCount = v
-		hasControls = true
-	}
 	if v, ok := readIntParam(params, paramkeys.OutputCount); ok {
 		controls.OutputCount = v
-		hasControls = true
-	}
-	if v, ok := readIntParam(params, paramkeys.ImageCount); ok {
-		controls.ImageCount = v
 		hasControls = true
 	}
 	if v, ok := readBoolParam(params, paramkeys.PromptUpsampling); ok {
@@ -390,6 +384,10 @@ func readIntParam(params map[string]interface{}, key string) (int, bool) {
 	if !ok {
 		return 0, false
 	}
+	return readExactIntParam(raw)
+}
+
+func readExactIntParam(raw interface{}) (int, bool) {
 	switch v := raw.(type) {
 	case int:
 		return v, true
@@ -398,8 +396,14 @@ func readIntParam(params map[string]interface{}, key string) (int, bool) {
 	case int32:
 		return int(v), true
 	case float64:
+		if math.IsNaN(v) || math.IsInf(v, 0) || math.Trunc(v) != v {
+			return 0, false
+		}
 		return int(v), true
 	case float32:
+		if math.IsNaN(float64(v)) || math.IsInf(float64(v), 0) || float32(math.Trunc(float64(v))) != v {
+			return 0, false
+		}
 		return int(v), true
 	case json.Number:
 		n, err := v.Int64()
