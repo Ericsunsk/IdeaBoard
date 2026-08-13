@@ -57,7 +57,6 @@ type terminalTransitionPolicy struct {
 	failureStage    string
 	failureCategory string
 	leaseReason     string
-	billingOutcome  taskbilling.TerminalOutcome
 	replacesOutputs bool
 }
 
@@ -293,7 +292,7 @@ func (r *Repository) runTerminalTransition(ctx context.Context, command terminal
 			return err
 		}
 		task := taskFromSQLC(taskRow)
-		if task.Status != policy.taskStatus {
+		if task.Status != policy.taskStatus && !(command.kind == terminalTransitionCancelled && tasks.IsTerminalStatus(task.Status) && (task.Status == tasks.StatusCancelled || task.Status == tasks.StatusCancelledWithResults)) {
 			return fmt.Errorf("task terminal fact status=%q, want %q", task.Status, policy.taskStatus)
 		}
 
@@ -346,7 +345,7 @@ func applyTerminalOutcomeTx(
 	); err != nil {
 		return err
 	}
-	return taskbilling.SettleTerminal(ctx, tx, command.taskID, policy.billingOutcome)
+	return taskbilling.SettleTerminal(ctx, tx, command.taskID)
 }
 
 func resolveTerminalTransitionPolicy(kind terminalTransitionKind) (terminalTransitionPolicy, error) {
@@ -357,7 +356,6 @@ func resolveTerminalTransitionPolicy(kind terminalTransitionKind) (terminalTrans
 			attemptStatus:   tasks.TaskAttemptStatusCompleted,
 			executionStage:  tasks.ExecutionStageCompleted,
 			leaseReason:     tasks.TaskAttemptStatusCompleted,
-			billingOutcome:  taskbilling.TerminalOutcomeSucceeded,
 			replacesOutputs: true,
 		}, nil
 	case terminalTransitionFailed:
@@ -368,7 +366,6 @@ func resolveTerminalTransitionPolicy(kind terminalTransitionKind) (terminalTrans
 			failureStage:    tasks.ExecutionStageAssigned,
 			failureCategory: tasks.FailureCategoryUnknown,
 			leaseReason:     tasks.TaskAttemptStatusFailed,
-			billingOutcome:  taskbilling.TerminalOutcomeUnsuccessful,
 		}, nil
 	case terminalTransitionCancelled:
 		return terminalTransitionPolicy{
@@ -378,7 +375,6 @@ func resolveTerminalTransitionPolicy(kind terminalTransitionKind) (terminalTrans
 			failureStage:    tasks.ExecutionStageQueued,
 			failureCategory: tasks.FailureCategoryCancelled,
 			leaseReason:     tasks.TaskAttemptStatusCancelled,
-			billingOutcome:  taskbilling.TerminalOutcomeUnsuccessful,
 		}, nil
 	default:
 		return terminalTransitionPolicy{}, fmt.Errorf("unsupported task terminal transition %q", kind)

@@ -24,7 +24,7 @@ func TestAIImageWorkflowSKUContract(t *testing.T) {
 
 	for _, feature := range workflow.AIImageFeatureSlugs() {
 		t.Run(feature, func(t *testing.T) {
-			request, err := AIImageRequest(feature)
+			request, err := AIImageRequest(feature, 1)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -43,11 +43,11 @@ func TestAIImageWorkflowSKUContract(t *testing.T) {
 }
 
 func TestAIImagePricingIdentityAndFingerprintAreFeatureScoped(t *testing.T) {
-	first, err := AIImageRequest(workflow.FeatureSlugPartialEdit)
+	first, err := AIImageRequest(workflow.FeatureSlugPartialEdit, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := AIImageRequest(workflow.FeatureSlugPartialEdit)
+	second, err := AIImageRequest(workflow.FeatureSlugPartialEdit, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestAIImagePricingIdentityAndFingerprintAreFeatureScoped(t *testing.T) {
 func TestAIImageWorkflowRequestRejectsNonWorkflowProducts(t *testing.T) {
 	for _, feature := range []string{"", "crop", "color-adjust", "mask-draw", "unknown"} {
 		t.Run(feature, func(t *testing.T) {
-			_, err := AIImageRequest(feature)
+			_, err := AIImageRequest(feature, 1)
 			if !errors.Is(err, ErrUnsupportedProduct) {
 				t.Fatalf("err=%v, want ErrUnsupportedProduct", err)
 			}
@@ -106,10 +106,10 @@ func TestTaskBillingRequestValidationFailsClosed(t *testing.T) {
 }
 
 func TestSettleTerminalRejectsInvalidInputsBeforeDatabaseAccess(t *testing.T) {
-	if err := SettleTerminal(context.Background(), nil, "task", TerminalOutcomeSucceeded); err == nil {
+	if err := SettleTerminal(context.Background(), nil, "task"); err == nil {
 		t.Fatal("nil SQL transaction was accepted")
 	}
-	if err := SettleTerminal(context.Background(), new(sql.Tx), "task", TerminalOutcome("unexpected")); err == nil {
-		t.Fatal("invalid terminal outcome was accepted")
+	if err := SettleTerminal(context.Background(), new(sql.Tx), ""); err == nil {
+		t.Fatal("blank task id was accepted")
 	}
 }

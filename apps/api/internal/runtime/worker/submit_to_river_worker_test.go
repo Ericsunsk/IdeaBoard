@@ -41,7 +41,7 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
 	taskBilling := taskbilling.NewService(billingService, creditService)
-	billingRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugSketchToImage)
+	billingRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugSketchToImage, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +157,7 @@ func TestRiverFinalFailureSettlementRetrySurvivesRestartWithoutProviderRecall(t 
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
 	taskBilling := taskbilling.NewService(billingService, creditService)
-	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen)
+	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen, 1)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -278,6 +278,7 @@ func TestWalletRestrictionBlocksNewExposureButAllowsConvergenceAndRepair(t *test
 	capture, err := service.Capture(ctx, CaptureCommand{
 		UserID:            userID,
 		HoldTransactionID: captureHold.TransactionID,
+		Amount:            mustCreditAmount(t, 5),
 		Metadata:          testMetadata("wallet-restriction-gate:capture", "wallet-restriction-gate-capture"),
 	})
 	if err != nil {
@@ -286,6 +287,7 @@ func TestWalletRestrictionBlocksNewExposureButAllowsConvergenceAndRepair(t *test
 	if _, err := service.Release(ctx, ReleaseCommand{
 		UserID:            userID,
 		HoldTransactionID: releaseHold.TransactionID,
+		Amount:            mustCreditAmount(t, 5),
 		Metadata:          testMetadata("wallet-restriction-gate:release", "wallet-restriction-gate-release"),
 	}); err != nil {
 		t.Fatalf("Release(restricted frozen Wallet) error = %v", err)

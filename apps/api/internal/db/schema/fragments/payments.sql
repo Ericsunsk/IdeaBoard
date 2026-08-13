@@ -818,7 +818,11 @@ BEGIN
   );
   INSERT INTO credit_postings (transaction_id, account_id, amount)
   VALUES (v_transaction_id, v_reserved_id, -v_amount), (v_transaction_id, v_issuance_id, v_amount);
-  UPDATE credit_holds SET status = 'captured', terminal_transaction_id = v_transaction_id, settled_at = now()
+  UPDATE credit_holds
+  SET status = 'captured',
+      captured_amount = captured_amount + v_amount,
+      capture_transaction_id = v_transaction_id,
+      settled_at = now()
   WHERE hold_transaction_id = p_hold_transaction_id;
   RETURN QUERY SELECT created.transaction_id, created.command_type, created.command_amount,
     created.wallet_user_id, created.available_balance_after, created.reserved_balance_after, FALSE, created.created_at

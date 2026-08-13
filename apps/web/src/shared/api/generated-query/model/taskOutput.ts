@@ -23,7 +23,11 @@ export interface TaskOutput {
   checksum_sha256?: string
   storage_profile?: string
   metadata?: string
-  sort_index: number
+  /**
+   * @minimum 0
+   * @maximum 3
+   */
+  result_index: number
   created_at: string
   updated_at: string
 }

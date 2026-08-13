@@ -87,6 +87,7 @@ func (s *Service) GetTaskStats(ctx context.Context) (map[string]int64, error) {
 		tasks.StatusCompleted,
 		tasks.StatusFailed,
 		tasks.StatusCancelled,
+		tasks.StatusCancelledWithResults,
 	}
 	stats := make(map[string]int64, len(statuses))
 	for _, status := range statuses {
@@ -355,7 +356,7 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 			Running:            stats[tasks.StatusRunning],
 			Completed:          stats[tasks.StatusCompleted],
 			Failed:             stats[tasks.StatusFailed],
-			Cancelled:          stats[tasks.StatusCancelled],
+			Cancelled:          stats[tasks.StatusCancelled] + stats[tasks.StatusCancelledWithResults],
 		},
 		Trend:        trend,
 		ModelHealth:  modelHealth,
@@ -540,7 +541,7 @@ func (s *Service) buildIntradayTrendItems(ctx context.Context, dayStart time.Tim
 	}
 
 	for _, row := range rows {
-		if row.Status != tasks.StatusCompleted && row.Status != tasks.StatusFailed && row.Status != tasks.StatusCancelled {
+		if row.Status != tasks.StatusCompleted && row.Status != tasks.StatusFailed && !tasks.IsTerminalStatus(row.Status) {
 			continue
 		}
 		occurredAt := row.OccurredAt.In(loc)

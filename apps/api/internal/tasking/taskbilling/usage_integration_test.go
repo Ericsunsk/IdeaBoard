@@ -149,7 +149,7 @@ func seedTaskBillingUsageProduct(
 	pool *pgxpool.Pool,
 ) (Request, billing.SKU) {
 	t.Helper()
-	request, err := AIImageRequest(workflow.FeatureSlugPatternGen)
+	request, err := AIImageRequest(workflow.FeatureSlugPatternGen, 1)
 	if err != nil {
 		t.Fatal(err)
 	}

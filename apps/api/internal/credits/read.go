@@ -250,27 +250,43 @@ func (s *Service) loadReferences(ctx context.Context, transactions []LedgerTrans
 	}
 
 	holds, err := s.pool.Query(ctx, `
-SELECT hold_transaction_id, amount, status, COALESCE(terminal_transaction_id, '')
-FROM credit_holds
-WHERE hold_transaction_id = ANY($1::VARCHAR[]) OR terminal_transaction_id = ANY($1::VARCHAR[])`, transactionIDs)
+	SELECT hold_transaction_id, amount, captured_amount, released_amount, status,
+	       COALESCE(capture_transaction_id, ''), COALESCE(release_transaction_id, '')
+	FROM credit_holds
+	WHERE hold_transaction_id = ANY($1::VARCHAR[])
+	   OR capture_transaction_id = ANY($1::VARCHAR[])
+	   OR release_transaction_id = ANY($1::VARCHAR[])`, transactionIDs)
 	if err != nil {
 		return fmt.Errorf("credits service: list hold references: %w", err)
 	}
 	defer holds.Close()
 	holdsByTransactionID := make(map[string]*HoldReference, len(transactions))
 	for holds.Next() {
-		var holdTransactionID, terminalTransactionID string
+		var holdTransactionID, captureTransactionID, releaseTransactionID string
 		reference := HoldReference{}
-		if err := holds.Scan(&holdTransactionID, &reference.Amount, &reference.Status, &terminalTransactionID); err != nil {
+		if err := holds.Scan(
+			&holdTransactionID,
+			&reference.Amount,
+			&reference.CapturedAmount,
+			&reference.ReleasedAmount,
+			&reference.Status,
+			&captureTransactionID,
+			&releaseTransactionID,
+		); err != nil {
 			return fmt.Errorf("credits service: scan hold reference: %w", err)
 		}
-		reference.TerminalTransactionID = terminalTransactionID
+		reference.CaptureTransactionID = captureTransactionID
+		reference.ReleaseTransactionID = releaseTransactionID
 		holdsByTransactionID[holdTransactionID] = &reference
-		holdsByTransactionID[terminalTransactionID] = &reference
+		holdsByTransactionID[captureTransactionID] = &reference
+		holdsByTransactionID[releaseTransactionID] = &reference
 		if transaction := byID[holdTransactionID]; transaction != nil {
 			transaction.Hold = &reference
 		}
-		if transaction := byID[terminalTransactionID]; transaction != nil {
+		if transaction := byID[captureTransactionID]; transaction != nil {
+			transaction.Hold = &reference
+		}
+		if transaction := byID[releaseTransactionID]; transaction != nil {
 			transaction.Hold = &reference
 		}
 	}

@@ -503,18 +503,18 @@ func executeHold(ctx context.Context, command HoldCommand, execute commandExecut
 
 func executeCapture(ctx context.Context, command CaptureCommand, execute commandExecutor) (CommandResult, error) {
 	metadata, err := normalizeMetadata(command.Metadata)
-	if err != nil || command.UserID <= 0 || strings.TrimSpace(command.HoldTransactionID) == "" {
+	if err != nil || command.UserID <= 0 || strings.TrimSpace(command.HoldTransactionID) == "" || !isValidAmount(command.Amount) {
 		return CommandResult{}, ErrInvalidCommand
 	}
-	return execute(ctx, CommandCapture, command.UserID, 0, command.HoldTransactionID, metadata)
+	return execute(ctx, CommandCapture, command.UserID, command.Amount.Int64(), command.HoldTransactionID, metadata)
 }
 
 func executeRelease(ctx context.Context, command ReleaseCommand, execute commandExecutor) (CommandResult, error) {
 	metadata, err := normalizeMetadata(command.Metadata)
-	if err != nil || command.UserID <= 0 || strings.TrimSpace(command.HoldTransactionID) == "" {
+	if err != nil || command.UserID <= 0 || strings.TrimSpace(command.HoldTransactionID) == "" || !isValidAmount(command.Amount) {
 		return CommandResult{}, ErrInvalidCommand
 	}
-	return execute(ctx, CommandRelease, command.UserID, 0, command.HoldTransactionID, metadata)
+	return execute(ctx, CommandRelease, command.UserID, command.Amount.Int64(), command.HoldTransactionID, metadata)
 }
 
 func executeRefund(ctx context.Context, command RefundCommand, execute commandExecutor) (CommandResult, error) {

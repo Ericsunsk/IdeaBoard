@@ -537,21 +537,21 @@ func TestReconciliationTreatsCorruptTerminalFactsAsHighRiskInsteadOfTaskTrace(t 
 
 	const capturedTaskID = "reconcile-corrupt-captured-terminal"
 	capturedHold := createReconciliationTaskFixture(t, db, service, capturedTaskID, "completed", "", userID, priceID, priceVersion)
-	capture, err := service.Capture(ctx, CaptureCommand{UserID: userID, HoldTransactionID: capturedHold, Metadata: taskReconciliationMetadata("terminal-fact-risk:capture", capturedTaskID)})
+	capture, err := service.Capture(ctx, CaptureCommand{UserID: userID, HoldTransactionID: capturedHold, Amount: mustCreditAmount(t, 10), Metadata: taskReconciliationMetadata("terminal-fact-risk:capture", capturedTaskID)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(ctx, `UPDATE task_billing_settlements SET state = 'captured', settlement_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, capturedTaskID, capture.TransactionID); err != nil {
+	if _, err := db.ExecContext(ctx, `UPDATE task_billing_settlements SET state = 'captured', actual_output_count = 2, captured_credits = 10, capture_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, capturedTaskID, capture.TransactionID); err != nil {
 		t.Fatal(err)
 	}
 
 	const releasedTaskID = "reconcile-corrupt-released-terminal"
 	releasedHold := createReconciliationTaskFixture(t, db, service, releasedTaskID, "failed", "provider failed", userID, priceID, priceVersion)
-	release, err := service.Release(ctx, ReleaseCommand{UserID: userID, HoldTransactionID: releasedHold, Metadata: taskReconciliationMetadata("terminal-fact-risk:release", releasedTaskID)})
+	release, err := service.Release(ctx, ReleaseCommand{UserID: userID, HoldTransactionID: releasedHold, Amount: mustCreditAmount(t, 10), Metadata: taskReconciliationMetadata("terminal-fact-risk:release", releasedTaskID)})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(ctx, `UPDATE task_billing_settlements SET state = 'released', settlement_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, releasedTaskID, release.TransactionID); err != nil {
+	if _, err := db.ExecContext(ctx, `UPDATE task_billing_settlements SET state = 'released', actual_output_count = 0, released_credits = 10, release_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, releasedTaskID, release.TransactionID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.ExecContext(ctx, `DELETE FROM tasks WHERE task_id IN ($1, $2)`, capturedTaskID, releasedTaskID); err != nil {
@@ -682,11 +682,11 @@ func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *te
 	}
 
 	releasedHold := createReconciliationTaskFixture(t, db, service, "reconcile-running-released", "pending", "", 93, priceID, priceVersion)
-	release, err := service.Release(ctx, ReleaseCommand{UserID: 93, HoldTransactionID: releasedHold, Metadata: taskReconciliationMetadata("release:running", "reconcile-running-released")})
+	release, err := service.Release(ctx, ReleaseCommand{UserID: 93, HoldTransactionID: releasedHold, Amount: mustCreditAmount(t, 10), Metadata: taskReconciliationMetadata("release:running", "reconcile-running-released")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(ctx, `UPDATE task_billing_settlements SET state = 'released', settlement_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, "reconcile-running-released", release.TransactionID); err != nil {
+	if _, err := db.ExecContext(ctx, `UPDATE task_billing_settlements SET state = 'released', actual_output_count = 0, released_credits = 10, release_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, "reconcile-running-released", release.TransactionID); err != nil {
 		t.Fatal(err)
 	}
 	createReconciliationTaskFixture(t, db, service, "reconcile-completed-held", "completed", "", 93, priceID, priceVersion)
@@ -716,7 +716,7 @@ func TestReconciliationDetectsLedgerTaskIdempotencyRefundAndStateAnomalies(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	capture, err := service.Capture(ctx, CaptureCommand{UserID: 93, HoldTransactionID: hold.TransactionID, Metadata: testMetadata("matrix:capture", "matrix-capture")})
+	capture, err := service.Capture(ctx, CaptureCommand{UserID: 93, HoldTransactionID: hold.TransactionID, Amount: mustCreditAmount(t, 10), Metadata: testMetadata("matrix:capture", "matrix-capture")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -855,7 +855,7 @@ FROM credit_transactions WHERE transaction_id = $1`, illegal.TransactionID); err
 	}
 	for _, expected := range []string{
 		"ledger_postings_invalid", "wallet_projection_mismatch", "task_hold_missing_billing_snapshot",
-		"active_task_not_held", "completed_task_not_captured", "failed_task_not_released",
+		"active_task_not_held", "terminal_task_settlement_mismatch",
 		"task_terminal_transaction_count", "idempotency_request_hash_conflict", "duplicate_business_reference",
 		"refund_amount_invalid", "illegal_reference_chain", "hold_state_invalid", "charge_state_invalid",
 		"task_billing_fact_missing", "correction_amount_exceeds_original",
@@ -879,11 +879,11 @@ func TestReconciliationRequiresPaidActiveTasksToRemainHeld(t *testing.T) {
 	}
 
 	capturedHold := createReconciliationTaskFixture(t, db, service, "active-captured", "pending", "", 93, priceID, priceVersion)
-	capture, err := service.Capture(ctx, CaptureCommand{UserID: 93, HoldTransactionID: capturedHold, Metadata: taskReconciliationMetadata("capture:active", "active-captured")})
+	capture, err := service.Capture(ctx, CaptureCommand{UserID: 93, HoldTransactionID: capturedHold, Amount: mustCreditAmount(t, 10), Metadata: taskReconciliationMetadata("capture:active", "active-captured")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(ctx, `UPDATE task_billing_settlements SET state = 'captured', settlement_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, "active-captured", capture.TransactionID); err != nil {
+	if _, err := db.ExecContext(ctx, `UPDATE task_billing_settlements SET state = 'captured', actual_output_count = 2, captured_credits = 10, capture_transaction_id = $2, settled_at = clock_timestamp() WHERE task_id = $1`, "active-captured", capture.TransactionID); err != nil {
 		t.Fatal(err)
 	}
 

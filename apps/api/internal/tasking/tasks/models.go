@@ -112,7 +112,7 @@ type TaskOutput struct {
 	ChecksumSHA256 string    `json:"checksum_sha256,omitempty"`
 	StorageProfile string    `json:"storage_profile,omitempty"`
 	Metadata       string    `json:"metadata,omitempty"`
-	SortIndex      int       `json:"sort_index"`
+	ResultIndex    int       `json:"result_index"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
@@ -133,18 +133,18 @@ type TaskUserView struct {
 }
 
 type TaskOutputUserView struct {
-	ID         int64     `json:"id"`
-	TaskID     string    `json:"task_id"`
-	OutputKind string    `json:"output_kind"`
-	Role       string    `json:"role"`
-	URL        string    `json:"url"`
-	MIMEType   string    `json:"mime_type"`
-	Width      int       `json:"width"`
-	Height     int       `json:"height"`
-	SizeBytes  int64     `json:"size_bytes"`
-	SortIndex  int       `json:"sort_index"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID          int64     `json:"id"`
+	TaskID      string    `json:"task_id"`
+	OutputKind  string    `json:"output_kind"`
+	Role        string    `json:"role"`
+	URL         string    `json:"url"`
+	MIMEType    string    `json:"mime_type"`
+	Width       int       `json:"width"`
+	Height      int       `json:"height"`
+	SizeBytes   int64     `json:"size_bytes"`
+	ResultIndex int       `json:"result_index"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 type TaskResultUserView struct {
@@ -197,18 +197,18 @@ func taskOutputsUserView(outputs []TaskOutput) []TaskOutputUserView {
 	result := make([]TaskOutputUserView, 0, len(outputs))
 	for _, output := range outputs {
 		result = append(result, TaskOutputUserView{
-			ID:         output.ID,
-			TaskID:     output.TaskID,
-			OutputKind: output.OutputKind,
-			Role:       output.Role,
-			URL:        output.URL,
-			MIMEType:   output.MIMEType,
-			Width:      output.Width,
-			Height:     output.Height,
-			SizeBytes:  output.SizeBytes,
-			SortIndex:  output.SortIndex,
-			CreatedAt:  output.CreatedAt,
-			UpdatedAt:  output.UpdatedAt,
+			ID:          output.ID,
+			TaskID:      output.TaskID,
+			OutputKind:  output.OutputKind,
+			Role:        output.Role,
+			URL:         output.URL,
+			MIMEType:    output.MIMEType,
+			Width:       output.Width,
+			Height:      output.Height,
+			SizeBytes:   output.SizeBytes,
+			ResultIndex: output.ResultIndex,
+			CreatedAt:   output.CreatedAt,
+			UpdatedAt:   output.UpdatedAt,
 		})
 	}
 	return result

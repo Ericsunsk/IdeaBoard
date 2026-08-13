@@ -41,7 +41,7 @@ func TestBilledStyleVariationSubmissionSucceedsAsRuntimeRole(t *testing.T) {
 	db, ownerPool := testdb.OpenWithPool(t)
 	ownerCredits := credits.NewService(ownerPool)
 	ownerBilling := billing.NewService(ownerPool)
-	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugStyleVariation)
+	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugStyleVariation, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,7 +282,7 @@ func TestBilledDuplicateRejectsDifferentProductForSameClientAction(t *testing.T)
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
 	firstRequest := seedPatternBillingProduct(t, billingService, 25)
-	secondRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugStyleVariation)
+	secondRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugStyleVariation, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -456,7 +456,7 @@ func TestAllAIImageWorkflowSubmissionPricingMatrix(t *testing.T) {
 				db, pool := testdb.OpenWithPool(t)
 				creditService := credits.NewService(pool)
 				billingService := billing.NewService(pool)
-				request, err := taskbilling.AIImageRequest(feature)
+				request, err := taskbilling.AIImageRequest(feature, 1)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -514,7 +514,7 @@ WHERE snapshots.task_id = $1`, result.TaskID).Scan(&snapshotFeature, &state); er
 
 func seedPatternBillingProduct(t *testing.T, service *billing.Service, unitCredits int64) taskbilling.Request {
 	t.Helper()
-	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen)
+	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen, 1)
 	if err != nil {
 		t.Fatal(err)
 	}

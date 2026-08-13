@@ -54,6 +54,7 @@ var (
 	ErrIdempotencyConflict        = errors.New("credit idempotency key conflicts with a different request")
 	ErrHoldNotFound               = errors.New("credit hold not found")
 	ErrHoldSettled                = errors.New("credit hold is already settled")
+	ErrHoldSettlementExceeds      = errors.New("credit hold settlement exceeds remaining amount")
 	ErrChargeNotFound             = errors.New("credit charge not found")
 	ErrRefundExceedsCharge        = errors.New("credit refund exceeds remaining charge")
 	ErrWelcomeIdentityKeyMismatch = errors.New("welcome identity key does not match the permanently bound key")
@@ -152,12 +153,14 @@ type HoldCommand struct {
 type CaptureCommand struct {
 	UserID            int64
 	HoldTransactionID string
+	Amount            CreditAmount
 	Metadata          CommandMetadata
 }
 
 type ReleaseCommand struct {
 	UserID            int64
 	HoldTransactionID string
+	Amount            CreditAmount
 	Metadata          CommandMetadata
 }
 
@@ -292,9 +295,12 @@ type LedgerTransaction struct {
 // HoldReference and ChargeReference make settlement facts explicit in Admin
 // ledger reads; related_transaction_id remains the immutable audit link.
 type HoldReference struct {
-	Amount                int64  `json:"amount_credits"`
-	Status                string `json:"status"`
-	TerminalTransactionID string `json:"terminal_transaction_id,omitempty"`
+	Amount               int64  `json:"amount_credits"`
+	CapturedAmount       int64  `json:"captured_credits"`
+	ReleasedAmount       int64  `json:"released_credits"`
+	Status               string `json:"status"`
+	CaptureTransactionID string `json:"capture_transaction_id,omitempty"`
+	ReleaseTransactionID string `json:"release_transaction_id,omitempty"`
 }
 
 type ChargeReference struct {

@@ -74,7 +74,7 @@ func taskStatEventFromTask(task *tasks.Task, attemptFinish *tasks.TaskAttemptFin
 	if task == nil || strings.TrimSpace(task.Status) == "" || strings.TrimSpace(task.TaskID) == "" {
 		return normalizedTaskStatEvent{}, false
 	}
-	if task.Status != tasks.StatusCompleted && task.Status != tasks.StatusFailed && task.Status != tasks.StatusCancelled {
+	if task.Status != tasks.StatusCompleted && task.Status != tasks.StatusFailed && !tasks.IsTerminalStatus(task.Status) {
 		return normalizedTaskStatEvent{}, false
 	}
 	occurredAt := taskStatOccurredAt(task)
@@ -140,7 +140,7 @@ func upsertTaskDailyStatDeltaTx(ctx context.Context, q *dbsqlc.Queries, event no
 		}
 	case tasks.StatusFailed:
 		failedDelta = 1
-	case tasks.StatusCancelled:
+	case tasks.StatusCancelled, tasks.StatusCancelledWithResults:
 		cancelledDelta = 1
 	}
 
@@ -313,7 +313,7 @@ func taskStatEventFromCorrection(correction TaskStatEventCorrection) (normalized
 	if taskID == "" {
 		return normalizedTaskStatEvent{}, false
 	}
-	if correction.Status != tasks.StatusCompleted && correction.Status != tasks.StatusFailed && correction.Status != tasks.StatusCancelled {
+	if correction.Status != tasks.StatusCompleted && correction.Status != tasks.StatusFailed && !tasks.IsTerminalStatus(correction.Status) {
 		return normalizedTaskStatEvent{}, false
 	}
 	occurredAt := correction.OccurredAt

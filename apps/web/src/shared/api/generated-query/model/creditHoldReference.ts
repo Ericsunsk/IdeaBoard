@@ -9,6 +9,11 @@ import type { CreditHoldReferenceStatus } from './creditHoldReferenceStatus'
 export interface CreditHoldReference {
   /** @minimum 1 */
   amount_credits: number
+  /** @minimum 0 */
+  captured_credits: number
+  /** @minimum 0 */
+  released_credits: number
   status: CreditHoldReferenceStatus
-  terminal_transaction_id?: string
+  capture_transaction_id?: string
+  release_transaction_id?: string
 }

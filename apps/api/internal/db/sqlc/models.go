@@ -149,13 +149,16 @@ type CreditCharge struct {
 }
 
 type CreditHold struct {
-	HoldTransactionID     string         `json:"hold_transaction_id"`
-	WalletUserID          int64          `json:"wallet_user_id"`
-	Amount                int64          `json:"amount"`
-	Status                string         `json:"status"`
-	TerminalTransactionID sql.NullString `json:"terminal_transaction_id"`
-	CreatedAt             time.Time      `json:"created_at"`
-	SettledAt             sql.NullTime   `json:"settled_at"`
+	HoldTransactionID    string         `json:"hold_transaction_id"`
+	WalletUserID         int64          `json:"wallet_user_id"`
+	Amount               int64          `json:"amount"`
+	CapturedAmount       int64          `json:"captured_amount"`
+	ReleasedAmount       int64          `json:"released_amount"`
+	Status               string         `json:"status"`
+	CaptureTransactionID sql.NullString `json:"capture_transaction_id"`
+	ReleaseTransactionID sql.NullString `json:"release_transaction_id"`
+	CreatedAt            time.Time      `json:"created_at"`
+	SettledAt            sql.NullTime   `json:"settled_at"`
 }
 
 type CreditPosting struct {
@@ -666,11 +669,15 @@ type TaskAttempt struct {
 }
 
 type TaskBillingSettlement struct {
-	TaskID                  string         `json:"task_id"`
-	State                   string         `json:"state"`
-	SettlementTransactionID sql.NullString `json:"settlement_transaction_id"`
-	SettledAt               sql.NullTime   `json:"settled_at"`
-	UpdatedAt               time.Time      `json:"updated_at"`
+	TaskID               string         `json:"task_id"`
+	State                string         `json:"state"`
+	ActualOutputCount    int64          `json:"actual_output_count"`
+	CapturedCredits      int64          `json:"captured_credits"`
+	ReleasedCredits      int64          `json:"released_credits"`
+	CaptureTransactionID sql.NullString `json:"capture_transaction_id"`
+	ReleaseTransactionID sql.NullString `json:"release_transaction_id"`
+	SettledAt            sql.NullTime   `json:"settled_at"`
+	UpdatedAt            time.Time      `json:"updated_at"`
 }
 
 type TaskBillingSnapshot struct {
@@ -776,7 +783,7 @@ type TaskOutput struct {
 	Url          string          `json:"url"`
 	SourceUrl    string          `json:"source_url"`
 	Metadata     json.RawMessage `json:"metadata"`
-	SortIndex    int32           `json:"sort_index"`
+	ResultIndex  int32           `json:"result_index"`
 	CreatedAt    time.Time       `json:"created_at"`
 	UpdatedAt    time.Time       `json:"updated_at"`
 }

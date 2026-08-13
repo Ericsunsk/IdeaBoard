@@ -16,7 +16,11 @@ export interface TaskUserOutput {
   width: number
   height: number
   size_bytes: number
-  sort_index: number
+  /**
+   * @minimum 0
+   * @maximum 3
+   */
+  result_index: number
   created_at: string
   updated_at: string
 }

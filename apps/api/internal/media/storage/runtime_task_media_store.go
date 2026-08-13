@@ -114,9 +114,9 @@ func (s *RuntimeTaskMediaStore) cleanupMaterializedResultKeys(ctx context.Contex
 	}
 }
 
-func taskOutputFromStoredUploadRef(taskID string, ref *StoredUploadRef, sourceURL string, sortIndex int) tasks.TaskOutput {
+func taskOutputFromStoredUploadRef(taskID string, ref *StoredUploadRef, sourceURL string, resultIndex int) tasks.TaskOutput {
 	if ref == nil {
-		return tasks.TaskOutput{TaskID: taskID, Role: "image", SourceURL: sourceURL, SortIndex: sortIndex}
+		return tasks.TaskOutput{TaskID: taskID, Role: "image", SourceURL: sourceURL, ResultIndex: resultIndex}
 	}
 	return tasks.TaskOutput{
 		TaskID:         taskID,
@@ -129,7 +129,7 @@ func taskOutputFromStoredUploadRef(taskID string, ref *StoredUploadRef, sourceUR
 		SizeBytes:      ref.SizeBytes,
 		SourceURL:      sourceURL,
 		StorageProfile: ref.StorageProfile,
-		SortIndex:      sortIndex,
+		ResultIndex:    resultIndex,
 	}
 }
 

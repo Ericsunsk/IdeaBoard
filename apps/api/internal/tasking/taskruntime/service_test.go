@@ -959,12 +959,14 @@ func TestCompleteTaskPersistsTaskOutputs(t *testing.T) {
 			StorageKey:     "uploads/tasks/7/task-completed-outputs/out-a.png",
 			MIMEType:       "image/png",
 			StorageProfile: "builtin-local",
+			ResultIndex:    0,
 		},
 		{
 			URL:            "https://assets.example.com/uploads/tasks/7/task-completed-outputs/out-b.png",
 			StorageKey:     "uploads/tasks/7/task-completed-outputs/out-b.png",
 			MIMEType:       "image/png",
 			StorageProfile: "builtin-local",
+			ResultIndex:    2,
 		},
 	}
 	if err := service.CompleteTask(ctx, CompleteTaskInput{
@@ -989,6 +991,9 @@ func TestCompleteTaskPersistsTaskOutputs(t *testing.T) {
 	if outputs[1].URL != "https://assets.example.com/uploads/tasks/7/task-completed-outputs/out-b.png" || outputs[1].StorageKey != "uploads/tasks/7/task-completed-outputs/out-b.png" {
 		t.Fatalf("unexpected second output: %+v", outputs[1])
 	}
+	if outputs[0].ResultIndex != 0 || outputs[1].ResultIndex != 2 {
+		t.Fatalf("result indices = %d/%d, want 0/2", outputs[0].ResultIndex, outputs[1].ResultIndex)
+	}
 	for _, output := range outputs {
 		if output.OutputKind != "asset" {
 			t.Fatalf("output kind=%q, want asset", output.OutputKind)
@@ -998,7 +1003,7 @@ func TestCompleteTaskPersistsTaskOutputs(t *testing.T) {
 		}
 	}
 	var persistedOutputURL string
-	if err := db.QueryRowContext(ctx, `SELECT url FROM task_outputs WHERE task_id = $1 ORDER BY sort_index ASC LIMIT 1`, task.TaskID).Scan(&persistedOutputURL); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT url FROM task_outputs WHERE task_id = $1 ORDER BY result_index ASC LIMIT 1`, task.TaskID).Scan(&persistedOutputURL); err != nil {
 		t.Fatalf("read raw task output failed: %v", err)
 	}
 	if persistedOutputURL != "" {
@@ -1054,8 +1059,8 @@ func TestCompleteTaskReusesDuplicateMediaAsset(t *testing.T) {
 
 	sharedKey := "uploads/tasks/7/task-duplicate-output-asset/shared.png"
 	outputs := []tasks.TaskOutput{
-		{URL: "/uploads/" + sharedKey, StorageKey: sharedKey, MIMEType: "image/png", StorageProfile: "builtin-local"},
-		{URL: "/uploads/" + sharedKey, StorageKey: sharedKey, MIMEType: "image/png", StorageProfile: "builtin-local"},
+		{URL: "/uploads/" + sharedKey, StorageKey: sharedKey, MIMEType: "image/png", StorageProfile: "builtin-local", ResultIndex: 0},
+		{URL: "/uploads/" + sharedKey, StorageKey: sharedKey, MIMEType: "image/png", StorageProfile: "builtin-local", ResultIndex: 1},
 	}
 	if err := service.CompleteTask(ctx, CompleteTaskInput{
 		Assignment: taskRuntimeAssignment(task),

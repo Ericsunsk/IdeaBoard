@@ -1624,30 +1624,30 @@ func (q *Queries) ListTasksByUserID(ctx context.Context, arg ListTasksByUserIDPa
 
 const markTaskCancelled = `-- name: MarkTaskCancelled :execrows
 UPDATE tasks
-SET status = 'cancelled',
+SET status = CASE WHEN EXISTS (SELECT 1 FROM task_outputs outputs WHERE outputs.task_id = $1) THEN 'cancelled_with_results' ELSE 'cancelled' END,
     lease_token = '',
-    completed_at = $1::timestamptz,
-    cancelled_at = $1::timestamptz,
-    cancelled_by = $2,
-    cancel_reason = $3,
+    completed_at = $2::timestamptz,
+    cancelled_at = $2::timestamptz,
+    cancelled_by = $3,
+    cancel_reason = $4,
     updated_at = now()
-WHERE task_id = $4
+WHERE task_id = $1
   AND status IN ('pending', 'running')
 `
 
 type MarkTaskCancelledParams struct {
+	TaskID       string        `json:"task_id"`
 	CancelledAt  sql.NullTime  `json:"cancelled_at"`
 	CancelledBy  sql.NullInt64 `json:"cancelled_by"`
 	CancelReason string        `json:"cancel_reason"`
-	TaskID       string        `json:"task_id"`
 }
 
 func (q *Queries) MarkTaskCancelled(ctx context.Context, arg MarkTaskCancelledParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, markTaskCancelled,
+		arg.TaskID,
 		arg.CancelledAt,
 		arg.CancelledBy,
 		arg.CancelReason,
-		arg.TaskID,
 	)
 	if err != nil {
 		return 0, err
@@ -1781,20 +1781,20 @@ INSERT INTO task_execution_metrics (
 SELECT
   t.task_id,
   CASE
-    WHEN t.status IN ('completed', 'failed', 'cancelled') THEN t.status
+    WHEN t.status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results') THEN t.status
     ELSE COALESCE($1::text, 'queued')
   END,
   COALESCE($2::text, 'unknown'),
   CASE
     WHEN t.status = 'completed' THEN ''
     WHEN t.status = 'failed' THEN COALESCE(NULLIF($3::text, ''), 'assigned')
-    WHEN t.status = 'cancelled' THEN COALESCE(NULLIF($3::text, ''), 'queued')
+    WHEN t.status IN ('cancelled', 'cancelled_with_results') THEN COALESCE(NULLIF($3::text, ''), 'queued')
     ELSE COALESCE($3::text, '')
   END,
   CASE
     WHEN t.status = 'completed' THEN ''
     WHEN t.status = 'failed' THEN COALESCE(NULLIF($4::text, ''), 'unknown')
-    WHEN t.status = 'cancelled' THEN 'cancelled'
+    WHEN t.status IN ('cancelled', 'cancelled_with_results') THEN 'cancelled'
     ELSE COALESCE($4::text, '')
   END,
   $5,
@@ -2102,8 +2102,8 @@ SELECT
   COUNT(*) FILTER (WHERE status = 'running') AS running_count,
   COUNT(*) FILTER (WHERE status = 'completed') AS completed_count,
   COUNT(*) FILTER (WHERE status = 'failed') AS failed_count,
-  COUNT(*) FILTER (WHERE status = 'cancelled') AS cancelled_count,
-  COUNT(*) FILTER (WHERE status NOT IN ('pending', 'running', 'completed', 'failed', 'cancelled')) AS other_count
+  COUNT(*) FILTER (WHERE status IN ('cancelled', 'cancelled_with_results')) AS cancelled_count,
+  COUNT(*) FILTER (WHERE status NOT IN ('pending', 'running', 'completed', 'failed', 'cancelled', 'cancelled_with_results')) AS other_count
 FROM tasks
 WHERE (NOT $1::boolean OR user_id = $2)
   AND (NOT $3::boolean OR account_id = $4)

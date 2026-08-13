@@ -17,7 +17,7 @@ import (
 const createTaskOutput = `-- name: CreateTaskOutput :one
 INSERT INTO task_outputs (
   task_id, media_asset_id, output_kind, role, url,
-  source_url, metadata, sort_index
+  source_url, metadata, result_index
 ) VALUES (
   $1, $2, $3, $4, $5,
   $6, $7, $8
@@ -33,7 +33,7 @@ type CreateTaskOutputParams struct {
 	Url          string          `json:"url"`
 	SourceUrl    string          `json:"source_url"`
 	Metadata     json.RawMessage `json:"metadata"`
-	SortIndex    int32           `json:"sort_index"`
+	ResultIndex  int32           `json:"result_index"`
 }
 
 func (q *Queries) CreateTaskOutput(ctx context.Context, arg CreateTaskOutputParams) (int64, error) {
@@ -45,7 +45,7 @@ func (q *Queries) CreateTaskOutput(ctx context.Context, arg CreateTaskOutputPara
 		arg.Url,
 		arg.SourceUrl,
 		arg.Metadata,
-		arg.SortIndex,
+		arg.ResultIndex,
 	)
 	var id int64
 	err := row.Scan(&id)
@@ -79,13 +79,13 @@ SELECT
   COALESCE(a.checksum_sha256, '') AS checksum_sha256,
   COALESCE(a.storage_profile_id, '') AS storage_profile,
   o.metadata,
-  o.sort_index,
+  o.result_index,
   o.created_at,
   o.updated_at
 FROM task_outputs AS o
 LEFT JOIN media_assets AS a ON a.id = o.media_asset_id
 WHERE o.task_id = ANY($1::text[])
-ORDER BY o.task_id ASC, o.sort_index ASC, o.id ASC
+ORDER BY o.task_id ASC, o.result_index ASC, o.id ASC
 `
 
 type ListOutputsByTaskIDsRow struct {
@@ -104,7 +104,7 @@ type ListOutputsByTaskIDsRow struct {
 	ChecksumSha256 string          `json:"checksum_sha256"`
 	StorageProfile string          `json:"storage_profile"`
 	Metadata       json.RawMessage `json:"metadata"`
-	SortIndex      int32           `json:"sort_index"`
+	ResultIndex    int32           `json:"result_index"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`
 }
@@ -134,7 +134,7 @@ func (q *Queries) ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([
 			&i.ChecksumSha256,
 			&i.StorageProfile,
 			&i.Metadata,
-			&i.SortIndex,
+			&i.ResultIndex,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {

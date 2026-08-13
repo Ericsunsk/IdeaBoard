@@ -284,6 +284,8 @@ func mapCreditDatabaseError(err error) error {
 		return ErrWalletRestricted
 	case "IB012":
 		return ErrWalletRestrictionNotFound
+	case "IB013":
+		return ErrHoldSettlementExceeds
 	default:
 		return fmt.Errorf("credits service: execute command: %w", err)
 	}

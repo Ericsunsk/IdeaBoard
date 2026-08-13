@@ -21,7 +21,6 @@ func insertTaskOutputs(ctx context.Context, q *dbsqlc.Queries, taskID string, ow
 	for i := range outputs {
 		output := outputs[i]
 		output.TaskID = taskID
-		output.SortIndex = i
 		output.OutputKind = normalizeTaskOutputKind(output)
 		if strings.TrimSpace(output.Role) == "" {
 			output.Role = "image"
@@ -44,7 +43,7 @@ func insertTaskOutputs(ctx context.Context, q *dbsqlc.Queries, taskID string, ow
 			Url:          output.URL,
 			SourceUrl:    output.SourceURL,
 			Metadata:     outputMetadataJSON(output.Metadata),
-			SortIndex:    int32(output.SortIndex),
+			ResultIndex:  int32(output.ResultIndex),
 		})
 		if err != nil {
 			return err

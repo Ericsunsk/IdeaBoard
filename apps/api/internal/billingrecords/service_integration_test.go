@@ -193,7 +193,11 @@ func hold(t *testing.T, ctx context.Context, service *credits.Service, userID, a
 
 func capture(t *testing.T, ctx context.Context, service *credits.Service, userID int64, holdID string, commandMetadata credits.CommandMetadata) credits.CommandResult {
 	t.Helper()
-	result, err := service.Capture(ctx, credits.CaptureCommand{UserID: userID, HoldTransactionID: holdID, Metadata: commandMetadata})
+	amount, err := credits.NewCreditAmount(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := service.Capture(ctx, credits.CaptureCommand{UserID: userID, HoldTransactionID: holdID, Amount: amount, Metadata: commandMetadata})
 	if err != nil {
 		t.Fatal(err)
 	}

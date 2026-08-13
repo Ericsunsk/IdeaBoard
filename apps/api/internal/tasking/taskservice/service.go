@@ -485,7 +485,7 @@ func (s *Service) enrichAdminTaskDetail(ctx context.Context, detail *AdminTaskMo
 
 func normalizeTaskListStatus(status string) (string, error) {
 	switch normalized := strings.ToLower(strings.TrimSpace(status)); normalized {
-	case "", tasks.StatusPending, tasks.StatusRunning, tasks.StatusCompleted, tasks.StatusFailed, tasks.StatusCancelled:
+	case "", tasks.StatusPending, tasks.StatusRunning, tasks.StatusCompleted, tasks.StatusFailed, tasks.StatusCancelled, tasks.StatusCancelledWithResults:
 		return normalized, nil
 	default:
 		return "", validation.New("status 仅支持 pending、running、completed、failed 或 cancelled")

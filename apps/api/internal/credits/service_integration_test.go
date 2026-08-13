@@ -150,6 +150,7 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 	capture, err := service.Capture(ctx, CaptureCommand{
 		UserID:            userID,
 		HoldTransactionID: hold.TransactionID,
+		Amount:            mustCreditAmount(t, 80),
 		Metadata:          testMetadata("lifecycle:capture", "lifecycle-capture"),
 	})
 	if err != nil {
@@ -161,6 +162,7 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 	if _, err := service.Release(ctx, ReleaseCommand{
 		UserID:            userID,
 		HoldTransactionID: hold.TransactionID,
+		Amount:            mustCreditAmount(t, 1),
 		Metadata:          testMetadata("lifecycle:release-settled", "lifecycle-release-settled"),
 	}); !errors.Is(err, ErrHoldSettled) {
 		t.Fatalf("Release(settled hold) error = %v, want ErrHoldSettled", err)
@@ -197,6 +199,7 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 	release, err := service.Release(ctx, ReleaseCommand{
 		UserID:            userID,
 		HoldTransactionID: releasedHold.TransactionID,
+		Amount:            mustCreditAmount(t, 10),
 		Metadata:          testMetadata("lifecycle:release", "lifecycle-release"),
 	})
 	if err != nil {
@@ -219,6 +222,43 @@ func TestCreditCommandsHoldCaptureReleaseAndRefund(t *testing.T) {
 	}
 	if len(page.Transactions) != 6 {
 		t.Fatalf("ledger transactions = %d, want 6", len(page.Transactions))
+	}
+}
+
+func TestCreditHoldSupportsOneCaptureAndOneReleaseWithStableTotals(t *testing.T) {
+	_, pool := testdb.OpenWithPool(t)
+	service := NewService(pool)
+	ctx := context.Background()
+	const userID int64 = 889
+
+	if _, err := service.Grant(ctx, GrantCommand{UserID: userID, Amount: mustCreditAmount(t, 4), Metadata: testMetadata("partial:grant", "partial-grant")}); err != nil {
+		t.Fatalf("Grant() error = %v", err)
+	}
+	hold, err := service.Hold(ctx, HoldCommand{UserID: userID, Amount: mustCreditAmount(t, 4), Metadata: testMetadata("partial:hold", "partial-hold")})
+	if err != nil {
+		t.Fatalf("Hold() error = %v", err)
+	}
+	capture, err := service.Capture(ctx, CaptureCommand{UserID: userID, HoldTransactionID: hold.TransactionID, Amount: mustCreditAmount(t, 2), Metadata: testMetadata("partial:capture", "partial-capture")})
+	if err != nil {
+		t.Fatalf("partial Capture() error = %v", err)
+	}
+	if capture.Amount != 2 || capture.Wallet.Reserved != 2 {
+		t.Fatalf("partial capture = %+v", capture)
+	}
+	release, err := service.Release(ctx, ReleaseCommand{UserID: userID, HoldTransactionID: hold.TransactionID, Amount: mustCreditAmount(t, 2), Metadata: testMetadata("partial:release", "partial-release")})
+	if err != nil {
+		t.Fatalf("partial Release() error = %v", err)
+	}
+	if release.Wallet.Available != 4 || release.Wallet.Reserved != 0 {
+		t.Fatalf("partial release = %+v", release)
+	}
+	var captured, released int64
+	var status string
+	if err := pool.QueryRow(ctx, `SELECT captured_amount, released_amount, status FROM credit_holds WHERE hold_transaction_id = $1`, hold.TransactionID).Scan(&captured, &released, &status); err != nil {
+		t.Fatalf("read partial hold = %v", err)
+	}
+	if captured != 2 || released != 2 || status != "captured" {
+		t.Fatalf("partial hold facts = captured=%d released=%d status=%s", captured, released, status)
 	}
 }
 

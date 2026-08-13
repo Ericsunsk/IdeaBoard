@@ -3130,11 +3130,14 @@ components:
 
     CreditHoldReference:
       type: object
-      required: [amount_credits, status]
+      required: [amount_credits, captured_credits, released_credits, status]
       properties:
         amount_credits: { type: integer, format: int64, minimum: 1 }
+        captured_credits: { type: integer, format: int64, minimum: 0 }
+        released_credits: { type: integer, format: int64, minimum: 0 }
         status: { type: string, enum: [held, captured, released] }
-        terminal_transaction_id: { type: string }
+        capture_transaction_id: { type: string }
+        release_transaction_id: { type: string }
 
     CreditChargeReference:
       type: object
@@ -3275,8 +3278,7 @@ components:
         - task_trace_missing
         - task_billing_fact_missing
         - active_task_not_held
-        - completed_task_not_captured
-        - failed_task_not_released
+        - terminal_task_settlement_mismatch
         - task_terminal_transaction_count
         - idempotency_request_hash_conflict
         - task_settlement_reference_invalid
@@ -3506,7 +3508,7 @@ components:
     TaskUserOutput:
       type: object
       additionalProperties: false
-      required: [id, task_id, output_kind, role, url, mime_type, width, height, size_bytes, sort_index, created_at, updated_at]
+      required: [id, task_id, output_kind, role, url, mime_type, width, height, size_bytes, result_index, created_at, updated_at]
       properties:
         id: { type: integer }
         task_id: { type: string }
@@ -3517,7 +3519,7 @@ components:
         width: { type: integer }
         height: { type: integer }
         size_bytes: { type: integer }
-        sort_index: { type: integer }
+        result_index: { type: integer, minimum: 0, maximum: 3 }
         created_at: { type: string }
         updated_at: { type: string }
 
@@ -3741,7 +3743,7 @@ components:
         - width
         - height
         - size_bytes
-        - sort_index
+        - result_index
         - created_at
         - updated_at
       properties:
@@ -3764,7 +3766,7 @@ components:
         checksum_sha256: { type: string }
         storage_profile: { type: string }
         metadata: { type: string }
-        sort_index: { type: integer }
+        result_index: { type: integer, minimum: 0, maximum: 3 }
         created_at: { type: string }
         updated_at: { type: string }
 

@@ -44,7 +44,7 @@ func TestRuntimeTaskMediaStoreMaterializeRemoteResultsStoresOutputs(t *testing.T
 	}
 	for i, item := range materialized.Items {
 		output := item.Output
-		if output.TaskID != "task-abc" || output.Role != "image" || output.SourceURL != sourceURLs[i] || output.SortIndex != i {
+		if output.TaskID != "task-abc" || output.Role != "image" || output.SourceURL != sourceURLs[i] || output.ResultIndex != i {
 			t.Fatalf("output[%d] metadata = %#v", i, output)
 		}
 		if item.ImageURL != output.URL || output.URL != materializedURLs[i] || !strings.HasPrefix(output.StorageKey, "uploads/tasks/42/task-abc/") {
@@ -110,7 +110,7 @@ func TestRuntimeTaskMediaStoreMaterializeBytesResultStoresOutput(t *testing.T) {
 		t.Fatalf("materialized count = %d, want 1", len(materialized.Items))
 	}
 	output := materialized.Items[0].Output
-	if output.TaskID != "task-bytes" || output.Role != "image" || output.URL != materialized.Items[0].ImageURL || output.SourceURL != "upstream://image" || output.SortIndex != 0 {
+	if output.TaskID != "task-bytes" || output.Role != "image" || output.URL != materialized.Items[0].ImageURL || output.SourceURL != "upstream://image" || output.ResultIndex != 0 {
 		t.Fatalf("output metadata = %#v", output)
 	}
 	if !strings.HasPrefix(output.StorageKey, "uploads/tasks/42/task-bytes/") || output.MIMEType != "image/png" || output.Width != 1 || output.Height != 1 || output.SizeBytes != int64(len(imageBytes)) {

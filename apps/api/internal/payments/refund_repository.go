@@ -406,7 +406,11 @@ func (r *Repository) MarkPaymentRefundFailed(ctx context.Context, refundID, summ
 	if err != nil {
 		return PaymentRefund{}, err
 	}
-	if _, err := commands.Release(ctx, credits.ReleaseCommand{UserID: refund.UserID, HoldTransactionID: refund.CreditHoldTransactionID, Metadata: credits.CommandMetadata{IdempotencyKey: "refund-release-" + refund.ID, Actor: credits.Actor{Type: credits.ActorService, ID: "payments"}, Source: "stripe_refund", Reason: "Stripe refund failed", BusinessReference: credits.BusinessReference{Type: "payment_refund", ID: refund.ID}}}); err != nil && !errors.Is(err, credits.ErrHoldSettled) {
+	creditAmount, err := credits.NewCreditAmount(refund.IdeaQuantity)
+	if err != nil {
+		return PaymentRefund{}, err
+	}
+	if _, err := commands.Release(ctx, credits.ReleaseCommand{UserID: refund.UserID, HoldTransactionID: refund.CreditHoldTransactionID, Amount: creditAmount, Metadata: credits.CommandMetadata{IdempotencyKey: "refund-release-" + refund.ID, Actor: credits.Actor{Type: credits.ActorService, ID: "payments"}, Source: "stripe_refund", Reason: "Stripe refund failed", BusinessReference: credits.BusinessReference{Type: "payment_refund", ID: refund.ID}}}); err != nil && !errors.Is(err, credits.ErrHoldSettled) {
 		return PaymentRefund{}, err
 	}
 	if err := scanPaymentRefund(tx.QueryRowContext(ctx, `UPDATE payment_refunds SET status = 'failed', error_summary = $2, failed_at = $3, updated_at = $3 WHERE id = $1::uuid RETURNING id::text, payment_order_id::text, user_id, idea_quantity, amount_minor, currency, status, stripe_status, stripe_refund_id, stripe_charge_id, credit_hold_transaction_id, credit_transaction_id, error_summary, created_at, updated_at`, refundID, boundedText(summary, 500), now), &refund); err != nil {

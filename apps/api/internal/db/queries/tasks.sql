@@ -83,8 +83,8 @@ SELECT
   COUNT(*) FILTER (WHERE status = 'running') AS running_count,
   COUNT(*) FILTER (WHERE status = 'completed') AS completed_count,
   COUNT(*) FILTER (WHERE status = 'failed') AS failed_count,
-  COUNT(*) FILTER (WHERE status = 'cancelled') AS cancelled_count,
-  COUNT(*) FILTER (WHERE status NOT IN ('pending', 'running', 'completed', 'failed', 'cancelled')) AS other_count
+  COUNT(*) FILTER (WHERE status IN ('cancelled', 'cancelled_with_results')) AS cancelled_count,
+  COUNT(*) FILTER (WHERE status NOT IN ('pending', 'running', 'completed', 'failed', 'cancelled', 'cancelled_with_results')) AS other_count
 FROM tasks
 WHERE (NOT sqlc.arg(has_user_id)::boolean OR user_id = sqlc.arg(user_id))
   AND (NOT sqlc.arg(has_account_id)::boolean OR account_id = sqlc.arg(account_id))
@@ -156,20 +156,20 @@ INSERT INTO task_execution_metrics (
 SELECT
   t.task_id,
   CASE
-    WHEN t.status IN ('completed', 'failed', 'cancelled') THEN t.status
+    WHEN t.status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results') THEN t.status
     ELSE COALESCE(sqlc.narg(current_stage)::text, 'queued')
   END,
   COALESCE(sqlc.narg(bottleneck_source)::text, 'unknown'),
   CASE
     WHEN t.status = 'completed' THEN ''
     WHEN t.status = 'failed' THEN COALESCE(NULLIF(sqlc.narg(failure_stage)::text, ''), 'assigned')
-    WHEN t.status = 'cancelled' THEN COALESCE(NULLIF(sqlc.narg(failure_stage)::text, ''), 'queued')
+    WHEN t.status IN ('cancelled', 'cancelled_with_results') THEN COALESCE(NULLIF(sqlc.narg(failure_stage)::text, ''), 'queued')
     ELSE COALESCE(sqlc.narg(failure_stage)::text, '')
   END,
   CASE
     WHEN t.status = 'completed' THEN ''
     WHEN t.status = 'failed' THEN COALESCE(NULLIF(sqlc.narg(failure_category)::text, ''), 'unknown')
-    WHEN t.status = 'cancelled' THEN 'cancelled'
+    WHEN t.status IN ('cancelled', 'cancelled_with_results') THEN 'cancelled'
     ELSE COALESCE(sqlc.narg(failure_category)::text, '')
   END,
   sqlc.narg(assigned_at),
@@ -260,7 +260,7 @@ WHERE task_id = sqlc.arg(task_id)
 
 -- name: MarkTaskCancelled :execrows
 UPDATE tasks
-SET status = 'cancelled',
+SET status = CASE WHEN EXISTS (SELECT 1 FROM task_outputs outputs WHERE outputs.task_id = sqlc.arg(task_id)) THEN 'cancelled_with_results' ELSE 'cancelled' END,
     lease_token = '',
     completed_at = sqlc.narg(cancelled_at)::timestamptz,
     cancelled_at = sqlc.narg(cancelled_at)::timestamptz,

@@ -19,7 +19,7 @@ func TestAIImageReadinessReturnsQuoteAndWalletAvailability(t *testing.T) {
 	billingService := billing.NewService(pool)
 	creditService := credits.NewService(pool)
 	service := NewService(billingService, creditService)
-	request, err := AIImageRequest(workflow.FeatureSlugPatternGen)
+	request, err := AIImageRequest(workflow.FeatureSlugPatternGen, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestAllAIImageWorkflowReadinessPricingMatrix(t *testing.T) {
 				_, pool := testdb.OpenWithPool(t)
 				billingService := billing.NewService(pool)
 				creditService := credits.NewService(pool)
-				request, err := AIImageRequest(feature)
+				request, err := AIImageRequest(feature, 1)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -162,7 +162,7 @@ func TestHoldAndPersistFailsClosedForUnavailableFeatureStates(t *testing.T) {
 			db, pool := testdb.OpenWithPool(t)
 			billingService := billing.NewService(pool)
 			creditService := credits.NewService(pool)
-			request, err := AIImageRequest(workflow.FeatureSlugPartialEdit)
+			request, err := AIImageRequest(workflow.FeatureSlugPartialEdit, 1)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -211,33 +211,29 @@ func TestHoldAndPersistFailsClosedForUnavailableFeatureStates(t *testing.T) {
 	}
 }
 
-func TestSettleTerminalMapsTaskOutcomeToCreditsSettlement(t *testing.T) {
+func TestSettleTerminalUsesPersistedOutputCount(t *testing.T) {
 	for _, testCase := range []struct {
 		name          string
-		outcome       TerminalOutcome
-		opposite      TerminalOutcome
+		outputCount   int
 		wantState     SettlementState
 		wantAvailable int64
 	}{
-		{name: "succeeded", outcome: TerminalOutcomeSucceeded, opposite: TerminalOutcomeUnsuccessful, wantState: SettlementStateCaptured, wantAvailable: 75},
-		{name: "unsuccessful", outcome: TerminalOutcomeUnsuccessful, opposite: TerminalOutcomeSucceeded, wantState: SettlementStateReleased, wantAvailable: 100},
+		{name: "with-output", outputCount: 1, wantState: SettlementStateCaptured, wantAvailable: 75},
+		{name: "without-output", outputCount: 0, wantState: SettlementStateReleased, wantAvailable: 100},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			db, pool := testdb.OpenWithPool(t)
 			taskID := "settle-terminal-" + testCase.name
 			seedTaskBillingFacts(t, pool, taskID, 1, 100, 25)
-
-			settleTerminalInSQLTx(t, db, taskID, testCase.outcome)
-			settleTerminalInSQLTx(t, db, taskID, testCase.outcome)
-
-			tx, err := db.BeginTx(t.Context(), nil)
-			if err != nil {
-				t.Fatal(err)
+			insertTerminalSettlementTask(t, db, taskID, workflow.FeatureSlugPatternGen)
+			for index := 0; index < testCase.outputCount; index++ {
+				if _, err := db.ExecContext(t.Context(), `INSERT INTO task_outputs (task_id, output_kind, role, url, result_index) VALUES ($1, 'remote', 'image', $2, $3)`, taskID, fmt.Sprintf("https://example.com/%d.png", index), index); err != nil {
+					t.Fatal(err)
+				}
 			}
-			defer tx.Rollback()
-			if err := SettleTerminal(t.Context(), tx, taskID, testCase.opposite); !errors.Is(err, ErrSettlementConflict) {
-				t.Fatalf("opposite terminal outcome error=%v, want ErrSettlementConflict", err)
-			}
+
+			settleTerminalInSQLTx(t, db, taskID)
+			settleTerminalInSQLTx(t, db, taskID)
 
 			assertTaskBillingSettlementFacts(t, db, taskID, testCase.wantState, testCase.wantAvailable)
 		})
@@ -250,7 +246,7 @@ func TestSettleTerminalNoOpsForFreeAndNonBillableTasks(t *testing.T) {
 		taskID := "settle-terminal-free"
 		seedTaskBillingFacts(t, pool, taskID, 1, 0, 0)
 
-		settleTerminalInSQLTx(t, db, taskID, TerminalOutcomeSucceeded)
+		settleTerminalInSQLTx(t, db, taskID)
 
 		assertTaskBillingSettlementFacts(t, db, taskID, SettlementStateFree, 0)
 		var terminalTransactions int
@@ -270,7 +266,7 @@ WHERE business_reference_id = $1
 		db, _ := testdb.OpenWithPool(t)
 		insertTerminalSettlementTask(t, db, "settle-terminal-local", "crop")
 
-		settleTerminalInSQLTx(t, db, "settle-terminal-local", TerminalOutcomeUnsuccessful)
+		settleTerminalInSQLTx(t, db, "settle-terminal-local")
 	})
 }
 
@@ -302,7 +298,7 @@ func TestDatabaseRejectsTaskBillingFactMutationAndIllegalSettlement(t *testing.T
 	billingService := billing.NewService(pool)
 	creditService := credits.NewService(pool)
 	service := NewService(billingService, creditService)
-	request, _ := AIImageRequest(workflow.FeatureSlugPatternGen)
+	request, _ := AIImageRequest(workflow.FeatureSlugPatternGen, 1)
 	sku, _ := ResolveSKU(request)
 	if _, err := billingService.PublishPrice(t.Context(), featurePriceInput(sku, "Pattern", 0)); err != nil {
 		t.Fatal(err)
@@ -354,7 +350,7 @@ VALUES ('invalid-initial-settlement', 'held')`); err == nil {
 		`UPDATE task_billing_snapshots SET display_name = 'tampered' WHERE task_id = 'immutable-billing-task'`,
 		`UPDATE task_billing_snapshots SET total_credits = 1 WHERE task_id = 'immutable-billing-task'`,
 		`DELETE FROM task_billing_snapshots WHERE task_id = 'immutable-billing-task'`,
-		`UPDATE task_billing_settlements SET state = 'released', settlement_transaction_id = 'fake', settled_at = now() WHERE task_id = 'immutable-billing-task'`,
+		`UPDATE task_billing_settlements SET state = 'released', actual_output_count = 0, released_credits = 1, release_transaction_id = 'fake', settled_at = now() WHERE task_id = 'immutable-billing-task'`,
 		`DELETE FROM task_billing_settlements WHERE task_id = 'immutable-billing-task'`,
 	} {
 		if _, err := db.ExecContext(t.Context(), statement); err == nil {
@@ -378,7 +374,7 @@ func seedTaskBillingFacts(t *testing.T, pool *pgxpool.Pool, taskID string, userI
 	billingService := billing.NewService(pool)
 	creditService := credits.NewService(pool)
 	service := NewService(billingService, creditService)
-	request, err := AIImageRequest(workflow.FeatureSlugPatternGen)
+	request, err := AIImageRequest(workflow.FeatureSlugPatternGen, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -424,14 +420,14 @@ func seedTaskBillingFacts(t *testing.T, pool *pgxpool.Pool, taskID string, userI
 	}
 }
 
-func settleTerminalInSQLTx(t *testing.T, db *sql.DB, taskID string, outcome TerminalOutcome) {
+func settleTerminalInSQLTx(t *testing.T, db *sql.DB, taskID string) {
 	t.Helper()
 	tx, err := db.BeginTx(t.Context(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer tx.Rollback()
-	if err := SettleTerminal(t.Context(), tx, taskID, outcome); err != nil {
+	if err := SettleTerminal(t.Context(), tx, taskID); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -446,7 +442,7 @@ func assertSettlementIntegrityError(t *testing.T, db *sql.DB, taskID string) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback()
-	if err := SettleTerminal(t.Context(), tx, taskID, TerminalOutcomeUnsuccessful); !errors.Is(err, ErrIntegrity) {
+	if err := SettleTerminal(t.Context(), tx, taskID); !errors.Is(err, ErrIntegrity) {
 		t.Fatalf("SettleTerminal error=%v, want ErrIntegrity", err)
 	}
 }

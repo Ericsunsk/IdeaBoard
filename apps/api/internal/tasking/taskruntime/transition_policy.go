@@ -79,7 +79,7 @@ var taskTransitionRules = map[taskTransition]taskTransitionRule{
 	taskTransitionCancel: {
 		from:       []string{tasks.StatusPending, tasks.StatusRunning},
 		target:     tasks.StatusCancelled,
-		idempotent: []string{tasks.StatusCancelled},
+		idempotent: []string{tasks.StatusCancelled, tasks.StatusCancelledWithResults},
 	},
 }
 

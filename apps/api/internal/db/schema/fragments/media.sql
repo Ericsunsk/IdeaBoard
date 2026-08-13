@@ -111,14 +111,14 @@ CREATE TABLE task_outputs (
   url TEXT NOT NULL DEFAULT '',
   source_url TEXT NOT NULL DEFAULT '',
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-  sort_index INTEGER NOT NULL DEFAULT 0,
+  result_index INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   CONSTRAINT fk_task_outputs_task_id FOREIGN KEY (task_id) REFERENCES tasks(task_id) ON DELETE CASCADE,
   CONSTRAINT fk_task_outputs_media_asset_id FOREIGN KEY (media_asset_id) REFERENCES media_assets(id) ON DELETE RESTRICT,
   CONSTRAINT ck_task_outputs_output_kind CHECK (output_kind IN ('asset', 'remote')),
   CONSTRAINT ck_task_outputs_role_not_blank CHECK (btrim(role) <> ''),
-  CONSTRAINT ck_task_outputs_sort_index_non_negative CHECK (sort_index >= 0),
+  CONSTRAINT ck_task_outputs_result_index_non_negative CHECK (result_index >= 0),
   CONSTRAINT ck_task_outputs_metadata_object CHECK (jsonb_typeof(metadata) = 'object'),
   CONSTRAINT ck_task_outputs_output_kind_shape CHECK (
     (output_kind = 'asset' AND media_asset_id IS NOT NULL AND btrim(url) = '')
@@ -126,7 +126,8 @@ CREATE TABLE task_outputs (
   )
 );
 
-CREATE INDEX idx_task_outputs_task_sort ON task_outputs (task_id, sort_index);
+CREATE INDEX idx_task_outputs_task_sort ON task_outputs (task_id, result_index);
+CREATE UNIQUE INDEX uq_task_outputs_task_result_index ON task_outputs (task_id, result_index);
 CREATE INDEX idx_task_outputs_media_asset_id ON task_outputs (media_asset_id);
 
 CREATE OR REPLACE FUNCTION enforce_task_output_media_asset_owner()

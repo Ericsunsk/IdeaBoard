@@ -579,7 +579,7 @@ func taskOutputFromSQLC(row dbsqlc.ListOutputsByTaskIDsRow) tasks.TaskOutput {
 		ChecksumSHA256: row.ChecksumSha256,
 		StorageProfile: row.StorageProfile,
 		Metadata:       string(row.Metadata),
-		SortIndex:      int(row.SortIndex),
+		ResultIndex:    int(row.ResultIndex),
 		CreatedAt:      row.CreatedAt,
 		UpdatedAt:      row.UpdatedAt,
 	}
@@ -595,9 +595,9 @@ func outputMetadataJSON(value string) json.RawMessage {
 
 func mediaAssetMetadataJSON(output tasks.TaskOutput) json.RawMessage {
 	metadata := map[string]interface{}{
-		"task_id":    strings.TrimSpace(output.TaskID),
-		"role":       strings.TrimSpace(output.Role),
-		"sort_index": output.SortIndex,
+		"task_id":      strings.TrimSpace(output.TaskID),
+		"role":         strings.TrimSpace(output.Role),
+		"result_index": output.ResultIndex,
 	}
 	if strings.TrimSpace(output.Metadata) != "" {
 		metadata["output_metadata"] = json.RawMessage(output.Metadata)

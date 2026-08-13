@@ -25,7 +25,7 @@ CREATE TABLE tasks (
   cancel_reason TEXT NOT NULL DEFAULT '',
   CONSTRAINT uq_tasks_task_id UNIQUE (task_id),
   CONSTRAINT ck_tasks_client_action_id_trimmed CHECK (client_action_id = btrim(client_action_id)),
-  CONSTRAINT ck_tasks_status CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
+  CONSTRAINT ck_tasks_status CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled', 'cancelled_with_results')),
   CONSTRAINT ck_tasks_priority CHECK (priority BETWEEN 1 AND 4),
   CONSTRAINT ck_tasks_retry_count_non_negative CHECK (retry_count >= 0),
   CONSTRAINT ck_tasks_attempt_seq_non_negative CHECK (attempt_seq >= 0),
@@ -36,7 +36,7 @@ CREATE TABLE tasks (
   CONSTRAINT ck_tasks_assignment_status CHECK (
     (status = 'pending' AND account_id IS NULL AND assigned_provider_endpoint_id IS NULL AND assigned_credential_id IS NULL)
     OR (status = 'running' AND account_id IS NOT NULL AND assigned_provider_endpoint_id IS NOT NULL AND assigned_credential_id IS NOT NULL)
-    OR status IN ('completed', 'failed', 'cancelled')
+    OR status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results')
   ),
   CONSTRAINT ck_tasks_lease_status CHECK (status = 'running' OR lease_token = ''),
   CONSTRAINT ck_tasks_terminal_consistency CHECK (
@@ -63,7 +63,7 @@ CREATE TABLE tasks (
       AND btrim(error_msg) <> ''
     )
     OR (
-      status = 'cancelled'
+      status IN ('cancelled', 'cancelled_with_results')
       AND completed_at IS NOT NULL
       AND cancelled_at IS NOT NULL
       AND btrim(cancel_reason) <> ''
@@ -95,7 +95,7 @@ CREATE INDEX idx_tasks_status_created_at ON tasks (status, created_at DESC);
 CREATE INDEX idx_tasks_account_status_created_at ON tasks (account_id, status, created_at DESC) WHERE account_id IS NOT NULL;
 CREATE INDEX idx_tasks_assigned_provider_endpoint_created_at ON tasks (assigned_provider_endpoint_id, created_at DESC) WHERE assigned_provider_endpoint_id IS NOT NULL;
 CREATE INDEX idx_tasks_feature_created_at ON tasks (feature_slug, created_at DESC) WHERE feature_slug <> '';
-CREATE INDEX idx_tasks_terminal_created_at ON tasks (created_at) WHERE status IN ('completed', 'failed', 'cancelled');
+CREATE INDEX idx_tasks_terminal_created_at ON tasks (created_at) WHERE status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results');
 CREATE INDEX idx_tasks_pending_updated_at ON tasks (updated_at) WHERE status = 'pending';
 
 CREATE TABLE task_execution_metrics (

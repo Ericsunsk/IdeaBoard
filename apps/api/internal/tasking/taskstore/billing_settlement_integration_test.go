@@ -147,6 +147,108 @@ func TestBilledTaskCompletionCapturesWithResultAndRejectsWrongLease(t *testing.T
 	}
 }
 
+func TestBilledTaskPartialCompletionCapturesOutputsAndReleasesRemainder(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	repo, taskBilling, request := newBillingSettlementFixture(t, db, pool, 1, 100, 25)
+	request, err := taskbilling.AIImageRequest(request.Feature, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accountID := seedRepositoryTestAccount(t, db, 1771)
+	channelID := accountID + 10000
+	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
+	task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-partial", accountID, channelID, credentialID, "lease-partial", "lease-partial")
+	holdTaskForSettlementTest(t, pool, taskBilling, task, request)
+
+	outputs := []tasks.TaskOutput{
+		{OutputKind: "remote", Role: "image", URL: "https://example.com/0.png", ResultIndex: 0},
+		{OutputKind: "remote", Role: "image", URL: "https://example.com/2.png", ResultIndex: 2},
+	}
+	rows, err := repo.ConvergeTask(t.Context(), completedTaskConvergenceIntent(task.TaskID, accountID, channelID, credentialID, task.LeaseToken, `{"status":"success"}`, time.Now(), outputs, nil))
+	if err != nil || rows != 1 {
+		t.Fatalf("rows=%d err=%v", rows, err)
+	}
+	assertTaskBillingSettlement(t, db, task.TaskID, "captured", 0, 0)
+	var actual, captured, released int64
+	if err := db.QueryRowContext(t.Context(), `SELECT actual_output_count, captured_credits, released_credits FROM task_billing_settlements WHERE task_id = $1`, task.TaskID).Scan(&actual, &captured, &released); err != nil {
+		t.Fatal(err)
+	}
+	if actual != 2 || captured != 50 || released != 50 {
+		t.Fatalf("settlement actual/captured/released=%d/%d/%d", actual, captured, released)
+	}
+	rowsOut, err := repo.ListOutputsByTaskIDs(t.Context(), []string{task.TaskID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rowsOut[task.TaskID]) != 2 || rowsOut[task.TaskID][0].ResultIndex != 0 || rowsOut[task.TaskID][1].ResultIndex != 2 {
+		t.Fatalf("outputs=%+v, want stable indexes [0,2]", rowsOut[task.TaskID])
+	}
+	terminalTransactions := countTaskSettlementTransactions(t, db, task.TaskID)
+	tx, err := db.BeginTx(t.Context(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	if err := taskbilling.SettleTerminal(t.Context(), tx, task.TaskID); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if got := countTaskSettlementTransactions(t, db, task.TaskID); got != terminalTransactions {
+		t.Fatalf("terminal transaction count=%d, want idempotent %d", got, terminalTransactions)
+	}
+}
+
+func TestBilledTaskCancellationWithResultsCapturesOutputsAndReleasesRemainder(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	repo, taskBilling, request := newBillingSettlementFixture(t, db, pool, 1, 100, 25)
+	request, err := taskbilling.AIImageRequest(request.Feature, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accountID := seedRepositoryTestAccount(t, db, 1772)
+	channelID := accountID + 10000
+	credentialID := loadRepositoryTestCredentialID(t, db, accountID)
+	task := seedRepositoryRunningTaskWithActiveLease(t, repo, db, t.Context(), "billing-cancelled-with-results", accountID, channelID, credentialID, "lease-cancel-results", "lease-cancel-results")
+	holdTaskForSettlementTest(t, pool, taskBilling, task, request)
+	if _, err := db.ExecContext(t.Context(), `
+INSERT INTO task_outputs (task_id, output_kind, role, url, result_index)
+VALUES ($1, 'remote', 'image', 'https://example.com/0.png', 0),
+       ($1, 'remote', 'image', 'https://example.com/2.png', 2)`, task.TaskID); err != nil {
+		t.Fatal(err)
+	}
+
+	rows, err := repo.MarkTaskCancelled(t.Context(), tasks.TaskCancellationSnapshot{
+		TaskID: task.TaskID, CancelledAt: time.Now(), Reason: "cancelled after partial results",
+	}, nil)
+	if err != nil || rows != 1 {
+		t.Fatalf("rows=%d err=%v", rows, err)
+	}
+	loaded, err := repo.GetByTaskID(t.Context(), task.TaskID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Status != tasks.StatusCancelledWithResults {
+		t.Fatalf("task status=%q, want %q", loaded.Status, tasks.StatusCancelledWithResults)
+	}
+	assertTaskBillingSettlement(t, db, task.TaskID, "captured", 0, 0)
+	var actual, captured, released int64
+	if err := db.QueryRowContext(t.Context(), `SELECT actual_output_count, captured_credits, released_credits FROM task_billing_settlements WHERE task_id = $1`, task.TaskID).Scan(&actual, &captured, &released); err != nil {
+		t.Fatal(err)
+	}
+	if actual != 2 || captured != 50 || released != 50 {
+		t.Fatalf("settlement actual/captured/released=%d/%d/%d", actual, captured, released)
+	}
+	var statStatus string
+	if err := db.QueryRowContext(t.Context(), `SELECT status FROM task_stat_events WHERE task_id = $1`, task.TaskID).Scan(&statStatus); err != nil {
+		t.Fatal(err)
+	}
+	if statStatus != tasks.StatusCancelledWithResults {
+		t.Fatalf("daily stat event status=%q, want %q", statStatus, tasks.StatusCancelledWithResults)
+	}
+}
+
 func TestAdminBillingSnapshotProjectsFreeSettlementWithoutLedgerMetadata(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	repo, taskBilling, request := newBillingSettlementFixture(t, db, pool, 1, 0, 0)
@@ -412,7 +514,7 @@ func newBillingSettlementFixtureForFeature(t *testing.T, db *sql.DB, pool *pgxpo
 	billingService := billing.NewService(pool)
 	taskBilling := taskbilling.NewService(billingService, creditService)
 	repo := NewRepository(db)
-	request, err := taskbilling.AIImageRequest(feature)
+	request, err := taskbilling.AIImageRequest(feature, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -486,4 +588,18 @@ func assertTaskBillingSettlement(t *testing.T, db *sql.DB, taskID, wantState str
 	if available != wantAvailable || reserved != wantReserved {
 		t.Fatalf("available/reserved=%d/%d want=%d/%d", available, reserved, wantAvailable, wantReserved)
 	}
+}
+
+func countTaskSettlementTransactions(t *testing.T, db *sql.DB, taskID string) int64 {
+	t.Helper()
+	var count int64
+	if err := db.QueryRowContext(t.Context(), `
+SELECT COUNT(*)
+FROM credit_transactions
+WHERE business_reference_type = 'task'
+  AND business_reference_id = $1
+  AND command_type IN ('capture', 'release')`, taskID).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	return count
 }

@@ -119,7 +119,7 @@ func TestAdminRefundIsIdempotentAndDoesNotDoubleRefund(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Hold() error = %v", err)
 	}
-	capture, err := service.Capture(ctx, CaptureCommand{UserID: userID, HoldTransactionID: hold.TransactionID, Metadata: testMetadata("admin-refund-idempotent:capture", "admin-refund-idempotent-capture")})
+	capture, err := service.Capture(ctx, CaptureCommand{UserID: userID, HoldTransactionID: hold.TransactionID, Amount: mustCreditAmount(t, 30), Metadata: testMetadata("admin-refund-idempotent:capture", "admin-refund-idempotent-capture")})
 	if err != nil {
 		t.Fatalf("Capture() error = %v", err)
 	}
@@ -298,7 +298,7 @@ func TestAdminCorrectionSupportsDeductionAndRefundDirectionsAndRejectsInvalidOri
 	if err != nil {
 		t.Fatalf("Hold() error=%v", err)
 	}
-	capture, err := service.Capture(ctx, CaptureCommand{UserID: 409, HoldTransactionID: hold.TransactionID, Metadata: testMetadata("correction-directions:capture", "correction-directions-capture")})
+	capture, err := service.Capture(ctx, CaptureCommand{UserID: 409, HoldTransactionID: hold.TransactionID, Amount: mustCreditAmount(t, 20), Metadata: testMetadata("correction-directions:capture", "correction-directions-capture")})
 	if err != nil {
 		t.Fatalf("Capture() error=%v", err)
 	}
@@ -332,7 +332,7 @@ func TestAdminRefundsAreConcurrentBoundedAndAllowedForFrozenWallet(t *testing.T)
 	if err != nil {
 		t.Fatalf("Hold() error = %v", err)
 	}
-	capture, err := service.Capture(ctx, CaptureCommand{UserID: userID, HoldTransactionID: hold.TransactionID, Metadata: testMetadata("admin-refund:capture", "admin-refund-capture")})
+	capture, err := service.Capture(ctx, CaptureCommand{UserID: userID, HoldTransactionID: hold.TransactionID, Amount: mustCreditAmount(t, 30), Metadata: testMetadata("admin-refund:capture", "admin-refund-capture")})
 	if err != nil {
 		t.Fatalf("Capture() error = %v", err)
 	}
@@ -397,7 +397,7 @@ func TestAdminLedgerPageExposesCrossPageHoldAndChargeReferences(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Hold() error = %v", err)
 	}
-	capture, err := service.Capture(ctx, CaptureCommand{UserID: userID, HoldTransactionID: hold.TransactionID, Metadata: testMetadata("admin-reference:capture", "admin-reference-capture")})
+	capture, err := service.Capture(ctx, CaptureCommand{UserID: userID, HoldTransactionID: hold.TransactionID, Amount: mustCreditAmount(t, 50), Metadata: testMetadata("admin-reference:capture", "admin-reference-capture")})
 	if err != nil {
 		t.Fatalf("Capture() error = %v", err)
 	}
@@ -409,7 +409,7 @@ func TestAdminLedgerPageExposesCrossPageHoldAndChargeReferences(t *testing.T) {
 	if transaction.TransactionID != capture.TransactionID || transaction.RelatedTransactionID != hold.TransactionID || transaction.Hold == nil || transaction.Charge == nil {
 		t.Fatalf("capture references = %+v", transaction)
 	}
-	if transaction.Hold.Status != "captured" || transaction.Hold.Amount != 50 || transaction.Hold.TerminalTransactionID != capture.TransactionID || transaction.Charge.RemainingRefundable != 50 {
+	if transaction.Hold.Status != "captured" || transaction.Hold.Amount != 50 || transaction.Hold.CaptureTransactionID != capture.TransactionID || transaction.Charge.RemainingRefundable != 50 {
 		t.Fatalf("capture reference details = %+v", transaction)
 	}
 	refund, err := service.Refund(ctx, RefundCommand{UserID: userID, ChargeTransactionID: capture.TransactionID, Amount: mustCreditAmount(t, 20), Metadata: testMetadata("admin-reference:refund", "admin-reference-refund")})
@@ -442,7 +442,7 @@ func TestAnonymizedTombstoneRetainsAdminLedgerReadAndLinkedRefundOnly(t *testing
 	if err != nil {
 		t.Fatalf("Hold() error = %v", err)
 	}
-	capture, err := service.Capture(ctx, CaptureCommand{UserID: userID, HoldTransactionID: hold.TransactionID, Metadata: testMetadata("anonymized:capture", "anonymized-capture")})
+	capture, err := service.Capture(ctx, CaptureCommand{UserID: userID, HoldTransactionID: hold.TransactionID, Amount: mustCreditAmount(t, 20), Metadata: testMetadata("anonymized:capture", "anonymized-capture")})
 	if err != nil {
 		t.Fatalf("Capture() error = %v", err)
 	}

@@ -22,10 +22,13 @@ func TestTaskResultColumnSupportsProviderMetadata(t *testing.T) {
 	}
 }
 
-func TestTaskOutputUsesTaskSortIndex(t *testing.T) {
+func TestTaskOutputUsesTaskResultIndex(t *testing.T) {
 	schema := readDBSchema(t)
-	if !strings.Contains(schema, "CREATE INDEX idx_task_outputs_task_sort ON task_outputs (task_id, sort_index)") {
-		t.Fatalf("task_outputs must keep task_id/sort_index index")
+	if !strings.Contains(schema, "CREATE INDEX idx_task_outputs_task_sort ON task_outputs (task_id, result_index)") {
+		t.Fatalf("task_outputs must keep task_id/result_index index")
+	}
+	if strings.Contains(schema, "sort_index") {
+		t.Fatalf("task_outputs must not retain sort_index")
 	}
 }
 

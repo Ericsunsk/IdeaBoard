@@ -231,20 +231,36 @@ CREATE TABLE credit_holds (
   hold_transaction_id VARCHAR(64) PRIMARY KEY,
   wallet_user_id BIGINT NOT NULL,
   amount BIGINT NOT NULL,
+  captured_amount BIGINT NOT NULL DEFAULT 0,
+  released_amount BIGINT NOT NULL DEFAULT 0,
   status VARCHAR(20) NOT NULL DEFAULT 'held',
-  terminal_transaction_id VARCHAR(64),
+  capture_transaction_id VARCHAR(64),
+  release_transaction_id VARCHAR(64),
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   settled_at TIMESTAMPTZ(3),
   CONSTRAINT fk_credit_holds_hold_transaction_id FOREIGN KEY (hold_transaction_id) REFERENCES credit_transactions(transaction_id) ON DELETE RESTRICT,
   CONSTRAINT fk_credit_holds_wallet_user_id FOREIGN KEY (wallet_user_id) REFERENCES credit_wallets(user_id) ON DELETE RESTRICT,
-  CONSTRAINT fk_credit_holds_terminal_transaction_id FOREIGN KEY (terminal_transaction_id) REFERENCES credit_transactions(transaction_id) ON DELETE RESTRICT,
-  CONSTRAINT uq_credit_holds_terminal_transaction_id UNIQUE (terminal_transaction_id),
+  CONSTRAINT fk_credit_holds_capture_transaction_id FOREIGN KEY (capture_transaction_id) REFERENCES credit_transactions(transaction_id) ON DELETE RESTRICT,
+  CONSTRAINT fk_credit_holds_release_transaction_id FOREIGN KEY (release_transaction_id) REFERENCES credit_transactions(transaction_id) ON DELETE RESTRICT,
+  CONSTRAINT uq_credit_holds_capture_transaction_id UNIQUE (capture_transaction_id),
+  CONSTRAINT uq_credit_holds_release_transaction_id UNIQUE (release_transaction_id),
   CONSTRAINT ck_credit_holds_amount_positive CHECK (amount > 0),
+  CONSTRAINT ck_credit_holds_settlement_amounts CHECK (
+    captured_amount >= 0
+    AND released_amount >= 0
+    AND captured_amount + released_amount <= amount
+  ),
+  CONSTRAINT ck_credit_holds_transaction_consistency CHECK (
+    (captured_amount = 0) = (capture_transaction_id IS NULL)
+    AND (released_amount = 0) = (release_transaction_id IS NULL)
+  ),
   CONSTRAINT ck_credit_holds_status CHECK (status IN ('held', 'captured', 'released')),
   CONSTRAINT ck_credit_holds_terminal_consistency CHECK (
-    (status = 'held' AND terminal_transaction_id IS NULL AND settled_at IS NULL)
+    (status = 'held' AND captured_amount + released_amount < amount AND settled_at IS NULL)
     OR
-    (status IN ('captured', 'released') AND terminal_transaction_id IS NOT NULL AND settled_at IS NOT NULL)
+    (status = 'captured' AND captured_amount > 0 AND captured_amount + released_amount = amount AND settled_at IS NOT NULL)
+    OR
+    (status = 'released' AND captured_amount = 0 AND released_amount = amount AND settled_at IS NOT NULL)
   )
 );
 
@@ -511,6 +527,8 @@ AS $$
 DECLARE
   v_payload JSONB; v_hash TEXT; v_existing_hash TEXT; v_transaction_id VARCHAR(64);
   v_amount BIGINT := p_amount; v_wallet_status VARCHAR(20); v_hold_status VARCHAR(20);
+  v_hold_amount BIGINT; v_captured_amount BIGINT; v_released_amount BIGINT;
+  v_capture_transaction_id VARCHAR(64); v_release_transaction_id VARCHAR(64);
   v_charge_amount BIGINT; v_refunded_amount BIGINT; v_original_command_type VARCHAR(24); v_original_amount BIGINT;
   v_original_actor_type VARCHAR(24); v_original_source VARCHAR(64); v_original_posting_count INT; v_corrected_amount BIGINT;
   v_original_from_id BIGINT; v_original_to_id BIGINT; v_original_positive_amount BIGINT;
@@ -531,8 +549,8 @@ BEGIN
      OR p_business_reference_type = '' OR length(p_business_reference_type) > 64
      OR p_business_reference_id = '' OR length(p_business_reference_id) > 160
      OR (p_command_type IN ('deduction', 'correction') AND p_actor_type <> 'admin')
-     OR (p_command_type IN ('grant', 'deduction', 'hold', 'refund', 'correction') AND (p_amount <= 0 OR p_amount > 9000000000000000))
-     OR (p_command_type IN ('capture', 'release') AND (p_amount <> 0 OR p_related_transaction_id = ''))
+     OR (p_command_type IN ('grant', 'deduction', 'hold', 'capture', 'release', 'refund', 'correction') AND (p_amount <= 0 OR p_amount > 9000000000000000))
+     OR (p_command_type IN ('capture', 'release') AND p_related_transaction_id = '')
      OR (p_command_type IN ('refund', 'correction') AND (p_related_transaction_id = '' OR length(p_related_transaction_id) > 64)) THEN
     RAISE EXCEPTION USING ERRCODE = 'IB009', MESSAGE = 'invalid credit command';
   END IF;
@@ -559,10 +577,19 @@ BEGIN
       ('system_sink', v_shard_key, jsonb_build_object('scope', 'wallet', 'wallet_user_id', p_user_id)) ON CONFLICT DO NOTHING;
   END IF;
   IF p_command_type IN ('capture', 'release') THEN
-    SELECT amount, status INTO v_amount, v_hold_status FROM credit_holds holds
+    SELECT amount, status, captured_amount, released_amount, capture_transaction_id, release_transaction_id
+      INTO v_hold_amount, v_hold_status, v_captured_amount, v_released_amount, v_capture_transaction_id, v_release_transaction_id
+      FROM credit_holds holds
       WHERE holds.hold_transaction_id = p_related_transaction_id AND holds.wallet_user_id = p_user_id FOR UPDATE;
     IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = 'IB005', MESSAGE = 'credit hold not found'; END IF;
     IF v_hold_status <> 'held' THEN RAISE EXCEPTION USING ERRCODE = 'IB006', MESSAGE = 'credit hold already settled'; END IF;
+    IF (p_command_type = 'capture' AND v_capture_transaction_id IS NOT NULL)
+       OR (p_command_type = 'release' AND v_release_transaction_id IS NOT NULL) THEN
+      RAISE EXCEPTION USING ERRCODE = 'IB006', MESSAGE = 'credit hold settlement command already recorded';
+    END IF;
+    IF v_amount > v_hold_amount - v_captured_amount - v_released_amount THEN
+      RAISE EXCEPTION USING ERRCODE = 'IB013', MESSAGE = 'credit hold settlement exceeds remaining amount';
+    END IF;
   ELSIF p_command_type = 'refund' THEN
     SELECT amount, refunded_amount INTO v_charge_amount, v_refunded_amount FROM credit_charges charges
       WHERE charges.capture_transaction_id = p_related_transaction_id AND charges.wallet_user_id = p_user_id FOR UPDATE;
@@ -628,8 +655,8 @@ BEGIN
     WHEN 'deduction' THEN v_from_id := v_available_id; v_to_id := v_sink_id;
     WHEN 'correction' THEN v_from_id := v_original_to_id; v_to_id := v_original_from_id;
     WHEN 'hold' THEN v_from_id := v_available_id; v_to_id := v_reserved_id;
-    WHEN 'capture' THEN v_from_id := v_reserved_id; v_to_id := v_revenue_id; v_terminal_status := 'captured';
-    WHEN 'release' THEN v_from_id := v_reserved_id; v_to_id := v_available_id; v_terminal_status := 'released';
+    WHEN 'capture' THEN v_from_id := v_reserved_id; v_to_id := v_revenue_id;
+    WHEN 'release' THEN v_from_id := v_reserved_id; v_to_id := v_available_id;
     WHEN 'refund' THEN v_from_id := v_revenue_id; v_to_id := v_available_id;
   END CASE;
   v_available_after := v_available_balance; v_reserved_after := v_reserved_balance;
@@ -647,7 +674,26 @@ BEGIN
   IF p_command_type = 'hold' THEN
     INSERT INTO credit_holds (hold_transaction_id, wallet_user_id, amount) VALUES (v_transaction_id, p_user_id, v_amount);
   ELSIF p_command_type IN ('capture', 'release') THEN
-    UPDATE credit_holds SET status = v_terminal_status, terminal_transaction_id = v_transaction_id, settled_at = now() WHERE hold_transaction_id = p_related_transaction_id;
+    IF p_command_type = 'capture' THEN
+      v_captured_amount := v_captured_amount + v_amount;
+      v_capture_transaction_id := v_transaction_id;
+    ELSE
+      v_released_amount := v_released_amount + v_amount;
+      v_release_transaction_id := v_transaction_id;
+    END IF;
+    IF v_captured_amount + v_released_amount = v_hold_amount THEN
+      v_terminal_status := CASE WHEN v_captured_amount > 0 THEN 'captured' ELSE 'released' END;
+    ELSE
+      v_terminal_status := 'held';
+    END IF;
+    UPDATE credit_holds
+    SET captured_amount = v_captured_amount,
+        released_amount = v_released_amount,
+        status = v_terminal_status,
+        capture_transaction_id = v_capture_transaction_id,
+        release_transaction_id = v_release_transaction_id,
+        settled_at = CASE WHEN v_terminal_status = 'held' THEN NULL ELSE now() END
+    WHERE hold_transaction_id = p_related_transaction_id;
     IF p_command_type = 'capture' THEN INSERT INTO credit_charges (capture_transaction_id, wallet_user_id, amount) VALUES (v_transaction_id, p_user_id, v_amount); END IF;
   ELSIF p_command_type = 'refund' THEN
     UPDATE credit_charges SET refunded_amount = refunded_amount + v_amount, updated_at = now() WHERE capture_transaction_id = p_related_transaction_id;
@@ -886,15 +932,14 @@ BEGIN
   JOIN task_billing_settlements settlements ON settlements.task_id = snapshots.task_id
   JOIN credit_holds holds ON holds.hold_transaction_id = snapshots.hold_transaction_id
     AND holds.wallet_user_id = snapshots.user_id AND holds.amount = snapshots.total_credits
-    AND holds.status = settlements.state AND holds.terminal_transaction_id IS NOT DISTINCT FROM settlements.settlement_transaction_id
+    AND holds.status = settlements.state
   LEFT JOIN tasks ON tasks.task_id = snapshots.task_id
   WHERE snapshots.total_credits > 0 AND tasks.task_id IS NULL
     AND settlements.state IN ('held', 'captured', 'released')
     AND (settlements.state = 'held' OR EXISTS (
       SELECT 1 FROM credit_transactions terminal
-      WHERE terminal.transaction_id = settlements.settlement_transaction_id
-        AND terminal.command_type = CASE settlements.state WHEN 'captured' THEN 'capture' ELSE 'release' END
-        AND terminal.command_amount = snapshots.total_credits
+      WHERE terminal.transaction_id IN (settlements.capture_transaction_id, settlements.release_transaction_id)
+        AND terminal.command_amount > 0
         AND terminal.wallet_user_id = snapshots.user_id
         AND terminal.related_transaction_id = snapshots.hold_transaction_id
         AND terminal.business_reference_type = 'task' AND terminal.business_reference_id = snapshots.task_id
@@ -911,7 +956,7 @@ BEGIN
         FROM credit_postings postings
         WHERE postings.transaction_id = ledger_transactions.transaction_id
       ) ledger ON TRUE
-      WHERE ledger_transactions.transaction_id IN (transactions.transaction_id, settlements.settlement_transaction_id)
+      WHERE ledger_transactions.transaction_id IN (transactions.transaction_id, settlements.capture_transaction_id, settlements.release_transaction_id)
         AND (ledger.posting_count < 2 OR ledger.posting_count <> ledger_transactions.posting_count
           OR ledger.asset_count <> 1 OR ledger.asset_mismatch OR ledger.posting_sum <> 0
           OR ledger.debit_amount <> ledger_transactions.command_amount
@@ -926,13 +971,14 @@ BEGIN
       'hold_wallet_matches', hold_transactions.wallet_user_id = snapshots.user_id,
       'hold_reference_matches', hold_transactions.business_reference_type = 'task' AND hold_transactions.business_reference_id = snapshots.task_id,
       'hold_projection_matches', holds.wallet_user_id = snapshots.user_id AND holds.amount = snapshots.total_credits,
-      'settlement_state', settlements.state, 'terminal_command', terminal.command_type,
-      'terminal_command_amount', terminal.command_amount)
+      'settlement_state', settlements.state, 'capture_command', capture_tx.command_type,
+      'release_command', release_tx.command_type)
   FROM task_billing_snapshots snapshots
   LEFT JOIN credit_transactions hold_transactions ON hold_transactions.transaction_id = snapshots.hold_transaction_id
   LEFT JOIN credit_holds holds ON holds.hold_transaction_id = snapshots.hold_transaction_id
   LEFT JOIN task_billing_settlements settlements ON settlements.task_id = snapshots.task_id
-  LEFT JOIN credit_transactions terminal ON terminal.transaction_id = settlements.settlement_transaction_id
+  LEFT JOIN credit_transactions capture_tx ON capture_tx.transaction_id = settlements.capture_transaction_id
+  LEFT JOIN credit_transactions release_tx ON release_tx.transaction_id = settlements.release_transaction_id
   WHERE snapshots.total_credits > 0 AND (
     holds.hold_transaction_id IS NULL OR settlements.task_id IS NULL
     OR hold_transactions.command_type IS DISTINCT FROM 'hold'
@@ -944,49 +990,56 @@ BEGIN
     OR holds.amount IS DISTINCT FROM snapshots.total_credits
     OR settlements.state NOT IN ('held', 'captured', 'released')
     OR holds.status IS DISTINCT FROM settlements.state
-    OR holds.terminal_transaction_id IS DISTINCT FROM settlements.settlement_transaction_id
-    OR (settlements.state IN ('captured', 'released') AND (
-      terminal.transaction_id IS NULL
-      OR terminal.command_type IS DISTINCT FROM CASE settlements.state WHEN 'captured' THEN 'capture' ELSE 'release' END
-      OR terminal.command_amount IS DISTINCT FROM snapshots.total_credits
-      OR terminal.wallet_user_id IS DISTINCT FROM snapshots.user_id
-      OR terminal.related_transaction_id IS DISTINCT FROM snapshots.hold_transaction_id
-      OR terminal.business_reference_type IS DISTINCT FROM 'task'
-      OR terminal.business_reference_id IS DISTINCT FROM snapshots.task_id
-    ))
+    OR settlements.captured_credits <> settlements.actual_output_count * snapshots.unit_credits
+    OR settlements.released_credits <> snapshots.total_credits - settlements.captured_credits
+    OR (settlements.capture_transaction_id IS NOT NULL AND (capture_tx.command_type IS DISTINCT FROM 'capture' OR capture_tx.command_amount IS DISTINCT FROM settlements.captured_credits))
+    OR (settlements.release_transaction_id IS NOT NULL AND (release_tx.command_type IS DISTINCT FROM 'release' OR release_tx.command_amount IS DISTINCT FROM settlements.released_credits))
   );
 
   INSERT INTO reconciliation_scan
   SELECT CASE
       WHEN tasks.status IN ('pending', 'running') THEN 'active_task_not_held'
-      WHEN tasks.status = 'completed' AND (settlements.state IS DISTINCT FROM 'captured' OR holds.status IS DISTINCT FROM 'captured') THEN 'completed_task_not_captured'
-      WHEN tasks.status IN ('failed', 'cancelled') AND (settlements.state IS DISTINCT FROM 'released' OR holds.status IS DISTINCT FROM 'released') THEN 'failed_task_not_released'
+      WHEN tasks.status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results') THEN 'terminal_task_settlement_mismatch'
     END,
     'critical', 'high', snapshots.user_id, 'task', tasks.task_id,
-    jsonb_build_object('task_status', tasks.status, 'settlement_state', settlements.state,
-      'hold_status', holds.status, 'settlement_transaction_id', settlements.settlement_transaction_id)
+      jsonb_build_object('task_status', tasks.status, 'settlement_state', settlements.state,
+      'capture_transaction_id', settlements.capture_transaction_id, 'release_transaction_id', settlements.release_transaction_id)
   FROM task_billing_snapshots snapshots
   JOIN tasks ON tasks.task_id = snapshots.task_id
   LEFT JOIN task_billing_settlements settlements ON settlements.task_id = snapshots.task_id
   LEFT JOIN credit_holds holds ON holds.hold_transaction_id = snapshots.hold_transaction_id
   WHERE snapshots.total_credits > 0 AND (
     (tasks.status IN ('pending', 'running') AND (settlements.state IS DISTINCT FROM 'held' OR holds.status IS DISTINCT FROM 'held'))
-    OR (tasks.status = 'completed' AND (settlements.state IS DISTINCT FROM 'captured' OR holds.status IS DISTINCT FROM 'captured'))
-    OR (tasks.status IN ('failed', 'cancelled') AND (settlements.state IS DISTINCT FROM 'released' OR holds.status IS DISTINCT FROM 'released')));
+    OR (tasks.status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results') AND (
+      settlements.actual_output_count IS DISTINCT FROM (SELECT COUNT(*) FROM task_outputs outputs WHERE outputs.task_id = tasks.task_id)
+      OR settlements.state IS DISTINCT FROM CASE
+        WHEN EXISTS (SELECT 1 FROM task_outputs outputs WHERE outputs.task_id = tasks.task_id) THEN 'captured'
+        ELSE 'released'
+      END
+      OR holds.status IS DISTINCT FROM CASE
+        WHEN EXISTS (SELECT 1 FROM task_outputs outputs WHERE outputs.task_id = tasks.task_id) THEN 'captured'
+        ELSE 'released'
+      END
+    )));
 
   INSERT INTO reconciliation_scan
   SELECT 'task_terminal_transaction_count', 'critical', 'high', snapshots.user_id, 'task', tasks.task_id,
-    jsonb_build_object('task_status', tasks.status, 'expected_command',
-      CASE WHEN tasks.status = 'completed' THEN 'capture' ELSE 'release' END, 'actual_count', COUNT(terminals.transaction_id))
+    jsonb_build_object('task_status', tasks.status, 'expected_count',
+      (CASE WHEN settlements.captured_credits > 0 THEN 1 ELSE 0 END) +
+      (CASE WHEN settlements.released_credits > 0 THEN 1 ELSE 0 END),
+      'actual_count', COUNT(terminals.transaction_id))
   FROM task_billing_snapshots snapshots
   JOIN tasks ON tasks.task_id = snapshots.task_id
+  JOIN task_billing_settlements settlements ON settlements.task_id = snapshots.task_id
   LEFT JOIN credit_transactions terminals ON terminals.related_transaction_id = snapshots.hold_transaction_id
-    AND terminals.command_type = CASE WHEN tasks.status = 'completed' THEN 'capture' ELSE 'release' END
+    AND terminals.command_type IN ('capture', 'release')
     AND terminals.wallet_user_id = snapshots.user_id
     AND terminals.business_reference_type = 'task' AND terminals.business_reference_id = tasks.task_id
-  WHERE snapshots.total_credits > 0 AND tasks.status IN ('completed', 'failed', 'cancelled')
-  GROUP BY snapshots.user_id, tasks.task_id, tasks.status
-  HAVING COUNT(terminals.transaction_id) <> 1;
+  WHERE snapshots.total_credits > 0 AND tasks.status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results')
+  GROUP BY snapshots.user_id, tasks.task_id, tasks.status, settlements.captured_credits, settlements.released_credits
+  HAVING COUNT(terminals.transaction_id) <>
+    (CASE WHEN settlements.captured_credits > 0 THEN 1 ELSE 0 END) +
+    (CASE WHEN settlements.released_credits > 0 THEN 1 ELSE 0 END);
 
   INSERT INTO reconciliation_scan
   WITH conflicts AS (
@@ -1001,19 +1054,31 @@ BEGIN
 
   INSERT INTO reconciliation_scan
   SELECT 'task_settlement_reference_invalid', 'critical', 'high', snapshots.user_id, 'task', snapshots.task_id,
-    jsonb_build_object('settlement_state', settlements.state, 'settlement_transaction_id', settlements.settlement_transaction_id,
-      'transaction_command', terminal.command_type, 'transaction_wallet_user_id', terminal.wallet_user_id,
-      'business_reference_type', terminal.business_reference_type, 'business_reference_id', terminal.business_reference_id)
+    jsonb_build_object('settlement_state', settlements.state, 'capture_transaction_id', settlements.capture_transaction_id,
+      'release_transaction_id', settlements.release_transaction_id)
   FROM task_billing_snapshots snapshots
   JOIN task_billing_settlements settlements ON settlements.task_id = snapshots.task_id
-  LEFT JOIN credit_transactions terminal ON terminal.transaction_id = settlements.settlement_transaction_id
+  LEFT JOIN credit_transactions capture_tx ON capture_tx.transaction_id = settlements.capture_transaction_id
+  LEFT JOIN credit_transactions release_tx ON release_tx.transaction_id = settlements.release_transaction_id
   WHERE settlements.state IN ('captured', 'released') AND (
-    terminal.transaction_id IS NULL
-    OR terminal.command_type IS DISTINCT FROM CASE settlements.state WHEN 'captured' THEN 'capture' ELSE 'release' END
-    OR terminal.wallet_user_id IS DISTINCT FROM snapshots.user_id
-    OR terminal.related_transaction_id IS DISTINCT FROM snapshots.hold_transaction_id
-    OR terminal.business_reference_type IS DISTINCT FROM 'task'
-    OR terminal.business_reference_id IS DISTINCT FROM snapshots.task_id
+    (settlements.captured_credits > 0) IS DISTINCT FROM (settlements.capture_transaction_id IS NOT NULL)
+    OR (settlements.released_credits > 0) IS DISTINCT FROM (settlements.release_transaction_id IS NOT NULL)
+    OR (settlements.capture_transaction_id IS NOT NULL AND (
+      capture_tx.command_type IS DISTINCT FROM 'capture'
+      OR capture_tx.command_amount IS DISTINCT FROM settlements.captured_credits
+      OR capture_tx.wallet_user_id IS DISTINCT FROM snapshots.user_id
+      OR capture_tx.related_transaction_id IS DISTINCT FROM snapshots.hold_transaction_id
+      OR capture_tx.business_reference_type IS DISTINCT FROM 'task'
+      OR capture_tx.business_reference_id IS DISTINCT FROM snapshots.task_id
+    ))
+    OR (settlements.release_transaction_id IS NOT NULL AND (
+      release_tx.command_type IS DISTINCT FROM 'release'
+      OR release_tx.command_amount IS DISTINCT FROM settlements.released_credits
+      OR release_tx.wallet_user_id IS DISTINCT FROM snapshots.user_id
+      OR release_tx.related_transaction_id IS DISTINCT FROM snapshots.hold_transaction_id
+      OR release_tx.business_reference_type IS DISTINCT FROM 'task'
+      OR release_tx.business_reference_id IS DISTINCT FROM snapshots.task_id
+    ))
   );
 
   INSERT INTO reconciliation_scan
@@ -1092,24 +1157,52 @@ BEGIN
   INSERT INTO reconciliation_scan
   SELECT 'hold_state_invalid', 'critical', 'high', holds.wallet_user_id, 'hold', holds.hold_transaction_id,
     jsonb_build_object('hold_status', holds.status, 'hold_amount', holds.amount, 'hold_command', hold_tx.command_type,
-      'terminal_command', terminal.command_type)
+      'capture_command', capture_tx.command_type, 'release_command', release_tx.command_type)
   FROM credit_holds holds
   LEFT JOIN credit_transactions hold_tx ON hold_tx.transaction_id = holds.hold_transaction_id
-  LEFT JOIN credit_transactions terminal ON terminal.transaction_id = holds.terminal_transaction_id
+  LEFT JOIN credit_transactions capture_tx ON capture_tx.transaction_id = holds.capture_transaction_id
+  LEFT JOIN credit_transactions release_tx ON release_tx.transaction_id = holds.release_transaction_id
   WHERE hold_tx.command_type IS DISTINCT FROM 'hold' OR hold_tx.wallet_user_id IS DISTINCT FROM holds.wallet_user_id
     OR hold_tx.command_amount IS DISTINCT FROM holds.amount
-    OR (holds.status = 'held' AND holds.terminal_transaction_id IS NOT NULL)
-    OR (holds.status = 'captured' AND ((terminal.command_type IS NULL OR terminal.command_type NOT IN ('capture', 'purchase_refund')) OR terminal.related_transaction_id IS DISTINCT FROM holds.hold_transaction_id))
-    OR (holds.status = 'released' AND (terminal.command_type IS DISTINCT FROM 'release' OR terminal.related_transaction_id IS DISTINCT FROM holds.hold_transaction_id));
+    OR (holds.status = 'held' AND (
+      holds.captured_amount + holds.released_amount >= holds.amount
+      OR holds.settled_at IS NOT NULL
+    ))
+    OR (holds.status = 'captured' AND (
+      holds.captured_amount <= 0
+      OR holds.captured_amount + holds.released_amount <> holds.amount
+      OR holds.settled_at IS NULL
+      OR capture_tx.command_type NOT IN ('capture', 'purchase_refund')
+      OR capture_tx.command_amount IS DISTINCT FROM holds.captured_amount
+      OR capture_tx.wallet_user_id IS DISTINCT FROM holds.wallet_user_id
+      OR capture_tx.related_transaction_id IS DISTINCT FROM holds.hold_transaction_id
+      OR (holds.released_amount > 0 AND (
+        release_tx.command_type IS DISTINCT FROM 'release'
+        OR release_tx.command_amount IS DISTINCT FROM holds.released_amount
+        OR release_tx.wallet_user_id IS DISTINCT FROM holds.wallet_user_id
+        OR release_tx.related_transaction_id IS DISTINCT FROM holds.hold_transaction_id
+      ))
+    ))
+    OR (holds.status = 'released' AND (
+      holds.captured_amount <> 0
+      OR holds.released_amount <> holds.amount
+      OR holds.settled_at IS NULL
+      OR release_tx.command_type IS DISTINCT FROM 'release'
+      OR release_tx.command_amount IS DISTINCT FROM holds.released_amount
+      OR release_tx.wallet_user_id IS DISTINCT FROM holds.wallet_user_id
+      OR release_tx.related_transaction_id IS DISTINCT FROM holds.hold_transaction_id
+    ));
 
   INSERT INTO reconciliation_scan
   SELECT 'hold_terminal_transaction_count', 'critical', 'high', holds.wallet_user_id, 'hold', holds.hold_transaction_id,
-    jsonb_build_object('hold_status', holds.status, 'terminal_transaction_count', COUNT(terminals.transaction_id))
+    jsonb_build_object('hold_status', holds.status, 'settlement_transaction_count', COUNT(terminals.transaction_id))
   FROM credit_holds holds
   LEFT JOIN credit_transactions terminals ON terminals.related_transaction_id = holds.hold_transaction_id
     AND terminals.command_type IN ('capture', 'release', 'purchase_refund')
-  GROUP BY holds.hold_transaction_id, holds.wallet_user_id, holds.status
-  HAVING COUNT(terminals.transaction_id) <> CASE WHEN holds.status = 'held' THEN 0 ELSE 1 END;
+  GROUP BY holds.hold_transaction_id, holds.wallet_user_id, holds.status, holds.captured_amount, holds.released_amount
+  HAVING COUNT(terminals.transaction_id) <>
+    (CASE WHEN holds.captured_amount > 0 THEN 1 ELSE 0 END) +
+    (CASE WHEN holds.released_amount > 0 THEN 1 ELSE 0 END);
 
   INSERT INTO reconciliation_scan
   SELECT 'charge_state_invalid', 'critical', 'high', charges.wallet_user_id, 'charge', charges.capture_transaction_id,
@@ -1881,7 +1974,7 @@ CREATE TABLE tasks (
   cancel_reason TEXT NOT NULL DEFAULT '',
   CONSTRAINT uq_tasks_task_id UNIQUE (task_id),
   CONSTRAINT ck_tasks_client_action_id_trimmed CHECK (client_action_id = btrim(client_action_id)),
-  CONSTRAINT ck_tasks_status CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
+  CONSTRAINT ck_tasks_status CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled', 'cancelled_with_results')),
   CONSTRAINT ck_tasks_priority CHECK (priority BETWEEN 1 AND 4),
   CONSTRAINT ck_tasks_retry_count_non_negative CHECK (retry_count >= 0),
   CONSTRAINT ck_tasks_attempt_seq_non_negative CHECK (attempt_seq >= 0),
@@ -1892,7 +1985,7 @@ CREATE TABLE tasks (
   CONSTRAINT ck_tasks_assignment_status CHECK (
     (status = 'pending' AND account_id IS NULL AND assigned_provider_endpoint_id IS NULL AND assigned_credential_id IS NULL)
     OR (status = 'running' AND account_id IS NOT NULL AND assigned_provider_endpoint_id IS NOT NULL AND assigned_credential_id IS NOT NULL)
-    OR status IN ('completed', 'failed', 'cancelled')
+    OR status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results')
   ),
   CONSTRAINT ck_tasks_lease_status CHECK (status = 'running' OR lease_token = ''),
   CONSTRAINT ck_tasks_terminal_consistency CHECK (
@@ -1919,7 +2012,7 @@ CREATE TABLE tasks (
       AND btrim(error_msg) <> ''
     )
     OR (
-      status = 'cancelled'
+      status IN ('cancelled', 'cancelled_with_results')
       AND completed_at IS NOT NULL
       AND cancelled_at IS NOT NULL
       AND btrim(cancel_reason) <> ''
@@ -1951,7 +2044,7 @@ CREATE INDEX idx_tasks_status_created_at ON tasks (status, created_at DESC);
 CREATE INDEX idx_tasks_account_status_created_at ON tasks (account_id, status, created_at DESC) WHERE account_id IS NOT NULL;
 CREATE INDEX idx_tasks_assigned_provider_endpoint_created_at ON tasks (assigned_provider_endpoint_id, created_at DESC) WHERE assigned_provider_endpoint_id IS NOT NULL;
 CREATE INDEX idx_tasks_feature_created_at ON tasks (feature_slug, created_at DESC) WHERE feature_slug <> '';
-CREATE INDEX idx_tasks_terminal_created_at ON tasks (created_at) WHERE status IN ('completed', 'failed', 'cancelled');
+CREATE INDEX idx_tasks_terminal_created_at ON tasks (created_at) WHERE status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results');
 CREATE INDEX idx_tasks_pending_updated_at ON tasks (updated_at) WHERE status = 'pending';
 
 CREATE TABLE task_execution_metrics (
@@ -2237,14 +2330,14 @@ CREATE TABLE task_outputs (
   url TEXT NOT NULL DEFAULT '',
   source_url TEXT NOT NULL DEFAULT '',
   metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
-  sort_index INTEGER NOT NULL DEFAULT 0,
+  result_index INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   CONSTRAINT fk_task_outputs_task_id FOREIGN KEY (task_id) REFERENCES tasks(task_id) ON DELETE CASCADE,
   CONSTRAINT fk_task_outputs_media_asset_id FOREIGN KEY (media_asset_id) REFERENCES media_assets(id) ON DELETE RESTRICT,
   CONSTRAINT ck_task_outputs_output_kind CHECK (output_kind IN ('asset', 'remote')),
   CONSTRAINT ck_task_outputs_role_not_blank CHECK (btrim(role) <> ''),
-  CONSTRAINT ck_task_outputs_sort_index_non_negative CHECK (sort_index >= 0),
+  CONSTRAINT ck_task_outputs_result_index_non_negative CHECK (result_index >= 0),
   CONSTRAINT ck_task_outputs_metadata_object CHECK (jsonb_typeof(metadata) = 'object'),
   CONSTRAINT ck_task_outputs_output_kind_shape CHECK (
     (output_kind = 'asset' AND media_asset_id IS NOT NULL AND btrim(url) = '')
@@ -2252,7 +2345,8 @@ CREATE TABLE task_outputs (
   )
 );
 
-CREATE INDEX idx_task_outputs_task_sort ON task_outputs (task_id, sort_index);
+CREATE INDEX idx_task_outputs_task_sort ON task_outputs (task_id, result_index);
+CREATE UNIQUE INDEX uq_task_outputs_task_result_index ON task_outputs (task_id, result_index);
 CREATE INDEX idx_task_outputs_media_asset_id ON task_outputs (media_asset_id);
 
 CREATE OR REPLACE FUNCTION enforce_task_output_media_asset_owner()
@@ -2863,6 +2957,8 @@ CREATE FUNCTION guard_task_billing_settlement_transition() RETURNS trigger
     AS $$
 DECLARE
   snapshot_total BIGINT;
+  snapshot_unit BIGINT;
+  snapshot_quantity BIGINT;
   snapshot_user BIGINT;
   snapshot_hold TEXT;
   valid_terminal BOOLEAN;
@@ -2870,8 +2966,8 @@ BEGIN
   IF TG_OP = 'DELETE' THEN
     RAISE EXCEPTION USING ERRCODE = 'IB202', MESSAGE = 'task billing settlements cannot be deleted';
   END IF;
-  SELECT total_credits, user_id, hold_transaction_id
-  INTO snapshot_total, snapshot_user, snapshot_hold
+  SELECT total_credits, unit_credits, quantity, user_id, hold_transaction_id
+  INTO snapshot_total, snapshot_unit, snapshot_quantity, snapshot_user, snapshot_hold
   FROM task_billing_snapshots
   WHERE task_id = NEW.task_id;
   IF NOT FOUND THEN
@@ -2887,19 +2983,36 @@ BEGIN
   IF NEW.task_id <> OLD.task_id
      OR OLD.state <> 'held'
      OR NEW.state NOT IN ('captured', 'released')
-     OR NEW.settlement_transaction_id IS NULL
+     OR NEW.actual_output_count < 0
+     OR NEW.actual_output_count > snapshot_quantity
+     OR NEW.captured_credits <> NEW.actual_output_count * snapshot_unit
+     OR NEW.released_credits <> snapshot_total - NEW.captured_credits
+     OR (NEW.captured_credits > 0) <> (NEW.capture_transaction_id IS NOT NULL)
+     OR (NEW.released_credits > 0) <> (NEW.release_transaction_id IS NOT NULL)
      OR NEW.settled_at IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = 'IB203', MESSAGE = 'invalid task billing settlement transition';
   END IF;
-  SELECT EXISTS (
-    SELECT 1
-    FROM credit_transactions transactions
-    WHERE transactions.transaction_id = NEW.settlement_transaction_id
-      AND transactions.command_type = CASE NEW.state WHEN 'captured' THEN 'capture' ELSE 'release' END
-      AND transactions.wallet_user_id = snapshot_user
-      AND transactions.related_transaction_id = snapshot_hold
-      AND transactions.business_reference_type = 'task'
-      AND transactions.business_reference_id = NEW.task_id
+  SELECT (
+    (NEW.capture_transaction_id IS NULL OR EXISTS (
+      SELECT 1 FROM credit_transactions transactions
+      WHERE transactions.transaction_id = NEW.capture_transaction_id
+        AND transactions.command_type = 'capture'
+        AND transactions.command_amount = NEW.captured_credits
+        AND transactions.wallet_user_id = snapshot_user
+        AND transactions.related_transaction_id = snapshot_hold
+        AND transactions.business_reference_type = 'task'
+        AND transactions.business_reference_id = NEW.task_id
+    )) AND
+    (NEW.release_transaction_id IS NULL OR EXISTS (
+      SELECT 1 FROM credit_transactions transactions
+      WHERE transactions.transaction_id = NEW.release_transaction_id
+        AND transactions.command_type = 'release'
+        AND transactions.command_amount = NEW.released_credits
+        AND transactions.wallet_user_id = snapshot_user
+        AND transactions.related_transaction_id = snapshot_hold
+        AND transactions.business_reference_type = 'task'
+        AND transactions.business_reference_id = NEW.task_id
+    ))
   ) INTO valid_terminal;
   IF NOT valid_terminal THEN
     RAISE EXCEPTION USING ERRCODE = 'IB207', MESSAGE = 'task billing terminal settlement does not match Credit Ledger';
@@ -3324,10 +3437,15 @@ CREATE TABLE billing_skus (
 CREATE TABLE task_billing_settlements (
     task_id character varying(64) NOT NULL,
     state character varying(16) NOT NULL,
-    settlement_transaction_id text,
+    actual_output_count bigint NOT NULL DEFAULT 0,
+    captured_credits bigint NOT NULL DEFAULT 0,
+    released_credits bigint NOT NULL DEFAULT 0,
+    capture_transaction_id text,
+    release_transaction_id text,
     settled_at timestamp(3) with time zone,
     updated_at timestamp(3) with time zone DEFAULT clock_timestamp() NOT NULL,
-    CONSTRAINT task_billing_settlement_state_check CHECK (((((state)::text = 'held'::text) AND (settlement_transaction_id IS NULL) AND (settled_at IS NULL)) OR (((state)::text = 'free'::text) AND (settlement_transaction_id IS NULL) AND (settled_at IS NOT NULL)) OR (((state)::text = ANY (ARRAY[('captured'::character varying)::text, ('released'::character varying)::text])) AND (settlement_transaction_id IS NOT NULL) AND (btrim(settlement_transaction_id) <> ''::text) AND (settled_at IS NOT NULL)))),
+    CONSTRAINT task_billing_settlement_state_check CHECK ((((state)::text = 'held'::text AND capture_transaction_id IS NULL AND release_transaction_id IS NULL AND settled_at IS NULL) OR ((state)::text = 'free'::text AND capture_transaction_id IS NULL AND release_transaction_id IS NULL AND settled_at IS NOT NULL) OR ((state)::text IN ('captured', 'released') AND settled_at IS NOT NULL))),
+    CONSTRAINT task_billing_settlement_amounts_check CHECK (actual_output_count >= 0 AND captured_credits >= 0 AND released_credits >= 0),
     CONSTRAINT task_billing_settlements_state_check CHECK (((state)::text = ANY (ARRAY[('held'::character varying)::text, ('free'::character varying)::text, ('captured'::character varying)::text, ('released'::character varying)::text])))
 );
 
@@ -3544,11 +3662,14 @@ ALTER TABLE ONLY billing_skus
 
 
 --
--- Name: task_billing_settlements task_billing_settlements_settlement_transaction_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: task_billing_settlements task_billing_settlements_capture_transaction_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY task_billing_settlements
-    ADD CONSTRAINT task_billing_settlements_settlement_transaction_id_fkey FOREIGN KEY (settlement_transaction_id) REFERENCES credit_transactions(transaction_id) ON UPDATE RESTRICT ON DELETE RESTRICT;
+    ADD CONSTRAINT task_billing_settlements_capture_transaction_id_fkey FOREIGN KEY (capture_transaction_id) REFERENCES credit_transactions(transaction_id) ON UPDATE RESTRICT ON DELETE RESTRICT;
+
+ALTER TABLE ONLY task_billing_settlements
+    ADD CONSTRAINT task_billing_settlements_release_transaction_id_fkey FOREIGN KEY (release_transaction_id) REFERENCES credit_transactions(transaction_id) ON UPDATE RESTRICT ON DELETE RESTRICT;
 
 
 --
@@ -4413,7 +4534,11 @@ BEGIN
   );
   INSERT INTO credit_postings (transaction_id, account_id, amount)
   VALUES (v_transaction_id, v_reserved_id, -v_amount), (v_transaction_id, v_issuance_id, v_amount);
-  UPDATE credit_holds SET status = 'captured', terminal_transaction_id = v_transaction_id, settled_at = now()
+  UPDATE credit_holds
+  SET status = 'captured',
+      captured_amount = captured_amount + v_amount,
+      capture_transaction_id = v_transaction_id,
+      settled_at = now()
   WHERE hold_transaction_id = p_hold_transaction_id;
   RETURN QUERY SELECT created.transaction_id, created.command_type, created.command_amount,
     created.wallet_user_id, created.available_balance_after, created.reserved_balance_after, FALSE, created.created_at

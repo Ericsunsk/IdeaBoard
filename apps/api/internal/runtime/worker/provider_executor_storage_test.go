@@ -32,12 +32,12 @@ func TestMaterializeProviderResultImagesUsesResultMaterializer(t *testing.T) {
 			Items: []taskmedia.MaterializedResult{{
 				ImageURL: "/uploads/tasks/42/task-owned/result.png",
 				Output: tasks.TaskOutput{
-					TaskID:     "task-owned",
-					Role:       "image",
-					URL:        "/uploads/tasks/42/task-owned/result.png",
-					SourceURL:  dataURL,
-					SortIndex:  0,
-					StorageKey: "uploads/tasks/42/task-owned/result.png",
+					TaskID:      "task-owned",
+					Role:        "image",
+					URL:         "/uploads/tasks/42/task-owned/result.png",
+					SourceURL:   dataURL,
+					ResultIndex: 0,
+					StorageKey:  "uploads/tasks/42/task-owned/result.png",
 				},
 			}},
 		},

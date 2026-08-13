@@ -112,6 +112,7 @@ func captureUsageCredits(t *testing.T, ctx context.Context, service *credits.Ser
 	capture, err := service.Capture(ctx, credits.CaptureCommand{
 		UserID:            userID,
 		HoldTransactionID: hold.TransactionID,
+		Amount:            mustUsageCreditAmount(t, amount),
 		Metadata:          usageCreditMetadata("usage-capture-" + key),
 	})
 	if err != nil {
@@ -177,7 +178,7 @@ func newDurableUsageBilling(
 ) (*taskbilling.Service, taskbilling.Request) {
 	t.Helper()
 	billingService := billing.NewService(pool)
-	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen)
+	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen, 1)
 	if err != nil {
 		t.Fatalf("build task billing request: %v", err)
 	}

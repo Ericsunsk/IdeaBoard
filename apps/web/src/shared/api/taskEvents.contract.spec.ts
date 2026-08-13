@@ -81,7 +81,7 @@ function makeImageOutput(url: string): NonNullable<Task['outputs']>[number] {
     width: 1024,
     height: 1024,
     size_bytes: 1024,
-    sort_index: 0,
+    result_index: 0,
     created_at: '2026-01-01T00:00:00.000Z',
     updated_at: '2026-01-01T00:00:00.000Z',
   }

@@ -303,11 +303,11 @@ func TestFinalizeLocalRedrawResultUsesResultMaterializer(t *testing.T) {
 	}
 
 	outputs := []tasks.TaskOutput{{
-		TaskID:    "task-local-redraw-materializer",
-		Role:      "image",
-		URL:       "/uploads/tasks/42/task-local-redraw-materializer/result.png",
-		SourceURL: "upstream://image",
-		SortIndex: 0,
+		TaskID:      "task-local-redraw-materializer",
+		Role:        "image",
+		URL:         "/uploads/tasks/42/task-local-redraw-materializer/result.png",
+		SourceURL:   "upstream://image",
+		ResultIndex: 0,
 	}}
 	materializer := &captureResultMaterializer{
 		bytesResult: taskmedia.MaterializedResults{

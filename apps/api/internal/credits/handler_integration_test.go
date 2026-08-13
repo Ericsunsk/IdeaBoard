@@ -328,7 +328,7 @@ func TestAdminCreditCommandsReturnCommittedFactsWhenIdentityProjectionFails(t *t
 					t.Fatalf("seed refund Hold() error = %v", err)
 				}
 				capture, err := service.Capture(t.Context(), CaptureCommand{
-					UserID: 94, HoldTransactionID: hold.TransactionID, Metadata: testMetadata("projection-failure:refund-capture", "projection-failure-refund-capture"),
+					UserID: 94, HoldTransactionID: hold.TransactionID, Amount: mustCreditAmount(t, 10), Metadata: testMetadata("projection-failure:refund-capture", "projection-failure-refund-capture"),
 				})
 				if err != nil {
 					t.Fatalf("seed refund Capture() error = %v", err)
@@ -544,7 +544,7 @@ func TestAdminCreditHTTPBindsActorAndRejectsUnknownFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("seed refund hold error = %v", err)
 	}
-	capture, err := service.Capture(request.Context(), CaptureCommand{UserID: 94, HoldTransactionID: hold.TransactionID, Metadata: testMetadata("http-refund-limit-capture", "http-refund-limit-capture")})
+	capture, err := service.Capture(request.Context(), CaptureCommand{UserID: 94, HoldTransactionID: hold.TransactionID, Amount: mustCreditAmount(t, 3), Metadata: testMetadata("http-refund-limit-capture", "http-refund-limit-capture")})
 	if err != nil {
 		t.Fatalf("seed refund capture error = %v", err)
 	}

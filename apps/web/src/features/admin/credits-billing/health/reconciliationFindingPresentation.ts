@@ -41,17 +41,13 @@ const findingTypePresentation = {
     title: '活动 Task 未保持 Hold',
     summary: 'Pending 或 Running Task 的 Billing settlement 未保持 held 状态。',
   },
-  completed_task_not_captured: {
-    title: '完成 Task 未完成 Capture',
-    summary: 'Completed Task 的 Credit Hold 尚未正确 Capture。',
-  },
-  failed_task_not_released: {
-    title: '失败 Task 未完成 Release',
-    summary: 'Failed 或 Cancelled Task 的 Credit Hold 尚未正确 Release。',
+  terminal_task_settlement_mismatch: {
+    title: '终态 Task 结算不一致',
+    summary: 'Task 的持久化结果数量与 Capture、Release 结算事实不一致。',
   },
   task_terminal_transaction_count: {
     title: 'Task 终态交易数量异常',
-    summary: 'Task 应有的 Capture 或 Release 交易数量不等于 1。',
+    summary: 'Task 的 Capture、Release 交易数量与实际结算金额不一致。',
   },
   idempotency_request_hash_conflict: {
     title: 'Idempotency 请求冲突',

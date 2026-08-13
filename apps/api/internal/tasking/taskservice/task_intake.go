@@ -158,13 +158,6 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 	if err := validateSubmitTaskPrompt(fullPrompt, maxSubmitTaskFinalPromptBytes, "最终提示词"); err != nil {
 		return CanonicalTaskRequest{}, err
 	}
-	billingRequest, err := resolveTaskBillingRequest(featureSlug)
-	if err != nil {
-		return CanonicalTaskRequest{}, err
-	}
-	if billingRequest != nil && clientActionID == "" {
-		return CanonicalTaskRequest{}, validation.New("AI 生图任务必须提供 client_action_id")
-	}
 	generationSnapshot, err := tasksubmission.CompileGenerationSnapshot(tasksubmission.GenerationCompilerInput{
 		Feature:             featureSlug,
 		UserPrompt:          req.Prompt,
@@ -174,6 +167,13 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 	})
 	if err != nil {
 		return CanonicalTaskRequest{}, err
+	}
+	billingRequest, err := resolveTaskBillingRequest(featureSlug, generationSnapshot.RequestedOutputCount)
+	if err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+	if billingRequest != nil && clientActionID == "" {
+		return CanonicalTaskRequest{}, validation.New("AI 生图任务必须提供 client_action_id")
 	}
 	typedParams.Generation = &generationSnapshot
 	paramsJSON, err := marshalWorkflowTaskParams(typedParams, params)
@@ -237,11 +237,11 @@ func (i *taskIntake) ensureProviderAvailable(ctx context.Context) error {
 	return nil
 }
 
-func resolveTaskBillingRequest(feature string) (*taskbilling.Request, error) {
+func resolveTaskBillingRequest(feature string, quantity int) (*taskbilling.Request, error) {
 	if !taskbilling.RequiresBilling(feature) {
 		return nil, nil
 	}
-	request, err := taskbilling.AIImageRequest(feature)
+	request, err := taskbilling.AIImageRequest(feature, int64(quantity))
 	if err != nil {
 		return nil, err
 	}

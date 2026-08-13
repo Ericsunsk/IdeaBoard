@@ -18,8 +18,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const imageWorkflowQuantity int64 = 1
-
 var (
 	ErrUnsupportedProduct  = errors.New("task product is not billable")
 	ErrPricingUnavailable  = errors.New("task pricing is unavailable")
@@ -56,15 +54,6 @@ const (
 	SettlementStateReleased SettlementState = "released"
 )
 
-// TerminalOutcome is the only caller choice exposed by terminal Task Billing.
-// It deliberately excludes non-terminal settlement states.
-type TerminalOutcome string
-
-const (
-	TerminalOutcomeSucceeded    TerminalOutcome = "succeeded"
-	TerminalOutcomeUnsuccessful TerminalOutcome = "unsuccessful"
-)
-
 type Request struct {
 	Feature  string
 	Quantity int64
@@ -96,12 +85,15 @@ func NewService(quoter Quoter, creditService CreditService) *Service {
 	return &Service{quoter: quoter, credits: creditService}
 }
 
-func AIImageRequest(feature string) (Request, error) {
+func AIImageRequest(feature string, quantity int64) (Request, error) {
 	canonicalFeature, ok := workflow.ParseAIImageFeatureSlug(feature)
 	if !ok {
 		return Request{}, ErrUnsupportedProduct
 	}
-	return Request{Feature: canonicalFeature, Quantity: imageWorkflowQuantity}, nil
+	if _, err := workflow.ParseRequestedOutputCount(int(quantity)); err != nil {
+		return Request{}, err
+	}
+	return Request{Feature: canonicalFeature, Quantity: quantity}, nil
 }
 
 // RequiresBilling identifies task products whose terminal transition must
@@ -248,7 +240,7 @@ VALUES ($1, $2, $3, $4)`, userID, clientActionID, taskID, requestHash); err != n
 
 // SettleTerminal composes the Task Billing state machine and Credits command
 // into the caller-owned Task terminal transaction.
-func SettleTerminal(ctx context.Context, tx *sql.Tx, taskID string, outcome TerminalOutcome) error {
+func SettleTerminal(ctx context.Context, tx *sql.Tx, taskID string) error {
 	if tx == nil {
 		return fmt.Errorf("task billing transaction unavailable")
 	}
@@ -256,20 +248,18 @@ func SettleTerminal(ctx context.Context, tx *sql.Tx, taskID string, outcome Term
 	if taskID == "" {
 		return fmt.Errorf("task id is required")
 	}
-	target, err := terminalSettlementState(outcome)
-	if err != nil {
-		return err
-	}
 	var userID int64
-	var totalCredits int64
+	var unitCredits, quantity, totalCredits int64
 	var holdTransactionID sql.NullString
 	var currentState SettlementState
-	err = tx.QueryRowContext(ctx, `
-SELECT snapshots.user_id, snapshots.total_credits, snapshots.hold_transaction_id, settlements.state
+	var settledOutputCount int64
+	err := tx.QueryRowContext(ctx, `
+SELECT snapshots.user_id, snapshots.unit_credits, snapshots.quantity, snapshots.total_credits,
+	       snapshots.hold_transaction_id, settlements.state, settlements.actual_output_count
 FROM task_billing_snapshots snapshots
 JOIN task_billing_settlements settlements USING (task_id)
 WHERE snapshots.task_id = $1
-FOR UPDATE OF settlements`, taskID).Scan(&userID, &totalCredits, &holdTransactionID, &currentState)
+	FOR UPDATE OF settlements`, taskID).Scan(&userID, &unitCredits, &quantity, &totalCredits, &holdTransactionID, &currentState, &settledOutputCount)
 	if errors.Is(err, sql.ErrNoRows) {
 		var snapshotExists bool
 		if existsErr := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM task_billing_snapshots WHERE task_id = $1)`, taskID).Scan(&snapshotExists); existsErr != nil {
@@ -288,8 +278,25 @@ FOR UPDATE OF settlements`, taskID).Scan(&userID, &totalCredits, &holdTransactio
 	if err != nil {
 		return fmt.Errorf("load task billing settlement: %w", err)
 	}
-	if currentState == SettlementStateFree || currentState == target {
+	var actualOutputCount int64
+	if err := tx.QueryRowContext(ctx, `SELECT count(*) FROM task_outputs WHERE task_id = $1`, taskID).Scan(&actualOutputCount); err != nil {
+		return fmt.Errorf("count persisted task outputs: %w", err)
+	}
+	if actualOutputCount < 0 || actualOutputCount > quantity {
+		return fmt.Errorf("actual output count %d exceeds requested quantity %d", actualOutputCount, quantity)
+	}
+	target := SettlementStateReleased
+	if actualOutputCount > 0 {
+		target = SettlementStateCaptured
+	}
+	if currentState == SettlementStateFree {
 		return nil
+	}
+	if currentState == target {
+		if settledOutputCount == actualOutputCount {
+			return nil
+		}
+		return ErrSettlementConflict
 	}
 	if currentState != SettlementStateHeld || totalCredits <= 0 || !holdTransactionID.Valid || strings.TrimSpace(holdTransactionID.String) == "" {
 		return ErrSettlementConflict
@@ -299,23 +306,46 @@ FOR UPDATE OF settlements`, taskID).Scan(&userID, &totalCredits, &holdTransactio
 	if err != nil {
 		return err
 	}
-	metadata := taskCommandMetadata("task-"+string(target)+":"+taskID, credits.ActorService, "task-runtime", "task_terminal", "AI 生图任务终态结算", taskID)
-	var result credits.CommandResult
-	switch target {
-	case SettlementStateCaptured:
-		result, err = commands.Capture(ctx, credits.CaptureCommand{UserID: userID, HoldTransactionID: holdTransactionID.String, Metadata: metadata})
-	case SettlementStateReleased:
-		result, err = commands.Release(ctx, credits.ReleaseCommand{UserID: userID, HoldTransactionID: holdTransactionID.String, Metadata: metadata})
-	default:
-		return fmt.Errorf("invalid task billing settlement target %q", target)
+	captureAmount := actualOutputCount * unitCredits
+	releaseAmount := totalCredits - captureAmount
+	var captureTransactionID, releaseTransactionID any
+	var settledAt time.Time
+	if releaseAmount > 0 {
+		amount, amountErr := credits.NewCreditAmount(releaseAmount)
+		if amountErr != nil {
+			return amountErr
+		}
+		result, releaseErr := commands.Release(ctx, credits.ReleaseCommand{
+			UserID: userID, HoldTransactionID: holdTransactionID.String, Amount: amount,
+			Metadata: taskCommandMetadata("task-release:"+taskID, credits.ActorService, "task-runtime", "task_terminal", "AI 生图任务未产出部分释放", taskID),
+		})
+		if releaseErr != nil {
+			return releaseErr
+		}
+		releaseTransactionID = result.TransactionID
+		settledAt = result.CreatedAt
 	}
-	if err != nil {
-		return err
+	if captureAmount > 0 {
+		amount, amountErr := credits.NewCreditAmount(captureAmount)
+		if amountErr != nil {
+			return amountErr
+		}
+		result, captureErr := commands.Capture(ctx, credits.CaptureCommand{
+			UserID: userID, HoldTransactionID: holdTransactionID.String, Amount: amount,
+			Metadata: taskCommandMetadata("task-capture:"+taskID, credits.ActorService, "task-runtime", "task_terminal", "AI 生图任务实际产出结算", taskID),
+		})
+		if captureErr != nil {
+			return captureErr
+		}
+		captureTransactionID = result.TransactionID
+		settledAt = result.CreatedAt
 	}
 	resultUpdate, err := tx.ExecContext(ctx, `
 UPDATE task_billing_settlements
-SET state = $2, settlement_transaction_id = $3, settled_at = $4, updated_at = clock_timestamp()
-WHERE task_id = $1 AND state = 'held'`, taskID, target, result.TransactionID, result.CreatedAt)
+SET state = $2, actual_output_count = $3, captured_credits = $4, released_credits = $5,
+    capture_transaction_id = $6, release_transaction_id = $7, settled_at = $8, updated_at = clock_timestamp()
+WHERE task_id = $1 AND state = 'held'`, taskID, target, actualOutputCount, captureAmount, releaseAmount,
+		captureTransactionID, releaseTransactionID, settledAt)
 	if err != nil {
 		return fmt.Errorf("persist task billing settlement: %w", err)
 	}
@@ -327,17 +357,6 @@ WHERE task_id = $1 AND state = 'held'`, taskID, target, result.TransactionID, re
 		return fmt.Errorf("persist task billing settlement affected %d rows", rows)
 	}
 	return nil
-}
-
-func terminalSettlementState(outcome TerminalOutcome) (SettlementState, error) {
-	switch outcome {
-	case TerminalOutcomeSucceeded:
-		return SettlementStateCaptured, nil
-	case TerminalOutcomeUnsuccessful:
-		return SettlementStateReleased, nil
-	default:
-		return "", fmt.Errorf("invalid task billing terminal outcome %q", outcome)
-	}
 }
 
 func taskCommandMetadata(key string, actorType credits.ActorType, actorID, source, reason, taskID string) credits.CommandMetadata {
