@@ -2510,23 +2510,29 @@ components:
 
     CheckoutRequestRejectedError:
       type: object
-      required: [code, msg]
+      required: [code, msg, message_safe]
       properties:
         code:
           type: string
           enum: [checkout_request_rejected]
         msg:
           type: string
+        message_safe:
+          type: boolean
+          enum: [true]
 
     CheckoutStateConflictError:
       type: object
-      required: [code, msg]
+      required: [code, msg, message_safe]
       properties:
         code:
           type: string
           enum: [checkout_session_expired, payment_already_completed]
         msg:
           type: string
+        message_safe:
+          type: boolean
+          enum: [true]
 
     SubmissionFailedError:
       type: object

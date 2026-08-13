@@ -196,7 +196,15 @@ func TestCheckoutHTTPIdentifiesResultsThatAllowANewIntent(t *testing.T) {
 		code    string
 		message string
 	}{
-		{name: "provider rejected creation", err: errors.Join(ErrCheckoutRequestRejected, ErrPurchasesUnavailable), code: "checkout_request_rejected", message: "无法创建支付页面，请重试"},
+		{
+			name: "provider rejected creation",
+			err: errors.Join(
+				ErrCheckoutRequestRejected,
+				NewGatewayError(GatewayErrorRequestRejected, "decline_code=insufficient_funds", errors.New("raw provider body sk_test_secret")),
+			),
+			code:    "checkout_request_rejected",
+			message: "无法创建支付页面，请重试",
+		},
 		{name: "recovered session expired", err: ErrCheckoutSessionExpired, code: "checkout_session_expired", message: ErrCheckoutSessionExpired.Error()},
 		{name: "recovered payment completed", err: ErrPaymentAlreadyCompleted, code: "payment_already_completed", message: ErrPaymentAlreadyCompleted.Error()},
 	}
@@ -211,14 +219,18 @@ func TestCheckoutHTTPIdentifiesResultsThatAllowANewIntent(t *testing.T) {
 				t.Fatalf("status = %d, want %d", result.Code, http.StatusUnprocessableEntity)
 			}
 			var responseBody struct {
-				Code string `json:"code"`
-				Msg  string `json:"msg"`
+				Code        string `json:"code"`
+				Msg         string `json:"msg"`
+				MessageSafe bool   `json:"message_safe"`
 			}
 			if err := json.Unmarshal(result.Body.Bytes(), &responseBody); err != nil {
 				t.Fatal(err)
 			}
-			if responseBody.Code != test.code || responseBody.Msg != test.message {
+			if responseBody.Code != test.code || responseBody.Msg != test.message || !responseBody.MessageSafe {
 				t.Fatalf("response = %+v", responseBody)
+			}
+			if strings.Contains(result.Body.String(), "decline_code") || strings.Contains(result.Body.String(), "sk_test_secret") {
+				t.Fatalf("response leaked provider details: %s", result.Body.String())
 			}
 		})
 	}

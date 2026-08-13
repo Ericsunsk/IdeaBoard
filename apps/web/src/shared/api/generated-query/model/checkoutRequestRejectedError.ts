@@ -9,4 +9,5 @@ import type { CheckoutRequestRejectedErrorCode } from './checkoutRequestRejected
 export interface CheckoutRequestRejectedError {
   code: CheckoutRequestRejectedErrorCode
   msg: string
+  message_safe: true
 }

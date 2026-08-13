@@ -117,6 +117,8 @@ CREDITS_WELCOME_IDENTITY_KEY='<base64-32-byte-key>' \
 
 GitHub 只暴露一个稳定的 required check：`CI Gate`。它在 PR、`main` push 和手动运行上始终创建，先把改动分类为 Web、API、Auth、Schema、Migration Integration、Docker 与 Ops，再只调用受影响的 reusable workflows；docs-only 改动会明确成功。Dependency audit 由 Web/Auth quality 与 API quality 各自负责，周一 schedule 的 `security.yml` 做全量 audit。未知路径采用 fail-safe 分类，执行全部 context，避免新增目录静默绕过 CI。
 
+`CI Gate` 的 Step Summary 会列出本次实际选中的 verification lanes 及结果；耗时以 GitHub Actions 原生 job timing 为事实源。优化 CI 前先对最近多次相同改动类型的运行取基线，重点比较 API race shards、Web Quality 与 Browser Smoke，不以单次 cache hit 或总时长推断收益。
+
 修改 CI classifier、workflow 或 repo-local setup actions 后，先运行本地 contract tests：
 
 ```bash
@@ -207,6 +209,7 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 | [reconciliation.go](./apps/api/internal/credits/reconciliation.go) | 自动账本检查、Run history 与全局 Finding queue；Stale Hold 固定 24 小时且不接受 Admin 配置 |
 | [CONTEXT.md](./apps/api/internal/credits/CONTEXT.md) | Credits domain language 与 invariants |
 | [credits-million.md](./docs/benchmarks/credits-million.md) | 显式百万流水 harness 与参考结果 |
+| [web-performance.md](./docs/benchmarks/web-performance.md) | Web bundle size guard 与 Canvas interaction benchmark |
 
 ### Rewards
 

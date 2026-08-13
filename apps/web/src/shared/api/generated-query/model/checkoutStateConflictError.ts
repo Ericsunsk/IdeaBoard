@@ -9,4 +9,5 @@ import type { CheckoutStateConflictErrorCode } from './checkoutStateConflictErro
 export interface CheckoutStateConflictError {
   code: CheckoutStateConflictErrorCode
   msg: string
+  message_safe: true
 }
