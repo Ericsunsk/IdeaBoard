@@ -48,7 +48,7 @@ func (s *Service) PrepareGenerationMedia(ctx context.Context, userID int64, clie
 			cleanup()
 			return tasks.GenerationRequestSnapshot{}, err
 		}
-		stored, err := s.storage.StoreRemoteRef(ctx, media.Ref, storage.StorageStoreOptions{DirPrefix: dirPrefix, AllowHosts: outbound.AllowHosts(ctx)})
+		stored, err := s.storage.StoreMediaRef(ctx, media.Ref, storage.StorageStoreOptions{DirPrefix: dirPrefix, AllowHosts: outbound.AllowHosts(ctx)})
 		if err != nil {
 			cleanup()
 			return tasks.GenerationRequestSnapshot{}, fmt.Errorf("prepare media index=%d: %w", media.InputIndex, err)

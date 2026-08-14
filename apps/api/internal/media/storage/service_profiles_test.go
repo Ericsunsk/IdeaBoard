@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -1023,6 +1024,52 @@ func TestReadUploadResourceByURLLocalInfersContentType(t *testing.T) {
 	}
 	if obj.ContentType != "image/png" {
 		t.Fatalf("ContentType = %q, want image/png", obj.ContentType)
+	}
+}
+
+func TestStoreMediaRefCopiesInternalUpload(t *testing.T) {
+	service, _ := newStorageServiceTest(t)
+	oldWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get cwd: %v", err)
+	}
+	tmpDir := t.TempDir()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("chdir temp: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(oldWd)
+	})
+
+	sourceRef := "/uploads/canvas/OWNR1A/board-1/content/image.png"
+	sourcePath := filepath.FromSlash(strings.TrimPrefix(sourceRef, "/"))
+	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+		t.Fatalf("mkdir upload dir: %v", err)
+	}
+	pngData := tinyPNGBytes(t)
+	if err := os.WriteFile(sourcePath, pngData, 0o600); err != nil {
+		t.Fatalf("write upload: %v", err)
+	}
+
+	stored, err := service.StoreMediaRef(context.Background(), sourceRef, StorageStoreOptions{
+		DirPrefix: "tasks/1/prepare-action",
+	})
+	if err != nil {
+		t.Fatalf("StoreMediaRef returned error: %v", err)
+	}
+	if stored.URL == sourceRef || !strings.HasPrefix(stored.URL, "/uploads/tasks/1/prepare-action/") {
+		t.Fatalf("stored URL = %q, want prepared task upload", stored.URL)
+	}
+	if stored.MIMEType != "image/png" || stored.Width != 1 || stored.Height != 1 {
+		t.Fatalf("stored metadata = %#v, want 1x1 image/png", stored)
+	}
+
+	copied, err := service.ReadUploadResourceByURL(context.Background(), stored.URL, int64(len(pngData)))
+	if err != nil {
+		t.Fatalf("read copied upload: %v", err)
+	}
+	if !bytes.Equal(copied.Data, pngData) {
+		t.Fatal("copied upload data differs from source")
 	}
 }
 

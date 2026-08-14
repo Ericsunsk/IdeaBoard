@@ -104,6 +104,25 @@ func (s *StorageService) StoreRemoteRef(ctx context.Context, remoteURL string, o
 	return s.storeRemoteRefWithProfile(ctx, *profile, remoteURL, opts)
 }
 
+// StoreMediaRef materializes an authorized internal upload or an external image
+// into a new storage object. Internal refs are copied through the active storage
+// adapter instead of being routed through the HTTP downloader.
+func (s *StorageService) StoreMediaRef(ctx context.Context, sourceRef string, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	trimmed := strings.TrimSpace(sourceRef)
+	if !strings.HasPrefix(trimmed, "/uploads/") {
+		return s.StoreRemoteRef(ctx, trimmed, opts)
+	}
+
+	obj, err := s.ReadUploadResourceByURL(ctx, trimmed, maxRemoteFileSize)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateImageBytes(obj.Filename, obj.Data); err != nil {
+		return nil, err
+	}
+	return s.StoreBytesRef(ctx, obj.Filename, obj.Data, opts)
+}
+
 func (s *StorageService) StoreBytes(ctx context.Context, filename string, data []byte, opts StorageStoreOptions) (string, error) {
 	ref, err := s.StoreBytesRef(ctx, filename, data, opts)
 	if err != nil {
@@ -355,7 +374,7 @@ func (s *StorageService) storeRemoteRefWithProfile(ctx context.Context, profile 
 		if err != nil {
 			return nil, err
 		}
-		if err := validateRemoteImageBytes(filename, data); err != nil {
+		if err := validateImageBytes(filename, data); err != nil {
 			return nil, err
 		}
 		adapter, err := s.adapterRegistry.get(profile.Provider)
@@ -788,13 +807,13 @@ func validateRemoteImageFile(file *os.File, ext string) error {
 	return nil
 }
 
-func validateRemoteImageBytes(filename string, data []byte) error {
+func validateImageBytes(filename string, data []byte) error {
 	ext, ok := imageformat.NormalizeImageExtension(filepath.Ext(filename))
 	if !ok {
 		return fmt.Errorf("仅支持 %s 图片", imageformat.SupportedUploadImageLabel())
 	}
 	if err := imageformat.ValidateImageBytes(data, ext); err != nil {
-		return fmt.Errorf("远程文件校验失败: %w", err)
+		return fmt.Errorf("图片校验失败: %w", err)
 	}
 	return nil
 }
