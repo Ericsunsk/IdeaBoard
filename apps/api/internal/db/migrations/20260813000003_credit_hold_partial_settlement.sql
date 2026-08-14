@@ -248,3 +248,20 @@ BEGIN
   RETURN QUERY SELECT created.transaction_id, created.command_type, created.command_amount, created.wallet_user_id, created.available_balance_after, created.reserved_balance_after, FALSE, created.created_at FROM credit_transactions created WHERE created.transaction_id = v_transaction_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog;
+
+DO $$
+DECLARE
+  trusted_schema TEXT := current_schema();
+BEGIN
+  EXECUTE format(
+    'ALTER FUNCTION %I.execute_credit_purchase_refund_v1(BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
+    trusted_schema,
+    trusted_schema
+  );
+  EXECUTE format(
+    'ALTER FUNCTION %I.execute_credit_command_v2(TEXT, BIGINT, BIGINT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) SET search_path TO %I, pg_catalog, pg_temp',
+    trusted_schema,
+    trusted_schema
+  );
+END;
+$$;

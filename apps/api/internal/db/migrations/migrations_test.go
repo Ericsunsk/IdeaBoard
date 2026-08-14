@@ -167,6 +167,33 @@ func TestImageEditWorkflowMigrationUsesCurrentFeaturePromptContract(t *testing.T
 	}
 }
 
+func TestCreditRoutineMigrationsBindRecreatedRoutinesToTrustedSchema(t *testing.T) {
+	tests := map[string][]string{
+		"20260813000003_credit_hold_partial_settlement.sql": {
+			"execute_credit_command_v2(text, bigint, bigint, text, text, text, text, text, text, text, text)",
+			"execute_credit_purchase_refund_v1(bigint, text, text, text, text, text, text, text, text)",
+		},
+		"20260813000004_reconciliation_partial_settlement.sql": {
+			"execute_credit_reconciliation(bigint)",
+		},
+	}
+	for file, signatures := range tests {
+		raw, err := migrationFS.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sql := strings.ToLower(strings.Join(strings.Fields(string(raw)), " "))
+		if !strings.Contains(sql, "set search_path to %i, pg_catalog, pg_temp") {
+			t.Fatalf("%s does not use the trusted schema path", file)
+		}
+		for _, signature := range signatures {
+			if !strings.Contains(sql, signature) {
+				t.Fatalf("%s does not rebind %s", file, signature)
+			}
+		}
+	}
+}
+
 func TestSchemaSnapshotCoversCanonicalBaselineObjects(t *testing.T) {
 	baseline, err := migrationFS.ReadFile(baselineMigrationFile)
 	if err != nil {
