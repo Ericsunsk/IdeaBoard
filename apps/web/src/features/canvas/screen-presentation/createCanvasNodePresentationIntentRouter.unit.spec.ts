@@ -141,11 +141,12 @@ describe('Canvas Node presentation intent routing seam', () => {
         intent: {
           type: 'image-prompt-generation-requested',
           nodeId,
+          action: 'image-edit',
           prompt: 'restyle',
           outputCount: 3,
         },
         command: commands.image.generateFromPrompt,
-        args: [nodeId, 'restyle', 3],
+        args: [nodeId, 'image-edit', 'restyle', 3],
       },
       {
         intent: { type: 'canvas-extend-submitted', nodeId, prompt: 'extend', outputCount: 1 },
@@ -153,9 +154,9 @@ describe('Canvas Node presentation intent routing seam', () => {
         args: [nodeId, 'extend', 1],
       },
       {
-        intent: { type: 'action-requested', nodeId, action },
+        intent: { type: 'action-requested', nodeId, action, prompt: '', outputCount: 1 },
         command: commands.image.runAction,
-        args: [nodeId, action],
+        args: [nodeId, action, '', 1, undefined],
       },
       {
         intent: { type: 'canvas-extend-handle-pointerdown', nodeId, anchor, event: pointerEvent },

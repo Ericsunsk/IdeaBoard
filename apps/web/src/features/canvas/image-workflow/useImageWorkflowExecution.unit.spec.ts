@@ -5,9 +5,10 @@ import { CanvasBillingPreflightError, createCanvasExecutionRuntime } from '../ex
 
 const mocks = vi.hoisted(() => {
   const plan = {
-    kind: 'text-prompt',
+    kind: 'prompt-generation',
     sourceNodeId: 'prompt-1',
     source: { url: '', ratio: 1 },
+    referenceImages: [],
     prompt: 'draw this',
     outputCount: 1,
     aspectRatio: 'auto',
@@ -20,7 +21,7 @@ const mocks = vi.hoisted(() => {
       planImageInpaintAction: vi.fn(() => plan),
       planImagePromptGeneration: vi.fn(() => plan),
       planImagePromptGenerationFromSource: vi.fn(() => plan),
-      planTextPromptGeneration: vi.fn(() => plan),
+      planPromptGeneration: vi.fn(() => plan),
       planFusionPromptGeneration: vi.fn(() => plan),
     },
     workflow: {
@@ -89,7 +90,7 @@ describe('useImageWorkflowExecution', () => {
     mocks.executionOptions?.onWarning('provider unavailable')
 
     expect(runtime.isGenerationAvailable()).toBe(false)
-    await runtime.runTextPromptGeneration('prompt-1', 'draw this', 1, 'auto')
+    await runtime.runPromptGeneration('prompt-1', [], 'draw this', 1, 'auto')
 
     expect(mocks.workflow.executeImageWorkflow).not.toHaveBeenCalled()
     expect(feedback.warning).toHaveBeenCalledWith('provider unavailable')
@@ -97,10 +98,11 @@ describe('useImageWorkflowExecution', () => {
     vi.setSystemTime(15_001)
 
     expect(runtime.isGenerationAvailable()).toBe(true)
-    await runtime.runTextPromptGeneration('prompt-1', 'draw this', 1, 'auto')
+    await runtime.runPromptGeneration('prompt-1', [], 'draw this', 1, 'auto')
 
-    expect(mocks.planner.planTextPromptGeneration).toHaveBeenCalledWith(
+    expect(mocks.planner.planPromptGeneration).toHaveBeenCalledWith(
       'prompt-1',
+      [],
       'draw this',
       1,
       'auto',

@@ -15,14 +15,16 @@ type workflowPresentation struct {
 }
 
 var workflowPresentations = map[string]workflowPresentation{
-	workflow.FeatureSlugSketchToImage:  {displayName: "草图成图", description: "将草图转换为完整图片。"},
-	workflow.FeatureSlugStyleVariation: {displayName: "风格延展", description: "基于图片生成同风格变体。"},
-	workflow.FeatureSlugPartialEdit:    {displayName: "局部重绘", description: "仅重绘图片选定区域。"},
-	workflow.FeatureSlugRemoveBg:       {displayName: "抠图", description: "识别主体并移除图片背景。"},
-	workflow.FeatureSlugStyleFusion:    {displayName: "多图融合", description: "融合多张参考图的内容与风格。"},
-	workflow.FeatureSlugPatternGen:     {displayName: "图案生成", description: "生成可用于设计的图案素材。"},
-	workflow.FeatureSlugHDUpscale:      {displayName: "HD", description: "提升图片分辨率与细节。"},
-	workflow.FeatureSlugImageExtend:    {displayName: "扩图", description: "向指定方向扩展图片画面。"},
+	workflow.FeatureSlugPromptGeneration: {displayName: "Prompt 生图", description: "使用文字与可选参考图生成图片。"},
+	workflow.FeatureSlugImageEdit:        {displayName: "文字改图", description: "使用文字调整整张图片。"},
+	workflow.FeatureSlugLocalInpaint:     {displayName: "局部重绘", description: "仅重绘图片选定区域。"},
+	workflow.FeatureSlugSketchToImage:    {displayName: "草图成图", description: "将草图转换为完整图片。"},
+	workflow.FeatureSlugStyleVariation:   {displayName: "风格延展", description: "基于图片生成同风格变体。"},
+	workflow.FeatureSlugRemoveBg:         {displayName: "抠图", description: "识别主体并移除图片背景。"},
+	workflow.FeatureSlugStyleFusion:      {displayName: "多图融合", description: "融合多张参考图的内容与风格。"},
+	workflow.FeatureSlugPatternGen:       {displayName: "图案生成", description: "生成可用于设计的图案素材。"},
+	workflow.FeatureSlugHDUpscale:        {displayName: "HD", description: "提升图片分辨率与细节。"},
+	workflow.FeatureSlugImageExtend:      {displayName: "扩图", description: "向指定方向扩展图片画面。"},
 }
 
 // WorkflowItems adapts Workflow's canonical executable features to the

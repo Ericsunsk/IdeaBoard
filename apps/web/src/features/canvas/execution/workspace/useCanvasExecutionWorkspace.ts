@@ -44,8 +44,8 @@ export type CanvasExecutionWorkspaceState = {
 }
 
 export type CanvasExecutionWorkspaceCommands = {
-  runTextPromptGeneration: (
-    plan: ActivatedImageExecutionPlan & { kind: 'text-prompt' },
+  runPromptGeneration: (
+    plan: ActivatedImageExecutionPlan & { kind: 'prompt-generation' },
   ) => Promise<void>
   reattachPendingImageResults: () => Promise<void>
 }
@@ -136,14 +136,6 @@ export function useCanvasExecutionWorkspace(
     }
   }
 
-  async function resolveFirstTaskImageResult(taskId: string, fallbackRatio: number) {
-    return await resolveFirstTaskImageResultDisplay(
-      await waitTaskImageResults(taskId),
-      fallbackRatio,
-      loadImageSize,
-    )
-  }
-
   function isPendingImageTaskStillCurrent(nodeId: string, taskId: string): boolean {
     const snapshot = readPendingImageSnapshot(options.nodes.value, nodeId)
     return !!snapshot && isPendingImageTaskSnapshot(snapshot, taskId)
@@ -170,10 +162,11 @@ export function useCanvasExecutionWorkspace(
     onError: options.onError,
   })
 
-  async function runTextPromptGeneration(
-    plan: ActivatedImageExecutionPlan & { kind: 'text-prompt' },
+  async function runPromptGeneration(
+    plan: ActivatedImageExecutionPlan & { kind: 'prompt-generation' },
   ): Promise<void> {
     const attachment = requireCurrentAttachment()
+    let taskResultsPromise: Promise<TaskImageResult[]> | null = null
     let taskRequest: SubmitTaskData | null = null
     const buildTaskRequest = () => {
       taskRequest ??= buildImageExecutionTaskRequest(plan)
@@ -189,13 +182,22 @@ export function useCanvasExecutionWorkspace(
       sourceNodeId: plan.sourceNodeId,
       attachment,
       outputCount: plan.outputCount,
+      submissionMode: 'shared-task',
       resultOptions: plan.resultOptions,
       preflight: async () => {
         buildTaskRequest()
       },
       assertReady: taskSubmission.assertReady,
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
-      resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, 1),
+      resolveResult: async (taskId, _resultNodeId, resultIndex) => {
+        taskResultsPromise ??= waitTaskImageResults(taskId)
+        return resolveTaskImageResultAtIndexDisplay(
+          await taskResultsPromise,
+          resultIndex,
+          plan.source.ratio,
+          loadImageSize,
+        )
+      },
       fallbackErrorMessage: '生成失败',
     })
   }
@@ -336,7 +338,7 @@ export function useCanvasExecutionWorkspace(
       isNodeRunning,
     },
     commands: {
-      runTextPromptGeneration,
+      runPromptGeneration,
       reattachPendingImageResults,
     },
   }

@@ -21,9 +21,9 @@ describe('task readiness billing updates', () => {
     const readiness = {
       ready: false,
       message: 'Idea不足',
-      feature: 'pattern-gen',
+      feature: 'prompt-generation',
       billing: {
-        sku: 'ai.image.pattern-gen',
+        sku: 'ai-image:prompt-generation',
         price_version_id: 2,
         price_version: 2,
         unit_credits: 6,
@@ -42,7 +42,7 @@ describe('task readiness billing updates', () => {
     await expect(
       assertTaskSubmitReady({
         prompt: 'final prompt',
-        feature: 'pattern-gen',
+        feature: 'prompt-generation',
         client_action_id: 'canvas:action-1',
         params: { output_count: 4 },
       }),
@@ -55,9 +55,9 @@ describe('task readiness billing updates', () => {
   it('keeps an explicit free quote ready without requiring wallet coverage', async () => {
     const readiness = {
       ready: true,
-      feature: 'pattern-gen',
+      feature: 'prompt-generation',
       billing: {
-        sku: 'ai-image:pattern-gen.test',
+        sku: 'ai-image:prompt-generation.test',
         price_version_id: 2,
         price_version: 2,
         unit_credits: 0,
@@ -74,7 +74,7 @@ describe('task readiness billing updates', () => {
     await expect(
       assertTaskSubmitReady({
         prompt: 'free prompt',
-        feature: 'pattern-gen',
+        feature: 'prompt-generation',
         client_action_id: 'canvas:free-action',
         params: { output_count: 4 },
       }),
@@ -87,7 +87,7 @@ describe('task readiness billing updates', () => {
     await expect(
       assertTaskSubmitReady({
         prompt: 'network prompt',
-        feature: 'pattern-gen',
+        feature: 'prompt-generation',
         params: { output_count: 1 },
       }),
     ).rejects.toMatchObject({ kind: 'network', message: '网络错误，请重试' })
@@ -102,7 +102,7 @@ describe('task readiness billing updates', () => {
     await expect(
       assertTaskSubmitReady({
         prompt: 'quote prompt',
-        feature: 'pattern-gen',
+        feature: 'prompt-generation',
         params: { output_count: 1 },
       }),
     ).rejects.toMatchObject({

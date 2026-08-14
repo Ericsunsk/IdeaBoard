@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/media/imageformat"
@@ -53,7 +54,7 @@ func readLocalRedrawRequest(params map[string]interface{}) (localRedrawRequest, 
 		return localRedrawRequest{}, false, nil
 	}
 	featureSlug, ok := workflow.ReadWorkflowStringParam(params, "feature")
-	if !ok || featureSlug != workflow.FeatureSlugPartialEdit {
+	if !ok || featureSlug != workflow.FeatureSlugLocalInpaint {
 		return localRedrawRequest{}, false, nil
 	}
 	maskRef, ok := readLocalRedrawMaskRef(params)
@@ -244,6 +245,60 @@ func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID
 		)
 	}
 	return materializedURL, []tasks.TaskOutput{materialized.Items[0].Output}, true, nil
+}
+
+func (c *ProviderExecutor) finalizeLocalRedrawResults(ctx context.Context, userID int64, taskID string, redraw *localRedrawContext, upstreamImageRefs []string, timeout time.Duration) ([]string, []tasks.TaskOutput, bool, error) {
+	if redraw == nil {
+		return upstreamImageRefs, nil, false, nil
+	}
+
+	imageURLs := make([]string, 0, len(upstreamImageRefs))
+	outputs := make([]tasks.TaskOutput, 0, len(upstreamImageRefs))
+	var firstFailure error
+	for resultIndex, upstreamImageRef := range upstreamImageRefs {
+		imageURL, materializedOutputs, stored, err := c.finalizeLocalRedrawResult(
+			ctx,
+			userID,
+			taskID,
+			redraw,
+			upstreamImageRef,
+			timeout,
+		)
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return nil, nil, false, err
+			}
+			if firstFailure == nil {
+				firstFailure = err
+			}
+			continue
+		}
+		if !stored || len(materializedOutputs) != 1 || strings.TrimSpace(imageURL) == "" {
+			if firstFailure == nil {
+				firstFailure = newExecutionFailureError(
+					tasks.ExecutionStageFinalizing,
+					tasks.FailureCategoryStorageError,
+					fmt.Errorf("local redraw 持久化返回无效结果: feature=%s", redraw.featureSlug),
+				)
+			}
+			continue
+		}
+		output := materializedOutputs[0]
+		output.ResultIndex = resultIndex
+		imageURLs = append(imageURLs, imageURL)
+		outputs = append(outputs, output)
+	}
+	if len(imageURLs) > 0 {
+		return imageURLs, outputs, true, nil
+	}
+	if firstFailure != nil {
+		return nil, nil, false, firstFailure
+	}
+	return nil, nil, false, newExecutionFailureError(
+		tasks.ExecutionStageFinalizing,
+		tasks.FailureCategoryFinalizeError,
+		fmt.Errorf("local redraw 未收到可合成的上游结果: feature=%s", redraw.featureSlug),
+	)
 }
 
 func readLocalRedrawOriginalImageRef(params map[string]interface{}) (string, bool) {

@@ -5,18 +5,18 @@ import type {
   ImageInpaintExecutionPlan,
   ImagePromptExecutionPlan,
   ImageExecutionInput,
+  PromptGenerationExecutionPlan,
   PreparedFusionExecutionPlan,
-  TextPromptExecutionPlan,
 } from '../planning/ImageExecutionPlan'
 import type { CanvasExtendPercent } from '../../utils/canvasExtendGeometry'
 import {
   buildExecutionTaskRequest,
   EXECUTION_FEATURE,
   EXECUTION_FUSION_META,
+  EXECUTION_IMAGE_EDIT_META,
+  EXECUTION_LOCAL_INPAINT_META,
   EXECUTION_META,
-  EXECUTION_PARTIAL_EDIT_META,
 } from '../contracts/executionContract'
-import { assertPatternGenTaskRequest } from '../contracts/patternGenContract'
 import {
   buildExecutionSizeParams,
   extendExecutionImageSize,
@@ -47,10 +47,10 @@ function requireImageExecutionInputUrl(source: ImageExecutionInput): string {
 
 export type ImageInpaintTaskRequestInput = {
   prompt: string
-  croppedImageUrl: string
-  croppedMaskUrl: string
+  originalImageUrl: string
+  maskImageUrl: string
   referenceImageUrls?: string[]
-  cropSize: ExecutionImageSize | null
+  outputCount: number
 }
 
 export type FusionTaskRequestInput = {
@@ -71,7 +71,7 @@ function buildDirectActionReadinessRequest(action: ImageDirectTaskAction): Submi
       ? { variation: { strength: strengthConfig.defaultValue } }
       : undefined
   return buildExecutionTaskRequest({
-    prompt: 'submit readiness',
+    prompt: '',
     feature: execution.feature,
     params,
   })
@@ -79,15 +79,24 @@ function buildDirectActionReadinessRequest(action: ImageDirectTaskAction): Submi
 
 export function buildPromptImageReadinessRequest(): SubmitTaskData {
   return buildExecutionTaskRequest({
-    prompt: 'submit readiness',
-    feature: EXECUTION_PARTIAL_EDIT_META.feature,
+    prompt: '',
+    feature: EXECUTION_IMAGE_EDIT_META.feature,
+    params: { output_count: 1 },
+  })
+}
+
+export function buildLocalInpaintReadinessRequest(): SubmitTaskData {
+  return buildExecutionTaskRequest({
+    prompt: '',
+    feature: EXECUTION_LOCAL_INPAINT_META.feature,
+    params: { output_count: 1 },
   })
 }
 
 export function buildCanvasExtendReadinessRequest(): SubmitTaskData {
   const execution = requireImageActionExecution(IMAGE_CANVAS_EXTEND_ACTION)
   return buildExecutionTaskRequest({
-    prompt: 'submit readiness',
+    prompt: '',
     feature: execution.feature,
     params: {
       extend: {
@@ -104,7 +113,7 @@ function buildHdUpscaleReadinessRequest(): SubmitTaskData {
   const execution = requireImageActionExecution(IMAGE_HD_UPSCALE_ACTION)
   const clarityStrength = execution.strength?.defaultValue ?? DEFAULT_IMAGE_ACTION_STRENGTH
   return buildExecutionTaskRequest({
-    prompt: 'submit readiness',
+    prompt: '',
     feature: execution.feature,
     params: {
       hd: {
@@ -121,23 +130,30 @@ export function buildImageActionReadinessRequest(action: ImageExecutionAction): 
   throw new Error(`Unsupported image execution action ${action}`)
 }
 
-export function buildTextPromptTaskRequest(input: {
+export function buildPromptGenerationTaskRequest(input: {
   prompt: string
   aspectRatio: PromptAspectRatio
+  imageUrls?: string[]
+  outputCount: number
 }): SubmitTaskData {
-  const request = buildExecutionTaskRequest({
+  const outputCount = assertRequestedOutputCount(input.outputCount)
+  return buildExecutionTaskRequest({
     prompt: `${input.prompt ?? ''}`.trim(),
-    feature: EXECUTION_META[EXECUTION_FEATURE.patternGen].feature,
-    params: buildPromptAspectRatioTaskParams(input.aspectRatio),
+    feature: EXECUTION_META[EXECUTION_FEATURE.promptGeneration].feature,
+    imageUrls: input.imageUrls,
+    params: {
+      output_count: outputCount,
+      ...buildPromptAspectRatioTaskParams(input.aspectRatio),
+    },
   })
-  assertPatternGenTaskRequest(request)
-  return request
 }
 
 export function buildDirectActionTaskRequest(input: {
   source: ImageExecutionInput
   action: ImageDirectTaskAction
   imageSize: ExecutionImageSize | null
+  prompt: string
+  outputCount: number
   strength?: number
 }): SubmitTaskData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
@@ -146,10 +162,11 @@ export function buildDirectActionTaskRequest(input: {
   const strengthConfig = execution.strength
   if (strengthConfig?.paramPath === 'variation.strength') {
     return buildExecutionTaskRequest({
-      prompt: '',
+      prompt: input.prompt.trim(),
       feature: execution.feature,
       imageUrls: [sourceUrl],
       params: {
+        output_count: assertRequestedOutputCount(input.outputCount),
         ...sizeParams,
         variation: {
           strength: Number.isFinite(input.strength)
@@ -161,10 +178,13 @@ export function buildDirectActionTaskRequest(input: {
   }
 
   return buildExecutionTaskRequest({
-    prompt: '',
+    prompt: input.prompt.trim(),
     feature: execution.feature,
     imageUrls: [sourceUrl],
-    params: sizeParams,
+    params: {
+      output_count: assertRequestedOutputCount(input.outputCount),
+      ...sizeParams,
+    },
   })
 }
 
@@ -173,14 +193,15 @@ export function buildPromptImageTaskRequest(input: {
   prompt: string
   imageSize: ExecutionImageSize | null
   aspectRatio: PromptAspectRatio
+  outputCount: number
 }): SubmitTaskData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
   return buildExecutionTaskRequest({
-    prompt: `${EXECUTION_PARTIAL_EDIT_META.promptPrefix} ${input.prompt}`,
-    feature: EXECUTION_PARTIAL_EDIT_META.feature,
+    prompt: input.prompt.trim(),
+    feature: EXECUTION_IMAGE_EDIT_META.feature,
     imageUrls: [sourceUrl],
     params: {
-      original_image_url: sourceUrl,
+      output_count: assertRequestedOutputCount(input.outputCount),
       ...buildExecutionSizeParams(input.imageSize),
       ...buildPromptAspectRatioTaskParams(input.aspectRatio),
     },
@@ -188,16 +209,16 @@ export function buildPromptImageTaskRequest(input: {
 }
 
 export function buildImageInpaintTaskRequest(input: ImageInpaintTaskRequestInput): SubmitTaskData {
+  const referenceImageUrls = normalizePromptReferenceImageUrls(input.referenceImageUrls)
   return buildExecutionTaskRequest({
-    prompt: `${EXECUTION_PARTIAL_EDIT_META.promptPrefix} ${input.prompt}`,
-    feature: EXECUTION_PARTIAL_EDIT_META.feature,
-    imageUrls: [input.croppedImageUrl],
+    prompt: input.prompt.trim(),
+    feature: EXECUTION_LOCAL_INPAINT_META.feature,
     params: {
-      original_image_url: input.croppedImageUrl,
-      mask_image_url: input.croppedMaskUrl,
-      reference_image_urls: normalizePromptReferenceImageUrls(input.referenceImageUrls),
+      output_count: assertRequestedOutputCount(input.outputCount),
+      original_image_url: input.originalImageUrl,
+      mask_image_url: input.maskImageUrl,
+      reference_image_urls: referenceImageUrls,
       use_mask: true,
-      ...buildExecutionSizeParams(input.cropSize),
     },
   })
 }
@@ -207,17 +228,17 @@ export function buildCanvasExtendTaskRequest(input: {
   imageSize: ExecutionImageSize | null
   extendPercent: CanvasExtendPercent
   prompt?: string
+  outputCount: number
 }): SubmitTaskData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
   const prompt = `${input.prompt ?? ''}`.trim()
   const execution = requireImageActionExecution(IMAGE_CANVAS_EXTEND_ACTION)
-  const executionPrompt =
-    prompt && execution.promptPrefix ? `${execution.promptPrefix} ${prompt}` : prompt
   return buildExecutionTaskRequest({
-    prompt: executionPrompt,
+    prompt,
     feature: execution.feature,
     imageUrls: [sourceUrl],
     params: {
+      output_count: assertRequestedOutputCount(input.outputCount),
       ...buildExecutionSizeParams(
         input.imageSize,
         extendExecutionImageSize(input.imageSize, input.extendPercent),
@@ -235,18 +256,18 @@ export function buildCanvasExtendTaskRequest(input: {
 export function buildHdUpscaleTaskRequest(input: {
   source: ImageExecutionInput
   imageSize: ExecutionImageSize | null
+  prompt: string
+  outputCount: number
   strength?: number
 }): SubmitTaskData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
   const execution = requireImageActionExecution(IMAGE_HD_UPSCALE_ACTION)
-  if (!execution.prompt) {
-    throw new Error('HD action execution prompt is not configured')
-  }
   return buildExecutionTaskRequest({
-    prompt: execution.prompt,
+    prompt: input.prompt.trim(),
     feature: execution.feature,
     imageUrls: [sourceUrl],
     params: {
+      output_count: assertRequestedOutputCount(input.outputCount),
       ...buildExecutionSizeParams(input.imageSize, input.imageSize),
       hd: {
         clarity_strength: resolveHdClarityStrength(input.strength),
@@ -278,7 +299,7 @@ type ImageExecutionTaskRequestPlan =
   | ImageActionExecutionPlan
   | CanvasExtendExecutionPlan
   | ImagePromptExecutionPlan
-  | TextPromptExecutionPlan
+  | PromptGenerationExecutionPlan
   | PreparedFusionExecutionPlan
 
 export function buildImageExecutionTaskRequest(
@@ -291,6 +312,8 @@ export function buildImageExecutionTaskRequest(
         return buildHdUpscaleTaskRequest({
           source: plan.source,
           imageSize,
+          prompt: plan.prompt,
+          outputCount: plan.outputCount,
           strength: plan.strength,
         })
       }
@@ -299,6 +322,8 @@ export function buildImageExecutionTaskRequest(
           source: plan.source,
           action: plan.action,
           imageSize,
+          prompt: plan.prompt,
+          outputCount: plan.outputCount,
           strength: plan.strength,
         })
       }
@@ -309,6 +334,7 @@ export function buildImageExecutionTaskRequest(
         imageSize,
         extendPercent: plan.extendPercent,
         prompt: plan.prompt,
+        outputCount: plan.outputCount,
       })
     case 'image-prompt':
       return buildPromptImageTaskRequest({
@@ -316,11 +342,14 @@ export function buildImageExecutionTaskRequest(
         prompt: plan.prompt,
         imageSize,
         aspectRatio: plan.aspectRatio,
+        outputCount: plan.outputCount,
       })
-    case 'text-prompt':
-      return buildTextPromptTaskRequest({
+    case 'prompt-generation':
+      return buildPromptGenerationTaskRequest({
         prompt: plan.prompt,
         aspectRatio: plan.aspectRatio,
+        imageUrls: plan.referenceImages.map((image) => image.url),
+        outputCount: plan.outputCount,
       })
     case 'fusion':
       return buildFusionTaskRequest({
@@ -337,15 +366,13 @@ export function buildImageExecutionTaskRequest(
 
 export function buildPreparedImageInpaintTaskRequest(input: {
   plan: ImageInpaintExecutionPlan
-  croppedImageUrl: string
-  croppedMaskUrl: string
-  cropSize: ExecutionImageSize | null
+  maskImageUrl: string
 }): SubmitTaskData {
   return buildImageInpaintTaskRequest({
     prompt: input.plan.prompt,
-    croppedImageUrl: input.croppedImageUrl,
-    croppedMaskUrl: input.croppedMaskUrl,
+    originalImageUrl: input.plan.source.url,
+    maskImageUrl: input.maskImageUrl,
     referenceImageUrls: input.plan.referenceImageUrls,
-    cropSize: input.cropSize,
+    outputCount: input.plan.outputCount,
   })
 }

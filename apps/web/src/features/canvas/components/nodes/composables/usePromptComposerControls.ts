@@ -72,12 +72,6 @@ export function usePromptComposerControls(options: UsePromptComposerControlsOpti
     closePopovers()
   }
 
-  function onEnter(event: KeyboardEvent) {
-    if (event.isComposing) return
-    event.preventDefault()
-    submit()
-  }
-
   function toggleAspectRatioPicker() {
     if (options.disabled() || !shouldRenderAspectRatio.value) return
     toolPopovers.toggle('aspect-ratio')
@@ -105,7 +99,6 @@ export function usePromptComposerControls(options: UsePromptComposerControlsOpti
     canSubmit,
     draft,
     inputRef,
-    onEnter,
     outputCountPickerVisible,
     outputCountValue,
     selectAspectRatio,

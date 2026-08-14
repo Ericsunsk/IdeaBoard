@@ -19,6 +19,7 @@ describe('imageActionExecution', () => {
     const actions = IMAGE_ACTION_EXECUTION_REGISTRY_LIST.map((item) => item.action)
 
     expect(actions).toEqual([
+      IMAGE_NODE_ACTION.imageEdit,
       IMAGE_NODE_ACTION.removeBg,
       IMAGE_NODE_ACTION.styleVariation,
       IMAGE_NODE_ACTION.sketchToImage,
@@ -34,6 +35,7 @@ describe('imageActionExecution', () => {
 
   it('derives task and strength action contracts', () => {
     expect(IMAGE_DIRECT_TASK_ACTIONS).toEqual([
+      IMAGE_NODE_ACTION.imageEdit,
       IMAGE_NODE_ACTION.removeBg,
       IMAGE_NODE_ACTION.styleVariation,
       IMAGE_NODE_ACTION.sketchToImage,

@@ -7,8 +7,9 @@ import {
 import {
   buildFusionTaskRequest,
   buildImageActionReadinessRequest,
+  buildLocalInpaintReadinessRequest,
+  buildPromptGenerationTaskRequest,
   buildPromptImageReadinessRequest,
-  buildTextPromptTaskRequest,
 } from '../commands/flowImageTaskRequests'
 import {
   createCanvasTaskClientActionId,
@@ -17,10 +18,16 @@ import {
 
 function buildCanvasBillingReadinessRequest(feature: WorkflowFeature): SubmitTaskData {
   switch (feature) {
-    case WORKFLOW_FEATURE.partialEdit:
+    case WORKFLOW_FEATURE.imageEdit:
       return buildPromptImageReadinessRequest()
-    case WORKFLOW_FEATURE.patternGen:
-      return buildTextPromptTaskRequest({ prompt: 'submit readiness', aspectRatio: 'auto' })
+    case WORKFLOW_FEATURE.localInpaint:
+      return buildLocalInpaintReadinessRequest()
+    case WORKFLOW_FEATURE.promptGeneration:
+      return buildPromptGenerationTaskRequest({
+        prompt: '',
+        aspectRatio: 'auto',
+        outputCount: 1,
+      })
     case WORKFLOW_FEATURE.styleFusion:
       throw new Error('Fusion readiness requires current image inputs')
     case WORKFLOW_FEATURE.removeBg:

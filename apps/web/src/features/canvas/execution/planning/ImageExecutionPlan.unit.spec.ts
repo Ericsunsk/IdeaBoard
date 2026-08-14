@@ -275,7 +275,7 @@ describe('ImageExecutionPlan', () => {
       1,
       'bad-ratio' as never,
     )
-    const textPlan = planner.planTextPromptGeneration('prompt-1', 'generate', 1, 'bad' as never)
+    const textPlan = planner.planPromptGeneration('prompt-1', [], 'generate', 1, 'bad' as never)
 
     expect(imagePlan.aspectRatio).toBe('auto')
     expect(textPlan.aspectRatio).toBe('auto')

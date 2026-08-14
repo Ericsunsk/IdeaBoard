@@ -907,12 +907,12 @@ func TestSubmitTaskPreservesSubmissionStoreCause(t *testing.T) {
 			{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
 		}},
 		SubmissionStore: &recordingSubmissionStore{err: cause},
-		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugPatternGen, ""),
+		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugPromptGeneration, ""),
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
 		Prompt:         "draw a pattern",
-		Feature:        workflow.FeatureSlugPatternGen,
+		Feature:        workflow.FeatureSlugPromptGeneration,
 		ClientActionID: "submission-store-cause",
 	})
 	if !errors.Is(err, cause) {
@@ -932,12 +932,12 @@ func TestSubmitTaskMissingSubmissionStoreReturnsTypedSafeError(t *testing.T) {
 		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
 			{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
 		}},
-		PromptStore: featurePromptStoreForTest(workflow.FeatureSlugPatternGen, ""),
+		PromptStore: featurePromptStoreForTest(workflow.FeatureSlugPromptGeneration, ""),
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(context.Background(), 42, &tasks.SubmitTaskRequest{
 		Prompt:         "draw a pattern",
-		Feature:        workflow.FeatureSlugPatternGen,
+		Feature:        workflow.FeatureSlugPromptGeneration,
 		ClientActionID: "missing-submission-store",
 	})
 	if !errors.Is(err, errTaskSubmissionStoreUnavailable) {
@@ -957,12 +957,12 @@ func TestCheckSubmitTaskReadinessMissingBillingReturnsTypedSafeError(t *testing.
 		AccountRepo: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
 			{ID: 101, Models: []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}}},
 		}},
-		PromptStore: featurePromptStoreForTest(workflow.FeatureSlugPatternGen, ""),
+		PromptStore: featurePromptStoreForTest(workflow.FeatureSlugPromptGeneration, ""),
 	}, ServiceOptions{})
 
 	_, err := svc.CheckSubmitTaskReadiness(context.Background(), 42, &tasks.SubmitTaskRequest{
 		Prompt:         "draw a pattern",
-		Feature:        workflow.FeatureSlugPatternGen,
+		Feature:        workflow.FeatureSlugPromptGeneration,
 		ClientActionID: "missing-billing-service",
 	})
 	if !errors.Is(err, errTaskBillingUnavailable) {
@@ -1027,7 +1027,7 @@ func TestReadinessDoesNotPrepareMediaButSubmitDoes(t *testing.T) {
 	}
 }
 
-func TestSubmitTaskRejectsInvalidPatternGenContractBeforeSubmission(t *testing.T) {
+func TestSubmitTaskRejectsConflictingPromptGenerationModeBeforeSubmission(t *testing.T) {
 	ctx := context.Background()
 	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
 		{
@@ -1042,21 +1042,21 @@ func TestSubmitTaskRejectsInvalidPatternGenContractBeforeSubmission(t *testing.T
 	svc := newSubmitServiceForTest(submitTestServiceDeps{
 		AccountRepo:     accountRepo,
 		SubmissionStore: submissionStore,
-		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugPatternGen, "gpt-image-1"),
+		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugPromptGeneration, "template {{user_prompt}}"),
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
 		Prompt:  "repeatable textile pattern",
-		Feature: workflow.FeatureSlugPatternGen,
+		Feature: workflow.FeatureSlugPromptGeneration,
 		Params: map[string]interface{}{
-			"ratio": "2:1",
+			"mode": "text-to-image",
 		},
 	})
 	if err == nil {
-		t.Fatalf("expected pattern-gen contract validation error")
+		t.Fatalf("expected prompt-generation contract validation error")
 	}
-	if !strings.Contains(err.Error(), "图案生成尺寸比例仅支持 auto、1:1、3:4、4:3、9:16、16:9") {
-		t.Fatalf("error=%q, want actionable pattern-gen ratio message", err.Error())
+	if !strings.Contains(err.Error(), "不接受显式 mode") {
+		t.Fatalf("error=%q, want inferred mode contract message", err.Error())
 	}
 	if len(submissionStore.calls) != 0 {
 		t.Fatalf("submission calls=%d, want 0", len(submissionStore.calls))

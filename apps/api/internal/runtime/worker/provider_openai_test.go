@@ -567,7 +567,7 @@ func TestCallOpenAIPartialEditUsesEditEndpointAndMultipartFiles(t *testing.T) {
 	maskDataURL := buildTinyPNGDataURL(t)
 	sourceDataURL := buildTinyPNGDataURL(t)
 	params := map[string]interface{}{
-		"feature":            "partial-edit",
+		"feature":            "image-edit",
 		"image_urls":         []interface{}{maskDataURL},
 		"original_image_url": sourceDataURL,
 		"mask_image_url":     maskDataURL,
@@ -611,7 +611,7 @@ func TestCallOpenAIPartialEditNormalizesWebPDataURLToPNGMultipart(t *testing.T) 
 	sourceWebPDataURL := "data:image/webp;base64," + tinyWebPBase64
 	maskDataURL := buildTinyPNGDataURL(t)
 	params := map[string]interface{}{
-		"feature":            "partial-edit",
+		"feature":            "image-edit",
 		"image_urls":         []interface{}{sourceWebPDataURL},
 		"original_image_url": sourceWebPDataURL,
 		"mask_image_url":     maskDataURL,
@@ -666,7 +666,7 @@ func TestCallOpenAIPartialEditNormalizesWebPURLToPNGMultipart(t *testing.T) {
 	sourceURL := server.URL + "/source.webp"
 	maskDataURL := buildTinyPNGDataURL(t)
 	params := map[string]interface{}{
-		"feature":            "partial-edit",
+		"feature":            "image-edit",
 		"image_urls":         []interface{}{sourceURL},
 		"original_image_url": sourceURL,
 		"mask_image_url":     maskDataURL,
@@ -881,11 +881,11 @@ func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
 	}
 
 	if !usesEditEndpoint(map[string]interface{}{
-		"feature":    "partial-edit",
+		"feature":    "image-edit",
 		"image_urls": []interface{}{"https://img.example/source.png"},
 		"use_mask":   true,
 	}) {
-		t.Fatalf("expected partial-edit to use edit endpoint")
+		t.Fatalf("expected image-edit to use edit endpoint")
 	}
 
 	if usesEditEndpoint(map[string]interface{}{
@@ -910,14 +910,14 @@ func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
 func TestReadOpenAIProviderParamsDerivesEditMaskAndHDQuality(t *testing.T) {
 	maskURL := "https://img.example/mask.png"
 	req := newProviderRequest("prompt", 1024, 1024, map[string]interface{}{
-		"feature":        "partial-edit",
+		"feature":        "image-edit",
 		"image_urls":     []interface{}{"https://img.example/source.png"},
 		"mask_image_url": maskURL,
 	}, "gpt-image-1")
 
 	params := readOpenAIProviderParams(req)
 	if !params.useEditEndpoint() {
-		t.Fatalf("expected partial-edit image request to use edit endpoint")
+		t.Fatalf("expected image-edit image request to use edit endpoint")
 	}
 	if params.MaskImageRef != maskURL {
 		t.Fatalf("mask ref = %q, want %q", params.MaskImageRef, maskURL)

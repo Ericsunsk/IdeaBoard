@@ -1,5 +1,6 @@
 import type { PromptAspectRatio } from '../../canvas-board/domain'
 import type { ImageNodeAction } from '../config/imageActionRegistry'
+import type { ImageTaskAction } from '../execution'
 import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 
@@ -31,11 +32,19 @@ export type CanvasNodePresentationIntent =
   | {
       type: 'image-prompt-generation-requested'
       nodeId: string
+      action: ImageTaskAction
       prompt: string
       outputCount: number
     }
   | { type: 'canvas-extend-submitted'; nodeId: string; prompt: string; outputCount: number }
-  | { type: 'action-requested'; nodeId: string; action: ImageNodeAction }
+  | {
+      type: 'action-requested'
+      nodeId: string
+      action: ImageNodeAction
+      prompt: string
+      outputCount: number
+      strength?: number
+    }
   | {
       type: 'canvas-extend-handle-pointerdown'
       nodeId: string

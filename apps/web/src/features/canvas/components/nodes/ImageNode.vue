@@ -23,9 +23,7 @@
     <div
       class="relative flex flex-col gap-2 overflow-visible rounded-[11px] p-0"
       :class="
-        expandModeActive || isImageEditorActive
-          ? 'bg-transparent'
-          : 'bg-[var(--canvas-node-bg)]'
+        expandModeActive || isImageEditorActive ? 'bg-transparent' : 'bg-[var(--canvas-node-bg)]'
       "
       @contextmenu.stop
     >
@@ -64,18 +62,18 @@
       <NodeFloatingControls v-if="showImageActionMenu || showPromptComposer">
         <HomeCanvasImageActionMenu
           v-if="showImageActionMenu"
-          :direct-generating="actionBinding.directGenerating"
+          :output-count="outputCountValue"
           :strength-control="actionBinding.strengthControl"
-          @action="emit('action', $event)"
+          @action="submitAction"
         />
         <NodePromptComposer
           v-if="showPromptComposer"
           v-model="promptDraft"
           offset="52px"
           :placeholder="actionBinding.promptPlaceholder"
-          :disabled="actionBinding.directGenerating"
+          allow-empty
           :output-count="outputCountValue"
-          :billing-state="partialEditBillingQuote"
+          :billing-state="workflowBillingQuote"
           @update:output-count="selectOutputCount"
           @submit="submitPrompt"
         />
@@ -89,6 +87,7 @@ import { computed, ref, watchPostEffect } from 'vue'
 import { MediaImage } from '@iconoir/vue'
 import { requireImageNodeOutputCount, type ImageNodeItem } from '../../../canvas-board/domain'
 import type { ImageNodeAction } from '../../config/imageActionRegistry'
+import { isImageTaskAction, type ImageTaskAction } from '../../execution'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import type { ImageActionBinding, ImageToolStageBinding } from '../../image-tools'
 import HomeCanvasImageActionMenu from '../home/HomeCanvasImageActionMenu.vue'
@@ -130,9 +129,15 @@ const emit = defineEmits<{
   (e: 'append-to-canvas'): void
   (e: 'reset'): void
   (e: 'contextmenu', event: MouseEvent): void
-  (e: 'prompt-generate', prompt: string, outputCount: number): void
+  (e: 'prompt-generate', action: ImageTaskAction, prompt: string, outputCount: number): void
   (e: 'expand-submit', prompt: string, outputCount: number): void
-  (e: 'action', action: ImageNodeAction): void
+  (
+    e: 'action',
+    action: ImageNodeAction,
+    prompt: string,
+    outputCount: number,
+    strength?: number,
+  ): void
   (
     e: 'expand-handle-pointerdown',
     payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent },
@@ -156,8 +161,9 @@ type StageExpose = { stageElement: HTMLElement | null }
 const imageStageRef = ref<StageExpose | null>(null)
 const promptDraft = ref('')
 const outputCountValue = computed(() => requireImageNodeOutputCount(props.node.outputCount))
-const partialEditBillingQuote = useCanvasBillingQuote(
-  () => WORKFLOW_FEATURE.partialEdit,
+const activeWorkflowAction = ref<ImageTaskAction>(WORKFLOW_FEATURE.imageEdit)
+const workflowBillingQuote = useCanvasBillingQuote(
+  () => activeWorkflowAction.value,
   () => showPromptComposer.value,
 )
 
@@ -173,13 +179,16 @@ watchPostEffect((onCleanup) => {
 })
 
 function submitPrompt(prompt: string, outputCount: number) {
-  if (!prompt || props.actionBinding.directGenerating) return
-  emit('prompt-generate', prompt, outputCount)
+  emit('prompt-generate', activeWorkflowAction.value, prompt, outputCount)
   promptDraft.value = ''
 }
 
+function submitAction(action: ImageNodeAction, strength?: number) {
+  if (isImageTaskAction(action)) activeWorkflowAction.value = action
+  emit('action', action, promptDraft.value.trim(), outputCountValue.value, strength)
+}
+
 function submitExpand(prompt: string, outputCount: number) {
-  if (props.actionBinding.directGenerating) return
   emit('expand-submit', prompt, outputCount)
 }
 

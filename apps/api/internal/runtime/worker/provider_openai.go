@@ -114,7 +114,7 @@ func readOpenAIProviderParams(providerReq providerRequest) openAIProviderParams 
 	out := openAIProviderParams{
 		EditImageRefs:        normalizeOpenAIImageURLStrings(providerReq.ImageRefs),
 		OriginalImageRef:     providerReq.CanvasRef,
-		UseEditEndpoint:      providerReq.OpenAI.UseEditEndpoint,
+		UseEditEndpoint:      providerReq.OpenAI.UseEditEndpoint || providerReq.Primitive == "image-to-image",
 		DropOriginalImageRef: providerReq.OpenAI.DropOriginalImageRef,
 		RemoveBackground:     providerReq.OpenAI.RemoveBackground,
 		VariationStrength:    providerReq.OpenAI.VariationStrength,

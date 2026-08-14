@@ -11,7 +11,7 @@ function makeReadiness(
     ready: true,
     feature,
     billing: {
-      sku: 'ai.image.pattern-gen',
+      sku: 'ai-image:prompt-generation',
       display_name: 'Pattern generation',
       price_version_id: 1,
       price_version: 1,
@@ -32,8 +32,8 @@ describe('canvas billing readiness store', () => {
     const fetchReadiness = vi.fn(async (feature: WorkflowFeature) => makeReadiness(feature))
     const store = createCanvasBillingReadinessStore({ fetchReadiness })
 
-    await store.ensureFeature(WORKFLOW_FEATURE.patternGen)
-    expect(store.getFeatureState(WORKFLOW_FEATURE.patternGen)).toMatchObject({
+    await store.ensureFeature(WORKFLOW_FEATURE.promptGeneration)
+    expect(store.getFeatureState(WORKFLOW_FEATURE.promptGeneration)).toMatchObject({
       status: 'ready',
       unitCredits: 4,
       availableCredits: 20,
@@ -41,9 +41,9 @@ describe('canvas billing readiness store', () => {
     })
 
     store.applyReadiness(
-      makeReadiness(WORKFLOW_FEATURE.patternGen, {
+      makeReadiness(WORKFLOW_FEATURE.promptGeneration, {
         billing: {
-          ...makeReadiness(WORKFLOW_FEATURE.patternGen).billing!,
+          ...makeReadiness(WORKFLOW_FEATURE.promptGeneration).billing!,
           price_version_id: 2,
           price_version: 2,
           unit_credits: 6,
@@ -53,7 +53,7 @@ describe('canvas billing readiness store', () => {
       }),
     )
 
-    expect(store.getFeatureState(WORKFLOW_FEATURE.patternGen)).toMatchObject({
+    expect(store.getFeatureState(WORKFLOW_FEATURE.promptGeneration)).toMatchObject({
       status: 'ready',
       unitCredits: 6,
       priceVersionId: 2,
@@ -75,9 +75,9 @@ describe('canvas billing readiness store', () => {
         }),
     })
 
-    await store.ensureFeature(WORKFLOW_FEATURE.partialEdit)
+    await store.ensureFeature(WORKFLOW_FEATURE.imageEdit)
 
-    expect(store.getFeatureState(WORKFLOW_FEATURE.partialEdit)).toMatchObject({
+    expect(store.getFeatureState(WORKFLOW_FEATURE.imageEdit)).toMatchObject({
       status: 'ready',
       unitCredits: 4,
       availableCredits: 3,

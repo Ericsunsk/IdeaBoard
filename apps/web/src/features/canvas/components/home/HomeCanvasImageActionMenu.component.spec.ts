@@ -11,10 +11,11 @@ function renderImageActionMenu(
     showStrengthControl?: boolean
     strengthValue?: number
     billingStore?: CanvasBillingReadinessStore
+    outputCount?: number
   } = {},
 ) {
   const props = {
-    directGenerating: false,
+    outputCount: input.outputCount ?? 1,
     strengthControl: {
       visible: input.showStrengthControl ?? false,
       activeAction: input.activeStrengthAction ?? null,
@@ -111,11 +112,11 @@ describe('HomeCanvasImageActionMenu', () => {
           : { feature, status: 'ready', unitCredits: 3, availableCredits: 20 },
     }
 
-    renderImageActionMenu({ billingStore })
+    renderImageActionMenu({ billingStore, outputCount: 4 })
 
     expect(screen.getByRole('button', { name: '抠图' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: '风格延展 · 3 Ideas' })).toBeEnabled()
-    expect(screen.getAllByText('3 Ideas')[0]).toHaveAttribute('data-touch-quote')
+    expect(screen.getByRole('button', { name: '风格延展 · 12 Ideas' })).toBeEnabled()
+    expect(screen.getAllByText('12 Ideas')[0]).toHaveAttribute('data-touch-quote')
     expect(screen.getByRole('button', { name: '图像编辑' })).toBeEnabled()
     expect(screen.getByRole('button', { name: '局部重绘' })).toBeEnabled()
   })
@@ -137,5 +138,24 @@ describe('HomeCanvasImageActionMenu', () => {
 
     expect(screen.getByRole('button', { name: '抠图 · 免费' })).toBeEnabled()
     expect(screen.getAllByText('免费')[0]).toHaveAttribute('data-touch-quote')
+  })
+
+  it('submits a strength action once when the committed value changes', () => {
+    const view = renderImageActionMenu({
+      showStrengthControl: true,
+      activeStrengthAction: IMAGE_NODE_ACTION.styleVariation,
+    })
+    const range = screen.getByRole('slider', { name: '风格延展强度' })
+
+    Object.defineProperty(range, 'value', { configurable: true, value: '72' })
+    range.dispatchEvent(new Event('input', { bubbles: true }))
+    range.dispatchEvent(new Event('pointerup', { bubbles: true }))
+    range.dispatchEvent(new Event('click', { bubbles: true }))
+    range.dispatchEvent(new Event('change', { bubbles: true }))
+
+    expect(view.props.strengthControl.onInput).toHaveBeenCalledOnce()
+    expect(view.props.strengthControl.onPointerUp).toHaveBeenCalledOnce()
+    expect(view.props.strengthControl.onChange).toHaveBeenCalledOnce()
+    expect(view.emitted('action')).toEqual([[IMAGE_NODE_ACTION.styleVariation, 72]])
   })
 })

@@ -6,7 +6,7 @@ describe('taskClientActionIds', () => {
   it('adds a normalized client action id to a submit request', () => {
     const request: SubmitTaskData = {
       prompt: 'generate',
-      feature: 'pattern-gen',
+      feature: 'prompt-generation',
     }
 
     expect(withTaskClientActionId(request, ' canvas:action-1 ')).toEqual({

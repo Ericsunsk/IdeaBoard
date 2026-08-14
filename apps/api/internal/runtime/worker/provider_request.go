@@ -111,7 +111,8 @@ func compileProviderControls(params map[string]interface{}, featureSlug string) 
 	controls := compiledProviderControls{Google: googleProviderControls{AspectRatio: parseGoogleAspectRatioValue(params)}}
 	switch featureSlug {
 	case workflow.FeatureSlugImageExtend,
-		workflow.FeatureSlugPartialEdit,
+		workflow.FeatureSlugImageEdit,
+		workflow.FeatureSlugLocalInpaint,
 		workflow.FeatureSlugRemoveBg,
 		workflow.FeatureSlugSketchToImage,
 		workflow.FeatureSlugStyleVariation,

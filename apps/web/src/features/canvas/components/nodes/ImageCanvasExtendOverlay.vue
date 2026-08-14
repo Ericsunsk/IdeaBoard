@@ -27,7 +27,6 @@
           class="image-node-expand-composer"
           offset="10px"
           placeholder="输入扩图提示词"
-          :disabled="directGenerating"
           :allow-empty="true"
           :output-count="outputCount"
           :billing-state="billingQuote"
@@ -52,7 +51,6 @@ import { useCanvasBillingQuote } from '../../execution'
 const props = defineProps<{
   overlayStyle: Record<string, string>
   handleRadius: number
-  directGenerating: boolean
   outputCount: number
 }>()
 
@@ -80,7 +78,6 @@ const handleStyle = computed(() => {
 })
 
 function onSubmit(prompt: string, outputCount: number) {
-  if (props.directGenerating) return
   emit('submit', prompt, outputCount)
   promptDraft.value = ''
 }

@@ -8,7 +8,6 @@
     :placeholder="placeholder"
     :disabled="disabled"
     @focus="emit('focus')"
-    @keydown.enter.exact="onEnter"
   />
   <div ref="actionsRef" :class="actionsClass">
     <NodeAspectRatioPicker
@@ -121,7 +120,6 @@ const {
   canSubmit,
   draft,
   inputRef,
-  onEnter,
   outputCountPickerVisible,
   outputCountValue,
   selectAspectRatio,

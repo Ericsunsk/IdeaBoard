@@ -3,10 +3,11 @@ import { canonicalizeRuntimeUploadRef } from '../../../../shared/config/runtimeU
 import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
 
 export const EXECUTION_FEATURE = {
-  partialEdit: WORKFLOW_FEATURE.partialEdit,
+  promptGeneration: WORKFLOW_FEATURE.promptGeneration,
+  imageEdit: WORKFLOW_FEATURE.imageEdit,
+  localInpaint: WORKFLOW_FEATURE.localInpaint,
   removeBg: WORKFLOW_FEATURE.removeBg,
   styleFusion: WORKFLOW_FEATURE.styleFusion,
-  patternGen: WORKFLOW_FEATURE.patternGen,
   sketchToImage: WORKFLOW_FEATURE.sketchToImage,
   styleVariation: WORKFLOW_FEATURE.styleVariation,
   hdUpscale: WORKFLOW_FEATURE.hdUpscale,
@@ -22,16 +23,18 @@ type ExecutionMetaEntry = {
 }
 
 export const EXECUTION_META = {
-  [EXECUTION_FEATURE.partialEdit]: {
-    feature: EXECUTION_FEATURE.partialEdit,
-    promptPrefix: '[partial-edit]',
+  [EXECUTION_FEATURE.promptGeneration]: {
+    feature: EXECUTION_FEATURE.promptGeneration,
+  },
+  [EXECUTION_FEATURE.imageEdit]: {
+    feature: EXECUTION_FEATURE.imageEdit,
+  },
+  [EXECUTION_FEATURE.localInpaint]: {
+    feature: EXECUTION_FEATURE.localInpaint,
   },
   [EXECUTION_FEATURE.styleFusion]: {
     feature: EXECUTION_FEATURE.styleFusion,
     promptPrefix: '[style-fusion]',
-  },
-  [EXECUTION_FEATURE.patternGen]: {
-    feature: EXECUTION_FEATURE.patternGen,
   },
   [EXECUTION_FEATURE.sketchToImage]: {
     feature: EXECUTION_FEATURE.sketchToImage,
@@ -52,7 +55,9 @@ export const EXECUTION_META = {
   },
 } as const satisfies Record<ExecutionFeature, ExecutionMetaEntry>
 
-export const EXECUTION_PARTIAL_EDIT_META = EXECUTION_META[EXECUTION_FEATURE.partialEdit]
+export const EXECUTION_IMAGE_EDIT_META = EXECUTION_META[EXECUTION_FEATURE.imageEdit]
+
+export const EXECUTION_LOCAL_INPAINT_META = EXECUTION_META[EXECUTION_FEATURE.localInpaint]
 
 export const EXECUTION_FUSION_META = EXECUTION_META[EXECUTION_FEATURE.styleFusion]
 

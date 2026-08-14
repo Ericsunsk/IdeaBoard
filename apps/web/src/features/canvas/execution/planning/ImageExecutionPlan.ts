@@ -42,6 +42,8 @@ export type ImageActionExecutionPlan = {
   sourceNodeId: string
   source: ImageExecutionInput
   action: ImageTaskAction
+  prompt: string
+  outputCount: number
   strength?: number
   resultOptions: ImageExecutionResultOptions
 }
@@ -79,10 +81,11 @@ export type ImagePromptExecutionPlan = {
   resultOptions: ImageExecutionResultOptions
 }
 
-export type TextPromptExecutionPlan = {
-  kind: 'text-prompt'
+export type PromptGenerationExecutionPlan = {
+  kind: 'prompt-generation'
   sourceNodeId: string
   source: ImageExecutionInput
+  referenceImages: ImageExecutionInput[]
   prompt: string
   outputCount: number
   aspectRatio: PromptAspectRatio
@@ -119,7 +122,7 @@ export type ImageExecutionPlan =
   | CanvasExtendExecutionPlan
   | ImageInpaintExecutionPlan
   | ImagePromptExecutionPlan
-  | TextPromptExecutionPlan
+  | PromptGenerationExecutionPlan
   | FusionExecutionPlan
 
 export type ActivatedImageExecutionPlan = ImageExecutionPlan & {
@@ -301,7 +304,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
   function planImageDirectAction(
     nodeId: string,
     action: ImageTaskAction,
-    options: { strength?: number } = {},
+    options: { prompt?: string; outputCount?: number; strength?: number } = {},
   ): ImageActionExecutionPlan {
     const source = requireImageExecutionImage(readGraph(), nodeId)
     return {
@@ -309,6 +312,8 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       sourceNodeId: nodeId,
       source: source.input,
       action,
+      prompt: `${options.prompt ?? ''}`.trim(),
+      outputCount: requireRequestedOutputCount(options.outputCount ?? 1),
       strength: options.strength,
       resultOptions: {
         anchor: withOutputAnchorNodeId(source.resultAnchor, nodeId),
@@ -433,23 +438,27 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     }
   }
 
-  function planTextPromptGeneration(
+  function planPromptGeneration(
     anchorNodeId: string,
+    referenceImages: readonly ImageExecutionInput[],
     prompt: string,
     outputCount: number,
     aspectRatio: PromptAspectRatio,
-  ): TextPromptExecutionPlan {
+  ): PromptGenerationExecutionPlan {
     const normalizedPrompt = `${prompt ?? ''}`.trim()
-    if (!normalizedPrompt) failPlanning('请输入 Prompt')
+    if (referenceImages.length > 4) failPlanning('Prompt 节点最多支持 4 张参考图')
+    const normalizedReferences = referenceImages.map((image) => ({
+      url: `${image.url ?? ''}`.trim(),
+      ratio: normalizeExecutionRatio(image.ratio),
+    }))
+    if (normalizedReferences.some((image) => !image.url)) failPlanning('参考图缺少 URL')
     const graph = readGraph()
-    const source: ImageExecutionInput = {
-      url: '',
-      ratio: 1,
-    }
+    const source = normalizedReferences[0] ?? { url: '', ratio: 1 }
     return {
-      kind: 'text-prompt',
+      kind: 'prompt-generation',
       sourceNodeId: anchorNodeId,
       source,
+      referenceImages: normalizedReferences,
       prompt: normalizedPrompt,
       outputCount: requireRequestedOutputCount(outputCount),
       aspectRatio: normalizePromptAspectRatio(aspectRatio),
@@ -528,6 +537,6 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     planImageInpaintAction,
     planImagePromptGeneration,
     planImagePromptGenerationFromSource,
-    planTextPromptGeneration,
+    planPromptGeneration,
   }
 }

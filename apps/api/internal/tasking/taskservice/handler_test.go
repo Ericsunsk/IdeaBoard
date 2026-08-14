@@ -221,7 +221,7 @@ func TestSubmitTaskHandlerReturnsStructuredInsufficientCreditsError(t *testing.T
 	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit", map[string]interface{}{
 		"prompt":           "生成海报",
 		"client_action_id": "handler-insufficient",
-		"feature":          workflow.FeatureSlugPatternGen,
+		"feature":          workflow.FeatureSlugPromptGeneration,
 		"params": map[string]interface{}{
 			"model": "gpt-image-1",
 		},
@@ -261,7 +261,7 @@ func TestSubmitTaskHandlerReturnsStructuredPricingUnavailableError(t *testing.T)
 	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit", map[string]interface{}{
 		"prompt":           "生成海报",
 		"client_action_id": "handler-pricing-unavailable",
-		"feature":          workflow.FeatureSlugPatternGen,
+		"feature":          workflow.FeatureSlugPromptGeneration,
 		"params":           map[string]interface{}{"model": "gpt-image-1"},
 	}))
 
@@ -287,7 +287,7 @@ func TestSubmitTaskHandlerHidesSubmissionStoreCause(t *testing.T) {
 	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit", map[string]interface{}{
 		"prompt":           "生成图案",
 		"client_action_id": "handler-submission-failed",
-		"feature":          workflow.FeatureSlugPatternGen,
+		"feature":          workflow.FeatureSlugPromptGeneration,
 	}))
 
 	assertMachineErrorResponse(t, rec, http.StatusServiceUnavailable, "submission_failed", "任务提交失败，请稍后重试")
@@ -313,7 +313,7 @@ func TestSubmitTaskHandlerMissingSubmissionStoreReturnsSafeServiceUnavailable(t 
 	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit", map[string]interface{}{
 		"prompt":           "生成图案",
 		"client_action_id": "handler-missing-submission-store",
-		"feature":          workflow.FeatureSlugPatternGen,
+		"feature":          workflow.FeatureSlugPromptGeneration,
 	}))
 
 	assertMachineErrorResponse(t, rec, http.StatusServiceUnavailable, "submission_failed", "任务提交失败，请稍后重试")
@@ -339,7 +339,7 @@ func TestCheckSubmitTaskReadinessHandlerMissingBillingReturnsStructuredSafeError
 	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit/readiness", map[string]interface{}{
 		"prompt":           "生成图案",
 		"client_action_id": "readiness-missing-billing",
-		"feature":          workflow.FeatureSlugPatternGen,
+		"feature":          workflow.FeatureSlugPromptGeneration,
 	}))
 
 	if rec.Code != http.StatusOK {
@@ -436,7 +436,7 @@ func TestCheckSubmitTaskReadinessHandlerHidesMissingProviderConfiguration(t *tes
 	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit/readiness", map[string]interface{}{
 		"prompt":           "生成海报",
 		"client_action_id": "handler-provider-unavailable",
-		"feature":          workflow.FeatureSlugPatternGen,
+		"feature":          workflow.FeatureSlugPromptGeneration,
 	}))
 
 	if rec.Code != http.StatusOK {
@@ -482,7 +482,7 @@ func TestCheckSubmitTaskReadinessHandlerReturnsStructuredPricingUnavailableError
 			router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit/readiness", map[string]interface{}{
 				"prompt":           "生成海报",
 				"client_action_id": "handler-pricing-unavailable",
-				"feature":          workflow.FeatureSlugPatternGen,
+				"feature":          workflow.FeatureSlugPromptGeneration,
 				"params":           map[string]interface{}{"model": "gpt-image-1"},
 			}))
 

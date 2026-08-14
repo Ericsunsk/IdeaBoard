@@ -59,7 +59,8 @@
           :model-value="node.text"
           :output-count="outputCount"
           :aspect-ratio="aspectRatio"
-          :submit-disabled="!canGenerate || props.generationAvailable === false"
+          :allow-empty="true"
+          :submit-disabled="props.generationAvailable === false"
           :billing-state="billingQuote"
           class="flex-auto"
           @update:model-value="emit('update:text', $event)"
@@ -117,8 +118,7 @@ const thumbsRef = ref<HTMLElement | null>(null)
 const maxInputImages = 4
 const outputCount = computed(() => requireImageNodeOutputCount(props.node.outputCount))
 const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectRatio))
-const canGenerate = computed(() => props.node.text.trim().length > 0)
-const billingQuote = useCanvasBillingQuote(() => WORKFLOW_FEATURE.patternGen)
+const billingQuote = useCanvasBillingQuote(() => WORKFLOW_FEATURE.promptGeneration)
 const {
   addSlotDragOver,
   canAcceptMoreImages,

@@ -32,6 +32,7 @@ describe('prompt config workspace facade', () => {
 
     expect(workspace.promptMap[featureSlug]).toBe('Initial {{variation_strength}}')
     expect(workspace.getPromptVariables(featureSlug)).toEqual([
+      { key: '{{user_prompt}}', tone: 'prompt' },
       { key: '{{variation_strength}}', tone: 'control' },
     ])
     expect(workspace.getDraftValidation(featureSlug)).toEqual({

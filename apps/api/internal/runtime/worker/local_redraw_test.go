@@ -87,16 +87,17 @@ func TestBuildLocalRedrawMaskSamplerUsesLuminanceFallbackAndPadding(t *testing.T
 	}
 }
 
-func TestShouldUseLocalRedrawPipelineOnlyForPartialEditWithMask(t *testing.T) {
+func TestShouldUseLocalRedrawPipelineOnlyForLocalInpaintWithMask(t *testing.T) {
 	tests := []struct {
 		name    string
 		feature string
 		mask    string
 		want    bool
 	}{
-		{name: "partial edit with mask", feature: "partial-edit", mask: "data:image/png;base64,bWFzaw==", want: true},
+		{name: "local inpaint with mask", feature: "local-inpaint", mask: "data:image/png;base64,bWFzaw==", want: true},
+		{name: "image edit with stale mask", feature: "image-edit", mask: "data:image/png;base64,bWFzaw=="},
 		{name: "other feature with stale mask", feature: "hd-upscale", mask: "data:image/png;base64,bWFzaw=="},
-		{name: "partial edit without mask", feature: "partial-edit"},
+		{name: "local inpaint without mask", feature: "local-inpaint"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -221,7 +222,7 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 	useMask := true
 	paramsJSON := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       "partial-edit",
+		Feature:       "local-inpaint",
 		Media: &tasks.MediaInputs{
 			Inputs: []tasks.MediaRef{{
 				URL:  originalDataURL,
@@ -324,7 +325,7 @@ func TestFinalizeLocalRedrawResultUsesResultMaterializer(t *testing.T) {
 		42,
 		"task-local-redraw-materializer",
 		&localRedrawContext{
-			featureSlug: "partial-edit",
+			featureSlug: "local-inpaint",
 			original:    original,
 			maskSampler: maskCoverageSampler{
 				mask:         mask,
@@ -353,7 +354,7 @@ func TestFinalizeLocalRedrawResultUsesResultMaterializer(t *testing.T) {
 	if materializer.bytesUserID != 42 || materializer.bytesTaskID != "task-local-redraw-materializer" {
 		t.Fatalf("materializer target=%d/%s", materializer.bytesUserID, materializer.bytesTaskID)
 	}
-	if !strings.HasPrefix(materializer.bytesFilename, "local-redraw-partial-edit-") || !strings.HasSuffix(materializer.bytesFilename, ".png") {
+	if !strings.HasPrefix(materializer.bytesFilename, "local-redraw-local-inpaint-") || !strings.HasSuffix(materializer.bytesFilename, ".png") {
 		t.Fatalf("unexpected materialized filename: %q", materializer.bytesFilename)
 	}
 	if !strings.HasPrefix(materializer.bytesSourceURL, "data:image/png;base64,") {
@@ -366,6 +367,86 @@ func TestFinalizeLocalRedrawResultUsesResultMaterializer(t *testing.T) {
 	gotPixel := color.NRGBAModel.Convert(finalImage.At(0, 0)).(color.NRGBA)
 	if gotPixel.R < 200 || gotPixel.B > 20 {
 		t.Fatalf("materialized bytes should contain composited redraw result, got %#v", gotPixel)
+	}
+}
+
+func TestFinalizeLocalRedrawResultsMaterializesEachSuccessfulPatch(t *testing.T) {
+	original := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	mask := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	redPatch := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	greenPatch := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	for y := 0; y < 2; y++ {
+		for x := 0; x < 2; x++ {
+			original.SetNRGBA(x, y, color.NRGBA{B: 255, A: 255})
+			mask.SetNRGBA(x, y, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
+			redPatch.SetNRGBA(x, y, color.NRGBA{R: 255, A: 255})
+			greenPatch.SetNRGBA(x, y, color.NRGBA{G: 255, A: 255})
+		}
+	}
+
+	executor := newTestProviderExecutorWithLocalStorage(t)
+	urls, outputs, stored, err := executor.finalizeLocalRedrawResults(
+		context.Background(),
+		42,
+		"task-local-redraw-batch",
+		&localRedrawContext{
+			featureSlug: "local-inpaint",
+			original:    original,
+			maskSampler: maskCoverageSampler{mask: mask, maskBounds: mask.Bounds(), dstWidth: 2, dstHeight: 2, useLuminance: true},
+			roi:         image.Rect(0, 0, 2, 2),
+		},
+		[]string{mustEncodePNGDataURL(t, redPatch), mustEncodePNGDataURL(t, greenPatch)},
+		0,
+	)
+	if err != nil {
+		t.Fatalf("finalizeLocalRedrawResults returned error: %v", err)
+	}
+	if !stored || len(urls) != 2 || len(outputs) != 2 {
+		t.Fatalf("stored/urls/outputs = %v/%#v/%#v, want true/two/two", stored, urls, outputs)
+	}
+	for index, output := range outputs {
+		if output.ResultIndex != index {
+			t.Fatalf("output[%d].ResultIndex=%d, want %d", index, output.ResultIndex, index)
+		}
+	}
+	first := color.NRGBAModel.Convert(mustDecodeStoredUploadImage(t, urls[0]).At(0, 0)).(color.NRGBA)
+	second := color.NRGBAModel.Convert(mustDecodeStoredUploadImage(t, urls[1]).At(0, 0)).(color.NRGBA)
+	if first.R < 200 || first.G > 20 || second.G < 200 || second.R > 20 {
+		t.Fatalf("unexpected composed output colors: first=%#v second=%#v", first, second)
+	}
+}
+
+func TestFinalizeLocalRedrawResultsKeepsSuccessfulPatchesWhenOneFails(t *testing.T) {
+	original := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	mask := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	patch := image.NewNRGBA(image.Rect(0, 0, 2, 2))
+	for y := 0; y < 2; y++ {
+		for x := 0; x < 2; x++ {
+			original.SetNRGBA(x, y, color.NRGBA{B: 255, A: 255})
+			mask.SetNRGBA(x, y, color.NRGBA{R: 255, G: 255, B: 255, A: 255})
+			patch.SetNRGBA(x, y, color.NRGBA{R: 255, A: 255})
+		}
+	}
+
+	executor := newTestProviderExecutorWithLocalStorage(t)
+	urls, outputs, stored, err := executor.finalizeLocalRedrawResults(
+		context.Background(),
+		42,
+		"task-local-redraw-partial",
+		&localRedrawContext{
+			featureSlug: "local-inpaint",
+			original:    original,
+			maskSampler: maskCoverageSampler{mask: mask, maskBounds: mask.Bounds(), dstWidth: 2, dstHeight: 2, useLuminance: true},
+			roi:         image.Rect(0, 0, 2, 2),
+		},
+		[]string{mustEncodePNGDataURL(t, patch), "data:image/png;base64,bm90LWFuLWltYWdl"},
+		0,
+	)
+	if err != nil {
+		t.Fatalf("partial finalization returned error: %v", err)
+	}
+	if !stored || len(urls) != 1 || len(outputs) != 1 || outputs[0].ResultIndex != 0 {
+		t.Fatalf("stored/urls/outputs = %v/%#v/%#v, want one preserved slot", stored, urls, outputs)
 	}
 }
 
@@ -387,7 +468,7 @@ func TestFinalizeLocalRedrawResultRequiresMaterializer(t *testing.T) {
 		42,
 		"task-local-redraw-no-store",
 		&localRedrawContext{
-			featureSlug: "partial-edit",
+			featureSlug: "local-inpaint",
 			original:    original,
 			maskSampler: maskCoverageSampler{
 				mask:       mask,

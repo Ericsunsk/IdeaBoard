@@ -14,7 +14,7 @@ import type {
   ImageInpaintExecutionPlan,
   ImagePromptExecutionPlan,
   PreparedFusionExecutionPlan,
-  TextPromptExecutionPlan,
+  PromptGenerationExecutionPlan,
 } from '../planning/ImageExecutionPlan'
 import {
   buildCanvasExtendTaskRequest,
@@ -25,7 +25,7 @@ import {
   buildImageActionReadinessRequest,
   buildImageInpaintTaskRequest,
   buildPreparedImageInpaintTaskRequest,
-  buildTextPromptTaskRequest,
+  buildPromptGenerationTaskRequest,
 } from './flowImageTaskRequests'
 
 const source = {
@@ -41,7 +41,7 @@ describe('flowImageTaskRequests', () => {
 
   it('builds task readiness requests from the execution contract', () => {
     expect(buildImageActionReadinessRequest(IMAGE_NODE_ACTION.styleVariation)).toMatchObject({
-      prompt: 'submit readiness',
+      prompt: '',
       feature: EXECUTION_FEATURE.styleVariation,
       params: {
         variation: {
@@ -50,7 +50,7 @@ describe('flowImageTaskRequests', () => {
       },
     })
     expect(buildImageActionReadinessRequest(IMAGE_HD_UPSCALE_ACTION)).toMatchObject({
-      prompt: 'submit readiness',
+      prompt: '',
       feature: EXECUTION_FEATURE.hdUpscale,
       params: {
         hd: {
@@ -60,17 +60,20 @@ describe('flowImageTaskRequests', () => {
     })
   })
 
-  it('builds pattern-gen text prompt requests from the typed node IO contract', () => {
-    const request = buildTextPromptTaskRequest({
+  it('builds prompt-generation requests with output count independent from ordered refs', () => {
+    const request = buildPromptGenerationTaskRequest({
       prompt: '  repeatable textile pattern  ',
       aspectRatio: '1:1',
+      imageUrls: ['https://assets.example.com/ref-1.png', 'https://assets.example.com/ref-2.png'],
+      outputCount: 3,
     })
 
     expect(request).toEqual({
       prompt: 'repeatable textile pattern',
       priority: 1,
-      feature: EXECUTION_FEATURE.patternGen,
-      params: { ratio: '1:1' },
+      feature: EXECUTION_FEATURE.promptGeneration,
+      image_urls: ['https://assets.example.com/ref-1.png', 'https://assets.example.com/ref-2.png'],
+      params: { output_count: 3, ratio: '1:1' },
     })
   })
 
@@ -79,6 +82,8 @@ describe('flowImageTaskRequests', () => {
       source,
       action: IMAGE_NODE_ACTION.styleVariation,
       imageSize: { width: 1024, height: 1024 },
+      prompt: 'vary style',
+      outputCount: 1,
       strength: 61.6,
     })
 
@@ -100,6 +105,8 @@ describe('flowImageTaskRequests', () => {
         source: { url: '   ', ratio: 1 },
         action: IMAGE_NODE_ACTION.removeBg,
         imageSize: null,
+        prompt: '',
+        outputCount: 1,
       }),
     ).toThrow('图片缺少 URL')
   })
@@ -109,6 +116,8 @@ describe('flowImageTaskRequests', () => {
       source,
       action: IMAGE_NODE_ACTION.removeBg,
       imageSize: { width: 1024, height: 1024 },
+      prompt: '',
+      outputCount: 1,
     })
 
     expect(request.params).toMatchObject({
@@ -124,6 +133,8 @@ describe('flowImageTaskRequests', () => {
     const request = buildHdUpscaleTaskRequest({
       source,
       imageSize: { width: 1200, height: 800 },
+      prompt: '',
+      outputCount: 1,
       strength: 75,
     })
 
@@ -142,6 +153,55 @@ describe('flowImageTaskRequests', () => {
     expect(request.params).not.toHaveProperty('upscale_mode')
   })
 
+  it('keeps each image workflow in one 1-4 output task with the optional prompt', () => {
+    const prompt = '  preserve the subject  '
+    const requests = [
+      buildDirectActionTaskRequest({
+        source,
+        action: IMAGE_NODE_ACTION.styleVariation,
+        imageSize: null,
+        prompt,
+        outputCount: 4,
+        strength: 35,
+      }),
+      buildDirectActionTaskRequest({
+        source,
+        action: IMAGE_NODE_ACTION.sketchToImage,
+        imageSize: null,
+        prompt,
+        outputCount: 4,
+      }),
+      buildDirectActionTaskRequest({
+        source,
+        action: IMAGE_NODE_ACTION.removeBg,
+        imageSize: null,
+        prompt,
+        outputCount: 4,
+      }),
+      buildHdUpscaleTaskRequest({
+        source,
+        imageSize: null,
+        prompt,
+        outputCount: 4,
+        strength: 65,
+      }),
+    ]
+
+    expect(requests.map((request) => request.feature)).toEqual([
+      EXECUTION_FEATURE.styleVariation,
+      EXECUTION_FEATURE.sketchToImage,
+      EXECUTION_FEATURE.removeBg,
+      EXECUTION_FEATURE.hdUpscale,
+    ])
+    for (const request of requests) {
+      expect(request).toMatchObject({
+        prompt: 'preserve the subject',
+        image_urls: [source.url],
+        params: { output_count: 4 },
+      })
+    }
+  })
+
   it('limits inpaint reference images by the canvas image input contract', () => {
     const referenceImageLimit = getCanvasNodeImageInputLimit('prompt')
     const referenceImageUrls = Array.from(
@@ -151,10 +211,10 @@ describe('flowImageTaskRequests', () => {
 
     const request = buildImageInpaintTaskRequest({
       prompt: 'redraw the selected area',
-      croppedImageUrl: 'https://assets.example.com/crop.png',
-      croppedMaskUrl: 'https://assets.example.com/mask.png',
+      originalImageUrl: source.url,
+      maskImageUrl: 'https://assets.example.com/mask.png',
       referenceImageUrls,
-      cropSize: { width: 512, height: 384 },
+      outputCount: 2,
     })
 
     expect(request.params).toMatchObject({
@@ -176,10 +236,12 @@ describe('flowImageTaskRequests', () => {
         left: 40,
       },
       prompt: 'extend horizon',
+      outputCount: 3,
     })
 
     expect(request.feature).toBe(EXECUTION_FEATURE.imageExtend)
     expect(request.params).toMatchObject({
+      output_count: 3,
       custom_width: 1600,
       custom_height: 1050,
       original_image_width: 1000,
@@ -315,6 +377,8 @@ describe('flowImageTaskRequests', () => {
       sourceNodeId: 'image-1',
       source,
       action: IMAGE_NODE_ACTION.removeBg,
+      prompt: '',
+      outputCount: 1,
       resultOptions: {},
     }
     const promptPlan: ImagePromptExecutionPlan = {
@@ -326,10 +390,11 @@ describe('flowImageTaskRequests', () => {
       aspectRatio: '3:4',
       resultOptions: {},
     }
-    const textPlan: TextPromptExecutionPlan = {
-      kind: 'text-prompt',
+    const textPlan: PromptGenerationExecutionPlan = {
+      kind: 'prompt-generation',
       sourceNodeId: 'prompt-1',
       source: { url: '', ratio: 1 },
+      referenceImages: [],
       prompt: 'make a pattern',
       outputCount: 1,
       aspectRatio: 'auto',
@@ -366,18 +431,18 @@ describe('flowImageTaskRequests', () => {
 
     expect(buildImageExecutionTaskRequest(actionPlan).feature).toBe(EXECUTION_FEATURE.removeBg)
     expect(buildImageExecutionTaskRequest(promptPlan)).toMatchObject({
-      feature: EXECUTION_FEATURE.partialEdit,
+      feature: EXECUTION_FEATURE.imageEdit,
       image_urls: [source.url],
       params: {
-        original_image_url: source.url,
+        output_count: 1,
         ratio: '3:4',
       },
     })
     expect(buildImageExecutionTaskRequest(textPlan)).toMatchObject({
-      feature: EXECUTION_FEATURE.patternGen,
+      feature: EXECUTION_FEATURE.promptGeneration,
     })
     expect(buildImageExecutionTaskRequest(textPlan)).not.toHaveProperty('image_urls')
-    expect(buildImageExecutionTaskRequest(textPlan)).not.toHaveProperty('params')
+    expect(buildImageExecutionTaskRequest(textPlan)).toMatchObject({ params: { output_count: 1 } })
     expect(buildImageExecutionTaskRequest(extendPlan)).toMatchObject({
       feature: EXECUTION_FEATURE.imageExtend,
       image_urls: [source.url],
@@ -413,15 +478,13 @@ describe('flowImageTaskRequests', () => {
     expect(
       buildPreparedImageInpaintTaskRequest({
         plan,
-        croppedImageUrl: 'https://assets.example.com/crop.png',
-        croppedMaskUrl: 'https://assets.example.com/mask.png',
-        cropSize: { width: 512, height: 512 },
+        maskImageUrl: 'https://assets.example.com/mask.png',
       }),
     ).toMatchObject({
-      feature: EXECUTION_FEATURE.partialEdit,
-      image_urls: ['https://assets.example.com/crop.png'],
+      feature: EXECUTION_FEATURE.localInpaint,
       params: {
-        original_image_url: 'https://assets.example.com/crop.png',
+        output_count: 1,
+        original_image_url: source.url,
         mask_image_url: 'https://assets.example.com/mask.png',
         reference_image_urls: ['https://assets.example.com/ref.png'],
         use_mask: true,

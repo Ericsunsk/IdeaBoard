@@ -38,12 +38,7 @@ export type ImageActionIntentRouterOptions = {
   runImageDirectAction: (
     nodeId: string,
     action: ImageTaskAction,
-    options?: { strength?: number },
-  ) => Promise<void> | void
-  runImagePromptAction: (
-    nodeId: string,
-    prompt: string,
-    outputCount: number,
+    options?: { prompt?: string; outputCount?: number; strength?: number },
   ) => Promise<void> | void
   runFusionPromptGeneration: (
     nodeId: string,
@@ -74,7 +69,13 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
     options.hideStrengthControl()
   }
 
-  function onFlowImageDirectAction(nodeId: string, action: ImageNodeAction) {
+  function onFlowImageDirectAction(
+    nodeId: string,
+    action: ImageNodeAction,
+    prompt = '',
+    outputCount = 1,
+    strength?: number,
+  ) {
     const actionMode = IMAGE_ACTION_REGISTRY[action].mode
     if (actionMode === IMAGE_ACTION_MODE.canvasExtend) {
       options.cancelFlowMaskEditorMode()
@@ -108,7 +109,11 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
       options.onWarning('当前图片工具不可执行')
       return
     }
-    if (isImageStrengthAction(action) && options.consumeSuppressedStrengthClick(action)) {
+    if (
+      strength === undefined &&
+      isImageStrengthAction(action) &&
+      options.consumeSuppressedStrengthClick(action)
+    ) {
       return
     }
     options.cancelFlowExpandMode()
@@ -118,16 +123,27 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
     void options.runImageDirectAction(
       nodeId,
       action,
-      isImageStrengthAction(action) ? { strength: options.getActionStrength(action) } : undefined,
+      {
+        prompt,
+        outputCount,
+        ...(isImageStrengthAction(action)
+          ? { strength: strength ?? options.getActionStrength(action) }
+          : {}),
+      },
     )
   }
 
-  function onFlowImagePromptGenerate(nodeId: string, prompt: string, outputCount: number) {
+  function onFlowImagePromptGenerate(
+    nodeId: string,
+    action: ImageTaskAction,
+    prompt: string,
+    outputCount: number,
+  ) {
     options.cancelFlowExpandMode()
     options.cancelFlowMaskEditorMode()
     options.clearActiveNodePanel()
     options.hideStrengthControl()
-    void options.runImagePromptAction(nodeId, prompt, outputCount)
+    void options.runImageDirectAction(nodeId, action, { prompt, outputCount })
   }
 
   function onFlowFusionPromptGenerate(

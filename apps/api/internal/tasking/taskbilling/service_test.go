@@ -12,14 +12,15 @@ import (
 
 func TestAIImageWorkflowSKUContract(t *testing.T) {
 	expected := map[string]string{
-		workflow.FeatureSlugSketchToImage:  "ai-image:sketch-to-image",
-		workflow.FeatureSlugStyleVariation: "ai-image:style-variation",
-		workflow.FeatureSlugPartialEdit:    "ai-image:partial-edit",
-		workflow.FeatureSlugRemoveBg:       "ai-image:remove-bg",
-		workflow.FeatureSlugStyleFusion:    "ai-image:style-fusion",
-		workflow.FeatureSlugPatternGen:     "ai-image:pattern-gen",
-		workflow.FeatureSlugHDUpscale:      "ai-image:hd-upscale",
-		workflow.FeatureSlugImageExtend:    "ai-image:image-extend",
+		workflow.FeatureSlugPromptGeneration: "ai-image:prompt-generation",
+		workflow.FeatureSlugImageEdit:        "ai-image:image-edit",
+		workflow.FeatureSlugLocalInpaint:     "ai-image:local-inpaint",
+		workflow.FeatureSlugSketchToImage:    "ai-image:sketch-to-image",
+		workflow.FeatureSlugStyleVariation:   "ai-image:style-variation",
+		workflow.FeatureSlugRemoveBg:         "ai-image:remove-bg",
+		workflow.FeatureSlugStyleFusion:      "ai-image:style-fusion",
+		workflow.FeatureSlugHDUpscale:        "ai-image:hd-upscale",
+		workflow.FeatureSlugImageExtend:      "ai-image:image-extend",
 	}
 
 	for _, feature := range workflow.AIImageFeatureSlugs() {
@@ -43,11 +44,11 @@ func TestAIImageWorkflowSKUContract(t *testing.T) {
 }
 
 func TestAIImagePricingIdentityAndFingerprintAreFeatureScoped(t *testing.T) {
-	first, err := AIImageRequest(workflow.FeatureSlugPartialEdit, 1)
+	first, err := AIImageRequest(workflow.FeatureSlugImageEdit, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := AIImageRequest(workflow.FeatureSlugPartialEdit, 1)
+	second, err := AIImageRequest(workflow.FeatureSlugImageEdit, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +96,7 @@ func TestTaskBillingRequestValidationFailsClosed(t *testing.T) {
 		request Request
 		wantErr error
 	}{
-		{name: "zero quantity", request: Request{Feature: workflow.FeatureSlugPartialEdit}, wantErr: billing.ErrInvalidQuantity},
+		{name: "zero quantity", request: Request{Feature: workflow.FeatureSlugImageEdit}, wantErr: billing.ErrInvalidQuantity},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			if _, err := validateRequest(testCase.request); !errors.Is(err, testCase.wantErr) {

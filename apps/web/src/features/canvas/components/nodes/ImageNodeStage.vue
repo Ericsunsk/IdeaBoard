@@ -54,7 +54,6 @@
         v-if="expandModeActive && expandOverlayStyle"
         :overlay-style="expandOverlayStyle"
         :handle-radius="expandHandleRadius ?? 4"
-        :direct-generating="!!directGenerating"
         :output-count="outputCountValue"
         @submit="submitExpand"
         @update:output-count="selectOutputCount"
@@ -210,7 +209,6 @@ function onStageContextMenu(event: MouseEvent) {
 }
 
 function submitExpand(prompt: string, outputCount: number) {
-  if (props.directGenerating) return
   emit('expand-submit', prompt, outputCount)
 }
 

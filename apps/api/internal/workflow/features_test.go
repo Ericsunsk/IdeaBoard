@@ -37,12 +37,13 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 
 func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 	canonical := []string{
+		FeatureSlugPromptGeneration,
+		FeatureSlugImageEdit,
+		FeatureSlugLocalInpaint,
 		FeatureSlugSketchToImage,
 		FeatureSlugStyleVariation,
-		FeatureSlugPartialEdit,
 		FeatureSlugRemoveBg,
 		FeatureSlugStyleFusion,
-		FeatureSlugPatternGen,
 		FeatureSlugHDUpscale,
 		FeatureSlugImageExtend,
 	}
@@ -57,28 +58,20 @@ func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 	}
 }
 
-func TestCanonicalFeatureRegistryExpandsWithoutChangingProductionRouting(t *testing.T) {
-	newFeatures := []string{
-		FeatureSlugPromptGeneration,
-		FeatureSlugImageEdit,
-		FeatureSlugLocalInpaint,
-	}
+func TestCanonicalFeatureRegistryMatchesProductionRouting(t *testing.T) {
 	canonical := CanonicalFeatureSlugs()
 	for _, removedSlug := range []string{FeatureSlugPartialEdit, FeatureSlugPatternGen} {
 		if slices.Contains(canonical, removedSlug) {
 			t.Fatalf("legacy production feature %q must not enter the canonical registry", removedSlug)
 		}
 	}
-	for _, slug := range newFeatures {
+	for _, slug := range canonical {
 		t.Run(slug, func(t *testing.T) {
-			if !slices.Contains(canonical, slug) {
-				t.Fatalf("canonical registry does not include %q", slug)
+			if _, ok := ParseWorkflowFeatureSlug(slug); !ok {
+				t.Fatalf("canonical feature %q is not routable", slug)
 			}
-			if _, ok := ParseWorkflowFeatureSlug(slug); ok {
-				t.Fatalf("expand-phase feature %q must not enter production routing", slug)
-			}
-			if IsAIImageFeature(slug) {
-				t.Fatalf("expand-phase feature %q must not enter production Billing routing", slug)
+			if !IsAIImageFeature(slug) {
+				t.Fatalf("canonical feature %q is not billable", slug)
 			}
 		})
 	}
@@ -87,12 +80,13 @@ func TestCanonicalFeatureRegistryExpandsWithoutChangingProductionRouting(t *test
 func TestAIImageFeatureSlugsAreTheCanonicalWorkflowContract(t *testing.T) {
 	got := AIImageFeatureSlugs()
 	want := []string{
+		FeatureSlugPromptGeneration,
+		FeatureSlugImageEdit,
+		FeatureSlugLocalInpaint,
 		FeatureSlugSketchToImage,
 		FeatureSlugStyleVariation,
-		FeatureSlugPartialEdit,
 		FeatureSlugRemoveBg,
 		FeatureSlugStyleFusion,
-		FeatureSlugPatternGen,
 		FeatureSlugHDUpscale,
 		FeatureSlugImageExtend,
 	}

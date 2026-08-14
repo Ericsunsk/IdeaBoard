@@ -10,10 +10,10 @@ describe('canvas task submission billing contract', () => {
     const callbacks = createCanvasTaskSubmissionCallbacks({
       readinessRequest: () => ({
         prompt: 'submit readiness',
-        feature: 'pattern-gen',
+        feature: 'prompt-generation',
         params: { output_count: 2 },
       }),
-      buildRequest: () => ({ prompt: 'final prompt', feature: 'pattern-gen' }),
+      buildRequest: () => ({ prompt: 'final prompt', feature: 'prompt-generation' }),
       taskAdapter,
     })
 
@@ -25,7 +25,7 @@ describe('canvas task submission billing contract', () => {
     expect(taskAdapter.assertTaskRequestReady).toHaveBeenCalledWith(
       expect.objectContaining({
         prompt: 'submit readiness',
-        feature: 'pattern-gen',
+        feature: 'prompt-generation',
         params: { output_count: 2 },
         client_action_id: expect.stringMatching(/^canvas:/),
       }),
@@ -35,7 +35,7 @@ describe('canvas task submission billing contract', () => {
       1,
       {
         prompt: 'final prompt',
-        feature: 'pattern-gen',
+        feature: 'prompt-generation',
         client_action_id: 'canvas:action-1',
       },
       undefined,
@@ -44,7 +44,7 @@ describe('canvas task submission billing contract', () => {
       2,
       {
         prompt: 'final prompt',
-        feature: 'pattern-gen',
+        feature: 'prompt-generation',
         client_action_id: 'canvas:action-2',
       },
       undefined,
@@ -61,10 +61,10 @@ describe('canvas task submission billing contract', () => {
     const callbacks = createCanvasTaskSubmissionCallbacks({
       readinessRequest: () => ({
         prompt: 'submit readiness',
-        feature: 'pattern-gen',
+        feature: 'prompt-generation',
         params: { output_count: 4 },
       }),
-      buildRequest: () => ({ prompt: 'final prompt', feature: 'pattern-gen' }),
+      buildRequest: () => ({ prompt: 'final prompt', feature: 'prompt-generation' }),
       taskAdapter,
     })
 
@@ -83,10 +83,10 @@ describe('canvas task submission billing contract', () => {
     const callbacks = createCanvasTaskSubmissionCallbacks({
       readinessRequest: () => ({
         prompt: 'submit readiness',
-        feature: 'pattern-gen',
+        feature: 'prompt-generation',
         params: { output_count: 4 },
       }),
-      buildRequest: () => ({ prompt: 'free prompt', feature: 'pattern-gen' }),
+      buildRequest: () => ({ prompt: 'free prompt', feature: 'prompt-generation' }),
       taskAdapter,
     })
 
@@ -102,10 +102,10 @@ describe('canvas task submission billing contract', () => {
     const callbacks = createCanvasTaskSubmissionCallbacks({
       readinessRequest: () => ({
         prompt: 'submit readiness',
-        feature: 'pattern-gen',
+        feature: 'prompt-generation',
         params: { output_count: 4 },
       }),
-      buildRequest: () => ({ prompt: 'final prompt', feature: 'pattern-gen' }),
+      buildRequest: () => ({ prompt: 'final prompt', feature: 'prompt-generation' }),
       taskAdapter,
     })
 

@@ -22,7 +22,6 @@
             :ref="(el) => setItemStrengthTriggerRef(item, el)"
             class="image-action-icon-btn"
             :aria-label-value="getItemTooltip(item)"
-            :disabled="isItemDisabled(item)"
             :tooltip="getItemTooltip(item)"
             @click="onActionClick(item)"
           >
@@ -42,7 +41,6 @@
             step="1"
             :value="getItemStrengthValue(item)"
             :style="getItemStrengthRangeStyle(item)"
-            :disabled="isItemDisabled(item)"
             tabindex="-1"
             :aria-hidden="isStrengthActive(item) ? undefined : 'true'"
             :aria-label="`${item.label}强度`"
@@ -79,12 +77,12 @@ import { createPopoverMotionTransition } from '../../../../shared/motion/popover
 
 const props = defineProps<{
   strengthMenuStyle?: string | Record<string, string>
-  directGenerating: boolean
+  outputCount: number
   strengthControl: ImageActionStrengthControl
 }>()
 
 const emit = defineEmits<{
-  (event: 'action', action: ImageNodeAction): void
+  (event: 'action', action: ImageNodeAction, strength?: number): void
 }>()
 
 const showStrengthControl = computed(() => props.strengthControl.visible)
@@ -110,15 +108,11 @@ function getItemBillingState(item: ImageActionMenuItem) {
   return feature && billingStore ? billingStore.getFeatureState(feature) : null
 }
 
-function isItemDisabled(_item: ImageActionMenuItem) {
-  return props.directGenerating
-}
-
 function getItemTooltip(item: ImageActionMenuItem) {
   const billing = getItemBillingState(item)
   if (!billing) return item.label
   if (billing.status === 'ready') {
-    return `${item.label} · ${formatQuote(billing.unitCredits ?? 0)}`
+    return `${item.label} · ${formatQuote((billing.unitCredits ?? 0) * props.outputCount)}`
   }
   return item.label
 }
@@ -129,11 +123,12 @@ function formatQuote(totalCredits: number) {
 
 function getItemTouchPrice(item: ImageActionMenuItem) {
   const billing = getItemBillingState(item)
-  return billing?.status === 'ready' ? formatQuote(billing.unitCredits ?? 0) : ''
+  return billing?.status === 'ready'
+    ? formatQuote((billing.unitCredits ?? 0) * props.outputCount)
+    : ''
 }
 
 function onActionClick(item: ImageActionMenuItem) {
-  if (isItemDisabled(item)) return
   emit('action', item.action)
 }
 
@@ -197,7 +192,9 @@ function onItemStrengthInput(item: ImageActionMenuItem, event: Event) {
 function onItemStrengthChange(item: ImageActionMenuItem, event: Event) {
   const action = getStrengthAction(item)
   if (!action) return
+  const strength = Number((event.currentTarget as HTMLInputElement).value)
   props.strengthControl.onChange(action, event)
+  emit('action', item.action, strength)
 }
 
 function onItemStrengthPointerUp(item: ImageActionMenuItem, event: PointerEvent) {
@@ -209,9 +206,7 @@ function onItemStrengthPointerUp(item: ImageActionMenuItem, event: PointerEvent)
 function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
   const action = getStrengthAction(item)
   if (!action) return
-  if (isItemDisabled(item)) return
   props.strengthControl.onClick(action, event)
-  emit('action', item.action)
 }
 </script>
 

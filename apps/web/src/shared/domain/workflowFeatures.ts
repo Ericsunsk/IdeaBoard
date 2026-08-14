@@ -1,8 +1,9 @@
 export const WORKFLOW_FEATURE = {
-  partialEdit: 'partial-edit',
+  promptGeneration: 'prompt-generation',
+  imageEdit: 'image-edit',
+  localInpaint: 'local-inpaint',
   removeBg: 'remove-bg',
   styleFusion: 'style-fusion',
-  patternGen: 'pattern-gen',
   sketchToImage: 'sketch-to-image',
   styleVariation: 'style-variation',
   hdUpscale: 'hd-upscale',

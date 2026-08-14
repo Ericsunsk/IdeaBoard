@@ -116,6 +116,11 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 	if err := workflow.NormalizeStructuredPromptContractParams(params, featureSlug); err != nil {
 		return CanonicalTaskRequest{}, err
 	}
+	if featureSlug == workflow.FeatureSlugPromptGeneration {
+		if err := workflow.ValidatePromptGenerationSubmitContract(params); err != nil {
+			return CanonicalTaskRequest{}, err
+		}
+	}
 	if featureSlug == workflow.FeatureSlugPatternGen {
 		if err := workflow.ValidatePatternGenSubmitContract(req.Prompt, params); err != nil {
 			return CanonicalTaskRequest{}, err
@@ -154,7 +159,10 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 			return CanonicalTaskRequest{}, newSubmissionError("prompt_unavailable", "系统提示词暂不可用", err)
 		}
 	}
-	fullPrompt := prompts.ApplyFeatureSystemPromptWithConfig(req.Prompt, req.Prompt, featureSlug, params, promptConfig)
+	fullPrompt := strings.TrimSpace(prompts.ApplyFeatureSystemPromptWithConfig(req.Prompt, req.Prompt, featureSlug, params, promptConfig))
+	if featureSlug == workflow.FeatureSlugPromptGeneration && fullPrompt == "" {
+		return CanonicalTaskRequest{}, validation.New("Prompt Node 需要系统模板或用户描述")
+	}
 	if err := validateSubmitTaskPrompt(fullPrompt, maxSubmitTaskFinalPromptBytes, "最终提示词"); err != nil {
 		return CanonicalTaskRequest{}, err
 	}

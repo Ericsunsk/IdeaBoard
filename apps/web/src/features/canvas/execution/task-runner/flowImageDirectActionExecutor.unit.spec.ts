@@ -28,7 +28,7 @@ describe('flowImageDirectActionExecutor', () => {
   it('submits a prepared task request and returns the task id', async () => {
     const request: SubmitTaskData = {
       prompt: 'generate',
-      feature: 'pattern-gen',
+      feature: 'prompt-generation',
     }
 
     await expect(submitTaskRequest(request)).resolves.toEqual({ taskId: 'task-hd' })

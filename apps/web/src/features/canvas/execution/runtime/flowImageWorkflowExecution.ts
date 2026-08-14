@@ -1,7 +1,6 @@
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import type { SubmitTaskData } from '../../../../shared/api/task'
-import { isTaskResultPendingError } from '../../../../shared/api/taskEvents'
 import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
 import type { CanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
 import type { CanvasGraphStore } from '../../graph-runtime'
@@ -11,13 +10,11 @@ import {
   buildCanvasExtendReadinessRequest,
   buildImageActionReadinessRequest,
   buildImageExecutionTaskRequest,
+  buildLocalInpaintReadinessRequest,
   buildPreparedImageInpaintTaskRequest,
   buildPromptImageReadinessRequest,
 } from '../commands/flowImageTaskRequests'
-import {
-  prepareFlowLocalInpaintMedia,
-  type PreparedFlowLocalInpaintMedia,
-} from '../media/flowLocalInpaint'
+import { prepareFlowLocalInpaintMask } from '../media/flowLocalInpaintMask'
 import { loadImageSizeFromUrl } from '../media/imageSize'
 import {
   prepareFusionExecutionPlan,
@@ -27,13 +24,9 @@ import {
   type ImageActionExecutionPlan,
   type ImageInpaintExecutionPlan,
   type ImagePromptExecutionPlan,
-  type TextPromptExecutionPlan,
+  type PromptGenerationExecutionPlan,
 } from '../planning/ImageExecutionPlan'
-import {
-  resolveFirstTaskImageResultDisplay,
-  resolveTaskImageResultAtIndexDisplay,
-} from '../result-nodes/flowImageDirectActionTaskResult'
-import { composeFlowLocalInpaintTaskResult } from '../result-nodes/flowLocalInpaintTaskResult'
+import { resolveTaskImageResultAtIndexDisplay } from '../result-nodes/flowImageDirectActionTaskResult'
 import { usePendingImageResultExecution } from '../result-nodes/usePendingImageResultNodes'
 import { waitExistingOrLiveTaskImageResults } from '../task-runner/flowImageDirectActionExecutor'
 import { createCanvasTaskSubmissionCallbacks } from '../workspace/canvasTaskSubmissionAdapter'
@@ -88,12 +81,17 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     }
   }
 
-  async function resolveFirstTaskImageResult(taskId: string, fallbackRatio: number) {
-    return await resolveFirstTaskImageResultDisplay(
-      await waitExistingOrLiveTaskImageResults(taskId),
-      fallbackRatio,
-      loadImageSizeFromUrl,
-    )
+  function createIndexedTaskResultResolver(fallbackRatio: () => number) {
+    let taskResultsPromise: ReturnType<typeof waitExistingOrLiveTaskImageResults> | null = null
+    return async (taskId: string, _resultNodeId: string, resultIndex: number) => {
+      taskResultsPromise ??= waitExistingOrLiveTaskImageResults(taskId)
+      return await resolveTaskImageResultAtIndexDisplay(
+        await taskResultsPromise,
+        resultIndex,
+        fallbackRatio(),
+        loadImageSizeFromUrl,
+      )
+    }
   }
 
   const executionWorkspace = options.executionWorkspace
@@ -135,10 +133,11 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       sourceNodeId: plan.sourceNodeId,
       resultOptions: plan.resultOptions,
       attachment,
-      outputCount: 1,
+      outputCount: plan.outputCount,
+      submissionMode: 'shared-task',
       assertReady: taskSubmission.assertReady,
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
-      resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, plan.source.ratio),
+      resolveResult: createIndexedTaskResultResolver(() => plan.source.ratio),
       successMessage: '处理完成',
       fallbackErrorMessage: '执行失败',
     })
@@ -158,10 +157,11 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       sourceNodeId: plan.sourceNodeId,
       attachment,
       outputCount: plan.outputCount,
+      submissionMode: 'shared-task',
       resultOptions: plan.resultOptions,
       assertReady: taskSubmission.assertReady,
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
-      resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, plan.targetRatio),
+      resolveResult: createIndexedTaskResultResolver(() => plan.targetRatio),
       fallbackErrorMessage: '扩图失败',
     })
   }
@@ -169,13 +169,12 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
   async function executeImageInpaint(
     plan: ImageInpaintExecutionPlan & { activationId: string },
   ): Promise<void> {
-    let localInpaint: PreparedFlowLocalInpaintMedia | null = null
     let request: SubmitTaskData | null = null
     const attachment = requireCurrentAttachment()
     const boardId = attachment.boardId
     const readinessSubmission = createCanvasTaskSubmissionCallbacks({
-      readinessRequest: buildPromptImageReadinessRequest,
-      buildRequest: buildPromptImageReadinessRequest,
+      readinessRequest: buildLocalInpaintReadinessRequest,
+      buildRequest: buildLocalInpaintReadinessRequest,
     })
     const taskSubmission = createCanvasTaskSubmissionCallbacks({
       buildRequest: () => requirePreparedTaskRequest(request, '局部重绘任务未准备完成'),
@@ -186,53 +185,19 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       sourceNodeId: plan.sourceNodeId,
       attachment,
       outputCount: plan.outputCount,
+      submissionMode: 'shared-task',
       resultOptions: plan.resultOptions,
       preflight: readinessSubmission.assertReady,
       prepare: async () => {
-        localInpaint = await prepareFlowLocalInpaintMedia({
-          originalImageUrl: plan.source.url,
-          rawMaskDataUrl: plan.rawMaskDataUrl,
-          boardId,
-        })
+        const maskImageUrl = await prepareFlowLocalInpaintMask(plan.rawMaskDataUrl, boardId)
         request = buildPreparedImageInpaintTaskRequest({
           plan,
-          croppedImageUrl: localInpaint.crop.croppedImageUrl,
-          croppedMaskUrl: localInpaint.crop.croppedMaskUrl,
-          cropSize: localInpaint.crop.cropSize,
+          maskImageUrl,
         })
       },
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
-      resolveResult: async (taskId) => {
-        if (!localInpaint) throw new Error('局部重绘任务未准备完成')
-        async function waitLocalInpaintTaskResults() {
-          while (true) {
-            try {
-              return await waitExistingOrLiveTaskImageResults(taskId)
-            } catch (error) {
-              if (
-                !isTaskResultPendingError(error) ||
-                !executionRuntime.isAttachmentCurrent(attachment)
-              ) {
-                throw error
-              }
-            }
-          }
-        }
-        return await composeFlowLocalInpaintTaskResult({
-          originalImageUrl: plan.source.url,
-          croppedTaskResults: await waitLocalInpaintTaskResults(),
-          prepared: localInpaint,
-          boardId,
-          fallbackRatio: plan.source.ratio,
-          loadImageSize: loadImageSizeFromUrl,
-        })
-      },
-      persistPendingTaskIds: false,
+      resolveResult: createIndexedTaskResultResolver(() => plan.source.ratio),
       fallbackErrorMessage: '局部重绘失败',
-      formatErrorMessage: (error) => {
-        const message = error.message
-        return isTaskResultPendingError(error) ? '局部重绘仍在处理中，请稍后重试' : message
-      },
     })
   }
 
@@ -250,18 +215,19 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       sourceNodeId: plan.sourceNodeId,
       attachment,
       outputCount: plan.outputCount,
+      submissionMode: 'shared-task',
       resultOptions: plan.resultOptions,
       assertReady: taskSubmission.assertReady,
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
-      resolveResult: (taskId) => resolveFirstTaskImageResult(taskId, plan.source.ratio),
+      resolveResult: createIndexedTaskResultResolver(() => plan.source.ratio),
       fallbackErrorMessage: '生成失败',
     })
   }
 
-  async function executeTextPrompt(
-    plan: TextPromptExecutionPlan & { activationId: string },
+  async function executePromptGeneration(
+    plan: PromptGenerationExecutionPlan & { activationId: string },
   ): Promise<void> {
-    await executionWorkspace.commands.runTextPromptGeneration(plan)
+    await executionWorkspace.commands.runPromptGeneration(plan)
   }
 
   async function executeFusion(
@@ -320,8 +286,8 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
         return await executeImageInpaint(plan)
       case 'image-prompt':
         return await executeImagePrompt(plan)
-      case 'text-prompt':
-        return await executeTextPrompt(plan)
+      case 'prompt-generation':
+        return await executePromptGeneration(plan)
       case 'fusion':
         return await executeFusion(plan)
     }

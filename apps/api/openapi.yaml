@@ -3803,10 +3803,11 @@ components:
     WorkflowFeatureSlug:
       type: string
       enum:
-        - partial-edit
+        - prompt-generation
+        - image-edit
+        - local-inpaint
         - remove-bg
         - style-fusion
-        - pattern-gen
         - sketch-to-image
         - style-variation
         - hd-upscale

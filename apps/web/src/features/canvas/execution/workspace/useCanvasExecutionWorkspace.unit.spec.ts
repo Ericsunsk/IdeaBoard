@@ -54,16 +54,17 @@ function makeMaterializerResult(
 }
 
 function makeTextPromptPlan(
-  overrides: Partial<ActivatedImageExecutionPlan & { kind: 'text-prompt' }> = {},
-): ActivatedImageExecutionPlan & { kind: 'text-prompt' } {
+  overrides: Partial<ActivatedImageExecutionPlan & { kind: 'prompt-generation' }> = {},
+): ActivatedImageExecutionPlan & { kind: 'prompt-generation' } {
   return {
     activationId: 'canvas:test-activation',
-    kind: 'text-prompt',
+    kind: 'prompt-generation',
     sourceNodeId: 'prompt-1',
     source: {
       url: '',
       ratio: 1,
     },
+    referenceImages: [],
     prompt: 'draw a precise workspace boundary',
     outputCount: 1,
     aspectRatio: '1:1' as const,
@@ -181,6 +182,7 @@ function createWorkspaceHarness(options: {
           url: 'https://example.com/result.png',
           width: 400,
           height: 200,
+          result_index: 0,
         },
       ]),
   )
@@ -254,15 +256,15 @@ describe('useCanvasExecutionWorkspace', () => {
         },
       })
 
-    await workspace.commands.runTextPromptGeneration(makeTextPromptPlan())
+    await workspace.commands.runPromptGeneration(makeTextPromptPlan())
 
     expect(taskAdapter.submitTaskRequest).toHaveBeenCalledTimes(1)
     expect(submittedRequests).toHaveLength(1)
     expect(submittedRequests[0]).toEqual(
       expect.objectContaining({
         prompt: 'draw a precise workspace boundary',
-        feature: 'pattern-gen',
-        params: { ratio: '1:1' },
+        feature: 'prompt-generation',
+        params: { output_count: 1, ratio: '1:1' },
         client_action_id: 'client-action-1',
       }),
     )
@@ -275,23 +277,19 @@ describe('useCanvasExecutionWorkspace', () => {
     })
   })
 
-  it('reports pattern-gen preflight errors without submitting a task', async () => {
+  it('reports prompt-generation preflight errors without submitting a task', async () => {
     const { workspace, pendingResults, taskAdapter, onSuccess, onWarning } = createWorkspaceHarness(
       {
         runReservedPendingResults: async () => makeRunSummary(),
       },
     )
 
-    await workspace.commands.runTextPromptGeneration(
-      makeTextPromptPlan({ aspectRatio: '2:1' as never }),
-    )
+    await workspace.commands.runPromptGeneration(makeTextPromptPlan({ outputCount: 5 }))
 
     expect(pendingResults.reservePendingResults).not.toHaveBeenCalled()
     expect(pendingResults.runReservedPendingResults).not.toHaveBeenCalled()
     expect(taskAdapter.submitTaskRequest).not.toHaveBeenCalled()
-    expect(onWarning).toHaveBeenCalledWith(
-      '图案生成参数错误：图案生成尺寸比例仅支持 auto、1:1、3:4、4:3、9:16、16:9',
-    )
+    expect(onWarning).toHaveBeenCalledOnce()
     expect(onSuccess).not.toHaveBeenCalled()
   })
 
@@ -313,8 +311,8 @@ describe('useCanvasExecutionWorkspace', () => {
       },
     })
 
-    await workspace.commands.runTextPromptGeneration(makeTextPromptPlan())
-    await workspace.commands.runTextPromptGeneration(makeTextPromptPlan())
+    await workspace.commands.runPromptGeneration(makeTextPromptPlan())
+    await workspace.commands.runPromptGeneration(makeTextPromptPlan())
 
     expect(createClientActionId).toHaveBeenCalledTimes(2)
     expect(submittedClientActionIds).toEqual(['client-action-1', 'client-action-2'])
@@ -334,7 +332,7 @@ describe('useCanvasExecutionWorkspace', () => {
       },
     })
 
-    await workspace.commands.runTextPromptGeneration(makeTextPromptPlan())
+    await workspace.commands.runPromptGeneration(makeTextPromptPlan())
 
     expect(flushAutosave).toHaveBeenCalledWith({ silent: true })
     expect(onWarning).toHaveBeenCalledWith('任务进度推送超时，请稍后查看结果')
@@ -721,7 +719,7 @@ describe('useCanvasExecutionWorkspace', () => {
       },
     })
 
-    await workspace.commands.runTextPromptGeneration(makeTextPromptPlan())
+    await workspace.commands.runPromptGeneration(makeTextPromptPlan())
 
     expect(onWarning).toHaveBeenCalledWith('生成服务暂不可用')
     expect(onSuccess).not.toHaveBeenCalled()

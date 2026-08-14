@@ -2,7 +2,6 @@ import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { IMAGE_NODE_ACTION } from '../config/imageActionRegistry'
 import type { MediaInputImage } from '../composables/useFlowMediaInputImages'
-import { ImageExecutionPlanError } from '../execution/planning/ImageExecutionPlan'
 import { createCanvasExecutionRuntime } from '../execution/runtime/CanvasExecutionRuntime'
 import { useCanvasImageWorkflow } from './useCanvasImageWorkflow'
 
@@ -21,7 +20,7 @@ const mocks = vi.hoisted(() => {
       planImageInpaintAction: vi.fn(() => plan),
       planImagePromptGeneration: vi.fn(() => plan),
       planImagePromptGenerationFromSource: vi.fn(() => plan),
-      planTextPromptGeneration: vi.fn(() => plan),
+      planPromptGeneration: vi.fn(() => plan),
       planFusionPromptGeneration: vi.fn(() => plan),
     },
     execution: {
@@ -159,7 +158,10 @@ describe('useCanvasImageWorkflow', () => {
     expect(mocks.planner.planImageDirectAction).toHaveBeenCalledWith(
       'image-1',
       IMAGE_NODE_ACTION.removeBg,
-      undefined,
+      {
+        prompt: '',
+        outputCount: 1,
+      },
     )
     expect(options.ui.panels.clear).toHaveBeenCalledOnce()
   })
@@ -175,7 +177,44 @@ describe('useCanvasImageWorkflow', () => {
     expect(mocks.planner.planImageDirectAction).toHaveBeenCalledWith(
       'image-1',
       IMAGE_NODE_ACTION.styleVariation,
-      { strength: 50 },
+      {
+        strength: 50,
+        prompt: '',
+        outputCount: 1,
+      },
+    )
+  })
+
+  it('routes quick and Composer submissions through the same selected workflow', async () => {
+    const { options } = createOptions()
+    const workflow = useCanvasImageWorkflow(options as never)
+    const handlers = workflow.commands.interactions
+
+    handlers.onFlowImageDirectAction(
+      'image-1',
+      IMAGE_NODE_ACTION.styleVariation,
+      'soft watercolor',
+      4,
+      72,
+    )
+    await vi.waitFor(() => expect(mocks.execution.executeImageWorkflow).toHaveBeenCalledOnce())
+    expect(mocks.planner.planImageDirectAction).toHaveBeenLastCalledWith(
+      'image-1',
+      IMAGE_NODE_ACTION.styleVariation,
+      { prompt: 'soft watercolor', outputCount: 4, strength: 72 },
+    )
+
+    handlers.onFlowImagePromptGenerate(
+      'image-1',
+      IMAGE_NODE_ACTION.styleVariation,
+      'soft watercolor',
+      4,
+    )
+    await vi.waitFor(() => expect(mocks.execution.executeImageWorkflow).toHaveBeenCalledTimes(2))
+    expect(mocks.planner.planImageDirectAction).toHaveBeenLastCalledWith(
+      'image-1',
+      IMAGE_NODE_ACTION.styleVariation,
+      { prompt: 'soft watercolor', outputCount: 4 },
     )
   })
 
@@ -187,15 +226,16 @@ describe('useCanvasImageWorkflow', () => {
     handlers.onFlowPromptGenerate('prompt-1', 'Draw this', 2, 'unsupported' as never)
     await vi.waitFor(() => expect(mocks.execution.executeImageWorkflow).toHaveBeenCalledOnce())
 
-    expect(mocks.planner.planTextPromptGeneration).toHaveBeenCalledWith(
+    expect(mocks.planner.planPromptGeneration).toHaveBeenCalledWith(
       'prompt-1',
+      [],
       'Draw this',
       2,
       'auto',
     )
   })
 
-  it('routes linked and uploaded Prompt inputs through their canonical image paths', async () => {
+  it('submits linked and uploaded Prompt inputs as one ordered reference set', async () => {
     const { options, graph } = createOptions()
     graph.getMediaInputImages.mockReturnValue([
       {
@@ -219,39 +259,28 @@ describe('useCanvasImageWorkflow', () => {
     const handlers = workflow.commands.interactions
 
     handlers.onFlowPromptGenerate('prompt-1', 'Remix', 3, '16:9')
-    await vi.waitFor(() => expect(mocks.execution.executeImageWorkflow).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(mocks.execution.executeImageWorkflow).toHaveBeenCalledOnce())
 
-    expect(mocks.planner.planImagePromptGeneration).toHaveBeenCalledWith(
-      'image-1',
+    expect(mocks.planner.planPromptGeneration).toHaveBeenCalledWith(
+      'prompt-1',
+      [
+        { url: 'https://example.com/linked.png', ratio: 0.5 },
+        { url: 'https://example.com/uploaded.png', ratio: 1.5 },
+      ],
       'Remix',
       3,
       '16:9',
-      { outputAnchorNodeId: 'prompt-1' },
-    )
-    expect(mocks.planner.planImagePromptGenerationFromSource).toHaveBeenCalledWith(
-      { url: 'https://example.com/uploaded.png', ratio: 1.5 },
-      'uploaded-1',
-      'Remix',
-      3,
-      '16:9',
-      { outputAnchorNodeId: 'prompt-1' },
     )
   })
 
-  it('surfaces Prompt planning failures through workflow feedback', async () => {
-    const { options, feedback } = createOptions()
-    mocks.planner.planTextPromptGeneration.mockImplementationOnce(() => {
-      throw new ImageExecutionPlanError('请输入 Prompt')
-    })
+  it('allows an empty optional user prompt', async () => {
+    const { options } = createOptions()
     const workflow = useCanvasImageWorkflow(options as never)
     const handlers = workflow.commands.interactions
 
     handlers.onFlowPromptGenerate('prompt-1', '', 1, 'auto')
-    await vi.waitFor(() =>
-      expect(feedback.taskExecution.warning).toHaveBeenCalledWith('请输入 Prompt'),
-    )
-
-    expect(mocks.execution.executeImageWorkflow).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(mocks.execution.executeImageWorkflow).toHaveBeenCalledOnce())
+    expect(mocks.planner.planPromptGeneration).toHaveBeenCalledWith('prompt-1', [], '', 1, 'auto')
   })
 
   it('keeps Prompt generation disabled during provider degradation', () => {
@@ -265,7 +294,7 @@ describe('useCanvasImageWorkflow', () => {
       handlers.onFlowPromptGenerate('prompt-1', 'Keep editing', 1, 'auto')
 
       expect(feedback.taskExecution.warning).toHaveBeenCalledWith('provider unavailable')
-      expect(mocks.planner.planTextPromptGeneration).not.toHaveBeenCalled()
+      expect(mocks.planner.planPromptGeneration).not.toHaveBeenCalled()
       expect(mocks.execution.executeImageWorkflow).not.toHaveBeenCalled()
     } finally {
       vi.clearAllTimers()

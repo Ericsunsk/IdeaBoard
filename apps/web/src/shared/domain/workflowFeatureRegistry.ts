@@ -94,9 +94,16 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
     groupKey: WORKFLOW_FEATURE_GROUP.prompt,
     imageActionLabel: '草图成图',
     imageActionTitle: '草图成图',
+    promptVariables: [{ key: '{{user_prompt}}', tone: 'prompt' }],
   },
   {
-    slug: WORKFLOW_FEATURE.partialEdit,
+    slug: WORKFLOW_FEATURE.imageEdit,
+    label: '文字改图',
+    groupKey: WORKFLOW_FEATURE_GROUP.prompt,
+    promptVariables: [{ key: '{{user_prompt}}', tone: 'prompt' }],
+  },
+  {
+    slug: WORKFLOW_FEATURE.localInpaint,
     label: '局部重绘',
     groupKey: WORKFLOW_FEATURE_GROUP.inpaint,
     promptVariables: [{ key: '{{user_prompt}}', tone: 'prompt' }],
@@ -107,7 +114,10 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
     groupKey: WORKFLOW_FEATURE_GROUP.prompt,
     imageActionLabel: '风格延展',
     imageActionTitle: '风格延展',
-    promptVariables: [{ key: '{{variation_strength}}', tone: 'control' }],
+    promptVariables: [
+      { key: '{{user_prompt}}', tone: 'prompt' },
+      { key: '{{variation_strength}}', tone: 'control' },
+    ],
   },
   {
     slug: WORKFLOW_FEATURE.styleFusion,
@@ -124,10 +134,11 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
     groupKey: WORKFLOW_FEATURE_GROUP.prompt,
     imageActionLabel: '抠图',
     imageActionTitle: '抠图',
+    promptVariables: [{ key: '{{user_prompt}}', tone: 'prompt' }],
   },
   {
-    slug: WORKFLOW_FEATURE.patternGen,
-    label: '图案生成',
+    slug: WORKFLOW_FEATURE.promptGeneration,
+    label: 'Prompt 生图',
     groupKey: WORKFLOW_FEATURE_GROUP.prompt,
     promptVariables: [{ key: '{{user_prompt}}', tone: 'prompt' }],
   },
@@ -137,7 +148,10 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
     groupKey: WORKFLOW_FEATURE_GROUP.imageTools,
     imageActionLabel: 'HD',
     imageActionTitle: 'HD',
-    promptVariables: [{ key: '{{clarity_strength}}', tone: 'control' }],
+    promptVariables: [
+      { key: '{{user_prompt}}', tone: 'prompt' },
+      { key: '{{clarity_strength}}', tone: 'control' },
+    ],
   },
   {
     slug: WORKFLOW_FEATURE.imageExtend,
@@ -185,9 +199,10 @@ const WORKFLOW_FEATURE_CONFIG_GROUP_DEFS = [
     order: 10,
     slugs: [
       WORKFLOW_FEATURE.sketchToImage,
+      WORKFLOW_FEATURE.imageEdit,
       WORKFLOW_FEATURE.styleVariation,
       WORKFLOW_FEATURE.removeBg,
-      WORKFLOW_FEATURE.partialEdit,
+      WORKFLOW_FEATURE.localInpaint,
       WORKFLOW_FEATURE.hdUpscale,
       WORKFLOW_FEATURE.imageExtend,
     ],
@@ -196,7 +211,7 @@ const WORKFLOW_FEATURE_CONFIG_GROUP_DEFS = [
     key: 'prompt',
     title: 'Prompt',
     order: 20,
-    slugs: [WORKFLOW_FEATURE.patternGen],
+    slugs: [WORKFLOW_FEATURE.promptGeneration],
   },
   {
     key: 'fusion',

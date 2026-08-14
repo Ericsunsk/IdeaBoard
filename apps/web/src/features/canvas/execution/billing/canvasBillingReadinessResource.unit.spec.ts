@@ -18,13 +18,13 @@ describe('canvas billing readiness request contracts', () => {
   })
 
   it('uses the request output count for presentation quote refreshes', async () => {
-    const readiness = { ready: true, feature: 'pattern-gen' } as const
+    const readiness = { ready: true, feature: 'prompt-generation' } as const
     mocks.checkSubmitReadiness.mockResolvedValue(readiness)
 
     await expect(
-      fetchCanvasBillingReadiness('pattern-gen', {
+      fetchCanvasBillingReadiness('prompt-generation', {
         prompt: 'presentation quote',
-        feature: 'pattern-gen',
+        feature: 'prompt-generation',
         params: { output_count: 1 },
       }),
     ).resolves.toEqual(readiness)

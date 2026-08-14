@@ -23,9 +23,10 @@ describe('workflowFeatureRegistry projections', () => {
         order: 10,
         slugs: [
           WORKFLOW_FEATURE.sketchToImage,
+          WORKFLOW_FEATURE.imageEdit,
           WORKFLOW_FEATURE.styleVariation,
           WORKFLOW_FEATURE.removeBg,
-          WORKFLOW_FEATURE.partialEdit,
+          WORKFLOW_FEATURE.localInpaint,
           WORKFLOW_FEATURE.hdUpscale,
           WORKFLOW_FEATURE.imageExtend,
         ],
@@ -34,7 +35,7 @@ describe('workflowFeatureRegistry projections', () => {
         key: 'prompt',
         title: 'Prompt',
         order: 20,
-        slugs: [WORKFLOW_FEATURE.patternGen],
+        slugs: [WORKFLOW_FEATURE.promptGeneration],
       },
       {
         key: 'fusion',
@@ -51,22 +52,25 @@ describe('workflowFeatureRegistry projections', () => {
       title: 'Image · 草图成图',
       label: '草图成图',
     })
-    expect(WORKFLOW_FEATURE_CONFIG_ITEM_MAP[WORKFLOW_FEATURE.patternGen]).toEqual({
-      slug: WORKFLOW_FEATURE.patternGen,
-      title: 'Prompt · 图案生成',
-      label: '图案生成',
+    expect(WORKFLOW_FEATURE_CONFIG_ITEM_MAP[WORKFLOW_FEATURE.promptGeneration]).toEqual({
+      slug: WORKFLOW_FEATURE.promptGeneration,
+      title: 'Prompt · Prompt 生图',
+      label: 'Prompt 生图',
     })
   })
 
   it('publishes prompt variables from the workflow code registry', () => {
     expect(getWorkflowFeaturePromptVariables(WORKFLOW_FEATURE.styleVariation)).toEqual([
+      { key: '{{user_prompt}}', tone: 'prompt' },
       { key: '{{variation_strength}}', tone: 'control' },
     ])
     expect(getWorkflowFeaturePromptVariables(WORKFLOW_FEATURE.styleFusion)).toEqual([
       { key: '{{user_prompt}}', tone: 'prompt' },
       { key: '{{fusion_input_weights}}', tone: 'control' },
     ])
-    expect(getWorkflowFeaturePromptVariables(WORKFLOW_FEATURE.removeBg)).toEqual([])
+    expect(getWorkflowFeaturePromptVariables(WORKFLOW_FEATURE.removeBg)).toEqual([
+      { key: '{{user_prompt}}', tone: 'prompt' },
+    ])
   })
 
   it('exposes canvas image action text without feature modules rebuilding it', () => {
@@ -74,7 +78,7 @@ describe('workflowFeatureRegistry projections', () => {
       label: '抠图',
       title: '抠图',
     })
-    expect(getWorkflowFeatureImageActionText(WORKFLOW_FEATURE.partialEdit)).toEqual({
+    expect(getWorkflowFeatureImageActionText(WORKFLOW_FEATURE.localInpaint)).toEqual({
       label: 'Inpaint · 局部重绘',
       title: 'Inpaint · 局部重绘',
     })

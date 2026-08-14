@@ -335,7 +335,7 @@ const emit = defineEmits<{
 }>()
 
 const promptDraft = ref('')
-const billingQuote = useCanvasBillingQuote(() => WORKFLOW_FEATURE.partialEdit)
+const billingQuote = useCanvasBillingQuote(() => WORKFLOW_FEATURE.localInpaint)
 const {
   strength: featherStrength,
   visible: featherStrengthVisible,

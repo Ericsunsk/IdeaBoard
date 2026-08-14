@@ -5,6 +5,8 @@ import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtend
 import { useImageCanvasExtendOverlay } from '../composables/useImageCanvasExtendOverlay'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { ImageNodeAction } from '../config/imageActionRegistry'
+import { IMAGE_NODE_ACTION } from '../config/imageActionRegistry'
+import type { ImageTaskAction } from '../execution'
 import type { CanvasFlowPaneAdapter } from '../flow-pane'
 import {
   useCanvasImageTools,
@@ -32,7 +34,7 @@ type CanvasImageWorkflowExecutionPort = Pick<
   | 'runImageInpaintAction'
   | 'runImagePromptGeneration'
   | 'runImagePromptGenerationFromSource'
-  | 'runTextPromptGeneration'
+  | 'runPromptGeneration'
   | 'runFusionPromptGeneration'
   | 'runImageDirectAction'
   | 'runCanvasExtendAction'
@@ -56,7 +58,6 @@ type CanvasImageWorkflowGraphPort = Pick<
   | 'isCanvasInteractionLocked'
 > & {
   getMediaInputImages: PromptGenerationIntentOptions['getMediaInputImages']
-  resolvePromptInputImageNodeIds: PromptGenerationIntentOptions['resolvePromptInputImageNodeIds']
   updateSnapshotNodeParam: ImageActionIntentRouterOptions['onFlowNodeParamUpdate']
   markNodeExecutionDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
 }
@@ -100,8 +101,19 @@ export type CanvasImageWorkflow = {
     interactions: {
       onFlowImageContextMenu: (nodeId: string, event: MouseEvent) => void
       onFlowFusionContextMenu: (nodeId: string, event: MouseEvent) => void
-      onFlowImageDirectAction: (nodeId: string, action: ImageNodeAction) => void
-      onFlowImagePromptGenerate: (nodeId: string, prompt: string, outputCount: number) => void
+      onFlowImageDirectAction: (
+        nodeId: string,
+        action: ImageNodeAction,
+        prompt?: string,
+        outputCount?: number,
+        strength?: number,
+      ) => void
+      onFlowImagePromptGenerate: (
+        nodeId: string,
+        action: ImageTaskAction,
+        prompt: string,
+        outputCount: number,
+      ) => void
       onFlowFusionPromptGenerate: (
         nodeId: string,
         prompt: string,
@@ -152,12 +164,7 @@ export function useCanvasImageWorkflow(
   }
 
   const strengthControl = useFlowImageActionStrengthControl({
-    onCommit: (action, strength) => {
-      const targetNodeId = ui.panels.getActiveNodeId('image-tools')
-      if (!targetNodeId) return
-      ui.panels.clear()
-      void execution.runImageDirectAction(targetNodeId, action, { strength })
-    },
+    onCommit: () => undefined,
     onCancel: ui.panels.clear,
   })
 
@@ -200,7 +207,11 @@ export function useCanvasImageWorkflow(
     hideStrengthControl: strengthControl.hideStrengthControl,
     updateOutputCount: markImageWorkflowNodeDirty,
     runInpaintAction: execution.runImageInpaintAction,
-    runPromptGeneration: execution.runImagePromptGeneration,
+    runPromptGeneration: (nodeId, prompt, outputCount) =>
+      execution.runImageDirectAction(nodeId, IMAGE_NODE_ACTION.imageEdit, {
+        prompt,
+        outputCount,
+      }),
     isImageActionPanelVisible: (nodeId) => ui.panels.isActive('image-tools', nodeId),
     isImagePromptComposerVisible: (nodeId) => ui.panels.isActive('image-tools', nodeId),
     isGenerationAvailable: execution.isGenerationAvailable,
@@ -235,7 +246,6 @@ export function useCanvasImageWorkflow(
     enterFlowImageEditorMode: imageTools.commands.lifecycle.enter,
     focusImageEditorAndShowChrome: imageTools.commands.editor.focusAndShowChrome,
     runImageDirectAction: execution.runImageDirectAction,
-    runImagePromptAction: imageTools.commands.prompt.runPromptAction,
     runFusionPromptGeneration: execution.runFusionPromptGeneration,
     onFlowNodeParamUpdate: markImageWorkflowNodeDirty,
     onWarning: options.feedback.imageTools.actionUnavailable,
@@ -245,10 +255,7 @@ export function useCanvasImageWorkflow(
     cancelFlowExpandMode: canvasExtend.cancelExpandMode,
     cancelFlowMaskEditorMode: imageTools.commands.lifecycle.cancel,
     getMediaInputImages: graph.getMediaInputImages,
-    resolvePromptInputImageNodeIds: graph.resolvePromptInputImageNodeIds,
-    runTextPromptGeneration: execution.runTextPromptGeneration,
-    runImagePromptGeneration: execution.runImagePromptGeneration,
-    runImagePromptGenerationFromSource: execution.runImagePromptGenerationFromSource,
+    runPromptGeneration: execution.runPromptGeneration,
   })
   const canvasExtendInteractions = useFlowExpandInteractionHandlers({
     flowExpandNodeId: canvasExtend.expandNodeId,

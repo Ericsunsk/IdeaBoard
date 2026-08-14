@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/accountpool/accounts"
+	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/workflow"
 )
@@ -32,7 +33,8 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 			feature: workflow.FeatureSlugStyleVariation,
 			params:  map[string]interface{}{"variation": map[string]interface{}{"strength": 0.5}},
 		},
-		{feature: workflow.FeatureSlugPartialEdit},
+		{feature: workflow.FeatureSlugImageEdit},
+		{feature: workflow.FeatureSlugLocalInpaint},
 		{feature: workflow.FeatureSlugRemoveBg},
 		{
 			feature: workflow.FeatureSlugStyleFusion,
@@ -41,7 +43,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 				"fusion": map[string]interface{}{"input_weights": []float64{3, 1}},
 			},
 		},
-		{feature: workflow.FeatureSlugPatternGen},
+		{feature: workflow.FeatureSlugPromptGeneration},
 		{
 			feature: workflow.FeatureSlugHDUpscale,
 			params:  map[string]interface{}{"hd": map[string]interface{}{"clarity_strength": 0.5}},
@@ -109,7 +111,7 @@ func TestTaskIntakeRejectsOutputCountOutsideCanonicalContract(t *testing.T) {
 		t.Run(fmt.Sprint(outputCount), func(t *testing.T) {
 			_, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 				Prompt:         "generate",
-				Feature:        workflow.FeatureSlugPatternGen,
+				Feature:        workflow.FeatureSlugPromptGeneration,
 				ClientActionID: "invalid-output-count",
 				Params:         map[string]interface{}{"output_count": outputCount},
 			})
@@ -153,6 +155,55 @@ func TestTaskIntakePersistsProviderIndependentGenerationSnapshot(t *testing.T) {
 	}
 }
 
+func TestTaskIntakeCompilesPromptGenerationPrimitiveAndOrderedReferences(t *testing.T) {
+	intake := NewTaskIntake(TaskIntakeDeps{
+		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+			ID: 101, Models: []accounts.AccountModel{{Name: "runtime-model", Enabled: true}},
+		}}},
+		Prompts: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
+			workflow.FeatureSlugPromptGeneration: {
+				Prompt:                "Create an image. {{user_prompt}}",
+				UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(workflow.FeatureSlugPromptGeneration),
+			},
+		}},
+		Media: testSubmitMediaValidator{},
+	})
+
+	textRequest, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
+		Feature: workflow.FeatureSlugPromptGeneration, ClientActionID: "prompt-text",
+		Params: map[string]interface{}{"output_count": 2},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot := textRequest.GenerationSnapshot(); snapshot == nil || snapshot.Primitive != "text-to-image" || snapshot.RequestedOutputCount != 2 || snapshot.CompiledPrompt != "Create an image." {
+		t.Fatalf("text snapshot=%+v", snapshot)
+	}
+
+	refs := []string{"https://example.com/one.png", "https://example.com/two.png", "https://example.com/three.png"}
+	imageRequest, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
+		Prompt: "keep this order", Feature: workflow.FeatureSlugPromptGeneration,
+		ImageURLs: refs, ClientActionID: "prompt-image",
+		Params: map[string]interface{}{"output_count": 4},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := imageRequest.GenerationSnapshot()
+	if snapshot == nil || snapshot.Primitive != "image-to-image" || snapshot.RequestedOutputCount != 4 || len(snapshot.Media) != len(refs) {
+		t.Fatalf("image snapshot=%+v", snapshot)
+	}
+	for index, ref := range refs {
+		if snapshot.Media[index].InputIndex != index || snapshot.Media[index].Ref != ref || snapshot.Media[index].Weight != 0 {
+			t.Fatalf("ordered media[%d]=%+v", index, snapshot.Media[index])
+		}
+	}
+	billing := imageRequest.BillingRequest()
+	if billing == nil || billing.Feature != workflow.FeatureSlugPromptGeneration || billing.Quantity != 4 {
+		t.Fatalf("billing=%+v", billing)
+	}
+}
+
 func TestTaskIntakeAllowsMissingSystemPrompt(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
 		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
@@ -164,7 +215,7 @@ func TestTaskIntakeAllowsMissingSystemPrompt(t *testing.T) {
 
 	canonical, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 		Prompt:         "repeatable textile pattern",
-		Feature:        workflow.FeatureSlugPatternGen,
+		Feature:        workflow.FeatureSlugPromptGeneration,
 		ClientActionID: "missing-system-prompt",
 	})
 	if err != nil {
@@ -188,7 +239,7 @@ func TestTaskIntakePreservesPromptCauseBehindStableError(t *testing.T) {
 
 	_, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 		Prompt:         "repeatable textile pattern",
-		Feature:        workflow.FeatureSlugPatternGen,
+		Feature:        workflow.FeatureSlugPromptGeneration,
 		ClientActionID: "prompt-cause",
 	})
 	if !errors.Is(err, cause) {

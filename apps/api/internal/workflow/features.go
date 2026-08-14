@@ -39,12 +39,13 @@ var canonicalWorkflowFeatureSlugs = []string{
 }
 
 var supportedWorkflowFeatureSlugs = []string{
+	FeatureSlugPromptGeneration,
+	FeatureSlugImageEdit,
+	FeatureSlugLocalInpaint,
 	FeatureSlugSketchToImage,
 	FeatureSlugStyleVariation,
-	FeatureSlugPartialEdit,
 	FeatureSlugRemoveBg,
 	FeatureSlugStyleFusion,
-	FeatureSlugPatternGen,
 	FeatureSlugHDUpscale,
 	FeatureSlugImageExtend,
 }

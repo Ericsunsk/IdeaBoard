@@ -221,6 +221,7 @@ type providerExecutionConfig struct {
 	FeatureSlug          string
 	Timeout              time.Duration
 	LocalRedrawCtx       *localRedrawContext
+	ImageExtendCtx       *imageExtendContext
 	Request              providerRequest
 }
 
@@ -233,6 +234,7 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 		return providerCallOutput{}, err
 	}
 	localRedrawStored := false
+	imageExtendStored := false
 	output := providerCallOutput{}
 	providerStartedAt := time.Now()
 	output.Timeline.ProviderStartedAt = &providerStartedAt
@@ -289,7 +291,7 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 		output.Timeline.FinalizeFinishedAt = &finalizeFinishedAt
 	}
 	if exec.LocalRedrawCtx != nil {
-		imageURL, taskOutputs, localRedrawStored, err = c.finalizeLocalRedrawResult(ctx, task.UserID, task.TaskID, exec.LocalRedrawCtx, imageURL, exec.Timeout)
+		imageURLs, taskOutputs, localRedrawStored, err = c.finalizeLocalRedrawResults(ctx, task.UserID, task.TaskID, exec.LocalRedrawCtx, imageURLs, exec.Timeout)
 		if err != nil {
 			markFinalizeFinished()
 			if errors.Is(err, context.Canceled) {
@@ -300,10 +302,24 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 			}
 			return output, newExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, err)
 		}
-		imageURLs = []string{imageURL}
+		imageURL = imageURLs[0]
+	}
+	if exec.ImageExtendCtx != nil {
+		imageURLs, taskOutputs, imageExtendStored, err = c.finalizeImageExtendResults(ctx, task.UserID, task.TaskID, exec.ImageExtendCtx, imageURLs, exec.Timeout)
+		if err != nil {
+			markFinalizeFinished()
+			if errors.Is(err, context.Canceled) {
+				return output, err
+			}
+			if _, _, ok := executionFailureDetails(err); ok {
+				return output, err
+			}
+			return output, newExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, err)
+		}
+		imageURL = imageURLs[0]
 	}
 
-	if !localRedrawStored {
+	if !localRedrawStored && !imageExtendStored {
 		imageURLs, taskOutputs, err = c.materializeProviderResultImages(ctx, task.UserID, task.TaskID, correlationID, account, imageURLs)
 		if err != nil {
 			markFinalizeFinished()
@@ -458,6 +474,10 @@ func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account
 	if redrawErr != nil {
 		return providerExecutionConfig{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, redrawErr)
 	}
+	imageExtendCtx, extendErr := c.prepareImageExtendPipeline(ctx, account, taskParams.Provider, timeout)
+	if extendErr != nil {
+		return providerExecutionConfig{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, extendErr)
+	}
 
 	resolvedAccountModel, ok := resolveAccountModelForExecution(account, taskParams, assignment.ResolvedModel)
 	resolvedModel := strings.TrimSpace(resolvedAccountModel.Name)
@@ -475,6 +495,7 @@ func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account
 		FeatureSlug:          taskParams.featureSlug(),
 		Timeout:              timeout,
 		LocalRedrawCtx:       localRedrawCtx,
+		ImageExtendCtx:       imageExtendCtx,
 		Request:              taskParams.providerRequest(task.Prompt, resolvedModel),
 	}, nil
 }
