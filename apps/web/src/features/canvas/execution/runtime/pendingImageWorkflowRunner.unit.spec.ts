@@ -201,42 +201,6 @@ describe('pendingImageWorkflowRunner', () => {
     expect(onWarning).not.toHaveBeenCalled()
   })
 
-  it('keeps multi-output execution outcomes isolated', async () => {
-    const pendingResults = createPendingResults(
-      async (params) => {
-        await Promise.all(params.resultNodeIds.map((nodeId) => params.submitTask(nodeId)))
-        return makeRunSummary({
-          resultNodeIds: ['image-2', 'image-3'],
-          totalCount: 2,
-          successCount: 1,
-          failureCount: 1,
-          outcomes: [
-            { resultNodeId: 'image-2', status: 'succeeded', taskId: 'task-image-2' },
-            { resultNodeId: 'image-3', status: 'failed', taskId: 'task-image-3' },
-          ],
-        })
-      },
-      ['image-2', 'image-3'],
-    )
-    const { attachment, executionRuntime, runner } = createRunner(pendingResults)
-
-    await runner.run(
-      makeRunParams(attachment, {
-        outputCount: 2,
-        submitTask: vi.fn(async (resultNodeId: string) => ({ taskId: `task-${resultNodeId}` })),
-      }),
-    )
-
-    expect(executionRuntime.getNodeState('image-2')).toEqual({
-      status: 'succeeded',
-      taskId: 'task-image-2',
-    })
-    expect(executionRuntime.getNodeState('image-3')).toEqual({
-      status: 'failed',
-      taskId: 'task-image-3',
-    })
-  })
-
   it('submits one shared task for all output slots', async () => {
     const submitted: Array<[string, string, number]> = []
     const pendingResults = createPendingResults(
@@ -261,7 +225,6 @@ describe('pendingImageWorkflowRunner', () => {
     await runner.run(
       makeRunParams(attachment, {
         outputCount: 4,
-        submissionMode: 'shared-task',
         submitTask: vi.fn(async (resultNodeId: string, clientActionId: string, resultIndex: number) => {
           submitted.push([resultNodeId, clientActionId, resultIndex])
           return { taskId: 'task-shared' }

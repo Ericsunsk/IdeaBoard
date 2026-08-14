@@ -211,48 +211,10 @@ func TestRiverPayloadCanonicalParamsBecomeProviderRequest(t *testing.T) {
 	}
 }
 
-func TestPrepareProviderExecutionRejectsInvalidPatternGenTaskContract(t *testing.T) {
+func TestPrepareProviderExecutionAllowsPromptGenerationControls(t *testing.T) {
 	raw := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       workflow.FeatureSlugPatternGen,
-		Media: &tasks.MediaInputs{
-			Inputs: []tasks.MediaRef{{URL: "https://img.example/source.png", Role: "input"}},
-		},
-	})
-	_, err := (&ProviderExecutor{}).prepareProviderExecution(
-		context.Background(),
-		&accounts.ApiAccount{
-			Name:    "pattern-gen-provider",
-			ApiKey:  "key",
-			ApiType: workflow.ProviderOpenAICompatible,
-		},
-		&tasks.TaskPayload{
-			TaskID: "task-invalid-pattern-gen",
-			UserID: 42,
-			Prompt: "repeatable textile pattern",
-			Params: raw,
-		},
-		taskqueue.TaskAssignment{},
-	)
-	if err == nil {
-		t.Fatal("expected pattern-gen provider validation error")
-	}
-	stage, category, ok := executionFailureDetails(err)
-	if !ok {
-		t.Fatalf("expected execution failure details, got %T (%v)", err, err)
-	}
-	if stage != tasks.ExecutionStageAssigned || category != tasks.FailureCategoryInputInvalid {
-		t.Fatalf("details=%s/%s, want %s/%s", stage, category, tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid)
-	}
-	if !strings.Contains(err.Error(), "图案生成不需要输入图片，请移除图片输入后重试") {
-		t.Fatalf("error=%q, want actionable pattern-gen media message", err.Error())
-	}
-}
-
-func TestPrepareProviderExecutionAllowsPatternGenControls(t *testing.T) {
-	raw := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
-		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       workflow.FeatureSlugPatternGen,
+		Feature:       workflow.FeatureSlugPromptGeneration,
 		Controls: &tasks.GenerationControls{
 			Ratio:       "4:3",
 			OutputCount: 2,
@@ -261,7 +223,7 @@ func TestPrepareProviderExecutionAllowsPatternGenControls(t *testing.T) {
 	exec, err := (&ProviderExecutor{}).prepareProviderExecution(
 		context.Background(),
 		&accounts.ApiAccount{
-			Name:    "pattern-gen-provider",
+			Name:    "prompt-generation-provider",
 			ApiKey:  "key",
 			ApiType: workflow.ProviderOpenAICompatible,
 			Models: []accounts.AccountModel{
@@ -269,7 +231,7 @@ func TestPrepareProviderExecutionAllowsPatternGenControls(t *testing.T) {
 			},
 		},
 		&tasks.TaskPayload{
-			TaskID: "task-pattern-gen-provider-hints",
+			TaskID: "task-prompt-generation-provider-hints",
 			UserID: 42,
 			Prompt: "repeatable textile pattern",
 			Params: raw,
@@ -282,8 +244,8 @@ func TestPrepareProviderExecutionAllowsPatternGenControls(t *testing.T) {
 	if exec.Request.OutputCount != 2 {
 		t.Fatalf("output_count = %d, want 2", exec.Request.OutputCount)
 	}
-	if exec.FeatureSlug != workflow.FeatureSlugPatternGen {
-		t.Fatalf("execution feature = %q, want pattern-gen", exec.FeatureSlug)
+	if exec.FeatureSlug != workflow.FeatureSlugPromptGeneration {
+		t.Fatalf("execution feature = %q, want prompt-generation", exec.FeatureSlug)
 	}
 }
 
@@ -292,7 +254,7 @@ func TestProviderTaskParamsPreferCanonicalFeature(t *testing.T) {
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
 		Feature:       "style-fusion",
 		Extra: map[string]interface{}{
-			"feature": "partial-edit",
+			"feature": "local-inpaint",
 		},
 	})
 

@@ -35,7 +35,7 @@ func TestFeaturePromptSaveUpdatesSingleCurrentRow(t *testing.T) {
 
 func TestFeaturePromptRuntimeAllowsMissingPrompt(t *testing.T) {
 	repository := NewFeaturePromptRepository(testdb.Open(t))
-	config, err := repository.GetRuntimeConfig(context.Background(), workflow.FeatureSlugPatternGen)
+	config, err := repository.GetRuntimeConfig(context.Background(), workflow.FeatureSlugPromptGeneration)
 	if err != nil {
 		t.Fatalf("GetRuntimeConfig: %v", err)
 	}

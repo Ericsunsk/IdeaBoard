@@ -60,11 +60,6 @@ func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 
 func TestCanonicalFeatureRegistryMatchesProductionRouting(t *testing.T) {
 	canonical := CanonicalFeatureSlugs()
-	for _, removedSlug := range []string{FeatureSlugPartialEdit, FeatureSlugPatternGen} {
-		if slices.Contains(canonical, removedSlug) {
-			t.Fatalf("legacy production feature %q must not enter the canonical registry", removedSlug)
-		}
-	}
 	for _, slug := range canonical {
 		t.Run(slug, func(t *testing.T) {
 			if _, ok := ParseWorkflowFeatureSlug(slug); !ok {

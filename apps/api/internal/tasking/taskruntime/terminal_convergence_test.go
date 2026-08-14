@@ -519,7 +519,7 @@ func newBilledCompletionConvergenceFixture(
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
 	taskBilling := taskbilling.NewService(billingService, creditService)
-	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen, 1)
+	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPromptGeneration, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -532,7 +532,7 @@ func newBilledCompletionConvergenceFixture(
 			SKU:         sku,
 			Namespace:   "ai-image",
 			ProductKind: "workflow-feature",
-			DisplayName: workflow.FeatureSlugPatternGen,
+			DisplayName: workflow.FeatureSlugPromptGeneration,
 		},
 		UnitCredits: 25,
 		ActorID:     1,
@@ -577,7 +577,7 @@ func newBilledCompletionConvergenceFixture(
 	task := &tasks.Task{
 		TaskID:                     taskID,
 		UserID:                     userID,
-		FeatureSlug:                workflow.FeatureSlugPatternGen,
+		FeatureSlug:                workflow.FeatureSlugPromptGeneration,
 		AssignedProviderEndpointID: tasks.IDPtr(taskRuntimeProviderEndpointID(accountID)),
 		AccountID:                  tasks.IDPtr(accountID),
 		Status:                     tasks.StatusRunning,

@@ -99,7 +99,7 @@ describe('AdminBillingPricingPage', () => {
       ),
       http.post('/api/admin/billing/catalog/:sku/prices', async ({ request, params }) => {
         publishRequests += 1
-        expect(params.sku).toBe('ai-image:partial-edit')
+        expect(params.sku).toBe('ai-image:local-inpaint')
         await expect(request.json()).resolves.toEqual({ unit_credits: 0 })
         return HttpResponse.json({
           code: 0,
@@ -325,7 +325,7 @@ function makeCatalogItems() {
   }
   return [
     {
-      sku: 'ai-image:partial-edit',
+      sku: 'ai-image:local-inpaint',
       namespace: 'ai-image',
       product_kind: 'workflow-feature',
       display_name: '局部重绘',

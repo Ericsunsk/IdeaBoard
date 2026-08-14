@@ -43,7 +43,7 @@ func TestApplyFeatureSystemPromptNonStyleVariationStillAppendsBasePrompt(t *test
 	got := ApplyFeatureSystemPrompt(
 		"user prompt",
 		"user prompt",
-		"pattern-gen",
+		"prompt-generation",
 		nil,
 		func(string) (string, error) {
 			return "SYS", nil

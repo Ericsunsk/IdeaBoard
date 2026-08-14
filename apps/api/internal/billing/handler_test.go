@@ -128,7 +128,7 @@ func TestAdminBillableCatalogReturnsFeatureCardContract(t *testing.T) {
 	catalog := &billableCatalogReaderStub{items: []BillableItemCatalogCard{
 		{
 			BillableItemDefinition: BillableItemDefinition{
-				SKU: "ai-image:partial-edit", Namespace: "ai-image", ProductKind: "workflow-feature",
+				SKU: "ai-image:local-inpaint", Namespace: "ai-image", ProductKind: "workflow-feature",
 				DisplayName: "局部重绘", Description: "仅重绘图片选定区域。", SortOrder: 10,
 			},
 			Status: BillableItemStatusUnpriced,
@@ -168,7 +168,7 @@ func TestAdminBillableCatalogReturnsFeatureCardContract(t *testing.T) {
 
 	body := response.Body.String()
 	if response.Code != http.StatusOK ||
-		!strings.Contains(body, `"sku":"ai-image:partial-edit"`) ||
+		!strings.Contains(body, `"sku":"ai-image:local-inpaint"`) ||
 		!strings.Contains(body, `"product_kind":"workflow-feature"`) ||
 		!strings.Contains(body, `"display_name":"局部重绘"`) ||
 		!strings.Contains(body, `"status":"unpriced"`) ||
@@ -221,16 +221,16 @@ func TestAdminPublishPriceUsesAuthenticatedActorWithoutReason(t *testing.T) {
 	router.POST("/catalog/:sku/prices", handler.PublishPrice)
 
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/catalog/ai-image:partial-edit/prices", strings.NewReader(`{"unit_credits":0}`))
+	request := httptest.NewRequest(http.MethodPost, "/catalog/ai-image:local-inpaint/prices", strings.NewReader(`{"unit_credits":0}`))
 	request.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(recorder, request)
 
-	if recorder.Code != http.StatusOK || catalog.publishSKU != "ai-image:partial-edit" || catalog.publishCredits != 0 || catalog.publishActorID != 9 {
+	if recorder.Code != http.StatusOK || catalog.publishSKU != "ai-image:local-inpaint" || catalog.publishCredits != 0 || catalog.publishActorID != 9 {
 		t.Fatalf("status=%d body=%s publish=%+v", recorder.Code, recorder.Body.String(), catalog)
 	}
 
 	missingRecorder := httptest.NewRecorder()
-	missingRequest := httptest.NewRequest(http.MethodPost, "/catalog/ai-image:partial-edit/prices", strings.NewReader(`{}`))
+	missingRequest := httptest.NewRequest(http.MethodPost, "/catalog/ai-image:local-inpaint/prices", strings.NewReader(`{}`))
 	missingRequest.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(missingRecorder, missingRequest)
 	if missingRecorder.Code != http.StatusBadRequest {
@@ -250,16 +250,16 @@ func TestAdminSetAvailabilityUsesAuthenticatedActorWithoutReason(t *testing.T) {
 	router.PUT("/catalog/:sku/availability", handler.SetAvailability)
 
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPut, "/catalog/ai-image:partial-edit/availability", strings.NewReader(`{"enabled":false}`))
+	request := httptest.NewRequest(http.MethodPut, "/catalog/ai-image:local-inpaint/availability", strings.NewReader(`{"enabled":false}`))
 	request.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(recorder, request)
 
-	if recorder.Code != http.StatusOK || catalog.availabilitySKU != "ai-image:partial-edit" || catalog.availabilityEnabled || catalog.availabilityActorID != 9 || !strings.Contains(recorder.Body.String(), `"status":"disabled"`) {
+	if recorder.Code != http.StatusOK || catalog.availabilitySKU != "ai-image:local-inpaint" || catalog.availabilityEnabled || catalog.availabilityActorID != 9 || !strings.Contains(recorder.Body.String(), `"status":"disabled"`) {
 		t.Fatalf("status=%d body=%s availability=%+v", recorder.Code, recorder.Body.String(), catalog)
 	}
 
 	missingRecorder := httptest.NewRecorder()
-	missingRequest := httptest.NewRequest(http.MethodPut, "/catalog/ai-image:partial-edit/availability", strings.NewReader(`{}`))
+	missingRequest := httptest.NewRequest(http.MethodPut, "/catalog/ai-image:local-inpaint/availability", strings.NewReader(`{}`))
 	missingRequest.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(missingRecorder, missingRequest)
 	if missingRecorder.Code != http.StatusBadRequest {

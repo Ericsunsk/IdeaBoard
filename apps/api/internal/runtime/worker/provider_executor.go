@@ -39,8 +39,7 @@ const (
 )
 
 const (
-	parsedOutputStatusValid   = "valid"
-	parsedOutputStatusInvalid = "invalid"
+	parsedOutputStatusValid = "valid"
 )
 
 func readLimitedBody(body io.Reader) ([]byte, error) {
@@ -241,19 +240,9 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 	callResult, err := c.callProviderBatchWithRequest(ctx, account, exec)
 	providerFinishedAt := time.Now()
 	output.Timeline.ProviderFinishedAt = &providerFinishedAt
-	featureSlug := exec.FeatureSlug
-
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return output, err
-		}
-		if featureSlug == workflow.FeatureSlugPatternGen && isProviderOutputParseError(err) {
-			output.Result = buildProviderParseFailureResult(task, account, exec, callResult, nil, err)
-			return output, newExecutionFailureError(
-				tasks.ExecutionStageProvider,
-				tasks.FailureCategoryProviderError,
-				err,
-			)
 		}
 		return output, newExecutionFailureError(
 			tasks.ExecutionStageProvider,
@@ -262,16 +251,7 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 		)
 	}
 	imageURLs := normalizeProviderResultImageURLs(callResult)
-	if featureSlug == workflow.FeatureSlugPatternGen {
-		if err := validateProviderParsedOutput(featureSlug, resolvedProviderParsedOutputKind(callResult), imageURLs); err != nil {
-			output.Result = buildProviderParseFailureResult(task, account, exec, callResult, imageURLs, err)
-			return output, newExecutionFailureError(
-				tasks.ExecutionStageProvider,
-				tasks.FailureCategoryProviderError,
-				err,
-			)
-		}
-	} else if len(imageURLs) == 0 {
+	if len(imageURLs) == 0 {
 		return output, newExecutionFailureError(
 			tasks.ExecutionStageProvider,
 			tasks.FailureCategoryProviderError,
@@ -333,7 +313,7 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 	finalizeFinishedAt := time.Now()
 	output.Timeline.FinalizeFinishedAt = &finalizeFinishedAt
 
-	result := baseProviderTaskResult(task, account, exec, callResult, imageURLs, parsedOutputStatusValid, featureSlug == workflow.FeatureSlugPatternGen)
+	result := baseProviderTaskResult(task, account, exec, callResult, imageURLs, parsedOutputStatusValid)
 	result["status"] = tasks.ResultStatusSuccess
 	result["image_url"] = imageURL
 	result["image_urls"] = imageURLs
@@ -350,7 +330,7 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 	return output, nil
 }
 
-func baseProviderTaskResult(task *tasks.TaskPayload, account *accounts.ApiAccount, exec providerExecutionConfig, callResult providerCallResult, imageURLs []string, parsedStatus string, includeOutputFacts bool) map[string]interface{} {
+func baseProviderTaskResult(task *tasks.TaskPayload, account *accounts.ApiAccount, exec providerExecutionConfig, callResult providerCallResult, imageURLs []string, parsedStatus string) map[string]interface{} {
 	result := map[string]interface{}{
 		"task_id":                task.TaskID,
 		"correlation_id":         task.EffectiveCorrelationID(),
@@ -358,9 +338,6 @@ func baseProviderTaskResult(task *tasks.TaskPayload, account *accounts.ApiAccoun
 		"provider_endpoint_id":   account.ProviderEndpointID,
 		"provider_endpoint_name": exec.ProviderEndpointName,
 		"api_type":               exec.APIType,
-	}
-	if !includeOutputFacts {
-		return result
 	}
 	result["parsed_output_status"] = parsedStatus
 	result["parsed_output"] = map[string]interface{}{
@@ -371,49 +348,6 @@ func baseProviderTaskResult(task *tasks.TaskPayload, account *accounts.ApiAccoun
 		result["raw_provider_output_preview"] = strings.TrimSpace(callResult.RawOutputPreview)
 	}
 	return result
-}
-
-func buildProviderParseFailureResult(task *tasks.TaskPayload, account *accounts.ApiAccount, exec providerExecutionConfig, callResult providerCallResult, imageURLs []string, parseErr error) string {
-	result := baseProviderTaskResult(task, account, exec, callResult, imageURLs, parsedOutputStatusInvalid, true)
-	result["status"] = tasks.StatusFailed
-	result["error"] = parseErr.Error()
-	result["failure_stage"] = tasks.ExecutionStageProvider
-	result["failure_category"] = tasks.FailureCategoryProviderError
-	if strings.TrimSpace(callResult.Model) != "" {
-		result["model"] = strings.TrimSpace(callResult.Model)
-	}
-	resultJSON, err := marshalProviderTaskResult(task.TaskID, result)
-	if err != nil {
-		return formatProviderParseFallbackResult(task.TaskID, task.EffectiveCorrelationID(), parseErr)
-	}
-	return resultJSON
-}
-
-func formatProviderParseFallbackResult(taskID string, correlationID string, parseErr error) string {
-	result := map[string]string{
-		"task_id":              taskID,
-		"correlation_id":       correlationID,
-		"status":               tasks.StatusFailed,
-		"parsed_output_status": parsedOutputStatusInvalid,
-		"failure_stage":        tasks.ExecutionStageProvider,
-		"failure_category":     tasks.FailureCategoryProviderError,
-		"error":                parseErr.Error(),
-	}
-	resultJSON, err := json.Marshal(result)
-	if err != nil {
-		return fmt.Sprintf(`{"task_id":"%s","status":"failed","parsed_output_status":"invalid","error":"provider output parse failed"}`, taskID)
-	}
-	return string(resultJSON)
-}
-
-func validateProviderParsedOutput(featureSlug string, outputKind string, imageURLs []string) error {
-	if featureSlug == workflow.FeatureSlugPatternGen {
-		return workflow.ValidatePatternGenOutputContract(outputKind, imageURLs)
-	}
-	if len(imageURLs) == 0 {
-		return fmt.Errorf("API 未返回图片")
-	}
-	return nil
 }
 
 func resolvedProviderParsedOutputKind(callResult providerCallResult) string {
@@ -451,15 +385,6 @@ func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account
 	}
 
 	taskParams := c.parseAndNormalizeTaskParams(ctx, task)
-	if taskParams.featureSlug() == workflow.FeatureSlugPatternGen {
-		if err := workflow.ValidatePatternGenTaskContract(task.Prompt, taskParams.Canonical); err != nil {
-			return providerExecutionConfig{}, newExecutionFailureError(
-				tasks.ExecutionStageAssigned,
-				tasks.FailureCategoryInputInvalid,
-				err,
-			)
-		}
-	}
 	apiType, ok := workflow.ValidateProviderAPIType(account.ApiType, account.ProxyURL)
 	if !ok {
 		return providerExecutionConfig{}, newExecutionFailureError(

@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -72,7 +71,7 @@ func TestMaterializeProviderResultImagesUsesResultMaterializer(t *testing.T) {
 	}
 }
 
-func TestCallDrawingAPIPatternGenStoresParsedOutputEnvelope(t *testing.T) {
+func TestCallDrawingAPIStoresParsedOutputEnvelope(t *testing.T) {
 	rawImagePayload := base64.StdEncoding.EncodeToString(buildTinyPNGBytes(t))
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -83,11 +82,11 @@ func TestCallDrawingAPIPatternGenStoresParsedOutputEnvelope(t *testing.T) {
 	materializer := &captureResultMaterializer{
 		remoteResult: taskmedia.MaterializedResults{
 			Items: []taskmedia.MaterializedResult{{
-				ImageURL: "/uploads/tasks/42/task-pattern/result.png",
+				ImageURL: "/uploads/tasks/42/task-prompt/result.png",
 				Output: tasks.TaskOutput{
-					TaskID: "task-pattern",
+					TaskID: "task-prompt",
 					Role:   "image",
-					URL:    "/uploads/tasks/42/task-pattern/result.png",
+					URL:    "/uploads/tasks/42/task-prompt/result.png",
 				},
 			}},
 		},
@@ -95,17 +94,17 @@ func TestCallDrawingAPIPatternGenStoresParsedOutputEnvelope(t *testing.T) {
 	executor := &ProviderExecutor{resultMaterializer: materializer}
 	account := &accounts.ApiAccount{
 		ID:       7,
-		Name:     "pattern-openai",
+		Name:     "prompt-openai",
 		ApiType:  "openai-compatible",
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	task := &tasks.TaskPayload{
-		TaskID: "task-pattern",
+		TaskID: "task-prompt",
 		UserID: 42,
 		Prompt: "repeatable textile pattern",
-		Params: `{"feature":"pattern-gen"}`,
+		Params: `{"feature":"prompt-generation"}`,
 	}
 
 	output, err := executor.callDrawingAPIForTest(context.Background(), account, task, "gpt-image-1")
@@ -129,7 +128,7 @@ func TestCallDrawingAPIPatternGenStoresParsedOutputEnvelope(t *testing.T) {
 	if result["parsed_output_status"] != parsedOutputStatusValid {
 		t.Fatalf("parsed_output_status = %#v, want valid", result["parsed_output_status"])
 	}
-	if result["image_url"] != "/uploads/tasks/42/task-pattern/result.png" {
+	if result["image_url"] != "/uploads/tasks/42/task-prompt/result.png" {
 		t.Fatalf("image_url = %#v", result["image_url"])
 	}
 	rawPreview, _ := result["raw_provider_output_preview"].(string)
@@ -141,72 +140,6 @@ func TestCallDrawingAPIPatternGenStoresParsedOutputEnvelope(t *testing.T) {
 	}
 	if !strings.Contains(rawPreview, "[redacted:") {
 		t.Fatalf("raw preview should describe redaction, got %s", rawPreview)
-	}
-}
-
-func TestCallDrawingAPIPatternGenMalformedOutputFailsWithResultEnvelope(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":[]}`))
-	}))
-	defer server.Close()
-
-	materializer := &captureResultMaterializer{}
-	executor := &ProviderExecutor{resultMaterializer: materializer}
-	account := &accounts.ApiAccount{
-		ID:       8,
-		Name:     "pattern-openai",
-		ApiType:  "openai-compatible",
-		ProxyURL: server.URL,
-		ApiKey:   "test-key",
-		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
-	}
-	task := &tasks.TaskPayload{
-		TaskID: "task-pattern-bad",
-		UserID: 42,
-		Prompt: "repeatable textile pattern",
-		Params: `{"feature":"pattern-gen"}`,
-	}
-
-	output, err := executor.callDrawingAPIForTest(context.Background(), account, task, "gpt-image-1")
-	if err == nil {
-		t.Fatal("expected malformed provider output to fail")
-	}
-	stage, category, ok := executionFailureDetails(err)
-	if !ok {
-		t.Fatalf("expected execution failure details, got %T (%v)", err, err)
-	}
-	if stage != tasks.ExecutionStageProvider || category != tasks.FailureCategoryProviderError {
-		t.Fatalf("details=%s/%s, want %s/%s", stage, category, tasks.ExecutionStageProvider, tasks.FailureCategoryProviderError)
-	}
-	if len(output.Outputs) != 0 {
-		t.Fatalf("outputs len = %d, want 0", len(output.Outputs))
-	}
-	if materializer.remoteTaskID != "" {
-		t.Fatalf("materializer should not be called, got task %q", materializer.remoteTaskID)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal([]byte(output.Result), &result); err != nil {
-		t.Fatalf("unmarshal failure result: %v", err)
-	}
-	if result["status"] != tasks.StatusFailed {
-		t.Fatalf("status = %#v, want failed", result["status"])
-	}
-	if result["parsed_output_status"] != parsedOutputStatusInvalid {
-		t.Fatalf("parsed_output_status = %#v, want invalid", result["parsed_output_status"])
-	}
-	if result["failure_stage"] != tasks.ExecutionStageProvider {
-		t.Fatalf("failure_stage = %#v", result["failure_stage"])
-	}
-	if result["failure_category"] != tasks.FailureCategoryProviderError {
-		t.Fatalf("failure_category = %#v", result["failure_category"])
-	}
-	if !strings.Contains(fmt.Sprint(result["error"]), "API 未返回图片") {
-		t.Fatalf("error = %#v, want provider parse reason", result["error"])
-	}
-	if result["raw_provider_output_preview"] != `{"data":[]}` {
-		t.Fatalf("raw preview = %#v", result["raw_provider_output_preview"])
 	}
 }
 

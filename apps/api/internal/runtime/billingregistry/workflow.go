@@ -22,7 +22,6 @@ var workflowPresentations = map[string]workflowPresentation{
 	workflow.FeatureSlugStyleVariation:   {displayName: "风格延展", description: "基于图片生成同风格变体。"},
 	workflow.FeatureSlugRemoveBg:         {displayName: "抠图", description: "识别主体并移除图片背景。"},
 	workflow.FeatureSlugStyleFusion:      {displayName: "多图融合", description: "融合多张参考图的内容与风格。"},
-	workflow.FeatureSlugPatternGen:       {displayName: "图案生成", description: "生成可用于设计的图案素材。"},
 	workflow.FeatureSlugHDUpscale:        {displayName: "HD", description: "提升图片分辨率与细节。"},
 	workflow.FeatureSlugImageExtend:      {displayName: "扩图", description: "向指定方向扩展图片画面。"},
 }

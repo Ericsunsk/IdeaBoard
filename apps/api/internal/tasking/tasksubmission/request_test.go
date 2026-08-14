@@ -13,7 +13,7 @@ func TestNewCanonicalRequestRejectsMismatchedBillingProduct(t *testing.T) {
 		Feature:        "style-variation",
 		ClientActionID: "action-1",
 		BillingRequest: &taskbilling.Request{
-			Feature:  "pattern-gen",
+			Feature:  "prompt-generation",
 			Quantity: 1,
 		},
 	})
@@ -67,7 +67,7 @@ func TestCanonicalRequestOwnsBillingFacts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	inputBilling.Feature = "pattern-gen"
+	inputBilling.Feature = "prompt-generation"
 	inputBilling.Quantity = 9
 	billingRequest := request.BillingRequest()
 	if billingRequest == nil || billingRequest.Feature != "style-variation" || billingRequest.Quantity != 1 {

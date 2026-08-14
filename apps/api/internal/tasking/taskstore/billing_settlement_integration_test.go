@@ -505,7 +505,7 @@ func TestAccountStopAndArchiveReleaseBilledHoldsAtomically(t *testing.T) {
 }
 
 func newBillingSettlementFixture(t *testing.T, db *sql.DB, pool *pgxpool.Pool, userID, grant, unit int64) (*Repository, *taskbilling.Service, taskbilling.Request) {
-	return newBillingSettlementFixtureForFeature(t, db, pool, workflow.FeatureSlugPatternGen, userID, grant, unit)
+	return newBillingSettlementFixtureForFeature(t, db, pool, workflow.FeatureSlugPromptGeneration, userID, grant, unit)
 }
 
 func newBillingSettlementFixtureForFeature(t *testing.T, db *sql.DB, pool *pgxpool.Pool, feature string, userID, grant, unit int64) (*Repository, *taskbilling.Service, taskbilling.Request) {

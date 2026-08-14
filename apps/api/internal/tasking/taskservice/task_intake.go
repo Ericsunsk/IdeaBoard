@@ -121,11 +121,6 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 			return CanonicalTaskRequest{}, err
 		}
 	}
-	if featureSlug == workflow.FeatureSlugPatternGen {
-		if err := workflow.ValidatePatternGenSubmitContract(req.Prompt, params); err != nil {
-			return CanonicalTaskRequest{}, err
-		}
-	}
 	if featureSlug == workflow.FeatureSlugStyleFusion {
 		if err := normalizeStyleFusionParams(params); err != nil {
 			return CanonicalTaskRequest{}, err

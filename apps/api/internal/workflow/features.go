@@ -18,10 +18,8 @@ const (
 
 	FeatureSlugSketchToImage  = "sketch-to-image"
 	FeatureSlugStyleVariation = "style-variation"
-	FeatureSlugPartialEdit    = "partial-edit"
 	FeatureSlugRemoveBg       = "remove-bg"
 	FeatureSlugStyleFusion    = "style-fusion"
-	FeatureSlugPatternGen     = "pattern-gen"
 	FeatureSlugHDUpscale      = "hd-upscale"
 	FeatureSlugImageExtend    = "image-extend"
 )
@@ -84,8 +82,8 @@ func SupportedFeatureSlugs() []string {
 	return slugs
 }
 
-// CanonicalFeatureSlugs is the clean target registry. Legacy production-only
-// features stay outside it while their vertical migrations remove them.
+// CanonicalFeatureSlugs is the executable workflow registry used by routing
+// and Billing. There is no legacy feature alias layer.
 func CanonicalFeatureSlugs() []string {
 	slugs := make([]string, len(canonicalWorkflowFeatureSlugs))
 	copy(slugs, canonicalWorkflowFeatureSlugs)

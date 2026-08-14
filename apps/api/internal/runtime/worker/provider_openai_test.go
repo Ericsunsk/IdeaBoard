@@ -286,7 +286,7 @@ func TestCallOpenAIRetainsGenerationEndpointForStandardRequests(t *testing.T) {
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	params := map[string]interface{}{
-		"feature": "pattern-gen",
+		"feature": "prompt-generation",
 	}
 
 	gotResult, err := c.callOpenAIForTest(context.Background(), account, "pattern prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1")
@@ -329,7 +329,7 @@ func TestCallOpenAIRequestsOutputCountAndReturnsMultipleImages(t *testing.T) {
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	params := map[string]interface{}{
-		"feature":      "pattern-gen",
+		"feature":      "prompt-generation",
 		"output_count": 2,
 	}
 
@@ -719,7 +719,7 @@ func TestCallOpenAIUsesAssignedModelWhenAccountHasMultipleModels(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected assigned account model to resolve")
 	}
-	if _, err := c.callOpenAIForTest(context.Background(), account, "prompt", 1024, 1024, 2*time.Second, map[string]interface{}{"feature": "pattern-gen"}, resolved.Name); err != nil {
+	if _, err := c.callOpenAIForTest(context.Background(), account, "prompt", 1024, 1024, 2*time.Second, map[string]interface{}{"feature": "prompt-generation"}, resolved.Name); err != nil {
 		t.Fatalf("callOpenAI returned error: %v", err)
 	}
 	if gotBody["model"] != "gpt-image-2" {
@@ -748,7 +748,7 @@ func TestCallDrawingAPIResultIncludesResolvedModel(t *testing.T) {
 		TaskID: "task-model-field",
 		UserID: 42,
 		Prompt: "prompt",
-		Params: `{"feature":"pattern-gen"}`,
+		Params: `{"feature":"prompt-generation"}`,
 	}
 	output, err := c.callDrawingAPIForTest(context.Background(), account, task, "gpt-image-1")
 	if err != nil {
@@ -795,7 +795,7 @@ func TestCallDrawingAPIUsesAssignmentResolvedModel(t *testing.T) {
 		TaskID: "task-assignment-model",
 		UserID: 42,
 		Prompt: "prompt",
-		Params: `{"feature":"pattern-gen"}`,
+		Params: `{"feature":"prompt-generation"}`,
 	}
 	output, err := c.callDrawingAPIWithAssignment(context.Background(), account, task, taskqueue.TaskAssignment{ResolvedModel: "imagen-4"})
 	if err != nil {

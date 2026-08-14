@@ -378,7 +378,7 @@ func TestCallDrawingAPIRoutesGooglePlatformToNativeProvider(t *testing.T) {
 		TaskID: "task-google-native",
 		UserID: 42,
 		Prompt: "draw a cat",
-		Params: `{"feature":"pattern-gen"}`,
+		Params: `{"feature":"prompt-generation"}`,
 	}
 
 	output, err := c.callDrawingAPIForTest(context.Background(), account, task, "gemini-2.5-flash-image")
@@ -427,7 +427,7 @@ func TestCallDrawingAPIRoutesGoogleCloudToNativeProvider(t *testing.T) {
 		TaskID: "task-google-cloud",
 		UserID: 42,
 		Prompt: "draw a poster",
-		Params: `{"feature":"pattern-gen"}`,
+		Params: `{"feature":"prompt-generation"}`,
 	}
 
 	output, err := c.callDrawingAPIForTest(context.Background(), account, task, "gemini-3.1-flash-image")

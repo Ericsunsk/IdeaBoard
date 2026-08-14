@@ -134,7 +134,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       resultOptions: plan.resultOptions,
       attachment,
       outputCount: plan.outputCount,
-      submissionMode: 'shared-task',
       assertReady: taskSubmission.assertReady,
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
       resolveResult: createIndexedTaskResultResolver(() => plan.source.ratio),
@@ -157,7 +156,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       sourceNodeId: plan.sourceNodeId,
       attachment,
       outputCount: plan.outputCount,
-      submissionMode: 'shared-task',
       resultOptions: plan.resultOptions,
       assertReady: taskSubmission.assertReady,
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
@@ -185,7 +183,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       sourceNodeId: plan.sourceNodeId,
       attachment,
       outputCount: plan.outputCount,
-      submissionMode: 'shared-task',
       resultOptions: plan.resultOptions,
       preflight: readinessSubmission.assertReady,
       prepare: async () => {
@@ -215,7 +212,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       sourceNodeId: plan.sourceNodeId,
       attachment,
       outputCount: plan.outputCount,
-      submissionMode: 'shared-task',
       resultOptions: plan.resultOptions,
       assertReady: taskSubmission.assertReady,
       submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
@@ -247,7 +243,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       sourceNodeId: plan.sourceNodeId,
       attachment,
       outputCount: plan.outputCount,
-      submissionMode: 'shared-task',
       prepare: async () => {
         const imageSizes = await Promise.all(
           plan.inputImages.map((input) => loadImageSizeFromUrl(input.url)),

@@ -253,7 +253,7 @@ func TestLoadAdminBillingSnapshotsResolvesFeatureExistenceFromCurrentRegistry(t 
 	service := NewService(ServiceDeps{
 		AdminBillingHistory: adminBillingHistoryStub{snapshots: map[string]tasks.AdminBillingSnapshot{
 			"task-existing": {
-				SKU: "ai-image:partial-edit", DisplayName: "局部重绘", PriceVersionID: 10,
+				SKU: "ai-image:local-inpaint", DisplayName: "局部重绘", PriceVersionID: 10,
 				PriceVersion: 2, UnitCredits: 4, Quantity: 1, TotalCredits: 4, QuotedAt: quotedAt,
 			},
 			"task-deleted": {
@@ -261,7 +261,7 @@ func TestLoadAdminBillingSnapshotsResolvesFeatureExistenceFromCurrentRegistry(t 
 				PriceVersion: 1, UnitCredits: 2, Quantity: 2, TotalCredits: 4, QuotedAt: quotedAt,
 			},
 		}},
-		BillableItems: billableItemLookupStub{"ai-image:partial-edit": true},
+		BillableItems: billableItemLookupStub{"ai-image:local-inpaint": true},
 	}, ServiceOptions{})
 	snapshots, err := service.loadAdminBillingSnapshots(t.Context(), []string{"task-existing", "task-deleted"})
 	if err != nil {

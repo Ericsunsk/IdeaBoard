@@ -182,7 +182,6 @@ export function useCanvasExecutionWorkspace(
       sourceNodeId: plan.sourceNodeId,
       attachment,
       outputCount: plan.outputCount,
-      submissionMode: 'shared-task',
       resultOptions: plan.resultOptions,
       preflight: async () => {
         buildTaskRequest()

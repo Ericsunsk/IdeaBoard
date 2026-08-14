@@ -32,7 +32,6 @@ export type PendingImageWorkflowBatchParams = {
   sourceNodeId: string
   attachment: CanvasExecutionAttachment
   outputCount: number
-  submissionMode?: 'per-result' | 'shared-task'
   resultOptions?: PendingImageResultOptions
   preflight?: () => Promise<void>
   assertReady?: () => Promise<void>
@@ -137,7 +136,6 @@ export function createPendingImageWorkflowRunner(
   async function run(params: PendingImageWorkflowBatchParams): Promise<void> {
     let resultNodeIds: string[] = []
     const leasesByResultNodeId = new Map<string, CanvasExecutionLease>()
-    const clientActionIdsByResultNodeId = new Map<string, string>()
     const createClientActionId = options.createClientActionId ?? createCanvasTaskClientActionId
     const isCurrent = () => options.executionRuntime.isAttachmentCurrent(params.attachment)
     const isResultExecutionCurrent = (resultNodeId: string, taskId?: string) => {
@@ -173,35 +171,6 @@ export function createPendingImageWorkflowRunner(
           taskId: current.taskId,
         })
       })
-    }
-
-    async function submitWithTransportRetry(resultNodeId: string, resultIndex: number) {
-      if (!isCurrent()) throw new TaskCancelledError('Canvas execution is no longer attached')
-      const clientActionId =
-        clientActionIdsByResultNodeId.get(resultNodeId) ?? createClientActionId()
-      clientActionIdsByResultNodeId.set(resultNodeId, clientActionId)
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        if (!isCurrent()) throw new TaskCancelledError('Canvas execution is no longer attached')
-        try {
-          const submission = await params.submitTask(resultNodeId, clientActionId, resultIndex)
-          const lease = leasesByResultNodeId.get(resultNodeId)
-          const didAttachTask =
-            !!lease &&
-            options.executionRuntime.transitionNode(lease, {
-              status: 'running',
-              taskId: submission.taskId,
-            })
-          if (!didAttachTask) {
-            options.cancelTasks([submission.taskId])
-            throw new TaskCancelledError('Canvas execution is no longer attached')
-          }
-          return submission
-        } catch (error) {
-          if (attempt === 0 && isCanvasBillingPreflightError(error, 'network')) continue
-          throw error
-        }
-      }
-      throw new Error('网络错误，请重试')
     }
 
     async function submitSharedTaskWithTransportRetry(resultNodeIds: readonly string[]) {
@@ -257,20 +226,14 @@ export function createPendingImageWorkflowRunner(
         }
         leasesByResultNodeId.set(resultNodeId, lease)
       }
-      const sharedSubmissionPromise =
-        params.submissionMode === 'shared-task'
-          ? submitSharedTaskWithTransportRetry(resultNodeIds)
-          : null
+      const sharedSubmissionPromise = submitSharedTaskWithTransportRetry(resultNodeIds)
       const resultIndexByNodeId = new Map(
         resultNodeIds.map((resultNodeId, resultIndex) => [resultNodeId, resultIndex]),
       )
       let hasCurrentOutcome = false
       const summary = await options.pendingResults.runReservedPendingResults({
         resultNodeIds,
-        submitTask: (resultNodeId) => {
-          if (sharedSubmissionPromise) return sharedSubmissionPromise
-          return submitWithTransportRetry(resultNodeId, resultIndexByNodeId.get(resultNodeId) ?? -1)
-        },
+        submitTask: () => sharedSubmissionPromise,
         resolveResult: (taskId, resultNodeId) =>
           params.resolveResult(taskId, resultNodeId, resultIndexByNodeId.get(resultNodeId) ?? -1),
         persistPendingTaskIds: params.persistPendingTaskIds,

@@ -157,7 +157,7 @@ func TestRiverFinalFailureSettlementRetrySurvivesRestartWithoutProviderRecall(t 
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
 	taskBilling := taskbilling.NewService(billingService, creditService)
-	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen, 1)
+	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPromptGeneration, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +214,7 @@ func TestRiverFinalFailureSettlementRetrySurvivesRestartWithoutProviderRecall(t 
 		TaskID: taskID, UserID: 42,
 		ClientActionID: "action_" + taskID,
 		Prompt:         "draw a billed pattern", UserPrompt: "draw a billed pattern",
-		Params: `{"feature":"pattern-gen"}`, FeatureSlug: request.Feature,
+		Params: `{"feature":"prompt-generation"}`, FeatureSlug: request.Feature,
 		Status:         tasks.StatusPending,
 		BillingRequest: &tasks.TaskBillingRequest{Feature: request.Feature, Quantity: request.Quantity},
 	}

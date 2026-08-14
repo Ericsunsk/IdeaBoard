@@ -178,7 +178,7 @@ func newDurableUsageBilling(
 ) (*taskbilling.Service, taskbilling.Request) {
 	t.Helper()
 	billingService := billing.NewService(pool)
-	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPatternGen, 1)
+	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPromptGeneration, 1)
 	if err != nil {
 		t.Fatalf("build task billing request: %v", err)
 	}

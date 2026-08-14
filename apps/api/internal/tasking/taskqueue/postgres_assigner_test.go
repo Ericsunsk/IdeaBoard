@@ -262,7 +262,7 @@ func TestPostgresTaskAssignerWritesRuntimeAssignmentSnapshot(t *testing.T) {
 
 	assignment, err := assigner.Assign(ctx, &tasks.TaskPayload{
 		TaskID:     "pending-snapshot",
-		Params:     `{"feature":"pattern-gen","model":"gpt-image-1"}`,
+		Params:     `{"feature":"prompt-generation","model":"gpt-image-1"}`,
 		RiverJobID: 111,
 	})
 	if err != nil {
