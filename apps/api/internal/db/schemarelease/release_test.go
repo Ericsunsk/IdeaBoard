@@ -16,9 +16,30 @@ func TestValidateMigrationChangesAllowsAppendOnlyHistory(t *testing.T) {
 	}
 }
 
+func TestValidateMigrationChangesAllowsAtomicCleanBreakRebaseline(t *testing.T) {
+	changes := strings.Join([]string{
+		"D\tinternal/db/migrations/20260810000000_baseline.sql",
+		"D\tinternal/db/migrations/20260813000000_add_example.sql",
+		"A\tinternal/db/migrations/20260814000000_baseline.sql",
+	}, "\n")
+	if err := validateMigrationChanges(changes); err != nil {
+		t.Fatalf("atomic clean-break rebaseline rejected: %v", err)
+	}
+}
+
+func TestValidateMigrationChangesRejectsNonAdvancingRebaseline(t *testing.T) {
+	changes := strings.Join([]string{
+		"D\tinternal/db/migrations/20260810000000_baseline.sql",
+		"A\tinternal/db/migrations/20260809000000_baseline.sql",
+	}, "\n")
+	if err := validateMigrationChanges(changes); err == nil {
+		t.Fatal("non-advancing rebaseline unexpectedly accepted")
+	}
+}
+
 func TestValidateMigrationChangesRejectsPublishedHistoryMutation(t *testing.T) {
 	for name, change := range map[string]string{
-		"modified": "M\tinternal/db/migrations/20260810000000_baseline.sql\n",
+		"modified": "M\tinternal/db/migrations/20260814000000_baseline.sql\n",
 		"deleted":  "D\tinternal/db/migrations/20260810001000_align_schema_contract.sql\n",
 		"renamed":  "R100\tinternal/db/migrations/old.sql\tinternal/db/migrations/new.sql\n",
 	} {

@@ -7,7 +7,7 @@
 ### Changed
 
 - 数据库改为 domain-first schema fragments，并由 manifest 生成 canonical `schema.sql`。
-- migration history 改为 append-only SHA-256 checksum，并以 `20260810000000_baseline.sql` 作为唯一 clean-break baseline。
+- migration history 改为 append-only SHA-256 checksum，并以 `20260814000000_baseline.sql` 作为唯一 clean-break baseline。
 - 旧数据库不能通过已删除的历史 migrations 自动升级；部署前必须执行 Fresh Database reset 或从兼容备份恢复。
 
 ## v0.1.3 - 2026-08-08

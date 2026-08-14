@@ -63,7 +63,7 @@ func TestEmbeddedMigrationsStartWithCleanBaseline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) == 0 || files[0] != "20260810000000_baseline.sql" {
+	if len(files) == 0 || files[0] != baselineMigrationFile {
 		t.Fatalf("embedded migrations=%v, want clean baseline first", files)
 	}
 	raw, err := migrationFS.ReadFile(files[0])
@@ -91,7 +91,7 @@ func TestEmbeddedMigrationsStartWithCleanBaseline(t *testing.T) {
 }
 
 func TestMigrationChecksumIsStableAndCanonical(t *testing.T) {
-	raw, err := migrationFS.ReadFile("20260810000000_baseline.sql")
+	raw, err := migrationFS.ReadFile(baselineMigrationFile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,85 +112,6 @@ func TestSchemaAssemblySourceIsDeterministic(t *testing.T) {
 	}
 	if len(raw) == 0 || !strings.Contains(string(raw), "CREATE TABLE users") {
 		t.Fatal("schema snapshot is empty or missing identity contract")
-	}
-}
-
-func TestCreditHoldPartialSettlementBackfillsLegacyTerminalStateBeforeDroppingIt(t *testing.T) {
-	raw, err := migrationFS.ReadFile("20260813000003_credit_hold_partial_settlement.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	statements := parseSQLStatements(string(raw))
-	backfillIndex, dropColumnIndex := -1, -1
-	for index, statement := range statements {
-		sql := strings.ToLower(strings.Join(strings.Fields(statement.SQL), " "))
-		if strings.HasPrefix(sql, "update credit_holds set ") {
-			backfillIndex = index
-			for _, fragment := range []string{
-				"captured_amount = case when status = 'captured' then amount else 0 end",
-				"released_amount = case when status = 'released' then amount else 0 end",
-				"capture_transaction_id = case when status = 'captured' then terminal_transaction_id end",
-				"release_transaction_id = case when status = 'released' then terminal_transaction_id end",
-			} {
-				if !strings.Contains(sql, fragment) {
-					t.Fatalf("backfill is missing %q: %s", fragment, statement.SQL)
-				}
-			}
-		}
-		if strings.Contains(sql, "drop column terminal_transaction_id") {
-			dropColumnIndex = index
-		}
-	}
-	if backfillIndex < 0 || dropColumnIndex < 0 {
-		t.Fatalf("migration must backfill legacy terminal state before dropping terminal_transaction_id; backfill=%d drop=%d", backfillIndex, dropColumnIndex)
-	}
-	if backfillIndex >= dropColumnIndex {
-		t.Fatalf("legacy terminal state is dropped before backfill: backfill=%d drop=%d", backfillIndex, dropColumnIndex)
-	}
-}
-
-func TestImageEditWorkflowMigrationUsesCurrentFeaturePromptContract(t *testing.T) {
-	raw, err := migrationFS.ReadFile("20260814000200_image_edit_local_inpaint_workflows.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	sql := strings.ToLower(strings.Join(strings.Fields(string(raw)), " "))
-	for _, removedColumn := range []string{"canonical_model", "user_prompt_merge_policy"} {
-		if strings.Contains(sql, removedColumn) {
-			t.Fatalf("migration references removed feature_prompts column %q", removedColumn)
-		}
-	}
-	for _, currentColumn := range []string{"feature_slug", "prompt", "updated_by", "created_at", "updated_at"} {
-		if !strings.Contains(sql, currentColumn) {
-			t.Fatalf("migration does not preserve feature_prompts column %q", currentColumn)
-		}
-	}
-}
-
-func TestCreditRoutineMigrationsBindRecreatedRoutinesToTrustedSchema(t *testing.T) {
-	tests := map[string][]string{
-		"20260813000003_credit_hold_partial_settlement.sql": {
-			"execute_credit_command_v2(text, bigint, bigint, text, text, text, text, text, text, text, text)",
-			"execute_credit_purchase_refund_v1(bigint, text, text, text, text, text, text, text, text)",
-		},
-		"20260813000004_reconciliation_partial_settlement.sql": {
-			"execute_credit_reconciliation(bigint)",
-		},
-	}
-	for file, signatures := range tests {
-		raw, err := migrationFS.ReadFile(file)
-		if err != nil {
-			t.Fatal(err)
-		}
-		sql := strings.ToLower(strings.Join(strings.Fields(string(raw)), " "))
-		if !strings.Contains(sql, "set search_path to %i, pg_catalog, pg_temp") {
-			t.Fatalf("%s does not use the trusted schema path", file)
-		}
-		for _, signature := range signatures {
-			if !strings.Contains(sql, signature) {
-				t.Fatalf("%s does not rebind %s", file, signature)
-			}
-		}
 	}
 }
 
@@ -326,7 +247,7 @@ func TestMigrationsFreshDatabaseIsIdempotentAndTamperEvident(t *testing.T) {
 	if err := conn.QueryRowContext(ctx, `SELECT version, filename, checksum FROM schema_migrations WHERE version = $1`, baselineMigrationVersion).Scan(&version, &filename, &checksum); err != nil {
 		t.Fatal(err)
 	}
-	if version != baselineMigrationVersion || filename != "20260810000000_baseline.sql" || len(checksum) != 64 {
+	if version != baselineMigrationVersion || filename != baselineMigrationFile || len(checksum) != 64 {
 		t.Fatalf("unexpected migration history row: %d %q %q", version, filename, checksum)
 	}
 	if _, err := conn.ExecContext(ctx, `UPDATE schema_migrations SET checksum = repeat('0', 64)`); err == nil {

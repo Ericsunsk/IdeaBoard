@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,6 +31,11 @@ type Options struct {
 	BaseSHA       string
 	HeadSHA       string
 	DatabaseDSN   string
+}
+
+type migrationChange struct {
+	status string
+	path   string
 }
 
 type commandRunner interface {
@@ -154,6 +160,7 @@ func checkMigrationImmutability(ctx context.Context, runner commandRunner, apiRo
 }
 
 func validateMigrationChanges(raw string) error {
+	changes := make([]migrationChange, 0)
 	violations := make([]string, 0)
 	for _, line := range strings.Split(raw, "\n") {
 		line = strings.TrimSpace(line)
@@ -165,8 +172,14 @@ func validateMigrationChanges(raw string) error {
 			violations = append(violations, line)
 			continue
 		}
-		if fields[0] != "A" {
-			violations = append(violations, line)
+		changes = append(changes, migrationChange{status: fields[0], path: fields[1]})
+	}
+	if len(violations) == 0 && isCleanBreakRebaseline(changes) {
+		return nil
+	}
+	for _, change := range changes {
+		if change.status != "A" {
+			violations = append(violations, change.status+"\t"+change.path)
 		}
 	}
 	if len(violations) > 0 {
@@ -174,6 +187,48 @@ func validateMigrationChanges(raw string) error {
 		return fmt.Errorf("released migrations are append-only; invalid changes: %s", strings.Join(violations, ", "))
 	}
 	return nil
+}
+
+func isCleanBreakRebaseline(changes []migrationChange) bool {
+	var addedBaselineVersion int64
+	var deletedBaselineVersions []int64
+	for _, change := range changes {
+		switch change.status {
+		case "A":
+			version, ok := baselineVersion(change.path)
+			if !ok || addedBaselineVersion != 0 {
+				return false
+			}
+			addedBaselineVersion = version
+		case "D":
+			if version, ok := baselineVersion(change.path); ok {
+				deletedBaselineVersions = append(deletedBaselineVersions, version)
+			}
+		default:
+			return false
+		}
+	}
+	if addedBaselineVersion == 0 || len(deletedBaselineVersions) != 1 {
+		return false
+	}
+	return addedBaselineVersion > deletedBaselineVersions[0]
+}
+
+func baselineVersion(path string) (int64, bool) {
+	const suffix = "_baseline.sql"
+	name := filepath.Base(path)
+	if !strings.HasSuffix(name, suffix) {
+		return 0, false
+	}
+	versionText := strings.TrimSuffix(name, suffix)
+	if len(versionText) != 14 {
+		return 0, false
+	}
+	version, err := strconv.ParseInt(versionText, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return version, true
 }
 
 func checkSQLCGeneration(ctx context.Context, runner commandRunner, apiRoot string, assembled []byte) error {
