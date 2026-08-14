@@ -15,7 +15,7 @@ import (
 
 type Store interface {
 	CountByStatus(ctx context.Context, status string) (int64, error)
-	CountAllTasks(ctx context.Context) (int64, error)
+	CountAllTaskCalls(ctx context.Context) (int64, error)
 	ListBackfilledDatesByRange(ctx context.Context, startDate, endDate time.Time) ([]time.Time, error)
 	ListDailyStatsByDateRange(ctx context.Context, startDate, endDate time.Time) ([]taskstore.DailyStatAggregate, error)
 	ListExecutionBottleneckStatsByCreatedRange(ctx context.Context, start, end time.Time) ([]taskstore.ExecutionBottleneckAggregate, error)
@@ -261,7 +261,7 @@ func (s *Service) GetStatistics(ctx context.Context, rawRange string) (*AdminSta
 	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, loc)
 	rangeStart := todayStart.AddDate(0, 0, -(days - 1))
 
-	totalCalls, err := s.store.CountAllTasks(ctx)
+	totalCalls, err := s.store.CountAllTaskCalls(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -555,18 +555,18 @@ func (s *Service) buildIntradayTrendItems(ctx context.Context, dayStart time.Tim
 			continue
 		}
 
-		bucket.total++
+		bucket.total += row.OutputCount
 		switch row.Status {
 		case tasks.StatusCompleted:
-			bucket.success++
+			bucket.success += row.OutputCount
 		case tasks.StatusFailed:
-			bucket.fail++
+			bucket.fail += row.OutputCount
 		}
 		model := strings.TrimSpace(row.ModelName)
 		if model == "" {
 			model = "未识别模型"
 		}
-		bucket.models[model]++
+		bucket.models[model] += row.OutputCount
 	}
 
 	return buildTrendItems(orderedKeys, buckets), buildQualityTrendItems(orderedKeys, buckets), nil

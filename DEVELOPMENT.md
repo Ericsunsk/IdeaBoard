@@ -267,7 +267,7 @@ sqlc:
 - `apps/api/internal/db/sqlc/*.go` 不手动编辑。
 - SQL schema/query 变更后运行 `go tool sqlc generate`。
 - migrations 位于 `apps/api/internal/db/migrations/`。
-- API migration history 以 `20260814000000_baseline.sql` 为当前 clean-break baseline，后续 migration 必须 append-only。Pre-launch rebaseline 只能原子删除旧 SQL chain 并新增一个更高版本 baseline，随后重建 Fresh Database；不得手工编辑 `schema_migrations` 绕过 checksum 校验。
+- API migration history 以 `20260814010200_baseline.sql` 为当前 clean-break baseline，后续 migration 必须 append-only。Pre-launch rebaseline 只能原子删除旧 SQL chain 并新增一个更高版本 baseline，随后重建 Fresh Database；不得手工编辑 `schema_migrations` 绕过 checksum 校验。
 - Schema source 的唯一 lifecycle 是 `schema-release`：修改 domain fragment 或 manifest 后先用 `--write-artifact` 生成 `schema.sql`，再运行默认 check；CI 和 release gate 只运行默认 check。
 - clean-break release 只支持 Fresh Database。旧数据库必须先导出需要保留的数据，再重建并按当前 baseline 初始化；不能使用旧 migration binary 做跨 baseline 升级或回滚。
 

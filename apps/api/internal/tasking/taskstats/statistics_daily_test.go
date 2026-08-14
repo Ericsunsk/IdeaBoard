@@ -175,12 +175,13 @@ func TestGetStatisticsOneDayTrendUsesFourHourBuckets(t *testing.T) {
 	today := todayStart.Format(statisticsDateLayout)
 
 	seed := []struct {
-		id         string
-		status     string
-		model      string
-		occurredAt time.Time
+		id          string
+		status      string
+		model       string
+		outputCount int16
+		occurredAt  time.Time
 	}{
-		{id: "bucket-00-completed", status: tasks.StatusCompleted, model: "model-a", occurredAt: todayStart.Add(1 * time.Hour)},
+		{id: "bucket-00-completed", status: tasks.StatusCompleted, model: "model-a", outputCount: 2, occurredAt: todayStart.Add(1 * time.Hour)},
 		{id: "bucket-04-failed", status: tasks.StatusFailed, model: "model-b", occurredAt: todayStart.Add(5 * time.Hour)},
 		{id: "bucket-20-completed", status: tasks.StatusCompleted, model: "model-a", occurredAt: todayStart.Add(21 * time.Hour)},
 	}
@@ -192,6 +193,7 @@ func TestGetStatisticsOneDayTrendUsesFourHourBuckets(t *testing.T) {
 			ModelName:      item.model,
 			UserKey:        "1",
 			Status:         item.status,
+			OutputCount:    item.outputCount,
 			LatencySeconds: 30,
 		})
 	}
@@ -203,7 +205,7 @@ func TestGetStatisticsOneDayTrendUsesFourHourBuckets(t *testing.T) {
 	if len(stats.QualityTrend) != 6 {
 		t.Fatalf("quality trend len=%d, want 6", len(stats.QualityTrend))
 	}
-	if stats.QualityTrend[0].Label != "00:00" || stats.QualityTrend[0].Total != 1 || stats.QualityTrend[0].Success != 1 {
+	if stats.QualityTrend[0].Label != "00:00" || stats.QualityTrend[0].Total != 2 || stats.QualityTrend[0].Success != 2 {
 		t.Fatalf("00:00 bucket mismatch: %+v", stats.QualityTrend[0])
 	}
 	if stats.QualityTrend[1].Label != "04:00" || stats.QualityTrend[1].Total != 1 || stats.QualityTrend[1].Fail != 1 {
@@ -770,6 +772,7 @@ type taskStatEventSeed struct {
 	ModelName      string
 	UserKey        string
 	Status         string
+	OutputCount    int16
 	LatencySeconds float64
 }
 
@@ -796,11 +799,14 @@ func insertTaskStatEvent(t *testing.T, db *sql.DB, event taskStatEventSeed) {
 		}
 		occurredAt = parsed
 	}
+	if event.OutputCount == 0 {
+		event.OutputCount = 1
+	}
 	_, err := db.ExecContext(
 		context.Background(),
-		`INSERT INTO task_stat_events (task_id, occurred_at, stat_date, model_name, user_key, status, latency_seconds)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		event.TaskID, occurredAt, event.StatDate, event.ModelName, event.UserKey, event.Status, event.LatencySeconds,
+		`INSERT INTO task_stat_events (task_id, occurred_at, stat_date, model_name, user_key, status, output_count, latency_seconds)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		event.TaskID, occurredAt, event.StatDate, event.ModelName, event.UserKey, event.Status, event.OutputCount, event.LatencySeconds,
 	)
 	if err != nil {
 		t.Fatalf("seed stat event failed: %v", err)

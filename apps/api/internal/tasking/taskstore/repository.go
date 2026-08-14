@@ -120,6 +120,7 @@ type TaskStatEventCorrection struct {
 	ModelName          string
 	UserKey            string
 	Status             string
+	OutputCount        int64
 	LatencySeconds     float64
 	CostMicros         int64
 }
@@ -130,6 +131,7 @@ type StatEventTrendRow struct {
 	ModelName      string
 	UserKey        string
 	Status         string
+	OutputCount    int64
 	LatencySeconds float64
 	CostMicros     int64
 }

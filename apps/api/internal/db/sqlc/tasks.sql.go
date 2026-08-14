@@ -56,16 +56,16 @@ func (q *Queries) CompleteTaskWithLease(ctx context.Context, arg CompleteTaskWit
 	return result.RowsAffected()
 }
 
-const countAllTasks = `-- name: CountAllTasks :one
-SELECT COUNT(*)
+const countAllTaskCalls = `-- name: CountAllTaskCalls :one
+SELECT COALESCE(SUM(COALESCE((NULLIF(btrim(params), '')::jsonb #>> '{generation,requested_output_count}')::bigint, 1)), 0)::bigint
 FROM tasks
 `
 
-func (q *Queries) CountAllTasks(ctx context.Context) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countAllTasks)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
+func (q *Queries) CountAllTaskCalls(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countAllTaskCalls)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
 }
 
 const countRunningTasksMissingLeaseToken = `-- name: CountRunningTasksMissingLeaseToken :one
@@ -1781,7 +1781,8 @@ INSERT INTO task_execution_metrics (
 SELECT
   t.task_id,
   CASE
-    WHEN t.status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results') THEN t.status
+    WHEN t.status = 'cancelled_with_results' THEN 'cancelled'
+    WHEN t.status IN ('completed', 'failed', 'cancelled') THEN t.status
     ELSE COALESCE($1::text, 'queued')
   END,
   COALESCE($2::text, 'unknown'),

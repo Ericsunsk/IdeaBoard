@@ -28,7 +28,7 @@ type Querier interface {
 	CountAccounts(ctx context.Context, arg CountAccountsParams) (int64, error)
 	CountAccountsByProviderEndpointID(ctx context.Context, providerEndpointID int64) (int64, error)
 	CountAdminPaymentOrders(ctx context.Context, arg CountAdminPaymentOrdersParams) (int64, error)
-	CountAllTasks(ctx context.Context) (int64, error)
+	CountAllTaskCalls(ctx context.Context) (int64, error)
 	CountBoardNameConflicts(ctx context.Context, arg CountBoardNameConflictsParams) (int64, error)
 	CountBoardShareTokenByHash(ctx context.Context, tokenHash string) (int64, error)
 	CountBoardsByBoardID(ctx context.Context, boardID string) (int64, error)

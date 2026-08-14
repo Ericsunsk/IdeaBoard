@@ -3,19 +3,21 @@ package taskstore
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/tasking/tasks"
-	"strings"
-	"time"
+	"ideaboard/api/internal/workflow"
 )
 
 func (r *Repository) CountByStatus(ctx context.Context, status string) (int64, error) {
 	return r.q.CountTasksByStatus(ctx, status)
 }
 
-func (r *Repository) CountAllTasks(ctx context.Context) (int64, error) {
-	return r.q.CountAllTasks(ctx)
+func (r *Repository) CountAllTaskCalls(ctx context.Context) (int64, error) {
+	return r.q.CountAllTaskCalls(ctx)
 }
 
 func (r *Repository) UpsertDailyStatByTask(ctx context.Context, task *tasks.Task) error {
@@ -25,7 +27,10 @@ func (r *Repository) UpsertDailyStatByTask(ctx context.Context, task *tasks.Task
 }
 
 func upsertDailyStatByTaskTx(ctx context.Context, q *dbsqlc.Queries, task *tasks.Task, attemptFinish *tasks.TaskAttemptFinish) error {
-	event, ok := taskStatEventFromTask(task, attemptFinish)
+	event, ok, err := taskStatEventFromTask(task, attemptFinish)
+	if err != nil {
+		return err
+	}
 	if !ok {
 		return nil
 	}
@@ -43,6 +48,7 @@ func upsertDailyStatByTaskTx(ctx context.Context, q *dbsqlc.Queries, task *tasks
 		ModelName:          event.ModelName,
 		UserKey:            event.UserKey,
 		Status:             event.Status,
+		OutputCount:        int16(event.OutputCount),
 		LatencySeconds:     event.LatencySeconds,
 		CostMicros:         event.CostMicros,
 	})
@@ -66,19 +72,28 @@ type normalizedTaskStatEvent struct {
 	ModelName          string
 	UserKey            string
 	Status             string
+	OutputCount        int64
 	LatencySeconds     float64
 	CostMicros         int64
 }
 
-func taskStatEventFromTask(task *tasks.Task, attemptFinish *tasks.TaskAttemptFinish) (normalizedTaskStatEvent, bool) {
+func taskStatEventFromTask(task *tasks.Task, attemptFinish *tasks.TaskAttemptFinish) (normalizedTaskStatEvent, bool, error) {
 	if task == nil || strings.TrimSpace(task.Status) == "" || strings.TrimSpace(task.TaskID) == "" {
-		return normalizedTaskStatEvent{}, false
+		return normalizedTaskStatEvent{}, false, nil
 	}
 	if task.Status != tasks.StatusCompleted && task.Status != tasks.StatusFailed && !tasks.IsTerminalStatus(task.Status) {
-		return normalizedTaskStatEvent{}, false
+		return normalizedTaskStatEvent{}, false, nil
+	}
+	outputCount, err := taskStatOutputCount(task.Params)
+	if err != nil {
+		return normalizedTaskStatEvent{}, false, fmt.Errorf("resolve task stat output count: %w", err)
 	}
 	occurredAt := taskStatOccurredAt(task)
 	loc := time.Now().Location()
+	statStatus := task.Status
+	if statStatus == tasks.StatusCancelledWithResults {
+		statStatus = tasks.StatusCancelled
+	}
 	event := normalizedTaskStatEvent{
 		TaskID:             strings.TrimSpace(task.TaskID),
 		OccurredAt:         occurredAt,
@@ -91,11 +106,27 @@ func taskStatEventFromTask(task *tasks.Task, attemptFinish *tasks.TaskAttemptFin
 		APIType:            normalizeStatAPIType(task.APIType),
 		ModelName:          taskStatModel(task),
 		UserKey:            taskStatUserKey(task.UserID),
-		Status:             task.Status,
+		Status:             statStatus,
+		OutputCount:        outputCount,
 		LatencySeconds:     taskStatLatencySeconds(task, attemptFinish, occurredAt),
 		CostMicros:         0,
 	}
-	return event, true
+	return event, true, nil
+}
+
+func taskStatOutputCount(rawParams string) (int64, error) {
+	params, err := tasks.UnmarshalParams(rawParams)
+	if err != nil {
+		return 0, err
+	}
+	if params.Generation == nil {
+		return 1, nil
+	}
+	count, err := workflow.ParseRequestedOutputCount(params.Generation.RequestedOutputCount)
+	if err != nil {
+		return 0, err
+	}
+	return int64(count.Int()), nil
 }
 
 func taskStatOccurredAt(task *tasks.Task) time.Time {
@@ -134,14 +165,14 @@ func upsertTaskDailyStatDeltaTx(ctx context.Context, q *dbsqlc.Queries, event no
 	latencyCountDelta := int64(0)
 	switch event.Status {
 	case tasks.StatusCompleted:
-		completedDelta = 1
+		completedDelta = event.OutputCount
 		if event.LatencySeconds > 0 {
 			latencyCountDelta = 1
 		}
 	case tasks.StatusFailed:
-		failedDelta = 1
+		failedDelta = event.OutputCount
 	case tasks.StatusCancelled, tasks.StatusCancelledWithResults:
-		cancelledDelta = 1
+		cancelledDelta = event.OutputCount
 	}
 
 	return q.UpsertTaskDailyStatDelta(ctx, dbsqlc.UpsertTaskDailyStatDeltaParams{
@@ -154,7 +185,7 @@ func upsertTaskDailyStatDeltaTx(ctx context.Context, q *dbsqlc.Queries, event no
 		ApiType:            event.APIType,
 		ModelName:          event.ModelName,
 		UserKey:            event.UserKey,
-		Total:              1,
+		Total:              event.OutputCount,
 		Completed:          completedDelta,
 		Failed:             failedDelta,
 		Cancelled:          cancelledDelta,
@@ -239,6 +270,7 @@ func (r *Repository) ListStatEventsByOccurredRange(ctx context.Context, start, e
 			ModelName:      row.ModelName,
 			UserKey:        row.UserKey,
 			Status:         row.Status,
+			OutputCount:    int64(row.OutputCount),
 			LatencySeconds: row.LatencySeconds,
 			CostMicros:     row.CostMicros,
 		})
@@ -303,6 +335,7 @@ func (r *Repository) CorrectTaskStatEvent(ctx context.Context, correction TaskSt
 		ModelName:          event.ModelName,
 		UserKey:            event.UserKey,
 		Status:             event.Status,
+		OutputCount:        int16(event.OutputCount),
 		LatencySeconds:     event.LatencySeconds,
 		CostMicros:         event.CostMicros,
 	})
@@ -336,6 +369,13 @@ func taskStatEventFromCorrection(correction TaskStatEventCorrection) (normalized
 	if costMicros < 0 {
 		costMicros = 0
 	}
+	outputCount := correction.OutputCount
+	if outputCount == 0 {
+		outputCount = 1
+	}
+	if _, err := workflow.ParseRequestedOutputCount(int(outputCount)); err != nil {
+		return normalizedTaskStatEvent{}, false
+	}
 	return normalizedTaskStatEvent{
 		TaskID:             taskID,
 		OccurredAt:         occurredAt,
@@ -349,6 +389,7 @@ func taskStatEventFromCorrection(correction TaskStatEventCorrection) (normalized
 		ModelName:          model,
 		UserKey:            userKey,
 		Status:             correction.Status,
+		OutputCount:        outputCount,
 		LatencySeconds:     latencySeconds,
 		CostMicros:         costMicros,
 	}, true

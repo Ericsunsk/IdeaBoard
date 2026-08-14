@@ -3,17 +3,18 @@ package worker
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"ideaboard/api/internal/accountpool/accounts"
-	"ideaboard/api/internal/tasking/tasks"
-	"ideaboard/api/internal/tasking/taskstore"
 	"strings"
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/taskruntime"
+	"ideaboard/api/internal/tasking/tasks"
+	"ideaboard/api/internal/tasking/taskstore"
 	"ideaboard/api/internal/testdb"
 )
 
@@ -674,7 +675,7 @@ func newTaskExecutionOrchestratorTestDB(t *testing.T) *sql.DB {
 
 func providerOutputJSON(result string) providerCallOutput {
 	now := time.Now()
-	return providerCallOutput{
+	output := providerCallOutput{
 		Result: result,
 		Timeline: providerCallTimeline{
 			ProviderStartedAt:  &now,
@@ -683,6 +684,18 @@ func providerOutputJSON(result string) providerCallOutput {
 			FinalizeFinishedAt: &now,
 		},
 	}
+	var envelope struct {
+		ImageURL string `json:"image_url"`
+	}
+	if json.Unmarshal([]byte(result), &envelope) == nil && strings.TrimSpace(envelope.ImageURL) != "" {
+		output.Outputs = []tasks.TaskOutput{{
+			OutputKind:  "remote",
+			Role:        "image",
+			URL:         envelope.ImageURL,
+			ResultIndex: 0,
+		}}
+	}
+	return output
 }
 
 type recordingTaskExecutionConvergenceDecider struct {

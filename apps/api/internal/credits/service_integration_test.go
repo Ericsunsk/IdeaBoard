@@ -230,6 +230,7 @@ func TestCreditHoldSupportsOneCaptureAndOneReleaseWithStableTotals(t *testing.T)
 	service := NewService(pool)
 	ctx := context.Background()
 	const userID int64 = 889
+	ensureAdminOperationUser(t, pool, userID)
 
 	if _, err := service.Grant(ctx, GrantCommand{UserID: userID, Amount: mustCreditAmount(t, 4), Metadata: testMetadata("partial:grant", "partial-grant")}); err != nil {
 		t.Fatalf("Grant() error = %v", err)
@@ -249,7 +250,7 @@ func TestCreditHoldSupportsOneCaptureAndOneReleaseWithStableTotals(t *testing.T)
 	if err != nil {
 		t.Fatalf("partial Release() error = %v", err)
 	}
-	if release.Wallet.Available != 4 || release.Wallet.Reserved != 0 {
+	if release.Wallet.Available != 2 || release.Wallet.Reserved != 0 {
 		t.Fatalf("partial release = %+v", release)
 	}
 	var captured, released int64

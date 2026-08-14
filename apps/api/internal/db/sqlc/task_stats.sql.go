@@ -15,6 +15,7 @@ const backfillDailyStatsByCreatedRange = `-- name: BackfillDailyStatsByCreatedRa
 WITH candidate_tasks AS (
   SELECT t.task_id, t.user_id, t.account_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.status,
          t.feature_slug,
+         COALESCE((NULLIF(btrim(t.params), '')::jsonb #>> '{generation,requested_output_count}')::smallint, 1::smallint) AS output_count,
          COALESCE(latest_lease.resolved_model, '') AS resolved_model,
          COALESCE(latest_lease.api_type, '') AS api_type,
          t.created_at, t.completed_at, t.cancelled_at,
@@ -48,6 +49,7 @@ normalized_events AS (
     ), 128)::varchar(128) AS model_name,
     LEFT(COALESCE(NULLIF(t.user_id::text, '0'), 'unknown'), 128)::varchar(128) AS user_key,
     t.status,
+    t.output_count,
     CASE
       WHEN t.status = 'completed'
        AND t.completed_at IS NOT NULL
@@ -61,14 +63,14 @@ normalized_events AS (
 inserted_events AS (
   INSERT INTO task_stat_events (
     task_id, occurred_at, stat_date, user_id, account_id, provider_endpoint_id, credential_id,
-    feature_slug, api_type, model_name, user_key, status, latency_seconds, cost_micros
+    feature_slug, api_type, model_name, user_key, status, output_count, latency_seconds, cost_micros
   )
   SELECT task_id, occurred_at, stat_date, user_id, account_id, provider_endpoint_id, credential_id,
-         feature_slug, api_type, model_name, user_key, status, latency_seconds, cost_micros
+         feature_slug, api_type, model_name, user_key, status, output_count, latency_seconds, cost_micros
   FROM normalized_events
   ON CONFLICT (task_id) DO NOTHING
   RETURNING stat_date, user_id, account_id, provider_endpoint_id, credential_id, feature_slug, api_type,
-            model_name, user_key, status, latency_seconds, cost_micros
+            model_name, user_key, status, output_count, latency_seconds, cost_micros
 ),
 daily_delta AS (
   SELECT
@@ -81,10 +83,10 @@ daily_delta AS (
     api_type,
     model_name,
     user_key,
-    COUNT(*)::bigint AS total,
-    COUNT(*) FILTER (WHERE status = 'completed')::bigint AS completed,
-    COUNT(*) FILTER (WHERE status = 'failed')::bigint AS failed,
-    COUNT(*) FILTER (WHERE status = 'cancelled')::bigint AS cancelled,
+    COALESCE(SUM(output_count), 0)::bigint AS total,
+    COALESCE(SUM(output_count) FILTER (WHERE status = 'completed'), 0)::bigint AS completed,
+    COALESCE(SUM(output_count) FILTER (WHERE status = 'failed'), 0)::bigint AS failed,
+    COALESCE(SUM(output_count) FILTER (WHERE status = 'cancelled'), 0)::bigint AS cancelled,
     COALESCE(SUM(latency_seconds), 0)::double precision AS latency_seconds_sum,
     COUNT(*) FILTER (WHERE status = 'completed' AND latency_seconds > 0)::bigint AS latency_count,
     COALESCE(SUM(cost_micros), 0)::bigint AS cost_micros_sum
@@ -152,12 +154,12 @@ func (q *Queries) BackfillDailyStatsByCreatedRange(ctx context.Context, arg Back
 const insertTaskStatEventIgnore = `-- name: InsertTaskStatEventIgnore :execrows
 INSERT INTO task_stat_events (
   task_id, occurred_at, stat_date, user_id, account_id, provider_endpoint_id, credential_id,
-  feature_slug, api_type, model_name, user_key, status, latency_seconds, cost_micros
+  feature_slug, api_type, model_name, user_key, status, output_count, latency_seconds, cost_micros
 ) VALUES (
   $1, $2, $3, $4, $5,
   $6, $7, $8, $9,
-  $10, $11, $12, $13,
-  $14
+  $10, $11, $12, $13, $14,
+  $15
 )
 ON CONFLICT (task_id) DO NOTHING
 `
@@ -175,6 +177,7 @@ type InsertTaskStatEventIgnoreParams struct {
 	ModelName          string    `json:"model_name"`
 	UserKey            string    `json:"user_key"`
 	Status             string    `json:"status"`
+	OutputCount        int16     `json:"output_count"`
 	LatencySeconds     float64   `json:"latency_seconds"`
 	CostMicros         int64     `json:"cost_micros"`
 }
@@ -193,6 +196,7 @@ func (q *Queries) InsertTaskStatEventIgnore(ctx context.Context, arg InsertTaskS
 		arg.ModelName,
 		arg.UserKey,
 		arg.Status,
+		arg.OutputCount,
 		arg.LatencySeconds,
 		arg.CostMicros,
 	)
@@ -337,7 +341,7 @@ func (q *Queries) ListStatEventLatencySamplesByDateRange(ctx context.Context, ar
 }
 
 const listStatEventsByOccurredRange = `-- name: ListStatEventsByOccurredRange :many
-SELECT occurred_at, stat_date, model_name, user_key, status, latency_seconds, cost_micros
+SELECT occurred_at, stat_date, model_name, user_key, status, output_count, latency_seconds, cost_micros
 FROM task_stat_events
 WHERE occurred_at >= $1 AND occurred_at < $2
 ORDER BY occurred_at ASC
@@ -354,6 +358,7 @@ type ListStatEventsByOccurredRangeRow struct {
 	ModelName      string    `json:"model_name"`
 	UserKey        string    `json:"user_key"`
 	Status         string    `json:"status"`
+	OutputCount    int16     `json:"output_count"`
 	LatencySeconds float64   `json:"latency_seconds"`
 	CostMicros     int64     `json:"cost_micros"`
 }
@@ -373,6 +378,7 @@ func (q *Queries) ListStatEventsByOccurredRange(ctx context.Context, arg ListSta
 			&i.ModelName,
 			&i.UserKey,
 			&i.Status,
+			&i.OutputCount,
 			&i.LatencySeconds,
 			&i.CostMicros,
 		); err != nil {
@@ -406,10 +412,10 @@ daily_delta AS (
     e.api_type,
     e.model_name,
     e.user_key,
-    COUNT(*)::bigint AS total,
-    COUNT(*) FILTER (WHERE e.status = 'completed')::bigint AS completed,
-    COUNT(*) FILTER (WHERE e.status = 'failed')::bigint AS failed,
-    COUNT(*) FILTER (WHERE e.status = 'cancelled')::bigint AS cancelled,
+    COALESCE(SUM(e.output_count), 0)::bigint AS total,
+    COALESCE(SUM(e.output_count) FILTER (WHERE e.status = 'completed'), 0)::bigint AS completed,
+    COALESCE(SUM(e.output_count) FILTER (WHERE e.status = 'failed'), 0)::bigint AS failed,
+    COALESCE(SUM(e.output_count) FILTER (WHERE e.status = 'cancelled'), 0)::bigint AS cancelled,
     COALESCE(SUM(e.latency_seconds), 0)::double precision AS latency_seconds_sum,
     COUNT(*) FILTER (WHERE e.status = 'completed' AND e.latency_seconds > 0)::bigint AS latency_count,
     COALESCE(SUM(e.cost_micros), 0)::bigint AS cost_micros_sum
@@ -516,12 +522,12 @@ func (q *Queries) UpsertTaskDailyStatDelta(ctx context.Context, arg UpsertTaskDa
 const upsertTaskStatEventCorrection = `-- name: UpsertTaskStatEventCorrection :execrows
 INSERT INTO task_stat_events (
   task_id, occurred_at, stat_date, user_id, account_id, provider_endpoint_id, credential_id,
-  feature_slug, api_type, model_name, user_key, status, latency_seconds, cost_micros
+  feature_slug, api_type, model_name, user_key, status, output_count, latency_seconds, cost_micros
 ) VALUES (
   $1, $2, $3, $4, $5,
   $6, $7, $8, $9,
-  $10, $11, $12, $13,
-  $14
+  $10, $11, $12, $13, $14,
+  $15
 )
 ON CONFLICT (task_id) DO UPDATE
 SET occurred_at = EXCLUDED.occurred_at,
@@ -535,6 +541,7 @@ SET occurred_at = EXCLUDED.occurred_at,
     model_name = EXCLUDED.model_name,
     user_key = EXCLUDED.user_key,
     status = EXCLUDED.status,
+    output_count = EXCLUDED.output_count,
     latency_seconds = EXCLUDED.latency_seconds,
     cost_micros = EXCLUDED.cost_micros
 `
@@ -552,6 +559,7 @@ type UpsertTaskStatEventCorrectionParams struct {
 	ModelName          string    `json:"model_name"`
 	UserKey            string    `json:"user_key"`
 	Status             string    `json:"status"`
+	OutputCount        int16     `json:"output_count"`
 	LatencySeconds     float64   `json:"latency_seconds"`
 	CostMicros         int64     `json:"cost_micros"`
 }
@@ -570,6 +578,7 @@ func (q *Queries) UpsertTaskStatEventCorrection(ctx context.Context, arg UpsertT
 		arg.ModelName,
 		arg.UserKey,
 		arg.Status,
+		arg.OutputCount,
 		arg.LatencySeconds,
 		arg.CostMicros,
 	)

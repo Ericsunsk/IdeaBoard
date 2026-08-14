@@ -136,6 +136,7 @@ func TestCreateTaskOutputEnforcesOutputKindShape(t *testing.T) {
 	remoteParams.MediaAssetID = sql.NullInt64{}
 	remoteParams.OutputKind = "remote"
 	remoteParams.Url = "https://provider.example/result.png"
+	remoteParams.ResultIndex = 1
 	if _, err := q.CreateTaskOutput(ctx, remoteParams); err != nil {
 		t.Fatalf("remote output CreateTaskOutput returned error: %v", err)
 	}

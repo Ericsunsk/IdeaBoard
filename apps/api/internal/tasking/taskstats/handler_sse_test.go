@@ -40,7 +40,7 @@ func (s fakeStatsStore) CountByStatus(_ context.Context, status string) (int64, 
 	return s.counts[status], nil
 }
 
-func (s fakeStatsStore) CountAllTasks(context.Context) (int64, error) {
+func (s fakeStatsStore) CountAllTaskCalls(context.Context) (int64, error) {
 	return 0, nil
 }
 

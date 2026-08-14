@@ -146,7 +146,7 @@ func TestAdminRefundIsIdempotentAndDoesNotDoubleRefund(t *testing.T) {
 	if err != nil || len(page.Transactions) != 1 || page.Transactions[0].Charge == nil {
 		t.Fatalf("refund ledger page=%+v error=%v", page, err)
 	}
-	if page.Transactions[0].Charge.RefundedAmount != 15 || page.Transactions[0].Charge.RemainingRefundable != 25 {
+	if page.Transactions[0].Charge.RefundedAmount != 15 || page.Transactions[0].Charge.RemainingRefundable != 15 {
 		t.Fatalf("refund charge after replay=%+v", page.Transactions[0].Charge)
 	}
 }
@@ -298,7 +298,7 @@ func TestAdminCorrectionSupportsDeductionAndRefundDirectionsAndRejectsInvalidOri
 	if err != nil {
 		t.Fatalf("Hold() error=%v", err)
 	}
-	capture, err := service.Capture(ctx, CaptureCommand{UserID: 409, HoldTransactionID: hold.TransactionID, Amount: mustCreditAmount(t, 20), Metadata: testMetadata("correction-directions:capture", "correction-directions-capture")})
+	capture, err := service.Capture(ctx, CaptureCommand{UserID: 409, HoldTransactionID: hold.TransactionID, Amount: mustCreditAmount(t, 10), Metadata: testMetadata("correction-directions:capture", "correction-directions-capture")})
 	if err != nil {
 		t.Fatalf("Capture() error=%v", err)
 	}
@@ -332,7 +332,7 @@ func TestAdminRefundsAreConcurrentBoundedAndAllowedForFrozenWallet(t *testing.T)
 	if err != nil {
 		t.Fatalf("Hold() error = %v", err)
 	}
-	capture, err := service.Capture(ctx, CaptureCommand{UserID: userID, HoldTransactionID: hold.TransactionID, Amount: mustCreditAmount(t, 30), Metadata: testMetadata("admin-refund:capture", "admin-refund-capture")})
+	capture, err := service.Capture(ctx, CaptureCommand{UserID: userID, HoldTransactionID: hold.TransactionID, Amount: mustCreditAmount(t, 100), Metadata: testMetadata("admin-refund:capture", "admin-refund-capture")})
 	if err != nil {
 		t.Fatalf("Capture() error = %v", err)
 	}

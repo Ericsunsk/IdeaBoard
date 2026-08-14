@@ -26,7 +26,7 @@ func TestServiceListReturnsOnlyCurrentUsersFinalBillingRecords(t *testing.T) {
 	deduction := deduct(t, ctx, creditService, 42, 10, metadata("deduct:42", "admin", "7", "admin_deduction", "admin_adjustment", "deduct-42"))
 	hold := hold(t, ctx, creditService, 42, 20, metadata("hold:42", "user", "42", "task_submission", "task", "task-42"))
 	seedTaskSnapshot(t, ctx, pool, 42, "task-42", hold.TransactionID, "局部重绘", 20)
-	capture := capture(t, ctx, creditService, 42, hold.TransactionID, metadata("capture:42", "service", "task-runtime", "task_terminal", "task", "task-42"))
+	capture := capture(t, ctx, creditService, 42, hold.TransactionID, 20, metadata("capture:42", "service", "task-runtime", "task_terminal", "task", "task-42"))
 	_ = refund(t, ctx, creditService, 42, capture.TransactionID, 5, metadata("refund:42", "admin", "7", "admin_refund", "admin_adjustment", "refund-42"))
 	correction := correct(t, ctx, creditService, 42, adminGrant.TransactionID, 5, metadata("correction:42", "admin", "7", "admin_correction", "admin_adjustment", "correction-42"))
 	redemption := grant(t, ctx, creditService, 42, 15, metadata("redemption:42", "system", "rewards", "reward_redemption", "reward_redemption", "redemption-42"))
@@ -191,9 +191,9 @@ func hold(t *testing.T, ctx context.Context, service *credits.Service, userID, a
 	return result
 }
 
-func capture(t *testing.T, ctx context.Context, service *credits.Service, userID int64, holdID string, commandMetadata credits.CommandMetadata) credits.CommandResult {
+func capture(t *testing.T, ctx context.Context, service *credits.Service, userID int64, holdID string, amountValue int64, commandMetadata credits.CommandMetadata) credits.CommandResult {
 	t.Helper()
-	amount, err := credits.NewCreditAmount(10)
+	amount, err := credits.NewCreditAmount(amountValue)
 	if err != nil {
 		t.Fatal(err)
 	}

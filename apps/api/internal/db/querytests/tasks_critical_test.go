@@ -250,7 +250,7 @@ func TestCountTasksByStatus(t *testing.T) {
 	}
 }
 
-func TestCountAllTasks(t *testing.T) {
+func TestCountAllTaskCalls(t *testing.T) {
 	db := testdb.Open(t)
 	q := dbsqlc.New(db)
 
@@ -259,18 +259,18 @@ func TestCountAllTasks(t *testing.T) {
 		UserID:     1,
 		UserPrompt: "count all",
 		Status:     "pending",
-		Params:     `{}`,
+		Params:     `{"generation":{"requested_output_count":2}}`,
 	})
 	if err != nil {
 		t.Fatalf("CreateTask: %v", err)
 	}
 
-	count, err := q.CountAllTasks(context.Background())
+	count, err := q.CountAllTaskCalls(context.Background())
 	if err != nil {
-		t.Fatalf("CountAllTasks: %v", err)
+		t.Fatalf("CountAllTaskCalls: %v", err)
 	}
-	if count != 1 {
-		t.Fatalf("CountAllTasks=%d, want 1", count)
+	if count != 2 {
+		t.Fatalf("CountAllTaskCalls=%d, want 2", count)
 	}
 }
 

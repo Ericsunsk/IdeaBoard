@@ -426,7 +426,7 @@ VALUES ($1, 'stale-model', 'stale-user', 9, 9, 0, 0)`, statDate); err != nil {
 		t.Fatalf("seed stale daily stat failed: %v", err)
 	}
 	for _, correction := range []TaskStatEventCorrection{
-		{TaskID: "rebuild-event-1", OccurredAt: occurredAt, UserID: 41, ModelName: "event-model", UserKey: "41", Status: tasks.StatusCompleted, LatencySeconds: 12, CostMicros: 100},
+		{TaskID: "rebuild-event-1", OccurredAt: occurredAt, UserID: 41, ModelName: "event-model", UserKey: "41", Status: tasks.StatusCompleted, OutputCount: 2, LatencySeconds: 12, CostMicros: 100},
 		{TaskID: "rebuild-event-2", OccurredAt: occurredAt.Add(time.Minute), UserID: 41, ModelName: "event-model", UserKey: "41", Status: tasks.StatusFailed, CostMicros: 200},
 	} {
 		if _, err := taskRepo.CorrectTaskStatEvent(ctx, correction); err != nil {
@@ -445,7 +445,7 @@ VALUES ($1, 'stale-model', 'stale-user', 9, 9, 0, 0)`, statDate); err != nil {
 	if err != nil {
 		t.Fatalf("list rebuilt daily stats failed: %v", err)
 	}
-	if len(rows) != 1 || rows[0].ModelName != "event-model" || rows[0].Total != 2 || rows[0].Completed != 1 || rows[0].Failed != 1 || rows[0].CostMicrosSum != 300 {
+	if len(rows) != 1 || rows[0].ModelName != "event-model" || rows[0].Total != 3 || rows[0].Completed != 2 || rows[0].Failed != 1 || rows[0].CostMicrosSum != 300 {
 		t.Fatalf("rebuilt projection mismatch: %+v", rows)
 	}
 }
@@ -523,5 +523,55 @@ func TestUpsertDailyStatByTaskIgnoresZeroLatencySample(t *testing.T) {
 	}
 	if rows[0].Completed != 1 || rows[0].LatencyCount != 0 || rows[0].LatencySecondsSum != 0 {
 		t.Fatalf("zero latency should not contribute latency sample: %+v", rows[0])
+	}
+}
+
+func TestUpsertDailyStatByTaskUsesRequestedOutputCount(t *testing.T) {
+	ctx := context.Background()
+	taskRepo, _ := newRepositoryTestDB(t)
+	createdAt := time.Now().Add(-2 * time.Minute)
+	completedAt := time.Now()
+	task := &tasks.Task{
+		TaskID:      "multi-output-stat",
+		UserID:      19,
+		Params:      `{"generation":{"requested_output_count":2}}`,
+		Status:      tasks.StatusCompleted,
+		CreatedAt:   createdAt,
+		CompletedAt: &completedAt,
+	}
+
+	if err := taskRepo.UpsertDailyStatByTask(ctx, task); err != nil {
+		t.Fatalf("upsert multi-output task failed: %v", err)
+	}
+
+	rows, err := taskRepo.ListDailyStatsByDateRange(ctx, completedAt, completedAt)
+	if err != nil {
+		t.Fatalf("list daily stats failed: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows=%d, want 1", len(rows))
+	}
+	if rows[0].Total != 2 || rows[0].Completed != 2 || rows[0].LatencyCount != 1 {
+		t.Fatalf("multi-output task stats = %+v, want two completed calls and one latency sample", rows[0])
+	}
+}
+
+func TestTaskStatEventUsesFrozenRequestedOutputCount(t *testing.T) {
+	completedAt := time.Now()
+	event, ok, err := taskStatEventFromTask(&tasks.Task{
+		TaskID:      "multi-output-event",
+		UserID:      20,
+		Params:      `{"generation":{"requested_output_count":3}}`,
+		Status:      tasks.StatusCompleted,
+		CompletedAt: &completedAt,
+	}, nil)
+	if err != nil {
+		t.Fatalf("build task stat event: %v", err)
+	}
+	if !ok {
+		t.Fatal("task stat event was not created")
+	}
+	if event.OutputCount != 3 {
+		t.Fatalf("event output count = %d, want 3", event.OutputCount)
 	}
 }

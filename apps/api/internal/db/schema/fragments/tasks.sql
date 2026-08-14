@@ -11,7 +11,7 @@ CREATE TABLE tasks (
   params TEXT NOT NULL,
   feature_slug VARCHAR(64) NOT NULL DEFAULT '',
   priority INTEGER NOT NULL DEFAULT 2,
-  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  status VARCHAR(32) NOT NULL DEFAULT 'pending',
   lease_token VARCHAR(128) NOT NULL DEFAULT '',
   retry_count INTEGER NOT NULL DEFAULT 0,
   attempt_seq INTEGER NOT NULL DEFAULT 0,

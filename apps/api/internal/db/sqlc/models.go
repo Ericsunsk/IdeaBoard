@@ -802,6 +802,7 @@ type TaskStatEvent struct {
 	ModelName          string    `json:"model_name"`
 	UserKey            string    `json:"user_key"`
 	Status             string    `json:"status"`
+	OutputCount        int16     `json:"output_count"`
 	LatencySeconds     float64   `json:"latency_seconds"`
 	CostMicros         int64     `json:"cost_micros"`
 	CreatedAt          time.Time `json:"created_at"`

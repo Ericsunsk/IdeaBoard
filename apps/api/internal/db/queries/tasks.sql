@@ -156,7 +156,8 @@ INSERT INTO task_execution_metrics (
 SELECT
   t.task_id,
   CASE
-    WHEN t.status IN ('completed', 'failed', 'cancelled', 'cancelled_with_results') THEN t.status
+    WHEN t.status = 'cancelled_with_results' THEN 'cancelled'
+    WHEN t.status IN ('completed', 'failed', 'cancelled') THEN t.status
     ELSE COALESCE(sqlc.narg(current_stage)::text, 'queued')
   END,
   COALESCE(sqlc.narg(bottleneck_source)::text, 'unknown'),
@@ -723,6 +724,6 @@ SELECT COUNT(*)
 FROM tasks
 WHERE status = sqlc.arg(status);
 
--- name: CountAllTasks :one
-SELECT COUNT(*)
+-- name: CountAllTaskCalls :one
+SELECT COALESCE(SUM(COALESCE((NULLIF(btrim(params), '')::jsonb #>> '{generation,requested_output_count}')::bigint, 1)), 0)::bigint
 FROM tasks;
