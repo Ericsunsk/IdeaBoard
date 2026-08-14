@@ -292,7 +292,8 @@ func (r *Repository) runTerminalTransition(ctx context.Context, command terminal
 			return err
 		}
 		task := taskFromSQLC(taskRow)
-		if task.Status != policy.taskStatus && !(command.kind == terminalTransitionCancelled && tasks.IsTerminalStatus(task.Status) && (task.Status == tasks.StatusCancelled || task.Status == tasks.StatusCancelledWithResults)) {
+		isCompatibleCancellation := command.kind == terminalTransitionCancelled && tasks.IsTerminalStatus(task.Status) && (task.Status == tasks.StatusCancelled || task.Status == tasks.StatusCancelledWithResults)
+		if task.Status != policy.taskStatus && !isCompatibleCancellation {
 			return fmt.Errorf("task terminal fact status=%q, want %q", task.Status, policy.taskStatus)
 		}
 
