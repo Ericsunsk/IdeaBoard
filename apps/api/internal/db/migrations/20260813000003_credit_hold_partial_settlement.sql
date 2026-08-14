@@ -1,17 +1,19 @@
 ALTER TABLE credit_holds
-  DROP CONSTRAINT ck_credit_holds_terminal_consistency,
-  DROP CONSTRAINT uq_credit_holds_terminal_transaction_id,
-  DROP CONSTRAINT fk_credit_holds_terminal_transaction_id;
-
-ALTER TABLE credit_holds
   ADD COLUMN captured_amount BIGINT NOT NULL DEFAULT 0,
-  ADD COLUMN released_amount BIGINT NOT NULL DEFAULT 0;
-
-ALTER TABLE credit_holds
+  ADD COLUMN released_amount BIGINT NOT NULL DEFAULT 0,
   ADD COLUMN capture_transaction_id VARCHAR(64),
   ADD COLUMN release_transaction_id VARCHAR(64);
 
+UPDATE credit_holds
+SET captured_amount = CASE WHEN status = 'captured' THEN amount ELSE 0 END,
+    released_amount = CASE WHEN status = 'released' THEN amount ELSE 0 END,
+    capture_transaction_id = CASE WHEN status = 'captured' THEN terminal_transaction_id END,
+    release_transaction_id = CASE WHEN status = 'released' THEN terminal_transaction_id END;
+
 ALTER TABLE credit_holds
+  DROP CONSTRAINT ck_credit_holds_terminal_consistency,
+  DROP CONSTRAINT uq_credit_holds_terminal_transaction_id,
+  DROP CONSTRAINT fk_credit_holds_terminal_transaction_id,
   DROP COLUMN terminal_transaction_id,
   ADD CONSTRAINT fk_credit_holds_capture_transaction_id
     FOREIGN KEY (capture_transaction_id) REFERENCES credit_transactions(transaction_id) ON DELETE RESTRICT,

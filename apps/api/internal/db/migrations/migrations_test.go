@@ -115,6 +115,40 @@ func TestSchemaAssemblySourceIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestCreditHoldPartialSettlementBackfillsLegacyTerminalStateBeforeDroppingIt(t *testing.T) {
+	raw, err := migrationFS.ReadFile("20260813000003_credit_hold_partial_settlement.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	statements := parseSQLStatements(string(raw))
+	backfillIndex, dropColumnIndex := -1, -1
+	for index, statement := range statements {
+		sql := strings.ToLower(strings.Join(strings.Fields(statement.SQL), " "))
+		if strings.HasPrefix(sql, "update credit_holds set ") {
+			backfillIndex = index
+			for _, fragment := range []string{
+				"captured_amount = case when status = 'captured' then amount else 0 end",
+				"released_amount = case when status = 'released' then amount else 0 end",
+				"capture_transaction_id = case when status = 'captured' then terminal_transaction_id end",
+				"release_transaction_id = case when status = 'released' then terminal_transaction_id end",
+			} {
+				if !strings.Contains(sql, fragment) {
+					t.Fatalf("backfill is missing %q: %s", fragment, statement.SQL)
+				}
+			}
+		}
+		if strings.Contains(sql, "drop column terminal_transaction_id") {
+			dropColumnIndex = index
+		}
+	}
+	if backfillIndex < 0 || dropColumnIndex < 0 {
+		t.Fatalf("migration must backfill legacy terminal state before dropping terminal_transaction_id; backfill=%d drop=%d", backfillIndex, dropColumnIndex)
+	}
+	if backfillIndex >= dropColumnIndex {
+		t.Fatalf("legacy terminal state is dropped before backfill: backfill=%d drop=%d", backfillIndex, dropColumnIndex)
+	}
+}
+
 func TestSchemaSnapshotCoversCanonicalBaselineObjects(t *testing.T) {
 	baseline, err := migrationFS.ReadFile(baselineMigrationFile)
 	if err != nil {
