@@ -36,7 +36,7 @@ export type CanvasDeleteCommandLifecycleOptions<HistorySnapshot> = {
   scheduleMicrotask: (callback: () => void) => void
   onWarning: (message: string) => void
   captureActiveNodeExecutions: (nodeIds: readonly string[]) => CanvasExecutionLease[]
-  cancelNodeExecutions: (leases: readonly CanvasExecutionLease[]) => void
+  releaseNodeExecutions: (leases: readonly CanvasExecutionLease[]) => void
 }
 
 export type CanvasDeleteCommandLifecycle = {
@@ -115,7 +115,7 @@ export function createCanvasDeleteCommandLifecycle<HistorySnapshot>(
       projectionIndex,
       edgeRemoveChanges: command.edgeRemoveChanges,
       captureActiveNodeExecutions: options.captureActiveNodeExecutions,
-      cancelNodeExecutions: options.cancelNodeExecutions,
+      releaseNodeExecutions: options.releaseNodeExecutions,
     })
     return result?.didChange ?? false
   }

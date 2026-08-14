@@ -94,7 +94,6 @@ describe('useCanvasBoardRuntime', () => {
         saveSucceeded: vi.fn(),
         saveFailed: vi.fn(),
       },
-      cancelTasks: vi.fn(),
       executionRuntime: createCanvasExecutionRuntime(),
     })
 
@@ -121,7 +120,6 @@ describe('useCanvasBoardRuntime', () => {
       getUserIdentity: () => ({ userId: 7, userUid: 'user-seven' }),
       logoutAndRedirect: vi.fn(),
       feedback,
-      cancelTasks: vi.fn(),
       executionRuntime: createCanvasExecutionRuntime(),
     })
     const flowOptions = mocks.useFlowCanvasRuntime.mock.calls[0]?.[0]

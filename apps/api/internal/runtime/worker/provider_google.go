@@ -153,24 +153,38 @@ type googleProviderParams struct {
 }
 
 func readGoogleProviderParams(providerReq providerRequest) googleProviderParams {
-	model := resolveGoogleProviderModel(providerReq.Params, providerReq.Model)
+	model := normalizeGoogleModelName(providerReq.Model)
 	return googleProviderParams{
 		Model:       model,
 		UseImagen:   isGoogleImagenModel(model),
-		ImageRefs:   providerReq.MediaRefs.GoogleImages,
+		ImageRefs:   providerGoogleImageRefs(providerReq),
 		SampleCount: providerReq.OutputCount,
-		AspectRatio: parseGoogleAspectRatioValue(providerReq.Params),
+		AspectRatio: providerReq.Google.AspectRatio,
 	}
 }
 
-func resolveGoogleProviderModel(params map[string]interface{}, resolvedModel string) string {
-	if strings.TrimSpace(resolvedModel) != "" {
-		return normalizeGoogleModelName(resolvedModel)
+func providerGoogleImageRefs(providerReq providerRequest) []string {
+	refs := make([]string, 0, len(providerReq.ImageRefs)+len(providerReq.MaskRefs)+1)
+	seen := make(map[string]struct{}, cap(refs))
+	appendRef := func(ref string) {
+		ref = strings.TrimSpace(ref)
+		if ref == "" {
+			return
+		}
+		if _, exists := seen[ref]; exists {
+			return
+		}
+		seen[ref] = struct{}{}
+		refs = append(refs, ref)
 	}
-	if fromParams, ok := workflow.ReadWorkflowStringParam(params, "model"); ok && strings.TrimSpace(fromParams) != "" {
-		return normalizeGoogleModelName(fromParams)
+	for _, ref := range providerReq.ImageRefs {
+		appendRef(ref)
 	}
-	return ""
+	for _, ref := range providerReq.MaskRefs {
+		appendRef(ref)
+	}
+	appendRef(providerReq.CanvasRef)
+	return refs
 }
 
 func (c *ProviderExecutor) callGoogleAIWithRequest(ctx context.Context, account *accounts.ApiAccount, providerReq providerRequest, timeout time.Duration) (providerCallResult, error) {
@@ -500,23 +514,6 @@ func (c *ProviderExecutor) callGoogleImagenPredict(ctx context.Context, account 
 		ParsedOutputKind:  "image-results",
 		ParsedOutputCount: len(imageURLs),
 	}, nil
-}
-
-func parseGoogleAspectRatioValue(params map[string]interface{}) string {
-	if params == nil {
-		return ""
-	}
-	raw, ok := workflow.ReadWorkflowStringParam(params, "ratio")
-	if !ok {
-		return ""
-	}
-	ratio := strings.TrimSpace(raw)
-	switch ratio {
-	case "1:1", "16:9", "9:16", "3:4", "4:3":
-		return ratio
-	default:
-		return ""
-	}
 }
 
 func extractGoogleImagenResponses(respBody []byte) ([]string, error) {

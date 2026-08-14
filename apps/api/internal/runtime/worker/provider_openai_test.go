@@ -949,7 +949,7 @@ func TestOpenAIRequestFinalizerDropsRedundantFields(t *testing.T) {
 			"original_image_url": "data:image/png;base64,abc",
 		},
 	}
-	openAIRequestFinalizer{FeatureSlug: workflow.FeatureSlugStyleVariation}.apply(&reqBody)
+	openAIRequestFinalizer{DropOriginalImageRef: true}.apply(&reqBody)
 
 	if reqBody.Image != "data:image/png;base64,abc" {
 		t.Fatalf("image = %q", reqBody.Image)
@@ -966,14 +966,14 @@ func TestOpenAIRequestFinalizerDropsRedundantFields(t *testing.T) {
 		ImageURLs: []string{"https://img.example/first.png", "https://img.example/second.png"},
 		Extra:     map[string]interface{}{},
 	}
-	openAIRequestFinalizer{FeatureSlug: workflow.FeatureSlugStyleFusion}.apply(&reqBody)
+	openAIRequestFinalizer{}.apply(&reqBody)
 	if reqBody.Image != "" {
 		t.Fatalf("multi image fallback should be dropped, got %q", reqBody.Image)
 	}
 }
 
 func TestCollectOpenAIEditImageRefsIncludesReferenceImageURLs(t *testing.T) {
-	refs := collectProviderMediaRefs(map[string]interface{}{
+	refs := newProviderRequest("", 0, 0, map[string]interface{}{
 		"image_urls": []interface{}{
 			"https://img.example/source.png",
 		},
@@ -983,7 +983,7 @@ func TestCollectOpenAIEditImageRefsIncludesReferenceImageURLs(t *testing.T) {
 			" ",
 			"https://img.example/ref-b.png",
 		},
-	}).OpenAIImages
+	}, "").ImageRefs
 	want := []string{
 		"https://img.example/source.png",
 		"https://img.example/ref-a.png",

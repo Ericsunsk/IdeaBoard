@@ -59,7 +59,6 @@ export type UseFlowCanvasRuntimeOptions = {
   onWarning: (message: string) => void
   onSuccess: (message: string) => void
   onError: (message: string) => void
-  cancelTasks: (taskIds: readonly string[]) => void
   scheduleMicrotask?: (callback: () => void) => void
   scheduleAnimationFrame?: (callback: FrameRequestCallback) => number
   cancelAnimationFrame?: (handle: number) => void
@@ -68,9 +67,8 @@ export type UseFlowCanvasRuntimeOptions = {
 
 export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   const localEditVersion = ref(0)
-  const cancelNodeExecutions = (leases: readonly CanvasExecutionLease[]) => {
-    const taskIds = options.executionRuntime.cancelNodeExecutions(leases)
-    if (taskIds.length > 0) options.cancelTasks(taskIds)
+  const releaseNodeExecutions = (leases: readonly CanvasExecutionLease[]) => {
+    options.executionRuntime.releaseNodeExecutions(leases)
   }
   const historyGroups: { value: unknown[] } = {
     get value() {
@@ -334,7 +332,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     markDirty,
     onWarning: options.onWarning,
     captureActiveNodeExecutions: options.executionRuntime.captureActiveNodeExecutions,
-    cancelNodeExecutions,
+    releaseNodeExecutions,
   })
 
   const nodeDragLifecycle: CanvasNodeDragLifecycle = createCanvasNodeDragLifecycle({
@@ -378,7 +376,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       ((callback: () => void) => void Promise.resolve().then(callback)),
     onWarning: options.onWarning,
     captureActiveNodeExecutions: options.executionRuntime.captureActiveNodeExecutions,
-    cancelNodeExecutions,
+    releaseNodeExecutions,
   })
 
   function deleteNode(nodeId: string): boolean {

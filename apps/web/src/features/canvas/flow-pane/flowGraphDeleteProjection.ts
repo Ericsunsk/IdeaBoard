@@ -25,7 +25,7 @@ type FlowGraphDeleteProjectionOptions = {
   projectionIndex: FlowEdgeProjectionIndex
   edgeRemoveChanges?: readonly EdgeChange[]
   captureActiveNodeExecutions: (nodeIds: readonly string[]) => CanvasExecutionLease[]
-  cancelNodeExecutions: (leases: readonly CanvasExecutionLease[]) => void
+  releaseNodeExecutions: (leases: readonly CanvasExecutionLease[]) => void
 }
 
 function resolveGraphNodeIdForFlowNode(node: Pick<Node, 'id' | 'data'>): CanvasGraphNodeId | null {
@@ -61,6 +61,30 @@ function resolveRemovedFlowNodeIds(
   }
 
   return Array.from(flowNodeIds)
+}
+
+function resolveImageTargetsForRemovedSources(
+  nodes: readonly Node[],
+  edges: readonly Edge[],
+  removedFlowNodeIds: readonly string[],
+): string[] {
+  const removedNodeIds = new Set(removedFlowNodeIds)
+  const nodesById = new Map(nodes.map((node) => [node.id, node]))
+  return Array.from(
+    new Set(
+      edges.flatMap((edge) => {
+        if (
+          !removedNodeIds.has(edge.source) ||
+          edge.sourceHandle !== 'out:image' ||
+          edge.targetHandle !== 'in:image'
+        ) {
+          return []
+        }
+        const target = nodesById.get(edge.target)
+        return target?.data?.kind === 'image' ? [target.id] : []
+      }),
+    ),
+  )
 }
 
 function createNodeRemoveChanges(flowNodeIds: readonly string[]): NodeChange[] {
@@ -118,12 +142,30 @@ export function applyFlowGraphDeleteProjection(
   const { summary } = options.commitPolicy
   if (!summary.didChange) return null
 
-  const removedFlowNodeIds = resolveRemovedFlowNodeIds(
+  const explicitlyRemovedFlowNodeIds = resolveRemovedFlowNodeIds(
     options.nodes,
     summary.removedNodeIds,
     options.flowNodeIds,
   )
-  const executionLeases = options.captureActiveNodeExecutions(removedFlowNodeIds)
+  const candidateSlotNodeIds = resolveImageTargetsForRemovedSources(
+    options.nodes,
+    options.edges,
+    explicitlyRemovedFlowNodeIds,
+  )
+  const capturedExecutionLeases = options.captureActiveNodeExecutions(
+    Array.from(new Set([...explicitlyRemovedFlowNodeIds, ...candidateSlotNodeIds])),
+  )
+  const activeExecutionNodeIds = new Set(capturedExecutionLeases.map((lease) => lease.nodeId))
+  const removedFlowNodeIds = Array.from(
+    new Set([
+      ...explicitlyRemovedFlowNodeIds,
+      ...candidateSlotNodeIds.filter((nodeId) => activeExecutionNodeIds.has(nodeId)),
+    ]),
+  )
+  const removedFlowNodeIdSet = new Set(removedFlowNodeIds)
+  const executionLeases = capturedExecutionLeases.filter((lease) =>
+    removedFlowNodeIdSet.has(lease.nodeId),
+  )
   const result = applyCanvasGraphCommitPolicy(options.commitPolicy, (commandOptions) =>
     options.graphAdapter.applyGraphChanges(
       {
@@ -141,7 +183,7 @@ export function applyFlowGraphDeleteProjection(
   )
 
   if (result.didChange) {
-    options.cancelNodeExecutions(executionLeases)
+    options.releaseNodeExecutions(executionLeases)
   }
 
   return result

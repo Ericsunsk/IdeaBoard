@@ -119,6 +119,24 @@ describe('CanvasExecutionRuntime', () => {
 
     expect(runtime.cancelNodeExecutions([secondLease])).toEqual(['task-shared'])
   })
+
+  it('releases deleted slots without cancelling their submitted task', () => {
+    const runtime = createCanvasExecutionRuntime()
+    const attachment = runtime.attachBoard('board-a')
+    const succeededLease = runtime.hydratePending(attachment, 'image-2', 'task-shared')!
+    const deletedLease = runtime.hydratePending(attachment, 'image-3', 'task-shared')!
+
+    runtime.transitionNode(succeededLease, { status: 'succeeded', taskId: 'task-shared' })
+    runtime.releaseNodeExecutions([deletedLease])
+
+    expect(runtime.getNodeState('image-2')).toEqual({
+      status: 'succeeded',
+      taskId: 'task-shared',
+    })
+    expect(runtime.getNodeState('image-3')).toBeNull()
+    expect(runtime.getNodeLease('image-3')).toBeNull()
+    expect(runtime.cancelNodeExecutions([deletedLease])).toEqual([])
+  })
 })
 
 describe('projectCanvasExecutionEdgeAnimation', () => {

@@ -112,7 +112,7 @@ function createHarness() {
     markDirty,
     onWarning: vi.fn(),
     captureActiveNodeExecutions: vi.fn(() => []),
-    cancelNodeExecutions: vi.fn(),
+    releaseNodeExecutions: vi.fn(),
   })
 
   return {

@@ -353,7 +353,6 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect(mocks.useCanvasBoardRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
         feedback: mocks.feedback.boardSession,
-        cancelTasks: mocks.cancelTasks,
         executionRuntime: expect.objectContaining({
           beginSubmission: expect.any(Function),
           hydratePending: expect.any(Function),

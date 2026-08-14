@@ -85,6 +85,7 @@ export type RunReservedPendingImageResultsParams = {
   isPendingError: (error: unknown) => boolean
   persistPendingTaskIds?: boolean
   afterTaskIdAttached?: (params: { resultNodeId: string; taskId: string }) => Promise<void>
+  onOutcome?: (outcome: PendingImageResultOutcome) => void
 }
 
 export type MaterializeResolvedAttachedPendingImageResultsParams = {
@@ -550,7 +551,11 @@ export function usePendingImageResultExecution(
     return { resultNodeIds }
   }
 
-  function attachPendingTaskId(params: { resultNodeId: string; taskId: string; resultIndex: number }) {
+  function attachPendingTaskId(params: {
+    resultNodeId: string
+    taskId: string
+    resultIndex: number
+  }) {
     const normalizedTaskId = params.taskId.trim()
     if (!normalizedTaskId) return
     const targetNode = options.nodes.value.find((item) => item.id === params.resultNodeId)
@@ -625,7 +630,13 @@ export function usePendingImageResultExecution(
     const resolvedResults = new Array<ResultMaterializerImageResult | null>(
       resultNodeIds.length,
     ).fill(null)
+    const taskIds = new Array<string | undefined>(resultNodeIds.length).fill(undefined)
     const outcomes = new Array<PendingImageResultOutcome | null>(resultNodeIds.length).fill(null)
+
+    const setOutcome = (index: number, outcome: PendingImageResultOutcome) => {
+      outcomes[index] = outcome
+      params.onOutcome?.(outcome)
+    }
 
     let pendingCount = 0
     let failureCount = 0
@@ -640,6 +651,7 @@ export function usePendingImageResultExecution(
         try {
           const submission = await params.submitTask(resultNodeId)
           taskId = submission.taskId
+          taskIds[index] = taskId
           if (persistPendingTaskIds && isResultCurrent(resultNodeId, taskId)) {
             attachPendingTaskId({ resultNodeId, taskId, resultIndex: index })
             await params.afterTaskIdAttached?.({ resultNodeId, taskId })
@@ -654,11 +666,12 @@ export function usePendingImageResultExecution(
               resultNodeId,
               taskId: persistPendingTaskIds ? taskId : undefined,
             }
-          }
-          outcomes[index] = {
-            resultNodeId,
-            status: 'cancelled',
-            taskId,
+          } else {
+            setOutcome(index, {
+              resultNodeId,
+              status: 'cancelled',
+              taskId,
+            })
           }
         } catch (error) {
           const hasCurrentExecution = !!taskId && isResultCurrent(resultNodeId, taskId)
@@ -669,11 +682,11 @@ export function usePendingImageResultExecution(
             if (!persistPendingTaskIds && hasCurrentExecution) {
               cancelPendingResult({ resultNodeId })
             }
-            outcomes[index] = {
+            setOutcome(index, {
               resultNodeId,
               status: persistPendingTaskIds && hasCurrentExecution ? 'pending' : 'cancelled',
               taskId,
-            }
+            })
             return
           }
           const ownsReservation =
@@ -684,11 +697,11 @@ export function usePendingImageResultExecution(
             failures.push(error)
             failureCount += 1
           }
-          outcomes[index] = {
+          setOutcome(index, {
             resultNodeId,
             status: isCancelled ? 'cancelled' : 'failed',
             taskId,
-          }
+          })
           if (ownsReservation) {
             cancelPendingResult({ resultNodeId })
           }
@@ -703,7 +716,7 @@ export function usePendingImageResultExecution(
       const materialized = materializeResolvedAttachedPendingResults({
         results: materializableResults,
         isAttached: (result) => {
-          const taskId = outcomes[resultNodeIds.indexOf(result.resultNodeId)]?.taskId
+          const taskId = taskIds[resultNodeIds.indexOf(result.resultNodeId)]
           return !!taskId && isResultCurrent(result.resultNodeId, taskId)
         },
       })
@@ -711,11 +724,11 @@ export function usePendingImageResultExecution(
       materializableResults.forEach((result) => {
         const index = resultNodeIds.indexOf(result.resultNodeId)
         if (index < 0) return
-        outcomes[index] = {
+        setOutcome(index, {
           resultNodeId: result.resultNodeId,
           status: materializedNodeIds.has(result.resultNodeId) ? 'succeeded' : 'cancelled',
-          taskId: outcomes[index]?.taskId,
-        }
+          taskId: taskIds[index],
+        })
       })
     }
 

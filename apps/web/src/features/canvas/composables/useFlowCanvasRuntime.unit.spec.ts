@@ -259,7 +259,6 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
   }
   const isDirty = ref(false)
   const saveStatus = ref<SaveStatus>('idle')
-  const cancelTasks = vi.fn()
   const executionRuntime = createCanvasExecutionRuntime()
   const boardSession: CanvasBoardSession = {
     currentBoardId: computed(() => 'board-a'),
@@ -286,7 +285,6 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     onWarning,
     onSuccess: vi.fn(),
     onError,
-    cancelTasks,
     scheduleMicrotask: (callback) => {
       scheduledMicrotasks.push(callback)
     },
@@ -347,7 +345,6 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     boardSession,
     onWarning,
     onError,
-    cancelTasks,
     graphActions,
     isDirty,
     saveStatus,
@@ -1238,7 +1235,7 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.isDirty.value).toBe(false)
   })
 
-  it('deletes a selected group with member nodes, connected edges, running task cancellation, and undo redo', async () => {
+  it('deletes a selected group with member nodes and releases local execution without cancelling the task', async () => {
     const snapshot = createSnapshot()
     snapshot.imageNodes[0].pendingTaskId = 'task-running-1'
     snapshot.imageNodes[0].outputStatus = 'running'
@@ -1254,7 +1251,7 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-2'])
     expect(harness.fullEdges.value).toEqual([])
     expect(harness.boardBaseSnapshot.value.groups).toEqual([])
-    expect(harness.cancelTasks).toHaveBeenCalledWith(['task-running-1'])
+    expect(harness.executionRuntime.getNodeState('image-1')).toBeNull()
     expect(harness.isDirty.value).toBe(true)
 
     harness.runtime.persistence.history.undo()
@@ -2362,7 +2359,7 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toEqual([])
     expect(harness.boardBaseSnapshot.value.groups).toEqual([createGroup('group-1', ['prompt-1'])])
-    expect(harness.cancelTasks).toHaveBeenCalledWith(['task-ui-delete'])
+    expect(harness.executionRuntime.getNodeState('image-1')).toBeNull()
     expect(harness.isDirty.value).toBe(true)
 
     harness.runtime.persistence.history.undo()
@@ -2387,6 +2384,71 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.savedSnapshots[0]?.groups).toEqual([createGroup('group-1', ['prompt-1'])])
   })
 
+  it('removes a deleted source pending slots without cancelling their shared task', async () => {
+    const snapshot = createSnapshot()
+    snapshot.imageNodes.push(
+      {
+        id: 2,
+        type: 'image-node',
+        x: 760,
+        y: 40,
+        width: 280,
+        sourceImageUrl: '',
+        sourceImageRatio: 1,
+        outputStatus: 'running',
+        outputImages: [],
+        pendingTaskId: 'task-shared',
+        pendingResultIndex: 0,
+      },
+      {
+        id: 3,
+        type: 'image-node',
+        x: 760,
+        y: 380,
+        width: 280,
+        sourceImageUrl: '',
+        sourceImageRatio: 1,
+        outputStatus: 'running',
+        outputImages: [],
+        pendingTaskId: 'task-shared',
+        pendingResultIndex: 1,
+      },
+    )
+    snapshot.connections.push(
+      {
+        id: 4,
+        fromNodeType: 'prompt',
+        fromNodeId: 1,
+        fromPort: 'image',
+        toNodeType: 'image',
+        toNodeId: 2,
+        toPort: 'image',
+      },
+      {
+        id: 5,
+        fromNodeType: 'prompt',
+        fromNodeId: 1,
+        fromPort: 'image',
+        toNodeType: 'image',
+        toNodeId: 3,
+        toPort: 'image',
+      },
+    )
+    const harness = createRuntimeHarness(snapshot)
+    await harness.runtime.persistence.loadInitialOrRouteBoard()
+    await nextTick()
+
+    expect(harness.executionRuntime.getNodeState('image-2')).toEqual({
+      status: 'running',
+      taskId: 'task-shared',
+    })
+    expect(harness.runtime.graphEditing.deleteNode('prompt-1')).toBe(true)
+
+    expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['image-1', 'prompt-2'])
+    expect(harness.executionRuntime.getNodeState('image-2')).toBeNull()
+    expect(harness.executionRuntime.getNodeState('image-3')).toBeNull()
+  })
+
   it('warns without mutation when UI node deletion receives a non-canonical id', async () => {
     const harness = createRuntimeHarness()
     await harness.runtime.persistence.loadInitialOrRouteBoard()
@@ -2404,7 +2466,6 @@ describe('useFlowCanvasRuntime', () => {
 
     expect(harness.onWarning).toHaveBeenCalledWith('删除操作未能写入画布，请刷新后重试')
     expect(exportCurrentBoardSnapshot(harness)).toEqual(graphBefore)
-    expect(harness.cancelTasks).not.toHaveBeenCalled()
     expect(harness.isDirty.value).toBe(false)
   })
 
@@ -2444,7 +2505,6 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.fullNodes.value).toBe(nodesBefore)
     expect(harness.fullEdges.value).toBe(edgesBefore)
     expect(harness.boardBaseSnapshot.value.groups).toBe(groupsBefore)
-    expect(harness.cancelTasks).not.toHaveBeenCalled()
     expect(harness.isDirty.value).toBe(false)
     expect(harness.saveStatus.value).toBe(saveStatusBefore)
 
@@ -2512,7 +2572,7 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.savedSnapshots[0]?.connections.map((connection) => connection.id)).toEqual([3])
   })
 
-  it('stops pending task when native delete removes a running image node', async () => {
+  it('releases the pending slot without cancelling its submitted task on native delete', async () => {
     const snapshot = createSnapshot()
     snapshot.imageNodes[0] = {
       ...snapshot.imageNodes[0]!,
@@ -2526,7 +2586,7 @@ describe('useFlowCanvasRuntime', () => {
 
     await harness.applyNativeNodeChanges([{ id: 'image-1', type: 'remove' }])
 
-    expect(harness.cancelTasks).toHaveBeenCalledWith(['task-native-delete'])
+    expect(harness.executionRuntime.getNodeState('image-1')).toBeNull()
   })
 
   it('records native edge remove before node remove as one cleanup', async () => {

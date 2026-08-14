@@ -218,6 +218,7 @@ type providerCallOutput struct {
 type providerExecutionConfig struct {
 	APIType              string
 	ProviderEndpointName string
+	FeatureSlug          string
 	Timeout              time.Duration
 	LocalRedrawCtx       *localRedrawContext
 	Request              providerRequest
@@ -238,7 +239,7 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 	callResult, err := c.callProviderBatchWithRequest(ctx, account, exec)
 	providerFinishedAt := time.Now()
 	output.Timeline.ProviderFinishedAt = &providerFinishedAt
-	featureSlug := providerRequestFeatureSlug(exec.Request)
+	featureSlug := exec.FeatureSlug
 
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
@@ -413,13 +414,6 @@ func resolvedProviderParsedOutputCount(callResult providerCallResult, imageURLs 
 	return len(imageURLs)
 }
 
-func providerRequestFeatureSlug(req providerRequest) string {
-	if slug, err := workflow.ResolveWorkflowFeatureSlug(req.Params); err == nil {
-		return slug
-	}
-	return ""
-}
-
 func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account *accounts.ApiAccount, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (providerExecutionConfig, error) {
 	if account.ApiKey == "" {
 		return providerExecutionConfig{}, newExecutionFailureError(
@@ -478,6 +472,7 @@ func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account
 	return providerExecutionConfig{
 		APIType:              apiType,
 		ProviderEndpointName: providerEndpointName,
+		FeatureSlug:          taskParams.featureSlug(),
 		Timeout:              timeout,
 		LocalRedrawCtx:       localRedrawCtx,
 		Request:              taskParams.providerRequest(task.Prompt, resolvedModel),

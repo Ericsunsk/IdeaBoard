@@ -620,6 +620,70 @@ describe('usePendingImageResultExecution', () => {
     )
   })
 
+  it('publishes trusted terminal outcomes per slot while a shared batch is still running', async () => {
+    const harness = createHarness([makePromptNode('prompt-1')])
+    const success = createDeferred<{
+      url: string
+      ratio: number
+      width: number
+      height: number
+    }>()
+    const reservation = harness.actions.reservePendingResults({
+      source: { url: 'https://example.com/source.png', ratio: 1 },
+      sourceNodeId: 'prompt-1',
+      outputCount: 3,
+    })
+    const outcomes: Array<{ resultNodeId: string; status: string; taskId?: string }> = []
+    const run = harness.actions.runReservedPendingResults({
+      resultNodeIds: reservation.resultNodeIds,
+      submitTask: async () => ({ taskId: 'task-shared' }),
+      resolveResult: async (_taskId, resultNodeId) => {
+        if (resultNodeId === reservation.resultNodeIds[0]) return success.promise
+        if (resultNodeId === reservation.resultNodeIds[1]) throw new Error('slot failed')
+        throw new TaskCancelledError('slot cancelled')
+      },
+      isCurrent: () => true,
+      isResultExecutionCurrent: () => true,
+      isPendingError: () => false,
+      onOutcome: (outcome) => outcomes.push(outcome),
+    })
+
+    await flushPromises()
+    expect(outcomes).toEqual(
+      expect.arrayContaining([
+        {
+          resultNodeId: reservation.resultNodeIds[1],
+          status: 'failed',
+          taskId: 'task-shared',
+        },
+        {
+          resultNodeId: reservation.resultNodeIds[2],
+          status: 'cancelled',
+          taskId: 'task-shared',
+        },
+      ]),
+    )
+    expect(outcomes.some((outcome) => outcome.status === 'succeeded')).toBe(false)
+
+    success.resolve({
+      url: 'https://example.com/success.png',
+      ratio: 1,
+      width: 400,
+      height: 400,
+    })
+    const summary = await run
+
+    expect(summary).toMatchObject({ successCount: 1, failureCount: 1, pendingCount: 0 })
+    expect(outcomes.at(-1)).toEqual({
+      resultNodeId: reservation.resultNodeIds[0],
+      status: 'succeeded',
+      taskId: 'task-shared',
+    })
+    expect(
+      harness.nodes.value.filter((node) => reservation.resultNodeIds.includes(node.id)),
+    ).toHaveLength(1)
+  })
+
   it('keeps persisted pending results when task resolution is still pending', async () => {
     const harness = createHarness([makeAnchorNode()])
     const pendingError = new Error('任务进度推送超时，请稍后查看结果')

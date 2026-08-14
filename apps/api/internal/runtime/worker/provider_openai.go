@@ -24,7 +24,6 @@ import (
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/safehttp"
-	"ideaboard/api/internal/workflow"
 )
 
 const maxOpenAIDataURLBytes = 10 * 1024 * 1024
@@ -48,11 +47,18 @@ type openAIImageRequestBody struct {
 }
 
 type openAIProviderParams struct {
-	FeatureSlug     string
-	EditImageRefs   []string
-	MaskImageRef    string
-	SharedExtras    map[string]interface{}
-	HDOutputQuality *int
+	EditImageRefs        []string
+	MaskImageRef         string
+	OriginalImageRef     string
+	UseEditEndpoint      bool
+	DropOriginalImageRef bool
+	RemoveBackground     bool
+	VariationStrength    *float64
+	ExtendTop            *float64
+	ExtendRight          *float64
+	ExtendBottom         *float64
+	ExtendLeft           *float64
+	HDOutputQuality      *int
 }
 
 type openAIImageModelCapabilities struct {
@@ -60,7 +66,7 @@ type openAIImageModelCapabilities struct {
 }
 
 type openAIRequestFinalizer struct {
-	FeatureSlug string
+	DropOriginalImageRef bool
 }
 
 var defaultOpenAIImageModelCapabilities = openAIImageModelCapabilities{
@@ -98,64 +104,52 @@ func (f openAIRequestFinalizer) dropRedundantDataURLImageList(reqBody *openAIIma
 }
 
 func (f openAIRequestFinalizer) dropRedundantStyleVariationOriginalRef(reqBody *openAIImageRequestBody) {
-	if f.FeatureSlug != workflow.FeatureSlugStyleVariation {
+	if !f.DropOriginalImageRef {
 		return
 	}
 	delete(reqBody.Extra, "original_image_url")
 }
 
 func readOpenAIProviderParams(providerReq providerRequest) openAIProviderParams {
-	params := providerReq.Params
 	out := openAIProviderParams{
-		EditImageRefs: normalizeOpenAIImageURLStrings(providerReq.MediaRefs.OpenAIImages),
-		SharedExtras:  readOpenAISharedExtras(params),
+		EditImageRefs:        normalizeOpenAIImageURLStrings(providerReq.ImageRefs),
+		OriginalImageRef:     providerReq.CanvasRef,
+		UseEditEndpoint:      providerReq.OpenAI.UseEditEndpoint,
+		DropOriginalImageRef: providerReq.OpenAI.DropOriginalImageRef,
+		RemoveBackground:     providerReq.OpenAI.RemoveBackground,
+		VariationStrength:    providerReq.OpenAI.VariationStrength,
+		ExtendTop:            providerReq.OpenAI.ExtendTop,
+		ExtendRight:          providerReq.OpenAI.ExtendRight,
+		ExtendBottom:         providerReq.OpenAI.ExtendBottom,
+		ExtendLeft:           providerReq.OpenAI.ExtendLeft,
+		HDOutputQuality:      providerReq.OpenAI.HDOutputQuality,
 	}
-	if params == nil {
-		return out
-	}
-	out.FeatureSlug, _ = workflow.ReadWorkflowStringParam(params, "feature")
-	if maskURL, ok := workflow.ReadWorkflowStringParam(params, "mask_image_url"); ok {
-		out.MaskImageRef = strings.TrimSpace(maskURL)
-	}
-	if out.FeatureSlug == workflow.FeatureSlugHDUpscale {
-		if hd, ok := workflow.ReadHDUpscalePromptContract(params); ok {
-			quality := resolveOpenAIHDUpscaleOutputQuality(hd.ClarityStrength)
-			out.HDOutputQuality = &quality
-		}
+	if len(providerReq.MaskRefs) > 0 {
+		out.MaskImageRef = strings.TrimSpace(providerReq.MaskRefs[0])
 	}
 	return out
 }
 
-func readOpenAISharedExtras(params map[string]interface{}) map[string]interface{} {
-	extras := map[string]interface{}{}
-	for _, key := range openAISharedAllowedParamKeys() {
-		if v, ok := params[key]; ok {
-			extras[key] = v
-		}
-	}
-	return extras
-}
-
 func (p openAIProviderParams) useEditEndpoint() bool {
-	if len(p.EditImageRefs) == 0 {
-		return false
-	}
-	switch p.FeatureSlug {
-	case workflow.FeatureSlugImageExtend,
-		workflow.FeatureSlugPartialEdit,
-		workflow.FeatureSlugRemoveBg,
-		workflow.FeatureSlugSketchToImage,
-		workflow.FeatureSlugStyleVariation,
-		workflow.FeatureSlugStyleFusion:
-		return true
-	default:
-		return false
-	}
+	return p.UseEditEndpoint && len(p.EditImageRefs) > 0
 }
 
 func (p openAIProviderParams) applySharedExtras(reqBody *openAIImageRequestBody) {
-	for key, value := range p.SharedExtras {
-		reqBody.setExtra(key, value)
+	if p.VariationStrength != nil {
+		reqBody.setExtra("variation_strength", *p.VariationStrength)
+	}
+	for key, value := range map[string]*float64{
+		"extend_top":    p.ExtendTop,
+		"extend_right":  p.ExtendRight,
+		"extend_bottom": p.ExtendBottom,
+		"extend_left":   p.ExtendLeft,
+	} {
+		if value != nil {
+			reqBody.setExtra(key, *value)
+		}
+	}
+	if p.OriginalImageRef != "" {
+		reqBody.setExtra("original_image_url", p.OriginalImageRef)
 	}
 	if p.HDOutputQuality != nil {
 		reqBody.setExtra("output_quality", *p.HDOutputQuality)
@@ -231,8 +225,7 @@ func (c *ProviderExecutor) callOpenAIWithRequest(ctx context.Context, account *a
 	size := providerReq.Size
 	openAIParams := readOpenAIProviderParams(providerReq)
 	useEditEndpoint := openAIParams.useEditEndpoint()
-	imageInputCount := len(providerReq.MediaRefs.OpenAIImages)
-	featureSlug := openAIParams.FeatureSlug
+	imageInputCount := len(providerReq.ImageRefs)
 
 	reqBody := newOpenAIImageRequestBody(providerReq)
 
@@ -282,7 +275,7 @@ func (c *ProviderExecutor) callOpenAIWithRequest(ctx context.Context, account *a
 	}
 	req.Header.Set("Authorization", "Bearer "+account.ApiKey)
 
-	slog.Info("OpenAI-compatible image request", "feature", featureSlug, "endpoint", redactLogURL(endpoint), "model", model, "size", size, "edit", useEditEndpoint, "images", imageInputCount)
+	slog.Info("OpenAI-compatible image request", "endpoint", redactLogURL(endpoint), "model", model, "size", size, "edit", useEditEndpoint, "images", imageInputCount)
 
 	resp, err := safehttp.DoRequestWithAllowHosts(ctx, req, timeout, outbound.AllowHosts(ctx)...)
 	if err != nil {
@@ -305,7 +298,7 @@ func (c *ProviderExecutor) callOpenAIWithRequest(ctx context.Context, account *a
 		return providerCallResult{}, newUpstreamHTTPErrorFromResponse(resp, truncateErrorBody(string(respBody)))
 	}
 
-	imageURLs, err := extractOpenAIImageResponses(respBody, providerReq.Params)
+	imageURLs, err := extractOpenAIImageResponses(respBody)
 	if err != nil {
 		return providerCallResult{
 			Model:            model,
@@ -534,10 +527,6 @@ func openAIImageURLRefs(refs []string) []openAIImageURLRef {
 }
 
 func appendOpenAIAllowedParams(reqBody *openAIImageRequestBody, providerReq providerRequest, openAIParams openAIProviderParams) {
-	if providerReq.Params == nil {
-		return
-	}
-
 	if imageURLs := openAIParams.EditImageRefs; len(imageURLs) > 0 {
 		if len(imageURLs) == 1 {
 			reqBody.Image = imageURLs[0]
@@ -548,24 +537,13 @@ func appendOpenAIAllowedParams(reqBody *openAIImageRequestBody, providerReq prov
 	openAIParams.applySharedExtras(reqBody)
 }
 
-func openAISharedAllowedParamKeys() []string {
-	return []string{
-		"variation_strength",
-		"extend_top",
-		"extend_right",
-		"extend_bottom",
-		"extend_left",
-		"original_image_url",
-	}
-}
-
 func resolveOpenAIHDUpscaleOutputQuality(clarityStrength float64) int {
 	clarityStrength = math.Max(0, math.Min(100, math.Round(clarityStrength)))
 	return int(math.Max(60, math.Min(100, math.Round(60+clarityStrength*0.4))))
 }
 
 func finalizeOpenAIRequestBody(reqBody *openAIImageRequestBody, openAIParams openAIProviderParams) {
-	openAIRequestFinalizer{FeatureSlug: openAIParams.FeatureSlug}.apply(reqBody)
+	openAIRequestFinalizer{DropOriginalImageRef: openAIParams.DropOriginalImageRef}.apply(reqBody)
 }
 
 func trustedRuntimeAssetHosts(publicOrigins config.PublicOriginsConfig) []string {
@@ -592,9 +570,6 @@ func normalizeOpenAIImageURLStrings(refs []string) []string {
 }
 
 func appendOpenAIEditParams(reqBody *openAIImageRequestBody, providerReq providerRequest, openAIParams openAIProviderParams) error {
-	if providerReq.Params == nil {
-		return nil
-	}
 	if refs := openAIImageURLRefs(openAIParams.EditImageRefs); len(refs) > 0 {
 		reqBody.Images = refs
 	}
@@ -603,7 +578,7 @@ func appendOpenAIEditParams(reqBody *openAIImageRequestBody, providerReq provide
 	}
 
 	openAIParams.applySharedExtras(reqBody)
-	if openAIParams.FeatureSlug == workflow.FeatureSlugRemoveBg {
+	if openAIParams.RemoveBackground {
 		if err := applyOpenAIRemoveBgOutputOptions(reqBody, providerReq); err != nil {
 			return err
 		}
@@ -629,7 +604,7 @@ func openAIImageModelCapabilitiesFor(model string) openAIImageModelCapabilities 
 	return defaultOpenAIImageModelCapabilities
 }
 
-func extractOpenAIImageResponses(respBody []byte, params map[string]interface{}) ([]string, error) {
+func extractOpenAIImageResponses(respBody []byte) ([]string, error) {
 	var respData struct {
 		Data []struct {
 			URL     string `json:"url"`
@@ -649,15 +624,11 @@ func extractOpenAIImageResponses(respBody []byte, params map[string]interface{})
 			continue
 		}
 		if strings.TrimSpace(item.B64JSON) != "" {
-			urls = append(urls, "data:"+inferOpenAIImageMimeType(params)+";base64,"+strings.TrimSpace(item.B64JSON))
+			urls = append(urls, "data:image/png;base64,"+strings.TrimSpace(item.B64JSON))
 		}
 	}
 	if len(urls) == 0 {
 		return nil, fmt.Errorf("API 未返回可用图片")
 	}
 	return urls, nil
-}
-
-func inferOpenAIImageMimeType(params map[string]interface{}) string {
-	return "image/png"
 }

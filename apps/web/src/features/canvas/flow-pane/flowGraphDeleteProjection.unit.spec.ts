@@ -162,7 +162,7 @@ describe('flowGraphDeleteProjection', () => {
     const { graphAdapter, applyGraphChanges } = createGraphAdapter()
     const executionLease = { nodeId: imageNode.id } as CanvasExecutionLease
     const captureActiveNodeExecutions = vi.fn(() => [executionLease])
-    const cancelNodeExecutions = vi.fn()
+    const releaseNodeExecutions = vi.fn()
 
     applyFlowGraphDeleteProjection({
       graphAdapter,
@@ -177,7 +177,7 @@ describe('flowGraphDeleteProjection', () => {
       flowNodeIds: [imageNode.id],
       projectionIndex: createProjectionIndex([generatedEdge]),
       captureActiveNodeExecutions,
-      cancelNodeExecutions,
+      releaseNodeExecutions,
     })
 
     const projectedChanges = applyGraphChanges.mock.calls[0]?.[0]
@@ -191,12 +191,12 @@ describe('flowGraphDeleteProjection', () => {
       }),
     ])
     expect(captureActiveNodeExecutions).toHaveBeenCalledWith(['node-image-1'])
-    expect(cancelNodeExecutions).toHaveBeenCalledWith([executionLease])
+    expect(releaseNodeExecutions).toHaveBeenCalledWith([executionLease])
     expect(captureActiveNodeExecutions.mock.invocationCallOrder[0]).toBeLessThan(
       applyGraphChanges.mock.invocationCallOrder[0]!,
     )
     expect(applyGraphChanges.mock.invocationCallOrder[0]).toBeLessThan(
-      cancelNodeExecutions.mock.invocationCallOrder[0]!,
+      releaseNodeExecutions.mock.invocationCallOrder[0]!,
     )
   })
 
@@ -213,7 +213,7 @@ describe('flowGraphDeleteProjection', () => {
     const { graphAdapter, applyGraphChanges } = createGraphAdapter()
     const executionLease = { nodeId: imageNode.id } as CanvasExecutionLease
     const captureActiveNodeExecutions = vi.fn(() => [executionLease])
-    const cancelNodeExecutions = vi.fn()
+    const releaseNodeExecutions = vi.fn()
 
     applyFlowGraphDeleteProjection({
       graphAdapter,
@@ -228,7 +228,7 @@ describe('flowGraphDeleteProjection', () => {
       },
       projectionIndex: createProjectionIndex([edge]),
       captureActiveNodeExecutions,
-      cancelNodeExecutions,
+      releaseNodeExecutions,
     })
 
     const projectedChanges = applyGraphChanges.mock.calls[0]?.[0]
@@ -245,12 +245,61 @@ describe('flowGraphDeleteProjection', () => {
       }),
     ])
     expect(captureActiveNodeExecutions).toHaveBeenCalledWith(['image-1', 'prompt-1'])
-    expect(cancelNodeExecutions).toHaveBeenCalledWith([executionLease])
+    expect(releaseNodeExecutions).toHaveBeenCalledWith([executionLease])
     expect(captureActiveNodeExecutions.mock.invocationCallOrder[0]).toBeLessThan(
       applyGraphChanges.mock.invocationCallOrder[0]!,
     )
     expect(applyGraphChanges.mock.invocationCallOrder[0]).toBeLessThan(
-      cancelNodeExecutions.mock.invocationCallOrder[0]!,
+      releaseNodeExecutions.mock.invocationCallOrder[0]!,
     )
+  })
+
+  it('removes active output slots with their source and preserves completed images', () => {
+    const sourceNode = createPromptNode()
+    const firstSlot = createImageNode('image-2', 'task-shared')
+    const secondSlot = createImageNode('image-3', 'task-shared')
+    const completedImage = createImageNode('image-4')
+    const edges = [firstSlot, secondSlot, completedImage].map(
+      (slot, index) =>
+        ({
+          id: `pending-edge-${index}`,
+          source: sourceNode.id,
+          sourceHandle: 'out:image',
+          target: slot.id,
+          targetHandle: 'in:image',
+        }) as Edge,
+    )
+    const { graphAdapter, applyGraphChanges } = createGraphAdapter()
+    const leases = [
+      { nodeId: firstSlot.id } as CanvasExecutionLease,
+      { nodeId: secondSlot.id } as CanvasExecutionLease,
+    ]
+    const captureActiveNodeExecutions = vi.fn(() => leases)
+    const releaseNodeExecutions = vi.fn()
+
+    applyFlowGraphDeleteProjection({
+      graphAdapter,
+      nodes: [sourceNode, firstSlot, secondSlot, completedImage],
+      edges,
+      commitPolicy: {
+        summary: createDeleteSummary({ removedNodeIds: ['prompt-1'] }),
+      },
+      projectionIndex: createProjectionIndex(edges),
+      captureActiveNodeExecutions,
+      releaseNodeExecutions,
+    })
+
+    expect(applyGraphChanges.mock.calls[0]?.[0].nodes).toEqual([
+      { id: 'prompt-1', type: 'remove' },
+      { id: 'image-2', type: 'remove' },
+      { id: 'image-3', type: 'remove' },
+    ])
+    expect(captureActiveNodeExecutions).toHaveBeenCalledWith([
+      'prompt-1',
+      'image-2',
+      'image-3',
+      'image-4',
+    ])
+    expect(releaseNodeExecutions).toHaveBeenCalledWith(leases)
   })
 })

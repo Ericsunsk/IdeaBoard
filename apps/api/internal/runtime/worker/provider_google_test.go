@@ -205,7 +205,7 @@ func TestBuildGoogleModelEndpoint(t *testing.T) {
 }
 
 func TestCollectGoogleImageRefsIncludesReferenceImageURLs(t *testing.T) {
-	refs := collectProviderMediaRefs(map[string]interface{}{
+	req := newProviderRequest("", 0, 0, map[string]interface{}{
 		"image_urls": []interface{}{
 			"data:image/png;base64,aGVsbG8=",
 		},
@@ -221,7 +221,8 @@ func TestCollectGoogleImageRefsIncludesReferenceImageURLs(t *testing.T) {
 			"",
 			"https://img.example/ref-b.png",
 		},
-	}).GoogleImages
+	}, "")
+	refs := providerGoogleImageRefs(req)
 	want := []string{
 		"data:image/png;base64,aGVsbG8=",
 		"https://img.example/ref-a.png",
@@ -236,10 +237,9 @@ func TestCollectGoogleImageRefsIncludesReferenceImageURLs(t *testing.T) {
 
 func TestReadGoogleProviderParamsDerivesModelRefsAndImagenControls(t *testing.T) {
 	geminiReq := newProviderRequest("prompt", 0, 0, map[string]interface{}{
-		"model":                "models/gemini-2.5-flash-image",
 		"image_urls":           []interface{}{"https://img.example/source.png"},
 		"reference_image_urls": []interface{}{"https://img.example/ref.png"},
-	}, "")
+	}, "models/gemini-2.5-flash-image")
 	geminiParams := readGoogleProviderParams(geminiReq)
 	if geminiParams.Model != "gemini-2.5-flash-image" {
 		t.Fatalf("gemini model = %q", geminiParams.Model)
@@ -296,12 +296,11 @@ func TestCallGoogleImagenPredict(t *testing.T) {
 	c := &ProviderExecutor{}
 	account := &accounts.ApiAccount{ProxyURL: server.URL, ApiKey: "google-key"}
 	params := map[string]interface{}{
-		"model":        "imagen-4.0-generate-001",
 		"output_count": 4,
 		"ratio":        "16:9",
 	}
 
-	got, err := c.callGoogleAIForTest(context.Background(), account, "draw skyline", 2*time.Second, params, "")
+	got, err := c.callGoogleAIForTest(context.Background(), account, "draw skyline", 2*time.Second, params, "imagen-4.0-generate-001")
 	if err != nil {
 		t.Fatalf("callGoogleAI error: %v", err)
 	}
@@ -342,11 +341,7 @@ func TestCallGoogleImagenPredictAcceptsVersionedBaseURL(t *testing.T) {
 		ProxyURL: server.URL + "/v1beta",
 		ApiKey:   "google-key",
 	}
-	params := map[string]interface{}{
-		"model": "imagen-4.0-generate-001",
-	}
-
-	_, err := c.callGoogleAIForTest(context.Background(), account, "draw skyline", 2*time.Second, params, "")
+	_, err := c.callGoogleAIForTest(context.Background(), account, "draw skyline", 2*time.Second, nil, "imagen-4.0-generate-001")
 	if err != nil {
 		t.Fatalf("callGoogleAI error: %v", err)
 	}

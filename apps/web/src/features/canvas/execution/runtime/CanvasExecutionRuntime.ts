@@ -44,6 +44,7 @@ export type CanvasExecutionRuntime = {
   getNodeLease: (nodeId: string) => CanvasExecutionLease | null
   isNodeActive: (nodeId: string) => boolean
   captureActiveNodeExecutions: (nodeIds: readonly string[]) => CanvasExecutionLease[]
+  releaseNodeExecutions: (leases: readonly CanvasExecutionLease[]) => void
   cancelNodeExecutions: (leases: readonly CanvasExecutionLease[]) => string[]
 }
 
@@ -191,6 +192,25 @@ export function createCanvasExecutionRuntime(): CanvasExecutionRuntime {
     })
   }
 
+  function releaseNodeExecutions(leases: readonly CanvasExecutionLease[]): void {
+    const nextNodeStates = new Map(nodeStates.value)
+    let didChange = false
+    new Set(leases).forEach((lease) => {
+      const current = nextNodeStates.get(lease.nodeId)
+      if (
+        leasesByNodeId.get(lease.nodeId) !== lease ||
+        !isAttachmentCurrent(lease.attachment) ||
+        !isExecutionActive(current)
+      ) {
+        return
+      }
+      nextNodeStates.delete(lease.nodeId)
+      leasesByNodeId.delete(lease.nodeId)
+      didChange = true
+    })
+    if (didChange) nodeStates.value = nextNodeStates
+  }
+
   function cancelNodeExecutions(leases: readonly CanvasExecutionLease[]): string[] {
     if (leases.length === 0) return []
     const nextNodeStates = new Map(nodeStates.value)
@@ -237,6 +257,7 @@ export function createCanvasExecutionRuntime(): CanvasExecutionRuntime {
     getNodeLease,
     isNodeActive,
     captureActiveNodeExecutions,
+    releaseNodeExecutions,
     cancelNodeExecutions,
   }
 }

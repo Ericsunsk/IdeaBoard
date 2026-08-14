@@ -45,7 +45,6 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     getUserIdentity: options.getUserIdentity,
     logoutAndRedirect: options.logoutAndRedirect,
     feedback: feedback.boardSession,
-    cancelTasks: taskLifecycle.cancelTasks,
     executionRuntime,
     vueFlowGraphActions: options.flowPaneAdapter.vueFlowGraphActions,
   })

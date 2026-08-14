@@ -37,8 +37,16 @@ export type PendingImageWorkflowBatchParams = {
   preflight?: () => Promise<void>
   assertReady?: () => Promise<void>
   prepare?: () => Promise<PendingImageWorkflowPrepared | void>
-  submitTask: (resultNodeId: string, clientActionId: string, resultIndex: number) => Promise<{ taskId: string }>
-  resolveResult: (taskId: string, resultNodeId: string, resultIndex: number) => Promise<ResolvedTaskImageResult>
+  submitTask: (
+    resultNodeId: string,
+    clientActionId: string,
+    resultIndex: number,
+  ) => Promise<{ taskId: string }>
+  resolveResult: (
+    taskId: string,
+    resultNodeId: string,
+    resultIndex: number,
+  ) => Promise<ResolvedTaskImageResult>
   persistPendingTaskIds?: boolean
   cleanup?: () => Promise<void>
   successMessage?: string
@@ -142,6 +150,19 @@ export function createPendingImageWorkflowRunner(
         (!taskId || state?.taskId === taskId)
       )
     }
+    const transitionOutcome = (outcome: {
+      resultNodeId: string
+      taskId?: string
+      status: 'pending' | 'succeeded' | 'failed' | 'cancelled'
+    }) => {
+      if (outcome.status === 'pending') return false
+      const lease = leasesByResultNodeId.get(outcome.resultNodeId)
+      if (!lease || !options.executionRuntime.isNodeActive(outcome.resultNodeId)) return false
+      return options.executionRuntime.transitionNode(lease, {
+        status: outcome.status,
+        taskId: outcome.taskId,
+      })
+    }
     const transitionActiveResults = (status: 'failed' | 'cancelled') => {
       resultNodeIds.forEach((nodeId) => {
         const lease = leasesByResultNodeId.get(nodeId)
@@ -243,6 +264,7 @@ export function createPendingImageWorkflowRunner(
       const resultIndexByNodeId = new Map(
         resultNodeIds.map((resultNodeId, resultIndex) => [resultNodeId, resultIndex]),
       )
+      let hasCurrentOutcome = false
       const summary = await options.pendingResults.runReservedPendingResults({
         resultNodeIds,
         submitTask: (resultNodeId) => {
@@ -256,19 +278,22 @@ export function createPendingImageWorkflowRunner(
         isResultExecutionCurrent,
         isPendingError: isTaskResultPendingError,
         afterTaskIdAttached: options.afterTaskIdAttached,
+        onOutcome: (outcome) => {
+          if (outcome.status === 'pending') {
+            hasCurrentOutcome ||=
+              !!outcome.taskId && isResultExecutionCurrent(outcome.resultNodeId, outcome.taskId)
+            return
+          }
+          hasCurrentOutcome = transitionOutcome(outcome) || hasCurrentOutcome
+        },
       })
-      const hasCurrentOutcome = summary.outcomes.some(
-        (outcome) =>
-          !!outcome.taskId && isResultExecutionCurrent(outcome.resultNodeId, outcome.taskId),
-      )
       summary.outcomes.forEach((outcome) => {
-        if (outcome.status === 'pending') return
-        const lease = leasesByResultNodeId.get(outcome.resultNodeId)
-        if (!lease) return
-        options.executionRuntime.transitionNode(lease, {
-          status: outcome.status,
-          taskId: outcome.taskId,
-        })
+        if (outcome.status === 'pending') {
+          hasCurrentOutcome ||=
+            !!outcome.taskId && isResultExecutionCurrent(outcome.resultNodeId, outcome.taskId)
+          return
+        }
+        hasCurrentOutcome = transitionOutcome(outcome) || hasCurrentOutcome
       })
       if (!hasCurrentOutcome) return
       if (!isCurrent()) return

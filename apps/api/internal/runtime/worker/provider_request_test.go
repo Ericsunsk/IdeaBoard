@@ -30,8 +30,8 @@ func TestNewProviderRequestCollectsProviderMediaRefs(t *testing.T) {
 		"https://img.example/shared.png",
 		"https://img.example/ref.png",
 	}
-	if !reflect.DeepEqual(req.MediaRefs.OpenAIImages, wantOpenAI) {
-		t.Fatalf("unexpected OpenAI refs: got=%#v want=%#v", req.MediaRefs.OpenAIImages, wantOpenAI)
+	if !reflect.DeepEqual(req.ImageRefs, wantOpenAI) {
+		t.Fatalf("unexpected OpenAI refs: got=%#v want=%#v", req.ImageRefs, wantOpenAI)
 	}
 
 	wantGoogle := []string{
@@ -41,8 +41,8 @@ func TestNewProviderRequestCollectsProviderMediaRefs(t *testing.T) {
 		"https://img.example/mask-list.png",
 		"https://img.example/mask.png",
 	}
-	if !reflect.DeepEqual(req.MediaRefs.GoogleImages, wantGoogle) {
-		t.Fatalf("unexpected Google refs: got=%#v want=%#v", req.MediaRefs.GoogleImages, wantGoogle)
+	if !reflect.DeepEqual(providerGoogleImageRefs(req), wantGoogle) {
+		t.Fatalf("unexpected Google refs: got=%#v want=%#v", providerGoogleImageRefs(req), wantGoogle)
 	}
 	if req.Size != "640x480" {
 		t.Fatalf("unexpected size: %s", req.Size)
@@ -55,6 +55,24 @@ func TestNewProviderRequestMarksInvalidOutputCount(t *testing.T) {
 	}, "gpt-image-1")
 	if req.OutputCount != 0 {
 		t.Fatalf("output count = %d, want invalid marker 0", req.OutputCount)
+	}
+}
+
+func TestProviderAdapterBoundaryContainsNoWorkflowMapOrFeature(t *testing.T) {
+	for _, contract := range []reflect.Type{
+		reflect.TypeOf(providerRequest{}),
+		reflect.TypeOf(openAIProviderControls{}),
+		reflect.TypeOf(googleProviderControls{}),
+	} {
+		for index := 0; index < contract.NumField(); index++ {
+			field := contract.Field(index)
+			if field.Type.Kind() == reflect.Map || field.Type.Kind() == reflect.Interface {
+				t.Fatalf("%s.%s exposes dynamic workflow data", contract.Name(), field.Name)
+			}
+			if strings.Contains(field.Name, "Feature") || strings.Contains(field.Name, "Billing") || strings.Contains(field.Name, "Node") {
+				t.Fatalf("%s.%s exposes orchestration concept to provider adapter", contract.Name(), field.Name)
+			}
+		}
 	}
 }
 
@@ -81,8 +99,8 @@ func TestProviderRequestAfterLocalRedrawKeepsOpenAIROIInput(t *testing.T) {
 		"data:image/png;base64,roi",
 		"https://cdn.example/ref-a.png",
 	}
-	if !reflect.DeepEqual(req.MediaRefs.OpenAIImages, want) {
-		t.Fatalf("unexpected OpenAI refs after local redraw: got=%#v want=%#v", req.MediaRefs.OpenAIImages, want)
+	if !reflect.DeepEqual(req.ImageRefs, want) {
+		t.Fatalf("unexpected OpenAI refs after local redraw: got=%#v want=%#v", req.ImageRefs, want)
 	}
 }
 
@@ -144,6 +162,15 @@ func TestRiverPayloadCanonicalParamsBecomeProviderRequest(t *testing.T) {
 			CustomWidth:  512,
 			CustomHeight: 768,
 		},
+		Generation: &tasks.GenerationRequestSnapshot{
+			SchemaVersion:        tasks.CurrentParamsSchemaVersion,
+			Feature:              "style-fusion",
+			Primitive:            string(workflow.GenerationPrimitiveImageToImage),
+			UserPrompt:           "融合两张图",
+			CompiledPrompt:       "融合两张图",
+			TemplateFingerprint:  "test-style-fusion",
+			RequestedOutputCount: 1,
+		},
 		Fusion: &tasks.StyleFusionParams{
 			Mode:         "weighted_reference",
 			InputWeights: []float64{0.75, 0.25},
@@ -163,21 +190,24 @@ func TestRiverPayloadCanonicalParamsBecomeProviderRequest(t *testing.T) {
 	if req.Prompt != submitted.Prompt || req.Model != "gpt-image-1" || req.Size != "512x768" {
 		t.Fatalf("provider request = prompt:%q model:%q size:%q", req.Prompt, req.Model, req.Size)
 	}
-	if !reflect.DeepEqual(req.MediaRefs.OpenAIImages, []string{
+	if req.Primitive != workflow.GenerationPrimitiveImageToImage {
+		t.Fatalf("provider primitive=%q, want image-to-image", req.Primitive)
+	}
+	if !reflect.DeepEqual(req.ImageRefs, []string{
 		"https://img.example/a.png",
 		"https://img.example/b.png",
 		"https://img.example/ref.png",
 	}) {
-		t.Fatalf("OpenAI refs=%#v", req.MediaRefs.OpenAIImages)
+		t.Fatalf("OpenAI refs=%#v", req.ImageRefs)
 	}
-	if !reflect.DeepEqual(req.Params["fusion_input_weights"], []float64{0.75, 0.25}) {
-		t.Fatalf("fusion_input_weights=%#v", req.Params["fusion_input_weights"])
+	if req.OpenAI.VariationStrength != nil {
+		t.Fatalf("unexpected OpenAI controls: %#v", req.OpenAI)
 	}
-	if req.Params["feature"] != "style-fusion" {
-		t.Fatalf("feature=%#v, want style-fusion", req.Params["feature"])
+	if !req.OpenAI.UseEditEndpoint {
+		t.Fatalf("style-fusion should compile to OpenAI edit controls: %#v", req.OpenAI)
 	}
-	if _, exists := req.Params["media"]; exists {
-		t.Fatalf("provider request should not expose canonical media object: %#v", req.Params)
+	if req.Google.AspectRatio != "" {
+		t.Fatalf("unexpected Google controls: %#v", req.Google)
 	}
 }
 
@@ -219,16 +249,13 @@ func TestPrepareProviderExecutionRejectsInvalidPatternGenTaskContract(t *testing
 	}
 }
 
-func TestPrepareProviderExecutionAllowsPatternGenProviderHintsAndControls(t *testing.T) {
+func TestPrepareProviderExecutionAllowsPatternGenControls(t *testing.T) {
 	raw := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
 		Feature:       workflow.FeatureSlugPatternGen,
 		Controls: &tasks.GenerationControls{
 			Ratio:       "4:3",
 			OutputCount: 2,
-		},
-		Extra: map[string]interface{}{
-			"provider_hint": "keep",
 		},
 	})
 	exec, err := (&ProviderExecutor{}).prepareProviderExecution(
@@ -252,11 +279,11 @@ func TestPrepareProviderExecutionAllowsPatternGenProviderHintsAndControls(t *tes
 	if err != nil {
 		t.Fatalf("prepareProviderExecution returned error: %v", err)
 	}
-	if exec.Request.Params["provider_hint"] != "keep" {
-		t.Fatalf("provider_hint = %#v, want keep", exec.Request.Params["provider_hint"])
+	if exec.Request.OutputCount != 2 {
+		t.Fatalf("output_count = %d, want 2", exec.Request.OutputCount)
 	}
-	if exec.Request.Params["output_count"] != 2 {
-		t.Fatalf("output_count = %#v, want 2", exec.Request.Params["output_count"])
+	if exec.FeatureSlug != workflow.FeatureSlugPatternGen {
+		t.Fatalf("execution feature = %q, want pattern-gen", exec.FeatureSlug)
 	}
 }
 
