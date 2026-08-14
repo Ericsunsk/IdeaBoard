@@ -149,6 +149,24 @@ func TestCreditHoldPartialSettlementBackfillsLegacyTerminalStateBeforeDroppingIt
 	}
 }
 
+func TestImageEditWorkflowMigrationUsesCurrentFeaturePromptContract(t *testing.T) {
+	raw, err := migrationFS.ReadFile("20260814000200_image_edit_local_inpaint_workflows.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql := strings.ToLower(strings.Join(strings.Fields(string(raw)), " "))
+	for _, removedColumn := range []string{"canonical_model", "user_prompt_merge_policy"} {
+		if strings.Contains(sql, removedColumn) {
+			t.Fatalf("migration references removed feature_prompts column %q", removedColumn)
+		}
+	}
+	for _, currentColumn := range []string{"feature_slug", "prompt", "updated_by", "created_at", "updated_at"} {
+		if !strings.Contains(sql, currentColumn) {
+			t.Fatalf("migration does not preserve feature_prompts column %q", currentColumn)
+		}
+	}
+}
+
 func TestSchemaSnapshotCoversCanonicalBaselineObjects(t *testing.T) {
 	baseline, err := migrationFS.ReadFile(baselineMigrationFile)
 	if err != nil {

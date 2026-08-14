@@ -4,8 +4,6 @@ ALTER TABLE feature_prompts
 INSERT INTO feature_prompts (
   feature_slug,
   prompt,
-  canonical_model,
-  user_prompt_merge_policy,
   updated_by,
   created_at,
   updated_at
@@ -13,8 +11,6 @@ INSERT INTO feature_prompts (
 SELECT
   replacement.feature_slug,
   source.prompt,
-  source.canonical_model,
-  source.user_prompt_merge_policy,
   source.updated_by,
   source.created_at,
   source.updated_at
