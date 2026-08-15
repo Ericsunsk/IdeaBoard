@@ -6,6 +6,13 @@
           {{ item.displayName }}
         </span>
         <Tag
+          v-if="workflowPresentation"
+          :value="`${workflowPresentation.groupTitle} 节点`"
+          severity="secondary"
+          :class="adminCompactTagClass"
+          rounded
+        />
+        <Tag
           :value="statusMeta.label"
           :severity="statusMeta.severity"
           :class="adminCompactTagClass"
@@ -18,6 +25,12 @@
       <div class="flex min-w-0 flex-col gap-5">
         <p class="m-0 min-h-10 text-admin-body leading-5 text-ib-text-muted">
           {{ item.description || '暂无功能说明' }}
+        </p>
+        <p
+          v-if="workflowPresentation"
+          class="m-0 text-admin-caption leading-5 text-admin-text-2"
+        >
+          {{ workflowPresentation.inputDescription }}
         </p>
 
         <div class="flex items-end justify-between gap-4 border-t border-ib-border-soft pt-4">
@@ -87,6 +100,10 @@ import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
+import {
+  getWorkflowFeatureRegistryItem,
+  WORKFLOW_FEATURE_GROUP_LIST,
+} from '../../../../shared/domain/workflowFeatureRegistry'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
 import { adminCompactTagClass, adminMasonryCardClass } from '../../shared/lib/adminUiClasses'
 import type { AdminBillableItemCard, AdminBillableItemStatus } from './billableCatalogTypes'
@@ -113,6 +130,21 @@ const statusPresentation: Record<
 }
 
 const statusMeta = computed(() => statusPresentation[props.item.status])
+const workflowPresentation = computed(() => {
+  const prefix = 'ai-image:'
+  if (!props.item.sku.startsWith(prefix)) return null
+  const feature = getWorkflowFeatureRegistryItem(props.item.sku.slice(prefix.length))
+  if (!feature) return null
+  const group = WORKFLOW_FEATURE_GROUP_LIST.find((item) => item.key === feature.groupKey)
+  if (!group) return null
+  const inputDescription =
+    group.key === 'image'
+      ? '图片是主输入；用户文字通过 {{user_prompt}} 作为辅助要求。'
+      : group.key === 'prompt'
+        ? '用户文字是主导输入，可选参考图。'
+        : '多图是主输入；用户文字通过 {{user_prompt}} 作为融合辅助要求。'
+  return { groupTitle: group.title, inputDescription }
+})
 const priceLabel = computed(() =>
   props.item.currentPrice ? formatIdeaAmount(props.item.currentPrice.unitCredits) : '未设置',
 )

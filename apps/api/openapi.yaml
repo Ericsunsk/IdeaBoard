@@ -3804,7 +3804,6 @@ components:
       type: string
       enum:
         - prompt-generation
-        - image-edit
         - local-inpaint
         - remove-bg
         - style-fusion
@@ -3817,7 +3816,6 @@ components:
       type: string
       enum:
         - prompt-generation
-        - image-edit
         - local-inpaint
         - remove-bg
         - style-fusion

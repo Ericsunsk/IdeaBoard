@@ -12,7 +12,6 @@ import {
   buildImageExecutionTaskRequest,
   buildLocalInpaintReadinessRequest,
   buildPreparedImageInpaintTaskRequest,
-  buildPromptImageReadinessRequest,
 } from '../commands/flowImageTaskRequests'
 import { prepareFlowLocalInpaintMask } from '../media/flowLocalInpaintMask'
 import { loadImageSizeFromUrl } from '../media/imageSize'
@@ -23,7 +22,6 @@ import {
   type FusionExecutionPlan,
   type ImageActionExecutionPlan,
   type ImageInpaintExecutionPlan,
-  type ImagePromptExecutionPlan,
   type PromptGenerationExecutionPlan,
 } from '../planning/ImageExecutionPlan'
 import { resolveTaskImageResultAtIndexDisplay } from '../result-nodes/flowImageDirectActionTaskResult'
@@ -198,28 +196,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     })
   }
 
-  async function executeImagePrompt(
-    plan: ImagePromptExecutionPlan & { activationId: string },
-  ): Promise<void> {
-    const attachment = requireCurrentAttachment()
-    const taskSubmission = createCanvasTaskSubmissionCallbacks({
-      readinessRequest: buildPromptImageReadinessRequest,
-      buildRequest: async () =>
-        buildImageExecutionTaskRequest(plan, await loadImageSizeFromUrl(plan.source.url)),
-    })
-    await workflowRunner.run({
-      source: plan.source,
-      sourceNodeId: plan.sourceNodeId,
-      attachment,
-      outputCount: plan.outputCount,
-      resultOptions: plan.resultOptions,
-      assertReady: taskSubmission.assertReady,
-      submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
-      resolveResult: createIndexedTaskResultResolver(() => plan.source.ratio),
-      fallbackErrorMessage: '生成失败',
-    })
-  }
-
   async function executePromptGeneration(
     plan: PromptGenerationExecutionPlan & { activationId: string },
   ): Promise<void> {
@@ -279,8 +255,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
         return await executeCanvasExtend(plan)
       case 'image-inpaint':
         return await executeImageInpaint(plan)
-      case 'image-prompt':
-        return await executeImagePrompt(plan)
       case 'prompt-generation':
         return await executePromptGeneration(plan)
       case 'fusion':

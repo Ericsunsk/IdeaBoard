@@ -72,10 +72,9 @@
           offset="52px"
           :placeholder="actionBinding.promptPlaceholder"
           allow-empty
+          :show-submit="false"
           :output-count="outputCountValue"
-          :billing-state="workflowBillingQuote"
           @update:output-count="selectOutputCount"
-          @submit="submitPrompt"
         />
       </NodeFloatingControls>
     </div>
@@ -87,7 +86,6 @@ import { computed, ref, watchPostEffect } from 'vue'
 import { MediaImage } from '@iconoir/vue'
 import { requireImageNodeOutputCount, type ImageNodeItem } from '../../../canvas-board/domain'
 import type { ImageNodeAction } from '../../config/imageActionRegistry'
-import { isImageTaskAction, type ImageTaskAction } from '../../execution'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import type { ImageActionBinding, ImageToolStageBinding } from '../../image-tools'
 import HomeCanvasImageActionMenu from '../home/HomeCanvasImageActionMenu.vue'
@@ -95,8 +93,6 @@ import NodePromptComposer from './NodePromptComposer.vue'
 import NodeFloatingControls from './NodeFloatingControls.vue'
 import ImageNodeStage from './ImageNodeStage.vue'
 import NodeShell from './NodeShell.vue'
-import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
-import { useCanvasBillingQuote } from '../../execution'
 
 const props = defineProps<{
   node: ImageNodeItem
@@ -129,7 +125,6 @@ const emit = defineEmits<{
   (e: 'append-to-canvas'): void
   (e: 'reset'): void
   (e: 'contextmenu', event: MouseEvent): void
-  (e: 'prompt-generate', action: ImageTaskAction, prompt: string, outputCount: number): void
   (e: 'expand-submit', prompt: string, outputCount: number): void
   (
     e: 'action',
@@ -161,11 +156,6 @@ type StageExpose = { stageElement: HTMLElement | null }
 const imageStageRef = ref<StageExpose | null>(null)
 const promptDraft = ref('')
 const outputCountValue = computed(() => requireImageNodeOutputCount(props.node.outputCount))
-const activeWorkflowAction = ref<ImageTaskAction>(WORKFLOW_FEATURE.imageEdit)
-const workflowBillingQuote = useCanvasBillingQuote(
-  () => activeWorkflowAction.value,
-  () => showPromptComposer.value,
-)
 
 watchPostEffect((onCleanup) => {
   const flowNodeId = props.flowNodeId
@@ -178,13 +168,7 @@ watchPostEffect((onCleanup) => {
   })
 })
 
-function submitPrompt(prompt: string, outputCount: number) {
-  emit('prompt-generate', activeWorkflowAction.value, prompt, outputCount)
-  promptDraft.value = ''
-}
-
 function submitAction(action: ImageNodeAction, strength?: number) {
-  if (isImageTaskAction(action)) activeWorkflowAction.value = action
   emit('action', action, promptDraft.value.trim(), outputCountValue.value, strength)
 }
 

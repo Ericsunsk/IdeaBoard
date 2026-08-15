@@ -16,6 +16,7 @@
       :disabled="disabled"
       :allow-empty="allowEmpty"
       :submit-disabled="submitDisabled"
+      :show-submit="showSubmit"
       :show-aspect-ratio="showAspectRatio"
       :billing-state="billingState"
       :textarea-class="promptInputClass"
@@ -45,6 +46,7 @@ const props = withDefaults(
     disabled?: boolean
     allowEmpty?: boolean
     submitDisabled?: boolean
+    showSubmit?: boolean
     aspectRatio?: PromptAspectRatio
     offset?: string
     billingState?: CanvasBillingQuoteState | null
@@ -54,6 +56,7 @@ const props = withDefaults(
     aspectRatio: undefined,
     disabled: false,
     offset: '8px',
+    showSubmit: true,
     submitDisabled: false,
     billingState: null,
   },

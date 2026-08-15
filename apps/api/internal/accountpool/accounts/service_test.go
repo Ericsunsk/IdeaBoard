@@ -75,8 +75,8 @@ func TestFeatureSystemPromptDoesNotContainHiddenConstraintSnippet(t *testing.T) 
 		},
 	)
 
-	if got != "SYS=canvas extend only user prompt" {
-		t.Fatalf("got %q, want only configured system prompt + base prompt", got)
+	if got != "SYS=canvas extend only" {
+		t.Fatalf("got %q, want only configured system prompt", got)
 	}
 	if strings.Contains(got, "【执行语义】") {
 		t.Fatalf("expected no hidden constraint text, got %q", got)

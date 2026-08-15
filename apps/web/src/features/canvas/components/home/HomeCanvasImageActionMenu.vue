@@ -60,11 +60,13 @@
 import { computed, onMounted, type ComponentPublicInstance } from 'vue'
 import {
   WORKFLOW_FEATURE_SLUGS,
+  WORKFLOW_FEATURE,
   type WorkflowFeature,
 } from '../../../../shared/domain/workflowFeatures'
 import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
 import {
   IMAGE_ACTION_MENU_ITEMS,
+  IMAGE_NODE_ACTION,
   type ImageActionMenuItem,
   type ImageNodeAction,
 } from '../../config/imageActionRegistry'
@@ -98,6 +100,7 @@ onMounted(() => {
 })
 
 function resolveItemBillingFeature(item: ImageActionMenuItem): WorkflowFeature | null {
+  if (item.action === IMAGE_NODE_ACTION.imageInpaint) return WORKFLOW_FEATURE.localInpaint
   return WORKFLOW_FEATURE_SLUGS.includes(item.action as WorkflowFeature)
     ? (item.action as WorkflowFeature)
     : null

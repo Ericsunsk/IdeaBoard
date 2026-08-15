@@ -110,6 +110,8 @@ describe('useFlowImageActionStrengthControl', () => {
     const control = useFlowImageActionStrengthControl({ onCommit })
     const action = IMAGE_NODE_ACTION.styleVariation
     const { input, trigger } = bindRange(control, action, 35)
+    const onChange = vi.fn()
+    input.addEventListener('change', onChange)
     stubRangeBounds(input, { left: 100, width: 200 })
 
     trigger.dispatchEvent(createPointerEvent('pointerdown', { pointerId: 7, clientX: 150 }))
@@ -124,6 +126,7 @@ describe('useFlowImageActionStrengthControl', () => {
 
     expect(onCommit).toHaveBeenCalledWith(action, 90)
     expect(onCommit).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledOnce()
     expect(control.activeStrengthAction.value).toBeNull()
     expect(control.getActionStrength(action)).toBe(50)
     expect(control.consumeSuppressedStrengthClick(action)).toBe(true)

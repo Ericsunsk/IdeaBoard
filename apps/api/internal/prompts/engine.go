@@ -49,8 +49,20 @@ var defaultPromptMergePolicy = FeaturePromptMergePolicy{
 	AppendBasePromptWithoutTemplate:               true,
 }
 
+// Image nodes always have a media input as their semantic source of truth.
+// Their optional text must be requested explicitly by each System Prompt
+// instead of being appended implicitly when an operator omits the placeholder.
+var imageNodeFeatureSlugs = map[string]struct{}{
+	workflow.FeatureSlugLocalInpaint:   {},
+	workflow.FeatureSlugSketchToImage:  {},
+	workflow.FeatureSlugStyleVariation: {},
+	workflow.FeatureSlugRemoveBg:       {},
+	workflow.FeatureSlugHDUpscale:      {},
+	workflow.FeatureSlugImageExtend:    {},
+}
+
 func DefaultFeaturePromptMergePolicy(featureSlug string) FeaturePromptMergePolicy {
-	if featureSlug == workflow.FeatureSlugStyleVariation {
+	if _, ok := imageNodeFeatureSlugs[featureSlug]; ok {
 		return FeaturePromptMergePolicy{}
 	}
 	return defaultPromptMergePolicy

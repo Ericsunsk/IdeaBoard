@@ -171,7 +171,6 @@ function mountCanvasImageTools() {
   const setViewport = vi.fn()
   const setCenter = vi.fn()
   const runInpaintAction = vi.fn()
-  const runPromptGeneration = vi.fn()
   const updateOutputCount = vi.fn()
   const activeStrengthAction = ref<ImageStrengthAction | null>(null)
   let imageAdjustmentFinalApplyContext: CanvasImageAdjustmentFinalApplyContext | null = null
@@ -215,7 +214,6 @@ function mountCanvasImageTools() {
           hideStrengthControl: vi.fn(),
           updateOutputCount,
           runInpaintAction,
-          runPromptGeneration,
           isImageActionPanelVisible: (nodeId) => nodeId === 'image-1',
           isImagePromptComposerVisible: (nodeId) => nodeId === 'image-1',
           isGenerationAvailable: () => generationAvailable.value,
@@ -254,7 +252,6 @@ function mountCanvasImageTools() {
     host,
     isCanvasInteractionLocked,
     runInpaintAction,
-    runPromptGeneration,
     updateOutputCount,
     cancelImageAdjustmentFinalApply: () => {
       if (!imageAdjustmentFinalApplyContext) {
@@ -543,7 +540,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
         height: '240px',
       })
       expect(actionBinding.actionMenuVisible).toBe(true)
-      expect(actionBinding.promptPlaceholder).toBe('输入提示词改造这张图')
+      expect(actionBinding.promptPlaceholder).toBe('输入辅助要求（可选）')
     } finally {
       harness.unmount()
     }
@@ -668,7 +665,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
         '描述如何重绘选区',
       )
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').promptPlaceholder).toBe(
-        '输入提示词改造这张图',
+        '输入辅助要求（可选）',
       )
     } finally {
       harness.unmount()
@@ -708,15 +705,14 @@ describe('useCanvasImageTools image adjustment final apply', () => {
         outputCount: 3,
         maskDataUrl: 'data:image/png;base64,execution-mask',
       })
-      expect(harness.runPromptGeneration).not.toHaveBeenCalled()
 
       harness.runtime.commands.lifecycle.discardNodeEdits('image-1')
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').promptPlaceholder).toBe(
-        '输入提示词改造这张图',
+        '输入辅助要求（可选）',
       )
 
       harness.runtime.commands.prompt.runPromptAction('image-1', '普通生成', 1)
-      expect(harness.runPromptGeneration).toHaveBeenCalledWith('image-1', '普通生成', 1)
+      expect(harness.feedback.warning).toHaveBeenCalledWith('请先在图片上标记需要重绘的区域')
     } finally {
       harness.unmount()
     }

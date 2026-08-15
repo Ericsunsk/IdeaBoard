@@ -102,7 +102,7 @@ describe('HomeCanvasImageActionMenu', () => {
     expect(findActionControl(activeHdRange)).toHaveClass('is-strength-active')
   })
 
-  it('shows AI prices without disabling cached unavailable billing states, and keeps local tools price-free', () => {
+  it('shows AI prices without disabling cached unavailable billing states, and keeps local editor price-free', () => {
     const billingStore: CanvasBillingReadinessStore = {
       ensureFeature: vi.fn(async () => undefined),
       applyReadiness: vi.fn(),
@@ -118,7 +118,7 @@ describe('HomeCanvasImageActionMenu', () => {
     expect(screen.getByRole('button', { name: '风格延展 · 12 Ideas' })).toBeEnabled()
     expect(screen.getAllByText('12 Ideas')[0]).toHaveAttribute('data-touch-quote')
     expect(screen.getByRole('button', { name: '图像编辑' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: '局部重绘' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '局部重绘 · 12 Ideas' })).toBeEnabled()
   })
 
   it('presents explicit zero pricing as free in tooltip and touch quote', () => {

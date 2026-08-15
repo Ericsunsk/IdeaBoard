@@ -29,13 +29,6 @@ export type CanvasNodePresentationIntent =
   | { type: 'append-to-canvas-requested'; nodeId: string }
   | { type: 'reset-requested'; nodeId: string }
   | { type: 'image-context-menu-requested'; nodeId: string; event: MouseEvent }
-  | {
-      type: 'image-prompt-generation-requested'
-      nodeId: string
-      action: ImageTaskAction
-      prompt: string
-      outputCount: number
-    }
   | { type: 'canvas-extend-submitted'; nodeId: string; prompt: string; outputCount: number }
   | {
       type: 'action-requested'

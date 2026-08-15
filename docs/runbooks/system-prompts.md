@@ -14,8 +14,8 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 
 | 节点        | Vue Flow kind | Snapshot type | 负责的 feature                                                                                  | 说明                                                              |
 | ----------- | ------------- | ------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| Image 节点  | `image`       | `image-node`  | `sketch-to-image`、`style-variation`、`partial-edit`、`remove-bg`、`hd-upscale`、`image-extend` | 图片作为主输入，覆盖右键工具、Prompt 改图、局部重绘、扩图和 HD    |
-| Prompt 节点 | `prompt`      | `prompt`      | `pattern-gen`、`partial-edit`                                                                   | 无图片输入时走 `pattern-gen`；有图片输入时逐图触发 `partial-edit` |
+| Image 节点  | `image`       | `image-node`  | `local-inpaint`、`sketch-to-image`、`style-variation`、`remove-bg`、`hd-upscale`、`image-extend` | 图片作为主输入，覆盖右键工具、局部重绘、扩图和 HD |
+| Prompt 节点 | `prompt`      | `prompt`      | `prompt-generation`                                                                               | 文字是主导输入，可选参考图一起生成图片                         |
 | Fusion 节点 | `fusion`      | `fusion`      | `style-fusion`                                                                                  | 2 到 4 张输入图融合，blend point 会转为有序图片权重               |
 
 ## 2. 后台配置合约
@@ -39,10 +39,10 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 - 配置缺失或 Prompt 为空时使用空模板；数据库读取失败时拒绝任务提交。
 - `{{user_prompt}}` 始终会被替换为字符串；用户没有输入时替换为空字符串。
 - 模板中存在但后端不支持或运行时没有提供的变量会原样保留，所以不要写不属于当前 feature 的变量。
-- 除 `style-variation` 外，如果模板没有显式写 `{{user_prompt}}`，运行时可能把用户输入追加到模板末尾。
-- `style-variation` 不会自动追加用户输入；当前 Image 右键风格延展只稳定提供 `{{variation_strength}}`。
+- Prompt 节点和 Fusion 节点可以沿用默认 merge policy；如果模板没有显式写 `{{user_prompt}}`，运行时可能把用户输入追加到模板末尾。
+- Image 节点的图片是主输入，用户文字只作为辅助要求。Image 节点 Feature 不会自动追加用户输入；只有模板显式写出 `{{user_prompt}}` 时才会接收用户文字。
 - URL、base64、mask 文件、多参考图、multipart、本地重绘窗口属于运行时上下文，prompt 正文里只写业务边界。
-- 当前前端 `HD` 是整图高清处理，不读取 `use_mask` 或 mask 参数；局部 mask、本地重绘窗口和局部边界统一维护在 `partial-edit`。
+- 当前前端 `HD` 是整图高清处理，不读取 `use_mask` 或 mask 参数；局部 mask、本地重绘窗口和局部边界统一维护在 `local-inpaint`。
 
 ## 3. 变量合约
 
@@ -50,7 +50,7 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 
 | 变量                       | 主要适用 feature                                              | 说明                                                       |
 | -------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------- |
-| `{{user_prompt}}`          | `partial-edit`、`pattern-gen`、`style-fusion`、`image-extend` | 用户或连接 Prompt 文本；只能作为补充要求，不能覆盖系统边界 |
+| `{{user_prompt}}`          | `local-inpaint`、`sketch-to-image`、`style-variation`、`remove-bg`、`hd-upscale`、`image-extend`、`prompt-generation`、`style-fusion` | 用户或连接 Prompt 文本；在 Image 节点中只能作为补充要求，不能覆盖系统边界 |
 | `{{variation_strength}}`   | `style-variation`                                             | 风格延展强度百分比，来自 `variation.strength`              |
 | `{{fusion_input_weights}}` | `style-fusion`                                                | Fusion 输入图的有序权重，例如 `Image 1: 60%, Image 2: 40%` |
 | `{{extend_top_percent}}`   | `image-extend`                                                | 基于原图高度向上扩展的百分比，来自 `extend.top_percent`    |
@@ -139,7 +139,7 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 
 #### `sketch-to-image`
 
-可用变量：无。
+可用变量：`{{user_prompt}}`。
 
 ```text
 你是草图成图助手。
@@ -149,6 +149,9 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 输入理解：
 1. 输入图片是主导信息。
 2. 原图已经确定的主体品类、轮廓、结构线、比例关系、视角和关键设计元素必须保留。
+
+用户补充要求：
+{{user_prompt}}
 
 变更边界：
 1. 允许在不改变主体设计方向的前提下，补全材质、色彩、光影、表面细节、体积关系和真实质感。
@@ -166,7 +169,7 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 
 #### `style-variation`
 
-可用变量：`{{variation_strength}}`。
+可用变量：`{{user_prompt}}`、`{{variation_strength}}`。
 
 ```text
 你是基于原图进行可控风格延展的图像助手。
@@ -174,6 +177,9 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 任务：在保留原图主体、主体品类、核心轮廓、主要构图、视角关系与基础光影逻辑的前提下，做可控的风格延展与细节升级。
 
 当前延展强度：{{variation_strength}}%。
+
+用户补充要求：
+{{user_prompt}}
 
 强度语义：
 1. 0 到 20：仅做轻微润色、材质优化、局部装饰变化。
@@ -200,7 +206,7 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 2. 不要拼图、文字、水印、边框或多方案并排。
 ```
 
-#### `partial-edit`
+#### `local-inpaint`
 
 可用变量：`{{user_prompt}}`。
 
@@ -234,7 +240,7 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 
 #### `remove-bg`
 
-可用变量：无。
+可用变量：`{{user_prompt}}`。
 
 ```text
 你是商品与服装图像抠图助手。
@@ -244,6 +250,9 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 输入理解：
 1. 输入图片是前景主体和边缘细节的事实源。
 2. 背景只用于判断主体边界，不是需要保留或替换的内容。
+
+用户补充要求：
+{{user_prompt}}
 
 变更边界：
 1. 只做前景主体分离，不做风格化重绘。
@@ -265,7 +274,7 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 
 #### `hd-upscale`
 
-可用变量：`{{clarity_strength}}`。
+可用变量：`{{user_prompt}}`、`{{clarity_strength}}`。
 
 ```text
 你是图像 HD 与细节恢复助手。
@@ -283,11 +292,14 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 1. 原图是主体、款式、结构、颜色关系和视觉语义的事实源。
 2. 清晰度强度只控制增强幅度，不允许改写图像内容。
 
+用户补充要求：
+{{user_prompt}}
+
 变更边界：
 1. 保持原图主体、款式、结构、颜色关系和视觉语义不变。
 2. 优先修复边缘、纹理、针脚、印花、材质肌理、局部模糊和压缩损伤。
 3. 当前 HD 按整图保守增强理解，不要改变原图风格或主体设计。
-4. 需要局部 mask 时维护 `partial-edit` 模板。
+4. 需要局部 mask 时维护 `local-inpaint` 模板。
 
 质量要求：
 1. 增强结果应自然、真实。
@@ -338,36 +350,37 @@ System prompt 只定义任务边界、允许变化、禁止变化和输出质量
 
 ### 5.2 Prompt 节点
 
-Prompt 节点的 `pattern-gen` system prompt 可以为空；空 system prompt 时直接使用用户输入。
+Prompt 节点的 `prompt-generation` system prompt 可以为空；空 system prompt 时直接使用用户输入。
 
-后续需要统一补充图案边界、输出格式或风格约束时，再在 Admin 面板中配置。
+后续需要统一补充输出格式或风格约束时，再在 Admin 面板中配置。
 
-#### `pattern-gen`
+#### `prompt-generation`
 
 可用变量：`{{user_prompt}}`。
 
 ```text
-你是图案生成助手。
+你是文生图与图生图助手。
 
-任务：根据用户要求生成可用于服装、面料、商品表面或视觉素材的单张图案。
+任务：根据用户要求生成一张完整、自然、可展示的图片。
 
 输入理解：
 1. 用户文本是主导信息。
-2. 结果必须是可复用图案，而不是完整场景插画、海报或 UI 截图。
+2. 可选参考图是视觉、结构、材质和风格的辅助信息。
+3. 参考图只作为生成依据，不要把参考图拼贴进结果。
 
 变更边界：
-1. 如果用户要求平铺、连续纹样或中心构图，请按要求组织图案关系。
+1. 按用户要求组织主体、场景、构图、材质和风格。
 2. 不要生成品牌标识、说明文字或不相关 UI 元素。
 
 质量要求：
-1. 图案应结构清晰、主题明确、边缘干净。
-2. 视觉元素不要混乱。
+1. 主体清晰，结构、材质、光影和透视保持一致。
+2. 视觉元素不要混乱或互相遮挡。
 
 输出要求：
 1. 输出单张结果图。
 2. 不要生成水印、说明文字、品牌标识、边框或多方案并排。
 
-图案要求：
+用户生成要求：
 {{user_prompt}}
 ```
 
@@ -432,7 +445,7 @@ Prompt 节点的 `pattern-gen` system prompt 可以为空；空 system prompt �
 
 - 新增 workflow feature 时，同步更新本文件、Admin prompt 变量面板和 [DEVELOPMENT.md](../../DEVELOPMENT.md)。
 - 新增模板变量时，先确认后端 `ApplyFeatureSystemPrompt` 已注入，再更新后台变量说明。
-- 调整 mask、本地重绘、多参考图或媒体安全边界时，优先复查 `partial-edit`。
+- 调整 mask、本地重绘、多参考图或媒体安全边界时，优先复查 `local-inpaint`。
 - 调整整图高清参数时，优先复查 `hd-upscale`。
 - `hd-upscale` 当前不建议依赖任何模式变量；如果未来增加 UI 控制，再补充对应变量并同步代码和文档。
 - 运营侧通过管理后台保存 prompt，避免直接改数据库值。

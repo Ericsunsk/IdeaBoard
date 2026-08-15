@@ -2,6 +2,7 @@ import { fireEvent } from '@testing-library/vue'
 import { describe, expect, it, vi } from 'vitest'
 import FlowCanvasNode from './FlowCanvasNode.vue'
 import type { FusionNodeItem, ImageNodeItem, PromptNodeItem } from '../../canvas-board/domain'
+import { IMAGE_NODE_ACTION } from '../config/imageActionRegistry'
 import type { ImageActionBinding } from '../image-tools'
 import { createImageNodePresentationResolver } from '../node-presentation'
 import type { FlowNodeData } from '../types/flowTypes'
@@ -260,6 +261,43 @@ describe('FlowCanvasNode image presentation', () => {
     expect(floatingControls?.querySelector('.image-node-prompt-composer')).not.toBeNull()
     expect(view.getByPlaceholderText('输入提示词改造这张图')).toBeVisible()
     expect(view.getByLabelText('打开图片预览').closest('.node-floating-controls')).toBeNull()
+  })
+
+  it('uses image tools for the current draft without an independent submit button', async () => {
+    const view = render(FlowCanvasNode, {
+      props: {
+        nodeId: 'image-1',
+        data: createImageData(createImageSnapshot()),
+        imagePresentation: createImagePresentation({
+          actionMenuVisible: true,
+          promptPlaceholder: '输入提示词改造这张图',
+          promptComposerVisible: true,
+        }),
+      },
+      global: {
+        stubs: {
+          FlowCanvasNodeHandleRail: { template: '<div data-testid="flow-node-handles" />' },
+        },
+      },
+    })
+
+    const promptInput = view.getByPlaceholderText('输入提示词改造这张图')
+    await fireEvent.update(promptInput, '沿用当前草稿')
+
+    expect(view.queryByRole('button', { name: '发送' })).not.toBeInTheDocument()
+
+    await fireEvent.click(view.getByLabelText('风格延展'))
+
+    expect(view.emitted('node-intent')).toContainEqual([
+      {
+        type: 'action-requested',
+        nodeId: 'image-1',
+        action: IMAGE_NODE_ACTION.styleVariation,
+        prompt: '沿用当前草稿',
+        outputCount: 1,
+        strength: undefined,
+      },
+    ])
   })
 
   it('emits semantic intents for upload, preview, append, and reset', async () => {

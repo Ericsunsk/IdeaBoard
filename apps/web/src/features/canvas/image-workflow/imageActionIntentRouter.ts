@@ -133,19 +133,6 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
     )
   }
 
-  function onFlowImagePromptGenerate(
-    nodeId: string,
-    action: ImageTaskAction,
-    prompt: string,
-    outputCount: number,
-  ) {
-    options.cancelFlowExpandMode()
-    options.cancelFlowMaskEditorMode()
-    options.clearActiveNodePanel()
-    options.hideStrengthControl()
-    void options.runImageDirectAction(nodeId, action, { prompt, outputCount })
-  }
-
   function onFlowFusionPromptGenerate(
     nodeId: string,
     prompt: string,
@@ -166,7 +153,6 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
     onFlowImageContextMenu,
     onFlowFusionContextMenu,
     onFlowImageDirectAction,
-    onFlowImagePromptGenerate,
     onFlowFusionPromptGenerate,
   }
 }

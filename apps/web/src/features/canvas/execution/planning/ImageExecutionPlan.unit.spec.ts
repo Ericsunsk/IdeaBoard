@@ -269,50 +269,13 @@ describe('ImageExecutionPlan', () => {
       edges: [],
     }))
 
-    const imagePlan = planner.planImagePromptGeneration(
-      'image-1',
-      'generate',
-      1,
-      'bad-ratio' as never,
-    )
     const textPlan = planner.planPromptGeneration('prompt-1', [], 'generate', 1, 'bad' as never)
 
-    expect(imagePlan.aspectRatio).toBe('auto')
     expect(textPlan.aspectRatio).toBe('auto')
     expect(textPlan.resultOptions.anchor).toEqual({
       x: 40,
       y: 80,
       width: 360,
-      outputAnchorNodeId: 'prompt-1',
-    })
-  })
-
-  it('uses output anchor override only for result layout on image prompt plans', () => {
-    const planner = createImageExecutionPlanner(() => ({
-      nodes: [
-        {
-          id: 'image-1',
-          position: { x: 10, y: 20 },
-          data: { kind: 'image', snapshotNode: makeImageNode({ width: 320 }) },
-        },
-        {
-          id: 'prompt-1',
-          position: { x: 200, y: 300 },
-          data: { kind: 'prompt', snapshotNode: { width: 420 } },
-        },
-      ],
-      edges: [],
-    }))
-
-    const plan = planner.planImagePromptGeneration('image-1', 'generate', 1, '1:1', {
-      outputAnchorNodeId: 'prompt-1',
-    })
-
-    expect(plan.source).toEqual({ url: 'https://example.com/source.png', ratio: 0.75 })
-    expect(plan.resultOptions.anchor).toEqual({
-      x: 200,
-      y: 300,
-      width: 420,
       outputAnchorNodeId: 'prompt-1',
     })
   })

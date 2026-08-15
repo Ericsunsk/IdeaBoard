@@ -16,7 +16,6 @@ type workflowPresentation struct {
 
 var workflowPresentations = map[string]workflowPresentation{
 	workflow.FeatureSlugPromptGeneration: {displayName: "Prompt 生图", description: "使用文字与可选参考图生成图片。"},
-	workflow.FeatureSlugImageEdit:        {displayName: "文字改图", description: "使用文字调整整张图片。"},
 	workflow.FeatureSlugLocalInpaint:     {displayName: "局部重绘", description: "仅重绘图片选定区域。"},
 	workflow.FeatureSlugSketchToImage:    {displayName: "草图成图", description: "将草图转换为完整图片。"},
 	workflow.FeatureSlugStyleVariation:   {displayName: "风格延展", description: "基于图片生成同风格变体。"},

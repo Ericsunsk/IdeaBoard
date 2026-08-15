@@ -1,10 +1,9 @@
 import { WORKFLOW_FEATURE, type WorkflowFeature } from './workflowFeatures'
 
 export const WORKFLOW_FEATURE_GROUP = {
+  image: 'image',
   prompt: 'prompt',
   fusion: 'fusion',
-  inpaint: 'inpaint',
-  imageTools: 'image-tools',
 } as const
 
 export type WorkflowFeatureGroupKey =
@@ -19,28 +18,22 @@ export interface WorkflowFeatureGroupMeta {
 
 export const WORKFLOW_FEATURE_GROUP_LIST: readonly WorkflowFeatureGroupMeta[] = [
   {
+    key: WORKFLOW_FEATURE_GROUP.image,
+    title: 'Image',
+    desc: '图片是主输入；System Prompt 可通过 {{user_prompt}} 接收辅助要求。',
+    order: 10,
+  },
+  {
     key: WORKFLOW_FEATURE_GROUP.prompt,
     title: 'Prompt',
-    desc: '草图成图、风格延展、抠图和图案生成类右键/生成工作流。',
-    order: 10,
+    desc: '用户文字是主导输入，可选参考图。',
+    order: 20,
   },
   {
     key: WORKFLOW_FEATURE_GROUP.fusion,
     title: 'Fusion',
-    desc: '2 到 4 图融合时的主次、权重和修饰语义。',
-    order: 40,
-  },
-  {
-    key: WORKFLOW_FEATURE_GROUP.inpaint,
-    title: 'Inpaint',
-    desc: '局部重绘能力。',
-    order: 50,
-  },
-  {
-    key: WORKFLOW_FEATURE_GROUP.imageTools,
-    title: 'Image Tools',
-    desc: '图片右键工具里的 HD 和扩图。',
-    order: 60,
+    desc: '多图是主输入；用户文字通过 {{user_prompt}} 作为融合辅助要求。',
+    order: 30,
   },
 ] as const
 
@@ -71,6 +64,7 @@ export interface WorkflowFeatureConfigItem {
 export interface WorkflowFeatureConfigGroup {
   key: string
   title: string
+  description: string
   order: number
   items: readonly WorkflowFeatureConfigItem[]
 }
@@ -91,27 +85,23 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
   {
     slug: WORKFLOW_FEATURE.sketchToImage,
     label: '草图成图',
-    groupKey: WORKFLOW_FEATURE_GROUP.prompt,
+    groupKey: WORKFLOW_FEATURE_GROUP.image,
     imageActionLabel: '草图成图',
     imageActionTitle: '草图成图',
     promptVariables: [{ key: '{{user_prompt}}', tone: 'prompt' }],
   },
   {
-    slug: WORKFLOW_FEATURE.imageEdit,
-    label: '文字改图',
-    groupKey: WORKFLOW_FEATURE_GROUP.prompt,
-    promptVariables: [{ key: '{{user_prompt}}', tone: 'prompt' }],
-  },
-  {
     slug: WORKFLOW_FEATURE.localInpaint,
     label: '局部重绘',
-    groupKey: WORKFLOW_FEATURE_GROUP.inpaint,
+    groupKey: WORKFLOW_FEATURE_GROUP.image,
+    imageActionLabel: '局部重绘',
+    imageActionTitle: '局部重绘',
     promptVariables: [{ key: '{{user_prompt}}', tone: 'prompt' }],
   },
   {
     slug: WORKFLOW_FEATURE.styleVariation,
     label: '风格延展',
-    groupKey: WORKFLOW_FEATURE_GROUP.prompt,
+    groupKey: WORKFLOW_FEATURE_GROUP.image,
     imageActionLabel: '风格延展',
     imageActionTitle: '风格延展',
     promptVariables: [
@@ -131,7 +121,7 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
   {
     slug: WORKFLOW_FEATURE.removeBg,
     label: '抠图',
-    groupKey: WORKFLOW_FEATURE_GROUP.prompt,
+    groupKey: WORKFLOW_FEATURE_GROUP.image,
     imageActionLabel: '抠图',
     imageActionTitle: '抠图',
     promptVariables: [{ key: '{{user_prompt}}', tone: 'prompt' }],
@@ -145,7 +135,7 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
   {
     slug: WORKFLOW_FEATURE.hdUpscale,
     label: 'HD',
-    groupKey: WORKFLOW_FEATURE_GROUP.imageTools,
+    groupKey: WORKFLOW_FEATURE_GROUP.image,
     imageActionLabel: 'HD',
     imageActionTitle: 'HD',
     promptVariables: [
@@ -156,7 +146,7 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
   {
     slug: WORKFLOW_FEATURE.imageExtend,
     label: '扩图',
-    groupKey: WORKFLOW_FEATURE_GROUP.imageTools,
+    groupKey: WORKFLOW_FEATURE_GROUP.image,
     imageActionLabel: '扩图',
     imageActionTitle: '扩图',
     promptVariables: [
@@ -192,14 +182,18 @@ export const WORKFLOW_FEATURE_REGISTRY_MAP = Object.fromEntries(
   WORKFLOW_FEATURE_REGISTRY.map((item) => [item.slug, item]),
 ) as Record<WorkflowFeature, WorkflowFeatureRegistryItem>
 
+export function getWorkflowFeatureRegistryItem(slug: string): WorkflowFeatureRegistryItem | null {
+  return WORKFLOW_FEATURE_REGISTRY.find((item) => item.slug === slug) ?? null
+}
+
 const WORKFLOW_FEATURE_CONFIG_GROUP_DEFS = [
   {
     key: 'image',
     title: 'Image',
+    description: '图片是主输入；用户文字通过 {{user_prompt}} 作为辅助要求。',
     order: 10,
     slugs: [
       WORKFLOW_FEATURE.sketchToImage,
-      WORKFLOW_FEATURE.imageEdit,
       WORKFLOW_FEATURE.styleVariation,
       WORKFLOW_FEATURE.removeBg,
       WORKFLOW_FEATURE.localInpaint,
@@ -210,18 +204,21 @@ const WORKFLOW_FEATURE_CONFIG_GROUP_DEFS = [
   {
     key: 'prompt',
     title: 'Prompt',
+    description: '用户文字是主导输入，可选参考图。',
     order: 20,
     slugs: [WORKFLOW_FEATURE.promptGeneration],
   },
   {
     key: 'fusion',
     title: 'Fusion',
+    description: '多图是主输入；用户文字通过 {{user_prompt}} 作为融合辅助要求。',
     order: 30,
     slugs: [WORKFLOW_FEATURE.styleFusion],
   },
 ] as const satisfies readonly {
   key: string
   title: string
+  description: string
   order: number
   slugs: readonly WorkflowFeature[]
 }[]
@@ -253,6 +250,7 @@ export const WORKFLOW_FEATURE_CONFIG_GROUPS = WORKFLOW_FEATURE_CONFIG_GROUP_DEFS
   .map((group) => ({
     key: group.key,
     title: group.title,
+    description: group.description,
     order: group.order,
     items: group.slugs.map((slug) => WORKFLOW_FEATURE_CONFIG_ITEM_MAP[slug]),
   })) satisfies readonly WorkflowFeatureConfigGroup[]

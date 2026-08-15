@@ -13,7 +13,6 @@ var workflowFeatureSlugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 
 const (
 	FeatureSlugPromptGeneration = "prompt-generation"
-	FeatureSlugImageEdit        = "image-edit"
 	FeatureSlugLocalInpaint     = "local-inpaint"
 
 	FeatureSlugSketchToImage  = "sketch-to-image"
@@ -26,7 +25,6 @@ const (
 
 var canonicalWorkflowFeatureSlugs = []string{
 	FeatureSlugPromptGeneration,
-	FeatureSlugImageEdit,
 	FeatureSlugLocalInpaint,
 	FeatureSlugSketchToImage,
 	FeatureSlugStyleVariation,
@@ -38,7 +36,6 @@ var canonicalWorkflowFeatureSlugs = []string{
 
 var supportedWorkflowFeatureSlugs = []string{
 	FeatureSlugPromptGeneration,
-	FeatureSlugImageEdit,
 	FeatureSlugLocalInpaint,
 	FeatureSlugSketchToImage,
 	FeatureSlugStyleVariation,

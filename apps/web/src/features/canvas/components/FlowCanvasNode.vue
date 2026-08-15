@@ -69,7 +69,6 @@
           @append-to-canvas="onImageAppendToCanvasRequest"
           @reset="onImageResetRequest"
           @contextmenu="onImageContextMenuRequest"
-          @prompt-generate="onImagePromptGenerationRequest"
           @expand-submit="onImageCanvasExtendSubmit"
           @action="onImageActionRequest"
           @expand-handle-pointerdown="onImageCanvasExtendHandlePointerDown"
@@ -318,19 +317,6 @@ function onNodeMouseDown(event: MouseEvent) {
   emit('node-mousedown', props.nodeId, event)
 }
 
-function onImagePromptGenerationRequest(
-  action: Extract<CanvasNodePresentationIntent, { type: 'image-prompt-generation-requested' }>['action'],
-  prompt: string,
-  outputCount: number,
-) {
-  emit('node-intent', {
-    type: 'image-prompt-generation-requested',
-    nodeId: props.nodeId,
-    action,
-    prompt,
-    outputCount,
-  })
-}
 function onImageCanvasExtendSubmit(prompt: string, outputCount: number) {
   emit('node-intent', {
     type: 'canvas-extend-submitted',

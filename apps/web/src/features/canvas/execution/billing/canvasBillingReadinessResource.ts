@@ -9,7 +9,6 @@ import {
   buildImageActionReadinessRequest,
   buildLocalInpaintReadinessRequest,
   buildPromptGenerationTaskRequest,
-  buildPromptImageReadinessRequest,
 } from '../commands/flowImageTaskRequests'
 import {
   createCanvasTaskClientActionId,
@@ -18,8 +17,6 @@ import {
 
 function buildCanvasBillingReadinessRequest(feature: WorkflowFeature): SubmitTaskData {
   switch (feature) {
-    case WORKFLOW_FEATURE.imageEdit:
-      return buildPromptImageReadinessRequest()
     case WORKFLOW_FEATURE.localInpaint:
       return buildLocalInpaintReadinessRequest()
     case WORKFLOW_FEATURE.promptGeneration:

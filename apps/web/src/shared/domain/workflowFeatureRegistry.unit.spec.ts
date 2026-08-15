@@ -5,6 +5,7 @@ import {
   getWorkflowFeatureImageActionText,
   WORKFLOW_FEATURE_CONFIG_GROUPS,
   WORKFLOW_FEATURE_CONFIG_ITEM_MAP,
+  WORKFLOW_FEATURE_GROUP,
 } from './workflowFeatureRegistry'
 
 describe('workflowFeatureRegistry projections', () => {
@@ -23,7 +24,6 @@ describe('workflowFeatureRegistry projections', () => {
         order: 10,
         slugs: [
           WORKFLOW_FEATURE.sketchToImage,
-          WORKFLOW_FEATURE.imageEdit,
           WORKFLOW_FEATURE.styleVariation,
           WORKFLOW_FEATURE.removeBg,
           WORKFLOW_FEATURE.localInpaint,
@@ -73,14 +73,26 @@ describe('workflowFeatureRegistry projections', () => {
     ])
   })
 
+  it('exposes user_prompt for every configurable Image feature', () => {
+    const imageGroup = WORKFLOW_FEATURE_CONFIG_GROUPS.find(
+      (group) => group.key === WORKFLOW_FEATURE_GROUP.image,
+    )
+    expect(imageGroup).toBeDefined()
+    for (const item of imageGroup?.items ?? []) {
+      expect(getWorkflowFeaturePromptVariables(item.slug)).toEqual(
+        expect.arrayContaining([{ key: '{{user_prompt}}', tone: 'prompt' }]),
+      )
+    }
+  })
+
   it('exposes canvas image action text without feature modules rebuilding it', () => {
     expect(getWorkflowFeatureImageActionText(WORKFLOW_FEATURE.removeBg)).toEqual({
       label: '抠图',
       title: '抠图',
     })
     expect(getWorkflowFeatureImageActionText(WORKFLOW_FEATURE.localInpaint)).toEqual({
-      label: 'Inpaint · 局部重绘',
-      title: 'Inpaint · 局部重绘',
+      label: '局部重绘',
+      title: '局部重绘',
     })
   })
 })

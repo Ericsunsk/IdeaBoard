@@ -65,7 +65,6 @@ export function createCanvasScreenNodePresentation(options: {
       appendToCanvas: commands.graphEditing.onFlowImageAppendToCanvas,
       reset: options.nodeInteractions.onFlowImageReset,
       openContextMenu: interactions.onFlowImageContextMenu,
-      generateFromPrompt: interactions.onFlowImagePromptGenerate,
       runAction: interactions.onFlowImageDirectAction,
     },
     canvasExtend: {

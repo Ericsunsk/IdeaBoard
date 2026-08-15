@@ -27,7 +27,6 @@ func TestWorkflowRegistryUsesFeatureLevelBillingIdentities(t *testing.T) {
 	}
 	want := []string{
 		"ai-image:prompt-generation",
-		"ai-image:image-edit",
 		"ai-image:local-inpaint",
 		"ai-image:sketch-to-image",
 		"ai-image:style-variation",

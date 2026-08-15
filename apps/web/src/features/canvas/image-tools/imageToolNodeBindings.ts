@@ -86,7 +86,7 @@ export function createImageToolNodeBindings(
     const nextBinding: ImageActionBinding = {
       actionMenuVisible,
       promptComposerVisible: options.isImagePromptComposerVisible(nodeId),
-      promptPlaceholder: hasCommittedMask ? '描述如何重绘选区' : '输入提示词改造这张图',
+      promptPlaceholder: hasCommittedMask ? '描述如何重绘选区' : '输入辅助要求（可选）',
       directGenerating,
       strengthControl: {
         visible: !!activeStrengthAction && actionMenuVisible,

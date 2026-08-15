@@ -108,7 +108,7 @@ export function createImageToolCommands(session: ImageToolSession) {
       })
       return
     }
-    void options.runPromptGeneration(nodeId, prompt, outputCount)
+    options.feedback.warning('请先在图片上标记需要重绘的区域')
   }
 
   const maskChromeActions = useMaskEditorChromeActions({

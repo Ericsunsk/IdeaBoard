@@ -75,7 +75,6 @@ export type UseCanvasImageToolsOptions = {
       referenceImageUrls?: string[]
     },
   ) => Promise<void> | void
-  runPromptGeneration: (nodeId: string, prompt: string, outputCount: number) => Promise<void> | void
   isImageActionPanelVisible: (nodeId: string) => boolean
   isImagePromptComposerVisible: (nodeId: string) => boolean
   isGenerationAvailable: () => boolean

@@ -95,7 +95,6 @@ func TestShouldUseLocalRedrawPipelineOnlyForLocalInpaintWithMask(t *testing.T) {
 		want    bool
 	}{
 		{name: "local inpaint with mask", feature: "local-inpaint", mask: "data:image/png;base64,bWFzaw==", want: true},
-		{name: "image edit with stale mask", feature: "image-edit", mask: "data:image/png;base64,bWFzaw=="},
 		{name: "other feature with stale mask", feature: "hd-upscale", mask: "data:image/png;base64,bWFzaw=="},
 		{name: "local inpaint without mask", feature: "local-inpaint"},
 	}

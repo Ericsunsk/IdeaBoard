@@ -38,7 +38,6 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 	canonical := []string{
 		FeatureSlugPromptGeneration,
-		FeatureSlugImageEdit,
 		FeatureSlugLocalInpaint,
 		FeatureSlugSketchToImage,
 		FeatureSlugStyleVariation,
@@ -76,7 +75,6 @@ func TestAIImageFeatureSlugsAreTheCanonicalWorkflowContract(t *testing.T) {
 	got := AIImageFeatureSlugs()
 	want := []string{
 		FeatureSlugPromptGeneration,
-		FeatureSlugImageEdit,
 		FeatureSlugLocalInpaint,
 		FeatureSlugSketchToImage,
 		FeatureSlugStyleVariation,

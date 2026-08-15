@@ -3,6 +3,8 @@ package prompts
 import (
 	"strings"
 	"testing"
+
+	"ideaboard/api/internal/workflow"
 )
 
 func ApplyFeatureSystemPrompt(basePrompt, userPrompt, featureSlug string, params map[string]interface{}, loadPrompt func(string) (string, error)) string {
@@ -56,32 +58,56 @@ func TestApplyFeatureSystemPromptNonStyleVariationStillAppendsBasePrompt(t *test
 }
 
 func TestApplyFeatureSystemPromptDoesNotAppendHiddenConstraints(t *testing.T) {
-	features := []string{
+	got := ApplyFeatureSystemPrompt(
+		"user prompt",
+		"user prompt",
 		"style-fusion",
-		"image-extend",
-		"hd-upscale",
+		nil,
+		func(string) (string, error) {
+			return "SYS-CONFIG", nil
+		},
+	)
+
+	if got != "SYS-CONFIG user prompt" {
+		t.Fatalf("got %q, want only configured system prompt + base prompt", got)
+	}
+	if strings.Contains(got, "【执行语义】") {
+		t.Fatalf("expected no hidden constraint injection, got %q", got)
+	}
+}
+
+func TestApplyFeatureSystemPromptImageNodeFeaturesRequireExplicitUserPromptPlaceholder(t *testing.T) {
+	features := []string{
+		workflow.FeatureSlugLocalInpaint,
+		workflow.FeatureSlugSketchToImage,
+		workflow.FeatureSlugStyleVariation,
+		workflow.FeatureSlugRemoveBg,
+		workflow.FeatureSlugHDUpscale,
+		workflow.FeatureSlugImageExtend,
 	}
 
 	for _, feature := range features {
 		t.Run(feature, func(t *testing.T) {
-			got := ApplyFeatureSystemPrompt(
+			withoutPlaceholder := ApplyFeatureSystemPrompt(
 				"user prompt",
 				"user prompt",
 				feature,
-				map[string]interface{}{
-					"mask_image_url": "https://mask.example/a.png",
-					"use_mask":       true,
-				},
-				func(string) (string, error) {
-					return "SYS-CONFIG", nil
-				},
+				nil,
+				func(string) (string, error) { return "SYS-CONFIG", nil },
 			)
-
-			if got != "SYS-CONFIG user prompt" {
-				t.Fatalf("got %q, want only configured system prompt + base prompt", got)
+			if withoutPlaceholder != "SYS-CONFIG" {
+				t.Fatalf("got %q, want configured prompt without implicit user text", withoutPlaceholder)
 			}
-			if strings.Contains(got, "【执行语义】") {
-				t.Fatalf("expected no hidden constraint injection, got %q", got)
+
+			withPlaceholder := ApplyFeatureSystemPrompt(
+				"user prompt",
+				"user prompt",
+				feature,
+				nil,
+				func(string) (string, error) { return "SYS-CONFIG {{user_prompt}}", nil },
+			)
+			if withPlaceholder != "SYS-CONFIG user prompt" {
+				t.Fatalf("got %q, want explicit auxiliary user prompt", withPlaceholder)
 			}
 		})
 	}

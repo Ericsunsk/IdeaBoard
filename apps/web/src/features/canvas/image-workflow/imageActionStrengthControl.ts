@@ -86,7 +86,8 @@ export function useFlowImageActionStrengthControl(options: {
       if (event.pointerId !== pointerId) return
       stopDragSession()
       if (hasEffectiveDrag) {
-        strengthEdit.finishEdit(action)
+        // The document-level drag bypasses the range's native commit event.
+        input.dispatchEvent(new Event('change', { bubbles: true }))
         return
       }
       strengthEdit.cancelEdit(action)

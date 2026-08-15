@@ -71,16 +71,6 @@ export type ImageInpaintExecutionPlan = {
   resultOptions: ImageExecutionResultOptions
 }
 
-export type ImagePromptExecutionPlan = {
-  kind: 'image-prompt'
-  sourceNodeId: string
-  source: ImageExecutionInput
-  prompt: string
-  outputCount: number
-  aspectRatio: PromptAspectRatio
-  resultOptions: ImageExecutionResultOptions
-}
-
 export type PromptGenerationExecutionPlan = {
   kind: 'prompt-generation'
   sourceNodeId: string
@@ -121,7 +111,6 @@ export type ImageExecutionPlan =
   | ImageActionExecutionPlan
   | CanvasExtendExecutionPlan
   | ImageInpaintExecutionPlan
-  | ImagePromptExecutionPlan
   | PromptGenerationExecutionPlan
   | FusionExecutionPlan
 
@@ -386,58 +375,6 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     }
   }
 
-  function planImagePromptGeneration(
-    nodeId: string,
-    prompt: string,
-    outputCount: number,
-    aspectRatio: PromptAspectRatio = 'auto',
-    options: { outputAnchorNodeId?: string } = {},
-  ): ImagePromptExecutionPlan {
-    const graph = readGraph()
-    const source = requireImageExecutionImage(graph, nodeId)
-    return planImagePromptGenerationFromSource(
-      source.input,
-      nodeId,
-      prompt,
-      outputCount,
-      aspectRatio,
-      {
-        ...options,
-        anchor: options.outputAnchorNodeId
-          ? resolveGraphNodeResultAnchor(graph, options.outputAnchorNodeId)
-          : source.resultAnchor,
-      },
-    )
-  }
-
-  function planImagePromptGenerationFromSource(
-    source: ImageExecutionInput,
-    sourceNodeId: string,
-    prompt: string,
-    outputCount: number,
-    aspectRatio: PromptAspectRatio,
-    options: { outputAnchorNodeId?: string; anchor?: ImageResultAnchor } = {},
-  ): ImagePromptExecutionPlan {
-    const normalizedPrompt = `${prompt ?? ''}`.trim()
-    if (!normalizedPrompt) failPlanning('请输入 Prompt')
-    if (!source.url) failPlanning('图片缺少 URL')
-    return {
-      kind: 'image-prompt',
-      source,
-      sourceNodeId,
-      prompt: normalizedPrompt,
-      outputCount: requireRequestedOutputCount(outputCount),
-      aspectRatio: normalizePromptAspectRatio(aspectRatio),
-      resultOptions: {
-        ...(options.anchor
-          ? { anchor: withOutputAnchorNodeId(options.anchor, options.outputAnchorNodeId) }
-          : options.outputAnchorNodeId
-            ? { anchor: resolveGraphNodeResultAnchor(readGraph(), options.outputAnchorNodeId) }
-            : {}),
-      },
-    }
-  }
-
   function planPromptGeneration(
     anchorNodeId: string,
     referenceImages: readonly ImageExecutionInput[],
@@ -535,8 +472,6 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     planFusionPromptGeneration,
     planImageDirectAction,
     planImageInpaintAction,
-    planImagePromptGeneration,
-    planImagePromptGenerationFromSource,
     planPromptGeneration,
   }
 }

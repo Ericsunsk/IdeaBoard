@@ -32,8 +32,6 @@ import {
 type CanvasImageWorkflowExecutionPort = Pick<
   ImageWorkflowExecution,
   | 'runImageInpaintAction'
-  | 'runImagePromptGeneration'
-  | 'runImagePromptGenerationFromSource'
   | 'runPromptGeneration'
   | 'runFusionPromptGeneration'
   | 'runImageDirectAction'
@@ -107,12 +105,6 @@ export type CanvasImageWorkflow = {
         prompt?: string,
         outputCount?: number,
         strength?: number,
-      ) => void
-      onFlowImagePromptGenerate: (
-        nodeId: string,
-        action: ImageTaskAction,
-        prompt: string,
-        outputCount: number,
       ) => void
       onFlowFusionPromptGenerate: (
         nodeId: string,
@@ -207,11 +199,6 @@ export function useCanvasImageWorkflow(
     hideStrengthControl: strengthControl.hideStrengthControl,
     updateOutputCount: markImageWorkflowNodeDirty,
     runInpaintAction: execution.runImageInpaintAction,
-    runPromptGeneration: (nodeId, prompt, outputCount) =>
-      execution.runImageDirectAction(nodeId, IMAGE_NODE_ACTION.imageEdit, {
-        prompt,
-        outputCount,
-      }),
     isImageActionPanelVisible: (nodeId) => ui.panels.isActive('image-tools', nodeId),
     isImagePromptComposerVisible: (nodeId) => ui.panels.isActive('image-tools', nodeId),
     isGenerationAvailable: execution.isGenerationAvailable,

@@ -13,7 +13,6 @@ export type ImageExecutionMode = (typeof IMAGE_EXECUTION_MODE)[keyof typeof IMAG
 export const DEFAULT_IMAGE_ACTION_STRENGTH = 50
 
 export const IMAGE_DIRECT_TASK_ACTIONS = [
-  IMAGE_NODE_ACTION.imageEdit,
   IMAGE_NODE_ACTION.removeBg,
   IMAGE_NODE_ACTION.styleVariation,
   IMAGE_NODE_ACTION.sketchToImage,
@@ -73,9 +72,6 @@ function createWorkflowExecutionConfig<TAction extends WorkflowImageExecutionAct
 }
 
 export const IMAGE_ACTION_EXECUTION_REGISTRY_LIST = [
-  createWorkflowExecutionConfig(IMAGE_NODE_ACTION.imageEdit, {
-    mode: IMAGE_EXECUTION_MODE.directTask,
-  }),
   createWorkflowExecutionConfig(IMAGE_NODE_ACTION.removeBg, {
     mode: IMAGE_EXECUTION_MODE.directTask,
   }),

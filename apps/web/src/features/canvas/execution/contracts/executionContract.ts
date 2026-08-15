@@ -4,7 +4,6 @@ import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
 
 export const EXECUTION_FEATURE = {
   promptGeneration: WORKFLOW_FEATURE.promptGeneration,
-  imageEdit: WORKFLOW_FEATURE.imageEdit,
   localInpaint: WORKFLOW_FEATURE.localInpaint,
   removeBg: WORKFLOW_FEATURE.removeBg,
   styleFusion: WORKFLOW_FEATURE.styleFusion,
@@ -25,9 +24,6 @@ type ExecutionMetaEntry = {
 export const EXECUTION_META = {
   [EXECUTION_FEATURE.promptGeneration]: {
     feature: EXECUTION_FEATURE.promptGeneration,
-  },
-  [EXECUTION_FEATURE.imageEdit]: {
-    feature: EXECUTION_FEATURE.imageEdit,
   },
   [EXECUTION_FEATURE.localInpaint]: {
     feature: EXECUTION_FEATURE.localInpaint,
@@ -54,8 +50,6 @@ export const EXECUTION_META = {
     promptPrefix: '[image-extend]',
   },
 } as const satisfies Record<ExecutionFeature, ExecutionMetaEntry>
-
-export const EXECUTION_IMAGE_EDIT_META = EXECUTION_META[EXECUTION_FEATURE.imageEdit]
 
 export const EXECUTION_LOCAL_INPAINT_META = EXECUTION_META[EXECUTION_FEATURE.localInpaint]
 

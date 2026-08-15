@@ -5,7 +5,6 @@ import {
   type ActivatedImageExecutionPlan,
   type ImageExecutionInput,
   type ImageExecutionPlan,
-  type ImageResultAnchor,
 } from '../planning/ImageExecutionPlan'
 import type { CanvasExtendRect } from '../../utils/canvasExtendGeometry'
 import { createCanvasActivationId } from '../task-runner/taskClientActionIds'
@@ -41,21 +40,6 @@ export type ImageWorkflowPlanner = {
     nodeId: string,
     inpaint: RunImageInpaintActionOptions,
   ) => ImageExecutionPlan
-  planImagePromptGeneration: (
-    nodeId: string,
-    prompt: string,
-    outputCount: number,
-    aspectRatio: PromptAspectRatio,
-    optionsOverride?: { outputAnchorNodeId?: string },
-  ) => ImageExecutionPlan
-  planImagePromptGenerationFromSource: (
-    source: ImageExecutionInput,
-    sourceNodeId: string,
-    prompt: string,
-    outputCount: number,
-    aspectRatio: PromptAspectRatio,
-    optionsOverride?: { outputAnchorNodeId?: string; anchor?: ImageResultAnchor },
-  ) => ImageExecutionPlan
   planPromptGeneration: (
     anchorNodeId: string,
     referenceImages: readonly ImageExecutionInput[],
@@ -87,21 +71,6 @@ export type ImageWorkflowCommands = {
     options?: RunImageDirectActionOptions,
   ) => Promise<void>
   runCanvasExtendAction: (nodeId: string, intent: CanvasExtendRectIntent) => Promise<void>
-  runImagePromptGeneration: (
-    nodeId: string,
-    prompt: string,
-    outputCount: number,
-    aspectRatio?: PromptAspectRatio,
-    optionsOverride?: { outputAnchorNodeId?: string },
-  ) => Promise<void>
-  runImagePromptGenerationFromSource: (
-    source: ImageExecutionInput,
-    sourceNodeId: string,
-    prompt: string,
-    outputCount: number,
-    aspectRatio: PromptAspectRatio,
-    optionsOverride?: { outputAnchorNodeId?: string; anchor?: ImageResultAnchor },
-  ) => Promise<void>
   runImageInpaintAction: (nodeId: string, inpaint: RunImageInpaintActionOptions) => Promise<void>
   runFusionPromptGeneration: (
     nodeId: string,
@@ -174,44 +143,6 @@ export function createImageWorkflowCommands(options: {
     await executePlannedAction(() => options.planner.planImageInpaintAction(nodeId, inpaint))
   }
 
-  async function runImagePromptGeneration(
-    nodeId: string,
-    prompt: string,
-    outputCount: number,
-    aspectRatio: PromptAspectRatio = 'auto',
-    optionsOverride: { outputAnchorNodeId?: string } = {},
-  ) {
-    await executePlannedAction(() =>
-      options.planner.planImagePromptGeneration(
-        nodeId,
-        prompt,
-        outputCount,
-        aspectRatio,
-        optionsOverride,
-      ),
-    )
-  }
-
-  async function runImagePromptGenerationFromSource(
-    source: ImageExecutionInput,
-    sourceNodeId: string,
-    prompt: string,
-    outputCount: number,
-    aspectRatio: PromptAspectRatio,
-    optionsOverride: { outputAnchorNodeId?: string; anchor?: ImageResultAnchor } = {},
-  ) {
-    await executePlannedAction(() =>
-      options.planner.planImagePromptGenerationFromSource(
-        source,
-        sourceNodeId,
-        prompt,
-        outputCount,
-        aspectRatio,
-        optionsOverride,
-      ),
-    )
-  }
-
   async function runPromptGeneration(
     anchorNodeId: string,
     referenceImages: readonly ImageExecutionInput[],
@@ -247,8 +178,6 @@ export function createImageWorkflowCommands(options: {
     reattachPendingImageResults: options.workflow.reattachPendingImageResults,
     runImageDirectAction,
     runCanvasExtendAction,
-    runImagePromptGeneration,
-    runImagePromptGenerationFromSource,
     runImageInpaintAction,
     runFusionPromptGeneration,
     runPromptGeneration,

@@ -35,12 +35,6 @@ export type CanvasNodePresentationIntentCommands = {
     appendToCanvas: (nodeId: string) => void
     reset: (nodeId: string) => void
     openContextMenu: (nodeId: string, event: MouseEvent) => void
-    generateFromPrompt: (
-      nodeId: string,
-      action: CanvasNodeIntentOf<'image-prompt-generation-requested'>['action'],
-      prompt: string,
-      outputCount: number,
-    ) => void
     runAction: (
       nodeId: string,
       action: CanvasNodeIntentOf<'action-requested'>['action'],
@@ -126,14 +120,6 @@ export function createCanvasNodePresentationIntentRouter(
         return
       case 'image-context-menu-requested':
         commands.image.openContextMenu(intent.nodeId, intent.event)
-        return
-      case 'image-prompt-generation-requested':
-        commands.image.generateFromPrompt(
-          intent.nodeId,
-          intent.action,
-          intent.prompt,
-          intent.outputCount,
-        )
         return
       case 'canvas-extend-submitted':
         commands.canvasExtend.submit(intent.nodeId, intent.prompt, intent.outputCount)

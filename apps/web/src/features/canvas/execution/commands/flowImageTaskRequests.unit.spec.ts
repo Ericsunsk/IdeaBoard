@@ -12,7 +12,6 @@ import type {
   CanvasExtendExecutionPlan,
   ImageActionExecutionPlan,
   ImageInpaintExecutionPlan,
-  ImagePromptExecutionPlan,
   PreparedFusionExecutionPlan,
   PromptGenerationExecutionPlan,
 } from '../planning/ImageExecutionPlan'
@@ -381,15 +380,6 @@ describe('flowImageTaskRequests', () => {
       outputCount: 1,
       resultOptions: {},
     }
-    const promptPlan: ImagePromptExecutionPlan = {
-      kind: 'image-prompt',
-      sourceNodeId: 'image-1',
-      source,
-      prompt: 'make it cinematic',
-      outputCount: 1,
-      aspectRatio: '3:4',
-      resultOptions: {},
-    }
     const textPlan: PromptGenerationExecutionPlan = {
       kind: 'prompt-generation',
       sourceNodeId: 'prompt-1',
@@ -430,14 +420,6 @@ describe('flowImageTaskRequests', () => {
     }
 
     expect(buildImageExecutionTaskRequest(actionPlan).feature).toBe(EXECUTION_FEATURE.removeBg)
-    expect(buildImageExecutionTaskRequest(promptPlan)).toMatchObject({
-      feature: EXECUTION_FEATURE.imageEdit,
-      image_urls: [source.url],
-      params: {
-        output_count: 1,
-        ratio: '3:4',
-      },
-    })
     expect(buildImageExecutionTaskRequest(textPlan)).toMatchObject({
       feature: EXECUTION_FEATURE.promptGeneration,
     })

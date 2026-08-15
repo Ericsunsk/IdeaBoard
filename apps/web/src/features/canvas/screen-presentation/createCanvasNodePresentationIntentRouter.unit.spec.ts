@@ -138,17 +138,6 @@ describe('Canvas Node presentation intent routing seam', () => {
         args: [nodeId, mouseEvent],
       },
       {
-        intent: {
-          type: 'image-prompt-generation-requested',
-          nodeId,
-          action: 'image-edit',
-          prompt: 'restyle',
-          outputCount: 3,
-        },
-        command: commands.image.generateFromPrompt,
-        args: [nodeId, 'image-edit', 'restyle', 3],
-      },
-      {
         intent: { type: 'canvas-extend-submitted', nodeId, prompt: 'extend', outputCount: 1 },
         command: commands.canvasExtend.submit,
         args: [nodeId, 'extend', 1],

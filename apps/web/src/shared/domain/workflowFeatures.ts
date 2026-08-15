@@ -1,6 +1,5 @@
 export const WORKFLOW_FEATURE = {
   promptGeneration: 'prompt-generation',
-  imageEdit: 'image-edit',
   localInpaint: 'local-inpaint',
   removeBg: 'remove-bg',
   styleFusion: 'style-fusion',
@@ -16,7 +15,6 @@ export const WORKFLOW_FEATURE_SLUGS = Object.values(WORKFLOW_FEATURE) as readonl
 
 export const CANONICAL_WORKFLOW_FEATURE = {
   promptGeneration: 'prompt-generation',
-  imageEdit: 'image-edit',
   localInpaint: 'local-inpaint',
   removeBg: 'remove-bg',
   styleFusion: 'style-fusion',

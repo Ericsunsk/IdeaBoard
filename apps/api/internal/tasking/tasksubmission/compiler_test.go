@@ -9,7 +9,7 @@ import (
 func TestCompileGenerationSnapshotFreezesIntentAndMediaOrder(t *testing.T) {
 	upsampling := true
 	params := &tasks.WorkflowTaskParams{
-		Feature:  "image-edit",
+		Feature:  "local-inpaint",
 		Controls: &tasks.GenerationControls{OutputCount: 3, PromptUpsampling: &upsampling},
 		Media: &tasks.MediaInputs{
 			Inputs:     []tasks.MediaRef{{URL: " upload-a ", Role: "input"}},
@@ -18,7 +18,7 @@ func TestCompileGenerationSnapshotFreezesIntentAndMediaOrder(t *testing.T) {
 		},
 	}
 	snapshot, err := CompileGenerationSnapshot(GenerationCompilerInput{
-		Feature:         "image-edit",
+		Feature:         "local-inpaint",
 		UserPrompt:      "edit this",
 		CompiledPrompt:  "SYS edit this",
 		TemplateVersion: "v7",

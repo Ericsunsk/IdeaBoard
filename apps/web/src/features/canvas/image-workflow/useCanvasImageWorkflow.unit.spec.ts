@@ -18,8 +18,6 @@ const mocks = vi.hoisted(() => {
       planImageDirectAction: vi.fn(() => plan),
       planCanvasExtendAction: vi.fn(() => plan),
       planImageInpaintAction: vi.fn(() => plan),
-      planImagePromptGeneration: vi.fn(() => plan),
-      planImagePromptGenerationFromSource: vi.fn(() => plan),
       planPromptGeneration: vi.fn(() => plan),
       planFusionPromptGeneration: vi.fn(() => plan),
     },
@@ -204,18 +202,6 @@ describe('useCanvasImageWorkflow', () => {
       { prompt: 'soft watercolor', outputCount: 4, strength: 72 },
     )
 
-    handlers.onFlowImagePromptGenerate(
-      'image-1',
-      IMAGE_NODE_ACTION.styleVariation,
-      'soft watercolor',
-      4,
-    )
-    await vi.waitFor(() => expect(mocks.execution.executeImageWorkflow).toHaveBeenCalledTimes(2))
-    expect(mocks.planner.planImageDirectAction).toHaveBeenLastCalledWith(
-      'image-1',
-      IMAGE_NODE_ACTION.styleVariation,
-      { prompt: 'soft watercolor', outputCount: 4 },
-    )
   })
 
   it('routes text Prompt intent through planning and execution with normalized inputs', async () => {

@@ -26,8 +26,6 @@ function createCommandHarness(isGenerationAvailable = () => true) {
     planImageDirectAction: vi.fn(() => generationPlan),
     planCanvasExtendAction: vi.fn(() => generationPlan),
     planImageInpaintAction: vi.fn(() => generationPlan),
-    planImagePromptGeneration: vi.fn(() => generationPlan),
-    planImagePromptGenerationFromSource: vi.fn(() => generationPlan),
     planPromptGeneration: vi.fn(() => generationPlan),
     planFusionPromptGeneration: vi.fn(() => generationPlan),
   }

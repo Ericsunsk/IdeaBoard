@@ -27,7 +27,7 @@
       @toggle="toggleOutputCountPicker"
       @select="selectOutputCount"
     />
-    <div class="canvas-credit-submit-control">
+    <div v-if="showSubmit" class="canvas-credit-submit-control">
       <button
         :class="sendButtonClass"
         type="button"
@@ -75,6 +75,7 @@ const props = withDefaults(
     disabled?: boolean
     allowEmpty?: boolean
     submitDisabled?: boolean
+    showSubmit?: boolean
     aspectRatio?: PromptAspectRatio
     showAspectRatio?: boolean
     autofocus?: boolean
@@ -88,6 +89,7 @@ const props = withDefaults(
     disabled: false,
     rows: 1,
     showAspectRatio: true,
+    showSubmit: true,
     submitDisabled: false,
   },
 )

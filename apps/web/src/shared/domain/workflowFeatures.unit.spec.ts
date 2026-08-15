@@ -10,7 +10,6 @@ describe('canonical workflow feature registry', () => {
     expect(CANONICAL_WORKFLOW_FEATURE_SLUGS).toEqual(
       expect.arrayContaining([
         CANONICAL_WORKFLOW_FEATURE.promptGeneration,
-        CANONICAL_WORKFLOW_FEATURE.imageEdit,
         CANONICAL_WORKFLOW_FEATURE.localInpaint,
       ]),
     )

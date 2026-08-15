@@ -93,6 +93,28 @@ describe('PromptComposerControls billing contract', () => {
     expect(screen.getByRole('button', { name: '发送' })).toBeEnabled()
   })
 
+  it('can hide the independent submit control without affecting the draft input', async () => {
+    const { user } = renderWithUser(PromptComposerControls, {
+      props: {
+        modelValue: '保留这段提示词',
+        outputCount: 1,
+        placeholder: '输入提示词',
+        textareaClass: 'prompt-input',
+        actionsClass: 'prompt-actions',
+        sendButtonClass: 'prompt-send',
+        showSubmit: false,
+      },
+    })
+
+    const textarea = screen.getByRole('textbox')
+    expect(screen.queryByRole('button', { name: '发送' })).not.toBeInTheDocument()
+
+    await user.click(textarea)
+    await user.keyboard('{Enter}第二行')
+
+    expect(textarea).toHaveValue('保留这段提示词\n第二行')
+  })
+
   it('keeps Enter as a newline and submits only from the send button', async () => {
     const onSubmit = vi.fn()
     const { user } = renderWithUser(PromptComposerControls, {

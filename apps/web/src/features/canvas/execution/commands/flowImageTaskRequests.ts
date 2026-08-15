@@ -3,7 +3,6 @@ import type {
   CanvasExtendExecutionPlan,
   ImageActionExecutionPlan,
   ImageInpaintExecutionPlan,
-  ImagePromptExecutionPlan,
   ImageExecutionInput,
   PromptGenerationExecutionPlan,
   PreparedFusionExecutionPlan,
@@ -13,7 +12,6 @@ import {
   buildExecutionTaskRequest,
   EXECUTION_FEATURE,
   EXECUTION_FUSION_META,
-  EXECUTION_IMAGE_EDIT_META,
   EXECUTION_LOCAL_INPAINT_META,
   EXECUTION_META,
 } from '../contracts/executionContract'
@@ -74,14 +72,6 @@ function buildDirectActionReadinessRequest(action: ImageDirectTaskAction): Submi
     prompt: '',
     feature: execution.feature,
     params,
-  })
-}
-
-export function buildPromptImageReadinessRequest(): SubmitTaskData {
-  return buildExecutionTaskRequest({
-    prompt: '',
-    feature: EXECUTION_IMAGE_EDIT_META.feature,
-    params: { output_count: 1 },
   })
 }
 
@@ -188,26 +178,6 @@ export function buildDirectActionTaskRequest(input: {
   })
 }
 
-export function buildPromptImageTaskRequest(input: {
-  source: ImageExecutionInput
-  prompt: string
-  imageSize: ExecutionImageSize | null
-  aspectRatio: PromptAspectRatio
-  outputCount: number
-}): SubmitTaskData {
-  const sourceUrl = requireImageExecutionInputUrl(input.source)
-  return buildExecutionTaskRequest({
-    prompt: input.prompt.trim(),
-    feature: EXECUTION_IMAGE_EDIT_META.feature,
-    imageUrls: [sourceUrl],
-    params: {
-      output_count: assertRequestedOutputCount(input.outputCount),
-      ...buildExecutionSizeParams(input.imageSize),
-      ...buildPromptAspectRatioTaskParams(input.aspectRatio),
-    },
-  })
-}
-
 export function buildImageInpaintTaskRequest(input: ImageInpaintTaskRequestInput): SubmitTaskData {
   const referenceImageUrls = normalizePromptReferenceImageUrls(input.referenceImageUrls)
   return buildExecutionTaskRequest({
@@ -298,7 +268,6 @@ export function buildFusionTaskRequest(input: FusionTaskRequestInput): SubmitTas
 type ImageExecutionTaskRequestPlan =
   | ImageActionExecutionPlan
   | CanvasExtendExecutionPlan
-  | ImagePromptExecutionPlan
   | PromptGenerationExecutionPlan
   | PreparedFusionExecutionPlan
 
@@ -334,14 +303,6 @@ export function buildImageExecutionTaskRequest(
         imageSize,
         extendPercent: plan.extendPercent,
         prompt: plan.prompt,
-        outputCount: plan.outputCount,
-      })
-    case 'image-prompt':
-      return buildPromptImageTaskRequest({
-        source: plan.source,
-        prompt: plan.prompt,
-        imageSize,
-        aspectRatio: plan.aspectRatio,
         outputCount: plan.outputCount,
       })
     case 'prompt-generation':

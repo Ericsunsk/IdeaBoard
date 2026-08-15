@@ -13,7 +13,6 @@ import (
 func TestAIImageWorkflowSKUContract(t *testing.T) {
 	expected := map[string]string{
 		workflow.FeatureSlugPromptGeneration: "ai-image:prompt-generation",
-		workflow.FeatureSlugImageEdit:        "ai-image:image-edit",
 		workflow.FeatureSlugLocalInpaint:     "ai-image:local-inpaint",
 		workflow.FeatureSlugSketchToImage:    "ai-image:sketch-to-image",
 		workflow.FeatureSlugStyleVariation:   "ai-image:style-variation",
@@ -44,11 +43,11 @@ func TestAIImageWorkflowSKUContract(t *testing.T) {
 }
 
 func TestAIImagePricingIdentityAndFingerprintAreFeatureScoped(t *testing.T) {
-	first, err := AIImageRequest(workflow.FeatureSlugImageEdit, 1)
+	first, err := AIImageRequest(workflow.FeatureSlugLocalInpaint, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := AIImageRequest(workflow.FeatureSlugImageEdit, 1)
+	second, err := AIImageRequest(workflow.FeatureSlugLocalInpaint, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +95,7 @@ func TestTaskBillingRequestValidationFailsClosed(t *testing.T) {
 		request Request
 		wantErr error
 	}{
-		{name: "zero quantity", request: Request{Feature: workflow.FeatureSlugImageEdit}, wantErr: billing.ErrInvalidQuantity},
+		{name: "zero quantity", request: Request{Feature: workflow.FeatureSlugLocalInpaint}, wantErr: billing.ErrInvalidQuantity},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			if _, err := validateRequest(testCase.request); !errors.Is(err, testCase.wantErr) {

@@ -33,7 +33,6 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 			feature: workflow.FeatureSlugStyleVariation,
 			params:  map[string]interface{}{"variation": map[string]interface{}{"strength": 0.5}},
 		},
-		{feature: workflow.FeatureSlugImageEdit},
 		{feature: workflow.FeatureSlugLocalInpaint},
 		{feature: workflow.FeatureSlugRemoveBg},
 		{

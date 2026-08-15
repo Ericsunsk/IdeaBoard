@@ -49,6 +49,8 @@ describe('AdminBillingPricingPage', () => {
     expect(await screen.findByText('局部重绘')).toBeVisible()
     expect(screen.getByText('抠图')).toBeVisible()
     expect(screen.getByText('HD')).toBeVisible()
+    expect(screen.getAllByText('Image 节点')).toHaveLength(3)
+    expect(screen.getAllByText('图片是主输入；用户文字通过 {{user_prompt}} 作为辅助要求。')).toHaveLength(3)
     expect(screen.getByText('已移除功能')).toBeVisible()
     expect(screen.getByText('未定价')).toBeVisible()
     expect(screen.getByText('生效中')).toBeVisible()
