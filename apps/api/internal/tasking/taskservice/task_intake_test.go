@@ -17,8 +17,9 @@ import (
 func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t *testing.T) {
 	var intake = NewTaskIntake(TaskIntakeDeps{
 		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID:     101,
-			Models: []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
+			ID:           101,
+			Capabilities: []string{"background-removal", "image-upscale"},
+			Models:       []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
 		}}},
 		Media: testSubmitMediaValidator{},
 	})
@@ -128,7 +129,9 @@ func TestTaskIntakeRejectsOutputCountOutsideCanonicalContract(t *testing.T) {
 func TestTaskIntakeIgnoresDedicatedImageTransformGenerationControls(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
 		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
-			ID: 101, Models: []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
+			ID:           101,
+			Capabilities: []string{"background-removal", "image-upscale"},
+			Models:       []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
 		}}},
 		Media: testSubmitMediaValidator{},
 	})
@@ -159,6 +162,23 @@ func TestTaskIntakeIgnoresDedicatedImageTransformGenerationControls(t *testing.T
 				t.Fatalf("Generation = %#v", decoded.Generation)
 			}
 		})
+	}
+}
+
+func TestTaskIntakeAllowsModelessRemoveBackgroundAccount(t *testing.T) {
+	intake := NewTaskIntake(TaskIntakeDeps{
+		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+			ID:           101,
+			Capabilities: []string{"background-removal"},
+		}}},
+		Media: testSubmitMediaValidator{},
+	})
+
+	if _, err := intake.Compile(t.Context(), 42, &tasks.SubmitTaskRequest{
+		Feature:        workflow.FeatureSlugRemoveBg,
+		ClientActionID: "modeless-remove-bg",
+	}); err != nil {
+		t.Fatalf("model-less remove-bg account rejected: %v", err)
 	}
 }
 

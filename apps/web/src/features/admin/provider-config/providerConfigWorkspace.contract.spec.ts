@@ -79,9 +79,10 @@ describe('provider config workspace facade', () => {
     const data = {
       apiType: 'openai-compatible' as const,
       protocol: 'model-api' as const,
-      capabilities: ['image-generation' as const],
+      capability: '' as const,
       name: 'Updated ProviderEndpoint',
       baseUrl: 'https://api.updated.example/v1',
+      apiKey: '',
       status: 1,
     }
 
@@ -112,9 +113,10 @@ describe('provider config workspace facade', () => {
       data: {
         apiType: 'openai-compatible',
         protocol: 'model-api',
-        capabilities: ['image-generation'] as const,
+        capability: '',
         name: 'Broken ProviderEndpoint',
         baseUrl: 'https://api.broken.example/v1',
+        apiKey: '',
         status: 1,
       },
       isEditing: false,
@@ -141,9 +143,10 @@ describe('provider config workspace facade', () => {
       data: {
         apiType: 'openai-compatible',
         protocol: 'model-api',
-        capabilities: ['image-generation'],
+        capability: '',
         name: 'Saved ProviderEndpoint',
         baseUrl: 'https://api.saved.example/v1',
+        apiKey: '',
         status: 1,
       },
       isEditing: false,
@@ -442,6 +445,7 @@ function makeProviderEndpoint(
     capabilities: ['image-generation'],
     name: 'OpenAI ProviderEndpoint',
     baseUrl: 'https://api.example.com/v1',
+    apiKeyConfigured: false,
     status: 1,
     createdAt: '',
     updatedAt: '',

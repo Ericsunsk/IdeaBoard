@@ -77,17 +77,33 @@
           <div class="flex flex-col gap-3.5">
             <div class="flex flex-wrap items-center gap-1.5">
               <Tag
+                v-if="card.providerEndpoint.protocol === 'model-api'"
                 :value="card.providerEndpoint.apiTypeLabel"
                 severity="info"
                 :class="adminCompactTagClass"
                 rounded
               />
-              <Tag :value="card.providerEndpoint.protocol" severity="contrast" :class="adminCompactTagClass" rounded />
               <Tag
-                v-for="capability in card.providerEndpoint.capabilities"
-                :key="`${card.providerEndpoint.id}:${capability}`"
-                :value="capability"
-                severity="success"
+                :value="card.providerEndpoint.protocolLabel"
+                severity="contrast"
+                :class="adminCompactTagClass"
+                rounded
+              />
+              <Tag
+                v-if="card.providerEndpoint.protocol === 'image-url-json-to-image'"
+                :value="
+                  getAdminProviderEndpointCapabilityLabel(card.providerEndpoint.capabilities[0])
+                "
+                severity="info"
+                :class="adminCompactTagClass"
+                rounded
+              />
+              <Tag
+                v-if="card.providerEndpoint.protocol === 'image-url-json-to-image'"
+                :value="
+                  card.providerEndpoint.apiKeyConfigured ? 'API Key 已配置' : 'API Key 未配置'
+                "
+                :severity="card.providerEndpoint.apiKeyConfigured ? 'success' : 'warn'"
                 :class="adminCompactTagClass"
                 rounded
               />
@@ -98,12 +114,14 @@
                 rounded
               />
               <Tag
+                v-if="card.providerEndpoint.protocol === 'model-api'"
                 :value="`${card.accounts.length} APIKey`"
                 severity="secondary"
                 :class="adminCompactTagClass"
                 rounded
               />
               <Tag
+                v-if="card.providerEndpoint.protocol === 'model-api'"
                 :value="`${card.modelCount} 模型`"
                 severity="secondary"
                 :class="adminCompactTagClass"
@@ -111,7 +129,7 @@
               />
             </div>
 
-            <div class="flex flex-col gap-3">
+            <div v-if="card.providerEndpoint.protocol === 'model-api'" class="flex flex-col gap-3">
               <div class="flex items-center justify-between">
                 <span class="text-admin-caption font-bold text-admin-text-3">
                   关联 APIKey ({{ card.accounts.length }})
@@ -200,8 +218,20 @@
                           ]"
                         />
                         <div class="flex shrink-0 items-center gap-1">
-                          <Tag v-if="model.supports2K" value="2K" severity="info" :class="adminCompactTagClass" rounded />
-                          <Tag v-if="model.supports4K" value="4K" severity="success" :class="adminCompactTagClass" rounded />
+                          <Tag
+                            v-if="model.supports2K"
+                            value="2K"
+                            severity="info"
+                            :class="adminCompactTagClass"
+                            rounded
+                          />
+                          <Tag
+                            v-if="model.supports4K"
+                            value="4K"
+                            severity="success"
+                            :class="adminCompactTagClass"
+                            rounded
+                          />
                         </div>
                         <ToggleSwitch
                           :model-value="!model.disabled"
@@ -270,7 +300,7 @@
 
       <AdminFormField
         v-slot="{ describedbyId, invalid }"
-        label="Protocol"
+        label="调用协议"
         for="admin-provider-endpoint-protocol"
         :error="providerEndpointFormErrors.protocol"
       >
@@ -278,9 +308,9 @@
           v-model="providerEndpointForm.protocol"
           input-id="admin-provider-endpoint-protocol"
           class="w-full"
-          :options="providerEndpointEditor.protocolRegistry.value"
-          option-label="id"
-          option-value="id"
+          :options="providerProtocolOptions"
+          option-label="label"
+          option-value="value"
           :invalid="invalid"
           :aria-describedby="describedbyId"
           @update:model-value="handleProtocolChange"
@@ -288,26 +318,28 @@
       </AdminFormField>
 
       <AdminFormField
+        v-if="providerEndpointForm.protocol === 'image-url-json-to-image'"
         v-slot="{ describedbyId, invalid }"
-        label="Capability"
-        for="admin-provider-endpoint-capabilities"
-        :error="providerEndpointFormErrors.capabilities"
+        label="处理功能"
+        for="admin-provider-endpoint-capability"
+        :error="providerEndpointFormErrors.capability"
       >
-        <MultiSelect
-          v-model="providerEndpointForm.capabilities"
-          input-id="admin-provider-endpoint-capabilities"
+        <Select
+          v-model="providerEndpointForm.capability"
+          input-id="admin-provider-endpoint-capability"
           class="w-full"
-          :options="capabilityOptions(providerEndpointForm.protocol)"
+          :options="providerProcessingCapabilityOptions"
           option-label="label"
           option-value="value"
-          display="chip"
+          placeholder="选择处理功能"
           :invalid="invalid"
           :aria-describedby="describedbyId"
-          @update:model-value="clearProviderEndpointFormError('capabilities')"
+          @update:model-value="clearProviderEndpointFormError('capability')"
         />
       </AdminFormField>
 
       <AdminFormField
+        v-if="providerEndpointForm.protocol === 'model-api'"
         v-slot="{ describedbyId, invalid }"
         label="接口类型"
         for="admin-provider-endpoint-type"
@@ -342,6 +374,25 @@
           :aria-describedby="describedbyId"
           @blur="providerEndpointEditor.handleApiUrlBlur"
           @update:model-value="clearProviderEndpointFormError('baseUrl')"
+        />
+      </AdminFormField>
+      <AdminFormField
+        v-if="providerEndpointForm.protocol === 'image-url-json-to-image'"
+        v-slot="{ describedbyId, invalid }"
+        label="API Key"
+        for="admin-provider-endpoint-api-key"
+        :error="providerEndpointFormErrors.apiKey"
+      >
+        <InputText
+          id="admin-provider-endpoint-api-key"
+          v-model="providerEndpointForm.apiKey"
+          type="password"
+          class="w-full"
+          autocomplete="new-password"
+          placeholder="输入图片处理 API Key"
+          :invalid="invalid"
+          :aria-describedby="describedbyId"
+          @update:model-value="clearProviderEndpointFormError('apiKey')"
         />
       </AdminFormField>
       <AdminFormField label="端点状态" for="admin-provider-endpoint-status">
@@ -458,7 +509,9 @@
             :key="`resolution:${modelName}`"
             class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg border border-admin-border-soft bg-white px-3 py-2"
           >
-            <span class="truncate font-mono text-admin-meta text-admin-text-1">{{ modelName }}</span>
+            <span class="truncate font-mono text-admin-meta text-admin-text-1">{{
+              modelName
+            }}</span>
             <label class="flex items-center gap-1.5 text-admin-caption text-admin-text-2">
               <span>2K</span>
               <ToggleSwitch
@@ -532,7 +585,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import AutoComplete from 'primevue/autocomplete'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
@@ -564,7 +617,11 @@ import {
 } from '../../shared/lib/adminUiClasses'
 import { useAdminProviderConfig } from '../../provider-config/useAdminProviderConfig'
 import { useAdminProviderConfigFeedback } from '../../provider-config/useAdminProviderConfigFeedback'
-import { isModellessProviderEndpoint } from '../../provider-config/providerConfigPayload'
+import {
+  getAdminProviderEndpointCapabilityLabel,
+  getAdminProviderEndpointProtocolLabel,
+  isModellessProviderEndpoint,
+} from '../../provider-config/providerConfigPayload'
 
 const feedback = useAdminProviderConfigFeedback()
 const adminConfirm = useAdminConfirm()
@@ -588,6 +645,21 @@ const isEditProviderEndpoint = providerEndpointEditor.isEditing
 const providerEndpointSaveLoading = providerEndpointEditor.saveLoading
 const providerEndpointForm = providerEndpointEditor.form
 const providerEndpointFormErrors = providerEndpointEditor.errors
+const providerProtocolOptions = computed(() =>
+  providerEndpointEditor.protocolRegistry.value.map((protocol) => ({
+    label: getAdminProviderEndpointProtocolLabel(protocol.id),
+    value: protocol.id,
+  })),
+)
+const providerProcessingCapabilityOptions = computed(() => {
+  const protocol = providerEndpointEditor.protocolRegistry.value.find(
+    (item) => item.id === 'image-url-json-to-image',
+  )
+  return (protocol?.capabilities ?? []).map((capability) => ({
+    label: getAdminProviderEndpointCapabilityLabel(capability),
+    value: capability,
+  }))
+})
 
 const modelSelectPt = {
   root: { class: 'w-full' },
@@ -618,15 +690,13 @@ function clearProviderEndpointFormError(field: keyof typeof providerEndpointForm
 }
 
 function handleProtocolChange(protocol: string) {
-  const definition = providerEndpointEditor.protocolRegistry.value.find((item) => item.id === protocol)
-  providerEndpointForm.value.capabilities = (definition?.capabilities ?? []).slice() as typeof providerEndpointForm.value.capabilities
+  if (protocol !== 'image-url-json-to-image') {
+    providerEndpointForm.value.apiKey = ''
+    providerEndpointForm.value.capability = ''
+  }
   providerEndpointEditor.clearError('protocol')
-  providerEndpointEditor.clearError('capabilities')
-}
-
-function capabilityOptions(protocol: string) {
-  const definition = providerEndpointEditor.protocolRegistry.value.find((item) => item.id === protocol)
-  return (definition?.capabilities ?? []).map((value) => ({ label: value, value }))
+  providerEndpointEditor.clearError('apiKey')
+  providerEndpointEditor.clearError('capability')
 }
 
 const showAccountModal = accountEditor.visible
@@ -653,11 +723,7 @@ function modelCapability(modelName: string) {
   return (accountForm.value.modelCapabilities[key] ??= { supports2K: false, supports4K: false })
 }
 
-function setModelCapability(
-  modelName: string,
-  key: 'supports2K' | 'supports4K',
-  value: boolean,
-) {
+function setModelCapability(modelName: string, key: 'supports2K' | 'supports4K', value: boolean) {
   const capability = modelCapability(modelName)
   capability[key] = value
 }

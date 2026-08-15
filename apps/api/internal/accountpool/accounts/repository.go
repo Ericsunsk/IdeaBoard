@@ -487,6 +487,9 @@ func (r *AccountRepository) attachAccountModels(ctx context.Context, accounts []
 		return err
 	}
 	modelsByAccountID := make(map[int64][]AccountModel, len(accountIDs))
+	for _, accountID := range accountIDs {
+		modelsByAccountID[accountID] = make([]AccountModel, 0)
+	}
 	for _, row := range rows {
 		model, err := accountModelFromSQLC(row)
 		if err != nil {

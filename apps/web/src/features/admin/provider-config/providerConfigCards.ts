@@ -6,7 +6,10 @@ import type {
   ProviderEndpointRecord,
   ProviderEndpointView,
 } from './providerConfigTypes'
-import { getAdminProviderEndpointApiTypeLabel } from './providerConfigPayload'
+import {
+  getAdminProviderEndpointApiTypeLabel,
+  getAdminProviderEndpointProtocolLabel,
+} from './providerConfigPayload'
 
 export function groupAccountsByProviderEndpointId(accounts: ProviderAccountRecord[]) {
   const grouped = new Map<number, ProviderAccountRecord[]>()
@@ -70,6 +73,8 @@ export function createProviderEndpointView(
     protocol: providerEndpoint.protocol,
     capabilities: providerEndpoint.capabilities,
     apiTypeLabel: getAdminProviderEndpointApiTypeLabel(providerEndpoint.apiType),
+    protocolLabel: getAdminProviderEndpointProtocolLabel(providerEndpoint.protocol),
+    apiKeyConfigured: providerEndpoint.apiKeyConfigured,
     status: providerEndpoint.status,
     commandTarget: {
       kind: 'providerEndpoint',

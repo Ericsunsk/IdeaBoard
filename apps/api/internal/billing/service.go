@@ -2,6 +2,7 @@ package billing
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -61,10 +62,14 @@ func (s *Service) PublishPrices(ctx context.Context, input PublishPricesInput) (
 	if err := s.requirePool(); err != nil {
 		return nil, err
 	}
+	encodedPrices, err := json.Marshal(prices)
+	if err != nil {
+		return nil, fmt.Errorf("encode prices for publish: %w", err)
+	}
 	published := make(map[OutputResolution]PriceInfo, len(prices))
 	rows, err := s.pool.Query(ctx, `SELECT output_resolution, price_version_id, version, unit_credits, created_by, created_at
 	FROM publish_billing_prices($1, $2, $3, $4::jsonb, $5)
-	ORDER BY CASE output_resolution WHEN 'default' THEN 1 WHEN '1k' THEN 2 WHEN '2k' THEN 3 ELSE 4 END`, sku, displayName, description, prices, input.ActorID)
+	ORDER BY CASE output_resolution WHEN 'default' THEN 1 WHEN '1k' THEN 2 WHEN '2k' THEN 3 ELSE 4 END`, sku, displayName, description, string(encodedPrices), input.ActorID)
 	if err != nil {
 		return nil, mapDatabaseError("publish price version", err)
 	}

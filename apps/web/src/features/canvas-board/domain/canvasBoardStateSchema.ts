@@ -1,4 +1,5 @@
 import * as v from 'valibot'
+import { OUTPUT_RESOLUTION_OPTIONS } from '../../../shared/domain/generationContract'
 import {
   DEFAULT_FUSION_BLEND_POINT,
   DEFAULT_FUSION_NODE_OUTPUT_COUNT,
@@ -31,6 +32,7 @@ const positiveIntegerSchema = v.pipe(finiteNumberSchema, v.integer(), v.minValue
 const nonEmptyStringSchema = v.pipe(v.string(), v.minLength(1))
 
 const workflowNodeOutputStatusSchema = v.picklist(['idle', 'running', 'ready', 'stale'])
+const outputResolutionSchema = v.picklist(OUTPUT_RESOLUTION_OPTIONS)
 const canvasConnectionNodeTypeSchema = v.picklist(['image', 'prompt', 'fusion'])
 const canvasConnectionPortSchema = v.picklist(['image', 'prompt'])
 const canvasGroupIdSchema = v.pipe(
@@ -76,6 +78,7 @@ const promptNodeItemSchema = v.strictObject({
   title: v.optional(v.string()),
   text: v.string(),
   outputCount: v.optional(outputCountSchema, DEFAULT_PROMPT_NODE_OUTPUT_COUNT),
+  outputResolution: v.optional(outputResolutionSchema),
   aspectRatio: v.optional(v.picklist(PROMPT_ASPECT_RATIO_OPTIONS), DEFAULT_PROMPT_ASPECT_RATIO),
   inputImages: v.optional(v.array(promptNodeInputImageSchema), () => []),
 })
@@ -91,6 +94,7 @@ const imageNodeItemSchema = v.strictObject({
   sourceMediaAssetId: v.optional(positiveIntegerSchema),
   sourceImageRatio: positiveFiniteNumberSchema,
   outputCount: v.optional(outputCountSchema, DEFAULT_IMAGE_NODE_OUTPUT_COUNT),
+  outputResolution: v.optional(outputResolutionSchema),
   pendingTaskId: v.optional(nonEmptyStringSchema),
   pendingResultIndex: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0))),
   outputStatus: workflowNodeOutputStatusSchema,
@@ -106,6 +110,7 @@ const fusionNodeItemSchema = v.strictObject({
   title: v.optional(v.string()),
   prompt: v.optional(v.string(), ''),
   outputCount: v.optional(outputCountSchema, DEFAULT_FUSION_NODE_OUTPUT_COUNT),
+  outputResolution: v.optional(outputResolutionSchema),
   aspectRatio: v.optional(v.picklist(PROMPT_ASPECT_RATIO_OPTIONS), DEFAULT_PROMPT_ASPECT_RATIO),
   blendPoint: v.optional(
     v.strictObject({

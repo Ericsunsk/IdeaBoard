@@ -9,7 +9,9 @@ import (
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/platform/database"
+	"ideaboard/api/internal/platform/secrets"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lib/pq"
@@ -21,6 +23,7 @@ var ErrProviderEndpointURLConflict = errors.New("provider endpoint api type/base
 const (
 	providerEndpointNameUniqueIndex       = "uq_provider_endpoints_name_lower"
 	providerEndpointAPITypeBaseURLUniqIdx = "uq_provider_endpoints_api_type_base_url"
+	managedImageEndpointExtraConfig       = `{"managed_by":"image-processing-endpoint"}`
 )
 
 type ProviderEndpointRepository struct {
@@ -37,6 +40,11 @@ func (r *ProviderEndpointRepository) Create(ctx context.Context, endpoint *Provi
 	if err != nil {
 		return err
 	}
+	if err := validateManagedEndpointAPIKey(protocol, endpoint.APIKey); err != nil {
+		return err
+	}
+	endpoint.Protocol = protocol
+	endpoint.Capabilities = capabilities
 	err = dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		id, err := q.CreateProviderEndpoint(ctx, dbsqlc.CreateProviderEndpointParams{
 			ApiType:  endpoint.APIType,
@@ -49,13 +57,17 @@ func (r *ProviderEndpointRepository) Create(ctx context.Context, endpoint *Provi
 			return err
 		}
 		endpoint.ID = int64(id)
-		return replaceProviderEndpointCapabilities(ctx, q, endpoint.ID, capabilities)
+		if err := replaceProviderEndpointCapabilities(ctx, q, endpoint.ID, capabilities); err != nil {
+			return err
+		}
+		return syncManagedEndpointAccount(ctx, q, endpoint)
 	})
 	if err != nil {
 		return providerEndpointConflictError(err)
 	}
 	endpoint.Protocol = protocol
 	endpoint.Capabilities = capabilities
+	endpoint.APIKeyConfigured = protocol == ProtocolImageURLJSONImage
 	return nil
 }
 
@@ -65,14 +77,15 @@ func (r *ProviderEndpointRepository) GetByID(ctx context.Context, id int64) (*Pr
 		return nil, err
 	}
 	endpoint := ProviderEndpoint{
-		ID:        row.ID,
-		APIType:   row.ApiType,
-		Protocol:  row.Protocol,
-		Name:      row.Name,
-		BaseURL:   row.BaseUrl,
-		Status:    row.Status,
-		CreatedAt: row.CreatedAt,
-		UpdatedAt: row.UpdatedAt,
+		ID:               row.ID,
+		APIType:          row.ApiType,
+		Protocol:         row.Protocol,
+		Name:             row.Name,
+		BaseURL:          row.BaseUrl,
+		APIKeyConfigured: row.ApiKeyConfigured,
+		Status:           row.Status,
+		CreatedAt:        row.CreatedAt,
+		UpdatedAt:        row.UpdatedAt,
 	}
 	capabilities, err := r.capabilities(ctx, []int64{id})
 	if err != nil {
@@ -91,14 +104,15 @@ func (r *ProviderEndpointRepository) List(ctx context.Context) ([]*ProviderEndpo
 	ids := make([]int64, 0, len(rows))
 	for _, row := range rows {
 		endpoint := ProviderEndpoint{
-			ID:        row.ID,
-			APIType:   row.ApiType,
-			Protocol:  row.Protocol,
-			Name:      row.Name,
-			BaseURL:   row.BaseUrl,
-			Status:    row.Status,
-			CreatedAt: row.CreatedAt,
-			UpdatedAt: row.UpdatedAt,
+			ID:               row.ID,
+			APIType:          row.ApiType,
+			Protocol:         row.Protocol,
+			Name:             row.Name,
+			BaseURL:          row.BaseUrl,
+			APIKeyConfigured: row.ApiKeyConfigured,
+			Status:           row.Status,
+			CreatedAt:        row.CreatedAt,
+			UpdatedAt:        row.UpdatedAt,
 		}
 		endpoints = append(endpoints, &endpoint)
 		ids = append(ids, row.ID)
@@ -118,6 +132,11 @@ func (r *ProviderEndpointRepository) Update(ctx context.Context, endpoint *Provi
 	if err != nil {
 		return err
 	}
+	if err := validateManagedEndpointAPIKey(protocol, endpoint.APIKey); err != nil {
+		return err
+	}
+	endpoint.Protocol = protocol
+	endpoint.Capabilities = capabilities
 	err = dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
 		updated, err := q.UpdateProviderEndpoint(ctx, dbsqlc.UpdateProviderEndpointParams{
 			ApiType:  endpoint.APIType,
@@ -133,13 +152,17 @@ func (r *ProviderEndpointRepository) Update(ctx context.Context, endpoint *Provi
 		if updated == 0 {
 			return database.ErrNotFound
 		}
-		return replaceProviderEndpointCapabilities(ctx, q, endpoint.ID, capabilities)
+		if err := replaceProviderEndpointCapabilities(ctx, q, endpoint.ID, capabilities); err != nil {
+			return err
+		}
+		return syncManagedEndpointAccount(ctx, q, endpoint)
 	})
 	if err != nil {
 		return providerEndpointConflictError(err)
 	}
 	endpoint.Protocol = protocol
 	endpoint.Capabilities = capabilities
+	endpoint.APIKeyConfigured = protocol == ProtocolImageURLJSONImage
 	return nil
 }
 
@@ -174,14 +197,77 @@ func replaceProviderEndpointCapabilities(ctx context.Context, q *dbsqlc.Queries,
 }
 
 func (r *ProviderEndpointRepository) Delete(ctx context.Context, id int64) error {
-	updated, err := r.q.DeleteProviderEndpoint(ctx, id)
+	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		if _, err := q.DeleteManagedProviderEndpointAccounts(ctx, id); err != nil {
+			return err
+		}
+		updated, err := q.DeleteProviderEndpoint(ctx, id)
+		if err != nil {
+			return err
+		}
+		if updated == 0 {
+			return database.ErrNotFound
+		}
+		return nil
+	})
+}
+
+func validateManagedEndpointAPIKey(protocol, apiKey string) error {
+	if protocol == ProtocolImageURLJSONImage && strings.TrimSpace(apiKey) == "" {
+		return errors.New("图片处理 API 必须配置 API Key")
+	}
+	return nil
+}
+
+func syncManagedEndpointAccount(ctx context.Context, q *dbsqlc.Queries, endpoint *ProviderEndpoint) error {
+	if endpoint.Protocol != ProtocolImageURLJSONImage {
+		_, err := q.DeleteManagedProviderEndpointAccounts(ctx, endpoint.ID)
+		return err
+	}
+
+	accountID, err := q.GetManagedProviderEndpointAccountID(ctx, endpoint.ID)
+	if errors.Is(err, sql.ErrNoRows) {
+		accountID, err = q.CreateAccount(ctx, dbsqlc.CreateAccountParams{
+			Name:               endpoint.Name,
+			ProviderEndpointID: endpoint.ID,
+			MaxConcurrent:      int32(accountlimits.DefaultMaxConcurrent),
+			Timeout:            int32(accountlimits.DefaultTimeoutSeconds),
+			ExtraConfig:        managedImageEndpointExtraConfig,
+			Status:             endpoint.Status,
+			FailCount:          0,
+			Weight:             1,
+		})
+	} else if err == nil {
+		err = q.UpdateManagedProviderEndpointAccount(ctx, dbsqlc.UpdateManagedProviderEndpointAccountParams{
+			Name:               endpoint.Name,
+			Status:             endpoint.Status,
+			MaxConcurrent:      int32(accountlimits.DefaultMaxConcurrent),
+			Timeout:            int32(accountlimits.DefaultTimeoutSeconds),
+			ID:                 accountID,
+			ProviderEndpointID: endpoint.ID,
+		})
+	}
 	if err != nil {
 		return err
 	}
-	if updated == 0 {
-		return database.ErrNotFound
+
+	payload, err := secrets.EncryptString(strings.TrimSpace(endpoint.APIKey))
+	if err != nil {
+		return fmt.Errorf("加密 API Key 失败: %w", err)
 	}
-	return nil
+	if err := q.RetireActiveAccountSecrets(ctx, accountID); err != nil {
+		return err
+	}
+	_, err = q.CreateAccountSecret(ctx, dbsqlc.CreateAccountSecretParams{
+		AccountID:          accountID,
+		SecretMaterialKind: secrets.MaterialKindEncrypted,
+		SecretPayload:      payload,
+		KeyVersion:         "",
+		Fingerprint:        "",
+		Status:             "active",
+		ExpiresAt:          sql.NullTime{},
+	})
+	return err
 }
 
 func providerEndpointConflictError(err error) error {

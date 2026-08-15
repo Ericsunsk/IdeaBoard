@@ -150,7 +150,7 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 	if err != nil {
 		return CanonicalTaskRequest{}, err
 	}
-	if err := i.ensureProviderAvailable(ctx, resolution); err != nil {
+	if err := i.ensureProviderAvailable(ctx, featureSlug, resolution); err != nil {
 		return CanonicalTaskRequest{}, err
 	}
 
@@ -241,7 +241,7 @@ func (i *taskIntake) validateMediaRef(ctx context.Context, userID int64, raw str
 	return i.media.ValidateSubmitMediaRef(ctx, userID, raw)
 }
 
-func (i *taskIntake) ensureProviderAvailable(ctx context.Context, resolution string) error {
+func (i *taskIntake) ensureProviderAvailable(ctx context.Context, featureSlug, resolution string) error {
 	if i == nil || i.accounts == nil {
 		return newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
 	}
@@ -249,7 +249,13 @@ func (i *taskIntake) ensureProviderAvailable(ctx context.Context, resolution str
 	if err != nil {
 		return newSubmissionError("provider_unavailable", providerUnavailableMessage, err)
 	}
-	apiAccounts = accounts.FilterAccountsWithOutputResolution(apiAccounts, resolution)
+	if featureSlug == workflow.FeatureSlugRemoveBg {
+		apiAccounts = accounts.FilterAccountsWithCapability(apiAccounts, "background-removal")
+	} else if featureSlug == workflow.FeatureSlugHDUpscale {
+		apiAccounts = accounts.FilterAccountsWithCapability(apiAccounts, "image-upscale")
+	} else {
+		apiAccounts = accounts.FilterAccountsWithOutputResolution(apiAccounts, resolution)
+	}
 	if len(apiAccounts) == 0 {
 		return newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
 	}

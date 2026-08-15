@@ -26,6 +26,16 @@ func TestFilterAccountsWithOutputResolution(t *testing.T) {
 	assertAccountIDs(t, FilterAccountsWithOutputResolution(pool, "4k"), 3)
 }
 
+func TestFilterAccountsWithCapability(t *testing.T) {
+	pool := []*ApiAccount{
+		{ID: 1, Capabilities: []string{"image-generation"}},
+		{ID: 2, Capabilities: []string{"background-removal"}},
+		{ID: 3, Capabilities: []string{"IMAGE-UPSCALE"}},
+	}
+	assertAccountIDs(t, FilterAccountsWithCapability(pool, "background-removal"), 2)
+	assertAccountIDs(t, FilterAccountsWithCapability(pool, "image-upscale"), 3)
+}
+
 func assertAccountIDs(t *testing.T, got []*ApiAccount, want ...int64) {
 	t.Helper()
 	if len(got) != len(want) {

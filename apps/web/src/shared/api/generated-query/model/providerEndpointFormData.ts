@@ -5,12 +5,13 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { ProviderAPIType } from './providerAPIType'
+import type { ProviderEndpointFormDataCapability } from './providerEndpointFormDataCapability'
 
 export interface ProviderEndpointFormData {
   api_type: ProviderAPIType
   protocol: string
-  /** @minItems 1 */
-  capabilities: string[]
+  capability?: ProviderEndpointFormDataCapability
+  api_key?: string
   name: string
   base_url: string
   status: number

@@ -58,8 +58,11 @@ describe('useAdminProviderConfig', () => {
       {
         id: 1,
         apiType: 'openai-compatible',
+        protocol: 'model-api',
+        capabilities: ['image-generation'],
         name: 'OpenAI ProviderEndpoint',
         baseUrl: 'https://api.example.com/v1',
+        apiKeyConfigured: false,
         status: 1,
         createdAt: '',
         updatedAt: '',
@@ -87,8 +90,11 @@ describe('useAdminProviderConfig', () => {
       {
         id: 1,
         apiType: 'openai-compatible',
+        protocol: 'model-api',
+        capabilities: ['image-generation'],
         name: 'OpenAI ProviderEndpoint',
         baseUrl: 'https://api.example.com/v1',
+        apiKeyConfigured: false,
         status: 1,
         createdAt: '',
         updatedAt: '',
@@ -100,6 +106,8 @@ describe('useAdminProviderConfig', () => {
         name: 'OpenAI ProviderEndpoint APIKey',
         providerEndpointId: 1,
         apiType: 'openai-compatible',
+        protocol: 'model-api',
+        capabilities: ['image-generation'],
         baseUrl: 'https://api.example.com/v1',
         models: [{ name: 'gpt-4o', enabled: true, weight: 1, sortOrder: 0 }],
         secretConfigured: true,
@@ -137,6 +145,28 @@ describe('useAdminProviderConfig', () => {
         ],
       }),
     )
+  })
+
+  it('rejects an image processing endpoint without a selected capability', async () => {
+    const feedback = createProviderConfigFeedback()
+    const context = createContext(feedback)
+
+    context.providerEndpointEditor.openCreate()
+    context.providerEndpointEditor.form.value = {
+      apiType: 'openai-compatible',
+      protocol: 'image-url-json-to-image',
+      capability: '',
+      name: 'Modal Image Processing',
+      baseUrl: 'https://example.com/image-processing',
+      apiKey: 'modal-secret',
+      status: 1,
+    }
+
+    await context.providerEndpointEditor.save()
+
+    expect(feedback.providerEndpointFormInvalid).toHaveBeenCalledOnce()
+    expect(context.providerEndpointEditor.errors.value.capability).toBe('请选择处理功能')
+    expect(mockResource.saveProviderEndpoint).not.toHaveBeenCalled()
   })
 })
 

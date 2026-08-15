@@ -6,7 +6,9 @@ import (
 	"errors"
 	"testing"
 
+	"ideaboard/api/internal/platform/secrets"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/testsupport/secretstest"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/lib/pq"
@@ -81,6 +83,47 @@ func TestCreateProviderEndpointReturnsNameConflict(t *testing.T) {
 	})
 	if !errors.Is(err, ErrProviderEndpointNameConflict) {
 		t.Fatalf("duplicate provider endpoint name error = %v, want ErrProviderEndpointNameConflict", err)
+	}
+}
+
+func TestCreateImageEndpointStoresManagedAPIKeyInSameTransaction(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	ctx := context.Background()
+	db := newProviderEndpointRepositoryTestDB(t)
+	repo := NewProviderEndpointRepository(db)
+	endpoint := &ProviderEndpoint{
+		APIType:      "openai-compatible",
+		Protocol:     ProtocolImageURLJSONImage,
+		Capabilities: []string{CapabilityBackgroundRemoval},
+		Name:         "Modal Image Processing",
+		BaseURL:      "https://example.com/modal-image-processing",
+		APIKey:       "modal-secret",
+		Status:       1,
+	}
+
+	if err := repo.Create(ctx, endpoint); err != nil {
+		t.Fatalf("create image endpoint failed: %v", err)
+	}
+	if !endpoint.APIKeyConfigured {
+		t.Fatal("created image endpoint should report configured API key")
+	}
+	var capabilityCount int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM provider_endpoint_capabilities WHERE provider_endpoint_id = $1`, endpoint.ID).Scan(&capabilityCount); err != nil {
+		t.Fatalf("count derived capabilities: %v", err)
+	}
+	if capabilityCount != 1 {
+		t.Fatalf("derived capability count = %d, want 1", capabilityCount)
+	}
+	var accountID int64
+	if err := db.QueryRowContext(ctx, `SELECT id FROM api_accounts WHERE provider_endpoint_id = $1`, endpoint.ID).Scan(&accountID); err != nil {
+		t.Fatalf("load managed account: %v", err)
+	}
+	var materialKind, payload string
+	if err := db.QueryRowContext(ctx, `SELECT secret_material_kind, secret_payload FROM api_account_secrets WHERE account_id = $1 AND status = 'active'`, accountID).Scan(&materialKind, &payload); err != nil {
+		t.Fatalf("load managed secret: %v", err)
+	}
+	if materialKind != secrets.MaterialKindEncrypted || payload == "modal-secret" {
+		t.Fatalf("managed secret storage = (%q, %q)", materialKind, payload)
 	}
 }
 

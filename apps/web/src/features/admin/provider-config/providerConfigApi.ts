@@ -174,6 +174,7 @@ function toProviderEndpointRecord(providerEndpoint: ProviderEndpointDto): Provid
     capabilities: (providerEndpoint.capabilities ?? []) as ProviderEndpointRecord['capabilities'],
     name: providerEndpoint.name,
     baseUrl: providerEndpoint.base_url,
+    apiKeyConfigured: providerEndpoint.api_key_configured,
     status: providerEndpoint.status,
     createdAt: providerEndpoint.created_at,
     updatedAt: providerEndpoint.updated_at,
@@ -189,7 +190,7 @@ function toProviderAccountRecord(account: AdminAccountDto): ProviderAccountRecor
     protocol: account.provider_endpoint_protocol as ProviderAccountRecord['protocol'],
     capabilities: (account.provider_endpoint_capabilities ?? []) as ProviderAccountRecord['capabilities'],
     baseUrl: account.provider_endpoint_base_url,
-    models: account.models.map((model) => ({
+    models: (account.models ?? []).map((model) => ({
       name: model.name,
       enabled: model.enabled,
       weight: model.weight,

@@ -54,6 +54,7 @@ type Querier interface {
 	DeleteBoardMembersByBoardID(ctx context.Context, boardID string) error
 	DeleteBoardMembersByUserID(ctx context.Context, userID int64) error
 	DeleteBoardShareTokensByBoardID(ctx context.Context, boardID string) error
+	DeleteManagedProviderEndpointAccounts(ctx context.Context, providerEndpointID int64) (int64, error)
 	DeleteOutputsByTaskID(ctx context.Context, taskID string) error
 	DeleteProviderEndpoint(ctx context.Context, id int64) (int64, error)
 	DeleteTaskOutputMediaRefsByTaskID(ctx context.Context, taskID string) error
@@ -78,6 +79,7 @@ type Querier interface {
 	GetBoardMemberRole(ctx context.Context, arg GetBoardMemberRoleParams) (string, error)
 	GetBoardShareTokenByHash(ctx context.Context, tokenHash string) (BoardShareToken, error)
 	GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error)
+	GetManagedProviderEndpointAccountID(ctx context.Context, providerEndpointID int64) (int64, error)
 	GetMediaAssetByID(ctx context.Context, id int64) (MediaAsset, error)
 	GetPaymentCheckoutShutdown(ctx context.Context, id uuid.UUID) (PaymentCheckoutShutdown, error)
 	GetPaymentCustomer(ctx context.Context, arg GetPaymentCustomerParams) (PaymentCustomer, error)
@@ -91,7 +93,7 @@ type Querier interface {
 	GetPaymentStripeCredential(ctx context.Context, id uuid.UUID) (PaymentStripeCredential, error)
 	GetPaymentStripeCredentialForOrder(ctx context.Context, id uuid.UUID) (PaymentStripeCredential, error)
 	GetPaymentStripeCredentialForOrderNumber(ctx context.Context, publicOrderNumber string) (PaymentStripeCredential, error)
-	GetProviderEndpointByID(ctx context.Context, id int64) (ProviderEndpoint, error)
+	GetProviderEndpointByID(ctx context.Context, id int64) (GetProviderEndpointByIDRow, error)
 	GetRuntimeAccountByIDWithSecret(ctx context.Context, id int64) (GetRuntimeAccountByIDWithSecretRow, error)
 	GetRuntimeAccountForAssignment(ctx context.Context, arg GetRuntimeAccountForAssignmentParams) (GetRuntimeAccountForAssignmentRow, error)
 	GetRuntimeCredentialByID(ctx context.Context, arg GetRuntimeCredentialByIDParams) (ApiAccountSecret, error)
@@ -140,7 +142,7 @@ type Querier interface {
 	ListPaymentReconciliationAnomalies(ctx context.Context, rowLimit int32) ([]ListPaymentReconciliationAnomaliesRow, error)
 	ListPaymentStripeCredentials(ctx context.Context) ([]PaymentStripeCredential, error)
 	ListProviderEndpointCapabilities(ctx context.Context, providerEndpointIds []int64) ([]ListProviderEndpointCapabilitiesRow, error)
-	ListProviderEndpoints(ctx context.Context) ([]ProviderEndpoint, error)
+	ListProviderEndpoints(ctx context.Context) ([]ListProviderEndpointsRow, error)
 	ListRunningMissingLeaseTaskIDs(ctx context.Context, rowLimit int32) ([]string, error)
 	ListRunningTasksForStartupRecovery(ctx context.Context) ([]ListRunningTasksForStartupRecoveryRow, error)
 	ListRunningTasksMissingLeaseToken(ctx context.Context, rowLimit int32) ([]ListRunningTasksMissingLeaseTokenRow, error)
@@ -200,6 +202,7 @@ type Querier interface {
 	UpdateAccount(ctx context.Context, arg UpdateAccountParams) (int64, error)
 	UpdateAccountModelEnabled(ctx context.Context, arg UpdateAccountModelEnabledParams) (int64, error)
 	UpdateAccountStatus(ctx context.Context, arg UpdateAccountStatusParams) (int64, error)
+	UpdateManagedProviderEndpointAccount(ctx context.Context, arg UpdateManagedProviderEndpointAccountParams) error
 	UpdateProviderEndpoint(ctx context.Context, arg UpdateProviderEndpointParams) (int64, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (int64, error)
 	UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarParams) (int64, error)

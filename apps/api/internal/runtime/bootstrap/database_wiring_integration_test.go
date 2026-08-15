@@ -43,6 +43,42 @@ func TestOpenAppDatabasesStartsWithConfiguredLimitedRole(t *testing.T) {
 	if err := databases.riverPool.Ping(t.Context()); err != nil {
 		t.Fatalf("ping startup River pool: %v", err)
 	}
+	assertProviderEndpointConfigurationAccess(t, databases.db)
+}
+
+func assertProviderEndpointConfigurationAccess(t *testing.T, db *sql.DB) {
+	t.Helper()
+	ctx := t.Context()
+	var endpointID int64
+	if err := db.QueryRowContext(ctx, `
+INSERT INTO provider_endpoints (api_type, protocol, name, base_url)
+VALUES ('custom', 'image-url-json-to-image', 'runtime privilege test', 'https://runtime-privilege.test')
+RETURNING id`).Scan(&endpointID); err != nil {
+		t.Fatalf("insert provider endpoint with runtime role: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `
+INSERT INTO provider_endpoint_capabilities (provider_endpoint_id, capability)
+VALUES ($1, 'image-upscale')`, endpointID); err != nil {
+		t.Fatalf("insert provider endpoint capability with runtime role: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `
+INSERT INTO provider_endpoint_models (provider_endpoint_id, model_name, supports_2k, supports_4k)
+VALUES ($1, 'upscale-model', TRUE, TRUE)`, endpointID); err != nil {
+		t.Fatalf("insert provider endpoint model with runtime role: %v", err)
+	}
+	var capabilityCount int
+	if err := db.QueryRowContext(ctx, `
+SELECT count(*)
+FROM provider_endpoint_capabilities
+WHERE provider_endpoint_id = $1`, endpointID).Scan(&capabilityCount); err != nil {
+		t.Fatalf("read provider endpoint capabilities with runtime role: %v", err)
+	}
+	if capabilityCount != 1 {
+		t.Fatalf("provider endpoint capability count = %d, want 1", capabilityCount)
+	}
+	if _, err := db.ExecContext(ctx, `DELETE FROM provider_endpoints WHERE id = $1`, endpointID); err != nil {
+		t.Fatalf("delete provider endpoint with runtime role: %v", err)
+	}
 }
 
 func TestOpenAppDatabasesFailsBeforeRiverPoolAndClosesSQLPoolOnPrivilegeDrift(t *testing.T) {

@@ -1,6 +1,7 @@
 export type ProviderApiTypeValue = 'openai-compatible' | 'google-ai' | 'google-cloud'
 export type ProviderProtocolValue = 'model-api' | 'image-url-json-to-image'
 export type ProviderCapabilityValue = 'image-generation' | 'background-removal' | 'image-upscale'
+export type ProviderProcessingCapabilityValue = Exclude<ProviderCapabilityValue, 'image-generation'>
 
 export type AdminProviderAccountLimitRange = {
   min: number
@@ -22,9 +23,10 @@ export type ProviderModelDetectionInput = {
 export type ProviderEndpointFormData = {
   apiType: ProviderApiTypeValue
   protocol: ProviderProtocolValue
-  capabilities: ProviderCapabilityValue[]
+  capability: ProviderProcessingCapabilityValue | ''
   name: string
   baseUrl: string
+  apiKey: string
   status: number
 }
 
@@ -72,6 +74,7 @@ export type ProviderEndpointRecord = {
   capabilities: ProviderCapabilityValue[]
   name: string
   baseUrl: string
+  apiKeyConfigured: boolean
   status: number
   createdAt: string
   updatedAt: string
@@ -125,6 +128,8 @@ export type ProviderEndpointView = {
   protocol: ProviderProtocolValue
   capabilities: ProviderCapabilityValue[]
   apiTypeLabel: string
+  protocolLabel: string
+  apiKeyConfigured: boolean
   status: number
   commandTarget: ProviderEndpointCommandTarget
 }

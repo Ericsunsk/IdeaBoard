@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import * as v from 'valibot'
 import { canvasBoardStateSchema } from './canvasBoardStateSchema'
+import { createTypedCanvasNodeSnapshot } from './canvasNodeRegistry'
 import { CANVAS_BOARD_STATE_SCHEMA_VERSION, type CanvasGroup } from './canvasNodes'
 import { normalizeLatestCanvasBoardState } from './latestBoardState'
 import { makeCanvasBoardState, makePendingImageNodeSnapshot } from '../testing'
@@ -48,6 +49,35 @@ describe('canvasBoardStateSchema', () => {
     if (parsed.success) {
       expect(parsed.output.promptNodes[0]?.title).toBe('Custom Prompt')
       expect(parsed.output.previewSnapshotVersion).toBe(2)
+    }
+  })
+
+  it('accepts canonical node snapshots with output resolution at the board-save boundary', () => {
+    const imageNode = {
+      ...createTypedCanvasNodeSnapshot('image', { x: 12, y: 24 }, 1),
+      title: 'dropped-image.png',
+      sourceImageUrl: 'https://example.com/dropped-image.png',
+      sourceMediaAssetId: 101,
+      sourceImageRatio: 1.5,
+      outputStatus: 'ready' as const,
+      outputImages: [],
+    }
+    const state = makeCanvasBoardState({
+      imageNodes: [imageNode],
+      promptNodes: [createTypedCanvasNodeSnapshot('prompt', { x: 320, y: 24 }, 2)],
+      fusionNodes: [createTypedCanvasNodeSnapshot('fusion', { x: 640, y: 24 }, 3)],
+    })
+
+    const result = normalizeLatestCanvasBoardState(state, {
+      mode: 'result',
+      boundary: 'board-save',
+    })
+
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.value.imageNodes[0]?.outputResolution).toBe('1k')
+      expect(result.value.promptNodes[0]?.outputResolution).toBe('1k')
+      expect(result.value.fusionNodes[0]?.outputResolution).toBe('1k')
     }
   })
 

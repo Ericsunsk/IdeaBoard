@@ -37,37 +37,42 @@ func ProtocolRegistry() []ProtocolDefinition {
 	return result
 }
 
-func NormalizeProtocolCapabilities(protocol string, capabilities []string) (string, []string, error) {
+func NormalizeProtocolCapabilities(protocol string, requested []string) (string, []string, error) {
 	protocol = strings.ToLower(strings.TrimSpace(protocol))
 	allowed, ok := protocolCapabilities[protocol]
 	if !ok {
 		return "", nil, fmt.Errorf("不支持的 ProviderEndpoint Protocol")
 	}
-	allowedSet := make(map[string]struct{}, len(allowed))
-	for _, capability := range allowed {
-		allowedSet[capability] = struct{}{}
-	}
-	seen := make(map[string]struct{}, len(capabilities))
-	normalized := make([]string, 0, len(capabilities))
-	for _, raw := range capabilities {
-		capability := strings.ToLower(strings.TrimSpace(raw))
-		if capability == "" {
-			continue
+	if protocol == ProtocolImageURLJSONImage {
+		if len(requested) != 1 {
+			return "", nil, fmt.Errorf("图片处理 API 必须选择一个处理功能")
 		}
-		if _, ok := allowedSet[capability]; !ok {
-			return "", nil, fmt.Errorf("Protocol %q 不支持 Capability %q", protocol, capability)
+		capability := strings.ToLower(strings.TrimSpace(requested[0]))
+		if !containsCapability(allowed, capability) {
+			return "", nil, fmt.Errorf("图片处理 API 必须选择一个处理功能")
 		}
-		if _, ok := seen[capability]; ok {
-			continue
-		}
-		seen[capability] = struct{}{}
-		normalized = append(normalized, capability)
+		return protocol, []string{capability}, nil
 	}
-	if len(normalized) == 0 {
-		return "", nil, fmt.Errorf("ProviderEndpoint 至少需要一个 Capability")
-	}
+	normalized := append([]string(nil), allowed...)
 	sort.Strings(normalized)
 	return protocol, normalized, nil
+}
+
+func containsCapability(allowed []string, requested string) bool {
+	for _, capability := range allowed {
+		if capability == requested {
+			return true
+		}
+	}
+	return false
+}
+
+func requestedCapabilities(capability string) []string {
+	capability = strings.TrimSpace(capability)
+	if capability == "" {
+		return nil
+	}
+	return []string{capability}
 }
 
 func ProtocolSupportsModelDetection(protocol string) bool {
@@ -75,18 +80,13 @@ func ProtocolSupportsModelDetection(protocol string) bool {
 }
 
 func ProtocolSupportsCapability(protocol, capability string) bool {
-	_, _, err := NormalizeProtocolCapabilities(protocol, []string{capability})
-	return err == nil
+	allowed, ok := protocolCapabilities[strings.ToLower(strings.TrimSpace(protocol))]
+	return ok && containsCapability(allowed, strings.ToLower(strings.TrimSpace(capability)))
 }
 
 func AllowsModellessAccounts(protocol string, capabilities []string) bool {
-	if strings.TrimSpace(protocol) != ProtocolImageURLJSONImage || len(capabilities) == 0 {
+	if strings.TrimSpace(protocol) != ProtocolImageURLJSONImage || len(capabilities) != 1 {
 		return false
 	}
-	for _, capability := range capabilities {
-		if capability == CapabilityBackgroundRemoval || capability == CapabilityImageUpscale {
-			return true
-		}
-	}
-	return false
+	return capabilities[0] == CapabilityBackgroundRemoval || capabilities[0] == CapabilityImageUpscale
 }

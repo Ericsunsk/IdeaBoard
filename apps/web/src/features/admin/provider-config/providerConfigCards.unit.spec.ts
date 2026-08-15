@@ -26,12 +26,13 @@ describe('provider config cards', () => {
         card.providerEndpoint.id,
         card.providerEndpoint.baseUrl,
         card.providerEndpoint.apiTypeLabel,
+        card.providerEndpoint.protocolLabel,
         card.accounts.length,
         card.modelCount,
       ]),
     ).toEqual([
-      [1, 'https://api.example.com/v1', 'OpenAI Compatible', 2, 2],
-      [2, 'https://api.example.com/v1', 'OpenAI Compatible', 1, 1],
+      [1, 'https://api.example.com/v1', 'OpenAI Compatible', '生图模型 API', 2, 2],
+      [2, 'https://api.example.com/v1', 'OpenAI Compatible', '生图模型 API', 1, 1],
     ])
     expect(cards[0]?.accounts[0]).toMatchObject({
       id: 11,
@@ -74,6 +75,7 @@ function makeProviderEndpoint(
     capabilities: ['image-generation'],
     name: 'ProviderEndpoint',
     baseUrl: 'https://api.example.com/v1',
+    apiKeyConfigured: false,
     status: 1,
     createdAt: '',
     updatedAt: '',

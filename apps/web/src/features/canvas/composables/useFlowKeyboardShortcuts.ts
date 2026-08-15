@@ -11,9 +11,11 @@ const windowTarget = () => (typeof window === 'undefined' ? null : window)
 
 export function useFlowKeyboardShortcuts(options: UseFlowKeyboardShortcutsOptions) {
   function handleSelectStart(event: Event) {
-    const target = event.target as HTMLElement | null
-    if (!target?.closest('.canvas-layout')) return
-    if (isEditableEventTarget(target)) return
+    const target = event.target
+    const targetElement =
+      target instanceof Element ? target : target instanceof Node ? target.parentElement : null
+    if (!targetElement?.closest('.canvas-layout')) return
+    if (isEditableEventTarget(targetElement)) return
     event.preventDefault()
   }
 

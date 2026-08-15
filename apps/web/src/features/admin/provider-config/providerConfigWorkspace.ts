@@ -137,7 +137,7 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
 
   async function loadAccounts() {
     const [nextAccounts] = await Promise.all([resource.fetchAccounts(), loadAccountLimits()])
-    accounts.value = nextAccounts
+    accounts.value = nextAccounts.filter((account) => account.protocol === 'model-api')
   }
 
   async function refreshProviderData() {

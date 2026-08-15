@@ -9,11 +9,42 @@ import {
   accountModelInputsFromValues,
   createAccountCreatePayload,
   createAccountUpdatePayload,
+  createProviderEndpointSavePayload,
+  getAdminProviderEndpointProtocolLabel,
   inferProviderEndpointApiTypeFromUrl,
   isModellessProviderEndpoint,
 } from './providerConfigPayload'
 
 describe('provider config payload mapping', () => {
+  it('saves image processing endpoints with one selected capability', () => {
+    expect(
+      createProviderEndpointSavePayload({
+        apiType: 'openai-compatible',
+        protocol: 'image-url-json-to-image',
+        capability: 'background-removal',
+        name: 'Modal Image Processing',
+        baseUrl: 'https://example.com/matting',
+        apiKey: 'modal-secret',
+        status: 1,
+      }),
+    ).toEqual({
+      api_type: 'openai-compatible',
+      protocol: 'image-url-json-to-image',
+      capability: 'background-removal',
+      name: 'Modal Image Processing',
+      base_url: 'https://example.com/matting',
+      api_key: 'modal-secret',
+      status: 1,
+    })
+  })
+
+  it('maps provider protocol values to Chinese labels', () => {
+    expect(getAdminProviderEndpointProtocolLabel('model-api')).toBe('生图模型 API')
+    expect(getAdminProviderEndpointProtocolLabel('image-url-json-to-image')).toBe('图片处理 API')
+    expect(getAdminProviderEndpointProtocolLabel('custom-protocol')).toBe('custom-protocol')
+    expect(getAdminProviderEndpointProtocolLabel('')).toBe('未配置')
+  })
+
   it('maps new account form values to the backend create payload defaults', () => {
     const payload = createAccountCreatePayload({
       form: {
@@ -180,6 +211,7 @@ function makeProviderEndpoint(
     capabilities: ['image-generation'],
     name: 'Google ProviderEndpoint',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    apiKeyConfigured: false,
     status: 1,
     createdAt: '',
     updatedAt: '',

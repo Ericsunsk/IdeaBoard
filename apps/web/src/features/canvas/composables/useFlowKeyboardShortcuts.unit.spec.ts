@@ -265,4 +265,22 @@ describe('useFlowKeyboardShortcuts', () => {
       harness.unmount()
     }
   })
+
+  it('prevents selection when selectstart originates from a canvas text node', () => {
+    const harness = mountKeyboardShortcuts({ onSave: vi.fn() })
+    const canvasLayout = document.createElement('div')
+    canvasLayout.className = 'canvas-layout'
+    const canvasText = document.createTextNode('Canvas text')
+    canvasLayout.appendChild(canvasText)
+    document.body.appendChild(canvasLayout)
+
+    try {
+      const event = dispatchSelectStart(canvasText)
+
+      expect(event.defaultPrevented).toBe(true)
+    } finally {
+      canvasLayout.remove()
+      harness.unmount()
+    }
+  })
 })

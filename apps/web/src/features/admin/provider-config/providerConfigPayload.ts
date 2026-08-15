@@ -16,7 +16,6 @@ import type {
 
 export const DEFAULT_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['openai-compatible']
 export const DEFAULT_ADMIN_PROVIDER_ENDPOINT_PROTOCOL: ProviderProtocolValue = 'model-api'
-export const DEFAULT_ADMIN_PROVIDER_ENDPOINT_CAPABILITIES = ['image-generation'] as const
 export const GOOGLE_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['google-ai']
 export const GOOGLE_CLOUD_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['google-cloud']
 export const DEFAULT_ADMIN_ACCOUNT_EXTRA_CONFIG = '{}'
@@ -35,9 +34,26 @@ export const ADMIN_PROVIDER_ENDPOINT_API_TYPE_OPTIONS: Array<{
   },
 ]
 
+export const ADMIN_PROVIDER_ENDPOINT_PROTOCOL_OPTIONS: Array<{
+  label: string
+  value: ProviderProtocolValue
+}> = [
+  { label: '生图模型 API', value: 'model-api' },
+  { label: '图片处理 API', value: 'image-url-json-to-image' },
+]
+
 const adminProviderEndpointApiTypeLabelByValue = new Map(
   ADMIN_PROVIDER_ENDPOINT_API_TYPE_OPTIONS.map((item) => [item.value, item.label]),
 )
+
+const adminProviderEndpointProtocolLabelByValue = new Map(
+  ADMIN_PROVIDER_ENDPOINT_PROTOCOL_OPTIONS.map((item) => [item.value, item.label]),
+)
+
+const adminProviderEndpointCapabilityLabelByValue = new Map<string, string>([
+  ['background-removal', '抠图'],
+  ['image-upscale', 'HD'],
+])
 
 export function getAdminProviderEndpointApiTypeLabel(value: string) {
   return (
@@ -45,13 +61,26 @@ export function getAdminProviderEndpointApiTypeLabel(value: string) {
   )
 }
 
+export function getAdminProviderEndpointProtocolLabel(value: string) {
+  return (
+    adminProviderEndpointProtocolLabelByValue.get(value as ProviderProtocolValue) ||
+    value ||
+    '未配置'
+  )
+}
+
+export function getAdminProviderEndpointCapabilityLabel(value?: string) {
+  return adminProviderEndpointCapabilityLabelByValue.get(value || '') || value || '未配置'
+}
+
 export function createEmptyProviderEndpointForm(): ProviderEndpointFormData {
   return {
     apiType: DEFAULT_ADMIN_PROVIDER_ENDPOINT_API_TYPE,
     protocol: DEFAULT_ADMIN_PROVIDER_ENDPOINT_PROTOCOL,
-    capabilities: [...DEFAULT_ADMIN_PROVIDER_ENDPOINT_CAPABILITIES],
+    capability: '',
     name: '',
     baseUrl: '',
+    apiKey: '',
     status: 1,
   }
 }
@@ -60,9 +89,12 @@ export function createProviderEndpointSavePayload(form: ProviderEndpointFormData
   return {
     api_type: form.apiType,
     protocol: form.protocol,
-    capabilities: form.capabilities,
+    ...(form.protocol === 'image-url-json-to-image' && form.capability
+      ? { capability: form.capability }
+      : {}),
     name: form.name,
     base_url: form.baseUrl,
+    ...(form.protocol === 'image-url-json-to-image' ? { api_key: form.apiKey } : {}),
     status: form.status,
   }
 }

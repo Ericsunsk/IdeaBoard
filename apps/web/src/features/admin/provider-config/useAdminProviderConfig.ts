@@ -97,9 +97,14 @@ function createProviderEndpointEditor(options: {
     form.value = {
       apiType: row.apiType,
       protocol: row.protocol,
-      capabilities: [...row.capabilities],
+      capability:
+        row.protocol === 'image-url-json-to-image' &&
+        (row.capabilities[0] === 'background-removal' || row.capabilities[0] === 'image-upscale')
+          ? row.capabilities[0]
+          : '',
       name: row.name,
       baseUrl: row.baseUrl,
+      apiKey: '',
       status: row.status,
     }
     resetErrors()
@@ -139,9 +144,19 @@ function createProviderEndpointEditor(options: {
 
   function validate() {
     const nextErrors = createEmptyProviderEndpointFormErrors()
-    ;(['name', 'apiType', 'protocol', 'capabilities', 'baseUrl', 'status'] as ProviderEndpointFormField[]).forEach((field) => {
+    ;(
+      [
+        'name',
+        'apiType',
+        'protocol',
+        'capability',
+        'baseUrl',
+        'status',
+      ] as ProviderEndpointFormField[]
+    ).forEach((field) => {
       nextErrors[field] = resolveProviderEndpointFieldError(form.value, field)
     })
+    nextErrors.apiKey = resolveProviderEndpointFieldError(form.value, 'apiKey')
     errors.value = nextErrors
     return !Object.values(nextErrors).some(Boolean)
   }
@@ -281,7 +296,10 @@ function createAccountEditor(options: {
     } else if (hasDuplicateAccountName(accountName)) {
       nextErrors.name = '同一端点下已存在同名 APIKey'
     }
-    if (selectedModels.length === 0 && !isModellessProviderEndpoint(selectedProviderEndpoint.value)) {
+    if (
+      selectedModels.length === 0 &&
+      !isModellessProviderEndpoint(selectedProviderEndpoint.value)
+    ) {
       nextErrors.modelValues = '请至少选择或输入一个模型'
     }
     if (!isEditing.value && !form.value.secret.trim()) {
@@ -400,9 +418,10 @@ function createEmptyProviderEndpointFormErrors(): Record<ProviderEndpointFormFie
   return {
     apiType: '',
     protocol: '',
-    capabilities: '',
+    capability: '',
     name: '',
     baseUrl: '',
+    apiKey: '',
     status: '',
   }
 }
@@ -453,8 +472,13 @@ function resolveProviderEndpointFieldError(
 ) {
   if (field === 'name' && !form.name.trim()) return '请输入供应商端点名称'
   if (field === 'apiType' && !form.apiType) return '请选择接口类型'
-  if (field === 'protocol' && !form.protocol) return '请选择 Protocol'
-  if (field === 'capabilities' && form.capabilities.length === 0) return '至少选择一个 Capability'
+  if (field === 'protocol' && !form.protocol) return '请选择调用协议'
+  if (field === 'capability' && form.protocol === 'image-url-json-to-image' && !form.capability) {
+    return '请选择处理功能'
+  }
+  if (field === 'apiKey' && form.protocol === 'image-url-json-to-image' && !form.apiKey.trim()) {
+    return '请输入 API Key'
+  }
   if (field === 'baseUrl') {
     const apiUrl = form.baseUrl.trim()
     if (!apiUrl) return '请输入 Base URL地址'

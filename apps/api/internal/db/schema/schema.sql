@@ -3781,8 +3781,7 @@ CREATE OR REPLACE FUNCTION publish_billing_prices(
   p_prices jsonb,
   p_actor_id bigint
 )
-RETURNS TABLE(output_resolution varchar, price_version_id bigint, version bigint,
-              unit_credits bigint, created_by bigint, created_at timestamptz)
+RETURNS SETOF billing_price_versions
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path TO 'public', 'pg_catalog', 'pg_temp'
 AS $fn$
@@ -3797,6 +3796,7 @@ DECLARE
   v_new_id BIGINT;
   v_materialized BOOLEAN;
   v_inserted BIGINT;
+  v_result billing_price_versions%ROWTYPE;
 BEGIN
   p_sku := lower(btrim(p_sku));
   p_display_name := btrim(p_display_name);
@@ -3827,8 +3827,9 @@ BEGIN
   UPDATE billing_skus
   SET display_name = p_display_name, description = p_description,
       enabled = CASE WHEN NOT EXISTS (
-        SELECT 1 FROM billing_current_prices
-        WHERE sku = p_sku AND output_resolution IN ('default', '1k')
+        SELECT 1 FROM billing_current_prices AS current_prices
+        WHERE current_prices.sku = p_sku
+          AND current_prices.output_resolution IN ('default', '1k')
       ) THEN TRUE ELSE enabled END,
       updated_by = p_actor_id, updated_at = clock_timestamp()
   WHERE sku = p_sku;
@@ -3861,10 +3862,11 @@ BEGIN
     WHERE prices.sku = p_sku AND prices.output_resolution = v_resolution;
     INSERT INTO billing_price_versions (sku, output_resolution, version, unit_credits, created_by)
     VALUES (p_sku, v_resolution, v_version, v_unit, p_actor_id)
-    RETURNING billing_price_versions.price_version_id INTO v_new_id;
+    RETURNING billing_price_versions.* INTO v_result;
+    v_new_id := v_result.price_version_id;
     INSERT INTO billing_current_prices (sku, output_resolution, price_version_id)
     VALUES (p_sku, v_resolution, v_new_id)
-    ON CONFLICT (sku, output_resolution) DO UPDATE
+    ON CONFLICT ON CONSTRAINT billing_current_prices_pkey DO UPDATE
       SET price_version_id = EXCLUDED.price_version_id, updated_at = clock_timestamp();
     IF v_resolution IN ('default', '1k') THEN
       UPDATE billing_skus SET current_price_version_id = v_new_id WHERE sku = p_sku;
@@ -3874,13 +3876,7 @@ BEGIN
       jsonb_build_object('output_resolution', v_resolution, 'materialized', v_materialized,
         'old', CASE WHEN v_old_id IS NULL THEN NULL ELSE jsonb_build_object('price_version_id', v_old_id, 'version', v_old_version, 'unit_credits', v_old_unit) END,
         'new', jsonb_build_object('price_version_id', v_new_id, 'version', v_version, 'unit_credits', v_unit), 'outcome', 'published'));
-    output_resolution := v_resolution;
-    price_version_id := v_new_id;
-    version := v_version;
-    unit_credits := v_unit;
-    created_by := p_actor_id;
-    created_at := clock_timestamp();
-    RETURN NEXT;
+    RETURN NEXT v_result;
   END LOOP;
 END;
 $fn$;

@@ -7,6 +7,7 @@ package dbsqlc
 
 import (
 	"context"
+	"time"
 
 	"github.com/lib/pq"
 )
@@ -53,6 +54,20 @@ func (q *Queries) CreateProviderEndpoint(ctx context.Context, arg CreateProvider
 	return id, err
 }
 
+const deleteManagedProviderEndpointAccounts = `-- name: DeleteManagedProviderEndpointAccounts :execrows
+DELETE FROM api_accounts
+WHERE provider_endpoint_id = $1
+  AND extra_config = '{"managed_by":"image-processing-endpoint"}'
+`
+
+func (q *Queries) DeleteManagedProviderEndpointAccounts(ctx context.Context, providerEndpointID int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteManagedProviderEndpointAccounts, providerEndpointID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const deleteProviderEndpoint = `-- name: DeleteProviderEndpoint :execrows
 DELETE FROM provider_endpoints
 WHERE id = $1
@@ -66,15 +81,55 @@ func (q *Queries) DeleteProviderEndpoint(ctx context.Context, id int64) (int64, 
 	return result.RowsAffected()
 }
 
-const getProviderEndpointByID = `-- name: GetProviderEndpointByID :one
-SELECT id, api_type, protocol, name, base_url, status, created_at, updated_at
-FROM provider_endpoints
-WHERE id = $1
+const getManagedProviderEndpointAccountID = `-- name: GetManagedProviderEndpointAccountID :one
+SELECT id
+FROM api_accounts
+WHERE provider_endpoint_id = $1
+  AND deleted_at IS NULL
+  AND extra_config = '{"managed_by":"image-processing-endpoint"}'
+LIMIT 1
 `
 
-func (q *Queries) GetProviderEndpointByID(ctx context.Context, id int64) (ProviderEndpoint, error) {
+func (q *Queries) GetManagedProviderEndpointAccountID(ctx context.Context, providerEndpointID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getManagedProviderEndpointAccountID, providerEndpointID)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const getProviderEndpointByID = `-- name: GetProviderEndpointByID :one
+SELECT id, api_type, protocol, name, base_url, status, created_at, updated_at,
+       EXISTS (
+         SELECT 1
+         FROM api_accounts AS managed_account
+         INNER JOIN api_account_secrets AS active_secret
+           ON active_secret.account_id = managed_account.id
+          AND active_secret.status = 'active'
+          AND active_secret.secret_material_kind = 'encrypted'
+          AND btrim(active_secret.secret_payload) <> ''
+         WHERE managed_account.provider_endpoint_id = provider_endpoints.id
+           AND managed_account.deleted_at IS NULL
+           AND managed_account.extra_config = '{"managed_by":"image-processing-endpoint"}'
+       ) AS api_key_configured
+FROM provider_endpoints
+WHERE provider_endpoints.id = $1
+`
+
+type GetProviderEndpointByIDRow struct {
+	ID               int64     `json:"id"`
+	ApiType          string    `json:"api_type"`
+	Protocol         string    `json:"protocol"`
+	Name             string    `json:"name"`
+	BaseUrl          string    `json:"base_url"`
+	Status           int16     `json:"status"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+	ApiKeyConfigured bool      `json:"api_key_configured"`
+}
+
+func (q *Queries) GetProviderEndpointByID(ctx context.Context, id int64) (GetProviderEndpointByIDRow, error) {
 	row := q.db.QueryRowContext(ctx, getProviderEndpointByID, id)
-	var i ProviderEndpoint
+	var i GetProviderEndpointByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.ApiType,
@@ -84,6 +139,7 @@ func (q *Queries) GetProviderEndpointByID(ctx context.Context, id int64) (Provid
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ApiKeyConfigured,
 	)
 	return i, err
 }
@@ -124,20 +180,44 @@ func (q *Queries) ListProviderEndpointCapabilities(ctx context.Context, provider
 }
 
 const listProviderEndpoints = `-- name: ListProviderEndpoints :many
-SELECT id, api_type, protocol, name, base_url, status, created_at, updated_at
+SELECT id, api_type, protocol, name, base_url, status, created_at, updated_at,
+       EXISTS (
+         SELECT 1
+         FROM api_accounts AS managed_account
+         INNER JOIN api_account_secrets AS active_secret
+           ON active_secret.account_id = managed_account.id
+          AND active_secret.status = 'active'
+          AND active_secret.secret_material_kind = 'encrypted'
+          AND btrim(active_secret.secret_payload) <> ''
+         WHERE managed_account.provider_endpoint_id = provider_endpoints.id
+           AND managed_account.deleted_at IS NULL
+           AND managed_account.extra_config = '{"managed_by":"image-processing-endpoint"}'
+       ) AS api_key_configured
 FROM provider_endpoints
 ORDER BY id ASC
 `
 
-func (q *Queries) ListProviderEndpoints(ctx context.Context) ([]ProviderEndpoint, error) {
+type ListProviderEndpointsRow struct {
+	ID               int64     `json:"id"`
+	ApiType          string    `json:"api_type"`
+	Protocol         string    `json:"protocol"`
+	Name             string    `json:"name"`
+	BaseUrl          string    `json:"base_url"`
+	Status           int16     `json:"status"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+	ApiKeyConfigured bool      `json:"api_key_configured"`
+}
+
+func (q *Queries) ListProviderEndpoints(ctx context.Context) ([]ListProviderEndpointsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listProviderEndpoints)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ProviderEndpoint
+	var items []ListProviderEndpointsRow
 	for rows.Next() {
-		var i ProviderEndpoint
+		var i ListProviderEndpointsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ApiType,
@@ -147,6 +227,7 @@ func (q *Queries) ListProviderEndpoints(ctx context.Context) ([]ProviderEndpoint
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ApiKeyConfigured,
 		); err != nil {
 			return nil, err
 		}
@@ -168,6 +249,41 @@ WHERE provider_endpoint_id = $1
 
 func (q *Queries) ReplaceProviderEndpointCapabilities(ctx context.Context, providerEndpointID int64) error {
 	_, err := q.db.ExecContext(ctx, replaceProviderEndpointCapabilities, providerEndpointID)
+	return err
+}
+
+const updateManagedProviderEndpointAccount = `-- name: UpdateManagedProviderEndpointAccount :exec
+UPDATE api_accounts
+SET name = $1,
+    status = $2,
+    max_concurrent = $3,
+    timeout = $4,
+    extra_config = '{"managed_by":"image-processing-endpoint"}',
+    fail_count = 0,
+    weight = 1
+WHERE id = $5
+  AND provider_endpoint_id = $6
+  AND deleted_at IS NULL
+`
+
+type UpdateManagedProviderEndpointAccountParams struct {
+	Name               string `json:"name"`
+	Status             int16  `json:"status"`
+	MaxConcurrent      int32  `json:"max_concurrent"`
+	Timeout            int32  `json:"timeout"`
+	ID                 int64  `json:"id"`
+	ProviderEndpointID int64  `json:"provider_endpoint_id"`
+}
+
+func (q *Queries) UpdateManagedProviderEndpointAccount(ctx context.Context, arg UpdateManagedProviderEndpointAccountParams) error {
+	_, err := q.db.ExecContext(ctx, updateManagedProviderEndpointAccount,
+		arg.Name,
+		arg.Status,
+		arg.MaxConcurrent,
+		arg.Timeout,
+		arg.ID,
+		arg.ProviderEndpointID,
+	)
 	return err
 }
 

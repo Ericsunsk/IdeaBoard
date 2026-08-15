@@ -110,8 +110,12 @@ func (h *ProviderEndpointHandler) Create(c *gin.Context) {
 		response.Error(c, 400, "status 只支持 0 或 1")
 		return
 	}
-	protocol, capabilities, err := NormalizeProtocolCapabilities(req.Protocol, req.Capabilities)
+	protocol, capabilities, err := NormalizeProtocolCapabilities(req.Protocol, requestedCapabilities(req.Capability))
 	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	if err := validateManagedEndpointAPIKey(protocol, req.APIKey); err != nil {
 		response.Error(c, 400, err.Error())
 		return
 	}
@@ -134,6 +138,7 @@ func (h *ProviderEndpointHandler) Create(c *gin.Context) {
 		Capabilities: capabilities,
 		Name:         req.Name,
 		BaseURL:      baseURL,
+		APIKey:       req.APIKey,
 		Status:       req.Status,
 	}
 
@@ -164,8 +169,12 @@ func (h *ProviderEndpointHandler) Update(c *gin.Context) {
 		response.Error(c, 400, "status 只支持 0 或 1")
 		return
 	}
-	protocol, capabilities, err := NormalizeProtocolCapabilities(req.Protocol, req.Capabilities)
+	protocol, capabilities, err := NormalizeProtocolCapabilities(req.Protocol, requestedCapabilities(req.Capability))
 	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
+	if err := validateManagedEndpointAPIKey(protocol, req.APIKey); err != nil {
 		response.Error(c, 400, err.Error())
 		return
 	}
@@ -193,6 +202,7 @@ func (h *ProviderEndpointHandler) Update(c *gin.Context) {
 	endpoint.Capabilities = capabilities
 	endpoint.Name = req.Name
 	endpoint.BaseURL = baseURL
+	endpoint.APIKey = req.APIKey
 	endpoint.Status = req.Status
 
 	if err := h.endpointRepo.Update(c.Request.Context(), endpoint); err != nil {

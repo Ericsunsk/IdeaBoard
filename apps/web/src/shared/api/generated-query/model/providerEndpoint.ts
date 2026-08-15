@@ -14,6 +14,7 @@ export interface ProviderEndpoint {
   capabilities: string[]
   name: string
   base_url: string
+  api_key_configured: boolean
   status: number
   created_at: string
   updated_at: string
