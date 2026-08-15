@@ -7,6 +7,7 @@ import (
 
 	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/tasking/tasks"
+	"ideaboard/api/internal/workflow"
 )
 
 const taskAssignmentAgeBoostAfter = 15 * time.Minute
@@ -20,11 +21,13 @@ func chooseTaskRoutingTx(
 	taskID string,
 	current taskAssignmentTaskState,
 	now time.Time,
+	featureSlug string,
 	outputResolution string,
 ) (taskAssignmentSelectedAccount, bool, error) {
 	currentPriority := taskAssignmentEffectivePriority(current.Priority, current.CreatedAt, now)
 	ageBoostCutoff := now.Add(-taskAssignmentAgeBoostAfter)
 
+	capability := routingCapabilityForFeature(featureSlug)
 	var selected taskAssignmentSelectedAccount
 	var shouldDefer bool
 	err := tx.QueryRowContext(ctx, `
@@ -54,10 +57,34 @@ WITH locked_accounts AS (
   ) AS credential ON TRUE
   WHERE a.status = 1
     AND a.deleted_at IS NULL
+    AND EXISTS (
+      SELECT 1
+      FROM provider_endpoint_capabilities capability
+      WHERE capability.provider_endpoint_id = a.provider_endpoint_id
+        AND capability.capability = $9
+    )
   ORDER BY a.id ASC
   FOR UPDATE OF a SKIP LOCKED
 ),
-routing_candidates AS (
+modeless_routing_candidates AS (
+  SELECT
+    a.account_id,
+    a.provider_endpoint_id,
+    a.api_type,
+    a.provider_endpoint_name,
+    a.provider_endpoint_base_url,
+    a.credential_id,
+    a.credential_fingerprint,
+    a.credential_key_version,
+    a.account_max_concurrent,
+    ''::text AS model_name,
+    a.account_max_concurrent AS model_max_concurrent,
+    0::int AS model_sort_order,
+    0::bigint AS model_id
+  FROM locked_accounts a
+  WHERE $9 = 'background-removal'
+),
+model_routing_candidates AS (
   SELECT
     a.account_id,
     a.provider_endpoint_id,
@@ -78,9 +105,14 @@ routing_candidates AS (
   LEFT JOIN provider_endpoint_models AS pem
     ON pem.provider_endpoint_id = a.provider_endpoint_id
    AND lower(pem.model_name) = lower(m.model_name)
-  WHERE $9 = '1k'
-     OR ($9 = '2k' AND pem.supports_2k = TRUE)
-     OR ($9 = '4k' AND pem.supports_4k = TRUE)
+  WHERE $10 = '1k'
+     OR ($10 = '2k' AND pem.supports_2k = TRUE)
+     OR ($10 = '4k' AND pem.supports_4k = TRUE)
+),
+routing_candidates AS (
+  SELECT * FROM modeless_routing_candidates
+  UNION ALL
+  SELECT * FROM model_routing_candidates
 ),
 active_leases AS (
   SELECT
@@ -210,6 +242,7 @@ CROSS JOIN active_share share`,
 		current.CreatedAt,
 		tasks.StatusPending,
 		accountlimits.MaxMaxConcurrent,
+		capability,
 		outputResolution,
 	).Scan(
 		&selected.AccountID,
@@ -227,6 +260,13 @@ CROSS JOIN active_share share`,
 		return taskAssignmentSelectedAccount{}, false, err
 	}
 	return selected, shouldDefer, nil
+}
+
+func routingCapabilityForFeature(featureSlug string) string {
+	if featureSlug == workflow.FeatureSlugRemoveBg {
+		return "background-removal"
+	}
+	return "image-generation"
 }
 
 func taskAssignmentEffectivePriority(priority int, createdAt time.Time, now time.Time) int {

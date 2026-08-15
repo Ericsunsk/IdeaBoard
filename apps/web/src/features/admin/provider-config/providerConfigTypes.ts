@@ -82,6 +82,8 @@ export type ProviderAccountRecord = {
   name: string
   providerEndpointId: number
   apiType: string
+  protocol: ProviderProtocolValue
+  capabilities: ProviderCapabilityValue[]
   baseUrl: string
   models: ProviderAccountModelRecord[]
   secretConfigured: boolean

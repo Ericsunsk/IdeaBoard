@@ -11,6 +11,8 @@ export interface AdminAccount {
   name: string
   provider_endpoint_id: number
   provider_endpoint_api_type: string
+  provider_endpoint_protocol: string
+  provider_endpoint_capabilities: string[]
   provider_endpoint_base_url: string
   models: AdminAccountModel[]
   secret_configured: boolean

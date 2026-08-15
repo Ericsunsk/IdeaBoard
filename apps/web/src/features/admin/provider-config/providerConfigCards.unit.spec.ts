@@ -87,6 +87,8 @@ function makeAccount(overrides: Partial<ProviderAccountRecord> = {}): ProviderAc
     name: 'Account',
     providerEndpointId: 1,
     apiType: 'openai-compatible',
+    protocol: 'model-api',
+    capabilities: ['image-generation'],
     baseUrl: 'https://api.example.com/v1',
     models: [],
     secretConfigured: true,

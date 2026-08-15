@@ -186,6 +186,8 @@ function toProviderAccountRecord(account: AdminAccountDto): ProviderAccountRecor
     name: account.name,
     providerEndpointId: account.provider_endpoint_id,
     apiType: account.provider_endpoint_api_type,
+    protocol: account.provider_endpoint_protocol as ProviderAccountRecord['protocol'],
+    capabilities: (account.provider_endpoint_capabilities ?? []) as ProviderAccountRecord['capabilities'],
     baseUrl: account.provider_endpoint_base_url,
     models: account.models.map((model) => ({
       name: model.name,

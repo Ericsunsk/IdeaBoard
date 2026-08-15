@@ -4419,12 +4419,16 @@ components:
 
     AdminAccount:
       type: object
-      required: [id, name, provider_endpoint_id, provider_endpoint_api_type, provider_endpoint_base_url, models, secret_configured, max_concurrent, fail_count, weight, timeout, extra_config, status, created_at, updated_at]
+      required: [id, name, provider_endpoint_id, provider_endpoint_api_type, provider_endpoint_protocol, provider_endpoint_capabilities, provider_endpoint_base_url, models, secret_configured, max_concurrent, fail_count, weight, timeout, extra_config, status, created_at, updated_at]
       properties:
         id: { type: integer }
         name: { type: string }
         provider_endpoint_id: { type: integer }
         provider_endpoint_api_type: { type: string }
+        provider_endpoint_protocol: { type: string }
+        provider_endpoint_capabilities:
+          type: array
+          items: { type: string }
         provider_endpoint_base_url: { type: string }
         models:
           type: array

@@ -137,8 +137,10 @@ func compileProviderControls(params map[string]interface{}, featureSlug string) 
 		workflow.FeatureSlugStyleFusion:
 		controls.OpenAI.UseEditEndpoint = true
 	}
-	controls.OpenAI.DropOriginalImageRef = featureSlug == workflow.FeatureSlugStyleVariation
+	// Kept for the legacy OpenAI request helper; remove-bg tasks are routed to
+	// the capability-specific protocol before this control is consumed.
 	controls.OpenAI.RemoveBackground = featureSlug == workflow.FeatureSlugRemoveBg
+	controls.OpenAI.DropOriginalImageRef = featureSlug == workflow.FeatureSlugStyleVariation
 	if params == nil {
 		return controls
 	}

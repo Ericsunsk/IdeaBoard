@@ -62,7 +62,7 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, task *tasks.TaskPaylo
 	}
 
 	featureSlug := taskFeatureSlug(task.Params)
-	selectedAccount, shouldDefer, err := chooseTaskRoutingTx(ctx, tx, task.TaskID, taskState, time.Now(), taskOutputResolution(task.Params))
+	selectedAccount, shouldDefer, err := chooseTaskRoutingTx(ctx, tx, task.TaskID, taskState, time.Now(), featureSlug, taskOutputResolution(task.Params))
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return commitTaskAssignment(tx, &committed, policy.noCapacity(task.TaskID))

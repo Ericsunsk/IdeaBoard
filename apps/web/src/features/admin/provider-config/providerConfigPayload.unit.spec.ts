@@ -172,6 +172,8 @@ function makeAccount(overrides: Partial<ProviderAccountRecord> = {}): ProviderAc
     name: 'Account',
     providerEndpointId: 7,
     apiType: 'google-ai',
+    protocol: 'model-api',
+    capabilities: ['image-generation'],
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
     models: [],
     secretConfigured: true,

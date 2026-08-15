@@ -376,9 +376,10 @@ func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account
 		return providerExecutionConfig{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, finalizationErr)
 	}
 
-	resolvedAccountModel, ok := resolveAccountModelForExecution(account, taskParams, assignment.ResolvedModel)
+	resolvedAccountModel, modelOK := resolveAccountModelForExecution(account, taskParams, assignment.ResolvedModel)
 	resolvedModel := strings.TrimSpace(resolvedAccountModel.Name)
-	if !ok || resolvedModel == "" {
+	modelRequired := !providerendpoints.AllowsModellessAccounts(account.Protocol, account.Capabilities)
+	if modelRequired && (!modelOK || resolvedModel == "") {
 		return providerExecutionConfig{}, newExecutionFailureError(
 			tasks.ExecutionStageAssigned,
 			tasks.FailureCategoryInputInvalid,
@@ -458,6 +459,9 @@ func (c *ProviderExecutor) parseAndNormalizeTaskParams(ctx context.Context, task
 }
 
 func (c *ProviderExecutor) callProviderWithRequest(ctx context.Context, account *accounts.ApiAccount, exec providerExecutionConfig) (providerCallResult, error) {
+	if isBackgroundRemovalProtocol(account) {
+		return c.callBackgroundRemoval(ctx, account, exec.Request, exec.Timeout)
+	}
 	if workflow.IsGoogleNativeAPIType(exec.APIType) {
 		return c.callGoogleProviderWithRequest(ctx, account, exec.APIType, exec.Request, exec.Timeout)
 	}

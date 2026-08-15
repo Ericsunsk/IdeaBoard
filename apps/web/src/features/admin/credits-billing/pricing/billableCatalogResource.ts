@@ -21,7 +21,7 @@ export interface AdminBillableCatalogResource {
   list: () => Promise<AdminBillableItemCard[]>
   publishPrices: (
     sku: string,
-    prices: Record<PricingVariant, number | undefined>,
+    prices: Partial<Record<PricingVariant, number | undefined>>,
   ) => Promise<Partial<Record<PricingVariant, AdminBillableItemPrice>>>
   setAvailability: (sku: string, enabled: boolean) => Promise<AdminBillableItemAvailability>
   deleteArchived: (sku: string) => Promise<string>
@@ -54,7 +54,7 @@ export async function setBillableItemAvailability(
 
 export async function publishBillableItemPrices(
   sku: string,
-  prices: Record<PricingVariant, number | undefined>,
+  prices: Partial<Record<PricingVariant, number | undefined>>,
 ): Promise<Partial<Record<PricingVariant, AdminBillableItemPrice>>> {
   const requestPrices = Object.fromEntries(
     Object.entries(prices).filter(([, price]) => price !== undefined),
