@@ -129,8 +129,14 @@ WHERE account_id = sqlc.arg(account_id)
   );
 
 -- name: ListAccountModelsByAccountIDs :many
-SELECT id, account_id, model_name, enabled, weight, max_concurrent, metadata, sort_order, created_at, updated_at
+SELECT m.id, m.account_id, m.model_name, m.enabled, m.weight, m.max_concurrent, m.metadata, m.sort_order, m.created_at, m.updated_at,
+       COALESCE(pem.supports_2k, FALSE) AS supports_2k,
+       COALESCE(pem.supports_4k, FALSE) AS supports_4k
 FROM api_account_models AS m
+JOIN api_accounts AS a ON a.id = m.account_id
+LEFT JOIN provider_endpoint_models AS pem
+  ON pem.provider_endpoint_id = a.provider_endpoint_id
+ AND lower(pem.model_name) = lower(m.model_name)
 WHERE m.account_id = ANY(sqlc.arg(account_ids)::bigint[])
   AND EXISTS (
     SELECT 1
@@ -139,6 +145,16 @@ WHERE m.account_id = ANY(sqlc.arg(account_ids)::bigint[])
       AND a.deleted_at IS NULL
   )
 ORDER BY m.account_id ASC, m.sort_order ASC, m.id ASC;
+
+-- name: UpsertProviderEndpointModel :exec
+INSERT INTO provider_endpoint_models (
+  provider_endpoint_id, model_name, supports_2k, supports_4k
+) VALUES (
+  sqlc.arg(provider_endpoint_id), sqlc.arg(model_name), sqlc.arg(supports_2k), sqlc.arg(supports_4k)
+)
+ON CONFLICT (provider_endpoint_id, lower(model_name)) DO UPDATE
+SET supports_2k = EXCLUDED.supports_2k,
+    supports_4k = EXCLUDED.supports_4k;
 
 -- name: UpsertAccountModel :one
 INSERT INTO api_account_models (

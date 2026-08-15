@@ -10,6 +10,7 @@ import {
   buildLocalInpaintReadinessRequest,
   buildPromptGenerationTaskRequest,
 } from '../commands/flowImageTaskRequests'
+import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import {
   createCanvasTaskClientActionId,
   withTaskClientActionId,
@@ -52,6 +53,7 @@ export function buildFusionBillingReadinessRequest(input: {
   imageUrls: string[]
   aspectRatio: Parameters<typeof buildFusionTaskRequest>[0]['aspectRatio']
   outputCount?: Parameters<typeof buildFusionTaskRequest>[0]['outputCount']
+  outputResolution?: OutputResolution
 }): SubmitTaskData | null {
   const imageUrls = input.imageUrls
     .map((url) => url.trim())
@@ -66,5 +68,6 @@ export function buildFusionBillingReadinessRequest(input: {
     sizeSource: null,
     targetSize: null,
     aspectRatio: input.aspectRatio,
+    outputResolution: input.outputResolution,
   })
 }

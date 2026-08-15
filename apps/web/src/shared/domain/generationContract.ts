@@ -46,3 +46,14 @@ export function assertRequestedOutputCount(value: unknown): RequestedOutputCount
   }
   return parsed
 }
+
+export const OUTPUT_RESOLUTION_OPTIONS = ['1k', '2k', '4k'] as const
+export type OutputResolution = (typeof OUTPUT_RESOLUTION_OPTIONS)[number]
+
+export function isOutputResolution(value: unknown): value is OutputResolution {
+  return typeof value === 'string' && OUTPUT_RESOLUTION_OPTIONS.includes(value as OutputResolution)
+}
+
+export function normalizeOutputResolution(value: unknown): OutputResolution {
+  return isOutputResolution(value) ? value : '1k'
+}

@@ -220,6 +220,12 @@ func (s *AccountService) PatchAccountModel(ctx context.Context, accountID int64,
 		}
 		model.SortOrder = *req.SortOrder
 	}
+	if req.Supports2K != nil {
+		model.Supports2K = *req.Supports2K
+	}
+	if req.Supports4K != nil {
+		model.Supports4K = *req.Supports4K
+	}
 
 	if err := s.accountRepo.UpsertModel(ctx, accountID, model); err != nil {
 		if database.IsNotFound(err) {
@@ -286,6 +292,8 @@ func normalizeAccountModelInputs(inputs []AccountModelInput) ([]AccountModel, er
 			Weight:        weight,
 			MaxConcurrent: input.MaxConcurrent,
 			SortOrder:     len(models),
+			Supports2K:    input.Supports2K != nil && *input.Supports2K,
+			Supports4K:    input.Supports4K != nil && *input.Supports4K,
 		})
 	}
 	if len(models) == 0 {

@@ -27,6 +27,13 @@
       @toggle="toggleOutputCountPicker"
       @select="selectOutputCount"
     />
+    <NodeOutputResolutionPicker
+      :model-value="outputResolutionValue"
+      :visible="outputResolutionPickerVisible"
+      :disabled="disabled"
+      @toggle="toggleOutputResolutionPicker"
+      @select="selectOutputResolution"
+    />
     <div v-if="showSubmit" class="canvas-credit-submit-control">
       <button
         :class="sendButtonClass"
@@ -54,10 +61,12 @@
 import { computed } from 'vue'
 import { SendDiagonalSolid } from '@iconoir/vue'
 import type { PromptAspectRatio } from '../../../canvas-board/domain'
+import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
 import type { CanvasBillingQuoteState } from '../../execution'
 import NodeAspectRatioPicker from './NodeAspectRatioPicker.vue'
 import NodeOutputCountPicker from './NodeOutputCountPicker.vue'
+import NodeOutputResolutionPicker from './NodeOutputResolutionPicker.vue'
 import {
   usePromptComposerControls,
   type PromptComposerResizePayload,
@@ -67,6 +76,7 @@ const props = withDefaults(
   defineProps<{
     modelValue: string
     outputCount: number
+    outputResolution?: OutputResolution
     placeholder: string
     textareaClass: string
     actionsClass: string
@@ -97,6 +107,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
   (e: 'update:output-count', value: number): void
+  (e: 'update:output-resolution', value: OutputResolution): void
   (e: 'update:aspect-ratio', value: PromptAspectRatio): void
   (e: 'focus'): void
   (e: 'textarea-resize', payload: PromptComposerResizePayload): void
@@ -124,15 +135,20 @@ const {
   inputRef,
   outputCountPickerVisible,
   outputCountValue,
+  outputResolutionPickerVisible,
+  outputResolutionValue,
   selectAspectRatio,
   selectOutputCount,
+  selectOutputResolution,
   shouldRenderAspectRatio,
   submit,
   toggleAspectRatioPicker,
   toggleOutputCountPicker,
+  toggleOutputResolutionPicker,
 } = usePromptComposerControls({
   modelValue: () => props.modelValue,
   outputCount: () => props.outputCount,
+  outputResolution: () => props.outputResolution ?? '1k',
   aspectRatio: () => props.aspectRatio,
   disabled: () => props.disabled,
   submitDisabled: () => props.submitDisabled,
@@ -141,6 +157,7 @@ const {
   showAspectRatio: () => props.showAspectRatio,
   onTextUpdate: (value) => emit('update:modelValue', value),
   onOutputCountUpdate: (value) => emit('update:output-count', value),
+  onOutputResolutionUpdate: (value) => emit('update:output-resolution', value),
   onAspectRatioUpdate: (value) => emit('update:aspect-ratio', value),
   onTextareaResize: (payload) => emit('textarea-resize', payload),
   onSubmit: (prompt, outputCount, aspectRatio) => emit('submit', prompt, outputCount, aspectRatio),

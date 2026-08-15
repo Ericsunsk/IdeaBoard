@@ -230,6 +230,12 @@ function createAccountEditor(options: {
       providerEndpointId: account.providerEndpointId,
       name: account.name,
       modelValues: account.models.map((model) => model.name),
+      modelCapabilities: Object.fromEntries(
+        account.models.map((model) => [
+          model.name.trim().toLowerCase(),
+          { supports2K: model.supports2K, supports4K: model.supports4K },
+        ]),
+      ),
       secret: '',
       maxConcurrent: account.maxConcurrent,
       timeoutSeconds: account.timeoutSeconds,
@@ -304,6 +310,7 @@ function createAccountEditor(options: {
       form: form.value,
       selectedProviderEndpoint: selectedProviderEndpoint.value,
       modelValues,
+      modelCapabilities: form.value.modelCapabilities,
       secret: form.value.secret.trim(),
       afterSaved: () => {
         visible.value = false
@@ -398,6 +405,7 @@ function createEmptyAccountForm(
     providerEndpointId,
     name,
     modelValues: [],
+    modelCapabilities: {},
     secret: '',
     maxConcurrent: accountLimits.maxConcurrent.default,
     timeoutSeconds: accountLimits.timeoutSeconds.default,

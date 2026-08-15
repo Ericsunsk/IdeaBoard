@@ -72,7 +72,7 @@ describe('flowImageTaskRequests', () => {
       priority: 1,
       feature: EXECUTION_FEATURE.promptGeneration,
       image_urls: ['https://assets.example.com/ref-1.png', 'https://assets.example.com/ref-2.png'],
-      params: { output_count: 3, ratio: '1:1' },
+      params: { output_count: 3, output_resolution: '1k', ratio: '1:1' },
     })
   })
 
@@ -84,6 +84,7 @@ describe('flowImageTaskRequests', () => {
       prompt: 'vary style',
       outputCount: 1,
       strength: 61.6,
+      outputResolution: '2k',
     })
 
     expect(request.params).toMatchObject({
@@ -94,6 +95,7 @@ describe('flowImageTaskRequests', () => {
       variation: {
         strength: 62,
       },
+      output_resolution: '2k',
     })
     expect(request.params).not.toHaveProperty('variation_strength')
   })
@@ -236,11 +238,13 @@ describe('flowImageTaskRequests', () => {
       },
       prompt: 'extend horizon',
       outputCount: 3,
+      outputResolution: '4k',
     })
 
     expect(request.feature).toBe(EXECUTION_FEATURE.imageExtend)
     expect(request.params).toMatchObject({
       output_count: 3,
+      output_resolution: '4k',
       custom_width: 1600,
       custom_height: 1050,
       original_image_width: 1000,
@@ -275,6 +279,7 @@ describe('flowImageTaskRequests', () => {
       imageUrls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
       inputWeights: [0.35, 0.65],
       outputCount: 3,
+      outputResolution: '4k',
       sizeSource: null,
       targetSize: null,
       aspectRatio: 'auto',
@@ -286,6 +291,7 @@ describe('flowImageTaskRequests', () => {
       image_urls: ['https://assets.example.com/a.png', 'https://assets.example.com/b.png'],
       params: {
         output_count: 3,
+        output_resolution: '4k',
         fusion: {
           mode: 'weighted_reference',
           input_weights: [0.35, 0.65],

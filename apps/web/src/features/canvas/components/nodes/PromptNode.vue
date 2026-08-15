@@ -58,6 +58,7 @@
         <PromptTextComposer
           :model-value="node.text"
           :output-count="outputCount"
+          :output-resolution="node.outputResolution"
           :aspect-ratio="aspectRatio"
           :allow-empty="true"
           :submit-disabled="props.generationAvailable === false"
@@ -65,6 +66,7 @@
           class="flex-auto"
           @update:model-value="emit('update:text', $event)"
           @update:output-count="emit('update:output-count', $event)"
+          @update:output-resolution="emit('update:output-resolution', $event)"
           @update:aspect-ratio="emit('update:aspect-ratio', $event)"
           @focus="emit('focus')"
           @submit="emit('generate')"
@@ -105,6 +107,7 @@ const emit = defineEmits<{
   (e: 'focus'): void
   (e: 'update:text', value: string): void
   (e: 'update:output-count', value: number): void
+  (e: 'update:output-resolution', value: import('../../../../shared/domain/generationContract').OutputResolution): void
   (e: 'update:aspect-ratio', value: PromptAspectRatio): void
   (e: 'update:input-images', value: PromptNodeItem['inputImages']): void
   (e: 'input-image-drop', event: DragEvent): void

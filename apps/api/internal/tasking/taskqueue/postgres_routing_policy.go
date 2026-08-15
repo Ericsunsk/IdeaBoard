@@ -20,6 +20,7 @@ func chooseTaskRoutingTx(
 	taskID string,
 	current taskAssignmentTaskState,
 	now time.Time,
+	outputResolution string,
 ) (taskAssignmentSelectedAccount, bool, error) {
 	currentPriority := taskAssignmentEffectivePriority(current.Priority, current.CreatedAt, now)
 	ageBoostCutoff := now.Add(-taskAssignmentAgeBoostAfter)
@@ -74,6 +75,12 @@ routing_candidates AS (
   FROM locked_accounts a
   JOIN api_account_models AS m ON m.account_id = a.account_id
     AND m.enabled = TRUE
+  LEFT JOIN provider_endpoint_models AS pem
+    ON pem.provider_endpoint_id = a.provider_endpoint_id
+   AND lower(pem.model_name) = lower(m.model_name)
+  WHERE $9 = '1k'
+     OR ($9 = '2k' AND pem.supports_2k = TRUE)
+     OR ($9 = '4k' AND pem.supports_4k = TRUE)
 ),
 active_leases AS (
   SELECT
@@ -203,6 +210,7 @@ CROSS JOIN active_share share`,
 		current.CreatedAt,
 		tasks.StatusPending,
 		accountlimits.MaxMaxConcurrent,
+		outputResolution,
 	).Scan(
 		&selected.AccountID,
 		&selected.ProviderEndpointID,

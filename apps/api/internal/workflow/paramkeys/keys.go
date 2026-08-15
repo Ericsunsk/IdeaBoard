@@ -28,6 +28,7 @@ const (
 	Quality             = "quality"
 	SampleCount         = "sample_count"
 	OutputCount         = "output_count"
+	OutputResolution    = "output_resolution"
 	ImageCount          = "image_count"
 	PromptUpsampling    = "prompt_upsampling"
 
@@ -100,6 +101,7 @@ var providerReservedKeys = keySet(
 	Ratio,
 	Quality,
 	OutputCount,
+	OutputResolution,
 	PromptUpsampling,
 	VariationStrength,
 	ExtendTop,

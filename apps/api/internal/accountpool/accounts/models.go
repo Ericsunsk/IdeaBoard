@@ -42,6 +42,8 @@ type AccountModel struct {
 	Weight        int    `json:"weight"`
 	MaxConcurrent *int   `json:"max_concurrent,omitempty"`
 	SortOrder     int    `json:"sort_order"`
+	Supports2K    bool   `json:"supports_2k"`
+	Supports4K    bool   `json:"supports_4k"`
 }
 
 type AccountModelInput struct {
@@ -49,6 +51,8 @@ type AccountModelInput struct {
 	Enabled       *bool  `json:"enabled,omitempty"`
 	Weight        int    `json:"weight,omitempty"`
 	MaxConcurrent *int   `json:"max_concurrent,omitempty"`
+	Supports2K    *bool  `json:"supports_2k,omitempty"`
+	Supports4K    *bool  `json:"supports_4k,omitempty"`
 }
 
 type NullableIntPatch struct {
@@ -101,6 +105,8 @@ type PatchAccountModelRequest struct {
 	Weight        *int             `json:"weight,omitempty"`
 	MaxConcurrent NullableIntPatch `json:"max_concurrent,omitempty"`
 	SortOrder     *int             `json:"sort_order,omitempty"`
+	Supports2K    *bool            `json:"supports_2k,omitempty"`
+	Supports4K    *bool            `json:"supports_4k,omitempty"`
 }
 
 type AccountLimitRange struct {

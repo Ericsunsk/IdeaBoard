@@ -100,6 +100,7 @@ describe('ImageExecutionPlan', () => {
               width: 360,
               prompt: '',
               outputCount: 2,
+              outputResolution: '4k',
               aspectRatio: 'auto',
               blendPoint: { x: 0.5, y: 0.5 },
               inputImages: [
@@ -137,6 +138,7 @@ describe('ImageExecutionPlan', () => {
     expect(plan.kind).toBe('fusion')
     expect(plan.outputCount).toBe(4)
     expect(plan.aspectRatio).toBe('16:9')
+    expect(plan.outputResolution).toBe('4k')
     expect(plan.imageUrls).toEqual([
       'https://example.com/b.png',
       'https://example.com/external.png',
@@ -168,6 +170,7 @@ describe('ImageExecutionPlan', () => {
               width: 320,
               sourceImageUrl: ' https://example.com/source.png ',
               sourceImageRatio: 0.75,
+              outputResolution: '2k',
             }),
           },
         },
@@ -178,6 +181,7 @@ describe('ImageExecutionPlan', () => {
     const plan = planner.planImageDirectAction('image-1', 'remove-bg')
 
     expect(plan.source).toEqual({ url: 'https://example.com/source.png', ratio: 0.75 })
+    expect(plan.outputResolution).toBe('2k')
     expect(plan.source).not.toHaveProperty('x')
     expect(plan.source).not.toHaveProperty('width')
     expect(plan.resultOptions.anchor).toEqual({

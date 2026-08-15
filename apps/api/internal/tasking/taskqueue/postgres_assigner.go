@@ -62,7 +62,7 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, task *tasks.TaskPaylo
 	}
 
 	featureSlug := taskFeatureSlug(task.Params)
-	selectedAccount, shouldDefer, err := chooseTaskRoutingTx(ctx, tx, task.TaskID, taskState, time.Now())
+	selectedAccount, shouldDefer, err := chooseTaskRoutingTx(ctx, tx, task.TaskID, taskState, time.Now(), taskOutputResolution(task.Params))
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return commitTaskAssignment(tx, &committed, policy.noCapacity(task.TaskID))
@@ -316,6 +316,19 @@ func taskFeatureSlug(paramsJSON string) string {
 		return ""
 	}
 	return slug
+}
+
+func taskOutputResolution(paramsJSON string) string {
+	var params map[string]interface{}
+	if err := json.Unmarshal([]byte(paramsJSON), &params); err != nil {
+		return workflow.OutputResolution1K
+	}
+	value, _ := params["output_resolution"].(string)
+	resolution, ok := workflow.NormalizeOutputResolution(value)
+	if !ok {
+		return workflow.OutputResolution1K
+	}
+	return resolution
 }
 
 func newTaskLeaseToken(riverJobID int64) (string, error) {

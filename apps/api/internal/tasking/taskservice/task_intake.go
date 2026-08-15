@@ -137,11 +137,16 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 		}
 		params[paramkeys.OutputCount] = requestedOutputCount.Int()
 	}
+	resolution, ok := workflow.NormalizeOutputResolution(readStringParam(params, paramkeys.OutputResolution))
+	if !ok {
+		return CanonicalTaskRequest{}, validation.New("output_resolution 仅支持 1k、2k、4k")
+	}
+	params[paramkeys.OutputResolution] = resolution
 	typedParams, err := workflowTaskParamsFromMap(params, featureSlug)
 	if err != nil {
 		return CanonicalTaskRequest{}, err
 	}
-	if err := i.ensureProviderAvailable(ctx); err != nil {
+	if err := i.ensureProviderAvailable(ctx, resolution); err != nil {
 		return CanonicalTaskRequest{}, err
 	}
 
@@ -225,7 +230,7 @@ func (i *taskIntake) validateMediaRef(ctx context.Context, userID int64, raw str
 	return i.media.ValidateSubmitMediaRef(ctx, userID, raw)
 }
 
-func (i *taskIntake) ensureProviderAvailable(ctx context.Context) error {
+func (i *taskIntake) ensureProviderAvailable(ctx context.Context, resolution string) error {
 	if i == nil || i.accounts == nil {
 		return newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
 	}
@@ -233,11 +238,23 @@ func (i *taskIntake) ensureProviderAvailable(ctx context.Context) error {
 	if err != nil {
 		return newSubmissionError("provider_unavailable", providerUnavailableMessage, err)
 	}
-	apiAccounts = accounts.FilterAccountsWithEnabledModels(apiAccounts)
+	apiAccounts = accounts.FilterAccountsWithOutputResolution(apiAccounts, resolution)
 	if len(apiAccounts) == 0 {
 		return newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
 	}
 	return nil
+}
+
+func readStringParam(params map[string]interface{}, key string) string {
+	raw, ok := params[key]
+	if !ok {
+		return ""
+	}
+	value, ok := raw.(string)
+	if !ok {
+		return "\x00"
+	}
+	return value
 }
 
 func resolveTaskBillingRequest(feature string, quantity int) (*taskbilling.Request, error) {

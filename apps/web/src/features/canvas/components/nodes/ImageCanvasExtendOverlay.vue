@@ -29,8 +29,10 @@
           placeholder="输入扩图提示词"
           :allow-empty="true"
           :output-count="outputCount"
+          :output-resolution="outputResolution"
           :billing-state="billingQuote"
           @update:output-count="emit('update:output-count', $event)"
+          @update:output-resolution="emit('update:output-resolution', $event)"
           @submit="onSubmit"
         />
       </div>
@@ -40,6 +42,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import NodePromptComposer from './NodePromptComposer.vue'
 import {
   CANVAS_EXTEND_DRAG_ANCHORS,
@@ -52,11 +55,13 @@ const props = defineProps<{
   overlayStyle: Record<string, string>
   handleRadius: number
   outputCount: number
+  outputResolution?: OutputResolution
 }>()
 
 const emit = defineEmits<{
   (e: 'submit', prompt: string, outputCount: number): void
   (e: 'update:output-count', value: number): void
+  (e: 'update:output-resolution', value: OutputResolution): void
   (e: 'handle-pointerdown', payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent }): void
   (e: 'handle-pointermove', event: PointerEvent): void
   (e: 'handle-pointerup', event: PointerEvent): void

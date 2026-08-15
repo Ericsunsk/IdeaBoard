@@ -38,10 +38,12 @@
           offset="8px"
           placeholder="输入融合提示词"
           :aspect-ratio="aspectRatio"
+          :output-resolution="node.outputResolution"
           :output-count="outputCountValue"
           :submit-disabled="!canGenerate || props.generationAvailable === false"
           :billing-state="billingQuote"
           @update:aspect-ratio="emit('update:aspect-ratio', $event)"
+          @update:output-resolution="emit('update:output-resolution', $event)"
           @update:output-count="selectOutputCount"
           @submit="submitPrompt"
         />
@@ -55,6 +57,7 @@ import { computed, ref, watch } from 'vue'
 import { Keyframes } from '@iconoir/vue'
 import { requireImageNodeOutputCount, type FusionNodeItem } from '../../../canvas-board/domain'
 import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../canvas-board/domain'
+import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import type { NodeUiState } from '../../types/canvasNodeUi'
 import type { FusionBlendPoint } from '../../../canvas-board/domain'
 import FusionStage from './FusionStage.vue'
@@ -81,6 +84,7 @@ const emit = defineEmits<{
   (e: 'delete'): void
   (e: 'update:output-count', value: number): void
   (e: 'update:aspect-ratio', value: PromptAspectRatio): void
+  (e: 'update:output-resolution', value: OutputResolution): void
   (e: 'update:blend-point', value: FusionBlendPoint): void
   (e: 'update:input-images', value: FusionNodeItem['inputImages']): void
   (e: 'input-image-drop', event: DragEvent): void
@@ -103,6 +107,7 @@ const billingQuote = useCanvasBillingQuote(
       imageUrls: visibleInputImages.value.map((image) => image.url),
       aspectRatio: aspectRatio.value,
       outputCount: outputCountValue.value,
+      outputResolution: props.node.outputResolution,
     }) ?? undefined,
 )
 

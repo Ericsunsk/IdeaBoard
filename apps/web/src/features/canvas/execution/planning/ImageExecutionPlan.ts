@@ -7,8 +7,10 @@ import {
   type FusionNodeItem,
   type ImageNodeItem,
   type PromptAspectRatio,
+  type PromptNodeItem,
 } from '../../../canvas-board/domain'
 import { parseRequestedOutputCount } from '../../../../shared/domain/generationContract'
+import { normalizeOutputResolution, type OutputResolution } from '../../../../shared/domain/generationContract'
 import { EXECUTION_FUSION_META } from '../contracts/executionContract'
 import type { ImageTaskAction } from '../contracts/imageActionExecution'
 import {
@@ -45,6 +47,7 @@ export type ImageActionExecutionPlan = {
   prompt: string
   outputCount: number
   strength?: number
+  outputResolution?: OutputResolution
   resultOptions: ImageExecutionResultOptions
 }
 
@@ -57,6 +60,7 @@ export type CanvasExtendExecutionPlan = {
   extendPercent: CanvasExtendPercent
   targetRatio: number
   targetWidth: number
+  outputResolution?: OutputResolution
   resultOptions: ImageExecutionResultOptions
 }
 
@@ -68,6 +72,7 @@ export type ImageInpaintExecutionPlan = {
   rawMaskDataUrl: string
   outputCount: number
   referenceImageUrls: string[]
+  outputResolution?: OutputResolution
   resultOptions: ImageExecutionResultOptions
 }
 
@@ -79,6 +84,7 @@ export type PromptGenerationExecutionPlan = {
   prompt: string
   outputCount: number
   aspectRatio: PromptAspectRatio
+  outputResolution?: OutputResolution
   resultOptions: ImageExecutionResultOptions
 }
 
@@ -95,6 +101,7 @@ export type FusionExecutionPlan = {
   imageUrls: string[]
   blendPoint: FusionBlendPoint
   stageWidth: number
+  outputResolution?: OutputResolution
   resultOptions: ImageExecutionResultOptions
 }
 
@@ -131,6 +138,17 @@ export function isImageExecutionPlanError(error: unknown): error is ImageExecuti
 
 function failPlanning(message: string): never {
   throw new ImageExecutionPlanError(message)
+}
+
+function resolveNodeOutputResolution(
+  graph: FlowExecutionGraphOptions,
+  nodeId: string,
+): OutputResolution {
+  const node = graph.nodes.find((item) => item.id === nodeId)
+  const snapshot = node?.data?.snapshotNode
+  return snapshot && typeof snapshot === 'object' && 'outputResolution' in snapshot
+    ? normalizeOutputResolution((snapshot as { outputResolution?: unknown }).outputResolution)
+    : '1k'
 }
 
 function requireRequestedOutputCount(value: unknown): number {
@@ -295,7 +313,8 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     action: ImageTaskAction,
     options: { prompt?: string; outputCount?: number; strength?: number } = {},
   ): ImageActionExecutionPlan {
-    const source = requireImageExecutionImage(readGraph(), nodeId)
+    const graph = readGraph()
+    const source = requireImageExecutionImage(graph, nodeId)
     return {
       kind: 'image-action',
       sourceNodeId: nodeId,
@@ -304,6 +323,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       prompt: `${options.prompt ?? ''}`.trim(),
       outputCount: requireRequestedOutputCount(options.outputCount ?? 1),
       strength: options.strength,
+      outputResolution: resolveNodeOutputResolution(graph, nodeId),
       resultOptions: {
         anchor: withOutputAnchorNodeId(source.resultAnchor, nodeId),
       },
@@ -339,6 +359,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       extendPercent,
       targetRatio,
       targetWidth,
+      outputResolution: resolveNodeOutputResolution(graph, nodeId),
       resultOptions: {
         anchor: withOutputAnchorNodeId(source.resultAnchor, nodeId),
         targetRatio,
@@ -358,7 +379,8 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
   ): ImageInpaintExecutionPlan {
     const prompt = `${inpaint.prompt ?? ''}`.trim()
     if (!prompt) failPlanning('请输入 Prompt')
-    const source = requireImageExecutionImage(readGraph(), nodeId)
+    const graph = readGraph()
+    const source = requireImageExecutionImage(graph, nodeId)
     const rawMaskDataUrl = `${inpaint.maskDataUrl ?? ''}`.trim()
     if (!rawMaskDataUrl) failPlanning('请先标记局部重绘区域')
     return {
@@ -369,6 +391,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       rawMaskDataUrl,
       outputCount: requireRequestedOutputCount(inpaint.outputCount),
       referenceImageUrls: normalizePromptReferenceImageUrls(inpaint.referenceImageUrls),
+      outputResolution: resolveNodeOutputResolution(graph, nodeId),
       resultOptions: {
         anchor: withOutputAnchorNodeId(source.resultAnchor, nodeId),
       },
@@ -390,6 +413,11 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     }))
     if (normalizedReferences.some((image) => !image.url)) failPlanning('参考图缺少 URL')
     const graph = readGraph()
+    const promptNode = graph.nodes.find((node) => node.id === anchorNodeId)
+    const outputResolution =
+      promptNode?.data?.kind === 'prompt' && promptNode.data.snapshotNode
+        ? normalizeOutputResolution((promptNode.data.snapshotNode as PromptNodeItem).outputResolution)
+        : '1k'
     const source = normalizedReferences[0] ?? { url: '', ratio: 1 }
     return {
       kind: 'prompt-generation',
@@ -399,6 +427,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       prompt: normalizedPrompt,
       outputCount: requireRequestedOutputCount(outputCount),
       aspectRatio: normalizePromptAspectRatio(aspectRatio),
+      outputResolution,
       resultOptions: {
         anchor: resolveGraphNodeResultAnchor(graph, anchorNodeId),
       },
@@ -461,6 +490,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       imageUrls,
       blendPoint: snapshot.blendPoint,
       stageWidth: snapshot.width,
+      outputResolution: resolveNodeOutputResolution(graph, nodeId),
       resultOptions: {
         anchor: resultAnchor,
       },

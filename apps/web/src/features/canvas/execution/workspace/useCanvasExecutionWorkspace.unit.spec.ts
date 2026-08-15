@@ -264,7 +264,7 @@ describe('useCanvasExecutionWorkspace', () => {
       expect.objectContaining({
         prompt: 'draw a precise workspace boundary',
         feature: 'prompt-generation',
-        params: { output_count: 1, ratio: '1:1' },
+        params: { output_count: 1, output_resolution: '1k', ratio: '1:1' },
         client_action_id: 'client-action-1',
       }),
     )

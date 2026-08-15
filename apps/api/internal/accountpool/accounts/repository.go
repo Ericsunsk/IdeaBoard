@@ -56,7 +56,7 @@ func (r *AccountRepository) Create(ctx context.Context, account *ApiAccount) err
 		if account != nil {
 			account.ID = writeAccount.ID
 		}
-		if err := replaceAccountModels(ctx, q, writeAccount.ID, accountModelsForWrite(writeAccount)); err != nil {
+		if err := replaceAccountModels(ctx, q, writeAccount.ID, writeAccount.ProviderEndpointID, accountModelsForWrite(writeAccount)); err != nil {
 			return err
 		}
 		return rotateAccountSecret(ctx, q, writeAccount.ID, writeAccount.ApiKey)
@@ -207,7 +207,7 @@ func (r *AccountRepository) Update(ctx context.Context, account *ApiAccount) err
 		if updated == 0 {
 			return database.ErrNotFound
 		}
-		if err := replaceAccountModels(ctx, q, writeAccount.ID, accountModelsForWrite(writeAccount)); err != nil {
+		if err := replaceAccountModels(ctx, q, writeAccount.ID, writeAccount.ProviderEndpointID, accountModelsForWrite(writeAccount)); err != nil {
 			return err
 		}
 		if strings.TrimSpace(writeAccount.ApiKey) == "" {
@@ -255,11 +255,28 @@ func (r *AccountRepository) UpsertModel(ctx context.Context, accountID int64, mo
 	if err != nil {
 		return err
 	}
-	_, err = r.q.UpsertAccountModel(ctx, params)
-	if errors.Is(err, sql.ErrNoRows) {
-		return database.ErrNotFound
-	}
-	return err
+	return dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		account, err := q.GetAccountByID(ctx, accountID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return database.ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		if err := q.UpsertProviderEndpointModel(ctx, dbsqlc.UpsertProviderEndpointModelParams{
+			ProviderEndpointID: account.ApiAccount.ProviderEndpointID,
+			ModelName:          params.ModelName,
+			Supports2k:         model.Supports2K,
+			Supports4k:         model.Supports4K,
+		}); err != nil {
+			return err
+		}
+		_, err = q.UpsertAccountModel(ctx, params)
+		if errors.Is(err, sql.ErrNoRows) {
+			return database.ErrNotFound
+		}
+		return err
+	})
 }
 
 func (r *AccountRepository) UpdateModelEnabled(ctx context.Context, accountID int64, modelName string, enabled bool) error {
@@ -453,7 +470,7 @@ func (r *AccountRepository) attachAccountModels(ctx context.Context, accounts []
 	return nil
 }
 
-func accountModelFromSQLC(row dbsqlc.ApiAccountModel) (AccountModel, error) {
+func accountModelFromSQLC(row dbsqlc.ListAccountModelsByAccountIDsRow) (AccountModel, error) {
 	return AccountModel{
 		ID:            row.ID,
 		Name:          row.ModelName,
@@ -461,6 +478,8 @@ func accountModelFromSQLC(row dbsqlc.ApiAccountModel) (AccountModel, error) {
 		Weight:        int(row.Weight),
 		MaxConcurrent: intPtr(row.MaxConcurrent),
 		SortOrder:     int(row.SortOrder),
+		Supports2K:    row.Supports2k,
+		Supports4K:    row.Supports4k,
 	}, nil
 }
 
@@ -490,7 +509,7 @@ func accountForWrite(account *ApiAccount) *ApiAccount {
 	return &normalized
 }
 
-func replaceAccountModels(ctx context.Context, q *dbsqlc.Queries, accountID int64, models []AccountModel) error {
+func replaceAccountModels(ctx context.Context, q *dbsqlc.Queries, accountID, providerEndpointID int64, models []AccountModel) error {
 	if err := q.DeleteAccountModelsByAccountID(ctx, accountID); err != nil {
 		return err
 	}
@@ -501,6 +520,14 @@ func replaceAccountModels(ctx context.Context, q *dbsqlc.Queries, accountID int6
 		}
 		if params.ModelName == "" {
 			continue
+		}
+		if err := q.UpsertProviderEndpointModel(ctx, dbsqlc.UpsertProviderEndpointModelParams{
+			ProviderEndpointID: providerEndpointID,
+			ModelName:          params.ModelName,
+			Supports2k:         model.Supports2K,
+			Supports4k:         model.Supports4K,
+		}); err != nil {
+			return err
 		}
 		if _, err := q.UpsertAccountModel(ctx, params); err != nil {
 			return err

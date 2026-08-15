@@ -117,7 +117,7 @@ type Querier interface {
 	InsertUsedUIDIgnore(ctx context.Context, storageUid string) (int64, error)
 	ListAccessibleBoardsByUserID(ctx context.Context, userID int64) ([]ListAccessibleBoardsByUserIDRow, error)
 	ListAccountIDs(ctx context.Context) ([]int64, error)
-	ListAccountModelsByAccountIDs(ctx context.Context, accountIds []int64) ([]ApiAccountModel, error)
+	ListAccountModelsByAccountIDs(ctx context.Context, accountIds []int64) ([]ListAccountModelsByAccountIDsRow, error)
 	ListAccounts(ctx context.Context, arg ListAccountsParams) ([]ListAccountsRow, error)
 	ListActivePaymentCheckoutShutdowns(ctx context.Context) ([]PaymentCheckoutShutdown, error)
 	ListActivePaymentOrders(ctx context.Context, userID int64) ([]PaymentOrder, error)
@@ -211,6 +211,7 @@ type Querier interface {
 	UpsertMediaAsset(ctx context.Context, arg UpsertMediaAssetParams) (int64, error)
 	UpsertMediaRef(ctx context.Context, arg UpsertMediaRefParams) (int64, error)
 	UpsertPaymentCustomer(ctx context.Context, arg UpsertPaymentCustomerParams) (PaymentCustomer, error)
+	UpsertProviderEndpointModel(ctx context.Context, arg UpsertProviderEndpointModelParams) error
 	UpsertStorageProfile(ctx context.Context, arg UpsertStorageProfileParams) (int64, error)
 	UpsertSystemConfig(ctx context.Context, arg UpsertSystemConfigParams) error
 	UpsertTaskDailyStatDelta(ctx context.Context, arg UpsertTaskDailyStatDeltaParams) error

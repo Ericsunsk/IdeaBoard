@@ -184,6 +184,8 @@ function toProviderAccountRecord(account: AdminAccountDto): ProviderAccountRecor
       weight: model.weight,
       maxConcurrent: model.max_concurrent,
       sortOrder: model.sort_order,
+      supports2K: model.supports_2k,
+      supports4K: model.supports_4k,
     })),
     secretConfigured: account.secret_configured,
     maxConcurrent: account.max_concurrent,

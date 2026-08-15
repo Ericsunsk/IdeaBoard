@@ -9,6 +9,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"time"
 
 	"github.com/lib/pq"
 )
@@ -459,8 +460,14 @@ func (q *Queries) ListAccountIDs(ctx context.Context) ([]int64, error) {
 }
 
 const listAccountModelsByAccountIDs = `-- name: ListAccountModelsByAccountIDs :many
-SELECT id, account_id, model_name, enabled, weight, max_concurrent, metadata, sort_order, created_at, updated_at
+SELECT m.id, m.account_id, m.model_name, m.enabled, m.weight, m.max_concurrent, m.metadata, m.sort_order, m.created_at, m.updated_at,
+       COALESCE(pem.supports_2k, FALSE) AS supports_2k,
+       COALESCE(pem.supports_4k, FALSE) AS supports_4k
 FROM api_account_models AS m
+JOIN api_accounts AS a ON a.id = m.account_id
+LEFT JOIN provider_endpoint_models AS pem
+  ON pem.provider_endpoint_id = a.provider_endpoint_id
+ AND lower(pem.model_name) = lower(m.model_name)
 WHERE m.account_id = ANY($1::bigint[])
   AND EXISTS (
     SELECT 1
@@ -471,15 +478,30 @@ WHERE m.account_id = ANY($1::bigint[])
 ORDER BY m.account_id ASC, m.sort_order ASC, m.id ASC
 `
 
-func (q *Queries) ListAccountModelsByAccountIDs(ctx context.Context, accountIds []int64) ([]ApiAccountModel, error) {
+type ListAccountModelsByAccountIDsRow struct {
+	ID            int64           `json:"id"`
+	AccountID     int64           `json:"account_id"`
+	ModelName     string          `json:"model_name"`
+	Enabled       bool            `json:"enabled"`
+	Weight        int32           `json:"weight"`
+	MaxConcurrent sql.NullInt32   `json:"max_concurrent"`
+	Metadata      json.RawMessage `json:"metadata"`
+	SortOrder     int32           `json:"sort_order"`
+	CreatedAt     time.Time       `json:"created_at"`
+	UpdatedAt     time.Time       `json:"updated_at"`
+	Supports2k    bool            `json:"supports_2k"`
+	Supports4k    bool            `json:"supports_4k"`
+}
+
+func (q *Queries) ListAccountModelsByAccountIDs(ctx context.Context, accountIds []int64) ([]ListAccountModelsByAccountIDsRow, error) {
 	rows, err := q.db.QueryContext(ctx, listAccountModelsByAccountIDs, pq.Array(accountIds))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ApiAccountModel
+	var items []ListAccountModelsByAccountIDsRow
 	for rows.Next() {
-		var i ApiAccountModel
+		var i ListAccountModelsByAccountIDsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.AccountID,
@@ -491,6 +513,8 @@ func (q *Queries) ListAccountModelsByAccountIDs(ctx context.Context, accountIds 
 			&i.SortOrder,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Supports2k,
+			&i.Supports4k,
 		); err != nil {
 			return nil, err
 		}
@@ -832,4 +856,32 @@ func (q *Queries) UpsertAccountModel(ctx context.Context, arg UpsertAccountModel
 	var id int64
 	err := row.Scan(&id)
 	return id, err
+}
+
+const upsertProviderEndpointModel = `-- name: UpsertProviderEndpointModel :exec
+INSERT INTO provider_endpoint_models (
+  provider_endpoint_id, model_name, supports_2k, supports_4k
+) VALUES (
+  $1, $2, $3, $4
+)
+ON CONFLICT (provider_endpoint_id, lower(model_name)) DO UPDATE
+SET supports_2k = EXCLUDED.supports_2k,
+    supports_4k = EXCLUDED.supports_4k
+`
+
+type UpsertProviderEndpointModelParams struct {
+	ProviderEndpointID int64  `json:"provider_endpoint_id"`
+	ModelName          string `json:"model_name"`
+	Supports2k         bool   `json:"supports_2k"`
+	Supports4k         bool   `json:"supports_4k"`
+}
+
+func (q *Queries) UpsertProviderEndpointModel(ctx context.Context, arg UpsertProviderEndpointModelParams) error {
+	_, err := q.db.ExecContext(ctx, upsertProviderEndpointModel,
+		arg.ProviderEndpointID,
+		arg.ModelName,
+		arg.Supports2k,
+		arg.Supports4k,
+	)
+	return err
 }

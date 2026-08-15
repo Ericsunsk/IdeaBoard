@@ -55,8 +55,10 @@
         :overlay-style="expandOverlayStyle"
         :handle-radius="expandHandleRadius ?? 4"
         :output-count="outputCountValue"
+        :output-resolution="outputResolution"
         @submit="submitExpand"
         @update:output-count="selectOutputCount"
+        @update:output-resolution="emit('update:output-resolution', $event)"
         @handle-pointerdown="emit('expand-handle-pointerdown', $event)"
         @handle-pointermove="emit('expand-handle-pointermove', $event)"
         @handle-pointerup="emit('expand-handle-pointerup', $event)"
@@ -106,6 +108,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { requireImageNodeOutputCount } from '../../../canvas-board/domain'
+import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import { useCanvasViewportContext } from '../../composables/useCanvasViewportContext'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import type { ImageToolStageBinding } from '../../image-tools'
@@ -132,6 +135,7 @@ const props = defineProps<{
   expandHandleRadius?: number
   imageToolStageBinding?: ImageToolStageBinding | null
   outputCount?: number
+  outputResolution?: OutputResolution
   active: boolean
   connectionDropTarget?: boolean
   dragging: boolean
@@ -146,6 +150,7 @@ const emit = defineEmits<{
   (e: 'contextmenu', event: MouseEvent): void
   (e: 'expand-submit', prompt: string, outputCount: number): void
   (e: 'update:output-count', value: number): void
+  (e: 'update:output-resolution', value: OutputResolution): void
   (
     e: 'expand-handle-pointerdown',
     payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent },

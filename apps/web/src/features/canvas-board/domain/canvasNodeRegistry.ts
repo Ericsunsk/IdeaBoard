@@ -87,6 +87,7 @@ function createPromptSnapshot(point: CanvasPoint, id: number): PromptNodeItem {
     width: CANVAS_NODE_DEFAULTS.prompt.width,
     text: '',
     outputCount: DEFAULT_PROMPT_NODE_OUTPUT_COUNT,
+    outputResolution: '1k',
     aspectRatio: DEFAULT_PROMPT_ASPECT_RATIO,
     inputImages: [],
   }
@@ -102,6 +103,7 @@ function createImageSnapshot(point: CanvasPoint, id: number): ImageNodeItem {
     sourceImageUrl: '',
     sourceImageRatio: 1,
     outputCount: DEFAULT_IMAGE_NODE_OUTPUT_COUNT,
+    outputResolution: '1k',
     outputStatus: 'idle',
     outputImages: [],
   }
@@ -116,6 +118,7 @@ function createFusionSnapshot(point: CanvasPoint, id: number): FusionNodeItem {
     width: CANVAS_NODE_DEFAULTS.fusion.width,
     prompt: '',
     outputCount: DEFAULT_FUSION_NODE_OUTPUT_COUNT,
+    outputResolution: '1k',
     aspectRatio: DEFAULT_PROMPT_ASPECT_RATIO,
     blendPoint: { ...DEFAULT_FUSION_BLEND_POINT },
     inputImages: [],

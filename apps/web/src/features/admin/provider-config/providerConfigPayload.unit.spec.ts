@@ -36,7 +36,15 @@ describe('provider config payload mapping', () => {
       timeout: 90,
       extra_config: DEFAULT_ADMIN_ACCOUNT_EXTRA_CONFIG,
     })
-    expect(payload.models).toEqual([{ name: 'gemini-2.5-flash', enabled: true, weight: 1 }])
+    expect(payload.models).toEqual([
+      {
+        name: 'gemini-2.5-flash',
+        enabled: true,
+        weight: 1,
+        supports_2k: false,
+        supports_4k: false,
+      },
+    ])
   })
 
   it('maps edited account form values while preserving account backend-only fields', () => {
@@ -78,12 +86,16 @@ describe('provider config payload mapping', () => {
         enabled: false,
         weight: 3,
         max_concurrent: undefined,
+        supports_2k: false,
+        supports_4k: false,
       },
       {
         name: 'imagen-4',
         enabled: true,
         weight: 1,
         max_concurrent: undefined,
+        supports_2k: false,
+        supports_4k: false,
       },
     ])
     if (!payload.models) {
@@ -104,12 +116,16 @@ describe('provider config payload mapping', () => {
         enabled: false,
         weight: 9,
         max_concurrent: 2,
+        supports_2k: false,
+        supports_4k: false,
       },
       {
         name: 'Gemini',
         enabled: true,
         weight: 1,
         max_concurrent: undefined,
+        supports_2k: false,
+        supports_4k: false,
       },
     ])
     expect(models.every((model) => !Object.hasOwn(model, 'feature_slugs'))).toBe(true)

@@ -6,6 +6,7 @@
  */
 import type { HDUpscaleParams } from './hDUpscaleParams'
 import type { ImageExtendParams } from './imageExtendParams'
+import type { OutputResolution } from './outputResolution'
 import type { RequestedOutputCount } from './requestedOutputCount'
 import type { StyleFusionParams } from './styleFusionParams'
 import type { StyleVariationParams } from './styleVariationParams'
@@ -26,6 +27,7 @@ export interface SubmitTaskRequestParams {
   ratio?: string
   quality?: string
   output_count?: RequestedOutputCount
+  output_resolution?: OutputResolution
   prompt_upsampling?: boolean
   variation?: StyleVariationParams
   extend?: ImageExtendParams

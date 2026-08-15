@@ -12,6 +12,19 @@ func FilterAccountsWithEnabledModels(accounts []*ApiAccount) []*ApiAccount {
 	return result
 }
 
+func FilterAccountsWithOutputResolution(accounts []*ApiAccount, resolution string) []*ApiAccount {
+	result := make([]*ApiAccount, 0, len(accounts))
+	for _, account := range accounts {
+		for _, model := range account.Models {
+			if model.Enabled && workflow.SupportsOutputResolution(resolution, model.Supports2K, model.Supports4K) {
+				result = append(result, account)
+				break
+			}
+		}
+	}
+	return result
+}
+
 // ResolveAccountModel selects the first enabled model in the Admin-defined
 // stable order, or resolves the exact model chosen by the Task Assigner.
 func ResolveAccountModel(account *ApiAccount, modelName string) (AccountModel, bool) {

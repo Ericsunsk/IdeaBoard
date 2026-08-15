@@ -58,6 +58,7 @@ export type SaveProviderAccountCommand = {
   form: ProviderAccountForm
   selectedProviderEndpoint: ProviderEndpointRecord | null
   modelValues: string[]
+  modelCapabilities: ProviderAccountForm['modelCapabilities']
   secret: string
   afterSaved?: () => void
 }
@@ -196,6 +197,7 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
               providerEndpoint: command.selectedProviderEndpoint,
               existingAccount,
               modelValues: command.modelValues,
+              modelCapabilities: command.modelCapabilities,
               secret: command.secret,
             }),
           )
@@ -205,6 +207,7 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
               form: command.form,
               providerEndpoint: command.selectedProviderEndpoint,
               modelValues: command.modelValues,
+              modelCapabilities: command.modelCapabilities,
               secret: command.secret,
             }),
           )

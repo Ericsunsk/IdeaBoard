@@ -17,16 +17,17 @@ var (
 )
 
 type providerRequest struct {
-	Primitive   workflow.GenerationPrimitive
-	Prompt      string
-	Model       string
-	Size        string
-	OutputCount int
-	ImageRefs   []string
-	MaskRefs    []string
-	CanvasRef   string
-	OpenAI      openAIProviderControls
-	Google      googleProviderControls
+	Primitive        workflow.GenerationPrimitive
+	Prompt           string
+	Model            string
+	Size             string
+	OutputResolution string
+	OutputCount      int
+	ImageRefs        []string
+	MaskRefs         []string
+	CanvasRef        string
+	OpenAI           openAIProviderControls
+	Google           googleProviderControls
 }
 
 type openAIProviderControls struct {
@@ -90,16 +91,29 @@ func newProviderRequest(prompt string, width, height int, params map[string]inte
 	canvasRef := firstProviderRef(providerParams, "original_image_url")
 	controls := compileProviderControls(providerParams, featureSlug)
 	return providerRequest{
-		Prompt:      prompt,
-		Model:       resolvedModel,
-		Size:        providerImageSize(width, height),
-		OutputCount: readProviderOutputCount(providerParams),
-		ImageRefs:   imageRefs,
-		MaskRefs:    maskRefs,
-		CanvasRef:   canvasRef,
-		OpenAI:      controls.OpenAI,
-		Google:      controls.Google,
+		Prompt:           prompt,
+		Model:            resolvedModel,
+		Size:             providerImageSize(width, height),
+		OutputResolution: readOutputResolution(providerParams),
+		OutputCount:      readProviderOutputCount(providerParams),
+		ImageRefs:        imageRefs,
+		MaskRefs:         maskRefs,
+		CanvasRef:        canvasRef,
+		OpenAI:           controls.OpenAI,
+		Google:           controls.Google,
 	}
+}
+
+func readOutputResolution(params map[string]interface{}) string {
+	if params == nil {
+		return workflow.OutputResolution1K
+	}
+	value, _ := params["output_resolution"].(string)
+	resolution, ok := workflow.NormalizeOutputResolution(value)
+	if !ok {
+		return workflow.OutputResolution1K
+	}
+	return resolution
 }
 
 type compiledProviderControls struct {

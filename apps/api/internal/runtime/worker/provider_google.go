@@ -81,7 +81,12 @@ func (d googleGeminiInlineData) normalizedMIMEType() string {
 }
 
 type googleGeminiGenerationConfig struct {
-	ResponseModalities []string `json:"responseModalities"`
+	ResponseModalities []string                 `json:"responseModalities"`
+	ImageConfig        *googleGeminiImageConfig `json:"imageConfig,omitempty"`
+}
+
+type googleGeminiImageConfig struct {
+	ImageSize string `json:"imageSize,omitempty"`
 }
 
 type googleGeminiResponse struct {
@@ -118,8 +123,9 @@ type googleImagenInstance struct {
 }
 
 type googleImagenParameters struct {
-	SampleCount int    `json:"sampleCount"`
-	AspectRatio string `json:"aspectRatio,omitempty"`
+	SampleCount     int    `json:"sampleCount"`
+	AspectRatio     string `json:"aspectRatio,omitempty"`
+	SampleImageSize string `json:"sampleImageSize,omitempty"`
 }
 
 type googleImagenResponse struct {
@@ -273,6 +279,11 @@ func (c *ProviderExecutor) callGoogleGeminiGenerateContentForAPIType(ctx context
 		GenerationConfig: googleGeminiGenerationConfig{
 			ResponseModalities: []string{"TEXT", "IMAGE"},
 		},
+	}
+	if providerReq.OutputResolution != workflow.OutputResolution1K {
+		reqBody.GenerationConfig.ImageConfig = &googleGeminiImageConfig{
+			ImageSize: strings.ToUpper(providerReq.OutputResolution),
+		}
 	}
 
 	endpoint := buildGoogleProviderModelEndpoint(baseURL, apiType, model, "generateContent")
@@ -458,7 +469,8 @@ func (c *ProviderExecutor) callGoogleImagenPredict(ctx context.Context, account 
 			{Prompt: providerReq.Prompt},
 		},
 		Parameters: googleImagenParameters{
-			SampleCount: googleParams.SampleCount,
+			SampleCount:     googleParams.SampleCount,
+			SampleImageSize: strings.ToUpper(providerReq.OutputResolution),
 		},
 	}
 	if googleParams.AspectRatio != "" {

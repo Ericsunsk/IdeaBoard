@@ -12,4 +12,6 @@ export interface AdminAccountModel {
   weight: number
   max_concurrent?: number
   sort_order: number
+  supports_2k: boolean
+  supports_4k: boolean
 }

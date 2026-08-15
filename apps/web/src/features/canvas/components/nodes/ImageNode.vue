@@ -42,6 +42,7 @@
         :expand-handle-radius="expandHandleRadius"
         :image-tool-stage-binding="imageToolStageBinding"
         :output-count="node.outputCount"
+        :output-resolution="node.outputResolution"
         :active="active"
         :connection-drop-target="connectionDropTarget"
         :dragging="dragging"
@@ -53,6 +54,7 @@
         @contextmenu="onImageStageContextMenu"
         @expand-submit="submitExpand"
         @update:output-count="selectOutputCount"
+        @update:output-resolution="emit('update:output-resolution', $event)"
         @expand-handle-pointerdown="emit('expand-handle-pointerdown', $event)"
         @expand-handle-pointermove="emit('expand-handle-pointermove', $event)"
         @expand-handle-pointerup="emit('expand-handle-pointerup', $event)"
@@ -74,7 +76,9 @@
           allow-empty
           :show-submit="false"
           :output-count="outputCountValue"
+          :output-resolution="node.outputResolution"
           @update:output-count="selectOutputCount"
+          @update:output-resolution="emit('update:output-resolution', $event)"
         />
       </NodeFloatingControls>
     </div>
@@ -86,6 +90,7 @@ import { computed, ref, watchPostEffect } from 'vue'
 import { MediaImage } from '@iconoir/vue'
 import { requireImageNodeOutputCount, type ImageNodeItem } from '../../../canvas-board/domain'
 import type { ImageNodeAction } from '../../config/imageActionRegistry'
+import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import type { ImageActionBinding, ImageToolStageBinding } from '../../image-tools'
 import HomeCanvasImageActionMenu from '../home/HomeCanvasImageActionMenu.vue'
@@ -118,6 +123,7 @@ const emit = defineEmits<{
   (e: 'node-mousedown', event: MouseEvent): void
   (e: 'update:title', value: string): void
   (e: 'update:output-count', value: number): void
+  (e: 'update:output-resolution', value: OutputResolution): void
   (e: 'delete'): void
   (e: 'stage-drop', event: DragEvent): void
   (e: 'open-file'): void

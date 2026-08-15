@@ -11,6 +11,7 @@
     <PromptComposerControls
       :model-value="modelValue"
       :output-count="outputCount"
+      :output-resolution="outputResolution"
       :aspect-ratio="aspectRatio"
       :placeholder="placeholder"
       :disabled="disabled"
@@ -24,6 +25,7 @@
       send-button-class="image-node-prompt-send node-tool-send node-tool-button node-tool-tooltip-trigger"
       @update:model-value="emit('update:modelValue', $event)"
       @update:output-count="emit('update:output-count', $event)"
+      @update:output-resolution="emit('update:output-resolution', $event)"
       @update:aspect-ratio="emit('update:aspect-ratio', $event)"
       @textarea-resize="onTextareaResize"
       @submit="onSubmit"
@@ -34,6 +36,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { PromptAspectRatio } from '../../../canvas-board/domain'
+import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import type { CanvasBillingQuoteState } from '../../execution'
 import PromptComposerControls from './PromptComposerControls.vue'
 import type { PromptComposerResizePayload } from './composables/usePromptComposerControls'
@@ -42,6 +45,7 @@ const props = withDefaults(
   defineProps<{
     modelValue: string
     outputCount: number
+    outputResolution?: OutputResolution
     placeholder: string
     disabled?: boolean
     allowEmpty?: boolean
@@ -59,12 +63,14 @@ const props = withDefaults(
     showSubmit: true,
     submitDisabled: false,
     billingState: null,
+    outputResolution: '1k',
   },
 )
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
   (e: 'update:output-count', value: number): void
+  (e: 'update:output-resolution', value: OutputResolution): void
   (e: 'update:aspect-ratio', value: PromptAspectRatio): void
   (e: 'submit', prompt: string, outputCount: number, aspectRatio: PromptAspectRatio): void
 }>()
@@ -93,7 +99,11 @@ function onTextareaResize(payload: PromptComposerResizePayload) {
   shouldStackOutputCount.value = payload.naturalHeight > payload.singleLineHeight + 2
 }
 
-function onSubmit(prompt: string, outputCount: number, aspectRatio: PromptAspectRatio) {
+function onSubmit(
+  prompt: string,
+  outputCount: number,
+  aspectRatio: PromptAspectRatio,
+) {
   emit('submit', prompt, outputCount, aspectRatio)
 }
 </script>

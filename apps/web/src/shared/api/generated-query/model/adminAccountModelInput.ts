@@ -10,4 +10,6 @@ export interface AdminAccountModelInput {
   enabled?: boolean
   weight?: number
   max_concurrent?: number
+  supports_2k?: boolean
+  supports_4k?: boolean
 }

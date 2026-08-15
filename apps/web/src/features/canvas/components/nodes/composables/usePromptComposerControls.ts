@@ -4,6 +4,8 @@ import { normalizePromptAspectRatio } from '../../../../canvas-board/domain'
 import { requireImageNodeOutputCount } from '../../../../canvas-board/domain'
 import { useAutoResizeTextarea } from './useAutoResizeTextarea'
 import { useNodeToolPopoverGroup } from './useNodeToolPopoverGroup'
+import type { OutputResolution } from '../../../../../shared/domain/generationContract'
+import { normalizeOutputResolution } from '../../../../../shared/domain/generationContract'
 
 export type PromptComposerResizePayload = {
   naturalHeight: number
@@ -13,6 +15,7 @@ export type PromptComposerResizePayload = {
 type UsePromptComposerControlsOptions = {
   modelValue: () => string
   outputCount: () => number
+  outputResolution: () => OutputResolution
   aspectRatio: () => PromptAspectRatio | undefined
   disabled: () => boolean
   submitDisabled: () => boolean
@@ -21,6 +24,7 @@ type UsePromptComposerControlsOptions = {
   showAspectRatio?: () => boolean
   onTextUpdate: (value: string) => void
   onOutputCountUpdate: (value: number) => void
+  onOutputResolutionUpdate: (value: OutputResolution) => void
   onAspectRatioUpdate: (value: PromptAspectRatio) => void
   onSubmit: (prompt: string, outputCount: number, aspectRatio: PromptAspectRatio) => void
   onTextareaResize?: (payload: PromptComposerResizePayload) => void
@@ -34,6 +38,7 @@ export function usePromptComposerControls(options: UsePromptComposerControlsOpti
     set: (value) => options.onTextUpdate(value),
   })
   const outputCountValue = computed(() => requireImageNodeOutputCount(options.outputCount()))
+  const outputResolutionValue = computed(() => normalizeOutputResolution(options.outputResolution()))
   const shouldRenderAspectRatio = computed(
     () => (options.showAspectRatio?.() ?? true) && options.aspectRatio() !== undefined,
   )
@@ -45,11 +50,12 @@ export function usePromptComposerControls(options: UsePromptComposerControlsOpti
       (options.allowEmpty() || draft.value.trim().length > 0),
   )
   const toolPopovers = useNodeToolPopoverGroup({
-    keys: ['aspect-ratio', 'output-count'] as const,
+    keys: ['aspect-ratio', 'output-count', 'output-resolution'] as const,
     rootRefs: [actionsRef],
   })
   const aspectRatioPickerVisible = toolPopovers.isOpen('aspect-ratio')
   const outputCountPickerVisible = toolPopovers.isOpen('output-count')
+  const outputResolutionPickerVisible = toolPopovers.isOpen('output-resolution')
   const textarea = useAutoResizeTextarea(inputRef, {
     watchSource: options.modelValue,
     onResize: options.onTextareaResize,
@@ -64,6 +70,7 @@ export function usePromptComposerControls(options: UsePromptComposerControlsOpti
   function closePopovers() {
     toolPopovers.close('aspect-ratio')
     toolPopovers.close('output-count')
+    toolPopovers.close('output-resolution')
   }
 
   function submit() {
@@ -87,6 +94,16 @@ export function usePromptComposerControls(options: UsePromptComposerControlsOpti
     toolPopovers.toggle('output-count')
   }
 
+  function toggleOutputResolutionPicker() {
+    if (options.disabled()) return
+    toolPopovers.toggle('output-resolution')
+  }
+
+  function selectOutputResolution(value: OutputResolution) {
+    options.onOutputResolutionUpdate(value)
+    toolPopovers.close('output-resolution')
+  }
+
   function selectOutputCount(value: number) {
     options.onOutputCountUpdate(requireImageNodeOutputCount(value))
     toolPopovers.close('output-count')
@@ -101,11 +118,15 @@ export function usePromptComposerControls(options: UsePromptComposerControlsOpti
     inputRef,
     outputCountPickerVisible,
     outputCountValue,
+    outputResolutionPickerVisible,
+    outputResolutionValue,
     selectAspectRatio,
     selectOutputCount,
+    selectOutputResolution,
     shouldRenderAspectRatio,
     submit,
     toggleAspectRatioPicker,
     toggleOutputCountPicker,
+    toggleOutputResolutionPicker,
   }
 }

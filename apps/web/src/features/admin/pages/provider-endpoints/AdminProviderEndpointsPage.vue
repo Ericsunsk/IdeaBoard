@@ -180,7 +180,7 @@
                       <div
                         v-for="model in commands.getAccountModelRows(account)"
                         :key="`${account.id}:${model.name}`"
-                        class="grid min-h-9 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-lg border border-admin-border-soft bg-white px-2 py-1.5"
+                        class="grid min-h-9 grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg border border-admin-border-soft bg-white px-2 py-1.5"
                       >
                         <Chip
                           :label="model.name"
@@ -190,6 +190,10 @@
                             model.disabled ? '!opacity-55' : '',
                           ]"
                         />
+                        <div class="flex shrink-0 items-center gap-1">
+                          <Tag v-if="model.supports2K" value="2K" severity="info" :class="adminCompactTagClass" rounded />
+                          <Tag v-if="model.supports4K" value="4K" severity="success" :class="adminCompactTagClass" rounded />
+                        </div>
                         <ToggleSwitch
                           :model-value="!model.disabled"
                           size="small"
@@ -253,6 +257,7 @@
           @update:model-value="clearProviderEndpointFormError('name')"
         />
       </AdminFormField>
+
       <AdminFormField
         v-slot="{ describedbyId, invalid }"
         label="接口类型"
@@ -272,6 +277,7 @@
           @update:model-value="clearProviderEndpointFormError('apiType')"
         />
       </AdminFormField>
+
       <AdminFormField
         v-slot="{ describedbyId, invalid }"
         label="Base URL地址"
@@ -393,6 +399,36 @@
           @complete="searchModelSuggestions"
           @update:model-value="clearAccountFormError('modelValues')"
         />
+      </AdminFormField>
+
+      <AdminFormField v-if="accountForm.modelValues.length" label="2K/4K 支持">
+        <div class="flex flex-col gap-2">
+          <div
+            v-for="modelName in accountForm.modelValues"
+            :key="`resolution:${modelName}`"
+            class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-lg border border-admin-border-soft bg-white px-3 py-2"
+          >
+            <span class="truncate font-mono text-admin-meta text-admin-text-1">{{ modelName }}</span>
+            <label class="flex items-center gap-1.5 text-admin-caption text-admin-text-2">
+              <span>2K</span>
+              <ToggleSwitch
+                :model-value="modelCapability(modelName).supports2K"
+                size="small"
+                :aria-label="`${modelName} 2K 支持`"
+                @update:model-value="setModelCapability(modelName, 'supports2K', $event)"
+              />
+            </label>
+            <label class="flex items-center gap-1.5 text-admin-caption text-admin-text-2">
+              <span>4K</span>
+              <ToggleSwitch
+                :model-value="modelCapability(modelName).supports4K"
+                size="small"
+                :aria-label="`${modelName} 4K 支持`"
+                @update:model-value="setModelCapability(modelName, 'supports4K', $event)"
+              />
+            </label>
+          </div>
+        </div>
       </AdminFormField>
 
       <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
@@ -547,6 +583,20 @@ function closeAccountModal() {
 
 function clearAccountFormError(field: Parameters<typeof accountEditor.clearError>[0]) {
   accountEditor.clearError(field)
+}
+
+function modelCapability(modelName: string) {
+  const key = modelName.trim().toLowerCase()
+  return (accountForm.value.modelCapabilities[key] ??= { supports2K: false, supports4K: false })
+}
+
+function setModelCapability(
+  modelName: string,
+  key: 'supports2K' | 'supports4K',
+  value: boolean,
+) {
+  const capability = modelCapability(modelName)
+  capability[key] = value
 }
 
 onMounted(() => {

@@ -13,6 +13,31 @@ func TestFilterAccountsWithEnabledModels(t *testing.T) {
 	}
 }
 
+func TestFilterAccountsWithOutputResolution(t *testing.T) {
+	pool := []*ApiAccount{
+		{ID: 1, Models: []AccountModel{{Name: "default", Enabled: true}}},
+		{ID: 2, Models: []AccountModel{{Name: "two-k", Enabled: true, Supports2K: true}}},
+		{ID: 3, Models: []AccountModel{{Name: "four-k", Enabled: true, Supports4K: true}}},
+		{ID: 4, Models: []AccountModel{{Name: "disabled", Enabled: false, Supports2K: true, Supports4K: true}}},
+	}
+
+	assertAccountIDs(t, FilterAccountsWithOutputResolution(pool, "1k"), 1, 2, 3)
+	assertAccountIDs(t, FilterAccountsWithOutputResolution(pool, "2k"), 2)
+	assertAccountIDs(t, FilterAccountsWithOutputResolution(pool, "4k"), 3)
+}
+
+func assertAccountIDs(t *testing.T, got []*ApiAccount, want ...int64) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("account count = %d, want %d", len(got), len(want))
+	}
+	for index := range want {
+		if got[index].ID != want[index] {
+			t.Fatalf("account[%d].ID = %d, want %d", index, got[index].ID, want[index])
+		}
+	}
+}
+
 func TestResolveAccountModelUsesStableEnabledOrder(t *testing.T) {
 	account := &ApiAccount{Models: []AccountModel{
 		{Name: "disabled", Enabled: false, SortOrder: 0},

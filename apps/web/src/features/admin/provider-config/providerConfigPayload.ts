@@ -81,13 +81,14 @@ export function createAccountCreatePayload(input: {
   form: ProviderAccountForm
   providerEndpoint: ProviderEndpointRecord | null
   modelValues: string[]
+  modelCapabilities?: ProviderAccountForm['modelCapabilities']
   secret: string
 }): AdminAccountCreateRequest {
   const providerEndpoint = input.providerEndpoint
   const name = input.form.name.trim() || providerEndpoint?.name || 'Unknown'
 
   return {
-    models: accountModelInputsFromValues(input.modelValues),
+    models: accountModelInputsFromValues(input.modelValues, [], input.modelCapabilities),
     max_concurrent: input.form.maxConcurrent,
     timeout: input.form.timeoutSeconds,
     name,
@@ -103,6 +104,7 @@ export function createAccountUpdatePayload(input: {
   existingAccount?: ProviderAccountRecord
   modelValues: string[]
   secret?: string
+  modelCapabilities?: ProviderAccountForm['modelCapabilities']
 }): AdminAccountUpdateRequest {
   const providerEndpoint = input.providerEndpoint
   const existingAccount = input.existingAccount
@@ -110,7 +112,11 @@ export function createAccountUpdatePayload(input: {
     input.form.name.trim() || existingAccount?.name || providerEndpoint?.name || 'Unknown'
 
   return {
-    models: accountModelInputsFromValues(input.modelValues, existingAccount?.models),
+    models: accountModelInputsFromValues(
+      input.modelValues,
+      existingAccount?.models,
+      input.modelCapabilities,
+    ),
     max_concurrent: input.form.maxConcurrent,
     timeout: input.form.timeoutSeconds,
     name,
@@ -123,17 +129,21 @@ export function createAccountUpdatePayload(input: {
 export function accountModelInputsFromValues(
   values: string[],
   existingModels: ProviderAccountModelRecord[] = [],
+  capabilities: ProviderAccountForm['modelCapabilities'] = {},
 ): AdminAccountModelInput[] {
   const existingByKey = new Map(
     existingModels.map((model) => [normalizeModelKey(model.name), model]),
   )
   return uniqueTrimmedModelValues(values).map((name) => {
     const existing = existingByKey.get(normalizeModelKey(name))
+    const configured = capabilities[normalizeModelKey(name)]
     return {
       name,
       enabled: existing?.enabled ?? true,
       weight: existing?.weight ?? DEFAULT_ADMIN_ACCOUNT_MODEL_WEIGHT,
       max_concurrent: existing?.maxConcurrent,
+      supports_2k: configured?.supports2K ?? existing?.supports2K ?? false,
+      supports_4k: configured?.supports4K ?? existing?.supports4K ?? false,
     }
   })
 }

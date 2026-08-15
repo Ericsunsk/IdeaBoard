@@ -25,6 +25,8 @@ export function createAccountModelRows(account: ProviderAccountView): AccountMod
   return account.models.map((model) => ({
     name: model.name,
     disabled: !model.enabled,
+    supports2K: model.supports2K,
+    supports4K: model.supports4K,
   }))
 }
 
@@ -84,6 +86,8 @@ export function createProviderAccountView(account: ProviderAccountRecord): Provi
     models: account.models.map((model) => ({
       name: model.name,
       enabled: model.enabled,
+      supports2K: model.supports2K,
+      supports4K: model.supports4K,
     })),
     maxConcurrent,
     currentConcurrent,

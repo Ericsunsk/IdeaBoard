@@ -520,6 +520,16 @@ type ProviderEndpoint struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type ProviderEndpointModel struct {
+	ID                 int64     `json:"id"`
+	ProviderEndpointID int64     `json:"provider_endpoint_id"`
+	ModelName          string    `json:"model_name"`
+	Supports2k         bool      `json:"supports_2k"`
+	Supports4k         bool      `json:"supports_4k"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
+}
+
 type RewardAdminAction struct {
 	ID                   int64           `json:"id"`
 	RewardCodeID         sql.NullInt64   `json:"reward_code_id"`

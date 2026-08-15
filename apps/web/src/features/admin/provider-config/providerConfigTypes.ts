@@ -29,10 +29,16 @@ export type ProviderEndpointFormField = keyof ProviderEndpointFormData
 export type ProviderAccountFormField =
   'name' | 'secret' | 'modelValues' | 'maxConcurrent' | 'timeoutSeconds'
 
+export type ProviderModelCapabilities = {
+  supports2K: boolean
+  supports4K: boolean
+}
+
 export type ProviderAccountForm = {
   providerEndpointId: number
   name: string
   modelValues: string[]
+  modelCapabilities: Record<string, ProviderModelCapabilities>
   secret: string
   maxConcurrent: number
   timeoutSeconds: number
@@ -41,6 +47,8 @@ export type ProviderAccountForm = {
 export type ProviderAccountModelView = {
   name: string
   enabled: boolean
+  supports2K: boolean
+  supports4K: boolean
 }
 
 export type ProviderAccountModelRecord = {
@@ -49,6 +57,8 @@ export type ProviderAccountModelRecord = {
   weight: number
   maxConcurrent?: number
   sortOrder: number
+  supports2K: boolean
+  supports4K: boolean
 }
 
 export type ProviderEndpointRecord = {
@@ -85,6 +95,8 @@ export type ProviderAccountRecord = {
 export type AccountModelRow = {
   name: string
   disabled: boolean
+  supports2K: boolean
+  supports4K: boolean
 }
 
 export type ProviderEndpointCommandTarget = {

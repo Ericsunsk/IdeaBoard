@@ -12,4 +12,6 @@ export interface AdminAccountModelPatchRequest {
   /** @nullable */
   max_concurrent?: number | null
   sort_order?: number
+  supports_2k?: boolean
+  supports_4k?: boolean
 }

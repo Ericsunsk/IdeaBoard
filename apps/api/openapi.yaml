@@ -3834,6 +3834,10 @@ components:
       type: integer
       enum: [1, 2, 3, 4]
 
+    OutputResolution:
+      type: string
+      enum: [1k, 2k, 4k]
+
     SubmitTaskRequestParams:
       type: object
       additionalProperties: false
@@ -3860,6 +3864,8 @@ components:
         quality: { type: string }
         output_count:
           $ref: '#/components/schemas/RequestedOutputCount'
+        output_resolution:
+          $ref: '#/components/schemas/OutputResolution'
         prompt_upsampling: { type: boolean }
         variation:
           $ref: '#/components/schemas/StyleVariationParams'
@@ -4409,7 +4415,7 @@ components:
 
     AdminAccountModel:
       type: object
-      required: [name, enabled, weight, sort_order]
+      required: [name, enabled, weight, sort_order, supports_2k, supports_4k]
       properties:
         id: { type: integer }
         name: { type: string }
@@ -4417,6 +4423,8 @@ components:
         weight: { type: integer }
         max_concurrent: { type: integer }
         sort_order: { type: integer }
+        supports_2k: { type: boolean }
+        supports_4k: { type: boolean }
 
     AdminAccountModelInput:
       type: object
@@ -4426,6 +4434,8 @@ components:
         enabled: { type: boolean }
         weight: { type: integer }
         max_concurrent: { type: integer }
+        supports_2k: { type: boolean }
+        supports_4k: { type: boolean }
 
     AdminAccountModelPatchRequest:
       type: object
@@ -4438,6 +4448,8 @@ components:
           type: integer
           nullable: true
         sort_order: { type: integer }
+        supports_2k: { type: boolean }
+        supports_4k: { type: boolean }
 
     AdminAccountCreateRequest:
       type: object

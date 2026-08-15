@@ -22,6 +22,7 @@ import {
 } from '../contracts/executionSizeParams'
 import { buildPromptAspectRatioTaskParams } from '../contracts/promptAspectRatioTaskParams'
 import { assertRequestedOutputCount } from '../../../../shared/domain/generationContract'
+import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import {
   normalizePromptReferenceImageUrls,
   type PromptAspectRatio,
@@ -49,6 +50,7 @@ export type ImageInpaintTaskRequestInput = {
   maskImageUrl: string
   referenceImageUrls?: string[]
   outputCount: number
+  outputResolution?: OutputResolution
 }
 
 export type FusionTaskRequestInput = {
@@ -59,6 +61,7 @@ export type FusionTaskRequestInput = {
   sizeSource: ExecutionImageSize | null
   targetSize: ExecutionImageSize | null
   aspectRatio: PromptAspectRatio
+  outputResolution?: OutputResolution
 }
 
 function buildDirectActionReadinessRequest(action: ImageDirectTaskAction): SubmitTaskData {
@@ -125,6 +128,7 @@ export function buildPromptGenerationTaskRequest(input: {
   aspectRatio: PromptAspectRatio
   imageUrls?: string[]
   outputCount: number
+  outputResolution?: import('../../../../shared/domain/generationContract').OutputResolution
 }): SubmitTaskData {
   const outputCount = assertRequestedOutputCount(input.outputCount)
   return buildExecutionTaskRequest({
@@ -133,6 +137,7 @@ export function buildPromptGenerationTaskRequest(input: {
     imageUrls: input.imageUrls,
     params: {
       output_count: outputCount,
+      output_resolution: input.outputResolution ?? '1k',
       ...buildPromptAspectRatioTaskParams(input.aspectRatio),
     },
   })
@@ -145,6 +150,7 @@ export function buildDirectActionTaskRequest(input: {
   prompt: string
   outputCount: number
   strength?: number
+  outputResolution?: OutputResolution
 }): SubmitTaskData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
   const execution = requireImageActionExecution(input.action)
@@ -157,6 +163,7 @@ export function buildDirectActionTaskRequest(input: {
       imageUrls: [sourceUrl],
       params: {
         output_count: assertRequestedOutputCount(input.outputCount),
+        output_resolution: input.outputResolution ?? '1k',
         ...sizeParams,
         variation: {
           strength: Number.isFinite(input.strength)
@@ -173,6 +180,7 @@ export function buildDirectActionTaskRequest(input: {
     imageUrls: [sourceUrl],
     params: {
       output_count: assertRequestedOutputCount(input.outputCount),
+      output_resolution: input.outputResolution ?? '1k',
       ...sizeParams,
     },
   })
@@ -185,6 +193,7 @@ export function buildImageInpaintTaskRequest(input: ImageInpaintTaskRequestInput
     feature: EXECUTION_LOCAL_INPAINT_META.feature,
     params: {
       output_count: assertRequestedOutputCount(input.outputCount),
+      output_resolution: input.outputResolution ?? '1k',
       original_image_url: input.originalImageUrl,
       mask_image_url: input.maskImageUrl,
       reference_image_urls: referenceImageUrls,
@@ -199,6 +208,7 @@ export function buildCanvasExtendTaskRequest(input: {
   extendPercent: CanvasExtendPercent
   prompt?: string
   outputCount: number
+  outputResolution?: OutputResolution
 }): SubmitTaskData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
   const prompt = `${input.prompt ?? ''}`.trim()
@@ -209,6 +219,7 @@ export function buildCanvasExtendTaskRequest(input: {
     imageUrls: [sourceUrl],
     params: {
       output_count: assertRequestedOutputCount(input.outputCount),
+      output_resolution: input.outputResolution ?? '1k',
       ...buildExecutionSizeParams(
         input.imageSize,
         extendExecutionImageSize(input.imageSize, input.extendPercent),
@@ -229,6 +240,7 @@ export function buildHdUpscaleTaskRequest(input: {
   prompt: string
   outputCount: number
   strength?: number
+  outputResolution?: OutputResolution
 }): SubmitTaskData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
   const execution = requireImageActionExecution(IMAGE_HD_UPSCALE_ACTION)
@@ -238,6 +250,7 @@ export function buildHdUpscaleTaskRequest(input: {
     imageUrls: [sourceUrl],
     params: {
       output_count: assertRequestedOutputCount(input.outputCount),
+      output_resolution: input.outputResolution ?? '1k',
       ...buildExecutionSizeParams(input.imageSize, input.imageSize),
       hd: {
         detail_strength: resolveHdDetailStrength(input.strength),
@@ -255,6 +268,7 @@ export function buildFusionTaskRequest(input: FusionTaskRequestInput): SubmitTas
     imageUrls: input.imageUrls,
     params: {
       ...(outputCount ? { output_count: outputCount } : {}),
+      output_resolution: input.outputResolution ?? '1k',
       ...buildExecutionSizeParams(input.sizeSource, input.targetSize),
       ...buildPromptAspectRatioTaskParams(input.aspectRatio),
       fusion: {
@@ -284,6 +298,7 @@ export function buildImageExecutionTaskRequest(
           prompt: plan.prompt,
           outputCount: plan.outputCount,
           strength: plan.strength,
+          outputResolution: plan.outputResolution,
         })
       }
       if (isImageDirectTaskAction(plan.action)) {
@@ -294,6 +309,7 @@ export function buildImageExecutionTaskRequest(
           prompt: plan.prompt,
           outputCount: plan.outputCount,
           strength: plan.strength,
+          outputResolution: plan.outputResolution,
         })
       }
       throw new Error(`Unsupported image task action ${plan.action}`)
@@ -304,6 +320,7 @@ export function buildImageExecutionTaskRequest(
         extendPercent: plan.extendPercent,
         prompt: plan.prompt,
         outputCount: plan.outputCount,
+        outputResolution: plan.outputResolution,
       })
     case 'prompt-generation':
       return buildPromptGenerationTaskRequest({
@@ -311,6 +328,7 @@ export function buildImageExecutionTaskRequest(
         aspectRatio: plan.aspectRatio,
         imageUrls: plan.referenceImages.map((image) => image.url),
         outputCount: plan.outputCount,
+        outputResolution: plan.outputResolution,
       })
     case 'fusion':
       return buildFusionTaskRequest({
@@ -321,6 +339,7 @@ export function buildImageExecutionTaskRequest(
         sizeSource: plan.sizeSource,
         targetSize: plan.targetSize,
         aspectRatio: plan.aspectRatio,
+        outputResolution: plan.outputResolution,
       })
   }
 }
@@ -335,5 +354,6 @@ export function buildPreparedImageInpaintTaskRequest(input: {
     maskImageUrl: input.maskImageUrl,
     referenceImageUrls: input.plan.referenceImageUrls,
     outputCount: input.plan.outputCount,
+    outputResolution: input.plan.outputResolution,
   })
 }

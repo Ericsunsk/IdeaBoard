@@ -5,6 +5,8 @@ import {
   MAX_REQUESTED_OUTPUT_COUNT,
   MIN_REQUESTED_OUTPUT_COUNT,
   REQUESTED_OUTPUT_COUNT_OPTIONS,
+  type OutputResolution,
+  normalizeOutputResolution,
 } from '../../../shared/domain/generationContract'
 
 export interface CanvasPoint {
@@ -28,6 +30,8 @@ export const DEFAULT_PROMPT_NODE_OUTPUT_COUNT = 1
 export const DEFAULT_FUSION_NODE_OUTPUT_COUNT = 1
 export const CANVAS_BOARD_STATE_SCHEMA_VERSION = 3
 export { DEFAULT_PROMPT_ASPECT_RATIO, type PromptAspectRatio }
+export type { OutputResolution }
+export { normalizeOutputResolution }
 export { DEFAULT_FUSION_BLEND_POINT, type FusionBlendPoint }
 
 function isWorkflowNodeOutputStatus(value: unknown): value is WorkflowNodeOutputStatus {
@@ -60,6 +64,7 @@ export interface PromptNodeItem {
   title?: string
   text: string
   outputCount: number
+  outputResolution?: OutputResolution
   aspectRatio: PromptAspectRatio
   inputImages: PromptNodeInputImage[]
 }
@@ -96,6 +101,7 @@ export interface ImageNodeItem {
   sourceMediaAssetId?: number
   sourceImageRatio: number
   outputCount?: number
+  outputResolution?: OutputResolution
   pendingTaskId?: string
   pendingResultIndex?: number
   outputStatus: WorkflowNodeOutputStatus
@@ -111,6 +117,7 @@ export interface FusionNodeItem {
   title?: string
   prompt: string
   outputCount: number
+  outputResolution?: OutputResolution
   aspectRatio: PromptAspectRatio
   blendPoint: FusionBlendPoint
   inputImages: FusionNodeInputImage[]

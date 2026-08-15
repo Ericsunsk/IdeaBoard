@@ -13,6 +13,7 @@ CREATE TRIGGER set_task_daily_stats_updated_at BEFORE UPDATE ON task_daily_stats
 CREATE TRIGGER set_task_stat_events_updated_at BEFORE UPDATE ON task_stat_events FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_task_daily_stat_backfills_updated_at BEFORE UPDATE ON task_daily_stat_backfills FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_provider_endpoints_updated_at BEFORE UPDATE ON provider_endpoints FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER set_provider_endpoint_models_updated_at BEFORE UPDATE ON provider_endpoint_models FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_system_configs_updated_at BEFORE UPDATE ON system_configs FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_storage_profiles_updated_at BEFORE UPDATE ON storage_profiles FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_storage_profile_secret_versions_updated_at BEFORE UPDATE ON storage_profile_secret_versions FOR EACH ROW EXECUTE FUNCTION set_updated_at();

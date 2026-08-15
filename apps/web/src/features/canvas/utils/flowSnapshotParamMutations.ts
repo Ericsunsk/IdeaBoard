@@ -6,6 +6,7 @@ import type {
   PromptNodeInputImage,
   PromptNodeItem,
 } from '../../canvas-board/domain'
+import { normalizeOutputResolution, type OutputResolution } from '../../../shared/domain/generationContract'
 import {
   areFusionBlendPointsEqual,
   requireImageNodeOutputCount,
@@ -19,6 +20,7 @@ import {
 export type FlowSnapshotParamPatch =
   | { key: 'title'; value: string }
   | { key: 'outputCount'; value: number }
+  | { key: 'outputResolution'; value: OutputResolution }
   | { key: 'prompt'; value: string }
   | { key: 'aspectRatio'; value: PromptAspectRatio }
   | { key: 'inputImages'; value: PromptNodeInputImage[] }
@@ -112,6 +114,11 @@ export function patchFlowSnapshotParam(
       const nextOutputCount = requireImageNodeOutputCount(value)
       if (snapshotNode.outputCount === nextOutputCount) return snapshotNode
       return { ...snapshotNode, outputCount: nextOutputCount }
+    }
+    case 'outputResolution': {
+      const nextResolution = normalizeOutputResolution(value)
+      if (snapshotNode.outputResolution === nextResolution) return snapshotNode
+      return { ...snapshotNode, outputResolution: nextResolution }
     }
     case 'prompt': {
       if (snapshotNode.type !== 'fusion') return snapshotNode
