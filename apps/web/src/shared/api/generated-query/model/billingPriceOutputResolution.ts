@@ -9,6 +9,7 @@ export type BillingPriceOutputResolution =
   (typeof BillingPriceOutputResolution)[keyof typeof BillingPriceOutputResolution]
 
 export const BillingPriceOutputResolution = {
+  default: 'default',
   '1k': '1k',
   '2k': '2k',
   '4k': '4k',

@@ -68,6 +68,14 @@ describe('flowImageTaskRequests', () => {
         output_resolution: '4k',
       },
     })
+    expect(
+      buildImageActionReadinessRequest(IMAGE_NODE_ACTION.removeBg, {
+        outputCount: 4,
+        outputResolution: '4k',
+      }),
+    ).toMatchObject({
+      params: { output_count: 1, output_resolution: 'default' },
+    })
   })
 
   it('builds prompt-generation requests with output count independent from ordered refs', () => {
@@ -133,6 +141,8 @@ describe('flowImageTaskRequests', () => {
     })
 
     expect(request.params).toMatchObject({
+      output_count: 1,
+      output_resolution: 'default',
       custom_width: 1024,
       custom_height: 1024,
       original_image_width: 1024,
@@ -209,8 +219,13 @@ describe('flowImageTaskRequests', () => {
       expect(request).toMatchObject({
         prompt: 'preserve the subject',
         image_urls: [source.url],
-        params: { output_count: 4 },
       })
+      expect(request.params?.output_count).toBe(
+        request.feature === EXECUTION_FEATURE.removeBg ? 1 : 4,
+      )
+      if (request.feature === EXECUTION_FEATURE.removeBg) {
+        expect(request.params?.output_resolution).toBe('default')
+      }
     }
   })
 

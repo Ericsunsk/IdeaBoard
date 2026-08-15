@@ -394,7 +394,11 @@ func TestRemoveBgWithoutConfiguredSystemPromptAllowsEmptyPrompt(t *testing.T) {
 func TestResolveTaskBillingRequestUsesAIWorkflowRegistry(t *testing.T) {
 	for _, feature := range workflow.AIImageFeatureSlugs() {
 		t.Run(feature, func(t *testing.T) {
-			request, err := resolveTaskBillingRequest(feature, "1k", 1)
+			resolution := "1k"
+			if feature == workflow.FeatureSlugRemoveBg {
+				resolution = "default"
+			}
+			request, err := resolveTaskBillingRequest(feature, resolution, 1)
 			if err != nil {
 				t.Fatal(err)
 			}

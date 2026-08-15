@@ -67,6 +67,8 @@ export function createProviderEndpointView(
     name: providerEndpoint.name,
     baseUrl: providerEndpoint.baseUrl,
     apiType: providerEndpoint.apiType,
+    protocol: providerEndpoint.protocol,
+    capabilities: providerEndpoint.capabilities,
     apiTypeLabel: getAdminProviderEndpointApiTypeLabel(providerEndpoint.apiType),
     status: providerEndpoint.status,
     commandTarget: {

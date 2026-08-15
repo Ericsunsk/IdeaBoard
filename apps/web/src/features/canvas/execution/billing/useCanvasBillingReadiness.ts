@@ -21,6 +21,7 @@ export type CanvasBillingQuoteState = {
   feature: WorkflowFeature
   status: 'idle' | 'loading' | 'ready' | 'blocked' | 'error'
   unitCredits?: number
+  totalCredits?: number
   availableCredits?: number
   priceVersionId?: number
   sufficient?: boolean
@@ -89,6 +90,7 @@ export function createCanvasBillingReadinessStore(
         feature,
         status: 'ready',
         unitCredits: billing.unit_credits,
+        totalCredits: billing.total_credits,
         availableCredits: billing.available_credits,
         priceVersionId: billing.price_version_id,
         sufficient: false,
@@ -116,6 +118,7 @@ export function createCanvasBillingReadinessStore(
       feature,
       status: 'ready',
       unitCredits: billing.unit_credits,
+      totalCredits: billing.total_credits,
       availableCredits: billing.available_credits,
       priceVersionId: billing.price_version_id,
       sufficient: billing.sufficient,

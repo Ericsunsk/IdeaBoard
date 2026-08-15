@@ -15,12 +15,20 @@ const (
 type OutputResolution string
 
 const (
-	OutputResolution1K OutputResolution = "1k"
-	OutputResolution2K OutputResolution = "2k"
-	OutputResolution4K OutputResolution = "4k"
+	OutputResolutionDefault OutputResolution = "default"
+	OutputResolution1K      OutputResolution = "1k"
+	OutputResolution2K      OutputResolution = "2k"
+	OutputResolution4K      OutputResolution = "4k"
 )
 
 var outputResolutions = [...]OutputResolution{
+	OutputResolutionDefault,
+	OutputResolution1K,
+	OutputResolution2K,
+	OutputResolution4K,
+}
+
+var defaultPricingVariants = [...]OutputResolution{
 	OutputResolution1K,
 	OutputResolution2K,
 	OutputResolution4K,
@@ -97,6 +105,34 @@ type PublishPricesInput struct {
 	Definition BillableItemDefinition
 	Prices     map[OutputResolution]int64
 	ActorID    int64
+}
+
+func normalizePricingVariants(raw []OutputResolution) ([]OutputResolution, error) {
+	if len(raw) == 0 {
+		raw = defaultPricingVariants[:]
+	}
+	variants := make([]OutputResolution, 0, len(raw))
+	seen := make(map[OutputResolution]struct{}, len(raw))
+	for _, rawVariant := range raw {
+		variant, err := NormalizeOutputResolution(string(rawVariant))
+		if err != nil {
+			return nil, ErrInvalidCatalogEntry
+		}
+		if _, exists := seen[variant]; exists {
+			return nil, ErrInvalidCatalogEntry
+		}
+		seen[variant] = struct{}{}
+		variants = append(variants, variant)
+	}
+	return variants, nil
+}
+
+func (definition BillableItemDefinition) pricingVariants() []OutputResolution {
+	variants, err := normalizePricingVariants(definition.PricingVariants)
+	if err != nil {
+		return nil
+	}
+	return variants
 }
 
 type AvailabilityInfo struct {

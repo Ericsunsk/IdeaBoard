@@ -10,6 +10,7 @@ import {
   createAdminProviderEndpoint,
   deleteAdminProviderEndpoint as deleteAdminProviderEndpointRequest,
   detectAdminProviderEndpointModels as detectAdminProviderEndpointModelsRequest,
+  getAdminProviderEndpointRegistry,
   listAdminProviderEndpoints,
   updateAdminProviderEndpoint,
 } from '../../../shared/api/generated-query/admin-provider-endpoints/admin-provider-endpoints'
@@ -21,6 +22,7 @@ import type {
   AdminAccountModelPatchRequest,
   AdminAccountUpdateRequest,
   ProviderEndpoint as ProviderEndpointDto,
+  ProviderEndpointProtocol,
 } from '../../../shared/api/generated-query/model'
 import { resolveApiData, resolveApiOk } from '../../../shared/api/apiResponse'
 import { FALLBACK_ADMIN_ACCOUNT_LIMITS } from './providerConfigLimits'
@@ -45,6 +47,11 @@ const PROVIDER_MODEL_DETECTION_TIMEOUT_MS = 20_000
 export async function fetchAdminProviderEndpoints(): Promise<ProviderEndpointRecord[]> {
   const data = await resolveApiData(listAdminProviderEndpoints(), '加载供应商端点失败')
   return (data.list ?? []).map(toProviderEndpointRecord)
+}
+
+export async function fetchAdminProviderEndpointRegistry(): Promise<ProviderEndpointProtocol[]> {
+  const data = await resolveApiData(getAdminProviderEndpointRegistry(), '加载端点协议失败')
+  return data.protocols ?? []
 }
 
 export async function saveAdminProviderEndpoint(
@@ -163,6 +170,8 @@ function toProviderEndpointRecord(providerEndpoint: ProviderEndpointDto): Provid
   return {
     id: providerEndpoint.id,
     apiType: providerEndpoint.api_type as ProviderApiTypeValue,
+    protocol: providerEndpoint.protocol as ProviderEndpointRecord['protocol'],
+    capabilities: (providerEndpoint.capabilities ?? []) as ProviderEndpointRecord['capabilities'],
     name: providerEndpoint.name,
     baseUrl: providerEndpoint.base_url,
     status: providerEndpoint.status,

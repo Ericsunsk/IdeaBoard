@@ -44,6 +44,9 @@ func WorkflowItems() []billing.BillableItemDefinition {
 			Description: presentation.description,
 			SortOrder:   (index + 1) * 10,
 		})
+		if slug == workflow.FeatureSlugRemoveBg {
+			definitions[len(definitions)-1].PricingVariants = []billing.OutputResolution{billing.OutputResolutionDefault}
+		}
 	}
 	return definitions
 }

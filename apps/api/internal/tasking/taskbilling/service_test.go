@@ -24,7 +24,11 @@ func TestAIImageWorkflowSKUContract(t *testing.T) {
 
 	for _, feature := range workflow.AIImageFeatureSlugs() {
 		t.Run(feature, func(t *testing.T) {
-			request, err := AIImageRequest(feature, "1k", 1)
+			resolution := "1k"
+			if feature == workflow.FeatureSlugRemoveBg {
+				resolution = "default"
+			}
+			request, err := AIImageRequest(feature, resolution, 1)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -39,6 +43,16 @@ func TestAIImageWorkflowSKUContract(t *testing.T) {
 				t.Fatalf("feature %q must require billing facts", feature)
 			}
 		})
+	}
+}
+
+func TestAIImageRequestRemoveBgUsesOnlyDefaultPricingVariant(t *testing.T) {
+	request, err := AIImageRequest(workflow.FeatureSlugRemoveBg, "", 1)
+	if err != nil || request.OutputResolution != billing.OutputResolutionDefault {
+		t.Fatalf("empty resolution request=%+v err=%v", request, err)
+	}
+	if _, err := AIImageRequest(workflow.FeatureSlugRemoveBg, "1k", 1); !errors.Is(err, billing.ErrInvalidOutputResolution) {
+		t.Fatalf("1k remove-bg resolution error=%v", err)
 	}
 }
 

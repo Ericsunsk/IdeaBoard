@@ -109,16 +109,16 @@ describe('HomeCanvasImageActionMenu', () => {
       getFeatureState: (feature) =>
         feature === IMAGE_NODE_ACTION.removeBg
           ? { feature, status: 'blocked', reason: '价格未配置' }
-          : { feature, status: 'ready', unitCredits: 3, availableCredits: 20 },
+          : { feature, status: 'ready', unitCredits: 3, totalCredits: 7, availableCredits: 20 },
     }
 
     renderImageActionMenu({ billingStore, outputCount: 4 })
 
     expect(screen.getByRole('button', { name: '抠图' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: '风格延展 · 12 Ideas' })).toBeEnabled()
-    expect(screen.getAllByText('12 Ideas')[0]).toHaveAttribute('data-touch-quote')
+    expect(screen.getByRole('button', { name: '风格延展 · 7 Ideas' })).toBeEnabled()
+    expect(screen.getAllByText('7 Ideas')[0]).toHaveAttribute('data-touch-quote')
     expect(screen.getByRole('button', { name: '图像编辑' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: '局部重绘 · 12 Ideas' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: '局部重绘 · 7 Ideas' })).toBeEnabled()
   })
 
   it('presents explicit zero pricing as free in tooltip and touch quote', () => {

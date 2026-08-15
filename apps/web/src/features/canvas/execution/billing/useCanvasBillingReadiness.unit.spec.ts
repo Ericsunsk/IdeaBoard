@@ -37,6 +37,7 @@ describe('canvas billing readiness store', () => {
     expect(store.getFeatureState(WORKFLOW_FEATURE.promptGeneration)).toMatchObject({
       status: 'ready',
       unitCredits: 4,
+      totalCredits: 4,
       availableCredits: 20,
       priceVersionId: 1,
     })
@@ -57,6 +58,7 @@ describe('canvas billing readiness store', () => {
     expect(store.getFeatureState(WORKFLOW_FEATURE.promptGeneration)).toMatchObject({
       status: 'ready',
       unitCredits: 6,
+      totalCredits: 24,
       priceVersionId: 2,
     })
   })

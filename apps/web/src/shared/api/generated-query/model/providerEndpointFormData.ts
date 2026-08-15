@@ -8,6 +8,9 @@ import type { ProviderAPIType } from './providerAPIType'
 
 export interface ProviderEndpointFormData {
   api_type: ProviderAPIType
+  protocol: string
+  /** @minItems 1 */
+  capabilities: string[]
   name: string
   base_url: string
   status: number

@@ -9,6 +9,7 @@ export type AdminTaskBillingSnapshotOutputResolution =
   (typeof AdminTaskBillingSnapshotOutputResolution)[keyof typeof AdminTaskBillingSnapshotOutputResolution]
 
 export const AdminTaskBillingSnapshotOutputResolution = {
+  default: 'default',
   '1k': '1k',
   '2k': '2k',
   '4k': '4k',

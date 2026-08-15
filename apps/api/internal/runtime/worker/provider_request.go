@@ -113,6 +113,11 @@ func readOutputResolution(params map[string]interface{}) string {
 	if !ok {
 		return workflow.OutputResolution1K
 	}
+	if resolution == workflow.OutputResolutionDefault {
+		// `default` is a Billing variant; providers still need their baseline
+		// image size when the workflow has no user-selectable resolution.
+		return workflow.OutputResolution1K
+	}
 	return resolution
 }
 

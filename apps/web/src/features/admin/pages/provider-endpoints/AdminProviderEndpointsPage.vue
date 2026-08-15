@@ -82,6 +82,15 @@
                 :class="adminCompactTagClass"
                 rounded
               />
+              <Tag :value="card.providerEndpoint.protocol" severity="contrast" :class="adminCompactTagClass" rounded />
+              <Tag
+                v-for="capability in card.providerEndpoint.capabilities"
+                :key="`${card.providerEndpoint.id}:${capability}`"
+                :value="capability"
+                severity="success"
+                :class="adminCompactTagClass"
+                rounded
+              />
               <Tag
                 :value="card.providerEndpoint.status === 1 ? '启用' : '停用'"
                 :severity="card.providerEndpoint.status === 1 ? 'success' : 'warn'"
@@ -260,6 +269,45 @@
 
       <AdminFormField
         v-slot="{ describedbyId, invalid }"
+        label="Protocol"
+        for="admin-provider-endpoint-protocol"
+        :error="providerEndpointFormErrors.protocol"
+      >
+        <Select
+          v-model="providerEndpointForm.protocol"
+          input-id="admin-provider-endpoint-protocol"
+          class="w-full"
+          :options="providerEndpointEditor.protocolRegistry.value"
+          option-label="id"
+          option-value="id"
+          :invalid="invalid"
+          :aria-describedby="describedbyId"
+          @update:model-value="handleProtocolChange"
+        />
+      </AdminFormField>
+
+      <AdminFormField
+        v-slot="{ describedbyId, invalid }"
+        label="Capability"
+        for="admin-provider-endpoint-capabilities"
+        :error="providerEndpointFormErrors.capabilities"
+      >
+        <MultiSelect
+          v-model="providerEndpointForm.capabilities"
+          input-id="admin-provider-endpoint-capabilities"
+          class="w-full"
+          :options="capabilityOptions(providerEndpointForm.protocol)"
+          option-label="label"
+          option-value="value"
+          display="chip"
+          :invalid="invalid"
+          :aria-describedby="describedbyId"
+          @update:model-value="clearProviderEndpointFormError('capabilities')"
+        />
+      </AdminFormField>
+
+      <AdminFormField
+        v-slot="{ describedbyId, invalid }"
         label="接口类型"
         for="admin-provider-endpoint-type"
         :error="providerEndpointFormErrors.apiType"
@@ -378,6 +426,7 @@
       </AdminFormField>
 
       <AdminFormField
+        v-if="!isModellessEndpoint(selectedProviderEndpointForAccount)"
         v-slot="{ describedbyId, invalid }"
         label="分配模型"
         for="admin-account-models"
@@ -564,6 +613,25 @@ async function handleSaveProviderEndpoint() {
 
 function clearProviderEndpointFormError(field: keyof typeof providerEndpointForm.value) {
   providerEndpointEditor.clearError(field)
+}
+
+function handleProtocolChange(protocol: string) {
+  const definition = providerEndpointEditor.protocolRegistry.value.find((item) => item.id === protocol)
+  providerEndpointForm.value.capabilities = (definition?.capabilities ?? []).slice() as typeof providerEndpointForm.value.capabilities
+  providerEndpointEditor.clearError('protocol')
+  providerEndpointEditor.clearError('capabilities')
+}
+
+function capabilityOptions(protocol: string) {
+  const definition = providerEndpointEditor.protocolRegistry.value.find((item) => item.id === protocol)
+  return (definition?.capabilities ?? []).map((value) => ({ label: value, value }))
+}
+
+function isModellessEndpoint(providerEndpoint: (typeof selectedProviderEndpointForAccount.value) | null) {
+  return (
+    providerEndpoint?.protocol === 'image-url-json-to-png' &&
+    providerEndpoint.capabilities.includes('background-removal')
+  )
 }
 
 const showAccountModal = accountEditor.visible

@@ -93,7 +93,14 @@ function createProviderEndpointEditor(options: {
 
     isEditing.value = true
     currentProviderEndpointId.value = row.id
-    form.value = { apiType: row.apiType, name: row.name, baseUrl: row.baseUrl, status: row.status }
+    form.value = {
+      apiType: row.apiType,
+      protocol: row.protocol,
+      capabilities: [...row.capabilities],
+      name: row.name,
+      baseUrl: row.baseUrl,
+      status: row.status,
+    }
     resetErrors()
     visible.value = true
   }
@@ -131,7 +138,7 @@ function createProviderEndpointEditor(options: {
 
   function validate() {
     const nextErrors = createEmptyProviderEndpointFormErrors()
-    ;(['name', 'apiType', 'baseUrl', 'status'] as ProviderEndpointFormField[]).forEach((field) => {
+    ;(['name', 'apiType', 'protocol', 'capabilities', 'baseUrl', 'status'] as ProviderEndpointFormField[]).forEach((field) => {
       nextErrors[field] = resolveProviderEndpointFieldError(form.value, field)
     })
     errors.value = nextErrors
@@ -160,6 +167,7 @@ function createProviderEndpointEditor(options: {
     form,
     errors,
     apiTypeOptions: options.workspace.apiTypeOptions,
+    protocolRegistry: options.workspace.protocolRegistry,
     openCreate,
     openEdit,
     close,
@@ -272,7 +280,7 @@ function createAccountEditor(options: {
     } else if (hasDuplicateAccountName(accountName)) {
       nextErrors.name = '同一端点下已存在同名 APIKey'
     }
-    if (selectedModels.length === 0) {
+    if (selectedModels.length === 0 && !isModellessEndpoint(selectedProviderEndpoint.value)) {
       nextErrors.modelValues = '请至少选择或输入一个模型'
     }
     if (!isEditing.value && !form.value.secret.trim()) {
@@ -390,6 +398,8 @@ function createAccountEditor(options: {
 function createEmptyProviderEndpointFormErrors(): Record<ProviderEndpointFormField, string> {
   return {
     apiType: '',
+    protocol: '',
+    capabilities: '',
     name: '',
     baseUrl: '',
     status: '',
@@ -442,6 +452,8 @@ function resolveProviderEndpointFieldError(
 ) {
   if (field === 'name' && !form.name.trim()) return '请输入供应商端点名称'
   if (field === 'apiType' && !form.apiType) return '请选择接口类型'
+  if (field === 'protocol' && !form.protocol) return '请选择 Protocol'
+  if (field === 'capabilities' && form.capabilities.length === 0) return '至少选择一个 Capability'
   if (field === 'baseUrl') {
     const apiUrl = form.baseUrl.trim()
     if (!apiUrl) return '请输入 Base URL地址'
@@ -458,6 +470,13 @@ function resolveProviderEndpointFieldError(
     return '请选择启用状态'
   }
   return ''
+}
+
+function isModellessEndpoint(providerEndpoint: ProviderEndpointRecord | null) {
+  return (
+    providerEndpoint?.protocol === 'image-url-json-to-png' &&
+    providerEndpoint.capabilities.includes('background-removal')
+  )
 }
 
 function resolveNumberRangeError(value: number, min: number, max: number, label: string) {

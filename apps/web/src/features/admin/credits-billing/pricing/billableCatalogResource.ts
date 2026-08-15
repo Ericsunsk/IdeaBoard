@@ -14,15 +14,15 @@ import type {
   AdminBillableItemAvailability,
   AdminBillableItemCard,
   AdminBillableItemPrice,
-  OutputResolution,
+  PricingVariant,
 } from './billableCatalogTypes'
 
 export interface AdminBillableCatalogResource {
   list: () => Promise<AdminBillableItemCard[]>
   publishPrices: (
     sku: string,
-    prices: Record<OutputResolution, number | undefined>,
-  ) => Promise<Partial<Record<OutputResolution, AdminBillableItemPrice>>>
+    prices: Record<PricingVariant, number | undefined>,
+  ) => Promise<Partial<Record<PricingVariant, AdminBillableItemPrice>>>
   setAvailability: (sku: string, enabled: boolean) => Promise<AdminBillableItemAvailability>
   deleteArchived: (sku: string) => Promise<string>
 }
@@ -54,18 +54,18 @@ export async function setBillableItemAvailability(
 
 export async function publishBillableItemPrices(
   sku: string,
-  prices: Record<OutputResolution, number | undefined>,
-): Promise<Partial<Record<OutputResolution, AdminBillableItemPrice>>> {
-  const requestPrices: { '1k': number; '2k'?: number; '4k'?: number } = { '1k': prices['1k'] as number }
-  if (prices['2k'] !== undefined) requestPrices['2k'] = prices['2k']
-  if (prices['4k'] !== undefined) requestPrices['4k'] = prices['4k']
+  prices: Record<PricingVariant, number | undefined>,
+): Promise<Partial<Record<PricingVariant, AdminBillableItemPrice>>> {
+  const requestPrices = Object.fromEntries(
+    Object.entries(prices).filter(([, price]) => price !== undefined),
+  ) as Record<PricingVariant, number>
   const data = await resolveApiData(
     publishAdminBillingPrice(sku, { prices: requestPrices }),
     '发布价格失败',
   )
   return Object.fromEntries(
     Object.entries(data.prices).map(([resolution, price]) => [resolution, normalizePrice(price)]),
-  ) as Partial<Record<OutputResolution, AdminBillableItemPrice>>
+  ) as Partial<Record<PricingVariant, AdminBillableItemPrice>>
 }
 
 export async function fetchAdminBillableItems(): Promise<AdminBillableItemCard[]> {
@@ -81,14 +81,24 @@ function normalizeBillableItem(item: BillableItemCatalogCard): AdminBillableItem
     displayName: item.display_name,
     sortOrder: item.sort_order,
     status: item.status,
+    pricingVariants: normalizePricingVariants(item.pricing_variants),
     currentPrices: Object.fromEntries(
       Object.entries(item.current_prices ?? {}).map(([resolution, price]) => [
         resolution,
         normalizePrice(price),
       ]),
-    ) as Partial<Record<OutputResolution, AdminBillableItemPrice>>,
+    ) as Partial<Record<PricingVariant, AdminBillableItemPrice>>,
     updatedAt: item.updated_at,
   }
+}
+
+function normalizePricingVariants(raw: unknown): PricingVariant[] {
+  if (!Array.isArray(raw)) return ['1k', '2k', '4k']
+  const variants = raw.filter(
+    (value): value is PricingVariant =>
+      value === 'default' || value === '1k' || value === '2k' || value === '4k',
+  )
+  return variants.length > 0 ? variants : ['1k', '2k', '4k']
 }
 
 function normalizePrice(price: BillingPrice): AdminBillableItemPrice {

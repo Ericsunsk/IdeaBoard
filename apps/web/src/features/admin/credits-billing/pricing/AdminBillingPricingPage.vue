@@ -53,7 +53,7 @@ import BillingFeaturePriceCard from './BillingFeaturePriceCard.vue'
 import BillingPriceDialog from './BillingPriceDialog.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { createAdminBillableCatalogResource } from './billableCatalogResource'
-import type { AdminBillableItemCard, OutputResolution } from './billableCatalogTypes'
+import type { AdminBillableItemCard, PricingVariant } from './billableCatalogTypes'
 
 const resource = createAdminBillableCatalogResource()
 const items = ref<AdminBillableItemCard[]>([])
@@ -113,7 +113,7 @@ async function deleteArchived(item: AdminBillableItemCard) {
   }
 }
 
-async function publishPrice(prices: Record<OutputResolution, number | undefined>) {
+async function publishPrice(prices: Record<PricingVariant, number | undefined>) {
   const item = selectedItem.value
   if (!item || publishPending.value) return
   publishPending.value = true

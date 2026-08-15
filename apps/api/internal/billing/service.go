@@ -20,27 +20,32 @@ func NewService(pool *pgxpool.Pool) *Service {
 }
 
 func (s *Service) PublishPrice(ctx context.Context, input PublishPriceInput) (PriceInfo, error) {
+	variants := input.Definition.pricingVariants()
+	if len(variants) == 0 {
+		return PriceInfo{}, ErrInvalidCatalogEntry
+	}
 	prices, err := s.PublishPrices(ctx, PublishPricesInput{
 		Definition: input.Definition,
-		Prices:     map[OutputResolution]int64{OutputResolution1K: input.UnitCredits},
+		Prices:     map[OutputResolution]int64{variants[0]: input.UnitCredits},
 		ActorID:    input.ActorID,
 	})
-	return prices[OutputResolution1K], err
+	return prices[variants[0]], err
 }
 
 func (s *Service) PublishPrices(ctx context.Context, input PublishPricesInput) (map[OutputResolution]PriceInfo, error) {
 	definition := input.Definition
 	sku, err := CanonicalizeSKU(string(definition.SKU))
-	oneK, hasOneK := input.Prices[OutputResolution1K]
-	if err != nil || input.ActorID <= 0 || !hasOneK || oneK < 0 || oneK > MaxQuoteCredits {
+	variants := definition.pricingVariants()
+	if err != nil || input.ActorID <= 0 || len(variants) == 0 {
 		return nil, ErrInvalidCatalogEntry
 	}
-	if len(input.Prices) == 0 {
+	requiredPrice, hasRequired := input.Prices[variants[0]]
+	if !hasRequired || requiredPrice < 0 || requiredPrice > MaxQuoteCredits {
 		return nil, ErrInvalidCatalogEntry
 	}
 	prices := make(map[string]int64, len(input.Prices))
 	for resolution, unitCredits := range input.Prices {
-		if _, err := NormalizeOutputResolution(string(resolution)); err != nil || unitCredits < 0 || unitCredits > MaxQuoteCredits {
+		if err := validatePricingVariant(definition, resolution); err != nil || unitCredits < 0 || unitCredits > MaxQuoteCredits {
 			return nil, ErrInvalidCatalogEntry
 		}
 		prices[string(resolution)] = unitCredits
@@ -59,7 +64,7 @@ func (s *Service) PublishPrices(ctx context.Context, input PublishPricesInput) (
 	published := make(map[OutputResolution]PriceInfo, len(prices))
 	rows, err := s.pool.Query(ctx, `SELECT output_resolution, price_version_id, version, unit_credits, created_by, created_at
 	FROM publish_billing_prices($1, $2, $3, $4::jsonb, $5)
-	ORDER BY CASE output_resolution WHEN '1k' THEN 1 WHEN '2k' THEN 2 ELSE 3 END`, sku, displayName, description, prices, input.ActorID)
+	ORDER BY CASE output_resolution WHEN 'default' THEN 1 WHEN '1k' THEN 2 WHEN '2k' THEN 3 ELSE 4 END`, sku, displayName, description, prices, input.ActorID)
 	if err != nil {
 		return nil, mapDatabaseError("publish price version", err)
 	}
@@ -74,7 +79,7 @@ func (s *Service) PublishPrices(ctx context.Context, input PublishPricesInput) (
 	if err := rows.Err(); err != nil {
 		return nil, mapDatabaseError("publish price version", err)
 	}
-	if _, ok := published[OutputResolution1K]; !ok {
+	if _, ok := published[variants[0]]; !ok {
 		return nil, ErrInvalidCatalogEntry
 	}
 	return published, nil
@@ -107,7 +112,11 @@ FROM set_billing_item_availability($1, $2, $3)`, sku, enabled, actorID).Scan(
 }
 
 func (s *Service) Quote(ctx context.Context, rawSKU string, quantity int64) (Quote, error) {
-	return s.QuoteAtResolution(ctx, rawSKU, OutputResolution1K, quantity)
+	resolution := OutputResolution1K
+	if sku, err := CanonicalizeSKU(rawSKU); err == nil && sku == SKU("ai-image:remove-bg") {
+		resolution = OutputResolutionDefault
+	}
+	return s.QuoteAtResolution(ctx, rawSKU, resolution, quantity)
 }
 
 func (s *Service) QuoteAtResolution(ctx context.Context, rawSKU string, resolution OutputResolution, quantity int64) (Quote, error) {
@@ -120,7 +129,11 @@ func (s *Service) QuoteAtResolution(ctx context.Context, rawSKU string, resoluti
 // QuoteInTx locks a submission to the price visible in its caller-owned
 // PostgreSQL transaction.
 func (s *Service) QuoteInTx(ctx context.Context, tx pgx.Tx, rawSKU string, quantity int64) (Quote, error) {
-	return s.QuoteAtResolutionInTx(ctx, tx, rawSKU, OutputResolution1K, quantity)
+	resolution := OutputResolution1K
+	if sku, err := CanonicalizeSKU(rawSKU); err == nil && sku == SKU("ai-image:remove-bg") {
+		resolution = OutputResolutionDefault
+	}
+	return s.QuoteAtResolutionInTx(ctx, tx, rawSKU, resolution, quantity)
 }
 
 func (s *Service) QuoteAtResolutionInTx(ctx context.Context, tx pgx.Tx, rawSKU string, resolution OutputResolution, quantity int64) (Quote, error) {
@@ -138,6 +151,9 @@ func (s *Service) quote(ctx context.Context, querier quoteQuerier, rawSKU string
 	sku, err := CanonicalizeSKU(rawSKU)
 	if err != nil {
 		return Quote{}, err
+	}
+	if sku == SKU("ai-image:remove-bg") && resolution != OutputResolutionDefault {
+		return Quote{}, ErrInvalidOutputResolution
 	}
 	if quantity <= 0 {
 		return Quote{}, ErrInvalidQuantity

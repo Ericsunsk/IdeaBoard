@@ -11,9 +11,12 @@ import type {
   ProviderApiTypeValue,
   ProviderEndpointFormData,
   ProviderEndpointRecord,
+  ProviderProtocolValue,
 } from './providerConfigTypes'
 
 export const DEFAULT_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['openai-compatible']
+export const DEFAULT_ADMIN_PROVIDER_ENDPOINT_PROTOCOL: ProviderProtocolValue = 'model-api'
+export const DEFAULT_ADMIN_PROVIDER_ENDPOINT_CAPABILITIES = ['image-generation'] as const
 export const GOOGLE_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['google-ai']
 export const GOOGLE_CLOUD_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['google-cloud']
 export const DEFAULT_ADMIN_ACCOUNT_EXTRA_CONFIG = '{}'
@@ -45,6 +48,8 @@ export function getAdminProviderEndpointApiTypeLabel(value: string) {
 export function createEmptyProviderEndpointForm(): ProviderEndpointFormData {
   return {
     apiType: DEFAULT_ADMIN_PROVIDER_ENDPOINT_API_TYPE,
+    protocol: DEFAULT_ADMIN_PROVIDER_ENDPOINT_PROTOCOL,
+    capabilities: [...DEFAULT_ADMIN_PROVIDER_ENDPOINT_CAPABILITIES],
     name: '',
     baseUrl: '',
     status: 1,
@@ -54,6 +59,8 @@ export function createEmptyProviderEndpointForm(): ProviderEndpointFormData {
 export function createProviderEndpointSavePayload(form: ProviderEndpointFormData) {
   return {
     api_type: form.apiType,
+    protocol: form.protocol,
+    capabilities: form.capabilities,
     name: form.name,
     base_url: form.baseUrl,
     status: form.status,

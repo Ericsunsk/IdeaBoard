@@ -23,7 +23,7 @@ func TestBillableItemRegistryRejectsDuplicateSKUs(t *testing.T) {
 
 func TestBillableItemRegistryReturnsDeterministicCopies(t *testing.T) {
 	registry, err := NewBillableItemRegistry([]BillableItemDefinition{
-		{SKU: "ai-image:remove-bg", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "抠图", SortOrder: 20},
+		{SKU: "ai-image:remove-bg", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "抠图", SortOrder: 20, PricingVariants: []OutputResolution{OutputResolutionDefault}},
 		{SKU: "ai-image:local-inpaint", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "局部重绘", SortOrder: 10},
 	})
 	if err != nil {
@@ -32,6 +32,7 @@ func TestBillableItemRegistryReturnsDeterministicCopies(t *testing.T) {
 
 	first := registry.Items()
 	first[0].DisplayName = "mutated"
+	first[0].PricingVariants[0] = OutputResolution1K
 	second := registry.Items()
 
 	if got := string(second[0].SKU); got != "ai-image:local-inpaint" {
@@ -39,6 +40,10 @@ func TestBillableItemRegistryReturnsDeterministicCopies(t *testing.T) {
 	}
 	if got := second[0].DisplayName; got != "局部重绘" {
 		t.Fatalf("registry leaked caller mutation: %q", got)
+	}
+	removeBg, _ := registry.Find("ai-image:remove-bg")
+	if removeBg.PricingVariants[0] != OutputResolutionDefault {
+		t.Fatalf("registry leaked pricing variants mutation: %v", removeBg.PricingVariants)
 	}
 }
 
@@ -70,12 +75,12 @@ func TestBillableItemRegistryEnforcesProductKindLength(t *testing.T) {
 func TestBillableCatalogMergesRegistryAndPersistedFacts(t *testing.T) {
 	now := time.Date(2026, 7, 16, 8, 0, 0, 0, time.UTC)
 	activePrice := PriceInfo{PriceVersionID: 11, Version: 2, OutputResolution: OutputResolution1K, UnitCredits: 25, CreatedAt: now}
-	disabledPrice := PriceInfo{PriceVersionID: 12, Version: 1, OutputResolution: OutputResolution1K, UnitCredits: 10, CreatedAt: now}
+	disabledPrice := PriceInfo{PriceVersionID: 12, Version: 1, OutputResolution: OutputResolutionDefault, UnitCredits: 10, CreatedAt: now}
 	activePriceTwo := PriceInfo{PriceVersionID: 14, Version: 1, OutputResolution: OutputResolution1K, UnitCredits: 12, CreatedAt: now}
 	archivedPrice := PriceInfo{PriceVersionID: 13, Version: 3, OutputResolution: OutputResolution1K, UnitCredits: 50, CreatedAt: now}
 	registry, err := NewBillableItemRegistry([]BillableItemDefinition{
 		{SKU: "ai-image:local-inpaint", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "局部重绘", Description: "只修改选区", SortOrder: 10},
-		{SKU: "ai-image:remove-bg", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "抠图", SortOrder: 20},
+		{SKU: "ai-image:remove-bg", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "抠图", SortOrder: 20, PricingVariants: []OutputResolution{OutputResolutionDefault}},
 		{SKU: "ai-image:hd-upscale", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "HD", SortOrder: 30},
 		{SKU: "ai-image:image-extend", Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: "扩图", SortOrder: 40},
 	})
@@ -84,7 +89,7 @@ func TestBillableCatalogMergesRegistryAndPersistedFacts(t *testing.T) {
 	}
 	facts := catalogFactReaderStub{items: []CatalogItem{
 		{SKU: "ai-image:local-inpaint", Enabled: true, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolution1K: activePrice}, UpdatedAt: now},
-		{SKU: "ai-image:remove-bg", Enabled: false, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolution1K: disabledPrice}, UpdatedAt: now},
+		{SKU: "ai-image:remove-bg", Enabled: false, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolutionDefault: disabledPrice}, UpdatedAt: now},
 		{SKU: "ai-image:image-extend", Enabled: true, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolution1K: activePriceTwo}, UpdatedAt: now},
 		{SKU: "legacy:removed", DisplayName: "旧功能", Description: "已从 Registry 移除", Enabled: true, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolution1K: archivedPrice}, UpdatedAt: now},
 	}}

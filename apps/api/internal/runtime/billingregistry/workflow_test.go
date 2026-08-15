@@ -38,4 +38,13 @@ func TestWorkflowRegistryUsesFeatureLevelBillingIdentities(t *testing.T) {
 	if !slices.Equal(skus, want) {
 		t.Fatalf("billing identities=%v, want=%v", skus, want)
 	}
+	for _, item := range items {
+		if string(item.SKU) == "ai-image:remove-bg" {
+			if !slices.Equal(item.PricingVariants, []billing.OutputResolution{billing.OutputResolutionDefault}) {
+				t.Fatalf("remove-bg pricing variants=%v", item.PricingVariants)
+			}
+		} else if !slices.Equal(item.PricingVariants, []billing.OutputResolution{billing.OutputResolution1K, billing.OutputResolution2K, billing.OutputResolution4K}) {
+			t.Fatalf("default pricing variants for %s=%v", item.SKU, item.PricingVariants)
+		}
+	}
 }

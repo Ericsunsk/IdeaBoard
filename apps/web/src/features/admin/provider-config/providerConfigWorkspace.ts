@@ -16,6 +16,11 @@ import {
   getAdminProviderEndpointApiTypeLabel,
   normalizeModelKey,
 } from './providerConfigPayload'
+import type { ProviderEndpointProtocol } from '../../../shared/api/generated-query/model'
+import {
+  DEFAULT_ADMIN_PROVIDER_ENDPOINT_CAPABILITIES,
+  DEFAULT_ADMIN_PROVIDER_ENDPOINT_PROTOCOL,
+} from './providerConfigPayload'
 import {
   createAdminProviderConfigResource,
   type AdminProviderConfigResource,
@@ -89,6 +94,10 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
   const detectModelsLoading = ref(false)
   const modelStatusChangingKeys = ref<ReadonlySet<string>>(new Set())
   const providerEndpoints = ref<ProviderEndpointRecord[]>([])
+  const protocolRegistry = ref<ProviderEndpointProtocol[]>([
+    { id: DEFAULT_ADMIN_PROVIDER_ENDPOINT_PROTOCOL, capabilities: [...DEFAULT_ADMIN_PROVIDER_ENDPOINT_CAPABILITIES] },
+    { id: 'image-url-json-to-png', capabilities: ['background-removal'] },
+  ])
   const accounts = ref<ProviderAccountRecord[]>([])
   const accountLimits = ref<AdminProviderAccountLimits>(FALLBACK_ADMIN_ACCOUNT_LIMITS)
   const searchKeyword = ref('')
@@ -138,7 +147,13 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
   }
 
   async function refreshProviderData() {
-    providerEndpoints.value = await resource.fetchProviderEndpoints()
+    const registryPromise = resource.fetchProviderEndpointRegistry?.()
+    const [nextEndpoints, nextRegistry] = await Promise.all([
+      resource.fetchProviderEndpoints(),
+      registryPromise ?? Promise.resolve(protocolRegistry.value),
+    ])
+    providerEndpoints.value = nextEndpoints
+    if (nextRegistry.length > 0) protocolRegistry.value = nextRegistry
     await loadAccounts()
   }
 
@@ -291,7 +306,11 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
         hasShownApiKeyHint: true,
       }
     }
-    if (detectModelsLoading.value) return result
+    if (
+      detectModelsLoading.value ||
+      (command.providerEndpoint?.protocol === 'image-url-json-to-png' &&
+        command.providerEndpoint.capabilities.includes('background-removal'))
+    ) return result
 
     const apiType = command.providerEndpoint?.apiType || DEFAULT_PROVIDER_API_TYPE
     const sessionKey = `${apiType}::${baseURL}::${secret}`
@@ -439,6 +458,7 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
     detectModelsLoading,
     accountLimits,
     apiTypeOptions: ADMIN_PROVIDER_ENDPOINT_API_TYPE_OPTIONS,
+    protocolRegistry,
     loadData,
     saveProviderEndpoint,
     saveAccount,

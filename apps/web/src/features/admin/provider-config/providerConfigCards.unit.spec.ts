@@ -70,6 +70,8 @@ function makeProviderEndpoint(
   return {
     id: 1,
     apiType: 'openai-compatible',
+    protocol: 'model-api',
+    capabilities: ['image-generation'],
     name: 'ProviderEndpoint',
     baseUrl: 'https://api.example.com/v1',
     status: 1,

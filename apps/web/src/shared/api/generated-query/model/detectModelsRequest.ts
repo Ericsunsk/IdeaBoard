@@ -10,4 +10,5 @@ export interface DetectModelsRequest {
   base_url: string
   api_key: string
   api_type?: ProviderAPIType
+  protocol?: string
 }

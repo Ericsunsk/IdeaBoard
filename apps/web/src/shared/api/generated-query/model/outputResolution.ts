@@ -8,6 +8,7 @@
 export type OutputResolution = (typeof OutputResolution)[keyof typeof OutputResolution]
 
 export const OutputResolution = {
+  default: 'default',
   '1k': '1k',
   '2k': '2k',
   '4k': '4k',

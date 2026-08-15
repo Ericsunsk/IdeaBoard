@@ -22,6 +22,7 @@ import type {
   ApiResponseEmpty,
   ApiResponseProviderEndpoint,
   ApiResponseProviderEndpointList,
+  ApiResponseProviderEndpointRegistry,
   DetectModelsRequest,
   ProviderEndpointFormData,
 } from '../model'
@@ -169,6 +170,78 @@ export function useCreateAdminProviderEndpoint<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getCreateAdminProviderEndpointQueryOptions(providerEndpointFormData, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetAdminProviderEndpointRegistryUrl = () => {
+  return `/admin/provider-endpoints/registry`
+}
+
+export const getAdminProviderEndpointRegistry = async (
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseProviderEndpointRegistry> => {
+  return orvalMutator<ApiResponseProviderEndpointRegistry>(
+    getGetAdminProviderEndpointRegistryUrl(),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getGetAdminProviderEndpointRegistryQueryKey = () => {
+  return ['admin', 'provider-endpoints', 'registry'] as const
+}
+
+export const getGetAdminProviderEndpointRegistryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAdminProviderEndpointRegistry>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getAdminProviderEndpointRegistry>>, TError, TData>
+  >
+  request?: SecondParameter<typeof orvalMutator>
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetAdminProviderEndpointRegistryQueryKey()
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminProviderEndpointRegistry>>> = ({
+    signal,
+  }) => getAdminProviderEndpointRegistry({ signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAdminProviderEndpointRegistry>>,
+    TError,
+    TData
+  >
+}
+
+export type GetAdminProviderEndpointRegistryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAdminProviderEndpointRegistry>>
+>
+export type GetAdminProviderEndpointRegistryQueryError = ErrorType<unknown>
+
+export function useGetAdminProviderEndpointRegistry<
+  TData = Awaited<ReturnType<typeof getAdminProviderEndpointRegistry>>,
+  TError = ErrorType<unknown>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getAdminProviderEndpointRegistry>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetAdminProviderEndpointRegistryQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

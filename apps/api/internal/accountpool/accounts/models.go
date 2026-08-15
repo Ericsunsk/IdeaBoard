@@ -11,6 +11,8 @@ type ApiAccount struct {
 	Name               string         `json:"name"`
 	ProviderEndpointID int64          `json:"provider_endpoint_id"`
 	ApiType            string         `json:"provider_endpoint_api_type"`
+	Protocol           string         `json:"provider_endpoint_protocol"`
+	Capabilities       []string       `json:"provider_endpoint_capabilities"`
 	Models             []AccountModel `json:"models"`
 	ApiKey             string         `json:"-"`
 	SecretConfigured   bool           `json:"secret_configured"`
@@ -81,7 +83,7 @@ func (p *NullableIntPatch) UnmarshalJSON(data []byte) error {
 type CreateAccountRequest struct {
 	Name               string              `json:"name"`
 	ProviderEndpointID int64               `json:"provider_endpoint_id" binding:"required"`
-	Models             []AccountModelInput `json:"models" binding:"required"`
+	Models             []AccountModelInput `json:"models"`
 	Secret             string              `json:"secret" binding:"required"`
 	MaxConcurrent      int                 `json:"max_concurrent"`
 	Timeout            int                 `json:"timeout"`

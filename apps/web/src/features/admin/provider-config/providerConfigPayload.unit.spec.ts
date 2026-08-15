@@ -155,6 +155,8 @@ function makeProviderEndpoint(
   return {
     id: 7,
     apiType: 'google-ai',
+    protocol: 'model-api',
+    capabilities: ['image-generation'],
     name: 'Google ProviderEndpoint',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
     status: 1,

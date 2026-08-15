@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/validation"
@@ -23,9 +24,16 @@ func (s *AccountService) CreateAccount(ctx context.Context, req *CreateAccountRe
 	if req.Weight <= 0 {
 		req.Weight = 1
 	}
-	models, err := normalizeAccountModelInputs(req.Models)
+	protocol, capabilities, err := s.accountRepo.ProviderEndpointConfig(ctx, req.ProviderEndpointID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ProviderEndpoint 不存在")
+	}
+	var models []AccountModel
+	if len(req.Models) > 0 || !providerendpoints.AllowsModellessAccounts(protocol, capabilities) {
+		models, err = normalizeAccountModelInputs(req.Models)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	account := &ApiAccount{
@@ -131,9 +139,16 @@ func (s *AccountService) UpdateAccount(ctx context.Context, id int64, req *Updat
 	}
 	shouldReplaceModels := req.Models != nil
 	if shouldReplaceModels {
-		models, err := normalizeAccountModelInputs(*req.Models)
-		if err != nil {
-			return err
+		protocol, capabilities, configErr := s.accountRepo.ProviderEndpointConfig(ctx, account.ProviderEndpointID)
+		if configErr != nil {
+			return configErr
+		}
+		models := []AccountModel(nil)
+		if len(*req.Models) > 0 || !providerendpoints.AllowsModellessAccounts(protocol, capabilities) {
+			models, err = normalizeAccountModelInputs(*req.Models)
+			if err != nil {
+				return err
+			}
 		}
 		account.Models = models
 	}

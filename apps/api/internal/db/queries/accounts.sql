@@ -12,6 +12,8 @@ RETURNING id;
 -- name: GetAccountByID :one
 SELECT sqlc.embed(a),
        pe.api_type,
+       pe.protocol,
+       COALESCE((SELECT string_agg(capability, ',' ORDER BY capability) FROM provider_endpoint_capabilities WHERE provider_endpoint_id = pe.id), ''::text)::text AS capabilities,
        ''::text AS api_key,
        EXISTS (
          SELECT 1 FROM api_account_secrets AS active_secret
@@ -26,6 +28,8 @@ WHERE a.id = sqlc.arg(id)
 -- name: GetRuntimeAccountByIDWithSecret :one
 SELECT sqlc.embed(a),
        pe.api_type,
+       pe.protocol,
+       COALESCE((SELECT string_agg(capability, ',' ORDER BY capability) FROM provider_endpoint_capabilities WHERE provider_endpoint_id = pe.id), ''::text)::text AS capabilities,
        secret.secret_payload::text AS api_key,
        secret.secret_material_kind AS api_key_material_kind,
        TRUE::boolean AS secret_configured,
@@ -50,6 +54,8 @@ WHERE a.id = sqlc.arg(id)
 -- name: GetRuntimeAccountForAssignment :one
 SELECT sqlc.embed(a),
        pe.api_type,
+       pe.protocol,
+       COALESCE((SELECT string_agg(capability, ',' ORDER BY capability) FROM provider_endpoint_capabilities WHERE provider_endpoint_id = pe.id), ''::text)::text AS capabilities,
        secret.secret_payload::text AS api_key,
        secret.secret_material_kind AS api_key_material_kind,
        TRUE::boolean AS secret_configured,
@@ -78,6 +84,8 @@ WHERE a.deleted_at IS NULL
 -- name: ListAccounts :many
 SELECT sqlc.embed(a),
        pe.api_type,
+       pe.protocol,
+       COALESCE((SELECT string_agg(capability, ',' ORDER BY capability) FROM provider_endpoint_capabilities WHERE provider_endpoint_id = pe.id), ''::text)::text AS capabilities,
        ''::text AS api_key,
        EXISTS (
          SELECT 1 FROM api_account_secrets AS active_secret
@@ -95,6 +103,8 @@ LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
 -- name: ListEnabledAccounts :many
 SELECT sqlc.embed(a),
        pe.api_type,
+       pe.protocol,
+       COALESCE((SELECT string_agg(capability, ',' ORDER BY capability) FROM provider_endpoint_capabilities WHERE provider_endpoint_id = pe.id), ''::text)::text AS capabilities,
        ''::text AS api_key,
        TRUE::boolean AS secret_configured,
        pe.base_url AS proxy_url
@@ -103,6 +113,10 @@ INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 WHERE a.status = 1
   AND pe.status = 1
   AND a.deleted_at IS NULL
+  AND EXISTS (
+    SELECT 1 FROM provider_endpoint_capabilities AS configured_capability
+    WHERE configured_capability.provider_endpoint_id = pe.id
+  )
   AND EXISTS (
     SELECT 1
 	    FROM api_account_secrets AS active_secret

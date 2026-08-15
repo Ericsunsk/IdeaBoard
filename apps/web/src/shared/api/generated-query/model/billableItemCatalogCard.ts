@@ -5,6 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { BillableItemCatalogCardCurrentPrices } from './billableItemCatalogCardCurrentPrices'
+import type { BillableItemCatalogCardPricingVariantsItem } from './billableItemCatalogCardPricingVariantsItem'
 import type { BillableItemStatus } from './billableItemStatus'
 import type { BillingSKUCode } from './billingSKUCode'
 
@@ -31,5 +32,7 @@ export interface BillableItemCatalogCard {
   sort_order: number
   status: BillableItemStatus
   current_prices?: BillableItemCatalogCardCurrentPrices
+  /** @minItems 1 */
+  pricing_variants: BillableItemCatalogCardPricingVariantsItem[]
   updated_at?: string
 }

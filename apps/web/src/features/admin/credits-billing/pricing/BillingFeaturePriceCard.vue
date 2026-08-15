@@ -24,15 +24,18 @@
     <template #content>
       <div class="flex min-w-0 flex-col gap-5">
         <div class="flex items-end justify-between gap-4">
-          <dl class="grid min-w-0 flex-1 grid-cols-3 gap-3">
+          <dl
+            class="grid min-w-0 flex-1 gap-3"
+            :class="resolutions.length === 1 ? 'grid-cols-1' : 'grid-cols-3'"
+          >
             <div
-              v-for="resolution in resolutions"
-              :key="resolution"
+              v-for="variant in resolutions"
+              :key="variant"
               class="min-w-0 rounded-lg border border-admin-border-soft bg-admin-surface-muted/50 px-2.5 py-2"
             >
-              <dt class="text-admin-caption text-ib-text-muted">{{ resolution.toUpperCase() }}</dt>
+              <dt class="text-admin-caption text-ib-text-muted">{{ variantLabel(variant) }}</dt>
               <dd class="mt-1 truncate text-admin-meta font-bold text-admin-title-color">
-                {{ priceLabel(resolution) }}
+                {{ priceLabel(variant) }}
               </dd>
             </div>
           </dl>
@@ -106,7 +109,11 @@ import {
   adminCompactTagClass,
   adminMasonryCardClass,
 } from '../../shared/lib/adminUiClasses'
-import type { AdminBillableItemCard, AdminBillableItemStatus, OutputResolution } from './billableCatalogTypes'
+import type {
+  AdminBillableItemCard,
+  AdminBillableItemStatus,
+  PricingVariant,
+} from './billableCatalogTypes'
 
 const props = defineProps<{
   item: AdminBillableItemCard
@@ -139,9 +146,12 @@ const workflowPresentation = computed(() => {
   if (!group) return null
   return { groupTitle: group.title }
 })
-const resolutions: OutputResolution[] = ['1k', '2k', '4k']
-function priceLabel(resolution: OutputResolution) {
-  const price = props.item.currentPrices[resolution]
+const resolutions = computed(() => props.item.pricingVariants)
+function variantLabel(variant: PricingVariant) {
+  return variant === 'default' ? '固定' : variant.toUpperCase()
+}
+function priceLabel(variant: PricingVariant) {
+  const price = props.item.currentPrices[variant]
   return price ? formatIdeaAmount(price.unitCredits) : '未设置'
 }
 const updatedAtLabel = computed(() => {

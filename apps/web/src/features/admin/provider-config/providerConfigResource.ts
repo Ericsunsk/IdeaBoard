@@ -3,6 +3,7 @@ import {
   deleteAdminAccountRecord,
   deleteAdminProviderEndpoint,
   detectAdminProviderEndpointModels,
+  fetchAdminProviderEndpointRegistry,
   fetchAdminAccountLimits,
   fetchAdminProviderEndpoints,
   fetchAllAdminAccounts,
@@ -18,6 +19,7 @@ export type AdminProviderConfigResource = {
   saveProviderEndpoint: typeof saveAdminProviderEndpoint
   deleteProviderEndpoint: typeof deleteAdminProviderEndpoint
   detectProviderEndpointModels: typeof detectAdminProviderEndpointModels
+  fetchProviderEndpointRegistry?: typeof fetchAdminProviderEndpointRegistry
   createAccountRecord: typeof createAdminAccountRecord
   updateAccountRecord: typeof updateAdminAccountRecord
   patchAccountModelRecord: typeof patchAdminAccountModelRecord
@@ -32,6 +34,7 @@ export function createAdminProviderConfigResource(): AdminProviderConfigResource
     saveProviderEndpoint: saveAdminProviderEndpoint,
     deleteProviderEndpoint: deleteAdminProviderEndpoint,
     detectProviderEndpointModels: detectAdminProviderEndpointModels,
+    fetchProviderEndpointRegistry: fetchAdminProviderEndpointRegistry,
     createAccountRecord: createAdminAccountRecord,
     updateAccountRecord: updateAdminAccountRecord,
     patchAccountModelRecord: patchAdminAccountModelRecord,

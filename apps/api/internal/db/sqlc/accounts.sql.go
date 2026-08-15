@@ -179,6 +179,8 @@ func (q *Queries) DeleteAccountModelsByAccountID(ctx context.Context, accountID 
 const getAccountByID = `-- name: GetAccountByID :one
 SELECT a.id, a.name, a.provider_endpoint_id, a.max_concurrent, a.timeout, a.extra_config, a.status, a.fail_count, a.weight, a.created_at, a.updated_at, a.deleted_at,
        pe.api_type,
+       pe.protocol,
+       COALESCE((SELECT string_agg(capability, ',' ORDER BY capability) FROM provider_endpoint_capabilities WHERE provider_endpoint_id = pe.id), ''::text)::text AS capabilities,
        ''::text AS api_key,
        EXISTS (
          SELECT 1 FROM api_account_secrets AS active_secret
@@ -194,6 +196,8 @@ WHERE a.id = $1
 type GetAccountByIDRow struct {
 	ApiAccount       ApiAccount `json:"api_account"`
 	ApiType          string     `json:"api_type"`
+	Protocol         string     `json:"protocol"`
+	Capabilities     string     `json:"capabilities"`
 	ApiKey           string     `json:"api_key"`
 	SecretConfigured bool       `json:"secret_configured"`
 	ProxyUrl         string     `json:"proxy_url"`
@@ -216,6 +220,8 @@ func (q *Queries) GetAccountByID(ctx context.Context, id int64) (GetAccountByIDR
 		&i.ApiAccount.UpdatedAt,
 		&i.ApiAccount.DeletedAt,
 		&i.ApiType,
+		&i.Protocol,
+		&i.Capabilities,
 		&i.ApiKey,
 		&i.SecretConfigured,
 		&i.ProxyUrl,
@@ -256,6 +262,8 @@ func (q *Queries) GetActiveAccountSecretByAccountID(ctx context.Context, account
 const getRuntimeAccountByIDWithSecret = `-- name: GetRuntimeAccountByIDWithSecret :one
 SELECT a.id, a.name, a.provider_endpoint_id, a.max_concurrent, a.timeout, a.extra_config, a.status, a.fail_count, a.weight, a.created_at, a.updated_at, a.deleted_at,
        pe.api_type,
+       pe.protocol,
+       COALESCE((SELECT string_agg(capability, ',' ORDER BY capability) FROM provider_endpoint_capabilities WHERE provider_endpoint_id = pe.id), ''::text)::text AS capabilities,
        secret.secret_payload::text AS api_key,
        secret.secret_material_kind AS api_key_material_kind,
        TRUE::boolean AS secret_configured,
@@ -281,6 +289,8 @@ WHERE a.id = $1
 type GetRuntimeAccountByIDWithSecretRow struct {
 	ApiAccount         ApiAccount `json:"api_account"`
 	ApiType            string     `json:"api_type"`
+	Protocol           string     `json:"protocol"`
+	Capabilities       string     `json:"capabilities"`
 	ApiKey             string     `json:"api_key"`
 	ApiKeyMaterialKind string     `json:"api_key_material_kind"`
 	SecretConfigured   bool       `json:"secret_configured"`
@@ -304,6 +314,8 @@ func (q *Queries) GetRuntimeAccountByIDWithSecret(ctx context.Context, id int64)
 		&i.ApiAccount.UpdatedAt,
 		&i.ApiAccount.DeletedAt,
 		&i.ApiType,
+		&i.Protocol,
+		&i.Capabilities,
 		&i.ApiKey,
 		&i.ApiKeyMaterialKind,
 		&i.SecretConfigured,
@@ -315,6 +327,8 @@ func (q *Queries) GetRuntimeAccountByIDWithSecret(ctx context.Context, id int64)
 const getRuntimeAccountForAssignment = `-- name: GetRuntimeAccountForAssignment :one
 SELECT a.id, a.name, a.provider_endpoint_id, a.max_concurrent, a.timeout, a.extra_config, a.status, a.fail_count, a.weight, a.created_at, a.updated_at, a.deleted_at,
        pe.api_type,
+       pe.protocol,
+       COALESCE((SELECT string_agg(capability, ',' ORDER BY capability) FROM provider_endpoint_capabilities WHERE provider_endpoint_id = pe.id), ''::text)::text AS capabilities,
        secret.secret_payload::text AS api_key,
        secret.secret_material_kind AS api_key_material_kind,
        TRUE::boolean AS secret_configured,
@@ -342,6 +356,8 @@ type GetRuntimeAccountForAssignmentParams struct {
 type GetRuntimeAccountForAssignmentRow struct {
 	ApiAccount         ApiAccount `json:"api_account"`
 	ApiType            string     `json:"api_type"`
+	Protocol           string     `json:"protocol"`
+	Capabilities       string     `json:"capabilities"`
 	ApiKey             string     `json:"api_key"`
 	ApiKeyMaterialKind string     `json:"api_key_material_kind"`
 	SecretConfigured   bool       `json:"secret_configured"`
@@ -365,6 +381,8 @@ func (q *Queries) GetRuntimeAccountForAssignment(ctx context.Context, arg GetRun
 		&i.ApiAccount.UpdatedAt,
 		&i.ApiAccount.DeletedAt,
 		&i.ApiType,
+		&i.Protocol,
+		&i.Capabilities,
 		&i.ApiKey,
 		&i.ApiKeyMaterialKind,
 		&i.SecretConfigured,
@@ -532,6 +550,8 @@ func (q *Queries) ListAccountModelsByAccountIDs(ctx context.Context, accountIds 
 const listAccounts = `-- name: ListAccounts :many
 SELECT a.id, a.name, a.provider_endpoint_id, a.max_concurrent, a.timeout, a.extra_config, a.status, a.fail_count, a.weight, a.created_at, a.updated_at, a.deleted_at,
        pe.api_type,
+       pe.protocol,
+       COALESCE((SELECT string_agg(capability, ',' ORDER BY capability) FROM provider_endpoint_capabilities WHERE provider_endpoint_id = pe.id), ''::text)::text AS capabilities,
        ''::text AS api_key,
        EXISTS (
          SELECT 1 FROM api_account_secrets AS active_secret
@@ -559,6 +579,8 @@ type ListAccountsParams struct {
 type ListAccountsRow struct {
 	ApiAccount       ApiAccount `json:"api_account"`
 	ApiType          string     `json:"api_type"`
+	Protocol         string     `json:"protocol"`
+	Capabilities     string     `json:"capabilities"`
 	ApiKey           string     `json:"api_key"`
 	SecretConfigured bool       `json:"secret_configured"`
 	ProxyUrl         string     `json:"proxy_url"`
@@ -594,6 +616,8 @@ func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]L
 			&i.ApiAccount.UpdatedAt,
 			&i.ApiAccount.DeletedAt,
 			&i.ApiType,
+			&i.Protocol,
+			&i.Capabilities,
 			&i.ApiKey,
 			&i.SecretConfigured,
 			&i.ProxyUrl,
@@ -614,6 +638,8 @@ func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]L
 const listEnabledAccounts = `-- name: ListEnabledAccounts :many
 SELECT a.id, a.name, a.provider_endpoint_id, a.max_concurrent, a.timeout, a.extra_config, a.status, a.fail_count, a.weight, a.created_at, a.updated_at, a.deleted_at,
        pe.api_type,
+       pe.protocol,
+       COALESCE((SELECT string_agg(capability, ',' ORDER BY capability) FROM provider_endpoint_capabilities WHERE provider_endpoint_id = pe.id), ''::text)::text AS capabilities,
        ''::text AS api_key,
        TRUE::boolean AS secret_configured,
        pe.base_url AS proxy_url
@@ -622,6 +648,10 @@ INNER JOIN provider_endpoints AS pe ON pe.id = a.provider_endpoint_id
 WHERE a.status = 1
   AND pe.status = 1
   AND a.deleted_at IS NULL
+  AND EXISTS (
+    SELECT 1 FROM provider_endpoint_capabilities AS configured_capability
+    WHERE configured_capability.provider_endpoint_id = pe.id
+  )
   AND EXISTS (
     SELECT 1
 	    FROM api_account_secrets AS active_secret
@@ -636,6 +666,8 @@ ORDER BY a.id ASC
 type ListEnabledAccountsRow struct {
 	ApiAccount       ApiAccount `json:"api_account"`
 	ApiType          string     `json:"api_type"`
+	Protocol         string     `json:"protocol"`
+	Capabilities     string     `json:"capabilities"`
 	ApiKey           string     `json:"api_key"`
 	SecretConfigured bool       `json:"secret_configured"`
 	ProxyUrl         string     `json:"proxy_url"`
@@ -664,6 +696,8 @@ func (q *Queries) ListEnabledAccounts(ctx context.Context) ([]ListEnabledAccount
 			&i.ApiAccount.UpdatedAt,
 			&i.ApiAccount.DeletedAt,
 			&i.ApiType,
+			&i.Protocol,
+			&i.Capabilities,
 			&i.ApiKey,
 			&i.SecretConfigured,
 			&i.ProxyUrl,

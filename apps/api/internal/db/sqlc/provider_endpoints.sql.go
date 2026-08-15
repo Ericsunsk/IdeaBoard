@@ -7,24 +7,43 @@ package dbsqlc
 
 import (
 	"context"
+
+	"github.com/lib/pq"
 )
 
+const addProviderEndpointCapability = `-- name: AddProviderEndpointCapability :exec
+INSERT INTO provider_endpoint_capabilities (provider_endpoint_id, capability)
+VALUES ($1, $2)
+`
+
+type AddProviderEndpointCapabilityParams struct {
+	ProviderEndpointID int64  `json:"provider_endpoint_id"`
+	Capability         string `json:"capability"`
+}
+
+func (q *Queries) AddProviderEndpointCapability(ctx context.Context, arg AddProviderEndpointCapabilityParams) error {
+	_, err := q.db.ExecContext(ctx, addProviderEndpointCapability, arg.ProviderEndpointID, arg.Capability)
+	return err
+}
+
 const createProviderEndpoint = `-- name: CreateProviderEndpoint :one
-INSERT INTO provider_endpoints (api_type, name, base_url, status)
-VALUES ($1, $2, $3, $4)
+INSERT INTO provider_endpoints (api_type, protocol, name, base_url, status)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING id
 `
 
 type CreateProviderEndpointParams struct {
-	ApiType string `json:"api_type"`
-	Name    string `json:"name"`
-	BaseUrl string `json:"base_url"`
-	Status  int16  `json:"status"`
+	ApiType  string `json:"api_type"`
+	Protocol string `json:"protocol"`
+	Name     string `json:"name"`
+	BaseUrl  string `json:"base_url"`
+	Status   int16  `json:"status"`
 }
 
 func (q *Queries) CreateProviderEndpoint(ctx context.Context, arg CreateProviderEndpointParams) (int64, error) {
 	row := q.db.QueryRowContext(ctx, createProviderEndpoint,
 		arg.ApiType,
+		arg.Protocol,
 		arg.Name,
 		arg.BaseUrl,
 		arg.Status,
@@ -48,7 +67,7 @@ func (q *Queries) DeleteProviderEndpoint(ctx context.Context, id int64) (int64, 
 }
 
 const getProviderEndpointByID = `-- name: GetProviderEndpointByID :one
-SELECT id, api_type, name, base_url, status, created_at, updated_at
+SELECT id, api_type, protocol, name, base_url, status, created_at, updated_at
 FROM provider_endpoints
 WHERE id = $1
 `
@@ -59,6 +78,7 @@ func (q *Queries) GetProviderEndpointByID(ctx context.Context, id int64) (Provid
 	err := row.Scan(
 		&i.ID,
 		&i.ApiType,
+		&i.Protocol,
 		&i.Name,
 		&i.BaseUrl,
 		&i.Status,
@@ -68,8 +88,43 @@ func (q *Queries) GetProviderEndpointByID(ctx context.Context, id int64) (Provid
 	return i, err
 }
 
+const listProviderEndpointCapabilities = `-- name: ListProviderEndpointCapabilities :many
+SELECT provider_endpoint_id, capability
+FROM provider_endpoint_capabilities
+WHERE provider_endpoint_id = ANY($1::bigint[])
+ORDER BY provider_endpoint_id ASC, capability ASC
+`
+
+type ListProviderEndpointCapabilitiesRow struct {
+	ProviderEndpointID int64  `json:"provider_endpoint_id"`
+	Capability         string `json:"capability"`
+}
+
+func (q *Queries) ListProviderEndpointCapabilities(ctx context.Context, providerEndpointIds []int64) ([]ListProviderEndpointCapabilitiesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listProviderEndpointCapabilities, pq.Array(providerEndpointIds))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListProviderEndpointCapabilitiesRow
+	for rows.Next() {
+		var i ListProviderEndpointCapabilitiesRow
+		if err := rows.Scan(&i.ProviderEndpointID, &i.Capability); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listProviderEndpoints = `-- name: ListProviderEndpoints :many
-SELECT id, api_type, name, base_url, status, created_at, updated_at
+SELECT id, api_type, protocol, name, base_url, status, created_at, updated_at
 FROM provider_endpoints
 ORDER BY id ASC
 `
@@ -86,6 +141,7 @@ func (q *Queries) ListProviderEndpoints(ctx context.Context) ([]ProviderEndpoint
 		if err := rows.Scan(
 			&i.ID,
 			&i.ApiType,
+			&i.Protocol,
 			&i.Name,
 			&i.BaseUrl,
 			&i.Status,
@@ -105,26 +161,39 @@ func (q *Queries) ListProviderEndpoints(ctx context.Context) ([]ProviderEndpoint
 	return items, nil
 }
 
+const replaceProviderEndpointCapabilities = `-- name: ReplaceProviderEndpointCapabilities :exec
+DELETE FROM provider_endpoint_capabilities
+WHERE provider_endpoint_id = $1
+`
+
+func (q *Queries) ReplaceProviderEndpointCapabilities(ctx context.Context, providerEndpointID int64) error {
+	_, err := q.db.ExecContext(ctx, replaceProviderEndpointCapabilities, providerEndpointID)
+	return err
+}
+
 const updateProviderEndpoint = `-- name: UpdateProviderEndpoint :execrows
 UPDATE provider_endpoints
 SET api_type = $1,
-    name = $2,
-    base_url = $3,
-    status = $4
-WHERE id = $5
+    protocol = $2,
+    name = $3,
+    base_url = $4,
+    status = $5
+WHERE id = $6
 `
 
 type UpdateProviderEndpointParams struct {
-	ApiType string `json:"api_type"`
-	Name    string `json:"name"`
-	BaseUrl string `json:"base_url"`
-	Status  int16  `json:"status"`
-	ID      int64  `json:"id"`
+	ApiType  string `json:"api_type"`
+	Protocol string `json:"protocol"`
+	Name     string `json:"name"`
+	BaseUrl  string `json:"base_url"`
+	Status   int16  `json:"status"`
+	ID       int64  `json:"id"`
 }
 
 func (q *Queries) UpdateProviderEndpoint(ctx context.Context, arg UpdateProviderEndpointParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, updateProviderEndpoint,
 		arg.ApiType,
+		arg.Protocol,
 		arg.Name,
 		arg.BaseUrl,
 		arg.Status,

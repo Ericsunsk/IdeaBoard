@@ -3,13 +3,16 @@ package workflow
 import "strings"
 
 const (
-	OutputResolution1K = "1k"
-	OutputResolution2K = "2k"
-	OutputResolution4K = "4k"
+	OutputResolutionDefault = "default"
+	OutputResolution1K      = "1k"
+	OutputResolution2K      = "2k"
+	OutputResolution4K      = "4k"
 )
 
 func NormalizeOutputResolution(raw string) (string, bool) {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case OutputResolutionDefault:
+		return OutputResolutionDefault, true
 	case "", OutputResolution1K:
 		return OutputResolution1K, true
 	case OutputResolution2K:
@@ -21,8 +24,24 @@ func NormalizeOutputResolution(raw string) (string, bool) {
 	}
 }
 
+func NormalizeOutputResolutionForFeature(feature, raw string) (string, bool) {
+	if feature == FeatureSlugRemoveBg && strings.TrimSpace(raw) == "" {
+		return OutputResolutionDefault, true
+	}
+	resolution, ok := NormalizeOutputResolution(raw)
+	if !ok {
+		return "", false
+	}
+	if feature == FeatureSlugRemoveBg && resolution != OutputResolutionDefault {
+		return "", false
+	}
+	return resolution, true
+}
+
 func SupportsOutputResolution(resolution string, supports2K, supports4K bool) bool {
 	switch resolution {
+	case OutputResolutionDefault:
+		return true
 	case OutputResolution1K:
 		return true
 	case OutputResolution2K:

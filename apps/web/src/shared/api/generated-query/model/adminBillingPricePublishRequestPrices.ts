@@ -10,7 +10,12 @@ export type AdminBillingPricePublishRequestPrices = {
    * @minimum 0
    * @maximum 9000000000000000
    */
-  '1k': number
+  default?: number
+  /**
+   * @minimum 0
+   * @maximum 9000000000000000
+   */
+  '1k'?: number
   /**
    * @minimum 0
    * @maximum 9000000000000000

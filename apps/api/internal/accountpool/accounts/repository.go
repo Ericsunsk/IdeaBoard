@@ -24,6 +24,22 @@ type AccountRepository struct {
 	runningTaskFinalizer RunningTaskFinalizer
 }
 
+func (r *AccountRepository) ProviderEndpointConfig(ctx context.Context, endpointID int64) (string, []string, error) {
+	row, err := r.q.GetProviderEndpointByID(ctx, endpointID)
+	if err != nil {
+		return "", nil, err
+	}
+	rows, err := r.q.ListProviderEndpointCapabilities(ctx, []int64{endpointID})
+	if err != nil {
+		return "", nil, err
+	}
+	capabilities := make([]string, 0, len(rows))
+	for _, capability := range rows {
+		capabilities = append(capabilities, capability.Capability)
+	}
+	return row.Protocol, capabilities, nil
+}
+
 type RunningTaskFinalizer interface {
 	FailRunningByAccountIDWithTx(ctx context.Context, tx *sql.Tx, accountID int64, errMsg string, completedAt time.Time) ([]string, error)
 }
@@ -72,7 +88,7 @@ func (r *AccountRepository) GetByID(ctx context.Context, id int64) (*ApiAccount,
 	if err != nil {
 		return nil, err
 	}
-	account := accountFromSQLC(row.ApiAccount, row.ApiType, row.ApiKey, row.SecretConfigured, row.ProxyUrl)
+	account := accountFromSQLC(row.ApiAccount, row.ApiType, row.Protocol, row.Capabilities, row.ApiKey, row.SecretConfigured, row.ProxyUrl)
 	if err := r.attachAccountModels(ctx, []*ApiAccount{&account}); err != nil {
 		return nil, err
 	}
@@ -88,7 +104,7 @@ func (r *AccountRepository) GetRuntimeByIDWithSecret(ctx context.Context, id int
 	if err != nil {
 		return nil, err
 	}
-	account := accountFromSQLC(row.ApiAccount, row.ApiType, apiKey, row.SecretConfigured, row.ProxyUrl)
+	account := accountFromSQLC(row.ApiAccount, row.ApiType, row.Protocol, row.Capabilities, apiKey, row.SecretConfigured, row.ProxyUrl)
 	if err := r.attachAccountModels(ctx, []*ApiAccount{&account}); err != nil {
 		return nil, err
 	}
@@ -108,7 +124,7 @@ func (r *AccountRepository) GetRuntimeAccountForAssignment(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	account := accountFromSQLC(row.ApiAccount, row.ApiType, apiKey, row.SecretConfigured, row.ProxyUrl)
+	account := accountFromSQLC(row.ApiAccount, row.ApiType, row.Protocol, row.Capabilities, apiKey, row.SecretConfigured, row.ProxyUrl)
 	if err := r.attachAccountModels(ctx, []*ApiAccount{&account}); err != nil {
 		return nil, err
 	}
@@ -395,12 +411,14 @@ func (r *AccountRepository) ResetFailCount(ctx context.Context, id int64) error 
 	return nil
 }
 
-func accountFromSQLC(row dbsqlc.ApiAccount, apiType, apiKey string, secretConfigured bool, proxyURL string) ApiAccount {
+func accountFromSQLC(row dbsqlc.ApiAccount, apiType, protocol, capabilityCSV, apiKey string, secretConfigured bool, proxyURL string) ApiAccount {
 	return ApiAccount{
 		ID:                 row.ID,
 		Name:               row.Name,
 		ProviderEndpointID: row.ProviderEndpointID,
 		ApiType:            apiType,
+		Protocol:           protocol,
+		Capabilities:       splitCapabilities(capabilityCSV),
 		ApiKey:             apiKey,
 		SecretConfigured:   secretConfigured,
 		ProxyURL:           proxyURL,
@@ -416,11 +434,25 @@ func accountFromSQLC(row dbsqlc.ApiAccount, apiType, apiKey string, secretConfig
 }
 
 func accountFromListRow(row dbsqlc.ListAccountsRow) ApiAccount {
-	return accountFromSQLC(row.ApiAccount, row.ApiType, row.ApiKey, row.SecretConfigured, row.ProxyUrl)
+	return accountFromSQLC(row.ApiAccount, row.ApiType, row.Protocol, row.Capabilities, row.ApiKey, row.SecretConfigured, row.ProxyUrl)
 }
 
 func accountFromEnabledRow(row dbsqlc.ListEnabledAccountsRow) ApiAccount {
-	return accountFromSQLC(row.ApiAccount, row.ApiType, row.ApiKey, row.SecretConfigured, row.ProxyUrl)
+	return accountFromSQLC(row.ApiAccount, row.ApiType, row.Protocol, row.Capabilities, row.ApiKey, row.SecretConfigured, row.ProxyUrl)
+}
+
+func splitCapabilities(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	capabilities := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if capability := strings.TrimSpace(part); capability != "" {
+			capabilities = append(capabilities, capability)
+		}
+	}
+	return capabilities
 }
 
 func accountsFromListRows(rows []dbsqlc.ListAccountsRow) []*ApiAccount {

@@ -144,7 +144,7 @@ function getItemTooltip(item: ImageActionMenuItem) {
   const billing = getItemBillingState(item)
   if (!billing) return item.label
   if (billing.status === 'ready') {
-    return `${item.label} · ${formatQuote((billing.unitCredits ?? 0) * props.outputCount)}`
+    return `${item.label} · ${formatQuote(billing.totalCredits ?? (billing.unitCredits ?? 0) * props.outputCount)}`
   }
   return item.label
 }
@@ -156,7 +156,7 @@ function formatQuote(totalCredits: number) {
 function getItemTouchPrice(item: ImageActionMenuItem) {
   const billing = getItemBillingState(item)
   return billing?.status === 'ready'
-    ? formatQuote((billing.unitCredits ?? 0) * props.outputCount)
+    ? formatQuote(billing.totalCredits ?? (billing.unitCredits ?? 0) * props.outputCount)
     : ''
 }
 

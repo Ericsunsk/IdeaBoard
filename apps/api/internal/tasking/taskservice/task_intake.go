@@ -137,9 +137,9 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 		}
 		params[paramkeys.OutputCount] = requestedOutputCount.Int()
 	}
-	resolution, ok := workflow.NormalizeOutputResolution(readStringParam(params, paramkeys.OutputResolution))
+	resolution, ok := workflow.NormalizeOutputResolutionForFeature(featureSlug, readStringParam(params, paramkeys.OutputResolution))
 	if !ok {
-		return CanonicalTaskRequest{}, validation.New("output_resolution 仅支持 1k、2k、4k")
+		return CanonicalTaskRequest{}, validation.New("该功能的 output_resolution 不受支持")
 	}
 	params[paramkeys.OutputResolution] = resolution
 	typedParams, err := workflowTaskParamsFromMap(params, featureSlug)

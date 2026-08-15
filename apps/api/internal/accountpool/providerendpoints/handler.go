@@ -41,6 +41,10 @@ type providerEndpointListResponse struct {
 	List []*ProviderEndpoint `json:"list"`
 }
 
+type providerEndpointRegistryResponse struct {
+	Protocols []ProtocolDefinition `json:"protocols"`
+}
+
 type providerEndpointResponse struct {
 	ProviderEndpoint *ProviderEndpoint `json:"provider_endpoint"`
 }
@@ -92,6 +96,10 @@ func (h *ProviderEndpointHandler) List(c *gin.Context) {
 	response.SuccessDTO(c, providerEndpointListResponse{List: endpoints})
 }
 
+func (h *ProviderEndpointHandler) Registry(c *gin.Context) {
+	response.SuccessDTO(c, providerEndpointRegistryResponse{Protocols: ProtocolRegistry()})
+}
+
 func (h *ProviderEndpointHandler) Create(c *gin.Context) {
 	var req CreateProviderEndpointRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -100,6 +108,11 @@ func (h *ProviderEndpointHandler) Create(c *gin.Context) {
 	}
 	if !isValidProviderEndpointStatus(req.Status) {
 		response.Error(c, 400, "status 只支持 0 或 1")
+		return
+	}
+	protocol, capabilities, err := NormalizeProtocolCapabilities(req.Protocol, req.Capabilities)
+	if err != nil {
+		response.Error(c, 400, err.Error())
 		return
 	}
 
@@ -116,10 +129,12 @@ func (h *ProviderEndpointHandler) Create(c *gin.Context) {
 	}
 
 	endpoint := &ProviderEndpoint{
-		APIType: apiType,
-		Name:    req.Name,
-		BaseURL: baseURL,
-		Status:  req.Status,
+		APIType:      apiType,
+		Protocol:     protocol,
+		Capabilities: capabilities,
+		Name:         req.Name,
+		BaseURL:      baseURL,
+		Status:       req.Status,
 	}
 
 	if err := h.endpointRepo.Create(c.Request.Context(), endpoint); err != nil {
@@ -149,6 +164,11 @@ func (h *ProviderEndpointHandler) Update(c *gin.Context) {
 		response.Error(c, 400, "status 只支持 0 或 1")
 		return
 	}
+	protocol, capabilities, err := NormalizeProtocolCapabilities(req.Protocol, req.Capabilities)
+	if err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
 
 	baseURL, err := outbound.ValidateConfiguredEndpoint(req.BaseURL, outbound.AllowHosts(c.Request.Context())...)
 	if err != nil {
@@ -169,6 +189,8 @@ func (h *ProviderEndpointHandler) Update(c *gin.Context) {
 	}
 
 	endpoint.APIType = apiType
+	endpoint.Protocol = protocol
+	endpoint.Capabilities = capabilities
 	endpoint.Name = req.Name
 	endpoint.BaseURL = baseURL
 	endpoint.Status = req.Status
@@ -218,6 +240,10 @@ func (h *ProviderEndpointHandler) DetectModels(c *gin.Context) {
 	apiKey := strings.TrimSpace(req.APIKey)
 	if baseURL == "" || apiKey == "" {
 		response.Error(c, 400, "base_url 与 api_key 不能为空")
+		return
+	}
+	if strings.TrimSpace(req.Protocol) != "" && !ProtocolSupportsModelDetection(req.Protocol) {
+		response.Error(c, 400, "当前 Protocol 不支持模型检测")
 		return
 	}
 

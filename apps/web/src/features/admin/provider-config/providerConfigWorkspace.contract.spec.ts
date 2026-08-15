@@ -78,6 +78,8 @@ describe('provider config workspace facade', () => {
     const afterSaved = vi.fn()
     const data = {
       apiType: 'openai-compatible' as const,
+      protocol: 'model-api' as const,
+      capabilities: ['image-generation' as const],
       name: 'Updated ProviderEndpoint',
       baseUrl: 'https://api.updated.example/v1',
       status: 1,
@@ -109,6 +111,8 @@ describe('provider config workspace facade', () => {
     await workspace.saveProviderEndpoint({
       data: {
         apiType: 'openai-compatible',
+        protocol: 'model-api',
+        capabilities: ['image-generation'] as const,
         name: 'Broken ProviderEndpoint',
         baseUrl: 'https://api.broken.example/v1',
         status: 1,
@@ -136,6 +140,8 @@ describe('provider config workspace facade', () => {
     await workspace.saveProviderEndpoint({
       data: {
         apiType: 'openai-compatible',
+        protocol: 'model-api',
+        capabilities: ['image-generation'],
         name: 'Saved ProviderEndpoint',
         baseUrl: 'https://api.saved.example/v1',
         status: 1,
@@ -432,6 +438,8 @@ function makeProviderEndpoint(
   return {
     id: 1,
     apiType: 'openai-compatible',
+    protocol: 'model-api',
+    capabilities: ['image-generation'],
     name: 'OpenAI ProviderEndpoint',
     baseUrl: 'https://api.example.com/v1',
     status: 1,

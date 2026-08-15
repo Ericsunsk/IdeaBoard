@@ -69,10 +69,14 @@ type ImageActionReadinessOptions = {
   outputResolution?: OutputResolution
 }
 
-function buildOutputBillingParams(options: ImageActionReadinessOptions = {}) {
+function buildOutputBillingParams(
+  options: ImageActionReadinessOptions = {},
+  feature?: string,
+) {
+  const isRemoveBg = feature === EXECUTION_FEATURE.removeBg
   return {
-    output_count: assertRequestedOutputCount(options.outputCount ?? 1),
-    output_resolution: options.outputResolution ?? '1k',
+    output_count: assertRequestedOutputCount(isRemoveBg ? 1 : (options.outputCount ?? 1)),
+    output_resolution: isRemoveBg ? ('default' as const) : (options.outputResolution ?? '1k'),
   }
 }
 
@@ -83,7 +87,7 @@ function buildDirectActionReadinessRequest(
   const execution = requireImageActionExecution(action)
   const strengthConfig = execution.strength
   const params = {
-    ...buildOutputBillingParams(options),
+    ...buildOutputBillingParams(options, execution.feature),
     ...(strengthConfig?.paramPath === 'variation.strength'
       ? { variation: { strength: strengthConfig.defaultValue } }
       : {}),
@@ -184,14 +188,17 @@ export function buildDirectActionTaskRequest(input: {
   const execution = requireImageActionExecution(input.action)
   const sizeParams = buildExecutionSizeParams(input.imageSize)
   const strengthConfig = execution.strength
+  const outputParams = buildOutputBillingParams(
+    { outputCount: input.outputCount, outputResolution: input.outputResolution },
+    execution.feature,
+  )
   if (strengthConfig?.paramPath === 'variation.strength') {
     return buildExecutionTaskRequest({
       prompt: input.prompt.trim(),
       feature: execution.feature,
       imageUrls: [sourceUrl],
       params: {
-        output_count: assertRequestedOutputCount(input.outputCount),
-        output_resolution: input.outputResolution ?? '1k',
+        ...outputParams,
         ...sizeParams,
         variation: {
           strength: Number.isFinite(input.strength)
@@ -207,8 +214,7 @@ export function buildDirectActionTaskRequest(input: {
     feature: execution.feature,
     imageUrls: [sourceUrl],
     params: {
-      output_count: assertRequestedOutputCount(input.outputCount),
-      output_resolution: input.outputResolution ?? '1k',
+      ...outputParams,
       ...sizeParams,
     },
   })

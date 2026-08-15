@@ -142,6 +142,7 @@ func registerAdminStorageRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 
 func registerAdminProviderEndpointRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	adminAPI.GET("/provider-endpoints", h.ProviderEndpointHandler.List)
+	adminAPI.GET("/provider-endpoints/registry", h.ProviderEndpointHandler.Registry)
 	adminAPI.POST("/provider-endpoints", h.ProviderEndpointHandler.Create)
 	adminAPI.PUT("/provider-endpoints/:id", h.ProviderEndpointHandler.Update)
 	adminAPI.DELETE("/provider-endpoints/:id", h.ProviderEndpointHandler.Delete)

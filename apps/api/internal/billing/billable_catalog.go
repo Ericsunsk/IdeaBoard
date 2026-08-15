@@ -26,12 +26,13 @@ const (
 // BillableItemDefinition is the product-owned registration contract consumed
 // by Billing. Provider models are intentionally absent from this identity.
 type BillableItemDefinition struct {
-	SKU         SKU    `json:"sku"`
-	Namespace   string `json:"namespace"`
-	ProductKind string `json:"product_kind"`
-	DisplayName string `json:"display_name"`
-	Description string `json:"description"`
-	SortOrder   int    `json:"sort_order"`
+	SKU             SKU                `json:"sku"`
+	Namespace       string             `json:"namespace"`
+	ProductKind     string             `json:"product_kind"`
+	DisplayName     string             `json:"display_name"`
+	Description     string             `json:"description"`
+	SortOrder       int                `json:"sort_order"`
+	PricingVariants []OutputResolution `json:"-"`
 }
 
 type BillableItemRegistry struct {
@@ -69,6 +70,11 @@ func NewBillableItemRegistry(definitions []BillableItemDefinition) (*BillableIte
 		definition.ProductKind = productKind
 		definition.DisplayName = displayName
 		definition.Description = description
+		pricingVariants, err := normalizePricingVariants(definition.PricingVariants)
+		if err != nil {
+			return nil, err
+		}
+		definition.PricingVariants = pricingVariants
 		items = append(items, definition)
 	}
 	sort.Slice(items, func(i, j int) bool {
@@ -90,6 +96,9 @@ func (r *BillableItemRegistry) Items() []BillableItemDefinition {
 	}
 	items := make([]BillableItemDefinition, len(r.items))
 	copy(items, r.items)
+	for index := range items {
+		items[index].PricingVariants = append([]OutputResolution(nil), r.items[index].PricingVariants...)
+	}
 	return items
 }
 
@@ -102,6 +111,7 @@ func (r *BillableItemRegistry) Find(rawSKU string) (BillableItemDefinition, bool
 		return BillableItemDefinition{}, false
 	}
 	item, exists := r.bySKU[sku]
+	item.PricingVariants = append([]OutputResolution(nil), item.PricingVariants...)
 	return item, exists
 }
 
@@ -112,9 +122,10 @@ func (r *BillableItemRegistry) Contains(rawSKU string) bool {
 
 type BillableItemCatalogCard struct {
 	BillableItemDefinition
-	Status        BillableItemStatus             `json:"status"`
-	CurrentPrices map[OutputResolution]PriceInfo `json:"current_prices"`
-	UpdatedAt     *time.Time                     `json:"updated_at,omitempty"`
+	Status          BillableItemStatus             `json:"status"`
+	CurrentPrices   map[OutputResolution]PriceInfo `json:"current_prices"`
+	PricingVariants []OutputResolution             `json:"pricing_variants"`
+	UpdatedAt       *time.Time                     `json:"updated_at,omitempty"`
 }
 
 type CatalogFactReader interface {
@@ -154,6 +165,9 @@ func (c *BillableItemCatalog) PublishPrices(ctx context.Context, rawSKU string, 
 	if actorID <= 0 {
 		return nil, ErrInvalidCatalogEntry
 	}
+	if err := validatePricingVariants(definition, prices); err != nil {
+		return nil, err
+	}
 	return c.store.PublishPrices(ctx, PublishPricesInput{
 		Definition: definition, Prices: prices, ActorID: actorID,
 	})
@@ -186,7 +200,11 @@ func (c *BillableItemCatalog) DeleteArchived(ctx context.Context, rawSKU string,
 }
 
 func (c *BillableItemCatalog) QuoteAtResolution(ctx context.Context, rawSKU string, resolution OutputResolution, quantity int64) (Quote, error) {
-	if err := c.requireRegistered(rawSKU); err != nil {
+	definition, err := c.registeredDefinition(rawSKU)
+	if err != nil {
+		return Quote{}, err
+	}
+	if err := validatePricingVariant(definition, resolution); err != nil {
 		return Quote{}, err
 	}
 	quote, err := c.store.QuoteAtResolution(ctx, rawSKU, resolution, quantity)
@@ -194,24 +212,29 @@ func (c *BillableItemCatalog) QuoteAtResolution(ctx context.Context, rawSKU stri
 }
 
 func (c *BillableItemCatalog) QuoteAtResolutionInTx(ctx context.Context, tx pgx.Tx, rawSKU string, resolution OutputResolution, quantity int64) (Quote, error) {
-	if err := c.requireRegistered(rawSKU); err != nil {
+	definition, err := c.registeredDefinition(rawSKU)
+	if err != nil {
+		return Quote{}, err
+	}
+	if err := validatePricingVariant(definition, resolution); err != nil {
 		return Quote{}, err
 	}
 	quote, err := c.store.QuoteAtResolutionInTx(ctx, tx, rawSKU, resolution, quantity)
 	return quote, normalizeCatalogQuoteError(err)
 }
 
-func (c *BillableItemCatalog) requireRegistered(rawSKU string) error {
+func (c *BillableItemCatalog) registeredDefinition(rawSKU string) (BillableItemDefinition, error) {
 	if c == nil || c.registry == nil || c.store == nil {
-		return ErrServiceUnavailable
+		return BillableItemDefinition{}, ErrServiceUnavailable
 	}
 	if _, err := CanonicalizeSKU(rawSKU); err != nil {
-		return err
+		return BillableItemDefinition{}, err
 	}
-	if _, exists := c.registry.Find(rawSKU); !exists {
-		return ErrPricingUnavailable
+	definition, exists := c.registry.Find(rawSKU)
+	if !exists {
+		return BillableItemDefinition{}, ErrPricingUnavailable
 	}
-	return nil
+	return definition, nil
 }
 
 func normalizeCatalogQuoteError(err error) error {
@@ -241,12 +264,13 @@ func (c *BillableItemCatalog) List(ctx context.Context) ([]BillableItemCatalogCa
 			BillableItemDefinition: definition,
 			Status:                 BillableItemStatusUnpriced,
 			CurrentPrices:          map[OutputResolution]PriceInfo{},
+			PricingVariants:        append([]OutputResolution(nil), definition.PricingVariants...),
 		}
 		if fact, exists := factsBySKU[definition.SKU]; exists {
 			card.CurrentPrices = clonePriceMap(fact.CurrentPrices)
 			updatedAt := fact.UpdatedAt
 			card.UpdatedAt = &updatedAt
-			if _, hasOneK := fact.CurrentPrices[OutputResolution1K]; hasOneK {
+			if hasConfiguredPricingVariant(definition, fact.CurrentPrices) {
 				if fact.Enabled {
 					card.Status = BillableItemStatusActive
 				} else {
@@ -271,12 +295,80 @@ func (c *BillableItemCatalog) List(ctx context.Context) ([]BillableItemCatalogCa
 				SKU: fact.SKU, Namespace: namespace, ProductKind: "legacy",
 				DisplayName: fact.DisplayName, Description: fact.Description,
 			},
-			Status:        BillableItemStatusArchived,
-			CurrentPrices: clonePriceMap(fact.CurrentPrices),
-			UpdatedAt:     &updatedAt,
+			Status:          BillableItemStatusArchived,
+			CurrentPrices:   clonePriceMap(fact.CurrentPrices),
+			PricingVariants: sortedPriceVariants(fact.CurrentPrices),
+			UpdatedAt:       &updatedAt,
 		})
 	}
 	return cards, nil
+}
+
+func validatePricingVariants(definition BillableItemDefinition, prices map[OutputResolution]int64) error {
+	variants := definition.pricingVariants()
+	if len(variants) == 0 || len(prices) == 0 {
+		return ErrInvalidCatalogEntry
+	}
+	allowed := make(map[OutputResolution]struct{}, len(variants))
+	for _, variant := range variants {
+		allowed[variant] = struct{}{}
+	}
+	if _, required := prices[variants[0]]; !required {
+		return ErrInvalidCatalogEntry
+	}
+	for variant := range prices {
+		if _, ok := allowed[variant]; !ok {
+			return ErrInvalidCatalogEntry
+		}
+	}
+	return nil
+}
+
+func validatePricingVariant(definition BillableItemDefinition, variant OutputResolution) error {
+	if _, err := NormalizeOutputResolution(string(variant)); err != nil {
+		return err
+	}
+	for _, allowed := range definition.pricingVariants() {
+		if variant == allowed {
+			return nil
+		}
+	}
+	return ErrInvalidOutputResolution
+}
+
+func hasConfiguredPricingVariant(definition BillableItemDefinition, prices map[OutputResolution]PriceInfo) bool {
+	for _, variant := range definition.pricingVariants() {
+		if _, ok := prices[variant]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func sortedPriceVariants(prices map[OutputResolution]PriceInfo) []OutputResolution {
+	variants := make([]OutputResolution, 0, len(prices))
+	for variant := range prices {
+		variants = append(variants, variant)
+	}
+	sort.Slice(variants, func(i, j int) bool {
+		return pricingVariantOrder(variants[i]) < pricingVariantOrder(variants[j])
+	})
+	return variants
+}
+
+func pricingVariantOrder(variant OutputResolution) int {
+	switch variant {
+	case OutputResolutionDefault:
+		return 0
+	case OutputResolution1K:
+		return 1
+	case OutputResolution2K:
+		return 2
+	case OutputResolution4K:
+		return 3
+	default:
+		return 4
+	}
 }
 
 func clonePriceMap(prices map[OutputResolution]PriceInfo) map[OutputResolution]PriceInfo {

@@ -1,5 +1,6 @@
 export type AdminBillableItemStatus = 'unpriced' | 'active' | 'disabled' | 'archived'
-export type OutputResolution = '1k' | '2k' | '4k'
+export type PricingVariant = 'default' | '1k' | '2k' | '4k'
+export type OutputResolution = Exclude<PricingVariant, 'default'>
 
 export interface AdminBillableItemPrice {
   priceVersionId: number
@@ -21,6 +22,7 @@ export interface AdminBillableItemCard {
   displayName: string
   sortOrder: number
   status: AdminBillableItemStatus
-  currentPrices: Partial<Record<OutputResolution, AdminBillableItemPrice>>
+  pricingVariants: PricingVariant[]
+  currentPrices: Partial<Record<PricingVariant, AdminBillableItemPrice>>
   updatedAt?: string
 }

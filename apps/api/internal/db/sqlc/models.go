@@ -513,11 +513,18 @@ type PaymentWebhookEvent struct {
 type ProviderEndpoint struct {
 	ID        int64     `json:"id"`
 	ApiType   string    `json:"api_type"`
+	Protocol  string    `json:"protocol"`
 	Name      string    `json:"name"`
 	BaseUrl   string    `json:"base_url"`
 	Status    int16     `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type ProviderEndpointCapability struct {
+	ProviderEndpointID int64     `json:"provider_endpoint_id"`
+	Capability         string    `json:"capability"`
+	CreatedAt          time.Time `json:"created_at"`
 }
 
 type ProviderEndpointModel struct {

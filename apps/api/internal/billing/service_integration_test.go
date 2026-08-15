@@ -70,7 +70,9 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 		t.Fatalf("ListCatalogFacts() = %+v", catalog)
 	}
 
-	if _, err := service.PublishPrice(ctx, PublishPriceInput{Definition: testBillableDefinition("ai-image:remove-bg", "抠图"), UnitCredits: 0, ActorID: 7}); err != nil {
+	removeBgDefinition := testBillableDefinition("ai-image:remove-bg", "抠图")
+	removeBgDefinition.PricingVariants = []OutputResolution{OutputResolutionDefault}
+	if _, err := service.PublishPrice(ctx, PublishPriceInput{Definition: removeBgDefinition, UnitCredits: 0, ActorID: 7}); err != nil {
 		t.Fatalf("PublishPrice(free) error = %v", err)
 	}
 	freeQuote, err := service.Quote(ctx, "ai-image:remove-bg", 99)
