@@ -118,7 +118,7 @@ func flattenWorkflowFeatureParams(out map[string]interface{}, params *tasks.Work
 	}
 	if params.HD != nil {
 		out[ParamKeyHD] = map[string]interface{}{
-			paramkeys.ClarityStrength: params.HD.ClarityStrength,
+			paramkeys.DetailStrength: params.HD.DetailStrength,
 		}
 	}
 	if params.Fusion != nil {

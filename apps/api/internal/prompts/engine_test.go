@@ -165,11 +165,11 @@ func TestApplyFeatureSystemPromptDoesNotExposeAssetOrDeprecatedVariables(t *test
 			"mask_image_url":     "https://img.example/mask.png",
 			"use_mask":           true,
 			"hd": map[string]interface{}{
-				"clarity_strength": 75,
+				"detail_strength": 75,
 			},
 		},
 		func(string) (string, error) {
-			return "SYS {{category}} {{pattern_mode}} {{original_image_url}} {{mask_image_url}} {{use_mask}} {{clarity_strength}}", nil
+			return "SYS {{category}} {{pattern_mode}} {{original_image_url}} {{mask_image_url}} {{use_mask}} {{detail_strength}}", nil
 		},
 	)
 
@@ -230,16 +230,16 @@ func TestApplyFeatureSystemPromptHDUpscaleDoesNotExposeUseMask(t *testing.T) {
 		map[string]interface{}{
 			"image_urls": []interface{}{"https://img.example/original.png"},
 			"hd": map[string]interface{}{
-				"clarity_strength": 75,
+				"detail_strength": 75,
 			},
 			"use_mask": true,
 		},
 		func(string) (string, error) {
-			return "SYS use_mask={{use_mask}} clarity={{clarity_strength}}", nil
+			return "SYS use_mask={{use_mask}} detail={{detail_strength}}", nil
 		},
 	)
 
-	if got != "SYS use_mask={{use_mask}} clarity=75" {
+	if got != "SYS use_mask={{use_mask}} detail=75" {
 		t.Fatalf("got %q, want unsupported use_mask placeholder to remain unchanged", got)
 	}
 }

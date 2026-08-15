@@ -3982,10 +3982,10 @@ components:
 
     HDUpscaleParams:
       type: object
-      required: [clarity_strength]
+      required: [detail_strength]
       additionalProperties: false
       properties:
-        clarity_strength:
+        detail_strength:
           type: number
           minimum: 0
           maximum: 100

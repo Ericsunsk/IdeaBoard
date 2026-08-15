@@ -31,7 +31,7 @@ import {
   IMAGE_CANVAS_EXTEND_ACTION,
   IMAGE_HD_UPSCALE_ACTION,
   isImageDirectTaskAction,
-  resolveHdClarityStrength,
+  resolveHdDetailStrength,
   requireImageActionExecution,
   type ImageDirectTaskAction,
   type ImageExecutionAction,
@@ -101,13 +101,13 @@ export function buildCanvasExtendReadinessRequest(): SubmitTaskData {
 
 function buildHdUpscaleReadinessRequest(): SubmitTaskData {
   const execution = requireImageActionExecution(IMAGE_HD_UPSCALE_ACTION)
-  const clarityStrength = execution.strength?.defaultValue ?? DEFAULT_IMAGE_ACTION_STRENGTH
+  const detailStrength = execution.strength?.defaultValue ?? DEFAULT_IMAGE_ACTION_STRENGTH
   return buildExecutionTaskRequest({
     prompt: '',
     feature: execution.feature,
     params: {
       hd: {
-        clarity_strength: clarityStrength,
+        detail_strength: detailStrength,
       },
     },
   })
@@ -240,7 +240,7 @@ export function buildHdUpscaleTaskRequest(input: {
       output_count: assertRequestedOutputCount(input.outputCount),
       ...buildExecutionSizeParams(input.imageSize, input.imageSize),
       hd: {
-        clarity_strength: resolveHdClarityStrength(input.strength),
+        detail_strength: resolveHdDetailStrength(input.strength),
       },
     },
   })

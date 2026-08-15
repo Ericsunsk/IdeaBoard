@@ -31,7 +31,7 @@ export type ImageExecutionAction = ImageTaskAction | ImageCanvasExtendAction
 
 export type ImageActionStrengthConfig = {
   defaultValue: number
-  paramPath?: 'variation.strength' | 'hd.clarity_strength'
+  paramPath?: 'variation.strength' | 'hd.detail_strength'
 }
 
 export type ImageStrengthAction =
@@ -89,7 +89,7 @@ export const IMAGE_ACTION_EXECUTION_REGISTRY_LIST = [
     mode: IMAGE_EXECUTION_MODE.hdUpscaleTask,
     strength: {
       defaultValue: DEFAULT_IMAGE_ACTION_STRENGTH,
-      paramPath: 'hd.clarity_strength',
+      paramPath: 'hd.detail_strength',
     },
   }),
   createWorkflowExecutionConfig(IMAGE_NODE_ACTION.imageExtend, {
@@ -146,7 +146,7 @@ export function requireImageActionExecution(
   return execution
 }
 
-export function resolveHdClarityStrength(strength: number | undefined): number {
+export function resolveHdDetailStrength(strength: number | undefined): number {
   return Number.isFinite(strength)
     ? Math.max(0, Math.min(100, Math.round(strength as number)))
     : DEFAULT_IMAGE_ACTION_STRENGTH

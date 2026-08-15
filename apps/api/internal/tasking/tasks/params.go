@@ -108,7 +108,7 @@ type ImageExtendParams struct {
 }
 
 type HDUpscaleParams struct {
-	ClarityStrength float64 `json:"clarity_strength"`
+	DetailStrength float64 `json:"detail_strength"`
 }
 
 type StyleFusionParams struct {

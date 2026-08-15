@@ -140,7 +140,7 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
     imageActionTitle: 'HD',
     promptVariables: [
       { key: '{{user_prompt}}', tone: 'prompt' },
-      { key: '{{clarity_strength}}', tone: 'control' },
+      { key: '{{detail_strength}}', tone: 'control' },
     ],
   },
   {

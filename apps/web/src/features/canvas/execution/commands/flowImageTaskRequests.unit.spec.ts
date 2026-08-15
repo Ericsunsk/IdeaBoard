@@ -5,7 +5,7 @@ import { getCanvasNodeImageInputLimit } from '../../../canvas-board/domain'
 import {
   IMAGE_CANVAS_EXTEND_ACTION,
   IMAGE_HD_UPSCALE_ACTION,
-  resolveHdClarityStrength,
+  resolveHdDetailStrength,
 } from '../contracts/imageActionExecution'
 import { EXECUTION_FEATURE } from '../contracts/executionContract'
 import type {
@@ -33,9 +33,9 @@ const source = {
 }
 
 describe('flowImageTaskRequests', () => {
-  it('normalizes HD clarity strength without changing size semantics', () => {
-    expect(resolveHdClarityStrength(undefined)).toBe(50)
-    expect(resolveHdClarityStrength(75.4)).toBe(75)
+  it('normalizes HD detail strength without changing size semantics', () => {
+    expect(resolveHdDetailStrength(undefined)).toBe(50)
+    expect(resolveHdDetailStrength(75.4)).toBe(75)
   })
 
   it('builds task readiness requests from the execution contract', () => {
@@ -53,7 +53,7 @@ describe('flowImageTaskRequests', () => {
       feature: EXECUTION_FEATURE.hdUpscale,
       params: {
         hd: {
-          clarity_strength: 50,
+          detail_strength: 50,
         },
       },
     })
@@ -143,7 +143,7 @@ describe('flowImageTaskRequests', () => {
       original_image_width: 1200,
       original_image_height: 800,
       hd: {
-        clarity_strength: 75,
+        detail_strength: 75,
       },
     })
     expect(request.params?.hd).not.toHaveProperty('output_quality')

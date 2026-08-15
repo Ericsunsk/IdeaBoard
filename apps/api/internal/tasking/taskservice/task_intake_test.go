@@ -45,7 +45,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 		{feature: workflow.FeatureSlugPromptGeneration},
 		{
 			feature: workflow.FeatureSlugHDUpscale,
-			params:  map[string]interface{}{"hd": map[string]interface{}{"clarity_strength": 0.5}},
+			params:  map[string]interface{}{"hd": map[string]interface{}{"detail_strength": 0.5}},
 		},
 		{
 			feature: workflow.FeatureSlugImageExtend,

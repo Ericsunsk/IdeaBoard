@@ -138,7 +138,7 @@ func compileProviderControls(params map[string]interface{}, featureSlug string) 
 	}
 	if featureSlug == workflow.FeatureSlugHDUpscale {
 		if hd, ok := workflow.ReadHDUpscalePromptContract(params); ok {
-			quality := resolveOpenAIHDUpscaleOutputQuality(hd.ClarityStrength)
+			quality := resolveOpenAIHDUpscaleOutputQuality(hd.DetailStrength)
 			controls.OpenAI.HDOutputQuality = &quality
 		}
 	}

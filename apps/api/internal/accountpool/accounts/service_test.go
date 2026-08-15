@@ -35,7 +35,7 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 func TestApplyFeatureSystemPromptUsesCanonicalKeys(t *testing.T) {
 	params := map[string]interface{}{
 		"hd": map[string]interface{}{
-			"clarity_strength": 75,
+			"detail_strength": 75,
 		},
 	}
 
@@ -45,7 +45,7 @@ func TestApplyFeatureSystemPromptUsesCanonicalKeys(t *testing.T) {
 		"hd-upscale",
 		params,
 		prompts.FeaturePromptRuntimeConfig{
-			Prompt:                "SYS={{user_prompt}}|{{clarity_strength}}",
+			Prompt:                "SYS={{user_prompt}}|{{detail_strength}}",
 			UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy("hd-upscale"),
 		},
 	)

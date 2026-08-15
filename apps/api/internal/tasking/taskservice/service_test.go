@@ -115,11 +115,11 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 			userPrompt: "",
 			params: map[string]interface{}{
 				"hd": map[string]interface{}{
-					"clarity_strength": 90,
+					"detail_strength": 90,
 				},
 			},
-			template: "SYS clarity={{clarity_strength}}",
-			want:     "SYS clarity=90",
+			template: "SYS detail={{detail_strength}}",
+			want:     "SYS detail=90",
 		},
 	}
 
@@ -475,7 +475,7 @@ func TestSubmitTaskInputLimits(t *testing.T) {
 			"extend_right",
 			"extend_bottom",
 			"extend_left",
-			"clarity_strength",
+			"detail_strength",
 			"fusion_input_weights",
 		}
 		for _, key := range tests {

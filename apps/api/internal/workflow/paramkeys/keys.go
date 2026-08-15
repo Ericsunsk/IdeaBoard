@@ -31,14 +31,14 @@ const (
 	ImageCount          = "image_count"
 	PromptUpsampling    = "prompt_upsampling"
 
-	Strength        = "strength"
-	TopPercent      = "top_percent"
-	RightPercent    = "right_percent"
-	BottomPercent   = "bottom_percent"
-	LeftPercent     = "left_percent"
-	ClarityStrength = "clarity_strength"
-	Mode            = "mode"
-	InputWeights    = "input_weights"
+	Strength       = "strength"
+	TopPercent     = "top_percent"
+	RightPercent   = "right_percent"
+	BottomPercent  = "bottom_percent"
+	LeftPercent    = "left_percent"
+	DetailStrength = "detail_strength"
+	Mode           = "mode"
+	InputWeights   = "input_weights"
 
 	VariationStrength  = "variation_strength"
 	ExtendTop          = "extend_top"
@@ -56,7 +56,7 @@ const (
 	PromptPlaceholderExtendRightPercent  = "{{extend_right_percent}}"
 	PromptPlaceholderExtendBottomPercent = "{{extend_bottom_percent}}"
 	PromptPlaceholderExtendLeftPercent   = "{{extend_left_percent}}"
-	PromptPlaceholderClarityStrength     = "{{" + ClarityStrength + "}}"
+	PromptPlaceholderDetailStrength      = "{{" + DetailStrength + "}}"
 	PromptPlaceholderFusionInputWeights  = "{{" + FusionInputWeights + "}}"
 
 	PromptPathFusionInputWeights = Fusion + "." + InputWeights

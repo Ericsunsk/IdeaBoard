@@ -10,5 +10,5 @@ export interface HDUpscaleParams {
    * @minimum 0
    * @maximum 100
    */
-  clarity_strength: number
+  detail_strength: number
 }

@@ -537,9 +537,9 @@ func appendOpenAIAllowedParams(reqBody *openAIImageRequestBody, providerReq prov
 	openAIParams.applySharedExtras(reqBody)
 }
 
-func resolveOpenAIHDUpscaleOutputQuality(clarityStrength float64) int {
-	clarityStrength = math.Max(0, math.Min(100, math.Round(clarityStrength)))
-	return int(math.Max(60, math.Min(100, math.Round(60+clarityStrength*0.4))))
+func resolveOpenAIHDUpscaleOutputQuality(detailStrength float64) int {
+	detailStrength = math.Max(0, math.Min(100, math.Round(detailStrength)))
+	return int(math.Max(60, math.Min(100, math.Round(60+detailStrength*0.4))))
 }
 
 func finalizeOpenAIRequestBody(reqBody *openAIImageRequestBody, openAIParams openAIProviderParams) {

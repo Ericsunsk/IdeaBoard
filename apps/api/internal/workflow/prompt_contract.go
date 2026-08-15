@@ -26,7 +26,7 @@ type ImageExtendPromptContract struct {
 }
 
 type HDUpscalePromptContract struct {
-	ClarityStrength float64
+	DetailStrength float64
 }
 
 func ReadStyleVariationPromptContract(params map[string]interface{}) (StyleVariationPromptContract, bool) {
@@ -90,16 +90,16 @@ func ReadHDUpscalePromptContract(params map[string]interface{}) (HDUpscalePrompt
 	if !ok {
 		return HDUpscalePromptContract{}, false
 	}
-	clarity, ok := readNumberField(obj, paramkeys.ClarityStrength)
+	detail, ok := readNumberField(obj, paramkeys.DetailStrength)
 	if !ok {
 		return HDUpscalePromptContract{}, false
 	}
-	return HDUpscalePromptContract{ClarityStrength: clarity}, true
+	return HDUpscalePromptContract{DetailStrength: detail}, true
 }
 
 func (c HDUpscalePromptContract) PromptVariables() map[string]interface{} {
 	return map[string]interface{}{
-		paramkeys.PromptPlaceholderClarityStrength: formatPercentControl(c.ClarityStrength),
+		paramkeys.PromptPlaceholderDetailStrength: formatPercentControl(c.DetailStrength),
 	}
 }
 
@@ -218,11 +218,11 @@ func normalizeHDUpscaleContract(params map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	clarity, ok := readNumberField(obj, paramkeys.ClarityStrength)
+	detail, ok := readNumberField(obj, paramkeys.DetailStrength)
 	if !ok {
-		return fmt.Errorf("hd.clarity_strength 必须是数字")
+		return fmt.Errorf("hd.detail_strength 必须是数字")
 	}
-	obj[paramkeys.ClarityStrength] = clampPercent(clarity)
+	obj[paramkeys.DetailStrength] = clampPercent(detail)
 	params[ParamKeyHD] = obj
 	return nil
 }

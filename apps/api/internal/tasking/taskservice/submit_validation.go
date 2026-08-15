@@ -21,7 +21,7 @@ var unsupportedSubmitTaskParamKeys = []string{
 	paramkeys.ExtendRight,
 	paramkeys.ExtendBottom,
 	paramkeys.ExtendLeft,
-	paramkeys.ClarityStrength,
+	paramkeys.DetailStrength,
 	paramkeys.FusionInputWeights,
 	paramkeys.UpscaleMode,
 	paramkeys.UpscaleFactor,
@@ -260,7 +260,7 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 		}
 	case workflow.FeatureSlugHDUpscale:
 		if c, ok := workflow.ReadHDUpscalePromptContract(params); ok {
-			p.HD = &tasks.HDUpscaleParams{ClarityStrength: c.ClarityStrength}
+			p.HD = &tasks.HDUpscaleParams{DetailStrength: c.DetailStrength}
 		}
 	case workflow.FeatureSlugStyleFusion:
 		if c, ok := workflow.ReadStyleFusionPromptContract(params); ok {

@@ -843,7 +843,7 @@ func TestCallOpenAIHDUpscaleUsesGenerationEndpointAndIgnoresMaskParams(t *testin
 		"feature":    "hd-upscale",
 		"image_urls": []interface{}{sourceDataURL},
 		"hd": map[string]interface{}{
-			"clarity_strength": 75,
+			"detail_strength": 75,
 		},
 		"mask_image_url":  maskDataURL,
 		"mask_image_urls": []interface{}{maskDataURL},
@@ -929,7 +929,7 @@ func TestReadOpenAIProviderParamsDerivesEditMaskAndHDQuality(t *testing.T) {
 	hdReq := newProviderRequest("prompt", 1024, 1024, map[string]interface{}{
 		"feature": "hd-upscale",
 		"hd": map[string]interface{}{
-			"clarity_strength": 75,
+			"detail_strength": 75,
 		},
 	}, "gpt-image-1")
 	hdParams := readOpenAIProviderParams(hdReq)
