@@ -1,6 +1,10 @@
 import type { Edge } from '@vue-flow/core'
 import { describe, expect, it } from 'vitest'
-import { createCanvasExecutionRuntime, projectCanvasExecutionEdgeAnimation } from '../index'
+import {
+  createCanvasExecutionRuntime,
+  createCanvasPendingResultLifecycle,
+  projectCanvasExecutionEdgeAnimation,
+} from '../index'
 
 function makeEdge(overrides: Partial<Edge> = {}): Edge {
   return {
@@ -136,6 +140,25 @@ describe('CanvasExecutionRuntime', () => {
     expect(runtime.getNodeState('image-3')).toBeNull()
     expect(runtime.getNodeLease('image-3')).toBeNull()
     expect(runtime.cancelNodeExecutions([deletedLease])).toEqual([])
+  })
+
+  it('applies the same lease contract to live submission and pending reattach', () => {
+    const runtime = createCanvasExecutionRuntime()
+    const attachment = runtime.attachBoard('board-a')
+    const live = createCanvasPendingResultLifecycle(runtime, attachment)
+    const liveLease = live.begin('image-2')
+
+    expect(liveLease).not.toBeNull()
+    expect(live.isCurrent('image-2')).toBe(true)
+    expect(live.transition('image-2', 'running', 'task-1')).toBe(true)
+    expect(live.isCurrent('image-2', 'task-1')).toBe(true)
+    expect(live.isCurrent('image-2', 'stale-task')).toBe(false)
+    expect(live.transition('image-2', 'succeeded', 'stale-task')).toBe(false)
+
+    const reattach = createCanvasPendingResultLifecycle(runtime, attachment)
+    expect(reattach.adopt('image-2', 'task-1')).toBe(liveLease)
+    expect(reattach.transition('image-2', 'succeeded', 'task-1')).toBe(true)
+    expect(reattach.isCurrent('image-2', 'task-1')).toBe(false)
   })
 })
 

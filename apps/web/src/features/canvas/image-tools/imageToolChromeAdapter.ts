@@ -12,14 +12,14 @@ export function createImageToolChromeAdapter(
   session: ImageToolSession,
   commands: ImageToolChromeCommands,
 ) {
-  const { options } = session
+  const { board, execution } = session.capabilities
   const { imageEditorRenderedPreview, imageEditorPreviewSource } =
     useImageAdjustmentRenderedPreview({
       isAdjustMode: session.isImageAdjustmentMode,
       layers: session.imageEditorSession.imageEditorLayers,
       sourceUrl: () =>
         session.imageEditorNodeId.value
-          ? options.getImageNodeDisplayPayload(session.imageEditorNodeId.value)?.url
+          ? board.getImageNodeDisplayPayload(session.imageEditorNodeId.value)?.url
           : null,
     })
   const { imageEditorHistogramSource } = useImageEditorHistogramSource({
@@ -44,7 +44,7 @@ export function createImageToolChromeAdapter(
         layerOpacity: session.maskChromeState.maskEditorLayerOpacity.value,
         outputCount: session.maskChromeState.activeMaskEditorOutputCount.value,
         referenceImages: session.maskChromeState.maskEditorReferenceImages.value,
-        directGenerating: nodeId ? options.isNodeExecutionActive(nodeId) : false,
+        directGenerating: nodeId ? execution.isNodeExecutionActive(nodeId) : false,
         canUndo: session.maskEditor.canUndoMask.value,
         canRedo: session.maskEditor.canRedoMask.value,
       },

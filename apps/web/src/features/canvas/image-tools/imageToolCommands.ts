@@ -8,7 +8,7 @@ import type { ImageToolChromeCommands } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
 
 export function createImageToolCommands(session: ImageToolSession) {
-  const { options } = session
+  const { board, execution, ui, feedback } = session.capabilities
 
   async function applyAdjustments() {
     if (session.isApplyingImageEditorAdjustments.value) return
@@ -16,21 +16,21 @@ export function createImageToolCommands(session: ImageToolSession) {
     const nodeId = session.imageEditorNodeId.value
     if (!nodeId || session.imageEditorMode.value !== 'adjust') return
     if (!isCanvasGraphNodeId(nodeId)) {
-      options.feedback.warning('图片节点未能写入画布')
+      feedback.warning('图片节点未能写入画布')
       return
     }
 
-    const boardId = options.currentBoardId.value
-    const source = options.getImageNodeDisplayPayload(nodeId)
-    const sourceNode = options.getImageNodeSnapshot(nodeId)
+    const boardId = board.currentBoardId.value
+    const source = board.getImageNodeDisplayPayload(nodeId)
+    const sourceNode = board.getImageNodeSnapshot(nodeId)
     if (!source || !sourceNode) {
-      options.feedback.warning('当前图片不可编辑')
+      feedback.warning('当前图片不可编辑')
       return
     }
 
     const layers = session.imageEditorSession.imageEditorLayers.value
     if (!hasRenderableImageEditorLayerStack(layers)) {
-      options.feedback.warning('没有可应用的编辑图层')
+      feedback.warning('没有可应用的编辑图层')
       return
     }
 
@@ -54,10 +54,10 @@ export function createImageToolCommands(session: ImageToolSession) {
           },
         },
       )
-      if (options.currentBoardId.value !== boardId || session.imageEditorNodeId.value !== nodeId) {
+      if (board.currentBoardId.value !== boardId || session.imageEditorNodeId.value !== nodeId) {
         return
       }
-      const newNodeId = await options.createImageNodeFromFile(
+      const newNodeId = await board.createImageNodeFromFile(
         {
           x: Number(sourceNode.x ?? 0) + Math.max(240, Number(sourceNode.width ?? 300) + 64),
           y: Number(sourceNode.y ?? 0) + 18,
@@ -65,30 +65,30 @@ export function createImageToolCommands(session: ImageToolSession) {
         renderedFile,
       )
       if (!newNodeId) return
-      const didConnect = options.connectionAdapter.connectIntent({
+      const didConnect = board.connectIntent({
         sourceNodeId: nodeId,
         sourcePort: 'image',
         targetNodeId: newNodeId,
         targetPort: 'image',
       })
       if (!didConnect) {
-        options.feedback.warning('图片已创建，但自动连线失败，请手动连接')
+        feedback.warning('图片已创建，但自动连线失败，请手动连接')
         return
       }
       session.imageEditorSession.clearImageEditorRasterHistory()
       session.exitImageEditorMode({ runBeforeExit: false })
       session.imageEditorSession.resetImageEditorSession()
-      options.feedback.succeeded('已应用编辑并派生新节点')
+      feedback.succeeded('已应用编辑并派生新节点')
     } catch (error) {
       if (
         isImageAdjustmentFinalApplyCancelled(error) ||
-        options.currentBoardId.value !== boardId ||
+        board.currentBoardId.value !== boardId ||
         session.imageEditorNodeId.value !== nodeId ||
         session.activeImageAdjustmentFinalScopeId.value !== scopeId
       ) {
         return
       }
-      options.feedback.warning(error instanceof Error ? error.message : '应用编辑失败')
+      feedback.warning(error instanceof Error ? error.message : '应用编辑失败')
     } finally {
       if (session.activeImageAdjustmentFinalScopeId.value === scopeId) {
         session.activeImageAdjustmentFinalScopeId.value = null
@@ -101,14 +101,14 @@ export function createImageToolCommands(session: ImageToolSession) {
   function runPromptAction(nodeId: string, prompt: string, outputCount: number) {
     const committedMaskData = session.maskEditor.getCommittedMaskData(nodeId)
     if (committedMaskData?.executionMaskDataUrl) {
-      void options.runInpaintAction(nodeId, {
+      void execution.runInpaintAction(nodeId, {
         prompt,
         outputCount,
         maskDataUrl: committedMaskData.executionMaskDataUrl,
       })
       return
     }
-    options.feedback.warning('请先在图片上标记需要重绘的区域')
+    feedback.warning('请先在图片上标记需要重绘的区域')
   }
 
   const maskChromeActions = useMaskEditorChromeActions({
@@ -116,16 +116,16 @@ export function createImageToolCommands(session: ImageToolSession) {
     referenceImages: session.maskChromeState.maskEditorReferenceImages,
     commitMaskEditorMode: session.commitMask,
     getCommittedMaskData: session.maskEditor.getCommittedMaskData,
-    clearActiveNodePanel: options.clearActiveNodePanel,
-    hideStrengthControl: options.hideStrengthControl,
-    runInpaintAction: options.runInpaintAction,
+    clearActiveNodePanel: ui.clearActiveNodePanel,
+    hideStrengthControl: ui.hideStrengthControl,
+    runInpaintAction: execution.runInpaintAction,
     updateOutputCount: (nodeId, outputCount) => {
-      options.updateOutputCount(nodeId, {
+      ui.updateOutputCount(nodeId, {
         key: 'outputCount',
         value: outputCount,
       })
     },
-    onWarning: options.feedback.warning,
+    onWarning: feedback.warning,
   })
 
   const chromeCommands: ImageToolChromeCommands = {

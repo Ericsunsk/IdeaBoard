@@ -86,7 +86,30 @@ export type UseCanvasImageToolsOptions = {
   feedback: CanvasImageToolsFeedback
 }
 
-export type ImageToolSession = ReturnType<typeof createImageToolSession>
+export type ImageToolSessionCapabilities = {
+  board: {
+    currentBoardId: ValueRef<string | null | undefined>
+    getImageNodeDisplayPayload: UseCanvasImageToolsOptions['getImageNodeDisplayPayload']
+    getImageNodeSnapshot: UseCanvasImageToolsOptions['getImageNodeSnapshot']
+    createImageNodeFromFile: UseCanvasImageToolsOptions['createImageNodeFromFile']
+    connectIntent: CanvasFlowPaneConnectionAdapter['connectIntent']
+  }
+  execution: {
+    isNodeExecutionActive: UseCanvasImageToolsOptions['isNodeExecutionActive']
+    runInpaintAction: UseCanvasImageToolsOptions['runInpaintAction']
+  }
+  ui: {
+    clearActiveNodePanel: UseCanvasImageToolsOptions['clearActiveNodePanel']
+    hideStrengthControl: UseCanvasImageToolsOptions['hideStrengthControl']
+    updateOutputCount: UseCanvasImageToolsOptions['updateOutputCount']
+    isImageActionPanelVisible: UseCanvasImageToolsOptions['isImageActionPanelVisible']
+    isImagePromptComposerVisible: UseCanvasImageToolsOptions['isImagePromptComposerVisible']
+    strengthControl: UseCanvasImageToolsOptions['strengthControl']
+  }
+  feedback: Pick<CanvasImageToolsFeedback, 'warning' | 'succeeded'>
+}
+
+export type ImageToolSession = Omit<ReturnType<typeof createImageToolSession>, 'options'>
 
 export function createImageToolSession(options: UseCanvasImageToolsOptions) {
   let requestApplyImageEditorAdjustments: (() => void) | null = null
@@ -255,7 +278,31 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
   useEventListener<KeyboardEvent>(windowTarget, 'keydown', onGlobalKeydown, true)
 
   return {
-    options,
+    capabilities: {
+      board: {
+        currentBoardId: options.currentBoardId,
+        getImageNodeDisplayPayload: options.getImageNodeDisplayPayload,
+        getImageNodeSnapshot: options.getImageNodeSnapshot,
+        createImageNodeFromFile: options.createImageNodeFromFile,
+        connectIntent: options.connectionAdapter.connectIntent,
+      },
+      execution: {
+        isNodeExecutionActive: options.isNodeExecutionActive,
+        runInpaintAction: options.runInpaintAction,
+      },
+      ui: {
+        clearActiveNodePanel: options.clearActiveNodePanel,
+        hideStrengthControl: options.hideStrengthControl,
+        updateOutputCount: options.updateOutputCount,
+        isImageActionPanelVisible: options.isImageActionPanelVisible,
+        isImagePromptComposerVisible: options.isImagePromptComposerVisible,
+        strengthControl: options.strengthControl,
+      },
+      feedback: {
+        warning: options.feedback.warning,
+        succeeded: options.feedback.succeeded,
+      },
+    } satisfies ImageToolSessionCapabilities,
     imageEditorMode,
     imageEditorNodeId,
     imageEditorSession,

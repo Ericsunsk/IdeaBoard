@@ -34,9 +34,9 @@ import {
 } from './canvasTaskSubmissionAdapter'
 import {
   type CanvasExecutionAttachment,
-  type CanvasExecutionLease,
   type CanvasExecutionRuntime,
 } from '../runtime/CanvasExecutionRuntime'
+import { createCanvasPendingResultLifecycle } from '../runtime/CanvasExecutionRuntime'
 
 export type CanvasExecutionWorkspaceState = {
   readonly executionRuntime: CanvasExecutionRuntime
@@ -85,7 +85,6 @@ type ReattachResolvedAttempt = {
   reattachKey: string
   nodeId: CanvasGraphNodeId
   taskId: string
-  lease: CanvasExecutionLease
   resolved: ResultMaterializerImageResult
 }
 
@@ -111,16 +110,6 @@ export function useCanvasExecutionWorkspace(
     return executionRuntime.isNodeActive(nodeId)
   }
 
-  function transitionOwnedReattachExecution(
-    lease: CanvasExecutionLease,
-    taskId: string,
-    status: 'succeeded' | 'failed' | 'cancelled',
-  ): boolean {
-    const current = executionRuntime.getNodeState(lease.nodeId)
-    if (current?.taskId !== taskId || !executionRuntime.isNodeActive(lease.nodeId)) return false
-    return executionRuntime.transitionNode(lease, { status, taskId })
-  }
-
   function requireCurrentAttachment(): CanvasExecutionAttachment {
     const attachment = executionRuntime.attachment.value
     if (!attachment) throw new Error('Canvas execution requires an active Board attachment')
@@ -139,16 +128,6 @@ export function useCanvasExecutionWorkspace(
   function isPendingImageTaskStillCurrent(nodeId: string, taskId: string): boolean {
     const snapshot = readPendingImageSnapshot(options.nodes.value, nodeId)
     return !!snapshot && isPendingImageTaskSnapshot(snapshot, taskId)
-  }
-
-  function isReattachExecutionCurrent(lease: CanvasExecutionLease, taskId: string): boolean {
-    const current = executionRuntime.getNodeState(lease.nodeId)
-    return (
-      executionRuntime.getNodeLease(lease.nodeId) === lease &&
-      executionRuntime.isAttachmentCurrent(lease.attachment) &&
-      executionRuntime.isNodeActive(lease.nodeId) &&
-      current?.taskId === taskId
-    )
   }
 
   const workflowRunner = createPendingImageWorkflowRunner({
@@ -203,6 +182,7 @@ export function useCanvasExecutionWorkspace(
 
   async function reattachPendingImageResults(): Promise<void> {
     const attachment = requireCurrentAttachment()
+    const lifecycle = createCanvasPendingResultLifecycle(executionRuntime, attachment)
     const pendingTasks = collectPendingImageTasks(options.nodes.value)
     if (pendingTasks.length === 0) return
     let failureCount = 0
@@ -213,17 +193,10 @@ export function useCanvasExecutionWorkspace(
         if (activeReattachKeys.has(reattachKey)) return
         if (!isCanvasGraphNodeId(nodeId)) return
         activeReattachKeys.add(reattachKey)
-        const hydratedState = executionRuntime.getNodeState(nodeId)
-        const hydratedLease = executionRuntime.getNodeLease(nodeId)
-        if (
-          hydratedState?.status !== 'running' ||
-          hydratedState.taskId !== taskId ||
-          hydratedLease?.attachment !== attachment
-        ) {
+        if (!lifecycle.adopt(nodeId, taskId)) {
           activeReattachKeys.delete(reattachKey)
           return
         }
-        const lease = hydratedLease
         try {
           const results = await waitTaskImageResults(taskId)
           const resolved =
@@ -237,10 +210,9 @@ export function useCanvasExecutionWorkspace(
                 )
           const isCurrentBoard = executionRuntime.isAttachmentCurrent(attachment)
           const isAttached =
-            isReattachExecutionCurrent(lease, taskId) &&
-            isPendingImageTaskStillCurrent(nodeId, taskId)
+            lifecycle.isCurrent(nodeId, taskId) && isPendingImageTaskStillCurrent(nodeId, taskId)
           if (!isCurrentBoard || !isAttached) {
-            transitionOwnedReattachExecution(lease, taskId, 'cancelled')
+            lifecycle.transition(nodeId, 'cancelled', taskId)
             activeReattachKeys.delete(reattachKey)
             return
           }
@@ -248,19 +220,17 @@ export function useCanvasExecutionWorkspace(
             reattachKey,
             nodeId,
             taskId,
-            lease,
             resolved: { ...resolved, resultNodeId: nodeId, taskId },
           })
         } catch (error) {
           const isCurrentBoard = executionRuntime.isAttachmentCurrent(attachment)
           const isAttached =
-            isReattachExecutionCurrent(lease, taskId) &&
-            isPendingImageTaskStillCurrent(nodeId, taskId)
+            lifecycle.isCurrent(nodeId, taskId) && isPendingImageTaskStillCurrent(nodeId, taskId)
           const status =
             !isCurrentBoard || !isAttached || error instanceof TaskCancelledError
               ? 'cancelled'
               : 'failed'
-          transitionOwnedReattachExecution(lease, taskId, status)
+          lifecycle.transition(nodeId, status, taskId)
           if (status === 'failed') {
             console.warn('[canvas] reattach pending image task failed', error)
             failureCount += 1
@@ -271,7 +241,7 @@ export function useCanvasExecutionWorkspace(
     )
     if (!executionRuntime.isAttachmentCurrent(attachment)) {
       resolvedAttempts.forEach((attempt) => {
-        transitionOwnedReattachExecution(attempt.lease, attempt.taskId, 'cancelled')
+        lifecycle.transition(attempt.nodeId, 'cancelled', attempt.taskId)
         activeReattachKeys.delete(attempt.reattachKey)
       })
       return
@@ -292,7 +262,7 @@ export function useCanvasExecutionWorkspace(
                   (attempt) =>
                     attempt.nodeId === result.resultNodeId &&
                     attempt.taskId === result.taskId &&
-                    isReattachExecutionCurrent(attempt.lease, attempt.taskId),
+                    lifecycle.isCurrent(attempt.nodeId, attempt.taskId),
                 ),
             })
           : null
@@ -300,7 +270,7 @@ export function useCanvasExecutionWorkspace(
       console.warn('[canvas] materialize reattached image task failed', error)
       failureCount += resolvedAttempts.length
       resolvedAttempts.forEach((attempt) => {
-        transitionOwnedReattachExecution(attempt.lease, attempt.taskId, 'failed')
+        lifecycle.transition(attempt.nodeId, 'failed', attempt.taskId)
         activeReattachKeys.delete(attempt.reattachKey)
       })
     }
@@ -308,13 +278,13 @@ export function useCanvasExecutionWorkspace(
     const materializedNodeIds = new Set(materialized?.materializedNodeIds ?? [])
     resolvedAttempts.forEach((attempt) => {
       if (materializedNodeIds.has(attempt.nodeId)) {
-        transitionOwnedReattachExecution(attempt.lease, attempt.taskId, 'succeeded')
+        lifecycle.transition(attempt.nodeId, 'succeeded', attempt.taskId)
       } else if (!materialized) {
         // The materializer failure path already assigned failed above.
         activeReattachKeys.delete(attempt.reattachKey)
         return
       } else {
-        transitionOwnedReattachExecution(attempt.lease, attempt.taskId, 'cancelled')
+        lifecycle.transition(attempt.nodeId, 'cancelled', attempt.taskId)
       }
       activeReattachKeys.delete(attempt.reattachKey)
     })

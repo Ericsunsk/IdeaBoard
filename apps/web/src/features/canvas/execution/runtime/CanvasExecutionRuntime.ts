@@ -24,6 +24,22 @@ export type CanvasExecutionLease = Readonly<{
   [canvasExecutionLeaseBrand]: true
 }>
 
+export type CanvasPendingResultLifecycle = {
+  begin: (nodeId: string) => CanvasExecutionLease | null
+  adopt: (nodeId: string, taskId: string) => CanvasExecutionLease | null
+  isCurrent: (nodeId: string, taskId?: string) => boolean
+  transition: (
+    nodeId: string,
+    status: Exclude<CanvasExecutionStatus, 'submitting'>,
+    taskId?: string,
+  ) => boolean
+  transitionAll: (
+    nodeIds: readonly string[],
+    status: Exclude<CanvasExecutionStatus, 'submitting' | 'running'>,
+  ) => boolean
+  leaseFor: (nodeId: string) => CanvasExecutionLease | null
+}
+
 export type CanvasExecutionRuntime = {
   readonly attachment: Readonly<Ref<CanvasExecutionAttachment | null>>
   readonly nodeStates: Readonly<Ref<ReadonlyMap<string, CanvasNodeExecutionState>>>
@@ -51,6 +67,82 @@ export type CanvasExecutionRuntime = {
 export type CanvasExecutionEdgeProjection = {
   edges: Edge[]
   didChange: boolean
+}
+
+export function createCanvasPendingResultLifecycle(
+  runtime: CanvasExecutionRuntime,
+  attachment: CanvasExecutionAttachment,
+): CanvasPendingResultLifecycle {
+  const leasesByNodeId = new Map<string, CanvasExecutionLease>()
+
+  function begin(nodeId: string): CanvasExecutionLease | null {
+    const lease = runtime.beginSubmission(attachment, nodeId)
+    if (lease) leasesByNodeId.set(lease.nodeId, lease)
+    return lease
+  }
+
+  function adopt(nodeId: string, taskId: string): CanvasExecutionLease | null {
+    const normalizedTaskId = taskId.trim()
+    if (!normalizedTaskId) return null
+    const lease = runtime.getNodeLease(nodeId)
+    const state = runtime.getNodeState(nodeId)
+    if (
+      !lease ||
+      lease.attachment !== attachment ||
+      !runtime.isNodeActive(nodeId) ||
+      state?.taskId !== normalizedTaskId
+    ) {
+      return null
+    }
+    leasesByNodeId.set(lease.nodeId, lease)
+    return lease
+  }
+
+  function leaseFor(nodeId: string): CanvasExecutionLease | null {
+    return leasesByNodeId.get(nodeId.trim()) ?? null
+  }
+
+  function isCurrent(nodeId: string, taskId?: string): boolean {
+    const lease = leaseFor(nodeId)
+    if (
+      !lease ||
+      !runtime.isAttachmentCurrent(attachment) ||
+      runtime.getNodeLease(lease.nodeId) !== lease ||
+      !runtime.isNodeActive(lease.nodeId)
+    ) {
+      return false
+    }
+    const currentTaskId = runtime.getNodeState(lease.nodeId)?.taskId
+    return taskId === undefined || currentTaskId === taskId
+  }
+
+  function transition(
+    nodeId: string,
+    status: Exclude<CanvasExecutionStatus, 'submitting'>,
+    taskId?: string,
+  ): boolean {
+    const lease = leaseFor(nodeId)
+    if (!lease) return false
+    const currentTaskId = runtime.getNodeState(lease.nodeId)?.taskId
+    if (!isCurrent(nodeId) || (currentTaskId && taskId && currentTaskId !== taskId)) return false
+    return runtime.transitionNode(lease, {
+      status,
+      taskId: taskId ?? currentTaskId,
+    })
+  }
+
+  function transitionAll(
+    nodeIds: readonly string[],
+    status: Exclude<CanvasExecutionStatus, 'submitting' | 'running'>,
+  ): boolean {
+    let didTransition = false
+    for (const nodeId of nodeIds) {
+      didTransition = transition(nodeId, status) || didTransition
+    }
+    return didTransition
+  }
+
+  return { begin, adopt, isCurrent, transition, transitionAll, leaseFor }
 }
 
 const ACTIVE_EXECUTION_STATUSES: ReadonlySet<CanvasExecutionStatus> = new Set([

@@ -13,11 +13,8 @@ import {
   type ClientActionIdFactory,
 } from '../task-runner/taskClientActionIds'
 import { isCanvasBillingPreflightError } from '../task-runner/canvasBillingPreflight'
-import type {
-  CanvasExecutionAttachment,
-  CanvasExecutionLease,
-  CanvasExecutionRuntime,
-} from './CanvasExecutionRuntime'
+import type { CanvasExecutionAttachment, CanvasExecutionRuntime } from './CanvasExecutionRuntime'
+import { createCanvasPendingResultLifecycle } from './CanvasExecutionRuntime'
 
 type PendingImageResultOptions = ImageExecutionResultOptions
 
@@ -135,43 +132,23 @@ export function createPendingImageWorkflowRunner(
 
   async function run(params: PendingImageWorkflowBatchParams): Promise<void> {
     let resultNodeIds: string[] = []
-    const leasesByResultNodeId = new Map<string, CanvasExecutionLease>()
     const createClientActionId = options.createClientActionId ?? createCanvasTaskClientActionId
     const isCurrent = () => options.executionRuntime.isAttachmentCurrent(params.attachment)
-    const isResultExecutionCurrent = (resultNodeId: string, taskId?: string) => {
-      const lease = leasesByResultNodeId.get(resultNodeId)
-      const state = options.executionRuntime.getNodeState(resultNodeId)
-      return (
-        !!lease &&
-        options.executionRuntime.getNodeLease(resultNodeId) === lease &&
-        options.executionRuntime.isNodeActive(resultNodeId) &&
-        (!taskId || state?.taskId === taskId)
-      )
-    }
+    const lifecycle = createCanvasPendingResultLifecycle(
+      options.executionRuntime,
+      params.attachment,
+    )
+    const isResultExecutionCurrent = lifecycle.isCurrent
     const transitionOutcome = (outcome: {
       resultNodeId: string
       taskId?: string
       status: 'pending' | 'succeeded' | 'failed' | 'cancelled'
-    }) => {
-      if (outcome.status === 'pending') return false
-      const lease = leasesByResultNodeId.get(outcome.resultNodeId)
-      if (!lease || !options.executionRuntime.isNodeActive(outcome.resultNodeId)) return false
-      return options.executionRuntime.transitionNode(lease, {
-        status: outcome.status,
-        taskId: outcome.taskId,
-      })
-    }
-    const transitionActiveResults = (status: 'failed' | 'cancelled') => {
-      resultNodeIds.forEach((nodeId) => {
-        const lease = leasesByResultNodeId.get(nodeId)
-        const current = options.executionRuntime.getNodeState(nodeId)
-        if (!lease || !current || !options.executionRuntime.isNodeActive(nodeId)) return
-        options.executionRuntime.transitionNode(lease, {
-          status,
-          taskId: current.taskId,
-        })
-      })
-    }
+    }) =>
+      outcome.status === 'pending'
+        ? false
+        : lifecycle.transition(outcome.resultNodeId, outcome.status, outcome.taskId)
+    const transitionActiveResults = (status: 'failed' | 'cancelled') =>
+      lifecycle.transitionAll(resultNodeIds, status)
 
     async function submitSharedTaskWithTransportRetry(resultNodeIds: readonly string[]) {
       const clientActionId = createClientActionId()
@@ -181,13 +158,9 @@ export function createPendingImageWorkflowRunner(
           const submission = await params.submitTask(resultNodeIds[0] ?? '', clientActionId, 0)
           let attachedCount = 0
           for (const resultNodeId of resultNodeIds) {
-            const lease = leasesByResultNodeId.get(resultNodeId)
             if (
-              lease &&
-              options.executionRuntime.transitionNode(lease, {
-                status: 'running',
-                taskId: submission.taskId,
-              })
+              lifecycle.isCurrent(resultNodeId) &&
+              lifecycle.transition(resultNodeId, 'running', submission.taskId)
             ) {
               attachedCount += 1
             }
@@ -218,13 +191,12 @@ export function createPendingImageWorkflowRunner(
       })
       resultNodeIds = reservation.resultNodeIds
       for (const resultNodeId of resultNodeIds) {
-        const lease = options.executionRuntime.beginSubmission(params.attachment, resultNodeId)
+        const lease = lifecycle.begin(resultNodeId)
         if (!lease) {
           transitionActiveResults('cancelled')
           options.pendingResults.cancelPendingResults(resultNodeIds)
           return
         }
-        leasesByResultNodeId.set(resultNodeId, lease)
       }
       const sharedSubmissionPromise = submitSharedTaskWithTransportRetry(resultNodeIds)
       const resultIndexByNodeId = new Map(

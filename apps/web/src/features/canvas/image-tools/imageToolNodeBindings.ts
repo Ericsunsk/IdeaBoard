@@ -58,7 +58,7 @@ export function createImageToolNodeBindings(
   session: ImageToolSession,
   renderedPreview: { readonly value: ImageToolStageBinding['renderedPreview'] },
 ) {
-  const { options } = session
+  const { execution, ui } = session.capabilities
   const stageBindingCache = new Map<string, ImageToolStageBinding>()
   const actionBindingCache = new Map<string, ImageActionBinding>()
   function stageBindingFor(nodeId: string): ImageToolStageBinding {
@@ -80,25 +80,25 @@ export function createImageToolNodeBindings(
 
   function actionBindingFor(nodeId: string): ImageActionBinding {
     const hasCommittedMask = !!session.maskEditor.getCommittedMaskData(nodeId)
-    const actionMenuVisible = options.isImageActionPanelVisible(nodeId)
-    const activeStrengthAction = options.strengthControl.activeAction.value
-    const directGenerating = options.isNodeExecutionActive(nodeId)
+    const actionMenuVisible = ui.isImageActionPanelVisible(nodeId)
+    const activeStrengthAction = ui.strengthControl.activeAction.value
+    const directGenerating = execution.isNodeExecutionActive(nodeId)
     const nextBinding: ImageActionBinding = {
       actionMenuVisible,
-      promptComposerVisible: options.isImagePromptComposerVisible(nodeId),
+      promptComposerVisible: ui.isImagePromptComposerVisible(nodeId),
       promptPlaceholder: hasCommittedMask ? '描述如何重绘选区' : '输入辅助要求（可选）',
       directGenerating,
       strengthControl: {
         visible: !!activeStrengthAction && actionMenuVisible,
         activeAction: activeStrengthAction,
-        getValue: options.strengthControl.getValue,
-        setRangeRef: options.strengthControl.setRangeRef,
-        setTriggerRef: options.strengthControl.setTriggerRef,
-        onRangePointerDown: options.strengthControl.onRangePointerDown,
-        onInput: options.strengthControl.onInput,
-        onChange: options.strengthControl.onChange,
-        onPointerUp: options.strengthControl.onPointerUp,
-        onClick: options.strengthControl.onClick,
+        getValue: ui.strengthControl.getValue,
+        setRangeRef: ui.strengthControl.setRangeRef,
+        setTriggerRef: ui.strengthControl.setTriggerRef,
+        onRangePointerDown: ui.strengthControl.onRangePointerDown,
+        onInput: ui.strengthControl.onInput,
+        onChange: ui.strengthControl.onChange,
+        onPointerUp: ui.strengthControl.onPointerUp,
+        onClick: ui.strengthControl.onClick,
       },
     }
     return reuseCachedBinding(actionBindingCache, nodeId, nextBinding, (left, right) =>

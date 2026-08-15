@@ -219,8 +219,7 @@ type providerExecutionConfig struct {
 	ProviderEndpointName string
 	FeatureSlug          string
 	Timeout              time.Duration
-	LocalRedrawCtx       *localRedrawContext
-	ImageExtendCtx       *imageExtendContext
+	Finalization         providerFinalizationPipeline
 	Request              providerRequest
 }
 
@@ -232,8 +231,6 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 	if err != nil {
 		return providerCallOutput{}, err
 	}
-	localRedrawStored := false
-	imageExtendStored := false
 	output := providerCallOutput{}
 	providerStartedAt := time.Now()
 	output.Timeline.ProviderStartedAt = &providerStartedAt
@@ -258,9 +255,6 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 			fmt.Errorf("API 未返回图片"),
 		)
 	}
-	imageURL := imageURLs[0]
-	var taskOutputs []tasks.TaskOutput
-
 	finalizeStartedAt := time.Now()
 	output.Timeline.FinalizeStartedAt = &finalizeStartedAt
 	markFinalizeFinished := func() {
@@ -270,46 +264,22 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 		finalizeFinishedAt := time.Now()
 		output.Timeline.FinalizeFinishedAt = &finalizeFinishedAt
 	}
-	if exec.LocalRedrawCtx != nil {
-		imageURLs, taskOutputs, localRedrawStored, err = c.finalizeLocalRedrawResults(ctx, task.UserID, task.TaskID, exec.LocalRedrawCtx, imageURLs, exec.Timeout)
-		if err != nil {
-			markFinalizeFinished()
-			if errors.Is(err, context.Canceled) {
-				return output, err
-			}
-			if _, _, ok := executionFailureDetails(err); ok {
-				return output, err
-			}
-			return output, newExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, err)
-		}
-		imageURL = imageURLs[0]
-	}
-	if exec.ImageExtendCtx != nil {
-		imageURLs, taskOutputs, imageExtendStored, err = c.finalizeImageExtendResults(ctx, task.UserID, task.TaskID, exec.ImageExtendCtx, imageURLs, exec.Timeout)
-		if err != nil {
-			markFinalizeFinished()
-			if errors.Is(err, context.Canceled) {
-				return output, err
-			}
-			if _, _, ok := executionFailureDetails(err); ok {
-				return output, err
-			}
-			return output, newExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, err)
-		}
-		imageURL = imageURLs[0]
-	}
-
-	if !localRedrawStored && !imageExtendStored {
-		imageURLs, taskOutputs, err = c.materializeProviderResultImages(ctx, task.UserID, task.TaskID, correlationID, account, imageURLs)
-		if err != nil {
-			markFinalizeFinished()
-			if errors.Is(err, context.Canceled) {
-				return output, err
-			}
+	imageURLs, taskOutputs, err := exec.Finalization.finalize(ctx, task.UserID, task.TaskID, imageURLs, exec.Timeout)
+	if err != nil {
+		markFinalizeFinished()
+		if errors.Is(err, context.Canceled) {
 			return output, err
 		}
-		imageURL = imageURLs[0]
+		if _, _, ok := executionFailureDetails(err); ok {
+			return output, err
+		}
+		return output, newExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, err)
 	}
+	if len(imageURLs) == 0 {
+		markFinalizeFinished()
+		return output, newExecutionFailureError(tasks.ExecutionStageFinalizing, tasks.FailureCategoryFinalizeError, fmt.Errorf("finalizer 未返回图片"))
+	}
+	imageURL := imageURLs[0]
 	finalizeFinishedAt := time.Now()
 	output.Timeline.FinalizeFinishedAt = &finalizeFinishedAt
 
@@ -395,13 +365,15 @@ func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account
 	}
 
 	timeout := resolveAccountTimeout(account)
-	localRedrawCtx, redrawErr := c.prepareLocalRedrawPipeline(ctx, account, taskParams.Provider, timeout)
-	if redrawErr != nil {
-		return providerExecutionConfig{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, redrawErr)
-	}
-	imageExtendCtx, extendErr := c.prepareImageExtendPipeline(ctx, account, taskParams.Provider, timeout)
-	if extendErr != nil {
-		return providerExecutionConfig{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, extendErr)
+	finalization, finalizationErr := c.prepareProviderFinalization(
+		ctx,
+		account,
+		taskParams.Provider,
+		timeout,
+		task.EffectiveCorrelationID(),
+	)
+	if finalizationErr != nil {
+		return providerExecutionConfig{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, finalizationErr)
 	}
 
 	resolvedAccountModel, ok := resolveAccountModelForExecution(account, taskParams, assignment.ResolvedModel)
@@ -419,8 +391,7 @@ func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account
 		ProviderEndpointName: providerEndpointName,
 		FeatureSlug:          taskParams.featureSlug(),
 		Timeout:              timeout,
-		LocalRedrawCtx:       localRedrawCtx,
-		ImageExtendCtx:       imageExtendCtx,
+		Finalization:         finalization,
 		Request:              taskParams.providerRequest(task.Prompt, resolvedModel),
 	}, nil
 }
