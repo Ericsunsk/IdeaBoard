@@ -66,13 +66,21 @@ type BillingAdminAction struct {
 	CreatedAt      time.Time       `json:"created_at"`
 }
 
+type BillingCurrentPrice struct {
+	Sku              string    `json:"sku"`
+	OutputResolution string    `json:"output_resolution"`
+	PriceVersionID   int64     `json:"price_version_id"`
+	UpdatedAt        time.Time `json:"updated_at"`
+}
+
 type BillingPriceVersion struct {
-	PriceVersionID int64     `json:"price_version_id"`
-	Sku            string    `json:"sku"`
-	Version        int64     `json:"version"`
-	UnitCredits    int64     `json:"unit_credits"`
-	CreatedBy      int64     `json:"created_by"`
-	CreatedAt      time.Time `json:"created_at"`
+	PriceVersionID   int64     `json:"price_version_id"`
+	Sku              string    `json:"sku"`
+	OutputResolution string    `json:"output_resolution"`
+	Version          int64     `json:"version"`
+	UnitCredits      int64     `json:"unit_credits"`
+	CreatedBy        int64     `json:"created_by"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 type BillingSku struct {
@@ -711,6 +719,7 @@ type TaskBillingSnapshot struct {
 	HoldTransactionID sql.NullString `json:"hold_transaction_id"`
 	CreatedAt         time.Time      `json:"created_at"`
 	DisplayName       string         `json:"display_name"`
+	OutputResolution  string         `json:"output_resolution"`
 }
 
 type TaskCancellation struct {
@@ -770,25 +779,26 @@ type TaskExecutionMetric struct {
 }
 
 type TaskLease struct {
-	ID                      int64        `json:"id"`
-	TaskID                  string       `json:"task_id"`
-	LeaseToken              string       `json:"lease_token"`
-	RiverJobID              int64        `json:"river_job_id"`
-	AccountID               int64        `json:"account_id"`
-	ProviderEndpointID      int64        `json:"provider_endpoint_id"`
-	CredentialID            int64        `json:"credential_id"`
-	FeatureSlug             string       `json:"feature_slug"`
-	ResolvedModel           string       `json:"resolved_model"`
-	ApiType                 string       `json:"api_type"`
-	ProviderEndpointName    string       `json:"provider_endpoint_name"`
-	ProviderEndpointBaseUrl string       `json:"provider_endpoint_base_url"`
-	CredentialFingerprint   string       `json:"credential_fingerprint"`
-	CredentialKeyVersion    string       `json:"credential_key_version"`
-	AcquiredAt              time.Time    `json:"acquired_at"`
-	ReleasedAt              sql.NullTime `json:"released_at"`
-	ReleaseReason           string       `json:"release_reason"`
-	CreatedAt               time.Time    `json:"created_at"`
-	UpdatedAt               time.Time    `json:"updated_at"`
+	ID                       int64        `json:"id"`
+	TaskID                   string       `json:"task_id"`
+	LeaseToken               string       `json:"lease_token"`
+	RiverJobID               int64        `json:"river_job_id"`
+	AccountID                int64        `json:"account_id"`
+	ProviderEndpointID       int64        `json:"provider_endpoint_id"`
+	CredentialID             int64        `json:"credential_id"`
+	FeatureSlug              string       `json:"feature_slug"`
+	ResolvedModel            string       `json:"resolved_model"`
+	ApiType                  string       `json:"api_type"`
+	ProviderEndpointProtocol string       `json:"provider_endpoint_protocol"`
+	ProviderEndpointName     string       `json:"provider_endpoint_name"`
+	ProviderEndpointBaseUrl  string       `json:"provider_endpoint_base_url"`
+	CredentialFingerprint    string       `json:"credential_fingerprint"`
+	CredentialKeyVersion     string       `json:"credential_key_version"`
+	AcquiredAt               time.Time    `json:"acquired_at"`
+	ReleasedAt               sql.NullTime `json:"released_at"`
+	ReleaseReason            string       `json:"release_reason"`
+	CreatedAt                time.Time    `json:"created_at"`
+	UpdatedAt                time.Time    `json:"updated_at"`
 }
 
 type TaskOutput struct {

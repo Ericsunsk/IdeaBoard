@@ -25,9 +25,7 @@ type ImageExtendPromptContract struct {
 	LeftPercent   float64
 }
 
-type HDUpscalePromptContract struct {
-	DetailStrength float64
-}
+type HDUpscaleContract struct{ Scale float64 }
 
 func ReadStyleVariationPromptContract(params map[string]interface{}) (StyleVariationPromptContract, bool) {
 	obj, ok := readWorkflowObjectParam(params, ParamKeyVariation)
@@ -85,22 +83,16 @@ func (c ImageExtendPromptContract) PromptVariables() map[string]interface{} {
 	}
 }
 
-func ReadHDUpscalePromptContract(params map[string]interface{}) (HDUpscalePromptContract, bool) {
+func ReadHDUpscaleContract(params map[string]interface{}) (HDUpscaleContract, bool) {
 	obj, ok := readWorkflowObjectParam(params, ParamKeyHD)
 	if !ok {
-		return HDUpscalePromptContract{}, false
+		return HDUpscaleContract{}, false
 	}
-	detail, ok := readNumberField(obj, paramkeys.DetailStrength)
+	scale, ok := readNumberField(obj, paramkeys.Scale)
 	if !ok {
-		return HDUpscalePromptContract{}, false
+		return HDUpscaleContract{}, false
 	}
-	return HDUpscalePromptContract{DetailStrength: detail}, true
-}
-
-func (c HDUpscalePromptContract) PromptVariables() map[string]interface{} {
-	return map[string]interface{}{
-		paramkeys.PromptPlaceholderDetailStrength: formatPercentControl(c.DetailStrength),
-	}
+	return HDUpscaleContract{Scale: scale}, true
 }
 
 type StyleFusionPromptContract struct {
@@ -218,11 +210,14 @@ func normalizeHDUpscaleContract(params map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	detail, ok := readNumberField(obj, paramkeys.DetailStrength)
+	scale, ok := readNumberField(obj, paramkeys.Scale)
 	if !ok {
-		return fmt.Errorf("hd.detail_strength 必须是数字")
+		return fmt.Errorf("hd.scale 必须是数字")
 	}
-	obj[paramkeys.DetailStrength] = clampPercent(detail)
+	if scale < 1 || scale > 4 || math.Abs(scale*10-math.Round(scale*10)) > 1e-9 {
+		return fmt.Errorf("hd.scale 必须是 1.0-4.0 且步长为 0.1")
+	}
+	obj[paramkeys.Scale] = math.Round(scale*10) / 10
 	params[ParamKeyHD] = obj
 	return nil
 }

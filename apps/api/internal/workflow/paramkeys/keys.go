@@ -37,7 +37,7 @@ const (
 	RightPercent   = "right_percent"
 	BottomPercent  = "bottom_percent"
 	LeftPercent    = "left_percent"
-	DetailStrength = "detail_strength"
+	Scale          = "scale"
 	Mode           = "mode"
 	InputWeights   = "input_weights"
 
@@ -57,7 +57,6 @@ const (
 	PromptPlaceholderExtendRightPercent  = "{{extend_right_percent}}"
 	PromptPlaceholderExtendBottomPercent = "{{extend_bottom_percent}}"
 	PromptPlaceholderExtendLeftPercent   = "{{extend_left_percent}}"
-	PromptPlaceholderDetailStrength      = "{{" + DetailStrength + "}}"
 	PromptPlaceholderFusionInputWeights  = "{{" + FusionInputWeights + "}}"
 
 	PromptPathFusionInputWeights = Fusion + "." + InputWeights

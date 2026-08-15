@@ -213,7 +213,7 @@ describe('useFlowImageActionStrengthControl', () => {
     document.dispatchEvent(createPointerEvent('pointerup', { pointerId: 8, clientX: 150 }))
 
     expect(control.activeStrengthAction.value).toBeNull()
-    expect(control.getActionStrength(action)).toBe(50)
+    expect(control.getActionStrength(action)).toBe(2)
     expect(onCommit).not.toHaveBeenCalled()
     expect(onCancel).toHaveBeenCalledTimes(1)
 

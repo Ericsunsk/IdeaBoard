@@ -43,7 +43,6 @@ export const EXECUTION_META = {
   },
   [EXECUTION_FEATURE.hdUpscale]: {
     feature: EXECUTION_FEATURE.hdUpscale,
-    prompt: '[hd-upscale] HD 与细节增强',
   },
   [EXECUTION_FEATURE.imageExtend]: {
     feature: EXECUTION_FEATURE.imageExtend,

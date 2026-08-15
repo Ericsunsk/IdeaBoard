@@ -30,7 +30,6 @@ type featurePromptVariableProvider func(map[string]interface{}) map[string]inter
 var featurePromptVariableProviders = map[string]featurePromptVariableProvider{
 	workflow.FeatureSlugStyleVariation: styleVariationPromptVariables,
 	workflow.FeatureSlugImageExtend:    imageExtendPromptVariables,
-	workflow.FeatureSlugHDUpscale:      hdUpscalePromptVariables,
 }
 
 var featurePromptBindings = map[string][]promptTemplateBinding{
@@ -57,7 +56,6 @@ var imageNodeFeatureSlugs = map[string]struct{}{
 	workflow.FeatureSlugSketchToImage:  {},
 	workflow.FeatureSlugStyleVariation: {},
 	workflow.FeatureSlugRemoveBg:       {},
-	workflow.FeatureSlugHDUpscale:      {},
 	workflow.FeatureSlugImageExtend:    {},
 }
 
@@ -123,14 +121,6 @@ func styleVariationPromptVariables(params map[string]interface{}) map[string]int
 
 func imageExtendPromptVariables(params map[string]interface{}) map[string]interface{} {
 	contract, ok := workflow.ReadImageExtendPromptContract(params)
-	if !ok {
-		return nil
-	}
-	return contract.PromptVariables()
-}
-
-func hdUpscalePromptVariables(params map[string]interface{}) map[string]interface{} {
-	contract, ok := workflow.ReadHDUpscalePromptContract(params)
 	if !ok {
 		return nil
 	}

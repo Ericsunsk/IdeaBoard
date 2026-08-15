@@ -113,7 +113,7 @@ FROM set_billing_item_availability($1, $2, $3)`, sku, enabled, actorID).Scan(
 
 func (s *Service) Quote(ctx context.Context, rawSKU string, quantity int64) (Quote, error) {
 	resolution := OutputResolution1K
-	if sku, err := CanonicalizeSKU(rawSKU); err == nil && sku == SKU("ai-image:remove-bg") {
+	if sku, err := CanonicalizeSKU(rawSKU); err == nil && (sku == SKU("ai-image:remove-bg") || sku == SKU("ai-image:hd-upscale")) {
 		resolution = OutputResolutionDefault
 	}
 	return s.QuoteAtResolution(ctx, rawSKU, resolution, quantity)
@@ -130,7 +130,7 @@ func (s *Service) QuoteAtResolution(ctx context.Context, rawSKU string, resoluti
 // PostgreSQL transaction.
 func (s *Service) QuoteInTx(ctx context.Context, tx pgx.Tx, rawSKU string, quantity int64) (Quote, error) {
 	resolution := OutputResolution1K
-	if sku, err := CanonicalizeSKU(rawSKU); err == nil && sku == SKU("ai-image:remove-bg") {
+	if sku, err := CanonicalizeSKU(rawSKU); err == nil && (sku == SKU("ai-image:remove-bg") || sku == SKU("ai-image:hd-upscale")) {
 		resolution = OutputResolutionDefault
 	}
 	return s.QuoteAtResolutionInTx(ctx, tx, rawSKU, resolution, quantity)
@@ -152,7 +152,7 @@ func (s *Service) quote(ctx context.Context, querier quoteQuerier, rawSKU string
 	if err != nil {
 		return Quote{}, err
 	}
-	if sku == SKU("ai-image:remove-bg") && resolution != OutputResolutionDefault {
+	if (sku == SKU("ai-image:remove-bg") || sku == SKU("ai-image:hd-upscale")) && resolution != OutputResolutionDefault {
 		return Quote{}, ErrInvalidOutputResolution
 	}
 	if quantity <= 0 {

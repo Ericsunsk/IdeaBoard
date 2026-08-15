@@ -5,7 +5,7 @@ import "testing"
 func TestUnmarshalParamsPreservesUnknownKeysInExtra(t *testing.T) {
 	params, err := UnmarshalParams(`{
 		"feature": "hd-upscale",
-		"hd": {"detail_strength": 75},
+		"hd": {"scale": 2.0},
 		"provider_only": {"mode": "test"},
 		"controls": {"sample_count": 2}
 	}`)
@@ -15,8 +15,8 @@ func TestUnmarshalParamsPreservesUnknownKeysInExtra(t *testing.T) {
 	if params.Feature != "hd-upscale" {
 		t.Fatalf("feature = %q, want hd-upscale", params.Feature)
 	}
-	if params.HD == nil || params.HD.DetailStrength != 75 {
-		t.Fatalf("hd = %#v, want detail strength 75", params.HD)
+	if params.HD == nil || params.HD.Scale != 2 {
+		t.Fatalf("hd = %#v, want scale 2", params.HD)
 	}
 	if params.Extra == nil {
 		t.Fatal("Extra is nil, want unknown keys preserved")

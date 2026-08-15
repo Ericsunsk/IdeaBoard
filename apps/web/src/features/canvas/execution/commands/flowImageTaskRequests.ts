@@ -28,11 +28,10 @@ import {
   type PromptAspectRatio,
 } from '../../../canvas-board/domain'
 import {
-  DEFAULT_IMAGE_ACTION_STRENGTH,
   IMAGE_CANVAS_EXTEND_ACTION,
   IMAGE_HD_UPSCALE_ACTION,
   isImageDirectTaskAction,
-  resolveHdDetailStrength,
+  resolveHdScale,
   requireImageActionExecution,
   type ImageDirectTaskAction,
   type ImageExecutionAction,
@@ -132,14 +131,12 @@ function buildHdUpscaleReadinessRequest(
   options: ImageActionReadinessOptions = {},
 ): SubmitTaskData {
   const execution = requireImageActionExecution(IMAGE_HD_UPSCALE_ACTION)
-  const detailStrength = execution.strength?.defaultValue ?? DEFAULT_IMAGE_ACTION_STRENGTH
   return buildExecutionTaskRequest({
     prompt: '',
     feature: execution.feature,
     params: {
-      ...buildOutputBillingParams(options),
       hd: {
-        detail_strength: detailStrength,
+        scale: resolveHdScale(),
       },
     },
   })
@@ -279,15 +276,13 @@ export function buildHdUpscaleTaskRequest(input: {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
   const execution = requireImageActionExecution(IMAGE_HD_UPSCALE_ACTION)
   return buildExecutionTaskRequest({
-    prompt: input.prompt.trim(),
+    prompt: '',
     feature: execution.feature,
     imageUrls: [sourceUrl],
     params: {
-      output_count: assertRequestedOutputCount(input.outputCount),
-      output_resolution: input.outputResolution ?? '1k',
       ...buildExecutionSizeParams(input.imageSize, input.imageSize),
       hd: {
-        detail_strength: resolveHdDetailStrength(input.strength),
+        scale: resolveHdScale(input.strength),
       },
     },
   })

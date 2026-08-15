@@ -5,7 +5,7 @@ import { getCanvasNodeImageInputLimit } from '../../../canvas-board/domain'
 import {
   IMAGE_CANVAS_EXTEND_ACTION,
   IMAGE_HD_UPSCALE_ACTION,
-  resolveHdDetailStrength,
+  resolveHdScale,
 } from '../contracts/imageActionExecution'
 import { EXECUTION_FEATURE } from '../contracts/executionContract'
 import type {
@@ -33,9 +33,11 @@ const source = {
 }
 
 describe('flowImageTaskRequests', () => {
-  it('normalizes HD detail strength without changing size semantics', () => {
-    expect(resolveHdDetailStrength(undefined)).toBe(50)
-    expect(resolveHdDetailStrength(75.4)).toBe(75)
+  it('normalizes HD slider strength to a 1.0-4.0 scale', () => {
+    expect(resolveHdScale(undefined)).toBe(2)
+    expect(resolveHdScale(0)).toBe(1)
+    expect(resolveHdScale(2.34)).toBe(2.3)
+    expect(resolveHdScale(5)).toBe(4)
   })
 
   it('builds task readiness requests from the execution contract', () => {
@@ -53,7 +55,7 @@ describe('flowImageTaskRequests', () => {
       feature: EXECUTION_FEATURE.hdUpscale,
       params: {
         hd: {
-          detail_strength: 50,
+          scale: 2,
         },
       },
     })
@@ -151,13 +153,13 @@ describe('flowImageTaskRequests', () => {
     expect(request.params).not.toHaveProperty('output_format')
   })
 
-  it('keeps HD output size at the source size and maps strength to quality', () => {
+  it('keeps HD output size at the source size and sends only scale', () => {
     const request = buildHdUpscaleTaskRequest({
       source,
       imageSize: { width: 1200, height: 800 },
-      prompt: '',
+      prompt: 'ignored prompt',
       outputCount: 1,
-      strength: 75,
+      strength: 3.2,
     })
 
     expect(request.params).toMatchObject({
@@ -166,13 +168,16 @@ describe('flowImageTaskRequests', () => {
       original_image_width: 1200,
       original_image_height: 800,
       hd: {
-        detail_strength: 75,
+        scale: 3.2,
       },
     })
     expect(request.params?.hd).not.toHaveProperty('output_quality')
     expect(request.params?.hd).not.toHaveProperty('size_policy')
     expect(request.params).not.toHaveProperty('upscale_factor')
     expect(request.params).not.toHaveProperty('upscale_mode')
+    expect(request.params).not.toHaveProperty('output_count')
+    expect(request.params).not.toHaveProperty('output_resolution')
+    expect(request.prompt).toBe('')
   })
 
   it('keeps each image workflow in one 1-4 output task with the optional prompt', () => {
@@ -216,10 +221,14 @@ describe('flowImageTaskRequests', () => {
       EXECUTION_FEATURE.hdUpscale,
     ])
     for (const request of requests) {
-      expect(request).toMatchObject({
-        prompt: 'preserve the subject',
-        image_urls: [source.url],
-      })
+      expect(request.image_urls).toEqual([source.url])
+      if (request.feature === EXECUTION_FEATURE.hdUpscale) {
+        expect(request.prompt).toBe('')
+        expect(request.params).not.toHaveProperty('output_count')
+        expect(request.params).not.toHaveProperty('output_resolution')
+        continue
+      }
+      expect(request.prompt).toBe('preserve the subject')
       expect(request.params?.output_count).toBe(
         request.feature === EXECUTION_FEATURE.removeBg ? 1 : 4,
       )

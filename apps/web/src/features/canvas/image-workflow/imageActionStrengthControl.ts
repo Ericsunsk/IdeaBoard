@@ -1,13 +1,10 @@
 import { reactive } from 'vue'
 import {
-  DEFAULT_IMAGE_ACTION_STRENGTH,
   DEFAULT_IMAGE_ACTION_STRENGTHS,
+  getImageActionStrengthConfig,
   type ImageStrengthAction,
 } from '../execution'
 import { useStrengthRangeEditSession } from '../composables/useStrengthRangeEditSession'
-
-const MIN_STRENGTH = 0
-const MAX_STRENGTH = 100
 
 export function useFlowImageActionStrengthControl(options: {
   onCommit: (action: ImageStrengthAction, strength: number) => void
@@ -20,9 +17,11 @@ export function useFlowImageActionStrengthControl(options: {
   let dragSession: { action: ImageStrengthAction; pointerId: number; stop: () => void } | null =
     null
 
-  function clampStrength(value: number): number {
-    if (!Number.isFinite(value)) return DEFAULT_IMAGE_ACTION_STRENGTH
-    return Math.max(MIN_STRENGTH, Math.min(MAX_STRENGTH, Math.round(value)))
+  function normalizeStrength(action: ImageStrengthAction, value: number): number {
+    const config = getImageActionStrengthConfig(action)
+    if (!Number.isFinite(value)) return config.defaultValue
+    const clamped = Math.max(config.min, Math.min(config.max, value))
+    return Math.round(clamped / config.step) * config.step
   }
 
   function stopDragSession() {
@@ -32,16 +31,16 @@ export function useFlowImageActionStrengthControl(options: {
 
   const strengthEdit = useStrengthRangeEditSession<ImageStrengthAction>({
     readValue: (action) => strengths[action],
-    normalizeValue: (_action, value) => clampStrength(value),
+    normalizeValue: (action, value) => normalizeStrength(action, value),
     writeValue: (action, value) => {
       strengths[action] = value
     },
     onCommit: (action, strength) => {
       onCommit(action, strength)
-      strengths[action] = DEFAULT_IMAGE_ACTION_STRENGTH
+      strengths[action] = getImageActionStrengthConfig(action).defaultValue
     },
     onCancel: (action) => {
-      strengths[action] = DEFAULT_IMAGE_ACTION_STRENGTH
+      strengths[action] = getImageActionStrengthConfig(action).defaultValue
       onCancel?.(action)
     },
     onLongPressStart: (action, input, event) => {
@@ -52,10 +51,16 @@ export function useFlowImageActionStrengthControl(options: {
       trigger instanceof HTMLButtonElement && trigger.disabled,
   })
 
-  function getStrengthFromPointer(input: HTMLInputElement, event: PointerEvent): number {
+  function getStrengthFromPointer(
+    action: ImageStrengthAction,
+    input: HTMLInputElement,
+    event: PointerEvent,
+  ): number {
     const rect = input.getBoundingClientRect()
-    if (rect.width <= 0) return DEFAULT_IMAGE_ACTION_STRENGTH
-    return clampStrength(((event.clientX - rect.left) / rect.width) * MAX_STRENGTH)
+    const config = getImageActionStrengthConfig(action)
+    if (rect.width <= 0) return config.defaultValue
+    const progress = (event.clientX - rect.left) / rect.width
+    return normalizeStrength(action, config.min + progress * (config.max - config.min))
   }
 
   function startDragSession(
@@ -64,7 +69,7 @@ export function useFlowImageActionStrengthControl(options: {
     startEvent: PointerEvent,
   ) {
     stopDragSession()
-    const initialStrength = getStrengthFromPointer(input, startEvent)
+    const initialStrength = getStrengthFromPointer(action, input, startEvent)
     strengthEdit.beginEdit(action, input, {
       syncInitial: false,
       initialValue: initialStrength,
@@ -76,9 +81,9 @@ export function useFlowImageActionStrengthControl(options: {
 
     const onPointerMove = (event: PointerEvent) => {
       if (event.pointerId !== pointerId) return
-      const nextStrength = getStrengthFromPointer(input, event)
+      const nextStrength = getStrengthFromPointer(action, input, event)
       strengthEdit.writeValueToRange(action, input, nextStrength)
-      if (Math.abs(nextStrength - initialStrength) >= 1) {
+      if (Math.abs(nextStrength - initialStrength) >= getImageActionStrengthConfig(action).step) {
         hasEffectiveDrag = true
       }
     }

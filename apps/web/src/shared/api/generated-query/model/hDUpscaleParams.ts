@@ -7,8 +7,8 @@
 
 export interface HDUpscaleParams {
   /**
-   * @minimum 0
-   * @maximum 100
+   * @minimum 1
+   * @maximum 4
    */
-  detail_strength: number
+  scale: number
 }

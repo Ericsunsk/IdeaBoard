@@ -46,7 +46,7 @@ describe('imageActionExecution', () => {
     expect(isImageStrengthAction(IMAGE_HD_UPSCALE_ACTION)).toBe(true)
     expect(DEFAULT_IMAGE_ACTION_STRENGTHS).toEqual({
       [IMAGE_NODE_ACTION.styleVariation]: DEFAULT_IMAGE_ACTION_STRENGTH,
-      [IMAGE_HD_UPSCALE_ACTION]: DEFAULT_IMAGE_ACTION_STRENGTH,
+      [IMAGE_HD_UPSCALE_ACTION]: 2,
     })
   })
 

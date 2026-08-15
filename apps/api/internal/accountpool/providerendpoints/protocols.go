@@ -8,9 +8,10 @@ import (
 
 const (
 	ProtocolModelAPI            = "model-api"
-	ProtocolImageURLJSONPNG     = "image-url-json-to-png"
+	ProtocolImageURLJSONImage   = "image-url-json-to-image"
 	CapabilityImageGeneration   = "image-generation"
 	CapabilityBackgroundRemoval = "background-removal"
+	CapabilityImageUpscale      = "image-upscale"
 )
 
 type ProtocolDefinition struct {
@@ -19,8 +20,8 @@ type ProtocolDefinition struct {
 }
 
 var protocolCapabilities = map[string][]string{
-	ProtocolModelAPI:        {CapabilityImageGeneration},
-	ProtocolImageURLJSONPNG: {CapabilityBackgroundRemoval},
+	ProtocolModelAPI:          {CapabilityImageGeneration},
+	ProtocolImageURLJSONImage: {CapabilityBackgroundRemoval, CapabilityImageUpscale},
 }
 
 func ProtocolRegistry() []ProtocolDefinition {
@@ -79,5 +80,13 @@ func ProtocolSupportsCapability(protocol, capability string) bool {
 }
 
 func AllowsModellessAccounts(protocol string, capabilities []string) bool {
-	return strings.TrimSpace(protocol) == ProtocolImageURLJSONPNG && len(capabilities) == 1 && capabilities[0] == CapabilityBackgroundRemoval
+	if strings.TrimSpace(protocol) != ProtocolImageURLJSONImage || len(capabilities) == 0 {
+		return false
+	}
+	for _, capability := range capabilities {
+		if capability == CapabilityBackgroundRemoval || capability == CapabilityImageUpscale {
+			return true
+		}
+	}
+	return false
 }

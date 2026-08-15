@@ -68,20 +68,21 @@ type StartupRecoveredTask struct {
 }
 
 type ActiveTaskLease struct {
-	TaskID                  string
-	LeaseToken              string
-	RiverJobID              int64
-	AccountID               int64
-	ProviderEndpointID      int64
-	CredentialID            int64
-	FeatureSlug             string
-	ResolvedModel           string
-	APIType                 string
-	ProviderEndpointName    string
-	ProviderEndpointBaseURL string
-	CredentialFingerprint   string
-	CredentialKeyVersion    string
-	AcquiredAt              time.Time
+	TaskID                   string
+	LeaseToken               string
+	RiverJobID               int64
+	AccountID                int64
+	ProviderEndpointID       int64
+	CredentialID             int64
+	FeatureSlug              string
+	ResolvedModel            string
+	APIType                  string
+	ProviderEndpointProtocol string
+	ProviderEndpointName     string
+	ProviderEndpointBaseURL  string
+	CredentialFingerprint    string
+	CredentialKeyVersion     string
+	AcquiredAt               time.Time
 }
 
 type DailyStatAggregate struct {

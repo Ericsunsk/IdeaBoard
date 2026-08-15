@@ -26,7 +26,6 @@ describe('workflowFeatureRegistry projections', () => {
           WORKFLOW_FEATURE.sketchToImage,
           WORKFLOW_FEATURE.styleVariation,
           WORKFLOW_FEATURE.localInpaint,
-          WORKFLOW_FEATURE.hdUpscale,
           WORKFLOW_FEATURE.imageExtend,
         ],
       },

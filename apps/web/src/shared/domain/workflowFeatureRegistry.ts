@@ -133,10 +133,7 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
     groupKey: WORKFLOW_FEATURE_GROUP.image,
     imageActionLabel: 'HD',
     imageActionTitle: 'HD',
-    promptVariables: [
-      { key: '{{user_prompt}}', tone: 'prompt' },
-      { key: '{{detail_strength}}', tone: 'control' },
-    ],
+    promptVariables: [],
   },
   {
     slug: WORKFLOW_FEATURE.imageExtend,
@@ -190,7 +187,6 @@ const WORKFLOW_FEATURE_CONFIG_GROUP_DEFS = [
       WORKFLOW_FEATURE.sketchToImage,
       WORKFLOW_FEATURE.styleVariation,
       WORKFLOW_FEATURE.localInpaint,
-      WORKFLOW_FEATURE.hdUpscale,
       WORKFLOW_FEATURE.imageExtend,
     ],
   },

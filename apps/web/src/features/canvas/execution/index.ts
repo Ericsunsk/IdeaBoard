@@ -5,6 +5,7 @@ export {
   IMAGE_EXECUTION_MODE,
   IMAGE_HD_UPSCALE_ACTION,
   IMAGE_STRENGTH_ACTIONS,
+  getImageActionStrengthConfig,
   isImageStrengthAction,
   isImageTaskAction,
   type ImageStrengthAction,

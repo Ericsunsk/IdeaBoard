@@ -737,62 +737,6 @@ func TestCallDrawingAPIUsesAssignmentResolvedModel(t *testing.T) {
 	}
 }
 
-func TestCallOpenAIHDUpscaleUsesGenerationEndpointAndIgnoresMaskParams(t *testing.T) {
-	var gotPath string
-	var gotBody map[string]interface{}
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			t.Fatalf("read body: %v", err)
-		}
-		if err := json.Unmarshal(body, &gotBody); err != nil {
-			t.Fatalf("unmarshal body: %v", err)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":[{"url":"https://cdn.example/upscale.png"}]}`))
-	}))
-	defer server.Close()
-
-	c := &ProviderExecutor{}
-	account := &accounts.ApiAccount{
-		ProxyURL: server.URL,
-		ApiKey:   "test-key",
-		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
-	}
-	sourceDataURL := buildTinyPNGDataURL(t)
-	maskDataURL := buildTinyPNGDataURL(t)
-	params := map[string]interface{}{
-		"feature":    "hd-upscale",
-		"image_urls": []interface{}{sourceDataURL},
-		"hd": map[string]interface{}{
-			"detail_strength": 75,
-		},
-		"mask_image_url":  maskDataURL,
-		"mask_image_urls": []interface{}{maskDataURL},
-		"use_mask":        true,
-	}
-
-	if _, err := c.callOpenAIForTest(context.Background(), account, "upscale prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1"); err != nil {
-		t.Fatalf("callOpenAI returned error: %v", err)
-	}
-	if gotPath != "/v1/images/generations" {
-		t.Fatalf("expected generations endpoint, got %s", gotPath)
-	}
-	if gotBody["image"] != sourceDataURL {
-		t.Fatalf("expected source image field, got %#v", gotBody["image"])
-	}
-	if gotBody["output_quality"] != float64(90) {
-		t.Fatalf("expected output_quality field, got %#v", gotBody["output_quality"])
-	}
-	for _, key := range []string{"mask", "images", "mask_image_url", "mask_image_urls", "use_mask", "upscale_factor", "output_format", "upscale_mode"} {
-		if _, exists := gotBody[key]; exists {
-			t.Fatalf("did not expect %s in hd-upscale generation request body: %#v", key, gotBody[key])
-		}
-	}
-}
-
 func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
 	usesEditEndpoint := func(params map[string]interface{}) bool {
 		return readOpenAIProviderParams(newProviderRequest("", 0, 0, params, "")).useEditEndpoint()
@@ -831,7 +775,7 @@ func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
 	}
 }
 
-func TestReadOpenAIProviderParamsDerivesEditMaskAndHDQuality(t *testing.T) {
+func TestReadOpenAIProviderParamsDerivesEditMask(t *testing.T) {
 	maskURL := "https://img.example/mask.png"
 	req := newProviderRequest("prompt", 1024, 1024, map[string]interface{}{
 		"feature":        "local-inpaint",
@@ -850,19 +794,6 @@ func TestReadOpenAIProviderParamsDerivesEditMaskAndHDQuality(t *testing.T) {
 		t.Fatalf("edit refs = %#v", params.EditImageRefs)
 	}
 
-	hdReq := newProviderRequest("prompt", 1024, 1024, map[string]interface{}{
-		"feature": "hd-upscale",
-		"hd": map[string]interface{}{
-			"detail_strength": 75,
-		},
-	}, "gpt-image-1")
-	hdParams := readOpenAIProviderParams(hdReq)
-	if hdParams.HDOutputQuality == nil || *hdParams.HDOutputQuality != 90 {
-		t.Fatalf("HD output quality = %#v, want 90", hdParams.HDOutputQuality)
-	}
-	if hdParams.useEditEndpoint() {
-		t.Fatalf("hd-upscale should stay on generation endpoint")
-	}
 }
 
 func TestOpenAIRequestFinalizerDropsRedundantFields(t *testing.T) {

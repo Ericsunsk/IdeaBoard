@@ -10,6 +10,7 @@ import {
   createAccountCreatePayload,
   createAccountUpdatePayload,
   inferProviderEndpointApiTypeFromUrl,
+  isModellessProviderEndpoint,
 } from './providerConfigPayload'
 
 describe('provider config payload mapping', () => {
@@ -146,6 +147,26 @@ describe('provider config payload mapping', () => {
     expect(inferProviderEndpointApiTypeFromUrl('https://example.com/custom', 'google-ai')).toBe(
       'google-ai',
     )
+  })
+
+  it('identifies capability endpoints that do not require a model', () => {
+    expect(
+      isModellessProviderEndpoint(
+        makeProviderEndpoint({
+          protocol: 'image-url-json-to-image',
+          capabilities: ['background-removal'],
+        }),
+      ),
+    ).toBe(true)
+    expect(
+      isModellessProviderEndpoint(
+        makeProviderEndpoint({
+          protocol: 'image-url-json-to-image',
+          capabilities: ['image-upscale'],
+        }),
+      ),
+    ).toBe(true)
+    expect(isModellessProviderEndpoint(makeProviderEndpoint())).toBe(false)
   })
 })
 

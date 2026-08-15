@@ -67,6 +67,17 @@ export function createProviderEndpointSavePayload(form: ProviderEndpointFormData
   }
 }
 
+export function isModellessProviderEndpoint(
+  providerEndpoint: Pick<ProviderEndpointRecord, 'protocol' | 'capabilities'> | null | undefined,
+) {
+  return (
+    providerEndpoint?.protocol === 'image-url-json-to-image' &&
+    providerEndpoint.capabilities.some(
+      (capability) => capability === 'background-removal' || capability === 'image-upscale',
+    )
+  )
+}
+
 export function inferProviderEndpointApiTypeFromUrl(
   apiUrl: string,
   fallback: ProviderApiTypeValue = DEFAULT_ADMIN_PROVIDER_ENDPOINT_API_TYPE,

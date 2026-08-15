@@ -64,7 +64,7 @@ func (h *Handler) Quote(c *gin.Context) {
 	resolution, err := NormalizeOutputResolution(request.OutputResolution)
 	if request.OutputResolution == "" {
 		resolution = OutputResolution1K
-		if sku, skuErr := CanonicalizeSKU(request.SKU); skuErr == nil && sku == SKU("ai-image:remove-bg") {
+		if sku, skuErr := CanonicalizeSKU(request.SKU); skuErr == nil && (sku == SKU("ai-image:remove-bg") || sku == SKU("ai-image:hd-upscale")) {
 			resolution = OutputResolutionDefault
 		}
 		err = nil

@@ -14,6 +14,7 @@ import {
   createAccountCreatePayload,
   createAccountUpdatePayload,
   getAdminProviderEndpointApiTypeLabel,
+  isModellessProviderEndpoint,
   normalizeModelKey,
 } from './providerConfigPayload'
 import type { ProviderEndpointProtocol } from '../../../shared/api/generated-query/model'
@@ -301,8 +302,7 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
     }
     if (
       detectModelsLoading.value ||
-      (command.providerEndpoint?.protocol === 'image-url-json-to-png' &&
-        command.providerEndpoint.capabilities.includes('background-removal'))
+      isModellessProviderEndpoint(command.providerEndpoint)
     ) return result
 
     const apiType = command.providerEndpoint?.apiType || DEFAULT_PROVIDER_API_TYPE

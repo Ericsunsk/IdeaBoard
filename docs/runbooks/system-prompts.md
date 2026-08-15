@@ -5,9 +5,9 @@
 
 ## 1. 文档边界
 
-- `feature_prompts` 保存每个 Feature 当前生效的一份 `System Prompt`，是运行时事实源。
+- `feature_prompts` 保存每个 Prompt-driven Feature 当前生效的一份 `System Prompt`，是运行时事实源。
 - 本文中的模板是 `Recommended Baseline`，不代表数据库当前已经使用这些内容。
-- 每个 Feature 只有一份当前模板；模板按原值更新，不在本文设计 version、revision 或 history。
+- 每个 Prompt-driven Feature 只有一份当前模板；模板按原值更新，不在本文设计 version、revision 或 history。
 - 图片、mask、多参考图、尺寸、模型、质量、输出数量和上传协议由运行时提供，不写成 Prompt 变量。
 - 当前只确认稳定链路的模板；`local-inpaint` 和 `image-extend` 暂缓，不能把本文当作这两个 Feature 的最终模板。
 
@@ -29,11 +29,10 @@
 `local-inpaint`、`image-extend`。
 
 - 图片是主输入。
-- 用户文字只能作为显式辅助要求；没有辅助文字时，Feature 仍应按图片和结构化控制执行。
+- Prompt-driven Image Feature 的用户文字只能作为显式辅助要求；没有辅助文字时仍按图片和结构化控制执行。
 - `style-variation` 的 `variation_strength` 控制变化幅度。
-- `hd-upscale` 的 `detail_strength` 只控制细节恢复幅度；输出尺寸和 Provider quality 由运行时控制。
-- `remove-bg` 当前输出固定纯品红 Key Color 背景，不承诺透明 alpha；未来透明化属于后处理边界。
-- 每个 Image Feature 保持自己的 Prompt Contract，不归入 Prompt Node 或其他功能。
+- `remove-bg` 与 `hd-upscale` 由 Modal 专用端点处理，不读取用户文字或 System Prompt；HD 只接受结构化 `hd.scale`。
+- Prompt-driven Image Feature 保持自己的 Prompt Contract，不归入 Prompt Node 或其他功能。
 
 ### 2.3 Fusion Node
 
@@ -61,7 +60,7 @@
 
 ### 3.2 必须满足
 
-- 每个 Feature 的 `System Prompt` 都必须非空，去除首尾空白后仍有内容。
+- 每个已配置模板的 `System Prompt` 都必须非空，去除首尾空白后仍有内容。
 - 模板只能使用该 Feature 允许的变量。
 - 未知变量、拼写错误变量、未闭合变量和当前 Feature 不支持的变量都不合法。
 - 同一个变量最多出现一次。
@@ -77,8 +76,8 @@
 | `local-inpaint` | `{{user_prompt}}`（暂缓） |
 | `sketch-to-image` | `{{user_prompt}}` |
 | `style-variation` | `{{user_prompt}}`、`{{variation_strength}}` |
-| `remove-bg` | `{{user_prompt}}` |
-| `hd-upscale` | `{{user_prompt}}`、`{{detail_strength}}` |
+| `remove-bg` | 无（由 Modal 专用端点处理） |
+| `hd-upscale` | 无（由 Modal 专用端点处理） |
 | `image-extend` | `{{user_prompt}}`（暂缓） |
 | `style-fusion` | `{{user_prompt}}`、`{{fusion_input_weights}}` |
 
@@ -191,75 +190,7 @@
 不要输出解释、分析过程或提示词文本，只生成结果图。
 ```
 
-### 4.4 `remove-bg` · Image Node
-
-```text
-[ROLE]
-你是前景主体分离助手。
-
-[OBJECTIVE]
-从输入图片中准确分离前景主体，并将背景替换为便于后续 Chroma Key 处理的固定纯品红背景。
-
-[INPUTS]
-输入图片是唯一主输入，提供主体身份、结构、材质、颜色、姿态、文字和构图信息。
-
-用户辅助要求：
-{{user_prompt}}
-
-用户辅助要求可以为空；如果提供，只能补充前景识别或边缘保留要求。
-
-[PRIORITY_AND_CONSTRAINTS]
-1. 本模板定义的任务目标与限制优先级最高，必须遵守。
-2. 主体身份、结构、材质、颜色、姿态、文字和构图必须保持不变。
-3. 只处理背景，不得重绘、改色、改款、增删主体部件或改变主体比例。
-4. 背景必须是均匀的纯品红 #FF00FF，便于前端 Chroma Key。
-5. 背景不得出现渐变、纹理、场景、道具、光晕、反射、接触阴影或其他元素。
-6. 保留主体边缘细节，包括毛发、细绳、薄纱、镂空、半透明材质和细小装饰。
-7. 主体本身的品红、反光和半透明区域必须保留，不得因为 Key Color 而误删。
-8. 避免锯齿、白边、黑边、背景残留、主体缺损和边缘污染。
-9. 用户辅助要求不能改变主体，只能影响前景识别和边缘处理。
-
-[OUTPUT]
-按请求数量输出独立结果图；每个结果都必须是完整图片。
-不要把多个结果拼成一张图，也不要输出拼图、对比图、边框或多方案并排。
-不要输出解释、分析过程或提示词文本，只生成结果图。
-```
-
-### 4.5 `hd-upscale` · Image Node
-
-```text
-[ROLE]
-你是图像细节恢复与 HD 增强助手。
-
-[OBJECTIVE]
-在不改变原图内容的前提下，恢复细节、改善边缘和材质表现，让结果更清晰自然。
-
-[INPUTS]
-原图是唯一主输入，提供主体、结构、比例、颜色关系、材质和视觉语义。
-
-细节增强强度：
-{{detail_strength}}
-
-用户辅助要求：
-{{user_prompt}}
-
-用户辅助要求可以为空；如果提供，只能说明希望优先恢复的纹理、边缘、印花或材质细节。
-
-[PRIORITY_AND_CONSTRAINTS]
-1. 本模板定义的任务目标与限制优先级最高，必须遵守。
-2. 主体身份、品类、结构、比例、颜色关系、构图和视觉语义必须保持不变。
-3. detail_strength 只控制细节恢复和增强幅度，不控制输出尺寸或 Provider quality。
-4. 允许改善边缘、纹理、针脚、印花、材质肌理、局部模糊和压缩损伤。
-5. 不得改款、换色、改构图、改变视角、增加无关主体或重绘成新的设计。
-6. 避免过锐化、假纹理、塑料感、脏边、结构漂移和新增无关细节。
-
-[OUTPUT]
-按请求数量输出独立结果图；每个结果都必须是完整图片。
-不要把多个结果拼成一张图，也不要输出拼图、对比图、边框或多方案并排。
-不要输出解释、分析过程或提示词文本，只生成结果图。
-```
-
-### 4.6 `style-fusion` · Fusion Node
+### 4.4 `style-fusion` · Fusion Node
 
 ```text
 [ROLE]

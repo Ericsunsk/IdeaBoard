@@ -190,6 +190,7 @@ func runtimeAccountFromAssignment(account *accounts.ApiAccount, assignment taskq
 	runtimeAccount := *account
 	runtimeAccount.ProviderEndpointID = assignment.ProviderEndpointID
 	runtimeAccount.ApiType = strings.TrimSpace(assignment.APIType)
+	runtimeAccount.Protocol = strings.TrimSpace(assignment.ProviderEndpointProtocol)
 	runtimeAccount.ProxyURL = strings.TrimSpace(assignment.ProviderEndpointBaseURL)
 	runtimeAccount.ApiKey = strings.TrimSpace(account.ApiKey)
 	runtimeAccount.SecretConfigured = runtimeAccount.ApiKey != ""

@@ -31,7 +31,10 @@ export type ImageExecutionAction = ImageTaskAction | ImageCanvasExtendAction
 
 export type ImageActionStrengthConfig = {
   defaultValue: number
-  paramPath?: 'variation.strength' | 'hd.detail_strength'
+  min: number
+  max: number
+  step: number
+  paramPath?: 'variation.strength' | 'hd.scale'
 }
 
 export type ImageStrengthAction =
@@ -79,6 +82,9 @@ export const IMAGE_ACTION_EXECUTION_REGISTRY_LIST = [
     mode: IMAGE_EXECUTION_MODE.directTask,
     strength: {
       defaultValue: DEFAULT_IMAGE_ACTION_STRENGTH,
+      min: 0,
+      max: 100,
+      step: 1,
       paramPath: 'variation.strength',
     },
   }),
@@ -88,8 +94,11 @@ export const IMAGE_ACTION_EXECUTION_REGISTRY_LIST = [
   createWorkflowExecutionConfig(IMAGE_NODE_ACTION.hdUpscale, {
     mode: IMAGE_EXECUTION_MODE.hdUpscaleTask,
     strength: {
-      defaultValue: DEFAULT_IMAGE_ACTION_STRENGTH,
-      paramPath: 'hd.detail_strength',
+      defaultValue: 2,
+      min: 1,
+      max: 4,
+      step: 0.1,
+      paramPath: 'hd.scale',
     },
   }),
   createWorkflowExecutionConfig(IMAGE_NODE_ACTION.imageExtend, {
@@ -110,7 +119,7 @@ export const IMAGE_ACTION_EXECUTION_REGISTRY = Object.fromEntries(
 
 export const DEFAULT_IMAGE_ACTION_STRENGTHS = {
   [IMAGE_NODE_ACTION.styleVariation]: DEFAULT_IMAGE_ACTION_STRENGTH,
-  [IMAGE_HD_UPSCALE_ACTION]: DEFAULT_IMAGE_ACTION_STRENGTH,
+  [IMAGE_HD_UPSCALE_ACTION]: 2,
 } as const satisfies Record<ImageStrengthAction, number>
 
 const IMAGE_DIRECT_TASK_ACTION_SET: ReadonlySet<string> = new Set(IMAGE_DIRECT_TASK_ACTIONS)
@@ -146,8 +155,15 @@ export function requireImageActionExecution(
   return execution
 }
 
-export function resolveHdDetailStrength(strength: number | undefined): number {
-  return Number.isFinite(strength)
-    ? Math.max(0, Math.min(100, Math.round(strength as number)))
-    : DEFAULT_IMAGE_ACTION_STRENGTH
+export const DEFAULT_HD_SCALE = 2
+
+export function getImageActionStrengthConfig(action: ImageStrengthAction): ImageActionStrengthConfig {
+  const config = requireImageActionExecution(action).strength
+  if (!config) throw new Error(`Image action ${action} has no strength config`)
+  return config
+}
+
+export function resolveHdScale(strength?: number): number {
+  if (!Number.isFinite(strength)) return DEFAULT_HD_SCALE
+  return Math.round(Math.max(1, Math.min(4, strength as number)) * 10) / 10
 }

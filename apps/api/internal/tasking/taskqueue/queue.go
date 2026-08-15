@@ -33,18 +33,19 @@ type TaskAssigner interface {
 }
 
 type TaskAssignment struct {
-	TaskID                  string
-	AccountID               int64
-	ProviderEndpointID      int64
-	CredentialID            int64
-	ResolvedModel           string
-	APIType                 string
-	ProviderEndpointName    string
-	ProviderEndpointBaseURL string
-	CredentialFingerprint   string
-	CredentialKeyVersion    string
-	Status                  string
-	LeaseToken              string
+	TaskID                   string
+	AccountID                int64
+	ProviderEndpointID       int64
+	CredentialID             int64
+	ResolvedModel            string
+	APIType                  string
+	ProviderEndpointProtocol string
+	ProviderEndpointName     string
+	ProviderEndpointBaseURL  string
+	CredentialFingerprint    string
+	CredentialKeyVersion     string
+	Status                   string
+	LeaseToken               string
 }
 
 func (a TaskAssignment) HasLeaseIdentity() bool {
@@ -52,7 +53,7 @@ func (a TaskAssignment) HasLeaseIdentity() bool {
 }
 
 func (a TaskAssignment) HasRuntimeSnapshot() bool {
-	return a.HasLeaseIdentity() && a.CredentialID > 0 && a.APIType != "" && a.ProviderEndpointBaseURL != ""
+	return a.HasLeaseIdentity() && a.CredentialID > 0 && a.APIType != "" && a.ProviderEndpointProtocol != "" && a.ProviderEndpointBaseURL != ""
 }
 
 type AccountConcurrencyStore interface {

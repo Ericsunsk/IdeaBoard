@@ -99,6 +99,9 @@ describe('HomeCanvasImageActionMenu', () => {
     const activeHdRange = hdRender.getByRole('slider', { name: 'HD强度' })
 
     expect(activeHdRange).not.toHaveAttribute('aria-hidden')
+    expect(activeHdRange).toHaveAttribute('min', '1')
+    expect(activeHdRange).toHaveAttribute('max', '4')
+    expect(activeHdRange).toHaveAttribute('step', '0.1')
     expect(findActionControl(activeHdRange)).toHaveClass('is-strength-active')
   })
 

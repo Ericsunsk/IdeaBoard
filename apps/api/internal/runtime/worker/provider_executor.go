@@ -378,7 +378,7 @@ func (c *ProviderExecutor) prepareProviderExecution(ctx context.Context, account
 
 	resolvedAccountModel, modelOK := resolveAccountModelForExecution(account, taskParams, assignment.ResolvedModel)
 	resolvedModel := strings.TrimSpace(resolvedAccountModel.Name)
-	modelRequired := !providerendpoints.AllowsModellessAccounts(account.Protocol, account.Capabilities)
+	modelRequired := strings.TrimSpace(account.Protocol) != providerendpoints.ProtocolImageURLJSONImage
 	if modelRequired && (!modelOK || resolvedModel == "") {
 		return providerExecutionConfig{}, newExecutionFailureError(
 			tasks.ExecutionStageAssigned,
@@ -459,8 +459,18 @@ func (c *ProviderExecutor) parseAndNormalizeTaskParams(ctx context.Context, task
 }
 
 func (c *ProviderExecutor) callProviderWithRequest(ctx context.Context, account *accounts.ApiAccount, exec providerExecutionConfig) (providerCallResult, error) {
-	if isBackgroundRemovalProtocol(account) {
-		return c.callBackgroundRemoval(ctx, account, exec.Request, exec.Timeout)
+	if account == nil {
+		return providerCallResult{}, fmt.Errorf("provider account 未配置")
+	}
+	if strings.TrimSpace(account.Protocol) == providerendpoints.ProtocolImageURLJSONImage {
+		switch exec.FeatureSlug {
+		case workflow.FeatureSlugRemoveBg:
+			return c.callBackgroundRemoval(ctx, account, exec.Request, exec.Timeout)
+		case workflow.FeatureSlugHDUpscale:
+			return c.callImageUpscale(ctx, account, exec.Request, exec.Timeout)
+		default:
+			return providerCallResult{}, fmt.Errorf("image-url-json-to-image 不支持功能 %q", exec.FeatureSlug)
+		}
 	}
 	if workflow.IsGoogleNativeAPIType(exec.APIType) {
 		return c.callGoogleProviderWithRequest(ctx, account, exec.APIType, exec.Request, exec.Timeout)
@@ -470,7 +480,10 @@ func (c *ProviderExecutor) callProviderWithRequest(ctx context.Context, account 
 }
 
 func (c *ProviderExecutor) callProviderBatchWithRequest(ctx context.Context, account *accounts.ApiAccount, exec providerExecutionConfig) (providerCallResult, error) {
-	if isBackgroundRemovalProtocol(account) {
+	if account == nil {
+		return providerCallResult{}, fmt.Errorf("provider account 未配置")
+	}
+	if strings.TrimSpace(account.Protocol) == providerendpoints.ProtocolImageURLJSONImage {
 		exec.Request = exec.Request.withOutputCount(1)
 		return c.callProviderWithRequest(ctx, account, exec)
 	}

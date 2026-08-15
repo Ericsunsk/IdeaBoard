@@ -149,6 +149,7 @@ CREATE TABLE task_leases (
   feature_slug VARCHAR(64) NOT NULL DEFAULT '',
   resolved_model VARCHAR(128) NOT NULL DEFAULT '',
   api_type VARCHAR(50) NOT NULL DEFAULT '',
+  provider_endpoint_protocol VARCHAR(64) NOT NULL DEFAULT '',
   provider_endpoint_name VARCHAR(100) NOT NULL DEFAULT '',
   provider_endpoint_base_url VARCHAR(500) NOT NULL DEFAULT '',
   credential_fingerprint VARCHAR(128) NOT NULL DEFAULT '',
@@ -162,9 +163,10 @@ CREATE TABLE task_leases (
   CONSTRAINT ck_task_leases_ids_valid CHECK (river_job_id >= 0 AND account_id > 0 AND provider_endpoint_id > 0 AND credential_id > 0),
   CONSTRAINT ck_task_leases_snapshot CHECK (
     btrim(lease_token) <> ''
-    AND btrim(resolved_model) <> ''
     AND btrim(api_type) <> ''
+    AND btrim(provider_endpoint_protocol) <> ''
     AND btrim(provider_endpoint_base_url) <> ''
+    AND (btrim(resolved_model) <> '' OR provider_endpoint_protocol = 'image-url-json-to-image')
   ),
   CONSTRAINT ck_task_leases_release_reason CHECK (
     (released_at IS NULL AND release_reason = '')

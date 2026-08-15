@@ -142,6 +142,7 @@ func getTaskStateForUpdate(ctx context.Context, tx *sql.Tx, taskID string) (task
 	var priority int
 	var resolvedModel string
 	var apiType string
+	var providerEndpointProtocol string
 	var providerEndpointName string
 	var providerEndpointBaseURL string
 	var credentialFingerprint string
@@ -153,6 +154,7 @@ SELECT t.status, t.user_id, tl.account_id, tl.provider_endpoint_id, tl.credentia
        t.priority,
        COALESCE(tl.resolved_model, '') AS resolved_model,
        COALESCE(tl.api_type, '') AS api_type,
+	       COALESCE(tl.provider_endpoint_protocol, '') AS provider_endpoint_protocol,
        COALESCE(tl.provider_endpoint_name, '') AS provider_endpoint_name,
        COALESCE(tl.provider_endpoint_base_url, '') AS provider_endpoint_base_url,
        COALESCE(tl.credential_fingerprint, '') AS credential_fingerprint,
@@ -172,6 +174,7 @@ FOR UPDATE OF t`, taskID).Scan(
 		&priority,
 		&resolvedModel,
 		&apiType,
+		&providerEndpointProtocol,
 		&providerEndpointName,
 		&providerEndpointBaseURL,
 		&credentialFingerprint,
@@ -194,20 +197,21 @@ FOR UPDATE OF t`, taskID).Scan(
 		currentCredentialID = credentialID.Int64
 	}
 	return taskAssignmentTaskState{
-		Status:                  status,
-		UserID:                  userID,
-		AccountID:               currentAccountID,
-		ProviderEndpointID:      currentProviderEndpointID,
-		CredentialID:            currentCredentialID,
-		LeaseToken:              leaseToken,
-		Priority:                tasks.EffectiveTaskPriority(priority),
-		ResolvedModel:           resolvedModel,
-		APIType:                 apiType,
-		ProviderEndpointName:    providerEndpointName,
-		ProviderEndpointBaseURL: providerEndpointBaseURL,
-		CredentialFingerprint:   credentialFingerprint,
-		CredentialKeyVersion:    credentialKeyVersion,
-		CreatedAt:               createdAt,
+		Status:                   status,
+		UserID:                   userID,
+		AccountID:                currentAccountID,
+		ProviderEndpointID:       currentProviderEndpointID,
+		CredentialID:             currentCredentialID,
+		LeaseToken:               leaseToken,
+		Priority:                 tasks.EffectiveTaskPriority(priority),
+		ResolvedModel:            resolvedModel,
+		APIType:                  apiType,
+		ProviderEndpointProtocol: providerEndpointProtocol,
+		ProviderEndpointName:     providerEndpointName,
+		ProviderEndpointBaseURL:  providerEndpointBaseURL,
+		CredentialFingerprint:    credentialFingerprint,
+		CredentialKeyVersion:     credentialKeyVersion,
+		CreatedAt:                createdAt,
 	}, nil
 }
 
@@ -241,14 +245,14 @@ func acquireTaskLeaseTx(ctx context.Context, tx *sql.Tx, taskID string, riverJob
 	result, err := tx.ExecContext(ctx, `
 	INSERT INTO task_leases (
 	  task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
-	  feature_slug, resolved_model, api_type,
+	  feature_slug, resolved_model, api_type, provider_endpoint_protocol,
 	  provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version,
 	  acquired_at
 	) VALUES (
 	  $1, $2, $3, $4, $5, $6,
-	  $7, $8, $9,
-	  $10, $11, $12, $13,
-	  $14
+	  $7, $8, $9, $10,
+	  $11, $12, $13, $14,
+	  $15
 	)
 	ON CONFLICT (task_id) WHERE released_at IS NULL DO NOTHING`,
 		taskID,
@@ -260,6 +264,7 @@ func acquireTaskLeaseTx(ctx context.Context, tx *sql.Tx, taskID string, riverJob
 		strings.TrimSpace(featureSlug),
 		strings.TrimSpace(selected.ResolvedModel),
 		strings.TrimSpace(selected.APIType),
+		strings.TrimSpace(selected.ProviderEndpointProtocol),
 		strings.TrimSpace(selected.ProviderEndpointName),
 		strings.TrimSpace(selected.ProviderEndpointBaseURL),
 		strings.TrimSpace(selected.CredentialFingerprint),

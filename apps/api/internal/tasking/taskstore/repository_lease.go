@@ -152,20 +152,21 @@ func (r *Repository) GetActiveTaskLeaseByTaskID(ctx context.Context, taskID stri
 		return nil, err
 	}
 	return &ActiveTaskLease{
-		TaskID:                  row.TaskID,
-		LeaseToken:              row.LeaseToken,
-		RiverJobID:              row.RiverJobID,
-		AccountID:               row.AccountID,
-		ProviderEndpointID:      row.ProviderEndpointID,
-		CredentialID:            row.CredentialID,
-		FeatureSlug:             row.FeatureSlug,
-		ResolvedModel:           row.ResolvedModel,
-		APIType:                 row.ApiType,
-		ProviderEndpointName:    row.ProviderEndpointName,
-		ProviderEndpointBaseURL: row.ProviderEndpointBaseUrl,
-		CredentialFingerprint:   row.CredentialFingerprint,
-		CredentialKeyVersion:    row.CredentialKeyVersion,
-		AcquiredAt:              row.AcquiredAt,
+		TaskID:                   row.TaskID,
+		LeaseToken:               row.LeaseToken,
+		RiverJobID:               row.RiverJobID,
+		AccountID:                row.AccountID,
+		ProviderEndpointID:       row.ProviderEndpointID,
+		CredentialID:             row.CredentialID,
+		FeatureSlug:              row.FeatureSlug,
+		ResolvedModel:            row.ResolvedModel,
+		APIType:                  row.ApiType,
+		ProviderEndpointProtocol: row.ProviderEndpointProtocol,
+		ProviderEndpointName:     row.ProviderEndpointName,
+		ProviderEndpointBaseURL:  row.ProviderEndpointBaseUrl,
+		CredentialFingerprint:    row.CredentialFingerprint,
+		CredentialKeyVersion:     row.CredentialKeyVersion,
+		AcquiredAt:               row.AcquiredAt,
 	}, nil
 }
 

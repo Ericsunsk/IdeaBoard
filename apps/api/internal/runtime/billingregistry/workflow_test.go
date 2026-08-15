@@ -39,9 +39,9 @@ func TestWorkflowRegistryUsesFeatureLevelBillingIdentities(t *testing.T) {
 		t.Fatalf("billing identities=%v, want=%v", skus, want)
 	}
 	for _, item := range items {
-		if string(item.SKU) == "ai-image:remove-bg" {
+		if string(item.SKU) == "ai-image:remove-bg" || string(item.SKU) == "ai-image:hd-upscale" {
 			if !slices.Equal(item.PricingVariants, []billing.OutputResolution{billing.OutputResolutionDefault}) {
-				t.Fatalf("remove-bg pricing variants=%v", item.PricingVariants)
+				t.Fatalf("dedicated image pricing variants for %s=%v", item.SKU, item.PricingVariants)
 			}
 		} else if !slices.Equal(item.PricingVariants, []billing.OutputResolution{billing.OutputResolution1K, billing.OutputResolution2K, billing.OutputResolution4K}) {
 			t.Fatalf("default pricing variants for %s=%v", item.SKU, item.PricingVariants)

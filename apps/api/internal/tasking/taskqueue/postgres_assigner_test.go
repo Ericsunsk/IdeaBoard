@@ -12,6 +12,7 @@ import (
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
+	"ideaboard/api/internal/workflow"
 )
 
 func TestTaskLeaseTokenBindsToRiverJobID(t *testing.T) {
@@ -30,6 +31,19 @@ func TestTaskLeaseTokenBindsToRiverJobID(t *testing.T) {
 	}
 	if LeaseBelongsToRiverJob("legacy-token", 987) {
 		t.Fatal("unscoped lease token should not belong to a river job")
+	}
+}
+
+func TestRoutingCapabilityForFeature(t *testing.T) {
+	tests := map[string]string{
+		workflow.FeatureSlugRemoveBg:    "background-removal",
+		workflow.FeatureSlugHDUpscale:   "image-upscale",
+		workflow.FeatureSlugStyleFusion: "image-generation",
+	}
+	for feature, want := range tests {
+		if got := routingCapabilityForFeature(feature); got != want {
+			t.Fatalf("routingCapabilityForFeature(%q) = %q, want %q", feature, got, want)
+		}
 	}
 }
 

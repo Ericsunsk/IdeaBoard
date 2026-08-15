@@ -111,15 +111,15 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 		{
 			name:       "hd-upscale",
 			feature:    workflow.FeatureSlugHDUpscale,
-			basePrompt: "user prompt",
+			basePrompt: "",
 			userPrompt: "",
 			params: map[string]interface{}{
 				"hd": map[string]interface{}{
-					"detail_strength": 90,
+					"scale": 2.0,
 				},
 			},
-			template: "SYS detail={{detail_strength}}",
-			want:     "SYS detail=90",
+			template: "SYS HD",
+			want:     "SYS HD ",
 		},
 	}
 
@@ -479,7 +479,6 @@ func TestSubmitTaskInputLimits(t *testing.T) {
 			"extend_right",
 			"extend_bottom",
 			"extend_left",
-			"detail_strength",
 			"fusion_input_weights",
 		}
 		for _, key := range tests {

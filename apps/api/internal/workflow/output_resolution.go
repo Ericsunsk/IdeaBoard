@@ -25,14 +25,14 @@ func NormalizeOutputResolution(raw string) (string, bool) {
 }
 
 func NormalizeOutputResolutionForFeature(feature, raw string) (string, bool) {
-	if feature == FeatureSlugRemoveBg && strings.TrimSpace(raw) == "" {
+	if (feature == FeatureSlugRemoveBg || feature == FeatureSlugHDUpscale) && strings.TrimSpace(raw) == "" {
 		return OutputResolutionDefault, true
 	}
 	resolution, ok := NormalizeOutputResolution(raw)
 	if !ok {
 		return "", false
 	}
-	if feature == FeatureSlugRemoveBg && resolution != OutputResolutionDefault {
+	if (feature == FeatureSlugRemoveBg || feature == FeatureSlugHDUpscale) && resolution != OutputResolutionDefault {
 		return "", false
 	}
 	return resolution, true

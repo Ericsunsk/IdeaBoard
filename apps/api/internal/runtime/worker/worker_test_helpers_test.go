@@ -64,16 +64,17 @@ func (f *fakeAssigner) Assign(_ context.Context, task *tasks.TaskPayload) (taskq
 		endpointBaseURL = "https://example.com/fake-provider"
 	}
 	return taskqueue.TaskAssignment{
-		TaskID:                  task.TaskID,
-		AccountID:               f.assignAccount,
-		ProviderEndpointID:      channelID,
-		CredentialID:            credentialID,
-		ResolvedModel:           f.assignModel,
-		APIType:                 apiType,
-		ProviderEndpointName:    endpointName,
-		ProviderEndpointBaseURL: endpointBaseURL,
-		Status:                  f.assignStatus,
-		LeaseToken:              f.leaseToken(),
+		TaskID:                   task.TaskID,
+		AccountID:                f.assignAccount,
+		ProviderEndpointID:       channelID,
+		CredentialID:             credentialID,
+		ResolvedModel:            f.assignModel,
+		APIType:                  apiType,
+		ProviderEndpointProtocol: "model-api",
+		ProviderEndpointName:     endpointName,
+		ProviderEndpointBaseURL:  endpointBaseURL,
+		Status:                   f.assignStatus,
+		LeaseToken:               f.leaseToken(),
 	}, nil
 }
 

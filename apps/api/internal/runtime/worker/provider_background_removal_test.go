@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/platform/config"
+	"ideaboard/api/internal/workflow"
 )
 
 func TestCallBackgroundRemovalUsesJSONContractAndKeepsBinaryResult(t *testing.T) {
@@ -31,9 +33,10 @@ func TestCallBackgroundRemovalUsesJSONContractAndKeepsBinaryResult(t *testing.T)
 
 	executor := &ProviderExecutor{publicOrigins: config.PublicOriginsConfig{API: "https://media.ideaboard.art"}}
 	result, err := executor.callBackgroundRemoval(context.Background(), &accounts.ApiAccount{
-		ApiKey:   "secret",
-		Protocol: providerendpoints.ProtocolImageURLJSONPNG,
-		ProxyURL: server.URL + "/matting",
+		ApiKey:       "secret",
+		Protocol:     providerendpoints.ProtocolImageURLJSONImage,
+		Capabilities: []string{providerendpoints.CapabilityBackgroundRemoval},
+		ProxyURL:     server.URL + "/matting",
 	}, providerRequest{ImageRefs: []string{inputURL}}, time.Second)
 	if err != nil {
 		t.Fatalf("callBackgroundRemoval: %v", err)
@@ -50,9 +53,9 @@ func TestCallBackgroundRemovalUsesJSONContractAndKeepsBinaryResult(t *testing.T)
 
 func TestBackgroundRemovalInputURLResolvesUploadReference(t *testing.T) {
 	executor := &ProviderExecutor{publicOrigins: config.PublicOriginsConfig{API: "https://media.ideaboard.art"}}
-	got, err := executor.backgroundRemovalInputURL(providerRequest{ImageRefs: []string{"/uploads/canvas/demo/source.jpg"}})
+	got, err := executor.imageTransformInputURL(providerRequest{ImageRefs: []string{"/uploads/canvas/demo/source.jpg"}}, "抠图")
 	if err != nil {
-		t.Fatalf("backgroundRemovalInputURL: %v", err)
+		t.Fatalf("imageTransformInputURL: %v", err)
 	}
 	if got != "https://media.ideaboard.art/uploads/canvas/demo/source.jpg" {
 		t.Fatalf("resolved URL = %q", got)
@@ -61,7 +64,7 @@ func TestBackgroundRemovalInputURLResolvesUploadReference(t *testing.T) {
 
 func TestBackgroundRemovalInputURLRejectsHTTP(t *testing.T) {
 	executor := &ProviderExecutor{}
-	if _, err := executor.backgroundRemovalInputURL(providerRequest{ImageRefs: []string{"http://media.ideaboard.art/source.jpg"}}); err == nil {
+	if _, err := executor.imageTransformInputURL(providerRequest{ImageRefs: []string{"http://media.ideaboard.art/source.jpg"}}, "抠图"); err == nil {
 		t.Fatal("expected HTTP input URL to be rejected")
 	}
 }
@@ -82,6 +85,60 @@ func TestCallBackgroundRemovalRejectsNonImageContentType(t *testing.T) {
 	}
 }
 
+func TestCallImageUpscaleUsesScaleContractAndSingleImage(t *testing.T) {
+	const inputURL = "https://media.ideaboard.art/uploads/canvas/demo/source.jpg"
+	var got map[string]interface{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write([]byte("upscaled"))
+	}))
+	defer server.Close()
+
+	executor := &ProviderExecutor{}
+	result, err := executor.callImageUpscale(context.Background(), &accounts.ApiAccount{
+		ApiKey:       "secret",
+		Protocol:     providerendpoints.ProtocolImageURLJSONImage,
+		Capabilities: []string{providerendpoints.CapabilityImageUpscale},
+		ProxyURL:     server.URL,
+	}, providerRequest{
+		ImageRefs:        []string{inputURL, "https://media.ideaboard.art/uploads/canvas/demo/ignored.jpg"},
+		Prompt:           "must not be sent",
+		OutputCount:      4,
+		OutputResolution: "4k",
+		Scale:            2.3,
+	}, time.Second)
+	if err != nil {
+		t.Fatalf("callImageUpscale: %v", err)
+	}
+	if got["image_url"] != inputURL || got["scale"] != 2.3 || got["mode"] != "final" || got["output_format"] != "png" {
+		t.Fatalf("payload = %#v, want image_url, scale, mode and output_format", got)
+	}
+	if len(got) != 4 {
+		t.Fatalf("payload contains ignored controls: %#v", got)
+	}
+	if !strings.HasPrefix(result.ImageURL, "data:image/png;base64,") {
+		t.Fatalf("result URL = %q", result.ImageURL)
+	}
+}
+
+func TestCallImageUpscaleRejectsInvalidScale(t *testing.T) {
+	executor := &ProviderExecutor{}
+	for _, scale := range []float64{0.9, 4.1} {
+		_, err := executor.callImageUpscale(context.Background(), &accounts.ApiAccount{
+			ApiKey:       "secret",
+			Protocol:     providerendpoints.ProtocolImageURLJSONImage,
+			Capabilities: []string{providerendpoints.CapabilityImageUpscale},
+			ProxyURL:     "https://upscale.example/modal",
+		}, providerRequest{ImageRefs: []string{"https://media.ideaboard.art/source.jpg"}, Scale: scale}, time.Second)
+		if err == nil || !strings.Contains(err.Error(), "scale") {
+			t.Fatalf("scale=%v error=%v, want scale validation", scale, err)
+		}
+	}
+}
+
 func TestBackgroundRemovalBatchIgnoresRequestedOutputCount(t *testing.T) {
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -93,12 +150,14 @@ func TestBackgroundRemovalBatchIgnoresRequestedOutputCount(t *testing.T) {
 
 	executor := &ProviderExecutor{}
 	_, err := executor.callProviderBatchWithRequest(context.Background(), &accounts.ApiAccount{
-		ApiKey:   "secret",
-		Protocol: providerendpoints.ProtocolImageURLJSONPNG,
-		ProxyURL: server.URL,
+		ApiKey:       "secret",
+		Protocol:     providerendpoints.ProtocolImageURLJSONImage,
+		Capabilities: []string{providerendpoints.CapabilityBackgroundRemoval},
+		ProxyURL:     server.URL,
 	}, providerExecutionConfig{
-		Timeout: time.Second,
-		Request: providerRequest{ImageRefs: []string{"https://media.ideaboard.art/source.jpg"}, OutputCount: 4},
+		FeatureSlug: workflow.FeatureSlugRemoveBg,
+		Timeout:     time.Second,
+		Request:     providerRequest{ImageRefs: []string{"https://media.ideaboard.art/source.jpg"}, OutputCount: 4},
 	})
 	if err != nil {
 		t.Fatalf("callProviderBatchWithRequest: %v", err)

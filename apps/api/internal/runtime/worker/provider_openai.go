@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"math"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -55,7 +54,6 @@ type openAIProviderParams struct {
 	ExtendRight          *float64
 	ExtendBottom         *float64
 	ExtendLeft           *float64
-	HDOutputQuality      *int
 }
 
 type openAIRequestFinalizer struct {
@@ -105,7 +103,6 @@ func readOpenAIProviderParams(providerReq providerRequest) openAIProviderParams 
 		ExtendRight:          providerReq.OpenAI.ExtendRight,
 		ExtendBottom:         providerReq.OpenAI.ExtendBottom,
 		ExtendLeft:           providerReq.OpenAI.ExtendLeft,
-		HDOutputQuality:      providerReq.OpenAI.HDOutputQuality,
 	}
 	if len(providerReq.MaskRefs) > 0 {
 		out.MaskImageRef = strings.TrimSpace(providerReq.MaskRefs[0])
@@ -133,9 +130,6 @@ func (p openAIProviderParams) applySharedExtras(reqBody *openAIImageRequestBody)
 	}
 	if p.OriginalImageRef != "" {
 		reqBody.setExtra("original_image_url", p.OriginalImageRef)
-	}
-	if p.HDOutputQuality != nil {
-		reqBody.setExtra("output_quality", *p.HDOutputQuality)
 	}
 }
 
@@ -516,11 +510,6 @@ func appendOpenAIAllowedParams(reqBody *openAIImageRequestBody, providerReq prov
 	}
 
 	openAIParams.applySharedExtras(reqBody)
-}
-
-func resolveOpenAIHDUpscaleOutputQuality(detailStrength float64) int {
-	detailStrength = math.Max(0, math.Min(100, math.Round(detailStrength)))
-	return int(math.Max(60, math.Min(100, math.Round(60+detailStrength*0.4))))
 }
 
 func finalizeOpenAIRequestBody(reqBody *openAIImageRequestBody, openAIParams openAIProviderParams) {

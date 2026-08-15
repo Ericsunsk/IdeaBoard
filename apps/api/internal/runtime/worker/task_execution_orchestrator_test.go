@@ -38,6 +38,27 @@ func TestUserFacingProviderErrorFallsBackForNonTimeout(t *testing.T) {
 	}
 }
 
+func TestRuntimeAccountFromAssignmentUsesEndpointProtocolSnapshot(t *testing.T) {
+	account := &accounts.ApiAccount{
+		ProviderEndpointID: 7,
+		ApiType:            "openai-compatible",
+		Protocol:           "model-api",
+		Capabilities:       []string{"image-generation"},
+		ApiKey:             "secret",
+	}
+	assignment := taskqueue.TaskAssignment{
+		ProviderEndpointID:       7,
+		APIType:                  "openai-compatible",
+		ProviderEndpointProtocol: "image-url-json-to-image",
+		ProviderEndpointBaseURL:  "https://provider.example/upscale",
+	}
+
+	runtime := runtimeAccountFromAssignment(account, assignment)
+	if runtime.Protocol != assignment.ProviderEndpointProtocol {
+		t.Fatalf("runtime protocol = %q, want %q", runtime.Protocol, assignment.ProviderEndpointProtocol)
+	}
+}
+
 func TestUserFacingProviderErrorPreservesInputInvalidDetails(t *testing.T) {
 	err := newExecutionFailureError(
 		tasks.ExecutionStageAssigned,

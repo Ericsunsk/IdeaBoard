@@ -36,9 +36,9 @@
             :name="`image-action-strength-${item.label}`"
             class="image-action-strength-range canvas-range-input"
             type="range"
-            min="0"
-            max="100"
-            step="1"
+            :min="getItemStrengthConfig(item)?.min"
+            :max="getItemStrengthConfig(item)?.max"
+            :step="getItemStrengthConfig(item)?.step"
             :value="getItemStrengthValue(item)"
             :style="getItemStrengthRangeStyle(item)"
             tabindex="-1"
@@ -72,6 +72,7 @@ import {
 } from '../../config/imageActionRegistry'
 import {
   isImageTaskAction,
+  getImageActionStrengthConfig,
   useCanvasBillingReadinessStore,
   type ImageStrengthAction,
 } from '../../execution'
@@ -183,9 +184,19 @@ function getItemStrengthValue(item: ImageActionMenuItem) {
   return action ? props.strengthControl.getValue(action) : 0
 }
 
+function getItemStrengthConfig(item: ImageActionMenuItem) {
+  const action = getStrengthAction(item)
+  return action ? getImageActionStrengthConfig(action) : null
+}
+
 function getItemStrengthRangeStyle(item: ImageActionMenuItem) {
   const strength = getItemStrengthValue(item)
-  const progress = Math.max(0, Math.min(100, strength))
+  const config = getItemStrengthConfig(item)
+  const progress = config
+    ? ((Math.max(config.min, Math.min(config.max, strength)) - config.min) /
+        (config.max - config.min)) *
+      100
+    : 0
   return {
     '--image-action-strength-progress': `${progress}%`,
   }

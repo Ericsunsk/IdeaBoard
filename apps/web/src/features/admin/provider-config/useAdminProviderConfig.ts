@@ -5,6 +5,7 @@ import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import {
   createEmptyProviderEndpointForm,
   inferProviderEndpointApiTypeFromUrl,
+  isModellessProviderEndpoint,
   uniqueTrimmedModelValues,
 } from './providerConfigPayload'
 import { createModelSuggestions } from './providerModelOptions'
@@ -280,7 +281,7 @@ function createAccountEditor(options: {
     } else if (hasDuplicateAccountName(accountName)) {
       nextErrors.name = '同一端点下已存在同名 APIKey'
     }
-    if (selectedModels.length === 0 && !isModellessEndpoint(selectedProviderEndpoint.value)) {
+    if (selectedModels.length === 0 && !isModellessProviderEndpoint(selectedProviderEndpoint.value)) {
       nextErrors.modelValues = '请至少选择或输入一个模型'
     }
     if (!isEditing.value && !form.value.secret.trim()) {
@@ -470,13 +471,6 @@ function resolveProviderEndpointFieldError(
     return '请选择启用状态'
   }
   return ''
-}
-
-function isModellessEndpoint(providerEndpoint: ProviderEndpointRecord | null) {
-  return (
-    providerEndpoint?.protocol === 'image-url-json-to-png' &&
-    providerEndpoint.capabilities.includes('background-removal')
-  )
 }
 
 function resolveNumberRangeError(value: number, min: number, max: number, label: string) {

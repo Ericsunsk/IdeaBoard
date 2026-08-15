@@ -82,7 +82,6 @@ func TestApplyFeatureSystemPromptImageNodeFeaturesRequireExplicitUserPromptPlace
 		workflow.FeatureSlugSketchToImage,
 		workflow.FeatureSlugStyleVariation,
 		workflow.FeatureSlugRemoveBg,
-		workflow.FeatureSlugHDUpscale,
 		workflow.FeatureSlugImageExtend,
 	}
 
@@ -164,16 +163,14 @@ func TestApplyFeatureSystemPromptDoesNotExposeAssetOrDeprecatedVariables(t *test
 			"original_image_url": "https://img.example/original.png",
 			"mask_image_url":     "https://img.example/mask.png",
 			"use_mask":           true,
-			"hd": map[string]interface{}{
-				"detail_strength": 75,
-			},
+			"hd":                 map[string]interface{}{"scale": 2.0},
 		},
 		func(string) (string, error) {
-			return "SYS {{category}} {{pattern_mode}} {{original_image_url}} {{mask_image_url}} {{use_mask}} {{detail_strength}}", nil
+			return "SYS {{category}} {{pattern_mode}} {{original_image_url}} {{mask_image_url}} {{use_mask}} {{unknown}}", nil
 		},
 	)
 
-	want := "SYS {{category}} {{pattern_mode}} {{original_image_url}} {{mask_image_url}} {{use_mask}} 75"
+	want := "SYS {{category}} {{pattern_mode}} {{original_image_url}} {{mask_image_url}} {{use_mask}} {{unknown}}"
 	if got != want {
 		t.Fatalf("got %q, want unsupported placeholders to remain unchanged", got)
 	}
@@ -219,27 +216,5 @@ func TestApplyFeatureSystemPromptDoesNotReplacePlaceholdersInsideUserPrompt(t *t
 
 	if got != "SYS variation_strength=40 prompt=literal {{variation_strength}}" {
 		t.Fatalf("got %q, want user prompt placeholder content left literal", got)
-	}
-}
-
-func TestApplyFeatureSystemPromptHDUpscaleDoesNotExposeUseMask(t *testing.T) {
-	got := ApplyFeatureSystemPrompt(
-		"user prompt",
-		"",
-		"hd-upscale",
-		map[string]interface{}{
-			"image_urls": []interface{}{"https://img.example/original.png"},
-			"hd": map[string]interface{}{
-				"detail_strength": 75,
-			},
-			"use_mask": true,
-		},
-		func(string) (string, error) {
-			return "SYS use_mask={{use_mask}} detail={{detail_strength}}", nil
-		},
-	)
-
-	if got != "SYS use_mask={{use_mask}} detail=75" {
-		t.Fatalf("got %q, want unsupported use_mask placeholder to remain unchanged", got)
 	}
 }

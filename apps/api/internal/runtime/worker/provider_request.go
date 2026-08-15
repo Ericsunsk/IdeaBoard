@@ -26,6 +26,7 @@ type providerRequest struct {
 	ImageRefs        []string
 	MaskRefs         []string
 	CanvasRef        string
+	Scale            float64
 	OpenAI           openAIProviderControls
 	Google           googleProviderControls
 }
@@ -38,7 +39,6 @@ type openAIProviderControls struct {
 	ExtendRight          *float64
 	ExtendBottom         *float64
 	ExtendLeft           *float64
-	HDOutputQuality      *int
 }
 
 type googleProviderControls struct {
@@ -98,9 +98,21 @@ func newProviderRequest(prompt string, width, height int, params map[string]inte
 		ImageRefs:        imageRefs,
 		MaskRefs:         maskRefs,
 		CanvasRef:        canvasRef,
+		Scale:            readHDUpscaleScale(providerParams, featureSlug),
 		OpenAI:           controls.OpenAI,
 		Google:           controls.Google,
 	}
+}
+
+func readHDUpscaleScale(params map[string]interface{}, featureSlug string) float64 {
+	if featureSlug != workflow.FeatureSlugHDUpscale {
+		return 0
+	}
+	contract, ok := workflow.ReadHDUpscaleContract(params)
+	if !ok {
+		return 0
+	}
+	return contract.Scale
 }
 
 func readOutputResolution(params map[string]interface{}) string {
@@ -151,12 +163,6 @@ func compileProviderControls(params map[string]interface{}, featureSlug string) 
 	} {
 		if raw, ok := readProviderNumber(params, key); ok {
 			*target = float64Ptr(raw)
-		}
-	}
-	if featureSlug == workflow.FeatureSlugHDUpscale {
-		if hd, ok := workflow.ReadHDUpscalePromptContract(params); ok {
-			quality := resolveOpenAIHDUpscaleOutputQuality(hd.DetailStrength)
-			controls.OpenAI.HDOutputQuality = &quality
 		}
 	}
 	return controls

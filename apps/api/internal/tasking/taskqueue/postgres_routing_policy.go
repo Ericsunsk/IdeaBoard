@@ -36,6 +36,7 @@ WITH locked_accounts AS (
     a.id AS account_id,
     a.provider_endpoint_id,
     pe.api_type,
+    pe.protocol AS provider_endpoint_protocol,
     pe.name AS provider_endpoint_name,
     pe.base_url AS provider_endpoint_base_url,
     credential.id AS credential_id,
@@ -71,6 +72,7 @@ modeless_routing_candidates AS (
     a.account_id,
     a.provider_endpoint_id,
     a.api_type,
+    a.provider_endpoint_protocol,
     a.provider_endpoint_name,
     a.provider_endpoint_base_url,
     a.credential_id,
@@ -82,13 +84,14 @@ modeless_routing_candidates AS (
     0::int AS model_sort_order,
     0::bigint AS model_id
   FROM locked_accounts a
-  WHERE $9 = 'background-removal'
+  WHERE $9 IN ('background-removal', 'image-upscale')
 ),
 model_routing_candidates AS (
   SELECT
     a.account_id,
     a.provider_endpoint_id,
     a.api_type,
+    a.provider_endpoint_protocol,
     a.provider_endpoint_name,
     a.provider_endpoint_base_url,
     a.credential_id,
@@ -130,6 +133,7 @@ candidate_load AS (
     candidate.account_id,
     candidate.provider_endpoint_id,
     candidate.api_type,
+    candidate.provider_endpoint_protocol,
     candidate.provider_endpoint_name,
     candidate.provider_endpoint_base_url,
     candidate.credential_id,
@@ -150,6 +154,7 @@ candidate_load AS (
     candidate.account_id,
     candidate.provider_endpoint_id,
     candidate.api_type,
+    candidate.provider_endpoint_protocol,
     candidate.provider_endpoint_name,
     candidate.provider_endpoint_base_url,
     candidate.credential_id,
@@ -209,6 +214,7 @@ SELECT
   selected.credential_id,
   selected.model_name,
   selected.api_type,
+  selected.provider_endpoint_protocol,
   selected.provider_endpoint_name,
   selected.provider_endpoint_base_url,
   selected.credential_fingerprint,
@@ -250,6 +256,7 @@ CROSS JOIN active_share share`,
 		&selected.CredentialID,
 		&selected.ResolvedModel,
 		&selected.APIType,
+		&selected.ProviderEndpointProtocol,
 		&selected.ProviderEndpointName,
 		&selected.ProviderEndpointBaseURL,
 		&selected.CredentialFingerprint,
@@ -263,10 +270,14 @@ CROSS JOIN active_share share`,
 }
 
 func routingCapabilityForFeature(featureSlug string) string {
-	if featureSlug == workflow.FeatureSlugRemoveBg {
+	switch featureSlug {
+	case workflow.FeatureSlugRemoveBg:
 		return "background-removal"
+	case workflow.FeatureSlugHDUpscale:
+		return "image-upscale"
+	default:
+		return "image-generation"
 	}
-	return "image-generation"
 }
 
 func taskAssignmentEffectivePriority(priority int, createdAt time.Time, now time.Time) int {

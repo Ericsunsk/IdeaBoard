@@ -45,7 +45,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 		{feature: workflow.FeatureSlugPromptGeneration},
 		{
 			feature: workflow.FeatureSlugHDUpscale,
-			params:  map[string]interface{}{"hd": map[string]interface{}{"detail_strength": 0.5}},
+			params:  map[string]interface{}{"hd": map[string]interface{}{"scale": 2.0}},
 		},
 		{
 			feature: workflow.FeatureSlugImageExtend,
@@ -79,7 +79,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 			}
 
 			wantQuantity := int64(2)
-			if tt.feature == workflow.FeatureSlugRemoveBg {
+			if tt.feature == workflow.FeatureSlugRemoveBg || tt.feature == workflow.FeatureSlugHDUpscale {
 				wantQuantity = 1
 			}
 			billingRequest := canonical.BillingRequest()
@@ -120,6 +120,43 @@ func TestTaskIntakeRejectsOutputCountOutsideCanonicalContract(t *testing.T) {
 			})
 			if err == nil || !strings.Contains(err.Error(), "output_count 仅支持整数 1-4") {
 				t.Fatalf("output_count=%v error=%v", outputCount, err)
+			}
+		})
+	}
+}
+
+func TestTaskIntakeIgnoresDedicatedImageTransformGenerationControls(t *testing.T) {
+	intake := NewTaskIntake(TaskIntakeDeps{
+		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+			ID: 101, Models: []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
+		}}},
+		Media: testSubmitMediaValidator{},
+	})
+
+	for _, feature := range []string{workflow.FeatureSlugRemoveBg, workflow.FeatureSlugHDUpscale} {
+		t.Run(feature, func(t *testing.T) {
+			params := map[string]interface{}{
+				"output_count":      99,
+				"output_resolution": "4k",
+			}
+			if feature == workflow.FeatureSlugHDUpscale {
+				params["hd"] = map[string]interface{}{"scale": 2.5}
+			}
+			canonical, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
+				Prompt: "ignored", Feature: feature, ClientActionID: "ignored-controls-" + feature, Params: params,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if billing := canonical.BillingRequest(); billing == nil || billing.Quantity != 1 || billing.OutputResolution != workflow.OutputResolutionDefault {
+				t.Fatalf("BillingRequest() = %#v", billing)
+			}
+			decoded, err := tasks.UnmarshalParams(canonical.Params())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if decoded.Generation == nil || decoded.Generation.RequestedOutputCount != 1 {
+				t.Fatalf("Generation = %#v", decoded.Generation)
 			}
 		})
 	}

@@ -1,6 +1,6 @@
 export type ProviderApiTypeValue = 'openai-compatible' | 'google-ai' | 'google-cloud'
-export type ProviderProtocolValue = 'model-api' | 'image-url-json-to-png'
-export type ProviderCapabilityValue = 'image-generation' | 'background-removal'
+export type ProviderProtocolValue = 'model-api' | 'image-url-json-to-image'
+export type ProviderCapabilityValue = 'image-generation' | 'background-removal' | 'image-upscale'
 
 export type AdminProviderAccountLimitRange = {
   min: number

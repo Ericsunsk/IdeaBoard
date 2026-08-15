@@ -427,7 +427,7 @@
       </AdminFormField>
 
       <AdminFormField
-        v-if="!isModellessEndpoint(selectedProviderEndpointForAccount)"
+        v-if="!isModellessProviderEndpoint(selectedProviderEndpointForAccount)"
         v-slot="{ describedbyId, invalid }"
         label="分配模型"
         for="admin-account-models"
@@ -564,6 +564,7 @@ import {
 } from '../../shared/lib/adminUiClasses'
 import { useAdminProviderConfig } from '../../provider-config/useAdminProviderConfig'
 import { useAdminProviderConfigFeedback } from '../../provider-config/useAdminProviderConfigFeedback'
+import { isModellessProviderEndpoint } from '../../provider-config/providerConfigPayload'
 
 const feedback = useAdminProviderConfigFeedback()
 const adminConfirm = useAdminConfirm()
@@ -626,13 +627,6 @@ function handleProtocolChange(protocol: string) {
 function capabilityOptions(protocol: string) {
   const definition = providerEndpointEditor.protocolRegistry.value.find((item) => item.id === protocol)
   return (definition?.capabilities ?? []).map((value) => ({ label: value, value }))
-}
-
-function isModellessEndpoint(providerEndpoint: (typeof selectedProviderEndpointForAccount.value) | null) {
-  return (
-    providerEndpoint?.protocol === 'image-url-json-to-png' &&
-    providerEndpoint.capabilities.includes('background-removal')
-  )
 }
 
 const showAccountModal = accountEditor.visible

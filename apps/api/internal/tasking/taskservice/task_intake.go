@@ -126,7 +126,11 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 			return CanonicalTaskRequest{}, err
 		}
 	}
-	if rawOutputCount, ok := params[paramkeys.OutputCount]; ok {
+	dedicatedImageTransform := featureSlug == workflow.FeatureSlugRemoveBg || featureSlug == workflow.FeatureSlugHDUpscale
+	if dedicatedImageTransform {
+		params[paramkeys.OutputCount] = 1
+		params[paramkeys.OutputResolution] = workflow.OutputResolutionDefault
+	} else if rawOutputCount, ok := params[paramkeys.OutputCount]; ok {
 		outputCount, ok := readExactIntParam(rawOutputCount)
 		if !ok {
 			return CanonicalTaskRequest{}, validation.New("output_count 仅支持整数 1-4")
@@ -136,9 +140,6 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 			return CanonicalTaskRequest{}, validation.New("output_count 仅支持整数 1-4")
 		}
 		params[paramkeys.OutputCount] = requestedOutputCount.Int()
-	}
-	if featureSlug == workflow.FeatureSlugRemoveBg {
-		params[paramkeys.OutputCount] = 1
 	}
 	resolution, ok := workflow.NormalizeOutputResolutionForFeature(featureSlug, readStringParam(params, paramkeys.OutputResolution))
 	if !ok {
@@ -156,13 +157,20 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 	promptConfig := prompts.FeaturePromptRuntimeConfig{
 		UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(featureSlug),
 	}
-	if i.prompts != nil {
+	if i.prompts != nil && !dedicatedImageTransform {
 		promptConfig, err = i.prompts.GetRuntimeConfig(ctx, featureSlug)
 		if err != nil {
 			return CanonicalTaskRequest{}, newSubmissionError("prompt_unavailable", "系统提示词暂不可用", err)
 		}
 	}
-	fullPrompt := strings.TrimSpace(prompts.ApplyFeatureSystemPromptWithConfig(req.Prompt, req.Prompt, featureSlug, params, promptConfig))
+	fullPrompt := strings.TrimSpace(req.Prompt)
+	if dedicatedImageTransform {
+		// Dedicated image transforms are binary media operations. Their Modal
+		// contracts do not consume user text or a System Prompt.
+		fullPrompt = ""
+	} else {
+		fullPrompt = strings.TrimSpace(prompts.ApplyFeatureSystemPromptWithConfig(req.Prompt, req.Prompt, featureSlug, params, promptConfig))
+	}
 	if featureSlug == workflow.FeatureSlugPromptGeneration && fullPrompt == "" {
 		return CanonicalTaskRequest{}, validation.New("Prompt Node 需要系统模板或用户描述")
 	}

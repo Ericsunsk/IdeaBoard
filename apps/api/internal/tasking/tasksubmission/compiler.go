@@ -68,7 +68,7 @@ func CompileGenerationSnapshot(input GenerationCompilerInput) (tasks.GenerationR
 			snapshot.RequestedOutputCount = count.Int()
 		}
 	}
-	if feature == workflow.FeatureSlugRemoveBg {
+	if feature == workflow.FeatureSlugRemoveBg || feature == workflow.FeatureSlugHDUpscale {
 		snapshot.RequestedOutputCount = 1
 		if snapshot.Controls != nil {
 			snapshot.Controls.OutputCount = 1

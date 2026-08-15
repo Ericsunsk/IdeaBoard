@@ -54,14 +54,14 @@ func TestBuildProviderPromptParamsDerivesProviderFieldsFromNestedContract(t *tes
 	params := map[string]interface{}{
 		"feature": FeatureSlugHDUpscale,
 		ParamKeyHD: map[string]interface{}{
-			"detail_strength": 75,
+			"scale": 2.0,
 		},
 	}
 
 	providerParams := BuildProviderPromptParams(params)
 
-	if _, exists := providerParams["detail_strength"]; exists {
-		t.Fatalf("did not expect HD detail strength in provider params: %#v", providerParams)
+	if _, exists := providerParams["scale"]; exists {
+		t.Fatalf("did not expect HD scale to be flattened into provider params: %#v", providerParams)
 	}
 	if _, exists := params["output_quality"]; exists {
 		t.Fatalf("provider param build should not mutate original params: %#v", params)
@@ -176,13 +176,13 @@ func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
 			name: "hd upscale",
 			params: &tasks.WorkflowTaskParams{
 				Feature: FeatureSlugHDUpscale,
-				HD:      &tasks.HDUpscaleParams{DetailStrength: 75},
+				HD:      &tasks.HDUpscaleParams{Scale: 2},
 			},
 			want: map[string]interface{}{
 				"feature": FeatureSlugHDUpscale,
-				"hd":      map[string]interface{}{"detail_strength": float64(75)},
+				"hd":      map[string]interface{}{"scale": float64(2)},
 			},
-			wantAbsent: []string{"detail_strength", "output_quality"},
+			wantAbsent: []string{"scale", "output_quality"},
 		},
 		{
 			name: "style fusion",
