@@ -227,12 +227,6 @@
             <div class="flex flex-wrap gap-2">
               <Button
                 size="small"
-                label="配置能力"
-                severity="contrast"
-                @click="providerEndpointEditor.openEdit(card.providerEndpoint.commandTarget)"
-              />
-              <Button
-                size="small"
                 label="编辑端点"
                 severity="contrast"
                 outlined

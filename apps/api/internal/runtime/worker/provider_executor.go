@@ -470,6 +470,10 @@ func (c *ProviderExecutor) callProviderWithRequest(ctx context.Context, account 
 }
 
 func (c *ProviderExecutor) callProviderBatchWithRequest(ctx context.Context, account *accounts.ApiAccount, exec providerExecutionConfig) (providerCallResult, error) {
+	if isBackgroundRemovalProtocol(account) {
+		exec.Request = exec.Request.withOutputCount(1)
+		return c.callProviderWithRequest(ctx, account, exec)
+	}
 	orchestrator := newProviderBatchOrchestrator(func(callCtx context.Context, request providerRequest) (providerCallResult, error) {
 		current := exec
 		current.Request = request

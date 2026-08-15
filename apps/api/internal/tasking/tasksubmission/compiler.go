@@ -68,6 +68,12 @@ func CompileGenerationSnapshot(input GenerationCompilerInput) (tasks.GenerationR
 			snapshot.RequestedOutputCount = count.Int()
 		}
 	}
+	if feature == workflow.FeatureSlugRemoveBg {
+		snapshot.RequestedOutputCount = 1
+		if snapshot.Controls != nil {
+			snapshot.Controls.OutputCount = 1
+		}
+	}
 	appendMedia := func(ref tasks.MediaRef) {
 		if strings.TrimSpace(ref.URL) == "" {
 			return

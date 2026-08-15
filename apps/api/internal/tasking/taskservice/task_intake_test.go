@@ -78,8 +78,12 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 				t.Fatalf("UserID() = %d, want authorized user 42", canonical.UserID())
 			}
 
+			wantQuantity := int64(2)
+			if tt.feature == workflow.FeatureSlugRemoveBg {
+				wantQuantity = 1
+			}
 			billingRequest := canonical.BillingRequest()
-			if billingRequest == nil || billingRequest.Feature != tt.feature || billingRequest.Quantity != 2 {
+			if billingRequest == nil || billingRequest.Feature != tt.feature || billingRequest.Quantity != wantQuantity {
 				t.Fatalf("BillingRequest() = %#v", billingRequest)
 			}
 

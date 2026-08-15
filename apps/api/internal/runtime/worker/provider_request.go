@@ -33,7 +33,6 @@ type providerRequest struct {
 type openAIProviderControls struct {
 	UseEditEndpoint      bool
 	DropOriginalImageRef bool
-	RemoveBackground     bool
 	VariationStrength    *float64
 	ExtendTop            *float64
 	ExtendRight          *float64
@@ -137,9 +136,6 @@ func compileProviderControls(params map[string]interface{}, featureSlug string) 
 		workflow.FeatureSlugStyleFusion:
 		controls.OpenAI.UseEditEndpoint = true
 	}
-	// Kept for the legacy OpenAI request helper; remove-bg tasks are routed to
-	// the capability-specific protocol before this control is consumed.
-	controls.OpenAI.RemoveBackground = featureSlug == workflow.FeatureSlugRemoveBg
 	controls.OpenAI.DropOriginalImageRef = featureSlug == workflow.FeatureSlugStyleVariation
 	if params == nil {
 		return controls

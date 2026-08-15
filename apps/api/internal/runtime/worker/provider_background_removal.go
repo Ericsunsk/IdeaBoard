@@ -68,7 +68,7 @@ func (c *ProviderExecutor) callBackgroundRemoval(
 	}
 	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
 	if contentType == "" || !strings.HasPrefix(strings.ToLower(contentType), "image/") {
-		contentType = "image/png"
+		return providerCallResult{}, fmt.Errorf("抠图响应 Content-Type 无效: %q", contentType)
 	}
 	return providerCallResult{
 		ImageURL:          "data:" + contentType + ";base64," + base64.StdEncoding.EncodeToString(data),
@@ -99,8 +99,8 @@ func (c *ProviderExecutor) backgroundRemovalInputURL(request providerRequest) (s
 		}
 		parsed = base.ResolveReference(parsed)
 	}
-	if !strings.EqualFold(parsed.Scheme, "http") && !strings.EqualFold(parsed.Scheme, "https") {
-		return "", fmt.Errorf("抠图原图仅支持 http/https URL")
+	if !strings.EqualFold(parsed.Scheme, "https") {
+		return "", fmt.Errorf("抠图原图仅支持公网 HTTPS URL")
 	}
 	if parsed.Host == "" {
 		return "", fmt.Errorf("抠图原图地址无效")

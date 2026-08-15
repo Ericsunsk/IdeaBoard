@@ -18,10 +18,6 @@ import {
 } from './providerConfigPayload'
 import type { ProviderEndpointProtocol } from '../../../shared/api/generated-query/model'
 import {
-  DEFAULT_ADMIN_PROVIDER_ENDPOINT_CAPABILITIES,
-  DEFAULT_ADMIN_PROVIDER_ENDPOINT_PROTOCOL,
-} from './providerConfigPayload'
-import {
   createAdminProviderConfigResource,
   type AdminProviderConfigResource,
 } from './providerConfigResource'
@@ -94,10 +90,7 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
   const detectModelsLoading = ref(false)
   const modelStatusChangingKeys = ref<ReadonlySet<string>>(new Set())
   const providerEndpoints = ref<ProviderEndpointRecord[]>([])
-  const protocolRegistry = ref<ProviderEndpointProtocol[]>([
-    { id: DEFAULT_ADMIN_PROVIDER_ENDPOINT_PROTOCOL, capabilities: [...DEFAULT_ADMIN_PROVIDER_ENDPOINT_CAPABILITIES] },
-    { id: 'image-url-json-to-png', capabilities: ['background-removal'] },
-  ])
+  const protocolRegistry = ref<ProviderEndpointProtocol[]>([])
   const accounts = ref<ProviderAccountRecord[]>([])
   const accountLimits = ref<AdminProviderAccountLimits>(FALLBACK_ADMIN_ACCOUNT_LIMITS)
   const searchKeyword = ref('')
@@ -150,10 +143,10 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
     const registryPromise = resource.fetchProviderEndpointRegistry?.()
     const [nextEndpoints, nextRegistry] = await Promise.all([
       resource.fetchProviderEndpoints(),
-      registryPromise ?? Promise.resolve(protocolRegistry.value),
+      registryPromise ?? Promise.resolve([]),
     ])
     providerEndpoints.value = nextEndpoints
-    if (nextRegistry.length > 0) protocolRegistry.value = nextRegistry
+    protocolRegistry.value = nextRegistry
     await loadAccounts()
   }
 

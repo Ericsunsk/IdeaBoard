@@ -137,6 +137,9 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 		}
 		params[paramkeys.OutputCount] = requestedOutputCount.Int()
 	}
+	if featureSlug == workflow.FeatureSlugRemoveBg {
+		params[paramkeys.OutputCount] = 1
+	}
 	resolution, ok := workflow.NormalizeOutputResolutionForFeature(featureSlug, readStringParam(params, paramkeys.OutputResolution))
 	if !ok {
 		return CanonicalTaskRequest{}, validation.New("该功能的 output_resolution 不受支持")

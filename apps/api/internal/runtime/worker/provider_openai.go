@@ -27,8 +27,6 @@ import (
 )
 
 const maxOpenAIDataURLBytes = 10 * 1024 * 1024
-const openAIRemoveBgOutputFormat = "png"
-const openAIRemoveBgTransparentBackground = "transparent"
 
 type openAIImageURLRef struct {
 	ImageURL string `json:"image_url"`
@@ -52,7 +50,6 @@ type openAIProviderParams struct {
 	OriginalImageRef     string
 	UseEditEndpoint      bool
 	DropOriginalImageRef bool
-	RemoveBackground     bool
 	VariationStrength    *float64
 	ExtendTop            *float64
 	ExtendRight          *float64
@@ -61,21 +58,8 @@ type openAIProviderParams struct {
 	HDOutputQuality      *int
 }
 
-type openAIImageModelCapabilities struct {
-	SupportsTransparentBackground bool
-}
-
 type openAIRequestFinalizer struct {
 	DropOriginalImageRef bool
-}
-
-var defaultOpenAIImageModelCapabilities = openAIImageModelCapabilities{
-	SupportsTransparentBackground: true,
-}
-
-var openAIImageModelCapabilityOverrides = map[string]openAIImageModelCapabilities{
-	"gpt-image-2":            {SupportsTransparentBackground: false},
-	"gpt-image-2-2026-04-21": {SupportsTransparentBackground: false},
 }
 
 func (f openAIRequestFinalizer) apply(reqBody *openAIImageRequestBody) {
@@ -116,7 +100,6 @@ func readOpenAIProviderParams(providerReq providerRequest) openAIProviderParams 
 		OriginalImageRef:     providerReq.CanvasRef,
 		UseEditEndpoint:      providerReq.OpenAI.UseEditEndpoint || providerReq.Primitive == "image-to-image",
 		DropOriginalImageRef: providerReq.OpenAI.DropOriginalImageRef,
-		RemoveBackground:     providerReq.OpenAI.RemoveBackground,
 		VariationStrength:    providerReq.OpenAI.VariationStrength,
 		ExtendTop:            providerReq.OpenAI.ExtendTop,
 		ExtendRight:          providerReq.OpenAI.ExtendRight,
@@ -230,9 +213,7 @@ func (c *ProviderExecutor) callOpenAIWithRequest(ctx context.Context, account *a
 	reqBody := newOpenAIImageRequestBody(providerReq)
 
 	if useEditEndpoint {
-		if err := appendOpenAIEditParams(&reqBody, providerReq, openAIParams); err != nil {
-			return providerCallResult{}, err
-		}
+		appendOpenAIEditParams(&reqBody, openAIParams)
 	} else {
 		appendOpenAIAllowedParams(&reqBody, providerReq, openAIParams)
 	}
@@ -569,7 +550,7 @@ func normalizeOpenAIImageURLStrings(refs []string) []string {
 	return urls
 }
 
-func appendOpenAIEditParams(reqBody *openAIImageRequestBody, providerReq providerRequest, openAIParams openAIProviderParams) error {
+func appendOpenAIEditParams(reqBody *openAIImageRequestBody, openAIParams openAIProviderParams) {
 	if refs := openAIImageURLRefs(openAIParams.EditImageRefs); len(refs) > 0 {
 		reqBody.Images = refs
 	}
@@ -578,30 +559,6 @@ func appendOpenAIEditParams(reqBody *openAIImageRequestBody, providerReq provide
 	}
 
 	openAIParams.applySharedExtras(reqBody)
-	if openAIParams.RemoveBackground {
-		if err := applyOpenAIRemoveBgOutputOptions(reqBody, providerReq); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func applyOpenAIRemoveBgOutputOptions(reqBody *openAIImageRequestBody, providerReq providerRequest) error {
-	capabilities := openAIImageModelCapabilitiesFor(providerReq.Model)
-	if !capabilities.SupportsTransparentBackground {
-		return fmt.Errorf("remove-bg 当前模型 %q 不支持透明背景", providerReq.Model)
-	}
-	reqBody.setExtra("output_format", openAIRemoveBgOutputFormat)
-	reqBody.setExtra("background", openAIRemoveBgTransparentBackground)
-	return nil
-}
-
-func openAIImageModelCapabilitiesFor(model string) openAIImageModelCapabilities {
-	normalized := strings.ToLower(strings.TrimSpace(model))
-	if capabilities, ok := openAIImageModelCapabilityOverrides[normalized]; ok {
-		return capabilities
-	}
-	return defaultOpenAIImageModelCapabilities
 }
 
 func extractOpenAIImageResponses(respBody []byte) ([]string, error) {
