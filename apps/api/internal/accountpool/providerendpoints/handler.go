@@ -200,10 +200,6 @@ func (h *ProviderEndpointHandler) Delete(c *gin.Context) {
 			response.Error(c, 404, "ProviderEndpoint 不存在")
 			return
 		}
-		if errors.Is(err, ErrProviderEndpointInUse) {
-			response.Error(c, 409, "ProviderEndpoint 已绑定 APIKey，不能删除")
-			return
-		}
 		response.InternalError(c, 500, "删除 ProviderEndpoint 失败", err)
 		return
 	}

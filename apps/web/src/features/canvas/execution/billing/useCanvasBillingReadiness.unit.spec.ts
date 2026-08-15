@@ -12,6 +12,7 @@ function makeReadiness(
     feature,
     billing: {
       sku: 'ai-image:prompt-generation',
+      output_resolution: '1k',
       display_name: 'Pattern generation',
       price_version_id: 1,
       price_version: 1,

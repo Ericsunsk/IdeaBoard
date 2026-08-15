@@ -41,7 +41,7 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
 	taskBilling := taskbilling.NewService(billingService, creditService)
-	billingRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugSketchToImage, 1)
+	billingRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugSketchToImage, "1k", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +157,7 @@ func TestRiverFinalFailureSettlementRetrySurvivesRestartWithoutProviderRecall(t 
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
 	taskBilling := taskbilling.NewService(billingService, creditService)
-	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPromptGeneration, 1)
+	request, err := taskbilling.AIImageRequest(workflow.FeatureSlugPromptGeneration, "1k", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -216,7 +216,7 @@ func TestRiverFinalFailureSettlementRetrySurvivesRestartWithoutProviderRecall(t 
 		Prompt:         "draw a billed pattern", UserPrompt: "draw a billed pattern",
 		Params: `{"feature":"prompt-generation"}`, FeatureSlug: request.Feature,
 		Status:         tasks.StatusPending,
-		BillingRequest: &tasks.TaskBillingRequest{Feature: request.Feature, Quantity: request.Quantity},
+		BillingRequest: &tasks.TaskBillingRequest{Feature: request.Feature, OutputResolution: string(request.OutputResolution), Quantity: request.Quantity},
 	}
 	store := tasksubmission.NewStore(pool, taskRepo, client, queueName, submitToRiverWorkerMaxAttempts, taskBilling)
 	result, err := store.SubmitTask(ctx, newSubmitToRiverWorkerCanonicalRequest(t, task))
@@ -452,8 +452,9 @@ func newSubmitToRiverWorkerCanonicalRequest(t testing.TB, task *tasks.Task) task
 	var billingRequest *taskbilling.Request
 	if task.BillingRequest != nil {
 		billingRequest = &taskbilling.Request{
-			Feature:  task.BillingRequest.Feature,
-			Quantity: task.BillingRequest.Quantity,
+			Feature:          task.BillingRequest.Feature,
+			OutputResolution: billing.OutputResolution(task.BillingRequest.OutputResolution),
+			Quantity:         task.BillingRequest.Quantity,
 		}
 	}
 	request, err := tasksubmission.NewCanonicalRequest(tasksubmission.CanonicalRequestInput{

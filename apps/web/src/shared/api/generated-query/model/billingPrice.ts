@@ -4,8 +4,10 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { BillingPriceOutputResolution } from './billingPriceOutputResolution'
 
 export interface BillingPrice {
+  output_resolution: BillingPriceOutputResolution
   /** @minimum 1 */
   price_version_id: number
   /** @minimum 1 */

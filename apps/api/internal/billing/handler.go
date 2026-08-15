@@ -15,12 +15,12 @@ import (
 const maxBillingRequestBytes = 64 << 10
 
 type QuoteService interface {
-	Quote(context.Context, string, int64) (Quote, error)
+	QuoteAtResolution(context.Context, string, OutputResolution, int64) (Quote, error)
 }
 
 type BillableCatalogService interface {
 	List(context.Context) ([]BillableItemCatalogCard, error)
-	PublishPrice(context.Context, string, int64, int64) (PriceInfo, error)
+	PublishPrices(context.Context, string, map[OutputResolution]int64, int64) (map[OutputResolution]PriceInfo, error)
 	SetAvailability(context.Context, string, bool, int64) (AvailabilityInfo, error)
 	DeleteArchived(context.Context, string, int64) (ArchivedItemDeleteResult, error)
 }
@@ -35,12 +35,13 @@ func NewHandler(quoter QuoteService, catalog BillableCatalogService) *Handler {
 }
 
 type quoteRequest struct {
-	SKU      string `json:"sku"`
-	Quantity int64  `json:"quantity"`
+	SKU              string `json:"sku"`
+	OutputResolution string `json:"output_resolution"`
+	Quantity         int64  `json:"quantity"`
 }
 
 type createPriceRequest struct {
-	UnitCredits *int64 `json:"unit_credits"`
+	Prices map[string]int64 `json:"prices"`
 }
 
 type setAvailabilityRequest struct {
@@ -60,7 +61,16 @@ func (h *Handler) Quote(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
-	quote, err := h.quoter.Quote(c.Request.Context(), request.SKU, request.Quantity)
+	resolution, err := NormalizeOutputResolution(request.OutputResolution)
+	if request.OutputResolution == "" {
+		resolution = OutputResolution1K
+		err = nil
+	}
+	if err != nil {
+		writeError(c, err)
+		return
+	}
+	quote, err := h.quoter.QuoteAtResolution(c.Request.Context(), request.SKU, resolution, request.Quantity)
 	if err != nil {
 		writeError(c, err)
 		return
@@ -74,7 +84,20 @@ func (h *Handler) PublishPrice(c *gin.Context) {
 		return
 	}
 	var request createPriceRequest
-	if err := decodeStrictJSON(c, &request); err != nil || request.UnitCredits == nil {
+	if err := decodeStrictJSON(c, &request); err != nil {
+		response.Error(c, http.StatusBadRequest, "参数错误")
+		return
+	}
+	prices := make(map[OutputResolution]int64, len(request.Prices))
+	for rawResolution, unitCredits := range request.Prices {
+		resolution, err := NormalizeOutputResolution(rawResolution)
+		if err != nil {
+			writeError(c, err)
+			return
+		}
+		prices[resolution] = unitCredits
+	}
+	if _, hasOneK := prices[OutputResolution1K]; !hasOneK {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
@@ -82,12 +105,12 @@ func (h *Handler) PublishPrice(c *gin.Context) {
 		writeError(c, ErrServiceUnavailable)
 		return
 	}
-	price, err := h.catalog.PublishPrice(c.Request.Context(), c.Param("sku"), *request.UnitCredits, admin.UserID())
+	published, err := h.catalog.PublishPrices(c.Request.Context(), c.Param("sku"), prices, admin.UserID())
 	if err != nil {
 		writeError(c, err)
 		return
 	}
-	response.SuccessDTO(c, price)
+	response.SuccessDTO(c, gin.H{"prices": published})
 }
 
 func (h *Handler) SetAvailability(c *gin.Context) {
@@ -151,7 +174,7 @@ func decodeStrictJSON(c *gin.Context, destination any) error {
 
 func writeError(c *gin.Context, err error) {
 	switch {
-	case errors.Is(err, ErrInvalidSKU), errors.Is(err, ErrInvalidQuantity), errors.Is(err, ErrInvalidCatalogEntry):
+	case errors.Is(err, ErrInvalidSKU), errors.Is(err, ErrInvalidQuantity), errors.Is(err, ErrInvalidCatalogEntry), errors.Is(err, ErrInvalidOutputResolution):
 		response.Error(c, http.StatusBadRequest, "参数错误")
 	case errors.Is(err, ErrSKUNotFound):
 		response.Error(c, http.StatusNotFound, "SKU 不存在")

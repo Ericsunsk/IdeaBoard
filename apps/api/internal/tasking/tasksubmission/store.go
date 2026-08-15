@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
@@ -74,7 +75,7 @@ func (s *Store) SubmitTask(ctx context.Context, canonical CanonicalRequest) (tas
 			return emptyResult, fmt.Errorf("submit task: billing request does not match canonical task product")
 		}
 		billingRequest = taskbilling.Request{
-			Feature: task.BillingRequest.Feature, Quantity: task.BillingRequest.Quantity,
+			Feature: task.BillingRequest.Feature, OutputResolution: billing.OutputResolution(task.BillingRequest.OutputResolution), Quantity: task.BillingRequest.Quantity,
 		}
 		if _, err := taskbilling.RequestFingerprint(billingRequest); err != nil {
 			return emptyResult, fmt.Errorf("submit task: invalid billing request: %w", err)

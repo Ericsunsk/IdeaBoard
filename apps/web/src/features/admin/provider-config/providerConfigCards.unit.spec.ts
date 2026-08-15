@@ -110,6 +110,8 @@ function makeModel(overrides: Partial<ProviderAccountRecord['models'][number]> =
     weight: 1,
     maxConcurrent: undefined,
     sortOrder: 0,
+    supports2K: false,
+    supports4K: false,
     ...overrides,
   }
 }

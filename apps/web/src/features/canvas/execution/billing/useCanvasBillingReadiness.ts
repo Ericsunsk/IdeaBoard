@@ -185,7 +185,12 @@ export function useCanvasBillingQuote(
   watchEffect(() => {
     if (!store || !enabled()) return
     const readinessRequest = request()
-    void store.ensureFeature(feature(), { request: readinessRequest })
+    void store.ensureFeature(feature(), {
+      request: readinessRequest,
+      // Readiness quotes include quantity and resolution. Dynamic node controls
+      // must bypass the feature-level cache when they provide a concrete request.
+      force: readinessRequest !== undefined,
+    })
   })
   return computed(() => (store ? store.getFeatureState(feature()) : null))
 }

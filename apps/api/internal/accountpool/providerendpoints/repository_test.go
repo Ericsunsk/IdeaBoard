@@ -106,6 +106,38 @@ func TestCreateProviderEndpointReturnsURLConflict(t *testing.T) {
 	}
 }
 
+func TestDeleteProviderEndpointCascadesBoundAccounts(t *testing.T) {
+	ctx := context.Background()
+	db := newProviderEndpointRepositoryTestDB(t)
+	repo := NewProviderEndpointRepository(db)
+	endpoint := seedProviderEndpoint(t, ctx, repo, &ProviderEndpoint{
+		APIType: "openai-compatible",
+		Name:    "Endpoint with API key",
+		BaseURL: "https://example.com/provider-endpoint-delete",
+		Status:  1,
+	})
+
+	var accountID int64
+	if err := db.QueryRowContext(ctx, `
+INSERT INTO api_accounts (name, provider_endpoint_id, extra_config)
+VALUES ('bound-api-key', $1, '{}')
+RETURNING id`, endpoint.ID).Scan(&accountID); err != nil {
+		t.Fatalf("seed bound APIKey: %v", err)
+	}
+
+	if err := repo.Delete(ctx, endpoint.ID); err != nil {
+		t.Fatalf("delete ProviderEndpoint with bound APIKey: %v", err)
+	}
+
+	var accountCount int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM api_accounts WHERE id = $1`, accountID).Scan(&accountCount); err != nil {
+		t.Fatalf("count cascaded APIKey: %v", err)
+	}
+	if accountCount != 0 {
+		t.Fatalf("cascaded APIKey rows = %d, want 0", accountCount)
+	}
+}
+
 func TestUpdateProviderEndpointReturnsNameConflict(t *testing.T) {
 	ctx := context.Background()
 	db := newProviderEndpointRepositoryTestDB(t)

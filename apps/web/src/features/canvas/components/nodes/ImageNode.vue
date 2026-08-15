@@ -65,6 +65,7 @@
         <HomeCanvasImageActionMenu
           v-if="showImageActionMenu"
           :output-count="outputCountValue"
+          :output-resolution="node.outputResolution"
           :strength-control="actionBinding.strengthControl"
           @action="submitAction"
         />

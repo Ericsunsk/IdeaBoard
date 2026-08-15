@@ -26,7 +26,6 @@ type Querier interface {
 	CompleteTaskWithLease(ctx context.Context, arg CompleteTaskWithLeaseParams) (int64, error)
 	ConsumeBoardShareToken(ctx context.Context, tokenHash string) (BoardShareToken, error)
 	CountAccounts(ctx context.Context, arg CountAccountsParams) (int64, error)
-	CountAccountsByProviderEndpointID(ctx context.Context, providerEndpointID int64) (int64, error)
 	CountAdminPaymentOrders(ctx context.Context, arg CountAdminPaymentOrdersParams) (int64, error)
 	CountAllTaskCalls(ctx context.Context) (int64, error)
 	CountBoardNameConflicts(ctx context.Context, arg CountBoardNameConflictsParams) (int64, error)

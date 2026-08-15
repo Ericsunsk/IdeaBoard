@@ -89,6 +89,7 @@ import { useImageInputSlots } from './composables/useImageInputSlots'
 import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../canvas-board/domain'
 import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
 import { useCanvasBillingQuote } from '../../execution'
+import { buildPromptGenerationTaskRequest } from '../../execution/commands/flowImageTaskRequests'
 
 const props = defineProps<{
   node: PromptNodeItem
@@ -121,7 +122,17 @@ const thumbsRef = ref<HTMLElement | null>(null)
 const maxInputImages = 4
 const outputCount = computed(() => requireImageNodeOutputCount(props.node.outputCount))
 const aspectRatio = computed(() => normalizePromptAspectRatio(props.node.aspectRatio))
-const billingQuote = useCanvasBillingQuote(() => WORKFLOW_FEATURE.promptGeneration)
+const billingQuote = useCanvasBillingQuote(
+  () => WORKFLOW_FEATURE.promptGeneration,
+  () => props.active,
+  () =>
+    buildPromptGenerationTaskRequest({
+      prompt: '',
+      aspectRatio: 'auto',
+      outputCount: outputCount.value,
+      outputResolution: props.node.outputResolution,
+    }),
+)
 const {
   addSlotDragOver,
   canAcceptMoreImages,

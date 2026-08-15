@@ -19,7 +19,7 @@ func TestAIImageReadinessReturnsQuoteAndWalletAvailability(t *testing.T) {
 	billingService := billing.NewService(pool)
 	creditService := credits.NewService(pool)
 	service := NewService(billingService, creditService)
-	request, err := AIImageRequest(workflow.FeatureSlugPromptGeneration, 1)
+	request, err := AIImageRequest(workflow.FeatureSlugPromptGeneration, "1k", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestAllAIImageWorkflowReadinessPricingMatrix(t *testing.T) {
 				_, pool := testdb.OpenWithPool(t)
 				billingService := billing.NewService(pool)
 				creditService := credits.NewService(pool)
-				request, err := AIImageRequest(feature, 1)
+				request, err := AIImageRequest(feature, "1k", 1)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -162,7 +162,7 @@ func TestHoldAndPersistFailsClosedForUnavailableFeatureStates(t *testing.T) {
 			db, pool := testdb.OpenWithPool(t)
 			billingService := billing.NewService(pool)
 			creditService := credits.NewService(pool)
-			request, err := AIImageRequest(workflow.FeatureSlugLocalInpaint, 1)
+			request, err := AIImageRequest(workflow.FeatureSlugLocalInpaint, "1k", 1)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -298,7 +298,7 @@ func TestDatabaseRejectsTaskBillingFactMutationAndIllegalSettlement(t *testing.T
 	billingService := billing.NewService(pool)
 	creditService := credits.NewService(pool)
 	service := NewService(billingService, creditService)
-	request, _ := AIImageRequest(workflow.FeatureSlugPromptGeneration, 1)
+	request, _ := AIImageRequest(workflow.FeatureSlugPromptGeneration, "1k", 1)
 	sku, _ := ResolveSKU(request)
 	if _, err := billingService.PublishPrice(t.Context(), featurePriceInput(sku, "Pattern", 0)); err != nil {
 		t.Fatal(err)
@@ -374,7 +374,7 @@ func seedTaskBillingFacts(t *testing.T, pool *pgxpool.Pool, taskID string, userI
 	billingService := billing.NewService(pool)
 	creditService := credits.NewService(pool)
 	service := NewService(billingService, creditService)
-	request, err := AIImageRequest(workflow.FeatureSlugPromptGeneration, 1)
+	request, err := AIImageRequest(workflow.FeatureSlugPromptGeneration, "1k", 1)
 	if err != nil {
 		t.Fatal(err)
 	}

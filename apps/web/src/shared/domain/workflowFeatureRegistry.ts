@@ -12,7 +12,6 @@ export type WorkflowFeatureGroupKey =
 export interface WorkflowFeatureGroupMeta {
   key: WorkflowFeatureGroupKey
   title: string
-  desc: string
   order: number
 }
 
@@ -20,19 +19,16 @@ export const WORKFLOW_FEATURE_GROUP_LIST: readonly WorkflowFeatureGroupMeta[] = 
   {
     key: WORKFLOW_FEATURE_GROUP.image,
     title: 'Image',
-    desc: '图片是主输入；System Prompt 可通过 {{user_prompt}} 接收辅助要求。',
     order: 10,
   },
   {
     key: WORKFLOW_FEATURE_GROUP.prompt,
     title: 'Prompt',
-    desc: '用户文字是主导输入，可选参考图。',
     order: 20,
   },
   {
     key: WORKFLOW_FEATURE_GROUP.fusion,
     title: 'Fusion',
-    desc: '多图是主输入；用户文字通过 {{user_prompt}} 作为融合辅助要求。',
     order: 30,
   },
 ] as const
@@ -64,7 +60,6 @@ export interface WorkflowFeatureConfigItem {
 export interface WorkflowFeatureConfigGroup {
   key: string
   title: string
-  description: string
   order: number
   items: readonly WorkflowFeatureConfigItem[]
 }
@@ -190,7 +185,6 @@ const WORKFLOW_FEATURE_CONFIG_GROUP_DEFS = [
   {
     key: 'image',
     title: 'Image',
-    description: '图片是主输入；用户文字通过 {{user_prompt}} 作为辅助要求。',
     order: 10,
     slugs: [
       WORKFLOW_FEATURE.sketchToImage,
@@ -204,21 +198,18 @@ const WORKFLOW_FEATURE_CONFIG_GROUP_DEFS = [
   {
     key: 'prompt',
     title: 'Prompt',
-    description: '用户文字是主导输入，可选参考图。',
     order: 20,
     slugs: [WORKFLOW_FEATURE.promptGeneration],
   },
   {
     key: 'fusion',
     title: 'Fusion',
-    description: '多图是主输入；用户文字通过 {{user_prompt}} 作为融合辅助要求。',
     order: 30,
     slugs: [WORKFLOW_FEATURE.styleFusion],
   },
 ] as const satisfies readonly {
   key: string
   title: string
-  description: string
   order: number
   slugs: readonly WorkflowFeature[]
 }[]
@@ -250,7 +241,6 @@ export const WORKFLOW_FEATURE_CONFIG_GROUPS = WORKFLOW_FEATURE_CONFIG_GROUP_DEFS
   .map((group) => ({
     key: group.key,
     title: group.title,
-    description: group.description,
     order: group.order,
     items: group.slugs.map((slug) => WORKFLOW_FEATURE_CONFIG_ITEM_MAP[slug]),
   })) satisfies readonly WorkflowFeatureConfigGroup[]

@@ -14,11 +14,15 @@ import type {
   AdminBillableItemAvailability,
   AdminBillableItemCard,
   AdminBillableItemPrice,
+  OutputResolution,
 } from './billableCatalogTypes'
 
 export interface AdminBillableCatalogResource {
   list: () => Promise<AdminBillableItemCard[]>
-  publishPrice: (sku: string, unitCredits: number) => Promise<AdminBillableItemPrice>
+  publishPrices: (
+    sku: string,
+    prices: Record<OutputResolution, number | undefined>,
+  ) => Promise<Partial<Record<OutputResolution, AdminBillableItemPrice>>>
   setAvailability: (sku: string, enabled: boolean) => Promise<AdminBillableItemAvailability>
   deleteArchived: (sku: string) => Promise<string>
 }
@@ -26,7 +30,7 @@ export interface AdminBillableCatalogResource {
 export function createAdminBillableCatalogResource(): AdminBillableCatalogResource {
   return {
     list: fetchAdminBillableItems,
-    publishPrice: publishBillableItemPrice,
+    publishPrices: publishBillableItemPrices,
     setAvailability: setBillableItemAvailability,
     deleteArchived: deleteArchivedBillableItem,
   }
@@ -48,15 +52,20 @@ export async function setBillableItemAvailability(
   return normalizeAvailability(data)
 }
 
-export async function publishBillableItemPrice(
+export async function publishBillableItemPrices(
   sku: string,
-  unitCredits: number,
-): Promise<AdminBillableItemPrice> {
+  prices: Record<OutputResolution, number | undefined>,
+): Promise<Partial<Record<OutputResolution, AdminBillableItemPrice>>> {
+  const requestPrices: { '1k': number; '2k'?: number; '4k'?: number } = { '1k': prices['1k'] as number }
+  if (prices['2k'] !== undefined) requestPrices['2k'] = prices['2k']
+  if (prices['4k'] !== undefined) requestPrices['4k'] = prices['4k']
   const data = await resolveApiData(
-    publishAdminBillingPrice(sku, { unit_credits: unitCredits }),
+    publishAdminBillingPrice(sku, { prices: requestPrices }),
     '发布价格失败',
   )
-  return normalizePrice(data)
+  return Object.fromEntries(
+    Object.entries(data.prices).map(([resolution, price]) => [resolution, normalizePrice(price)]),
+  ) as Partial<Record<OutputResolution, AdminBillableItemPrice>>
 }
 
 export async function fetchAdminBillableItems(): Promise<AdminBillableItemCard[]> {
@@ -70,17 +79,14 @@ function normalizeBillableItem(item: BillableItemCatalogCard): AdminBillableItem
     namespace: item.namespace,
     productKind: item.product_kind,
     displayName: item.display_name,
-    description: item.description,
     sortOrder: item.sort_order,
     status: item.status,
-    currentPrice: item.current_price
-      ? {
-          priceVersionId: item.current_price.price_version_id,
-          version: item.current_price.version,
-          unitCredits: item.current_price.unit_credits,
-          createdAt: item.current_price.created_at,
-        }
-      : undefined,
+    currentPrices: Object.fromEntries(
+      Object.entries(item.current_prices ?? {}).map(([resolution, price]) => [
+        resolution,
+        normalizePrice(price),
+      ]),
+    ) as Partial<Record<OutputResolution, AdminBillableItemPrice>>,
     updatedAt: item.updated_at,
   }
 }

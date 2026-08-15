@@ -20,30 +20,64 @@ func NewService(pool *pgxpool.Pool) *Service {
 }
 
 func (s *Service) PublishPrice(ctx context.Context, input PublishPriceInput) (PriceInfo, error) {
+	prices, err := s.PublishPrices(ctx, PublishPricesInput{
+		Definition: input.Definition,
+		Prices:     map[OutputResolution]int64{OutputResolution1K: input.UnitCredits},
+		ActorID:    input.ActorID,
+	})
+	return prices[OutputResolution1K], err
+}
+
+func (s *Service) PublishPrices(ctx context.Context, input PublishPricesInput) (map[OutputResolution]PriceInfo, error) {
 	definition := input.Definition
 	sku, err := CanonicalizeSKU(string(definition.SKU))
-	if err != nil || input.UnitCredits < 0 || input.UnitCredits > MaxQuoteCredits || input.ActorID <= 0 {
-		return PriceInfo{}, ErrInvalidCatalogEntry
+	oneK, hasOneK := input.Prices[OutputResolution1K]
+	if err != nil || input.ActorID <= 0 || !hasOneK || oneK < 0 || oneK > MaxQuoteCredits {
+		return nil, ErrInvalidCatalogEntry
+	}
+	if len(input.Prices) == 0 {
+		return nil, ErrInvalidCatalogEntry
+	}
+	prices := make(map[string]int64, len(input.Prices))
+	for resolution, unitCredits := range input.Prices {
+		if _, err := NormalizeOutputResolution(string(resolution)); err != nil || unitCredits < 0 || unitCredits > MaxQuoteCredits {
+			return nil, ErrInvalidCatalogEntry
+		}
+		prices[string(resolution)] = unitCredits
 	}
 	displayName, err := normalizeDisplayName(definition.DisplayName)
 	if err != nil {
-		return PriceInfo{}, err
+		return nil, err
 	}
 	description, err := normalizeDescription(definition.Description)
 	if err != nil {
-		return PriceInfo{}, err
+		return nil, err
 	}
 	if err := s.requirePool(); err != nil {
-		return PriceInfo{}, err
+		return nil, err
 	}
-	var price PriceInfo
-	err = s.pool.QueryRow(ctx, `SELECT `+priceInfoColumns+`
-	FROM publish_billing_price($1, $2, $3, $4, $5)`, sku, displayName, description, input.UnitCredits, input.ActorID).
-		Scan(priceInfoScanTargets(&price)...)
+	published := make(map[OutputResolution]PriceInfo, len(prices))
+	rows, err := s.pool.Query(ctx, `SELECT output_resolution, price_version_id, version, unit_credits, created_by, created_at
+	FROM publish_billing_prices($1, $2, $3, $4::jsonb, $5)
+	ORDER BY CASE output_resolution WHEN '1k' THEN 1 WHEN '2k' THEN 2 ELSE 3 END`, sku, displayName, description, prices, input.ActorID)
 	if err != nil {
-		return PriceInfo{}, mapDatabaseError("publish price version", err)
+		return nil, mapDatabaseError("publish price version", err)
 	}
-	return price, nil
+	defer rows.Close()
+	for rows.Next() {
+		var candidate PriceInfo
+		if err := rows.Scan(&candidate.OutputResolution, &candidate.PriceVersionID, &candidate.Version, &candidate.UnitCredits, &candidate.CreatedBy, &candidate.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan published price version: %w", err)
+		}
+		published[candidate.OutputResolution] = candidate
+	}
+	if err := rows.Err(); err != nil {
+		return nil, mapDatabaseError("publish price version", err)
+	}
+	if _, ok := published[OutputResolution1K]; !ok {
+		return nil, ErrInvalidCatalogEntry
+	}
+	return published, nil
 }
 
 func (s *Service) SetAvailability(ctx context.Context, rawSKU string, enabled bool, actorID int64) (AvailabilityInfo, error) {
@@ -73,32 +107,43 @@ FROM set_billing_item_availability($1, $2, $3)`, sku, enabled, actorID).Scan(
 }
 
 func (s *Service) Quote(ctx context.Context, rawSKU string, quantity int64) (Quote, error) {
+	return s.QuoteAtResolution(ctx, rawSKU, OutputResolution1K, quantity)
+}
+
+func (s *Service) QuoteAtResolution(ctx context.Context, rawSKU string, resolution OutputResolution, quantity int64) (Quote, error) {
 	if err := s.requirePool(); err != nil {
 		return Quote{}, err
 	}
-	return s.quote(ctx, s.pool, rawSKU, quantity)
+	return s.quote(ctx, s.pool, rawSKU, resolution, quantity)
 }
 
 // QuoteInTx locks a submission to the price visible in its caller-owned
 // PostgreSQL transaction.
 func (s *Service) QuoteInTx(ctx context.Context, tx pgx.Tx, rawSKU string, quantity int64) (Quote, error) {
+	return s.QuoteAtResolutionInTx(ctx, tx, rawSKU, OutputResolution1K, quantity)
+}
+
+func (s *Service) QuoteAtResolutionInTx(ctx context.Context, tx pgx.Tx, rawSKU string, resolution OutputResolution, quantity int64) (Quote, error) {
 	if tx == nil {
 		return Quote{}, ErrServiceUnavailable
 	}
-	return s.quote(ctx, tx, rawSKU, quantity)
+	return s.quote(ctx, tx, rawSKU, resolution, quantity)
 }
 
 type quoteQuerier interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 
-func (s *Service) quote(ctx context.Context, querier quoteQuerier, rawSKU string, quantity int64) (Quote, error) {
+func (s *Service) quote(ctx context.Context, querier quoteQuerier, rawSKU string, resolution OutputResolution, quantity int64) (Quote, error) {
 	sku, err := CanonicalizeSKU(rawSKU)
 	if err != nil {
 		return Quote{}, err
 	}
 	if quantity <= 0 {
 		return Quote{}, ErrInvalidQuantity
+	}
+	if _, err := NormalizeOutputResolution(string(resolution)); err != nil {
+		return Quote{}, err
 	}
 	if querier == nil {
 		return Quote{}, ErrServiceUnavailable
@@ -110,12 +155,15 @@ func (s *Service) quote(ctx context.Context, querier quoteQuerier, rawSKU string
 	var unitCredits pgtype.Int8
 	var quotedAt pgtype.Timestamptz
 	err = querier.QueryRow(ctx, `
-SELECT skus.enabled, skus.display_name, prices.price_version_id, prices.version, prices.unit_credits,
+	SELECT skus.enabled, skus.display_name, prices.price_version_id, prices.version, prices.unit_credits,
 	       statement_timestamp()
 FROM billing_skus skus
+LEFT JOIN billing_current_prices current_prices
+  ON current_prices.sku = skus.sku AND current_prices.output_resolution = $2
 LEFT JOIN billing_price_versions prices
-  ON prices.sku = skus.sku AND prices.price_version_id = skus.current_price_version_id
-WHERE skus.sku = $1`, sku).Scan(
+  ON prices.sku = current_prices.sku AND prices.output_resolution = current_prices.output_resolution
+ AND prices.price_version_id = current_prices.price_version_id
+	WHERE skus.sku = $1`, sku, resolution).Scan(
 		&skuEnabled, &displayName, &priceVersionID, &priceVersion, &unitCredits, &quotedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -129,7 +177,7 @@ WHERE skus.sku = $1`, sku).Scan(
 	}
 	snapshot := PriceSnapshot{
 		SKU: sku, DisplayName: displayName, PriceVersionID: priceVersionID.Int64, PriceVersion: priceVersion.Int64,
-		UnitCredits: unitCredits.Int64, QuotedAt: quotedAt.Time,
+		OutputResolution: resolution, UnitCredits: unitCredits.Int64, QuotedAt: quotedAt.Time,
 	}
 	total, err := snapshot.Total(quantity)
 	if err != nil {
@@ -144,18 +192,30 @@ func (s *Service) ListCatalogFacts(ctx context.Context) ([]CatalogItem, error) {
 	if err := s.requirePool(); err != nil {
 		return nil, err
 	}
-	rows, err := s.pool.Query(ctx, catalogSelectSQL+` ORDER BY skus.sku`)
+	rows, err := s.pool.Query(ctx, catalogSelectSQL+` ORDER BY skus.sku, current_prices.output_resolution`)
 	if err != nil {
 		return nil, fmt.Errorf("list billing catalog facts: %w", err)
 	}
 	defer rows.Close()
 	items := make([]CatalogItem, 0)
+	indexBySKU := make(map[SKU]int)
 	for rows.Next() {
 		item, err := scanCatalogItem(rows)
 		if err != nil {
 			return nil, fmt.Errorf("scan billing catalog facts: %w", err)
 		}
-		items = append(items, item)
+		index, exists := indexBySKU[item.SKU]
+		if !exists {
+			indexBySKU[item.SKU] = len(items)
+			items = append(items, item)
+			continue
+		}
+		for resolution, price := range item.CurrentPrices {
+			if items[index].CurrentPrices == nil {
+				items[index].CurrentPrices = make(map[OutputResolution]PriceInfo)
+			}
+			items[index].CurrentPrices[resolution] = price
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("read billing catalog facts: %w", err)
@@ -188,49 +248,45 @@ func mapDeleteArchivedDatabaseError(err error) error {
 
 const catalogSelectSQL = `
 SELECT skus.sku, skus.display_name, skus.description, skus.enabled,
-       skus.current_price_version_id, skus.created_at, skus.updated_at,
+       skus.created_at, skus.updated_at,
+	   current_prices.output_resolution,
 	   prices.price_version_id, prices.version, prices.unit_credits,
 	   prices.created_by, prices.created_at
 FROM billing_skus skus
+LEFT JOIN billing_current_prices current_prices ON current_prices.sku = skus.sku
 LEFT JOIN billing_price_versions prices
-  ON prices.sku = skus.sku AND prices.price_version_id = skus.current_price_version_id`
-
-const priceInfoColumns = `price_version_id, version, unit_credits, created_by, created_at`
+	ON prices.sku = current_prices.sku
+ AND prices.output_resolution = current_prices.output_resolution
+ AND prices.price_version_id = current_prices.price_version_id`
 
 type rowScanner interface {
 	Scan(dest ...any) error
 }
 
-func priceInfoScanTargets(price *PriceInfo) []any {
-	return []any{
-		&price.PriceVersionID, &price.Version, &price.UnitCredits, &price.CreatedBy, &price.CreatedAt,
-	}
-}
-
 func scanCatalogItem(row rowScanner) (CatalogItem, error) {
 	var item CatalogItem
-	var currentID pgtype.Int8
 	var priceID pgtype.Int8
 	var version pgtype.Int8
 	var unitCredits pgtype.Int8
 	var createdBy pgtype.Int8
 	var priceCreatedAt pgtype.Timestamptz
+	var resolution pgtype.Text
 	if err := row.Scan(
 		&item.SKU, &item.DisplayName, &item.Description, &item.Enabled,
-		&currentID, &item.CreatedAt, &item.UpdatedAt,
-		&priceID, &version, &unitCredits, &createdBy, &priceCreatedAt,
+		&item.CreatedAt, &item.UpdatedAt,
+		&resolution, &priceID, &version, &unitCredits, &createdBy, &priceCreatedAt,
 	); err != nil {
 		return CatalogItem{}, err
 	}
-	if currentID.Valid {
-		value := currentID.Int64
-		item.CurrentPriceVersionID = &value
-	}
-	if priceID.Valid && version.Valid && unitCredits.Valid && createdBy.Valid && priceCreatedAt.Valid {
-		item.CurrentPrice = &PriceInfo{
-			PriceVersionID: priceID.Int64, Version: version.Int64, UnitCredits: unitCredits.Int64,
+	if priceID.Valid && version.Valid && unitCredits.Valid && createdBy.Valid && priceCreatedAt.Valid && resolution.Valid {
+		candidate := PriceInfo{
+			PriceVersionID: priceID.Int64, Version: version.Int64, OutputResolution: OutputResolution(resolution.String), UnitCredits: unitCredits.Int64,
 			CreatedBy: createdBy.Int64, CreatedAt: priceCreatedAt.Time,
 		}
+		if item.CurrentPrices == nil {
+			item.CurrentPrices = make(map[OutputResolution]PriceInfo)
+		}
+		item.CurrentPrices[candidate.OutputResolution] = candidate
 	}
 	return item, nil
 }

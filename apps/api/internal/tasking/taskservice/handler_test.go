@@ -493,7 +493,7 @@ func TestCheckSubmitTaskReadinessHandlerReturnsStructuredPricingUnavailableError
 
 type handlerBillingQuoter struct{ err error }
 
-func (q handlerBillingQuoter) Quote(_ context.Context, rawSKU string, quantity int64) (billing.Quote, error) {
+func (q handlerBillingQuoter) QuoteAtResolution(_ context.Context, rawSKU string, resolution billing.OutputResolution, quantity int64) (billing.Quote, error) {
 	if q.err != nil {
 		return billing.Quote{}, q.err
 	}
@@ -502,14 +502,14 @@ func (q handlerBillingQuoter) Quote(_ context.Context, rawSKU string, quantity i
 		return billing.Quote{}, err
 	}
 	return billing.Quote{
-		PriceSnapshot: billing.PriceSnapshot{SKU: sku, DisplayName: "Test AI image", PriceVersionID: 1, PriceVersion: 1, UnitCredits: 3},
+		PriceSnapshot: billing.PriceSnapshot{SKU: sku, DisplayName: "Test AI image", PriceVersionID: 1, PriceVersion: 1, OutputResolution: resolution, UnitCredits: 3},
 		Quantity:      quantity,
 		TotalCredits:  3 * quantity,
 	}, nil
 }
 
-func (q handlerBillingQuoter) QuoteInTx(ctx context.Context, _ pgx.Tx, rawSKU string, quantity int64) (billing.Quote, error) {
-	return q.Quote(ctx, rawSKU, quantity)
+func (q handlerBillingQuoter) QuoteAtResolutionInTx(ctx context.Context, _ pgx.Tx, rawSKU string, resolution billing.OutputResolution, quantity int64) (billing.Quote, error) {
+	return q.QuoteAtResolution(ctx, rawSKU, resolution, quantity)
 }
 
 type handlerBillingCredits struct{}

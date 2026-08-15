@@ -124,6 +124,7 @@ describe('AdminTaskResultDialog', () => {
       makeTask({
         billing: {
           sku: 'legacy:removed',
+          output_resolution: '1k',
           display_name: '已移除功能',
           price_version_id: 9,
           price_version: 2,

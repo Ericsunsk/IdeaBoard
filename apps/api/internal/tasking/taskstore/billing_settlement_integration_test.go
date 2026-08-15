@@ -150,7 +150,7 @@ func TestBilledTaskCompletionCapturesWithResultAndRejectsWrongLease(t *testing.T
 func TestBilledTaskPartialCompletionCapturesOutputsAndReleasesRemainder(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	repo, taskBilling, request := newBillingSettlementFixture(t, db, pool, 1, 100, 25)
-	request, err := taskbilling.AIImageRequest(request.Feature, 4)
+	request, err := taskbilling.AIImageRequest(request.Feature, "1k", 4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +203,7 @@ func TestBilledTaskPartialCompletionCapturesOutputsAndReleasesRemainder(t *testi
 func TestBilledTaskCancellationWithResultsCapturesOutputsAndReleasesRemainder(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	repo, taskBilling, request := newBillingSettlementFixture(t, db, pool, 1, 100, 25)
-	request, err := taskbilling.AIImageRequest(request.Feature, 4)
+	request, err := taskbilling.AIImageRequest(request.Feature, "1k", 4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -514,7 +514,7 @@ func newBillingSettlementFixtureForFeature(t *testing.T, db *sql.DB, pool *pgxpo
 	billingService := billing.NewService(pool)
 	taskBilling := taskbilling.NewService(billingService, creditService)
 	repo := NewRepository(db)
-	request, err := taskbilling.AIImageRequest(feature, 1)
+	request, err := taskbilling.AIImageRequest(feature, "1k", 1)
 	if err != nil {
 		t.Fatal(err)
 	}

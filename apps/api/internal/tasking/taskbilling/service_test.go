@@ -24,7 +24,7 @@ func TestAIImageWorkflowSKUContract(t *testing.T) {
 
 	for _, feature := range workflow.AIImageFeatureSlugs() {
 		t.Run(feature, func(t *testing.T) {
-			request, err := AIImageRequest(feature, 1)
+			request, err := AIImageRequest(feature, "1k", 1)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -43,11 +43,11 @@ func TestAIImageWorkflowSKUContract(t *testing.T) {
 }
 
 func TestAIImagePricingIdentityAndFingerprintAreFeatureScoped(t *testing.T) {
-	first, err := AIImageRequest(workflow.FeatureSlugLocalInpaint, 1)
+	first, err := AIImageRequest(workflow.FeatureSlugLocalInpaint, "1k", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := AIImageRequest(workflow.FeatureSlugLocalInpaint, 1)
+	second, err := AIImageRequest(workflow.FeatureSlugLocalInpaint, "1k", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestAIImagePricingIdentityAndFingerprintAreFeatureScoped(t *testing.T) {
 func TestAIImageWorkflowRequestRejectsNonWorkflowProducts(t *testing.T) {
 	for _, feature := range []string{"", "crop", "color-adjust", "mask-draw", "unknown"} {
 		t.Run(feature, func(t *testing.T) {
-			_, err := AIImageRequest(feature, 1)
+			_, err := AIImageRequest(feature, "1k", 1)
 			if !errors.Is(err, ErrUnsupportedProduct) {
 				t.Fatalf("err=%v, want ErrUnsupportedProduct", err)
 			}

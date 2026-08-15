@@ -9,20 +9,6 @@ import (
 	"context"
 )
 
-const countAccountsByProviderEndpointID = `-- name: CountAccountsByProviderEndpointID :one
-SELECT COUNT(*)
-FROM api_accounts
-WHERE provider_endpoint_id = $1
-  AND deleted_at IS NULL
-`
-
-func (q *Queries) CountAccountsByProviderEndpointID(ctx context.Context, providerEndpointID int64) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countAccountsByProviderEndpointID, providerEndpointID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createProviderEndpoint = `-- name: CreateProviderEndpoint :one
 INSERT INTO provider_endpoints (api_type, name, base_url, status)
 VALUES ($1, $2, $3, $4)

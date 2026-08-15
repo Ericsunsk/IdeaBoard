@@ -16,8 +16,9 @@ import (
 
 type handlerServiceStub struct {
 	quoteInput struct {
-		sku      string
-		quantity int64
+		sku        string
+		resolution OutputResolution
+		quantity   int64
 	}
 }
 
@@ -25,7 +26,7 @@ type billableCatalogReaderStub struct {
 	items               []BillableItemCatalogCard
 	err                 error
 	publishSKU          string
-	publishCredits      int64
+	publishPrices       map[OutputResolution]int64
 	publishActorID      int64
 	availabilitySKU     string
 	availabilityEnabled bool
@@ -44,11 +45,11 @@ func (s *billableCatalogReaderStub) List(context.Context) ([]BillableItemCatalog
 	return s.items, s.err
 }
 
-func (s *billableCatalogReaderStub) PublishPrice(_ context.Context, sku string, unitCredits, actorID int64) (PriceInfo, error) {
+func (s *billableCatalogReaderStub) PublishPrices(_ context.Context, sku string, prices map[OutputResolution]int64, actorID int64) (map[OutputResolution]PriceInfo, error) {
 	s.publishSKU = sku
-	s.publishCredits = unitCredits
+	s.publishPrices = prices
 	s.publishActorID = actorID
-	return PriceInfo{PriceVersionID: 1, Version: 1, UnitCredits: unitCredits}, s.err
+	return map[OutputResolution]PriceInfo{OutputResolution1K: {PriceVersionID: 1, Version: 1, OutputResolution: OutputResolution1K, UnitCredits: prices[OutputResolution1K]}}, s.err
 }
 
 func (s *billableCatalogReaderStub) SetAvailability(_ context.Context, sku string, enabled bool, actorID int64) (AvailabilityInfo, error) {
@@ -62,11 +63,12 @@ func (s *billableCatalogReaderStub) SetAvailability(_ context.Context, sku strin
 	return AvailabilityInfo{SKU: SKU(sku), Status: status}, s.err
 }
 
-func (s *handlerServiceStub) Quote(_ context.Context, sku string, quantity int64) (Quote, error) {
+func (s *handlerServiceStub) QuoteAtResolution(_ context.Context, sku string, resolution OutputResolution, quantity int64) (Quote, error) {
 	s.quoteInput.sku = sku
+	s.quoteInput.resolution = resolution
 	s.quoteInput.quantity = quantity
 	return Quote{
-		PriceSnapshot: PriceSnapshot{SKU: "ideaboard:image.generate", DisplayName: "AI 生图", PriceVersionID: 3, PriceVersion: 2, UnitCredits: 25, QuotedAt: time.Unix(10, 0).UTC()},
+		PriceSnapshot: PriceSnapshot{SKU: "ideaboard:image.generate", DisplayName: "AI 生图", PriceVersionID: 3, PriceVersion: 2, OutputResolution: resolution, UnitCredits: 25, QuotedAt: time.Unix(10, 0).UTC()},
 		Quantity:      quantity, TotalCredits: 100,
 	}, nil
 }
@@ -124,7 +126,7 @@ func TestQuoteHandlerReturnsServerSnapshot(t *testing.T) {
 func TestAdminBillableCatalogReturnsFeatureCardContract(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	service := &handlerServiceStub{}
-	price := &PriceInfo{PriceVersionID: 1, Version: 1, UnitCredits: 25}
+	price := PriceInfo{PriceVersionID: 1, Version: 1, OutputResolution: OutputResolution1K, UnitCredits: 25}
 	catalog := &billableCatalogReaderStub{items: []BillableItemCatalogCard{
 		{
 			BillableItemDefinition: BillableItemDefinition{
@@ -138,21 +140,21 @@ func TestAdminBillableCatalogReturnsFeatureCardContract(t *testing.T) {
 				SKU: "ai-image:remove-bg", Namespace: "ai-image", ProductKind: "workflow-feature",
 				DisplayName: "抠图", SortOrder: 20,
 			},
-			Status: BillableItemStatusActive, CurrentPrice: price,
+			Status: BillableItemStatusActive, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolution1K: price},
 		},
 		{
 			BillableItemDefinition: BillableItemDefinition{
 				SKU: "ai-image:hd-upscale", Namespace: "ai-image", ProductKind: "workflow-feature",
 				DisplayName: "HD", SortOrder: 30,
 			},
-			Status: BillableItemStatusDisabled, CurrentPrice: price,
+			Status: BillableItemStatusDisabled, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolution1K: price},
 		},
 		{
 			BillableItemDefinition: BillableItemDefinition{
 				SKU: "legacy:removed", Namespace: "legacy", ProductKind: "legacy",
 				DisplayName: "已移除功能", SortOrder: 0,
 			},
-			Status: BillableItemStatusArchived, CurrentPrice: price,
+			Status: BillableItemStatusArchived, CurrentPrices: map[OutputResolution]PriceInfo{OutputResolution1K: price},
 		},
 	}}
 	handler := NewHandler(service, catalog)
@@ -221,11 +223,11 @@ func TestAdminPublishPriceUsesAuthenticatedActorWithoutReason(t *testing.T) {
 	router.POST("/catalog/:sku/prices", handler.PublishPrice)
 
 	recorder := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/catalog/ai-image:local-inpaint/prices", strings.NewReader(`{"unit_credits":0}`))
+	request := httptest.NewRequest(http.MethodPost, "/catalog/ai-image:local-inpaint/prices", strings.NewReader(`{"prices":{"1k":0,"2k":2}}`))
 	request.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(recorder, request)
 
-	if recorder.Code != http.StatusOK || catalog.publishSKU != "ai-image:local-inpaint" || catalog.publishCredits != 0 || catalog.publishActorID != 9 {
+	if recorder.Code != http.StatusOK || catalog.publishSKU != "ai-image:local-inpaint" || catalog.publishPrices[OutputResolution1K] != 0 || catalog.publishPrices[OutputResolution2K] != 2 || catalog.publishActorID != 9 {
 		t.Fatalf("status=%d body=%s publish=%+v", recorder.Code, recorder.Body.String(), catalog)
 	}
 
@@ -234,7 +236,7 @@ func TestAdminPublishPriceUsesAuthenticatedActorWithoutReason(t *testing.T) {
 	missingRequest.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(missingRecorder, missingRequest)
 	if missingRecorder.Code != http.StatusBadRequest {
-		t.Fatalf("missing unit_credits status=%d body=%s", missingRecorder.Code, missingRecorder.Body.String())
+		t.Fatalf("missing prices status=%d body=%s", missingRecorder.Code, missingRecorder.Body.String())
 	}
 }
 

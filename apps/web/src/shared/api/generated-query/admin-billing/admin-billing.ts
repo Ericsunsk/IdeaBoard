@@ -23,7 +23,7 @@ import type {
   ApiResponseArchivedBillingItemDeleteResult,
   ApiResponseBillableItemAvailability,
   ApiResponseBillableItemCatalog,
-  ApiResponseBillingPrice,
+  ApiResponseBillingPriceSet,
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
@@ -107,8 +107,8 @@ export const publishAdminBillingPrice = async (
   sku: string,
   adminBillingPricePublishRequest: AdminBillingPricePublishRequest,
   options?: Parameters<typeof orvalMutator>[1],
-): Promise<ApiResponseBillingPrice> => {
-  return orvalMutator<ApiResponseBillingPrice>(getPublishAdminBillingPriceUrl(sku), {
+): Promise<ApiResponseBillingPriceSet> => {
+  return orvalMutator<ApiResponseBillingPriceSet>(getPublishAdminBillingPriceUrl(sku), {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },

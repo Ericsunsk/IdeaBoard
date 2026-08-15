@@ -3,7 +3,7 @@ import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import {
   createAdminBillableCatalogResource,
   deleteArchivedBillableItem,
-  publishBillableItemPrice,
+  publishBillableItemPrices,
   setBillableItemAvailability,
 } from './billableCatalogResource'
 
@@ -21,7 +21,6 @@ describe('Admin Billable Catalog resource', () => {
                 namespace: 'ai-image',
                 product_kind: 'workflow-feature',
                 display_name: '局部重绘',
-                description: '仅重绘图片选定区域。',
                 sort_order: 30,
                 status: 'unpriced',
               },
@@ -37,16 +36,15 @@ describe('Admin Billable Catalog resource', () => {
         namespace: 'ai-image',
         productKind: 'workflow-feature',
         displayName: '局部重绘',
-        description: '仅重绘图片选定区域。',
         sortOrder: 30,
         status: 'unpriced',
-        currentPrice: undefined,
+        currentPrices: {},
         updatedAt: undefined,
       },
     ])
   })
 
-  it('publishes a feature price without legacy state or reason fields', async () => {
+  it('publishes all configured resolution prices atomically', async () => {
     let requestBody: unknown
     useMswHandlers(
       http.post('/api/admin/billing/catalog/:sku/prices', async ({ request, params }) => {
@@ -56,22 +54,23 @@ describe('Admin Billable Catalog resource', () => {
           code: 0,
           msg: 'ok',
           data: {
-            price_version_id: 9,
-            version: 1,
-            unit_credits: 0,
-            created_at: '2026-07-16T08:00:00Z',
+            prices: {
+              '1k': { output_resolution: '1k', price_version_id: 9, version: 1, unit_credits: 0, created_at: '2026-07-16T08:00:00Z' },
+            },
           },
         })
       }),
     )
 
-    await expect(publishBillableItemPrice('ai-image:local-inpaint', 0)).resolves.toEqual({
-      priceVersionId: 9,
-      version: 1,
-      unitCredits: 0,
-      createdAt: '2026-07-16T08:00:00Z',
+    await expect(publishBillableItemPrices('ai-image:local-inpaint', { '1k': 0, '2k': undefined, '4k': undefined })).resolves.toEqual({
+      '1k': {
+        priceVersionId: 9,
+        version: 1,
+        unitCredits: 0,
+        createdAt: '2026-07-16T08:00:00Z',
+      },
     })
-    expect(requestBody).toEqual({ unit_credits: 0 })
+    expect(requestBody).toEqual({ prices: { '1k': 0 } })
   })
 
   it('sets feature availability without a manual reason', async () => {

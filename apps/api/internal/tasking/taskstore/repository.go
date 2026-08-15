@@ -396,7 +396,7 @@ func (r *Repository) ListAdminBillingSnapshots(ctx context.Context, taskIDs []st
 	}
 	rows, err := r.dbWithContext(ctx).Query(`
 SELECT snapshots.task_id, snapshots.sku, snapshots.display_name, snapshots.price_version_id, snapshots.price_version,
-       unit_credits, quantity, total_credits, quoted_at,
+	   snapshots.output_resolution, unit_credits, quantity, total_credits, quoted_at,
        settlements.state, settlements.settled_at
 FROM task_billing_snapshots snapshots
 JOIN task_billing_settlements settlements ON settlements.task_id = snapshots.task_id
@@ -411,7 +411,7 @@ WHERE snapshots.task_id = ANY($1::text[])`, pq.Array(taskIDs))
 		var settledAt sql.NullTime
 		if err := rows.Scan(
 			&taskID, &snapshot.SKU, &snapshot.DisplayName, &snapshot.PriceVersionID,
-			&snapshot.PriceVersion, &snapshot.UnitCredits, &snapshot.Quantity,
+			&snapshot.PriceVersion, &snapshot.OutputResolution, &snapshot.UnitCredits, &snapshot.Quantity,
 			&snapshot.TotalCredits, &snapshot.QuotedAt, &snapshot.SettlementState, &settledAt,
 		); err != nil {
 			return nil, fmt.Errorf("taskstore: scan Admin Billing snapshot: %w", err)

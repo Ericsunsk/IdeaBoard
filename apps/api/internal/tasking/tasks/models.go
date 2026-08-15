@@ -43,24 +43,26 @@ type Task struct {
 }
 
 type TaskBillingRequest struct {
-	Feature  string
-	Quantity int64
+	Feature          string
+	OutputResolution string
+	Quantity         int64
 }
 
 // AdminBillingSnapshot is a read-only projection over immutable Task Billing
 // facts. FeatureExists is resolved dynamically from the current Registry.
 type AdminBillingSnapshot struct {
-	SKU             string     `json:"sku"`
-	DisplayName     string     `json:"display_name"`
-	PriceVersionID  int64      `json:"price_version_id"`
-	PriceVersion    int64      `json:"price_version"`
-	UnitCredits     int64      `json:"unit_credits"`
-	Quantity        int64      `json:"quantity"`
-	TotalCredits    int64      `json:"total_credits"`
-	QuotedAt        time.Time  `json:"quoted_at"`
-	SettlementState string     `json:"settlement_state"`
-	SettledAt       *time.Time `json:"settled_at"`
-	FeatureExists   bool       `json:"feature_exists"`
+	SKU              string     `json:"sku"`
+	DisplayName      string     `json:"display_name"`
+	PriceVersionID   int64      `json:"price_version_id"`
+	PriceVersion     int64      `json:"price_version"`
+	OutputResolution string     `json:"output_resolution"`
+	UnitCredits      int64      `json:"unit_credits"`
+	Quantity         int64      `json:"quantity"`
+	TotalCredits     int64      `json:"total_credits"`
+	QuotedAt         time.Time  `json:"quoted_at"`
+	SettlementState  string     `json:"settlement_state"`
+	SettledAt        *time.Time `json:"settled_at"`
+	FeatureExists    bool       `json:"feature_exists"`
 }
 
 // AdminTaskExecutionSnapshot is the immutable lease snapshot used by Admin

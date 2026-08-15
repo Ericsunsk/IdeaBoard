@@ -57,7 +57,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, type ComponentPublicInstance } from 'vue'
+import { computed, watch, type ComponentPublicInstance } from 'vue'
 import {
   WORKFLOW_FEATURE_SLUGS,
   WORKFLOW_FEATURE,
@@ -70,16 +70,25 @@ import {
   type ImageActionMenuItem,
   type ImageNodeAction,
 } from '../../config/imageActionRegistry'
-import type { ImageStrengthAction } from '../../execution'
+import {
+  isImageTaskAction,
+  useCanvasBillingReadinessStore,
+  type ImageStrengthAction,
+} from '../../execution'
 import type { ImageActionStrengthControl } from '../../image-tools'
+import {
+  buildImageActionReadinessRequest,
+  buildLocalInpaintReadinessRequest,
+} from '../../execution/commands/flowImageTaskRequests'
+import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import ImageActionMenuIcon from './ImageActionMenuIcon.vue'
 import NodeToolIconButton from '../nodes/NodeToolIconButton.vue'
-import { useCanvasBillingReadinessStore } from '../../execution'
 import { createPopoverMotionTransition } from '../../../../shared/motion/popoverMotion'
 
 const props = defineProps<{
   strengthMenuStyle?: string | Record<string, string>
   outputCount: number
+  outputResolution?: OutputResolution
   strengthControl: ImageActionStrengthControl
 }>()
 
@@ -90,14 +99,7 @@ const emit = defineEmits<{
 const showStrengthControl = computed(() => props.strengthControl.visible)
 const billingStore = useCanvasBillingReadinessStore()
 const actionMenuMotion = createPopoverMotionTransition()
-
-onMounted(() => {
-  if (!billingStore) return
-  for (const item of IMAGE_ACTION_MENU_ITEMS) {
-    const feature = resolveItemBillingFeature(item)
-    if (feature) void billingStore.ensureFeature(feature)
-  }
-})
+const outputResolution = computed(() => props.outputResolution ?? '1k')
 
 function resolveItemBillingFeature(item: ImageActionMenuItem): WorkflowFeature | null {
   if (item.action === IMAGE_NODE_ACTION.imageInpaint) return WORKFLOW_FEATURE.localInpaint
@@ -105,6 +107,33 @@ function resolveItemBillingFeature(item: ImageActionMenuItem): WorkflowFeature |
     ? (item.action as WorkflowFeature)
     : null
 }
+
+function buildItemReadinessRequest(item: ImageActionMenuItem) {
+  const options = {
+    outputCount: props.outputCount,
+    outputResolution: outputResolution.value,
+  }
+  if (item.action === IMAGE_NODE_ACTION.imageInpaint) {
+    return buildLocalInpaintReadinessRequest(options)
+  }
+  if (item.action === IMAGE_NODE_ACTION.imageExtend || isImageTaskAction(item.action)) {
+    return buildImageActionReadinessRequest(item.action, options)
+  }
+  return undefined
+}
+
+function refreshBillingQuotes() {
+  if (!billingStore) return
+  for (const item of IMAGE_ACTION_MENU_ITEMS) {
+    const feature = resolveItemBillingFeature(item)
+    const request = buildItemReadinessRequest(item)
+    if (feature && request) {
+      void billingStore.ensureFeature(feature, { request, force: true })
+    }
+  }
+}
+
+watch([() => props.outputCount, outputResolution], refreshBillingQuotes, { immediate: true })
 
 function getItemBillingState(item: ImageActionMenuItem) {
   const feature = resolveItemBillingFeature(item)

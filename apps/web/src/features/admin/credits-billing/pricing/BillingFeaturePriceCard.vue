@@ -23,23 +23,19 @@
 
     <template #content>
       <div class="flex min-w-0 flex-col gap-5">
-        <p class="m-0 min-h-10 text-admin-body leading-5 text-ib-text-muted">
-          {{ item.description || '暂无功能说明' }}
-        </p>
-        <p
-          v-if="workflowPresentation"
-          class="m-0 text-admin-caption leading-5 text-admin-text-2"
-        >
-          {{ workflowPresentation.inputDescription }}
-        </p>
-
-        <div class="flex items-end justify-between gap-4 border-t border-ib-border-soft pt-4">
-          <div class="min-w-0">
-            <div class="text-admin-meta text-ib-text-muted">当前价格</div>
-            <div class="mt-1 text-admin-title font-bold text-admin-title-color">
-              {{ priceLabel }}
+        <div class="flex items-end justify-between gap-4">
+          <dl class="grid min-w-0 flex-1 grid-cols-3 gap-3">
+            <div
+              v-for="resolution in resolutions"
+              :key="resolution"
+              class="min-w-0 rounded-lg border border-admin-border-soft bg-admin-surface-muted/50 px-2.5 py-2"
+            >
+              <dt class="text-admin-caption text-ib-text-muted">{{ resolution.toUpperCase() }}</dt>
+              <dd class="mt-1 truncate text-admin-meta font-bold text-admin-title-color">
+                {{ priceLabel(resolution) }}
+              </dd>
             </div>
-          </div>
+          </dl>
           <div
             v-if="item.updatedAt"
             class="shrink-0 text-right text-admin-caption text-ib-text-muted"
@@ -49,8 +45,8 @@
           <Button
             v-if="item.status !== 'archived'"
             size="small"
-            severity="secondary"
-            outlined
+            :class="adminActionButtonClass"
+            severity="contrast"
             :label="item.status === 'unpriced' ? '设置价格' : '调整价格'"
             @click="emit('publish', item)"
           />
@@ -76,7 +72,7 @@
 
         <div
           v-if="item.status === 'archived'"
-          class="flex min-h-8 items-center justify-end gap-2 border-t border-ib-border-soft pt-4"
+          class="flex min-h-8 items-center justify-end gap-2"
         >
           <Button
             size="small"
@@ -105,8 +101,12 @@ import {
   WORKFLOW_FEATURE_GROUP_LIST,
 } from '../../../../shared/domain/workflowFeatureRegistry'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
-import { adminCompactTagClass, adminMasonryCardClass } from '../../shared/lib/adminUiClasses'
-import type { AdminBillableItemCard, AdminBillableItemStatus } from './billableCatalogTypes'
+import {
+  adminActionButtonClass,
+  adminCompactTagClass,
+  adminMasonryCardClass,
+} from '../../shared/lib/adminUiClasses'
+import type { AdminBillableItemCard, AdminBillableItemStatus, OutputResolution } from './billableCatalogTypes'
 
 const props = defineProps<{
   item: AdminBillableItemCard
@@ -137,17 +137,13 @@ const workflowPresentation = computed(() => {
   if (!feature) return null
   const group = WORKFLOW_FEATURE_GROUP_LIST.find((item) => item.key === feature.groupKey)
   if (!group) return null
-  const inputDescription =
-    group.key === 'image'
-      ? '图片是主输入；用户文字通过 {{user_prompt}} 作为辅助要求。'
-      : group.key === 'prompt'
-        ? '用户文字是主导输入，可选参考图。'
-        : '多图是主输入；用户文字通过 {{user_prompt}} 作为融合辅助要求。'
-  return { groupTitle: group.title, inputDescription }
+  return { groupTitle: group.title }
 })
-const priceLabel = computed(() =>
-  props.item.currentPrice ? formatIdeaAmount(props.item.currentPrice.unitCredits) : '未设置',
-)
+const resolutions: OutputResolution[] = ['1k', '2k', '4k']
+function priceLabel(resolution: OutputResolution) {
+  const price = props.item.currentPrices[resolution]
+  return price ? formatIdeaAmount(price.unitCredits) : '未设置'
+}
 const updatedAtLabel = computed(() => {
   if (!props.item.updatedAt) return ''
   const date = new Date(props.item.updatedAt)

@@ -4,10 +4,12 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { BillingQuoteRequestOutputResolution } from './billingQuoteRequestOutputResolution'
 import type { BillingSKUCode } from './billingSKUCode'
 
 export interface BillingQuoteRequest {
   sku: BillingSKUCode
+  output_resolution?: BillingQuoteRequestOutputResolution
   /** @minimum 1 */
   quantity: number
 }

@@ -1798,7 +1798,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApiResponseBillingPrice'
+                $ref: '#/components/schemas/ApiResponseBillingPriceSet'
 
   /admin/billing/catalog/{sku}:
     delete:
@@ -2701,13 +2701,15 @@ components:
       required: [sku, quantity]
       properties:
         sku: { $ref: '#/components/schemas/BillingSKUCode' }
+        output_resolution: { type: string, enum: [1k, 2k, 4k], default: 1k }
         quantity: { type: integer, format: int64, minimum: 1 }
 
     BillingQuote:
       type: object
-      required: [sku, display_name, price_version_id, price_version, unit_credits, quantity, total_credits, quoted_at]
+      required: [sku, output_resolution, display_name, price_version_id, price_version, unit_credits, quantity, total_credits, quoted_at]
       properties:
         sku: { $ref: '#/components/schemas/BillingSKUCode' }
+        output_resolution: { type: string, enum: [1k, 2k, 4k] }
         display_name: { type: string, minLength: 1, maxLength: 120 }
         price_version_id: { type: integer, format: int64, minimum: 1 }
         price_version: { type: integer, format: int64, minimum: 1 }
@@ -2728,8 +2730,9 @@ components:
 
     BillingPrice:
       type: object
-      required: [price_version_id, version, unit_credits, created_at]
+      required: [output_resolution, price_version_id, version, unit_credits, created_at]
       properties:
+        output_resolution: { type: string, enum: [1k, 2k, 4k] }
         price_version_id: { type: integer, format: int64, minimum: 1 }
         version: { type: integer, format: int64, minimum: 1 }
         unit_credits: { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }
@@ -2750,7 +2753,10 @@ components:
         description: { type: string, maxLength: 1000 }
         sort_order: { type: integer, minimum: 0 }
         status: { $ref: '#/components/schemas/BillableItemStatus' }
-        current_price: { $ref: '#/components/schemas/BillingPrice' }
+        current_prices:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/BillingPrice'
         updated_at: { type: string, format: date-time }
 
     BillableItemCatalog:
@@ -2794,9 +2800,16 @@ components:
     AdminBillingPricePublishRequest:
       type: object
       additionalProperties: false
-      required: [unit_credits]
+      required: [prices]
       properties:
-        unit_credits: { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }
+        prices:
+          type: object
+          additionalProperties: false
+          required: ['1k']
+          properties:
+            '1k': { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }
+            '2k': { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }
+            '4k': { type: integer, format: int64, minimum: 0, maximum: 9000000000000000 }
 
     AdminActionReason:
       type: string
@@ -3525,9 +3538,10 @@ components:
 
     AdminTaskBillingSnapshot:
       type: object
-      required: [sku, display_name, price_version_id, price_version, unit_credits, quantity, total_credits, quoted_at, settlement_state, settled_at, feature_exists]
+      required: [sku, output_resolution, display_name, price_version_id, price_version, unit_credits, quantity, total_credits, quoted_at, settlement_state, settled_at, feature_exists]
       properties:
         sku: { $ref: '#/components/schemas/BillingSKUCode' }
+        output_resolution: { type: string, enum: [1k, 2k, 4k] }
         display_name: { type: string, minLength: 1, maxLength: 120 }
         price_version_id: { type: integer, format: int64, minimum: 1 }
         price_version: { type: integer, format: int64, minimum: 1 }
@@ -5439,13 +5453,19 @@ components:
             data:
               $ref: '#/components/schemas/BillableItemCatalog'
 
-    ApiResponseBillingPrice:
+    ApiResponseBillingPriceSet:
       allOf:
         - $ref: '#/components/schemas/ApiResponseBase'
         - type: object
           properties:
             data:
-              $ref: '#/components/schemas/BillingPrice'
+              type: object
+              required: [prices]
+              properties:
+                prices:
+                  type: object
+                  additionalProperties:
+                    $ref: '#/components/schemas/BillingPrice'
 
     ApiResponseArchivedBillingItemDeleteResult:
       allOf:

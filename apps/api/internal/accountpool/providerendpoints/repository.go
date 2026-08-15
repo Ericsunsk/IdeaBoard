@@ -14,7 +14,6 @@ import (
 	"github.com/lib/pq"
 )
 
-var ErrProviderEndpointInUse = errors.New("provider endpoint has active accounts")
 var ErrProviderEndpointNameConflict = errors.New("provider endpoint name conflict")
 var ErrProviderEndpointURLConflict = errors.New("provider endpoint api type/base url conflict")
 
@@ -101,13 +100,6 @@ func (r *ProviderEndpointRepository) Update(ctx context.Context, endpoint *Provi
 }
 
 func (r *ProviderEndpointRepository) Delete(ctx context.Context, id int64) error {
-	count, err := r.q.CountAccountsByProviderEndpointID(ctx, id)
-	if err != nil {
-		return err
-	}
-	if count > 0 {
-		return ErrProviderEndpointInUse
-	}
 	updated, err := r.q.DeleteProviderEndpoint(ctx, id)
 	if err != nil {
 		return err

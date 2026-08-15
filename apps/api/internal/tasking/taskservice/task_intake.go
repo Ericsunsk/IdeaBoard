@@ -176,7 +176,7 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 	if err != nil {
 		return CanonicalTaskRequest{}, err
 	}
-	billingRequest, err := resolveTaskBillingRequest(featureSlug, generationSnapshot.RequestedOutputCount)
+	billingRequest, err := resolveTaskBillingRequest(featureSlug, resolution, generationSnapshot.RequestedOutputCount)
 	if err != nil {
 		return CanonicalTaskRequest{}, err
 	}
@@ -257,11 +257,11 @@ func readStringParam(params map[string]interface{}, key string) string {
 	return value
 }
 
-func resolveTaskBillingRequest(feature string, quantity int) (*taskbilling.Request, error) {
+func resolveTaskBillingRequest(feature, outputResolution string, quantity int) (*taskbilling.Request, error) {
 	if !taskbilling.RequiresBilling(feature) {
 		return nil, nil
 	}
-	request, err := taskbilling.AIImageRequest(feature, int64(quantity))
+	request, err := taskbilling.AIImageRequest(feature, outputResolution, int64(quantity))
 	if err != nil {
 		return nil, err
 	}

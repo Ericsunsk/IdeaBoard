@@ -1,4 +1,5 @@
 export type AdminBillableItemStatus = 'unpriced' | 'active' | 'disabled' | 'archived'
+export type OutputResolution = '1k' | '2k' | '4k'
 
 export interface AdminBillableItemPrice {
   priceVersionId: number
@@ -18,9 +19,8 @@ export interface AdminBillableItemCard {
   namespace: string
   productKind: string
   displayName: string
-  description: string
   sortOrder: number
   status: AdminBillableItemStatus
-  currentPrice?: AdminBillableItemPrice
+  currentPrices: Partial<Record<OutputResolution, AdminBillableItemPrice>>
   updatedAt?: string
 }

@@ -112,9 +112,9 @@ func (r *BillableItemRegistry) Contains(rawSKU string) bool {
 
 type BillableItemCatalogCard struct {
 	BillableItemDefinition
-	Status       BillableItemStatus `json:"status"`
-	CurrentPrice *PriceInfo         `json:"current_price,omitempty"`
-	UpdatedAt    *time.Time         `json:"updated_at,omitempty"`
+	Status        BillableItemStatus             `json:"status"`
+	CurrentPrices map[OutputResolution]PriceInfo `json:"current_prices"`
+	UpdatedAt     *time.Time                     `json:"updated_at,omitempty"`
 }
 
 type CatalogFactReader interface {
@@ -122,7 +122,7 @@ type CatalogFactReader interface {
 }
 
 type CatalogPricePublisher interface {
-	PublishPrice(context.Context, PublishPriceInput) (PriceInfo, error)
+	PublishPrices(context.Context, PublishPricesInput) (map[OutputResolution]PriceInfo, error)
 }
 
 type CatalogStore interface {
@@ -130,8 +130,8 @@ type CatalogStore interface {
 	CatalogPricePublisher
 	SetAvailability(context.Context, string, bool, int64) (AvailabilityInfo, error)
 	DeleteArchived(context.Context, string, int64) (ArchivedItemDeleteResult, error)
-	Quote(context.Context, string, int64) (Quote, error)
-	QuoteInTx(context.Context, pgx.Tx, string, int64) (Quote, error)
+	QuoteAtResolution(context.Context, string, OutputResolution, int64) (Quote, error)
+	QuoteAtResolutionInTx(context.Context, pgx.Tx, string, OutputResolution, int64) (Quote, error)
 }
 
 type BillableItemCatalog struct {
@@ -143,19 +143,19 @@ func NewBillableItemCatalog(registry *BillableItemRegistry, store CatalogStore) 
 	return &BillableItemCatalog{registry: registry, store: store}
 }
 
-func (c *BillableItemCatalog) PublishPrice(ctx context.Context, rawSKU string, unitCredits, actorID int64) (PriceInfo, error) {
+func (c *BillableItemCatalog) PublishPrices(ctx context.Context, rawSKU string, prices map[OutputResolution]int64, actorID int64) (map[OutputResolution]PriceInfo, error) {
 	if c == nil || c.registry == nil || c.store == nil {
-		return PriceInfo{}, ErrServiceUnavailable
+		return nil, ErrServiceUnavailable
 	}
 	definition, exists := c.registry.Find(rawSKU)
 	if !exists {
-		return PriceInfo{}, ErrSKUNotFound
+		return nil, ErrSKUNotFound
 	}
-	if unitCredits < 0 || unitCredits > MaxQuoteCredits || actorID <= 0 {
-		return PriceInfo{}, ErrInvalidCatalogEntry
+	if actorID <= 0 {
+		return nil, ErrInvalidCatalogEntry
 	}
-	return c.store.PublishPrice(ctx, PublishPriceInput{
-		Definition: definition, UnitCredits: unitCredits, ActorID: actorID,
+	return c.store.PublishPrices(ctx, PublishPricesInput{
+		Definition: definition, Prices: prices, ActorID: actorID,
 	})
 }
 
@@ -185,19 +185,19 @@ func (c *BillableItemCatalog) DeleteArchived(ctx context.Context, rawSKU string,
 	return c.store.DeleteArchived(ctx, rawSKU, actorID)
 }
 
-func (c *BillableItemCatalog) Quote(ctx context.Context, rawSKU string, quantity int64) (Quote, error) {
+func (c *BillableItemCatalog) QuoteAtResolution(ctx context.Context, rawSKU string, resolution OutputResolution, quantity int64) (Quote, error) {
 	if err := c.requireRegistered(rawSKU); err != nil {
 		return Quote{}, err
 	}
-	quote, err := c.store.Quote(ctx, rawSKU, quantity)
+	quote, err := c.store.QuoteAtResolution(ctx, rawSKU, resolution, quantity)
 	return quote, normalizeCatalogQuoteError(err)
 }
 
-func (c *BillableItemCatalog) QuoteInTx(ctx context.Context, tx pgx.Tx, rawSKU string, quantity int64) (Quote, error) {
+func (c *BillableItemCatalog) QuoteAtResolutionInTx(ctx context.Context, tx pgx.Tx, rawSKU string, resolution OutputResolution, quantity int64) (Quote, error) {
 	if err := c.requireRegistered(rawSKU); err != nil {
 		return Quote{}, err
 	}
-	quote, err := c.store.QuoteInTx(ctx, tx, rawSKU, quantity)
+	quote, err := c.store.QuoteAtResolutionInTx(ctx, tx, rawSKU, resolution, quantity)
 	return quote, normalizeCatalogQuoteError(err)
 }
 
@@ -240,12 +240,13 @@ func (c *BillableItemCatalog) List(ctx context.Context) ([]BillableItemCatalogCa
 		card := BillableItemCatalogCard{
 			BillableItemDefinition: definition,
 			Status:                 BillableItemStatusUnpriced,
+			CurrentPrices:          map[OutputResolution]PriceInfo{},
 		}
 		if fact, exists := factsBySKU[definition.SKU]; exists {
-			card.CurrentPrice = clonePriceInfo(fact.CurrentPrice)
+			card.CurrentPrices = clonePriceMap(fact.CurrentPrices)
 			updatedAt := fact.UpdatedAt
 			card.UpdatedAt = &updatedAt
-			if fact.CurrentPrice != nil {
+			if _, hasOneK := fact.CurrentPrices[OutputResolution1K]; hasOneK {
 				if fact.Enabled {
 					card.Status = BillableItemStatusActive
 				} else {
@@ -270,18 +271,18 @@ func (c *BillableItemCatalog) List(ctx context.Context) ([]BillableItemCatalogCa
 				SKU: fact.SKU, Namespace: namespace, ProductKind: "legacy",
 				DisplayName: fact.DisplayName, Description: fact.Description,
 			},
-			Status:       BillableItemStatusArchived,
-			CurrentPrice: clonePriceInfo(fact.CurrentPrice),
-			UpdatedAt:    &updatedAt,
+			Status:        BillableItemStatusArchived,
+			CurrentPrices: clonePriceMap(fact.CurrentPrices),
+			UpdatedAt:     &updatedAt,
 		})
 	}
 	return cards, nil
 }
 
-func clonePriceInfo(price *PriceInfo) *PriceInfo {
-	if price == nil {
-		return nil
+func clonePriceMap(prices map[OutputResolution]PriceInfo) map[OutputResolution]PriceInfo {
+	cloned := make(map[OutputResolution]PriceInfo, len(prices))
+	for resolution, price := range prices {
+		cloned[resolution] = price
 	}
-	cloned := *price
-	return &cloned
+	return cloned
 }

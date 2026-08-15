@@ -29,8 +29,8 @@ var (
 )
 
 type Quoter interface {
-	Quote(context.Context, string, int64) (billing.Quote, error)
-	QuoteInTx(context.Context, pgx.Tx, string, int64) (billing.Quote, error)
+	QuoteAtResolution(context.Context, string, billing.OutputResolution, int64) (billing.Quote, error)
+	QuoteAtResolutionInTx(context.Context, pgx.Tx, string, billing.OutputResolution, int64) (billing.Quote, error)
 }
 
 type CreditService interface {
@@ -55,8 +55,9 @@ const (
 )
 
 type Request struct {
-	Feature  string
-	Quantity int64
+	Feature          string
+	OutputResolution billing.OutputResolution
+	Quantity         int64
 }
 
 type Readiness struct {
@@ -74,6 +75,7 @@ type Snapshot struct {
 	DisplayName       string
 	PriceVersionID    int64
 	PriceVersion      int64
+	OutputResolution  billing.OutputResolution
 	UnitCredits       int64
 	Quantity          int64
 	TotalCredits      int64
@@ -85,7 +87,7 @@ func NewService(quoter Quoter, creditService CreditService) *Service {
 	return &Service{quoter: quoter, credits: creditService}
 }
 
-func AIImageRequest(feature string, quantity int64) (Request, error) {
+func AIImageRequest(feature, rawResolution string, quantity int64) (Request, error) {
 	canonicalFeature, ok := workflow.ParseAIImageFeatureSlug(feature)
 	if !ok {
 		return Request{}, ErrUnsupportedProduct
@@ -93,7 +95,15 @@ func AIImageRequest(feature string, quantity int64) (Request, error) {
 	if _, err := workflow.ParseRequestedOutputCount(int(quantity)); err != nil {
 		return Request{}, err
 	}
-	return Request{Feature: canonicalFeature, Quantity: quantity}, nil
+	resolution, err := billing.NormalizeOutputResolution(rawResolution)
+	if rawResolution == "" {
+		resolution = billing.OutputResolution1K
+		err = nil
+	}
+	if err != nil {
+		return Request{}, err
+	}
+	return Request{Feature: canonicalFeature, OutputResolution: resolution, Quantity: quantity}, nil
 }
 
 // RequiresBilling identifies task products whose terminal transition must
@@ -115,7 +125,7 @@ func RequestFingerprint(request Request) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	digest := sha256.Sum256([]byte(string(sku) + "\x00" + strconv.FormatInt(request.Quantity, 10)))
+	digest := sha256.Sum256([]byte(string(sku) + "\x00" + string(request.OutputResolution) + "\x00" + strconv.FormatInt(request.Quantity, 10)))
 	return hex.EncodeToString(digest[:]), nil
 }
 
@@ -126,6 +136,9 @@ func validateRequest(request Request) (billing.SKU, error) {
 	}
 	if request.Quantity <= 0 {
 		return "", billing.ErrInvalidQuantity
+	}
+	if _, err := billing.NormalizeOutputResolution(string(request.OutputResolution)); err != nil {
+		return "", err
 	}
 	return sku, nil
 }
@@ -138,7 +151,7 @@ func (s *Service) Readiness(ctx context.Context, userID int64, request Request) 
 	if err != nil {
 		return Readiness{}, err
 	}
-	quote, err := s.quoter.Quote(ctx, string(sku), request.Quantity)
+	quote, err := s.quoter.QuoteAtResolution(ctx, string(sku), request.OutputResolution, request.Quantity)
 	if err != nil {
 		return Readiness{}, fmt.Errorf("%w: %w", ErrPricingUnavailable, err)
 	}
@@ -163,7 +176,7 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, taskID string, 
 	if err != nil {
 		return Snapshot{}, err
 	}
-	quote, err := s.quoter.QuoteInTx(ctx, tx, string(sku), request.Quantity)
+	quote, err := s.quoter.QuoteAtResolutionInTx(ctx, tx, string(sku), request.OutputResolution, request.Quantity)
 	if err != nil {
 		return Snapshot{}, fmt.Errorf("%w: %w", ErrPricingUnavailable, err)
 	}
@@ -171,7 +184,8 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, taskID string, 
 	snapshot := Snapshot{
 		TaskID: taskID, UserID: userID, Feature: request.Feature,
 		SKU: quote.SKU, DisplayName: quote.DisplayName, PriceVersionID: quote.PriceVersionID, PriceVersion: quote.PriceVersion,
-		UnitCredits: quote.UnitCredits, Quantity: quote.Quantity, TotalCredits: quote.TotalCredits, QuotedAt: quote.QuotedAt,
+		OutputResolution: quote.OutputResolution,
+		UnitCredits:      quote.UnitCredits, Quantity: quote.Quantity, TotalCredits: quote.TotalCredits, QuotedAt: quote.QuotedAt,
 	}
 	state := SettlementStateFree
 	settledAt := any(quote.QuotedAt)
@@ -204,10 +218,10 @@ func (s *Service) HoldAndPersist(ctx context.Context, tx pgx.Tx, taskID string, 
 	if _, err := tx.Exec(ctx, `
 INSERT INTO task_billing_snapshots (
   task_id, user_id, feature_slug, sku, display_name, price_version_id, price_version,
-  unit_credits, quantity, total_credits, quoted_at, hold_transaction_id
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+  output_resolution, unit_credits, quantity, total_credits, quoted_at, hold_transaction_id
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 		snapshot.TaskID, snapshot.UserID, snapshot.Feature, snapshot.SKU,
-		snapshot.DisplayName, snapshot.PriceVersionID, snapshot.PriceVersion, snapshot.UnitCredits, snapshot.Quantity,
+		snapshot.DisplayName, snapshot.PriceVersionID, snapshot.PriceVersion, snapshot.OutputResolution, snapshot.UnitCredits, snapshot.Quantity,
 		snapshot.TotalCredits, snapshot.QuotedAt, holdTransactionID,
 	); err != nil {
 		return Snapshot{}, fmt.Errorf("persist task billing snapshot: %w", err)

@@ -5,12 +5,14 @@ import dbprivileges "ideaboard/api/internal/platform/database/privileges"
 var billingTableNames = []string{
 	"billing_skus",
 	"billing_price_versions",
+	"billing_current_prices",
 }
 
 var billingNoDirectAccessTableNames = []string{"billing_admin_actions"}
 
 var billingCommandFunctionSignatures = []string{
 	"publish_billing_price(TEXT, TEXT, TEXT, BIGINT, BIGINT)",
+	"publish_billing_prices(TEXT, TEXT, TEXT, JSONB, BIGINT)",
 	"set_billing_item_availability(TEXT, BOOLEAN, BIGINT)",
 	"delete_archived_billing_item(TEXT, BIGINT)",
 }

@@ -42,7 +42,7 @@ func TestAIImageWorkflowBillingContractUsesCurrentProviderPoolAndConvergesFacts(
 	creditService := credits.NewService(pool)
 	billingService := billing.NewService(pool)
 	taskBilling := taskbilling.NewService(billingService, creditService)
-	billingRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugPromptGeneration, 1)
+	billingRequest, err := taskbilling.AIImageRequest(workflow.FeatureSlugPromptGeneration, "1k", 1)
 	if err != nil {
 		t.Fatal(err)
 	}

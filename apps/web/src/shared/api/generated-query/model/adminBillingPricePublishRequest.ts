@@ -4,11 +4,8 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { AdminBillingPricePublishRequestPrices } from './adminBillingPricePublishRequestPrices'
 
 export interface AdminBillingPricePublishRequest {
-  /**
-   * @minimum 0
-   * @maximum 9000000000000000
-   */
-  unit_credits: number
+  prices: AdminBillingPricePublishRequestPrices
 }

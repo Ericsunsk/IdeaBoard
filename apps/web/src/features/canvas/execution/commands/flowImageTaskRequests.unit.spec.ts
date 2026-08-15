@@ -57,6 +57,17 @@ describe('flowImageTaskRequests', () => {
         },
       },
     })
+    expect(
+      buildImageActionReadinessRequest(IMAGE_NODE_ACTION.styleVariation, {
+        outputCount: 4,
+        outputResolution: '4k',
+      }),
+    ).toMatchObject({
+      params: {
+        output_count: 4,
+        output_resolution: '4k',
+      },
+    })
   })
 
   it('builds prompt-generation requests with output count independent from ordered refs', () => {

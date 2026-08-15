@@ -19,6 +19,7 @@ describe('provider config payload mapping', () => {
         providerEndpointId: 7,
         name: 'Google APIKey A',
         modelValues: ['gemini-2.5-flash'],
+        modelCapabilities: {},
         secret: 'sk-test',
         maxConcurrent: 4,
         timeoutSeconds: 90,
@@ -53,6 +54,7 @@ describe('provider config payload mapping', () => {
         providerEndpointId: 7,
         name: 'Google APIKey B',
         modelValues: ['gemini-2.5-flash', 'imagen-4'],
+        modelCapabilities: {},
         secret: '',
         maxConcurrent: 8,
         timeoutSeconds: 180,
@@ -195,6 +197,8 @@ function makeModel(
     weight: 1,
     maxConcurrent: undefined,
     sortOrder: 0,
+    supports2K: false,
+    supports4K: false,
     ...overrides,
   }
 }

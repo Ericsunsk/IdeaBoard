@@ -4,8 +4,8 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { BillableItemCatalogCardCurrentPrices } from './billableItemCatalogCardCurrentPrices'
 import type { BillableItemStatus } from './billableItemStatus'
-import type { BillingPrice } from './billingPrice'
 import type { BillingSKUCode } from './billingSKUCode'
 
 export interface BillableItemCatalogCard {
@@ -30,6 +30,6 @@ export interface BillableItemCatalogCard {
   /** @minimum 0 */
   sort_order: number
   status: BillableItemStatus
-  current_price?: BillingPrice
+  current_prices?: BillableItemCatalogCardCurrentPrices
   updated_at?: string
 }

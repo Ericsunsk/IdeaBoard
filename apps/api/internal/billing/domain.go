@@ -12,16 +12,45 @@ const (
 	MaxQuoteCredits = int64(9_000_000_000_000_000)
 )
 
+type OutputResolution string
+
+const (
+	OutputResolution1K OutputResolution = "1k"
+	OutputResolution2K OutputResolution = "2k"
+	OutputResolution4K OutputResolution = "4k"
+)
+
+var outputResolutions = [...]OutputResolution{
+	OutputResolution1K,
+	OutputResolution2K,
+	OutputResolution4K,
+}
+
+func NormalizeOutputResolution(raw string) (OutputResolution, error) {
+	resolution := OutputResolution(strings.ToLower(strings.TrimSpace(raw)))
+	for _, supported := range outputResolutions {
+		if resolution == supported {
+			return resolution, nil
+		}
+	}
+	return "", ErrInvalidOutputResolution
+}
+
+func SupportedOutputResolutions() []OutputResolution {
+	return append([]OutputResolution(nil), outputResolutions[:]...)
+}
+
 var (
-	ErrInvalidSKU          = errors.New("invalid billing SKU")
-	ErrInvalidQuantity     = errors.New("quantity must be a positive integer")
-	ErrQuoteTotalExceeded  = errors.New("quote total exceeds allowed Credits")
-	ErrInvalidCatalogEntry = errors.New("invalid billing catalog entry")
-	ErrSKUNotFound         = errors.New("billing SKU not found")
-	ErrPricingUnavailable  = errors.New("billing price is unavailable")
-	ErrItemNotArchived     = errors.New("billing item is not archived")
-	ErrArchivedItemInUse   = errors.New("archived billing item has durable references")
-	ErrServiceUnavailable  = errors.New("billing service is unavailable")
+	ErrInvalidSKU              = errors.New("invalid billing SKU")
+	ErrInvalidQuantity         = errors.New("quantity must be a positive integer")
+	ErrQuoteTotalExceeded      = errors.New("quote total exceeds allowed Credits")
+	ErrInvalidCatalogEntry     = errors.New("invalid billing catalog entry")
+	ErrInvalidOutputResolution = errors.New("invalid output resolution")
+	ErrSKUNotFound             = errors.New("billing SKU not found")
+	ErrPricingUnavailable      = errors.New("billing price is unavailable")
+	ErrItemNotArchived         = errors.New("billing item is not archived")
+	ErrArchivedItemInUse       = errors.New("archived billing item has durable references")
+	ErrServiceUnavailable      = errors.New("billing service is unavailable")
 )
 
 // A SKU is globally unique as <namespace>:<local-key>. Both components use
@@ -40,28 +69,34 @@ func CanonicalizeSKU(raw string) (SKU, error) {
 }
 
 type CatalogItem struct {
-	SKU                   SKU        `json:"sku"`
-	DisplayName           string     `json:"display_name"`
-	Description           string     `json:"description"`
-	Enabled               bool       `json:"enabled"`
-	CurrentPriceVersionID *int64     `json:"current_price_version_id,omitempty"`
-	CreatedAt             time.Time  `json:"created_at"`
-	UpdatedAt             time.Time  `json:"updated_at"`
-	CurrentPrice          *PriceInfo `json:"current_price,omitempty"`
+	SKU           SKU                            `json:"sku"`
+	DisplayName   string                         `json:"display_name"`
+	Description   string                         `json:"description"`
+	Enabled       bool                           `json:"enabled"`
+	CreatedAt     time.Time                      `json:"created_at"`
+	UpdatedAt     time.Time                      `json:"updated_at"`
+	CurrentPrices map[OutputResolution]PriceInfo `json:"current_prices,omitempty"`
 }
 
 type PriceInfo struct {
-	PriceVersionID int64     `json:"price_version_id"`
-	Version        int64     `json:"version"`
-	UnitCredits    int64     `json:"unit_credits"`
-	CreatedBy      int64     `json:"-"`
-	CreatedAt      time.Time `json:"created_at"`
+	PriceVersionID   int64            `json:"price_version_id"`
+	Version          int64            `json:"version"`
+	OutputResolution OutputResolution `json:"output_resolution"`
+	UnitCredits      int64            `json:"unit_credits"`
+	CreatedBy        int64            `json:"-"`
+	CreatedAt        time.Time        `json:"created_at"`
 }
 
 type PublishPriceInput struct {
 	Definition  BillableItemDefinition
 	UnitCredits int64
 	ActorID     int64
+}
+
+type PublishPricesInput struct {
+	Definition BillableItemDefinition
+	Prices     map[OutputResolution]int64
+	ActorID    int64
 }
 
 type AvailabilityInfo struct {
@@ -77,12 +112,13 @@ type ArchivedItemDeleteResult struct {
 // PriceSnapshot is the immutable value object later Billing Commands persist.
 // It contains no Provider Account or routing information.
 type PriceSnapshot struct {
-	SKU            SKU       `json:"sku"`
-	DisplayName    string    `json:"display_name"`
-	PriceVersionID int64     `json:"price_version_id"`
-	PriceVersion   int64     `json:"price_version"`
-	UnitCredits    int64     `json:"unit_credits"`
-	QuotedAt       time.Time `json:"quoted_at"`
+	SKU              SKU              `json:"sku"`
+	DisplayName      string           `json:"display_name"`
+	PriceVersionID   int64            `json:"price_version_id"`
+	PriceVersion     int64            `json:"price_version"`
+	OutputResolution OutputResolution `json:"output_resolution"`
+	UnitCredits      int64            `json:"unit_credits"`
+	QuotedAt         time.Time        `json:"quoted_at"`
 }
 
 func (snapshot PriceSnapshot) Total(quantity int64) (int64, error) {

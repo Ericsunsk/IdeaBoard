@@ -163,12 +163,14 @@ describe('provider config workspace facade', () => {
         providerEndpointId: 1,
         name: 'OpenAI Account',
         modelValues: ['gpt-4o', 'imagen-4'],
+        modelCapabilities: {},
         secret: 'sk-new',
         maxConcurrent: 5,
         timeoutSeconds: 180,
       },
       selectedProviderEndpoint,
       modelValues: ['gpt-4o', 'imagen-4'],
+      modelCapabilities: {},
       secret: 'sk-new',
       afterSaved,
     })
@@ -285,7 +287,7 @@ describe('provider config workspace facade', () => {
     expect(mockResource.updateAccountRecord).not.toHaveBeenCalled()
     expect(feedback.modelStatusChanged).toHaveBeenCalledWith(false)
     expect(workspace.getAccountModelRows(workspace.cards.items.value[0]!.accounts[0]!)).toEqual([
-      { name: 'gpt-4o', disabled: true },
+      { name: 'gpt-4o', disabled: true, supports2K: false, supports4K: false },
     ])
   })
 
@@ -470,6 +472,8 @@ function makeModel(overrides: Partial<ProviderAccountRecord['models'][number]> =
     weight: 1,
     maxConcurrent: undefined,
     sortOrder: 0,
+    supports2K: false,
+    supports4K: false,
     ...overrides,
   }
 }

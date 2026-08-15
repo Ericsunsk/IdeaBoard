@@ -50,6 +50,7 @@ import {
 } from '../../composables/useImageCanvasExtendOverlay'
 import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
 import { useCanvasBillingQuote } from '../../execution'
+import { buildCanvasExtendReadinessRequest } from '../../execution/commands/flowImageTaskRequests'
 
 const props = defineProps<{
   overlayStyle: Record<string, string>
@@ -70,7 +71,15 @@ const emit = defineEmits<{
 
 const promptDraft = ref('')
 const anchors = CANVAS_EXTEND_DRAG_ANCHORS
-const billingQuote = useCanvasBillingQuote(() => WORKFLOW_FEATURE.imageExtend)
+const billingQuote = useCanvasBillingQuote(
+  () => WORKFLOW_FEATURE.imageExtend,
+  () => true,
+  () =>
+    buildCanvasExtendReadinessRequest({
+      outputCount: props.outputCount,
+      outputResolution: props.outputResolution,
+    }),
+)
 const handleStyle = computed(() => {
   const radius = Number.isFinite(props.handleRadius)
     ? Math.max(2, Math.round(props.handleRadius))

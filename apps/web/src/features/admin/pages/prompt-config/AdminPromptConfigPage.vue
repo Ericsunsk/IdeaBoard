@@ -24,10 +24,6 @@
               <Tag :value="`${group.items.length} 项配置`" severity="secondary" rounded />
             </div>
 
-            <p class="m-0 text-admin-caption leading-5 text-admin-text-2">
-              {{ group.description }}
-            </p>
-
             <div class="flex flex-wrap gap-2">
               <Tag :value="`${getGroupVariableCount(group)} 个变量`" severity="secondary" rounded />
               <Tag
@@ -85,9 +81,6 @@
           <h2 :class="adminDialogTitleClass">
             {{ activeGroup ? `编辑 ${activeGroup.title} 节点提示词` : '' }}
           </h2>
-          <p v-if="activeGroup" class="m-0 mt-2 text-admin-caption leading-5 text-admin-text-2">
-            {{ activeGroup.description }}
-          </p>
         </div>
 
         <div v-if="activeGroup" class="flex flex-wrap gap-2">

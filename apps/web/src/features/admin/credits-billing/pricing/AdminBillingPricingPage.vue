@@ -53,7 +53,7 @@ import BillingFeaturePriceCard from './BillingFeaturePriceCard.vue'
 import BillingPriceDialog from './BillingPriceDialog.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { createAdminBillableCatalogResource } from './billableCatalogResource'
-import type { AdminBillableItemCard } from './billableCatalogTypes'
+import type { AdminBillableItemCard, OutputResolution } from './billableCatalogTypes'
 
 const resource = createAdminBillableCatalogResource()
 const items = ref<AdminBillableItemCard[]>([])
@@ -113,15 +113,16 @@ async function deleteArchived(item: AdminBillableItemCard) {
   }
 }
 
-async function publishPrice(unitCredits: number) {
+async function publishPrice(prices: Record<OutputResolution, number | undefined>) {
   const item = selectedItem.value
   if (!item || publishPending.value) return
   publishPending.value = true
   publishError.value = ''
   try {
-    const price = await resource.publishPrice(item.sku, unitCredits)
-    item.currentPrice = price
-    item.updatedAt = price.createdAt
+    const published = await resource.publishPrices(item.sku, prices)
+    item.currentPrices = published
+    const latest = Object.values(published).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+    if (latest) item.updatedAt = latest.createdAt
     if (item.status === 'unpriced') item.status = 'active'
     priceDialogVisible.value = false
     toast.success('价格已发布')

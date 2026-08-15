@@ -50,7 +50,6 @@ describe('AdminBillingPricingPage', () => {
     expect(screen.getByText('抠图')).toBeVisible()
     expect(screen.getByText('HD')).toBeVisible()
     expect(screen.getAllByText('Image 节点')).toHaveLength(3)
-    expect(screen.getAllByText('图片是主输入；用户文字通过 {{user_prompt}} 作为辅助要求。')).toHaveLength(3)
     expect(screen.getByText('已移除功能')).toBeVisible()
     expect(screen.getByText('未定价')).toBeVisible()
     expect(screen.getByText('生效中')).toBeVisible()
@@ -102,16 +101,11 @@ describe('AdminBillingPricingPage', () => {
       http.post('/api/admin/billing/catalog/:sku/prices', async ({ request, params }) => {
         publishRequests += 1
         expect(params.sku).toBe('ai-image:local-inpaint')
-        await expect(request.json()).resolves.toEqual({ unit_credits: 0 })
+        await expect(request.json()).resolves.toEqual({ prices: { '1k': 0 } })
         return HttpResponse.json({
           code: 0,
           msg: 'ok',
-          data: {
-            price_version_id: 8,
-            version: 1,
-            unit_credits: 0,
-            created_at: '2026-07-16T09:00:00Z',
-          },
+          data: { prices: { '1k': { output_resolution: '1k', price_version_id: 8, version: 1, unit_credits: 0, created_at: '2026-07-16T09:00:00Z' } } },
         })
       }),
     )
@@ -119,8 +113,8 @@ describe('AdminBillingPricingPage', () => {
     const { user } = renderPricingPage()
     await user.click(await screen.findByRole('button', { name: '设置价格' }))
     expect(screen.getByText('创建新版本，历史版本不变')).toBeVisible()
-    expect(screen.getByText('待输入')).toBeVisible()
-    const priceInput = screen.getByRole('spinbutton', { name: '价格' })
+    expect(screen.getAllByText(/未配置/).length).toBeGreaterThan(0)
+    const priceInput = screen.getByRole('spinbutton', { name: '1K' })
     await user.type(priceInput, '0')
     expect(priceInput).toHaveValue('0 Ideas')
     await user.click(screen.getByRole('button', { name: '发布价格' }))
@@ -142,11 +136,11 @@ describe('AdminBillingPricingPage', () => {
     await user.click((await screen.findAllByRole('button', { name: '调整价格' }))[0])
 
     const dialog = screen.getByRole('dialog')
-    expect(within(dialog).getByText('当前价格')).toBeVisible()
-    expect(within(dialog).getByText('新价格')).toBeVisible()
-    expect(within(dialog).getByText('差值')).toBeVisible()
-    expect(within(dialog).getAllByText('1 Idea')).toHaveLength(2)
-    expect(within(dialog).getByText('0 Ideas')).toBeVisible()
+    expect(within(dialog).getAllByText('1K').length).toBeGreaterThan(0)
+    expect(within(dialog).getAllByText('2K').length).toBeGreaterThan(0)
+    expect(within(dialog).getAllByText('4K').length).toBeGreaterThan(0)
+    expect(within(dialog).getByText('1 Idea → 1 Idea')).toBeVisible()
+    expect(within(dialog).getAllByText('未设置 → 未配置')).toHaveLength(2)
     expect(within(dialog).getByText('创建新版本，历史版本不变')).toBeVisible()
   })
 
@@ -201,19 +195,14 @@ describe('AdminBillingPricingPage', () => {
         return HttpResponse.json({
           code: 0,
           msg: 'ok',
-          data: {
-            price_version_id: 9,
-            version: 1,
-            unit_credits: 3,
-            created_at: '2026-07-16T09:00:00Z',
-          },
+          data: { prices: { '1k': { output_resolution: '1k', price_version_id: 9, version: 1, unit_credits: 3, created_at: '2026-07-16T09:00:00Z' } } },
         })
       }),
     )
 
     const { user } = renderPricingPage()
     await user.click(await screen.findByRole('button', { name: '设置价格' }))
-    await user.type(screen.getByRole('spinbutton', { name: '价格' }), '3')
+    await user.type(screen.getByRole('spinbutton', { name: '1K' }), '3')
     await user.click(screen.getByRole('button', { name: '发布价格' }))
 
     expect((await screen.findAllByText('publish unavailable')).length).toBeGreaterThan(0)
@@ -239,12 +228,7 @@ describe('AdminBillingPricingPage', () => {
         return HttpResponse.json({
           code: 0,
           msg: 'ok',
-          data: {
-            price_version_id: 10,
-            version: 1,
-            unit_credits: 5,
-            created_at: '2026-07-16T09:00:00Z',
-          },
+          data: { prices: { '1k': { output_resolution: '1k', price_version_id: 10, version: 1, unit_credits: 5, created_at: '2026-07-16T09:00:00Z' } } },
         })
       }),
     )
@@ -256,7 +240,7 @@ describe('AdminBillingPricingPage', () => {
     expect(screen.getByText('请输入价格')).toBeVisible()
     expect(publishRequests).toBe(0)
 
-    await user.type(screen.getByRole('spinbutton', { name: /价格/ }), '5')
+    await user.type(screen.getByRole('spinbutton', { name: /1K/ }), '5')
     await user.click(publishButton)
     expect(publishButton).toBeDisabled()
     await user.click(publishButton)
@@ -320,6 +304,7 @@ function renderPricingPage() {
 
 function makeCatalogItems() {
   const price = {
+    output_resolution: '1k' as const,
     price_version_id: 1,
     version: 1,
     unit_credits: 1,
@@ -331,7 +316,6 @@ function makeCatalogItems() {
       namespace: 'ai-image',
       product_kind: 'workflow-feature',
       display_name: '局部重绘',
-      description: '仅重绘图片选定区域。',
       sort_order: 10,
       status: 'unpriced',
     },
@@ -340,30 +324,27 @@ function makeCatalogItems() {
       namespace: 'ai-image',
       product_kind: 'workflow-feature',
       display_name: '抠图',
-      description: '识别主体并移除图片背景。',
       sort_order: 20,
       status: 'active',
-      current_price: price,
+      current_prices: { '1k': price },
     },
     {
       sku: 'ai-image:hd-upscale',
       namespace: 'ai-image',
       product_kind: 'workflow-feature',
       display_name: 'HD',
-      description: '提升图片分辨率与细节。',
       sort_order: 30,
       status: 'disabled',
-      current_price: price,
+      current_prices: { '1k': price },
     },
     {
       sku: 'legacy:removed',
       namespace: 'legacy',
       product_kind: 'legacy',
       display_name: '已移除功能',
-      description: '已从 Registry 移除。',
       sort_order: 0,
       status: 'archived',
-      current_price: price,
+      current_prices: { '1k': price },
     },
   ]
 }

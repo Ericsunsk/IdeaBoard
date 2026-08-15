@@ -13,12 +13,6 @@ SELECT id, api_type, name, base_url, status, created_at, updated_at
 FROM provider_endpoints
 ORDER BY id ASC;
 
--- name: CountAccountsByProviderEndpointID :one
-SELECT COUNT(*)
-FROM api_accounts
-WHERE provider_endpoint_id = sqlc.arg(provider_endpoint_id)
-  AND deleted_at IS NULL;
-
 -- name: UpdateProviderEndpoint :execrows
 UPDATE provider_endpoints
 SET api_type = sqlc.arg(api_type),

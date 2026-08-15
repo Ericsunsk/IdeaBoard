@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
@@ -411,7 +412,7 @@ func canonicalRequestForTest(task *tasks.Task) CanonicalRequest {
 	var billingRequest *taskbilling.Request
 	if task.BillingRequest != nil {
 		billingRequest = &taskbilling.Request{
-			Feature: task.BillingRequest.Feature, Quantity: task.BillingRequest.Quantity,
+			Feature: task.BillingRequest.Feature, OutputResolution: billing.OutputResolution(task.BillingRequest.OutputResolution), Quantity: task.BillingRequest.Quantity,
 		}
 	}
 	request, err := NewCanonicalRequest(CanonicalRequestInput{

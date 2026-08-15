@@ -64,13 +64,30 @@ export type FusionTaskRequestInput = {
   outputResolution?: OutputResolution
 }
 
-function buildDirectActionReadinessRequest(action: ImageDirectTaskAction): SubmitTaskData {
+type ImageActionReadinessOptions = {
+  outputCount?: number
+  outputResolution?: OutputResolution
+}
+
+function buildOutputBillingParams(options: ImageActionReadinessOptions = {}) {
+  return {
+    output_count: assertRequestedOutputCount(options.outputCount ?? 1),
+    output_resolution: options.outputResolution ?? '1k',
+  }
+}
+
+function buildDirectActionReadinessRequest(
+  action: ImageDirectTaskAction,
+  options: ImageActionReadinessOptions = {},
+): SubmitTaskData {
   const execution = requireImageActionExecution(action)
   const strengthConfig = execution.strength
-  const params =
-    strengthConfig?.paramPath === 'variation.strength'
+  const params = {
+    ...buildOutputBillingParams(options),
+    ...(strengthConfig?.paramPath === 'variation.strength'
       ? { variation: { strength: strengthConfig.defaultValue } }
-      : undefined
+      : {}),
+  }
   return buildExecutionTaskRequest({
     prompt: '',
     feature: execution.feature,
@@ -78,20 +95,25 @@ function buildDirectActionReadinessRequest(action: ImageDirectTaskAction): Submi
   })
 }
 
-export function buildLocalInpaintReadinessRequest(): SubmitTaskData {
+export function buildLocalInpaintReadinessRequest(
+  options: ImageActionReadinessOptions = {},
+): SubmitTaskData {
   return buildExecutionTaskRequest({
     prompt: '',
     feature: EXECUTION_LOCAL_INPAINT_META.feature,
-    params: { output_count: 1 },
+    params: buildOutputBillingParams(options),
   })
 }
 
-export function buildCanvasExtendReadinessRequest(): SubmitTaskData {
+export function buildCanvasExtendReadinessRequest(
+  options: ImageActionReadinessOptions = {},
+): SubmitTaskData {
   const execution = requireImageActionExecution(IMAGE_CANVAS_EXTEND_ACTION)
   return buildExecutionTaskRequest({
     prompt: '',
     feature: execution.feature,
     params: {
+      ...buildOutputBillingParams(options),
       extend: {
         top_percent: 0,
         right_percent: 1,
@@ -102,13 +124,16 @@ export function buildCanvasExtendReadinessRequest(): SubmitTaskData {
   })
 }
 
-function buildHdUpscaleReadinessRequest(): SubmitTaskData {
+function buildHdUpscaleReadinessRequest(
+  options: ImageActionReadinessOptions = {},
+): SubmitTaskData {
   const execution = requireImageActionExecution(IMAGE_HD_UPSCALE_ACTION)
   const detailStrength = execution.strength?.defaultValue ?? DEFAULT_IMAGE_ACTION_STRENGTH
   return buildExecutionTaskRequest({
     prompt: '',
     feature: execution.feature,
     params: {
+      ...buildOutputBillingParams(options),
       hd: {
         detail_strength: detailStrength,
       },
@@ -116,10 +141,13 @@ function buildHdUpscaleReadinessRequest(): SubmitTaskData {
   })
 }
 
-export function buildImageActionReadinessRequest(action: ImageExecutionAction): SubmitTaskData {
-  if (action === IMAGE_CANVAS_EXTEND_ACTION) return buildCanvasExtendReadinessRequest()
-  if (action === IMAGE_HD_UPSCALE_ACTION) return buildHdUpscaleReadinessRequest()
-  if (isImageDirectTaskAction(action)) return buildDirectActionReadinessRequest(action)
+export function buildImageActionReadinessRequest(
+  action: ImageExecutionAction,
+  options: ImageActionReadinessOptions = {},
+): SubmitTaskData {
+  if (action === IMAGE_CANVAS_EXTEND_ACTION) return buildCanvasExtendReadinessRequest(options)
+  if (action === IMAGE_HD_UPSCALE_ACTION) return buildHdUpscaleReadinessRequest(options)
+  if (isImageDirectTaskAction(action)) return buildDirectActionReadinessRequest(action, options)
   throw new Error(`Unsupported image execution action ${action}`)
 }
 

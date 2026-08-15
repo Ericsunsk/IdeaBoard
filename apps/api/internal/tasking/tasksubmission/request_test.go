@@ -13,8 +13,9 @@ func TestNewCanonicalRequestRejectsMismatchedBillingProduct(t *testing.T) {
 		Feature:        "style-variation",
 		ClientActionID: "action-1",
 		BillingRequest: &taskbilling.Request{
-			Feature:  "prompt-generation",
-			Quantity: 1,
+			Feature:          "prompt-generation",
+			OutputResolution: "1k",
+			Quantity:         1,
 		},
 	})
 	if err == nil {
@@ -56,7 +57,7 @@ func TestNewCanonicalRequestRejectsMissingBillingForBillableWorkflow(t *testing.
 }
 
 func TestCanonicalRequestOwnsBillingFacts(t *testing.T) {
-	inputBilling := &taskbilling.Request{Feature: "style-variation", Quantity: 1}
+	inputBilling := &taskbilling.Request{Feature: "style-variation", OutputResolution: "1k", Quantity: 1}
 	request, err := NewCanonicalRequest(CanonicalRequestInput{
 		UserID:         42,
 		Feature:        inputBilling.Feature,
@@ -79,7 +80,7 @@ func TestNewCanonicalRequestRejectsBillingQuantityMismatchedWithGeneration(t *te
 	count := 2
 	_, err := NewCanonicalRequest(CanonicalRequestInput{
 		UserID: 42, Feature: "style-variation", ClientActionID: "action-1",
-		BillingRequest: &taskbilling.Request{Feature: "style-variation", Quantity: 1},
+		BillingRequest: &taskbilling.Request{Feature: "style-variation", OutputResolution: "1k", Quantity: 1},
 		Generation: &tasks.GenerationRequestSnapshot{
 			Feature: "style-variation", Primitive: "text-to-image", TemplateFingerprint: "fp", RequestedOutputCount: count,
 		},

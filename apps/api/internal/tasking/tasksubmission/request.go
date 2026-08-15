@@ -206,7 +206,7 @@ func (r CanonicalRequest) materialize(taskID string, createdAt time.Time) (*task
 	}
 	if r.billingRequest != nil {
 		task.BillingRequest = &tasks.TaskBillingRequest{
-			Feature: r.billingRequest.Feature, Quantity: r.billingRequest.Quantity,
+			Feature: r.billingRequest.Feature, OutputResolution: string(r.billingRequest.OutputResolution), Quantity: r.billingRequest.Quantity,
 		}
 	}
 	payload := &tasks.TaskPayload{

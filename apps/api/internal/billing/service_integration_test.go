@@ -66,7 +66,7 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListCatalogFacts() error = %v", err)
 	}
-	if len(catalog) != 1 || catalog[0].CurrentPrice == nil || catalog[0].CurrentPrice.Version != 2 {
+	if len(catalog) != 1 || catalog[0].CurrentPrices[OutputResolution1K].Version != 2 {
 		t.Fatalf("ListCatalogFacts() = %+v", catalog)
 	}
 
@@ -163,7 +163,7 @@ func TestPublishingNewPricePreservesDisabledCatalogState(t *testing.T) {
 		t.Fatalf("ListCatalogFacts()=%+v", items)
 	}
 	item := items[0]
-	if item.Enabled || item.CurrentPrice == nil || item.CurrentPrice.PriceVersionID != price.PriceVersionID || price.Version != 2 {
+	if item.Enabled || item.CurrentPrices[OutputResolution1K].PriceVersionID != price.PriceVersionID || price.Version != 2 {
 		t.Fatalf("disabled repricing item=%+v price=%+v", item, price)
 	}
 	if _, err := service.Quote(t.Context(), string(definition.SKU), 1); !errors.Is(err, ErrPricingUnavailable) {
@@ -184,14 +184,14 @@ func TestCatalogAvailabilityTransitionsRequirePriceAndPersistAudit(t *testing.T)
 	if _, err := catalog.SetAvailability(t.Context(), string(definition.SKU), true, 7); !errors.Is(err, ErrPricingUnavailable) {
 		t.Fatalf("enable unpriced error=%v, want ErrPricingUnavailable", err)
 	}
-	if _, err := catalog.PublishPrice(t.Context(), string(definition.SKU), 10, 7); err != nil {
+	if _, err := catalog.PublishPrices(t.Context(), string(definition.SKU), map[OutputResolution]int64{OutputResolution1K: 10}, 7); err != nil {
 		t.Fatal(err)
 	}
 	disabled, err := catalog.SetAvailability(t.Context(), string(definition.SKU), false, 8)
 	if err != nil || disabled.Status != BillableItemStatusDisabled {
 		t.Fatalf("disable=%+v error=%v", disabled, err)
 	}
-	if _, err := catalog.Quote(t.Context(), string(definition.SKU), 1); !errors.Is(err, ErrPricingUnavailable) {
+	if _, err := catalog.QuoteAtResolution(t.Context(), string(definition.SKU), OutputResolution1K, 1); !errors.Is(err, ErrPricingUnavailable) {
 		t.Fatalf("disabled quote error=%v, want ErrPricingUnavailable", err)
 	}
 	unchanged, err := catalog.SetAvailability(t.Context(), string(definition.SKU), false, 9)
