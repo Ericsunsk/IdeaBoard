@@ -25,7 +25,6 @@ describe('workflowFeatureRegistry projections', () => {
         slugs: [
           WORKFLOW_FEATURE.sketchToImage,
           WORKFLOW_FEATURE.styleVariation,
-          WORKFLOW_FEATURE.removeBg,
           WORKFLOW_FEATURE.localInpaint,
           WORKFLOW_FEATURE.hdUpscale,
           WORKFLOW_FEATURE.imageExtend,
@@ -68,9 +67,7 @@ describe('workflowFeatureRegistry projections', () => {
       { key: '{{user_prompt}}', tone: 'prompt' },
       { key: '{{fusion_input_weights}}', tone: 'control' },
     ])
-    expect(getWorkflowFeaturePromptVariables(WORKFLOW_FEATURE.removeBg)).toEqual([
-      { key: '{{user_prompt}}', tone: 'prompt' },
-    ])
+    expect(getWorkflowFeaturePromptVariables(WORKFLOW_FEATURE.removeBg)).toEqual([])
   })
 
   it('exposes user_prompt for every configurable Image feature', () => {

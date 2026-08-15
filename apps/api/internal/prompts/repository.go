@@ -3,12 +3,15 @@ package prompts
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/workflow"
 )
+
+var ErrFeaturePromptUnsupported = errors.New("该功能不支持 System Prompt")
 
 type FeaturePromptRepository struct {
 	q *dbsqlc.Queries
@@ -33,6 +36,9 @@ func NewFeaturePromptRepository(db *sql.DB) *FeaturePromptRepository {
 // been configured. A missing prompt is valid runtime state.
 func (r *FeaturePromptRepository) GetRuntimeConfig(ctx context.Context, slug string) (FeaturePromptRuntimeConfig, error) {
 	config := FeaturePromptRuntimeConfig{UserPromptMergePolicy: DefaultFeaturePromptMergePolicy(slug)}
+	if !isPromptConfigurableFeature(slug) {
+		return config, nil
+	}
 	row, err := r.q.GetFeaturePrompt(ctx, slug)
 	if err != nil {
 		if database.IsNotFound(err) {
@@ -45,6 +51,9 @@ func (r *FeaturePromptRepository) GetRuntimeConfig(ctx context.Context, slug str
 }
 
 func (r *FeaturePromptRepository) GetConfig(ctx context.Context, slug string) (*FeaturePromptConfig, error) {
+	if !isPromptConfigurableFeature(slug) {
+		return nil, ErrFeaturePromptUnsupported
+	}
 	row, err := r.q.GetFeaturePrompt(ctx, slug)
 	if err != nil {
 		if database.IsNotFound(err) {
@@ -66,8 +75,11 @@ func (r *FeaturePromptRepository) ListConfigs(ctx context.Context) ([]FeaturePro
 	for _, row := range rows {
 		bySlug[row.FeatureSlug] = row
 	}
-	configs := make([]FeaturePromptConfig, 0, len(workflow.SupportedFeatureSlugs()))
+	configs := make([]FeaturePromptConfig, 0, len(workflow.SupportedFeatureSlugs())-1)
 	for _, slug := range workflow.SupportedFeatureSlugs() {
+		if !isPromptConfigurableFeature(slug) {
+			continue
+		}
 		if row, ok := bySlug[slug]; ok {
 			configs = append(configs, featurePromptConfigFromRow(row))
 			continue
@@ -78,6 +90,9 @@ func (r *FeaturePromptRepository) ListConfigs(ctx context.Context) ([]FeaturePro
 }
 
 func (r *FeaturePromptRepository) SaveConfig(ctx context.Context, slug, prompt string, updatedBy *int64) (*FeaturePromptConfig, error) {
+	if !isPromptConfigurableFeature(slug) {
+		return nil, ErrFeaturePromptUnsupported
+	}
 	updatedByValue := sql.NullInt64{}
 	if updatedBy != nil {
 		updatedByValue = sql.NullInt64{Int64: *updatedBy, Valid: true}
@@ -92,6 +107,10 @@ func (r *FeaturePromptRepository) SaveConfig(ctx context.Context, slug, prompt s
 	}
 	config := featurePromptConfigFromRow(row)
 	return &config, nil
+}
+
+func isPromptConfigurableFeature(slug string) bool {
+	return slug != workflow.FeatureSlugRemoveBg
 }
 
 func defaultFeaturePromptConfig(slug string) FeaturePromptConfig {

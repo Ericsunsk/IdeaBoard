@@ -119,7 +119,7 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
     groupKey: WORKFLOW_FEATURE_GROUP.image,
     imageActionLabel: '抠图',
     imageActionTitle: '抠图',
-    promptVariables: [{ key: '{{user_prompt}}', tone: 'prompt' }],
+    promptVariables: [],
   },
   {
     slug: WORKFLOW_FEATURE.promptGeneration,
@@ -189,7 +189,6 @@ const WORKFLOW_FEATURE_CONFIG_GROUP_DEFS = [
     slugs: [
       WORKFLOW_FEATURE.sketchToImage,
       WORKFLOW_FEATURE.styleVariation,
-      WORKFLOW_FEATURE.removeBg,
       WORKFLOW_FEATURE.localInpaint,
       WORKFLOW_FEATURE.hdUpscale,
       WORKFLOW_FEATURE.imageExtend,

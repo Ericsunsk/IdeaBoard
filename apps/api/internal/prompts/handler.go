@@ -37,6 +37,10 @@ func (h *FeaturePromptHandler) Get(c *gin.Context) {
 	}
 	config, err := h.promptRepo.GetConfig(c.Request.Context(), slug)
 	if err != nil {
+		if errors.Is(err, ErrFeaturePromptUnsupported) {
+			response.Error(c, 400, err.Error())
+			return
+		}
 		response.InternalError(c, 500, "获取失败", err)
 		return
 	}
@@ -70,6 +74,10 @@ func (h *FeaturePromptHandler) Save(c *gin.Context) {
 	updatedBy := identityPrincipal.UserID()
 	config, err := h.promptRepo.SaveConfig(c.Request.Context(), slug, *req.Prompt, &updatedBy)
 	if err != nil {
+		if errors.Is(err, ErrFeaturePromptUnsupported) {
+			response.Error(c, 400, err.Error())
+			return
+		}
 		response.InternalError(c, 500, "保存失败", err)
 		return
 	}
