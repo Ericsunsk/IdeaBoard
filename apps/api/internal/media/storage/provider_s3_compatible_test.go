@@ -3,6 +3,8 @@ package storage
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"testing"
 
 	"ideaboard/api/internal/platform/outbound"
@@ -30,6 +32,35 @@ type stubS3BucketExistenceChecker struct {
 	exists  bool
 	err     error
 	seenCtx context.Context
+}
+
+type stubS3CapabilityProbeClient struct {
+	listErr   error
+	putErr    error
+	getErr    error
+	deleteErr error
+	putKeys   []string
+	getKeys   []string
+	delKeys   []string
+}
+
+func (s *stubS3CapabilityProbeClient) ListBucket(context.Context, string, string) error {
+	return s.listErr
+}
+
+func (s *stubS3CapabilityProbeClient) PutObject(_ context.Context, _, objectName string) error {
+	s.putKeys = append(s.putKeys, objectName)
+	return s.putErr
+}
+
+func (s *stubS3CapabilityProbeClient) GetObject(_ context.Context, _, objectName string) error {
+	s.getKeys = append(s.getKeys, objectName)
+	return s.getErr
+}
+
+func (s *stubS3CapabilityProbeClient) DeleteObject(_ context.Context, _, objectName string) error {
+	s.delKeys = append(s.delKeys, objectName)
+	return s.deleteErr
 }
 
 func (s *stubS3BucketExistenceChecker) BucketExists(ctx context.Context, _ string) (bool, error) {
@@ -151,6 +182,79 @@ func TestEnsureS3BucketAccessible(t *testing.T) {
 			t.Fatalf("BucketExists ctx was not caller ctx")
 		}
 	})
+}
+
+func TestProbeS3Capabilities(t *testing.T) {
+	t.Run("accepts all capabilities and removes probe object", func(t *testing.T) {
+		client := &stubS3CapabilityProbeClient{}
+		service := NewS3CompatibleService()
+		if err := service.probeCapabilities(context.Background(), &S3CompatibleConfig{BucketName: "feng-assets"}, client); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(client.putKeys) != 1 || len(client.getKeys) != 1 || len(client.delKeys) != 2 {
+			t.Fatalf("probe calls = put:%d get:%d delete:%d, want put:1 get:1 delete:2", len(client.putKeys), len(client.getKeys), len(client.delKeys))
+		}
+	})
+
+	t.Run("reports missing permissions and cleans up probe object", func(t *testing.T) {
+		client := &stubS3CapabilityProbeClient{listErr: errors.New("access denied"), getErr: errors.New("access denied")}
+		service := NewS3CompatibleService()
+		cfg := &S3CompatibleConfig{BucketName: "feng-assets"}
+		err := service.probeCapabilities(context.Background(), cfg, client)
+		var capabilityErr *StorageCapabilityError
+		if !errors.As(err, &capabilityErr) {
+			t.Fatalf("error = %v, want StorageCapabilityError", err)
+		}
+		want := []StorageCapability{StorageCapabilityListBucket, StorageCapabilityGetObject}
+		if !slices.Equal(capabilityErr.Missing, want) {
+			t.Fatalf("missing = %#v, want %#v", capabilityErr.Missing, want)
+		}
+		if len(client.putKeys) != 1 || len(client.getKeys) != 1 || len(client.delKeys) != 2 {
+			t.Fatalf("probe calls = put:%d get:%d delete:%d, want put:1 get:1 delete:2", len(client.putKeys), len(client.getKeys), len(client.delKeys))
+		}
+		if client.delKeys[0] == client.putKeys[0] || client.delKeys[1] != client.putKeys[0] {
+			t.Fatalf("cleanup used unexpected key: put=%#v delete=%#v", client.putKeys, client.delKeys)
+		}
+	})
+
+	t.Run("reports put permission after delete probe succeeds", func(t *testing.T) {
+		client := &stubS3CapabilityProbeClient{putErr: errors.New("access denied")}
+		service := NewS3CompatibleService()
+		err := service.probeCapabilities(context.Background(), &S3CompatibleConfig{BucketName: "feng-assets"}, client)
+		var capabilityErr *StorageCapabilityError
+		if !errors.As(err, &capabilityErr) {
+			t.Fatalf("error = %v, want StorageCapabilityError", err)
+		}
+		if !slices.Equal(capabilityErr.Missing, []StorageCapability{StorageCapabilityPutObject}) {
+			t.Fatalf("missing = %#v, want PutObject only", capabilityErr.Missing)
+		}
+		if len(client.getKeys) != 0 || len(client.delKeys) != 1 {
+			t.Fatalf("get/delete calls = %d/%d, want 0/1", len(client.getKeys), len(client.delKeys))
+		}
+	})
+
+	t.Run("does not create probe object when delete is denied", func(t *testing.T) {
+		client := &stubS3CapabilityProbeClient{deleteErr: errors.New("access denied")}
+		service := NewS3CompatibleService()
+		err := service.probeCapabilities(context.Background(), &S3CompatibleConfig{BucketName: "feng-assets"}, client)
+		var capabilityErr *StorageCapabilityError
+		if !errors.As(err, &capabilityErr) {
+			t.Fatalf("error = %v, want StorageCapabilityError", err)
+		}
+		if !slices.Equal(capabilityErr.Missing, []StorageCapability{StorageCapabilityDeleteObject}) {
+			t.Fatalf("missing = %#v, want DeleteObject only", capabilityErr.Missing)
+		}
+		if len(client.putKeys) != 0 || len(client.getKeys) != 0 || len(client.delKeys) != 1 {
+			t.Fatalf("object operations should not run after denied delete: put=%d get=%d delete=%d", len(client.putKeys), len(client.getKeys), len(client.delKeys))
+		}
+	})
+}
+
+func TestStorageCapabilityErrorMessage(t *testing.T) {
+	err := (&StorageCapabilityError{Missing: []StorageCapability{StorageCapabilityListBucket, StorageCapabilityDeleteObject}}).Error()
+	if !strings.Contains(err, "s3:ListBucket") || !strings.Contains(err, "s3:DeleteObject") || !strings.Contains(err, "Bucket ARN") {
+		t.Fatalf("message = %q, want actionable capability guidance", err)
+	}
 }
 
 func TestS3CompatibleValidateBaseConfigEndpointPolicy(t *testing.T) {

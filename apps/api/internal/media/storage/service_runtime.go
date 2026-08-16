@@ -306,7 +306,7 @@ func (s *StorageService) UsesObjectStorage(ctx context.Context) bool {
 	return adapter.UsesObjectStorage()
 }
 
-func (s *StorageService) ensureProfileReadyForRuntime(profile StorageProfile) error {
+func (s *StorageService) ensureProfileReadyForRuntime(ctx context.Context, profile StorageProfile) error {
 	switch profile.Provider {
 	case StorageProviderLocal:
 		return nil
@@ -315,7 +315,7 @@ func (s *StorageService) ensureProfileReadyForRuntime(profile StorageProfile) er
 		if !s.s3CompatibleService.IsConfigEnabled(cfg) {
 			return fmt.Errorf("请先完整填写并启用 S3 兼容存储")
 		}
-		return nil
+		return s.s3CompatibleService.ProbeCapabilitiesWithConfig(ctx, cfg)
 	default:
 		return fmt.Errorf("不支持的存储类型")
 	}

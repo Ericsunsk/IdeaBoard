@@ -136,6 +136,7 @@ func newStorageServiceTest(t *testing.T) (*StorageService, *StorageProfileReposi
 	db := testdb.Open(t)
 	repo := NewStorageProfileRepository(db)
 	service := NewStorageService(repo)
+	service.s3CompatibleService.capabilityProbe = func(context.Context, *S3CompatibleConfig) error { return nil }
 	if err := service.EnsureDefaultProfiles(context.Background()); err != nil {
 		t.Fatalf("EnsureDefaultProfiles returned error: %v", err)
 	}
@@ -148,7 +149,9 @@ func newStorageServiceTestWithoutDefault(t *testing.T) (*StorageService, *Storag
 
 	db := testdb.Open(t)
 	repo := NewStorageProfileRepository(db)
-	return NewStorageService(repo), repo
+	service := NewStorageService(repo)
+	service.s3CompatibleService.capabilityProbe = func(context.Context, *S3CompatibleConfig) error { return nil }
+	return service, repo
 }
 
 func TestListProfilesStartsWithLocalProfile(t *testing.T) {

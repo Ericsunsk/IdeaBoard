@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"errors"
+
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -57,7 +59,7 @@ func (h *StorageHandler) CreateProfile(c *gin.Context) {
 
 	profile, err := h.saveProfile(c, &req)
 	if err != nil {
-		response.InternalError(c, 400, "保存失败，请检查配置或稍后重试", err)
+		writeStorageCommandError(c, "保存失败，请检查配置或稍后重试", err)
 		return
 	}
 	response.SuccessDTO(c, storageProfileWithMessageDTO{
@@ -76,7 +78,7 @@ func (h *StorageHandler) UpdateProfile(c *gin.Context) {
 
 	profile, err := h.saveProfile(c, &req)
 	if err != nil {
-		response.InternalError(c, 400, "保存失败，请检查配置或稍后重试", err)
+		writeStorageCommandError(c, "保存失败，请检查配置或稍后重试", err)
 		return
 	}
 	response.SuccessDTO(c, storageProfileWithMessageDTO{
@@ -96,7 +98,7 @@ func (h *StorageHandler) DeleteProfile(c *gin.Context) {
 func (h *StorageHandler) ApplyProfile(c *gin.Context) {
 	profile, err := h.storageService.ApplyProfile(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		response.InternalError(c, 400, "设为当前失败，请检查配置或稍后重试", err)
+		writeStorageCommandError(c, "设为当前失败，请检查配置或稍后重试", err)
 		return
 	}
 	response.SuccessDTO(c, storageProfileWithMessageDTO{
@@ -107,7 +109,7 @@ func (h *StorageHandler) ApplyProfile(c *gin.Context) {
 
 func (h *StorageHandler) TestProfile(c *gin.Context) {
 	if err := h.storageService.TestProfile(c.Request.Context(), c.Param("id")); err != nil {
-		response.InternalError(c, 400, "连接测试失败，请检查配置或稍后重试", err)
+		writeStorageCommandError(c, "连接测试失败，请检查配置或稍后重试", err)
 		return
 	}
 	response.SuccessDTO(c, storageMessageDTO{Message: "连接成功"})
@@ -116,10 +118,19 @@ func (h *StorageHandler) TestProfile(c *gin.Context) {
 func (h *StorageHandler) GetBucketInfo(c *gin.Context) {
 	info, err := h.storageService.GetBucketInfo(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		response.InternalError(c, 400, "获取 Bucket 信息失败，请检查配置或稍后重试", err)
+		writeStorageCommandError(c, "获取 Bucket 信息失败，请检查配置或稍后重试", err)
 		return
 	}
 	response.SuccessDTO(c, storageBucketInfoDTO{Info: info})
+}
+
+func writeStorageCommandError(c *gin.Context, fallback string, err error) {
+	var capabilityErr *StorageCapabilityError
+	if errors.As(err, &capabilityErr) {
+		response.Error(c, 400, capabilityErr.Error())
+		return
+	}
+	response.InternalError(c, 400, fallback, err)
 }
 
 func (h *StorageHandler) saveProfile(c *gin.Context, req *StorageProfile) (*StorageProfile, error) {

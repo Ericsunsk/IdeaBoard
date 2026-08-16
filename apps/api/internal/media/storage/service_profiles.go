@@ -101,7 +101,7 @@ func (s *StorageService) saveProfile(ctx context.Context, profile *StorageProfil
 		return nil, fmt.Errorf("当前存储不允许停用")
 	}
 	if apply {
-		if err := s.ensureProfileReadyForRuntime(next); err != nil {
+		if err := s.ensureProfileReadyForRuntime(ctx, next); err != nil {
 			return nil, err
 		}
 	}
@@ -163,7 +163,7 @@ func (s *StorageService) ApplyProfile(ctx context.Context, id string) (*StorageP
 		return nil, database.ErrNotFound
 	}
 
-	if err := s.ensureProfileReadyForRuntime(*target); err != nil {
+	if err := s.ensureProfileReadyForRuntime(ctx, *target); err != nil {
 		return nil, err
 	}
 

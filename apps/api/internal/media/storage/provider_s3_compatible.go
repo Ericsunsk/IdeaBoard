@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/platform/outbound"
@@ -23,7 +24,87 @@ import (
 )
 
 type S3CompatibleService struct {
-	clientCache sync.Map
+	clientCache     sync.Map
+	capabilityProbe func(context.Context, *S3CompatibleConfig) error
+}
+
+type StorageCapability string
+
+const (
+	StorageCapabilityListBucket   StorageCapability = "s3:ListBucket"
+	StorageCapabilityGetObject    StorageCapability = "s3:GetObject"
+	StorageCapabilityPutObject    StorageCapability = "s3:PutObject"
+	StorageCapabilityDeleteObject StorageCapability = "s3:DeleteObject"
+)
+
+type StorageCapabilityError struct {
+	Missing []StorageCapability
+}
+
+func (e *StorageCapabilityError) Error() string {
+	if e == nil || len(e.Missing) == 0 {
+		return "S3 权限探测失败"
+	}
+	missing := make([]string, 0, len(e.Missing))
+	bucketActions := make([]string, 0, 1)
+	objectActions := make([]string, 0, 3)
+	for _, capability := range e.Missing {
+		missing = append(missing, string(capability))
+		switch capability {
+		case StorageCapabilityListBucket:
+			bucketActions = append(bucketActions, string(capability))
+		default:
+			objectActions = append(objectActions, string(capability))
+		}
+	}
+	scope := make([]string, 0, 2)
+	if len(bucketActions) > 0 {
+		scope = append(scope, fmt.Sprintf("Bucket ARN 添加 %s", strings.Join(bucketActions, "、")))
+	}
+	if len(objectActions) > 0 {
+		scope = append(scope, fmt.Sprintf("Object ARN 添加 %s", strings.Join(objectActions, "、")))
+	}
+	return fmt.Sprintf("S3 凭证缺少权限：%s。请在%s策略中授予对应权限", strings.Join(missing, "、"), strings.Join(scope, "；"))
+}
+
+type s3CapabilityProbeClient interface {
+	ListBucket(ctx context.Context, bucketName, prefix string) error
+	PutObject(ctx context.Context, bucketName, objectName string) error
+	GetObject(ctx context.Context, bucketName, objectName string) error
+	DeleteObject(ctx context.Context, bucketName, objectName string) error
+}
+
+type minioS3CapabilityProbeClient struct {
+	client *minio.Client
+}
+
+func (c minioS3CapabilityProbeClient) ListBucket(ctx context.Context, bucketName, prefix string) error {
+	var firstErr error
+	for object := range c.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Prefix: prefix, Recursive: true}) {
+		if firstErr == nil && object.Err != nil {
+			firstErr = object.Err
+		}
+	}
+	return firstErr
+}
+
+func (c minioS3CapabilityProbeClient) PutObject(ctx context.Context, bucketName, objectName string) error {
+	_, err := c.client.PutObject(ctx, bucketName, objectName, strings.NewReader("ideaboard-s3-capability-probe"), int64(len("ideaboard-s3-capability-probe")), minio.PutObjectOptions{ContentType: "text/plain"})
+	return err
+}
+
+func (c minioS3CapabilityProbeClient) GetObject(ctx context.Context, bucketName, objectName string) error {
+	object, err := c.client.GetObject(ctx, bucketName, objectName, minio.GetObjectOptions{})
+	if err != nil {
+		return err
+	}
+	defer object.Close()
+	_, err = object.Stat()
+	return err
+}
+
+func (c minioS3CapabilityProbeClient) DeleteObject(ctx context.Context, bucketName, objectName string) error {
+	return c.client.RemoveObject(ctx, bucketName, objectName, minio.RemoveObjectOptions{})
 }
 
 type s3BucketExistenceChecker interface {
@@ -50,15 +131,68 @@ func (s *S3CompatibleService) TestConnectionWithConfig(ctx context.Context, cfg 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	return s.ProbeCapabilitiesWithConfig(ctx, cfg)
+}
+
+func (s *S3CompatibleService) ProbeCapabilitiesWithConfig(ctx context.Context, cfg *S3CompatibleConfig) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := s.validateBaseConfig(ctx, cfg); err != nil {
 		return err
+	}
+	if s.capabilityProbe != nil {
+		return s.capabilityProbe(ctx, cfg)
 	}
 	client, err := s.clientWithConfig(ctx, cfg)
 	if err != nil {
 		return err
 	}
-	if err := ensureS3BucketAccessible(ctx, client, strings.TrimSpace(cfg.BucketName)); err != nil {
-		return err
+	return s.probeCapabilities(ctx, cfg, minioS3CapabilityProbeClient{client: client})
+}
+
+func (s *S3CompatibleService) probeCapabilities(ctx context.Context, cfg *S3CompatibleConfig, client s3CapabilityProbeClient) error {
+	bucketName := strings.TrimSpace(cfg.BucketName)
+	missing := make([]StorageCapability, 0, 4)
+	if err := client.ListBucket(ctx, bucketName, ".ideaboard-capability-probe/"); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+		missing = append(missing, StorageCapabilityListBucket)
+	}
+
+	deleteProbeKey := fmt.Sprintf(".ideaboard-capability-probe/delete-%d", time.Now().UnixNano())
+	if err := client.DeleteObject(ctx, bucketName, deleteProbeKey); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+		missing = append(missing, StorageCapabilityDeleteObject)
+	} else {
+		probeKey := fmt.Sprintf(".ideaboard-capability-probe/read-write-%d", time.Now().UnixNano())
+		putErr := client.PutObject(ctx, bucketName, probeKey)
+		if putErr != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return ctxErr
+			}
+			missing = append(missing, StorageCapabilityPutObject)
+		} else {
+			if err := client.GetObject(ctx, bucketName, probeKey); err != nil {
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return ctxErr
+				}
+				missing = append(missing, StorageCapabilityGetObject)
+			}
+			cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			cleanupErr := client.DeleteObject(cleanupCtx, bucketName, probeKey)
+			cancel()
+			if cleanupErr != nil {
+				missing = append(missing, StorageCapabilityDeleteObject)
+			}
+		}
+	}
+
+	if len(missing) > 0 {
+		return &StorageCapabilityError{Missing: missing}
 	}
 	return nil
 }
@@ -75,7 +209,7 @@ func (s *S3CompatibleService) GetBucketInfoWithConfig(ctx context.Context, cfg *
 		return nil, err
 	}
 	if err := ensureS3BucketAccessible(ctx, client, strings.TrimSpace(cfg.BucketName)); err != nil {
-		return nil, err
+		return nil, &StorageCapabilityError{Missing: []StorageCapability{StorageCapabilityListBucket}}
 	}
 
 	domainSet := map[string]struct{}{}
