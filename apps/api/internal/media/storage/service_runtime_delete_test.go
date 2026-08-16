@@ -247,7 +247,7 @@ func TestExtractObjectKeyFromAccessDomainURL(t *testing.T) {
 			t.Fatalf("parse url failed: %v", err)
 		}
 
-		got, err := extractObjectKeyFromAccessDomainURL("https://img.example.com", parsed, "", false)
+		got, err := extractObjectKeyFromAccessDomainURL("https://img.example.com", parsed)
 		if err != nil {
 			t.Fatalf("extractObjectKeyFromAccessDomainURL returned error: %v", err)
 		}
@@ -257,18 +257,13 @@ func TestExtractObjectKeyFromAccessDomainURL(t *testing.T) {
 		}
 	})
 
-	t.Run("path style strips bucket prefix once", func(t *testing.T) {
+	t.Run("access domain base path is removed once", func(t *testing.T) {
 		parsed, err := url.Parse("https://minio.example.com/feng-assets/uploads/canvas/AB12C3/2026/04/24/demo.png")
 		if err != nil {
 			t.Fatalf("parse url failed: %v", err)
 		}
 
-		got, err := extractObjectKeyFromAccessDomainURL(
-			"https://minio.example.com/feng-assets",
-			parsed,
-			"feng-assets",
-			true,
-		)
+		got, err := extractObjectKeyFromAccessDomainURL("https://minio.example.com/feng-assets", parsed)
 		if err != nil {
 			t.Fatalf("extractObjectKeyFromAccessDomainURL returned error: %v", err)
 		}
@@ -284,7 +279,7 @@ func TestExtractObjectKeyFromAccessDomainURL(t *testing.T) {
 			t.Fatalf("parse url failed: %v", err)
 		}
 
-		if _, err := extractObjectKeyFromAccessDomainURL("https://img.example.com", parsed, "", false); err == nil {
+		if _, err := extractObjectKeyFromAccessDomainURL("https://img.example.com", parsed); err == nil {
 			t.Fatalf("expected host mismatch error")
 		}
 	})

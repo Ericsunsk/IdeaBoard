@@ -3,9 +3,14 @@ package storage
 import (
 	"context"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
@@ -37,16 +42,23 @@ type stubS3BucketExistenceChecker struct {
 }
 
 type stubS3CapabilityProbeClient struct {
-	listErr   error
-	putErr    error
-	getErr    error
-	deleteErr error
-	putKeys   []string
-	getKeys   []string
-	delKeys   []string
+	listErr    error
+	putErr     error
+	deleteErr  error
+	listErrors []error
+	deleteErrs []error
+	listCalls  int
+	putKeys    []string
+	delKeys    []string
 }
 
 func (s *stubS3CapabilityProbeClient) ListBucket(context.Context, string, string) error {
+	if s.listCalls < len(s.listErrors) {
+		err := s.listErrors[s.listCalls]
+		s.listCalls++
+		return err
+	}
+	s.listCalls++
 	return s.listErr
 }
 
@@ -55,14 +67,20 @@ func (s *stubS3CapabilityProbeClient) PutObject(_ context.Context, _, objectName
 	return s.putErr
 }
 
-func (s *stubS3CapabilityProbeClient) GetObject(_ context.Context, _, objectName string) error {
-	s.getKeys = append(s.getKeys, objectName)
-	return s.getErr
-}
-
 func (s *stubS3CapabilityProbeClient) DeleteObject(_ context.Context, _, objectName string) error {
 	s.delKeys = append(s.delKeys, objectName)
+	if callIndex := len(s.delKeys) - 1; callIndex < len(s.deleteErrs) {
+		return s.deleteErrs[callIndex]
+	}
 	return s.deleteErr
+}
+
+func newCapabilityProbeTestService() *S3CompatibleService {
+	service := NewS3CompatibleService()
+	service.deliveryRead = func(_ context.Context, key string, _ *S3CompatibleConfig, _ int64) (*StoredUploadObject, error) {
+		return &StoredUploadObject{ObjectKey: key, Data: []byte(s3CapabilityProbePayload)}, nil
+	}
+	return service
 }
 
 func (s *stubS3BucketExistenceChecker) BucketExists(ctx context.Context, _ string) (bool, error) {
@@ -121,7 +139,7 @@ func TestS3CompatiblePublicObjectURL(t *testing.T) {
 		}
 	})
 
-	t.Run("path style prefixes bucket exactly once", func(t *testing.T) {
+	t.Run("endpoint path style does not alter access domain", func(t *testing.T) {
 		url, err := service.publicObjectURL(&S3CompatibleConfig{
 			BucketName:     "feng-assets",
 			AccessDomain:   "https://minio.example.com",
@@ -130,13 +148,13 @@ func TestS3CompatiblePublicObjectURL(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		want := "https://minio.example.com/feng-assets/uploads/2026/04/22/demo.png"
+		want := "https://minio.example.com/uploads/2026/04/22/demo.png"
 		if url != want {
 			t.Fatalf("url = %q, want %q", url, want)
 		}
 	})
 
-	t.Run("path style does not duplicate bucket when domain already contains it", func(t *testing.T) {
+	t.Run("access domain may contain an explicit bucket path", func(t *testing.T) {
 		url, err := service.publicObjectURL(&S3CompatibleConfig{
 			BucketName:     "feng-assets",
 			AccessDomain:   "https://minio.example.com/feng-assets",
@@ -150,6 +168,115 @@ func TestS3CompatiblePublicObjectURL(t *testing.T) {
 			t.Fatalf("url = %q, want %q", url, want)
 		}
 	})
+}
+
+func TestS3CompatibleReadUsesAccessDomainDeliveryPlane(t *testing.T) {
+	restore := outbound.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{hosts: []string{"127.0.0.1"}})
+	t.Cleanup(restore)
+
+	var endpointCalls atomic.Int64
+	endpoint := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		endpointCalls.Add(1)
+		w.Header().Set("Content-Type", "application/xml")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`<Error><Code>AccessDenied</Code><Message>Access Denied.</Message></Error>`))
+	}))
+	t.Cleanup(endpoint.Close)
+
+	payload := []byte{0x89, 0x50, 0x4e, 0x47}
+	var deliveryCalls atomic.Int64
+	delivery := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		deliveryCalls.Add(1)
+		if r.URL.Path != "/uploads/canvas/OWNER/board/content/image.png" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write(payload)
+	}))
+	t.Cleanup(delivery.Close)
+
+	service := NewStorageService(nil, nil)
+	adapter, err := service.adapterRegistry.get(StorageProviderS3Compatible)
+	if err != nil {
+		t.Fatal(err)
+	}
+	object, err := adapter.Read(context.Background(), &StorageProfile{
+		ID:       "r2-delivery-test",
+		Provider: StorageProviderS3Compatible,
+		Enabled:  true,
+		Config: map[string]interface{}{
+			"access_key_id":            "access-key",
+			storageSecretAccessKeyName: "secret-key",
+			"bucket_name":              "ideaboard",
+			"endpoint":                 endpoint.URL,
+			"access_domain":            delivery.URL,
+			"force_path_style":         true,
+		},
+	}, "uploads/canvas/OWNER/board/content/image.png", int64(len(payload)))
+	if err != nil {
+		t.Fatalf("public delivery read failed: %v", err)
+	}
+	if !slices.Equal(object.Data, payload) || object.ContentType != "image/png" {
+		t.Fatalf("object=%+v, want access-domain payload", object)
+	}
+	if endpointCalls.Load() != 0 || deliveryCalls.Load() != 1 {
+		t.Fatalf("calls endpoint=%d delivery=%d, want endpoint=0 delivery=1", endpointCalls.Load(), deliveryCalls.Load())
+	}
+}
+
+func TestS3CompatiblePutRetriesTransientR2AccessDenied(t *testing.T) {
+	service := NewS3CompatibleService()
+	service.r2PermissionRetryDelays = []time.Duration{0}
+	cfg := &S3CompatibleConfig{Endpoint: "account-id.r2.cloudflarestorage.com"}
+	body := strings.NewReader("payload")
+	permissionErr := minio.ErrorResponse{Code: "AccessDenied", StatusCode: 403}
+	attempts := 0
+	payloads := make([]string, 0, 2)
+	err := service.putObjectWithRetry(context.Background(), cfg, body, func(context.Context) error {
+		attempts++
+		data, err := io.ReadAll(body)
+		if err != nil {
+			return err
+		}
+		payloads = append(payloads, string(data))
+		if attempts == 1 {
+			return permissionErr
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if attempts != 2 {
+		t.Fatalf("attempts = %d, want transient permission retry", attempts)
+	}
+	if !slices.Equal(payloads, []string{"payload", "payload"}) {
+		t.Fatalf("payloads = %#v, want body rewound before retry", payloads)
+	}
+}
+
+func TestS3ClientTransportUsesFreshConnectionsForR2(t *testing.T) {
+	transport, err := s3ClientTransport(&S3CompatibleConfig{
+		Endpoint: "account-id.r2.cloudflarestorage.com",
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r2Transport, ok := transport.(*http.Transport)
+	if !ok || !r2Transport.DisableKeepAlives {
+		t.Fatalf("transport = %#v, want R2 transport with keep-alives disabled", transport)
+	}
+
+	genericTransport, err := s3ClientTransport(&S3CompatibleConfig{
+		Endpoint: "s3.us-east-1.amazonaws.com",
+	}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if genericTransport != nil {
+		t.Fatalf("generic transport = %#v, want MinIO default transport", genericTransport)
+	}
 }
 
 func TestEnsureS3BucketAccessible(t *testing.T) {
@@ -187,6 +314,44 @@ func TestEnsureS3BucketAccessible(t *testing.T) {
 }
 
 func TestProbeS3Capabilities(t *testing.T) {
+	t.Run("retries transient R2 access denied responses", func(t *testing.T) {
+		permissionErr := minio.ErrorResponse{Code: "AccessDenied", Message: "Access Denied", StatusCode: 403}
+		client := &stubS3CapabilityProbeClient{
+			listErrors: []error{permissionErr, nil},
+			deleteErrs: []error{permissionErr, nil},
+		}
+		service := newCapabilityProbeTestService()
+		service.r2PermissionRetryDelays = []time.Duration{0}
+		err := service.probeCapabilities(context.Background(), &S3CompatibleConfig{
+			BucketName: "feng-assets",
+			Endpoint:   "account-id.r2.cloudflarestorage.com",
+		}, client)
+		if err != nil {
+			t.Fatalf("transient R2 AccessDenied must not become a permanent permission error: %v", err)
+		}
+		if client.listCalls < 2 || len(client.delKeys) < 3 {
+			t.Fatalf("probe calls = list:%d delete:%d, want retries before accepting a permission failure", client.listCalls, len(client.delKeys))
+		}
+	})
+
+	t.Run("bounds persistent R2 permission retries", func(t *testing.T) {
+		permissionErr := minio.ErrorResponse{Code: "AccessDenied", Message: "Access Denied", StatusCode: 403}
+		client := &stubS3CapabilityProbeClient{listErr: permissionErr, deleteErr: permissionErr}
+		service := newCapabilityProbeTestService()
+		service.r2PermissionRetryDelays = []time.Duration{0, 0}
+		err := service.probeCapabilities(context.Background(), &S3CompatibleConfig{
+			BucketName: "feng-assets",
+			Endpoint:   "account-id.r2.cloudflarestorage.com",
+		}, client)
+		var capabilityErr *StorageCapabilityError
+		if !errors.As(err, &capabilityErr) {
+			t.Fatalf("error = %v, want StorageCapabilityError after bounded retries", err)
+		}
+		if client.listCalls != 3 || len(client.delKeys) != 3 {
+			t.Fatalf("probe calls = list:%d delete:%d, want exactly three attempts", client.listCalls, len(client.delKeys))
+		}
+	})
+
 	t.Run("does not report R2 request configuration errors as missing permissions", func(t *testing.T) {
 		upstreamErr := minio.ErrorResponse{
 			Code:       "AuthorizationHeaderMalformed",
@@ -194,7 +359,7 @@ func TestProbeS3Capabilities(t *testing.T) {
 			StatusCode: 400,
 		}
 		client := &stubS3CapabilityProbeClient{listErr: upstreamErr, deleteErr: upstreamErr}
-		service := NewS3CompatibleService()
+		service := newCapabilityProbeTestService()
 
 		err := service.probeCapabilities(context.Background(), &S3CompatibleConfig{
 			BucketName: "feng-assets",
@@ -218,56 +383,63 @@ func TestProbeS3Capabilities(t *testing.T) {
 
 	t.Run("accepts all capabilities and removes probe object", func(t *testing.T) {
 		client := &stubS3CapabilityProbeClient{}
-		service := NewS3CompatibleService()
+		service := newCapabilityProbeTestService()
 		if err := service.probeCapabilities(context.Background(), &S3CompatibleConfig{BucketName: "feng-assets"}, client); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if len(client.putKeys) != 1 || len(client.getKeys) != 1 || len(client.delKeys) != 2 {
-			t.Fatalf("probe calls = put:%d get:%d delete:%d, want put:1 get:1 delete:2", len(client.putKeys), len(client.getKeys), len(client.delKeys))
+		if len(client.putKeys) != 1 || len(client.delKeys) != 2 {
+			t.Fatalf("probe calls = put:%d delete:%d, want put:1 delete:2", len(client.putKeys), len(client.delKeys))
 		}
 	})
 
 	t.Run("reports missing permissions and cleans up probe object", func(t *testing.T) {
 		permissionErr := minio.ErrorResponse{Code: "AccessDenied", Message: "Access Denied", StatusCode: 403}
-		client := &stubS3CapabilityProbeClient{listErr: permissionErr, getErr: permissionErr}
-		service := NewS3CompatibleService()
+		client := &stubS3CapabilityProbeClient{listErr: permissionErr}
+		service := newCapabilityProbeTestService()
 		cfg := &S3CompatibleConfig{BucketName: "feng-assets"}
 		err := service.probeCapabilities(context.Background(), cfg, client)
 		var capabilityErr *StorageCapabilityError
 		if !errors.As(err, &capabilityErr) {
 			t.Fatalf("error = %v, want StorageCapabilityError", err)
 		}
-		want := []StorageCapability{StorageCapabilityListBucket, StorageCapabilityGetObject}
+		want := []StorageCapability{StorageCapabilityListBucket}
 		if !slices.Equal(capabilityErr.Missing, want) {
 			t.Fatalf("missing = %#v, want %#v", capabilityErr.Missing, want)
 		}
-		if len(client.putKeys) != 1 || len(client.getKeys) != 1 || len(client.delKeys) != 2 {
-			t.Fatalf("probe calls = put:%d get:%d delete:%d, want put:1 get:1 delete:2", len(client.putKeys), len(client.getKeys), len(client.delKeys))
+		if len(client.putKeys) != 1 || len(client.delKeys) != 2 {
+			t.Fatalf("probe calls = put:%d delete:%d, want put:1 delete:2", len(client.putKeys), len(client.delKeys))
 		}
 		if client.delKeys[0] == client.putKeys[0] || client.delKeys[1] != client.putKeys[0] {
 			t.Fatalf("cleanup used unexpected key: put=%#v delete=%#v", client.putKeys, client.delKeys)
 		}
 	})
 
-	t.Run("reports put permission after delete probe succeeds", func(t *testing.T) {
-		client := &stubS3CapabilityProbeClient{putErr: minio.ErrorResponse{Code: "AccessDenied", StatusCode: 403}}
-		service := NewS3CompatibleService()
+	t.Run("reports public delivery failure and cleans up probe object", func(t *testing.T) {
+		client := &stubS3CapabilityProbeClient{}
+		service := newCapabilityProbeTestService()
+		service.deliveryRead = func(context.Context, string, *S3CompatibleConfig, int64) (*StoredUploadObject, error) {
+			return nil, errors.New("access domain returned 403")
+		}
 		err := service.probeCapabilities(context.Background(), &S3CompatibleConfig{BucketName: "feng-assets"}, client)
-		var capabilityErr *StorageCapabilityError
-		if !errors.As(err, &capabilityErr) {
-			t.Fatalf("error = %v, want StorageCapabilityError", err)
+		var probeErr *StorageProbeError
+		if !errors.As(err, &probeErr) || probeErr.Capability != StorageCapabilityPublicRead {
+			t.Fatalf("error = %v, want public delivery StorageProbeError", err)
 		}
-		if !slices.Equal(capabilityErr.Missing, []StorageCapability{StorageCapabilityPutObject}) {
-			t.Fatalf("missing = %#v, want PutObject only", capabilityErr.Missing)
+		if !strings.Contains(probeErr.UserMessage(), "公开访问域名读取失败") {
+			t.Fatalf("user message = %q, want access-domain guidance", probeErr.UserMessage())
 		}
-		if len(client.getKeys) != 0 || len(client.delKeys) != 1 {
-			t.Fatalf("get/delete calls = %d/%d, want 0/1", len(client.getKeys), len(client.delKeys))
+		if len(client.putKeys) != 1 || len(client.delKeys) != 2 || client.delKeys[1] != client.putKeys[0] {
+			t.Fatalf("probe cleanup = put:%#v delete:%#v", client.putKeys, client.delKeys)
 		}
 	})
 
-	t.Run("does not create probe object when delete is denied", func(t *testing.T) {
-		client := &stubS3CapabilityProbeClient{deleteErr: minio.ErrorResponse{Code: "AccessDenied", StatusCode: 403}}
-		service := NewS3CompatibleService()
+	t.Run("reports cleanup permission before public delivery failure", func(t *testing.T) {
+		permissionErr := minio.ErrorResponse{Code: "AccessDenied", Message: "Access Denied", StatusCode: 403}
+		client := &stubS3CapabilityProbeClient{deleteErrs: []error{nil, permissionErr}}
+		service := newCapabilityProbeTestService()
+		service.deliveryRead = func(context.Context, string, *S3CompatibleConfig, int64) (*StoredUploadObject, error) {
+			return nil, errors.New("access domain returned 403")
+		}
 		err := service.probeCapabilities(context.Background(), &S3CompatibleConfig{BucketName: "feng-assets"}, client)
 		var capabilityErr *StorageCapabilityError
 		if !errors.As(err, &capabilityErr) {
@@ -276,8 +448,37 @@ func TestProbeS3Capabilities(t *testing.T) {
 		if !slices.Equal(capabilityErr.Missing, []StorageCapability{StorageCapabilityDeleteObject}) {
 			t.Fatalf("missing = %#v, want DeleteObject only", capabilityErr.Missing)
 		}
-		if len(client.putKeys) != 0 || len(client.getKeys) != 0 || len(client.delKeys) != 1 {
-			t.Fatalf("object operations should not run after denied delete: put=%d get=%d delete=%d", len(client.putKeys), len(client.getKeys), len(client.delKeys))
+	})
+
+	t.Run("reports put permission after delete probe succeeds", func(t *testing.T) {
+		client := &stubS3CapabilityProbeClient{putErr: minio.ErrorResponse{Code: "AccessDenied", StatusCode: 403}}
+		service := newCapabilityProbeTestService()
+		err := service.probeCapabilities(context.Background(), &S3CompatibleConfig{BucketName: "feng-assets"}, client)
+		var capabilityErr *StorageCapabilityError
+		if !errors.As(err, &capabilityErr) {
+			t.Fatalf("error = %v, want StorageCapabilityError", err)
+		}
+		if !slices.Equal(capabilityErr.Missing, []StorageCapability{StorageCapabilityPutObject}) {
+			t.Fatalf("missing = %#v, want PutObject only", capabilityErr.Missing)
+		}
+		if len(client.delKeys) != 1 {
+			t.Fatalf("delete calls = %d, want 1", len(client.delKeys))
+		}
+	})
+
+	t.Run("does not create probe object when delete is denied", func(t *testing.T) {
+		client := &stubS3CapabilityProbeClient{deleteErr: minio.ErrorResponse{Code: "AccessDenied", StatusCode: 403}}
+		service := newCapabilityProbeTestService()
+		err := service.probeCapabilities(context.Background(), &S3CompatibleConfig{BucketName: "feng-assets"}, client)
+		var capabilityErr *StorageCapabilityError
+		if !errors.As(err, &capabilityErr) {
+			t.Fatalf("error = %v, want StorageCapabilityError", err)
+		}
+		if !slices.Equal(capabilityErr.Missing, []StorageCapability{StorageCapabilityDeleteObject}) {
+			t.Fatalf("missing = %#v, want DeleteObject only", capabilityErr.Missing)
+		}
+		if len(client.putKeys) != 0 || len(client.delKeys) != 1 {
+			t.Fatalf("object operations should not run after denied delete: put=%d delete=%d", len(client.putKeys), len(client.delKeys))
 		}
 	})
 }

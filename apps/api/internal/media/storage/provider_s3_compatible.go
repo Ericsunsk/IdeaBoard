@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
+	"net/http"
 	"net/url"
 	"path"
 	"sort"
@@ -18,24 +20,34 @@ import (
 
 	"ideaboard/api/internal/media/imageformat"
 	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/safehttp"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
 type S3CompatibleService struct {
-	clientCache     sync.Map
-	capabilityProbe func(context.Context, *S3CompatibleConfig) error
+	clientCache             sync.Map
+	capabilityProbe         func(context.Context, *S3CompatibleConfig) error
+	deliveryRead            func(context.Context, string, *S3CompatibleConfig, int64) (*StoredUploadObject, error)
+	r2PermissionRetryDelays []time.Duration
+}
+
+var defaultR2PermissionRetryDelays = []time.Duration{
+	250 * time.Millisecond,
+	750 * time.Millisecond,
 }
 
 type StorageCapability string
 
 const (
 	StorageCapabilityListBucket   StorageCapability = "s3:ListBucket"
-	StorageCapabilityGetObject    StorageCapability = "s3:GetObject"
 	StorageCapabilityPutObject    StorageCapability = "s3:PutObject"
 	StorageCapabilityDeleteObject StorageCapability = "s3:DeleteObject"
+	StorageCapabilityPublicRead   StorageCapability = "public:ReadObject"
 )
+
+const s3CapabilityProbePayload = "ideaboard-s3-capability-probe"
 
 type StorageCapabilityError struct {
 	Missing  []StorageCapability
@@ -99,6 +111,9 @@ func (e *StorageProbeError) UserMessage() string {
 	if isCloudflareR2Endpoint(e.Endpoint) {
 		provider = "Cloudflare R2"
 	}
+	if e.Capability == StorageCapabilityPublicRead {
+		return fmt.Sprintf("%s 公开访问域名读取失败：请确认 Access Domain 已绑定当前 Bucket 且允许公网读取", provider)
+	}
 	code := s3ErrorCode(e.Cause)
 	switch code {
 	case "AuthorizationHeaderMalformed":
@@ -118,7 +133,6 @@ func (e *StorageProbeError) UserMessage() string {
 type s3CapabilityProbeClient interface {
 	ListBucket(ctx context.Context, bucketName, prefix string) error
 	PutObject(ctx context.Context, bucketName, objectName string) error
-	GetObject(ctx context.Context, bucketName, objectName string) error
 	DeleteObject(ctx context.Context, bucketName, objectName string) error
 }
 
@@ -137,17 +151,7 @@ func (c minioS3CapabilityProbeClient) ListBucket(ctx context.Context, bucketName
 }
 
 func (c minioS3CapabilityProbeClient) PutObject(ctx context.Context, bucketName, objectName string) error {
-	_, err := c.client.PutObject(ctx, bucketName, objectName, strings.NewReader("ideaboard-s3-capability-probe"), int64(len("ideaboard-s3-capability-probe")), minio.PutObjectOptions{ContentType: "text/plain"})
-	return err
-}
-
-func (c minioS3CapabilityProbeClient) GetObject(ctx context.Context, bucketName, objectName string) error {
-	object, err := c.client.GetObject(ctx, bucketName, objectName, minio.GetObjectOptions{})
-	if err != nil {
-		return err
-	}
-	defer object.Close()
-	_, err = object.Stat()
+	_, err := c.client.PutObject(ctx, bucketName, objectName, strings.NewReader(s3CapabilityProbePayload), int64(len(s3CapabilityProbePayload)), minio.PutObjectOptions{ContentType: "text/plain"})
 	return err
 }
 
@@ -160,7 +164,9 @@ type s3BucketExistenceChecker interface {
 }
 
 func NewS3CompatibleService() *S3CompatibleService {
-	return &S3CompatibleService{}
+	return &S3CompatibleService{
+		r2PermissionRetryDelays: defaultR2PermissionRetryDelays,
+	}
 }
 
 func (s *S3CompatibleService) IsConfigEnabled(cfg *S3CompatibleConfig) bool {
@@ -200,6 +206,33 @@ func (s *S3CompatibleService) ProbeCapabilitiesWithConfig(ctx context.Context, c
 }
 
 func (s *S3CompatibleService) probeCapabilities(ctx context.Context, cfg *S3CompatibleConfig, client s3CapabilityProbeClient) error {
+	retryDelays := s.r2PermissionRetryDelays
+	if !isCloudflareR2Endpoint(cfg.Endpoint) {
+		retryDelays = nil
+	}
+	for attempt := 0; ; attempt++ {
+		err := s.probeCapabilitiesOnce(ctx, cfg, client)
+		if err == nil {
+			return nil
+		}
+		var capabilityErr *StorageCapabilityError
+		if !errors.As(err, &capabilityErr) || attempt >= len(retryDelays) {
+			return err
+		}
+
+		slog.WarnContext(ctx, "Cloudflare R2 capability probe denied; retrying before reporting missing permissions",
+			"attempt", attempt+1,
+			"max_attempts", len(retryDelays)+1,
+			"missing", capabilityErr.Missing,
+			"endpoint", cfg.Endpoint,
+		)
+		if err := waitForStorageProbeRetry(ctx, retryDelays[attempt]); err != nil {
+			return err
+		}
+	}
+}
+
+func (s *S3CompatibleService) probeCapabilitiesOnce(ctx context.Context, cfg *S3CompatibleConfig, client s3CapabilityProbeClient) error {
 	bucketName := strings.TrimSpace(cfg.BucketName)
 	missing := make([]StorageCapability, 0, 4)
 	if err := client.ListBucket(ctx, bucketName, ".ideaboard-capability-probe/"); err != nil {
@@ -233,15 +266,7 @@ func (s *S3CompatibleService) probeCapabilities(ctx context.Context, cfg *S3Comp
 			}
 			missing = append(missing, StorageCapabilityPutObject)
 		} else {
-			if err := client.GetObject(ctx, bucketName, probeKey); err != nil {
-				if ctxErr := ctx.Err(); ctxErr != nil {
-					return ctxErr
-				}
-				if !isS3PermissionDenied(err) {
-					return newStorageProbeError(cfg, StorageCapabilityGetObject, err)
-				}
-				missing = append(missing, StorageCapabilityGetObject)
-			}
+			delivered, deliveryErr := s.readDeliveryObject(ctx, probeKey, cfg, int64(len(s3CapabilityProbePayload)))
 			cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			cleanupErr := client.DeleteObject(cleanupCtx, bucketName, probeKey)
 			cancel()
@@ -250,6 +275,10 @@ func (s *S3CompatibleService) probeCapabilities(ctx context.Context, cfg *S3Comp
 					return newStorageProbeError(cfg, StorageCapabilityDeleteObject, cleanupErr)
 				}
 				missing = append(missing, StorageCapabilityDeleteObject)
+			} else if deliveryErr != nil {
+				return newStorageProbeError(cfg, StorageCapabilityPublicRead, deliveryErr)
+			} else if delivered == nil || string(delivered.Data) != s3CapabilityProbePayload {
+				return newStorageProbeError(cfg, StorageCapabilityPublicRead, errors.New("公开访问域名返回的探测对象内容不一致"))
 			}
 		}
 	}
@@ -258,6 +287,20 @@ func (s *S3CompatibleService) probeCapabilities(ctx context.Context, cfg *S3Comp
 		return newStorageCapabilityError(cfg, missing)
 	}
 	return nil
+}
+
+func waitForStorageProbeRetry(ctx context.Context, delay time.Duration) error {
+	if delay <= 0 {
+		return ctx.Err()
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func newStorageCapabilityError(cfg *S3CompatibleConfig, missing []StorageCapability) *StorageCapabilityError {
@@ -432,14 +475,17 @@ func (s *S3CompatibleService) putReaderWithConfigRef(ctx context.Context, client
 		contentType = "application/octet-stream"
 	}
 
-	_, err = client.PutObject(
-		ctx,
-		strings.TrimSpace(cfg.BucketName),
-		key,
-		body,
-		size,
-		minio.PutObjectOptions{ContentType: contentType},
-	)
+	err = s.putObjectWithRetry(ctx, cfg, body, func(attemptCtx context.Context) error {
+		_, putErr := client.PutObject(
+			attemptCtx,
+			strings.TrimSpace(cfg.BucketName),
+			key,
+			body,
+			size,
+			minio.PutObjectOptions{ContentType: contentType},
+		)
+		return putErr
+	})
 	if err != nil {
 		return nil, fmt.Errorf("上传失败: %w", err)
 	}
@@ -457,6 +503,60 @@ func (s *S3CompatibleService) putReaderWithConfigRef(ctx context.Context, client
 	}, nil
 }
 
+func (s *S3CompatibleService) putObjectWithRetry(
+	ctx context.Context,
+	cfg *S3CompatibleConfig,
+	body io.Reader,
+	put func(context.Context) error,
+) error {
+	seeker, canRetry := body.(io.Seeker)
+	if !canRetry {
+		return put(ctx)
+	}
+	return s.retryR2PermissionDenied(ctx, cfg, "object upload", func(attempt int) error {
+		if attempt > 0 {
+			if _, err := seeker.Seek(0, io.SeekStart); err != nil {
+				return fmt.Errorf("重试上传前重置文件失败: %w", err)
+			}
+		}
+		return put(ctx)
+	})
+}
+
+func (s *S3CompatibleService) retryR2PermissionDenied(
+	ctx context.Context,
+	cfg *S3CompatibleConfig,
+	operation string,
+	run func(attempt int) error,
+) error {
+	retryDelays := s.r2PermissionRetryDelays
+	if cfg == nil || !isCloudflareR2Endpoint(cfg.Endpoint) {
+		retryDelays = nil
+	}
+	for attempt := 0; ; attempt++ {
+		err := run(attempt)
+		if err == nil {
+			return nil
+		}
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+		if !isS3PermissionDenied(err) || attempt >= len(retryDelays) {
+			return err
+		}
+
+		slog.WarnContext(ctx, "Cloudflare R2 operation denied; retrying on a fresh connection",
+			"operation", operation,
+			"attempt", attempt+1,
+			"max_attempts", len(retryDelays)+1,
+			"endpoint", cfg.Endpoint,
+		)
+		if err := waitForStorageProbeRetry(ctx, retryDelays[attempt]); err != nil {
+			return err
+		}
+	}
+}
+
 func (s *S3CompatibleService) DeleteWithConfig(ctx context.Context, objectKey string, cfg *S3CompatibleConfig) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -472,7 +572,10 @@ func (s *S3CompatibleService) DeleteWithConfig(ctx context.Context, objectKey st
 	if err != nil {
 		return err
 	}
-	if err := client.RemoveObject(ctx, strings.TrimSpace(cfg.BucketName), key, minio.RemoveObjectOptions{}); err != nil {
+	err = s.retryR2PermissionDenied(ctx, cfg, "object delete", func(int) error {
+		return client.RemoveObject(ctx, strings.TrimSpace(cfg.BucketName), key, minio.RemoveObjectOptions{})
+	})
+	if err != nil {
 		return fmt.Errorf("删除失败: %w", err)
 	}
 	return nil
@@ -489,24 +592,33 @@ func (s *S3CompatibleService) readWithConfig(ctx context.Context, objectKey stri
 	if key == "" {
 		return nil, fmt.Errorf("文件路径不能为空")
 	}
-	client, err := s.clientWithConfig(ctx, cfg)
+	return s.readDeliveryObject(ctx, key, cfg, maxBytes)
+}
+
+func (s *S3CompatibleService) readDeliveryObject(ctx context.Context, key string, cfg *S3CompatibleConfig, maxBytes int64) (*StoredUploadObject, error) {
+	if s.deliveryRead != nil {
+		return s.deliveryRead(ctx, key, cfg, maxBytes)
+	}
+	publicURL, err := s.publicObjectURL(cfg, key)
 	if err != nil {
 		return nil, err
 	}
-	object, err := client.GetObject(ctx, strings.TrimSpace(cfg.BucketName), key, minio.GetObjectOptions{})
+	response, err := safehttp.GetWithAllowHosts(ctx, publicURL, 30*time.Second, outbound.AllowHosts(ctx)...)
 	if err != nil {
 		return nil, fmt.Errorf("读取文件失败: %w", err)
 	}
-	defer object.Close()
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("读取文件失败: 访问域名返回 HTTP %d", response.StatusCode)
+	}
 
-	stat, statErr := object.Stat()
-	data, err := readStorageObject(object, maxBytes)
+	data, err := readStorageObject(response.Body, maxBytes)
 	if err != nil {
 		return nil, err
 	}
-	contentType := ""
-	if statErr == nil {
-		contentType = strings.TrimSpace(stat.ContentType)
+	contentType := strings.TrimSpace(strings.Split(response.Header.Get("Content-Type"), ";")[0])
+	if contentType == "" {
+		contentType = inferStoredUploadContentType(path.Base(key), data)
 	}
 	return &StoredUploadObject{
 		ObjectKey:   key,
@@ -534,20 +646,26 @@ func (s *S3CompatibleService) DeletePrefixWithConfig(ctx context.Context, object
 	}
 
 	bucketName := strings.TrimSpace(cfg.BucketName)
-	objectCh := client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{
-		Prefix:    prefix,
-		Recursive: true,
+	err = s.retryR2PermissionDenied(ctx, cfg, "prefix delete", func(int) error {
+		objectCh := client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{
+			Prefix:    prefix,
+			Recursive: true,
+		})
+		for object := range objectCh {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			if object.Err != nil {
+				return object.Err
+			}
+			if err := client.RemoveObject(ctx, bucketName, object.Key, minio.RemoveObjectOptions{}); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
-	for object := range objectCh {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if object.Err != nil {
-			return fmt.Errorf("列举前缀对象失败: %v", object.Err)
-		}
-		if err := client.RemoveObject(ctx, bucketName, object.Key, minio.RemoveObjectOptions{}); err != nil {
-			return fmt.Errorf("删除对象失败: %w", err)
-		}
+	if err != nil {
+		return fmt.Errorf("删除前缀对象失败: %w", err)
 	}
 	return nil
 }
@@ -602,12 +720,17 @@ func (s *S3CompatibleService) clientWithConfig(ctx context.Context, cfg *S3Compa
 	if cfg.ForcePathStyle {
 		bucketLookup = minio.BucketLookupPath
 	}
+	transport, err := s3ClientTransport(cfg, secure)
+	if err != nil {
+		return nil, err
+	}
 
 	client, err := minio.New(endpointHost, &minio.Options{
 		Creds:        credentials.NewStaticV4(strings.TrimSpace(cfg.AccessKeyID), cfg.SecretAccessKey, ""),
 		Secure:       secure,
 		Region:       strings.TrimSpace(cfg.RegionID),
 		BucketLookup: bucketLookup,
+		Transport:    transport,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("初始化 S3 客户端失败: %w", err)
@@ -615,6 +738,18 @@ func (s *S3CompatibleService) clientWithConfig(ctx context.Context, cfg *S3Compa
 
 	actual, _ := s.clientCache.LoadOrStore(cacheKey, client)
 	return actual.(*minio.Client), nil
+}
+
+func s3ClientTransport(cfg *S3CompatibleConfig, secure bool) (http.RoundTripper, error) {
+	if cfg == nil || !isCloudflareR2Endpoint(cfg.Endpoint) {
+		return nil, nil
+	}
+	transport, err := minio.DefaultTransport(secure)
+	if err != nil {
+		return nil, fmt.Errorf("初始化 R2 HTTP 传输失败: %w", err)
+	}
+	transport.DisableKeepAlives = true
+	return transport, nil
 }
 
 func s3ClientCacheKey(cfg *S3CompatibleConfig) string {
@@ -643,13 +778,6 @@ func (s *S3CompatibleService) publicObjectURL(cfg *S3CompatibleConfig, key strin
 	base, err := normalizePublicDomain(cfg.AccessDomain)
 	if err != nil {
 		return "", err
-	}
-	bucketName := strings.TrimSpace(cfg.BucketName)
-	if cfg.ForcePathStyle {
-		if strings.Contains(base, "/"+bucketName) {
-			return fmt.Sprintf("%s/%s", base, key), nil
-		}
-		return fmt.Sprintf("%s/%s/%s", base, bucketName, key), nil
 	}
 	return fmt.Sprintf("%s/%s", base, key), nil
 }

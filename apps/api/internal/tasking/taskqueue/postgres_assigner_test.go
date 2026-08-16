@@ -218,6 +218,42 @@ func TestPostgresTaskAssignerRoutesUpscaleCapabilityFromExecutionPlan(t *testing
 	}
 }
 
+func TestPostgresTaskAssignerRoutesModelessImageFillTasks(t *testing.T) {
+	tests := []struct {
+		name    string
+		feature string
+	}{
+		{name: "partial edit", feature: workflow.FeatureSlugPartialEdit},
+		{name: "outpaint", feature: workflow.FeatureSlugOutpaint},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := newPostgresAssignerTestDB(t)
+			assigner := NewPostgresTaskAssigner(db)
+			accountID := createAssignerAccount(t, db, "image-fill-modeless", 2)
+			setAssignerEndpointProtocol(t, db, accountID, "flux-fill-json-image")
+			setAssignerEndpointCapabilities(t, db, accountID, string(workflow.RoutingCapabilityImageFill))
+			setAssignerModelEnabled(t, db, accountID, "gpt-image-1", false)
+
+			taskID := "pending-image-fill-" + strings.ReplaceAll(tt.name, " ", "-")
+			createAssignerTaskWithOptions(t, db, taskID, 0, tasks.StatusPending, "", "", assignerTaskOptions{
+				ParamsJSON: assignerExecutionParams(t, tt.feature, workflow.OutputResolutionDefault),
+			})
+
+			assignment, err := assigner.Assign(context.Background(), &tasks.TaskPayload{
+				TaskID: taskID, RiverJobID: 136,
+			})
+			if err != nil {
+				t.Fatalf("Assign failed: %v", err)
+			}
+			if assignment.Status != AssignStatusAssigned || assignment.AccountID != accountID || assignment.ResolvedModel != "" {
+				t.Fatalf("assignment=%+v, want modeless image-fill account %d", assignment, accountID)
+			}
+		})
+	}
+}
+
 func TestPostgresTaskAssignerRejectsResolutionMismatchFromExecutionPlan(t *testing.T) {
 	db := newPostgresAssignerTestDB(t)
 	assigner := NewPostgresTaskAssigner(db)

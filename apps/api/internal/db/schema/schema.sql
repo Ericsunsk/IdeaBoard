@@ -2127,6 +2127,7 @@ CREATE TABLE task_leases (
   provider_endpoint_id BIGINT NOT NULL,
   credential_id BIGINT NOT NULL,
   feature_slug VARCHAR(64) NOT NULL DEFAULT '',
+  model_requirement VARCHAR(16) NOT NULL DEFAULT 'required',
   resolved_model VARCHAR(128) NOT NULL DEFAULT '',
   api_type VARCHAR(50) NOT NULL DEFAULT '',
   provider_endpoint_protocol VARCHAR(64) NOT NULL DEFAULT '',
@@ -2146,7 +2147,10 @@ CREATE TABLE task_leases (
     AND btrim(api_type) <> ''
     AND btrim(provider_endpoint_protocol) <> ''
     AND btrim(provider_endpoint_base_url) <> ''
-    AND (btrim(resolved_model) <> '' OR provider_endpoint_protocol = 'image-url-json-to-image')
+    AND (
+      (model_requirement = 'required' AND btrim(resolved_model) <> '')
+      OR (model_requirement = 'not-required' AND btrim(resolved_model) = '')
+    )
   ),
   CONSTRAINT ck_task_leases_release_reason CHECK (
     (released_at IS NULL AND release_reason = '')
@@ -5234,7 +5238,6 @@ ON CONFLICT (profile_id) DO NOTHING;
 INSERT INTO system_configs (config_key, value)
 VALUES ('api_outbound_allow_hosts', '[]')
 ON CONFLICT (config_key) DO NOTHING;
-
 
 INSERT INTO feature_prompts (feature_slug, prompt, updated_by)
 VALUES

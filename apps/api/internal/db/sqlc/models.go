@@ -787,6 +787,7 @@ type TaskLease struct {
 	ProviderEndpointID       int64        `json:"provider_endpoint_id"`
 	CredentialID             int64        `json:"credential_id"`
 	FeatureSlug              string       `json:"feature_slug"`
+	ModelRequirement         string       `json:"model_requirement"`
 	ResolvedModel            string       `json:"resolved_model"`
 	ApiType                  string       `json:"api_type"`
 	ProviderEndpointProtocol string       `json:"provider_endpoint_protocol"`

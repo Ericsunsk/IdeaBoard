@@ -732,13 +732,13 @@ func (s *StorageService) extractObjectKeyFromUserUploadURL(profile StorageProfil
 		return normalizeUploadObjectKey(strings.TrimPrefix(parsed.Path, "/"))
 	case StorageProviderS3Compatible:
 		cfg := s.s3CompatibleConfigFromProfile(&profile)
-		return extractObjectKeyFromAccessDomainURL(cfg.AccessDomain, parsed, strings.TrimSpace(cfg.BucketName), cfg.ForcePathStyle)
+		return extractObjectKeyFromAccessDomainURL(cfg.AccessDomain, parsed)
 	default:
 		return "", fmt.Errorf("不支持的存储类型")
 	}
 }
 
-func extractObjectKeyFromAccessDomainURL(accessDomain string, parsed *url.URL, bucketName string, forcePathStyle bool) (string, error) {
+func extractObjectKeyFromAccessDomainURL(accessDomain string, parsed *url.URL) (string, error) {
 	if parsed == nil {
 		return "", fmt.Errorf("图片地址格式错误")
 	}
@@ -766,11 +766,6 @@ func extractObjectKeyFromAccessDomainURL(accessDomain string, parsed *url.URL, b
 	}
 
 	candidate := strings.TrimPrefix(relativePath, "/")
-	if forcePathStyle && strings.TrimSpace(bucketName) != "" {
-		bucketPrefix := strings.Trim(strings.TrimSpace(bucketName), "/") + "/"
-		candidate = strings.TrimPrefix(candidate, bucketPrefix)
-	}
-
 	return normalizeUploadObjectKey(candidate)
 }
 
@@ -811,6 +806,10 @@ type remoteImageFile struct {
 
 func (f *remoteImageFile) Read(p []byte) (int, error) {
 	return f.file.Read(p)
+}
+
+func (f *remoteImageFile) Seek(offset int64, whence int) (int64, error) {
+	return f.file.Seek(offset, whence)
 }
 
 func (f *remoteImageFile) Cleanup() error {

@@ -97,7 +97,7 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, task *tasks.TaskPaylo
 	}
 	decision := policy.decideAssignedTask(task.TaskID, selectedAccount, leaseToken, updated)
 	if updated > 0 {
-		if err := acquireTaskLeaseTx(ctx, tx, task.TaskID, task.RiverJobID, featureSlug, selectedAccount, leaseToken, assignedAt); err != nil {
+		if err := acquireTaskLeaseTx(ctx, tx, task.TaskID, task.RiverJobID, featureSlug, executionPlan.RoutingRequirement().ModelRequirement(), selectedAccount, leaseToken, assignedAt); err != nil {
 			return TaskAssignment{}, err
 		}
 		if err := patchTaskAssignmentMetricsTx(ctx, tx, task.TaskID, taskState.CreatedAt, assignedAt); err != nil {
@@ -257,18 +257,18 @@ func markTaskAssignedTx(ctx context.Context, tx *sql.Tx, taskID string, selected
 	return result.RowsAffected()
 }
 
-func acquireTaskLeaseTx(ctx context.Context, tx *sql.Tx, taskID string, riverJobID int64, featureSlug string, selected taskAssignmentSelectedAccount, leaseToken string, acquiredAt time.Time) error {
+func acquireTaskLeaseTx(ctx context.Context, tx *sql.Tx, taskID string, riverJobID int64, featureSlug string, modelRequirement workflow.RoutingModelRequirement, selected taskAssignmentSelectedAccount, leaseToken string, acquiredAt time.Time) error {
 	result, err := tx.ExecContext(ctx, `
 	INSERT INTO task_leases (
 	  task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
-	  feature_slug, resolved_model, api_type, provider_endpoint_protocol,
+	  feature_slug, model_requirement, resolved_model, api_type, provider_endpoint_protocol,
 	  provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version,
 	  acquired_at
 	) VALUES (
 	  $1, $2, $3, $4, $5, $6,
-	  $7, $8, $9, $10,
-	  $11, $12, $13, $14,
-	  $15
+	  $7, $8, $9, $10, $11,
+	  $12, $13, $14, $15,
+	  $16
 	)
 	ON CONFLICT (task_id) WHERE released_at IS NULL DO NOTHING`,
 		taskID,
@@ -278,6 +278,7 @@ func acquireTaskLeaseTx(ctx context.Context, tx *sql.Tx, taskID string, riverJob
 		selected.ProviderEndpointID,
 		selected.CredentialID,
 		strings.TrimSpace(featureSlug),
+		strings.TrimSpace(string(modelRequirement)),
 		strings.TrimSpace(selected.ResolvedModel),
 		strings.TrimSpace(selected.APIType),
 		strings.TrimSpace(selected.ProviderEndpointProtocol),

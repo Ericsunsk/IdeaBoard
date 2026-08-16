@@ -81,7 +81,7 @@ func NewStorageService(profileRepo *StorageProfileRepository, assetLocator Store
 				{Key: "bucket_name", Label: "Bucket 名称", Type: StorageFieldTypeText, Placeholder: "请输入 Bucket 名称", Required: true},
 				{Key: "endpoint", Label: "Endpoint", Type: StorageFieldTypeText, Placeholder: "例如：s3.us-east-1.amazonaws.com / <account>.r2.cloudflarestorage.com", Required: true},
 				{Key: "region_id", Label: "地域 / Region", Type: StorageFieldTypeText, Placeholder: "例如：us-east-1，可留空"},
-				{Key: "access_domain", Label: "访问域名", Type: StorageFieldTypeText, Placeholder: "例如：https://bucket.s3.us-east-1.amazonaws.com", Required: true},
+				{Key: "access_domain", Label: "公开访问域名", Type: StorageFieldTypeText, Placeholder: "例如：https://bucket.s3.us-east-1.amazonaws.com", Hint: "直接拼接对象 Key；若服务需要 Bucket 路径，请在域名中包含 /bucket。", Required: true},
 				{Key: "force_path_style", Label: "Path Style", Type: StorageFieldTypeSwitch, Hint: "部分兼容存储需要使用 path-style 访问。"},
 			},
 		},

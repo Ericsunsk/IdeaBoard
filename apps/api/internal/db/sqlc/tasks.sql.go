@@ -562,7 +562,7 @@ func (q *Queries) FinishTaskAttempt(ctx context.Context, arg FinishTaskAttemptPa
 
 const getActiveTaskLeaseByTaskID = `-- name: GetActiveTaskLeaseByTaskID :one
 SELECT id, task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
-	       feature_slug, resolved_model, api_type,
+	       feature_slug, model_requirement, resolved_model, api_type,
 	       provider_endpoint_protocol,
        provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version,
        acquired_at, released_at, release_reason, created_at, updated_at
@@ -583,6 +583,7 @@ func (q *Queries) GetActiveTaskLeaseByTaskID(ctx context.Context, taskID string)
 		&i.ProviderEndpointID,
 		&i.CredentialID,
 		&i.FeatureSlug,
+		&i.ModelRequirement,
 		&i.ResolvedModel,
 		&i.ApiType,
 		&i.ProviderEndpointProtocol,
