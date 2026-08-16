@@ -49,11 +49,11 @@ func TestAIImageRequestConsumesExplicitCompiledResolution(t *testing.T) {
 }
 
 func TestAIImagePricingIdentityAndFingerprintAreFeatureScoped(t *testing.T) {
-	first, err := AIImageRequest(workflow.FeatureSlugLocalInpaint, "1k", 1)
+	first, err := AIImageRequest(workflow.FeatureSlugPartialEdit, "default", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := AIImageRequest(workflow.FeatureSlugLocalInpaint, "1k", 1)
+	second, err := AIImageRequest(workflow.FeatureSlugPartialEdit, "default", 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestTaskBillingRequestValidationFailsClosed(t *testing.T) {
 		request Request
 		wantErr error
 	}{
-		{name: "zero quantity", request: Request{Feature: workflow.FeatureSlugLocalInpaint}, wantErr: billing.ErrInvalidQuantity},
+		{name: "zero quantity", request: Request{Feature: workflow.FeatureSlugPartialEdit}, wantErr: billing.ErrInvalidQuantity},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			if _, err := validateRequest(testCase.request); !errors.Is(err, testCase.wantErr) {

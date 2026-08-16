@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accountpool/accounts"
+	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/workflow"
 )
 
@@ -27,7 +28,6 @@ func TestCallFluxFillOutpaintUsesPromptSeedAndGeometryContract(t *testing.T) {
 	}))
 	defer server.Close()
 
-	left, top := 25.0, 10.0
 	executor := &ProviderExecutor{}
 	_, err := executor.callFluxFill(context.Background(), &accounts.ApiAccount{
 		ProxyURL: server.URL + "/fill",
@@ -37,15 +37,16 @@ func TestCallFluxFillOutpaintUsesPromptSeedAndGeometryContract(t *testing.T) {
 		SystemPrompt:   "保持原有摄影风格",
 		UserPrompt:     "向左补全海岸线",
 		Seed:           42,
-		Size:           "960x720",
 		ImageRefs:      []string{inputURL},
 		OriginalWidth:  640,
 		OriginalHeight: 480,
-		OpenAI: openAIProviderControls{
-			ExtendLeft: &left,
-			ExtendTop:  &top,
+		Extend: &tasks.OutpaintParams{
+			TargetWidth:  960,
+			TargetHeight: 720,
+			ImageOffsetX: 160,
+			ImageOffsetY: 48,
 		},
-	}, workflow.RuntimeOperationImageExtend, time.Second)
+	}, workflow.RuntimeOperationOutpaint, time.Second)
 	if err != nil {
 		t.Fatalf("callFluxFill: %v", err)
 	}
@@ -70,7 +71,7 @@ func TestCallFluxFillOutpaintUsesPromptSeedAndGeometryContract(t *testing.T) {
 	}
 }
 
-func TestCallFluxFillInpaintUsesMaskURLAndDefaultSystemPrompt(t *testing.T) {
+func TestCallFluxFillInpaintUsesMaskURLAndConfiguredSystemPrompt(t *testing.T) {
 	const inputURL = "https://media.ideaboard.art/uploads/canvas/demo/source.png"
 	const maskURL = "https://media.ideaboard.art/uploads/canvas/demo/mask.png"
 	var payload map[string]interface{}
@@ -91,12 +92,12 @@ func TestCallFluxFillInpaintUsesMaskURLAndDefaultSystemPrompt(t *testing.T) {
 		ProxyURL: server.URL,
 		ApiKey:   "secret",
 	}, providerRequest{
-		SystemPrompt: "  ",
+		SystemPrompt: "仅编辑蒙版区域",
 		UserPrompt:   "  移除路人  ",
 		Seed:         7,
 		ImageRefs:    []string{inputURL},
 		MaskRefs:     []string{maskURL},
-	}, workflow.RuntimeOperationLocalInpaint, time.Second)
+	}, workflow.RuntimeOperationPartialEdit, time.Second)
 	if err != nil {
 		t.Fatalf("callFluxFill: %v", err)
 	}
@@ -104,7 +105,7 @@ func TestCallFluxFillInpaintUsesMaskURLAndDefaultSystemPrompt(t *testing.T) {
 	if payload["image_url"] != inputURL || payload["mask_url"] != maskURL {
 		t.Fatalf("media payload = %#v", payload)
 	}
-	if payload["system_prompt"] != defaultFluxFillSystemPrompt {
+	if payload["system_prompt"] != "仅编辑蒙版区域" {
 		t.Fatalf("system_prompt = %#v", payload["system_prompt"])
 	}
 	if payload["prompt"] != "移除路人" || payload["seed"] != float64(7) {
@@ -143,9 +144,10 @@ func TestCallFluxFillHTTPErrorRetryClassification(t *testing.T) {
 			_, err := executor.callFluxFill(context.Background(), &accounts.ApiAccount{
 				ProxyURL: server.URL,
 			}, providerRequest{
-				ImageRefs: []string{"https://media.ideaboard.art/source.png"},
-				MaskRefs:  []string{"https://media.ideaboard.art/mask.png"},
-			}, workflow.RuntimeOperationLocalInpaint, time.Second)
+				SystemPrompt: "仅编辑蒙版区域",
+				ImageRefs:    []string{"https://media.ideaboard.art/source.png"},
+				MaskRefs:     []string{"https://media.ideaboard.art/mask.png"},
+			}, workflow.RuntimeOperationPartialEdit, time.Second)
 			if err == nil {
 				t.Fatal("expected provider error")
 			}
@@ -165,9 +167,10 @@ func TestCallFluxFillNetworkErrorIsRetryable(t *testing.T) {
 	_, err := executor.callFluxFill(context.Background(), &accounts.ApiAccount{
 		ProxyURL: endpoint,
 	}, providerRequest{
-		ImageRefs: []string{"https://media.ideaboard.art/source.png"},
-		MaskRefs:  []string{"https://media.ideaboard.art/mask.png"},
-	}, workflow.RuntimeOperationLocalInpaint, time.Second)
+		SystemPrompt: "仅编辑蒙版区域",
+		ImageRefs:    []string{"https://media.ideaboard.art/source.png"},
+		MaskRefs:     []string{"https://media.ideaboard.art/mask.png"},
+	}, workflow.RuntimeOperationPartialEdit, time.Second)
 	if err == nil {
 		t.Fatal("expected network error")
 	}

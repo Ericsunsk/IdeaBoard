@@ -35,7 +35,7 @@ func canonicalExecutionPlanFixture(feature string, count int) (workflow.FeatureE
 			RequestedOutputCount: &count,
 			OutputResolution:     &resolution,
 			ImageInputCount:      imageInputCount,
-			HasMaskInput:         feature == workflow.FeatureSlugLocalInpaint,
+			HasMaskInput:         feature == workflow.FeatureSlugPartialEdit,
 		},
 	})
 	if err != nil {

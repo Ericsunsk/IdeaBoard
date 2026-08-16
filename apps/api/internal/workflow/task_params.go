@@ -106,15 +106,11 @@ func flattenWorkflowFeatureParams(out map[string]interface{}, params *tasks.Work
 	}
 	if params.Extend != nil {
 		out[ParamKeyExtend] = map[string]interface{}{
-			paramkeys.TopPercent:    params.Extend.TopPercent,
-			paramkeys.RightPercent:  params.Extend.RightPercent,
-			paramkeys.BottomPercent: params.Extend.BottomPercent,
-			paramkeys.LeftPercent:   params.Extend.LeftPercent,
+			paramkeys.TargetWidth:  params.Extend.TargetWidth,
+			paramkeys.TargetHeight: params.Extend.TargetHeight,
+			paramkeys.ImageOffsetX: params.Extend.ImageOffsetX,
+			paramkeys.ImageOffsetY: params.Extend.ImageOffsetY,
 		}
-		out[paramkeys.ExtendTop] = params.Extend.TopPercent
-		out[paramkeys.ExtendRight] = params.Extend.RightPercent
-		out[paramkeys.ExtendBottom] = params.Extend.BottomPercent
-		out[paramkeys.ExtendLeft] = params.Extend.LeftPercent
 	}
 	if params.HD != nil {
 		out[ParamKeyHD] = map[string]interface{}{

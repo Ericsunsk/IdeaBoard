@@ -3834,25 +3834,25 @@ components:
       type: string
       enum:
         - prompt-generation
-        - local-inpaint
+        - partial-edit
         - remove-bg
         - style-fusion
         - sketch-to-image
         - style-variation
         - hd-upscale
-        - image-extend
+        - outpaint
 
     CanonicalWorkflowFeatureSlug:
       type: string
       enum:
         - prompt-generation
-        - local-inpaint
+        - partial-edit
         - remove-bg
         - style-fusion
         - sketch-to-image
         - style-variation
         - hd-upscale
-        - image-extend
+        - outpaint
 
     GenerationPrimitive:
       type: string
@@ -3900,7 +3900,7 @@ components:
         variation:
           $ref: '#/components/schemas/StyleVariationParams'
         extend:
-          $ref: '#/components/schemas/ImageExtendParams'
+          $ref: '#/components/schemas/OutpaintParams'
         hd:
           $ref: '#/components/schemas/HDUpscaleParams'
         fusion:
@@ -3922,7 +3922,7 @@ components:
         variation:
           $ref: '#/components/schemas/StyleVariationParams'
         extend:
-          $ref: '#/components/schemas/ImageExtendParams'
+          $ref: '#/components/schemas/OutpaintParams'
         hd:
           $ref: '#/components/schemas/HDUpscaleParams'
         fusion:
@@ -3998,22 +3998,22 @@ components:
           minimum: 0
           maximum: 100
 
-    ImageExtendParams:
+    OutpaintParams:
       type: object
-      required: [top_percent, right_percent, bottom_percent, left_percent]
+      required: [target_width, target_height, image_offset_x, image_offset_y]
       additionalProperties: false
       properties:
-        top_percent:
-          type: number
+        target_width:
+          type: integer
+          minimum: 1
+        target_height:
+          type: integer
+          minimum: 1
+        image_offset_x:
+          type: integer
           minimum: 0
-        right_percent:
-          type: number
-          minimum: 0
-        bottom_percent:
-          type: number
-          minimum: 0
-        left_percent:
-          type: number
+        image_offset_y:
+          type: integer
           minimum: 0
 
     HDUpscaleParams:

@@ -15,19 +15,20 @@ func TestValidateImageFillDimensions(t *testing.T) {
 		name        string
 		feature     string
 		controls    *tasks.GenerationControls
+		extend      *tasks.OutpaintParams
 		wantMessage string
 	}{
 		{
 			name:    "extend accepts aligned dimensions within limits",
-			feature: workflow.FeatureSlugImageExtend,
+			feature: workflow.FeatureSlugOutpaint,
 			controls: &tasks.GenerationControls{
 				OriginalWidth: 1001, OriginalHeight: 1001,
-				CustomWidth: 1201, CustomHeight: 1001,
 			},
+			extend: &tasks.OutpaintParams{TargetWidth: 1201, TargetHeight: 1001},
 		},
 		{
 			name:    "inpaint accepts matching four megapixel dimensions",
-			feature: workflow.FeatureSlugLocalInpaint,
+			feature: workflow.FeatureSlugPartialEdit,
 			controls: &tasks.GenerationControls{
 				OriginalWidth: 2048, OriginalHeight: 2048,
 				CustomWidth: 2048, CustomHeight: 2048,
@@ -35,22 +36,31 @@ func TestValidateImageFillDimensions(t *testing.T) {
 		},
 		{
 			name:        "requires all dimensions",
-			feature:     workflow.FeatureSlugImageExtend,
+			feature:     workflow.FeatureSlugOutpaint,
 			controls:    &tasks.GenerationControls{OriginalWidth: 1024, OriginalHeight: 1024},
-			wantMessage: "目标图片宽高必须是正整数",
+			wantMessage: "扩图需要提供目标尺寸和原图偏移",
 		},
 		{
 			name:    "rejects smaller extend target",
-			feature: workflow.FeatureSlugImageExtend,
+			feature: workflow.FeatureSlugOutpaint,
 			controls: &tasks.GenerationControls{
 				OriginalWidth: 1024, OriginalHeight: 768,
-				CustomWidth: 1000, CustomHeight: 768,
 			},
+			extend:      &tasks.OutpaintParams{TargetWidth: 1000, TargetHeight: 768},
 			wantMessage: "扩图目标尺寸不能小于原图尺寸",
 		},
 		{
+			name:    "rejects negative image offset",
+			feature: workflow.FeatureSlugOutpaint,
+			controls: &tasks.GenerationControls{
+				OriginalWidth: 1024, OriginalHeight: 768,
+			},
+			extend:      &tasks.OutpaintParams{TargetWidth: 1280, TargetHeight: 768, ImageOffsetX: -1},
+			wantMessage: "扩图偏移不能让原图超出目标画布",
+		},
+		{
 			name:    "requires inpaint dimensions to match",
-			feature: workflow.FeatureSlugLocalInpaint,
+			feature: workflow.FeatureSlugPartialEdit,
 			controls: &tasks.GenerationControls{
 				OriginalWidth: 1024, OriginalHeight: 768,
 				CustomWidth: 1024, CustomHeight: 776,
@@ -59,16 +69,16 @@ func TestValidateImageFillDimensions(t *testing.T) {
 		},
 		{
 			name:    "rejects edge over limit",
-			feature: workflow.FeatureSlugImageExtend,
+			feature: workflow.FeatureSlugOutpaint,
 			controls: &tasks.GenerationControls{
 				OriginalWidth: 1024, OriginalHeight: 1024,
-				CustomWidth: 4097, CustomHeight: 1024,
 			},
+			extend:      &tasks.OutpaintParams{TargetWidth: 4097, TargetHeight: 1024},
 			wantMessage: "目标图片超过图像填充服务的 4096 边长或约 4MP 限制",
 		},
 		{
 			name:    "checks pixel limit after eight pixel alignment",
-			feature: workflow.FeatureSlugLocalInpaint,
+			feature: workflow.FeatureSlugPartialEdit,
 			controls: &tasks.GenerationControls{
 				OriginalWidth: 2041, OriginalHeight: 2055,
 				CustomWidth: 2041, CustomHeight: 2055,
@@ -79,7 +89,7 @@ func TestValidateImageFillDimensions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := validateImageFillDimensions(tt.feature, &tasks.WorkflowTaskParams{Controls: tt.controls})
+			err := validateImageFillDimensions(tt.feature, &tasks.WorkflowTaskParams{Controls: tt.controls, Extend: tt.extend})
 			if tt.wantMessage == "" {
 				if err != nil {
 					t.Fatalf("validateImageFillDimensions() error = %v", err)
@@ -102,17 +112,15 @@ func TestTaskIntakeRejectsImageFillDimensionsBeforeProviderLookup(t *testing.T) 
 
 	_, err := intake.Compile(t.Context(), 42, &tasks.SubmitTaskRequest{
 		Prompt:         "补全右侧背景",
-		Feature:        workflow.FeatureSlugImageExtend,
+		Feature:        workflow.FeatureSlugOutpaint,
 		ImageURLs:      []string{"https://example.com/source.png"},
 		ClientActionID: "invalid-image-fill-size",
 		Params: map[string]interface{}{
 			"original_image_width":  1024,
 			"original_image_height": 1024,
-			"custom_width":          5000,
-			"custom_height":         1024,
 			"extend": map[string]interface{}{
-				"top_percent": 0, "right_percent": 25,
-				"bottom_percent": 0, "left_percent": 0,
+				"target_width": 5000, "target_height": 1024,
+				"image_offset_x": 0, "image_offset_y": 0,
 			},
 		},
 	})
@@ -129,7 +137,7 @@ func TestTaskIntakeReadinessRejectsImageFillDimensionsBeforeProviderLookup(t *te
 	intake := NewTaskIntake(TaskIntakeDeps{Accounts: accountsStore})
 
 	_, err := intake.CompileReadiness(t.Context(), &tasks.SubmitTaskRequest{
-		Feature: workflow.FeatureSlugLocalInpaint,
+		Feature: workflow.FeatureSlugPartialEdit,
 		Params: map[string]interface{}{
 			"original_image_width":  1024,
 			"original_image_height": 768,
@@ -156,17 +164,15 @@ func TestSubmitTaskRejectsImageFillDimensionsBeforeSubmissionTransaction(t *test
 
 	_, err := service.SubmitTask(t.Context(), 42, &tasks.SubmitTaskRequest{
 		Prompt:         "补全右侧背景",
-		Feature:        workflow.FeatureSlugImageExtend,
+		Feature:        workflow.FeatureSlugOutpaint,
 		ImageURLs:      []string{"https://example.com/source.png"},
 		ClientActionID: "invalid-size-before-transaction",
 		Params: map[string]interface{}{
 			"original_image_width":  1024,
 			"original_image_height": 1024,
-			"custom_width":          5000,
-			"custom_height":         1024,
 			"extend": map[string]interface{}{
-				"top_percent": 0, "right_percent": 25,
-				"bottom_percent": 0, "left_percent": 0,
+				"target_width": 5000, "target_height": 1024,
+				"image_offset_x": 0, "image_offset_y": 0,
 			},
 		},
 	})

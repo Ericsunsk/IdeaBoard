@@ -33,32 +33,24 @@ const (
 	ImageCount          = "image_count"
 	PromptUpsampling    = "prompt_upsampling"
 
-	Strength      = "strength"
-	TopPercent    = "top_percent"
-	RightPercent  = "right_percent"
-	BottomPercent = "bottom_percent"
-	LeftPercent   = "left_percent"
-	Scale         = "scale"
-	Mode          = "mode"
-	InputWeights  = "input_weights"
+	Strength     = "strength"
+	TargetWidth  = "target_width"
+	TargetHeight = "target_height"
+	ImageOffsetX = "image_offset_x"
+	ImageOffsetY = "image_offset_y"
+	Scale        = "scale"
+	Mode         = "mode"
+	InputWeights = "input_weights"
 
 	VariationStrength  = "variation_strength"
-	ExtendTop          = "extend_top"
-	ExtendRight        = "extend_right"
-	ExtendBottom       = "extend_bottom"
-	ExtendLeft         = "extend_left"
 	FusionInputWeights = "fusion_input_weights"
 	OutputFormat       = "output_format"
 	OutputQuality      = "output_quality"
 	UpscaleMode        = "upscale_mode"
 	UpscaleFactor      = "upscale_factor"
 
-	PromptPlaceholderVariationStrength   = "{{" + VariationStrength + "}}"
-	PromptPlaceholderExtendTopPercent    = "{{extend_top_percent}}"
-	PromptPlaceholderExtendRightPercent  = "{{extend_right_percent}}"
-	PromptPlaceholderExtendBottomPercent = "{{extend_bottom_percent}}"
-	PromptPlaceholderExtendLeftPercent   = "{{extend_left_percent}}"
-	PromptPlaceholderFusionInputWeights  = "{{" + FusionInputWeights + "}}"
+	PromptPlaceholderVariationStrength  = "{{" + VariationStrength + "}}"
+	PromptPlaceholderFusionInputWeights = "{{" + FusionInputWeights + "}}"
 
 	PromptPathFusionInputWeights = Fusion + "." + InputWeights
 )
@@ -106,10 +98,6 @@ var providerReservedKeys = keySet(
 	OutputResolution,
 	PromptUpsampling,
 	VariationStrength,
-	ExtendTop,
-	ExtendRight,
-	ExtendBottom,
-	ExtendLeft,
 	FusionInputWeights,
 	OutputQuality,
 	UpscaleMode,

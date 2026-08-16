@@ -15,7 +15,7 @@ export const IMAGE_ACTION_MODE = {
   directTask: IMAGE_EXECUTION_MODE.directTask,
   hdUpscaleTask: IMAGE_EXECUTION_MODE.hdUpscaleTask,
   canvasExtend: IMAGE_EXECUTION_MODE.canvasExtend,
-  localInpaint: 'local-inpaint',
+  partialEdit: 'partial-edit',
   localImageEditor: 'local-image-editor',
 } as const
 
@@ -26,7 +26,7 @@ export type ImageActionMenuIcon =
   | 'style-variation'
   | 'sketch-to-image'
   | 'hd'
-  | 'image-extend'
+  | 'outpaint'
   | 'image-inpaint'
   | 'adobe-photoshop'
 
@@ -70,13 +70,13 @@ export const IMAGE_ACTION_REGISTRY_LIST = [
     mode: IMAGE_ACTION_MODE.hdUpscaleTask,
     icon: 'hd',
   }),
-  createWorkflowImageAction(IMAGE_NODE_ACTION.imageExtend, {
+  createWorkflowImageAction(IMAGE_NODE_ACTION.outpaint, {
     mode: IMAGE_ACTION_MODE.canvasExtend,
-    icon: 'image-extend',
+    icon: 'outpaint',
   }),
   {
     action: IMAGE_NODE_ACTION.imageInpaint,
-    mode: IMAGE_ACTION_MODE.localInpaint,
+    mode: IMAGE_ACTION_MODE.partialEdit,
     label: '局部重绘',
     title: '局部重绘',
     icon: 'image-inpaint',

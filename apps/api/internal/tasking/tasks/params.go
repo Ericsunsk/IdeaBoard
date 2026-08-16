@@ -37,7 +37,7 @@ type WorkflowTaskParams struct {
 	// Feature-specific canonical prompt contracts. Keep these in sync with
 	// workflow/prompt_contract.go and SYSTEM_PROMPT.md.
 	Variation *StyleVariationParams `json:"variation,omitempty"`
-	Extend    *ImageExtendParams    `json:"extend,omitempty"`
+	Extend    *OutpaintParams       `json:"extend,omitempty"`
 	HD        *HDUpscaleParams      `json:"hd,omitempty"`
 	Fusion    *StyleFusionParams    `json:"fusion,omitempty"`
 
@@ -208,11 +208,11 @@ type StyleVariationParams struct {
 	Strength float64 `json:"strength"`
 }
 
-type ImageExtendParams struct {
-	TopPercent    float64 `json:"top_percent"`
-	RightPercent  float64 `json:"right_percent"`
-	BottomPercent float64 `json:"bottom_percent"`
-	LeftPercent   float64 `json:"left_percent"`
+type OutpaintParams struct {
+	TargetWidth  int `json:"target_width"`
+	TargetHeight int `json:"target_height"`
+	ImageOffsetX int `json:"image_offset_x"`
+	ImageOffsetY int `json:"image_offset_y"`
 }
 
 type HDUpscaleParams struct {

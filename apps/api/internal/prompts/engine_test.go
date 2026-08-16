@@ -78,11 +78,11 @@ func TestApplyFeatureSystemPromptDoesNotAppendHiddenConstraints(t *testing.T) {
 
 func TestApplyFeatureSystemPromptImageNodeFeaturesRequireExplicitUserPromptPlaceholder(t *testing.T) {
 	features := []string{
-		workflow.FeatureSlugLocalInpaint,
+		workflow.FeatureSlugPartialEdit,
 		workflow.FeatureSlugSketchToImage,
 		workflow.FeatureSlugStyleVariation,
 		workflow.FeatureSlugRemoveBg,
-		workflow.FeatureSlugImageExtend,
+		workflow.FeatureSlugOutpaint,
 	}
 
 	for _, feature := range features {

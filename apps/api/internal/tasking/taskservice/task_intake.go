@@ -112,6 +112,11 @@ func (i *taskIntake) CompileReadiness(ctx context.Context, req *tasks.SubmitTask
 	if err := validateImageFillDimensions(featureSlug, typedParams); err != nil {
 		return TaskReadinessCompilation{}, err
 	}
+	if requiresImageFillSystemPrompt(featureSlug) {
+		if err := i.requireSystemPrompt(ctx, featureSlug); err != nil {
+			return TaskReadinessCompilation{}, err
+		}
+	}
 	if err := i.ensureProviderAvailable(ctx, executionPlan.RoutingRequirement()); err != nil {
 		return TaskReadinessCompilation{}, err
 	}
@@ -219,6 +224,9 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 			return CanonicalTaskRequest{}, newSubmissionError("prompt_unavailable", "系统提示词暂不可用", err)
 		}
 	}
+	if requiresImageFillSystemPrompt(featureSlug) && strings.TrimSpace(promptConfig.Prompt) == "" {
+		return CanonicalTaskRequest{}, validation.New("该功能未配置 System Prompt")
+	}
 	fullPrompt := strings.TrimSpace(req.Prompt)
 	systemPrompt := ""
 	if executionPlan.PromptPolicy() == workflow.PromptPolicyIgnored {
@@ -266,6 +274,24 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 		BillingRequest: billingRequest,
 		ExecutionPlan:  &executionPlan,
 	})
+}
+
+func requiresImageFillSystemPrompt(featureSlug string) bool {
+	return featureSlug == workflow.FeatureSlugPartialEdit || featureSlug == workflow.FeatureSlugOutpaint
+}
+
+func (i *taskIntake) requireSystemPrompt(ctx context.Context, featureSlug string) error {
+	if i.prompts == nil {
+		return validation.New("该功能未配置 System Prompt")
+	}
+	config, err := i.prompts.GetRuntimeConfig(ctx, featureSlug)
+	if err != nil {
+		return newSubmissionError("prompt_unavailable", "系统提示词暂不可用", err)
+	}
+	if strings.TrimSpace(config.Prompt) == "" {
+		return validation.New("该功能未配置 System Prompt")
+	}
+	return nil
 }
 
 func (i *taskIntake) PrepareMedia(ctx context.Context, userID int64, canonical CanonicalTaskRequest) (CanonicalTaskRequest, error) {

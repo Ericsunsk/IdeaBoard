@@ -50,10 +50,6 @@ type openAIProviderParams struct {
 	UseEditEndpoint      bool
 	DropOriginalImageRef bool
 	VariationStrength    *float64
-	ExtendTop            *float64
-	ExtendRight          *float64
-	ExtendBottom         *float64
-	ExtendLeft           *float64
 }
 
 type openAIRequestFinalizer struct {
@@ -99,10 +95,6 @@ func readOpenAIProviderParams(providerReq providerRequest) openAIProviderParams 
 		UseEditEndpoint:      providerReq.OpenAI.UseEditEndpoint || providerReq.Primitive == "image-to-image",
 		DropOriginalImageRef: providerReq.OpenAI.DropOriginalImageRef,
 		VariationStrength:    providerReq.OpenAI.VariationStrength,
-		ExtendTop:            providerReq.OpenAI.ExtendTop,
-		ExtendRight:          providerReq.OpenAI.ExtendRight,
-		ExtendBottom:         providerReq.OpenAI.ExtendBottom,
-		ExtendLeft:           providerReq.OpenAI.ExtendLeft,
 	}
 	if len(providerReq.MaskRefs) > 0 {
 		out.MaskImageRef = strings.TrimSpace(providerReq.MaskRefs[0])
@@ -117,16 +109,6 @@ func (p openAIProviderParams) useEditEndpoint() bool {
 func (p openAIProviderParams) applySharedExtras(reqBody *openAIImageRequestBody) {
 	if p.VariationStrength != nil {
 		reqBody.setExtra("variation_strength", *p.VariationStrength)
-	}
-	for key, value := range map[string]*float64{
-		"extend_top":    p.ExtendTop,
-		"extend_right":  p.ExtendRight,
-		"extend_bottom": p.ExtendBottom,
-		"extend_left":   p.ExtendLeft,
-	} {
-		if value != nil {
-			reqBody.setExtra(key, *value)
-		}
 	}
 	if p.OriginalImageRef != "" {
 		reqBody.setExtra("original_image_url", p.OriginalImageRef)

@@ -11,11 +11,22 @@ import (
 )
 
 type Service struct {
-	storage  *storage.StorageService
-	registry *assets.MediaAssetRegistry
+	storage  mediaStore
+	registry mediaRegistry
 }
 
-func NewService(storageService *storage.StorageService, registry *assets.MediaAssetRegistry) *Service {
+type mediaStore interface {
+	StoreMediaRef(context.Context, string, storage.StorageStoreOptions) (*storage.StoredUploadRef, error)
+	DeleteObjectByStorageProfile(context.Context, string, string) error
+}
+
+type mediaRegistry interface {
+	FindPreparedGenerationMedia(context.Context, int64, string, string, int) (assets.PreparedGenerationMedia, bool, error)
+	FindReusableGenerationMedia(context.Context, int64, string) (int64, bool, error)
+	RegisterPreparedGenerationMedia(context.Context, assets.PreparedGenerationMedia) (int64, error)
+}
+
+func NewService(storageService mediaStore, registry mediaRegistry) *Service {
 	return &Service{storage: storageService, registry: registry}
 }
 
@@ -41,6 +52,15 @@ func (s *Service) PrepareGenerationMedia(ctx context.Context, userID int64, clie
 			return tasks.GenerationRequestSnapshot{}, err
 		} else if found {
 			media.AssetID, media.Source = existing.AssetID, ""
+			continue
+		}
+		reusableAssetID, found, err := s.registry.FindReusableGenerationMedia(ctx, userID, media.Source)
+		if err != nil {
+			cleanup()
+			return tasks.GenerationRequestSnapshot{}, err
+		}
+		if found {
+			media.AssetID, media.Source = reusableAssetID, ""
 			continue
 		}
 		dirPrefix, err := storage.TaskOutputUploadDirPrefix(userID, "prepare-"+clientActionID)

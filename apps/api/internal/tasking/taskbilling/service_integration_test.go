@@ -162,7 +162,7 @@ func TestHoldAndPersistFailsClosedForUnavailableFeatureStates(t *testing.T) {
 			db, pool := testdb.OpenWithPool(t)
 			billingService := billing.NewService(pool)
 			creditService := credits.NewService(pool)
-			request, err := AIImageRequest(workflow.FeatureSlugLocalInpaint, "1k", 1)
+			request, err := AIImageRequest(workflow.FeatureSlugPartialEdit, "1k", 1)
 			if err != nil {
 				t.Fatal(err)
 			}

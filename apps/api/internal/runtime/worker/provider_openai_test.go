@@ -113,7 +113,7 @@ func readMultipartRequest(t *testing.T, r *http.Request) multipartRequestCapture
 	return capture
 }
 
-func TestCallOpenAIUsesEditEndpointForImageExtend(t *testing.T) {
+func TestCallOpenAIUsesEditEndpointForStyleVariation(t *testing.T) {
 	var gotPath string
 	var gotContentType string
 	var gotMultipart multipartRequestCapture
@@ -142,9 +142,9 @@ func TestCallOpenAIUsesEditEndpointForImageExtend(t *testing.T) {
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 	}
 	params := map[string]interface{}{
-		"feature":      "image-extend",
-		"image_urls":   []interface{}{server.URL + "/source.png"},
-		"extend_right": 22,
+		"feature":            "style-variation",
+		"image_urls":         []interface{}{server.URL + "/source.png"},
+		"variation_strength": 22,
 	}
 
 	gotResult, err := c.callOpenAIForTest(context.Background(), account, "extend prompt", 1024, 1024, 2*time.Second, params, "gpt-image-1")
@@ -166,8 +166,8 @@ func TestCallOpenAIUsesEditEndpointForImageExtend(t *testing.T) {
 	if gotMultipart.Fields["model"][0] != "gpt-image-1" {
 		t.Fatalf("unexpected model field: %#v", gotMultipart.Fields["model"])
 	}
-	if gotMultipart.Fields["extend_right"][0] != "22" {
-		t.Fatalf("unexpected extend_right field: %#v", gotMultipart.Fields["extend_right"])
+	if gotMultipart.Fields["variation_strength"][0] != "22" {
+		t.Fatalf("unexpected variation_strength field: %#v", gotMultipart.Fields["variation_strength"])
 	}
 	images := gotMultipart.Files["image"]
 	if len(images) != 1 {
@@ -489,7 +489,7 @@ func TestCallOpenAIPartialEditUsesEditEndpointAndMultipartFiles(t *testing.T) {
 	maskDataURL := buildTinyPNGDataURL(t)
 	sourceDataURL := buildTinyPNGDataURL(t)
 	params := map[string]interface{}{
-		"feature":            "local-inpaint",
+		"feature":            "partial-edit",
 		"image_urls":         []interface{}{maskDataURL},
 		"original_image_url": sourceDataURL,
 		"mask_image_url":     maskDataURL,
@@ -533,7 +533,7 @@ func TestCallOpenAIPartialEditNormalizesWebPDataURLToPNGMultipart(t *testing.T) 
 	sourceWebPDataURL := "data:image/webp;base64," + tinyWebPBase64
 	maskDataURL := buildTinyPNGDataURL(t)
 	params := map[string]interface{}{
-		"feature":            "local-inpaint",
+		"feature":            "partial-edit",
 		"image_urls":         []interface{}{sourceWebPDataURL},
 		"original_image_url": sourceWebPDataURL,
 		"mask_image_url":     maskDataURL,
@@ -588,7 +588,7 @@ func TestCallOpenAIPartialEditNormalizesWebPURLToPNGMultipart(t *testing.T) {
 	sourceURL := server.URL + "/source.webp"
 	maskDataURL := buildTinyPNGDataURL(t)
 	params := map[string]interface{}{
-		"feature":            "local-inpaint",
+		"feature":            "partial-edit",
 		"image_urls":         []interface{}{sourceURL},
 		"original_image_url": sourceURL,
 		"mask_image_url":     maskDataURL,
@@ -757,11 +757,11 @@ func TestOpenAIEndpointSelectionConsumesRuntimeInvocation(t *testing.T) {
 		)
 		return readOpenAIProviderParams(request).useEditEndpoint()
 	}
-	if !usesEditEndpoint(workflow.RuntimeOperationImageExtend, workflow.RuntimeInvocationEdit) {
-		t.Fatalf("expected image-extend to use edit endpoint")
+	if !usesEditEndpoint(workflow.RuntimeOperationOutpaint, workflow.RuntimeInvocationEdit) {
+		t.Fatalf("expected outpaint to use edit endpoint")
 	}
-	if !usesEditEndpoint(workflow.RuntimeOperationLocalInpaint, workflow.RuntimeInvocationEdit) {
-		t.Fatalf("expected local-inpaint to use edit endpoint")
+	if !usesEditEndpoint(workflow.RuntimeOperationPartialEdit, workflow.RuntimeInvocationEdit) {
+		t.Fatalf("expected partial-edit to use edit endpoint")
 	}
 	if usesEditEndpoint(workflow.RuntimeOperationImageUpscale, workflow.RuntimeInvocationTransform) {
 		t.Fatalf("expected transform invocation to stay out of the edit endpoint")
@@ -780,14 +780,14 @@ func TestOpenAIEndpointSelectionConsumesRuntimeInvocation(t *testing.T) {
 func TestReadOpenAIProviderParamsDerivesEditMask(t *testing.T) {
 	maskURL := "https://img.example/mask.png"
 	req := newProviderRequest("prompt", 1024, 1024, map[string]interface{}{
-		"feature":        "local-inpaint",
+		"feature":        "partial-edit",
 		"image_urls":     []interface{}{"https://img.example/source.png"},
 		"mask_image_url": maskURL,
-	}, "gpt-image-1", resolvedProviderRequestFacts{}, workflow.RuntimeOperationLocalInpaint, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsNone)
+	}, "gpt-image-1", resolvedProviderRequestFacts{}, workflow.RuntimeOperationPartialEdit, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsNone)
 
 	params := readOpenAIProviderParams(req)
 	if !params.useEditEndpoint() {
-		t.Fatalf("expected local-inpaint image request to use edit endpoint")
+		t.Fatalf("expected partial-edit image request to use edit endpoint")
 	}
 	if params.MaskImageRef != maskURL {
 		t.Fatalf("mask ref = %q, want %q", params.MaskImageRef, maskURL)

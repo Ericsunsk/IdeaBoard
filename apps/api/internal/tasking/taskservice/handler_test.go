@@ -386,21 +386,17 @@ func TestCheckSubmitTaskReadinessHandlerReturnsFeatureEnvelope(t *testing.T) {
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, newJSONRequest(t, http.MethodPost, "/submit/readiness", map[string]interface{}{
 		"prompt":           "向右扩展为工作室背景",
-		"client_action_id": "handler-image-extend",
-		"feature":          workflow.FeatureSlugImageExtend,
+		"client_action_id": "handler-outpaint",
+		"feature":          workflow.FeatureSlugOutpaint,
 		"image_urls":       []string{"https://example.com/source.png"},
 		"params": map[string]interface{}{
 			"model":                 "gpt-image-1",
 			"output_count":          1,
 			"original_image_width":  1024,
 			"original_image_height": 768,
-			"custom_width":          1280,
-			"custom_height":         768,
 			"extend": map[string]interface{}{
-				"top_percent":    0,
-				"right_percent":  25,
-				"bottom_percent": 0,
-				"left_percent":   0,
+				"target_width": 1280, "target_height": 768,
+				"image_offset_x": 0, "image_offset_y": 0,
 			},
 		},
 	}))
@@ -419,7 +415,7 @@ func TestCheckSubmitTaskReadinessHandlerReturnsFeatureEnvelope(t *testing.T) {
 	if body.Code != 0 || body.Msg != "success" {
 		t.Fatalf("unexpected response envelope: %+v", body)
 	}
-	if !body.Data.Ready || body.Data.Feature != workflow.FeatureSlugImageExtend || body.Data.Message != "" || body.Data.Billing == nil {
+	if !body.Data.Ready || body.Data.Feature != workflow.FeatureSlugOutpaint || body.Data.Message != "" || body.Data.Billing == nil {
 		t.Fatalf("unexpected readiness data: %+v", body.Data)
 	}
 	if body.Data.Billing.UnitCredits != 3 || body.Data.Billing.Quantity != 1 || body.Data.Billing.TotalCredits != 3 || !body.Data.Billing.Sufficient {

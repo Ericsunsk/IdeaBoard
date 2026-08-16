@@ -72,6 +72,26 @@ WHERE id = sqlc.arg(id)
   AND status = 'ready'
   AND deleted_at IS NULL;
 
+-- name: FindReadyOwnedMediaAssetIDByURL :one
+SELECT id
+FROM media_assets
+WHERE owner_user_id = sqlc.arg(owner_user_id)
+  AND url = sqlc.arg(url)
+  AND status = 'ready'
+  AND deleted_at IS NULL
+ORDER BY updated_at DESC, id DESC
+LIMIT 1;
+
+-- name: ListReadyOwnedMediaAssetIDsByStorageKey :many
+SELECT id
+FROM media_assets
+WHERE owner_user_id = sqlc.arg(owner_user_id)
+  AND storage_key = sqlc.arg(storage_key)
+  AND status = 'ready'
+  AND deleted_at IS NULL
+ORDER BY updated_at DESC, id DESC
+LIMIT 2;
+
 -- name: FindMediaAssetStorageLocationByURL :one
 SELECT storage_profile_id, storage_key
 FROM media_assets

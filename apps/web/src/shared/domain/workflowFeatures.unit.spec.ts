@@ -10,11 +10,12 @@ describe('canonical workflow feature registry', () => {
     expect(CANONICAL_WORKFLOW_FEATURE_SLUGS).toEqual(
       expect.arrayContaining([
         CANONICAL_WORKFLOW_FEATURE.promptGeneration,
-        CANONICAL_WORKFLOW_FEATURE.localInpaint,
+        CANONICAL_WORKFLOW_FEATURE.partialEdit,
       ]),
     )
     expect(WORKFLOW_FEATURE_SLUGS).toEqual(CANONICAL_WORKFLOW_FEATURE_SLUGS)
-    expect(CANONICAL_WORKFLOW_FEATURE_SLUGS).not.toContain('partial-edit')
+    expect(CANONICAL_WORKFLOW_FEATURE_SLUGS).not.toContain('local-inpaint')
+    expect(CANONICAL_WORKFLOW_FEATURE_SLUGS).not.toContain('image-extend')
     expect(CANONICAL_WORKFLOW_FEATURE_SLUGS).not.toContain('pattern-gen')
   })
 })

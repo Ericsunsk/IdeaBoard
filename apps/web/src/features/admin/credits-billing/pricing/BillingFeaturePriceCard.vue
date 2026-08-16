@@ -1,5 +1,5 @@
 <template>
-  <Card :class="adminMasonryCardClass" :pt="adminCardPt">
+  <Card class="min-w-0 !rounded-lg" :pt="adminCardPt">
     <template #title>
       <div class="flex min-w-0 items-center justify-between gap-3">
         <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
@@ -73,10 +73,7 @@
           />
         </div>
 
-        <div
-          v-if="item.status === 'archived'"
-          class="flex min-h-8 items-center justify-end gap-2"
-        >
+        <div v-if="item.status === 'archived'" class="flex min-h-8 items-center justify-end gap-2">
           <Button
             size="small"
             severity="danger"
@@ -104,11 +101,7 @@ import {
   WORKFLOW_FEATURE_GROUP_LIST,
 } from '../../../../shared/domain/workflowFeatureRegistry'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
-import {
-  adminActionButtonClass,
-  adminCompactTagClass,
-  adminMasonryCardClass,
-} from '../../shared/lib/adminUiClasses'
+import { adminActionButtonClass, adminCompactTagClass } from '../../shared/lib/adminUiClasses'
 import type {
   AdminBillableItemCard,
   AdminBillableItemStatus,

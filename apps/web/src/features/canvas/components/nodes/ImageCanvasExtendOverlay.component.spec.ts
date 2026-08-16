@@ -30,7 +30,7 @@ describe('ImageCanvasExtendOverlay', () => {
     view.container.addEventListener('mouseup', parentMouseUp)
     view.container.addEventListener('click', parentClick)
 
-    const frame = view.container.querySelector('[data-image-extend-frame]')
+    const frame = view.container.querySelector('[data-outpaint-frame]')
     const handle = view.container.querySelector('.image-node-expand-handle')
 
     expect(frame).toBeInstanceOf(HTMLElement)

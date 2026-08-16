@@ -25,8 +25,8 @@ describe('workflowFeatureRegistry projections', () => {
         slugs: [
           WORKFLOW_FEATURE.sketchToImage,
           WORKFLOW_FEATURE.styleVariation,
-          WORKFLOW_FEATURE.localInpaint,
-          WORKFLOW_FEATURE.imageExtend,
+          WORKFLOW_FEATURE.partialEdit,
+          WORKFLOW_FEATURE.outpaint,
         ],
       },
       {
@@ -86,7 +86,7 @@ describe('workflowFeatureRegistry projections', () => {
       label: '抠图',
       title: '抠图',
     })
-    expect(getWorkflowFeatureImageActionText(WORKFLOW_FEATURE.localInpaint)).toEqual({
+    expect(getWorkflowFeatureImageActionText(WORKFLOW_FEATURE.partialEdit)).toEqual({
       label: '局部重绘',
       title: '局部重绘',
     })

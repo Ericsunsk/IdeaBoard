@@ -22,12 +22,12 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 		t.Fatalf("Quote() missing SKU error = %v, want ErrSKUNotFound", err)
 	}
 
-	definition := testBillableDefinition("ai-image:local-inpaint", "局部重绘")
+	definition := testBillableDefinition("ai-image:partial-edit", "局部重绘")
 	priceV1, err := service.PublishPrice(ctx, PublishPriceInput{Definition: definition, UnitCredits: 25, ActorID: 7})
 	if err != nil {
 		t.Fatalf("CreatePrice(v1) error = %v", err)
 	}
-	quoteV1, err := service.QuoteAtResolution(ctx, "AI-IMAGE:LOCAL-INPAINT", OutputResolution1K, 4)
+	quoteV1, err := service.QuoteAtResolution(ctx, "AI-IMAGE:PARTIAL-EDIT", OutputResolution1K, 4)
 	if err != nil {
 		t.Fatalf("Quote(v1) error = %v", err)
 	}
@@ -41,7 +41,7 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreatePrice(v2) error = %v", err)
 	}
-	quoteV2, err := service.QuoteAtResolution(ctx, "ai-image:local-inpaint", OutputResolution1K, 3)
+	quoteV2, err := service.QuoteAtResolution(ctx, "ai-image:partial-edit", OutputResolution1K, 3)
 	if err != nil {
 		t.Fatalf("Quote(v2) error = %v", err)
 	}
@@ -55,10 +55,10 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	if quoteV1.DisplayName != "局部重绘" {
 		t.Fatalf("old quote display name changed after repricing: %q", quoteV1.DisplayName)
 	}
-	if _, err := service.SetAvailability(ctx, "ai-image:local-inpaint", false, 10); err != nil {
+	if _, err := service.SetAvailability(ctx, "ai-image:partial-edit", false, 10); err != nil {
 		t.Fatalf("SetAvailability() error = %v", err)
 	}
-	if _, err := service.QuoteAtResolution(ctx, "ai-image:local-inpaint", OutputResolution1K, 1); !errors.Is(err, ErrPricingUnavailable) {
+	if _, err := service.QuoteAtResolution(ctx, "ai-image:partial-edit", OutputResolution1K, 1); !errors.Is(err, ErrPricingUnavailable) {
 		t.Fatalf("Quote() with disabled SKU error = %v", err)
 	}
 
@@ -146,7 +146,7 @@ FROM billing_admin_actions WHERE sku = 'test:audit' ORDER BY id`)
 func TestPublishingNewPricePreservesDisabledCatalogState(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	service := NewService(pool)
-	definition := testBillableDefinition("ai-image:local-inpaint", "局部重绘")
+	definition := testBillableDefinition("ai-image:partial-edit", "局部重绘")
 	if _, err := service.PublishPrice(t.Context(), PublishPriceInput{Definition: definition, UnitCredits: 10, ActorID: 1}); err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +176,7 @@ func TestPublishingNewPricePreservesDisabledCatalogState(t *testing.T) {
 func TestCatalogAvailabilityTransitionsRequirePriceAndPersistAudit(t *testing.T) {
 	db, pool := testdb.OpenWithPool(t)
 	service := NewService(pool)
-	definition := testBillableDefinition("ai-image:local-inpaint", "局部重绘")
+	definition := testBillableDefinition("ai-image:partial-edit", "局部重绘")
 	registry, err := NewBillableItemRegistry([]BillableItemDefinition{definition})
 	if err != nil {
 		t.Fatal(err)

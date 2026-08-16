@@ -241,7 +241,7 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
   function onGlobalKeydown(event: KeyboardEvent) {
     if (!state.value) return
     const target = event.target as HTMLElement | null
-    if (target?.closest('[data-image-extend-composer]')) return
+    if (target?.closest('[data-outpaint-composer]')) return
     if (isEditableEventTarget(event.target)) return
     if (event.key === 'Enter' && !event.isComposing) {
       event.preventDefault()
@@ -251,9 +251,9 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
 
   useCanvasCustomLayerOverlay({
     visible: isExpandMode,
-    ignore: ['[data-image-extend-frame]', '[data-image-extend-composer]'],
+    ignore: ['[data-outpaint-frame]', '[data-outpaint-composer]'],
     ignoreEscape: [
-      '[data-image-extend-composer]',
+      '[data-outpaint-composer]',
       'textarea',
       'input:not([type="button"]):not([type="submit"]):not([type="reset"])',
       '[contenteditable=""]',

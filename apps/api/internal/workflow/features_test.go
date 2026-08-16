@@ -38,13 +38,13 @@ func TestParseWorkflowFeatureSlug(t *testing.T) {
 func TestParseWorkflowFeatureSlugSupportsCanonicalAllowlist(t *testing.T) {
 	canonical := []string{
 		FeatureSlugPromptGeneration,
-		FeatureSlugLocalInpaint,
+		FeatureSlugPartialEdit,
 		FeatureSlugSketchToImage,
 		FeatureSlugStyleVariation,
 		FeatureSlugRemoveBg,
 		FeatureSlugStyleFusion,
 		FeatureSlugHDUpscale,
-		FeatureSlugImageExtend,
+		FeatureSlugOutpaint,
 	}
 
 	for _, slug := range canonical {
@@ -75,13 +75,13 @@ func TestAIImageFeatureSlugsAreTheCanonicalWorkflowContract(t *testing.T) {
 	got := AIImageFeatureSlugs()
 	want := []string{
 		FeatureSlugPromptGeneration,
-		FeatureSlugLocalInpaint,
+		FeatureSlugPartialEdit,
 		FeatureSlugSketchToImage,
 		FeatureSlugStyleVariation,
 		FeatureSlugRemoveBg,
 		FeatureSlugStyleFusion,
 		FeatureSlugHDUpscale,
-		FeatureSlugImageExtend,
+		FeatureSlugOutpaint,
 	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("AI image features=%v, want=%v", got, want)

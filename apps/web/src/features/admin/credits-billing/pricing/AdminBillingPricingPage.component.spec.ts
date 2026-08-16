@@ -57,8 +57,45 @@ describe('AdminBillingPricingPage', () => {
     expect(screen.getByText('已归档')).toBeVisible()
     expect(screen.getAllByText('1 Idea')).toHaveLength(3)
     expect(screen.queryByText('1 Ideas')).not.toBeInTheDocument()
-    expect(container.querySelector('.columns-1.md\\:columns-2.xl\\:columns-3')).toBeTruthy()
+    expect(
+      container.querySelector('.grid.grid-cols-1.md\\:grid-cols-2.xl\\:grid-cols-3'),
+    ).toBeTruthy()
+    expect(container.querySelector('.columns-1')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '新建 SKU' })).not.toBeInTheDocument()
+  })
+
+  it('orders active priced cards before single-price and archived cards', async () => {
+    const items = [
+      ...makeCatalogItems(),
+      {
+        sku: 'ai-image:style-variation',
+        namespace: 'ai-image',
+        product_kind: 'workflow-feature',
+        display_name: '风格延展',
+        sort_order: 5,
+        status: 'active',
+        pricing_variants: ['1k', '2k', '4k'],
+        current_prices: {
+          '1k': {
+            output_resolution: '1k',
+            price_version_id: 2,
+            version: 1,
+            unit_credits: 2,
+            created_at: '2026-07-12T08:00:00Z',
+          },
+        },
+      },
+    ]
+    useMswHandlers(
+      http.get('/api/admin/billing/catalog', () =>
+        HttpResponse.json({ code: 0, msg: 'ok', data: { items } }),
+      ),
+    )
+
+    renderPricingPage()
+
+    expect(await screen.findByText('风格延展')).toBeVisible()
+    expectTextOrder(['风格延展', '抠图', '局部重绘', 'HD', '已移除功能'])
   })
 
   it('shows an empty state when no products are registered', async () => {
@@ -100,12 +137,22 @@ describe('AdminBillingPricingPage', () => {
       ),
       http.post('/api/admin/billing/catalog/:sku/prices', async ({ request, params }) => {
         publishRequests += 1
-        expect(params.sku).toBe('ai-image:local-inpaint')
-        await expect(request.json()).resolves.toEqual({ prices: { '1k': 0 } })
+        expect(params.sku).toBe('ai-image:partial-edit')
+        await expect(request.json()).resolves.toEqual({ prices: { default: 0 } })
         return HttpResponse.json({
           code: 0,
           msg: 'ok',
-          data: { prices: { '1k': { output_resolution: '1k', price_version_id: 8, version: 1, unit_credits: 0, created_at: '2026-07-16T09:00:00Z' } } },
+          data: {
+            prices: {
+              default: {
+                output_resolution: 'default',
+                price_version_id: 8,
+                version: 1,
+                unit_credits: 0,
+                created_at: '2026-07-16T09:00:00Z',
+              },
+            },
+          },
         })
       }),
     )
@@ -113,13 +160,14 @@ describe('AdminBillingPricingPage', () => {
     const { user } = renderPricingPage()
     await user.click(await screen.findByRole('button', { name: '设置价格' }))
     expect(screen.getByText('创建新版本，历史版本不变')).toBeVisible()
-    const priceInput = screen.getByRole('spinbutton', { name: '1K' })
+    const priceInput = screen.getByRole('spinbutton', { name: '固定' })
     await user.type(priceInput, '0')
     expect(priceInput).toHaveValue('0 Ideas')
     await user.click(screen.getByRole('button', { name: '发布价格' }))
 
     expect(await screen.findByText('0 Ideas')).toBeVisible()
     expect(screen.getAllByText('生效中')).toHaveLength(2)
+    expectTextOrder(['局部重绘', '抠图'])
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(publishRequests).toBe(1)
   })
@@ -175,14 +223,24 @@ describe('AdminBillingPricingPage', () => {
         return HttpResponse.json({
           code: 0,
           msg: 'ok',
-          data: { prices: { '1k': { output_resolution: '1k', price_version_id: 9, version: 1, unit_credits: 3, created_at: '2026-07-16T09:00:00Z' } } },
+          data: {
+            prices: {
+              default: {
+                output_resolution: 'default',
+                price_version_id: 9,
+                version: 1,
+                unit_credits: 3,
+                created_at: '2026-07-16T09:00:00Z',
+              },
+            },
+          },
         })
       }),
     )
 
     const { user } = renderPricingPage()
     await user.click(await screen.findByRole('button', { name: '设置价格' }))
-    await user.type(screen.getByRole('spinbutton', { name: '1K' }), '3')
+    await user.type(screen.getByRole('spinbutton', { name: '固定' }), '3')
     await user.click(screen.getByRole('button', { name: '发布价格' }))
 
     expect((await screen.findAllByText('publish unavailable')).length).toBeGreaterThan(0)
@@ -208,7 +266,17 @@ describe('AdminBillingPricingPage', () => {
         return HttpResponse.json({
           code: 0,
           msg: 'ok',
-          data: { prices: { '1k': { output_resolution: '1k', price_version_id: 10, version: 1, unit_credits: 5, created_at: '2026-07-16T09:00:00Z' } } },
+          data: {
+            prices: {
+              default: {
+                output_resolution: 'default',
+                price_version_id: 10,
+                version: 1,
+                unit_credits: 5,
+                created_at: '2026-07-16T09:00:00Z',
+              },
+            },
+          },
         })
       }),
     )
@@ -220,7 +288,7 @@ describe('AdminBillingPricingPage', () => {
     expect(screen.getByText('请输入价格')).toBeVisible()
     expect(publishRequests).toBe(0)
 
-    await user.type(screen.getByRole('spinbutton', { name: /1K/ }), '5')
+    await user.type(screen.getByRole('spinbutton', { name: /固定/ }), '5')
     await user.click(publishButton)
     expect(publishButton).toBeDisabled()
     await user.click(publishButton)
@@ -282,22 +350,34 @@ function renderPricingPage() {
   })
 }
 
+function expectTextOrder(labels: string[]) {
+  const elements = labels.map((label) => screen.getByText(label))
+  for (let index = 0; index < elements.length - 1; index += 1) {
+    expect(
+      elements[index]!.compareDocumentPosition(elements[index + 1]!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  }
+}
+
 function makeCatalogItems() {
   const price = {
-    output_resolution: '1k' as const,
+    output_resolution: 'default' as const,
     price_version_id: 1,
     version: 1,
     unit_credits: 1,
     created_at: '2026-07-12T08:00:00Z',
   }
+  const legacyPrice = { ...price, output_resolution: '1k' as const }
   return [
     {
-      sku: 'ai-image:local-inpaint',
+      sku: 'ai-image:partial-edit',
       namespace: 'ai-image',
       product_kind: 'workflow-feature',
       display_name: '局部重绘',
       sort_order: 10,
       status: 'unpriced',
+      pricing_variants: ['default'],
     },
     {
       sku: 'ai-image:remove-bg',
@@ -306,7 +386,8 @@ function makeCatalogItems() {
       display_name: '抠图',
       sort_order: 20,
       status: 'active',
-      current_prices: { '1k': price },
+      pricing_variants: ['default'],
+      current_prices: { default: price },
     },
     {
       sku: 'ai-image:hd-upscale',
@@ -315,7 +396,8 @@ function makeCatalogItems() {
       display_name: 'HD',
       sort_order: 30,
       status: 'disabled',
-      current_prices: { '1k': price },
+      pricing_variants: ['default'],
+      current_prices: { default: price },
     },
     {
       sku: 'legacy:removed',
@@ -324,7 +406,7 @@ function makeCatalogItems() {
       display_name: '已移除功能',
       sort_order: 0,
       status: 'archived',
-      current_prices: { '1k': price },
+      current_prices: { '1k': legacyPrice },
     },
   ]
 }

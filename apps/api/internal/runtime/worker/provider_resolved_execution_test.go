@@ -50,7 +50,7 @@ func TestResolveProviderExecutionRejectsIncompleteSnapshotBeforeMediaIO(t *testi
 	useMask := true
 	task := &tasks.TaskPayload{TaskID: "incomplete-snapshot", Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       workflow.FeatureSlugLocalInpaint,
+		Feature:       workflow.FeatureSlugPartialEdit,
 		Media: &tasks.MediaInputs{
 			Original: &tasks.MediaRef{AssetID: 1, Role: "original"},
 			Mask:     &tasks.MediaRef{AssetID: 2, Role: "mask"},

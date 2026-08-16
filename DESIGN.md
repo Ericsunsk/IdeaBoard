@@ -71,7 +71,7 @@ Canvas 术语以 [apps/web/src/features/canvas/CONTEXT.md](./apps/web/src/featur
 | `style-fusion` | 多图融合 |
 | `pattern-gen` | 图案生成 |
 | `hd-upscale` | HD |
-| `image-extend` | 扩图 |
+| `outpaint` | 扩图 |
 
 Contract rules:
 

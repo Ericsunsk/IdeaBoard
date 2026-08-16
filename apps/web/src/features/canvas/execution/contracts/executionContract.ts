@@ -4,13 +4,13 @@ import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
 
 export const EXECUTION_FEATURE = {
   promptGeneration: WORKFLOW_FEATURE.promptGeneration,
-  localInpaint: WORKFLOW_FEATURE.localInpaint,
+  partialEdit: WORKFLOW_FEATURE.partialEdit,
   removeBg: WORKFLOW_FEATURE.removeBg,
   styleFusion: WORKFLOW_FEATURE.styleFusion,
   sketchToImage: WORKFLOW_FEATURE.sketchToImage,
   styleVariation: WORKFLOW_FEATURE.styleVariation,
   hdUpscale: WORKFLOW_FEATURE.hdUpscale,
-  imageExtend: WORKFLOW_FEATURE.imageExtend,
+  outpaint: WORKFLOW_FEATURE.outpaint,
 } as const
 
 export type ExecutionFeature = (typeof EXECUTION_FEATURE)[keyof typeof EXECUTION_FEATURE]
@@ -25,8 +25,8 @@ export const EXECUTION_META = {
   [EXECUTION_FEATURE.promptGeneration]: {
     feature: EXECUTION_FEATURE.promptGeneration,
   },
-  [EXECUTION_FEATURE.localInpaint]: {
-    feature: EXECUTION_FEATURE.localInpaint,
+  [EXECUTION_FEATURE.partialEdit]: {
+    feature: EXECUTION_FEATURE.partialEdit,
   },
   [EXECUTION_FEATURE.styleFusion]: {
     feature: EXECUTION_FEATURE.styleFusion,
@@ -44,13 +44,13 @@ export const EXECUTION_META = {
   [EXECUTION_FEATURE.hdUpscale]: {
     feature: EXECUTION_FEATURE.hdUpscale,
   },
-  [EXECUTION_FEATURE.imageExtend]: {
-    feature: EXECUTION_FEATURE.imageExtend,
-    promptPrefix: '[image-extend]',
+  [EXECUTION_FEATURE.outpaint]: {
+    feature: EXECUTION_FEATURE.outpaint,
+    promptPrefix: '[outpaint]',
   },
 } as const satisfies Record<ExecutionFeature, ExecutionMetaEntry>
 
-export const EXECUTION_LOCAL_INPAINT_META = EXECUTION_META[EXECUTION_FEATURE.localInpaint]
+export const EXECUTION_PARTIAL_EDIT_META = EXECUTION_META[EXECUTION_FEATURE.partialEdit]
 
 export const EXECUTION_FUSION_META = EXECUTION_META[EXECUTION_FEATURE.styleFusion]
 

@@ -2,7 +2,7 @@
   <div class="image-node-expand-overlay">
     <div
       class="image-node-expand-frame"
-      data-image-extend-frame
+      data-outpaint-frame
       :style="overlayStyle"
       @pointermove.stop="emit('handle-pointermove', $event)"
       @pointerup.stop="emit('handle-pointerup', $event)"
@@ -21,7 +21,7 @@
         :style="handleStyle"
         @pointerdown.stop.prevent="emit('handle-pointerdown', { anchor, event: $event })"
       />
-      <div class="image-node-expand-composer-wrap" data-image-extend-composer @pointerdown.stop>
+      <div class="image-node-expand-composer-wrap" data-outpaint-composer @pointerdown.stop>
         <NodePromptComposer
           v-model="promptDraft"
           class="image-node-expand-composer"
@@ -70,12 +70,9 @@ const emit = defineEmits<{
 const promptDraft = ref('')
 const anchors = CANVAS_EXTEND_DRAG_ANCHORS
 const billingQuote = useCanvasBillingQuote(
-  () => WORKFLOW_FEATURE.imageExtend,
+  () => WORKFLOW_FEATURE.outpaint,
   () => true,
-  () =>
-    buildCanvasExtendReadinessRequest({
-      outputResolution: props.outputResolution,
-    }),
+  () => buildCanvasExtendReadinessRequest(),
 )
 const handleStyle = computed(() => {
   const radius = Number.isFinite(props.handleRadius)

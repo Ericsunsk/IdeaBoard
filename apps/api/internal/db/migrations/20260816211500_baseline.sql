@@ -2495,7 +2495,7 @@ CREATE TABLE feature_prompts (
   updated_by BIGINT,
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
-  CONSTRAINT ck_feature_prompts_feature_slug CHECK (feature_slug IN ('prompt-generation', 'local-inpaint', 'sketch-to-image', 'style-variation', 'remove-bg', 'style-fusion', 'hd-upscale', 'image-extend')),
+  CONSTRAINT ck_feature_prompts_feature_slug CHECK (feature_slug IN ('prompt-generation', 'partial-edit', 'sketch-to-image', 'style-variation', 'remove-bg', 'style-fusion', 'hd-upscale', 'outpaint')),
   CONSTRAINT fk_feature_prompts_updated_by FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
 );
 CREATE TABLE boards (
@@ -5234,6 +5234,21 @@ ON CONFLICT (profile_id) DO NOTHING;
 INSERT INTO system_configs (config_key, value)
 VALUES ('api_outbound_allow_hosts', '[]')
 ON CONFLICT (config_key) DO NOTHING;
+
+
+INSERT INTO feature_prompts (feature_slug, prompt, updated_by)
+VALUES
+  (
+    'partial-edit',
+    'Edit only the masked region according to the requested edit. Preserve all unmasked content. When removing an object, reconstruct the occluded background from surrounding visual evidence. Blend only a narrow boundary for seamless color and texture continuity. Maintain composition, perspective, lighting, identity, text, logos, and product structure wherever they are not masked.',
+    NULL
+  ),
+  (
+    'outpaint',
+    'Naturally extend the original image into the expanded canvas area. Preserve the original image content. Continue its composition, spatial relationships, perspective, lighting, color, texture, and style. Complete subjects only when they are cut off by the original boundary. Otherwise, do not duplicate existing subjects or introduce new subjects, text, logos, watermarks, faces, limbs, or product parts unless explicitly requested.',
+    NULL
+  )
+ON CONFLICT (feature_slug) DO NOTHING;
 
 -- Bind every privileged routine to its installed schema and keep PUBLIC from
 -- bypassing the runtime privilege model.

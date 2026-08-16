@@ -14,7 +14,6 @@ import { EXECUTION_FUSION_META } from '../contracts/executionContract'
 import type { ImageTaskAction } from '../contracts/imageActionExecution'
 import {
   resolveCanvasExtendIntent,
-  type CanvasExtendPercent,
   type CanvasExtendRect,
 } from '../../utils/canvasExtendGeometry'
 import {
@@ -56,10 +55,10 @@ export type CanvasExtendExecutionPlan = {
   source: ImageExecutionInput
   prompt: string
   outputCount: number
-  extendPercent: CanvasExtendPercent
+  frameRect: CanvasExtendRect
+  originalImageRect: CanvasExtendRect
   targetRatio: number
   targetWidth: number
-  outputResolution?: OutputResolution
   resultOptions: ImageExecutionResultOptions
 }
 
@@ -70,7 +69,6 @@ export type ImageInpaintExecutionPlan = {
   prompt: string
   rawMaskDataUrl: string
   outputCount: number
-  outputResolution?: OutputResolution
   resultOptions: ImageExecutionResultOptions
 }
 
@@ -340,7 +338,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     const source = requireImageExecutionImage(graph, nodeId)
     const resolvedIntent = resolveCanvasExtendIntent(intent.frameRect, intent.originalImageRect)
     if (!resolvedIntent.hasExtension) failPlanning('请先拖动扩图框')
-    const { extendPercent, targetRatio } = resolvedIntent
+    const { targetRatio } = resolvedIntent
     const targetWidth = resolveCanvasExtendResultWidth(
       source.resultAnchor.width,
       resolvedIntent.frameRect,
@@ -353,10 +351,10 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       source: source.input,
       prompt: `${intent.prompt ?? ''}`.trim(),
       outputCount: 1,
-      extendPercent,
+      frameRect: resolvedIntent.frameRect,
+      originalImageRect: resolvedIntent.originalImageRect,
       targetRatio,
       targetWidth,
-      outputResolution: resolveNodeOutputResolution(graph, nodeId),
       resultOptions: {
         anchor: withOutputAnchorNodeId(source.resultAnchor, nodeId),
         targetRatio,
@@ -385,7 +383,6 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       prompt,
       rawMaskDataUrl,
       outputCount: 1,
-      outputResolution: resolveNodeOutputResolution(graph, nodeId),
       resultOptions: {
         anchor: withOutputAnchorNodeId(source.resultAnchor, nodeId),
       },

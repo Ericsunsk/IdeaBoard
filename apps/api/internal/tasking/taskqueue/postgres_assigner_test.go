@@ -1082,7 +1082,7 @@ func assignerExecutionParams(t *testing.T, feature string, resolution string) st
 	case workflow.FeatureSlugPromptGeneration:
 	case workflow.FeatureSlugStyleFusion:
 		imageInputCount = 2
-	case workflow.FeatureSlugLocalInpaint:
+	case workflow.FeatureSlugPartialEdit:
 		imageInputCount = 1
 		hasMaskInput = true
 	case workflow.FeatureSlugRemoveBg, workflow.FeatureSlugHDUpscale:

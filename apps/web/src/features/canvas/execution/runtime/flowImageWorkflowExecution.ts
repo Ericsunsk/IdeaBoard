@@ -10,7 +10,7 @@ import {
   buildImageExecutionTaskRequest,
   buildPreparedImageInpaintTaskRequest,
 } from '../commands/flowImageTaskRequests'
-import { prepareFlowLocalInpaintMask } from '../media/flowLocalInpaintMask'
+import { prepareFlowPartialEditMask } from '../media/flowPartialEditMask'
 import { loadImageSizeFromUrl } from '../media/imageSize'
 import {
   prepareFusionExecutionPlan,
@@ -167,7 +167,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     const attachment = requireCurrentAttachment()
     const boardId = attachment.boardId
     const [maskImageUrl, imageSize] = await Promise.all([
-      prepareFlowLocalInpaintMask(plan.rawMaskDataUrl, boardId),
+      prepareFlowPartialEditMask(plan.rawMaskDataUrl, boardId),
       loadImageSizeFromUrl(plan.source.url),
     ])
     const taskRequest = buildPreparedImageInpaintTaskRequest({ plan, maskImageUrl, imageSize })

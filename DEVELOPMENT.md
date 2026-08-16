@@ -243,7 +243,7 @@ Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration �
 | `style-fusion` | 多图融合 |
 | `pattern-gen` | 图案生成 |
 | `hd-upscale` | HD |
-| `image-extend` | 扩图 |
+| `outpaint` | 扩图 |
 
 Rules:
 

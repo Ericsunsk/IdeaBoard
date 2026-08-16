@@ -5,7 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { HDUpscaleParams } from './hDUpscaleParams'
-import type { ImageExtendParams } from './imageExtendParams'
+import type { OutpaintParams } from './outpaintParams'
 import type { OutputResolution } from './outputResolution'
 import type { RequestedOutputCount } from './requestedOutputCount'
 import type { StyleFusionParams } from './styleFusionParams'
@@ -30,7 +30,7 @@ export interface SubmitTaskRequestParams {
   output_resolution?: OutputResolution
   prompt_upsampling?: boolean
   variation?: StyleVariationParams
-  extend?: ImageExtendParams
+  extend?: OutpaintParams
   hd?: HDUpscaleParams
   fusion?: StyleFusionParams
 }

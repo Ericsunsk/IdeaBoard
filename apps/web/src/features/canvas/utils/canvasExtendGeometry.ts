@@ -5,19 +5,18 @@ export type CanvasExtendRect = {
   height: number
 }
 
-export type CanvasExtendPercent = {
-  top: number
-  right: number
-  bottom: number
-  left: number
-}
-
 export type CanvasExtendResolvedIntent = {
   frameRect: CanvasExtendRect
   originalImageRect: CanvasExtendRect
-  extendPercent: CanvasExtendPercent
   targetRatio: number
   hasExtension: boolean
+}
+
+export type CanvasExtendPixelGeometry = {
+  targetWidth: number
+  targetHeight: number
+  imageOffsetX: number
+  imageOffsetY: number
 }
 
 export type CanvasExtendDragAnchor = 'n' | 'e' | 's' | 'w' | 'nw' | 'ne' | 'sw' | 'se'
@@ -154,18 +153,8 @@ export function resolveCanvasExtendIntent(
   const extendTopPx = Math.max(0, originalTop - frameTop)
   const extendRightPx = Math.max(0, frameRight - originalRight)
   const extendBottomPx = Math.max(0, frameBottom - originalBottom)
-  const toPercent = (px: number, base: number) => Math.max(0, Math.round((px / base) * 100))
-  const extendPercent = {
-    top: toPercent(extendTopPx, originalHeight),
-    right: toPercent(extendRightPx, originalWidth),
-    bottom: toPercent(extendBottomPx, originalHeight),
-    left: toPercent(extendLeftPx, originalWidth),
-  }
   const hasExtension =
-    extendPercent.top > 0 ||
-    extendPercent.right > 0 ||
-    extendPercent.bottom > 0 ||
-    extendPercent.left > 0
+    extendTopPx > 0 || extendRightPx > 0 || extendBottomPx > 0 || extendLeftPx > 0
   return {
     frameRect: normalizedFrameRect,
     originalImageRect: createCanvasExtendRect(
@@ -174,8 +163,44 @@ export function resolveCanvasExtendIntent(
       originalWidth,
       originalHeight,
     ),
-    extendPercent,
     targetRatio: normalizedFrameRect.height / normalizedFrameRect.width,
     hasExtension,
+  }
+}
+
+export function resolveCanvasExtendPixelGeometry(
+  imageSize: { width: number; height: number },
+  frameRect: CanvasExtendRect,
+  originalImageRect: CanvasExtendRect,
+): CanvasExtendPixelGeometry {
+  const sourceWidth = Math.max(1, Math.round(imageSize.width))
+  const sourceHeight = Math.max(1, Math.round(imageSize.height))
+  const originalWidth = Math.max(1, originalImageRect.width)
+  const originalHeight = Math.max(1, originalImageRect.height)
+  const originalRight = originalImageRect.left + originalWidth
+  const originalBottom = originalImageRect.top + originalHeight
+  const frameRight = frameRect.left + frameRect.width
+  const frameBottom = frameRect.top + frameRect.height
+  const imageOffsetX = Math.max(
+    0,
+    Math.round(sourceWidth * ((originalImageRect.left - frameRect.left) / originalWidth)),
+  )
+  const imageOffsetY = Math.max(
+    0,
+    Math.round(sourceHeight * ((originalImageRect.top - frameRect.top) / originalHeight)),
+  )
+  const rightExtension = Math.max(
+    0,
+    Math.round(sourceWidth * ((frameRight - originalRight) / originalWidth)),
+  )
+  const bottomExtension = Math.max(
+    0,
+    Math.round(sourceHeight * ((frameBottom - originalBottom) / originalHeight)),
+  )
+  return {
+    targetWidth: sourceWidth + imageOffsetX + rightExtension,
+    targetHeight: sourceHeight + imageOffsetY + bottomExtension,
+    imageOffsetX,
+    imageOffsetY,
   }
 }

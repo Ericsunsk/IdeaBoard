@@ -86,7 +86,7 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
     promptVariables: [{ key: '{{user_prompt}}', tone: 'prompt' }],
   },
   {
-    slug: WORKFLOW_FEATURE.localInpaint,
+    slug: WORKFLOW_FEATURE.partialEdit,
     label: '局部重绘',
     groupKey: WORKFLOW_FEATURE_GROUP.image,
     imageActionLabel: '局部重绘',
@@ -136,18 +136,12 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
     promptVariables: [],
   },
   {
-    slug: WORKFLOW_FEATURE.imageExtend,
+    slug: WORKFLOW_FEATURE.outpaint,
     label: '扩图',
     groupKey: WORKFLOW_FEATURE_GROUP.image,
     imageActionLabel: '扩图',
     imageActionTitle: '扩图',
-    promptVariables: [
-      { key: '{{user_prompt}}', tone: 'prompt' },
-      { key: '{{extend_top_percent}}', tone: 'control' },
-      { key: '{{extend_right_percent}}', tone: 'control' },
-      { key: '{{extend_bottom_percent}}', tone: 'control' },
-      { key: '{{extend_left_percent}}', tone: 'control' },
-    ],
+    promptVariables: [{ key: '{{user_prompt}}', tone: 'prompt' }],
   },
 ] as const
 
@@ -186,8 +180,8 @@ const WORKFLOW_FEATURE_CONFIG_GROUP_DEFS = [
     slugs: [
       WORKFLOW_FEATURE.sketchToImage,
       WORKFLOW_FEATURE.styleVariation,
-      WORKFLOW_FEATURE.localInpaint,
-      WORKFLOW_FEATURE.imageExtend,
+      WORKFLOW_FEATURE.partialEdit,
+      WORKFLOW_FEATURE.outpaint,
     ],
   },
   {

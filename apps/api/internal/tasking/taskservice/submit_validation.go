@@ -17,10 +17,6 @@ var unsupportedSubmitTaskParamKeys = []string{
 	paramkeys.ImageURL,
 	paramkeys.MaskImageURLs,
 	paramkeys.VariationStrength,
-	paramkeys.ExtendTop,
-	paramkeys.ExtendRight,
-	paramkeys.ExtendBottom,
-	paramkeys.ExtendLeft,
 	paramkeys.FusionInputWeights,
 	paramkeys.UpscaleMode,
 	paramkeys.UpscaleFactor,
@@ -250,11 +246,11 @@ func workflowTaskParamsFromMap(params map[string]interface{}, featureSlug string
 		if c, ok := workflow.ReadStyleVariationPromptContract(params); ok {
 			p.Variation = &tasks.StyleVariationParams{Strength: c.Strength}
 		}
-	case workflow.FeatureSlugImageExtend:
-		if c, ok := workflow.ReadImageExtendPromptContract(params); ok {
-			p.Extend = &tasks.ImageExtendParams{
-				TopPercent: c.TopPercent, RightPercent: c.RightPercent,
-				BottomPercent: c.BottomPercent, LeftPercent: c.LeftPercent,
+	case workflow.FeatureSlugOutpaint:
+		if c, ok := workflow.ReadOutpaintContract(params); ok {
+			p.Extend = &tasks.OutpaintParams{
+				TargetWidth: c.TargetWidth, TargetHeight: c.TargetHeight,
+				ImageOffsetX: c.ImageOffsetX, ImageOffsetY: c.ImageOffsetY,
 			}
 		}
 	case workflow.FeatureSlugHDUpscale:

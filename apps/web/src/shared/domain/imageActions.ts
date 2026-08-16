@@ -5,5 +5,5 @@ export const IMAGE_NODE_ACTION = {
   styleVariation: WORKFLOW_FEATURE.styleVariation,
   sketchToImage: WORKFLOW_FEATURE.sketchToImage,
   hdUpscale: WORKFLOW_FEATURE.hdUpscale,
-  imageExtend: WORKFLOW_FEATURE.imageExtend,
+  outpaint: WORKFLOW_FEATURE.outpaint,
 } as const

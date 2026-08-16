@@ -78,9 +78,9 @@ describe('canvas billing readiness store', () => {
         }),
     })
 
-    await store.ensureFeature(WORKFLOW_FEATURE.localInpaint)
+    await store.ensureFeature(WORKFLOW_FEATURE.partialEdit)
 
-    expect(store.getFeatureState(WORKFLOW_FEATURE.localInpaint)).toMatchObject({
+    expect(store.getFeatureState(WORKFLOW_FEATURE.partialEdit)).toMatchObject({
       status: 'ready',
       unitCredits: 4,
       availableCredits: 3,

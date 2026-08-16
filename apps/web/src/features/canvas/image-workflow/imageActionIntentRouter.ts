@@ -86,7 +86,7 @@ export function createImageActionIntentRouter(options: ImageActionIntentRouterOp
       return
     }
     if (
-      actionMode === IMAGE_ACTION_MODE.localInpaint ||
+      actionMode === IMAGE_ACTION_MODE.partialEdit ||
       actionMode === IMAGE_ACTION_MODE.localImageEditor
     ) {
       options.cancelFlowExpandMode()

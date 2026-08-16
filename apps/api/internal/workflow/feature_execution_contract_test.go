@@ -36,10 +36,10 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 			controlContract: RuntimeControlsNone,
 		},
 		{
-			feature: FeatureSlugLocalInpaint, promptPolicy: PromptPolicyRequired,
-			outputCountPolicy: OutputCountPolicyFixed, outputResolutionPolicy: OutputResolutionPolicyScalable,
+			feature: FeatureSlugPartialEdit, promptPolicy: PromptPolicyRequired,
+			outputCountPolicy: OutputCountPolicyFixed, outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
 			capability: RoutingCapabilityImageFill, modelRequirement: RoutingModelNotRequired,
-			operation: RuntimeOperationLocalInpaint, imageInputCount: 1, hasMaskInput: true, primitive: GenerationPrimitiveImageToImage,
+			operation: RuntimeOperationPartialEdit, imageInputCount: 1, hasMaskInput: true, primitive: GenerationPrimitiveImageToImage,
 			invocation: RuntimeInvocationTransform, imageInputPolicy: ImageInputRequired,
 			maskInputPolicy: MaskInputRequired, originalImagePolicy: OriginalImageForwardWhenPresent,
 			controlContract: RuntimeControlsNone,
@@ -90,10 +90,10 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 			controlContract: RuntimeControlsUpscale,
 		},
 		{
-			feature: FeatureSlugImageExtend, promptPolicy: PromptPolicyOptional,
-			outputCountPolicy: OutputCountPolicyFixed, outputResolutionPolicy: OutputResolutionPolicyScalable,
+			feature: FeatureSlugOutpaint, promptPolicy: PromptPolicyOptional,
+			outputCountPolicy: OutputCountPolicyFixed, outputResolutionPolicy: OutputResolutionPolicyDefaultOnly,
 			capability: RoutingCapabilityImageFill, modelRequirement: RoutingModelNotRequired,
-			operation: RuntimeOperationImageExtend, imageInputCount: 1, primitive: GenerationPrimitiveImageToImage,
+			operation: RuntimeOperationOutpaint, imageInputCount: 1, primitive: GenerationPrimitiveImageToImage,
 			invocation: RuntimeInvocationTransform, imageInputPolicy: ImageInputRequired,
 			maskInputPolicy: MaskInputIgnored, originalImagePolicy: OriginalImageForwardWhenPresent,
 			controlContract: RuntimeControlsExtend,
@@ -205,13 +205,13 @@ func TestCompileFeatureReadinessPlanSuppliesContractValidMediaFacts(t *testing.T
 		hasMask bool
 	}{
 		{feature: FeatureSlugPromptGeneration},
-		{feature: FeatureSlugLocalInpaint, images: 1, hasMask: true},
+		{feature: FeatureSlugPartialEdit, images: 1, hasMask: true},
 		{feature: FeatureSlugRemoveBg, images: 1},
 		{feature: FeatureSlugStyleFusion, images: 2},
 		{feature: FeatureSlugSketchToImage, images: 1},
 		{feature: FeatureSlugStyleVariation, images: 1},
 		{feature: FeatureSlugHDUpscale, images: 1},
-		{feature: FeatureSlugImageExtend, images: 1},
+		{feature: FeatureSlugOutpaint, images: 1},
 	}
 
 	for _, tt := range tests {
@@ -278,11 +278,11 @@ func TestCompileFeatureExecutionPlanRejectsInvalidRuntimeMediaByFeature(t *testi
 	}{
 		{name: "remove background needs image", feature: FeatureSlugRemoveBg, field: "image_input_count"},
 		{name: "upscale needs image", feature: FeatureSlugHDUpscale, field: "image_input_count"},
-		{name: "inpaint needs image", feature: FeatureSlugLocalInpaint, params: FeatureExecutionParams{HasMaskInput: true}, field: "image_input_count"},
-		{name: "inpaint needs mask", feature: FeatureSlugLocalInpaint, params: FeatureExecutionParams{ImageInputCount: 1}, field: "mask_input"},
+		{name: "inpaint needs image", feature: FeatureSlugPartialEdit, params: FeatureExecutionParams{HasMaskInput: true}, field: "image_input_count"},
+		{name: "inpaint needs mask", feature: FeatureSlugPartialEdit, params: FeatureExecutionParams{ImageInputCount: 1}, field: "mask_input"},
 		{name: "sketch needs image", feature: FeatureSlugSketchToImage, field: "image_input_count"},
 		{name: "variation needs image", feature: FeatureSlugStyleVariation, field: "image_input_count"},
-		{name: "extend needs image", feature: FeatureSlugImageExtend, field: "image_input_count"},
+		{name: "extend needs image", feature: FeatureSlugOutpaint, field: "image_input_count"},
 		{name: "fusion needs multiple images", feature: FeatureSlugStyleFusion, params: FeatureExecutionParams{ImageInputCount: 1}, field: "image_input_count"},
 		{name: "fusion caps images at four", feature: FeatureSlugStyleFusion, params: FeatureExecutionParams{ImageInputCount: 5}, field: "image_input_count"},
 		{name: "non mask operation rejects mask", feature: FeatureSlugSketchToImage, params: FeatureExecutionParams{ImageInputCount: 1, HasMaskInput: true}, field: "mask_input"},
@@ -334,16 +334,19 @@ func TestCompileFeatureExecutionPlanUsesFeatureVersionedImageLimits(t *testing.T
 	}
 }
 
-func TestCompileFeatureExecutionPlanDedicatedTransformsAreFixedAndModeless(t *testing.T) {
+func TestCompileFeatureExecutionPlanFixedPriceTransformsUseDefaultResolution(t *testing.T) {
 	count := 1
 	resolution := " DEFAULT "
 	for _, test := range []struct {
 		feature    string
 		capability RoutingCapability
 		operation  RuntimeOperation
+		hasMask    bool
 	}{
+		{feature: FeatureSlugPartialEdit, capability: RoutingCapabilityImageFill, operation: RuntimeOperationPartialEdit, hasMask: true},
 		{feature: FeatureSlugRemoveBg, capability: RoutingCapabilityBackgroundRemoval, operation: RuntimeOperationBackgroundRemoval},
 		{feature: FeatureSlugHDUpscale, capability: RoutingCapabilityImageUpscale, operation: RuntimeOperationImageUpscale},
+		{feature: FeatureSlugOutpaint, capability: RoutingCapabilityImageFill, operation: RuntimeOperationOutpaint},
 	} {
 		t.Run(test.feature, func(t *testing.T) {
 			plan, err := CompileFeatureExecutionPlan(CompileFeatureExecutionInput{
@@ -352,13 +355,14 @@ func TestCompileFeatureExecutionPlanDedicatedTransformsAreFixedAndModeless(t *te
 					RequestedOutputCount: &count,
 					OutputResolution:     &resolution,
 					ImageInputCount:      1,
+					HasMaskInput:         test.hasMask,
 				},
 			})
 			if err != nil {
 				t.Fatalf("compile: %v", err)
 			}
-			if plan.PromptPolicy() != PromptPolicyIgnored || plan.RequestedOutputCount().Int() != 1 || plan.OutputResolution() != OutputResolutionDefault {
-				t.Fatalf("dedicated plan=(prompt=%q,count=%d,resolution=%q)", plan.PromptPolicy(), plan.RequestedOutputCount().Int(), plan.OutputResolution())
+			if plan.RequestedOutputCount().Int() != 1 || plan.OutputResolution() != OutputResolutionDefault {
+				t.Fatalf("fixed-price plan=(count=%d,resolution=%q)", plan.RequestedOutputCount().Int(), plan.OutputResolution())
 			}
 			routing := plan.RoutingRequirement()
 			if routing.Capability() != test.capability || routing.ModelRequirement() != RoutingModelNotRequired {
@@ -377,13 +381,13 @@ func TestFeatureExecutionPlanDurableRoundTripPreservesCanonicalFacts(t *testing.
 	for _, feature := range CanonicalFeatureSlugs() {
 		t.Run(feature, func(t *testing.T) {
 			params := FeatureExecutionParams{ImageInputCount: 1}
-			if feature == FeatureSlugLocalInpaint {
+			if feature == FeatureSlugPartialEdit {
 				params.HasMaskInput = true
 			}
 			if feature == FeatureSlugStyleFusion {
 				params.ImageInputCount = 2
 			}
-			if feature != FeatureSlugRemoveBg && feature != FeatureSlugHDUpscale && feature != FeatureSlugLocalInpaint && feature != FeatureSlugImageExtend {
+			if feature != FeatureSlugRemoveBg && feature != FeatureSlugHDUpscale && feature != FeatureSlugPartialEdit && feature != FeatureSlugOutpaint {
 				params.RequestedOutputCount = &count
 				params.OutputResolution = &resolution
 			}
@@ -419,7 +423,7 @@ func TestFeatureExecutionPlanJSONUsesVersionedDurableSeam(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if string(payload) == `{}` || !strings.Contains(string(payload), `"schema_version":2`) {
+	if string(payload) == `{}` || !strings.Contains(string(payload), `"schema_version":3`) {
 		t.Fatalf("plan did not use versioned durable encoding: %s", payload)
 	}
 	var decoded FeatureExecutionPlan
@@ -447,7 +451,7 @@ func TestDecodeFeatureExecutionPlanFailsClosed(t *testing.T) {
 	}{
 		{
 			name:    "unknown schema",
-			payload: strings.Replace(string(payload), `"schema_version":2`, `"schema_version":99`, 1),
+			payload: strings.Replace(string(payload), `"schema_version":3`, `"schema_version":99`, 1),
 			code:    FeatureContractUnsupportedSchema,
 		},
 		{
@@ -561,7 +565,17 @@ func TestCompileFeatureExecutionPlanReturnsRecognizableValidationErrors(t *testi
 		},
 		{
 			name:  "unknown scalable resolution",
-			input: CompileFeatureExecutionInput{Feature: FeatureSlugLocalInpaint, Params: FeatureExecutionParams{OutputResolution: &resolution8K}},
+			input: CompileFeatureExecutionInput{Feature: FeatureSlugStyleVariation, Params: FeatureExecutionParams{OutputResolution: &resolution8K}},
+			code:  FeatureContractUnsupportedResolution, field: "output_resolution",
+		},
+		{
+			name:  "local inpaint rejects scaled resolution",
+			input: CompileFeatureExecutionInput{Feature: FeatureSlugPartialEdit, Params: FeatureExecutionParams{OutputResolution: &resolution4K}},
+			code:  FeatureContractUnsupportedResolution, field: "output_resolution",
+		},
+		{
+			name:  "image extend rejects scaled resolution",
+			input: CompileFeatureExecutionInput{Feature: FeatureSlugOutpaint, Params: FeatureExecutionParams{OutputResolution: &resolution4K}},
 			code:  FeatureContractUnsupportedResolution, field: "output_resolution",
 		},
 		{

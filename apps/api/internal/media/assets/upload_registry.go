@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -147,6 +148,52 @@ func (r *MediaAssetRegistry) FindPreparedGenerationMedia(ctx context.Context, ow
 		return PreparedGenerationMedia{}, false, err
 	}
 	return PreparedGenerationMedia{AssetID: row.ID, OwnerUserID: ownerUserID, StorageProfile: row.StorageProfileID, StorageKey: row.StorageKey, URL: row.Url, SourceURL: row.SourceUrl, MIMEType: row.MimeType, Width: int(row.Width), Height: int(row.Height), SizeBytes: row.SizeBytes, InputIndex: inputIndex, Role: role, RefID: refID}, true, nil
+}
+
+func (r *MediaAssetRegistry) FindReusableGenerationMedia(ctx context.Context, ownerUserID int64, source string) (int64, bool, error) {
+	if r == nil || r.q == nil || ownerUserID <= 0 {
+		return 0, false, fmt.Errorf("media asset registry is unavailable")
+	}
+	trimmed := strings.TrimSpace(source)
+	if trimmed == "" {
+		return 0, false, nil
+	}
+	if strings.HasPrefix(trimmed, "/uploads/") {
+		resource, err := storage.ParseUploadResource(strings.TrimPrefix(trimmed, "/"))
+		if err != nil {
+			return 0, false, nil
+		}
+		ids, err := r.q.ListReadyOwnedMediaAssetIDsByStorageKey(ctx, dbsqlc.ListReadyOwnedMediaAssetIDsByStorageKeyParams{
+			OwnerUserID: ownerUserID,
+			StorageKey:  resource.ObjectKey,
+		})
+		if err != nil {
+			return 0, false, fmt.Errorf("find reusable media asset by storage key: %w", err)
+		}
+		switch len(ids) {
+		case 0:
+			return 0, false, nil
+		case 1:
+			return ids[0], true, nil
+		default:
+			return 0, false, fmt.Errorf("reusable media asset storage key is ambiguous")
+		}
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || !strings.HasPrefix(parsed.Path, "/uploads/") {
+		return 0, false, nil
+	}
+	assetID, err := r.q.FindReadyOwnedMediaAssetIDByURL(ctx, dbsqlc.FindReadyOwnedMediaAssetIDByURLParams{
+		OwnerUserID: ownerUserID,
+		Url:         trimmed,
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, fmt.Errorf("find reusable media asset by URL: %w", err)
+	}
+	return assetID, true, nil
 }
 
 func (r *MediaAssetRegistry) LocateStoredUpload(ctx context.Context, lookup storage.StoredUploadLookup) (storage.StoredUploadLocation, bool, error) {

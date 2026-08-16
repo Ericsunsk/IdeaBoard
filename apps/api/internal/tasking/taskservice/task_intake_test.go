@@ -22,6 +22,10 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 			Capabilities: []string{"background-removal", "image-upscale", "image-fill"},
 			Models:       []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
 		}}},
+		Prompts: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
+			workflow.FeatureSlugPartialEdit: {Prompt: "system"},
+			workflow.FeatureSlugOutpaint:    {Prompt: "system"},
+		}},
 		Media: testSubmitMediaValidator{},
 	})
 
@@ -37,7 +41,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 			params:  map[string]interface{}{"variation": map[string]interface{}{"strength": 0.5}},
 		},
 		{
-			feature: workflow.FeatureSlugLocalInpaint,
+			feature: workflow.FeatureSlugPartialEdit,
 			images:  []string{"https://example.com/inpaint.png"},
 			params: map[string]interface{}{
 				"mask_image_url":        "https://example.com/mask.png",
@@ -62,15 +66,14 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 			params:  map[string]interface{}{"hd": map[string]interface{}{"scale": 2.0}},
 		},
 		{
-			feature: workflow.FeatureSlugImageExtend,
+			feature: workflow.FeatureSlugOutpaint,
 			images:  []string{"https://example.com/extend.png"},
 			params: map[string]interface{}{"extend": map[string]interface{}{
-				"top_percent": 0, "right_percent": 25, "bottom_percent": 0, "left_percent": 0,
+				"target_width": 1280, "target_height": 768,
+				"image_offset_x": 0, "image_offset_y": 0,
 			},
 				"original_image_width":  1024,
 				"original_image_height": 768,
-				"custom_width":          1280,
-				"custom_height":         768,
 			},
 		},
 	}
@@ -78,7 +81,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 	for _, tt := range tests {
 		t.Run(tt.feature, func(t *testing.T) {
 			outputCount := 2
-			if tt.feature == workflow.FeatureSlugRemoveBg || tt.feature == workflow.FeatureSlugHDUpscale || tt.feature == workflow.FeatureSlugLocalInpaint || tt.feature == workflow.FeatureSlugImageExtend {
+			if tt.feature == workflow.FeatureSlugRemoveBg || tt.feature == workflow.FeatureSlugHDUpscale || tt.feature == workflow.FeatureSlugPartialEdit || tt.feature == workflow.FeatureSlugOutpaint {
 				outputCount = 1
 			}
 			requestParams := map[string]interface{}{"output_count": outputCount}
@@ -103,7 +106,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 			}
 
 			wantQuantity := int64(2)
-			if tt.feature == workflow.FeatureSlugRemoveBg || tt.feature == workflow.FeatureSlugHDUpscale || tt.feature == workflow.FeatureSlugLocalInpaint || tt.feature == workflow.FeatureSlugImageExtend {
+			if tt.feature == workflow.FeatureSlugRemoveBg || tt.feature == workflow.FeatureSlugHDUpscale || tt.feature == workflow.FeatureSlugPartialEdit || tt.feature == workflow.FeatureSlugOutpaint {
 				wantQuantity = 1
 			}
 			billingRequest := canonical.BillingRequest()
@@ -211,12 +214,15 @@ func TestTaskIntakeReadinessDoesNotRequireExecutionMedia(t *testing.T) {
 			Capabilities: []string{"background-removal", "image-fill"},
 			Models:       []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 		}}},
+		Prompts: fakeFeaturePromptStore{configs: map[string]prompts.FeaturePromptRuntimeConfig{
+			workflow.FeatureSlugPartialEdit: {Prompt: "system"},
+		}},
 	})
 
-	for _, feature := range []string{workflow.FeatureSlugLocalInpaint, workflow.FeatureSlugRemoveBg} {
+	for _, feature := range []string{workflow.FeatureSlugPartialEdit, workflow.FeatureSlugRemoveBg} {
 		t.Run(feature, func(t *testing.T) {
 			params := map[string]interface{}{"output_count": 1}
-			if feature == workflow.FeatureSlugLocalInpaint {
+			if feature == workflow.FeatureSlugPartialEdit {
 				params["original_image_width"] = 1024
 				params["original_image_height"] = 768
 				params["custom_width"] = 1024
@@ -401,6 +407,48 @@ func TestTaskIntakeAllowsMissingSystemPrompt(t *testing.T) {
 	}
 	if canonical.Prompt() != "repeatable textile pattern" {
 		t.Fatalf("Prompt = %q, want user prompt unchanged", canonical.Prompt())
+	}
+}
+
+func TestTaskIntakeRequiresImageFillSystemPrompt(t *testing.T) {
+	intake := NewTaskIntake(TaskIntakeDeps{
+		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+			ID:           101,
+			Capabilities: []string{"image-fill"},
+		}}},
+	})
+	tests := []struct {
+		feature string
+		params  map[string]interface{}
+	}{
+		{
+			feature: workflow.FeatureSlugPartialEdit,
+			params: map[string]interface{}{
+				"original_image_width": 1024, "original_image_height": 768,
+				"custom_width": 1024, "custom_height": 768,
+			},
+		},
+		{
+			feature: workflow.FeatureSlugOutpaint,
+			params: map[string]interface{}{
+				"original_image_width": 1024, "original_image_height": 768,
+				"extend": map[string]interface{}{
+					"target_width": 1280, "target_height": 768,
+					"image_offset_x": 0, "image_offset_y": 0,
+				},
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.feature, func(t *testing.T) {
+			_, err := intake.CompileReadiness(t.Context(), &tasks.SubmitTaskRequest{
+				Feature: test.feature,
+				Params:  test.params,
+			})
+			if err == nil || !strings.Contains(err.Error(), "未配置 System Prompt") {
+				t.Fatalf("CompileReadiness() error = %v", err)
+			}
+		})
 	}
 }
 

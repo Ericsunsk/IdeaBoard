@@ -26,7 +26,7 @@ const iconMap: Record<ImageActionMenuIcon, Component> = {
   'style-variation': Spark,
   'sketch-to-image': EditPencil,
   hd: Hd,
-  'image-extend': Expand,
+  'outpaint': Expand,
   'image-inpaint': DesignPencil,
   'adobe-photoshop': AdobePhotoshop,
 }

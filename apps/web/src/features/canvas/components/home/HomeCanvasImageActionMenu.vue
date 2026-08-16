@@ -79,7 +79,7 @@ import {
 import type { ImageActionStrengthControl } from '../../image-tools'
 import {
   buildImageActionReadinessRequest,
-  buildLocalInpaintReadinessRequest,
+  buildPartialEditReadinessRequest,
 } from '../../execution/commands/flowImageTaskRequests'
 import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import ImageActionMenuIcon from './ImageActionMenuIcon.vue'
@@ -103,7 +103,7 @@ const actionMenuMotion = createPopoverMotionTransition()
 const outputResolution = computed(() => props.outputResolution ?? '1k')
 
 function resolveItemBillingFeature(item: ImageActionMenuItem): WorkflowFeature | null {
-  if (item.action === IMAGE_NODE_ACTION.imageInpaint) return WORKFLOW_FEATURE.localInpaint
+  if (item.action === IMAGE_NODE_ACTION.imageInpaint) return WORKFLOW_FEATURE.partialEdit
   return WORKFLOW_FEATURE_SLUGS.includes(item.action as WorkflowFeature)
     ? (item.action as WorkflowFeature)
     : null
@@ -115,9 +115,9 @@ function buildItemReadinessRequest(item: ImageActionMenuItem) {
     outputResolution: outputResolution.value,
   }
   if (item.action === IMAGE_NODE_ACTION.imageInpaint) {
-    return buildLocalInpaintReadinessRequest(options)
+    return buildPartialEditReadinessRequest()
   }
-  if (item.action === IMAGE_NODE_ACTION.imageExtend || isImageTaskAction(item.action)) {
+  if (item.action === IMAGE_NODE_ACTION.outpaint || isImageTaskAction(item.action)) {
     return buildImageActionReadinessRequest(item.action, options)
   }
   return undefined

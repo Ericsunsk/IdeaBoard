@@ -31,6 +31,7 @@ type providerRequest struct {
 	Scale            float64
 	OriginalWidth    int
 	OriginalHeight   int
+	Extend           *tasks.OutpaintParams
 	OpenAI           openAIProviderControls
 	Google           googleProviderControls
 }
@@ -39,10 +40,6 @@ type openAIProviderControls struct {
 	UseEditEndpoint      bool
 	DropOriginalImageRef bool
 	VariationStrength    *float64
-	ExtendTop            *float64
-	ExtendRight          *float64
-	ExtendBottom         *float64
-	ExtendLeft           *float64
 }
 
 type googleProviderControls struct {
@@ -94,6 +91,10 @@ func (p providerTaskParams) providerRequest(prompt string, resolvedModel string)
 	if p.Canonical != nil && p.Canonical.Controls != nil {
 		request.OriginalWidth = int(math.Round(p.Canonical.Controls.OriginalWidth))
 		request.OriginalHeight = int(math.Round(p.Canonical.Controls.OriginalHeight))
+	}
+	if p.Canonical != nil && p.Canonical.Extend != nil {
+		extend := *p.Canonical.Extend
+		request.Extend = &extend
 	}
 	return request, nil
 }
@@ -173,15 +174,8 @@ func validateCanonicalRuntimeControls(params *tasks.WorkflowTaskParams, contract
 		if err := rejectOtherControls(false, true, false, false); err != nil {
 			return err
 		}
-		values := []float64{params.Extend.TopPercent, params.Extend.RightPercent, params.Extend.BottomPercent, params.Extend.LeftPercent}
-		hasExtension := false
-		for _, value := range values {
-			if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > 100 || value != math.Round(value) {
-				return fmt.Errorf("task image extend controls are invalid")
-			}
-			hasExtension = hasExtension || value > 0
-		}
-		if !hasExtension {
+		extend := params.Extend
+		if extend.TargetWidth <= 0 || extend.TargetHeight <= 0 || extend.ImageOffsetX < 0 || extend.ImageOffsetY < 0 {
 			return fmt.Errorf("task image extend controls are invalid")
 		}
 		return nil
@@ -325,17 +319,6 @@ func compileProviderControls(params map[string]interface{}, operation workflow.R
 	case workflow.RuntimeControlsVariation:
 		if raw, ok := readProviderNumber(params, "variation_strength"); ok {
 			controls.OpenAI.VariationStrength = float64Ptr(raw)
-		}
-	case workflow.RuntimeControlsExtend:
-		for key, target := range map[string]**float64{
-			"extend_top":    &controls.OpenAI.ExtendTop,
-			"extend_right":  &controls.OpenAI.ExtendRight,
-			"extend_bottom": &controls.OpenAI.ExtendBottom,
-			"extend_left":   &controls.OpenAI.ExtendLeft,
-		} {
-			if raw, ok := readProviderNumber(params, key); ok {
-				*target = float64Ptr(raw)
-			}
 		}
 	}
 	return controls

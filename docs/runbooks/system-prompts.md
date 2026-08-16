@@ -6,10 +6,9 @@
 ## 1. 文档边界
 
 - `feature_prompts` 保存每个 Prompt-driven Feature 当前生效的一份 `System Prompt`，是运行时事实源。
-- 本文中的模板是 `Recommended Baseline`，不代表数据库当前已经使用这些内容。
+- `partial-edit` 和 `outpaint` 的模板由 baseline 写入数据库；其他模板仍是 `Recommended Baseline`。
 - 每个 Prompt-driven Feature 只有一份当前模板；模板按原值更新，不在本文设计 version、revision 或 history。
 - 图片、mask、多参考图、尺寸、模型、质量、输出数量和上传协议由运行时提供，不写成 Prompt 变量。
-- 当前只确认稳定链路的模板；`local-inpaint` 和 `image-extend` 暂缓，不能把本文当作这两个 Feature 的最终模板。
 
 ## 2. Node Contract
 
@@ -25,8 +24,8 @@
 
 ### 2.2 Image Node
 
-对应 Feature：`sketch-to-image`、`style-variation`、`remove-bg`、`hd-upscale`，以及暂缓的
-`local-inpaint`、`image-extend`。
+对应 Feature：`sketch-to-image`、`style-variation`、`remove-bg`、`hd-upscale`、
+`partial-edit`、`outpaint`。
 
 - 图片是主输入。
 - Prompt-driven Image Feature 的用户文字只能作为显式辅助要求；没有辅助文字时仍按图片和结构化控制执行。
@@ -46,7 +45,7 @@
 
 ### 3.1 固定结构
 
-每个模板使用以下五个区块，顺序固定：
+通用模板使用以下五个区块，顺序固定；专用 Modal 图像填充模板使用简短英文指令：
 
 ```text
 [ROLE]
@@ -73,12 +72,12 @@
 | Feature | 允许的变量 |
 | --- | --- |
 | `prompt-generation` | `{{user_prompt}}` |
-| `local-inpaint` | `{{user_prompt}}`（暂缓） |
+| `partial-edit` | `{{user_prompt}}` |
 | `sketch-to-image` | `{{user_prompt}}` |
 | `style-variation` | `{{user_prompt}}`、`{{variation_strength}}` |
 | `remove-bg` | 无（由 Modal 专用端点处理） |
 | `hd-upscale` | 无（由 Modal 专用端点处理） |
-| `image-extend` | `{{user_prompt}}`（暂缓） |
+| `outpaint` | `{{user_prompt}}` |
 | `style-fusion` | `{{user_prompt}}`、`{{fusion_input_weights}}` |
 
 以下内容不是模板变量：`image_urls`、`reference_image_urls`、`mask_image_url`、
@@ -227,17 +226,23 @@
 不要输出解释、分析过程或提示词文本，只生成结果图。
 ```
 
-## 5. 暂缓模板
+### 4.5 `partial-edit` · Image Node
 
-### `local-inpaint`
+```text
+Edit only the masked region according to the requested edit. Preserve all unmasked content. When removing an object, reconstruct the occluded background from surrounding visual evidence. Blend only a narrow boundary for seamless color and texture continuity. Maintain composition, perspective, lighting, identity, text, logos, and product structure wherever they are not masked.
+```
 
-当前链路包含 mask → ROI 裁剪 → Provider 生成 → mask 回贴，且 Provider 看不到原始 mask。链路稳定前不定稿模板，本文不提供误导性的 mask 指令。
+用户 Prompt 必填，由 Modal 以 `Requested edit: ...` 拼接；不使用 Florence caption。
 
-### `image-extend`
+### 4.6 `outpaint` · Image Node
 
-当前扩图链路仍在调整。方向、扩展区域和结果合成稳定前不定稿模板。
+```text
+Naturally extend the original image into the expanded canvas area. Preserve the original image content. Continue its composition, spatial relationships, perspective, lighting, color, texture, and style. Complete subjects only when they are cut off by the original boundary. Otherwise, do not duplicate existing subjects or introduce new subjects, text, logos, watermarks, faces, limbs, or product parts unless explicitly requested.
+```
 
-## 6. 最小评审清单
+用户 Prompt 可选，由 Modal 以 `Guidance for the expanded area: ...` 拼接；Florence caption 作为原图上下文，失败时降级为无 caption 扩图。
+
+## 5. 最小评审清单
 
 - Feature 是否归属于正确的 Node，且没有把 Prompt Node 当作 Image/Fusion 的子功能。
 - 模板是否非空，并且只使用该 Feature 允许的变量。
@@ -246,7 +251,7 @@
 - 输出数量是否保持运行时语义：每个结果独立，不在 Prompt 中拼接多张结果。
 - 输出格式或背景要求是否超过当前 Provider/后处理链路实际能保证的能力。
 
-## 7. 维护边界
+## 6. 维护边界
 
 新增或删除 workflow Feature 时，必须同步更新 Node Contract、变量表和 Recommended Baseline。
 新增变量前，先确认它确实是该 Feature 的业务参数；不要为了描述运行时实现而增加模板变量。

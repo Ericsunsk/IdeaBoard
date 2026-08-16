@@ -22,7 +22,7 @@ import {
   buildImageExecutionTaskRequest,
   buildImageActionReadinessRequest,
   buildImageInpaintTaskRequest,
-  buildLocalInpaintReadinessRequest,
+  buildPartialEditReadinessRequest,
   buildCanvasExtendReadinessRequest,
   buildPreparedImageInpaintTaskRequest,
   buildPromptGenerationTaskRequest,
@@ -82,33 +82,27 @@ describe('flowImageTaskRequests', () => {
   })
 
   it('builds valid quote-only image-fill readiness placeholders', () => {
-    expect(
-      buildLocalInpaintReadinessRequest({ outputResolution: '4k' }),
-    ).toMatchObject({
+    expect(buildPartialEditReadinessRequest()).toMatchObject({
       prompt: '局部重绘',
-      feature: EXECUTION_FEATURE.localInpaint,
+      feature: EXECUTION_FEATURE.partialEdit,
       params: {
         output_count: 1,
-        output_resolution: '4k',
+        output_resolution: 'default',
         original_image_width: 1024,
         original_image_height: 1024,
         custom_width: 1024,
         custom_height: 1024,
       },
     })
-    expect(
-      buildCanvasExtendReadinessRequest({ outputResolution: '2k' }),
-    ).toMatchObject({
+    expect(buildCanvasExtendReadinessRequest()).toMatchObject({
       prompt: '',
-      feature: EXECUTION_FEATURE.imageExtend,
+      feature: EXECUTION_FEATURE.outpaint,
       params: {
         output_count: 1,
-        output_resolution: '2k',
+        output_resolution: 'default',
         original_image_width: 1024,
         original_image_height: 1024,
-        custom_width: 1032,
-        custom_height: 1024,
-        extend: { top_percent: 0, right_percent: 1, bottom_percent: 0, left_percent: 0 },
+        extend: { target_width: 1032, target_height: 1024, image_offset_x: 0, image_offset_y: 0 },
       },
     })
   })
@@ -294,43 +288,34 @@ describe('flowImageTaskRequests', () => {
     const request = buildCanvasExtendTaskRequest({
       source,
       imageSize: { width: 1000, height: 750 },
-      extendPercent: {
-        top: 10,
-        right: 20,
-        bottom: 30,
-        left: 40,
-      },
+      frameRect: { left: -40, top: -10, width: 160, height: 140 },
+      originalImageRect: { left: 0, top: 0, width: 100, height: 100 },
       prompt: 'extend horizon',
-      outputResolution: '4k',
     })
 
-    expect(request.feature).toBe(EXECUTION_FEATURE.imageExtend)
+    expect(request.feature).toBe(EXECUTION_FEATURE.outpaint)
     expect(request.params).toMatchObject({
       output_count: 1,
-      output_resolution: '4k',
-      custom_width: 1600,
-      custom_height: 1050,
+      output_resolution: 'default',
       original_image_width: 1000,
       original_image_height: 750,
       extend: {
-        top_percent: 10,
-        right_percent: 20,
-        bottom_percent: 30,
-        left_percent: 40,
+        target_width: 1600,
+        target_height: 1050,
+        image_offset_x: 400,
+        image_offset_y: 75,
       },
     })
-    expect(request.params).not.toHaveProperty('extend_top')
-    expect(request.params).not.toHaveProperty('extend_right')
-    expect(request.params).not.toHaveProperty('extend_bottom')
-    expect(request.params).not.toHaveProperty('extend_left')
+	 expect(request.params).not.toHaveProperty('custom_width')
+	 expect(request.params).not.toHaveProperty('custom_height')
   })
 
   it('builds canvas extend readiness from the same action contract', () => {
     expect(buildImageActionReadinessRequest(IMAGE_CANVAS_EXTEND_ACTION)).toMatchObject({
-      feature: EXECUTION_FEATURE.imageExtend,
+      feature: EXECUTION_FEATURE.outpaint,
       params: {
         extend: {
-          right_percent: 1,
+          target_width: 1032,
         },
       },
     })
@@ -465,7 +450,8 @@ describe('flowImageTaskRequests', () => {
       source,
       prompt: 'extend horizon',
       outputCount: 1,
-      extendPercent: { top: 0, right: 10, bottom: 0, left: 0 },
+      frameRect: { left: 0, top: 0, width: 110, height: 100 },
+      originalImageRect: { left: 0, top: 0, width: 100, height: 100 },
       targetRatio: 1,
       targetWidth: 300,
       resultOptions: {},
@@ -494,12 +480,13 @@ describe('flowImageTaskRequests', () => {
     })
     expect(buildImageExecutionTaskRequest(textPlan)).not.toHaveProperty('image_urls')
     expect(buildImageExecutionTaskRequest(textPlan)).toMatchObject({ params: { output_count: 1 } })
-    expect(buildImageExecutionTaskRequest(extendPlan)).toMatchObject({
-      feature: EXECUTION_FEATURE.imageExtend,
+    expect(buildImageExecutionTaskRequest(extendPlan, { width: 1000, height: 1000 })).toMatchObject({
+      feature: EXECUTION_FEATURE.outpaint,
       image_urls: [source.url],
       params: {
         extend: {
-          right_percent: 10,
+          target_width: 1100,
+          target_height: 1000,
         },
       },
     })
@@ -532,7 +519,7 @@ describe('flowImageTaskRequests', () => {
         imageSize: { width: 900, height: 600 },
       }),
     ).toMatchObject({
-      feature: EXECUTION_FEATURE.localInpaint,
+      feature: EXECUTION_FEATURE.partialEdit,
       params: {
         output_count: 1,
         original_image_url: source.url,

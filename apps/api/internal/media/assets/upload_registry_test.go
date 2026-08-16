@@ -26,7 +26,7 @@ func TestMediaAssetRegistryRegistersBoardUploadForInitialReclamation(t *testing.
 		OwnerUserID: owner.ID,
 		BoardID:     "shared-board",
 		Stored: storage.StoredUploadRef{
-			URL:            "/uploads/canvas/OWNER/shared-board/content/image.png",
+			URL:            "https://media.example.com/uploads/canvas/OWNER/shared-board/content/image.png",
 			StorageKey:     "uploads/canvas/OWNER/shared-board/content/image.png",
 			StorageProfile: "builtin-local",
 			MIMEType:       "image/png",
@@ -51,6 +51,23 @@ func TestMediaAssetRegistryRegistersBoardUploadForInitialReclamation(t *testing.
 	}
 	if asset.ReclaimGeneration != 1 {
 		t.Fatalf("reclaim_generation = %d, want 1", asset.ReclaimGeneration)
+	}
+	for name, source := range map[string]string{
+		"provider URL":  asset.Url,
+		"relative path": "/" + asset.StorageKey,
+	} {
+		t.Run("reusable "+name, func(t *testing.T) {
+			gotID, found, err := registry.FindReusableGenerationMedia(ctx, owner.ID, source)
+			if err != nil {
+				t.Fatalf("FindReusableGenerationMedia returned error: %v", err)
+			}
+			if !found || gotID != mediaAssetID {
+				t.Fatalf("reusable asset = %d, %v, want %d, true", gotID, found, mediaAssetID)
+			}
+		})
+	}
+	if gotID, found, err := registry.FindReusableGenerationMedia(ctx, owner.ID+1, asset.Url); err != nil || found || gotID != 0 {
+		t.Fatalf("other owner reusable asset = %d, %v, %v, want 0, false, nil", gotID, found, err)
 	}
 
 	for name, lookup := range map[string]storage.StoredUploadLookup{

@@ -7,7 +7,7 @@ import {
 import {
   buildFusionTaskRequest,
   buildImageActionReadinessRequest,
-  buildLocalInpaintReadinessRequest,
+  buildPartialEditReadinessRequest,
   buildPromptGenerationTaskRequest,
 } from '../commands/flowImageTaskRequests'
 import type { OutputResolution } from '../../../../shared/domain/generationContract'
@@ -18,8 +18,8 @@ import {
 
 function buildCanvasBillingReadinessRequest(feature: WorkflowFeature): SubmitTaskData {
   switch (feature) {
-    case WORKFLOW_FEATURE.localInpaint:
-      return buildLocalInpaintReadinessRequest()
+    case WORKFLOW_FEATURE.partialEdit:
+      return buildPartialEditReadinessRequest()
     case WORKFLOW_FEATURE.promptGeneration:
       return buildPromptGenerationTaskRequest({
         prompt: '',
@@ -32,7 +32,7 @@ function buildCanvasBillingReadinessRequest(feature: WorkflowFeature): SubmitTas
     case WORKFLOW_FEATURE.styleVariation:
     case WORKFLOW_FEATURE.sketchToImage:
     case WORKFLOW_FEATURE.hdUpscale:
-    case WORKFLOW_FEATURE.imageExtend:
+    case WORKFLOW_FEATURE.outpaint:
       return buildImageActionReadinessRequest(feature)
   }
 }

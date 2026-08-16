@@ -293,7 +293,7 @@ describe('useCanvasImageWorkflow', () => {
     const handlers = workflow.commands.interactions
 
     handlers.onFlowImageDirectAction('image-1', IMAGE_NODE_ACTION.localImageEditor)
-    handlers.onFlowImageDirectAction('image-1', IMAGE_NODE_ACTION.imageExtend)
+    handlers.onFlowImageDirectAction('image-1', IMAGE_NODE_ACTION.outpaint)
 
     const imageTools = mocks.useCanvasImageTools.mock.results[0]?.value
     expect(imageTools.commands.lifecycle.enter).toHaveBeenCalledWith('image-1', 'adjust')

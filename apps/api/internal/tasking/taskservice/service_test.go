@@ -94,19 +94,17 @@ func TestApplyTaskSystemPromptUsesAdminConfiguredPromptOnly(t *testing.T) {
 		},
 		{
 			name:       "canvas extend",
-			feature:    workflow.FeatureSlugImageExtend,
+			feature:    workflow.FeatureSlugOutpaint,
 			basePrompt: "user prompt",
 			userPrompt: "右侧延展为工作室背景",
 			params: map[string]interface{}{
 				"extend": map[string]interface{}{
-					"top_percent":    0,
-					"right_percent":  22,
-					"bottom_percent": 0,
-					"left_percent":   0,
+					"target_width": 1280, "target_height": 768,
+					"image_offset_x": 0, "image_offset_y": 0,
 				},
 			},
-			template: "SYS {{user_prompt}} top={{extend_top_percent}} right={{extend_right_percent}} bottom={{extend_bottom_percent}} left={{extend_left_percent}}",
-			want:     "SYS 右侧延展为工作室背景 top=0 right=22 bottom=0 left=0",
+			template: "SYS {{user_prompt}}",
+			want:     "SYS 右侧延展为工作室背景",
 		},
 		{
 			name:       "hd-upscale",
@@ -253,7 +251,7 @@ func TestLoadAdminBillingSnapshotsResolvesFeatureExistenceFromCurrentRegistry(t 
 	service := NewService(ServiceDeps{
 		AdminBillingHistory: adminBillingHistoryStub{snapshots: map[string]tasks.AdminBillingSnapshot{
 			"task-existing": {
-				SKU: "ai-image:local-inpaint", DisplayName: "局部重绘", PriceVersionID: 10,
+				SKU: "ai-image:partial-edit", DisplayName: "局部重绘", PriceVersionID: 10,
 				PriceVersion: 2, UnitCredits: 4, Quantity: 1, TotalCredits: 4, QuotedAt: quotedAt,
 			},
 			"task-deleted": {
@@ -261,7 +259,7 @@ func TestLoadAdminBillingSnapshotsResolvesFeatureExistenceFromCurrentRegistry(t 
 				PriceVersion: 1, UnitCredits: 2, Quantity: 2, TotalCredits: 4, QuotedAt: quotedAt,
 			},
 		}},
-		BillableItems: billableItemLookupStub{"ai-image:local-inpaint": true},
+		BillableItems: billableItemLookupStub{"ai-image:partial-edit": true},
 	}, ServiceOptions{})
 	snapshots, err := service.loadAdminBillingSnapshots(t.Context(), []string{"task-existing", "task-deleted"})
 	if err != nil {
@@ -350,21 +348,19 @@ func TestGetTaskIncludesExplicitLatestExecutionAlongsideOrderedTrace(t *testing.
 	}
 }
 
-func TestImageExtendEmptyUserPromptCanStillBuildConfiguredPrompt(t *testing.T) {
+func TestOutpaintEmptyUserPromptCanStillBuildConfiguredPrompt(t *testing.T) {
 	fullPrompt := applyTaskSystemPrompt(
 		"",
 		"",
-		workflow.FeatureSlugImageExtend,
+		workflow.FeatureSlugOutpaint,
 		map[string]interface{}{
 			"extend": map[string]interface{}{
-				"top_percent":    0,
-				"right_percent":  30,
-				"bottom_percent": 0,
-				"left_percent":   0,
+				"target_width": 1280, "target_height": 768,
+				"image_offset_x": 0, "image_offset_y": 0,
 			},
 		},
 		func(string) (string, error) {
-			return "SYS 扩图 right={{extend_right_percent}}", nil
+			return "SYS 扩图", nil
 		},
 	)
 
@@ -395,7 +391,10 @@ func TestResolveTaskBillingRequestUsesAIWorkflowRegistry(t *testing.T) {
 	for _, feature := range workflow.AIImageFeatureSlugs() {
 		t.Run(feature, func(t *testing.T) {
 			resolution := "1k"
-			if feature == workflow.FeatureSlugRemoveBg || feature == workflow.FeatureSlugHDUpscale {
+			if feature == workflow.FeatureSlugPartialEdit ||
+				feature == workflow.FeatureSlugRemoveBg ||
+				feature == workflow.FeatureSlugHDUpscale ||
+				feature == workflow.FeatureSlugOutpaint {
 				resolution = "default"
 			}
 			imageInputCount := 1
@@ -409,7 +408,7 @@ func TestResolveTaskBillingRequestUsesAIWorkflowRegistry(t *testing.T) {
 				Params: workflow.FeatureExecutionParams{
 					OutputResolution: &resolution,
 					ImageInputCount:  imageInputCount,
-					HasMaskInput:     feature == workflow.FeatureSlugLocalInpaint,
+					HasMaskInput:     feature == workflow.FeatureSlugPartialEdit,
 				},
 			})
 			if err != nil {
@@ -486,10 +485,6 @@ func TestSubmitTaskInputLimits(t *testing.T) {
 	t.Run("reject non-structured feature params", func(t *testing.T) {
 		tests := []string{
 			"variation_strength",
-			"extend_top",
-			"extend_right",
-			"extend_bottom",
-			"extend_left",
 			"fusion_input_weights",
 		}
 		for _, key := range tests {
@@ -722,7 +717,7 @@ func TestWorkflowTaskParamsFromMapPreservesExtraAndFusionContract(t *testing.T) 
 
 func TestWorkflowTaskParamsFromMapDoesNotPreserveKnownContractKeysInExtra(t *testing.T) {
 	params := map[string]interface{}{
-		"feature": "image-extend",
+		"feature": "outpaint",
 		"model":   "gpt-image-1",
 		"image_urls": []string{
 			"https://example.com/source.png",
@@ -741,11 +736,11 @@ func TestWorkflowTaskParamsFromMapDoesNotPreserveKnownContractKeysInExtra(t *tes
 		"quality":                 "high",
 		"output_count":            2,
 		"prompt_upsampling":       false,
-		"extend":                  map[string]interface{}{"top_percent": 0, "right_percent": 25, "bottom_percent": 0, "left_percent": 0},
+		"extend":                  map[string]interface{}{"target_width": 1280, "target_height": 768, "image_offset_x": 0, "image_offset_y": 0},
 		"provider_specific_param": "keep-me",
 	}
 
-	typedParams, err := workflowTaskParamsFromMap(params, workflow.FeatureSlugImageExtend)
+	typedParams, err := workflowTaskParamsFromMap(params, workflow.FeatureSlugOutpaint)
 	if err != nil {
 		t.Fatalf("workflowTaskParamsFromMap returned error: %v", err)
 	}
@@ -783,8 +778,8 @@ func TestWorkflowTaskParamsFromMapDoesNotPreserveKnownContractKeysInExtra(t *tes
 	if typedParams.Controls == nil || typedParams.Controls.CustomWidth != 640 || typedParams.Controls.OutputCount != 2 {
 		t.Fatalf("controls = %#v, want canonical controls", typedParams.Controls)
 	}
-	if typedParams.Extend == nil || typedParams.Extend.RightPercent != 25 {
-		t.Fatalf("extend = %#v, want right_percent 25", typedParams.Extend)
+	if typedParams.Extend == nil || typedParams.Extend.TargetWidth != 1280 {
+		t.Fatalf("extend = %#v, want target_width 1280", typedParams.Extend)
 	}
 }
 
@@ -1292,13 +1287,13 @@ func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
 		AccountRepo:     accountRepo,
 		SubmissionStore: submissionStore,
 		MediaValidator:  testSubmitMediaValidator{},
-		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugImageExtend, "gpt-image-1"),
+		PromptStore:     featurePromptStoreForTest(workflow.FeatureSlugOutpaint, "gpt-image-1"),
 	}, ServiceOptions{})
 
 	_, err := svc.SubmitTask(ctx, 42, &tasks.SubmitTaskRequest{
 		Prompt:         "右侧延展为工作室背景",
-		Feature:        workflow.FeatureSlugImageExtend,
-		ClientActionID: "image-extend-normalize",
+		Feature:        workflow.FeatureSlugOutpaint,
+		ClientActionID: "outpaint-normalize",
 		ImageURLs: []string{
 			"https://example.com/source.png",
 		},
@@ -1306,13 +1301,9 @@ func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
 			"model":                 "gpt-image-1",
 			"original_image_width":  1024,
 			"original_image_height": 768,
-			"custom_width":          1280,
-			"custom_height":         768,
 			"extend": map[string]interface{}{
-				"top_percent":    0,
-				"right_percent":  25,
-				"bottom_percent": 0,
-				"left_percent":   0,
+				"target_width": 1280, "target_height": 768,
+				"image_offset_x": 0, "image_offset_y": 0,
 			},
 		},
 	})
@@ -1328,11 +1319,8 @@ func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
 	if !ok {
 		t.Fatalf("extend = %#v, want object", params["extend"])
 	}
-	if extend["right_percent"] != float64(25) {
-		t.Fatalf("right_percent = %#v, want 25", extend["right_percent"])
-	}
-	if _, exists := params["extend_right"]; exists {
-		t.Fatalf("did not expect provider extend_right in stored params: %#v", params)
+	if extend["target_width"] != float64(1280) {
+		t.Fatalf("target_width = %#v, want 1280", extend["target_width"])
 	}
 	if _, exists := params["image_urls"]; exists {
 		t.Fatalf("did not expect provider image_urls in stored params: %#v", params)

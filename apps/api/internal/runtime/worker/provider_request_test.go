@@ -89,18 +89,14 @@ func TestProviderRequestShapesOnlyDeclaredRuntimeControlContract(t *testing.T) {
 	params := map[string]interface{}{
 		"variation":          map[string]interface{}{"strength": 40},
 		"variation_strength": 40,
-		"extend": map[string]interface{}{
-			"top_percent": 0, "right_percent": 20, "bottom_percent": 0, "left_percent": 0,
-		},
-		"extend_top": 0, "extend_right": 20, "extend_bottom": 0, "extend_left": 0,
-		"hd": map[string]interface{}{"scale": 2.0},
+		"hd":                 map[string]interface{}{"scale": 2.0},
 	}
 
 	none := newProviderRequest(
 		"", 0, 0, params, "", resolvedProviderRequestFacts{}, workflow.RuntimeOperationPromptGeneration,
 		workflow.RuntimeInvocationGenerate, workflow.RuntimeControlsNone,
 	)
-	if none.OpenAI.VariationStrength != nil || none.OpenAI.ExtendRight != nil || none.Scale != 0 {
+	if none.OpenAI.VariationStrength != nil || none.Scale != 0 {
 		t.Fatalf("none contract leaked controls: %#v", none)
 	}
 
@@ -108,15 +104,15 @@ func TestProviderRequestShapesOnlyDeclaredRuntimeControlContract(t *testing.T) {
 		"", 0, 0, params, "", resolvedProviderRequestFacts{}, workflow.RuntimeOperationStyleVariation,
 		workflow.RuntimeInvocationEdit, workflow.RuntimeControlsVariation,
 	)
-	if variation.OpenAI.VariationStrength == nil || *variation.OpenAI.VariationStrength != 40 || variation.OpenAI.ExtendRight != nil || variation.Scale != 0 {
+	if variation.OpenAI.VariationStrength == nil || *variation.OpenAI.VariationStrength != 40 || variation.Scale != 0 {
 		t.Fatalf("variation controls = %#v", variation)
 	}
 
 	extend := newProviderRequest(
-		"", 0, 0, params, "", resolvedProviderRequestFacts{}, workflow.RuntimeOperationImageExtend,
+		"", 0, 0, params, "", resolvedProviderRequestFacts{}, workflow.RuntimeOperationOutpaint,
 		workflow.RuntimeInvocationEdit, workflow.RuntimeControlsExtend,
 	)
-	if extend.OpenAI.ExtendRight == nil || *extend.OpenAI.ExtendRight != 20 || extend.OpenAI.VariationStrength != nil || extend.Scale != 0 {
+	if extend.OpenAI.VariationStrength != nil || extend.Scale != 0 {
 		t.Fatalf("extend controls = %#v", extend)
 	}
 
@@ -124,7 +120,7 @@ func TestProviderRequestShapesOnlyDeclaredRuntimeControlContract(t *testing.T) {
 		"", 0, 0, params, "", resolvedProviderRequestFacts{}, workflow.RuntimeOperationImageUpscale,
 		workflow.RuntimeInvocationTransform, workflow.RuntimeControlsUpscale,
 	)
-	if upscale.Scale != 2 || upscale.OpenAI.VariationStrength != nil || upscale.OpenAI.ExtendRight != nil {
+	if upscale.Scale != 2 || upscale.OpenAI.VariationStrength != nil {
 		t.Fatalf("upscale controls = %#v", upscale)
 	}
 }
@@ -132,19 +128,19 @@ func TestProviderRequestShapesOnlyDeclaredRuntimeControlContract(t *testing.T) {
 func TestParseAndNormalizeTaskParamsFlattensCanonicalWorkflowParams(t *testing.T) {
 	raw := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       "image-extend",
+		Feature:       "outpaint",
 		Media: &tasks.MediaInputs{
 			Original: &tasks.MediaRef{AssetID: 2, Role: "original"},
 		},
 		Controls: &tasks.GenerationControls{
-			CustomWidth:  640,
-			CustomHeight: 480,
+			OriginalWidth:  640,
+			OriginalHeight: 480,
 		},
-		Extend: &tasks.ImageExtendParams{
-			TopPercent:    0,
-			RightPercent:  20,
-			BottomPercent: 0,
-			LeftPercent:   0,
+		Extend: &tasks.OutpaintParams{
+			TargetWidth:  768,
+			TargetHeight: 480,
+			ImageOffsetX: 0,
+			ImageOffsetY: 0,
 		},
 	})
 	executor := &ProviderExecutor{mediaResolver: testRuntimeMediaResolver{urls: map[int64]string{
@@ -162,17 +158,17 @@ func TestParseAndNormalizeTaskParamsFlattensCanonicalWorkflowParams(t *testing.T
 		t.Fatal(err)
 	}
 
-	if got.ExecutionPlan == nil || got.ExecutionPlan.RuntimeOperation() != workflow.RuntimeOperationImageExtend {
-		t.Fatalf("runtime operation = %#v, want image-extend", got.ExecutionPlan)
+	if got.ExecutionPlan == nil || got.ExecutionPlan.RuntimeOperation() != workflow.RuntimeOperationOutpaint {
+		t.Fatalf("runtime operation = %#v, want outpaint", got.ExecutionPlan)
 	}
 	if got.Provider["original_image_url"] != "https://img.example/source.png" {
 		t.Fatalf("original_image_url = %#v", got.Provider["original_image_url"])
 	}
-	if got.Provider["custom_width"] != float64(640) || got.Provider["custom_height"] != float64(480) {
-		t.Fatalf("custom size = %#v x %#v", got.Provider["custom_width"], got.Provider["custom_height"])
+	if got.Provider["original_image_width"] != float64(640) || got.Provider["original_image_height"] != float64(480) {
+		t.Fatalf("original size = %#v x %#v", got.Provider["original_image_width"], got.Provider["original_image_height"])
 	}
-	if got.Provider["extend_right"] != float64(20) {
-		t.Fatalf("extend_right = %#v, want 20", got.Provider["extend_right"])
+	if got.Provider["extend"] == nil {
+		t.Fatalf("extend = %#v, want canonical geometry", got.Provider["extend"])
 	}
 	if _, exists := got.Provider["media"]; exists {
 		t.Fatalf("provider map should not expose canonical media object: %#v", got.Provider)
@@ -206,7 +202,7 @@ func TestProviderRuntimeAdapterForUsesProtocolAndRuntimeOperation(t *testing.T) 
 		wantErr   bool
 	}{
 		{name: "model prompt", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationPromptGeneration, want: providerRuntimeAdapterModelImage},
-		{name: "image fill on model protocol", apiType: workflow.ProviderGoogleAI, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationLocalInpaint, wantErr: true},
+		{name: "image fill on model protocol", apiType: workflow.ProviderGoogleAI, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationPartialEdit, wantErr: true},
 		{name: "background removal", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationBackgroundRemoval, want: providerRuntimeAdapterBackgroundRemoval},
 		{name: "upscale", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationImageUpscale, want: providerRuntimeAdapterImageUpscale},
 		{name: "transform API type mismatch", apiType: workflow.ProviderGoogleAI, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationImageUpscale, wantErr: true},
@@ -369,7 +365,7 @@ func TestParseAndNormalizeTaskParamsRejectsCanonicalControlsOutsidePlanContract(
 			params.Variation = &tasks.StyleVariationParams{Strength: 40}
 		},
 		"extend": func(params *tasks.WorkflowTaskParams) {
-			params.Extend = &tasks.ImageExtendParams{RightPercent: 20}
+			params.Extend = &tasks.OutpaintParams{TargetWidth: 768, TargetHeight: 480}
 		},
 		"upscale": func(params *tasks.WorkflowTaskParams) {
 			params.HD = &tasks.HDUpscaleParams{Scale: 2}
@@ -403,7 +399,7 @@ func TestPrepareProviderExecutionCompletesPreflightBeforeLocalMediaIO(t *testing
 	useMask := true
 	raw := marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
-		Feature:       workflow.FeatureSlugLocalInpaint,
+		Feature:       workflow.FeatureSlugPartialEdit,
 		Media: &tasks.MediaInputs{
 			Original: &tasks.MediaRef{AssetID: 1, Role: "original"},
 			Mask:     &tasks.MediaRef{AssetID: 2, Role: "mask"},
@@ -584,7 +580,7 @@ func TestProviderTaskParamsPreferCanonicalFeature(t *testing.T) {
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
 		Feature:       "style-fusion",
 		Extra: map[string]interface{}{
-			"feature": "local-inpaint",
+			"feature": "partial-edit",
 		},
 	}, nil)
 

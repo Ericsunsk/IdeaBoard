@@ -12,8 +12,8 @@ import { useFlowImageWorkflowExecution } from './flowImageWorkflowExecution'
 vi.mock('../media/imageSize', () => ({
   loadImageSizeFromUrl: vi.fn(async () => ({ width: 1200, height: 800 })),
 }))
-vi.mock('../media/flowLocalInpaintMask', () => ({
-  prepareFlowLocalInpaintMask: vi.fn(async () => 'https://example.com/mask.png'),
+vi.mock('../media/flowPartialEditMask', () => ({
+  prepareFlowPartialEditMask: vi.fn(async () => 'https://example.com/mask.png'),
 }))
 
 function imageActionPlan() {
@@ -121,7 +121,8 @@ describe('useFlowImageWorkflowExecution', () => {
       source: { url: 'https://example.com/a.png', ratio: 1 },
       prompt: 'extend the horizon',
       outputCount: 1,
-      extendPercent: { top: 10, right: 20, bottom: 30, left: 40 },
+      frameRect: { left: -40, top: -10, width: 160, height: 140 },
+      originalImageRect: { left: 0, top: 0, width: 100, height: 100 },
       targetRatio: 0.75,
       targetWidth: 320,
       resultOptions: {},
@@ -129,15 +130,13 @@ describe('useFlowImageWorkflowExecution', () => {
 
     const readinessRequest = assertReady.mock.calls[0]?.[0]
     expect(readinessRequest).toMatchObject({
-      feature: 'image-extend',
+      feature: 'outpaint',
       image_urls: ['https://example.com/a.png'],
       params: {
         output_count: 1,
         original_image_width: 1200,
         original_image_height: 800,
-        custom_width: 1920,
-        custom_height: 1120,
-        extend: { top_percent: 10, right_percent: 20, bottom_percent: 30, left_percent: 40 },
+        extend: { target_width: 1920, target_height: 1120, image_offset_x: 480, image_offset_y: 80 },
       },
     })
     expect(submit.mock.calls[0]?.[0]).toBe(readinessRequest)
@@ -165,7 +164,7 @@ describe('useFlowImageWorkflowExecution', () => {
 
     const readinessRequest = assertReady.mock.calls[0]?.[0]
     expect(readinessRequest).toMatchObject({
-      feature: 'local-inpaint',
+      feature: 'partial-edit',
       params: {
         output_count: 1,
         original_image_url: 'https://example.com/a.png',

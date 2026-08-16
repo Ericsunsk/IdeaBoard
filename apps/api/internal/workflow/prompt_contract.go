@@ -18,11 +18,11 @@ type StyleVariationPromptContract struct {
 	Strength float64
 }
 
-type ImageExtendPromptContract struct {
-	TopPercent    float64
-	RightPercent  float64
-	BottomPercent float64
-	LeftPercent   float64
+type OutpaintContract struct {
+	TargetWidth  int
+	TargetHeight int
+	ImageOffsetX int
+	ImageOffsetY int
 }
 
 type HDUpscaleContract struct{ Scale float64 }
@@ -45,42 +45,33 @@ func (c StyleVariationPromptContract) PromptVariables() map[string]interface{} {
 	}
 }
 
-func ReadImageExtendPromptContract(params map[string]interface{}) (ImageExtendPromptContract, bool) {
+func ReadOutpaintContract(params map[string]interface{}) (OutpaintContract, bool) {
 	obj, ok := readWorkflowObjectParam(params, ParamKeyExtend)
 	if !ok {
-		return ImageExtendPromptContract{}, false
+		return OutpaintContract{}, false
 	}
-	top, ok := readNumberField(obj, paramkeys.TopPercent)
+	targetWidth, ok := readNumberField(obj, paramkeys.TargetWidth)
 	if !ok {
-		return ImageExtendPromptContract{}, false
+		return OutpaintContract{}, false
 	}
-	right, ok := readNumberField(obj, paramkeys.RightPercent)
+	targetHeight, ok := readNumberField(obj, paramkeys.TargetHeight)
 	if !ok {
-		return ImageExtendPromptContract{}, false
+		return OutpaintContract{}, false
 	}
-	bottom, ok := readNumberField(obj, paramkeys.BottomPercent)
+	imageOffsetX, ok := readNumberField(obj, paramkeys.ImageOffsetX)
 	if !ok {
-		return ImageExtendPromptContract{}, false
+		return OutpaintContract{}, false
 	}
-	left, ok := readNumberField(obj, paramkeys.LeftPercent)
+	imageOffsetY, ok := readNumberField(obj, paramkeys.ImageOffsetY)
 	if !ok {
-		return ImageExtendPromptContract{}, false
+		return OutpaintContract{}, false
 	}
-	return ImageExtendPromptContract{
-		TopPercent:    top,
-		RightPercent:  right,
-		BottomPercent: bottom,
-		LeftPercent:   left,
+	return OutpaintContract{
+		TargetWidth:  int(targetWidth),
+		TargetHeight: int(targetHeight),
+		ImageOffsetX: int(imageOffsetX),
+		ImageOffsetY: int(imageOffsetY),
 	}, true
-}
-
-func (c ImageExtendPromptContract) PromptVariables() map[string]interface{} {
-	return map[string]interface{}{
-		paramkeys.PromptPlaceholderExtendTopPercent:    formatPercentControl(c.TopPercent),
-		paramkeys.PromptPlaceholderExtendRightPercent:  formatPercentControl(c.RightPercent),
-		paramkeys.PromptPlaceholderExtendBottomPercent: formatPercentControl(c.BottomPercent),
-		paramkeys.PromptPlaceholderExtendLeftPercent:   formatPercentControl(c.LeftPercent),
-	}
 }
 
 func ReadHDUpscaleContract(params map[string]interface{}) (HDUpscaleContract, bool) {
@@ -129,8 +120,8 @@ func NormalizeStructuredPromptContractParams(params map[string]interface{}, feat
 	switch featureSlug {
 	case FeatureSlugStyleVariation:
 		return normalizeStyleVariationContract(params)
-	case FeatureSlugImageExtend:
-		return normalizeImageExtendContract(params)
+	case FeatureSlugOutpaint:
+		return normalizeOutpaintContract(params)
 	case FeatureSlugHDUpscale:
 		return normalizeHDUpscaleContract(params)
 	case FeatureSlugStyleFusion:
@@ -155,12 +146,6 @@ func buildProviderPromptParams(params map[string]interface{}) map[string]interfa
 	if contract, ok := ReadStyleVariationPromptContract(params); ok {
 		out[paramkeys.VariationStrength] = contract.Strength
 	}
-	if contract, ok := ReadImageExtendPromptContract(params); ok {
-		out[paramkeys.ExtendTop] = contract.TopPercent
-		out[paramkeys.ExtendRight] = contract.RightPercent
-		out[paramkeys.ExtendBottom] = contract.BottomPercent
-		out[paramkeys.ExtendLeft] = contract.LeftPercent
-	}
 	if contract, ok := ReadStyleFusionPromptContract(params); ok {
 		out[paramkeys.FusionInputWeights] = contract.InputWeights
 	}
@@ -181,25 +166,26 @@ func normalizeStyleVariationContract(params map[string]interface{}) error {
 	return nil
 }
 
-func normalizeImageExtendContract(params map[string]interface{}) error {
+func normalizeOutpaintContract(params map[string]interface{}) error {
 	obj, err := requiredWorkflowObjectParam(params, ParamKeyExtend)
 	if err != nil {
 		return err
 	}
-	hasExtension := false
-	for _, key := range []string{paramkeys.TopPercent, paramkeys.RightPercent, paramkeys.BottomPercent, paramkeys.LeftPercent} {
+	for _, key := range []string{paramkeys.TargetWidth, paramkeys.TargetHeight, paramkeys.ImageOffsetX, paramkeys.ImageOffsetY} {
 		value, ok := readNumberField(obj, key)
 		if !ok {
 			return fmt.Errorf("extend.%s 必须是数字", key)
 		}
-		normalized := math.Round(math.Max(0, math.Min(100, value)))
-		obj[key] = normalized
-		if normalized > 0 {
-			hasExtension = true
+		if math.IsNaN(value) || math.IsInf(value, 0) || math.Trunc(value) != value {
+			return fmt.Errorf("extend.%s 必须是整数", key)
 		}
-	}
-	if !hasExtension {
-		return fmt.Errorf("extend 至少需要一个方向大于 0")
+		if (key == paramkeys.TargetWidth || key == paramkeys.TargetHeight) && value <= 0 {
+			return fmt.Errorf("extend.%s 必须是正整数", key)
+		}
+		if (key == paramkeys.ImageOffsetX || key == paramkeys.ImageOffsetY) && value < 0 {
+			return fmt.Errorf("extend.%s 不能为负数", key)
+		}
+		obj[key] = value
 	}
 	params[ParamKeyExtend] = obj
 	return nil

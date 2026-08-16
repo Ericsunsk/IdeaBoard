@@ -2,6 +2,7 @@
   <AdminResourceGridFrame
     empty-description="注册后的计费功能会显示在这里。"
     empty-title="暂无可定价功能"
+    grid-class="grid grid-cols-1 items-start gap-3.5 md:grid-cols-2 xl:grid-cols-3"
     :is-empty="!errorMessage && items.length === 0"
     :is-loading="isLoading"
   >
@@ -21,7 +22,7 @@
     </div>
 
     <BillingFeaturePriceCard
-      v-for="item in items"
+      v-for="item in sortedItems"
       v-else
       :key="item.sku"
       :item="item"
@@ -43,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { Refresh } from '@iconoir/vue'
 import Button from 'primevue/button'
 import AdminResourceGridFrame from '../../shared/components/AdminResourceGridFrame.vue'
@@ -57,6 +58,7 @@ import type { AdminBillableItemCard, PricingVariant } from './billableCatalogTyp
 
 const resource = createAdminBillableCatalogResource()
 const items = ref<AdminBillableItemCard[]>([])
+const sortedItems = computed(() => [...items.value].sort(compareCatalogCards))
 const isLoading = ref(true)
 const errorMessage = ref('')
 const selectedItem = ref<AdminBillableItemCard | null>(null)
@@ -67,6 +69,24 @@ const availabilityPending = reactive<Record<string, boolean>>({})
 const deletePending = reactive<Record<string, boolean>>({})
 const toast = useAdminToast()
 const confirm = useAdminConfirm()
+
+function compareCatalogCards(left: AdminBillableItemCard, right: AdminBillableItemCard) {
+  const priorityDifference = catalogCardPriority(left) - catalogCardPriority(right)
+  if (priorityDifference !== 0) return priorityDifference
+  if (left.sortOrder !== right.sortOrder) return left.sortOrder - right.sortOrder
+  return left.sku.localeCompare(right.sku)
+}
+
+function catalogCardPriority(item: AdminBillableItemCard) {
+  if (item.status === 'archived') return 4
+  const hasConfiguredPrice = item.pricingVariants.some(
+    (variant) => item.currentPrices[variant] !== undefined,
+  )
+  if (item.status === 'active' && hasConfiguredPrice) return 0
+  if (item.pricingVariants.length === 1) return 1
+  if (hasConfiguredPrice) return 2
+  return 3
+}
 
 async function loadCatalog() {
   isLoading.value = true
@@ -121,7 +141,9 @@ async function publishPrice(prices: Record<PricingVariant, number | undefined>) 
   try {
     const published = await resource.publishPrices(item.sku, prices)
     item.currentPrices = published
-    const latest = Object.values(published).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+    const latest = Object.values(published).sort((a, b) =>
+      b.createdAt.localeCompare(a.createdAt),
+    )[0]
     if (latest) item.updatedAt = latest.createdAt
     if (item.status === 'unpriced') item.status = 'active'
     priceDialogVisible.value = false

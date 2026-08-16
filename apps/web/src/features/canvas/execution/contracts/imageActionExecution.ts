@@ -23,7 +23,7 @@ export type ImageDirectTaskAction = (typeof IMAGE_DIRECT_TASK_ACTIONS)[number]
 export const IMAGE_HD_UPSCALE_ACTION = IMAGE_NODE_ACTION.hdUpscale
 export type ImageHdUpscaleTaskAction = typeof IMAGE_HD_UPSCALE_ACTION
 
-export const IMAGE_CANVAS_EXTEND_ACTION = IMAGE_NODE_ACTION.imageExtend
+export const IMAGE_CANVAS_EXTEND_ACTION = IMAGE_NODE_ACTION.outpaint
 export type ImageCanvasExtendAction = typeof IMAGE_CANVAS_EXTEND_ACTION
 
 export type ImageTaskAction = ImageDirectTaskAction | ImageHdUpscaleTaskAction
@@ -101,7 +101,7 @@ export const IMAGE_ACTION_EXECUTION_REGISTRY_LIST = [
       paramPath: 'hd.scale',
     },
   }),
-  createWorkflowExecutionConfig(IMAGE_NODE_ACTION.imageExtend, {
+  createWorkflowExecutionConfig(IMAGE_NODE_ACTION.outpaint, {
     mode: IMAGE_EXECUTION_MODE.canvasExtend,
   }),
 ] as const satisfies readonly ImageActionExecutionConfig[]

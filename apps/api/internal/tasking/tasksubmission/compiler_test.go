@@ -10,7 +10,7 @@ import (
 func TestCompileGenerationSnapshotFreezesIntentAndMediaOrder(t *testing.T) {
 	upsampling := true
 	params := &tasks.WorkflowTaskParams{
-		Feature:  "local-inpaint",
+		Feature:  "partial-edit",
 		Controls: &tasks.GenerationControls{OutputCount: 1, PromptUpsampling: &upsampling},
 		Media: &tasks.MediaInputs{
 			Original: &tasks.MediaRef{Source: " upload-a ", Role: "original"},
@@ -18,7 +18,7 @@ func TestCompileGenerationSnapshotFreezesIntentAndMediaOrder(t *testing.T) {
 		},
 	}
 	plan, err := workflow.CompileFeatureExecutionPlan(workflow.CompileFeatureExecutionInput{
-		Feature: workflow.FeatureSlugLocalInpaint,
+		Feature: workflow.FeatureSlugPartialEdit,
 		Params: workflow.FeatureExecutionParams{
 			ImageInputCount: 1,
 			HasMaskInput:    true,

@@ -23,7 +23,7 @@ describe('imageActionExecution', () => {
       IMAGE_NODE_ACTION.styleVariation,
       IMAGE_NODE_ACTION.sketchToImage,
       IMAGE_NODE_ACTION.hdUpscale,
-      IMAGE_NODE_ACTION.imageExtend,
+      IMAGE_NODE_ACTION.outpaint,
     ])
     for (const item of IMAGE_ACTION_EXECUTION_REGISTRY_LIST) {
       expect(item).not.toHaveProperty('label')

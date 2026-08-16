@@ -365,6 +365,29 @@ func (q *Queries) FindPreparedGenerationMedia(ctx context.Context, arg FindPrepa
 	return i, err
 }
 
+const findReadyOwnedMediaAssetIDByURL = `-- name: FindReadyOwnedMediaAssetIDByURL :one
+SELECT id
+FROM media_assets
+WHERE owner_user_id = $1
+  AND url = $2
+  AND status = 'ready'
+  AND deleted_at IS NULL
+ORDER BY updated_at DESC, id DESC
+LIMIT 1
+`
+
+type FindReadyOwnedMediaAssetIDByURLParams struct {
+	OwnerUserID int64  `json:"owner_user_id"`
+	Url         string `json:"url"`
+}
+
+func (q *Queries) FindReadyOwnedMediaAssetIDByURL(ctx context.Context, arg FindReadyOwnedMediaAssetIDByURLParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, findReadyOwnedMediaAssetIDByURL, arg.OwnerUserID, arg.Url)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getMediaAssetByID = `-- name: GetMediaAssetByID :one
 SELECT
   id, asset_id, owner_user_id, storage_profile_id, storage_key,
@@ -557,6 +580,45 @@ func (q *Queries) ListMediaRefsByBoardID(ctx context.Context, arg ListMediaRefsB
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listReadyOwnedMediaAssetIDsByStorageKey = `-- name: ListReadyOwnedMediaAssetIDsByStorageKey :many
+SELECT id
+FROM media_assets
+WHERE owner_user_id = $1
+  AND storage_key = $2
+  AND status = 'ready'
+  AND deleted_at IS NULL
+ORDER BY updated_at DESC, id DESC
+LIMIT 2
+`
+
+type ListReadyOwnedMediaAssetIDsByStorageKeyParams struct {
+	OwnerUserID int64  `json:"owner_user_id"`
+	StorageKey  string `json:"storage_key"`
+}
+
+func (q *Queries) ListReadyOwnedMediaAssetIDsByStorageKey(ctx context.Context, arg ListReadyOwnedMediaAssetIDsByStorageKeyParams) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, listReadyOwnedMediaAssetIDsByStorageKey, arg.OwnerUserID, arg.StorageKey)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err

@@ -1,6 +1,6 @@
 import { ensureFlowMaskImageUrl } from './flowMediaUpload'
 
-export async function prepareFlowLocalInpaintMask(
+export async function prepareFlowPartialEditMask(
   rawMaskDataUrl: string,
   boardId?: string,
 ): Promise<string> {

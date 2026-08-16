@@ -60,18 +60,16 @@ func TestFeatureSystemPromptDoesNotContainHiddenConstraintSnippet(t *testing.T) 
 	got := prompts.ApplyFeatureSystemPromptWithConfig(
 		"user prompt",
 		"user prompt",
-		"image-extend",
+		"outpaint",
 		map[string]interface{}{
 			"extend": map[string]interface{}{
-				"top_percent":    30,
-				"right_percent":  0,
-				"bottom_percent": 0,
-				"left_percent":   0,
+				"target_width": 1024, "target_height": 1280,
+				"image_offset_x": 0, "image_offset_y": 256,
 			},
 		},
 		prompts.FeaturePromptRuntimeConfig{
 			Prompt:                "SYS=canvas extend only",
-			UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy("image-extend"),
+			UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy("outpaint"),
 		},
 	)
 

@@ -34,17 +34,3 @@ export function buildExecutionSizeParams(
     original_image_height: normalizedSource.height,
   }
 }
-
-export function extendExecutionImageSize(
-  size: ExecutionImageSize | null | undefined,
-  extend: { top: number; right: number; bottom: number; left: number },
-): ExecutionImageSize | null {
-  const normalized = normalizeExecutionImageSize(size)
-  if (!normalized) return null
-  const widthScale = 1 + ((extend.left || 0) + (extend.right || 0)) / 100
-  const heightScale = 1 + ((extend.top || 0) + (extend.bottom || 0)) / 100
-  return {
-    width: Math.max(1, Math.round(normalized.width * widthScale)),
-    height: Math.max(1, Math.round(normalized.height * heightScale)),
-  }
-}

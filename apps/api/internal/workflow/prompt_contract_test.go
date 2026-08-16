@@ -30,14 +30,14 @@ func TestNormalizeStructuredPromptContractParamsMovesFlatVariationParams(t *test
 func TestNormalizeStructuredPromptContractParamsNormalizesExtendContract(t *testing.T) {
 	params := map[string]interface{}{
 		"extend": map[string]interface{}{
-			"top_percent":    0,
-			"right_percent":  25,
-			"bottom_percent": 0,
-			"left_percent":   10,
+			"target_width":   1280,
+			"target_height":  768,
+			"image_offset_x": 0,
+			"image_offset_y": 0,
 		},
 	}
 
-	if err := NormalizeStructuredPromptContractParams(params, FeatureSlugImageExtend); err != nil {
+	if err := NormalizeStructuredPromptContractParams(params, FeatureSlugOutpaint); err != nil {
 		t.Fatalf("NormalizeStructuredPromptContractParams returned error: %v", err)
 	}
 
@@ -45,8 +45,8 @@ func TestNormalizeStructuredPromptContractParamsNormalizesExtendContract(t *test
 	if !ok {
 		t.Fatalf("extend = %#v, want object", params[ParamKeyExtend])
 	}
-	if extend["right_percent"] != float64(25) {
-		t.Fatalf("right_percent = %#v, want 25", extend["right_percent"])
+	if extend["target_width"] != float64(1280) {
+		t.Fatalf("target_width = %#v, want 1280", extend["target_width"])
 	}
 }
 
@@ -161,21 +161,17 @@ func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
 		{
 			name: "image extend",
 			params: &tasks.WorkflowTaskParams{
-				Feature: FeatureSlugImageExtend,
-				Extend: &tasks.ImageExtendParams{
-					TopPercent:    1,
-					RightPercent:  2,
-					BottomPercent: 3,
-					LeftPercent:   4,
+				Feature: FeatureSlugOutpaint,
+				Extend: &tasks.OutpaintParams{
+					TargetWidth:  1280,
+					TargetHeight: 768,
+					ImageOffsetX: 32,
+					ImageOffsetY: 16,
 				},
 			},
 			want: map[string]interface{}{
-				"feature":       FeatureSlugImageExtend,
-				"extend":        map[string]interface{}{"top_percent": float64(1), "right_percent": float64(2), "bottom_percent": float64(3), "left_percent": float64(4)},
-				"extend_top":    float64(1),
-				"extend_right":  float64(2),
-				"extend_bottom": float64(3),
-				"extend_left":   float64(4),
+				"feature": FeatureSlugOutpaint,
+				"extend":  map[string]interface{}{"target_width": 1280, "target_height": 768, "image_offset_x": 32, "image_offset_y": 16},
 			},
 		},
 		{

@@ -1,12 +1,12 @@
 export const WORKFLOW_FEATURE = {
   promptGeneration: 'prompt-generation',
-  localInpaint: 'local-inpaint',
+  partialEdit: 'partial-edit',
   removeBg: 'remove-bg',
   styleFusion: 'style-fusion',
   sketchToImage: 'sketch-to-image',
   styleVariation: 'style-variation',
   hdUpscale: 'hd-upscale',
-  imageExtend: 'image-extend',
+  outpaint: 'outpaint',
 } as const
 
 export type WorkflowFeature = (typeof WORKFLOW_FEATURE)[keyof typeof WORKFLOW_FEATURE]
@@ -15,13 +15,13 @@ export const WORKFLOW_FEATURE_SLUGS = Object.values(WORKFLOW_FEATURE) as readonl
 
 export const CANONICAL_WORKFLOW_FEATURE = {
   promptGeneration: 'prompt-generation',
-  localInpaint: 'local-inpaint',
+  partialEdit: 'partial-edit',
   removeBg: 'remove-bg',
   styleFusion: 'style-fusion',
   sketchToImage: 'sketch-to-image',
   styleVariation: 'style-variation',
   hdUpscale: 'hd-upscale',
-  imageExtend: 'image-extend',
+  outpaint: 'outpaint',
 } as const
 
 export type CanonicalWorkflowFeature =

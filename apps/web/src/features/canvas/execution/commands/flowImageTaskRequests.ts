@@ -7,17 +7,16 @@ import type {
   PromptGenerationExecutionPlan,
   PreparedFusionExecutionPlan,
 } from '../planning/ImageExecutionPlan'
-import type { CanvasExtendPercent } from '../../utils/canvasExtendGeometry'
+import { resolveCanvasExtendPixelGeometry, type CanvasExtendRect } from '../../utils/canvasExtendGeometry'
 import {
   buildExecutionTaskRequest,
   EXECUTION_FEATURE,
   EXECUTION_FUSION_META,
-  EXECUTION_LOCAL_INPAINT_META,
+  EXECUTION_PARTIAL_EDIT_META,
   EXECUTION_META,
 } from '../contracts/executionContract'
 import {
   buildExecutionSizeParams,
-  extendExecutionImageSize,
   type ExecutionImageSize,
 } from '../contracts/executionSizeParams'
 import { buildPromptAspectRatioTaskParams } from '../contracts/promptAspectRatioTaskParams'
@@ -45,7 +44,6 @@ export type ImageInpaintTaskRequestInput = {
   originalImageUrl: string
   maskImageUrl: string
   imageSize: ExecutionImageSize | null
-  outputResolution?: OutputResolution
 }
 
 export type FusionTaskRequestInput = {
@@ -63,8 +61,6 @@ type ImageActionReadinessOptions = {
   outputCount?: number
   outputResolution?: OutputResolution
 }
-
-type ImageFillReadinessOptions = Pick<ImageActionReadinessOptions, 'outputResolution'>
 
 function buildOutputBillingParams(
   options: ImageActionReadinessOptions = {},
@@ -96,14 +92,13 @@ function buildDirectActionReadinessRequest(
   })
 }
 
-export function buildLocalInpaintReadinessRequest(
-  options: ImageFillReadinessOptions = {},
-): SubmitTaskData {
+export function buildPartialEditReadinessRequest(): SubmitTaskData {
   return buildExecutionTaskRequest({
     prompt: '局部重绘',
-    feature: EXECUTION_LOCAL_INPAINT_META.feature,
+    feature: EXECUTION_PARTIAL_EDIT_META.feature,
     params: {
-      ...buildOutputBillingParams(options),
+      output_count: 1,
+      output_resolution: 'default',
       ...buildExecutionSizeParams(
         { width: 1024, height: 1024 },
         { width: 1024, height: 1024 },
@@ -112,25 +107,17 @@ export function buildLocalInpaintReadinessRequest(
   })
 }
 
-export function buildCanvasExtendReadinessRequest(
-  options: ImageFillReadinessOptions = {},
-): SubmitTaskData {
+export function buildCanvasExtendReadinessRequest(): SubmitTaskData {
   const execution = requireImageActionExecution(IMAGE_CANVAS_EXTEND_ACTION)
   return buildExecutionTaskRequest({
     prompt: '',
     feature: execution.feature,
     params: {
-      ...buildOutputBillingParams(options),
-      ...buildExecutionSizeParams(
-        { width: 1024, height: 1024 },
-        { width: 1032, height: 1024 },
-      ),
-      extend: {
-        top_percent: 0,
-        right_percent: 1,
-        bottom_percent: 0,
-        left_percent: 0,
-      },
+      output_count: 1,
+      output_resolution: 'default',
+      original_image_width: 1024,
+      original_image_height: 1024,
+      extend: { target_width: 1032, target_height: 1024, image_offset_x: 0, image_offset_y: 0 },
     },
   })
 }
@@ -152,7 +139,7 @@ export function buildImageActionReadinessRequest(
   action: ImageExecutionAction,
   options: ImageActionReadinessOptions = {},
 ): SubmitTaskData {
-  if (action === IMAGE_CANVAS_EXTEND_ACTION) return buildCanvasExtendReadinessRequest(options)
+  if (action === IMAGE_CANVAS_EXTEND_ACTION) return buildCanvasExtendReadinessRequest()
   if (action === IMAGE_HD_UPSCALE_ACTION) return buildHdUpscaleReadinessRequest()
   if (isImageDirectTaskAction(action)) return buildDirectActionReadinessRequest(action, options)
   throw new Error(`Unsupported image execution action ${action}`)
@@ -226,10 +213,10 @@ export function buildDirectActionTaskRequest(input: {
 export function buildImageInpaintTaskRequest(input: ImageInpaintTaskRequestInput): SubmitTaskData {
   return buildExecutionTaskRequest({
     prompt: input.prompt.trim(),
-    feature: EXECUTION_LOCAL_INPAINT_META.feature,
+    feature: EXECUTION_PARTIAL_EDIT_META.feature,
     params: {
       output_count: 1,
-      output_resolution: input.outputResolution ?? '1k',
+      output_resolution: 'default',
       ...buildExecutionSizeParams(input.imageSize, input.imageSize),
       original_image_url: input.originalImageUrl,
       mask_image_url: input.maskImageUrl,
@@ -241,29 +228,29 @@ export function buildImageInpaintTaskRequest(input: ImageInpaintTaskRequestInput
 export function buildCanvasExtendTaskRequest(input: {
   source: ImageExecutionInput
   imageSize: ExecutionImageSize | null
-  extendPercent: CanvasExtendPercent
+  frameRect: CanvasExtendRect
+  originalImageRect: CanvasExtendRect
   prompt?: string
-  outputResolution?: OutputResolution
 }): SubmitTaskData {
   const sourceUrl = requireImageExecutionInputUrl(input.source)
   const prompt = `${input.prompt ?? ''}`.trim()
   const execution = requireImageActionExecution(IMAGE_CANVAS_EXTEND_ACTION)
+  if (!input.imageSize) throw new Error('扩图缺少原图尺寸')
+  const geometry = resolveCanvasExtendPixelGeometry(input.imageSize, input.frameRect, input.originalImageRect)
   return buildExecutionTaskRequest({
     prompt,
     feature: execution.feature,
     imageUrls: [sourceUrl],
     params: {
       output_count: 1,
-      output_resolution: input.outputResolution ?? '1k',
-      ...buildExecutionSizeParams(
-        input.imageSize,
-        extendExecutionImageSize(input.imageSize, input.extendPercent),
-      ),
+      output_resolution: 'default',
+      original_image_width: input.imageSize.width,
+      original_image_height: input.imageSize.height,
       extend: {
-        top_percent: input.extendPercent.top,
-        right_percent: input.extendPercent.right,
-        bottom_percent: input.extendPercent.bottom,
-        left_percent: input.extendPercent.left,
+        target_width: geometry.targetWidth,
+        target_height: geometry.targetHeight,
+        image_offset_x: geometry.imageOffsetX,
+        image_offset_y: geometry.imageOffsetY,
       },
     },
   })
@@ -350,9 +337,9 @@ export function buildImageExecutionTaskRequest(
       return buildCanvasExtendTaskRequest({
         source: plan.source,
         imageSize,
-        extendPercent: plan.extendPercent,
+        frameRect: plan.frameRect,
+        originalImageRect: plan.originalImageRect,
         prompt: plan.prompt,
-        outputResolution: plan.outputResolution,
       })
     case 'prompt-generation':
       return buildPromptGenerationTaskRequest({
@@ -386,6 +373,5 @@ export function buildPreparedImageInpaintTaskRequest(input: {
     originalImageUrl: input.plan.source.url,
     maskImageUrl: input.maskImageUrl,
     imageSize: input.imageSize,
-    outputResolution: input.plan.outputResolution,
   })
 }

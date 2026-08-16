@@ -17,13 +17,13 @@ describe('Admin Billable Catalog resource', () => {
           data: {
             items: [
               {
-                sku: 'ai-image:local-inpaint',
+                sku: 'ai-image:partial-edit',
                 namespace: 'ai-image',
                 product_kind: 'workflow-feature',
                 display_name: '局部重绘',
                 sort_order: 30,
                 status: 'unpriced',
-                pricing_variants: ['1k', '2k', '4k'],
+                pricing_variants: ['default'],
               },
             ],
           },
@@ -33,46 +33,54 @@ describe('Admin Billable Catalog resource', () => {
 
     await expect(createAdminBillableCatalogResource().list()).resolves.toEqual([
       {
-                sku: 'ai-image:local-inpaint',
+        sku: 'ai-image:partial-edit',
         namespace: 'ai-image',
         productKind: 'workflow-feature',
         displayName: '局部重绘',
         sortOrder: 30,
         status: 'unpriced',
-        pricingVariants: ['1k', '2k', '4k'],
+        pricingVariants: ['default'],
         currentPrices: {},
         updatedAt: undefined,
       },
     ])
   })
 
-  it('publishes all configured resolution prices atomically', async () => {
+  it('publishes the configured fixed price', async () => {
     let requestBody: unknown
     useMswHandlers(
       http.post('/api/admin/billing/catalog/:sku/prices', async ({ request, params }) => {
         requestBody = await request.json()
-        expect(params.sku).toBe('ai-image:local-inpaint')
+        expect(params.sku).toBe('ai-image:partial-edit')
         return HttpResponse.json({
           code: 0,
           msg: 'ok',
           data: {
             prices: {
-              '1k': { output_resolution: '1k', price_version_id: 9, version: 1, unit_credits: 0, created_at: '2026-07-16T08:00:00Z' },
+              default: {
+                output_resolution: 'default',
+                price_version_id: 9,
+                version: 1,
+                unit_credits: 0,
+                created_at: '2026-07-16T08:00:00Z',
+              },
             },
           },
         })
       }),
     )
 
-    await expect(publishBillableItemPrices('ai-image:local-inpaint', { '1k': 0, '2k': undefined, '4k': undefined })).resolves.toEqual({
-      '1k': {
+    await expect(
+      publishBillableItemPrices('ai-image:partial-edit', { default: 0 }),
+    ).resolves.toEqual({
+      default: {
         priceVersionId: 9,
         version: 1,
         unitCredits: 0,
         createdAt: '2026-07-16T08:00:00Z',
       },
     })
-    expect(requestBody).toEqual({ prices: { '1k': 0 } })
+    expect(requestBody).toEqual({ prices: { default: 0 } })
   })
 
   it('sets feature availability without a manual reason', async () => {
@@ -80,12 +88,12 @@ describe('Admin Billable Catalog resource', () => {
     useMswHandlers(
       http.put('/api/admin/billing/catalog/:sku/availability', async ({ request, params }) => {
         requestBody = await request.json()
-        expect(params.sku).toBe('ai-image:local-inpaint')
+        expect(params.sku).toBe('ai-image:partial-edit')
         return HttpResponse.json({
           code: 0,
           msg: 'ok',
           data: {
-            sku: 'ai-image:local-inpaint',
+            sku: 'ai-image:partial-edit',
             status: 'disabled',
             updated_at: '2026-07-16T10:00:00Z',
           },
@@ -93,8 +101,8 @@ describe('Admin Billable Catalog resource', () => {
       }),
     )
 
-    await expect(setBillableItemAvailability('ai-image:local-inpaint', false)).resolves.toEqual({
-      sku: 'ai-image:local-inpaint',
+    await expect(setBillableItemAvailability('ai-image:partial-edit', false)).resolves.toEqual({
+      sku: 'ai-image:partial-edit',
       status: 'disabled',
       updatedAt: '2026-07-16T10:00:00Z',
     })
