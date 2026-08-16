@@ -42,8 +42,6 @@ export function createImageToolChromeAdapter(
         brushSize: session.maskEditor.brushSize.value,
         brushHardness: session.maskEditor.brushHardness.value,
         layerOpacity: session.maskChromeState.maskEditorLayerOpacity.value,
-        outputCount: session.maskChromeState.activeMaskEditorOutputCount.value,
-        referenceImages: session.maskChromeState.maskEditorReferenceImages.value,
         directGenerating: nodeId ? execution.isNodeExecutionActive(nodeId) : false,
         canUndo: session.maskEditor.canUndoMask.value,
         canRedo: session.maskEditor.canRedoMask.value,

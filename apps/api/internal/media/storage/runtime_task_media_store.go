@@ -17,6 +17,7 @@ type RuntimeTaskMediaStore struct {
 
 var _ taskmedia.ResultMaterializer = (*RuntimeTaskMediaStore)(nil)
 var _ taskmedia.UploadReader = (*RuntimeTaskMediaStore)(nil)
+var _ taskmedia.RuntimeMediaResolver = (*RuntimeTaskMediaStore)(nil)
 
 func NewRuntimeTaskMediaStore(service *StorageService) *RuntimeTaskMediaStore {
 	return &RuntimeTaskMediaStore{service: service}
@@ -31,6 +32,64 @@ func (s *RuntimeTaskMediaStore) ReadUploadObject(ctx context.Context, ref string
 		return nil, err
 	}
 	return taskMediaStoredObject(obj), nil
+}
+
+func (s *RuntimeTaskMediaStore) ResolveRuntimeMedia(ctx context.Context, params *tasks.WorkflowTaskParams) (*tasks.RuntimeMediaInputs, error) {
+	if params == nil {
+		return nil, fmt.Errorf("任务媒体参数为空")
+	}
+	if s == nil || s.service == nil {
+		return nil, fmt.Errorf("存储服务未初始化")
+	}
+	urls := make(map[int64]string)
+	resolve := func(assetID int64) (string, error) {
+		if assetID <= 0 {
+			return "", fmt.Errorf("媒体 AssetID 缺失")
+		}
+		if existing := urls[assetID]; existing != "" {
+			return existing, nil
+		}
+		providerURL, err := s.service.ResolveProviderAssetURL(ctx, assetID)
+		if err != nil {
+			return "", err
+		}
+		urls[assetID] = providerURL
+		return providerURL, nil
+	}
+
+	if params.Media == nil {
+		return nil, nil
+	}
+	resolved := &tasks.RuntimeMediaInputs{UseMask: params.Media.UseMask}
+	for index, ref := range params.Media.Inputs {
+		url, err := resolve(ref.AssetID)
+		if err != nil {
+			return nil, fmt.Errorf("解析 input 媒体失败: index=%d: %w", index, err)
+		}
+		resolved.Inputs = append(resolved.Inputs, tasks.RuntimeMediaRef{URL: url, Role: ref.Role, Weight: ref.Weight})
+	}
+	for index, ref := range params.Media.References {
+		url, err := resolve(ref.AssetID)
+		if err != nil {
+			return nil, fmt.Errorf("解析 reference 媒体失败: index=%d: %w", index, err)
+		}
+		resolved.References = append(resolved.References, tasks.RuntimeMediaRef{URL: url, Role: ref.Role, Weight: ref.Weight})
+	}
+	if ref := params.Media.Original; ref != nil {
+		url, err := resolve(ref.AssetID)
+		if err != nil {
+			return nil, fmt.Errorf("解析 original 媒体失败: %w", err)
+		}
+		resolved.Original = &tasks.RuntimeMediaRef{URL: url, Role: ref.Role, Weight: ref.Weight}
+	}
+	if ref := params.Media.Mask; ref != nil {
+		url, err := resolve(ref.AssetID)
+		if err != nil {
+			return nil, fmt.Errorf("解析 mask 媒体失败: %w", err)
+		}
+		resolved.Mask = &tasks.RuntimeMediaRef{URL: url, Role: ref.Role, Weight: ref.Weight}
+	}
+	return resolved, nil
 }
 
 func (s *RuntimeTaskMediaStore) MaterializeRemoteResults(ctx context.Context, userID int64, taskID string, sourceURLs []string, opts taskmedia.ResultMaterializeOptions) (taskmedia.MaterializedResults, error) {

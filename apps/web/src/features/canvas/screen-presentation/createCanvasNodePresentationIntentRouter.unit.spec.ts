@@ -138,9 +138,9 @@ describe('Canvas Node presentation intent routing seam', () => {
         args: [nodeId, mouseEvent],
       },
       {
-        intent: { type: 'canvas-extend-submitted', nodeId, prompt: 'extend', outputCount: 1 },
+        intent: { type: 'canvas-extend-submitted', nodeId, prompt: 'extend' },
         command: commands.canvasExtend.submit,
-        args: [nodeId, 'extend', 1],
+        args: [nodeId, 'extend'],
       },
       {
         intent: { type: 'action-requested', nodeId, action, prompt: '', outputCount: 1 },

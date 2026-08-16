@@ -286,20 +286,20 @@ func workflowMediaInputsFromMap(params map[string]interface{}, featureSlug strin
 
 	imageURLs := mediarefs.CollectStringList(params[paramkeys.ImageURLs])
 	if len(imageURLs) > 0 {
-		media.Inputs = mediaRefsFromURLs(imageURLs, "input", inputWeights)
+		media.Inputs = mediaRefsFromURLs(imageURLs, tasks.MediaRoleInput, inputWeights)
 		hasMedia = true
 	}
 	referenceImageURLs := mediarefs.CollectStringList(params[paramkeys.ReferenceImageURLs])
 	if len(referenceImageURLs) > 0 {
-		media.References = mediaRefsFromURLs(referenceImageURLs, "reference", nil)
+		media.References = mediaRefsFromURLs(referenceImageURLs, tasks.MediaRoleReference, nil)
 		hasMedia = true
 	}
 	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.MaskImageURL); ok {
-		media.Mask = &tasks.MediaRef{URL: v, Role: "mask"}
+		media.Mask = &tasks.MediaRef{Source: v, Role: tasks.MediaRoleMask}
 		hasMedia = true
 	}
 	if v, ok := workflow.ReadWorkflowStringParam(params, paramkeys.OriginalImageURL); ok {
-		media.Original = &tasks.MediaRef{URL: v, Role: "original"}
+		media.Original = &tasks.MediaRef{Source: v, Role: tasks.MediaRoleOriginal}
 		hasMedia = true
 	}
 	if v, ok := readBoolParam(params, paramkeys.UseMask); ok {
@@ -319,8 +319,8 @@ func mediaRefsFromURLs(urls []string, role string, weights []float64) []tasks.Me
 	refs := make([]tasks.MediaRef, 0, len(urls))
 	for index, raw := range urls {
 		ref := tasks.MediaRef{
-			URL:  strings.TrimSpace(raw),
-			Role: role,
+			Source: strings.TrimSpace(raw),
+			Role:   role,
 		}
 		if index < len(weights) {
 			ref.Weight = weights[index]

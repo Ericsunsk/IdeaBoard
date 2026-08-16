@@ -1,6 +1,11 @@
 package storage
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+var errProviderHTTPSUnavailable = errors.New("storage profile does not expose a provider HTTPS URL")
 
 type StorageStoreOptions struct {
 	DirPrefix  string
@@ -25,6 +30,7 @@ type StoredUploadObject struct {
 }
 
 type StoredUploadLookup struct {
+	AssetID   int64
 	URL       string
 	ObjectKey string
 }

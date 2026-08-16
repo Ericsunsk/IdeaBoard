@@ -438,7 +438,7 @@ func newSubmitToRiverWorkerTask(t *testing.T, taskID string) *tasks.Task {
 		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
 			SchemaVersion: tasks.CurrentParamsSchemaVersion,
 			Feature:       workflow.FeatureSlugSketchToImage,
-			Media:         &tasks.MediaInputs{Inputs: []tasks.MediaRef{{URL: "https://example.com/river-worker-input.png", Role: "input"}}},
+			Media:         &tasks.MediaInputs{Inputs: []tasks.MediaRef{{AssetID: 1, Role: "input"}}},
 		}),
 		FeatureSlug: workflow.FeatureSlugSketchToImage,
 		APIType:     "openai-compatible",

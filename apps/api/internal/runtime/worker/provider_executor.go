@@ -169,6 +169,7 @@ func truncateProviderRawOutputPreview(value string) string {
 
 type ProviderExecutor struct {
 	mediaReader        taskmedia.UploadReader
+	mediaResolver      taskmedia.RuntimeMediaResolver
 	resultMaterializer taskmedia.ResultMaterializer
 	publicOrigins      config.PublicOriginsConfig
 }
@@ -226,7 +227,6 @@ type resolvedProviderExecution struct {
 	runtimeOperation        workflow.RuntimeOperation
 	adapter                 providerRuntimeAdapter
 	timeout                 time.Duration
-	finalizationRequirement providerFinalizationRequirement
 	finalization            providerResultFinalizer
 	request                 providerRequest
 }
@@ -251,6 +251,7 @@ const (
 	providerRuntimeAdapterModelImage providerRuntimeAdapter = iota + 1
 	providerRuntimeAdapterBackgroundRemoval
 	providerRuntimeAdapterImageUpscale
+	providerRuntimeAdapterFluxFill
 )
 
 func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error) {
@@ -294,7 +295,7 @@ func (c *ProviderExecutor) callDrawingAPIWithAssignment(ctx context.Context, acc
 		finalizeFinishedAt := time.Now()
 		output.Timeline.FinalizeFinishedAt = &finalizeFinishedAt
 	}
-	finalization := exec.finalization.finalize(ctx, task.UserID, task.TaskID, imageURLs, exec.timeout)
+	finalization := exec.finalization.finalize(ctx, task.UserID, task.TaskID, imageURLs)
 	imageURLs, taskOutputs, err := finalization.completedOutputs()
 	if err != nil {
 		markFinalizeFinished()
@@ -455,6 +456,14 @@ func (c *ProviderExecutor) resolveProviderExecution(ctx context.Context, account
 			fmt.Errorf("modelless operation must not carry a resolved model"),
 		)
 	}
+	taskParams, err = c.resolveRuntimeProviderTaskParams(ctx, taskParams)
+	if err != nil {
+		return resolvedProviderExecution{}, newExecutionFailureError(
+			tasks.ExecutionStageAssigned,
+			tasks.FailureCategoryInputInvalid,
+			err,
+		)
+	}
 
 	request, requestErr := taskParams.providerRequest(task.Prompt, resolvedModel)
 	if requestErr != nil {
@@ -464,7 +473,6 @@ func (c *ProviderExecutor) resolveProviderExecution(ctx context.Context, account
 			requestErr,
 		)
 	}
-	requirement := finalizationRequirementFor(operation)
 	resolved := resolvedProviderExecution{
 		accountID:               account.ID,
 		accountName:             strings.TrimSpace(account.Name),
@@ -478,25 +486,14 @@ func (c *ProviderExecutor) resolveProviderExecution(ctx context.Context, account
 		runtimeOperation:        operation,
 		adapter:                 adapter,
 		timeout:                 timeout,
-		finalizationRequirement: requirement,
 		request:                 request,
 	}
 	adapterAccount := resolved.adapterAccount()
-
-	// Local finalizers may fetch and rewrite media inputs, so all durable intent,
-	// control, route, and model validation must converge before this I/O seam.
-	finalization, finalizationErr := c.prepareProviderFinalization(
-		ctx,
-		adapterAccount,
-		taskParams.Provider,
-		resolved.finalizationRequirement,
-		timeout,
-		task.EffectiveCorrelationID(),
-	)
-	if finalizationErr != nil {
-		return resolvedProviderExecution{}, newExecutionFailureError(tasks.ExecutionStageAssigned, tasks.FailureCategoryInputInvalid, finalizationErr)
+	resolved.finalization = providerResultFinalizer{
+		executor:      c,
+		correlationID: task.EffectiveCorrelationID(),
+		account:       adapterAccount,
 	}
-	resolved.finalization = finalization
 	return resolved, nil
 }
 
@@ -505,8 +502,8 @@ func (c *ProviderExecutor) parseAndNormalizeTaskParams(ctx context.Context, task
 	if err != nil {
 		return providerTaskParams{}, fmt.Errorf("parse task params: %w", err)
 	}
-	params := newProviderTaskParams(typedParams)
 	feature := strings.TrimSpace(typedParams.Feature)
+	var executionPlan *workflow.FeatureExecutionPlan
 	if workflow.IsAIImageFeature(feature) {
 		plan, decodeErr := workflow.DecodeFeatureExecutionPlan(typedParams.ExecutionPlan)
 		if decodeErr != nil {
@@ -518,12 +515,29 @@ func (c *ProviderExecutor) parseAndNormalizeTaskParams(ctx context.Context, task
 		if validateErr := validateProviderTaskContract(typedParams, plan); validateErr != nil {
 			return providerTaskParams{}, validateErr
 		}
-		params.ExecutionPlan = &plan
+		executionPlan = &plan
 	} else if len(typedParams.ExecutionPlan) > 0 && string(typedParams.ExecutionPlan) != "null" {
 		return providerTaskParams{}, fmt.Errorf("non-image task must not carry execution plan")
 	}
-	c.normalizeUpstreamMediaParams(ctx, params.Provider)
+	params := newProviderTaskParams(typedParams, nil)
+	params.ExecutionPlan = executionPlan
 	return params, nil
+}
+
+func (c *ProviderExecutor) resolveRuntimeProviderTaskParams(ctx context.Context, params providerTaskParams) (providerTaskParams, error) {
+	if params.Canonical == nil || params.Canonical.Media == nil {
+		return params, nil
+	}
+	if c == nil || c.mediaResolver == nil {
+		return providerTaskParams{}, fmt.Errorf("runtime media resolver is unavailable")
+	}
+	runtimeMedia, err := c.mediaResolver.ResolveRuntimeMedia(ctx, params.Canonical)
+	if err != nil {
+		return providerTaskParams{}, fmt.Errorf("resolve task media: %w", err)
+	}
+	resolved := newProviderTaskParams(params.Canonical, runtimeMedia)
+	resolved.ExecutionPlan = params.ExecutionPlan
+	return resolved, nil
 }
 
 func (c *ProviderExecutor) callProviderWithRequest(ctx context.Context, exec resolvedProviderExecution) (providerCallResult, error) {
@@ -535,6 +549,8 @@ func (c *ProviderExecutor) callProviderWithRequest(ctx context.Context, exec res
 		return c.callBackgroundRemoval(ctx, account, exec.request, exec.timeout)
 	case providerRuntimeAdapterImageUpscale:
 		return c.callImageUpscale(ctx, account, exec.request, exec.timeout)
+	case providerRuntimeAdapterFluxFill:
+		return c.callFluxFill(ctx, account, exec.request, exec.runtimeOperation, exec.timeout)
 	case providerRuntimeAdapterModelImage:
 		if workflow.IsGoogleNativeAPIType(exec.apiType) {
 			return c.callGoogleProviderWithRequest(ctx, account, exec.apiType, exec.request, exec.timeout)
@@ -554,11 +570,9 @@ func providerRuntimeAdapterFor(apiType string, protocol string, operation workfl
 	case providerendpoints.ProtocolModelAPI:
 		switch operation {
 		case workflow.RuntimeOperationPromptGeneration,
-			workflow.RuntimeOperationLocalInpaint,
 			workflow.RuntimeOperationSketchToImage,
 			workflow.RuntimeOperationStyleVariation,
-			workflow.RuntimeOperationStyleFusion,
-			workflow.RuntimeOperationImageExtend:
+			workflow.RuntimeOperationStyleFusion:
 			return providerRuntimeAdapterModelImage, nil
 		}
 	case providerendpoints.ProtocolImageURLJSONImage:
@@ -570,6 +584,14 @@ func providerRuntimeAdapterFor(apiType string, protocol string, operation workfl
 			return providerRuntimeAdapterBackgroundRemoval, nil
 		case workflow.RuntimeOperationImageUpscale:
 			return providerRuntimeAdapterImageUpscale, nil
+		}
+	case providerendpoints.ProtocolFluxFillJSONImage:
+		if apiType != workflow.ProviderOpenAICompatible {
+			return 0, fmt.Errorf("endpoint protocol %q does not support API type %q", protocol, apiType)
+		}
+		switch operation {
+		case workflow.RuntimeOperationLocalInpaint, workflow.RuntimeOperationImageExtend:
+			return providerRuntimeAdapterFluxFill, nil
 		}
 	}
 	return 0, fmt.Errorf("endpoint protocol %q does not support runtime operation %q", strings.TrimSpace(protocol), operation)

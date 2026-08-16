@@ -19,6 +19,7 @@
       :submit-disabled="submitDisabled"
       :show-submit="showSubmit"
       :show-aspect-ratio="showAspectRatio"
+      :show-output-count="showOutputCount"
       :billing-state="billingState"
       :textarea-class="promptInputClass"
       :actions-class="promptActionsClass"
@@ -51,6 +52,7 @@ const props = withDefaults(
     allowEmpty?: boolean
     submitDisabled?: boolean
     showSubmit?: boolean
+    showOutputCount?: boolean
     aspectRatio?: PromptAspectRatio
     offset?: string
     billingState?: CanvasBillingQuoteState | null
@@ -61,6 +63,7 @@ const props = withDefaults(
     disabled: false,
     offset: '8px',
     showSubmit: true,
+    showOutputCount: true,
     submitDisabled: false,
     billingState: null,
     outputResolution: '1k',

@@ -604,7 +604,7 @@ func seedTasks(t *testing.T, repo *Repository, ctx context.Context, items ...*ta
 	t.Helper()
 	for _, item := range items {
 		if item.Params == "" {
-			item.Params = `{"schema_version":2}`
+			item.Params = `{"schema_version":3}`
 		}
 		if item.AccountID != nil && item.AssignedProviderEndpointID == nil {
 			item.AssignedProviderEndpointID = tasks.IDPtr(tasks.IDValue(item.AccountID) + 10000)

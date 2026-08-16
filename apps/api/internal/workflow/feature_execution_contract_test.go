@@ -36,11 +36,11 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 			controlContract: RuntimeControlsNone,
 		},
 		{
-			feature: FeatureSlugLocalInpaint, promptPolicy: PromptPolicyOptional,
-			outputCountPolicy: OutputCountPolicySelectable, outputResolutionPolicy: OutputResolutionPolicyScalable,
-			capability: RoutingCapabilityImageGeneration, modelRequirement: RoutingModelRequired,
+			feature: FeatureSlugLocalInpaint, promptPolicy: PromptPolicyRequired,
+			outputCountPolicy: OutputCountPolicyFixed, outputResolutionPolicy: OutputResolutionPolicyScalable,
+			capability: RoutingCapabilityImageFill, modelRequirement: RoutingModelNotRequired,
 			operation: RuntimeOperationLocalInpaint, imageInputCount: 1, hasMaskInput: true, primitive: GenerationPrimitiveImageToImage,
-			invocation: RuntimeInvocationEdit, imageInputPolicy: ImageInputRequired,
+			invocation: RuntimeInvocationTransform, imageInputPolicy: ImageInputRequired,
 			maskInputPolicy: MaskInputRequired, originalImagePolicy: OriginalImageForwardWhenPresent,
 			controlContract: RuntimeControlsNone,
 		},
@@ -91,10 +91,10 @@ func TestCompileFeatureExecutionPlanCoversCanonicalImageFeatures(t *testing.T) {
 		},
 		{
 			feature: FeatureSlugImageExtend, promptPolicy: PromptPolicyOptional,
-			outputCountPolicy: OutputCountPolicySelectable, outputResolutionPolicy: OutputResolutionPolicyScalable,
-			capability: RoutingCapabilityImageGeneration, modelRequirement: RoutingModelRequired,
+			outputCountPolicy: OutputCountPolicyFixed, outputResolutionPolicy: OutputResolutionPolicyScalable,
+			capability: RoutingCapabilityImageFill, modelRequirement: RoutingModelNotRequired,
 			operation: RuntimeOperationImageExtend, imageInputCount: 1, primitive: GenerationPrimitiveImageToImage,
-			invocation: RuntimeInvocationEdit, imageInputPolicy: ImageInputRequired,
+			invocation: RuntimeInvocationTransform, imageInputPolicy: ImageInputRequired,
 			maskInputPolicy: MaskInputIgnored, originalImagePolicy: OriginalImageForwardWhenPresent,
 			controlContract: RuntimeControlsExtend,
 		},
@@ -383,7 +383,7 @@ func TestFeatureExecutionPlanDurableRoundTripPreservesCanonicalFacts(t *testing.
 			if feature == FeatureSlugStyleFusion {
 				params.ImageInputCount = 2
 			}
-			if feature != FeatureSlugRemoveBg && feature != FeatureSlugHDUpscale {
+			if feature != FeatureSlugRemoveBg && feature != FeatureSlugHDUpscale && feature != FeatureSlugLocalInpaint && feature != FeatureSlugImageExtend {
 				params.RequestedOutputCount = &count
 				params.OutputResolution = &resolution
 			}
@@ -419,7 +419,7 @@ func TestFeatureExecutionPlanJSONUsesVersionedDurableSeam(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if string(payload) == `{}` || !strings.Contains(string(payload), `"schema_version":1`) {
+	if string(payload) == `{}` || !strings.Contains(string(payload), `"schema_version":2`) {
 		t.Fatalf("plan did not use versioned durable encoding: %s", payload)
 	}
 	var decoded FeatureExecutionPlan
@@ -447,7 +447,7 @@ func TestDecodeFeatureExecutionPlanFailsClosed(t *testing.T) {
 	}{
 		{
 			name:    "unknown schema",
-			payload: strings.Replace(string(payload), `"schema_version":1`, `"schema_version":99`, 1),
+			payload: strings.Replace(string(payload), `"schema_version":2`, `"schema_version":99`, 1),
 			code:    FeatureContractUnsupportedSchema,
 		},
 		{

@@ -207,7 +207,7 @@ describe('maskPaintingCanvas', () => {
     ])
   })
 
-  it('builds execution and preview masks from source alpha without RGB pixel rewrites', () => {
+  it('encodes execution masks as opaque grayscale where white redraws and black preserves', () => {
     const canvas = createFixtureCanvas(3, 1, [10, 20, 30, 0, 10, 20, 30, 128, 10, 20, 30, 255])
 
     const result = buildMaskCommitResult(canvas)
@@ -215,9 +215,9 @@ describe('maskPaintingCanvas', () => {
     expect(result).not.toBeNull()
     const executionPixels = readEncodedPixels(result!.executionMaskDataUrl)
     const previewPixels = readEncodedPixels(result!.maskDataUrl)
-    expect(pixelAt(executionPixels, 0).alpha).toBe(0)
+    expect(pixelAt(executionPixels, 0)).toEqual({ red: 0, green: 0, blue: 0, alpha: 255 })
     expect(pixelAt(previewPixels, 0).alpha).toBe(0)
-    expect(pixelAt(executionPixels, 1)).toEqual({ red: 255, green: 255, blue: 255, alpha: 128 })
+    expect(pixelAt(executionPixels, 1)).toEqual({ red: 128, green: 128, blue: 128, alpha: 255 })
     expect(pixelAt(executionPixels, 2)).toEqual({ red: 255, green: 255, blue: 255, alpha: 255 })
     expect(pixelAt(previewPixels, 1)).toEqual({
       red: MASK_EDITOR_PAINT_RGB.r,

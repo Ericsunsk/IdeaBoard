@@ -16,12 +16,6 @@ type MaskRgbColor = {
   b: number
 }
 
-const MASK_EXECUTION_RGB = {
-  r: 255,
-  g: 255,
-  b: 255,
-} as const
-
 function createMaskCanvas(width: number, height: number) {
   const canvas = document.createElement('canvas')
   canvas.width = width
@@ -80,6 +74,25 @@ function drawTintedMaskToCanvas(
   ctx.clearRect(0, 0, width, height)
   ctx.drawImage(sourceCanvas, 0, 0, width, height)
   tintCurrentAlpha(ctx, width, height, color, alpha)
+}
+
+function drawExecutionMaskToCanvas(
+  targetCanvas: HTMLCanvasElement,
+  source: ImageData,
+) {
+  const ctx = targetCanvas.getContext('2d')
+  if (!ctx) return
+  const imageData = ctx.createImageData(source.width, source.height)
+  const total = source.width * source.height
+  for (let index = 0; index < total; index += 1) {
+    const base = index * 4
+    const maskValue = source.data[base + 3]
+    imageData.data[base] = maskValue
+    imageData.data[base + 1] = maskValue
+    imageData.data[base + 2] = maskValue
+    imageData.data[base + 3] = 255
+  }
+  ctx.putImageData(imageData, 0, 0)
 }
 
 export function drawMaskRasterPreviewToCanvas(
@@ -240,7 +253,7 @@ export function buildMaskCommitResult(canvas: HTMLCanvasElement): MaskCommitResu
   const source = ctx.getImageData(0, 0, canvas.width, canvas.height)
   if (!hasMaskPaint(source.data)) return null
   const executionCanvas = createMaskCanvas(canvas.width, canvas.height)
-  drawTintedMaskToCanvas(executionCanvas, canvas, MASK_EXECUTION_RGB)
+  drawExecutionMaskToCanvas(executionCanvas, source)
   const previewCanvas = createMaskCanvas(canvas.width, canvas.height)
   drawTintedMaskToCanvas(previewCanvas, canvas, MASK_EDITOR_PAINT_RGB, MASK_EDITOR_PREVIEW_ALPHA)
   const executionMaskDataUrl = executionCanvas.toDataURL('image/png')

@@ -34,6 +34,7 @@
 ## Current Design Rules
 
 - Task submission is transactional: insert the business task and enqueue the River job in the same PostgreSQL transaction.
+- Canonical Task media uses ordered `AssetID + role` facts. Submit atomically creates `task_input` refs, every terminal transition releases them, reclamation protects them while active, and runtime resolves each Asset through its recorded Storage Profile into provider-only URLs; persisted Task Params never contain media URLs.
 - Task submission idempotency uses `client_action_id` as the user-action boundary: retries of the same user action return the existing Task, while intentional reruns send a new `client_action_id`.
 - River + PostgreSQL are the task queue and task state fact source.
 - API 启动会在 River worker 启动前把遗留的 `running` tasks 经 durable final-failure convergence 收敛为 `failed`；`pending` tasks 保持队列语义，active leases 与 Credit Hold 在同一 transaction 释放，旧 River jobs 通过 River public API 做 best-effort cleanup。

@@ -8,9 +8,3 @@ export type ImageMaskEditorCommittedData = {
   executionMaskDataUrl: string
   maskDataUrl: string
 }
-
-export type MaskEditorReferenceImage = {
-  id: string
-  url: string
-  ratio?: number
-}

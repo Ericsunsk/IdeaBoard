@@ -5,7 +5,9 @@ import type { AdminConfirmPort } from '../shared/composables/useAdminConfirm'
 import {
   createEmptyProviderEndpointForm,
   inferProviderEndpointApiTypeFromUrl,
+  isModellessProviderCapability,
   isModellessProviderEndpoint,
+  isModellessProviderProtocol,
   uniqueTrimmedModelValues,
 } from './providerConfigPayload'
 import { createModelSuggestions } from './providerModelOptions'
@@ -98,8 +100,8 @@ function createProviderEndpointEditor(options: {
       apiType: row.apiType,
       protocol: row.protocol,
       capability:
-        row.protocol === 'image-url-json-to-image' &&
-        (row.capabilities[0] === 'background-removal' || row.capabilities[0] === 'image-upscale')
+        isModellessProviderProtocol(row.protocol) &&
+        isModellessProviderCapability(row.capabilities[0])
           ? row.capabilities[0]
           : '',
       name: row.name,
@@ -473,10 +475,10 @@ function resolveProviderEndpointFieldError(
   if (field === 'name' && !form.name.trim()) return '请输入供应商端点名称'
   if (field === 'apiType' && !form.apiType) return '请选择接口类型'
   if (field === 'protocol' && !form.protocol) return '请选择调用协议'
-  if (field === 'capability' && form.protocol === 'image-url-json-to-image' && !form.capability) {
+  if (field === 'capability' && isModellessProviderProtocol(form.protocol) && !form.capability) {
     return '请选择处理功能'
   }
-  if (field === 'apiKey' && form.protocol === 'image-url-json-to-image' && !form.apiKey.trim()) {
+  if (field === 'apiKey' && isModellessProviderProtocol(form.protocol) && !form.apiKey.trim()) {
     return '请输入 API Key'
   }
   if (field === 'baseUrl') {

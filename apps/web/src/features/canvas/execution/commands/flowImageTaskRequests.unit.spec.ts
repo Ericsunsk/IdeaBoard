@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SubmitTaskData } from '../../../../shared/api/task'
 import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
-import { getCanvasNodeImageInputLimit } from '../../../canvas-board/domain'
 import {
   IMAGE_CANVAS_EXTEND_ACTION,
   IMAGE_HD_UPSCALE_ACTION,
@@ -23,6 +22,8 @@ import {
   buildImageExecutionTaskRequest,
   buildImageActionReadinessRequest,
   buildImageInpaintTaskRequest,
+  buildLocalInpaintReadinessRequest,
+  buildCanvasExtendReadinessRequest,
   buildPreparedImageInpaintTaskRequest,
   buildPromptGenerationTaskRequest,
 } from './flowImageTaskRequests'
@@ -77,6 +78,38 @@ describe('flowImageTaskRequests', () => {
       }),
     ).toMatchObject({
       params: { output_count: 1, output_resolution: 'default' },
+    })
+  })
+
+  it('builds valid quote-only image-fill readiness placeholders', () => {
+    expect(
+      buildLocalInpaintReadinessRequest({ outputResolution: '4k' }),
+    ).toMatchObject({
+      prompt: '局部重绘',
+      feature: EXECUTION_FEATURE.localInpaint,
+      params: {
+        output_count: 1,
+        output_resolution: '4k',
+        original_image_width: 1024,
+        original_image_height: 1024,
+        custom_width: 1024,
+        custom_height: 1024,
+      },
+    })
+    expect(
+      buildCanvasExtendReadinessRequest({ outputResolution: '2k' }),
+    ).toMatchObject({
+      prompt: '',
+      feature: EXECUTION_FEATURE.imageExtend,
+      params: {
+        output_count: 1,
+        output_resolution: '2k',
+        original_image_width: 1024,
+        original_image_height: 1024,
+        custom_width: 1032,
+        custom_height: 1024,
+        extend: { top_percent: 0, right_percent: 1, bottom_percent: 0, left_percent: 0 },
+      },
     })
   })
 
@@ -238,27 +271,23 @@ describe('flowImageTaskRequests', () => {
     }
   })
 
-  it('limits inpaint reference images by the canvas image input contract', () => {
-    const referenceImageLimit = getCanvasNodeImageInputLimit('prompt')
-    const referenceImageUrls = Array.from(
-      { length: referenceImageLimit + 2 },
-      (_, index) => ` https://assets.example.com/ref-${index}.png `,
-    )
-
+  it('builds single-output inpaint params with source dimensions and no reference contract', () => {
     const request = buildImageInpaintTaskRequest({
       prompt: 'redraw the selected area',
       originalImageUrl: source.url,
       maskImageUrl: 'https://assets.example.com/mask.png',
-      referenceImageUrls,
-      outputCount: 2,
+      imageSize: { width: 1200, height: 800 },
     })
 
     expect(request.params).toMatchObject({
-      reference_image_urls: referenceImageUrls
-        .map((url) => url.trim())
-        .slice(0, referenceImageLimit),
+      output_count: 1,
+      custom_width: 1200,
+      custom_height: 800,
+      original_image_width: 1200,
+      original_image_height: 800,
       use_mask: true,
     })
+    expect(request.params).not.toHaveProperty('reference_image_urls')
   })
 
   it('builds image extend params under the nested extend contract', () => {
@@ -272,13 +301,12 @@ describe('flowImageTaskRequests', () => {
         left: 40,
       },
       prompt: 'extend horizon',
-      outputCount: 3,
       outputResolution: '4k',
     })
 
     expect(request.feature).toBe(EXECUTION_FEATURE.imageExtend)
     expect(request.params).toMatchObject({
-      output_count: 3,
+      output_count: 1,
       output_resolution: '4k',
       custom_width: 1600,
       custom_height: 1050,
@@ -494,7 +522,6 @@ describe('flowImageTaskRequests', () => {
       prompt: 'replace object',
       rawMaskDataUrl: 'data:image/png;base64,mask',
       outputCount: 1,
-      referenceImageUrls: [' https://assets.example.com/ref.png '],
       resultOptions: {},
     }
 
@@ -502,6 +529,7 @@ describe('flowImageTaskRequests', () => {
       buildPreparedImageInpaintTaskRequest({
         plan,
         maskImageUrl: 'https://assets.example.com/mask.png',
+        imageSize: { width: 900, height: 600 },
       }),
     ).toMatchObject({
       feature: EXECUTION_FEATURE.localInpaint,
@@ -509,9 +537,19 @@ describe('flowImageTaskRequests', () => {
         output_count: 1,
         original_image_url: source.url,
         mask_image_url: 'https://assets.example.com/mask.png',
-        reference_image_urls: ['https://assets.example.com/ref.png'],
+        custom_width: 900,
+        custom_height: 600,
+        original_image_width: 900,
+        original_image_height: 600,
         use_mask: true,
       },
     })
+    expect(
+      buildPreparedImageInpaintTaskRequest({
+        plan,
+        maskImageUrl: 'https://assets.example.com/mask.png',
+        imageSize: { width: 900, height: 600 },
+      }).params,
+    ).not.toHaveProperty('reference_image_urls')
   })
 })

@@ -139,7 +139,6 @@ describe('useCanvasImageWorkflow', () => {
           focusAndShowChrome: vi.fn(),
           scheduleChromeAnchorUpdate: vi.fn(),
         },
-        prompt: { runPromptAction: vi.fn() },
         chrome: {},
       },
     })
@@ -303,7 +302,7 @@ describe('useCanvasImageWorkflow', () => {
     expect(mocks.execution.executeImageWorkflow).not.toHaveBeenCalled()
   })
 
-  it('wires Image Tool Session and graph mutations without exposing execution internals', () => {
+  it('wires Image Tool Session without exposing image-fill execution internals', () => {
     const { options, graph, feedback } = createOptions()
     const workflow = useCanvasImageWorkflow(options as never)
 
@@ -320,14 +319,7 @@ describe('useCanvasImageWorkflow', () => {
     workflow.commands.interactions.onFlowImageContextMenu('image-1', new MouseEvent('contextmenu'))
     expect(options.flowPaneAdapter.selectOnlyNode).toHaveBeenCalledWith('image-1')
     const imageToolOptions = mocks.useCanvasImageTools.mock.calls[0]?.[0]
-    const patch = { key: 'outputCount', value: 2 } as const
-
-    imageToolOptions.updateOutputCount('image-1', patch)
-
-    expect(graph.updateSnapshotNodeParam).toHaveBeenCalledWith('image-1', patch)
-    expect(graph.markNodeExecutionDirty).toHaveBeenCalledWith('image-1', {
-      includeSelf: true,
-    })
+    expect(imageToolOptions).not.toHaveProperty('updateOutputCount')
   })
 
   it('owns fusion mutations and pending-result reattachment on the workflow runtime', () => {

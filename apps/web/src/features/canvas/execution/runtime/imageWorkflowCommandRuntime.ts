@@ -18,15 +18,12 @@ export type RunImageDirectActionOptions = {
 export type RunImageInpaintActionOptions = {
   prompt: string
   maskDataUrl: string
-  outputCount: number
-  referenceImageUrls?: string[]
 }
 
 export type CanvasExtendRectIntent = {
   frameRect: CanvasExtendRect
   originalImageRect: CanvasExtendRect
   prompt?: string
-  outputCount?: number
 }
 
 export type ImageWorkflowPlanner = {

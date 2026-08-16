@@ -72,7 +72,7 @@ WHERE asset.id = $3
     SELECT 1
     FROM media_refs AS ref
     WHERE ref.media_asset_id = asset.id
-      AND ref.ref_type IN ('board', 'board_node')
+      AND ref.ref_type IN ('board', 'board_node', 'task_input')
   )
 RETURNING asset.id, asset.asset_id, asset.owner_user_id, asset.storage_profile_id, asset.storage_key,
   asset.url, asset.source_url, asset.media_kind, asset.mime_type,
@@ -123,56 +123,6 @@ func (q *Queries) ClaimDueMediaAssetReclamation(ctx context.Context, arg ClaimDu
 		&i.ReclaimStartedAt,
 		&i.ReclaimClaimToken,
 		&i.ReclaimGeneration,
-	)
-	return i, err
-}
-
-const claimPromptReferenceMediaRef = `-- name: ClaimPromptReferenceMediaRef :one
-UPDATE media_refs
-SET task_id = $1, updated_at = now()
-WHERE owner_user_id = $2
-  AND media_asset_id = $3
-  AND ref_type = 'prompt_reference'
-  AND ref_id = $4
-  AND role = $5
-  AND input_index = $6
-  AND task_id = ''
-RETURNING id, media_asset_id, owner_user_id, ref_type, ref_id,
-  board_id, task_id, role, input_index, metadata, created_at, updated_at
-`
-
-type ClaimPromptReferenceMediaRefParams struct {
-	TaskID       string `json:"task_id"`
-	OwnerUserID  int64  `json:"owner_user_id"`
-	MediaAssetID int64  `json:"media_asset_id"`
-	RefID        string `json:"ref_id"`
-	Role         string `json:"role"`
-	InputIndex   int32  `json:"input_index"`
-}
-
-func (q *Queries) ClaimPromptReferenceMediaRef(ctx context.Context, arg ClaimPromptReferenceMediaRefParams) (MediaRef, error) {
-	row := q.db.QueryRowContext(ctx, claimPromptReferenceMediaRef,
-		arg.TaskID,
-		arg.OwnerUserID,
-		arg.MediaAssetID,
-		arg.RefID,
-		arg.Role,
-		arg.InputIndex,
-	)
-	var i MediaRef
-	err := row.Scan(
-		&i.ID,
-		&i.MediaAssetID,
-		&i.OwnerUserID,
-		&i.RefType,
-		&i.RefID,
-		&i.BoardID,
-		&i.TaskID,
-		&i.Role,
-		&i.InputIndex,
-		&i.Metadata,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -369,6 +319,7 @@ WHERE ref.owner_user_id = $1
   AND ref.ref_id = $2
   AND ref.role = $3
   AND ref.input_index = $4
+  AND ref.task_id = ''
   AND asset.deleted_at IS NULL
 LIMIT 1
 `
@@ -455,6 +406,26 @@ func (q *Queries) GetMediaAssetByID(ctx context.Context, id int64) (MediaAsset, 
 	return i, err
 }
 
+const getReadyMediaAssetStorageLocationByID = `-- name: GetReadyMediaAssetStorageLocationByID :one
+SELECT storage_profile_id, storage_key
+FROM media_assets
+WHERE id = $1
+  AND status = 'ready'
+  AND deleted_at IS NULL
+`
+
+type GetReadyMediaAssetStorageLocationByIDRow struct {
+	StorageProfileID string `json:"storage_profile_id"`
+	StorageKey       string `json:"storage_key"`
+}
+
+func (q *Queries) GetReadyMediaAssetStorageLocationByID(ctx context.Context, id int64) (GetReadyMediaAssetStorageLocationByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getReadyMediaAssetStorageLocationByID, id)
+	var i GetReadyMediaAssetStorageLocationByIDRow
+	err := row.Scan(&i.StorageProfileID, &i.StorageKey)
+	return i, err
+}
+
 const listDueMediaAssetReclamationIDs = `-- name: ListDueMediaAssetReclamationIDs :many
 SELECT asset.id, asset.reclaim_generation
 FROM media_assets AS asset
@@ -468,7 +439,7 @@ WHERE asset.deleted_at IS NULL
     SELECT 1
     FROM media_refs AS ref
     WHERE ref.media_asset_id = asset.id
-      AND ref.ref_type IN ('board', 'board_node')
+      AND ref.ref_type IN ('board', 'board_node', 'task_input')
   )
 ORDER BY asset.reclaim_after ASC, asset.id ASC
 LIMIT $3
@@ -613,7 +584,7 @@ WHERE media_assets.id = $2
     SELECT 1
     FROM media_refs AS ref
     WHERE ref.media_asset_id = media_assets.id
-      AND ref.ref_type IN ('board', 'board_node')
+      AND ref.ref_type IN ('board', 'board_node', 'task_input')
   )
 `
 
@@ -658,6 +629,49 @@ func (q *Queries) ReleaseMediaAssetReclamationClaim(ctx context.Context, arg Rel
 	return err
 }
 
+const releaseTaskInputMediaRefs = `-- name: ReleaseTaskInputMediaRefs :many
+WITH released AS (
+  DELETE FROM media_refs
+  WHERE task_id = $1
+    AND ref_type = 'task_input'
+  RETURNING media_asset_id
+)
+UPDATE media_assets AS asset
+SET reclaim_after = COALESCE(asset.reclaim_after, now()),
+    reclaim_started_at = NULL,
+    reclaim_claim_token = NULL,
+    reclaim_generation = CASE
+      WHEN asset.reclaim_after IS NULL THEN asset.reclaim_generation + 1
+      ELSE asset.reclaim_generation
+    END
+WHERE asset.id IN (SELECT media_asset_id FROM released)
+  AND asset.deleted_at IS NULL
+RETURNING asset.id
+`
+
+func (q *Queries) ReleaseTaskInputMediaRefs(ctx context.Context, taskID string) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, releaseTaskInputMediaRefs, taskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const scheduleUnreferencedMediaAssetsForReclamation = `-- name: ScheduleUnreferencedMediaAssetsForReclamation :exec
 UPDATE media_assets AS asset
 SET reclaim_after = COALESCE(asset.reclaim_after, $1),
@@ -673,7 +687,7 @@ WHERE asset.id = ANY($2::bigint[])
     SELECT 1
     FROM media_refs AS ref
     WHERE ref.media_asset_id = asset.id
-      AND ref.ref_type IN ('board', 'board_node')
+      AND ref.ref_type IN ('board', 'board_node', 'task_input')
   )
 `
 

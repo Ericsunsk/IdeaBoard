@@ -44,7 +44,7 @@ export type CanvasNodePresentationIntentCommands = {
     ) => void
   }
   canvasExtend: {
-    submit: (nodeId: string, prompt: string, outputCount: number) => void
+    submit: (nodeId: string, prompt: string) => void
     beginHandle: (
       nodeId: string,
       anchor: CanvasNodeIntentOf<'canvas-extend-handle-pointerdown'>['anchor'],
@@ -122,7 +122,7 @@ export function createCanvasNodePresentationIntentRouter(
         commands.image.openContextMenu(intent.nodeId, intent.event)
         return
       case 'canvas-extend-submitted':
-        commands.canvasExtend.submit(intent.nodeId, intent.prompt, intent.outputCount)
+        commands.canvasExtend.submit(intent.nodeId, intent.prompt)
         return
       case 'action-requested':
         commands.image.runAction(

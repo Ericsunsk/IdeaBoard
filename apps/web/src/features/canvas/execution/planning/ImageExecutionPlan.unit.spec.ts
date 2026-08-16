@@ -226,16 +226,39 @@ describe('ImageExecutionPlan', () => {
       planner.planImageInpaintAction('image-1', {
         prompt: '   ',
         maskDataUrl: 'data:image/png;base64,mask',
-        outputCount: 1,
       }),
     ).toThrow('请输入 Prompt')
     expect(() =>
       planner.planImageInpaintAction('image-1', {
         prompt: 'redraw',
         maskDataUrl: '   ',
-        outputCount: 1,
       }),
     ).toThrow('请先标记局部重绘区域')
+  })
+
+  it('plans image-fill actions as single-output tasks without inpaint references', () => {
+    const planner = createImageExecutionPlanner(() => ({
+      nodes: [
+        {
+          id: 'image-1',
+          data: { kind: 'image', snapshotNode: makeImageNode() },
+        },
+      ],
+      edges: [],
+    }))
+
+    const inpaint = planner.planImageInpaintAction('image-1', {
+      prompt: 'redraw',
+      maskDataUrl: 'data:image/png;base64,mask',
+    })
+    const extend = planner.planCanvasExtendAction('image-1', {
+      frameRect: { left: -20, top: 0, width: 140, height: 100 },
+      originalImageRect: { left: 0, top: 0, width: 100, height: 100 },
+    })
+
+    expect(inpaint.outputCount).toBe(1)
+    expect(inpaint).not.toHaveProperty('referenceImageUrls')
+    expect(extend.outputCount).toBe(1)
   })
 
   it('rejects canvas extend plans with no extension', () => {

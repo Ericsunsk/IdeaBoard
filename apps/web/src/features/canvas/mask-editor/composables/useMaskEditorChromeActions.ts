@@ -1,5 +1,4 @@
-import { requireImageNodeOutputCount } from '../../../canvas-board/domain'
-import type { ImageMaskEditorCommittedData, MaskEditorReferenceImage } from '../types'
+import type { ImageMaskEditorCommittedData } from '../types'
 
 type ValueRef<T> = {
   readonly value: T
@@ -11,7 +10,6 @@ type MaskEditorExecutionMaskData = {
 
 type UseMaskEditorChromeActionsOptions = {
   maskEditorNodeId: ValueRef<string | null>
-  referenceImages: ValueRef<readonly Pick<MaskEditorReferenceImage, 'url'>[]>
   commitMaskEditorMode: () => boolean
   getCommittedMaskData: (nodeId: string) => MaskEditorExecutionMaskData | null | undefined
   clearActiveNodePanel: () => void
@@ -20,17 +18,14 @@ type UseMaskEditorChromeActionsOptions = {
     nodeId: string,
     options: {
       prompt: string
-      outputCount: number
       maskDataUrl: string
-      referenceImageUrls?: string[]
     },
   ) => Promise<void> | void
-  updateOutputCount: (nodeId: string, outputCount: number) => void
   onWarning: (message: string) => void
 }
 
 export function useMaskEditorChromeActions(options: UseMaskEditorChromeActionsOptions) {
-  function onMaskEditorChromeSubmit(prompt: string, outputCount: number) {
+  function onMaskEditorChromeSubmit(prompt: string) {
     const nodeId = options.maskEditorNodeId.value
     if (!nodeId) return
     const didCommitMask = options.commitMaskEditorMode()
@@ -43,20 +38,11 @@ export function useMaskEditorChromeActions(options: UseMaskEditorChromeActionsOp
     options.hideStrengthControl()
     void options.runInpaintAction(nodeId, {
       prompt,
-      outputCount,
       maskDataUrl: committed.executionMaskDataUrl,
-      referenceImageUrls: options.referenceImages.value.map((image) => image.url),
     })
-  }
-
-  function onMaskEditorChromeOutputCountUpdate(value: number) {
-    const nodeId = options.maskEditorNodeId.value
-    if (!nodeId) return
-    options.updateOutputCount(nodeId, requireImageNodeOutputCount(value))
   }
 
   return {
     onMaskEditorChromeSubmit,
-    onMaskEditorChromeOutputCountUpdate,
   }
 }

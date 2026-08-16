@@ -32,15 +32,6 @@
       </AdminFormField>
     </div>
 
-    <dl class="grid gap-3 border-y border-ib-border-soft py-3" :class="resolutions.length === 1 ? 'grid-cols-1' : 'grid-cols-3'">
-      <div v-for="variant in resolutions" :key="variant" class="min-w-0">
-        <dt class="text-admin-caption text-ib-text-muted">{{ variantLabel(variant) }}</dt>
-        <dd class="mt-1 truncate text-admin-meta font-semibold text-admin-title-color">
-          {{ currentPriceLabel(variant) }} → {{ newPriceLabel(variant) }}
-        </dd>
-      </div>
-    </dl>
-
     <div class="flex items-center justify-between gap-4 text-admin-meta">
       <span class="text-ib-text-muted">版本影响</span>
       <span class="text-right text-admin-title-color">创建新版本，历史版本不变</span>
@@ -64,7 +55,6 @@ import InputNumber from 'primevue/inputnumber'
 import Message from 'primevue/message'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
-import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
 import type { AdminBillableItemCard, PricingVariant } from './billableCatalogTypes'
 
 const props = withDefaults(
@@ -101,14 +91,6 @@ const validationErrors = computed<Record<PricingVariant, string>>(() => {
 })
 function variantLabel(variant: PricingVariant) {
   return variant === 'default' ? '固定' : variant.toUpperCase()
-}
-function currentPriceLabel(variant: PricingVariant) {
-  const value = props.item?.currentPrices[variant]?.unitCredits
-  return value == null ? '未设置' : formatIdeaAmount(value)
-}
-function newPriceLabel(variant: PricingVariant) {
-  const value = prices.value[variant]
-  return value == null ? '未配置' : formatIdeaAmount(value)
 }
 
 watch(

@@ -54,10 +54,8 @@
         v-if="expandModeActive && expandOverlayStyle"
         :overlay-style="expandOverlayStyle"
         :handle-radius="expandHandleRadius ?? 4"
-        :output-count="outputCountValue"
         :output-resolution="outputResolution"
         @submit="submitExpand"
-        @update:output-count="selectOutputCount"
         @update:output-resolution="emit('update:output-resolution', $event)"
         @handle-pointerdown="emit('expand-handle-pointerdown', $event)"
         @handle-pointermove="emit('expand-handle-pointermove', $event)"
@@ -107,7 +105,6 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { requireImageNodeOutputCount } from '../../../canvas-board/domain'
 import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import { useCanvasViewportContext } from '../../composables/useCanvasViewportContext'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
@@ -134,7 +131,6 @@ const props = defineProps<{
   expandOverlayStyle?: Record<string, string> | null
   expandHandleRadius?: number
   imageToolStageBinding?: ImageToolStageBinding | null
-  outputCount?: number
   outputResolution?: OutputResolution
   active: boolean
   connectionDropTarget?: boolean
@@ -148,8 +144,7 @@ const emit = defineEmits<{
   (e: 'append-to-canvas'): void
   (e: 'reset'): void
   (e: 'contextmenu', event: MouseEvent): void
-  (e: 'expand-submit', prompt: string, outputCount: number): void
-  (e: 'update:output-count', value: number): void
+  (e: 'expand-submit', prompt: string): void
   (e: 'update:output-resolution', value: OutputResolution): void
   (
     e: 'expand-handle-pointerdown',
@@ -183,7 +178,6 @@ const emptyStageAriaLabel = computed(() => {
   return '上传图片作为输入'
 })
 const emptyIconVariantComputed = computed(() => props.emptyIconVariant ?? 'image')
-const outputCountValue = computed(() => requireImageNodeOutputCount(props.outputCount))
 type NodeStageFrameExpose = { stageElement: HTMLElement | null }
 const stageFrameRef = ref<NodeStageFrameExpose | null>(null)
 
@@ -213,13 +207,10 @@ function onStageContextMenu(event: MouseEvent) {
   emit('contextmenu', event)
 }
 
-function submitExpand(prompt: string, outputCount: number) {
-  emit('expand-submit', prompt, outputCount)
+function submitExpand(prompt: string) {
+  emit('expand-submit', prompt)
 }
 
-function selectOutputCount(value: number) {
-  emit('update:output-count', requireImageNodeOutputCount(value))
-}
 </script>
 
 <style scoped>

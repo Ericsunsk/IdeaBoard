@@ -61,9 +61,6 @@ export function useCanvasImageTools(options: UseCanvasImageToolsOptions): Canvas
         focusAndShowChrome: session.coordinates.focusImageEditorAndShowChrome,
         scheduleChromeAnchorUpdate: session.coordinates.scheduleImageEditorChromeAnchorUpdate,
       },
-      prompt: {
-        runPromptAction: commands.runPromptAction,
-      },
       chrome: chrome.chromeCommands,
     },
   }

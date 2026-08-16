@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { getCanvasNodeImageInputLimit } from '../../../canvas-board/domain'
 import {
   clampMaskBrushHardness,
   clampMaskBrushSize,
@@ -7,7 +6,6 @@ import {
   clampMaskLayerOpacity,
   MASK_EDITOR_DEFAULT_BRUSH_HARDNESS,
   MASK_EDITOR_DEFAULT_FEATHER_RADIUS,
-  MASK_EDITOR_REFERENCE_IMAGE_LIMIT,
   normalizeMaskBrushShape,
   resolveMaskFeatherRadius,
 } from './maskEditorConstants'
@@ -39,9 +37,5 @@ describe('maskEditorConstants', () => {
     expect(clampMaskLayerOpacity(5)).toBe(15)
     expect(clampMaskLayerOpacity(150)).toBe(100)
     expect(clampMaskLayerOpacity(Number.NaN)).toBe(72)
-  })
-
-  it('keeps reference image limit centralized for partial repaint', () => {
-    expect(MASK_EDITOR_REFERENCE_IMAGE_LIMIT).toBe(getCanvasNodeImageInputLimit('prompt'))
   })
 })

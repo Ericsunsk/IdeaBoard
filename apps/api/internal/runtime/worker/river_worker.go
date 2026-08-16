@@ -84,6 +84,9 @@ func NewRiverTaskWorker(
 		resultMaterializer: deps.ResultMaterializer,
 		publicOrigins:      deps.PublicOrigins,
 	}
+	if resolver, ok := deps.MediaReader.(taskmedia.RuntimeMediaResolver); ok {
+		executor.mediaResolver = resolver
+	}
 	taskRuntime := taskruntime.NewService(deps.AccountRepo, deps.TaskRepo, deps.Assigner, deps.CancelStore)
 	taskRuntime.SetTaskStatusPublisher(deps.TaskEvents)
 	orchestrator := newTaskExecutionOrchestrator(deps.AccountRepo, deps.Enqueuer, taskRuntime, executor.callDrawingAPIWithAssignment)

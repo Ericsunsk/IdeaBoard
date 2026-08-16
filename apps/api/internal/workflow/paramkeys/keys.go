@@ -148,6 +148,17 @@ func IsProviderReservedKey(key string) bool {
 	return ok
 }
 
+// IsLegacyPersistedMediaKey identifies submit-time URL keys that must never
+// appear in durable Task Params after the AssetID media contract cutover.
+func IsLegacyPersistedMediaKey(key string) bool {
+	switch key {
+	case ImageURL, ImageURLs, ReferenceImageURLs, MaskImageURL, MaskImageURLs, OriginalImageURL:
+		return true
+	default:
+		return false
+	}
+}
+
 func IsKnownSubmitTaskParamKey(key string) bool {
 	_, ok := submitTaskParamKeys[key]
 	return ok

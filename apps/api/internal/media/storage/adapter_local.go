@@ -108,3 +108,7 @@ func (a *localStorageAdapter) Read(ctx context.Context, profile *StorageProfile,
 	}
 	return a.service.readLocalByObjectKey(objectKey, maxBytes)
 }
+
+func (a *localStorageAdapter) ProviderURL(_ *StorageProfile, _ string) (string, error) {
+	return "", errProviderHTTPSUnavailable
+}

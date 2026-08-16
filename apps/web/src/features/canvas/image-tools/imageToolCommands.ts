@@ -98,33 +98,13 @@ export function createImageToolCommands(session: ImageToolSession) {
     }
   }
 
-  function runPromptAction(nodeId: string, prompt: string, outputCount: number) {
-    const committedMaskData = session.maskEditor.getCommittedMaskData(nodeId)
-    if (committedMaskData?.executionMaskDataUrl) {
-      void execution.runInpaintAction(nodeId, {
-        prompt,
-        outputCount,
-        maskDataUrl: committedMaskData.executionMaskDataUrl,
-      })
-      return
-    }
-    feedback.warning('请先在图片上标记需要重绘的区域')
-  }
-
   const maskChromeActions = useMaskEditorChromeActions({
     maskEditorNodeId: session.maskEditor.maskEditorNodeId,
-    referenceImages: session.maskChromeState.maskEditorReferenceImages,
     commitMaskEditorMode: session.commitMask,
     getCommittedMaskData: session.maskEditor.getCommittedMaskData,
     clearActiveNodePanel: ui.clearActiveNodePanel,
     hideStrengthControl: ui.hideStrengthControl,
     runInpaintAction: execution.runInpaintAction,
-    updateOutputCount: (nodeId, outputCount) => {
-      ui.updateOutputCount(nodeId, {
-        key: 'outputCount',
-        value: outputCount,
-      })
-    },
     onWarning: feedback.warning,
   })
 
@@ -139,10 +119,6 @@ export function createImageToolCommands(session: ImageToolSession) {
     featherMask: session.maskEditor.featherMask,
     undoMask: session.maskEditor.undoMask,
     redoMask: session.maskEditor.redoMask,
-    updateMaskOutputCount: maskChromeActions.onMaskEditorChromeOutputCountUpdate,
-    openMaskReferenceImageInput: session.maskChromeState.onMaskEditorReferenceImageOpen,
-    removeMaskReferenceImage: session.maskChromeState.onMaskEditorReferenceImageRemove,
-    previewMaskReferenceImage: session.maskChromeState.onMaskEditorReferenceImagePreview,
     submitMaskPrompt: maskChromeActions.onMaskEditorChromeSubmit,
     selectEditorTool: session.imageEditorSession.selectImageEditorTool,
     selectAdjustmentLayer: session.imageEditorSession.selectImageAdjustmentLayer,
@@ -168,7 +144,6 @@ export function createImageToolCommands(session: ImageToolSession) {
   return {
     chromeCommands,
     applyAdjustments,
-    runPromptAction,
   }
 }
 

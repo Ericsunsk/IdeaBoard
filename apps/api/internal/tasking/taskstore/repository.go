@@ -25,20 +25,42 @@ type Repository struct {
 	q  *dbsqlc.Queries
 }
 
-func (r *Repository) ClaimPromptReferenceMediaRef(ctx context.Context, tx pgx.Tx, taskID string, ownerUserID, mediaAssetID int64, refID, role string, inputIndex int) error {
+func (r *Repository) ClaimTaskInputMediaRef(ctx context.Context, tx pgx.Tx, taskID string, ownerUserID, mediaAssetID int64, preparedRefID, role string, inputIndex int) error {
 	if tx == nil {
 		return fmt.Errorf("taskstore: pgx tx is nil")
 	}
-	var id int64
+	if strings.TrimSpace(taskID) == "" || ownerUserID <= 0 || mediaAssetID <= 0 || inputIndex < 0 || !tasks.IsGenerationMediaRole(role) {
+		return fmt.Errorf("taskstore: invalid task input media ref")
+	}
+	var lockedAssetID int64
 	err := tx.QueryRow(ctx, `
-UPDATE media_refs
-SET task_id = $1, updated_at = now()
-WHERE owner_user_id = $2 AND media_asset_id = $3
-  AND ref_type = 'prompt_reference' AND ref_id = $4
-  AND role = $5 AND input_index = $6 AND task_id = ''
-	RETURNING id`, taskID, ownerUserID, mediaAssetID, refID, role, inputIndex).Scan(&id)
+UPDATE media_assets
+SET reclaim_after = NULL,
+    reclaim_started_at = NULL,
+    reclaim_claim_token = NULL,
+    updated_at = now()
+WHERE id = $1 AND owner_user_id = $2
+  AND status = 'ready' AND deleted_at IS NULL
+  AND reclaim_started_at IS NULL
+RETURNING id`, mediaAssetID, ownerUserID).Scan(&lockedAssetID)
 	if err != nil {
-		return fmt.Errorf("claim prompt reference media ref: %w", err)
+		return fmt.Errorf("claim task input media asset: %w", err)
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO media_refs (
+  media_asset_id, owner_user_id, ref_type, ref_id, task_id, role, input_index, metadata
+)
+VALUES ($1, $2, 'task_input', $3, $3, $4, $5, '{}'::jsonb)`, lockedAssetID, ownerUserID, taskID, role, inputIndex); err != nil {
+		return fmt.Errorf("create task input media ref: %w", err)
+	}
+	if strings.TrimSpace(preparedRefID) != "" {
+		if _, err := tx.Exec(ctx, `
+DELETE FROM media_refs
+WHERE owner_user_id = $1 AND media_asset_id = $2
+  AND ref_type = 'prompt_reference' AND ref_id = $3
+  AND role = $4 AND input_index = $5 AND task_id = ''`, ownerUserID, lockedAssetID, preparedRefID, role, inputIndex); err != nil {
+			return fmt.Errorf("release prepared media ref: %w", err)
+		}
 	}
 	return nil
 }

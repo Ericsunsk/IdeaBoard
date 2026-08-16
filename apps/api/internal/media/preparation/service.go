@@ -40,7 +40,7 @@ func (s *Service) PrepareGenerationMedia(ctx context.Context, userID int64, clie
 			cleanup()
 			return tasks.GenerationRequestSnapshot{}, err
 		} else if found {
-			media.AssetID, media.Ref = existing.AssetID, existing.URL
+			media.AssetID, media.Source = existing.AssetID, ""
 			continue
 		}
 		dirPrefix, err := storage.TaskOutputUploadDirPrefix(userID, "prepare-"+clientActionID)
@@ -48,12 +48,12 @@ func (s *Service) PrepareGenerationMedia(ctx context.Context, userID int64, clie
 			cleanup()
 			return tasks.GenerationRequestSnapshot{}, err
 		}
-		stored, err := s.storage.StoreMediaRef(ctx, media.Ref, storage.StorageStoreOptions{DirPrefix: dirPrefix, AllowHosts: outbound.AllowHosts(ctx)})
+		stored, err := s.storage.StoreMediaRef(ctx, media.Source, storage.StorageStoreOptions{DirPrefix: dirPrefix, AllowHosts: outbound.AllowHosts(ctx)})
 		if err != nil {
 			cleanup()
 			return tasks.GenerationRequestSnapshot{}, fmt.Errorf("prepare media index=%d: %w", media.InputIndex, err)
 		}
-		item := assets.PreparedGenerationMedia{OwnerUserID: userID, StorageProfile: stored.StorageProfile, StorageKey: stored.StorageKey, URL: stored.URL, SourceURL: media.Ref, MIMEType: stored.MIMEType, Width: stored.Width, Height: stored.Height, SizeBytes: stored.SizeBytes, InputIndex: media.InputIndex, Role: media.Role, RefID: clientActionID}
+		item := assets.PreparedGenerationMedia{OwnerUserID: userID, StorageProfile: stored.StorageProfile, StorageKey: stored.StorageKey, URL: stored.URL, SourceURL: media.Source, MIMEType: stored.MIMEType, Width: stored.Width, Height: stored.Height, SizeBytes: stored.SizeBytes, InputIndex: media.InputIndex, Role: media.Role, RefID: clientActionID}
 		assetID, err := s.registry.RegisterPreparedGenerationMedia(ctx, item)
 		if err != nil {
 			_ = s.storage.DeleteObjectByStorageProfile(context.WithoutCancel(ctx), item.StorageProfile, item.StorageKey)
@@ -62,7 +62,7 @@ func (s *Service) PrepareGenerationMedia(ctx context.Context, userID int64, clie
 		}
 		item.AssetID = assetID
 		created = append(created, item)
-		media.AssetID, media.Ref = assetID, stored.URL
+		media.AssetID, media.Source = assetID, ""
 	}
 	return prepared, nil
 }

@@ -28,10 +28,10 @@
           offset="10px"
           placeholder="输入扩图提示词"
           :allow-empty="true"
-          :output-count="outputCount"
+          :output-count="1"
           :output-resolution="outputResolution"
+          :show-output-count="false"
           :billing-state="billingQuote"
-          @update:output-count="emit('update:output-count', $event)"
           @update:output-resolution="emit('update:output-resolution', $event)"
           @submit="onSubmit"
         />
@@ -55,13 +55,11 @@ import { buildCanvasExtendReadinessRequest } from '../../execution/commands/flow
 const props = defineProps<{
   overlayStyle: Record<string, string>
   handleRadius: number
-  outputCount: number
   outputResolution?: OutputResolution
 }>()
 
 const emit = defineEmits<{
-  (e: 'submit', prompt: string, outputCount: number): void
-  (e: 'update:output-count', value: number): void
+  (e: 'submit', prompt: string): void
   (e: 'update:output-resolution', value: OutputResolution): void
   (e: 'handle-pointerdown', payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent }): void
   (e: 'handle-pointermove', event: PointerEvent): void
@@ -76,7 +74,6 @@ const billingQuote = useCanvasBillingQuote(
   () => true,
   () =>
     buildCanvasExtendReadinessRequest({
-      outputCount: props.outputCount,
       outputResolution: props.outputResolution,
     }),
 )
@@ -91,8 +88,8 @@ const handleStyle = computed(() => {
   }
 })
 
-function onSubmit(prompt: string, outputCount: number) {
-  emit('submit', prompt, outputCount)
+function onSubmit(prompt: string) {
+  emit('submit', prompt)
   promptDraft.value = ''
 }
 </script>

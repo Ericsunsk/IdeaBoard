@@ -3,7 +3,6 @@ package worker
 import (
 	"context"
 	"encoding/json"
-	"image"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -86,38 +85,6 @@ func TestProviderAdapterBoundaryContainsNoWorkflowMapOrFeature(t *testing.T) {
 	}
 }
 
-func TestProviderRequestAfterLocalRedrawKeepsOpenAIROIInput(t *testing.T) {
-	params := map[string]interface{}{
-		"image_urls": []interface{}{
-			"data:image/png;base64,original",
-			"https://cdn.example/reference-input.png",
-		},
-		"reference_image_urls": []interface{}{
-			"https://cdn.example/ref-a.png",
-		},
-	}
-	patch := localRedrawUpstreamPatch{
-		ROIDataURL: "data:image/png;base64,roi",
-		ROI:        image.Rect(0, 0, 64, 72),
-	}
-	if err := patch.apply(params); err != nil {
-		t.Fatalf("localRedrawUpstreamPatch.apply: %v", err)
-	}
-
-	req := newProviderRequest(
-		"prompt", 64, 72, params, "gpt-image-1",
-		resolvedProviderRequestFacts{},
-		workflow.RuntimeOperationLocalInpaint, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsNone,
-	)
-	want := []string{
-		"data:image/png;base64,roi",
-		"https://cdn.example/ref-a.png",
-	}
-	if !reflect.DeepEqual(req.ImageRefs, want) {
-		t.Fatalf("unexpected OpenAI refs after local redraw: got=%#v want=%#v", req.ImageRefs, want)
-	}
-}
-
 func TestProviderRequestShapesOnlyDeclaredRuntimeControlContract(t *testing.T) {
 	params := map[string]interface{}{
 		"variation":          map[string]interface{}{"strength": 40},
@@ -167,8 +134,7 @@ func TestParseAndNormalizeTaskParamsFlattensCanonicalWorkflowParams(t *testing.T
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
 		Feature:       "image-extend",
 		Media: &tasks.MediaInputs{
-			Inputs:   []tasks.MediaRef{{URL: "https://img.example/source.png", Role: "input"}},
-			Original: &tasks.MediaRef{URL: "https://img.example/source.png", Role: "original"},
+			Original: &tasks.MediaRef{AssetID: 2, Role: "original"},
 		},
 		Controls: &tasks.GenerationControls{
 			CustomWidth:  640,
@@ -181,10 +147,17 @@ func TestParseAndNormalizeTaskParamsFlattensCanonicalWorkflowParams(t *testing.T
 			LeftPercent:   0,
 		},
 	})
-	got, err := (&ProviderExecutor{}).parseAndNormalizeTaskParams(context.Background(), &tasks.TaskPayload{
+	executor := &ProviderExecutor{mediaResolver: testRuntimeMediaResolver{urls: map[int64]string{
+		2: "https://img.example/source.png",
+	}}}
+	got, err := executor.parseAndNormalizeTaskParams(context.Background(), &tasks.TaskPayload{
 		TaskID: "task-canonical-params",
 		Params: raw,
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err = executor.resolveRuntimeProviderTaskParams(context.Background(), got)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,8 +165,8 @@ func TestParseAndNormalizeTaskParamsFlattensCanonicalWorkflowParams(t *testing.T
 	if got.ExecutionPlan == nil || got.ExecutionPlan.RuntimeOperation() != workflow.RuntimeOperationImageExtend {
 		t.Fatalf("runtime operation = %#v, want image-extend", got.ExecutionPlan)
 	}
-	if !reflect.DeepEqual(got.Provider["image_urls"], []string{"https://img.example/source.png"}) {
-		t.Fatalf("image_urls = %#v", got.Provider["image_urls"])
+	if got.Provider["original_image_url"] != "https://img.example/source.png" {
+		t.Fatalf("original_image_url = %#v", got.Provider["original_image_url"])
 	}
 	if got.Provider["custom_width"] != float64(640) || got.Provider["custom_height"] != float64(480) {
 		t.Fatalf("custom size = %#v x %#v", got.Provider["custom_width"], got.Provider["custom_height"])
@@ -211,8 +184,8 @@ func TestParseAndNormalizeTaskParamsRejectsInvalidDurableContracts(t *testing.T)
 		"missing schema": `{"feature":"prompt-generation"}`,
 		"legacy schema":  `{"schema_version":1,"feature":"prompt-generation"}`,
 		"future schema":  `{"schema_version":3,"feature":"prompt-generation"}`,
-		"missing plan":   `{"schema_version":2,"feature":"prompt-generation"}`,
-		"malformed plan": `{"schema_version":2,"feature":"prompt-generation","execution_plan":{"schema_version":1}}`,
+		"missing plan":   `{"schema_version":3,"feature":"prompt-generation"}`,
+		"malformed plan": `{"schema_version":3,"feature":"prompt-generation","execution_plan":{"schema_version":1}}`,
 	}
 	for name, raw := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -233,7 +206,7 @@ func TestProviderRuntimeAdapterForUsesProtocolAndRuntimeOperation(t *testing.T) 
 		wantErr   bool
 	}{
 		{name: "model prompt", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationPromptGeneration, want: providerRuntimeAdapterModelImage},
-		{name: "model edit", apiType: workflow.ProviderGoogleAI, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationLocalInpaint, want: providerRuntimeAdapterModelImage},
+		{name: "image fill on model protocol", apiType: workflow.ProviderGoogleAI, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationLocalInpaint, wantErr: true},
 		{name: "background removal", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationBackgroundRemoval, want: providerRuntimeAdapterBackgroundRemoval},
 		{name: "upscale", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationImageUpscale, want: providerRuntimeAdapterImageUpscale},
 		{name: "transform API type mismatch", apiType: workflow.ProviderGoogleAI, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationImageUpscale, wantErr: true},
@@ -345,7 +318,7 @@ func TestParseAndNormalizeTaskParamsRejectsFactsForgedAroundValidPlan(t *testing
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
 		Feature:       workflow.FeatureSlugStyleVariation,
 		Media: &tasks.MediaInputs{
-			Inputs: []tasks.MediaRef{{URL: "https://img.example/source.png", Role: "input"}},
+			Inputs: []tasks.MediaRef{{AssetID: 1, Role: "input"}},
 		},
 	})
 	tests := map[string]func(*tasks.WorkflowTaskParams){
@@ -359,7 +332,7 @@ func TestParseAndNormalizeTaskParamsRejectsFactsForgedAroundValidPlan(t *testing
 			params.Generation.RequestedOutputCount = 2
 		},
 		"generation media": func(params *tasks.WorkflowTaskParams) {
-			params.Generation.Media = []tasks.GenerationMediaIntent{{InputIndex: 0, Role: "mask", Ref: "https://img.example/mask.png"}}
+			params.Generation.Media = []tasks.GenerationMediaIntent{{InputIndex: 0, Role: "mask", AssetID: 1}}
 		},
 		"provider output controls": func(params *tasks.WorkflowTaskParams) {
 			params.Controls.OutputCount = 2
@@ -432,8 +405,8 @@ func TestPrepareProviderExecutionCompletesPreflightBeforeLocalMediaIO(t *testing
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
 		Feature:       workflow.FeatureSlugLocalInpaint,
 		Media: &tasks.MediaInputs{
-			Original: &tasks.MediaRef{URL: "https://media.example/original.png", Role: "original"},
-			Mask:     &tasks.MediaRef{URL: "https://media.example/mask.png", Role: "mask"},
+			Original: &tasks.MediaRef{AssetID: 1, Role: "original"},
+			Mask:     &tasks.MediaRef{AssetID: 2, Role: "mask"},
 			UseMask:  &useMask,
 		},
 	})
@@ -444,18 +417,18 @@ func TestPrepareProviderExecutionCompletesPreflightBeforeLocalMediaIO(t *testing
 	defer server.Close()
 	raw = strings.ReplaceAll(raw, "https://media.example", server.URL)
 
-	missingModelAccount := &accounts.ApiAccount{
-		ID: 1, Name: "missing-model", ApiKey: "key", ApiType: workflow.ProviderOpenAICompatible,
-		Protocol: providerendpoints.ProtocolModelAPI, ProxyURL: "https://provider.example/v1",
+	unexpectedModelAccount := &accounts.ApiAccount{
+		ID: 1, Name: "unexpected-model", ApiKey: "key", ApiType: workflow.ProviderOpenAICompatible,
+		Protocol: providerendpoints.ProtocolFluxFillJSONImage, ProxyURL: "https://provider.example",
 	}
 	_, err := (&ProviderExecutor{}).resolveProviderExecution(
 		context.Background(),
-		runtimeAccountAccessForTest(missingModelAccount),
-		&tasks.TaskPayload{TaskID: "task-missing-model", Params: raw},
-		assignmentSnapshotForTest(missingModelAccount, ""),
+		runtimeAccountAccessForTest(unexpectedModelAccount),
+		&tasks.TaskPayload{TaskID: "task-unexpected-model", Params: raw},
+		assignmentSnapshotForTest(unexpectedModelAccount, "gpt-image-1"),
 	)
-	if err == nil || !strings.Contains(err.Error(), "未分配模型") {
-		t.Fatalf("error = %v, want missing model", err)
+	if err == nil || !strings.Contains(err.Error(), "modelless operation") {
+		t.Fatalf("error = %v, want unexpected model", err)
 	}
 	if mediaCalls != 0 {
 		t.Fatalf("media HTTP calls = %d, want 0", mediaCalls)
@@ -472,13 +445,13 @@ func TestPrepareProviderExecutionCompletesPreflightBeforeLocalMediaIO(t *testing
 	}
 	incompatibleAccount := &accounts.ApiAccount{
 		ID: 1, Name: "incompatible-controls", ApiKey: "key", ApiType: workflow.ProviderOpenAICompatible,
-		Protocol: providerendpoints.ProtocolModelAPI, ProxyURL: "https://provider.example/v1",
+		Protocol: providerendpoints.ProtocolFluxFillJSONImage, ProxyURL: "https://provider.example",
 	}
 	_, err = (&ProviderExecutor{}).resolveProviderExecution(
 		context.Background(),
 		runtimeAccountAccessForTest(incompatibleAccount),
 		&tasks.TaskPayload{TaskID: "task-incompatible-controls", Params: string(forgedRaw)},
-		assignmentSnapshotForTest(incompatibleAccount, "gpt-image-1"),
+		assignmentSnapshotForTest(incompatibleAccount, ""),
 	)
 	if err == nil || !strings.Contains(err.Error(), "canonical controls") {
 		t.Fatalf("error = %v, want incompatible controls", err)
@@ -494,11 +467,11 @@ func TestRiverPayloadCanonicalParamsBecomeProviderRequest(t *testing.T) {
 		Feature:       "style-fusion",
 		Media: &tasks.MediaInputs{
 			Inputs: []tasks.MediaRef{
-				{URL: "https://img.example/a.png", Role: "input", Weight: 0.75},
-				{URL: "https://img.example/b.png", Role: "input", Weight: 0.25},
+				{AssetID: 1, Role: "input", Weight: 0.75},
+				{AssetID: 2, Role: "input", Weight: 0.25},
 			},
 			References: []tasks.MediaRef{
-				{URL: "https://img.example/ref.png", Role: "reference"},
+				{AssetID: 3, Role: "reference"},
 			},
 		},
 		Controls: &tasks.GenerationControls{
@@ -527,7 +500,14 @@ func TestRiverPayloadCanonicalParamsBecomeProviderRequest(t *testing.T) {
 	}
 	decoded := roundTripDrawingTaskForTest(t, submitted)
 
-	params, err := (&ProviderExecutor{}).parseAndNormalizeTaskParams(context.Background(), decoded)
+	executor := &ProviderExecutor{mediaResolver: testRuntimeMediaResolver{urls: map[int64]string{
+		1: "https://img.example/a.png", 2: "https://img.example/b.png", 3: "https://img.example/ref.png",
+	}}}
+	params, err := executor.parseAndNormalizeTaskParams(context.Background(), decoded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	params, err = executor.resolveRuntimeProviderTaskParams(context.Background(), params)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -606,7 +586,7 @@ func TestProviderTaskParamsPreferCanonicalFeature(t *testing.T) {
 		Extra: map[string]interface{}{
 			"feature": "local-inpaint",
 		},
-	})
+	}, nil)
 
 	if params.Provider["feature"] != "style-fusion" {
 		t.Fatalf("provider params should keep canonical feature, got %#v", params.Provider)

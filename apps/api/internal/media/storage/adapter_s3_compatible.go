@@ -80,3 +80,7 @@ func (a *s3CompatibleStorageAdapter) StoreRemoteRef(ctx context.Context, profile
 func (a *s3CompatibleStorageAdapter) Read(ctx context.Context, profile *StorageProfile, objectKey string, maxBytes int64) (*StoredUploadObject, error) {
 	return a.service.s3CompatibleService.readWithConfig(ctx, objectKey, a.service.s3CompatibleConfigFromProfile(profile), maxBytes)
 }
+
+func (a *s3CompatibleStorageAdapter) ProviderURL(profile *StorageProfile, objectKey string) (string, error) {
+	return a.service.s3CompatibleService.publicObjectURL(a.service.s3CompatibleConfigFromProfile(profile), objectKey)
+}

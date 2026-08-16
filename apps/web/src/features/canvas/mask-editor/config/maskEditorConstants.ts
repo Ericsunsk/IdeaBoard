@@ -1,5 +1,4 @@
 import type { ImageMaskBrushShape } from '../types'
-import { getCanvasNodeImageInputLimit } from '../../../canvas-board/domain'
 
 export const MASK_EDITOR_PAINT_RGB = {
   r: 122,
@@ -18,7 +17,6 @@ export const MASK_EDITOR_MAX_FEATHER_RADIUS = 16
 export const MASK_EDITOR_DEFAULT_FEATHER_STRENGTH = 35
 export const MASK_EDITOR_MIN_FEATHER_STRENGTH = 0
 export const MASK_EDITOR_MAX_FEATHER_STRENGTH = 100
-export const MASK_EDITOR_REFERENCE_IMAGE_LIMIT = getCanvasNodeImageInputLimit('prompt')
 
 export const MASK_EDITOR_DEFAULT_BRUSH_SIZE = 18
 export const MASK_EDITOR_MIN_BRUSH_SIZE = 4

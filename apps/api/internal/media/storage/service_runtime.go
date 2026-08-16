@@ -157,6 +157,42 @@ func (s *StorageService) ReadUploadResourceByURL(ctx context.Context, rawURL str
 	return adapter.Read(ctx, profile, key, maxBytes)
 }
 
+// ResolveProviderAssetURL resolves an immutable Asset fact through its owning
+// Storage Profile. It never follows the current profile selected by operators.
+func (s *StorageService) ResolveProviderAssetURL(ctx context.Context, assetID int64) (string, error) {
+	if s == nil || s.assetLocator == nil || assetID <= 0 {
+		return "", fmt.Errorf("媒体资产解析器未配置")
+	}
+	location, found, err := s.assetLocator.LocateStoredUpload(ctx, StoredUploadLookup{AssetID: assetID})
+	if err != nil {
+		return "", fmt.Errorf("定位媒体资产失败: %w", err)
+	}
+	if !found {
+		return "", fmt.Errorf("媒体资产不存在或已不可用")
+	}
+	key, err := normalizeUploadObjectKey(location.StorageKey)
+	if err != nil {
+		return "", fmt.Errorf("媒体资产存储路径无效: %w", err)
+	}
+	profile, err := s.resolveProfileByID(ctx, location.StorageProfileID)
+	if err != nil {
+		return "", fmt.Errorf("读取媒体资产存储配置失败: %w", err)
+	}
+	adapter, err := s.adapterRegistry.get(profile.Provider)
+	if err != nil {
+		return "", err
+	}
+	resolved, err := adapter.ProviderURL(profile, key)
+	if err != nil {
+		return "", err
+	}
+	parsed, err := url.Parse(strings.TrimSpace(resolved))
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
+		return "", fmt.Errorf("媒体资产未配置 Provider 可访问的 HTTPS URL")
+	}
+	return parsed.String(), nil
+}
+
 func (s *StorageService) DeleteProfileAvatarByURL(ctx context.Context, storageUID string, rawURL string) error {
 	expectedPrefix, err := ProfileAvatarUploadObjectPrefix(storageUID)
 	if err != nil {

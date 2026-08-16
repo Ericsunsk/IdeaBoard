@@ -162,6 +162,9 @@ func (r CanonicalRequest) Params() string {
 
 func (r CanonicalRequest) WithGenerationSnapshot(snapshot tasks.GenerationRequestSnapshot) (CanonicalRequest, error) {
 	copySnapshot := cloneGenerationSnapshot(snapshot)
+	for index := range copySnapshot.Media {
+		copySnapshot.Media[index].Source = ""
+	}
 	if err := validateGenerationSnapshot(copySnapshot); err != nil {
 		return CanonicalRequest{}, err
 	}
@@ -175,11 +178,24 @@ func (r CanonicalRequest) WithGenerationSnapshot(snapshot tasks.GenerationReques
 	if err := json.Unmarshal([]byte(r.params), &params); err != nil {
 		return CanonicalRequest{}, fmt.Errorf("update canonical generation snapshot: %w", err)
 	}
+	typedParams, err := tasks.UnmarshalParams(r.params)
+	if err != nil {
+		return CanonicalRequest{}, fmt.Errorf("decode canonical params: %w", err)
+	}
+	media, err := tasks.ApplyGenerationMediaFacts(typedParams.Media, copySnapshot.Media)
+	if err != nil {
+		return CanonicalRequest{}, err
+	}
 	generationJSON, err := json.Marshal(copySnapshot)
 	if err != nil {
 		return CanonicalRequest{}, fmt.Errorf("encode canonical generation snapshot: %w", err)
 	}
 	params["generation"] = generationJSON
+	mediaJSON, err := json.Marshal(media)
+	if err != nil {
+		return CanonicalRequest{}, fmt.Errorf("encode canonical media: %w", err)
+	}
+	params["media"] = mediaJSON
 	paramsJSON, err := json.Marshal(params)
 	if err != nil {
 		return CanonicalRequest{}, fmt.Errorf("encode canonical params: %w", err)
@@ -254,8 +270,22 @@ func validateGenerationSnapshot(snapshot tasks.GenerationRequestSnapshot) error 
 		return fmt.Errorf("canonical generation snapshot output count is invalid")
 	}
 	for index, media := range snapshot.Media {
-		if media.InputIndex != index || strings.TrimSpace(media.Ref) == "" || strings.TrimSpace(media.Role) == "" {
+		if media.InputIndex != index || (media.AssetID <= 0 && strings.TrimSpace(media.Source) == "") || !tasks.IsGenerationMediaRole(media.Role) {
 			return fmt.Errorf("canonical generation snapshot media order is invalid")
+		}
+	}
+	return nil
+}
+
+// ValidatePreparedGenerationMedia requires persisted generation inputs to be
+// backed by registered assets rather than durable URL references.
+func ValidatePreparedGenerationMedia(snapshot *tasks.GenerationRequestSnapshot) error {
+	if snapshot == nil {
+		return nil
+	}
+	for index, media := range snapshot.Media {
+		if media.AssetID <= 0 {
+			return fmt.Errorf("prepared generation media asset is missing: index=%d", index)
 		}
 	}
 	return nil
@@ -271,7 +301,7 @@ func validateGenerationSnapshotAgainstPlan(snapshot tasks.GenerationRequestSnaps
 	imageInputCount := 0
 	hasMaskInput := false
 	for _, media := range snapshot.Media {
-		if media.Role == "mask" {
+		if media.Role == tasks.MediaRoleMask {
 			hasMaskInput = true
 			continue
 		}

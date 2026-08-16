@@ -63,16 +63,10 @@ interface BuildExecutionTaskRequestOptions {
 
 const CANVAS_INTERACTIVE_TASK_PRIORITY = 1
 const MEDIA_STRING_PARAM_KEYS = new Set(['original_image_url', 'mask_image_url'])
-const MEDIA_LIST_PARAM_KEYS = new Set(['reference_image_urls'])
 
 function canonicalizeTaskMediaParam(key: string, value: unknown): unknown {
   if (MEDIA_STRING_PARAM_KEYS.has(key) && typeof value === 'string') {
     return canonicalizeRuntimeUploadRef(value)
-  }
-  if (MEDIA_LIST_PARAM_KEYS.has(key) && Array.isArray(value)) {
-    return value.map((item) =>
-      typeof item === 'string' ? canonicalizeRuntimeUploadRef(item) : item,
-    )
   }
   return value
 }

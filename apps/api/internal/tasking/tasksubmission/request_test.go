@@ -165,7 +165,7 @@ func TestCanonicalRequestRejectsPreparedMediaThatDivergesFromExecutionPlan(t *te
 		Generation: &tasks.GenerationRequestSnapshot{
 			Feature: workflow.FeatureSlugStyleVariation, Primitive: string(workflow.GenerationPrimitiveImageToImage),
 			TemplateFingerprint: "fp", RequestedOutputCount: 1,
-			Media: []tasks.GenerationMediaIntent{{InputIndex: 0, Role: "input", Ref: "source"}},
+			Media: []tasks.GenerationMediaIntent{{InputIndex: 0, Role: "input", Source: "source"}},
 		},
 	})
 	if err != nil {
@@ -175,11 +175,11 @@ func TestCanonicalRequestRejectsPreparedMediaThatDivergesFromExecutionPlan(t *te
 	tests := map[string][]tasks.GenerationMediaIntent{
 		"missing image": nil,
 		"extra image": {
-			{InputIndex: 0, Role: "input", Ref: "source"},
-			{InputIndex: 1, Role: "reference", Ref: "extra"},
+			{InputIndex: 0, Role: "input", Source: "source"},
+			{InputIndex: 1, Role: "reference", Source: "extra"},
 		},
 		"injected mask": {
-			{InputIndex: 0, Role: "mask", Ref: "mask"},
+			{InputIndex: 0, Role: "mask", Source: "mask"},
 		},
 	}
 	for name, media := range tests {
@@ -190,6 +190,19 @@ func TestCanonicalRequestRejectsPreparedMediaThatDivergesFromExecutionPlan(t *te
 				t.Fatal("expected prepared media divergence to be rejected")
 			}
 		})
+	}
+}
+
+func TestValidatePreparedGenerationMediaRequiresAssetIDs(t *testing.T) {
+	snapshot := &tasks.GenerationRequestSnapshot{
+		Media: []tasks.GenerationMediaIntent{{InputIndex: 0, Role: tasks.MediaRoleInput, Source: "/uploads/source.png"}},
+	}
+	if err := ValidatePreparedGenerationMedia(snapshot); err == nil {
+		t.Fatal("expected prepared media without an asset id to be rejected")
+	}
+	snapshot.Media[0].AssetID = 101
+	if err := ValidatePreparedGenerationMedia(snapshot); err != nil {
+		t.Fatalf("ValidatePreparedGenerationMedia() error = %v", err)
 	}
 }
 

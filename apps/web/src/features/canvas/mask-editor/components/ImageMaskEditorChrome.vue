@@ -242,16 +242,10 @@
         variant="floating"
         placeholder="描述如何重绘选区"
         :disabled="directGenerating"
-        :output-count="outputCount"
-        :image-inputs="referenceImages"
-        :max-image-inputs="MASK_EDITOR_REFERENCE_IMAGE_LIMIT"
+        :output-count="1"
         :show-aspect-ratio="false"
+        :show-output-count="false"
         :billing-state="billingQuote"
-        show-image-input
-        @update:output-count="emit('update:output-count', $event)"
-        @image-input-open="emit('image-input-open')"
-        @image-input-remove="emit('reference-image-remove', $event)"
-        @image-input-preview="emit('reference-image-preview', $event)"
         @submit="onSubmit"
       />
     </template>
@@ -274,8 +268,7 @@ import {
   Square,
   Undo,
 } from '@iconoir/vue'
-import type { ImageMaskBrushShape, ImageMaskDrawMode, MaskEditorReferenceImage } from '../types'
-import { requireImageNodeOutputCount } from '../../../canvas-board/domain'
+import type { ImageMaskBrushShape, ImageMaskDrawMode } from '../types'
 import {
   clampMaskBrushHardness,
   clampMaskBrushSize,
@@ -288,7 +281,6 @@ import {
   MASK_EDITOR_MIN_BRUSH_SIZE,
   MASK_EDITOR_MIN_FEATHER_STRENGTH,
   MASK_EDITOR_MIN_LAYER_OPACITY,
-  MASK_EDITOR_REFERENCE_IMAGE_LIMIT,
 } from '../config/maskEditorConstants'
 import { useMaskFeatherStrengthControl } from '../composables/useMaskFeatherStrengthControl'
 import ImageToolChromeFrame from '../../components/nodes/ImageToolChromeFrame.vue'
@@ -303,8 +295,6 @@ defineProps<{
   brushSize: number
   brushHardness: number
   maskLayerOpacity: number
-  outputCount: number
-  referenceImages: MaskEditorReferenceImage[]
   directGenerating?: boolean
   canUndo?: boolean
   canRedo?: boolean
@@ -327,11 +317,7 @@ const emit = defineEmits<{
   (e: 'feather-mask', strength: number): void
   (e: 'undo-mask'): void
   (e: 'redo-mask'): void
-  (e: 'update:output-count', value: number): void
-  (e: 'image-input-open'): void
-  (e: 'reference-image-remove', imageId: string): void
-  (e: 'reference-image-preview', image: MaskEditorReferenceImage): void
-  (e: 'submit', prompt: string, outputCount: number): void
+  (e: 'submit', prompt: string): void
 }>()
 
 const promptDraft = ref('')
@@ -370,8 +356,8 @@ function rangeTooltipStyle(value: number, min: number, max: number) {
   return { '--editing-controls-range-value': `${percent}%` }
 }
 
-function onSubmit(prompt: string, outputCount: number) {
-  emit('submit', prompt, requireImageNodeOutputCount(outputCount))
+function onSubmit(prompt: string) {
+  emit('submit', prompt)
   promptDraft.value = ''
 }
 </script>

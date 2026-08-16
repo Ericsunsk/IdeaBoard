@@ -1,6 +1,5 @@
 import {
   getCanvasNodeImageInputLimit,
-  normalizePromptReferenceImageUrls,
   normalizePromptAspectRatio,
   resolveImageNodeFrameSize,
   type FusionBlendPoint,
@@ -71,7 +70,6 @@ export type ImageInpaintExecutionPlan = {
   prompt: string
   rawMaskDataUrl: string
   outputCount: number
-  referenceImageUrls: string[]
   outputResolution?: OutputResolution
   resultOptions: ImageExecutionResultOptions
 }
@@ -336,7 +334,6 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       frameRect: CanvasExtendRect
       originalImageRect: CanvasExtendRect
       prompt?: string
-      outputCount?: number
     },
   ): CanvasExtendExecutionPlan {
     const graph = readGraph()
@@ -355,7 +352,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       sourceNodeId: nodeId,
       source: source.input,
       prompt: `${intent.prompt ?? ''}`.trim(),
-      outputCount: requireRequestedOutputCount(intent.outputCount ?? 1),
+      outputCount: 1,
       extendPercent,
       targetRatio,
       targetWidth,
@@ -373,8 +370,6 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
     inpaint: {
       prompt: string
       maskDataUrl: string
-      outputCount: number
-      referenceImageUrls?: string[]
     },
   ): ImageInpaintExecutionPlan {
     const prompt = `${inpaint.prompt ?? ''}`.trim()
@@ -389,8 +384,7 @@ export function createImageExecutionPlanner(readGraph: () => FlowExecutionGraphO
       source: source.input,
       prompt,
       rawMaskDataUrl,
-      outputCount: requireRequestedOutputCount(inpaint.outputCount),
-      referenceImageUrls: normalizePromptReferenceImageUrls(inpaint.referenceImageUrls),
+      outputCount: 1,
       outputResolution: resolveNodeOutputResolution(graph, nodeId),
       resultOptions: {
         anchor: withOutputAnchorNodeId(source.resultAnchor, nodeId),

@@ -20,7 +20,6 @@ type Querier interface {
 	CancelMediaAssetReclamation(ctx context.Context, arg CancelMediaAssetReclamationParams) ([]int64, error)
 	ClaimDueMediaAssetReclamation(ctx context.Context, arg ClaimDueMediaAssetReclamationParams) (MediaAsset, error)
 	ClaimDuePaymentOrderReconciliations(ctx context.Context, arg ClaimDuePaymentOrderReconciliationsParams) ([]ClaimDuePaymentOrderReconciliationsRow, error)
-	ClaimPromptReferenceMediaRef(ctx context.Context, arg ClaimPromptReferenceMediaRefParams) (MediaRef, error)
 	ClearCurrentStorageProfiles(ctx context.Context) error
 	CompletePaymentCheckoutShutdown(ctx context.Context, arg CompletePaymentCheckoutShutdownParams) (int64, error)
 	CompletePaymentOrderReconciliationClaim(ctx context.Context, arg CompletePaymentOrderReconciliationClaimParams) (int64, error)
@@ -95,6 +94,7 @@ type Querier interface {
 	GetPaymentStripeCredentialForOrder(ctx context.Context, id uuid.UUID) (PaymentStripeCredential, error)
 	GetPaymentStripeCredentialForOrderNumber(ctx context.Context, publicOrderNumber string) (PaymentStripeCredential, error)
 	GetProviderEndpointByID(ctx context.Context, id int64) (GetProviderEndpointByIDRow, error)
+	GetReadyMediaAssetStorageLocationByID(ctx context.Context, id int64) (GetReadyMediaAssetStorageLocationByIDRow, error)
 	GetRuntimeAccountByIDWithSecret(ctx context.Context, id int64) (GetRuntimeAccountByIDWithSecretRow, error)
 	GetRuntimeAccountForAssignment(ctx context.Context, arg GetRuntimeAccountForAssignmentParams) (GetRuntimeAccountForAssignmentRow, error)
 	GetRuntimeCredentialByID(ctx context.Context, arg GetRuntimeCredentialByIDParams) (ApiAccountSecret, error)
@@ -186,6 +186,7 @@ type Querier interface {
 	ReleaseActiveTaskLeaseByTaskID(ctx context.Context, arg ReleaseActiveTaskLeaseByTaskIDParams) (int64, error)
 	ReleaseActiveTaskLeasesByTaskIDs(ctx context.Context, arg ReleaseActiveTaskLeasesByTaskIDsParams) (int64, error)
 	ReleaseMediaAssetReclamationClaim(ctx context.Context, arg ReleaseMediaAssetReclamationClaimParams) error
+	ReleaseTaskInputMediaRefs(ctx context.Context, taskID string) ([]int64, error)
 	ReleaseTaskLease(ctx context.Context, arg ReleaseTaskLeaseParams) (int64, error)
 	ReplacePaymentStripeConfiguration(ctx context.Context, arg ReplacePaymentStripeConfigurationParams) (PaymentStripeConfiguration, error)
 	ReplaceProviderEndpointCapabilities(ctx context.Context, providerEndpointID int64) error

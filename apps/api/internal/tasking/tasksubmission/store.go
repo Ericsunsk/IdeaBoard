@@ -35,10 +35,7 @@ type Store struct {
 type SubmissionTaskStore interface {
 	CreateWithPGXTx(context.Context, pgx.Tx, *tasks.Task) (bool, error)
 	LockAndFindSubmissionByClientActionWithPGXTx(context.Context, pgx.Tx, int64, string, taskbilling.Request) (tasks.TaskSubmissionResult, bool, error)
-}
-
-type promptReferenceClaimer interface {
-	ClaimPromptReferenceMediaRef(context.Context, pgx.Tx, string, int64, int64, string, string, int) error
+	ClaimTaskInputMediaRef(context.Context, pgx.Tx, string, int64, int64, string, string, int) error
 }
 
 func NewStore(pool *pgxpool.Pool, repository SubmissionTaskStore, client taskqueue.RiverTxClient, queueName string, maxRetry int, billingService *taskbilling.Service) *Store {
@@ -65,6 +62,9 @@ func (s *Store) SubmitTask(ctx context.Context, canonical CanonicalRequest) (tas
 	}
 	if !canonical.valid() {
 		return emptyResult, fmt.Errorf("submit task: canonical request is invalid")
+	}
+	if err := ValidatePreparedGenerationMedia(canonical.GenerationSnapshot()); err != nil {
+		return emptyResult, fmt.Errorf("submit task: %w", err)
 	}
 	taskID := generateTaskID()
 	emptyResult.TaskID = taskID
@@ -132,15 +132,10 @@ func (s *Store) SubmitTask(ctx context.Context, canonical CanonicalRequest) (tas
 		committed = true
 		return tasks.TaskSubmissionResult{TaskID: task.TaskID, Created: false}, nil
 	}
-	if claimer, ok := s.repository.(promptReferenceClaimer); ok {
-		if snapshot := canonical.GenerationSnapshot(); snapshot != nil {
-			for _, media := range snapshot.Media {
-				if media.AssetID <= 0 {
-					continue
-				}
-				if err := claimer.ClaimPromptReferenceMediaRef(ctx, tx, task.TaskID, task.UserID, media.AssetID, task.ClientActionID, media.Role, media.InputIndex); err != nil {
-					return emptyResult, fmt.Errorf("submit task: claim prepared media: %w", err)
-				}
+	if snapshot := canonical.GenerationSnapshot(); snapshot != nil {
+		for _, media := range snapshot.Media {
+			if err := s.repository.ClaimTaskInputMediaRef(ctx, tx, task.TaskID, task.UserID, media.AssetID, task.ClientActionID, media.Role, media.InputIndex); err != nil {
+				return emptyResult, fmt.Errorf("submit task: claim input media: %w", err)
 			}
 		}
 	}

@@ -12,7 +12,6 @@ function renderOverlay() {
         height: '240px',
       },
       handleRadius: 4,
-      outputCount: 1,
     },
   })
 }

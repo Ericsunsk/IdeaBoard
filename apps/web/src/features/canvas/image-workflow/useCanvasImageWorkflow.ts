@@ -116,7 +116,7 @@ export type CanvasImageWorkflow = {
         outputCount: number,
         aspectRatio: PromptAspectRatio,
       ) => void
-      onFlowImageExpandSubmit: (nodeId: string, prompt: string, outputCount: number) => void
+      onFlowImageExpandSubmit: (nodeId: string, prompt: string) => void
       onFlowExpandHandlePointerDown: (
         nodeId: string,
         anchor: CanvasExtendDragAnchor,
@@ -171,7 +171,6 @@ export function useCanvasImageWorkflow(
         frameRect: payload.frameRect,
         originalImageRect: payload.originalImageRect,
         prompt: payload.prompt,
-        outputCount: payload.outputCount,
       })
     },
   })
@@ -195,7 +194,6 @@ export function useCanvasImageWorkflow(
     openImageUrlPreview: options.openImageUrlPreview,
     clearActiveNodePanel: ui.panels.clear,
     hideStrengthControl: strengthControl.hideStrengthControl,
-    updateOutputCount: markImageWorkflowNodeDirty,
     runInpaintAction: execution.runImageInpaintAction,
     isImageActionPanelVisible: (nodeId) => ui.panels.isActive('image-tools', nodeId),
     isImagePromptComposerVisible: (nodeId) => ui.panels.isActive('image-tools', nodeId),

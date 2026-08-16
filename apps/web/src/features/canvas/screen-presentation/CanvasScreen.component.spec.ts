@@ -258,7 +258,6 @@ function createRuntime() {
       focusAndShowChrome: vi.fn(),
       scheduleChromeAnchorUpdate: vi.fn(),
     },
-    prompt: { runPromptAction: vi.fn() },
     chrome: {},
   }
   const imageWorkflowInteractions = {

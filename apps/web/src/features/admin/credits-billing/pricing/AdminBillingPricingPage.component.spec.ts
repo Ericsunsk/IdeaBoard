@@ -2,7 +2,7 @@ import PrimeVue from 'primevue/config'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse, useMswHandlers } from '../../../../test/msw'
 import { primeVueTestOptions } from '../../../../test/primeVue'
-import { renderWithUser, screen, waitFor, within } from '../../../../test/render'
+import { renderWithUser, screen, waitFor } from '../../../../test/render'
 import AdminBillingPricingPage from './AdminBillingPricingPage.vue'
 
 const confirmRequestMock = vi.hoisted(() => vi.fn())
@@ -113,7 +113,6 @@ describe('AdminBillingPricingPage', () => {
     const { user } = renderPricingPage()
     await user.click(await screen.findByRole('button', { name: '设置价格' }))
     expect(screen.getByText('创建新版本，历史版本不变')).toBeVisible()
-    expect(screen.getAllByText(/未配置/).length).toBeGreaterThan(0)
     const priceInput = screen.getByRole('spinbutton', { name: '1K' })
     await user.type(priceInput, '0')
     expect(priceInput).toHaveValue('0 Ideas')
@@ -123,25 +122,6 @@ describe('AdminBillingPricingPage', () => {
     expect(screen.getAllByText('生效中')).toHaveLength(2)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(publishRequests).toBe(1)
-  })
-
-  it('shows the current, next, delta, and immutable version impact', async () => {
-    useMswHandlers(
-      http.get('/api/admin/billing/catalog', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: { items: makeCatalogItems() } }),
-      ),
-    )
-
-    const { user } = renderPricingPage()
-    await user.click((await screen.findAllByRole('button', { name: '调整价格' }))[0])
-
-    const dialog = screen.getByRole('dialog')
-    expect(within(dialog).getAllByText('1K').length).toBeGreaterThan(0)
-    expect(within(dialog).getAllByText('2K').length).toBeGreaterThan(0)
-    expect(within(dialog).getAllByText('4K').length).toBeGreaterThan(0)
-    expect(within(dialog).getByText('1 Idea → 1 Idea')).toBeVisible()
-    expect(within(dialog).getAllByText('未设置 → 未配置')).toHaveLength(2)
-    expect(within(dialog).getByText('创建新版本，历史版本不变')).toBeVisible()
   })
 
   it('disables and re-enables a priced feature from its card', async () => {

@@ -74,11 +74,11 @@ func TestBuildProviderTaskParamsDerivesProviderMapFromCanonicalContract(t *testi
 		Feature: FeatureSlugStyleFusion,
 		Media: &tasks.MediaInputs{
 			Inputs: []tasks.MediaRef{
-				{URL: "https://img.example/a.png", Role: "input", Weight: 0.7},
-				{URL: "https://img.example/b.png", Role: "input", Weight: 0.3},
+				{AssetID: 1, Role: "input", Weight: 0.7},
+				{AssetID: 2, Role: "input", Weight: 0.3},
 			},
-			References: []tasks.MediaRef{{URL: "https://img.example/ref.png", Role: "reference"}},
-			Mask:       &tasks.MediaRef{URL: "https://img.example/mask.png", Role: "mask"},
+			References: []tasks.MediaRef{{AssetID: 3, Role: "reference"}},
+			Mask:       &tasks.MediaRef{AssetID: 4, Role: "mask"},
 			UseMask:    &useMask,
 		},
 		Controls: &tasks.GenerationControls{
@@ -96,8 +96,14 @@ func TestBuildProviderTaskParamsDerivesProviderMapFromCanonicalContract(t *testi
 			"variation_strength": 99,
 		},
 	}
+	runtimeMedia := &tasks.RuntimeMediaInputs{
+		Inputs:     []tasks.RuntimeMediaRef{{URL: "https://img.example/a.png", Role: "input", Weight: 0.7}, {URL: "https://img.example/b.png", Role: "input", Weight: 0.3}},
+		References: []tasks.RuntimeMediaRef{{URL: "https://img.example/ref.png", Role: "reference"}},
+		Mask:       &tasks.RuntimeMediaRef{URL: "https://img.example/mask.png", Role: "mask"},
+		UseMask:    &useMask,
+	}
 
-	providerParams := BuildProviderTaskParams(params)
+	providerParams := BuildProviderTaskParams(params, runtimeMedia)
 
 	if got := providerParams["feature"]; got != FeatureSlugStyleFusion {
 		t.Fatalf("feature = %#v, want style-fusion", got)
@@ -214,7 +220,7 @@ func TestBuildProviderTaskParamsEncodesCanonicalFeatureContracts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			providerParams := BuildProviderTaskParams(tt.params)
+			providerParams := BuildProviderTaskParams(tt.params, nil)
 			for key, want := range tt.want {
 				if got := providerParams[key]; !reflect.DeepEqual(got, want) {
 					t.Fatalf("%s = %#v, want %#v; provider params=%#v", key, got, want, providerParams)

@@ -11,6 +11,7 @@ import type {
   ProviderApiTypeValue,
   ProviderEndpointFormData,
   ProviderEndpointRecord,
+  ProviderProcessingCapabilityValue,
   ProviderProtocolValue,
 } from './providerConfigTypes'
 
@@ -40,6 +41,7 @@ export const ADMIN_PROVIDER_ENDPOINT_PROTOCOL_OPTIONS: Array<{
 }> = [
   { label: '生图模型 API', value: 'model-api' },
   { label: '图片处理 API', value: 'image-url-json-to-image' },
+  { label: '图像填充（扩图 / 局部重绘）', value: 'flux-fill-json-image' },
 ]
 
 const adminProviderEndpointApiTypeLabelByValue = new Map(
@@ -53,6 +55,16 @@ const adminProviderEndpointProtocolLabelByValue = new Map(
 const adminProviderEndpointCapabilityLabelByValue = new Map<string, string>([
   ['background-removal', '抠图'],
   ['image-upscale', 'HD'],
+  ['image-fill', '图像填充（扩图 / 局部重绘）'],
+])
+const modellessProviderProtocols = new Set<ProviderProtocolValue>([
+  'image-url-json-to-image',
+  'flux-fill-json-image',
+])
+const modellessProviderCapabilities = new Set<ProviderProcessingCapabilityValue>([
+  'background-removal',
+  'image-upscale',
+  'image-fill',
 ])
 
 export function getAdminProviderEndpointApiTypeLabel(value: string) {
@@ -73,6 +85,16 @@ export function getAdminProviderEndpointCapabilityLabel(value?: string) {
   return adminProviderEndpointCapabilityLabelByValue.get(value || '') || value || '未配置'
 }
 
+export function isModellessProviderProtocol(value: string) {
+  return modellessProviderProtocols.has(value as ProviderProtocolValue)
+}
+
+export function isModellessProviderCapability(
+  value?: string,
+): value is ProviderProcessingCapabilityValue {
+  return modellessProviderCapabilities.has(value as ProviderProcessingCapabilityValue)
+}
+
 export function createEmptyProviderEndpointForm(): ProviderEndpointFormData {
   return {
     apiType: DEFAULT_ADMIN_PROVIDER_ENDPOINT_API_TYPE,
@@ -86,15 +108,14 @@ export function createEmptyProviderEndpointForm(): ProviderEndpointFormData {
 }
 
 export function createProviderEndpointSavePayload(form: ProviderEndpointFormData) {
+  const isModelless = isModellessProviderProtocol(form.protocol)
   return {
     api_type: form.apiType,
     protocol: form.protocol,
-    ...(form.protocol === 'image-url-json-to-image' && form.capability
-      ? { capability: form.capability }
-      : {}),
+    ...(isModelless && form.capability ? { capability: form.capability } : {}),
     name: form.name,
     base_url: form.baseUrl,
-    ...(form.protocol === 'image-url-json-to-image' ? { api_key: form.apiKey } : {}),
+    ...(isModelless ? { api_key: form.apiKey } : {}),
     status: form.status,
   }
 }
@@ -103,10 +124,8 @@ export function isModellessProviderEndpoint(
   providerEndpoint: Pick<ProviderEndpointRecord, 'protocol' | 'capabilities'> | null | undefined,
 ) {
   return (
-    providerEndpoint?.protocol === 'image-url-json-to-image' &&
-    providerEndpoint.capabilities.some(
-      (capability) => capability === 'background-removal' || capability === 'image-upscale',
-    )
+    isModellessProviderProtocol(providerEndpoint?.protocol ?? '') &&
+    providerEndpoint?.capabilities.some(isModellessProviderCapability) === true
   )
 }
 

@@ -54,7 +54,8 @@ func TestMediaAssetRegistryRegistersBoardUploadForInitialReclamation(t *testing.
 	}
 
 	for name, lookup := range map[string]storage.StoredUploadLookup{
-		"URL": {URL: asset.Url, ObjectKey: "unused"},
+		"AssetID": {AssetID: mediaAssetID},
+		"URL":     {URL: asset.Url, ObjectKey: "unused"},
 		"storage key": {
 			URL:       "https://retired-cdn.example.com/uploads/canvas/OWNER/shared-board/content/image.png",
 			ObjectKey: asset.StorageKey,

@@ -11,4 +11,5 @@ export type ProviderEndpointFormDataCapability =
 export const ProviderEndpointFormDataCapability = {
   'background-removal': 'background-removal',
   'image-upscale': 'image-upscale',
+  'image-fill': 'image-fill',
 } as const

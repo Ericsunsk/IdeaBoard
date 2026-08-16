@@ -76,7 +76,7 @@ func generationMediaFromParamsForTest(media *tasks.MediaInputs) []tasks.Generati
 	}
 	result := make([]tasks.GenerationMediaIntent, 0, len(media.Inputs)+len(media.References)+2)
 	appendRef := func(ref tasks.MediaRef, fallbackRole string) {
-		if ref.URL == "" {
+		if ref.AssetID <= 0 {
 			return
 		}
 		role := ref.Role
@@ -84,7 +84,7 @@ func generationMediaFromParamsForTest(media *tasks.MediaInputs) []tasks.Generati
 			role = fallbackRole
 		}
 		result = append(result, tasks.GenerationMediaIntent{
-			InputIndex: len(result), Role: role, Ref: ref.URL, Weight: ref.Weight,
+			InputIndex: len(result), Role: role, AssetID: ref.AssetID, Weight: ref.Weight,
 		})
 	}
 	for _, ref := range media.Inputs {
@@ -100,6 +100,35 @@ func generationMediaFromParamsForTest(media *tasks.MediaInputs) []tasks.Generati
 		appendRef(*media.Mask, "mask")
 	}
 	return result
+}
+
+type testRuntimeMediaResolver struct {
+	urls map[int64]string
+}
+
+func (r testRuntimeMediaResolver) ResolveRuntimeMedia(_ context.Context, params *tasks.WorkflowTaskParams) (*tasks.RuntimeMediaInputs, error) {
+	if params == nil || params.Media == nil {
+		return nil, nil
+	}
+	resolve := func(ref tasks.MediaRef) tasks.RuntimeMediaRef {
+		return tasks.RuntimeMediaRef{URL: r.urls[ref.AssetID], Role: ref.Role, Weight: ref.Weight}
+	}
+	result := &tasks.RuntimeMediaInputs{UseMask: params.Media.UseMask}
+	for _, ref := range params.Media.Inputs {
+		result.Inputs = append(result.Inputs, resolve(ref))
+	}
+	for _, ref := range params.Media.References {
+		result.References = append(result.References, resolve(ref))
+	}
+	if params.Media.Original != nil {
+		ref := resolve(*params.Media.Original)
+		result.Original = &ref
+	}
+	if params.Media.Mask != nil {
+		ref := resolve(*params.Media.Mask)
+		result.Mask = &ref
+	}
+	return result, nil
 }
 
 func roundTripDrawingTaskForTest(t *testing.T, task *tasks.TaskPayload) *tasks.TaskPayload {

@@ -171,7 +171,6 @@ function mountCanvasImageTools() {
   const setViewport = vi.fn()
   const setCenter = vi.fn()
   const runInpaintAction = vi.fn()
-  const updateOutputCount = vi.fn()
   const activeStrengthAction = ref<ImageStrengthAction | null>(null)
   let imageAdjustmentFinalApplyContext: CanvasImageAdjustmentFinalApplyContext | null = null
   const feedback = {
@@ -212,7 +211,6 @@ function mountCanvasImageTools() {
           openImageUrlPreview: vi.fn(),
           clearActiveNodePanel: vi.fn(),
           hideStrengthControl: vi.fn(),
-          updateOutputCount,
           runInpaintAction,
           isImageActionPanelVisible: (nodeId) => nodeId === 'image-1',
           isImagePromptComposerVisible: (nodeId) => nodeId === 'image-1',
@@ -252,7 +250,6 @@ function mountCanvasImageTools() {
     host,
     isCanvasInteractionLocked,
     runInpaintAction,
-    updateOutputCount,
     cancelImageAdjustmentFinalApply: () => {
       if (!imageAdjustmentFinalApplyContext) {
         throw new Error('Image adjustment final apply context was not provided')
@@ -333,7 +330,6 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(harness.runtime.commands.editor.scheduleChromeAnchorUpdate).toEqual(
         expect.any(Function),
       )
-      expect(harness.runtime.commands.prompt.runPromptAction).toEqual(expect.any(Function))
       expect(harness.runtime.commands.chrome.selectAdjustmentLayer).toEqual(expect.any(Function))
     } finally {
       harness.unmount()
@@ -659,7 +655,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       maskCanvas.width = 4
       maskCanvas.height = 4
       node2StageBinding.session.maskEditor.setMaskCanvasRef('image-2', maskCanvas)
-      harness.runtime.commands.chrome.submitMaskPrompt('重绘 image-2', 1)
+      harness.runtime.commands.chrome.submitMaskPrompt('重绘 image-2')
 
       expect(harness.runtime.viewModel.nodeBindings.actionFor('image-2').promptPlaceholder).toBe(
         '描述如何重绘选区',
@@ -672,7 +668,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     }
   })
 
-  it('keeps committed mask data inside image-tools when running prompt actions', () => {
+  it('runs inpaint from committed mask data', () => {
     const harness = mountCanvasImageTools()
 
     try {
@@ -685,34 +681,13 @@ describe('useCanvasImageTools image adjustment final apply', () => {
         .stageFor('image-1')
         .session.maskEditor.setMaskCanvasRef('image-1', canvas)
 
-      harness.runtime.commands.chrome.submitMaskPrompt('重绘这块区域', 2)
+      harness.runtime.commands.chrome.submitMaskPrompt('重绘这块区域')
 
       expect(harness.runInpaintAction).toHaveBeenCalledWith('image-1', {
         prompt: '重绘这块区域',
-        outputCount: 2,
         maskDataUrl: 'data:image/png;base64,execution-mask',
-        referenceImageUrls: [],
       })
       expect(harness.runtime.viewModel.active.nodeId.value).toBeNull()
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').promptPlaceholder).toBe(
-        '描述如何重绘选区',
-      )
-
-      harness.runtime.commands.prompt.runPromptAction('image-1', '继续用选区生成', 3)
-
-      expect(harness.runInpaintAction).toHaveBeenLastCalledWith('image-1', {
-        prompt: '继续用选区生成',
-        outputCount: 3,
-        maskDataUrl: 'data:image/png;base64,execution-mask',
-      })
-
-      harness.runtime.commands.lifecycle.discardNodeEdits('image-1')
-      expect(harness.runtime.viewModel.nodeBindings.actionFor('image-1').promptPlaceholder).toBe(
-        '输入辅助要求（可选）',
-      )
-
-      harness.runtime.commands.prompt.runPromptAction('image-1', '普通生成', 1)
-      expect(harness.feedback.warning).toHaveBeenCalledWith('请先在图片上标记需要重绘的区域')
     } finally {
       harness.unmount()
     }
@@ -727,7 +702,6 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       harness.runtime.commands.chrome.setMaskBrushShape('square')
       harness.runtime.commands.chrome.setMaskBrushSize(36)
       harness.runtime.commands.chrome.setMaskLayerOpacity(40)
-      harness.runtime.commands.chrome.updateMaskOutputCount(3)
 
       const chromeModel = harness.runtime.viewModel.chrome.value
       const stageBinding = harness.runtime.viewModel.nodeBindings.stageFor('image-1')
@@ -740,10 +714,6 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(stageBinding.session.maskEditor.brushShape.value).toBe('square')
       expect(stageBinding.session.maskEditor.brushSize.value).toBe(36)
       expect(actionBinding.promptComposerVisible).toBe(true)
-      expect(harness.updateOutputCount).toHaveBeenCalledWith('image-1', {
-        key: 'outputCount',
-        value: 3,
-      })
       expect('getCommittedMaskData' in harness.runtime).toBe(false)
       expect('clearCommittedMaskData' in harness.runtime).toBe(false)
     } finally {

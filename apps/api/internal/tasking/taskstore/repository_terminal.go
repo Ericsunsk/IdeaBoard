@@ -308,6 +308,9 @@ func (r *Repository) runTerminalTransition(ctx context.Context, command terminal
 		if err := releaseTerminalTaskLeaseTx(ctx, q, command, policy); err != nil {
 			return err
 		}
+		if _, err := q.ReleaseTaskInputMediaRefs(ctx, command.taskID); err != nil {
+			return err
+		}
 		metricsByTaskID, err := listExecutionMetricsByTaskIDsTx(ctx, q, []string{command.taskID})
 		if err != nil {
 			return err

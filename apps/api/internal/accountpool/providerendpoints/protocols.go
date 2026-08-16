@@ -9,9 +9,11 @@ import (
 const (
 	ProtocolModelAPI            = "model-api"
 	ProtocolImageURLJSONImage   = "image-url-json-to-image"
+	ProtocolFluxFillJSONImage   = "flux-fill-json-image"
 	CapabilityImageGeneration   = "image-generation"
 	CapabilityBackgroundRemoval = "background-removal"
 	CapabilityImageUpscale      = "image-upscale"
+	CapabilityImageFill         = "image-fill"
 )
 
 type ProtocolDefinition struct {
@@ -22,6 +24,7 @@ type ProtocolDefinition struct {
 var protocolCapabilities = map[string][]string{
 	ProtocolModelAPI:          {CapabilityImageGeneration},
 	ProtocolImageURLJSONImage: {CapabilityBackgroundRemoval, CapabilityImageUpscale},
+	ProtocolFluxFillJSONImage: {CapabilityImageFill},
 }
 
 func ProtocolRegistry() []ProtocolDefinition {
@@ -43,7 +46,7 @@ func NormalizeProtocolCapabilities(protocol string, requested []string) (string,
 	if !ok {
 		return "", nil, fmt.Errorf("不支持的 ProviderEndpoint Protocol")
 	}
-	if protocol == ProtocolImageURLJSONImage {
+	if protocol == ProtocolImageURLJSONImage || protocol == ProtocolFluxFillJSONImage {
 		if len(requested) != 1 {
 			return "", nil, fmt.Errorf("图片处理 API 必须选择一个处理功能")
 		}
@@ -85,8 +88,10 @@ func ProtocolSupportsCapability(protocol, capability string) bool {
 }
 
 func AllowsModellessAccounts(protocol string, capabilities []string) bool {
-	if strings.TrimSpace(protocol) != ProtocolImageURLJSONImage || len(capabilities) != 1 {
+	if len(capabilities) != 1 {
 		return false
 	}
-	return capabilities[0] == CapabilityBackgroundRemoval || capabilities[0] == CapabilityImageUpscale
+	return (strings.TrimSpace(protocol) == ProtocolImageURLJSONImage &&
+		(capabilities[0] == CapabilityBackgroundRemoval || capabilities[0] == CapabilityImageUpscale)) ||
+		(strings.TrimSpace(protocol) == ProtocolFluxFillJSONImage && capabilities[0] == CapabilityImageFill)
 }

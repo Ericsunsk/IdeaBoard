@@ -65,6 +65,13 @@ SELECT
 FROM media_assets
 WHERE id = sqlc.arg(id);
 
+-- name: GetReadyMediaAssetStorageLocationByID :one
+SELECT storage_profile_id, storage_key
+FROM media_assets
+WHERE id = sqlc.arg(id)
+  AND status = 'ready'
+  AND deleted_at IS NULL;
+
 -- name: FindMediaAssetStorageLocationByURL :one
 SELECT storage_profile_id, storage_key
 FROM media_assets
@@ -108,19 +115,6 @@ FROM media_refs
 WHERE owner_user_id = sqlc.arg(owner_user_id) AND board_id = sqlc.arg(board_id)
 ORDER BY created_at ASC, id ASC;
 
--- name: ClaimPromptReferenceMediaRef :one
-UPDATE media_refs
-SET task_id = sqlc.arg(task_id), updated_at = now()
-WHERE owner_user_id = sqlc.arg(owner_user_id)
-  AND media_asset_id = sqlc.arg(media_asset_id)
-  AND ref_type = 'prompt_reference'
-  AND ref_id = sqlc.arg(ref_id)
-  AND role = sqlc.arg(role)
-  AND input_index = sqlc.arg(input_index)
-  AND task_id = ''
-RETURNING id, media_asset_id, owner_user_id, ref_type, ref_id,
-  board_id, task_id, role, input_index, metadata, created_at, updated_at;
-
 -- name: FindPreparedGenerationMedia :one
 SELECT asset.id, asset.storage_profile_id, asset.storage_key, asset.url,
   asset.source_url, asset.mime_type, asset.width, asset.height, asset.size_bytes
@@ -131,6 +125,7 @@ WHERE ref.owner_user_id = sqlc.arg(owner_user_id)
   AND ref.ref_id = sqlc.arg(ref_id)
   AND ref.role = sqlc.arg(role)
   AND ref.input_index = sqlc.arg(input_index)
+  AND ref.task_id = ''
   AND asset.deleted_at IS NULL
 LIMIT 1;
 
@@ -154,6 +149,25 @@ DELETE FROM media_refs
 WHERE task_id = sqlc.arg(task_id)
   AND ref_type = 'task_output';
 
+-- name: ReleaseTaskInputMediaRefs :many
+WITH released AS (
+  DELETE FROM media_refs
+  WHERE task_id = sqlc.arg(task_id)
+    AND ref_type = 'task_input'
+  RETURNING media_asset_id
+)
+UPDATE media_assets AS asset
+SET reclaim_after = COALESCE(asset.reclaim_after, now()),
+    reclaim_started_at = NULL,
+    reclaim_claim_token = NULL,
+    reclaim_generation = CASE
+      WHEN asset.reclaim_after IS NULL THEN asset.reclaim_generation + 1
+      ELSE asset.reclaim_generation
+    END
+WHERE asset.id IN (SELECT media_asset_id FROM released)
+  AND asset.deleted_at IS NULL
+RETURNING asset.id;
+
 -- name: CountMediaRefsByAssetID :one
 SELECT COUNT(*)
 FROM media_refs
@@ -174,7 +188,7 @@ WHERE asset.id = ANY(sqlc.arg(media_asset_ids)::bigint[])
     SELECT 1
     FROM media_refs AS ref
     WHERE ref.media_asset_id = asset.id
-      AND ref.ref_type IN ('board', 'board_node')
+      AND ref.ref_type IN ('board', 'board_node', 'task_input')
   );
 
 -- name: CancelMediaAssetReclamation :many
@@ -203,7 +217,7 @@ WHERE asset.deleted_at IS NULL
     SELECT 1
     FROM media_refs AS ref
     WHERE ref.media_asset_id = asset.id
-      AND ref.ref_type IN ('board', 'board_node')
+      AND ref.ref_type IN ('board', 'board_node', 'task_input')
   )
 ORDER BY asset.reclaim_after ASC, asset.id ASC
 LIMIT sqlc.arg(row_limit);
@@ -224,7 +238,7 @@ WHERE asset.id = sqlc.arg(id)
     SELECT 1
     FROM media_refs AS ref
     WHERE ref.media_asset_id = asset.id
-      AND ref.ref_type IN ('board', 'board_node')
+      AND ref.ref_type IN ('board', 'board_node', 'task_input')
   )
 RETURNING asset.id, asset.asset_id, asset.owner_user_id, asset.storage_profile_id, asset.storage_key,
   asset.url, asset.source_url, asset.media_kind, asset.mime_type,
@@ -258,5 +272,5 @@ WHERE media_assets.id = sqlc.arg(id)
     SELECT 1
     FROM media_refs AS ref
     WHERE ref.media_asset_id = media_assets.id
-      AND ref.ref_type IN ('board', 'board_node')
+      AND ref.ref_type IN ('board', 'board_node', 'task_input')
   );

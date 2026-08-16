@@ -9,7 +9,12 @@ import { canvasBoardSnapshotToFlow, flowToCanvasBoardSnapshot } from '../../util
 import { CanvasBoardGraphSession, createPendingImageExecutionCore } from '../pending-execution'
 import { useFlowImageWorkflowExecution } from './flowImageWorkflowExecution'
 
-vi.mock('../media/imageSize', () => ({ loadImageSizeFromUrl: vi.fn(async () => null) }))
+vi.mock('../media/imageSize', () => ({
+  loadImageSizeFromUrl: vi.fn(async () => ({ width: 1200, height: 800 })),
+}))
+vi.mock('../media/flowLocalInpaintMask', () => ({
+  prepareFlowLocalInpaintMask: vi.fn(async () => 'https://example.com/mask.png'),
+}))
 
 function imageActionPlan() {
   return { kind: 'image-action', activationId: 'a', sourceNodeId: 'image-1', source: { url: 'https://example.com/a.png', ratio: 1 }, action: 'remove-bg', prompt: '', outputCount: 1, resultOptions: {} } as never
@@ -98,6 +103,81 @@ describe('useFlowImageWorkflowExecution', () => {
     await execution.executeImageWorkflow({ kind: 'image-action', activationId: 'a', sourceNodeId: 'image-1', source: { url: 'https://example.com/a.png', ratio: 1 }, action: 'remove-bg', prompt: '', outputCount: 1, resultOptions: {} } as never)
     expect(assertReady).toHaveBeenCalledOnce()
     expect(core.snapshot().executions).toEqual([])
+  })
+
+  it('uses the complete extend request for readiness and submission', async () => {
+    const assertReady = vi.fn(async () => undefined)
+    const submit = vi.fn(async () => ({ taskId: 'task-extend' }))
+    const harness = createPublicHarness({
+      assertReady,
+      submit,
+      resolve: async () => ({ url: 'https://example.com/extended.png', ratio: 0.75 }),
+    })
+
+    await harness.execution.executeImageWorkflow({
+      kind: 'canvas-extend',
+      activationId: 'extend',
+      sourceNodeId: 'image-1',
+      source: { url: 'https://example.com/a.png', ratio: 1 },
+      prompt: 'extend the horizon',
+      outputCount: 1,
+      extendPercent: { top: 10, right: 20, bottom: 30, left: 40 },
+      targetRatio: 0.75,
+      targetWidth: 320,
+      resultOptions: {},
+    } as never)
+
+    const readinessRequest = assertReady.mock.calls[0]?.[0]
+    expect(readinessRequest).toMatchObject({
+      feature: 'image-extend',
+      image_urls: ['https://example.com/a.png'],
+      params: {
+        output_count: 1,
+        original_image_width: 1200,
+        original_image_height: 800,
+        custom_width: 1920,
+        custom_height: 1120,
+        extend: { top_percent: 10, right_percent: 20, bottom_percent: 30, left_percent: 40 },
+      },
+    })
+    expect(submit.mock.calls[0]?.[0]).toBe(readinessRequest)
+  })
+
+  it('uses the complete sized inpaint request for readiness and submission', async () => {
+    const assertReady = vi.fn(async () => undefined)
+    const submit = vi.fn(async () => ({ taskId: 'task-inpaint' }))
+    const harness = createPublicHarness({
+      assertReady,
+      submit,
+      resolve: async () => ({ url: 'https://example.com/inpainted.png', ratio: 1 }),
+    })
+
+    await harness.execution.executeImageWorkflow({
+      kind: 'image-inpaint',
+      activationId: 'inpaint',
+      sourceNodeId: 'image-1',
+      source: { url: 'https://example.com/a.png', ratio: 1 },
+      prompt: 'remove the object',
+      rawMaskDataUrl: 'data:image/png;base64,mask',
+      outputCount: 1,
+      resultOptions: {},
+    } as never)
+
+    const readinessRequest = assertReady.mock.calls[0]?.[0]
+    expect(readinessRequest).toMatchObject({
+      feature: 'local-inpaint',
+      params: {
+        output_count: 1,
+        original_image_url: 'https://example.com/a.png',
+        mask_image_url: 'https://example.com/mask.png',
+        original_image_width: 1200,
+        original_image_height: 800,
+        custom_width: 1200,
+        custom_height: 800,
+      },
+    })
+    expect(readinessRequest?.params).not.toHaveProperty('reference_image_urls')
+    expect(submit.mock.calls[0]?.[0]).toBe(readinessRequest)
   })
 
   it('delegates prompt execution and pending reattach to the shared Core workspace seam', async () => {

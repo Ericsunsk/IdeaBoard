@@ -4,7 +4,6 @@ import { useMaskEditorChromeActions } from './useMaskEditorChromeActions'
 
 function createHarness(options: { didCommitMask?: boolean; maskDataUrl?: string | null } = {}) {
   const maskEditorNodeId = ref<string | null>('node-1')
-  const referenceImages = ref([{ url: 'https://example.com/ref-a.png' }])
   const commitMaskEditorMode = vi.fn(() => options.didCommitMask ?? true)
   const getCommittedMaskData = vi.fn(() =>
     options.maskDataUrl === undefined
@@ -14,18 +13,15 @@ function createHarness(options: { didCommitMask?: boolean; maskDataUrl?: string 
   const clearActiveNodePanel = vi.fn()
   const hideStrengthControl = vi.fn()
   const runInpaintAction = vi.fn()
-  const updateOutputCount = vi.fn()
   const onWarning = vi.fn()
 
   const actions = useMaskEditorChromeActions({
     maskEditorNodeId,
-    referenceImages,
     commitMaskEditorMode,
     getCommittedMaskData,
     clearActiveNodePanel,
     hideStrengthControl,
     runInpaintAction,
-    updateOutputCount,
     onWarning,
   })
 
@@ -36,7 +32,6 @@ function createHarness(options: { didCommitMask?: boolean; maskDataUrl?: string 
     clearActiveNodePanel,
     hideStrengthControl,
     runInpaintAction,
-    updateOutputCount,
     onWarning,
   }
 }
@@ -45,7 +40,7 @@ describe('useMaskEditorChromeActions', () => {
   it('warns and keeps transient UI when mask commit fails', () => {
     const harness = createHarness({ didCommitMask: false, maskDataUrl: null })
 
-    harness.actions.onMaskEditorChromeSubmit('paint this area', 2)
+    harness.actions.onMaskEditorChromeSubmit('paint this area')
 
     expect(harness.commitMaskEditorMode).toHaveBeenCalledTimes(1)
     expect(harness.getCommittedMaskData).toHaveBeenCalledWith('node-1')
@@ -55,28 +50,16 @@ describe('useMaskEditorChromeActions', () => {
     expect(harness.runInpaintAction).not.toHaveBeenCalled()
   })
 
-  it('runs inpaint with reference images after a successful mask commit', () => {
+  it('runs inpaint with only the prompt and committed execution mask', () => {
     const harness = createHarness()
 
-    harness.actions.onMaskEditorChromeSubmit('paint this area', 2)
+    harness.actions.onMaskEditorChromeSubmit('paint this area')
 
     expect(harness.clearActiveNodePanel).toHaveBeenCalledTimes(1)
     expect(harness.hideStrengthControl).toHaveBeenCalledTimes(1)
     expect(harness.runInpaintAction).toHaveBeenCalledWith('node-1', {
       prompt: 'paint this area',
-      outputCount: 2,
       maskDataUrl: 'data:image/png;base64,mask',
-      referenceImageUrls: ['https://example.com/ref-a.png'],
     })
-  })
-
-  it('rejects output counts outside the domain contract', () => {
-    const harness = createHarness()
-
-    expect(() => harness.actions.onMaskEditorChromeOutputCountUpdate(99)).toThrow(
-      'requested output count must be an integer between 1 and 4',
-    )
-
-    expect(harness.updateOutputCount).not.toHaveBeenCalled()
   })
 })

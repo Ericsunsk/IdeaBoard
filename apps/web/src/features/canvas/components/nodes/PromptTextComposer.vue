@@ -43,6 +43,7 @@
       :allow-empty="allowEmpty"
       :submit-disabled="submitDisabled"
       :show-aspect-ratio="showAspectRatio"
+      :show-output-count="showOutputCount"
       :autofocus="autofocus"
       :billing-state="billingState"
       :textarea-class="promptTextInputClass"
@@ -87,6 +88,7 @@ const props = withDefaults(
     maxImageInputs?: number
     showAspectRatio?: boolean
     showImageInput?: boolean
+    showOutputCount?: boolean
     autofocus?: boolean
     variant?: 'node' | 'floating'
     billingState?: CanvasBillingQuoteState | null
@@ -102,6 +104,7 @@ const props = withDefaults(
     placeholder: 'type your idea...',
     showAspectRatio: true,
     showImageInput: false,
+    showOutputCount: true,
     submitDisabled: false,
     variant: 'node',
     billingState: null,

@@ -4,22 +4,18 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/tasking/tasks"
-	"ideaboard/api/internal/workflow"
 )
 
 type providerResultFinalizationState uint8
 
 const (
 	// RemoteRefs is the only non-durable state. The universal materializer owns
-	// its transition to DurableOutputs; specialized finalizers own the direct
-	// transition to AlreadyMaterialized.
+	// its transition to DurableOutputs.
 	providerResultRemoteRefs providerResultFinalizationState = iota + 1
 	providerResultDurableOutputs
-	providerResultAlreadyMaterialized
 	providerResultTerminalFailure
 )
 
@@ -45,15 +41,6 @@ func newProviderRemoteRefs(imageRefs []string) providerResultFinalization {
 func newProviderDurableOutputs(imageURLs []string, outputs []tasks.TaskOutput) providerResultFinalization {
 	result := providerResultFinalization{
 		state:     providerResultDurableOutputs,
-		imageURLs: append([]string(nil), imageURLs...),
-		outputs:   append([]tasks.TaskOutput(nil), outputs...),
-	}
-	return result.validatedOrTerminal()
-}
-
-func newProviderAlreadyMaterialized(imageURLs []string, outputs []tasks.TaskOutput) providerResultFinalization {
-	result := providerResultFinalization{
-		state:     providerResultAlreadyMaterialized,
 		imageURLs: append([]string(nil), imageURLs...),
 		outputs:   append([]tasks.TaskOutput(nil), outputs...),
 	}
@@ -91,7 +78,7 @@ func (r providerResultFinalization) validate() error {
 				return fmt.Errorf("provider result contains an empty remote reference")
 			}
 		}
-	case providerResultDurableOutputs, providerResultAlreadyMaterialized:
+	case providerResultDurableOutputs:
 		if len(r.remoteRefs) != 0 || r.terminalErr != nil {
 			return fmt.Errorf("provider result durable outputs contain incompatible payload")
 		}
@@ -134,36 +121,14 @@ func (r providerResultFinalization) completedOutputs() ([]string, []tasks.TaskOu
 	if r.state == providerResultTerminalFailure {
 		return nil, nil, r.terminalErr
 	}
-	if r.state != providerResultDurableOutputs && r.state != providerResultAlreadyMaterialized {
+	if r.state != providerResultDurableOutputs {
 		return nil, nil, fmt.Errorf("provider result finalization stopped before materialization")
 	}
 	return append([]string(nil), r.imageURLs...), append([]tasks.TaskOutput(nil), r.outputs...), nil
 }
 
-type providerFinalizationRequirement uint8
-
-const (
-	providerFinalizationRemoteResult providerFinalizationRequirement = iota + 1
-	providerFinalizationLocalRedraw
-	providerFinalizationImageExtend
-)
-
-func finalizationRequirementFor(operation workflow.RuntimeOperation) providerFinalizationRequirement {
-	switch operation {
-	case workflow.RuntimeOperationLocalInpaint:
-		return providerFinalizationLocalRedraw
-	case workflow.RuntimeOperationImageExtend:
-		return providerFinalizationImageExtend
-	default:
-		return providerFinalizationRemoteResult
-	}
-}
-
 type providerResultFinalizer struct {
 	executor      *ProviderExecutor
-	requirement   providerFinalizationRequirement
-	localRedraw   *localRedrawContext
-	imageExtend   *imageExtendContext
 	correlationID string
 	account       *accounts.ApiAccount
 }
@@ -173,7 +138,6 @@ func (f providerResultFinalizer) finalize(
 	userID int64,
 	taskID string,
 	imageRefs []string,
-	timeout time.Duration,
 ) providerResultFinalization {
 	result := newProviderRemoteRefs(imageRefs)
 	if result.state == providerResultTerminalFailure {
@@ -183,17 +147,7 @@ func (f providerResultFinalizer) finalize(
 		return newProviderTerminalFailure(fmt.Errorf("provider executor is not initialized"))
 	}
 
-	switch f.requirement {
-	case providerFinalizationRemoteResult:
-		result = f.materializeRemoteRefs(ctx, userID, taskID, result)
-	case providerFinalizationLocalRedraw:
-		result = f.executor.finalizeLocalRedrawResults(ctx, userID, taskID, f.localRedraw, result.remoteRefs, timeout)
-	case providerFinalizationImageExtend:
-		result = f.executor.finalizeImageExtendResults(ctx, userID, taskID, f.imageExtend, result.remoteRefs, timeout)
-	default:
-		return newProviderTerminalFailure(fmt.Errorf("unsupported provider finalization requirement %d", f.requirement))
-	}
-	return result
+	return f.materializeRemoteRefs(ctx, userID, taskID, result)
 }
 
 func (f providerResultFinalizer) materializeRemoteRefs(ctx context.Context, userID int64, taskID string, result providerResultFinalization) providerResultFinalization {
@@ -218,34 +172,4 @@ func (f providerResultFinalizer) materializeRemoteRefs(ctx context.Context, user
 		return newProviderTerminalFailure(err)
 	}
 	return newProviderDurableOutputs(imageURLs, outputs)
-}
-
-func (c *ProviderExecutor) prepareProviderFinalization(
-	ctx context.Context,
-	account *accounts.ApiAccount,
-	params map[string]interface{},
-	requirement providerFinalizationRequirement,
-	timeout time.Duration,
-	correlationID string,
-) (providerResultFinalizer, error) {
-	finalizer := providerResultFinalizer{
-		executor:      c,
-		requirement:   requirement,
-		correlationID: correlationID,
-		account:       account,
-	}
-	var err error
-	switch requirement {
-	case providerFinalizationLocalRedraw:
-		finalizer.localRedraw, err = c.prepareLocalRedrawPipeline(ctx, account, params, timeout)
-	case providerFinalizationImageExtend:
-		finalizer.imageExtend, err = c.prepareImageExtendPipeline(ctx, account, params, timeout)
-	case providerFinalizationRemoteResult:
-	default:
-		return providerResultFinalizer{}, fmt.Errorf("unsupported provider finalization requirement %d", requirement)
-	}
-	if err != nil {
-		return providerResultFinalizer{}, err
-	}
-	return finalizer, nil
 }

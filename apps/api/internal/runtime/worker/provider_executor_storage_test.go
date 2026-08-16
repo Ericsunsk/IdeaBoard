@@ -238,8 +238,8 @@ func TestGoogleGeminiReadsRelativeCanvasUploadFromStorage(t *testing.T) {
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
 		Feature:       "style-variation",
 		Media: &tasks.MediaInputs{
-			Inputs:   []tasks.MediaRef{{URL: "/uploads/canvas/OWNR1A/board-1/content/source.png", Role: "input"}},
-			Original: &tasks.MediaRef{URL: "/uploads/canvas/OWNR1A/board-1/content/source.png", Role: "original"},
+			Inputs:   []tasks.MediaRef{{AssetID: 1, Role: "input"}},
+			Original: &tasks.MediaRef{AssetID: 2, Role: "original"},
 		},
 		Variation: &tasks.StyleVariationParams{Strength: 40},
 	})

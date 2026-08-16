@@ -12,8 +12,6 @@
     :brush-size="chromeModel.mask.brushSize"
     :brush-hardness="chromeModel.mask.brushHardness"
     :mask-layer-opacity="chromeModel.mask.layerOpacity"
-    :output-count="chromeModel.mask.outputCount"
-    :reference-images="chromeModel.mask.referenceImages"
     :direct-generating="chromeModel.mask.directGenerating"
     :can-undo="chromeModel.mask.canUndo"
     :can-redo="chromeModel.mask.canRedo"
@@ -27,10 +25,6 @@
     @feather-mask="chromeCommands.featherMask"
     @undo-mask="chromeCommands.undoMask"
     @redo-mask="chromeCommands.redoMask"
-    @update:output-count="chromeCommands.updateMaskOutputCount"
-    @image-input-open="chromeCommands.openMaskReferenceImageInput"
-    @reference-image-remove="chromeCommands.removeMaskReferenceImage"
-    @reference-image-preview="chromeCommands.previewMaskReferenceImage"
     @submit="chromeCommands.submitMaskPrompt"
   />
   <ImageEditorChrome

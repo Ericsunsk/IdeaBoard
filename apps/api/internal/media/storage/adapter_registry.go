@@ -20,6 +20,7 @@ type storageProviderAdapter interface {
 	StoreBytesRef(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (*StoredUploadRef, error)
 	StoreRemoteRef(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (*StoredUploadRef, error)
 	Read(ctx context.Context, profile *StorageProfile, objectKey string, maxBytes int64) (*StoredUploadObject, error)
+	ProviderURL(profile *StorageProfile, objectKey string) (string, error)
 }
 
 type storageAdapterRegistry struct {

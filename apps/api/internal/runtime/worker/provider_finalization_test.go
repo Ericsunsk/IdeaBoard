@@ -21,11 +21,10 @@ func TestProviderResultFinalizerMaterializesRemoteRefsOnce(t *testing.T) {
 		}}},
 	}
 	finalizer := providerResultFinalizer{
-		executor:    &ProviderExecutor{resultMaterializer: materializer},
-		requirement: providerFinalizationRemoteResult,
+		executor: &ProviderExecutor{resultMaterializer: materializer},
 	}
 
-	result := finalizer.finalize(context.Background(), 42, "task-1", []string{"https://provider.example/result.png"}, 0)
+	result := finalizer.finalize(context.Background(), 42, "task-1", []string{"https://provider.example/result.png"})
 	if result.state != providerResultDurableOutputs {
 		t.Fatalf("state=%d, want durable outputs", result.state)
 	}
@@ -48,11 +47,10 @@ func TestProviderResultFinalizerTurnsStorageErrorIntoTerminalFailure(t *testing.
 	storeErr := errors.New("materializer unavailable")
 	materializer := &captureResultMaterializer{remoteErr: storeErr}
 	finalizer := providerResultFinalizer{
-		executor:    &ProviderExecutor{resultMaterializer: materializer},
-		requirement: providerFinalizationRemoteResult,
+		executor: &ProviderExecutor{resultMaterializer: materializer},
 	}
 
-	result := finalizer.finalize(context.Background(), 42, "task-1", []string{"https://provider.example/result.png"}, 0)
+	result := finalizer.finalize(context.Background(), 42, "task-1", []string{"https://provider.example/result.png"})
 	if result.state != providerResultTerminalFailure {
 		t.Fatalf("state=%d, want terminal failure", result.state)
 	}
@@ -88,7 +86,7 @@ func TestProviderResultFinalizationRequiresMaterializedOutputs(t *testing.T) {
 }
 
 func TestProviderResultFinalizationRejectsMismatchedOutputURL(t *testing.T) {
-	result := newProviderAlreadyMaterialized(
+	result := newProviderDurableOutputs(
 		[]string{"/uploads/result.png"},
 		[]tasks.TaskOutput{{URL: "/uploads/other.png", ResultIndex: 0}},
 	)

@@ -17,20 +17,14 @@ describe('buildExecutionTaskRequest', () => {
       imageUrls: ['https://assets.example.com/uploads/canvas/U123/board/content/a.png'],
       params: {
         original_image_url: 'https://assets.example.com/uploads/canvas/U123/board/content/a.png',
-        reference_image_urls: [
-          'https://assets.example.com/uploads/canvas/U123/board/content/b.png',
-          'https://cdn.example.com/uploads/canvas/U123/board/content/c.png',
-        ],
+        mask_image_url: 'https://assets.example.com/uploads/canvas/U123/board/content/b.png',
       },
     })
 
     expect(request.image_urls).toEqual(['/uploads/canvas/U123/board/content/a.png'])
     expect(request.params).toEqual({
       original_image_url: '/uploads/canvas/U123/board/content/a.png',
-      reference_image_urls: [
-        '/uploads/canvas/U123/board/content/b.png',
-        'https://cdn.example.com/uploads/canvas/U123/board/content/c.png',
-      ],
+      mask_image_url: '/uploads/canvas/U123/board/content/b.png',
     })
   })
 })

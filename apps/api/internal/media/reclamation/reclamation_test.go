@@ -54,6 +54,39 @@ func TestReclaimWorkerTreatsObjectNotFoundAsSuccess(t *testing.T) {
 	}
 }
 
+func TestReclaimWorkerDoesNotClaimAssetOwnedByActiveTask(t *testing.T) {
+	db := testdb.Open(t)
+	q := dbsqlc.New(db)
+	assetID, generation := seedDueMediaAsset(t, db, q)
+	assetBefore, err := q.GetMediaAssetByID(t.Context(), assetID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := q.UpsertMediaRef(t.Context(), dbsqlc.UpsertMediaRefParams{
+		MediaAssetID: assetID,
+		OwnerUserID:  assetBefore.OwnerUserID,
+		RefType:      "task_input",
+		RefID:        "task-active-media",
+		TaskID:       "task-active-media",
+		Role:         "input",
+		Metadata:     []byte(`{}`),
+	}); err != nil {
+		t.Fatalf("seed active task media ref: %v", err)
+	}
+	storage := &recordingObjectDeleter{}
+	worker := NewReclaimWorker(db, storage)
+	if err := worker.Work(t.Context(), &river.Job[ReclaimJobArgs]{Args: ReclaimJobArgs{MediaAssetID: assetID, ReclaimGeneration: generation}}); err != nil {
+		t.Fatalf("active task ref should make reclamation a no-op: %v", err)
+	}
+	asset, err := q.GetMediaAssetByID(t.Context(), assetID)
+	if err != nil || asset.Status != "ready" || asset.DeletedAt.Valid {
+		t.Fatalf("asset after protected reclamation = %#v err=%v", asset, err)
+	}
+	if storage.objectKey != "" {
+		t.Fatalf("active task asset was deleted: %q", storage.objectKey)
+	}
+}
+
 func TestReclaimWorkerReleasesClaimForRiverRetryAfterStorageFailure(t *testing.T) {
 	db := testdb.Open(t)
 	q := dbsqlc.New(db)

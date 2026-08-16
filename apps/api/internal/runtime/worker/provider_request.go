@@ -18,6 +18,9 @@ var (
 type providerRequest struct {
 	Primitive        workflow.GenerationPrimitive
 	Prompt           string
+	SystemPrompt     string
+	UserPrompt       string
+	Seed             uint64
 	Model            string
 	Size             string
 	OutputResolution string
@@ -26,6 +29,8 @@ type providerRequest struct {
 	MaskRefs         []string
 	CanvasRef        string
 	Scale            float64
+	OriginalWidth    int
+	OriginalHeight   int
 	OpenAI           openAIProviderControls
 	Google           googleProviderControls
 }
@@ -50,10 +55,10 @@ type providerTaskParams struct {
 	Provider      map[string]interface{}
 }
 
-func newProviderTaskParams(params *tasks.WorkflowTaskParams) providerTaskParams {
+func newProviderTaskParams(params *tasks.WorkflowTaskParams, runtimeMedia *tasks.RuntimeMediaInputs) providerTaskParams {
 	return providerTaskParams{
 		Canonical: params,
-		Provider:  workflow.BuildProviderTaskParams(params),
+		Provider:  workflow.BuildProviderTaskParams(params, runtimeMedia),
 	}
 }
 
@@ -81,6 +86,15 @@ func (p providerTaskParams) providerRequest(prompt string, resolvedModel string)
 		},
 		plan.RuntimeOperation(), runtimeInputs.Invocation(), runtimeInputs.ControlContract(),
 	)
+	if p.Canonical != nil && p.Canonical.Generation != nil {
+		request.SystemPrompt = p.Canonical.Generation.SystemPrompt
+		request.UserPrompt = p.Canonical.Generation.UserPrompt
+		request.Seed = p.Canonical.Generation.Seed
+	}
+	if p.Canonical != nil && p.Canonical.Controls != nil {
+		request.OriginalWidth = int(math.Round(p.Canonical.Controls.OriginalWidth))
+		request.OriginalHeight = int(math.Round(p.Canonical.Controls.OriginalHeight))
+	}
 	return request, nil
 }
 
@@ -100,10 +114,10 @@ func validateProviderTaskContract(params *tasks.WorkflowTaskParams, plan workflo
 	generationImageCount := 0
 	generationHasMask := false
 	for index, media := range generation.Media {
-		if media.InputIndex != index || strings.TrimSpace(media.Ref) == "" || strings.TrimSpace(media.Role) == "" {
+		if media.InputIndex != index || media.AssetID <= 0 || !tasks.IsGenerationMediaRole(media.Role) {
 			return fmt.Errorf("task generation media is invalid")
 		}
-		if media.Role == "mask" {
+		if media.Role == tasks.MediaRoleMask {
 			generationHasMask = true
 			continue
 		}
@@ -119,6 +133,9 @@ func validateProviderTaskContract(params *tasks.WorkflowTaskParams, plan workflo
 	mediaImageCount, mediaHasMask := providerMediaFacts(params.Media)
 	if mediaImageCount != runtimeInputs.ImageInputCount() || mediaHasMask != runtimeInputs.HasMaskInput() {
 		return fmt.Errorf("task provider media facts do not match execution plan")
+	}
+	if err := validateProviderMediaMatchesGeneration(params.Media, generation.Media); err != nil {
+		return err
 	}
 	return validateCanonicalRuntimeControls(params, runtimeInputs.ControlContract())
 }
@@ -204,20 +221,44 @@ func providerMediaFacts(media *tasks.MediaInputs) (int, bool) {
 	}
 	count := 0
 	for _, ref := range media.Inputs {
-		if strings.TrimSpace(ref.URL) != "" {
+		if ref.AssetID > 0 {
 			count++
 		}
 	}
 	for _, ref := range media.References {
-		if strings.TrimSpace(ref.URL) != "" {
+		if ref.AssetID > 0 {
 			count++
 		}
 	}
-	if media.Original != nil && strings.TrimSpace(media.Original.URL) != "" {
+	if media.Original != nil && media.Original.AssetID > 0 {
 		count++
 	}
-	hasMask := media.Mask != nil && strings.TrimSpace(media.Mask.URL) != ""
+	hasMask := media.Mask != nil && media.Mask.AssetID > 0
 	return count, hasMask
+}
+
+func validateProviderMediaMatchesGeneration(media *tasks.MediaInputs, generation []tasks.GenerationMediaIntent) error {
+	refs := make([]tasks.MediaRef, 0, len(generation))
+	if media != nil {
+		refs = append(refs, media.Inputs...)
+		refs = append(refs, media.References...)
+		if media.Original != nil {
+			refs = append(refs, *media.Original)
+		}
+		if media.Mask != nil {
+			refs = append(refs, *media.Mask)
+		}
+	}
+	if len(refs) != len(generation) {
+		return fmt.Errorf("task provider media facts do not match generation snapshot")
+	}
+	for index, ref := range refs {
+		intent := generation[index]
+		if ref.AssetID <= 0 || ref.AssetID != intent.AssetID || ref.Role != intent.Role {
+			return fmt.Errorf("task provider media fact %d does not match generation snapshot", index)
+		}
+	}
+	return nil
 }
 
 type resolvedProviderRequestFacts struct {

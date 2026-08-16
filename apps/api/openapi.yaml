@@ -4826,7 +4826,7 @@ components:
         protocol: { type: string }
         capability:
           type: string
-          enum: [background-removal, image-upscale]
+          enum: [background-removal, image-upscale, image-fill]
         api_key: { type: string, writeOnly: true }
         name: { type: string }
         base_url: { type: string }

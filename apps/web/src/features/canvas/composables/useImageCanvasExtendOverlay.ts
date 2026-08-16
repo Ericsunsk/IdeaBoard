@@ -1,7 +1,6 @@
 import { tryOnScopeDispose, useEventListener } from '@vueuse/core'
 import { computed, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
-import { requireImageNodeOutputCount } from '../../canvas-board/domain'
 import type { CanvasInteractionKey } from './useFlowCanvasInteractionState'
 import {
   containImageRect,
@@ -32,7 +31,6 @@ type ExtendCommitPayload = {
   frameRect: CanvasExtendRect
   originalImageRect: CanvasExtendRect
   prompt: string
-  outputCount: number
 }
 
 type UseImageCanvasExtendOverlayOptions = {
@@ -227,7 +225,7 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
     stopDragSession()
   }
 
-  async function commitExpandMode(prompt = '', outputCount = 1) {
+  async function commitExpandMode(prompt = '') {
     if (!state.value) return
     const nodeId = state.value.nodeId
     const payload: ExtendCommitPayload = {
@@ -235,7 +233,6 @@ export function useImageCanvasExtendOverlay(options: UseImageCanvasExtendOverlay
       frameRect: { ...state.value.frameRect },
       originalImageRect: { ...state.value.imageRect },
       prompt: `${prompt}`.trim(),
-      outputCount: requireImageNodeOutputCount(outputCount),
     }
     cancelExpandMode()
     await options.onCommit(payload)

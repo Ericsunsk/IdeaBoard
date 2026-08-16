@@ -19,7 +19,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 	var intake = NewTaskIntake(TaskIntakeDeps{
 		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
 			ID:           101,
-			Capabilities: []string{"background-removal", "image-upscale"},
+			Capabilities: []string{"background-removal", "image-upscale", "image-fill"},
 			Models:       []accounts.AccountModel{{Name: "runtime-selected-model", Enabled: true}},
 		}}},
 		Media: testSubmitMediaValidator{},
@@ -39,7 +39,13 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 		{
 			feature: workflow.FeatureSlugLocalInpaint,
 			images:  []string{"https://example.com/inpaint.png"},
-			params:  map[string]interface{}{"mask_image_url": "https://example.com/mask.png"},
+			params: map[string]interface{}{
+				"mask_image_url":        "https://example.com/mask.png",
+				"original_image_width":  1024,
+				"original_image_height": 768,
+				"custom_width":          1024,
+				"custom_height":         768,
+			},
 		},
 		{feature: workflow.FeatureSlugRemoveBg, images: []string{"https://example.com/remove.png"}},
 		{
@@ -60,14 +66,19 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 			images:  []string{"https://example.com/extend.png"},
 			params: map[string]interface{}{"extend": map[string]interface{}{
 				"top_percent": 0, "right_percent": 25, "bottom_percent": 0, "left_percent": 0,
-			}},
+			},
+				"original_image_width":  1024,
+				"original_image_height": 768,
+				"custom_width":          1280,
+				"custom_height":         768,
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.feature, func(t *testing.T) {
 			outputCount := 2
-			if tt.feature == workflow.FeatureSlugRemoveBg || tt.feature == workflow.FeatureSlugHDUpscale {
+			if tt.feature == workflow.FeatureSlugRemoveBg || tt.feature == workflow.FeatureSlugHDUpscale || tt.feature == workflow.FeatureSlugLocalInpaint || tt.feature == workflow.FeatureSlugImageExtend {
 				outputCount = 1
 			}
 			requestParams := map[string]interface{}{"output_count": outputCount}
@@ -92,7 +103,7 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 			}
 
 			wantQuantity := int64(2)
-			if tt.feature == workflow.FeatureSlugRemoveBg || tt.feature == workflow.FeatureSlugHDUpscale {
+			if tt.feature == workflow.FeatureSlugRemoveBg || tt.feature == workflow.FeatureSlugHDUpscale || tt.feature == workflow.FeatureSlugLocalInpaint || tt.feature == workflow.FeatureSlugImageExtend {
 				wantQuantity = 1
 			}
 			billingRequest := canonical.BillingRequest()
@@ -197,16 +208,23 @@ func TestTaskIntakeReadinessDoesNotRequireExecutionMedia(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
 		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
 			ID:           101,
-			Capabilities: []string{"background-removal"},
+			Capabilities: []string{"background-removal", "image-fill"},
 			Models:       []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
 		}}},
 	})
 
 	for _, feature := range []string{workflow.FeatureSlugLocalInpaint, workflow.FeatureSlugRemoveBg} {
 		t.Run(feature, func(t *testing.T) {
+			params := map[string]interface{}{"output_count": 1}
+			if feature == workflow.FeatureSlugLocalInpaint {
+				params["original_image_width"] = 1024
+				params["original_image_height"] = 768
+				params["custom_width"] = 1024
+				params["custom_height"] = 768
+			}
 			compiled, err := intake.CompileReadiness(t.Context(), &tasks.SubmitTaskRequest{
 				Feature: feature,
-				Params:  map[string]interface{}{"output_count": 1},
+				Params:  params,
 			})
 			if err != nil {
 				t.Fatalf("CompileReadiness() error = %v", err)
@@ -283,8 +301,35 @@ func TestTaskIntakePrepareMediaPreservesCompiledExecutionPlan(t *testing.T) {
 	if !bytes.Equal(before.ExecutionPlan, after.ExecutionPlan) {
 		t.Fatalf("execution plan changed during media preparation\nbefore=%s\nafter=%s", before.ExecutionPlan, after.ExecutionPlan)
 	}
-	if after.Generation == nil || len(after.Generation.Media) != 1 || after.Generation.Media[0].AssetID == 0 || after.Generation.Media[0].Ref == before.Generation.Media[0].Ref {
+	if after.Generation == nil || len(after.Generation.Media) != 1 || after.Generation.Media[0].AssetID == 0 || after.Generation.Media[0].Source != "" {
 		t.Fatalf("prepared generation media=%+v", after.Generation)
+	}
+	if after.Media == nil || len(after.Media.Inputs) != 1 || after.Media.Inputs[0].AssetID != after.Generation.Media[0].AssetID || after.Media.Inputs[0].Source != "" {
+		t.Fatalf("prepared typed media=%+v, generation=%+v", after.Media, after.Generation)
+	}
+	for _, legacyField := range []string{`"url"`, `"ref"`, `"image_urls"`, `"mask_image_url"`, `"mask_image_urls"`, `"original_image_url"`} {
+		if strings.Contains(prepared.Params(), legacyField) {
+			t.Fatalf("prepared params retained legacy media field %s: %s", legacyField, prepared.Params())
+		}
+	}
+}
+
+func TestTaskIntakePrepareMediaFailsClosedWithoutPreparer(t *testing.T) {
+	intake := NewTaskIntake(TaskIntakeDeps{
+		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+			ID: 101, Models: []accounts.AccountModel{{Name: "runtime-model", Enabled: true}},
+		}}},
+		Media: testSubmitMediaValidator{},
+	})
+	canonical, err := intake.Compile(t.Context(), 42, &tasks.SubmitTaskRequest{
+		Prompt: "draw from reference", Feature: workflow.FeatureSlugSketchToImage,
+		ImageURLs: []string{"https://example.com/reference.png"}, ClientActionID: "missing-media-preparer",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := intake.PrepareMedia(t.Context(), 42, canonical); err == nil {
+		t.Fatal("expected media preparation to fail without a preparer")
 	}
 }
 
@@ -327,7 +372,7 @@ func TestTaskIntakeCompilesPromptGenerationPrimitiveAndOrderedReferences(t *test
 		t.Fatalf("image snapshot=%+v", snapshot)
 	}
 	for index, ref := range refs {
-		if snapshot.Media[index].InputIndex != index || snapshot.Media[index].Ref != ref || snapshot.Media[index].Weight != 0 {
+		if snapshot.Media[index].InputIndex != index || snapshot.Media[index].Source != ref || snapshot.Media[index].Weight != 0 {
 			t.Fatalf("ordered media[%d]=%+v", index, snapshot.Media[index])
 		}
 	}

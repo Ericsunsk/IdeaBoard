@@ -25,10 +25,10 @@ const migrationNoTxLockTimeout = "5s"
 const migrationNoTxStatementTimeout = "2h"
 const statementNoTx = "-- statement:no-tx"
 const statementIndexNamePrefix = "-- statement:index-name="
-const baselineMigrationVersion int64 = 20260815040300
+const baselineMigrationVersion int64 = 20260816211500
 const migrationLockNamespace = "ideaboard:migrations:v1"
 
-const baselineMigrationFile = "20260815040300_baseline.sql"
+const baselineMigrationFile = "20260816211500_baseline.sql"
 
 var createTableNamePattern = regexp.MustCompile(`(?im)^\s*CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:[a-zA-Z_][a-zA-Z0-9_$]*\.)?([a-zA-Z_][a-zA-Z0-9_$]*)`)
 

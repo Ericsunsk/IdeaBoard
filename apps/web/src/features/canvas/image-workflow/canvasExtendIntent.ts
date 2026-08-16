@@ -5,17 +5,17 @@ type UseFlowExpandInteractionHandlersOptions = {
   flowExpandNodeId: Ref<string | null>
   clearActiveNodePanel: () => void
   hideStrengthControl: () => void
-  commitFlowExpandMode: (prompt: string, outputCount: number) => Promise<void> | void
+  commitFlowExpandMode: (prompt: string) => Promise<void> | void
   beginFlowExpandHandleResize: (event: PointerEvent, anchor: CanvasExtendDragAnchor) => void
   beginFlowExpandFrameDrag: (event: PointerEvent) => void
 }
 
 export function useFlowExpandInteractionHandlers(options: UseFlowExpandInteractionHandlersOptions) {
-  function onFlowImageExpandSubmit(nodeId: string, prompt: string, outputCount: number) {
+  function onFlowImageExpandSubmit(nodeId: string, prompt: string) {
     if (options.flowExpandNodeId.value !== nodeId) return
     options.clearActiveNodePanel()
     options.hideStrengthControl()
-    void options.commitFlowExpandMode(prompt, outputCount)
+    void options.commitFlowExpandMode(prompt)
   }
 
   function onFlowExpandHandlePointerDown(

@@ -41,7 +41,6 @@
         :expand-overlay-style="expandOverlayStyle"
         :expand-handle-radius="expandHandleRadius"
         :image-tool-stage-binding="imageToolStageBinding"
-        :output-count="node.outputCount"
         :output-resolution="node.outputResolution"
         :active="active"
         :connection-drop-target="connectionDropTarget"
@@ -53,7 +52,6 @@
         @reset="emit('reset')"
         @contextmenu="onImageStageContextMenu"
         @expand-submit="submitExpand"
-        @update:output-count="selectOutputCount"
         @update:output-resolution="emit('update:output-resolution', $event)"
         @expand-handle-pointerdown="emit('expand-handle-pointerdown', $event)"
         @expand-handle-pointermove="emit('expand-handle-pointermove', $event)"
@@ -132,7 +130,7 @@ const emit = defineEmits<{
   (e: 'append-to-canvas'): void
   (e: 'reset'): void
   (e: 'contextmenu', event: MouseEvent): void
-  (e: 'expand-submit', prompt: string, outputCount: number): void
+  (e: 'expand-submit', prompt: string): void
   (
     e: 'action',
     action: ImageNodeAction,
@@ -179,8 +177,8 @@ function submitAction(action: ImageNodeAction, strength?: number) {
   emit('action', action, promptDraft.value.trim(), outputCountValue.value, strength)
 }
 
-function submitExpand(prompt: string, outputCount: number) {
-  emit('expand-submit', prompt, outputCount)
+function submitExpand(prompt: string) {
+  emit('expand-submit', prompt)
 }
 
 function selectOutputCount(value: number) {

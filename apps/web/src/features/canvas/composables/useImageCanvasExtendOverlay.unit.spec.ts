@@ -72,7 +72,7 @@ describe('useImageCanvasExtendOverlay', () => {
       expect(harness.stopCanvasInteraction).toHaveBeenCalledTimes(2)
 
       expect(harness.overlay.enterExpandMode('image-1')).toBe(true)
-      await harness.overlay.commitExpandMode('extend it', 1)
+      await harness.overlay.commitExpandMode('extend it')
 
       expect(harness.overlay.isExpandMode.value).toBe(false)
       expect(harness.stopCanvasInteraction).toHaveBeenCalledTimes(3)
@@ -80,7 +80,6 @@ describe('useImageCanvasExtendOverlay', () => {
         expect.objectContaining({
           nodeId: 'image-1',
           prompt: 'extend it',
-          outputCount: 1,
         }),
       )
     } finally {

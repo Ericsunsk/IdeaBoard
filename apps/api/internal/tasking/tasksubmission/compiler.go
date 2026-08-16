@@ -2,6 +2,7 @@ package tasksubmission
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -16,9 +17,11 @@ import (
 type GenerationCompilerInput struct {
 	Plan                workflow.FeatureExecutionPlan
 	UserPrompt          string
+	SystemPrompt        string
 	CompiledPrompt      string
 	TemplateVersion     string
 	TemplateFingerprint string
+	SeedMaterial        string
 	Params              *tasks.WorkflowTaskParams
 }
 
@@ -45,9 +48,11 @@ func CompileGenerationSnapshot(input GenerationCompilerInput) (tasks.GenerationR
 		Feature:              feature,
 		Primitive:            string(input.Plan.RuntimeInputs().GenerationPrimitive()),
 		UserPrompt:           input.UserPrompt,
+		SystemPrompt:         input.SystemPrompt,
 		CompiledPrompt:       input.CompiledPrompt,
 		TemplateVersion:      strings.TrimSpace(input.TemplateVersion),
 		TemplateFingerprint:  input.TemplateFingerprint,
+		Seed:                 generationSeed(input.SeedMaterial, input.TemplateFingerprint, input.CompiledPrompt),
 		RequestedOutputCount: input.Plan.RequestedOutputCount().Int(),
 	}
 	if input.Params == nil {
@@ -68,11 +73,11 @@ func CompileGenerationSnapshot(input GenerationCompilerInput) (tasks.GenerationR
 		}
 	}
 	appendMedia := func(ref tasks.MediaRef) {
-		if strings.TrimSpace(ref.URL) == "" {
+		if strings.TrimSpace(ref.Source) == "" {
 			return
 		}
 		snapshot.Media = append(snapshot.Media, tasks.GenerationMediaIntent{
-			InputIndex: len(snapshot.Media), Role: ref.Role, Ref: strings.TrimSpace(ref.URL), Weight: ref.Weight,
+			InputIndex: len(snapshot.Media), Role: ref.Role, AssetID: ref.AssetID, Weight: ref.Weight, Source: strings.TrimSpace(ref.Source),
 		})
 	}
 	if media := input.Params.Media; media != nil {
@@ -92,7 +97,10 @@ func CompileGenerationSnapshot(input GenerationCompilerInput) (tasks.GenerationR
 	imageInputCount := 0
 	hasMaskInput := false
 	for _, media := range snapshot.Media {
-		if media.Role == "mask" {
+		if !tasks.IsGenerationMediaRole(media.Role) {
+			return tasks.GenerationRequestSnapshot{}, fmt.Errorf("generation compiler media role is invalid")
+		}
+		if media.Role == tasks.MediaRoleMask {
 			hasMaskInput = true
 			continue
 		}
@@ -103,6 +111,11 @@ func CompileGenerationSnapshot(input GenerationCompilerInput) (tasks.GenerationR
 		return tasks.GenerationRequestSnapshot{}, fmt.Errorf("generation compiler media facts do not match execution plan")
 	}
 	return snapshot, nil
+}
+
+func generationSeed(parts ...string) uint64 {
+	sum := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
+	return binary.BigEndian.Uint64(sum[:8])
 }
 
 // TemplateFingerprint is a stable content-addressed version for the current

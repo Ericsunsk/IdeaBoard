@@ -11,43 +11,43 @@ func TestCompileGenerationSnapshotFreezesIntentAndMediaOrder(t *testing.T) {
 	upsampling := true
 	params := &tasks.WorkflowTaskParams{
 		Feature:  "local-inpaint",
-		Controls: &tasks.GenerationControls{OutputCount: 3, PromptUpsampling: &upsampling},
+		Controls: &tasks.GenerationControls{OutputCount: 1, PromptUpsampling: &upsampling},
 		Media: &tasks.MediaInputs{
-			Inputs:     []tasks.MediaRef{{URL: " upload-a ", Role: "input"}},
-			References: []tasks.MediaRef{{URL: "reference-b", Role: "reference", Weight: 0.4}},
-			Mask:       &tasks.MediaRef{URL: "mask-c", Role: "mask"},
+			Original: &tasks.MediaRef{Source: " upload-a ", Role: "original"},
+			Mask:     &tasks.MediaRef{Source: "mask-b", Role: "mask"},
 		},
 	}
-	count := 3
 	plan, err := workflow.CompileFeatureExecutionPlan(workflow.CompileFeatureExecutionInput{
 		Feature: workflow.FeatureSlugLocalInpaint,
 		Params: workflow.FeatureExecutionParams{
-			RequestedOutputCount: &count,
-			ImageInputCount:      2,
-			HasMaskInput:         true,
+			ImageInputCount: 1,
+			HasMaskInput:    true,
 		},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	snapshot, err := CompileGenerationSnapshot(GenerationCompilerInput{
-		Plan:            plan,
-		UserPrompt:      "edit this",
-		CompiledPrompt:  "SYS edit this",
-		TemplateVersion: "v7",
-		Params:          params,
+		Plan:                plan,
+		UserPrompt:          "edit this",
+		SystemPrompt:        "SYS",
+		CompiledPrompt:      "SYS edit this",
+		TemplateVersion:     "v7",
+		TemplateFingerprint: "fingerprint-v7",
+		SeedMaterial:        "action-123",
+		Params:              params,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.Primitive != "image-to-image" || snapshot.RequestedOutputCount != 3 {
+	if snapshot.Primitive != "image-to-image" || snapshot.RequestedOutputCount != 1 || snapshot.SystemPrompt != "SYS" || snapshot.Seed == 0 {
 		t.Fatalf("snapshot semantics = %+v", snapshot)
 	}
-	if len(snapshot.Media) != 3 || snapshot.Media[0].InputIndex != 0 || snapshot.Media[0].Ref != "upload-a" || snapshot.Media[2].Role != "mask" {
+	if len(snapshot.Media) != 2 || snapshot.Media[0].InputIndex != 0 || snapshot.Media[0].Source != "upload-a" || snapshot.Media[1].Role != "mask" {
 		t.Fatalf("snapshot media = %+v", snapshot.Media)
 	}
-	params.Controls.OutputCount = 1
-	if snapshot.Controls == nil || snapshot.Controls.OutputCount != 3 {
+	params.Controls.OutputCount = 4
+	if snapshot.Controls == nil || snapshot.Controls.OutputCount != 1 {
 		t.Fatalf("controls were not frozen: %+v", snapshot.Controls)
 	}
 }

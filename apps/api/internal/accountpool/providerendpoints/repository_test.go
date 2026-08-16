@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"testing"
 
 	"ideaboard/api/internal/platform/secrets"
@@ -91,43 +92,54 @@ func TestCreateProviderEndpointReturnsNameConflict(t *testing.T) {
 }
 
 func TestCreateImageEndpointStoresManagedAPIKeyInSameTransaction(t *testing.T) {
-	secretstest.EnableEncryption(t)
-	ctx := context.Background()
-	db := newProviderEndpointRepositoryTestDB(t)
-	repo := NewProviderEndpointRepository(db)
-	endpoint := &ProviderEndpoint{
-		APIType:      "openai-compatible",
-		Protocol:     ProtocolImageURLJSONImage,
-		Capabilities: []string{CapabilityBackgroundRemoval},
-		Name:         "Modal Image Processing",
-		BaseURL:      "https://example.com/modal-image-processing",
-		APIKey:       "modal-secret",
-		Status:       1,
-	}
+	for _, test := range []struct {
+		name       string
+		protocol   string
+		capability string
+	}{
+		{name: "single image transform", protocol: ProtocolImageURLJSONImage, capability: CapabilityBackgroundRemoval},
+		{name: "flux fill", protocol: ProtocolFluxFillJSONImage, capability: CapabilityImageFill},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			secretstest.EnableEncryption(t)
+			ctx := context.Background()
+			db := newProviderEndpointRepositoryTestDB(t)
+			repo := NewProviderEndpointRepository(db)
+			endpoint := &ProviderEndpoint{
+				APIType:      "openai-compatible",
+				Protocol:     test.protocol,
+				Capabilities: []string{test.capability},
+				Name:         "Modal " + test.name,
+				BaseURL:      "https://example.com/modal-" + strings.ReplaceAll(test.name, " ", "-"),
+				APIKey:       "modal-secret",
+				Status:       1,
+			}
 
-	if err := repo.Create(ctx, endpoint); err != nil {
-		t.Fatalf("create image endpoint failed: %v", err)
-	}
-	if !endpoint.APIKeyConfigured {
-		t.Fatal("created image endpoint should report configured API key")
-	}
-	var capabilityCount int
-	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM provider_endpoint_capabilities WHERE provider_endpoint_id = $1`, endpoint.ID).Scan(&capabilityCount); err != nil {
-		t.Fatalf("count derived capabilities: %v", err)
-	}
-	if capabilityCount != 1 {
-		t.Fatalf("derived capability count = %d, want 1", capabilityCount)
-	}
-	var accountID int64
-	if err := db.QueryRowContext(ctx, `SELECT id FROM api_accounts WHERE provider_endpoint_id = $1`, endpoint.ID).Scan(&accountID); err != nil {
-		t.Fatalf("load managed account: %v", err)
-	}
-	var materialKind, payload string
-	if err := db.QueryRowContext(ctx, `SELECT secret_material_kind, secret_payload FROM api_account_secrets WHERE account_id = $1 AND status = 'active'`, accountID).Scan(&materialKind, &payload); err != nil {
-		t.Fatalf("load managed secret: %v", err)
-	}
-	if materialKind != secrets.MaterialKindEncrypted || payload == "modal-secret" {
-		t.Fatalf("managed secret storage = (%q, %q)", materialKind, payload)
+			if err := repo.Create(ctx, endpoint); err != nil {
+				t.Fatalf("create image endpoint failed: %v", err)
+			}
+			if !endpoint.APIKeyConfigured {
+				t.Fatal("created image endpoint should report configured API key")
+			}
+			var capabilityCount int
+			if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM provider_endpoint_capabilities WHERE provider_endpoint_id = $1`, endpoint.ID).Scan(&capabilityCount); err != nil {
+				t.Fatalf("count derived capabilities: %v", err)
+			}
+			if capabilityCount != 1 {
+				t.Fatalf("derived capability count = %d, want 1", capabilityCount)
+			}
+			var accountID int64
+			if err := db.QueryRowContext(ctx, `SELECT id FROM api_accounts WHERE provider_endpoint_id = $1`, endpoint.ID).Scan(&accountID); err != nil {
+				t.Fatalf("load managed account: %v", err)
+			}
+			var materialKind, payload string
+			if err := db.QueryRowContext(ctx, `SELECT secret_material_kind, secret_payload FROM api_account_secrets WHERE account_id = $1 AND status = 'active'`, accountID).Scan(&materialKind, &payload); err != nil {
+				t.Fatalf("load managed secret: %v", err)
+			}
+			if materialKind != secrets.MaterialKindEncrypted || payload == "modal-secret" {
+				t.Fatalf("managed secret storage = (%q, %q)", materialKind, payload)
+			}
+		})
 	}
 }
 

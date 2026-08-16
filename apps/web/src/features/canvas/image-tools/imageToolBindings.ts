@@ -12,11 +12,7 @@ import type {
 } from '../image-editor/types'
 import type { ImageAdjustmentFinalApplyProgress } from '../image-editor/runtime/imageAdjustmentFinalApplyContext'
 import type { ImageEditorRasterToolSettings } from '../image-editor/utils/imageEditorRasterTools'
-import type {
-  ImageMaskBrushShape,
-  ImageMaskDrawMode,
-  MaskEditorReferenceImage,
-} from '../mask-editor/types'
+import type { ImageMaskBrushShape, ImageMaskDrawMode } from '../mask-editor/types'
 import type { ImageStrengthAction } from '../execution'
 import type { ImageToolSession } from './imageToolSession'
 
@@ -74,8 +70,6 @@ export type ImageToolChromeModel = {
     brushSize: number
     brushHardness: number
     layerOpacity: number
-    outputCount: number
-    referenceImages: MaskEditorReferenceImage[]
     directGenerating: boolean
     canUndo: boolean
     canRedo: boolean
@@ -106,11 +100,7 @@ export type ImageToolChromeCommands = {
   featherMask: (strength?: number) => void
   undoMask: () => void
   redoMask: () => void
-  updateMaskOutputCount: (count: number) => void
-  openMaskReferenceImageInput: () => void
-  removeMaskReferenceImage: (imageId: string) => void
-  previewMaskReferenceImage: (image: MaskEditorReferenceImage) => void
-  submitMaskPrompt: (prompt: string, outputCount: number) => void
+  submitMaskPrompt: (prompt: string) => void
   selectEditorTool: (tool: ImageEditorTool) => void
   selectAdjustmentLayer: (kind: ImageAdjustmentKind) => void
   selectEditorLayer: (layerId: string) => void
@@ -160,9 +150,6 @@ export type CanvasImageTools = {
       onCanvasWheel: (event: WheelEvent) => void
       focusAndShowChrome: (nodeId: string) => void | Promise<void>
       scheduleChromeAnchorUpdate: () => void
-    }
-    prompt: {
-      runPromptAction: (nodeId: string, prompt: string, outputCount: number) => Promise<void> | void
     }
     chrome: ImageToolChromeCommands
   }

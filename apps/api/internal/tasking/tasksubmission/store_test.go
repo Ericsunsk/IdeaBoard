@@ -42,6 +42,34 @@ func TestStoreSubmitTaskRollsBackTaskWhenRiverInsertFails(t *testing.T) {
 	}
 }
 
+func TestStoreRejectsUnpreparedGenerationMediaBeforeTaskInsert(t *testing.T) {
+	ctx := t.Context()
+	db, pool := testdb.OpenWithPool(t)
+	canonical, err := NewCanonicalRequest(CanonicalRequestInput{
+		UserID: 42, Prompt: "draw", UserPrompt: "draw", Params: `{"schema_version":3}`,
+		Feature: "test-non-billable", ClientActionID: "unprepared-media",
+		Generation: &tasks.GenerationRequestSnapshot{
+			SchemaVersion: tasks.CurrentParamsSchemaVersion, Feature: "test-non-billable", Primitive: "image-to-image",
+			TemplateFingerprint: "unprepared-media", RequestedOutputCount: 1,
+			Media: []tasks.GenerationMediaIntent{{InputIndex: 0, Role: tasks.MediaRoleInput, Source: "/uploads/source.png"}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := NewStore(pool, taskstore.NewRepository(db), failingRiverTxClient{err: errors.New("River must not be called")}, "drawing_default", 3, nil)
+	if _, err := store.SubmitTask(ctx, canonical); err == nil {
+		t.Fatal("expected unprepared media submission to fail")
+	}
+	var count int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM tasks WHERE user_id = $1`, int64(42)).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatalf("task row count=%d, want 0", count)
+	}
+}
+
 func TestStoreRejectsMissingBillingWithoutPartialFacts(t *testing.T) {
 	ctx := t.Context()
 	db, pool := testdb.OpenWithPool(t)

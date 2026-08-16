@@ -10,7 +10,6 @@ import {
   createAccountCreatePayload,
   createAccountUpdatePayload,
   createProviderEndpointSavePayload,
-  getAdminProviderEndpointProtocolLabel,
   inferProviderEndpointApiTypeFromUrl,
   isModellessProviderEndpoint,
 } from './providerConfigPayload'
@@ -36,13 +35,26 @@ describe('provider config payload mapping', () => {
       api_key: 'modal-secret',
       status: 1,
     })
-  })
 
-  it('maps provider protocol values to Chinese labels', () => {
-    expect(getAdminProviderEndpointProtocolLabel('model-api')).toBe('生图模型 API')
-    expect(getAdminProviderEndpointProtocolLabel('image-url-json-to-image')).toBe('图片处理 API')
-    expect(getAdminProviderEndpointProtocolLabel('custom-protocol')).toBe('custom-protocol')
-    expect(getAdminProviderEndpointProtocolLabel('')).toBe('未配置')
+    expect(
+      createProviderEndpointSavePayload({
+        apiType: 'openai-compatible',
+        protocol: 'flux-fill-json-image',
+        capability: 'image-fill',
+        name: 'Modal Flux Fill',
+        baseUrl: 'https://example.com/flux-fill',
+        apiKey: 'modal-secret',
+        status: 1,
+      }),
+    ).toEqual({
+      api_type: 'openai-compatible',
+      protocol: 'flux-fill-json-image',
+      capability: 'image-fill',
+      name: 'Modal Flux Fill',
+      base_url: 'https://example.com/flux-fill',
+      api_key: 'modal-secret',
+      status: 1,
+    })
   })
 
   it('maps new account form values to the backend create payload defaults', () => {
@@ -186,6 +198,14 @@ describe('provider config payload mapping', () => {
         makeProviderEndpoint({
           protocol: 'image-url-json-to-image',
           capabilities: ['background-removal'],
+        }),
+      ),
+    ).toBe(true)
+    expect(
+      isModellessProviderEndpoint(
+        makeProviderEndpoint({
+          protocol: 'flux-fill-json-image',
+          capabilities: ['image-fill'],
         }),
       ),
     ).toBe(true)

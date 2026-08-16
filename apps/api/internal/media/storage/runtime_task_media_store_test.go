@@ -11,7 +11,75 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/tasking/taskmedia"
+	"ideaboard/api/internal/tasking/tasks"
 )
+
+type fixedAssetLocator map[int64]StoredUploadLocation
+
+func (l fixedAssetLocator) LocateStoredUpload(_ context.Context, lookup StoredUploadLookup) (StoredUploadLocation, bool, error) {
+	location, ok := l[lookup.AssetID]
+	return location, ok, nil
+}
+
+func TestRuntimeTaskMediaStoreResolvesAssetThroughOwningProfileAfterCurrentSwitch(t *testing.T) {
+	service, _ := newStorageServiceTest(t)
+	ctx := t.Context()
+	profile := func(id, domain string) *StorageProfile {
+		return &StorageProfile{
+			ID: id, Name: id, Provider: StorageProviderS3Compatible, Enabled: true,
+			Config: map[string]interface{}{
+				"access_key_id": "ak", storageSecretAccessKeyName: "sk", "bucket_name": "bucket",
+				"endpoint": "s3.example.com", "region_id": "us-east-1", "access_domain": domain,
+			},
+		}
+	}
+	if _, err := service.SaveProfile(ctx, profile("asset-profile", "https://asset-cdn.example.com")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.SaveProfile(ctx, profile("current-profile", "https://current-cdn.example.com")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.ApplyProfile(ctx, "current-profile"); err != nil {
+		t.Fatal(err)
+	}
+	service.assetLocator = fixedAssetLocator{91: {
+		StorageProfileID: "asset-profile",
+		StorageKey:       "uploads/tasks/42/task/input.png",
+	}}
+
+	store := NewRuntimeTaskMediaStore(service)
+	params := &tasks.WorkflowTaskParams{
+		Media: &tasks.MediaInputs{Inputs: []tasks.MediaRef{{
+			AssetID: 91, Role: tasks.MediaRoleInput,
+		}}},
+	}
+	resolved, err := store.ResolveRuntimeMedia(ctx, params)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "https://asset-cdn.example.com/uploads/tasks/42/task/input.png"
+	if resolved.Inputs[0].URL != want {
+		t.Fatalf("resolved media = %#v, want %q", resolved, want)
+	}
+	if strings.Contains(resolved.Inputs[0].URL, "current-cdn") {
+		t.Fatalf("resolver followed current profile: resolved=%q", resolved.Inputs[0].URL)
+	}
+}
+
+func TestRuntimeTaskMediaStoreRejectsLocalAssetWithoutProviderURL(t *testing.T) {
+	service, _ := newStorageServiceTest(t)
+	service.assetLocator = fixedAssetLocator{92: {
+		StorageProfileID: builtinLocalProfileID(),
+		StorageKey:       "uploads/canvas/owner/board/content/input.png",
+	}}
+	store := NewRuntimeTaskMediaStore(service)
+	params := &tasks.WorkflowTaskParams{Media: &tasks.MediaInputs{Inputs: []tasks.MediaRef{{
+		AssetID: 92, Role: tasks.MediaRoleInput,
+	}}}}
+	if _, err := store.ResolveRuntimeMedia(t.Context(), params); err == nil {
+		t.Fatal("expected local asset without a provider URL to be rejected")
+	}
+}
 
 func TestRuntimeTaskMediaStoreMaterializeRemoteResultsStoresOutputs(t *testing.T) {
 	withTempWorkingDir(t)

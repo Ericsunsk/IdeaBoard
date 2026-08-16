@@ -19,6 +19,7 @@
       @select="selectAspectRatio"
     />
     <NodeOutputCountPicker
+      v-if="showOutputCount"
       :model-value="outputCountValue"
       :visible="outputCountPickerVisible"
       :disabled="disabled"
@@ -86,6 +87,7 @@ const props = withDefaults(
     allowEmpty?: boolean
     submitDisabled?: boolean
     showSubmit?: boolean
+    showOutputCount?: boolean
     aspectRatio?: PromptAspectRatio
     showAspectRatio?: boolean
     autofocus?: boolean
@@ -100,6 +102,7 @@ const props = withDefaults(
     outputResolution: undefined,
     rows: 1,
     showAspectRatio: true,
+    showOutputCount: true,
     showSubmit: true,
     submitDisabled: false,
   },

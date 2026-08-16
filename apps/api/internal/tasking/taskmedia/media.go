@@ -21,6 +21,12 @@ type UploadReader interface {
 	ReadUploadObject(ctx context.Context, ref string, maxBytes int64) (*StoredObject, error)
 }
 
+// RuntimeMediaResolver turns durable Asset facts into provider-safe runtime
+// refs without mutating the persisted Task Params shape.
+type RuntimeMediaResolver interface {
+	ResolveRuntimeMedia(context.Context, *tasks.WorkflowTaskParams) (*tasks.RuntimeMediaInputs, error)
+}
+
 type ResultMaterializer interface {
 	MaterializeRemoteResults(ctx context.Context, userID int64, taskID string, sourceURLs []string, opts ResultMaterializeOptions) (MaterializedResults, error)
 	MaterializeBytesResult(ctx context.Context, userID int64, taskID string, filename string, sourceURL string, data []byte, opts ResultMaterializeOptions) (MaterializedResults, error)

@@ -6,10 +6,8 @@ import type { CanvasGraphStore } from '../../graph-runtime'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
 import type { FlowToCanvasBoardSnapshotOptions } from '../../utils/flowSnapshotAdapter'
 import {
-  buildCanvasExtendReadinessRequest,
   buildImageActionReadinessRequest,
   buildImageExecutionTaskRequest,
-  buildLocalInpaintReadinessRequest,
   buildPreparedImageInpaintTaskRequest,
 } from '../commands/flowImageTaskRequests'
 import { prepareFlowLocalInpaintMask } from '../media/flowLocalInpaintMask'
@@ -157,7 +155,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
       taskRequest,
-      readinessRequest: buildCanvasExtendReadinessRequest(),
+      readinessRequest: taskRequest,
       fallbackRatio: plan.targetRatio,
       fallbackErrorMessage: '扩图失败',
     })
@@ -168,8 +166,11 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
   ): Promise<void> {
     const attachment = requireCurrentAttachment()
     const boardId = attachment.boardId
-    const maskImageUrl = await prepareFlowLocalInpaintMask(plan.rawMaskDataUrl, boardId)
-    const taskRequest = buildPreparedImageInpaintTaskRequest({ plan, maskImageUrl })
+    const [maskImageUrl, imageSize] = await Promise.all([
+      prepareFlowLocalInpaintMask(plan.rawMaskDataUrl, boardId),
+      loadImageSizeFromUrl(plan.source.url),
+    ])
+    const taskRequest = buildPreparedImageInpaintTaskRequest({ plan, maskImageUrl, imageSize })
     await workflowRunner.execute({
       source: plan.source,
       sourceNodeId: plan.sourceNodeId,
@@ -177,7 +178,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
       taskRequest,
-      readinessRequest: buildLocalInpaintReadinessRequest(),
+      readinessRequest: taskRequest,
       fallbackRatio: plan.source.ratio,
       fallbackErrorMessage: '局部重绘失败',
     })

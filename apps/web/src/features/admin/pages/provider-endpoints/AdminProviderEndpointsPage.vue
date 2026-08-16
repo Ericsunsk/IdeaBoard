@@ -318,7 +318,7 @@
       </AdminFormField>
 
       <AdminFormField
-        v-if="providerEndpointForm.protocol === 'image-url-json-to-image'"
+        v-if="providerProcessingCapabilityOptions.length"
         v-slot="{ describedbyId, invalid }"
         label="处理功能"
         for="admin-provider-endpoint-capability"
@@ -377,7 +377,7 @@
         />
       </AdminFormField>
       <AdminFormField
-        v-if="providerEndpointForm.protocol === 'image-url-json-to-image'"
+        v-if="providerProcessingCapabilityOptions.length"
         v-slot="{ describedbyId, invalid }"
         label="API Key"
         for="admin-provider-endpoint-api-key"
@@ -653,7 +653,7 @@ const providerProtocolOptions = computed(() =>
 )
 const providerProcessingCapabilityOptions = computed(() => {
   const protocol = providerEndpointEditor.protocolRegistry.value.find(
-    (item) => item.id === 'image-url-json-to-image',
+    (item) => item.id === providerEndpointForm.value.protocol,
   )
   return (protocol?.capabilities ?? []).map((capability) => ({
     label: getAdminProviderEndpointCapabilityLabel(capability),

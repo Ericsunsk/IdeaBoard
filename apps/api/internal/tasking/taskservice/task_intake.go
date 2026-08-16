@@ -105,6 +105,13 @@ func (i *taskIntake) CompileReadiness(ctx context.Context, req *tasks.SubmitTask
 	if err != nil {
 		return TaskReadinessCompilation{}, mapFeatureContractValidationError(err)
 	}
+	typedParams, err := workflowTaskParamsFromMap(params, featureSlug)
+	if err != nil {
+		return TaskReadinessCompilation{}, err
+	}
+	if err := validateImageFillDimensions(featureSlug, typedParams); err != nil {
+		return TaskReadinessCompilation{}, err
+	}
 	if err := i.ensureProviderAvailable(ctx, executionPlan.RoutingRequirement()); err != nil {
 		return TaskReadinessCompilation{}, err
 	}
@@ -191,6 +198,9 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 	if err != nil {
 		return CanonicalTaskRequest{}, err
 	}
+	if err := validateImageFillDimensions(featureSlug, typedParams); err != nil {
+		return CanonicalTaskRequest{}, err
+	}
 	executionPlanJSON, err := workflow.EncodeFeatureExecutionPlan(executionPlan)
 	if err != nil {
 		return CanonicalTaskRequest{}, err
@@ -210,11 +220,13 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 		}
 	}
 	fullPrompt := strings.TrimSpace(req.Prompt)
+	systemPrompt := ""
 	if executionPlan.PromptPolicy() == workflow.PromptPolicyIgnored {
 		// Dedicated image transforms are binary media operations. Their Modal
 		// contracts do not consume user text or a System Prompt.
 		fullPrompt = ""
 	} else {
+		systemPrompt = strings.TrimSpace(prompts.ApplyFeatureSystemPromptWithConfig("", "", featureSlug, params, promptConfig))
 		fullPrompt = strings.TrimSpace(prompts.ApplyFeatureSystemPromptWithConfig(req.Prompt, req.Prompt, featureSlug, params, promptConfig))
 	}
 	if executionPlan.PromptPolicy() == workflow.PromptPolicyRequired && fullPrompt == "" {
@@ -226,8 +238,10 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 	generationSnapshot, err := tasksubmission.CompileGenerationSnapshot(tasksubmission.GenerationCompilerInput{
 		Plan:                executionPlan,
 		UserPrompt:          req.Prompt,
+		SystemPrompt:        systemPrompt,
 		CompiledPrompt:      fullPrompt,
 		TemplateFingerprint: tasksubmission.TemplateFingerprint("", promptConfig.Prompt),
+		SeedMaterial:        clientActionID,
 		Params:              typedParams,
 	})
 	if err != nil {
@@ -259,14 +273,21 @@ func (i *taskIntake) PrepareMedia(ctx context.Context, userID int64, canonical C
 		return CanonicalTaskRequest{}, validation.New("请求用户与任务不匹配")
 	}
 	snapshot := canonical.GenerationSnapshot()
-	if snapshot == nil || len(snapshot.Media) == 0 || i.mediaPreparer == nil {
+	if snapshot == nil || len(snapshot.Media) == 0 {
 		return canonical, nil
+	}
+	if i.mediaPreparer == nil {
+		return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", fmt.Errorf("generation media preparer is unavailable"))
 	}
 	prepared, err := i.mediaPreparer.PrepareGenerationMedia(ctx, userID, canonical.ClientActionID(), snapshot)
 	if err != nil {
 		return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", err)
 	}
-	return canonical.WithGenerationSnapshot(prepared)
+	updated, err := canonical.WithGenerationSnapshot(prepared)
+	if err != nil {
+		return CanonicalTaskRequest{}, newSubmissionError("media_preparation_failed", "参考图片准备失败，请稍后重试", err)
+	}
+	return updated, nil
 }
 
 func (i *taskIntake) validateImageURLs(ctx context.Context, userID int64, imageURLs []string) error {

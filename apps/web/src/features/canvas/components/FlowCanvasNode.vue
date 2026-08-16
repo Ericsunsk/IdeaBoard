@@ -320,12 +320,11 @@ function onNodeMouseDown(event: MouseEvent) {
   emit('node-mousedown', props.nodeId, event)
 }
 
-function onImageCanvasExtendSubmit(prompt: string, outputCount: number) {
+function onImageCanvasExtendSubmit(prompt: string) {
   emit('node-intent', {
     type: 'canvas-extend-submitted',
     nodeId: props.nodeId,
     prompt,
-    outputCount,
   })
 }
 function onFusionParameterChanged<Key extends FlowSnapshotParamPatch['key']>(

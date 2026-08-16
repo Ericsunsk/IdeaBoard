@@ -8,7 +8,7 @@ import (
 )
 
 type ProviderParamsEncoder interface {
-	EncodeTaskParams(params *tasks.WorkflowTaskParams) map[string]interface{}
+	EncodeTaskParams(params *tasks.WorkflowTaskParams, runtimeMedia *tasks.RuntimeMediaInputs) map[string]interface{}
 	EncodePromptParams(params map[string]interface{}) map[string]interface{}
 }
 
@@ -16,8 +16,8 @@ type providerParamsEncoder struct{}
 
 var defaultProviderParamsEncoder ProviderParamsEncoder = providerParamsEncoder{}
 
-func (providerParamsEncoder) EncodeTaskParams(params *tasks.WorkflowTaskParams) map[string]interface{} {
-	return buildProviderTaskParams(params)
+func (providerParamsEncoder) EncodeTaskParams(params *tasks.WorkflowTaskParams, runtimeMedia *tasks.RuntimeMediaInputs) map[string]interface{} {
+	return buildProviderTaskParams(params, runtimeMedia)
 }
 
 func (providerParamsEncoder) EncodePromptParams(params map[string]interface{}) map[string]interface{} {
@@ -26,11 +26,11 @@ func (providerParamsEncoder) EncodePromptParams(params map[string]interface{}) m
 
 // BuildProviderTaskParams adapts the canonical task params contract to the
 // provider request map expected by current integrations.
-func BuildProviderTaskParams(params *tasks.WorkflowTaskParams) map[string]interface{} {
-	return defaultProviderParamsEncoder.EncodeTaskParams(params)
+func BuildProviderTaskParams(params *tasks.WorkflowTaskParams, runtimeMedia *tasks.RuntimeMediaInputs) map[string]interface{} {
+	return defaultProviderParamsEncoder.EncodeTaskParams(params, runtimeMedia)
 }
 
-func buildProviderTaskParams(params *tasks.WorkflowTaskParams) map[string]interface{} {
+func buildProviderTaskParams(params *tasks.WorkflowTaskParams, runtimeMedia *tasks.RuntimeMediaInputs) map[string]interface{} {
 	if params == nil {
 		return nil
 	}
@@ -44,20 +44,20 @@ func buildProviderTaskParams(params *tasks.WorkflowTaskParams) map[string]interf
 	if text := strings.TrimSpace(params.Feature); text != "" {
 		out[paramkeys.Feature] = text
 	}
-	flattenWorkflowMediaInputs(out, params.Media)
+	flattenRuntimeMediaInputs(out, runtimeMedia)
 	flattenWorkflowControls(out, params.Controls)
 	flattenWorkflowFeatureParams(out, params)
 	return out
 }
 
-func flattenWorkflowMediaInputs(out map[string]interface{}, media *tasks.MediaInputs) {
+func flattenRuntimeMediaInputs(out map[string]interface{}, media *tasks.RuntimeMediaInputs) {
 	if media == nil {
 		return
 	}
-	if urls := mediaRefURLs(media.Inputs); len(urls) > 0 {
+	if urls := runtimeMediaRefURLs(media.Inputs); len(urls) > 0 {
 		out[paramkeys.ImageURLs] = urls
 	}
-	if urls := mediaRefURLs(media.References); len(urls) > 0 {
+	if urls := runtimeMediaRefURLs(media.References); len(urls) > 0 {
 		out[paramkeys.ReferenceImageURLs] = urls
 	}
 	if media.Original != nil {
@@ -137,7 +137,7 @@ func flattenWorkflowFeatureParams(out map[string]interface{}, params *tasks.Work
 	}
 }
 
-func mediaRefURLs(refs []tasks.MediaRef) []string {
+func runtimeMediaRefURLs(refs []tasks.RuntimeMediaRef) []string {
 	if len(refs) == 0 {
 		return nil
 	}

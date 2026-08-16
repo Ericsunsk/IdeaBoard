@@ -38,9 +38,6 @@ func TestResolveProviderExecutionUsesAssignmentSnapshotAfterLiveConfigChanges(t 
 	if exec.request.Model != assignment.ResolvedModel {
 		t.Fatalf("provider request model = %q, want frozen assignment model", exec.request.Model)
 	}
-	if exec.finalizationRequirement != providerFinalizationRemoteResult {
-		t.Fatalf("finalization requirement = %d, want remote result", exec.finalizationRequirement)
-	}
 }
 
 func TestResolveProviderExecutionRejectsIncompleteSnapshotBeforeMediaIO(t *testing.T) {
@@ -55,8 +52,8 @@ func TestResolveProviderExecutionRejectsIncompleteSnapshotBeforeMediaIO(t *testi
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
 		Feature:       workflow.FeatureSlugLocalInpaint,
 		Media: &tasks.MediaInputs{
-			Original: &tasks.MediaRef{URL: server.URL + "/original.png", Role: "original"},
-			Mask:     &tasks.MediaRef{URL: server.URL + "/mask.png", Role: "mask"},
+			Original: &tasks.MediaRef{AssetID: 1, Role: "original"},
+			Mask:     &tasks.MediaRef{AssetID: 2, Role: "mask"},
 			UseMask:  &useMask,
 		},
 	})}
@@ -78,7 +75,7 @@ func TestResolveProviderExecutionRejectsIncompleteSnapshotBeforeMediaIO(t *testi
 }
 
 func TestResolveProviderExecutionEnforcesSnapshotModelPolicy(t *testing.T) {
-	executor := &ProviderExecutor{}
+	executor := &ProviderExecutor{mediaResolver: testRuntimeMediaResolver{urls: map[int64]string{1: "https://media.example/input.png", 2: "https://media.example/mask.png"}}}
 	account := &accounts.RuntimeAccountAccess{ID: 17, Name: "account", APIKey: "secret"}
 
 	t.Run("model required", func(t *testing.T) {
@@ -178,7 +175,7 @@ func resolvedExecutionTask(t *testing.T, feature string) *tasks.TaskPayload {
 	params := &tasks.WorkflowTaskParams{SchemaVersion: tasks.CurrentParamsSchemaVersion, Feature: feature}
 	switch feature {
 	case workflow.FeatureSlugRemoveBg, workflow.FeatureSlugHDUpscale:
-		params.Media = &tasks.MediaInputs{Inputs: []tasks.MediaRef{{URL: "https://media.example/input.png", Role: "input"}}}
+		params.Media = &tasks.MediaInputs{Inputs: []tasks.MediaRef{{AssetID: 1, Role: "input"}}}
 	}
 	return &tasks.TaskPayload{
 		TaskID: "resolved-execution-" + feature,

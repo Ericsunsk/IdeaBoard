@@ -153,6 +153,16 @@ func (r *MediaAssetRegistry) LocateStoredUpload(ctx context.Context, lookup stor
 	if r == nil || r.q == nil {
 		return storage.StoredUploadLocation{}, false, fmt.Errorf("media asset registry is unavailable")
 	}
+	if lookup.AssetID > 0 {
+		row, err := r.q.GetReadyMediaAssetStorageLocationByID(ctx, lookup.AssetID)
+		if err == nil {
+			return storage.StoredUploadLocation{StorageProfileID: row.StorageProfileID, StorageKey: row.StorageKey}, true, nil
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return storage.StoredUploadLocation{}, false, fmt.Errorf("locate media asset by ID: %w", err)
+		}
+		return storage.StoredUploadLocation{}, false, nil
+	}
 	if rawURL := strings.TrimSpace(lookup.URL); rawURL != "" {
 		row, err := r.q.FindMediaAssetStorageLocationByURL(ctx, rawURL)
 		if err == nil {

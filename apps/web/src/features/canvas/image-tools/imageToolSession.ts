@@ -17,7 +17,6 @@ import { hasImageEditorRasterEdits } from '../image-editor/utils/imageEditorRast
 import { useImageMaskEditorOverlay } from '../mask-editor/composables/useImageMaskEditorOverlay'
 import { useMaskEditorChromeState } from '../mask-editor/composables/useMaskEditorChromeState'
 import type { ImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
-import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import { isEditableEventTarget } from '../utils/domEventTargets'
 import { createImageToolMaskOverlayState } from './maskOverlayAdapter'
@@ -62,17 +61,11 @@ export type UseCanvasImageToolsOptions = {
   openImageUrlPreview: (url: string, ratio: number) => void | Promise<void>
   clearActiveNodePanel: () => void
   hideStrengthControl: () => void
-  updateOutputCount: (
-    nodeId: string,
-    payload: Extract<FlowSnapshotParamPatch, { key: 'outputCount' }>,
-  ) => void
   runInpaintAction: (
     nodeId: string,
     options: {
       prompt: string
-      outputCount: number
       maskDataUrl: string
-      referenceImageUrls?: string[]
     },
   ) => Promise<void> | void
   isImageActionPanelVisible: (nodeId: string) => boolean
@@ -101,7 +94,6 @@ export type ImageToolSessionCapabilities = {
   ui: {
     clearActiveNodePanel: UseCanvasImageToolsOptions['clearActiveNodePanel']
     hideStrengthControl: UseCanvasImageToolsOptions['hideStrengthControl']
-    updateOutputCount: UseCanvasImageToolsOptions['updateOutputCount']
     isImageActionPanelVisible: UseCanvasImageToolsOptions['isImageActionPanelVisible']
     isImagePromptComposerVisible: UseCanvasImageToolsOptions['isImagePromptComposerVisible']
     strengthControl: UseCanvasImageToolsOptions['strengthControl']
@@ -171,12 +163,6 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
 
   const maskChromeState = useMaskEditorChromeState({
     imageEditorNodeId,
-    getImageNodeSnapshot: options.getImageNodeSnapshot,
-    uploadImageToBoard: options.uploadImageToBoard,
-    onWarning: options.feedback.warning,
-    onReferenceImagePreview: (image) => {
-      void options.openImageUrlPreview(image.url, image.ratio)
-    },
   })
 
   function cancelImageAdjustmentFinalTask(nodeId: string | null = imageEditorNodeId.value) {
@@ -293,7 +279,6 @@ export function createImageToolSession(options: UseCanvasImageToolsOptions) {
       ui: {
         clearActiveNodePanel: options.clearActiveNodePanel,
         hideStrengthControl: options.hideStrengthControl,
-        updateOutputCount: options.updateOutputCount,
         isImageActionPanelVisible: options.isImageActionPanelVisible,
         isImagePromptComposerVisible: options.isImagePromptComposerVisible,
         strengthControl: options.strengthControl,

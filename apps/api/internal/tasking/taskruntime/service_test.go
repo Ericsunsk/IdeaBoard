@@ -21,7 +21,7 @@ type recordingTaskStatusPublisher struct {
 	ch chan events.TaskStatusEvent
 }
 
-const taskRuntimeTestParams = `{"schema_version":2}`
+const taskRuntimeTestParams = `{"schema_version":3}`
 
 func newRecordingTaskStatusPublisher() *recordingTaskStatusPublisher {
 	return &recordingTaskStatusPublisher{ch: make(chan events.TaskStatusEvent, 8)}

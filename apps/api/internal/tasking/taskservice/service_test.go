@@ -64,7 +64,7 @@ func (p *recordingGenerationMediaPreparer) PrepareGenerationMedia(_ context.Cont
 	prepared.Media = append([]tasks.GenerationMediaIntent(nil), snapshot.Media...)
 	for index := range prepared.Media {
 		prepared.Media[index].AssetID = int64(index + 1)
-		prepared.Media[index].Ref = "/uploads/prepared/reference.png"
+		prepared.Media[index].Source = ""
 	}
 	return prepared, nil
 }
@@ -1279,7 +1279,8 @@ func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
 	ctx := context.Background()
 	accountRepo := &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{
 		{
-			ID: 101,
+			ID:           101,
+			Capabilities: []string{"image-fill"},
 			Models: []accounts.AccountModel{{
 				Name:    "gpt-image-1",
 				Enabled: true,
@@ -1302,7 +1303,11 @@ func TestSubmitTaskNormalizesStructuredPromptContractParams(t *testing.T) {
 			"https://example.com/source.png",
 		},
 		Params: map[string]interface{}{
-			"model": "gpt-image-1",
+			"model":                 "gpt-image-1",
+			"original_image_width":  1024,
+			"original_image_height": 768,
+			"custom_width":          1280,
+			"custom_height":         768,
 			"extend": map[string]interface{}{
 				"top_percent":    0,
 				"right_percent":  25,

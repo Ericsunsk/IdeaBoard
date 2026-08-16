@@ -67,7 +67,7 @@ func (r *ProviderEndpointRepository) Create(ctx context.Context, endpoint *Provi
 	}
 	endpoint.Protocol = protocol
 	endpoint.Capabilities = capabilities
-	endpoint.APIKeyConfigured = protocol == ProtocolImageURLJSONImage
+	endpoint.APIKeyConfigured = isManagedImageEndpointProtocol(protocol)
 	return nil
 }
 
@@ -162,7 +162,7 @@ func (r *ProviderEndpointRepository) Update(ctx context.Context, endpoint *Provi
 	}
 	endpoint.Protocol = protocol
 	endpoint.Capabilities = capabilities
-	endpoint.APIKeyConfigured = protocol == ProtocolImageURLJSONImage
+	endpoint.APIKeyConfigured = isManagedImageEndpointProtocol(protocol)
 	return nil
 }
 
@@ -213,14 +213,14 @@ func (r *ProviderEndpointRepository) Delete(ctx context.Context, id int64) error
 }
 
 func validateManagedEndpointAPIKey(protocol, apiKey string) error {
-	if protocol == ProtocolImageURLJSONImage && strings.TrimSpace(apiKey) == "" {
+	if isManagedImageEndpointProtocol(protocol) && strings.TrimSpace(apiKey) == "" {
 		return errors.New("图片处理 API 必须配置 API Key")
 	}
 	return nil
 }
 
 func syncManagedEndpointAccount(ctx context.Context, q *dbsqlc.Queries, endpoint *ProviderEndpoint) error {
-	if endpoint.Protocol != ProtocolImageURLJSONImage {
+	if !isManagedImageEndpointProtocol(endpoint.Protocol) {
 		_, err := q.DeleteManagedProviderEndpointAccounts(ctx, endpoint.ID)
 		return err
 	}
@@ -268,6 +268,15 @@ func syncManagedEndpointAccount(ctx context.Context, q *dbsqlc.Queries, endpoint
 		ExpiresAt:          sql.NullTime{},
 	})
 	return err
+}
+
+func isManagedImageEndpointProtocol(protocol string) bool {
+	switch strings.TrimSpace(protocol) {
+	case ProtocolImageURLJSONImage, ProtocolFluxFillJSONImage:
+		return true
+	default:
+		return false
+	}
 }
 
 func providerEndpointConflictError(err error) error {
