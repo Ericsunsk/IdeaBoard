@@ -17,11 +17,13 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accountpool/accounts"
+	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/workflow"
 )
 
 func TestMaterializeProviderResultImagesUsesResultMaterializer(t *testing.T) {
@@ -96,6 +98,7 @@ func TestCallDrawingAPIStoresParsedOutputEnvelope(t *testing.T) {
 		ID:       7,
 		Name:     "prompt-openai",
 		ApiType:  "openai-compatible",
+		Protocol: providerendpoints.ProtocolModelAPI,
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
@@ -104,7 +107,10 @@ func TestCallDrawingAPIStoresParsedOutputEnvelope(t *testing.T) {
 		TaskID: "task-prompt",
 		UserID: 42,
 		Prompt: "repeatable textile pattern",
-		Params: `{"feature":"prompt-generation"}`,
+		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
+			SchemaVersion: tasks.CurrentParamsSchemaVersion,
+			Feature:       workflow.FeatureSlugPromptGeneration,
+		}),
 	}
 
 	output, err := executor.callDrawingAPIForTest(context.Background(), account, task, "gpt-image-1")
@@ -237,7 +243,14 @@ func TestGoogleGeminiReadsRelativeCanvasUploadFromStorage(t *testing.T) {
 		},
 	})
 	task := &tasks.TaskPayload{TaskID: "task-google-storage-input", Prompt: "prompt", Params: rawParams}
-	providerReq := executor.parseAndNormalizeTaskParams(context.Background(), task).providerRequest(task.Prompt, "gemini-3.1-flash-image")
+	parsedParams, parseErr := executor.parseAndNormalizeTaskParams(context.Background(), task)
+	if parseErr != nil {
+		t.Fatal(parseErr)
+	}
+	providerReq, requestErr := parsedParams.providerRequest(task.Prompt, "gemini-3.1-flash-image")
+	if requestErr != nil {
+		t.Fatal(requestErr)
+	}
 	_, err := executor.callGoogleGeminiGenerateContent(context.Background(), &accounts.ApiAccount{ApiKey: "key"}, server.URL, providerReq, 5*time.Second, readGoogleProviderParams(providerReq))
 	if err != nil {
 		t.Fatalf("callGoogleGeminiGenerateContent returned error: %v", err)
@@ -334,6 +347,7 @@ func TestRedactLogURLDropsUserinfoQueryFragmentAndDataPayload(t *testing.T) {
 }
 
 type captureResultMaterializer struct {
+	remoteCalls      int
 	remoteUserID     int64
 	remoteTaskID     string
 	remoteSourceURLs []string
@@ -352,6 +366,7 @@ type captureResultMaterializer struct {
 }
 
 func (m *captureResultMaterializer) MaterializeRemoteResults(ctx context.Context, userID int64, taskID string, sourceURLs []string, opts taskmedia.ResultMaterializeOptions) (taskmedia.MaterializedResults, error) {
+	m.remoteCalls++
 	m.remoteUserID = userID
 	m.remoteTaskID = taskID
 	m.remoteSourceURLs = append([]string(nil), sourceURLs...)

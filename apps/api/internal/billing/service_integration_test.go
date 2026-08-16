@@ -18,7 +18,7 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	service := NewService(pool)
 	ctx := t.Context()
 
-	if _, err := service.Quote(ctx, "ideaboard:not-found", 1); !errors.Is(err, ErrSKUNotFound) {
+	if _, err := service.QuoteAtResolution(ctx, "ideaboard:not-found", OutputResolution1K, 1); !errors.Is(err, ErrSKUNotFound) {
 		t.Fatalf("Quote() missing SKU error = %v, want ErrSKUNotFound", err)
 	}
 
@@ -27,7 +27,7 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreatePrice(v1) error = %v", err)
 	}
-	quoteV1, err := service.Quote(ctx, "AI-IMAGE:LOCAL-INPAINT", 4)
+	quoteV1, err := service.QuoteAtResolution(ctx, "AI-IMAGE:LOCAL-INPAINT", OutputResolution1K, 4)
 	if err != nil {
 		t.Fatalf("Quote(v1) error = %v", err)
 	}
@@ -41,7 +41,7 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreatePrice(v2) error = %v", err)
 	}
-	quoteV2, err := service.Quote(ctx, "ai-image:local-inpaint", 3)
+	quoteV2, err := service.QuoteAtResolution(ctx, "ai-image:local-inpaint", OutputResolution1K, 3)
 	if err != nil {
 		t.Fatalf("Quote(v2) error = %v", err)
 	}
@@ -58,7 +58,7 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	if _, err := service.SetAvailability(ctx, "ai-image:local-inpaint", false, 10); err != nil {
 		t.Fatalf("SetAvailability() error = %v", err)
 	}
-	if _, err := service.Quote(ctx, "ai-image:local-inpaint", 1); !errors.Is(err, ErrPricingUnavailable) {
+	if _, err := service.QuoteAtResolution(ctx, "ai-image:local-inpaint", OutputResolution1K, 1); !errors.Is(err, ErrPricingUnavailable) {
 		t.Fatalf("Quote() with disabled SKU error = %v", err)
 	}
 
@@ -75,7 +75,7 @@ func TestCatalogPricingAndQuoteLifecycle(t *testing.T) {
 	if _, err := service.PublishPrice(ctx, PublishPriceInput{Definition: removeBgDefinition, UnitCredits: 0, ActorID: 7}); err != nil {
 		t.Fatalf("PublishPrice(free) error = %v", err)
 	}
-	freeQuote, err := service.Quote(ctx, "ai-image:remove-bg", 99)
+	freeQuote, err := service.QuoteAtResolution(ctx, "ai-image:remove-bg", OutputResolutionDefault, 99)
 	if err != nil || freeQuote.UnitCredits != 0 || freeQuote.TotalCredits != 0 {
 		t.Fatalf("Quote(free) = %+v, %v", freeQuote, err)
 	}
@@ -168,7 +168,7 @@ func TestPublishingNewPricePreservesDisabledCatalogState(t *testing.T) {
 	if item.Enabled || item.CurrentPrices[OutputResolution1K].PriceVersionID != price.PriceVersionID || price.Version != 2 {
 		t.Fatalf("disabled repricing item=%+v price=%+v", item, price)
 	}
-	if _, err := service.Quote(t.Context(), string(definition.SKU), 1); !errors.Is(err, ErrPricingUnavailable) {
+	if _, err := service.QuoteAtResolution(t.Context(), string(definition.SKU), OutputResolution1K, 1); !errors.Is(err, ErrPricingUnavailable) {
 		t.Fatalf("disabled feature quote error=%v", err)
 	}
 }
@@ -453,7 +453,7 @@ func TestConcurrentRepricingAndQuotesUseOneVersionSnapshot(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			quote, err := service.Quote(ctx, "test:concurrent", 3)
+			quote, err := service.QuoteAtResolution(ctx, "test:concurrent", OutputResolution1K, 3)
 			if err != nil {
 				errCh <- fmt.Errorf("Quote(): %w", err)
 				return

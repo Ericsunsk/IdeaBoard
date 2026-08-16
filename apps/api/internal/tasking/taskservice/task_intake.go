@@ -126,59 +126,57 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 			return CanonicalTaskRequest{}, err
 		}
 	}
-	dedicatedImageTransform := featureSlug == workflow.FeatureSlugRemoveBg || featureSlug == workflow.FeatureSlugHDUpscale
-	if dedicatedImageTransform {
-		params[paramkeys.OutputCount] = 1
-		params[paramkeys.OutputResolution] = workflow.OutputResolutionDefault
-	} else if rawOutputCount, ok := params[paramkeys.OutputCount]; ok {
-		outputCount, ok := readExactIntParam(rawOutputCount)
-		if !ok {
-			return CanonicalTaskRequest{}, validation.New("output_count 仅支持整数 1-4")
-		}
-		requestedOutputCount, err := workflow.ParseRequestedOutputCount(outputCount)
-		if err != nil {
-			return CanonicalTaskRequest{}, validation.New("output_count 仅支持整数 1-4")
-		}
-		params[paramkeys.OutputCount] = requestedOutputCount.Int()
+	executionParams, err := compileFeatureExecutionParams(params, featureSlug)
+	if err != nil {
+		return CanonicalTaskRequest{}, err
 	}
-	resolution, ok := workflow.NormalizeOutputResolutionForFeature(featureSlug, readStringParam(params, paramkeys.OutputResolution))
-	if !ok {
-		return CanonicalTaskRequest{}, validation.New("该功能的 output_resolution 不受支持")
+	executionPlan, err := workflow.CompileFeatureExecutionPlan(workflow.CompileFeatureExecutionInput{
+		Feature: featureSlug,
+		Params:  executionParams,
+	})
+	if err != nil {
+		return CanonicalTaskRequest{}, mapFeatureContractValidationError(err)
 	}
-	params[paramkeys.OutputResolution] = resolution
+	params[paramkeys.OutputCount] = executionPlan.RequestedOutputCount().Int()
+	params[paramkeys.OutputResolution] = executionPlan.OutputResolution()
 	typedParams, err := workflowTaskParamsFromMap(params, featureSlug)
 	if err != nil {
 		return CanonicalTaskRequest{}, err
 	}
-	if err := i.ensureProviderAvailable(ctx, featureSlug, resolution); err != nil {
+	executionPlanJSON, err := workflow.EncodeFeatureExecutionPlan(executionPlan)
+	if err != nil {
+		return CanonicalTaskRequest{}, err
+	}
+	typedParams.ExecutionPlan = executionPlanJSON
+	if err := i.ensureProviderAvailable(ctx, executionPlan.RoutingRequirement()); err != nil {
 		return CanonicalTaskRequest{}, err
 	}
 
 	promptConfig := prompts.FeaturePromptRuntimeConfig{
 		UserPromptMergePolicy: prompts.DefaultFeaturePromptMergePolicy(featureSlug),
 	}
-	if i.prompts != nil && !dedicatedImageTransform {
+	if i.prompts != nil && executionPlan.PromptPolicy() != workflow.PromptPolicyIgnored {
 		promptConfig, err = i.prompts.GetRuntimeConfig(ctx, featureSlug)
 		if err != nil {
 			return CanonicalTaskRequest{}, newSubmissionError("prompt_unavailable", "系统提示词暂不可用", err)
 		}
 	}
 	fullPrompt := strings.TrimSpace(req.Prompt)
-	if dedicatedImageTransform {
+	if executionPlan.PromptPolicy() == workflow.PromptPolicyIgnored {
 		// Dedicated image transforms are binary media operations. Their Modal
 		// contracts do not consume user text or a System Prompt.
 		fullPrompt = ""
 	} else {
 		fullPrompt = strings.TrimSpace(prompts.ApplyFeatureSystemPromptWithConfig(req.Prompt, req.Prompt, featureSlug, params, promptConfig))
 	}
-	if featureSlug == workflow.FeatureSlugPromptGeneration && fullPrompt == "" {
+	if executionPlan.PromptPolicy() == workflow.PromptPolicyRequired && fullPrompt == "" {
 		return CanonicalTaskRequest{}, validation.New("Prompt Node 需要系统模板或用户描述")
 	}
 	if err := validateSubmitTaskPrompt(fullPrompt, maxSubmitTaskFinalPromptBytes, "最终提示词"); err != nil {
 		return CanonicalTaskRequest{}, err
 	}
 	generationSnapshot, err := tasksubmission.CompileGenerationSnapshot(tasksubmission.GenerationCompilerInput{
-		Feature:             featureSlug,
+		Plan:                executionPlan,
 		UserPrompt:          req.Prompt,
 		CompiledPrompt:      fullPrompt,
 		TemplateFingerprint: tasksubmission.TemplateFingerprint("", promptConfig.Prompt),
@@ -187,7 +185,7 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 	if err != nil {
 		return CanonicalTaskRequest{}, err
 	}
-	billingRequest, err := resolveTaskBillingRequest(featureSlug, resolution, generationSnapshot.RequestedOutputCount)
+	billingRequest, err := resolveTaskBillingRequest(executionPlan)
 	if err != nil {
 		return CanonicalTaskRequest{}, err
 	}
@@ -204,6 +202,7 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 		Params: paramsJSON, ClientActionID: clientActionID, Priority: priority,
 		Generation:     &generationSnapshot,
 		BillingRequest: billingRequest,
+		ExecutionPlan:  &executionPlan,
 	})
 }
 
@@ -241,7 +240,7 @@ func (i *taskIntake) validateMediaRef(ctx context.Context, userID int64, raw str
 	return i.media.ValidateSubmitMediaRef(ctx, userID, raw)
 }
 
-func (i *taskIntake) ensureProviderAvailable(ctx context.Context, featureSlug, resolution string) error {
+func (i *taskIntake) ensureProviderAvailable(ctx context.Context, requirement workflow.RoutingRequirement) error {
 	if i == nil || i.accounts == nil {
 		return newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
 	}
@@ -249,12 +248,9 @@ func (i *taskIntake) ensureProviderAvailable(ctx context.Context, featureSlug, r
 	if err != nil {
 		return newSubmissionError("provider_unavailable", providerUnavailableMessage, err)
 	}
-	if featureSlug == workflow.FeatureSlugRemoveBg {
-		apiAccounts = accounts.FilterAccountsWithCapability(apiAccounts, "background-removal")
-	} else if featureSlug == workflow.FeatureSlugHDUpscale {
-		apiAccounts = accounts.FilterAccountsWithCapability(apiAccounts, "image-upscale")
-	} else {
-		apiAccounts = accounts.FilterAccountsWithOutputResolution(apiAccounts, resolution)
+	apiAccounts = accounts.FilterAccountsWithCapability(apiAccounts, string(requirement.Capability()))
+	if requirement.ModelRequirement() == workflow.RoutingModelRequired {
+		apiAccounts = accounts.FilterAccountsWithOutputResolution(apiAccounts, requirement.OutputResolution())
 	}
 	if len(apiAccounts) == 0 {
 		return newSubmissionError("provider_unavailable", providerUnavailableMessage, errNoAvailableAPIAccount)
@@ -262,27 +258,66 @@ func (i *taskIntake) ensureProviderAvailable(ctx context.Context, featureSlug, r
 	return nil
 }
 
-func readStringParam(params map[string]interface{}, key string) string {
-	raw, ok := params[key]
-	if !ok {
-		return ""
-	}
-	value, ok := raw.(string)
-	if !ok {
-		return "\x00"
-	}
-	return value
-}
-
-func resolveTaskBillingRequest(feature, outputResolution string, quantity int) (*taskbilling.Request, error) {
-	if !taskbilling.RequiresBilling(feature) {
+func resolveTaskBillingRequest(plan workflow.FeatureExecutionPlan) (*taskbilling.Request, error) {
+	if !taskbilling.RequiresBilling(plan.Feature()) {
 		return nil, nil
 	}
-	request, err := taskbilling.AIImageRequest(feature, outputResolution, int64(quantity))
+	request, err := taskbilling.AIImageRequest(
+		plan.Feature(),
+		plan.OutputResolution(),
+		int64(plan.RequestedOutputCount().Int()),
+	)
 	if err != nil {
 		return nil, err
 	}
 	return &request, nil
+}
+
+func compileFeatureExecutionParams(params map[string]interface{}, featureSlug string) (workflow.FeatureExecutionParams, error) {
+	result := workflow.FeatureExecutionParams{}
+	if raw, ok := params[paramkeys.OutputCount]; ok {
+		value, ok := readExactIntParam(raw)
+		if !ok {
+			return result, validation.New("output_count 仅支持整数 1-4")
+		}
+		result.RequestedOutputCount = &value
+	}
+	if raw, ok := params[paramkeys.OutputResolution]; ok {
+		value, ok := raw.(string)
+		if !ok {
+			return result, validation.New("output_resolution 必须是字符串")
+		}
+		result.OutputResolution = &value
+	}
+	media := workflowMediaInputsFromMap(params, featureSlug)
+	if media == nil {
+		return result, nil
+	}
+	result.ImageInputCount = len(media.Inputs) + len(media.References)
+	if media.Original != nil {
+		result.ImageInputCount++
+	}
+	result.HasMaskInput = media.Mask != nil
+	return result, nil
+}
+
+func mapFeatureContractValidationError(err error) error {
+	var contractErr *workflow.FeatureContractValidationError
+	if !errors.As(err, &contractErr) {
+		return err
+	}
+	switch contractErr.Code {
+	case workflow.FeatureContractUnknownFeature:
+		return validation.New("feature 不受支持")
+	case workflow.FeatureContractInvalidOutputCount:
+		return validation.New("output_count 不符合功能要求")
+	case workflow.FeatureContractUnsupportedResolution:
+		return validation.New("该功能的 output_resolution 不受支持")
+	case workflow.FeatureContractInvalidRuntimeInput:
+		return validation.New("该功能的图片输入不符合要求")
+	default:
+		return validation.New("功能执行参数无效")
+	}
 }
 
 func normalizeSubmitTaskClientActionID(raw string) (string, error) {

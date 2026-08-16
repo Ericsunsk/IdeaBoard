@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accountpool/accounts"
-	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/tasking/taskmedia"
@@ -62,30 +61,28 @@ type finalFailureRetryOutput struct {
 
 type WorkerAccountStore interface {
 	taskruntime.AccountStore
-	GetRuntimeAccountForAssignment(ctx context.Context, accountID int64, providerEndpointID int64, credentialID int64) (*accounts.ApiAccount, error)
+	GetRuntimeAccountForAssignment(ctx context.Context, accountID int64, providerEndpointID int64, credentialID int64) (*accounts.RuntimeAccountAccess, error)
 }
 
 type RiverTaskWorkerDeps struct {
-	AccountRepo          WorkerAccountStore
-	ProviderEndpointRepo *providerendpoints.ProviderEndpointRepository
-	TaskRepo             taskruntime.TaskStore
-	Enqueuer             taskqueue.TaskEnqueuer
-	Assigner             taskqueue.TaskAssigner
-	CancelStore          taskqueue.TaskCancellationStore
-	MediaReader          taskmedia.UploadReader
-	ResultMaterializer   taskmedia.ResultMaterializer
-	TaskEvents           events.TaskStatusPublisher
-	PublicOrigins        config.PublicOriginsConfig
+	AccountRepo        WorkerAccountStore
+	TaskRepo           taskruntime.TaskStore
+	Enqueuer           taskqueue.TaskEnqueuer
+	Assigner           taskqueue.TaskAssigner
+	CancelStore        taskqueue.TaskCancellationStore
+	MediaReader        taskmedia.UploadReader
+	ResultMaterializer taskmedia.ResultMaterializer
+	TaskEvents         events.TaskStatusPublisher
+	PublicOrigins      config.PublicOriginsConfig
 }
 
 func NewRiverTaskWorker(
 	deps RiverTaskWorkerDeps,
 ) *RiverTaskWorker {
 	executor := &ProviderExecutor{
-		providerEndpointRepo: deps.ProviderEndpointRepo,
-		mediaReader:          deps.MediaReader,
-		resultMaterializer:   deps.ResultMaterializer,
-		publicOrigins:        deps.PublicOrigins,
+		mediaReader:        deps.MediaReader,
+		resultMaterializer: deps.ResultMaterializer,
+		publicOrigins:      deps.PublicOrigins,
 	}
 	taskRuntime := taskruntime.NewService(deps.AccountRepo, deps.TaskRepo, deps.Assigner, deps.CancelStore)
 	taskRuntime.SetTaskStatusPublisher(deps.TaskEvents)

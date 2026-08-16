@@ -2709,10 +2709,10 @@ components:
     BillingQuoteRequest:
       type: object
       additionalProperties: false
-      required: [sku, quantity]
+      required: [sku, output_resolution, quantity]
       properties:
         sku: { $ref: '#/components/schemas/BillingSKUCode' }
-        output_resolution: { type: string, enum: [default, 1k, 2k, 4k], default: 1k }
+        output_resolution: { type: string, enum: [default, 1k, 2k, 4k] }
         quantity: { type: integer, format: int64, minimum: 1 }
 
     BillingQuote:

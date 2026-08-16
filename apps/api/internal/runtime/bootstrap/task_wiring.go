@@ -96,16 +96,15 @@ func newAppTaskRuntime(
 		TaskEvents: taskEvents,
 	})
 	riverTaskWorker := worker.NewRiverTaskWorker(worker.RiverTaskWorkerDeps{
-		AccountRepo:          repos.accountRepo,
-		ProviderEndpointRepo: repos.providerEndpointRepo,
-		TaskRepo:             repos.taskRepo,
-		Enqueuer:             riverQueue,
-		Assigner:             postgresAssigner,
-		CancelStore:          postgresRuntimeStore,
-		MediaReader:          runtimeTaskMediaStore,
-		ResultMaterializer:   runtimeTaskMediaStore,
-		TaskEvents:           taskEvents,
-		PublicOrigins:        cfg.PublicOrigins,
+		AccountRepo:        repos.accountRepo,
+		TaskRepo:           repos.taskRepo,
+		Enqueuer:           riverQueue,
+		Assigner:           postgresAssigner,
+		CancelStore:        postgresRuntimeStore,
+		MediaReader:        runtimeTaskMediaStore,
+		ResultMaterializer: runtimeTaskMediaStore,
+		TaskEvents:         taskEvents,
+		PublicOrigins:      cfg.PublicOrigins,
 	})
 	creditPeriodicJobs := worker.CreditReconciliationPeriodicJobs()
 	reclamationPeriodicJobs := reclamation.PeriodicJobs()

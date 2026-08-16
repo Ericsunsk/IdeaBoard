@@ -111,15 +111,35 @@ func TestQuoteHandlerReturnsServerSnapshot(t *testing.T) {
 	router.POST("/quote", handler.Quote)
 
 	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/quote", strings.NewReader(`{"sku":"IDEABOARD:IMAGE.GENERATE","quantity":4}`))
+	request := httptest.NewRequest(http.MethodPost, "/quote", strings.NewReader(`{"sku":"IDEABOARD:IMAGE.GENERATE","output_resolution":"1k","quantity":4}`))
 	request.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(response, request)
 
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"display_name":"AI 生图"`) || !strings.Contains(response.Body.String(), `"total_credits":100`) || !strings.Contains(response.Body.String(), `"price_version_id":3`) {
 		t.Fatalf("status = %d body=%s", response.Code, response.Body.String())
 	}
-	if service.quoteInput.sku != "IDEABOARD:IMAGE.GENERATE" || service.quoteInput.quantity != 4 {
+	if service.quoteInput.sku != "IDEABOARD:IMAGE.GENERATE" || service.quoteInput.resolution != OutputResolution1K || service.quoteInput.quantity != 4 {
 		t.Fatalf("Quote input = %+v", service.quoteInput)
+	}
+}
+
+func TestQuoteHandlerRequiresExplicitOutputResolution(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	service := &handlerServiceStub{}
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		testsupport.SetPrincipal(t, c, 42, principal.RoleUser)
+		c.Next()
+	})
+	router.POST("/quote", NewHandler(service, nil).Quote)
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/quote", strings.NewReader(`{"sku":"ideaboard:image.generate","quantity":1}`))
+	request.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest || service.quoteInput.sku != "" {
+		t.Fatalf("status=%d quote=%+v body=%s", response.Code, service.quoteInput, response.Body.String())
 	}
 }
 

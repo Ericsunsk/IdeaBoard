@@ -9,7 +9,7 @@ import type { BillingSKUCode } from './billingSKUCode'
 
 export interface BillingQuoteRequest {
   sku: BillingSKUCode
-  output_resolution?: BillingQuoteRequestOutputResolution
+  output_resolution: BillingQuoteRequestOutputResolution
   /** @minimum 1 */
   quantity: number
 }

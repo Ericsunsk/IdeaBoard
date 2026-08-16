@@ -21,13 +21,14 @@ func chooseTaskRoutingTx(
 	taskID string,
 	current taskAssignmentTaskState,
 	now time.Time,
-	featureSlug string,
-	outputResolution string,
+	routing workflow.RoutingRequirement,
 ) (taskAssignmentSelectedAccount, bool, error) {
 	currentPriority := taskAssignmentEffectivePriority(current.Priority, current.CreatedAt, now)
 	ageBoostCutoff := now.Add(-taskAssignmentAgeBoostAfter)
 
-	capability := routingCapabilityForFeature(featureSlug)
+	capability := routing.Capability()
+	modelRequired := routing.ModelRequirement() == workflow.RoutingModelRequired
+	outputResolution := routing.OutputResolution()
 	var selected taskAssignmentSelectedAccount
 	var shouldDefer bool
 	err := tx.QueryRowContext(ctx, `
@@ -84,7 +85,7 @@ modeless_routing_candidates AS (
     0::int AS model_sort_order,
     0::bigint AS model_id
   FROM locked_accounts a
-  WHERE $9 IN ('background-removal', 'image-upscale')
+  WHERE $10 = FALSE
 ),
 model_routing_candidates AS (
   SELECT
@@ -108,9 +109,12 @@ model_routing_candidates AS (
   LEFT JOIN provider_endpoint_models AS pem
     ON pem.provider_endpoint_id = a.provider_endpoint_id
    AND lower(pem.model_name) = lower(m.model_name)
-  WHERE $10 = '1k'
-     OR ($10 = '2k' AND pem.supports_2k = TRUE)
-     OR ($10 = '4k' AND pem.supports_4k = TRUE)
+  WHERE $10 = TRUE
+    AND (
+	  $11 IN ('default', '1k')
+      OR ($11 = '2k' AND pem.supports_2k = TRUE)
+      OR ($11 = '4k' AND pem.supports_4k = TRUE)
+    )
 ),
 routing_candidates AS (
   SELECT * FROM modeless_routing_candidates
@@ -248,7 +252,8 @@ CROSS JOIN active_share share`,
 		current.CreatedAt,
 		tasks.StatusPending,
 		accountlimits.MaxMaxConcurrent,
-		capability,
+		string(capability),
+		modelRequired,
 		outputResolution,
 	).Scan(
 		&selected.AccountID,
@@ -267,17 +272,6 @@ CROSS JOIN active_share share`,
 		return taskAssignmentSelectedAccount{}, false, err
 	}
 	return selected, shouldDefer, nil
-}
-
-func routingCapabilityForFeature(featureSlug string) string {
-	switch featureSlug {
-	case workflow.FeatureSlugRemoveBg:
-		return "background-removal"
-	case workflow.FeatureSlugHDUpscale:
-		return "image-upscale"
-	default:
-		return "image-generation"
-	}
 }
 
 func taskAssignmentEffectivePriority(priority int, createdAt time.Time, now time.Time) int {

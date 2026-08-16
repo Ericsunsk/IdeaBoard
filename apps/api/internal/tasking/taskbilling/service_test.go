@@ -10,49 +10,41 @@ import (
 	"ideaboard/api/internal/workflow"
 )
 
-func TestAIImageWorkflowSKUContract(t *testing.T) {
-	expected := map[string]string{
-		workflow.FeatureSlugPromptGeneration: "ai-image:prompt-generation",
-		workflow.FeatureSlugLocalInpaint:     "ai-image:local-inpaint",
-		workflow.FeatureSlugSketchToImage:    "ai-image:sketch-to-image",
-		workflow.FeatureSlugStyleVariation:   "ai-image:style-variation",
-		workflow.FeatureSlugRemoveBg:         "ai-image:remove-bg",
-		workflow.FeatureSlugStyleFusion:      "ai-image:style-fusion",
-		workflow.FeatureSlugHDUpscale:        "ai-image:hd-upscale",
-		workflow.FeatureSlugImageExtend:      "ai-image:image-extend",
+func TestAIImageWorkflowBillingConsumesCompiledPlan(t *testing.T) {
+	plan, err := workflow.CompileFeatureExecutionPlan(workflow.CompileFeatureExecutionInput{
+		Feature: workflow.FeatureSlugRemoveBg,
+		Params:  workflow.FeatureExecutionParams{ImageInputCount: 1},
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	for _, feature := range workflow.AIImageFeatureSlugs() {
-		t.Run(feature, func(t *testing.T) {
-			resolution := "1k"
-			if feature == workflow.FeatureSlugRemoveBg {
-				resolution = "default"
-			}
-			request, err := AIImageRequest(feature, resolution, 1)
-			if err != nil {
-				t.Fatal(err)
-			}
-			sku, err := ResolveSKU(request)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if string(sku) != expected[feature] {
-				t.Fatalf("sku=%q, want %q", sku, expected[feature])
-			}
-			if !RequiresBilling(feature) {
-				t.Fatalf("feature %q must require billing facts", feature)
-			}
-		})
+	request, err := AIImageRequest(
+		plan.Feature(),
+		plan.OutputResolution(),
+		int64(plan.RequestedOutputCount().Int()),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sku, err := ResolveSKU(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(sku) != "ai-image:remove-bg" || !RequiresBilling(plan.Feature()) {
+		t.Fatalf("compiled plan billing identity: sku=%q request=%+v", sku, request)
 	}
 }
 
-func TestAIImageRequestRemoveBgUsesOnlyDefaultPricingVariant(t *testing.T) {
-	request, err := AIImageRequest(workflow.FeatureSlugRemoveBg, "", 1)
+func TestAIImageRequestConsumesExplicitCompiledResolution(t *testing.T) {
+	request, err := AIImageRequest(workflow.FeatureSlugRemoveBg, "default", 5)
 	if err != nil || request.OutputResolution != billing.OutputResolutionDefault {
-		t.Fatalf("empty resolution request=%+v err=%v", request, err)
+		t.Fatalf("default resolution request=%+v err=%v", request, err)
 	}
-	if _, err := AIImageRequest(workflow.FeatureSlugRemoveBg, "1k", 1); !errors.Is(err, billing.ErrInvalidOutputResolution) {
-		t.Fatalf("1k remove-bg resolution error=%v", err)
+	if request.Quantity != 5 {
+		t.Fatalf("billing quantity=%d, want explicit quantity 5", request.Quantity)
+	}
+	if _, err := AIImageRequest(workflow.FeatureSlugRemoveBg, "", 1); !errors.Is(err, billing.ErrInvalidOutputResolution) {
+		t.Fatalf("empty resolution error=%v", err)
 	}
 }
 

@@ -534,7 +534,7 @@ func TestUpsertDailyStatByTaskUsesRequestedOutputCount(t *testing.T) {
 	task := &tasks.Task{
 		TaskID:      "multi-output-stat",
 		UserID:      19,
-		Params:      `{"generation":{"requested_output_count":2}}`,
+		Params:      `{"schema_version":2,"generation":{"requested_output_count":2}}`,
 		Status:      tasks.StatusCompleted,
 		CreatedAt:   createdAt,
 		CompletedAt: &completedAt,
@@ -561,7 +561,7 @@ func TestTaskStatEventUsesFrozenRequestedOutputCount(t *testing.T) {
 	event, ok, err := taskStatEventFromTask(&tasks.Task{
 		TaskID:      "multi-output-event",
 		UserID:      20,
-		Params:      `{"generation":{"requested_output_count":3}}`,
+		Params:      `{"schema_version":2,"generation":{"requested_output_count":3}}`,
 		Status:      tasks.StatusCompleted,
 		CompletedAt: &completedAt,
 	}, nil)

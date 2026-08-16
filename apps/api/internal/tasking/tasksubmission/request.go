@@ -1,6 +1,7 @@
 package tasksubmission
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -23,6 +24,7 @@ type CanonicalRequestInput struct {
 	Priority       int
 	BillingRequest *taskbilling.Request
 	Generation     *tasks.GenerationRequestSnapshot
+	ExecutionPlan  *workflow.FeatureExecutionPlan
 }
 
 // CanonicalRequest is immutable after construction. Only this package can
@@ -37,6 +39,7 @@ type CanonicalRequest struct {
 	priority       int
 	billingRequest *taskbilling.Request
 	generation     *tasks.GenerationRequestSnapshot
+	executionPlan  *workflow.FeatureExecutionPlan
 }
 
 func NewCanonicalRequest(input CanonicalRequestInput) (CanonicalRequest, error) {
@@ -50,6 +53,35 @@ func NewCanonicalRequest(input CanonicalRequestInput) (CanonicalRequest, error) 
 	priority := tasks.EffectiveTaskPriority(input.Priority)
 	if !tasks.IsValidTaskPriority(priority) {
 		return CanonicalRequest{}, fmt.Errorf("canonical submission priority is invalid")
+	}
+	var executionPlan *workflow.FeatureExecutionPlan
+	if workflow.IsAIImageFeature(feature) {
+		if input.ExecutionPlan == nil {
+			return CanonicalRequest{}, fmt.Errorf("canonical AI image submission requires execution plan")
+		}
+		encodedPlan, err := workflow.EncodeFeatureExecutionPlan(*input.ExecutionPlan)
+		if err != nil {
+			return CanonicalRequest{}, fmt.Errorf("canonical submission execution plan: %w", err)
+		}
+		if input.ExecutionPlan.Feature() != feature {
+			return CanonicalRequest{}, fmt.Errorf("canonical submission execution plan does not match feature")
+		}
+		typedParams, err := tasks.UnmarshalParams(input.Params)
+		if err != nil {
+			return CanonicalRequest{}, fmt.Errorf("canonical submission params: %w", err)
+		}
+		persistedPlan, err := workflow.DecodeFeatureExecutionPlan(typedParams.ExecutionPlan)
+		if err != nil {
+			return CanonicalRequest{}, fmt.Errorf("canonical submission persisted execution plan: %w", err)
+		}
+		persistedPlanJSON, err := workflow.EncodeFeatureExecutionPlan(persistedPlan)
+		if err != nil || !bytes.Equal(encodedPlan, persistedPlanJSON) {
+			return CanonicalRequest{}, fmt.Errorf("canonical submission persisted execution plan does not match compiled plan")
+		}
+		planCopy := *input.ExecutionPlan
+		executionPlan = &planCopy
+	} else if input.ExecutionPlan != nil {
+		return CanonicalRequest{}, fmt.Errorf("canonical non-image submission must not carry execution plan")
 	}
 	var billingRequest *taskbilling.Request
 	if taskbilling.RequiresBilling(feature) && input.BillingRequest == nil {
@@ -66,6 +98,9 @@ func NewCanonicalRequest(input CanonicalRequestInput) (CanonicalRequest, error) 
 		if strings.TrimSpace(input.ClientActionID) == "" {
 			return CanonicalRequest{}, fmt.Errorf("canonical billed submission requires client action id")
 		}
+		if executionPlan != nil && (string(request.OutputResolution) != executionPlan.OutputResolution() || request.Quantity != int64(executionPlan.RequestedOutputCount().Int())) {
+			return CanonicalRequest{}, fmt.Errorf("canonical submission billing request does not match execution plan")
+		}
 		billingRequest = &request
 	}
 	var generation *tasks.GenerationRequestSnapshot
@@ -75,6 +110,11 @@ func NewCanonicalRequest(input CanonicalRequestInput) (CanonicalRequest, error) 
 			return CanonicalRequest{}, err
 		}
 		generation = &copySnapshot
+		if executionPlan != nil {
+			if err := validateGenerationSnapshotAgainstPlan(copySnapshot, *executionPlan); err != nil {
+				return CanonicalRequest{}, err
+			}
+		}
 	}
 	if billingRequest != nil && generation != nil && billingRequest.Quantity != int64(generation.RequestedOutputCount) {
 		return CanonicalRequest{}, fmt.Errorf("canonical submission billing quantity does not match generation output count")
@@ -83,7 +123,7 @@ func NewCanonicalRequest(input CanonicalRequestInput) (CanonicalRequest, error) 
 		userID: input.UserID, userPrompt: input.UserPrompt, prompt: input.Prompt, params: input.Params,
 		clientActionID: strings.TrimSpace(input.ClientActionID), feature: feature,
 		priority: priority, billingRequest: billingRequest,
-		generation: generation,
+		generation: generation, executionPlan: executionPlan,
 	}, nil
 }
 
@@ -109,6 +149,13 @@ func (r CanonicalRequest) GenerationSnapshot() *tasks.GenerationRequestSnapshot 
 	return &copySnapshot
 }
 
+func (r CanonicalRequest) ExecutionPlan() (workflow.FeatureExecutionPlan, bool) {
+	if r.executionPlan == nil {
+		return workflow.FeatureExecutionPlan{}, false
+	}
+	return *r.executionPlan, true
+}
+
 func (r CanonicalRequest) Params() string {
 	return r.params
 }
@@ -116,6 +163,12 @@ func (r CanonicalRequest) Params() string {
 func (r CanonicalRequest) WithGenerationSnapshot(snapshot tasks.GenerationRequestSnapshot) (CanonicalRequest, error) {
 	copySnapshot := cloneGenerationSnapshot(snapshot)
 	if err := validateGenerationSnapshot(copySnapshot); err != nil {
+		return CanonicalRequest{}, err
+	}
+	if r.executionPlan == nil {
+		return CanonicalRequest{}, fmt.Errorf("update canonical generation snapshot requires execution plan")
+	}
+	if err := validateGenerationSnapshotAgainstPlan(copySnapshot, *r.executionPlan); err != nil {
 		return CanonicalRequest{}, err
 	}
 	params := map[string]json.RawMessage{}
@@ -165,6 +218,17 @@ func (r CanonicalRequest) valid() bool {
 	if r.generation != nil && validateGenerationSnapshot(*r.generation) != nil {
 		return false
 	}
+	if workflow.IsAIImageFeature(r.feature) {
+		if r.executionPlan == nil || r.executionPlan.Feature() != r.feature {
+			return false
+		}
+		if _, err := workflow.EncodeFeatureExecutionPlan(*r.executionPlan); err != nil {
+			return false
+		}
+		if r.generation != nil && validateGenerationSnapshotAgainstPlan(*r.generation, *r.executionPlan) != nil {
+			return false
+		}
+	}
 	return true
 }
 
@@ -193,6 +257,28 @@ func validateGenerationSnapshot(snapshot tasks.GenerationRequestSnapshot) error 
 		if media.InputIndex != index || strings.TrimSpace(media.Ref) == "" || strings.TrimSpace(media.Role) == "" {
 			return fmt.Errorf("canonical generation snapshot media order is invalid")
 		}
+	}
+	return nil
+}
+
+func validateGenerationSnapshotAgainstPlan(snapshot tasks.GenerationRequestSnapshot, plan workflow.FeatureExecutionPlan) error {
+	runtimeInputs := plan.RuntimeInputs()
+	if snapshot.Feature != plan.Feature() ||
+		snapshot.Primitive != string(runtimeInputs.GenerationPrimitive()) ||
+		snapshot.RequestedOutputCount != plan.RequestedOutputCount().Int() {
+		return fmt.Errorf("canonical generation snapshot does not match execution plan")
+	}
+	imageInputCount := 0
+	hasMaskInput := false
+	for _, media := range snapshot.Media {
+		if media.Role == "mask" {
+			hasMaskInput = true
+			continue
+		}
+		imageInputCount++
+	}
+	if imageInputCount != runtimeInputs.ImageInputCount() || hasMaskInput != runtimeInputs.HasMaskInput() {
+		return fmt.Errorf("canonical generation snapshot media facts do not match execution plan")
 	}
 	return nil
 }

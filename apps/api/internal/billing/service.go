@@ -116,29 +116,11 @@ FROM set_billing_item_availability($1, $2, $3)`, sku, enabled, actorID).Scan(
 	return info, nil
 }
 
-func (s *Service) Quote(ctx context.Context, rawSKU string, quantity int64) (Quote, error) {
-	resolution := OutputResolution1K
-	if sku, err := CanonicalizeSKU(rawSKU); err == nil && (sku == SKU("ai-image:remove-bg") || sku == SKU("ai-image:hd-upscale")) {
-		resolution = OutputResolutionDefault
-	}
-	return s.QuoteAtResolution(ctx, rawSKU, resolution, quantity)
-}
-
 func (s *Service) QuoteAtResolution(ctx context.Context, rawSKU string, resolution OutputResolution, quantity int64) (Quote, error) {
 	if err := s.requirePool(); err != nil {
 		return Quote{}, err
 	}
 	return s.quote(ctx, s.pool, rawSKU, resolution, quantity)
-}
-
-// QuoteInTx locks a submission to the price visible in its caller-owned
-// PostgreSQL transaction.
-func (s *Service) QuoteInTx(ctx context.Context, tx pgx.Tx, rawSKU string, quantity int64) (Quote, error) {
-	resolution := OutputResolution1K
-	if sku, err := CanonicalizeSKU(rawSKU); err == nil && (sku == SKU("ai-image:remove-bg") || sku == SKU("ai-image:hd-upscale")) {
-		resolution = OutputResolutionDefault
-	}
-	return s.QuoteAtResolutionInTx(ctx, tx, rawSKU, resolution, quantity)
 }
 
 func (s *Service) QuoteAtResolutionInTx(ctx context.Context, tx pgx.Tx, rawSKU string, resolution OutputResolution, quantity int64) (Quote, error) {
@@ -156,9 +138,6 @@ func (s *Service) quote(ctx context.Context, querier quoteQuerier, rawSKU string
 	sku, err := CanonicalizeSKU(rawSKU)
 	if err != nil {
 		return Quote{}, err
-	}
-	if (sku == SKU("ai-image:remove-bg") || sku == SKU("ai-image:hd-upscale")) && resolution != OutputResolutionDefault {
-		return Quote{}, ErrInvalidOutputResolution
 	}
 	if quantity <= 0 {
 		return Quote{}, ErrInvalidQuantity

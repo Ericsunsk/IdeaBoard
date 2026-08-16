@@ -22,15 +22,3 @@ func TestNormalizeOutputResolution(t *testing.T) {
 		}
 	}
 }
-
-func TestNormalizeOutputResolutionForFeature(t *testing.T) {
-	if got, ok := NormalizeOutputResolutionForFeature(FeatureSlugRemoveBg, ""); !ok || got != OutputResolutionDefault {
-		t.Fatalf("remove-bg empty resolution=(%q, %v)", got, ok)
-	}
-	if _, ok := NormalizeOutputResolutionForFeature(FeatureSlugRemoveBg, "1k"); ok {
-		t.Fatal("remove-bg 1k should be rejected")
-	}
-	if got, ok := NormalizeOutputResolutionForFeature(FeatureSlugLocalInpaint, "2k"); !ok || got != OutputResolution2K {
-		t.Fatalf("local inpaint resolution=(%q, %v)", got, ok)
-	}
-}

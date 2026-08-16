@@ -149,15 +149,15 @@ func TestBackgroundRemovalBatchIgnoresRequestedOutputCount(t *testing.T) {
 	defer server.Close()
 
 	executor := &ProviderExecutor{}
-	_, err := executor.callProviderBatchWithRequest(context.Background(), &accounts.ApiAccount{
-		ApiKey:       "secret",
-		Protocol:     providerendpoints.ProtocolImageURLJSONImage,
-		Capabilities: []string{providerendpoints.CapabilityBackgroundRemoval},
-		ProxyURL:     server.URL,
-	}, providerExecutionConfig{
-		FeatureSlug: workflow.FeatureSlugRemoveBg,
-		Timeout:     time.Second,
-		Request:     providerRequest{ImageRefs: []string{"https://media.ideaboard.art/source.jpg"}, OutputCount: 4},
+	_, err := executor.callProviderBatchWithRequest(context.Background(), resolvedProviderExecution{
+		providerEndpointBaseURL: server.URL,
+		apiType:                 workflow.ProviderOpenAICompatible,
+		protocol:                providerendpoints.ProtocolImageURLJSONImage,
+		apiKey:                  "secret",
+		runtimeOperation:        workflow.RuntimeOperationBackgroundRemoval,
+		adapter:                 providerRuntimeAdapterBackgroundRemoval,
+		timeout:                 time.Second,
+		request:                 providerRequest{ImageRefs: []string{"https://media.ideaboard.art/source.jpg"}, OutputCount: 4},
 	})
 	if err != nil {
 		t.Fatalf("callProviderBatchWithRequest: %v", err)

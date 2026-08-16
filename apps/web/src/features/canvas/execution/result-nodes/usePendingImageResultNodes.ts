@@ -15,7 +15,6 @@ import type {
   ImageResultAnchor,
 } from '../planning/imageExecutionResultTypes'
 import { resolveImageNodeLayoutAnchor } from '../../utils/flowImageNodeSelectors'
-import type { ResolvedTaskImageResult } from './resolvedTaskImageResult'
 import { waitForNextRenderFrame } from '../../utils/animationFrame'
 import type {
   CanvasVueFlowGraphAdapter,
@@ -26,13 +25,8 @@ import {
   canvasBoardSnapshotToFlow,
   type FlowToCanvasBoardSnapshotOptions,
 } from '../../utils/flowSnapshotAdapter'
-import { type CanvasGraphNodeId, type CanvasGraphStore } from '../../graph-runtime'
-import {
-  materializeResolvedImageResults,
-  type ResultMaterializerImageResult,
-  type ResultMaterializerResult,
-} from './resultMaterializer'
-import { TaskCancelledError } from '../../../../shared/api/taskEvents'
+import type { CanvasGraphStore } from '../../graph-runtime'
+import { CanvasBoardGraphSession } from '../pending-execution'
 
 type UsePendingImageResultNodesOptions = {
   nodes: Ref<Node[]>
@@ -59,55 +53,20 @@ export type PendingImageResultExecution = {
   reservePendingResults: (
     params: PendingImageResultReservationParams,
   ) => PendingImageResultReservation
-  runReservedPendingResults: (
-    params: RunReservedPendingImageResultsParams,
-  ) => Promise<PendingImageResultRunSummary>
-  cancelPendingResults: (resultNodeIds: readonly string[]) => void
-  materializeResolvedAttachedPendingResults: (
-    params: MaterializeResolvedAttachedPendingImageResultsParams,
-  ) => ResultMaterializerResult
-}
-
-export type PendingImageResultTaskSubmission = {
-  taskId: string
+  attachPendingTaskIds: (
+    slots: readonly Readonly<{
+      resultNodeId: string
+      taskId: string
+      resultIndex: number
+      clientActionId: string
+    }>[],
+  ) => void
+  removePendingResults: (resultNodeIds: readonly string[]) => void
+  createBoardGraphSession: (boardId: string) => CanvasBoardGraphSession
 }
 
 export type PendingImageResultReservation = {
   resultNodeIds: string[]
-}
-
-export type RunReservedPendingImageResultsParams = {
-  resultNodeIds: readonly string[]
-  submitTask: (resultNodeId: string) => Promise<PendingImageResultTaskSubmission>
-  resolveResult: (taskId: string, resultNodeId: string) => Promise<ResolvedTaskImageResult>
-  isCurrent: () => boolean
-  isResultExecutionCurrent: (resultNodeId: string, taskId?: string) => boolean
-  isPendingError: (error: unknown) => boolean
-  persistPendingTaskIds?: boolean
-  afterTaskIdAttached?: (params: { resultNodeId: string; taskId: string }) => Promise<void>
-  onOutcome?: (outcome: PendingImageResultOutcome) => void
-}
-
-export type MaterializeResolvedAttachedPendingImageResultsParams = {
-  results: ResultMaterializerImageResult[]
-  isAttached: (result: ResultMaterializerImageResult) => boolean
-}
-
-export type PendingImageResultRunSummary = {
-  resultNodeIds: string[]
-  totalCount: number
-  successCount: number
-  pendingCount: number
-  failureCount: number
-  firstFailure: unknown
-  failures: unknown[]
-  outcomes: PendingImageResultOutcome[]
-}
-
-export type PendingImageResultOutcome = {
-  resultNodeId: string
-  taskId?: string
-  status: 'pending' | 'succeeded' | 'failed' | 'cancelled'
 }
 
 type ImageResultLayout = ImageResultAnchor & {
@@ -147,10 +106,6 @@ function createPendingResultCommandOptions(
   })
 }
 
-function isCanvasGraphNodeId(nodeId: string): nodeId is CanvasGraphNodeId {
-  return /^(?:image|prompt|fusion)-\d+(?:\.\d+)?$/.test(nodeId)
-}
-
 function estimateImageNodeHeight(source: Pick<ImageResultLayout, 'width' | 'ratio'>): number {
   const stageHeight = resolveImageNodeStageHeight(source.width, source.ratio, true)
   return IMAGE_NODE_HEADER_HEIGHT + stageHeight
@@ -159,8 +114,6 @@ function estimateImageNodeHeight(source: Pick<ImageResultLayout, 'width' | 'rati
 export function usePendingImageResultExecution(
   options: UsePendingImageResultNodesOptions,
 ): PendingImageResultExecution {
-  const cancelledResultNodeIds = new Set<string>()
-
   function buildPendingResultLookup(): PendingImageResultLookup {
     const nodeById = new Map<string, Node>()
     const imageChildIdsBySource = new Map<string, string[]>()
@@ -360,6 +313,7 @@ export function usePendingImageResultExecution(
       width: params.width,
       pendingTaskId: undefined,
       pendingResultIndex: undefined,
+      pendingClientActionId: undefined,
       outputStatus: 'running',
       outputImages: [],
     }
@@ -372,8 +326,8 @@ export function usePendingImageResultExecution(
   ) {
     if (edgesToAppend.length === 0) return
     await waitForNextRenderFrame()
-    const activeResultNodeIds = resultNodeIds.filter(
-      (resultNodeId) => !cancelledResultNodeIds.has(resultNodeId),
+    const activeResultNodeIds = resultNodeIds.filter((resultNodeId) =>
+      options.nodes.value.some((node) => node.id === resultNodeId),
     )
     if (activeResultNodeIds.length === 0) return
     const hasSource = options.nodes.value.some((node) => node.id === anchorNodeId)
@@ -469,7 +423,6 @@ export function usePendingImageResultExecution(
         throw new Error(`Reusable pending result node is no longer available: ${preferredNodeId}`)
       }
       lookup.nodeById.set(preferredNodeId, updatedNode)
-      cancelledResultNodeIds.delete(preferredNodeId)
       return {
         resultNodeId: preferredNodeId,
         nextNode: updatedNode,
@@ -491,7 +444,6 @@ export function usePendingImageResultExecution(
     }
 
     lookup.nodeById.set(nextNode.id, nextNode as Node)
-    cancelledResultNodeIds.delete(nextNode.id)
     return {
       resultNodeId: nextNode.id,
       nextNode: nextNode as Node,
@@ -551,207 +503,66 @@ export function usePendingImageResultExecution(
     return { resultNodeIds }
   }
 
-  function attachPendingTaskId(params: {
-    resultNodeId: string
-    taskId: string
-    resultIndex: number
-  }) {
-    const normalizedTaskId = params.taskId.trim()
-    if (!normalizedTaskId) return
-    const targetNode = options.nodes.value.find((item) => item.id === params.resultNodeId)
-    if (targetNode?.data?.kind !== 'image') return
-    const snapshot = targetNode.data.snapshotNode
-    if (!snapshot || typeof snapshot !== 'object') return
-    options.graphAdapter.updateNode(
-      params.resultNodeId,
-      {
-        data: {
-          ...targetNode.data,
-          snapshotNode: {
-            ...(snapshot as ImageNodeItem),
-            pendingTaskId: normalizedTaskId,
-            pendingResultIndex: params.resultIndex,
+  function attachPendingTaskIds(
+    slots: readonly Readonly<{
+      resultNodeId: string
+      taskId: string
+      resultIndex: number
+      clientActionId: string
+    }>[],
+  ) {
+    for (const slot of slots) {
+      const taskId = slot.taskId.trim()
+      if (!taskId) continue
+      const targetNode = options.nodes.value.find((item) => item.id === slot.resultNodeId)
+      const snapshot = targetNode?.data?.snapshotNode
+      if (targetNode?.data?.kind !== 'image' || !snapshot || typeof snapshot !== 'object') continue
+      options.graphAdapter.updateNode(
+        slot.resultNodeId,
+        {
+          data: {
+            ...targetNode.data,
+            snapshotNode: {
+              ...(snapshot as ImageNodeItem),
+              pendingTaskId: taskId,
+              pendingResultIndex: slot.resultIndex,
+              pendingClientActionId: slot.clientActionId,
+            },
           },
         },
-      },
-      createPendingResultCommandOptions({ recordHistory: false }),
-    )
-  }
-
-  function applyResultMaterializerGraph(store: CanvasGraphStore, result: ResultMaterializerResult) {
-    if (!result.summary.didChange) return
-    const snapshot = store.exportSnapshot(options.boardBaseSnapshot?.value)
-    const nextFlow = canvasBoardSnapshotToFlow(snapshot)
-
-    options.graphAdapter.replaceGraph(
-      {
-        nodes: nextFlow.nodes as Node[],
-        edges: nextFlow.edges as Edge[],
-      },
-      createPendingResultCommandOptions({ recordHistory: false }),
-    )
-  }
-
-  function materializeResolvedAttachedPendingResults(
-    params: MaterializeResolvedAttachedPendingImageResultsParams,
-  ): ResultMaterializerResult {
-    const store = options.createCurrentCanvasGraphStore({
-      projection: 'runtime',
-    })
-    const result = materializeResolvedImageResults({
-      store,
-      results: params.results,
-      isAttached: params.isAttached,
-    })
-    applyResultMaterializerGraph(store, result)
-    result.materializedNodeIds.forEach((nodeId) => {
-      options.refreshNodeInternals?.([nodeId])
-    })
-    return result
-  }
-
-  function cancelPendingResult(params: { resultNodeId: string }) {
-    cancelledResultNodeIds.add(params.resultNodeId)
-    options.graphAdapter.removeNodes(params.resultNodeId, {
-      ...createPendingResultCommandOptions({ recordHistory: false }),
-      removeConnectedEdges: true,
-    })
-  }
-
-  function cancelPendingResults(resultNodeIds: readonly string[]) {
-    resultNodeIds.forEach((resultNodeId) => cancelPendingResult({ resultNodeId }))
-  }
-
-  async function runReservedPendingResults(
-    params: RunReservedPendingImageResultsParams,
-  ): Promise<PendingImageResultRunSummary> {
-    const persistPendingTaskIds = params.persistPendingTaskIds ?? true
-    const resultNodeIds = [...params.resultNodeIds]
-    const resolvedResults = new Array<ResultMaterializerImageResult | null>(
-      resultNodeIds.length,
-    ).fill(null)
-    const taskIds = new Array<string | undefined>(resultNodeIds.length).fill(undefined)
-    const outcomes = new Array<PendingImageResultOutcome | null>(resultNodeIds.length).fill(null)
-
-    const setOutcome = (index: number, outcome: PendingImageResultOutcome) => {
-      outcomes[index] = outcome
-      params.onOutcome?.(outcome)
+        createPendingResultCommandOptions({ recordHistory: false }),
+      )
     }
+  }
 
-    let pendingCount = 0
-    let failureCount = 0
-    let firstFailure: unknown = null
-    const failures: unknown[] = []
-    const isResultCurrent = (resultNodeId: string, taskId?: string) =>
-      params.isCurrent() && params.isResultExecutionCurrent(resultNodeId, taskId)
-
-    await Promise.allSettled(
-      resultNodeIds.map(async (resultNodeId, index) => {
-        let taskId: string | undefined
-        try {
-          const submission = await params.submitTask(resultNodeId)
-          taskId = submission.taskId
-          taskIds[index] = taskId
-          if (persistPendingTaskIds && isResultCurrent(resultNodeId, taskId)) {
-            attachPendingTaskId({ resultNodeId, taskId, resultIndex: index })
-            await params.afterTaskIdAttached?.({ resultNodeId, taskId })
-          }
-          if (!isResultCurrent(resultNodeId, taskId)) {
-            throw new TaskCancelledError('Canvas execution lease is no longer current')
-          }
-          const resolved = await params.resolveResult(taskId, resultNodeId)
-          if (isResultCurrent(resultNodeId, taskId) && isCanvasGraphNodeId(resultNodeId)) {
-            resolvedResults[index] = {
-              ...resolved,
-              resultNodeId,
-              taskId: persistPendingTaskIds ? taskId : undefined,
-            }
-          } else {
-            setOutcome(index, {
-              resultNodeId,
-              status: 'cancelled',
-              taskId,
-            })
-          }
-        } catch (error) {
-          const hasCurrentExecution = !!taskId && isResultCurrent(resultNodeId, taskId)
-          if (params.isPendingError(error)) {
-            firstFailure ??= error
-            failures.push(error)
-            pendingCount += 1
-            if (!persistPendingTaskIds && hasCurrentExecution) {
-              cancelPendingResult({ resultNodeId })
-            }
-            setOutcome(index, {
-              resultNodeId,
-              status: persistPendingTaskIds && hasCurrentExecution ? 'pending' : 'cancelled',
-              taskId,
-            })
-            return
-          }
-          const ownsReservation =
-            params.isCurrent() && params.isResultExecutionCurrent(resultNodeId, taskId)
-          const isCancelled = !ownsReservation || error instanceof TaskCancelledError
-          if (!isCancelled) {
-            firstFailure ??= error
-            failures.push(error)
-            failureCount += 1
-          }
-          setOutcome(index, {
-            resultNodeId,
-            status: isCancelled ? 'cancelled' : 'failed',
-            taskId,
-          })
-          if (ownsReservation) {
-            cancelPendingResult({ resultNodeId })
-          }
-        }
-      }),
-    )
-
-    const materializableResults = resolvedResults.filter(
-      (result): result is ResultMaterializerImageResult => !!result,
-    )
-    if (materializableResults.length > 0 && params.isCurrent()) {
-      const materialized = materializeResolvedAttachedPendingResults({
-        results: materializableResults,
-        isAttached: (result) => {
-          const taskId = taskIds[resultNodeIds.indexOf(result.resultNodeId)]
-          return !!taskId && isResultCurrent(result.resultNodeId, taskId)
-        },
-      })
-      const materializedNodeIds = new Set<string>(materialized.materializedNodeIds)
-      materializableResults.forEach((result) => {
-        const index = resultNodeIds.indexOf(result.resultNodeId)
-        if (index < 0) return
-        setOutcome(index, {
-          resultNodeId: result.resultNodeId,
-          status: materializedNodeIds.has(result.resultNodeId) ? 'succeeded' : 'cancelled',
-          taskId: taskIds[index],
-        })
+  function removePendingResults(resultNodeIds: readonly string[]) {
+    for (const resultNodeId of resultNodeIds) {
+      options.graphAdapter.removeNodes(resultNodeId, {
+        ...createPendingResultCommandOptions({ recordHistory: false }),
+        removeConnectedEdges: true,
       })
     }
+  }
 
-    const completedOutcomes = outcomes.filter(
-      (outcome): outcome is PendingImageResultOutcome => !!outcome,
-    )
-
-    return {
-      resultNodeIds,
-      totalCount: resultNodeIds.length,
-      successCount: completedOutcomes.filter((outcome) => outcome.status === 'succeeded').length,
-      pendingCount,
-      failureCount,
-      firstFailure,
-      failures,
-      outcomes: completedOutcomes,
-    }
+  function createBoardGraphSession(boardId: string): CanvasBoardGraphSession {
+    return CanvasBoardGraphSession.create(boardId, {
+      createGraphStore: () => options.createCurrentCanvasGraphStore({ projection: 'runtime' }),
+      onMaterialized: (store, result) => {
+        const snapshot = store.exportSnapshot(options.boardBaseSnapshot?.value)
+        const nextFlow = canvasBoardSnapshotToFlow(snapshot)
+        options.graphAdapter.replaceGraph(
+          { nodes: nextFlow.nodes as Node[], edges: nextFlow.edges as Edge[] },
+          createPendingResultCommandOptions({ recordHistory: false }),
+        )
+        options.refreshNodeInternals?.([...result.changedNodeIds])
+      },
+    })
   }
 
   return {
     reservePendingResults,
-    runReservedPendingResults,
-    cancelPendingResults,
-    materializeResolvedAttachedPendingResults,
+    attachPendingTaskIds,
+    removePendingResults,
+    createBoardGraphSession,
   }
 }

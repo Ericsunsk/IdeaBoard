@@ -40,7 +40,7 @@ func TestFinalizeImageExtendResultsKeepsMaterializedPartialSuccess(t *testing.T)
 	materializer := &imageExtendMaterializer{}
 	executor := &ProviderExecutor{resultMaterializer: materializer}
 
-	urls, outputs, stored, err := executor.finalizeImageExtendResults(
+	finalization := executor.finalizeImageExtendResults(
 		context.Background(),
 		42,
 		"task-image-extend",
@@ -51,17 +51,24 @@ func TestFinalizeImageExtendResultsKeepsMaterializedPartialSuccess(t *testing.T)
 		[]string{"data:image/png;base64,not-base64", imageDataURL(t, generated)},
 		0,
 	)
+	if finalization.state != providerResultAlreadyMaterialized {
+		t.Fatalf("state=%d, want already materialized", finalization.state)
+	}
+	urls, outputs, err := finalization.completedOutputs()
 	if err != nil {
 		t.Fatalf("finalizeImageExtendResults error: %v", err)
 	}
-	if !stored || !reflect.DeepEqual(urls, []string{"/uploads/tasks/42/task-image-extend/0.png"}) {
-		t.Fatalf("stored/urls=%v/%#v", stored, urls)
+	if !reflect.DeepEqual(urls, []string{"/uploads/tasks/42/task-image-extend/0.png"}) {
+		t.Fatalf("urls=%#v", urls)
 	}
 	if len(outputs) != 1 || outputs[0].ResultIndex != 1 {
 		t.Fatalf("outputs=%#v, want preserved provider result index", outputs)
 	}
 	if len(materializer.data) != 1 {
 		t.Fatalf("materialized count=%d, want 1", len(materializer.data))
+	}
+	if materializer.remoteCalls != 0 {
+		t.Fatalf("remote materializer calls=%d, want no fallback", materializer.remoteCalls)
 	}
 	result, err := png.Decode(bytes.NewReader(materializer.data[0]))
 	if err != nil {
@@ -72,11 +79,34 @@ func TestFinalizeImageExtendResultsKeepsMaterializedPartialSuccess(t *testing.T)
 	}
 }
 
+func TestFinalizeImageExtendResultsReturnsTerminalFailureWhenAllSlotsFail(t *testing.T) {
+	materializer := &imageExtendMaterializer{}
+	executor := &ProviderExecutor{resultMaterializer: materializer}
+
+	finalization := executor.finalizeImageExtendResults(
+		context.Background(),
+		42,
+		"task-image-extend-fail",
+		&imageExtendContext{original: solidImage(2, 2, color.NRGBA{A: 255}), geometry: workflow.ImageExtendPromptContract{RightPercent: 100}},
+		[]string{"data:image/png;base64,not-base64"},
+		0,
+	)
+	if finalization.state != providerResultTerminalFailure {
+		t.Fatalf("state=%d, want terminal failure", finalization.state)
+	}
+	if _, _, err := finalization.completedOutputs(); err == nil {
+		t.Fatal("expected terminal failure")
+	}
+	if materializer.remoteCalls != 0 {
+		t.Fatalf("remote materializer calls=%d, want no fallback", materializer.remoteCalls)
+	}
+}
+
 func TestPrepareImageExtendPipelineReadsFrozenOriginalAndGeometry(t *testing.T) {
 	original := solidImage(2, 3, color.NRGBA{R: 220, A: 255})
 	executor := &ProviderExecutor{}
 	prepared, err := executor.prepareImageExtendPipeline(context.Background(), nil, map[string]interface{}{
-		"feature":    workflow.FeatureSlugImageExtend,
+		"feature":    "ignored-by-runtime-parser",
 		"image_urls": []string{imageDataURL(t, original)},
 		"extend": map[string]interface{}{
 			"top_percent": 0, "right_percent": 25, "bottom_percent": 0, "left_percent": 0,
@@ -90,11 +120,20 @@ func TestPrepareImageExtendPipelineReadsFrozenOriginalAndGeometry(t *testing.T) 
 	}
 }
 
+func TestPrepareImageExtendPipelineRejectsMissingRuntimeInputs(t *testing.T) {
+	executor := &ProviderExecutor{}
+	if prepared, err := executor.prepareImageExtendPipeline(context.Background(), nil, map[string]interface{}{}, 0); err == nil || prepared != nil {
+		t.Fatalf("prepared=%#v err=%v, want strict missing geometry failure", prepared, err)
+	}
+}
+
 type imageExtendMaterializer struct {
-	data [][]byte
+	data        [][]byte
+	remoteCalls int
 }
 
 func (m *imageExtendMaterializer) MaterializeRemoteResults(context.Context, int64, string, []string, taskmedia.ResultMaterializeOptions) (taskmedia.MaterializedResults, error) {
+	m.remoteCalls++
 	return taskmedia.MaterializedResults{}, nil
 }
 

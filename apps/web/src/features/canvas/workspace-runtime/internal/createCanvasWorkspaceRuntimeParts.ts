@@ -17,7 +17,7 @@ import { createCanvasWorkspaceAutosave } from './createCanvasWorkspaceAutosave'
 import { createCanvasWorkspaceGraphRuntime } from './createCanvasWorkspaceGraphRuntime'
 import { createCanvasWorkspaceImageWorkflow } from './createCanvasWorkspaceImageWorkflow'
 import { createCanvasWorkspaceRuntimeFacade } from './createCanvasWorkspaceRuntimeFacade'
-import { createCanvasExecutionRuntime } from '../../execution/runtime/CanvasExecutionRuntime'
+import { createPendingImageExecutionCore } from '../../execution/pending-execution'
 
 export type UseCanvasWorkspaceRuntimeOptions = {
   route: RouteLocationNormalizedLoaded
@@ -37,7 +37,7 @@ export type UseCanvasWorkspaceRuntimeOptions = {
 export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRuntimeOptions) {
   const feedback = useCanvasFeedback(options.openRecharge)
   const taskLifecycle = createCanvasTaskLifecycle({ cancel: taskApi.cancel })
-  const executionRuntime = createCanvasExecutionRuntime()
+  const executionCore = createPendingImageExecutionCore()
 
   const board = useCanvasBoardRuntime({
     route: options.route,
@@ -45,7 +45,8 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     getUserIdentity: options.getUserIdentity,
     logoutAndRedirect: options.logoutAndRedirect,
     feedback: feedback.boardSession,
-    executionRuntime,
+    executionCore,
+    cancelTasks: taskLifecycle.cancelTasks,
     vueFlowGraphActions: options.flowPaneAdapter.vueFlowGraphActions,
   })
 
@@ -60,7 +61,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
       openNodeImage: options.openNodeImagePreview,
     },
     feedback: feedback.graph,
-    executionRuntime,
+    executionCore,
   })
 
   const viewport = useCanvasViewportRuntime({
@@ -99,7 +100,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
       imageTools: feedback.imageTools,
       taskExecution: feedback.taskExecution,
     },
-    executionRuntime,
+    executionCore,
     cancelTasks: taskLifecycle.cancelTasks,
   })
 

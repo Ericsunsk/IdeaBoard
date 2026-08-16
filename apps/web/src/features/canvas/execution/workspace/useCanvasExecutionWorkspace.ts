@@ -1,45 +1,41 @@
 import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
-import type { SubmitTaskData } from '../../../../shared/api/task'
 import type { TaskImageResult } from '../../../../shared/query/taskResult'
 import { TaskCancelledError } from '../../../../shared/api/taskEvents'
 import type { CanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
-import type { CanvasGraphNodeId, CanvasGraphStore } from '../../graph-runtime'
+import type { CanvasGraphStore } from '../../graph-runtime'
 import { loadImageSizeFromUrl } from '../media/imageSize'
 import type { ActivatedImageExecutionPlan } from '../planning/ImageExecutionPlan'
 import {
   resolveFirstTaskImageResultDisplay,
   resolveTaskImageResultAtIndexDisplay,
+  type ImageSizeLoader,
 } from '../result-nodes/flowImageDirectActionTaskResult'
-import {
-  collectPendingImageTasks,
-  isPendingImageTaskSnapshot,
-  readPendingImageSnapshot,
-} from '../result-nodes/flowPendingImageTaskSnapshot'
-import type { ResultMaterializerImageResult } from '../result-nodes/resultMaterializer'
 import {
   type PendingImageResultExecution,
   usePendingImageResultExecution,
 } from '../result-nodes/usePendingImageResultNodes'
 import { waitExistingOrLiveTaskImageResults } from '../task-runner/flowImageDirectActionExecutor'
-import type { ClientActionIdFactory } from '../task-runner/taskClientActionIds'
+import {
+  createCanvasTaskClientActionId,
+  type ClientActionIdFactory,
+  withTaskClientActionId,
+} from '../task-runner/taskClientActionIds'
 import { buildImageExecutionTaskRequest } from '../commands/flowImageTaskRequests'
 import type { FlowToCanvasBoardSnapshotOptions } from '../../utils/flowSnapshotAdapter'
 import { createPendingImageWorkflowRunner } from '../runtime/pendingImageWorkflowRunner'
-import type { ImageSizeLoader } from '../result-nodes/flowImageDirectActionTaskResult'
 import {
-  createCanvasTaskSubmissionCallbacks,
+  type PendingImageExecutionCore,
+  collectPendingImageTasks,
+} from '../pending-execution'
+import {
+  defaultCanvasTaskSubmissionAdapter,
   type CanvasTaskSubmissionAdapter,
 } from './canvasTaskSubmissionAdapter'
-import {
-  type CanvasExecutionAttachment,
-  type CanvasExecutionRuntime,
-} from '../runtime/CanvasExecutionRuntime'
-import { createCanvasPendingResultLifecycle } from '../runtime/CanvasExecutionRuntime'
 
 export type CanvasExecutionWorkspaceState = {
-  readonly executionRuntime: CanvasExecutionRuntime
+  readonly executionCore: PendingImageExecutionCore
   isNodeRunning: (nodeId: string) => boolean
 }
 
@@ -62,7 +58,7 @@ export type UseCanvasExecutionWorkspaceOptions = {
   createCurrentCanvasGraphStore: (
     snapshotOptions?: FlowToCanvasBoardSnapshotOptions,
   ) => CanvasGraphStore
-  boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
+  boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   refreshNodeInternals?: (nodeIds: string[]) => void
   flushAutosave?: (options?: { silent?: boolean }) => Promise<void>
   pendingResults?: PendingImageResultExecution
@@ -70,48 +66,38 @@ export type UseCanvasExecutionWorkspaceOptions = {
   waitTaskImageResults?: (taskId: string) => Promise<TaskImageResult[]>
   loadImageSize?: ImageSizeLoader
   createClientActionId?: ClientActionIdFactory
-  executionRuntime: CanvasExecutionRuntime
+  executionCore: PendingImageExecutionCore
   cancelTasks: (taskIds: readonly string[]) => void
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
   onError?: (error: unknown) => boolean
 }
 
-function isCanvasGraphNodeId(nodeId: string): nodeId is CanvasGraphNodeId {
-  return /^(?:image|prompt|fusion)-\d+(?:\.\d+)?$/.test(nodeId)
-}
-
-type ReattachResolvedAttempt = {
-  reattachKey: string
-  nodeId: CanvasGraphNodeId
-  taskId: string
-  resolved: ResultMaterializerImageResult
-}
-
 export function useCanvasExecutionWorkspace(
   options: UseCanvasExecutionWorkspaceOptions,
 ): CanvasExecutionWorkspace {
-  const executionRuntime = options.executionRuntime
-  const activeReattachKeys = new Set<string>()
   const waitTaskImageResults = options.waitTaskImageResults ?? waitExistingOrLiveTaskImageResults
   const loadImageSize = options.loadImageSize ?? loadImageSizeFromUrl
-  const ownedPendingResults = usePendingImageResultExecution({
-    nodes: options.nodes,
-    edges: options.edges,
-    graphAdapter: options.graphAdapter,
-    createCurrentCanvasGraphStore: options.createCurrentCanvasGraphStore,
-    boardBaseSnapshot: options.boardBaseSnapshot,
-    refreshNodeInternals: options.refreshNodeInternals,
-    isNodeExecutionActive: executionRuntime.isNodeActive,
-  })
-  const pendingResults = options.pendingResults ?? ownedPendingResults
+  const taskAdapter = options.taskAdapter ?? defaultCanvasTaskSubmissionAdapter
+  const pendingResults =
+    options.pendingResults ??
+    usePendingImageResultExecution({
+      nodes: options.nodes,
+      edges: options.edges,
+      graphAdapter: options.graphAdapter,
+      createCurrentCanvasGraphStore: options.createCurrentCanvasGraphStore,
+      boardBaseSnapshot: options.boardBaseSnapshot,
+      refreshNodeInternals: options.refreshNodeInternals,
+      isNodeExecutionActive: (nodeId) =>
+        options.executionCore.captureActiveLeases([nodeId as `image-${number}`]).length > 0,
+    })
 
   function isNodeRunning(nodeId: string): boolean {
-    return executionRuntime.isNodeActive(nodeId)
+    return options.executionCore.captureActiveLeases([nodeId as `image-${number}`]).length > 0
   }
 
-  function requireCurrentAttachment(): CanvasExecutionAttachment {
-    const attachment = executionRuntime.attachment.value
+  function requireAttachment() {
+    const attachment = options.executionCore.currentAttachment()
     if (!attachment) throw new Error('Canvas execution requires an active Board attachment')
     return attachment
   }
@@ -125,14 +111,28 @@ export function useCanvasExecutionWorkspace(
     }
   }
 
-  function isPendingImageTaskStillCurrent(nodeId: string, taskId: string): boolean {
-    const snapshot = readPendingImageSnapshot(options.nodes.value, nodeId)
-    return !!snapshot && isPendingImageTaskSnapshot(snapshot, taskId)
-  }
-
   const workflowRunner = createPendingImageWorkflowRunner({
     pendingResults,
-    executionRuntime,
+    executionCore: options.executionCore,
+    taskTransport: {
+      assertReady: (request, fallbackMessage) =>
+        taskAdapter.assertTaskRequestReady(
+          withTaskClientActionId(request, createCanvasTaskClientActionId()),
+          fallbackMessage,
+        ),
+      submit: (request, clientActionId, fallbackMessage) =>
+        taskAdapter.submitTaskRequest(
+          withTaskClientActionId(request, clientActionId),
+          fallbackMessage,
+        ),
+      resolve: async (taskId, resultIndex, fallbackRatio) =>
+        resolveTaskImageResultAtIndexDisplay(
+          await waitTaskImageResults(taskId),
+          resultIndex,
+          fallbackRatio,
+          loadImageSize,
+        ),
+    },
     cancelTasks: options.cancelTasks,
     afterTaskIdAttached: flushPendingTaskSnapshot,
     createClientActionId: options.createClientActionId,
@@ -144,62 +144,36 @@ export function useCanvasExecutionWorkspace(
   async function runPromptGeneration(
     plan: ActivatedImageExecutionPlan & { kind: 'prompt-generation' },
   ): Promise<void> {
-    const attachment = requireCurrentAttachment()
-    let taskResultsPromise: Promise<TaskImageResult[]> | null = null
-    let taskRequest: SubmitTaskData | null = null
-    const buildTaskRequest = () => {
-      taskRequest ??= buildImageExecutionTaskRequest(plan)
-      return taskRequest
-    }
-    const taskSubmission = createCanvasTaskSubmissionCallbacks({
-      readinessRequest: buildTaskRequest,
-      buildRequest: buildTaskRequest,
-      taskAdapter: options.taskAdapter,
-    })
-    await workflowRunner.run({
+    const attachment = requireAttachment()
+    const taskRequest = buildImageExecutionTaskRequest(plan)
+    await workflowRunner.execute({
       source: plan.source,
       sourceNodeId: plan.sourceNodeId,
       attachment,
       outputCount: plan.outputCount,
       resultOptions: plan.resultOptions,
-      preflight: async () => {
-        buildTaskRequest()
-      },
-      assertReady: taskSubmission.assertReady,
-      submitTask: (_resultNodeId, clientActionId) => taskSubmission.submitTask(clientActionId),
-      resolveResult: async (taskId, _resultNodeId, resultIndex) => {
-        taskResultsPromise ??= waitTaskImageResults(taskId)
-        return resolveTaskImageResultAtIndexDisplay(
-          await taskResultsPromise,
-          resultIndex,
-          plan.source.ratio,
-          loadImageSize,
-        )
-      },
+      taskRequest,
+      readinessRequest: taskRequest,
+      fallbackRatio: plan.source.ratio,
       fallbackErrorMessage: '生成失败',
     })
   }
 
   async function reattachPendingImageResults(): Promise<void> {
-    const attachment = requireCurrentAttachment()
-    const lifecycle = createCanvasPendingResultLifecycle(executionRuntime, attachment)
-    const pendingTasks = collectPendingImageTasks(options.nodes.value)
-    if (pendingTasks.length === 0) return
-    let failureCount = 0
-    const resolvedAttempts: ReattachResolvedAttempt[] = []
+    const attachment = requireAttachment()
+    const pending = collectPendingImageTasks(options.boardBaseSnapshot.value)
     await Promise.all(
-      pendingTasks.map(async ({ nodeId, taskId, resultIndex, fallbackRatio }) => {
-        const reattachKey = `${attachment.epoch}:${nodeId}:${taskId}`
-        if (activeReattachKeys.has(reattachKey)) return
-        if (!isCanvasGraphNodeId(nodeId)) return
-        activeReattachKeys.add(reattachKey)
-        if (!lifecycle.adopt(nodeId, taskId)) {
-          activeReattachKeys.delete(reattachKey)
-          return
-        }
+      pending.map(async ({ resultNodeId, taskId, resultIndex, fallbackRatio, clientActionId }) => {
+        const lease = options.executionCore.claimHydratedLease(attachment, {
+          resultNodeId,
+          taskId,
+          clientActionId,
+        })
+        if (!lease) return
         try {
           const results = await waitTaskImageResults(taskId)
-          const resolved =
+          if (!options.executionCore.isCurrent(lease, taskId)) return
+          const result =
             resultIndex === undefined
               ? await resolveFirstTaskImageResultDisplay(results, fallbackRatio, loadImageSize)
               : await resolveTaskImageResultAtIndexDisplay(
@@ -208,107 +182,18 @@ export function useCanvasExecutionWorkspace(
                   fallbackRatio,
                   loadImageSize,
                 )
-          const isCurrentBoard = executionRuntime.isAttachmentCurrent(attachment)
-          const isAttached =
-            lifecycle.isCurrent(nodeId, taskId) && isPendingImageTaskStillCurrent(nodeId, taskId)
-          if (!isCurrentBoard || !isAttached) {
-            lifecycle.transition(nodeId, 'cancelled', taskId)
-            activeReattachKeys.delete(reattachKey)
-            return
-          }
-          resolvedAttempts.push({
-            reattachKey,
-            nodeId,
-            taskId,
-            resolved: { ...resolved, resultNodeId: nodeId, taskId },
-          })
+          options.executionCore.materializeBatch([{ lease, result }])
+          await flushPendingTaskSnapshot()
         } catch (error) {
-          const isCurrentBoard = executionRuntime.isAttachmentCurrent(attachment)
-          const isAttached =
-            lifecycle.isCurrent(nodeId, taskId) && isPendingImageTaskStillCurrent(nodeId, taskId)
-          const status =
-            !isCurrentBoard || !isAttached || error instanceof TaskCancelledError
-              ? 'cancelled'
-              : 'failed'
-          lifecycle.transition(nodeId, status, taskId)
-          if (status === 'failed') {
-            console.warn('[canvas] reattach pending image task failed', error)
-            failureCount += 1
-          }
-          activeReattachKeys.delete(reattachKey)
+          if (error instanceof TaskCancelledError) options.executionCore.cancel([lease])
+          else options.executionCore.fail(lease)
         }
       }),
     )
-    if (!executionRuntime.isAttachmentCurrent(attachment)) {
-      resolvedAttempts.forEach((attempt) => {
-        lifecycle.transition(attempt.nodeId, 'cancelled', attempt.taskId)
-        activeReattachKeys.delete(attempt.reattachKey)
-      })
-      return
-    }
-
-    let materialized: ReturnType<
-      PendingImageResultExecution['materializeResolvedAttachedPendingResults']
-    > | null = null
-    try {
-      materialized =
-        resolvedAttempts.length > 0
-          ? pendingResults.materializeResolvedAttachedPendingResults({
-              results: resolvedAttempts.map((attempt) => attempt.resolved),
-              isAttached: (result) =>
-                !!result.taskId &&
-                isPendingImageTaskStillCurrent(result.resultNodeId, result.taskId) &&
-                resolvedAttempts.some(
-                  (attempt) =>
-                    attempt.nodeId === result.resultNodeId &&
-                    attempt.taskId === result.taskId &&
-                    lifecycle.isCurrent(attempt.nodeId, attempt.taskId),
-                ),
-            })
-          : null
-    } catch (error) {
-      console.warn('[canvas] materialize reattached image task failed', error)
-      failureCount += resolvedAttempts.length
-      resolvedAttempts.forEach((attempt) => {
-        lifecycle.transition(attempt.nodeId, 'failed', attempt.taskId)
-        activeReattachKeys.delete(attempt.reattachKey)
-      })
-    }
-
-    const materializedNodeIds = new Set(materialized?.materializedNodeIds ?? [])
-    resolvedAttempts.forEach((attempt) => {
-      if (materializedNodeIds.has(attempt.nodeId)) {
-        lifecycle.transition(attempt.nodeId, 'succeeded', attempt.taskId)
-      } else if (!materialized) {
-        // The materializer failure path already assigned failed above.
-        activeReattachKeys.delete(attempt.reattachKey)
-        return
-      } else {
-        lifecycle.transition(attempt.nodeId, 'cancelled', attempt.taskId)
-      }
-      activeReattachKeys.delete(attempt.reattachKey)
-    })
-
-    const successCount = materialized?.materializedNodeIds.length ?? 0
-    if (successCount > 0) {
-      options.onSuccess(successCount > 1 ? `已恢复 ${successCount} 个生成结果` : '已恢复生成结果')
-      await flushPendingTaskSnapshot()
-    }
-    if (failureCount > 0) {
-      options.onWarning(
-        failureCount > 1 ? `${failureCount} 个生成任务恢复失败` : '生成任务恢复失败',
-      )
-    }
   }
 
   return {
-    state: {
-      executionRuntime,
-      isNodeRunning,
-    },
-    commands: {
-      runPromptGeneration,
-      reattachPendingImageResults,
-    },
+    state: { executionCore: options.executionCore, isNodeRunning },
+    commands: { runPromptGeneration, reattachPendingImageResults },
   }
 }

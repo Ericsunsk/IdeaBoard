@@ -3,7 +3,7 @@ import type { CanvasFeedback } from '../../feedback/useCanvasFeedback'
 import type { CanvasFlowPaneAdapter } from '../../flow-pane'
 import { useCanvasImageWorkflow, type CanvasImageWorkflowUiAdapter } from '../../image-workflow'
 import type { createCanvasWorkspaceGraphRuntime } from './createCanvasWorkspaceGraphRuntime'
-import type { CanvasExecutionRuntime } from '../../execution/runtime/CanvasExecutionRuntime'
+import type { PendingImageExecutionCore } from '../../execution/pending-execution'
 
 type CreateCanvasWorkspaceImageWorkflowOptions = {
   board: ReturnType<typeof useCanvasBoardRuntime>
@@ -13,7 +13,7 @@ type CreateCanvasWorkspaceImageWorkflowOptions = {
   openImageUrlPreview: (src: string, ratio?: number) => Promise<void>
   ui: CanvasImageWorkflowUiAdapter
   feedback: Pick<CanvasFeedback, 'imageTools' | 'taskExecution'>
-  executionRuntime: CanvasExecutionRuntime
+  executionCore: PendingImageExecutionCore
   cancelTasks: (taskIds: readonly string[]) => void
 }
 
@@ -29,7 +29,7 @@ export function createCanvasWorkspaceImageWorkflow(
       boardBaseSnapshot: options.board.boardSession.boardBaseSnapshot,
       flushAutosave: options.flushAutosave,
       refreshNodeInternals: options.graph.executionPort.refreshNodeInternals,
-      executionRuntime: options.executionRuntime,
+      executionCore: options.executionCore,
       cancelTasks: options.cancelTasks,
     },
     flowPaneAdapter: options.flowPaneAdapter,

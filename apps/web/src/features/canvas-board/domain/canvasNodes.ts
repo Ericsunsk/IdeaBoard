@@ -104,6 +104,7 @@ export interface ImageNodeItem {
   outputResolution?: OutputResolution
   pendingTaskId?: string
   pendingResultIndex?: number
+  pendingClientActionId?: string
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
 }

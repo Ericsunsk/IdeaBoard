@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import { useImageWorkflowExecution } from './useImageWorkflowExecution'
-import { CanvasBillingPreflightError, createCanvasExecutionRuntime } from '../execution'
+import { CanvasBillingPreflightError, createPendingImageExecutionCore } from '../execution'
 
 const mocks = vi.hoisted(() => {
   const plan = {
@@ -64,7 +64,7 @@ function createRuntime() {
     createCurrentCanvasGraphStore: vi.fn(() => ({})),
     flushAutosave: vi.fn(async () => undefined),
     refreshNodeInternals: vi.fn(),
-    executionRuntime: createCanvasExecutionRuntime(),
+    executionCore: createPendingImageExecutionCore(),
     cancelTasks: vi.fn(),
     feedback,
   }

@@ -2,7 +2,7 @@ import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { IMAGE_NODE_ACTION } from '../config/imageActionRegistry'
 import type { MediaInputImage } from '../composables/useFlowMediaInputImages'
-import { createCanvasExecutionRuntime } from '../execution/runtime/CanvasExecutionRuntime'
+import { createPendingImageExecutionCore } from '../execution/pending-execution'
 import { useCanvasImageWorkflow } from './useCanvasImageWorkflow'
 
 const mocks = vi.hoisted(() => {
@@ -97,7 +97,7 @@ function createOptions() {
       boardBaseSnapshot: ref({ groups: [] }),
       flushAutosave: vi.fn(async () => undefined),
       refreshNodeInternals: vi.fn(),
-      executionRuntime: createCanvasExecutionRuntime(),
+      executionCore: createPendingImageExecutionCore(),
       cancelTasks: vi.fn(),
     },
     flowPaneAdapter: {

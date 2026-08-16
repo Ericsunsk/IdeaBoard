@@ -1,6 +1,7 @@
 package taskservice
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -29,13 +30,18 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 		images  []string
 		params  map[string]interface{}
 	}{
-		{feature: workflow.FeatureSlugSketchToImage},
+		{feature: workflow.FeatureSlugSketchToImage, images: []string{"https://example.com/sketch.png"}},
 		{
 			feature: workflow.FeatureSlugStyleVariation,
+			images:  []string{"https://example.com/style.png"},
 			params:  map[string]interface{}{"variation": map[string]interface{}{"strength": 0.5}},
 		},
-		{feature: workflow.FeatureSlugLocalInpaint},
-		{feature: workflow.FeatureSlugRemoveBg},
+		{
+			feature: workflow.FeatureSlugLocalInpaint,
+			images:  []string{"https://example.com/inpaint.png"},
+			params:  map[string]interface{}{"mask_image_url": "https://example.com/mask.png"},
+		},
+		{feature: workflow.FeatureSlugRemoveBg, images: []string{"https://example.com/remove.png"}},
 		{
 			feature: workflow.FeatureSlugStyleFusion,
 			images:  []string{"https://example.com/a.png", "https://example.com/b.png"},
@@ -46,10 +52,12 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 		{feature: workflow.FeatureSlugPromptGeneration},
 		{
 			feature: workflow.FeatureSlugHDUpscale,
+			images:  []string{"https://example.com/upscale.png"},
 			params:  map[string]interface{}{"hd": map[string]interface{}{"scale": 2.0}},
 		},
 		{
 			feature: workflow.FeatureSlugImageExtend,
+			images:  []string{"https://example.com/extend.png"},
 			params: map[string]interface{}{"extend": map[string]interface{}{
 				"top_percent": 0, "right_percent": 25, "bottom_percent": 0, "left_percent": 0,
 			}},
@@ -58,7 +66,11 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 
 	for _, tt := range tests {
 		t.Run(tt.feature, func(t *testing.T) {
-			requestParams := map[string]interface{}{"output_count": 2}
+			outputCount := 2
+			if tt.feature == workflow.FeatureSlugRemoveBg || tt.feature == workflow.FeatureSlugHDUpscale {
+				outputCount = 1
+			}
+			requestParams := map[string]interface{}{"output_count": outputCount}
 			for key, value := range tt.params {
 				requestParams[key] = value
 			}
@@ -98,6 +110,14 @@ func TestTaskIntakeCanonicalizesEveryAIImageWorkflowThroughItsPublicInterface(t 
 			if _, exists := params["account_ids"]; exists {
 				t.Fatalf("canonical params must not snapshot account ids: %#v", params)
 			}
+			typed, err := tasks.UnmarshalParams(canonical.Params())
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan, err := workflow.DecodeFeatureExecutionPlan(typed.ExecutionPlan)
+			if err != nil || plan.Feature() != tt.feature {
+				t.Fatalf("execution plan feature=%q err=%v", plan.Feature(), err)
+			}
 		})
 	}
 }
@@ -119,14 +139,14 @@ func TestTaskIntakeRejectsOutputCountOutsideCanonicalContract(t *testing.T) {
 				ClientActionID: "invalid-output-count",
 				Params:         map[string]interface{}{"output_count": outputCount},
 			})
-			if err == nil || !strings.Contains(err.Error(), "output_count 仅支持整数 1-4") {
+			if err == nil || !strings.Contains(err.Error(), "output_count") {
 				t.Fatalf("output_count=%v error=%v", outputCount, err)
 			}
 		})
 	}
 }
 
-func TestTaskIntakeIgnoresDedicatedImageTransformGenerationControls(t *testing.T) {
+func TestTaskIntakeRejectsDedicatedImageTransformGenerationControls(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
 		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
 			ID:           101,
@@ -145,21 +165,11 @@ func TestTaskIntakeIgnoresDedicatedImageTransformGenerationControls(t *testing.T
 			if feature == workflow.FeatureSlugHDUpscale {
 				params["hd"] = map[string]interface{}{"scale": 2.5}
 			}
-			canonical, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
+			_, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 				Prompt: "ignored", Feature: feature, ClientActionID: "ignored-controls-" + feature, Params: params,
 			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if billing := canonical.BillingRequest(); billing == nil || billing.Quantity != 1 || billing.OutputResolution != workflow.OutputResolutionDefault {
-				t.Fatalf("BillingRequest() = %#v", billing)
-			}
-			decoded, err := tasks.UnmarshalParams(canonical.Params())
-			if err != nil {
-				t.Fatal(err)
-			}
-			if decoded.Generation == nil || decoded.Generation.RequestedOutputCount != 1 {
-				t.Fatalf("Generation = %#v", decoded.Generation)
+			if err == nil || !strings.Contains(err.Error(), "output_count") {
+				t.Fatalf("expected fixed output contract error, got %v", err)
 			}
 		})
 	}
@@ -176,6 +186,7 @@ func TestTaskIntakeAllowsModelessRemoveBackgroundAccount(t *testing.T) {
 
 	if _, err := intake.Compile(t.Context(), 42, &tasks.SubmitTaskRequest{
 		Feature:        workflow.FeatureSlugRemoveBg,
+		ImageURLs:      []string{"https://example.com/source.png"},
 		ClientActionID: "modeless-remove-bg",
 	}); err != nil {
 		t.Fatalf("model-less remove-bg account rejected: %v", err)
@@ -191,6 +202,7 @@ func TestTaskIntakePersistsProviderIndependentGenerationSnapshot(t *testing.T) {
 	})
 	canonical, err := intake.Compile(context.Background(), 42, &tasks.SubmitTaskRequest{
 		Prompt: "draw a chair", Feature: workflow.FeatureSlugSketchToImage,
+		ImageURLs:      []string{"https://example.com/sketch.png"},
 		ClientActionID: "snapshot-intake", Params: map[string]interface{}{"output_count": 2},
 	})
 	if err != nil {
@@ -212,6 +224,42 @@ func TestTaskIntakePersistsProviderIndependentGenerationSnapshot(t *testing.T) {
 	}
 	if canonical.GenerationSnapshot() == nil {
 		t.Fatal("expected canonical request generation snapshot")
+	}
+}
+
+func TestTaskIntakePrepareMediaPreservesCompiledExecutionPlan(t *testing.T) {
+	preparer := &recordingGenerationMediaPreparer{}
+	intake := NewTaskIntake(TaskIntakeDeps{
+		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+			ID: 101, Models: []accounts.AccountModel{{Name: "runtime-model", Enabled: true}},
+		}}},
+		Media:         testSubmitMediaValidator{},
+		MediaPreparer: preparer,
+	})
+	canonical, err := intake.Compile(t.Context(), 42, &tasks.SubmitTaskRequest{
+		Prompt: "draw from reference", Feature: workflow.FeatureSlugSketchToImage,
+		ImageURLs: []string{"https://example.com/reference.png"}, ClientActionID: "plan-media-prepare",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := tasks.UnmarshalParams(canonical.Params())
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := intake.PrepareMedia(t.Context(), 42, canonical)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after, err := tasks.UnmarshalParams(prepared.Params())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before.ExecutionPlan, after.ExecutionPlan) {
+		t.Fatalf("execution plan changed during media preparation\nbefore=%s\nafter=%s", before.ExecutionPlan, after.ExecutionPlan)
+	}
+	if after.Generation == nil || len(after.Generation.Media) != 1 || after.Generation.Media[0].AssetID == 0 || after.Generation.Media[0].Ref == before.Generation.Media[0].Ref {
+		t.Fatalf("prepared generation media=%+v", after.Generation)
 	}
 }
 

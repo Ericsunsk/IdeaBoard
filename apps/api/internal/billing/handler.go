@@ -62,13 +62,6 @@ func (h *Handler) Quote(c *gin.Context) {
 		return
 	}
 	resolution, err := NormalizeOutputResolution(request.OutputResolution)
-	if request.OutputResolution == "" {
-		resolution = OutputResolution1K
-		if sku, skuErr := CanonicalizeSKU(request.SKU); skuErr == nil && (sku == SKU("ai-image:remove-bg") || sku == SKU("ai-image:hd-upscale")) {
-			resolution = OutputResolutionDefault
-		}
-		err = nil
-	}
 	if err != nil {
 		writeError(c, err)
 		return
@@ -100,9 +93,7 @@ func (h *Handler) PublishPrice(c *gin.Context) {
 		}
 		prices[resolution] = unitCredits
 	}
-	_, hasOneK := prices[OutputResolution1K]
-	_, hasDefault := prices[OutputResolutionDefault]
-	if !hasOneK && !hasDefault {
+	if len(prices) == 0 {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}

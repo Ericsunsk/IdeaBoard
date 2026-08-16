@@ -17,6 +17,7 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/accountpool/accounts"
+	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/tasks"
 )
@@ -87,32 +88,34 @@ func TestBuildLocalRedrawMaskSamplerUsesLuminanceFallbackAndPadding(t *testing.T
 	}
 }
 
-func TestShouldUseLocalRedrawPipelineOnlyForLocalInpaintWithMask(t *testing.T) {
+func TestReadLocalRedrawRequestValidatesOnlyRequiredMedia(t *testing.T) {
 	tests := []struct {
-		name    string
-		feature string
-		mask    string
-		want    bool
+		name      string
+		params    map[string]interface{}
+		wantError string
 	}{
-		{name: "local inpaint with mask", feature: "local-inpaint", mask: "data:image/png;base64,bWFzaw==", want: true},
-		{name: "other feature with stale mask", feature: "hd-upscale", mask: "data:image/png;base64,bWFzaw=="},
-		{name: "local inpaint without mask", feature: "local-inpaint"},
+		{
+			name: "ignores feature slug after runtime dispatch",
+			params: map[string]interface{}{
+				"feature": "not-local-inpaint", "image_urls": []interface{}{"data:image/png;base64,aGVsbG8="},
+				"mask_image_url": "data:image/png;base64,bWFzaw==",
+			},
+		},
+		{name: "missing mask", params: map[string]interface{}{"image_urls": []interface{}{"data:image/png;base64,aGVsbG8="}}, wantError: "缺少蒙版"},
+		{name: "missing original", params: map[string]interface{}{"mask_image_url": "data:image/png;base64,bWFzaw=="}, wantError: "缺少原图"},
+		{name: "missing params", wantError: "参数为空"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			params := map[string]interface{}{
-				"feature":    tt.feature,
-				"image_urls": []interface{}{"data:image/png;base64,aGVsbG8="},
+			got, err := readLocalRedrawRequest(tt.params)
+			if tt.wantError != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantError) {
+					t.Fatalf("error = %v, want %q", err, tt.wantError)
+				}
+				return
 			}
-			if tt.mask != "" {
-				params["mask_image_url"] = tt.mask
-			}
-			_, got, err := readLocalRedrawRequest(params)
-			if err != nil {
-				t.Fatalf("readLocalRedrawRequest: %v", err)
-			}
-			if got != tt.want {
-				t.Fatalf("local redraw eligibility=%v, want %v", got, tt.want)
+			if err != nil || got.OriginalRef == "" || got.MaskRef == "" {
+				t.Fatalf("request=%#v err=%v", got, err)
 			}
 		})
 	}
@@ -234,6 +237,7 @@ func TestCallDrawingAPILocalRedrawReplacesUpstreamInputAndCompositesByMask(t *te
 	})
 	c := newTestProviderExecutorWithLocalStorage(t)
 	account := &accounts.ApiAccount{
+		Protocol: providerendpoints.ProtocolModelAPI,
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
@@ -319,13 +323,12 @@ func TestFinalizeLocalRedrawResultUsesResultMaterializer(t *testing.T) {
 	}
 	c := &ProviderExecutor{resultMaterializer: materializer}
 
-	imageURL, gotOutputs, stored, err := c.finalizeLocalRedrawResult(
+	imageURL, output, err := c.finalizeLocalRedrawResult(
 		context.Background(),
 		42,
 		"task-local-redraw-materializer",
 		&localRedrawContext{
-			featureSlug: "local-inpaint",
-			original:    original,
+			original: original,
 			maskSampler: maskCoverageSampler{
 				mask:         mask,
 				maskBounds:   mask.Bounds(),
@@ -344,16 +347,13 @@ func TestFinalizeLocalRedrawResultUsesResultMaterializer(t *testing.T) {
 	if imageURL != materializer.bytesResult.Items[0].ImageURL {
 		t.Fatalf("imageURL=%q, want %q", imageURL, materializer.bytesResult.Items[0].ImageURL)
 	}
-	if !reflect.DeepEqual(gotOutputs, outputs) {
-		t.Fatalf("outputs=%#v, want %#v", gotOutputs, outputs)
-	}
-	if !stored {
-		t.Fatalf("stored=false, want true")
+	if !reflect.DeepEqual(output, outputs[0]) {
+		t.Fatalf("output=%#v, want %#v", output, outputs[0])
 	}
 	if materializer.bytesUserID != 42 || materializer.bytesTaskID != "task-local-redraw-materializer" {
 		t.Fatalf("materializer target=%d/%s", materializer.bytesUserID, materializer.bytesTaskID)
 	}
-	if !strings.HasPrefix(materializer.bytesFilename, "local-redraw-local-inpaint-") || !strings.HasSuffix(materializer.bytesFilename, ".png") {
+	if !strings.HasPrefix(materializer.bytesFilename, "local-redraw-") || !strings.HasSuffix(materializer.bytesFilename, ".png") {
 		t.Fatalf("unexpected materialized filename: %q", materializer.bytesFilename)
 	}
 	if !strings.HasPrefix(materializer.bytesSourceURL, "data:image/png;base64,") {
@@ -384,12 +384,11 @@ func TestFinalizeLocalRedrawResultsMaterializesEachSuccessfulPatch(t *testing.T)
 	}
 
 	executor := newTestProviderExecutorWithLocalStorage(t)
-	urls, outputs, stored, err := executor.finalizeLocalRedrawResults(
+	finalization := executor.finalizeLocalRedrawResults(
 		context.Background(),
 		42,
 		"task-local-redraw-batch",
 		&localRedrawContext{
-			featureSlug: "local-inpaint",
 			original:    original,
 			maskSampler: maskCoverageSampler{mask: mask, maskBounds: mask.Bounds(), dstWidth: 2, dstHeight: 2, useLuminance: true},
 			roi:         image.Rect(0, 0, 2, 2),
@@ -397,11 +396,15 @@ func TestFinalizeLocalRedrawResultsMaterializesEachSuccessfulPatch(t *testing.T)
 		[]string{mustEncodePNGDataURL(t, redPatch), mustEncodePNGDataURL(t, greenPatch)},
 		0,
 	)
+	if finalization.state != providerResultAlreadyMaterialized {
+		t.Fatalf("state=%d, want already materialized", finalization.state)
+	}
+	urls, outputs, err := finalization.completedOutputs()
 	if err != nil {
 		t.Fatalf("finalizeLocalRedrawResults returned error: %v", err)
 	}
-	if !stored || len(urls) != 2 || len(outputs) != 2 {
-		t.Fatalf("stored/urls/outputs = %v/%#v/%#v, want true/two/two", stored, urls, outputs)
+	if len(urls) != 2 || len(outputs) != 2 {
+		t.Fatalf("urls/outputs = %#v/%#v, want two/two", urls, outputs)
 	}
 	for index, output := range outputs {
 		if output.ResultIndex != index {
@@ -428,12 +431,11 @@ func TestFinalizeLocalRedrawResultsKeepsSuccessfulPatchesWhenOneFails(t *testing
 	}
 
 	executor := newTestProviderExecutorWithLocalStorage(t)
-	urls, outputs, stored, err := executor.finalizeLocalRedrawResults(
+	finalization := executor.finalizeLocalRedrawResults(
 		context.Background(),
 		42,
 		"task-local-redraw-partial",
 		&localRedrawContext{
-			featureSlug: "local-inpaint",
 			original:    original,
 			maskSampler: maskCoverageSampler{mask: mask, maskBounds: mask.Bounds(), dstWidth: 2, dstHeight: 2, useLuminance: true},
 			roi:         image.Rect(0, 0, 2, 2),
@@ -441,11 +443,15 @@ func TestFinalizeLocalRedrawResultsKeepsSuccessfulPatchesWhenOneFails(t *testing
 		[]string{mustEncodePNGDataURL(t, patch), "data:image/png;base64,bm90LWFuLWltYWdl"},
 		0,
 	)
+	if finalization.state != providerResultAlreadyMaterialized {
+		t.Fatalf("state=%d, want already materialized", finalization.state)
+	}
+	urls, outputs, err := finalization.completedOutputs()
 	if err != nil {
 		t.Fatalf("partial finalization returned error: %v", err)
 	}
-	if !stored || len(urls) != 1 || len(outputs) != 1 || outputs[0].ResultIndex != 0 {
-		t.Fatalf("stored/urls/outputs = %v/%#v/%#v, want one preserved slot", stored, urls, outputs)
+	if len(urls) != 1 || len(outputs) != 1 || outputs[0].ResultIndex != 0 {
+		t.Fatalf("urls/outputs = %#v/%#v, want one preserved slot", urls, outputs)
 	}
 }
 
@@ -462,13 +468,12 @@ func TestFinalizeLocalRedrawResultRequiresMaterializer(t *testing.T) {
 	}
 
 	c := &ProviderExecutor{}
-	imageURL, outputs, stored, err := c.finalizeLocalRedrawResult(
+	imageURL, output, err := c.finalizeLocalRedrawResult(
 		context.Background(),
 		42,
 		"task-local-redraw-no-store",
 		&localRedrawContext{
-			featureSlug: "local-inpaint",
-			original:    original,
+			original: original,
 			maskSampler: maskCoverageSampler{
 				mask:       mask,
 				maskBounds: mask.Bounds(),
@@ -487,11 +492,8 @@ func TestFinalizeLocalRedrawResultRequiresMaterializer(t *testing.T) {
 	if imageURL != "" {
 		t.Fatalf("imageURL=%q, want empty string", imageURL)
 	}
-	if len(outputs) != 0 {
-		t.Fatalf("outputs=%#v, want empty", outputs)
-	}
-	if stored {
-		t.Fatalf("stored=true, want false")
+	if output != (tasks.TaskOutput{}) {
+		t.Fatalf("output=%#v, want empty", output)
 	}
 	stage, category, ok := executionFailureDetails(err)
 	if !ok {

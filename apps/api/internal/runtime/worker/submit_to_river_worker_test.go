@@ -61,7 +61,7 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 	taskRuntime := taskruntime.NewService(accountRepo, taskRepo, assigner, newFakeCancelStoreForRiver())
 
 	seenRiverJobID := make(chan int64, 1)
-	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, taskRuntime, func(_ context.Context, runtimeAccount *accounts.ApiAccount, task *tasks.TaskPayload, _ taskqueue.TaskAssignment) (providerCallOutput, error) {
+	orchestrator := newTaskExecutionOrchestrator(accountRepo, &fakeRequeuer{}, taskRuntime, func(_ context.Context, runtimeAccount *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, _ taskqueue.TaskAssignment) (providerCallOutput, error) {
 		if runtimeAccount.ID != account.ID {
 			return providerCallOutput{}, fmt.Errorf("provider got account_id=%d, want %d", runtimeAccount.ID, account.ID)
 		}

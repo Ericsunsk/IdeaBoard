@@ -97,6 +97,7 @@ const imageNodeItemSchema = v.strictObject({
   outputResolution: v.optional(outputResolutionSchema),
   pendingTaskId: v.optional(nonEmptyStringSchema),
   pendingResultIndex: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0))),
+  pendingClientActionId: v.optional(nonEmptyStringSchema),
   outputStatus: workflowNodeOutputStatusSchema,
   outputImages: v.array(imageNodeOutputItemSchema),
 })

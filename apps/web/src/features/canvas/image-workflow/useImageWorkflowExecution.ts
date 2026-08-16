@@ -7,7 +7,7 @@ import {
   type ImageWorkflowCommands,
   useCanvasExecutionWorkspace,
   useFlowImageWorkflowExecution,
-  type CanvasExecutionRuntime,
+  type PendingImageExecutionCore,
 } from '../execution'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasGraphStore } from '../graph-runtime'
@@ -24,11 +24,11 @@ export type UseImageWorkflowExecutionOptions = {
   createCurrentCanvasGraphStore: (
     snapshotOptions?: FlowToCanvasBoardSnapshotOptions,
   ) => CanvasGraphStore
-  boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
+  boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   flushAutosave: (options?: { silent?: boolean }) => Promise<void>
   refreshNodeInternals: (nodeIds: string[]) => void
   feedback: CanvasTaskExecutionFeedback
-  executionRuntime: CanvasExecutionRuntime
+  executionCore: PendingImageExecutionCore
   cancelTasks: (taskIds: readonly string[]) => void
 }
 
@@ -111,7 +111,7 @@ export function useImageWorkflowExecution(
     boardBaseSnapshot: options.boardBaseSnapshot,
     flushAutosave: options.flushAutosave,
     refreshNodeInternals: options.refreshNodeInternals,
-    executionRuntime: options.executionRuntime,
+    executionCore: options.executionCore,
     cancelTasks: options.cancelTasks,
     onSuccess: options.feedback.succeeded,
     onWarning: handleWorkflowWarning,

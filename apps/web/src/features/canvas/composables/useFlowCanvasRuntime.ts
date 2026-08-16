@@ -1,4 +1,4 @@
-import { ref, watch, type Ref } from 'vue'
+import { onScopeDispose, ref, shallowRef, watch, type Ref } from 'vue'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import { useFlowHistory, type FlowHistorySnapshot } from './useFlowHistory'
 import {
@@ -21,6 +21,7 @@ import { useCanvasGroupRuntime } from './useCanvasGroupRuntime'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasBoardSession } from '../board-session'
 import {
+  canvasBoardSnapshotToFlow,
   flowToCanvasBoardSnapshot,
   type FlowToCanvasBoardSnapshotOptions,
 } from '../utils/flowSnapshotAdapter'
@@ -31,10 +32,12 @@ import {
   type CanvasNodeDragLifecycle,
 } from '../flow-pane'
 import {
-  projectCanvasExecutionEdgeAnimation,
-  type CanvasExecutionLease,
-  type CanvasExecutionRuntime,
-} from '../execution/runtime/CanvasExecutionRuntime'
+  CanvasBoardGraphSession,
+  collectPendingImageTasks,
+  projectPendingImageExecutionEdges,
+  type PendingImageExecutionCore,
+  type PendingImageExecutionLease,
+} from '../execution/pending-execution'
 
 type SelectableFlowItem = {
   id: string
@@ -55,7 +58,8 @@ export type UseFlowCanvasRuntimeOptions = {
   isSavingBoard: Ref<boolean>
   autosaveResumeSignal?: Ref<unknown>
   boardSession: CanvasBoardSession
-  executionRuntime: CanvasExecutionRuntime
+  executionCore: PendingImageExecutionCore
+  cancelTasks: (taskIds: readonly string[]) => void
   onWarning: (message: string) => void
   onSuccess: (message: string) => void
   onError: (message: string) => void
@@ -67,8 +71,13 @@ export type UseFlowCanvasRuntimeOptions = {
 
 export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   const localEditVersion = ref(0)
-  const releaseNodeExecutions = (leases: readonly CanvasExecutionLease[]) => {
-    options.executionRuntime.releaseNodeExecutions(leases)
+  const executionSnapshot = shallowRef(options.executionCore.snapshot())
+  onScopeDispose(options.executionCore.subscribe((snapshot) => (executionSnapshot.value = snapshot)))
+  const isNodeExecutionActive = (nodeId: string) =>
+    options.executionCore.captureActiveLeases([nodeId as `image-${number}`]).length > 0
+  const releaseNodeExecutions = (leases: readonly PendingImageExecutionLease[]) => {
+    const release = options.executionCore.release(leases)
+    options.cancelTasks(release.cancellableTaskIds)
   }
   const historyGroups: { value: unknown[] } = {
     get value() {
@@ -154,40 +163,33 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       nodes: [
         ...savedGraph.nodes,
         ...options.nodes.value.filter(
-          (node) => !savedNodesById.has(node.id) && options.executionRuntime.isNodeActive(node.id),
+          (node) => !savedNodesById.has(node.id) && isNodeExecutionActive(node.id),
         ),
       ],
       edges: [
         ...savedGraph.edges,
         ...options.edges.value.filter(
           (edge) =>
-            !savedEdgesById.has(edge.id) && options.executionRuntime.isNodeActive(edge.target),
+            !savedEdgesById.has(edge.id) && isNodeExecutionActive(edge.target),
         ),
       ],
     }
   }
 
   function projectExecutionEdges(edges: Edge[]): Edge[] {
-    return projectCanvasExecutionEdgeAnimation(edges, options.executionRuntime.nodeStates.value)
-      .edges
+    return projectPendingImageExecutionEdges(edges, executionSnapshot.value).edges
   }
 
-  function hydratePendingExecutionLeases(nodes: Node[]) {
-    const attachment = options.executionRuntime.attachment.value
+  function hydratePendingExecutionLeases() {
+    const attachment = options.executionCore.currentAttachment()
     if (!attachment) return
-    nodes.forEach((node) => {
-      const snapshotNode = node.data?.snapshotNode as
-        { type?: unknown; outputStatus?: unknown; pendingTaskId?: unknown } | undefined
-      const taskId =
-        typeof snapshotNode?.pendingTaskId === 'string' ? snapshotNode.pendingTaskId.trim() : ''
-      if (
-        snapshotNode?.type !== 'image-node' ||
-        snapshotNode.outputStatus !== 'running' ||
-        !taskId
-      ) {
-        return
-      }
-      options.executionRuntime.hydratePending(attachment, node.id, taskId)
+    collectPendingImageTasks(options.boardBaseSnapshot.value).forEach((pending) => {
+      const reattached = options.executionCore.hydratePendingLease(attachment, {
+        resultNodeId: pending.resultNodeId,
+        taskId: pending.taskId,
+        clientActionId: pending.clientActionId,
+      })
+      if (reattached.kind === 'started') options.cancelTasks(reattached.cancellableTaskIds)
     })
   }
 
@@ -196,7 +198,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     commitOptions: FlowGraphCommitOptions,
   ) {
     if (commitOptions.source === 'hydrate-replace') {
-      hydratePendingExecutionLeases(nextGraph.nodes)
+      hydratePendingExecutionLeases()
     }
     const semanticGraph =
       commitOptions.source === 'save-reconcile' ? rebaseSavedFlowProjection(nextGraph) : nextGraph
@@ -221,7 +223,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   }
 
   watch(
-    [options.edges, options.executionRuntime.nodeStates],
+    [options.edges, executionSnapshot],
     () => {
       const projectedEdges = projectExecutionEdges(options.edges.value)
       if (projectedEdges === options.edges.value) return
@@ -255,7 +257,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     isLoadingBoardSnapshot: options.isLoadingBoardSnapshot,
     isSavingBoard: options.isSavingBoard,
     boardSession: options.boardSession,
-    readBoardAttachmentEpoch: () => options.executionRuntime.attachment.value?.epoch ?? 0,
+    readBoardAttachmentEpoch: () => options.executionCore.snapshot().attachment?.epoch ?? 0,
     onWarning: options.onWarning,
     onSuccess: options.onSuccess,
     onError: options.onError,
@@ -276,8 +278,21 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     nodeDragLifecycle.cancel()
     groupRuntime?.internal.resetTransientSelectionState()
     const boardId = options.boardSession.currentBoardId.value
-    if (boardId) options.executionRuntime.attachBoard(boardId)
-    else options.executionRuntime.detachBoard()
+    if (boardId) {
+      options.executionCore.attachBoard(
+        CanvasBoardGraphSession.create(boardId, {
+          createGraphStore: () => createCurrentCanvasGraphStore({ projection: 'runtime' }),
+          onMaterialized: (store) => {
+            const snapshot = store.exportSnapshot(options.boardBaseSnapshot.value)
+            const flow = canvasBoardSnapshotToFlow(snapshot)
+            graphAdapter.replaceGraph(
+              { nodes: flow.nodes as Node[], edges: flow.edges as Edge[] },
+              createFlowGraphCommandOptions({ recordHistory: false }),
+            )
+          },
+        }),
+      )
+    } else options.executionCore.detachBoard()
     const result = await loadInitialOrRouteBoardBase(...args)
     groupRuntime?.internal.handleCommittedGroupsChanged()
     return result
@@ -331,7 +346,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     commitGroups: commitHistoryGroups,
     markDirty,
     onWarning: options.onWarning,
-    captureActiveNodeExecutions: options.executionRuntime.captureActiveNodeExecutions,
+    captureActiveNodeExecutions: options.executionCore.captureActiveLeases,
     releaseNodeExecutions,
   })
 
@@ -375,7 +390,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       options.scheduleMicrotask ??
       ((callback: () => void) => void Promise.resolve().then(callback)),
     onWarning: options.onWarning,
-    captureActiveNodeExecutions: options.executionRuntime.captureActiveNodeExecutions,
+    captureActiveNodeExecutions: options.executionCore.captureActiveLeases,
     releaseNodeExecutions,
   })
 

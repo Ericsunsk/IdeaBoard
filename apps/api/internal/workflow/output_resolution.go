@@ -24,20 +24,6 @@ func NormalizeOutputResolution(raw string) (string, bool) {
 	}
 }
 
-func NormalizeOutputResolutionForFeature(feature, raw string) (string, bool) {
-	if (feature == FeatureSlugRemoveBg || feature == FeatureSlugHDUpscale) && strings.TrimSpace(raw) == "" {
-		return OutputResolutionDefault, true
-	}
-	resolution, ok := NormalizeOutputResolution(raw)
-	if !ok {
-		return "", false
-	}
-	if (feature == FeatureSlugRemoveBg || feature == FeatureSlugHDUpscale) && resolution != OutputResolutionDefault {
-		return "", false
-	}
-	return resolution, true
-}
-
 func SupportsOutputResolution(resolution string, supports2K, supports4K bool) bool {
 	switch resolution {
 	case OutputResolutionDefault:

@@ -2,6 +2,7 @@ package billingregistry
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"ideaboard/api/internal/billing"
@@ -39,12 +40,14 @@ func TestWorkflowRegistryUsesFeatureLevelBillingIdentities(t *testing.T) {
 		t.Fatalf("billing identities=%v, want=%v", skus, want)
 	}
 	for _, item := range items {
-		if string(item.SKU) == "ai-image:remove-bg" || string(item.SKU) == "ai-image:hd-upscale" {
-			if !slices.Equal(item.PricingVariants, []billing.OutputResolution{billing.OutputResolutionDefault}) {
-				t.Fatalf("dedicated image pricing variants for %s=%v", item.SKU, item.PricingVariants)
-			}
-		} else if !slices.Equal(item.PricingVariants, []billing.OutputResolution{billing.OutputResolution1K, billing.OutputResolution2K, billing.OutputResolution4K}) {
-			t.Fatalf("default pricing variants for %s=%v", item.SKU, item.PricingVariants)
+		slug := strings.TrimPrefix(string(item.SKU), "ai-image:")
+		resolutionValues := workflow.SupportedFeatureOutputResolutions(slug)
+		want := make([]billing.OutputResolution, 0, len(resolutionValues))
+		for _, resolution := range resolutionValues {
+			want = append(want, billing.OutputResolution(resolution))
+		}
+		if !slices.Equal(item.PricingVariants, want) {
+			t.Fatalf("pricing variants for %s=%v, want %v", item.SKU, item.PricingVariants, want)
 		}
 	}
 }

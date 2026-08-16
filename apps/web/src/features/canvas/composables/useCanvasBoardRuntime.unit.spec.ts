@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { HOME_PATH } from '../../../shared/constants/routePaths'
 import { useCanvasBoardRuntime } from './useCanvasBoardRuntime'
-import { createCanvasExecutionRuntime } from '../execution/runtime/CanvasExecutionRuntime'
+import { createPendingImageExecutionCore } from '../execution/pending-execution'
 
 const mocks = vi.hoisted(() => ({
   useCanvasBoardSession: vi.fn(),
@@ -94,7 +94,8 @@ describe('useCanvasBoardRuntime', () => {
         saveSucceeded: vi.fn(),
         saveFailed: vi.fn(),
       },
-      executionRuntime: createCanvasExecutionRuntime(),
+      executionCore: createPendingImageExecutionCore(),
+      cancelTasks: vi.fn(),
     })
 
     await runtime.boardChrome.onNavigateRequest('/boards/next')
@@ -120,7 +121,8 @@ describe('useCanvasBoardRuntime', () => {
       getUserIdentity: () => ({ userId: 7, userUid: 'user-seven' }),
       logoutAndRedirect: vi.fn(),
       feedback,
-      executionRuntime: createCanvasExecutionRuntime(),
+      executionCore: createPendingImageExecutionCore(),
+      cancelTasks: vi.fn(),
     })
     const flowOptions = mocks.useFlowCanvasRuntime.mock.calls[0]?.[0]
 

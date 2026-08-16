@@ -15,7 +15,7 @@ import {
 import { applyFlowGraphDeleteProjection } from './flowGraphDeleteProjection'
 import type { CanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
-import type { CanvasExecutionLease } from '../execution/runtime/CanvasExecutionRuntime'
+import type { PendingImageExecutionLease } from '../execution/pending-execution'
 
 type EdgeRemoveChange = Extract<EdgeChange, { type: 'remove' }>
 
@@ -35,8 +35,8 @@ export type CanvasDeleteCommandLifecycleOptions<HistorySnapshot> = {
   resolveRemovedFlowNodes: (changes: readonly NodeChange[]) => ResolvedFlowNodeChanges | null
   scheduleMicrotask: (callback: () => void) => void
   onWarning: (message: string) => void
-  captureActiveNodeExecutions: (nodeIds: readonly string[]) => CanvasExecutionLease[]
-  releaseNodeExecutions: (leases: readonly CanvasExecutionLease[]) => void
+  captureActiveNodeExecutions: (nodeIds: readonly string[]) => PendingImageExecutionLease[]
+  releaseNodeExecutions: (leases: readonly PendingImageExecutionLease[]) => void
 }
 
 export type CanvasDeleteCommandLifecycle = {

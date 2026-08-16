@@ -1,7 +1,7 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
-import type { CanvasExecutionLease } from '../execution/runtime/CanvasExecutionRuntime'
+import type { PendingImageExecutionLease } from '../execution/pending-execution'
 import {
   commitCanvasGraphDeleteGroupIntent,
   createCanvasGraphStore,
@@ -164,8 +164,8 @@ export type UseCanvasGroupRuntimeOptions = {
   commitGroups: (groups: CanvasBoardSnapshot['groups']) => void
   markDirty: () => void
   onWarning: (message: string) => void
-  captureActiveNodeExecutions: (nodeIds: readonly string[]) => CanvasExecutionLease[]
-  releaseNodeExecutions: (leases: readonly CanvasExecutionLease[]) => void
+  captureActiveNodeExecutions: (nodeIds: readonly string[]) => PendingImageExecutionLease[]
+  releaseNodeExecutions: (leases: readonly PendingImageExecutionLease[]) => void
 }
 
 export function useCanvasGroupRuntime(

@@ -36,17 +36,20 @@ func WorkflowItems() []billing.BillableItemDefinition {
 		if !ok {
 			presentation = workflowPresentation{displayName: slug}
 		}
-		definitions = append(definitions, billing.BillableItemDefinition{
-			SKU:         billing.SKU(fmt.Sprintf("ai-image:%s", slug)),
-			Namespace:   "ai-image",
-			ProductKind: workflowProductKind,
-			DisplayName: presentation.displayName,
-			Description: presentation.description,
-			SortOrder:   (index + 1) * 10,
-		})
-		if slug == workflow.FeatureSlugRemoveBg || slug == workflow.FeatureSlugHDUpscale {
-			definitions[len(definitions)-1].PricingVariants = []billing.OutputResolution{billing.OutputResolutionDefault}
+		resolutionValues := workflow.SupportedFeatureOutputResolutions(slug)
+		pricingVariants := make([]billing.OutputResolution, 0, len(resolutionValues))
+		for _, resolution := range resolutionValues {
+			pricingVariants = append(pricingVariants, billing.OutputResolution(resolution))
 		}
+		definitions = append(definitions, billing.BillableItemDefinition{
+			SKU:             billing.SKU(fmt.Sprintf("ai-image:%s", slug)),
+			Namespace:       "ai-image",
+			ProductKind:     workflowProductKind,
+			DisplayName:     presentation.displayName,
+			Description:     presentation.description,
+			SortOrder:       (index + 1) * 10,
+			PricingVariants: pricingVariants,
+		})
 	}
 	return definitions
 }

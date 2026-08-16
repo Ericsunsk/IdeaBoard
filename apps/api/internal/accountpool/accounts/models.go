@@ -37,6 +37,16 @@ type RuntimeCredential struct {
 	Status             string
 }
 
+// RuntimeAccountAccess is the live gate for an already-resolved assignment.
+// Provider routing facts intentionally do not cross this boundary: the worker
+// must execute the immutable assignment snapshot, not current Admin config.
+type RuntimeAccountAccess struct {
+	ID      int64
+	Name    string
+	APIKey  string
+	Timeout int
+}
+
 type AccountModel struct {
 	ID            int64  `json:"id,omitempty"`
 	Name          string `json:"name"`

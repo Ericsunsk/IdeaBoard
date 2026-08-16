@@ -1,11 +1,49 @@
 package tasksubmission
 
 import (
+	"encoding/json"
 	"testing"
 
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/tasks"
+	"ideaboard/api/internal/workflow"
 )
+
+func canonicalExecutionPlanForTest(t *testing.T, feature string, count int) (workflow.FeatureExecutionPlan, string) {
+	t.Helper()
+	resolution := workflow.OutputResolution1K
+	imageInputCount := 1
+	if feature == workflow.FeatureSlugPromptGeneration {
+		imageInputCount = 0
+	} else if feature == workflow.FeatureSlugStyleFusion {
+		imageInputCount = 2
+	}
+	plan, err := workflow.CompileFeatureExecutionPlan(workflow.CompileFeatureExecutionInput{
+		Feature: feature,
+		Params: workflow.FeatureExecutionParams{
+			RequestedOutputCount: &count,
+			OutputResolution:     &resolution,
+			ImageInputCount:      imageInputCount,
+			HasMaskInput:         feature == workflow.FeatureSlugLocalInpaint,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := workflow.EncodeFeatureExecutionPlan(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	params, err := json.Marshal(tasks.WorkflowTaskParams{
+		SchemaVersion: tasks.CurrentParamsSchemaVersion,
+		Feature:       feature,
+		ExecutionPlan: encoded,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return plan, string(params)
+}
 
 func TestNewCanonicalRequestRejectsMismatchedBillingProduct(t *testing.T) {
 	_, err := NewCanonicalRequest(CanonicalRequestInput{
@@ -56,13 +94,44 @@ func TestNewCanonicalRequestRejectsMissingBillingForBillableWorkflow(t *testing.
 	}
 }
 
+func TestNewCanonicalRequestRejectsMissingExecutionPlanForAIImageWorkflow(t *testing.T) {
+	_, err := NewCanonicalRequest(CanonicalRequestInput{
+		UserID: 42, Feature: workflow.FeatureSlugPromptGeneration,
+		ClientActionID: "missing-plan",
+		BillingRequest: &taskbilling.Request{
+			Feature: workflow.FeatureSlugPromptGeneration, OutputResolution: "1k", Quantity: 1,
+		},
+	})
+	if err == nil {
+		t.Fatal("expected AI image request without execution plan to be rejected")
+	}
+}
+
+func TestNewCanonicalRequestRejectsPersistedExecutionPlanMismatch(t *testing.T) {
+	plan, _ := canonicalExecutionPlanForTest(t, workflow.FeatureSlugPromptGeneration, 1)
+	_, styleParams := canonicalExecutionPlanForTest(t, workflow.FeatureSlugStyleVariation, 1)
+	_, err := NewCanonicalRequest(CanonicalRequestInput{
+		UserID: 42, Feature: workflow.FeatureSlugPromptGeneration, Params: styleParams,
+		ClientActionID: "mismatched-plan", ExecutionPlan: &plan,
+		BillingRequest: &taskbilling.Request{
+			Feature: workflow.FeatureSlugPromptGeneration, OutputResolution: "1k", Quantity: 1,
+		},
+	})
+	if err == nil {
+		t.Fatal("expected persisted execution plan mismatch to be rejected")
+	}
+}
+
 func TestCanonicalRequestOwnsBillingFacts(t *testing.T) {
 	inputBilling := &taskbilling.Request{Feature: "style-variation", OutputResolution: "1k", Quantity: 1}
+	plan, params := canonicalExecutionPlanForTest(t, inputBilling.Feature, 1)
 	request, err := NewCanonicalRequest(CanonicalRequestInput{
 		UserID:         42,
 		Feature:        inputBilling.Feature,
+		Params:         params,
 		ClientActionID: "action-1",
 		BillingRequest: inputBilling,
+		ExecutionPlan:  &plan,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -76,13 +145,51 @@ func TestCanonicalRequestOwnsBillingFacts(t *testing.T) {
 	}
 }
 
+func TestCanonicalRequestRejectsPreparedMediaThatDivergesFromExecutionPlan(t *testing.T) {
+	plan, params := canonicalExecutionPlanForTest(t, workflow.FeatureSlugStyleVariation, 1)
+	request, err := NewCanonicalRequest(CanonicalRequestInput{
+		UserID: 42, Feature: workflow.FeatureSlugStyleVariation, Params: params,
+		ClientActionID: "prepare-media-contract", ExecutionPlan: &plan,
+		BillingRequest: &taskbilling.Request{Feature: workflow.FeatureSlugStyleVariation, OutputResolution: "1k", Quantity: 1},
+		Generation: &tasks.GenerationRequestSnapshot{
+			Feature: workflow.FeatureSlugStyleVariation, Primitive: string(workflow.GenerationPrimitiveImageToImage),
+			TemplateFingerprint: "fp", RequestedOutputCount: 1,
+			Media: []tasks.GenerationMediaIntent{{InputIndex: 0, Role: "input", Ref: "source"}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := map[string][]tasks.GenerationMediaIntent{
+		"missing image": nil,
+		"extra image": {
+			{InputIndex: 0, Role: "input", Ref: "source"},
+			{InputIndex: 1, Role: "reference", Ref: "extra"},
+		},
+		"injected mask": {
+			{InputIndex: 0, Role: "mask", Ref: "mask"},
+		},
+	}
+	for name, media := range tests {
+		t.Run(name, func(t *testing.T) {
+			snapshot := *request.GenerationSnapshot()
+			snapshot.Media = media
+			if _, err := request.WithGenerationSnapshot(snapshot); err == nil {
+				t.Fatal("expected prepared media divergence to be rejected")
+			}
+		})
+	}
+}
+
 func TestNewCanonicalRequestRejectsBillingQuantityMismatchedWithGeneration(t *testing.T) {
 	count := 2
+	plan, params := canonicalExecutionPlanForTest(t, workflow.FeatureSlugStyleVariation, count)
 	_, err := NewCanonicalRequest(CanonicalRequestInput{
-		UserID: 42, Feature: "style-variation", ClientActionID: "action-1",
+		UserID: 42, Feature: "style-variation", Params: params, ClientActionID: "action-1", ExecutionPlan: &plan,
 		BillingRequest: &taskbilling.Request{Feature: "style-variation", OutputResolution: "1k", Quantity: 1},
 		Generation: &tasks.GenerationRequestSnapshot{
-			Feature: "style-variation", Primitive: "text-to-image", TemplateFingerprint: "fp", RequestedOutputCount: count,
+			Feature: "style-variation", Primitive: "image-to-image", TemplateFingerprint: "fp", RequestedOutputCount: count,
 		},
 	})
 	if err == nil {

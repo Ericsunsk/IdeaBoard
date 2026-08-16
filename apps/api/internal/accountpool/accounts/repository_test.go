@@ -308,14 +308,11 @@ func TestRuntimeAccountForAssignmentRequiresActiveAccountEndpointAndCredential(t
 		if err != nil {
 			t.Fatalf("GetRuntimeAccountForAssignment returned error: %v", err)
 		}
-		if runtimeAccount.ApiKey != "runtime-secret" {
-			t.Fatalf("runtime api key = %q, want runtime-secret", runtimeAccount.ApiKey)
+		if runtimeAccount.APIKey != "runtime-secret" {
+			t.Fatalf("runtime api key = %q, want runtime-secret", runtimeAccount.APIKey)
 		}
-		if runtimeAccount.ProviderEndpointID != account.ProviderEndpointID || runtimeAccount.ApiType != "openai-compatible" {
-			t.Fatalf("runtime account = %+v, want assignment endpoint facts", runtimeAccount)
-		}
-		if len(runtimeAccount.Models) != 1 || runtimeAccount.Models[0].Name != "gpt-image-1" {
-			t.Fatalf("runtime models = %+v, want account models attached", runtimeAccount.Models)
+		if runtimeAccount.ID != account.ID || runtimeAccount.Name != account.Name || runtimeAccount.Timeout != account.Timeout {
+			t.Fatalf("runtime account access = %+v, want live account identity and timeout", runtimeAccount)
 		}
 	})
 

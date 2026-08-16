@@ -7,6 +7,7 @@ import (
 )
 
 type taskAssignmentTaskState struct {
+	Params                   string
 	Status                   string
 	UserID                   int64
 	AccountID                int64

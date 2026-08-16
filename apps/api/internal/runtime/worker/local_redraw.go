@@ -31,7 +31,6 @@ import (
 const maskLuminanceThreshold = 16
 
 type localRedrawContext struct {
-	featureSlug string
 	original    *image.NRGBA
 	maskSampler maskCoverageSampler
 	roi         image.Rectangle
@@ -39,7 +38,6 @@ type localRedrawContext struct {
 }
 
 type localRedrawRequest struct {
-	FeatureSlug string
 	OriginalRef string
 	MaskRef     string
 }
@@ -49,27 +47,22 @@ type localRedrawUpstreamPatch struct {
 	ROI        image.Rectangle
 }
 
-func readLocalRedrawRequest(params map[string]interface{}) (localRedrawRequest, bool, error) {
+func readLocalRedrawRequest(params map[string]interface{}) (localRedrawRequest, error) {
 	if params == nil {
-		return localRedrawRequest{}, false, nil
-	}
-	featureSlug, ok := workflow.ReadWorkflowStringParam(params, "feature")
-	if !ok || featureSlug != workflow.FeatureSlugLocalInpaint {
-		return localRedrawRequest{}, false, nil
+		return localRedrawRequest{}, fmt.Errorf("local redraw 参数为空")
 	}
 	maskRef, ok := readLocalRedrawMaskRef(params)
 	if !ok {
-		return localRedrawRequest{}, false, nil
+		return localRedrawRequest{}, fmt.Errorf("local redraw 缺少蒙版")
 	}
 	originalRef, ok := readLocalRedrawOriginalImageRef(params)
 	if !ok {
-		return localRedrawRequest{}, true, fmt.Errorf("local redraw 缺少原图: feature=%s", featureSlug)
+		return localRedrawRequest{}, fmt.Errorf("local redraw 缺少原图")
 	}
 	return localRedrawRequest{
-		FeatureSlug: featureSlug,
 		OriginalRef: originalRef,
 		MaskRef:     maskRef,
-	}, true, nil
+	}, nil
 }
 
 func (p localRedrawUpstreamPatch) apply(params map[string]interface{}) error {
@@ -123,40 +116,37 @@ func (s maskCoverageSampler) coverageAt(x, y int) uint8 {
 }
 
 func (c *ProviderExecutor) prepareLocalRedrawPipeline(ctx context.Context, account *accounts.ApiAccount, params map[string]interface{}, timeout time.Duration) (*localRedrawContext, error) {
-	redrawReq, ok, err := readLocalRedrawRequest(params)
+	redrawReq, err := readLocalRedrawRequest(params)
 	if err != nil {
 		return nil, err
-	}
-	if !ok {
-		return nil, nil
 	}
 
 	allowHosts := trustedImageDownloadHosts(ctx, account, c.publicOrigins)
 	originalImage, err := c.loadImageFromRef(ctx, redrawReq.OriginalRef, timeout, allowHosts)
 	if err != nil {
-		return nil, fmt.Errorf("local redraw 读取原图失败: feature=%s err=%w", redrawReq.FeatureSlug, err)
+		return nil, fmt.Errorf("local redraw 读取原图失败: %w", err)
 	}
 	maskImage, err := c.loadImageFromRef(ctx, redrawReq.MaskRef, timeout, allowHosts)
 	if err != nil {
-		return nil, fmt.Errorf("local redraw 读取蒙版失败: feature=%s err=%w", redrawReq.FeatureSlug, err)
+		return nil, fmt.Errorf("local redraw 读取蒙版失败: %w", err)
 	}
 
 	originalNRGBA := cloneImageToNRGBA(originalImage)
 	if originalNRGBA.Bounds().Dx() == 0 || originalNRGBA.Bounds().Dy() == 0 {
-		return nil, fmt.Errorf("local redraw 原图尺寸无效: feature=%s", redrawReq.FeatureSlug)
+		return nil, fmt.Errorf("local redraw 原图尺寸无效")
 	}
 
 	sampler, bbox, err := buildLocalRedrawMaskSampler(maskImage, originalNRGBA.Bounds())
 	if err != nil {
-		return nil, fmt.Errorf("local redraw 计算蒙版区域失败: feature=%s err=%w", redrawReq.FeatureSlug, err)
+		return nil, fmt.Errorf("local redraw 计算蒙版区域失败: %w", err)
 	}
 	roi, err := expandBBoxWithPadding(bbox, originalNRGBA.Bounds())
 	if err != nil {
-		return nil, fmt.Errorf("local redraw 裁剪区域无效: feature=%s err=%w", redrawReq.FeatureSlug, err)
+		return nil, fmt.Errorf("local redraw 裁剪区域无效: %w", err)
 	}
 	roiDataURL, err := encodeROIToDataURL(originalNRGBA, roi)
 	if err != nil {
-		return nil, fmt.Errorf("local redraw 裁剪 ROI 失败: feature=%s err=%w", redrawReq.FeatureSlug, err)
+		return nil, fmt.Errorf("local redraw 裁剪 ROI 失败: %w", err)
 	}
 
 	patch := localRedrawUpstreamPatch{ROIDataURL: roiDataURL, ROI: roi}
@@ -165,7 +155,6 @@ func (c *ProviderExecutor) prepareLocalRedrawPipeline(ctx context.Context, accou
 	}
 
 	return &localRedrawContext{
-		featureSlug: redrawReq.FeatureSlug,
 		original:    originalNRGBA,
 		maskSampler: sampler,
 		roi:         roi,
@@ -173,90 +162,90 @@ func (c *ProviderExecutor) prepareLocalRedrawPipeline(ctx context.Context, accou
 	}, nil
 }
 
-func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID int64, taskID string, redraw *localRedrawContext, upstreamImageRef string, timeout time.Duration) (string, []tasks.TaskOutput, bool, error) {
+func (c *ProviderExecutor) finalizeLocalRedrawResult(ctx context.Context, userID int64, taskID string, redraw *localRedrawContext, upstreamImageRef string, timeout time.Duration) (string, tasks.TaskOutput, error) {
 	if redraw == nil {
-		return upstreamImageRef, nil, false, nil
+		return "", tasks.TaskOutput{}, fmt.Errorf("local redraw 后处理上下文无效")
 	}
 	upstreamImage, err := c.loadImageFromRef(ctx, upstreamImageRef, timeout, redraw.allowHosts)
 	if err != nil {
-		return "", nil, false, newExecutionFailureError(
+		return "", tasks.TaskOutput{}, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryFinalizeError,
-			fmt.Errorf("local redraw 读取上游结果失败: feature=%s err=%w", redraw.featureSlug, err),
+			fmt.Errorf("local redraw 读取上游结果失败: %w", err),
 		)
 	}
 	roiWidth := redraw.roi.Dx()
 	roiHeight := redraw.roi.Dy()
 	if roiWidth <= 0 || roiHeight <= 0 {
-		return "", nil, false, newExecutionFailureError(
+		return "", tasks.TaskOutput{}, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryFinalizeError,
-			fmt.Errorf("local redraw 回贴 ROI 尺寸无效: feature=%s", redraw.featureSlug),
+			fmt.Errorf("local redraw 回贴 ROI 尺寸无效"),
 		)
 	}
 
 	upstreamScaled := scaleImageToNRGBA(upstreamImage, roiWidth, roiHeight)
 	composed, err := applyMaskedComposite(redraw.original, redraw.maskSampler, redraw.roi, upstreamScaled)
 	if err != nil {
-		return "", nil, false, newExecutionFailureError(
+		return "", tasks.TaskOutput{}, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryFinalizeError,
-			fmt.Errorf("local redraw 回贴失败: feature=%s err=%w", redraw.featureSlug, err),
+			fmt.Errorf("local redraw 回贴失败: %w", err),
 		)
 	}
 	composedBytes, err := encodeImagePNG(composed)
 	if err != nil {
-		return "", nil, false, newExecutionFailureError(
+		return "", tasks.TaskOutput{}, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryFinalizeError,
-			fmt.Errorf("local redraw 编码结果失败: feature=%s err=%w", redraw.featureSlug, err),
+			fmt.Errorf("local redraw 编码结果失败: %w", err),
 		)
 	}
 
 	if c.resultMaterializer == nil {
-		return "", nil, false, newExecutionFailureError(
+		return "", tasks.TaskOutput{}, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
 			fmt.Errorf("local redraw 持久化失败: 存储服务未初始化"),
 		)
 	}
-	filename := fmt.Sprintf("local-redraw-%s-%d.png", sanitizeFeatureSlug(redraw.featureSlug), time.Now().UnixNano())
+	filename := fmt.Sprintf("local-redraw-%d.png", time.Now().UnixNano())
 	materialized, err := c.resultMaterializer.MaterializeBytesResult(ctx, userID, taskID, filename, upstreamImageRef, composedBytes, taskmedia.ResultMaterializeOptions{})
 	if err != nil {
-		return "", nil, false, newExecutionFailureError(
+		return "", tasks.TaskOutput{}, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
-			fmt.Errorf("local redraw 持久化失败: feature=%s err=%w", redraw.featureSlug, err),
+			fmt.Errorf("local redraw 持久化失败: %w", err),
 		)
 	}
 	if len(materialized.Items) != 1 {
-		return "", nil, false, newExecutionFailureError(
+		return "", tasks.TaskOutput{}, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
-			fmt.Errorf("local redraw 持久化失败: feature=%s materializer returned inconsistent result counts: items=%d", redraw.featureSlug, len(materialized.Items)),
+			fmt.Errorf("local redraw 持久化失败: materializer returned inconsistent result counts: items=%d", len(materialized.Items)),
 		)
 	}
 	materializedURL := materialized.Items[0].ImageURL
 	if strings.TrimSpace(materializedURL) == "" {
-		return "", nil, false, newExecutionFailureError(
+		return "", tasks.TaskOutput{}, newExecutionFailureError(
 			tasks.ExecutionStageFinalizing,
 			tasks.FailureCategoryStorageError,
-			fmt.Errorf("local redraw 持久化失败: feature=%s materializer returned empty URL", redraw.featureSlug),
+			fmt.Errorf("local redraw 持久化失败: materializer returned empty URL"),
 		)
 	}
-	return materializedURL, []tasks.TaskOutput{materialized.Items[0].Output}, true, nil
+	return materializedURL, materialized.Items[0].Output, nil
 }
 
-func (c *ProviderExecutor) finalizeLocalRedrawResults(ctx context.Context, userID int64, taskID string, redraw *localRedrawContext, upstreamImageRefs []string, timeout time.Duration) ([]string, []tasks.TaskOutput, bool, error) {
+func (c *ProviderExecutor) finalizeLocalRedrawResults(ctx context.Context, userID int64, taskID string, redraw *localRedrawContext, upstreamImageRefs []string, timeout time.Duration) providerResultFinalization {
 	if redraw == nil {
-		return upstreamImageRefs, nil, false, nil
+		return newProviderTerminalFailure(fmt.Errorf("local redraw 后处理上下文无效"))
 	}
 
 	imageURLs := make([]string, 0, len(upstreamImageRefs))
 	outputs := make([]tasks.TaskOutput, 0, len(upstreamImageRefs))
 	var firstFailure error
 	for resultIndex, upstreamImageRef := range upstreamImageRefs {
-		imageURL, materializedOutputs, stored, err := c.finalizeLocalRedrawResult(
+		imageURL, output, err := c.finalizeLocalRedrawResult(
 			ctx,
 			userID,
 			taskID,
@@ -266,39 +255,38 @@ func (c *ProviderExecutor) finalizeLocalRedrawResults(ctx context.Context, userI
 		)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
-				return nil, nil, false, err
+				return newProviderTerminalFailure(err)
 			}
 			if firstFailure == nil {
 				firstFailure = err
 			}
 			continue
 		}
-		if !stored || len(materializedOutputs) != 1 || strings.TrimSpace(imageURL) == "" {
+		if strings.TrimSpace(imageURL) == "" {
 			if firstFailure == nil {
 				firstFailure = newExecutionFailureError(
 					tasks.ExecutionStageFinalizing,
 					tasks.FailureCategoryStorageError,
-					fmt.Errorf("local redraw 持久化返回无效结果: feature=%s", redraw.featureSlug),
+					fmt.Errorf("local redraw 持久化返回无效结果"),
 				)
 			}
 			continue
 		}
-		output := materializedOutputs[0]
 		output.ResultIndex = resultIndex
 		imageURLs = append(imageURLs, imageURL)
 		outputs = append(outputs, output)
 	}
 	if len(imageURLs) > 0 {
-		return imageURLs, outputs, true, nil
+		return newProviderAlreadyMaterialized(imageURLs, outputs)
 	}
 	if firstFailure != nil {
-		return nil, nil, false, firstFailure
+		return newProviderTerminalFailure(firstFailure)
 	}
-	return nil, nil, false, newExecutionFailureError(
+	return newProviderTerminalFailure(newExecutionFailureError(
 		tasks.ExecutionStageFinalizing,
 		tasks.FailureCategoryFinalizeError,
-		fmt.Errorf("local redraw 未收到可合成的上游结果: feature=%s", redraw.featureSlug),
-	)
+		fmt.Errorf("local redraw 未收到可合成的上游结果"),
+	))
 }
 
 func readLocalRedrawOriginalImageRef(params map[string]interface{}) (string, bool) {
@@ -585,15 +573,6 @@ func toInterfaceSlice(values []string) []interface{} {
 		out = append(out, value)
 	}
 	return out
-}
-
-func sanitizeFeatureSlug(featureSlug string) string {
-	trimmed := strings.TrimSpace(featureSlug)
-	if trimmed == "" {
-		return "unknown"
-	}
-	replacer := strings.NewReplacer("/", "-", "\\", "-", " ", "-")
-	return replacer.Replace(trimmed)
 }
 
 func isFullBounds(rect image.Rectangle, bounds image.Rectangle) bool {

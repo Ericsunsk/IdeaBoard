@@ -196,14 +196,14 @@ Vue Flow 是 interaction/rendering Adapter，不是 graph domain。
 
 ### Execution Projection Contract
 
-`CanvasExecutionRuntime` 是 Canvas Task runtime projection 的唯一 owner。每次 Board open、switch 或 reload 都创建新的 opaque attachment epoch；每个 node execution 使用 lease/CAS transition，旧 attachment 或被 supersede 的 lease 不得修改当前 graph。
+`PendingImageExecutionCore` 是 Canvas Task runtime 的唯一 owner。每次 Board open、switch 或 reload 都创建新的 opaque attachment epoch；每个 node execution 使用 lease/CAS transition，旧 attachment 或被 supersede 的 lease 不得修改当前 graph。
 
 - `CanvasBoardSnapshot` 只保存 persistence facts，永不保存 Flow Edge `animated`。
-- Runtime state/lease 是当前 Board 唯一 live running fact；presentation、Task cancellation 和 delete lifecycle 必须读取 Runtime capability，不得维护 running `Ref`/`Set`、透传 running callback，或从 snapshot `outputStatus` 推导 live state。
-- Snapshot 中的 `outputStatus: 'running'` 和 `pendingTaskId` 只表示 Hydration 所需的 persisted pending-task fact。只有 Hydration 可以据此建立 reattach lease；reattach driver 只能复用该 lease，save reconciliation、重复 reattach、presentation 和 delete lifecycle 都不得从 snapshot 反推或复活 running state。
-- Whole-graph hydrate、save reconciliation、history restore 和 execution transition 最终都由 Flow runtime 使用当前 Runtime state 重算所有 image-input edge animation。
+- Core state/lease 是当前 Board 唯一 live running fact；presentation、Task cancellation 和 delete lifecycle 必须读取 Core capability，不得维护 running `Ref`/`Set`、透传 running callback，或从 snapshot `outputStatus` 推导 live state。
+- Snapshot 中的 `outputStatus: 'running'` 和 `pendingTaskId` 只表示 Hydration 所需的 persisted pending-task fact。只有 Hydration 可以据此建立 reattach lease；reattach driver 只能原子 claim 该 lease 一次，save reconciliation、重复 reattach、presentation 和 delete lifecycle 都不得从 snapshot 反推或复活 running state。
+- Whole-graph hydrate、save reconciliation、history restore 和 execution transition 最终都由 Flow runtime 使用当前 Core snapshot 重算所有 image-input edge animation。
 - Flow Edge `animated` 是 serializer、history 和 undo/redo contract 之外的 ephemeral projection；history capture/restore 不得记录或恢复其值，semantic graph commit 后必须从当前 Runtime state 重新投影。
-- 删除 active execution node 时，Task identity 必须来自当前 Runtime lease/state；不得通过 snapshot `outputStatus` + `pendingTaskId` 猜测需要取消的 live Task。
+- 删除 active execution node 时，Task identity 必须来自当前 Core lease/state；Graph delete 成功后 release lease，并且只取消 Core 返回的 `cancellableTaskIds`；不得通过 snapshot `outputStatus` + `pendingTaskId` 猜测需要取消的 live Task。
 - Save 捕获 graph revision；revision 已推进时必须把 upload stabilization 作为有 precondition 的 media patch rebase 到最新 semantic snapshot，不能用旧 snapshot 覆盖当前 groups/media refs。Save reconciliation 只叠加 active lease 拥有、被 serializer 明确排除的 runtime overlay。
 - Board attachment 或 execution lease 失效后，旧 async completion 必须被拒绝，不能 materialize、cancel 或投影到新的 Board session。
 

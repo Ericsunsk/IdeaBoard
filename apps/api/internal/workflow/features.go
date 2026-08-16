@@ -23,27 +23,7 @@ const (
 	FeatureSlugImageExtend    = "image-extend"
 )
 
-var canonicalWorkflowFeatureSlugs = []string{
-	FeatureSlugPromptGeneration,
-	FeatureSlugLocalInpaint,
-	FeatureSlugSketchToImage,
-	FeatureSlugStyleVariation,
-	FeatureSlugRemoveBg,
-	FeatureSlugStyleFusion,
-	FeatureSlugHDUpscale,
-	FeatureSlugImageExtend,
-}
-
-var supportedWorkflowFeatureSlugs = []string{
-	FeatureSlugPromptGeneration,
-	FeatureSlugLocalInpaint,
-	FeatureSlugSketchToImage,
-	FeatureSlugStyleVariation,
-	FeatureSlugRemoveBg,
-	FeatureSlugStyleFusion,
-	FeatureSlugHDUpscale,
-	FeatureSlugImageExtend,
-}
+var supportedWorkflowFeatureSlugs = registeredImageFeatureSlugs()
 var supportedTaskFeatureSlugs = supportedFeatureSlugSet(supportedWorkflowFeatureSlugs)
 var aiImageWorkflowFeatures = supportedFeatureSlugSet(supportedWorkflowFeatureSlugs)
 
@@ -82,8 +62,8 @@ func SupportedFeatureSlugs() []string {
 // CanonicalFeatureSlugs is the executable workflow registry used by routing
 // and Billing. There is no legacy feature alias layer.
 func CanonicalFeatureSlugs() []string {
-	slugs := make([]string, len(canonicalWorkflowFeatureSlugs))
-	copy(slugs, canonicalWorkflowFeatureSlugs)
+	slugs := make([]string, len(supportedWorkflowFeatureSlugs))
+	copy(slugs, supportedWorkflowFeatureSlugs)
 	return slugs
 }
 

@@ -11,6 +11,7 @@ const (
 	Fusion        = "fusion"
 	Extra         = "extra"
 	Generation    = "generation"
+	ExecutionPlan = "execution_plan"
 
 	ImageURL           = "image_url"
 	ImageURLs          = "image_urls"
@@ -32,14 +33,14 @@ const (
 	ImageCount          = "image_count"
 	PromptUpsampling    = "prompt_upsampling"
 
-	Strength       = "strength"
-	TopPercent     = "top_percent"
-	RightPercent   = "right_percent"
-	BottomPercent  = "bottom_percent"
-	LeftPercent    = "left_percent"
-	Scale          = "scale"
-	Mode           = "mode"
-	InputWeights   = "input_weights"
+	Strength      = "strength"
+	TopPercent    = "top_percent"
+	RightPercent  = "right_percent"
+	BottomPercent = "bottom_percent"
+	LeftPercent   = "left_percent"
+	Scale         = "scale"
+	Mode          = "mode"
+	InputWeights  = "input_weights"
 
 	VariationStrength  = "variation_strength"
 	ExtendTop          = "extend_top"
@@ -73,6 +74,7 @@ var canonicalTaskParamKeys = keySet(
 	Fusion,
 	Extra,
 	Generation,
+	ExecutionPlan,
 )
 
 var providerReservedKeys = keySet(
@@ -86,6 +88,7 @@ var providerReservedKeys = keySet(
 	Fusion,
 	Extra,
 	Generation,
+	ExecutionPlan,
 	ImageURL,
 	ImageURLs,
 	ReferenceImageURLs,

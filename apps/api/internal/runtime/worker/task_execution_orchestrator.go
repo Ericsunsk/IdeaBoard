@@ -15,10 +15,10 @@ import (
 	"ideaboard/api/internal/workflow"
 )
 
-type providerCallFunc func(ctx context.Context, account *accounts.ApiAccount, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error)
+type providerCallFunc func(ctx context.Context, account *accounts.RuntimeAccountAccess, task *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error)
 
 type accountLookupStore interface {
-	GetRuntimeAccountForAssignment(ctx context.Context, accountID int64, providerEndpointID int64, credentialID int64) (*accounts.ApiAccount, error)
+	GetRuntimeAccountForAssignment(ctx context.Context, accountID int64, providerEndpointID int64, credentialID int64) (*accounts.RuntimeAccountAccess, error)
 }
 
 type taskExecutionOrchestrator struct {
@@ -62,8 +62,6 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.Tas
 		}
 		return nil
 	}
-	account = runtimeAccountFromAssignment(account, assignment)
-
 	cancelled, err := o.taskRuntime.IsTaskCancelled(ctx, task.TaskID)
 	if err != nil {
 		slog.Warn("check task cancellation failed", "task_id", task.TaskID, "correlation_id", correlationID, "err", err)
@@ -181,20 +179,6 @@ func (o *taskExecutionOrchestrator) execute(ctx context.Context, task *tasks.Tas
 		}
 	}
 	return nil
-}
-
-func runtimeAccountFromAssignment(account *accounts.ApiAccount, assignment taskqueue.TaskAssignment) *accounts.ApiAccount {
-	if account == nil {
-		return nil
-	}
-	runtimeAccount := *account
-	runtimeAccount.ProviderEndpointID = assignment.ProviderEndpointID
-	runtimeAccount.ApiType = strings.TrimSpace(assignment.APIType)
-	runtimeAccount.Protocol = strings.TrimSpace(assignment.ProviderEndpointProtocol)
-	runtimeAccount.ProxyURL = strings.TrimSpace(assignment.ProviderEndpointBaseURL)
-	runtimeAccount.ApiKey = strings.TrimSpace(account.ApiKey)
-	runtimeAccount.SecretConfigured = runtimeAccount.ApiKey != ""
-	return &runtimeAccount
 }
 
 func (o *taskExecutionOrchestrator) handleProviderFailure(
@@ -601,7 +585,7 @@ func (o *taskExecutionOrchestrator) recordExecutionSnapshot(ctx context.Context,
 	}
 }
 
-func taskExecutionSnapshot(task *tasks.TaskPayload, account *accounts.ApiAccount, assignment taskqueue.TaskAssignment) tasks.TaskExecutionSnapshot {
+func taskExecutionSnapshot(task *tasks.TaskPayload, account *accounts.RuntimeAccountAccess, assignment taskqueue.TaskAssignment) tasks.TaskExecutionSnapshot {
 	snapshot := tasks.TaskExecutionSnapshot{}
 	if task == nil {
 		return snapshot
@@ -611,7 +595,7 @@ func taskExecutionSnapshot(task *tasks.TaskPayload, account *accounts.ApiAccount
 	if account == nil {
 		return snapshot
 	}
-	if apiType, ok := workflow.ValidateProviderAPIType(account.ApiType, account.ProxyURL); ok {
+	if apiType := strings.ToLower(strings.TrimSpace(assignment.APIType)); workflow.IsSupportedProviderAPIType(apiType) {
 		snapshot.APIType = apiType
 	}
 	snapshot.ProviderEndpointName = strings.TrimSpace(assignment.ProviderEndpointName)

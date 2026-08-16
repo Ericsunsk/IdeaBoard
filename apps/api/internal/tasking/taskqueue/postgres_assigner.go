@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -57,12 +56,26 @@ func (a *PostgresTaskAssigner) Assign(ctx context.Context, task *tasks.TaskPaylo
 		}
 		return TaskAssignment{}, err
 	}
+	if tasks.IsTerminalStatus(taskState.Status) {
+		return commitTaskAssignment(tx, &committed, policy.discard(task.TaskID))
+	}
+	executionPlan, err := taskExecutionPlan(taskState.Params)
+	if err != nil {
+		return TaskAssignment{}, fmt.Errorf("resolve task routing requirement: %w", err)
+	}
 	if decision := policy.decideLockedTask(task.TaskID, task.RiverJobID, taskState); decision.done {
 		return commitTaskAssignment(tx, &committed, decision.assignment)
 	}
 
-	featureSlug := taskFeatureSlug(task.Params)
-	selectedAccount, shouldDefer, err := chooseTaskRoutingTx(ctx, tx, task.TaskID, taskState, time.Now(), featureSlug, taskOutputResolution(task.Params))
+	featureSlug := executionPlan.Feature()
+	selectedAccount, shouldDefer, err := chooseTaskRoutingTx(
+		ctx,
+		tx,
+		task.TaskID,
+		taskState,
+		time.Now(),
+		executionPlan.RoutingRequirement(),
+	)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return commitTaskAssignment(tx, &committed, policy.noCapacity(task.TaskID))
@@ -133,6 +146,7 @@ func (a *PostgresTaskAssigner) ConfirmTaskLease(ctx context.Context, assignment 
 }
 
 func getTaskStateForUpdate(ctx context.Context, tx *sql.Tx, taskID string) (taskAssignmentTaskState, error) {
+	var params string
 	var status string
 	var userID int64
 	var accountID sql.NullInt64
@@ -149,7 +163,7 @@ func getTaskStateForUpdate(ctx context.Context, tx *sql.Tx, taskID string) (task
 	var credentialKeyVersion string
 	var createdAt time.Time
 	err := tx.QueryRowContext(ctx, `
-SELECT t.status, t.user_id, tl.account_id, tl.provider_endpoint_id, tl.credential_id,
+SELECT t.params, t.status, t.user_id, tl.account_id, tl.provider_endpoint_id, tl.credential_id,
        COALESCE(tl.lease_token, '') AS lease_token,
        t.priority,
        COALESCE(tl.resolved_model, '') AS resolved_model,
@@ -165,6 +179,7 @@ LEFT JOIN task_leases tl ON tl.task_id = t.task_id
   AND tl.released_at IS NULL
 WHERE t.task_id = $1
 FOR UPDATE OF t`, taskID).Scan(
+		&params,
 		&status,
 		&userID,
 		&accountID,
@@ -197,6 +212,7 @@ FOR UPDATE OF t`, taskID).Scan(
 		currentCredentialID = credentialID.Int64
 	}
 	return taskAssignmentTaskState{
+		Params:                   params,
 		Status:                   status,
 		UserID:                   userID,
 		AccountID:                currentAccountID,
@@ -311,29 +327,19 @@ SET current_stage = EXCLUDED.current_stage,
 	return err
 }
 
-func taskFeatureSlug(paramsJSON string) string {
-	var params map[string]interface{}
-	if err := json.Unmarshal([]byte(paramsJSON), &params); err != nil {
-		return ""
-	}
-	slug, err := workflow.ResolveWorkflowFeatureSlug(params)
+func taskExecutionPlan(paramsJSON string) (workflow.FeatureExecutionPlan, error) {
+	params, err := tasks.UnmarshalParams(paramsJSON)
 	if err != nil {
-		return ""
+		return workflow.FeatureExecutionPlan{}, err
 	}
-	return slug
-}
-
-func taskOutputResolution(paramsJSON string) string {
-	var params map[string]interface{}
-	if err := json.Unmarshal([]byte(paramsJSON), &params); err != nil {
-		return workflow.OutputResolution1K
+	plan, err := workflow.DecodeFeatureExecutionPlan(params.ExecutionPlan)
+	if err != nil {
+		return workflow.FeatureExecutionPlan{}, err
 	}
-	value, _ := params["output_resolution"].(string)
-	resolution, ok := workflow.NormalizeOutputResolution(value)
-	if !ok {
-		return workflow.OutputResolution1K
+	if strings.TrimSpace(params.Feature) != plan.Feature() {
+		return workflow.FeatureExecutionPlan{}, fmt.Errorf("task params feature does not match execution plan")
 	}
-	return resolution
+	return plan, nil
 }
 
 func newTaskLeaseToken(riverJobID int64) (string, error) {

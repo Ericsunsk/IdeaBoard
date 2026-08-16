@@ -4,6 +4,7 @@ import "testing"
 
 func TestUnmarshalParamsPreservesUnknownKeysInExtra(t *testing.T) {
 	params, err := UnmarshalParams(`{
+		"schema_version": 2,
 		"feature": "hd-upscale",
 		"hd": {"scale": 2.0},
 		"provider_only": {"mode": "test"},
@@ -26,5 +27,22 @@ func TestUnmarshalParamsPreservesUnknownKeysInExtra(t *testing.T) {
 	}
 	if params.Controls == nil || params.Controls.SampleCount != 2 {
 		t.Fatalf("controls = %#v, want sample_count 2", params.Controls)
+	}
+}
+
+func TestUnmarshalParamsRejectsMissingAndUnsupportedSchemaVersions(t *testing.T) {
+	tests := map[string]string{
+		"empty":   "",
+		"missing": `{"feature":"prompt-generation"}`,
+		"zero":    `{"schema_version":0}`,
+		"legacy":  `{"schema_version":1}`,
+		"future":  `{"schema_version":3}`,
+	}
+	for name, raw := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, err := UnmarshalParams(raw); err == nil {
+				t.Fatal("expected unsupported schema to be rejected")
+			}
+		})
 	}
 }

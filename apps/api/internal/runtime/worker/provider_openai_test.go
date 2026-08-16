@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/tasks"
 	"image"
 	"image/color"
@@ -23,6 +22,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accountpool/accounts"
+	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/workflow"
 )
@@ -664,6 +664,7 @@ func TestCallDrawingAPIResultIncludesResolvedModel(t *testing.T) {
 		ID:       1,
 		Name:     "test",
 		ApiType:  workflow.ProviderOpenAICompatible,
+		Protocol: providerendpoints.ProtocolModelAPI,
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
 		Models:   []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
@@ -672,7 +673,10 @@ func TestCallDrawingAPIResultIncludesResolvedModel(t *testing.T) {
 		TaskID: "task-model-field",
 		UserID: 42,
 		Prompt: "prompt",
-		Params: `{"feature":"prompt-generation"}`,
+		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
+			SchemaVersion: tasks.CurrentParamsSchemaVersion,
+			Feature:       workflow.FeatureSlugPromptGeneration,
+		}),
 	}
 	output, err := c.callDrawingAPIForTest(context.Background(), account, task, "gpt-image-1")
 	if err != nil {
@@ -708,6 +712,7 @@ func TestCallDrawingAPIUsesAssignmentResolvedModel(t *testing.T) {
 		ID:       1,
 		Name:     "test",
 		ApiType:  workflow.ProviderOpenAICompatible,
+		Protocol: providerendpoints.ProtocolModelAPI,
 		ProxyURL: server.URL,
 		ApiKey:   "test-key",
 		Models: []accounts.AccountModel{
@@ -719,9 +724,17 @@ func TestCallDrawingAPIUsesAssignmentResolvedModel(t *testing.T) {
 		TaskID: "task-assignment-model",
 		UserID: 42,
 		Prompt: "prompt",
-		Params: `{"feature":"prompt-generation"}`,
+		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
+			SchemaVersion: tasks.CurrentParamsSchemaVersion,
+			Feature:       workflow.FeatureSlugPromptGeneration,
+		}),
 	}
-	output, err := c.callDrawingAPIWithAssignment(context.Background(), account, task, taskqueue.TaskAssignment{ResolvedModel: "imagen-4"})
+	output, err := c.callDrawingAPIWithAssignment(
+		context.Background(),
+		runtimeAccountAccessForTest(account),
+		task,
+		assignmentSnapshotForTest(account, "imagen-4"),
+	)
 	if err != nil {
 		t.Fatalf("callDrawingAPIWithAssignment returned error: %v", err)
 	}
@@ -737,40 +750,31 @@ func TestCallDrawingAPIUsesAssignmentResolvedModel(t *testing.T) {
 	}
 }
 
-func TestShouldUseOpenAIEditEndpointForKnownEditFeatures(t *testing.T) {
-	usesEditEndpoint := func(params map[string]interface{}) bool {
-		return readOpenAIProviderParams(newProviderRequest("", 0, 0, params, "")).useEditEndpoint()
+func TestOpenAIEndpointSelectionConsumesRuntimeInvocation(t *testing.T) {
+	usesEditEndpoint := func(operation workflow.RuntimeOperation, invocation workflow.RuntimeInvocation) bool {
+		request := newProviderRequest(
+			"", 0, 0,
+			map[string]interface{}{"image_urls": []interface{}{"https://img.example/source.png"}},
+			"", resolvedProviderRequestFacts{}, operation, invocation, workflow.RuntimeControlsNone,
+		)
+		return readOpenAIProviderParams(request).useEditEndpoint()
 	}
-	if !usesEditEndpoint(map[string]interface{}{
-		"feature":    "image-extend",
-		"image_urls": []interface{}{"https://img.example/source.png"},
-	}) {
+	if !usesEditEndpoint(workflow.RuntimeOperationImageExtend, workflow.RuntimeInvocationEdit) {
 		t.Fatalf("expected image-extend to use edit endpoint")
 	}
-
-	if !usesEditEndpoint(map[string]interface{}{
-		"feature":    "local-inpaint",
-		"image_urls": []interface{}{"https://img.example/source.png"},
-		"use_mask":   true,
-	}) {
+	if !usesEditEndpoint(workflow.RuntimeOperationLocalInpaint, workflow.RuntimeInvocationEdit) {
 		t.Fatalf("expected local-inpaint to use edit endpoint")
 	}
-
-	if usesEditEndpoint(map[string]interface{}{
-		"feature":        "hd-upscale",
-		"image_urls":     []interface{}{"https://img.example/source.png"},
-		"mask_image_url": "https://img.example/mask.png",
-		"use_mask":       true,
-	}) {
-		t.Fatalf("expected hd-upscale to stay on generation endpoint even with stale mask params")
+	if usesEditEndpoint(workflow.RuntimeOperationImageUpscale, workflow.RuntimeInvocationTransform) {
+		t.Fatalf("expected transform invocation to stay out of the edit endpoint")
 	}
-
-	for _, feature := range []string{"style-fusion", "remove-bg", "style-variation", "sketch-to-image"} {
-		if !usesEditEndpoint(map[string]interface{}{
-			"feature":    feature,
-			"image_urls": []interface{}{"https://img.example/source.png", "https://img.example/ref.png"},
-		}) {
-			t.Fatalf("expected %s to use edit endpoint", feature)
+	for _, operation := range []workflow.RuntimeOperation{
+		workflow.RuntimeOperationStyleFusion,
+		workflow.RuntimeOperationStyleVariation,
+		workflow.RuntimeOperationSketchToImage,
+	} {
+		if !usesEditEndpoint(operation, workflow.RuntimeInvocationEdit) {
+			t.Fatalf("expected %s to use edit endpoint", operation)
 		}
 	}
 }
@@ -781,7 +785,7 @@ func TestReadOpenAIProviderParamsDerivesEditMask(t *testing.T) {
 		"feature":        "local-inpaint",
 		"image_urls":     []interface{}{"https://img.example/source.png"},
 		"mask_image_url": maskURL,
-	}, "gpt-image-1")
+	}, "gpt-image-1", resolvedProviderRequestFacts{}, workflow.RuntimeOperationLocalInpaint, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsNone)
 
 	params := readOpenAIProviderParams(req)
 	if !params.useEditEndpoint() {
@@ -838,7 +842,7 @@ func TestCollectOpenAIEditImageRefsIncludesReferenceImageURLs(t *testing.T) {
 			" ",
 			"https://img.example/ref-b.png",
 		},
-	}, "").ImageRefs
+	}, "", resolvedProviderRequestFacts{}, workflow.RuntimeOperationStyleFusion, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsFusion).ImageRefs
 	want := []string{
 		"https://img.example/source.png",
 		"https://img.example/ref-a.png",

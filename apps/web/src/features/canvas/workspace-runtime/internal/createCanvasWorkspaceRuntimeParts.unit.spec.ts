@@ -353,9 +353,10 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect(mocks.useCanvasBoardRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
         feedback: mocks.feedback.boardSession,
-        executionRuntime: expect.objectContaining({
-          beginSubmission: expect.any(Function),
-          hydratePending: expect.any(Function),
+        executionCore: expect.objectContaining({
+          begin: expect.any(Function),
+          hydratePendingLease: expect.any(Function),
+          claimHydratedLease: expect.any(Function),
         }),
         vueFlowGraphActions: runtimeOptions.flowPaneAdapter.vueFlowGraphActions,
       }),
@@ -407,7 +408,7 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
           graphAdapter: board.graphEditing.adapter,
           refreshNodeInternals: graph.scheduleFlowNodeInternalsRefresh,
           flushAutosave: runtime.persistence.flushAutosave,
-          executionRuntime: expect.any(Object),
+          executionCore: expect.any(Object),
         }),
         feedback: {
           imageTools: mocks.feedback.imageTools,

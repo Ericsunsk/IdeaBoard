@@ -23,10 +23,6 @@ type imageExtendContext struct {
 }
 
 func (c *ProviderExecutor) prepareImageExtendPipeline(ctx context.Context, account *accounts.ApiAccount, params map[string]interface{}, timeout time.Duration) (*imageExtendContext, error) {
-	feature, ok := workflow.ReadWorkflowStringParam(params, "feature")
-	if !ok || feature != workflow.FeatureSlugImageExtend {
-		return nil, nil
-	}
 	geometry, ok := workflow.ReadImageExtendPromptContract(params)
 	if !ok {
 		return nil, fmt.Errorf("image extend 缺少扩图 geometry")
@@ -61,9 +57,9 @@ func readImageExtendOriginalRef(params map[string]interface{}) string {
 	return ""
 }
 
-func (c *ProviderExecutor) finalizeImageExtendResults(ctx context.Context, userID int64, taskID string, extend *imageExtendContext, upstreamImageRefs []string, timeout time.Duration) ([]string, []tasks.TaskOutput, bool, error) {
+func (c *ProviderExecutor) finalizeImageExtendResults(ctx context.Context, userID int64, taskID string, extend *imageExtendContext, upstreamImageRefs []string, timeout time.Duration) providerResultFinalization {
 	if extend == nil {
-		return upstreamImageRefs, nil, false, nil
+		return newProviderTerminalFailure(fmt.Errorf("image extend 后处理上下文无效"))
 	}
 
 	imageURLs := make([]string, 0, len(upstreamImageRefs))
@@ -73,7 +69,7 @@ func (c *ProviderExecutor) finalizeImageExtendResults(ctx context.Context, userI
 		imageURL, output, err := c.finalizeImageExtendResult(ctx, userID, taskID, extend, upstreamImageRef, timeout)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
-				return nil, nil, false, err
+				return newProviderTerminalFailure(err)
 			}
 			if firstFailure == nil {
 				firstFailure = err
@@ -85,16 +81,16 @@ func (c *ProviderExecutor) finalizeImageExtendResults(ctx context.Context, userI
 		outputs = append(outputs, output)
 	}
 	if len(imageURLs) > 0 {
-		return imageURLs, outputs, true, nil
+		return newProviderAlreadyMaterialized(imageURLs, outputs)
 	}
 	if firstFailure != nil {
-		return nil, nil, false, firstFailure
+		return newProviderTerminalFailure(firstFailure)
 	}
-	return nil, nil, false, newExecutionFailureError(
+	return newProviderTerminalFailure(newExecutionFailureError(
 		tasks.ExecutionStageFinalizing,
 		tasks.FailureCategoryFinalizeError,
 		fmt.Errorf("image extend 未收到可合成的上游结果"),
-	)
+	))
 }
 
 func (c *ProviderExecutor) finalizeImageExtendResult(ctx context.Context, userID int64, taskID string, extend *imageExtendContext, upstreamImageRef string, timeout time.Duration) (string, tasks.TaskOutput, error) {

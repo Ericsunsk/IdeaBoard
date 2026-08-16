@@ -1,257 +1,206 @@
 import { isTaskResultPendingError, TaskCancelledError } from '../../../../shared/api/taskEvents'
-import type {
-  ImageExecutionInput,
-  ImageExecutionResultOptions,
-} from '../planning/ImageExecutionPlan'
+import type { SubmitTaskData } from '../../../../shared/api/task'
+import type { ImageExecutionInput, ImageExecutionResultOptions } from '../planning/ImageExecutionPlan'
 import type { ResolvedTaskImageResult } from '../result-nodes/resolvedTaskImageResult'
-import type {
-  PendingImageResultExecution,
-  PendingImageResultRunSummary,
-} from '../result-nodes/usePendingImageResultNodes'
+import type { PendingImageResultExecution } from '../result-nodes/usePendingImageResultNodes'
+import {
+  type PendingImageAttachment,
+  type PendingImageExecutionCore,
+  type PendingImageExecutionLease,
+} from '../pending-execution'
 import {
   createCanvasTaskClientActionId,
   type ClientActionIdFactory,
 } from '../task-runner/taskClientActionIds'
 import { isCanvasBillingPreflightError } from '../task-runner/canvasBillingPreflight'
-import type { CanvasExecutionAttachment, CanvasExecutionRuntime } from './CanvasExecutionRuntime'
-import { createCanvasPendingResultLifecycle } from './CanvasExecutionRuntime'
 
 type PendingImageResultOptions = ImageExecutionResultOptions
 
-export type PendingImageWorkflowPrepared = {
-  source?: ImageExecutionInput
-  sourceNodeId?: string
-  resultOptions?: PendingImageResultOptions
-}
+export type PendingImageWorkflowTaskTransport = Readonly<{
+  assertReady: (request: SubmitTaskData, fallbackMessage: string) => Promise<void>
+  submit: (
+    request: SubmitTaskData,
+    clientActionId: string,
+    fallbackMessage: string,
+  ) => Promise<{ taskId: string }>
+  resolve: (
+    taskId: string,
+    resultIndex: number,
+    fallbackRatio: number,
+  ) => Promise<ResolvedTaskImageResult>
+}>
 
-export type PendingImageWorkflowBatchParams = {
+export type PendingImageWorkflowIntent = {
   source: ImageExecutionInput
   sourceNodeId: string
-  attachment: CanvasExecutionAttachment
+  attachment: PendingImageAttachment
   outputCount: number
   resultOptions?: PendingImageResultOptions
-  preflight?: () => Promise<void>
-  assertReady?: () => Promise<void>
-  prepare?: () => Promise<PendingImageWorkflowPrepared | void>
-  submitTask: (
-    resultNodeId: string,
-    clientActionId: string,
-    resultIndex: number,
-  ) => Promise<{ taskId: string }>
-  resolveResult: (
-    taskId: string,
-    resultNodeId: string,
-    resultIndex: number,
-  ) => Promise<ResolvedTaskImageResult>
-  persistPendingTaskIds?: boolean
-  cleanup?: () => Promise<void>
+  taskRequest: SubmitTaskData
+  readinessRequest?: SubmitTaskData
+  fallbackRatio: number
   successMessage?: string
   fallbackErrorMessage: string
   formatErrorMessage?: (error: Error) => string
 }
 
 export type PendingImageWorkflowRunner = {
-  run: (params: PendingImageWorkflowBatchParams) => Promise<void>
+  execute: (intent: PendingImageWorkflowIntent) => Promise<void>
 }
 
 export type PendingImageWorkflowRunnerOptions = {
   pendingResults: Pick<
     PendingImageResultExecution,
-    'reservePendingResults' | 'runReservedPendingResults' | 'cancelPendingResults'
+    'reservePendingResults' | 'attachPendingTaskIds' | 'removePendingResults'
   >
-  executionRuntime: CanvasExecutionRuntime
+  taskTransport: PendingImageWorkflowTaskTransport
+  executionCore: PendingImageExecutionCore
   cancelTasks: (taskIds: readonly string[]) => void
-  afterTaskIdAttached?: (params: { resultNodeId: string; taskId: string }) => Promise<void>
+  afterTaskIdAttached?: () => Promise<void>
   createClientActionId?: ClientActionIdFactory
   onSuccess: (message: string) => void
   onWarning: (message: string) => void
   onError?: (error: unknown) => boolean
 }
 
-function resolvePendingRunErrorMessage(
-  error: unknown,
-  params: Pick<PendingImageWorkflowBatchParams, 'fallbackErrorMessage' | 'formatErrorMessage'>,
-): string {
-  if (!(error instanceof Error)) return params.fallbackErrorMessage
-  return params.formatErrorMessage?.(error) ?? error.message
+function errorMessage(error: unknown, intent: PendingImageWorkflowIntent): string {
+  if (!(error instanceof Error)) return intent.fallbackErrorMessage
+  return intent.formatErrorMessage?.(error) ?? error.message
 }
 
-function reportPendingImageRunSummary(
-  summary: PendingImageResultRunSummary,
-  params: Pick<
-    PendingImageWorkflowBatchParams,
-    'persistPendingTaskIds' | 'successMessage' | 'fallbackErrorMessage'
-  >,
-  onSuccess: (message: string) => void,
-  onWarning: (message: string) => void,
-) {
-  const persistPendingTaskIds = params.persistPendingTaskIds ?? true
-  const totalCount = summary.totalCount
-  if (summary.successCount === 0 && summary.pendingCount > 0) {
-    if (!persistPendingTaskIds) {
-      throw summary.firstFailure instanceof Error
-        ? summary.firstFailure
-        : new Error('任务仍在处理中，请稍后重试')
-    }
-    onWarning(
-      totalCount === 1 && summary.firstFailure instanceof Error
-        ? summary.firstFailure.message
-        : '任务进行中，稍后可在画布上查看结果',
-    )
-    return
-  }
-  if (summary.successCount === 0) {
-    throw summary.firstFailure instanceof Error
-      ? summary.firstFailure
-      : new Error(params.fallbackErrorMessage)
-  }
-  if (summary.pendingCount > 0) {
-    onWarning(
-      persistPendingTaskIds
-        ? `生成完成 ${summary.successCount}/${totalCount} 张，其余任务稍后可查看`
-        : `生成完成 ${summary.successCount}/${totalCount} 张，部分任务仍在处理中，请稍后重试`,
-    )
-    return
-  }
-  if (summary.failureCount > 0) {
-    onWarning(`生成完成 ${summary.successCount}/${totalCount} 张，部分任务失败`)
-    return
-  }
-  onSuccess(
-    params.successMessage ??
-      (summary.successCount > 1 ? `生成完成（${summary.successCount} 张）` : '生成完成'),
+function releasedResultNodeIds(
+  release: ReturnType<PendingImageExecutionCore['release']>,
+): string[] {
+  return release.outcomes.flatMap((outcome) =>
+    outcome.kind === 'released' || outcome.kind === 'cancelled' ? [outcome.resultNodeId] : [],
   )
 }
 
 export function createPendingImageWorkflowRunner(
   options: PendingImageWorkflowRunnerOptions,
 ): PendingImageWorkflowRunner {
-  function warnIfAttachmentCurrent(attachment: CanvasExecutionAttachment, message: string) {
-    if (options.executionRuntime.isAttachmentCurrent(attachment)) options.onWarning(message)
-  }
-
-  async function run(params: PendingImageWorkflowBatchParams): Promise<void> {
-    let resultNodeIds: string[] = []
-    const createClientActionId = options.createClientActionId ?? createCanvasTaskClientActionId
-    const isCurrent = () => options.executionRuntime.isAttachmentCurrent(params.attachment)
-    const lifecycle = createCanvasPendingResultLifecycle(
-      options.executionRuntime,
-      params.attachment,
-    )
-    const isResultExecutionCurrent = lifecycle.isCurrent
-    const transitionOutcome = (outcome: {
-      resultNodeId: string
-      taskId?: string
-      status: 'pending' | 'succeeded' | 'failed' | 'cancelled'
-    }) =>
-      outcome.status === 'pending'
-        ? false
-        : lifecycle.transition(outcome.resultNodeId, outcome.status, outcome.taskId)
-    const transitionActiveResults = (status: 'failed' | 'cancelled') =>
-      lifecycle.transitionAll(resultNodeIds, status)
-
-    async function submitSharedTaskWithTransportRetry(resultNodeIds: readonly string[]) {
-      const clientActionId = createClientActionId()
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        if (!isCurrent()) throw new TaskCancelledError('Canvas execution is no longer attached')
-        try {
-          const submission = await params.submitTask(resultNodeIds[0] ?? '', clientActionId, 0)
-          let attachedCount = 0
-          for (const resultNodeId of resultNodeIds) {
-            if (
-              lifecycle.isCurrent(resultNodeId) &&
-              lifecycle.transition(resultNodeId, 'running', submission.taskId)
-            ) {
-              attachedCount += 1
-            }
-          }
-          if (attachedCount === 0) {
-            options.cancelTasks([submission.taskId])
-            throw new TaskCancelledError('Canvas execution is no longer attached')
-          }
-          return submission
-        } catch (error) {
-          if (attempt === 0 && isCanvasBillingPreflightError(error, 'network')) continue
-          throw error
-        }
+  async function submitSharedTask(
+    intent: PendingImageWorkflowIntent,
+    leases: readonly PendingImageExecutionLease[],
+    resultNodeIds: readonly string[],
+  ): Promise<string> {
+    const actionId = (options.createClientActionId ?? createCanvasTaskClientActionId)()
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      if (!options.executionCore.isAttachmentCurrent(intent.attachment)) {
+        throw new TaskCancelledError('Canvas execution is no longer attached')
       }
-      throw new Error('网络错误，请重试')
-    }
-
-    try {
-      await params.preflight?.()
-      const prepared = await params.prepare?.()
-      await params.assertReady?.()
-      if (!isCurrent()) return
-      const reservation = options.pendingResults.reservePendingResults({
-        source: prepared?.source ?? params.source,
-        sourceNodeId: prepared?.sourceNodeId ?? params.sourceNodeId,
-        outputCount: params.outputCount,
-        resultOptions: prepared?.resultOptions ?? params.resultOptions,
-      })
-      resultNodeIds = reservation.resultNodeIds
-      for (const resultNodeId of resultNodeIds) {
-        const lease = lifecycle.begin(resultNodeId)
-        if (!lease) {
-          transitionActiveResults('cancelled')
-          options.pendingResults.cancelPendingResults(resultNodeIds)
-          return
-        }
-      }
-      const sharedSubmissionPromise = submitSharedTaskWithTransportRetry(resultNodeIds)
-      const resultIndexByNodeId = new Map(
-        resultNodeIds.map((resultNodeId, resultIndex) => [resultNodeId, resultIndex]),
-      )
-      let hasCurrentOutcome = false
-      const summary = await options.pendingResults.runReservedPendingResults({
-        resultNodeIds,
-        submitTask: () => sharedSubmissionPromise,
-        resolveResult: (taskId, resultNodeId) =>
-          params.resolveResult(taskId, resultNodeId, resultIndexByNodeId.get(resultNodeId) ?? -1),
-        persistPendingTaskIds: params.persistPendingTaskIds,
-        isCurrent,
-        isResultExecutionCurrent,
-        isPendingError: isTaskResultPendingError,
-        afterTaskIdAttached: options.afterTaskIdAttached,
-        onOutcome: (outcome) => {
-          if (outcome.status === 'pending') {
-            hasCurrentOutcome ||=
-              !!outcome.taskId && isResultExecutionCurrent(outcome.resultNodeId, outcome.taskId)
-            return
-          }
-          hasCurrentOutcome = transitionOutcome(outcome) || hasCurrentOutcome
-        },
-      })
-      summary.outcomes.forEach((outcome) => {
-        if (outcome.status === 'pending') {
-          hasCurrentOutcome ||=
-            !!outcome.taskId && isResultExecutionCurrent(outcome.resultNodeId, outcome.taskId)
-          return
-        }
-        hasCurrentOutcome = transitionOutcome(outcome) || hasCurrentOutcome
-      })
-      if (!hasCurrentOutcome) return
-      if (!isCurrent()) return
-      let typedFailureHandled = false
-      if (summary.successCount > 0) {
-        const typedFailure = summary.failures.find((error) =>
-          isCanvasBillingPreflightError(error, 'insufficient-credits'),
+      try {
+        const submission = await options.taskTransport.submit(
+          intent.taskRequest,
+          actionId,
+          intent.fallbackErrorMessage,
         )
-        typedFailureHandled = !!typedFailure && options.onError?.(typedFailure) === true
+        const applied = leases.filter(
+          (lease) => options.executionCore.markSubmitted(lease, submission.taskId, actionId).kind === 'applied',
+        )
+        if (applied.length !== leases.length) {
+          const release = options.executionCore.release(applied)
+          options.cancelTasks([submission.taskId, ...release.cancellableTaskIds])
+          const releasedNodeIds = releasedResultNodeIds(release)
+          if (releasedNodeIds.length > 0) options.pendingResults.removePendingResults(releasedNodeIds)
+          throw new TaskCancelledError('Canvas execution lease is no longer current')
+        }
+        options.pendingResults.attachPendingTaskIds(
+          resultNodeIds.map((resultNodeId, resultIndex) => ({
+            resultNodeId,
+            resultIndex,
+            taskId: submission.taskId,
+            clientActionId: actionId,
+          })),
+        )
+        await options.afterTaskIdAttached?.()
+        return submission.taskId
+      } catch (error) {
+        if (attempt === 0 && isCanvasBillingPreflightError(error, 'network')) continue
+        throw error
       }
-      if (typedFailureHandled) return
-      reportPendingImageRunSummary(summary, params, options.onSuccess, options.onWarning)
+    }
+    throw new Error('网络错误，请重试')
+  }
+
+  async function execute(intent: PendingImageWorkflowIntent): Promise<void> {
+    let leases: PendingImageExecutionLease[] = []
+    try {
+      await options.taskTransport.assertReady(
+        intent.readinessRequest ?? intent.taskRequest,
+        intent.fallbackErrorMessage,
+      )
+      if (!options.executionCore.isAttachmentCurrent(intent.attachment)) return
+
+      const resultNodeIds = options.pendingResults.reservePendingResults({
+        source: intent.source,
+        sourceNodeId: intent.sourceNodeId,
+        outputCount: intent.outputCount,
+        resultOptions: intent.resultOptions,
+      }).resultNodeIds
+      leases = resultNodeIds.flatMap((resultNodeId) => {
+        const started = options.executionCore.begin(intent.attachment, resultNodeId as `image-${number}`)
+        return started.kind === 'started' ? [started.lease] : []
+      })
+      if (leases.length !== resultNodeIds.length) {
+        const release = options.executionCore.release(leases)
+        const releasedNodeIds = releasedResultNodeIds(release)
+        if (releasedNodeIds.length > 0) options.pendingResults.removePendingResults(releasedNodeIds)
+        return
+      }
+
+      const taskId = await submitSharedTask(intent, leases, resultNodeIds)
+      const attempts = await Promise.allSettled(
+        leases.map(async (lease, resultIndex) => ({
+          lease,
+          result: await options.taskTransport.resolve(taskId, resultIndex, intent.fallbackRatio),
+        })),
+      )
+      if (!options.executionCore.isAttachmentCurrent(intent.attachment)) return
+
+      const resolved = attempts.flatMap((attempt) =>
+        attempt.status === 'fulfilled' && options.executionCore.isCurrent(attempt.value.lease, taskId)
+          ? [attempt.value]
+          : [],
+      )
+      const pending = attempts.filter(
+        (attempt) => attempt.status === 'rejected' && isTaskResultPendingError(attempt.reason),
+      )
+      const failures = attempts.filter(
+        (attempt) => attempt.status === 'rejected' && !isTaskResultPendingError(attempt.reason),
+      )
+      const failedLeases = attempts.flatMap((attempt, index) => {
+        if (attempt.status !== 'rejected' || isTaskResultPendingError(attempt.reason)) return []
+        const lease = leases[index]!
+        return options.executionCore.fail(lease).kind === 'applied' ? [lease] : []
+      })
+      if (failedLeases.length > 0) {
+        options.pendingResults.removePendingResults(failedLeases.map((lease) => lease.resultNodeId))
+      }
+      const materialized = resolved.length > 0 ? options.executionCore.materializeBatch(resolved) : null
+      const successCount = materialized?.changedNodeIds.length ?? 0
+      if (successCount > 0) {
+        options.onSuccess(
+          intent.successMessage ?? (successCount > 1 ? `生成完成（${successCount} 张）` : '生成完成'),
+        )
+      }
+      if (pending.length > 0) options.onWarning('任务进行中，稍后可在画布上查看结果')
+      if (failures.length > 0) {
+        const firstFailure = failures[0]
+        const handled = firstFailure?.status === 'rejected' && options.onError?.(firstFailure.reason)
+        if (!handled) options.onWarning(errorMessage(firstFailure?.status === 'rejected' ? firstFailure.reason : null, intent))
+      }
     } catch (error) {
-      transitionActiveResults(error instanceof TaskCancelledError ? 'cancelled' : 'failed')
-      const handled = isCurrent() && options.onError?.(error) === true
-      if (!handled) {
-        warnIfAttachmentCurrent(params.attachment, resolvePendingRunErrorMessage(error, params))
+      const release = error instanceof TaskCancelledError ? options.executionCore.cancel(leases) : options.executionCore.release(leases)
+      options.cancelTasks(release.cancellableTaskIds)
+      const releasedNodeIds = releasedResultNodeIds(release)
+      if (releasedNodeIds.length > 0) options.pendingResults.removePendingResults(releasedNodeIds)
+      const handled = options.executionCore.isAttachmentCurrent(intent.attachment) && options.onError?.(error)
+      if (!handled && options.executionCore.isAttachmentCurrent(intent.attachment)) {
+        options.onWarning(errorMessage(error, intent))
       }
-    } finally {
-      await params.cleanup?.()
-      if (!isCurrent()) transitionActiveResults('cancelled')
     }
   }
 
-  return { run }
+  return { execute }
 }

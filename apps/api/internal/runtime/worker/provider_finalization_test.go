@@ -2,93 +2,100 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"reflect"
+	"strings"
 	"testing"
-	"time"
 
+	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/tasks"
 )
 
-type recordingProviderFinalizer struct {
-	name       string
-	stored     bool
-	resultRefs []string
-	calls      *[]string
-}
-
-func (f recordingProviderFinalizer) finalize(
-	_ context.Context,
-	_ int64,
-	_ string,
-	imageRefs []string,
-	_ time.Duration,
-) ([]string, []tasks.TaskOutput, bool, error) {
-	*f.calls = append(*f.calls, f.name+":"+joinFinalizerRefs(imageRefs))
-	if !f.stored {
-		return imageRefs, nil, false, nil
+func TestProviderResultFinalizerMaterializesRemoteRefsOnce(t *testing.T) {
+	materializer := &captureResultMaterializer{
+		remoteResult: taskmedia.MaterializedResults{Items: []taskmedia.MaterializedResult{{
+			ImageURL: "/uploads/tasks/42/task-1/result.png",
+			Output: tasks.TaskOutput{
+				TaskID: "task-1", URL: "/uploads/tasks/42/task-1/result.png", ResultIndex: 0,
+			},
+		}}},
 	}
-	return f.resultRefs, []tasks.TaskOutput{{TaskID: f.name, ResultIndex: 0}}, true, nil
-}
-
-func joinFinalizerRefs(refs []string) string {
-	if len(refs) == 0 {
-		return "-"
-	}
-	result := refs[0]
-	for _, ref := range refs[1:] {
-		result += "," + ref
-	}
-	return result
-}
-
-func TestProviderFinalizationPipelineChainsFeatureFinalizersAndSkipsRemoteMaterialization(t *testing.T) {
-	calls := make([]string, 0, 3)
-	pipeline := providerFinalizationPipeline{
-		featureFinalizers: []providerFinalizer{
-			recordingProviderFinalizer{name: "local-redraw", stored: true, resultRefs: []string{"redraw-result"}, calls: &calls},
-			recordingProviderFinalizer{name: "image-extend", stored: true, resultRefs: []string{"extend-result"}, calls: &calls},
-		},
-		remoteFinalizer: recordingProviderFinalizer{name: "remote", stored: true, resultRefs: []string{"remote-result"}, calls: &calls},
+	finalizer := providerResultFinalizer{
+		executor:    &ProviderExecutor{resultMaterializer: materializer},
+		requirement: providerFinalizationRemoteResult,
 	}
 
-	urls, outputs, err := pipeline.finalize(context.Background(), 42, "task-1", []string{"provider-result"}, 0)
+	result := finalizer.finalize(context.Background(), 42, "task-1", []string{"https://provider.example/result.png"}, 0)
+	if result.state != providerResultDurableOutputs {
+		t.Fatalf("state=%d, want durable outputs", result.state)
+	}
+	urls, outputs, err := result.completedOutputs()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(urls, []string{"extend-result"}) {
-		t.Fatalf("urls=%v, want final feature result", urls)
+	if !reflect.DeepEqual(urls, []string{"/uploads/tasks/42/task-1/result.png"}) || len(outputs) != 1 {
+		t.Fatalf("urls/outputs=%#v/%#v", urls, outputs)
 	}
-	if len(outputs) != 1 || outputs[0].TaskID != "image-extend" {
-		t.Fatalf("outputs=%#v, want image-extend output", outputs)
+	if !reflect.DeepEqual(materializer.remoteSourceURLs, []string{"https://provider.example/result.png"}) {
+		t.Fatalf("remote materializer sources=%#v", materializer.remoteSourceURLs)
 	}
-	if !reflect.DeepEqual(calls, []string{
-		"local-redraw:provider-result",
-		"image-extend:redraw-result",
-	}) {
-		t.Fatalf("calls=%v, want ordered feature finalizers without remote materialization", calls)
+	if materializer.remoteCalls != 1 {
+		t.Fatalf("remote materializer calls=%d, want 1", materializer.remoteCalls)
 	}
 }
 
-func TestProviderFinalizationPipelineUsesRemoteMaterializerForPlainProviderResults(t *testing.T) {
-	calls := make([]string, 0, 2)
-	pipeline := providerFinalizationPipeline{
-		featureFinalizers: []providerFinalizer{
-			recordingProviderFinalizer{name: "inactive-feature", stored: false, calls: &calls},
-		},
-		remoteFinalizer: recordingProviderFinalizer{name: "remote", stored: true, resultRefs: []string{"stored-result"}, calls: &calls},
+func TestProviderResultFinalizerTurnsStorageErrorIntoTerminalFailure(t *testing.T) {
+	storeErr := errors.New("materializer unavailable")
+	materializer := &captureResultMaterializer{remoteErr: storeErr}
+	finalizer := providerResultFinalizer{
+		executor:    &ProviderExecutor{resultMaterializer: materializer},
+		requirement: providerFinalizationRemoteResult,
 	}
 
-	urls, outputs, err := pipeline.finalize(context.Background(), 42, "task-2", []string{"provider-result"}, 0)
-	if err != nil {
-		t.Fatal(err)
+	result := finalizer.finalize(context.Background(), 42, "task-1", []string{"https://provider.example/result.png"}, 0)
+	if result.state != providerResultTerminalFailure {
+		t.Fatalf("state=%d, want terminal failure", result.state)
 	}
-	if !reflect.DeepEqual(urls, []string{"stored-result"}) || len(outputs) != 1 {
-		t.Fatalf("urls/outputs=%v/%#v, want remote materialized result", urls, outputs)
+	if _, _, err := result.completedOutputs(); !errors.Is(err, storeErr) {
+		t.Fatalf("err=%v, want wrapped storage error", err)
 	}
-	if !reflect.DeepEqual(calls, []string{
-		"inactive-feature:provider-result",
-		"remote:provider-result",
-	}) {
-		t.Fatalf("calls=%v, want remote fallback after inactive feature", calls)
+	if materializer.remoteCalls != 1 {
+		t.Fatalf("remote materializer calls=%d, want 1", materializer.remoteCalls)
+	}
+}
+
+func TestProviderResultFinalizationRejectsDuplicateResultSlots(t *testing.T) {
+	result := newProviderDurableOutputs(
+		[]string{"/uploads/first.png", "/uploads/second.png"},
+		[]tasks.TaskOutput{
+			{URL: "/uploads/first.png", ResultIndex: 1},
+			{URL: "/uploads/second.png", ResultIndex: 1},
+		},
+	)
+	if result.state != providerResultTerminalFailure {
+		t.Fatalf("state=%d, want terminal failure", result.state)
+	}
+	if _, _, err := result.completedOutputs(); err == nil || !strings.Contains(err.Error(), "more than once") {
+		t.Fatalf("err=%v, want duplicate slot failure", err)
+	}
+}
+
+func TestProviderResultFinalizationRequiresMaterializedOutputs(t *testing.T) {
+	result := newProviderRemoteRefs([]string{"https://provider.example/result.png"})
+	if _, _, err := result.completedOutputs(); err == nil || !strings.Contains(err.Error(), "before materialization") {
+		t.Fatalf("err=%v, want incomplete state failure", err)
+	}
+}
+
+func TestProviderResultFinalizationRejectsMismatchedOutputURL(t *testing.T) {
+	result := newProviderAlreadyMaterialized(
+		[]string{"/uploads/result.png"},
+		[]tasks.TaskOutput{{URL: "/uploads/other.png", ResultIndex: 0}},
+	)
+	if result.state != providerResultTerminalFailure {
+		t.Fatalf("state=%d, want terminal failure", result.state)
+	}
+	if _, _, err := result.completedOutputs(); err == nil || !strings.Contains(err.Error(), "does not match") {
+		t.Fatalf("err=%v, want mismatched URL failure", err)
 	}
 }

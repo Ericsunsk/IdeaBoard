@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/tasking/tasks"
+	"ideaboard/api/internal/workflow"
 )
 
 func TestCompileGenerationSnapshotFreezesIntentAndMediaOrder(t *testing.T) {
@@ -17,8 +18,20 @@ func TestCompileGenerationSnapshotFreezesIntentAndMediaOrder(t *testing.T) {
 			Mask:       &tasks.MediaRef{URL: "mask-c", Role: "mask"},
 		},
 	}
+	count := 3
+	plan, err := workflow.CompileFeatureExecutionPlan(workflow.CompileFeatureExecutionInput{
+		Feature: workflow.FeatureSlugLocalInpaint,
+		Params: workflow.FeatureExecutionParams{
+			RequestedOutputCount: &count,
+			ImageInputCount:      2,
+			HasMaskInput:         true,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	snapshot, err := CompileGenerationSnapshot(GenerationCompilerInput{
-		Feature:         "local-inpaint",
+		Plan:            plan,
 		UserPrompt:      "edit this",
 		CompiledPrompt:  "SYS edit this",
 		TemplateVersion: "v7",

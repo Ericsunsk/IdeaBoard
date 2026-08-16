@@ -14,7 +14,7 @@ import type {
   CanvasVueFlowGraphAdapter,
   CanvasVueFlowGraphCommandResult,
 } from '../composables/useCanvasVueFlowGraphAdapter'
-import type { CanvasExecutionLease } from '../execution/runtime/CanvasExecutionRuntime'
+import type { PendingImageExecutionLease } from '../execution/pending-execution'
 
 type FlowGraphDeleteProjectionOptions = {
   graphAdapter: Pick<CanvasVueFlowGraphAdapter, 'applyGraphChanges'>
@@ -24,8 +24,8 @@ type FlowGraphDeleteProjectionOptions = {
   flowNodeIds?: readonly string[]
   projectionIndex: FlowEdgeProjectionIndex
   edgeRemoveChanges?: readonly EdgeChange[]
-  captureActiveNodeExecutions: (nodeIds: readonly string[]) => CanvasExecutionLease[]
-  releaseNodeExecutions: (leases: readonly CanvasExecutionLease[]) => void
+  captureActiveNodeExecutions: (nodeIds: readonly string[]) => PendingImageExecutionLease[]
+  releaseNodeExecutions: (leases: readonly PendingImageExecutionLease[]) => void
 }
 
 function resolveGraphNodeIdForFlowNode(node: Pick<Node, 'id' | 'data'>): CanvasGraphNodeId | null {
@@ -155,7 +155,9 @@ export function applyFlowGraphDeleteProjection(
   const capturedExecutionLeases = options.captureActiveNodeExecutions(
     Array.from(new Set([...explicitlyRemovedFlowNodeIds, ...candidateSlotNodeIds])),
   )
-  const activeExecutionNodeIds = new Set(capturedExecutionLeases.map((lease) => lease.nodeId))
+  const activeExecutionNodeIds = new Set<string>(
+    capturedExecutionLeases.map((lease) => lease.resultNodeId),
+  )
   const removedFlowNodeIds = Array.from(
     new Set([
       ...explicitlyRemovedFlowNodeIds,
@@ -164,7 +166,7 @@ export function applyFlowGraphDeleteProjection(
   )
   const removedFlowNodeIdSet = new Set(removedFlowNodeIds)
   const executionLeases = capturedExecutionLeases.filter((lease) =>
-    removedFlowNodeIdSet.has(lease.nodeId),
+    removedFlowNodeIdSet.has(lease.resultNodeId),
   )
   const result = applyCanvasGraphCommitPolicy(options.commitPolicy, (commandOptions) =>
     options.graphAdapter.applyGraphChanges(

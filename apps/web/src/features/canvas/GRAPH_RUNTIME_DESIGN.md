@@ -36,7 +36,7 @@ Baseline 证据来自 `apps/web/.benchmark-reports/` 的本地 report，汇总�
 
 - `CanvasBoardSnapshot` 继续是 persistence schema 和 import/export contract。
 - Canvas route 保持不变；支持打开 board、拖拽节点、创建/删除连线、undo/redo、autosave 和运行 workflow。已创建连线的 endpoints 不可变，调整位置必须删除后重新创建。
-- Execution Plan、Task submission 与 Pending Result materialization 继续使用现有 feature boundaries；runtime state 由单一 `CanvasExecutionRuntime` attachment/lease seam 拥有。
+- Execution Plan、Task submission 与 Pending Result materialization 继续使用 feature boundaries；runtime state 由单一 `PendingImageExecutionCore` attachment/lease seam 拥有。
 - `features/canvas-board/domain` 继续拥有 shared snapshot schema/core module。
 - Benchmark report artifacts 继续只写入 ignored local directory，不能进入 git。
 
@@ -89,7 +89,7 @@ Projection strategy:
 - For single-node position updates, patch only the changed Flow Node record when practical.
 - Keep Flow Node UI-only fields separate from Canvas Node domain fields when possible.
 
-### `CanvasExecutionRuntime`
+### `PendingImageExecutionCore`
 
 Execution Runtime owns transient Task lifecycle projection, not persistence facts.
 
@@ -99,7 +99,7 @@ Responsibilities:
 - issue per-node execution leases and reject stale attachment/lease transitions with CAS semantics
 - expose the current attachment's node execution states as the only image-input animation source
 - establish running leases from persisted pending tasks only during hydration
-- allow the reattach driver to reuse, but never recreate, hydration leases
+- allow the reattach driver to claim each hydration lease once, but never recreate it
 - retain serializer-omitted nodes and edges only while an active execution lease owns them
 - keep animation out of `CanvasBoardSnapshot` and graph dirty/history accounting
 
@@ -107,7 +107,7 @@ Flow runtime applies execution projection synchronously after semantic graph rec
 
 Clean-break constraints:
 
-- `CanvasExecutionRuntime` state/lease is the only live running fact. Presentation, Task cancellation, and delete lifecycle consume Runtime capability directly; they must not own shadow running `Ref`/`Set` state or relay running state through optional callbacks.
+- `PendingImageExecutionCore` state/lease is the only live running fact. Presentation, Task cancellation, and delete lifecycle consume Core capability directly; they must not own shadow running `Ref`/`Set` state or relay running state through optional callbacks.
 - Snapshot `outputStatus: 'running'` and `pendingTaskId` are hydration facts only. Outside Hydration, code must not infer live execution, animation, or deletion cancellation from them.
 - Flow Edge `animated` is an ephemeral Runtime projection. Snapshot serialization, history capture, and undo/redo restore exclude it; every semantic graph replacement reprojects it from the current Runtime state.
 - Deleting an active execution node resolves Task identity from the current Runtime lease/state, never from snapshot running fields.

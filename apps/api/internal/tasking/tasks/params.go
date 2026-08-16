@@ -8,12 +8,12 @@ import (
 )
 
 // SchemaVersion tracks the WorkflowTaskParams schema carried by task records.
-const CurrentParamsSchemaVersion = 1
+const CurrentParamsSchemaVersion = 2
 
 // WorkflowTaskParams is the typed contract for task parameters flowing
 // from frontend submit through API, River, and into the worker/provider layer.
 type WorkflowTaskParams struct {
-	SchemaVersion int `json:"schema_version,omitempty"`
+	SchemaVersion int `json:"schema_version"`
 
 	// Feature routing.
 	Feature string `json:"feature,omitempty"`
@@ -28,6 +28,11 @@ type WorkflowTaskParams struct {
 	// captured before Task submission. Provider adapters must treat it as a
 	// fact snapshot and derive their own request at the runtime boundary.
 	Generation *GenerationRequestSnapshot `json:"generation,omitempty"`
+
+	// ExecutionPlan is the opaque, versioned Workflow contract compiled at
+	// intake. Tasking persists it without interpreting or duplicating Workflow
+	// enums; routing and runtime decode it through the Workflow module.
+	ExecutionPlan json.RawMessage `json:"execution_plan"`
 
 	// Feature-specific canonical prompt contracts. Keep these in sync with
 	// workflow/prompt_contract.go and SYSTEM_PROMPT.md.
@@ -120,14 +125,11 @@ type StyleFusionParams struct {
 // Unknown provider-specific keys are preserved in Extra.
 func UnmarshalParams(raw string) (*WorkflowTaskParams, error) {
 	if raw == "" {
-		return &WorkflowTaskParams{SchemaVersion: CurrentParamsSchemaVersion}, nil
+		return nil, fmt.Errorf("task params are required")
 	}
 	p := &WorkflowTaskParams{}
 	if err := p.UnmarshalJSON([]byte(raw)); err != nil {
 		return nil, err
-	}
-	if p.SchemaVersion == 0 {
-		p.SchemaVersion = CurrentParamsSchemaVersion
 	}
 	return p, nil
 }
@@ -142,6 +144,9 @@ func (p *WorkflowTaskParams) UnmarshalJSON(data []byte) error {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
+	}
+	if _, ok := raw["schema_version"]; !ok || alias.SchemaVersion != CurrentParamsSchemaVersion {
+		return fmt.Errorf("unsupported task params schema version %d: expected %d", alias.SchemaVersion, CurrentParamsSchemaVersion)
 	}
 	extra := map[string]interface{}{}
 	for key, value := range raw {
@@ -162,9 +167,6 @@ func (p *WorkflowTaskParams) UnmarshalJSON(data []byte) error {
 		for key, value := range extra {
 			p.Extra[key] = value
 		}
-	}
-	if p.SchemaVersion == 0 {
-		p.SchemaVersion = CurrentParamsSchemaVersion
 	}
 	return nil
 }

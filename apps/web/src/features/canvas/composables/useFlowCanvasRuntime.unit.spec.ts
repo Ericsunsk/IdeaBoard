@@ -11,7 +11,10 @@ import {
 import { useCanvasGraphEditing } from '../graph-editing'
 import { useFlowCanvasRuntime, type UseFlowCanvasRuntimeOptions } from './useFlowCanvasRuntime'
 import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
-import { createCanvasExecutionRuntime } from '../execution/runtime/CanvasExecutionRuntime'
+import {
+  CanvasBoardGraphSession,
+  createPendingImageExecutionCore,
+} from '../execution/pending-execution'
 
 type MutableHarnessNode = Node & {
   selected?: boolean
@@ -259,7 +262,50 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
   }
   const isDirty = ref(false)
   const saveStatus = ref<SaveStatus>('idle')
-  const executionRuntime = createCanvasExecutionRuntime()
+  const executionCore = createPendingImageExecutionCore()
+  const terminalStates = new Map<string, { status: string; taskId?: string }>()
+  const executionRuntime = {
+    get attachment() {
+      return { value: executionCore.currentAttachment() }
+    },
+    attachBoard(boardId: string) {
+      return executionCore.attachBoard(
+        CanvasBoardGraphSession.create(boardId, { createGraphStore: () => ({}) as never }),
+      )
+    },
+    hydratePending(attachment: ReturnType<typeof executionCore.currentAttachment>, nodeId: string, taskId: string) {
+      if (!attachment) return null
+      const hydrated = executionCore.hydratePendingLease(attachment, {
+        resultNodeId: nodeId as `image-${number}`,
+        taskId,
+        clientActionId: `action-${taskId}`,
+      })
+      return hydrated.kind === 'started' ? hydrated.lease : null
+    },
+    beginSubmission(attachment: ReturnType<typeof executionCore.currentAttachment>, nodeId: string) {
+      return attachment ? executionCore.begin(attachment, nodeId as `image-${number}`).lease : null
+    },
+    getNodeState(nodeId: string) {
+      const terminal = terminalStates.get(nodeId)
+      if (terminal) return terminal
+      const fact = executionCore.factFor(nodeId as `image-${number}`)
+      return fact ? { status: fact.status, ...(fact.taskId ? { taskId: fact.taskId } : {}) } : null
+    },
+    getNodeLease(nodeId: string) {
+      return executionCore.captureActiveLeases([nodeId])[0] ?? null
+    },
+    transitionNode(lease: { resultNodeId: `image-${number}` }, state: { status: string; taskId?: string }) {
+      if (state.status === 'failed') return executionCore.fail(lease as never).kind === 'applied'
+      if (state.status === 'cancelled') return executionCore.cancel([lease as never]).outcomes.length > 0
+      if (state.status === 'running' && state.taskId) return executionCore.markSubmitted(lease as never, state.taskId, `action-${state.taskId}`).kind === 'applied'
+      if (state.status === 'succeeded') {
+        terminalStates.set(lease.resultNodeId, { status: state.status, taskId: state.taskId })
+        executionCore.release([lease as never])
+        return true
+      }
+      return false
+    },
+  }
   const boardSession: CanvasBoardSession = {
     currentBoardId: computed(() => 'board-a'),
     exists: vi.fn(() => true),
@@ -281,7 +327,8 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     isLoadingBoardSnapshot: ref(false),
     isSavingBoard: ref(false),
     boardSession,
-    executionRuntime,
+    executionCore,
+    cancelTasks: vi.fn(),
     onWarning,
     onSuccess: vi.fn(),
     onError,
@@ -520,6 +567,7 @@ describe('useFlowCanvasRuntime', () => {
       sourceImageUrl: '',
       outputStatus: 'running',
       pendingTaskId: 'task-1',
+      pendingClientActionId: 'action-task-1',
       outputImages: [],
     }
     snapshot.connections = [
@@ -2399,6 +2447,7 @@ describe('useFlowCanvasRuntime', () => {
         outputImages: [],
         pendingTaskId: 'task-shared',
         pendingResultIndex: 0,
+        pendingClientActionId: 'action-task-shared',
       },
       {
         id: 3,
@@ -2412,6 +2461,7 @@ describe('useFlowCanvasRuntime', () => {
         outputImages: [],
         pendingTaskId: 'task-shared',
         pendingResultIndex: 1,
+        pendingClientActionId: 'action-task-shared',
       },
     )
     snapshot.connections.push(

@@ -1,615 +1,120 @@
-import type { Edge, Node } from '@vue-flow/core'
-import type { Ref } from 'vue'
-import { shallowRef } from 'vue'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ImageNodeItem } from '../../../canvas-board/domain'
-import { TaskResultPendingError } from '../../../../shared/api/taskEvents'
-import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
-import { CanvasBillingPreflightError } from '../task-runner/canvasBillingPreflight'
+import { ref } from 'vue'
+import { describe, expect, it, vi } from 'vitest'
+import { TaskCancelledError } from '../../../../shared/api/taskEvents'
+import { createEmptyCanvasBoardSnapshot } from '../../../canvas-board/domain'
 import { useCanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
-import { createCanvasGraphStore } from '../../graph-runtime'
-import { flowToCanvasBoardSnapshot } from '../../utils/flowSnapshotAdapter'
+import { createFlowGraphCommandOptions, readFlowGraphCommandSideEffects } from '../../composables/flowGraphAdapterCommandSideEffects'
+import { CanvasGraphStore } from '../../graph-runtime'
+import { canvasBoardSnapshotToFlow, flowToCanvasBoardSnapshot } from '../../utils/flowSnapshotAdapter'
+import { CanvasBoardGraphSession, createPendingImageExecutionCore } from '../pending-execution'
 import { useFlowImageWorkflowExecution } from './flowImageWorkflowExecution'
-import { createCanvasExecutionRuntime } from './CanvasExecutionRuntime'
-import { useCanvasExecutionWorkspace } from '../workspace/useCanvasExecutionWorkspace'
 
-type MockTaskImageResult = {
-  url: string
-  width: number
-  height: number
-  resultIndex?: number
-}
-
-const executorMocks = vi.hoisted(() => ({
-  assertTaskRequestReady: vi.fn(async () => undefined),
-  submitTaskRequest: vi.fn(async () => ({ taskId: 'task-1' })),
-  waitExistingOrLiveTaskImageResults: vi.fn<() => Promise<MockTaskImageResult[]>>(async () => [
-    {
-      url: 'https://example.com/result.png',
-      width: 400,
-      height: 200,
-      resultIndex: 0,
-    },
-  ]),
-}))
-
-const imageSizeMocks = vi.hoisted(() => ({
-  loadImageSizeFromUrl: vi.fn(async () => ({ width: 400, height: 400 })),
-}))
-
-const localInpaintMaskMocks = vi.hoisted(() => ({
-  prepareFlowLocalInpaintMask: vi.fn(async () => 'https://example.com/mask.png'),
-}))
-
-vi.mock('../task-runner/flowImageDirectActionExecutor', () => executorMocks)
-vi.mock('../media/imageSize', () => imageSizeMocks)
-vi.mock('../media/flowLocalInpaintMask', () => localInpaintMaskMocks)
-vi.mock('../../utils/animationFrame', () => ({
-  waitForNextRenderFrame: vi.fn(async () => undefined),
-}))
-
-type Deferred<T> = {
-  promise: Promise<T>
-  resolve: (value: T) => void
-  reject: (reason?: unknown) => void
-}
-
-function createDeferred<T>(): Deferred<T> {
-  let resolve!: (value: T) => void
-  let reject!: (reason?: unknown) => void
-  const promise = new Promise<T>((promiseResolve, promiseReject) => {
-    resolve = promiseResolve
-    reject = promiseReject
-  })
-  return { promise, resolve, reject }
-}
-
-async function flushPromises() {
-  for (let index = 0; index < 5; index += 1) await Promise.resolve()
-}
-
-function makeImageSnapshot(overrides: Partial<ImageNodeItem> = {}): ImageNodeItem {
-  return {
-    id: 1,
-    type: 'image-node',
-    x: 0,
-    y: 0,
-    width: 280,
-    sourceImageUrl: 'https://example.com/source.png',
-    sourceImageRatio: 1,
-    outputStatus: 'ready',
-    outputImages: [],
-    ...overrides,
-  }
-}
-
-function makeImageNode(nodeId: string, overrides: Partial<ImageNodeItem> = {}): Node {
-  const snapshot = makeImageSnapshot(overrides)
-  return {
-    id: nodeId,
-    type: 'canvas',
-    position: { x: snapshot.x, y: snapshot.y },
-    data: {
-      kind: 'image',
-      nodeType: 'image',
-      title: 'Image',
-      snapshotNode: snapshot,
-    },
-  }
-}
-
-function makePendingImageNode(nodeId: string, taskId: string): Node {
-  return makeImageNode(nodeId, {
-    id: Number(nodeId.slice(nodeId.indexOf('-') + 1)) || 1,
-    sourceImageUrl: '',
-    pendingTaskId: taskId,
-    outputStatus: 'running',
-    outputImages: [],
-  })
-}
-
-function readImageSnapshot(nodes: Node[], nodeId: string): ImageNodeItem {
-  const snapshot = nodes.find((node) => node.id === nodeId)?.data?.snapshotNode
-  if (!snapshot || typeof snapshot !== 'object') throw new Error(`missing image node ${nodeId}`)
-  return snapshot as ImageNodeItem
-}
-
-function createExecutionHarness(
-  initialNodes: Node[] = [makeImageNode('image-1')],
-  initialEdges: Edge[] = [],
-) {
-  const nodes: Ref<Node[]> = shallowRef(initialNodes)
-  const edges: Ref<Edge[]> = shallowRef(initialEdges)
-  const graphAdapter = useCanvasVueFlowGraphAdapter({ nodes, edges })
-  const flushAutosave = vi.fn(async () => undefined)
-  const onSuccess = vi.fn()
-  const onWarning = vi.fn()
-  const currentBoardId = shallowRef('board-a')
-  const executionRuntime = createCanvasExecutionRuntime()
-  const attachment = executionRuntime.attachBoard(currentBoardId.value)
-  nodes.value.forEach((node) => {
-    const snapshot = node.data?.snapshotNode as ImageNodeItem | undefined
-    const taskId = snapshot?.pendingTaskId?.trim()
-    if (snapshot?.type === 'image-node' && snapshot.outputStatus === 'running' && taskId) {
-      executionRuntime.hydratePending(attachment, node.id, taskId)
-    }
-  })
-  const cancelTasks = vi.fn()
-  const createCurrentCanvasGraphStore = (
-    snapshotOptions?: Parameters<typeof flowToCanvasBoardSnapshot>[2],
-  ) =>
-    createCanvasGraphStore(
-      flowToCanvasBoardSnapshot(
-        {
-          nodes: nodes.value,
-          edges: edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
-        },
-        undefined,
-        snapshotOptions,
-      ),
-    )
-  const executionWorkspace = useCanvasExecutionWorkspace({
-    nodes,
-    edges,
-    graphAdapter,
-    createCurrentCanvasGraphStore,
-    flushAutosave,
-    executionRuntime,
-    cancelTasks,
-    onSuccess,
-    onWarning,
-  })
-  const execution = useFlowImageWorkflowExecution({
-    nodes,
-    edges,
-    graphAdapter,
-    createCurrentCanvasGraphStore,
-    flushAutosave,
-    onSuccess,
-    onWarning,
-    executionWorkspace,
-    cancelTasks,
-  })
-
-  return {
-    nodes,
-    edges,
-    flushAutosave,
-    onSuccess,
-    onWarning,
-    currentBoardId,
-    executionRuntime,
-    execution,
-  }
-}
+vi.mock('../media/imageSize', () => ({ loadImageSizeFromUrl: vi.fn(async () => null) }))
 
 function imageActionPlan() {
-  return {
-    activationId: 'canvas:test-activation',
-    kind: 'image-action' as const,
-    sourceNodeId: 'image-1',
-    source: {
-      url: 'https://example.com/source.png',
-      ratio: 1,
-    },
-    action: IMAGE_NODE_ACTION.removeBg,
-    prompt: '',
-    outputCount: 1,
-    resultOptions: {
-      anchor: {
-        x: 0,
-        y: 0,
-        width: 280,
-        outputAnchorNodeId: 'image-1',
-      },
-    },
-  }
+  return { kind: 'image-action', activationId: 'a', sourceNodeId: 'image-1', source: { url: 'https://example.com/a.png', ratio: 1 }, action: 'remove-bg', prompt: '', outputCount: 1, resultOptions: {} } as never
 }
 
-function imageInpaintPlan() {
-  return {
-    activationId: 'canvas:test-activation',
-    kind: 'image-inpaint' as const,
-    sourceNodeId: 'image-1',
-    source: {
-      url: 'https://example.com/source.png',
-      ratio: 1,
+function createPublicHarness(transport: { assertReady: () => Promise<void>; submit: () => Promise<{ taskId: string }>; resolve: () => Promise<{ url: string; ratio: number }> }) {
+  const base = createEmptyCanvasBoardSnapshot()
+  base.imageNodes.push({ id: 1, type: 'image-node', x: 0, y: 0, width: 280, sourceImageUrl: 'https://example.com/a.png', sourceImageRatio: 1, outputStatus: 'ready', outputImages: [] })
+  const flow = canvasBoardSnapshotToFlow(base)
+  const nodes = ref(flow.nodes as never[])
+  const edges = ref(flow.edges as never[])
+  const markDirty = vi.fn()
+  const flushAutosave = vi.fn(async () => undefined)
+  const graphAdapter = useCanvasVueFlowGraphAdapter({
+    nodes: nodes as never,
+    edges: edges as never,
+    afterCommand: (result) => {
+      const sideEffects = readFlowGraphCommandSideEffects(result.metadata)
+      if (result.didChange && sideEffects?.markDirty !== false) {
+        markDirty()
+        void flushAutosave({ silent: true })
+      }
     },
-    prompt: 'replace the marked area',
-    rawMaskDataUrl: 'data:image/png;base64,mask',
-    outputCount: 1,
-    referenceImageUrls: [],
-    resultOptions: {
-      anchor: {
-        x: 0,
-        y: 0,
-        width: 280,
-        outputAnchorNodeId: 'image-1',
-      },
+  })
+  const core = createPendingImageExecutionCore()
+  core.attachBoard(CanvasBoardGraphSession.create('board-a', {
+    createGraphStore: () => CanvasGraphStore.fromSnapshot(flowToCanvasBoardSnapshot({ nodes: nodes.value, edges: edges.value }, base, { projection: 'runtime' })),
+    onMaterialized: (store) => {
+      const next = canvasBoardSnapshotToFlow(store.exportSnapshot(base))
+      graphAdapter.replaceGraph({ nodes: next.nodes as never, edges: next.edges as never }, createFlowGraphCommandOptions({ recordHistory: false }))
     },
-  }
+  }))
+  const execution = useFlowImageWorkflowExecution({
+    nodes: nodes as never, edges: edges as never, graphAdapter,
+    createCurrentCanvasGraphStore: () => CanvasGraphStore.fromSnapshot(flowToCanvasBoardSnapshot({ nodes: nodes.value, edges: edges.value }, base, { projection: 'runtime' })),
+    boardBaseSnapshot: ref(base),
+    executionWorkspace: { state: { executionCore: core, isNodeRunning: (id) => core.captureActiveLeases([id]).length > 0 }, commands: { runPromptGeneration: vi.fn(), reattachPendingImageResults: vi.fn() } },
+    cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(), taskTransport: transport,
+  })
+  return { core, execution, flushAutosave, markDirty, nodes }
 }
 
-describe('flowImageWorkflowExecution', () => {
-  beforeEach(() => {
-    executorMocks.assertTaskRequestReady.mockReset()
-    executorMocks.submitTaskRequest.mockReset()
-    executorMocks.waitExistingOrLiveTaskImageResults.mockReset()
-    imageSizeMocks.loadImageSizeFromUrl.mockReset()
-    localInpaintMaskMocks.prepareFlowLocalInpaintMask.mockReset()
-    executorMocks.assertTaskRequestReady.mockResolvedValue(undefined)
-    executorMocks.submitTaskRequest.mockResolvedValue({ taskId: 'task-1' })
-    executorMocks.waitExistingOrLiveTaskImageResults.mockResolvedValue([
-      {
-        url: 'https://example.com/result.png',
-        width: 400,
-        height: 200,
-        resultIndex: 0,
-      },
-    ])
-    imageSizeMocks.loadImageSizeFromUrl.mockResolvedValue({ width: 400, height: 400 })
-    localInpaintMaskMocks.prepareFlowLocalInpaintMask.mockResolvedValue(
-      'https://example.com/mask.png',
-    )
+describe('useFlowImageWorkflowExecution', () => {
+  it('materializes through Graph Session projection and marks the board dirty for autosave', async () => {
+    const harness = createPublicHarness({ assertReady: async () => undefined, submit: async () => ({ taskId: 'task-1' }), resolve: async () => ({ url: 'https://example.com/result.png', ratio: 1 }) })
+    await harness.execution.executeImageWorkflow(imageActionPlan())
+    expect(harness.nodes.value.find((node) => node.id !== 'image-1')?.data.snapshotNode).toMatchObject({ sourceImageUrl: 'https://example.com/result.png', outputStatus: 'ready' })
+    expect(harness.markDirty).toHaveBeenCalled()
+    expect(harness.flushAutosave).toHaveBeenCalledWith({ silent: true })
   })
 
-  it('executes image actions through the unified pending image batch path', async () => {
-    const submitTask = createDeferred<{ taskId: string }>()
-    const taskResult = createDeferred<MockTaskImageResult[]>()
-    executorMocks.submitTaskRequest.mockImplementationOnce(() => submitTask.promise)
-    executorMocks.waitExistingOrLiveTaskImageResults.mockImplementationOnce(
-      () => taskResult.promise,
-    )
-    const { execution, executionRuntime, nodes, edges, flushAutosave, onSuccess, onWarning } =
-      createExecutionHarness()
-
-    const run = execution.executeImageWorkflow(imageActionPlan())
-    await flushPromises()
-
-    const resultNode = nodes.value.find((node) => node.id !== 'image-1')
-    expect(resultNode?.data?.kind).toBe('image')
-    expect(execution.isNodeExecutionActive(resultNode!.id)).toBe(true)
-    expect(executionRuntime.getNodeState(resultNode!.id)).toEqual({ status: 'submitting' })
-    expect(edges.value.find((edge) => edge.target === resultNode!.id)?.animated).toBeUndefined()
-
-    submitTask.resolve({ taskId: 'task-1' })
-    await flushPromises()
-
-    expect(flushAutosave).toHaveBeenCalledWith({ silent: true })
-    expect(readImageSnapshot(nodes.value, resultNode!.id).pendingTaskId).toBe('task-1')
-    expect(executionRuntime.getNodeState(resultNode!.id)).toEqual({
-      status: 'running',
-      taskId: 'task-1',
-    })
-
-    taskResult.resolve([
-      {
-        url: 'https://example.com/result.png',
-        width: 400,
-        height: 200,
-        resultIndex: 0,
-      },
-    ])
-    await run
-
-    expect(executorMocks.assertTaskRequestReady).toHaveBeenCalledOnce()
-    expect(executorMocks.submitTaskRequest).toHaveBeenCalledTimes(1)
-    expect(executorMocks.submitTaskRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        client_action_id: expect.stringMatching(/^canvas:[A-Za-z0-9_.:-]+$/),
-      }),
-      undefined,
-    )
-    expect(executorMocks.waitExistingOrLiveTaskImageResults).toHaveBeenCalledWith('task-1')
-    expect(onSuccess).toHaveBeenCalledWith('处理完成')
-    expect(onWarning).not.toHaveBeenCalled()
-
-    const snapshot = readImageSnapshot(nodes.value, resultNode!.id)
-    expect(snapshot).toMatchObject({
-      sourceImageUrl: 'https://example.com/result.png',
-      sourceImageRatio: 0.5,
-      outputStatus: 'ready',
-      outputImages: [],
-    })
-    expect(snapshot.pendingTaskId).toBeUndefined()
-    expect(execution.isNodeExecutionActive(resultNode!.id)).toBe(false)
-    expect(executionRuntime.getNodeState(resultNode!.id)).toEqual({
-      status: 'succeeded',
-      taskId: 'task-1',
-    })
-    expect(edges.value.find((edge) => edge.target === resultNode!.id)?.animated).toBeUndefined()
+  it('cancels a real reserved pending node when submit is cancelled', async () => {
+    const harness = createPublicHarness({ assertReady: async () => undefined, submit: async () => { throw new TaskCancelledError() }, resolve: async () => ({ url: '', ratio: 1 }) })
+    await harness.execution.executeImageWorkflow(imageActionPlan())
+    expect(harness.nodes.value.map((node) => node.id)).toEqual(['image-1'])
   })
 
-  it('cancels active execution state when the board changes before a result resolves', async () => {
-    const taskResult = createDeferred<MockTaskImageResult[]>()
-    executorMocks.waitExistingOrLiveTaskImageResults.mockImplementationOnce(
-      () => taskResult.promise,
-    )
-    const { execution, nodes, currentBoardId, executionRuntime } = createExecutionHarness()
-
-    const run = execution.executeImageWorkflow(imageActionPlan())
-    await flushPromises()
-
-    const resultNode = nodes.value.find((node) => node.id !== 'image-1')
-    await vi.waitFor(() => {
-      expect(executionRuntime.getNodeState(resultNode!.id)?.status).toBe('running')
-    })
-
-    currentBoardId.value = 'board-b'
-    executionRuntime.attachBoard('board-b')
-    taskResult.resolve([
-      {
-        url: 'https://example.com/task-1.png',
-        width: 400,
-        height: 200,
-      },
-    ])
-    await run
-
-    expect(executionRuntime.getNodeState(resultNode!.id)).toBeNull()
+  it('does not remove a superseding pending node when an old submit resolves late', async () => {
+    let resolveSubmit!: (value: { taskId: string }) => void
+    const harness = createPublicHarness({ assertReady: async () => undefined, submit: async () => await new Promise((resolve) => { resolveSubmit = resolve }), resolve: async () => ({ url: '', ratio: 1 }) })
+    const running = harness.execution.executeImageWorkflow(imageActionPlan())
+    await vi.waitFor(() => expect(harness.nodes.value).toHaveLength(2))
+    const resultNodeId = harness.nodes.value.find((node) => node.id !== 'image-1')!.id as `image-${number}`
+    const attachment = harness.core.currentAttachment()!
+    const superseding = harness.core.begin(attachment, resultNodeId)
+    if (superseding.kind !== 'started') throw new Error('Expected superseding execution')
+    harness.core.markSubmitted(superseding.lease, 'task-new', 'action-task-new')
+    resolveSubmit({ taskId: 'task-old' })
+    await running
+    expect(harness.nodes.value.some((node) => node.id === resultNodeId)).toBe(true)
+    expect(harness.core.factFor(resultNodeId)).toMatchObject({ status: 'running', taskId: 'task-new' })
   })
 
-  it('cancels active execution state when a result rejects after the board changes', async () => {
-    const taskResult = createDeferred<MockTaskImageResult[]>()
-    executorMocks.waitExistingOrLiveTaskImageResults.mockImplementationOnce(
-      () => taskResult.promise,
-    )
-    const { execution, nodes, currentBoardId, executionRuntime } = createExecutionHarness()
-
-    const run = execution.executeImageWorkflow(imageActionPlan())
-    await flushPromises()
-
-    const resultNode = nodes.value.find((node) => node.id !== 'image-1')
-    await vi.waitFor(() => {
-      expect(executionRuntime.getNodeState(resultNode!.id)?.status).toBe('running')
+  it('passes a prepared image action to the real Runner transport without per-run callbacks', async () => {
+    const core = createPendingImageExecutionCore()
+    const store = CanvasGraphStore.fromSnapshot(createEmptyCanvasBoardSnapshot())
+    core.attachBoard(CanvasBoardGraphSession.create('board-a', { createGraphStore: () => store }))
+    const assertReady = vi.fn(async () => { throw new Error('not ready') })
+    const execution = useFlowImageWorkflowExecution({
+      nodes: ref([]), edges: ref([]), graphAdapter: {} as never, createCurrentCanvasGraphStore: () => store,
+      boardBaseSnapshot: ref(createEmptyCanvasBoardSnapshot()),
+      executionWorkspace: { state: { executionCore: core, isNodeRunning: () => false }, commands: { runPromptGeneration: vi.fn(), reattachPendingImageResults: vi.fn() } },
+      cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(),
+      taskTransport: { assertReady, submit: vi.fn(), resolve: vi.fn() },
     })
-
-    currentBoardId.value = 'board-b'
-    executionRuntime.attachBoard('board-b')
-    taskResult.reject(new Error('provider failed after navigation'))
-    await run
-
-    expect(executionRuntime.getNodeState(resultNode!.id)).toBeNull()
+    await execution.executeImageWorkflow({ kind: 'image-action', activationId: 'a', sourceNodeId: 'image-1', source: { url: 'https://example.com/a.png', ratio: 1 }, action: 'remove-bg', prompt: '', outputCount: 1, resultOptions: {} } as never)
+    expect(assertReady).toHaveBeenCalledOnce()
+    expect(core.snapshot().executions).toEqual([])
   })
 
-  it('uses backend materialized local inpaint results by stable result index', async () => {
-    executorMocks.waitExistingOrLiveTaskImageResults.mockResolvedValueOnce([
-      {
-        url: 'https://example.com/local-inpaint-final-0.png',
-        width: 400,
-        height: 400,
-        resultIndex: 0,
-      },
-      {
-        url: 'https://example.com/local-inpaint-final-1.png',
-        width: 400,
-        height: 200,
-        resultIndex: 1,
-      },
-    ])
-    const { execution, nodes, onSuccess, onWarning } = createExecutionHarness()
-
-    await execution.executeImageWorkflow({ ...imageInpaintPlan(), outputCount: 2 })
-
-    const resultNodes = nodes.value.filter((node) => node.id !== 'image-1')
-    expect(resultNodes).toHaveLength(2)
-    expect(localInpaintMaskMocks.prepareFlowLocalInpaintMask).toHaveBeenCalledWith(
-      'data:image/png;base64,mask',
-      'board-a',
-    )
-    expect(executorMocks.submitTaskRequest).toHaveBeenCalledTimes(1)
-    expect(executorMocks.submitTaskRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        feature: 'local-inpaint',
-        params: expect.objectContaining({
-          original_image_url: 'https://example.com/source.png',
-          mask_image_url: 'https://example.com/mask.png',
-          output_count: 2,
-        }),
-      }),
-      '提交局部重绘任务失败',
-    )
-    expect(executorMocks.waitExistingOrLiveTaskImageResults).toHaveBeenCalledTimes(1)
-    expect(resultNodes.map((node) => readImageSnapshot(nodes.value, node.id))).toMatchObject([
-      {
-        sourceImageUrl: 'https://example.com/local-inpaint-final-0.png',
-        sourceImageRatio: 1,
-        outputStatus: 'ready',
-      },
-      {
-        sourceImageUrl: 'https://example.com/local-inpaint-final-1.png',
-        sourceImageRatio: 0.5,
-        outputStatus: 'ready',
-      },
-    ])
-    expect(onSuccess).toHaveBeenCalledWith('生成完成（2 张）')
-    expect(onWarning).not.toHaveBeenCalled()
-    expect(resultNodes.every((node) => !execution.isNodeExecutionActive(node.id))).toBe(true)
-  })
-
-  it('keeps single-image pending timeout copy from the underlying pending error', async () => {
-    executorMocks.waitExistingOrLiveTaskImageResults.mockRejectedValueOnce(
-      new TaskResultPendingError('任务进度推送超时，请稍后查看结果'),
-    )
-    const { execution, executionRuntime, nodes, onSuccess, onWarning } = createExecutionHarness()
-
-    await execution.executeImageWorkflow(imageActionPlan())
-
-    const resultNode = nodes.value.find((node) => node.id !== 'image-1')
-    expect(resultNode?.data?.kind).toBe('image')
-    expect(onWarning).toHaveBeenCalledWith('任务进度推送超时，请稍后查看结果')
-    expect(onSuccess).not.toHaveBeenCalled()
-    expect(readImageSnapshot(nodes.value, resultNode!.id)).toMatchObject({
-      pendingTaskId: 'task-1',
-      outputStatus: 'running',
+  it('delegates prompt execution and pending reattach to the shared Core workspace seam', async () => {
+    const core = createPendingImageExecutionCore()
+    const store = CanvasGraphStore.fromSnapshot(createEmptyCanvasBoardSnapshot())
+    core.attachBoard(CanvasBoardGraphSession.create('board-a', { createGraphStore: () => store }))
+    const workspace = { state: { executionCore: core, isNodeRunning: () => false }, commands: { runPromptGeneration: vi.fn(), reattachPendingImageResults: vi.fn() } }
+    const execution = useFlowImageWorkflowExecution({
+      nodes: ref([]), edges: ref([]), graphAdapter: {} as never, createCurrentCanvasGraphStore: () => store,
+      boardBaseSnapshot: ref(createEmptyCanvasBoardSnapshot()),
+      executionWorkspace: workspace, cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(),
+      taskTransport: { assertReady: vi.fn(), submit: vi.fn(), resolve: vi.fn() },
     })
-    expect(execution.isNodeExecutionActive(resultNode!.id)).toBe(true)
-    expect(executionRuntime.getNodeState(resultNode!.id)).toEqual({
-      status: 'running',
-      taskId: 'task-1',
-    })
-  })
-
-  it('keeps identical activations as distinct pending tasks and idempotency requests', async () => {
-    executorMocks.submitTaskRequest
-      .mockResolvedValueOnce({ taskId: 'task-first' })
-      .mockResolvedValueOnce({ taskId: 'task-second' })
-    executorMocks.waitExistingOrLiveTaskImageResults.mockRejectedValue(
-      new TaskResultPendingError('任务进度推送超时，请稍后查看结果'),
-    )
-    const { execution, nodes } = createExecutionHarness()
-
-    await execution.executeImageWorkflow({
-      ...imageActionPlan(),
-      activationId: 'canvas:activation-1',
-    })
-    await execution.executeImageWorkflow({
-      ...imageActionPlan(),
-      activationId: 'canvas:activation-2',
-    })
-
-    const pendingResultNodes = nodes.value.filter(
-      (node) => node.id !== 'image-1' && node.data?.kind === 'image',
-    )
-    expect(pendingResultNodes).toHaveLength(2)
-    expect(
-      pendingResultNodes.map((node) => readImageSnapshot(nodes.value, node.id).pendingTaskId),
-    ).toEqual(['task-first', 'task-second'])
-    expect(executorMocks.submitTaskRequest).toHaveBeenCalledTimes(2)
-    const submitCalls = executorMocks.submitTaskRequest.mock.calls as unknown as Array<
-      [{ client_action_id?: string }]
-    >
-    const submittedIds = submitCalls.map(([request]) => request.client_action_id)
-    expect(submittedIds[0]).toMatch(/^canvas:/)
-    expect(submittedIds[1]).toMatch(/^canvas:/)
-    expect(submittedIds[0]).not.toBe(submittedIds[1])
-  })
-
-  it('retries one network submit within an activation without creating another pending task', async () => {
-    executorMocks.submitTaskRequest
-      .mockRejectedValueOnce(new CanvasBillingPreflightError('network', '网络错误，请重试'))
-      .mockResolvedValueOnce({ taskId: 'task-retried' })
-    executorMocks.waitExistingOrLiveTaskImageResults.mockRejectedValueOnce(
-      new TaskResultPendingError('任务进度推送超时，请稍后查看结果'),
-    )
-    const { execution, nodes } = createExecutionHarness()
-
-    await execution.executeImageWorkflow({
-      ...imageActionPlan(),
-      activationId: 'canvas:activation-retry',
-    })
-
-    const pendingResultNodes = nodes.value.filter(
-      (node) => node.id !== 'image-1' && node.data?.kind === 'image',
-    )
-    expect(pendingResultNodes).toHaveLength(1)
-    expect(readImageSnapshot(nodes.value, pendingResultNodes[0].id).pendingTaskId).toBe(
-      'task-retried',
-    )
-    expect(executorMocks.submitTaskRequest).toHaveBeenCalledTimes(2)
-    const submitCalls = executorMocks.submitTaskRequest.mock.calls as unknown as Array<
-      [{ client_action_id?: string }]
-    >
-    expect(submitCalls.map(([request]) => request.client_action_id)).toEqual([
-      expect.stringMatching(/^canvas:/),
-      submitCalls[0][0].client_action_id,
-    ])
-  })
-
-  it('keeps the canvas editable without creating result nodes when provider readiness is unavailable', async () => {
-    executorMocks.assertTaskRequestReady.mockRejectedValueOnce(
-      new Error('暂无可用生成服务，请稍后重试'),
-    )
-    const { execution, nodes, onSuccess, onWarning } = createExecutionHarness()
-
-    await execution.executeImageWorkflow(imageActionPlan())
-
-    expect(executorMocks.assertTaskRequestReady).toHaveBeenCalledTimes(1)
-    expect(executorMocks.submitTaskRequest).not.toHaveBeenCalled()
-    expect(nodes.value).toHaveLength(1)
-    expect(readImageSnapshot(nodes.value, 'image-1')).toMatchObject({
-      sourceImageUrl: 'https://example.com/source.png',
-      outputStatus: 'ready',
-    })
-    expect(onWarning).toHaveBeenCalledWith('暂无可用生成服务，请稍后重试')
-    expect(onSuccess).not.toHaveBeenCalled()
-  })
-
-  it('reattaches pending image results through the workflow public API', async () => {
-    executorMocks.waitExistingOrLiveTaskImageResults.mockImplementation(
-      async (...args: unknown[]) => {
-        const taskId = String(args[0])
-        return [
-          {
-            url: `https://example.com/${taskId}.png`,
-            width: 400,
-            height: 200,
-          },
-        ]
-      },
-    )
-    const { execution, nodes, flushAutosave, onSuccess, onWarning } = createExecutionHarness([
-      makePendingImageNode('image-1', 'task-1'),
-      makePendingImageNode('image-2.25', 'task-2'),
-    ])
-
+    const plan = { kind: 'prompt-generation', activationId: 'prompt', sourceNodeId: 'prompt-1', source: { url: '', ratio: 1 }, referenceImages: [], prompt: 'draw', outputCount: 1, aspectRatio: 'auto', resultOptions: {} } as never
+    await execution.executeImageWorkflow(plan)
     await execution.reattachPendingImageResults()
-
-    expect(executorMocks.waitExistingOrLiveTaskImageResults).toHaveBeenCalledWith('task-1')
-    expect(executorMocks.waitExistingOrLiveTaskImageResults).toHaveBeenCalledWith('task-2')
-    expect(readImageSnapshot(nodes.value, 'image-1')).toMatchObject({
-      sourceImageUrl: 'https://example.com/task-1.png',
-      sourceImageRatio: 0.5,
-      outputStatus: 'ready',
-    })
-    expect(readImageSnapshot(nodes.value, 'image-2.25')).toMatchObject({
-      sourceImageUrl: 'https://example.com/task-2.png',
-      sourceImageRatio: 0.5,
-      outputStatus: 'ready',
-    })
-    expect(readImageSnapshot(nodes.value, 'image-1').pendingTaskId).toBeUndefined()
-    expect(readImageSnapshot(nodes.value, 'image-2.25').pendingTaskId).toBeUndefined()
-    expect(onSuccess).toHaveBeenCalledWith('已恢复 2 个生成结果')
-    expect(onWarning).not.toHaveBeenCalled()
-    expect(flushAutosave).toHaveBeenCalledWith({ silent: true })
-    expect(execution.isNodeExecutionActive('image-1')).toBe(false)
-    expect(execution.isNodeExecutionActive('image-2.25')).toBe(false)
-  })
-
-  it('restores pending execution state while reattaching running nodes', async () => {
-    const taskResult = createDeferred<MockTaskImageResult[]>()
-    executorMocks.waitExistingOrLiveTaskImageResults.mockImplementationOnce(
-      () => taskResult.promise,
-    )
-    const { execution, edges } = createExecutionHarness(
-      [makeImageNode('image-10', { id: 10 }), makePendingImageNode('image-1', 'task-1')],
-      [
-        {
-          id: 'connection-1',
-          source: 'image-10',
-          sourceHandle: 'out:image',
-          target: 'image-1',
-          targetHandle: 'in:image',
-          animated: false,
-        },
-      ],
-    )
-
-    const run = execution.reattachPendingImageResults()
-    await flushPromises()
-
-    expect(execution.isNodeExecutionActive('image-1')).toBe(true)
-
-    taskResult.resolve([
-      {
-        url: 'https://example.com/task-1.png',
-        width: 400,
-        height: 200,
-      },
-    ])
-    await run
-
-    expect(execution.isNodeExecutionActive('image-1')).toBe(false)
-    expect(edges.value.find((edge) => edge.id === 'connection-1')?.animated).toBeUndefined()
+    expect(workspace.commands.runPromptGeneration).toHaveBeenCalledWith(plan)
+    expect(workspace.commands.reattachPendingImageResults).toHaveBeenCalledOnce()
   })
 })

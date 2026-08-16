@@ -8,7 +8,7 @@ import { useFlowBoardHeaderActions } from './useFlowBoardHeaderActions'
 import { useFlowCanvasRuntime } from './useFlowCanvasRuntime'
 import type { CanvasVueFlowGraphActions } from './useCanvasVueFlowGraphAdapter'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
-import type { CanvasExecutionRuntime } from '../execution/runtime/CanvasExecutionRuntime'
+import type { PendingImageExecutionCore } from '../execution/pending-execution'
 
 type CanvasBoardRuntimeFeedback = CanvasFeedback['boardSession']
 
@@ -18,7 +18,8 @@ type UseCanvasBoardRuntimeOptions = {
   getUserIdentity: () => { userId: number; userUid: string }
   logoutAndRedirect: (path: string) => Promise<unknown> | unknown
   feedback: CanvasBoardRuntimeFeedback
-  executionRuntime: CanvasExecutionRuntime
+  executionCore: PendingImageExecutionCore
+  cancelTasks: (taskIds: readonly string[]) => void
   vueFlowGraphActions?: CanvasVueFlowGraphActions
 }
 
@@ -63,7 +64,8 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions) {
     isSavingBoard,
     autosaveResumeSignal,
     boardSession,
-    executionRuntime: options.executionRuntime,
+    executionCore: options.executionCore,
+    cancelTasks: options.cancelTasks,
     onWarning: options.feedback.warning,
     onSuccess: options.feedback.saveSucceeded,
     onError: options.feedback.saveFailed,

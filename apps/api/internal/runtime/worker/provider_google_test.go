@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"ideaboard/api/internal/accountpool/accounts"
+	"ideaboard/api/internal/accountpool/providerendpoints"
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/workflow"
 )
@@ -221,7 +222,7 @@ func TestCollectGoogleImageRefsIncludesReferenceImageURLs(t *testing.T) {
 			"",
 			"https://img.example/ref-b.png",
 		},
-	}, "")
+	}, "", resolvedProviderRequestFacts{}, workflow.RuntimeOperationPromptGeneration, workflow.RuntimeInvocationGenerate, workflow.RuntimeControlsNone)
 	refs := providerGoogleImageRefs(req)
 	want := []string{
 		"data:image/png;base64,aGVsbG8=",
@@ -239,7 +240,7 @@ func TestReadGoogleProviderParamsDerivesModelRefsAndImagenControls(t *testing.T)
 	geminiReq := newProviderRequest("prompt", 0, 0, map[string]interface{}{
 		"image_urls":           []interface{}{"https://img.example/source.png"},
 		"reference_image_urls": []interface{}{"https://img.example/ref.png"},
-	}, "models/gemini-2.5-flash-image")
+	}, "models/gemini-2.5-flash-image", resolvedProviderRequestFacts{outputCount: 1}, workflow.RuntimeOperationSketchToImage, workflow.RuntimeInvocationEdit, workflow.RuntimeControlsNone)
 	geminiParams := readGoogleProviderParams(geminiReq)
 	if geminiParams.Model != "gemini-2.5-flash-image" {
 		t.Fatalf("gemini model = %q", geminiParams.Model)
@@ -255,7 +256,7 @@ func TestReadGoogleProviderParamsDerivesModelRefsAndImagenControls(t *testing.T)
 	imagenReq := newProviderRequest("prompt", 0, 0, map[string]interface{}{
 		"output_count": 4,
 		"ratio":        "16:9",
-	}, "models/imagen-4.0-generate-001")
+	}, "models/imagen-4.0-generate-001", resolvedProviderRequestFacts{outputCount: 4}, workflow.RuntimeOperationPromptGeneration, workflow.RuntimeInvocationGenerate, workflow.RuntimeControlsNone)
 	imagenParams := readGoogleProviderParams(imagenReq)
 	if imagenParams.Model != "imagen-4.0-generate-001" {
 		t.Fatalf("imagen model = %q", imagenParams.Model)
@@ -370,6 +371,7 @@ func TestCallDrawingAPIRoutesGooglePlatformToNativeProvider(t *testing.T) {
 		ID:       1,
 		Name:     "google-native",
 		ApiType:  workflow.ProviderGoogleAI,
+		Protocol: providerendpoints.ProtocolModelAPI,
 		ProxyURL: server.URL,
 		ApiKey:   "google-key",
 		Models:   []accounts.AccountModel{{Name: "gemini-2.5-flash-image", Enabled: true}},
@@ -378,7 +380,10 @@ func TestCallDrawingAPIRoutesGooglePlatformToNativeProvider(t *testing.T) {
 		TaskID: "task-google-native",
 		UserID: 42,
 		Prompt: "draw a cat",
-		Params: `{"feature":"prompt-generation"}`,
+		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
+			SchemaVersion: tasks.CurrentParamsSchemaVersion,
+			Feature:       workflow.FeatureSlugPromptGeneration,
+		}),
 	}
 
 	output, err := c.callDrawingAPIForTest(context.Background(), account, task, "gemini-2.5-flash-image")
@@ -419,6 +424,7 @@ func TestCallDrawingAPIRoutesGoogleCloudToNativeProvider(t *testing.T) {
 		ID:       1,
 		Name:     "google-cloud",
 		ApiType:  workflow.ProviderGoogleCloud,
+		Protocol: providerendpoints.ProtocolModelAPI,
 		ProxyURL: server.URL,
 		ApiKey:   "google-cloud-key",
 		Models:   []accounts.AccountModel{{Name: "gemini-3.1-flash-image", Enabled: true}},
@@ -427,7 +433,10 @@ func TestCallDrawingAPIRoutesGoogleCloudToNativeProvider(t *testing.T) {
 		TaskID: "task-google-cloud",
 		UserID: 42,
 		Prompt: "draw a poster",
-		Params: `{"feature":"prompt-generation"}`,
+		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
+			SchemaVersion: tasks.CurrentParamsSchemaVersion,
+			Feature:       workflow.FeatureSlugPromptGeneration,
+		}),
 	}
 
 	output, err := c.callDrawingAPIForTest(context.Background(), account, task, "gemini-3.1-flash-image")

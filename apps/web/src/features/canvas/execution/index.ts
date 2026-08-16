@@ -14,22 +14,36 @@ export {
 export { createImageExecutionPlanner } from './planning/ImageExecutionPlan'
 export { useFlowImageWorkflowExecution } from './runtime/flowImageWorkflowExecution'
 export {
-  createCanvasExecutionRuntime,
-  createCanvasPendingResultLifecycle,
-  projectCanvasExecutionEdgeAnimation,
-  type CanvasExecutionEdgeProjection,
-  type CanvasExecutionAttachment,
-  type CanvasExecutionLease,
-  type CanvasPendingResultLifecycle,
-  type CanvasExecutionRuntime,
-  type CanvasExecutionStatus,
-  type CanvasNodeExecutionState,
-} from './runtime/CanvasExecutionRuntime'
-export {
   createImageWorkflowCommands,
   type ImageWorkflowCommands,
 } from './runtime/imageWorkflowCommandRuntime'
 export { useCanvasExecutionWorkspace } from './workspace/useCanvasExecutionWorkspace'
+export {
+  CanvasBoardGraphSession,
+  createPendingImageExecutionCore,
+  PendingImageMaterializationError,
+  PendingImageMutationContractError,
+  type PendingImageAttachment,
+  type CanvasBoardGraphSessionOptions,
+  type PendingImageExecutionCore,
+  type PendingImageExecutionEdgeProjection,
+  type PendingImageExecutionCoreOptions,
+  type PendingImageExecutionFact,
+  type PendingImageExecutionLease,
+  type PendingImageExecutionRejectionReason,
+  type PendingImageExecutionReleaseOutcome,
+  type PendingImageExecutionReleaseResult,
+  type PendingImageExecutionSnapshot,
+  type PendingImageExecutionStartResult,
+  type PendingImageExecutionStatus,
+  type PendingImageExecutionTransition,
+  type PendingImageMaterializationOutcome,
+  type PendingImageMaterializationResult,
+  type PendingImageMutationRejectReason,
+  type PendingImageResolvedResult,
+  type PendingImageResultNodeId,
+  type PendingImageSupersededExecution,
+} from './pending-execution'
 export { buildFusionBillingReadinessRequest } from './billing/canvasBillingReadinessResource'
 export {
   CanvasBillingPreflightError,

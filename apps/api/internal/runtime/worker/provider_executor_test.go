@@ -39,29 +39,10 @@ func TestMarshalProviderTaskResultReturnsContextualError(t *testing.T) {
 	}
 }
 
-func TestResolveAccountModelForExecutionRequiresExactAssignedModel(t *testing.T) {
-	account := &accounts.ApiAccount{Models: []accounts.AccountModel{
-		{Name: "first-model", Enabled: true},
-		{Name: "assigned-model", Enabled: true},
-	}}
-	params := newProviderTaskParams(&tasks.WorkflowTaskParams{})
-
-	model, ok := resolveAccountModelForExecution(account, params, "assigned-model")
-	if !ok || model.Name != "assigned-model" {
-		t.Fatalf("resolved model = %+v ok=%v, want exact assigned-model", model, ok)
-	}
-	if _, ok := resolveAccountModelForExecution(account, params, "missing-model"); ok {
-		t.Fatal("assigned missing model must not fall back to another account model")
-	}
-	if _, ok := resolveAccountModelForExecution(account, params, ""); ok {
-		t.Fatal("empty assigned model must not fall back to the account's first model")
-	}
-}
-
-func TestResolveAccountTimeout(t *testing.T) {
+func TestResolveRuntimeAccountTimeout(t *testing.T) {
 	tests := []struct {
 		name    string
-		account *accounts.ApiAccount
+		account *accounts.RuntimeAccountAccess
 		want    time.Duration
 	}{
 		{
@@ -71,21 +52,21 @@ func TestResolveAccountTimeout(t *testing.T) {
 		},
 		{
 			name: "negative timeout fallback",
-			account: &accounts.ApiAccount{
+			account: &accounts.RuntimeAccountAccess{
 				Timeout: -10,
 			},
 			want: 120 * time.Second,
 		},
 		{
 			name: "zero timeout fallback",
-			account: &accounts.ApiAccount{
+			account: &accounts.RuntimeAccountAccess{
 				Timeout: 0,
 			},
 			want: 120 * time.Second,
 		},
 		{
 			name: "positive timeout keep",
-			account: &accounts.ApiAccount{
+			account: &accounts.RuntimeAccountAccess{
 				Timeout: 75,
 			},
 			want: 75 * time.Second,
@@ -94,8 +75,8 @@ func TestResolveAccountTimeout(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := resolveAccountTimeout(tt.account); got != tt.want {
-				t.Fatalf("resolveAccountTimeout() = %v, want %v", got, tt.want)
+			if got := resolveRuntimeAccountTimeout(tt.account); got != tt.want {
+				t.Fatalf("resolveRuntimeAccountTimeout() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -1,320 +1,103 @@
 import { describe, expect, it, vi } from 'vitest'
-import type {
-  PendingImageResultExecution,
-  PendingImageResultRunSummary,
-  RunReservedPendingImageResultsParams,
-} from '../result-nodes/usePendingImageResultNodes'
+import { TaskCancelledError, TaskResultPendingError } from '../../../../shared/api/taskEvents'
+import { createEmptyCanvasBoardSnapshot, type ImageNodeItem } from '../../../canvas-board/domain'
+import { CanvasGraphStore } from '../../graph-runtime'
+import { CanvasBoardGraphSession, createPendingImageExecutionCore } from '../pending-execution'
 import { CanvasBillingPreflightError } from '../task-runner/canvasBillingPreflight'
-import { createCanvasExecutionRuntime } from './CanvasExecutionRuntime'
 import { createPendingImageWorkflowRunner } from './pendingImageWorkflowRunner'
 
-type Deferred<T> = {
-  promise: Promise<T>
-  resolve: (value: T) => void
-}
-
-type RunnerPendingResults = Pick<
-  PendingImageResultExecution,
-  'reservePendingResults' | 'runReservedPendingResults' | 'cancelPendingResults'
->
-
-function createDeferred<T>(): Deferred<T> {
-  let resolve!: (value: T) => void
-  const promise = new Promise<T>((promiseResolve) => {
-    resolve = promiseResolve
-  })
-  return { promise, resolve }
-}
-
-async function flushPromises() {
-  await Promise.resolve()
-  await Promise.resolve()
-  await Promise.resolve()
-}
-
-function makeRunSummary(
-  overrides: Partial<PendingImageResultRunSummary> = {},
-): PendingImageResultRunSummary {
-  return {
-    resultNodeIds: ['image-2'],
-    totalCount: 1,
-    successCount: 1,
-    pendingCount: 0,
-    failureCount: 0,
-    firstFailure: null,
-    failures: [],
-    outcomes: [{ resultNodeId: 'image-2', status: 'succeeded', taskId: 'task-1' }],
-    ...overrides,
+function createHarness(taskIds: readonly string[] = ['task-1']) {
+  const snapshot = createEmptyCanvasBoardSnapshot()
+  snapshot.imageNodes = taskIds.map((taskId, index) => ({
+    id: index + 1, type: 'image-node', x: index * 320, y: 0, width: 280,
+    sourceImageUrl: '', sourceImageRatio: 1, pendingTaskId: taskId, pendingResultIndex: index,
+    outputStatus: 'running', outputImages: [],
+  }) satisfies ImageNodeItem)
+  const store = CanvasGraphStore.fromSnapshot(snapshot)
+  const core = createPendingImageExecutionCore()
+  const attachment = core.attachBoard(CanvasBoardGraphSession.create('board-a', { createGraphStore: () => store }))
+  const pendingResults = {
+    reservePendingResults: vi.fn(() => ({ resultNodeIds: taskIds.map((_, index) => `image-${index + 1}`) })),
+    attachPendingTaskIds: vi.fn(), removePendingResults: vi.fn(),
   }
-}
-
-function createPendingResults(
-  runReservedPendingResults: (
-    params: RunReservedPendingImageResultsParams,
-  ) => Promise<PendingImageResultRunSummary>,
-  resultNodeIds: string[] = ['image-2'],
-): RunnerPendingResults {
-  return {
-    reservePendingResults: vi.fn(() => ({ resultNodeIds })),
-    runReservedPendingResults: vi.fn(runReservedPendingResults),
-    cancelPendingResults: vi.fn(),
+  const transport = {
+    assertReady: vi.fn(async () => undefined),
+    submit: vi.fn(async () => ({ taskId: 'task-1' })),
+    resolve: vi.fn(async (_taskId, resultIndex) => ({ url: `https://example.com/${resultIndex}.png`, ratio: 1 })),
   }
-}
-
-function createRunner(
-  pendingResults: RunnerPendingResults,
-  overrides: Partial<Parameters<typeof createPendingImageWorkflowRunner>[0]> = {},
-) {
-  const executionRuntime = createCanvasExecutionRuntime()
-  const attachment = executionRuntime.attachBoard('board-a')
   const cancelTasks = vi.fn()
-  const onSuccess = vi.fn()
-  const onWarning = vi.fn()
   const runner = createPendingImageWorkflowRunner({
-    pendingResults,
-    executionRuntime,
-    cancelTasks,
-    onSuccess,
-    onWarning,
-    ...overrides,
+    executionCore: core, pendingResults, taskTransport: transport, cancelTasks,
+    onSuccess: vi.fn(), onWarning: vi.fn(), createClientActionId: () => 'action-1',
   })
-  return { attachment, cancelTasks, executionRuntime, onSuccess, onWarning, runner }
-}
-
-function makeRunParams(
-  attachment: ReturnType<typeof createCanvasExecutionRuntime>['attachment']['value'],
-  overrides: Record<string, unknown> = {},
-) {
-  if (!attachment) throw new Error('test attachment is required')
-  return {
-    source: { url: 'https://example.com/source.png', ratio: 1 },
-    sourceNodeId: 'image-1',
-    attachment,
-    outputCount: 1,
-    submitTask: vi.fn(async () => ({ taskId: 'task-1' })),
-    resolveResult: vi.fn(async () => ({ url: 'https://example.com/result.png', ratio: 1 })),
-    fallbackErrorMessage: '生成失败',
-    ...overrides,
+  const intent = {
+    attachment, source: { url: 'https://example.com/input.png', ratio: 1 }, sourceNodeId: 'image-0',
+    outputCount: taskIds.length, taskRequest: {} as never, readinessRequest: {} as never,
+    fallbackRatio: 1, fallbackErrorMessage: '生成失败',
   }
+  return { attachment, cancelTasks, core, intent, pendingResults, runner, store, transport }
 }
 
 describe('pendingImageWorkflowRunner', () => {
-  it('retries one network transport failure with the same idempotency key and reservation', async () => {
-    const submittedClientActionIds: string[] = []
-    const pendingResults = createPendingResults(async (params) => {
-      await params.submitTask('image-2')
-      return makeRunSummary()
-    })
-    const { attachment, runner } = createRunner(pendingResults, {
-      createClientActionId: vi.fn(() => 'client-action-1'),
-    })
-
-    await runner.run(
-      makeRunParams(attachment, {
-        submitTask: vi.fn(async (_resultNodeId: string, clientActionId: string) => {
-          submittedClientActionIds.push(clientActionId)
-          if (submittedClientActionIds.length === 1) {
-            throw new CanvasBillingPreflightError('network', '网络错误，请重试')
-          }
-          return { taskId: 'task-1' }
-        }),
-      }),
-    )
-
-    expect(submittedClientActionIds).toEqual(['client-action-1', 'client-action-1'])
-    expect(pendingResults.reservePendingResults).toHaveBeenCalledTimes(1)
+  it('executes one shared prepared intent through stable transport adapters', async () => {
+    const harness = createHarness(['task-1', 'task-1'])
+    await harness.runner.execute(harness.intent)
+    expect(harness.transport.assertReady).toHaveBeenCalledWith(harness.intent.readinessRequest, '生成失败')
+    expect(harness.transport.submit).toHaveBeenCalledWith(harness.intent.taskRequest, 'action-1', '生成失败')
+    expect(harness.pendingResults.attachPendingTaskIds).toHaveBeenCalledWith([
+      { resultNodeId: 'image-1', resultIndex: 0, taskId: 'task-1', clientActionId: 'action-1' },
+      { resultNodeId: 'image-2', resultIndex: 1, taskId: 'task-1', clientActionId: 'action-1' },
+    ])
+    expect(harness.core.snapshot().executions.every((fact) => fact.status === 'succeeded')).toBe(true)
   })
 
-  it('does not reserve execution state when readiness fails', async () => {
-    const pendingResults = createPendingResults(async () => makeRunSummary())
-    const { attachment, executionRuntime, onWarning, runner } = createRunner(pendingResults)
-
-    await runner.run(
-      makeRunParams(attachment, {
-        assertReady: vi.fn(async () => {
-          throw new Error('生图服务暂不可用，请稍后重试')
-        }),
-      }),
-    )
-
-    expect(pendingResults.reservePendingResults).not.toHaveBeenCalled()
-    expect(pendingResults.runReservedPendingResults).not.toHaveBeenCalled()
-    expect(executionRuntime.nodeStates.value.size).toBe(0)
-    expect(onWarning).toHaveBeenCalledWith('生图服务暂不可用，请稍后重试')
+  it('does not reserve when the injected readiness transport rejects', async () => {
+    const harness = createHarness()
+    harness.transport.assertReady.mockRejectedValueOnce(new Error('余额不足'))
+    await harness.runner.execute(harness.intent)
+    expect(harness.pendingResults.reservePendingResults).not.toHaveBeenCalled()
   })
 
-  it('does not reserve after the Board switches while readiness is in flight', async () => {
-    const readiness = createDeferred<void>()
-    const pendingResults = createPendingResults(async () => makeRunSummary())
-    const { attachment, executionRuntime, onSuccess, onWarning, runner } =
-      createRunner(pendingResults)
-
-    const run = runner.run(
-      makeRunParams(attachment, {
-        assertReady: vi.fn(() => readiness.promise),
-      }),
-    )
-    await flushPromises()
-    executionRuntime.attachBoard('board-b')
-    readiness.resolve(undefined)
-    await run
-
-    expect(pendingResults.reservePendingResults).not.toHaveBeenCalled()
-    expect(pendingResults.runReservedPendingResults).not.toHaveBeenCalled()
-    expect(onSuccess).not.toHaveBeenCalled()
-    expect(onWarning).not.toHaveBeenCalled()
+  it('retries transient submit with one action id and preserves pending recovery handles', async () => {
+    const harness = createHarness()
+    harness.transport.submit
+      .mockRejectedValueOnce(new CanvasBillingPreflightError('network', '网络错误'))
+      .mockResolvedValueOnce({ taskId: 'task-1' })
+    harness.transport.resolve.mockRejectedValueOnce(new TaskResultPendingError())
+    await harness.runner.execute(harness.intent)
+    expect(harness.transport.submit.mock.calls.map((call) => call[1])).toEqual(['action-1', 'action-1'])
+    expect(harness.core.factFor('image-1')).toMatchObject({ status: 'running', taskId: 'task-1' })
+    expect(harness.pendingResults.removePendingResults).not.toHaveBeenCalled()
   })
 
-  it('applies reserved result outcomes through one attachment-scoped execution lease', async () => {
-    const pendingResults = createPendingResults(async (params) => {
-      await params.submitTask('image-2')
-      return makeRunSummary()
-    })
-    const { attachment, executionRuntime, onSuccess, runner } = createRunner(pendingResults)
-
-    await runner.run(makeRunParams(attachment))
-
-    expect(executionRuntime.getNodeState('image-2')).toEqual({
-      status: 'succeeded',
-      taskId: 'task-1',
-    })
-    expect(onSuccess).toHaveBeenCalledWith('生成完成')
+  it('does not remove a superseding slot after a stale failure or late submit', async () => {
+    const harness = createHarness()
+    let resolveSubmit!: (value: { taskId: string }) => void
+    harness.transport.submit.mockImplementationOnce(() => new Promise((resolve) => { resolveSubmit = resolve }))
+    const running = harness.runner.execute(harness.intent)
+    await vi.waitFor(() => expect(harness.pendingResults.reservePendingResults).toHaveBeenCalledOnce())
+    const superseding = harness.core.begin(harness.attachment, 'image-1')
+    if (superseding.kind !== 'started') throw new Error('Expected superseding execution')
+    harness.core.markSubmitted(superseding.lease, 'task-new', 'action-task-new')
+    resolveSubmit({ taskId: 'task-old' })
+    await running
+    expect(harness.pendingResults.removePendingResults).not.toHaveBeenCalled()
+    expect(harness.core.factFor('image-1')).toMatchObject({ status: 'running', taskId: 'task-new' })
   })
 
-  it('rejects old outcomes after the same Board opens a new attachment epoch', async () => {
-    const outcome = createDeferred<PendingImageResultRunSummary>()
-    const pendingResults = createPendingResults(async (params) => {
-      await params.submitTask('image-2')
-      return outcome.promise
-    })
-    const { attachment, executionRuntime, onSuccess, onWarning, runner } =
-      createRunner(pendingResults)
-
-    const run = runner.run(makeRunParams(attachment))
-    await flushPromises()
-    executionRuntime.attachBoard('board-a')
-    outcome.resolve(makeRunSummary())
-    await run
-
-    expect(executionRuntime.getNodeState('image-2')).toBeNull()
-    expect(onSuccess).not.toHaveBeenCalled()
-    expect(onWarning).not.toHaveBeenCalled()
+  it('keeps pending nodes when graph materialization fails so reattach can recover them', async () => {
+    const harness = createHarness()
+    vi.spyOn(harness.store, 'beginTransaction').mockImplementation(() => { throw new Error('graph write failed') })
+    await harness.runner.execute(harness.intent)
+    expect(harness.core.factFor('image-1')).toMatchObject({ status: 'failed', taskId: 'task-1' })
+    expect(harness.pendingResults.removePendingResults).not.toHaveBeenCalled()
   })
 
-  it('submits one shared task for all output slots', async () => {
-    const submitted: Array<[string, string, number]> = []
-    const pendingResults = createPendingResults(
-      async (params) => {
-        await Promise.all(params.resultNodeIds.map((nodeId) => params.submitTask(nodeId)))
-        return makeRunSummary({
-          resultNodeIds: ['image-2', 'image-3', 'image-4', 'image-5'],
-          totalCount: 4,
-          successCount: 4,
-          outcomes: [
-            { resultNodeId: 'image-2', status: 'succeeded', taskId: 'task-shared' },
-            { resultNodeId: 'image-3', status: 'succeeded', taskId: 'task-shared' },
-            { resultNodeId: 'image-4', status: 'succeeded', taskId: 'task-shared' },
-            { resultNodeId: 'image-5', status: 'succeeded', taskId: 'task-shared' },
-          ],
-        })
-      },
-      ['image-2', 'image-3', 'image-4', 'image-5'],
-    )
-    const { attachment, runner } = createRunner(pendingResults)
-
-    await runner.run(
-      makeRunParams(attachment, {
-        outputCount: 4,
-        submitTask: vi.fn(async (resultNodeId: string, clientActionId: string, resultIndex: number) => {
-          submitted.push([resultNodeId, clientActionId, resultIndex])
-          return { taskId: 'task-shared' }
-        }),
-      }),
-    )
-
-    expect(submitted).toHaveLength(1)
-    expect(submitted[0]?.[0]).toBe('image-2')
-    expect(submitted[0]?.[2]).toBe(0)
-  })
-
-  it('cancels a late submitted task when its lease was superseded', async () => {
-    const submission = createDeferred<{ taskId: string }>()
-    const pendingResults = createPendingResults(async (params) => {
-      await params.submitTask('image-2')
-      return makeRunSummary()
-    })
-    const { attachment, cancelTasks, executionRuntime, onWarning, runner } =
-      createRunner(pendingResults)
-
-    const run = runner.run(
-      makeRunParams(attachment, {
-        submitTask: vi.fn(() => submission.promise),
-      }),
-    )
-    await flushPromises()
-    const replacementLease = executionRuntime.beginSubmission(attachment, 'image-2')
-    submission.resolve({ taskId: 'task-late' })
-    await run
-
-    expect(replacementLease).not.toBeNull()
-    expect(cancelTasks).toHaveBeenCalledWith(['task-late'])
-    expect(executionRuntime.getNodeState('image-2')).toEqual({ status: 'submitting' })
-    expect(onWarning).toHaveBeenCalledWith('Canvas execution is no longer attached')
-  })
-
-  it('drops a late completion after delete cancels its exact lease', async () => {
-    const completion = createDeferred<void>()
-    const pendingResults = createPendingResults(async (params) => {
-      await params.submitTask('image-2')
-      await completion.promise
-      const isCurrent = params.isResultExecutionCurrent('image-2', 'task-1')
-      return makeRunSummary({
-        successCount: isCurrent ? 1 : 0,
-        outcomes: [
-          {
-            resultNodeId: 'image-2',
-            status: isCurrent ? 'succeeded' : 'cancelled',
-            taskId: 'task-1',
-          },
-        ],
-      })
-    })
-    const { attachment, executionRuntime, onSuccess, onWarning, runner } =
-      createRunner(pendingResults)
-
-    const run = runner.run(makeRunParams(attachment))
-    await flushPromises()
-    const leases = executionRuntime.captureActiveNodeExecutions(['image-2'])
-    expect(executionRuntime.cancelNodeExecutions(leases)).toEqual(['task-1'])
-    completion.resolve(undefined)
-    await run
-
-    expect(executionRuntime.getNodeState('image-2')).toEqual({
-      status: 'cancelled',
-      taskId: 'task-1',
-    })
-    expect(onSuccess).not.toHaveBeenCalled()
-    expect(onWarning).not.toHaveBeenCalled()
-  })
-
-  it('routes typed billing failures from outcomes through the error port', async () => {
-    const insufficient = new CanvasBillingPreflightError('insufficient-credits', 'Idea不足')
-    const onError = vi.fn(() => true)
-    const pendingResults = createPendingResults(async (params) => {
-      await params.submitTask('image-2')
-      return makeRunSummary({
-        totalCount: 2,
-        successCount: 1,
-        failureCount: 1,
-        firstFailure: insufficient,
-        failures: [insufficient],
-      })
-    })
-    const { attachment, onWarning, runner } = createRunner(pendingResults, { onError })
-
-    await runner.run(makeRunParams(attachment, { outputCount: 2 }))
-
-    expect(onError).toHaveBeenCalledWith(insufficient)
-    expect(onWarning).not.toHaveBeenCalled()
+  it('cancels and removes a reserved slot before a task id exists', async () => {
+    const harness = createHarness()
+    harness.transport.submit.mockRejectedValueOnce(new TaskCancelledError())
+    await harness.runner.execute(harness.intent)
+    expect(harness.pendingResults.removePendingResults).toHaveBeenCalledWith(['image-1'])
+    expect(harness.cancelTasks).toHaveBeenCalledWith([])
   })
 })

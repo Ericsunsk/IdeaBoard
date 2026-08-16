@@ -92,21 +92,10 @@ func AIImageRequest(feature, rawResolution string, quantity int64) (Request, err
 	if !ok {
 		return Request{}, ErrUnsupportedProduct
 	}
-	if _, err := workflow.ParseRequestedOutputCount(int(quantity)); err != nil {
-		return Request{}, err
+	if quantity <= 0 {
+		return Request{}, billing.ErrInvalidQuantity
 	}
 	resolution, err := billing.NormalizeOutputResolution(rawResolution)
-	if rawResolution == "" {
-		if canonicalFeature == workflow.FeatureSlugRemoveBg {
-			resolution = billing.OutputResolutionDefault
-		} else {
-			resolution = billing.OutputResolution1K
-		}
-		err = nil
-	}
-	if canonicalFeature == workflow.FeatureSlugRemoveBg && resolution != billing.OutputResolutionDefault {
-		return Request{}, billing.ErrInvalidOutputResolution
-	}
 	if err != nil {
 		return Request{}, err
 	}
@@ -146,9 +135,6 @@ func validateRequest(request Request) (billing.SKU, error) {
 	}
 	if _, err := billing.NormalizeOutputResolution(string(request.OutputResolution)); err != nil {
 		return "", err
-	}
-	if request.Feature == workflow.FeatureSlugRemoveBg && request.OutputResolution != billing.OutputResolutionDefault {
-		return "", billing.ErrInvalidOutputResolution
 	}
 	return sku, nil
 }

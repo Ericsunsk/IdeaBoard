@@ -14,7 +14,7 @@ import (
 // GenerationCompilerInput is the provider-independent intent required to
 // freeze a generation request before Task submission.
 type GenerationCompilerInput struct {
-	Feature             string
+	Plan                workflow.FeatureExecutionPlan
 	UserPrompt          string
 	CompiledPrompt      string
 	TemplateVersion     string
@@ -26,10 +26,10 @@ type GenerationCompilerInput struct {
 // provider, account, model, or endpoint. The returned value is safe to retain
 // as a Task fact.
 func CompileGenerationSnapshot(input GenerationCompilerInput) (tasks.GenerationRequestSnapshot, error) {
-	feature := strings.TrimSpace(input.Feature)
-	if feature == "" {
-		return tasks.GenerationRequestSnapshot{}, fmt.Errorf("generation compiler feature is required")
+	if _, err := workflow.EncodeFeatureExecutionPlan(input.Plan); err != nil {
+		return tasks.GenerationRequestSnapshot{}, fmt.Errorf("generation compiler execution plan: %w", err)
 	}
+	feature := input.Plan.Feature()
 	if strings.TrimSpace(input.TemplateFingerprint) == "" {
 		input.TemplateFingerprint = TemplateFingerprint(input.TemplateVersion, input.CompiledPrompt)
 	}
@@ -43,14 +43,17 @@ func CompileGenerationSnapshot(input GenerationCompilerInput) (tasks.GenerationR
 	snapshot := tasks.GenerationRequestSnapshot{
 		SchemaVersion:        tasks.CurrentParamsSchemaVersion,
 		Feature:              feature,
-		Primitive:            string(workflow.GenerationPrimitiveTextToImage),
+		Primitive:            string(input.Plan.RuntimeInputs().GenerationPrimitive()),
 		UserPrompt:           input.UserPrompt,
 		CompiledPrompt:       input.CompiledPrompt,
 		TemplateVersion:      strings.TrimSpace(input.TemplateVersion),
 		TemplateFingerprint:  input.TemplateFingerprint,
-		RequestedOutputCount: 1,
+		RequestedOutputCount: input.Plan.RequestedOutputCount().Int(),
 	}
 	if input.Params == nil {
+		if input.Plan.RuntimeInputs().ImageInputCount() != 0 || input.Plan.RuntimeInputs().HasMaskInput() {
+			return tasks.GenerationRequestSnapshot{}, fmt.Errorf("generation compiler media facts do not match execution plan")
+		}
 		return snapshot, nil
 	}
 	if input.Params.Controls != nil {
@@ -60,18 +63,8 @@ func CompileGenerationSnapshot(input GenerationCompilerInput) (tasks.GenerationR
 			controls.PromptUpsampling = &value
 		}
 		snapshot.Controls = &controls
-		if controls.OutputCount > 0 {
-			count, err := workflow.ParseRequestedOutputCount(controls.OutputCount)
-			if err != nil {
-				return tasks.GenerationRequestSnapshot{}, err
-			}
-			snapshot.RequestedOutputCount = count.Int()
-		}
-	}
-	if feature == workflow.FeatureSlugRemoveBg || feature == workflow.FeatureSlugHDUpscale {
-		snapshot.RequestedOutputCount = 1
-		if snapshot.Controls != nil {
-			snapshot.Controls.OutputCount = 1
+		if controls.OutputCount > 0 && controls.OutputCount != snapshot.RequestedOutputCount {
+			return tasks.GenerationRequestSnapshot{}, fmt.Errorf("generation compiler output count does not match execution plan")
 		}
 	}
 	appendMedia := func(ref tasks.MediaRef) {
@@ -96,8 +89,18 @@ func CompileGenerationSnapshot(input GenerationCompilerInput) (tasks.GenerationR
 			appendMedia(*media.Mask)
 		}
 	}
-	if len(snapshot.Media) > 0 {
-		snapshot.Primitive = string(workflow.GenerationPrimitiveImageToImage)
+	imageInputCount := 0
+	hasMaskInput := false
+	for _, media := range snapshot.Media {
+		if media.Role == "mask" {
+			hasMaskInput = true
+			continue
+		}
+		imageInputCount++
+	}
+	runtimeInputs := input.Plan.RuntimeInputs()
+	if imageInputCount != runtimeInputs.ImageInputCount() || hasMaskInput != runtimeInputs.HasMaskInput() {
+		return tasks.GenerationRequestSnapshot{}, fmt.Errorf("generation compiler media facts do not match execution plan")
 	}
 	return snapshot, nil
 }

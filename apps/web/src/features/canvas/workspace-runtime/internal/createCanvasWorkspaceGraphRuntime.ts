@@ -9,7 +9,7 @@ import {
   type CanvasGraphEditingUploadAdapter,
   type CanvasGraphInteractionBrowserAdapter,
 } from '../../graph-editing'
-import type { CanvasExecutionRuntime } from '../../execution/runtime/CanvasExecutionRuntime'
+import type { PendingImageExecutionCore } from '../../execution/pending-execution'
 
 type CanvasWorkspaceBoardRuntime = ReturnType<typeof useCanvasBoardRuntime>
 
@@ -24,7 +24,7 @@ type CreateCanvasWorkspaceGraphRuntimeOptions = {
     openNodeImage: (snapshot: ImageNodeItem, mode: 'latest-output') => Promise<void>
   }
   feedback: CanvasFeedback['graph']
-  executionRuntime: CanvasExecutionRuntime
+  executionCore: PendingImageExecutionCore
 }
 
 export function createCanvasWorkspaceGraphRuntime(
@@ -58,7 +58,8 @@ export function createCanvasWorkspaceGraphRuntime(
     browser: options.interactionBrowser,
     preview: { openNodeImage: options.preview.openNodeImage },
     feedback: options.feedback,
-    isNodeExecutionActive: options.executionRuntime.isNodeActive,
+    isNodeExecutionActive: (nodeId) =>
+      options.executionCore.captureActiveLeases([nodeId as `image-${number}`]).length > 0,
   })
 
   return {

@@ -10,7 +10,7 @@ import {
 import { createFlowEdgeProjectionIndex } from './flowConnectionIdentity'
 import { applyFlowGraphDeleteProjection } from './flowGraphDeleteProjection'
 import type { CanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
-import type { CanvasExecutionLease } from '../execution/runtime/CanvasExecutionRuntime'
+import type { PendingImageExecutionLease } from '../execution/pending-execution'
 
 function createDeleteSummary(
   options: {
@@ -160,7 +160,7 @@ describe('flowGraphDeleteProjection', () => {
       data: undefined,
     } as Edge
     const { graphAdapter, applyGraphChanges } = createGraphAdapter()
-    const executionLease = { nodeId: imageNode.id } as CanvasExecutionLease
+    const executionLease = { resultNodeId: imageNode.id } as PendingImageExecutionLease
     const captureActiveNodeExecutions = vi.fn(() => [executionLease])
     const releaseNodeExecutions = vi.fn()
 
@@ -211,7 +211,7 @@ describe('flowGraphDeleteProjection', () => {
       targetHandle: 'in:image',
     } as Edge
     const { graphAdapter, applyGraphChanges } = createGraphAdapter()
-    const executionLease = { nodeId: imageNode.id } as CanvasExecutionLease
+    const executionLease = { resultNodeId: imageNode.id } as PendingImageExecutionLease
     const captureActiveNodeExecutions = vi.fn(() => [executionLease])
     const releaseNodeExecutions = vi.fn()
 
@@ -271,8 +271,8 @@ describe('flowGraphDeleteProjection', () => {
     )
     const { graphAdapter, applyGraphChanges } = createGraphAdapter()
     const leases = [
-      { nodeId: firstSlot.id } as CanvasExecutionLease,
-      { nodeId: secondSlot.id } as CanvasExecutionLease,
+      { resultNodeId: firstSlot.id } as PendingImageExecutionLease,
+      { resultNodeId: secondSlot.id } as PendingImageExecutionLease,
     ]
     const captureActiveNodeExecutions = vi.fn(() => leases)
     const releaseNodeExecutions = vi.fn()

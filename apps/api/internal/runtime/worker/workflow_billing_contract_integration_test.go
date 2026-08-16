@@ -70,7 +70,7 @@ func TestAIImageWorkflowBillingContractUsesCurrentProviderPoolAndConvergesFacts(
 		accountRepo,
 		riverQueue,
 		taskRuntime,
-		func(_ context.Context, runtimeAccount *accounts.ApiAccount, _ *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error) {
+		func(_ context.Context, runtimeAccount *accounts.RuntimeAccountAccess, _ *tasks.TaskPayload, assignment taskqueue.TaskAssignment) (providerCallOutput, error) {
 			providerCalls.Add(1)
 			switch runtimeAccount.ID {
 			case failedProviderID.Load():

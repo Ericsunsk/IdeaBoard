@@ -111,7 +111,7 @@ func (r *AccountRepository) GetRuntimeByIDWithSecret(ctx context.Context, id int
 	return &account, nil
 }
 
-func (r *AccountRepository) GetRuntimeAccountForAssignment(ctx context.Context, accountID int64, providerEndpointID int64, credentialID int64) (*ApiAccount, error) {
+func (r *AccountRepository) GetRuntimeAccountForAssignment(ctx context.Context, accountID int64, providerEndpointID int64, credentialID int64) (*RuntimeAccountAccess, error) {
 	row, err := r.q.GetRuntimeAccountForAssignment(ctx, dbsqlc.GetRuntimeAccountForAssignmentParams{
 		AccountID:          accountID,
 		ProviderEndpointID: providerEndpointID,
@@ -124,11 +124,12 @@ func (r *AccountRepository) GetRuntimeAccountForAssignment(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	account := accountFromSQLC(row.ApiAccount, row.ApiType, row.Protocol, row.Capabilities, apiKey, row.SecretConfigured, row.ProxyUrl)
-	if err := r.attachAccountModels(ctx, []*ApiAccount{&account}); err != nil {
-		return nil, err
-	}
-	return &account, nil
+	return &RuntimeAccountAccess{
+		ID:      int64(row.ApiAccount.ID),
+		Name:    row.ApiAccount.Name,
+		APIKey:  apiKey,
+		Timeout: int(row.ApiAccount.Timeout),
+	}, nil
 }
 
 func (r *AccountRepository) GetRuntimeCredentialByID(ctx context.Context, accountID int64, credentialID int64) (*RuntimeCredential, error) {
