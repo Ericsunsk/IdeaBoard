@@ -113,10 +113,10 @@ func TestCallImageUpscaleUsesScaleContractAndSingleImage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("callImageUpscale: %v", err)
 	}
-	if got["image_url"] != inputURL || got["scale"] != 2.3 || got["mode"] != "final" || got["output_format"] != "png" {
-		t.Fatalf("payload = %#v, want image_url, scale, mode and output_format", got)
+	if got["image_url"] != inputURL || got["scale"] != 2.3 || got["output_format"] != "png" {
+		t.Fatalf("payload = %#v, want image_url, scale and output_format", got)
 	}
-	if len(got) != 4 {
+	if len(got) != 3 {
 		t.Fatalf("payload contains ignored controls: %#v", got)
 	}
 	if !strings.HasPrefix(result.ImageURL, "data:image/png;base64,") {

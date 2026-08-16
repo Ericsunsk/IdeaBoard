@@ -57,7 +57,6 @@ func (c *ProviderExecutor) callImageUpscale(
 	return c.callImageURLJSONImage(ctx, account, map[string]interface{}{
 		"image_url":     inputURL,
 		"scale":         request.Scale,
-		"mode":          "final",
 		"output_format": "png",
 	}, timeout, "高清放大")
 }
