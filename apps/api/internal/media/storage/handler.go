@@ -130,6 +130,11 @@ func writeStorageCommandError(c *gin.Context, fallback string, err error) {
 		response.Error(c, 400, capabilityErr.Error())
 		return
 	}
+	var probeErr *StorageProbeError
+	if errors.As(err, &probeErr) {
+		response.Error(c, 400, probeErr.UserMessage())
+		return
+	}
 	response.InternalError(c, 400, fallback, err)
 }
 

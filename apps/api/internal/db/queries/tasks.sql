@@ -688,10 +688,10 @@ WITH updated_tasks AS (
       error_msg = sqlc.arg(error_msg),
       completed_at = sqlc.narg(completed_at)::timestamptz
   WHERE t.account_id = sqlc.arg(account_id) AND t.status = 'running'
-  RETURNING t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.result,
+  RETURNING t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.params, t.result,
             t.feature_slug, t.created_at, t.completed_at
 )
-SELECT t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.result,
+SELECT t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.params, t.result,
        t.feature_slug,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,

@@ -1,5 +1,7 @@
 package storage
 
+import "context"
+
 type StorageStoreOptions struct {
 	DirPrefix  string
 	AllowHosts []string
@@ -22,16 +24,32 @@ type StoredUploadObject struct {
 	Data        []byte
 }
 
+type StoredUploadLookup struct {
+	URL       string
+	ObjectKey string
+}
+
+type StoredUploadLocation struct {
+	StorageProfileID string
+	StorageKey       string
+}
+
+type StoredUploadLocator interface {
+	LocateStoredUpload(context.Context, StoredUploadLookup) (StoredUploadLocation, bool, error)
+}
+
 type StorageService struct {
 	profileRepo         *StorageProfileRepository
+	assetLocator        StoredUploadLocator
 	s3CompatibleService *S3CompatibleService
 	adapterRegistry     *storageAdapterRegistry
 	providerMeta        map[StorageProvider]StorageProviderMeta
 }
 
-func NewStorageService(profileRepo *StorageProfileRepository) *StorageService {
+func NewStorageService(profileRepo *StorageProfileRepository, assetLocator StoredUploadLocator) *StorageService {
 	service := &StorageService{
 		profileRepo:         profileRepo,
+		assetLocator:        assetLocator,
 		s3CompatibleService: NewS3CompatibleService(),
 		providerMeta:        make(map[StorageProvider]StorageProviderMeta),
 	}

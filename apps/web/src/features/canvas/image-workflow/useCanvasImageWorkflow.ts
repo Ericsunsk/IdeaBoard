@@ -5,8 +5,6 @@ import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtend
 import { useImageCanvasExtendOverlay } from '../composables/useImageCanvasExtendOverlay'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { ImageNodeAction } from '../config/imageActionRegistry'
-import { IMAGE_NODE_ACTION } from '../config/imageActionRegistry'
-import type { ImageTaskAction } from '../execution'
 import type { CanvasFlowPaneAdapter } from '../flow-pane'
 import {
   useCanvasImageTools,

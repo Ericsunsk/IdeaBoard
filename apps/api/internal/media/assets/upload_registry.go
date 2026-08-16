@@ -149,6 +149,43 @@ func (r *MediaAssetRegistry) FindPreparedGenerationMedia(ctx context.Context, ow
 	return PreparedGenerationMedia{AssetID: row.ID, OwnerUserID: ownerUserID, StorageProfile: row.StorageProfileID, StorageKey: row.StorageKey, URL: row.Url, SourceURL: row.SourceUrl, MIMEType: row.MimeType, Width: int(row.Width), Height: int(row.Height), SizeBytes: row.SizeBytes, InputIndex: inputIndex, Role: role, RefID: refID}, true, nil
 }
 
+func (r *MediaAssetRegistry) LocateStoredUpload(ctx context.Context, lookup storage.StoredUploadLookup) (storage.StoredUploadLocation, bool, error) {
+	if r == nil || r.q == nil {
+		return storage.StoredUploadLocation{}, false, fmt.Errorf("media asset registry is unavailable")
+	}
+	if rawURL := strings.TrimSpace(lookup.URL); rawURL != "" {
+		row, err := r.q.FindMediaAssetStorageLocationByURL(ctx, rawURL)
+		if err == nil {
+			return storage.StoredUploadLocation{
+				StorageProfileID: row.StorageProfileID,
+				StorageKey:       row.StorageKey,
+			}, true, nil
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return storage.StoredUploadLocation{}, false, fmt.Errorf("locate media asset by URL: %w", err)
+		}
+	}
+
+	storageKey := strings.TrimSpace(lookup.ObjectKey)
+	if storageKey == "" {
+		return storage.StoredUploadLocation{}, false, nil
+	}
+	rows, err := r.q.ListMediaAssetStorageLocationsByKey(ctx, storageKey)
+	if err != nil {
+		return storage.StoredUploadLocation{}, false, fmt.Errorf("locate media asset by storage key: %w", err)
+	}
+	if len(rows) == 0 {
+		return storage.StoredUploadLocation{}, false, nil
+	}
+	if len(rows) > 1 {
+		return storage.StoredUploadLocation{}, false, fmt.Errorf("media asset storage key is ambiguous")
+	}
+	return storage.StoredUploadLocation{
+		StorageProfileID: rows[0].StorageProfileID,
+		StorageKey:       rows[0].StorageKey,
+	}, true, nil
+}
+
 func newUploadMediaAssetID() (string, error) {
 	var value [12]byte
 	if _, err := rand.Read(value[:]); err != nil {

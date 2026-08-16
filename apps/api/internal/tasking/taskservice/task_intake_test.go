@@ -193,6 +193,31 @@ func TestTaskIntakeAllowsModelessRemoveBackgroundAccount(t *testing.T) {
 	}
 }
 
+func TestTaskIntakeReadinessDoesNotRequireExecutionMedia(t *testing.T) {
+	intake := NewTaskIntake(TaskIntakeDeps{
+		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{
+			ID:           101,
+			Capabilities: []string{"background-removal"},
+			Models:       []accounts.AccountModel{{Name: "gpt-image-1", Enabled: true}},
+		}}},
+	})
+
+	for _, feature := range []string{workflow.FeatureSlugLocalInpaint, workflow.FeatureSlugRemoveBg} {
+		t.Run(feature, func(t *testing.T) {
+			compiled, err := intake.CompileReadiness(t.Context(), &tasks.SubmitTaskRequest{
+				Feature: feature,
+				Params:  map[string]interface{}{"output_count": 1},
+			})
+			if err != nil {
+				t.Fatalf("CompileReadiness() error = %v", err)
+			}
+			if compiled.Feature != feature {
+				t.Fatalf("feature = %q, want %q", compiled.Feature, feature)
+			}
+		})
+	}
+}
+
 func TestTaskIntakePersistsProviderIndependentGenerationSnapshot(t *testing.T) {
 	intake := NewTaskIntake(TaskIntakeDeps{
 		Accounts: &fakeSubmitAccountStore{accounts: []*accounts.ApiAccount{{

@@ -348,6 +348,7 @@ func (r *Repository) failRunningByAccountIDTx(ctx context.Context, q *dbsqlc.Que
 		task := &tasks.Task{
 			TaskID:                     c.TaskID,
 			UserID:                     c.UserID,
+			Params:                     c.Params,
 			AssignedProviderEndpointID: dbutil.Int64Ptr(c.AssignedProviderEndpointID),
 			AssignedCredentialID:       dbutil.Int64Ptr(c.AssignedCredentialID),
 			AccountID:                  dbutil.Int64Ptr(c.AccountID),

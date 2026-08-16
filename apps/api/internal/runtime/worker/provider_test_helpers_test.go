@@ -15,7 +15,7 @@ import (
 	"ideaboard/api/internal/workflow"
 )
 
-func marshalWorkflowTaskParamsForTest(t *testing.T, params *tasks.WorkflowTaskParams) string {
+func marshalWorkflowTaskParamsForTest(t testing.TB, params *tasks.WorkflowTaskParams) string {
 	t.Helper()
 	if workflow.IsAIImageFeature(params.Feature) && len(params.ExecutionPlan) == 0 {
 		imageInputCount := 0

@@ -237,12 +237,12 @@ func (s *Service) CheckSubmitTaskReadiness(ctx context.Context, userID int64, re
 			"submission_failed", "任务提交检查暂不可用，请稍后重试", errTaskIntakeUnavailable,
 		)
 	}
-	canonical, err := s.taskIntake.Compile(ctx, userID, req)
+	compilation, err := s.taskIntake.CompileReadiness(ctx, req)
 	if err != nil {
 		return SubmitTaskReadiness{}, err
 	}
-	result := SubmitTaskReadiness{Feature: canonical.Feature()}
-	billingRequest := canonical.BillingRequest()
+	result := SubmitTaskReadiness{Feature: compilation.Feature}
+	billingRequest := compilation.BillingRequest
 	if billingRequest == nil {
 		return result, nil
 	}

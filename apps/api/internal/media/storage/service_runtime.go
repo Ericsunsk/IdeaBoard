@@ -144,17 +144,10 @@ func (s *StorageService) StoreBytesRef(ctx context.Context, filename string, dat
 }
 
 // ReadUploadResourceByURL resolves a structured uploads URL/path and reads it
-// from the active storage profile. Callers must authorize access before reading.
+// from the profile that owns the asset. Callers must authorize access before reading.
 func (s *StorageService) ReadUploadResourceByURL(ctx context.Context, rawURL string, maxBytes int64) (*StoredUploadObject, error) {
-	profile, err := s.resolveActiveProfile(ctx)
+	profile, key, err := s.resolveStoredUploadTarget(ctx, rawURL)
 	if err != nil {
-		return nil, err
-	}
-	key, err := s.extractObjectKeyFromUserUploadURL(*profile, rawURL)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := ParseUploadResource(key); err != nil {
 		return nil, err
 	}
 	adapter, err := s.adapterRegistry.get(profile.Provider)
@@ -179,11 +172,7 @@ func (s *StorageService) DeleteProfileAvatarByURL(ctx context.Context, storageUI
 }
 
 func (s *StorageService) deleteUserUploadByURL(ctx context.Context, rawURL string, validateResource func(UploadResource) error) error {
-	profile, err := s.resolveActiveProfile(ctx)
-	if err != nil {
-		return err
-	}
-	key, err := s.extractObjectKeyFromUserUploadURL(*profile, rawURL)
+	profile, key, err := s.resolveStoredUploadTarget(ctx, rawURL)
 	if err != nil {
 		return err
 	}
@@ -342,6 +331,112 @@ func (s *StorageService) resolveActiveProfile(ctx context.Context) (*StorageProf
 		return nil, err
 	}
 	return local, nil
+}
+
+func (s *StorageService) resolveStoredUploadTarget(ctx context.Context, rawURL string) (*StorageProfile, string, error) {
+	key, err := uploadObjectKeyFromURL(rawURL)
+	if err != nil {
+		return nil, "", err
+	}
+	if _, err := ParseUploadResource(key); err != nil {
+		return nil, "", err
+	}
+
+	if s.assetLocator != nil {
+		location, found, err := s.assetLocator.LocateStoredUpload(ctx, StoredUploadLookup{
+			URL:       strings.TrimSpace(rawURL),
+			ObjectKey: key,
+		})
+		if err != nil {
+			return nil, "", fmt.Errorf("定位媒体资产失败: %w", err)
+		}
+		if found {
+			locatedKey, err := normalizeUploadObjectKey(location.StorageKey)
+			if err != nil {
+				return nil, "", fmt.Errorf("媒体资产存储路径无效: %w", err)
+			}
+			if locatedKey != key {
+				return nil, "", fmt.Errorf("媒体资产存储路径与请求不一致")
+			}
+			profile, err := s.resolveProfileByID(ctx, location.StorageProfileID)
+			if err != nil {
+				return nil, "", fmt.Errorf("读取媒体资产存储配置失败: %w", err)
+			}
+			return profile, locatedKey, nil
+		}
+	}
+
+	profile, err := s.resolveProfileFromUploadURL(ctx, rawURL, key)
+	if err != nil {
+		return nil, "", err
+	}
+	return profile, key, nil
+}
+
+func (s *StorageService) resolveProfileByID(ctx context.Context, profileID string) (*StorageProfile, error) {
+	profiles, err := s.loadProfilesWithSecrets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.findProfile(profiles, strings.TrimSpace(profileID))
+}
+
+func (s *StorageService) resolveProfileFromUploadURL(ctx context.Context, rawURL string, key string) (*StorageProfile, error) {
+	trimmed := strings.TrimSpace(rawURL)
+	if strings.HasPrefix(trimmed, "/") {
+		return s.resolveProfileByID(ctx, builtinLocalProfileID())
+	}
+
+	parsed, err := url.Parse(trimmed)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return nil, fmt.Errorf("图片地址格式错误")
+	}
+	profiles, err := s.loadProfilesWithSecrets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var matched *StorageProfile
+	for index := range profiles {
+		profile := &profiles[index]
+		if profile.Provider != StorageProviderS3Compatible {
+			continue
+		}
+		candidate, candidateErr := s.extractObjectKeyFromUserUploadURL(*profile, trimmed)
+		if candidateErr != nil || candidate != key {
+			continue
+		}
+		if matched != nil {
+			return nil, fmt.Errorf("图片地址匹配多个存储配置")
+		}
+		matched = profile
+	}
+	if matched == nil {
+		return nil, fmt.Errorf("未找到图片所属的存储配置")
+	}
+	return matched, nil
+}
+
+func uploadObjectKeyFromURL(rawURL string) (string, error) {
+	trimmed := strings.TrimSpace(rawURL)
+	if trimmed == "" {
+		return "", fmt.Errorf("图片地址不能为空")
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		return "", fmt.Errorf("图片地址格式错误")
+	}
+	if parsed.Scheme != "" {
+		scheme := strings.ToLower(parsed.Scheme)
+		if (scheme != "http" && scheme != "https") || parsed.Host == "" {
+			return "", fmt.Errorf("图片地址格式错误")
+		}
+	}
+	pathValue := "/" + strings.TrimLeft(parsed.Path, "/")
+	markerIndex := strings.Index(pathValue, "/uploads/")
+	if markerIndex < 0 {
+		return "", fmt.Errorf("不支持的上传资源路径")
+	}
+	return normalizeUploadObjectKey(strings.TrimPrefix(pathValue[markerIndex:], "/"))
 }
 
 func (s *StorageService) isProfileReady(profile StorageProfile) bool {

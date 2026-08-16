@@ -337,6 +337,28 @@ func (q *Queries) DeleteUnclaimedPreparedMediaAsset(ctx context.Context, arg Del
 	return result.RowsAffected()
 }
 
+const findMediaAssetStorageLocationByURL = `-- name: FindMediaAssetStorageLocationByURL :one
+SELECT storage_profile_id, storage_key
+FROM media_assets
+WHERE url = $1
+  AND status = 'ready'
+  AND deleted_at IS NULL
+ORDER BY updated_at DESC, id DESC
+LIMIT 1
+`
+
+type FindMediaAssetStorageLocationByURLRow struct {
+	StorageProfileID string `json:"storage_profile_id"`
+	StorageKey       string `json:"storage_key"`
+}
+
+func (q *Queries) FindMediaAssetStorageLocationByURL(ctx context.Context, url string) (FindMediaAssetStorageLocationByURLRow, error) {
+	row := q.db.QueryRowContext(ctx, findMediaAssetStorageLocationByURL, url)
+	var i FindMediaAssetStorageLocationByURLRow
+	err := row.Scan(&i.StorageProfileID, &i.StorageKey)
+	return i, err
+}
+
 const findPreparedGenerationMedia = `-- name: FindPreparedGenerationMedia :one
 SELECT asset.id, asset.storage_profile_id, asset.storage_key, asset.url,
   asset.source_url, asset.mime_type, asset.width, asset.height, asset.size_bytes
@@ -473,6 +495,44 @@ func (q *Queries) ListDueMediaAssetReclamationIDs(ctx context.Context, arg ListD
 	for rows.Next() {
 		var i ListDueMediaAssetReclamationIDsRow
 		if err := rows.Scan(&i.ID, &i.ReclaimGeneration); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMediaAssetStorageLocationsByKey = `-- name: ListMediaAssetStorageLocationsByKey :many
+SELECT storage_profile_id, storage_key
+FROM media_assets
+WHERE storage_key = $1
+  AND status = 'ready'
+  AND deleted_at IS NULL
+ORDER BY updated_at DESC, id DESC
+LIMIT 2
+`
+
+type ListMediaAssetStorageLocationsByKeyRow struct {
+	StorageProfileID string `json:"storage_profile_id"`
+	StorageKey       string `json:"storage_key"`
+}
+
+func (q *Queries) ListMediaAssetStorageLocationsByKey(ctx context.Context, storageKey string) ([]ListMediaAssetStorageLocationsByKeyRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMediaAssetStorageLocationsByKey, storageKey)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMediaAssetStorageLocationsByKeyRow
+	for rows.Next() {
+		var i ListMediaAssetStorageLocationsByKeyRow
+		if err := rows.Scan(&i.StorageProfileID, &i.StorageKey); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

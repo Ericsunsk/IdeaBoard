@@ -21,6 +21,8 @@ type recordingTaskStatusPublisher struct {
 	ch chan events.TaskStatusEvent
 }
 
+const taskRuntimeTestParams = `{"schema_version":2}`
+
 func newRecordingTaskStatusPublisher() *recordingTaskStatusPublisher {
 	return &recordingTaskStatusPublisher{ch: make(chan events.TaskStatusEvent, 8)}
 }
@@ -239,6 +241,9 @@ RETURNING id`,
 
 func seedTaskRuntimeTask(t testing.TB, db *sql.DB, repo *taskstore.Repository, ctx context.Context, task *tasks.Task) error {
 	t.Helper()
+	if task.Params == "" {
+		task.Params = taskRuntimeTestParams
+	}
 	if task.Status == tasks.StatusRunning || task.AccountID != nil {
 		accountID := tasks.IDValue(task.AccountID)
 		if accountID <= 0 {
@@ -296,10 +301,10 @@ func seedTaskRuntimeActiveLease(t testing.TB, db *sql.DB, task *tasks.Task, cred
 	if _, err := db.Exec(`
 INSERT INTO task_leases (
   task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
-  feature_slug, resolved_model, api_type,
+  feature_slug, resolved_model, api_type, provider_endpoint_protocol,
   provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version,
   acquired_at
-) VALUES ($1, $2, 1, $3, $4, $5, 'image-generate', COALESCE(NULLIF($6, ''), 'gpt-image-1'), 'openai-compatible',
+) VALUES ($1, $2, 1, $3, $4, $5, 'image-generate', COALESCE(NULLIF($6, ''), 'gpt-image-1'), 'openai-compatible', 'model-api',
   'runtime-test-endpoint', 'https://example.com/runtime-test', 'runtime-test-fingerprint', 'test-key', now())`,
 		task.TaskID,
 		task.LeaseToken,

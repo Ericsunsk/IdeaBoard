@@ -267,6 +267,7 @@ func TestUpsertDailyStatByTaskIsIdempotentByTaskID(t *testing.T) {
 	completedAt := createdAt.Add(10 * time.Second)
 	task := &tasks.Task{
 		TaskID:      "idem-1",
+		Params:      `{"schema_version":2}`,
 		UserID:      3,
 		Status:      tasks.StatusCompleted,
 		Result:      `{"model":"idem-model","username":"idem-user"}`,
@@ -297,6 +298,7 @@ func TestUpsertDailyStatByCancelledTaskIsIdempotentByTaskID(t *testing.T) {
 	cancelledAt := createdAt.Add(10 * time.Second)
 	task := &tasks.Task{
 		TaskID:      "idem-cancelled-1",
+		Params:      `{"schema_version":2}`,
 		UserID:      4,
 		Status:      tasks.StatusCancelled,
 		Result:      `{"model":"idem-cancelled-model","username":"idem-cancelled-user"}`,
@@ -328,6 +330,7 @@ func TestUpsertDailyStatByTaskWithoutResolvedModelUsesUnknownModel(t *testing.T)
 	completedAt := createdAt.Add(15 * time.Second)
 	task := &tasks.Task{
 		TaskID:      "fallback-1",
+		Params:      `{"schema_version":2}`,
 		UserID:      7,
 		AccountID:   tasks.IDPtr(12345),
 		Status:      tasks.StatusCompleted,
@@ -359,6 +362,7 @@ func TestUpsertDailyStatByTaskUsesSnapshotModelNotResultJSON(t *testing.T) {
 	completedAt := createdAt.Add(15 * time.Second)
 	task := &tasks.Task{
 		TaskID:        "snapshot-model-not-result-json",
+		Params:        `{"schema_version":2}`,
 		UserID:        7,
 		Status:        tasks.StatusCompleted,
 		ResolvedModel: "snapshot-model",
@@ -388,6 +392,7 @@ func TestUpsertDailyStatByTaskNormalizesLongDimensions(t *testing.T) {
 	longModel := strings.Repeat("模", maxStatDimensionSize+10)
 	task := &tasks.Task{
 		TaskID:        "long-stat-dimensions",
+		Params:        `{"schema_version":2}`,
 		UserID:        17,
 		Status:        tasks.StatusCompleted,
 		ResolvedModel: longModel,
@@ -503,6 +508,7 @@ func TestUpsertDailyStatByTaskIgnoresZeroLatencySample(t *testing.T) {
 	completedAt := createdAt
 	task := &tasks.Task{
 		TaskID:      "zero-latency-stat",
+		Params:      `{"schema_version":2}`,
 		UserID:      18,
 		Status:      tasks.StatusCompleted,
 		Result:      `{"model":"zero-latency-model","username":"zero-latency-user"}`,

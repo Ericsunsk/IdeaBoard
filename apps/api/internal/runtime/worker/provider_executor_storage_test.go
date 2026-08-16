@@ -203,7 +203,7 @@ func newTestProviderExecutorWithLocalStorage(t *testing.T) *ProviderExecutor {
 	})
 
 	db := testdb.Open(t)
-	storageService := storage.NewStorageService(storage.NewStorageProfileRepository(db))
+	storageService := storage.NewStorageService(storage.NewStorageProfileRepository(db), nil)
 	mediaStore := storage.NewRuntimeTaskMediaStore(storageService)
 
 	return &ProviderExecutor{
@@ -241,6 +241,7 @@ func TestGoogleGeminiReadsRelativeCanvasUploadFromStorage(t *testing.T) {
 			Inputs:   []tasks.MediaRef{{URL: "/uploads/canvas/OWNR1A/board-1/content/source.png", Role: "input"}},
 			Original: &tasks.MediaRef{URL: "/uploads/canvas/OWNR1A/board-1/content/source.png", Role: "original"},
 		},
+		Variation: &tasks.StyleVariationParams{Strength: 40},
 	})
 	task := &tasks.TaskPayload{TaskID: "task-google-storage-input", Prompt: "prompt", Params: rawParams}
 	parsedParams, parseErr := executor.parseAndNormalizeTaskParams(context.Background(), task)

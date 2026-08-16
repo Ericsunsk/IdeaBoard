@@ -98,6 +98,7 @@ const props = withDefaults(
     disabled: false,
     imageInputs: () => [],
     maxImageInputs: 4,
+    outputResolution: undefined,
     placeholder: 'type your idea...',
     showAspectRatio: true,
     showImageInput: false,

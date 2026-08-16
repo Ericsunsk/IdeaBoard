@@ -11,7 +11,18 @@ import (
 
 func canonicalExecutionPlanForTest(t *testing.T, feature string, count int) (workflow.FeatureExecutionPlan, string) {
 	t.Helper()
+	plan, params, err := canonicalExecutionPlanFixture(feature, count)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return plan, params
+}
+
+func canonicalExecutionPlanFixture(feature string, count int) (workflow.FeatureExecutionPlan, string, error) {
 	resolution := workflow.OutputResolution1K
+	if feature == workflow.FeatureSlugRemoveBg {
+		resolution = workflow.OutputResolutionDefault
+	}
 	imageInputCount := 1
 	if feature == workflow.FeatureSlugPromptGeneration {
 		imageInputCount = 0
@@ -28,11 +39,11 @@ func canonicalExecutionPlanForTest(t *testing.T, feature string, count int) (wor
 		},
 	})
 	if err != nil {
-		t.Fatal(err)
+		return workflow.FeatureExecutionPlan{}, "", err
 	}
 	encoded, err := workflow.EncodeFeatureExecutionPlan(plan)
 	if err != nil {
-		t.Fatal(err)
+		return workflow.FeatureExecutionPlan{}, "", err
 	}
 	params, err := json.Marshal(tasks.WorkflowTaskParams{
 		SchemaVersion: tasks.CurrentParamsSchemaVersion,
@@ -40,9 +51,9 @@ func canonicalExecutionPlanForTest(t *testing.T, feature string, count int) (wor
 		ExecutionPlan: encoded,
 	})
 	if err != nil {
-		t.Fatal(err)
+		return workflow.FeatureExecutionPlan{}, "", err
 	}
-	return plan, string(params)
+	return plan, string(params), nil
 }
 
 func TestNewCanonicalRequestRejectsMismatchedBillingProduct(t *testing.T) {

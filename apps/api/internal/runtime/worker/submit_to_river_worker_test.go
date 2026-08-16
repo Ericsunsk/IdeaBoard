@@ -82,10 +82,10 @@ func TestSubmitTaskConvergesThroughStartedRiverWorker(t *testing.T) {
 		t.Fatalf("create River client failed: %v", err)
 	}
 
-	task := newSubmitToRiverWorkerTask("task_submit_worker_converges")
+	task := newSubmitToRiverWorkerTask(t, "task_submit_worker_converges")
 	task.ClientActionID = "action-task-submit-worker-converges"
 	task.BillingRequest = &tasks.TaskBillingRequest{
-		Feature: billingRequest.Feature, Quantity: billingRequest.Quantity,
+		Feature: billingRequest.Feature, OutputResolution: string(billing.OutputResolution1K), Quantity: billingRequest.Quantity,
 	}
 	if task.Status != tasks.StatusPending {
 		t.Fatalf("new task status=%q, want %q", task.Status, tasks.StatusPending)
@@ -214,7 +214,11 @@ func TestRiverFinalFailureSettlementRetrySurvivesRestartWithoutProviderRecall(t 
 		TaskID: taskID, UserID: 42,
 		ClientActionID: "action_" + taskID,
 		Prompt:         "draw a billed pattern", UserPrompt: "draw a billed pattern",
-		Params: `{"feature":"prompt-generation"}`, FeatureSlug: request.Feature,
+		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
+			SchemaVersion: tasks.CurrentParamsSchemaVersion,
+			Feature:       request.Feature,
+		}),
+		FeatureSlug:    request.Feature,
 		Status:         tasks.StatusPending,
 		BillingRequest: &tasks.TaskBillingRequest{Feature: request.Feature, OutputResolution: string(request.OutputResolution), Quantity: request.Quantity},
 	}
@@ -294,7 +298,7 @@ func TestFinalAttemptMarkerFailureResetsLeaseBeforeProviderRetry(t *testing.T) {
 		providerCalls++
 		return nil
 	})
-	task := newSubmitToRiverWorkerTask(fmt.Sprintf("task_marker_reset_%d", time.Now().UnixNano()))
+	task := newSubmitToRiverWorkerTask(t, fmt.Sprintf("task_marker_reset_%d", time.Now().UnixNano()))
 	if err := taskRepo.Create(t.Context(), task); err != nil {
 		t.Fatal(err)
 	}
@@ -424,14 +428,19 @@ WHERE tasks.task_id = $1`, taskID).Scan(&taskStatus, &settlementState, &availabl
 	}
 }
 
-func newSubmitToRiverWorkerTask(taskID string) *tasks.Task {
+func newSubmitToRiverWorkerTask(t *testing.T, taskID string) *tasks.Task {
+	t.Helper()
 	return &tasks.Task{
-		TaskID:      taskID,
-		UserID:      42,
-		Prompt:      "draw a River convergence proof",
-		UserPrompt:  "draw a River convergence proof",
-		Params:      `{"feature":"sketch-to-image","size":"1024x1024"}`,
-		FeatureSlug: "sketch-to-image",
+		TaskID:     taskID,
+		UserID:     42,
+		Prompt:     "draw a River convergence proof",
+		UserPrompt: "draw a River convergence proof",
+		Params: marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{
+			SchemaVersion: tasks.CurrentParamsSchemaVersion,
+			Feature:       workflow.FeatureSlugSketchToImage,
+			Media:         &tasks.MediaInputs{Inputs: []tasks.MediaRef{{URL: "https://example.com/river-worker-input.png", Role: "input"}}},
+		}),
+		FeatureSlug: workflow.FeatureSlugSketchToImage,
 		APIType:     "openai-compatible",
 		Status:      tasks.StatusPending,
 	}
@@ -449,6 +458,14 @@ func newSubmitToRiverWorkerQueueTask(task *tasks.Task) *tasks.TaskPayload {
 
 func newSubmitToRiverWorkerCanonicalRequest(t testing.TB, task *tasks.Task) tasksubmission.CanonicalRequest {
 	t.Helper()
+	canonicalParams, err := tasks.UnmarshalParams(task.Params)
+	if err != nil {
+		t.Fatalf("unmarshal canonical task params: %v", err)
+	}
+	plan, err := workflow.DecodeFeatureExecutionPlan(canonicalParams.ExecutionPlan)
+	if err != nil {
+		t.Fatalf("decode canonical execution plan: %v", err)
+	}
 	var billingRequest *taskbilling.Request
 	if task.BillingRequest != nil {
 		billingRequest = &taskbilling.Request{
@@ -466,6 +483,7 @@ func newSubmitToRiverWorkerCanonicalRequest(t testing.TB, task *tasks.Task) task
 		Feature:        task.FeatureSlug,
 		Priority:       task.Priority,
 		BillingRequest: billingRequest,
+		ExecutionPlan:  &plan,
 	})
 	if err != nil {
 		t.Fatalf("build canonical task request: %v", err)

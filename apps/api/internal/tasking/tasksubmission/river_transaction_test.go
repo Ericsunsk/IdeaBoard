@@ -17,6 +17,7 @@ import (
 	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/tasking/taskstore"
 	"ideaboard/api/internal/testdb"
+	"ideaboard/api/internal/workflow"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -415,10 +416,24 @@ func canonicalRequestForTest(task *tasks.Task) CanonicalRequest {
 			Feature: task.BillingRequest.Feature, OutputResolution: billing.OutputResolution(task.BillingRequest.OutputResolution), Quantity: task.BillingRequest.Quantity,
 		}
 	}
+	params := task.Params
+	var executionPlan *workflow.FeatureExecutionPlan
+	if workflow.IsAIImageFeature(task.FeatureSlug) {
+		outputCount := 1
+		if billingRequest != nil {
+			outputCount = int(billingRequest.Quantity)
+		}
+		plan, canonicalParams, err := canonicalExecutionPlanFixture(task.FeatureSlug, outputCount)
+		if err != nil {
+			panic(err)
+		}
+		params = canonicalParams
+		executionPlan = &plan
+	}
 	request, err := NewCanonicalRequest(CanonicalRequestInput{
-		UserID: task.UserID, UserPrompt: task.UserPrompt, Prompt: task.Prompt, Params: task.Params,
+		UserID: task.UserID, UserPrompt: task.UserPrompt, Prompt: task.Prompt, Params: params,
 		ClientActionID: task.ClientActionID, Feature: task.FeatureSlug, Priority: task.Priority,
-		BillingRequest: billingRequest,
+		BillingRequest: billingRequest, ExecutionPlan: executionPlan,
 	})
 	if err != nil {
 		panic(err)

@@ -11,8 +11,13 @@ import (
 	"ideaboard/api/internal/tasking/taskstore"
 )
 
+const taskStatsTestParams = `{"schema_version":2}`
+
 func createTaskStatsTestTask(t testing.TB, db *sql.DB, repo *taskstore.Repository, ctx context.Context, task *tasks.Task) error {
 	t.Helper()
+	if task.Params == "" {
+		task.Params = taskStatsTestParams
+	}
 	if task.AccountID != nil {
 		accountID := tasks.IDValue(task.AccountID)
 		if task.AssignedProviderEndpointID == nil {

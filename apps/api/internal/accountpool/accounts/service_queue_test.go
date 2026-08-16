@@ -138,17 +138,19 @@ LIMIT 1`, account.ID).Scan(&credentialID, &credentialFingerprint, &credentialKey
 		t.Fatalf("load running task credential snapshot failed: %v", err)
 	}
 	var apiType string
+	var protocol string
 	var endpointName string
 	var endpointBaseURL string
 	if err := db.QueryRowContext(ctx, `
-SELECT api_type, name, base_url
+SELECT api_type, protocol, name, base_url
 FROM provider_endpoints
-WHERE id = $1`, account.ProviderEndpointID).Scan(&apiType, &endpointName, &endpointBaseURL); err != nil {
+WHERE id = $1`, account.ProviderEndpointID).Scan(&apiType, &protocol, &endpointName, &endpointBaseURL); err != nil {
 		t.Fatalf("load running task provider snapshot failed: %v", err)
 	}
 	leaseToken := "lease-" + taskID
 	task := &tasks.Task{
 		TaskID: taskID, UserID: 1,
+		Params:                     `{"schema_version":2}`,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
 		AssignedCredentialID:       tasks.IDPtr(credentialID),
 		AccountID:                  tasks.IDPtr(account.ID),
@@ -161,11 +163,11 @@ WHERE id = $1`, account.ProviderEndpointID).Scan(&apiType, &endpointName, &endpo
 	if _, err := db.ExecContext(ctx, `
 INSERT INTO task_leases (
   task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
-  resolved_model, api_type, provider_endpoint_name, provider_endpoint_base_url,
+  resolved_model, api_type, provider_endpoint_protocol, provider_endpoint_name, provider_endpoint_base_url,
   credential_fingerprint, credential_key_version
-) VALUES ($1, $2, 0, $3, $4, $5, 'gpt-image-1', $6, $7, $8, $9, $10)`,
+) VALUES ($1, $2, 0, $3, $4, $5, 'gpt-image-1', $6, $7, $8, $9, $10, $11)`,
 		taskID, leaseToken, account.ID, account.ProviderEndpointID, credentialID,
-		apiType, endpointName, endpointBaseURL, credentialFingerprint, credentialKeyVersion,
+		apiType, protocol, endpointName, endpointBaseURL, credentialFingerprint, credentialKeyVersion,
 	); err != nil {
 		t.Fatalf("create running task lease %q failed: %v", taskID, err)
 	}
@@ -176,14 +178,19 @@ func createAccountTestChannel(t testing.TB, db *sql.DB, suffix string) int64 {
 	t.Helper()
 	var id int64
 	err := db.QueryRowContext(context.Background(), `
-INSERT INTO provider_endpoints (api_type, name, base_url, status)
-VALUES ('openai-compatible', $1, $2, 1)
+INSERT INTO provider_endpoints (api_type, protocol, name, base_url, status)
+VALUES ('openai-compatible', 'model-api', $1, $2, 1)
 RETURNING id`,
 		"test-channel-"+suffix,
 		"https://example.com/"+suffix,
 	).Scan(&id)
 	if err != nil {
 		t.Fatalf("create test channel failed: %v", err)
+	}
+	if _, err := db.ExecContext(context.Background(), `
+INSERT INTO provider_endpoint_capabilities (provider_endpoint_id, capability)
+VALUES ($1, 'image-generation')`, id); err != nil {
+		t.Fatalf("create test channel capability failed: %v", err)
 	}
 	return id
 }

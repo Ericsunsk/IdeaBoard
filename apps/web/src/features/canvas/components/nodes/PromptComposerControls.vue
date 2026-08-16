@@ -97,6 +97,7 @@ const props = withDefaults(
     autofocus: false,
     billingState: null,
     disabled: false,
+    outputResolution: undefined,
     rows: 1,
     showAspectRatio: true,
     showSubmit: true,

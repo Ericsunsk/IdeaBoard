@@ -50,7 +50,24 @@ func TestFeaturePromptListIncludesUnconfiguredFeatures(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListConfigs: %v", err)
 	}
-	if len(configs) != len(workflow.SupportedFeatureSlugs()) {
-		t.Fatalf("config count = %d, want %d", len(configs), len(workflow.SupportedFeatureSlugs()))
+	want := make(map[string]bool, len(workflow.SupportedFeatureSlugs())-1)
+	for _, slug := range workflow.SupportedFeatureSlugs() {
+		if slug != workflow.FeatureSlugRemoveBg {
+			want[slug] = false
+		}
+	}
+	if len(configs) != len(want) {
+		t.Fatalf("config count = %d, want %d", len(configs), len(want))
+	}
+	for _, config := range configs {
+		if _, ok := want[config.FeatureSlug]; !ok {
+			t.Fatalf("unexpected prompt config for feature %q", config.FeatureSlug)
+		}
+		want[config.FeatureSlug] = true
+	}
+	for slug, found := range want {
+		if !found {
+			t.Fatalf("missing prompt config for feature %q", slug)
+		}
 	}
 }

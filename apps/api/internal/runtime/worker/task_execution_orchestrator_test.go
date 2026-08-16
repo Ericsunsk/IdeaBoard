@@ -262,6 +262,7 @@ func TestExecuteReleasesRunningLeaseWhenCancelledAfterProviderReturns(t *testing
 
 	task := &tasks.Task{
 		TaskID:                     "cancel-after-provider-task",
+		Params:                     `{"schema_version":2}`,
 		UserID:                     1,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
 		AssignedCredentialID:       tasks.IDPtr(loadRiverTestCredentialID(t, db, account.ID)),
@@ -323,6 +324,7 @@ func TestExecuteReleasesRunningLeaseWhenCancelledBeforeProvider(t *testing.T) {
 
 	task := &tasks.Task{
 		TaskID:                     "cancel-before-provider-task",
+		Params:                     `{"schema_version":2}`,
 		UserID:                     1,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
 		AssignedCredentialID:       tasks.IDPtr(loadRiverTestCredentialID(t, db, account.ID)),
@@ -441,6 +443,7 @@ func TestExecuteProviderFailureRoutesThroughConvergenceDecision(t *testing.T) {
 
 	task := &tasks.Task{
 		TaskID:                     "convergence-provider-failure-task",
+		Params:                     `{"schema_version":2}`,
 		UserID:                     1,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
 		AssignedCredentialID:       tasks.IDPtr(loadRiverTestCredentialID(t, db, account.ID)),
@@ -558,6 +561,7 @@ func TestExecuteTemporaryProviderFailureRequeuesWithoutFailureResult(t *testing.
 
 	task := &tasks.Task{
 		TaskID:                     "temporary-provider-failure-task",
+		Params:                     `{"schema_version":2}`,
 		UserID:                     1,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
 		AssignedCredentialID:       tasks.IDPtr(loadRiverTestCredentialID(t, db, account.ID)),
@@ -615,6 +619,7 @@ func TestExecuteProviderParseFailureFinalFailsWithFailureResultEnvelope(t *testi
 
 	task := &tasks.Task{
 		TaskID:                     "provider-parse-retry-task",
+		Params:                     `{"schema_version":2}`,
 		UserID:                     1,
 		AssignedProviderEndpointID: tasks.IDPtr(account.ProviderEndpointID),
 		AssignedCredentialID:       tasks.IDPtr(loadRiverTestCredentialID(t, db, account.ID)),

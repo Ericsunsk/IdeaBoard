@@ -9,6 +9,8 @@ import (
 
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/settings"
+
+	"github.com/minio/minio-go/v7"
 )
 
 type testStorageOutboundPolicyProvider struct{ hosts []string }
@@ -185,6 +187,35 @@ func TestEnsureS3BucketAccessible(t *testing.T) {
 }
 
 func TestProbeS3Capabilities(t *testing.T) {
+	t.Run("does not report R2 request configuration errors as missing permissions", func(t *testing.T) {
+		upstreamErr := minio.ErrorResponse{
+			Code:       "AuthorizationHeaderMalformed",
+			Message:    "The authorization header is malformed; region must be auto",
+			StatusCode: 400,
+		}
+		client := &stubS3CapabilityProbeClient{listErr: upstreamErr, deleteErr: upstreamErr}
+		service := NewS3CompatibleService()
+
+		err := service.probeCapabilities(context.Background(), &S3CompatibleConfig{
+			BucketName: "feng-assets",
+			Endpoint:   "account-id.r2.cloudflarestorage.com",
+		}, client)
+		var capabilityErr *StorageCapabilityError
+		if errors.As(err, &capabilityErr) {
+			t.Fatalf("error = %v, must preserve the R2 request error instead of reporting missing permissions", err)
+		}
+		var probeErr *StorageProbeError
+		if !errors.As(err, &probeErr) {
+			t.Fatalf("error = %v, want StorageProbeError", err)
+		}
+		if err == nil || !strings.Contains(err.Error(), "AuthorizationHeaderMalformed") {
+			t.Fatalf("error = %v, want original R2 request error", err)
+		}
+		if !strings.Contains(probeErr.UserMessage(), "Region 必须为 auto") {
+			t.Fatalf("user message = %q, want R2 region guidance", probeErr.UserMessage())
+		}
+	})
+
 	t.Run("accepts all capabilities and removes probe object", func(t *testing.T) {
 		client := &stubS3CapabilityProbeClient{}
 		service := NewS3CompatibleService()
@@ -197,7 +228,8 @@ func TestProbeS3Capabilities(t *testing.T) {
 	})
 
 	t.Run("reports missing permissions and cleans up probe object", func(t *testing.T) {
-		client := &stubS3CapabilityProbeClient{listErr: errors.New("access denied"), getErr: errors.New("access denied")}
+		permissionErr := minio.ErrorResponse{Code: "AccessDenied", Message: "Access Denied", StatusCode: 403}
+		client := &stubS3CapabilityProbeClient{listErr: permissionErr, getErr: permissionErr}
 		service := NewS3CompatibleService()
 		cfg := &S3CompatibleConfig{BucketName: "feng-assets"}
 		err := service.probeCapabilities(context.Background(), cfg, client)
@@ -218,7 +250,7 @@ func TestProbeS3Capabilities(t *testing.T) {
 	})
 
 	t.Run("reports put permission after delete probe succeeds", func(t *testing.T) {
-		client := &stubS3CapabilityProbeClient{putErr: errors.New("access denied")}
+		client := &stubS3CapabilityProbeClient{putErr: minio.ErrorResponse{Code: "AccessDenied", StatusCode: 403}}
 		service := NewS3CompatibleService()
 		err := service.probeCapabilities(context.Background(), &S3CompatibleConfig{BucketName: "feng-assets"}, client)
 		var capabilityErr *StorageCapabilityError
@@ -234,7 +266,7 @@ func TestProbeS3Capabilities(t *testing.T) {
 	})
 
 	t.Run("does not create probe object when delete is denied", func(t *testing.T) {
-		client := &stubS3CapabilityProbeClient{deleteErr: errors.New("access denied")}
+		client := &stubS3CapabilityProbeClient{deleteErr: minio.ErrorResponse{Code: "AccessDenied", StatusCode: 403}}
 		service := NewS3CompatibleService()
 		err := service.probeCapabilities(context.Background(), &S3CompatibleConfig{BucketName: "feng-assets"}, client)
 		var capabilityErr *StorageCapabilityError
@@ -251,9 +283,43 @@ func TestProbeS3Capabilities(t *testing.T) {
 }
 
 func TestStorageCapabilityErrorMessage(t *testing.T) {
-	err := (&StorageCapabilityError{Missing: []StorageCapability{StorageCapabilityListBucket, StorageCapabilityDeleteObject}}).Error()
-	if !strings.Contains(err, "s3:ListBucket") || !strings.Contains(err, "s3:DeleteObject") || !strings.Contains(err, "Bucket ARN") {
-		t.Fatalf("message = %q, want actionable capability guidance", err)
+	t.Run("uses IAM guidance for generic S3", func(t *testing.T) {
+		err := (&StorageCapabilityError{Missing: []StorageCapability{StorageCapabilityListBucket, StorageCapabilityDeleteObject}}).Error()
+		if !strings.Contains(err, "s3:ListBucket") || !strings.Contains(err, "s3:DeleteObject") || !strings.Contains(err, "Bucket ARN") {
+			t.Fatalf("message = %q, want actionable capability guidance", err)
+		}
+	})
+
+	t.Run("uses API token guidance for Cloudflare R2", func(t *testing.T) {
+		err := (&StorageCapabilityError{
+			Missing:  []StorageCapability{StorageCapabilityListBucket, StorageCapabilityDeleteObject},
+			Endpoint: "https://account-id.r2.cloudflarestorage.com",
+		}).Error()
+		if !strings.Contains(err, "Object Read & Write") || !strings.Contains(err, "当前 Bucket") || strings.Contains(err, "Bucket ARN") {
+			t.Fatalf("message = %q, want Cloudflare R2 token guidance", err)
+		}
+	})
+}
+
+func TestIsS3PermissionDenied(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "access denied", err: minio.ErrorResponse{Code: "AccessDenied", StatusCode: 403}, want: true},
+		{name: "malformed authorization header", err: minio.ErrorResponse{Code: "AuthorizationHeaderMalformed", StatusCode: 400}, want: false},
+		{name: "signature mismatch", err: minio.ErrorResponse{Code: "SignatureDoesNotMatch", StatusCode: 403}, want: false},
+		{name: "invalid access key", err: minio.ErrorResponse{Code: "InvalidAccessKeyId", StatusCode: 403}, want: false},
+		{name: "network or protocol error", err: errors.New("connection reset"), want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isS3PermissionDenied(tt.err); got != tt.want {
+				t.Fatalf("isS3PermissionDenied() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 

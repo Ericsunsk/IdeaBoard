@@ -52,4 +52,25 @@ func TestMediaAssetRegistryRegistersBoardUploadForInitialReclamation(t *testing.
 	if asset.ReclaimGeneration != 1 {
 		t.Fatalf("reclaim_generation = %d, want 1", asset.ReclaimGeneration)
 	}
+
+	for name, lookup := range map[string]storage.StoredUploadLookup{
+		"URL": {URL: asset.Url, ObjectKey: "unused"},
+		"storage key": {
+			URL:       "https://retired-cdn.example.com/uploads/canvas/OWNER/shared-board/content/image.png",
+			ObjectKey: asset.StorageKey,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			location, found, err := registry.LocateStoredUpload(ctx, lookup)
+			if err != nil {
+				t.Fatalf("LocateStoredUpload returned error: %v", err)
+			}
+			if !found {
+				t.Fatal("LocateStoredUpload did not find registered asset")
+			}
+			if location.StorageProfileID != asset.StorageProfileID || location.StorageKey != asset.StorageKey {
+				t.Fatalf("location = %#v, want profile/key from asset", location)
+			}
+		})
+	}
 }

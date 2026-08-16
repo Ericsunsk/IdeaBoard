@@ -313,10 +313,11 @@ func TestProviderEndpointHandlerCreateDuplicateReturnsConflict(t *testing.T) {
 				Status:  1,
 			},
 			request: CreateProviderEndpointRequest{
-				APIType: "openai-compatible",
-				Name:    "duplicate create",
-				BaseURL: "http://127.0.0.1:19082/v1",
-				Status:  1,
+				APIType:  "openai-compatible",
+				Protocol: ProtocolModelAPI,
+				Name:     "duplicate create",
+				BaseURL:  "http://127.0.0.1:19082/v1",
+				Status:   1,
 			},
 			wantMsg: "ProviderEndpoint 名称已存在，请使用其他名称",
 		},
@@ -329,10 +330,11 @@ func TestProviderEndpointHandlerCreateDuplicateReturnsConflict(t *testing.T) {
 				Status:  1,
 			},
 			request: CreateProviderEndpointRequest{
-				APIType: "openai-compatible",
-				Name:    "Duplicate URL B",
-				BaseURL: "http://127.0.0.1:19083/v1",
-				Status:  1,
+				APIType:  "openai-compatible",
+				Protocol: ProtocolModelAPI,
+				Name:     "Duplicate URL B",
+				BaseURL:  "http://127.0.0.1:19083/v1",
+				Status:   1,
 			},
 			wantMsg: "同一接口类型下已存在相同 Base URL 的 ProviderEndpoint",
 		},
@@ -361,10 +363,11 @@ func TestProviderEndpointHandlerUpdateDuplicateReturnsConflict(t *testing.T) {
 			name: "duplicate name",
 			mutate: func(first *ProviderEndpoint, second *ProviderEndpoint) UpdateProviderEndpointRequest {
 				return UpdateProviderEndpointRequest{
-					APIType: second.APIType,
-					Name:    first.Name,
-					BaseURL: second.BaseURL,
-					Status:  second.Status,
+					APIType:  second.APIType,
+					Protocol: second.Protocol,
+					Name:     first.Name,
+					BaseURL:  second.BaseURL,
+					Status:   second.Status,
 				}
 			},
 			wantMsg:   "ProviderEndpoint 名称已存在，请使用其他名称",
@@ -375,10 +378,11 @@ func TestProviderEndpointHandlerUpdateDuplicateReturnsConflict(t *testing.T) {
 			name: "duplicate api type and base url",
 			mutate: func(first *ProviderEndpoint, second *ProviderEndpoint) UpdateProviderEndpointRequest {
 				return UpdateProviderEndpointRequest{
-					APIType: second.APIType,
-					Name:    second.Name,
-					BaseURL: first.BaseURL,
-					Status:  second.Status,
+					APIType:  second.APIType,
+					Protocol: second.Protocol,
+					Name:     second.Name,
+					BaseURL:  first.BaseURL,
+					Status:   second.Status,
 				}
 			},
 			wantMsg:   "同一接口类型下已存在相同 Base URL 的 ProviderEndpoint",

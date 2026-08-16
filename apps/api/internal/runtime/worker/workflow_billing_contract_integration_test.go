@@ -219,7 +219,7 @@ func saturateWorkflowContractProvider(
 		UserID:      1,
 		Prompt:      "occupy Provider capacity",
 		UserPrompt:  "occupy Provider capacity",
-		Params:      `{"schema_version":1,"feature":"prompt-generation"}`,
+		Params:      marshalWorkflowTaskParamsForTest(t, &tasks.WorkflowTaskParams{SchemaVersion: tasks.CurrentParamsSchemaVersion, Feature: workflow.FeatureSlugPromptGeneration}),
 		FeatureSlug: workflow.FeatureSlugPromptGeneration,
 		Priority:    tasks.TaskPriorityDefault,
 		Status:      tasks.StatusPending,

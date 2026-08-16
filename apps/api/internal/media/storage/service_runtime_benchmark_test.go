@@ -95,7 +95,7 @@ func newBenchmarkStorageService(b *testing.B) *StorageService {
 		_ = os.Chdir(originalWD)
 	})
 
-	return NewStorageService(nil)
+	return NewStorageService(nil, nil)
 }
 
 func benchmarkLocalProfile() StorageProfile {

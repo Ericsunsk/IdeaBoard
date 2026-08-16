@@ -8,7 +8,7 @@ import (
 )
 
 func TestListProviderMetaUsesEmptyFieldSlices(t *testing.T) {
-	service := NewStorageService(nil)
+	service := NewStorageService(nil, nil)
 
 	providers := service.ListProviderMeta()
 	for _, provider := range providers {

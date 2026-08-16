@@ -294,10 +294,10 @@ WITH updated_tasks AS (
       error_msg = $1,
       completed_at = $2::timestamptz
   WHERE t.account_id = $3 AND t.status = 'running'
-  RETURNING t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.result,
+  RETURNING t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.params, t.result,
             t.feature_slug, t.created_at, t.completed_at
 )
-SELECT t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.result,
+SELECT t.task_id, t.user_id, t.assigned_provider_endpoint_id, t.assigned_credential_id, t.account_id, t.params, t.result,
        t.feature_slug,
        COALESCE(latest_lease.resolved_model, '') AS resolved_model,
        COALESCE(latest_lease.api_type, '') AS api_type,
@@ -324,6 +324,7 @@ type FailRunningTasksByAccountIDRow struct {
 	AssignedProviderEndpointID sql.NullInt64 `json:"assigned_provider_endpoint_id"`
 	AssignedCredentialID       sql.NullInt64 `json:"assigned_credential_id"`
 	AccountID                  sql.NullInt64 `json:"account_id"`
+	Params                     string        `json:"params"`
 	Result                     string        `json:"result"`
 	FeatureSlug                string        `json:"feature_slug"`
 	ResolvedModel              string        `json:"resolved_model"`
@@ -347,6 +348,7 @@ func (q *Queries) FailRunningTasksByAccountID(ctx context.Context, arg FailRunni
 			&i.AssignedProviderEndpointID,
 			&i.AssignedCredentialID,
 			&i.AccountID,
+			&i.Params,
 			&i.Result,
 			&i.FeatureSlug,
 			&i.ResolvedModel,

@@ -34,10 +34,16 @@ var errNoAvailableAPIAccount = errors.New("no available API account")
 // into the canonical Tasking request shared by Readiness and Submit.
 type TaskIntake interface {
 	Compile(context.Context, int64, *tasks.SubmitTaskRequest) (CanonicalTaskRequest, error)
+	CompileReadiness(context.Context, *tasks.SubmitTaskRequest) (TaskReadinessCompilation, error)
 	PrepareMedia(context.Context, int64, CanonicalTaskRequest) (CanonicalTaskRequest, error)
 }
 
 type CanonicalTaskRequest = tasksubmission.CanonicalRequest
+
+type TaskReadinessCompilation struct {
+	Feature        string
+	BillingRequest *taskbilling.Request
+}
 
 type FeaturePromptStore interface {
 	GetRuntimeConfig(ctx context.Context, slug string) (prompts.FeaturePromptRuntimeConfig, error)
@@ -68,6 +74,48 @@ func NewTaskIntake(deps TaskIntakeDeps) TaskIntake {
 		media:         deps.Media,
 		mediaPreparer: deps.MediaPreparer,
 	}
+}
+
+func (i *taskIntake) CompileReadiness(ctx context.Context, req *tasks.SubmitTaskRequest) (TaskReadinessCompilation, error) {
+	if req == nil {
+		return TaskReadinessCompilation{}, validation.New("请求参数错误")
+	}
+	params := make(map[string]interface{}, len(req.Params)+1)
+	for key, value := range req.Params {
+		params[key] = value
+	}
+	if req.Feature != "" {
+		params["feature"] = req.Feature
+	}
+	featureSlug, err := workflow.ResolveWorkflowFeatureSlug(params)
+	if err != nil {
+		return TaskReadinessCompilation{}, err
+	}
+	if featureSlug == "" {
+		return TaskReadinessCompilation{}, validation.New("feature 不能为空")
+	}
+	executionParams, err := compileFeatureExecutionParams(params, featureSlug)
+	if err != nil {
+		return TaskReadinessCompilation{}, err
+	}
+	executionPlan, err := workflow.CompileFeatureReadinessPlan(workflow.CompileFeatureExecutionInput{
+		Feature: featureSlug,
+		Params:  executionParams,
+	})
+	if err != nil {
+		return TaskReadinessCompilation{}, mapFeatureContractValidationError(err)
+	}
+	if err := i.ensureProviderAvailable(ctx, executionPlan.RoutingRequirement()); err != nil {
+		return TaskReadinessCompilation{}, err
+	}
+	billingRequest, err := resolveTaskBillingRequest(executionPlan)
+	if err != nil {
+		return TaskReadinessCompilation{}, err
+	}
+	return TaskReadinessCompilation{
+		Feature:        executionPlan.Feature(),
+		BillingRequest: billingRequest,
+	}, nil
 }
 
 func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.SubmitTaskRequest) (CanonicalTaskRequest, error) {

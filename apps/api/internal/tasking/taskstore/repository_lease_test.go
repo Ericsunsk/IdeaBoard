@@ -603,6 +603,9 @@ func TestResetRunningTasksMissingLeaseTokenToPendingRequiresPositiveLimit(t *tes
 func seedTasks(t *testing.T, repo *Repository, ctx context.Context, items ...*tasks.Task) {
 	t.Helper()
 	for _, item := range items {
+		if item.Params == "" {
+			item.Params = `{"schema_version":2}`
+		}
 		if item.AccountID != nil && item.AssignedProviderEndpointID == nil {
 			item.AssignedProviderEndpointID = tasks.IDPtr(tasks.IDValue(item.AccountID) + 10000)
 		}
@@ -662,13 +665,13 @@ func insertRepositoryActiveTaskLease(t *testing.T, db testDBExecQuerier, taskID 
 	_, err := db.Exec(`
 INSERT INTO task_leases (
   task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
-  resolved_model, api_type, provider_endpoint_base_url,
+  resolved_model, api_type, provider_endpoint_protocol, provider_endpoint_base_url,
   provider_endpoint_name, credential_fingerprint, credential_key_version,
   acquired_at
 )
 VALUES (
   $1, $2, 1, $3, $4, $5,
-  'gpt-image-1', 'openai-compatible', $6,
+  'gpt-image-1', 'openai-compatible', 'model-api', $6,
   $7, $8, 'test-key-v1',
   now()
 )`,

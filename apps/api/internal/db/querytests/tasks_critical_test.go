@@ -25,10 +25,11 @@ func seedTestAccount(t *testing.T, q *dbsqlc.Queries) testTaskAccount {
 	ctx := context.Background()
 
 	providerEndpointID, err := q.CreateProviderEndpoint(ctx, dbsqlc.CreateProviderEndpointParams{
-		ApiType: "openai-compatible",
-		Name:    "test-provider-endpoint",
-		BaseUrl: "https://example.invalid/v1",
-		Status:  1,
+		ApiType:  "openai-compatible",
+		Protocol: "model-api",
+		Name:     "test-provider-endpoint",
+		BaseUrl:  "https://example.invalid/v1",
+		Status:   1,
 	})
 	if err != nil {
 		t.Fatalf("seed provider endpoint: %v", err)

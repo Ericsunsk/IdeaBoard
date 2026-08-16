@@ -463,6 +463,35 @@ func CompileFeatureExecutionPlan(input CompileFeatureExecutionInput) (FeatureExe
 	}, nil
 }
 
+// CompileFeatureReadinessPlan resolves routing and Billing facts without
+// requiring media that only exists when the user executes the operation.
+func CompileFeatureReadinessPlan(input CompileFeatureExecutionInput) (FeatureExecutionPlan, error) {
+	feature, ok := ParseAIImageFeatureSlug(input.Feature)
+	if !ok {
+		return FeatureExecutionPlan{}, newFeatureContractValidationError(
+			FeatureContractUnknownFeature, strings.TrimSpace(input.Feature), "feature", input.Feature,
+		)
+	}
+	definition, ok := imageFeatureExecutionDefinitions[feature]
+	if !ok {
+		return FeatureExecutionPlan{}, newFeatureContractValidationError(
+			FeatureContractUnknownFeature, feature, "feature", input.Feature,
+		)
+	}
+
+	params := input.Params
+	switch definition.imageInputPolicy {
+	case ImageInputOptional:
+		params.ImageInputCount = 0
+	case ImageInputRequired:
+		params.ImageInputCount = 1
+	case MultipleImageInputsRequired:
+		params.ImageInputCount = 2
+	}
+	params.HasMaskInput = definition.maskInputPolicy == MaskInputRequired
+	return CompileFeatureExecutionPlan(CompileFeatureExecutionInput{Feature: feature, Params: params})
+}
+
 const CurrentFeatureExecutionPlanSchemaVersion = 1
 
 type durableFeatureExecutionPlan struct {

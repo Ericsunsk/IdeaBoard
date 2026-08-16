@@ -380,6 +380,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/accounts/:id/queue":                           false,
 		"GET /api/admin/accounts/limits":                              false,
 		"GET /api/admin/provider-endpoints":                           false,
+		"GET /api/admin/provider-endpoints/registry":                  false,
 		"GET /api/admin/feature-prompts":                              false,
 		"GET /api/admin/feature-prompts/:slug":                        false,
 		"GET /api/admin/credits/wallets/:public_id":                   false,

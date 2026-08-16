@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,6 +18,7 @@ import (
 
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/secrets"
 	"ideaboard/api/internal/testdb"
 	"ideaboard/api/internal/testsupport/secretstest"
@@ -135,7 +138,7 @@ func newStorageServiceTest(t *testing.T) (*StorageService, *StorageProfileReposi
 
 	db := testdb.Open(t)
 	repo := NewStorageProfileRepository(db)
-	service := NewStorageService(repo)
+	service := NewStorageService(repo, nil)
 	service.s3CompatibleService.capabilityProbe = func(context.Context, *S3CompatibleConfig) error { return nil }
 	if err := service.EnsureDefaultProfiles(context.Background()); err != nil {
 		t.Fatalf("EnsureDefaultProfiles returned error: %v", err)
@@ -149,7 +152,7 @@ func newStorageServiceTestWithoutDefault(t *testing.T) (*StorageService, *Storag
 
 	db := testdb.Open(t)
 	repo := NewStorageProfileRepository(db)
-	service := NewStorageService(repo)
+	service := NewStorageService(repo, nil)
 	service.s3CompatibleService.capabilityProbe = func(context.Context, *S3CompatibleConfig) error { return nil }
 	return service, repo
 }
@@ -1028,6 +1031,88 @@ func TestReadUploadResourceByURLLocalInfersContentType(t *testing.T) {
 	if obj.ContentType != "image/png" {
 		t.Fatalf("ContentType = %q, want image/png", obj.ContentType)
 	}
+}
+
+func TestReadUploadResourceByURLUsesAssetStorageAfterCurrentProfileChanges(t *testing.T) {
+	restore := outbound.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{hosts: []string{"127.0.0.1"}})
+	t.Cleanup(restore)
+
+	s3Server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`<Error><Code>AccessDenied</Code><Message>Access Denied.</Message></Error>`))
+	}))
+	t.Cleanup(s3Server.Close)
+
+	service, _ := newStorageServiceTest(t)
+	const oldLocalObjectKey = "uploads/canvas/OWNR1A/board-1/content/old-local.png"
+	service.assetLocator = staticStoredUploadLocator{
+		location: StoredUploadLocation{
+			StorageProfileID: builtinLocalProfileID(),
+			StorageKey:       oldLocalObjectKey,
+		},
+	}
+	if _, err := service.SaveAndApplyProfile(context.Background(), &StorageProfile{
+		Name:      "Current S3",
+		Provider:  StorageProviderS3Compatible,
+		Enabled:   true,
+		IsCurrent: true,
+		Config: map[string]interface{}{
+			"access_key_id":            "access-key",
+			storageSecretAccessKeyName: "secret-key",
+			"bucket_name":              "current-bucket",
+			"endpoint":                 s3Server.URL,
+			"region_id":                "auto",
+			"access_domain":            s3Server.URL,
+			"force_path_style":         true,
+		},
+	}); err != nil {
+		t.Fatalf("apply current S3 profile: %v", err)
+	}
+	activeProfile, err := service.resolveActiveProfile(context.Background())
+	if err != nil {
+		t.Fatalf("resolve active profile: %v", err)
+	}
+	if activeProfile.Provider != StorageProviderS3Compatible {
+		t.Fatalf("active provider = %q, want %q", activeProfile.Provider, StorageProviderS3Compatible)
+	}
+
+	oldWd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get cwd: %v", err)
+	}
+	tmpDir := t.TempDir()
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("chdir temp: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(oldWd) })
+
+	const oldLocalURL = "https://old-media.example.com/" + oldLocalObjectKey
+	oldLocalPath := filepath.FromSlash(oldLocalObjectKey)
+	if err := os.MkdirAll(filepath.Dir(oldLocalPath), 0o755); err != nil {
+		t.Fatalf("mkdir old local upload: %v", err)
+	}
+	want := tinyPNGBytes(t)
+	if err := os.WriteFile(oldLocalPath, want, 0o600); err != nil {
+		t.Fatalf("write old local upload: %v", err)
+	}
+
+	object, err := service.ReadUploadResourceByURL(context.Background(), oldLocalURL, int64(len(want)))
+	if err != nil {
+		t.Fatalf("read old local upload after storage switch: %v", err)
+	}
+	if !bytes.Equal(object.Data, want) {
+		t.Fatal("old local upload data changed after storage switch")
+	}
+}
+
+type staticStoredUploadLocator struct {
+	location StoredUploadLocation
+	err      error
+}
+
+func (l staticStoredUploadLocator) LocateStoredUpload(context.Context, StoredUploadLookup) (StoredUploadLocation, bool, error) {
+	return l.location, l.location.StorageProfileID != "", l.err
 }
 
 func TestStoreMediaRefCopiesInternalUpload(t *testing.T) {

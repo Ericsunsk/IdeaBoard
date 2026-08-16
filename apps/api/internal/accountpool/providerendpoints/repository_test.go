@@ -21,6 +21,9 @@ func newProviderEndpointRepositoryTestDB(t *testing.T) *sql.DB {
 
 func seedProviderEndpoint(t testing.TB, ctx context.Context, repo *ProviderEndpointRepository, endpoint *ProviderEndpoint) *ProviderEndpoint {
 	t.Helper()
+	if endpoint.Protocol == "" {
+		endpoint.Protocol = ProtocolModelAPI
+	}
 	if err := repo.Create(ctx, endpoint); err != nil {
 		t.Fatalf("seed provider endpoint failed: %v", err)
 	}
@@ -76,10 +79,11 @@ func TestCreateProviderEndpointReturnsNameConflict(t *testing.T) {
 	})
 
 	err := repo.Create(ctx, &ProviderEndpoint{
-		APIType: "openai-compatible",
-		Name:    "duplicate endpoint",
-		BaseURL: "https://example.com/provider-endpoint-name-b",
-		Status:  1,
+		APIType:  "openai-compatible",
+		Protocol: ProtocolModelAPI,
+		Name:     "duplicate endpoint",
+		BaseURL:  "https://example.com/provider-endpoint-name-b",
+		Status:   1,
 	})
 	if !errors.Is(err, ErrProviderEndpointNameConflict) {
 		t.Fatalf("duplicate provider endpoint name error = %v, want ErrProviderEndpointNameConflict", err)
@@ -139,10 +143,11 @@ func TestCreateProviderEndpointReturnsURLConflict(t *testing.T) {
 	})
 
 	err := repo.Create(ctx, &ProviderEndpoint{
-		APIType: "openai-compatible",
-		Name:    "URL B",
-		BaseURL: "https://example.com/provider-endpoint-url",
-		Status:  1,
+		APIType:  "openai-compatible",
+		Protocol: ProtocolModelAPI,
+		Name:     "URL B",
+		BaseURL:  "https://example.com/provider-endpoint-url",
+		Status:   1,
 	})
 	if !errors.Is(err, ErrProviderEndpointURLConflict) {
 		t.Fatalf("duplicate provider endpoint url error = %v, want ErrProviderEndpointURLConflict", err)
@@ -163,7 +168,7 @@ func TestDeleteProviderEndpointCascadesBoundAccounts(t *testing.T) {
 	var accountID int64
 	if err := db.QueryRowContext(ctx, `
 INSERT INTO api_accounts (name, provider_endpoint_id, extra_config)
-VALUES ('bound-api-key', $1, '{}')
+VALUES ('bound-api-key', $1, '{"managed_by":"image-processing-endpoint"}')
 RETURNING id`, endpoint.ID).Scan(&accountID); err != nil {
 		t.Fatalf("seed bound APIKey: %v", err)
 	}

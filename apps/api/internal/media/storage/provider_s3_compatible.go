@@ -38,7 +38,8 @@ const (
 )
 
 type StorageCapabilityError struct {
-	Missing []StorageCapability
+	Missing  []StorageCapability
+	Endpoint string
 }
 
 func (e *StorageCapabilityError) Error() string {
@@ -64,7 +65,54 @@ func (e *StorageCapabilityError) Error() string {
 	if len(objectActions) > 0 {
 		scope = append(scope, fmt.Sprintf("Object ARN 添加 %s", strings.Join(objectActions, "、")))
 	}
+	if isCloudflareR2Endpoint(e.Endpoint) {
+		return fmt.Sprintf("Cloudflare R2 凭证缺少权限：%s。请确认 R2 API Token 使用 Object Read & Write、包含当前 Bucket，且 Access Key ID 与 Secret Access Key 来自同一个 Token", strings.Join(missing, "、"))
+	}
 	return fmt.Sprintf("S3 凭证缺少权限：%s。请在%s策略中授予对应权限", strings.Join(missing, "、"), strings.Join(scope, "；"))
+}
+
+type StorageProbeError struct {
+	Capability StorageCapability
+	Endpoint   string
+	Cause      error
+}
+
+func (e *StorageProbeError) Error() string {
+	if e == nil || e.Cause == nil {
+		return "S3 权限探测失败"
+	}
+	if code := s3ErrorCode(e.Cause); code != "" {
+		return fmt.Sprintf("探测 %s 失败: %s: %v", e.Capability, code, e.Cause)
+	}
+	return fmt.Sprintf("探测 %s 失败: %v", e.Capability, e.Cause)
+}
+
+func (e *StorageProbeError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Cause
+}
+
+func (e *StorageProbeError) UserMessage() string {
+	provider := "S3"
+	if isCloudflareR2Endpoint(e.Endpoint) {
+		provider = "Cloudflare R2"
+	}
+	code := s3ErrorCode(e.Cause)
+	switch code {
+	case "AuthorizationHeaderMalformed":
+		if provider == "Cloudflare R2" {
+			return "Cloudflare R2 请求配置错误：Region 必须为 auto，Endpoint 必须为 <account-id>.r2.cloudflarestorage.com"
+		}
+		return "S3 请求配置错误：请检查 Region 与 Endpoint 是否匹配"
+	case "SignatureDoesNotMatch", "InvalidAccessKeyId", "InvalidToken":
+		return fmt.Sprintf("%s 凭证校验失败：请检查 Endpoint、Region，并确认 Access Key ID 与 Secret Access Key 匹配", provider)
+	case "NoSuchBucket":
+		return fmt.Sprintf("%s Bucket 不存在或不属于当前账号", provider)
+	default:
+		return fmt.Sprintf("%s 请求失败（%s），请检查 Endpoint、Region 和凭证配置", provider, e.Capability)
+	}
 }
 
 type s3CapabilityProbeClient interface {
@@ -158,6 +206,9 @@ func (s *S3CompatibleService) probeCapabilities(ctx context.Context, cfg *S3Comp
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
 		}
+		if !isS3PermissionDenied(err) {
+			return newStorageProbeError(cfg, StorageCapabilityListBucket, err)
+		}
 		missing = append(missing, StorageCapabilityListBucket)
 	}
 
@@ -165,6 +216,9 @@ func (s *S3CompatibleService) probeCapabilities(ctx context.Context, cfg *S3Comp
 	if err := client.DeleteObject(ctx, bucketName, deleteProbeKey); err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
+		}
+		if !isS3PermissionDenied(err) {
+			return newStorageProbeError(cfg, StorageCapabilityDeleteObject, err)
 		}
 		missing = append(missing, StorageCapabilityDeleteObject)
 	} else {
@@ -174,11 +228,17 @@ func (s *S3CompatibleService) probeCapabilities(ctx context.Context, cfg *S3Comp
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				return ctxErr
 			}
+			if !isS3PermissionDenied(putErr) {
+				return newStorageProbeError(cfg, StorageCapabilityPutObject, putErr)
+			}
 			missing = append(missing, StorageCapabilityPutObject)
 		} else {
 			if err := client.GetObject(ctx, bucketName, probeKey); err != nil {
 				if ctxErr := ctx.Err(); ctxErr != nil {
 					return ctxErr
+				}
+				if !isS3PermissionDenied(err) {
+					return newStorageProbeError(cfg, StorageCapabilityGetObject, err)
 				}
 				missing = append(missing, StorageCapabilityGetObject)
 			}
@@ -186,15 +246,60 @@ func (s *S3CompatibleService) probeCapabilities(ctx context.Context, cfg *S3Comp
 			cleanupErr := client.DeleteObject(cleanupCtx, bucketName, probeKey)
 			cancel()
 			if cleanupErr != nil {
+				if !isS3PermissionDenied(cleanupErr) {
+					return newStorageProbeError(cfg, StorageCapabilityDeleteObject, cleanupErr)
+				}
 				missing = append(missing, StorageCapabilityDeleteObject)
 			}
 		}
 	}
 
 	if len(missing) > 0 {
-		return &StorageCapabilityError{Missing: missing}
+		return newStorageCapabilityError(cfg, missing)
 	}
 	return nil
+}
+
+func newStorageCapabilityError(cfg *S3CompatibleConfig, missing []StorageCapability) *StorageCapabilityError {
+	endpoint := ""
+	if cfg != nil {
+		endpoint = cfg.Endpoint
+	}
+	return &StorageCapabilityError{Missing: missing, Endpoint: endpoint}
+}
+
+func newStorageProbeError(cfg *S3CompatibleConfig, capability StorageCapability, cause error) *StorageProbeError {
+	endpoint := ""
+	if cfg != nil {
+		endpoint = cfg.Endpoint
+	}
+	return &StorageProbeError{Capability: capability, Endpoint: endpoint, Cause: cause}
+}
+
+func isS3PermissionDenied(err error) bool {
+	switch strings.ToLower(s3ErrorCode(err)) {
+	case "accessdenied", "allaccessdisabled", "forbidden", "notauthorized", "operationnotpermitted", "unauthorized":
+		return true
+	default:
+		return false
+	}
+}
+
+func s3ErrorCode(err error) string {
+	var response minio.ErrorResponse
+	if errors.As(err, &response) {
+		return strings.TrimSpace(response.Code)
+	}
+	var responsePtr *minio.ErrorResponse
+	if errors.As(err, &responsePtr) && responsePtr != nil {
+		return strings.TrimSpace(responsePtr.Code)
+	}
+	return ""
+}
+
+func isCloudflareR2Endpoint(endpoint string) bool {
+	host := strings.ToLower(parseS3Host(endpoint))
+	return strings.HasSuffix(host, ".r2.cloudflarestorage.com")
 }
 
 func (s *S3CompatibleService) GetBucketInfoWithConfig(ctx context.Context, cfg *S3CompatibleConfig) (map[string]interface{}, error) {
@@ -209,7 +314,10 @@ func (s *S3CompatibleService) GetBucketInfoWithConfig(ctx context.Context, cfg *
 		return nil, err
 	}
 	if err := ensureS3BucketAccessible(ctx, client, strings.TrimSpace(cfg.BucketName)); err != nil {
-		return nil, &StorageCapabilityError{Missing: []StorageCapability{StorageCapabilityListBucket}}
+		if isS3PermissionDenied(err) {
+			return nil, newStorageCapabilityError(cfg, []StorageCapability{StorageCapabilityListBucket})
+		}
+		return nil, newStorageProbeError(cfg, StorageCapabilityListBucket, err)
 	}
 
 	domainSet := map[string]struct{}{}

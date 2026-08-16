@@ -97,10 +97,10 @@ func insertAdminTraceAttempt(t *testing.T, db *sql.DB, taskID string, accountID,
 	err := db.QueryRow(`
 INSERT INTO task_leases (
   task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
-  resolved_model, api_type, provider_endpoint_base_url, provider_endpoint_name,
+  resolved_model, api_type, provider_endpoint_protocol, provider_endpoint_base_url, provider_endpoint_name,
   credential_fingerprint, credential_key_version, acquired_at, released_at, release_reason
 )
-VALUES ($1, $2, 1, $3, $4, $5, $6, 'openai-compatible', 'https://snapshot.example', $7, 'snapshot-fingerprint', 'test-key-v1', now(),
+VALUES ($1, $2, 1, $3, $4, $5, $6, 'openai-compatible', 'model-api', 'https://snapshot.example', $7, 'snapshot-fingerprint', 'test-key-v1', now(),
   CASE WHEN $8 = 'running' THEN NULL ELSE now() END,
   CASE WHEN $8 = 'running' THEN '' ELSE $8 END)
 RETURNING id`, taskID, leaseToken, accountID, endpointID, credentialID, model, endpointName, status).Scan(&leaseID)

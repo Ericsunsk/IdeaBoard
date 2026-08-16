@@ -1,6 +1,5 @@
 import type { PromptAspectRatio } from '../../canvas-board/domain'
 import type { ImageNodeAction } from '../config/imageActionRegistry'
-import type { ImageTaskAction } from '../execution'
 import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 

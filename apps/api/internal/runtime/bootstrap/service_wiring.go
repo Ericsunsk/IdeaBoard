@@ -45,7 +45,7 @@ type appDomainServices struct {
 func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepositories, appPool *pgxpool.Pool) (appDomainServices, error) {
 	runtimeSettings := settings.NewRuntimeSettingsService(repos.systemConfigRepo)
 	outbound.ConfigurePolicyProvider(runtimeSettings)
-	storageService := storage.NewStorageService(repos.storageProfileRepo)
+	storageService := storage.NewStorageService(repos.storageProfileRepo, repos.mediaAssetRegistry)
 	if err := storageService.EnsureDefaultProfiles(ctx); err != nil {
 		return appDomainServices{}, fmt.Errorf("failed to ensure default storage profiles: %w", err)
 	}

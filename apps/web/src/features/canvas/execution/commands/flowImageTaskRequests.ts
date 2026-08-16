@@ -127,9 +127,7 @@ export function buildCanvasExtendReadinessRequest(
   })
 }
 
-function buildHdUpscaleReadinessRequest(
-  options: ImageActionReadinessOptions = {},
-): SubmitTaskData {
+function buildHdUpscaleReadinessRequest(): SubmitTaskData {
   const execution = requireImageActionExecution(IMAGE_HD_UPSCALE_ACTION)
   return buildExecutionTaskRequest({
     prompt: '',
@@ -147,7 +145,7 @@ export function buildImageActionReadinessRequest(
   options: ImageActionReadinessOptions = {},
 ): SubmitTaskData {
   if (action === IMAGE_CANVAS_EXTEND_ACTION) return buildCanvasExtendReadinessRequest(options)
-  if (action === IMAGE_HD_UPSCALE_ACTION) return buildHdUpscaleReadinessRequest(options)
+  if (action === IMAGE_HD_UPSCALE_ACTION) return buildHdUpscaleReadinessRequest()
   if (isImageDirectTaskAction(action)) return buildDirectActionReadinessRequest(action, options)
   throw new Error(`Unsupported image execution action ${action}`)
 }

@@ -161,7 +161,7 @@ func (f *fakeCancelStoreForRiver) ClearCancelled(_ context.Context, taskID strin
 	return nil
 }
 
-func createRiverTestAccount(t *testing.T, db testDB, repo *accounts.AccountRepository, name string) *accounts.ApiAccount {
+func createRiverTestAccount(t *testing.T, db testRuntimeDB, repo *accounts.AccountRepository, name string) *accounts.ApiAccount {
 	t.Helper()
 	secretstest.EnableEncryption(t)
 	channelID := createRiverTestChannel(t, db, name)
@@ -192,18 +192,21 @@ type testRuntimeDB interface {
 	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 }
 
-func createRiverTestChannel(t *testing.T, db testDB, suffix string) int64 {
+func createRiverTestChannel(t *testing.T, db testRuntimeDB, suffix string) int64 {
 	t.Helper()
 	var id int64
 	err := db.QueryRowContext(context.Background(), `
-INSERT INTO provider_endpoints (api_type, name, base_url, status)
-VALUES ('openai-compatible', $1, $2, 1)
+INSERT INTO provider_endpoints (api_type, protocol, name, base_url, status)
+VALUES ('openai-compatible', 'model-api', $1, $2, 1)
 RETURNING id`,
 		"river-test-channel-"+suffix,
 		"https://example.com/"+suffix,
 	).Scan(&id)
 	if err != nil {
 		t.Fatalf("create river test channel failed: %v", err)
+	}
+	if _, err := db.ExecContext(context.Background(), `INSERT INTO provider_endpoint_capabilities (provider_endpoint_id, capability) VALUES ($1, 'image-generation')`, id); err != nil {
+		t.Fatalf("create river test channel capability failed: %v", err)
 	}
 	return id
 }
@@ -225,32 +228,34 @@ LIMIT 1`, account.ID).Scan(&credentialID, &credentialFingerprint, &credentialKey
 	var endpointName string
 	var endpointBaseURL string
 	var apiType string
+	var protocol string
 	if err := db.QueryRowContext(context.Background(), `
-SELECT name, base_url, api_type
+SELECT name, base_url, api_type, protocol
 FROM provider_endpoints
-WHERE id = $1`, account.ProviderEndpointID).Scan(&endpointName, &endpointBaseURL, &apiType); err != nil {
+WHERE id = $1`, account.ProviderEndpointID).Scan(&endpointName, &endpointBaseURL, &apiType, &protocol); err != nil {
 		t.Fatalf("load provider endpoint snapshot failed: %v", err)
 	}
 	assignment := taskqueue.TaskAssignment{
-		TaskID:                  taskID,
-		AccountID:               account.ID,
-		ProviderEndpointID:      account.ProviderEndpointID,
-		CredentialID:            credentialID,
-		ResolvedModel:           "gpt-image-1",
-		APIType:                 apiType,
-		ProviderEndpointName:    endpointName,
-		ProviderEndpointBaseURL: endpointBaseURL,
-		CredentialFingerprint:   credentialFingerprint,
-		CredentialKeyVersion:    credentialKeyVersion,
-		Status:                  taskqueue.AssignStatusAssigned,
-		LeaseToken:              leaseToken,
+		TaskID:                   taskID,
+		AccountID:                account.ID,
+		ProviderEndpointID:       account.ProviderEndpointID,
+		CredentialID:             credentialID,
+		ResolvedModel:            "gpt-image-1",
+		APIType:                  apiType,
+		ProviderEndpointProtocol: protocol,
+		ProviderEndpointName:     endpointName,
+		ProviderEndpointBaseURL:  endpointBaseURL,
+		CredentialFingerprint:    credentialFingerprint,
+		CredentialKeyVersion:     credentialKeyVersion,
+		Status:                   taskqueue.AssignStatusAssigned,
+		LeaseToken:               leaseToken,
 	}
 	if _, err := db.ExecContext(context.Background(), `
 INSERT INTO task_leases (
   task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
-  resolved_model, api_type, provider_endpoint_name, provider_endpoint_base_url,
+  resolved_model, api_type, provider_endpoint_protocol, provider_endpoint_name, provider_endpoint_base_url,
   credential_fingerprint, credential_key_version
-) VALUES ($1, $2, 0, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+) VALUES ($1, $2, 0, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
 		taskID,
 		assignment.LeaseToken,
 		assignment.AccountID,
@@ -258,6 +263,7 @@ INSERT INTO task_leases (
 		assignment.CredentialID,
 		assignment.ResolvedModel,
 		assignment.APIType,
+		assignment.ProviderEndpointProtocol,
 		assignment.ProviderEndpointName,
 		assignment.ProviderEndpointBaseURL,
 		assignment.CredentialFingerprint,

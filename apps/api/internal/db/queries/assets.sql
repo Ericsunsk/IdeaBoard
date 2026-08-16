@@ -65,6 +65,24 @@ SELECT
 FROM media_assets
 WHERE id = sqlc.arg(id);
 
+-- name: FindMediaAssetStorageLocationByURL :one
+SELECT storage_profile_id, storage_key
+FROM media_assets
+WHERE url = sqlc.arg(url)
+  AND status = 'ready'
+  AND deleted_at IS NULL
+ORDER BY updated_at DESC, id DESC
+LIMIT 1;
+
+-- name: ListMediaAssetStorageLocationsByKey :many
+SELECT storage_profile_id, storage_key
+FROM media_assets
+WHERE storage_key = sqlc.arg(storage_key)
+  AND status = 'ready'
+  AND deleted_at IS NULL
+ORDER BY updated_at DESC, id DESC
+LIMIT 2;
+
 -- name: UpsertMediaRef :one
 INSERT INTO media_refs (
   media_asset_id, owner_user_id, ref_type, ref_id,

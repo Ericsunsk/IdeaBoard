@@ -175,6 +175,7 @@ func TestPostgresTaskAssignerRoutesModelessTaskFromExecutionPlan(t *testing.T) {
 	generationAccount := createAssignerAccount(t, db, "generation-only", 2)
 	setAssignerEndpointCapabilities(t, db, generationAccount, string(workflow.RoutingCapabilityImageGeneration))
 	backgroundAccount := createAssignerAccount(t, db, "background-modeless", 2)
+	setAssignerEndpointProtocol(t, db, backgroundAccount, "image-url-json-to-image")
 	setAssignerEndpointCapabilities(t, db, backgroundAccount, string(workflow.RoutingCapabilityBackgroundRemoval))
 	setAssignerModelEnabled(t, db, backgroundAccount, "gpt-image-1", false)
 	createAssignerTaskWithOptions(t, db, "pending-background-modeless", 0, tasks.StatusPending, "", "", assignerTaskOptions{
@@ -201,6 +202,7 @@ func TestPostgresTaskAssignerRoutesUpscaleCapabilityFromExecutionPlan(t *testing
 	backgroundAccount := createAssignerAccount(t, db, "background-only", 2)
 	setAssignerEndpointCapabilities(t, db, backgroundAccount, string(workflow.RoutingCapabilityBackgroundRemoval))
 	upscaleAccount := createAssignerAccount(t, db, "upscale-modeless", 2)
+	setAssignerEndpointProtocol(t, db, upscaleAccount, "image-url-json-to-image")
 	setAssignerEndpointCapabilities(t, db, upscaleAccount, string(workflow.RoutingCapabilityImageUpscale))
 	setAssignerModelEnabled(t, db, upscaleAccount, "gpt-image-1", false)
 	createAssignerTaskWithOptions(t, db, "pending-upscale-modeless", 0, tasks.StatusPending, "", "", assignerTaskOptions{
@@ -844,10 +846,13 @@ func createAssignerAccount(t *testing.T, db *sql.DB, name string, maxConcurrent 
 	t.Helper()
 	var channelID int64
 	if err := db.QueryRow(`
-INSERT INTO provider_endpoints (api_type, name, base_url, status)
-VALUES ('openai-compatible', $1, $2, 1)
+INSERT INTO provider_endpoints (api_type, protocol, name, base_url, status)
+VALUES ('openai-compatible', 'model-api', $1, $2, 1)
 RETURNING id`, "assigner-channel-"+name, "https://example.com/"+name).Scan(&channelID); err != nil {
 		t.Fatalf("create channel %q failed: %v", name, err)
+	}
+	if _, err := db.Exec(`INSERT INTO provider_endpoint_capabilities (provider_endpoint_id, capability) VALUES ($1, 'image-generation')`, channelID); err != nil {
+		t.Fatalf("create channel capability %q failed: %v", name, err)
 	}
 	var id int64
 	err := db.QueryRow(`
@@ -947,6 +952,14 @@ INSERT INTO provider_endpoint_capabilities (provider_endpoint_id, capability)
 VALUES ($1, $2)`, providerEndpointID, capability); err != nil {
 			t.Fatalf("set endpoint capability %q for account %d failed: %v", capability, accountID, err)
 		}
+	}
+}
+
+func setAssignerEndpointProtocol(t *testing.T, db *sql.DB, accountID int64, protocol string) {
+	t.Helper()
+	providerEndpointID := loadAssignerAccountProviderEndpointID(t, db, accountID)
+	if _, err := db.Exec(`UPDATE provider_endpoints SET protocol = $1 WHERE id = $2`, protocol, providerEndpointID); err != nil {
+		t.Fatalf("set provider endpoint protocol for account %d failed: %v", accountID, err)
 	}
 }
 
@@ -1116,7 +1129,7 @@ func insertAssignerTaskLease(t *testing.T, db *sql.DB, taskID string, accountID 
 	_, err := db.Exec(`
 INSERT INTO task_leases (
   task_id, lease_token, river_job_id, account_id, provider_endpoint_id, credential_id,
-  feature_slug, resolved_model, api_type,
+  feature_slug, resolved_model, api_type, provider_endpoint_protocol,
   provider_endpoint_name, provider_endpoint_base_url, credential_fingerprint, credential_key_version,
   acquired_at, released_at, release_reason
 )
@@ -1127,6 +1140,7 @@ VALUES (
   'image-generate',
   CASE WHEN NULLIF($4, '') IS NOT NULL THEN $4 ELSE 'gpt-image-1' END,
   COALESCE((SELECT pe.api_type FROM provider_endpoints pe JOIN api_accounts a ON a.provider_endpoint_id = pe.id WHERE a.id = $3), ''),
+  COALESCE((SELECT pe.protocol FROM provider_endpoints pe JOIN api_accounts a ON a.provider_endpoint_id = pe.id WHERE a.id = $3), 'model-api'),
   COALESCE((SELECT pe.name FROM provider_endpoints pe JOIN api_accounts a ON a.provider_endpoint_id = pe.id WHERE a.id = $3), ''),
   COALESCE((SELECT pe.base_url FROM provider_endpoints pe JOIN api_accounts a ON a.provider_endpoint_id = pe.id WHERE a.id = $3), ''),
   COALESCE((SELECT fingerprint FROM api_account_secrets WHERE account_id = $3 AND status = 'active' ORDER BY rotated_at DESC, id DESC LIMIT 1), ''),
