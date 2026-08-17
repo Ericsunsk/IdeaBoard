@@ -5,7 +5,6 @@ import {
   getWorkflowFeatureImageActionText,
   WORKFLOW_FEATURE_CONFIG_GROUPS,
   WORKFLOW_FEATURE_CONFIG_ITEM_MAP,
-  WORKFLOW_FEATURE_GROUP,
 } from './workflowFeatureRegistry'
 
 describe('workflowFeatureRegistry projections', () => {
