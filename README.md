@@ -148,7 +148,7 @@ sequenceDiagram
 | **Web Frontend** | Vue 3 (Composition API), Vite, TypeScript, Tailwind CSS v4, PrimeVue v4, Vue Flow |
 | **Go API Backend** | Go 1.26+, Gin Framework, sqlc (Typed Query Engine), River Queue (PG 17 Native Queue) |
 | **Auth Service** | Better Auth, Fastify, TypeScript, OTP & Google OAuth 2.0 |
-| **Database & Cache** | PostgreSQL 17 (Triggers, JSONB, Composite Indexes), Redis / Local Memory |
+| **Database & Cache** | PostgreSQL 17 (Triggers, JSONB, Composite Indexes), Usage Per-process LRU Cache |
 | **Message & Events** | NATS JetStream (Audit Trail & Event Fanout), SSE Realtime Adapter |
 | **Deploy & Infra** | Cloudflare Pages, VPS Reverse Proxy, Docker Compose, GHCR Registry |
 

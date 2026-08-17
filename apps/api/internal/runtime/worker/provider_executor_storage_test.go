@@ -217,6 +217,8 @@ func TestGoogleGeminiReadsRelativeCanvasUploadFromStorage(t *testing.T) {
 	executor.publicOrigins = config.PublicOriginsConfig{API: "https://api.example.com"}
 	source := buildTinyPNGBytes(t)
 	sourcePath := filepath.Join("uploads", "canvas", "OWNR1A", "board-1", "content", "source.png")
+	relativeRef := "/" + filepath.ToSlash(sourcePath)
+	executor.mediaResolver = testRuntimeMediaResolver{urls: map[int64]string{1: relativeRef, 2: relativeRef}}
 	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
 		t.Fatalf("mkdir upload dir: %v", err)
 	}
@@ -247,6 +249,10 @@ func TestGoogleGeminiReadsRelativeCanvasUploadFromStorage(t *testing.T) {
 	parsedParams, parseErr := executor.parseAndNormalizeTaskParams(context.Background(), task)
 	if parseErr != nil {
 		t.Fatal(parseErr)
+	}
+	parsedParams, resolveErr := executor.resolveRuntimeProviderTaskParams(context.Background(), parsedParams)
+	if resolveErr != nil {
+		t.Fatal(resolveErr)
 	}
 	providerReq, requestErr := parsedParams.providerRequest(task.Prompt, "gemini-3.1-flash-image")
 	if requestErr != nil {

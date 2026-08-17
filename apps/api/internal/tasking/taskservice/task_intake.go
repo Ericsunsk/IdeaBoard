@@ -227,13 +227,10 @@ func (i *taskIntake) Compile(ctx context.Context, userID int64, req *tasks.Submi
 	if requiresImageFillSystemPrompt(featureSlug) && strings.TrimSpace(promptConfig.Prompt) == "" {
 		return CanonicalTaskRequest{}, validation.New("该功能未配置 System Prompt")
 	}
-	fullPrompt := strings.TrimSpace(req.Prompt)
-	systemPrompt := ""
-	if executionPlan.PromptPolicy() == workflow.PromptPolicyIgnored {
-		// Dedicated image transforms are binary media operations. Their Modal
-		// contracts do not consume user text or a System Prompt.
-		fullPrompt = ""
-	} else {
+	var fullPrompt, systemPrompt string
+	// Dedicated image transforms are binary media operations. Their Modal
+	// contracts do not consume user text or a System Prompt.
+	if executionPlan.PromptPolicy() != workflow.PromptPolicyIgnored {
 		systemPrompt = strings.TrimSpace(prompts.ApplyFeatureSystemPromptWithConfig("", "", featureSlug, params, promptConfig))
 		fullPrompt = strings.TrimSpace(prompts.ApplyFeatureSystemPromptWithConfig(req.Prompt, req.Prompt, featureSlug, params, promptConfig))
 	}

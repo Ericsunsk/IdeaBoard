@@ -46,7 +46,7 @@ func TestBilledStyleVariationSubmissionSucceedsAsRuntimeRole(t *testing.T) {
 		t.Fatal(err)
 	}
 	sku := mustResolveSKU(t, request)
-	if _, err := ownerBilling.PublishPrice(t.Context(), submissionPriceInput(sku, "Style Variation", 20)); err != nil {
+	if _, err := ownerBilling.PublishPrice(t.Context(), submissionPriceInput(sku, "Style Variation", request.OutputResolution, 20)); err != nil {
 		t.Fatal(err)
 	}
 	seedCreditWallet(t, ownerPool, ownerCredits, 42, 200)
@@ -118,7 +118,7 @@ func TestBilledSubmissionHoldsAndReturnsOriginalFactsAcrossPriceChange(t *testin
 	if !firstResult.Created || firstResult.HoldTransactionID == "" {
 		t.Fatalf("first result=%+v", firstResult)
 	}
-	if _, err := billingService.PublishPrice(t.Context(), submissionPriceInput(mustResolveSKU(t, request), "Pattern Generation", 40)); err != nil {
+	if _, err := billingService.PublishPrice(t.Context(), submissionPriceInput(mustResolveSKU(t, request), "Pattern Generation", request.OutputResolution, 40)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -286,7 +286,7 @@ func TestBilledDuplicateRejectsDifferentProductForSameClientAction(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := billingService.PublishPrice(t.Context(), submissionPriceInput(mustResolveSKU(t, secondRequest), "Style Variation", 30)); err != nil {
+	if _, err := billingService.PublishPrice(t.Context(), submissionPriceInput(mustResolveSKU(t, secondRequest), "Style Variation", secondRequest.OutputResolution, 30)); err != nil {
 		t.Fatal(err)
 	}
 	seedCreditWallet(t, pool, creditService, 42, 100)
@@ -456,13 +456,17 @@ func TestAllAIImageWorkflowSubmissionPricingMatrix(t *testing.T) {
 				db, pool := testdb.OpenWithPool(t)
 				creditService := credits.NewService(pool)
 				billingService := billing.NewService(pool)
-				request, err := taskbilling.AIImageRequest(feature, "1k", 1)
+				plan, _, err := canonicalExecutionPlanFixture(feature, 1)
+				if err != nil {
+					t.Fatal(err)
+				}
+				request, err := taskbilling.AIImageRequest(feature, plan.OutputResolution(), 1)
 				if err != nil {
 					t.Fatal(err)
 				}
 				if scenario.createSKU {
 					sku := mustResolveSKU(t, request)
-					if _, err := billingService.PublishPrice(t.Context(), submissionPriceInput(sku, feature, scenario.unitCredits)); err != nil {
+					if _, err := billingService.PublishPrice(t.Context(), submissionPriceInput(sku, feature, request.OutputResolution, scenario.unitCredits)); err != nil {
 						t.Fatal(err)
 					}
 					if !scenario.skuEnabled {
@@ -519,16 +523,17 @@ func seedPatternBillingProduct(t *testing.T, service *billing.Service, unitCredi
 		t.Fatal(err)
 	}
 	sku := mustResolveSKU(t, request)
-	if _, err := service.PublishPrice(t.Context(), submissionPriceInput(sku, "Pattern Generation", unitCredits)); err != nil {
+	if _, err := service.PublishPrice(t.Context(), submissionPriceInput(sku, "Pattern Generation", request.OutputResolution, unitCredits)); err != nil {
 		t.Fatal(err)
 	}
 	return request
 }
 
-func submissionPriceInput(sku billing.SKU, displayName string, unitCredits int64) billing.PublishPriceInput {
+func submissionPriceInput(sku billing.SKU, displayName string, outputResolution billing.OutputResolution, unitCredits int64) billing.PublishPriceInput {
 	return billing.PublishPriceInput{
 		Definition: billing.BillableItemDefinition{
 			SKU: sku, Namespace: "ai-image", ProductKind: "workflow-feature", DisplayName: displayName,
+			PricingVariants: []billing.OutputResolution{outputResolution},
 		},
 		UnitCredits: unitCredits,
 		ActorID:     1,

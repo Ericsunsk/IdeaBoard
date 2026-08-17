@@ -398,9 +398,10 @@ func TestResolveTaskBillingRequestUsesAIWorkflowRegistry(t *testing.T) {
 				resolution = "default"
 			}
 			imageInputCount := 1
-			if feature == workflow.FeatureSlugPromptGeneration {
+			switch feature {
+			case workflow.FeatureSlugPromptGeneration:
 				imageInputCount = 0
-			} else if feature == workflow.FeatureSlugStyleFusion {
+			case workflow.FeatureSlugStyleFusion:
 				imageInputCount = 2
 			}
 			plan, err := workflow.CompileFeatureExecutionPlan(workflow.CompileFeatureExecutionInput{

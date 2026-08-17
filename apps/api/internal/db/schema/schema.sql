@@ -3788,7 +3788,7 @@ CREATE OR REPLACE FUNCTION publish_billing_prices(
 )
 RETURNS SETOF billing_price_versions
 LANGUAGE plpgsql SECURITY DEFINER
-SET search_path TO 'public', 'pg_catalog', 'pg_temp'
+SET search_path FROM CURRENT
 AS $fn$
 DECLARE
   v_resolution TEXT;
