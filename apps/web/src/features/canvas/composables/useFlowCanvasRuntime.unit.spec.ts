@@ -283,7 +283,9 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
       return hydrated.kind === 'started' ? hydrated.lease : null
     },
     beginSubmission(attachment: ReturnType<typeof executionCore.currentAttachment>, nodeId: string) {
-      return attachment ? executionCore.begin(attachment, nodeId as `image-${number}`).lease : null
+      if (!attachment) return null
+      const started = executionCore.begin(attachment, nodeId as `image-${number}`)
+      return started.kind === 'started' ? started.lease : null
     },
     getNodeState(nodeId: string) {
       const terminal = terminalStates.get(nodeId)
@@ -672,7 +674,7 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.renderEdges.value[0]?.animated).toBe(false)
     expect(harness.graphActions.setEdges).toHaveBeenCalledOnce()
     const lastPresentedEdges = vi.mocked(harness.graphActions.setEdges).mock.lastCall?.[0] ?? []
-    expect(lastPresentedEdges.find((edge) => edge.id === 'connection-4')?.animated).toBe(false)
+    expect(lastPresentedEdges.find((edge: Edge) => edge.id === 'connection-4')?.animated).toBe(false)
     resolveSave()
     await save
 

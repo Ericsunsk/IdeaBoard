@@ -72,7 +72,7 @@ describe('useCanvasExecutionWorkspace', () => {
 
   it('reattaches a persisted result through Core without a second state owner', async () => {
     const store = createStore()
-    store.beginTransaction('persist-client-action').updateNode('image-1', {
+    store.beginTransaction('node-update').updateNode('image-1', {
       pendingClientActionId: 'canvas:restored-action',
     }).commit()
     const core = createPendingImageExecutionCore()
@@ -167,7 +167,7 @@ describe('useCanvasExecutionWorkspace', () => {
 
     const reattach = workspace.commands.reattachPendingImageResults()
     await vi.waitFor(() => expect(core.factFor('image-1')).toMatchObject({ status: 'running' }))
-    store.beginTransaction('delete-before-poll').removeNode('image-1').commit()
+    store.beginTransaction('delete').removeNode('image-1').commit()
     deferred.resolve([{ url: 'https://example.com/deleted.png', resultIndex: 0 }])
     await reattach
 

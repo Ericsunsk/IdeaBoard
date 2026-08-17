@@ -5,6 +5,7 @@ import { CanvasGraphStore } from '../../graph-runtime'
 import { CanvasBoardGraphSession, createPendingImageExecutionCore } from '../pending-execution'
 import { CanvasBillingPreflightError } from '../task-runner/canvasBillingPreflight'
 import { createPendingImageWorkflowRunner } from './pendingImageWorkflowRunner'
+import type { PendingImageWorkflowTaskTransport } from './pendingImageWorkflowRunner'
 
 function createHarness(taskIds: readonly string[] = ['task-1']) {
   const snapshot = createEmptyCanvasBoardSnapshot()
@@ -20,11 +21,19 @@ function createHarness(taskIds: readonly string[] = ['task-1']) {
     reservePendingResults: vi.fn(() => ({ resultNodeIds: taskIds.map((_, index) => `image-${index + 1}`) })),
     attachPendingTaskIds: vi.fn(), removePendingResults: vi.fn(),
   }
-  const transport = {
-    assertReady: vi.fn(async () => undefined),
-    submit: vi.fn(async () => ({ taskId: 'task-1' })),
-    resolve: vi.fn(async (_taskId, resultIndex) => ({ url: `https://example.com/${resultIndex}.png`, ratio: 1 })),
-  }
+  const assertReady = vi.fn<PendingImageWorkflowTaskTransport['assertReady']>(
+    async () => undefined,
+  )
+  const submit = vi.fn<PendingImageWorkflowTaskTransport['submit']>(async () => ({
+    taskId: 'task-1',
+  }))
+  const resolve = vi.fn<PendingImageWorkflowTaskTransport['resolve']>(
+    async (_taskId, resultIndex) => ({
+      url: `https://example.com/${resultIndex}.png`,
+      ratio: 1,
+    }),
+  )
+  const transport = { assertReady, submit, resolve }
   const cancelTasks = vi.fn()
   const runner = createPendingImageWorkflowRunner({
     executionCore: core, pendingResults, taskTransport: transport, cancelTasks,

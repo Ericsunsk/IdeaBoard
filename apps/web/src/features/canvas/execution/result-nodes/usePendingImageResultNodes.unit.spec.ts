@@ -1,12 +1,19 @@
-import { ref } from 'vue'
+import { shallowRef } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
 import { createEmptyCanvasBoardSnapshot } from '../../../canvas-board/domain'
 import { readFlowGraphCommandSideEffects } from '../../composables/flowGraphAdapterCommandSideEffects'
+import type {
+  CanvasVueFlowGraphCommandOptions,
+  CanvasVueFlowGraphNodeUpdateOptions,
+} from '../../composables/useCanvasVueFlowGraphAdapter'
 import { CanvasGraphStore } from '../../graph-runtime'
-import { usePendingImageResultExecution } from './usePendingImageResultNodes'
+import {
+  usePendingImageResultExecution,
+  type PendingImageResultGraphAdapter,
+} from './usePendingImageResultNodes'
 
-function imageNode(id: number, x: number, sourceImageUrl = 'source') {
+function imageNode(id: number, x: number, sourceImageUrl = 'source'): Node {
   return {
     id: `image-${id}`,
     position: { x, y: 20 },
@@ -24,28 +31,52 @@ function imageNode(id: number, x: number, sourceImageUrl = 'source') {
         outputImages: [],
       },
     },
-  }
+  } as Node
 }
 
 function createHarness(activeNodeIds: readonly string[] = []) {
-  const nodes = ref<Node[]>([imageNode(1, 10) as Node])
-  const edges = ref<Edge[]>([])
-  const replaceGraph = vi.fn((graph) => {
-    nodes.value = graph.nodes
-    edges.value = graph.edges
-  })
-  const addEdges = vi.fn((next) => {
-    edges.value = [...edges.value, ...next]
-  })
-  const updateNode = vi.fn((nodeId, update) => {
-    nodes.value = nodes.value.map((node) =>
-      node.id === nodeId ? { ...node, ...update, data: update.data ?? node.data } : node,
-    )
-  })
+  const nodes = shallowRef<Node[]>([imageNode(1, 10)])
+  const edges = shallowRef<Edge[]>([])
+  const replaceGraph = vi.fn(
+    (
+      graph: { nodes: Node[]; edges: Edge[] },
+      _commandOptions?: CanvasVueFlowGraphCommandOptions,
+    ) => {
+      nodes.value = graph.nodes
+      edges.value = graph.edges
+      return { didChange: true }
+    },
+  )
+  const addEdges = vi.fn(
+    (next: Edge | Edge[], _commandOptions?: CanvasVueFlowGraphCommandOptions) => {
+      edges.value = [...edges.value, ...(Array.isArray(next) ? next : [next])]
+      return { didChange: true }
+    },
+  )
+  const updateNode = vi.fn(
+    (
+      nodeId: string,
+      update: Partial<Node> | ((node: Node) => Partial<Node>),
+      _commandOptions?: CanvasVueFlowGraphNodeUpdateOptions,
+    ) => {
+      nodes.value = nodes.value.map((node) => {
+        if (node.id !== nodeId) return node
+        const patch = typeof update === 'function' ? update(node) : update
+        return { ...node, ...patch, data: patch.data ?? node.data }
+      })
+      return { didChange: true }
+    },
+  )
+  const graphAdapter = {
+    replaceGraph,
+    addEdges,
+    updateNode,
+    removeNodes: vi.fn(),
+  } satisfies PendingImageResultGraphAdapter
   const actions = usePendingImageResultExecution({
     nodes,
     edges,
-    graphAdapter: { replaceGraph, addEdges, updateNode, removeNodes: vi.fn() } as never,
+    graphAdapter,
     createCurrentCanvasGraphStore: () => CanvasGraphStore.fromSnapshot(createEmptyCanvasBoardSnapshot()),
     isNodeExecutionActive: (nodeId) => activeNodeIds.includes(nodeId),
   })
@@ -65,9 +96,11 @@ describe('usePendingImageResultExecution reservation projection', () => {
 
     expect(reservation.resultNodeIds).toHaveLength(1)
     expect(harness.nodes.value).toHaveLength(2)
-    expect(harness.nodes.value[1].position.x).toBeGreaterThan(harness.nodes.value[0].position.x)
+    expect(harness.nodes.value[1]!.position.x).toBeGreaterThan(
+      harness.nodes.value[0]!.position.x,
+    )
     const commandOptions = harness.replaceGraph.mock.calls[0]?.[1]
-    expect(readFlowGraphCommandSideEffects(commandOptions.metadata)).toMatchObject({
+    expect(readFlowGraphCommandSideEffects(commandOptions?.metadata)).toMatchObject({
       recordHistory: false,
     })
   })
@@ -104,13 +137,16 @@ describe('usePendingImageResultExecution reservation projection', () => {
     harness.nodes.value.push({
       id: 'note-2',
       position: { x: 390, y: 20 },
-      dimensions: { width: 280, height: 180 },
+      width: 280,
+      height: 180,
       data: { kind: 'note', snapshotNode: { width: 280, height: 180 } },
     })
 
     const reservation = harness.actions.reservePendingResults({ source, sourceNodeId: 'image-1', outputCount: 1 })
     const resultNode = harness.nodes.value.find((node) => node.id === reservation.resultNodeIds[0])
 
+    expect(resultNode).toBeDefined()
+    if (!resultNode) throw new Error('Expected reserved result node')
     expect(resultNode.position).toMatchObject({ x: 390 })
     expect(resultNode.position.y).toBeGreaterThan(20)
   })
@@ -129,13 +165,15 @@ describe('usePendingImageResultExecution reservation projection', () => {
     ])
 
     const node = harness.nodes.value.find((item) => item.id === resultNodeIds[0])
+    expect(node).toBeDefined()
+    if (!node) throw new Error('Expected pending result node')
     expect(node.data.snapshotNode).toMatchObject({
       pendingTaskId: 'task-1',
       pendingResultIndex: 0,
       pendingClientActionId: 'canvas:action-1',
     })
     const commandOptions = harness.updateNode.mock.calls[0]?.[2]
-    expect(readFlowGraphCommandSideEffects(commandOptions.metadata)).toMatchObject({
+    expect(readFlowGraphCommandSideEffects(commandOptions?.metadata)).toMatchObject({
       recordHistory: false,
     })
   })

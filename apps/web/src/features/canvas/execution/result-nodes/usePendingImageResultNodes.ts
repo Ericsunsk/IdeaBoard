@@ -17,8 +17,10 @@ import type {
 import { resolveImageNodeLayoutAnchor } from '../../utils/flowImageNodeSelectors'
 import { waitForNextRenderFrame } from '../../utils/animationFrame'
 import type {
-  CanvasVueFlowGraphAdapter,
+  CanvasVueFlowGraph,
   CanvasVueFlowGraphCommandOptions,
+  CanvasVueFlowGraphNodeUpdateOptions,
+  CanvasVueFlowGraphRemoveNodesOptions,
 } from '../../composables/useCanvasVueFlowGraphAdapter'
 import { createFlowGraphCommandOptions } from '../../composables/flowGraphAdapterCommandSideEffects'
 import {
@@ -28,10 +30,30 @@ import {
 import type { CanvasGraphStore } from '../../graph-runtime'
 import { CanvasBoardGraphSession } from '../pending-execution'
 
+export type PendingImageResultGraphAdapter = {
+  replaceGraph: (
+    nextGraph: CanvasVueFlowGraph,
+    commandOptions?: CanvasVueFlowGraphCommandOptions,
+  ) => void
+  addEdges: (
+    edges: Edge | Edge[],
+    commandOptions?: CanvasVueFlowGraphCommandOptions,
+  ) => void
+  updateNode: (
+    nodeId: string,
+    update: Partial<Node> | ((node: Node) => Partial<Node>),
+    commandOptions?: CanvasVueFlowGraphNodeUpdateOptions,
+  ) => void
+  removeNodes: (
+    nodeId: string,
+    commandOptions?: CanvasVueFlowGraphRemoveNodesOptions,
+  ) => void
+}
+
 type UsePendingImageResultNodesOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  graphAdapter: CanvasVueFlowGraphAdapter
+  graphAdapter: PendingImageResultGraphAdapter
   createCurrentCanvasGraphStore: (
     snapshotOptions?: FlowToCanvasBoardSnapshotOptions,
   ) => CanvasGraphStore

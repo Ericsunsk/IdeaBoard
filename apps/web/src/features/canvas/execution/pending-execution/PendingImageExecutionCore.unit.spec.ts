@@ -221,20 +221,15 @@ describe('PendingImageExecutionCore', () => {
     })
     core.subscribe(laterSubscriber)
 
-    let attachment: PendingImageAttachment | null = null
     expect(() => {
-      attachment = core.attachBoard(
-        CanvasBoardGraphSession.create('board-a', { createGraphStore: () => store }),
-      )
+      core.attachBoard(CanvasBoardGraphSession.create('board-a', { createGraphStore: () => store }))
     }).not.toThrow()
 
     expect(onSubscriberError).toHaveBeenCalledOnce()
     expect(onSubscriberError).toHaveBeenCalledWith(subscriberError)
     expect(laterSubscriber).toHaveBeenCalledOnce()
-    expect(core.snapshot().attachment).toEqual({
-      boardId: 'board-a',
-      epoch: attachment?.epoch,
-    })
+    expect(core.snapshot().attachment).toMatchObject({ boardId: 'board-a' })
+    expect(core.snapshot().attachment?.epoch).toBeGreaterThan(0)
   })
 
   it('rejects old epochs and different Graph Sessions even when boardId is unchanged', () => {
@@ -459,7 +454,7 @@ describe('PendingImageExecutionCore', () => {
       const bindSession = session[bindCanvasBoardGraphSession]
       const bindSpy = vi
         .spyOn(CanvasBoardGraphSession.prototype, bindCanvasBoardGraphSession)
-        .mockImplementationOnce(function (epoch) {
+        .mockImplementationOnce(function (this: CanvasBoardGraphSession, epoch: number) {
           const binding = bindSession.call(this, epoch)
           return Object.freeze({
             ...binding,

@@ -1,13 +1,19 @@
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
+import type { Edge, Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
 import { TaskCancelledError } from '../../../../shared/api/taskEvents'
 import { createEmptyCanvasBoardSnapshot } from '../../../canvas-board/domain'
 import { useCanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
 import { createFlowGraphCommandOptions, readFlowGraphCommandSideEffects } from '../../composables/flowGraphAdapterCommandSideEffects'
 import { CanvasGraphStore } from '../../graph-runtime'
-import { canvasBoardSnapshotToFlow, flowToCanvasBoardSnapshot } from '../../utils/flowSnapshotAdapter'
+import {
+  canvasBoardSnapshotToFlow,
+  flowToCanvasBoardSnapshot,
+  type FlowAdapterEdge,
+} from '../../utils/flowSnapshotAdapter'
 import { CanvasBoardGraphSession, createPendingImageExecutionCore } from '../pending-execution'
 import { useFlowImageWorkflowExecution } from './flowImageWorkflowExecution'
+import type { PendingImageWorkflowTaskTransport } from './pendingImageWorkflowRunner'
 
 vi.mock('../media/imageSize', () => ({
   loadImageSizeFromUrl: vi.fn(async () => ({ width: 1200, height: 800 })),
@@ -20,17 +26,17 @@ function imageActionPlan() {
   return { kind: 'image-action', activationId: 'a', sourceNodeId: 'image-1', source: { url: 'https://example.com/a.png', ratio: 1 }, action: 'remove-bg', prompt: '', outputCount: 1, resultOptions: {} } as never
 }
 
-function createPublicHarness(transport: { assertReady: () => Promise<void>; submit: () => Promise<{ taskId: string }>; resolve: () => Promise<{ url: string; ratio: number }> }) {
+function createPublicHarness(transport: PendingImageWorkflowTaskTransport) {
   const base = createEmptyCanvasBoardSnapshot()
   base.imageNodes.push({ id: 1, type: 'image-node', x: 0, y: 0, width: 280, sourceImageUrl: 'https://example.com/a.png', sourceImageRatio: 1, outputStatus: 'ready', outputImages: [] })
   const flow = canvasBoardSnapshotToFlow(base)
-  const nodes = ref(flow.nodes as never[])
-  const edges = ref(flow.edges as never[])
+  const nodes = shallowRef<Node[]>(flow.nodes)
+  const edges = shallowRef<Edge[]>(flow.edges)
   const markDirty = vi.fn()
-  const flushAutosave = vi.fn(async () => undefined)
+  const flushAutosave = vi.fn(async (_options?: { silent?: boolean }) => undefined)
   const graphAdapter = useCanvasVueFlowGraphAdapter({
-    nodes: nodes as never,
-    edges: edges as never,
+    nodes,
+    edges,
     afterCommand: (result) => {
       const sideEffects = readFlowGraphCommandSideEffects(result.metadata)
       if (result.didChange && sideEffects?.markDirty !== false) {
@@ -41,15 +47,32 @@ function createPublicHarness(transport: { assertReady: () => Promise<void>; subm
   })
   const core = createPendingImageExecutionCore()
   core.attachBoard(CanvasBoardGraphSession.create('board-a', {
-    createGraphStore: () => CanvasGraphStore.fromSnapshot(flowToCanvasBoardSnapshot({ nodes: nodes.value, edges: edges.value }, base, { projection: 'runtime' })),
+    createGraphStore: () =>
+      CanvasGraphStore.fromSnapshot(
+        flowToCanvasBoardSnapshot(
+          { nodes: nodes.value, edges: edges.value as FlowAdapterEdge[] },
+          base,
+          { projection: 'runtime' },
+        ),
+      ),
     onMaterialized: (store) => {
       const next = canvasBoardSnapshotToFlow(store.exportSnapshot(base))
-      graphAdapter.replaceGraph({ nodes: next.nodes as never, edges: next.edges as never }, createFlowGraphCommandOptions({ recordHistory: false }))
+      graphAdapter.replaceGraph(
+        { nodes: next.nodes, edges: next.edges },
+        createFlowGraphCommandOptions({ recordHistory: false }),
+      )
     },
   }))
   const execution = useFlowImageWorkflowExecution({
-    nodes: nodes as never, edges: edges as never, graphAdapter,
-    createCurrentCanvasGraphStore: () => CanvasGraphStore.fromSnapshot(flowToCanvasBoardSnapshot({ nodes: nodes.value, edges: edges.value }, base, { projection: 'runtime' })),
+    nodes, edges, graphAdapter,
+    createCurrentCanvasGraphStore: () =>
+      CanvasGraphStore.fromSnapshot(
+        flowToCanvasBoardSnapshot(
+          { nodes: nodes.value, edges: edges.value as FlowAdapterEdge[] },
+          base,
+          { projection: 'runtime' },
+        ),
+      ),
     boardBaseSnapshot: ref(base),
     executionWorkspace: { state: { executionCore: core, isNodeRunning: (id) => core.captureActiveLeases([id]).length > 0 }, commands: { runPromptGeneration: vi.fn(), reattachPendingImageResults: vi.fn() } },
     cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(), taskTransport: transport,
@@ -106,8 +129,12 @@ describe('useFlowImageWorkflowExecution', () => {
   })
 
   it('uses the complete extend request for readiness and submission', async () => {
-    const assertReady = vi.fn(async () => undefined)
-    const submit = vi.fn(async () => ({ taskId: 'task-extend' }))
+    const assertReady = vi.fn<PendingImageWorkflowTaskTransport['assertReady']>(
+      async () => undefined,
+    )
+    const submit = vi.fn<PendingImageWorkflowTaskTransport['submit']>(async () => ({
+      taskId: 'task-extend',
+    }))
     const harness = createPublicHarness({
       assertReady,
       submit,
@@ -143,8 +170,12 @@ describe('useFlowImageWorkflowExecution', () => {
   })
 
   it('uses the complete sized inpaint request for readiness and submission', async () => {
-    const assertReady = vi.fn(async () => undefined)
-    const submit = vi.fn(async () => ({ taskId: 'task-inpaint' }))
+    const assertReady = vi.fn<PendingImageWorkflowTaskTransport['assertReady']>(
+      async () => undefined,
+    )
+    const submit = vi.fn<PendingImageWorkflowTaskTransport['submit']>(async () => ({
+      taskId: 'task-inpaint',
+    }))
     const harness = createPublicHarness({
       assertReady,
       submit,
