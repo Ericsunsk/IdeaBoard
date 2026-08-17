@@ -17,7 +17,7 @@ import (
 
 func TestResolveProviderExecutionUsesAssignmentSnapshotAfterLiveConfigChanges(t *testing.T) {
 	account := &accounts.RuntimeAccountAccess{ID: 17, Name: "live-account-name", APIKey: "secret", Timeout: 45}
-	assignment := resolvedExecutionAssignment("https://snapshot.example/v1", workflow.ProviderGoogleAI, providerendpoints.ProtocolModelAPI, "models/frozen-image")
+	assignment := resolvedExecutionAssignment("http://127.0.0.1:18080/v1", workflow.ProviderGoogleAI, providerendpoints.ProtocolModelAPI, "models/frozen-image")
 	task := resolvedExecutionTask(t, workflow.FeatureSlugPromptGeneration)
 
 	exec, err := (&ProviderExecutor{}).resolveProviderExecution(context.Background(), account, task, assignment)
@@ -57,7 +57,7 @@ func TestResolveProviderExecutionRejectsIncompleteSnapshotBeforeMediaIO(t *testi
 			UseMask:  &useMask,
 		},
 	})}
-	assignment := resolvedExecutionAssignment("https://snapshot.example/v1", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolModelAPI, "gpt-image-1")
+	assignment := resolvedExecutionAssignment("http://127.0.0.1:18080/v1", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolModelAPI, "gpt-image-1")
 	assignment.ProviderEndpointName = ""
 
 	_, err := (&ProviderExecutor{}).resolveProviderExecution(
@@ -79,7 +79,7 @@ func TestResolveProviderExecutionEnforcesSnapshotModelPolicy(t *testing.T) {
 	account := &accounts.RuntimeAccountAccess{ID: 17, Name: "account", APIKey: "secret"}
 
 	t.Run("model required", func(t *testing.T) {
-		assignment := resolvedExecutionAssignment("https://snapshot.example/v1", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolModelAPI, "")
+		assignment := resolvedExecutionAssignment("http://127.0.0.1:18080/v1", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolModelAPI, "")
 		_, err := executor.resolveProviderExecution(context.Background(), account, resolvedExecutionTask(t, workflow.FeatureSlugPromptGeneration), assignment)
 		if err == nil || !strings.Contains(err.Error(), "未分配模型") {
 			t.Fatalf("error = %v, want missing model", err)
@@ -87,7 +87,7 @@ func TestResolveProviderExecutionEnforcesSnapshotModelPolicy(t *testing.T) {
 	})
 
 	t.Run("modelless transform", func(t *testing.T) {
-		assignment := resolvedExecutionAssignment("https://snapshot.example/remove-bg", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolImageURLJSONImage, "")
+		assignment := resolvedExecutionAssignment("http://127.0.0.1:18080/remove-bg", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolImageURLJSONImage, "")
 		exec, err := executor.resolveProviderExecution(context.Background(), account, resolvedExecutionTask(t, workflow.FeatureSlugRemoveBg), assignment)
 		if err != nil {
 			t.Fatalf("resolve modelless execution: %v", err)
@@ -109,7 +109,7 @@ func TestResolveProviderExecutionRejectsProtocolURLAndAPITypeBeforeProviderIO(t 
 	task := resolvedExecutionTask(t, workflow.FeatureSlugPromptGeneration)
 
 	t.Run("protocol operation mismatch", func(t *testing.T) {
-		assignment := resolvedExecutionAssignment("https://snapshot.example/transform", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolImageURLJSONImage, "gpt-image-1")
+		assignment := resolvedExecutionAssignment("http://127.0.0.1:18080/transform", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolImageURLJSONImage, "gpt-image-1")
 		if _, err := executor.resolveProviderExecution(context.Background(), account, task, assignment); err == nil || !strings.Contains(err.Error(), "does not support runtime operation") {
 			t.Fatalf("error = %v, want protocol mismatch", err)
 		}
@@ -136,7 +136,7 @@ func TestResolveProviderExecutionRejectsProtocolURLAndAPITypeBeforeProviderIO(t 
 
 func TestResolveProviderExecutionDoesNotMutateInputs(t *testing.T) {
 	account := &accounts.RuntimeAccountAccess{ID: 17, Name: " account ", APIKey: " secret ", Timeout: 30}
-	assignment := resolvedExecutionAssignment("https://snapshot.example/v1", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolModelAPI, "gpt-image-1")
+	assignment := resolvedExecutionAssignment("http://127.0.0.1:18080/v1", workflow.ProviderOpenAICompatible, providerendpoints.ProtocolModelAPI, "gpt-image-1")
 	task := resolvedExecutionTask(t, workflow.FeatureSlugPromptGeneration)
 	accountBefore := *account
 	assignmentBefore := assignment

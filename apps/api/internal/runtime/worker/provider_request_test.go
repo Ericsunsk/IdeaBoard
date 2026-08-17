@@ -415,7 +415,7 @@ func TestPrepareProviderExecutionCompletesPreflightBeforeLocalMediaIO(t *testing
 
 	unexpectedModelAccount := &accounts.ApiAccount{
 		ID: 1, Name: "unexpected-model", ApiKey: "key", ApiType: workflow.ProviderOpenAICompatible,
-		Protocol: providerendpoints.ProtocolFluxFillJSONImage, ProxyURL: "https://provider.example",
+		Protocol: providerendpoints.ProtocolFluxFillJSONImage, ProxyURL: "http://127.0.0.1:18080",
 	}
 	_, err := (&ProviderExecutor{}).resolveProviderExecution(
 		context.Background(),
@@ -441,7 +441,7 @@ func TestPrepareProviderExecutionCompletesPreflightBeforeLocalMediaIO(t *testing
 	}
 	incompatibleAccount := &accounts.ApiAccount{
 		ID: 1, Name: "incompatible-controls", ApiKey: "key", ApiType: workflow.ProviderOpenAICompatible,
-		Protocol: providerendpoints.ProtocolFluxFillJSONImage, ProxyURL: "https://provider.example",
+		Protocol: providerendpoints.ProtocolFluxFillJSONImage, ProxyURL: "http://127.0.0.1:18080",
 	}
 	_, err = (&ProviderExecutor{}).resolveProviderExecution(
 		context.Background(),
@@ -551,7 +551,7 @@ func TestPrepareProviderExecutionAllowsPromptGenerationControls(t *testing.T) {
 		ApiKey:   "key",
 		ApiType:  workflow.ProviderOpenAICompatible,
 		Protocol: providerendpoints.ProtocolModelAPI,
-		ProxyURL: "https://provider.example/v1",
+		ProxyURL: "http://127.0.0.1:18080/v1",
 	}
 	exec, err := (&ProviderExecutor{}).resolveProviderExecution(
 		context.Background(),

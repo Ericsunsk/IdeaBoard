@@ -280,6 +280,8 @@ func TestSaveAndApplyProfileCreatesRuntimeActiveProfile(t *testing.T) {
 }
 
 func TestSaveAndApplyProfileClearsPreviousCurrentProfile(t *testing.T) {
+	restore := outbound.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{hosts: []string{"127.0.0.1"}})
+	t.Cleanup(restore)
 	service, _ := newStorageServiceTest(t)
 	ctx := context.Background()
 
@@ -292,7 +294,7 @@ func TestSaveAndApplyProfileClearsPreviousCurrentProfile(t *testing.T) {
 			"access_key_id":     "ak-a",
 			"secret_access_key": "sk-a",
 			"bucket_name":       "bucket-a",
-			"endpoint":          "s3.example.com",
+			"endpoint":          "127.0.0.1:18080",
 			"access_domain":     "https://bucket-a.s3.example.com",
 		},
 	})
@@ -308,7 +310,7 @@ func TestSaveAndApplyProfileClearsPreviousCurrentProfile(t *testing.T) {
 			"access_key_id":     "ak-b",
 			"secret_access_key": "sk-b",
 			"bucket_name":       "bucket-b",
-			"endpoint":          "s3.example.com",
+			"endpoint":          "127.0.0.1:18080",
 			"access_domain":     "https://bucket-b.s3.example.com",
 		},
 	})

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/tasks"
 )
@@ -22,6 +23,8 @@ func (l fixedAssetLocator) LocateStoredUpload(_ context.Context, lookup StoredUp
 }
 
 func TestRuntimeTaskMediaStoreResolvesAssetThroughOwningProfileAfterCurrentSwitch(t *testing.T) {
+	restore := outbound.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{hosts: []string{"127.0.0.1"}})
+	t.Cleanup(restore)
 	service, _ := newStorageServiceTest(t)
 	ctx := t.Context()
 	profile := func(id, domain string) *StorageProfile {
@@ -29,7 +32,7 @@ func TestRuntimeTaskMediaStoreResolvesAssetThroughOwningProfileAfterCurrentSwitc
 			ID: id, Name: id, Provider: StorageProviderS3Compatible, Enabled: true,
 			Config: map[string]interface{}{
 				"access_key_id": "ak", storageSecretAccessKeyName: "sk", "bucket_name": "bucket",
-				"endpoint": "s3.example.com", "region_id": "us-east-1", "access_domain": domain,
+				"endpoint": "127.0.0.1:18080", "region_id": "us-east-1", "access_domain": domain,
 			},
 		}
 	}
