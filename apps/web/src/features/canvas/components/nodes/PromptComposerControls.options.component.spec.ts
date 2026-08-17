@@ -35,7 +35,7 @@ describe('PromptComposerControls output options', () => {
     expect(view.emitted()['update:output-count']).toEqual([[4]])
   })
 
-  it('formats resolution options as radio menu items and preserves disabled triggers', async () => {
+  it('formats resolution options as radio menu items', async () => {
     const view = renderControls()
 
     await view.user.click(screen.getByRole('button', { name: '输出清晰度' }))
@@ -49,8 +49,9 @@ describe('PromptComposerControls output options', () => {
 
     await view.user.click(option)
     expect(view.emitted()['update:output-resolution']).toEqual([['2k']])
+  })
 
-    view.unmount()
+  it('disables output triggers with the composer', () => {
     renderControls(true)
     expect(screen.getByRole('button', { name: '输出张数' })).toBeDisabled()
     expect(screen.getByRole('button', { name: '输出清晰度' })).toBeDisabled()

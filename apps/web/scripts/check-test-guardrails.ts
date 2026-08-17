@@ -115,6 +115,12 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
         'Verifies the visual active/hidden state class that coordinates the strength control overlay.',
     },
   ],
+  'src/features/canvas/components/nodes/PromptComposerControls.options.component.spec.ts': [
+    {
+      reason:
+        'Verifies the stable count-picker style hooks preserved by the generic output option picker refactor.',
+    },
+  ],
   'src/features/canvas/image-editor/components/ImageEditorHistogramPlot.component.spec.ts': [
     {
       reason:
@@ -125,6 +131,12 @@ const componentClassAssertionExceptions: ExceptionMap<Exception> = {
     {
       reason:
         'Verifies SVG marker, guide-line, and numeric control visual classes for the levels editor.',
+    },
+  ],
+  'src/features/canvas/image-editor/components/ImageEditorSharpenControl.component.spec.ts': [
+    {
+      reason:
+        'Verifies the tonal track class contract that keeps the radius and threshold sliders visible.',
     },
   ],
   'src/features/canvas/image-editor/components/ImageEditorThresholdControl.component.spec.ts': [
