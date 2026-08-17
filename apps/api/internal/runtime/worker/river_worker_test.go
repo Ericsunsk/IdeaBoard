@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/tasking/taskqueue"
 	"ideaboard/api/internal/tasking/taskruntime"
 	"ideaboard/api/internal/tasking/tasks"
@@ -14,6 +15,13 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/rivertype"
 )
+
+func TestDrawingWorkerTimeoutOutlivesProviderRequestBudget(t *testing.T) {
+	providerBudget := time.Duration(accountlimits.MaxTimeoutSeconds) * time.Second
+	if defaultRiverJobTimeout <= providerBudget {
+		t.Fatalf("drawing worker timeout = %v, must outlive provider budget %v", defaultRiverJobTimeout, providerBudget)
+	}
+}
 
 func TestRiverWorkerNoCapacitySnoozesJob(t *testing.T) {
 	assigner := &fakeAssigner{assignStatus: taskqueue.AssignStatusNoCapacity}

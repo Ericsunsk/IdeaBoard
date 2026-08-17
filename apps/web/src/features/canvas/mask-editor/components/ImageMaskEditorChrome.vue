@@ -19,65 +19,14 @@
       >
         <Erase />
       </NodeToolIconButton>
-      <NodeToolIconButton
-        class="image-mask-editor-tool-btn"
-        disabled
-        aria-label-value="填充（待支持）"
-        tooltip="填充（待支持）"
-      >
-        <FillColor />
-      </NodeToolIconButton>
-      <NodeToolIconButton
-        class="image-mask-editor-tool-btn"
-        disabled
-        aria-label-value="魔棒（待支持）"
-        tooltip="魔棒（待支持）"
-      >
-        <CircleSpark />
-      </NodeToolIconButton>
-      <NodeToolIconButton
-        class="image-mask-editor-tool-btn"
-        disabled
-        aria-label-value="智能蒙版（待支持）"
-        tooltip="智能蒙版（待支持）"
-      >
-        <Sparks />
-      </NodeToolIconButton>
     </template>
     <template #dock>
       <div
         class="editing-controls-panel editing-controls-panel--padded image-mask-editor-right-panel"
       >
         <section class="editing-controls-section">
-          <div class="editing-controls-field image-mask-editor-field">
-            <span class="editing-controls-label image-mask-editor-field-label">笔刷</span>
-            <div class="editing-controls-segmented">
-              <button
-                type="button"
-                class="editing-controls-segmented-button node-tool-tooltip-trigger"
-                :class="{ 'is-active': brushShape === 'round' }"
-                :aria-pressed="brushShape === 'round'"
-                aria-label="圆形笔尖"
-                @click="emit('set-brush-shape', 'round')"
-              >
-                <Circle class="editing-controls-segmented-icon" />
-                <span class="node-tool-tooltip" aria-hidden="true">圆形笔尖</span>
-              </button>
-              <button
-                type="button"
-                class="editing-controls-segmented-button node-tool-tooltip-trigger"
-                :class="{ 'is-active': brushShape === 'square' }"
-                :aria-pressed="brushShape === 'square'"
-                aria-label="方形笔尖"
-                @click="emit('set-brush-shape', 'square')"
-              >
-                <Square class="editing-controls-segmented-icon" />
-                <span class="node-tool-tooltip" aria-hidden="true">方形笔尖</span>
-              </button>
-            </div>
-          </div>
           <label class="editing-controls-field image-mask-editor-field">
-            <span class="editing-controls-label image-mask-editor-field-label">粗细</span>
+            <span class="editing-controls-label image-mask-editor-field-label">笔刷大小</span>
             <div class="editing-controls-range-row">
               <div
                 class="editing-controls-range-wrap"
@@ -101,34 +50,6 @@
                   @input="onBrushSizeInput"
                 />
                 <span class="editing-controls-range-tooltip">{{ brushSize }}</span>
-              </div>
-            </div>
-          </label>
-          <label class="editing-controls-field image-mask-editor-field">
-            <span class="editing-controls-label image-mask-editor-field-label">硬度</span>
-            <div class="editing-controls-range-row">
-              <div
-                class="editing-controls-range-wrap"
-                :style="
-                  rangeTooltipStyle(
-                    brushHardness,
-                    MASK_EDITOR_MIN_BRUSH_HARDNESS,
-                    MASK_EDITOR_MAX_BRUSH_HARDNESS,
-                  )
-                "
-              >
-                <input
-                  id="mask-editor-brush-hardness"
-                  name="mask-brush-hardness"
-                  class="canvas-range-input"
-                  type="range"
-                  :min="MASK_EDITOR_MIN_BRUSH_HARDNESS"
-                  :max="MASK_EDITOR_MAX_BRUSH_HARDNESS"
-                  step="1"
-                  :value="brushHardness"
-                  @input="onBrushHardnessInput"
-                />
-                <span class="editing-controls-range-tooltip">{{ brushHardness }}</span>
               </div>
             </div>
           </label>
@@ -164,12 +85,8 @@
           </label>
         </section>
       </div>
-      <div
-        class="image-mask-editor-right-actions node-tool-surface"
-        :class="{ 'is-feather-strength-mode': featherStrengthVisible }"
-      >
+      <div class="image-mask-editor-right-actions node-tool-surface">
         <NodeToolIconButton
-          v-show="!featherStrengthVisible"
           class="image-mask-editor-tool-btn"
           aria-label-value="清空蒙版"
           tooltip="清空蒙版"
@@ -178,45 +95,6 @@
           <XmarkCircle />
         </NodeToolIconButton>
         <NodeToolIconButton
-          v-show="!featherStrengthVisible"
-          class="image-mask-editor-tool-btn"
-          aria-label-value="反选蒙版"
-          tooltip="反选蒙版"
-          @click="emit('invert-mask')"
-        >
-          <PlusSquareDashed />
-        </NodeToolIconButton>
-        <div class="image-mask-editor-feather-control">
-          <NodeToolIconButton
-            v-show="!featherStrengthVisible"
-            class="image-mask-editor-tool-btn"
-            aria-label-value="羽化边缘"
-            tooltip="羽化边缘"
-            @click="onFeatherButtonClick"
-          >
-            <CenterAlign />
-          </NodeToolIconButton>
-          <input
-            id="mask-editor-feather-strength"
-            :ref="setFeatherStrengthRangeRef"
-            name="mask-feather-strength"
-            class="image-mask-editor-feather-range canvas-range-input"
-            type="range"
-            :min="MASK_EDITOR_MIN_FEATHER_STRENGTH"
-            :max="MASK_EDITOR_MAX_FEATHER_STRENGTH"
-            step="1"
-            :value="featherStrength"
-            :tabindex="featherStrengthVisible ? 0 : -1"
-            aria-label="羽化强度"
-            @pointerdown.stop="onFeatherButtonPointerDown"
-            @input="onFeatherStrengthInput"
-            @change="onFeatherStrengthChange"
-            @pointerup="onFeatherStrengthPointerUp"
-            @click.stop="onFeatherButtonClick"
-          />
-        </div>
-        <NodeToolIconButton
-          v-show="!featherStrengthVisible"
           class="image-mask-editor-tool-btn"
           :disabled="!canUndo"
           aria-label-value="回退"
@@ -226,7 +104,6 @@
           <Undo />
         </NodeToolIconButton>
         <NodeToolIconButton
-          v-show="!featherStrengthVisible"
           class="image-mask-editor-tool-btn"
           :disabled="!canRedo"
           aria-label-value="前进"
@@ -245,6 +122,7 @@
         :output-count="1"
         :show-aspect-ratio="false"
         :show-output-count="false"
+        :show-output-resolution="false"
         :billing-state="billingQuote"
         @submit="onSubmit"
       />
@@ -254,35 +132,16 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { EditPencil, Erase, Redo, XmarkCircle, Undo } from '@iconoir/vue'
+import type { ImageMaskDrawMode } from '../types'
 import {
-  Circle,
-  CircleSpark,
-  EditPencil,
-  Erase,
-  FillColor,
-  CenterAlign,
-  PlusSquareDashed,
-  Redo,
-  XmarkCircle,
-  Sparks,
-  Square,
-  Undo,
-} from '@iconoir/vue'
-import type { ImageMaskBrushShape, ImageMaskDrawMode } from '../types'
-import {
-  clampMaskBrushHardness,
   clampMaskBrushSize,
   clampMaskLayerOpacity,
-  MASK_EDITOR_MAX_BRUSH_HARDNESS,
   MASK_EDITOR_MAX_BRUSH_SIZE,
-  MASK_EDITOR_MAX_FEATHER_STRENGTH,
   MASK_EDITOR_MAX_LAYER_OPACITY,
-  MASK_EDITOR_MIN_BRUSH_HARDNESS,
   MASK_EDITOR_MIN_BRUSH_SIZE,
-  MASK_EDITOR_MIN_FEATHER_STRENGTH,
   MASK_EDITOR_MIN_LAYER_OPACITY,
 } from '../config/maskEditorConstants'
-import { useMaskFeatherStrengthControl } from '../composables/useMaskFeatherStrengthControl'
 import ImageToolChromeFrame from '../../components/nodes/ImageToolChromeFrame.vue'
 import NodeToolIconButton from '../../components/nodes/NodeToolIconButton.vue'
 import PromptTextComposer from '../../components/nodes/PromptTextComposer.vue'
@@ -291,9 +150,7 @@ import { useCanvasBillingQuote } from '../../execution'
 
 defineProps<{
   drawMode: ImageMaskDrawMode
-  brushShape: ImageMaskBrushShape
   brushSize: number
-  brushHardness: number
   maskLayerOpacity: number
   directGenerating?: boolean
   canUndo?: boolean
@@ -308,13 +165,9 @@ defineProps<{
 
 const emit = defineEmits<{
   (e: 'set-draw-mode', mode: ImageMaskDrawMode): void
-  (e: 'set-brush-shape', value: ImageMaskBrushShape): void
   (e: 'set-brush-size', value: number): void
-  (e: 'set-brush-hardness', value: number): void
   (e: 'set-mask-layer-opacity', value: number): void
   (e: 'clear-mask'): void
-  (e: 'invert-mask'): void
-  (e: 'feather-mask', strength: number): void
   (e: 'undo-mask'): void
   (e: 'redo-mask'): void
   (e: 'submit', prompt: string): void
@@ -322,27 +175,10 @@ const emit = defineEmits<{
 
 const promptDraft = ref('')
 const billingQuote = useCanvasBillingQuote(() => WORKFLOW_FEATURE.partialEdit)
-const {
-  strength: featherStrength,
-  visible: featherStrengthVisible,
-  setRangeRef: setFeatherStrengthRangeRef,
-  onButtonPointerDown: onFeatherButtonPointerDown,
-  onButtonClick: onFeatherButtonClick,
-  onStrengthInput: onFeatherStrengthInput,
-  onStrengthChange: onFeatherStrengthChange,
-  onStrengthPointerUp: onFeatherStrengthPointerUp,
-} = useMaskFeatherStrengthControl({
-  onApply: (strength) => emit('feather-mask', strength),
-})
 
 function onBrushSizeInput(event: Event) {
   const target = event.target as HTMLInputElement | null
   emit('set-brush-size', clampMaskBrushSize(Number(target?.value)))
-}
-
-function onBrushHardnessInput(event: Event) {
-  const target = event.target as HTMLInputElement | null
-  emit('set-brush-hardness', clampMaskBrushHardness(Number(target?.value)))
 }
 
 function onMaskOpacityInput(event: Event) {
@@ -380,48 +216,13 @@ function onSubmit(prompt: string) {
 .image-mask-editor-right-actions {
   position: relative;
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: var(--node-tool-button-gap);
 }
 
-.image-mask-editor-right-actions .image-mask-editor-tool-btn,
-.image-mask-editor-feather-control {
+.image-mask-editor-right-actions .image-mask-editor-tool-btn {
   width: var(--node-tool-button-size);
   flex: 0 0 var(--node-tool-button-size);
-}
-
-.image-mask-editor-feather-control {
-  position: relative;
-  height: var(--node-tool-button-size);
-}
-
-.image-mask-editor-right-actions.is-feather-strength-mode {
-  width: 100%;
-  height: var(--node-tool-button-size);
-  gap: 0;
-}
-
-.image-mask-editor-feather-range {
-  --canvas-range-track-height: 6px;
-  --canvas-range-thumb-size: 14px;
-  --canvas-range-thumb-offset: -4px;
-  --canvas-range-fill-color: var(--canvas-accent-hover);
-  --canvas-range-track-background: var(--canvas-accent-outline);
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.image-mask-editor-right-actions.is-feather-strength-mode .image-mask-editor-feather-control {
-  flex: 1 1 100%;
-  width: 100%;
-}
-
-.image-mask-editor-right-actions.is-feather-strength-mode .image-mask-editor-feather-range {
-  position: relative;
-  opacity: 1;
 }
 
 .image-mask-editor-composer {

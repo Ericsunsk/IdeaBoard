@@ -115,6 +115,23 @@ describe('PromptComposerControls billing contract', () => {
     expect(textarea).toHaveValue('保留这段提示词\n第二行')
   })
 
+  it('can hide output resolution without affecting the other composer actions', () => {
+    render(PromptComposerControls, {
+      props: {
+        modelValue: '局部重绘',
+        outputCount: 1,
+        placeholder: '输入提示词',
+        textareaClass: 'prompt-input',
+        actionsClass: 'prompt-actions',
+        sendButtonClass: 'prompt-send',
+        showOutputResolution: false,
+      },
+    })
+
+    expect(screen.queryByRole('button', { name: '输出清晰度' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '发送' })).toBeEnabled()
+  })
+
   it('keeps Enter as a newline and submits only from the send button', async () => {
     const onSubmit = vi.fn()
     const { user } = renderWithUser(PromptComposerControls, {

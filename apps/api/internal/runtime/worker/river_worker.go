@@ -11,6 +11,7 @@ import (
 
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/events"
+	"ideaboard/api/internal/platform/accountlimits"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/taskqueue"
@@ -48,7 +49,7 @@ const (
 	finalFailureExecutionOutputKind = "task_final_attempt_started"
 	defaultFinalFailureRetryDelay   = 5 * time.Second
 	defaultNoCapacityRetryDelay     = 5 * time.Second
-	defaultRiverJobTimeout          = 3 * time.Minute
+	defaultRiverJobTimeout          = time.Duration(accountlimits.MaxTimeoutSeconds)*time.Second + 2*time.Minute
 	finalFailureConvergeTimeout     = 15 * time.Second
 	riverSchemaLookupTimeout        = 5 * time.Second
 )

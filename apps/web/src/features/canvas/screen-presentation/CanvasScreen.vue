@@ -38,7 +38,7 @@
     >
       <VueFlow
         :nodes="nodes"
-        :edges="edges"
+        :edges="renderEdges"
         v-bind="vueFlowProps"
         @nodes-change="onNodesChange"
         @edges-change="vueFlowSelectionBindings.onEdgesChange"
@@ -170,7 +170,7 @@ const workspace = useCanvasWorkspaceRuntime({
 const viewModel = workspace.viewModel
 const commands = workspace.commands
 
-const { nodes, edges } = viewModel.flowPane
+const { nodes, renderEdges } = viewModel.flowPane
 const { connectionAdapter } = commands.flowPane
 const connectionDropTargetNodeId = ref<string | null>(null)
 const connectionDropLifecycle = createCanvasConnectionDropLifecycle({

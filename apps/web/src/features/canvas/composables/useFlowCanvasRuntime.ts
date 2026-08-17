@@ -1,4 +1,4 @@
-import { onScopeDispose, ref, shallowRef, watch, type Ref } from 'vue'
+import { computed, onScopeDispose, ref, shallowRef, type Ref } from 'vue'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import { useFlowHistory, type FlowHistorySnapshot } from './useFlowHistory'
 import {
@@ -48,6 +48,15 @@ type FlowGraphCommitOptions = {
   source: 'hydrate-replace' | 'save-reconcile'
 }
 
+function createFlowEdgeEndpointKey(edge: Edge): string {
+  return JSON.stringify([
+    edge.source,
+    edge.sourceHandle ?? null,
+    edge.target,
+    edge.targetHandle ?? null,
+  ])
+}
+
 export type UseFlowCanvasRuntimeOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
@@ -72,7 +81,14 @@ export type UseFlowCanvasRuntimeOptions = {
 export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   const localEditVersion = ref(0)
   const executionSnapshot = shallowRef(options.executionCore.snapshot())
-  onScopeDispose(options.executionCore.subscribe((snapshot) => (executionSnapshot.value = snapshot)))
+  const projectEdgesForRendering = (edges: Edge[]) =>
+    projectPendingImageExecutionEdges(edges, executionSnapshot.value).edges
+  const renderEdges = computed(() => projectEdgesForRendering(options.edges.value))
+  const unsubscribeExecutionSnapshot = options.executionCore.subscribe((snapshot) => {
+    executionSnapshot.value = snapshot
+    options.vueFlowGraphActions?.setEdges?.(renderEdges.value)
+  })
+  onScopeDispose(unsubscribeExecutionSnapshot)
   const isNodeExecutionActive = (nodeId: string) =>
     options.executionCore.captureActiveLeases([nodeId as `image-${number}`]).length > 0
   const releaseNodeExecutions = (leases: readonly PendingImageExecutionLease[]) => {
@@ -152,6 +168,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     nodes: options.nodes,
     edges: options.edges,
     actions: options.vueFlowGraphActions,
+    projectEdgesForActions: projectEdgesForRendering,
     beforeCommand: captureGraphCommandHistory,
     afterCommand: commitGraphCommandSideEffects,
   })
@@ -159,6 +176,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   function rebaseSavedFlowProjection(savedGraph: { nodes: Node[]; edges: Edge[] }) {
     const savedNodesById = new Map(savedGraph.nodes.map((node) => [node.id, node] as const))
     const savedEdgesById = new Map(savedGraph.edges.map((edge) => [edge.id, edge] as const))
+    const savedEdgeEndpointKeys = new Set(savedGraph.edges.map(createFlowEdgeEndpointKey))
     return {
       nodes: [
         ...savedGraph.nodes,
@@ -170,14 +188,12 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
         ...savedGraph.edges,
         ...options.edges.value.filter(
           (edge) =>
-            !savedEdgesById.has(edge.id) && isNodeExecutionActive(edge.target),
+            !savedEdgesById.has(edge.id) &&
+            !savedEdgeEndpointKeys.has(createFlowEdgeEndpointKey(edge)) &&
+            isNodeExecutionActive(edge.target),
         ),
       ],
     }
-  }
-
-  function projectExecutionEdges(edges: Edge[]): Edge[] {
-    return projectPendingImageExecutionEdges(edges, executionSnapshot.value).edges
   }
 
   function hydratePendingExecutionLeases() {
@@ -206,7 +222,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       nodes:
         groupRuntime?.internal.projectCurrentGroupNodeLayers(semanticGraph.nodes) ??
         semanticGraph.nodes,
-      edges: projectExecutionEdges(semanticGraph.edges),
+      edges: semanticGraph.edges,
     }
     const resolvedGraph =
       commitOptions.source === 'save-reconcile'
@@ -221,16 +237,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       markDirty: false,
     })
   }
-
-  watch(
-    [options.edges, executionSnapshot],
-    () => {
-      const projectedEdges = projectExecutionEdges(options.edges.value)
-      if (projectedEdges === options.edges.value) return
-      graphAdapter.replaceEdges(projectedEdges, createRestoreGraphCommandOptions())
-    },
-    { flush: 'sync' },
-  )
 
   const flowHistory = useFlowHistory({
     nodes: options.nodes,
@@ -422,6 +428,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       history: flowHistory,
     },
     flowPane: {
+      renderEdges,
       onNodesChange,
       onEdgesChange,
       nodeDragTransactions: {

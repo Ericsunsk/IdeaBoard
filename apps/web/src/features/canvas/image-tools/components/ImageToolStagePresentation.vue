@@ -23,7 +23,6 @@
     :mask-layer-opacity="binding.session.maskChromeState.maskEditorLayerOpacity.value"
     :image-layer-visible="true"
     :brush-size="binding.session.maskEditor.brushSize.value"
-    :brush-shape="binding.session.maskEditor.brushShape.value"
     :set-canvas-ref="maskCanvasRefSetter"
     @canvas-pointerdown="binding.session.maskEditor.onCanvasPointerDown"
   />

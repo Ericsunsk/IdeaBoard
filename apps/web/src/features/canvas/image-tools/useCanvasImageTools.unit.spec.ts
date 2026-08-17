@@ -699,7 +699,6 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     try {
       expect(harness.runtime.commands.lifecycle.enter('image-1', 'inpaint')).toBe(true)
 
-      harness.runtime.commands.chrome.setMaskBrushShape('square')
       harness.runtime.commands.chrome.setMaskBrushSize(36)
       harness.runtime.commands.chrome.setMaskLayerOpacity(40)
 
@@ -708,10 +707,8 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       const actionBinding = harness.runtime.viewModel.nodeBindings.actionFor('image-1')
 
       expect(chromeModel.mode).toBe('inpaint')
-      expect(chromeModel.mask.brushShape).toBe('square')
       expect(chromeModel.mask.brushSize).toBe(36)
       expect(chromeModel.mask.layerOpacity).toBe(40)
-      expect(stageBinding.session.maskEditor.brushShape.value).toBe('square')
       expect(stageBinding.session.maskEditor.brushSize.value).toBe(36)
       expect(actionBinding.promptComposerVisible).toBe(true)
       expect('getCommittedMaskData' in harness.runtime).toBe(false)

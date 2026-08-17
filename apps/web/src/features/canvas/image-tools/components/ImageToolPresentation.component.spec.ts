@@ -11,12 +11,20 @@ import ImageToolPresentation from './ImageToolPresentation.vue'
 
 const MaskChromeStub = defineComponent({
   name: 'ImageMaskEditorChrome',
-  props: { brushSize: { type: Number, required: true } },
-  emits: ['set-brush-size'],
+  props: {
+    brushSize: { type: Number, required: true },
+    maskLayerOpacity: { type: Number, required: true },
+  },
+  emits: ['set-brush-size', 'set-mask-layer-opacity'],
   template: `
-    <button data-testid="mask-chrome" @click="$emit('set-brush-size', 48)">
-      Mask {{ brushSize }}
-    </button>
+    <div data-testid="mask-chrome">
+      <button data-testid="mask-brush-size" @click="$emit('set-brush-size', 48)">
+        Size {{ brushSize }}
+      </button>
+      <button data-testid="mask-opacity" @click="$emit('set-mask-layer-opacity', 60)">
+        Opacity {{ maskLayerOpacity }}
+      </button>
+    </div>
   `,
 })
 
@@ -34,13 +42,9 @@ const EditorChromeStub = defineComponent({
 function createChromeCommands(): ImageToolChromeCommands {
   return {
     setMaskDrawMode: vi.fn(),
-    setMaskBrushShape: vi.fn(),
     setMaskBrushSize: vi.fn(),
-    setMaskBrushHardness: vi.fn(),
     setMaskLayerOpacity: vi.fn(),
     clearMask: vi.fn(),
-    invertMask: vi.fn(),
-    featherMask: vi.fn(),
     undoMask: vi.fn(),
     redoMask: vi.fn(),
     submitMaskPrompt: vi.fn(),
@@ -69,9 +73,7 @@ function createChromeModel(overrides: Partial<ImageToolChromeModel> = {}): Image
     isReady: true,
     mask: {
       drawMode: 'paint',
-      brushShape: 'round',
       brushSize: 24,
-      brushHardness: 75,
       layerOpacity: 40,
       directGenerating: false,
       canUndo: false,
@@ -128,9 +130,12 @@ describe('ImageToolPresentation', () => {
   it('renders Mask chrome and dispatches its command through the Image Tool session', async () => {
     const view = renderPresentation(createChromeModel())
 
-    expect(screen.getByTestId('mask-chrome')).toHaveTextContent('Mask 24')
-    await screen.getByTestId('mask-chrome').click()
+    expect(screen.getByTestId('mask-brush-size')).toHaveTextContent('Size 24')
+    expect(screen.getByTestId('mask-opacity')).toHaveTextContent('Opacity 40')
+    await screen.getByTestId('mask-brush-size').click()
+    await screen.getByTestId('mask-opacity').click()
     expect(view.commands.setMaskBrushSize).toHaveBeenCalledWith(48)
+    expect(view.commands.setMaskLayerOpacity).toHaveBeenCalledWith(60)
   })
 
   it('renders Editor chrome and dispatches its command through the Image Tool session', async () => {

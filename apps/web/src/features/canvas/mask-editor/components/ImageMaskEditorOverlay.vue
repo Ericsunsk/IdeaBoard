@@ -16,8 +16,7 @@
       @pointercancel="hideBrushCursor"
       @pointerdown="onCanvasPointerDown"
     />
-    <component
-      :is="brushCursorComponent"
+    <Circle
       class="image-mask-editor-brush-cursor"
       :class="{ 'is-visible': brushCursorVisible }"
       :style="brushCursorStyle"
@@ -28,8 +27,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { Circle, Square } from '@iconoir/vue'
-import type { ImageMaskBrushShape } from '../types'
+import { Circle } from '@iconoir/vue'
 import { clampMaskBrushSize } from '../config/maskEditorConstants'
 
 const props = defineProps<{
@@ -38,7 +36,6 @@ const props = defineProps<{
   maskLayerOpacity: number
   imageLayerVisible: boolean
   brushSize: number
-  brushShape: ImageMaskBrushShape
   setCanvasRef: (element: Element | null) => void
 }>()
 
@@ -52,15 +49,9 @@ const brushCursorX = ref(0)
 const brushCursorY = ref(0)
 
 const ICONOIR_CIRCLE_PATH_DIAMETER_RATIO = 20 / 24
-const ICONOIR_SQUARE_PATH_DIAMETER_RATIO = 16 / 24
-const brushCursorComponent = computed(() => (props.brushShape === 'square' ? Square : Circle))
 const brushCursorDiameter = computed(() => {
   const brushSize = clampMaskBrushSize(props.brushSize)
-  const ratio =
-    props.brushShape === 'square'
-      ? ICONOIR_SQUARE_PATH_DIAMETER_RATIO
-      : ICONOIR_CIRCLE_PATH_DIAMETER_RATIO
-  return brushSize / ratio
+  return brushSize / ICONOIR_CIRCLE_PATH_DIAMETER_RATIO
 })
 const brushCursorStyle = computed(() => ({
   width: `${brushCursorDiameter.value}px`,

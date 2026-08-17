@@ -18,7 +18,11 @@ export function createCanvasWorkspaceRuntimeFacade(
         currentBoardName: board.boardChrome.currentBoardName,
         boardOptions: board.boardChrome.boardOptions,
       },
-      flowPane: { nodes: board.flowPane.nodes, edges: board.flowPane.edges },
+      flowPane: {
+        nodes: board.flowPane.nodes,
+        edges: board.flowPane.edges,
+        renderEdges: board.flowPane.renderEdges,
+      },
       persistence: { history: persistence.history },
       viewportControls: { zoomLevel: viewport.zoomLevel },
       graphEditing: graph.viewModel,

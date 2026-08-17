@@ -55,6 +55,7 @@ export type CanvasWorkspaceRuntimeViewModel = {
   flowPane: {
     nodes: Ref<Node[]>
     edges: Ref<Edge[]>
+    renderEdges: ComputedRef<Edge[]>
   }
   persistence: {
     history: CanvasWorkspaceHistory

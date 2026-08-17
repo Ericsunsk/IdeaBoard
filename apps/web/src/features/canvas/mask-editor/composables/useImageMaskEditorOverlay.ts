@@ -2,7 +2,6 @@ import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import { usePointerDragSession } from '../../composables/usePointerDragSession'
 import { MASK_EDITOR_INTERACTION_KEY } from '../types'
 import type {
-  ImageMaskBrushShape,
   ImageMaskDrawMode,
   ImageMaskEditorCommittedData,
   MaskEditorInteractionKey,
@@ -10,8 +9,6 @@ import type {
 import {
   buildMaskCommitResult,
   drawMaskRasterPreviewToCanvas,
-  featherMaskPreviewCanvas,
-  invertMaskPreviewCanvas,
 } from '../lib/maskPaintingCanvas'
 import { drawMaskStrokeSegment } from '../lib/maskBrushEngine'
 import {
@@ -19,14 +16,9 @@ import {
   type MaskCanvasPointerProjection,
 } from '../lib/maskCanvasGeometry'
 import {
-  clampMaskBrushHardness,
   clampMaskBrushSize,
-  MASK_EDITOR_DEFAULT_BRUSH_HARDNESS,
   MASK_EDITOR_DEFAULT_BRUSH_SIZE,
-  MASK_EDITOR_DEFAULT_FEATHER_STRENGTH,
   MASK_EDITOR_HISTORY_LIMIT,
-  normalizeMaskBrushShape,
-  resolveMaskFeatherRadius,
 } from '../config/maskEditorConstants'
 import type { ImageEditorImageRect } from '../../image-editor'
 
@@ -51,8 +43,6 @@ type UseImageMaskEditorOverlayOptions = {
 export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOptions) {
   const drawMode = ref<ImageMaskDrawMode>('paint')
   const brushSize = ref(MASK_EDITOR_DEFAULT_BRUSH_SIZE)
-  const brushHardness = ref(MASK_EDITOR_DEFAULT_BRUSH_HARDNESS)
-  const brushShape = ref<ImageMaskBrushShape>('round')
   const canUndoMask = ref(false)
   const canRedoMask = ref(false)
   const canvasRefs = new Map<string, HTMLCanvasElement>()
@@ -243,8 +233,6 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     drawMaskStrokeSegment(
       {
         brushSize: brushSize.value,
-        brushHardness: brushHardness.value,
-        brushShape: brushShape.value,
         drawMode: drawMode.value,
       },
       paintingCanvas,
@@ -280,8 +268,6 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     drawMaskStrokeSegment(
       {
         brushSize: brushSize.value,
-        brushHardness: brushHardness.value,
-        brushShape: brushShape.value,
         drawMode: drawMode.value,
       },
       canvas,
@@ -312,30 +298,6 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     if (!canvas || !ctx) return
     const before = captureMaskHistoryEntry(canvas)
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-    commitUndoHistoryIfChanged(nodeId, before, canvas)
-  }
-
-  function invertMask() {
-    const nodeId = maskEditorNodeId.value
-    if (!nodeId) return
-    const canvas = canvasRefs.get(nodeId)
-    if (!canvas) return
-    const before = captureMaskHistoryEntry(canvas)
-    invertMaskPreviewCanvas(canvas)
-    commitUndoHistoryIfChanged(nodeId, before, canvas)
-  }
-
-  function featherMask(strength = MASK_EDITOR_DEFAULT_FEATHER_STRENGTH) {
-    const nodeId = maskEditorNodeId.value
-    if (!nodeId) return
-    const canvas = canvasRefs.get(nodeId)
-    if (!canvas) return
-    const before = captureMaskHistoryEntry(canvas)
-    const changed = featherMaskPreviewCanvas(canvas, resolveMaskFeatherRadius(strength))
-    if (!changed) {
-      updateHistoryAvailability(nodeId)
-      return
-    }
     commitUndoHistoryIfChanged(nodeId, before, canvas)
   }
 
@@ -394,14 +356,6 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     brushSize.value = clampMaskBrushSize(value)
   }
 
-  function updateBrushHardness(value: number) {
-    brushHardness.value = clampMaskBrushHardness(value)
-  }
-
-  function updateBrushShape(value: ImageMaskBrushShape) {
-    brushShape.value = normalizeMaskBrushShape(value)
-  }
-
   watch(maskEditorNodeId, (nodeId) => {
     stopPainting()
     if (!nodeId) {
@@ -425,15 +379,11 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     maskEditorOverlayStyle,
     drawMode,
     brushSize,
-    brushHardness,
-    brushShape,
     canUndoMask,
     canRedoMask,
     saveMaskDraft,
     commitMaskDraft,
     clearMask,
-    invertMask,
-    featherMask,
     undoMask,
     redoMask,
     clearCommittedMaskData,
@@ -443,8 +393,6 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
       drawMode.value = mode
     },
     setBrushSize: updateBrushSize,
-    setBrushHardness: updateBrushHardness,
-    setBrushShape: updateBrushShape,
     getCommittedMaskData,
   }
 }

@@ -9,6 +9,7 @@ import {
 } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import { recordCanvasInteractionCount } from '../utils/canvasInteractionMetrics'
+import { toCanvasSemanticEdges } from './canvasEdgeProjection'
 import type {
   CanvasVueFlowGraphCommandOptions,
   CanvasVueFlowGraphCommandResult,
@@ -119,7 +120,7 @@ export function createCanvasVueFlowNativeChangeAdapter(
     recordCanvasInteractionCount('nativeEdgeChangeCount', changes.length)
     const actionResult = options.actions?.applyEdgeChanges?.(changes)
     if (Array.isArray(actionResult)) {
-      options.syncEdges(actionResult as Edge[])
+      options.syncEdges(toCanvasSemanticEdges(actionResult as Edge[]))
       return
     }
     const nextEdges = applyVueFlowEdgeChanges(

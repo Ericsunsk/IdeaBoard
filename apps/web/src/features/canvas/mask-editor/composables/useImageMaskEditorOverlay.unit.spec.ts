@@ -51,18 +51,19 @@ function createMaskCanvas() {
     save: vi.fn(),
     restore: vi.fn(),
     beginPath: vi.fn(),
-    arc: vi.fn(),
-    fill: vi.fn(),
-    createRadialGradient: vi.fn(() => ({
-      addColorStop: vi.fn(),
-    })),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    stroke: vi.fn(),
     createImageData: vi.fn((width: number, height: number) => ({
       width,
       height,
       data: new Uint8ClampedArray(width * height * 4),
     })),
     globalCompositeOperation: 'source-over',
-    fillStyle: '',
+    strokeStyle: '',
+    lineCap: 'round',
+    lineJoin: 'round',
+    lineWidth: 0,
     canvas,
   } as unknown as CanvasRenderingContext2D
   vi.spyOn(canvas, 'getContext').mockReturnValue(ctx)

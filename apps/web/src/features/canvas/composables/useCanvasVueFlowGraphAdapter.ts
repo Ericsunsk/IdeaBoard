@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import { recordCanvasInteractionCount } from '../utils/canvasInteractionMetrics'
+import { toCanvasSemanticEdges } from './canvasEdgeProjection'
 import {
   createCanvasVueFlowNativeChangeAdapter,
   type CanvasVueFlowGraphActions,
@@ -33,6 +34,7 @@ export type UseCanvasVueFlowGraphAdapterOptions = CanvasVueFlowGraphCommandOptio
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   actions?: CanvasVueFlowGraphActions
+  projectEdgesForActions?: (edges: Edge[]) => Edge[]
 }
 
 type NodeInput = Node | Node[]
@@ -62,7 +64,7 @@ function toArray<T>(value: T | T[]): T[] {
 }
 
 function createGraph(nodes: Node[], edges: Edge[]): CanvasVueFlowGraph {
-  return { nodes, edges }
+  return { nodes, edges: toCanvasSemanticEdges(edges) }
 }
 
 function readNodeTargetId(target: NodeTarget): string {
@@ -74,6 +76,9 @@ function readEdgeTargetId(target: EdgeTarget): string {
 }
 
 export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapterOptions) {
+  const projectEdgesForActions = (edges: Edge[]) =>
+    options.projectEdgesForActions?.(edges) ?? edges
+
   function readGraph(): CanvasVueFlowGraph {
     return createGraph(options.nodes.value, options.edges.value)
   }
@@ -84,8 +89,9 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
   }
 
   function syncEdges(nextEdges: Edge[]) {
-    if (nextEdges !== options.edges.value) recordCanvasInteractionCount('edgeArrayReplacements')
-    options.edges.value = nextEdges
+    const semanticEdges = toCanvasSemanticEdges(nextEdges)
+    if (semanticEdges !== options.edges.value) recordCanvasInteractionCount('edgeArrayReplacements')
+    options.edges.value = semanticEdges
   }
 
   const commandRunner = createGraphCommandRunner({
@@ -107,17 +113,18 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
     nextGraph: CanvasVueFlowGraph,
     commandOptions?: CanvasVueFlowGraphCommandOptions,
   ): CanvasVueFlowGraphCommandResult {
+    const semanticGraph = createGraph(nextGraph.nodes, nextGraph.edges)
     return commandRunner.run({
       command: 'replaceGraph',
-      nextGraph,
+      nextGraph: semanticGraph,
       commit: () => {
-        if (nextGraph.nodes !== options.nodes.value) {
-          options.actions?.setNodes?.(nextGraph.nodes)
-          syncNodes(nextGraph.nodes)
+        if (semanticGraph.nodes !== options.nodes.value) {
+          options.actions?.setNodes?.(semanticGraph.nodes)
+          syncNodes(semanticGraph.nodes)
         }
-        if (nextGraph.edges !== options.edges.value) {
-          options.actions?.setEdges?.(nextGraph.edges)
-          syncEdges(nextGraph.edges)
+        if (semanticGraph.edges !== options.edges.value) {
+          options.actions?.setEdges?.(projectEdgesForActions(semanticGraph.edges))
+          syncEdges(semanticGraph.edges)
         }
       },
       commandOptions,
@@ -144,12 +151,12 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
     edgesOrResolver: Edge[] | ((edges: Edge[]) => Edge[]),
     commandOptions?: CanvasVueFlowGraphCommandOptions,
   ): CanvasVueFlowGraphCommandResult {
-    const nextEdges = resolveValue(edgesOrResolver, options.edges.value)
+    const nextEdges = toCanvasSemanticEdges(resolveValue(edgesOrResolver, options.edges.value))
     return commandRunner.run({
       command: 'replaceEdges',
       nextGraph: createGraph(options.nodes.value, nextEdges),
       commit: () => {
-        options.actions?.setEdges?.(nextEdges)
+        options.actions?.setEdges?.(projectEdgesForActions(nextEdges))
         syncEdges(nextEdges)
       },
       commandOptions,
@@ -180,7 +187,9 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
     edgesOrResolver: EdgeInputResolver,
     commandOptions?: CanvasVueFlowGraphCommandOptions,
   ): CanvasVueFlowGraphCommandResult {
-    const edgesToAdd = toArray(resolveValue(edgesOrResolver, options.edges.value))
+    const edgesToAdd = toCanvasSemanticEdges(
+      toArray(resolveValue(edgesOrResolver, options.edges.value)),
+    )
     if (edgesToAdd.length === 0) {
       return commandRunner.noOp('addEdges', commandOptions)
     }
@@ -189,7 +198,10 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
       command: 'addEdges',
       nextGraph: createGraph(options.nodes.value, nextEdges),
       commit: () => {
-        options.actions?.addEdges?.(edgesToAdd.length === 1 ? edgesToAdd[0] : edgesToAdd)
+        const projectedEdges = projectEdgesForActions(edgesToAdd)
+        options.actions?.addEdges?.(
+          projectedEdges.length === 1 ? projectedEdges[0] : projectedEdges,
+        )
         syncEdges(nextEdges)
       },
       commandOptions,

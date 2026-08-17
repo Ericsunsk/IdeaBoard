@@ -15,6 +15,35 @@ type MeasuredNode = Node & {
 }
 
 describe('useCanvasVueFlowGraphAdapter', () => {
+  it('keeps animated edge state out of the semantic graph on every write path', () => {
+    const nodes = shallowRef<Node[]>([])
+    const edges = shallowRef<Edge[]>([])
+    const setEdges = vi.fn()
+    const adapter = useCanvasVueFlowGraphAdapter({ nodes, edges, actions: { setEdges } })
+    const renderEdge: Edge = {
+      id: 'edge-1',
+      source: 'node-1',
+      target: 'image-1',
+      targetHandle: 'in:image',
+      animated: true,
+    }
+
+    adapter.replaceGraph({ nodes: [], edges: [renderEdge] })
+    expect(edges.value[0]).not.toHaveProperty('animated')
+    expect(setEdges).toHaveBeenLastCalledWith([expect.not.objectContaining({ animated: true })])
+
+    adapter.replaceEdges([renderEdge])
+    expect(edges.value[0]).not.toHaveProperty('animated')
+    expect(setEdges).toHaveBeenLastCalledWith([expect.not.objectContaining({ animated: true })])
+
+    adapter.addEdges({ ...renderEdge, id: 'edge-2' })
+    expect(edges.value).toEqual([
+      expect.objectContaining({ id: 'edge-1' }),
+      expect.objectContaining({ id: 'edge-2' }),
+    ])
+    expect(edges.value.every((edge) => !('animated' in edge))).toBe(true)
+  })
+
   it('runs a node command through Vue Flow actions and exposes hook results', () => {
     const nodes = shallowRef<Node[]>([{ id: 'node-1', position: { x: 0, y: 0 }, data: {} }])
     const edges = shallowRef<Edge[]>([])

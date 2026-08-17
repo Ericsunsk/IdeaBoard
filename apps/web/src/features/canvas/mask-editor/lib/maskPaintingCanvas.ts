@@ -1,6 +1,5 @@
 import {
   MASK_EDITOR_EMPTY_ALPHA_THRESHOLD,
-  MASK_EDITOR_DEFAULT_FEATHER_RADIUS,
   MASK_EDITOR_PAINT_RGB,
   MASK_EDITOR_PREVIEW_ALPHA,
 } from '../config/maskEditorConstants'
@@ -30,20 +29,6 @@ function maskColorToRgba(color: MaskRgbColor, alpha = 1) {
 function releaseTemporaryCanvas(canvas: HTMLCanvasElement) {
   canvas.width = 0
   canvas.height = 0
-}
-
-function copyCanvasToTemporaryCanvas(sourceCanvas: HTMLCanvasElement): HTMLCanvasElement | null {
-  const width = sourceCanvas.width
-  const height = sourceCanvas.height
-  if (!width || !height) return null
-  const copyCanvas = createMaskCanvas(width, height)
-  const copyCtx = copyCanvas.getContext('2d')
-  if (!copyCtx) {
-    releaseTemporaryCanvas(copyCanvas)
-    return null
-  }
-  copyCtx.drawImage(sourceCanvas, 0, 0, width, height)
-  return copyCanvas
 }
 
 function tintCurrentAlpha(
@@ -128,115 +113,6 @@ export function drawMaskRasterPreviewToCanvas(
   targetCtx.clearRect(0, 0, width, height)
   targetCtx.putImageData(imageData, 0, 0)
   releaseTemporaryCanvas(tempCanvas)
-}
-
-export function invertMaskPreviewCanvas(canvas: HTMLCanvasElement) {
-  const width = canvas.width
-  const height = canvas.height
-  if (!width || !height) return
-  const ctx = canvas.getContext('2d', { willReadFrequently: true })
-  if (!ctx) return
-  const sourceCanvas = copyCanvasToTemporaryCanvas(canvas)
-  if (!sourceCanvas) return
-
-  ctx.save()
-  ctx.clearRect(0, 0, width, height)
-  ctx.globalCompositeOperation = 'source-over'
-  ctx.fillStyle = maskColorToRgba(MASK_EDITOR_PAINT_RGB)
-  ctx.fillRect(0, 0, width, height)
-  ctx.globalCompositeOperation = 'destination-out'
-  ctx.drawImage(sourceCanvas, 0, 0, width, height)
-  ctx.restore()
-  releaseTemporaryCanvas(sourceCanvas)
-}
-
-function blurAlphaHorizontal(
-  source: Uint8ClampedArray,
-  target: Uint8ClampedArray,
-  width: number,
-  height: number,
-  radius: number,
-) {
-  const windowSize = radius * 2 + 1
-  for (let y = 0; y < height; y += 1) {
-    const rowOffset = y * width
-    let sum = 0
-    for (let k = -radius; k <= radius; k += 1) {
-      const x = Math.min(width - 1, Math.max(0, k))
-      sum += source[rowOffset + x]
-    }
-    for (let x = 0; x < width; x += 1) {
-      target[rowOffset + x] = Math.round(sum / windowSize)
-      const removeX = Math.max(0, x - radius)
-      const addX = Math.min(width - 1, x + radius + 1)
-      sum += source[rowOffset + addX] - source[rowOffset + removeX]
-    }
-  }
-}
-
-function blurAlphaVertical(
-  source: Uint8ClampedArray,
-  target: Uint8ClampedArray,
-  width: number,
-  height: number,
-  radius: number,
-) {
-  const windowSize = radius * 2 + 1
-  for (let x = 0; x < width; x += 1) {
-    let sum = 0
-    for (let k = -radius; k <= radius; k += 1) {
-      const y = Math.min(height - 1, Math.max(0, k))
-      sum += source[y * width + x]
-    }
-    for (let y = 0; y < height; y += 1) {
-      target[y * width + x] = Math.round(sum / windowSize)
-      const removeY = Math.max(0, y - radius)
-      const addY = Math.min(height - 1, y + radius + 1)
-      sum += source[addY * width + x] - source[removeY * width + x]
-    }
-  }
-}
-
-export function featherMaskPreviewCanvas(
-  canvas: HTMLCanvasElement,
-  radius = MASK_EDITOR_DEFAULT_FEATHER_RADIUS,
-): boolean {
-  const width = canvas.width
-  const height = canvas.height
-  if (!width || !height) return false
-  const ctx = canvas.getContext('2d', { willReadFrequently: true })
-  if (!ctx) return false
-  const blurRadius = Math.floor(radius)
-  if (blurRadius <= 0) return false
-  const imageData = ctx.getImageData(0, 0, width, height)
-  const source = imageData.data
-  const total = width * height
-  const alphaSource = new Uint8ClampedArray(total)
-  let hasMask = false
-  for (let i = 0; i < total; i += 1) {
-    const alpha = source[i * 4 + 3]
-    alphaSource[i] = alpha
-    if (alpha > 0) hasMask = true
-  }
-  if (!hasMask) return false
-
-  const alphaTemp = new Uint8ClampedArray(total)
-  const alphaBlurred = new Uint8ClampedArray(total)
-  blurAlphaHorizontal(alphaSource, alphaTemp, width, height, blurRadius)
-  blurAlphaVertical(alphaTemp, alphaBlurred, width, height, blurRadius)
-
-  let changed = false
-  const blurredImageData = ctx.createImageData(width, height)
-  for (let i = 0; i < total; i += 1) {
-    const base = i * 4
-    const nextAlpha = alphaBlurred[i]
-    if (alphaSource[i] !== nextAlpha) changed = true
-    blurredImageData.data[base + 3] = nextAlpha
-  }
-  if (!changed) return false
-  ctx.putImageData(blurredImageData, 0, 0)
-  tintCurrentAlpha(ctx, width, height, MASK_EDITOR_PAINT_RGB)
-  return true
 }
 
 function hasMaskPaint(data: Uint8ClampedArray): boolean {

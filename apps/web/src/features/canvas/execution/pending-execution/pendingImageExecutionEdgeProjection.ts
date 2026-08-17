@@ -1,5 +1,6 @@
 import type { Edge } from '@vue-flow/core'
 import type { PendingImageExecutionSnapshot } from './PendingImageExecutionCore'
+import { projectCanvasRenderEdges } from '../../composables/canvasEdgeProjection'
 
 export type PendingImageExecutionEdgeProjection = Readonly<{
   edges: Edge[]
@@ -20,13 +21,9 @@ export function projectPendingImageExecutionEdges(
       .filter((execution) => ACTIVE_STATUSES.has(execution.status))
       .map((execution) => execution.resultNodeId),
   )
-  let didChange = false
-  const projectedEdges = edges.map((edge) => {
-    if (edge.targetHandle !== 'in:image') return edge
-    const animated = activeNodeIds.has(edge.target as `image-${number}`)
-    if (edge.animated === animated) return edge
-    didChange = true
-    return { ...edge, animated }
-  })
+  const projectedEdges = projectCanvasRenderEdges(edges, (edge) =>
+    activeNodeIds.has(edge.target as `image-${number}`),
+  )
+  const didChange = projectedEdges !== edges
   return { edges: didChange ? projectedEdges : edges, didChange }
 }

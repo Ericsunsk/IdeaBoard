@@ -110,13 +110,9 @@ export function createImageToolCommands(session: ImageToolSession) {
 
   const chromeCommands: ImageToolChromeCommands = {
     setMaskDrawMode: session.maskEditor.setDrawMode,
-    setMaskBrushShape: session.maskEditor.setBrushShape,
     setMaskBrushSize: session.maskEditor.setBrushSize,
-    setMaskBrushHardness: session.maskEditor.setBrushHardness,
     setMaskLayerOpacity: session.maskChromeState.setMaskEditorLayerOpacity,
     clearMask: session.maskEditor.clearMask,
-    invertMask: session.maskEditor.invertMask,
-    featherMask: session.maskEditor.featherMask,
     undoMask: session.maskEditor.undoMask,
     redoMask: session.maskEditor.redoMask,
     submitMaskPrompt: maskChromeActions.onMaskEditorChromeSubmit,

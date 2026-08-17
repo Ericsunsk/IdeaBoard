@@ -18,6 +18,45 @@ type upstreamHTTPError struct {
 	retryAfter time.Duration
 }
 
+type providerInvocationOutcomeUnknownError struct {
+	err error
+}
+
+func (e *providerInvocationOutcomeUnknownError) Error() string {
+	if e == nil || e.err == nil {
+		return "provider invocation outcome is unknown"
+	}
+	return e.err.Error()
+}
+
+func (e *providerInvocationOutcomeUnknownError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.err
+}
+
+func markProviderInvocationOutcomeUnknown(err error) error {
+	if err == nil {
+		return nil
+	}
+	if _, ok := providerHTTPStatus(err); ok {
+		return err
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return &providerInvocationOutcomeUnknownError{err: err}
+	}
+	var operationErr *net.OpError
+	if errors.As(err, &operationErr) && operationErr.Op == "dial" {
+		return err
+	}
+	var networkErr net.Error
+	if errors.As(err, &networkErr) {
+		return &providerInvocationOutcomeUnknownError{err: err}
+	}
+	return err
+}
+
 func newUpstreamHTTPError(statusCode int, body string) error {
 	return &upstreamHTTPError{
 		statusCode: statusCode,
@@ -106,6 +145,10 @@ func shouldFailoverProviderError(err error) bool {
 		return false
 	}
 	if errors.Is(err, context.Canceled) {
+		return false
+	}
+	var outcomeUnknown *providerInvocationOutcomeUnknownError
+	if errors.As(err, &outcomeUnknown) {
 		return false
 	}
 	if _, category, ok := executionFailureDetails(err); ok {

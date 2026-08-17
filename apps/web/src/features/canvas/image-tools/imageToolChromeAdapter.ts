@@ -38,9 +38,7 @@ export function createImageToolChromeAdapter(
       isReady: session.coordinates.isImageEditorChromeReady.value,
       mask: {
         drawMode: session.maskEditor.drawMode.value,
-        brushShape: session.maskEditor.brushShape.value,
         brushSize: session.maskEditor.brushSize.value,
-        brushHardness: session.maskEditor.brushHardness.value,
         layerOpacity: session.maskChromeState.maskEditorLayerOpacity.value,
         directGenerating: nodeId ? execution.isNodeExecutionActive(nodeId) : false,
         canUndo: session.maskEditor.canUndoMask.value,

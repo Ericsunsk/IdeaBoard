@@ -36,6 +36,7 @@ const (
 	maxProviderRawOutputStringLen  = 300
 	maxProviderRawOutputDepth      = 4
 	maxProviderRawOutputArrayItems = 5
+	minimumFluxFillTimeout         = 5 * time.Minute
 )
 
 const (
@@ -439,7 +440,7 @@ func (c *ProviderExecutor) resolveProviderExecution(ctx context.Context, account
 			routeErr,
 		)
 	}
-	timeout := resolveRuntimeAccountTimeout(account)
+	timeout := resolveProviderTimeout(account, adapter)
 	resolvedModel := strings.TrimSpace(assignment.ResolvedModel)
 	modelRequired := plan.RoutingRequirement().ModelRequirement() == workflow.RoutingModelRequired
 	if modelRequired && resolvedModel == "" {
@@ -720,4 +721,12 @@ func resolveRuntimeAccountTimeout(account *accounts.RuntimeAccountAccess) time.D
 	}
 	timeoutSeconds := accountlimits.NormalizeTimeoutSeconds(account.Timeout)
 	return time.Duration(timeoutSeconds) * time.Second
+}
+
+func resolveProviderTimeout(account *accounts.RuntimeAccountAccess, adapter providerRuntimeAdapter) time.Duration {
+	timeout := resolveRuntimeAccountTimeout(account)
+	if adapter == providerRuntimeAdapterFluxFill && timeout < minimumFluxFillTimeout {
+		return minimumFluxFillTimeout
+	}
+	return timeout
 }

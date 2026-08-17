@@ -3,8 +3,6 @@ import { MASK_EDITOR_PAINT_RGB, MASK_EDITOR_PREVIEW_ALPHA } from '../config/mask
 import {
   buildMaskCommitResult,
   drawMaskRasterPreviewToCanvas,
-  featherMaskPreviewCanvas,
-  invertMaskPreviewCanvas,
 } from './maskPaintingCanvas'
 
 type PixelSnapshot = {
@@ -165,48 +163,6 @@ afterEach(() => {
 })
 
 describe('maskPaintingCanvas', () => {
-  it('inverts mask alpha with Canvas 2D compositing and keeps paint color on visible pixels', () => {
-    const canvas = createFixtureCanvas(3, 1, [12, 34, 56, 0, 12, 34, 56, 128, 12, 34, 56, 255])
-
-    invertMaskPreviewCanvas(canvas)
-
-    expect(readPixels(canvas)).toEqual([
-      MASK_EDITOR_PAINT_RGB.r,
-      MASK_EDITOR_PAINT_RGB.g,
-      MASK_EDITOR_PAINT_RGB.b,
-      255,
-      MASK_EDITOR_PAINT_RGB.r,
-      MASK_EDITOR_PAINT_RGB.g,
-      MASK_EDITOR_PAINT_RGB.b,
-      127,
-      MASK_EDITOR_PAINT_RGB.r,
-      MASK_EDITOR_PAINT_RGB.g,
-      MASK_EDITOR_PAINT_RGB.b,
-      0,
-    ])
-  })
-
-  it('feathers mask alpha and tints the blurred output through source-in compositing', () => {
-    const canvas = createFixtureCanvas(3, 1, [0, 0, 0, 0, 12, 34, 56, 255, 0, 0, 0, 0])
-
-    expect(featherMaskPreviewCanvas(canvas, 1)).toBe(true)
-
-    expect(readPixels(canvas)).toEqual([
-      MASK_EDITOR_PAINT_RGB.r,
-      MASK_EDITOR_PAINT_RGB.g,
-      MASK_EDITOR_PAINT_RGB.b,
-      85,
-      MASK_EDITOR_PAINT_RGB.r,
-      MASK_EDITOR_PAINT_RGB.g,
-      MASK_EDITOR_PAINT_RGB.b,
-      85,
-      MASK_EDITOR_PAINT_RGB.r,
-      MASK_EDITOR_PAINT_RGB.g,
-      MASK_EDITOR_PAINT_RGB.b,
-      85,
-    ])
-  })
-
   it('encodes execution masks as opaque grayscale where white redraws and black preserves', () => {
     const canvas = createFixtureCanvas(3, 1, [10, 20, 30, 0, 10, 20, 30, 128, 10, 20, 30, 255])
 

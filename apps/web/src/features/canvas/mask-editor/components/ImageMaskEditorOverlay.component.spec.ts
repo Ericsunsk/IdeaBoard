@@ -6,7 +6,6 @@ function renderOverlay() {
   const setCanvasRef = vi.fn()
   const result = render(ImageMaskEditorOverlay, {
     props: {
-      brushShape: 'round',
       brushSize: 40,
       canvasHeight: 100,
       canvasWidth: 200,

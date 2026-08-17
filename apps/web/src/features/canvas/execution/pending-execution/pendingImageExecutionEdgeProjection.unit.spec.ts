@@ -18,5 +18,13 @@ describe('projectPendingImageExecutionEdges', () => {
     expect(result).toMatchObject({ didChange: true })
     expect(result.edges[0]).toMatchObject({ animated: true })
     expect(result.edges[1]).not.toHaveProperty('animated')
+
+    const completed = projectPendingImageExecutionEdges(result.edges, {
+      version: 2,
+      attachment: { boardId: 'board-a', epoch: 1 },
+      executions: [{ resultNodeId: 'image-2', status: 'succeeded', taskId: 'task-1' }],
+    })
+
+    expect(completed.edges[0]).toMatchObject({ animated: false })
   })
 })

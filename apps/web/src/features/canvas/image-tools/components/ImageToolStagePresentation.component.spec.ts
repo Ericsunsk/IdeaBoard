@@ -87,7 +87,6 @@ function createBinding(
             () => options.maskOverlayStyle ?? { width: '20.2px', height: '10.6px' },
           ),
           brushSize: ref(20),
-          brushShape: ref('round'),
           setMaskCanvasRef,
           onCanvasPointerDown,
         },

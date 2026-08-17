@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -176,5 +177,76 @@ func TestCallFluxFillNetworkErrorIsRetryable(t *testing.T) {
 	}
 	if !shouldFailoverProviderError(err) {
 		t.Fatalf("network error must be retryable: %v", err)
+	}
+}
+
+func TestFluxFillTimedOutInvocationIsNotRetried(t *testing.T) {
+	var requestCount atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount.Add(1)
+		time.Sleep(50 * time.Millisecond)
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write([]byte("inpainted"))
+	}))
+	defer server.Close()
+
+	executor := &ProviderExecutor{}
+	orchestrator := newProviderBatchOrchestrator(func(ctx context.Context, request providerRequest) (providerCallResult, error) {
+		return executor.callFluxFill(ctx, &accounts.ApiAccount{
+			ProxyURL: server.URL,
+		}, request, workflow.RuntimeOperationPartialEdit, 10*time.Millisecond)
+	})
+	orchestrator.wait = func(context.Context, time.Duration) error { return nil }
+
+	_, err := orchestrator.run(context.Background(), providerRequest{
+		SystemPrompt: "仅编辑蒙版区域",
+		ImageRefs:    []string{"https://media.ideaboard.art/source.png"},
+		MaskRefs:     []string{"https://media.ideaboard.art/mask.png"},
+		OutputCount:  1,
+	})
+	if err == nil {
+		t.Fatal("expected provider timeout")
+	}
+	if got := requestCount.Load(); got != 1 {
+		t.Fatalf("provider requests = %d, want 1 for an invocation with unknown outcome", got)
+	}
+	if shouldFailoverProviderError(err) {
+		t.Fatalf("timed out Flux Fill invocation must not be retried: %v", err)
+	}
+}
+
+func TestFluxFillFollowsModalResultRedirect(t *testing.T) {
+	var server *httptest.Server
+	var requestCount atomic.Int32
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount.Add(1)
+		if r.URL.Query().Get("modal-result") == "ready" {
+			if r.Method != http.MethodGet {
+				t.Fatalf("result request method = %s, want GET", r.Method)
+			}
+			w.Header().Set("Content-Type", "image/png")
+			_, _ = w.Write([]byte("inpainted"))
+			return
+		}
+		if r.Method != http.MethodPost {
+			t.Fatalf("initial request method = %s, want POST", r.Method)
+		}
+		http.Redirect(w, r, server.URL+"/inpaint?modal-result=ready", http.StatusSeeOther)
+	}))
+	defer server.Close()
+
+	executor := &ProviderExecutor{}
+	_, err := executor.callFluxFill(context.Background(), &accounts.ApiAccount{
+		ProxyURL: server.URL,
+	}, providerRequest{
+		SystemPrompt: "仅编辑蒙版区域",
+		ImageRefs:    []string{"https://media.ideaboard.art/source.png"},
+		MaskRefs:     []string{"https://media.ideaboard.art/mask.png"},
+	}, workflow.RuntimeOperationPartialEdit, time.Second)
+	if err != nil {
+		t.Fatalf("callFluxFill: %v", err)
+	}
+	if got := requestCount.Load(); got != 2 {
+		t.Fatalf("Modal redirect requests = %d, want 2", got)
 	}
 }

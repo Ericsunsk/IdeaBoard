@@ -12,7 +12,7 @@ import type {
 } from '../image-editor/types'
 import type { ImageAdjustmentFinalApplyProgress } from '../image-editor/runtime/imageAdjustmentFinalApplyContext'
 import type { ImageEditorRasterToolSettings } from '../image-editor/utils/imageEditorRasterTools'
-import type { ImageMaskBrushShape, ImageMaskDrawMode } from '../mask-editor/types'
+import type { ImageMaskDrawMode } from '../mask-editor/types'
 import type { ImageStrengthAction } from '../execution'
 import type { ImageToolSession } from './imageToolSession'
 
@@ -66,9 +66,7 @@ export type ImageToolChromeModel = {
   isReady: boolean
   mask: {
     drawMode: ImageMaskDrawMode
-    brushShape: ImageMaskBrushShape
     brushSize: number
-    brushHardness: number
     layerOpacity: number
     directGenerating: boolean
     canUndo: boolean
@@ -91,13 +89,9 @@ export type ImageToolChromeModel = {
 
 export type ImageToolChromeCommands = {
   setMaskDrawMode: (mode: ImageMaskDrawMode) => void
-  setMaskBrushShape: (shape: ImageMaskBrushShape) => void
   setMaskBrushSize: (size: number) => void
-  setMaskBrushHardness: (hardness: number) => void
   setMaskLayerOpacity: (opacity: number) => void
   clearMask: () => void
-  invertMask: () => void
-  featherMask: (strength?: number) => void
   undoMask: () => void
   redoMask: () => void
   submitMaskPrompt: (prompt: string) => void

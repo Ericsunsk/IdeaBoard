@@ -81,3 +81,14 @@ func TestResolveRuntimeAccountTimeout(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveProviderTimeoutGrantsFluxFillColdStartBudget(t *testing.T) {
+	account := &accounts.RuntimeAccountAccess{Timeout: 120}
+
+	if got := resolveProviderTimeout(account, providerRuntimeAdapterFluxFill); got != minimumFluxFillTimeout {
+		t.Fatalf("Flux Fill timeout = %v, want %v", got, minimumFluxFillTimeout)
+	}
+	if got := resolveProviderTimeout(account, providerRuntimeAdapterBackgroundRemoval); got != 120*time.Second {
+		t.Fatalf("background removal timeout = %v, want %v", got, 120*time.Second)
+	}
+}

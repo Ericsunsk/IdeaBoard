@@ -60,5 +60,6 @@ func (c *ProviderExecutor) callFluxFill(ctx context.Context, account *accounts.A
 		return providerCallResult{}, fmt.Errorf("图像填充不支持操作 %q", operation)
 	}
 	baseURL.Path = strings.TrimRight(baseURL.Path, "/") + route
-	return c.callImageURLJSONImage(ctx, &accounts.ApiAccount{ProxyURL: baseURL.String(), ApiKey: account.ApiKey}, payload, timeout, "图像填充")
+	result, err := c.callImageURLJSONImage(ctx, &accounts.ApiAccount{ProxyURL: baseURL.String(), ApiKey: account.ApiKey}, payload, timeout, "图像填充")
+	return result, markProviderInvocationOutcomeUnknown(err)
 }
