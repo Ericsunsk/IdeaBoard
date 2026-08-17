@@ -1,19 +1,5 @@
 <template>
   <ImageToolChromeFrame mode="adjust" :anchor-rect="anchorRect">
-    <template #tools>
-      <ImageEditorToolRail
-        :active-tool="activeTool"
-        :can-use-raster-tool="canUseRasterTool"
-        :applying-adjustments="applyingAdjustments"
-        :raster-tool-settings="rasterToolSettings"
-        :can-undo-raster-stroke="canUndoRasterStroke"
-        :can-redo-raster-stroke="canRedoRasterStroke"
-        @select-tool="emit('select-tool', $event)"
-        @update-raster-settings="emit('update-raster-settings', $event)"
-        @undo-raster-stroke="emit('undo-raster-stroke')"
-        @redo-raster-stroke="emit('redo-raster-stroke')"
-      />
-    </template>
     <template #dock>
       <ImageEditorAdjustmentActions
         :selected-kind="selectedAdjustmentLayer?.kind ?? null"
@@ -58,17 +44,14 @@ import type {
   ImageEditorLayer,
   ImageEditorParamKey,
   ImageEditorParamValue,
-  ImageEditorTool,
 } from '../types'
-import type { ImageEditorRasterToolSettings } from '../utils/imageEditorRasterTools'
 import ImageEditorAdjustmentActions from './ImageEditorAdjustmentActions.vue'
 import ImageToolChromeFrame from '../../components/nodes/ImageToolChromeFrame.vue'
 import ImageEditorLayerActions from './ImageEditorLayerActions.vue'
 import ImageEditorLayersPanel from './ImageEditorLayersPanel.vue'
 import ImageEditorPropertiesPanel from './ImageEditorPropertiesPanel.vue'
-import ImageEditorToolRail from './ImageEditorToolRail.vue'
 import { IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY } from '../runtime/imageAdjustmentFinalApplyContext'
-import { hasEffectiveImageEditorAdjustmentLayers } from '../utils/imageEditorLayerAdjustments'
+import { hasRenderableImageEditorLayerStack } from '../services/imageAdjustmentRenderer'
 
 const props = defineProps<{
   anchorRect: {
@@ -77,21 +60,14 @@ const props = defineProps<{
     width: number
     height: number
   }
-  activeTool: ImageEditorTool
   layers: ImageEditorLayer[]
   selectedLayerId: string
   selectedAdjustmentLayer: ImageEditorAdjustmentLayer | null
-  rasterToolSettings: ImageEditorRasterToolSettings
-  canUseRasterTool: boolean
-  canUndoRasterStroke: boolean
-  canRedoRasterStroke: boolean
-  hasRasterEdits: boolean
   histogramSource: ImageData | null
   applyingAdjustments: boolean
 }>()
 
 const emit = defineEmits<{
-  (e: 'select-tool', tool: ImageEditorTool): void
   (e: 'select-adjustment', kind: ImageAdjustmentKind): void
   (e: 'select-layer', layerId: string): void
   (e: 'set-layer-visible', layerId: string, visible: boolean): void
@@ -101,9 +77,6 @@ const emit = defineEmits<{
   (e: 'remove-layer', layerId: string): void
   (e: 'update-param', key: ImageEditorParamKey, value: ImageEditorParamValue): void
   (e: 'update-params', params: ImageEditorAdjustmentWholeParams): void
-  (e: 'update-raster-settings', patch: Partial<ImageEditorRasterToolSettings>): void
-  (e: 'undo-raster-stroke'): void
-  (e: 'redo-raster-stroke'): void
   (e: 'apply-adjustments'): void
 }>()
 
@@ -123,9 +96,7 @@ const canMergeSelectedLayer = computed(() => {
 const canRemoveSelectedLayer = computed(
   () => selectedLayer.value != null && selectedLayer.value.type !== 'source',
 )
-const canApplyAdjustments = computed(
-  () => props.hasRasterEdits || hasEffectiveImageEditorAdjustmentLayers(props.layers),
-)
+const canApplyAdjustments = computed(() => hasRenderableImageEditorLayerStack(props.layers))
 const imageAdjustmentFinalApplyContext = inject(IMAGE_ADJUSTMENT_FINAL_APPLY_CONTEXT_KEY, null)
 const imageAdjustmentFinalApplyProgress = computed(
   () => imageAdjustmentFinalApplyContext?.progress.value ?? null,

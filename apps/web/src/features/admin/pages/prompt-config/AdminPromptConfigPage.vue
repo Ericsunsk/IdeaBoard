@@ -1,5 +1,5 @@
 <template>
-  <AdminManagementFrame :content-class="promptPanelContentClass">
+  <AdminSurfaceFrame viewport-height scroll-content :content-class="promptPanelContentClass">
     <div
       v-if="loading && prompts.length === 0"
       class="flex min-h-[260px] items-center justify-center rounded-lg border border-admin-border-soft bg-admin-card text-admin-text-2"
@@ -62,7 +62,7 @@
     >
       <span class="text-admin-title font-semibold text-admin-title-color">未加载到节点配置</span>
     </div>
-  </AdminManagementFrame>
+  </AdminSurfaceFrame>
 
   <AdminDialogShell
     :visible="Boolean(activeGroup)"
@@ -191,7 +191,7 @@ import type { TagPassThroughOptions } from 'primevue/tag'
 import Textarea from 'primevue/textarea'
 import { useAdminPromptConfigFeedback } from '../../prompt-config/useAdminPromptConfigFeedback'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
-import AdminManagementFrame from '../../shared/components/AdminManagementFrame.vue'
+import AdminSurfaceFrame from '../../shared/components/AdminSurfaceFrame.vue'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
 import { adminPanelPt } from '../../shared/lib/adminPanelPt'
 import {

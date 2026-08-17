@@ -1,8 +1,5 @@
 export type ImageEditorMode = 'inpaint' | 'adjust'
 
-export type ImageEditorTool =
-  'move' | 'selection' | 'brush' | 'eraser' | 'eyedropper' | 'crop' | 'zoom'
-
 export type ImageAdjustmentKind = 'hsl' | 'threshold' | 'curves' | 'levels' | 'sharpen'
 
 export type ImageEditorParamValue = number

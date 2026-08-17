@@ -6,31 +6,22 @@ import type {
   ImageEditorLayer,
   ImageEditorParamKey,
   ImageEditorParamValue,
-  ImageEditorRasterContent,
-  ImageEditorTool,
 } from '../types'
 import {
   applyLayerCommand,
+  createDefaultImageAdjustmentLayer,
   createInitialLayerStack,
   getSelectedAdjustment,
+  SOURCE_LAYER_ID,
   type ImageEditorLayerCommand,
 } from '../utils/imageEditorLayerStack'
-import {
-  clampImageEditorRasterHardness,
-  clampImageEditorRasterOpacity,
-  clampImageEditorRasterSize,
-  createDefaultImageEditorRasterToolSettings,
-  IMAGE_EDITOR_RASTER_HISTORY_LIMIT,
-  normalizeImageEditorRasterColor,
-  type ImageEditorRasterToolSettings,
-} from '../utils/imageEditorRasterTools'
+import { getImageAdjustmentDefaultParams } from '../utils/imageAdjustmentDefinitions'
 
 export function useImageEditorSession() {
-  const activeTool = ref<ImageEditorTool>('move')
   const stack = ref(createInitialLayerStack())
-  const rasterToolSettings = ref(createDefaultImageEditorRasterToolSettings())
-  const rasterUndoStack = ref<ImageEditorLayer[][]>([])
-  const rasterRedoStack = ref<ImageEditorLayer[][]>([])
+  const pendingAdjustment = ref<ImageEditorAdjustmentLayer | null>(
+    createDefaultImageAdjustmentLayer('hsl'),
+  )
 
   const layers = computed<ImageEditorLayer[]>({
     get: () => stack.value.layers,
@@ -44,45 +35,51 @@ export function useImageEditorSession() {
       stack.value = { ...stack.value, selectedLayerId: nextSelectedLayerId }
     },
   })
-  const selectedAdjustmentLayer = computed<ImageEditorAdjustmentLayer | null>(() =>
-    getSelectedAdjustment(stack.value),
+  const selectedAdjustmentLayer = computed<ImageEditorAdjustmentLayer | null>(
+    () => getSelectedAdjustment(stack.value) ?? pendingAdjustment.value,
   )
-  const canUndoRasterStroke = computed(() => rasterUndoStack.value.length > 0)
-  const canRedoRasterStroke = computed(() => rasterRedoStack.value.length > 0)
-
   function applyCommand(command: ImageEditorLayerCommand) {
     stack.value = applyLayerCommand(stack.value, command)
   }
 
   function resetImageEditorSession() {
     stack.value = createInitialLayerStack()
-    activeTool.value = 'move'
-    rasterToolSettings.value = createDefaultImageEditorRasterToolSettings()
-    clearRasterHistory()
+    pendingAdjustment.value = createDefaultImageAdjustmentLayer('hsl')
   }
 
   function selectLayer(layerId: string) {
+    pendingAdjustment.value = null
     applyCommand({ type: 'select-layer', layerId })
   }
 
   function addLayer() {
+    pendingAdjustment.value = null
     applyCommand({ type: 'add-paint' })
   }
 
   function copyLayer() {
+    pendingAdjustment.value = null
     applyCommand({ type: 'copy-selected' })
   }
 
   function mergeLayer() {
+    pendingAdjustment.value = null
     applyCommand({ type: 'merge-selected-down' })
   }
 
-  function selectTool(tool: ImageEditorTool) {
-    activeTool.value = tool
-  }
-
   function selectAdjustmentLayer(kind: ImageAdjustmentKind) {
-    applyCommand({ type: 'ensure-adjustment', kind })
+    const existing = stack.value.layers.find(
+      (layer): layer is ImageEditorAdjustmentLayer =>
+        layer.type === 'adjustment' && layer.kind === kind,
+    )
+    if (existing) {
+      pendingAdjustment.value = null
+      applyCommand({ type: 'select-layer', layerId: existing.id })
+      return
+    }
+
+    pendingAdjustment.value = createDefaultImageAdjustmentLayer(kind)
+    stack.value = { ...stack.value, selectedLayerId: SOURCE_LAYER_ID }
   }
 
   function setLayerVisible(layerId: string, visible: boolean) {
@@ -90,103 +87,79 @@ export function useImageEditorSession() {
   }
 
   function removeLayer(layerId: string) {
+    pendingAdjustment.value = null
     applyCommand({ type: 'remove', layerId })
   }
 
   function updateSelectedLayerParam(key: ImageEditorParamKey, value: ImageEditorParamValue) {
+    if (pendingAdjustment.value?.kind === 'hsl') {
+      const params = { ...pendingAdjustment.value.params, [key]: value }
+      updatePendingAdjustment({ ...pendingAdjustment.value, params })
+      return
+    }
     applyCommand({ type: 'update-selected-param', key, value })
   }
 
   function updateSelectedAdjustmentParams(params: ImageEditorAdjustmentWholeParams) {
+    const pending = pendingAdjustment.value
+    if (pending && pending.kind !== 'hsl') {
+      const next = updatePendingWholeParams(pending, params)
+      if (next) updatePendingAdjustment(next)
+      return
+    }
     applyCommand({ type: 'update-selected-adjustment-params', params })
   }
 
-  function captureRasterHistorySnapshot(): ImageEditorLayer[] {
-    return cloneImageEditorLayers(stack.value.layers)
-  }
-
-  function commitRasterStroke(
-    layerId: string,
-    beforeLayers: readonly ImageEditorLayer[],
-    content: ImageEditorRasterContent,
-  ) {
-    const before = cloneImageEditorLayers(beforeLayers)
-    applyCommand({ type: 'update-raster-content', layerId, content })
-    const after = cloneImageEditorLayers(stack.value.layers)
-    if (createRasterHistorySignature(before) === createRasterHistorySignature(after)) return
-
-    rasterUndoStack.value = [...rasterUndoStack.value, before].slice(
-      -IMAGE_EDITOR_RASTER_HISTORY_LIMIT,
-    )
-    rasterRedoStack.value = []
-  }
-
-  function undoRasterStroke() {
-    const undoStack = rasterUndoStack.value.slice()
-    const previousLayers = undoStack.pop()
-    if (!previousLayers) return
-    rasterRedoStack.value = [
-      ...rasterRedoStack.value,
-      cloneImageEditorLayers(stack.value.layers),
-    ].slice(-IMAGE_EDITOR_RASTER_HISTORY_LIMIT)
-    rasterUndoStack.value = undoStack
-    stack.value = { ...stack.value, layers: cloneImageEditorLayers(previousLayers) }
-  }
-
-  function redoRasterStroke() {
-    const redoStack = rasterRedoStack.value.slice()
-    const nextLayers = redoStack.pop()
-    if (!nextLayers) return
-    rasterUndoStack.value = [
-      ...rasterUndoStack.value,
-      cloneImageEditorLayers(stack.value.layers),
-    ].slice(-IMAGE_EDITOR_RASTER_HISTORY_LIMIT)
-    rasterRedoStack.value = redoStack
-    stack.value = { ...stack.value, layers: cloneImageEditorLayers(nextLayers) }
-  }
-
-  function clearRasterHistory() {
-    rasterUndoStack.value = []
-    rasterRedoStack.value = []
-  }
-
-  function clearRasterEdits() {
-    stack.value = {
-      ...stack.value,
-      layers: clearRasterEditsFromLayers(stack.value.layers),
+  function updatePendingAdjustment(next: ImageEditorAdjustmentLayer) {
+    const defaults = getImageAdjustmentDefaultParams(next.kind)
+    if (JSON.stringify(next.params) === JSON.stringify(defaults)) {
+      pendingAdjustment.value = {
+        ...next,
+        params: structuredClone(defaults),
+      } as ImageEditorAdjustmentLayer
+      return
     }
-    clearRasterHistory()
+
+    const kind = next.kind
+    pendingAdjustment.value = null
+    applyCommand({ type: 'ensure-adjustment', kind })
+    if (kind === 'hsl') {
+      for (const [key, value] of Object.entries(next.params)) {
+        applyCommand({
+          type: 'update-selected-param',
+          key: key as ImageEditorParamKey,
+          value: value as ImageEditorParamValue,
+        })
+      }
+      return
+    }
+    applyCommand({ type: 'update-selected-adjustment-params', params: next.params })
   }
 
-  function updateRasterToolSettings(patch: Partial<ImageEditorRasterToolSettings>) {
-    rasterToolSettings.value = {
-      ...rasterToolSettings.value,
-      ...(patch.size == null ? {} : { size: clampImageEditorRasterSize(patch.size) }),
-      ...(patch.hardness == null
-        ? {}
-        : { hardness: clampImageEditorRasterHardness(patch.hardness) }),
-      ...(patch.brushOpacity == null
-        ? {}
-        : { brushOpacity: clampImageEditorRasterOpacity(patch.brushOpacity) }),
-      ...(patch.eraserOpacity == null
-        ? {}
-        : { eraserOpacity: clampImageEditorRasterOpacity(patch.eraserOpacity) }),
-      ...(patch.brushColor == null
-        ? {}
-        : { brushColor: normalizeImageEditorRasterColor(patch.brushColor) }),
+  function updatePendingWholeParams(
+    pending: Exclude<ImageEditorAdjustmentLayer, { kind: 'hsl' }>,
+    params: ImageEditorAdjustmentWholeParams,
+  ): ImageEditorAdjustmentLayer | null {
+    if (pending.kind === 'threshold' && 'threshold' in params && 'invert' in params) {
+      return { ...pending, params }
     }
+    if (pending.kind === 'curves' && 'channels' in params) {
+      return { ...pending, params }
+    }
+    if (pending.kind === 'levels' && 'shadows' in params) {
+      return { ...pending, params }
+    }
+    if (pending.kind === 'sharpen' && 'amount' in params) {
+      return { ...pending, params }
+    }
+    return null
   }
 
   return {
-    activeImageEditorTool: activeTool,
     imageEditorLayers: layers,
     selectedImageEditorLayerId: selectedLayerId,
     selectedImageEditorAdjustmentLayer: selectedAdjustmentLayer,
-    imageEditorRasterToolSettings: rasterToolSettings,
-    canUndoImageEditorRasterStroke: canUndoRasterStroke,
-    canRedoImageEditorRasterStroke: canRedoRasterStroke,
     resetImageEditorSession,
-    selectImageEditorTool: selectTool,
     selectImageEditorLayer: selectLayer,
     setImageEditorLayerVisible: setLayerVisible,
     addImageEditorLayer: addLayer,
@@ -196,52 +169,5 @@ export function useImageEditorSession() {
     updateSelectedImageEditorLayerParam: updateSelectedLayerParam,
     updateSelectedImageEditorAdjustmentParams: updateSelectedAdjustmentParams,
     selectImageAdjustmentLayer: selectAdjustmentLayer,
-    captureImageEditorRasterHistorySnapshot: captureRasterHistorySnapshot,
-    commitImageEditorRasterStroke: commitRasterStroke,
-    undoImageEditorRasterStroke: undoRasterStroke,
-    redoImageEditorRasterStroke: redoRasterStroke,
-    clearImageEditorRasterHistory: clearRasterHistory,
-    clearImageEditorRasterEdits: clearRasterEdits,
-    updateImageEditorRasterToolSettings: updateRasterToolSettings,
   }
-}
-
-function cloneImageEditorLayers(layers: readonly ImageEditorLayer[]): ImageEditorLayer[] {
-  return structuredClone(layers) as ImageEditorLayer[]
-}
-
-function createRasterHistorySignature(layers: readonly ImageEditorLayer[]): string {
-  return JSON.stringify(
-    layers.map((layer) => {
-      if (layer.type === 'source') {
-        return [layer.id, layer.type, layer.content ?? null]
-      }
-      if (layer.type === 'paint') {
-        return [layer.id, layer.type, layer.visible, layer.content]
-      }
-      if (layer.type === 'merged') {
-        return [layer.id, layer.type, layer.visible, createRasterHistorySignature(layer.children)]
-      }
-      return [layer.id, layer.type, layer.visible]
-    }),
-  )
-}
-
-function clearRasterEditsFromLayers(layers: readonly ImageEditorLayer[]): ImageEditorLayer[] {
-  return layers.map((layer) => {
-    if (layer.type === 'source') {
-      const { content: _content, ...rest } = layer
-      return rest
-    }
-    if (layer.type === 'paint') {
-      return { ...layer, content: { kind: 'empty' } }
-    }
-    if (layer.type === 'merged') {
-      return {
-        ...layer,
-        children: clearRasterEditsFromLayers(layer.children) as typeof layer.children,
-      }
-    }
-    return layer
-  })
 }

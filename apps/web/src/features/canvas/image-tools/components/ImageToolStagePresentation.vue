@@ -3,17 +3,6 @@
     <RenderedImagePreviewCanvas v-if="binding.renderedPreview" :preview="binding.renderedPreview" />
     <slot v-else />
   </div>
-  <ImageEditorRasterOverlay
-    v-if="isRasterOverlayVisible && rasterOverlayStyle"
-    :key="`raster:${binding.nodeId}`"
-    :style="rasterOverlayStyle"
-    :canvas-width="binding.session.imageEditorRasterOverlay.rasterCanvasWidth.value"
-    :canvas-height="binding.session.imageEditorRasterOverlay.rasterCanvasHeight.value"
-    :brush-size="binding.session.imageEditorRasterOverlay.rasterBrushSize.value"
-    :raster-tool-enabled="binding.session.imageEditorRasterOverlay.rasterToolEnabled.value"
-    :set-canvas-ref="rasterCanvasRefSetter"
-    @canvas-pointerdown="binding.session.imageEditorRasterOverlay.onRasterCanvasPointerDown"
-  />
   <ImageMaskEditorOverlay
     v-if="binding.mode === 'inpaint' && maskOverlayStyle"
     :key="`mask:${binding.nodeId}`"
@@ -31,7 +20,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, watch } from 'vue'
 import type { ImageToolStageBinding } from '../imageToolBindings'
-import { ImageEditorRasterOverlay } from '../../image-editor'
 import { ImageMaskEditorOverlay } from '../../mask-editor'
 import RenderedImagePreviewCanvas from '../../components/nodes/RenderedImagePreviewCanvas.vue'
 
@@ -41,26 +29,11 @@ const maskOverlayStyle = computed(() =>
     ? props.binding.session.maskEditor.maskEditorOverlayStyle.value
     : null,
 )
-const rasterOverlayStyle = computed(() =>
-  props.binding.mode === 'adjust'
-    ? props.binding.session.imageEditorRasterOverlay.rasterOverlayStyle.value
-    : null,
-)
-const isRasterOverlayVisible = computed(
-  () =>
-    props.binding.session.imageEditorRasterOverlay.hasRasterEdits.value ||
-    props.binding.session.imageEditorRasterOverlay.rasterTool.value != null,
-)
 const maskCanvasWidth = computed(() => readMaskCanvasSize(maskOverlayStyle.value, 'width'))
 const maskCanvasHeight = computed(() => readMaskCanvasSize(maskOverlayStyle.value, 'height'))
 const maskCanvasRefSetter = computed(() => {
   const { nodeId, session } = props.binding
   return (element: Element | null) => session.maskEditor.setMaskCanvasRef(nodeId, element)
-})
-const rasterCanvasRefSetter = computed(() => {
-  const { nodeId, session } = props.binding
-  return (element: Element | null) =>
-    session.imageEditorRasterOverlay.setRasterCanvasRef(nodeId, element)
 })
 
 watch(
@@ -85,7 +58,6 @@ onBeforeUnmount(() => {
 
 function releaseCanvasRefs(binding: ImageToolStageBinding) {
   binding.session.maskEditor.setMaskCanvasRef(binding.nodeId, null)
-  binding.session.imageEditorRasterOverlay.setRasterCanvasRef(binding.nodeId, null)
 }
 function readMaskCanvasSize(style: Record<string, string> | null, key: 'width' | 'height') {
   return Math.max(1, Math.round(parseFloat(style?.[key] ?? '') || 0))

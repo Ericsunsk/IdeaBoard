@@ -37,8 +37,11 @@ import Dialog from 'primevue/dialog'
 import { usePrimeDialogOverlayLifecycle } from '../../../../shared/composables/usePrimeDialogOverlayLifecycle'
 import { createAdminDialogPt } from '../lib/adminOverlayPt'
 import {
+  adminDialogContentClass,
+  adminDialogFooterClass,
   adminDialogFooterActionsClass,
   adminDialogFormBodyClass,
+  adminDialogHeaderClass,
   adminDialogScrollableBodyClass,
 } from '../lib/adminUiClasses'
 
@@ -93,6 +96,9 @@ const contentLayoutClasses: Record<AdminDialogContentLayout, string> = {
 const dialogPt = computed(() =>
   createAdminDialogPt({
     rootClass: dialogWidthClasses[props.size],
+    headerClass: adminDialogHeaderClass,
+    contentClass: adminDialogContentClass,
+    footerClass: adminDialogFooterClass,
   }),
 )
 const contentClass = computed(() => contentLayoutClasses[props.contentLayout])

@@ -25,7 +25,7 @@ import { clampLevelsHandles } from './imageEditorLevels'
 import { normalizeThresholdAdjustment } from './imageEditorThreshold'
 
 export const SOURCE_LAYER_ID = 'source'
-export const INITIAL_SELECTED_IMAGE_EDITOR_LAYER_ID = 'adjustment:hsl'
+export const INITIAL_SELECTED_IMAGE_EDITOR_LAYER_ID = SOURCE_LAYER_ID
 
 let imageEditorLayerIdSeed = 0
 
@@ -89,21 +89,18 @@ export type ImageEditorLayerCommand =
   | { type: 'remove'; layerId: string }
   | { type: 'update-selected-param'; key: ImageEditorParamKey; value: ImageEditorParamValue }
   | { type: 'update-selected-adjustment-params'; params: ImageEditorAdjustmentWholeParams }
-  | { type: 'update-raster-content'; layerId: string; content: ImageEditorRasterContent }
 
 export function createInitialLayerStack(): ImageEditorLayerStack {
   return {
-    layers: [
-      cloneAdjustmentLayer('hsl'),
-      {
-        id: SOURCE_LAYER_ID,
-        type: 'source',
-        name: '原图',
-        visible: true,
-      },
-    ],
+    layers: [{ id: SOURCE_LAYER_ID, type: 'source', name: '原图', visible: true }],
     selectedLayerId: INITIAL_SELECTED_IMAGE_EDITOR_LAYER_ID,
   }
+}
+
+export function createDefaultImageAdjustmentLayer<TKind extends ImageAdjustmentKind>(
+  kind: TKind,
+): ImageEditorLayerByKind<TKind> {
+  return cloneAdjustmentLayer(kind)
 }
 
 export function applyLayerCommand(
@@ -129,8 +126,6 @@ export function applyLayerCommand(
       return updateSelectedLayerParam(stack, command.key, command.value)
     case 'update-selected-adjustment-params':
       return updateSelectedAdjustmentParams(stack, command.params)
-    case 'update-raster-content':
-      return updateRasterLayerContent(stack, command.layerId, command.content)
   }
 }
 
@@ -276,17 +271,6 @@ function updateSelectedAdjustmentParams(
   }
 }
 
-function updateRasterLayerContent(
-  stack: ImageEditorLayerStack,
-  layerId: string,
-  content: ImageEditorRasterContent,
-): ImageEditorLayerStack {
-  return {
-    ...stack,
-    layers: stack.layers.map((layer) => updateRasterContentForLayer(layer, layerId, content)),
-  }
-}
-
 function resolveLayerInsertionIndex(stack: ImageEditorLayerStack) {
   const selectedIndex = stack.layers.findIndex((layer) => layer.id === stack.selectedLayerId)
   if (selectedIndex >= 0 && stack.layers[selectedIndex]?.type !== 'source') return selectedIndex
@@ -385,25 +369,6 @@ function cloneEditableLayer(
     name,
     params: cloneAdjustmentParams(layer.params),
   } as ImageEditorAdjustmentLayer
-}
-
-function updateRasterContentForLayer(
-  layer: ImageEditorLayer,
-  layerId: string,
-  content: ImageEditorRasterContent,
-): ImageEditorLayer {
-  if (layer.id === layerId) {
-    if (layer.type === 'source') return { ...layer, content: cloneRasterContent(content) }
-    if (layer.type === 'paint') return { ...layer, content: cloneRasterContent(content) }
-    return layer
-  }
-  if (layer.type !== 'merged') return layer
-  return {
-    ...layer,
-    children: layer.children.map(
-      (child) => updateRasterContentForLayer(child, layerId, content) as ImageEditorEditableLayer,
-    ),
-  }
 }
 
 function clonePaintContent(content: ImageEditorPaintLayer['content']) {

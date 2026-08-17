@@ -11,21 +11,21 @@ function joinOverlayClasses(...classes: OverlayClass[]) {
   return classes.filter(Boolean).join(' ')
 }
 
-export const adminOverlayMenuListClass = '!m-0 !p-1.5'
+const adminOverlayMenuListClass = '!m-0 !p-1.5'
 
 export const adminOverlayMenuRootClass =
   'min-w-[180px] overflow-hidden rounded-[var(--radius-ib-overlay)] border border-ib-border bg-ib-surface shadow-[var(--shadow-ib-overlay)]'
 
-export const adminOverlayMenuItemContentClass =
+const adminOverlayMenuItemContentClass =
   'rounded-[var(--radius-ib-control)] hover:!bg-ib-surface-hover'
 
-export const adminOverlayMenuItemLinkClass =
+const adminOverlayMenuItemLinkClass =
   '!px-3 !py-2.5 !text-admin-body !font-[650] !text-ib-text-muted hover:!text-ib-text'
 
-export const adminOverlayPopoverRootClass =
+const adminOverlayPopoverRootClass =
   '!rounded-[var(--radius-ib-overlay)] !border-ib-border !bg-ib-surface !shadow-none'
 
-export const adminOverlayPopoverContentClass =
+const adminOverlayPopoverContentClass =
   '!overflow-clip !rounded-[calc(var(--radius-ib-overlay)-1px)]'
 
 export const adminOverlayDialogRootClass =
@@ -65,6 +65,7 @@ export function createAdminDialogPt(input: {
   rootClass?: string
   headerClass?: string
   contentClass?: string
+  footerClass?: string
 }): DialogPassThroughOptions {
   return {
     ...createDialogMotionPt(),
@@ -72,5 +73,6 @@ export function createAdminDialogPt(input: {
     ...(input.rootClass ? { root: { class: input.rootClass } } : {}),
     ...(input.headerClass ? { header: { class: input.headerClass } } : {}),
     ...(input.contentClass ? { content: { class: input.contentClass } } : {}),
+    ...(input.footerClass ? { footer: { class: input.footerClass } } : {}),
   }
 }

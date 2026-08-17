@@ -3,30 +3,58 @@ import { useImageEditorSession } from './useImageEditorSession'
 import { flattenVisibleImageEditorAdjustmentLayers } from '../utils/imageEditorLayerAdjustments'
 
 describe('useImageEditorSession', () => {
-  it('keeps canvas tools independent from adjustment layer selection', () => {
+  it('keeps adjustment selection transient until a parameter changes', () => {
     const session = useImageEditorSession()
 
-    session.selectImageEditorTool('brush')
-
-    expect(session.activeImageEditorTool.value).toBe('brush')
     expect(session.selectedImageEditorAdjustmentLayer.value?.kind).toBe('hsl')
+    expect(session.imageEditorLayers.value.map((layer) => layer.id)).toEqual(['source'])
 
     session.selectImageAdjustmentLayer('threshold')
 
-    expect(session.activeImageEditorTool.value).toBe('brush')
     expect(session.selectedImageEditorAdjustmentLayer.value?.kind).toBe('threshold')
+    expect(session.imageEditorLayers.value).toHaveLength(1)
+
+    session.updateSelectedImageEditorAdjustmentParams({ threshold: 128, invert: false })
+    expect(session.imageEditorLayers.value).toHaveLength(1)
+
+    session.updateSelectedImageEditorAdjustmentParams({ threshold: 128, invert: true })
     expect(
       session.imageEditorLayers.value.some((layer) => layer.id === 'adjustment:threshold'),
     ).toBe(true)
   })
 
-  it('selects source layers without changing the active tool', () => {
+  it('does not leave a layer when switching tools without editing', () => {
     const session = useImageEditorSession()
 
-    session.selectImageEditorTool('eraser')
+    session.selectImageAdjustmentLayer('hsl')
+    session.updateSelectedImageEditorLayerParam('lightness', 0)
+    session.selectImageAdjustmentLayer('curves')
+    session.updateSelectedImageEditorAdjustmentParams({ channels: {} })
+    session.selectImageAdjustmentLayer('levels')
+    session.updateSelectedImageEditorAdjustmentParams({
+      shadows: 0,
+      midtones: 128,
+      highlights: 255,
+      outputBlack: 0,
+      outputWhite: 255,
+    })
+    session.selectImageAdjustmentLayer('sharpen')
+    session.updateSelectedImageEditorAdjustmentParams({
+      amount: 0,
+      radius: 1,
+      threshold: 4,
+      protectColor: true,
+    })
+
+    expect(session.imageEditorLayers.value.map((layer) => layer.id)).toEqual(['source'])
+    expect(session.selectedImageEditorAdjustmentLayer.value?.kind).toBe('sharpen')
+  })
+
+  it('selects source layers and clears the pending adjustment', () => {
+    const session = useImageEditorSession()
+
     session.selectImageEditorLayer('source')
 
-    expect(session.activeImageEditorTool.value).toBe('eraser')
     expect(session.selectedImageEditorAdjustmentLayer.value).toBeNull()
   })
 
@@ -36,8 +64,7 @@ describe('useImageEditorSession', () => {
     session.addImageEditorLayer()
     session.addImageEditorLayer()
 
-    const [secondPaintLayer, firstPaintLayer, hslLayer, sourceLayer] =
-      session.imageEditorLayers.value
+    const [secondPaintLayer, firstPaintLayer, sourceLayer] = session.imageEditorLayers.value
     expect(secondPaintLayer?.type).toBe('paint')
     expect(secondPaintLayer?.name).toBe('图层 2')
     expect(secondPaintLayer?.type === 'paint' ? secondPaintLayer.content : null).toEqual({
@@ -45,7 +72,6 @@ describe('useImageEditorSession', () => {
     })
     expect(firstPaintLayer?.type).toBe('paint')
     expect(firstPaintLayer?.name).toBe('图层 1')
-    expect(hslLayer?.type).toBe('adjustment')
     expect(sourceLayer?.type).toBe('source')
     expect(session.selectedImageEditorLayerId.value).toBe(secondPaintLayer?.id)
   })
@@ -56,10 +82,9 @@ describe('useImageEditorSession', () => {
     session.selectImageEditorLayer('source')
     session.addImageEditorLayer()
 
-    const [hslLayer, paintLayer, sourceLayer] = session.imageEditorLayers.value
+    const [paintLayer, sourceLayer] = session.imageEditorLayers.value
     expect(paintLayer?.type).toBe('paint')
     expect(paintLayer?.name).toBe('图层 1')
-    expect(hslLayer?.type).toBe('adjustment')
     expect(sourceLayer?.type).toBe('source')
     expect(session.selectedImageEditorLayerId.value).toBe(paintLayer?.id)
   })
@@ -67,6 +92,8 @@ describe('useImageEditorSession', () => {
   it('copies editable layers with unique ids and names', () => {
     const session = useImageEditorSession()
 
+    session.selectImageAdjustmentLayer('hsl')
+    session.updateSelectedImageEditorLayerParam('lightness', 10)
     session.copyImageEditorLayer()
 
     const [copyLayer, originalLayer] = session.imageEditorLayers.value
@@ -92,7 +119,10 @@ describe('useImageEditorSession', () => {
 
   it('merges the selected editable layer down and preserves visible adjustments', () => {
     const session = useImageEditorSession()
+    session.selectImageAdjustmentLayer('hsl')
+    session.updateSelectedImageEditorLayerParam('lightness', 10)
     session.selectImageAdjustmentLayer('threshold')
+    session.updateSelectedImageEditorAdjustmentParams({ threshold: 128, invert: true })
     session.selectImageAdjustmentLayer('hsl')
     session.mergeImageEditorLayer()
 
@@ -110,7 +140,9 @@ describe('useImageEditorSession', () => {
   it('removes selected editable layers and selects the nearest editable fallback', () => {
     const session = useImageEditorSession()
     session.selectImageAdjustmentLayer('threshold')
+    session.updateSelectedImageEditorAdjustmentParams({ threshold: 128, invert: true })
     session.selectImageAdjustmentLayer('hsl')
+    session.updateSelectedImageEditorLayerParam('lightness', 10)
 
     session.removeImageEditorLayer('adjustment:hsl')
 
@@ -129,10 +161,7 @@ describe('useImageEditorSession', () => {
     session.mergeImageEditorLayer()
     session.removeImageEditorLayer('source')
 
-    expect(session.imageEditorLayers.value.map((layer) => layer.id)).toEqual([
-      'adjustment:hsl',
-      'source',
-    ])
+    expect(session.imageEditorLayers.value.map((layer) => layer.id)).toEqual(['source'])
     expect(session.selectedImageEditorLayerId.value).toBe('source')
   })
 
@@ -207,6 +236,7 @@ describe('useImageEditorSession', () => {
   it('keeps simple adjustment params on the field-level API', () => {
     const session = useImageEditorSession()
 
+    session.selectImageAdjustmentLayer('hsl')
     session.updateSelectedImageEditorLayerParam('lightness', 25)
     expect(session.selectedImageEditorAdjustmentLayer.value).toMatchObject({
       kind: 'hsl',

@@ -30,11 +30,11 @@ const MaskChromeStub = defineComponent({
 
 const EditorChromeStub = defineComponent({
   name: 'ImageEditorChrome',
-  props: { activeTool: { type: String, required: true } },
-  emits: ['select-tool'],
+  props: { selectedLayerId: { type: String, required: true } },
+  emits: ['select-adjustment'],
   template: `
-    <button data-testid="editor-chrome" @click="$emit('select-tool', 'brush')">
-      Editor {{ activeTool }}
+    <button data-testid="editor-chrome" @click="$emit('select-adjustment', 'hsl')">
+      Editor {{ selectedLayerId }}
     </button>
   `,
 })
@@ -48,7 +48,6 @@ function createChromeCommands(): ImageToolChromeCommands {
     undoMask: vi.fn(),
     redoMask: vi.fn(),
     submitMaskPrompt: vi.fn(),
-    selectEditorTool: vi.fn(),
     selectAdjustmentLayer: vi.fn(),
     selectEditorLayer: vi.fn(),
     setEditorLayerVisible: vi.fn(),
@@ -58,9 +57,6 @@ function createChromeCommands(): ImageToolChromeCommands {
     removeEditorLayer: vi.fn(),
     updateEditorParam: vi.fn(),
     updateEditorAdjustmentParams: vi.fn(),
-    updateEditorRasterToolSettings: vi.fn(),
-    undoEditorRasterStroke: vi.fn(),
-    redoEditorRasterStroke: vi.fn(),
     applyAdjustments: vi.fn(async () => {}),
   }
 }
@@ -80,21 +76,9 @@ function createChromeModel(overrides: Partial<ImageToolChromeModel> = {}): Image
       canRedo: false,
     },
     editor: {
-      activeTool: 'move',
       layers: [],
       selectedLayerId: 'base',
       selectedAdjustmentLayer: null,
-      rasterToolSettings: {
-        size: 24,
-        hardness: 75,
-        brushOpacity: 100,
-        eraserOpacity: 100,
-        brushColor: '#000000',
-      },
-      canUseRasterTool: false,
-      canUndoRasterStroke: false,
-      canRedoRasterStroke: false,
-      hasRasterEdits: false,
       histogramSource: null,
       applyingAdjustments: false,
     },
@@ -141,9 +125,9 @@ describe('ImageToolPresentation', () => {
   it('renders Editor chrome and dispatches its command through the Image Tool session', async () => {
     const view = renderPresentation(createChromeModel({ mode: 'adjust' }))
 
-    expect(screen.getByTestId('editor-chrome')).toHaveTextContent('Editor move')
+    expect(screen.getByTestId('editor-chrome')).toHaveTextContent('Editor base')
     await screen.getByTestId('editor-chrome').click()
-    expect(view.commands.selectEditorTool).toHaveBeenCalledWith('brush')
+    expect(view.commands.selectAdjustmentLayer).toHaveBeenCalledWith('hsl')
   })
 
   it('renders no chrome when Image Tool is inactive or not ready', () => {

@@ -12,7 +12,7 @@ import {
 } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { cleanup } from '@testing-library/vue'
-import { render, waitFor } from '../../../../test/render'
+import { render } from '../../../../test/render'
 import type { ImageToolStageBinding } from '../imageToolBindings'
 import ImageToolStagePresentation from './ImageToolStagePresentation.vue'
 
@@ -47,7 +47,6 @@ function createCanvasOverlayStub(className: string) {
   })
 }
 
-const RasterOverlayStub = createCanvasOverlayStub('image-editor-raster-overlay')
 const MaskOverlayStub = createCanvasOverlayStub('image-mask-editor-overlay')
 const RenderedPreviewStub = defineComponent({
   props: {
@@ -62,17 +61,13 @@ function createBinding(
   mode: ImageToolStageBinding['mode'],
   nodeId = 'node-1',
   options: {
-    hasRasterEdits?: boolean
     maskEditorNodeId?: string
     maskOverlayStyle?: Record<string, string>
-    rasterTool?: string | null
     renderedPreview?: ImageToolStageBinding['renderedPreview']
   } = {},
 ) {
   const setMaskCanvasRef = vi.fn()
-  const setRasterCanvasRef = vi.fn()
   const onCanvasPointerDown = vi.fn()
-  const onRasterCanvasPointerDown = vi.fn()
   const maskEditorNodeId = options.maskEditorNodeId ?? nodeId
 
   return {
@@ -91,23 +86,10 @@ function createBinding(
           onCanvasPointerDown,
         },
         maskChromeState: { maskEditorLayerOpacity: ref(50) },
-        imageEditorRasterOverlay: {
-          rasterOverlayStyle: computed(() => ({ width: '20px', height: '10px' })),
-          rasterCanvasWidth: ref(20),
-          rasterCanvasHeight: ref(10),
-          rasterBrushSize: ref(20),
-          rasterToolEnabled: ref(true),
-          hasRasterEdits: ref(options.hasRasterEdits ?? true),
-          rasterTool: ref(options.rasterTool ?? 'brush'),
-          setRasterCanvasRef,
-          onRasterCanvasPointerDown,
-        },
       },
     } as unknown as ImageToolStageBinding,
     onCanvasPointerDown,
-    onRasterCanvasPointerDown,
     setMaskCanvasRef,
-    setRasterCanvasRef,
   }
 }
 
@@ -129,7 +111,6 @@ function renderPresentation(binding: ImageToolStageBinding) {
   const view = render(Harness, {
     global: {
       stubs: {
-        ImageEditorRasterOverlay: RasterOverlayStub,
         ImageMaskEditorOverlay: MaskOverlayStub,
         RenderedImagePreviewCanvas: RenderedPreviewStub,
       },
@@ -146,7 +127,7 @@ function renderPresentation(binding: ImageToolStageBinding) {
 }
 
 describe('ImageToolStagePresentation', () => {
-  it('keeps the media slot neutral without a selected tool and releases both refs on unmount', () => {
+  it('keeps the media slot neutral without a selected tool and releases the mask ref on unmount', () => {
     const current = createBinding(null)
     const view = renderPresentation(current.binding)
 
@@ -157,17 +138,11 @@ describe('ImageToolStagePresentation', () => {
     cleanup()
 
     expect(current.setMaskCanvasRef).toHaveBeenCalledExactlyOnceWith('node-1', null)
-    expect(current.setRasterCanvasRef).toHaveBeenCalledExactlyOnceWith('node-1', null)
   })
 
   it('replaces source media with the rendered adjustment preview', () => {
-    const source = createBinding('adjust', 'node-1', {
-      hasRasterEdits: false,
-      rasterTool: null,
-    })
+    const source = createBinding('adjust', 'node-1')
     const rendered = createBinding('adjust', 'node-2', {
-      hasRasterEdits: false,
-      rasterTool: null,
       renderedPreview: {
         type: 'rendered-image',
         imageData: new ImageData(2, 2),
@@ -182,23 +157,6 @@ describe('ImageToolStagePresentation', () => {
     expect(sourceView.container.querySelector('[data-rendered-preview]')).toBeNull()
     expect(renderedView.container.querySelector('[data-stage-image]')).toBeNull()
     expect(renderedView.container.querySelector('[data-rendered-preview]')).toBeTruthy()
-  })
-
-  it('renders the adjustment canvas from presentation props and forwards its pointer event', () => {
-    const current = createBinding('adjust')
-    const view = renderPresentation(current.binding)
-    const canvas = view.container.querySelector<HTMLCanvasElement>('.image-editor-raster-overlay')
-    const pointerDown = new Event('pointerdown', { bubbles: true }) as PointerEvent
-
-    expect(canvas).toBeInstanceOf(HTMLCanvasElement)
-    expect(canvas).toHaveAttribute('data-canvas-width', '20')
-    expect(canvas).toHaveAttribute('data-canvas-height', '10')
-    expect(canvas?.style.width).toBe('20px')
-    expect(current.setRasterCanvasRef).toHaveBeenCalledWith('node-1', canvas)
-
-    canvas?.dispatchEvent(pointerDown)
-
-    expect(current.onRasterCanvasPointerDown).toHaveBeenCalledExactlyOnceWith(pointerDown)
   })
 
   it('renders the inpaint canvas at its derived mask dimensions and forwards its pointer event', () => {
@@ -218,31 +176,23 @@ describe('ImageToolStagePresentation', () => {
     expect(current.onCanvasPointerDown).toHaveBeenCalledExactlyOnceWith(pointerDown)
   })
 
-  it('releases the previous canvas before switching nodes and modes', async () => {
-    const firstAdjust = createBinding('adjust', 'node-1')
-    const secondAdjust = createBinding('adjust', 'node-2')
-    const inpaint = createBinding('inpaint', 'node-2')
-    const view = renderPresentation(firstAdjust.binding)
+  it('releases the previous mask canvas before switching nodes and modes', async () => {
+    const firstInpaint = createBinding('inpaint', 'node-1')
+    const secondInpaint = createBinding('inpaint', 'node-2')
+    const adjust = createBinding('adjust', 'node-2')
+    const view = renderPresentation(firstInpaint.binding)
 
-    await view.setBinding(secondAdjust.binding)
+    await view.setBinding(secondInpaint.binding)
 
-    expect(firstAdjust.setRasterCanvasRef).toHaveBeenCalledWith('node-1', null)
-    expect(secondAdjust.setRasterCanvasRef).toHaveBeenCalledWith(
+    expect(firstInpaint.setMaskCanvasRef).toHaveBeenCalledWith('node-1', null)
+    expect(secondInpaint.setMaskCanvasRef).toHaveBeenCalledWith(
       'node-2',
       expect.any(HTMLCanvasElement),
     )
 
-    await view.setBinding(inpaint.binding)
+    await view.setBinding(adjust.binding)
 
-    await waitFor(() => {
-      expect(view.container.querySelector('.image-editor-raster-overlay')).toBeNull()
-      expect(view.container.querySelector('.image-mask-editor-overlay')).toBeInstanceOf(
-        HTMLCanvasElement,
-      )
-    })
-
-    const maskCanvas = view.container.querySelector<HTMLCanvasElement>('.image-mask-editor-overlay')
-    expect(secondAdjust.setRasterCanvasRef).toHaveBeenCalledWith('node-2', null)
-    expect(inpaint.setMaskCanvasRef).toHaveBeenCalledWith('node-2', maskCanvas)
+    expect(view.container.querySelector('.image-mask-editor-overlay')).toBeNull()
+    expect(secondInpaint.setMaskCanvasRef).toHaveBeenCalledWith('node-2', null)
   })
 })

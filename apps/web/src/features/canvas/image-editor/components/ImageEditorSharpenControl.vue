@@ -14,6 +14,7 @@
       :min="ranges.radius.min"
       :max="ranges.radius.max"
       :step="0.1"
+      track-variant="tonal"
       @update:value="updateNumberParam('radius', $event)"
     />
     <ImageEditorSlider
@@ -21,6 +22,7 @@
       :value="normalizedParams.threshold"
       :min="ranges.threshold.min"
       :max="ranges.threshold.max"
+      track-variant="tonal"
       @update:value="updateNumberParam('threshold', $event)"
     />
     <div class="editing-controls-toggle-row">

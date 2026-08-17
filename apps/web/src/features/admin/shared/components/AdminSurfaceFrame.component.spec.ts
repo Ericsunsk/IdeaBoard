@@ -6,18 +6,20 @@ import {
   adminSurfacePanelViewportClass,
   adminSurfaceRootViewportClass,
   adminSurfaceScrollContentClass,
-  adminSurfaceToolbarClass,
 } from '../lib/adminUiClasses'
-import AdminManagementFrame from './AdminManagementFrame.vue'
 import AdminResourceGridFrame from './AdminResourceGridFrame.vue'
+import AdminSurfaceFrame from './AdminSurfaceFrame.vue'
 import AdminTablePanel from './AdminTablePanel.vue'
 
 describe('Admin surface frame adapters', () => {
-  it('keeps Management content in the shared scroll viewport', () => {
-    render(AdminManagementFrame, {
+  it('keeps management content in the shared scroll viewport', () => {
+    render(AdminSurfaceFrame, {
+      props: {
+        scrollContent: true,
+        viewportHeight: true,
+      },
       slots: {
-        'toolbar-start': 'Toolbar start',
-        'toolbar-end': 'Toolbar end',
+        toolbar: 'Management toolbar',
         default: 'Management content',
       },
     })
@@ -25,15 +27,13 @@ describe('Admin surface frame adapters', () => {
     const content = screen.getByText('Management content')
     const panel = content.parentElement
     const root = panel?.parentElement
-    const toolbar = screen.getByText('Toolbar start').parentElement
 
     expectClassContract(root, adminSurfaceRootViewportClass)
     expectClassContract(panel, adminSurfacePanelClass)
     expectClassContract(panel, adminSurfacePanelViewportClass)
     expectClassContract(content, adminSurfaceScrollContentClass)
     expect(content).toHaveClass('px-6', 'pb-6')
-    expectClassContract(toolbar, adminSurfaceToolbarClass)
-    expect(screen.getByText('Toolbar end')).toBeInTheDocument()
+    expect(screen.getByText('Management toolbar')).toBeInTheDocument()
   })
 
   it('keeps ordinary tables framed without opting into viewport height', () => {
@@ -77,7 +77,7 @@ describe('Admin surface frame adapters', () => {
     expect(tableFrame).toHaveClass('h-full')
   })
 
-  it('keeps Resource Grid on the Management adapter interface', () => {
+  it('keeps Resource Grid in the shared scroll viewport', () => {
     render(AdminResourceGridFrame, {
       props: {
         emptyDescription: 'No resources yet',
@@ -86,8 +86,7 @@ describe('Admin surface frame adapters', () => {
         isLoading: false,
       },
       slots: {
-        'toolbar-start': 'Grid toolbar start',
-        'toolbar-end': 'Grid toolbar end',
+        toolbar: 'Grid toolbar',
         default: 'Grid item',
       },
     })
@@ -97,8 +96,7 @@ describe('Admin surface frame adapters', () => {
 
     expectClassContract(grid, adminMasonryGridClass)
     expectClassContract(content, adminSurfaceScrollContentClass)
-    expect(screen.getByText('Grid toolbar start')).toBeInTheDocument()
-    expect(screen.getByText('Grid toolbar end')).toBeInTheDocument()
+    expect(screen.getByText('Grid toolbar')).toBeInTheDocument()
   })
 })
 

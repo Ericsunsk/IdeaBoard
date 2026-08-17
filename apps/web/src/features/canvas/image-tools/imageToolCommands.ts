@@ -75,7 +75,6 @@ export function createImageToolCommands(session: ImageToolSession) {
         feedback.warning('图片已创建，但自动连线失败，请手动连接')
         return
       }
-      session.imageEditorSession.clearImageEditorRasterHistory()
       session.exitImageEditorMode({ runBeforeExit: false })
       session.imageEditorSession.resetImageEditorSession()
       feedback.succeeded('已应用编辑并派生新节点')
@@ -116,7 +115,6 @@ export function createImageToolCommands(session: ImageToolSession) {
     undoMask: session.maskEditor.undoMask,
     redoMask: session.maskEditor.redoMask,
     submitMaskPrompt: maskChromeActions.onMaskEditorChromeSubmit,
-    selectEditorTool: session.imageEditorSession.selectImageEditorTool,
     selectAdjustmentLayer: session.imageEditorSession.selectImageAdjustmentLayer,
     selectEditorLayer: session.imageEditorSession.selectImageEditorLayer,
     setEditorLayerVisible: session.imageEditorSession.setImageEditorLayerVisible,
@@ -127,15 +125,8 @@ export function createImageToolCommands(session: ImageToolSession) {
     updateEditorParam: session.imageEditorSession.updateSelectedImageEditorLayerParam,
     updateEditorAdjustmentParams:
       session.imageEditorSession.updateSelectedImageEditorAdjustmentParams,
-    updateEditorRasterToolSettings: session.imageEditorSession.updateImageEditorRasterToolSettings,
-    undoEditorRasterStroke: session.imageEditorSession.undoImageEditorRasterStroke,
-    redoEditorRasterStroke: session.imageEditorSession.redoImageEditorRasterStroke,
     applyAdjustments,
   }
-
-  session.setImageEditorApplyRequest(() => {
-    void applyAdjustments()
-  })
 
   return {
     chromeCommands,

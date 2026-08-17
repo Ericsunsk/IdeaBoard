@@ -34,6 +34,17 @@ function updateInputValue(target: HTMLElement, value: string) {
 }
 
 describe('ImageEditorSharpenControl', () => {
+  it('keeps radius and threshold tracks visibly styled', () => {
+    renderSharpenControl({ amount: 0, radius: 1, threshold: 4, protectColor: true })
+
+    expect(screen.getByLabelText('半径滑块')).toHaveClass(
+      'editing-controls-slider-row__range--tonal',
+    )
+    expect(screen.getByLabelText('阈值滑块')).toHaveClass(
+      'editing-controls-slider-row__range--tonal',
+    )
+  })
+
   it('updates sharpen amount, decimal radius, threshold, and color protection', async () => {
     const { events, user } = renderSharpenControl({
       amount: 0,

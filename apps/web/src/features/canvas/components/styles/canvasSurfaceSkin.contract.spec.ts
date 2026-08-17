@@ -19,7 +19,6 @@ const imageToolStagePresentation = readSource(
 )
 const vueFlowAdapterSkin = readSource('components/styles/canvas-vue-flow-adapter-skin.css')
 const canvasMiniMap = readSource('components/CanvasMiniMap.vue')
-const imageEditorToolRail = readSource('image-editor/components/ImageEditorToolRail.vue')
 const imageEditorLayerActions = readSource('image-editor/components/ImageEditorLayerActions.vue')
 const imageEditorHistogram = readSource(
   'image-editor/components/styles/image-editor-histogram-plot.css',
@@ -58,7 +57,6 @@ describe('Canvas surface skin contract', () => {
       nodeStageFrame,
       vueFlowAdapterSkin,
       canvasMiniMap,
-      imageEditorToolRail,
       imageEditorLayerActions,
       imageEditorHistogram,
       maskEditorChrome,
@@ -98,7 +96,6 @@ describe('Canvas surface skin contract', () => {
     expect(nodeStageFrame).toContain('.node-stage-frame::after')
     expect(nodeStageFrame).toContain('.node-stage-frame.is-active')
     expect(nodeStageFrame).toContain('--node-stage-frame-emphasis-shadow-primary')
-    expect(imageEditorToolRail).toContain("'is-disabled': getToolState(item.tool).disabled")
     expect(imageEditorLayerActions).toContain('@media (prefers-reduced-motion: reduce)')
     expect(maskEditorChrome).toContain(':disabled="directGenerating"')
   })

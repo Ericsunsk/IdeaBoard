@@ -6,7 +6,7 @@
     :data-image-mask-editor="mode === 'inpaint' ? '' : undefined"
     @pointerdown.stop
   >
-    <div class="image-tool-chrome-frame__tool-rail node-tool-surface">
+    <div v-if="$slots.tools" class="image-tool-chrome-frame__tool-rail node-tool-surface">
       <slot name="tools" />
     </div>
     <div class="image-tool-chrome-frame__right-dock">

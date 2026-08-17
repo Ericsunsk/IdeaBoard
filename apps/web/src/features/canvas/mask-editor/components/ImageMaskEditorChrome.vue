@@ -31,7 +31,7 @@
               <div
                 class="editing-controls-range-wrap"
                 :style="
-                  rangeTooltipStyle(
+                  rangePresentationStyle(
                     brushSize,
                     MASK_EDITOR_MIN_BRUSH_SIZE,
                     MASK_EDITOR_MAX_BRUSH_SIZE,
@@ -61,7 +61,7 @@
               <div
                 class="editing-controls-range-wrap"
                 :style="
-                  rangeTooltipStyle(
+                  rangePresentationStyle(
                     maskLayerOpacity,
                     MASK_EDITOR_MIN_LAYER_OPACITY,
                     MASK_EDITOR_MAX_LAYER_OPACITY,
@@ -186,10 +186,13 @@ function onMaskOpacityInput(event: Event) {
   emit('set-mask-layer-opacity', clampMaskLayerOpacity(Number(target?.value)))
 }
 
-function rangeTooltipStyle(value: number, min: number, max: number) {
+function rangePresentationStyle(value: number, min: number, max: number) {
   const ratio = max === min ? 0 : (value - min) / (max - min)
-  const percent = Math.min(1, Math.max(0, ratio)) * 100
-  return { '--editing-controls-range-value': `${percent}%` }
+  const percent = `${Math.min(1, Math.max(0, ratio)) * 100}%`
+  return {
+    '--editing-controls-range-value': percent,
+    '--canvas-range-track-background': `linear-gradient(90deg, var(--canvas-accent) 0%, var(--canvas-accent) ${percent}, var(--canvas-accent-outline) ${percent}, var(--canvas-accent-outline) 100%)`,
+  }
 }
 
 function onSubmit(prompt: string) {

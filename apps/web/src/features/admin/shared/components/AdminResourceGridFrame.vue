@@ -1,15 +1,7 @@
 <template>
-  <AdminManagementFrame :content-class="contentClass">
+  <AdminSurfaceFrame viewport-height scroll-content :content-class="contentClass">
     <template v-if="$slots.toolbar" #toolbar>
       <slot name="toolbar" />
-    </template>
-
-    <template v-if="$slots['toolbar-start']" #toolbar-start>
-      <slot name="toolbar-start" />
-    </template>
-
-    <template v-if="$slots['toolbar-end']" #toolbar-end>
-      <slot name="toolbar-end" />
     </template>
 
     <div v-if="isLoading" :class="adminLoadingStateClass">
@@ -28,13 +20,13 @@
     <div v-else :class="resolvedGridClass">
       <slot />
     </div>
-  </AdminManagementFrame>
+  </AdminSurfaceFrame>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import ProgressSpinner from 'primevue/progressspinner'
-import AdminManagementFrame from './AdminManagementFrame.vue'
+import AdminSurfaceFrame from './AdminSurfaceFrame.vue'
 import {
   adminEmptyStateClass,
   adminLoadingStateClass,

@@ -91,7 +91,7 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
     groupKey: WORKFLOW_FEATURE_GROUP.image,
     imageActionLabel: '局部重绘',
     imageActionTitle: '局部重绘',
-    promptVariables: [{ key: '{{user_prompt}}', tone: 'prompt' }],
+    promptVariables: [],
   },
   {
     slug: WORKFLOW_FEATURE.styleVariation,
@@ -141,7 +141,7 @@ const WORKFLOW_FEATURE_REGISTRY_BASE: readonly WorkflowFeatureRegistryBaseItem[]
     groupKey: WORKFLOW_FEATURE_GROUP.image,
     imageActionLabel: '扩图',
     imageActionTitle: '扩图',
-    promptVariables: [{ key: '{{user_prompt}}', tone: 'prompt' }],
+    promptVariables: [],
   },
 ] as const
 

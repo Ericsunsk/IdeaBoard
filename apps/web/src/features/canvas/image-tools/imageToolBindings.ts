@@ -8,10 +8,8 @@ import type {
   ImageEditorParamKey,
   ImageEditorParamValue,
   ImageEditorRenderedPreview,
-  ImageEditorTool,
 } from '../image-editor/types'
 import type { ImageAdjustmentFinalApplyProgress } from '../image-editor/runtime/imageAdjustmentFinalApplyContext'
-import type { ImageEditorRasterToolSettings } from '../image-editor/utils/imageEditorRasterTools'
 import type { ImageMaskDrawMode } from '../mask-editor/types'
 import type { ImageStrengthAction } from '../execution'
 import type { ImageToolSession } from './imageToolSession'
@@ -73,15 +71,9 @@ export type ImageToolChromeModel = {
     canRedo: boolean
   }
   editor: {
-    activeTool: ImageEditorTool
     layers: ImageEditorLayer[]
     selectedLayerId: string
     selectedAdjustmentLayer: ImageEditorAdjustmentLayer | null
-    rasterToolSettings: ImageEditorRasterToolSettings
-    canUseRasterTool: boolean
-    canUndoRasterStroke: boolean
-    canRedoRasterStroke: boolean
-    hasRasterEdits: boolean
     histogramSource: ImageData | null
     applyingAdjustments: boolean
   }
@@ -95,7 +87,6 @@ export type ImageToolChromeCommands = {
   undoMask: () => void
   redoMask: () => void
   submitMaskPrompt: (prompt: string) => void
-  selectEditorTool: (tool: ImageEditorTool) => void
   selectAdjustmentLayer: (kind: ImageAdjustmentKind) => void
   selectEditorLayer: (layerId: string) => void
   setEditorLayerVisible: (layerId: string, visible: boolean) => void
@@ -105,9 +96,6 @@ export type ImageToolChromeCommands = {
   removeEditorLayer: (layerId: string) => void
   updateEditorParam: (key: ImageEditorParamKey, value: ImageEditorParamValue) => void
   updateEditorAdjustmentParams: (params: ImageEditorAdjustmentWholeParams) => void
-  updateEditorRasterToolSettings: (patch: Partial<ImageEditorRasterToolSettings>) => void
-  undoEditorRasterStroke: () => void
-  redoEditorRasterStroke: () => void
   applyAdjustments: () => Promise<void>
 }
 

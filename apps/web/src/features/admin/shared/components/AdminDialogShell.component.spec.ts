@@ -192,10 +192,21 @@ describe('AdminDialogShell', () => {
     const content = (await screen.findByRole('button', { name: '第一个操作' })).parentElement
     expect(content).toHaveClass(
       'app-scrollbar',
+      '-mr-3',
       'overflow-y-auto',
       'overscroll-contain',
+      'pr-3',
       'max-h-[min(68dvh,40rem)]',
     )
+  })
+
+  it('aligns header, content, and footer to one horizontal rail', async () => {
+    renderShell()
+
+    const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
+    expect(dialog.querySelector('[data-pc-section="header"]')).toHaveClass('!px-6')
+    expect(dialog.querySelector('[data-pc-section="content"]')).toHaveClass('!px-6')
+    expect(dialog.querySelector('[data-pc-section="footer"]')).toHaveClass('!px-6')
   })
 
   it.each([

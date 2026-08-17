@@ -2,38 +2,26 @@ import { describe, expect, it } from 'vitest'
 import type { ImageEditorLayerStack } from './imageEditorLayerStack'
 import {
   applyLayerCommand,
+  createDefaultImageAdjustmentLayer,
   createInitialLayerStack,
   getSelectedAdjustment,
   selectAfterRemove,
 } from './imageEditorLayerStack'
 
 describe('imageEditorLayerStack', () => {
-  it('creates the initial stack with independent default adjustment params', () => {
+  it('creates the initial stack with only the source layer', () => {
     const firstStack = createInitialLayerStack()
-    const secondStack = createInitialLayerStack()
-    const firstHslLayer = firstStack.layers[0]
-    const secondHslLayer = secondStack.layers[0]
 
-    expect(firstStack.selectedLayerId).toBe('adjustment:hsl')
-    expect(firstStack.layers.map((layer) => layer.id)).toEqual(['adjustment:hsl', 'source'])
-    expect(firstHslLayer?.type).toBe('adjustment')
-    expect(secondHslLayer?.type).toBe('adjustment')
-    if (
-      firstHslLayer?.type !== 'adjustment' ||
-      firstHslLayer.kind !== 'hsl' ||
-      secondHslLayer?.type !== 'adjustment' ||
-      secondHslLayer.kind !== 'hsl'
-    ) {
-      return
-    }
+    expect(firstStack.selectedLayerId).toBe('source')
+    expect(firstStack.layers.map((layer) => layer.id)).toEqual(['source'])
+  })
 
+  it('creates independent default adjustment layer params', () => {
+    const firstHslLayer = createDefaultImageAdjustmentLayer('hsl')
+    const secondHslLayer = createDefaultImageAdjustmentLayer('hsl')
     firstHslLayer.params.lightness = 45
 
-    expect(secondHslLayer.params).toEqual({
-      hue: 0,
-      saturation: 0,
-      lightness: 0,
-    })
+    expect(secondHslLayer.params).toEqual({ hue: 0, saturation: 0, lightness: 0 })
   })
 
   it('copies adjustment params without sharing nested curve references', () => {
@@ -93,7 +81,7 @@ describe('imageEditorLayerStack', () => {
     const mergedStack = applyLayerCommand(copiedStack, { type: 'merge-selected-down' })
     const removedStack = applyLayerCommand(mergedStack, { type: 'remove', layerId: 'source' })
 
-    expect(removedStack.layers.map((layer) => layer.id)).toEqual(['adjustment:hsl', 'source'])
+    expect(removedStack.layers.map((layer) => layer.id)).toEqual(['source'])
     expect(removedStack.selectedLayerId).toBe('source')
   })
 
@@ -108,11 +96,7 @@ describe('imageEditorLayerStack', () => {
       id: 'adjustment:threshold',
       kind: 'threshold',
     })
-    expect(nextStack.layers.map((layer) => layer.id)).toEqual([
-      'adjustment:hsl',
-      'adjustment:threshold',
-      'source',
-    ])
+    expect(nextStack.layers.map((layer) => layer.id)).toEqual(['adjustment:threshold', 'source'])
   })
 
   it('creates sharpen adjustment layers with normalized params', () => {
@@ -142,15 +126,15 @@ describe('imageEditorLayerStack', () => {
         protectColor: false,
       },
     })
-    expect(updatedStack.layers.map((layer) => layer.id)).toEqual([
-      'adjustment:hsl',
-      'adjustment:sharpen',
-      'source',
-    ])
+    expect(updatedStack.layers.map((layer) => layer.id)).toEqual(['adjustment:sharpen', 'source'])
   })
 
   it('falls back to source selection when the last editable layer is removed', () => {
-    const nextStack = applyLayerCommand(createInitialLayerStack(), {
+    const stack = applyLayerCommand(createInitialLayerStack(), {
+      type: 'ensure-adjustment',
+      kind: 'hsl',
+    })
+    const nextStack = applyLayerCommand(stack, {
       type: 'remove',
       layerId: 'adjustment:hsl',
     })

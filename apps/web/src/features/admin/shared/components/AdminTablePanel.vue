@@ -4,14 +4,6 @@
       <slot name="toolbar" />
     </template>
 
-    <template v-if="$slots['toolbar-start']" #toolbar-start>
-      <slot name="toolbar-start" />
-    </template>
-
-    <template v-if="$slots['toolbar-end']" #toolbar-end>
-      <slot name="toolbar-end" />
-    </template>
-
     <div :class="tableFrameClass">
       <slot />
     </div>

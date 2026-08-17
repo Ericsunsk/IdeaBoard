@@ -18,21 +18,29 @@
       @toggle="toggleAspectRatioPicker"
       @select="selectAspectRatio"
     />
-    <NodeOutputCountPicker
+    <!-- @vue-generic {number} -->
+    <NodeTextOptionPicker
       v-if="showOutputCount"
       :model-value="outputCountValue"
+      :options="IMAGE_OUTPUT_COUNT_PRESET_OPTIONS"
       :visible="outputCountPickerVisible"
       :disabled="disabled"
       tooltip="选择张数"
-      aria-label="输出张数"
+      label="输出张数"
       @toggle="toggleOutputCountPicker"
       @select="selectOutputCount"
     />
-    <NodeOutputResolutionPicker
+    <!-- @vue-generic {OutputResolution} -->
+    <NodeTextOptionPicker
       v-if="showOutputResolution"
       :model-value="outputResolutionValue"
+      :options="OUTPUT_RESOLUTION_OPTIONS"
       :visible="outputResolutionPickerVisible"
       :disabled="disabled"
+      :format="formatOutputResolution"
+      option-role="menuitemradio"
+      tooltip="选择清晰度"
+      label="输出清晰度"
       @toggle="toggleOutputResolutionPicker"
       @select="selectOutputResolution"
     />
@@ -62,13 +70,18 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { SendDiagonalSolid } from '@iconoir/vue'
-import type { PromptAspectRatio } from '../../../canvas-board/domain'
-import type { OutputResolution } from '../../../../shared/domain/generationContract'
+import {
+  IMAGE_OUTPUT_COUNT_PRESET_OPTIONS,
+  type PromptAspectRatio,
+} from '../../../canvas-board/domain'
+import {
+  OUTPUT_RESOLUTION_OPTIONS,
+  type OutputResolution,
+} from '../../../../shared/domain/generationContract'
 import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
 import type { CanvasBillingQuoteState } from '../../execution'
 import NodeAspectRatioPicker from './NodeAspectRatioPicker.vue'
-import NodeOutputCountPicker from './NodeOutputCountPicker.vue'
-import NodeOutputResolutionPicker from './NodeOutputResolutionPicker.vue'
+import NodeTextOptionPicker from './NodeTextOptionPicker.vue'
 import {
   usePromptComposerControls,
   type PromptComposerResizePayload,
@@ -132,6 +145,7 @@ const quoteLabel = computed(() => {
 })
 const billingTooltip = computed(() => (quoteLabel.value ? `发送 · ${quoteLabel.value}` : '发送'))
 const touchQuoteLabel = computed(() => quoteLabel.value)
+const formatOutputResolution = (value: OutputResolution) => value.toUpperCase()
 
 const {
   actionsRef,

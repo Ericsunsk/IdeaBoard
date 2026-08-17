@@ -1,15 +1,7 @@
 <template>
   <div :class="rootClass">
     <div :class="panelClass">
-      <slot v-if="slots.toolbar" name="toolbar" />
-      <div v-else-if="hasToolbar" :class="adminSurfaceToolbarClass">
-        <div class="flex flex-wrap items-center gap-3">
-          <slot name="toolbar-start" />
-        </div>
-        <div class="flex flex-wrap items-center justify-end gap-3">
-          <slot name="toolbar-end" />
-        </div>
-      </div>
+      <slot v-if="hasToolbar" name="toolbar" />
 
       <div :class="resolvedContentClass">
         <slot />
@@ -25,7 +17,6 @@ import {
   adminSurfacePanelViewportClass,
   adminSurfaceRootViewportClass,
   adminSurfaceScrollContentClass,
-  adminSurfaceToolbarClass,
 } from '../lib/adminUiClasses'
 
 const props = defineProps<{
@@ -35,9 +26,7 @@ const props = defineProps<{
 }>()
 
 const slots = useSlots()
-const hasToolbar = computed(() =>
-  Boolean(slots.toolbar || slots['toolbar-start'] || slots['toolbar-end']),
-)
+const hasToolbar = computed(() => Boolean(slots.toolbar))
 const rootClass = computed(() => (props.viewportHeight ? adminSurfaceRootViewportClass : 'min-w-0'))
 const panelClass = computed(() => [
   adminSurfacePanelClass,

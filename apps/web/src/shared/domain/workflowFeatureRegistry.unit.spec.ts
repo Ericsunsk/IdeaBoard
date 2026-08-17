@@ -69,16 +69,9 @@ describe('workflowFeatureRegistry projections', () => {
     expect(getWorkflowFeaturePromptVariables(WORKFLOW_FEATURE.removeBg)).toEqual([])
   })
 
-  it('exposes user_prompt for every configurable Image feature', () => {
-    const imageGroup = WORKFLOW_FEATURE_CONFIG_GROUPS.find(
-      (group) => group.key === WORKFLOW_FEATURE_GROUP.image,
-    )
-    expect(imageGroup).toBeDefined()
-    for (const item of imageGroup?.items ?? []) {
-      expect(getWorkflowFeaturePromptVariables(item.slug)).toEqual(
-        expect.arrayContaining([{ key: '{{user_prompt}}', tone: 'prompt' }]),
-      )
-    }
+  it('hides user_prompt when image-fill providers receive it separately', () => {
+    expect(getWorkflowFeaturePromptVariables(WORKFLOW_FEATURE.partialEdit)).toEqual([])
+    expect(getWorkflowFeaturePromptVariables(WORKFLOW_FEATURE.outpaint)).toEqual([])
   })
 
   it('exposes canvas image action text without feature modules rebuilding it', () => {

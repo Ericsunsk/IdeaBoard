@@ -38,7 +38,7 @@ export const adminToolbarSearchInputClass =
 export const adminToolbarMetricClass =
   'flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-admin-border bg-white px-3 py-1.5 text-admin-body font-bold text-admin-text-1 shadow-[0_2px_8px_rgba(45,64,89,0.02)]'
 
-export const adminFramedIconButtonBaseClass =
+const adminFramedIconButtonBaseClass =
   '!h-9 !w-9 !border !border-ib-border !bg-ib-surface !text-admin-text-2 hover:!bg-ib-surface-muted hover:!text-admin-text-1 disabled:!text-admin-text-3 transition-colors flex items-center justify-center p-0'
 
 export const adminFramedIconButtonClass = `${adminFramedIconButtonBaseClass} !rounded-lg`
@@ -74,10 +74,16 @@ export const adminDialogHeaderContentClass = 'min-w-0'
 export const adminDialogTitleClass =
   'm-0 text-admin-modal-title leading-[1.15] font-bold text-admin-title-color'
 
+export const adminDialogHeaderClass = '!px-6 !pt-5 !pb-3.5'
+
+export const adminDialogContentClass = '!overflow-hidden !px-6 !pb-0'
+
 export const adminDialogScrollableBodyClass =
-  'app-scrollbar overflow-y-auto overscroll-contain pr-3'
+  'app-scrollbar -mr-3 overflow-y-auto overscroll-contain pr-3'
 
 export const adminDialogFormBodyClass = 'flex flex-col gap-3.5'
+
+export const adminDialogFooterClass = '!px-6 !pt-4 !pb-5'
 
 export const adminDialogFooterActionsClass = 'flex flex-wrap justify-end gap-2'
 

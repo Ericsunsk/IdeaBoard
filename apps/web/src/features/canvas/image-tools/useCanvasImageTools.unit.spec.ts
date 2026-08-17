@@ -15,11 +15,6 @@ import { IMAGE_STRENGTH_ACTIONS, type ImageStrengthAction } from '../execution'
 import type { UseCanvasImageToolsOptions } from './imageToolSession'
 import { useCanvasImageTools, type CanvasImageTools } from '.'
 
-const rasterOverlayMocks = vi.hoisted(() => ({
-  setRasterCanvasRef: vi.fn<(nodeId: string, element: Element | null) => void>(),
-  onRasterCanvasPointerDown: vi.fn<(event: PointerEvent) => void>(),
-}))
-
 vi.mock('../image-editor/services/imageAdjustmentRenderer', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('../image-editor/services/imageAdjustmentRenderer')>()
@@ -36,23 +31,6 @@ vi.mock('../image-editor/composables/useImageAdjustmentRenderedPreview', async (
     useImageAdjustmentRenderedPreview: vi.fn(() => ({
       imageEditorRenderedPreview: computed(() => null),
       imageEditorPreviewSource: computed(() => null),
-    })),
-  }
-})
-
-vi.mock('../image-editor/composables/useImageEditorRasterOverlay', async () => {
-  const { computed } = await import('vue')
-  return {
-    useImageEditorRasterOverlay: vi.fn(() => ({
-      rasterOverlayStyle: computed(() => null),
-      rasterCanvasWidth: computed(() => 1),
-      rasterCanvasHeight: computed(() => 1),
-      rasterBrushSize: computed(() => 32),
-      rasterTool: computed(() => null),
-      rasterToolEnabled: computed(() => false),
-      hasRasterEdits: computed(() => false),
-      setRasterCanvasRef: rasterOverlayMocks.setRasterCanvasRef,
-      onRasterCanvasPointerDown: rasterOverlayMocks.onRasterCanvasPointerDown,
     })),
   }
 })
@@ -268,6 +246,7 @@ function mountCanvasImageTools() {
 function prepareRenderableAdjustmentSession(runtime: CanvasImageTools) {
   expect(runtime.commands.lifecycle.enter('image-1', 'adjust')).toBe(true)
   runtime.commands.chrome.selectAdjustmentLayer('threshold')
+  runtime.commands.chrome.updateEditorAdjustmentParams({ threshold: 128, invert: true })
   return runtime.viewModel.chrome.value.editor.layers
 }
 
@@ -280,8 +259,6 @@ afterEach(() => {
   vi.restoreAllMocks()
   cancelFinalRenderMock.mockReset()
   renderLayerStackFileMock.mockReset()
-  rasterOverlayMocks.setRasterCanvasRef.mockReset()
-  rasterOverlayMocks.onRasterCanvasPointerDown.mockReset()
 })
 
 describe('useCanvasImageTools image adjustment final apply', () => {
@@ -292,7 +269,6 @@ describe('useCanvasImageTools image adjustment final apply', () => {
     try {
       expect(harness.runtime.viewModel.active.mode.value).toBeNull()
       expect(harness.runtime.commands.lifecycle.enter('image-1', 'adjust')).toBe(true)
-      session.imageEditorRasterOverlay.setRasterCanvasRef('image-1', canvas)
       expect(harness.runtime.commands.lifecycle.enter('image-1', 'inpaint')).toBe(true)
       session.maskEditor.setMaskCanvasRef('image-1', canvas)
       expect(harness.runtime.commands.lifecycle.enter('image-2', 'inpaint')).toBe(true)
@@ -645,10 +621,6 @@ describe('useCanvasImageTools image adjustment final apply', () => {
 
       expect(node1StageBindingAgain).toBe(node1StageBinding)
       expect(node2StageBinding.nodeId).toBe('image-2')
-
-      const rasterCanvas = document.createElement('canvas')
-      node2StageBinding.session.imageEditorRasterOverlay.setRasterCanvasRef('image-2', rasterCanvas)
-      expect(rasterOverlayMocks.setRasterCanvasRef).toHaveBeenCalledWith('image-2', rasterCanvas)
 
       expect(harness.runtime.commands.lifecycle.enter('image-2', 'inpaint')).toBe(true)
       const maskCanvas = document.createElement('canvas')

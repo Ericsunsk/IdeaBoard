@@ -28,7 +28,6 @@ const editorMotionSources = [
   'components/styles/editing-controls.css',
   'image-editor/components/ImageEditorLayerActions.vue',
   'image-editor/components/ImageEditorLayersPanel.vue',
-  'image-editor/components/ImageEditorRasterOverlay.vue',
   'mask-editor/components/ImageMaskEditorOverlay.vue',
 ].map(readSource)
 
@@ -60,10 +59,8 @@ describe('Canvas Node and editor Motion contract', () => {
   })
 
   it('keeps precision cursors free from transform animation', () => {
-    const rasterOverlay = readSource('image-editor/components/ImageEditorRasterOverlay.vue')
     const maskOverlay = readSource('mask-editor/components/ImageMaskEditorOverlay.vue')
 
-    expect(rasterOverlay).not.toMatch(/transition:\s*transform/)
     expect(maskOverlay).not.toMatch(/transition:\s*transform/)
   })
 })
