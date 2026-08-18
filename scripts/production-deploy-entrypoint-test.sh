@@ -102,6 +102,7 @@ write_manifest() {
   "commit": "${commit}",
   "images": {
     "api": "ghcr.io/ericsunsk/ideaboard/ideaboard-api@sha256:${digest}",
+    "api-migrate": "ghcr.io/ericsunsk/ideaboard/ideaboard-api-migrate@sha256:${digest}",
     "auth": "ghcr.io/ericsunsk/ideaboard/ideaboard-auth@sha256:${digest}",
     "auth-migrate": "ghcr.io/ericsunsk/ideaboard/ideaboard-auth-migrate@sha256:${digest}"
   }

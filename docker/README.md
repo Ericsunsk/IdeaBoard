@@ -123,11 +123,11 @@ NPM_NETWORK_NAME=npm-nw
 
 `ideaboard update --manifest ...`、`up`、`restart`、`status`、`doctor` 与卸载流程都会加载该 override。NPM 应使用 Docker DNS 转发到 `ideaboard-api:6000`；仅在确实需要独立代理 Auth 时使用 `ideaboard-auth:6001`。PostgreSQL 与 NATS 不会加入 NPM network。
 
-后端镜像由 GitHub Actions 发布到 GHCR；发布路径会生成 SBOM、执行 Grype 高危漏洞 gate，并用 Cosign keyless 签名。`ideaboard update --manifest ...` 从目标发布的 manifest 写入三张完整 digest 引用，并在 pull 前自动验签；不接受 mutable tag，也不从 tag 反查 digest。
+后端镜像由 GitHub Actions 发布到 GHCR；发布路径会生成 SBOM、执行 Grype 高危漏洞 gate，并用 Cosign keyless 签名。`ideaboard update --manifest ...` 从目标发布的 manifest 写入四张完整 digest 引用（API runtime、API migrator、Auth runtime、Auth migrator），并在 pull 前自动验签；不接受 mutable tag，也不从 tag 反查 digest。
 
 API 运行时还必须设置 `APP_SECRETS_ENCRYPTION_KEY`，用于加密 API Key 与对象存储密钥；推荐用 `openssl rand -base64 32` 生成。
 
-生产环境只使用 `ideaboard update --manifest release-manifest.json` 部署同一发布批次的三张镜像。脚本会先执行 preflight，在 API / Auth migrations 前把 PostgreSQL custom dump 写入 `/opt/stacks/ideaboard-backups/postgres-*.dump[.age|.gpg]`，并在启动后检查 PostgreSQL、NATS JetStream、本机 API/Auth health、River schema、默认 JetStream event stream 和公网 `${API_BASE_URL}/api/health`。成功后会写入 `docker/releases/current.json` 与 `previous.json`；已启动的 stack 可用 `ideaboard status` 查看 release 摘要，也可以执行 `ideaboard doctor` / `ideaboard doctor --deep` 排查运行态。如果 health gate 失败，请先查看 `api/auth/postgres/nats` 日志；需要回退运行镜像时用 `ideaboard rollback --to previous`，DB restore 需要基于 backup 人工确认后执行。
+生产环境只使用 `ideaboard update --manifest release-manifest.json` 部署同一发布批次的四张镜像。脚本会先执行 preflight，在 API / Auth migrations 前把 PostgreSQL custom dump 写入 `/opt/stacks/ideaboard-backups/postgres-*.dump[.age|.gpg]`，并在启动后检查 PostgreSQL、NATS JetStream、本机 API/Auth health、River schema、默认 JetStream event stream 和公网 `${API_BASE_URL}/api/health`。成功后会写入 `docker/releases/current.json` 与 `previous.json`；已启动的 stack 可用 `ideaboard status` 查看 release 摘要，也可以执行 `ideaboard doctor` / `ideaboard doctor --deep` 排查运行态。如果 health gate 失败，请先查看 `api/auth/postgres/nats` 日志；需要回退运行镜像时用 `ideaboard rollback --to previous`，DB restore 需要基于 backup 人工确认后执行。
 
 > [!IMPORTANT]
 > `postgres-*.dump[.age|.gpg]` 会包含 `api_account_secrets`、`storage_profile_secrets` 等表中的上游 API key 与 S3 secret，必须按 secret artifact 处理：建议设置 `BACKUP_ENCRYPTION_RECIPIENT` 加密保存、限制传输与下载，restore 后轮换受影响的上游 API key 和对象存储凭据。

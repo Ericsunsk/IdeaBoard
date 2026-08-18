@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,8 +18,8 @@ import (
 	"strings"
 	"time"
 
-	"ideaboard/api/internal/db/migrations"
 	"ideaboard/api/internal/db/schemaassembly"
+	"ideaboard/api/internal/db/schemacontract"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -96,7 +97,7 @@ func check(ctx context.Context, options Options, runner commandRunner) error {
 	if err := checkSQLCGeneration(ctx, runner, apiRoot, assembled); err != nil {
 		return fmt.Errorf("schema release sqlc generation: %w", err)
 	}
-	if err := verifyCatalogSemantics(ctx, strings.TrimSpace(options.DatabaseDSN), assembled); err != nil {
+	if err := verifyCatalogSemantics(ctx, apiRoot, strings.TrimSpace(options.DatabaseDSN), assembled); err != nil {
 		return fmt.Errorf("schema release semantic verification: %w", err)
 	}
 	if options.WriteArtifact {
@@ -392,7 +393,7 @@ func readTree(root string) (map[string][]byte, error) {
 	return result, nil
 }
 
-func verifyCatalogSemantics(ctx context.Context, dsn string, snapshot []byte) (err error) {
+func verifyCatalogSemantics(ctx context.Context, apiRoot, dsn string, snapshot []byte) (err error) {
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return fmt.Errorf("open PostgreSQL: %w", err)
@@ -410,7 +411,41 @@ func verifyCatalogSemantics(ctx context.Context, dsn string, snapshot []byte) (e
 	}
 	defer func() { err = errors.Join(err, migrationCleanup()) }()
 
-	return migrations.VerifySchemaSnapshotContract(ctx, snapshotConn, migrationConn, snapshot)
+	return schemacontract.VerifySchemaSnapshotContract(
+		ctx,
+		snapshotConn,
+		migrationConn,
+		snapshot,
+		func(ctx context.Context, conn *sql.Conn) error {
+			return applyAtlasMigration(ctx, apiRoot, dsn, conn)
+		},
+	)
+}
+
+func applyAtlasMigration(ctx context.Context, apiRoot, dsn string, conn *sql.Conn) error {
+	if conn == nil {
+		return errors.New("migration connection is nil")
+	}
+	var schemaName string
+	if err := conn.QueryRowContext(ctx, `SELECT current_schema()`).Scan(&schemaName); err != nil {
+		return fmt.Errorf("resolve migration schema: %w", err)
+	}
+	parsed, err := url.Parse(dsn)
+	if err != nil {
+		return fmt.Errorf("parse migration database DSN: %w", err)
+	}
+	query := parsed.Query()
+	query.Set("search_path", schemaName+",public")
+	parsed.RawQuery = query.Encode()
+	atlasBinary := strings.TrimSpace(os.Getenv("ATLAS_BINARY"))
+	if atlasBinary == "" {
+		atlasBinary = "atlas"
+	}
+	migrationDir := "file://" + filepath.ToSlash(filepath.Join(apiRoot, "internal/db/migrations"))
+	if _, err := (execRunner{}).Run(ctx, apiRoot, atlasBinary, "migrate", "apply", "--allow-dirty", "--revisions-schema", schemaName, "--dir", migrationDir, "--url", parsed.String()); err != nil {
+		return err
+	}
+	return nil
 }
 
 func openIsolatedSchema(ctx context.Context, db *sql.DB, prefix string) (*sql.Conn, func() error, error) {

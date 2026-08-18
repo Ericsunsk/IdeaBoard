@@ -24,8 +24,8 @@ func Run(args []string) {
 		case "init-admin":
 			runInitAdmin()
 			return
-		case "migrate":
-			runMigrate()
+		case "finalize-migrate":
+			runFinalizeMigrate()
 			return
 		case "init-credit-wallets":
 			runInitCreditWallets(args[2:])
@@ -106,13 +106,13 @@ func runInitCreditWallets(args []string) {
 	slog.Info("Credit Wallet initialization completed", "identities", len(results), "welcome_grants", granted)
 }
 
-func runMigrate() {
+func runFinalizeMigrate() {
 	cfg := config.Load()
 	configureRuntimeLogging(cfg)
-	if err := migrateAppDatabases(context.Background(), cfg); err != nil {
-		fatal("failed to migrate database schema", "err", err)
+	if err := finalizeAppDatabases(context.Background(), cfg); err != nil {
+		fatal("failed to finalize database migration", "err", err)
 	}
-	slog.Info("database schema migration completed")
+	slog.Info("database migration finalization completed")
 }
 
 func runInitAdmin() {

@@ -102,9 +102,11 @@ DEPLOY_SMOKE_GATE="pending"
 DEPLOY_SOURCE_MANIFEST=""
 DEPLOY_SOURCE_MANIFEST_COPY=""
 DEPLOY_API_IMAGE=""
+DEPLOY_API_MIGRATE_IMAGE=""
 DEPLOY_AUTH_IMAGE=""
 DEPLOY_AUTH_MIGRATE_IMAGE=""
 PREVIOUS_API_IMAGE=""
+PREVIOUS_API_MIGRATE_IMAGE=""
 PREVIOUS_AUTH_IMAGE=""
 PREVIOUS_AUTH_MIGRATE_IMAGE=""
 DEPLOY_AUTOMATION_RESULT_FILE="${IDEABOARD_DEPLOY_RESULT_FILE:-}"
@@ -346,6 +348,7 @@ validate_env_file() {
     APP_BASE_URL \
     API_BASE_URL \
     IDEABOARD_API_IMAGE \
+    IDEABOARD_API_MIGRATE_IMAGE \
     IDEABOARD_AUTH_IMAGE \
     IDEABOARD_AUTH_MIGRATE_IMAGE \
     POSTGRES_PASSWORD \
@@ -367,18 +370,25 @@ validate_env_file() {
   fi
 
   local api_image
+  local api_migrate_image
   local auth_image
-  local auth_migrate_image
   local api_repo
+  local api_migrate_repo
+  local auth_migrate_image
   local auth_repo
   local auth_migrate_repo
   local nats_password
   api_image="$(env_value IDEABOARD_API_IMAGE)"
+  api_migrate_image="$(env_value IDEABOARD_API_MIGRATE_IMAGE)"
   auth_image="$(env_value IDEABOARD_AUTH_IMAGE)"
   auth_migrate_image="$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
 
   if ! is_ideaboard_image_ref "$api_image" "api"; then
     echo "Please set IDEABOARD_API_IMAGE to a full immutable GHCR digest ref, e.g. ghcr.io/owner/repo/ideaboard-api@sha256:..." >&2
+    return 1
+  fi
+  if ! is_ideaboard_image_ref "$api_migrate_image" "api-migrate"; then
+    echo "Please set IDEABOARD_API_MIGRATE_IMAGE to a full immutable GHCR digest ref, e.g. ghcr.io/owner/repo/ideaboard-api-migrate@sha256:..." >&2
     return 1
   fi
   if ! is_ideaboard_image_ref "$auth_image" "auth"; then
@@ -390,10 +400,11 @@ validate_env_file() {
     return 1
   fi
   api_repo="$(image_source_repo_from_ref "$api_image")"
+  api_migrate_repo="$(image_source_repo_from_ref "$api_migrate_image")"
   auth_repo="$(image_source_repo_from_ref "$auth_image")"
   auth_migrate_repo="$(image_source_repo_from_ref "$auth_migrate_image")"
-  if ! [[ "$api_repo" == "$auth_repo" && "$api_repo" == "$auth_migrate_repo" ]]; then
-    echo "IDEABOARD_API_IMAGE, IDEABOARD_AUTH_IMAGE, and IDEABOARD_AUTH_MIGRATE_IMAGE must come from the same GHCR owner/repo." >&2
+  if ! [[ "$api_repo" == "$api_migrate_repo" && "$api_repo" == "$auth_repo" && "$api_repo" == "$auth_migrate_repo" ]]; then
+    echo "All IDEABOARD_*_IMAGE values must come from the same GHCR owner/repo." >&2
     return 1
   fi
   nats_password="$(env_value NATS_PASSWORD)"
@@ -1194,6 +1205,7 @@ init_release_context() {
   mkdir -p "$RELEASE_HISTORY_DIR"
   chmod 700 "$RELEASE_STATE_DIR" "$RELEASE_HISTORY_DIR"
   PREVIOUS_API_IMAGE="$(env_value IDEABOARD_API_IMAGE)"
+  PREVIOUS_API_MIGRATE_IMAGE="$(env_value IDEABOARD_API_MIGRATE_IMAGE)"
   PREVIOUS_AUTH_IMAGE="$(env_value IDEABOARD_AUTH_IMAGE)"
   PREVIOUS_AUTH_MIGRATE_IMAGE="$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
   DEPLOY_ENV_SNAPSHOT="$(mktemp "$RELEASE_STATE_DIR/env.${DEPLOY_RELEASE_ID}.XXXXXX")"
@@ -1222,13 +1234,15 @@ write_release_manifest() {
   "git_commit": $(json_value "$DEPLOY_GIT_COMMIT"),
   "images": {
     "api": $(json_value "${DEPLOY_API_IMAGE:-$(env_value IDEABOARD_API_IMAGE)}"),
+    "api-migrate": $(json_value "${DEPLOY_API_MIGRATE_IMAGE:-$(env_value IDEABOARD_API_MIGRATE_IMAGE)}"),
     "auth": $(json_value "${DEPLOY_AUTH_IMAGE:-$(env_value IDEABOARD_AUTH_IMAGE)}"),
-    "auth_migrate": $(json_value "${DEPLOY_AUTH_MIGRATE_IMAGE:-$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)}")
+    "auth-migrate": $(json_value "${DEPLOY_AUTH_MIGRATE_IMAGE:-$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)}")
   },
   "previous_images": {
     "api": $(json_value "$PREVIOUS_API_IMAGE"),
+    "api-migrate": $(json_value "$PREVIOUS_API_MIGRATE_IMAGE"),
     "auth": $(json_value "$PREVIOUS_AUTH_IMAGE"),
-    "auth_migrate": $(json_value "$PREVIOUS_AUTH_MIGRATE_IMAGE")
+    "auth-migrate": $(json_value "$PREVIOUS_AUTH_MIGRATE_IMAGE")
   },
   "backups": {
     "postgres": $(json_value "$DEPLOY_POSTGRES_BACKUP"),
@@ -1269,6 +1283,7 @@ restore_env_snapshot() {
 
 capture_deploy_image_refs() {
   DEPLOY_API_IMAGE="$(env_value IDEABOARD_API_IMAGE)"
+  DEPLOY_API_MIGRATE_IMAGE="$(env_value IDEABOARD_API_MIGRATE_IMAGE)"
   DEPLOY_AUTH_IMAGE="$(env_value IDEABOARD_AUTH_IMAGE)"
   DEPLOY_AUTH_MIGRATE_IMAGE="$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
 }
@@ -1284,6 +1299,7 @@ print_recovery_hint() {
   [[ -n "$DEPLOY_POSTGRES_BACKUP" ]] && echo "PostgreSQL backup: $DEPLOY_POSTGRES_BACKUP" >&2
   [[ -n "$DEPLOY_UPLOADS_BACKUP" ]] && echo "Uploads backup: $DEPLOY_UPLOADS_BACKUP" >&2
   echo "Previous API image: $PREVIOUS_API_IMAGE" >&2
+  echo "Previous API migration image: $PREVIOUS_API_MIGRATE_IMAGE" >&2
   echo "Previous Auth image: $PREVIOUS_AUTH_IMAGE" >&2
   echo "Previous Auth migration image: $PREVIOUS_AUTH_MIGRATE_IMAGE" >&2
   echo "Inspect logs: ideaboard logs --tail=200 api auth postgres nats" >&2
@@ -1393,6 +1409,7 @@ print_env_image_refs() {
   echo "Configured image refs:"
   echo "  api: $(env_value IDEABOARD_API_IMAGE)"
   echo "  auth: $(env_value IDEABOARD_AUTH_IMAGE)"
+  echo "  api-migrate: $(env_value IDEABOARD_API_MIGRATE_IMAGE)"
   echo "  auth-migrate: $(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
 }
 
@@ -1472,6 +1489,7 @@ fetch_update_manifest() {
 apply_update_manifest() {
   local manifest_file="$1"
   local api_image
+  local api_migrate_image
   local auth_image
   local auth_migrate_image
   local tag
@@ -1479,14 +1497,16 @@ apply_update_manifest() {
   local checkout_commit
 
   api_image="$(json_image_field "api" "$manifest_file")"
+  api_migrate_image="$(json_image_field "api-migrate" "$manifest_file")"
   auth_image="$(json_image_field "auth" "$manifest_file")"
   auth_migrate_image="$(json_image_field "auth-migrate" "$manifest_file")"
   if [[ -z "$auth_migrate_image" ]]; then
     auth_migrate_image="$(json_image_field "auth_migrate" "$manifest_file")"
   fi
-  [[ -n "$api_image" && -n "$auth_image" && -n "$auth_migrate_image" ]] || \
-    die "release manifest must contain images.api, images.auth, and images.auth-migrate"
+  [[ -n "$api_image" && -n "$api_migrate_image" && -n "$auth_image" && -n "$auth_migrate_image" ]] || \
+    die "release manifest must contain images.api, images.api-migrate, images.auth, and images.auth-migrate"
   is_ideaboard_image_ref "$api_image" "api" || die "release manifest has invalid api image ref"
+  is_ideaboard_image_ref "$api_migrate_image" "api-migrate" || die "release manifest has invalid api-migrate image ref"
   is_ideaboard_image_ref "$auth_image" "auth" || die "release manifest has invalid auth image ref"
   is_ideaboard_image_ref "$auth_migrate_image" "auth-migrate" || die "release manifest has invalid auth-migrate image ref"
 
@@ -1499,6 +1519,7 @@ apply_update_manifest() {
     die "stack checkout commit $checkout_commit does not match release manifest commit $commit"
   echo "Applying release manifest${tag:+ tag: $tag}${commit:+ commit: $commit}"
   set_env_value IDEABOARD_API_IMAGE "$api_image"
+  set_env_value IDEABOARD_API_MIGRATE_IMAGE "$api_migrate_image"
   set_env_value IDEABOARD_AUTH_IMAGE "$auth_image"
   set_env_value IDEABOARD_AUTH_MIGRATE_IMAGE "$auth_migrate_image"
   DEPLOY_IMAGE_UPDATE_PENDING=1
@@ -1557,19 +1578,20 @@ run_deploy_transaction() {
 restore_previous_image_refs() {
   [[ -f "$PREVIOUS_RELEASE_FILE" ]] || die "previous release manifest not found: $PREVIOUS_RELEASE_FILE"
   local api_image
+  local api_migrate_image
   local auth_image
   local auth_migrate_image
   api_image="$(json_object_string_field "images" "api" "$PREVIOUS_RELEASE_FILE")"
+  api_migrate_image="$(json_object_string_field "images" "api-migrate" "$PREVIOUS_RELEASE_FILE")"
   auth_image="$(json_object_string_field "images" "auth" "$PREVIOUS_RELEASE_FILE")"
-  auth_migrate_image="$(json_object_string_field "images" "auth_migrate" "$PREVIOUS_RELEASE_FILE")"
-  if [[ -z "$auth_migrate_image" ]]; then
-    auth_migrate_image="$(json_object_string_field "images" "auth-migrate" "$PREVIOUS_RELEASE_FILE")"
-  fi
-  [[ -n "$api_image" && -n "$auth_image" && -n "$auth_migrate_image" ]] || die "previous release manifest is missing image refs"
+  auth_migrate_image="$(json_object_string_field "images" "auth-migrate" "$PREVIOUS_RELEASE_FILE")"
+  [[ -n "$api_image" && -n "$api_migrate_image" && -n "$auth_image" && -n "$auth_migrate_image" ]] || die "previous release manifest is missing image refs"
   is_ideaboard_image_ref "$api_image" "api" || die "previous release manifest has invalid api image ref"
+  is_ideaboard_image_ref "$api_migrate_image" "api-migrate" || die "previous release manifest has invalid api-migrate image ref"
   is_ideaboard_image_ref "$auth_image" "auth" || die "previous release manifest has invalid auth image ref"
   is_ideaboard_image_ref "$auth_migrate_image" "auth-migrate" || die "previous release manifest has invalid auth-migrate image ref"
   set_env_value IDEABOARD_API_IMAGE "$api_image"
+  set_env_value IDEABOARD_API_MIGRATE_IMAGE "$api_migrate_image"
   set_env_value IDEABOARD_AUTH_IMAGE "$auth_image"
   set_env_value IDEABOARD_AUTH_MIGRATE_IMAGE "$auth_migrate_image"
 }
@@ -1704,6 +1726,7 @@ verify_image_signature() {
 
 verify_image_signatures() {
   verify_image_signature "$(env_value IDEABOARD_API_IMAGE)"
+  verify_image_signature "$(env_value IDEABOARD_API_MIGRATE_IMAGE)"
   verify_image_signature "$(env_value IDEABOARD_AUTH_IMAGE)"
   verify_image_signature "$(env_value IDEABOARD_AUTH_MIGRATE_IMAGE)"
   DEPLOY_COSIGN_GATE="passed"

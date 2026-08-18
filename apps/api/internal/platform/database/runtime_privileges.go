@@ -99,20 +99,6 @@ func RuntimePrivilegePolicy() dbprivileges.Policy {
 				PublicForbidden: allSequencePrivileges,
 			},
 			{
-				Kind:     dbprivileges.KindTable,
-				Names:    []string{"schema_migrations"},
-				Required: []dbprivileges.Privilege{dbprivileges.PrivilegeSelect},
-				Forbidden: []dbprivileges.Privilege{
-					dbprivileges.PrivilegeInsert,
-					dbprivileges.PrivilegeUpdate,
-					dbprivileges.PrivilegeDelete,
-					dbprivileges.PrivilegeTruncate,
-					dbprivileges.PrivilegeReferences,
-					dbprivileges.PrivilegeTrigger,
-				},
-				PublicForbidden: allTablePrivileges,
-			},
-			{
 				Kind:  dbprivileges.KindTable,
 				Names: []string{"user_deletion_requests"},
 				Required: []dbprivileges.Privilege{

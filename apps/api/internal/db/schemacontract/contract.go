@@ -1,4 +1,4 @@
-package migrations
+package schemacontract
 
 import (
 	"context"
@@ -19,6 +19,8 @@ type schemaContract struct {
 	properties map[catalogProperty]string
 }
 
+type MigrationApplier func(context.Context, *sql.Conn) error
+
 // VerifySchemaSnapshotContract applies both schema release paths and compares
 // their PostgreSQL catalog semantics. The caller owns two empty, isolated
 // schemas and their connection lifecycle.
@@ -27,8 +29,9 @@ func VerifySchemaSnapshotContract(
 	snapshotConn *sql.Conn,
 	migrationConn *sql.Conn,
 	snapshotSQL []byte,
+	applyMigration MigrationApplier,
 ) error {
-	if snapshotConn == nil || migrationConn == nil {
+	if snapshotConn == nil || migrationConn == nil || applyMigration == nil {
 		return fmt.Errorf("schema contract verification requires two database connections")
 	}
 	if len(snapshotSQL) == 0 {
@@ -37,7 +40,7 @@ func VerifySchemaSnapshotContract(
 	if _, err := snapshotConn.ExecContext(ctx, string(snapshotSQL)); err != nil {
 		return fmt.Errorf("apply schema snapshot: %w", err)
 	}
-	if err := upWithConn(ctx, migrationConn); err != nil {
+	if err := applyMigration(ctx, migrationConn); err != nil {
 		return fmt.Errorf("apply migration chain: %w", err)
 	}
 
@@ -246,7 +249,7 @@ tables AS (
   JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = class.relnamespace
   JOIN target_schema ON target_schema.name = namespace.nspname
   WHERE class.relkind IN ('r', 'p')
-    AND class.relname <> 'schema_migrations'
+    AND class.relname <> 'atlas_schema_revisions'
 ),
 functions AS (
   SELECT function.*,
@@ -256,7 +259,6 @@ functions AS (
   JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = function.pronamespace
   JOIN pg_catalog.pg_language AS language ON language.oid = function.prolang
   JOIN target_schema ON target_schema.name = namespace.nspname
-  WHERE function.proname <> 'prevent_schema_migrations_mutation'
 ),
 constraints AS (
   SELECT constraint_info.*,

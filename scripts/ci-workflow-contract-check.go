@@ -92,8 +92,11 @@ func checkReusableWorkflows(root string) {
 	requireEqual(webAudit["run"], "npm audit --omit=dev --audit-level=high", "Web audit must reject high production vulnerabilities")
 
 	migration := loadWorkflow(root, "migration-integration.yml")
+	migrationInputs := object(object(migration, "on"), "workflow_call")
+	requireKey(migrationInputs, "inputs", "Migration integration must accept commit range inputs")
 	verify := object(object(migration, "jobs"), "verify")
 	requireStepRun(verify, "bash scripts/ci-migration-integration-test.sh")
+	requireStepRun(verify, "bash scripts/atlas-migration-check.sh")
 	requireStepRun(verify, "./scripts/ci-migration-integration.sh")
 	for _, step := range steps(verify) {
 		run, _ := step["run"].(string)

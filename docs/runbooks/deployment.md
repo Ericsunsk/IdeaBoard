@@ -108,6 +108,7 @@ VPS 防火墙只开放 SSH、80、443。API/Auth 容器只绑定 `127.0.0.1:6000
 ```text
 GitHub Actions
   -> ghcr.io/<owner>/<repo>/ideaboard-api@sha256:<digest>
+  -> ghcr.io/<owner>/<repo>/ideaboard-api-migrate@sha256:<digest>
   -> ghcr.io/<owner>/<repo>/ideaboard-auth@sha256:<digest>
   -> ghcr.io/<owner>/<repo>/ideaboard-auth-migrate@sha256:<digest>
 
@@ -124,7 +125,7 @@ VPS
 
 生产部署不要把 VPS 端 bootstrap 绑定到 `main`；请始终使用明确的发布 tag 或 commit SHA。镜像部署值必须使用 GitHub Actions 输出的 digest 引用。
 
-Docker Images workflow 只消费目标 commit 已成功的 `CI Gate`，然后构建、扫描、签名并发布 immutable `sha-<commit>` images。workflow 会上传 `release-manifest` artifact；strict SemVer tag 发布还会把 `release-manifest.json` 和六份按 `linux/amd64`、`linux/arm64` 拆分的 CycloneDX SBOM 附到同一 GitHub Release。该 manifest 是推荐升级输入，记录本次 workflow 的 `repository` / `tag` / `ref` / `commit` / `run_id`、三张 GHCR digest 镜像引用、各平台 SBOM 文件名与 Cosign OIDC identity。
+Docker Images workflow 只消费目标 commit 已成功的 `CI Gate`，然后构建、扫描、签名并发布 immutable `sha-<commit>` images。workflow 会上传 `release-manifest` artifact；strict SemVer tag 发布还会把 `release-manifest.json` 和八份按 `linux/amd64`、`linux/arm64` 拆分的 CycloneDX SBOM 附到同一 GitHub Release。该 manifest 是推荐升级输入，记录本次 workflow 的 `repository` / `tag` / `ref` / `commit` / `run_id`、四张 GHCR digest 镜像引用、各平台 SBOM 文件名与 Cosign OIDC identity。API Migration image 同时发布 `linux/amd64` 与 `linux/arm64`，VPS 可直接使用 ARM64 节点。
 
 严格 SemVer tag（例如 `v0.1.0`）还会触发同一 workflow 内的 Production deployment；手动 workflow 可以构建、扫描、签名 artifact，但不会自动进入 Production deployment。deployment job 只下载本次 workflow 生成的 `release-manifest`，在建立 SSH 连接前验证 manifest 的 tag、commit、ref 和三张 image digest，然后把 manifest 通过 stdin 发送给 VPS 上的 restricted forced command。VPS entrypoint 继续负责 checkout 对应 commit、Cosign 验签、backup、migration、health、smoke 和 release state；GitHub Actions 不重新 build、不解析 mutable image tag，也不读取应用运行时 Secret。
 
@@ -248,13 +249,15 @@ Migration 前失败会恢复 `.env` snapshot；migration 后失败不会自动 r
 
 `ideaboard` 是固定 schema owner；`ideaboard_api` 与 `ideaboard_auth` 是彼此独立的 limited runtime roles。三个 roles 必须使用不同密码；长期运行的 API/Auth 容器只接收各自 runtime credential，只有一次性的 `api-migrate` / `auth-migrate` 容器接收 owner credential。
 
-空 PostgreSQL 库由 API migration 以 `20260817182925_baseline.sql` 初始化业务 schema，并写入 version、filename、SHA-256 checksum 和 applied timestamp；API runtime 不再自动迁移。Docker 部署会先运行 `api-migrate`，授予 runtime 常规业务表 DML，并将 Credits Ledger 收紧为只读 + typed Credit Commands；再运行 Auth migration，为 Auth runtime role 授予 Better Auth tables DML 与 `get_auth_runtime_settings()` 的 `EXECUTE`，最后启动服务。`DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` 只注入一次性的 migration process，不得进入长期运行的 API/Auth runtime；本地示例见 `docker/migration.env.example`。
+空 PostgreSQL 库由 API migration 以 `20260817182925_baseline.sql` 初始化业务 schema；Atlas 在 `atlas_schema_revisions` 中维护版本与校验信息，API runtime 不再自动迁移。Docker 部署会先运行 `api-migrate`，授予 runtime 常规业务表 DML，并将 Credits Ledger 收紧为只读 + typed Credit Commands；再运行 Auth migration，为 Auth runtime role 授予 Better Auth tables DML 与 `get_auth_runtime_settings()` 的 `EXECUTE`，最后启动服务。`DB_MIGRATION_USER` / `DB_MIGRATION_PASSWORD` 只注入一次性的 migration process，不得进入长期运行的 API/Auth runtime；本地示例见 `docker/migration.env.example`。
 
 Schema 变更必须经过同一条 Schema Release lifecycle：在 `apps/api` 中修改 domain fragment 或 manifest 后运行 `BASE_SHA=HEAD API_TEST_DATABASE_DSN='<test-dsn>' go run ./cmd/schema-release --write-artifact` 生成 `internal/db/schema/schema.sql`，提交 snapshot 与 append-only migration；发布前和 CI 使用相同 command 但不带 `--write-artifact`，以只读方式检查 manifest assembly、snapshot drift、sqlc generation、migration immutability 和 PostgreSQL catalog semantics。不要调用已移除的旧 schema assembly 或 migration history scripts。
 
-非空数据库不能直接套用该 baseline。若你从其他形态迁入数据，标准做法是先导出需要保留的数据，再在空库上初始化当前 baseline，最后用受控脚本导入业务数据；不要手动修改 `schema_migrations` 绕过 baseline 校验。
+非空数据库不能直接套用该 baseline。若你从其他形态迁入数据，标准做法是先导出需要保留的数据，再在空库上初始化当前 baseline，最后用受控脚本导入业务数据；不要手动修改 `atlas_schema_revisions` 绕过 migration 校验。
 
-当前 API migration 保护会拒绝四类风险状态：未知历史 migration 版本；历史 filename/checksum 与当前 embedded migration 不一致；baseline 未应用但 schema 已有 API-owned 业务表；baseline 已标记应用但当前 schema 缺少 baseline 业务表。`schema_migrations` 由 database trigger 强制 append-only。Better Auth 的认证表可以先存在，不计入 API baseline 冲突；不过标准部署顺序仍是 API baseline first、Better Auth migration second。Clean-break 后禁止只回滚 API/Auth image；需要同时恢复数据库 backup 或重新初始化 Fresh Database。
+Atlas migration integrity 由 `atlas.sum` 与 `atlas_schema_revisions` 共同保证；API migration image 在部署前应用 versioned migrations，随后由 `finalize-migrate` 完成 River schema 与 runtime privilege setup。Better Auth 的认证表可以先存在，不计入 API baseline 冲突；不过标准部署顺序仍是 API baseline first、Better Auth migration second。Clean-break 后禁止只回滚 API/Auth image；需要同时恢复数据库 backup 或重新初始化 Fresh Database。
+
+Migration workflow 使用 Atlas Community Edition 的 `atlas migrate validate` 完成 `atlas.sum` integrity、Fresh replay 和 PostgreSQL semantic validation；`atlas migrate lint` 需要 Atlas Pro 登录，不是部署或 CI 前置条件。新增 migration 由 `atlas migrate diff` 生成，必须与 `atlas.sum` 一起提交。`scripts/atlas-migration-check.sh` 只检查本次新增 SQL，并默认阻止 `DROP TABLE`、`DROP COLUMN`、`TRUNCATE` 等 destructive DDL；若业务确实需要 destructive change，必须在 SQL 中写入 `-- destructive: approved`，并在受控 review 环境显式设置 `ATLAS_ALLOW_DESTRUCTIVE=1`。CI 使用隔离的 Fresh database 运行该 gate，然后对集成 database 执行两轮 Atlas apply，覆盖 Fresh 与 incremental idempotency 路径。
 
 PostgreSQL init script 只在空 volume 创建 API/Auth runtime roles。项目尚未上线时若本地 volume 早于该角色分离方案，直接删除并重建开发 volume；不要把 owner credential 配回任何长期运行的应用 runtime。
 

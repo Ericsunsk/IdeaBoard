@@ -1,30 +1,9 @@
-package migrations
+package schemacontract
 
 import (
-	"context"
-	"os"
 	"strings"
 	"testing"
-	"time"
 )
-
-func TestVerifySchemaSnapshotContractMatchesMigrationChain(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
-	defer cancel()
-
-	snapshot, err := os.ReadFile("../schema/schema.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := VerifySchemaSnapshotContract(
-		ctx,
-		openIsolatedMigrationConn(t, ctx),
-		openIsolatedMigrationConn(t, ctx),
-		snapshot,
-	); err != nil {
-		t.Fatal(err)
-	}
-}
 
 func TestCompareSchemaContractsReportsObjectAndPropertyDrift(t *testing.T) {
 	leftContract := schemaContract{properties: map[catalogProperty]string{

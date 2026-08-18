@@ -100,6 +100,13 @@ assert_output_line "${migration_integration_output}" 'auth=true'
 assert_output_line "${migration_integration_output}" 'migration_integration=true'
 assert_output_line "${migration_integration_output}" 'ops=true'
 
+atlas_migration_output="$(printf '%s\n' scripts/atlas-migration-check.sh | "${classifier}")"
+
+assert_output_line "${atlas_migration_output}" 'api=true'
+assert_output_line "${atlas_migration_output}" 'auth=true'
+assert_output_line "${atlas_migration_output}" 'migration_integration=true'
+assert_output_line "${atlas_migration_output}" 'ops=true'
+
 gate_output="$(printf '%s\n' scripts/ci-gate.sh | "${classifier}")"
 
 assert_output_line "${gate_output}" 'web=true'

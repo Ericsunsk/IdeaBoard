@@ -11,6 +11,7 @@
 | Node.js | `22.23.2` |
 | Go | `1.26.6+` |
 | PostgreSQL | `17+` |
+| Atlas CLI | `1.3.0` |
 
 启动本地依赖：
 
@@ -29,9 +30,14 @@ docker compose -f compose.local.yml up -d
 cd apps/api
 cp .env.example .env
 set -a
+source ../../docker/.env
 source ../../docker/migration.env
 set +a
-go run ./cmd migrate
+atlas migrate apply --dir file://internal/db/migrations \
+  --url "postgres://${DB_MIGRATION_USER}:${DB_MIGRATION_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}"
+DB_USER=ideaboard_api DB_PASSWORD="$API_DB_PASSWORD" \
+  DB_MIGRATION_USER=ideaboard DB_MIGRATION_PASSWORD="$DB_MIGRATION_PASSWORD" \
+  go run ./cmd finalize-migrate
 ```
 
 ```bash
@@ -43,6 +49,29 @@ source ../../docker/migration.env
 set +a
 npm run migrate
 ```
+
+### Atlas migration workflow
+
+Atlas Community Edition 的 migration contract 使用 `atlas migrate validate`，它会校验 `atlas.sum`、执行 Fresh replay 并检查 PostgreSQL semantic validity。`atlas migrate lint` 属于 Atlas Pro，不作为本项目的 CI 依赖。
+
+生成新的 versioned migration 时，在隔离的 development database 上运行：
+
+```bash
+cd apps/api
+atlas migrate diff add_feature \
+  --dir file://internal/db/migrations \
+  --dev-url "${ATLAS_DEV_URL}" \
+  --to file://internal/db/schema/schema.sql
+```
+
+提交 migration SQL 与更新后的 `internal/db/migrations/atlas.sum`。提交前使用同一份隔离 database 运行 contract check；它还会阻止新增 migration 中未经明确批准的 `DROP TABLE`、`DROP COLUMN`、`TRUNCATE` 等 destructive DDL：
+
+```bash
+ATLAS_DEV_URL='postgres://user:password@127.0.0.1:5432/ideaboard_atlas_validate?sslmode=disable' \
+bash scripts/atlas-migration-check.sh
+```
+
+如确需 destructive migration，SQL 文件必须包含 `-- destructive: approved`，并且只在经过 review 的环境中显式设置 `ATLAS_ALLOW_DESTRUCTIVE=1`；CI 默认始终拒绝。
 
 然后分别启动 Auth 与 API：
 
@@ -162,7 +191,7 @@ go tool sqlc generate
 git diff --exit-code -- internal/db/sqlc
 ```
 
-Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration 创建。若本地数据库包含已删除的 Rewards migration version 或历史 Rewards Ledger fact，`go run ./cmd migrate` 会 fail closed；请显式重建 Fresh Database，不要补空 migration、手删 Ledger 或尝试兼容性回放。
+Rewards 是 pre-launch clean break：RewardCode 由单一 canonical migration 创建。API schema 由 Atlas versioned migrations 管理；若本地数据库不符合当前 Atlas history，请显式重建 Fresh Database，不要补空 migration、手删 Ledger 或尝试兼容性回放。
 
 ## 常用入口
 
@@ -266,8 +295,9 @@ sqlc:
 
 - `apps/api/internal/db/sqlc/*.go` 不手动编辑。
 - SQL schema/query 变更后运行 `go tool sqlc generate`。
-- migrations 位于 `apps/api/internal/db/migrations/`。
-- API migration history 以 `20260817182925_baseline.sql` 为当前 clean-break baseline，后续 migration 必须 append-only。Pre-launch rebaseline 只能原子删除旧 SQL chain 并新增一个更高版本 baseline，随后重建 Fresh Database；不得手工编辑 `schema_migrations` 绕过 checksum 校验。
+- Atlas migrations 位于 `apps/api/internal/db/migrations/`，由 `apps/api/atlas.hcl` 与 `atlas.sum` 管理。
+- Atlas migration 生成使用 `atlas migrate diff`；完整性与 Fresh replay 使用 `scripts/atlas-migration-check.sh`。CI 先在隔离 database 执行 `atlas migrate validate`，再在集成 database 执行 Fresh apply 与 incremental idempotency apply；不要把 Atlas Pro-only 的 `atlas migrate lint` 加入流水线。
+- API schema 由独立 `api-migrate` image 执行 Atlas versioned migrations，再执行 `finalize-migrate` 完成 River 与 runtime privilege setup。Pre-launch rebaseline 只能原子删除旧 SQL chain 并新增一个更高版本 baseline，随后重建 Fresh Database；不得手工编辑 Atlas revisions 表。
 - Schema source 的唯一 lifecycle 是 `schema-release`：修改 domain fragment 或 manifest 后先用 `--write-artifact` 生成 `schema.sql`，再运行默认 check；CI 和 release gate 只运行默认 check。
 - clean-break release 只支持 Fresh Database。旧数据库必须先导出需要保留的数据，再重建并按当前 baseline 初始化；不能使用旧 migration binary 做跨 baseline 升级或回滚。
 

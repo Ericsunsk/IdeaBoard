@@ -77,6 +77,12 @@ jobs:
             file: ./apps/api/Dockerfile
             target: runtime
             cache_scope: ideaboard-api
+          - name: api-migrate
+            display: API Migration
+            context: ./apps/api
+            file: ./apps/api/Dockerfile
+            target: migrator
+            cache_scope: ideaboard-api-migrate
           - name: auth
             display: Auth
             context: ./apps/auth
@@ -272,7 +278,7 @@ jobs:
       - name: Generate release manifest
         shell: bash
         run: |
-          for image in api auth auth-migrate; do
+          for image in api api-migrate auth auth-migrate; do
             test -s "release-assets/${image}.json" || {
               echo "Missing metadata for ${image}" >&2
               exit 1
@@ -289,6 +295,7 @@ jobs:
             --arg cosign_identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/docker-images.yml@${GITHUB_REF}" \
             --arg cosign_issuer "https://token.actions.githubusercontent.com" \
             --slurpfile api release-assets/api.json \
+            --slurpfile api_migrate release-assets/api-migrate.json \
             --slurpfile auth release-assets/auth.json \
             --slurpfile auth_migrate release-assets/auth-migrate.json \
             '{
@@ -302,11 +309,13 @@ jobs:
               },
               images: {
                 api: $api[0].ref,
+                "api-migrate": $api_migrate[0].ref,
                 auth: $auth[0].ref,
                 "auth-migrate": $auth_migrate[0].ref
               },
               sbom_files: {
                 api: $api[0].sbom_files,
+                "api-migrate": $api_migrate[0].sbom_files,
                 auth: $auth[0].sbom_files,
                 "auth-migrate": $auth_migrate[0].sbom_files
               },
@@ -387,6 +396,9 @@ jobs:
               .ref == $expected_ref and
               (.images.api |
                 startswith($expected_image_repository + "/ideaboard-api@sha256:") and
+                test("@sha256:[0-9a-f]{64}$")) and
+              (.images["api-migrate"] |
+                startswith($expected_image_repository + "/ideaboard-api-migrate@sha256:") and
                 test("@sha256:[0-9a-f]{64}$")) and
               (.images.auth |
                 startswith($expected_image_repository + "/ideaboard-auth@sha256:") and
@@ -526,6 +538,7 @@ jobs:
           }
 
           api_digest="$(digest_or_unavailable api)"
+          api_migrate_digest="$(digest_or_unavailable api-migrate)"
           auth_digest="$(digest_or_unavailable auth)"
           auth_migrate_digest="$(digest_or_unavailable auth-migrate)"
           failed_stage='not-started'
@@ -547,6 +560,7 @@ jobs:
             echo "| Tag | \`${GITHUB_REF_NAME}\` |"
             echo "| Commit | \`${GITHUB_SHA}\` |"
             echo "| API digest | \`${api_digest}\` |"
+            echo "| API migration digest | \`${api_migrate_digest}\` |"
             echo "| Auth digest | \`${auth_digest}\` |"
             echo "| Auth migration digest | \`${auth_migrate_digest}\` |"
             echo "| Failed stage | \`${failed_stage}\` |"

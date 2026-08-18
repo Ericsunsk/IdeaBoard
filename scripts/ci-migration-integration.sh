@@ -36,6 +36,23 @@ export NODE_ENV="${NODE_ENV:-production}"
 
 (cd "${repo_root}/apps/auth" && npm run build)
 
+atlas_version="${ATLAS_VERSION:-1.3.0}"
+atlas_arch="$(uname -m)"
+case "${atlas_arch}" in
+  x86_64) atlas_arch=amd64 ;;
+  aarch64|arm64) atlas_arch=arm64 ;;
+  *) printf 'ci-migration-integration: unsupported host architecture %s\n' "${atlas_arch}" >&2; exit 2 ;;
+esac
+atlas_binary="${CI_MIGRATION_ATLAS_BINARY:-}"
+if [[ -z "${atlas_binary}" ]]; then
+  atlas_binary="$(mktemp)"
+  trap 'rm -f -- "${atlas_binary}"' EXIT
+  curl -fsSL "https://release.ariga.io/atlas/atlas-linux-${atlas_arch}-v${atlas_version}" -o "${atlas_binary}"
+  chmod 0555 "${atlas_binary}"
+fi
+
+atlas_url="postgres://${DB_MIGRATION_USER}:${DB_MIGRATION_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}"
+
 docker cp \
   "${repo_root}/docker/postgres/init-runtime-roles.sh" \
   "${postgres_container}:/tmp/init-runtime-roles.sh"
@@ -48,8 +65,11 @@ docker exec \
   sh /tmp/init-runtime-roles.sh
 
 run_api_migration() {
-  (cd "${repo_root}/apps/api" && \
-    env DB_USER="${API_DB_USER}" DB_PASSWORD="${API_DB_PASSWORD}" go run ./cmd migrate)
+	"${atlas_binary}" migrate apply \
+	  --dir "file://${repo_root}/apps/api/internal/db/migrations" \
+	  --url "${atlas_url}"
+	(cd "${repo_root}/apps/api" && \
+	  env DB_USER="${API_DB_USER}" DB_PASSWORD="${API_DB_PASSWORD}" go run ./cmd finalize-migrate)
 }
 
 run_auth_migration() {
@@ -61,4 +81,3 @@ run_api_migration
 run_auth_migration
 run_api_migration
 run_auth_migration
-

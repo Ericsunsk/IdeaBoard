@@ -3,14 +3,17 @@ package testdb
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"net/url"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"ideaboard/api/internal/db/migrations"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -24,7 +27,7 @@ func Open(t testing.TB) *sql.DB {
 
 	env := createIsolatedEnv(t)
 	db := openIsolatedSQLDB(t, env)
-	migrateAndSeed(t, db)
+	migrateAndSeed(t, db, env)
 	return db
 }
 
@@ -33,7 +36,7 @@ func OpenWithPool(t testing.TB) (*sql.DB, *pgxpool.Pool) {
 
 	env := createIsolatedEnv(t)
 	db := openIsolatedSQLDB(t, env)
-	migrateAndSeed(t, db)
+	migrateAndSeed(t, db, env)
 	pool := openIsolatedPool(t, env)
 	return db, pool
 }
@@ -130,13 +133,38 @@ func openIsolatedPool(t testing.TB, env isolatedEnv) *pgxpool.Pool {
 	return pool
 }
 
-func migrateAndSeed(t testing.TB, db *sql.DB) {
+func migrateAndSeed(t testing.TB, db *sql.DB, env isolatedEnv) {
 	t.Helper()
 
-	if err := migrations.Up(t.Context(), db); err != nil {
+	if err := applyAtlasMigration(t.Context(), env.rawDSN, env.schemaName); err != nil {
 		t.Fatalf("migrate PostgreSQL test db failed: %v", err)
 	}
 	seedDefaults(t, db)
+}
+
+func applyAtlasMigration(ctx context.Context, rawDSN, schemaName string) error {
+	parsed, err := url.Parse(rawDSN)
+	if err != nil {
+		return fmt.Errorf("parse test database dsn: %w", err)
+	}
+	query := parsed.Query()
+	query.Set("search_path", schemaName+",public")
+	parsed.RawQuery = query.Encode()
+	_, sourcePath, _, ok := runtime.Caller(0)
+	if !ok {
+		return fmt.Errorf("resolve test database migration directory")
+	}
+	migrationDir := filepath.Join(filepath.Dir(sourcePath), "../db/migrations")
+	atlasBinary := strings.TrimSpace(os.Getenv("ATLAS_BINARY"))
+	if atlasBinary == "" {
+		atlasBinary = "atlas"
+	}
+	command := exec.CommandContext(ctx, atlasBinary, "migrate", "apply", "--allow-dirty", "--revisions-schema", schemaName, "--dir", "file://"+filepath.ToSlash(migrationDir), "--url", parsed.String())
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("atlas migrate apply: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+	return nil
 }
 
 func nextSchemaName() string {

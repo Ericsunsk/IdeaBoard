@@ -12,7 +12,6 @@ import (
 	"ideaboard/api/internal/billing"
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/credits"
-	"ideaboard/api/internal/db/migrations"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"
@@ -93,7 +92,7 @@ func closeStartupDatabase(db *sql.DB, cause error) error {
 	return cause
 }
 
-func migrateAppDatabases(ctx context.Context, cfg *config.Config) error {
+func finalizeAppDatabases(ctx context.Context, cfg *config.Config) error {
 	if cfg == nil {
 		return fmt.Errorf("database config is nil")
 	}
@@ -106,9 +105,6 @@ func migrateAppDatabases(ctx context.Context, cfg *config.Config) error {
 		return fmt.Errorf("failed to connect migration database: %w", err)
 	}
 	defer migrationDB.Close()
-	if err := migrations.Up(ctx, migrationDB); err != nil {
-		return fmt.Errorf("failed to migrate database schema: %w", err)
-	}
 	migrationPool, err := worker.NewRiverPgxPool(ctx, database.PostgresDSN(migrationConfig))
 	if err != nil {
 		return fmt.Errorf("failed to connect River migration pool: %w", err)

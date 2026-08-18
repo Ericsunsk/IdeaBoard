@@ -55,11 +55,9 @@ services:
       - ideaboard-network
 
   api-migrate:
-    image: ${IDEABOARD_API_IMAGE:?Set IDEABOARD_API_IMAGE in docker/.env}
+    image: ${IDEABOARD_API_MIGRATE_IMAGE:?Set IDEABOARD_API_MIGRATE_IMAGE in docker/.env}
     profiles:
       - tools
-    command:
-      - migrate
     cap_drop:
       - ALL
     security_opt:

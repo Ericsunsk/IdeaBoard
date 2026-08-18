@@ -68,6 +68,8 @@ tag="$(jq -er '.tag | strings' "${MANIFEST_FILE}")" || die 'manifest tag is miss
 commit="$(jq -er '.commit | strings' "${MANIFEST_FILE}")" || die 'manifest commit is missing'
 repository="$(jq -er '.repository | strings' "${MANIFEST_FILE}")" || die 'manifest repository is missing'
 api_image="$(jq -er '.images.api | strings' "${MANIFEST_FILE}")" || die 'manifest API image is missing'
+api_migrate_image="$(jq -er '.images["api-migrate"] | strings' "${MANIFEST_FILE}")" || \
+  die 'manifest API Migration image is missing'
 auth_image="$(jq -er '.images.auth | strings' "${MANIFEST_FILE}")" || die 'manifest Auth image is missing'
 auth_migrate_image="$(jq -er '.images["auth-migrate"] | strings' "${MANIFEST_FILE}")" || \
   die 'manifest Auth Migration image is missing'
@@ -76,6 +78,8 @@ auth_migrate_image="$(jq -er '.images["auth-migrate"] | strings' "${MANIFEST_FIL
 [[ "${commit}" =~ ^[0-9a-f]{40}$ ]] || die 'manifest commit must be a full Git SHA'
 [[ "${repository}" == "${EXPECTED_REPOSITORY}" ]] || die 'manifest repository is not allowed'
 validate_image_ref "${api_image}" api || die 'manifest API image must use the expected immutable digest'
+validate_image_ref "${api_migrate_image}" api-migrate || \
+  die 'manifest API Migration image must use the expected immutable digest'
 validate_image_ref "${auth_image}" auth || die 'manifest Auth image must use the expected immutable digest'
 validate_image_ref "${auth_migrate_image}" auth-migrate || \
   die 'manifest Auth Migration image must use the expected immutable digest'
