@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
   login: vi.fn(),
   logout: vi.fn(),
   getCapabilities: vi.fn(),
-  signInWithGoogle: vi.fn(),
+  signInWithOAuth: vi.fn(),
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
 }))
@@ -41,7 +41,7 @@ vi.mock('../session/authSession', () => ({
 vi.mock('../session/authTransport', () => ({
   authTransport: {
     getCapabilities: mocks.getCapabilities,
-    signInWithGoogle: mocks.signInWithGoogle,
+    signInWithOAuth: mocks.signInWithOAuth,
     logout: mocks.logout,
   },
 }))
@@ -138,18 +138,18 @@ function renderCallbackPage() {
   })
 }
 
-describe('Google OAuth entry points', () => {
+describe('Social OAuth entry points', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.route.path = '/user/auth/callback'
     mocks.route.query = {}
-    mocks.getCapabilities.mockResolvedValue({ social: { google: false } })
-    mocks.signInWithGoogle.mockResolvedValue(undefined)
+    mocks.getCapabilities.mockResolvedValue({ social: { google: false, discord: false } })
+    mocks.signInWithOAuth.mockResolvedValue(undefined)
     mocks.logout.mockResolvedValue(true)
   })
 
   it('shows the Google button on User Login only when the capability is enabled', async () => {
-    mocks.getCapabilities.mockResolvedValue({ social: { google: true } })
+    mocks.getCapabilities.mockResolvedValue({ social: { google: true, discord: false } })
     const view = renderLoginPanel()
 
     const googleButton = await screen.findByRole('button', { name: '使用 Google 登录' })
@@ -158,8 +158,18 @@ describe('Google OAuth entry points', () => {
     expect(screen.queryByText('或')).not.toBeInTheDocument()
     await view.user.click(googleButton)
 
-    expect(mocks.signInWithGoogle).toHaveBeenCalledOnce()
+    expect(mocks.signInWithOAuth).toHaveBeenCalledWith('google')
     expect(mocks.toastSuccess).not.toHaveBeenCalled()
+  })
+
+  it('shows enabled Google and Discord buttons in one row', async () => {
+    mocks.getCapabilities.mockResolvedValue({ social: { google: true, discord: true } })
+    renderLoginPanel()
+
+    const googleButton = await screen.findByRole('button', { name: '使用 Google 登录' })
+    const discordButton = await screen.findByRole('button', { name: '使用 Discord 登录' })
+    expect(discordButton.parentElement).toBe(googleButton.parentElement)
+    expect(googleButton.parentElement?.children).toHaveLength(2)
   })
 
   it('hides the Google button on User Login when the capability is disabled', async () => {
@@ -171,8 +181,8 @@ describe('Google OAuth entry points', () => {
   })
 
   it('shows an error when the Google redirect cannot start', async () => {
-    mocks.getCapabilities.mockResolvedValue({ social: { google: true } })
-    mocks.signInWithGoogle.mockRejectedValue(new Error('Google 登录失败'))
+    mocks.getCapabilities.mockResolvedValue({ social: { google: true, discord: false } })
+    mocks.signInWithOAuth.mockRejectedValue(new Error('Google 登录失败'))
     const view = renderLoginPanel()
 
     await view.user.click(await screen.findByRole('button', { name: '使用 Google 登录' }))
@@ -230,7 +240,7 @@ describe('UserAuthCallbackPage', () => {
 
     renderCallbackPage()
 
-    expect(await screen.findByText('Google 登录失败，请重新尝试。')).toBeVisible()
+    expect(await screen.findByText('OAuth 登录失败，请重新尝试。')).toBeVisible()
     expect(mocks.ensureSession).not.toHaveBeenCalled()
     expect(mocks.logout).toHaveBeenCalledOnce()
     expect(mocks.clearAuth).toHaveBeenCalledOnce()

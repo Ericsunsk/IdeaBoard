@@ -44,6 +44,21 @@ func TestProtocolSupportsCapabilityChecksExactCapability(t *testing.T) {
 	}
 }
 
+func TestValidateProtocolAPITypeSeparatesSelfHostedImageServices(t *testing.T) {
+	if err := ValidateProtocolAPIType(ProtocolFluxFillJSONImage, "self-hosted"); err != nil {
+		t.Fatalf("self-hosted flux fill endpoint should be valid: %v", err)
+	}
+	if err := ValidateProtocolAPIType(ProtocolImageURLJSONImage, "openai-compatible"); err != nil {
+		t.Fatalf("legacy OpenAI-compatible image endpoint should remain valid: %v", err)
+	}
+	if err := ValidateProtocolAPIType(ProtocolFluxFillJSONImage, "google-cloud"); err == nil {
+		t.Fatal("Google Cloud must not be accepted for the flux fill request format")
+	}
+	if err := ValidateProtocolAPIType(ProtocolModelAPI, "google-cloud"); err != nil {
+		t.Fatalf("model API should accept Google Cloud: %v", err)
+	}
+}
+
 func TestCustomProtocolDoesNotSupportModelDetection(t *testing.T) {
 	if ProtocolSupportsModelDetection(ProtocolImageURLJSONImage) {
 		t.Fatal("custom protocol must not expose model detection")

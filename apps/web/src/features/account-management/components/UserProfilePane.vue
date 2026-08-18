@@ -63,13 +63,8 @@
           >
             {{ userStore.user?.display_name }}
           </p>
-          <p
-            class="mt-1 mb-0 truncate font-mono text-[14px] leading-6 font-semibold text-ib-text-subtle"
-          >
-            {{ userStore.user?.public_id || '-' }}
-          </p>
           <div class="mt-3 flex min-w-0 flex-wrap items-center gap-2">
-            <Tag :value="userStatusLabel" :severity="userStatusSeverity" rounded />
+            <Tag v-if="isUserBanned" value="已封禁" severity="danger" rounded />
             <Tag :value="userRoleLabel" :severity="userRoleSeverity" rounded />
           </div>
         </div>
@@ -124,10 +119,7 @@ const avatarInputRef = ref<HTMLInputElement | null>(null)
 
 const formattedJoinedAt = computed(() => formatDateWithDots(userStore.user?.created_at))
 const formattedUpdatedAt = computed(() => formatDateWithDots(userStore.user?.updated_at))
-const userStatusLabel = computed(() => (userStore.user?.status === 1 ? '正常使用中' : '已封禁'))
-const userStatusSeverity = computed<TagSeverity>(() =>
-  userStore.user?.status === 1 ? 'success' : 'danger',
-)
+const isUserBanned = computed(() => userStore.user?.status === 0)
 const userRoleLabel = computed(() => (userStore.user?.role === 'admin' ? '管理员' : '创作者'))
 const userRoleSeverity = computed<TagSeverity>(() =>
   userStore.user?.role === 'admin' ? 'info' : 'secondary',
@@ -137,10 +129,6 @@ const userInitial = computed(() => {
   return displayName?.[0]?.toUpperCase() || 'U'
 })
 const profileFields = computed<ProfileField[]>(() => [
-  {
-    label: '显示名称',
-    value: userStore.user?.display_name || '-',
-  },
   {
     label: '存储命名空间',
     value: userStore.user?.storage_namespace || '-',

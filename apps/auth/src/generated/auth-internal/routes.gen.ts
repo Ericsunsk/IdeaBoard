@@ -13,6 +13,12 @@ export const authInternalRoutes = {
     fastifyPath: "/internal/users/ensure",
     responseStatuses: [200,400,401,404,409,500],
   },
+  "getUserEmails": {
+    method: "POST",
+    openapiPath: "/internal/users/emails",
+    fastifyPath: "/internal/users/emails",
+    responseStatuses: [200,400,401,500],
+  },
   "deleteUser": {
     method: "DELETE",
     openapiPath: "/internal/users/{id}",

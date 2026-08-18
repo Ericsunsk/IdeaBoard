@@ -3,7 +3,7 @@ import type { MenuPassThroughOptions } from 'primevue/menu'
 import type { PopoverPassThroughOptions } from 'primevue/popover'
 import { createDialogMotionPt } from '../../../../shared/motion/dialogMotion'
 import { createPopoverMotionPt } from '../../../../shared/motion/popoverMotion'
-import { ibDialogMaskPt } from '../../../../shared/theme/dialogMask'
+import { baseDialogPt } from '../../../../shared/theme/baseDialogPt'
 
 type OverlayClass = string | undefined
 
@@ -68,8 +68,8 @@ export function createAdminDialogPt(input: {
   footerClass?: string
 }): DialogPassThroughOptions {
   return {
+    ...baseDialogPt,
     ...createDialogMotionPt(),
-    ...ibDialogMaskPt,
     ...(input.rootClass ? { root: { class: input.rootClass } } : {}),
     ...(input.headerClass ? { header: { class: input.headerClass } } : {}),
     ...(input.contentClass ? { content: { class: input.contentClass } } : {}),

@@ -72,6 +72,14 @@ export function registerInternalRoutes(
         }),
       );
     },
+    getUserEmails: async (request, reply) => {
+      sendCommandResult(
+        reply,
+        await options.commands.getUserEmails({
+          userIDs: request.body?.user_ids,
+        }),
+      );
+    },
     deleteUser: async (request, reply) => {
       sendCommandResult(
         reply,
@@ -128,6 +136,12 @@ export function registerInternalRoutes(
     url: authInternalRoutes.ensureUser.fastifyPath,
     preHandler: requireInternalKey,
     handler: handlers.ensureUser,
+  });
+  app.route({
+    method: authInternalRoutes.getUserEmails.method,
+    url: authInternalRoutes.getUserEmails.fastifyPath,
+    preHandler: requireInternalKey,
+    handler: handlers.getUserEmails,
   });
   app.route({
     method: authInternalRoutes.deleteUser.method,

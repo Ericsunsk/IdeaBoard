@@ -301,10 +301,10 @@ import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
 import { PRIVACY_POLICY_PATH, TERMS_PATH } from '../../../shared/constants/routePaths'
 import IbFormField from '../../../shared/components/IbFormField.vue'
+import { getPasswordLengthError } from '../../../shared/auth/passwordPolicy'
 import { useAuthFeedback } from '../useAuthFeedback'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import {
-  AUTH_PASSWORD_LIMIT,
   AUTH_DISPLAY_NAME_LIMIT,
   getLengthError,
   getRequiredError,
@@ -385,8 +385,7 @@ function validateField(field: RegisterField) {
 
   if (field === 'password') {
     const password = formValue.value.password
-    errors.value.password =
-      getRequiredError(password, '密码') || getLengthError(password, AUTH_PASSWORD_LIMIT, '密码')
+    errors.value.password = getRequiredError(password, '密码') || getPasswordLengthError(password)
     return !errors.value.password
   }
 
@@ -401,8 +400,7 @@ function validateField(field: RegisterField) {
 
   const confirmPassword = formValue.value.confirmPassword
   errors.value.confirmPassword =
-    getRequiredError(confirmPassword, '密码') ||
-    getLengthError(confirmPassword, AUTH_PASSWORD_LIMIT, '密码')
+    getRequiredError(confirmPassword, '密码') || getPasswordLengthError(confirmPassword)
 
   if (!errors.value.confirmPassword && confirmPassword !== formValue.value.password) {
     errors.value.confirmPassword = '两次输入的密码不一致'

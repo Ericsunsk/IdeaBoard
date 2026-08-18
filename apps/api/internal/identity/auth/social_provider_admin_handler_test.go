@@ -48,7 +48,7 @@ func (f *fakeSocialProviderService) GetSocialProviderCapabilities(context.Contex
 	if f.err != nil {
 		return nil, f.err
 	}
-	return &SocialProviderCapabilities{Social: map[string]bool{"google": true}}, nil
+	return &SocialProviderCapabilities{Social: map[string]bool{"google": true, "discord": true}}, nil
 }
 
 func TestSocialProviderAdminHandlerRequiresAdminForEveryOperation(t *testing.T) {
@@ -92,6 +92,15 @@ func TestSocialProviderAdminHandlerSuccessAndInputMapping(t *testing.T) {
 	}
 	if service.provider != "google" || !service.update.Enabled || service.update.ClientID != "google-client.apps.googleusercontent.com" || service.update.ClientSecret != "secret" {
 		t.Fatalf("mapped update = %+v provider=%q", service.update, service.provider)
+	}
+}
+
+func TestSocialProviderAdminHandlerAcceptsDiscord(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	service := &fakeSocialProviderService{}
+	status := serveSocialProviderHandler(t, http.MethodGet, "/discord", "admin", service, func(h *SocialProviderAdminHandler, c *gin.Context) { h.Get(c) })
+	if status != http.StatusOK || service.provider != "discord" {
+		t.Fatalf("status=%d provider=%q", status, service.provider)
 	}
 }
 

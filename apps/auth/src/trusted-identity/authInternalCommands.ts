@@ -1,5 +1,6 @@
 import type {
   AuthRole,
+  GetUserEmailsData,
   BanUserData,
   DeleteUserData,
   EnsureUserEnvelope,
@@ -23,6 +24,9 @@ export type AuthSessionAPI = {
 };
 
 export type AuthIdentityMutationStore = {
+  findUserEmailsByIDs?: (
+    authUserIDs: string[],
+  ) => Promise<Array<{ auth_user_id: string; email: string }>>;
   removeAuthUserCascade(authUserID: string): Promise<boolean>;
   updateAuthUserRole(authUserID: string, role: AuthRole): Promise<boolean>;
   updateAuthUserBanState(
@@ -60,6 +64,10 @@ export type AuthUserIDCommandInput = {
   authUserID?: unknown;
 };
 
+export type GetUserEmailsCommandInput = {
+  userIDs?: unknown;
+};
+
 export type BanIdentityCommandInput = AuthUserIDCommandInput & {
   banReason?: unknown;
   banExpiresIn?: unknown;
@@ -72,6 +80,9 @@ export type SetRoleCommandInput = AuthUserIDCommandInput & {
 export type TrustedIdentityData = EnsureUserEnvelope["data"];
 
 export type AuthInternalCommands = {
+  getUserEmails(
+    input: GetUserEmailsCommandInput,
+  ): Promise<AuthInternalCommandResult<GetUserEmailsData>>;
   ensureIdentity(
     input: EnsureIdentityCommandInput,
   ): Promise<AuthInternalCommandResult<TrustedIdentityData>>;
@@ -97,6 +108,7 @@ export function createAuthInternalCommands(
   mutationStore: AuthIdentityMutationStore,
 ): AuthInternalCommands {
   return {
+    getUserEmails: (input) => getUserEmails(input, mutationStore),
     ensureIdentity: (input) => ensureIdentity(input, provisioner),
     deleteIdentity: (input) => deleteIdentity(input, mutationStore),
     banIdentity: (input) => banIdentity(input, mutationStore),
@@ -104,6 +116,41 @@ export function createAuthInternalCommands(
     revokeSessions: (input) => revokeSessions(input, mutationStore),
     setRole: (input) => setRole(input, mutationStore),
   };
+}
+
+async function getUserEmails(
+  input: GetUserEmailsCommandInput,
+  repository: AuthIdentityMutationStore,
+): Promise<AuthInternalCommandResult<GetUserEmailsData>> {
+  const rawIDs = Array.isArray(input.userIDs) ? input.userIDs : [];
+  const userIDs = [
+    ...new Set(
+      rawIDs.map((value) => String(value ?? "").trim()).filter(Boolean),
+    ),
+  ];
+  if (
+    userIDs.length === 0 ||
+    userIDs.length > 100 ||
+    userIDs.some((id) => id.length > 191)
+  ) {
+    return commandFailure(
+      "invalid_input",
+      "user_ids must contain 1 to 100 valid user ids",
+    );
+  }
+  if (!repository.findUserEmailsByIDs) {
+    return commandFailure(
+      "repository_failure",
+      "auth user email reader is not configured",
+    );
+  }
+  try {
+    return commandSuccess({
+      users: await repository.findUserEmailsByIDs(userIDs),
+    });
+  } catch (error) {
+    return repositoryFailure(error, "failed to read auth user emails");
+  }
 }
 
 async function ensureIdentity(

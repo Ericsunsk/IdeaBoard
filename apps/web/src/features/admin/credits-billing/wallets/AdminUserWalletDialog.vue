@@ -12,9 +12,6 @@
         <div class="text-admin-modal-title font-[780] text-admin-title-color">
           {{ user.displayName }} 的Idea账户
         </div>
-        <div class="mt-0.5 text-admin-caption text-admin-text-3">
-          {{ user.publicId }} · 余额仅可通过 Ledger command 变更
-        </div>
       </div>
     </template>
 
@@ -62,9 +59,6 @@
               class="text-admin-title-sm font-[740] text-admin-title-color"
             >
               账户操作
-            </div>
-            <div class="mt-0.5 text-admin-caption text-admin-text-3">
-              提交后需要二次确认；原因会写入不可变 Ledger。
             </div>
           </div>
           <div class="flex gap-2">
@@ -156,9 +150,6 @@
             >
               最近 Ledger 流水
             </div>
-            <div class="mt-0.5 text-admin-caption text-admin-text-3">
-              每次加载 25 条；退款只能从可退款 Charge 发起。
-            </div>
           </div>
           <Button
             label="刷新"
@@ -207,9 +198,6 @@
           <Column header="原因 / 关联" style="min-width: 240px"
             ><template #body="{ data }"
               ><div class="max-w-72 truncate" :title="data.reason">{{ data.reason }}</div>
-              <div class="mt-1 text-admin-caption text-admin-text-3">
-                {{ data.business_reference.type }} · {{ data.business_reference.id }}
-              </div>
               <div v-if="data.charge" class="mt-1 text-admin-caption text-admin-text-3">
                 可退 {{ formatCredits(data.charge.remaining_refundable_credits) }}
               </div></template
@@ -235,9 +223,8 @@
             ></Column
           >
         </DataTableFrame>
-        <div class="mt-3 flex justify-center">
+        <div v-if="nextBeforeSequence != null" class="mt-3 flex justify-center">
           <Button
-            v-if="nextBeforeSequence != null"
             label="加载更多 Ledger"
             severity="secondary"
             outlined
@@ -246,9 +233,6 @@
             aria-controls="admin-user-wallet-ledger-title"
             @click="loadMore"
           />
-          <span v-else-if="transactions.length" class="text-admin-caption text-admin-text-3"
-            >已加载全部可用流水</span
-          >
         </div>
       </section>
     </div>

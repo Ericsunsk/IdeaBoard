@@ -111,12 +111,12 @@ export function useListAdminUsers<
   return query
 }
 
-export const getGetAdminOAuthProviderSettingsUrl = (provider: 'google') => {
+export const getGetAdminOAuthProviderSettingsUrl = (provider: 'google' | 'discord') => {
   return `/admin/users/oauth-providers/${encodeURIComponent(String(provider))}`
 }
 
 export const getAdminOAuthProviderSettings = async (
-  provider: 'google',
+  provider: 'google' | 'discord',
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseOAuthProviderSettings> => {
   return orvalMutator<ApiResponseOAuthProviderSettings>(
@@ -128,7 +128,9 @@ export const getAdminOAuthProviderSettings = async (
   )
 }
 
-export const getGetAdminOAuthProviderSettingsQueryKey = (provider: MaybeRefOrGetter<'google'>) => {
+export const getGetAdminOAuthProviderSettingsQueryKey = (
+  provider: MaybeRefOrGetter<'google' | 'discord'>,
+) => {
   return ['admin', 'users', 'oauth-providers', provider] as const
 }
 
@@ -136,7 +138,7 @@ export const getGetAdminOAuthProviderSettingsQueryOptions = <
   TData = Awaited<ReturnType<typeof getAdminOAuthProviderSettings>>,
   TError = ErrorType<ApiResponseBase>,
 >(
-  provider: MaybeRefOrGetter<'google'>,
+  provider: MaybeRefOrGetter<'google' | 'discord'>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getAdminOAuthProviderSettings>>, TError, TData>
@@ -169,7 +171,7 @@ export function useGetAdminOAuthProviderSettings<
   TData = Awaited<ReturnType<typeof getAdminOAuthProviderSettings>>,
   TError = ErrorType<ApiResponseBase>,
 >(
-  provider: MaybeRefOrGetter<'google'>,
+  provider: MaybeRefOrGetter<'google' | 'discord'>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getAdminOAuthProviderSettings>>, TError, TData>
@@ -189,12 +191,12 @@ export function useGetAdminOAuthProviderSettings<
   return query
 }
 
-export const getUpdateAdminOAuthProviderSettingsUrl = (provider: 'google') => {
+export const getUpdateAdminOAuthProviderSettingsUrl = (provider: 'google' | 'discord') => {
   return `/admin/users/oauth-providers/${encodeURIComponent(String(provider))}`
 }
 
 export const updateAdminOAuthProviderSettings = async (
-  provider: 'google',
+  provider: 'google' | 'discord',
   oAuthProviderSettingsUpdate: OAuthProviderSettingsUpdate,
   options?: Parameters<typeof orvalMutator>[1],
 ): Promise<ApiResponseOAuthProviderSettings> => {
@@ -210,7 +212,7 @@ export const updateAdminOAuthProviderSettings = async (
 }
 
 export const getUpdateAdminOAuthProviderSettingsQueryKey = (
-  provider: MaybeRefOrGetter<'google'>,
+  provider: MaybeRefOrGetter<'google' | 'discord'>,
   oAuthProviderSettingsUpdate?: MaybeRefOrGetter<OAuthProviderSettingsUpdate>,
 ) => {
   return [
@@ -227,7 +229,7 @@ export const getUpdateAdminOAuthProviderSettingsQueryOptions = <
   TData = Awaited<ReturnType<typeof updateAdminOAuthProviderSettings>>,
   TError = ErrorType<ApiResponseBase>,
 >(
-  provider: MaybeRefOrGetter<'google'>,
+  provider: MaybeRefOrGetter<'google' | 'discord'>,
   oAuthProviderSettingsUpdate: MaybeRefOrGetter<OAuthProviderSettingsUpdate>,
   options?: {
     query?: Partial<
@@ -268,7 +270,7 @@ export function useUpdateAdminOAuthProviderSettings<
   TData = Awaited<ReturnType<typeof updateAdminOAuthProviderSettings>>,
   TError = ErrorType<ApiResponseBase>,
 >(
-  provider: MaybeRefOrGetter<'google'>,
+  provider: MaybeRefOrGetter<'google' | 'discord'>,
   oAuthProviderSettingsUpdate: MaybeRefOrGetter<OAuthProviderSettingsUpdate>,
   options?: {
     query?: Partial<

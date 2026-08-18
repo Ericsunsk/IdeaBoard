@@ -123,4 +123,43 @@ describe('useDisplayImagePreview', () => {
     expect(flowMediaIOMocks.canvasToBlob).not.toHaveBeenCalled()
     scope.stop()
   })
+
+  it('resolves upload refs before the first image render', async () => {
+    vi.stubEnv('VITE_PUBLIC_ASSET_BASE_URL', 'https://assets.example.com')
+    vi.resetModules()
+    const sourceUrl = ref('/uploads/canvas/U123/board/content/image.png')
+    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview(sourceUrl, {
+        maxSide: null,
+      }),
+    )
+    if (!preview) throw new Error('preview composable was not created')
+
+    expect(preview.displayUrl.value).toBe(
+      'https://assets.example.com/uploads/canvas/U123/board/content/image.png',
+    )
+    scope.stop()
+  })
+
+  it('resolves local upload refs through the configured API origin', async () => {
+    vi.stubEnv('VITE_PUBLIC_ASSET_BASE_URL', '')
+    vi.stubEnv('VITE_API_BASE_URL', 'https://api.example.com/api')
+    vi.resetModules()
+    const sourceUrl = ref('/uploads/canvas/U123/board/content/local.png')
+    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview(sourceUrl, {
+        maxSide: null,
+      }),
+    )
+    if (!preview) throw new Error('preview composable was not created')
+
+    expect(preview.displayUrl.value).toBe(
+      'https://api.example.com/uploads/canvas/U123/board/content/local.png',
+    )
+    scope.stop()
+  })
 })

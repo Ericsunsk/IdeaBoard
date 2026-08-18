@@ -44,6 +44,19 @@ export type EnsureUserRequest = {
     role: AuthRole;
 };
 
+export type GetUserEmailsRequest = {
+    user_ids: Array<string>;
+};
+
+export type GetUserEmailsData = {
+    users: Array<AuthUserEmail>;
+};
+
+export type AuthUserEmail = {
+    auth_user_id: string;
+    email: string;
+};
+
 export type SetUserRoleRequest = {
     role: AuthRole;
 };
@@ -72,6 +85,12 @@ export type EnsureUserEnvelope = {
     data: {
         user: ProvisionedAuthUser;
     };
+};
+
+export type GetUserEmailsEnvelope = {
+    code: 0;
+    msg: string;
+    data: GetUserEmailsData;
 };
 
 export type DeleteUserData = {
@@ -202,6 +221,39 @@ export type EnsureUserResponses = {
 };
 
 export type EnsureUserResponse = EnsureUserResponses[keyof EnsureUserResponses];
+
+export type GetUserEmailsData2 = {
+    body: GetUserEmailsRequest;
+    path?: never;
+    query?: never;
+    url: '/internal/users/emails';
+};
+
+export type GetUserEmailsErrors = {
+    /**
+     * Invalid request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Internal key or session rejected
+     */
+    401: ErrorEnvelope;
+    /**
+     * Auth dependency or repository failure
+     */
+    500: ErrorEnvelope;
+};
+
+export type GetUserEmailsError = GetUserEmailsErrors[keyof GetUserEmailsErrors];
+
+export type GetUserEmailsResponses = {
+    /**
+     * Auth emails resolved
+     */
+    200: GetUserEmailsEnvelope;
+};
+
+export type GetUserEmailsResponse = GetUserEmailsResponses[keyof GetUserEmailsResponses];
 
 export type DeleteUserData2 = {
     body?: never;

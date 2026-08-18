@@ -14,11 +14,11 @@ export type AdminUserCommandTarget = {
 }
 
 export type AdminUserRowView = AdminUserCommandTarget & {
+  email: string
   availableCredits: number
   availableCreditsLabel: string
   avatarUrl: string
   initial: string
-  publicIdLabel: string
   createdDateLabel: string
   isAdmin: boolean
   isActive: boolean
@@ -73,6 +73,7 @@ export function createAdminUserRowView(user: AdminUserListItem): AdminUserRowVie
 
   return {
     publicId: user.public_id,
+    email: user.email ?? '',
     displayName: user.display_name,
     role: user.role,
     status: user.status,
@@ -80,7 +81,6 @@ export function createAdminUserRowView(user: AdminUserListItem): AdminUserRowVie
     availableCreditsLabel: formatIdeaAmount(user.available_credits),
     avatarUrl: user.avatar || '',
     initial: getUserInitial({ displayName: user.display_name, publicId: user.public_id }),
-    publicIdLabel: user.public_id || '-',
     createdDateLabel: user.created_at ? formatDateOnly(user.created_at) : '-',
     isAdmin,
     isActive,

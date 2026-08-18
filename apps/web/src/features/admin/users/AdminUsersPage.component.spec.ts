@@ -45,6 +45,7 @@ describe('AdminUsersPage', () => {
             list: [
               {
                 public_id: userPublicID,
+                email: 'admin@example.com',
                 display_name: 'admin_balance_user',
                 avatar: '',
                 role: 'user',
@@ -708,6 +709,7 @@ describe('AdminUsersPage', () => {
 function makeUser(availableCredits: number) {
   return {
     public_id: userPublicID,
+    email: 'admin@example.com',
     display_name: 'admin_balance_user',
     avatar: '',
     role: 'user',

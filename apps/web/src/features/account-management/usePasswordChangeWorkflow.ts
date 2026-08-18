@@ -3,6 +3,7 @@ import type { Router } from 'vue-router'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../auth/session/authSession'
 import { type AsyncActionFeedback, useAsyncAction } from '../../shared/composables/useAsyncAction'
+import { getPasswordLengthError } from '../../shared/auth/passwordPolicy'
 import { USER_LOGIN_PATH } from '../../shared/constants/routePaths'
 import { markRequiredError } from '../../shared/utils/formValidation'
 import { type ProfileFeedback, useProfileFeedback } from './useProfileFeedback'
@@ -58,7 +59,7 @@ export function usePasswordChangeWorkflow(deps: PasswordChangeWorkflowDependenci
     }
     if (field === 'newPassword') {
       if (!value.trim()) return markRequiredError('请输入新密码')
-      if (value.length < 6) return '密码至少6个字符'
+      return getPasswordLengthError(value)
     }
     if (field === 'confirmPassword') {
       if (!value.trim()) return markRequiredError('请确认新密码')

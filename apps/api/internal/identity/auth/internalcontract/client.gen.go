@@ -113,6 +113,21 @@ func (e EnsureUserEnvelopeCode) Valid() bool {
 	}
 }
 
+// Defines values for GetUserEmailsEnvelopeCode.
+const (
+	GetUserEmailsEnvelopeCodeN0 GetUserEmailsEnvelopeCode = 0
+)
+
+// Valid indicates whether the value is a known member of the GetUserEmailsEnvelopeCode enum.
+func (e GetUserEmailsEnvelopeCode) Valid() bool {
+	switch e {
+	case GetUserEmailsEnvelopeCodeN0:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ProvisionedAuthUserClaimIdentityVerified.
 const (
 	ProvisionedAuthUserClaimIdentityVerifiedTrue ProvisionedAuthUserClaimIdentityVerified = true
@@ -238,13 +253,13 @@ func (e UnbanUserDataBanned) Valid() bool {
 
 // Defines values for UnbanUserEnvelopeCode.
 const (
-	N0 UnbanUserEnvelopeCode = 0
+	UnbanUserEnvelopeCodeN0 UnbanUserEnvelopeCode = 0
 )
 
 // Valid indicates whether the value is a known member of the UnbanUserEnvelopeCode enum.
 func (e UnbanUserEnvelopeCode) Valid() bool {
 	switch e {
-	case N0:
+	case UnbanUserEnvelopeCodeN0:
 		return true
 	default:
 		return false
@@ -253,6 +268,12 @@ func (e UnbanUserEnvelopeCode) Valid() bool {
 
 // AuthRole defines model for AuthRole.
 type AuthRole string
+
+// AuthUserEmail defines model for AuthUserEmail.
+type AuthUserEmail struct {
+	AuthUserID string `json:"auth_user_id"`
+	Email      string `json:"email"`
+}
 
 // AuthUserRequest defines model for AuthUserRequest.
 type AuthUserRequest struct {
@@ -332,6 +353,26 @@ type EnsureUserRequest struct {
 type ErrorEnvelope struct {
 	Code int    `json:"code"`
 	Msg  string `json:"msg"`
+}
+
+// GetUserEmailsData defines model for GetUserEmailsData.
+type GetUserEmailsData struct {
+	Users []AuthUserEmail `json:"users"`
+}
+
+// GetUserEmailsEnvelope defines model for GetUserEmailsEnvelope.
+type GetUserEmailsEnvelope struct {
+	Code GetUserEmailsEnvelopeCode `json:"code"`
+	Data GetUserEmailsData         `json:"data"`
+	Msg  string                    `json:"msg"`
+}
+
+// GetUserEmailsEnvelopeCode defines model for GetUserEmailsEnvelope.Code.
+type GetUserEmailsEnvelopeCode int
+
+// GetUserEmailsRequest defines model for GetUserEmailsRequest.
+type GetUserEmailsRequest struct {
+	UserIds []string `json:"user_ids"`
 }
 
 // ProvisionedAuthUser defines model for ProvisionedAuthUser.
@@ -461,6 +502,9 @@ type internalKeyContextKey string
 // BanUserJSONRequestBody defines body for BanUser for application/json ContentType.
 type BanUserJSONRequestBody = BanUserRequest
 
+// GetUserEmailsJSONRequestBody defines body for GetUserEmails for application/json ContentType.
+type GetUserEmailsJSONRequestBody = GetUserEmailsRequest
+
 // EnsureUserJSONRequestBody defines body for EnsureUser for application/json ContentType.
 type EnsureUserJSONRequestBody = EnsureUserRequest
 
@@ -554,6 +598,11 @@ type ClientInterface interface {
 
 	BanUser(ctx context.Context, body BanUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetUserEmailsWithBody request with any body
+	GetUserEmailsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	GetUserEmails(ctx context.Context, body GetUserEmailsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// EnsureUserWithBody request with any body
 	EnsureUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -604,6 +653,30 @@ func (c *Client) BanUserWithBody(ctx context.Context, contentType string, body i
 
 func (c *Client) BanUser(ctx context.Context, body BanUserJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewBanUserRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetUserEmailsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetUserEmailsRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetUserEmails(ctx context.Context, body GetUserEmailsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetUserEmailsRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -770,6 +843,46 @@ func NewBanUserRequestWithBody(server string, contentType string, body io.Reader
 	}
 
 	operationPath := fmt.Sprintf("/internal/users/ban")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetUserEmailsRequest calls the generic GetUserEmails builder with application/json body
+func NewGetUserEmailsRequest(server string, body GetUserEmailsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewGetUserEmailsRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewGetUserEmailsRequestWithBody generates requests for GetUserEmails with any type of body
+func NewGetUserEmailsRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/users/emails")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1041,6 +1154,11 @@ type ClientWithResponsesInterface interface {
 
 	BanUserWithResponse(ctx context.Context, body BanUserJSONRequestBody, reqEditors ...RequestEditorFn) (*BanUserResponse, error)
 
+	// GetUserEmailsWithBodyWithResponse request with any body
+	GetUserEmailsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*GetUserEmailsResponse, error)
+
+	GetUserEmailsWithResponse(ctx context.Context, body GetUserEmailsJSONRequestBody, reqEditors ...RequestEditorFn) (*GetUserEmailsResponse, error)
+
 	// EnsureUserWithBodyWithResponse request with any body
 	EnsureUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*EnsureUserResponse, error)
 
@@ -1126,6 +1244,39 @@ func (r BanUserResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r BanUserResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetUserEmailsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *GetUserEmailsEnvelope
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON500      *InternalError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetUserEmailsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetUserEmailsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetUserEmailsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -1333,6 +1484,23 @@ func (c *ClientWithResponses) BanUserWithResponse(ctx context.Context, body BanU
 	return ParseBanUserResponse(rsp)
 }
 
+// GetUserEmailsWithBodyWithResponse request with arbitrary body returning *GetUserEmailsResponse
+func (c *ClientWithResponses) GetUserEmailsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*GetUserEmailsResponse, error) {
+	rsp, err := c.GetUserEmailsWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetUserEmailsResponse(rsp)
+}
+
+func (c *ClientWithResponses) GetUserEmailsWithResponse(ctx context.Context, body GetUserEmailsJSONRequestBody, reqEditors ...RequestEditorFn) (*GetUserEmailsResponse, error) {
+	rsp, err := c.GetUserEmails(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetUserEmailsResponse(rsp)
+}
+
 // EnsureUserWithBodyWithResponse request with arbitrary body returning *EnsureUserResponse
 func (c *ClientWithResponses) EnsureUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*EnsureUserResponse, error) {
 	rsp, err := c.EnsureUserWithBody(ctx, contentType, body, reqEditors...)
@@ -1498,6 +1666,53 @@ func ParseBanUserResponse(rsp *http.Response) (*BanUserResponse, error) {
 			return nil, err
 		}
 		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetUserEmailsResponse parses an HTTP response from a GetUserEmailsWithResponse call
+func ParseGetUserEmailsResponse(rsp *http.Response) (*GetUserEmailsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetUserEmailsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GetUserEmailsEnvelope
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest InternalError

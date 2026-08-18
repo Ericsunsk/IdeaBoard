@@ -577,7 +577,7 @@ func providerRuntimeAdapterFor(apiType string, protocol string, operation workfl
 			return providerRuntimeAdapterModelImage, nil
 		}
 	case providerendpoints.ProtocolImageURLJSONImage:
-		if apiType != workflow.ProviderOpenAICompatible {
+		if apiType != workflow.ProviderOpenAICompatible && apiType != workflow.ProviderSelfHosted {
 			return 0, fmt.Errorf("endpoint protocol %q does not support API type %q", protocol, apiType)
 		}
 		switch operation {
@@ -587,7 +587,7 @@ func providerRuntimeAdapterFor(apiType string, protocol string, operation workfl
 			return providerRuntimeAdapterImageUpscale, nil
 		}
 	case providerendpoints.ProtocolFluxFillJSONImage:
-		if apiType != workflow.ProviderOpenAICompatible {
+		if apiType != workflow.ProviderOpenAICompatible && apiType != workflow.ProviderSelfHosted {
 			return 0, fmt.Errorf("endpoint protocol %q does not support API type %q", protocol, apiType)
 		}
 		switch operation {

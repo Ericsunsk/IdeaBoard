@@ -1,6 +1,6 @@
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { createAuthMiddleware } from "better-auth/api";
-import { admin, emailOTP, haveIBeenPwned } from "better-auth/plugins";
+import { admin, emailOTP } from "better-auth/plugins";
 import { Pool, type PoolConfig } from "pg";
 import type { AuthAdmissionPolicy } from "../admission/authAdmissionPolicy.js";
 import { createAuthAdmissionPolicy } from "../admission/authAdmissionPolicy.js";
@@ -12,9 +12,9 @@ import {
   verificationOtp,
 } from "../transactional-mail/emailTemplates/index.js";
 import {
-  applyGoogleOAuthRequestPolicy,
+  applySocialOAuthRequestPolicy,
   createRegistrationUserCreationGuard,
-} from "../admission/googleOAuthPolicy.js";
+} from "../admission/socialOAuthPolicy.js";
 import { createRuntimeAuthRegistry } from "../social-identity/runtimeAuthRegistry.js";
 import type { MailConfigService } from "../transactional-mail/mailConfig.js";
 import { createRuntimeMailConfigService } from "../transactional-mail/mailConfigAdapters.js";
@@ -83,10 +83,10 @@ export function createAuthComponents(
     getSettings: getAuthGuardSettings,
     isMailReady: async () =>
       (await mailConfigService.getSummary()).readiness === "ready",
-    getGoogleProviderReadiness: async () =>
+    getSocialProviderReadiness: async (provider) =>
       Boolean(
         socialProviderSettingsService &&
-          (await socialProviderSettingsService.getCapabilities()).social.google,
+          (await socialProviderSettingsService.getCapabilities()).social[provider],
       ),
   });
   const authBaseOptions = createBetterAuthOptions({
@@ -167,10 +167,6 @@ export function createBetterAuthOptions(input: {
           await mailConfigService.send({ to: email, content });
         },
       }),
-      haveIBeenPwned({
-        customPasswordCompromisedMessage:
-          "该 Password 已出现在泄露数据中，请更换后重试",
-      }),
       admin({
         defaultRole: "user",
         adminRoles: ["admin"],
@@ -186,7 +182,7 @@ export function createBetterAuthOptions(input: {
     },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
-        await applyGoogleOAuthRequestPolicy(ctx, authAdmissionPolicy);
+        await applySocialOAuthRequestPolicy(ctx, authAdmissionPolicy);
         if (CANONICAL_EMAIL_PATHS.has(ctx.path)) {
           if (typeof ctx.body?.email === "string") {
             ctx.body.email = normalizeCanonicalEmail(ctx.body.email);

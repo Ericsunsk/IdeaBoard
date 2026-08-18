@@ -67,7 +67,7 @@ The Privacy Policy must cover:
 - Account, OAuth, profile, Board, Prompt, uploaded media, generated output, usage, payment metadata, support, security, and technical-log data.
 - Processing purposes and applicable legal bases for contract performance, legitimate interests, consent where required, and legal obligations.
 - No sale of personal information and no training on user content, whether private or shared, unless a future separate opt-in explicitly says otherwise.
-- Third-party recipients, including Stripe, Google OAuth, Resend, Cloudflare, configured AI Providers, and configured Storage Providers.
+- Third-party recipients, including Stripe, Google/Discord OAuth, Resend, Cloudflare, configured AI Providers, and configured Storage Providers.
 - For each recipient category: purpose, data category, transfer/hosting region where known, and a link to the Provider policy.
 - The published Provider inventory is a controlled release artifact. Adding or changing an AI, Storage, Analytics, Auth, Email, or Payment Provider requires updating Privacy Policy content and its effective date before the Provider is enabled for users.
 - Cross-border processing and transfer safeguards after professional review.

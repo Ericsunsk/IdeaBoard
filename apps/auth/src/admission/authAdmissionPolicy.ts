@@ -10,7 +10,11 @@ type RateLimitEntry = {
   resetAtMs: number;
 };
 
-export type AuthRegistrationEntry = "email_otp" | "google_oauth";
+export type AuthRegistrationEntry =
+  | "email_otp"
+  | "google_oauth"
+  | "discord_oauth"
+  | "social_oauth";
 
 export type AuthAdmissionDecision =
   | {
@@ -51,7 +55,7 @@ export type AuthAdmissionPolicyOptions = {
   trustedOrigins: string[];
   getSettings: () => Promise<AuthGuardSettings>;
   isMailReady?: () => Promise<boolean>;
-  getGoogleProviderReadiness?: () => Promise<boolean>;
+  getSocialProviderReadiness?: (provider: "google" | "discord") => Promise<boolean>;
   onDependencyError?: (
     dependency: "settings" | "mail" | "provider",
     error: unknown,
@@ -171,11 +175,26 @@ async function checkRegistrationDependencies(
   if (entry === "email_credential" || entry === "email_otp") {
     return checkMailReadiness(options);
   }
-  if (!options.getGoogleProviderReadiness) {
+  const provider =
+    entry === "discord_oauth"
+      ? "discord"
+      : entry === "google_oauth"
+        ? "google"
+        : undefined;
+  if (!options.getSocialProviderReadiness) {
     return { allowed: false, reason: "provider_not_ready" };
   }
   try {
-    return (await options.getGoogleProviderReadiness())
+    const ready = provider
+      ? await options.getSocialProviderReadiness(provider)
+      : (
+          await Promise.all(
+            (["google", "discord"] as const).map((candidate) =>
+              options.getSocialProviderReadiness!(candidate),
+            ),
+          )
+        ).some(Boolean);
+    return ready
       ? null
       : { allowed: false, reason: "provider_not_ready" };
   } catch (error) {

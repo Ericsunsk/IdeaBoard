@@ -26,7 +26,7 @@ vi.mock('../../../shared/auth/client', () => ({
 import { USER_AUTH_CALLBACK_PATH } from '../../../shared/constants/routePaths'
 import { authTransport } from './authTransport'
 
-describe('authTransport Google OAuth', () => {
+describe('authTransport OAuth providers', () => {
   beforeEach(() => {
     mocks.signInSocial.mockReset().mockResolvedValue({})
   })
@@ -38,7 +38,7 @@ describe('authTransport Google OAuth', () => {
       '/user/login?redirect=%2Fuser%2Fboards%3Fview%3Drecent%23owned',
     )
 
-    await authTransport.signInWithGoogle()
+    await authTransport.signInWithOAuth('google')
 
     expect(mocks.signInSocial).toHaveBeenCalledOnce()
     const request = mocks.signInSocial.mock.calls[0]?.[0] as {
@@ -62,12 +62,22 @@ describe('authTransport Google OAuth', () => {
   ])('does not forward an unsafe redirect into the callback URL: %s', async (redirect) => {
     window.history.replaceState({}, '', `/user/login?redirect=${encodeURIComponent(redirect)}`)
 
-    await authTransport.signInWithGoogle()
+    await authTransport.signInWithOAuth('google')
 
     const request = mocks.signInSocial.mock.calls[0]?.[0] as { callbackURL: string }
     const callbackURL = new URL(request.callbackURL)
     expect(callbackURL.origin).toBe(window.location.origin)
     expect(callbackURL.pathname).toBe(USER_AUTH_CALLBACK_PATH)
     expect(callbackURL.searchParams.has('redirect')).toBe(false)
+  })
+
+  it('uses the Discord provider with the same callback contract', async () => {
+    window.history.replaceState({}, '', '/user/login')
+
+    await authTransport.signInWithOAuth('discord')
+
+    expect(mocks.signInSocial).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'discord' }),
+    )
   })
 })

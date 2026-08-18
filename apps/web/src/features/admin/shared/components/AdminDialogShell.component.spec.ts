@@ -112,6 +112,10 @@ describe('AdminDialogShell', () => {
     const { user, onVisibleUpdate } = renderShell()
     const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
 
+    expect(within(dialog).getByRole('button', { name: /close|关闭/i })).toHaveClass(
+      '!bg-transparent',
+      '!shadow-none',
+    )
     await user.click(within(dialog).getByRole('button', { name: /close|关闭/i }))
     expect(onVisibleUpdate).toHaveBeenCalledWith(false)
   })

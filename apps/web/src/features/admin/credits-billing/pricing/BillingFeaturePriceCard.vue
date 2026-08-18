@@ -1,5 +1,5 @@
 <template>
-  <Card class="min-w-0 !rounded-lg" :pt="adminCardPt">
+  <Card :class="adminMasonryCardClass" :pt="adminCardPt">
     <template #title>
       <div class="flex min-w-0 items-center justify-between gap-3">
         <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
@@ -61,8 +61,8 @@
         >
           <div class="min-w-0">
             <div class="text-admin-meta font-medium text-admin-title-color">功能状态</div>
-            <div class="text-admin-caption text-ib-text-muted">
-              {{ item.status === 'unpriced' ? '发布价格后自动启用' : '关闭后将停止新任务调用' }}
+            <div v-if="item.status !== 'unpriced'" class="text-admin-caption text-ib-text-muted">
+              关闭后将停止新任务调用
             </div>
           </div>
           <ToggleSwitch
@@ -101,7 +101,11 @@ import {
   WORKFLOW_FEATURE_GROUP_LIST,
 } from '../../../../shared/domain/workflowFeatureRegistry'
 import { adminCardPt } from '../../shared/lib/adminCardPt'
-import { adminActionButtonClass, adminCompactTagClass } from '../../shared/lib/adminUiClasses'
+import {
+  adminActionButtonClass,
+  adminCompactTagClass,
+  adminMasonryCardClass,
+} from '../../shared/lib/adminUiClasses'
 import type {
   AdminBillableItemCard,
   AdminBillableItemStatus,

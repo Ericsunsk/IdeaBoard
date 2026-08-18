@@ -4,13 +4,14 @@ import "strings"
 
 const (
 	ProviderOpenAICompatible = "openai-compatible"
+	ProviderSelfHosted       = "self-hosted"
 	ProviderGoogleAI         = "google-ai"
 	ProviderGoogleCloud      = "google-cloud"
 )
 
 func IsSupportedProviderAPIType(apiType string) bool {
 	switch strings.ToLower(strings.TrimSpace(apiType)) {
-	case ProviderOpenAICompatible, ProviderGoogleAI, ProviderGoogleCloud:
+	case ProviderOpenAICompatible, ProviderSelfHosted, ProviderGoogleAI, ProviderGoogleCloud:
 		return true
 	default:
 		return false

@@ -124,7 +124,7 @@ func TestServiceClientSocialProviderProxyUsesStableContract(t *testing.T) {
 				t.Fatalf("public capabilities leaked X-Internal-Key = %q", got)
 			}
 			writeContractJSON(w, http.StatusOK, map[string]any{
-				"code": 0, "msg": "success", "data": map[string]any{"social": map[string]bool{"google": true}},
+					"code": 0, "msg": "success", "data": map[string]any{"social": map[string]bool{"google": true, "discord": true}},
 			})
 		default:
 			http.NotFound(w, r)
@@ -146,7 +146,7 @@ func TestServiceClientSocialProviderProxyUsesStableContract(t *testing.T) {
 		t.Fatalf("UpdateSocialProviderSettings with secret: %v", err)
 	}
 	capabilities, err := client.GetSocialProviderCapabilities(context.Background())
-	if err != nil || !capabilities.Social["google"] {
+	if err != nil || !capabilities.Social["google"] || !capabilities.Social["discord"] {
 		t.Fatalf("GetSocialProviderCapabilities = %+v, err=%v", capabilities, err)
 	}
 }

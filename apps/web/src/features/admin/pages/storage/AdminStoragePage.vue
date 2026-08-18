@@ -207,10 +207,7 @@
               class="grid items-end gap-3 md:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]"
             >
               <div class="flex min-w-0 flex-1 flex-col gap-1.5">
-                <div class="flex items-center justify-between gap-2">
-                  <label class="text-admin-meta font-[680] text-admin-text-2">供应商</label>
-                  <span class="text-admin-meta text-admin-text-3">仅已接入供应商可直接创建</span>
-                </div>
+                <label class="text-admin-meta font-[680] text-admin-text-2">供应商</label>
                 <Select
                   :model-value="selectedVendorKey"
                   :options="vendorSelectOptions"

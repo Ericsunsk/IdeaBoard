@@ -42,8 +42,15 @@ func TestServiceClientAgainstFastify(t *testing.T) {
 	if user.AuthUserID != "auth-contract-user" || user.Role != "admin" || user.Existing {
 		t.Fatalf("EnsureUser response = %+v, want newly provisioned admin identity", user)
 	}
-
 	const authUserID = "auth-contract-user"
+	emails, err := client.GetUserEmails(ctx, []string{authUserID})
+	if err != nil {
+		t.Fatalf("GetUserEmails against Fastify: %v", err)
+	}
+	if emails[authUserID] != "alice@example.com" {
+		t.Fatalf("GetUserEmails response = %+v, want alice@example.com", emails)
+	}
+
 	assertFastifyMutationSuccess(t, "DeleteUser", func() error {
 		return client.DeleteUser(ctx, authUserID)
 	})

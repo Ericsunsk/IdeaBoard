@@ -26,7 +26,7 @@ describe('OAuth Provider settings resource', () => {
       getCapabilities: vi.fn().mockResolvedValue({
         code: 0,
         msg: 'success',
-        data: { social: { google: true } },
+        data: { social: { google: true, discord: false } },
       }),
     }
     const resource = createOAuthProviderSettingsResource(api)
@@ -37,7 +37,9 @@ describe('OAuth Provider settings resource', () => {
       clientSecretConfigured: true,
       callbackUrl: 'https://example.com/api/auth/callback/google',
     })
-    await expect(resource.getCapabilities()).resolves.toEqual({ social: { google: true } })
+    await expect(resource.getCapabilities()).resolves.toEqual({
+      social: { google: true, discord: false },
+    })
     expect(api.getSettings).toHaveBeenCalledWith('google')
   })
 

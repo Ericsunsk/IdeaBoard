@@ -1183,7 +1183,7 @@ paths:
         required: true
         schema:
           type: string
-          enum: [google]
+          enum: [google, discord]
     get:
       tags: [AdminUsers]
       operationId: getAdminOAuthProviderSettings
@@ -2580,9 +2580,10 @@ components:
 
     AdminUserListItem:
       type: object
-      required: [public_id, display_name, role, status, created_at, updated_at, available_credits]
+      required: [public_id, email, display_name, role, status, created_at, updated_at, available_credits]
       properties:
         public_id: { type: string, format: uuid }
+        email: { type: string }
         display_name: { type: string, minLength: 1, maxLength: 100 }
         avatar: { type: string }
         role: { type: string }
@@ -2612,7 +2613,7 @@ components:
       properties:
         provider:
           type: string
-          enum: [google]
+          enum: [google, discord]
         enabled: { type: boolean }
         configured: { type: boolean }
         available: { type: boolean }
@@ -4834,7 +4835,7 @@ components:
 
     ProviderAPIType:
       type: string
-      enum: [openai-compatible, google-ai, google-cloud]
+      enum: [openai-compatible, self-hosted, google-ai, google-cloud]
 
     ProviderEndpointProtocol:
       type: object

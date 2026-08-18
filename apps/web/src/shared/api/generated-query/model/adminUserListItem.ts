@@ -7,6 +7,7 @@
 
 export interface AdminUserListItem {
   public_id: string
+  email: string
   /**
    * @minLength 1
    * @maxLength 100

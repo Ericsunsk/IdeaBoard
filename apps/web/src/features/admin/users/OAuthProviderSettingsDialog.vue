@@ -41,7 +41,7 @@
           />
         </AdminFormField>
 
-        <AdminFormField label="Google 登录" for="admin-oauth-enabled">
+        <AdminFormField :label="`${providerLabel} 登录`" for="admin-oauth-enabled">
           <div class="flex min-h-10 items-center justify-between border-y border-admin-border py-2">
             <div class="flex min-w-0 items-center gap-2">
               <span class="text-admin-body text-admin-text-2">
@@ -56,7 +56,7 @@
               v-model="form.enabled"
               input-id="admin-oauth-enabled"
               name="oauth_enabled"
-              aria-label="Google 登录"
+              :aria-label="`${providerLabel} 登录`"
               :disabled="isBusy"
             />
           </div>
@@ -135,7 +135,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
@@ -149,10 +149,13 @@ import { formatAdminDisplayError, useAdminToast } from '../shared/lib/adminToast
 import {
   createOAuthProviderSettingsResource,
   type OAuthCapabilities,
-  type OAuthProviderCode,
   type OAuthProviderSettingsResource,
   type OAuthProviderSettingsSummary,
 } from './oauthProviderSettingsResource'
+import {
+  getOAuthProviderLabel,
+  type OAuthProviderCode,
+} from '../../../shared/auth/oauthProviders'
 
 const props = withDefaults(
   defineProps<{
@@ -169,6 +172,7 @@ const defaultResource = createOAuthProviderSettingsResource()
 const toast = useAdminToast()
 const providerOptions: Array<{ label: string; value: OAuthProviderCode }> = [
   { label: 'Google', value: 'google' },
+  { label: 'Discord', value: 'discord' },
 ]
 const selectedProvider = ref<OAuthProviderCode>('google')
 const summary = ref<OAuthProviderSettingsSummary | null>(null)
@@ -183,12 +187,17 @@ const isBusy = computed(() => isLoading.value || isSaving.value)
 const runtimeAvailable = computed(
   () => capabilities.value?.social[selectedProvider.value] ?? summary.value?.available ?? false,
 )
+const providerLabel = computed(() => getOAuthProviderLabel(selectedProvider.value))
 const secretPlaceholder = computed(() =>
   summary.value?.clientSecretConfigured ? '已配置，留空则保持不变' : '输入 Client Secret',
 )
 const secretHint = computed(() =>
   summary.value?.clientSecretConfigured ? '当前 Secret 不会回显。' : undefined,
 )
+
+watch(selectedProvider, () => {
+  if (props.visible) resetAndLoad()
+})
 
 function activeResource() {
   return props.resource ?? defaultResource
@@ -239,7 +248,7 @@ async function submit() {
     })
     clearSensitiveState()
     applySummary(savedSummary)
-    toast.success('Google OAuth 设置已保存')
+    toast.success(`${providerLabel.value} OAuth 设置已保存`)
     try {
       const [nextSummary, nextCapabilities] = await Promise.all([
         activeResource().get(selectedProvider.value),

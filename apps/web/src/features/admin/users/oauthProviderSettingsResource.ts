@@ -10,8 +10,10 @@ import type {
   OAuthProviderSettings,
   OAuthProviderSettingsUpdate,
 } from '../../../shared/api/generated-query/model'
-
-export type OAuthProviderCode = 'google'
+import {
+  getOAuthProviderLabel,
+  type OAuthProviderCode,
+} from '../../../shared/auth/oauthProviders'
 
 export type OAuthProviderSettingsSummary = {
   provider: OAuthProviderCode
@@ -69,7 +71,7 @@ export function createOAuthProviderSettingsResource(
         api.getSettings(provider),
         `加载 ${providerLabel(provider)} OAuth 设置失败`,
       )
-      return normalizeSettings(settings)
+      return normalizeSettings(settings, provider)
     },
     async save(provider, input) {
       const body: OAuthProviderSettingsUpdate = {
@@ -81,21 +83,29 @@ export function createOAuthProviderSettingsResource(
         api.updateSettings(provider, body),
         `保存 ${providerLabel(provider)} OAuth 设置失败`,
       )
-      return normalizeSettings(settings)
+      return normalizeSettings(settings, provider)
     },
     async getCapabilities() {
       const capabilities = await resolveApiData(
         api.getCapabilities(),
         '加载 OAuth capabilities 失败',
       )
-      return { social: { ...capabilities.social } }
+      return {
+        social: {
+          google: capabilities.social.google === true,
+          discord: capabilities.social.discord === true,
+        },
+      }
     },
   }
 }
 
-function normalizeSettings(settings: OAuthProviderSettings): OAuthProviderSettingsSummary {
+function normalizeSettings(
+  settings: OAuthProviderSettings,
+  requestedProvider: OAuthProviderCode,
+): OAuthProviderSettingsSummary {
   return {
-    provider: settings.provider,
+    provider: requestedProvider,
     enabled: settings.enabled,
     configured: settings.configured,
     available: settings.available,
@@ -109,5 +119,5 @@ function normalizeSettings(settings: OAuthProviderSettings): OAuthProviderSettin
 }
 
 function providerLabel(provider: OAuthProviderCode): string {
-  return provider === 'google' ? 'Google' : provider
+  return getOAuthProviderLabel(provider)
 }

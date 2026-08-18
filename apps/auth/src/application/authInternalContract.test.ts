@@ -55,6 +55,15 @@ function createContractAuthAPI(): AuthSessionAPI {
 
 function createContractCommands(): AuthInternalCommands {
   return {
+    getUserEmails: async (input) => {
+      assert.deepEqual(input, { userIDs: [authUserID] });
+      return {
+        ok: true,
+        data: {
+          users: [{ auth_user_id: authUserID, email: "alice@example.com" }],
+        },
+      };
+    },
     ensureIdentity: async (input) => {
       assert.deepEqual(input, {
         email: "alice@example.com",

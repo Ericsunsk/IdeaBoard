@@ -1,5 +1,12 @@
 export const GOOGLE_PROVIDER = "google" as const;
-export type SupportedSocialProvider = typeof GOOGLE_PROVIDER;
+export const DISCORD_PROVIDER = "discord" as const;
+export type SupportedSocialProvider =
+  | typeof GOOGLE_PROVIDER
+  | typeof DISCORD_PROVIDER;
+
+export type RuntimeSocialProviderConfigs = Partial<
+  Record<SupportedSocialProvider, RuntimeSocialProviderConfig>
+>;
 
 const providerDefinitions = {
   [GOOGLE_PROVIDER]: {
@@ -11,7 +18,18 @@ const providerDefinitions = {
       );
     },
   },
+  [DISCORD_PROVIDER]: {
+    scopes: ["identify", "email"] as const,
+    validateClientId(value: string) {
+      return value.length <= 32 && /^\d{1,32}$/.test(value);
+    },
+  },
 } as const;
+
+const providerLabels: Record<SupportedSocialProvider, string> = {
+  [GOOGLE_PROVIDER]: "Google",
+  [DISCORD_PROVIDER]: "Discord",
+};
 
 export type StoredSocialProviderSettings = {
   provider: SupportedSocialProvider;
@@ -57,7 +75,7 @@ export type SocialProviderSettingsRepository = {
 };
 
 export type RuntimeSocialProviderApply = (
-  config: RuntimeSocialProviderConfig | null,
+  configs: RuntimeSocialProviderConfigs,
 ) => Promise<void> | void;
 
 export type SocialProviderSecretCipher = {
@@ -79,8 +97,7 @@ export class SocialProviderSettingsService {
   ) {}
 
   async initialize(): Promise<void> {
-    const config = await this.resolve(GOOGLE_PROVIDER);
-    await this.applyRuntimeConfig?.(config);
+    await this.applyAllRuntimeConfigs();
   }
 
   async getSummary(providerValue: string): Promise<SocialProviderSettingsSummary> {
@@ -126,13 +143,13 @@ export class SocialProviderSettingsService {
     ) {
       throw new SocialProviderSettingsError(
         "invalid_input",
-        "Google OAuth Client ID 格式无效",
+        `${providerLabel(provider)} OAuth Client ID 格式无效`,
       );
     }
     if (current?.enabled && current.clientId !== clientId) {
       throw new SocialProviderSettingsError(
         "disable_before_client_id_change",
-        "请先关闭 Google OAuth，再修改 Client ID",
+        `请先关闭 ${providerLabel(provider)} OAuth，再修改 Client ID`,
       );
     }
 
@@ -150,7 +167,7 @@ export class SocialProviderSettingsService {
     if (input.enabled && (!clientId || !encryptedClientSecret)) {
       throw new SocialProviderSettingsError(
         "incomplete_configuration",
-        "启用 Google OAuth 前必须配置 Client ID 和 Client Secret",
+        `启用 ${providerLabel(provider)} OAuth 前必须配置 Client ID 和 Client Secret`,
       );
     }
     if (input.enabled) {
@@ -161,7 +178,7 @@ export class SocialProviderSettingsService {
       } catch {
         throw new SocialProviderSettingsError(
           "encryption_unavailable",
-          "Google OAuth Client Secret 不可用，请重新填写",
+          `${providerLabel(provider)} OAuth Client Secret 不可用，请重新填写`,
         );
       }
     }
@@ -183,7 +200,7 @@ export class SocialProviderSettingsService {
         })
       : current;
     const resolved = await resolveStoredSettings(saved, this.secretCipher);
-    if (changed) await this.applyRuntimeConfig?.(resolved);
+    if (changed) await this.applyAllRuntimeConfigs();
     return summarize(saved, Boolean(resolved), this.callbackURL(provider));
   }
 
@@ -205,12 +222,32 @@ export class SocialProviderSettingsService {
     }
   }
 
-  async getCapabilities(): Promise<{ social: { google: boolean } }> {
+  async getCapabilities(): Promise<{
+    social: Record<SupportedSocialProvider, boolean>;
+  }> {
+    const [google, discord] = await Promise.all(
+      supportedSocialProviders.map((provider) => this.resolve(provider)),
+    );
     return {
       social: {
-        google: Boolean(await this.resolve(GOOGLE_PROVIDER)),
+        google: Boolean(google),
+        discord: Boolean(discord),
       },
     };
+  }
+
+  private async applyAllRuntimeConfigs(): Promise<void> {
+    const entries = await Promise.all(
+      supportedSocialProviders.map(async (provider) => [
+        provider,
+        await this.resolve(provider),
+      ] as const),
+    );
+    const configs: RuntimeSocialProviderConfigs = {};
+    for (const [provider, config] of entries) {
+      if (config) configs[provider] = config;
+    }
+    await this.applyRuntimeConfig?.(configs);
   }
 
   private callbackURL(provider: SupportedSocialProvider): string {
@@ -235,13 +272,28 @@ export class SocialProviderSettingsError extends Error {
 
 function requireSupportedProvider(value: string): SupportedSocialProvider {
   const provider = value.trim().toLowerCase();
-  if (provider !== GOOGLE_PROVIDER) {
+  if (!isSupportedSocialProvider(provider)) {
     throw new SocialProviderSettingsError(
       "unsupported_provider",
       "不支持的 OAuth Provider",
     );
   }
   return provider;
+}
+
+export const supportedSocialProviders: readonly SupportedSocialProvider[] = [
+  GOOGLE_PROVIDER,
+  DISCORD_PROVIDER,
+];
+
+export function isSupportedSocialProvider(
+  value: string,
+): value is SupportedSocialProvider {
+  return supportedSocialProviders.includes(value as SupportedSocialProvider);
+}
+
+function providerLabel(provider: SupportedSocialProvider): string {
+  return providerLabels[provider];
 }
 
 async function resolveStoredSettings(

@@ -16,6 +16,7 @@ import type {
 } from './providerConfigTypes'
 
 export const DEFAULT_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['openai-compatible']
+export const SELF_HOSTED_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['self-hosted']
 export const DEFAULT_ADMIN_PROVIDER_ENDPOINT_PROTOCOL: ProviderProtocolValue = 'model-api'
 export const GOOGLE_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['google-ai']
 export const GOOGLE_CLOUD_ADMIN_PROVIDER_ENDPOINT_API_TYPE = ProviderAPIType['google-cloud']
@@ -28,6 +29,7 @@ export const ADMIN_PROVIDER_ENDPOINT_API_TYPE_OPTIONS: Array<{
   value: ProviderApiTypeValue
 }> = [
   { label: 'OpenAI Compatible', value: DEFAULT_ADMIN_PROVIDER_ENDPOINT_API_TYPE },
+  { label: 'Self-hosted HTTP', value: SELF_HOSTED_ADMIN_PROVIDER_ENDPOINT_API_TYPE },
   { label: 'Google AI Studio', value: GOOGLE_ADMIN_PROVIDER_ENDPOINT_API_TYPE },
   {
     label: 'Gemini Enterprise Agent Platform',
@@ -110,7 +112,7 @@ export function createEmptyProviderEndpointForm(): ProviderEndpointFormData {
 export function createProviderEndpointSavePayload(form: ProviderEndpointFormData) {
   const isModelless = isModellessProviderProtocol(form.protocol)
   return {
-    api_type: form.apiType,
+    api_type: isModelless ? SELF_HOSTED_ADMIN_PROVIDER_ENDPOINT_API_TYPE : form.apiType,
     protocol: form.protocol,
     ...(isModelless && form.capability ? { capability: form.capability } : {}),
     name: form.name,

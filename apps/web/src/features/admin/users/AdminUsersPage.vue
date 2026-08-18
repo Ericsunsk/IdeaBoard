@@ -105,7 +105,7 @@
       scrollable
       scroll-height="flex"
       frame-class="h-full min-h-0"
-      :table-style="{ minWidth: '1040px' }"
+      :table-style="{ minWidth: '1300px' }"
     >
       <Column selection-mode="multiple" style="width: 3rem" />
 
@@ -140,11 +140,14 @@
               <div class="truncate text-admin-content font-bold text-admin-text-1">
                 {{ user.displayName }}
               </div>
-              <div class="mt-0.5 truncate font-mono text-admin-caption text-admin-text-3">
-                {{ user.publicIdLabel }}
-              </div>
             </div>
           </div>
+        </template>
+      </Column>
+
+      <Column field="email" header="Email" :style="{ minWidth: '260px' }">
+        <template #body="{ data: user }">
+          <span class="truncate text-admin-body text-admin-text-2">{{ user.email || '-' }}</span>
         </template>
       </Column>
 

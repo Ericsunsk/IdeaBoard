@@ -40,6 +40,9 @@ func (r *ProviderEndpointRepository) Create(ctx context.Context, endpoint *Provi
 	if err != nil {
 		return err
 	}
+	if err := ValidateProtocolAPIType(protocol, endpoint.APIType); err != nil {
+		return err
+	}
 	if err := validateManagedEndpointAPIKey(protocol, endpoint.APIKey); err != nil {
 		return err
 	}
@@ -130,6 +133,9 @@ func (r *ProviderEndpointRepository) List(ctx context.Context) ([]*ProviderEndpo
 func (r *ProviderEndpointRepository) Update(ctx context.Context, endpoint *ProviderEndpoint) error {
 	protocol, capabilities, err := NormalizeProtocolCapabilities(endpoint.Protocol, endpoint.Capabilities)
 	if err != nil {
+		return err
+	}
+	if err := ValidateProtocolAPIType(protocol, endpoint.APIType); err != nil {
 		return err
 	}
 	if err := validateManagedEndpointAPIKey(protocol, endpoint.APIKey); err != nil {

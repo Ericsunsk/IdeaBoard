@@ -57,10 +57,9 @@ describe('AdminBillingPricingPage', () => {
     expect(screen.getByText('已归档')).toBeVisible()
     expect(screen.getAllByText('1 Idea')).toHaveLength(3)
     expect(screen.queryByText('1 Ideas')).not.toBeInTheDocument()
-    expect(
-      container.querySelector('.grid.grid-cols-1.md\\:grid-cols-2.xl\\:grid-cols-3'),
-    ).toBeTruthy()
-    expect(container.querySelector('.columns-1')).not.toBeInTheDocument()
+    expect(container.querySelector('.columns-1.md\\:columns-2.xl\\:columns-3')).toBeTruthy()
+    expect(container.querySelector('.break-inside-avoid')).toBeTruthy()
+    expect(container.querySelector('.grid.grid-cols-1.md\\:grid-cols-2.xl\\:grid-cols-3')).toBeNull()
     expect(screen.queryByRole('button', { name: '新建 SKU' })).not.toBeInTheDocument()
   })
 

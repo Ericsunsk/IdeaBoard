@@ -28,6 +28,7 @@ type UserListResponse struct {
 
 type AdminUserListItem struct {
 	PublicID         uuid.UUID `json:"public_id"`
+	Email            string    `json:"email"`
 	DisplayName      string    `json:"display_name"`
 	Avatar           string    `json:"avatar,omitempty"`
 	Role             string    `json:"role"`

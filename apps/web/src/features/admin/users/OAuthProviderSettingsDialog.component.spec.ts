@@ -49,7 +49,9 @@ describe('OAuthProviderSettingsDialog', () => {
     vi.clearAllMocks()
     vi.mocked(resource.get).mockResolvedValue(configuredSummary)
     vi.mocked(resource.save).mockResolvedValue(configuredSummary)
-    vi.mocked(resource.getCapabilities).mockResolvedValue({ social: { google: true } })
+    vi.mocked(resource.getCapabilities).mockResolvedValue({
+      social: { google: true, discord: false },
+    })
   })
 
   it('shows the generic Provider selector and keeps callback and Secret safe', async () => {

@@ -60,9 +60,8 @@ test("native authentication security configuration stays explicit", async (t) =>
   assert.equal(emailOTP.options?.changeEmail?.enabled, true);
   assert.deepEqual(emailOTP.options?.rateLimit, { window: 3600, max: 5 });
 
-  const hibp = plugins.find((plugin) => plugin.id === "have-i-been-pwned") as
-    | { id: string; options?: { enabled?: boolean } }
-    | undefined;
-  assert.ok(hibp);
-  assert.notEqual(hibp.options?.enabled, false);
+  assert.equal(
+    plugins.some((plugin) => plugin.id === "have-i-been-pwned"),
+    false,
+  );
 });

@@ -12,9 +12,6 @@
           <template #start>
             <div class="min-w-0">
               <div class="text-admin-title-sm font-[740] text-admin-title-color">账本检查历史</div>
-              <div class="mt-0.5 text-admin-caption text-admin-text-3">
-                检查发现包含仅报告的业务追踪异常；只有资金风险才会限制 Wallet
-              </div>
             </div>
           </template>
           <template #actions>

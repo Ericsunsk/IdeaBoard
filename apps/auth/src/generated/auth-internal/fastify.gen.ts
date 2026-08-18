@@ -2,7 +2,7 @@
 
 import type { RouteHandler } from 'fastify';
 
-import type { BanUserData2, BanUserErrors, BanUserResponses, DeleteUserData2, DeleteUserErrors, DeleteUserResponses, EnsureUserData, EnsureUserErrors, EnsureUserResponses, RevokeUserSessionsData2, RevokeUserSessionsErrors, RevokeUserSessionsResponses, SetUserRoleData2, SetUserRoleErrors, SetUserRoleResponses, UnbanUserData2, UnbanUserErrors, UnbanUserResponses, ValidateSessionErrors, ValidateSessionResponses } from './types.gen.js';
+import type { BanUserData2, BanUserErrors, BanUserResponses, DeleteUserData2, DeleteUserErrors, DeleteUserResponses, EnsureUserData, EnsureUserErrors, EnsureUserResponses, GetUserEmailsData2, GetUserEmailsErrors, GetUserEmailsResponses, RevokeUserSessionsData2, RevokeUserSessionsErrors, RevokeUserSessionsResponses, SetUserRoleData2, SetUserRoleErrors, SetUserRoleResponses, UnbanUserData2, UnbanUserErrors, UnbanUserResponses, ValidateSessionErrors, ValidateSessionResponses } from './types.gen.js';
 
 export type RouteHandlers = {
     validateSession: RouteHandler<{
@@ -11,6 +11,10 @@ export type RouteHandlers = {
     ensureUser: RouteHandler<{
         Body: EnsureUserData['body'];
         Reply: EnsureUserErrors & EnsureUserResponses;
+    }>;
+    getUserEmails: RouteHandler<{
+        Body: GetUserEmailsData2['body'];
+        Reply: GetUserEmailsErrors & GetUserEmailsResponses;
     }>;
     deleteUser: RouteHandler<{
         Params: DeleteUserData2['path'];

@@ -10,4 +10,5 @@ export type OAuthProviderSettingsProvider =
 
 export const OAuthProviderSettingsProvider = {
   google: 'google',
+  discord: 'discord',
 } as const

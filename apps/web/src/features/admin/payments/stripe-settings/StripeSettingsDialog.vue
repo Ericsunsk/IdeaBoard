@@ -64,7 +64,6 @@
           label="Payment Method Configuration ID"
           for="admin-stripe-payment-method-configuration-id"
           :error="errors.paymentMethodConfigurationId"
-          hint="来自当前 Stripe Account 和当前 Mode，例如 pmc_...。保存前会由 Stripe 验证。"
           required
         >
           <InputText
@@ -86,7 +85,7 @@
           label="Stripe API Key"
           for="admin-stripe-api-key"
           :error="errors.apiKey"
-          :hint="apiKeyHint"
+          hint="支持 sk_ 或 rk_ 格式。"
           :required="!summary?.apiKeyConfigured"
         >
           <InputText
@@ -199,13 +198,6 @@ const apiKeyPlaceholder = computed(() =>
   summary.value?.apiKeyConfigured ? '已配置，留空则保持不变' : '输入 Stripe API Key',
 )
 const paymentMethodConfigurationIdPattern = /^pmc_[A-Za-z0-9]+$/
-const apiKeyHint = computed(() => {
-  const acceptedFormats =
-    '支持对应环境的 Secret key（sk_）或 Restricted key（rk_），建议优先使用最小权限的 Restricted key。'
-  return summary.value?.apiKeyConfigured
-    ? `为保护 Secret，不会回显当前 API Key。${acceptedFormats}`
-    : acceptedFormats
-})
 const modeLabel = computed(() =>
   summary.value?.mode === 'live' ? 'Live Mode' : summary.value?.mode === 'test' ? 'Test Mode' : '—',
 )

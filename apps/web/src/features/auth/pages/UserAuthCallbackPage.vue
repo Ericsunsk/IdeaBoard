@@ -31,7 +31,7 @@ const userStore = useUserStore()
 const status = ref<'loading' | 'failed'>('loading')
 const title = computed(() => (status.value === 'loading' ? '正在完成登录' : '登录未完成'))
 const message = computed(() =>
-  status.value === 'loading' ? '正在恢复你的 Session...' : 'Google 登录失败，请重新尝试。',
+  status.value === 'loading' ? '正在恢复你的 Session...' : 'OAuth 登录失败，请重新尝试。',
 )
 
 function safeRedirectPath() {

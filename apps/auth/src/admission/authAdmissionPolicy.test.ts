@@ -19,7 +19,7 @@ describe("AuthAdmissionPolicy", () => {
         calls.push("mail");
         return true;
       },
-      getGoogleProviderReadiness: async () => {
+      getSocialProviderReadiness: async () => {
         calls.push("provider");
         return true;
       },
@@ -126,7 +126,7 @@ describe("AuthAdmissionPolicy", () => {
     assert.ok((limited.retryAfterSeconds ?? 0) > 0);
   });
 
-  it("allows Google user creation only after Settings and Provider readiness", async () => {
+  it("allows social provider creation only after Settings and Provider readiness", async () => {
     const calls: string[] = [];
     let providerReady = false;
     const policy = createAuthAdmissionPolicy({
@@ -139,7 +139,7 @@ describe("AuthAdmissionPolicy", () => {
           maxRequests: 30,
         };
       },
-      getGoogleProviderReadiness: async () => {
+      getSocialProviderReadiness: async () => {
         calls.push("google");
         return providerReady;
       },

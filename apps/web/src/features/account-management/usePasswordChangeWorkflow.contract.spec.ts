@@ -13,11 +13,15 @@ describe('usePasswordChangeWorkflow', () => {
     expect(workflow.validateField('oldPassword')).toBe(false)
     expect(workflow.errors.value.oldPassword).toBe(markRequiredError('请输入当前原密码'))
 
-    workflow.form.value.newPassword = '12345'
+    workflow.form.value.newPassword = '123456789'
     expect(workflow.validateField('newPassword')).toBe(false)
-    expect(workflow.errors.value.newPassword).toBe('密码至少6个字符')
+    expect(workflow.errors.value.newPassword).toBe('密码长度需为 10-128 个字符')
 
-    workflow.form.value.newPassword = '123456'
+    workflow.form.value.newPassword = 'x'.repeat(129)
+    expect(workflow.validateField('newPassword')).toBe(false)
+    expect(workflow.errors.value.newPassword).toBe('密码长度需为 10-128 个字符')
+
+    workflow.form.value.newPassword = '1234567890'
     workflow.form.value.confirmPassword = 'abcdef'
     expect(workflow.validateField('confirmPassword')).toBe(false)
     expect(workflow.errors.value.confirmPassword).toBe('两次输入密码不一致')
@@ -26,12 +30,12 @@ describe('usePasswordChangeWorkflow', () => {
   it('clears new password error and revalidates confirm password when needed', () => {
     const workflow = usePasswordChangeWorkflow(createDeps())
 
-    workflow.form.value.newPassword = '123456'
-    workflow.form.value.confirmPassword = 'abcdef'
-    workflow.errors.value.newPassword = '密码至少6个字符'
+    workflow.form.value.newPassword = '1234567890'
+    workflow.form.value.confirmPassword = 'abcdefghij'
+    workflow.errors.value.newPassword = '密码长度需为 10-128 个字符'
     workflow.errors.value.confirmPassword = '两次输入密码不一致'
 
-    workflow.form.value.newPassword = 'abcdef'
+    workflow.form.value.newPassword = 'abcdefghij'
     workflow.handleNewPasswordInput()
 
     expect(workflow.errors.value.newPassword).toBe('')
@@ -58,13 +62,13 @@ describe('usePasswordChangeWorkflow', () => {
     const workflow = usePasswordChangeWorkflow(deps)
     workflow.form.value = {
       oldPassword: 'old-pass',
-      newPassword: 'new-pass',
-      confirmPassword: 'new-pass',
+      newPassword: 'new-password',
+      confirmPassword: 'new-password',
     }
 
     await workflow.submit()
 
-    expect(deps.userStore.updatePassword).toHaveBeenCalledWith('old-pass', 'new-pass')
+    expect(deps.userStore.updatePassword).toHaveBeenCalledWith('old-pass', 'new-password')
     expect(workflow.form.value).toEqual({
       oldPassword: '',
       newPassword: '',
@@ -96,8 +100,8 @@ describe('usePasswordChangeWorkflow', () => {
     const workflow = usePasswordChangeWorkflow(deps)
     workflow.form.value = {
       oldPassword: 'old-pass',
-      newPassword: 'new-pass',
-      confirmPassword: 'new-pass',
+      newPassword: 'new-password',
+      confirmPassword: 'new-password',
     }
 
     await workflow.submit()
@@ -117,8 +121,8 @@ describe('usePasswordChangeWorkflow', () => {
     const workflow = usePasswordChangeWorkflow(deps)
     workflow.form.value = {
       oldPassword: 'old-pass',
-      newPassword: 'new-pass',
-      confirmPassword: 'new-pass',
+      newPassword: 'new-password',
+      confirmPassword: 'new-password',
     }
 
     await workflow.submit()

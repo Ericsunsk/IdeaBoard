@@ -5,9 +5,6 @@
         <template #start>
           <div class="min-w-0">
             <div class="text-admin-title-sm font-[740] text-admin-title-color">异常队列</div>
-            <div class="mt-0.5 text-admin-caption text-admin-text-3">
-              待处理显示当前异常，已解决保留历史诊断记录
-            </div>
           </div>
         </template>
         <template #filters>
@@ -21,10 +18,10 @@
             aria-label="异常队列视图"
           />
         </template>
-        <template #actions>
+        <template #actions="{ iconButtonClass }">
           <Button
             text
-            :class="adminRoundIconButtonClass"
+            :class="iconButtonClass"
             aria-label="刷新异常队列"
             :loading="loading"
             @click="refreshFindings"
@@ -238,7 +235,7 @@ import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.v
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import { useAdminCollectionState } from '../../shared/composables/useAdminCollectionState'
 import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
-import { adminCompactTagClass, adminRoundIconButtonClass } from '../../shared/lib/adminUiClasses'
+import { adminCompactTagClass } from '../../shared/lib/adminUiClasses'
 import { formatAdminDateTime } from '../creditsBillingFormat'
 import {
   createAdminCreditFindingQueueResource,

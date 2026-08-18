@@ -141,7 +141,7 @@
               auto-resize
               class="w-full"
               rows="4"
-              :placeholder="`为「${item.title}」设置系统提示词，可使用上方变量按钮插入模板变量...`"
+              placeholder="可使用上方变量插入模板"
               :disabled="saving[item.slug]"
             />
           </div>

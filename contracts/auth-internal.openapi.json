@@ -83,6 +83,43 @@
         }
       }
     },
+    "/internal/users/emails": {
+      "post": {
+        "operationId": "getUserEmails",
+        "summary": "Read Auth emails for a bounded set of user IDs",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GetUserEmailsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Auth emails resolved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetUserEmailsEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalError"
+          }
+        }
+      }
+    },
     "/internal/users/{id}": {
       "parameters": [
         {
@@ -523,6 +560,50 @@
           }
         }
       },
+      "GetUserEmailsRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["user_ids"],
+        "properties": {
+          "user_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 191
+            }
+          }
+        }
+      },
+      "GetUserEmailsData": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["users"],
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuthUserEmail"
+            }
+          }
+        }
+      },
+      "AuthUserEmail": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["auth_user_id", "email"],
+        "properties": {
+          "auth_user_id": {
+            "type": "string",
+            "x-go-name": "AuthUserID"
+          },
+          "email": {
+            "type": "string"
+          }
+        }
+      },
       "SetUserRoleRequest": {
         "type": "object",
         "additionalProperties": false,
@@ -630,6 +711,23 @@
                 "$ref": "#/components/schemas/ProvisionedAuthUser"
               }
             }
+          }
+        }
+      },
+      "GetUserEmailsEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "msg", "data"],
+        "properties": {
+          "code": {
+            "type": "integer",
+            "enum": [0]
+          },
+          "msg": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/GetUserEmailsData"
           }
         }
       },

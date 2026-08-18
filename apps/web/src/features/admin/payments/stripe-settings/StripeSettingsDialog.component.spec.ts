@@ -66,11 +66,7 @@ describe('StripeSettingsDialog', () => {
     expect(apiKey.value).toBe('')
     expect(apiKey).toHaveAttribute('type', 'password')
     expect(apiKey).toHaveAttribute('placeholder', '已配置，留空则保持不变')
-    expect(
-      screen.getByText(
-        '为保护 Secret，不会回显当前 API Key。支持对应环境的 Secret key（sk_）或 Restricted key（rk_），建议优先使用最小权限的 Restricted key。',
-      ),
-    ).toBeVisible()
+    expect(screen.getByText('支持 sk_ 或 rk_ 格式。')).toBeVisible()
     expect(screen.queryByDisplayValue('sk_test_secret')).not.toBeInTheDocument()
   })
 

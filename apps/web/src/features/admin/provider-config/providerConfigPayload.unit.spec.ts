@@ -12,13 +12,14 @@ import {
   createProviderEndpointSavePayload,
   inferProviderEndpointApiTypeFromUrl,
   isModellessProviderEndpoint,
+  isModellessProviderProtocol,
 } from './providerConfigPayload'
 
 describe('provider config payload mapping', () => {
   it('saves image processing endpoints with one selected capability', () => {
     expect(
       createProviderEndpointSavePayload({
-        apiType: 'openai-compatible',
+        apiType: 'google-cloud',
         protocol: 'image-url-json-to-image',
         capability: 'background-removal',
         name: 'Modal Image Processing',
@@ -27,7 +28,7 @@ describe('provider config payload mapping', () => {
         status: 1,
       }),
     ).toEqual({
-      api_type: 'openai-compatible',
+      api_type: 'self-hosted',
       protocol: 'image-url-json-to-image',
       capability: 'background-removal',
       name: 'Modal Image Processing',
@@ -38,7 +39,7 @@ describe('provider config payload mapping', () => {
 
     expect(
       createProviderEndpointSavePayload({
-        apiType: 'openai-compatible',
+        apiType: 'google-cloud',
         protocol: 'flux-fill-json-image',
         capability: 'image-fill',
         name: 'Modal Flux Fill',
@@ -47,12 +48,32 @@ describe('provider config payload mapping', () => {
         status: 1,
       }),
     ).toEqual({
-      api_type: 'openai-compatible',
+      api_type: 'self-hosted',
       protocol: 'flux-fill-json-image',
       capability: 'image-fill',
       name: 'Modal Flux Fill',
       base_url: 'https://example.com/flux-fill',
       api_key: 'modal-secret',
+      status: 1,
+    })
+  })
+
+  it('keeps model API keys on account records instead of endpoint payloads', () => {
+    expect(
+      createProviderEndpointSavePayload({
+        apiType: 'openai-compatible',
+        protocol: 'model-api',
+        capability: '',
+        name: 'OpenAI Image Models',
+        baseUrl: 'https://api.example.com/v1',
+        apiKey: 'account-secret',
+        status: 1,
+      }),
+    ).toEqual({
+      api_type: 'openai-compatible',
+      protocol: 'model-api',
+      name: 'OpenAI Image Models',
+      base_url: 'https://api.example.com/v1',
       status: 1,
     })
   })
@@ -193,6 +214,9 @@ describe('provider config payload mapping', () => {
   })
 
   it('identifies capability endpoints that do not require a model', () => {
+    expect(isModellessProviderProtocol('model-api')).toBe(false)
+    expect(isModellessProviderProtocol('image-url-json-to-image')).toBe(true)
+    expect(isModellessProviderProtocol('flux-fill-json-image')).toBe(true)
     expect(
       isModellessProviderEndpoint(
         makeProviderEndpoint({

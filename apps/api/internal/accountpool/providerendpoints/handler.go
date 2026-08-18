@@ -131,6 +131,10 @@ func (h *ProviderEndpointHandler) Create(c *gin.Context) {
 		response.Error(c, 400, "接口类型不支持")
 		return
 	}
+	if err := ValidateProtocolAPIType(protocol, apiType); err != nil {
+		response.Error(c, 400, err.Error())
+		return
+	}
 
 	endpoint := &ProviderEndpoint{
 		APIType:      apiType,
@@ -194,6 +198,10 @@ func (h *ProviderEndpointHandler) Update(c *gin.Context) {
 	apiType, ok := workflow.ValidateProviderAPIType(req.APIType, baseURL)
 	if !ok {
 		response.Error(c, 400, "接口类型不支持")
+		return
+	}
+	if err := ValidateProtocolAPIType(protocol, apiType); err != nil {
+		response.Error(c, 400, err.Error())
 		return
 	}
 

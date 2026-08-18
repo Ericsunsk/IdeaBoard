@@ -84,7 +84,8 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 	if err := userLifecycle.VerifyWelcomeIdentityKey(ctx); err != nil {
 		return appDomainServices{}, err
 	}
-	userService := users.NewUserService(repos.userRepo, userLifecycle, creditService, storageService)
+	authServiceClient := auth.NewServiceClient(cfg.Auth)
+	userService := users.NewUserServiceWithEmailReader(repos.userRepo, userLifecycle, creditService, storageService, authServiceClient)
 	stripeAdapter := stripeadapter.New()
 	paymentCheckoutShutdownDispatcher, err := worker.NewPaymentCheckoutShutdownDispatcher(riverProducer)
 	if err != nil {
@@ -115,7 +116,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		return appDomainServices{}, fmt.Errorf("initialize payments service: %w", err)
 	}
 	return appDomainServices{
-		authServiceClient:    auth.NewServiceClient(cfg.Auth),
+		authServiceClient:    authServiceClient,
 		runtimeSettings:      runtimeSettings,
 		storageService:       storageService,
 		userService:          userService,

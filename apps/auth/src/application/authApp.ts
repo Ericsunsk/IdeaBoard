@@ -106,11 +106,7 @@ export function createAuthApp(deps: AuthAppDependencies): FastifyInstance {
       trustedOrigins: deps.config.trustedOrigins,
       service: deps.socialProviderSettingsService,
       getPublicCapabilities: async () => ({
-        social: {
-          google: (
-            await deps.admissionPolicy.admitRegistration("google_oauth")
-          ).allowed,
-        },
+        social: (await deps.socialProviderSettingsService!.getCapabilities()).social,
       }),
     });
   }

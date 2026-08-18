@@ -16,18 +16,26 @@
         novalidate
         @submit.prevent="handleLogin"
       >
-        <Button
-          v-if="googleEnabled"
-          unstyled
-          type="button"
-          :class="authSocialIconButtonClass"
-          :disabled="loading"
-          aria-label="使用 Google 登录"
-          title="使用 Google 登录"
-          @click="handleGoogleLogin"
-        >
-          <img :src="googleLogoUrl" class="size-6" alt="" aria-hidden="true" />
-        </Button>
+        <div v-if="enabledSocialProviders.length" class="grid grid-cols-2 gap-3">
+          <Button
+            v-for="provider in enabledSocialProviders"
+            :key="provider"
+            unstyled
+            type="button"
+            :class="authSocialIconButtonClass"
+            :disabled="loading"
+            :aria-label="`使用 ${getOAuthProviderLabel(provider)} 登录`"
+            :title="`使用 ${getOAuthProviderLabel(provider)} 登录`"
+            @click="handleSocialLogin(provider)"
+          >
+            <img
+              :src="providerLogoUrls[provider]"
+              class="size-6"
+              alt=""
+              aria-hidden="true"
+            />
+          </Button>
+        </div>
 
         <IbFormField
           v-slot="{
@@ -265,15 +273,22 @@ import InputText from 'primevue/inputtext'
 import Password from 'primevue/password'
 import { Lock as LockIcon, User as UserIcon } from '@iconoir/vue'
 import googleLogoUrl from '../assets/google.svg'
+import discordLogoUrl from '../assets/discord.svg'
 import { useUserStore } from '../session/authSession'
 import { authTransport } from '../session/authTransport'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
+import { getPasswordLengthError } from '../../../shared/auth/passwordPolicy'
 import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
 import IbFormField from '../../../shared/components/IbFormField.vue'
 import { useAuthFeedback } from '../useAuthFeedback'
 import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import { getRequiredError } from './authFormUtils'
+import {
+  getOAuthProviderLabel,
+  OAUTH_PROVIDER_CODES,
+  type OAuthProviderCode,
+} from '../../../shared/auth/oauthProviders'
 import {
   authButtonPt,
   authErrorMessagePt,
@@ -330,13 +345,23 @@ const resetMode = ref(false)
 const resetOtpSent = ref(false)
 const resetForm = ref({ email: '', otp: '', password: '' })
 const resetErrors = ref({ email: '', otp: '', password: '' })
-const googleEnabled = ref(false)
+const socialCapabilities = ref<Record<OAuthProviderCode, boolean>>({
+  google: false,
+  discord: false,
+})
+const providerLogoUrls: Record<OAuthProviderCode, string> = {
+  google: googleLogoUrl,
+  discord: discordLogoUrl,
+}
+const enabledSocialProviders = computed(() =>
+  OAUTH_PROVIDER_CODES.filter((provider) => socialCapabilities.value[provider]),
+)
 
 watch(loading, (busy) => emit('update:busy', busy), { immediate: true })
 onBeforeUnmount(() => emit('update:busy', false))
 
 onMounted(async () => {
-  googleEnabled.value = (await authTransport.getCapabilities()).social.google
+  socialCapabilities.value = (await authTransport.getCapabilities()).social
 })
 
 function resolveFieldControlState(invalid: boolean) {
@@ -377,10 +402,10 @@ async function handleLogin() {
   if (loggedIn) emit('login-success')
 }
 
-async function handleGoogleLogin() {
+async function handleSocialLogin(provider: OAuthProviderCode) {
   await runAsyncAction(
     async () => {
-      await authTransport.signInWithGoogle()
+      await authTransport.signInWithOAuth(provider)
       return true
     },
     { feedback: { error: authFeedback.login.error } },
@@ -401,7 +426,7 @@ async function handleResetPassword() {
 
 async function handleResetPasswordConfirm() {
   resetErrors.value.otp = /^\d{6}$/.test(resetForm.value.otp.trim()) ? '' : '请输入 6 位验证码'
-  resetErrors.value.password = resetForm.value.password.length >= 10 ? '' : '密码至少 10 个字符'
+  resetErrors.value.password = getPasswordLengthError(resetForm.value.password)
   if (resetErrors.value.otp || resetErrors.value.password) return
 
   const reset = await runAsyncAction(

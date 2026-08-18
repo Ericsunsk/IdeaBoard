@@ -102,9 +102,6 @@
               >
                 <div class="min-w-0">
                   <div class="text-admin-content font-bold text-admin-title-color">异常雷达</div>
-                  <div class="mt-0.5 text-admin-meta text-admin-subtitle-color">
-                    活跃异常恢复后自动消失
-                  </div>
                 </div>
                 <Tag
                   :value="hasAnomalies ? `${anomalyCount} 项` : '正常'"
@@ -158,14 +155,31 @@
       </section>
     </main>
 
-    <Menu
+    <Popover
       ref="userMenuRef"
-      :model="userMenuItems"
-      popup
       :pt="userMenuPt"
       @show="userMenuOpen = true"
       @hide="userMenuOpen = false"
-    />
+    >
+      <div class="flex min-w-[132px] flex-col gap-1 p-1.5" role="menu">
+        <Button
+          label="返回画布"
+          text
+          fluid
+          role="menuitem"
+          class="justify-start rounded-md px-3 py-2.5 text-admin-meta font-[650]"
+          @click="handleUserAction('boards')"
+        />
+        <Button
+          label="退出登录"
+          text
+          fluid
+          role="menuitem"
+          class="justify-start rounded-md px-3 py-2.5 text-admin-meta font-[650]"
+          @click="handleUserAction('logout')"
+        />
+      </div>
+    </Popover>
     <ConfirmDialog />
 
     <Drawer
@@ -232,11 +246,9 @@ import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import ConfirmDialog from 'primevue/confirmdialog'
 import Drawer from 'primevue/drawer'
-import Menu from 'primevue/menu'
 import Popover from 'primevue/popover'
 import Tag from 'primevue/tag'
 import Tooltip from 'primevue/tooltip'
-import type { MenuItem } from 'primevue/menuitem'
 import { Bell as BellIcon, Menu as MenuIcon, User as UserIcon, Xmark } from '@iconoir/vue'
 import {
   adminNavigationByKey,
@@ -254,8 +266,6 @@ import { brandMarkClasses, createBrandMarkClass } from '../../../shared/lib/bran
 import { useAdminAnomalyRadar } from '../shared/composables/useAdminAnomalyRadar'
 import type { AdminAnomalyItem } from '../shared/lib/adminAnomalyRules'
 import {
-  adminOverlayMenuRootClass,
-  createAdminMenuPt,
   createAdminPopoverPt,
 } from '../shared/lib/adminOverlayPt'
 import { adminAnomalyPopoverClass } from '../shared/lib/adminUiClasses'
@@ -277,7 +287,7 @@ const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout
 
 const mobileMenuOpen = ref(false)
 const userMenuOpen = ref(false)
-const userMenuRef = ref<PrimePopupMenu | null>(null)
+const userMenuRef = ref<PrimePopupPanel | null>(null)
 const anomalyRadarPopoverRef = ref<PrimePopupPanel | null>(null)
 const isLoginRoute = computed(() => route.path === ADMIN_LOGIN_PATH)
 const isAdminShellRoute = computed(() => !isLoginRoute.value)
@@ -351,9 +361,7 @@ const mobileNavButtonClass = [
 const mobileNavButtonIdleClass =
   'bg-transparent text-ib-text-muted hover:border-ib-border hover:bg-ib-surface hover:text-ib-text'
 const mobileNavButtonActiveClass = 'bg-ib-accent-pressed text-ib-text-inverse'
-const userMenuPt = createAdminMenuPt({
-  rootClass: adminOverlayMenuRootClass,
-})
+const userMenuPt = createAdminPopoverPt({ contentClass: '!p-0' })
 const anomalyRadarPopoverPt = createAdminPopoverPt({
   rootClass: '!max-h-[calc(100dvh-24px)] !overflow-hidden',
   contentClass: '!max-h-[calc(100dvh-24px)] !overflow-hidden !p-0',
@@ -388,26 +396,6 @@ function navIconClassFor(isActive: boolean) {
   return isActive ? navIconActiveClass : navIconIdleClass
 }
 
-const userMenuItems = computed<MenuItem[]>(() => [
-  {
-    label: userStore.user?.display_name || 'Admin',
-    disabled: true,
-  },
-  { separator: true },
-  {
-    label: '返回画布列表',
-    command: () => {
-      void handleUserAction('boards')
-    },
-  },
-  {
-    label: '退出登录',
-    command: () => {
-      void handleUserAction('logout')
-    },
-  },
-])
-
 function toggleUserMenu(event: Event) {
   userMenuOpen.value = !userMenuOpen.value
   userMenuRef.value?.toggle(event)
@@ -423,6 +411,7 @@ function handleAnomalySelect(item: AdminAnomalyItem) {
 }
 
 async function handleUserAction(key: 'boards' | 'logout') {
+  userMenuRef.value?.hide?.()
   if (key === 'logout') {
     await logoutAndRedirect(ADMIN_LOGIN_PATH)
   } else {

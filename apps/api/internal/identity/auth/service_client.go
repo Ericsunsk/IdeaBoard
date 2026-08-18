@@ -515,6 +515,49 @@ func (c *ServiceClient) EnsureUser(ctx context.Context, email, displayName, pass
 	return &user, nil
 }
 
+// GetUserEmails resolves a bounded batch of Auth-owned email identities.
+func (c *ServiceClient) GetUserEmails(ctx context.Context, authUserIDs []string) (map[string]string, error) {
+	client, err := c.contractClient()
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(authUserIDs))
+	seen := make(map[string]struct{}, len(authUserIDs))
+	for _, rawID := range authUserIDs {
+		id := strings.TrimSpace(rawID)
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return map[string]string{}, nil
+	}
+	response, err := client.GetUserEmailsWithResponse(ctx, internalcontract.GetUserEmailsJSONRequestBody{UserIds: ids})
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode() != http.StatusOK {
+		return nil, contractFailure("get user emails", response.StatusCode(), response.Body)
+	}
+	if response.JSON200 == nil || response.JSON200.Code != internalcontract.GetUserEmailsEnvelopeCodeN0 {
+		return nil, fmt.Errorf("auth service get user emails returned an invalid success envelope")
+	}
+	emails := make(map[string]string, len(response.JSON200.Data.Users))
+	for _, user := range response.JSON200.Data.Users {
+		id := strings.TrimSpace(user.AuthUserID)
+		email := strings.TrimSpace(user.Email)
+		if id != "" && email != "" {
+			emails[id] = email
+		}
+	}
+	return emails, nil
+}
+
 func (c *ServiceClient) DeleteUser(ctx context.Context, authUserID string) error {
 	client, normalizedID, err := c.managedUserClient(authUserID)
 	if err != nil {

@@ -6,6 +6,10 @@ import {
 import { resolveAuthUrl } from '../../../shared/config/runtimeUrls'
 import { USER_AUTH_CALLBACK_PATH } from '../../../shared/constants/routePaths'
 import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
+import {
+  getOAuthProviderLabel,
+  type OAuthProviderCode,
+} from '../../../shared/auth/oauthProviders'
 
 async function requestAuthEndpoint(
   path: string,
@@ -47,7 +51,7 @@ export const authTransport = {
     }
   },
 
-  async signInWithGoogle(): Promise<void> {
+  async signInWithOAuth(provider: OAuthProviderCode): Promise<void> {
     const currentURL = new URL(window.location.href)
     const callbackURL = new URL(USER_AUTH_CALLBACK_PATH, window.location.origin)
     const redirectPath = currentURL.searchParams.get('redirect')?.trim() ?? ''
@@ -55,28 +59,36 @@ export const authTransport = {
       callbackURL.searchParams.set('redirect', redirectPath)
     }
     const result = await authClient.signIn.social({
-      provider: 'google',
+      provider,
       callbackURL: callbackURL.toString(),
       errorCallbackURL: callbackURL.toString(),
     })
     if (result?.error) {
-      throw new Error(extractBetterAuthErrorMessage(result.error, 'Google 登录失败'))
+      throw new Error(
+        extractBetterAuthErrorMessage(result.error, `${getOAuthProviderLabel(provider)} 登录失败`),
+      )
     }
   },
 
-  async getCapabilities(): Promise<{ social: { google: boolean } }> {
+  async getCapabilities(): Promise<{ social: Record<OAuthProviderCode, boolean> }> {
     try {
       const response = await fetch(resolveAuthUrl('/api/auth/capabilities'), {
         credentials: 'include',
         cache: 'no-store',
       })
-      if (!response.ok) return { social: { google: false } }
+      if (!response.ok) return { social: { google: false, discord: false } }
       const payload = (await response.json().catch(() => null)) as {
-        data?: { social?: { google?: unknown } }
+        data?: { social?: Record<string, unknown> }
       } | null
-      return { social: { google: payload?.data?.social?.google === true } }
+      const social = payload?.data?.social
+      return {
+        social: {
+          google: social?.google === true,
+          discord: social?.discord === true,
+        },
+      }
     } catch {
-      return { social: { google: false } }
+      return { social: { google: false, discord: false } }
     }
   },
 

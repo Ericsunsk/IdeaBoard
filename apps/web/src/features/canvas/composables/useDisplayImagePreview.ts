@@ -14,6 +14,7 @@ import {
   WEBP_PREVIEW_MIME_TYPE,
   WEBP_PREVIEW_QUALITY,
 } from '../utils/displayImagePreviewEncoding'
+import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../shared/config/runtimeUrls'
 
 interface PreviewOptions {
   maxSide?: MaybeRefOrGetter<number | null | undefined>
@@ -154,12 +155,17 @@ export function useDisplayImagePreview(
   sourceUrl: MaybeRefOrGetter<string | null | undefined>,
   options: PreviewOptions = {},
 ) {
+  const resolvedSourceUrl = computed(() => {
+    const raw = toValue(sourceUrl)
+    if (!raw) return ''
+    return resolveAssetUrl(canonicalizeRuntimeUploadRef(raw.trim()))
+  })
   const readMaxSide = () => resolvePreviewMaxSide(toValue(options.maxSide))
   const previewUrl = ref<string | null>(null)
   let requestToken = 0
 
   watch(
-    [() => toValue(sourceUrl), readMaxSide],
+    [() => resolvedSourceUrl.value, readMaxSide],
     ([currentSource, maxSide]) => {
       requestToken += 1
       const token = requestToken
@@ -189,7 +195,7 @@ export function useDisplayImagePreview(
     })
   }
 
-  const displayUrl = computed(() => previewUrl.value || toValue(sourceUrl) || '')
+  const displayUrl = computed(() => previewUrl.value || resolvedSourceUrl.value || '')
 
   return {
     displayUrl,

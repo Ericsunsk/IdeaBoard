@@ -18,6 +18,7 @@ type UserService struct {
 	repo                *UserRepository
 	creditBalanceReader UserCreditBalanceReader
 	uploadCleaner       UserUploadCleaner
+	emailReader         UserEmailReader
 	lifecycle           UserLifecycle
 }
 
@@ -30,6 +31,10 @@ type UserCreditBalanceReader interface {
 	GetAvailableBalances(context.Context, []int64) (map[int64]int64, error)
 }
 
+type UserEmailReader interface {
+	GetUserEmails(context.Context, []string) (map[string]string, error)
+}
+
 func NewUserService(
 	repo *UserRepository,
 	lifecycle UserLifecycle,
@@ -40,10 +45,31 @@ func NewUserService(
 	if len(uploadCleaner) > 0 {
 		cleaner = uploadCleaner[0]
 	}
+	return newUserService(repo, lifecycle, creditBalanceReader, cleaner, nil)
+}
+
+func NewUserServiceWithEmailReader(
+	repo *UserRepository,
+	lifecycle UserLifecycle,
+	creditBalanceReader UserCreditBalanceReader,
+	uploadCleaner UserUploadCleaner,
+	emailReader UserEmailReader,
+) *UserService {
+	return newUserService(repo, lifecycle, creditBalanceReader, uploadCleaner, emailReader)
+}
+
+func newUserService(
+	repo *UserRepository,
+	lifecycle UserLifecycle,
+	creditBalanceReader UserCreditBalanceReader,
+	uploadCleaner UserUploadCleaner,
+	emailReader UserEmailReader,
+) *UserService {
 	return &UserService{
 		repo:                repo,
 		creditBalanceReader: creditBalanceReader,
-		uploadCleaner:       cleaner,
+		uploadCleaner:       uploadCleaner,
+		emailReader:         emailReader,
 		lifecycle:           lifecycle,
 	}
 }
@@ -96,6 +122,19 @@ func (s *UserService) ListUsers(ctx context.Context, req *UserListRequest) (*Use
 		if err != nil {
 			return nil, fmt.Errorf("读取用户Idea余额失败: %w", err)
 		}
+		emails := make(map[string]string)
+		if s.emailReader != nil {
+			authUserIDs := make([]string, 0, len(users))
+			for _, user := range users {
+				if user.AuthUserID != nil {
+					authUserIDs = append(authUserIDs, *user.AuthUserID)
+				}
+			}
+			emails, err = s.emailReader.GetUserEmails(ctx, authUserIDs)
+			if err != nil {
+				return nil, fmt.Errorf("读取用户邮箱失败: %w", err)
+			}
+		}
 		for _, user := range users {
 			availableCredits, ok := balances[user.ID]
 			if !ok {
@@ -103,6 +142,7 @@ func (s *UserService) ListUsers(ctx context.Context, req *UserListRequest) (*Use
 			}
 			list = append(list, &AdminUserListItem{
 				PublicID:         user.PublicID,
+				Email:            userEmail(emails, user.AuthUserID),
 				DisplayName:      user.DisplayName,
 				Avatar:           user.Avatar,
 				Role:             user.Role,
@@ -118,6 +158,13 @@ func (s *UserService) ListUsers(ctx context.Context, req *UserListRequest) (*Use
 		UserListCounts: counts,
 		List:           list,
 	}, nil
+}
+
+func userEmail(emails map[string]string, authUserID *string) string {
+	if authUserID == nil {
+		return ""
+	}
+	return emails[*authUserID]
 }
 
 func normalizeUserListRole(role string) string {

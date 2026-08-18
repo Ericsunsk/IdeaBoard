@@ -61,6 +61,18 @@ func NormalizeProtocolCapabilities(protocol string, requested []string) (string,
 	return protocol, normalized, nil
 }
 
+func ValidateProtocolAPIType(protocol, apiType string) error {
+	protocol = strings.ToLower(strings.TrimSpace(protocol))
+	apiType = strings.ToLower(strings.TrimSpace(apiType))
+	if protocol != ProtocolImageURLJSONImage && protocol != ProtocolFluxFillJSONImage {
+		return nil
+	}
+	if apiType != "openai-compatible" && apiType != "self-hosted" {
+		return fmt.Errorf("端点请求格式 %q 仅支持 self-hosted 或 openai-compatible 服务类型", protocol)
+	}
+	return nil
+}
+
 func containsCapability(allowed []string, requested string) bool {
 	for _, capability := range allowed {
 		if capability == requested {

@@ -25,6 +25,9 @@ type UserRow = {
 
 export type AuthIdentityStore = {
   findUserByEmail(email: string): Promise<InternalUserShape | null>;
+  findUserEmailsByIDs(
+    authUserIDs: string[],
+  ): Promise<Array<{ auth_user_id: string; email: string }>>;
   updateAuthUserRole(
     authUserID: string,
     role: "admin" | "user",
@@ -56,6 +59,22 @@ export function createAuthIdentityStore(
       return result.rows[0]
         ? normalizeUserRow(result.rows[0] as UserRow)
         : null;
+    },
+
+    async findUserEmailsByIDs(authUserIDs) {
+      const result = await database.query(
+        'SELECT id, email FROM "user" WHERE id = ANY($1::text[])',
+        [authUserIDs],
+      );
+      return result.rows.flatMap((row) => {
+        const candidate = row as UserRow;
+        if (
+          typeof candidate.id !== "string" ||
+          typeof candidate.email !== "string"
+        )
+          return [];
+        return [{ auth_user_id: candidate.id, email: candidate.email }];
+      });
     },
 
     async updateAuthUserRole(authUserID, role) {

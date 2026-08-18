@@ -58,6 +58,11 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
   };
   const repository: TestIdentityStore = {
     findUserByEmail: async () => null,
+    findUserEmailsByIDs: async (authUserIDs) =>
+      authUserIDs.map((auth_user_id) => ({
+        auth_user_id,
+        email: `${auth_user_id}@example.com`,
+      })),
     finalizeTrustedRegistrationIdentity: async () => true,
     updateAuthUserRole: async () => true,
     updateAuthUserBanState: async () => true,
@@ -89,10 +94,10 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
             (await overrides.mailConfigService!.getSummary()).readiness ===
             "ready"
         : undefined,
-      getGoogleProviderReadiness: overrides.socialProviderSettingsService
-        ? async () =>
+      getSocialProviderReadiness: overrides.socialProviderSettingsService
+        ? async (provider) =>
             (await overrides.socialProviderSettingsService!.getCapabilities())
-              .social.google
+              .social[provider]
         : undefined,
     });
   const baseDeps: AuthAppDependencies = {
@@ -183,6 +188,7 @@ describe("createAuthApp", () => {
           role: "user",
         },
       },
+      getUserEmails: { payload: { user_ids: ["auth-user-1"] } },
       deleteUser: {},
       setUserRole: { payload: { role: "user" } },
       banUser: { payload: { userId: "auth-user-1" } },
@@ -271,7 +277,7 @@ describe("createAuthApp", () => {
     assert.equal(authHandlerCalled, false);
   });
 
-  it("hides the Google runtime capability when registration is disabled", async (t) => {
+  it("keeps social runtime capabilities available when registration is disabled", async (t) => {
     let registrationEnabled = false;
     const app = createAuthApp(
       createTestDeps({
@@ -287,7 +293,7 @@ describe("createAuthApp", () => {
           update: async () => {
             throw new Error("unused");
           },
-          getCapabilities: async () => ({ social: { google: true } }),
+          getCapabilities: async () => ({ social: { google: true, discord: true } }),
         },
       }),
     );
@@ -300,7 +306,7 @@ describe("createAuthApp", () => {
 
     assert.equal(response.statusCode, 200);
     assert.deepEqual(response.json().data, {
-      social: { google: false },
+      social: { google: true, discord: true },
     });
 
     registrationEnabled = true;
@@ -309,7 +315,7 @@ describe("createAuthApp", () => {
       url: "/api/auth/capabilities",
     });
     assert.deepEqual(enabledResponse.json().data, {
-      social: { google: true },
+      social: { google: true, discord: true },
     });
   });
 

@@ -246,7 +246,8 @@ describe('AccountManagementDialogContent', () => {
     expect(screen.getAllByText('mock-user')[0]).toBeVisible()
     expect(screen.getAllByText('USM001')[0]).toBeVisible()
     expect(screen.getByRole('region', { name: '账户资料概览' })).toBeVisible()
-    expect(screen.getAllByText('00000000-0000-0000-0000-000000000001')[0]).toBeVisible()
+    expect(screen.queryByText('00000000-0000-0000-0000-000000000001')).not.toBeInTheDocument()
+    expect(screen.queryByText('正常使用中')).not.toBeInTheDocument()
   })
 
   it('switches the right pane from profile to account security', async () => {

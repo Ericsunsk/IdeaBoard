@@ -5,11 +5,6 @@ export const AUTH_DISPLAY_NAME_LIMIT = {
   max: 100,
 } as const
 
-export const AUTH_PASSWORD_LIMIT = {
-  min: 10,
-  max: 128,
-} as const
-
 export function getRequiredError(value: string, label: string) {
   return value ? '' : markRequiredError(`请输入${label}`)
 }

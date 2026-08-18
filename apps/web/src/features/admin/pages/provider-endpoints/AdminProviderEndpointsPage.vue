@@ -2,7 +2,7 @@
   <div>
     <AdminResourceGridFrame
       :empty-description="
-        hasProviderEndpointSearch ? '调整搜索关键词后重试。' : '点击右上角新增供应商端点开始配置。'
+        hasProviderEndpointSearch ? '调整搜索关键词后重试。' : '点击右上角新增端点开始配置。'
       "
       :empty-title="emptyProviderEndpointMessage"
       :is-empty="providerEndpointCards.length === 0"
@@ -35,7 +35,7 @@
               </template>
             </Button>
             <Button
-              label="新增供应商端点"
+              label="新增端点"
               :class="adminActionButtonClass"
               @click="providerEndpointEditor.openCreate"
             >
@@ -278,7 +278,7 @@
     <!-- 供应商端点表单弹窗 -->
     <AdminDialogShell
       v-model:visible="showProviderEndpointModal"
-      :header="isEditProviderEndpoint ? '编辑供应商端点' : '新增供应商端点'"
+      :header="isEditProviderEndpoint ? '编辑供应商端点' : '新增端点'"
       :busy="providerEndpointSaveLoading"
     >
       <AdminFormField
@@ -300,7 +300,7 @@
 
       <AdminFormField
         v-slot="{ describedbyId, invalid }"
-        label="调用协议"
+        label="请求格式"
         for="admin-provider-endpoint-protocol"
         :error="providerEndpointFormErrors.protocol"
       >
@@ -318,7 +318,7 @@
       </AdminFormField>
 
       <AdminFormField
-        v-if="providerProcessingCapabilityOptions.length"
+        v-if="providerEndpointForm.protocol === 'image-url-json-to-image'"
         v-slot="{ describedbyId, invalid }"
         label="处理功能"
         for="admin-provider-endpoint-capability"
@@ -341,7 +341,7 @@
       <AdminFormField
         v-if="providerEndpointForm.protocol === 'model-api'"
         v-slot="{ describedbyId, invalid }"
-        label="接口类型"
+        label="服务类型"
         for="admin-provider-endpoint-type"
         :error="providerEndpointFormErrors.apiType"
       >
@@ -352,7 +352,7 @@
           :options="providerEndpointEditor.apiTypeOptions"
           option-label="label"
           option-value="value"
-          placeholder="选择接口协议"
+          placeholder="选择服务类型"
           :invalid="invalid"
           :aria-describedby="describedbyId"
           @update:model-value="clearProviderEndpointFormError('apiType')"
@@ -360,24 +360,31 @@
       </AdminFormField>
 
       <AdminFormField
-        v-slot="{ describedbyId, invalid }"
+        v-slot="{ describedbyId, errorId, invalid }"
         label="Base URL地址"
         for="admin-provider-endpoint-api-url"
         :error="providerEndpointFormErrors.baseUrl"
+        error-placement="inline"
       >
         <InputText
           id="admin-provider-endpoint-api-url"
           v-model="providerEndpointForm.baseUrl"
           class="w-full"
-          placeholder="例如：https://api.example.com/v1"
+          :placeholder="
+            providerEndpointFormErrors.baseUrl || '例如：https://api.example.com/v1'
+          "
+          :class="invalid ? 'placeholder:text-admin-danger' : ''"
           :invalid="invalid"
           :aria-describedby="describedbyId"
           @blur="providerEndpointEditor.handleApiUrlBlur"
           @update:model-value="clearProviderEndpointFormError('baseUrl')"
         />
+        <span v-if="invalid" :id="errorId" class="sr-only">
+          {{ providerEndpointFormErrors.baseUrl }}
+        </span>
       </AdminFormField>
       <AdminFormField
-        v-if="providerProcessingCapabilityOptions.length"
+        v-if="isModellessProviderProtocol(providerEndpointForm.protocol)"
         v-slot="{ describedbyId, invalid }"
         label="API Key"
         for="admin-provider-endpoint-api-key"
@@ -621,6 +628,7 @@ import {
   getAdminProviderEndpointCapabilityLabel,
   getAdminProviderEndpointProtocolLabel,
   isModellessProviderEndpoint,
+  isModellessProviderProtocol,
 } from '../../provider-config/providerConfigPayload'
 
 const feedback = useAdminProviderConfigFeedback()
@@ -690,7 +698,13 @@ function clearProviderEndpointFormError(field: keyof typeof providerEndpointForm
 }
 
 function handleProtocolChange(protocol: string) {
-  if (protocol !== 'image-url-json-to-image') {
+  if (protocol === 'flux-fill-json-image') {
+    providerEndpointForm.value.apiType = 'self-hosted'
+    providerEndpointForm.value.capability = 'image-fill'
+  } else if (protocol === 'image-url-json-to-image') {
+    providerEndpointForm.value.apiType = 'self-hosted'
+    providerEndpointForm.value.capability = ''
+  } else {
     providerEndpointForm.value.apiKey = ''
     providerEndpointForm.value.capability = ''
   }

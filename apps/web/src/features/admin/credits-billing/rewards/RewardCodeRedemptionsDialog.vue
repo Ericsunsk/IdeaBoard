@@ -12,9 +12,6 @@
           <template #start>
             <div class="min-w-0">
               <div class="text-admin-title-sm font-[740] text-admin-title-color">兑换历史</div>
-              <div class="mt-0.5 text-admin-caption text-admin-text-3">
-                仅显示已成功提交的 Redemption
-              </div>
             </div>
           </template>
           <template #pager>

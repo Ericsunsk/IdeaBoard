@@ -2,7 +2,6 @@
   <AdminResourceGridFrame
     empty-description="注册后的计费功能会显示在这里。"
     empty-title="暂无可定价功能"
-    grid-class="grid grid-cols-1 items-start gap-3.5 md:grid-cols-2 xl:grid-cols-3"
     :is-empty="!errorMessage && items.length === 0"
     :is-loading="isLoading"
   >

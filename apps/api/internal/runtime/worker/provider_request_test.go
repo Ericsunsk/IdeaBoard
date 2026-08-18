@@ -205,6 +205,7 @@ func TestProviderRuntimeAdapterForUsesProtocolAndRuntimeOperation(t *testing.T) 
 		{name: "image fill on model protocol", apiType: workflow.ProviderGoogleAI, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationPartialEdit, wantErr: true},
 		{name: "background removal", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationBackgroundRemoval, want: providerRuntimeAdapterBackgroundRemoval},
 		{name: "upscale", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationImageUpscale, want: providerRuntimeAdapterImageUpscale},
+		{name: "self-hosted flux fill", apiType: workflow.ProviderSelfHosted, protocol: providerendpoints.ProtocolFluxFillJSONImage, operation: workflow.RuntimeOperationOutpaint, want: providerRuntimeAdapterFluxFill},
 		{name: "transform API type mismatch", apiType: workflow.ProviderGoogleAI, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationImageUpscale, wantErr: true},
 		{name: "transform on model protocol", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolModelAPI, operation: workflow.RuntimeOperationBackgroundRemoval, wantErr: true},
 		{name: "generation on transform protocol", apiType: workflow.ProviderOpenAICompatible, protocol: providerendpoints.ProtocolImageURLJSONImage, operation: workflow.RuntimeOperationPromptGeneration, wantErr: true},

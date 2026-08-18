@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { APIError } from "better-auth/api";
 import {
-  applyGoogleOAuthRequestPolicy,
+  applySocialOAuthRequestPolicy,
   createRegistrationUserCreationGuard,
-} from "./googleOAuthPolicy.js";
+} from "./socialOAuthPolicy.js";
 import { createAuthAdmissionPolicy } from "./authAdmissionPolicy.js";
 
 function createPolicy(
@@ -20,11 +20,11 @@ function createPolicy(
       maxRequests: 30,
     }),
     isMailReady: async () => true,
-    getGoogleProviderReadiness: async () => providerReady,
+    getSocialProviderReadiness: async () => providerReady,
   });
 }
 
-describe("Google OAuth policy", () => {
+describe("Social OAuth policy", () => {
   it("removes caller scopes and derives sign-up intent from server policy", async () => {
     const context = {
       path: "/sign-in/social",
@@ -35,7 +35,23 @@ describe("Google OAuth policy", () => {
       },
     };
 
-    await applyGoogleOAuthRequestPolicy(context, createPolicy(async () => true));
+    await applySocialOAuthRequestPolicy(context, createPolicy(async () => true));
+
+    assert.equal("scopes" in context.body, false);
+    assert.equal(context.body.requestSignUp, true);
+  });
+
+  it("applies the same sign-up policy to Discord", async () => {
+    const context = {
+      path: "/sign-in/social",
+      body: {
+        provider: "discord",
+        scopes: ["guilds"],
+        requestSignUp: true,
+      },
+    };
+
+    await applySocialOAuthRequestPolicy(context, createPolicy(async () => true));
 
     assert.equal("scopes" in context.body, false);
     assert.equal(context.body.requestSignUp, true);
@@ -52,8 +68,8 @@ describe("Google OAuth policy", () => {
     };
 
     const policy = createPolicy(async () => true);
-    await applyGoogleOAuthRequestPolicy(google, policy);
-    await applyGoogleOAuthRequestPolicy(github, policy);
+    await applySocialOAuthRequestPolicy(google, policy);
+    await applySocialOAuthRequestPolicy(github, policy);
 
     assert.equal("scopes" in google.body, false);
     assert.deepEqual(github.body.scopes, ["repo"]);
@@ -100,7 +116,7 @@ describe("Google OAuth policy", () => {
       body: { provider: "google", requestSignUp: true },
     };
 
-    await applyGoogleOAuthRequestPolicy(context, policy);
+    await applySocialOAuthRequestPolicy(context, policy);
 
     assert.equal(context.body.requestSignUp, false);
     await assert.rejects(

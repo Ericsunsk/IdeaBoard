@@ -114,7 +114,7 @@ func (h *SocialProviderAdminHandler) respondError(c *gin.Context, err error) {
 
 func requireSupportedSocialProvider(c *gin.Context) (string, bool) {
 	provider := strings.ToLower(strings.TrimSpace(c.Param("provider")))
-	if provider != "google" {
+	if provider != "google" && provider != "discord" {
 		response.Error(c, http.StatusNotFound, "不支持的 OAuth Provider")
 		return "", false
 	}

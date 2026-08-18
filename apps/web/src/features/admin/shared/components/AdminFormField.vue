@@ -11,7 +11,13 @@
       {{ hint }}
     </p>
 
-    <Message v-if="hasError" :id="errorElementId" severity="error" size="small" :closable="false">
+    <Message
+      v-if="hasError && errorPlacement === 'below'"
+      :id="errorElementId"
+      severity="error"
+      size="small"
+      :closable="false"
+    >
       {{ error }}
     </Message>
   </label>
@@ -34,6 +40,7 @@ const props = withDefaults(
     label: string
     for?: string
     error?: string
+    errorPlacement?: 'below' | 'inline'
     hint?: string
     required?: boolean
     labelClass?: string
@@ -42,6 +49,7 @@ const props = withDefaults(
   {
     for: undefined,
     error: '',
+    errorPlacement: 'below',
     hint: '',
     required: false,
     labelClass: '',

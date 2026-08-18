@@ -14,13 +14,13 @@ type UserCreationContext = {
   path?: unknown;
 } | null;
 
-export async function applyGoogleOAuthRequestPolicy(
+export async function applySocialOAuthRequestPolicy(
   context: AuthHookContext,
   admissionPolicy: AuthAdmissionPolicy,
 ): Promise<void> {
   if (!context.body || typeof context.body !== "object") return;
   const body = context.body as Record<string, unknown>;
-  if (body.provider !== "google") return;
+  if (body.provider !== "google" && body.provider !== "discord") return;
   if (context.path !== "/sign-in/social" && context.path !== "/link-social") {
     return;
   }
@@ -29,7 +29,9 @@ export async function applyGoogleOAuthRequestPolicy(
   // caller value keeps the server-side provider definition as the allowlist.
   delete body.scopes;
   if (context.path === "/sign-in/social") {
-    const decision = await admissionPolicy.admitRegistration("google_oauth");
+    const decision = await admissionPolicy.admitRegistration(
+      body.provider === "discord" ? "discord_oauth" : "google_oauth",
+    );
     body.requestSignUp = decision.allowed;
   }
 }
@@ -80,5 +82,5 @@ function registrationEntryFromContext(
 ): AuthRegistrationEntry {
   return context?.path === "/sign-in/email-otp"
     ? "email_otp"
-    : "google_oauth";
+    : "social_oauth";
 }

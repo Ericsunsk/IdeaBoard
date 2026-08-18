@@ -79,7 +79,7 @@ describe("social provider HTTP contracts", () => {
     assert.equal(response.statusCode, 200);
     assert.equal(response.headers["cache-control"], "no-store");
     assert.deepEqual(response.json().data, {
-      social: { google: true },
+      social: { google: true, discord: false },
     });
     assert.doesNotMatch(response.body, /client|secret|scope/i);
 
@@ -111,7 +111,7 @@ function createApp(
       provider: string,
       input: SocialProviderSettingsInput,
     ) => Promise<SocialProviderSettingsSummary>;
-    getCapabilities: () => Promise<{ social: { google: boolean } }>;
+    getCapabilities: () => Promise<{ social: { google: boolean; discord: boolean } }>;
   }> = {},
   trustedOrigins: string[] = [],
 ) {
@@ -121,7 +121,7 @@ function createApp(
     trustedOrigins,
     getPublicCapabilities:
       overrides.getCapabilities ??
-      (async () => ({ social: { google: true } })),
+      (async () => ({ social: { google: true, discord: false } })),
     service: {
       getSummary: async () => summary,
       update: async () => summary,

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { createSecretCipher } from "../infrastructure/secretCipher.js";
 import {
+  DISCORD_PROVIDER,
   GOOGLE_PROVIDER,
   SocialProviderSettingsError,
   SocialProviderSettingsService,
@@ -34,6 +35,49 @@ describe("SocialProviderSettingsService", () => {
       updatedAt: null,
     });
     assert.equal(await service.resolve(GOOGLE_PROVIDER), null);
+    assert.deepEqual(await service.getSummary(DISCORD_PROVIDER), {
+      provider: "discord",
+      enabled: false,
+      configured: false,
+      available: false,
+      clientId: "",
+      clientSecretConfigured: false,
+      scopes: ["identify", "email"],
+      configVersion: 0,
+      callbackURL: "https://api.ideaboard.art/api/auth/callback/discord",
+      updatedAt: null,
+    });
+  });
+
+  it("supports Discord credentials with a fixed minimal scope", async () => {
+    const repository = memoryRepository();
+    const applied: string[][] = [];
+    const service = new SocialProviderSettingsService(
+      repository,
+      secretCipher,
+      "https://api.ideaboard.art",
+      async (configs) => {
+        applied.push(Object.keys(configs).sort());
+      },
+    );
+
+    const summary = await service.update(DISCORD_PROVIDER, {
+      enabled: true,
+      clientId: "123456789012345678",
+      clientSecret: "discord-secret",
+    });
+
+    assert.equal(summary.available, true);
+    assert.deepEqual(await service.resolve(DISCORD_PROVIDER), {
+      provider: "discord",
+      clientId: "123456789012345678",
+      clientSecret: "discord-secret",
+      scopes: ["identify", "email"],
+    });
+    assert.deepEqual(await service.getCapabilities(), {
+      social: { google: false, discord: true },
+    });
+    assert.deepEqual(applied, [["discord"]]);
   });
 
   it("encrypts the secret, preserves it on blank updates, and resolves runtime config", async () => {
@@ -43,8 +87,8 @@ describe("SocialProviderSettingsService", () => {
       repository,
       secretCipher,
       "https://api.ideaboard.art",
-      async (config) => {
-        applied.push(config?.clientId ?? null);
+      async (configs) => {
+        applied.push(configs.google?.clientId ?? null);
       },
     );
 
@@ -94,9 +138,9 @@ describe("SocialProviderSettingsService", () => {
       repository,
       secretCipher,
       "https://api.ideaboard.art",
-      async (config) => {
-        applied.push(config?.clientId ?? null);
-        if (config) await firstApplyGate;
+      async (configs) => {
+        applied.push(configs.google?.clientId ?? null);
+        if (configs.google) await firstApplyGate;
       },
     );
 
@@ -261,8 +305,8 @@ describe("SocialProviderSettingsService", () => {
       repository,
       secretCipher,
       "https://api.ideaboard.art",
-      async (config) => {
-        applied.push(config?.provider ?? null);
+      async (configs) => {
+        applied.push(configs.google?.provider ?? null);
       },
     );
 
@@ -270,7 +314,7 @@ describe("SocialProviderSettingsService", () => {
 
     assert.deepEqual(applied, [null]);
     assert.deepEqual(await service.getCapabilities(), {
-      social: { google: false },
+      social: { google: false, discord: false },
     });
   });
 

@@ -38,7 +38,7 @@ describe('admin user view model', () => {
 
     expect(row).toMatchObject({
       publicId: '00000000-0000-0000-0000-000000000001',
-      publicIdLabel: '00000000-0000-0000-0000-000000000001',
+      email: 'user@example.com',
       availableCredits: 125,
       availableCreditsLabel: '125 Ideas',
       avatarUrl: '/avatar.png',
@@ -78,6 +78,7 @@ describe('admin user view model', () => {
 function makeUser(overrides: Partial<AdminUserListItem> = {}): AdminUserListItem {
   return {
     public_id: '00000000-0000-0000-0000-000000000001',
+    email: 'user@example.com',
     display_name: 'user',
     role: 'user',
     status: 1,
