@@ -50,6 +50,7 @@
           <Button
             :label="isEditing ? '生成新 Code' : '重新生成'"
             type="button"
+            :class="adminActionButtonClass"
             severity="secondary"
             outlined
             @click="regenerate"
@@ -166,6 +167,7 @@
       <Button
         label="取消"
         type="button"
+        :class="adminActionButtonClass"
         severity="secondary"
         outlined
         :disabled="pending"
@@ -173,6 +175,8 @@
       />
       <Button
         :label="isEditing ? '保存更改' : '创建兑换码'"
+        :class="adminActionButtonClass"
+        severity="contrast"
         type="submit"
         form="reward-code-form"
         :loading="pending"
@@ -195,6 +199,7 @@ import {
   adminDateTimePickerActionClass,
   adminDateTimePickerPt,
 } from '../../shared/lib/adminDateTimePickerPt'
+import { adminActionButtonClass } from '../../shared/lib/adminUiClasses'
 import type { RewardCode, UpdateRewardCodeInput } from './rewardCodeAdminResource'
 import { generateRewardCode } from './rewardCodeGenerator'
 import {

@@ -24,10 +24,10 @@
               @next="nextPage"
             />
           </template>
-          <template #actions>
+          <template #actions="{ iconButtonClass }">
             <Button
               text
-              severity="secondary"
+              :class="iconButtonClass"
               :loading="loading"
               aria-label="刷新兑换记录"
               @click="refreshRedemptions"
@@ -41,14 +41,26 @@
       <Message v-if="initialError" severity="error" :closable="false">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>兑换记录加载失败，请重试。</span>
-          <Button label="重试加载兑换记录" text :loading="loading" @click="loadRedemptions()" />
+          <Button
+            label="重试加载兑换记录"
+            text
+            :class="adminTextButtonClass"
+            :loading="loading"
+            @click="loadRedemptions()"
+          />
         </div>
       </Message>
 
       <Message v-if="backgroundError" severity="secondary" :closable="false">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <span>刷新兑换记录失败，正在显示上次成功的数据。</span>
-          <Button label="重试刷新兑换记录" text :loading="loading" @click="refreshRedemptions" />
+          <Button
+            label="重试刷新兑换记录"
+            text
+            :class="adminTextButtonClass"
+            :loading="loading"
+            @click="refreshRedemptions"
+          />
         </div>
       </Message>
 
@@ -62,7 +74,6 @@
         table-aria-label="兑换记录列表"
         scroll-aria-label="兑换记录列表横向滚动区域"
         empty-title="暂无兑换记录"
-        empty-description="用户成功兑换后，记录会显示在这里；可关闭窗口继续管理兑换码。"
         :table-style="{ minWidth: '620px' }"
         @row-expand="expandRedemption"
         @row-collapse="collapseRedemption"
@@ -100,6 +111,7 @@
                 <Button
                   label="重试兑换详情"
                   text
+                  :class="adminTextButtonClass"
                   :loading="detailLoading"
                   @click="loadRedemptionDetail(data.id)"
                 />
@@ -160,6 +172,7 @@ import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import { useAdminCollectionState } from '../../shared/composables/useAdminCollectionState'
 import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
 import { formatAdminDateTime } from '../creditsBillingFormat'
+import { adminTextButtonClass } from '../../shared/lib/adminUiClasses'
 import type { RewardCode } from './rewardCodeAdminResource'
 import {
   createRewardCodeRedemptionResource,

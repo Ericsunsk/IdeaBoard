@@ -50,6 +50,7 @@
           severity="secondary"
           size="small"
           text
+          :class="adminTextButtonClass"
           :loading="loading"
           @click="refreshFindings"
         />
@@ -61,6 +62,7 @@
         <span>异常队列加载失败。</span>
         <Button
           label="重新加载异常队列"
+          :class="adminActionButtonClass"
           severity="secondary"
           outlined
           :loading="loading"
@@ -235,7 +237,11 @@ import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.v
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import { useAdminCollectionState } from '../../shared/composables/useAdminCollectionState'
 import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
-import { adminCompactTagClass } from '../../shared/lib/adminUiClasses'
+import {
+  adminActionButtonClass,
+  adminCompactTagClass,
+  adminTextButtonClass,
+} from '../../shared/lib/adminUiClasses'
 import { formatAdminDateTime } from '../creditsBillingFormat'
 import {
   createAdminCreditFindingQueueResource,

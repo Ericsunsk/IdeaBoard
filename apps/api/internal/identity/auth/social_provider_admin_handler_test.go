@@ -61,7 +61,6 @@ func TestSocialProviderAdminHandlerRequiresAdminForEveryOperation(t *testing.T) 
 	}{
 		{name: "get", method: http.MethodGet, path: "/google", run: func(h *SocialProviderAdminHandler, c *gin.Context) { h.Get(c) }},
 		{name: "update", method: http.MethodPut, path: "/google", run: func(h *SocialProviderAdminHandler, c *gin.Context) { h.Update(c) }},
-		{name: "capabilities", method: http.MethodGet, path: "/capabilities", run: func(h *SocialProviderAdminHandler, c *gin.Context) { h.GetCapabilities(c) }},
 	}
 	for _, operation := range operations {
 		t.Run(operation.name+" unauthenticated", func(t *testing.T) {
@@ -86,9 +85,8 @@ func TestSocialProviderAdminHandlerSuccessAndInputMapping(t *testing.T) {
 	service := &fakeSocialProviderService{}
 	getStatus := serveSocialProviderHandler(t, http.MethodGet, "/google", "admin", service, func(h *SocialProviderAdminHandler, c *gin.Context) { h.Get(c) })
 	updateStatus := serveSocialProviderHandler(t, http.MethodPut, "/google", "admin", service, func(h *SocialProviderAdminHandler, c *gin.Context) { h.Update(c) })
-	capabilitiesStatus := serveSocialProviderHandler(t, http.MethodGet, "/capabilities", "admin", service, func(h *SocialProviderAdminHandler, c *gin.Context) { h.GetCapabilities(c) })
-	if getStatus != http.StatusOK || updateStatus != http.StatusOK || capabilitiesStatus != http.StatusOK {
-		t.Fatalf("statuses = %d, %d, %d", getStatus, updateStatus, capabilitiesStatus)
+	if getStatus != http.StatusOK || updateStatus != http.StatusOK {
+		t.Fatalf("statuses = %d, %d", getStatus, updateStatus)
 	}
 	if service.provider != "google" || !service.update.Enabled || service.update.ClientID != "google-client.apps.googleusercontent.com" || service.update.ClientSecret != "secret" {
 		t.Fatalf("mapped update = %+v provider=%q", service.update, service.provider)

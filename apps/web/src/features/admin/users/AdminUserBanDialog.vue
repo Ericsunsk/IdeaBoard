@@ -50,12 +50,19 @@
         <div :class="adminDialogFooterActionsClass">
           <Button
             label="取消"
+            :class="adminActionButtonClass"
             severity="secondary"
             outlined
             :disabled="loading"
             @click="$emit('cancel')"
           />
-          <Button label="确认封禁" severity="danger" :loading="loading" @click="$emit('confirm')" />
+          <Button
+            label="确认封禁"
+            :class="adminActionButtonClass"
+            severity="danger"
+            :loading="loading"
+            @click="$emit('confirm')"
+          />
         </div>
       </div>
     </template>
@@ -72,6 +79,7 @@ import {
   adminDialogFooterActionsClass,
   adminDialogHeaderContentClass,
   adminDialogTitleClass,
+  adminActionButtonClass,
 } from '../shared/lib/adminUiClasses'
 
 type BanDurationOption = {

@@ -5,66 +5,53 @@
         <span class="truncate text-admin-title-sm font-bold text-admin-title-color">
           {{ item.displayName }}
         </span>
-        <Tag
-          v-if="workflowPresentation"
-          :value="`${workflowPresentation.groupTitle} 节点`"
-          severity="secondary"
-          :class="adminCompactTagClass"
-          rounded
-        />
-        <Tag
-          :value="statusMeta.label"
-          :severity="statusMeta.severity"
-          :class="adminCompactTagClass"
-          rounded
-        />
+        <div class="flex shrink-0 items-center gap-2">
+          <Tag
+            v-if="workflowPresentation"
+            :value="`${workflowPresentation.groupTitle} 节点`"
+            severity="secondary"
+            :class="adminCompactTagClass"
+            rounded
+          />
+          <Tag
+            :value="statusMeta.label"
+            :severity="statusMeta.severity"
+            :class="adminCompactTagClass"
+            rounded
+          />
+        </div>
       </div>
     </template>
 
     <template #content>
       <div class="flex min-w-0 flex-col gap-5">
-        <div class="flex items-end justify-between gap-4">
-          <dl
-            class="grid min-w-0 flex-1 gap-3"
-            :class="resolutions.length === 1 ? 'grid-cols-1' : 'grid-cols-3'"
-          >
-            <div
-              v-for="variant in resolutions"
-              :key="variant"
-              class="min-w-0 rounded-lg border border-admin-border-soft bg-admin-surface-muted/50 px-2.5 py-2"
-            >
-              <dt class="text-admin-caption text-ib-text-muted">{{ variantLabel(variant) }}</dt>
-              <dd class="mt-1 truncate text-admin-meta font-bold text-admin-title-color">
-                {{ priceLabel(variant) }}
-              </dd>
-            </div>
-          </dl>
+        <dl
+          class="grid w-full min-w-0 gap-3"
+          :class="resolutions.length === 1 ? 'grid-cols-1' : 'grid-cols-2 sm:grid-cols-4'"
+        >
           <div
-            v-if="item.updatedAt"
-            class="shrink-0 text-right text-admin-caption text-ib-text-muted"
+            v-for="variant in resolutions"
+            :key="variant"
+            class="min-w-0 rounded-lg border border-admin-border-soft bg-admin-surface-muted/50 px-2.5 py-2"
           >
-            {{ updatedAtLabel }}
+            <dt class="text-admin-caption text-ib-text-muted">{{ variantLabel(variant) }}</dt>
+            <dd class="mt-1 truncate text-admin-meta font-bold text-admin-title-color">
+              {{ priceLabel(variant) }}
+            </dd>
           </div>
+        </dl>
+
+        <div
+          v-if="item.status !== 'archived'"
+          class="flex min-h-8 items-center justify-between gap-3"
+        >
           <Button
-            v-if="item.status !== 'archived'"
             size="small"
             :class="adminActionButtonClass"
             severity="contrast"
             :label="item.status === 'unpriced' ? '设置价格' : '调整价格'"
             @click="emit('publish', item)"
           />
-        </div>
-
-        <div
-          v-if="item.status !== 'archived'"
-          class="flex min-h-8 items-center justify-between gap-3"
-        >
-          <div class="min-w-0">
-            <div class="text-admin-meta font-medium text-admin-title-color">功能状态</div>
-            <div v-if="item.status !== 'unpriced'" class="text-admin-caption text-ib-text-muted">
-              关闭后将停止新任务调用
-            </div>
-          </div>
           <ToggleSwitch
             :model-value="item.status === 'active'"
             :disabled="item.status === 'unpriced' || availabilityPending"
@@ -78,6 +65,7 @@
             size="small"
             severity="danger"
             text
+            :class="adminActionButtonClass"
             label="删除"
             :loading="deletePending"
             :disabled="deletePending"
@@ -95,7 +83,6 @@ import Card from 'primevue/card'
 import Button from 'primevue/button'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
-import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
 import {
   getWorkflowFeatureRegistryItem,
   WORKFLOW_FEATURE_GROUP_LIST,
@@ -144,23 +131,12 @@ const workflowPresentation = computed(() => {
   return { groupTitle: group.title }
 })
 const resolutions = computed(() => props.item.pricingVariants)
+const priceNumberFormat = new Intl.NumberFormat('zh-CN')
 function variantLabel(variant: PricingVariant) {
   return variant === 'default' ? '固定' : variant.toUpperCase()
 }
 function priceLabel(variant: PricingVariant) {
   const price = props.item.currentPrices[variant]
-  return price ? formatIdeaAmount(price.unitCredits) : '未设置'
+  return price ? priceNumberFormat.format(price.unitCredits) : '未设置'
 }
-const updatedAtLabel = computed(() => {
-  if (!props.item.updatedAt) return ''
-  const date = new Date(props.item.updatedAt)
-  if (Number.isNaN(date.getTime())) return ''
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date)
-})
 </script>

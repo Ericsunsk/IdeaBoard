@@ -14,13 +14,24 @@
       >
         {{ plaintext }}
       </code>
-      <Button :label="copied ? '已复制' : '复制'" severity="secondary" outlined @click="copy" />
+      <Button
+        :label="copied ? '已复制' : '复制'"
+        :class="adminActionButtonClass"
+        severity="secondary"
+        outlined
+        @click="copy"
+      />
     </div>
     <Message v-if="copyError" severity="error" :closable="false" role="alert">
       复制失败，请手动选择并复制 Code。
     </Message>
     <template #footer>
-      <Button label="我已保存" @click="emit('update:visible', false)" />
+      <Button
+        label="我已保存"
+        :class="adminActionButtonClass"
+        severity="contrast"
+        @click="emit('update:visible', false)"
+      />
     </template>
   </AdminDialogShell>
 </template>
@@ -30,6 +41,7 @@ import { ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
+import { adminActionButtonClass } from '../../shared/lib/adminUiClasses'
 
 const props = withDefaults(
   defineProps<{ visible: boolean; plaintext: string; header?: string }>(),

@@ -1,5 +1,6 @@
 import { onBeforeUnmount } from 'vue'
 import type { ImageNodeItem, ImageNodeOutputItem } from '../../canvas-board/domain'
+import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../shared/config/runtimeUrls'
 import PhotoSwipeLightbox from 'photoswipe/lightbox'
 import 'photoswipe/style.css'
 
@@ -27,8 +28,11 @@ const IMAGE_DIMENSION_CACHE_LIMIT = 120
 const imageDimensionCache = new Map<string, ImageNaturalSize>()
 const imageDimensionTasks = new Map<string, Promise<ImageNaturalSize | null>>()
 
-function normalizeImageUrl(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : ''
+export function normalizeImageUrl(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  return resolveAssetUrl(canonicalizeRuntimeUploadRef(trimmed)).trim()
 }
 
 function normalizeImageRatio(value: unknown): number {

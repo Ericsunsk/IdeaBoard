@@ -21,7 +21,7 @@ func TestFilterAccountsWithOutputResolution(t *testing.T) {
 		{ID: 4, Models: []AccountModel{{Name: "disabled", Enabled: false, Supports2K: true, Supports4K: true}}},
 	}
 
-	assertAccountIDs(t, FilterAccountsWithOutputResolution(pool, "1k"), 1, 2, 3)
+	assertAccountIDs(t, FilterAccountsWithOutputResolution(pool, "1k"), 1)
 	assertAccountIDs(t, FilterAccountsWithOutputResolution(pool, "2k"), 2)
 	assertAccountIDs(t, FilterAccountsWithOutputResolution(pool, "4k"), 3)
 }

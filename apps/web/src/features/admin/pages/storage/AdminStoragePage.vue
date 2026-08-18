@@ -130,6 +130,7 @@
             <Button
               size="small"
               label="编辑"
+              :class="adminActionButtonClass"
               severity="contrast"
               @click="openEdit(card.storage.id)"
             />
@@ -137,6 +138,7 @@
               v-if="card.supportsTest"
               size="small"
               label="测试连接"
+              :class="adminActionButtonClass"
               severity="contrast"
               outlined
               :loading="testingId === card.storage.id"
@@ -147,6 +149,7 @@
               v-if="!card.storage.isCurrent"
               size="small"
               label="设为当前"
+              :class="adminActionButtonClass"
               severity="contrast"
               :loading="applyingId === card.storage.id"
               :disabled="!card.canApply || applyingId !== null"
@@ -156,6 +159,7 @@
               v-if="!card.storage.isCurrent && !card.storage.builtin"
               size="small"
               label="删除"
+              :class="adminActionButtonClass"
               severity="contrast"
               outlined
               @click="requestRemoveProfile(card.storage)"
@@ -374,14 +378,24 @@
     <template #footer>
       <Button
         label="取消"
+        :class="adminActionButtonClass"
         severity="secondary"
         outlined
         :disabled="saving || savingAndApplying"
         @click="closeEditor"
       />
-      <Button label="保存" severity="secondary" :loading="saving" @click="saveDraft" />
+      <Button
+        label="保存"
+        :class="adminActionButtonClass"
+        severity="secondary"
+        outlined
+        :loading="saving"
+        @click="saveDraft"
+      />
       <Button
         :label="form.isCurrent ? '保存当前配置' : '保存并设为当前'"
+        :class="adminActionButtonClass"
+        severity="contrast"
         :loading="savingAndApplying"
         @click="saveAndApply"
       />

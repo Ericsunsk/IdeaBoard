@@ -64,12 +64,15 @@
           <div class="flex gap-2">
             <Button
               label="赠送"
+              :class="adminActionButtonClass"
+              severity="contrast"
               size="small"
               :disabled="commandPending || !wallet"
               @click="openCommand('grant')"
             />
             <Button
               label="扣减"
+              :class="adminActionButtonClass"
               size="small"
               severity="danger"
               outlined
@@ -115,6 +118,7 @@
             <Button
               label="取消"
               type="button"
+              :class="adminActionButtonClass"
               severity="secondary"
               outlined
               :disabled="commandPending"
@@ -122,8 +126,9 @@
             />
             <Button
               :label="activeCommand === 'refund' ? '核对退款' : '核对操作'"
+              :class="adminActionButtonClass"
               type="submit"
-              :severity="activeCommand === 'grant' ? undefined : 'danger'"
+              :severity="activeCommand === 'grant' ? 'contrast' : 'danger'"
               :loading="commandPending"
               :disabled="commandPending"
             />
@@ -153,6 +158,7 @@
           </div>
           <Button
             label="刷新"
+            :class="adminActionButtonClass"
             size="small"
             severity="secondary"
             outlined
@@ -226,6 +232,7 @@
         <div v-if="nextBeforeSequence != null" class="mt-3 flex justify-center">
           <Button
             label="加载更多 Ledger"
+            :class="adminActionButtonClass"
             severity="secondary"
             outlined
             :loading="ledgerLoading && transactions.length > 0"
@@ -251,7 +258,7 @@ import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
-import { adminCompactTagClass } from '../../shared/lib/adminUiClasses'
+import { adminActionButtonClass, adminCompactTagClass } from '../../shared/lib/adminUiClasses'
 import AdminActionReasonField from '../AdminActionReasonField.vue'
 import { useAdminCreditsBillingOperationsFeedback } from '../creditsBillingFeedback'
 import {

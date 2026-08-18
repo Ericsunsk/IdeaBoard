@@ -157,7 +157,7 @@ describe('AdminCreditHealthPage', () => {
     )
   })
 
-  it('starts a manual check with an audited reason and refreshes health', async () => {
+  it('starts a manual check with an automatic audited reason and refreshes health', async () => {
     const requests: unknown[] = []
     let health = makeHealth()
     useMswHandlers(
@@ -178,10 +178,8 @@ describe('AdminCreditHealthPage', () => {
     const { user, queryClient } = renderPage()
 
     await user.click(await screen.findByRole('button', { name: '重新检查' }))
-    await user.type(screen.getByRole('textbox', { name: /操作原因/ }), '  运营复核  ')
-    await user.click(screen.getByRole('button', { name: '启动检查' }))
 
-    await waitFor(() => expect(requests).toEqual([{ reason: '运营复核' }]))
+    await waitFor(() => expect(requests).toEqual([{ reason: '管理员手动触发账本检查' }]))
     expect(await screen.findByText('检查进行中 · Run #14')).toBeVisible()
     expect(screen.getByRole('button', { name: '检查中' })).toBeDisabled()
     expect(toastMocks.success).toHaveBeenCalledWith('账本检查已启动')

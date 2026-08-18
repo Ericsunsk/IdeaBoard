@@ -19,6 +19,10 @@
       <slot name="header" />
     </template>
 
+    <template #closeicon>
+      <Xmark class="!h-5 !w-5" data-icon="xmark" aria-hidden="true" />
+    </template>
+
     <div :class="contentClass">
       <slot />
     </div>
@@ -33,6 +37,7 @@
 
 <script setup lang="ts">
 import { computed, useSlots } from 'vue'
+import { Xmark } from '@iconoir/vue'
 import Dialog from 'primevue/dialog'
 import { usePrimeDialogOverlayLifecycle } from '../../../../shared/composables/usePrimeDialogOverlayLifecycle'
 import { createAdminDialogPt } from '../lib/adminOverlayPt'

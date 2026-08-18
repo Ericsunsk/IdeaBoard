@@ -138,7 +138,9 @@ watch([() => props.outputCount, outputResolution], refreshBillingQuotes, { immed
 
 function getItemBillingState(item: ImageActionMenuItem) {
   const feature = resolveItemBillingFeature(item)
-  return feature && billingStore ? billingStore.getFeatureState(feature) : null
+  return feature && billingStore
+    ? billingStore.getFeatureState(feature, buildItemReadinessRequest(item))
+    : null
 }
 
 function getItemTooltip(item: ImageActionMenuItem) {

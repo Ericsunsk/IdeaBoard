@@ -61,7 +61,14 @@
             {{ formError }}
           </p>
 
-          <Button type="submit" :label="loading ? '登录中' : '进入后台'" :loading="loading" fluid />
+          <Button
+            type="submit"
+            :class="adminActionButtonClass"
+            severity="contrast"
+            :label="loading ? '登录中' : '进入后台'"
+            :loading="loading"
+            fluid
+          />
         </form>
       </template>
 
@@ -101,7 +108,7 @@ import { useLogoutRedirect } from '../../../../shared/composables/useLogoutRedir
 import { useSiteBranding } from '../../../../shared/composables/useSiteBranding'
 import { normalizeSafeInternalRedirectPath } from '../../../../shared/utils/auth'
 import { brandMarkClasses, createBrandMarkClass } from '../../../../shared/lib/brandMark'
-import { adminTextButtonClass } from '../../shared/lib/adminUiClasses'
+import { adminActionButtonClass, adminTextButtonClass } from '../../shared/lib/adminUiClasses'
 import { useAdminLoginFeedback } from './useAdminLoginFeedback'
 
 const router = useRouter()

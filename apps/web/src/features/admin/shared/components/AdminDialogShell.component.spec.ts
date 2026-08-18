@@ -72,6 +72,17 @@ describe('AdminDialogShell', () => {
     expect(await screen.findByRole('dialog', { name: '编辑节点提示词' })).toBeInTheDocument()
   })
 
+  it('uses the shared Xmark close icon', async () => {
+    renderShell()
+
+    const dialog = await screen.findByRole('dialog', { name: '编辑配置' })
+    const icon = within(dialog)
+      .getByRole('button', { name: /close|关闭/i })
+      .querySelector('[data-icon="xmark"]')
+    expect(icon).toBeInTheDocument()
+    expect(icon).toHaveClass('!h-5', '!w-5')
+  })
+
   it('uses the real PrimeVue focus trap to wrap both tab directions', async () => {
     renderShell()
     const dialog = await screen.findByRole('dialog', { name: '编辑配置' })

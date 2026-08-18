@@ -3,7 +3,7 @@
     :visible="visible"
     header="OAuth Provider 设置"
     size="form"
-    :busy="isBusy"
+    :busy="isSaving"
     @reset="resetAndLoad"
     @update:visible="emit('update:visible', $event)"
   >
@@ -20,46 +20,54 @@
             severity="secondary"
             size="small"
             text
+            :class="adminTextButtonClass"
             :disabled="isBusy"
             @click="load"
           />
         </div>
       </Message>
 
-      <form v-if="summary" class="flex flex-col gap-4" novalidate @submit.prevent="submit">
+      <form
+        v-if="summary"
+        class="flex min-h-[26rem] flex-col gap-4"
+        novalidate
+        @submit.prevent="submit"
+      >
+        <div class="grid grid-cols-2 gap-5" role="group" aria-label="OAuth 登录方式">
+          <div
+            v-for="provider in oauthLoginProviders"
+            :key="provider.value"
+            class="flex min-w-0 items-center justify-between"
+          >
+            <img
+              :src="provider.value === 'google' ? googleLogoUrl : discordLogoUrl"
+              class="size-6 shrink-0"
+              alt=""
+              aria-hidden="true"
+            />
+            <ToggleSwitch
+              :model-value="providerEnabled[provider.value] ?? false"
+              :input-id="`admin-oauth-enabled-${provider.value}`"
+              :name="`oauth_enabled_${provider.value}`"
+              :aria-label="`${provider.label} 登录`"
+              :disabled="isBusy"
+              @update:model-value="setProviderEnabled(provider.value, $event)"
+            />
+          </div>
+        </div>
+
         <AdminFormField label="OAuth Provider" for="admin-oauth-provider">
           <Select
             v-model="selectedProvider"
             input-id="admin-oauth-provider"
             name="oauth_provider"
             aria-label="OAuth Provider"
-            :options="providerOptions"
+            :options="oauthLoginProviders"
             option-label="label"
             option-value="value"
             class="w-full"
             :disabled="isBusy"
           />
-        </AdminFormField>
-
-        <AdminFormField :label="`${providerLabel} 登录`" for="admin-oauth-enabled">
-          <div class="flex min-h-10 items-center justify-between border-y border-admin-border py-2">
-            <div class="flex min-w-0 items-center gap-2">
-              <span class="text-admin-body text-admin-text-2">
-                {{ form.enabled ? '已启用' : '已停用' }}
-              </span>
-              <Tag
-                :value="runtimeAvailable ? 'Runtime 可用' : 'Runtime 未就绪'"
-                :severity="runtimeAvailable ? 'success' : 'secondary'"
-              />
-            </div>
-            <ToggleSwitch
-              v-model="form.enabled"
-              input-id="admin-oauth-enabled"
-              name="oauth_enabled"
-              :aria-label="`${providerLabel} 登录`"
-              :disabled="isBusy"
-            />
-          </div>
         </AdminFormField>
 
         <AdminFormField
@@ -88,7 +96,6 @@
           label="Client Secret"
           for="admin-oauth-client-secret"
           :error="errors.clientSecret"
-          :hint="secretHint"
           :required="form.enabled && !summary.clientSecretConfigured"
         >
           <InputText
@@ -123,9 +130,18 @@
     </template>
 
     <template #footer="{ requestClose }">
-      <Button label="取消" severity="secondary" outlined :disabled="isBusy" @click="requestClose" />
+      <Button
+        label="取消"
+        :class="adminActionButtonClass"
+        severity="secondary"
+        outlined
+        :disabled="isBusy"
+        @click="requestClose"
+      />
       <Button
         label="保存设置"
+        :class="adminActionButtonClass"
+        severity="contrast"
         :loading="isSaving"
         :disabled="isLoading || Boolean(loadError) || !summary"
         @click="submit"
@@ -141,14 +157,15 @@ import InputText from 'primevue/inputtext'
 import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import Select from 'primevue/select'
-import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import AdminDialogShell from '../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../shared/components/AdminFormField.vue'
 import { formatAdminDisplayError, useAdminToast } from '../shared/lib/adminToast'
+import { adminActionButtonClass, adminTextButtonClass } from '../shared/lib/adminUiClasses'
+import googleLogoUrl from '../../../shared/assets/oauth/google.svg'
+import discordLogoUrl from '../../../shared/assets/oauth/discord.svg'
 import {
   createOAuthProviderSettingsResource,
-  type OAuthCapabilities,
   type OAuthProviderSettingsResource,
   type OAuthProviderSettingsSummary,
 } from './oauthProviderSettingsResource'
@@ -170,30 +187,37 @@ const emit = defineEmits<{
 
 const defaultResource = createOAuthProviderSettingsResource()
 const toast = useAdminToast()
-const providerOptions = ref<Array<{ label: string; value: OAuthProviderCode }>>([])
+const oauthLoginProviders = [
+  { label: 'Google', value: 'google' as OAuthProviderCode },
+  { label: 'Discord', value: 'discord' as OAuthProviderCode },
+]
 const selectedProvider = ref<OAuthProviderCode>('google')
 const summary = ref<OAuthProviderSettingsSummary | null>(null)
-const capabilities = ref<OAuthCapabilities | null>(null)
+const providerSummaries = ref<Record<string, OAuthProviderSettingsSummary>>({})
+const providerEnabled = reactive<Record<string, boolean>>({})
+const initialProviderEnabled = reactive<Record<string, boolean>>({})
 const isLoading = ref(false)
 const isSaving = ref(false)
+const providerSwitching = ref(false)
 const loadError = ref('')
 const saveError = ref('')
 const form = reactive({ enabled: false, clientId: '', clientSecret: '' })
 const errors = reactive({ clientId: '', clientSecret: '' })
-const isBusy = computed(() => isLoading.value || isSaving.value)
-const runtimeAvailable = computed(
-  () => capabilities.value?.social[selectedProvider.value] ?? summary.value?.available ?? false,
-)
+let providerLoadEpoch = 0
+const isBusy = computed(() => isSaving.value || (isLoading.value && !summary.value))
 const providerLabel = computed(() => getOAuthProviderLabel(selectedProvider.value))
 const secretPlaceholder = computed(() =>
   summary.value?.clientSecretConfigured ? '已配置，留空则保持不变' : '输入 Client Secret',
 )
-const secretHint = computed(() =>
-  summary.value?.clientSecretConfigured ? '当前 Secret 不会回显。' : undefined,
-)
 
-watch(selectedProvider, () => {
-  if (props.visible) resetAndLoad()
+watch(selectedProvider, (provider) => {
+  if (!props.visible) return
+  clearSensitiveState()
+  saveError.value = ''
+  loadError.value = ''
+  const cachedSummary = providerSummaries.value[provider]
+  if (cachedSummary) applySummary(cachedSummary)
+  void loadSelectedProvider(provider)
 })
 
 function activeResource() {
@@ -212,15 +236,32 @@ async function load() {
   isLoading.value = true
   loadError.value = ''
   try {
-    const [nextSummary, nextCapabilities] = await Promise.all([
-      activeResource().get(selectedProvider.value),
-      activeResource().getCapabilities(),
-    ])
-    applyLoadedState(nextSummary, nextCapabilities)
+    const state = await fetchProviderState()
+    applySummary(state.summaries[selectedProvider.value] ?? state.firstSummary)
+    applyProviderSummaries(state.summaries)
   } catch (error) {
     loadError.value = formatAdminDisplayError(error, '加载 OAuth Provider 设置失败，请重试')
   } finally {
     isLoading.value = false
+  }
+}
+
+async function loadSelectedProvider(provider: OAuthProviderCode) {
+  const epoch = ++providerLoadEpoch
+  providerSwitching.value = true
+  try {
+    const nextSummary = await activeResource().get(provider)
+    providerSummaries.value[provider] = nextSummary
+    if (epoch !== providerLoadEpoch) return
+    if (selectedProvider.value === provider) applySummary(nextSummary)
+    providerEnabled[provider] = nextSummary.enabled
+    initialProviderEnabled[provider] = nextSummary.enabled
+  } catch (error) {
+    if (epoch === providerLoadEpoch) {
+      loadError.value = formatAdminDisplayError(error, '加载 OAuth Provider 设置失败，请重试')
+    }
+  } finally {
+    if (epoch === providerLoadEpoch) providerSwitching.value = false
   }
 }
 
@@ -233,25 +274,53 @@ function validate() {
   return !errors.clientId && !errors.clientSecret
 }
 
+function setProviderEnabled(provider: OAuthProviderCode, enabled: boolean) {
+  providerEnabled[provider] = enabled
+  if (provider === selectedProvider.value) form.enabled = enabled
+}
+
 async function submit() {
-  if (isBusy.value || !summary.value || !validate()) return
+  if (isBusy.value || providerSwitching.value || !summary.value || !validate()) return
+  const changedProviders = oauthLoginProviders
+    .map((provider) => provider.value)
+    .filter(
+      (provider) =>
+        provider !== selectedProvider.value &&
+        providerEnabled[provider] !== initialProviderEnabled[provider],
+    )
+  const incompleteProvider = changedProviders.find(
+    (provider) => providerEnabled[provider] && !providerSummaries.value[provider]?.configured,
+  )
+  if (incompleteProvider) {
+    saveError.value = `请先配置 ${getOAuthProviderLabel(incompleteProvider)} 的 Client ID 和 Client Secret`
+    return
+  }
   isSaving.value = true
   saveError.value = ''
   try {
-    const savedSummary = await activeResource().save(selectedProvider.value, {
-      enabled: form.enabled,
-      clientId: form.clientId,
-      clientSecret: form.clientSecret,
-    })
+    const currentProvider = selectedProvider.value
+    const saveRequests = [
+      activeResource().save(currentProvider, {
+        enabled: form.enabled,
+        clientId: form.clientId,
+        clientSecret: form.clientSecret,
+      }),
+      ...changedProviders.map((provider) =>
+        activeResource().save(provider, {
+          enabled: providerEnabled[provider],
+          clientId: providerSummaries.value[provider]?.clientId ?? '',
+          clientSecret: '',
+        }),
+      ),
+    ]
+    const [savedSummary] = await Promise.all(saveRequests)
     clearSensitiveState()
     applySummary(savedSummary)
     toast.success(`${providerLabel.value} OAuth 设置已保存`)
     try {
-      const [nextSummary, nextCapabilities] = await Promise.all([
-        activeResource().get(selectedProvider.value),
-        activeResource().getCapabilities(),
-      ])
-      applyLoadedState(nextSummary, nextCapabilities)
+      const state = await fetchProviderState()
+      applySummary(state.summaries[selectedProvider.value] ?? state.firstSummary)
+      applyProviderSummaries(state.summaries)
       emit('update:visible', false)
     } catch {
       loadError.value = '设置已保存，但状态刷新失败，请重新加载'
@@ -264,22 +333,24 @@ async function submit() {
   }
 }
 
-function applyLoadedState(
-  nextSummary: OAuthProviderSettingsSummary,
-  nextCapabilities: OAuthCapabilities,
-) {
-  applySummary(nextSummary)
-  capabilities.value = nextCapabilities
-  const providers = nextCapabilities.providers?.length
-    ? nextCapabilities.providers
-    : Object.keys(nextCapabilities.social).map((provider) => ({
-        provider,
-        label: getOAuthProviderLabel(provider),
-        available: nextCapabilities.social[provider] === true,
-      }))
-  providerOptions.value = providers.map((provider) => ({ label: provider.label, value: provider.provider }))
-  if (!providerOptions.value.some((option) => option.value === selectedProvider.value)) {
-    selectedProvider.value = providerOptions.value[0]?.value ?? selectedProvider.value
+async function fetchProviderState() {
+  const entries = await Promise.all(
+    oauthLoginProviders.map(async (provider) =>
+      [provider.value, await activeResource().get(provider.value)] as const,
+    ),
+  )
+  const summaries = Object.fromEntries(entries)
+  const firstSummary = summaries[selectedProvider.value] ?? entries[0]?.[1]
+  if (!firstSummary) throw new Error('未找到 OAuth Provider 配置')
+  return { summaries, firstSummary }
+}
+
+function applyProviderSummaries(nextSummaries: Record<string, OAuthProviderSettingsSummary>) {
+  providerSummaries.value = nextSummaries
+  for (const provider of oauthLoginProviders) {
+    const enabled = nextSummaries[provider.value]?.enabled ?? false
+    providerEnabled[provider.value] = enabled
+    initialProviderEnabled[provider.value] = enabled
   }
 }
 
@@ -287,6 +358,7 @@ function applySummary(nextSummary: OAuthProviderSettingsSummary) {
   summary.value = nextSummary
   form.enabled = nextSummary.enabled
   form.clientId = nextSummary.clientId
+  providerEnabled[selectedProvider.value] = nextSummary.enabled
   clearSensitiveState()
 }
 

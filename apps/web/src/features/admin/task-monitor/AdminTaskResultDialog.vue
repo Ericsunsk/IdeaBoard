@@ -69,7 +69,13 @@
       role="alert"
     >
       <span class="text-admin-body font-semibold text-admin-danger">{{ errorMessage }}</span>
-      <Button label="重试" size="small" severity="secondary" @click="emit('retry')" />
+      <Button
+        label="重试"
+        :class="adminActionButtonClass"
+        size="small"
+        severity="secondary"
+        @click="emit('retry')"
+      />
     </div>
     <div
       v-else-if="!detailTask"
@@ -396,7 +402,7 @@ import PrimeImage from 'primevue/image'
 import Tag from 'primevue/tag'
 import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
 import { adminOverlayDialogRootClass, createAdminDialogPt } from '../shared/lib/adminOverlayPt'
-import { adminTextButtonClass } from '../shared/lib/adminUiClasses'
+import { adminActionButtonClass, adminTextButtonClass } from '../shared/lib/adminUiClasses'
 import { getTaskPriorityLabel } from './taskMonitorColumns'
 import { adminTaskStatuses, getTaskStatusDefinition } from './taskMonitorStatus'
 import type {

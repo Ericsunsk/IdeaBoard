@@ -27,9 +27,9 @@ func NormalizeOutputResolution(raw string) (string, bool) {
 func SupportsOutputResolution(resolution string, supports2K, supports4K bool) bool {
 	switch resolution {
 	case OutputResolutionDefault:
-		return true
+		return !supports2K && !supports4K
 	case OutputResolution1K:
-		return true
+		return !supports2K && !supports4K
 	case OutputResolution2K:
 		return supports2K
 	case OutputResolution4K:

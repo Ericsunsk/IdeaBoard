@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render } from '../../../../test/render'
+import { render, screen } from '../../../../test/render'
 import ImageCanvasExtendOverlay from './ImageCanvasExtendOverlay.vue'
 
 function renderOverlay() {
@@ -21,6 +21,12 @@ function dispatchBubblingMouseEvent(target: Element, type: 'mousedown' | 'mouseu
 }
 
 describe('ImageCanvasExtendOverlay', () => {
+  it('hides output resolution from the expand composer', () => {
+    renderOverlay()
+
+    expect(screen.queryByRole('button', { name: '输出清晰度' })).not.toBeInTheDocument()
+  })
+
   it('keeps expand drag mouse events inside the overlay', () => {
     const view = renderOverlay()
     const parentMouseDown = vi.fn()

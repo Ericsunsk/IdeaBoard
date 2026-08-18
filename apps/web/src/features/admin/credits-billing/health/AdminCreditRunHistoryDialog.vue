@@ -14,12 +14,10 @@
               <div class="text-admin-title-sm font-[740] text-admin-title-color">账本检查历史</div>
             </div>
           </template>
-          <template #actions>
+          <template #actions="{ iconButtonClass }">
             <Button
-              label="刷新"
-              severity="secondary"
-              size="small"
               text
+              :class="iconButtonClass"
               aria-label="刷新检查记录"
               :loading="runsLoading"
               @click="refreshRuns"
@@ -48,6 +46,7 @@
             severity="secondary"
             size="small"
             text
+            :class="adminTextButtonClass"
             :loading="runsLoading"
             @click="refreshRuns"
           />
@@ -59,6 +58,7 @@
           <span>检查记录加载失败。</span>
           <Button
             label="重新加载检查记录"
+            :class="adminActionButtonClass"
             severity="secondary"
             outlined
             :loading="runsLoading"
@@ -138,6 +138,7 @@
                 <Button
                   label="重试 Run 详情"
                   text
+                  :class="adminTextButtonClass"
                   :loading="runDetailLoading"
                   @click="runDetail.refresh()"
                 />
@@ -178,7 +179,13 @@
     </AdminTablePanel>
 
     <template #footer>
-      <Button label="关闭" severity="secondary" outlined @click="$emit('update:visible', false)" />
+      <Button
+        label="关闭"
+        :class="adminActionButtonClass"
+        severity="secondary"
+        outlined
+        @click="$emit('update:visible', false)"
+      />
     </template>
   </AdminDialogShell>
 </template>
@@ -205,6 +212,7 @@ import {
   getRunStatusLabel,
   getRunStatusSeverity,
 } from '../creditsBillingFormat'
+import { adminActionButtonClass, adminTextButtonClass } from '../../shared/lib/adminUiClasses'
 import {
   createAdminCreditRunHistoryResource,
   type AdminCreditRun,

@@ -344,6 +344,7 @@
                 text
                 size="small"
                 severity="warn"
+                :class="adminTextButtonClass"
                 label="取消"
                 :loading="isCancellingTask(data.task_id)"
                 aria-label="取消任务"
@@ -351,9 +352,9 @@
               />
               <Button
                 text
-                rounded
                 size="small"
                 severity="secondary"
+                :class="adminFramedIconButtonClass"
                 aria-label="查看任务详情"
                 @click="showDetail(data)"
               >
@@ -405,6 +406,7 @@ import {
   adminChartCanvasClass,
   adminChartGridClass,
   adminDashboardRootClass,
+  adminFramedIconButtonClass,
   adminSummaryGridClass,
   adminTextButtonClass,
 } from '../../shared/lib/adminUiClasses'

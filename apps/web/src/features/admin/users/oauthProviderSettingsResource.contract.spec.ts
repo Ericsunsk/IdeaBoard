@@ -19,26 +19,17 @@ const summaryEnvelope = {
 }
 
 describe('OAuth Provider settings resource', () => {
-  it('normalizes provider settings and capabilities through the generated API boundary', async () => {
+  it('normalizes provider settings through the generated API boundary', async () => {
     const api = {
       getSettings: vi.fn().mockResolvedValue(summaryEnvelope),
       updateSettings: vi.fn().mockResolvedValue(summaryEnvelope),
-      getCapabilities: vi.fn().mockResolvedValue({
-        code: 0,
-        msg: 'success',
-        data: { social: { google: true, discord: false } },
-      }),
     }
     const resource = createOAuthProviderSettingsResource(api)
 
     await expect(resource.get('google')).resolves.toMatchObject({
-      provider: 'google',
       clientId: 'google-client.apps.googleusercontent.com',
       clientSecretConfigured: true,
       callbackUrl: 'https://example.com/api/auth/callback/google',
-    })
-    await expect(resource.getCapabilities()).resolves.toEqual({
-      social: { google: true, discord: false },
     })
     expect(api.getSettings).toHaveBeenCalledWith('google')
   })
@@ -47,7 +38,6 @@ describe('OAuth Provider settings resource', () => {
     const api = {
       getSettings: vi.fn().mockResolvedValue(summaryEnvelope),
       updateSettings: vi.fn().mockResolvedValue(summaryEnvelope),
-      getCapabilities: vi.fn(),
     }
     const resource = createOAuthProviderSettingsResource(api)
 
@@ -79,7 +69,6 @@ describe('OAuth Provider settings resource', () => {
         .fn()
         .mockResolvedValue({ code: 502, msg: 'auth unavailable', message_safe: true }),
       updateSettings: vi.fn(),
-      getCapabilities: vi.fn(),
     })
 
     await expect(resource.get('google')).rejects.toThrow('auth unavailable')

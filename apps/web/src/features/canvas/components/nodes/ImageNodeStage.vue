@@ -54,9 +54,7 @@
         v-if="expandModeActive && expandOverlayStyle"
         :overlay-style="expandOverlayStyle"
         :handle-radius="expandHandleRadius ?? 4"
-        :output-resolution="outputResolution"
         @submit="submitExpand"
-        @update:output-resolution="emit('update:output-resolution', $event)"
         @handle-pointerdown="emit('expand-handle-pointerdown', $event)"
         @handle-pointermove="emit('expand-handle-pointermove', $event)"
         @handle-pointerup="emit('expand-handle-pointerup', $event)"
@@ -105,7 +103,6 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import { useCanvasViewportContext } from '../../composables/useCanvasViewportContext'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import type { ImageToolStageBinding } from '../../image-tools'
@@ -131,7 +128,6 @@ const props = defineProps<{
   expandOverlayStyle?: Record<string, string> | null
   expandHandleRadius?: number
   imageToolStageBinding?: ImageToolStageBinding | null
-  outputResolution?: OutputResolution
   active: boolean
   connectionDropTarget?: boolean
   dragging: boolean
@@ -145,7 +141,6 @@ const emit = defineEmits<{
   (e: 'reset'): void
   (e: 'contextmenu', event: MouseEvent): void
   (e: 'expand-submit', prompt: string): void
-  (e: 'update:output-resolution', value: OutputResolution): void
   (
     e: 'expand-handle-pointerdown',
     payload: { anchor: CanvasExtendDragAnchor; event: PointerEvent },

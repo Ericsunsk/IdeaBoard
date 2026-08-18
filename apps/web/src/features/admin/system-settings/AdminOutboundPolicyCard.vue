@@ -9,7 +9,14 @@
         <Message v-if="error" severity="error" :closable="false">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <span>私有地址访问策略加载失败，请重试。</span>
-            <Button label="重试" severity="secondary" size="small" outlined @click="refetch()" />
+            <Button
+              label="重试"
+              :class="adminActionButtonClass"
+              severity="secondary"
+              size="small"
+              outlined
+              @click="refetch()"
+            />
           </div>
         </Message>
         <Message v-else-if="loading && !setting" severity="secondary" :closable="false">

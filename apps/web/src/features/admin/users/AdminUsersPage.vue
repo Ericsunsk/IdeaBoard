@@ -207,9 +207,9 @@
         <template #body="{ data: user }">
           <Button
             text
-            rounded
             size="small"
             severity="secondary"
+            :class="adminFramedIconButtonClass"
             aria-haspopup="dialog"
             :aria-label="`${user.displayName} 操作菜单`"
             @click="toggleUserActionMenu($event, user)"
@@ -282,7 +282,10 @@ import { banDurationOptions } from './adminUserCommands'
 import { useAdminUsersContext } from './adminUsersContext'
 import type { AdminUserRowView, UserActionKey } from './adminUserView'
 import { useAdminUsersFeedback } from './useAdminUsersFeedback'
-import { adminToolbarIconButtonClass } from '../shared/lib/adminUiClasses'
+import {
+  adminFramedIconButtonClass,
+  adminToolbarIconButtonClass,
+} from '../shared/lib/adminUiClasses'
 
 const vTooltip = Tooltip
 

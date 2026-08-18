@@ -20,6 +20,7 @@
 
       <Button
         :label="resetLabel"
+        :class="adminActionButtonClass"
         size="small"
         severity="contrast"
         :disabled="!active"
@@ -36,6 +37,7 @@ import Popover from 'primevue/popover'
 import { Filter } from '@iconoir/vue'
 import {
   adminFilterPopoverClass,
+  adminActionButtonClass,
   adminPopoverSectionHeaderClass,
   adminPopoverTitleClass,
   adminToolbarIconButtonClass,

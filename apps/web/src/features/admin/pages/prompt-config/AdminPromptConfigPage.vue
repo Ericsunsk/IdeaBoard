@@ -11,7 +11,13 @@
       class="flex min-h-[260px] flex-col items-center justify-center gap-3 rounded-lg border border-admin-border-soft bg-admin-card text-admin-text-2"
     >
       <span class="text-admin-title font-semibold text-admin-title-color">系统提示词加载失败</span>
-      <Button size="small" label="重新加载" @click="loadPrompts()" />
+      <Button
+        :class="adminActionButtonClass"
+        label="重新加载"
+        severity="secondary"
+        outlined
+        @click="loadPrompts()"
+      />
     </div>
     <template v-else-if="featureGroups.length > 0">
       <Card v-for="group in featureGroups" :key="group.key" class="!rounded-lg" :pt="adminCardPt">
@@ -47,6 +53,8 @@
               <Button
                 size="small"
                 label="编辑"
+                :class="adminActionButtonClass"
+                severity="contrast"
                 :disabled="loading"
                 :loading="loading"
                 @click="openEditor(group.key)"
@@ -157,6 +165,8 @@
             <Button
               size="small"
               label="保存"
+              :class="adminActionButtonClass"
+              severity="contrast"
               :loading="saving[item.slug]"
               :disabled="
                 !getDraftValidation(item.slug).canSave || !getDraftValidation(item.slug).isDirty
@@ -171,6 +181,7 @@
     <template #footer>
       <Button
         label="关闭"
+        :class="adminActionButtonClass"
         severity="secondary"
         outlined
         :disabled="isEditorBusy"
@@ -198,6 +209,7 @@ import {
   adminDialogHeaderContentClass,
   adminDialogHeaderSplitClass,
   adminDialogTitleClass,
+  adminActionButtonClass,
 } from '../../shared/lib/adminUiClasses'
 import { useAdminPromptConfigWorkspace } from '../../prompt-config/promptConfigWorkspace'
 import type {

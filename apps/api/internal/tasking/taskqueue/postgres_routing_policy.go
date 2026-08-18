@@ -111,7 +111,7 @@ model_routing_candidates AS (
    AND lower(pem.model_name) = lower(m.model_name)
   WHERE $10 = TRUE
     AND (
-	  $11 IN ('default', '1k')
+      ($11 IN ('default', '1k') AND pem.supports_2k IS NOT TRUE AND pem.supports_4k IS NOT TRUE)
       OR ($11 = '2k' AND pem.supports_2k = TRUE)
       OR ($11 = '4k' AND pem.supports_4k = TRUE)
     )

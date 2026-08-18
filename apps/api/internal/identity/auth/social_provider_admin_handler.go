@@ -75,21 +75,6 @@ func (h *SocialProviderAdminHandler) Update(c *gin.Context) {
 	response.SuccessDTO(c, summary)
 }
 
-func (h *SocialProviderAdminHandler) GetCapabilities(c *gin.Context) {
-	if _, ok := principal.RequireAdmin(c); !ok {
-		return
-	}
-	if !h.requireService(c) {
-		return
-	}
-	capabilities, err := h.service.GetSocialProviderCapabilities(c.Request.Context())
-	if err != nil {
-		h.respondError(c, err)
-		return
-	}
-	response.SuccessDTO(c, capabilities)
-}
-
 func (h *SocialProviderAdminHandler) requireService(c *gin.Context) bool {
 	if h == nil || h.service == nil {
 		response.InternalError(c, http.StatusInternalServerError, "OAuth Provider 配置服务未初始化", errors.New("social provider admin service is not initialized"))

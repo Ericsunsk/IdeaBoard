@@ -90,7 +90,6 @@ func registerAdminUserRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	if h.SocialProviderHandler != nil {
 		adminAPI.GET(RouteAdminUsersOAuthProvider, h.SocialProviderHandler.Get)
 		adminAPI.PUT(RouteAdminUsersOAuthProvider, h.SocialProviderHandler.Update)
-		adminAPI.GET(RouteAdminUsersOAuthCapabilities, h.SocialProviderHandler.GetCapabilities)
 	}
 	adminAPI.POST("/users/:public_id/ban", h.AdminHandler.BanUser)
 	adminAPI.POST("/users/:public_id/unban", h.AdminHandler.UnbanUser)

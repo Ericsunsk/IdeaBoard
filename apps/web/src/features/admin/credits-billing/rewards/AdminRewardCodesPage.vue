@@ -50,7 +50,13 @@
           >
             <template #icon><Refresh class="size-4 text-admin-text-2" /></template>
           </Button>
-          <Button label="创建兑换码" size="small" :disabled="saving" @click="openCreateDialog" />
+          <Button
+            label="创建兑换码"
+            :class="adminActionButtonClass"
+            severity="contrast"
+            :disabled="saving"
+            @click="openCreateDialog"
+          />
         </template>
         <template #pager>
           <AdminPagerControls
@@ -73,6 +79,7 @@
           severity="secondary"
           size="small"
           outlined
+          :class="adminActionButtonClass"
           :disabled="loading"
           @click="refreshRewardCodes"
         />
@@ -86,6 +93,7 @@
           severity="secondary"
           size="small"
           outlined
+          :class="adminActionButtonClass"
           :disabled="loading"
           @click="refreshRewardCodes"
         />
@@ -159,9 +167,9 @@
         <template #body="{ data }">
           <Button
             text
-            rounded
             size="small"
             severity="secondary"
+            :class="adminFramedIconButtonClass"
             aria-haspopup="dialog"
             :aria-label="`${data.displayName} 操作菜单`"
             @click="toggleActionMenu($event, data)"
@@ -221,6 +229,10 @@ import { useAdminCollectionState } from '../../shared/composables/useAdminCollec
 import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminToast'
+import {
+  adminActionButtonClass,
+  adminFramedIconButtonClass,
+} from '../../shared/lib/adminUiClasses'
 import RewardCodeFormDialog, { type RewardCodeFormValue } from './RewardCodeFormDialog.vue'
 import RewardCodePlaintextDialog from './RewardCodePlaintextDialog.vue'
 import RewardCodeRedemptionsDialog from './RewardCodeRedemptionsDialog.vue'

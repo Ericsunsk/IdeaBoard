@@ -1,6 +1,5 @@
 <template>
   <AdminResourceGridFrame
-    empty-description="系统配置加载完成后会显示在这里。"
     empty-title="暂无系统配置"
     :grid-class="adminTwoColumnMasonryGridClass"
     :is-empty="false"

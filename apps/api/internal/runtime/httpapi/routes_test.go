@@ -409,7 +409,6 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"GET /api/admin/tasks":                                        false,
 		"GET /api/admin/tasks/:task_id":                               false,
 		"GET /api/admin/users":                                        false,
-		"GET /api/admin/users/oauth-capabilities":                     false,
 		"GET /api/admin/users/oauth-providers/:provider":              false,
 		"POST /api/admin/accounts":                                    false,
 		"POST /api/admin/credits/grants":                              false,

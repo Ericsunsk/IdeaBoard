@@ -96,6 +96,7 @@
           severity="secondary"
           size="small"
           outlined
+          :class="adminActionButtonClass"
           :disabled="loading"
           @click="refreshOrders"
         />
@@ -110,6 +111,7 @@
           severity="secondary"
           size="small"
           outlined
+          :class="adminActionButtonClass"
           :disabled="loading"
           @click="refreshOrders"
         />
@@ -162,7 +164,6 @@
             <div class="truncate text-admin-body font-bold text-admin-text-1">
               {{ data.user.displayName }}
             </div>
-            <div class="mt-0.5 text-admin-caption text-admin-text-3">{{ data.user.publicId }}</div>
           </div>
         </template>
       </Column>
@@ -208,9 +209,9 @@
         <template #body="{ data }">
           <Button
             text
-            rounded
             size="small"
             severity="secondary"
+            :class="adminFramedIconButtonClass"
             :aria-label="`查看订单 ${data.publicOrderNumber}`"
             @click="openDetail(data.publicOrderNumber)"
           >
@@ -252,6 +253,10 @@ import { useAdminCollectionState } from '../../shared/composables/useAdminCollec
 import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminToast'
+import {
+  adminActionButtonClass,
+  adminFramedIconButtonClass,
+} from '../../shared/lib/adminUiClasses'
 import PaymentOrderDetailDialog from './PaymentOrderDetailDialog.vue'
 import {
   formatPaymentDateTime,

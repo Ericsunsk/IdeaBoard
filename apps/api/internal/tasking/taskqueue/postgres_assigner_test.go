@@ -294,6 +294,46 @@ func TestPostgresTaskAssignerRoutesDefaultResolutionAsProviderBaseline(t *testin
 	}
 }
 
+func TestPostgresTaskAssignerRoutesResolutionToMatchingModel(t *testing.T) {
+	tests := []struct {
+		name       string
+		resolution string
+		wantModel  string
+	}{
+		{name: "default", resolution: workflow.OutputResolutionDefault, wantModel: "baseline-model"},
+		{name: "1k", resolution: workflow.OutputResolution1K, wantModel: "baseline-model"},
+		{name: "2k", resolution: workflow.OutputResolution2K, wantModel: "two-k-model"},
+		{name: "4k", resolution: workflow.OutputResolution4K, wantModel: "four-k-model"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := newPostgresAssignerTestDB(t)
+			assigner := NewPostgresTaskAssigner(db)
+			accountID := createAssignerAccount(t, db, "resolution-"+tt.name, 2)
+			setAssignerModelEnabled(t, db, accountID, "gpt-image-1", false)
+			addAssignerModel(t, db, accountID, "baseline-model", 1, 0)
+			addAssignerModel(t, db, accountID, "two-k-model", 2, 0)
+			addAssignerModel(t, db, accountID, "four-k-model", 3, 0)
+			setAssignerEndpointModelCapabilities(t, db, accountID, "baseline-model", false, false)
+			setAssignerEndpointModelCapabilities(t, db, accountID, "two-k-model", true, false)
+			setAssignerEndpointModelCapabilities(t, db, accountID, "four-k-model", false, true)
+			taskID := "pending-resolution-" + tt.name
+			createAssignerTaskWithOptions(t, db, taskID, 0, tasks.StatusPending, "", "", assignerTaskOptions{
+				ParamsJSON: assignerExecutionParams(t, workflow.FeatureSlugPromptGeneration, tt.resolution),
+			})
+
+			assignment, err := assigner.Assign(context.Background(), &tasks.TaskPayload{TaskID: taskID, RiverJobID: 134})
+			if err != nil {
+				t.Fatalf("Assign failed: %v", err)
+			}
+			if assignment.Status != AssignStatusAssigned || assignment.AccountID != accountID || assignment.ResolvedModel != tt.wantModel {
+				t.Fatalf("assignment=%+v, want account %d model %q", assignment, accountID, tt.wantModel)
+			}
+		})
+	}
+}
+
 func TestPostgresTaskAssignerFailsClosedOnInvalidExecutionPlan(t *testing.T) {
 	db := newPostgresAssignerTestDB(t)
 	assigner := NewPostgresTaskAssigner(db)
@@ -996,6 +1036,19 @@ func setAssignerEndpointProtocol(t *testing.T, db *sql.DB, accountID int64, prot
 	providerEndpointID := loadAssignerAccountProviderEndpointID(t, db, accountID)
 	if _, err := db.Exec(`UPDATE provider_endpoints SET protocol = $1 WHERE id = $2`, protocol, providerEndpointID); err != nil {
 		t.Fatalf("set provider endpoint protocol for account %d failed: %v", accountID, err)
+	}
+}
+
+func setAssignerEndpointModelCapabilities(t *testing.T, db *sql.DB, accountID int64, modelName string, supports2K, supports4K bool) {
+	t.Helper()
+	providerEndpointID := loadAssignerAccountProviderEndpointID(t, db, accountID)
+	if _, err := db.Exec(`
+INSERT INTO provider_endpoint_models (provider_endpoint_id, model_name, supports_2k, supports_4k)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (provider_endpoint_id, lower(model_name)) DO UPDATE
+SET supports_2k = EXCLUDED.supports_2k,
+    supports_4k = EXCLUDED.supports_4k`, providerEndpointID, modelName, supports2K, supports4K); err != nil {
+		t.Fatalf("set provider endpoint model %q capabilities for account %d failed: %v", modelName, accountID, err)
 	}
 }
 

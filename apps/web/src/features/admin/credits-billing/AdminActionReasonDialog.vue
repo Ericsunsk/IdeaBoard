@@ -22,12 +22,19 @@
     <template #footer="{ requestClose }">
       <Button
         label="取消"
+        :class="adminActionButtonClass"
         severity="secondary"
         outlined
         :disabled="loading"
         @click="requestClose"
       />
-      <Button :label="confirmLabel" :severity="intent" :loading="loading" @click="submit" />
+      <Button
+        :label="confirmLabel"
+        :class="adminActionButtonClass"
+        :severity="intent"
+        :loading="loading"
+        @click="submit"
+      />
     </template>
   </AdminDialogShell>
 </template>
@@ -37,6 +44,7 @@ import { computed, ref } from 'vue'
 import Button from 'primevue/button'
 import Message from 'primevue/message'
 import AdminDialogShell from '../shared/components/AdminDialogShell.vue'
+import { adminActionButtonClass } from '../shared/lib/adminUiClasses'
 import { validateAdminActionReason } from '../shared/validation/adminActionReasonContract'
 import AdminActionReasonField from './AdminActionReasonField.vue'
 

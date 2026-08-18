@@ -136,14 +136,13 @@
                 </span>
                 <Button
                   text
-                  rounded
                   size="small"
-                  :class="adminTextButtonClass"
+                  :class="adminFramedIconButtonClass"
                   aria-label="添加 APIKey"
                   @click="accountEditor.openCreate(card.providerEndpoint.commandTarget)"
                 >
                   <template #icon>
-                    <Plus />
+                    <Plus class="size-5 text-admin-text-2" />
                   </template>
                 </Button>
               </div>
@@ -258,6 +257,7 @@
               <Button
                 size="small"
                 label="编辑端点"
+                :class="adminActionButtonClass"
                 severity="contrast"
                 outlined
                 @click="providerEndpointEditor.openEdit(card.providerEndpoint.commandTarget)"
@@ -265,6 +265,7 @@
               <Button
                 size="small"
                 label="删除"
+                :class="adminActionButtonClass"
                 severity="contrast"
                 outlined
                 @click="commands.deleteProviderEndpoint(card.providerEndpoint.commandTarget)"
@@ -420,6 +421,7 @@
       <template #footer>
         <Button
           label="取消"
+          :class="adminActionButtonClass"
           severity="secondary"
           outlined
           :disabled="providerEndpointSaveLoading"
@@ -427,6 +429,8 @@
         />
         <Button
           label="确定"
+          :class="adminActionButtonClass"
+          severity="contrast"
           :loading="providerEndpointSaveLoading"
           @click="handleSaveProviderEndpoint"
         />
@@ -580,12 +584,19 @@
       <template #footer>
         <Button
           label="取消"
+          :class="adminActionButtonClass"
           severity="secondary"
           outlined
           :disabled="accountSaveLoading"
           @click="closeAccountModal"
         />
-        <Button label="确定" :loading="accountSaveLoading" @click="accountEditor.save" />
+        <Button
+          label="确定"
+          :class="adminActionButtonClass"
+          severity="contrast"
+          :loading="accountSaveLoading"
+          @click="accountEditor.save"
+        />
       </template>
     </AdminDialogShell>
   </div>
@@ -620,7 +631,6 @@ import {
   adminActionButtonClass,
   adminFramedIconButtonClass,
   adminMasonryCardClass,
-  adminTextButtonClass,
 } from '../../shared/lib/adminUiClasses'
 import { useAdminProviderConfig } from '../../provider-config/useAdminProviderConfig'
 import { useAdminProviderConfigFeedback } from '../../provider-config/useAdminProviderConfigFeedback'

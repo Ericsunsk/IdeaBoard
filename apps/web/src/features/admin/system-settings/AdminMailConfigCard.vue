@@ -5,7 +5,14 @@
         <Message v-if="error" severity="error" :closable="false">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <span>{{ error }}</span>
-            <Button label="重试" severity="secondary" size="small" outlined @click="load" />
+            <Button
+              label="重试"
+              :class="adminActionButtonClass"
+              severity="secondary"
+              size="small"
+              outlined
+              @click="load"
+            />
           </div>
         </Message>
         <Message v-else-if="loading" severity="secondary" :closable="false"
@@ -78,6 +85,7 @@
           </AdminFormField>
           <Button
             label="发送 Test Email"
+            :class="adminActionButtonClass"
             severity="secondary"
             outlined
             :loading="testing"

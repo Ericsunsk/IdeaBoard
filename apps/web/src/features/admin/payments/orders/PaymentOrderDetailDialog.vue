@@ -14,7 +14,13 @@
     <Message v-else-if="error" severity="error" :closable="false">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <span>支付订单详情加载失败，请重试。</span>
-        <Button label="重试" size="small" severity="secondary" outlined @click="$emit('retry')" />
+        <Button
+          label="重试"
+          :class="adminActionButtonClass"
+          severity="secondary"
+          outlined
+          @click="$emit('retry')"
+        />
       </div>
     </Message>
 
@@ -25,9 +31,7 @@
             <div class="font-mono text-admin-content font-bold text-admin-title-color">
               {{ detail.publicOrderNumber }}
             </div>
-            <div class="mt-1 text-admin-meta text-admin-text-3">
-              用户 {{ detail.user.displayName }} · {{ detail.user.publicId }}
-            </div>
+            <div class="mt-1 text-admin-meta text-admin-text-3">{{ detail.user.displayName }}</div>
           </div>
           <Tag
             :value="getPaymentOrderStatusPresentation(detail.status).label"
@@ -49,9 +53,6 @@
         <h3 id="payment-stripe-identities" class="text-admin-body font-bold text-admin-title-color">
           Stripe 安全摘要
         </h3>
-        <p class="mt-1 text-admin-caption text-admin-text-3">
-          仅显示服务端脱敏 identity，不包含 API Key、Webhook Payload 或账单地址。
-        </p>
         <dl class="mt-3 grid grid-cols-2 gap-x-5 gap-y-3 max-[640px]:grid-cols-1">
           <div v-for="row in stripeRows" :key="row.label" class="min-w-0">
             <dt class="text-admin-caption font-[650] text-admin-text-3">{{ row.label }}</dt>
@@ -150,9 +151,6 @@
             <h3 id="payment-refund-action" class="text-admin-body font-bold text-admin-title-color">
               发起退款
             </h3>
-            <p class="mt-1 text-admin-caption text-admin-text-3">
-              仅可退回未消费 Idea，最终可退额度由服务端按 Wallet 可用余额再次校验。
-            </p>
           </div>
           <Tag :value="`${formatIdeas(refundableIdeas)} 可退`" severity="info" rounded />
         </div>
@@ -180,6 +178,7 @@
           <Button
             type="submit"
             label="确认退款"
+            :class="adminActionButtonClass"
             severity="danger"
             :loading="refunding"
             :disabled="refunding || !canSubmitRefund"
@@ -197,7 +196,7 @@
           target="_blank"
           rel="noopener noreferrer"
           label="打开 Stripe 收据"
-          size="small"
+          :class="adminActionButtonClass"
           severity="secondary"
           outlined
         />
@@ -213,6 +212,7 @@ import InputNumber from 'primevue/inputnumber'
 import Message from 'primevue/message'
 import Tag from 'primevue/tag'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
+import { adminActionButtonClass } from '../../shared/lib/adminUiClasses'
 import {
   formatPaymentDateTime,
   formatPaymentMoney,
@@ -287,11 +287,11 @@ const overviewRows = computed(() => {
       label: '原始实付',
       value: formatPaymentMoney(detail.paidTotalMinor, detail.paidCurrency),
     },
-    { label: 'Stripe 状态', value: getStripeStatusLabel(detail.stripeStatus) },
-    { label: '本地到账状态', value: getCreditStatusLabel(detail.creditStatus) },
     { label: '商品金额', value: formatPaymentMoney(detail.paidSubtotalMinor, detail.paidCurrency) },
     { label: '税费', value: formatPaymentMoney(detail.paidTaxMinor, detail.paidCurrency) },
     { label: '基准金额', value: formatPaymentMoney(detail.baseAmountMinor, detail.baseCurrency) },
+    { label: 'Stripe 状态', value: getStripeStatusLabel(detail.stripeStatus) },
+    { label: '本地到账状态', value: getCreditStatusLabel(detail.creditStatus) },
     { label: '条款版本', value: detail.termsVersion || '—' },
     { label: '退款政策版本', value: detail.refundPolicyVersion || '—' },
     { label: '创建时间', value: formatPaymentDateTime(detail.createdAt) },

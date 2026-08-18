@@ -20,7 +20,6 @@ import type { MaybeRefOrGetter } from 'vue'
 import type {
   ApiResponseBase,
   ApiResponseEmpty,
-  ApiResponseOAuthCapabilities,
   ApiResponseOAuthProviderSettings,
   ApiResponseUserList,
   BanAdminUserBody,
@@ -283,75 +282,6 @@ export function useUpdateAdminOAuthProviderSettings<
     oAuthProviderSettingsUpdate,
     options,
   )
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
-}
-
-export const getGetAdminOAuthCapabilitiesUrl = () => {
-  return `/admin/users/oauth-capabilities`
-}
-
-export const getAdminOAuthCapabilities = async (
-  options?: Parameters<typeof orvalMutator>[1],
-): Promise<ApiResponseOAuthCapabilities> => {
-  return orvalMutator<ApiResponseOAuthCapabilities>(getGetAdminOAuthCapabilitiesUrl(), {
-    ...options,
-    method: 'GET',
-  })
-}
-
-export const getGetAdminOAuthCapabilitiesQueryKey = () => {
-  return ['admin', 'users', 'oauth-capabilities'] as const
-}
-
-export const getGetAdminOAuthCapabilitiesQueryOptions = <
-  TData = Awaited<ReturnType<typeof getAdminOAuthCapabilities>>,
-  TError = ErrorType<ApiResponseBase>,
->(options?: {
-  query?: Partial<
-    UseQueryOptions<Awaited<ReturnType<typeof getAdminOAuthCapabilities>>, TError, TData>
-  >
-  request?: SecondParameter<typeof orvalMutator>
-}) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getGetAdminOAuthCapabilitiesQueryKey()
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminOAuthCapabilities>>> = ({
-    signal,
-  }) => getAdminOAuthCapabilities({ signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof getAdminOAuthCapabilities>>,
-    TError,
-    TData
-  >
-}
-
-export type GetAdminOAuthCapabilitiesQueryResult = NonNullable<
-  Awaited<ReturnType<typeof getAdminOAuthCapabilities>>
->
-export type GetAdminOAuthCapabilitiesQueryError = ErrorType<ApiResponseBase>
-
-export function useGetAdminOAuthCapabilities<
-  TData = Awaited<ReturnType<typeof getAdminOAuthCapabilities>>,
-  TError = ErrorType<ApiResponseBase>,
->(
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof getAdminOAuthCapabilities>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-  queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getGetAdminOAuthCapabilitiesQueryOptions(options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

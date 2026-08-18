@@ -1,9 +1,46 @@
 import { describe, expect, it, vi } from 'vitest'
 import { IMAGE_NODE_ACTION } from '../../../../shared/domain/imageActions'
+import type { OutputResolution } from '../../../../shared/domain/generationContract'
+import type { WorkflowFeature } from '../../../../shared/domain/workflowFeatures'
+import type { SubmitTaskReadinessData } from '../../../../shared/api/task'
 import type { ImageStrengthAction } from '../../execution'
 import HomeCanvasImageActionMenu from './HomeCanvasImageActionMenu.vue'
 import { render, screen, waitFor } from '../../../../test/render'
 import { canvasBillingReadinessKey, type CanvasBillingReadinessStore } from '../../execution'
+import { createCanvasBillingReadinessStore } from '../../execution/billing/useCanvasBillingReadiness'
+
+function createDeferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((promiseResolve) => {
+    resolve = promiseResolve
+  })
+  return { promise, resolve }
+}
+
+function makeReadiness(
+  feature: WorkflowFeature,
+  outputResolution: OutputResolution,
+  unitCredits: number,
+): SubmitTaskReadinessData {
+  return {
+    ready: true,
+    feature,
+    billing: {
+      sku: `ai-image:${feature}`,
+      output_resolution: outputResolution,
+      display_name: feature,
+      price_version_id: 1,
+      price_version: 1,
+      unit_credits: unitCredits,
+      quantity: 1,
+      total_credits: unitCredits,
+      quoted_at: '2026-08-19T00:00:00.000Z',
+      available_credits: 100,
+      reserved_credits: 0,
+      sufficient: true,
+    },
+  }
+}
 
 function renderImageActionMenu(
   input: {
@@ -12,10 +49,12 @@ function renderImageActionMenu(
     strengthValue?: number
     billingStore?: CanvasBillingReadinessStore
     outputCount?: number
+    outputResolution?: OutputResolution
   } = {},
 ) {
   const props = {
     outputCount: input.outputCount ?? 1,
+    outputResolution: input.outputResolution ?? '1k',
     strengthControl: {
       visible: input.showStrengthControl ?? false,
       activeAction: input.activeStrengthAction ?? null,
@@ -141,6 +180,47 @@ describe('HomeCanvasImageActionMenu', () => {
 
     expect(screen.getByRole('button', { name: '抠图 · 免费' })).toBeEnabled()
     expect(screen.getAllByText('免费')[0]).toHaveAttribute('data-touch-quote')
+  })
+
+  it('requests and displays the 4K quote when resolution changes during a 2K request', async () => {
+    const pending2K = createDeferred<SubmitTaskReadinessData>()
+    const fetchReadiness = vi.fn(
+      async (feature: WorkflowFeature, request?: { params?: unknown }) => {
+        const params = request?.params as { output_resolution?: OutputResolution } | undefined
+        if (feature === IMAGE_NODE_ACTION.styleVariation && params?.output_resolution === '2k') {
+          return pending2K.promise
+        }
+        return makeReadiness(
+          feature,
+          params?.output_resolution ?? '1k',
+          params?.output_resolution === '4k' ? 12 : 4,
+        )
+      },
+    )
+    const billingStore = createCanvasBillingReadinessStore({ fetchReadiness })
+    const view = renderImageActionMenu({ billingStore, outputResolution: '2k' })
+
+    await waitFor(() => {
+      expect(fetchReadiness).toHaveBeenCalledWith(
+        IMAGE_NODE_ACTION.styleVariation,
+        expect.objectContaining({ params: expect.objectContaining({ output_resolution: '2k' }) }),
+      )
+    })
+
+    await view.rerender({ outputResolution: '4k' })
+
+    await waitFor(() => {
+      expect(fetchReadiness).toHaveBeenCalledWith(
+        IMAGE_NODE_ACTION.styleVariation,
+        expect.objectContaining({ params: expect.objectContaining({ output_resolution: '4k' }) }),
+      )
+      expect(screen.getByRole('button', { name: '风格延展 · 12 Ideas' })).toBeEnabled()
+    })
+
+    pending2K.resolve(makeReadiness(IMAGE_NODE_ACTION.styleVariation, '2k', 8))
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '风格延展 · 12 Ideas' })).toBeEnabled()
+    })
   })
 
   it('submits a strength action once when the committed value changes', () => {

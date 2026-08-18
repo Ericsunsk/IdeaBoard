@@ -114,9 +114,6 @@ describe('AdminUsersPage', () => {
           },
         }),
       ),
-      http.get('/api/admin/users/oauth-capabilities', () =>
-        HttpResponse.json({ code: 0, msg: 'ok', data: { social: { google: false } } }),
-      ),
       http.post('/api/admin/credits/grants', async ({ request }) => {
         commandRequests.push((await request.json()) as Record<string, unknown>)
         return HttpResponse.json({

@@ -16,22 +16,16 @@ vi.mock('../shared/lib/adminToast', async (importOriginal) => ({
 }))
 
 const configuredSummary: OAuthProviderSettingsSummary = {
-  provider: 'google',
   enabled: true,
   configured: true,
-  available: true,
   clientId: 'google-client.apps.googleusercontent.com',
   clientSecretConfigured: true,
-  scopes: ['openid', 'email', 'profile'],
-  configVersion: 2,
   callbackUrl: 'https://example.com/api/auth/callback/google',
-  updatedAt: '2026-08-06T00:00:00Z',
 }
 
 const resource: OAuthProviderSettingsResource = {
   get: vi.fn(),
   save: vi.fn(),
-  getCapabilities: vi.fn(),
 }
 
 function renderDialog() {
@@ -49,9 +43,6 @@ describe('OAuthProviderSettingsDialog', () => {
     vi.clearAllMocks()
     vi.mocked(resource.get).mockResolvedValue(configuredSummary)
     vi.mocked(resource.save).mockResolvedValue(configuredSummary)
-    vi.mocked(resource.getCapabilities).mockResolvedValue({
-      social: { google: true, discord: false },
-    })
   })
 
   it('shows the generic Provider selector and keeps callback and Secret safe', async () => {
@@ -59,6 +50,10 @@ describe('OAuthProviderSettingsDialog', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'OAuth Provider 设置' })
     await within(dialog).findByDisplayValue('google-client.apps.googleusercontent.com')
+    expect(within(dialog).getByRole('group', { name: 'OAuth 登录方式' })).toBeVisible()
+    expect(within(dialog).getAllByRole('switch')).toHaveLength(2)
+    expect(within(dialog).queryByText('Google 登录')).not.toBeInTheDocument()
+    expect(within(dialog).queryByText('已启用')).not.toBeInTheDocument()
     expect(within(dialog).getByLabelText('OAuth Provider')).toHaveTextContent('Google')
     const callback = within(dialog).getByLabelText('Callback URL') as HTMLInputElement
     expect(callback).toHaveValue('https://example.com/api/auth/callback/google')
@@ -73,7 +68,6 @@ describe('OAuthProviderSettingsDialog', () => {
     vi.mocked(resource.get).mockResolvedValueOnce({
       ...configuredSummary,
       configured: false,
-      available: false,
       clientId: '',
       clientSecretConfigured: false,
     })
@@ -88,7 +82,7 @@ describe('OAuthProviderSettingsDialog', () => {
     expect(resource.save).not.toHaveBeenCalled()
   })
 
-  it('allows a blank Secret when one is already configured and refetches both contracts', async () => {
+  it('allows a blank Secret when one is already configured and refetches both providers', async () => {
     const { user, emitted } = renderDialog()
     const dialog = await screen.findByRole('dialog', { name: 'OAuth Provider 设置' })
     await within(dialog).findByDisplayValue('google-client.apps.googleusercontent.com')
@@ -102,8 +96,7 @@ describe('OAuthProviderSettingsDialog', () => {
         clientSecret: '',
       }),
     )
-    await waitFor(() => expect(resource.get).toHaveBeenCalledTimes(2))
-    expect(resource.getCapabilities).toHaveBeenCalledTimes(2)
+    await waitFor(() => expect(resource.get).toHaveBeenCalledTimes(4))
     expect(emitted()['update:visible']).toEqual([[false]])
     expect(toast.success).toHaveBeenCalledWith('Google OAuth 设置已保存')
   })
@@ -120,6 +113,7 @@ describe('OAuthProviderSettingsDialog', () => {
 
   it('reports a refresh failure as partial success without repeating the saved mutation', async () => {
     vi.mocked(resource.get)
+      .mockResolvedValueOnce(configuredSummary)
       .mockResolvedValueOnce(configuredSummary)
       .mockRejectedValueOnce(new Error('refresh unavailable'))
     const { user, emitted } = renderDialog()

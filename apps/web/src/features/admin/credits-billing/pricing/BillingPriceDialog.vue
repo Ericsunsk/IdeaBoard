@@ -32,18 +32,27 @@
       </AdminFormField>
     </div>
 
-    <div class="flex items-center justify-between gap-4 text-admin-meta">
-      <span class="text-ib-text-muted">版本影响</span>
-      <span class="text-right text-admin-title-color">创建新版本，历史版本不变</span>
-    </div>
-
     <Message v-if="errorMessage" severity="error" :closable="false" role="alert">
       {{ errorMessage }}
     </Message>
 
     <template #footer>
-      <Button label="取消" severity="secondary" outlined :disabled="pending" @click="close" />
-      <Button label="发布价格" :loading="pending" :disabled="pending" @click="submit" />
+      <Button
+        label="取消"
+        :class="adminActionButtonClass"
+        severity="secondary"
+        outlined
+        :disabled="pending"
+        @click="close"
+      />
+      <Button
+        label="发布价格"
+        :class="adminActionButtonClass"
+        severity="contrast"
+        :loading="pending"
+        :disabled="pending"
+        @click="submit"
+      />
     </template>
   </AdminDialogShell>
 </template>
@@ -55,6 +64,7 @@ import InputNumber from 'primevue/inputnumber'
 import Message from 'primevue/message'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
+import { adminActionButtonClass } from '../../shared/lib/adminUiClasses'
 import type { AdminBillableItemCard, PricingVariant } from './billableCatalogTypes'
 
 const props = withDefaults(

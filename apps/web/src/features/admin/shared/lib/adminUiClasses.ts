@@ -79,7 +79,7 @@ export const adminDialogHeaderClass = '!px-6 !pt-5 !pb-3.5'
 export const adminDialogContentClass = '!overflow-hidden !px-6 !pb-0'
 
 export const adminDialogScrollableBodyClass =
-  'app-scrollbar -mr-3 overflow-y-auto overscroll-contain pr-3'
+  'app-scrollbar -mr-3 overflow-y-auto overscroll-contain pr-3 [scrollbar-gutter:stable]'
 
 export const adminDialogFormBodyClass = 'flex flex-col gap-3.5'
 

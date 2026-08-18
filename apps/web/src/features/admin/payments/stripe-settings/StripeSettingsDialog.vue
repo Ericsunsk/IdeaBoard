@@ -20,6 +20,7 @@
             severity="secondary"
             size="small"
             text
+            :class="adminTextButtonClass"
             :disabled="isBusy"
             @click="load"
           />
@@ -144,9 +145,18 @@
     </template>
 
     <template #footer="{ requestClose }">
-      <Button label="取消" severity="secondary" outlined :disabled="isBusy" @click="requestClose" />
+      <Button
+        label="取消"
+        :class="adminActionButtonClass"
+        severity="secondary"
+        outlined
+        :disabled="isBusy"
+        @click="requestClose"
+      />
       <Button
         label="保存设置"
+        :class="adminActionButtonClass"
+        severity="contrast"
         :loading="isSaving"
         :disabled="isLoading || Boolean(loadError)"
         @click="submit"
@@ -165,6 +175,7 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminToast'
+import { adminActionButtonClass, adminTextButtonClass } from '../../shared/lib/adminUiClasses'
 import { createAdminStripeSettingsResource } from './stripeSettingsResource'
 import type { AdminStripeSettingsResource, StripeConfigurationSummary } from './stripeSettingsTypes'
 

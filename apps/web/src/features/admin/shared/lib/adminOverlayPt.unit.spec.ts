@@ -6,6 +6,19 @@ afterEach(() => {
 })
 
 describe('Admin overlay Motion Policy', () => {
+  it('keeps Dialog close controls free of the default gray hover and focus ring', () => {
+    const closeButtonClass = String(
+      (createAdminDialogPt({}).pcCloseButton as { root?: { class?: string } }).root?.class ?? '',
+    )
+
+    expect(closeButtonClass).toContain('hover:!bg-transparent')
+    expect(closeButtonClass).toContain('focus-visible:!shadow-none')
+    expect(closeButtonClass).toContain('focus-visible:!outline-none')
+    expect(closeButtonClass).not.toContain('hover:!bg-ib-surface-muted')
+    expect(closeButtonClass).not.toContain('focus-visible:!outline-admin-accent')
+    expect(closeButtonClass).not.toContain('focus-visible:!shadow-[var(--shadow-ib-focus)]')
+  })
+
   it('maps shared Dialog and Popover primitives to semantic presence motion', () => {
     vi.stubGlobal(
       'matchMedia',

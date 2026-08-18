@@ -1263,33 +1263,6 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseBase' }
-  /admin/users/oauth-capabilities:
-    get:
-      tags: [AdminUsers]
-      operationId: getAdminOAuthCapabilities
-      security:
-        - cookieAuth: []
-      responses:
-        '200':
-          description: Runtime OAuth provider availability
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ApiResponseOAuthCapabilities' }
-        '502':
-          description: Auth service unavailable or invalid response
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ApiResponseBase' }
-        '401':
-          description: Authentication required
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ApiResponseBase' }
-        '403':
-          description: Admin role required
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ApiResponseBase' }
   /admin/users/{public_id}/ban:
     post:
       tags: [AdminUsers]
@@ -2650,29 +2623,6 @@ components:
         client_secret:
           type: string
           writeOnly: true
-
-    OAuthCapabilities:
-      type: object
-      additionalProperties: false
-      required: [social]
-      properties:
-        social:
-          type: object
-          additionalProperties:
-            type: boolean
-        providers:
-          type: array
-          items:
-            $ref: '#/components/schemas/OAuthProviderCapability'
-
-    OAuthProviderCapability:
-      type: object
-      additionalProperties: false
-      required: [provider, label, available]
-      properties:
-        provider: { type: string, minLength: 1, maxLength: 64 }
-        label: { type: string }
-        available: { type: boolean }
 
     AdminCreditGrantRequest:
       type: object
@@ -5361,14 +5311,6 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/OAuthProviderSettings'
-
-    ApiResponseOAuthCapabilities:
-      allOf:
-        - $ref: '#/components/schemas/ApiResponseBase'
-        - type: object
-          properties:
-            data:
-              $ref: '#/components/schemas/OAuthCapabilities'
 
     ApiResponseCreditCommandResult:
       allOf:

@@ -19,6 +19,7 @@
         <Button
           class="mt-5"
           label="重新加载"
+          :class="adminActionButtonClass"
           severity="secondary"
           outlined
           :loading="resource.query.isFetching.value"
@@ -56,17 +57,18 @@
           <div class="flex shrink-0 flex-wrap items-center gap-2">
             <Button
               label="检查记录"
+              :class="adminActionButtonClass"
               severity="secondary"
-              text
+              outlined
               @click="historyDialogVisible = true"
             />
             <Button
               :label="health.active_run ? '检查中' : '重新检查'"
-              severity="secondary"
-              outlined
-              :disabled="Boolean(health.active_run)"
+              :class="adminActionButtonClass"
+              severity="contrast"
+              :disabled="Boolean(health.active_run) || resource.startPending.value"
               :loading="resource.startPending.value"
-              @click="startDialogVisible = true"
+              @click="startReconciliation"
             />
           </div>
         </div>
@@ -84,6 +86,7 @@
               severity="secondary"
               size="small"
               text
+              :class="adminTextButtonClass"
               :loading="resource.query.isFetching.value"
               @click="resource.query.refetch()"
             />
@@ -124,15 +127,6 @@
     <AdminCreditFindingQueue />
   </div>
 
-  <AdminActionReasonDialog
-    v-model:visible="startDialogVisible"
-    title="重新检查账本"
-    message="将启动一次完整账本检查。高风险异常可能限制相关 Wallet 的新消费。"
-    confirm-label="启动检查"
-    :loading="resource.startPending.value"
-    @confirm="startReconciliation"
-  />
-
   <AdminCreditRunHistoryDialog v-model:visible="historyDialogVisible" />
 </template>
 
@@ -144,7 +138,7 @@ import Message from 'primevue/message'
 import ProgressSpinner from 'primevue/progressspinner'
 import AdminSurfaceFrame from '../../shared/components/AdminSurfaceFrame.vue'
 import { formatAdminDisplayError, useAdminToast } from '../../shared/lib/adminToast'
-import AdminActionReasonDialog from '../AdminActionReasonDialog.vue'
+import { adminActionButtonClass, adminTextButtonClass } from '../../shared/lib/adminUiClasses'
 import { formatAdminDateTime, formatReconciliationRunError } from '../creditsBillingFormat'
 import AdminCreditFindingQueue from './AdminCreditFindingQueue.vue'
 import AdminCreditRunHistoryDialog from './AdminCreditRunHistoryDialog.vue'
@@ -153,8 +147,8 @@ import { getCreditHealthPresentation } from './creditHealthPresentation'
 
 const toast = useAdminToast()
 const resource = useAdminCreditHealthResource()
-const startDialogVisible = ref(false)
 const historyDialogVisible = ref(false)
+const manualReconciliationReason = '管理员手动触发账本检查'
 const health = resource.health
 const showLoading = computed(() => resource.query.isLoading.value && !health.value)
 const loadError = computed(() => resource.query.isError.value && !health.value)
@@ -197,10 +191,9 @@ const facts = computed(() => {
   ]
 })
 
-async function startReconciliation(reason: string) {
+async function startReconciliation() {
   try {
-    await resource.start({ reason })
-    startDialogVisible.value = false
+    await resource.start({ reason: manualReconciliationReason })
     toast.success('账本检查已启动')
   } catch (error) {
     toast.error(formatAdminDisplayError(error, '启动账本检查失败，请重试'))

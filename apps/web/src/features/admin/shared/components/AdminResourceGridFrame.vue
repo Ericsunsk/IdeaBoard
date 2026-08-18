@@ -12,7 +12,7 @@
       <div class="text-admin-title font-semibold text-admin-title-color">
         {{ emptyTitle }}
       </div>
-      <div class="mt-2 text-admin-meta text-admin-subtitle-color">
+      <div v-if="emptyDescription" class="mt-2 text-admin-meta text-admin-subtitle-color">
         {{ emptyDescription }}
       </div>
     </div>
@@ -35,7 +35,7 @@ import {
 
 const props = defineProps<{
   contentClass?: string
-  emptyDescription: string
+  emptyDescription?: string
   emptyTitle: string
   gridClass?: string
   isEmpty: boolean

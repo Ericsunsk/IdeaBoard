@@ -33,12 +33,17 @@ type CanvasBillingReadinessFetcher = (
   request?: Parameters<typeof fetchCanvasBillingReadiness>[1],
 ) => Promise<SubmitTaskReadinessData>
 
+type CanvasBillingReadinessRequest = Parameters<typeof fetchCanvasBillingReadiness>[1]
+
 export type CanvasBillingReadinessStore = {
   ensureFeature: (
     feature: WorkflowFeature,
-    options?: { force?: boolean; request?: Parameters<typeof fetchCanvasBillingReadiness>[1] },
+    options?: { force?: boolean; request?: CanvasBillingReadinessRequest },
   ) => Promise<void>
-  getFeatureState: (feature: WorkflowFeature) => CanvasBillingQuoteState
+  getFeatureState: (
+    feature: WorkflowFeature,
+    request?: CanvasBillingReadinessRequest,
+  ) => CanvasBillingQuoteState
   applyReadiness: (readiness: SubmitTaskReadinessData) => void
 }
 
@@ -67,6 +72,13 @@ function isWorkflowFeature(value: string | undefined): value is WorkflowFeature 
   return WORKFLOW_FEATURE_SLUGS.includes(value as WorkflowFeature)
 }
 
+function buildReadinessStateKey(
+  feature: WorkflowFeature,
+  request?: CanvasBillingReadinessRequest,
+): string {
+  return request === undefined ? feature : `${feature}:${JSON.stringify(request)}`
+}
+
 export function createCanvasBillingReadinessStore(
   options: {
     fetchReadiness?: CanvasBillingReadinessFetcher
@@ -77,16 +89,18 @@ export function createCanvasBillingReadinessStore(
   const fetchReadiness = options.fetchReadiness ?? fetchCanvasBillingReadiness
   const now = options.now ?? Date.now
   const cacheMs = options.cacheMs ?? 60_000
-  const states = reactive({ ...EMPTY_STATES }) as Record<WorkflowFeature, CanvasBillingQuoteState>
-  const pending = new Map<WorkflowFeature, Promise<void>>()
-  const loadedAt = new Map<WorkflowFeature, number>()
+  const states = reactive(new Map<string, CanvasBillingQuoteState>())
+  const pending = new Map<string, Promise<void>>()
+  const loadedAt = new Map<string, number>()
 
-  function applyReadiness(readiness: SubmitTaskReadinessData): void {
-    if (!isWorkflowFeature(readiness.feature)) return
+  function resolveReadinessState(
+    readiness: SubmitTaskReadinessData,
+  ): CanvasBillingQuoteState | null {
+    if (!isWorkflowFeature(readiness.feature)) return null
     const feature = readiness.feature
     const billing = readiness.billing
     if (billing && !billing.sufficient) {
-      states[feature] = {
+      return {
         feature,
         status: 'ready',
         unitCredits: billing.unit_credits,
@@ -96,25 +110,22 @@ export function createCanvasBillingReadinessStore(
         sufficient: false,
         reason: `Idea不足（需要 ${formatIdeaAmount(billing.total_credits)}，当前 ${formatIdeaAmount(billing.available_credits)}）`,
       }
-      return
     }
     if (!readiness.ready) {
-      states[feature] = {
+      return {
         feature,
         status: 'blocked',
         reason: normalizeBlockedReason(readiness.message, '当前操作暂不可用'),
       }
-      return
     }
     if (!billing) {
-      states[feature] = {
+      return {
         feature,
         status: 'error',
         reason: 'Idea计费信息暂不可用',
       }
-      return
     }
-    states[feature] = {
+    return {
       feature,
       status: 'ready',
       unitCredits: billing.unit_credits,
@@ -123,45 +134,58 @@ export function createCanvasBillingReadinessStore(
       priceVersionId: billing.price_version_id,
       sufficient: billing.sufficient,
     }
-    loadedAt.set(feature, now())
+  }
+
+  function applyReadinessForKey(key: string, readiness: SubmitTaskReadinessData): void {
+    const state = resolveReadinessState(readiness)
+    if (!state) return
+    states.set(key, state)
+    loadedAt.set(key, now())
+  }
+
+  function applyReadiness(readiness: SubmitTaskReadinessData): void {
+    if (!isWorkflowFeature(readiness.feature)) return
+    applyReadinessForKey(buildReadinessStateKey(readiness.feature), readiness)
   }
 
   async function ensureFeature(
     feature: WorkflowFeature,
     requestOptions: {
       force?: boolean
-      request?: Parameters<typeof fetchCanvasBillingReadiness>[1]
+      request?: CanvasBillingReadinessRequest
     } = {},
   ): Promise<void> {
-    const lastLoadedAt = loadedAt.get(feature) ?? 0
+    const stateKey = buildReadinessStateKey(feature, requestOptions.request)
+    const lastLoadedAt = loadedAt.get(stateKey) ?? 0
     if (!requestOptions.force && lastLoadedAt > 0 && now() - lastLoadedAt < cacheMs) return
-    const existing = pending.get(feature)
+    const existing = pending.get(stateKey)
     if (existing) return existing
 
-    const previous = states[feature]
-    states[feature] = { ...previous, status: 'loading', reason: undefined }
+    const previous = states.get(stateKey) ?? EMPTY_STATES[feature]
+    states.set(stateKey, { ...previous, status: 'loading', reason: undefined })
     const request = fetchReadiness(feature, requestOptions.request)
-      .then(applyReadiness)
+      .then((readiness) => applyReadinessForKey(stateKey, readiness))
       .catch((error: unknown) => {
-        states[feature] = {
+        states.set(stateKey, {
           feature,
           status: 'error',
           reason: normalizeBlockedReason(
             error instanceof Error ? error.message : undefined,
             'Idea计费信息暂不可用',
           ),
-        }
+        })
       })
       .finally(() => {
-        pending.delete(feature)
+        pending.delete(stateKey)
       })
-    pending.set(feature, request)
+    pending.set(stateKey, request)
     return request
   }
 
   return {
     ensureFeature,
-    getFeatureState: (feature) => states[feature],
+    getFeatureState: (feature, request) =>
+      states.get(buildReadinessStateKey(feature, request)) ?? EMPTY_STATES[feature],
     applyReadiness,
   }
 }
@@ -195,5 +219,8 @@ export function useCanvasBillingQuote(
       force: readinessRequest !== undefined,
     })
   })
-  return computed(() => (store ? store.getFeatureState(feature()) : null))
+  return computed(() => {
+    if (!store) return null
+    return store.getFeatureState(feature(), request())
+  })
 }

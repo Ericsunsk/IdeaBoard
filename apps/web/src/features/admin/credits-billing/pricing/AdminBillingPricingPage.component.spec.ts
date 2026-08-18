@@ -55,8 +55,7 @@ describe('AdminBillingPricingPage', () => {
     expect(screen.getByText('生效中')).toBeVisible()
     expect(screen.getByText('已停用')).toBeVisible()
     expect(screen.getByText('已归档')).toBeVisible()
-    expect(screen.getAllByText('1 Idea')).toHaveLength(3)
-    expect(screen.queryByText('1 Ideas')).not.toBeInTheDocument()
+    expect(screen.getAllByText('1')).toHaveLength(3)
     expect(container.querySelector('.columns-1.md\\:columns-2.xl\\:columns-3')).toBeTruthy()
     expect(container.querySelector('.break-inside-avoid')).toBeTruthy()
     expect(container.querySelector('.grid.grid-cols-1.md\\:grid-cols-2.xl\\:grid-cols-3')).toBeNull()
@@ -158,13 +157,12 @@ describe('AdminBillingPricingPage', () => {
 
     const { user } = renderPricingPage()
     await user.click(await screen.findByRole('button', { name: '设置价格' }))
-    expect(screen.getByText('创建新版本，历史版本不变')).toBeVisible()
     const priceInput = screen.getByRole('spinbutton', { name: '固定' })
     await user.type(priceInput, '0')
     expect(priceInput).toHaveValue('0 Ideas')
     await user.click(screen.getByRole('button', { name: '发布价格' }))
 
-    expect(await screen.findByText('0 Ideas')).toBeVisible()
+    expect(await screen.findByText('0')).toBeVisible()
     expect(screen.getAllByText('生效中')).toHaveLength(2)
     expectTextOrder(['局部重绘', '抠图'])
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -245,7 +243,7 @@ describe('AdminBillingPricingPage', () => {
     expect((await screen.findAllByText('publish unavailable')).length).toBeGreaterThan(0)
     expect(screen.getByRole('dialog')).toBeVisible()
     await user.click(screen.getByRole('button', { name: '发布价格' }))
-    expect(await screen.findByText('3 Ideas')).toBeVisible()
+    expect(await screen.findByText('3')).toBeVisible()
     expect(requests).toBe(2)
   })
 
@@ -294,7 +292,7 @@ describe('AdminBillingPricingPage', () => {
     expect(publishRequests).toBe(1)
 
     releasePublish()
-    expect(await screen.findByText('5 Ideas')).toBeVisible()
+    expect(await screen.findByText('5')).toBeVisible()
   })
 
   it('confirms and removes an unreferenced Archived card', async () => {

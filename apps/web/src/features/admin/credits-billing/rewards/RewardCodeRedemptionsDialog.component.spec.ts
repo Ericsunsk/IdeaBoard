@@ -165,14 +165,12 @@ describe('RewardCodeRedemptionsDialog', () => {
     expect(cursors).toEqual([null, '40'])
   })
 
-  it('shows an actionable empty state for a RewardCode with no successful Redemption', async () => {
+  it('shows a compact empty state for a RewardCode with no successful Redemption', async () => {
     useMswHandlers(listHandler([]))
     renderDialog()
 
     expect(await screen.findByText('暂无兑换记录')).toBeVisible()
-    expect(
-      screen.getByText('用户成功兑换后，记录会显示在这里；可关闭窗口继续管理兑换码。'),
-    ).toBeVisible()
+    expect(screen.queryByText(/用户成功兑换后/)).not.toBeInTheDocument()
   })
 
   it('clears cursor and expanded detail when switching to another RewardCode', async () => {
