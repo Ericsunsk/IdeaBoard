@@ -15,6 +15,7 @@ export type AdminUserCommandTarget = {
 
 export type AdminUserRowView = AdminUserCommandTarget & {
   email: string
+  providers: string[]
   availableCredits: number
   availableCreditsLabel: string
   avatarUrl: string
@@ -74,6 +75,7 @@ export function createAdminUserRowView(user: AdminUserListItem): AdminUserRowVie
   return {
     publicId: user.public_id,
     email: user.email ?? '',
+    providers: user.providers ?? ['email'],
     displayName: user.display_name,
     role: user.role,
     status: user.status,

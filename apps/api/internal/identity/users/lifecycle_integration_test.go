@@ -372,6 +372,24 @@ RETURNING id`, authUserID).Scan(&userID); err != nil {
 	}
 }
 
+func TestDirectUserRepositoryInsertProvisionsCreditWalletProjection(t *testing.T) {
+	db, pool := testdb.OpenWithPool(t)
+	ctx := context.Background()
+	repo := NewUserRepository(db)
+	user := &User{DisplayName: "direct-user-insert", Role: "user", Status: 1}
+	if err := repo.Create(ctx, user); err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	balances, err := credits.NewService(pool).GetAvailableBalances(ctx, []int64{user.ID})
+	if err != nil {
+		t.Fatalf("read provisioned wallet balance: %v", err)
+	}
+	if got := balances[user.ID]; got != 0 {
+		t.Fatalf("available balance = %d, want 0", got)
+	}
+}
+
 func TestInitializeExistingBannedIdentityGrantsWelcomeCreditsIntoFrozenWallet(t *testing.T) {
 	_, pool := testdb.OpenWithPool(t)
 	ctx := context.Background()

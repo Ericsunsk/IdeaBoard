@@ -143,6 +143,7 @@ export type GetUserEmailsData = {
 export type AuthUserEmail = {
     auth_user_id: string;
     email: string;
+    providers: Array<string>;
 };
 
 export type SetUserRoleRequest = {

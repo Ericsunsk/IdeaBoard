@@ -147,7 +147,23 @@
 
       <Column field="email" header="Email" :style="{ minWidth: '260px' }">
         <template #body="{ data: user }">
-          <span class="truncate text-admin-body text-admin-text-2">{{ user.email || '-' }}</span>
+          <div class="flex min-w-0 items-center gap-2">
+            <span
+              v-for="provider in user.providers"
+              :key="provider"
+              v-tooltip.top="getAuthProviderLabel(provider)"
+              class="flex size-5 shrink-0 items-center justify-center text-admin-text-3"
+              :aria-label="getAuthProviderLabel(provider)"
+            >
+              <Mail v-if="provider === 'email'" class="size-4" aria-hidden="true" />
+              <Google v-else-if="provider === 'google'" class="size-4" aria-hidden="true" />
+              <Discord v-else-if="provider === 'discord'" class="size-4" aria-hidden="true" />
+              <span v-else class="text-[10px] font-bold uppercase" aria-hidden="true">
+                {{ provider.slice(0, 1) }}
+              </span>
+            </span>
+            <span class="truncate text-admin-body text-admin-text-2">{{ user.email || '-' }}</span>
+          </div>
         </template>
       </Column>
 
@@ -243,7 +259,7 @@
 </template>
 
 <script setup lang="ts">
-import { Refresh, Search, Settings } from '@iconoir/vue'
+import { Discord, Google, Mail, Refresh, Search, Settings } from '@iconoir/vue'
 import { computed, ref } from 'vue'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
@@ -343,5 +359,12 @@ function handleActionSelect(key: string) {
 
 function openWalletDialog(user: AdminUserRowView) {
   walletDialogUser.value = user
+}
+
+function getAuthProviderLabel(provider: string) {
+  if (provider === 'email') return 'Email'
+  if (provider === 'google') return 'Google'
+  if (provider === 'discord') return 'Discord'
+  return provider
 }
 </script>

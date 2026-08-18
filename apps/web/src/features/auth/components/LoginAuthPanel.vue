@@ -16,7 +16,13 @@
         novalidate
         @submit.prevent="handleLogin"
       >
-        <div v-if="enabledSocialProviders.length" class="grid grid-cols-2 gap-3">
+        <div
+          v-if="enabledSocialProviders.length"
+          :class="[
+            'grid gap-3',
+            enabledSocialProviders.length === 1 ? 'grid-cols-1' : 'grid-cols-2',
+          ]"
+        >
           <Button
             v-for="provider in enabledSocialProviders"
             :key="provider"
@@ -31,7 +37,7 @@
             <img
               v-if="providerLogoUrls[provider]"
               :src="providerLogoUrls[provider]"
-              class="size-6"
+              :class="provider === 'discord' ? 'size-6 scale-[1.18]' : 'size-6'"
               alt=""
               aria-hidden="true"
             />

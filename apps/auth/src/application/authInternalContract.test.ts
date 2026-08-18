@@ -60,7 +60,7 @@ function createContractCommands(): AuthInternalCommands {
       return {
         ok: true,
         data: {
-          users: [{ auth_user_id: authUserID, email: "alice@example.com" }],
+          users: [{ auth_user_id: authUserID, email: "alice@example.com", providers: ["email"] }],
         },
       };
     },

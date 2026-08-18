@@ -376,8 +376,9 @@ type AuthRole string
 
 // AuthUserEmail defines model for AuthUserEmail.
 type AuthUserEmail struct {
-	AuthUserID string `json:"auth_user_id"`
-	Email      string `json:"email"`
+	AuthUserID string   `json:"auth_user_id"`
+	Email      string   `json:"email"`
+	Providers  []string `json:"providers"`
 }
 
 // AuthUserRequest defines model for AuthUserRequest.

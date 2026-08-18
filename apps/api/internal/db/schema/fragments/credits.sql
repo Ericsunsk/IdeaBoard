@@ -1493,6 +1493,21 @@ BEGIN
 END;
 $$;
 
+CREATE FUNCTION ensure_credit_wallet_projection_on_user_insert() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_catalog', 'pg_temp'
+    AS $$
+BEGIN
+  PERFORM provision_credit_wallet(NEW.id);
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER ensure_credit_wallet_projection_after_user_insert
+AFTER INSERT ON users
+FOR EACH ROW
+EXECUTE FUNCTION ensure_credit_wallet_projection_on_user_insert();
+
 
 --
 

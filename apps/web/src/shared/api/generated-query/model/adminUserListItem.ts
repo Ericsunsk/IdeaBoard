@@ -9,6 +9,11 @@ export interface AdminUserListItem {
   public_id: string
   email: string
   /**
+   * @minItems 1
+   * @items.minLength 1
+   */
+  providers: string[]
+  /**
    * @minLength 1
    * @maxLength 100
    */

@@ -320,7 +320,17 @@ func TestAdminListUsersFailsWhenCreditWalletBalanceIsIncomplete(t *testing.T) {
 		{
 			name:           "wallet is missing",
 			usernameSuffix: "wallet_missing",
-			setup: func(_ *testing.T, _ *User) {
+			setup: func(t *testing.T, user *User) {
+				if _, err := pool.Exec(t.Context(), `
+DELETE FROM credit_accounts
+WHERE wallet_user_id = $1`, user.ID); err != nil {
+					t.Fatalf("delete wallet accounts failed: %v", err)
+				}
+				if _, err := pool.Exec(t.Context(), `
+DELETE FROM credit_wallets
+WHERE user_id = $1`, user.ID); err != nil {
+					t.Fatalf("delete wallet failed: %v", err)
+				}
 			},
 		},
 		{

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"ideaboard/api/internal/identity/authidentity"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/platform/validation"
 )
@@ -32,7 +33,7 @@ type UserCreditBalanceReader interface {
 }
 
 type UserEmailReader interface {
-	GetUserEmails(context.Context, []string) (map[string]string, error)
+	GetUserEmails(context.Context, []string) (map[string]authidentity.UserIdentity, error)
 }
 
 func NewUserService(
@@ -122,7 +123,7 @@ func (s *UserService) ListUsers(ctx context.Context, req *UserListRequest) (*Use
 		if err != nil {
 			return nil, fmt.Errorf("读取用户Idea余额失败: %w", err)
 		}
-		emails := make(map[string]string)
+		identities := make(map[string]authidentity.UserIdentity)
 		if s.emailReader != nil {
 			authUserIDs := make([]string, 0, len(users))
 			for _, user := range users {
@@ -130,7 +131,7 @@ func (s *UserService) ListUsers(ctx context.Context, req *UserListRequest) (*Use
 					authUserIDs = append(authUserIDs, *user.AuthUserID)
 				}
 			}
-			emails, err = s.emailReader.GetUserEmails(ctx, authUserIDs)
+			identities, err = s.emailReader.GetUserEmails(ctx, authUserIDs)
 			if err != nil {
 				return nil, fmt.Errorf("读取用户邮箱失败: %w", err)
 			}
@@ -140,9 +141,11 @@ func (s *UserService) ListUsers(ctx context.Context, req *UserListRequest) (*Use
 			if !ok {
 				return nil, fmt.Errorf("用户 %d 的Idea余额缺失", user.ID)
 			}
+			identity := identities[authUserIDValue(user.AuthUserID)]
 			list = append(list, &AdminUserListItem{
 				PublicID:         user.PublicID,
-				Email:            userEmail(emails, user.AuthUserID),
+				Email:            identity.Email,
+				Providers:        append([]string(nil), identity.Providers...),
 				DisplayName:      user.DisplayName,
 				Avatar:           user.Avatar,
 				Role:             user.Role,
@@ -160,11 +163,11 @@ func (s *UserService) ListUsers(ctx context.Context, req *UserListRequest) (*Use
 	}, nil
 }
 
-func userEmail(emails map[string]string, authUserID *string) string {
-	if authUserID == nil {
+func authUserIDValue(value *string) string {
+	if value == nil {
 		return ""
 	}
-	return emails[*authUserID]
+	return *value
 }
 
 func normalizeUserListRole(role string) string {

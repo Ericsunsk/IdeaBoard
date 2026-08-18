@@ -814,7 +814,7 @@
       "AuthUserEmail": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["auth_user_id", "email"],
+        "required": ["auth_user_id", "email", "providers"],
         "properties": {
           "auth_user_id": {
             "type": "string",
@@ -822,6 +822,14 @@
           },
           "email": {
             "type": "string"
+          },
+          "providers": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         }
       },

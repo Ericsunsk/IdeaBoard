@@ -21,13 +21,14 @@ type UserRow = {
   name?: unknown;
   role?: unknown;
   emailVerified?: unknown;
+  providers?: unknown;
 };
 
 export type AuthIdentityStore = {
   findUserByEmail(email: string): Promise<InternalUserShape | null>;
   findUserEmailsByIDs(
     authUserIDs: string[],
-  ): Promise<Array<{ auth_user_id: string; email: string }>>;
+  ): Promise<Array<{ auth_user_id: string; email: string; providers: string[] }>>;
   updateAuthUserRole(
     authUserID: string,
     role: "admin" | "user",
@@ -63,17 +64,47 @@ export function createAuthIdentityStore(
 
     async findUserEmailsByIDs(authUserIDs) {
       const result = await database.query(
-        'SELECT id, email FROM "user" WHERE id = ANY($1::text[])',
+        `
+SELECT users.id,
+       users.email,
+       COALESCE(
+         ARRAY_AGG(
+           DISTINCT CASE
+             WHEN accounts."providerId" = 'credential' THEN 'email'
+             ELSE accounts."providerId"
+           END
+           ORDER BY CASE
+             WHEN accounts."providerId" = 'credential' THEN 'email'
+             ELSE accounts."providerId"
+           END
+         ) FILTER (WHERE accounts."providerId" IS NOT NULL),
+         ARRAY['email']::text[]
+       ) AS providers
+FROM "user" users
+LEFT JOIN "account" accounts ON accounts."userId" = users.id
+WHERE users.id = ANY($1::text[])
+GROUP BY users.id, users.email`,
         [authUserIDs],
       );
       return result.rows.flatMap((row) => {
         const candidate = row as UserRow;
+        const providers = Array.isArray(candidate.providers)
+          ? candidate.providers.filter(
+              (provider): provider is string =>
+                typeof provider === "string" && provider.length > 0,
+            )
+          : [];
         if (
           typeof candidate.id !== "string" ||
-          typeof candidate.email !== "string"
+          typeof candidate.email !== "string" ||
+          providers.length === 0
         )
           return [];
-        return [{ auth_user_id: candidate.id, email: candidate.email }];
+        return [{
+          auth_user_id: candidate.id,
+          email: candidate.email,
+          providers,
+        }];
       });
     },
 

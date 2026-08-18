@@ -12,6 +12,7 @@ import (
 
 	"ideaboard/api/internal/identity/auth/internalcontract"
 	"ideaboard/api/internal/identity/autherrors"
+	"ideaboard/api/internal/identity/authidentity"
 	"ideaboard/api/internal/identity/trust"
 	"ideaboard/api/internal/platform/config"
 )
@@ -504,7 +505,7 @@ func (c *ServiceClient) EnsureUser(ctx context.Context, email, displayName, pass
 }
 
 // GetUserEmails resolves a bounded batch of Auth-owned email identities.
-func (c *ServiceClient) GetUserEmails(ctx context.Context, authUserIDs []string) (map[string]string, error) {
+func (c *ServiceClient) GetUserEmails(ctx context.Context, authUserIDs []string) (map[string]authidentity.UserIdentity, error) {
 	client, err := c.contractClient()
 	if err != nil {
 		return nil, err
@@ -523,7 +524,7 @@ func (c *ServiceClient) GetUserEmails(ctx context.Context, authUserIDs []string)
 		ids = append(ids, id)
 	}
 	if len(ids) == 0 {
-		return map[string]string{}, nil
+		return map[string]authidentity.UserIdentity{}, nil
 	}
 	response, err := client.GetUserEmailsWithResponse(ctx, internalcontract.GetUserEmailsJSONRequestBody{UserIds: ids})
 	if err != nil {
@@ -535,15 +536,25 @@ func (c *ServiceClient) GetUserEmails(ctx context.Context, authUserIDs []string)
 	if response.JSON200 == nil || response.JSON200.Code != internalcontract.GetUserEmailsEnvelopeCodeN0 {
 		return nil, fmt.Errorf("auth service get user emails returned an invalid success envelope")
 	}
-	emails := make(map[string]string, len(response.JSON200.Data.Users))
+	identities := make(map[string]authidentity.UserIdentity, len(response.JSON200.Data.Users))
 	for _, user := range response.JSON200.Data.Users {
 		id := strings.TrimSpace(user.AuthUserID)
 		email := strings.TrimSpace(user.Email)
 		if id != "" && email != "" {
-			emails[id] = email
+			providers := make([]string, 0, len(user.Providers))
+			for _, provider := range user.Providers {
+				provider = strings.TrimSpace(provider)
+				if provider != "" {
+					providers = append(providers, provider)
+				}
+			}
+			if len(providers) == 0 {
+				providers = []string{"email"}
+			}
+			identities[id] = authidentity.UserIdentity{Email: email, Providers: providers}
 		}
 	}
-	return emails, nil
+	return identities, nil
 }
 
 func (c *ServiceClient) DeleteUser(ctx context.Context, authUserID string) error {

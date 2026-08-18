@@ -47,8 +47,8 @@ func TestServiceClientAgainstFastify(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUserEmails against Fastify: %v", err)
 	}
-	if emails[authUserID] != "alice@example.com" {
-		t.Fatalf("GetUserEmails response = %+v, want alice@example.com", emails)
+	if emails[authUserID].Email != "alice@example.com" || len(emails[authUserID].Providers) != 1 || emails[authUserID].Providers[0] != "email" {
+		t.Fatalf("GetUserEmails response = %+v, want email identity", emails)
 	}
 
 	assertFastifyMutationSuccess(t, "DeleteUser", func() error {

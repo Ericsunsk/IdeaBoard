@@ -193,9 +193,7 @@ export function storageStatusSeverity(status: StorageStatusClass) {
 }
 
 export function storageSubtitle(storage: StorageCard) {
-  if (storage.provider === 'local') {
-    return '服务器本地 /uploads 目录'
-  }
+  if (storage.provider === 'local') return ''
   return configText(storage, 'bucket_name') || '未配置 Bucket'
 }
 

@@ -26,7 +26,7 @@ export type AuthSessionAPI = {
 export type AuthIdentityMutationStore = {
   findUserEmailsByIDs?: (
     authUserIDs: string[],
-  ) => Promise<Array<{ auth_user_id: string; email: string }>>;
+  ) => Promise<Array<{ auth_user_id: string; email: string; providers: string[] }>>;
   removeAuthUserCascade(authUserID: string): Promise<boolean>;
   updateAuthUserRole(authUserID: string, role: AuthRole): Promise<boolean>;
   updateAuthUserBanState(

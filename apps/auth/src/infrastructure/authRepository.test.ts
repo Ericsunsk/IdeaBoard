@@ -3,6 +3,35 @@ import { describe, it } from "node:test";
 import { createAuthIdentityStore } from "./authRepository.js";
 
 describe("AuthIdentityStore", () => {
+  it("reads linked login providers with each email identity", async () => {
+    const store = createAuthIdentityStore({
+      async query() {
+        return {
+          rows: [
+            {
+              id: "auth-user-1",
+              email: "user@example.com",
+              providers: ["discord", "email"],
+            },
+          ],
+          rowCount: 1,
+        };
+      },
+      async connect() {
+        throw new Error("not used");
+      },
+    });
+
+    assert.deepEqual(
+      await store.findUserEmailsByIDs(["auth-user-1"]),
+      [{
+        auth_user_id: "auth-user-1",
+        email: "user@example.com",
+        providers: ["discord", "email"],
+      }],
+    );
+  });
+
   it("reads identities through the injected database", async () => {
     const queries: Array<{ text: string; values?: unknown[] }> = [];
     const store = createAuthIdentityStore({

@@ -153,6 +153,7 @@ describe('Social OAuth entry points', () => {
     const googleButton = await screen.findByRole('button', { name: '使用 Google 登录' })
     expect(googleButton).toHaveTextContent('')
     expect(googleButton.querySelector('img')).toHaveAttribute('alt', '')
+    expect(googleButton.parentElement).toHaveClass('grid-cols-1')
     expect(screen.queryByText('或')).not.toBeInTheDocument()
     await view.user.click(googleButton)
 

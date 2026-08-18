@@ -64,6 +64,7 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
       authUserIDs.map((auth_user_id) => ({
         auth_user_id,
         email: `${auth_user_id}@example.com`,
+        providers: ["email"],
       })),
     finalizeTrustedRegistrationIdentity: async () => true,
     updateAuthUserRole: async () => true,

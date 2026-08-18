@@ -85,7 +85,10 @@
               <div class="truncate text-admin-title-sm font-bold text-admin-title-color">
                 {{ card.storage.name }}
               </div>
-              <div class="truncate text-admin-meta font-medium text-admin-subtitle-color">
+              <div
+                v-if="card.subtitle"
+                class="truncate text-admin-meta font-medium text-admin-subtitle-color"
+              >
                 {{ card.subtitle }}
               </div>
             </div>

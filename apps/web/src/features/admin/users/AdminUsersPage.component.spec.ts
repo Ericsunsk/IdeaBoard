@@ -46,6 +46,7 @@ describe('AdminUsersPage', () => {
               {
                 public_id: userPublicID,
                 email: 'admin@example.com',
+                providers: ['email'],
                 display_name: 'admin_balance_user',
                 avatar: '',
                 role: 'user',
@@ -318,7 +319,11 @@ describe('AdminUsersPage', () => {
       ),
       http.post('/api/admin/credits/deductions', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>
-        expect(body).toMatchObject({ user_public_id: userPublicID, amount_credits: 25, reason: '运营扣减' })
+        expect(body).toMatchObject({
+          user_public_id: userPublicID,
+          amount_credits: 25,
+          reason: '运营扣减',
+        })
         availableCredits = 100
         hasDeduction = true
         return HttpResponse.json({
@@ -567,7 +572,11 @@ describe('AdminUsersPage', () => {
             admin_count: 0,
             list: [
               makeUser(125),
-              { ...makeUser(55), public_id: '00000000-0000-0000-0000-000000000013', display_name: 'another_balance_user' },
+              {
+                ...makeUser(55),
+                public_id: '00000000-0000-0000-0000-000000000013',
+                display_name: 'another_balance_user',
+              },
             ],
           },
         }),
@@ -577,8 +586,14 @@ describe('AdminUsersPage', () => {
           code: 0,
           msg: 'ok',
           data: {
-            public_id: String(params.publicId) === userPublicID ? userPublicID : '00000000-0000-0000-0000-000000000013',
-            display_name: String(params.publicId) === userPublicID ? 'admin_balance_user' : 'another_balance_user',
+            public_id:
+              String(params.publicId) === userPublicID
+                ? userPublicID
+                : '00000000-0000-0000-0000-000000000013',
+            display_name:
+              String(params.publicId) === userPublicID
+                ? 'admin_balance_user'
+                : 'another_balance_user',
             status: 'active',
             available_credits: params.publicId === userPublicID ? 125 : 55,
             reserved_credits: 0,
@@ -710,6 +725,7 @@ function makeUser(availableCredits: number) {
   return {
     public_id: userPublicID,
     email: 'admin@example.com',
+    providers: ['email'],
     display_name: 'admin_balance_user',
     avatar: '',
     role: 'user',
