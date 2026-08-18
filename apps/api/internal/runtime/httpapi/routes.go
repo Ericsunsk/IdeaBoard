@@ -58,9 +58,15 @@ type UploadResourceReader interface {
 	ReadUploadResourceByURL(context.Context, string, int64) (*storage.StoredUploadObject, error)
 }
 
+type ImagePreviewStore interface {
+	ReadImagePreview(context.Context, string, int, int64) (*storage.StoredUploadObject, bool, error)
+	StoreImagePreview(context.Context, string, int, []byte, string) error
+}
+
 type UploadDownloadDeps struct {
-	Reader     UploadResourceReader
-	ReadAccess storage.ReadableUploadAccess
+	Reader       UploadResourceReader
+	PreviewStore ImagePreviewStore
+	ReadAccess   storage.ReadableUploadAccess
 }
 
 type StaticUploadDeps struct {
@@ -115,6 +121,7 @@ const (
 	RouteUserProfileAvatar        = "/profile/avatar"
 	RouteUserBoardUploads         = "/boards/:board_id/uploads"
 	RouteUserDownload             = "/download"
+	RouteUserImagePreview         = "/image-preview"
 	RouteAdminUpload              = "/upload"
 	RouteAdminSettingsBranding    = "/settings/branding"
 	RouteAdminSettingsMediaUpload = "/settings/media-upload"

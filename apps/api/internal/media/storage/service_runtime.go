@@ -3,8 +3,10 @@ package storage
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"mime/multipart"
 	"net/url"
 	"os"
@@ -267,7 +269,57 @@ func (s *StorageService) DeleteObjectByStorageProfile(ctx context.Context, stora
 	if err != nil {
 		return err
 	}
+	previewPrefix, err := imagePreviewObjectPrefix(objectKey)
+	if err != nil {
+		return err
+	}
+	if err := adapter.DeleteByPrefix(ctx, profile, previewPrefix); err != nil {
+		return fmt.Errorf("删除图片派生文件失败: %w", err)
+	}
 	return adapter.Delete(ctx, profile, objectKey)
+}
+
+func (s *StorageService) ReadImagePreview(ctx context.Context, sourceURL string, maxSide int, maxBytes int64) (*StoredUploadObject, bool, error) {
+	profile, key, err := s.resolveImagePreviewTarget(ctx, sourceURL, maxSide)
+	if err != nil {
+		return nil, false, err
+	}
+	adapter, err := s.adapterRegistry.get(profile.Provider)
+	if err != nil {
+		return nil, false, err
+	}
+	object, err := adapter.Read(ctx, profile, key, maxBytes)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, errStoredObjectNotFound) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return object, true, nil
+}
+
+func (s *StorageService) StoreImagePreview(ctx context.Context, sourceURL string, maxSide int, data []byte, contentType string) error {
+	profile, key, err := s.resolveImagePreviewTarget(ctx, sourceURL, maxSide)
+	if err != nil {
+		return err
+	}
+	adapter, err := s.adapterRegistry.get(profile.Provider)
+	if err != nil {
+		return err
+	}
+	return adapter.PutObject(ctx, profile, key, data, contentType)
+}
+
+func (s *StorageService) resolveImagePreviewTarget(ctx context.Context, sourceURL string, maxSide int) (*StorageProfile, string, error) {
+	profile, sourceKey, err := s.resolveStoredUploadTarget(ctx, sourceURL)
+	if err != nil {
+		return nil, "", err
+	}
+	key, err := imagePreviewObjectKey(sourceKey, maxSide)
+	if err != nil {
+		return nil, "", err
+	}
+	return profile, key, nil
 }
 
 func (s *StorageService) deleteUploadObjectPrefix(ctx context.Context, prefix string) error {
@@ -597,6 +649,38 @@ func (s *StorageService) saveReaderLocalRef(ctx context.Context, filename string
 		MIMEType:       contentType,
 		SizeBytes:      size,
 	}, nil
+}
+
+func (s *StorageService) putLocalObject(objectKey string, data []byte) error {
+	normalized, err := normalizeUploadObjectKey(objectKey)
+	if err != nil {
+		return err
+	}
+	destination := filepath.FromSlash(normalized)
+	if err := os.MkdirAll(filepath.Dir(destination), 0700); err != nil {
+		return fmt.Errorf("创建派生图片目录失败: %w", err)
+	}
+	temporary, err := os.CreateTemp(filepath.Dir(destination), ".preview-*")
+	if err != nil {
+		return fmt.Errorf("创建派生图片临时文件失败: %w", err)
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(0600); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("设置派生图片权限失败: %w", err)
+	}
+	if _, err := temporary.Write(data); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("保存派生图片失败: %w", err)
+	}
+	if err := temporary.Close(); err != nil {
+		return fmt.Errorf("保存派生图片失败: %w", err)
+	}
+	if err := os.Rename(temporaryPath, destination); err != nil {
+		return fmt.Errorf("发布派生图片失败: %w", err)
+	}
+	return nil
 }
 
 type storageCopyWriter struct {

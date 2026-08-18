@@ -124,6 +124,49 @@ describe('useDisplayImagePreview', () => {
     scope.stop()
   })
 
+  it('uses the server preview for managed uploads before decoding an original', async () => {
+    const sourceUrl = ref('/uploads/canvas/U123/board/content/image.png')
+    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview(sourceUrl, {
+        maxSide: 640,
+      }),
+    )
+    if (!preview) throw new Error('preview composable was not created')
+
+    expect(preview.displayUrl.value).toBe('')
+
+    await vi.waitFor(() => {
+      expect(preview.displayUrl.value).toBe('blob:5')
+    })
+
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '/api/user/image-preview?url=%2Fuploads%2Fcanvas%2FU123%2Fboard%2Fcontent%2Fimage.png&max_side=640',
+      ),
+      { credentials: 'include' },
+    )
+    expect(createImageBitmap).not.toHaveBeenCalled()
+    expect(flowMediaIOMocks.canvasToBlob).not.toHaveBeenCalled()
+    scope.stop()
+  })
+
+  it('falls back to the original managed upload only after the server preview fails', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({ ok: false } as Response)
+    const sourceUrl = ref('/uploads/canvas/U123/board/content/fallback.png')
+    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const scope = effectScope()
+    const preview = scope.run(() => useDisplayImagePreview(sourceUrl, { maxSide: 640 }))
+    if (!preview) throw new Error('preview composable was not created')
+
+    expect(preview.displayUrl.value).toBe('')
+    await vi.waitFor(() => {
+      expect(preview.displayUrl.value).toContain('/uploads/canvas/U123/board/content/fallback.png')
+    })
+    scope.stop()
+  })
+
   it('resolves upload refs before the first image render', async () => {
     vi.stubEnv('VITE_PUBLIC_ASSET_BASE_URL', 'https://assets.example.com')
     vi.resetModules()

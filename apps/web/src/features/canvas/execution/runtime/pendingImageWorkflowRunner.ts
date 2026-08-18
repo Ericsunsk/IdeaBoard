@@ -1,6 +1,13 @@
 import { isTaskResultPendingError, TaskCancelledError } from '../../../../shared/api/taskEvents'
+import {
+  IMAGE_GENERATION_FAILURE_MESSAGE,
+  IMAGE_GENERATION_SUCCESS_MESSAGE,
+} from '../../../../shared/constants/media'
 import type { SubmitTaskData } from '../../../../shared/api/task'
-import type { ImageExecutionInput, ImageExecutionResultOptions } from '../planning/ImageExecutionPlan'
+import type {
+  ImageExecutionInput,
+  ImageExecutionResultOptions,
+} from '../planning/ImageExecutionPlan'
 import type { ResolvedTaskImageResult } from '../result-nodes/resolvedTaskImageResult'
 import type { PendingImageResultExecution } from '../result-nodes/usePendingImageResultNodes'
 import {
@@ -39,9 +46,6 @@ export type PendingImageWorkflowIntent = {
   taskRequest: SubmitTaskData
   readinessRequest?: SubmitTaskData
   fallbackRatio: number
-  successMessage?: string
-  fallbackErrorMessage: string
-  formatErrorMessage?: (error: Error) => string
 }
 
 export type PendingImageWorkflowRunner = {
@@ -63,9 +67,8 @@ export type PendingImageWorkflowRunnerOptions = {
   onError?: (error: unknown) => boolean
 }
 
-function errorMessage(error: unknown, intent: PendingImageWorkflowIntent): string {
-  if (!(error instanceof Error)) return intent.fallbackErrorMessage
-  return intent.formatErrorMessage?.(error) ?? error.message
+function errorMessage(): string {
+  return IMAGE_GENERATION_FAILURE_MESSAGE
 }
 
 function releasedResultNodeIds(
@@ -93,16 +96,19 @@ export function createPendingImageWorkflowRunner(
         const submission = await options.taskTransport.submit(
           intent.taskRequest,
           actionId,
-          intent.fallbackErrorMessage,
+          IMAGE_GENERATION_FAILURE_MESSAGE,
         )
         const applied = leases.filter(
-          (lease) => options.executionCore.markSubmitted(lease, submission.taskId, actionId).kind === 'applied',
+          (lease) =>
+            options.executionCore.markSubmitted(lease, submission.taskId, actionId).kind ===
+            'applied',
         )
         if (applied.length !== leases.length) {
           const release = options.executionCore.release(applied)
           options.cancelTasks([submission.taskId, ...release.cancellableTaskIds])
           const releasedNodeIds = releasedResultNodeIds(release)
-          if (releasedNodeIds.length > 0) options.pendingResults.removePendingResults(releasedNodeIds)
+          if (releasedNodeIds.length > 0)
+            options.pendingResults.removePendingResults(releasedNodeIds)
           throw new TaskCancelledError('Canvas execution lease is no longer current')
         }
         options.pendingResults.attachPendingTaskIds(
@@ -128,7 +134,7 @@ export function createPendingImageWorkflowRunner(
     try {
       await options.taskTransport.assertReady(
         intent.readinessRequest ?? intent.taskRequest,
-        intent.fallbackErrorMessage,
+        IMAGE_GENERATION_FAILURE_MESSAGE,
       )
       if (!options.executionCore.isAttachmentCurrent(intent.attachment)) return
 
@@ -139,7 +145,10 @@ export function createPendingImageWorkflowRunner(
         resultOptions: intent.resultOptions,
       }).resultNodeIds
       leases = resultNodeIds.flatMap((resultNodeId) => {
-        const started = options.executionCore.begin(intent.attachment, resultNodeId as `image-${number}`)
+        const started = options.executionCore.begin(
+          intent.attachment,
+          resultNodeId as `image-${number}`,
+        )
         return started.kind === 'started' ? [started.lease] : []
       })
       if (leases.length !== resultNodeIds.length) {
@@ -159,7 +168,8 @@ export function createPendingImageWorkflowRunner(
       if (!options.executionCore.isAttachmentCurrent(intent.attachment)) return
 
       const resolved = attempts.flatMap((attempt) =>
-        attempt.status === 'fulfilled' && options.executionCore.isCurrent(attempt.value.lease, taskId)
+        attempt.status === 'fulfilled' &&
+        options.executionCore.isCurrent(attempt.value.lease, taskId)
           ? [attempt.value]
           : [],
       )
@@ -177,27 +187,31 @@ export function createPendingImageWorkflowRunner(
       if (failedLeases.length > 0) {
         options.pendingResults.removePendingResults(failedLeases.map((lease) => lease.resultNodeId))
       }
-      const materialized = resolved.length > 0 ? options.executionCore.materializeBatch(resolved) : null
+      const materialized =
+        resolved.length > 0 ? options.executionCore.materializeBatch(resolved) : null
       const successCount = materialized?.changedNodeIds.length ?? 0
       if (successCount > 0) {
-        options.onSuccess(
-          intent.successMessage ?? (successCount > 1 ? `生成完成（${successCount} 张）` : '生成完成'),
-        )
+        options.onSuccess(IMAGE_GENERATION_SUCCESS_MESSAGE)
       }
       if (pending.length > 0) options.onWarning('任务进行中，稍后可在画布上查看结果')
       if (failures.length > 0) {
         const firstFailure = failures[0]
-        const handled = firstFailure?.status === 'rejected' && options.onError?.(firstFailure.reason)
-        if (!handled) options.onWarning(errorMessage(firstFailure?.status === 'rejected' ? firstFailure.reason : null, intent))
+        const handled =
+          firstFailure?.status === 'rejected' && options.onError?.(firstFailure.reason)
+        if (!handled) options.onWarning(errorMessage())
       }
     } catch (error) {
-      const release = error instanceof TaskCancelledError ? options.executionCore.cancel(leases) : options.executionCore.release(leases)
+      const release =
+        error instanceof TaskCancelledError
+          ? options.executionCore.cancel(leases)
+          : options.executionCore.release(leases)
       options.cancelTasks(release.cancellableTaskIds)
       const releasedNodeIds = releasedResultNodeIds(release)
       if (releasedNodeIds.length > 0) options.pendingResults.removePendingResults(releasedNodeIds)
-      const handled = options.executionCore.isAttachmentCurrent(intent.attachment) && options.onError?.(error)
+      const handled =
+        options.executionCore.isAttachmentCurrent(intent.attachment) && options.onError?.(error)
       if (!handled && options.executionCore.isAttachmentCurrent(intent.attachment)) {
-        options.onWarning(errorMessage(error, intent))
+        options.onWarning(errorMessage())
       }
     }
   }

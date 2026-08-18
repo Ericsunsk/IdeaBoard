@@ -2,6 +2,7 @@ import { resolveApiUrl } from '../config/runtimeUrls'
 
 export const ADMIN_UPLOAD_ENDPOINT = resolveApiUrl('/admin/upload')
 export const USER_DOWNLOAD_ENDPOINT = resolveApiUrl('/user/download')
+export const IMAGE_PREVIEW_ENDPOINT = resolveApiUrl('/user/image-preview')
 
 export const SUPPORTED_IMAGE_UPLOAD_MIME_TYPES = [
   'image/jpeg',
@@ -28,3 +29,5 @@ export const IMAGE_UPLOAD_FORMAT_LABEL = 'JPG / PNG / GIF / BMP / WEBP'
 export const DEFAULT_IMAGE_DOWNLOAD_NAME = 'image.png'
 export const UPLOAD_SUCCESS_MESSAGE = '上传成功'
 export const UPLOAD_FAILED_MESSAGE = '上传失败'
+export const IMAGE_GENERATION_SUCCESS_MESSAGE = '图片已生成'
+export const IMAGE_GENERATION_FAILURE_MESSAGE = '图片生成失败'

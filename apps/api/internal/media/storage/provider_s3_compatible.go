@@ -429,6 +429,38 @@ func (s *S3CompatibleService) uploadBytesWithConfigRef(ctx context.Context, file
 	return ref, nil
 }
 
+func (s *S3CompatibleService) putBytesAtKeyWithConfig(ctx context.Context, objectKey string, data []byte, contentType string, cfg *S3CompatibleConfig) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	client, err := s.prepareUploadClient(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	key := strings.TrimSpace(objectKey)
+	if key == "" {
+		return fmt.Errorf("文件路径不能为空")
+	}
+	if strings.TrimSpace(contentType) == "" {
+		contentType = "application/octet-stream"
+	}
+	body := bytes.NewReader(data)
+	if err := s.putObjectWithRetry(ctx, cfg, body, func(attemptCtx context.Context) error {
+		_, putErr := client.PutObject(
+			attemptCtx,
+			strings.TrimSpace(cfg.BucketName),
+			key,
+			body,
+			int64(len(data)),
+			minio.PutObjectOptions{ContentType: contentType},
+		)
+		return putErr
+	}); err != nil {
+		return fmt.Errorf("上传派生图片失败: %w", err)
+	}
+	return nil
+}
+
 func (s *S3CompatibleService) uploadReaderWithConfig(ctx context.Context, filename string, contentType string, body io.Reader, size int64, cfg *S3CompatibleConfig, opts StorageStoreOptions) (string, error) {
 	ref, err := s.uploadReaderWithConfigRef(ctx, filename, contentType, body, size, cfg, opts)
 	if err != nil {
@@ -608,6 +640,9 @@ func (s *S3CompatibleService) readDeliveryObject(ctx context.Context, key string
 		return nil, fmt.Errorf("读取文件失败: %w", err)
 	}
 	defer response.Body.Close()
+	if response.StatusCode == http.StatusNotFound {
+		return nil, errStoredObjectNotFound
+	}
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("读取文件失败: 访问域名返回 HTTP %d", response.StatusCode)
 	}

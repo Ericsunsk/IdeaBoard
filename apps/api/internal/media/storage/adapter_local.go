@@ -58,6 +58,13 @@ func (a *localStorageAdapter) DeleteByPrefix(ctx context.Context, profile *Stora
 	return a.service.deleteLocalByPrefix(objectKeyPrefix)
 }
 
+func (a *localStorageAdapter) PutObject(ctx context.Context, profile *StorageProfile, objectKey string, data []byte, contentType string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return a.service.putLocalObject(objectKey, data)
+}
+
 func (a *localStorageAdapter) StoreBytes(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err

@@ -25,10 +25,7 @@ import {
 import { buildImageExecutionTaskRequest } from '../commands/flowImageTaskRequests'
 import type { FlowToCanvasBoardSnapshotOptions } from '../../utils/flowSnapshotAdapter'
 import { createPendingImageWorkflowRunner } from '../runtime/pendingImageWorkflowRunner'
-import {
-  type PendingImageExecutionCore,
-  collectPendingImageTasks,
-} from '../pending-execution'
+import { type PendingImageExecutionCore, collectPendingImageTasks } from '../pending-execution'
 import {
   defaultCanvasTaskSubmissionAdapter,
   type CanvasTaskSubmissionAdapter,
@@ -155,7 +152,6 @@ export function useCanvasExecutionWorkspace(
       taskRequest,
       readinessRequest: taskRequest,
       fallbackRatio: plan.source.ratio,
-      fallbackErrorMessage: '生成失败',
     })
   }
 

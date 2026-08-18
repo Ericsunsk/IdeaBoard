@@ -4,6 +4,7 @@ import {
 } from '../image-editor/services/imageAdjustmentRenderer'
 import { useMaskEditorChromeActions } from '../mask-editor/composables/useMaskEditorChromeActions'
 import { isCanvasGraphNodeId } from '../graph-runtime'
+import { IMAGE_GENERATION_SUCCESS_MESSAGE } from '../../../shared/constants/media'
 import type { ImageToolChromeCommands } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
 
@@ -77,7 +78,7 @@ export function createImageToolCommands(session: ImageToolSession) {
       }
       session.exitImageEditorMode({ runBeforeExit: false })
       session.imageEditorSession.resetImageEditorSession()
-      feedback.succeeded('已应用编辑并派生新节点')
+      feedback.succeeded(IMAGE_GENERATION_SUCCESS_MESSAGE)
     } catch (error) {
       if (
         isImageAdjustmentFinalApplyCancelled(error) ||

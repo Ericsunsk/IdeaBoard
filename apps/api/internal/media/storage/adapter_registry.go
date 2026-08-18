@@ -15,6 +15,7 @@ type storageProviderAdapter interface {
 	UploadRef(ctx context.Context, profile *StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (*StoredUploadRef, error)
 	Delete(ctx context.Context, profile *StorageProfile, objectKey string) error
 	DeleteByPrefix(ctx context.Context, profile *StorageProfile, objectKeyPrefix string) error
+	PutObject(ctx context.Context, profile *StorageProfile, objectKey string, data []byte, contentType string) error
 	StoreBytes(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error)
 	StoreRemote(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error)
 	StoreBytesRef(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (*StoredUploadRef, error)

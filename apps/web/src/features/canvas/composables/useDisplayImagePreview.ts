@@ -8,6 +8,7 @@ import {
   type MaybeRefOrGetter,
 } from 'vue'
 import { canvasToBlob, resolveFetchUrl } from '../services/flowMediaIO'
+import { IMAGE_PREVIEW_ENDPOINT } from '../../../shared/constants/media'
 import {
   detectCanvasTransparency,
   resolvePreviewMimeType,
@@ -89,12 +90,18 @@ function enqueuePreviewTask<T>(taskFactory: () => Promise<T>): Promise<T> {
 }
 
 async function createPreviewObjectUrl(sourceUrl: string, maxSide: number): Promise<string | null> {
-  const fetchUrl = resolveFetchUrl(sourceUrl)
+  const canonicalSourceUrl = canonicalizeRuntimeUploadRef(sourceUrl.trim()).trim()
+  const serverPreviewUrl = canonicalSourceUrl.startsWith('/uploads/')
+    ? `${IMAGE_PREVIEW_ENDPOINT}?url=${encodeURIComponent(canonicalSourceUrl)}&max_side=${maxSide}`
+    : null
+  const fetchUrl = serverPreviewUrl ?? resolveFetchUrl(sourceUrl)
   if (!fetchUrl) return null
   const response = await fetch(fetchUrl, { credentials: 'include' })
   if (!response.ok) return null
   const sourceBlob = await response.blob()
   if (!sourceBlob.type.startsWith('image/')) return null
+
+  if (serverPreviewUrl) return URL.createObjectURL(sourceBlob)
 
   const bitmap = await createImageBitmap(sourceBlob)
   const longestSide = Math.max(bitmap.width, bitmap.height)
@@ -155,35 +162,47 @@ export function useDisplayImagePreview(
   sourceUrl: MaybeRefOrGetter<string | null | undefined>,
   options: PreviewOptions = {},
 ) {
-  const resolvedSourceUrl = computed(() => {
+  const canonicalSourceUrl = computed(() => {
     const raw = toValue(sourceUrl)
-    if (!raw) return ''
-    return resolveAssetUrl(canonicalizeRuntimeUploadRef(raw.trim()))
+    return raw ? canonicalizeRuntimeUploadRef(raw.trim()).trim() : ''
   })
-  const readMaxSide = () => resolvePreviewMaxSide(toValue(options.maxSide))
+  const isManagedUpload = computed(() => canonicalSourceUrl.value.startsWith('/uploads/'))
+  const resolvedSourceUrl = computed(() => {
+    return canonicalSourceUrl.value ? resolveAssetUrl(canonicalSourceUrl.value) : ''
+  })
+  const resolvedMaxSide = computed(() => resolvePreviewMaxSide(toValue(options.maxSide)))
   const previewUrl = ref<string | null>(null)
+  const isResolved = ref(false)
   let requestToken = 0
+  let activeSource = ''
 
   watch(
-    [() => resolvedSourceUrl.value, readMaxSide],
+    [() => resolvedSourceUrl.value, () => resolvedMaxSide.value],
     ([currentSource, maxSide]) => {
       requestToken += 1
       const token = requestToken
-      previewUrl.value = null
+      if (currentSource !== activeSource) previewUrl.value = null
+      activeSource = currentSource
+      isResolved.value = false
 
       if (!currentSource) return
-      if (maxSide === null) return
+      if (maxSide === null) {
+        previewUrl.value = null
+        return
+      }
 
       const cacheKey = buildPreviewCacheKey(currentSource, maxSide)
       const cached = getCachedPreviewUrl(cacheKey)
       if (cached) {
         previewUrl.value = cached
+        isResolved.value = true
         return
       }
 
       void getOrCreatePreviewUrl(currentSource, maxSide).then((generatedPreviewUrl) => {
         if (token !== requestToken) return
         previewUrl.value = generatedPreviewUrl
+        isResolved.value = true
       })
     },
     { immediate: true },
@@ -195,7 +214,11 @@ export function useDisplayImagePreview(
     })
   }
 
-  const displayUrl = computed(() => previewUrl.value || resolvedSourceUrl.value || '')
+  const displayUrl = computed(() => {
+    if (previewUrl.value) return previewUrl.value
+    if (isManagedUpload.value && resolvedMaxSide.value !== null && !isResolved.value) return ''
+    return resolvedSourceUrl.value
+  })
 
   return {
     displayUrl,

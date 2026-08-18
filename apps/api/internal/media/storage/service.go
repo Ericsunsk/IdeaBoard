@@ -7,6 +7,8 @@ import (
 
 var errProviderHTTPSUnavailable = errors.New("storage profile does not expose a provider HTTPS URL")
 
+var errStoredObjectNotFound = errors.New("stored object not found")
+
 type StorageStoreOptions struct {
 	DirPrefix  string
 	AllowHosts []string

@@ -9,21 +9,35 @@ import type { PendingImageWorkflowTaskTransport } from './pendingImageWorkflowRu
 
 function createHarness(taskIds: readonly string[] = ['task-1']) {
   const snapshot = createEmptyCanvasBoardSnapshot()
-  snapshot.imageNodes = taskIds.map((taskId, index) => ({
-    id: index + 1, type: 'image-node', x: index * 320, y: 0, width: 280,
-    sourceImageUrl: '', sourceImageRatio: 1, pendingTaskId: taskId, pendingResultIndex: index,
-    outputStatus: 'running', outputImages: [],
-  }) satisfies ImageNodeItem)
+  snapshot.imageNodes = taskIds.map(
+    (taskId, index) =>
+      ({
+        id: index + 1,
+        type: 'image-node',
+        x: index * 320,
+        y: 0,
+        width: 280,
+        sourceImageUrl: '',
+        sourceImageRatio: 1,
+        pendingTaskId: taskId,
+        pendingResultIndex: index,
+        outputStatus: 'running',
+        outputImages: [],
+      }) satisfies ImageNodeItem,
+  )
   const store = CanvasGraphStore.fromSnapshot(snapshot)
   const core = createPendingImageExecutionCore()
-  const attachment = core.attachBoard(CanvasBoardGraphSession.create('board-a', { createGraphStore: () => store }))
-  const pendingResults = {
-    reservePendingResults: vi.fn(() => ({ resultNodeIds: taskIds.map((_, index) => `image-${index + 1}`) })),
-    attachPendingTaskIds: vi.fn(), removePendingResults: vi.fn(),
-  }
-  const assertReady = vi.fn<PendingImageWorkflowTaskTransport['assertReady']>(
-    async () => undefined,
+  const attachment = core.attachBoard(
+    CanvasBoardGraphSession.create('board-a', { createGraphStore: () => store }),
   )
+  const pendingResults = {
+    reservePendingResults: vi.fn(() => ({
+      resultNodeIds: taskIds.map((_, index) => `image-${index + 1}`),
+    })),
+    attachPendingTaskIds: vi.fn(),
+    removePendingResults: vi.fn(),
+  }
+  const assertReady = vi.fn<PendingImageWorkflowTaskTransport['assertReady']>(async () => undefined)
   const submit = vi.fn<PendingImageWorkflowTaskTransport['submit']>(async () => ({
     taskId: 'task-1',
   }))
@@ -36,13 +50,22 @@ function createHarness(taskIds: readonly string[] = ['task-1']) {
   const transport = { assertReady, submit, resolve }
   const cancelTasks = vi.fn()
   const runner = createPendingImageWorkflowRunner({
-    executionCore: core, pendingResults, taskTransport: transport, cancelTasks,
-    onSuccess: vi.fn(), onWarning: vi.fn(), createClientActionId: () => 'action-1',
+    executionCore: core,
+    pendingResults,
+    taskTransport: transport,
+    cancelTasks,
+    onSuccess: vi.fn(),
+    onWarning: vi.fn(),
+    createClientActionId: () => 'action-1',
   })
   const intent = {
-    attachment, source: { url: 'https://example.com/input.png', ratio: 1 }, sourceNodeId: 'image-0',
-    outputCount: taskIds.length, taskRequest: {} as never, readinessRequest: {} as never,
-    fallbackRatio: 1, fallbackErrorMessage: '生成失败',
+    attachment,
+    source: { url: 'https://example.com/input.png', ratio: 1 },
+    sourceNodeId: 'image-0',
+    outputCount: taskIds.length,
+    taskRequest: {} as never,
+    readinessRequest: {} as never,
+    fallbackRatio: 1,
   }
   return { attachment, cancelTasks, core, intent, pendingResults, runner, store, transport }
 }
@@ -51,13 +74,22 @@ describe('pendingImageWorkflowRunner', () => {
   it('executes one shared prepared intent through stable transport adapters', async () => {
     const harness = createHarness(['task-1', 'task-1'])
     await harness.runner.execute(harness.intent)
-    expect(harness.transport.assertReady).toHaveBeenCalledWith(harness.intent.readinessRequest, '生成失败')
-    expect(harness.transport.submit).toHaveBeenCalledWith(harness.intent.taskRequest, 'action-1', '生成失败')
+    expect(harness.transport.assertReady).toHaveBeenCalledWith(
+      harness.intent.readinessRequest,
+      '图片生成失败',
+    )
+    expect(harness.transport.submit).toHaveBeenCalledWith(
+      harness.intent.taskRequest,
+      'action-1',
+      '图片生成失败',
+    )
     expect(harness.pendingResults.attachPendingTaskIds).toHaveBeenCalledWith([
       { resultNodeId: 'image-1', resultIndex: 0, taskId: 'task-1', clientActionId: 'action-1' },
       { resultNodeId: 'image-2', resultIndex: 1, taskId: 'task-1', clientActionId: 'action-1' },
     ])
-    expect(harness.core.snapshot().executions.every((fact) => fact.status === 'succeeded')).toBe(true)
+    expect(harness.core.snapshot().executions.every((fact) => fact.status === 'succeeded')).toBe(
+      true,
+    )
   })
 
   it('does not reserve when the injected readiness transport rejects', async () => {
@@ -74,7 +106,10 @@ describe('pendingImageWorkflowRunner', () => {
       .mockResolvedValueOnce({ taskId: 'task-1' })
     harness.transport.resolve.mockRejectedValueOnce(new TaskResultPendingError())
     await harness.runner.execute(harness.intent)
-    expect(harness.transport.submit.mock.calls.map((call) => call[1])).toEqual(['action-1', 'action-1'])
+    expect(harness.transport.submit.mock.calls.map((call) => call[1])).toEqual([
+      'action-1',
+      'action-1',
+    ])
     expect(harness.core.factFor('image-1')).toMatchObject({ status: 'running', taskId: 'task-1' })
     expect(harness.pendingResults.removePendingResults).not.toHaveBeenCalled()
   })
@@ -82,9 +117,16 @@ describe('pendingImageWorkflowRunner', () => {
   it('does not remove a superseding slot after a stale failure or late submit', async () => {
     const harness = createHarness()
     let resolveSubmit!: (value: { taskId: string }) => void
-    harness.transport.submit.mockImplementationOnce(() => new Promise((resolve) => { resolveSubmit = resolve }))
+    harness.transport.submit.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveSubmit = resolve
+        }),
+    )
     const running = harness.runner.execute(harness.intent)
-    await vi.waitFor(() => expect(harness.pendingResults.reservePendingResults).toHaveBeenCalledOnce())
+    await vi.waitFor(() =>
+      expect(harness.pendingResults.reservePendingResults).toHaveBeenCalledOnce(),
+    )
     const superseding = harness.core.begin(harness.attachment, 'image-1')
     if (superseding.kind !== 'started') throw new Error('Expected superseding execution')
     harness.core.markSubmitted(superseding.lease, 'task-new', 'action-task-new')
@@ -96,7 +138,9 @@ describe('pendingImageWorkflowRunner', () => {
 
   it('keeps pending nodes when graph materialization fails so reattach can recover them', async () => {
     const harness = createHarness()
-    vi.spyOn(harness.store, 'beginTransaction').mockImplementation(() => { throw new Error('graph write failed') })
+    vi.spyOn(harness.store, 'beginTransaction').mockImplementation(() => {
+      throw new Error('graph write failed')
+    })
     await harness.runner.execute(harness.intent)
     expect(harness.core.factFor('image-1')).toMatchObject({ status: 'failed', taskId: 'task-1' })
     expect(harness.pendingResults.removePendingResults).not.toHaveBeenCalled()

@@ -227,7 +227,7 @@ describe('waitTaskImageResultsWithSse', () => {
     })
 
     await expect(result).rejects.toThrow(TaskResultPendingError)
-    await expect(result).rejects.toThrow('图片已生成，但结果保存暂时失败，请稍后重试')
+    await expect(result).rejects.toThrow('图片生成失败')
     expect(mocks.getTask).not.toHaveBeenCalled()
     expect(MockEventSource.instances[0]?.closed).toBe(true)
   })
@@ -318,6 +318,6 @@ describe('waitTaskImageResultsWithSse', () => {
     const result = waitTaskImageResultsWithSse('task-1')
 
     await expect(result).rejects.toThrow(TaskResultPendingError)
-    await expect(result).rejects.toThrow('图片已生成，但结果保存暂时失败，请稍后重试')
+    await expect(result).rejects.toThrow('图片生成失败')
   })
 })

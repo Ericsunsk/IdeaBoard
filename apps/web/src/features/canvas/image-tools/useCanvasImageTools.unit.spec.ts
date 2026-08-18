@@ -370,7 +370,7 @@ describe('useCanvasImageTools image adjustment final apply', () => {
       expect(harness.runtime.viewModel.adjustment.isApplying.value).toBe(false)
       expect(harness.runtime.viewModel.adjustment.finalApplyProgress.value).toBeNull()
       expect(harness.feedback.warning).not.toHaveBeenCalled()
-      expect(harness.feedback.succeeded).toHaveBeenCalledWith('已应用编辑并派生新节点')
+      expect(harness.feedback.succeeded).toHaveBeenCalledWith('图片已生成')
       expect(harness.connectionAdapter.connectIntent).toHaveBeenCalledWith({
         sourceNodeId: 'image-1',
         sourcePort: 'image',

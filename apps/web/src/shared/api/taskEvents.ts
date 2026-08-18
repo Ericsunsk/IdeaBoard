@@ -4,6 +4,7 @@ import { taskApi } from './task'
 import type { Task } from './task'
 import { resolveApiUrl } from '../config/runtimeUrls'
 import { notifyUserCreditsInvalidation } from '../query/userCreditsInvalidation'
+import { IMAGE_GENERATION_FAILURE_MESSAGE } from '../constants/media'
 
 type TaskEventPayload = Pick<
   Task,
@@ -14,7 +15,7 @@ const SSE_TIMEOUT_MS = 6 * 60 * 1000
 const POLL_INITIAL_DELAY_MS = 1200
 const POLL_MAX_DELAY_MS = 8000
 const POLL_BACKOFF_FACTOR = 1.6
-const RESULT_FINALIZATION_PENDING_MESSAGE = '图片已生成，但结果保存暂时失败，请稍后重试'
+const RESULT_FINALIZATION_PENDING_MESSAGE = IMAGE_GENERATION_FAILURE_MESSAGE
 
 type WaitTaskResultOptions = {
   timeoutMs?: number
@@ -63,7 +64,7 @@ function isResultFinalizationFailure(task: TaskFailurePayload): boolean {
 
 export function createTaskResultFailureError(
   task: TaskFailurePayload,
-  fallbackMessage = '生成失败',
+  fallbackMessage = IMAGE_GENERATION_FAILURE_MESSAGE,
 ): Error {
   if (isResultFinalizationFailure(task)) {
     return new TaskResultPendingError(RESULT_FINALIZATION_PENDING_MESSAGE)

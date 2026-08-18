@@ -5,7 +5,12 @@
     tabindex="0"
     v-bind="$attrs"
   >
-    <img :src="displayUrl" :alt="alt" :draggable="draggable" />
+    <img
+      :src="displayUrl || undefined"
+      :alt="alt"
+      :draggable="draggable"
+      :class="{ invisible: !displayUrl }"
+    />
     <button
       v-if="removable"
       class="node-input-thumbnail-remove"

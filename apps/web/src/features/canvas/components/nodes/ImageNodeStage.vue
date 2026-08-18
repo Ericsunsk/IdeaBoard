@@ -24,9 +24,9 @@
     <template v-if="displayImage">
       <ImageToolStagePresentation v-if="imageToolStageBinding" :binding="imageToolStageBinding">
         <img
-          :src="stageDisplayUrl"
+          :src="stageDisplayUrl || undefined"
           class="image-node-stage-image image-tool-stage-media"
-          :class="{ 'is-dragging': dragging }"
+          :class="{ 'is-dragging': dragging, 'is-preview-loading': !stageDisplayUrl }"
           alt="图片节点预览"
           draggable="false"
           role="button"
@@ -39,8 +39,9 @@
       </ImageToolStagePresentation>
       <img
         v-else
-        :src="stageDisplayUrl"
+        :src="stageDisplayUrl || undefined"
         class="image-node-stage-image"
+        :class="{ 'is-preview-loading': !stageDisplayUrl }"
         alt="图片节点预览"
         draggable="false"
         role="button"
@@ -205,7 +206,6 @@ function onStageContextMenu(event: MouseEvent) {
 function submitExpand(prompt: string) {
   emit('expand-submit', prompt)
 }
-
 </script>
 
 <style scoped>
@@ -225,6 +225,10 @@ function submitExpand(prompt: string) {
 
 .image-node-stage-image.is-dragging {
   cursor: grabbing;
+}
+
+.image-node-stage-image.is-preview-loading {
+  visibility: hidden;
 }
 
 .image-node-stage.is-running .image-node-stage-image,

@@ -83,8 +83,9 @@ func newAppRouter(
 			PaymentEventStreamHandler: paymentEventStreamHandler,
 			Uploads:                   uploadDeps,
 			UploadDownloads: httpapi.UploadDownloadDeps{
-				Reader:     services.storageService,
-				ReadAccess: uploadReadAccess,
+				Reader:       services.storageService,
+				PreviewStore: services.storageService,
+				ReadAccess:   uploadReadAccess,
 			},
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{

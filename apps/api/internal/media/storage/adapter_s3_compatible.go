@@ -45,6 +45,10 @@ func (a *s3CompatibleStorageAdapter) DeleteByPrefix(ctx context.Context, profile
 	return a.service.s3CompatibleService.DeletePrefixWithConfig(ctx, objectKeyPrefix, a.service.s3CompatibleConfigFromProfile(profile))
 }
 
+func (a *s3CompatibleStorageAdapter) PutObject(ctx context.Context, profile *StorageProfile, objectKey string, data []byte, contentType string) error {
+	return a.service.s3CompatibleService.putBytesAtKeyWithConfig(ctx, objectKey, data, contentType, a.service.s3CompatibleConfigFromProfile(profile))
+}
+
 func (a *s3CompatibleStorageAdapter) StoreBytes(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error) {
 	return a.service.s3CompatibleService.uploadBytesWithConfig(ctx, filename, data, a.service.s3CompatibleConfigFromProfile(profile), opts)
 }

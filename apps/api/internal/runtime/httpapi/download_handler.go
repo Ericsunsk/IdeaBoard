@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"strconv"
@@ -78,33 +79,57 @@ func readManagedUpload(
 	rawURL string,
 	resource storage.UploadResource,
 ) (downloadImageSource, bool) {
-	identity, ok := principal.Require(c)
+	object, ok := readManagedUploadObject(c, deps, rawURL, resource)
 	if !ok {
-		return downloadImageSource{}, false
-	}
-	if deps.Reader == nil || deps.ReadAccess == nil {
-		response.InternalError(c, 500, "下载服务暂不可用", nil)
-		return downloadImageSource{}, false
-	}
-	if _, err := deps.ReadAccess.AuthorizeUploadResourceRead(c.Request.Context(), identity.UserID(), resource); err != nil {
-		writeStaticUploadReadError(c, resource.Kind, err)
-		return downloadImageSource{}, false
-	}
-	object, err := deps.Reader.ReadUploadResourceByURL(c.Request.Context(), rawURL, maxDownloadSize+1)
-	if err != nil {
-		response.InternalError(c, 500, "下载失败", err)
-		return downloadImageSource{}, false
-	}
-	if object == nil {
-		response.InternalError(c, 500, "下载失败", nil)
 		return downloadImageSource{}, false
 	}
 	return downloadImageSource{
 		body:          bytes.NewReader(object.Data),
 		contentType:   object.ContentType,
 		contentLength: int64(len(object.Data)),
-		statusCode:    200,
+		statusCode:    http.StatusOK,
 	}, true
+}
+
+func readManagedUploadObject(
+	c *gin.Context,
+	deps UploadDownloadDeps,
+	rawURL string,
+	resource storage.UploadResource,
+) (*storage.StoredUploadObject, bool) {
+	if !authorizeManagedUploadRead(c, deps, resource) {
+		return nil, false
+	}
+	return readManagedUploadObjectAfterAuthorization(c, deps, rawURL)
+}
+
+func authorizeManagedUploadRead(c *gin.Context, deps UploadDownloadDeps, resource storage.UploadResource) bool {
+	identity, ok := principal.Require(c)
+	if !ok {
+		return false
+	}
+	if deps.Reader == nil || deps.ReadAccess == nil {
+		response.InternalError(c, 500, "下载服务暂不可用", nil)
+		return false
+	}
+	if _, err := deps.ReadAccess.AuthorizeUploadResourceRead(c.Request.Context(), identity.UserID(), resource); err != nil {
+		writeStaticUploadReadError(c, resource.Kind, err)
+		return false
+	}
+	return true
+}
+
+func readManagedUploadObjectAfterAuthorization(c *gin.Context, deps UploadDownloadDeps, rawURL string) (*storage.StoredUploadObject, bool) {
+	object, err := deps.Reader.ReadUploadResourceByURL(c.Request.Context(), rawURL, maxDownloadSize+1)
+	if err != nil {
+		response.InternalError(c, 500, "下载失败", err)
+		return nil, false
+	}
+	if object == nil {
+		response.InternalError(c, 500, "下载失败", nil)
+		return nil, false
+	}
+	return object, true
 }
 
 func serveDownloadedImage(c *gin.Context, source downloadImageSource) {

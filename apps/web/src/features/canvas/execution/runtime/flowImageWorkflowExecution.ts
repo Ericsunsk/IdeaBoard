@@ -1,6 +1,5 @@
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
-import { sanitizeApiErrorMessage } from '../../../../shared/utils/errorMessages'
 import type { CanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
 import type { CanvasGraphStore } from '../../graph-runtime'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
@@ -31,7 +30,10 @@ import {
   type PendingImageWorkflowTaskTransport,
 } from './pendingImageWorkflowRunner'
 import type { PendingImageAttachment } from '../pending-execution'
-import { createCanvasTaskClientActionId, withTaskClientActionId } from '../task-runner/taskClientActionIds'
+import {
+  createCanvasTaskClientActionId,
+  withTaskClientActionId,
+} from '../task-runner/taskClientActionIds'
 
 export type FlowImageWorkflowExecutionPlan = ActivatedImageExecutionPlan
 
@@ -75,25 +77,27 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
 
   const executionWorkspace = options.executionWorkspace
   const executionCore = executionWorkspace.state.executionCore
-  const taskTransport = options.taskTransport ?? {
-    assertReady: (request, fallbackMessage) =>
-      defaultCanvasTaskSubmissionAdapter.assertTaskRequestReady(
-        withTaskClientActionId(request, createCanvasTaskClientActionId()),
-        fallbackMessage,
-      ),
-    submit: (request, clientActionId, fallbackMessage) =>
-      defaultCanvasTaskSubmissionAdapter.submitTaskRequest(
-        withTaskClientActionId(request, clientActionId),
-        fallbackMessage,
-      ),
-    resolve: async (taskId, resultIndex, fallbackRatio) =>
-      resolveTaskImageResultAtIndexDisplay(
-        await waitExistingOrLiveTaskImageResults(taskId),
-        resultIndex,
-        fallbackRatio,
-        loadImageSizeFromUrl,
-      ),
-  } satisfies PendingImageWorkflowTaskTransport
+  const taskTransport =
+    options.taskTransport ??
+    ({
+      assertReady: (request, fallbackMessage) =>
+        defaultCanvasTaskSubmissionAdapter.assertTaskRequestReady(
+          withTaskClientActionId(request, createCanvasTaskClientActionId()),
+          fallbackMessage,
+        ),
+      submit: (request, clientActionId, fallbackMessage) =>
+        defaultCanvasTaskSubmissionAdapter.submitTaskRequest(
+          withTaskClientActionId(request, clientActionId),
+          fallbackMessage,
+        ),
+      resolve: async (taskId, resultIndex, fallbackRatio) =>
+        resolveTaskImageResultAtIndexDisplay(
+          await waitExistingOrLiveTaskImageResults(taskId),
+          resultIndex,
+          fallbackRatio,
+          loadImageSizeFromUrl,
+        ),
+    } satisfies PendingImageWorkflowTaskTransport)
 
   const workflowRunner = createPendingImageWorkflowRunner({
     pendingResults,
@@ -135,8 +139,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       taskRequest,
       readinessRequest: buildImageActionReadinessRequest(plan.action),
       fallbackRatio: plan.source.ratio,
-      successMessage: '处理完成',
-      fallbackErrorMessage: '执行失败',
     })
   }
 
@@ -157,7 +159,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       taskRequest,
       readinessRequest: taskRequest,
       fallbackRatio: plan.targetRatio,
-      fallbackErrorMessage: '扩图失败',
     })
   }
 
@@ -180,7 +181,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       taskRequest,
       readinessRequest: taskRequest,
       fallbackRatio: plan.source.ratio,
-      fallbackErrorMessage: '局部重绘失败',
     })
   }
 
@@ -194,7 +194,9 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     plan: FusionExecutionPlan & { activationId: string },
   ): Promise<void> {
     const attachment = requireCurrentAttachment()
-    const imageSizes = await Promise.all(plan.inputImages.map((input) => loadImageSizeFromUrl(input.url)))
+    const imageSizes = await Promise.all(
+      plan.inputImages.map((input) => loadImageSizeFromUrl(input.url)),
+    )
     const preparedPlan = prepareFusionExecutionPlan(plan, imageSizes)
     const taskRequest = buildImageExecutionTaskRequest(preparedPlan)
     await workflowRunner.execute({
@@ -206,8 +208,6 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
       taskRequest,
       readinessRequest: taskRequest,
       fallbackRatio: preparedPlan.targetRatio,
-      fallbackErrorMessage: 'Fusion 生成失败',
-      formatErrorMessage: (error) => sanitizeApiErrorMessage(error.message, 'Fusion 生成失败'),
     })
   }
 
