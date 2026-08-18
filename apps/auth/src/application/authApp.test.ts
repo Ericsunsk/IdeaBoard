@@ -16,6 +16,8 @@ import {
   type TrustedIdentityAuthAPI,
   type TrustedIdentityRepository,
 } from "../trusted-identity/trustedIdentity.js";
+import type { MailConfigSummary } from "../transactional-mail/mailConfig.js";
+import type { SocialProviderSettingsSummary } from "../social-identity/socialProviderSettings.js";
 
 type TestAuthAPI = AuthSessionAPI & TrustedIdentityAuthAPI;
 type TestIdentityStore = AuthIdentityMutationStore & TrustedIdentityRepository;
@@ -100,6 +102,18 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
               .social[provider]
         : undefined,
     });
+  const mailSummary: MailConfigSummary = {
+    configured: true,
+    apiKeyConfigured: true,
+    fromName: "IdeaBoard",
+    fromEmail: "auth@example.com",
+    replyTo: "",
+    configVersion: 1,
+    readiness: "ready",
+    updatedAt: null,
+    lastTestedAt: null,
+    lastTestErrorCode: null,
+  };
   const baseDeps: AuthAppDependencies = {
     config,
     healthCheck: async () => {},
@@ -110,6 +124,39 @@ function createTestDeps(overrides: TestOverrides = {}): AuthAppDependencies {
     authApi,
     internalCommands,
     admissionPolicy,
+    mailConfigService: {
+      getSummary: async () => mailSummary,
+      update: async () => mailSummary,
+      clear: async () => {},
+      sendTest: async () => {},
+    },
+    socialProviderSettingsService: {
+      getSummary: async (provider: SocialProviderSettingsSummary["provider"]): Promise<SocialProviderSettingsSummary> => ({
+        provider,
+        enabled: true,
+        configured: true,
+        available: true,
+        clientId: "client",
+        clientSecretConfigured: true,
+        scopes: [],
+        configVersion: 1,
+        callbackURL: "https://app.example.com/callback",
+        updatedAt: null,
+      }),
+      update: async (provider: SocialProviderSettingsSummary["provider"]) => ({
+        provider,
+        enabled: true,
+        configured: true,
+        available: true,
+        clientId: "client",
+        clientSecretConfigured: true,
+        scopes: [],
+        configVersion: 1,
+        callbackURL: "https://app.example.com/callback",
+        updatedAt: null,
+      }),
+      getCapabilities: async () => ({ social: { google: true, discord: true } }),
+    },
   };
 
   return {
@@ -194,6 +241,16 @@ describe("createAuthApp", () => {
       banUser: { payload: { userId: "auth-user-1" } },
       unbanUser: { payload: { userId: "auth-user-1" } },
       revokeUserSessions: { payload: { userId: "auth-user-1" } },
+      updateMailConfig: {
+        payload: {
+          from_name: "IdeaBoard",
+          from_email: "auth@example.com",
+          actor_id: 1,
+        },
+      },
+      clearMailConfig: { payload: { actor_id: 1 } },
+      sendMailConfigTest: { payload: { recipient: "admin@example.com", actor_id: 1 } },
+      updateSocialProvider: { payload: { enabled: true, client_id: "client" } },
     } as const;
 
     for (const operationID of Object.keys(authInternalRoutes) as Array<
@@ -202,9 +259,9 @@ describe("createAuthApp", () => {
       const route = authInternalRoutes[operationID];
       const response = await app.inject({
         method: route.method,
-        url: route.fastifyPath.replace(":id", "auth-user-1"),
+        url: route.fastifyPath.replace(/:id|:provider/g, "google"),
         headers: { "x-internal-key": "test-internal-key" },
-        ...requests[operationID],
+        ...(requests[operationID as keyof typeof requests] ?? {}),
       });
 
       assert.equal(

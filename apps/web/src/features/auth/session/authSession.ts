@@ -1,14 +1,8 @@
 import { ref, computed, reactive } from 'vue'
-import { fetchCurrentUserInfo, type User } from '../../../shared/api/userSession'
-import { clearAuthScopedQueryCache } from '../../../shared/query/queryClient'
+import type { User } from '../../../shared/api/userSession'
 import { authTransport } from './authTransport'
-import {
-  clearPersistedSession,
-  persistSessionUser,
-  readStoredSessionUser,
-} from './authSessionPersistence'
-
-const SESSION_CACHE_TTL_MS = 30_000
+import { readStoredSessionUser } from './authSessionPersistence'
+import { createBrowserSessionTransition } from './browserSessionTransition'
 
 export type UserSessionStore = {
   user: User | null
@@ -30,21 +24,14 @@ export type UserSessionStore = {
     options?: { failClosedOnError?: boolean },
   ) => Promise<User | null>
   ensureSession: (options?: { fresh?: boolean }) => Promise<User | null>
+  completeOAuthCallback: (input: {
+    providerError?: unknown
+    redirectPath?: unknown
+    replace: (target: string | { path: string; query: Record<string, never> }) => Promise<unknown>
+  }) => Promise<boolean>
+  stopImpersonating: () => Promise<void>
   updatePassword: (oldPassword: string, newPassword: string) => Promise<boolean>
   setAvatarLocal: (avatar: string) => void
-}
-
-function getUserIdentity(authUser: User | null): string | null {
-  if (!authUser) return null
-
-  const publicID = typeof authUser.public_id === 'string' ? authUser.public_id.trim() : ''
-  return publicID || null
-}
-
-function getErrorStatusCode(error: unknown): number {
-  const errorRecord =
-    error && typeof error === 'object' ? (error as { status?: unknown; code?: unknown }) : null
-  return Number(errorRecord?.status ?? errorRecord?.code)
 }
 
 let userStore: UserSessionStore | null = null
@@ -59,35 +46,36 @@ function createUserSessionStore(): UserSessionStore {
 
   const isAdmin = computed(() => user.value?.role === 'admin')
 
-  function restoreStoredUser() {
-    if (user.value || userInfoLoaded.value) return
-    const storedUser = readStoredSessionUser()
-    if (storedUser) {
-      user.value = storedUser
-    }
-  }
-
   function updateAuth(newUser: User) {
-    if (getUserIdentity(user.value) !== getUserIdentity(newUser)) {
-      clearAuthScopedQueryCache()
-    }
     user.value = newUser
     userInfoLoaded.value = true
     sessionValidatedAt.value = Date.now()
-    persistSessionUser(newUser)
   }
 
   function resetAuth() {
     user.value = null
     userInfoLoaded.value = false
     sessionValidatedAt.value = 0
-    clearPersistedSession()
   }
+
+  const transition = createBrowserSessionTransition({
+    getUser: () => user.value,
+    isLoaded: () => userInfoLoaded.value,
+    getValidatedAt: () => sessionValidatedAt.value,
+    commit: updateAuth,
+    restore: (storedUser) => {
+      user.value = storedUser
+    },
+    markUnloaded: () => {
+      userInfoLoaded.value = false
+    },
+    clear: resetAuth,
+  })
 
   async function login(identifier: string, password: string) {
     await authTransport.login(identifier, password)
 
-    await fetchUserInfo(true, { failClosedOnError: true })
+    await transition.fetchUserInfo(true, { failClosedOnError: true })
     if (!user.value) {
       throw new Error('登录状态恢复失败')
     }
@@ -101,7 +89,7 @@ function createUserSessionStore(): UserSessionStore {
 
   async function verifyRegistrationOTP(email: string, otp: string) {
     await authTransport.verifyRegistrationOTP(email, otp)
-    await fetchUserInfo(true, { failClosedOnError: true })
+    await transition.fetchUserInfo(true, { failClosedOnError: true })
     if (!user.value) throw new Error('验证成功，但登录状态恢复失败')
     return true
   }
@@ -113,7 +101,7 @@ function createUserSessionStore(): UserSessionStore {
 
   async function resetPasswordWithOTP(email: string, otp: string, password: string) {
     await authTransport.resetPasswordWithOTP(email, otp, password)
-    resetAuth()
+    transition.clearLocal()
     return true
   }
 
@@ -129,73 +117,32 @@ function createUserSessionStore(): UserSessionStore {
 
   async function changeEmailWithOTP(newEmail: string, otp: string) {
     await authTransport.changeEmailWithOTP(newEmail, otp)
-    await fetchUserInfo(true, { failClosedOnError: true })
+    await transition.fetchUserInfo(true, { failClosedOnError: true })
     return true
   }
 
   async function logout() {
-    const succeeded = await authTransport.logout()
-    if (!succeeded) return false
-    resetAuth()
-    return true
-  }
-
-  async function fetchUserInfo(force = false, options: { failClosedOnError?: boolean } = {}) {
-    if (userInfoLoaded.value && !force) return user.value
-    try {
-      const session = await fetchCurrentUserInfo()
-      updateAuth(session.user)
-      return user.value
-    } catch (e) {
-      const code = getErrorStatusCode(e)
-      if (code === 401 || code === 403) {
-        resetAuth()
-        return null
-      }
-      if (options.failClosedOnError) {
-        resetAuth()
-        return null
-      }
-      userInfoLoaded.value = false
-    }
-    return user.value
-  }
-
-  async function hasAuthSession() {
-    return authTransport.hasSession()
-  }
-
-  async function ensureSession(options: { fresh?: boolean } = {}) {
-    const cacheValid =
-      userInfoLoaded.value &&
-      !options.fresh &&
-      Date.now() - sessionValidatedAt.value < SESSION_CACHE_TTL_MS
-    if (cacheValid) return user.value
-    if (!(await hasAuthSession())) {
-      resetAuth()
-      return null
-    }
-    return await fetchUserInfo(true, { failClosedOnError: options.fresh })
+    return transition.logout()
   }
 
   async function updatePassword(oldPassword: string, newPassword: string) {
     await authTransport.updatePassword(oldPassword, newPassword)
-    resetAuth()
+    transition.clearLocal()
     return true
   }
 
   function setAvatarLocal(avatar: string) {
     const nextAvatar = avatar.trim()
     if (!nextAvatar || !user.value) return
-    updateAuth({ ...user.value, avatar: nextAvatar })
+    transition.setAuth({ ...user.value, avatar: nextAvatar })
   }
 
   const store = reactive({
     user,
     isAdmin,
     sessionValidatedAt,
-    setAuth: updateAuth,
-    clearAuth: resetAuth,
+    setAuth: transition.setAuth,
+    clearAuth: transition.clearLocal,
     login,
     register,
     verifyRegistrationOTP,
@@ -205,13 +152,15 @@ function createUserSessionStore(): UserSessionStore {
     requestEmailChangeOTP,
     changeEmailWithOTP,
     logout,
-    fetchUserInfo,
-    ensureSession,
+    fetchUserInfo: transition.fetchUserInfo,
+    ensureSession: transition.ensureSession,
+    completeOAuthCallback: transition.completeOAuthCallback,
+    stopImpersonating: transition.stopImpersonating,
     updatePassword,
     setAvatarLocal,
   })
 
-  restoreStoredUserIfAvailable = restoreStoredUser
+  restoreStoredUserIfAvailable = transition.restoreStoredUser
   return store
 }
 
@@ -227,12 +176,4 @@ export function useUserStore() {
 
 export function useAuthSession() {
   return authTransport.useSession()
-}
-
-export async function startImpersonation(authUserId: string): Promise<void> {
-  await authTransport.startImpersonation(authUserId)
-}
-
-export async function stopImpersonating(): Promise<void> {
-  await authTransport.stopImpersonating()
 }

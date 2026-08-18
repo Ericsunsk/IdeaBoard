@@ -38,7 +38,17 @@ export function registerInternalRoutes(
   options: InternalRoutesOptions,
 ) {
   const requireInternalKey = createRequireInternalKey(options.internalKey);
-  const handlers: RouteHandlers = {
+  const handlers: Pick<
+    RouteHandlers,
+    | "validateSession"
+    | "ensureUser"
+    | "getUserEmails"
+    | "deleteUser"
+    | "setUserRole"
+    | "banUser"
+    | "unbanUser"
+    | "revokeUserSessions"
+  > = {
     validateSession: async (request, reply) => {
       try {
         const session = await options.authApi.getSession({

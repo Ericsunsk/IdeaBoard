@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const events: string[] = []
 const clearAuth = vi.fn(() => events.push('clearAuth'))
-const clearAuthScopedQueryCache = vi.fn(() => events.push('clearQueryCache'))
 const impersonateAdminUser = vi.fn()
 
 vi.mock('../../auth/session/authSession', () => ({
@@ -13,10 +12,6 @@ vi.mock('../../auth/session/authSession', () => ({
 
 vi.mock('./adminUserApi', () => ({
   impersonateAdminUser,
-}))
-
-vi.mock('../../../shared/query/queryClient', () => ({
-  clearAuthScopedQueryCache,
 }))
 
 describe('admin user session commands', () => {
@@ -36,9 +31,8 @@ describe('admin user session commands', () => {
 
     expect(impersonateAdminUser).toHaveBeenCalledWith('public-1')
     expect(clearAuth).toHaveBeenCalledTimes(1)
-    expect(clearAuthScopedQueryCache).toHaveBeenCalledTimes(1)
     expect(redirect.schedule).toHaveBeenCalledWith('/', 1000)
-    expect(events).toEqual(['clearAuth', 'clearQueryCache', 'redirect'])
+    expect(events).toEqual(['clearAuth', 'redirect'])
   })
 
   it('surfaces bridge errors without clearing session state', async () => {
@@ -50,6 +44,5 @@ describe('admin user session commands', () => {
     ).rejects.toThrow('not allowed')
 
     expect(clearAuth).not.toHaveBeenCalled()
-    expect(clearAuthScopedQueryCache).not.toHaveBeenCalled()
   })
 })

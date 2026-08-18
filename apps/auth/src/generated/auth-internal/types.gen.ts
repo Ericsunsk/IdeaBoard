@@ -4,6 +4,88 @@ export type ClientOptions = {
     baseUrl: 'http://localhost:6001' | (string & {});
 };
 
+export type ActorRequest = {
+    actor_id: number;
+};
+
+export type MailConfigRequest = {
+    api_key?: string;
+    from_name: string;
+    from_email: string;
+    reply_to?: string;
+    actor_id: number;
+};
+
+export type MailTestRequest = {
+    recipient: string;
+    actor_id: number;
+};
+
+export type MailConfigSummary = {
+    configured: boolean;
+    api_key_configured: boolean;
+    from_name: string;
+    from_email: string;
+    reply_to: string;
+    config_version: number;
+    readiness: 'not_configured' | 'not_tested' | 'ready' | 'unavailable';
+    updated_at: string | null;
+    last_tested_at: string | null;
+    last_test_error_code: string | null;
+};
+
+export type MailConfigEnvelope = {
+    code: 0;
+    msg: string;
+    data: MailConfigSummary;
+};
+
+export type MailMutationEnvelope = {
+    code: 0;
+    msg: string;
+    data: {
+        ok: true;
+    };
+};
+
+export type SocialProviderRequest = {
+    enabled: boolean;
+    client_id: string;
+    client_secret?: string;
+};
+
+export type SocialProviderSummary = {
+    provider: 'google' | 'discord';
+    enabled: boolean;
+    configured: boolean;
+    available: boolean;
+    client_id: string;
+    client_secret_configured: boolean;
+    scopes: Array<string>;
+    config_version: number;
+    callback_url: string;
+    updated_at: string | null;
+};
+
+export type SocialProviderEnvelope = {
+    code: 0;
+    msg: string;
+    data: SocialProviderSummary;
+};
+
+export type SocialCapabilities = {
+    social: {
+        google: boolean;
+        discord: boolean;
+    };
+};
+
+export type SocialCapabilitiesEnvelope = {
+    code: 0;
+    msg: string;
+    data: SocialCapabilities;
+};
+
 export type AuthRole = 'admin' | 'user';
 
 export type TrustedClaimIdentityKind = 'canonical_email';
@@ -151,6 +233,8 @@ export type RevokeUserSessionsEnvelope = {
 };
 
 export type AuthUserId = string;
+
+export type SocialProvider = 'google' | 'discord';
 
 export type ValidateSessionData = {
     body?: never;
@@ -463,3 +547,270 @@ export type RevokeUserSessionsResponses = {
 };
 
 export type RevokeUserSessionsResponse = RevokeUserSessionsResponses[keyof RevokeUserSessionsResponses];
+
+export type ClearMailConfigData = {
+    body: ActorRequest;
+    path?: never;
+    query?: never;
+    url: '/internal/mail/config';
+};
+
+export type ClearMailConfigErrors = {
+    /**
+     * Invalid request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Internal key or session rejected
+     */
+    401: ErrorEnvelope;
+    /**
+     * Identity conflicts with requested trusted state
+     */
+    409: ErrorEnvelope;
+    /**
+     * Auth dependency or repository failure
+     */
+    500: ErrorEnvelope;
+};
+
+export type ClearMailConfigError = ClearMailConfigErrors[keyof ClearMailConfigErrors];
+
+export type ClearMailConfigResponses = {
+    /**
+     * Mail mutation completed
+     */
+    200: MailMutationEnvelope;
+};
+
+export type ClearMailConfigResponse = ClearMailConfigResponses[keyof ClearMailConfigResponses];
+
+export type GetMailConfigData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/internal/mail/config';
+};
+
+export type GetMailConfigErrors = {
+    /**
+     * Internal key or session rejected
+     */
+    401: ErrorEnvelope;
+    /**
+     * Auth dependency or repository failure
+     */
+    500: ErrorEnvelope;
+};
+
+export type GetMailConfigError = GetMailConfigErrors[keyof GetMailConfigErrors];
+
+export type GetMailConfigResponses = {
+    /**
+     * Mail configuration summary
+     */
+    200: MailConfigEnvelope;
+};
+
+export type GetMailConfigResponse = GetMailConfigResponses[keyof GetMailConfigResponses];
+
+export type UpdateMailConfigData = {
+    body: MailConfigRequest;
+    path?: never;
+    query?: never;
+    url: '/internal/mail/config';
+};
+
+export type UpdateMailConfigErrors = {
+    /**
+     * Invalid request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Internal key or session rejected
+     */
+    401: ErrorEnvelope;
+    /**
+     * Identity conflicts with requested trusted state
+     */
+    409: ErrorEnvelope;
+    /**
+     * Auth dependency or repository failure
+     */
+    500: ErrorEnvelope;
+    /**
+     * Auth dependency unavailable
+     */
+    503: ErrorEnvelope;
+};
+
+export type UpdateMailConfigError = UpdateMailConfigErrors[keyof UpdateMailConfigErrors];
+
+export type UpdateMailConfigResponses = {
+    /**
+     * Mail configuration summary
+     */
+    200: MailConfigEnvelope;
+};
+
+export type UpdateMailConfigResponse = UpdateMailConfigResponses[keyof UpdateMailConfigResponses];
+
+export type SendMailConfigTestData = {
+    body: MailTestRequest;
+    path?: never;
+    query?: never;
+    url: '/internal/mail/config/test';
+};
+
+export type SendMailConfigTestErrors = {
+    /**
+     * Invalid request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Internal key or session rejected
+     */
+    401: ErrorEnvelope;
+    /**
+     * Identity conflicts with requested trusted state
+     */
+    409: ErrorEnvelope;
+    /**
+     * Auth dependency or repository failure
+     */
+    500: ErrorEnvelope;
+    /**
+     * Auth dependency unavailable
+     */
+    503: ErrorEnvelope;
+};
+
+export type SendMailConfigTestError = SendMailConfigTestErrors[keyof SendMailConfigTestErrors];
+
+export type SendMailConfigTestResponses = {
+    /**
+     * Mail mutation completed
+     */
+    200: MailMutationEnvelope;
+};
+
+export type SendMailConfigTestResponse = SendMailConfigTestResponses[keyof SendMailConfigTestResponses];
+
+export type GetSocialProviderCapabilitiesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/internal/social-providers/capabilities';
+};
+
+export type GetSocialProviderCapabilitiesErrors = {
+    /**
+     * Internal key or session rejected
+     */
+    401: ErrorEnvelope;
+    /**
+     * Auth dependency or repository failure
+     */
+    500: ErrorEnvelope;
+    /**
+     * Auth dependency unavailable
+     */
+    503: ErrorEnvelope;
+};
+
+export type GetSocialProviderCapabilitiesError = GetSocialProviderCapabilitiesErrors[keyof GetSocialProviderCapabilitiesErrors];
+
+export type GetSocialProviderCapabilitiesResponses = {
+    /**
+     * Social provider capabilities
+     */
+    200: SocialCapabilitiesEnvelope;
+};
+
+export type GetSocialProviderCapabilitiesResponse = GetSocialProviderCapabilitiesResponses[keyof GetSocialProviderCapabilitiesResponses];
+
+export type GetSocialProviderData = {
+    body?: never;
+    path: {
+        provider: 'google' | 'discord';
+    };
+    query?: never;
+    url: '/internal/social-providers/{provider}';
+};
+
+export type GetSocialProviderErrors = {
+    /**
+     * Internal key or session rejected
+     */
+    401: ErrorEnvelope;
+    /**
+     * Auth identity not found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Auth dependency or repository failure
+     */
+    500: ErrorEnvelope;
+    /**
+     * Auth dependency unavailable
+     */
+    503: ErrorEnvelope;
+};
+
+export type GetSocialProviderError = GetSocialProviderErrors[keyof GetSocialProviderErrors];
+
+export type GetSocialProviderResponses = {
+    /**
+     * Social provider configuration summary
+     */
+    200: SocialProviderEnvelope;
+};
+
+export type GetSocialProviderResponse = GetSocialProviderResponses[keyof GetSocialProviderResponses];
+
+export type UpdateSocialProviderData = {
+    body: SocialProviderRequest;
+    path: {
+        provider: 'google' | 'discord';
+    };
+    query?: never;
+    url: '/internal/social-providers/{provider}';
+};
+
+export type UpdateSocialProviderErrors = {
+    /**
+     * Invalid request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Internal key or session rejected
+     */
+    401: ErrorEnvelope;
+    /**
+     * Auth identity not found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Identity conflicts with requested trusted state
+     */
+    409: ErrorEnvelope;
+    /**
+     * Auth dependency or repository failure
+     */
+    500: ErrorEnvelope;
+    /**
+     * Auth dependency unavailable
+     */
+    503: ErrorEnvelope;
+};
+
+export type UpdateSocialProviderError = UpdateSocialProviderErrors[keyof UpdateSocialProviderErrors];
+
+export type UpdateSocialProviderResponses = {
+    /**
+     * Social provider configuration summary
+     */
+    200: SocialProviderEnvelope;
+};
+
+export type UpdateSocialProviderResponse = UpdateSocialProviderResponses[keyof UpdateSocialProviderResponses];

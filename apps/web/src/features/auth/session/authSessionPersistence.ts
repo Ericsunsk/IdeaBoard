@@ -1,5 +1,5 @@
 import type { User } from '../../../shared/api/userSession'
-import { clearStoredAuthState, getStoredUser, setStoredAuth } from '../../../shared/utils/auth'
+import { clearStoredAuth, getStoredUser, setStoredAuth } from '../../../shared/utils/auth'
 
 export function readStoredSessionUser(): User | null {
   return getStoredUser()
@@ -10,5 +10,5 @@ export function persistSessionUser(user: User): void {
 }
 
 export function clearPersistedSession(): void {
-  clearStoredAuthState()
+  clearStoredAuth()
 }

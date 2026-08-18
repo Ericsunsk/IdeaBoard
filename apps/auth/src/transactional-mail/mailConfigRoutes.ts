@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { getHeaderValue, sendError, sendSuccess } from "../infrastructure/httpResponse.js";
 import { MailConfigError, type MailConfigService } from "./mailConfig.js";
+import { authInternalRoutes } from "../generated/auth-internal/routes.gen.js";
 
 export function registerMailConfigRoutes(
   app: FastifyInstance,
@@ -28,12 +29,12 @@ export function registerMailConfigRoutes(
     }
   };
 
-  app.get("/internal/mail/config", { preHandler }, async (_request, reply) => {
+  app.get(authInternalRoutes.getMailConfig.fastifyPath, { preHandler }, async (_request, reply) => {
     reply.header("Cache-Control", "no-store");
     sendSuccess(reply, serializeSummary(await options.service.getSummary()));
   });
 
-  app.put("/internal/mail/config", { preHandler }, async (request, reply) => {
+  app.put(authInternalRoutes.updateMailConfig.fastifyPath, { preHandler }, async (request, reply) => {
     reply.header("Cache-Control", "no-store");
     try {
       const body = request.body as Record<string, unknown>;
@@ -51,7 +52,7 @@ export function registerMailConfigRoutes(
   });
 
   app.delete(
-    "/internal/mail/config",
+    authInternalRoutes.clearMailConfig.fastifyPath,
     { preHandler },
     async (request, reply) => {
       reply.header("Cache-Control", "no-store");
@@ -67,7 +68,7 @@ export function registerMailConfigRoutes(
   );
 
   app.post(
-    "/internal/mail/config/test",
+    authInternalRoutes.sendMailConfigTest.fastifyPath,
     { preHandler },
     async (request, reply) => {
       reply.header("Cache-Control", "no-store");

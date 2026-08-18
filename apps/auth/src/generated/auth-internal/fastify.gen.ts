@@ -2,7 +2,7 @@
 
 import type { RouteHandler } from 'fastify';
 
-import type { BanUserData2, BanUserErrors, BanUserResponses, DeleteUserData2, DeleteUserErrors, DeleteUserResponses, EnsureUserData, EnsureUserErrors, EnsureUserResponses, GetUserEmailsData2, GetUserEmailsErrors, GetUserEmailsResponses, RevokeUserSessionsData2, RevokeUserSessionsErrors, RevokeUserSessionsResponses, SetUserRoleData2, SetUserRoleErrors, SetUserRoleResponses, UnbanUserData2, UnbanUserErrors, UnbanUserResponses, ValidateSessionErrors, ValidateSessionResponses } from './types.gen.js';
+import type { BanUserData2, BanUserErrors, BanUserResponses, ClearMailConfigData, ClearMailConfigErrors, ClearMailConfigResponses, DeleteUserData2, DeleteUserErrors, DeleteUserResponses, EnsureUserData, EnsureUserErrors, EnsureUserResponses, GetMailConfigErrors, GetMailConfigResponses, GetSocialProviderCapabilitiesErrors, GetSocialProviderCapabilitiesResponses, GetSocialProviderData, GetSocialProviderErrors, GetSocialProviderResponses, GetUserEmailsData2, GetUserEmailsErrors, GetUserEmailsResponses, RevokeUserSessionsData2, RevokeUserSessionsErrors, RevokeUserSessionsResponses, SendMailConfigTestData, SendMailConfigTestErrors, SendMailConfigTestResponses, SetUserRoleData2, SetUserRoleErrors, SetUserRoleResponses, UnbanUserData2, UnbanUserErrors, UnbanUserResponses, UpdateMailConfigData, UpdateMailConfigErrors, UpdateMailConfigResponses, UpdateSocialProviderData, UpdateSocialProviderErrors, UpdateSocialProviderResponses, ValidateSessionErrors, ValidateSessionResponses } from './types.gen.js';
 
 export type RouteHandlers = {
     validateSession: RouteHandler<{
@@ -36,5 +36,32 @@ export type RouteHandlers = {
     revokeUserSessions: RouteHandler<{
         Body: RevokeUserSessionsData2['body'];
         Reply: RevokeUserSessionsErrors & RevokeUserSessionsResponses;
+    }>;
+    clearMailConfig: RouteHandler<{
+        Body: ClearMailConfigData['body'];
+        Reply: ClearMailConfigErrors & ClearMailConfigResponses;
+    }>;
+    getMailConfig: RouteHandler<{
+        Reply: GetMailConfigErrors & GetMailConfigResponses;
+    }>;
+    updateMailConfig: RouteHandler<{
+        Body: UpdateMailConfigData['body'];
+        Reply: UpdateMailConfigErrors & UpdateMailConfigResponses;
+    }>;
+    sendMailConfigTest: RouteHandler<{
+        Body: SendMailConfigTestData['body'];
+        Reply: SendMailConfigTestErrors & SendMailConfigTestResponses;
+    }>;
+    getSocialProviderCapabilities: RouteHandler<{
+        Reply: GetSocialProviderCapabilitiesErrors & GetSocialProviderCapabilitiesResponses;
+    }>;
+    getSocialProvider: RouteHandler<{
+        Params: GetSocialProviderData['path'];
+        Reply: GetSocialProviderErrors & GetSocialProviderResponses;
+    }>;
+    updateSocialProvider: RouteHandler<{
+        Body: UpdateSocialProviderData['body'];
+        Params: UpdateSocialProviderData['path'];
+        Reply: UpdateSocialProviderErrors & UpdateSocialProviderResponses;
     }>;
 };

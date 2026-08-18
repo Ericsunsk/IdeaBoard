@@ -43,7 +43,7 @@ import { Shield, Xmark } from '@iconoir/vue'
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
-import { stopImpersonating, useAuthSession, useUserStore } from '../../auth/session/authSession'
+import { useAuthSession, useUserStore } from '../../auth/session/authSession'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
 import {
   ADMIN_USERS_PATH,
@@ -94,7 +94,7 @@ const authMode = computed<'login' | 'register' | null>(() => {
 async function handleStopImpersonating() {
   await runAsyncAction(
     async () => {
-      await stopImpersonating()
+      await userStore.stopImpersonating()
       await userStore.fetchUserInfo(true)
       await authSession.value?.refetch?.()
       await router.push(ADMIN_USERS_PATH)

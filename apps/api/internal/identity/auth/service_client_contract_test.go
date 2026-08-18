@@ -71,11 +71,11 @@ func TestServiceClientMailConfigProxyUsesInternalContractAndActor(t *testing.T) 
 			body := decodeContractBody(t, r)
 			assertContractField(t, body, "actor_id", float64(42))
 			assertContractField(t, body, "recipient", "ops@example.com")
-			writeContractJSON(w, http.StatusOK, map[string]any{"code": 0, "msg": "success", "data": map[string]any{"sent": true}})
+			writeContractJSON(w, http.StatusOK, map[string]any{"code": 0, "msg": "success", "data": map[string]any{"ok": true}})
 		case r.Method == http.MethodDelete && r.URL.Path == "/internal/mail/config":
 			body := decodeContractBody(t, r)
 			assertContractField(t, body, "actor_id", float64(42))
-			writeContractJSON(w, http.StatusOK, map[string]any{"code": 0, "msg": "success", "data": map[string]any{"deleted": true}})
+			writeContractJSON(w, http.StatusOK, map[string]any{"code": 0, "msg": "success", "data": map[string]any{"ok": true}})
 		default:
 			http.NotFound(w, r)
 		}
@@ -119,10 +119,8 @@ func TestServiceClientSocialProviderProxyUsesStableContract(t *testing.T) {
 				assertContractField(t, body, "client_secret", "google-secret")
 			}
 			writeContractJSON(w, http.StatusOK, socialProviderContractEnvelope(3+updateCalls))
-		case r.Method == http.MethodGet && r.URL.Path == "/api/auth/capabilities":
-			if got := r.Header.Get("X-Internal-Key"); got != "" {
-				t.Fatalf("public capabilities leaked X-Internal-Key = %q", got)
-			}
+		case r.Method == http.MethodGet && r.URL.Path == "/internal/social-providers/capabilities":
+			assertContractInternalKey(t, r)
 			writeContractJSON(w, http.StatusOK, map[string]any{
 					"code": 0, "msg": "success", "data": map[string]any{"social": map[string]bool{"google": true, "discord": true}},
 			})

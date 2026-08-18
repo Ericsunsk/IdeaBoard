@@ -334,6 +334,97 @@
           }
         }
       }
+    },
+    "/internal/mail/config": {
+      "get": {
+        "operationId": "getMailConfig",
+        "summary": "Read the transactional mail configuration summary",
+        "responses": {
+          "200": { "$ref": "#/components/responses/MailConfigSuccess" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      },
+      "put": {
+        "operationId": "updateMailConfig",
+        "summary": "Update the transactional mail configuration",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MailConfigRequest" } } } },
+        "responses": {
+          "200": { "$ref": "#/components/responses/MailConfigSuccess" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      },
+      "delete": {
+        "operationId": "clearMailConfig",
+        "summary": "Clear the transactional mail configuration",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ActorRequest" } } } },
+        "responses": {
+          "200": { "$ref": "#/components/responses/MailMutationSuccess" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/internal/mail/config/test": {
+      "post": {
+        "operationId": "sendMailConfigTest",
+        "summary": "Send a transactional mail configuration test",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MailTestRequest" } } } },
+        "responses": {
+          "200": { "$ref": "#/components/responses/MailMutationSuccess" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/internal/social-providers/capabilities": {
+      "get": {
+        "operationId": "getSocialProviderCapabilities",
+        "summary": "Read configured social identity provider capabilities",
+        "responses": {
+          "200": { "$ref": "#/components/responses/SocialCapabilitiesSuccess" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/internal/social-providers/{provider}": {
+      "parameters": [{ "$ref": "#/components/parameters/SocialProvider" }],
+      "get": {
+        "operationId": "getSocialProvider",
+        "summary": "Read a social identity provider configuration summary",
+        "responses": {
+          "200": { "$ref": "#/components/responses/SocialProviderSuccess" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      },
+      "put": {
+        "operationId": "updateSocialProvider",
+        "summary": "Update a social identity provider configuration",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SocialProviderRequest" } } } },
+        "responses": {
+          "200": { "$ref": "#/components/responses/SocialProviderSuccess" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
     }
   },
   "components": {
@@ -353,6 +444,15 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 191
+        }
+      },
+      "SocialProvider": {
+        "name": "provider",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "enum": ["google", "discord"]
         }
       }
     },
@@ -406,9 +506,124 @@
             }
           }
         }
+      },
+      "ServiceUnavailable": {
+        "description": "Auth dependency unavailable",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorEnvelope" }
+          }
+        }
+      },
+      "MailConfigSuccess": {
+        "description": "Mail configuration summary",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/MailConfigEnvelope" }
+          }
+        }
+      },
+      "MailMutationSuccess": {
+        "description": "Mail mutation completed",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/MailMutationEnvelope" }
+          }
+        }
+      },
+      "SocialProviderSuccess": {
+        "description": "Social provider configuration summary",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/SocialProviderEnvelope" }
+          }
+        }
+      },
+      "SocialCapabilitiesSuccess": {
+        "description": "Social provider capabilities",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/SocialCapabilitiesEnvelope" }
+          }
+        }
       }
     },
     "schemas": {
+      "ActorRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["actor_id"],
+        "properties": { "actor_id": { "type": "integer", "format": "int64", "minimum": 1, "x-go-name": "ActorID" } }
+      },
+      "MailConfigRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from_name", "from_email", "actor_id"],
+        "properties": {
+          "api_key": { "type": "string", "minLength": 1, "x-go-name": "APIKey" },
+          "from_name": { "type": "string", "minLength": 1 },
+          "from_email": { "type": "string", "minLength": 1 },
+          "reply_to": { "type": "string" },
+          "actor_id": { "type": "integer", "format": "int64", "minimum": 1, "x-go-name": "ActorID" }
+        }
+      },
+      "MailTestRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["recipient", "actor_id"],
+        "properties": {
+          "recipient": { "type": "string", "minLength": 1 },
+          "actor_id": { "type": "integer", "format": "int64", "minimum": 1, "x-go-name": "ActorID" }
+        }
+      },
+      "MailConfigSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["configured", "api_key_configured", "from_name", "from_email", "reply_to", "config_version", "readiness", "updated_at", "last_tested_at", "last_test_error_code"],
+        "properties": {
+          "configured": { "type": "boolean" },
+          "api_key_configured": { "type": "boolean" },
+          "from_name": { "type": "string" },
+          "from_email": { "type": "string" },
+          "reply_to": { "type": "string" },
+          "config_version": { "type": "integer" },
+          "readiness": { "type": "string", "enum": ["not_configured", "not_tested", "ready", "unavailable"] },
+          "updated_at": { "type": "string", "format": "date-time", "nullable": true },
+          "last_tested_at": { "type": "string", "format": "date-time", "nullable": true },
+          "last_test_error_code": { "type": "string", "nullable": true }
+        }
+      },
+      "MailConfigEnvelope": {
+        "type": "object", "additionalProperties": false, "required": ["code", "msg", "data"],
+        "properties": { "code": { "type": "integer", "enum": [0] }, "msg": { "type": "string" }, "data": { "$ref": "#/components/schemas/MailConfigSummary" } }
+      },
+      "MailMutationEnvelope": {
+        "type": "object", "additionalProperties": false, "required": ["code", "msg", "data"],
+        "properties": { "code": { "type": "integer", "enum": [0] }, "msg": { "type": "string" }, "data": { "type": "object", "additionalProperties": false, "required": ["ok"], "properties": { "ok": { "type": "boolean", "enum": [true] } } } }
+      },
+      "SocialProviderRequest": {
+        "type": "object", "additionalProperties": false, "required": ["enabled", "client_id"],
+        "properties": { "enabled": { "type": "boolean" }, "client_id": { "type": "string" }, "client_secret": { "type": "string", "minLength": 1 } }
+      },
+      "SocialProviderSummary": {
+        "type": "object", "additionalProperties": false,
+        "required": ["provider", "enabled", "configured", "available", "client_id", "client_secret_configured", "scopes", "config_version", "callback_url", "updated_at"],
+        "properties": {
+          "provider": { "type": "string", "enum": ["google", "discord"] }, "enabled": { "type": "boolean" }, "configured": { "type": "boolean" }, "available": { "type": "boolean" }, "client_id": { "type": "string" }, "client_secret_configured": { "type": "boolean" }, "scopes": { "type": "array", "items": { "type": "string" } }, "config_version": { "type": "integer" }, "callback_url": { "type": "string" }, "updated_at": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      },
+      "SocialProviderEnvelope": {
+        "type": "object", "additionalProperties": false, "required": ["code", "msg", "data"],
+        "properties": { "code": { "type": "integer", "enum": [0] }, "msg": { "type": "string" }, "data": { "$ref": "#/components/schemas/SocialProviderSummary" } }
+      },
+      "SocialCapabilities": {
+        "type": "object", "additionalProperties": false, "required": ["social"],
+        "properties": { "social": { "type": "object", "additionalProperties": false, "required": ["google", "discord"], "properties": { "google": { "type": "boolean" }, "discord": { "type": "boolean" } } } }
+      },
+      "SocialCapabilitiesEnvelope": {
+        "type": "object", "additionalProperties": false, "required": ["code", "msg", "data"],
+        "properties": { "code": { "type": "integer", "enum": [0] }, "msg": { "type": "string" }, "data": { "$ref": "#/components/schemas/SocialCapabilities" } }
+      },
       "AuthRole": {
         "type": "string",
         "enum": [

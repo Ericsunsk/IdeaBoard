@@ -21,9 +21,7 @@ import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useUserStore } from '../session/authSession'
-import { authTransport } from '../session/authTransport'
-import { USER_BOARDS_PATH, USER_LOGIN_PATH } from '../../../shared/constants/routePaths'
-import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
+import { USER_LOGIN_PATH } from '../../../shared/constants/routePaths'
 
 const route = useRoute()
 const router = useRouter()
@@ -34,28 +32,19 @@ const message = computed(() =>
   status.value === 'loading' ? '正在恢复你的 Session...' : 'OAuth 登录失败，请重新尝试。',
 )
 
-function safeRedirectPath() {
-  const raw = Array.isArray(route.query.redirect) ? route.query.redirect[0] : route.query.redirect
-  const path = typeof raw === 'string' ? raw.trim() : ''
-  return isSafeInternalRedirectPath(path) ? path : USER_BOARDS_PATH
-}
-
 async function returnToLogin() {
   await router.replace(USER_LOGIN_PATH)
 }
 
 onMounted(async () => {
-  try {
-    const providerError = Array.isArray(route.query.error) ? route.query.error[0] : route.query.error
-    if (providerError) throw new Error('oauth callback failed')
-    const user = await userStore.ensureSession({ fresh: true })
-    if (!user) throw new Error('session provisioning failed')
-    await router.replace(safeRedirectPath())
-  } catch {
-    await authTransport.logout()
-    userStore.clearAuth()
+  const providerError = Array.isArray(route.query.error) ? route.query.error[0] : route.query.error
+  const succeeded = await userStore.completeOAuthCallback({
+    providerError,
+    redirectPath: route.query.redirect,
+    replace: (target) => router.replace(target),
+  })
+  if (!succeeded) {
     status.value = 'failed'
-    await router.replace({ path: route.path, query: {} })
   }
 })
 </script>

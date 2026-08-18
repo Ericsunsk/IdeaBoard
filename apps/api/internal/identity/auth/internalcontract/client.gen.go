@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/oapi-codegen/runtime"
 )
@@ -128,6 +129,75 @@ func (e GetUserEmailsEnvelopeCode) Valid() bool {
 	}
 }
 
+// Defines values for MailConfigEnvelopeCode.
+const (
+	MailConfigEnvelopeCodeN0 MailConfigEnvelopeCode = 0
+)
+
+// Valid indicates whether the value is a known member of the MailConfigEnvelopeCode enum.
+func (e MailConfigEnvelopeCode) Valid() bool {
+	switch e {
+	case MailConfigEnvelopeCodeN0:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MailConfigSummaryReadiness.
+const (
+	NotConfigured MailConfigSummaryReadiness = "not_configured"
+	NotTested     MailConfigSummaryReadiness = "not_tested"
+	Ready         MailConfigSummaryReadiness = "ready"
+	Unavailable   MailConfigSummaryReadiness = "unavailable"
+)
+
+// Valid indicates whether the value is a known member of the MailConfigSummaryReadiness enum.
+func (e MailConfigSummaryReadiness) Valid() bool {
+	switch e {
+	case NotConfigured:
+		return true
+	case NotTested:
+		return true
+	case Ready:
+		return true
+	case Unavailable:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MailMutationEnvelopeCode.
+const (
+	MailMutationEnvelopeCodeN0 MailMutationEnvelopeCode = 0
+)
+
+// Valid indicates whether the value is a known member of the MailMutationEnvelopeCode enum.
+func (e MailMutationEnvelopeCode) Valid() bool {
+	switch e {
+	case MailMutationEnvelopeCodeN0:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MailMutationEnvelopeDataOk.
+const (
+	MailMutationEnvelopeDataOkTrue MailMutationEnvelopeDataOk = true
+)
+
+// Valid indicates whether the value is a known member of the MailMutationEnvelopeDataOk enum.
+func (e MailMutationEnvelopeDataOk) Valid() bool {
+	switch e {
+	case MailMutationEnvelopeDataOkTrue:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ProvisionedAuthUserClaimIdentityVerified.
 const (
 	ProvisionedAuthUserClaimIdentityVerifiedTrue ProvisionedAuthUserClaimIdentityVerified = true
@@ -145,13 +215,13 @@ func (e ProvisionedAuthUserClaimIdentityVerified) Valid() bool {
 
 // Defines values for RevokeUserSessionsDataRevoked.
 const (
-	RevokeUserSessionsDataRevokedTrue RevokeUserSessionsDataRevoked = true
+	True RevokeUserSessionsDataRevoked = true
 )
 
 // Valid indicates whether the value is a known member of the RevokeUserSessionsDataRevoked enum.
 func (e RevokeUserSessionsDataRevoked) Valid() bool {
 	switch e {
-	case RevokeUserSessionsDataRevokedTrue:
+	case True:
 		return true
 	default:
 		return false
@@ -221,6 +291,54 @@ func (e SetUserRoleEnvelopeCode) Valid() bool {
 	}
 }
 
+// Defines values for SocialCapabilitiesEnvelopeCode.
+const (
+	SocialCapabilitiesEnvelopeCodeN0 SocialCapabilitiesEnvelopeCode = 0
+)
+
+// Valid indicates whether the value is a known member of the SocialCapabilitiesEnvelopeCode enum.
+func (e SocialCapabilitiesEnvelopeCode) Valid() bool {
+	switch e {
+	case SocialCapabilitiesEnvelopeCodeN0:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SocialProviderEnvelopeCode.
+const (
+	SocialProviderEnvelopeCodeN0 SocialProviderEnvelopeCode = 0
+)
+
+// Valid indicates whether the value is a known member of the SocialProviderEnvelopeCode enum.
+func (e SocialProviderEnvelopeCode) Valid() bool {
+	switch e {
+	case SocialProviderEnvelopeCodeN0:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SocialProviderSummaryProvider.
+const (
+	SocialProviderSummaryProviderDiscord SocialProviderSummaryProvider = "discord"
+	SocialProviderSummaryProviderGoogle  SocialProviderSummaryProvider = "google"
+)
+
+// Valid indicates whether the value is a known member of the SocialProviderSummaryProvider enum.
+func (e SocialProviderSummaryProvider) Valid() bool {
+	switch e {
+	case SocialProviderSummaryProviderDiscord:
+		return true
+	case SocialProviderSummaryProviderGoogle:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TrustedClaimIdentityKind.
 const (
 	TrustedClaimIdentityKindCanonicalEmail TrustedClaimIdentityKind = "canonical_email"
@@ -264,6 +382,29 @@ func (e UnbanUserEnvelopeCode) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// Defines values for SocialProvider.
+const (
+	SocialProviderDiscord SocialProvider = "discord"
+	SocialProviderGoogle  SocialProvider = "google"
+)
+
+// Valid indicates whether the value is a known member of the SocialProvider enum.
+func (e SocialProvider) Valid() bool {
+	switch e {
+	case SocialProviderDiscord:
+		return true
+	case SocialProviderGoogle:
+		return true
+	default:
+		return false
+	}
+}
+
+// ActorRequest defines model for ActorRequest.
+type ActorRequest struct {
+	ActorID int64 `json:"actor_id"`
 }
 
 // AuthRole defines model for AuthRole.
@@ -375,6 +516,63 @@ type GetUserEmailsRequest struct {
 	UserIds []string `json:"user_ids"`
 }
 
+// MailConfigEnvelope defines model for MailConfigEnvelope.
+type MailConfigEnvelope struct {
+	Code MailConfigEnvelopeCode `json:"code"`
+	Data MailConfigSummary      `json:"data"`
+	Msg  string                 `json:"msg"`
+}
+
+// MailConfigEnvelopeCode defines model for MailConfigEnvelope.Code.
+type MailConfigEnvelopeCode int
+
+// MailConfigRequest defines model for MailConfigRequest.
+type MailConfigRequest struct {
+	ActorID   int64   `json:"actor_id"`
+	APIKey    *string `json:"api_key,omitempty"`
+	FromEmail string  `json:"from_email"`
+	FromName  string  `json:"from_name"`
+	ReplyTo   *string `json:"reply_to,omitempty"`
+}
+
+// MailConfigSummary defines model for MailConfigSummary.
+type MailConfigSummary struct {
+	ApiKeyConfigured  bool                       `json:"api_key_configured"`
+	ConfigVersion     int                        `json:"config_version"`
+	Configured        bool                       `json:"configured"`
+	FromEmail         string                     `json:"from_email"`
+	FromName          string                     `json:"from_name"`
+	LastTestErrorCode *string                    `json:"last_test_error_code"`
+	LastTestedAt      *time.Time                 `json:"last_tested_at"`
+	Readiness         MailConfigSummaryReadiness `json:"readiness"`
+	ReplyTo           string                     `json:"reply_to"`
+	UpdatedAt         *time.Time                 `json:"updated_at"`
+}
+
+// MailConfigSummaryReadiness defines model for MailConfigSummary.Readiness.
+type MailConfigSummaryReadiness string
+
+// MailMutationEnvelope defines model for MailMutationEnvelope.
+type MailMutationEnvelope struct {
+	Code MailMutationEnvelopeCode `json:"code"`
+	Data struct {
+		Ok MailMutationEnvelopeDataOk `json:"ok"`
+	} `json:"data"`
+	Msg string `json:"msg"`
+}
+
+// MailMutationEnvelopeCode defines model for MailMutationEnvelope.Code.
+type MailMutationEnvelopeCode int
+
+// MailMutationEnvelopeDataOk defines model for MailMutationEnvelope.Data.Ok.
+type MailMutationEnvelopeDataOk bool
+
+// MailTestRequest defines model for MailTestRequest.
+type MailTestRequest struct {
+	ActorID   int64  `json:"actor_id"`
+	Recipient string `json:"recipient"`
+}
+
 // ProvisionedAuthUser defines model for ProvisionedAuthUser.
 type ProvisionedAuthUser struct {
 	AuthUserID            string                                   `json:"auth_user_id"`
@@ -456,6 +654,58 @@ type SetUserRoleRequest struct {
 	Role AuthRole `json:"role"`
 }
 
+// SocialCapabilities defines model for SocialCapabilities.
+type SocialCapabilities struct {
+	Social struct {
+		Discord bool `json:"discord"`
+		Google  bool `json:"google"`
+	} `json:"social"`
+}
+
+// SocialCapabilitiesEnvelope defines model for SocialCapabilitiesEnvelope.
+type SocialCapabilitiesEnvelope struct {
+	Code SocialCapabilitiesEnvelopeCode `json:"code"`
+	Data SocialCapabilities             `json:"data"`
+	Msg  string                         `json:"msg"`
+}
+
+// SocialCapabilitiesEnvelopeCode defines model for SocialCapabilitiesEnvelope.Code.
+type SocialCapabilitiesEnvelopeCode int
+
+// SocialProviderEnvelope defines model for SocialProviderEnvelope.
+type SocialProviderEnvelope struct {
+	Code SocialProviderEnvelopeCode `json:"code"`
+	Data SocialProviderSummary      `json:"data"`
+	Msg  string                     `json:"msg"`
+}
+
+// SocialProviderEnvelopeCode defines model for SocialProviderEnvelope.Code.
+type SocialProviderEnvelopeCode int
+
+// SocialProviderRequest defines model for SocialProviderRequest.
+type SocialProviderRequest struct {
+	ClientId     string  `json:"client_id"`
+	ClientSecret *string `json:"client_secret,omitempty"`
+	Enabled      bool    `json:"enabled"`
+}
+
+// SocialProviderSummary defines model for SocialProviderSummary.
+type SocialProviderSummary struct {
+	Available              bool                          `json:"available"`
+	CallbackUrl            string                        `json:"callback_url"`
+	ClientId               string                        `json:"client_id"`
+	ClientSecretConfigured bool                          `json:"client_secret_configured"`
+	ConfigVersion          int                           `json:"config_version"`
+	Configured             bool                          `json:"configured"`
+	Enabled                bool                          `json:"enabled"`
+	Provider               SocialProviderSummaryProvider `json:"provider"`
+	Scopes                 []string                      `json:"scopes"`
+	UpdatedAt              *time.Time                    `json:"updated_at"`
+}
+
+// SocialProviderSummaryProvider defines model for SocialProviderSummary.Provider.
+type SocialProviderSummaryProvider string
+
 // TrustedClaimIdentityKind defines model for TrustedClaimIdentityKind.
 type TrustedClaimIdentityKind string
 
@@ -481,6 +731,9 @@ type UnbanUserEnvelopeCode int
 // AuthUserID defines model for AuthUserID.
 type AuthUserID = string
 
+// SocialProvider defines model for SocialProvider.
+type SocialProvider string
+
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorEnvelope
 
@@ -490,14 +743,41 @@ type Conflict = ErrorEnvelope
 // InternalError defines model for InternalError.
 type InternalError = ErrorEnvelope
 
+// MailConfigSuccess defines model for MailConfigSuccess.
+type MailConfigSuccess = MailConfigEnvelope
+
+// MailMutationSuccess defines model for MailMutationSuccess.
+type MailMutationSuccess = MailMutationEnvelope
+
 // NotFound defines model for NotFound.
 type NotFound = ErrorEnvelope
+
+// ServiceUnavailable defines model for ServiceUnavailable.
+type ServiceUnavailable = ErrorEnvelope
+
+// SocialCapabilitiesSuccess defines model for SocialCapabilitiesSuccess.
+type SocialCapabilitiesSuccess = SocialCapabilitiesEnvelope
+
+// SocialProviderSuccess defines model for SocialProviderSuccess.
+type SocialProviderSuccess = SocialProviderEnvelope
 
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = ErrorEnvelope
 
 // internalKeyContextKey is the context key for InternalKey security scheme
 type internalKeyContextKey string
+
+// ClearMailConfigJSONRequestBody defines body for ClearMailConfig for application/json ContentType.
+type ClearMailConfigJSONRequestBody = ActorRequest
+
+// UpdateMailConfigJSONRequestBody defines body for UpdateMailConfig for application/json ContentType.
+type UpdateMailConfigJSONRequestBody = MailConfigRequest
+
+// SendMailConfigTestJSONRequestBody defines body for SendMailConfigTest for application/json ContentType.
+type SendMailConfigTestJSONRequestBody = MailTestRequest
+
+// UpdateSocialProviderJSONRequestBody defines body for UpdateSocialProvider for application/json ContentType.
+type UpdateSocialProviderJSONRequestBody = SocialProviderRequest
 
 // BanUserJSONRequestBody defines body for BanUser for application/json ContentType.
 type BanUserJSONRequestBody = BanUserRequest
@@ -590,8 +870,37 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
+	// ClearMailConfigWithBody request with any body
+	ClearMailConfigWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	ClearMailConfig(ctx context.Context, body ClearMailConfigJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetMailConfig request
+	GetMailConfig(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateMailConfigWithBody request with any body
+	UpdateMailConfigWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateMailConfig(ctx context.Context, body UpdateMailConfigJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SendMailConfigTestWithBody request with any body
+	SendMailConfigTestWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	SendMailConfigTest(ctx context.Context, body SendMailConfigTestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ValidateSession request
 	ValidateSession(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSocialProviderCapabilities request
+	GetSocialProviderCapabilities(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSocialProvider request
+	GetSocialProvider(ctx context.Context, provider SocialProvider, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSocialProviderWithBody request with any body
+	UpdateSocialProviderWithBody(ctx context.Context, provider SocialProvider, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateSocialProvider(ctx context.Context, provider SocialProvider, body UpdateSocialProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// BanUserWithBody request with any body
 	BanUserWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -627,8 +936,140 @@ type ClientInterface interface {
 	SetUserRole(ctx context.Context, id AuthUserID, body SetUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
+func (c *Client) ClearMailConfigWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewClearMailConfigRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ClearMailConfig(ctx context.Context, body ClearMailConfigJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewClearMailConfigRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetMailConfig(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetMailConfigRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateMailConfigWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateMailConfigRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateMailConfig(ctx context.Context, body UpdateMailConfigJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateMailConfigRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SendMailConfigTestWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSendMailConfigTestRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SendMailConfigTest(ctx context.Context, body SendMailConfigTestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSendMailConfigTestRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ValidateSession(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewValidateSessionRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetSocialProviderCapabilities(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSocialProviderCapabilitiesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetSocialProvider(ctx context.Context, provider SocialProvider, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSocialProviderRequest(c.Server, provider)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateSocialProviderWithBody(ctx context.Context, provider SocialProvider, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSocialProviderRequestWithBody(c.Server, provider, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateSocialProvider(ctx context.Context, provider SocialProvider, body UpdateSocialProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSocialProviderRequest(c.Server, provider, body)
 	if err != nil {
 		return nil, err
 	}
@@ -795,6 +1236,153 @@ func (c *Client) SetUserRole(ctx context.Context, id AuthUserID, body SetUserRol
 	return c.Client.Do(req)
 }
 
+// NewClearMailConfigRequest calls the generic ClearMailConfig builder with application/json body
+func NewClearMailConfigRequest(server string, body ClearMailConfigJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewClearMailConfigRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewClearMailConfigRequestWithBody generates requests for ClearMailConfig with any type of body
+func NewClearMailConfigRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/mail/config")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetMailConfigRequest generates requests for GetMailConfig
+func NewGetMailConfigRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/mail/config")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateMailConfigRequest calls the generic UpdateMailConfig builder with application/json body
+func NewUpdateMailConfigRequest(server string, body UpdateMailConfigJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateMailConfigRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewUpdateMailConfigRequestWithBody generates requests for UpdateMailConfig with any type of body
+func NewUpdateMailConfigRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/mail/config")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewSendMailConfigTestRequest calls the generic SendMailConfigTest builder with application/json body
+func NewSendMailConfigTestRequest(server string, body SendMailConfigTestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSendMailConfigTestRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewSendMailConfigTestRequestWithBody generates requests for SendMailConfigTest with any type of body
+func NewSendMailConfigTestRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/mail/config/test")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewValidateSessionRequest generates requests for ValidateSession
 func NewValidateSessionRequest(server string) (*http.Request, error) {
 	var err error
@@ -818,6 +1406,114 @@ func NewValidateSessionRequest(server string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewGetSocialProviderCapabilitiesRequest generates requests for GetSocialProviderCapabilities
+func NewGetSocialProviderCapabilitiesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/social-providers/capabilities")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetSocialProviderRequest generates requests for GetSocialProvider
+func NewGetSocialProviderRequest(server string, provider SocialProvider) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/social-providers/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateSocialProviderRequest calls the generic UpdateSocialProvider builder with application/json body
+func NewUpdateSocialProviderRequest(server string, provider SocialProvider, body UpdateSocialProviderJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateSocialProviderRequestWithBody(server, provider, "application/json", bodyReader)
+}
+
+// NewUpdateSocialProviderRequestWithBody generates requests for UpdateSocialProvider with any type of body
+func NewUpdateSocialProviderRequestWithBody(server string, provider SocialProvider, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "provider", provider, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/internal/social-providers/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -1146,8 +1842,37 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
+	// ClearMailConfigWithBodyWithResponse request with any body
+	ClearMailConfigWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ClearMailConfigResponse, error)
+
+	ClearMailConfigWithResponse(ctx context.Context, body ClearMailConfigJSONRequestBody, reqEditors ...RequestEditorFn) (*ClearMailConfigResponse, error)
+
+	// GetMailConfigWithResponse request
+	GetMailConfigWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMailConfigResponse, error)
+
+	// UpdateMailConfigWithBodyWithResponse request with any body
+	UpdateMailConfigWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateMailConfigResponse, error)
+
+	UpdateMailConfigWithResponse(ctx context.Context, body UpdateMailConfigJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateMailConfigResponse, error)
+
+	// SendMailConfigTestWithBodyWithResponse request with any body
+	SendMailConfigTestWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SendMailConfigTestResponse, error)
+
+	SendMailConfigTestWithResponse(ctx context.Context, body SendMailConfigTestJSONRequestBody, reqEditors ...RequestEditorFn) (*SendMailConfigTestResponse, error)
+
 	// ValidateSessionWithResponse request
 	ValidateSessionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ValidateSessionResponse, error)
+
+	// GetSocialProviderCapabilitiesWithResponse request
+	GetSocialProviderCapabilitiesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSocialProviderCapabilitiesResponse, error)
+
+	// GetSocialProviderWithResponse request
+	GetSocialProviderWithResponse(ctx context.Context, provider SocialProvider, reqEditors ...RequestEditorFn) (*GetSocialProviderResponse, error)
+
+	// UpdateSocialProviderWithBodyWithResponse request with any body
+	UpdateSocialProviderWithBodyWithResponse(ctx context.Context, provider SocialProvider, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSocialProviderResponse, error)
+
+	UpdateSocialProviderWithResponse(ctx context.Context, provider SocialProvider, body UpdateSocialProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSocialProviderResponse, error)
 
 	// BanUserWithBodyWithResponse request with any body
 	BanUserWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*BanUserResponse, error)
@@ -1183,6 +1908,142 @@ type ClientWithResponsesInterface interface {
 	SetUserRoleWithResponse(ctx context.Context, id AuthUserID, body SetUserRoleJSONRequestBody, reqEditors ...RequestEditorFn) (*SetUserRoleResponse, error)
 }
 
+type ClearMailConfigResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *MailMutationSuccess
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON409      *Conflict
+	JSON500      *InternalError
+}
+
+// Status returns HTTPResponse.Status
+func (r ClearMailConfigResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ClearMailConfigResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ClearMailConfigResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetMailConfigResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *MailConfigSuccess
+	JSON401      *Unauthorized
+	JSON500      *InternalError
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMailConfigResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMailConfigResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetMailConfigResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateMailConfigResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *MailConfigSuccess
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON409      *Conflict
+	JSON500      *InternalError
+	JSON503      *ServiceUnavailable
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateMailConfigResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateMailConfigResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateMailConfigResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SendMailConfigTestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *MailMutationSuccess
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON409      *Conflict
+	JSON500      *InternalError
+	JSON503      *ServiceUnavailable
+}
+
+// Status returns HTTPResponse.Status
+func (r SendMailConfigTestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SendMailConfigTestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SendMailConfigTestResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ValidateSessionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1209,6 +2070,109 @@ func (r ValidateSessionResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ValidateSessionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetSocialProviderCapabilitiesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SocialCapabilitiesSuccess
+	JSON401      *Unauthorized
+	JSON500      *InternalError
+	JSON503      *ServiceUnavailable
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSocialProviderCapabilitiesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSocialProviderCapabilitiesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSocialProviderCapabilitiesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetSocialProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SocialProviderSuccess
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+	JSON500      *InternalError
+	JSON503      *ServiceUnavailable
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSocialProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSocialProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSocialProviderResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateSocialProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SocialProviderSuccess
+	JSON400      *BadRequest
+	JSON401      *Unauthorized
+	JSON404      *NotFound
+	JSON409      *Conflict
+	JSON500      *InternalError
+	JSON503      *ServiceUnavailable
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateSocialProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateSocialProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateSocialProviderResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -1458,6 +2422,66 @@ func (r SetUserRoleResponse) ContentType() string {
 	return ""
 }
 
+// ClearMailConfigWithBodyWithResponse request with arbitrary body returning *ClearMailConfigResponse
+func (c *ClientWithResponses) ClearMailConfigWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ClearMailConfigResponse, error) {
+	rsp, err := c.ClearMailConfigWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseClearMailConfigResponse(rsp)
+}
+
+func (c *ClientWithResponses) ClearMailConfigWithResponse(ctx context.Context, body ClearMailConfigJSONRequestBody, reqEditors ...RequestEditorFn) (*ClearMailConfigResponse, error) {
+	rsp, err := c.ClearMailConfig(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseClearMailConfigResponse(rsp)
+}
+
+// GetMailConfigWithResponse request returning *GetMailConfigResponse
+func (c *ClientWithResponses) GetMailConfigWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetMailConfigResponse, error) {
+	rsp, err := c.GetMailConfig(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMailConfigResponse(rsp)
+}
+
+// UpdateMailConfigWithBodyWithResponse request with arbitrary body returning *UpdateMailConfigResponse
+func (c *ClientWithResponses) UpdateMailConfigWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateMailConfigResponse, error) {
+	rsp, err := c.UpdateMailConfigWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateMailConfigResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateMailConfigWithResponse(ctx context.Context, body UpdateMailConfigJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateMailConfigResponse, error) {
+	rsp, err := c.UpdateMailConfig(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateMailConfigResponse(rsp)
+}
+
+// SendMailConfigTestWithBodyWithResponse request with arbitrary body returning *SendMailConfigTestResponse
+func (c *ClientWithResponses) SendMailConfigTestWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SendMailConfigTestResponse, error) {
+	rsp, err := c.SendMailConfigTestWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSendMailConfigTestResponse(rsp)
+}
+
+func (c *ClientWithResponses) SendMailConfigTestWithResponse(ctx context.Context, body SendMailConfigTestJSONRequestBody, reqEditors ...RequestEditorFn) (*SendMailConfigTestResponse, error) {
+	rsp, err := c.SendMailConfigTest(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSendMailConfigTestResponse(rsp)
+}
+
 // ValidateSessionWithResponse request returning *ValidateSessionResponse
 func (c *ClientWithResponses) ValidateSessionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ValidateSessionResponse, error) {
 	rsp, err := c.ValidateSession(ctx, reqEditors...)
@@ -1465,6 +2489,41 @@ func (c *ClientWithResponses) ValidateSessionWithResponse(ctx context.Context, r
 		return nil, err
 	}
 	return ParseValidateSessionResponse(rsp)
+}
+
+// GetSocialProviderCapabilitiesWithResponse request returning *GetSocialProviderCapabilitiesResponse
+func (c *ClientWithResponses) GetSocialProviderCapabilitiesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSocialProviderCapabilitiesResponse, error) {
+	rsp, err := c.GetSocialProviderCapabilities(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSocialProviderCapabilitiesResponse(rsp)
+}
+
+// GetSocialProviderWithResponse request returning *GetSocialProviderResponse
+func (c *ClientWithResponses) GetSocialProviderWithResponse(ctx context.Context, provider SocialProvider, reqEditors ...RequestEditorFn) (*GetSocialProviderResponse, error) {
+	rsp, err := c.GetSocialProvider(ctx, provider, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSocialProviderResponse(rsp)
+}
+
+// UpdateSocialProviderWithBodyWithResponse request with arbitrary body returning *UpdateSocialProviderResponse
+func (c *ClientWithResponses) UpdateSocialProviderWithBodyWithResponse(ctx context.Context, provider SocialProvider, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSocialProviderResponse, error) {
+	rsp, err := c.UpdateSocialProviderWithBody(ctx, provider, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSocialProviderResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateSocialProviderWithResponse(ctx context.Context, provider SocialProvider, body UpdateSocialProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSocialProviderResponse, error) {
+	rsp, err := c.UpdateSocialProvider(ctx, provider, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSocialProviderResponse(rsp)
 }
 
 // BanUserWithBodyWithResponse request with arbitrary body returning *BanUserResponse
@@ -1578,6 +2637,222 @@ func (c *ClientWithResponses) SetUserRoleWithResponse(ctx context.Context, id Au
 	return ParseSetUserRoleResponse(rsp)
 }
 
+// ParseClearMailConfigResponse parses an HTTP response from a ClearMailConfigWithResponse call
+func ParseClearMailConfigResponse(rsp *http.Response) (*ClearMailConfigResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ClearMailConfigResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MailMutationSuccess
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetMailConfigResponse parses an HTTP response from a GetMailConfigWithResponse call
+func ParseGetMailConfigResponse(rsp *http.Response) (*GetMailConfigResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetMailConfigResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MailConfigSuccess
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateMailConfigResponse parses an HTTP response from a UpdateMailConfigWithResponse call
+func ParseUpdateMailConfigResponse(rsp *http.Response) (*UpdateMailConfigResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateMailConfigResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MailConfigSuccess
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSendMailConfigTestResponse parses an HTTP response from a SendMailConfigTestWithResponse call
+func ParseSendMailConfigTestResponse(rsp *http.Response) (*SendMailConfigTestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SendMailConfigTestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MailMutationSuccess
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseValidateSessionResponse parses an HTTP response from a ValidateSessionWithResponse call
 func ParseValidateSessionResponse(rsp *http.Response) (*ValidateSessionResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -1612,6 +2887,175 @@ func ParseValidateSessionResponse(rsp *http.Response) (*ValidateSessionResponse,
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSocialProviderCapabilitiesResponse parses an HTTP response from a GetSocialProviderCapabilitiesWithResponse call
+func ParseGetSocialProviderCapabilitiesResponse(rsp *http.Response) (*GetSocialProviderCapabilitiesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSocialProviderCapabilitiesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SocialCapabilitiesSuccess
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSocialProviderResponse parses an HTTP response from a GetSocialProviderWithResponse call
+func ParseGetSocialProviderResponse(rsp *http.Response) (*GetSocialProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSocialProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SocialProviderSuccess
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateSocialProviderResponse parses an HTTP response from a UpdateSocialProviderWithResponse call
+func ParseUpdateSocialProviderResponse(rsp *http.Response) (*UpdateSocialProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateSocialProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SocialProviderSuccess
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Unauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest NotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Conflict
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest InternalError
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest ServiceUnavailable
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

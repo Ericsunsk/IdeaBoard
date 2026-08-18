@@ -14,7 +14,6 @@ vi.mock('../../../shared/auth/client', () => ({
     signOut: vi.fn(),
     getSession: vi.fn(),
     admin: {
-      impersonateUser: vi.fn(),
       stopImpersonating: vi.fn(),
     },
     useSession: vi.fn(),

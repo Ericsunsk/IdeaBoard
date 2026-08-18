@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -172,79 +171,145 @@ func (e *MailConfigError) Error() string {
 }
 
 func (c *ServiceClient) GetMailConfig(ctx context.Context) (*MailConfigSummary, error) {
-	var summary MailConfigSummary
-	if err := c.mailConfigRequest(ctx, http.MethodGet, "/internal/mail/config", nil, &summary); err != nil {
+	client, err := c.contractClient()
+	if err != nil {
 		return nil, err
 	}
-	return &summary, nil
+	response, err := client.GetMailConfigWithResponse(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode() != http.StatusOK || response.JSON200 == nil {
+		return nil, mailConfigContractFailure("get mail config", response.StatusCode(), response.Body)
+	}
+	if _, err := requireSuccessEnvelopeFields(response.Body); err != nil || response.JSON200.Code != 0 {
+		return nil, fmt.Errorf("auth service get mail config returned an invalid success envelope: %w", err)
+	}
+	return convertMailConfigSummary(response.JSON200.Data), nil
 }
 
 func (c *ServiceClient) UpdateMailConfig(ctx context.Context, input MailConfigUpdate, actorID int64) (*MailConfigSummary, error) {
-	var summary MailConfigSummary
-	body := map[string]any{
-		"from_name":  input.FromName,
-		"from_email": input.FromEmail,
-		"actor_id":   actorID,
-	}
-	if strings.TrimSpace(input.APIKey) != "" {
-		body["api_key"] = input.APIKey
-	}
-	if strings.TrimSpace(input.ReplyTo) != "" {
-		body["reply_to"] = input.ReplyTo
-	}
-	if err := c.mailConfigRequest(ctx, http.MethodPut, "/internal/mail/config", body, &summary); err != nil {
+	client, err := c.contractClient()
+	if err != nil {
 		return nil, err
 	}
-	return &summary, nil
+	body := internalcontract.UpdateMailConfigJSONRequestBody{
+		FromName: input.FromName, FromEmail: input.FromEmail, ActorID: actorID,
+	}
+	if value := strings.TrimSpace(input.APIKey); value != "" {
+		body.APIKey = &value
+	}
+	if value := strings.TrimSpace(input.ReplyTo); value != "" {
+		body.ReplyTo = &value
+	}
+	response, err := client.UpdateMailConfigWithResponse(ctx, body)
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode() != http.StatusOK || response.JSON200 == nil {
+		return nil, mailConfigContractFailure("update mail config", response.StatusCode(), response.Body)
+	}
+	if _, err := requireSuccessEnvelopeFields(response.Body); err != nil || response.JSON200.Code != 0 {
+		return nil, fmt.Errorf("auth service update mail config returned an invalid success envelope: %w", err)
+	}
+	return convertMailConfigSummary(response.JSON200.Data), nil
 }
 
 func (c *ServiceClient) ClearMailConfig(ctx context.Context, actorID int64) error {
-	var envelope struct {
-		Code int    `json:"code"`
-		Msg  string `json:"msg"`
+	client, err := c.contractClient()
+	if err != nil {
+		return err
 	}
-	return c.mailConfigRequest(ctx, http.MethodDelete, "/internal/mail/config", map[string]any{"actor_id": actorID}, &envelope)
+	response, err := client.ClearMailConfigWithResponse(ctx, internalcontract.ActorRequest{ActorID: actorID})
+	if err != nil {
+		return err
+	}
+	if response.StatusCode() != http.StatusOK || response.JSON200 == nil {
+		return mailConfigContractFailure("clear mail config", response.StatusCode(), response.Body)
+	}
+	if _, err := requireSuccessEnvelopeFields(response.Body); err != nil || response.JSON200.Code != 0 || !bool(response.JSON200.Data.Ok) {
+		return fmt.Errorf("auth service clear mail config returned an invalid success envelope")
+	}
+	return nil
 }
 
 func (c *ServiceClient) SendMailConfigTest(ctx context.Context, recipient string, actorID int64) error {
-	var envelope struct {
-		Code int    `json:"code"`
-		Msg  string `json:"msg"`
+	client, err := c.contractClient()
+	if err != nil {
+		return err
 	}
-	return c.mailConfigRequest(ctx, http.MethodPost, "/internal/mail/config/test", map[string]any{"recipient": recipient, "actor_id": actorID}, &envelope)
+	response, err := client.SendMailConfigTestWithResponse(ctx, internalcontract.MailTestRequest{Recipient: recipient, ActorID: actorID})
+	if err != nil {
+		return err
+	}
+	if response.StatusCode() != http.StatusOK || response.JSON200 == nil {
+		return mailConfigContractFailure("send mail config test", response.StatusCode(), response.Body)
+	}
+	if _, err := requireSuccessEnvelopeFields(response.Body); err != nil || response.JSON200.Code != 0 || !bool(response.JSON200.Data.Ok) {
+		return fmt.Errorf("auth service send mail config test returned an invalid success envelope")
+	}
+	return nil
 }
 
 func (c *ServiceClient) GetSocialProviderSettings(ctx context.Context, provider string) (*SocialProviderSettingsSummary, error) {
-	var summary SocialProviderSettingsSummary
-	path := "/internal/social-providers/" + url.PathEscape(strings.TrimSpace(provider))
-	if err := c.socialProviderRequest(ctx, http.MethodGet, path, nil, &summary, true); err != nil {
+	client, err := c.contractClient()
+	if err != nil {
 		return nil, err
 	}
-	return &summary, nil
+	response, err := client.GetSocialProviderWithResponse(ctx, internalcontract.SocialProvider(strings.TrimSpace(provider)))
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode() != http.StatusOK || response.JSON200 == nil {
+		return nil, socialProviderContractFailure("get social provider", response.StatusCode(), response.Body)
+	}
+	if _, err := requireSuccessEnvelopeFields(response.Body); err != nil || response.JSON200.Code != 0 {
+		return nil, fmt.Errorf("auth service get social provider returned an invalid success envelope")
+	}
+	return convertSocialProviderSummary(response.JSON200.Data), nil
 }
 
 func (c *ServiceClient) UpdateSocialProviderSettings(ctx context.Context, provider string, input SocialProviderSettingsUpdate) (*SocialProviderSettingsSummary, error) {
-	body := map[string]any{
-		"enabled":   input.Enabled,
-		"client_id": input.ClientID,
-	}
-	if strings.TrimSpace(input.ClientSecret) != "" {
-		body["client_secret"] = input.ClientSecret
-	}
-	var summary SocialProviderSettingsSummary
-	path := "/internal/social-providers/" + url.PathEscape(strings.TrimSpace(provider))
-	if err := c.socialProviderRequest(ctx, http.MethodPut, path, body, &summary, true); err != nil {
+	client, err := c.contractClient()
+	if err != nil {
 		return nil, err
 	}
-	return &summary, nil
+	body := internalcontract.UpdateSocialProviderJSONRequestBody{Enabled: input.Enabled, ClientId: input.ClientID}
+	if value := strings.TrimSpace(input.ClientSecret); value != "" {
+		body.ClientSecret = &value
+	}
+	response, err := client.UpdateSocialProviderWithResponse(ctx, internalcontract.SocialProvider(strings.TrimSpace(provider)), body)
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode() != http.StatusOK || response.JSON200 == nil {
+		return nil, socialProviderContractFailure("update social provider", response.StatusCode(), response.Body)
+	}
+	if _, err := requireSuccessEnvelopeFields(response.Body); err != nil || response.JSON200.Code != 0 {
+		return nil, fmt.Errorf("auth service update social provider returned an invalid success envelope")
+	}
+	return convertSocialProviderSummary(response.JSON200.Data), nil
 }
 
 func (c *ServiceClient) GetSocialProviderCapabilities(ctx context.Context) (*SocialProviderCapabilities, error) {
-	var capabilities SocialProviderCapabilities
-	if err := c.socialProviderRequest(ctx, http.MethodGet, "/api/auth/capabilities", nil, &capabilities, false); err != nil {
+	client, err := c.contractClient()
+	if err != nil {
 		return nil, err
 	}
-	return &capabilities, nil
+	response, err := client.GetSocialProviderCapabilitiesWithResponse(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode() != http.StatusOK || response.JSON200 == nil {
+		return nil, socialProviderContractFailure("get social provider capabilities", response.StatusCode(), response.Body)
+	}
+	if _, err := requireSuccessEnvelopeFields(response.Body); err != nil || response.JSON200.Code != 0 {
+		return nil, fmt.Errorf("auth service get social provider capabilities returned an invalid success envelope")
+	}
+	return &SocialProviderCapabilities{Social: map[string]bool{
+		"google":  response.JSON200.Data.Social.Google,
+		"discord": response.JSON200.Data.Social.Discord,
+	}}, nil
 }
 
 // ImpersonateUser bridges the Admin API session to Better Auth's native
@@ -290,122 +355,31 @@ func (c *ServiceClient) ImpersonateUser(ctx context.Context, cookieHeader string
 	return nil, &ImpersonationError{Status: http.StatusBadGateway, Message: "认证服务未返回伪装 Session"}
 }
 
-func (c *ServiceClient) socialProviderRequest(ctx context.Context, method, path string, body any, result any, includeInternalKey bool) error {
-	if _, err := c.contractClient(); err != nil {
-		return err
+func convertMailConfigSummary(value internalcontract.MailConfigSummary) *MailConfigSummary {
+	return &MailConfigSummary{
+		Configured: value.Configured, APIKeyConfigured: value.ApiKeyConfigured,
+		FromName: value.FromName, FromEmail: value.FromEmail, ReplyTo: value.ReplyTo,
+		ConfigVersion: value.ConfigVersion, Readiness: string(value.Readiness),
+		UpdatedAt: formatContractTime(value.UpdatedAt), LastTestedAt: formatContractTime(value.LastTestedAt),
+		LastTestErrorCode: value.LastTestErrorCode,
 	}
-	if strings.TrimSpace(c.baseURL) == "" {
-		return fmt.Errorf("auth service base URL is not configured")
-	}
-	var reader io.Reader
-	if body != nil {
-		payload, err := json.Marshal(body)
-		if err != nil {
-			return fmt.Errorf("encode auth social provider request: %w", err)
-		}
-		reader = strings.NewReader(string(payload))
-	}
-	request, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reader)
-	if err != nil {
-		return fmt.Errorf("build auth social provider request: %w", err)
-	}
-	if body != nil {
-		request.Header.Set("Content-Type", "application/json")
-	}
-	if includeInternalKey && c.internalKey != "" {
-		request.Header.Set("X-Internal-Key", c.internalKey)
-	}
-	upstreamResponse, err := c.httpClient.Do(request)
-	if err != nil {
-		return fmt.Errorf("call auth social provider service: %w", err)
-	}
-	defer upstreamResponse.Body.Close()
-	payload, err := io.ReadAll(upstreamResponse.Body)
-	if err != nil {
-		return fmt.Errorf("read auth social provider response: %w", err)
-	}
-	var envelope struct {
-		Code *int            `json:"code"`
-		Msg  *string         `json:"msg"`
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal(payload, &envelope); err != nil {
-		return &SocialProviderSettingsError{Status: http.StatusBadGateway, Message: "认证服务返回无效响应"}
-	}
-	if upstreamResponse.StatusCode < 200 || upstreamResponse.StatusCode >= 300 || envelope.Code == nil || envelope.Msg == nil || *envelope.Code != 0 {
-		message := "OAuth Provider 配置操作失败"
-		if envelope.Msg != nil && strings.TrimSpace(*envelope.Msg) != "" {
-			message = strings.TrimSpace(*envelope.Msg)
-		}
-		return &SocialProviderSettingsError{Status: upstreamResponse.StatusCode, Message: message}
-	}
-	if len(envelope.Data) == 0 || string(envelope.Data) == "null" {
-		return &SocialProviderSettingsError{Status: http.StatusBadGateway, Message: "认证服务返回无效响应"}
-	}
-	if err := json.Unmarshal(envelope.Data, result); err != nil {
-		return &SocialProviderSettingsError{Status: http.StatusBadGateway, Message: "认证服务返回无效响应"}
-	}
-	return nil
 }
 
-func (c *ServiceClient) mailConfigRequest(ctx context.Context, method, path string, body any, result any) error {
-	if _, err := c.contractClient(); err != nil {
-		return err
+func convertSocialProviderSummary(value internalcontract.SocialProviderSummary) *SocialProviderSettingsSummary {
+	return &SocialProviderSettingsSummary{
+		Provider: string(value.Provider), Enabled: value.Enabled, Configured: value.Configured,
+		Available: value.Available, ClientID: value.ClientId, ClientSecretConfigured: value.ClientSecretConfigured,
+		Scopes: value.Scopes, ConfigVersion: value.ConfigVersion, CallbackURL: value.CallbackUrl,
+		UpdatedAt: formatContractTime(value.UpdatedAt),
 	}
-	if strings.TrimSpace(c.baseURL) == "" {
-		return fmt.Errorf("auth service base URL is not configured")
+}
+
+func formatContractTime(value *time.Time) *string {
+	if value == nil {
+		return nil
 	}
-	var reader io.Reader
-	if body != nil {
-		payload, err := json.Marshal(body)
-		if err != nil {
-			return fmt.Errorf("encode auth mail configuration request: %w", err)
-		}
-		reader = strings.NewReader(string(payload))
-	}
-	request, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reader)
-	if err != nil {
-		return fmt.Errorf("build auth mail configuration request: %w", err)
-	}
-	if body != nil {
-		request.Header.Set("Content-Type", "application/json")
-	}
-	if c.internalKey != "" {
-		request.Header.Set("X-Internal-Key", c.internalKey)
-	}
-	response, err := c.httpClient.Do(request)
-	if err != nil {
-		return fmt.Errorf("call auth mail configuration: %w", err)
-	}
-	defer response.Body.Close()
-	payload, err := io.ReadAll(response.Body)
-	if err != nil {
-		return fmt.Errorf("read auth mail configuration response: %w", err)
-	}
-	var envelope struct {
-		Code *int            `json:"code"`
-		Msg  *string         `json:"msg"`
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.Unmarshal(payload, &envelope); err != nil {
-		return &MailConfigError{Status: response.StatusCode, Message: "认证服务返回无效响应"}
-	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 || envelope.Code == nil || envelope.Msg == nil || *envelope.Code != 0 {
-		message := "邮件配置操作失败"
-		if envelope.Msg != nil && strings.TrimSpace(*envelope.Msg) != "" {
-			message = strings.TrimSpace(*envelope.Msg)
-		}
-		return &MailConfigError{Status: response.StatusCode, Message: message}
-	}
-	if result != nil && (len(envelope.Data) == 0 || string(envelope.Data) == "null") {
-		return &MailConfigError{Status: http.StatusBadGateway, Message: "认证服务返回无效响应"}
-	}
-	if result != nil {
-		if err := json.Unmarshal(envelope.Data, result); err != nil {
-			return fmt.Errorf("decode auth mail configuration response: %w", err)
-		}
-	}
-	return nil
+	formatted := value.UTC().Format(time.RFC3339Nano)
+	return &formatted
 }
 
 func (c *ServiceClient) ValidateSession(ctx context.Context, cookieHeader string) (*SessionIdentity, error) {
@@ -781,6 +755,28 @@ func contractFailure(action string, status int, body []byte) error {
 		return fmt.Errorf("auth service %s returned an invalid error envelope: %w", action, err)
 	}
 	return contractFailureWithEnvelope(action, status, failure)
+}
+
+func mailConfigContractFailure(action string, status int, body []byte) error {
+	failure, err := decodeContractFailure(body)
+	if err != nil {
+		return &MailConfigError{Status: http.StatusBadGateway, Message: fmt.Sprintf("认证服务返回无效响应: %s", err)}
+	}
+	if failure.Code != status {
+		return &MailConfigError{Status: http.StatusBadGateway, Message: fmt.Sprintf("认证服务返回无效错误状态: code=%d status=%d", failure.Code, status)}
+	}
+	return &MailConfigError{Status: status, Message: nonEmpty(failure.Msg, fmt.Sprintf("%s failed", action))}
+}
+
+func socialProviderContractFailure(action string, status int, body []byte) error {
+	failure, err := decodeContractFailure(body)
+	if err != nil {
+		return &SocialProviderSettingsError{Status: http.StatusBadGateway, Message: "认证服务返回无效响应"}
+	}
+	if failure.Code != status {
+		return &SocialProviderSettingsError{Status: http.StatusBadGateway, Message: fmt.Sprintf("认证服务返回无效错误状态: code=%d status=%d", failure.Code, status)}
+	}
+	return &SocialProviderSettingsError{Status: status, Message: nonEmpty(failure.Msg, fmt.Sprintf("%s failed", action))}
 }
 
 func validateContractFailureStatus(status int, failure internalcontract.ErrorEnvelope) error {

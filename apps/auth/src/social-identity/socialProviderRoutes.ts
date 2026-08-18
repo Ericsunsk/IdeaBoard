@@ -5,6 +5,7 @@ import {
   SocialProviderSettingsError,
   type SocialProviderSettingsService,
 } from "./socialProviderSettings.js";
+import { authInternalRoutes } from "../generated/auth-internal/routes.gen.js";
 
 type SocialProviderRouteService = Pick<
   SocialProviderSettingsService,
@@ -68,7 +69,16 @@ export function registerSocialProviderRoutes(
   );
 
   app.get(
-    "/internal/social-providers/:provider",
+    authInternalRoutes.getSocialProviderCapabilities.fastifyPath,
+    { preHandler: requireInternalKey },
+    async (_request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      sendSuccess(reply, await options.getPublicCapabilities());
+    },
+  );
+
+  app.get(
+    authInternalRoutes.getSocialProvider.fastifyPath,
     { preHandler: requireInternalKey },
     async (request, reply) => {
       reply.header("Cache-Control", "no-store");
@@ -82,7 +92,7 @@ export function registerSocialProviderRoutes(
   );
 
   app.put(
-    "/internal/social-providers/:provider",
+    authInternalRoutes.updateSocialProvider.fastifyPath,
     { preHandler: requireInternalKey },
     async (request, reply) => {
       reply.header("Cache-Control", "no-store");

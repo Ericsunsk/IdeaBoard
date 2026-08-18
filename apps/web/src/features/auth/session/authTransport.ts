@@ -6,10 +6,7 @@ import {
 import { resolveAuthUrl } from '../../../shared/config/runtimeUrls'
 import { USER_AUTH_CALLBACK_PATH } from '../../../shared/constants/routePaths'
 import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
-import {
-  getOAuthProviderLabel,
-  type OAuthProviderCode,
-} from '../../../shared/auth/oauthProviders'
+import { getOAuthProviderLabel, type OAuthProviderCode } from '../../../shared/auth/oauthProviders'
 
 async function requestAuthEndpoint(
   path: string,
@@ -227,13 +224,6 @@ export const authTransport = {
 
   useSession() {
     return authClient.useSession()
-  },
-
-  async startImpersonation(authUserId: string): Promise<void> {
-    const { error } = await authClient.admin.impersonateUser({ userId: authUserId })
-    if (error) {
-      throw new Error(extractBetterAuthErrorMessage(error, '伪装失败'))
-    }
   },
 
   async stopImpersonating(): Promise<void> {

@@ -13,8 +13,7 @@ const mocks = vi.hoisted(() => ({
   },
   routerPush: vi.fn(),
   routerReplace: vi.fn(),
-  ensureSession: vi.fn(),
-  clearAuth: vi.fn(),
+  completeOAuthCallback: vi.fn(),
   login: vi.fn(),
   logout: vi.fn(),
   getCapabilities: vi.fn(),
@@ -33,8 +32,7 @@ vi.mock('../session/authSession', () => ({
     isAdmin: false,
     login: mocks.login,
     logout: mocks.logout,
-    ensureSession: mocks.ensureSession,
-    clearAuth: mocks.clearAuth,
+    completeOAuthCallback: mocks.completeOAuthCallback,
   }),
 }))
 
@@ -204,7 +202,7 @@ describe('UserAuthCallbackPage', () => {
     vi.clearAllMocks()
     mocks.route.path = '/user/auth/callback'
     mocks.route.query = {}
-    mocks.ensureSession.mockResolvedValue({ public_id: 'user-public-id' })
+    mocks.completeOAuthCallback.mockResolvedValue(true)
     mocks.logout.mockResolvedValue(true)
   })
 
@@ -214,11 +212,12 @@ describe('UserAuthCallbackPage', () => {
     renderCallbackPage()
 
     await waitFor(() => {
-      expect(mocks.ensureSession).toHaveBeenCalledWith({ fresh: true })
-      expect(mocks.routerReplace).toHaveBeenCalledWith('/user/boards?view=recent#owned')
+      expect(mocks.completeOAuthCallback).toHaveBeenCalledWith({
+        providerError: undefined,
+        redirectPath: '/user/boards?view=recent#owned',
+        replace: expect.any(Function),
+      })
     })
-    expect(mocks.logout).not.toHaveBeenCalled()
-    expect(mocks.clearAuth).not.toHaveBeenCalled()
   })
 
   it('rejects an external redirect and falls back to User Boards', async () => {
@@ -226,27 +225,23 @@ describe('UserAuthCallbackPage', () => {
 
     renderCallbackPage()
 
-    await waitFor(() => expect(mocks.routerReplace).toHaveBeenCalledWith('/user/boards'))
-    expect(mocks.routerReplace).not.toHaveBeenCalledWith(
-      expect.stringContaining('attacker.example'),
-    )
+    await waitFor(() => expect(mocks.completeOAuthCallback).toHaveBeenCalledOnce())
   })
 
-  it('logs out, clears local auth, removes callback details, and shows only a generic error', async () => {
+  it('shows only a generic error when the session transition rejects the callback', async () => {
     mocks.route.query = {
       error: 'access_denied:provider-raw-detail',
       redirect: '/user/boards',
     }
+    mocks.completeOAuthCallback.mockResolvedValue(false)
 
     renderCallbackPage()
 
     expect(await screen.findByText('OAuth 登录失败，请重新尝试。')).toBeVisible()
-    expect(mocks.ensureSession).not.toHaveBeenCalled()
-    expect(mocks.logout).toHaveBeenCalledOnce()
-    expect(mocks.clearAuth).toHaveBeenCalledOnce()
-    expect(mocks.routerReplace).toHaveBeenCalledWith({
-      path: '/user/auth/callback',
-      query: {},
+    expect(mocks.completeOAuthCallback).toHaveBeenCalledWith({
+      providerError: 'access_denied:provider-raw-detail',
+      redirectPath: '/user/boards',
+      replace: expect.any(Function),
     })
     expect(screen.queryByText(/provider-raw-detail/)).not.toBeInTheDocument()
   })

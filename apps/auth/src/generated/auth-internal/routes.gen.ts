@@ -49,6 +49,48 @@ export const authInternalRoutes = {
     fastifyPath: "/internal/users/revoke-sessions",
     responseStatuses: [200,400,401,404,409,500],
   },
+  "getMailConfig": {
+    method: "GET",
+    openapiPath: "/internal/mail/config",
+    fastifyPath: "/internal/mail/config",
+    responseStatuses: [200,401,500],
+  },
+  "updateMailConfig": {
+    method: "PUT",
+    openapiPath: "/internal/mail/config",
+    fastifyPath: "/internal/mail/config",
+    responseStatuses: [200,400,401,409,500,503],
+  },
+  "clearMailConfig": {
+    method: "DELETE",
+    openapiPath: "/internal/mail/config",
+    fastifyPath: "/internal/mail/config",
+    responseStatuses: [200,400,401,409,500],
+  },
+  "sendMailConfigTest": {
+    method: "POST",
+    openapiPath: "/internal/mail/config/test",
+    fastifyPath: "/internal/mail/config/test",
+    responseStatuses: [200,400,401,409,500,503],
+  },
+  "getSocialProviderCapabilities": {
+    method: "GET",
+    openapiPath: "/internal/social-providers/capabilities",
+    fastifyPath: "/internal/social-providers/capabilities",
+    responseStatuses: [200,401,500,503],
+  },
+  "getSocialProvider": {
+    method: "GET",
+    openapiPath: "/internal/social-providers/{provider}",
+    fastifyPath: "/internal/social-providers/:provider",
+    responseStatuses: [200,401,404,500,503],
+  },
+  "updateSocialProvider": {
+    method: "PUT",
+    openapiPath: "/internal/social-providers/{provider}",
+    fastifyPath: "/internal/social-providers/:provider",
+    responseStatuses: [200,400,401,404,409,500,503],
+  },
 } as const
 
 export type AuthInternalOperationID = keyof typeof authInternalRoutes

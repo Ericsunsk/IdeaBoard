@@ -1,5 +1,4 @@
 import { useUserStore } from '../../auth/session/authSession'
-import { clearAuthScopedQueryCache } from '../../../shared/query/queryClient'
 import { impersonateAdminUser } from './adminUserApi'
 
 export type AdminUserRedirect = {
@@ -30,7 +29,6 @@ export function createAdminUserSessionCommands(
       await impersonateAdminUser(publicId)
 
       userStore.clearAuth()
-      clearAuthScopedQueryCache()
       redirect.schedule('/', 1000)
     },
   }
