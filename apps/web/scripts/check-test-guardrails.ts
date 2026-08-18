@@ -68,6 +68,12 @@ const componentHarnessExceptions: ExceptionMap<ComponentHarnessException> = {
 const componentRenderHelperExceptions: ExceptionMap<Exception> = {}
 
 const componentClassAssertionExceptions: ExceptionMap<Exception> = {
+  'src/features/auth/pages/OAuthFlow.component.spec.ts': [
+    {
+      reason:
+        'Verifies the one-provider OAuth layout contract that makes a single login button span the full row.',
+    },
+  ],
   'src/features/admin/task-monitor/AdminTaskResultDialog.component.spec.ts': [
     {
       reason:

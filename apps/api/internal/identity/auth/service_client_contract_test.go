@@ -122,7 +122,7 @@ func TestServiceClientSocialProviderProxyUsesStableContract(t *testing.T) {
 		case r.Method == http.MethodGet && r.URL.Path == "/internal/social-providers/capabilities":
 			assertContractInternalKey(t, r)
 			writeContractJSON(w, http.StatusOK, map[string]any{
-					"code": 0, "msg": "success", "data": map[string]any{"social": map[string]bool{"google": true, "discord": true}},
+				"code": 0, "msg": "success", "data": map[string]any{"social": map[string]bool{"google": true, "discord": true}},
 			})
 		default:
 			http.NotFound(w, r)

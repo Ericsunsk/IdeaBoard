@@ -836,7 +836,7 @@ function assertAdminShellAccountMenuReturnsToBoards(playwrightCli: CommandSpec) 
       'if (await legacyProfileItem.isVisible().catch(() => false)) {',
       '  throw new Error("Admin account menu should not link to personal center")',
       '}',
-      'const boardsItem = page.getByText("返回画布列表", { exact: true }).first()',
+      'const boardsItem = page.getByRole("menuitem").first()',
       'await boardsItem.waitFor({ state: "visible", timeout: 10000 })',
       'await boardsItem.click()',
       'await page.waitForURL((url) => url.pathname === "/user/boards", { timeout: 10000 })',

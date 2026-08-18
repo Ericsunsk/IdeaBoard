@@ -159,7 +159,7 @@ func applyAtlasMigration(ctx context.Context, rawDSN, schemaName string) error {
 	if atlasBinary == "" {
 		atlasBinary = "atlas"
 	}
-	command := exec.CommandContext(ctx, atlasBinary, "migrate", "apply", "--allow-dirty", "--revisions-schema", schemaName, "--dir", "file://"+filepath.ToSlash(migrationDir), "--url", parsed.String())
+	command := exec.CommandContext(ctx, atlasBinary, "migrate", "apply", "--allow-dirty", "--revisions-schema", schemaName, "--skip-lock", "--dir", "file://"+filepath.ToSlash(migrationDir), "--url", parsed.String())
 	output, err := command.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("atlas migrate apply: %w: %s", err, strings.TrimSpace(string(output)))

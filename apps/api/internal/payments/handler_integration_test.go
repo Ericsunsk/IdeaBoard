@@ -361,6 +361,9 @@ func waitForPaymentSubscriber(t *testing.T, hub *EventHub, userID int64) {
 func TestUserCheckoutHTTPRejectsWalletWithoutRechargeEligibility(t *testing.T) {
 	secretstest.EnableEncryption(t)
 	db, pool := testdb.OpenWithPool(t)
+	if _, err := db.ExecContext(t.Context(), `UPDATE credit_wallets SET status = 'frozen' WHERE user_id = 88`); err != nil {
+		t.Fatalf("freeze test wallet: %v", err)
+	}
 	service := newConfiguredPurchaseService(
 		t, db, configuredFakeStripeGateway("acct_locked_http", "prod_locked_http"),
 		&fakeCheckoutGateway{}, credits.NewService(pool),
