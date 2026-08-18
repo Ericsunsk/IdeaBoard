@@ -1183,7 +1183,9 @@ paths:
         required: true
         schema:
           type: string
-          enum: [google, discord]
+          minLength: 1
+          maxLength: 64
+          pattern: '^[a-z][a-z0-9_-]*$'
     get:
       tags: [AdminUsers]
       operationId: getAdminOAuthProviderSettings
@@ -2613,7 +2615,8 @@ components:
       properties:
         provider:
           type: string
-          enum: [google, discord]
+          minLength: 1
+          maxLength: 64
         enabled: { type: boolean }
         configured: { type: boolean }
         available: { type: boolean }
@@ -2653,6 +2656,19 @@ components:
           type: object
           additionalProperties:
             type: boolean
+        providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/OAuthProviderCapability'
+
+    OAuthProviderCapability:
+      type: object
+      additionalProperties: false
+      required: [provider, label, available]
+      properties:
+        provider: { type: string, minLength: 1, maxLength: 64 }
+        label: { type: string }
+        available: { type: boolean }
 
     AdminCreditGrantRequest:
       type: object

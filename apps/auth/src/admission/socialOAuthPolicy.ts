@@ -4,6 +4,7 @@ import type {
   AuthAdmissionPolicy,
   AuthRegistrationEntry,
 } from "./authAdmissionPolicy.js";
+import { isSupportedSocialProvider } from "../social-identity/catalog.js";
 
 type AuthHookContext = {
   path: string;
@@ -20,7 +21,7 @@ export async function applySocialOAuthRequestPolicy(
 ): Promise<void> {
   if (!context.body || typeof context.body !== "object") return;
   const body = context.body as Record<string, unknown>;
-  if (body.provider !== "google" && body.provider !== "discord") return;
+  if (typeof body.provider !== "string" || !isSupportedSocialProvider(body.provider)) return;
   if (context.path !== "/sign-in/social" && context.path !== "/link-social") {
     return;
   }
@@ -29,9 +30,7 @@ export async function applySocialOAuthRequestPolicy(
   // caller value keeps the server-side provider definition as the allowlist.
   delete body.scopes;
   if (context.path === "/sign-in/social") {
-    const decision = await admissionPolicy.admitRegistration(
-      body.provider === "discord" ? "discord_oauth" : "google_oauth",
-    );
+    const decision = await admissionPolicy.admitRegistration(`${body.provider}_oauth`);
     body.requestSignUp = decision.allowed;
   }
 }

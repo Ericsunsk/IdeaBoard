@@ -67,25 +67,35 @@ export const authTransport = {
     }
   },
 
-  async getCapabilities(): Promise<{ social: Record<OAuthProviderCode, boolean> }> {
+  async getCapabilities(): Promise<{
+    social: Record<OAuthProviderCode, boolean>
+    providers?: Array<{ provider: OAuthProviderCode; label: string; available: boolean }>
+  }> {
     try {
       const response = await fetch(resolveAuthUrl('/api/auth/capabilities'), {
         credentials: 'include',
         cache: 'no-store',
       })
-      if (!response.ok) return { social: { google: false, discord: false } }
+      if (!response.ok) return { social: {} }
       const payload = (await response.json().catch(() => null)) as {
-        data?: { social?: Record<string, unknown> }
+        data?: {
+          social?: Record<string, unknown>
+          providers?: Array<{ provider?: unknown; label?: unknown; available?: unknown }>
+        }
       } | null
       const social = payload?.data?.social
       return {
-        social: {
-          google: social?.google === true,
-          discord: social?.discord === true,
-        },
+        social: Object.fromEntries(
+          Object.entries(social ?? {}).map(([provider, available]) => [provider, available === true]),
+        ),
+        providers: payload?.data?.providers?.flatMap((provider) =>
+          typeof provider.provider === 'string' && typeof provider.label === 'string'
+            ? [{ provider: provider.provider, label: provider.label, available: provider.available === true }]
+            : [],
+        ),
       }
     } catch {
-      return { social: { google: false, discord: false } }
+      return { social: {} }
     }
   },
 

@@ -1,12 +1,9 @@
-export const OAUTH_PROVIDER_CODES = ['google', 'discord'] as const
-
-export type OAuthProviderCode = (typeof OAUTH_PROVIDER_CODES)[number]
-
-export const OAUTH_PROVIDER_LABELS: Record<OAuthProviderCode, string> = {
-  google: 'Google',
-  discord: 'Discord',
-}
+export type OAuthProviderCode = string
 
 export function getOAuthProviderLabel(provider: OAuthProviderCode): string {
-  return OAUTH_PROVIDER_LABELS[provider]
+  return provider
+    .split(/[-_]/g)
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(' ')
 }

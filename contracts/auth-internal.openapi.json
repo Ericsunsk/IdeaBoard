@@ -452,7 +452,9 @@
         "required": true,
         "schema": {
           "type": "string",
-          "enum": ["google", "discord"]
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_-]*$"
         }
       }
     },
@@ -609,7 +611,7 @@
         "type": "object", "additionalProperties": false,
         "required": ["provider", "enabled", "configured", "available", "client_id", "client_secret_configured", "scopes", "config_version", "callback_url", "updated_at"],
         "properties": {
-          "provider": { "type": "string", "enum": ["google", "discord"] }, "enabled": { "type": "boolean" }, "configured": { "type": "boolean" }, "available": { "type": "boolean" }, "client_id": { "type": "string" }, "client_secret_configured": { "type": "boolean" }, "scopes": { "type": "array", "items": { "type": "string" } }, "config_version": { "type": "integer" }, "callback_url": { "type": "string" }, "updated_at": { "type": "string", "format": "date-time", "nullable": true }
+          "provider": { "type": "string", "minLength": 1, "maxLength": 64 }, "enabled": { "type": "boolean" }, "configured": { "type": "boolean" }, "available": { "type": "boolean" }, "client_id": { "type": "string" }, "client_secret_configured": { "type": "boolean" }, "scopes": { "type": "array", "items": { "type": "string" } }, "config_version": { "type": "integer" }, "callback_url": { "type": "string" }, "updated_at": { "type": "string", "format": "date-time", "nullable": true }
         }
       },
       "SocialProviderEnvelope": {
@@ -618,7 +620,11 @@
       },
       "SocialCapabilities": {
         "type": "object", "additionalProperties": false, "required": ["social"],
-        "properties": { "social": { "type": "object", "additionalProperties": false, "required": ["google", "discord"], "properties": { "google": { "type": "boolean" }, "discord": { "type": "boolean" } } } }
+        "properties": { "social": { "type": "object", "additionalProperties": { "type": "boolean" } }, "providers": { "type": "array", "items": { "$ref": "#/components/schemas/SocialProviderCapability" } } }
+      },
+      "SocialProviderCapability": {
+        "type": "object", "additionalProperties": false, "required": ["provider", "label", "available"],
+        "properties": { "provider": { "type": "string", "minLength": 1, "maxLength": 64 }, "label": { "type": "string" }, "available": { "type": "boolean" } }
       },
       "SocialCapabilitiesEnvelope": {
         "type": "object", "additionalProperties": false, "required": ["code", "msg", "data"],

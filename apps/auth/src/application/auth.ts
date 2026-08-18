@@ -15,7 +15,8 @@ import {
   applySocialOAuthRequestPolicy,
   createRegistrationUserCreationGuard,
 } from "../admission/socialOAuthPolicy.js";
-import { createRuntimeAuthRegistry } from "../social-identity/runtimeAuthRegistry.js";
+import { createSocialProviderRuntimeCoordinator } from "../social-identity/socialProviderRuntimeCoordinator.js";
+import { isSupportedSocialProvider } from "../social-identity/catalog.js";
 import type { MailConfigService } from "../transactional-mail/mailConfig.js";
 import { createRuntimeMailConfigService } from "../transactional-mail/mailConfigAdapters.js";
 import {
@@ -46,7 +47,7 @@ export type AuthDatabase = Pool;
 export type AuthComponents = {
   mailConfigService: MailConfigService;
   authAdmissionPolicy: AuthAdmissionPolicy;
-  runtimeAuthRegistry: ReturnType<typeof createRuntimeAuthRegistry>;
+  runtimeAuthRegistry: ReturnType<ReturnType<typeof createSocialProviderRuntimeCoordinator>["configure"]>;
   socialProviderSettingsService: SocialProviderSettingsService;
 };
 
@@ -77,17 +78,14 @@ export function createAuthComponents(
     environment.secrets.encryptionKey,
   );
   const getAuthGuardSettings = createAuthGuardSettingsReader(database);
-  let socialProviderSettingsService: SocialProviderSettingsService | undefined;
+  const socialProviderRuntime = createSocialProviderRuntimeCoordinator(betterAuth);
   const authAdmissionPolicy = createAuthAdmissionPolicy({
     trustedOrigins: environment.auth.trustedOrigins,
     getSettings: getAuthGuardSettings,
     isMailReady: async () =>
       (await mailConfigService.getSummary()).readiness === "ready",
     getSocialProviderReadiness: async (provider) =>
-      Boolean(
-        socialProviderSettingsService &&
-          (await socialProviderSettingsService.getCapabilities()).social[provider],
-      ),
+      isSupportedSocialProvider(provider) && socialProviderRuntime.isReady(provider),
   });
   const authBaseOptions = createBetterAuthOptions({
     environment,
@@ -95,14 +93,12 @@ export function createAuthComponents(
     mailConfigService,
     authAdmissionPolicy,
   });
-  const runtimeAuthRegistry = createRuntimeAuthRegistry(betterAuth, {
-    baseOptions: authBaseOptions,
-  });
-  socialProviderSettingsService = createRuntimeSocialProviderSettingsService(
+  const runtimeAuthRegistry = socialProviderRuntime.configure(authBaseOptions);
+  const socialProviderSettingsService = createRuntimeSocialProviderSettingsService(
     database,
     environment.auth.baseURL,
     environment.secrets.encryptionKey,
-    (config) => runtimeAuthRegistry.apply(config),
+    (config) => socialProviderRuntime.apply(config),
   );
 
   return {
@@ -111,6 +107,25 @@ export function createAuthComponents(
     runtimeAuthRegistry,
     socialProviderSettingsService,
   };
+}
+
+export function createStaticBetterAuthOptions(
+  environment: AuthEnvironment,
+  database: BetterAuthOptions["database"],
+): BetterAuthOptions {
+  return createBetterAuthOptions({
+    environment,
+    database,
+    mailConfigService: {
+      send: async () => {
+        throw new Error("Transactional mail is unavailable during migration");
+      },
+    },
+    authAdmissionPolicy: {
+      admitRequest: async () => ({ allowed: true }),
+      admitRegistration: async () => ({ allowed: true }),
+    },
+  });
 }
 
 export function createBetterAuthOptions(input: {

@@ -13,7 +13,8 @@ type SocialProviderRouteService = Pick<
 >;
 
 type PublicSocialProviderCapabilities = {
-  social: { google: boolean; discord: boolean };
+  social: Record<string, boolean>;
+  providers?: Array<{ provider: string; label: string; available: boolean }>;
 };
 
 export function isSocialProviderCapabilitiesRoute(url: string): boolean {

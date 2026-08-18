@@ -5,7 +5,9 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { OAuthCapabilitiesSocial } from './oAuthCapabilitiesSocial'
+import type { OAuthProviderCapability } from './oAuthProviderCapability'
 
 export interface OAuthCapabilities {
   social: OAuthCapabilitiesSocial
+  providers?: OAuthProviderCapability[]
 }

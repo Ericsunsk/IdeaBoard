@@ -122,7 +122,14 @@ type SocialProviderSettingsUpdate struct {
 }
 
 type SocialProviderCapabilities struct {
-	Social map[string]bool `json:"social"`
+	Social    map[string]bool            `json:"social"`
+	Providers []SocialProviderCapability `json:"providers,omitempty"`
+}
+
+type SocialProviderCapability struct {
+	Provider  string `json:"provider"`
+	Label     string `json:"label"`
+	Available bool   `json:"available"`
 }
 
 type SocialProviderSettingsError struct {
@@ -306,10 +313,17 @@ func (c *ServiceClient) GetSocialProviderCapabilities(ctx context.Context) (*Soc
 	if _, err := requireSuccessEnvelopeFields(response.Body); err != nil || response.JSON200.Code != 0 {
 		return nil, fmt.Errorf("auth service get social provider capabilities returned an invalid success envelope")
 	}
-	return &SocialProviderCapabilities{Social: map[string]bool{
-		"google":  response.JSON200.Data.Social.Google,
-		"discord": response.JSON200.Data.Social.Discord,
-	}}, nil
+	capabilities := &SocialProviderCapabilities{Social: response.JSON200.Data.Social}
+	if response.JSON200.Data.Providers != nil {
+		for _, provider := range *response.JSON200.Data.Providers {
+			capabilities.Providers = append(capabilities.Providers, SocialProviderCapability{
+				Provider:  provider.Provider,
+				Label:     provider.Label,
+				Available: provider.Available,
+			})
+		}
+	}
+	return capabilities, nil
 }
 
 // ImpersonateUser bridges the Admin API session to Better Auth's native

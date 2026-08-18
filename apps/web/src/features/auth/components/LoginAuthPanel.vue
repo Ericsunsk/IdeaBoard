@@ -29,11 +29,13 @@
             @click="handleSocialLogin(provider)"
           >
             <img
+              v-if="providerLogoUrls[provider]"
               :src="providerLogoUrls[provider]"
               class="size-6"
               alt=""
               aria-hidden="true"
             />
+            <span v-else class="text-sm font-semibold uppercase">{{ provider.slice(0, 1) }}</span>
           </Button>
         </div>
 
@@ -286,7 +288,6 @@ import AuthModalCloseButton from './AuthModalCloseButton.vue'
 import { getRequiredError } from './authFormUtils'
 import {
   getOAuthProviderLabel,
-  OAUTH_PROVIDER_CODES,
   type OAuthProviderCode,
 } from '../../../shared/auth/oauthProviders'
 import {
@@ -345,16 +346,13 @@ const resetMode = ref(false)
 const resetOtpSent = ref(false)
 const resetForm = ref({ email: '', otp: '', password: '' })
 const resetErrors = ref({ email: '', otp: '', password: '' })
-const socialCapabilities = ref<Record<OAuthProviderCode, boolean>>({
-  google: false,
-  discord: false,
-})
-const providerLogoUrls: Record<OAuthProviderCode, string> = {
+const socialCapabilities = ref<Record<OAuthProviderCode, boolean>>({})
+const providerLogoUrls: Record<string, string> = {
   google: googleLogoUrl,
   discord: discordLogoUrl,
 }
 const enabledSocialProviders = computed(() =>
-  OAUTH_PROVIDER_CODES.filter((provider) => socialCapabilities.value[provider]),
+  Object.keys(socialCapabilities.value).filter((provider) => socialCapabilities.value[provider]),
 )
 
 watch(loading, (busy) => emit('update:busy', busy), { immediate: true })

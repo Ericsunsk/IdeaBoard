@@ -55,7 +55,7 @@ export type SocialProviderRequest = {
 };
 
 export type SocialProviderSummary = {
-    provider: 'google' | 'discord';
+    provider: string;
     enabled: boolean;
     configured: boolean;
     available: boolean;
@@ -75,9 +75,15 @@ export type SocialProviderEnvelope = {
 
 export type SocialCapabilities = {
     social: {
-        google: boolean;
-        discord: boolean;
+        [key: string]: boolean;
     };
+    providers?: Array<SocialProviderCapability>;
+};
+
+export type SocialProviderCapability = {
+    provider: string;
+    label: string;
+    available: boolean;
 };
 
 export type SocialCapabilitiesEnvelope = {
@@ -234,7 +240,7 @@ export type RevokeUserSessionsEnvelope = {
 
 export type AuthUserId = string;
 
-export type SocialProvider = 'google' | 'discord';
+export type SocialProvider = string;
 
 export type ValidateSessionData = {
     body?: never;
@@ -732,7 +738,7 @@ export type GetSocialProviderCapabilitiesResponse = GetSocialProviderCapabilitie
 export type GetSocialProviderData = {
     body?: never;
     path: {
-        provider: 'google' | 'discord';
+        provider: string;
     };
     query?: never;
     url: '/internal/social-providers/{provider}';
@@ -771,7 +777,7 @@ export type GetSocialProviderResponse = GetSocialProviderResponses[keyof GetSoci
 export type UpdateSocialProviderData = {
     body: SocialProviderRequest;
     path: {
-        provider: 'google' | 'discord';
+        provider: string;
     };
     query?: never;
     url: '/internal/social-providers/{provider}';

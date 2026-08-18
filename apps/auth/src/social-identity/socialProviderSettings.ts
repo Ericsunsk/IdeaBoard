@@ -1,35 +1,22 @@
+import {
+  isSupportedSocialProvider,
+  socialProviderDefinition,
+  socialProviderLabel,
+  socialProviderScopes,
+  supportedSocialProviders,
+  type RuntimeSocialProviderConfig,
+  type RuntimeSocialProviderConfigs,
+  type SupportedSocialProvider,
+} from "./catalog.js";
+
 export const GOOGLE_PROVIDER = "google" as const;
 export const DISCORD_PROVIDER = "discord" as const;
-export type SupportedSocialProvider =
-  | typeof GOOGLE_PROVIDER
-  | typeof DISCORD_PROVIDER;
 
-export type RuntimeSocialProviderConfigs = Partial<
-  Record<SupportedSocialProvider, RuntimeSocialProviderConfig>
->;
-
-const providerDefinitions = {
-  [GOOGLE_PROVIDER]: {
-    scopes: ["openid", "email", "profile"] as const,
-    validateClientId(value: string) {
-      return (
-        value.length <= 512 &&
-        /^[A-Za-z0-9._-]+\.apps\.googleusercontent\.com$/.test(value)
-      );
-    },
-  },
-  [DISCORD_PROVIDER]: {
-    scopes: ["identify", "email"] as const,
-    validateClientId(value: string) {
-      return value.length <= 32 && /^\d{1,32}$/.test(value);
-    },
-  },
-} as const;
-
-const providerLabels: Record<SupportedSocialProvider, string> = {
-  [GOOGLE_PROVIDER]: "Google",
-  [DISCORD_PROVIDER]: "Discord",
-};
+export type {
+  RuntimeSocialProviderConfig,
+  RuntimeSocialProviderConfigs,
+  SupportedSocialProvider,
+} from "./catalog.js";
 
 export type StoredSocialProviderSettings = {
   provider: SupportedSocialProvider;
@@ -58,13 +45,6 @@ export type SocialProviderSettingsInput = {
   enabled: boolean;
   clientId: string;
   clientSecret?: string;
-};
-
-export type RuntimeSocialProviderConfig = {
-  provider: SupportedSocialProvider;
-  clientId: string;
-  clientSecret: string;
-  scopes: string[];
 };
 
 export type SocialProviderSettingsRepository = {
@@ -130,7 +110,7 @@ export class SocialProviderSettingsService {
     input: SocialProviderSettingsInput,
   ): Promise<SocialProviderSettingsSummary> {
     const provider = requireSupportedProvider(providerValue);
-    const definition = providerDefinitions[provider];
+    const definition = socialProviderDefinition(provider);
     const current = await this.repository.get(provider);
     const clientId = input.clientId.trim();
     const nextClientSecret = input.clientSecret?.trim() ?? "";
@@ -143,13 +123,13 @@ export class SocialProviderSettingsService {
     ) {
       throw new SocialProviderSettingsError(
         "invalid_input",
-        `${providerLabel(provider)} OAuth Client ID 格式无效`,
+        `${socialProviderLabel(provider)} OAuth Client ID 格式无效`,
       );
     }
     if (current?.enabled && current.clientId !== clientId) {
       throw new SocialProviderSettingsError(
         "disable_before_client_id_change",
-        `请先关闭 ${providerLabel(provider)} OAuth，再修改 Client ID`,
+        `请先关闭 ${socialProviderLabel(provider)} OAuth，再修改 Client ID`,
       );
     }
 
@@ -178,12 +158,12 @@ export class SocialProviderSettingsService {
       } catch {
         throw new SocialProviderSettingsError(
           "encryption_unavailable",
-          `${providerLabel(provider)} OAuth Client Secret 不可用，请重新填写`,
+          `${socialProviderLabel(provider)} OAuth Client Secret 不可用，请重新填写`,
         );
       }
     }
 
-    const scopes = [...definition.scopes];
+    const scopes = socialProviderScopes(provider);
     const changed =
       !current ||
       current.enabled !== input.enabled ||
@@ -223,16 +203,16 @@ export class SocialProviderSettingsService {
   }
 
   async getCapabilities(): Promise<{
-    social: Record<SupportedSocialProvider, boolean>;
+    social: Record<string, boolean>;
   }> {
-    const [google, discord] = await Promise.all(
-      supportedSocialProviders.map((provider) => this.resolve(provider)),
+    const resolved = await Promise.all(
+      supportedSocialProviders.map(async (provider) => [provider, await this.resolve(provider)] as const),
+    );
+    const social = Object.fromEntries(
+      resolved.map(([provider, config]) => [provider, Boolean(config)]),
     );
     return {
-      social: {
-        google: Boolean(google),
-        discord: Boolean(discord),
-      },
+      social,
     };
   }
 
@@ -281,27 +261,16 @@ function requireSupportedProvider(value: string): SupportedSocialProvider {
   return provider;
 }
 
-export const supportedSocialProviders: readonly SupportedSocialProvider[] = [
-  GOOGLE_PROVIDER,
-  DISCORD_PROVIDER,
-];
-
-export function isSupportedSocialProvider(
-  value: string,
-): value is SupportedSocialProvider {
-  return supportedSocialProviders.includes(value as SupportedSocialProvider);
-}
-
 function providerLabel(provider: SupportedSocialProvider): string {
-  return providerLabels[provider];
+  return socialProviderLabel(provider);
 }
 
 async function resolveStoredSettings(
   stored: StoredSocialProviderSettings,
   secretCipher: SocialProviderSecretCipher,
 ): Promise<RuntimeSocialProviderConfig | null> {
-  const definition = providerDefinitions[stored.provider];
-  const expectedScopes = [...definition.scopes];
+  const definition = socialProviderDefinition(stored.provider);
+  const expectedScopes = socialProviderScopes(stored.provider);
   if (
     !stored.enabled ||
     !definition.validateClientId(stored.clientId) ||
@@ -335,7 +304,7 @@ function emptySummary(
     available: false,
     clientId: "",
     clientSecretConfigured: false,
-    scopes: [...providerDefinitions[provider].scopes],
+    scopes: socialProviderScopes(provider),
     configVersion: 0,
     callbackURL,
     updatedAt: null,

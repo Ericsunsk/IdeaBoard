@@ -170,10 +170,7 @@ const emit = defineEmits<{
 
 const defaultResource = createOAuthProviderSettingsResource()
 const toast = useAdminToast()
-const providerOptions: Array<{ label: string; value: OAuthProviderCode }> = [
-  { label: 'Google', value: 'google' },
-  { label: 'Discord', value: 'discord' },
-]
+const providerOptions = ref<Array<{ label: string; value: OAuthProviderCode }>>([])
 const selectedProvider = ref<OAuthProviderCode>('google')
 const summary = ref<OAuthProviderSettingsSummary | null>(null)
 const capabilities = ref<OAuthCapabilities | null>(null)
@@ -273,6 +270,17 @@ function applyLoadedState(
 ) {
   applySummary(nextSummary)
   capabilities.value = nextCapabilities
+  const providers = nextCapabilities.providers?.length
+    ? nextCapabilities.providers
+    : Object.keys(nextCapabilities.social).map((provider) => ({
+        provider,
+        label: getOAuthProviderLabel(provider),
+        available: nextCapabilities.social[provider] === true,
+      }))
+  providerOptions.value = providers.map((provider) => ({ label: provider.label, value: provider.provider }))
+  if (!providerOptions.value.some((option) => option.value === selectedProvider.value)) {
+    selectedProvider.value = providerOptions.value[0]?.value ?? selectedProvider.value
+  }
 }
 
 function applySummary(nextSummary: OAuthProviderSettingsSummary) {

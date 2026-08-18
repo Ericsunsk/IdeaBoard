@@ -321,24 +321,6 @@ func (e SocialProviderEnvelopeCode) Valid() bool {
 	}
 }
 
-// Defines values for SocialProviderSummaryProvider.
-const (
-	SocialProviderSummaryProviderDiscord SocialProviderSummaryProvider = "discord"
-	SocialProviderSummaryProviderGoogle  SocialProviderSummaryProvider = "google"
-)
-
-// Valid indicates whether the value is a known member of the SocialProviderSummaryProvider enum.
-func (e SocialProviderSummaryProvider) Valid() bool {
-	switch e {
-	case SocialProviderSummaryProviderDiscord:
-		return true
-	case SocialProviderSummaryProviderGoogle:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for TrustedClaimIdentityKind.
 const (
 	TrustedClaimIdentityKindCanonicalEmail TrustedClaimIdentityKind = "canonical_email"
@@ -378,24 +360,6 @@ const (
 func (e UnbanUserEnvelopeCode) Valid() bool {
 	switch e {
 	case UnbanUserEnvelopeCodeN0:
-		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for SocialProvider.
-const (
-	SocialProviderDiscord SocialProvider = "discord"
-	SocialProviderGoogle  SocialProvider = "google"
-)
-
-// Valid indicates whether the value is a known member of the SocialProvider enum.
-func (e SocialProvider) Valid() bool {
-	switch e {
-	case SocialProviderDiscord:
-		return true
-	case SocialProviderGoogle:
 		return true
 	default:
 		return false
@@ -656,10 +620,8 @@ type SetUserRoleRequest struct {
 
 // SocialCapabilities defines model for SocialCapabilities.
 type SocialCapabilities struct {
-	Social struct {
-		Discord bool `json:"discord"`
-		Google  bool `json:"google"`
-	} `json:"social"`
+	Providers *[]SocialProviderCapability `json:"providers,omitempty"`
+	Social    map[string]bool             `json:"social"`
 }
 
 // SocialCapabilitiesEnvelope defines model for SocialCapabilitiesEnvelope.
@@ -671,6 +633,13 @@ type SocialCapabilitiesEnvelope struct {
 
 // SocialCapabilitiesEnvelopeCode defines model for SocialCapabilitiesEnvelope.Code.
 type SocialCapabilitiesEnvelopeCode int
+
+// SocialProviderCapability defines model for SocialProviderCapability.
+type SocialProviderCapability struct {
+	Available bool   `json:"available"`
+	Label     string `json:"label"`
+	Provider  string `json:"provider"`
+}
 
 // SocialProviderEnvelope defines model for SocialProviderEnvelope.
 type SocialProviderEnvelope struct {
@@ -691,20 +660,17 @@ type SocialProviderRequest struct {
 
 // SocialProviderSummary defines model for SocialProviderSummary.
 type SocialProviderSummary struct {
-	Available              bool                          `json:"available"`
-	CallbackUrl            string                        `json:"callback_url"`
-	ClientId               string                        `json:"client_id"`
-	ClientSecretConfigured bool                          `json:"client_secret_configured"`
-	ConfigVersion          int                           `json:"config_version"`
-	Configured             bool                          `json:"configured"`
-	Enabled                bool                          `json:"enabled"`
-	Provider               SocialProviderSummaryProvider `json:"provider"`
-	Scopes                 []string                      `json:"scopes"`
-	UpdatedAt              *time.Time                    `json:"updated_at"`
+	Available              bool       `json:"available"`
+	CallbackUrl            string     `json:"callback_url"`
+	ClientId               string     `json:"client_id"`
+	ClientSecretConfigured bool       `json:"client_secret_configured"`
+	ConfigVersion          int        `json:"config_version"`
+	Configured             bool       `json:"configured"`
+	Enabled                bool       `json:"enabled"`
+	Provider               string     `json:"provider"`
+	Scopes                 []string   `json:"scopes"`
+	UpdatedAt              *time.Time `json:"updated_at"`
 }
-
-// SocialProviderSummaryProvider defines model for SocialProviderSummary.Provider.
-type SocialProviderSummaryProvider string
 
 // TrustedClaimIdentityKind defines model for TrustedClaimIdentityKind.
 type TrustedClaimIdentityKind string
@@ -732,7 +698,7 @@ type UnbanUserEnvelopeCode int
 type AuthUserID = string
 
 // SocialProvider defines model for SocialProvider.
-type SocialProvider string
+type SocialProvider = string
 
 // BadRequest defines model for BadRequest.
 type BadRequest = ErrorEnvelope

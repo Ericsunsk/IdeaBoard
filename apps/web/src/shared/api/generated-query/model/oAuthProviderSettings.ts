@@ -4,10 +4,13 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { OAuthProviderSettingsProvider } from './oAuthProviderSettingsProvider'
 
 export interface OAuthProviderSettings {
-  provider: OAuthProviderSettingsProvider
+  /**
+   * @minLength 1
+   * @maxLength 64
+   */
+  provider: string
   enabled: boolean
   configured: boolean
   available: boolean

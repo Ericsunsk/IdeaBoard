@@ -33,7 +33,7 @@ func (h *SocialProviderAdminHandler) Get(c *gin.Context) {
 	if !h.requireService(c) {
 		return
 	}
-	provider, ok := requireSupportedSocialProvider(c)
+	provider, ok := h.requireSupportedSocialProvider(c)
 	if !ok {
 		return
 	}
@@ -52,7 +52,7 @@ func (h *SocialProviderAdminHandler) Update(c *gin.Context) {
 	if !h.requireService(c) {
 		return
 	}
-	provider, ok := requireSupportedSocialProvider(c)
+	provider, ok := h.requireSupportedSocialProvider(c)
 	if !ok {
 		return
 	}
@@ -112,11 +112,41 @@ func (h *SocialProviderAdminHandler) respondError(c *gin.Context, err error) {
 	response.InternalError(c, http.StatusBadGateway, "认证服务暂不可用", err)
 }
 
-func requireSupportedSocialProvider(c *gin.Context) (string, bool) {
+func (h *SocialProviderAdminHandler) requireSupportedSocialProvider(c *gin.Context) (string, bool) {
 	provider := strings.ToLower(strings.TrimSpace(c.Param("provider")))
-	if provider != "google" && provider != "discord" {
+	if provider == "" || len(provider) > 64 {
 		response.Error(c, http.StatusNotFound, "不支持的 OAuth Provider")
 		return "", false
 	}
-	return provider, true
+	for _, character := range provider {
+		if (character < 'a' || character > 'z') && character != '-' && character != '_' && (character < '0' || character > '9') {
+			response.Error(c, http.StatusNotFound, "不支持的 OAuth Provider")
+			return "", false
+		}
+	}
+	capabilities, err := h.service.GetSocialProviderCapabilities(c.Request.Context())
+	if err != nil {
+		h.respondError(c, err)
+		return "", false
+	}
+	if capabilities == nil {
+		response.Error(c, http.StatusNotFound, "不支持的 OAuth Provider")
+		return "", false
+	}
+	if len(capabilities.Providers) > 0 {
+		for _, candidate := range capabilities.Providers {
+			if candidate.Provider == provider {
+				return provider, true
+			}
+		}
+	} else if hasCapabilityKey(capabilities.Social, provider) {
+		return provider, true
+	}
+	response.Error(c, http.StatusNotFound, "不支持的 OAuth Provider")
+	return "", false
+}
+
+func hasCapabilityKey(capabilities map[string]bool, provider string) bool {
+	_, exists := capabilities[provider]
+	return exists
 }

@@ -36,6 +36,7 @@ export type SaveOAuthProviderSettingsInput = {
 
 export type OAuthCapabilities = {
   social: Record<string, boolean>
+  providers?: Array<{ provider: string; label: string; available: boolean }>
 }
 
 export type OAuthProviderSettingsResource = {
@@ -91,10 +92,10 @@ export function createOAuthProviderSettingsResource(
         '加载 OAuth capabilities 失败',
       )
       return {
-        social: {
-          google: capabilities.social.google === true,
-          discord: capabilities.social.discord === true,
-        },
+        social: Object.fromEntries(
+          Object.entries(capabilities.social).map(([provider, available]) => [provider, available === true]),
+        ),
+        providers: capabilities.providers?.map((provider) => ({ ...provider })),
       }
     },
   }

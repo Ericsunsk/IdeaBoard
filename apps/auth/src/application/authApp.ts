@@ -22,6 +22,7 @@ import {
   registerSocialProviderRoutes,
 } from "../social-identity/socialProviderRoutes.js";
 import type { SocialProviderSettingsService } from "../social-identity/socialProviderSettings.js";
+import { socialProviderCapabilities } from "../social-identity/catalog.js";
 
 export type AuthAppConfig = {
   trustProxy: FastifyServerOptions["trustProxy"];
@@ -105,9 +106,13 @@ export function createAuthApp(deps: AuthAppDependencies): FastifyInstance {
       internalKey: deps.config.internalKey,
       trustedOrigins: deps.config.trustedOrigins,
       service: deps.socialProviderSettingsService,
-      getPublicCapabilities: async () => ({
-        social: (await deps.socialProviderSettingsService!.getCapabilities()).social,
-      }),
+      getPublicCapabilities: async () => {
+        const capabilities = await deps.socialProviderSettingsService!.getCapabilities();
+        return {
+          ...capabilities,
+          providers: socialProviderCapabilities(capabilities.social),
+        };
+      },
     });
   }
 

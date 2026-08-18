@@ -4,6 +4,7 @@ import {
   isSignUpPath,
   normalizeAuthPath,
 } from "../infrastructure/authUtils.js";
+import { supportedSocialProviders } from "../social-identity/catalog.js";
 
 type RateLimitEntry = {
   count: number;
@@ -12,9 +13,8 @@ type RateLimitEntry = {
 
 export type AuthRegistrationEntry =
   | "email_otp"
-  | "google_oauth"
-  | "discord_oauth"
-  | "social_oauth";
+  | "social_oauth"
+  | `${string}_oauth`;
 
 export type AuthAdmissionDecision =
   | {
@@ -55,7 +55,7 @@ export type AuthAdmissionPolicyOptions = {
   trustedOrigins: string[];
   getSettings: () => Promise<AuthGuardSettings>;
   isMailReady?: () => Promise<boolean>;
-  getSocialProviderReadiness?: (provider: "google" | "discord") => Promise<boolean>;
+  getSocialProviderReadiness?: (provider: string) => Promise<boolean>;
   onDependencyError?: (
     dependency: "settings" | "mail" | "provider",
     error: unknown,
@@ -175,12 +175,9 @@ async function checkRegistrationDependencies(
   if (entry === "email_credential" || entry === "email_otp") {
     return checkMailReadiness(options);
   }
-  const provider =
-    entry === "discord_oauth"
-      ? "discord"
-      : entry === "google_oauth"
-        ? "google"
-        : undefined;
+  const provider = entry.endsWith("_oauth") && entry !== "social_oauth"
+    ? entry.slice(0, -"_oauth".length)
+    : undefined;
   if (!options.getSocialProviderReadiness) {
     return { allowed: false, reason: "provider_not_ready" };
   }
@@ -189,7 +186,7 @@ async function checkRegistrationDependencies(
       ? await options.getSocialProviderReadiness(provider)
       : (
           await Promise.all(
-            (["google", "discord"] as const).map((candidate) =>
+            supportedSocialProviders.map((candidate) =>
               options.getSocialProviderReadiness!(candidate),
             ),
           )

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createAuthAdmissionPolicy } from "../admission/authAdmissionPolicy.js";
-import { createBetterAuthOptions } from "./auth.js";
+import { createBetterAuthOptions, createStaticBetterAuthOptions } from "./auth.js";
 import { loadEnv } from "../infrastructure/env.js";
 
 test("native authentication security configuration stays explicit", async (t) => {
@@ -64,4 +64,18 @@ test("native authentication security configuration stays explicit", async (t) =>
     plugins.some((plugin) => plugin.id === "have-i-been-pwned"),
     false,
   );
+});
+
+test("static schema construction does not attach runtime provider configuration", () => {
+  const environment = loadEnv({
+    NODE_ENV: "test",
+    AUTH_INTERNAL_KEY: "test-internal-key",
+    DB_SSLMODE: "disable",
+  });
+  const options = createStaticBetterAuthOptions(environment, {} as never);
+
+  assert.equal(options.socialProviders, undefined);
+  assert.deepEqual(options.database, {});
+  assert.ok(options.plugins?.some((plugin) => plugin.id === "email-otp"));
+  assert.ok(options.plugins?.some((plugin) => plugin.id === "admin"));
 });

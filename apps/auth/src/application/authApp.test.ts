@@ -364,6 +364,10 @@ describe("createAuthApp", () => {
     assert.equal(response.statusCode, 200);
     assert.deepEqual(response.json().data, {
       social: { google: true, discord: true },
+      providers: [
+        { provider: "google", label: "Google", available: true },
+        { provider: "discord", label: "Discord", available: true },
+      ],
     });
 
     registrationEnabled = true;
@@ -373,6 +377,10 @@ describe("createAuthApp", () => {
     });
     assert.deepEqual(enabledResponse.json().data, {
       social: { google: true, discord: true },
+      providers: [
+        { provider: "google", label: "Google", available: true },
+        { provider: "discord", label: "Discord", available: true },
+      ],
     });
   });
 

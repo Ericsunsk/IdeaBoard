@@ -15,15 +15,14 @@ import {
 } from "../infrastructure/authMigration.js";
 import type { EnvSource } from "../infrastructure/env.js";
 import { configureAuthRuntimePrivileges } from "../infrastructure/runtime-privileges.js";
-import { createAuthComponents, createAuthPool } from "./auth.js";
+import { createAuthPool, createStaticBetterAuthOptions } from "./auth.js";
 
 const productionDependencies: AuthMigrationDependencies = {
   createDatabase(environment) {
     return createAuthPool(environment.database);
   },
   createOptions(environment, database) {
-    return createAuthComponents(environment, database as Pool)
-      .runtimeAuthRegistry.current.options;
+    return createStaticBetterAuthOptions(environment, database as Pool);
   },
   getAdapter,
   getMigrations,
