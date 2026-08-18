@@ -36,7 +36,7 @@ export NODE_ENV="${NODE_ENV:-production}"
 
 (cd "${repo_root}/apps/auth" && npm run build)
 
-atlas_version="${ATLAS_VERSION:-1.3.0}"
+atlas_version="${ATLAS_VERSION:-1.3.1}"
 atlas_arch="$(uname -m)"
 case "${atlas_arch}" in
   x86_64) atlas_arch=amd64 ;;
