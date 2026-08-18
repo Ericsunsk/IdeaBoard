@@ -10,7 +10,11 @@ import {
   buildMaskCommitResult,
   drawMaskRasterPreviewToCanvas,
 } from '../lib/maskPaintingCanvas'
-import { drawMaskStrokeSegment } from '../lib/maskBrushEngine'
+import {
+  maskStrokeEngine,
+  type MaskStrokePoint,
+  type MaskStrokeRenderOptions,
+} from '../lib/maskBrushEngine'
 import {
   createMaskCanvasPointerProjection,
   type MaskCanvasPointerProjection,
@@ -53,8 +57,8 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   let paintingNodeId: string | null = null
   let paintingCanvas: HTMLCanvasElement | null = null
   let paintingPointerId: number | null = null
-  let paintingLastX = 0
-  let paintingLastY = 0
+  let paintingPoints: MaskStrokePoint[] = []
+  let paintingStrokeOptions: Omit<MaskStrokeRenderOptions, 'last'> | null = null
   let paintingBeforeEntry: MaskHistoryEntry | null = null
   let paintingPointProjection: MaskCanvasPointerProjection | null = null
   let interactionActive = false
@@ -189,6 +193,12 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
   function finishPainting() {
     const nodeId = paintingNodeId
     const canvas = paintingCanvas
+    if (canvas && paintingStrokeOptions && paintingPoints.length > 0) {
+      maskStrokeEngine.draw(canvas, paintingPoints, {
+        ...paintingStrokeOptions,
+        last: true,
+      })
+    }
     stopInteraction()
     if (nodeId && canvas && paintingBeforeEntry) {
       commitUndoHistoryIfChanged(nodeId, paintingBeforeEntry, canvas)
@@ -198,6 +208,8 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     paintingNodeId = null
     paintingCanvas = null
     paintingPointerId = null
+    paintingPoints = []
+    paintingStrokeOptions = null
     paintingBeforeEntry = null
     paintingPointProjection = null
   }
@@ -230,19 +242,16 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     if (paintingPointerId != null && event.pointerId !== paintingPointerId) return
     if (!paintingPointProjection) return
     const point = paintingPointProjection(event.clientX, event.clientY)
-    drawMaskStrokeSegment(
-      {
-        brushSize: brushSize.value,
-        drawMode: drawMode.value,
-      },
-      paintingCanvas,
-      paintingLastX,
-      paintingLastY,
-      point.x,
-      point.y,
-    )
-    paintingLastX = point.x
-    paintingLastY = point.y
+    paintingPoints.push({
+      x: point.x,
+      y: point.y,
+      pressure: event.pressure > 0 ? event.pressure : 0.5,
+    })
+    if (!paintingStrokeOptions) return
+    maskStrokeEngine.draw(paintingCanvas, paintingPoints, {
+      ...paintingStrokeOptions,
+      last: false,
+    })
   }
 
   function onCanvasPointerDown(event: PointerEvent) {
@@ -259,23 +268,25 @@ export function useImageMaskEditorOverlay(options: UseImageMaskEditorOverlayOpti
     paintingNodeId = editorState.nodeId
     paintingCanvas = canvas
     paintingPointerId = event.pointerId
+    paintingPoints = [
+      {
+        x: point.x,
+        y: point.y,
+        pressure: event.pressure > 0 ? event.pressure : 0.5,
+      },
+    ]
+    paintingStrokeOptions = {
+      brushSize: brushSize.value,
+      drawMode: drawMode.value,
+    }
     paintingBeforeEntry = captureMaskHistoryEntry(canvas)
     paintingPointProjection = pointProjection
     startInteraction()
     pointerDragSession.beginDrag(event, undefined, { target: canvas })
-    paintingLastX = point.x
-    paintingLastY = point.y
-    drawMaskStrokeSegment(
-      {
-        brushSize: brushSize.value,
-        drawMode: drawMode.value,
-      },
-      canvas,
-      point.x,
-      point.y,
-      point.x + 0.001,
-      point.y + 0.001,
-    )
+    maskStrokeEngine.draw(canvas, paintingPoints, {
+      ...paintingStrokeOptions,
+      last: false,
+    })
   }
 
   function setMaskCanvasRef(nodeId: string, element: Element | null) {

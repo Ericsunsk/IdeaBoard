@@ -1,4 +1,5 @@
 import type { ImageMaskDrawMode } from '../types'
+import getStroke from 'perfect-freehand'
 import { clampMaskBrushSize, MASK_EDITOR_PAINT_COLOR } from '../config/maskEditorConstants'
 
 export type MaskPaintBrushState = {
@@ -6,26 +7,60 @@ export type MaskPaintBrushState = {
   drawMode: ImageMaskDrawMode
 }
 
-export function drawMaskStrokeSegment(
-  brush: MaskPaintBrushState,
+export type MaskStrokePoint = {
+  x: number
+  y: number
+  pressure: number
+}
+
+export type MaskStrokeRenderOptions = MaskPaintBrushState & {
+  last: boolean
+}
+
+export type MaskStrokeEngine = {
+  draw: (
+    canvas: HTMLCanvasElement,
+    points: readonly MaskStrokePoint[],
+    options: MaskStrokeRenderOptions,
+  ) => void
+}
+
+function drawMaskStrokeOutline(
   canvas: HTMLCanvasElement,
-  fromX: number,
-  fromY: number,
-  toX: number,
-  toY: number,
+  outline: readonly [number, number][],
+  drawMode: ImageMaskDrawMode,
 ) {
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
-  if (!ctx) return
+  if (!ctx || outline.length === 0) return
 
   ctx.save()
-  ctx.globalCompositeOperation = brush.drawMode === 'erase' ? 'destination-out' : 'source-over'
-  ctx.strokeStyle = MASK_EDITOR_PAINT_COLOR
-  ctx.lineCap = 'round'
-  ctx.lineJoin = 'round'
-  ctx.lineWidth = clampMaskBrushSize(brush.brushSize)
+  ctx.globalCompositeOperation = drawMode === 'erase' ? 'destination-out' : 'source-over'
+  ctx.fillStyle = MASK_EDITOR_PAINT_COLOR
   ctx.beginPath()
-  ctx.moveTo(fromX, fromY)
-  ctx.lineTo(toX, toY)
-  ctx.stroke()
+  ctx.moveTo(outline[0][0], outline[0][1])
+  for (const [x, y] of outline.slice(1)) {
+    ctx.lineTo(x, y)
+  }
+  ctx.closePath()
+  ctx.fill()
   ctx.restore()
 }
+
+export const perfectFreehandMaskStrokeEngine: MaskStrokeEngine = {
+  draw(canvas, points, options) {
+    const outline = getStroke(
+      points.map(({ x, y, pressure }) => [x, y, pressure]),
+      {
+        size: clampMaskBrushSize(options.brushSize),
+        thinning: 0,
+        smoothing: 0.5,
+        streamline: 0.35,
+        simulatePressure: false,
+        last: options.last,
+      },
+    )
+    drawMaskStrokeOutline(canvas, outline, options.drawMode)
+  },
+}
+
+export const maskStrokeEngine = perfectFreehandMaskStrokeEngine
