@@ -3,10 +3,8 @@ package storage
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"mime/multipart"
 	"net/url"
 	"os"
@@ -308,57 +306,7 @@ func (s *StorageService) DeleteObjectByStorageProfile(ctx context.Context, stora
 	if err != nil {
 		return err
 	}
-	previewPrefix, err := imagePreviewObjectPrefix(objectKey)
-	if err != nil {
-		return err
-	}
-	if err := adapter.DeleteByPrefix(ctx, profile, previewPrefix); err != nil {
-		return fmt.Errorf("删除图片派生文件失败: %w", err)
-	}
 	return adapter.Delete(ctx, profile, objectKey)
-}
-
-func (s *StorageService) ReadImagePreview(ctx context.Context, sourceURL string, maxSide int, maxBytes int64) (*StoredUploadObject, bool, error) {
-	profile, key, err := s.resolveImagePreviewTarget(ctx, sourceURL, maxSide)
-	if err != nil {
-		return nil, false, err
-	}
-	adapter, err := s.adapterRegistry.get(profile.Provider)
-	if err != nil {
-		return nil, false, err
-	}
-	object, err := adapter.Read(ctx, profile, key, maxBytes)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, errStoredObjectNotFound) {
-			return nil, false, nil
-		}
-		return nil, false, err
-	}
-	return object, true, nil
-}
-
-func (s *StorageService) StoreImagePreview(ctx context.Context, sourceURL string, maxSide int, data []byte, contentType string) error {
-	profile, key, err := s.resolveImagePreviewTarget(ctx, sourceURL, maxSide)
-	if err != nil {
-		return err
-	}
-	adapter, err := s.adapterRegistry.get(profile.Provider)
-	if err != nil {
-		return err
-	}
-	return adapter.PutObject(ctx, profile, key, data, contentType)
-}
-
-func (s *StorageService) resolveImagePreviewTarget(ctx context.Context, sourceURL string, maxSide int) (*StorageProfile, string, error) {
-	profile, sourceKey, err := s.resolveStoredUploadTarget(ctx, sourceURL)
-	if err != nil {
-		return nil, "", err
-	}
-	key, err := imagePreviewObjectKey(sourceKey, maxSide)
-	if err != nil {
-		return nil, "", err
-	}
-	return profile, key, nil
 }
 
 func (s *StorageService) deleteUploadObjectPrefix(ctx context.Context, prefix string) error {

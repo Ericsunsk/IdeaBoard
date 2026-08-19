@@ -65,5 +65,4 @@ func registerUserUploadRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	userAPI.POST(RouteUserProfileAvatar, requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), uploadProfileAvatarHandler(h.Uploads))
 	userAPI.POST(RouteUserBoardUploads, requestBodyLimitMiddleware(uploadRequestBodyLimitBytes), uploadBoardAssetHandler(h.Uploads))
 	userAPI.GET(RouteUserDownload, downloadImageHandler(h.UploadDownloads))
-	userAPI.GET(RouteUserImagePreview, imagePreviewHandler(h.UploadDownloads))
 }

@@ -8,7 +8,7 @@ import {
   type MaybeRefOrGetter,
 } from 'vue'
 import { canvasToBlob, resolveFetchUrl } from '../services/flowMediaIO'
-import { IMAGE_PREVIEW_ENDPOINT, MEDIA_ASSET_ENDPOINT } from '../../../shared/constants/media'
+import { MEDIA_ASSET_ENDPOINT } from '../../../shared/constants/media'
 import {
   detectCanvasTransparency,
   resolvePreviewMimeType,
@@ -116,9 +116,7 @@ async function createPreviewObjectUrl(
   const canonicalSourceUrl = canonicalizeRuntimeUploadRef(sourceUrl.trim()).trim()
   const serverPreviewUrl = mediaAssetId
     ? `${MEDIA_ASSET_ENDPOINT}/${encodeURIComponent(String(mediaAssetId))}/derivatives/${resolveDerivativeTier(maxSide)}/content`
-    : canonicalSourceUrl.startsWith('/uploads/')
-      ? `${IMAGE_PREVIEW_ENDPOINT}?url=${encodeURIComponent(canonicalSourceUrl)}&max_side=${maxSide}`
-      : null
+    : null
   const fetchUrl = serverPreviewUrl ?? resolveFetchUrl(sourceUrl)
   if (!fetchUrl) return null
   const response = mediaAssetId

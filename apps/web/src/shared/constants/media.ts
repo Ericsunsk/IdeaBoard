@@ -2,7 +2,6 @@ import { resolveApiUrl } from '../config/runtimeUrls'
 
 export const ADMIN_UPLOAD_ENDPOINT = resolveApiUrl('/admin/upload')
 export const USER_DOWNLOAD_ENDPOINT = resolveApiUrl('/user/download')
-export const IMAGE_PREVIEW_ENDPOINT = resolveApiUrl('/user/image-preview')
 export const MEDIA_ASSET_ENDPOINT = resolveApiUrl('/user/media-assets')
 
 export const SUPPORTED_IMAGE_UPLOAD_MIME_TYPES = [

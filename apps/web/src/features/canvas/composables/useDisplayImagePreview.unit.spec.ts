@@ -124,7 +124,7 @@ describe('useDisplayImagePreview', () => {
     scope.stop()
   })
 
-  it('uses the server preview for managed uploads before decoding an original', async () => {
+  it('resizes managed uploads in the browser when no media asset id is available', async () => {
     const sourceUrl = ref('/uploads/canvas/U123/board/content/image.png')
     const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
     const scope = effectScope()
@@ -138,17 +138,15 @@ describe('useDisplayImagePreview', () => {
     expect(preview.displayUrl.value).toBe('')
 
     await vi.waitFor(() => {
-      expect(preview.displayUrl.value).toBe('blob:5')
+      expect(preview.displayUrl.value).toBe('blob:7')
     })
 
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining(
-        '/api/user/image-preview?url=%2Fuploads%2Fcanvas%2FU123%2Fboard%2Fcontent%2Fimage.png&max_side=640',
-      ),
+      '/uploads/canvas/U123/board/content/image.png',
       { credentials: 'include' },
     )
-    expect(createImageBitmap).not.toHaveBeenCalled()
-    expect(flowMediaIOMocks.canvasToBlob).not.toHaveBeenCalled()
+    expect(createImageBitmap).toHaveBeenCalled()
+    expect(flowMediaIOMocks.canvasToBlob).toHaveBeenCalled()
     scope.stop()
   })
 
@@ -169,7 +167,7 @@ describe('useDisplayImagePreview', () => {
     scope.stop()
   })
 
-  it('falls back to the original managed upload only after the server preview fails', async () => {
+  it('falls back to the original managed upload when browser preview fails', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({ ok: false } as Response)
     const sourceUrl = ref('/uploads/canvas/U123/board/content/fallback.png')
     const { useDisplayImagePreview } = await import('./useDisplayImagePreview')

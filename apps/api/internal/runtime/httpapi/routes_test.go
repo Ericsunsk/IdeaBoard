@@ -122,7 +122,6 @@ func TestRouteConstantsAreGroupRelative(t *testing.T) {
 	userGroup.POST(RouteUserProfileAvatar, func(c *gin.Context) {})
 	userGroup.POST(RouteUserBoardUploads, func(c *gin.Context) {})
 	userGroup.GET(RouteUserDownload, func(c *gin.Context) {})
-	userGroup.GET(RouteUserImagePreview, func(c *gin.Context) {})
 
 	adminGroup := router.Group("/api/admin")
 	adminGroup.POST(RouteAdminUpload, func(c *gin.Context) {})
@@ -137,7 +136,6 @@ func TestRouteConstantsAreGroupRelative(t *testing.T) {
 		http.MethodPost + " /api/user/profile/avatar":                   false,
 		http.MethodPost + " /api/user/boards/:board_id/uploads":         false,
 		http.MethodGet + " /api/user/download":                          false,
-		http.MethodGet + " /api/user/image-preview":                     false,
 		http.MethodPost + " /api/admin/upload":                          false,
 		http.MethodGet + " /api/admin/settings/branding":                false,
 		http.MethodGet + " /api/admin/settings/media-upload":            false,

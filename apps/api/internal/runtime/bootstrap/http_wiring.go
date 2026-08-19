@@ -87,9 +87,8 @@ func newAppRouter(
 			MediaStorageService:       services.storageService,
 			Uploads:                   uploadDeps,
 			UploadDownloads: httpapi.UploadDownloadDeps{
-				Reader:       services.storageService,
-				PreviewStore: services.storageService,
-				ReadAccess:   uploadReadAccess,
+				Reader:     services.storageService,
+				ReadAccess: uploadReadAccess,
 			},
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{
