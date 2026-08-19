@@ -20,11 +20,21 @@ func registerAdminRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	registerAdminUploadRoutes(adminAPI, h)
 	registerAdminStorageRoutes(adminAPI, h)
 	registerAdminProviderEndpointRoutes(adminAPI, h)
+	registerAdminSearchProviderRoutes(adminAPI, h)
 	registerAdminFeaturePromptRoutes(adminAPI, h)
 	registerAdminCreditRoutes(adminAPI, h)
 	registerAdminBillingRoutes(adminAPI, h)
 	registerAdminRewardRoutes(adminAPI, h)
 	registerAdminPaymentRoutes(adminAPI, h)
+}
+
+func registerAdminSearchProviderRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+	if h.SearchCatalogHandler == nil {
+		return
+	}
+	adminAPI.GET("/search/providers", h.SearchCatalogHandler.List)
+	adminAPI.PUT("/search/providers/:provider", h.SearchCatalogHandler.Update)
+	adminAPI.POST("/search/providers/:provider/test", h.SearchCatalogHandler.Test)
 }
 
 func registerAdminPaymentRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {

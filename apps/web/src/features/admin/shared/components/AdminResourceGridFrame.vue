@@ -8,16 +8,20 @@
       <ProgressSpinner class="!h-9 !w-9 text-admin-accent" stroke-width="4" />
     </div>
 
-    <div v-else-if="isEmpty" :class="adminEmptyStateClass">
-      <div class="text-admin-title font-semibold text-admin-title-color">
-        {{ emptyTitle }}
-      </div>
-      <div v-if="emptyDescription" class="mt-2 text-admin-meta text-admin-subtitle-color">
-        {{ emptyDescription }}
+    <div v-else-if="isEmpty" :class="resolvedGridClass">
+      <slot name="prepend" />
+      <div v-if="emptyTitle || emptyDescription" :class="adminEmptyStateClass">
+        <div class="text-admin-title font-semibold text-admin-title-color">
+          {{ emptyTitle }}
+        </div>
+        <div v-if="emptyDescription" class="mt-2 text-admin-meta text-admin-subtitle-color">
+          {{ emptyDescription }}
+        </div>
       </div>
     </div>
 
     <div v-else :class="resolvedGridClass">
+      <slot name="prepend" />
       <slot />
     </div>
   </AdminSurfaceFrame>

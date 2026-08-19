@@ -1,0 +1,66 @@
+import {
+  recordSearchImageFailure,
+  searchUserInspiration,
+} from '../../shared/api/generated-query/user/user'
+import type {
+  SearchResults,
+  SearchResult,
+  SearchProviderProvider,
+} from '../../shared/api/generated-query/model'
+import { resolveApiData, resolveApiOk } from '../../shared/api/apiResponse'
+
+export type SearchPage = SearchResults
+export const MAX_SEARCH_QUERY_RUNES = 200
+
+export function normalizeSearchQuery(raw: string): string {
+  return raw.trim().replace(/\s+/g, ' ')
+}
+
+export function isSearchQueryWithinLimit(query: string): boolean {
+  return Array.from(query).length <= MAX_SEARCH_QUERY_RUNES
+}
+
+const inFlightRequests = new Map<string, { promise: Promise<SearchPage>; signal?: AbortSignal }>()
+
+export async function searchInspiration(input: {
+  query: string
+  cursor?: string
+  limit?: number
+  signal?: AbortSignal
+}): Promise<SearchPage> {
+  if (input.signal?.aborted) {
+    throw new DOMException('The request was aborted.', 'AbortError')
+  }
+  const key = JSON.stringify({
+    query: input.query,
+    cursor: input.cursor ?? '',
+    limit: input.limit ?? 0,
+  })
+  const inFlight = inFlightRequests.get(key)
+  if (inFlight?.signal?.aborted) {
+    inFlightRequests.delete(key)
+  } else if (inFlight) {
+    return inFlight.promise
+  }
+  const request = resolveApiData(
+    searchUserInspiration(
+      { q: input.query || undefined, cursor: input.cursor, limit: input.limit },
+      { signal: input.signal },
+    ),
+    '搜索灵感失败',
+  ).finally(() => {
+    if (inFlightRequests.get(key)?.promise === request) inFlightRequests.delete(key)
+  })
+  inFlightRequests.set(key, { promise: request, signal: input.signal })
+  return request
+}
+
+export async function reportSearchImageFailure(provider: SearchProviderProvider): Promise<void> {
+  try {
+    await resolveApiOk(recordSearchImageFailure({ provider }), '上报图片加载失败指标失败')
+  } catch (error) {
+    if (import.meta.env.DEV) console.debug('search image failure metric unavailable', error)
+  }
+}
+
+export type { SearchResult }

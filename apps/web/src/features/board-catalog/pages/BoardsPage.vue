@@ -6,6 +6,7 @@
       <div :class="boardCatalogClasses.brand">
         <StudioName />
       </div>
+      <UserWorkspaceNavigation />
       <UserAccountMenu
         :avatar-url="accountControls.viewModel.avatarUrl.value"
         :balance="accountControls.viewModel.balance.value"
@@ -179,6 +180,7 @@ import { HOME_PATH, USER_CANVAS_PATH } from '../../../shared/constants/routePath
 import { useUserStore } from '../../auth/session/authSession'
 import UserAccountMenu from '../../../shared/components/UserAccountMenu.vue'
 import StudioName from '../../../shared/components/StudioName.vue'
+import UserWorkspaceNavigation from '../../user-shell/components/UserWorkspaceNavigation.vue'
 import { Search } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'

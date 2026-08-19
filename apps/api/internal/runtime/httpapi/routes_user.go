@@ -36,6 +36,12 @@ func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	registerUserTaskRoutes(userAPI, h)
 	registerUserBoardRoutes(userAPI, h)
 	registerUserUploadRoutes(userAPI, h)
+	if h.SearchHandler != nil {
+		userAPI.GET("/search", h.SearchHandler.Search)
+	}
+	if h.SearchMetricsHandler != nil {
+		userAPI.POST("/search/metrics", h.SearchMetricsHandler.RecordImageFailure)
+	}
 }
 
 func registerUserTaskRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {

@@ -26,6 +26,7 @@ tags:
   - name: AdminMonitor
   - name: AdminStatistics
   - name: AdminProviderEndpoints
+  - name: AdminSearchProviders
   - name: AdminStorage
   - name: AdminFeaturePrompts
   - name: UserAssets
@@ -54,6 +55,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseUserInfo'
+  /user/search:
+    get:
+      tags: [User]
+      operationId: searchUserInspiration
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 200 }
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 512 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 48, default: 24 }
+      responses:
+        '200':
+          description: Curated or text inspiration results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseSearchResults'
+  /user/search/metrics:
+    post:
+      tags: [User]
+      operationId: recordSearchImageFailure
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordSearchImageFailureRequest'
+      responses:
+        '200':
+          description: Recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseEmpty'
   /user/billing/quotes:
     post:
       tags: [Billing]
@@ -2226,6 +2269,49 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseProviderEndpoint'
+  /admin/search/providers:
+    get:
+      tags: [AdminSearchProviders]
+      operationId: listAdminSearchProviders
+      responses:
+        '200':
+          description: Search provider configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseSearchProviderList'
+  /admin/search/providers/{provider}:
+    put:
+      tags: [AdminSearchProviders]
+      operationId: updateAdminSearchProvider
+      parameters:
+        - $ref: '#/components/parameters/SearchProviderPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSearchProviderRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseEmpty'
+  /admin/search/providers/{provider}/test:
+    post:
+      tags: [AdminSearchProviders]
+      operationId: testAdminSearchProvider
+      parameters:
+        - $ref: '#/components/parameters/SearchProviderPath'
+      responses:
+        '200':
+          description: Search provider test result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseSearchProviderTest'
   /admin/provider-endpoints/registry:
     get:
       tags: [AdminProviderEndpoints]
@@ -2479,6 +2565,13 @@ components:
       in: path
       required: true
       schema: { type: integer }
+    SearchProviderPath:
+      name: provider
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [unsplash, pexels]
     PublicUserIDPath:
       name: public_id
       in: path
@@ -4883,6 +4976,93 @@ components:
           items:
             $ref: '#/components/schemas/ProviderEndpointProtocol'
 
+    SearchProvider:
+      type: object
+      required: [provider, api_key_configured, enabled, test_state]
+      properties:
+        provider:
+          $ref: '#/components/schemas/SearchProviderProvider'
+        api_key_configured: { type: boolean }
+        enabled: { type: boolean }
+        test_state:
+          $ref: '#/components/schemas/SearchProviderTestState'
+        failure_category:
+          $ref: '#/components/schemas/SearchProviderFailureCategory'
+        status_message: { type: string }
+        tested_at: { type: string, format: date-time, nullable: true }
+
+    UpdateSearchProviderRequest:
+      type: object
+      required: [enabled]
+      properties:
+        api_key: { type: string, writeOnly: true }
+        enabled: { type: boolean }
+
+    SearchProviderTestResult:
+      type: object
+      required: [provider, test_state, message]
+      properties:
+        provider:
+          $ref: '#/components/schemas/SearchProviderProvider'
+        test_state:
+          $ref: '#/components/schemas/SearchProviderTestResultTestState'
+        failure_category:
+          $ref: '#/components/schemas/SearchProviderFailureCategory'
+        message: { type: string }
+
+    SearchResult:
+      type: object
+      required: [id, provider, title, author, author_url, source_url, thumbnail_url, preview_url, original_url, width, height, media_kind]
+      properties:
+        id: { type: string }
+        provider:
+          $ref: '#/components/schemas/SearchProviderProvider'
+        title: { type: string }
+        description: { type: string }
+        author: { type: string }
+        author_url: { type: string, format: uri }
+        source_url: { type: string, format: uri }
+        thumbnail_url: { type: string, format: uri }
+        preview_url: { type: string, format: uri }
+        original_url: { type: string, format: uri }
+        width: { type: integer, minimum: 1 }
+        height: { type: integer, minimum: 1 }
+        media_kind: { type: string, enum: [image] }
+
+    SearchResults:
+      type: object
+      required: [query, results, has_more]
+      properties:
+        query: { type: string }
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/SearchResult' }
+        next_cursor: { type: string }
+        has_more: { type: boolean }
+
+    RecordSearchImageFailureRequest:
+      type: object
+      required: [provider]
+      properties:
+        provider:
+          $ref: '#/components/schemas/SearchProviderProvider'
+
+    SearchProviderProvider:
+      type: string
+      enum: [unsplash, pexels]
+
+    SearchProviderFailureCategory:
+      type: string
+      enum: [credentials, quota_or_permission, network_timeout, response_format, unknown]
+
+    SearchProviderTestState:
+      type: string
+      enum: [never, passed, failed]
+
+    SearchProviderTestResultTestState:
+      type: string
+      enum: [passed, failed]
+
     DetectModelsRequest:
       type: object
       required: [base_url, api_key]
@@ -5657,6 +5837,36 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/ProviderEndpointRegistry'
+
+    ApiResponseSearchProviderList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [providers]
+              properties:
+                providers:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SearchProvider'
+
+    ApiResponseSearchProviderTest:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/SearchProviderTestResult'
+
+    ApiResponseSearchResults:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/SearchResults'
 
     ApiResponseDetectModels:
       allOf:

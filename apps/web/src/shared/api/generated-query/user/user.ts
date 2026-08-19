@@ -14,9 +14,16 @@ import type {
   UseQueryReturnType,
 } from '@tanstack/vue-query'
 
-import { unref } from 'vue'
+import { toValue, unref } from 'vue'
+import type { MaybeRefOrGetter } from 'vue'
 
-import type { ApiResponseUserInfo } from '../model'
+import type {
+  ApiResponseEmpty,
+  ApiResponseSearchResults,
+  ApiResponseUserInfo,
+  RecordSearchImageFailureRequest,
+  SearchUserInspirationParams,
+} from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
 import type { ErrorType } from '../../orvalMutator'
@@ -75,6 +82,176 @@ export function useGetUserInfo<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getGetUserInfoQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getSearchUserInspirationUrl = (params?: SearchUserInspirationParams) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0 ? `/user/search?${stringifiedParams}` : `/user/search`
+}
+
+export const searchUserInspiration = async (
+  params?: SearchUserInspirationParams,
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseSearchResults> => {
+  return orvalMutator<ApiResponseSearchResults>(getSearchUserInspirationUrl(params), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getSearchUserInspirationQueryKey = (
+  params?: MaybeRefOrGetter<SearchUserInspirationParams>,
+) => {
+  return ['user', 'search', ...(params ? [params] : [])] as const
+}
+
+export const getSearchUserInspirationQueryOptions = <
+  TData = Awaited<ReturnType<typeof searchUserInspiration>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: MaybeRefOrGetter<SearchUserInspirationParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof searchUserInspiration>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getSearchUserInspirationQueryKey(params)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof searchUserInspiration>>> = ({ signal }) =>
+    searchUserInspiration(toValue(params), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof searchUserInspiration>>,
+    TError,
+    TData
+  >
+}
+
+export type SearchUserInspirationQueryResult = NonNullable<
+  Awaited<ReturnType<typeof searchUserInspiration>>
+>
+export type SearchUserInspirationQueryError = ErrorType<unknown>
+
+export function useSearchUserInspiration<
+  TData = Awaited<ReturnType<typeof searchUserInspiration>>,
+  TError = ErrorType<unknown>,
+>(
+  params?: MaybeRefOrGetter<SearchUserInspirationParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof searchUserInspiration>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getSearchUserInspirationQueryOptions(params, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getRecordSearchImageFailureUrl = () => {
+  return `/user/search/metrics`
+}
+
+export const recordSearchImageFailure = async (
+  recordSearchImageFailureRequest: RecordSearchImageFailureRequest,
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseEmpty> => {
+  return orvalMutator<ApiResponseEmpty>(getRecordSearchImageFailureUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(recordSearchImageFailureRequest),
+  })
+}
+
+export const getRecordSearchImageFailureQueryKey = (
+  recordSearchImageFailureRequest?: MaybeRefOrGetter<RecordSearchImageFailureRequest>,
+) => {
+  return ['POST', 'user', 'search', 'metrics', recordSearchImageFailureRequest] as const
+}
+
+export const getRecordSearchImageFailureQueryOptions = <
+  TData = Awaited<ReturnType<typeof recordSearchImageFailure>>,
+  TError = ErrorType<unknown>,
+>(
+  recordSearchImageFailureRequest: MaybeRefOrGetter<RecordSearchImageFailureRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof recordSearchImageFailure>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getRecordSearchImageFailureQueryKey(recordSearchImageFailureRequest)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof recordSearchImageFailure>>> = ({
+    signal,
+  }) =>
+    recordSearchImageFailure(toValue(recordSearchImageFailureRequest), {
+      signal,
+      ...requestOptions,
+    })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof recordSearchImageFailure>>,
+    TError,
+    TData
+  >
+}
+
+export type RecordSearchImageFailureQueryResult = NonNullable<
+  Awaited<ReturnType<typeof recordSearchImageFailure>>
+>
+export type RecordSearchImageFailureQueryError = ErrorType<unknown>
+
+export function useRecordSearchImageFailure<
+  TData = Awaited<ReturnType<typeof recordSearchImageFailure>>,
+  TError = ErrorType<unknown>,
+>(
+  recordSearchImageFailureRequest: MaybeRefOrGetter<RecordSearchImageFailureRequest>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof recordSearchImageFailure>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getRecordSearchImageFailureQueryOptions(
+    recordSearchImageFailureRequest,
+    options,
+  )
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

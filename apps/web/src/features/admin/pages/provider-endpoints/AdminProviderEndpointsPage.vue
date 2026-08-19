@@ -1,10 +1,8 @@
 <template>
   <div>
     <AdminResourceGridFrame
-      :empty-description="
-        hasProviderEndpointSearch ? '调整搜索关键词后重试。' : '点击右上角新增端点开始配置。'
-      "
-      :empty-title="emptyProviderEndpointMessage"
+      empty-description=""
+      empty-title=""
       :is-empty="providerEndpointCards.length === 0"
       :is-loading="isProviderEndpointLoading"
     >
@@ -47,6 +45,9 @@
         </AdminResourceToolbar>
       </template>
 
+      <template #prepend>
+        <SearchProviderCard />
+      </template>
       <Card
         v-for="card in providerEndpointCards"
         :key="card.providerEndpoint.id"
@@ -371,9 +372,7 @@
           id="admin-provider-endpoint-api-url"
           v-model="providerEndpointForm.baseUrl"
           class="w-full"
-          :placeholder="
-            providerEndpointFormErrors.baseUrl || '例如：https://api.example.com/v1'
-          "
+          :placeholder="providerEndpointFormErrors.baseUrl || '例如：https://api.example.com/v1'"
           :class="invalid ? 'placeholder:text-admin-danger' : ''"
           :invalid="invalid"
           :aria-describedby="describedbyId"
@@ -634,6 +633,7 @@ import {
 } from '../../shared/lib/adminUiClasses'
 import { useAdminProviderConfig } from '../../provider-config/useAdminProviderConfig'
 import { useAdminProviderConfigFeedback } from '../../provider-config/useAdminProviderConfigFeedback'
+import SearchProviderCard from '../../provider-config/SearchProviderCard.vue'
 import {
   getAdminProviderEndpointCapabilityLabel,
   getAdminProviderEndpointProtocolLabel,
@@ -652,9 +652,7 @@ const { cards, providerEndpointEditor, accountEditor, commands } = useAdminProvi
 const searchKeyword = cards.searchKeyword
 const providerEndpointCards = cards.items
 const isProviderEndpointLoading = cards.isLoading
-const hasProviderEndpointSearch = cards.hasSearch
 const totalProviderEndpointsLabel = cards.totalProviderEndpointsLabel
-const emptyProviderEndpointMessage = cards.emptyMessage
 const accountRunningLabel = cards.accountRunningLabel
 const activeModelCount = cards.activeModelCount
 

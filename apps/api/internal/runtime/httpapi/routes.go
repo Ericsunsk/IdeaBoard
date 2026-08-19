@@ -18,6 +18,7 @@ import (
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/rewards"
+	"ideaboard/api/internal/searchcatalog"
 	"ideaboard/api/internal/tasking/taskservice"
 	"ideaboard/api/internal/tasking/taskstats"
 	"ideaboard/api/internal/usage"
@@ -84,6 +85,8 @@ type UserRouteDeps struct {
 	MediaStorageService    *storage.StorageService
 	Uploads                UploadDeps
 	UploadDownloads        UploadDownloadDeps
+	SearchHandler          *searchcatalog.SearchHandler
+	SearchMetricsHandler   *searchcatalog.MetricsHandler
 }
 
 type AdminRouteDeps struct {
@@ -105,6 +108,7 @@ type AdminRouteDeps struct {
 	RewardAdminCommandHandler   *rewards.AdminCommandHandler
 	RewardAdminReadHandler      *rewards.AdminReadHandler
 	PaymentAdminHandler         *payments.AdminHandler
+	SearchCatalogHandler        *searchcatalog.Handler
 }
 
 const globalRequestBodyLimitBytes int64 = 2 * 1024 * 1024

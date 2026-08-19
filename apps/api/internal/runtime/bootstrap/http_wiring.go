@@ -18,11 +18,13 @@ import (
 	"ideaboard/api/internal/rewards"
 	"ideaboard/api/internal/runtime/httpapi"
 	"ideaboard/api/internal/runtime/webdist"
+	"ideaboard/api/internal/searchcatalog"
 	"ideaboard/api/internal/tasking/taskservice"
 	"ideaboard/api/internal/tasking/taskstats"
 	"ideaboard/api/internal/usage"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func newAppRouter(
@@ -65,6 +67,11 @@ func newAppRouter(
 		uploadBoardAccessResolver{service: services.boardService},
 		uploadOwnerStorageUIDResolver{repo: repos.userRepo},
 	)
+	searchProviderConfig := searchcatalog.NewConfigRepository(repos.systemConfigRepo)
+	searchMetrics, metricsErr := searchcatalog.NewPrometheusMetrics(prometheus.DefaultRegisterer)
+	if metricsErr != nil {
+		slog.Warn("search metrics unavailable", "err", metricsErr)
+	}
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -88,6 +95,8 @@ func newAppRouter(
 				Reader:     services.storageService,
 				ReadAccess: uploadReadAccess,
 			},
+			SearchHandler:        searchcatalog.NewSearchHandler(searchcatalog.NewSearchService(searchProviderConfig, searchMetrics)),
+			SearchMetricsHandler: searchcatalog.NewMetricsHandler(searchMetrics),
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{
 			AdminHandler: users.NewAdminHandler(
@@ -113,6 +122,7 @@ func newAppRouter(
 			RewardAdminCommandHandler:   rewardAdminCommandHandler,
 			RewardAdminReadHandler:      rewardAdminReadHandler,
 			PaymentAdminHandler:         paymentAdminHandler,
+			SearchCatalogHandler:        searchcatalog.NewHandler(searchProviderConfig),
 		},
 		PaymentWebhook: paymentWebhookHandler,
 		StaticUploads: httpapi.StaticUploadDeps{

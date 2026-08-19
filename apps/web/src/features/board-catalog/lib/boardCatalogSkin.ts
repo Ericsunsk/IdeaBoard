@@ -7,7 +7,7 @@ export { blankBoardPreviewSurfaceClass }
 export const boardCatalogClasses = {
   page: 'app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden overscroll-contain bg-board-page px-[var(--spacing-ib-page-chrome-inset)] pt-[var(--spacing-ib-page-chrome-inset)] pb-16 text-board-page-text [box-sizing:border-box] [-webkit-overflow-scrolling:touch] max-[860px]:pb-10',
   pageBackground: 'ib-board-page-background ib-page-dot-bg',
-  header: 'relative z-[1] flex items-start justify-between',
+  header: 'relative z-[1] flex flex-wrap items-start justify-between gap-x-4',
   brand: 'inline-flex min-w-0 max-w-[calc(100%-64px)] items-center',
   userMenuWrap: pageChromeAccountMenuClasses.wrap,
   userAvatarButton: pageChromeAccountMenuClasses.avatarButton,
