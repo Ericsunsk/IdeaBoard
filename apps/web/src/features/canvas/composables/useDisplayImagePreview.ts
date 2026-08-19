@@ -113,11 +113,9 @@ async function createPreviewObjectUrl(
   maxSide: number,
   mediaAssetId: number | null,
 ): Promise<string | null> {
-  const canonicalSourceUrl = canonicalizeRuntimeUploadRef(sourceUrl.trim()).trim()
-  const serverPreviewUrl = mediaAssetId
+  const fetchUrl = mediaAssetId
     ? `${MEDIA_ASSET_ENDPOINT}/${encodeURIComponent(String(mediaAssetId))}/derivatives/${resolveDerivativeTier(maxSide)}/content`
-    : null
-  const fetchUrl = serverPreviewUrl ?? resolveFetchUrl(sourceUrl)
+    : resolveFetchUrl(sourceUrl)
   if (!fetchUrl) return null
   const response = mediaAssetId
     ? await fetchMediaDerivative(fetchUrl)
@@ -127,7 +125,7 @@ async function createPreviewObjectUrl(
   const sourceBlob = await response.blob()
   if (!sourceBlob.type.startsWith('image/')) return null
 
-  if (serverPreviewUrl) return URL.createObjectURL(sourceBlob)
+  if (mediaAssetId) return URL.createObjectURL(sourceBlob)
 
   const bitmap = await createImageBitmap(sourceBlob)
   const longestSide = Math.max(bitmap.width, bitmap.height)

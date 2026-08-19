@@ -27,18 +27,16 @@ const (
 	TierLargePreview = "large-preview"
 	FormatJPEG       = "jpeg"
 	FormatPNG        = "png"
-	DefaultFormat    = FormatJPEG
 )
 
 type TierSpec struct {
-	Name    string
 	MaxSide int
 }
 
 var TierSpecs = map[string]TierSpec{
-	TierThumb:        {Name: TierThumb, MaxSide: 256},
-	TierPreview:      {Name: TierPreview, MaxSide: 640},
-	TierLargePreview: {Name: TierLargePreview, MaxSide: 1280},
+	TierThumb:        {MaxSide: 256},
+	TierPreview:      {MaxSide: 640},
+	TierLargePreview: {MaxSide: 1280},
 }
 
 type Service struct {
