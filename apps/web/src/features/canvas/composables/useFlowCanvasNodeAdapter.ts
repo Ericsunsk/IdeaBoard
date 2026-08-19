@@ -56,10 +56,10 @@ export function useFlowCanvasNodeAdapter({
     return resolveSnapshotNode<FusionNodeItem>(data())
   })
 
-  const displayImage = computed<{ url: string } | null>(() => {
+  const displayImage = computed<{ url: string; mediaAssetId?: number } | null>(() => {
     if (!imageSnapshot.value) return null
     const payload = resolveImageNodeDisplayPayload(imageSnapshot.value)
-    return payload ? { url: payload.url } : null
+    return payload ? { url: payload.url, mediaAssetId: payload.mediaAssetId } : null
   })
 
   const imageGenerating = computed(() => imageDirectGenerating())

@@ -515,6 +515,18 @@ func TestUserPaymentRoutesAreRegistered(t *testing.T) {
 	}
 }
 
+func TestUserEventsRouteIsRegistered(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	registerUserRoutes(router.Group("/api/user"), UserRouteDeps{})
+	for _, route := range router.Routes() {
+		if route.Method == http.MethodGet && route.Path == "/api/user/events" {
+			return
+		}
+	}
+	t.Fatal("user events route was not registered")
+}
+
 func TestAdminTaskRoutesDoNotExposeBulkTaskDeletion(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()

@@ -31,7 +31,7 @@ describe('userPaymentsResource payment events', () => {
     const createEventSource = vi.fn(() => source)
     const unsubscribe = subscribeToUserPaymentEvents(listener, createEventSource)
 
-    expect(createEventSource).toHaveBeenCalledWith(expect.stringContaining('/user/payments/events'), {
+    expect(createEventSource).toHaveBeenCalledWith(expect.stringContaining('/user/events'), {
       withCredentials: true,
     })
     if (typeof paymentHandler !== 'function') throw new Error('payment listener was not registered')

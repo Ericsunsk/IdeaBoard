@@ -10,6 +10,7 @@ import (
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/media/derivatives"
 	"ideaboard/api/internal/media/preparation"
 	"ideaboard/api/internal/media/reclamation"
 	"ideaboard/api/internal/media/storage"
@@ -18,6 +19,7 @@ import (
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/taskqueue"
+	"ideaboard/api/internal/tasking/tasks"
 	"ideaboard/api/internal/tasking/taskservice"
 	"ideaboard/api/internal/tasking/taskstats"
 	"ideaboard/api/internal/tasking/tasksubmission"
@@ -78,7 +80,7 @@ func newAppTaskRuntime(
 	generationMediaPreparer := preparation.NewService(services.storageService, repos.mediaAssetRegistry)
 	submitMediaValidator := taskmedia.NewSubmitMediaValidator(cfg.PublicOrigins, taskMediaAuthorizer)
 	taskEventHub := taskservice.NewEventHub()
-	taskEvents, eventBus, err := newTaskStatusEventPublisher(ctx, cfg.Events, taskEventHub)
+	taskEvents, eventBus, err := newTaskStatusEventPublisherWithResolver(ctx, cfg.Events, taskEventHub, repos.taskRepo)
 	if err != nil {
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize task event bus: %w", err)
 	}
@@ -110,11 +112,14 @@ func newAppTaskRuntime(
 	reclamationPeriodicJobs := reclamation.PeriodicJobs()
 	paymentPeriodicJobs := worker.PaymentReconciliationPeriodicJobs()
 	checkoutShutdownPeriodicJobs := worker.PaymentCheckoutShutdownPeriodicJobs()
-	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(reclamationPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs))
+	mediaDerivativeService := derivatives.NewService(dbs.db, services.storageService)
+	mediaDerivativePeriodicJobs := derivatives.PeriodicJobs()
+	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(reclamationPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(mediaDerivativePeriodicJobs))
 	periodicJobs = append(periodicJobs, creditPeriodicJobs...)
 	periodicJobs = append(periodicJobs, reclamationPeriodicJobs...)
 	periodicJobs = append(periodicJobs, paymentPeriodicJobs...)
 	periodicJobs = append(periodicJobs, checkoutShutdownPeriodicJobs...)
+	periodicJobs = append(periodicJobs, mediaDerivativePeriodicJobs...)
 	riverClient, err := worker.NewRiverClient(dbs.riverPool, riverTaskWorker, worker.RiverServerOptions{
 		QueueName:   taskqueue.RiverQueueDefault,
 		Concurrency: workerConcurrency,
@@ -123,6 +128,7 @@ func newAppTaskRuntime(
 			reclamation.QueueName:               {MaxWorkers: 1},
 			worker.PaymentReconciliationQueue:   {MaxWorkers: 1},
 			worker.PaymentCheckoutShutdownQueue: {MaxWorkers: 1},
+			derivatives.QueueName:               {MaxWorkers: 2},
 		},
 		RegisterWorkers: func(workers *river.Workers) {
 			river.AddWorker(workers, worker.NewCreditReconciliationWorker(services.creditService))
@@ -132,6 +138,8 @@ func newAppTaskRuntime(
 			river.AddWorker(workers, worker.NewPaymentReconciliationWorker(services.paymentService))
 			river.AddWorker(workers, worker.NewPaymentCheckoutShutdownWorker(services.paymentService))
 			river.AddWorker(workers, worker.NewPaymentCheckoutShutdownScheduleWorker(services.paymentService))
+			river.AddWorker(workers, derivatives.NewWorker(mediaDerivativeService))
+			river.AddWorker(workers, derivatives.NewOutboxDispatcher(dbs.db))
 		},
 		PeriodicJobs: periodicJobs,
 	})
@@ -141,6 +149,13 @@ func newAppTaskRuntime(
 		}
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize River client: %w", err)
 	}
+	repos.mediaAssetRegistry.SetDerivativeEnqueuer(func(ctx context.Context, derivativeID int64) error {
+		_, err := riverClient.Insert(ctx, derivatives.JobArgs{DerivativeID: derivativeID}, &river.InsertOpts{
+			Queue: derivatives.QueueName, MaxAttempts: 5, Priority: 4,
+			UniqueOpts: river.UniqueOpts{ByArgs: true},
+		})
+		return err
+	})
 	if _, err := recoverRunningTasksAfterStartup(ctx, repos.taskRepo, riverTaskWorker, riverStartupJobCanceller{client: riverClient}); err != nil {
 		if eventBus != nil {
 			_ = eventBus.Close()
@@ -184,15 +199,25 @@ func newAppTaskRuntime(
 }
 
 type taskEventHubPublisher struct {
-	hub *taskservice.EventHub
+	hub      *taskservice.EventHub
+	resolver interface {
+		GetByTaskID(context.Context, string) (*tasks.Task, error)
+	}
 }
 
-func (p taskEventHubPublisher) PublishTaskStatus(_ context.Context, event events.TaskStatusEvent) error {
+func (p taskEventHubPublisher) PublishTaskStatus(ctx context.Context, event events.TaskStatusEvent) error {
 	if p.hub == nil {
 		return nil
 	}
 	event = events.NormalizeTaskStatusEvent(event)
-	p.hub.Publish(event.TaskID, taskservice.TaskEvent{TaskID: event.TaskID, Status: event.Status})
+	taskEvent := taskservice.TaskEvent{TaskID: event.TaskID, Status: event.Status}
+	if p.resolver != nil {
+		if task, err := p.resolver.GetByTaskID(ctx, event.TaskID); err == nil && task != nil {
+			p.hub.PublishForUser(task.UserID, event.TaskID, taskEvent)
+			return nil
+		}
+	}
+	p.hub.Publish(event.TaskID, taskEvent)
 	return nil
 }
 
@@ -222,7 +247,18 @@ func newTaskStatusEventPublisher(
 	cfg config.EventBusConfig,
 	hub *taskservice.EventHub,
 ) (events.TaskStatusPublisher, *events.NATSJetStreamEventBus, error) {
-	localPublisher := taskEventHubPublisher{hub: hub}
+	return newTaskStatusEventPublisherWithResolver(ctx, cfg, hub, nil)
+}
+
+func newTaskStatusEventPublisherWithResolver(
+	ctx context.Context,
+	cfg config.EventBusConfig,
+	hub *taskservice.EventHub,
+	resolver interface {
+		GetByTaskID(context.Context, string) (*tasks.Task, error)
+	},
+) (events.TaskStatusPublisher, *events.NATSJetStreamEventBus, error) {
+	localPublisher := taskEventHubPublisher{hub: hub, resolver: resolver}
 	if !cfg.Enabled {
 		return localPublisher, nil, nil
 	}

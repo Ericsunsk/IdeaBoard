@@ -106,7 +106,7 @@ const props = defineProps<{
   dragging: boolean
   copyMode: boolean
   stageHeight: number
-  displayImage: { url: string } | null
+  displayImage: { url: string; mediaAssetId?: number } | null
   emptyIconVariant?: 'image' | 'fusion'
   inputLocked?: boolean
   actionBinding: ImageActionBinding

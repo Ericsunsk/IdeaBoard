@@ -33,6 +33,7 @@ import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview
 const props = withDefaults(
   defineProps<{
     src: string
+    mediaAssetId?: number
     alt?: string
     draggable?: boolean
     removable?: boolean
@@ -56,6 +57,7 @@ const emit = defineEmits<{
 
 const { displayUrl } = useDisplayImagePreview(() => props.src, {
   maxSide: () => props.previewMaxSide,
+  mediaAssetId: () => props.mediaAssetId,
 })
 
 defineOptions({

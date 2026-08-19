@@ -321,6 +321,50 @@ type MediaAsset struct {
 	ReclaimGeneration int64           `json:"reclaim_generation"`
 }
 
+type MediaAssetSource struct {
+	ID            int64           `json:"id"`
+	MediaAssetID  int64           `json:"media_asset_id"`
+	SourceAssetID int64           `json:"source_asset_id"`
+	OwnerUserID   int64           `json:"owner_user_id"`
+	SourceRole    string          `json:"source_role"`
+	SourceIndex   int32           `json:"source_index"`
+	Metadata      json.RawMessage `json:"metadata"`
+	CreatedAt     time.Time       `json:"created_at"`
+}
+
+type MediaDerivative struct {
+	ID               int64        `json:"id"`
+	MediaAssetID     int64        `json:"media_asset_id"`
+	OwnerUserID      int64        `json:"owner_user_id"`
+	Tier             string       `json:"tier"`
+	Format           string       `json:"format"`
+	Status           string       `json:"status"`
+	StorageProfileID string       `json:"storage_profile_id"`
+	StorageKey       string       `json:"storage_key"`
+	MimeType         string       `json:"mime_type"`
+	Width            int32        `json:"width"`
+	Height           int32        `json:"height"`
+	SizeBytes        int64        `json:"size_bytes"`
+	ChecksumSha256   string       `json:"checksum_sha256"`
+	AttemptCount     int32        `json:"attempt_count"`
+	ErrorCode        string       `json:"error_code"`
+	ErrorMessage     string       `json:"error_message"`
+	CreatedAt        time.Time    `json:"created_at"`
+	UpdatedAt        time.Time    `json:"updated_at"`
+	ReadyAt          sql.NullTime `json:"ready_at"`
+	LastAttemptAt    sql.NullTime `json:"last_attempt_at"`
+}
+
+type MediaDerivativeOutbox struct {
+	ID           int64        `json:"id"`
+	DerivativeID int64        `json:"derivative_id"`
+	AvailableAt  time.Time    `json:"available_at"`
+	ClaimedAt    sql.NullTime `json:"claimed_at"`
+	AttemptCount int32        `json:"attempt_count"`
+	LastError    string       `json:"last_error"`
+	CreatedAt    time.Time    `json:"created_at"`
+}
+
 type MediaRef struct {
 	ID           int64           `json:"id"`
 	MediaAssetID int64           `json:"media_asset_id"`

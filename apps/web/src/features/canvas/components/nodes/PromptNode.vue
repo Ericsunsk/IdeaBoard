@@ -29,6 +29,7 @@
             :key="item.id"
             class="prompt-node-thumb-item aspect-square h-[var(--node-input-thumbnail-size)] w-[var(--node-input-thumbnail-size)] flex-none cursor-grab"
             :src="item.url"
+            :media-asset-id="item.mediaAssetId"
             removable
             :data-image-id="item.id"
             @mousedown.stop

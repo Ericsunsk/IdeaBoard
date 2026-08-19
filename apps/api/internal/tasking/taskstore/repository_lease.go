@@ -202,6 +202,20 @@ func upsertTaskOutputMediaAsset(ctx context.Context, q *dbsqlc.Queries, ownerUse
 	if err != nil {
 		return nil, err
 	}
+	for _, tier := range []string{"thumb", "preview", "large-preview"} {
+		derivative, derivativeErr := q.UpsertMediaDerivative(ctx, dbsqlc.UpsertMediaDerivativeParams{
+			MediaAssetID: id,
+			OwnerUserID:  ownerUserID,
+			Tier:         tier,
+			Format:       "jpeg",
+		})
+		if derivativeErr != nil {
+			return nil, fmt.Errorf("create task output %s derivative: %w", tier, derivativeErr)
+		}
+		if _, derivativeErr := q.EnqueueMediaDerivativeOutbox(ctx, derivative.ID); derivativeErr != nil {
+			return nil, fmt.Errorf("enqueue task output %s derivative: %w", tier, derivativeErr)
+		}
+	}
 	return &id, nil
 }
 

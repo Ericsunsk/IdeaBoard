@@ -37,6 +37,7 @@ func newAppRouter(
 	billingHandler := billing.NewHandler(services.billingCatalog, services.billingCatalog)
 	paymentUserHandler := payments.NewUserCheckoutHandler(services.paymentService, cfg.PublicOrigins)
 	paymentEventStreamHandler := payments.NewEventStreamHandler(services.paymentService.EventHub())
+	userEventStreamHandler := httpapi.NewUserEventStreamHandler(taskServices.taskService.EventHub(), services.paymentService.EventHub())
 	paymentAdminHandler := payments.NewAdminHandler(services.paymentService, cfg.PublicOrigins)
 	paymentWebhookHandler := payments.NewWebhookHandler(services.paymentService)
 	creditUserResolver := creditsUserResolver{repo: repos.userRepo}
@@ -81,6 +82,9 @@ func newAppRouter(
 			RewardUserHandler:         rewardUserHandler,
 			PaymentUserHandler:        paymentUserHandler,
 			PaymentEventStreamHandler: paymentEventStreamHandler,
+			UserEventStreamHandler:    userEventStreamHandler,
+			MediaAssetRegistry:        repos.mediaAssetRegistry,
+			MediaStorageService:       services.storageService,
 			Uploads:                   uploadDeps,
 			UploadDownloads: httpapi.UploadDownloadDeps{
 				Reader:       services.storageService,

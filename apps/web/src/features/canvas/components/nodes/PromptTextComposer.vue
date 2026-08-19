@@ -15,6 +15,7 @@
         :key="item.id"
         class="prompt-text-composer-image-thumb aspect-square h-[var(--node-input-thumbnail-size)] w-[var(--node-input-thumbnail-size)]"
         :src="item.url"
+        :media-asset-id="item.mediaAssetId"
         :removable="!disabled"
         :data-image-id="item.id"
         @mousedown.stop
@@ -73,6 +74,7 @@ type PromptTextComposerImageInput = {
   id: string
   url: string
   ratio?: number
+  mediaAssetId?: number
 }
 
 const props = withDefaults(

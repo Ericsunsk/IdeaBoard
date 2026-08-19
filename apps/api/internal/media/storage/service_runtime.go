@@ -159,6 +159,45 @@ func (s *StorageService) ReadUploadResourceByURL(ctx context.Context, rawURL str
 	return adapter.Read(ctx, profile, key, maxBytes)
 }
 
+// PutObjectAtProfile writes a deterministic derivative through the profile
+// that owns the source asset. It intentionally bypasses the active profile.
+func (s *StorageService) PutObjectAtProfile(ctx context.Context, profileID, objectKey string, data []byte, contentType string) error {
+	profile, err := s.resolveProfileByID(ctx, profileID)
+	if err != nil {
+		return fmt.Errorf("读取媒体存储配置失败: %w", err)
+	}
+	adapter, err := s.adapterRegistry.get(profile.Provider)
+	if err != nil {
+		return err
+	}
+	return adapter.PutObject(ctx, profile, objectKey, data, contentType)
+}
+
+// ReadObjectAtProfile reads a derivative from its canonical storage profile.
+func (s *StorageService) ReadObjectAtProfile(ctx context.Context, profileID, objectKey string, maxBytes int64) (*StoredUploadObject, error) {
+	profile, err := s.resolveProfileByID(ctx, profileID)
+	if err != nil {
+		return nil, fmt.Errorf("读取媒体存储配置失败: %w", err)
+	}
+	adapter, err := s.adapterRegistry.get(profile.Provider)
+	if err != nil {
+		return nil, err
+	}
+	return adapter.Read(ctx, profile, objectKey, maxBytes)
+}
+
+func (s *StorageService) ResolveProviderURLAtProfile(ctx context.Context, profileID, objectKey string) (string, error) {
+	profile, err := s.resolveProfileByID(ctx, profileID)
+	if err != nil {
+		return "", fmt.Errorf("读取媒体存储配置失败: %w", err)
+	}
+	adapter, err := s.adapterRegistry.get(profile.Provider)
+	if err != nil {
+		return "", err
+	}
+	return adapter.ProviderURL(profile, objectKey)
+}
+
 // ResolveProviderAssetURL resolves an immutable Asset fact through its owning
 // Storage Profile. It never follows the current profile selected by operators.
 func (s *StorageService) ResolveProviderAssetURL(ctx context.Context, assetID int64) (string, error) {

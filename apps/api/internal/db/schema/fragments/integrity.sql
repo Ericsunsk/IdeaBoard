@@ -8,6 +8,7 @@ CREATE TRIGGER set_task_attempts_updated_at BEFORE UPDATE ON task_attempts FOR E
 CREATE TRIGGER set_task_cancellations_updated_at BEFORE UPDATE ON task_cancellations FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_media_assets_updated_at BEFORE UPDATE ON media_assets FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_media_refs_updated_at BEFORE UPDATE ON media_refs FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER set_media_derivatives_updated_at BEFORE UPDATE ON media_derivatives FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_task_outputs_updated_at BEFORE UPDATE ON task_outputs FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_task_daily_stats_updated_at BEFORE UPDATE ON task_daily_stats FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_task_stat_events_updated_at BEFORE UPDATE ON task_stat_events FOR EACH ROW EXECUTE FUNCTION set_updated_at();

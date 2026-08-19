@@ -24,10 +24,13 @@ type BoardUploadAsset struct {
 }
 
 type MediaAssetRegistry struct {
-	db  *sql.DB
-	q   *dbsqlc.Queries
-	now func() time.Time
+	db                 *sql.DB
+	q                  *dbsqlc.Queries
+	now                func() time.Time
+	derivativeEnqueuer func(context.Context, int64) error
 }
+
+type DerivativeEnqueuer func(context.Context, int64) error
 
 type PreparedGenerationMedia struct {
 	AssetID        int64
@@ -47,6 +50,37 @@ type PreparedGenerationMedia struct {
 
 func NewMediaAssetRegistry(db *sql.DB) *MediaAssetRegistry {
 	return &MediaAssetRegistry{db: db, q: dbsqlc.New(db), now: time.Now}
+}
+
+func (r *MediaAssetRegistry) SetDerivativeEnqueuer(enqueuer DerivativeEnqueuer) {
+	if r != nil {
+		r.derivativeEnqueuer = enqueuer
+	}
+}
+
+func (r *MediaAssetRegistry) GetByAssetID(ctx context.Context, ownerUserID int64, assetID string) (dbsqlc.MediaAsset, error) {
+	if r == nil || r.q == nil || ownerUserID <= 0 || strings.TrimSpace(assetID) == "" {
+		return dbsqlc.MediaAsset{}, fmt.Errorf("invalid media asset lookup")
+	}
+	return r.q.GetMediaAssetByAssetIDForOwner(ctx, dbsqlc.GetMediaAssetByAssetIDForOwnerParams{
+		AssetID: assetID, OwnerUserID: ownerUserID,
+	})
+}
+
+func (r *MediaAssetRegistry) GetByID(ctx context.Context, ownerUserID, assetID int64) (dbsqlc.MediaAsset, error) {
+	if r == nil || r.q == nil || ownerUserID <= 0 || assetID <= 0 {
+		return dbsqlc.MediaAsset{}, fmt.Errorf("invalid media asset lookup")
+	}
+	return r.q.GetMediaAssetByIDForOwner(ctx, dbsqlc.GetMediaAssetByIDForOwnerParams{ID: assetID, OwnerUserID: ownerUserID})
+}
+
+func (r *MediaAssetRegistry) ListDerivatives(ctx context.Context, ownerUserID, assetID int64) ([]dbsqlc.MediaDerivative, error) {
+	if r == nil || r.q == nil || ownerUserID <= 0 || assetID <= 0 {
+		return nil, fmt.Errorf("invalid media derivative lookup")
+	}
+	return r.q.ListMediaDerivativesByAsset(ctx, dbsqlc.ListMediaDerivativesByAssetParams{
+		MediaAssetID: assetID, OwnerUserID: ownerUserID,
+	})
 }
 
 func (r *MediaAssetRegistry) RegisterBoardUpload(ctx context.Context, upload BoardUploadAsset) (int64, error) {
@@ -72,7 +106,18 @@ func (r *MediaAssetRegistry) RegisterBoardUpload(ctx context.Context, upload Boa
 		return 0, fmt.Errorf("encode board upload media metadata: %w", err)
 	}
 	registeredAt := r.now()
-	id, err := r.q.CreateBoardUploadMediaAsset(ctx, dbsqlc.CreateBoardUploadMediaAssetParams{
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("begin board upload media registration: %w", err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+	q := dbsqlc.New(tx)
+	id, err := q.CreateBoardUploadMediaAsset(ctx, dbsqlc.CreateBoardUploadMediaAssetParams{
 		AssetID:          assetID,
 		OwnerUserID:      upload.OwnerUserID,
 		StorageProfileID: storageProfileID,
@@ -88,6 +133,15 @@ func (r *MediaAssetRegistry) RegisterBoardUpload(ctx context.Context, upload Boa
 	if err != nil {
 		return 0, fmt.Errorf("register board upload media asset: %w", err)
 	}
+	derivativeIDs, err := queuePreviewDerivatives(ctx, q, id, upload.OwnerUserID)
+	if err != nil {
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("commit board upload media registration: %w", err)
+	}
+	committed = true
+	r.enqueueDerivatives(ctx, derivativeIDs)
 	return id, nil
 }
 
@@ -129,11 +183,44 @@ func (r *MediaAssetRegistry) RegisterPreparedGenerationMedia(ctx context.Context
 	if _, err := q.UpsertMediaRef(ctx, dbsqlc.UpsertMediaRefParams{MediaAssetID: asset, OwnerUserID: media.OwnerUserID, RefType: "prompt_reference", RefID: media.RefID, TaskID: "", Role: media.Role, InputIndex: int32(media.InputIndex), Metadata: metadata}); err != nil {
 		return 0, fmt.Errorf("register prepared media ref: %w", err)
 	}
+	derivativeIDs, err := queuePreviewDerivatives(ctx, q, asset, media.OwnerUserID)
+	if err != nil {
+		return 0, err
+	}
 	if err := tx.Commit(); err != nil {
 		return 0, fmt.Errorf("commit prepared media registration: %w", err)
 	}
 	committed = true
+	r.enqueueDerivatives(ctx, derivativeIDs)
 	return asset, nil
+}
+
+func (r *MediaAssetRegistry) enqueueDerivatives(ctx context.Context, ids []int64) {
+	if r == nil || r.derivativeEnqueuer == nil {
+		return
+	}
+	for _, id := range ids {
+		if err := r.derivativeEnqueuer(ctx, id); err != nil {
+			continue
+		}
+	}
+}
+
+func queuePreviewDerivatives(ctx context.Context, q *dbsqlc.Queries, assetID, ownerUserID int64) ([]int64, error) {
+	ids := make([]int64, 0, 3)
+	for _, tier := range []string{"thumb", "preview", "large-preview"} {
+		derivative, err := q.UpsertMediaDerivative(ctx, dbsqlc.UpsertMediaDerivativeParams{
+			MediaAssetID: assetID, OwnerUserID: ownerUserID, Tier: tier, Format: "jpeg",
+		})
+		if err != nil {
+			return nil, fmt.Errorf("create %s media derivative: %w", tier, err)
+		}
+		if _, err := q.EnqueueMediaDerivativeOutbox(ctx, derivative.ID); err != nil {
+			return nil, fmt.Errorf("enqueue %s media derivative: %w", tier, err)
+		}
+		ids = append(ids, derivative.ID)
+	}
+	return ids, nil
 }
 
 func (r *MediaAssetRegistry) FindPreparedGenerationMedia(ctx context.Context, ownerUserID int64, refID, role string, inputIndex int) (PreparedGenerationMedia, bool, error) {

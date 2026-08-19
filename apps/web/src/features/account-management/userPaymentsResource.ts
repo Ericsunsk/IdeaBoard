@@ -98,7 +98,7 @@ export function subscribeToUserPaymentEvents(
     new EventSource(url, options),
 ): () => void {
   if (typeof EventSource === 'undefined' && arguments.length < 2) return () => undefined
-  const source = createEventSource(resolveApiUrl('/user/payments/events'), {
+  const source = createEventSource(resolveApiUrl('/user/events'), {
     withCredentials: true,
   })
   const handlePayment = (message: MessageEvent<string>) => {

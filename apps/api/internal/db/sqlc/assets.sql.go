@@ -388,6 +388,54 @@ func (q *Queries) FindReadyOwnedMediaAssetIDByURL(ctx context.Context, arg FindR
 	return id, err
 }
 
+const getMediaAssetByAssetIDForOwner = `-- name: GetMediaAssetByAssetIDForOwner :one
+SELECT
+  id, asset_id, owner_user_id, storage_profile_id, storage_key,
+  url, source_url, media_kind, mime_type,
+  width, height, size_bytes, checksum_sha256,
+  status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
+  reclaim_claim_token, reclaim_generation
+FROM media_assets
+WHERE asset_id = $1
+  AND owner_user_id = $2
+  AND deleted_at IS NULL
+`
+
+type GetMediaAssetByAssetIDForOwnerParams struct {
+	AssetID     string `json:"asset_id"`
+	OwnerUserID int64  `json:"owner_user_id"`
+}
+
+func (q *Queries) GetMediaAssetByAssetIDForOwner(ctx context.Context, arg GetMediaAssetByAssetIDForOwnerParams) (MediaAsset, error) {
+	row := q.db.QueryRowContext(ctx, getMediaAssetByAssetIDForOwner, arg.AssetID, arg.OwnerUserID)
+	var i MediaAsset
+	err := row.Scan(
+		&i.ID,
+		&i.AssetID,
+		&i.OwnerUserID,
+		&i.StorageProfileID,
+		&i.StorageKey,
+		&i.Url,
+		&i.SourceUrl,
+		&i.MediaKind,
+		&i.MimeType,
+		&i.Width,
+		&i.Height,
+		&i.SizeBytes,
+		&i.ChecksumSha256,
+		&i.Status,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.ReclaimAfter,
+		&i.ReclaimStartedAt,
+		&i.ReclaimClaimToken,
+		&i.ReclaimGeneration,
+	)
+	return i, err
+}
+
 const getMediaAssetByID = `-- name: GetMediaAssetByID :one
 SELECT
   id, asset_id, owner_user_id, storage_profile_id, storage_key,
@@ -401,6 +449,54 @@ WHERE id = $1
 
 func (q *Queries) GetMediaAssetByID(ctx context.Context, id int64) (MediaAsset, error) {
 	row := q.db.QueryRowContext(ctx, getMediaAssetByID, id)
+	var i MediaAsset
+	err := row.Scan(
+		&i.ID,
+		&i.AssetID,
+		&i.OwnerUserID,
+		&i.StorageProfileID,
+		&i.StorageKey,
+		&i.Url,
+		&i.SourceUrl,
+		&i.MediaKind,
+		&i.MimeType,
+		&i.Width,
+		&i.Height,
+		&i.SizeBytes,
+		&i.ChecksumSha256,
+		&i.Status,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.ReclaimAfter,
+		&i.ReclaimStartedAt,
+		&i.ReclaimClaimToken,
+		&i.ReclaimGeneration,
+	)
+	return i, err
+}
+
+const getMediaAssetByIDForOwner = `-- name: GetMediaAssetByIDForOwner :one
+SELECT
+  id, asset_id, owner_user_id, storage_profile_id, storage_key,
+  url, source_url, media_kind, mime_type,
+  width, height, size_bytes, checksum_sha256,
+  status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
+  reclaim_claim_token, reclaim_generation
+FROM media_assets
+WHERE id = $1
+  AND owner_user_id = $2
+  AND deleted_at IS NULL
+`
+
+type GetMediaAssetByIDForOwnerParams struct {
+	ID          int64 `json:"id"`
+	OwnerUserID int64 `json:"owner_user_id"`
+}
+
+func (q *Queries) GetMediaAssetByIDForOwner(ctx context.Context, arg GetMediaAssetByIDForOwnerParams) (MediaAsset, error) {
+	row := q.db.QueryRowContext(ctx, getMediaAssetByIDForOwner, arg.ID, arg.OwnerUserID)
 	var i MediaAsset
 	err := row.Scan(
 		&i.ID,

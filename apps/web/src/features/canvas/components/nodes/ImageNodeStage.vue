@@ -121,7 +121,7 @@ const props = defineProps<{
   flowNodeId?: string
   stageWidth: number
   stageHeight: number
-  displayImage: { url: string } | null
+  displayImage: { url: string; mediaAssetId?: number } | null
   inputLocked?: boolean
   emptyIconVariant?: 'image' | 'fusion'
   directGenerating?: boolean
@@ -163,6 +163,7 @@ const { maxSide: previewMaxSide } = useCanvasImagePreviewQuality({
 })
 const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl, {
   maxSide: previewMaxSide,
+  mediaAssetId: () => props.displayImage?.mediaAssetId,
 })
 const emptyStateLabel = computed(() =>
   props.inputLocked ? 'Waiting...' : '上传或拖拽图片作为输入',

@@ -13,7 +13,10 @@ func registerAuthenticatedUserRoutes(r *gin.Engine, authDeps AuthDeps, h UserRou
 }
 
 func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
+	mediaAssetHandler := newMediaAssetHandler(h.MediaAssetRegistry, h.MediaStorageService)
 	userAPI.GET("/info", h.AuthHandler.GetCurrentUser)
+	userAPI.GET("/media-assets/:asset_id", mediaAssetHandler.Metadata)
+	userAPI.GET("/media-assets/:asset_id/derivatives/:tier/content", mediaAssetHandler.Content)
 	userAPI.POST("/billing/quotes", h.BillingHandler.Quote)
 	userAPI.GET("/billing/records", h.BillingRecords.List)
 	userAPI.GET("/credits/wallet", h.CreditUserHandler.GetCurrentWallet)
@@ -28,6 +31,7 @@ func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	userAPI.POST("/payments/pending-orders/:public_token/abandon", h.PaymentUserHandler.AbandonPendingOrder)
 	userAPI.GET("/payments/recharges", h.PaymentUserHandler.ListRecharges)
 	userAPI.GET("/payments/events", h.PaymentEventStreamHandler.StreamUserPaymentEvents)
+	userAPI.GET("/events", h.UserEventStreamHandler.StreamUserEvents)
 
 	registerUserTaskRoutes(userAPI, h)
 	registerUserBoardRoutes(userAPI, h)

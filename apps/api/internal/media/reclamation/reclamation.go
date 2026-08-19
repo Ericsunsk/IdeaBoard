@@ -86,6 +86,27 @@ func (w *ReclaimWorker) Work(ctx context.Context, job *river.Job[ReclaimJobArgs]
 		}
 		return fmt.Errorf("delete media asset %d: %w", asset.ID, err)
 	}
+	derivatives, err := w.q.ListMediaDerivativesByAsset(ctx, dbsqlc.ListMediaDerivativesByAssetParams{
+		MediaAssetID: asset.ID, OwnerUserID: asset.OwnerUserID,
+	})
+	if err != nil {
+		return fmt.Errorf("list media asset %d derivatives: %w", asset.ID, err)
+	}
+	for _, derivative := range derivatives {
+		if derivative.StorageKey == "" || derivative.StorageProfileID == "" {
+			continue
+		}
+		if err := w.storage.DeleteObjectByStorageProfile(ctx, derivative.StorageProfileID, derivative.StorageKey); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			releaseCtx := context.WithoutCancel(ctx)
+			if releaseErr := w.q.ReleaseMediaAssetReclamationClaim(releaseCtx, dbsqlc.ReleaseMediaAssetReclamationClaimParams{ID: asset.ID, ReclaimGeneration: job.Args.ReclaimGeneration, ClaimToken: claimToken}); releaseErr != nil {
+				return errors.Join(fmt.Errorf("delete media asset %d derivative %s: %w", asset.ID, derivative.Tier, err), fmt.Errorf("release media reclamation claim: %w", releaseErr))
+			}
+			return fmt.Errorf("delete media asset %d derivative %s: %w", asset.ID, derivative.Tier, err)
+		}
+	}
+	if err := w.q.DeleteMediaDerivativesByAsset(ctx, dbsqlc.DeleteMediaDerivativesByAssetParams{MediaAssetID: asset.ID, OwnerUserID: asset.OwnerUserID}); err != nil {
+		return fmt.Errorf("delete media asset %d derivative records: %w", asset.ID, err)
+	}
 	rows, err := w.q.MarkMediaAssetReclaimed(ctx, dbsqlc.MarkMediaAssetReclaimedParams{
 		ID:                asset.ID,
 		ReclaimGeneration: job.Args.ReclaimGeneration,

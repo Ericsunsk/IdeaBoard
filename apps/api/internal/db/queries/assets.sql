@@ -65,6 +65,30 @@ SELECT
 FROM media_assets
 WHERE id = sqlc.arg(id);
 
+-- name: GetMediaAssetByIDForOwner :one
+SELECT
+  id, asset_id, owner_user_id, storage_profile_id, storage_key,
+  url, source_url, media_kind, mime_type,
+  width, height, size_bytes, checksum_sha256,
+  status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
+  reclaim_claim_token, reclaim_generation
+FROM media_assets
+WHERE id = sqlc.arg(id)
+  AND owner_user_id = sqlc.arg(owner_user_id)
+  AND deleted_at IS NULL;
+
+-- name: GetMediaAssetByAssetIDForOwner :one
+SELECT
+  id, asset_id, owner_user_id, storage_profile_id, storage_key,
+  url, source_url, media_kind, mime_type,
+  width, height, size_bytes, checksum_sha256,
+  status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
+  reclaim_claim_token, reclaim_generation
+FROM media_assets
+WHERE asset_id = sqlc.arg(asset_id)
+  AND owner_user_id = sqlc.arg(owner_user_id)
+  AND deleted_at IS NULL;
+
 -- name: GetReadyMediaAssetStorageLocationByID :one
 SELECT storage_profile_id, storage_key
 FROM media_assets

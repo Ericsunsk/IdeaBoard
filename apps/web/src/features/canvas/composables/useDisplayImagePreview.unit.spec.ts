@@ -152,6 +152,23 @@ describe('useDisplayImagePreview', () => {
     scope.stop()
   })
 
+  it('uses the canonical media derivative and never falls back to the original asset', async () => {
+    const sourceUrl = ref('/uploads/canvas/U123/board/content/image.png')
+    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview(sourceUrl, { maxSide: 640, mediaAssetId: 42 }),
+    )
+    if (!preview) throw new Error('preview composable was not created')
+
+    await vi.waitFor(() => expect(preview.displayUrl.value).toBe('blob:5'))
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/user/media-assets/42/derivatives/preview/content'),
+      { credentials: 'include' },
+    )
+    scope.stop()
+  })
+
   it('falls back to the original managed upload only after the server preview fails', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({ ok: false } as Response)
     const sourceUrl = ref('/uploads/canvas/U123/board/content/fallback.png')

@@ -86,6 +86,9 @@ type UserRouteDeps struct {
 	RewardUserHandler         *rewards.UserHandler
 	PaymentUserHandler        *payments.UserCheckoutHandler
 	PaymentEventStreamHandler *payments.EventStreamHandler
+	UserEventStreamHandler    *UserEventStreamHandler
+	MediaAssetRegistry        *assets.MediaAssetRegistry
+	MediaStorageService       *storage.StorageService
 	Uploads                   UploadDeps
 	UploadDownloads           UploadDownloadDeps
 }

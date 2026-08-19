@@ -54,12 +54,15 @@ type Querier interface {
 	DeleteBoardMembersByUserID(ctx context.Context, userID int64) error
 	DeleteBoardShareTokensByBoardID(ctx context.Context, boardID string) error
 	DeleteManagedProviderEndpointAccounts(ctx context.Context, providerEndpointID int64) (int64, error)
+	DeleteMediaDerivativeOutbox(ctx context.Context, derivativeID int64) error
+	DeleteMediaDerivativesByAsset(ctx context.Context, arg DeleteMediaDerivativesByAssetParams) error
 	DeleteOutputsByTaskID(ctx context.Context, taskID string) error
 	DeleteProviderEndpoint(ctx context.Context, id int64) (int64, error)
 	DeleteTaskOutputMediaRefsByTaskID(ctx context.Context, taskID string) error
 	DeleteUnclaimedPreparedMediaAsset(ctx context.Context, arg DeleteUnclaimedPreparedMediaAssetParams) (int64, error)
 	DeleteUserBoardsByUserID(ctx context.Context, userID int64) error
 	DeleteUserByID(ctx context.Context, id int64) (int64, error)
+	EnqueueMediaDerivativeOutbox(ctx context.Context, derivativeID int64) (MediaDerivativeOutbox, error)
 	FailRunningTaskAttemptsByAccountID(ctx context.Context, arg FailRunningTaskAttemptsByAccountIDParams) (int64, error)
 	FailRunningTasksByAccountID(ctx context.Context, arg FailRunningTasksByAccountIDParams) ([]FailRunningTasksByAccountIDRow, error)
 	FinalFailTaskRunningWithLease(ctx context.Context, arg FinalFailTaskRunningWithLeaseParams) (int64, error)
@@ -81,7 +84,12 @@ type Querier interface {
 	GetBoardShareTokenByHash(ctx context.Context, tokenHash string) (BoardShareToken, error)
 	GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error)
 	GetManagedProviderEndpointAccountID(ctx context.Context, providerEndpointID int64) (int64, error)
+	GetMediaAssetByAssetIDForOwner(ctx context.Context, arg GetMediaAssetByAssetIDForOwnerParams) (MediaAsset, error)
 	GetMediaAssetByID(ctx context.Context, id int64) (MediaAsset, error)
+	GetMediaAssetByIDForOwner(ctx context.Context, arg GetMediaAssetByIDForOwnerParams) (MediaAsset, error)
+	GetMediaDerivativeByAssetTier(ctx context.Context, arg GetMediaDerivativeByAssetTierParams) (MediaDerivative, error)
+	GetMediaDerivativeByID(ctx context.Context, id int64) (MediaDerivative, error)
+	GetMediaDerivativeForDelivery(ctx context.Context, arg GetMediaDerivativeForDeliveryParams) (MediaDerivative, error)
 	GetPaymentCheckoutShutdown(ctx context.Context, id uuid.UUID) (PaymentCheckoutShutdown, error)
 	GetPaymentCustomer(ctx context.Context, arg GetPaymentCustomerParams) (PaymentCustomer, error)
 	GetPaymentOrderByCheckoutSession(ctx context.Context, arg GetPaymentOrderByCheckoutSessionParams) (PaymentOrder, error)
@@ -136,7 +144,9 @@ type Querier interface {
 	ListDueMediaAssetReclamationIDs(ctx context.Context, arg ListDueMediaAssetReclamationIDsParams) ([]ListDueMediaAssetReclamationIDsRow, error)
 	ListEnabledAccounts(ctx context.Context) ([]ListEnabledAccountsRow, error)
 	ListFeaturePrompts(ctx context.Context) ([]FeaturePrompt, error)
+	ListMediaAssetSources(ctx context.Context, arg ListMediaAssetSourcesParams) ([]MediaAssetSource, error)
 	ListMediaAssetStorageLocationsByKey(ctx context.Context, storageKey string) ([]ListMediaAssetStorageLocationsByKeyRow, error)
+	ListMediaDerivativesByAsset(ctx context.Context, arg ListMediaDerivativesByAssetParams) ([]MediaDerivative, error)
 	ListMediaRefsByBoardID(ctx context.Context, arg ListMediaRefsByBoardIDParams) ([]MediaRef, error)
 	ListMonitorExecutionPressureByRange(ctx context.Context, arg ListMonitorExecutionPressureByRangeParams) ([]ListMonitorExecutionPressureByRangeRow, error)
 	ListOutputsByTaskIDs(ctx context.Context, taskIds []string) ([]ListOutputsByTaskIDsRow, error)
@@ -144,6 +154,7 @@ type Querier interface {
 	ListPaymentRechargeHistory(ctx context.Context, arg ListPaymentRechargeHistoryParams) ([]ListPaymentRechargeHistoryRow, error)
 	ListPaymentReconciliationAnomalies(ctx context.Context, rowLimit int32) ([]ListPaymentReconciliationAnomaliesRow, error)
 	ListPaymentStripeCredentials(ctx context.Context) ([]PaymentStripeCredential, error)
+	ListPendingMediaDerivativeIDs(ctx context.Context, limitCount int32) ([]int64, error)
 	ListProviderEndpointCapabilities(ctx context.Context, providerEndpointIds []int64) ([]ListProviderEndpointCapabilitiesRow, error)
 	ListProviderEndpoints(ctx context.Context) ([]ListProviderEndpointsRow, error)
 	ListReadyOwnedMediaAssetIDsByStorageKey(ctx context.Context, arg ListReadyOwnedMediaAssetIDsByStorageKeyParams) ([]int64, error)
@@ -170,6 +181,9 @@ type Querier interface {
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	LockStorageProfileSecretVersionRotation(ctx context.Context, arg LockStorageProfileSecretVersionRotationParams) (bool, error)
 	MarkMediaAssetReclaimed(ctx context.Context, arg MarkMediaAssetReclaimedParams) (int64, error)
+	MarkMediaDerivativeFailed(ctx context.Context, arg MarkMediaDerivativeFailedParams) (MediaDerivative, error)
+	MarkMediaDerivativeProcessing(ctx context.Context, id int64) (MediaDerivative, error)
+	MarkMediaDerivativeReady(ctx context.Context, arg MarkMediaDerivativeReadyParams) (MediaDerivative, error)
 	MarkPaymentOrderAsyncPending(ctx context.Context, id uuid.UUID) (PaymentOrder, error)
 	MarkPaymentOrderCancelled(ctx context.Context, arg MarkPaymentOrderCancelledParams) (PaymentOrder, error)
 	MarkPaymentOrderCredited(ctx context.Context, arg MarkPaymentOrderCreditedParams) (PaymentOrder, error)
@@ -219,6 +233,8 @@ type Querier interface {
 	UpsertBoardMember(ctx context.Context, arg UpsertBoardMemberParams) error
 	UpsertFeaturePrompt(ctx context.Context, arg UpsertFeaturePromptParams) (FeaturePrompt, error)
 	UpsertMediaAsset(ctx context.Context, arg UpsertMediaAssetParams) (int64, error)
+	UpsertMediaAssetSource(ctx context.Context, arg UpsertMediaAssetSourceParams) (int64, error)
+	UpsertMediaDerivative(ctx context.Context, arg UpsertMediaDerivativeParams) (MediaDerivative, error)
 	UpsertMediaRef(ctx context.Context, arg UpsertMediaRefParams) (int64, error)
 	UpsertPaymentCustomer(ctx context.Context, arg UpsertPaymentCustomerParams) (PaymentCustomer, error)
 	UpsertProviderEndpointModel(ctx context.Context, arg UpsertProviderEndpointModelParams) error
