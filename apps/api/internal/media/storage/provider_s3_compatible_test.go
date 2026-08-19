@@ -170,6 +170,32 @@ func TestS3CompatiblePublicObjectURL(t *testing.T) {
 	})
 }
 
+func TestS3CompatibleSignedURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/xml")
+		_, _ = w.Write([]byte(`<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>`))
+	}))
+	t.Cleanup(server.Close)
+	restore := outbound.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{hosts: []string{"127.0.0.1"}})
+	t.Cleanup(restore)
+
+	url, err := NewS3CompatibleService().SignedURLWithConfig(context.Background(), "uploads/asset/preview.webp", time.Hour, &S3CompatibleConfig{
+		Enabled:         true,
+		AccessKeyID:     "access-key",
+		SecretAccessKey: "secret-key",
+		BucketName:      "ideaboard",
+		Endpoint:        server.URL,
+		AccessDomain:    server.URL,
+		ForcePathStyle:  true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(url, "X-Amz-Expires=3600") {
+		t.Fatalf("signed URL = %q", url)
+	}
+}
+
 func TestS3CompatibleReadUsesAccessDomainDeliveryPlane(t *testing.T) {
 	restore := outbound.ConfigurePolicyProvider(testStorageOutboundPolicyProvider{hosts: []string{"127.0.0.1"}})
 	t.Cleanup(restore)

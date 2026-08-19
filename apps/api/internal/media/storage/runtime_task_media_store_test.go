@@ -17,6 +17,33 @@ import (
 
 type fixedAssetLocator map[int64]StoredUploadLocation
 
+type recordingTaskResultRegistry struct {
+	nextID    int64
+	started   []TaskResultIngestion
+	completed []TaskResultIngestion
+	failedIDs []int64
+}
+
+func (r *recordingTaskResultRegistry) BeginTaskResultIngestion(_ context.Context, ingestion TaskResultIngestion) (int64, bool, error) {
+	r.started = append(r.started, ingestion)
+	if r.nextID == 0 {
+		r.nextID = 100
+	}
+	id := r.nextID
+	r.nextID++
+	return id, false, nil
+}
+
+func (r *recordingTaskResultRegistry) CompleteTaskResultIngestion(_ context.Context, ingestion TaskResultIngestion, _ StoredUploadRef) error {
+	r.completed = append(r.completed, ingestion)
+	return nil
+}
+
+func (r *recordingTaskResultRegistry) FailTaskResultIngestion(_ context.Context, _ int64, assetID int64, _ error) error {
+	r.failedIDs = append(r.failedIDs, assetID)
+	return nil
+}
+
 func (l fixedAssetLocator) LocateStoredUpload(_ context.Context, lookup StoredUploadLookup) (StoredUploadLocation, bool, error) {
 	location, ok := l[lookup.AssetID]
 	return location, ok, nil
@@ -50,7 +77,7 @@ func TestRuntimeTaskMediaStoreResolvesAssetThroughOwningProfileAfterCurrentSwitc
 		StorageKey:       "uploads/tasks/42/task/input.png",
 	}}
 
-	store := NewRuntimeTaskMediaStore(service)
+	store := NewRuntimeTaskMediaStore(service, &recordingTaskResultRegistry{})
 	params := &tasks.WorkflowTaskParams{
 		Media: &tasks.MediaInputs{Inputs: []tasks.MediaRef{{
 			AssetID: 91, Role: tasks.MediaRoleInput,
@@ -75,7 +102,7 @@ func TestRuntimeTaskMediaStoreRejectsLocalAssetWithoutProviderURL(t *testing.T) 
 		StorageProfileID: builtinLocalProfileID(),
 		StorageKey:       "uploads/canvas/owner/board/content/input.png",
 	}}
-	store := NewRuntimeTaskMediaStore(service)
+	store := NewRuntimeTaskMediaStore(service, &recordingTaskResultRegistry{})
 	params := &tasks.WorkflowTaskParams{Media: &tasks.MediaInputs{Inputs: []tasks.MediaRef{{
 		AssetID: 92, Role: tasks.MediaRoleInput,
 	}}}}
@@ -97,7 +124,8 @@ func TestRuntimeTaskMediaStoreMaterializeRemoteResultsStoresOutputs(t *testing.T
 	defer server.Close()
 
 	service, _ := newStorageServiceTest(t)
-	adapter := NewRuntimeTaskMediaStore(service)
+	registry := &recordingTaskResultRegistry{}
+	adapter := NewRuntimeTaskMediaStore(service, registry)
 	sourceURLs := []string{server.URL + "/one.png", server.URL + "/two.png"}
 
 	materialized, err := adapter.MaterializeRemoteResults(context.Background(), 42, "task-abc", sourceURLs, taskmedia.ResultMaterializeOptions{
@@ -124,7 +152,13 @@ func TestRuntimeTaskMediaStoreMaterializeRemoteResultsStoresOutputs(t *testing.T
 		if output.MIMEType != "image/png" || output.Width != 1 || output.Height != 1 || output.SizeBytes != int64(len(imageBytes)) || output.StorageProfile != builtinLocalProfileID() {
 			t.Fatalf("output[%d] media fields = %#v", i, output)
 		}
+		if output.MediaAssetID == nil || *output.MediaAssetID != int64(100+i) {
+			t.Fatalf("output[%d] asset = %#v", i, output.MediaAssetID)
+		}
 		assertLocalUploadBytes(t, output.StorageKey, imageBytes)
+	}
+	if len(registry.completed) != 2 || registry.completed[0].AssetID != 100 || registry.completed[1].AssetID != 101 {
+		t.Fatalf("completed ingestions = %#v", registry.completed)
 	}
 	assertDirEmpty(t, tmpDir)
 }
@@ -148,7 +182,8 @@ func TestRuntimeTaskMediaStoreMaterializeRemoteResultsCleansStoredKeysOnFailure(
 	defer server.Close()
 
 	service, _ := newStorageServiceTest(t)
-	adapter := NewRuntimeTaskMediaStore(service)
+	registry := &recordingTaskResultRegistry{}
+	adapter := NewRuntimeTaskMediaStore(service, registry)
 
 	_, err := adapter.MaterializeRemoteResults(context.Background(), 42, "task-rollback", []string{
 		server.URL + "/ok.png",
@@ -160,8 +195,11 @@ func TestRuntimeTaskMediaStoreMaterializeRemoteResultsCleansStoredKeysOnFailure(
 	taskDir := filepath.FromSlash("uploads/tasks/42/task-rollback")
 	if entries, readErr := os.ReadDir(taskDir); readErr != nil && !os.IsNotExist(readErr) {
 		t.Fatalf("read task output dir failed: %v", readErr)
-	} else if len(entries) != 0 {
-		t.Fatalf("expected materialized task output files to be cleaned up, found %d entries", len(entries))
+	} else if len(entries) != 1 {
+		t.Fatalf("expected first tracked result to remain retryable, found %d entries", len(entries))
+	}
+	if len(registry.failedIDs) != 1 || registry.failedIDs[0] != 101 {
+		t.Fatalf("failed ingestions = %#v, want [101]", registry.failedIDs)
 	}
 	assertDirEmpty(t, tmpDir)
 }
@@ -171,7 +209,7 @@ func TestRuntimeTaskMediaStoreMaterializeBytesResultStoresOutput(t *testing.T) {
 
 	imageBytes := tinyPNGBytes(t)
 	service, _ := newStorageServiceTest(t)
-	adapter := NewRuntimeTaskMediaStore(service)
+	adapter := NewRuntimeTaskMediaStore(service, &recordingTaskResultRegistry{})
 
 	materialized, err := adapter.MaterializeBytesResult(context.Background(), 42, "task-bytes", "result.png", "upstream://image", imageBytes, taskmedia.ResultMaterializeOptions{})
 	if err != nil {

@@ -125,6 +125,46 @@ func TestCompositeTaskStatusPublisherKeepsLocalHubOnRemoteFailure(t *testing.T) 
 	assertNoTaskEvent(t, taskEvents, "origin after remote publish failure")
 }
 
+func TestTaskEventHubPublisherProjectsToUserHubWithoutSecondRemotePublish(t *testing.T) {
+	userHub := events.NewUserEventHub()
+	remotePublishes := 0
+	userHub.SetRemotePublisher(func(events.UserEvent) { remotePublishes++ })
+	userEvents, unsubscribe, accepted := userHub.Subscribe(42)
+	if !accepted {
+		t.Fatal("user event subscription rejected unexpectedly")
+	}
+	defer unsubscribe()
+
+	publisher := taskEventHubPublisher{
+		hub:      taskservice.NewEventHub(),
+		userHub:  userHub,
+		resolver: fixedTaskResolver{task: &tasks.Task{UserID: 42}},
+	}
+	if err := publisher.PublishTaskStatus(t.Context(), events.NewTaskStatusEvent("task-1", tasks.StatusRunning)); err != nil {
+		t.Fatalf("publish task status: %v", err)
+	}
+
+	select {
+	case event := <-userEvents:
+		if event.Type != events.EventTypeTaskUpdated {
+			t.Fatalf("event type=%q, want %q", event.Type, events.EventTypeTaskUpdated)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timeout waiting for user task event")
+	}
+	if remotePublishes != 0 {
+		t.Fatalf("task projection published %d duplicate user events", remotePublishes)
+	}
+}
+
+type fixedTaskResolver struct {
+	task *tasks.Task
+}
+
+func (r fixedTaskResolver) GetByTaskID(context.Context, string) (*tasks.Task, error) {
+	return r.task, nil
+}
+
 type failingTaskStatusPublisher struct {
 	err error
 }

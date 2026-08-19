@@ -400,7 +400,7 @@ func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	eventChannel, unsubscribe := events.Subscribe(42)
+	eventChannel, unsubscribe := subscribePaymentUserEvents(t, events, 42)
 	defer unsubscribe()
 
 	checkoutGateway.status = CheckoutSessionStatusComplete
@@ -409,7 +409,8 @@ func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testin
 		t.Fatalf("ReceiveStripeWebhook() = %+v, %v", receipt, err)
 	}
 	select {
-	case event := <-eventChannel:
+	case rawEvent := <-eventChannel:
+		event := decodePaymentUserEvent(t, rawEvent)
 		if event.PublicToken != checkout.PublicToken || event.Status != "processing" {
 			t.Fatalf("payment event = %+v", event)
 		}
@@ -429,7 +430,8 @@ func TestSignedPaidCheckoutWebhookConvergesLedgerAndPublishesUserEvent(t *testin
 		t.Fatalf("ReceiveStripeWebhook(async success) = %+v, %v", receipt, err)
 	}
 	select {
-	case event := <-eventChannel:
+	case rawEvent := <-eventChannel:
+		event := decodePaymentUserEvent(t, rawEvent)
 		if event.PublicToken != checkout.PublicToken || event.Status != "credited" {
 			t.Fatalf("payment event = %+v", event)
 		}

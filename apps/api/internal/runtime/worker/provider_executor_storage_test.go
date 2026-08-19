@@ -204,7 +204,7 @@ func newTestProviderExecutorWithLocalStorage(t *testing.T) *ProviderExecutor {
 
 	db := testdb.Open(t)
 	storageService := storage.NewStorageService(storage.NewStorageProfileRepository(db), nil)
-	mediaStore := storage.NewRuntimeTaskMediaStore(storageService)
+	mediaStore := storage.NewRuntimeTaskMediaStore(storageService, nil)
 
 	return &ProviderExecutor{
 		mediaReader:        mediaStore,

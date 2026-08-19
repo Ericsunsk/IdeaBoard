@@ -6,7 +6,7 @@ export default defineConfig({
       target: '../api/openapi.yaml',
       filters: {
         mode: 'exclude',
-        tags: ['PaymentWebhooks'],
+        tags: ['PaymentWebhooks', 'UserEvents'],
       },
     },
     output: {

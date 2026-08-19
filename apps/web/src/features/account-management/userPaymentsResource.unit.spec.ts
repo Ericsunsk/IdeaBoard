@@ -1,7 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parseUserPaymentEvent, subscribeToUserPaymentEvents } from './userPaymentsResource'
 
 describe('userPaymentsResource payment events', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
   it('accepts only the minimal typed payment event contract', () => {
     expect(parseUserPaymentEvent('{"public_token":"token","status":"credited"}')).toEqual({
       public_token: 'token',
@@ -22,28 +24,32 @@ describe('userPaymentsResource payment events', () => {
     const listener = vi.fn()
     let paymentHandler: EventListenerOrEventListenerObject | undefined
     const source = {
+      onerror: null as ((event: Event) => void) | null,
       addEventListener: vi.fn((event: string, handler: EventListenerOrEventListenerObject) => {
-        if (event === 'payment') paymentHandler = handler
+        if (event === 'payment.updated') paymentHandler = handler
       }),
       removeEventListener: vi.fn(),
       close: vi.fn(),
     }
-    const createEventSource = vi.fn(() => source)
-    const unsubscribe = subscribeToUserPaymentEvents(listener, createEventSource)
+    const createEventSource = vi.fn(function MockEventSource() {
+      return source
+    })
+    vi.stubGlobal('EventSource', createEventSource)
+    const unsubscribe = subscribeToUserPaymentEvents(listener)
 
     expect(createEventSource).toHaveBeenCalledWith(expect.stringContaining('/user/events'), {
       withCredentials: true,
     })
     if (typeof paymentHandler !== 'function') throw new Error('payment listener was not registered')
     paymentHandler(
-      new MessageEvent('payment', {
+      new MessageEvent('payment.updated', {
         data: '{"public_token":"token","status":"credited"}',
       }),
     )
     expect(listener).toHaveBeenCalledWith({ public_token: 'token', status: 'credited' })
 
     unsubscribe()
-    expect(source.removeEventListener).toHaveBeenCalledWith('payment', paymentHandler)
+    expect(source.removeEventListener).toHaveBeenCalledWith('payment.updated', paymentHandler)
     expect(source.close).toHaveBeenCalledOnce()
   })
 })

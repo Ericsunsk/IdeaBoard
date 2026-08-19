@@ -25,7 +25,7 @@ CREATE TABLE media_assets (
   CONSTRAINT uq_media_assets_id_owner UNIQUE (id, owner_user_id),
   CONSTRAINT uq_media_assets_storage_key UNIQUE (storage_profile_id, storage_key),
   CONSTRAINT ck_media_assets_media_kind CHECK (media_kind IN ('image', 'video', 'audio', 'document', 'other')),
-  CONSTRAINT ck_media_assets_status CHECK (status IN ('pending', 'ready', 'quarantined', 'deleted', 'failed')),
+  CONSTRAINT ck_media_assets_status CHECK (status IN ('pending', 'uploading', 'ready', 'quarantined', 'deleted', 'failed')),
   CONSTRAINT ck_media_assets_asset_id_not_blank CHECK (btrim(asset_id) <> ''),
   CONSTRAINT ck_media_assets_storage_profile_id_not_blank CHECK (btrim(storage_profile_id) <> ''),
   CONSTRAINT ck_media_assets_storage_key_not_blank CHECK (btrim(storage_key) <> ''),

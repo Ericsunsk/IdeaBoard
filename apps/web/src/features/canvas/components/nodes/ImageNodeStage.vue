@@ -22,7 +22,10 @@
     @contextmenu.prevent.stop="onStageContextMenu"
   >
     <template v-if="displayImage">
-      <ImageToolStagePresentation v-if="imageToolStageBinding" :binding="imageToolStageBinding">
+      <ImageToolStagePresentation
+        v-if="imageToolStageBinding && stageDisplayUrl"
+        :binding="imageToolStageBinding"
+      >
         <img
           :src="stageDisplayUrl || undefined"
           class="image-node-stage-image image-tool-stage-media"
@@ -38,7 +41,7 @@
         />
       </ImageToolStagePresentation>
       <img
-        v-else
+        v-else-if="stageDisplayUrl"
         :src="stageDisplayUrl || undefined"
         class="image-node-stage-image"
         :class="{ 'is-preview-loading': !stageDisplayUrl }"
@@ -51,8 +54,12 @@
         @keydown.enter.prevent="emit('open-preview')"
         @keydown.space.prevent="emit('append-to-canvas')"
       />
+      <div v-else class="image-node-stage-placeholder" role="status" aria-label="图片预览正在准备">
+        <ComposingOrb />
+        <span>图片处理中...</span>
+      </div>
       <ImageCanvasExtendOverlay
-        v-if="expandModeActive && expandOverlayStyle"
+        v-if="stageDisplayUrl && expandModeActive && expandOverlayStyle"
         :overlay-style="expandOverlayStyle"
         :handle-radius="expandHandleRadius ?? 4"
         @submit="submitExpand"
@@ -104,6 +111,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useElementVisibility } from '@vueuse/core'
 import { useCanvasViewportContext } from '../../composables/useCanvasViewportContext'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import type { ImageToolStageBinding } from '../../image-tools'
@@ -151,6 +159,11 @@ const emit = defineEmits<{
   (e: 'expand-frame-pointerdown', event: PointerEvent): void
 }>()
 
+type NodeStageFrameExpose = { stageElement: HTMLElement | null }
+const stageFrameRef = ref<NodeStageFrameExpose | null>(null)
+const stageElement = computed(() => stageFrameRef.value?.stageElement ?? null)
+const isStageVisible = useElementVisibility(stageElement)
+
 const sourceDisplayUrl = computed(() => props.displayImage?.url ?? null)
 const isImageToolActive = computed(() => !!props.imageToolStageBinding?.active)
 const forceFullPreviewQuality = computed(() => !!props.expandModeActive || isImageToolActive.value)
@@ -164,6 +177,7 @@ const { maxSide: previewMaxSide } = useCanvasImagePreviewQuality({
 const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl, {
   maxSide: previewMaxSide,
   mediaAssetId: () => props.displayImage?.mediaAssetId,
+  isVisible: isStageVisible,
 })
 const emptyStateLabel = computed(() =>
   props.inputLocked ? 'Waiting...' : '上传或拖拽图片作为输入',
@@ -175,9 +189,6 @@ const emptyStageAriaLabel = computed(() => {
   return '上传图片作为输入'
 })
 const emptyIconVariantComputed = computed(() => props.emptyIconVariant ?? 'image')
-type NodeStageFrameExpose = { stageElement: HTMLElement | null }
-const stageFrameRef = ref<NodeStageFrameExpose | null>(null)
-
 defineExpose({
   get stageElement() {
     return stageFrameRef.value?.stageElement ?? null
@@ -217,6 +228,18 @@ function submitExpand(prompt: string) {
   background: #fff;
   cursor: grab;
   user-select: none;
+}
+
+.image-node-stage-placeholder {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--color-canvas-muted, #8b8b8b);
+  background: var(--color-canvas-surface, #f5f5f5);
+  font-size: 12px;
 }
 
 .image-node-stage-image:focus-visible {

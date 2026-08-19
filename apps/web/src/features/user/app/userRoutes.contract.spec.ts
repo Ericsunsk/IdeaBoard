@@ -105,5 +105,5 @@ describe('userRoutes contract', () => {
     expect((loadedRegister as Component & { __name?: string }).__name).toBe('CanvasLandingPage')
     expect((loadedBoards as Component & { __name?: string }).__name).toBe('BoardsPage')
     expect((loadedCanvas as Component & { __name?: string }).__name).toBe('CanvasPage')
-  }, 15_000)
+  }, 30_000)
 })

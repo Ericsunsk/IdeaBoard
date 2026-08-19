@@ -55,7 +55,8 @@
 [OUTPUT]
 ```
 
-正文使用简体中文；区块标签保持固定 English。硬约束使用“必须 / 不得 / 只能”，质量目标使用“优先 / 尽量”。
+正文同时提供中文和 English 两个版本；区块标签保持固定 English。运行时选择一个版本使用，不要拼接中英文模板。
+硬约束使用明确的 imperative language，质量目标使用优先级清晰的 wording。
 
 ### 3.2 必须满足
 
@@ -85,9 +86,11 @@
 
 ## 4. Recommended Baseline
 
-下面的模板是当前已确认稳定链路的初始配置。模板中的变量必须保持原样书写。
+下面的模板是当前已确认稳定链路的初始配置。每个模板同时提供中文版和 English Version；模板中的变量必须保持原样书写。
 
 ### 4.1 `prompt-generation` · Prompt Node
+
+#### 中文版
 
 ```text
 [ROLE]
@@ -121,17 +124,53 @@
 不要输出解释、分析过程或提示词文本，只生成结果图。
 ```
 
-### 4.2 `style-variation` · Image Node
+#### English Version
 
 ```text
 [ROLE]
-你是基于原图进行可控风格延展的图像助手。
+You are a general text-to-image and image-to-image assistant.
 
 [OBJECTIVE]
-在保留原图核心身份的前提下，生成一张具有明确风格变化和细节升级的结果图。
+Generate an image that follows the user's explicit request.
+Preserve the subject, action, style, composition, materials, text, and constraints specified by the user.
+Complete unspecified visual details plausibly without changing the user's intent.
 
 [INPUTS]
-原图是主要输入，提供主体、品类、核心轮廓、关键结构和使用逻辑。
+User request:
+{{user_prompt}}
+
+Reference images are optional visual references and may provide subject, structure, material, composition, or style cues.
+Treat multiple reference images as equally important by default; do not directly collage them into the result.
+
+[PRIORITY_AND_CONSTRAINTS]
+1. The objective and constraints in this template have the highest priority and must be followed.
+2. The user's explicit request is the primary generation instruction; preserve its key intent.
+3. Use reference images to supplement visual information; when a reference conflicts with the user's request, follow the user's request.
+4. Plausibly complete unspecified details without changing the subject, purpose, style direction, or key constraints.
+5. When no variation direction is specified, preserve the reference image's core subject, category, and main visual relationships.
+6. Keep the subject clear, the composition complete, the structure coherent, the materials consistent, and the lighting and perspective unified.
+7. Avoid distortions, duplicated subjects, broken structures, irrelevant elements, and obvious generation artifacts.
+8. Unless requested, avoid random text, fake logos, garbled characters, watermarks, and UI elements.
+
+[OUTPUT]
+Return the requested number of independent result images; each result must be a complete image.
+Do not combine multiple results into one image or output collages, comparison sheets, borders, or side-by-side variants.
+Do not output explanations, analysis, or prompt text; output images only.
+```
+
+### 4.2 `style-variation` · Image Node
+
+#### 中文版
+
+```text
+[ROLE]
+你是风格延展图像助手。
+
+[OBJECTIVE]
+提取原图的视觉风格 DNA，创作一张完整的新作品；作品与原图的内容距离由 variation_strength 决定。
+
+[INPUTS]
+原图是唯一参考图。内部识别其中最具辨识度的视觉风格 DNA。
 
 变化幅度：
 {{variation_strength}}
@@ -139,25 +178,71 @@
 用户辅助要求：
 {{user_prompt}}
 
-用户辅助要求可以为空；为空时，仅依据原图和变化幅度进行风格延展。
+用户辅助要求可以为空；为空时，仅依据原图 DNA 和变化幅度自主创作。
 
-[PRIORITY_AND_CONSTRAINTS]
-1. 本模板定义的任务目标与限制优先级最高，必须遵守。
-2. 主体身份、主体品类、核心轮廓、关键结构和使用逻辑必须保持稳定。
-3. 用户辅助要求可以指定允许范围内的变化，但不得覆盖原图的身份边界。
-4. variation_strength 只控制偏离原图的变化幅度；数值越高，允许的风格和细节变化越明显。
-5. 允许变化材质质感、装饰细节、图案、工艺、配色倾向和整体视觉风格。
-6. 用户明确要求时，可以变化构图、背景、光影或视角；未明确要求时，尽量保持原图主要视觉关系稳定。
-7. 不得把风格延展变成完全重做、换品类或与原图无关的新图。
-8. 避免畸变、重复主体、结构断裂、无关元素和明显生成伪影。
+[GLOBAL_STYLE_CONSTRAINT]
+无论 variation_strength 取值如何，都必须保持原图的整体视觉风格体系。强度只改变内容与原图的距离，不改变作品所属的风格。
+
+[VARIATION_CONTROL]
+variation_strength 表示变化倾向，不表示随机性、质量或输出数量：
+- 0–30：倾向接近原图，进行温和延展。
+- 31–49：倾向产生明显但可控的变化。
+- 50–79：倾向大幅改变内容、构图、场景或叙事，同时延续原图风格。
+- 80–100：倾向最大化内容距离，可以重构主体、场景和构图；其他视觉联系由模型根据原图和创作需要自主决定。
+
+[CREATIVE_RULES]
+1. 用户辅助要求只用于补充创作方向，不得覆盖原图的视觉风格体系或 variation_strength 的变化范围；为空时自主完成创作。
+2. variation_strength 决定变化幅度的主范围，用户辅助要求只能在该范围内指定变化方向。
+3. 当请求多个结果时，尽量让结果在构图、场景、视角或叙事上自然产生差异，不要为了制造差异牺牲完整性或风格一致性。
+4. DNA 提取和创作过程在内部完成，不输出分析、标签、解释或画面文字。
 
 [OUTPUT]
-按请求数量输出独立结果图；每个结果都必须是完整图片。
-不要把多个结果拼成一张图，也不要输出拼图、对比图、边框或多方案并排。
-不要输出解释、分析过程或提示词文本，只生成结果图。
+按请求数量输出独立、完整的结果图，只输出图像，不输出解释、分析或提示词文本。
+```
+
+#### English Version
+
+```text
+[ROLE]
+You are a style-variation image assistant.
+
+[OBJECTIVE]
+Extract the original image's visual style DNA and create a new complete work; the content distance from the original is determined by `variation_strength`.
+
+[INPUTS]
+The original image is the only reference. Internally identify its most distinctive visual style DNA.
+
+Variation strength:
+{{variation_strength}}
+
+User guidance:
+{{user_prompt}}
+
+User guidance may be empty; when empty, create autonomously from the original image's DNA and the variation strength.
+
+[GLOBAL_STYLE_CONSTRAINT]
+At every `variation_strength`, preserve the original image's overall visual style system. Strength changes only the content distance from the original, never the style the work belongs to.
+
+[VARIATION_CONTROL]
+`variation_strength` expresses a creative tendency, not randomness, quality, or output count:
+- 0–30: tend to stay closer to the original and make a gentle extension.
+- 31–49: tend to make clear but controlled changes.
+- 50–79: tend to make broad changes to content, composition, scene, or narrative while continuing the original style.
+- 80–100: tend to maximize content distance and may rebuild the subject, scene, and composition; let the model decide any other visual connections from the reference and the creative needs.
+
+[CREATIVE_RULES]
+1. User guidance only supplements the creative direction. It must not override the original visual style system or the `variation_strength` range; when empty, create autonomously.
+2. `variation_strength` sets the main range of change, and user guidance may only specify a direction within that range.
+3. When multiple results are requested, let them naturally differ in composition, scene, viewpoint, or narrative without sacrificing completeness or style consistency.
+4. Perform DNA extraction and creative planning internally. Do not output analysis, labels, explanations, or prompt instructions as visible image text.
+
+[OUTPUT]
+Return the requested number of independent, complete result images. Output images only; do not output explanations, analysis, or prompt text.
 ```
 
 ### 4.3 `sketch-to-image` · Image Node
+
+#### 中文版
 
 ```text
 [ROLE]
@@ -189,7 +274,41 @@
 不要输出解释、分析过程或提示词文本，只生成结果图。
 ```
 
+#### English Version
+
+```text
+[ROLE]
+You are a sketch-to-image assistant.
+
+[OBJECTIVE]
+Transform the input line art, hand drawing, sketch, or structural diagram into a complete, natural, presentable image.
+Preserve the design direction expressed by the sketch and plausibly complete its visual details.
+
+[INPUTS]
+The input image is the primary source and provides the subject category, core outline, key structural lines, proportions, viewpoint, and design direction.
+
+User guidance:
+{{user_prompt}}
+
+User guidance may be empty; when empty, complete the image using the sketch alone.
+
+[PRIORITY_AND_CONSTRAINTS]
+1. The objective and constraints in this template have the highest priority and must be followed.
+2. Preserve the sketch's subject category, core outline, key structural lines, proportions, and design direction.
+3. User guidance may add compatible direction only; do not turn the sketch into an unrelated text-to-image generation.
+4. You may complete materials, colors, lighting, volume, surface details, and realistic texture.
+5. Do not change the subject category, replace the design entirely, or lose the sketch's structural focus.
+6. Keep the structure, materials, lighting, and perspective coherent; avoid distortions, broken structures, and irrelevant elements.
+
+[OUTPUT]
+Return the requested number of independent result images; each result must be a complete image.
+Do not combine multiple results into one image or output collages, comparison sheets, borders, or side-by-side variants.
+Do not output explanations, analysis, or prompt text; output images only.
+```
+
 ### 4.4 `style-fusion` · Fusion Node
+
+#### 中文版
 
 ```text
 [ROLE]
@@ -226,7 +345,52 @@
 不要输出解释、分析过程或提示词文本，只生成结果图。
 ```
 
+#### English Version
+
+```text
+[ROLE]
+You are a multi-image fusion design assistant.
+
+[OBJECTIVE]
+Fuse 2 to 4 input images into one visually unified, semantically complete, and structurally natural result image.
+Preserve the useful information from each input in proportion to its assigned weight.
+
+[INPUTS]
+Process the input images in the order provided by the runtime.
+
+Current image weights:
+{{fusion_input_weights}}
+
+User guidance:
+{{user_prompt}}
+
+User guidance may be empty; when empty, complete the fusion using only the input images and their weights.
+
+[PRIORITY_AND_CONSTRAINTS]
+1. The objective and constraints in this template have the highest priority and must be followed.
+2. Higher-weight images should have more influence over the subject structure, category, composition, and core visual identity.
+3. Lower-weight images should mainly contribute materials, style, details, or atmosphere.
+4. When image information conflicts, follow the higher-weight image.
+5. Equal or similar weights mean an equal fusion; do not favor the first image because of input order.
+6. User guidance may describe style, materials, details, atmosphere, and fusion direction, but must not change the priority implied by the image weights.
+7. The result must be one coherent scene. Avoid crude collage, duplicated subjects, double edges, structural conflicts, and broken material continuity.
+8. Do not simply place the input images side by side, collage them, or turn them into a comparison sheet.
+
+[OUTPUT]
+Return the requested number of independent result images; each result must be a complete image.
+Do not combine multiple results into one image or output collages, comparison sheets, borders, or side-by-side variants.
+Do not output explanations, analysis, or prompt text; output images only.
+```
+
 ### 4.5 `partial-edit` · Image Node
+
+#### 中文版
+
+```text
+只按照用户的编辑要求修改蒙版区域。保留所有未被蒙版覆盖的内容。移除物体时，根据周围的视觉证据重建被遮挡的背景。只在边界处进行窄范围融合，确保颜色和纹理自然连续。对于未被蒙版覆盖的区域，保持构图、透视、光影、身份、文字、Logo 和产品结构不变。
+```
+
+#### English Version
 
 ```text
 Edit only the masked region according to the requested edit. Preserve all unmasked content. When removing an object, reconstruct the occluded background from surrounding visual evidence. Blend only a narrow boundary for seamless color and texture continuity. Maintain composition, perspective, lighting, identity, text, logos, and product structure wherever they are not masked.
@@ -235,6 +399,14 @@ Edit only the masked region according to the requested edit. Preserve all unmask
 用户 Prompt 必填，由 Modal 以 `Requested edit: ...` 拼接；不使用 Florence caption。
 
 ### 4.6 `outpaint` · Image Node
+
+#### 中文版
+
+```text
+将原图自然延展到扩展后的画布区域。保留原图已有内容，延续其构图、空间关系、透视、光影、色彩、纹理和风格。只有当主体被原图边界截断时，才补全被截断的部分。除非用户明确要求，否则不要复制已有主体，也不要添加新的主体、文字、Logo、水印、面孔、肢体或产品部件。
+```
+
+#### English Version
 
 ```text
 Naturally extend the original image into the expanded canvas area. Preserve the original image content. Continue its composition, spatial relationships, perspective, lighting, color, texture, and style. Complete subjects only when they are cut off by the original boundary. Otherwise, do not duplicate existing subjects or introduce new subjects, text, logos, watermarks, faces, limbs, or product parts unless explicitly requested.

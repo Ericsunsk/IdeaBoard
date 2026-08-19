@@ -623,6 +623,7 @@ func mediaAssetMetadataJSON(output tasks.TaskOutput) json.RawMessage {
 		"task_id":      strings.TrimSpace(output.TaskID),
 		"role":         strings.TrimSpace(output.Role),
 		"result_index": output.ResultIndex,
+		"animated":     output.Animated,
 	}
 	if strings.TrimSpace(output.Metadata) != "" {
 		metadata["output_metadata"] = json.RawMessage(output.Metadata)

@@ -1,4 +1,8 @@
 import { computed } from 'vue'
+import {
+  resolveMediaAssetOriginalURL,
+  useMediaAssetDelivery,
+} from '../../../shared/api/mediaAssetDelivery'
 import { useImageAdjustmentRenderedPreview } from '../image-editor/composables/useImageAdjustmentRenderedPreview'
 import { useImageEditorHistogramSource } from '../image-editor/composables/useImageEditorHistogramSource'
 import type { ImageToolChromeCommands, ImageToolChromeModel } from './imageToolBindings'
@@ -9,14 +13,26 @@ export function createImageToolChromeAdapter(
   commands: ImageToolChromeCommands,
 ) {
   const { board, execution } = session.capabilities
+  const editorMediaAssetId = computed(() => {
+    const nodeId = session.imageEditorNodeId.value
+    return nodeId ? (board.getImageNodeDisplayPayload(nodeId)?.mediaAssetId ?? null) : null
+  })
+  const originalDelivery = useMediaAssetDelivery(editorMediaAssetId, 'original')
   const { imageEditorRenderedPreview, imageEditorPreviewSource } =
     useImageAdjustmentRenderedPreview({
       isAdjustMode: session.isImageAdjustmentMode,
       layers: session.imageEditorSession.imageEditorLayers,
-      sourceUrl: () =>
-        session.imageEditorNodeId.value
-          ? board.getImageNodeDisplayPayload(session.imageEditorNodeId.value)?.url
-          : null,
+      sourceUrl: () => {
+        const payload = session.imageEditorNodeId.value
+          ? board.getImageNodeDisplayPayload(session.imageEditorNodeId.value)
+          : null
+        return (
+          originalDelivery.url.value ||
+          (payload?.mediaAssetId
+            ? resolveMediaAssetOriginalURL(payload.mediaAssetId)
+            : (payload?.url ?? null))
+        )
+      },
     })
   const { imageEditorHistogramSource } = useImageEditorHistogramSource({
     isAdjustMode: session.isImageAdjustmentMode,

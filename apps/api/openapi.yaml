@@ -384,21 +384,98 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseRechargeHistoryPage' }
-  /user/payments/events:
+  /user/events:
     get:
-      tags: [UserPayments]
-      operationId: streamUserPaymentEvents
+      tags: [UserEvents]
+      operationId: streamUserEvents
       security:
         - cookieAuth: []
       responses:
         '200':
-          description: User-scoped recharge status events
+          description: User-scoped task, payment, and media derivative invalidation events
           headers:
             Cache-Control:
               schema: { type: string, enum: [no-store] }
           content:
             text/event-stream:
               schema: { type: string }
+  /user/media-assets/{asset_id}:
+    get:
+      tags: [UserAssets]
+      operationId: getUserMediaAssetMetadata
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: asset_id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+      responses:
+        '200':
+          description: User-owned media asset metadata and delivery URLs
+          headers:
+            Cache-Control:
+              schema: { type: string, enum: [no-store] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseMediaAssetMetadata' }
+        '404':
+          description: Media asset not found or not owned by the user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+  /user/media-assets/{asset_id}/original/content:
+    get:
+      tags: [UserAssets]
+      operationId: getUserMediaAssetOriginalContent
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: asset_id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+      responses:
+        '200':
+          description: Original media asset content
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        '202':
+          description: Original media asset is not ready
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+  /user/media-assets/{asset_id}/derivatives/{tier}/{format}/content:
+    get:
+      tags: [UserAssets]
+      operationId: getUserMediaAssetDerivativeContent
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: asset_id
+          in: path
+          required: true
+          schema: { type: string, minLength: 1, maxLength: 128 }
+        - name: tier
+          in: path
+          required: true
+          schema: { type: string, enum: [thumb, preview, large-preview] }
+        - name: format
+          in: path
+          required: true
+          schema: { type: string, enum: [webp, jpeg, png] }
+      responses:
+        '200':
+          description: Media derivative content
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        '202':
+          description: Media derivative is not ready
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
   /user/profile/avatar:
     post:
       tags: [UserAssets]
@@ -719,25 +796,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseMessage'
-  /user/tasks/{task_id}/events:
-    get:
-      tags: [Tasks]
-      operationId: streamUserTaskEvents
-      parameters:
-        - $ref: '#/components/parameters/TaskId'
-      responses:
-        '200':
-          description: Server-Sent Events stream for task updates
-          content:
-            text/event-stream:
-              schema:
-                type: string
-              example: |
-                event: ping
-                data: {}
-
-                event: task
-                data: {"task_id":"task_123","status":"running"}
   /user/download:
     get:
       tags: [UserAssets]
@@ -5681,6 +5739,43 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/UploadAvatarMetadata'
+
+    MediaAssetDeliveryVariant:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [uploading, pending, processing, ready, failed, reclaimed] }
+        format: { type: string }
+        url: { type: string, minLength: 1 }
+        width: { type: integer, minimum: 0 }
+        height: { type: integer, minimum: 0 }
+        size_bytes: { type: integer, format: int64, minimum: 0 }
+        error_code: { type: string }
+
+    MediaAssetMetadata:
+      type: object
+      required: [asset_id, status, mime_type, width, height, size_bytes, original, derivatives]
+      properties:
+        asset_id: { type: string, minLength: 1 }
+        status: { type: string, enum: [uploading, ready, failed, reclaimed] }
+        mime_type: { type: string }
+        width: { type: integer, minimum: 0 }
+        height: { type: integer, minimum: 0 }
+        size_bytes: { type: integer, format: int64, minimum: 0 }
+        original:
+          $ref: '#/components/schemas/MediaAssetDeliveryVariant'
+        derivatives:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/MediaAssetDeliveryVariant'
+
+    ApiResponseMediaAssetMetadata:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/MediaAssetMetadata'
 
     ApiResponseFeaturePromptList:
       allOf:

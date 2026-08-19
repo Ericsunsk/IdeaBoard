@@ -8,6 +8,9 @@ package dbsqlc
 import (
 	"context"
 	"encoding/json"
+	"time"
+
+	"github.com/lib/pq"
 )
 
 const deleteMediaDerivativeOutbox = `-- name: DeleteMediaDerivativeOutbox :exec
@@ -235,6 +238,81 @@ func (q *Queries) ListMediaAssetSources(ctx context.Context, arg ListMediaAssetS
 	return items, nil
 }
 
+const listMediaDerivativeIDsMissingOutbox = `-- name: ListMediaDerivativeIDsMissingOutbox :many
+SELECT d.id
+FROM media_derivatives AS d
+LEFT JOIN media_derivative_outbox AS o ON o.derivative_id = d.id
+WHERE o.id IS NULL
+  AND (
+    d.status = 'pending'
+    OR (d.status = 'failed' AND d.attempt_count < $1)
+  )
+ORDER BY d.updated_at ASC, d.id ASC
+LIMIT $2
+`
+
+type ListMediaDerivativeIDsMissingOutboxParams struct {
+	MaxAttemptCount int32 `json:"max_attempt_count"`
+	RowLimit        int32 `json:"row_limit"`
+}
+
+func (q *Queries) ListMediaDerivativeIDsMissingOutbox(ctx context.Context, arg ListMediaDerivativeIDsMissingOutboxParams) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, listMediaDerivativeIDsMissingOutbox, arg.MaxAttemptCount, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMediaDerivativeStorageKeys = `-- name: ListMediaDerivativeStorageKeys :many
+SELECT storage_profile_id, storage_key
+FROM media_derivatives
+WHERE btrim(storage_key) <> ''
+`
+
+type ListMediaDerivativeStorageKeysRow struct {
+	StorageProfileID string `json:"storage_profile_id"`
+	StorageKey       string `json:"storage_key"`
+}
+
+func (q *Queries) ListMediaDerivativeStorageKeys(ctx context.Context) ([]ListMediaDerivativeStorageKeysRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMediaDerivativeStorageKeys)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMediaDerivativeStorageKeysRow
+	for rows.Next() {
+		var i ListMediaDerivativeStorageKeysRow
+		if err := rows.Scan(&i.StorageProfileID, &i.StorageKey); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMediaDerivativesByAsset = `-- name: ListMediaDerivativesByAsset :many
 SELECT id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
   storage_key, mime_type, width, height, size_bytes, checksum_sha256, attempt_count,
@@ -301,13 +379,100 @@ FROM media_derivatives AS d
 JOIN media_derivative_outbox AS o ON o.derivative_id = d.id
 WHERE o.claimed_at IS NULL
   AND o.available_at <= now()
-  AND d.status IN ('pending', 'failed')
+  AND (
+    d.status = 'pending'
+    OR (d.status = 'failed' AND d.attempt_count < $1)
+  )
 ORDER BY o.available_at ASC, d.id ASC
+LIMIT $2
+`
+
+type ListPendingMediaDerivativeIDsParams struct {
+	MaxAttemptCount int32 `json:"max_attempt_count"`
+	LimitCount      int32 `json:"limit_count"`
+}
+
+func (q *Queries) ListPendingMediaDerivativeIDs(ctx context.Context, arg ListPendingMediaDerivativeIDsParams) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, listPendingMediaDerivativeIDs, arg.MaxAttemptCount, arg.LimitCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listReadyMediaAssetIDsMissingDerivatives = `-- name: ListReadyMediaAssetIDsMissingDerivatives :many
+SELECT a.id, a.owner_user_id
+FROM media_assets AS a
+WHERE a.status = 'ready'
+  AND a.deleted_at IS NULL
+  AND a.media_kind = 'image'
+  AND (
+    NOT EXISTS (SELECT 1 FROM media_derivatives AS d WHERE d.media_asset_id = a.id AND d.tier = 'thumb')
+    OR NOT EXISTS (SELECT 1 FROM media_derivatives AS d WHERE d.media_asset_id = a.id AND d.tier = 'preview')
+  )
+ORDER BY a.updated_at ASC, a.id ASC
 LIMIT $1
 `
 
-func (q *Queries) ListPendingMediaDerivativeIDs(ctx context.Context, limitCount int32) ([]int64, error) {
-	rows, err := q.db.QueryContext(ctx, listPendingMediaDerivativeIDs, limitCount)
+type ListReadyMediaAssetIDsMissingDerivativesRow struct {
+	ID          int64 `json:"id"`
+	OwnerUserID int64 `json:"owner_user_id"`
+}
+
+func (q *Queries) ListReadyMediaAssetIDsMissingDerivatives(ctx context.Context, rowLimit int32) ([]ListReadyMediaAssetIDsMissingDerivativesRow, error) {
+	rows, err := q.db.QueryContext(ctx, listReadyMediaAssetIDsMissingDerivatives, rowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListReadyMediaAssetIDsMissingDerivativesRow
+	for rows.Next() {
+		var i ListReadyMediaAssetIDsMissingDerivativesRow
+		if err := rows.Scan(&i.ID, &i.OwnerUserID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listStaleProcessingMediaDerivativeIDs = `-- name: ListStaleProcessingMediaDerivativeIDs :many
+SELECT id
+FROM media_derivatives
+WHERE status = 'processing'
+  AND updated_at < $1
+ORDER BY updated_at ASC, id ASC
+LIMIT $2
+`
+
+type ListStaleProcessingMediaDerivativeIDsParams struct {
+	StaleBefore time.Time `json:"stale_before"`
+	RowLimit    int32     `json:"row_limit"`
+}
+
+func (q *Queries) ListStaleProcessingMediaDerivativeIDs(ctx context.Context, arg ListStaleProcessingMediaDerivativeIDsParams) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, listStaleProcessingMediaDerivativeIDs, arg.StaleBefore, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -331,21 +496,30 @@ func (q *Queries) ListPendingMediaDerivativeIDs(ctx context.Context, limitCount 
 
 const markMediaDerivativeFailed = `-- name: MarkMediaDerivativeFailed :one
 UPDATE media_derivatives
-SET status = 'failed', error_code = $1, error_message = $2
-WHERE id = $3
+SET status = 'failed',
+    error_code = $1,
+    error_message = $2,
+    attempt_count = GREATEST(attempt_count, $3)
+WHERE id = $4
 RETURNING id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
   storage_key, mime_type, width, height, size_bytes, checksum_sha256, attempt_count,
   error_code, error_message, created_at, updated_at, ready_at, last_attempt_at
 `
 
 type MarkMediaDerivativeFailedParams struct {
-	ErrorCode    string `json:"error_code"`
-	ErrorMessage string `json:"error_message"`
-	ID           int64  `json:"id"`
+	ErrorCode       string `json:"error_code"`
+	ErrorMessage    string `json:"error_message"`
+	MinAttemptCount int32  `json:"min_attempt_count"`
+	ID              int64  `json:"id"`
 }
 
 func (q *Queries) MarkMediaDerivativeFailed(ctx context.Context, arg MarkMediaDerivativeFailedParams) (MediaDerivative, error) {
-	row := q.db.QueryRowContext(ctx, markMediaDerivativeFailed, arg.ErrorCode, arg.ErrorMessage, arg.ID)
+	row := q.db.QueryRowContext(ctx, markMediaDerivativeFailed,
+		arg.ErrorCode,
+		arg.ErrorMessage,
+		arg.MinAttemptCount,
+		arg.ID,
+	)
 	var i MediaDerivative
 	err := row.Scan(
 		&i.ID,
@@ -380,14 +554,22 @@ SET status = 'processing',
     error_code = '',
     error_message = ''
 WHERE id = $1
-  AND status IN ('pending', 'failed')
+  AND (
+    status = 'pending'
+    OR (status = 'failed' AND attempt_count < $2)
+  )
 RETURNING id, media_asset_id, owner_user_id, tier, format, status, storage_profile_id,
   storage_key, mime_type, width, height, size_bytes, checksum_sha256, attempt_count,
   error_code, error_message, created_at, updated_at, ready_at, last_attempt_at
 `
 
-func (q *Queries) MarkMediaDerivativeProcessing(ctx context.Context, id int64) (MediaDerivative, error) {
-	row := q.db.QueryRowContext(ctx, markMediaDerivativeProcessing, id)
+type MarkMediaDerivativeProcessingParams struct {
+	ID              int64 `json:"id"`
+	MaxAttemptCount int32 `json:"max_attempt_count"`
+}
+
+func (q *Queries) MarkMediaDerivativeProcessing(ctx context.Context, arg MarkMediaDerivativeProcessingParams) (MediaDerivative, error) {
+	row := q.db.QueryRowContext(ctx, markMediaDerivativeProcessing, arg.ID, arg.MaxAttemptCount)
 	var i MediaDerivative
 	err := row.Scan(
 		&i.ID,
@@ -471,6 +653,52 @@ func (q *Queries) MarkMediaDerivativeReady(ctx context.Context, arg MarkMediaDer
 		&i.LastAttemptAt,
 	)
 	return i, err
+}
+
+const rescheduleMediaDerivativeOutbox = `-- name: RescheduleMediaDerivativeOutbox :exec
+UPDATE media_derivative_outbox
+SET available_at = $1,
+    claimed_at = NULL,
+    last_error = $2
+WHERE derivative_id = $3
+`
+
+type RescheduleMediaDerivativeOutboxParams struct {
+	AvailableAt  time.Time `json:"available_at"`
+	LastError    string    `json:"last_error"`
+	DerivativeID int64     `json:"derivative_id"`
+}
+
+func (q *Queries) RescheduleMediaDerivativeOutbox(ctx context.Context, arg RescheduleMediaDerivativeOutboxParams) error {
+	_, err := q.db.ExecContext(ctx, rescheduleMediaDerivativeOutbox, arg.AvailableAt, arg.LastError, arg.DerivativeID)
+	return err
+}
+
+const resetStaleProcessingMediaDerivatives = `-- name: ResetStaleProcessingMediaDerivatives :execrows
+UPDATE media_derivatives
+SET status = CASE
+      WHEN attempt_count >= $1 THEN 'failed'
+      ELSE 'pending'
+    END,
+    error_code = 'stale_processing_recovered',
+    error_message = 'processing lease expired; reconciler requeued the derivative'
+WHERE id = ANY($2::bigint[])
+  AND status = 'processing'
+  AND updated_at < $3
+`
+
+type ResetStaleProcessingMediaDerivativesParams struct {
+	MaxAttemptCount int32     `json:"max_attempt_count"`
+	Ids             []int64   `json:"ids"`
+	StaleBefore     time.Time `json:"stale_before"`
+}
+
+func (q *Queries) ResetStaleProcessingMediaDerivatives(ctx context.Context, arg ResetStaleProcessingMediaDerivativesParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, resetStaleProcessingMediaDerivatives, arg.MaxAttemptCount, pq.Array(arg.Ids), arg.StaleBefore)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const upsertMediaAssetSource = `-- name: UpsertMediaAssetSource :one

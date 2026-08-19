@@ -91,6 +91,7 @@ describe('useCanvasGraphInteractions', () => {
 
     expect(harness.downloadImage).toHaveBeenCalledWith({
       url: 'https://example.test/output.png',
+      mediaAssetId: 201,
       fileName: 'Domain image.png',
     })
     expect(harness.loading.destroy).toHaveBeenCalledOnce()

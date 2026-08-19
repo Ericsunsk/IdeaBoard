@@ -112,6 +112,7 @@ type TaskOutput struct {
 	SizeBytes      int64     `json:"size_bytes"`
 	SourceURL      string    `json:"source_url,omitempty"`
 	ChecksumSHA256 string    `json:"checksum_sha256,omitempty"`
+	Animated       bool      `json:"animated,omitempty"`
 	StorageProfile string    `json:"storage_profile,omitempty"`
 	Metadata       string    `json:"metadata,omitempty"`
 	ResultIndex    int       `json:"result_index"`

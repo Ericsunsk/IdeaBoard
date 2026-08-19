@@ -12,6 +12,7 @@ var errStoredObjectNotFound = errors.New("stored object not found")
 type StorageStoreOptions struct {
 	DirPrefix  string
 	AllowHosts []string
+	ObjectKey  string
 }
 
 type StoredUploadRef struct {
@@ -22,6 +23,8 @@ type StoredUploadRef struct {
 	Width          int
 	Height         int
 	SizeBytes      int64
+	ChecksumSHA256 string
+	Animated       bool
 }
 
 type StoredUploadObject struct {

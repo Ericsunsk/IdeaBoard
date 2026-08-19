@@ -52,14 +52,6 @@ type uploadImageMetadata struct {
 	Ext    string
 }
 
-type boardUploadAssetRegistrar interface {
-	RegisterBoardUpload(context.Context, assets.BoardUploadAsset) (int64, error)
-}
-
-type boardUploadObjectCleaner interface {
-	DeleteObjectByStorageProfile(context.Context, string, string) error
-}
-
 func acquireUploadSlot(ctx context.Context, provider settings.MediaUploadSettingProvider) (func(), bool) {
 	limit := resolveUploadMaxConcurrent(ctx, provider)
 	return uploadLimiter.acquire(limit)
@@ -203,10 +195,27 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
-		stored, err := h.StorageService.UploadRefWithOptions(c.Request.Context(), file, storage.StorageStoreOptions{
+		storeOpts := storage.StorageStoreOptions{
 			DirPrefix: dirPrefix,
+		}
+		prepared, err := h.StorageService.PrepareUploadRef(c.Request.Context(), file.Filename, storeOpts)
+		if err != nil {
+			response.InternalError(c, 500, "上传失败", err)
+			return
+		}
+		mediaAssetID, err := h.MediaAssets.BeginBoardUpload(c.Request.Context(), assets.BoardUploadAsset{
+			OwnerUserID: board.OwnerUserID,
+			BoardID:     board.BoardID,
+			Stored:      *prepared,
 		})
 		if err != nil {
+			response.InternalError(c, 500, "上传失败", err)
+			return
+		}
+		storeOpts.ObjectKey = prepared.StorageKey
+		stored, err := h.StorageService.UploadRefWithOptions(c.Request.Context(), file, storeOpts)
+		if err != nil {
+			_ = h.MediaAssets.FailBoardUpload(context.WithoutCancel(c.Request.Context()), board.OwnerUserID, mediaAssetID, err)
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
@@ -215,12 +224,14 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 			stored.Height = meta.Height
 			stored.MIMEType = meta.Mime
 		}
-		mediaAssetID, err := registerBoardUploadAsset(c.Request.Context(), h.MediaAssets, h.StorageService, assets.BoardUploadAsset{
+		uploadAsset := assets.BoardUploadAsset{
 			OwnerUserID: board.OwnerUserID,
 			BoardID:     board.BoardID,
 			Stored:      *stored,
-		})
-		if err != nil {
+		}
+		if err := h.MediaAssets.CompleteBoardUpload(c.Request.Context(), uploadAsset, mediaAssetID); err != nil {
+			_ = h.MediaAssets.FailBoardUpload(context.WithoutCancel(c.Request.Context()), board.OwnerUserID, mediaAssetID, err)
+			_ = h.StorageService.DeleteObjectByStorageProfile(context.WithoutCancel(c.Request.Context()), stored.StorageProfile, stored.StorageKey)
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
@@ -228,35 +239,6 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 		payload.MediaAssetID = mediaAssetID
 		response.SuccessDTO(c, payload)
 	}
-}
-
-func registerBoardUploadAsset(
-	ctx context.Context,
-	registry boardUploadAssetRegistrar,
-	cleaner boardUploadObjectCleaner,
-	upload assets.BoardUploadAsset,
-) (int64, error) {
-	mediaAssetID, err := registry.RegisterBoardUpload(ctx, upload)
-	if err == nil {
-		return mediaAssetID, nil
-	}
-	cleanupCtx := context.WithoutCancel(ctx)
-	cleanupErr := cleaner.DeleteObjectByStorageProfile(
-		cleanupCtx,
-		upload.Stored.StorageProfile,
-		upload.Stored.StorageKey,
-	)
-	if cleanupErr != nil {
-		slog.ErrorContext(cleanupCtx, "cleanup unregistered board upload failed",
-			"board_id", upload.BoardID,
-			"owner_user_id", upload.OwnerUserID,
-			"storage_profile_id", upload.Stored.StorageProfile,
-			"storage_key", upload.Stored.StorageKey,
-			"registration_error", err,
-			"cleanup_error", cleanupErr,
-		)
-	}
-	return 0, err
 }
 
 func adminUploadHandler(storageService *storage.StorageService, uploadSettings settings.MediaUploadSettingProvider) gin.HandlerFunc {

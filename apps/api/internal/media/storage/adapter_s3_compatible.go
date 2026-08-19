@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"mime/multipart"
+	"time"
 )
 
 type s3CompatibleStorageAdapter struct {
@@ -45,6 +46,10 @@ func (a *s3CompatibleStorageAdapter) DeleteByPrefix(ctx context.Context, profile
 	return a.service.s3CompatibleService.DeletePrefixWithConfig(ctx, objectKeyPrefix, a.service.s3CompatibleConfigFromProfile(profile))
 }
 
+func (a *s3CompatibleStorageAdapter) ListObjectKeysByPrefix(ctx context.Context, profile *StorageProfile, objectKeyPrefix string) ([]string, error) {
+	return a.service.s3CompatibleService.ListObjectKeysWithConfig(ctx, objectKeyPrefix, a.service.s3CompatibleConfigFromProfile(profile))
+}
+
 func (a *s3CompatibleStorageAdapter) PutObject(ctx context.Context, profile *StorageProfile, objectKey string, data []byte, contentType string) error {
 	return a.service.s3CompatibleService.putBytesAtKeyWithConfig(ctx, objectKey, data, contentType, a.service.s3CompatibleConfigFromProfile(profile))
 }
@@ -78,11 +83,16 @@ func (a *s3CompatibleStorageAdapter) StoreRemoteRef(ctx context.Context, profile
 	}
 	ref.Width = remoteFile.Width
 	ref.Height = remoteFile.Height
+	ref.Animated = remoteFile.Animated
 	return ref, nil
 }
 
 func (a *s3CompatibleStorageAdapter) Read(ctx context.Context, profile *StorageProfile, objectKey string, maxBytes int64) (*StoredUploadObject, error) {
 	return a.service.s3CompatibleService.readWithConfig(ctx, objectKey, a.service.s3CompatibleConfigFromProfile(profile), maxBytes)
+}
+
+func (a *s3CompatibleStorageAdapter) SignedURL(ctx context.Context, profile *StorageProfile, objectKey string, expiry time.Duration) (string, error) {
+	return a.service.s3CompatibleService.SignedURLWithConfig(ctx, objectKey, expiry, a.service.s3CompatibleConfigFromProfile(profile))
 }
 
 func (a *s3CompatibleStorageAdapter) ProviderURL(profile *StorageProfile, objectKey string) (string, error) {

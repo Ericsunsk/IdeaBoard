@@ -498,7 +498,6 @@ func TestUserPaymentRoutesAreRegistered(t *testing.T) {
 		"POST /api/user/payments/pending-orders/:public_token/continue": false,
 		"POST /api/user/payments/pending-orders/:public_token/abandon":  false,
 		"GET /api/user/payments/recharges":                              false,
-		"GET /api/user/payments/events":                                 false,
 	}
 	for _, route := range router.Routes() {
 		key := route.Method + " " + route.Path

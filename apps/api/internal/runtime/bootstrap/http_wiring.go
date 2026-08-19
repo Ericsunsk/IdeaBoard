@@ -36,8 +36,7 @@ func newAppRouter(
 	taskStatsHandler := taskstats.NewHandler(taskServices.taskStatsService, taskServices.accountService)
 	billingHandler := billing.NewHandler(services.billingCatalog, services.billingCatalog)
 	paymentUserHandler := payments.NewUserCheckoutHandler(services.paymentService, cfg.PublicOrigins)
-	paymentEventStreamHandler := payments.NewEventStreamHandler(services.paymentService.EventHub())
-	userEventStreamHandler := httpapi.NewUserEventStreamHandler(taskServices.taskService.EventHub(), services.paymentService.EventHub())
+	userEventStreamHandler := httpapi.NewUserEventStreamHandler(taskServices.userEvents)
 	paymentAdminHandler := payments.NewAdminHandler(services.paymentService, cfg.PublicOrigins)
 	paymentWebhookHandler := payments.NewWebhookHandler(services.paymentService)
 	creditUserResolver := creditsUserResolver{repo: repos.userRepo}
@@ -72,20 +71,19 @@ func newAppRouter(
 	registerHTTPRoutes(router, httpapi.Dependencies{
 		Auth: authDeps,
 		UserRoutes: httpapi.UserRouteDeps{
-			AuthHandler:               auth.NewAuthHandler(services.userService),
-			TaskHandler:               taskHandler,
-			BoardHandler:              boards.NewBoardHandler(services.boardService, cfg.PublicOrigins),
-			BillingHandler:            billingHandler,
-			BillingRecords:            billingrecords.NewHandler(services.billingRecords),
-			CreditUserHandler:         creditUserHandler,
-			UsageHandler:              usage.NewHandler(services.usageService),
-			RewardUserHandler:         rewardUserHandler,
-			PaymentUserHandler:        paymentUserHandler,
-			PaymentEventStreamHandler: paymentEventStreamHandler,
-			UserEventStreamHandler:    userEventStreamHandler,
-			MediaAssetRegistry:        repos.mediaAssetRegistry,
-			MediaStorageService:       services.storageService,
-			Uploads:                   uploadDeps,
+			AuthHandler:            auth.NewAuthHandler(services.userService),
+			TaskHandler:            taskHandler,
+			BoardHandler:           boards.NewBoardHandler(services.boardService, cfg.PublicOrigins),
+			BillingHandler:         billingHandler,
+			BillingRecords:         billingrecords.NewHandler(services.billingRecords),
+			CreditUserHandler:      creditUserHandler,
+			UsageHandler:           usage.NewHandler(services.usageService),
+			RewardUserHandler:      rewardUserHandler,
+			PaymentUserHandler:     paymentUserHandler,
+			UserEventStreamHandler: userEventStreamHandler,
+			MediaAssetRegistry:     repos.mediaAssetRegistry,
+			MediaStorageService:    services.storageService,
+			Uploads:                uploadDeps,
 			UploadDownloads: httpapi.UploadDownloadDeps{
 				Reader:     services.storageService,
 				ReadAccess: uploadReadAccess,

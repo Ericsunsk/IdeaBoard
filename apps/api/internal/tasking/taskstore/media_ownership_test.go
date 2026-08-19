@@ -155,6 +155,56 @@ func TestCreateTaskOutputEnforcesOutputKindShape(t *testing.T) {
 	}
 }
 
+func TestInsertTaskOutputsReusesReadyMaterializedAssetAndPersistsLineage(t *testing.T) {
+	ctx := context.Background()
+	db := testdb.Open(t)
+	q := dbsqlc.New(db)
+	owner := createMediaOwnerForTest(t, db, "task-result-convergence-owner", "TRESULT")
+	sourceID, err := q.UpsertMediaAsset(ctx, mediaAssetParamsForTest(owner.ID, "task-result-source", "inputs/source.png"))
+	if err != nil {
+		t.Fatalf("create source asset: %v", err)
+	}
+	if _, err := q.UpsertMediaRef(ctx, dbsqlc.UpsertMediaRefParams{
+		MediaAssetID: sourceID, OwnerUserID: owner.ID, RefType: "task_input", RefID: "task-result-convergence",
+		TaskID: "task-result-convergence", Role: "input", InputIndex: 0, Metadata: []byte(`{}`),
+	}); err != nil {
+		t.Fatalf("create task input ref: %v", err)
+	}
+	outputID, err := q.UpsertMediaAsset(ctx, mediaAssetParamsForTest(owner.ID, "task-result-output", "outputs/result.png"))
+	if err != nil {
+		t.Fatalf("create output asset: %v", err)
+	}
+	if err := insertTaskOutputs(ctx, q, "task-result-convergence", owner.ID, []tasks.TaskOutput{{
+		MediaAssetID: &outputID, OutputKind: "asset", Role: "image", StorageKey: "outputs/result.png", ResultIndex: 0,
+	}}); err != nil {
+		t.Fatalf("insert task outputs: %v", err)
+	}
+	var taskOutputAssetID int64
+	if err := db.QueryRowContext(ctx, `SELECT media_asset_id FROM task_outputs WHERE task_id = $1`, "task-result-convergence").Scan(&taskOutputAssetID); err != nil {
+		t.Fatalf("load task output asset: %v", err)
+	}
+	if taskOutputAssetID != outputID {
+		t.Fatalf("task output asset=%d, want materialized asset %d", taskOutputAssetID, outputID)
+	}
+	var taskOutputRefs, lineageRows int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_refs WHERE media_asset_id = $1 AND ref_type = 'task_output'`, outputID).Scan(&taskOutputRefs); err != nil {
+		t.Fatalf("count task output refs: %v", err)
+	}
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_asset_sources WHERE media_asset_id = $1`, outputID).Scan(&lineageRows); err != nil {
+		t.Fatalf("count task output lineage: %v", err)
+	}
+	if taskOutputRefs != 1 || lineageRows != 1 {
+		t.Fatalf("task output refs/lineage=%d/%d, want 1/1", taskOutputRefs, lineageRows)
+	}
+	var assetCount int
+	if err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM media_assets WHERE owner_user_id = $1 AND storage_key = $2`, owner.ID, "outputs/result.png").Scan(&assetCount); err != nil {
+		t.Fatalf("count output assets: %v", err)
+	}
+	if assetCount != 1 {
+		t.Fatalf("output asset count=%d, want 1", assetCount)
+	}
+}
+
 func createMediaOwnerForTest(t *testing.T, db *sql.DB, displayName string, storageUID string) *users.User {
 	t.Helper()
 	repo := users.NewUserRepository(db)

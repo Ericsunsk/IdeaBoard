@@ -1,38 +1,34 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
 
+	"ideaboard/api/internal/events"
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/payments"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/sse"
-	"ideaboard/api/internal/tasking/taskservice"
 
 	"github.com/gin-gonic/gin"
 )
 
 const userEventsHeartbeatInterval = 15 * time.Second
 
-type userTaskEventStream interface {
-	SubscribeUser(int64) (<-chan taskservice.TaskEvent, func(), bool)
+type userEventStream interface {
+	Subscribe(int64) (<-chan events.UserEvent, func(), bool)
 }
 
-type userPaymentEventStream interface {
-	Subscribe(int64) (<-chan payments.PaymentEvent, func())
-}
-
-// UserEventStreamHandler multiplexes user-scoped task and payment invalidations.
-// Event payloads are intentionally small; clients reload authoritative views from the API.
+// UserEventStreamHandler is the single SSE delivery seam for user-scoped
+// invalidations. Event payloads are intentionally small; clients reload
+// authoritative views from the API.
 type UserEventStreamHandler struct {
-	tasks    userTaskEventStream
-	payments userPaymentEventStream
+	stream userEventStream
 }
 
-func NewUserEventStreamHandler(tasks userTaskEventStream, payments userPaymentEventStream) *UserEventStreamHandler {
-	return &UserEventStreamHandler{tasks: tasks, payments: payments}
+func NewUserEventStreamHandler(stream userEventStream) *UserEventStreamHandler {
+	return &UserEventStreamHandler{stream: stream}
 }
 
 func (h *UserEventStreamHandler) StreamUserEvents(c *gin.Context) {
@@ -40,47 +36,32 @@ func (h *UserEventStreamHandler) StreamUserEvents(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if h == nil || h.tasks == nil || h.payments == nil {
+	if h == nil || h.stream == nil {
 		response.Error(c, http.StatusServiceUnavailable, "用户事件服务暂不可用")
 		return
 	}
-	taskEvents, unsubscribeTasks, accepted := h.tasks.SubscribeUser(identityPrincipal.UserID())
-	if !accepted || taskEvents == nil {
+	userEvents, unsubscribe, accepted := h.stream.Subscribe(identityPrincipal.UserID())
+	if !accepted || userEvents == nil {
 		response.Error(c, http.StatusTooManyRequests, "SSE 连接数已达上限，请稍后重试")
 		return
 	}
-	defer unsubscribeTasks()
-	paymentEvents, unsubscribePayments := h.payments.Subscribe(identityPrincipal.UserID())
-	if paymentEvents == nil {
-		response.Error(c, http.StatusServiceUnavailable, "支付事件服务暂不可用")
-		return
-	}
-	defer unsubscribePayments()
+	defer unsubscribe()
 
-	c.Header("Cache-Control", "no-store")
 	if err := sse.Prepare(c); err != nil {
 		slog.Warn("clear user events SSE write deadline failed", "err", err)
 	}
+	c.Header("Cache-Control", "no-store")
 	heartbeat := time.NewTicker(userEventsHeartbeatInterval)
 	defer heartbeat.Stop()
 	for {
 		select {
 		case <-c.Request.Context().Done():
 			return
-		case event, open := <-taskEvents:
+		case event, open := <-userEvents:
 			if !open {
-				taskEvents = nil
-				continue
-			}
-			if err := sse.WriteEvent(c, "task", event); err != nil {
 				return
 			}
-		case event, open := <-paymentEvents:
-			if !open {
-				paymentEvents = nil
-				continue
-			}
-			if err := sse.WriteEvent(c, "payment", event); err != nil {
+			if err := sse.WriteEvent(c, event.Type, json.RawMessage(event.Data)); err != nil {
 				return
 			}
 		case <-heartbeat.C:

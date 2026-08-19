@@ -36,6 +36,9 @@ func Run(args []string) {
 		case "repair":
 			runRepair(args[2:])
 			return
+		case "media-reclamation":
+			runMediaReclamation(args[2:])
+			return
 		}
 	}
 

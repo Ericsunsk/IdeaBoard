@@ -16,7 +16,8 @@ func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	mediaAssetHandler := newMediaAssetHandler(h.MediaAssetRegistry, h.MediaStorageService)
 	userAPI.GET("/info", h.AuthHandler.GetCurrentUser)
 	userAPI.GET("/media-assets/:asset_id", mediaAssetHandler.Metadata)
-	userAPI.GET("/media-assets/:asset_id/derivatives/:tier/content", mediaAssetHandler.Content)
+	userAPI.GET("/media-assets/:asset_id/original/content", mediaAssetHandler.Original)
+	userAPI.GET("/media-assets/:asset_id/derivatives/:tier/:format/content", mediaAssetHandler.Content)
 	userAPI.POST("/billing/quotes", h.BillingHandler.Quote)
 	userAPI.GET("/billing/records", h.BillingRecords.List)
 	userAPI.GET("/credits/wallet", h.CreditUserHandler.GetCurrentWallet)
@@ -30,7 +31,6 @@ func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	userAPI.POST("/payments/pending-orders/:public_token/continue", h.PaymentUserHandler.ContinuePendingOrder)
 	userAPI.POST("/payments/pending-orders/:public_token/abandon", h.PaymentUserHandler.AbandonPendingOrder)
 	userAPI.GET("/payments/recharges", h.PaymentUserHandler.ListRecharges)
-	userAPI.GET("/payments/events", h.PaymentEventStreamHandler.StreamUserPaymentEvents)
 	userAPI.GET("/events", h.UserEventStreamHandler.StreamUserEvents)
 
 	registerUserTaskRoutes(userAPI, h)
@@ -41,7 +41,6 @@ func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 func registerUserTaskRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	userAPI.POST("/tasks/submit/readiness", h.TaskHandler.CheckSubmitTaskReadiness)
 	userAPI.POST("/tasks/submit", h.TaskHandler.SubmitTask)
-	userAPI.GET("/tasks/:task_id/events", h.TaskHandler.StreamUserTask)
 	userAPI.POST("/tasks/:task_id/cancel", h.TaskHandler.CancelUserTask)
 	userAPI.GET("/tasks/:task_id", h.TaskHandler.GetUserTask)
 	userAPI.GET("/tasks", h.TaskHandler.GetUserTasks)

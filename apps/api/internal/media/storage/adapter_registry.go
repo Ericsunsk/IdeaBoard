@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"mime/multipart"
+	"time"
 )
 
 type storageProviderAdapter interface {
@@ -15,12 +16,14 @@ type storageProviderAdapter interface {
 	UploadRef(ctx context.Context, profile *StorageProfile, file *multipart.FileHeader, opts StorageStoreOptions) (*StoredUploadRef, error)
 	Delete(ctx context.Context, profile *StorageProfile, objectKey string) error
 	DeleteByPrefix(ctx context.Context, profile *StorageProfile, objectKeyPrefix string) error
+	ListObjectKeysByPrefix(ctx context.Context, profile *StorageProfile, objectKeyPrefix string) ([]string, error)
 	PutObject(ctx context.Context, profile *StorageProfile, objectKey string, data []byte, contentType string) error
 	StoreBytes(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error)
 	StoreRemote(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error)
 	StoreBytesRef(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (*StoredUploadRef, error)
 	StoreRemoteRef(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (*StoredUploadRef, error)
 	Read(ctx context.Context, profile *StorageProfile, objectKey string, maxBytes int64) (*StoredUploadObject, error)
+	SignedURL(ctx context.Context, profile *StorageProfile, objectKey string, expiry time.Duration) (string, error)
 	ProviderURL(profile *StorageProfile, objectKey string) (string, error)
 }
 

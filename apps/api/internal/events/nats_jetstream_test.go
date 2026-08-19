@@ -33,6 +33,35 @@ func TestTaskStatusSubject(t *testing.T) {
 	}
 }
 
+func TestDecodeUserEventForInstanceSkipsLocalOriginAndDeliversRemote(t *testing.T) {
+	event := UserEvent{UserID: 42, Type: EventTypeTaskUpdated, Data: []byte(`{"task_id":"task-1"}`)}
+	payload, err := json.Marshal(userEventEnvelope{OriginInstance: "api-instance-1", Event: event})
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+	if _, shouldDeliver, err := decodeUserEventForInstance(payload, "api-instance-1"); err != nil {
+		t.Fatalf("decode local-origin user event failed: %v", err)
+	} else if shouldDeliver {
+		t.Fatal("local-origin user event should not be delivered through NATS")
+	}
+	got, shouldDeliver, err := decodeUserEventForInstance(payload, "api-instance-2")
+	if err != nil {
+		t.Fatalf("decode remote user event failed: %v", err)
+	}
+	if !shouldDeliver || got.UserID != event.UserID || got.Type != event.Type || string(got.Data) != string(event.Data) {
+		t.Fatalf("event=%+v shouldDeliver=%v, want remote event %+v", got, shouldDeliver, event)
+	}
+}
+
+func TestDecodeUserEventForInstanceRejectsMalformedPayload(t *testing.T) {
+	if _, _, err := decodeUserEventForInstance([]byte(`{"event":{"user_id":42,"type":"task.updated"}}`), "api-instance-1"); err == nil {
+		t.Fatal("payload without transport origin should be rejected")
+	}
+	if _, _, err := decodeUserEventForInstance([]byte(`{"origin_instance":"api-instance-1","event":{"user_id":0,"type":"task.updated"}}`), "api-instance-1"); err == nil {
+		t.Fatal("payload without a valid user id should be rejected")
+	}
+}
+
 func TestTaskStatusEnvelopeCarriesTransportOriginSeparatelyFromDomainEvent(t *testing.T) {
 	event := NewTaskStatusEvent("task-1", "running")
 	payload, err := json.Marshal(taskStatusEnvelope{

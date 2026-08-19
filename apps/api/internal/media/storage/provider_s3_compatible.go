@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash"
 	"io"
 	"log/slog"
 	"mime/multipart"
@@ -426,6 +427,7 @@ func (s *S3CompatibleService) uploadBytesWithConfigRef(ctx context.Context, file
 		return nil, err
 	}
 	ref.Width, ref.Height, _ = imageformat.ImageDimensions(data)
+	ref.Animated = imageformat.IsAnimated(data)
 	return ref, nil
 }
 
@@ -499,12 +501,20 @@ func (s *S3CompatibleService) prepareUploadClient(ctx context.Context, cfg *S3Co
 }
 
 func (s *S3CompatibleService) putReaderWithConfigRef(ctx context.Context, client *minio.Client, filename string, contentType string, body io.Reader, size int64, cfg *S3CompatibleConfig, opts StorageStoreOptions) (*StoredUploadRef, error) {
-	key, err := buildObjectKey(opts.DirPrefix, filepathExt(filename))
+	key := strings.TrimSpace(opts.ObjectKey)
+	var err error
+	if key == "" {
+		key, err = buildObjectKey(opts.DirPrefix, filepathExt(filename))
+	}
 	if err != nil {
 		return nil, err
 	}
 	if strings.TrimSpace(contentType) == "" {
 		contentType = "application/octet-stream"
+	}
+	body, checksum, err := prepareChecksumBody(body)
+	if err != nil {
+		return nil, fmt.Errorf("计算上传文件 checksum 失败: %w", err)
 	}
 
 	err = s.putObjectWithRetry(ctx, cfg, body, func(attemptCtx context.Context) error {
@@ -532,7 +542,43 @@ func (s *S3CompatibleService) putReaderWithConfigRef(ctx context.Context, client
 		StorageProfile: strings.TrimSpace(cfg.ProfileID),
 		MIMEType:       contentType,
 		SizeBytes:      size,
+		ChecksumSHA256: checksum(),
+		Animated:       strings.EqualFold(filepathExt(filename), ".gif"),
 	}, nil
+}
+
+func prepareChecksumBody(body io.Reader) (io.Reader, func() string, error) {
+	seeker, ok := body.(io.Seeker)
+	if ok {
+		position, err := seeker.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return nil, nil, err
+		}
+		hash := sha256.New()
+		if _, err := io.Copy(hash, body); err != nil {
+			return nil, nil, err
+		}
+		if _, err := seeker.Seek(position, io.SeekStart); err != nil {
+			return nil, nil, err
+		}
+		checksum := hex.EncodeToString(hash.Sum(nil))
+		return body, func() string { return checksum }, nil
+	}
+	capture := &streamChecksumReader{reader: body, hash: sha256.New()}
+	return capture, func() string { return hex.EncodeToString(capture.hash.Sum(nil)) }, nil
+}
+
+type streamChecksumReader struct {
+	reader io.Reader
+	hash   hash.Hash
+}
+
+func (r *streamChecksumReader) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	if n > 0 {
+		_, _ = r.hash.Write(p[:n])
+	}
+	return n, err
 }
 
 func (s *S3CompatibleService) putObjectWithRetry(
@@ -703,6 +749,59 @@ func (s *S3CompatibleService) DeletePrefixWithConfig(ctx context.Context, object
 		return fmt.Errorf("删除前缀对象失败: %w", err)
 	}
 	return nil
+}
+
+func (s *S3CompatibleService) ListObjectKeysWithConfig(ctx context.Context, objectKeyPrefix string, cfg *S3CompatibleConfig) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if !s.IsConfigEnabled(cfg) {
+		return nil, fmt.Errorf("S3 兼容存储配置未启用或不完整")
+	}
+	prefix := strings.Trim(strings.TrimSpace(objectKeyPrefix), "/")
+	if prefix == "" {
+		return nil, fmt.Errorf("文件前缀不能为空")
+	}
+	client, err := s.clientWithConfig(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]string, 0)
+	for object := range client.ListObjects(ctx, strings.TrimSpace(cfg.BucketName), minio.ListObjectsOptions{Prefix: prefix, Recursive: true}) {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if object.Err != nil {
+			return nil, object.Err
+		}
+		keys = append(keys, object.Key)
+	}
+	return keys, nil
+}
+
+func (s *S3CompatibleService) SignedURLWithConfig(ctx context.Context, objectKey string, expiry time.Duration, cfg *S3CompatibleConfig) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	if !s.IsConfigEnabled(cfg) {
+		return "", fmt.Errorf("S3 兼容存储配置未启用或不完整")
+	}
+	key := strings.TrimSpace(objectKey)
+	if key == "" {
+		return "", fmt.Errorf("文件路径不能为空")
+	}
+	if expiry <= 0 {
+		expiry = time.Hour
+	}
+	client, err := s.clientWithConfig(ctx, cfg)
+	if err != nil {
+		return "", err
+	}
+	signed, err := client.PresignedGetObject(ctx, strings.TrimSpace(cfg.BucketName), key, expiry, nil)
+	if err != nil {
+		return "", fmt.Errorf("生成 S3 signed URL 失败: %w", err)
+	}
+	return signed.String(), nil
 }
 
 func (s *S3CompatibleService) validateBaseConfig(ctx context.Context, cfg *S3CompatibleConfig) error {

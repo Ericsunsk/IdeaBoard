@@ -14,6 +14,7 @@ import (
 	"ideaboard/api/internal/media/preparation"
 	"ideaboard/api/internal/media/reclamation"
 	"ideaboard/api/internal/media/storage"
+	"ideaboard/api/internal/payments"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/runtime/worker"
 	"ideaboard/api/internal/tasking/taskbilling"
@@ -32,6 +33,7 @@ type appTaskServices struct {
 	accountService   *accounts.AccountService
 	taskService      *taskservice.Service
 	taskStatsService *taskstats.Service
+	userEvents       *events.UserEventHub
 }
 
 type appWorkerRuntime struct {
@@ -76,11 +78,12 @@ func newAppTaskRuntime(
 		uploadBoardAccessResolver{service: services.boardService},
 		uploadOwnerStorageUIDResolver{repo: repos.userRepo},
 	)
-	runtimeTaskMediaStore := storage.NewRuntimeTaskMediaStore(services.storageService)
+	runtimeTaskMediaStore := storage.NewRuntimeTaskMediaStore(services.storageService, repos.mediaAssetRegistry)
 	generationMediaPreparer := preparation.NewService(services.storageService, repos.mediaAssetRegistry)
 	submitMediaValidator := taskmedia.NewSubmitMediaValidator(cfg.PublicOrigins, taskMediaAuthorizer)
+	userEventHub := events.NewUserEventHub()
 	taskEventHub := taskservice.NewEventHub()
-	taskEvents, eventBus, err := newTaskStatusEventPublisherWithResolver(ctx, cfg.Events, taskEventHub, repos.taskRepo)
+	taskEvents, eventBus, err := newTaskStatusEventPublisherWithResolver(ctx, cfg.Events, taskEventHub, repos.taskRepo, userEventHub)
 	if err != nil {
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize task event bus: %w", err)
 	}
@@ -112,7 +115,14 @@ func newAppTaskRuntime(
 	reclamationPeriodicJobs := reclamation.PeriodicJobs()
 	paymentPeriodicJobs := worker.PaymentReconciliationPeriodicJobs()
 	checkoutShutdownPeriodicJobs := worker.PaymentCheckoutShutdownPeriodicJobs()
-	mediaDerivativeService := derivatives.NewService(dbs.db, services.storageService)
+	mediaDerivativeEvents := derivatives.NewUserEventPublisher(userEventHub)
+	mediaDerivativeService := derivatives.NewService(dbs.db, services.storageService, mediaDerivativeEvents)
+	if err := configureUserEventFanout(ctx, eventBus, userEventHub, services.paymentService.EventHub()); err != nil {
+		if eventBus != nil {
+			_ = eventBus.Close()
+		}
+		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize user event fanout: %w", err)
+	}
 	mediaDerivativePeriodicJobs := derivatives.PeriodicJobs()
 	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(reclamationPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(mediaDerivativePeriodicJobs))
 	periodicJobs = append(periodicJobs, creditPeriodicJobs...)
@@ -139,7 +149,7 @@ func newAppTaskRuntime(
 			river.AddWorker(workers, worker.NewPaymentCheckoutShutdownWorker(services.paymentService))
 			river.AddWorker(workers, worker.NewPaymentCheckoutShutdownScheduleWorker(services.paymentService))
 			river.AddWorker(workers, derivatives.NewWorker(mediaDerivativeService))
-			river.AddWorker(workers, derivatives.NewOutboxDispatcher(dbs.db))
+			river.AddWorker(workers, derivatives.NewOutboxDispatcher(dbs.db, services.storageService))
 		},
 		PeriodicJobs: periodicJobs,
 	})
@@ -190,6 +200,7 @@ func newAppTaskRuntime(
 			accountService:   accountService,
 			taskService:      taskService,
 			taskStatsService: taskstats.NewService(repos.taskRepo),
+			userEvents:       userEventHub,
 		}, appWorkerRuntime{
 			riverClient: riverClient,
 			eventBus:    eventBus,
@@ -198,8 +209,32 @@ func newAppTaskRuntime(
 		}, nil
 }
 
+func configureUserEventFanout(ctx context.Context, bus *events.NATSJetStreamEventBus, userHub *events.UserEventHub, paymentHub *payments.EventHub) error {
+	if userHub == nil || paymentHub == nil {
+		return fmt.Errorf("user event fanout requires user and payment hubs")
+	}
+	paymentHub.SetUserEventHub(userHub)
+	if bus != nil {
+		userHub.SetRemotePublisher(func(event events.UserEvent) {
+			publishCtx, cancel := context.WithTimeout(context.Background(), events.DefaultPublishTimeout)
+			defer cancel()
+			if err := bus.PublishUserEvent(publishCtx, event); err != nil {
+				slog.Warn("publish user event failed", "type", event.Type, "user_id", event.UserID, "err", err)
+			}
+		})
+	}
+	if bus == nil {
+		return nil
+	}
+	return bus.SubscribeUserEvents(ctx, func(_ context.Context, event events.UserEvent) error {
+		userHub.PublishRemote(event)
+		return nil
+	})
+}
+
 type taskEventHubPublisher struct {
 	hub      *taskservice.EventHub
+	userHub  *events.UserEventHub
 	resolver interface {
 		GetByTaskID(context.Context, string) (*tasks.Task, error)
 	}
@@ -213,7 +248,15 @@ func (p taskEventHubPublisher) PublishTaskStatus(ctx context.Context, event even
 	taskEvent := taskservice.TaskEvent{TaskID: event.TaskID, Status: event.Status}
 	if p.resolver != nil {
 		if task, err := p.resolver.GetByTaskID(ctx, event.TaskID); err == nil && task != nil {
-			p.hub.PublishForUser(task.UserID, event.TaskID, taskEvent)
+			p.hub.Publish(event.TaskID, taskEvent)
+			if p.userHub != nil {
+				userEvent, eventErr := events.NewUserEvent(task.UserID, events.EventTypeTaskUpdated, taskEvent)
+				if eventErr != nil {
+					return eventErr
+				}
+				userEvent.OccurredAt = event.OccurredAt
+				p.userHub.PublishRemote(userEvent)
+			}
 			return nil
 		}
 	}
@@ -257,8 +300,13 @@ func newTaskStatusEventPublisherWithResolver(
 	resolver interface {
 		GetByTaskID(context.Context, string) (*tasks.Task, error)
 	},
+	userHubs ...*events.UserEventHub,
 ) (events.TaskStatusPublisher, *events.NATSJetStreamEventBus, error) {
-	localPublisher := taskEventHubPublisher{hub: hub, resolver: resolver}
+	var userHub *events.UserEventHub
+	if len(userHubs) > 0 {
+		userHub = userHubs[0]
+	}
+	localPublisher := taskEventHubPublisher{hub: hub, userHub: userHub, resolver: resolver}
 	if !cfg.Enabled {
 		return localPublisher, nil, nil
 	}
@@ -278,8 +326,9 @@ func newTaskStatusEventPublisherWithResolver(
 	if err != nil {
 		return nil, nil, err
 	}
+	remotePublisher := taskEventHubPublisher{hub: hub, userHub: userHub, resolver: resolver}
 	if err := bus.SubscribeTaskStatus(ctx, func(ctx context.Context, event events.TaskStatusEvent) error {
-		return localPublisher.PublishTaskStatus(ctx, event)
+		return remotePublisher.PublishTaskStatus(ctx, event)
 	}); err != nil {
 		_ = bus.Close()
 		return nil, nil, err

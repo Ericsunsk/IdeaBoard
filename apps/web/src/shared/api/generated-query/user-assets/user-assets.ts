@@ -18,6 +18,8 @@ import { computed, toValue, unref } from 'vue'
 import type { MaybeRefOrGetter } from 'vue'
 
 import type {
+  ApiResponseBase,
+  ApiResponseMediaAssetMetadata,
   ApiResponseUploadAvatar,
   ApiResponseUploadImage,
   DownloadUserImageParams,
@@ -29,6 +31,269 @@ import { orvalMutator } from '../../orvalMutator'
 import type { ErrorType } from '../../orvalMutator'
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1]
+
+export const getGetUserMediaAssetMetadataUrl = (assetId: string) => {
+  return `/user/media-assets/${encodeURIComponent(String(assetId))}`
+}
+
+export const getUserMediaAssetMetadata = async (
+  assetId: string,
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseMediaAssetMetadata> => {
+  return orvalMutator<ApiResponseMediaAssetMetadata>(getGetUserMediaAssetMetadataUrl(assetId), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetUserMediaAssetMetadataQueryKey = (assetId: MaybeRefOrGetter<string>) => {
+  return ['user', 'media-assets', assetId] as const
+}
+
+export const getGetUserMediaAssetMetadataQueryOptions = <
+  TData = Awaited<ReturnType<typeof getUserMediaAssetMetadata>>,
+  TError = ErrorType<ApiResponseBase>,
+>(
+  assetId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getUserMediaAssetMetadata>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetUserMediaAssetMetadataQueryKey(assetId)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserMediaAssetMetadata>>> = ({
+    signal,
+  }) => getUserMediaAssetMetadata(toValue(assetId), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(assetId) !== null && toValue(assetId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getUserMediaAssetMetadata>>, TError, TData>
+}
+
+export type GetUserMediaAssetMetadataQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getUserMediaAssetMetadata>>
+>
+export type GetUserMediaAssetMetadataQueryError = ErrorType<ApiResponseBase>
+
+export function useGetUserMediaAssetMetadata<
+  TData = Awaited<ReturnType<typeof getUserMediaAssetMetadata>>,
+  TError = ErrorType<ApiResponseBase>,
+>(
+  assetId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getUserMediaAssetMetadata>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetUserMediaAssetMetadataQueryOptions(assetId, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetUserMediaAssetOriginalContentUrl = (assetId: string) => {
+  return `/user/media-assets/${encodeURIComponent(String(assetId))}/original/content`
+}
+
+export const getUserMediaAssetOriginalContent = async (
+  assetId: string,
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<Blob | ApiResponseBase> => {
+  return orvalMutator<Blob | ApiResponseBase>(getGetUserMediaAssetOriginalContentUrl(assetId), {
+    ...options,
+    method: 'GET',
+  })
+}
+
+export const getGetUserMediaAssetOriginalContentQueryKey = (assetId: MaybeRefOrGetter<string>) => {
+  return ['user', 'media-assets', assetId, 'original', 'content'] as const
+}
+
+export const getGetUserMediaAssetOriginalContentQueryOptions = <
+  TData = Awaited<ReturnType<typeof getUserMediaAssetOriginalContent>>,
+  TError = ErrorType<unknown>,
+>(
+  assetId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getUserMediaAssetOriginalContent>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetUserMediaAssetOriginalContentQueryKey(assetId)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserMediaAssetOriginalContent>>> = ({
+    signal,
+  }) => getUserMediaAssetOriginalContent(toValue(assetId), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(assetId) !== null && toValue(assetId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof getUserMediaAssetOriginalContent>>, TError, TData>
+}
+
+export type GetUserMediaAssetOriginalContentQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getUserMediaAssetOriginalContent>>
+>
+export type GetUserMediaAssetOriginalContentQueryError = ErrorType<unknown>
+
+export function useGetUserMediaAssetOriginalContent<
+  TData = Awaited<ReturnType<typeof getUserMediaAssetOriginalContent>>,
+  TError = ErrorType<unknown>,
+>(
+  assetId: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getUserMediaAssetOriginalContent>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetUserMediaAssetOriginalContentQueryOptions(assetId, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getGetUserMediaAssetDerivativeContentUrl = (
+  assetId: string,
+  tier: 'thumb' | 'preview' | 'large-preview',
+  format: 'webp' | 'jpeg' | 'png',
+) => {
+  return `/user/media-assets/${encodeURIComponent(String(assetId))}/derivatives/${encodeURIComponent(String(tier))}/${encodeURIComponent(String(format))}/content`
+}
+
+export const getUserMediaAssetDerivativeContent = async (
+  assetId: string,
+  tier: 'thumb' | 'preview' | 'large-preview',
+  format: 'webp' | 'jpeg' | 'png',
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<Blob | ApiResponseBase> => {
+  return orvalMutator<Blob | ApiResponseBase>(
+    getGetUserMediaAssetDerivativeContentUrl(assetId, tier, format),
+    {
+      ...options,
+      method: 'GET',
+    },
+  )
+}
+
+export const getGetUserMediaAssetDerivativeContentQueryKey = (
+  assetId: MaybeRefOrGetter<string>,
+  tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview'>,
+  format: MaybeRefOrGetter<'webp' | 'jpeg' | 'png'>,
+) => {
+  return ['user', 'media-assets', assetId, 'derivatives', tier, format, 'content'] as const
+}
+
+export const getGetUserMediaAssetDerivativeContentQueryOptions = <
+  TData = Awaited<ReturnType<typeof getUserMediaAssetDerivativeContent>>,
+  TError = ErrorType<unknown>,
+>(
+  assetId: MaybeRefOrGetter<string>,
+  tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview'>,
+  format: MaybeRefOrGetter<'webp' | 'jpeg' | 'png'>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getUserMediaAssetDerivativeContent>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getGetUserMediaAssetDerivativeContentQueryKey(assetId, tier, format)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserMediaAssetDerivativeContent>>> = ({
+    signal,
+  }) =>
+    getUserMediaAssetDerivativeContent(toValue(assetId), toValue(tier), toValue(format), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () =>
+        toValue(assetId) !== null &&
+        toValue(assetId) !== undefined &&
+        toValue(tier) !== null &&
+        toValue(tier) !== undefined &&
+        toValue(format) !== null &&
+        toValue(format) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getUserMediaAssetDerivativeContent>>,
+    TError,
+    TData
+  >
+}
+
+export type GetUserMediaAssetDerivativeContentQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getUserMediaAssetDerivativeContent>>
+>
+export type GetUserMediaAssetDerivativeContentQueryError = ErrorType<unknown>
+
+export function useGetUserMediaAssetDerivativeContent<
+  TData = Awaited<ReturnType<typeof getUserMediaAssetDerivativeContent>>,
+  TError = ErrorType<unknown>,
+>(
+  assetId: MaybeRefOrGetter<string>,
+  tier: MaybeRefOrGetter<'thumb' | 'preview' | 'large-preview'>,
+  format: MaybeRefOrGetter<'webp' | 'jpeg' | 'png'>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getUserMediaAssetDerivativeContent>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getGetUserMediaAssetDerivativeContentQueryOptions(
+    assetId,
+    tier,
+    format,
+    options,
+  )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
 
 export const getUploadUserProfileAvatarUrl = () => {
   return `/user/profile/avatar`

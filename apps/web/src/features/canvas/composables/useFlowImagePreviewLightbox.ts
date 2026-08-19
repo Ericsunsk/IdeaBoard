@@ -1,6 +1,10 @@
 import { onBeforeUnmount } from 'vue'
 import type { ImageNodeItem, ImageNodeOutputItem } from '../../canvas-board/domain'
 import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../shared/config/runtimeUrls'
+import {
+  getMediaAssetMetadata,
+  resolveMediaAssetOriginalURL,
+} from '../../../shared/api/mediaAssetDelivery'
 import PhotoSwipeLightbox from 'photoswipe/lightbox'
 import 'photoswipe/style.css'
 
@@ -14,6 +18,7 @@ interface ImageNaturalSize {
 interface LightboxCandidate {
   src: string
   ratio: number
+  mediaAssetId?: number
 }
 
 interface LightboxDataSourceItem {
@@ -120,9 +125,28 @@ async function createLightboxItem(candidate: LightboxCandidate): Promise<Lightbo
   }
 }
 
+async function resolveOriginalCandidateSource(candidate: LightboxCandidate): Promise<string> {
+  if (!candidate.mediaAssetId) return candidate.src
+  try {
+    const metadata = await getMediaAssetMetadata(candidate.mediaAssetId)
+    if (metadata.original.status === 'ready' && metadata.original.url) {
+      return normalizeImageUrl(metadata.original.url)
+    }
+  } catch {
+    return resolveMediaAssetOriginalURL(candidate.mediaAssetId)
+  }
+  return resolveMediaAssetOriginalURL(candidate.mediaAssetId)
+}
+
 function collectOutputItems(outputImages: ImageNodeItem['outputImages']): ImageNodeOutputItem[] {
   return Array.isArray(outputImages)
-    ? outputImages.filter((item) => normalizeImageUrl(item?.url).length > 0)
+    ? outputImages.filter((item) => {
+        const mediaAssetId = Number(item?.mediaAssetId)
+        return (
+          normalizeImageUrl(item?.url).length > 0 ||
+          (Number.isInteger(mediaAssetId) && mediaAssetId > 0)
+        )
+      })
     : []
 }
 
@@ -153,24 +177,37 @@ export function useFlowImagePreviewLightbox() {
     const sourceUrl = normalizeImageUrl(node.sourceImageUrl)
     const outputItems = collectOutputItems(node.outputImages)
 
+    const hasSourceCandidate = Boolean(sourceUrl || node.sourceMediaAssetId)
     const candidates: LightboxCandidate[] = []
-    if (sourceUrl) {
-      candidates.push({ src: sourceUrl, ratio: node.sourceImageRatio })
+    if (hasSourceCandidate) {
+      candidates.push({
+        src: node.sourceMediaAssetId
+          ? resolveMediaAssetOriginalURL(node.sourceMediaAssetId)
+          : sourceUrl,
+        ratio: node.sourceImageRatio,
+        ...(node.sourceMediaAssetId ? { mediaAssetId: node.sourceMediaAssetId } : {}),
+      })
     }
     outputItems.forEach((item) => {
       const outputUrl = normalizeImageUrl(item.url)
-      if (!outputUrl) return
-      candidates.push({ src: outputUrl, ratio: item.ratio })
+      if (!outputUrl && !item.mediaAssetId) return
+      candidates.push({
+        src: item.mediaAssetId ? resolveMediaAssetOriginalURL(item.mediaAssetId) : outputUrl,
+        ratio: item.ratio,
+        ...(item.mediaAssetId ? { mediaAssetId: item.mediaAssetId } : {}),
+      })
     })
 
     if (candidates.length === 0) return
 
-    const sourceOffset = sourceUrl ? 1 : 0
+    const sourceOffset = hasSourceCandidate ? 1 : 0
     const latestOutputIndex =
       outputItems.length > 0 ? sourceOffset + outputItems.length - 1 : Math.max(0, sourceOffset - 1)
     const index = target === 'source' ? 0 : Math.max(0, latestOutputIndex)
     const dataSource = await Promise.all(
-      candidates.map((candidate) => createLightboxItem(candidate)),
+      candidates.map(async (candidate) =>
+        createLightboxItem({ ...candidate, src: await resolveOriginalCandidateSource(candidate) }),
+      ),
     )
     if (isDisposed || requestId !== previewRequestId) return
 

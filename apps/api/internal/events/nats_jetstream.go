@@ -23,6 +23,7 @@ const (
 	defaultNATSDrainTimeout    = 2 * time.Second
 	defaultNATSConsumerPrefix  = "ideaboard-api-events"
 	taskStatusSubjectSuffix    = "task.status"
+	userEventSubjectSuffix     = "user.event"
 	natsDuplicateWindow        = 2 * time.Minute
 	natsConsumerInactivePeriod = 24 * time.Hour
 )
@@ -42,6 +43,7 @@ type NATSJetStreamEventBus struct {
 	js                jetstream.JetStream
 	streamName        string
 	taskStatusSubject string
+	userEventSubject  string
 	instanceID        string
 
 	mu       sync.Mutex
@@ -92,8 +94,102 @@ func NewNATSJetStreamEventBus(ctx context.Context, cfg NATSJetStreamConfig) (*NA
 		js:                js,
 		streamName:        cfg.StreamName,
 		taskStatusSubject: taskStatusSubject(cfg.SubjectPrefix),
+		userEventSubject:  userEventSubject(cfg.SubjectPrefix),
 		instanceID:        cfg.ConsumerName,
 	}, nil
+}
+
+type userEventEnvelope struct {
+	OriginInstance string    `json:"origin_instance"`
+	Event          UserEvent `json:"event"`
+}
+
+func decodeUserEventForInstance(payload []byte, instanceID string) (UserEvent, bool, error) {
+	var envelope userEventEnvelope
+	if err := json.Unmarshal(payload, &envelope); err != nil {
+		return UserEvent{}, false, fmt.Errorf("decode user event envelope: %w", err)
+	}
+	envelope.OriginInstance = strings.TrimSpace(envelope.OriginInstance)
+	envelope.Event.Type = strings.TrimSpace(envelope.Event.Type)
+	if envelope.OriginInstance == "" {
+		return UserEvent{}, false, fmt.Errorf("decode user event envelope: origin_instance is required")
+	}
+	if envelope.Event.UserID <= 0 || envelope.Event.Type == "" {
+		return UserEvent{}, false, fmt.Errorf("decode user event envelope: user_id and type are required")
+	}
+	if envelope.OriginInstance == strings.TrimSpace(instanceID) {
+		return UserEvent{}, false, nil
+	}
+	return envelope.Event, true, nil
+}
+
+func (b *NATSJetStreamEventBus) PublishUserEvent(ctx context.Context, event UserEvent) error {
+	if b == nil || b.js == nil {
+		return nil
+	}
+	if event.UserID <= 0 || strings.TrimSpace(event.Type) == "" {
+		return fmt.Errorf("publish user event: user_id and type are required")
+	}
+	if event.OccurredAt.IsZero() {
+		event.OccurredAt = time.Now().UTC()
+	}
+	payload, err := json.Marshal(userEventEnvelope{OriginInstance: b.instanceID, Event: event})
+	if err != nil {
+		return fmt.Errorf("marshal user event: %w", err)
+	}
+	msgID := fmt.Sprintf("%d:%s:%d", event.UserID, event.Type, event.OccurredAt.UnixNano())
+	if _, err := b.js.Publish(ctx, b.userEventSubject, payload, jetstream.WithMsgID(msgID)); err != nil {
+		return fmt.Errorf("publish user event: %w", err)
+	}
+	return nil
+}
+
+func (b *NATSJetStreamEventBus) SubscribeUserEvents(ctx context.Context, handler UserEventHandler) error {
+	if b == nil || b.js == nil {
+		return nil
+	}
+	if handler == nil {
+		return fmt.Errorf("subscribe user events: handler is nil")
+	}
+	consumerName := b.instanceID + "-user-events"
+	consumer, err := b.js.CreateOrUpdateConsumer(ctx, b.streamName, jetstream.ConsumerConfig{
+		Name: consumerName, Durable: consumerName, Description: "IdeaBoard API user event fanout bridge",
+		DeliverPolicy: jetstream.DeliverNewPolicy, AckPolicy: jetstream.AckExplicitPolicy,
+		AckWait: 30 * time.Second, MaxDeliver: 5, MaxAckPending: 1024,
+		FilterSubject: b.userEventSubject, InactiveThreshold: natsConsumerInactivePeriod,
+	})
+	if err != nil {
+		return fmt.Errorf("ensure nats user event consumer %s: %w", consumerName, err)
+	}
+	consume, err := consumer.Consume(func(msg jetstream.Msg) {
+		event, shouldDeliver, err := decodeUserEventForInstance(msg.Data(), b.instanceID)
+		if err != nil {
+			slog.Warn("discard malformed user event", "subject", msg.Subject(), "err", err)
+			_ = msg.Term()
+			return
+		}
+		if !shouldDeliver {
+			_ = msg.Ack()
+			return
+		}
+		handlerCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		err = handler(handlerCtx, event)
+		cancel()
+		if err != nil {
+			_ = msg.NakWithDelay(time.Second)
+			return
+		}
+		_ = msg.Ack()
+	}, jetstream.ConsumeErrHandler(func(_ jetstream.ConsumeContext, err error) {
+		slog.Warn("user event consumer error", "err", err)
+	}))
+	if err != nil {
+		return fmt.Errorf("start nats user event consumer %s: %w", consumerName, err)
+	}
+	b.mu.Lock()
+	b.consumes = append(b.consumes, consume)
+	b.mu.Unlock()
+	return nil
 }
 
 type taskStatusEnvelope struct {
@@ -255,6 +351,10 @@ func normalizeNATSJetStreamConfig(cfg NATSJetStreamConfig) NATSJetStreamConfig {
 
 func taskStatusSubject(prefix string) string {
 	return normalizeSubjectPrefix(prefix) + "." + taskStatusSubjectSuffix
+}
+
+func userEventSubject(prefix string) string {
+	return normalizeSubjectPrefix(prefix) + "." + userEventSubjectSuffix
 }
 
 func normalizeSubjectPrefix(raw string) string {

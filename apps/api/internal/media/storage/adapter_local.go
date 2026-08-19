@@ -4,6 +4,10 @@ import (
 	"context"
 	"fmt"
 	"mime/multipart"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 )
 
 type localStorageAdapter struct {
@@ -58,6 +62,42 @@ func (a *localStorageAdapter) DeleteByPrefix(ctx context.Context, profile *Stora
 	return a.service.deleteLocalByPrefix(objectKeyPrefix)
 }
 
+func (a *localStorageAdapter) ListObjectKeysByPrefix(ctx context.Context, profile *StorageProfile, objectKeyPrefix string) ([]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	prefix := strings.Trim(strings.TrimSpace(objectKeyPrefix), "/")
+	if prefix == "" {
+		return nil, fmt.Errorf("文件前缀不能为空")
+	}
+	root := filepath.FromSlash(prefix)
+	keys := make([]string, 0)
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			if os.IsNotExist(err) {
+				return filepath.SkipDir
+			}
+			return err
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		relative, err := filepath.Rel(".", path)
+		if err != nil {
+			return err
+		}
+		keys = append(keys, filepath.ToSlash(relative))
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return keys, nil
+}
+
 func (a *localStorageAdapter) PutObject(ctx context.Context, profile *StorageProfile, objectKey string, data []byte, contentType string) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -106,6 +146,7 @@ func (a *localStorageAdapter) StoreRemoteRef(ctx context.Context, profile *Stora
 	}
 	ref.Width = remoteFile.Width
 	ref.Height = remoteFile.Height
+	ref.Animated = remoteFile.Animated
 	return ref, nil
 }
 
@@ -114,6 +155,10 @@ func (a *localStorageAdapter) Read(ctx context.Context, profile *StorageProfile,
 		return nil, err
 	}
 	return a.service.readLocalByObjectKey(objectKey, maxBytes)
+}
+
+func (a *localStorageAdapter) SignedURL(_ context.Context, _ *StorageProfile, _ string, _ time.Duration) (string, error) {
+	return "", errProviderHTTPSUnavailable
 }
 
 func (a *localStorageAdapter) ProviderURL(_ *StorageProfile, _ string) (string, error) {

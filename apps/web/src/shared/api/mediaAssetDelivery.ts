@@ -1,0 +1,299 @@
+import {
+  computed,
+  getCurrentScope,
+  onScopeDispose,
+  ref,
+  toValue,
+  watch,
+  type MaybeRefOrGetter,
+} from 'vue'
+import { resolveAssetUrl } from '../config/runtimeUrls'
+import { requireApiData } from './apiResponse'
+import { api } from './client'
+import { subscribeUserEvent } from './userEventStream'
+import {
+  getGetUserMediaAssetMetadataUrl,
+  getGetUserMediaAssetOriginalContentUrl,
+} from './generated-query/user-assets/user-assets'
+import type {
+  ApiResponseMediaAssetMetadata,
+  MediaAssetDeliveryVariant as GeneratedMediaAssetDeliveryVariant,
+  MediaAssetMetadata,
+} from './generated-query/model'
+
+export type MediaAssetDeliveryTier = 'thumb' | 'preview' | 'large-preview' | 'original'
+export type MediaAssetDeliveryStatus =
+  'idle' | 'loading' | 'pending' | 'processing' | 'ready' | 'failed' | 'error'
+
+export type MediaAssetDeliveryMetadata = MediaAssetMetadata
+export type MediaAssetDeliveryVariant = GeneratedMediaAssetDeliveryVariant
+
+type CachedMetadata = {
+  value: MediaAssetDeliveryMetadata
+  expiresAt: number
+}
+
+const METADATA_CACHE_TTL_MS = 5 * 60 * 1000
+const SIGNED_URL_REFRESH_SKEW_MS = 2 * 60 * 1000
+
+const metadataCache = new Map<number, CachedMetadata>()
+const metadataRequests = new Map<string, Promise<MediaAssetDeliveryMetadata>>()
+const ensuredTiers = new Set<string>()
+const invalidationListeners = new Map<number, Set<() => void>>()
+let stopMediaEventSubscription: (() => void) | null = null
+
+function parseSignedURLExpiry(url: string): number | null {
+  try {
+    const parsed = new URL(
+      url,
+      typeof window === 'undefined' ? 'http://localhost' : window.location.origin,
+    )
+    const expires = Number(
+      parsed.searchParams.get('X-Amz-Expires') ?? parsed.searchParams.get('Expires'),
+    )
+    if (!Number.isFinite(expires) || expires <= 0) return null
+    const signedAt = parsed.searchParams.get('X-Amz-Date')
+    if (signedAt) {
+      const normalized = signedAt.replace(
+        /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/,
+        '$1-$2-$3T$4:$5:$6Z',
+      )
+      const timestamp = Date.parse(normalized)
+      if (Number.isFinite(timestamp)) return timestamp + expires * 1000
+    }
+    return Date.now() + expires * 1000
+  } catch {
+    return null
+  }
+}
+
+function resolveMetadataExpiry(metadata: MediaAssetDeliveryMetadata): number {
+  const signedURLExpiries = [
+    metadata.original.url,
+    ...Object.values(metadata.derivatives).map((item) => item.url),
+  ]
+    .filter((url): url is string => typeof url === 'string' && url.length > 0)
+    .map(parseSignedURLExpiry)
+    .filter((timestamp): timestamp is number => timestamp !== null)
+  const signedURLExpiry = signedURLExpiries.length > 0 ? Math.min(...signedURLExpiries) : Infinity
+  return Math.min(Date.now() + METADATA_CACHE_TTL_MS, signedURLExpiry - SIGNED_URL_REFRESH_SKEW_MS)
+}
+
+function notifyAssetInvalidated(assetId: number) {
+  metadataCache.delete(assetId)
+  for (const listener of invalidationListeners.get(assetId) ?? []) listener()
+}
+
+function ensureMediaEventSubscription() {
+  if (stopMediaEventSubscription) return
+  stopMediaEventSubscription = subscribeUserEvent('media.derivative.updated', (event) => {
+    try {
+      const payload = JSON.parse(event.data) as { media_asset_id?: unknown }
+      const assetId = Number(payload.media_asset_id)
+      if (Number.isInteger(assetId) && assetId > 0) notifyAssetInvalidated(assetId)
+    } catch {
+      return
+    }
+  })
+}
+
+function subscribeAssetInvalidation(assetId: number, listener: () => void): () => void {
+  ensureMediaEventSubscription()
+  let listeners = invalidationListeners.get(assetId)
+  if (!listeners) {
+    listeners = new Set()
+    invalidationListeners.set(assetId, listeners)
+  }
+  listeners.add(listener)
+  return () => {
+    listeners?.delete(listener)
+    if (listeners?.size === 0) invalidationListeners.delete(assetId)
+    if (invalidationListeners.size === 0 && stopMediaEventSubscription) {
+      stopMediaEventSubscription()
+      stopMediaEventSubscription = null
+    }
+  }
+}
+
+function getCachedMetadata(assetId: number): MediaAssetDeliveryMetadata | null {
+  const cached = metadataCache.get(assetId)
+  if (!cached) return null
+  if (cached.expiresAt <= Date.now()) {
+    metadataCache.delete(assetId)
+    return null
+  }
+  return cached.value
+}
+
+export function invalidateMediaAssetMetadata(assetId?: number) {
+  if (assetId === undefined) {
+    metadataCache.clear()
+    ensuredTiers.clear()
+    return
+  }
+  notifyAssetInvalidated(assetId)
+}
+
+export async function getMediaAssetMetadata(
+  assetId: number,
+  options: { signal?: AbortSignal; force?: boolean; ensureTier?: MediaAssetDeliveryTier } = {},
+): Promise<MediaAssetDeliveryMetadata> {
+  if (!Number.isInteger(assetId) || assetId <= 0) throw new Error('媒体引用无效')
+  const ensureKey = options.ensureTier ? `${assetId}:${options.ensureTier}` : ''
+  const requestKey = ensureKey || String(assetId)
+  const needsEnsure = Boolean(ensureKey && !ensuredTiers.has(ensureKey))
+  if (!options.force && !needsEnsure) {
+    const cached = getCachedMetadata(assetId)
+    if (cached) return cached
+  }
+  const existing = metadataRequests.get(requestKey)
+  if (existing) return existing
+
+  const request = api
+    .request<ApiResponseMediaAssetMetadata>(
+      `${getGetUserMediaAssetMetadataUrl(String(assetId))}${
+        options.ensureTier ? `?ensure_tier=${encodeURIComponent(options.ensureTier)}` : ''
+      }`,
+      { method: 'GET', signal: options.signal },
+    )
+    .then((response) => requireApiData(response, '读取媒体信息失败'))
+    .then((metadata) => {
+      metadataCache.set(assetId, { value: metadata, expiresAt: resolveMetadataExpiry(metadata) })
+      if (ensureKey) ensuredTiers.add(ensureKey)
+      return metadata
+    })
+    .finally(() => {
+      if (metadataRequests.get(requestKey) === request) metadataRequests.delete(requestKey)
+    })
+  metadataRequests.set(requestKey, request)
+  return request
+}
+
+export function resolveMediaAssetOriginalURL(assetId: number): string {
+	return getGetUserMediaAssetOriginalContentUrl(String(assetId))
+}
+
+function normalizeTier(value: unknown): MediaAssetDeliveryTier {
+  return value === 'original' ||
+    value === 'thumb' ||
+    value === 'preview' ||
+    value === 'large-preview'
+    ? value
+    : 'preview'
+}
+
+function resolveVariant(metadata: MediaAssetDeliveryMetadata, tier: MediaAssetDeliveryTier) {
+  return tier === 'original' ? metadata.original : metadata.derivatives[tier]
+}
+
+export function useMediaAssetDelivery(
+  assetId: MaybeRefOrGetter<number | null | undefined>,
+  tier: MaybeRefOrGetter<MediaAssetDeliveryTier>,
+  options: { enabled?: MaybeRefOrGetter<boolean> } = {},
+) {
+  const resolvedAssetId = computed(() => {
+    const value = Number(toValue(assetId))
+    return Number.isInteger(value) && value > 0 ? value : null
+  })
+  const resolvedTier = computed(() => normalizeTier(toValue(tier)))
+  const isEnabled = computed(() => toValue(options.enabled) !== false)
+  const metadata = ref<MediaAssetDeliveryMetadata | null>(null)
+  const url = ref('')
+  const status = ref<MediaAssetDeliveryStatus>('idle')
+  const error = ref<unknown>(null)
+  let requestToken = 0
+  let abortController: AbortController | null = null
+  let unsubscribeInvalidation: (() => void) | null = null
+  let refreshTimer = 0
+
+  function reset() {
+    window.clearTimeout(refreshTimer)
+    metadata.value = null
+    url.value = ''
+    status.value = 'idle'
+    error.value = null
+  }
+
+  function scheduleRefresh(
+    nextUrl: string,
+    currentAssetId: number,
+    currentTier: MediaAssetDeliveryTier,
+  ) {
+    window.clearTimeout(refreshTimer)
+    const expiresAt = parseSignedURLExpiry(nextUrl)
+    if (!expiresAt) return
+    refreshTimer = window.setTimeout(
+      () => void load(currentAssetId, currentTier, true),
+      Math.max(30_000, expiresAt - Date.now() - SIGNED_URL_REFRESH_SKEW_MS),
+    )
+  }
+
+  watch(
+    [resolvedAssetId, resolvedTier, isEnabled],
+    ([currentAssetId, currentTier, enabled]) => {
+      requestToken += 1
+      const token = requestToken
+      abortController?.abort()
+      abortController = null
+      unsubscribeInvalidation?.()
+      unsubscribeInvalidation = null
+      reset()
+      if (currentAssetId === null || !enabled) return
+
+      unsubscribeInvalidation = subscribeAssetInvalidation(currentAssetId, () => {
+        if (token !== requestToken) return
+        void load(currentAssetId, currentTier, true)
+      })
+      void load(currentAssetId, currentTier)
+    },
+    { immediate: true },
+  )
+
+  async function load(currentAssetId: number, currentTier: MediaAssetDeliveryTier, force = false) {
+    const token = requestToken
+    abortController?.abort()
+    const controller = new AbortController()
+    abortController = controller
+    status.value = 'loading'
+    error.value = null
+    try {
+      const nextMetadata = await getMediaAssetMetadata(currentAssetId, {
+        signal: controller.signal,
+        force,
+        ensureTier: currentTier === 'large-preview' ? currentTier : undefined,
+      })
+      if (token !== requestToken || controller.signal.aborted) return
+      metadata.value = nextMetadata
+      const variant = resolveVariant(nextMetadata, currentTier)
+      const nextStatus = (variant?.status || nextMetadata.status) as MediaAssetDeliveryStatus
+      status.value = nextStatus
+      url.value = variant?.status === 'ready' && variant.url ? resolveAssetUrl(variant.url) : ''
+      if (url.value) scheduleRefresh(url.value, currentAssetId, currentTier)
+    } catch (loadError) {
+      if (controller.signal.aborted || token !== requestToken) return
+      status.value = 'error'
+      error.value = loadError
+      url.value = ''
+    }
+  }
+
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      requestToken += 1
+      abortController?.abort()
+      window.clearTimeout(refreshTimer)
+      unsubscribeInvalidation?.()
+    })
+  }
+
+  return {
+    metadata,
+    url,
+    status,
+    error,
+    isLoading: computed(
+      () =>
+        status.value === 'loading' || status.value === 'pending' || status.value === 'processing',
+    ),
+  }
+}

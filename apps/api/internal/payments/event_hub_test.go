@@ -1,25 +1,33 @@
 package payments
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+	"time"
+
+	platformevents "ideaboard/api/internal/events"
+)
 
 func TestPaymentEventHubScopesEventsByUserAndKeepsLatest(t *testing.T) {
 	hub := NewEventHub()
-	first, unsubscribeFirst := hub.Subscribe(42)
+	first, unsubscribeFirst := subscribePaymentUserEvents(t, hub, 42)
 	defer unsubscribeFirst()
-	second, unsubscribeSecond := hub.Subscribe(99)
+	second, unsubscribeSecond := subscribePaymentUserEvents(t, hub, 99)
 	defer unsubscribeSecond()
 
 	hub.Publish(42, PaymentEvent{PublicToken: "first", Status: "processing"})
 	select {
-	case event := <-first:
+	case rawEvent := <-first:
+		event := decodePaymentUserEvent(t, rawEvent)
 		if event.PublicToken != "first" {
 			t.Fatalf("event = %+v", event)
 		}
-	default:
+	case <-time.After(time.Second):
 		t.Fatal("user 42 did not receive payment event")
 	}
 	select {
-	case event := <-second:
+	case rawEvent := <-second:
+		event := decodePaymentUserEvent(t, rawEvent)
 		t.Fatalf("user 99 received another user's event: %+v", event)
 	default:
 	}
@@ -27,11 +35,40 @@ func TestPaymentEventHubScopesEventsByUserAndKeepsLatest(t *testing.T) {
 	for index := range 8 {
 		hub.Publish(42, PaymentEvent{PublicToken: "latest", Status: string(rune('0' + index))})
 	}
-	var latest PaymentEvent
-	for len(first) > 0 {
-		latest = <-first
+	deadline := time.After(time.Second)
+	for {
+		select {
+		case rawEvent := <-first:
+			latest := decodePaymentUserEvent(t, rawEvent)
+			if latest.Status == "7" {
+				return
+			}
+		case <-deadline:
+			t.Fatal("latest event was not delivered")
+		}
 	}
-	if latest.Status != "7" {
-		t.Fatalf("latest event = %+v", latest)
+}
+
+func subscribePaymentUserEvents(t *testing.T, hub *EventHub, userID int64) (<-chan platformevents.UserEvent, func()) {
+	t.Helper()
+	if hub == nil || hub.currentUserEventHub() == nil {
+		t.Fatal("payment user event hub is unavailable")
 	}
+	stream, unsubscribe, accepted := hub.currentUserEventHub().Subscribe(userID)
+	if !accepted || stream == nil {
+		t.Fatal("payment user event subscription rejected")
+	}
+	return stream, unsubscribe
+}
+
+func decodePaymentUserEvent(t *testing.T, event platformevents.UserEvent) PaymentEvent {
+	t.Helper()
+	if event.Type != platformevents.EventTypePaymentUpdated {
+		t.Fatalf("event type=%q, want %q", event.Type, platformevents.EventTypePaymentUpdated)
+	}
+	var paymentEvent PaymentEvent
+	if err := json.Unmarshal(event.Data, &paymentEvent); err != nil {
+		t.Fatalf("decode payment user event: %v", err)
+	}
+	return paymentEvent
 }

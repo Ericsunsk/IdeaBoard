@@ -45,10 +45,36 @@ describe('useDisplayImagePreview', () => {
     })
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => ({
-        ok: true,
-        blob: async () => new Blob(['image'], { type: 'image/jpeg' }),
-      })),
+      vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        if (url.includes('/user/media-assets/42')) {
+          return new Response(
+            JSON.stringify({
+              code: 0,
+              msg: '',
+              data: {
+                asset_id: 'asset-42',
+                status: 'ready',
+                mime_type: 'image/jpeg',
+                width: 2048,
+                height: 1024,
+                size_bytes: 100,
+                original: { status: 'ready', url: '/api/user/media-assets/42/original/content' },
+                derivatives: {
+                  thumb: { status: 'ready', format: 'webp', url: '/api/thumb.webp' },
+                  preview: { status: 'ready', format: 'webp', url: '/api/preview.webp' },
+                  'large-preview': { status: 'ready', format: 'webp', url: '/api/large.webp' },
+                },
+              },
+            }),
+            { headers: { 'content-type': 'application/json' } },
+          )
+        }
+        return {
+          ok: true,
+          blob: async () => new Blob(['image'], { type: 'image/jpeg' }),
+        }
+      }),
     )
     vi.stubGlobal(
       'createImageBitmap',
@@ -159,10 +185,10 @@ describe('useDisplayImagePreview', () => {
     )
     if (!preview) throw new Error('preview composable was not created')
 
-    await vi.waitFor(() => expect(preview.displayUrl.value).toBe('blob:5'))
+    await vi.waitFor(() => expect(preview.displayUrl.value).toBe('/api/preview.webp'))
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/user/media-assets/42/derivatives/preview/content'),
-      { credentials: 'include' },
+      '/api/user/media-assets/42',
+      expect.objectContaining({ credentials: 'include', signal: expect.any(AbortSignal) }),
     )
     scope.stop()
   })

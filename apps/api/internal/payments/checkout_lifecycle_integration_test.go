@@ -364,7 +364,7 @@ func TestCheckoutLifecycleLateAsyncFailureDoesNotPublishFalseFailedEvent(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	events, unsubscribe := service.EventHub().Subscribe(42)
+	events, unsubscribe := subscribePaymentUserEvents(t, service.EventHub(), 42)
 	defer unsubscribe()
 	checkout.setPaid(true)
 	sessionID := checkout.onlySessionID(t)
@@ -373,7 +373,8 @@ func TestCheckoutLifecycleLateAsyncFailureDoesNotPublishFalseFailedEvent(t *test
 		t.Fatalf("async success webhook error = %v", err)
 	}
 	select {
-	case event := <-events:
+	case rawEvent := <-events:
+		event := decodePaymentUserEvent(t, rawEvent)
 		if event.PublicToken != created.PublicToken || event.Status != "credited" {
 			t.Fatalf("credited event = %+v", event)
 		}
@@ -386,7 +387,8 @@ func TestCheckoutLifecycleLateAsyncFailureDoesNotPublishFalseFailedEvent(t *test
 		t.Fatalf("late async failed webhook error = %v", err)
 	}
 	select {
-	case event := <-events:
+	case rawEvent := <-events:
+		event := decodePaymentUserEvent(t, rawEvent)
 		t.Fatalf("late terminal event must not report failed after paid credit: %+v", event)
 	case <-time.After(100 * time.Millisecond):
 	}
@@ -492,7 +494,7 @@ func TestCheckoutLifecycleRepeatedReturnCreditsAndPublishesOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkout.setPaid(true)
-	events, unsubscribe := service.EventHub().Subscribe(42)
+	events, unsubscribe := subscribePaymentUserEvents(t, service.EventHub(), 42)
 	defer unsubscribe()
 
 	for attempt := 0; attempt < 2; attempt++ {
@@ -503,7 +505,8 @@ func TestCheckoutLifecycleRepeatedReturnCreditsAndPublishesOnce(t *testing.T) {
 	}
 
 	select {
-	case event := <-events:
+	case rawEvent := <-events:
+		event := decodePaymentUserEvent(t, rawEvent)
 		if event.PublicToken != created.PublicToken || event.Status != "credited" {
 			t.Fatalf("credited event = %+v", event)
 		}
@@ -511,7 +514,8 @@ func TestCheckoutLifecycleRepeatedReturnCreditsAndPublishesOnce(t *testing.T) {
 		t.Fatal("credited event was not published")
 	}
 	select {
-	case event := <-events:
+	case rawEvent := <-events:
+		event := decodePaymentUserEvent(t, rawEvent)
 		t.Fatalf("repeated Return published duplicate event: %+v", event)
 	case <-time.After(100 * time.Millisecond):
 	}
@@ -528,7 +532,7 @@ func TestCheckoutLifecycleReturnExpiryAllowsVerifiedLatePayment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	events, unsubscribe := service.EventHub().Subscribe(42)
+	events, unsubscribe := subscribePaymentUserEvents(t, service.EventHub(), 42)
 	defer unsubscribe()
 
 	checkout.status = CheckoutSessionStatusExpired
@@ -539,7 +543,8 @@ func TestCheckoutLifecycleReturnExpiryAllowsVerifiedLatePayment(t *testing.T) {
 	assertLifecycleOrderStatus(t, db, created.PublicToken, PaymentOrderExpired)
 
 	select {
-	case event := <-events:
+	case rawEvent := <-events:
+		event := decodePaymentUserEvent(t, rawEvent)
 		if event.Status != "failed" {
 			t.Fatalf("expired Return event = %+v", event)
 		}
@@ -557,7 +562,8 @@ func TestCheckoutLifecycleReturnExpiryAllowsVerifiedLatePayment(t *testing.T) {
 	assertLifecycleWalletAvailable(t, wallets, 42, 701)
 
 	select {
-	case event := <-events:
+	case rawEvent := <-events:
+		event := decodePaymentUserEvent(t, rawEvent)
 		if event.Status != "credited" {
 			t.Fatalf("late paid Return event = %+v", event)
 		}

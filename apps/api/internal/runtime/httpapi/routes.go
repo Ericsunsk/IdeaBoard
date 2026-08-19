@@ -70,21 +70,20 @@ type StaticUploadDeps struct {
 }
 
 type UserRouteDeps struct {
-	AuthHandler               *auth.AuthHandler
-	TaskHandler               *taskservice.Handler
-	BoardHandler              *boards.BoardHandler
-	BillingHandler            *billing.Handler
-	BillingRecords            *billingrecords.Handler
-	CreditUserHandler         *credits.UserHandler
-	UsageHandler              *usage.Handler
-	RewardUserHandler         *rewards.UserHandler
-	PaymentUserHandler        *payments.UserCheckoutHandler
-	PaymentEventStreamHandler *payments.EventStreamHandler
-	UserEventStreamHandler    *UserEventStreamHandler
-	MediaAssetRegistry        *assets.MediaAssetRegistry
-	MediaStorageService       *storage.StorageService
-	Uploads                   UploadDeps
-	UploadDownloads           UploadDownloadDeps
+	AuthHandler            *auth.AuthHandler
+	TaskHandler            *taskservice.Handler
+	BoardHandler           *boards.BoardHandler
+	BillingHandler         *billing.Handler
+	BillingRecords         *billingrecords.Handler
+	CreditUserHandler      *credits.UserHandler
+	UsageHandler           *usage.Handler
+	RewardUserHandler      *rewards.UserHandler
+	PaymentUserHandler     *payments.UserCheckoutHandler
+	UserEventStreamHandler *UserEventStreamHandler
+	MediaAssetRegistry     *assets.MediaAssetRegistry
+	MediaStorageService    *storage.StorageService
+	Uploads                UploadDeps
+	UploadDownloads        UploadDownloadDeps
 }
 
 type AdminRouteDeps struct {

@@ -1,80 +1,52 @@
 package payments
 
-import "sync"
+import (
+	"encoding/json"
+	"sync"
+
+	"ideaboard/api/internal/events"
+)
 
 type PaymentEvent struct {
 	PublicToken string `json:"public_token,omitempty"`
 	Status      string `json:"status"`
 }
 
-type paymentSubscription struct {
-	channel chan PaymentEvent
-	done    chan struct{}
-}
-
 type EventHub struct {
-	mu          sync.RWMutex
-	subscribers map[int64][]*paymentSubscription
+	mu      sync.RWMutex
+	userHub *events.UserEventHub
 }
 
 func NewEventHub() *EventHub {
-	return &EventHub{subscribers: make(map[int64][]*paymentSubscription)}
+	return &EventHub{userHub: events.NewUserEventHub()}
 }
 
-func (h *EventHub) Subscribe(userID int64) (<-chan PaymentEvent, func()) {
-	if h == nil || userID <= 0 {
-		return nil, func() {}
+func (h *EventHub) SetUserEventHub(userHub *events.UserEventHub) {
+	if h == nil || userHub == nil {
+		return
 	}
-	subscription := &paymentSubscription{channel: make(chan PaymentEvent, 4), done: make(chan struct{})}
 	h.mu.Lock()
-	h.subscribers[userID] = append(h.subscribers[userID], subscription)
+	h.userHub = userHub
 	h.mu.Unlock()
-	return subscription.channel, func() {
-		h.mu.Lock()
-		defer h.mu.Unlock()
-		select {
-		case <-subscription.done:
-			return
-		default:
-			close(subscription.done)
-		}
-		entries := h.subscribers[userID]
-		for index, entry := range entries {
-			if entry == subscription {
-				h.subscribers[userID] = append(entries[:index], entries[index+1:]...)
-				break
-			}
-		}
-		if len(h.subscribers[userID]) == 0 {
-			delete(h.subscribers, userID)
-		}
+}
+
+func (h *EventHub) currentUserEventHub() *events.UserEventHub {
+	if h == nil {
+		return nil
 	}
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.userHub
 }
 
 func (h *EventHub) Publish(userID int64, event PaymentEvent) {
-	if h == nil || userID <= 0 {
+	userHub := h.currentUserEventHub()
+	if userHub == nil {
 		return
 	}
-	h.mu.RLock()
-	entries := append([]*paymentSubscription(nil), h.subscribers[userID]...)
-	h.mu.RUnlock()
-	for _, entry := range entries {
-		select {
-		case <-entry.done:
-			continue
-		default:
-		}
-		select {
-		case entry.channel <- event:
-		default:
-			select {
-			case <-entry.channel:
-			default:
-			}
-			select {
-			case entry.channel <- event:
-			default:
-			}
-		}
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return
 	}
+	userHub.Publish(events.UserEvent{UserID: userID, Type: events.EventTypePaymentUpdated, Data: payload})
 }

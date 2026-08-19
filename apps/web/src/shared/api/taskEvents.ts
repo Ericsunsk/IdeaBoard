@@ -2,9 +2,9 @@ import { extractImageResultsFromTaskPayload, type TaskImageResult } from '../que
 import { sanitizeApiErrorMessage } from '../utils/errorMessages'
 import { taskApi } from './task'
 import type { Task } from './task'
-import { resolveApiUrl } from '../config/runtimeUrls'
 import { notifyUserCreditsInvalidation } from '../query/userCreditsInvalidation'
 import { IMAGE_GENERATION_FAILURE_MESSAGE } from '../constants/media'
+import { subscribeUserEvent } from './userEventStream'
 
 type TaskEventPayload = Pick<
   Task,
@@ -95,15 +95,14 @@ function waitWithEventSource(
   pollOptions: { initialDelayMs: number; maxDelayMs: number },
 ): Promise<TaskImageResult[]> {
   return new Promise((resolve, reject) => {
-    const es = new EventSource(resolveApiUrl(`/user/tasks/${encodeURIComponent(taskId)}/events`), {
-      withCredentials: true,
-    })
     let settled = false
     let timeout = 0
+    let refreshing = false
+    let unsubscribe: () => void = () => undefined
 
     const cleanup = () => {
       clearTimeout(timeout)
-      es.close()
+      unsubscribe()
     }
 
     const settleResolve = (value: TaskImageResult[]) => {
@@ -156,21 +155,31 @@ function waitWithEventSource(
       }
     }
 
-    es.addEventListener('task', (event: MessageEvent) => {
+    const refreshTask = async () => {
+      if (settled || refreshing) return
+      refreshing = true
       try {
-        handleTaskEvent(JSON.parse(event.data) as TaskEventPayload)
-      } catch {
-        settleReject(new Error('任务进度数据异常，请稍后重试'))
+        const response = await taskApi.get(taskId)
+        handleTaskEvent(response.task)
+      } catch (error) {
+        if (isTaskNotFoundError(error)) settleReject(error as Error)
+      } finally {
+        refreshing = false
       }
-    })
-
-    es.addEventListener('close', () => {
-      fallbackToPolling()
-    })
-
-    es.onerror = () => {
-      fallbackToPolling()
     }
+
+    unsubscribe = subscribeUserEvent(
+      'task.updated',
+      (event) => {
+        try {
+          const payload = JSON.parse(event.data) as { task_id?: unknown }
+          if (payload.task_id === taskId) void refreshTask()
+        } catch {
+          settleReject(new Error('任务进度数据异常，请稍后重试'))
+        }
+      },
+      fallbackToPolling,
+    )
   })
 }
 

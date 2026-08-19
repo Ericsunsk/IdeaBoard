@@ -38,6 +38,12 @@ class MockEventSource {
     this.listeners[type] = [...(this.listeners[type] ?? []), eventListener]
   }
 
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject) {
+    const eventListener =
+      typeof listener === 'function' ? listener : listener.handleEvent.bind(listener)
+    this.listeners[type] = (this.listeners[type] ?? []).filter((entry) => entry !== eventListener)
+  }
+
   close() {
     this.closed = true
   }
@@ -141,17 +147,17 @@ describe('waitTaskImageResultsWithSse', () => {
     expect(mocks.getTask).toHaveBeenCalledWith('task-1')
   })
 
-  it('resolves image results from a completed SSE event without polling', async () => {
+  it('resolves image results after a completed task invalidation', async () => {
     vi.stubGlobal('EventSource', MockEventSource)
+    mocks.getTask.mockResolvedValueOnce(
+      makeTaskResponse('completed', {
+        outputs: [makeImageOutput(' https://cdn.example.com/sse-output.png ')],
+      }),
+    )
 
     const result = waitTaskImageResultsWithSse('task-1')
     expect(MockEventSource.instances).toHaveLength(1)
-    MockEventSource.instances[0]?.emit('task', {
-      task_id: 'task-1',
-      status: 'completed',
-      result: JSON.stringify({ image_url: 'https://cdn.example.com/result.png' }),
-      outputs: [makeImageOutput(' https://cdn.example.com/sse-output.png ')],
-    })
+    MockEventSource.instances[0]?.emit('task.updated', { task_id: 'task-1', status: 'completed' })
 
     await expect(result).resolves.toEqual([
       {
@@ -162,21 +168,22 @@ describe('waitTaskImageResultsWithSse', () => {
         resultIndex: 0,
       },
     ])
-    expect(mocks.getTask).not.toHaveBeenCalled()
+    expect(mocks.getTask).toHaveBeenCalledOnce()
     expect(MockEventSource.instances[0]?.closed).toBe(true)
   })
 
   it('notifies wallet and ledger consumers after terminal settlement', async () => {
     vi.stubGlobal('EventSource', MockEventSource)
+    mocks.getTask.mockResolvedValueOnce(
+      makeTaskResponse('completed', {
+        outputs: [makeImageOutput('https://cdn.example.com/settled.png')],
+      }),
+    )
     const listener = vi.fn()
     const unsubscribe = subscribeUserCreditsInvalidation(listener)
 
     const result = waitTaskImageResultsWithSse('task-1')
-    MockEventSource.instances[0]?.emit('task', {
-      task_id: 'task-1',
-      status: 'completed',
-      outputs: [makeImageOutput('https://cdn.example.com/settled.png')],
-    })
+    MockEventSource.instances[0]?.emit('task.updated', { task_id: 'task-1', status: 'completed' })
     await result
 
     expect(listener).toHaveBeenCalledWith({
@@ -192,7 +199,7 @@ describe('waitTaskImageResultsWithSse', () => {
 
     const result = waitTaskImageResultsWithSse('task-1')
     expect(MockEventSource.instances).toHaveLength(1)
-    MockEventSource.instances[0]?.emit('task', 'not-json')
+    MockEventSource.instances[0]?.emit('task.updated', 'not-json')
 
     await expect(result).rejects.toThrow('任务进度数据异常，请稍后重试')
     expect(mocks.getTask).not.toHaveBeenCalled()
@@ -201,34 +208,32 @@ describe('waitTaskImageResultsWithSse', () => {
 
   it('propagates the backend failure message from a failed SSE event without polling', async () => {
     vi.stubGlobal('EventSource', MockEventSource)
+    mocks.getTask.mockResolvedValueOnce(makeTaskResponse('failed', { error_msg: ' 上游超时 ' }))
 
     const result = waitTaskImageResultsWithSse('task-1')
     expect(MockEventSource.instances).toHaveLength(1)
-    MockEventSource.instances[0]?.emit('task', {
-      task_id: 'task-1',
-      status: 'failed',
-      error_msg: ' 上游超时 ',
-    })
+    MockEventSource.instances[0]?.emit('task.updated', { task_id: 'task-1', status: 'failed' })
 
     await expect(result).rejects.toThrow(/^上游超时$/)
-    expect(mocks.getTask).not.toHaveBeenCalled()
+    expect(mocks.getTask).toHaveBeenCalledOnce()
     expect(MockEventSource.instances[0]?.closed).toBe(true)
   })
 
   it('treats storage materialization failures from SSE as pending retry', async () => {
     vi.stubGlobal('EventSource', MockEventSource)
+    mocks.getTask.mockResolvedValueOnce(
+      makeTaskResponse('failed', {
+        error_msg: ' 图片结果保存失败，请检查存储配置 ',
+        execution_metrics: makeFinalizingFailureMetrics(),
+      }),
+    )
 
     const result = waitTaskImageResultsWithSse('task-1')
-    MockEventSource.instances[0]?.emit('task', {
-      task_id: 'task-1',
-      status: 'failed',
-      error_msg: ' 图片结果保存失败，请检查存储配置 ',
-      execution_metrics: makeFinalizingFailureMetrics(),
-    })
+    MockEventSource.instances[0]?.emit('task.updated', { task_id: 'task-1', status: 'failed' })
 
     await expect(result).rejects.toThrow(TaskResultPendingError)
     await expect(result).rejects.toThrow('图片生成失败')
-    expect(mocks.getTask).not.toHaveBeenCalled()
+    expect(mocks.getTask).toHaveBeenCalledOnce()
     expect(MockEventSource.instances[0]?.closed).toBe(true)
   })
 
@@ -255,42 +260,32 @@ describe('waitTaskImageResultsWithSse', () => {
     expect(MockEventSource.instances[0]?.closed).toBe(true)
   })
 
-  it('falls back to polling when the backend sends a close event', async () => {
+  it('shares one user EventSource across concurrent task waits', async () => {
     vi.stubGlobal('EventSource', MockEventSource)
-    mocks.getTask.mockResolvedValueOnce(
+    mocks.getTask.mockResolvedValue(
       makeTaskResponse('completed', {
-        outputs: [makeImageOutput('https://cdn.example.com/after-close.png')],
+        outputs: [makeImageOutput('https://cdn.example.com/done.png')],
       }),
     )
-
-    const result = waitTaskImageResultsWithSse('task-1')
-    MockEventSource.instances[0]?.emit('close', { reason: 'max_connection_duration_reached' })
-
-    await expect(result).resolves.toEqual([
-      {
-        url: 'https://cdn.example.com/after-close.png',
-        width: 1024,
-        height: 1024,
-        mimeType: 'image/png',
-        resultIndex: 0,
-      },
-    ])
-    expect(mocks.getTask).toHaveBeenCalledTimes(1)
+    const first = waitTaskImageResultsWithSse('task-1')
+    const second = waitTaskImageResultsWithSse('task-1')
+    expect(MockEventSource.instances).toHaveLength(1)
+    MockEventSource.instances[0]?.emit('task.updated', { task_id: 'task-1', status: 'completed' })
+    await Promise.all([first, second])
   })
 
   it('rejects explicitly when a task is cancelled from the SSE stream', async () => {
     vi.stubGlobal('EventSource', MockEventSource)
+    mocks.getTask.mockResolvedValueOnce(
+      makeTaskResponse('cancelled', { cancel_reason: '用户取消' }),
+    )
 
     const result = waitTaskImageResultsWithSse('task-1')
-    MockEventSource.instances[0]?.emit('task', {
-      task_id: 'task-1',
-      status: 'cancelled',
-      cancel_reason: '用户取消',
-    })
+    MockEventSource.instances[0]?.emit('task.updated', { task_id: 'task-1', status: 'cancelled' })
 
     await expect(result).rejects.toThrow(TaskCancelledError)
     await expect(result).rejects.toThrow('用户取消')
-    expect(mocks.getTask).not.toHaveBeenCalled()
+    expect(mocks.getTask).toHaveBeenCalledOnce()
   })
 
   it('rejects explicitly when polling observes a cancelled task', async () => {

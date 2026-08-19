@@ -33,32 +33,6 @@ func TestEventHubSubscribeAndPublish(t *testing.T) {
 	}
 }
 
-func TestEventHubSubscribeUserReceivesOwnedEvents(t *testing.T) {
-	hub := NewEventHub()
-	ch, unsub, ok := hub.SubscribeUser(42)
-	if !ok {
-		t.Fatal("user subscription rejected unexpectedly")
-	}
-	defer unsub()
-
-	hub.PublishForUser(42, "task-42", TaskEvent{TaskID: "task-42", Status: "completed"})
-	select {
-	case event := <-ch:
-		if event.TaskID != "task-42" || event.Status != "completed" {
-			t.Fatalf("event=%+v", event)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timeout waiting for user event")
-	}
-
-	hub.PublishForUser(99, "task-99", TaskEvent{TaskID: "task-99", Status: "completed"})
-	select {
-	case event := <-ch:
-		t.Fatalf("received another user's event: %+v", event)
-	case <-time.After(50 * time.Millisecond):
-	}
-}
-
 func TestEventHubUnsubscribe(t *testing.T) {
 	hub := NewEventHub()
 

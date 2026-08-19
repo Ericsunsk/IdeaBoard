@@ -9,10 +9,61 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 )
+
+const beginTaskResultMediaAsset = `-- name: BeginTaskResultMediaAsset :one
+INSERT INTO media_assets (
+  asset_id, owner_user_id, storage_profile_id, storage_key, url, source_url,
+  media_kind, status, metadata, reclaim_after, reclaim_generation
+)
+VALUES (
+  $1, $2, $3, $4,
+  $5, $6, 'image', 'uploading', $7,
+  $8, 1
+)
+ON CONFLICT (storage_profile_id, storage_key) DO UPDATE
+SET source_url = EXCLUDED.source_url,
+    status = CASE WHEN media_assets.status = 'ready' THEN 'ready' ELSE 'uploading' END,
+    metadata = CASE WHEN media_assets.status = 'ready' THEN media_assets.metadata ELSE EXCLUDED.metadata END,
+    updated_at = now(),
+    deleted_at = NULL,
+    reclaim_after = CASE WHEN media_assets.status = 'ready' THEN media_assets.reclaim_after ELSE EXCLUDED.reclaim_after END,
+    reclaim_started_at = NULL,
+    reclaim_claim_token = NULL
+WHERE media_assets.owner_user_id = EXCLUDED.owner_user_id
+RETURNING id
+`
+
+type BeginTaskResultMediaAssetParams struct {
+	AssetID          string          `json:"asset_id"`
+	OwnerUserID      int64           `json:"owner_user_id"`
+	StorageProfileID string          `json:"storage_profile_id"`
+	StorageKey       string          `json:"storage_key"`
+	Url              string          `json:"url"`
+	SourceUrl        string          `json:"source_url"`
+	Metadata         json.RawMessage `json:"metadata"`
+	ReclaimAfter     sql.NullTime    `json:"reclaim_after"`
+}
+
+func (q *Queries) BeginTaskResultMediaAsset(ctx context.Context, arg BeginTaskResultMediaAssetParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, beginTaskResultMediaAsset,
+		arg.AssetID,
+		arg.OwnerUserID,
+		arg.StorageProfileID,
+		arg.StorageKey,
+		arg.Url,
+		arg.SourceUrl,
+		arg.Metadata,
+		arg.ReclaimAfter,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
 
 const cancelMediaAssetReclamation = `-- name: CancelMediaAssetReclamation :many
 UPDATE media_assets
@@ -144,12 +195,12 @@ const createBoardUploadMediaAsset = `-- name: CreateBoardUploadMediaAsset :one
 INSERT INTO media_assets (
   asset_id, owner_user_id, storage_profile_id, storage_key,
   url, media_kind, mime_type, width, height, size_bytes,
-  status, metadata, reclaim_after, reclaim_generation
+  checksum_sha256, status, metadata, reclaim_after, reclaim_generation
 )
 VALUES (
   $1, $2, $3, $4,
-  $5, 'image', $6, $7, $8, $9,
-  'ready', $10, $11, 1
+  $5, 'image', $6, $7, $8, $9, $10,
+  $11, $12, $13, 1
 )
 RETURNING id
 `
@@ -164,6 +215,8 @@ type CreateBoardUploadMediaAssetParams struct {
 	Width            int32           `json:"width"`
 	Height           int32           `json:"height"`
 	SizeBytes        int64           `json:"size_bytes"`
+	ChecksumSha256   string          `json:"checksum_sha256"`
+	Status           string          `json:"status"`
 	Metadata         json.RawMessage `json:"metadata"`
 	ReclaimAfter     sql.NullTime    `json:"reclaim_after"`
 }
@@ -179,6 +232,8 @@ func (q *Queries) CreateBoardUploadMediaAsset(ctx context.Context, arg CreateBoa
 		arg.Width,
 		arg.Height,
 		arg.SizeBytes,
+		arg.ChecksumSha256,
+		arg.Status,
 		arg.Metadata,
 		arg.ReclaimAfter,
 	)
@@ -190,14 +245,29 @@ func (q *Queries) CreateBoardUploadMediaAsset(ctx context.Context, arg CreateBoa
 const createPreparedMediaAsset = `-- name: CreatePreparedMediaAsset :one
 INSERT INTO media_assets (
   asset_id, owner_user_id, storage_profile_id, storage_key, url, source_url,
-  media_kind, mime_type, width, height, size_bytes, status, metadata,
+  media_kind, mime_type, width, height, size_bytes, checksum_sha256, status, metadata,
   reclaim_after, reclaim_generation
 )
 VALUES (
   $1, $2, $3, $4,
   $5, $6, 'image', $7, $8, $9,
-  $10, 'ready', $11, $12, 1
+  $10, $11, $12, $13, $14, 1
 )
+ON CONFLICT (storage_profile_id, storage_key) DO UPDATE
+SET url = EXCLUDED.url,
+    source_url = EXCLUDED.source_url,
+    mime_type = EXCLUDED.mime_type,
+    width = EXCLUDED.width,
+    height = EXCLUDED.height,
+    size_bytes = EXCLUDED.size_bytes,
+    checksum_sha256 = EXCLUDED.checksum_sha256,
+    status = CASE WHEN media_assets.status = 'ready' THEN 'ready' ELSE EXCLUDED.status END,
+    metadata = EXCLUDED.metadata,
+    deleted_at = NULL,
+    reclaim_after = NULL,
+    reclaim_started_at = NULL,
+    reclaim_claim_token = NULL
+WHERE media_assets.owner_user_id = EXCLUDED.owner_user_id
 RETURNING id
 `
 
@@ -212,6 +282,8 @@ type CreatePreparedMediaAssetParams struct {
 	Width            int32           `json:"width"`
 	Height           int32           `json:"height"`
 	SizeBytes        int64           `json:"size_bytes"`
+	ChecksumSha256   string          `json:"checksum_sha256"`
+	Status           string          `json:"status"`
 	Metadata         json.RawMessage `json:"metadata"`
 	ReclaimAfter     sql.NullTime    `json:"reclaim_after"`
 }
@@ -228,6 +300,8 @@ func (q *Queries) CreatePreparedMediaAsset(ctx context.Context, arg CreatePrepar
 		arg.Width,
 		arg.Height,
 		arg.SizeBytes,
+		arg.ChecksumSha256,
+		arg.Status,
 		arg.Metadata,
 		arg.ReclaimAfter,
 	)
@@ -287,6 +361,65 @@ func (q *Queries) DeleteUnclaimedPreparedMediaAsset(ctx context.Context, arg Del
 	return result.RowsAffected()
 }
 
+const findIngestingPreparedGenerationMedia = `-- name: FindIngestingPreparedGenerationMedia :one
+SELECT asset.id, asset.storage_profile_id, asset.storage_key, asset.url,
+  asset.source_url, asset.mime_type, asset.width, asset.height, asset.size_bytes, asset.checksum_sha256
+FROM media_refs AS ref
+JOIN media_assets AS asset ON asset.id = ref.media_asset_id AND asset.owner_user_id = ref.owner_user_id
+WHERE ref.owner_user_id = $1
+  AND ref.ref_type = 'prompt_reference'
+  AND ref.ref_id = $2
+  AND ref.role = $3
+  AND ref.input_index = $4
+  AND ref.task_id = ''
+  AND asset.status IN ('uploading', 'failed')
+  AND asset.deleted_at IS NULL
+LIMIT 1
+`
+
+type FindIngestingPreparedGenerationMediaParams struct {
+	OwnerUserID int64  `json:"owner_user_id"`
+	RefID       string `json:"ref_id"`
+	Role        string `json:"role"`
+	InputIndex  int32  `json:"input_index"`
+}
+
+type FindIngestingPreparedGenerationMediaRow struct {
+	ID               int64  `json:"id"`
+	StorageProfileID string `json:"storage_profile_id"`
+	StorageKey       string `json:"storage_key"`
+	Url              string `json:"url"`
+	SourceUrl        string `json:"source_url"`
+	MimeType         string `json:"mime_type"`
+	Width            int32  `json:"width"`
+	Height           int32  `json:"height"`
+	SizeBytes        int64  `json:"size_bytes"`
+	ChecksumSha256   string `json:"checksum_sha256"`
+}
+
+func (q *Queries) FindIngestingPreparedGenerationMedia(ctx context.Context, arg FindIngestingPreparedGenerationMediaParams) (FindIngestingPreparedGenerationMediaRow, error) {
+	row := q.db.QueryRowContext(ctx, findIngestingPreparedGenerationMedia,
+		arg.OwnerUserID,
+		arg.RefID,
+		arg.Role,
+		arg.InputIndex,
+	)
+	var i FindIngestingPreparedGenerationMediaRow
+	err := row.Scan(
+		&i.ID,
+		&i.StorageProfileID,
+		&i.StorageKey,
+		&i.Url,
+		&i.SourceUrl,
+		&i.MimeType,
+		&i.Width,
+		&i.Height,
+		&i.SizeBytes,
+		&i.ChecksumSha256,
+	)
+	return i, err
+}
+
 const findMediaAssetStorageLocationByURL = `-- name: FindMediaAssetStorageLocationByURL :one
 SELECT storage_profile_id, storage_key
 FROM media_assets
@@ -311,7 +444,7 @@ func (q *Queries) FindMediaAssetStorageLocationByURL(ctx context.Context, url st
 
 const findPreparedGenerationMedia = `-- name: FindPreparedGenerationMedia :one
 SELECT asset.id, asset.storage_profile_id, asset.storage_key, asset.url,
-  asset.source_url, asset.mime_type, asset.width, asset.height, asset.size_bytes
+  asset.source_url, asset.mime_type, asset.width, asset.height, asset.size_bytes, asset.checksum_sha256
 FROM media_refs AS ref
 JOIN media_assets AS asset ON asset.id = ref.media_asset_id AND asset.owner_user_id = ref.owner_user_id
 WHERE ref.owner_user_id = $1
@@ -320,6 +453,7 @@ WHERE ref.owner_user_id = $1
   AND ref.role = $3
   AND ref.input_index = $4
   AND ref.task_id = ''
+  AND asset.status = 'ready'
   AND asset.deleted_at IS NULL
 LIMIT 1
 `
@@ -341,6 +475,7 @@ type FindPreparedGenerationMediaRow struct {
 	Width            int32  `json:"width"`
 	Height           int32  `json:"height"`
 	SizeBytes        int64  `json:"size_bytes"`
+	ChecksumSha256   string `json:"checksum_sha256"`
 }
 
 func (q *Queries) FindPreparedGenerationMedia(ctx context.Context, arg FindPreparedGenerationMediaParams) (FindPreparedGenerationMediaRow, error) {
@@ -361,6 +496,7 @@ func (q *Queries) FindPreparedGenerationMedia(ctx context.Context, arg FindPrepa
 		&i.Width,
 		&i.Height,
 		&i.SizeBytes,
+		&i.ChecksumSha256,
 	)
 	return i, err
 }
@@ -497,6 +633,53 @@ type GetMediaAssetByIDForOwnerParams struct {
 
 func (q *Queries) GetMediaAssetByIDForOwner(ctx context.Context, arg GetMediaAssetByIDForOwnerParams) (MediaAsset, error) {
 	row := q.db.QueryRowContext(ctx, getMediaAssetByIDForOwner, arg.ID, arg.OwnerUserID)
+	var i MediaAsset
+	err := row.Scan(
+		&i.ID,
+		&i.AssetID,
+		&i.OwnerUserID,
+		&i.StorageProfileID,
+		&i.StorageKey,
+		&i.Url,
+		&i.SourceUrl,
+		&i.MediaKind,
+		&i.MimeType,
+		&i.Width,
+		&i.Height,
+		&i.SizeBytes,
+		&i.ChecksumSha256,
+		&i.Status,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.ReclaimAfter,
+		&i.ReclaimStartedAt,
+		&i.ReclaimClaimToken,
+		&i.ReclaimGeneration,
+	)
+	return i, err
+}
+
+const getMediaAssetByStorageLocator = `-- name: GetMediaAssetByStorageLocator :one
+SELECT
+  id, asset_id, owner_user_id, storage_profile_id, storage_key,
+  url, source_url, media_kind, mime_type,
+  width, height, size_bytes, checksum_sha256,
+  status, metadata, created_at, updated_at, deleted_at, reclaim_after, reclaim_started_at,
+  reclaim_claim_token, reclaim_generation
+FROM media_assets
+WHERE storage_profile_id = $1
+  AND storage_key = $2
+`
+
+type GetMediaAssetByStorageLocatorParams struct {
+	StorageProfileID string `json:"storage_profile_id"`
+	StorageKey       string `json:"storage_key"`
+}
+
+func (q *Queries) GetMediaAssetByStorageLocator(ctx context.Context, arg GetMediaAssetByStorageLocatorParams) (MediaAsset, error) {
+	row := q.db.QueryRowContext(ctx, getMediaAssetByStorageLocator, arg.StorageProfileID, arg.StorageKey)
 	var i MediaAsset
 	err := row.Scan(
 		&i.ID,
@@ -725,6 +908,141 @@ func (q *Queries) ListReadyOwnedMediaAssetIDsByStorageKey(ctx context.Context, a
 	return items, nil
 }
 
+const listStaleUploadingMediaAssetIDs = `-- name: ListStaleUploadingMediaAssetIDs :many
+SELECT id
+FROM media_assets
+WHERE status = 'uploading' AND updated_at < $1
+ORDER BY updated_at ASC, id ASC
+LIMIT $2
+`
+
+type ListStaleUploadingMediaAssetIDsParams struct {
+	StaleBefore time.Time `json:"stale_before"`
+	RowLimit    int32     `json:"row_limit"`
+}
+
+func (q *Queries) ListStaleUploadingMediaAssetIDs(ctx context.Context, arg ListStaleUploadingMediaAssetIDsParams) ([]int64, error) {
+	rows, err := q.db.QueryContext(ctx, listStaleUploadingMediaAssetIDs, arg.StaleBefore, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTaskInputMediaRefsForLineage = `-- name: ListTaskInputMediaRefsForLineage :many
+SELECT media_asset_id, role, input_index
+FROM media_refs
+WHERE task_id = $1
+  AND ref_type = 'task_input'
+ORDER BY input_index ASC, id ASC
+`
+
+type ListTaskInputMediaRefsForLineageRow struct {
+	MediaAssetID int64  `json:"media_asset_id"`
+	Role         string `json:"role"`
+	InputIndex   int32  `json:"input_index"`
+}
+
+func (q *Queries) ListTaskInputMediaRefsForLineage(ctx context.Context, taskID string) ([]ListTaskInputMediaRefsForLineageRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTaskInputMediaRefsForLineage, taskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTaskInputMediaRefsForLineageRow
+	for rows.Next() {
+		var i ListTaskInputMediaRefsForLineageRow
+		if err := rows.Scan(&i.MediaAssetID, &i.Role, &i.InputIndex); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const markMediaAssetFailed = `-- name: MarkMediaAssetFailed :one
+UPDATE media_assets
+SET status = 'failed', updated_at = now(), metadata = jsonb_set(
+  metadata, '{ingestion_error}', to_jsonb($1::text), true
+)
+WHERE id = $2 AND owner_user_id = $3 AND status IN ('pending', 'uploading')
+RETURNING id
+`
+
+type MarkMediaAssetFailedParams struct {
+	ErrorMessage string `json:"error_message"`
+	ID           int64  `json:"id"`
+	OwnerUserID  int64  `json:"owner_user_id"`
+}
+
+func (q *Queries) MarkMediaAssetFailed(ctx context.Context, arg MarkMediaAssetFailedParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, markMediaAssetFailed, arg.ErrorMessage, arg.ID, arg.OwnerUserID)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
+const markMediaAssetReady = `-- name: MarkMediaAssetReady :one
+UPDATE media_assets
+SET status = 'ready', updated_at = now(), url = $1, source_url = $2,
+    mime_type = $3, width = $4, height = $5,
+    size_bytes = $6, checksum_sha256 = $7, metadata = $8
+WHERE id = $9 AND owner_user_id = $10 AND status IN ('pending', 'uploading', 'failed', 'ready')
+RETURNING id
+`
+
+type MarkMediaAssetReadyParams struct {
+	Url            string          `json:"url"`
+	SourceUrl      string          `json:"source_url"`
+	MimeType       string          `json:"mime_type"`
+	Width          int32           `json:"width"`
+	Height         int32           `json:"height"`
+	SizeBytes      int64           `json:"size_bytes"`
+	ChecksumSha256 string          `json:"checksum_sha256"`
+	Metadata       json.RawMessage `json:"metadata"`
+	ID             int64           `json:"id"`
+	OwnerUserID    int64           `json:"owner_user_id"`
+}
+
+func (q *Queries) MarkMediaAssetReady(ctx context.Context, arg MarkMediaAssetReadyParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, markMediaAssetReady,
+		arg.Url,
+		arg.SourceUrl,
+		arg.MimeType,
+		arg.Width,
+		arg.Height,
+		arg.SizeBytes,
+		arg.ChecksumSha256,
+		arg.Metadata,
+		arg.ID,
+		arg.OwnerUserID,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const markMediaAssetReclaimed = `-- name: MarkMediaAssetReclaimed :execrows
 UPDATE media_assets
 SET status = 'deleted',
@@ -760,6 +1078,22 @@ func (q *Queries) MarkMediaAssetReclaimed(ctx context.Context, arg MarkMediaAsse
 		arg.ReclaimGeneration,
 		arg.ClaimToken,
 	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const markStaleUploadingMediaAssetsFailed = `-- name: MarkStaleUploadingMediaAssetsFailed :execrows
+UPDATE media_assets
+SET status = 'failed', updated_at = now(), metadata = jsonb_set(
+  metadata, '{ingestion_error}', to_jsonb('upload lease expired; reconciler marked ingestion failed'::text), true
+)
+WHERE id = ANY($1::bigint[]) AND status = 'uploading'
+`
+
+func (q *Queries) MarkStaleUploadingMediaAssetsFailed(ctx context.Context, ids []int64) (int64, error) {
+	result, err := q.db.ExecContext(ctx, markStaleUploadingMediaAssetsFailed, pq.Array(ids))
 	if err != nil {
 		return 0, err
 	}

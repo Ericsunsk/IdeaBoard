@@ -1,9 +1,7 @@
 package payments
 
 import (
-	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -83,7 +81,6 @@ func TestUserCheckoutHTTPUsesPrincipalAndTrustedReturnURL(t *testing.T) {
 	verifier := &fakeWebhookVerifier{}
 	service.verifier = verifier
 	userHandler := NewUserCheckoutHandler(service, testPublicOrigins("https://configured.example.com"))
-	eventStreamHandler := NewEventStreamHandler(service.EventHub())
 	webhookHandler := NewWebhookHandler(service)
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -94,7 +91,6 @@ func TestUserCheckoutHTTPUsesPrincipalAndTrustedReturnURL(t *testing.T) {
 	router.POST("/user/payments/checkout-sessions", userHandler.CreateCheckoutSession)
 	router.GET("/user/payments/orders/:public_token", userHandler.GetPaymentOrderReturnStatus)
 	router.GET("/user/payments/recharges", userHandler.ListRecharges)
-	router.GET("/user/payments/events", eventStreamHandler.StreamUserPaymentEvents)
 	router.POST("/api/webhooks/stripe", webhookHandler.ReceiveStripeWebhook)
 
 	options := performPaymentRequest(router, http.MethodGet, "/user/payments/purchase-options", "", nil)
@@ -131,34 +127,8 @@ func TestUserCheckoutHTTPUsesPrincipalAndTrustedReturnURL(t *testing.T) {
 		t.Fatalf("status=%d %s", status.Code, status.Body.String())
 	}
 
-	server := httptest.NewServer(router)
-	defer server.Close()
-	streamContext, cancelStream := context.WithCancel(t.Context())
-	defer cancelStream()
-	streamEvent := make(chan string, 1)
-	streamError := make(chan error, 1)
-	go func() {
-		request, err := http.NewRequestWithContext(streamContext, http.MethodGet, server.URL+"/user/payments/events", nil)
-		if err != nil {
-			streamError <- err
-			return
-		}
-		response, err := server.Client().Do(request)
-		if err != nil {
-			streamError <- err
-			return
-		}
-		defer response.Body.Close()
-		scanner := bufio.NewScanner(response.Body)
-		for scanner.Scan() {
-			if strings.HasPrefix(scanner.Text(), "data: ") {
-				streamEvent <- strings.TrimPrefix(scanner.Text(), "data: ")
-				return
-			}
-		}
-		streamError <- scanner.Err()
-	}()
-	waitForPaymentSubscriber(t, service.EventHub(), 42)
+	paymentEvents, unsubscribe := subscribePaymentUserEvents(t, service.EventHub(), 42)
+	defer unsubscribe()
 	checkoutGateway.paid = true
 	verifier.event = StripeWebhookEvent{
 		ID: "evt_user_http_paid", Type: "checkout.session.completed",
@@ -169,14 +139,13 @@ func TestUserCheckoutHTTPUsesPrincipalAndTrustedReturnURL(t *testing.T) {
 		t.Fatalf("paid webhook=%d %s", webhook.Code, webhook.Body.String())
 	}
 	select {
-	case event := <-streamEvent:
-		if !strings.Contains(event, `"public_token":"`+result.PublicToken+`"`) || !strings.Contains(event, `"status":"credited"`) {
-			t.Fatalf("payment SSE event=%s", event)
+	case rawEvent := <-paymentEvents:
+		event := decodePaymentUserEvent(t, rawEvent)
+		if event.PublicToken != result.PublicToken || event.Status != "credited" {
+			t.Fatalf("payment event=%+v", event)
 		}
-	case err := <-streamError:
-		t.Fatalf("payment SSE stream failed: %v", err)
 	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for committed payment SSE event")
+		t.Fatal("timed out waiting for committed payment event")
 	}
 
 	history := performPaymentRequest(router, http.MethodGet, "/user/payments/recharges", "", nil)
@@ -341,21 +310,6 @@ func TestUserPendingPaymentOrderHTTPBoundaryScopesOwnershipAndRejectsActionBodie
 	if len(page.Items) != 0 {
 		t.Fatalf("pending items after abandon=%+v", page.Items)
 	}
-}
-
-func waitForPaymentSubscriber(t *testing.T, hub *EventHub, userID int64) {
-	t.Helper()
-	deadline := time.Now().Add(time.Second)
-	for time.Now().Before(deadline) {
-		hub.mu.RLock()
-		count := len(hub.subscribers[userID])
-		hub.mu.RUnlock()
-		if count == 1 {
-			return
-		}
-		time.Sleep(time.Millisecond)
-	}
-	t.Fatal("payment SSE subscriber was not ready")
 }
 
 func TestUserCheckoutHTTPRejectsWalletWithoutRechargeEligibility(t *testing.T) {

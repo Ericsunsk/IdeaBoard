@@ -3,6 +3,8 @@ package storage
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -88,6 +90,42 @@ func (s *StorageService) UploadRefWithOptions(ctx context.Context, file *multipa
 	return s.uploadRefWithProfile(ctx, *profile, file, opts)
 }
 
+func (s *StorageService) PrepareUploadRef(ctx context.Context, filename string, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	profile, err := s.resolveActiveProfile(ctx)
+	if err != nil {
+		return nil, err
+	}
+	key := strings.TrimSpace(opts.ObjectKey)
+	if key == "" {
+		key, err = buildObjectKey(opts.DirPrefix, filepathExt(filename))
+		if err != nil {
+			return nil, err
+		}
+	}
+	key, err = normalizeUploadObjectKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("上传对象路径无效: %w", err)
+	}
+	adapter, err := s.adapterRegistry.get(profile.Provider)
+	if err != nil {
+		return nil, err
+	}
+	publicURL, urlErr := adapter.ProviderURL(profile, key)
+	if urlErr != nil && profile.Provider == StorageProviderLocal {
+		publicURL = publicUploadURL(key)
+		urlErr = nil
+	}
+	if urlErr != nil {
+		return nil, urlErr
+	}
+	return &StoredUploadRef{
+		URL:            publicURL,
+		StorageKey:     key,
+		StorageProfile: profile.ID,
+		MIMEType:       inferStoredUploadContentType(filename, nil),
+	}, nil
+}
+
 func (s *StorageService) StoreRemote(ctx context.Context, remoteURL string, opts StorageStoreOptions) (string, error) {
 	ref, err := s.StoreRemoteRef(ctx, remoteURL, opts)
 	if err != nil {
@@ -108,9 +146,28 @@ func (s *StorageService) StoreRemoteRef(ctx context.Context, remoteURL string, o
 // into a new storage object. Internal refs are copied through the active storage
 // adapter instead of being routed through the HTTP downloader.
 func (s *StorageService) StoreMediaRef(ctx context.Context, sourceRef string, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	profile, err := s.resolveActiveProfile(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return s.storeMediaRefWithProfile(ctx, *profile, sourceRef, opts)
+}
+
+// StoreMediaRefAtProfile materializes a source into the immutable profile/key
+// selected when its Asset ingestion began. Retries must not follow a newly
+// activated storage profile.
+func (s *StorageService) StoreMediaRefAtProfile(ctx context.Context, profileID, sourceRef string, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	profile, err := s.resolveProfileByID(ctx, profileID)
+	if err != nil {
+		return nil, fmt.Errorf("读取媒体存储配置失败: %w", err)
+	}
+	return s.storeMediaRefWithProfile(ctx, *profile, sourceRef, opts)
+}
+
+func (s *StorageService) storeMediaRefWithProfile(ctx context.Context, profile StorageProfile, sourceRef string, opts StorageStoreOptions) (*StoredUploadRef, error) {
 	trimmed := strings.TrimSpace(sourceRef)
 	if !strings.HasPrefix(trimmed, "/uploads/") {
-		return s.StoreRemoteRef(ctx, trimmed, opts)
+		return s.storeRemoteRefWithProfile(ctx, profile, trimmed, opts)
 	}
 
 	obj, err := s.ReadUploadResourceByURL(ctx, trimmed, maxRemoteFileSize)
@@ -120,7 +177,11 @@ func (s *StorageService) StoreMediaRef(ctx context.Context, sourceRef string, op
 	if err := validateImageBytes(obj.Filename, obj.Data); err != nil {
 		return nil, err
 	}
-	return s.StoreBytesRef(ctx, obj.Filename, obj.Data, opts)
+	adapter, err := s.adapterRegistry.get(profile.Provider)
+	if err != nil {
+		return nil, err
+	}
+	return adapter.StoreBytesRef(ctx, &profile, obj.Filename, obj.Data, opts)
 }
 
 func (s *StorageService) StoreBytes(ctx context.Context, filename string, data []byte, opts StorageStoreOptions) (string, error) {
@@ -141,6 +202,26 @@ func (s *StorageService) StoreBytesRef(ctx context.Context, filename string, dat
 		return nil, err
 	}
 	return adapter.StoreBytesRef(ctx, profile, filename, data, opts)
+}
+
+func (s *StorageService) storeBytesRefAtProfile(ctx context.Context, profileID, filename string, data []byte, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	profile, err := s.resolveProfileByID(ctx, profileID)
+	if err != nil {
+		return nil, fmt.Errorf("读取媒体存储配置失败: %w", err)
+	}
+	adapter, err := s.adapterRegistry.get(profile.Provider)
+	if err != nil {
+		return nil, err
+	}
+	return adapter.StoreBytesRef(ctx, profile, filename, data, opts)
+}
+
+func (s *StorageService) storeRemoteRefAtProfile(ctx context.Context, profileID, remoteURL string, opts StorageStoreOptions) (*StoredUploadRef, error) {
+	profile, err := s.resolveProfileByID(ctx, profileID)
+	if err != nil {
+		return nil, fmt.Errorf("读取媒体存储配置失败: %w", err)
+	}
+	return s.storeRemoteRefWithProfile(ctx, *profile, remoteURL, opts)
 }
 
 // ReadUploadResourceByURL resolves a structured uploads URL/path and reads it
@@ -182,6 +263,25 @@ func (s *StorageService) ReadObjectAtProfile(ctx context.Context, profileID, obj
 		return nil, err
 	}
 	return adapter.Read(ctx, profile, objectKey, maxBytes)
+}
+
+func (s *StorageService) ResolveSignedURLAtProfile(ctx context.Context, profileID, objectKey string, expiry time.Duration) (string, bool, error) {
+	profile, err := s.resolveProfileByID(ctx, profileID)
+	if err != nil {
+		return "", false, fmt.Errorf("读取媒体存储配置失败: %w", err)
+	}
+	if canonicalizeStorageProvider(profile.Provider) == StorageProviderLocal {
+		return "", false, nil
+	}
+	adapter, err := s.adapterRegistry.get(profile.Provider)
+	if err != nil {
+		return "", false, err
+	}
+	url, err := adapter.SignedURL(ctx, profile, objectKey, expiry)
+	if err != nil {
+		return "", true, err
+	}
+	return url, true, nil
 }
 
 func (s *StorageService) ResolveProviderURLAtProfile(ctx context.Context, profileID, objectKey string) (string, error) {
@@ -307,6 +407,18 @@ func (s *StorageService) DeleteObjectByStorageProfile(ctx context.Context, stora
 		return err
 	}
 	return adapter.Delete(ctx, profile, objectKey)
+}
+
+func (s *StorageService) ListObjectKeysByStorageProfile(ctx context.Context, storageProfileID string, objectKeyPrefix string) ([]string, error) {
+	profile, err := s.loadProfileForReclamation(ctx, strings.TrimSpace(storageProfileID))
+	if err != nil {
+		return nil, err
+	}
+	adapter, err := s.adapterRegistry.get(profile.Provider)
+	if err != nil {
+		return nil, err
+	}
+	return adapter.ListObjectKeysByPrefix(ctx, profile, objectKeyPrefix)
 }
 
 func (s *StorageService) deleteUploadObjectPrefix(ctx context.Context, prefix string) error {
@@ -581,6 +693,7 @@ func (s *StorageService) saveBytesLocalRef(ctx context.Context, filename string,
 		return nil, err
 	}
 	ref.Width, ref.Height, _ = imageformat.ImageDimensions(data)
+	ref.Animated = imageformat.IsAnimated(data)
 	return ref, nil
 }
 
@@ -597,9 +710,17 @@ func (s *StorageService) saveReaderLocalRef(ctx context.Context, filename string
 	if ext == "" {
 		ext = ".png"
 	}
-	objectKey, err := buildObjectKey(opts.DirPrefix, ext)
+	objectKey := strings.TrimSpace(opts.ObjectKey)
+	var err error
+	if objectKey == "" {
+		objectKey, err = buildObjectKey(opts.DirPrefix, ext)
+	}
 	if err != nil {
 		return nil, err
+	}
+	objectKey, err = normalizeUploadObjectKey(objectKey)
+	if err != nil {
+		return nil, fmt.Errorf("上传对象路径无效: %w", err)
 	}
 	dst := filepath.FromSlash(objectKey)
 	if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
@@ -615,7 +736,8 @@ func (s *StorageService) saveReaderLocalRef(ctx context.Context, filename string
 			_ = os.Remove(dst)
 		}
 	}()
-	if err := copyExactWithStorageBuffer(dstFile, src, size); err != nil {
+	hash := sha256.New()
+	if err := copyExactWithStorageBuffer(io.MultiWriter(dstFile, hash), src, size); err != nil {
 		_ = dstFile.Close()
 		return nil, fmt.Errorf("保存文件失败: %w", err)
 	}
@@ -635,6 +757,8 @@ func (s *StorageService) saveReaderLocalRef(ctx context.Context, filename string
 		StorageProfile: builtinLocalProfileID(),
 		MIMEType:       contentType,
 		SizeBytes:      size,
+		ChecksumSHA256: hex.EncodeToString(hash.Sum(nil)),
+		Animated:       strings.EqualFold(ext, ".gif"),
 	}, nil
 }
 
@@ -869,6 +993,7 @@ type remoteImageFile struct {
 	ContentType string
 	Width       int
 	Height      int
+	Animated    bool
 	Size        int64
 
 	file *os.File
@@ -956,7 +1081,7 @@ func (s *StorageService) downloadRemoteFileWithLimit(ctx context.Context, remote
 	if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
 		return nil, fmt.Errorf("读取临时文件失败: %w", err)
 	}
-	width, height, err := imageReaderDimensions(tmpFile)
+	width, height, animated, err := imageReaderFacts(tmpFile)
 	if err != nil {
 		return nil, err
 	}
@@ -971,25 +1096,26 @@ func (s *StorageService) downloadRemoteFileWithLimit(ctx context.Context, remote
 		ContentType: imageformat.ImageMIMEFromExtension(ext),
 		Width:       width,
 		Height:      height,
+		Animated:    animated,
 		Size:        size,
 		file:        tmpFile,
 		path:        tmpFile.Name(),
 	}, nil
 }
 
-func imageReaderDimensions(file *os.File) (int, int, error) {
+func imageReaderFacts(file *os.File) (int, int, bool, error) {
 	if file == nil {
-		return 0, 0, fmt.Errorf("文件内容为空")
+		return 0, 0, false, fmt.Errorf("文件内容为空")
 	}
 	data, err := io.ReadAll(file)
 	if err != nil {
-		return 0, 0, fmt.Errorf("读取图片尺寸失败: %w", err)
+		return 0, 0, false, fmt.Errorf("读取图片尺寸失败: %w", err)
 	}
 	width, height, err := imageformat.ImageDimensions(data)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, false, err
 	}
-	return width, height, nil
+	return width, height, imageformat.IsAnimated(data), nil
 }
 
 func validateRemoteImageFile(file *os.File, ext string) error {

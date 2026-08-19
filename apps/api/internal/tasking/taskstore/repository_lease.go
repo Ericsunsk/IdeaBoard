@@ -11,6 +11,7 @@ import (
 
 	"ideaboard/api/internal/db/dbutil"
 	dbsqlc "ideaboard/api/internal/db/sqlc"
+	"ideaboard/api/internal/media/derivatives"
 	"ideaboard/api/internal/tasking/tasks"
 )
 
@@ -18,6 +19,10 @@ import (
 var ErrTaskLeaseStateConflict = errors.New("task lease state conflict")
 
 func insertTaskOutputs(ctx context.Context, q *dbsqlc.Queries, taskID string, ownerUserID int64, outputs []tasks.TaskOutput) error {
+	lineageRefs, err := q.ListTaskInputMediaRefsForLineage(ctx, taskID)
+	if err != nil {
+		return fmt.Errorf("load task input lineage: %w", err)
+	}
 	for i := range outputs {
 		output := outputs[i]
 		output.TaskID = taskID
@@ -26,7 +31,7 @@ func insertTaskOutputs(ctx context.Context, q *dbsqlc.Queries, taskID string, ow
 			output.Role = "image"
 		}
 		if output.OutputKind == "asset" {
-			mediaAssetID, err := upsertTaskOutputMediaAsset(ctx, q, ownerUserID, output)
+			mediaAssetID, err := resolveTaskOutputMediaAsset(ctx, q, ownerUserID, output)
 			if err != nil {
 				return err
 			}
@@ -61,6 +66,25 @@ func insertTaskOutputs(ctx context.Context, q *dbsqlc.Queries, taskID string, ow
 			}); err != nil {
 				return err
 			}
+			for _, source := range lineageRefs {
+				if source.MediaAssetID == *output.MediaAssetID {
+					continue
+				}
+				sourceRole := strings.TrimSpace(source.Role)
+				if sourceRole == "" {
+					sourceRole = "source"
+				}
+				if _, err := q.UpsertMediaAssetSource(ctx, dbsqlc.UpsertMediaAssetSourceParams{
+					MediaAssetID:  *output.MediaAssetID,
+					SourceAssetID: source.MediaAssetID,
+					OwnerUserID:   ownerUserID,
+					SourceRole:    sourceRole,
+					SourceIndex:   source.InputIndex,
+					Metadata:      []byte(`{"origin":"task_input"}`),
+				}); err != nil {
+					return fmt.Errorf("persist task output lineage: %w", err)
+				}
+			}
 		}
 	}
 	return nil
@@ -73,6 +97,25 @@ func normalizeTaskOutputKind(output tasks.TaskOutput) string {
 	default:
 		return "asset"
 	}
+}
+
+func resolveTaskOutputMediaAsset(ctx context.Context, q *dbsqlc.Queries, ownerUserID int64, output tasks.TaskOutput) (*int64, error) {
+	if output.MediaAssetID != nil && *output.MediaAssetID > 0 {
+		asset, err := q.GetMediaAssetByIDForOwner(ctx, dbsqlc.GetMediaAssetByIDForOwnerParams{
+			ID: *output.MediaAssetID, OwnerUserID: ownerUserID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("load task result media asset %d: %w", *output.MediaAssetID, err)
+		}
+		if asset.Status != "ready" || asset.DeletedAt.Valid {
+			return nil, fmt.Errorf("task result media asset %d is not ready", *output.MediaAssetID)
+		}
+		if storageKey := strings.TrimSpace(output.StorageKey); storageKey != "" && storageKey != asset.StorageKey {
+			return nil, fmt.Errorf("task result media asset %d storage key does not match", *output.MediaAssetID)
+		}
+		return output.MediaAssetID, nil
+	}
+	return upsertTaskOutputMediaAsset(ctx, q, ownerUserID, output)
 }
 
 func releaseTaskLeaseTx(ctx context.Context, q *dbsqlc.Queries, taskID string, accountID int64, providerEndpointID int64, credentialID int64, leaseToken string, reason string, releasedAt time.Time) error {
@@ -202,19 +245,8 @@ func upsertTaskOutputMediaAsset(ctx context.Context, q *dbsqlc.Queries, ownerUse
 	if err != nil {
 		return nil, err
 	}
-	for _, tier := range []string{"thumb", "preview", "large-preview"} {
-		derivative, derivativeErr := q.UpsertMediaDerivative(ctx, dbsqlc.UpsertMediaDerivativeParams{
-			MediaAssetID: id,
-			OwnerUserID:  ownerUserID,
-			Tier:         tier,
-			Format:       "jpeg",
-		})
-		if derivativeErr != nil {
-			return nil, fmt.Errorf("create task output %s derivative: %w", tier, derivativeErr)
-		}
-		if _, derivativeErr := q.EnqueueMediaDerivativeOutbox(ctx, derivative.ID); derivativeErr != nil {
-			return nil, fmt.Errorf("enqueue task output %s derivative: %w", tier, derivativeErr)
-		}
+	if _, err := derivatives.ScheduleDefault(ctx, q, id, ownerUserID); err != nil {
+		return nil, fmt.Errorf("schedule task output derivatives: %w", err)
 	}
 	return &id, nil
 }

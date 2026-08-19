@@ -44,7 +44,7 @@ type UseCanvasGraphInteractionsOptions = {
   isNodeExecutionActive: (nodeId: string) => boolean
 }
 
-type ExportImageEntry = { url: string; title: string }
+type ExportImageEntry = { url: string; mediaAssetId?: number; title: string }
 
 function safeDecodeURIComponent(value: string): string {
   try {
@@ -93,11 +93,21 @@ function readOutputImages(snapshot: CanvasNodeItem): ImageNodeOutputItem[] {
 function resolveExportEntries(snapshot: CanvasNodeItem): ExportImageEntry[] {
   if (snapshot.type !== 'image-node' && snapshot.type !== 'fusion') return []
   const outputs = readOutputImages(snapshot)
-  const urls =
+  const entries =
     snapshot.type === 'image-node'
-      ? [outputs.at(-1)?.url || snapshot.sourceImageUrl].filter(Boolean)
-      : outputs.map((item) => item.url)
-  return urls.map((url) => ({ url: url.trim(), title: snapshot.title?.trim() || 'image' }))
+      ? [
+          outputs.at(-1)
+            ? { url: outputs.at(-1)!.url, mediaAssetId: outputs.at(-1)!.mediaAssetId }
+            : { url: snapshot.sourceImageUrl, mediaAssetId: snapshot.sourceMediaAssetId },
+        ]
+      : outputs.map((item) => ({ url: item.url, mediaAssetId: item.mediaAssetId }))
+  return entries
+    .filter((entry) => !!entry.url?.trim() || Number.isInteger(entry.mediaAssetId))
+    .map((entry) => ({
+      url: entry.url.trim(),
+      ...(Number.isInteger(entry.mediaAssetId) ? { mediaAssetId: entry.mediaAssetId } : {}),
+      title: snapshot.title?.trim() || 'image',
+    }))
 }
 
 function cloneImageOutputs(source: ImageNodeItem): ImageNodeItem['outputImages'] {
@@ -202,6 +212,7 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
         try {
           options.browser.downloadImage({
             url: entry.url,
+            ...(entry.mediaAssetId ? { mediaAssetId: entry.mediaAssetId } : {}),
             fileName: buildUniqueExportFileName(entry, counts),
           })
         } catch {

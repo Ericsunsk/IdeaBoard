@@ -293,7 +293,8 @@ func TestBoardUploadRegistrationConvergesThroughSaveDeleteAndGraceScheduling(t *
 	if err := users.NewUserRepository(db).Create(ctx, owner); err != nil {
 		t.Fatalf("create owner: %v", err)
 	}
-	assetID, err := mediaassets.NewMediaAssetRegistry(db).RegisterBoardUpload(ctx, mediaassets.BoardUploadAsset{
+	registry := mediaassets.NewMediaAssetRegistry(db)
+	upload := mediaassets.BoardUploadAsset{
 		OwnerUserID: owner.ID,
 		BoardID:     "upload-reclamation-board",
 		Stored: storage.StoredUploadRef{
@@ -305,9 +306,13 @@ func TestBoardUploadRegistrationConvergesThroughSaveDeleteAndGraceScheduling(t *
 			Height:         480,
 			SizeBytes:      2048,
 		},
-	})
+	}
+	assetID, err := registry.BeginBoardUpload(ctx, upload)
 	if err != nil {
-		t.Fatalf("register uploaded media asset: %v", err)
+		t.Fatalf("begin uploaded media asset: %v", err)
+	}
+	if err := registry.CompleteBoardUpload(ctx, upload, assetID); err != nil {
+		t.Fatalf("complete uploaded media asset: %v", err)
 	}
 	q := dbsqlc.New(db)
 	uploaded, err := q.GetMediaAssetByID(ctx, assetID)

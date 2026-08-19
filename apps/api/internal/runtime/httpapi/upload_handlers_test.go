@@ -2,63 +2,17 @@ package httpapi
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"ideaboard/api/internal/identity/principal"
-	mediaassets "ideaboard/api/internal/media/assets"
-	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/testsupport"
 
 	"github.com/gin-gonic/gin"
 )
-
-type failingBoardUploadRegistry struct {
-	err error
-}
-
-func (f failingBoardUploadRegistry) RegisterBoardUpload(context.Context, mediaassets.BoardUploadAsset) (int64, error) {
-	return 0, f.err
-}
-
-type recordingBoardUploadCleaner struct {
-	profileID string
-	objectKey string
-}
-
-func (c *recordingBoardUploadCleaner) DeleteObjectByStorageProfile(_ context.Context, profileID, objectKey string) error {
-	c.profileID = profileID
-	c.objectKey = objectKey
-	return nil
-}
-
-func TestBoardUploadRegistrationFailureCleansUpStoredObject(t *testing.T) {
-	registrationErr := errors.New("database unavailable")
-	cleaner := &recordingBoardUploadCleaner{}
-	_, err := registerBoardUploadAsset(
-		context.Background(),
-		failingBoardUploadRegistry{err: registrationErr},
-		cleaner,
-		mediaassets.BoardUploadAsset{
-			OwnerUserID: 42,
-			BoardID:     "board-a",
-			Stored: storage.StoredUploadRef{
-				StorageProfile: "profile-a",
-				StorageKey:     "uploads/canvas/owner/board-a/content/image.png",
-			},
-		},
-	)
-	if !errors.Is(err, registrationErr) {
-		t.Fatalf("registration error = %v, want %v", err, registrationErr)
-	}
-	if cleaner.profileID != "profile-a" || cleaner.objectKey != "uploads/canvas/owner/board-a/content/image.png" {
-		t.Fatalf("cleanup target = profile:%q key:%q", cleaner.profileID, cleaner.objectKey)
-	}
-}
 
 type fakeMediaUploadSettingsProvider struct {
 	setting settings.MediaUploadSetting

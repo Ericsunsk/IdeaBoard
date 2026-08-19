@@ -8,7 +8,6 @@ import {
   type MaybeRefOrGetter,
 } from 'vue'
 import { canvasToBlob, resolveFetchUrl } from '../services/flowMediaIO'
-import { MEDIA_ASSET_ENDPOINT } from '../../../shared/constants/media'
 import {
   detectCanvasTransparency,
   resolvePreviewMimeType,
@@ -16,25 +15,27 @@ import {
   WEBP_PREVIEW_QUALITY,
 } from '../utils/displayImagePreviewEncoding'
 import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../shared/config/runtimeUrls'
+import {
+  useMediaAssetDelivery,
+  type MediaAssetDeliveryTier,
+} from '../../../shared/api/mediaAssetDelivery'
 
 interface PreviewOptions {
   maxSide?: MaybeRefOrGetter<number | null | undefined>
   mediaAssetId?: MaybeRefOrGetter<number | null | undefined>
+  isVisible?: MaybeRefOrGetter<boolean>
 }
 
 const DEFAULT_MAX_SIDE = 1280
 const PREVIEW_CACHE_LIMIT = 80
 const PREVIEW_CONCURRENCY = 2
-const MEDIA_DERIVATIVE_RETRY_LIMIT = 20
-const MEDIA_DERIVATIVE_RETRY_DELAY_MS = 750
-
 const previewCache = new Map<string, string>()
 const inFlightPreviewTasks = new Map<string, Promise<string | null>>()
 const pendingPreviewTasks: Array<() => void> = []
 let activePreviewTasks = 0
 
-function buildPreviewCacheKey(sourceUrl: string, maxSide: number, mediaAssetId: number | null) {
-  return `${maxSide}::${mediaAssetId ?? ''}::${sourceUrl}`
+function buildPreviewCacheKey(sourceUrl: string, maxSide: number) {
+  return `${maxSide}::${sourceUrl}`
 }
 
 function resolvePreviewMaxSide(value: unknown): number | null {
@@ -92,40 +93,14 @@ function enqueuePreviewTask<T>(taskFactory: () => Promise<T>): Promise<T> {
   })
 }
 
-function resolveDerivativeTier(maxSide: number): string {
-  if (maxSide <= 256) return 'thumb'
-  if (maxSide <= 640) return 'preview'
-  return 'large-preview'
-}
-
-async function fetchMediaDerivative(fetchUrl: string): Promise<Response | null> {
-  for (let attempt = 0; attempt <= MEDIA_DERIVATIVE_RETRY_LIMIT; attempt += 1) {
-    const response = await fetch(fetchUrl, { credentials: 'include' })
-    if (response.ok) return response
-    if (response.status !== 202 || attempt === MEDIA_DERIVATIVE_RETRY_LIMIT) return null
-    await new Promise((resolve) => window.setTimeout(resolve, MEDIA_DERIVATIVE_RETRY_DELAY_MS))
-  }
-  return null
-}
-
-async function createPreviewObjectUrl(
-  sourceUrl: string,
-  maxSide: number,
-  mediaAssetId: number | null,
-): Promise<string | null> {
-  const fetchUrl = mediaAssetId
-    ? `${MEDIA_ASSET_ENDPOINT}/${encodeURIComponent(String(mediaAssetId))}/derivatives/${resolveDerivativeTier(maxSide)}/content`
-    : resolveFetchUrl(sourceUrl)
+async function createPreviewObjectUrl(sourceUrl: string, maxSide: number): Promise<string | null> {
+  const fetchUrl = resolveFetchUrl(sourceUrl)
   if (!fetchUrl) return null
-  const response = mediaAssetId
-    ? await fetchMediaDerivative(fetchUrl)
-    : await fetch(fetchUrl, { credentials: 'include' })
+  const response = await fetch(fetchUrl, { credentials: 'include' })
   if (!response) return null
   if (!response.ok) return null
   const sourceBlob = await response.blob()
   if (!sourceBlob.type.startsWith('image/')) return null
-
-  if (mediaAssetId) return URL.createObjectURL(sourceBlob)
 
   const bitmap = await createImageBitmap(sourceBlob)
   const longestSide = Math.max(bitmap.width, bitmap.height)
@@ -160,19 +135,15 @@ async function createPreviewObjectUrl(
   return URL.createObjectURL(previewBlob)
 }
 
-async function getOrCreatePreviewUrl(
-  sourceUrl: string,
-  maxSide: number,
-  mediaAssetId: number | null,
-): Promise<string | null> {
-  const cacheKey = buildPreviewCacheKey(sourceUrl, maxSide, mediaAssetId)
+async function getOrCreatePreviewUrl(sourceUrl: string, maxSide: number): Promise<string | null> {
+  const cacheKey = buildPreviewCacheKey(sourceUrl, maxSide)
   const cached = getCachedPreviewUrl(cacheKey)
   if (cached) return cached
 
   const inFlight = inFlightPreviewTasks.get(cacheKey)
   if (inFlight) return inFlight
 
-  const task = enqueuePreviewTask(() => createPreviewObjectUrl(sourceUrl, maxSide, mediaAssetId))
+  const task = enqueuePreviewTask(() => createPreviewObjectUrl(sourceUrl, maxSide))
     .then((previewUrl) => {
       if (previewUrl) touchCache(cacheKey, previewUrl)
       return previewUrl
@@ -203,14 +174,29 @@ export function useDisplayImagePreview(
     const raw = toValue(options.mediaAssetId)
     return typeof raw === 'number' && Number.isInteger(raw) && raw > 0 ? raw : null
   })
+  const isVisible = computed(() => toValue(options.isVisible) !== false)
+  const resolvedMediaTier = computed<MediaAssetDeliveryTier>(() => {
+    if (resolvedMaxSide.value === null) return 'original'
+    if (resolvedMaxSide.value <= 256) return 'thumb'
+    if (resolvedMaxSide.value <= 640) return 'preview'
+    return 'large-preview'
+  })
+  const mediaDelivery = useMediaAssetDelivery(resolvedMediaAssetId, resolvedMediaTier, {
+    enabled: isVisible,
+  })
   const previewUrl = ref<string | null>(null)
   const isResolved = ref(false)
   let requestToken = 0
   let activeSource = ''
 
   watch(
-    [() => resolvedSourceUrl.value, () => resolvedMaxSide.value, () => resolvedMediaAssetId.value],
-    ([currentSource, maxSide, mediaAssetId]) => {
+    [
+      () => resolvedSourceUrl.value,
+      () => resolvedMaxSide.value,
+      () => resolvedMediaAssetId.value,
+      isVisible,
+    ],
+    ([currentSource, maxSide, mediaAssetId, visible]) => {
       requestToken += 1
       const token = requestToken
       if (currentSource !== activeSource) previewUrl.value = null
@@ -218,12 +204,15 @@ export function useDisplayImagePreview(
       isResolved.value = false
 
       if (!currentSource) return
+      if (mediaAssetId !== null && !visible) return
       if (maxSide === null) {
         previewUrl.value = null
         return
       }
 
-      const cacheKey = buildPreviewCacheKey(currentSource, maxSide, mediaAssetId)
+      if (mediaAssetId !== null) return
+
+      const cacheKey = buildPreviewCacheKey(currentSource, maxSide)
       const cached = getCachedPreviewUrl(cacheKey)
       if (cached) {
         previewUrl.value = cached
@@ -231,7 +220,7 @@ export function useDisplayImagePreview(
         return
       }
 
-      void getOrCreatePreviewUrl(currentSource, maxSide, mediaAssetId).then((generatedPreviewUrl) => {
+      void getOrCreatePreviewUrl(currentSource, maxSide).then((generatedPreviewUrl) => {
         if (token !== requestToken) return
         previewUrl.value = generatedPreviewUrl
         isResolved.value = true
@@ -247,6 +236,11 @@ export function useDisplayImagePreview(
   }
 
   const displayUrl = computed(() => {
+    if (resolvedMediaAssetId.value !== null) {
+      if (!isVisible.value) return ''
+      if (mediaDelivery.url.value) return mediaDelivery.url.value
+      return ''
+    }
     if (previewUrl.value) return previewUrl.value
     if (
       isManagedUpload.value &&

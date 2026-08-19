@@ -20,7 +20,7 @@ import type {
   RechargeHistoryItem,
   RechargeHistoryPage,
 } from '../../shared/api/generated-query/model'
-import { resolveApiUrl } from '../../shared/config/runtimeUrls'
+import { subscribeUserEvent } from '../../shared/api/userEventStream'
 
 export type UserPaymentCheckoutRequest = CreatePaymentCheckoutRequest
 export type UserPaymentCheckout = PaymentCheckout
@@ -82,34 +82,14 @@ const defaultContext: UserPaymentsContext = {
   navigateToCheckout: (checkoutURL) => window.location.assign(checkoutURL),
 }
 
-type UserPaymentEventSource = {
-  addEventListener(event: 'payment', listener: EventListener): void
-  removeEventListener(event: 'payment', listener: EventListener): void
-  close(): void
-}
-type UserPaymentEventSourceFactory = (
-  url: string,
-  options: EventSourceInit,
-) => UserPaymentEventSource
-
 export function subscribeToUserPaymentEvents(
   listener: (event: UserPaymentEvent) => void,
-  createEventSource: UserPaymentEventSourceFactory = (url, options) =>
-    new EventSource(url, options),
 ): () => void {
-  if (typeof EventSource === 'undefined' && arguments.length < 2) return () => undefined
-  const source = createEventSource(resolveApiUrl('/user/events'), {
-    withCredentials: true,
-  })
   const handlePayment = (message: MessageEvent<string>) => {
     const event = parseUserPaymentEvent(message.data)
     if (event) listener(event)
   }
-  source.addEventListener('payment', handlePayment as EventListener)
-  return () => {
-    source.removeEventListener('payment', handlePayment as EventListener)
-    source.close()
-  }
+  return subscribeUserEvent('payment.updated', handlePayment)
 }
 
 export function parseUserPaymentEvent(raw: string): UserPaymentEvent | null {

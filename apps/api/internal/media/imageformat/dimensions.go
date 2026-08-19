@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"image"
+	"image/gif"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
@@ -11,6 +12,14 @@ import (
 	_ "golang.org/x/image/bmp"
 	_ "golang.org/x/image/webp"
 )
+
+func IsAnimated(data []byte) bool {
+	if len(data) == 0 {
+		return false
+	}
+	decoded, err := gif.DecodeAll(bytes.NewReader(data))
+	return err == nil && len(decoded.Image) > 1
+}
 
 const (
 	MaxImageDimensionPixels = 16384

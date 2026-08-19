@@ -4,18 +4,15 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/jsonlimit"
 	"ideaboard/api/internal/platform/response"
-	"ideaboard/api/internal/platform/sse"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -26,7 +23,6 @@ const (
 	maxStripeWebhookRequestBytes       int64 = 128 << 10
 	maxPaymentCheckoutRequestBytes     int64 = 16 << 10
 	maxPaymentRefundRequestBytes       int64 = 16 << 10
-	paymentEventsHeartbeatInterval           = 15 * time.Second
 )
 
 type UserCheckoutService interface {
@@ -51,10 +47,6 @@ type WebhookService interface {
 	ReceiveStripeWebhook(context.Context, []byte, string) (StripeWebhookReceipt, error)
 }
 
-type UserPaymentEventStream interface {
-	Subscribe(int64) (<-chan PaymentEvent, func())
-}
-
 type UserCheckoutHandler struct {
 	service       UserCheckoutService
 	publicOrigins config.PublicOriginsConfig
@@ -67,10 +59,6 @@ type AdminHandler struct {
 
 type WebhookHandler struct {
 	service WebhookService
-}
-
-type EventStreamHandler struct {
-	events UserPaymentEventStream
 }
 
 type updateStripeConfigurationRequest struct {
@@ -104,10 +92,6 @@ func NewAdminHandler(service AdminService, publicOrigins config.PublicOriginsCon
 
 func NewWebhookHandler(service WebhookService) *WebhookHandler {
 	return &WebhookHandler{service: service}
-}
-
-func NewEventStreamHandler(events UserPaymentEventStream) *EventStreamHandler {
-	return &EventStreamHandler{events: events}
 }
 
 func (h *UserCheckoutHandler) GetPurchaseOptions(c *gin.Context) {
@@ -330,51 +314,6 @@ func (h *UserCheckoutHandler) ListRecharges(c *gin.Context) {
 		return
 	}
 	response.SuccessDTO(c, page)
-}
-
-func (h *EventStreamHandler) StreamUserPaymentEvents(c *gin.Context) {
-	c.Header("Cache-Control", "no-store")
-	identityPrincipal, ok := principal.Require(c)
-	if !ok {
-		return
-	}
-	var events UserPaymentEventStream
-	if h != nil {
-		events = h.events
-	}
-	if events == nil {
-		response.Error(c, http.StatusServiceUnavailable, "充值事件服务暂不可用")
-		return
-	}
-	eventChannel, unsubscribe := events.Subscribe(identityPrincipal.UserID())
-	if eventChannel == nil {
-		response.Error(c, http.StatusServiceUnavailable, "充值事件服务暂不可用")
-		return
-	}
-	defer unsubscribe()
-	if err := sse.Prepare(c); err != nil {
-		// A write-deadline reset is an optional transport optimization. The stream
-		// remains usable on ResponseWriter implementations that do not expose it.
-		slog.Warn("clear payment SSE write deadline failed", "err", err)
-	}
-	c.Header("Cache-Control", "no-store")
-	heartbeat := time.NewTicker(paymentEventsHeartbeatInterval)
-	defer heartbeat.Stop()
-	for {
-		select {
-		case <-c.Request.Context().Done():
-			return
-		case event := <-eventChannel:
-			if err := sse.WriteEvent(c, "payment", event); err != nil {
-				return
-			}
-		case <-heartbeat.C:
-			if _, err := c.Writer.Write([]byte(":keepalive\n\n")); err != nil {
-				return
-			}
-			c.Writer.Flush()
-		}
-	}
 }
 
 func (h *AdminHandler) ListAdminPaymentOrders(c *gin.Context) {
