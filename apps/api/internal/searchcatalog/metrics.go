@@ -20,10 +20,15 @@ type SearchMetrics interface {
 	RecordImageFailure(Provider)
 }
 
+type VisionSearchMetrics interface {
+	RecordVisionRequest()
+}
+
 type noopSearchMetrics struct{}
 
 func (noopSearchMetrics) RecordSearch(SearchObservation) {}
 func (noopSearchMetrics) RecordImageFailure(Provider)    {}
+func (noopSearchMetrics) RecordVisionRequest()           {}
 
 type prometheusSearchMetrics struct {
 	requests        *prometheus.CounterVec
@@ -32,6 +37,7 @@ type prometheusSearchMetrics struct {
 	providerLatency *prometheus.HistogramVec
 	resultCount     *prometheus.HistogramVec
 	imageFailures   *prometheus.CounterVec
+	visionRequests  prometheus.Counter
 }
 
 func NewPrometheusMetrics(registerer prometheus.Registerer) (SearchMetrics, error) {
@@ -88,7 +94,21 @@ func NewPrometheusMetrics(registerer prometheus.Registerer) (SearchMetrics, erro
 	}, []string{"provider"})); err != nil {
 		return nil, err
 	}
+	if metrics.visionRequests, err = registerCounter(registerer, prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: "ideaboard",
+		Subsystem: "search",
+		Name:      "vision_search_requests_total",
+		Help:      "Vision Search extraction requests.",
+	})); err != nil {
+		return nil, err
+	}
 	return metrics, nil
+}
+
+func (m *prometheusSearchMetrics) RecordVisionRequest() {
+	if m != nil && m.visionRequests != nil {
+		m.visionRequests.Inc()
+	}
 }
 
 func (m *prometheusSearchMetrics) RecordSearch(observation SearchObservation) {
@@ -127,6 +147,18 @@ func registerCounterVec(registerer prometheus.Registerer, collector *prometheus.
 	if err := registerer.Register(collector); err != nil {
 		if existing, ok := err.(prometheus.AlreadyRegisteredError); ok {
 			if typed, ok := existing.ExistingCollector.(*prometheus.CounterVec); ok {
+				return typed, nil
+			}
+		}
+		return nil, fmt.Errorf("register search counter: %w", err)
+	}
+	return collector, nil
+}
+
+func registerCounter(registerer prometheus.Registerer, collector prometheus.Counter) (prometheus.Counter, error) {
+	if err := registerer.Register(collector); err != nil {
+		if existing, ok := err.(prometheus.AlreadyRegisteredError); ok {
+			if typed, ok := existing.ExistingCollector.(prometheus.Counter); ok {
 				return typed, nil
 			}
 		}

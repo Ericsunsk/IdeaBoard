@@ -4,8 +4,8 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { SearchProviderProvider } from './searchProviderProvider'
+import type { SearchCatalogProvider } from './searchCatalogProvider'
 
 export interface RecordSearchImageFailureRequest {
-  provider: SearchProviderProvider
+  provider: SearchCatalogProvider
 }

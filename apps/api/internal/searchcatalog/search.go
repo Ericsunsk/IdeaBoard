@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -61,6 +62,23 @@ type SearchResponse struct {
 	ProviderStatus []ProviderStatus `json:"-"`
 }
 
+type SearchRefinements struct {
+	Palette        []string
+	AtmosphereTags []string
+}
+
+type SearchRequest struct {
+	Query       string
+	Page        int
+	Limit       int
+	Refinements SearchRefinements
+}
+
+type SearchCapabilities struct {
+	Palette        bool
+	AtmosphereTags bool
+}
+
 type searchCursor struct {
 	Unsplash     int  `json:"unsplash"`
 	Pexels       int  `json:"pexels"`
@@ -76,7 +94,8 @@ type SearchService struct {
 
 type searchAdapter interface {
 	Provider() Provider
-	Search(context.Context, string, int, int, string) (adapterPage, error)
+	Capabilities() SearchCapabilities
+	Search(context.Context, string, SearchRequest) (adapterPage, error)
 }
 
 type adapterPage struct {
@@ -96,7 +115,7 @@ func NewSearchService(configs *ConfigRepository, metrics ...SearchMetrics) *Sear
 	return &SearchService{configs: configs, adapters: adapters, metrics: recorder}
 }
 
-func (s *SearchService) Search(ctx context.Context, rawQuery, rawCursor string, limit int) (response SearchResponse, err error) {
+func (s *SearchService) Search(ctx context.Context, rawQuery, rawCursor string, limit int, refinements ...SearchRefinements) (response SearchResponse, err error) {
 	started := time.Now()
 	page := "append"
 	metricStatuses := []ProviderStatus(nil)
@@ -121,6 +140,10 @@ func (s *SearchService) Search(ctx context.Context, rawQuery, rawCursor string, 
 	query, err := normalizeQuery(rawQuery)
 	if err != nil {
 		return SearchResponse{}, err
+	}
+	requestedRefinements := SearchRefinements{}
+	if len(refinements) > 0 {
+		requestedRefinements = normalizeRefinements(refinements[0])
 	}
 	if limit <= 0 {
 		limit = DefaultSearchLimit
@@ -149,6 +172,9 @@ func (s *SearchService) Search(ctx context.Context, rawQuery, rawCursor string, 
 	keys := make(map[Provider]string, len(configs))
 	availableProviders := 0
 	for _, config := range configs {
+		if !isCatalogProvider(config.Provider) {
+			continue
+		}
 		if !config.Enabled || config.TestState != TestStatePassed {
 			continue
 		}
@@ -184,7 +210,15 @@ func (s *SearchService) Search(ctx context.Context, rawQuery, rawCursor string, 
 				return
 			}
 			callCtx, cancel := context.WithTimeout(ctx, searchTimeout)
-			page, callErr := adapter.Search(callCtx, keys[provider], pageNumber, limit, query)
+			providerRefinements := requestedRefinements
+			capabilities := adapter.Capabilities()
+			if !capabilities.Palette {
+				providerRefinements.Palette = nil
+			}
+			if !capabilities.AtmosphereTags {
+				providerRefinements.AtmosphereTags = nil
+			}
+			page, callErr := adapter.Search(callCtx, keys[provider], SearchRequest{Query: query, Page: pageNumber, Limit: limit, Refinements: providerRefinements})
 			cancel()
 			status := ProviderStatus{Provider: provider, Status: "ok", LatencyMS: time.Since(started).Milliseconds()}
 			if callErr != nil {
@@ -230,6 +264,122 @@ func (s *SearchService) Search(ctx context.Context, rawQuery, rawCursor string, 
 		next = encodeCursor(nextCursor(cursor, active, statuses, pages))
 	}
 	return SearchResponse{Query: query, Results: allResults, NextCursor: next, HasMore: hasMore, Partial: failures > 0, ProviderStatus: statuses}, nil
+}
+
+func normalizeRefinements(refinements SearchRefinements) SearchRefinements {
+	return SearchRefinements{
+		Palette:        normalizePalette(refinements.Palette),
+		AtmosphereTags: normalizeAtmosphereTags(refinements.AtmosphereTags),
+	}
+}
+
+func normalizePalette(values []string) []string {
+	return normalizeUnique(values, 5, func(value string) (string, bool) {
+		value = strings.ToLower(strings.TrimSpace(value))
+		if len(value) != 7 || value[0] != '#' {
+			return "", false
+		}
+		for _, char := range value[1:] {
+			if !strings.ContainsRune("0123456789abcdef", char) {
+				return "", false
+			}
+		}
+		return value, true
+	})
+}
+
+func normalizeAtmosphereTags(values []string) []string {
+	return normalizeUnique(values, 3, func(value string) (string, bool) {
+		value = strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
+		return value, value != "" && utf8RuneCount(value) <= 48
+	})
+}
+
+func refinementQuery(refinements SearchRefinements) string {
+	parts := make([]string, 0, len(refinements.Palette)+len(refinements.AtmosphereTags))
+	for _, color := range refinements.Palette {
+		if name := paletteColorName(color); name != "" {
+			parts = append(parts, name)
+		}
+	}
+	parts = append(parts, refinements.AtmosphereTags...)
+	return strings.Join(parts, " ")
+}
+
+func providerQuery(query string, refinements SearchRefinements) string {
+	return strings.Join(strings.Fields(strings.TrimSpace(query)+" "+refinementQuery(refinements)), " ")
+}
+
+func paletteColorName(value string) string {
+	value = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(value)), "#")
+	if len(value) != 6 {
+		return ""
+	}
+	red, okRed := parseHexByte(value[0:2])
+	green, okGreen := parseHexByte(value[2:4])
+	blue, okBlue := parseHexByte(value[4:6])
+	if !okRed || !okGreen || !okBlue {
+		return ""
+	}
+	maxValue := math.Max(float64(red), math.Max(float64(green), float64(blue)))
+	minValue := math.Min(float64(red), math.Min(float64(green), float64(blue)))
+	if maxValue-minValue < 18 {
+		if maxValue > 235 {
+			return "white"
+		}
+		if maxValue < 45 {
+			return "black"
+		}
+		return "gray"
+	}
+	hue := colorHue(float64(red), float64(green), float64(blue), maxValue, minValue)
+	switch {
+	case hue < 15 || hue >= 345:
+		return "red"
+	case hue < 45:
+		return "orange"
+	case hue < 75:
+		return "yellow"
+	case hue < 165:
+		return "green"
+	case hue < 195:
+		return "teal"
+	case hue < 255:
+		return "blue"
+	case hue < 285:
+		return "purple"
+	default:
+		return "magenta"
+	}
+}
+
+func parseHexByte(value string) (int, bool) {
+	parsed, err := strconv.ParseUint(value, 16, 8)
+	return int(parsed), err == nil
+}
+
+func colorHue(red, green, blue, maxValue, minValue float64) float64 {
+	delta := maxValue - minValue
+	if delta == 0 {
+		return 0
+	}
+	var hue float64
+	switch maxValue {
+	case red:
+		hue = 60 * math.Mod((green-blue)/delta, 6)
+	case green:
+		hue = 60 * ((blue-red)/delta + 2)
+	default:
+		hue = 60 * ((red-green)/delta + 4)
+	}
+	if hue < 0 {
+		hue += 360
+	}
+	return hue
+}
+
+func isCatalogProvider(provider Provider) bool {
+	return provider == ProviderUnsplash || provider == ProviderPexels
 }
 
 func normalizeQuery(raw string) (string, error) {
@@ -371,6 +521,9 @@ func isProviderURL(raw string, allowedHosts []string) bool {
 type unsplashAdapter struct{}
 
 func (*unsplashAdapter) Provider() Provider { return ProviderUnsplash }
+func (*unsplashAdapter) Capabilities() SearchCapabilities {
+	return SearchCapabilities{Palette: true, AtmosphereTags: true}
+}
 
 type unsplashPhoto struct {
 	ID, Description, AltDescription string
@@ -389,12 +542,13 @@ type unsplashPhoto struct {
 	} `json:"links"`
 }
 
-func (a *unsplashAdapter) Search(ctx context.Context, key string, page, limit int, query string) (adapterPage, error) {
+func (a *unsplashAdapter) Search(ctx context.Context, key string, search SearchRequest) (adapterPage, error) {
 	endpoint := "https://api.unsplash.com/photos"
-	if query != "" {
+	if search.Query != "" || refinementQuery(search.Refinements) != "" {
 		endpoint = "https://api.unsplash.com/search/photos"
 	}
-	values := url.Values{"page": {strconv.Itoa(page)}, "per_page": {strconv.Itoa(limit)}}
+	values := url.Values{"page": {strconv.Itoa(search.Page)}, "per_page": {strconv.Itoa(search.Limit)}}
+	query := providerQuery(search.Query, search.Refinements)
 	if query != "" {
 		values.Set("query", query)
 	}
@@ -418,7 +572,7 @@ func (a *unsplashAdapter) Search(ctx context.Context, key string, page, limit in
 		if err := json.Unmarshal(body, &photos); err != nil {
 			return adapterPage{}, err
 		}
-		hasMore = len(photos) == limit
+		hasMore = len(photos) == search.Limit
 	} else {
 		var payload struct {
 			Results    []unsplashPhoto `json:"results"`
@@ -427,7 +581,7 @@ func (a *unsplashAdapter) Search(ctx context.Context, key string, page, limit in
 		if err := json.Unmarshal(body, &payload); err != nil {
 			return adapterPage{}, err
 		}
-		photos, hasMore = payload.Results, payload.TotalPages == 0 || page < payload.TotalPages
+		photos, hasMore = payload.Results, payload.TotalPages == 0 || search.Page < payload.TotalPages
 	}
 	results := make([]Result, 0, len(photos))
 	for _, item := range photos {
@@ -439,12 +593,16 @@ func (a *unsplashAdapter) Search(ctx context.Context, key string, page, limit in
 type pexelsAdapter struct{}
 
 func (*pexelsAdapter) Provider() Provider { return ProviderPexels }
-func (a *pexelsAdapter) Search(ctx context.Context, key string, page, limit int, query string) (adapterPage, error) {
+func (*pexelsAdapter) Capabilities() SearchCapabilities {
+	return SearchCapabilities{Palette: true, AtmosphereTags: true}
+}
+func (a *pexelsAdapter) Search(ctx context.Context, key string, search SearchRequest) (adapterPage, error) {
 	endpoint := "https://api.pexels.com/v1/curated"
-	if query != "" {
+	if search.Query != "" || refinementQuery(search.Refinements) != "" {
 		endpoint = "https://api.pexels.com/v1/search"
 	}
-	values := url.Values{"page": {strconv.Itoa(page)}, "per_page": {strconv.Itoa(limit)}}
+	values := url.Values{"page": {strconv.Itoa(search.Page)}, "per_page": {strconv.Itoa(search.Limit)}}
+	query := providerQuery(search.Query, search.Refinements)
 	if query != "" {
 		values.Set("query", query)
 	}

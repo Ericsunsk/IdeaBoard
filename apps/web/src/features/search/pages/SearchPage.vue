@@ -41,6 +41,16 @@
                 aria-label="搜索灵感"
                 @input="queryError = ''"
               />
+              <button
+                type="button"
+                class="grid size-8 shrink-0 place-items-center rounded-full border border-board-card-border text-board-control-icon transition-colors hover:border-board-primary hover:bg-board-primary/10 hover:text-board-primary"
+                aria-label="Add search reference image"
+                title="Add search reference image"
+                :disabled="references.length >= 4"
+                @click="openFilePicker"
+              >
+                <Camera class="size-4" aria-hidden="true" />
+              </button>
               <Button
                 type="submit"
                 label="Search"
@@ -76,6 +86,109 @@
             />
           </button>
         </div>
+        <div
+          v-if="references.length > 0"
+          class="mt-2 flex w-full max-w-[720px] flex-wrap items-center gap-2 pointer-events-auto"
+        >
+          <div
+            v-for="reference in references"
+            :key="reference.key"
+            class="group relative size-12 overflow-hidden rounded-xl border border-board-card-border bg-board-card-bg"
+          >
+            <img
+              :src="reference.previewUrl"
+              alt="Search reference"
+              class="h-full w-full object-cover"
+            />
+            <button
+              type="button"
+              class="absolute right-0.5 top-0.5 grid size-5 place-items-center rounded-full bg-black/65 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+              :aria-label="`Remove reference ${reference.key}`"
+              @click="removeReference(reference.key)"
+            >
+              <Xmark class="size-3" aria-hidden="true" />
+            </button>
+          </div>
+          <button
+            v-if="references.length < 4"
+            type="button"
+            class="grid size-12 place-items-center rounded-xl border border-dashed border-board-card-border text-board-page-text-muted transition-colors hover:border-board-primary hover:text-board-primary"
+            aria-label="Add search reference image"
+            @click="openFilePicker"
+          >
+            <Plus class="size-4" aria-hidden="true" />
+          </button>
+          <input
+            ref="fileInput"
+            type="file"
+            accept="image/*"
+            multiple
+            class="hidden"
+            @change="handleFileInput"
+          />
+        </div>
+        <input
+          v-if="references.length === 0"
+          ref="fileInput"
+          type="file"
+          accept="image/*"
+          multiple
+          class="hidden"
+          @change="handleFileInput"
+        />
+        <div
+          v-if="
+            visionState === 'extracting' ||
+            visionState === 'error' ||
+            palette.length ||
+            atmosphereTags.length
+          "
+          class="mt-2 flex min-h-10 w-full max-w-[720px] flex-wrap items-center gap-2 rounded-2xl border border-board-card-border bg-board-control-bg/80 px-3 py-2 text-xs pointer-events-auto"
+          aria-live="polite"
+        >
+          <template v-if="visionState === 'extracting'">
+            <span class="h-3 w-24 animate-pulse rounded bg-board-card-border/70"></span>
+            <span class="h-3 w-16 animate-pulse rounded bg-board-card-border/70"></span>
+          </template>
+          <template v-else-if="visionState === 'error'">
+            <span class="font-semibold text-board-danger">{{ visionError }}</span>
+            <button
+              type="button"
+              class="ml-auto font-semibold text-board-primary"
+              @click="runVisionSearch"
+            >
+              Retry
+            </button>
+          </template>
+          <template v-else>
+            <button
+              v-for="color in palette"
+              :key="color"
+              type="button"
+              class="size-5 rounded-full border-2 transition-transform"
+              :class="
+                selectedPalette.has(color) ? 'scale-110 border-board-primary' : 'border-white/80'
+              "
+              :style="{ backgroundColor: color }"
+              :aria-label="`Toggle palette ${color}`"
+              @click="togglePalette(color)"
+            ></button>
+            <button
+              v-for="tag in atmosphereTags"
+              :key="tag"
+              type="button"
+              class="rounded-full border px-2.5 py-1 transition-colors"
+              :class="
+                selectedTags.has(tag)
+                  ? 'border-board-primary bg-board-primary/10 text-board-primary'
+                  : 'border-board-card-border text-board-page-text-muted'
+              "
+              @click="toggleTag(tag)"
+            >
+              {{ tag }}
+            </button>
+          </template>
+        </div>
         <p
           v-if="queryError"
           class="mt-2 mb-0 text-sm font-semibold text-board-danger pointer-events-auto"
@@ -92,6 +205,15 @@
           <p v-if="!hasError && statusText" class="mt-1 mb-0 text-sm text-board-page-text-muted">
             {{ statusText }}
           </p>
+          <div
+            v-if="hasError && results.length > 0"
+            class="mt-1 flex items-center gap-2 text-sm text-board-danger"
+          >
+            <span>Unable to load results</span>
+            <button type="button" class="font-semibold text-board-primary" @click="reload">
+              Retry
+            </button>
+          </div>
         </div>
       </div>
 
@@ -169,12 +291,12 @@
           <div
             class="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between p-3.5 opacity-0 transition-opacity duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] bg-gradient-to-t from-black/80 via-transparent to-black/20 group-hover:opacity-100"
           >
-            <!-- 顶部右上角：搜图/以图搜图圆形按钮 -->
             <div class="pointer-events-auto flex justify-end">
               <button
                 type="button"
                 class="grid size-7 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md transition-colors hover:bg-board-primary focus-visible:outline-none cursor-pointer"
-                title="Search with this reference / Open Lightbox"
+                title="查看大图"
+                aria-label="查看大图"
                 @click.stop="openLightbox(result)"
               >
                 <Search class="size-3.5" aria-hidden="true" />
@@ -239,8 +361,10 @@
       v-model:expanded="libraryIslandExpanded"
       :open="libraryIslandOpen"
       :refresh-key="libraryRefreshKey"
+      :reference-keys="references.map((reference) => reference.key)"
       @close="closeLibraryIsland"
       @asset-saved="markSavedKey"
+      @reference-selected="handleLibraryReference"
     />
 
     <!-- 🌟 Demo 同款零遮挡全景高清 Lightbox 弹窗 (bg-black/65 backdrop-blur-2xl) -->
@@ -315,12 +439,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
-import { Bookmark, Search, Xmark } from '@iconoir/vue'
+import { Bookmark, Camera, Plus, Search, Xmark } from '@iconoir/vue'
 import StudioName from '../../../shared/components/StudioName.vue'
 import UserAccountMenu from '../../../shared/components/UserAccountMenu.vue'
 import { HOME_PATH, USER_SEARCH_PATH } from '../../../shared/constants/routePaths'
@@ -331,7 +455,6 @@ import SearchSavePopover from '../components/SearchSavePopover.vue'
 import LibraryFloatingIsland from '../../library/components/LibraryFloatingIsland.vue'
 import {
   libraryAssetKey,
-  lookupSavedAssetKeys,
   saveSearchReference,
   type LibrarySearchReference,
 } from '../../library/libraryResource'
@@ -340,11 +463,11 @@ import { useAppToast } from '../../../shared/composables/useAppToast'
 import {
   isSearchQueryWithinLimit,
   normalizeSearchQuery,
-  reportSearchImageFailure,
-  searchInspiration,
   type SearchResult,
 } from '../searchResource'
-import { MOCK_SEARCH_RESULTS } from '../mockSearchData'
+import { useSearchResults } from '../useSearchResults'
+import { useSearchLightbox } from '../useSearchLightbox'
+import { useVisionSearchFlow } from '../useVisionSearchFlow'
 
 const route = useRoute()
 const router = useRouter()
@@ -357,27 +480,73 @@ const accountControls = useUserAccountControls({
 const draftQuery = ref('')
 const submittedQuery = ref('')
 const queryError = ref('')
-const results = ref<SearchResult[]>([])
-const nextCursor = ref('')
-const hasMore = ref(false)
-const loading = ref(false)
-const loadingMore = ref(false)
-const hasError = ref(false)
-const lightboxVisible = ref(false)
-const activeResult = ref<SearchResult | null>(null)
-const sentinel = ref<HTMLElement>()
-const failedImages = ref(new Set<string>())
-const imageRetryCounts = ref(new Map<string, number>())
-const savedKeys = ref(new Set<string>())
 const libraryIslandOpen = ref(false)
 const libraryIslandExpanded = ref(false)
 const libraryRefreshKey = ref(0)
 const isTriggerHoveredDuringDrag = ref(false)
-
-let controller: AbortController | null = null
-let observer: IntersectionObserver | null = null
-let loadGeneration = 0
+const selectedPalette = ref(new Set<string>())
+const selectedTags = ref(new Set<string>())
+const keepResultsOnNextLoad = ref(false)
 let autoOpenTimer: ReturnType<typeof setTimeout> | null = null
+
+const refinements = computed(() => ({
+  palette: [...selectedPalette.value],
+  atmosphereTags: [...selectedTags.value],
+}))
+const searchResults = useSearchResults({
+  submittedQuery,
+  refinements,
+  keepResultsOnNextLoad: keepResultsOnNextLoad,
+})
+const visionFlow = useVisionSearchFlow({
+  draftQuery,
+  submittedQuery,
+  queryError,
+  keepResultsOnNextLoad,
+  loadCatalog: () => searchResults.load(true),
+  selectedPalette,
+  selectedTags,
+})
+const lightbox = useSearchLightbox()
+const {
+  results,
+  hasMore,
+  loading,
+  loadingMore,
+  hasError,
+  sentinel,
+  failedImages,
+  savedKeys,
+  load,
+  reload,
+  markImageError,
+  retryImage,
+  imageRetryCount,
+  markSaved,
+  markSavedKey,
+} = searchResults
+const {
+  references,
+  fileInput,
+  visionState,
+  visionError,
+  palette,
+  atmosphereTags,
+  runVisionSearch,
+  togglePalette,
+  toggleTag,
+  removeReference,
+  handleFileInput,
+  openFilePicker,
+  handleLibraryReference,
+  clearVisionExtraction,
+} = visionFlow
+const {
+  visible: lightboxVisible,
+  activeResult,
+  open: openLightbox,
+  close: closeLightbox,
+} = lightbox
 
 const statusText = computed(() =>
   loadingMore.value
@@ -481,65 +650,6 @@ async function handleTriggerBtnDrop(e: DragEvent) {
   }
 }
 
-async function load(reset: boolean) {
-  const generation = reset ? ++loadGeneration : loadGeneration
-  if (reset) {
-    controller?.abort()
-    controller = new AbortController()
-    results.value = []
-    nextCursor.value = ''
-    hasMore.value = false
-    hasError.value = false
-    failedImages.value = new Set()
-    imageRetryCounts.value = new Map()
-    savedKeys.value = new Set()
-    loading.value = true
-  } else {
-    if (loadingMore.value || !hasMore.value) return
-    loadingMore.value = true
-  }
-  try {
-    const page = await searchInspiration({
-      query: submittedQuery.value,
-      cursor: nextCursor.value || undefined,
-      limit: 24,
-      signal: controller?.signal,
-    })
-    if (generation !== loadGeneration) return
-    const incomingResults =
-      page.results.length > 0 ? page.results : !submittedQuery.value ? MOCK_SEARCH_RESULTS : []
-    results.value = reset ? incomingResults : [...results.value, ...page.results]
-    try {
-      const saved = await lookupSavedAssetKeys(
-        incomingResults.map((result) => ({ provider: result.provider, source_id: result.id })),
-      )
-      if (generation === loadGeneration) {
-        savedKeys.value = new Set([...savedKeys.value, ...saved])
-      }
-    } catch (error) {
-      if (import.meta.env.DEV) console.debug('library lookup unavailable', error)
-    }
-    if (generation === loadGeneration) {
-      nextCursor.value = page.next_cursor || ''
-      hasMore.value = page.has_more
-    }
-  } catch (error) {
-    if (
-      generation === loadGeneration &&
-      !(error instanceof DOMException && error.name === 'AbortError')
-    ) {
-      // 🌟 当未连接后端或无返回时，优雅展示高精度临时 Mock 灵感流以供预览完整体验
-      results.value = MOCK_SEARCH_RESULTS
-      hasError.value = false
-    }
-  } finally {
-    if (generation === loadGeneration) {
-      loading.value = false
-      loadingMore.value = false
-    }
-  }
-}
-
 async function submitQuery() {
   const query = normalizeSearchQuery(draftQuery.value)
   if (!isSearchQueryWithinLimit(query)) {
@@ -547,25 +657,18 @@ async function submitQuery() {
     return
   }
   queryError.value = ''
-  await router.replace({ path: USER_SEARCH_PATH, query: query ? { q: query } : {} })
-}
-
-async function reload() {
-  await load(true)
-}
-
-function openLightbox(result: SearchResult) {
-  activeResult.value = result
-  lightboxVisible.value = true
-}
-
-function closeLightbox() {
-  lightboxVisible.value = false
-  activeResult.value = null
-}
-
-function handleKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape' && lightboxVisible.value) closeLightbox()
+  if (references.value.length > 0 && visionState.value !== 'ready') {
+    await runVisionSearch()
+    return
+  }
+  if (references.value.length === 0) clearVisionExtraction()
+  else keepResultsOnNextLoad.value = results.value.length > 0
+  const routeQuery: Record<string, string | string[]> = query ? { q: query } : {}
+  if (references.value.length > 0) {
+    if (selectedPalette.value.size > 0) routeQuery.palette = [...selectedPalette.value]
+    if (selectedTags.value.size > 0) routeQuery.atmosphere_tag = [...selectedTags.value]
+  }
+  await router.replace({ path: USER_SEARCH_PATH, query: routeQuery })
 }
 
 function closeLibraryIsland() {
@@ -581,66 +684,21 @@ function toggleLibraryIsland() {
   libraryIslandOpen.value = true
 }
 
-function markImageError(id: string) {
-  if (failedImages.value.has(id)) return
-  failedImages.value = new Set(failedImages.value).add(id)
-  const result = results.value.find((item) => item.id === id)
-  if (result) void reportSearchImageFailure(result.provider)
-}
-
-function retryImage(id: string) {
-  const next = new Map(imageRetryCounts.value)
-  next.set(id, (next.get(id) ?? 0) + 1)
-  imageRetryCounts.value = next
-  const failed = new Set(failedImages.value)
-  failed.delete(id)
-  failedImages.value = failed
-}
-
-function imageRetryCount(id: string) {
-  return imageRetryCounts.value.get(id) ?? 0
-}
-
-function markSaved(result: SearchResult) {
-  savedKeys.value = new Set(savedKeys.value).add(libraryAssetKey(result.provider, result.id))
-}
-
-function markSavedKey(key: string) {
-  savedKeys.value = new Set(savedKeys.value).add(key)
-}
-
 function queryValue() {
   const value = route.query.q
   return Array.isArray(value) ? String(value[0] || '') : String(value || '')
 }
 
 watch(
-  () => route.query.q,
+  () => [route.query.q, route.query.palette, route.query.atmosphere_tag],
   async () => {
     submittedQuery.value = normalizeSearchQuery(queryValue())
     draftQuery.value = submittedQuery.value
+    visionFlow.syncFromRoute()
     queryError.value = ''
     await load(true)
   },
   { immediate: true },
 )
 
-onMounted(async () => {
-  window.addEventListener('keydown', handleKeydown)
-  await nextTick()
-  observer = new IntersectionObserver(
-    (entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) void load(false)
-    },
-    { rootMargin: '640px' },
-  )
-  if (sentinel.value) observer.observe(sentinel.value)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', handleKeydown)
-  controller?.abort()
-  observer?.disconnect()
-  clearAutoOpenTimer()
-})
 </script>

@@ -11,4 +11,5 @@ export type SearchProviderProvider =
 export const SearchProviderProvider = {
   unsplash: 'unsplash',
   pexels: 'pexels',
+  vision: 'vision',
 } as const

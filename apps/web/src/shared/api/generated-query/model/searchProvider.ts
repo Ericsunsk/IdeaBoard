@@ -17,4 +17,6 @@ export interface SearchProvider {
   status_message?: string
   /** @nullable */
   tested_at?: string | null
+  endpoint_url?: string
+  model?: string
 }

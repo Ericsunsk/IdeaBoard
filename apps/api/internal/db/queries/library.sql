@@ -133,6 +133,26 @@ RETURNING
 DELETE FROM library_assets
 WHERE id = sqlc.arg(id) AND owner_user_id = sqlc.arg(owner_user_id);
 
+-- name: GetLibraryAssetByIDForOwner :one
+SELECT
+  assets.id,
+  assets.owner_user_id,
+  assets.folder_id,
+  assets.provider,
+  assets.source_id,
+  assets.source_url,
+  assets.preview_url,
+  assets.original_url,
+  assets.title,
+  assets.author,
+  assets.width,
+  assets.height,
+  assets.created_at,
+  assets.updated_at
+FROM library_assets AS assets
+WHERE assets.id = sqlc.arg(id)
+  AND assets.owner_user_id = sqlc.arg(owner_user_id);
+
 -- name: LookupLibraryAssets :many
 SELECT
   assets.id,

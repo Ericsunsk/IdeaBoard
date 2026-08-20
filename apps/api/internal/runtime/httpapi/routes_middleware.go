@@ -35,6 +35,9 @@ func isUploadRequest(req *http.Request) bool {
 	if requestPath == "/api/user/profile/avatar" || requestPath == "/api/admin/upload" {
 		return true
 	}
+	if requestPath == "/api/user/search/vision-extract" {
+		return true
+	}
 	return strings.HasPrefix(requestPath, "/api/user/boards/") &&
 		strings.HasSuffix(requestPath, "/uploads")
 }

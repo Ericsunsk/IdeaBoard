@@ -214,7 +214,7 @@
             <div
               class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover/libcard:opacity-100 transition-opacity duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] flex flex-col justify-between p-2 pointer-events-none"
             >
-              <div class="flex justify-end pointer-events-auto">
+              <div class="flex justify-end gap-1.5 pointer-events-auto">
                 <button
                   type="button"
                   class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-board-danger transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
@@ -223,6 +223,24 @@
                   @click="requestRemove(asset)"
                 >
                   <Trash class="size-3" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-board-primary transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
+                  aria-label="Use as search reference"
+                  title="Use as search reference"
+                  @click.stop="selectReference(asset)"
+                >
+                  <Check
+                    v-if="
+                      props.referenceKeys?.includes(
+                        libraryAssetKey(asset.provider, asset.source_id),
+                      )
+                    "
+                    class="size-3"
+                    aria-hidden="true"
+                  />
+                  <Bookmark v-else class="size-3" aria-hidden="true" />
                 </button>
               </div>
               <div class="min-w-0 pointer-events-auto">
@@ -448,6 +466,7 @@ import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import {
   Bookmark,
+  Check,
   Folder,
   NavArrowLeft,
   NavArrowRight,
@@ -468,8 +487,12 @@ import UserConfirmDialog from '../../../shared/components/UserConfirmDialog.vue'
 import { useUserConfirmDialog } from '../../../shared/composables/useUserConfirmDialog'
 import { deleteFolderConfirmation, removeAssetConfirmation } from '../libraryConfirmations'
 
-const props = defineProps<{ open: boolean; refreshKey: number }>()
-const emit = defineEmits<{ close: []; 'asset-saved': [key: string] }>()
+const props = defineProps<{ open: boolean; refreshKey: number; referenceKeys?: string[] }>()
+const emit = defineEmits<{
+  close: []
+  'asset-saved': [key: string]
+  'reference-selected': [LibraryAssetView]
+}>()
 const isExpanded = defineModel<boolean>('expanded', { default: false })
 
 const toast = useAppToast()
@@ -535,6 +558,10 @@ function markImageError(assetID: number) {
 
 function openAsset(asset: LibraryAssetView) {
   workspace.setActiveAsset(asset)
+}
+
+function selectReference(asset: LibraryAssetView) {
+  emit('reference-selected', asset)
 }
 
 function selectFolder(folderKey: string) {

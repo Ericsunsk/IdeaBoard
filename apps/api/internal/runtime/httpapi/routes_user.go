@@ -39,6 +39,9 @@ func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	if h.SearchHandler != nil {
 		userAPI.GET("/search", h.SearchHandler.Search)
 	}
+	if h.VisionHandler != nil {
+		userAPI.POST("/search/vision-extract", requestBodyLimitMiddleware(visionRequestBodyLimitBytes), h.VisionHandler.Extract)
+	}
 	if h.SearchMetricsHandler != nil {
 		userAPI.POST("/search/metrics", h.SearchMetricsHandler.RecordImageFailure)
 	}

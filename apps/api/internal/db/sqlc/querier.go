@@ -90,6 +90,7 @@ type Querier interface {
 	GetBoardMemberRole(ctx context.Context, arg GetBoardMemberRoleParams) (string, error)
 	GetBoardShareTokenByHash(ctx context.Context, tokenHash string) (BoardShareToken, error)
 	GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error)
+	GetLibraryAssetByIDForOwner(ctx context.Context, arg GetLibraryAssetByIDForOwnerParams) (LibraryAsset, error)
 	GetLibraryFolderByIDForOwner(ctx context.Context, arg GetLibraryFolderByIDForOwnerParams) (LibraryFolder, error)
 	GetLibraryFolderByOwnerAndName(ctx context.Context, arg GetLibraryFolderByOwnerAndNameParams) (LibraryFolder, error)
 	GetManagedProviderEndpointAccountID(ctx context.Context, providerEndpointID int64) (int64, error)

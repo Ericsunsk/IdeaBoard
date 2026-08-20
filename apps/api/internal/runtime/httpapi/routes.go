@@ -87,6 +87,7 @@ type UserRouteDeps struct {
 	Uploads                UploadDeps
 	UploadDownloads        UploadDownloadDeps
 	SearchHandler          *searchcatalog.SearchHandler
+	VisionHandler          *searchcatalog.VisionHandler
 	SearchMetricsHandler   *searchcatalog.MetricsHandler
 	LibraryHandler         *library.Handler
 }
@@ -115,6 +116,7 @@ type AdminRouteDeps struct {
 
 const globalRequestBodyLimitBytes int64 = 2 * 1024 * 1024
 const uploadRequestBodyLimitBytes int64 = 64 * 1024 * 1024
+const visionRequestBodyLimitBytes int64 = 11 * 1024 * 1024
 
 // Hand-written route paths that bypass the Orval-generated client.
 const (

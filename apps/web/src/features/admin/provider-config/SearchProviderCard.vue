@@ -55,6 +55,20 @@
               :placeholder="row.api_key_configured ? '已配置，留空保持不变' : '输入 API Key'"
               :disabled="savingProvider === row.provider || testingProvider === row.provider"
             />
+            <template v-if="row.provider === 'vision'">
+              <InputText
+                v-model="endpointDrafts[row.provider]"
+                class="w-full"
+                placeholder="Endpoint URL"
+                :disabled="savingProvider === row.provider || testingProvider === row.provider"
+              />
+              <InputText
+                v-model="modelDrafts[row.provider]"
+                class="w-full"
+                placeholder="Model"
+                :disabled="savingProvider === row.provider || testingProvider === row.provider"
+              />
+            </template>
             <div
               class="flex items-center justify-between rounded-lg border border-admin-border-soft bg-white px-3 py-2"
             >
@@ -131,12 +145,18 @@ const savingProvider = ref<SearchProviderRecord['provider'] | ''>('')
 const testingProvider = ref<SearchProviderRecord['provider'] | ''>('')
 const rows = ref<SearchProviderRecord[]>([])
 const drafts = reactive<Record<string, string>>({})
+const endpointDrafts = reactive<Record<string, string>>({})
+const modelDrafts = reactive<Record<string, string>>({})
 
 async function load() {
   loading.value = true
   try {
     rows.value = await fetchSearchProviders()
-    for (const row of rows.value) drafts[row.provider] = ''
+    for (const row of rows.value) {
+      drafts[row.provider] = ''
+      endpointDrafts[row.provider] = row.endpoint_url ?? ''
+      modelDrafts[row.provider] = row.model ?? ''
+    }
   } catch (error) {
     toast.error(error instanceof Error ? error.message : '加载搜索供应商配置失败')
   } finally {
@@ -146,7 +166,12 @@ async function load() {
 async function save(row: SearchProviderRecord, enabled: boolean) {
   savingProvider.value = row.provider
   try {
-    await saveSearchProvider(row.provider, { apiKey: drafts[row.provider], enabled })
+    await saveSearchProvider(row.provider, {
+      apiKey: drafts[row.provider],
+      endpointUrl: endpointDrafts[row.provider],
+      model: modelDrafts[row.provider],
+      enabled,
+    })
     drafts[row.provider] = ''
     toast.success(`${providerLabel(row.provider)} 配置已保存`)
     await load()
@@ -169,13 +194,21 @@ async function test(row: SearchProviderRecord) {
   }
 }
 function canEnable(row: SearchProviderRecord) {
-  return row.test_state === 'passed' && row.api_key_configured
+  return (
+    row.test_state === 'passed' &&
+    row.api_key_configured &&
+    (row.provider !== 'vision' || Boolean(row.endpoint_url && row.model))
+  )
 }
 function providerLabel(provider: SearchProviderRecord['provider']) {
-  return provider === 'unsplash' ? 'Unsplash' : 'Pexels'
+  if (provider === 'unsplash') return 'Unsplash'
+  if (provider === 'pexels') return 'Pexels'
+  return 'Vision Search'
 }
 function providerHost(provider: SearchProviderRecord['provider']) {
-  return provider === 'unsplash' ? 'api.unsplash.com' : 'api.pexels.com'
+  if (provider === 'unsplash') return 'api.unsplash.com'
+  if (provider === 'pexels') return 'api.pexels.com'
+  return 'multipart Vision endpoint'
 }
 function statusLabel(row: SearchProviderRecord) {
   if (row.enabled) return '已启用'

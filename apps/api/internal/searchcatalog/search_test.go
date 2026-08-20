@@ -50,6 +50,28 @@ func TestNormalizeQueryRejectsOverlongInput(t *testing.T) {
 	}
 }
 
+func TestProviderQueryMapsPaletteAndAtmosphereRefinements(t *testing.T) {
+	got := providerQuery("minimal cafe", SearchRefinements{Palette: []string{"#ff0000"}, AtmosphereTags: []string{" soft light "}})
+	if got != "minimal cafe red soft light" {
+		t.Fatalf("providerQuery() = %q", got)
+	}
+}
+
+func TestPaletteColorNameRejectsInvalidValues(t *testing.T) {
+	if paletteColorName("not-a-color") != "" || paletteColorName("#123") != "" {
+		t.Fatal("invalid palette values should not produce provider terms")
+	}
+}
+
+func TestSearchCapabilitiesDeclareRefinementSupport(t *testing.T) {
+	for _, adapter := range []searchAdapter{&unsplashAdapter{}, &pexelsAdapter{}} {
+		capabilities := adapter.Capabilities()
+		if !capabilities.Palette || !capabilities.AtmosphereTags {
+			t.Fatalf("%s capabilities = %#v", adapter.Provider(), capabilities)
+		}
+	}
+}
+
 func TestDedupeResultsUsesProviderAndStableSourceIdentity(t *testing.T) {
 	results := dedupeResults([]Result{
 		{ID: "1", Provider: ProviderUnsplash, ThumbnailURL: "thumb", PreviewURL: "preview", SourceURL: "source"},

@@ -103,6 +103,54 @@ func (q *Queries) EnsureQuickSavesFolder(ctx context.Context, ownerUserID int64)
 	return err
 }
 
+const getLibraryAssetByIDForOwner = `-- name: GetLibraryAssetByIDForOwner :one
+SELECT
+  assets.id,
+  assets.owner_user_id,
+  assets.folder_id,
+  assets.provider,
+  assets.source_id,
+  assets.source_url,
+  assets.preview_url,
+  assets.original_url,
+  assets.title,
+  assets.author,
+  assets.width,
+  assets.height,
+  assets.created_at,
+  assets.updated_at
+FROM library_assets AS assets
+WHERE assets.id = $1
+  AND assets.owner_user_id = $2
+`
+
+type GetLibraryAssetByIDForOwnerParams struct {
+	ID          int64 `json:"id"`
+	OwnerUserID int64 `json:"owner_user_id"`
+}
+
+func (q *Queries) GetLibraryAssetByIDForOwner(ctx context.Context, arg GetLibraryAssetByIDForOwnerParams) (LibraryAsset, error) {
+	row := q.db.QueryRowContext(ctx, getLibraryAssetByIDForOwner, arg.ID, arg.OwnerUserID)
+	var i LibraryAsset
+	err := row.Scan(
+		&i.ID,
+		&i.OwnerUserID,
+		&i.FolderID,
+		&i.Provider,
+		&i.SourceID,
+		&i.SourceUrl,
+		&i.PreviewUrl,
+		&i.OriginalUrl,
+		&i.Title,
+		&i.Author,
+		&i.Width,
+		&i.Height,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getLibraryFolderByIDForOwner = `-- name: GetLibraryFolderByIDForOwner :one
 SELECT id, owner_user_id, name, is_system, is_default, created_at, updated_at
 FROM library_folders

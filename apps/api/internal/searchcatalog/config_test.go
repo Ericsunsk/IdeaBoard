@@ -53,6 +53,36 @@ func TestConfigRepositoryRequiresPassedTestBeforeEnableAndMasksKey(t *testing.T)
 	}
 }
 
+func TestSaveVisionInvalidatesPassedTestWhenRuntimeConfigurationChanges(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	db := testdb.Open(t)
+	repository := NewConfigRepository(settings.NewSystemConfigRepository(db))
+	ctx := context.Background()
+	key := "vision-test-key"
+
+	if err := repository.SaveVision(ctx, &key, "https://vision-a.example/extract", "model-a", false, 1); err != nil {
+		t.Fatalf("save initial vision config: %v", err)
+	}
+	if err := repository.RecordTest(ctx, ProviderVision, TestStatePassed, "", "连接测试通过", 1); err != nil {
+		t.Fatalf("record vision test: %v", err)
+	}
+	if err := repository.SaveVision(ctx, nil, "https://vision-a.example/extract", "model-a", true, 1); err != nil {
+		t.Fatalf("enable tested vision config: %v", err)
+	}
+	if err := repository.SaveVision(ctx, nil, "https://vision-b.example/extract", "model-a", true, 1); err != nil {
+		t.Fatalf("save changed vision config: %v", err)
+	}
+
+	configs, err := repository.List(ctx)
+	if err != nil {
+		t.Fatalf("list provider configs: %v", err)
+	}
+	vision := configByProvider(configs, ProviderVision)
+	if vision.EndpointURL != "https://vision-b.example/extract" || vision.Enabled || vision.TestState != TestStateNever {
+		t.Fatalf("changed vision config = %#v", vision)
+	}
+}
+
 func configByProvider(configs []ProviderConfig, provider Provider) ProviderConfig {
 	for _, config := range configs {
 		if config.Provider == provider {

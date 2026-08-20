@@ -17,9 +17,10 @@ type Provider string
 const (
 	ProviderUnsplash Provider = "unsplash"
 	ProviderPexels   Provider = "pexels"
+	ProviderVision   Provider = "vision"
 )
 
-var providers = []Provider{ProviderUnsplash, ProviderPexels}
+var providers = []Provider{ProviderUnsplash, ProviderPexels, ProviderVision}
 
 var ErrProviderUnavailable = errors.New("search provider is not configured or enabled")
 var ErrProviderTestRequired = errors.New("search provider must pass a connection test before enabling")
@@ -45,6 +46,8 @@ const (
 type ProviderConfig struct {
 	Provider         Provider        `json:"provider"`
 	APIKeyConfigured bool            `json:"api_key_configured"`
+	EndpointURL      string          `json:"endpoint_url,omitempty"`
+	Model            string          `json:"model,omitempty"`
 	Enabled          bool            `json:"enabled"`
 	TestState        TestState       `json:"test_state"`
 	FailureCategory  FailureCategory `json:"failure_category,omitempty"`
@@ -52,9 +55,19 @@ type ProviderConfig struct {
 	TestedAt         *time.Time      `json:"tested_at,omitempty"`
 }
 
+// VisionProviderConfig is the runtime configuration needed by the Vision use case.
+// It keeps endpoint/model details out of the generic catalog provider lifecycle API.
+type VisionProviderConfig struct {
+	EndpointURL string
+	Model       string
+	APIKey      string
+}
+
 type storedProviderConfig struct {
 	APIKeyCiphertext string          `json:"api_key_ciphertext,omitempty"`
 	MaterialKind     string          `json:"material_kind,omitempty"`
+	EndpointURL      string          `json:"endpoint_url,omitempty"`
+	Model            string          `json:"model,omitempty"`
 	Enabled          bool            `json:"enabled"`
 	TestState        TestState       `json:"test_state"`
 	FailureCategory  FailureCategory `json:"failure_category,omitempty"`
@@ -101,6 +114,13 @@ func (r *ConfigRepository) load(ctx context.Context, provider Provider) (storedP
 }
 
 func (r *ConfigRepository) Save(ctx context.Context, provider Provider, apiKey *string, enabled bool, actorID int64) error {
+	if provider == ProviderVision {
+		return errors.New("vision provider requires typed configuration")
+	}
+	return r.saveLifecycle(ctx, provider, apiKey, enabled, actorID)
+}
+
+func (r *ConfigRepository) saveLifecycle(ctx context.Context, provider Provider, apiKey *string, enabled bool, actorID int64) error {
 	stored, err := r.load(ctx, provider)
 	if err != nil {
 		return err
@@ -128,6 +148,50 @@ func (r *ConfigRepository) Save(ctx context.Context, provider Provider, apiKey *
 	}
 	stored.Enabled = enabled
 	return r.persist(ctx, provider, stored, actorID, "save")
+}
+
+func (r *ConfigRepository) SaveVision(ctx context.Context, apiKey *string, endpointURL, model string, enabled bool, actorID int64) error {
+	stored, err := r.load(ctx, ProviderVision)
+	if err != nil {
+		return err
+	}
+	configurationChanged := false
+	if apiKey != nil {
+		key := strings.TrimSpace(*apiKey)
+		if key == "" {
+			return errors.New("api key cannot be empty")
+		}
+		ciphertext, err := secrets.EncryptString(key)
+		if err != nil {
+			return fmt.Errorf("encrypt vision provider API key: %w", err)
+		}
+		stored.APIKeyCiphertext = ciphertext
+		stored.MaterialKind = secrets.MaterialKindEncrypted
+		configurationChanged = true
+	}
+	if normalized := strings.TrimRight(strings.TrimSpace(endpointURL), "/"); normalized != "" {
+		configurationChanged = configurationChanged || normalized != stored.EndpointURL
+		stored.EndpointURL = normalized
+	}
+	if normalized := strings.TrimSpace(model); normalized != "" {
+		configurationChanged = configurationChanged || normalized != stored.Model
+		stored.Model = normalized
+	}
+	if configurationChanged {
+		stored.TestState = TestStateNever
+		stored.FailureCategory = ""
+		stored.StatusMessage = ""
+		stored.TestedAt = nil
+		stored.Enabled = false
+	}
+	if stored.EndpointURL == "" || stored.Model == "" {
+		return errors.New("vision endpoint 与 model 不能为空")
+	}
+	if enabled && !configurationChanged && (strings.TrimSpace(stored.APIKeyCiphertext) == "" || stored.TestState != TestStatePassed) {
+		return ErrProviderTestRequired
+	}
+	stored.Enabled = enabled && !configurationChanged
+	return r.persist(ctx, ProviderVision, stored, actorID, "save")
 }
 
 func (r *ConfigRepository) RecordTest(ctx context.Context, provider Provider, state TestState, category FailureCategory, message string, actorID int64) error {
@@ -164,6 +228,36 @@ func (r *ConfigRepository) APIKey(ctx context.Context, provider Provider) (strin
 	return key, nil
 }
 
+func (r *ConfigRepository) VisionConfig(ctx context.Context) (VisionProviderConfig, error) {
+	stored, err := r.load(ctx, ProviderVision)
+	if err != nil {
+		return VisionProviderConfig{}, err
+	}
+	if !stored.Enabled || stored.TestState != TestStatePassed || strings.TrimSpace(stored.EndpointURL) == "" || strings.TrimSpace(stored.Model) == "" {
+		return VisionProviderConfig{}, ErrProviderUnavailable
+	}
+	apiKey, err := decryptStoredAPIKey(stored)
+	if err != nil {
+		return VisionProviderConfig{}, err
+	}
+	return VisionProviderConfig{EndpointURL: stored.EndpointURL, Model: stored.Model, APIKey: apiKey}, nil
+}
+
+func (r *ConfigRepository) VisionTestConfig(ctx context.Context) (VisionProviderConfig, error) {
+	stored, err := r.load(ctx, ProviderVision)
+	if err != nil {
+		return VisionProviderConfig{}, err
+	}
+	if strings.TrimSpace(stored.EndpointURL) == "" || strings.TrimSpace(stored.Model) == "" {
+		return VisionProviderConfig{}, ErrProviderUnavailable
+	}
+	apiKey, err := decryptStoredAPIKey(stored)
+	if err != nil {
+		return VisionProviderConfig{}, err
+	}
+	return VisionProviderConfig{EndpointURL: stored.EndpointURL, Model: stored.Model, APIKey: apiKey}, nil
+}
+
 func (r *ConfigRepository) persist(ctx context.Context, provider Provider, stored storedProviderConfig, actorID int64, operation string) error {
 	payload, err := json.Marshal(stored)
 	if err != nil {
@@ -195,11 +289,11 @@ func decodeStoredConfig(raw string) (storedProviderConfig, error) {
 }
 
 func publicConfig(provider Provider, stored storedProviderConfig) ProviderConfig {
-	return ProviderConfig{Provider: provider, APIKeyConfigured: strings.TrimSpace(stored.APIKeyCiphertext) != "", Enabled: stored.Enabled, TestState: stored.TestState, FailureCategory: stored.FailureCategory, StatusMessage: stored.StatusMessage, TestedAt: stored.TestedAt}
+	return ProviderConfig{Provider: provider, APIKeyConfigured: strings.TrimSpace(stored.APIKeyCiphertext) != "", EndpointURL: stored.EndpointURL, Model: stored.Model, Enabled: stored.Enabled, TestState: stored.TestState, FailureCategory: stored.FailureCategory, StatusMessage: stored.StatusMessage, TestedAt: stored.TestedAt}
 }
 
 func Providers() []Provider { return append([]Provider(nil), providers...) }
 
 func isProvider(provider Provider) bool {
-	return provider == ProviderUnsplash || provider == ProviderPexels
+	return provider == ProviderUnsplash || provider == ProviderPexels || provider == ProviderVision
 }

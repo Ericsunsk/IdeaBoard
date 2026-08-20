@@ -4,12 +4,12 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
-import type { SearchProviderProvider } from './searchProviderProvider'
+import type { SearchCatalogProvider } from './searchCatalogProvider'
 import type { SearchResultMediaKind } from './searchResultMediaKind'
 
 export interface SearchResult {
   id: string
-  provider: SearchProviderProvider
+  provider: SearchCatalogProvider
   title: string
   description?: string
   author: string

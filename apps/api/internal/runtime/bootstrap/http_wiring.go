@@ -69,7 +69,8 @@ func newAppRouter(
 		uploadOwnerStorageUIDResolver{repo: repos.userRepo},
 	)
 	searchProviderConfig := searchcatalog.NewConfigRepository(repos.systemConfigRepo)
-	libraryHandler := library.NewHandler(library.NewService(repos.libraryRepo))
+	libraryService := library.NewService(repos.libraryRepo)
+	libraryHandler := library.NewHandler(libraryService)
 	searchMetrics, metricsErr := searchcatalog.NewPrometheusMetrics(prometheus.DefaultRegisterer)
 	if metricsErr != nil {
 		slog.Warn("search metrics unavailable", "err", metricsErr)
@@ -98,6 +99,7 @@ func newAppRouter(
 				ReadAccess: uploadReadAccess,
 			},
 			SearchHandler:        searchcatalog.NewSearchHandler(searchcatalog.NewSearchService(searchProviderConfig, searchMetrics)),
+			VisionHandler:        searchcatalog.NewVisionHandler(searchcatalog.NewVisionSearchService(searchProviderConfig, searchMetrics), searchcatalog.NewVisionInputReader(libraryService)),
 			SearchMetricsHandler: searchcatalog.NewMetricsHandler(searchMetrics),
 			LibraryHandler:       libraryHandler,
 		},

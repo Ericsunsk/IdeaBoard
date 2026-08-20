@@ -29,7 +29,7 @@ func (h *SearchHandler) Search(c *gin.Context) {
 		}
 		limit = parsed
 	}
-	result, err := h.service.Search(c.Request.Context(), c.Query("q"), c.Query("cursor"), limit)
+	result, err := h.service.Search(c.Request.Context(), c.Query("q"), c.Query("cursor"), limit, SearchRefinements{Palette: c.QueryArray("palette"), AtmosphereTags: c.QueryArray("atmosphere_tag")})
 	if err != nil {
 		if errors.Is(err, ErrNoSearchProviders) {
 			response.Error(c, http.StatusServiceUnavailable, "暂无可用的搜索供应商")

@@ -7,5 +7,7 @@
 
 export interface UpdateSearchProviderRequest {
   api_key?: string
+  endpoint_url?: string
+  model?: string
   enabled: boolean
 }

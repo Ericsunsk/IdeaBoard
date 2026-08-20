@@ -242,6 +242,20 @@ func (s *Service) DeleteAsset(ctx context.Context, ownerUserID, assetID int64) e
 	return s.repo.DeleteAsset(ctx, ownerUserID, assetID)
 }
 
+func (s *Service) GetAsset(ctx context.Context, ownerUserID, assetID int64) (Asset, error) {
+	if err := validateOwner(ownerUserID); err != nil {
+		return Asset{}, err
+	}
+	if assetID <= 0 {
+		return Asset{}, ErrAssetNotFound
+	}
+	row, err := s.repo.GetAsset(ctx, ownerUserID, assetID)
+	if err != nil {
+		return Asset{}, err
+	}
+	return assetFromRow(row), nil
+}
+
 func (s *Service) LookupAssets(ctx context.Context, ownerUserID int64, keys []AssetKey) ([]Asset, error) {
 	if err := validateOwner(ownerUserID); err != nil {
 		return nil, err

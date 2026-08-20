@@ -72,6 +72,22 @@ paths:
         - name: limit
           in: query
           schema: { type: integer, minimum: 1, maximum: 48, default: 24 }
+        - name: palette
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            maxItems: 5
+            items: { type: string, pattern: '^#[0-9a-fA-F]{6}$' }
+        - name: atmosphere_tag
+          in: query
+          style: form
+          explode: true
+          schema:
+            type: array
+            maxItems: 3
+            items: { type: string, maxLength: 48 }
       responses:
         '200':
           description: Curated or text inspiration results
@@ -98,6 +114,58 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseEmpty'
+  /user/search/vision-extract:
+    post:
+      tags: [User]
+      operationId: extractUserVisionSearch
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                images:
+                  type: array
+                  minItems: 1
+                  maxItems: 4
+                  items: { type: string, format: binary }
+                library_asset_ids:
+                  type: array
+                  maxItems: 4
+                  items: { type: integer, format: int64, minimum: 1 }
+                user_text:
+                  type: string
+                  maxLength: 200
+      responses:
+        '200':
+          description: Vision extraction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVisionExtraction'
+        '400':
+          description: Invalid Vision input or unavailable reference image
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VisionSearchError' }
+        '502':
+          description: Vision provider or response schema failure
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VisionSearchError' }
+        '503':
+          description: Vision Search is unavailable or not configured
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VisionSearchError' }
+        '504':
+          description: Vision provider timeout
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VisionSearchError' }
   /user/library/folders:
     get:
       tags: [UserLibrary]
@@ -2675,8 +2743,7 @@ components:
       in: path
       required: true
       schema:
-        type: string
-        enum: [unsplash, pexels]
+        $ref: '#/components/schemas/SearchProviderProvider'
     PublicUserIDPath:
       name: public_id
       in: path
@@ -5095,12 +5162,16 @@ components:
           $ref: '#/components/schemas/SearchProviderFailureCategory'
         status_message: { type: string }
         tested_at: { type: string, format: date-time, nullable: true }
+        endpoint_url: { type: string, format: uri }
+        model: { type: string }
 
     UpdateSearchProviderRequest:
       type: object
       required: [enabled]
       properties:
         api_key: { type: string, writeOnly: true }
+        endpoint_url: { type: string, format: uri }
+        model: { type: string }
         enabled: { type: boolean }
 
     SearchProviderTestResult:
@@ -5121,7 +5192,7 @@ components:
       properties:
         id: { type: string }
         provider:
-          $ref: '#/components/schemas/SearchProviderProvider'
+          $ref: '#/components/schemas/SearchCatalogProvider'
         title: { type: string }
         description: { type: string }
         author: { type: string }
@@ -5150,11 +5221,47 @@ components:
       required: [provider]
       properties:
         provider:
-          $ref: '#/components/schemas/SearchProviderProvider'
+          $ref: '#/components/schemas/SearchCatalogProvider'
+
+    SearchCatalogProvider:
+      type: string
+      enum: [unsplash, pexels]
 
     SearchProviderProvider:
       type: string
-      enum: [unsplash, pexels]
+      enum: [unsplash, pexels, vision]
+
+    VisionExtraction:
+      type: object
+      required: [query]
+      properties:
+        query: { type: string, minLength: 1, maxLength: 200 }
+        palette:
+          type: array
+          maxItems: 5
+          items: { type: string, pattern: '^#[0-9a-fA-F]{6}$' }
+        atmosphere_tags:
+          type: array
+          maxItems: 3
+          items: { type: string, maxLength: 48 }
+
+    VisionSearchError:
+      type: object
+      required: [code, msg, message_safe]
+      properties:
+        code:
+          type: string
+          enum:
+            - vision_search_not_configured
+            - vision_search_unavailable
+            - vision_search_input_invalid
+            - vision_search_image_invalid
+            - vision_search_image_unavailable
+            - vision_search_timeout
+            - vision_search_provider_error
+            - vision_search_schema_error
+        msg: { type: string }
+        message_safe: { type: boolean, enum: [true] }
 
     SearchProviderFailureCategory:
       type: string
@@ -6092,6 +6199,14 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/SearchResults'
+
+    ApiResponseVisionExtraction:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/VisionExtraction'
 
     ApiResponseDetectModels:
       allOf:

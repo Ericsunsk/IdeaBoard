@@ -20,11 +20,13 @@ export async function fetchSearchProviders(): Promise<SearchProviderRecord[]> {
 
 export async function saveSearchProvider(
   provider: SearchProviderKey,
-  input: { apiKey?: string; enabled: boolean },
+  input: { apiKey?: string; endpointUrl?: string; model?: string; enabled: boolean },
 ): Promise<void> {
   await resolveApiOk(
     updateAdminSearchProvider(provider, {
       ...(input.apiKey?.trim() ? { api_key: input.apiKey.trim() } : {}),
+      ...(input.endpointUrl?.trim() ? { endpoint_url: input.endpointUrl.trim() } : {}),
+      ...(input.model?.trim() ? { model: input.model.trim() } : {}),
       enabled: input.enabled,
     }),
     '保存搜索供应商配置失败',

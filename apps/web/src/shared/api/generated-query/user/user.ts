@@ -21,8 +21,11 @@ import type {
   ApiResponseEmpty,
   ApiResponseSearchResults,
   ApiResponseUserInfo,
+  ApiResponseVisionExtraction,
+  ExtractUserVisionSearchBody,
   RecordSearchImageFailureRequest,
   SearchUserInspirationParams,
+  VisionSearchError,
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
@@ -96,6 +99,15 @@ export const getSearchUserInspirationUrl = (params?: SearchUserInspirationParams
   const normalizedParams = new URLSearchParams()
 
   Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ['palette', 'atmosphere_tag']
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : String(v))
+      })
+      return
+    }
+
     if (value !== undefined) {
       normalizedParams.append(key, value === null ? 'null' : String(value))
     }
@@ -252,6 +264,96 @@ export function useRecordSearchImageFailure<
     recordSearchImageFailureRequest,
     options,
   )
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getExtractUserVisionSearchUrl = () => {
+  return `/user/search/vision-extract`
+}
+
+export const extractUserVisionSearch = async (
+  extractUserVisionSearchBody: ExtractUserVisionSearchBody,
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseVisionExtraction> => {
+  const formData = new FormData()
+  if (extractUserVisionSearchBody.images !== undefined) {
+    extractUserVisionSearchBody.images.forEach((value) => formData.append(`images`, value))
+  }
+  if (extractUserVisionSearchBody.library_asset_ids !== undefined) {
+    extractUserVisionSearchBody.library_asset_ids.forEach((value) =>
+      formData.append(`library_asset_ids`, value.toString()),
+    )
+  }
+  if (extractUserVisionSearchBody.user_text !== undefined) {
+    formData.append(`user_text`, extractUserVisionSearchBody.user_text)
+  }
+
+  return orvalMutator<ApiResponseVisionExtraction>(getExtractUserVisionSearchUrl(), {
+    ...options,
+    method: 'POST',
+    body: formData,
+  })
+}
+
+export const getExtractUserVisionSearchQueryKey = (
+  extractUserVisionSearchBody?: MaybeRefOrGetter<ExtractUserVisionSearchBody>,
+) => {
+  return ['POST', 'user', 'search', 'vision-extract', extractUserVisionSearchBody] as const
+}
+
+export const getExtractUserVisionSearchQueryOptions = <
+  TData = Awaited<ReturnType<typeof extractUserVisionSearch>>,
+  TError = ErrorType<VisionSearchError>,
+>(
+  extractUserVisionSearchBody: MaybeRefOrGetter<ExtractUserVisionSearchBody>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof extractUserVisionSearch>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getExtractUserVisionSearchQueryKey(extractUserVisionSearchBody)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof extractUserVisionSearch>>> = ({
+    signal,
+  }) => extractUserVisionSearch(toValue(extractUserVisionSearchBody), { signal, ...requestOptions })
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof extractUserVisionSearch>>,
+    TError,
+    TData
+  >
+}
+
+export type ExtractUserVisionSearchQueryResult = NonNullable<
+  Awaited<ReturnType<typeof extractUserVisionSearch>>
+>
+export type ExtractUserVisionSearchQueryError = ErrorType<VisionSearchError>
+
+export function useExtractUserVisionSearch<
+  TData = Awaited<ReturnType<typeof extractUserVisionSearch>>,
+  TError = ErrorType<VisionSearchError>,
+>(
+  extractUserVisionSearchBody: MaybeRefOrGetter<ExtractUserVisionSearchBody>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof extractUserVisionSearch>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getExtractUserVisionSearchQueryOptions(extractUserVisionSearchBody, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

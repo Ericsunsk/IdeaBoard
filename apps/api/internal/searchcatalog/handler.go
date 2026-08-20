@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/identity/principal"
+	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/secrets"
 
@@ -24,8 +25,10 @@ type ProviderListResponse struct {
 }
 
 type UpdateProviderRequest struct {
-	APIKey  *string `json:"api_key"`
-	Enabled bool    `json:"enabled"`
+	APIKey      *string `json:"api_key"`
+	EndpointURL string  `json:"endpoint_url"`
+	Model       string  `json:"model"`
+	Enabled     bool    `json:"enabled"`
 }
 
 type TestProviderResponse struct {
@@ -76,16 +79,30 @@ func (h *Handler) Update(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "参数错误")
 		return
 	}
-	if err := h.repository.Save(c.Request.Context(), provider, request.APIKey, request.Enabled, admin.UserID()); err != nil {
-		if errors.Is(err, ErrProviderTestRequired) {
+	if provider == ProviderVision {
+		endpoint, err := outbound.ValidateConfiguredEndpoint(request.EndpointURL, outbound.AllowHosts(c.Request.Context())...)
+		if err != nil || endpoint == "" || strings.TrimSpace(request.Model) == "" {
+			response.Error(c, http.StatusBadRequest, "Vision Search Endpoint URL 与 Model 无效")
+			return
+		}
+		request.EndpointURL = endpoint
+	}
+	var saveErr error
+	if provider == ProviderVision {
+		saveErr = h.repository.SaveVision(c.Request.Context(), request.APIKey, request.EndpointURL, request.Model, request.Enabled, admin.UserID())
+	} else {
+		saveErr = h.repository.Save(c.Request.Context(), provider, request.APIKey, request.Enabled, admin.UserID())
+	}
+	if saveErr != nil {
+		if errors.Is(saveErr, ErrProviderTestRequired) {
 			response.Error(c, http.StatusConflict, "启用前请先通过连接测试")
 			return
 		}
-		if strings.Contains(err.Error(), "api key cannot be empty") {
+		if strings.Contains(saveErr.Error(), "api key cannot be empty") {
 			response.Error(c, http.StatusBadRequest, "API Key 不能为空")
 			return
 		}
-		response.InternalError(c, http.StatusInternalServerError, "保存搜索供应商配置失败", err)
+		response.InternalError(c, http.StatusInternalServerError, "保存搜索供应商配置失败", saveErr)
 		return
 	}
 	response.Success(c, nil)
@@ -104,6 +121,28 @@ func (h *Handler) Test(c *gin.Context) {
 	key, err := h.repository.rawAPIKey(c.Request.Context(), provider)
 	if err != nil {
 		response.Error(c, http.StatusConflict, "请先保存 API Key")
+		return
+	}
+	if provider == ProviderVision {
+		config, configErr := h.repository.VisionTestConfig(c.Request.Context())
+		if configErr != nil {
+			response.Error(c, http.StatusConflict, "请先保存 Vision Search 配置")
+			return
+		}
+		category, message, testErr := testVisionProvider(c.Request.Context(), config.EndpointURL, config.Model, key)
+		state := TestStatePassed
+		if testErr != nil {
+			state = TestStateFailed
+		}
+		if err := h.repository.RecordTest(c.Request.Context(), provider, state, category, message, admin.UserID()); err != nil {
+			response.InternalError(c, http.StatusInternalServerError, "保存搜索供应商测试状态失败", err)
+			return
+		}
+		if testErr != nil {
+			response.ErrorDTO(c, http.StatusBadRequest, TestProviderResponse{Provider: provider, TestState: state, FailureCategory: category, Message: message})
+			return
+		}
+		response.SuccessDTO(c, TestProviderResponse{Provider: provider, TestState: state, Message: message})
 		return
 	}
 	adapter := h.adapters[provider]

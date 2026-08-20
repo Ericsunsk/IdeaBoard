@@ -281,6 +281,21 @@ func (r *Repository) DeleteAsset(ctx context.Context, ownerUserID, assetID int64
 	return nil
 }
 
+func (r *Repository) GetAsset(ctx context.Context, ownerUserID, assetID int64) (dbsqlc.LibraryAsset, error) {
+	q := r.dbWithContext(ctx)
+	if q == nil {
+		return dbsqlc.LibraryAsset{}, errors.New("library repository is not configured")
+	}
+	asset, err := q.GetLibraryAssetByIDForOwner(ctx, dbsqlc.GetLibraryAssetByIDForOwnerParams{ID: assetID, OwnerUserID: ownerUserID})
+	if errors.Is(err, sql.ErrNoRows) {
+		return dbsqlc.LibraryAsset{}, ErrAssetNotFound
+	}
+	if err != nil {
+		return dbsqlc.LibraryAsset{}, fmt.Errorf("get library asset: %w", err)
+	}
+	return asset, nil
+}
+
 func (r *Repository) LookupAssets(ctx context.Context, ownerUserID int64, keys []AssetKey) ([]dbsqlc.LibraryAsset, error) {
 	q := r.dbWithContext(ctx)
 	if q == nil {
