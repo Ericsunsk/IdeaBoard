@@ -13,6 +13,7 @@
 | AccountPool | `internal/accountpool/accounts`, `internal/accountpool/channels` | Account pool、channel config、account load、task scheduling visibility | `accounts.AccountService`, account/channel handlers and repositories |
 | Boards | `internal/boards` | Board ownership、access checks、board management API | `boards.BoardService`, board handler/repository |
 | Media | `internal/media/storage`, `internal/media/assets`, `internal/media/imageformat`, `internal/media/mediarefs` | Object storage、upload serving、upload authorization、media references、image format validation、bundled business assets | `storage.Service`, media stores/authorizers, media reference helpers |
+| Library | `internal/library` | Unsplash/Pexels 外部素材收藏、Folder 管理、幂等保存与 cursor pagination；不复制对象到 Media Storage | `library.Service`, `library.Repository` |
 | Workflow/Prompts | `internal/workflow`, `internal/prompts` | Executable workflow feature contract、task parameter shaping、prompt templates、prompt assembly | Workflow helpers, prompt engine/repository/handler |
 | Billing | `internal/billing` | 全局 SKU Catalog、versioned Credit pricing、server-side Quote snapshot | `billing.Service.Quote`, `billing.PriceSnapshot`, Admin billing handler |
 | Billing Records | `internal/billingrecords` | 用户侧最终 Idea 收支 Read Model；组合 Credits Ledger 与 immutable Task Billing Snapshot，不拥有账务写入 | `billingrecords.Service.List`, authenticated billing records handler |

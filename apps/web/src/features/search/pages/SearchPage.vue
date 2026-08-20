@@ -105,6 +105,11 @@
               />
             </div>
           </button>
+          <SearchSavePopover
+            :result="result"
+            :saved="savedKeys.has(libraryAssetKey(result.provider, result.id))"
+            @saved="markSaved(result)"
+          />
           <div
             v-if="failedImages.has(result.id)"
             class="grid place-items-center gap-2 bg-board-loading-bg px-4 py-5 text-center"
@@ -212,6 +217,8 @@ import { HOME_PATH, USER_SEARCH_PATH } from '../../../shared/constants/routePath
 import { useUserStore } from '../../auth/session/authSession'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import UserWorkspaceNavigation from '../../user-shell/components/UserWorkspaceNavigation.vue'
+import SearchSavePopover from '../components/SearchSavePopover.vue'
+import { libraryAssetKey, lookupSavedAssetKeys } from '../../library/libraryResource'
 import { useUserAccountControls } from '../../user-shell/useUserAccountControls'
 import {
   isSearchQueryWithinLimit,
@@ -242,8 +249,10 @@ const activeResult = ref<SearchResult | null>(null)
 const sentinel = ref<HTMLElement>()
 const failedImages = ref(new Set<string>())
 const imageRetryCounts = ref(new Map<string, number>())
+const savedKeys = ref(new Set<string>())
 let controller: AbortController | null = null
 let observer: IntersectionObserver | null = null
+let loadGeneration = 0
 const statusText = computed(() =>
   loadingMore.value
     ? '正在加载更多...'
@@ -252,6 +261,7 @@ const statusText = computed(() =>
       : '精选图片参考',
 )
 async function load(reset: boolean) {
+  const generation = reset ? ++loadGeneration : loadGeneration
   if (reset) {
     controller?.abort()
     controller = new AbortController()
@@ -261,6 +271,7 @@ async function load(reset: boolean) {
     hasError.value = false
     failedImages.value = new Set()
     imageRetryCounts.value = new Map()
+    savedKeys.value = new Set()
     loading.value = true
   } else {
     if (loadingMore.value || !hasMore.value) return
@@ -273,14 +284,33 @@ async function load(reset: boolean) {
       limit: 24,
       signal: controller?.signal,
     })
+    if (generation !== loadGeneration) return
     results.value = reset ? page.results : [...results.value, ...page.results]
-    nextCursor.value = page.next_cursor || ''
-    hasMore.value = page.has_more
+    try {
+      const saved = await lookupSavedAssetKeys(
+        page.results.map((result) => ({ provider: result.provider, source_id: result.id })),
+      )
+      if (generation === loadGeneration) {
+        savedKeys.value = new Set([...savedKeys.value, ...saved])
+      }
+    } catch (error) {
+      if (import.meta.env.DEV) console.debug('library lookup unavailable', error)
+    }
+    if (generation === loadGeneration) {
+      nextCursor.value = page.next_cursor || ''
+      hasMore.value = page.has_more
+    }
   } catch (error) {
-    if (!(error instanceof DOMException && error.name === 'AbortError')) hasError.value = true
+    if (
+      generation === loadGeneration &&
+      !(error instanceof DOMException && error.name === 'AbortError')
+    )
+      hasError.value = true
   } finally {
-    loading.value = false
-    loadingMore.value = false
+    if (generation === loadGeneration) {
+      loading.value = false
+      loadingMore.value = false
+    }
   }
 }
 async function submitQuery() {
@@ -315,6 +345,9 @@ function retryImage(id: string) {
 }
 function imageRetryCount(id: string) {
   return imageRetryCounts.value.get(id) ?? 0
+}
+function markSaved(result: SearchResult) {
+  savedKeys.value = new Set(savedKeys.value).add(libraryAssetKey(result.provider, result.id))
 }
 function queryValue() {
   const value = route.query.q

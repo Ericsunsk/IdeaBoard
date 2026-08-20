@@ -11,6 +11,7 @@ import (
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/payments"
 	"ideaboard/api/internal/platform/config"
@@ -68,6 +69,7 @@ func newAppRouter(
 		uploadOwnerStorageUIDResolver{repo: repos.userRepo},
 	)
 	searchProviderConfig := searchcatalog.NewConfigRepository(repos.systemConfigRepo)
+	libraryHandler := library.NewHandler(library.NewService(repos.libraryRepo))
 	searchMetrics, metricsErr := searchcatalog.NewPrometheusMetrics(prometheus.DefaultRegisterer)
 	if metricsErr != nil {
 		slog.Warn("search metrics unavailable", "err", metricsErr)
@@ -97,6 +99,7 @@ func newAppRouter(
 			},
 			SearchHandler:        searchcatalog.NewSearchHandler(searchcatalog.NewSearchService(searchProviderConfig, searchMetrics)),
 			SearchMetricsHandler: searchcatalog.NewMetricsHandler(searchMetrics),
+			LibraryHandler:       libraryHandler,
 		},
 		AdminRoutes: httpapi.AdminRouteDeps{
 			AdminHandler: users.NewAdminHandler(

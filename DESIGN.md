@@ -177,6 +177,7 @@ Backend context map 的局部规则见 [apps/api/CONTEXT.md](./apps/api/CONTEXT.
 | AccountPool | `internal/accountpool` | accounts、channels、load、scheduling visibility |
 | Boards | `internal/boards` | board ownership、access checks、board management API |
 | Media | `internal/media` | storage、assets、media refs、image format validation |
+| Library | `internal/library` | 外部灵感素材收藏、Folder、幂等保存与 cursor 分页；只保存 provider URL 和 source metadata |
 | Workflow/Prompts | `internal/workflow`, `internal/prompts` | executable feature contract、task params、prompt templates、prompt assembly |
 | Billing | `internal/billing` | 全局 immutable SKU identity、versioned Credit pricing、server-side Quote snapshot |
 | Billing Records | `internal/billingrecords` | 用户侧最终 Idea 收支 Read Model；组合 Credits Ledger 与 immutable Task Billing snapshot，不拥有账务写入 |

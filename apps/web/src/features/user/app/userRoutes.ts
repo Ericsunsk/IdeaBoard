@@ -80,6 +80,12 @@ export const userRoutes: RouteRecordRaw[] = [
         meta: { requiresAuth: true },
       },
       {
+        path: 'library',
+        name: 'UserLibrary',
+        component: () => import('../../library/pages/LibraryPage.vue'),
+        meta: { requiresAuth: true },
+      },
+      {
         path: 'canvas',
         name: 'UserCanvas',
         component: () => import('../../canvas/pages/CanvasPage.vue'),

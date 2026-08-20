@@ -25,7 +25,7 @@ type Fragment struct {
 }
 
 var requiredFragmentNames = []string{
-	"identity", "credits", "account_pool", "platform", "tasks", "media", "usage",
+	"identity", "credits", "account_pool", "platform", "tasks", "media", "library", "usage",
 	"workflow", "boards", "rewards", "billing", "payments", "integrity", "bootstrap",
 }
 

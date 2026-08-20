@@ -296,6 +296,33 @@ type FeaturePrompt struct {
 	UpdatedAt   time.Time     `json:"updated_at"`
 }
 
+type LibraryAsset struct {
+	ID          int64     `json:"id"`
+	OwnerUserID int64     `json:"owner_user_id"`
+	FolderID    int64     `json:"folder_id"`
+	Provider    string    `json:"provider"`
+	SourceID    string    `json:"source_id"`
+	SourceUrl   string    `json:"source_url"`
+	PreviewUrl  string    `json:"preview_url"`
+	OriginalUrl string    `json:"original_url"`
+	Title       string    `json:"title"`
+	Author      string    `json:"author"`
+	Width       int32     `json:"width"`
+	Height      int32     `json:"height"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type LibraryFolder struct {
+	ID          int64     `json:"id"`
+	OwnerUserID int64     `json:"owner_user_id"`
+	Name        string    `json:"name"`
+	IsSystem    bool      `json:"is_system"`
+	IsDefault   bool      `json:"is_default"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
 type MediaAsset struct {
 	ID                int64           `json:"id"`
 	AssetID           string          `json:"asset_id"`

@@ -40,6 +40,7 @@ type Querier interface {
 	CreateAccountSecret(ctx context.Context, arg CreateAccountSecretParams) (int64, error)
 	CreateBoardShareToken(ctx context.Context, arg CreateBoardShareTokenParams) (int64, error)
 	CreateBoardUploadMediaAsset(ctx context.Context, arg CreateBoardUploadMediaAssetParams) (int64, error)
+	CreateLibraryFolder(ctx context.Context, arg CreateLibraryFolderParams) (LibraryFolder, error)
 	CreatePreparedMediaAsset(ctx context.Context, arg CreatePreparedMediaAssetParams) (int64, error)
 	CreateProviderEndpoint(ctx context.Context, arg CreateProviderEndpointParams) (int64, error)
 	CreateTask(ctx context.Context, arg CreateTaskParams) (int64, error)
@@ -54,6 +55,8 @@ type Querier interface {
 	DeleteBoardMembersByBoardID(ctx context.Context, boardID string) error
 	DeleteBoardMembersByUserID(ctx context.Context, userID int64) error
 	DeleteBoardShareTokensByBoardID(ctx context.Context, boardID string) error
+	DeleteLibraryAsset(ctx context.Context, arg DeleteLibraryAssetParams) (int64, error)
+	DeleteLibraryFolder(ctx context.Context, arg DeleteLibraryFolderParams) (int64, error)
 	DeleteManagedProviderEndpointAccounts(ctx context.Context, providerEndpointID int64) (int64, error)
 	DeleteMediaDerivativeOutbox(ctx context.Context, derivativeID int64) error
 	DeleteMediaDerivativesByAsset(ctx context.Context, arg DeleteMediaDerivativesByAssetParams) error
@@ -64,6 +67,8 @@ type Querier interface {
 	DeleteUserBoardsByUserID(ctx context.Context, userID int64) error
 	DeleteUserByID(ctx context.Context, id int64) (int64, error)
 	EnqueueMediaDerivativeOutbox(ctx context.Context, derivativeID int64) (MediaDerivativeOutbox, error)
+	EnsureLibraryFolderByName(ctx context.Context, arg EnsureLibraryFolderByNameParams) error
+	EnsureQuickSavesFolder(ctx context.Context, ownerUserID int64) error
 	FailRunningTaskAttemptsByAccountID(ctx context.Context, arg FailRunningTaskAttemptsByAccountIDParams) (int64, error)
 	FailRunningTasksByAccountID(ctx context.Context, arg FailRunningTasksByAccountIDParams) ([]FailRunningTasksByAccountIDRow, error)
 	FinalFailTaskRunningWithLease(ctx context.Context, arg FinalFailTaskRunningWithLeaseParams) (int64, error)
@@ -85,6 +90,8 @@ type Querier interface {
 	GetBoardMemberRole(ctx context.Context, arg GetBoardMemberRoleParams) (string, error)
 	GetBoardShareTokenByHash(ctx context.Context, tokenHash string) (BoardShareToken, error)
 	GetFeaturePrompt(ctx context.Context, featureSlug string) (FeaturePrompt, error)
+	GetLibraryFolderByIDForOwner(ctx context.Context, arg GetLibraryFolderByIDForOwnerParams) (LibraryFolder, error)
+	GetLibraryFolderByOwnerAndName(ctx context.Context, arg GetLibraryFolderByOwnerAndNameParams) (LibraryFolder, error)
 	GetManagedProviderEndpointAccountID(ctx context.Context, providerEndpointID int64) (int64, error)
 	GetMediaAssetByAssetIDForOwner(ctx context.Context, arg GetMediaAssetByAssetIDForOwnerParams) (MediaAsset, error)
 	GetMediaAssetByID(ctx context.Context, id int64) (MediaAsset, error)
@@ -106,6 +113,7 @@ type Querier interface {
 	GetPaymentStripeCredentialForOrder(ctx context.Context, id uuid.UUID) (PaymentStripeCredential, error)
 	GetPaymentStripeCredentialForOrderNumber(ctx context.Context, publicOrderNumber string) (PaymentStripeCredential, error)
 	GetProviderEndpointByID(ctx context.Context, id int64) (GetProviderEndpointByIDRow, error)
+	GetQuickSavesFolder(ctx context.Context, ownerUserID int64) (LibraryFolder, error)
 	GetReadyMediaAssetStorageLocationByID(ctx context.Context, id int64) (GetReadyMediaAssetStorageLocationByIDRow, error)
 	GetRuntimeAccountByIDWithSecret(ctx context.Context, id int64) (GetRuntimeAccountByIDWithSecretRow, error)
 	GetRuntimeAccountForAssignment(ctx context.Context, arg GetRuntimeAccountForAssignmentParams) (GetRuntimeAccountForAssignmentRow, error)
@@ -147,6 +155,8 @@ type Querier interface {
 	ListDueMediaAssetReclamationIDs(ctx context.Context, arg ListDueMediaAssetReclamationIDsParams) ([]ListDueMediaAssetReclamationIDsRow, error)
 	ListEnabledAccounts(ctx context.Context) ([]ListEnabledAccountsRow, error)
 	ListFeaturePrompts(ctx context.Context) ([]FeaturePrompt, error)
+	ListLibraryAssets(ctx context.Context, arg ListLibraryAssetsParams) ([]LibraryAsset, error)
+	ListLibraryFolders(ctx context.Context, ownerUserID int64) ([]ListLibraryFoldersRow, error)
 	ListMediaAssetSources(ctx context.Context, arg ListMediaAssetSourcesParams) ([]MediaAssetSource, error)
 	ListMediaAssetStorageLocationsByKey(ctx context.Context, storageKey string) ([]ListMediaAssetStorageLocationsByKeyRow, error)
 	ListMediaDerivativeIDsMissingOutbox(ctx context.Context, arg ListMediaDerivativeIDsMissingOutboxParams) ([]int64, error)
@@ -189,6 +199,7 @@ type Querier interface {
 	ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUIDsRow, error)
 	ListUsers(ctx context.Context, arg ListUsersParams) ([]User, error)
 	LockStorageProfileSecretVersionRotation(ctx context.Context, arg LockStorageProfileSecretVersionRotationParams) (bool, error)
+	LookupLibraryAssets(ctx context.Context, arg LookupLibraryAssetsParams) ([]LibraryAsset, error)
 	MarkMediaAssetFailed(ctx context.Context, arg MarkMediaAssetFailedParams) (int64, error)
 	MarkMediaAssetReady(ctx context.Context, arg MarkMediaAssetReadyParams) (int64, error)
 	MarkMediaAssetReclaimed(ctx context.Context, arg MarkMediaAssetReclaimedParams) (int64, error)
@@ -207,6 +218,8 @@ type Querier interface {
 	MarkTaskFailed(ctx context.Context, arg MarkTaskFailedParams) (int64, error)
 	MarkTaskFailedWithLease(ctx context.Context, arg MarkTaskFailedWithLeaseParams) (int64, error)
 	MarkUnleasedTaskFailed(ctx context.Context, arg MarkUnleasedTaskFailedParams) (int64, error)
+	MoveLibraryAsset(ctx context.Context, arg MoveLibraryAssetParams) (LibraryAsset, error)
+	MoveLibraryAssetsToFolder(ctx context.Context, arg MoveLibraryAssetsToFolderParams) (int64, error)
 	PatchTaskExecutionMetrics(ctx context.Context, arg PatchTaskExecutionMetricsParams) error
 	PatchTaskExecutionSnapshot(ctx context.Context, arg PatchTaskExecutionSnapshotParams) (int64, error)
 	RebuildTaskDailyStatsByEventDateRange(ctx context.Context, arg RebuildTaskDailyStatsByEventDateRangeParams) (RebuildTaskDailyStatsByEventDateRangeRow, error)
@@ -216,6 +229,7 @@ type Querier interface {
 	ReleaseMediaAssetReclamationClaim(ctx context.Context, arg ReleaseMediaAssetReclamationClaimParams) error
 	ReleaseTaskInputMediaRefs(ctx context.Context, taskID string) ([]int64, error)
 	ReleaseTaskLease(ctx context.Context, arg ReleaseTaskLeaseParams) (int64, error)
+	RenameLibraryFolder(ctx context.Context, arg RenameLibraryFolderParams) (LibraryFolder, error)
 	ReplacePaymentStripeConfiguration(ctx context.Context, arg ReplacePaymentStripeConfigurationParams) (PaymentStripeConfiguration, error)
 	ReplaceProviderEndpointCapabilities(ctx context.Context, providerEndpointID int64) error
 	RequeueTaskRunningWithLease(ctx context.Context, arg RequeueTaskRunningWithLeaseParams) (int64, error)
@@ -246,6 +260,7 @@ type Querier interface {
 	UpsertBoard(ctx context.Context, arg UpsertBoardParams) (int64, error)
 	UpsertBoardMember(ctx context.Context, arg UpsertBoardMemberParams) error
 	UpsertFeaturePrompt(ctx context.Context, arg UpsertFeaturePromptParams) (FeaturePrompt, error)
+	UpsertLibraryAsset(ctx context.Context, arg UpsertLibraryAssetParams) (LibraryAsset, error)
 	UpsertMediaAsset(ctx context.Context, arg UpsertMediaAssetParams) (int64, error)
 	UpsertMediaAssetSource(ctx context.Context, arg UpsertMediaAssetSourceParams) (int64, error)
 	UpsertMediaDerivative(ctx context.Context, arg UpsertMediaDerivativeParams) (MediaDerivative, error)

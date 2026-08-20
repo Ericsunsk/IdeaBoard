@@ -30,6 +30,7 @@ tags:
   - name: AdminStorage
   - name: AdminFeaturePrompts
   - name: UserAssets
+  - name: UserLibrary
   - name: AdminAssets
   - name: PaymentWebhooks
 paths:
@@ -97,6 +98,110 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseEmpty'
+  /user/library/folders:
+    get:
+      tags: [UserLibrary]
+      operationId: listLibraryFolders
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Current user's library folders
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponseLibraryFolderList' } } }
+    post:
+      tags: [UserLibrary]
+      operationId: createLibraryFolder
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/LibraryFolderRequest' } } }
+      responses:
+        '200':
+          description: Created folder
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponseLibraryFolder' } } }
+  /user/library/folders/{folder_id}:
+    patch:
+      tags: [UserLibrary]
+      operationId: renameLibraryFolder
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: folder_id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/LibraryFolderRequest' } } }
+      responses:
+        '200':
+          description: Renamed folder
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponseLibraryFolder' } } }
+    delete:
+      tags: [UserLibrary]
+      operationId: deleteLibraryFolder
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: folder_id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+      responses:
+        '200':
+          description: Folder deleted and assets moved to Quick Saves
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponseEmpty' } } }
+  /user/library/assets:
+    get:
+      tags: [UserLibrary]
+      operationId: listLibraryAssets
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: folder_id, in: query, schema: { oneOf: [{ type: integer, format: int64, minimum: 1 }, { type: string, enum: [all, quick-saves] }] } }
+        - { name: cursor, in: query, schema: { type: string, maxLength: 512 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 48, default: 24 } }
+      responses:
+        '200':
+          description: Cursor-paginated personal library assets
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponseLibraryAssetList' } } }
+    post:
+      tags: [UserLibrary]
+      operationId: saveLibraryAsset
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/LibrarySaveAssetRequest' } } }
+      responses:
+        '200':
+          description: Saved external asset
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponseLibraryAsset' } } }
+  /user/library/assets/lookup:
+    post:
+      tags: [UserLibrary]
+      operationId: lookupLibraryAssets
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/LibraryLookupRequest' } } }
+      responses:
+        '200':
+          description: Assets already saved by the current user
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponseLibraryAssetList' } } }
+  /user/library/assets/{asset_id}:
+    patch:
+      tags: [UserLibrary]
+      operationId: moveLibraryAsset
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: asset_id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/LibraryMoveAssetRequest' } } }
+      responses:
+        '200':
+          description: Moved asset
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponseLibraryAsset' } } }
+    delete:
+      tags: [UserLibrary]
+      operationId: deleteLibraryAsset
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: asset_id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+      responses:
+        '200':
+          description: Asset removed from the library
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponseEmpty' } } }
   /user/billing/quotes:
     post:
       tags: [Billing]
@@ -5726,6 +5831,126 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/ArchivedBillingItemDeleteResult'
+
+    LibraryFolder:
+      type: object
+      required: [id, query_key, name, is_system, is_default, is_virtual, asset_count]
+      properties:
+        id: { type: integer, format: int64 }
+        query_key: { type: string, description: 'Stable route identity: all, quick-saves, or a persisted Folder ID' }
+        name: { type: string }
+        is_system: { type: boolean }
+        is_default: { type: boolean }
+        is_virtual: { type: boolean }
+        asset_count: { type: integer, format: int64, minimum: 0 }
+
+    LibraryAsset:
+      type: object
+      required: [id, folder_id, provider, source_id, source_url, preview_url, original_url, title, author, width, height, created_at, updated_at]
+      properties:
+        id: { type: integer, format: int64 }
+        folder_id: { type: integer, format: int64 }
+        provider: { type: string, enum: [unsplash, pexels] }
+        source_id: { type: string }
+        source_url: { type: string, format: uri, pattern: '^https://' }
+        preview_url: { type: string, format: uri, pattern: '^https://' }
+        original_url: { type: string, format: uri, pattern: '^https://' }
+        title: { type: string }
+        author: { type: string }
+        width: { type: integer, minimum: 0 }
+        height: { type: integer, minimum: 0 }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    LibraryFolderRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+
+    LibraryAssetInput:
+      type: object
+      required: [provider, source_id, source_url, preview_url, original_url]
+      properties:
+        provider: { type: string, enum: [unsplash, pexels] }
+        source_id: { type: string, minLength: 1, maxLength: 128 }
+        source_url: { type: string, format: uri }
+        preview_url: { type: string, format: uri }
+        original_url: { type: string, format: uri }
+        title: { type: string, maxLength: 255 }
+        author: { type: string, maxLength: 255 }
+        width: { type: integer, minimum: 0 }
+        height: { type: integer, minimum: 0 }
+
+    LibrarySaveAssetRequest:
+      type: object
+      required: [asset]
+      properties:
+        folder_id: { type: integer, format: int64, minimum: 1 }
+        new_folder_name: { type: string, maxLength: 100 }
+        asset: { $ref: '#/components/schemas/LibraryAssetInput' }
+
+    LibraryMoveAssetRequest:
+      type: object
+      required: [folder_id]
+      properties:
+        folder_id: { type: integer, format: int64, minimum: 1 }
+
+    LibraryLookupRequest:
+      type: object
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          maxItems: 48
+          items:
+            type: object
+            required: [provider, source_id]
+            properties:
+              provider: { type: string, enum: [unsplash, pexels] }
+              source_id: { type: string, minLength: 1, maxLength: 128 }
+
+    ApiResponseLibraryFolder:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/LibraryFolder' }
+
+    ApiResponseLibraryFolderList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [folders]
+              properties:
+                folders:
+                  type: array
+                  items: { $ref: '#/components/schemas/LibraryFolder' }
+
+    ApiResponseLibraryAsset:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/LibraryAsset' }
+
+    ApiResponseLibraryAssetList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [items, has_more]
+              properties:
+                items:
+                  type: array
+                  items: { $ref: '#/components/schemas/LibraryAsset' }
+                next_cursor: { type: string }
+                has_more: { type: boolean }
 
     ApiResponseEmpty:
       allOf:

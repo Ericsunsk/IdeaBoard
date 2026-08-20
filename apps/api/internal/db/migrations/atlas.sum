@@ -1,4 +1,5 @@
-h1:bxDe2uqvhvOQfona/8GxKqPxpGYg5gQiJXr7sRUUveM=
+h1:6ykufiDZTbidizWbgiVaz1AXEfkjBURxwyhuGoOHocg=
 20260819000000_baseline.sql h1:YTs3izecmQpm1Fy5L0UFiD6llYu+9v1Cx5rh5snsSU8=
 20260820050000_media_derivative_storage_key_index.sql h1:x8M92JoC8g8fx+wtiogHXPUpleMwrfU/zGmo+4RJ+3w=
 20260820060000_search_provider_audit_action.sql h1:5sV9aFkhLRdJKzFnIRYSokvHaCdLLTDlZfV4o6Ag2Vc=
+20260820120000_library_assets.sql h1:SPmVg4tWBkSorDOroLWYQm8EIcQ0hF+JMMvTdcFbXzQ=

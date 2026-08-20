@@ -12,6 +12,7 @@ import (
 	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/users"
+	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/payments"
@@ -87,6 +88,7 @@ type UserRouteDeps struct {
 	UploadDownloads        UploadDownloadDeps
 	SearchHandler          *searchcatalog.SearchHandler
 	SearchMetricsHandler   *searchcatalog.MetricsHandler
+	LibraryHandler         *library.Handler
 }
 
 type AdminRouteDeps struct {

@@ -42,6 +42,17 @@ func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	if h.SearchMetricsHandler != nil {
 		userAPI.POST("/search/metrics", h.SearchMetricsHandler.RecordImageFailure)
 	}
+	if h.LibraryHandler != nil {
+		userAPI.GET("/library/folders", h.LibraryHandler.ListFolders)
+		userAPI.POST("/library/folders", h.LibraryHandler.CreateFolder)
+		userAPI.PATCH("/library/folders/:folder_id", h.LibraryHandler.RenameFolder)
+		userAPI.DELETE("/library/folders/:folder_id", h.LibraryHandler.DeleteFolder)
+		userAPI.GET("/library/assets", h.LibraryHandler.ListAssets)
+		userAPI.POST("/library/assets", h.LibraryHandler.SaveAsset)
+		userAPI.POST("/library/assets/lookup", h.LibraryHandler.LookupAssets)
+		userAPI.PATCH("/library/assets/:asset_id", h.LibraryHandler.MoveAsset)
+		userAPI.DELETE("/library/assets/:asset_id", h.LibraryHandler.DeleteAsset)
+	}
 }
 
 func registerUserTaskRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {

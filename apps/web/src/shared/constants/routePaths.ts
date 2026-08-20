@@ -11,6 +11,7 @@ export const USER_REGISTER_PATH = '/user/register'
 export const USER_AUTH_CALLBACK_PATH = '/user/auth/callback'
 export const USER_BOARDS_PATH = '/user/boards'
 export const USER_SEARCH_PATH = '/user/search'
+export const USER_LIBRARY_PATH = '/user/library'
 export const USER_CANVAS_PATH = '/user/canvas'
 
 export const ADMIN_ROOT_PATH = '/admin'
