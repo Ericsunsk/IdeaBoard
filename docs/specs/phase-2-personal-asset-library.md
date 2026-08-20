@@ -8,7 +8,7 @@
 
 ## 已确认决策
 
-- Library 使用独立 `/user/library` 页面；当前 Folder 通过 `?folder=` 表示。
+- Library 只通过 Search 页面上的 Floating Island 访问；Folder 状态由浮岛内部 workspace 管理。
 - 顶部主导航保持 `Search / Workspace`；Library 通过 Search 搜索栏右侧的圆形入口进入。
 - 未来浮动岛只复用本阶段的 data layer 和组件，不改变 Library 数据模型。
 - 素材只保存外部 URL 与 Provider/source metadata，不复制到 R2，也不进入 `media_assets`。
@@ -138,11 +138,8 @@
 阶段二新增 `features/library` feature context，最小拆分如下：
 
 - `libraryResource.ts`：API adapter、cursor、Folder/Asset commands、batch lookup。
-- `LibraryPage.vue`：路由 query、加载状态、页面布局和 mutation orchestration。
-- `LibraryAssetGrid.vue`：masonry、sentinel、分页和列表状态。
-- `LibraryFolderPills.vue`：Folder 切换、创建和 context menu。
-- `LibraryAssetCard.vue`：图片、title/author hover 信息、Move/Remove 操作。
-- `LibraryLightbox.vue`：只读预览。
+- `useLibraryWorkspace.ts`：浮岛的 Folder、分页、Lightbox 和 mutation 状态。
+- `LibraryFloatingIsland.vue`：浮岛布局、Folder commands、分页状态和 Lightbox orchestration。
 
 Search feature 只通过 `libraryResource` 的明确 seam 参与保存和 lookup；不直接依赖 generated API。
 
@@ -183,7 +180,7 @@ Search feature 只通过 `libraryResource` 的明确 seam 参与保存和 lookup
 1. Schema fragments、Atlas migration、sqlc queries 和 Library backend context。
 2. REST handlers、routes、OpenAPI 和 backend tests。
 3. Generated frontend API 与 `features/library` data/UI seams。
-4. `/user/library` route、masonry、Folder commands、Lightbox。
+4. Search Floating Island、masonry、Folder commands、Lightbox。
 5. Search Quick Save Popover 与 batch lookup integration。
 6. Typecheck、lint、backend tests、frontend unit tests、OpenAPI/sqlc/schema release checks。
 
@@ -193,7 +190,7 @@ Search feature 只通过 `libraryResource` 的明确 seam 参与保存和 lookup
 - Palette、Atmosphere、semantic tags 和 VLM extraction
 - Moodboard compose
 - Canvas asset tray、Canvas insertion 和跨视窗拖拽
-- Search 内浮动 Library island 的拖拽归档、滚动折叠和跨页面全局状态
+- 跨页面全局 Library 状态
 - Library 内关键词搜索和复杂排序
 - Media Storage copy/cache、URL proxy 和自动健康检查
 - Mobile-specific layout、分享链接、权限共享和回收站

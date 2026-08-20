@@ -71,7 +71,6 @@ describe('userRoutes contract', () => {
       { path: 'auth/callback', name: 'UserAuthCallback', meta: { public: true } },
       { path: 'boards', name: 'UserBoards', meta: { requiresAuth: true } },
       { path: 'search', name: 'UserSearch', meta: { requiresAuth: true } },
-      { path: 'library', name: 'UserLibrary', meta: { requiresAuth: true } },
       { path: 'canvas', name: 'UserCanvas', meta: { requiresAuth: true } },
     ])
   })
@@ -93,7 +92,6 @@ describe('userRoutes contract', () => {
     const loadedRegister = await loadRouteComponent(requireRoute(children, 'register'))
     const loadedBoards = await loadRouteComponent(requireRoute(children, 'boards'))
     const loadedSearch = await loadRouteComponent(requireRoute(children, 'search'))
-    const loadedLibrary = await loadRouteComponent(requireRoute(children, 'library'))
     const loadedCanvas = await loadRouteComponent(requireRoute(children, 'canvas'))
 
     expect(loadedLayout).toBe(routeComponents.layout)
@@ -109,7 +107,6 @@ describe('userRoutes contract', () => {
     expect((loadedRegister as Component & { __name?: string }).__name).toBe('CanvasLandingPage')
     expect((loadedBoards as Component & { __name?: string }).__name).toBe('BoardsPage')
     expect((loadedSearch as Component & { __name?: string }).__name).toBe('SearchPage')
-    expect((loadedLibrary as Component & { __name?: string }).__name).toBe('LibraryPage')
     expect((loadedCanvas as Component & { __name?: string }).__name).toBe('CanvasPage')
   }, 30_000)
 })

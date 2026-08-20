@@ -2,7 +2,7 @@
   <Button
     unstyled
     type="button"
-    class="user-credit-pill"
+    class="user-credit-pill !bg-board-control-bg/80 !border-board-card-border backdrop-blur-md"
     :class="`is-${balance.status}`"
     :data-balance-status="balance.status"
     :title="balance.ariaLabel"

@@ -2,7 +2,12 @@
   <Transition name="library-island">
     <aside
       v-if="open"
-      class="fixed top-[84px] bottom-6 left-6 z-40 flex w-[min(350px,calc(100vw-32px))] flex-col overflow-hidden rounded-[28px] border border-board-card-border bg-board-surface-strong/80 p-5 text-board-page-text backdrop-blur-xl shadow-[0_16px_48px_rgba(45,64,89,0.08),0_2px_8px_rgba(0,0,0,0.02)] transition-all duration-300 max-[860px]:right-4 max-[860px]:left-4 max-[860px]:w-auto"
+      class="fixed top-[84px] bottom-4 sm:bottom-6 left-4 sm:left-6 z-40 flex flex-col overflow-hidden rounded-[28px] border border-board-card-border bg-board-surface-strong/80 p-5 text-board-page-text backdrop-blur-xl shadow-[0_16px_48px_rgba(45,64,89,0.08),0_2px_8px_rgba(0,0,0,0.02)] will-change-[width,transform] transition-[width,transform] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] max-w-[calc(100vw-32px)]"
+      :class="
+        isExpanded
+          ? 'w-[calc(100vw-32px)] sm:w-[calc(100vw-48px)]'
+          : 'w-[calc(100vw-32px)] sm:w-[350px]'
+      "
       aria-label="Personal Library"
       @click="closeFolderMenu"
       @dragover.prevent="handleIslandDragOver"
@@ -25,18 +30,30 @@
             pointerEvents: isHeaderCollapsed ? 'none' : 'auto',
           }"
         >
-          <!-- 顶栏：标题 + 微圆关闭按钮 -->
+          <!-- 顶栏：标题 + 展开/收缩按钮 + 微圆关闭按钮 -->
           <div class="flex items-center justify-between pb-2 shrink-0">
             <h2 class="m-0 text-base font-semibold tracking-tight">My Library</h2>
-            <button
-              type="button"
-              class="grid size-8 shrink-0 place-items-center rounded-full bg-black/[0.04] text-board-page-text-muted transition-colors hover:bg-black/[0.08] hover:text-board-page-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
-              aria-label="Close Library"
-              title="Close Library"
-              @click="emit('close')"
-            >
-              <Xmark class="size-4" aria-hidden="true" />
-            </button>
+            <div class="flex items-center gap-1.5">
+              <button
+                type="button"
+                class="grid size-8 shrink-0 place-items-center rounded-full bg-black/[0.04] text-board-page-text-muted transition-colors hover:bg-black/[0.08] hover:text-board-page-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] cursor-pointer"
+                :aria-label="isExpanded ? 'Collapse library' : 'Expand library'"
+                :title="isExpanded ? 'Collapse library' : 'Expand library'"
+                @click="isExpanded = !isExpanded"
+              >
+                <NavArrowLeft v-if="isExpanded" class="size-4" aria-hidden="true" />
+                <NavArrowRight v-else class="size-4" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class="grid size-8 shrink-0 place-items-center rounded-full bg-black/[0.04] text-board-page-text-muted transition-colors hover:bg-black/[0.08] hover:text-board-page-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] cursor-pointer"
+                aria-label="Close Library"
+                title="Close Library"
+                @click="emit('close')"
+              >
+                <Xmark class="size-4" aria-hidden="true" />
+              </button>
+            </div>
           </div>
 
           <!-- 灵感夹筛选微胶囊 (自然流式换行，支持拖拽落盘，零滚动条) -->
@@ -62,7 +79,7 @@
                   type="button"
                   role="tab"
                   :aria-selected="workspace.selectedFolder.value === folder.queryKey"
-                  class="h-7 rounded-full border px-2.5 text-xs font-medium transition-all duration-150 flex items-center gap-1.5 whitespace-nowrap focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
+                  class="h-7 rounded-full border px-2.5 text-xs font-medium transition-[transform,background-color,border-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] flex items-center gap-1.5 whitespace-nowrap focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
                   :class="[
                     workspace.selectedFolder.value === folder.queryKey
                       ? 'border-transparent bg-board-primary text-ib-text-inverse shadow-xs'
@@ -73,7 +90,7 @@
                   ]"
                   @click="selectFolder(folder.queryKey)"
                 >
-                  <ViewGrid
+                  <ReportColumns
                     v-if="folder.queryKey === 'all'"
                     class="size-3 opacity-80"
                     aria-hidden="true"
@@ -152,11 +169,19 @@
             </p>
           </div>
         </div>
-        <div v-else class="grid grid-cols-2 gap-2 pb-2">
+        <div
+          v-else
+          class="pb-2"
+          :class="
+            isExpanded
+              ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3'
+              : 'grid grid-cols-2 gap-2'
+          "
+        >
           <article
             v-for="asset in workspace.assets.value"
             :key="asset.id"
-            class="group/libcard relative overflow-hidden rounded-xl border border-board-card-border bg-board-card-bg shadow-none transition-all duration-150"
+            class="group/libcard relative overflow-hidden rounded-xl bg-board-card-bg/80 backdrop-blur-md shadow-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
           >
             <button
               type="button"
@@ -179,15 +204,15 @@
                   :src="asset.preview_url"
                   :alt="asset.title || 'Saved reference'"
                   loading="lazy"
-                  class="h-full w-full object-cover transition-transform duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] group-hover/libcard:scale-[1.025]"
+                  class="h-full w-full object-cover"
                   @error="markImageError(asset.id)"
                 />
               </div>
             </button>
 
-            <!-- 悬浮操作浮层 -->
+            <!-- 悬浮微渐变覆盖层 -->
             <div
-              class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover/libcard:opacity-100 transition-opacity duration-200 flex flex-col justify-between p-2 pointer-events-none"
+              class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover/libcard:opacity-100 transition-opacity duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] flex flex-col justify-between p-2 pointer-events-none"
             >
               <div class="flex justify-end pointer-events-auto">
                 <button
@@ -214,7 +239,7 @@
           <button
             v-if="workspace.hasMore.value"
             type="button"
-            class="mx-auto my-3 block rounded-full border border-board-card-border bg-board-control-bg px-3 py-1.5 text-xs font-semibold focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] disabled:opacity-50"
+            class="mx-auto my-3 block rounded-full border border-board-card-border bg-board-control-bg/80 backdrop-blur-md px-3 py-1.5 text-xs font-semibold focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] disabled:opacity-50 cursor-pointer"
             :disabled="workspace.loading.value"
             @click="workspace.loadAssets(false)"
           >
@@ -229,27 +254,25 @@
   <div
     v-if="contextMenu"
     ref="folderMenuRef"
-    class="fixed z-[80] min-w-40 rounded-xl border border-board-card-border bg-board-surface-strong p-1.5 text-board-page-text shadow-[0_12px_32px_rgba(45,64,89,0.16)] backdrop-blur-xl"
+    class="fixed z-[80] min-w-40 rounded-xl border border-board-card-border bg-board-surface-strong/80 p-1.5 text-board-page-text shadow-[0_12px_32px_rgba(45,64,89,0.16)] backdrop-blur-md"
     :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
     role="menu"
     @click.stop
   >
     <button
       type="button"
-      class="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs font-semibold text-board-page-text transition-colors hover:bg-ib-surface-hover"
+      class="flex h-8 w-full items-center rounded-lg px-2.5 text-left text-xs font-semibold text-board-page-text transition-colors hover:bg-ib-surface-hover cursor-pointer"
       role="menuitem"
       @click="openRenameFolder(contextMenu.folder)"
     >
-      <EditPencil class="size-3.5" aria-hidden="true" />
       <span>Rename</span>
     </button>
     <button
       type="button"
-      class="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs font-semibold text-board-danger transition-colors hover:bg-board-danger/10"
+      class="flex h-8 w-full items-center rounded-lg px-2.5 text-left text-xs font-semibold text-board-danger transition-colors hover:bg-board-danger/10 cursor-pointer"
       role="menuitem"
       @click="deleteFolder(contextMenu.folder)"
     >
-      <Trash class="size-3.5" aria-hidden="true" />
       <span>Delete</span>
     </button>
   </div>
@@ -260,10 +283,7 @@
     modal
     :show-header="false"
     :style="{ width: 'min(420px, calc(100vw - 32px))' }"
-    :pt="{
-      root: { class: '!rounded-2xl !border-board-card-border' },
-      content: { class: '!p-0' },
-    }"
+    :pt="dialogPt"
   >
     <form class="p-6" @submit.prevent="submitFolder">
       <h3 class="m-0 text-lg font-semibold">New folder</h3>
@@ -338,38 +358,76 @@
     </form>
   </Dialog>
 
-  <!-- Lightbox 预览弹窗 -->
-  <Dialog
-    :visible="!!workspace.activeAsset.value"
-    modal
-    :show-header="false"
-    :style="{ width: 'min(860px, calc(100vw - 32px))' }"
-    :pt="dialogPt"
-    @update:visible="(value) => !value && workspace.setActiveAsset(null)"
-  >
-    <div v-if="workspace.activeAsset.value" class="bg-board-surface-strong">
-      <div class="flex items-center justify-between border-b border-board-card-border px-5 py-4">
-        <div class="truncate text-base font-semibold">
-          {{ workspace.activeAsset.value.title || 'Saved reference' }}
-        </div>
-        <button
-          type="button"
-          class="grid size-9 shrink-0 place-items-center rounded-full text-board-page-text-muted hover:bg-ib-surface-hover focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
-          aria-label="Close preview"
-          @click="workspace.setActiveAsset(null)"
+  <!-- 🌟 Demo 同款零遮挡全景高清 Lightbox 弹窗 (bg-black/65 backdrop-blur-2xl) -->
+  <Teleport to="body">
+    <Transition
+      enter-active-class="transition-opacity duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)]"
+      leave-active-class="transition-opacity duration-[var(--motion-exit-duration)] ease-[var(--motion-exit-easing)]"
+      enter-from-class="opacity-0"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if="!!workspace.activeAsset.value"
+        class="fixed inset-0 z-[2000] flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-black/65 backdrop-blur-2xl select-none"
+        @click="workspace.setActiveAsset(null)"
+      >
+        <!-- 顶部极简悬浮信息与操作栏 -->
+        <div
+          class="flex w-full max-w-6xl items-center justify-between z-20 shrink-0 mb-3 px-2"
+          @click.stop
         >
-          <Xmark class="size-4" aria-hidden="true" />
-        </button>
+          <!-- 左上角：纯净悬浮文字 (Title + Author) -->
+          <div class="min-w-0 pr-4">
+            <h3
+              class="m-0 text-white text-base sm:text-lg font-semibold tracking-tight drop-shadow-md truncate max-w-[240px] sm:max-w-md"
+            >
+              {{ workspace.activeAsset.value.title || 'Saved reference' }}
+            </h3>
+            <p class="mt-1 mb-0 text-white/70 text-xs drop-shadow-md">
+              {{ workspace.activeAsset.value.author }} · {{ workspace.activeAsset.value.provider }}
+            </p>
+          </div>
+
+          <!-- 右上角：来源链接 + 极简圆形 ✕ 关闭按钮 -->
+          <div class="flex items-center gap-2.5">
+            <a
+              v-if="workspace.activeAsset.value.source_url"
+              :href="workspace.activeAsset.value.source_url"
+              target="_blank"
+              rel="noreferrer"
+              class="h-9 px-4 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-md border border-white/15 flex items-center gap-1.5 transition no-underline shadow-sm"
+            >
+              <span>View Source</span>
+            </a>
+
+            <button
+              type="button"
+              class="size-9 rounded-full bg-black/40 hover:bg-white/20 text-white/80 hover:text-white backdrop-blur-xl border border-white/10 flex items-center justify-center transition shadow-md shrink-0 cursor-pointer focus-visible:outline-none"
+              aria-label="Close preview"
+              title="Close (Esc)"
+              @click="workspace.setActiveAsset(null)"
+            >
+              <Xmark class="size-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+
+        <!-- 中间大图展示区 (彻底去除边框与遮挡，纯粹沉浸大图鉴赏) -->
+        <div
+          class="flex-1 w-full max-w-6xl flex items-center justify-center overflow-hidden min-h-0"
+          @click.stop
+        >
+          <img
+            :src="
+              workspace.activeAsset.value.original_url || workspace.activeAsset.value.preview_url
+            "
+            :alt="workspace.activeAsset.value.title || 'Saved reference'"
+            class="max-h-[82vh] max-w-full object-contain rounded-2xl shadow-2xl border-0 ring-0 outline-none select-none"
+          />
+        </div>
       </div>
-      <div class="grid max-h-[76vh] min-h-60 place-items-center bg-black/5 p-4">
-        <img
-          :src="workspace.activeAsset.value.original_url"
-          :alt="workspace.activeAsset.value.title || 'Saved reference'"
-          class="max-h-[68vh] max-w-full object-contain"
-        />
-      </div>
-    </div>
-  </Dialog>
+    </Transition>
+  </Teleport>
 
   <UserConfirmDialog
     :visible="confirmDialog.visible.value"
@@ -388,7 +446,16 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
-import { Bookmark, EditPencil, Folder, Plus, Trash, ViewGrid, Xmark } from '@iconoir/vue'
+import {
+  Bookmark,
+  Folder,
+  NavArrowLeft,
+  NavArrowRight,
+  Plus,
+  ReportColumns,
+  Trash,
+  Xmark,
+} from '@iconoir/vue'
 import { useLibraryWorkspace, type LibraryFolderTab } from '../useLibraryWorkspace'
 import {
   libraryAssetKey,
@@ -403,6 +470,7 @@ import { deleteFolderConfirmation, removeAssetConfirmation } from '../libraryCon
 
 const props = defineProps<{ open: boolean; refreshKey: number }>()
 const emit = defineEmits<{ close: []; 'asset-saved': [key: string] }>()
+const isExpanded = defineModel<boolean>('expanded', { default: false })
 
 const toast = useAppToast()
 const confirmDialog = useUserConfirmDialog()
@@ -427,7 +495,9 @@ const renameError = ref('')
 const renameSaving = ref(false)
 
 const dialogPt = {
-  root: { class: '!rounded-2xl !border-board-card-border' },
+  root: {
+    class: '!rounded-2xl !border-board-card-border !bg-board-surface-strong/80 backdrop-blur-md',
+  },
   content: { class: '!p-0' },
 }
 
@@ -541,6 +611,12 @@ function handleWindowResize() {
   closeFolderMenu()
 }
 
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && workspace.activeAsset.value) {
+    workspace.setActiveAsset(null)
+  }
+}
+
 // 拖拽落盘事件处理
 function parseDraggedReference(e: DragEvent): LibrarySearchReference | null {
   try {
@@ -633,7 +709,10 @@ async function submitFolder() {
 watch(
   () => props.open,
   (isOpen) => {
-    if (!isOpen) closeFolderMenu()
+    if (!isOpen) {
+      closeFolderMenu()
+      isExpanded.value = false
+    }
     if (isOpen && !initialized.value) {
       initialized.value = true
       void workspace.initialize()
@@ -653,35 +732,49 @@ watch(
 
 onMounted(() => {
   document.addEventListener('pointerdown', handleDocumentPointerDown)
+  window.addEventListener('keydown', handleKeydown)
   window.addEventListener('resize', handleWindowResize)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
+  window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('resize', handleWindowResize)
 })
 </script>
 
 <style scoped>
-.library-island-enter-active,
+.library-island-enter-active {
+  transition:
+    opacity var(--motion-enter-duration) var(--motion-enter-easing),
+    transform var(--motion-enter-duration) var(--motion-enter-easing);
+  will-change: opacity, transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+
 .library-island-leave-active {
   transition:
-    opacity 0.32s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity var(--motion-exit-duration) var(--motion-exit-easing),
+    transform var(--motion-exit-duration) var(--motion-exit-easing);
+  will-change: opacity, transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .library-island-enter-from,
 .library-island-leave-to {
   opacity: 0;
-  transform: translateX(-24px);
+  transform: translate3d(calc(-100% - 32px), 0, 0);
 }
 
 /* 🌟 120fps 硬件加速折叠动效 (CSS Grid 0fr <-> 1fr) */
 .smooth-grid-collapse {
   display: grid;
   transition:
-    grid-template-rows 0.36s cubic-bezier(0.16, 1, 0.3, 1),
-    margin-bottom 0.36s cubic-bezier(0.16, 1, 0.3, 1);
+    grid-template-rows var(--motion-control-duration) var(--motion-control-easing),
+    margin-bottom var(--motion-control-duration) var(--motion-control-easing);
   will-change: grid-template-rows, margin-bottom;
 }
 
@@ -689,8 +782,8 @@ onBeforeUnmount(() => {
   overflow: hidden;
   min-height: 0;
   transition:
-    opacity 0.26s ease,
-    transform 0.36s cubic-bezier(0.16, 1, 0.3, 1);
+    opacity var(--motion-control-duration) var(--motion-control-easing),
+    transform var(--motion-control-duration) var(--motion-control-easing);
   will-change: opacity, transform;
 }
 </style>

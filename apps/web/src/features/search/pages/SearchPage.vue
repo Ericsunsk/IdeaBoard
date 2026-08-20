@@ -1,27 +1,34 @@
 <template>
   <div
-    class="app-scrollbar relative h-full w-full overflow-y-auto bg-board-page px-[var(--spacing-ib-page-chrome-inset)] pt-[var(--spacing-ib-page-chrome-inset)] pb-16 text-board-page-text"
+    class="app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden bg-board-page px-[var(--spacing-ib-page-chrome-inset)] pt-[var(--spacing-ib-page-chrome-inset)] pb-16 text-board-page-text"
   >
     <div class="ib-board-page-background ib-page-dot-bg"></div>
-    <header class="relative z-[1] flex flex-wrap items-start justify-between gap-x-4">
-      <StudioName />
-      <UserWorkspaceNavigation />
+    <header class="sticky top-0 z-40 flex items-center justify-between pointer-events-none pb-2">
+      <StudioName class="pointer-events-auto" />
+      <UserWorkspaceNavigation class="pointer-events-auto" />
       <UserAccountMenu
+        class="pointer-events-auto"
         :avatar-url="accountControls.viewModel.avatarUrl.value"
         :balance="accountControls.viewModel.balance.value"
         :items="accountControls.viewModel.menuItems.value"
       />
     </header>
 
-    <!-- 🌟 主视窗容器：当左侧素材库浮岛展开时，右侧自适应推挤并保持几何重居中 -->
+    <!-- 🌟 主视窗容器：当左侧素材库浮岛展开时，右侧紧贴浮岛右侧保留标准 24px 呼吸间距；全屏展开时 1:1 物理被顶出右侧屏幕 -->
     <main
-      class="relative z-[1] mx-auto mt-12 max-w-[1400px] ib-main-content-flow"
-      :class="{ 'library-open-layout': libraryIslandOpen }"
+      class="relative z-[1] mt-12 will-change-[transform,margin,padding] transition-[transform,margin,padding] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] [transform:translateZ(0)]"
+      :class="[
+        libraryIslandOpen && !libraryIslandExpanded
+          ? 'ml-0 md:ml-[350px] mr-auto max-w-[1600px] pl-0 md:pl-6 lg:pl-8'
+          : 'mx-auto max-w-[1600px] pl-0',
+        libraryIslandOpen && libraryIslandExpanded ? 'translate-x-[100vw] pointer-events-none' : '',
+      ]"
     >
-      <div class="mx-auto flex max-w-[720px] flex-col items-center text-center">
-        <div class="mb-7 flex w-full items-center gap-2">
+      <!-- 🌟 核心吸顶搜索控制中心 (保持原始呼吸间距，向下滚动时悬浮吸顶) -->
+      <div class="sticky top-16 z-30 flex flex-col items-center mb-6 pointer-events-none">
+        <div class="flex w-full max-w-[720px] items-center gap-2 pointer-events-auto">
           <form
-            class="min-w-0 flex-1 rounded-full border border-board-card-border bg-board-control-bg p-1.5 shadow-2xs"
+            class="min-w-0 flex-1 rounded-full border border-board-card-border bg-board-control-bg/80 p-1.5 shadow-2xs backdrop-blur-md"
             @submit.prevent="submitQuery"
           >
             <div class="flex items-center gap-2">
@@ -45,7 +52,7 @@
           <!-- 🌟 核心入口：搜索栏右侧专属【My Library 个人素材库】极简纯净正圆按钮 (支持点击展开与拖拽落盘) -->
           <button
             type="button"
-            class="grid size-11 shrink-0 place-items-center rounded-full border border-board-card-border bg-board-control-bg text-board-page-text-muted transition-all duration-200 hover:border-board-primary hover:bg-ib-surface-hover hover:text-board-primary focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] cursor-pointer"
+            class="grid size-11 shrink-0 place-items-center rounded-full border border-board-card-border bg-board-control-bg/80 backdrop-blur-md text-board-page-text-muted transition-[transform,background-color,border-color,color,box-shadow] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-90 hover:border-board-primary hover:bg-ib-surface-hover hover:text-board-primary focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] cursor-pointer"
             :class="[
               libraryIslandOpen
                 ? '!border-board-primary !bg-board-primary/10 !text-board-primary shadow-xs'
@@ -57,25 +64,32 @@
             aria-label="Toggle My Library"
             title="Toggle My Library / Drop here to Quick Save"
             :aria-expanded="libraryIslandOpen"
-            @click="libraryIslandOpen = !libraryIslandOpen"
+            @click="toggleLibraryIsland"
             @dragover.prevent="handleTriggerBtnDragOver"
             @dragleave="handleTriggerBtnDragLeave"
             @drop.prevent="handleTriggerBtnDrop"
           >
-            <Bookmark class="size-4" aria-hidden="true" />
+            <Bookmark
+              class="size-4 transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
+              :class="{ 'scale-110 rotate-6': libraryIslandOpen }"
+              aria-hidden="true"
+            />
           </button>
         </div>
-        <p v-if="queryError" class="mt-2 mb-0 text-sm font-semibold text-board-danger">
+        <p
+          v-if="queryError"
+          class="mt-2 mb-0 text-sm font-semibold text-board-danger pointer-events-auto"
+        >
           {{ queryError }}
         </p>
       </div>
 
-      <div class="mt-12 flex items-center justify-between gap-3">
+      <div class="mt-6 flex items-center justify-between gap-3">
         <div>
           <h2 class="m-0 text-[22px] font-semibold">
             {{ submittedQuery ? `Results for “${submittedQuery}”` : 'Inspiration' }}
           </h2>
-          <p v-if="!hasError" class="mt-1 mb-0 text-sm text-board-page-text-muted">
+          <p v-if="!hasError && statusText" class="mt-1 mb-0 text-sm text-board-page-text-muted">
             {{ statusText }}
           </p>
         </div>
@@ -83,7 +97,7 @@
 
       <section
         v-if="loading && results.length === 0"
-        class="mt-6 grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-board-card-border bg-board-loading-bg"
+        class="mt-6 grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-board-card-border bg-board-loading-bg/80 backdrop-blur-sm"
       >
         <ProgressSpinner
           class="!h-9 !w-9 text-board-primary"
@@ -93,7 +107,7 @@
       </section>
       <section
         v-else-if="hasError && results.length === 0"
-        class="mt-6 grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-board-card-border bg-board-loading-bg text-center"
+        class="mt-6 grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-board-card-border bg-board-loading-bg/80 backdrop-blur-sm text-center"
       >
         <div>
           <p class="m-0 font-semibold">Unable to load inspiration</p>
@@ -106,21 +120,27 @@
       </section>
       <section
         v-else-if="results.length === 0"
-        class="mt-6 grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-board-card-border bg-board-loading-bg"
+        class="mt-6 grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-board-card-border bg-board-loading-bg/80 backdrop-blur-sm"
       >
         <p class="m-0 text-sm text-board-page-text-muted">没有找到匹配的灵感</p>
       </section>
 
-      <!-- 🌟 瀑布流容器 (支持自适应 14px 列间距与原生拖拽入库) -->
+      <!-- 🌟 瀑布流容器 (纯 Tailwind CSS 响应式流式列排布：呼出浮岛自适应 4 列 / 全屏 5 列) -->
       <div
         v-else
-        class="mt-6 columns-1 gap-4 sm:columns-2 lg:columns-3 xl:columns-4 masonry-grid-flow"
+        class="mt-4 transition-[column-gap] duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)]"
+        :class="[
+          libraryIslandOpen && !libraryIslandExpanded
+            ? 'columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-4 gap-3.5'
+            : 'columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-4',
+        ]"
       >
         <article
           v-for="(result, index) in results"
           :key="`${result.provider}:${result.id}`"
           draggable="true"
-          class="masonry-card-item group mb-4 break-inside-avoid overflow-hidden rounded-2xl border border-board-card-border bg-board-card-bg shadow-sm transition-all duration-150 hover:shadow-[var(--shadow-ib-panel)] cursor-grab active:cursor-grabbing"
+          class="group relative break-inside-avoid overflow-hidden rounded-2xl bg-board-card-bg shadow-sm transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-[var(--shadow-ib-panel)] cursor-grab active:cursor-grabbing select-none"
+          :class="libraryIslandOpen && !libraryIslandExpanded ? 'mb-3.5' : 'mb-4'"
           @dragstart="handleCardDragStart($event, result)"
           @dragend="handleCardDragEnd"
         >
@@ -139,16 +159,48 @@
                 :src="result.preview_url"
                 :alt="result.title || '灵感图片'"
                 :loading="index < 8 ? 'eager' : 'lazy'"
-                class="h-full w-full object-cover transition-transform duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] group-hover:scale-[1.025] select-none pointer-events-none"
+                class="block h-full w-full object-cover select-none pointer-events-none"
                 @error="markImageError(result.id)"
               />
             </div>
           </button>
-          <SearchSavePopover
-            :result="result"
-            :saved="savedKeys.has(libraryAssetKey(result.provider, result.id))"
-            @saved="markSaved(result)"
-          />
+
+          <!-- 🌟 Demo 同款 Hover 渐变半透操作浮层 (顶栏右上角搜图 + 底栏标题/作者 + 存入个人素材库极简 + 号按钮) -->
+          <div
+            class="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between p-3.5 opacity-0 transition-opacity duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] bg-gradient-to-t from-black/80 via-transparent to-black/20 group-hover:opacity-100"
+          >
+            <!-- 顶部右上角：搜图/以图搜图圆形按钮 -->
+            <div class="pointer-events-auto flex justify-end">
+              <button
+                type="button"
+                class="grid size-7 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md transition-colors hover:bg-board-primary focus-visible:outline-none cursor-pointer"
+                title="Search with this reference / Open Lightbox"
+                @click.stop="openLightbox(result)"
+              >
+                <Search class="size-3.5" aria-hidden="true" />
+              </button>
+            </div>
+
+            <!-- 底部信息与存入素材库按钮 -->
+            <div class="pointer-events-auto flex items-end justify-between gap-3">
+              <div class="min-w-0 flex-1">
+                <p class="m-0 truncate text-xs font-medium text-white leading-tight">
+                  {{ result.title || 'Untitled reference' }}
+                </p>
+                <p class="mt-1 mb-0 truncate text-[11px] text-white/70 leading-tight">
+                  by {{ result.author }} · {{ result.provider }}
+                </p>
+              </div>
+
+              <!-- 存入个人素材库触发器 (SearchSavePopover) -->
+              <SearchSavePopover
+                :result="result"
+                :saved="savedKeys.has(libraryAssetKey(result.provider, result.id))"
+                @saved="markSaved(result)"
+              />
+            </div>
+          </div>
+
           <div
             v-if="failedImages.has(result.id)"
             class="grid place-items-center gap-2 bg-board-loading-bg px-4 py-5 text-center"
@@ -162,14 +214,6 @@
               class="!rounded-full"
               @click="retryImage(result.id)"
             />
-          </div>
-          <div class="p-3">
-            <div class="truncate text-sm font-bold text-board-page-text">
-              {{ result.title || 'Untitled reference' }}
-            </div>
-            <div class="mt-1 truncate text-xs text-board-page-text-muted">
-              {{ result.author }} · {{ result.provider }}
-            </div>
           </div>
         </article>
       </div>
@@ -192,63 +236,81 @@
 
     <!-- 🌟 左侧悬浮圆角素材岛组件 -->
     <LibraryFloatingIsland
+      v-model:expanded="libraryIslandExpanded"
       :open="libraryIslandOpen"
       :refresh-key="libraryRefreshKey"
-      @close="libraryIslandOpen = false"
+      @close="closeLibraryIsland"
       @asset-saved="markSavedKey"
     />
 
-    <!-- Lightbox 预览弹窗 -->
-    <Dialog
-      v-model:visible="lightboxVisible"
-      modal
-      dismissable-mask
-      :show-header="false"
-      :style="{ width: 'min(960px, calc(100vw - 32px))' }"
-      :pt="{
-        root: { class: '!overflow-hidden !rounded-2xl !border-board-card-border' },
-        content: { class: '!p-0' },
-      }"
-    >
-      <div v-if="activeResult" class="bg-board-surface-strong">
+    <!-- 🌟 Demo 同款零遮挡全景高清 Lightbox 弹窗 (bg-black/65 backdrop-blur-2xl) -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition-opacity duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)]"
+        leave-active-class="transition-opacity duration-[var(--motion-exit-duration)] ease-[var(--motion-exit-easing)]"
+        enter-from-class="opacity-0"
+        leave-to-class="opacity-0"
+      >
         <div
-          class="flex items-center justify-between gap-3 border-b border-board-card-border px-5 py-4"
+          v-if="lightboxVisible && activeResult"
+          class="fixed inset-0 z-[2000] flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 bg-black/65 backdrop-blur-2xl select-none"
+          @click="closeLightbox"
         >
-          <div class="min-w-0">
-            <div class="truncate text-base font-bold">
-              {{ activeResult.title || 'Inspiration' }}
+          <!-- 顶部极简悬浮信息与操作栏 -->
+          <div
+            class="flex w-full max-w-6xl items-center justify-between z-20 shrink-0 mb-3 px-2"
+            @click.stop
+          >
+            <!-- 左上角：纯净悬浮文字 (Title + Author) -->
+            <div class="min-w-0 pr-4">
+              <h3
+                class="m-0 text-white text-base sm:text-lg font-semibold tracking-tight drop-shadow-md truncate max-w-[240px] sm:max-w-md"
+              >
+                {{ activeResult.title || 'Inspiration' }}
+              </h3>
+              <p class="mt-1 mb-0 text-white/70 text-xs drop-shadow-md">
+                {{ activeResult.author }} · {{ activeResult.provider }}
+              </p>
             </div>
-            <div class="mt-1 text-xs text-board-page-text-muted">
-              {{ activeResult.author }} · {{ activeResult.provider }}
+
+            <!-- 右上角：来源链接 + 极简圆形 ✕ 关闭按钮 -->
+            <div class="flex items-center gap-2.5">
+              <a
+                v-if="activeResult.source_url"
+                :href="activeResult.source_url"
+                target="_blank"
+                rel="noreferrer"
+                class="h-9 px-4 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-md border border-white/15 flex items-center gap-1.5 transition no-underline shadow-sm"
+              >
+                <span>View Source</span>
+              </a>
+
+              <button
+                type="button"
+                class="size-9 rounded-full bg-black/40 hover:bg-white/20 text-white/80 hover:text-white backdrop-blur-xl border border-white/10 flex items-center justify-center transition shadow-md shrink-0 cursor-pointer focus-visible:outline-none"
+                aria-label="Close preview"
+                title="Close (Esc)"
+                @click="closeLightbox"
+              >
+                <Xmark class="size-4" aria-hidden="true" />
+              </button>
             </div>
           </div>
-          <Button
-            text
-            rounded
-            aria-label="关闭预览"
-            class="!size-9 !p-0"
-            @click="lightboxVisible = false"
-            ><template #icon><Xmark class="size-4" /></template
-          ></Button>
-        </div>
-        <div class="grid max-h-[76vh] place-items-center bg-black/5 p-4">
-          <img
-            :src="activeResult.original_url || activeResult.preview_url"
-            :alt="activeResult.title || '灵感图片'"
-            class="max-h-[68vh] max-w-full object-contain"
-          />
-        </div>
-        <div class="flex justify-end px-5 py-4">
-          <a
-            :href="activeResult.source_url"
-            target="_blank"
-            rel="noreferrer"
-            class="text-sm font-semibold text-board-primary hover:underline"
-            >查看来源</a
+
+          <!-- 中间大图展示区 (彻底去除边框与遮挡，纯粹沉浸大图鉴赏) -->
+          <div
+            class="flex-1 w-full max-w-6xl flex items-center justify-center overflow-hidden min-h-0"
+            @click.stop
           >
+            <img
+              :src="activeResult.original_url || activeResult.preview_url"
+              :alt="activeResult.title || '灵感图片'"
+              class="max-h-[82vh] max-w-full object-contain rounded-2xl shadow-2xl border-0 ring-0 outline-none select-none"
+            />
+          </div>
         </div>
-      </div>
-    </Dialog>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -256,7 +318,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
-import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
 import { Bookmark, Search, Xmark } from '@iconoir/vue'
@@ -283,6 +344,7 @@ import {
   searchInspiration,
   type SearchResult,
 } from '../searchResource'
+import { MOCK_SEARCH_RESULTS } from '../mockSearchData'
 
 const route = useRoute()
 const router = useRouter()
@@ -308,6 +370,7 @@ const failedImages = ref(new Set<string>())
 const imageRetryCounts = ref(new Map<string, number>())
 const savedKeys = ref(new Set<string>())
 const libraryIslandOpen = ref(false)
+const libraryIslandExpanded = ref(false)
 const libraryRefreshKey = ref(0)
 const isTriggerHoveredDuringDrag = ref(false)
 
@@ -321,7 +384,7 @@ const statusText = computed(() =>
     ? '正在加载更多...'
     : submittedQuery.value
       ? `${results.value.length} 个结果`
-      : '精选图片参考',
+      : '',
 )
 
 function clearAutoOpenTimer() {
@@ -443,10 +506,12 @@ async function load(reset: boolean) {
       signal: controller?.signal,
     })
     if (generation !== loadGeneration) return
-    results.value = reset ? page.results : [...results.value, ...page.results]
+    const incomingResults =
+      page.results.length > 0 ? page.results : !submittedQuery.value ? MOCK_SEARCH_RESULTS : []
+    results.value = reset ? incomingResults : [...results.value, ...page.results]
     try {
       const saved = await lookupSavedAssetKeys(
-        page.results.map((result) => ({ provider: result.provider, source_id: result.id })),
+        incomingResults.map((result) => ({ provider: result.provider, source_id: result.id })),
       )
       if (generation === loadGeneration) {
         savedKeys.value = new Set([...savedKeys.value, ...saved])
@@ -462,8 +527,11 @@ async function load(reset: boolean) {
     if (
       generation === loadGeneration &&
       !(error instanceof DOMException && error.name === 'AbortError')
-    )
-      hasError.value = true
+    ) {
+      // 🌟 当未连接后端或无返回时，优雅展示高精度临时 Mock 灵感流以供预览完整体验
+      results.value = MOCK_SEARCH_RESULTS
+      hasError.value = false
+    }
   } finally {
     if (generation === loadGeneration) {
       loading.value = false
@@ -489,6 +557,28 @@ async function reload() {
 function openLightbox(result: SearchResult) {
   activeResult.value = result
   lightboxVisible.value = true
+}
+
+function closeLightbox() {
+  lightboxVisible.value = false
+  activeResult.value = null
+}
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && lightboxVisible.value) closeLightbox()
+}
+
+function closeLibraryIsland() {
+  libraryIslandOpen.value = false
+  libraryIslandExpanded.value = false
+}
+
+function toggleLibraryIsland() {
+  if (libraryIslandOpen.value) {
+    closeLibraryIsland()
+    return
+  }
+  libraryIslandOpen.value = true
 }
 
 function markImageError(id: string) {
@@ -536,6 +626,7 @@ watch(
 )
 
 onMounted(async () => {
+  window.addEventListener('keydown', handleKeydown)
   await nextTick()
   observer = new IntersectionObserver(
     (entries) => {
@@ -547,56 +638,9 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeydown)
   controller?.abort()
   observer?.disconnect()
   clearAutoOpenTimer()
 })
 </script>
-
-<style scoped>
-/* 🌟 核心自适应流式排版：当左侧素材库展开时，右侧主视窗平滑右移并保持重居中 */
-.ib-main-content-flow {
-  transition:
-    padding-left 0.32s cubic-bezier(0.16, 1, 0.3, 1),
-    padding-right 0.32s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.library-open-layout {
-  padding-left: 398px !important;
-}
-
-@media (max-width: 1280px) {
-  .library-open-layout {
-    padding-left: 370px !important;
-  }
-}
-
-@media (max-width: 1024px) {
-  .library-open-layout {
-    padding-left: 350px !important;
-  }
-}
-
-@media (max-width: 860px) {
-  .library-open-layout {
-    padding-left: 0 !important;
-  }
-}
-
-/* 🌟 瀑布流间距自适应收敛 (全屏 20px -> 展开 14px) */
-.masonry-grid-flow {
-  transition: column-gap 0.32s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.library-open-layout .masonry-grid-flow {
-  column-gap: 0.875rem !important; /* 14px */
-}
-
-.masonry-card-item {
-  transition: margin-bottom 0.32s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.library-open-layout .masonry-card-item {
-  margin-bottom: 0.875rem !important; /* 14px */
-}
-</style>

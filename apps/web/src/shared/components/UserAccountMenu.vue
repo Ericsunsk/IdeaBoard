@@ -15,11 +15,11 @@
       aria-label="账户菜单"
       aria-haspopup="menu"
       :aria-expanded="isMenuOpen"
-      :class="avatarButtonClass"
+      :class="[avatarButtonClass, '!border !border-board-card-border !bg-board-control-bg/80 backdrop-blur-md hover:!bg-ib-surface-hover']"
       @click="toggleMenu"
     >
       <img v-if="avatarUrl" :src="avatarUrl" :class="avatarImageClass" alt="用户头像" />
-      <div v-else :class="avatarPlaceholderClass">
+      <div v-else :class="[avatarPlaceholderClass, 'bg-transparent']">
         <User :class="avatarIconClass" />
       </div>
     </Button>
