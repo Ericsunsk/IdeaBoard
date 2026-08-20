@@ -165,7 +165,7 @@
                 type="button"
                 class="rounded-full p-2 text-board-page-text-muted hover:bg-ib-surface-hover hover:text-board-danger focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
                 aria-label="Remove saved reference"
-                @click="workspace.requestRemove(asset)"
+                @click="requestRemove(asset)"
               >
                 <Trash class="size-4" />
               </button>
@@ -321,6 +321,16 @@
         </div>
       </div></Dialog
     >
+    <UserConfirmDialog
+      :visible="confirmDialog.visible.value"
+      :title="confirmDialog.title.value"
+      :message="confirmDialog.message.value"
+      :confirm-label="confirmDialog.confirmLabel.value"
+      :intent="confirmDialog.intent.value"
+      :loading="confirmDialog.loading.value"
+      @update:visible="confirmDialog.close"
+      @confirm="confirmDialog.confirm"
+    />
   </div>
 </template>
 
@@ -338,11 +348,15 @@ import { useUserAccountControls } from '../../user-shell/useUserAccountControls'
 import { HOME_PATH } from '../../../shared/constants/routePaths'
 import { useUserStore } from '../../auth/session/authSession'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
+import UserConfirmDialog from '../../../shared/components/UserConfirmDialog.vue'
+import { useUserConfirmDialog } from '../../../shared/composables/useUserConfirmDialog'
+import { deleteFolderConfirmation, removeAssetConfirmation } from '../libraryConfirmations'
 import { useLibraryWorkspace } from '../useLibraryWorkspace'
 import type { LibraryAssetView } from '../libraryResource'
 const router = useRouter()
 const userStore = useUserStore()
 const workspace = useLibraryWorkspace()
+const confirmDialog = useUserConfirmDialog()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const accountControls = useUserAccountControls({
   navigation: { navigate: (path) => router.push(path), logout: () => logoutAndRedirect(HOME_PATH) },
@@ -409,7 +423,7 @@ async function submitRename() {
   renameSaving.value = true
   renameError.value = ''
   try {
-    await workspace.renameSelectedFolder(renameDraft.value.trim())
+    await workspace.renameFolder(workspace.selectedFolder.value, renameDraft.value.trim())
     renameDialogVisible.value = false
   } catch (error) {
     renameError.value = error instanceof Error ? error.message : '重命名收藏夹失败'
@@ -417,9 +431,17 @@ async function submitRename() {
     renameSaving.value = false
   }
 }
-async function deleteFolder() {
-  if (!window.confirm('Delete this folder? Saved references will move to Quick Saves.')) return
-  await workspace.deleteSelectedFolder()
+function deleteFolder() {
+  const folder = selectedFolderRecord.value
+  if (!folder?.isMutable) return
+  confirmDialog.request(deleteFolderConfirmation(folder.name), async () => {
+    await workspace.deleteFolder(workspace.selectedFolder.value)
+  })
+}
+function requestRemove(asset: LibraryAssetView) {
+  confirmDialog.request(removeAssetConfirmation(), async () => {
+    await workspace.requestRemove(asset)
+  })
 }
 async function submitMove() {
   if (!moveAsset.value || !moveTarget.value) return

@@ -13,27 +13,58 @@
       />
     </header>
 
-    <main class="relative z-[1] mx-auto mt-12 max-w-[1240px]">
+    <!-- 🌟 主视窗容器：当左侧素材库浮岛展开时，右侧自适应推挤并保持几何重居中 -->
+    <main
+      class="relative z-[1] mx-auto mt-12 max-w-[1400px] ib-main-content-flow"
+      :class="{ 'library-open-layout': libraryIslandOpen }"
+    >
       <div class="mx-auto flex max-w-[720px] flex-col items-center text-center">
-        <form
-          class="mb-7 flex w-full items-center gap-2 rounded-full border border-board-card-border bg-board-control-bg p-1.5"
-          @submit.prevent="submitQuery"
-        >
-          <Search class="ml-3 size-4 shrink-0 text-board-control-icon" aria-hidden="true" />
-          <InputText
-            v-model="draftQuery"
-            unstyled
-            class="min-w-0 flex-1 bg-transparent px-2 text-[14px] text-board-control-input-text outline-none"
-            placeholder="Search inspiration..."
-            aria-label="搜索灵感"
-            @input="queryError = ''"
-          />
-          <Button
-            type="submit"
-            label="Search"
-            class="!h-9 !rounded-full !border-0 !bg-board-primary !px-5 !text-sm !font-bold !text-ib-text-inverse !shadow-none hover:!bg-board-primary-hover"
-          />
-        </form>
+        <div class="mb-7 flex w-full items-center gap-2">
+          <form
+            class="min-w-0 flex-1 rounded-full border border-board-card-border bg-board-control-bg p-1.5 shadow-2xs"
+            @submit.prevent="submitQuery"
+          >
+            <div class="flex items-center gap-2">
+              <Search class="ml-3 size-4 shrink-0 text-board-control-icon" aria-hidden="true" />
+              <InputText
+                v-model="draftQuery"
+                unstyled
+                class="min-w-0 flex-1 bg-transparent px-2 text-[14px] text-board-control-input-text outline-none"
+                placeholder="Search inspiration..."
+                aria-label="搜索灵感"
+                @input="queryError = ''"
+              />
+              <Button
+                type="submit"
+                label="Search"
+                class="!h-9 !rounded-full !border-0 !bg-board-primary !px-5 !text-sm !font-bold !text-ib-text-inverse !shadow-none hover:!bg-board-primary-hover cursor-pointer"
+              />
+            </div>
+          </form>
+
+          <!-- 🌟 核心入口：搜索栏右侧专属【My Library 个人素材库】极简纯净正圆按钮 (支持点击展开与拖拽落盘) -->
+          <button
+            type="button"
+            class="grid size-11 shrink-0 place-items-center rounded-full border border-board-card-border bg-board-control-bg text-board-page-text-muted transition-all duration-200 hover:border-board-primary hover:bg-ib-surface-hover hover:text-board-primary focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] cursor-pointer"
+            :class="[
+              libraryIslandOpen
+                ? '!border-board-primary !bg-board-primary/10 !text-board-primary shadow-xs'
+                : '',
+              isTriggerHoveredDuringDrag
+                ? '!scale-110 !border-board-primary !text-board-primary'
+                : '',
+            ]"
+            aria-label="Toggle My Library"
+            title="Toggle My Library / Drop here to Quick Save"
+            :aria-expanded="libraryIslandOpen"
+            @click="libraryIslandOpen = !libraryIslandOpen"
+            @dragover.prevent="handleTriggerBtnDragOver"
+            @dragleave="handleTriggerBtnDragLeave"
+            @drop.prevent="handleTriggerBtnDrop"
+          >
+            <Bookmark class="size-4" aria-hidden="true" />
+          </button>
+        </div>
         <p v-if="queryError" class="mt-2 mb-0 text-sm font-semibold text-board-danger">
           {{ queryError }}
         </p>
@@ -65,7 +96,7 @@
         class="mt-6 grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-board-card-border bg-board-loading-bg text-center"
       >
         <div>
-          <p class="m-0 font-semibold">暂时无法加载灵感</p>
+          <p class="m-0 font-semibold">Unable to load inspiration</p>
           <Button
             label="Retry"
             class="!mt-4 !rounded-full !border-0 !bg-board-primary !text-ib-text-inverse"
@@ -79,11 +110,19 @@
       >
         <p class="m-0 text-sm text-board-page-text-muted">没有找到匹配的灵感</p>
       </section>
-      <div v-else class="mt-6 columns-1 gap-4 sm:columns-2 lg:columns-3 xl:columns-4">
+
+      <!-- 🌟 瀑布流容器 (支持自适应 14px 列间距与原生拖拽入库) -->
+      <div
+        v-else
+        class="mt-6 columns-1 gap-4 sm:columns-2 lg:columns-3 xl:columns-4 masonry-grid-flow"
+      >
         <article
           v-for="(result, index) in results"
           :key="`${result.provider}:${result.id}`"
-          class="group mb-4 break-inside-avoid overflow-hidden rounded-2xl border border-board-card-border bg-board-card-bg shadow-sm transition-shadow hover:shadow-[var(--shadow-ib-panel)]"
+          draggable="true"
+          class="masonry-card-item group mb-4 break-inside-avoid overflow-hidden rounded-2xl border border-board-card-border bg-board-card-bg shadow-sm transition-all duration-150 hover:shadow-[var(--shadow-ib-panel)] cursor-grab active:cursor-grabbing"
+          @dragstart="handleCardDragStart($event, result)"
+          @dragend="handleCardDragEnd"
         >
           <button
             type="button"
@@ -100,7 +139,7 @@
                 :src="result.preview_url"
                 :alt="result.title || '灵感图片'"
                 :loading="index < 8 ? 'eager' : 'lazy'"
-                class="h-full w-full object-cover transition-transform duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] group-hover:scale-[1.025]"
+                class="h-full w-full object-cover transition-transform duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] group-hover:scale-[1.025] select-none pointer-events-none"
                 @error="markImageError(result.id)"
               />
             </div>
@@ -134,6 +173,7 @@
           </div>
         </article>
       </div>
+
       <div ref="sentinel" class="h-10" aria-hidden="true"></div>
       <div v-if="loadingMore" class="flex justify-center py-5">
         <ProgressSpinner
@@ -150,6 +190,15 @@
       </p>
     </main>
 
+    <!-- 🌟 左侧悬浮圆角素材岛组件 -->
+    <LibraryFloatingIsland
+      :open="libraryIslandOpen"
+      :refresh-key="libraryRefreshKey"
+      @close="libraryIslandOpen = false"
+      @asset-saved="markSavedKey"
+    />
+
+    <!-- Lightbox 预览弹窗 -->
     <Dialog
       v-model:visible="lightboxVisible"
       modal
@@ -210,7 +259,7 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
-import { Search, Xmark } from '@iconoir/vue'
+import { Bookmark, Search, Xmark } from '@iconoir/vue'
 import StudioName from '../../../shared/components/StudioName.vue'
 import UserAccountMenu from '../../../shared/components/UserAccountMenu.vue'
 import { HOME_PATH, USER_SEARCH_PATH } from '../../../shared/constants/routePaths'
@@ -218,8 +267,15 @@ import { useUserStore } from '../../auth/session/authSession'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import UserWorkspaceNavigation from '../../user-shell/components/UserWorkspaceNavigation.vue'
 import SearchSavePopover from '../components/SearchSavePopover.vue'
-import { libraryAssetKey, lookupSavedAssetKeys } from '../../library/libraryResource'
+import LibraryFloatingIsland from '../../library/components/LibraryFloatingIsland.vue'
+import {
+  libraryAssetKey,
+  lookupSavedAssetKeys,
+  saveSearchReference,
+  type LibrarySearchReference,
+} from '../../library/libraryResource'
 import { useUserAccountControls } from '../../user-shell/useUserAccountControls'
+import { useAppToast } from '../../../shared/composables/useAppToast'
 import {
   isSearchQueryWithinLimit,
   normalizeSearchQuery,
@@ -230,6 +286,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+const toast = useAppToast()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const accountControls = useUserAccountControls({
@@ -250,9 +307,15 @@ const sentinel = ref<HTMLElement>()
 const failedImages = ref(new Set<string>())
 const imageRetryCounts = ref(new Map<string, number>())
 const savedKeys = ref(new Set<string>())
+const libraryIslandOpen = ref(false)
+const libraryRefreshKey = ref(0)
+const isTriggerHoveredDuringDrag = ref(false)
+
 let controller: AbortController | null = null
 let observer: IntersectionObserver | null = null
 let loadGeneration = 0
+let autoOpenTimer: ReturnType<typeof setTimeout> | null = null
+
 const statusText = computed(() =>
   loadingMore.value
     ? '正在加载更多...'
@@ -260,6 +323,101 @@ const statusText = computed(() =>
       ? `${results.value.length} 个结果`
       : '精选图片参考',
 )
+
+function clearAutoOpenTimer() {
+  if (!autoOpenTimer) return
+  clearTimeout(autoOpenTimer)
+  autoOpenTimer = null
+}
+
+// 🌟 跨视窗拖拽入库事件处理
+function toSearchReference(result: SearchResult): LibrarySearchReference {
+  return {
+    provider: result.provider,
+    id: result.id,
+    source_url: result.source_url,
+    preview_url: result.preview_url,
+    original_url: result.original_url,
+    title: result.title,
+    author: result.author,
+    width: result.width,
+    height: result.height,
+  }
+}
+
+function handleCardDragStart(e: DragEvent, result: SearchResult) {
+  const reference = toSearchReference(result)
+  e.dataTransfer!.setData('application/json', JSON.stringify(reference))
+  e.dataTransfer!.effectAllowed = 'copy'
+
+  // 创建 58×44px 微缩圆角影子 (Micro Drag Ghost)
+  const ghost = document.createElement('div')
+  ghost.style.position = 'fixed'
+  ghost.style.top = '-9999px'
+  ghost.style.left = '-9999px'
+  ghost.style.width = '58px'
+  ghost.style.height = '44px'
+  ghost.style.borderRadius = '8px'
+  ghost.style.overflow = 'hidden'
+  ghost.style.boxShadow = '0 12px 28px rgba(0,0,0,0.3)'
+  ghost.style.transform = 'rotate(-3deg)'
+  ghost.style.zIndex = '9999'
+
+  const img = document.createElement('img')
+  img.src = result.preview_url
+  img.style.width = '100%'
+  img.style.height = '100%'
+  img.style.objectFit = 'cover'
+
+  ghost.appendChild(img)
+  document.body.appendChild(ghost)
+  e.dataTransfer!.setDragImage(ghost, 29, 22)
+
+  setTimeout(() => {
+    document.body.removeChild(ghost)
+  }, 0)
+}
+
+function handleCardDragEnd() {
+  clearAutoOpenTimer()
+  isTriggerHoveredDuringDrag.value = false
+}
+
+function handleTriggerBtnDragOver(e: DragEvent) {
+  e.dataTransfer!.dropEffect = 'copy'
+  isTriggerHoveredDuringDrag.value = true
+
+  // 悬停 280ms 自动展开左侧素材库浮岛
+  if (!libraryIslandOpen.value && !autoOpenTimer) {
+    autoOpenTimer = setTimeout(() => {
+      libraryIslandOpen.value = true
+      autoOpenTimer = null
+    }, 280)
+  }
+}
+
+function handleTriggerBtnDragLeave() {
+  isTriggerHoveredDuringDrag.value = false
+  clearAutoOpenTimer()
+}
+
+async function handleTriggerBtnDrop(e: DragEvent) {
+  isTriggerHoveredDuringDrag.value = false
+  clearAutoOpenTimer()
+
+  try {
+    const raw = e.dataTransfer?.getData('application/json')
+    if (!raw) return
+    const reference = JSON.parse(raw) as LibrarySearchReference
+    await saveSearchReference(reference)
+    markSavedKey(libraryAssetKey(reference.provider, reference.id))
+    libraryRefreshKey.value += 1
+    toast.success(`Saved "${reference.title || 'Image'}" to Quick Saves!`)
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : '保存素材失败')
+  }
+}
+
 async function load(reset: boolean) {
   const generation = reset ? ++loadGeneration : loadGeneration
   if (reset) {
@@ -313,6 +471,7 @@ async function load(reset: boolean) {
     }
   }
 }
+
 async function submitQuery() {
   const query = normalizeSearchQuery(draftQuery.value)
   if (!isSearchQueryWithinLimit(query)) {
@@ -322,19 +481,23 @@ async function submitQuery() {
   queryError.value = ''
   await router.replace({ path: USER_SEARCH_PATH, query: query ? { q: query } : {} })
 }
+
 async function reload() {
   await load(true)
 }
+
 function openLightbox(result: SearchResult) {
   activeResult.value = result
   lightboxVisible.value = true
 }
+
 function markImageError(id: string) {
   if (failedImages.value.has(id)) return
   failedImages.value = new Set(failedImages.value).add(id)
   const result = results.value.find((item) => item.id === id)
   if (result) void reportSearchImageFailure(result.provider)
 }
+
 function retryImage(id: string) {
   const next = new Map(imageRetryCounts.value)
   next.set(id, (next.get(id) ?? 0) + 1)
@@ -343,16 +506,24 @@ function retryImage(id: string) {
   failed.delete(id)
   failedImages.value = failed
 }
+
 function imageRetryCount(id: string) {
   return imageRetryCounts.value.get(id) ?? 0
 }
+
 function markSaved(result: SearchResult) {
   savedKeys.value = new Set(savedKeys.value).add(libraryAssetKey(result.provider, result.id))
 }
+
+function markSavedKey(key: string) {
+  savedKeys.value = new Set(savedKeys.value).add(key)
+}
+
 function queryValue() {
   const value = route.query.q
   return Array.isArray(value) ? String(value[0] || '') : String(value || '')
 }
+
 watch(
   () => route.query.q,
   async () => {
@@ -363,6 +534,7 @@ watch(
   },
   { immediate: true },
 )
+
 onMounted(async () => {
   await nextTick()
   observer = new IntersectionObserver(
@@ -373,8 +545,58 @@ onMounted(async () => {
   )
   if (sentinel.value) observer.observe(sentinel.value)
 })
+
 onBeforeUnmount(() => {
   controller?.abort()
   observer?.disconnect()
+  clearAutoOpenTimer()
 })
 </script>
+
+<style scoped>
+/* 🌟 核心自适应流式排版：当左侧素材库展开时，右侧主视窗平滑右移并保持重居中 */
+.ib-main-content-flow {
+  transition:
+    padding-left 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    padding-right 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.library-open-layout {
+  padding-left: 398px !important;
+}
+
+@media (max-width: 1280px) {
+  .library-open-layout {
+    padding-left: 370px !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  .library-open-layout {
+    padding-left: 350px !important;
+  }
+}
+
+@media (max-width: 860px) {
+  .library-open-layout {
+    padding-left: 0 !important;
+  }
+}
+
+/* 🌟 瀑布流间距自适应收敛 (全屏 20px -> 展开 14px) */
+.masonry-grid-flow {
+  transition: column-gap 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.library-open-layout .masonry-grid-flow {
+  column-gap: 0.875rem !important; /* 14px */
+}
+
+.masonry-card-item {
+  transition: margin-bottom 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.library-open-layout .masonry-card-item {
+  margin-bottom: 0.875rem !important; /* 14px */
+}
+</style>

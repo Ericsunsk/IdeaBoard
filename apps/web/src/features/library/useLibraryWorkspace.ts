@@ -20,6 +20,12 @@ export type LibraryFolderTab = {
   isMutable: boolean
 }
 
+export type LibraryWorkspaceOptions = {
+  syncRoute?: boolean
+  autoLoad?: boolean
+  initialFolder?: string
+}
+
 function normalizeFolderQuery(value: unknown): string {
   if (typeof value !== 'string' || !value) return 'all'
   if (value === 'quick-saves') return value
@@ -27,7 +33,7 @@ function normalizeFolderQuery(value: unknown): string {
   return Number.isSafeInteger(parsed) && parsed > 0 ? String(parsed) : 'all'
 }
 
-export function useLibraryWorkspace(): {
+export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
   folders: Ref<LibraryFolderView[]>
   folderTabs: ComputedRef<LibraryFolderTab[]>
   assets: Ref<LibraryAssetView[]>
@@ -39,9 +45,11 @@ export function useLibraryWorkspace(): {
   activeAsset: Ref<LibraryAssetView | null>
   selectFolder: (key: string) => void
   loadAssets: (reset?: boolean) => Promise<void>
+  loadFolders: () => Promise<void>
+  initialize: () => Promise<void>
   createNewFolder: (name: string) => Promise<void>
-  renameSelectedFolder: (name: string) => Promise<void>
-  deleteSelectedFolder: () => Promise<boolean>
+  renameFolder: (key: string, name: string) => Promise<void>
+  deleteFolder: (key: string) => Promise<boolean>
   moveSelectedAsset: (asset: LibraryAssetView, folderKey: string) => Promise<boolean>
   requestRemove: (asset: LibraryAssetView) => Promise<void>
   retry: () => Promise<void>
@@ -49,6 +57,8 @@ export function useLibraryWorkspace(): {
 } {
   const route = useRoute()
   const router = useRouter()
+  const syncRoute = options.syncRoute ?? true
+  const autoLoad = options.autoLoad ?? true
   const toast = useAppToast()
   const folders = ref<LibraryFolderView[]>([])
   const assets = ref<LibraryAssetView[]>([])
@@ -60,19 +70,29 @@ export function useLibraryWorkspace(): {
   const activeAsset = ref<LibraryAssetView | null>(null)
   let assetRequestID = 0
   let folderRequestID = 0
-  const selectedFolder = ref(normalizeFolderQuery(route.query.folder))
-  const folderTabs = computed(() =>
-    folders.value.map((folder) => ({
+  const selectedFolder = ref(
+    normalizeFolderQuery(syncRoute ? route.query.folder : options.initialFolder),
+  )
+  const folderTabs = computed(() => {
+    const tabs = folders.value.map((folder) => ({
       queryKey: folder.query_key,
       name: folder.name,
       assetCount: folder.asset_count,
       isMutable: !folder.is_system && !folder.is_virtual,
-    })),
-  )
-  const selectedFolderRecord = computed(() =>
-    folders.value.find((folder) => folder.query_key === selectedFolder.value),
-  )
-
+    }))
+    if (!tabs.some((tab) => tab.queryKey === 'all')) {
+      tabs.unshift({ queryKey: 'all', name: 'All Assets', assetCount: 0, isMutable: false })
+    }
+    if (!tabs.some((tab) => tab.queryKey === 'quick-saves')) {
+      tabs.splice(1, 0, {
+        queryKey: 'quick-saves',
+        name: 'Quick Saves',
+        assetCount: 0,
+        isMutable: false,
+      })
+    }
+    return tabs
+  })
   function assetParams(folderKey: string, cursor?: string) {
     const numericFolderID = Number(folderKey)
     return {
@@ -128,7 +148,7 @@ export function useLibraryWorkspace(): {
 
   function selectFolder(key: string) {
     selectedFolder.value = key
-    void router.replace({ query: key === 'all' ? {} : { folder: key } })
+    if (syncRoute) void router.replace({ query: key === 'all' ? {} : { folder: key } })
     void loadAssets(true)
   }
 
@@ -139,21 +159,21 @@ export function useLibraryWorkspace(): {
     toast.success('Folder created')
   }
 
-  async function renameSelectedFolder(name: string) {
-    const folder = selectedFolderRecord.value
+  async function renameFolderByKey(key: string, name: string) {
+    const folder = folders.value.find((item) => item.query_key === key)
     if (!folder || folder.is_system || folder.is_virtual) return
     const updated = await renameFolder(folder.id, name)
     folders.value = folders.value.map((item) => (item.id === updated.id ? updated : item))
     toast.success('Folder renamed')
   }
 
-  async function deleteSelectedFolder(): Promise<boolean> {
-    const folder = selectedFolderRecord.value
+  async function deleteFolder(key: string): Promise<boolean> {
+    const folder = folders.value.find((item) => item.query_key === key)
     if (!folder || folder.is_system || folder.is_virtual) return false
     try {
       await removeFolder(folder.id)
       await loadFolders()
-      selectFolder('quick-saves')
+      if (selectedFolder.value === key) selectFolder('quick-saves')
       toast.success('Folder deleted')
       return true
     } catch (error) {
@@ -182,7 +202,6 @@ export function useLibraryWorkspace(): {
   }
 
   async function requestRemove(asset: LibraryAssetView) {
-    if (!window.confirm('Remove this saved reference?')) return
     try {
       await removeAsset(asset.id)
       assets.value = assets.value.filter((item) => item.id !== asset.id)
@@ -198,18 +217,24 @@ export function useLibraryWorkspace(): {
     await Promise.all([loadFolders(), loadAssets(true)])
   }
 
-  watch(
-    () => route.query.folder,
-    (value) => {
-      const next = normalizeFolderQuery(value)
-      if (next !== selectedFolder.value) {
-        selectedFolder.value = next
-        void loadAssets(true)
-      }
-    },
-  )
+  async function initialize() {
+    await Promise.all([loadFolders(), loadAssets(true)])
+  }
 
-  void Promise.all([loadFolders(), loadAssets(true)])
+  if (syncRoute) {
+    watch(
+      () => route.query.folder,
+      (value) => {
+        const next = normalizeFolderQuery(value)
+        if (next !== selectedFolder.value) {
+          selectedFolder.value = next
+          void loadAssets(true)
+        }
+      },
+    )
+  }
+
+  if (autoLoad) void initialize()
 
   return {
     folders,
@@ -223,9 +248,11 @@ export function useLibraryWorkspace(): {
     activeAsset,
     selectFolder,
     loadAssets,
+    loadFolders,
+    initialize,
     createNewFolder,
-    renameSelectedFolder,
-    deleteSelectedFolder,
+    renameFolder: renameFolderByKey,
+    deleteFolder,
     moveSelectedAsset,
     requestRemove,
     retry,

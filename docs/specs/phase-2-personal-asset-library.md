@@ -4,12 +4,12 @@
 
 ## 目标
 
-为 Search 建立一个可持久化的 Personal Asset Library，用于保存和整理 Unsplash/Pexels 外部素材引用。阶段二只解决“保存、归类、查看、移除”这条闭环，不提前实现视觉分析、Moodboard、Canvas 联动或浮动岛。
+为 Search 建立一个可持久化的 Personal Asset Library，用于保存和整理 Unsplash/Pexels 外部素材引用。阶段二解决“保存、归类、查看、移除”这条闭环，并在 Search 提供轻量浮动岛入口；不提前实现视觉分析、Moodboard 或 Canvas 联动。
 
 ## 已确认决策
 
 - Library 使用独立 `/user/library` 页面；当前 Folder 通过 `?folder=` 表示。
-- 顶部主导航包含 `Search / Workspace / Library`，三者保持统一导航样式。
+- 顶部主导航保持 `Search / Workspace`；Library 通过 Search 搜索栏右侧的圆形入口进入。
 - 未来浮动岛只复用本阶段的 data layer 和组件，不改变 Library 数据模型。
 - 素材只保存外部 URL 与 Provider/source metadata，不复制到 R2，也不进入 `media_assets`。
 - 阶段二只允许 `unsplash` 和 `pexels` 的规范素材引用。
@@ -23,6 +23,7 @@
 - 图片使用原生 lazy loading；路由使用 dynamic import；不引入虚拟列表。
 - Search 保存使用 Quick Save Popover；输入新 Folder 后，创建 Folder 与保存素材必须在同一 PostgreSQL transaction 中完成。
 - Search 页面通过独立 batch lookup 恢复已保存的 `+ / ✓` 状态，不把 Library 状态塞进 Provider Search API。
+- Search 页面通过搜索栏右侧 `44×44px` 圆形按钮打开轻量 Library 浮动岛；浮动岛按需加载并复用 Library workspace、Folder、分页、预览和移除能力。
 - Library 卡片只保留 Move 和 Remove；`Use as Search Reference` 延后到 Vision Search 阶段。
 - Lightbox 严格按 Demo 展示图片、title 和 author，不显示 Provider 或“查看来源”按钮；source metadata 只保存在数据层。
 - mutation 采用服务端成功后更新，不做盲目 optimistic mutation。
@@ -192,7 +193,7 @@ Search feature 只通过 `libraryResource` 的明确 seam 参与保存和 lookup
 - Palette、Atmosphere、semantic tags 和 VLM extraction
 - Moodboard compose
 - Canvas asset tray、Canvas insertion 和跨视窗拖拽
-- Search 内浮动 Library island
+- Search 内浮动 Library island 的拖拽归档、滚动折叠和跨页面全局状态
 - Library 内关键词搜索和复杂排序
 - Media Storage copy/cache、URL proxy 和自动健康检查
 - Mobile-specific layout、分享链接、权限共享和回收站
