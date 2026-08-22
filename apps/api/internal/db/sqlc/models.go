@@ -12,6 +12,24 @@ import (
 	"github.com/google/uuid"
 )
 
+type AiSearchOperation struct {
+	OperationID       uuid.UUID    `json:"operation_id"`
+	UserID            int64        `json:"user_id"`
+	IdempotencyKey    string       `json:"idempotency_key"`
+	RequestHash       string       `json:"request_hash"`
+	Sku               string       `json:"sku"`
+	PriceVersionID    int64        `json:"price_version_id"`
+	UnitCredits       int64        `json:"unit_credits"`
+	HoldTransactionID string       `json:"hold_transaction_id"`
+	Status            string       `json:"status"`
+	Query             string       `json:"query"`
+	ErrorCode         string       `json:"error_code"`
+	ErrorMessage      string       `json:"error_message"`
+	CreatedAt         time.Time    `json:"created_at"`
+	UpdatedAt         time.Time    `json:"updated_at"`
+	SettledAt         sql.NullTime `json:"settled_at"`
+}
+
 type ApiAccount struct {
 	ID                 int64        `json:"id"`
 	Name               string       `json:"name"`

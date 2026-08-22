@@ -53,3 +53,18 @@ func WorkflowItems() []billing.BillableItemDefinition {
 	}
 	return definitions
 }
+
+// VisionSearchItem is intentionally a separate SKU from image workflows:
+// extraction is a metered AI operation, while the subsequent provider search
+// remains free and has its own lifecycle/idempotency contract.
+func VisionSearchItem() billing.BillableItemDefinition {
+	return billing.BillableItemDefinition{
+		SKU:             "ai-search:vision",
+		Namespace:       "ai-search",
+		ProductKind:     "search-feature",
+		DisplayName:     "视觉搜索",
+		Description:     "从参考图提取搜索意图。",
+		SortOrder:       10,
+		PricingVariants: []billing.OutputResolution{billing.OutputResolutionDefault},
+	}
+}

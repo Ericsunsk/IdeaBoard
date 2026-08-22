@@ -44,6 +44,7 @@ export function useVisionSearchFlow(options: {
   const canAddReference = collection.canAdd
   let extractionController: AbortController | null = null
   let extractionGeneration = 0
+  let idempotencyKey: string | null = null
 
   async function runVisionSearch() {
     if (hasPendingReferences.value) {
@@ -57,14 +58,27 @@ export function useVisionSearchFlow(options: {
     const generation = ++extractionGeneration
     visionState.value = 'extracting'
     visionError.value = ''
+    idempotencyKey ??= crypto.randomUUID()
     try {
       const extraction = await extractVisionSearch({
         references: references.value,
         userText: options.draftQuery.value,
+        idempotencyKey,
         signal: controller.signal,
       })
       if (generation !== extractionGeneration) return
-      options.submittedQuery.value = extraction.query
+      if (extraction.status !== 'succeeded') {
+        visionState.value = 'idle'
+        visionError.value = '搜索正在处理中，请稍后重试'
+        return
+      }
+      const extractedQuery = extraction.query?.trim()
+      if (!extractedQuery) {
+        visionState.value = 'idle'
+        visionError.value = '视觉搜索结果无效，请重试'
+        return
+      }
+      options.submittedQuery.value = extractedQuery
       visionState.value = 'ready'
       options.keepResultsOnNextLoad.value = true
       await options.loadCatalog()
@@ -218,6 +232,7 @@ export function useVisionSearchFlow(options: {
 
   function clearVisionExtraction() {
     cancelVisionExtraction()
+    idempotencyKey = null
     visionState.value = 'idle'
     visionError.value = ''
   }

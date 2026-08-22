@@ -75,6 +75,9 @@ func newAppRouter(
 	if metricsErr != nil {
 		slog.Warn("search metrics unavailable", "err", metricsErr)
 	}
+	visionService := searchcatalog.NewVisionSearchService(searchProviderConfig, searchMetrics)
+	visionHandler := searchcatalog.NewVisionHandler(visionService, searchcatalog.NewVisionInputReader(libraryService))
+	visionHandler.SetBillingService(searchcatalog.NewVisionBillingService(services.dbPool, services.billingCatalog, services.creditService, visionService))
 
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -99,7 +102,7 @@ func newAppRouter(
 				ReadAccess: uploadReadAccess,
 			},
 			SearchHandler:        searchcatalog.NewSearchHandler(searchcatalog.NewSearchService(searchProviderConfig, searchMetrics)),
-			VisionHandler:        searchcatalog.NewVisionHandler(searchcatalog.NewVisionSearchService(searchProviderConfig, searchMetrics), searchcatalog.NewVisionInputReader(libraryService)),
+			VisionHandler:        visionHandler,
 			SearchMetricsHandler: searchcatalog.NewMetricsHandler(searchMetrics),
 			LibraryHandler:       libraryHandler,
 		},

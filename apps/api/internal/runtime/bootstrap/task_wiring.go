@@ -17,6 +17,7 @@ import (
 	"ideaboard/api/internal/payments"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/runtime/worker"
+	"ideaboard/api/internal/searchcatalog"
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/taskqueue"
@@ -124,12 +125,15 @@ func newAppTaskRuntime(
 		return appTaskServices{}, appWorkerRuntime{}, fmt.Errorf("failed to initialize user event fanout: %w", err)
 	}
 	mediaDerivativePeriodicJobs := derivatives.PeriodicJobs()
-	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(reclamationPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(mediaDerivativePeriodicJobs))
+	visionBillingService := searchcatalog.NewVisionBillingService(services.dbPool, services.billingCatalog, services.creditService, nil)
+	visionBillingPeriodicJobs := searchcatalog.VisionBillingPeriodicJobs()
+	periodicJobs := make([]*river.PeriodicJob, 0, len(creditPeriodicJobs)+len(reclamationPeriodicJobs)+len(paymentPeriodicJobs)+len(checkoutShutdownPeriodicJobs)+len(mediaDerivativePeriodicJobs)+len(visionBillingPeriodicJobs))
 	periodicJobs = append(periodicJobs, creditPeriodicJobs...)
 	periodicJobs = append(periodicJobs, reclamationPeriodicJobs...)
 	periodicJobs = append(periodicJobs, paymentPeriodicJobs...)
 	periodicJobs = append(periodicJobs, checkoutShutdownPeriodicJobs...)
 	periodicJobs = append(periodicJobs, mediaDerivativePeriodicJobs...)
+	periodicJobs = append(periodicJobs, visionBillingPeriodicJobs...)
 	riverClient, err := worker.NewRiverClient(dbs.riverPool, riverTaskWorker, worker.RiverServerOptions{
 		QueueName:   taskqueue.RiverQueueDefault,
 		Concurrency: workerConcurrency,
@@ -139,6 +143,7 @@ func newAppTaskRuntime(
 			worker.PaymentReconciliationQueue:   {MaxWorkers: 1},
 			worker.PaymentCheckoutShutdownQueue: {MaxWorkers: 1},
 			derivatives.QueueName:               {MaxWorkers: 2},
+			searchcatalog.VisionBillingQueue:    {MaxWorkers: 1},
 		},
 		RegisterWorkers: func(workers *river.Workers) {
 			river.AddWorker(workers, worker.NewCreditReconciliationWorker(services.creditService))
@@ -150,6 +155,7 @@ func newAppTaskRuntime(
 			river.AddWorker(workers, worker.NewPaymentCheckoutShutdownScheduleWorker(services.paymentService))
 			river.AddWorker(workers, derivatives.NewWorker(mediaDerivativeService))
 			river.AddWorker(workers, derivatives.NewOutboxDispatcher(dbs.db, services.storageService))
+			river.AddWorker(workers, searchcatalog.NewVisionBillingReconciliationWorker(visionBillingService))
 		},
 		PeriodicJobs: periodicJobs,
 	})

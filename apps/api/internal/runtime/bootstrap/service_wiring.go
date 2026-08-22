@@ -26,6 +26,7 @@ import (
 )
 
 type appDomainServices struct {
+	dbPool               *pgxpool.Pool
 	authServiceClient    *auth.ServiceClient
 	runtimeSettings      *settings.RuntimeSettingsService
 	storageService       *storage.StorageService
@@ -74,7 +75,9 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 	if err := rewardService.ValidateActiveCodeKeyVersions(ctx); err != nil {
 		return appDomainServices{}, err
 	}
-	billableItemRegistry, err := billing.NewBillableItemRegistry(billingregistry.WorkflowItems())
+	billingItems := billingregistry.WorkflowItems()
+	billingItems = append(billingItems, billingregistry.VisionSearchItem())
+	billableItemRegistry, err := billing.NewBillableItemRegistry(billingItems)
 	if err != nil {
 		return appDomainServices{}, fmt.Errorf("build billable item registry: %w", err)
 	}
@@ -116,6 +119,7 @@ func newAppDomainServices(ctx context.Context, cfg *config.Config, repos appRepo
 		return appDomainServices{}, fmt.Errorf("initialize payments service: %w", err)
 	}
 	return appDomainServices{
+		dbPool:               appPool,
 		authServiceClient:    authServiceClient,
 		runtimeSettings:      runtimeSettings,
 		storageService:       storageService,

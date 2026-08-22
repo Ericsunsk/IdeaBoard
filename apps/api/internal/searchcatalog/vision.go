@@ -81,16 +81,10 @@ func newVisionSearchService(config VisionConfigReader, client VisionProviderClie
 }
 
 func (s *VisionSearchService) Extract(ctx context.Context, input VisionInput) (VisionExtraction, error) {
-	if len(input.Images) < 1 || len(input.Images) > visionMaxImages {
-		return VisionExtraction{}, ErrVisionInput
-	}
-	if err := validateVisionImages(input.Images); err != nil {
+	if err := validateVisionInput(input); err != nil {
 		return VisionExtraction{}, err
 	}
 	input.UserText = strings.Join(strings.Fields(strings.TrimSpace(input.UserText)), " ")
-	if utf8RuneCount(input.UserText) > MaxSearchQueryRunes {
-		return VisionExtraction{}, fmt.Errorf("搜索关键词不能超过 %d 个字符", MaxSearchQueryRunes)
-	}
 	if s == nil || s.config == nil || s.client == nil {
 		return VisionExtraction{}, ErrVisionUnavailable
 	}

@@ -74,6 +74,7 @@ export type VisionReference = { file?: File; libraryAssetID?: number; previewUrl
 export async function extractVisionSearch(input: {
   references: VisionReference[]
   userText: string
+  idempotencyKey: string
   signal?: AbortSignal
 }) {
   return resolveApiData(
@@ -85,7 +86,11 @@ export async function extractVisionSearch(input: {
         ),
         user_text: input.userText || undefined,
       },
-      { signal: input.signal },
+      {
+        signal: input.signal,
+        timeout: 40_000,
+        headers: { 'Idempotency-Key': input.idempotencyKey },
+      },
     ),
     '视觉搜索失败',
   )

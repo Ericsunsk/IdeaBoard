@@ -84,6 +84,8 @@ describe('useVisionSearchFlow', () => {
     ]
     mocks.extractVisionSearch.mockResolvedValue({
       query: 'warm minimalist cafe',
+      operation_id: '00000000-0000-0000-0000-000000000001',
+      status: 'succeeded',
     })
 
     await flow.runVisionSearch()

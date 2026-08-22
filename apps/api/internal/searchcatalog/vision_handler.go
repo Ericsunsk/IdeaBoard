@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"ideaboard/api/internal/credits"
 	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/response"
 
@@ -13,6 +14,7 @@ import (
 type VisionHandler struct {
 	service     *VisionSearchService
 	inputReader VisionInputReader
+	billing     *VisionBillingService
 }
 
 func NewVisionHandler(service *VisionSearchService, readers ...VisionInputReader) *VisionHandler {
@@ -21,6 +23,12 @@ func NewVisionHandler(service *VisionSearchService, readers ...VisionInputReader
 		reader = readers[0]
 	}
 	return &VisionHandler{service: service, inputReader: reader}
+}
+
+func (h *VisionHandler) SetBillingService(service *VisionBillingService) {
+	if h != nil {
+		h.billing = service
+	}
 }
 
 func (h *VisionHandler) Extract(c *gin.Context) {
@@ -36,17 +44,51 @@ func (h *VisionHandler) Extract(c *gin.Context) {
 		response.MachineError(c, http.StatusServiceUnavailable, "vision_search_unavailable", "视觉搜索暂不可用")
 		return
 	}
+	if h.billing == nil {
+		response.MachineError(c, http.StatusServiceUnavailable, "vision_search_unavailable", "视觉搜索暂不可用")
+		return
+	}
 	input, err := h.inputReader.Read(c.Request, identity.UserID())
 	if err != nil {
 		writeVisionError(c, err)
 		return
 	}
-	extraction, err := h.service.Extract(c.Request.Context(), input)
+	result, err := h.billing.Extract(c.Request.Context(), identity.UserID(), c.GetHeader("Idempotency-Key"), input)
 	if err != nil {
+		var pending *visionBillingPending
+		if errors.As(err, &pending) || errors.Is(err, ErrVisionSettlement) {
+			c.JSON(http.StatusAccepted, response.Response{Code: 0, Msg: "accepted", Data: result})
+			return
+		}
+		var operationFailure *visionOperationFailure
+		if errors.As(err, &operationFailure) {
+			response.MachineError(c, operationFailure.HTTPStatus, operationFailure.Code, operationFailure.Message)
+			return
+		}
+		if errors.Is(err, ErrVisionIdempotencyKeyRequired) {
+			response.MachineError(c, http.StatusBadRequest, "vision_search_idempotency_key_required", "请重试此次搜索")
+			return
+		}
+		if errors.Is(err, ErrVisionIdempotencyConflict) {
+			response.MachineError(c, http.StatusConflict, "vision_search_idempotency_conflict", "此搜索请求已绑定其他输入")
+			return
+		}
+		if errors.Is(err, ErrVisionPricingUnavailable) {
+			response.MachineError(c, http.StatusPaymentRequired, "vision_search_pricing_unavailable", "视觉搜索暂未开放")
+			return
+		}
+		if errors.Is(err, credits.ErrInsufficientCredits) {
+			response.MachineError(c, http.StatusPaymentRequired, "insufficient_credits", "Ideas 余额不足")
+			return
+		}
 		writeVisionError(c, err)
 		return
 	}
-	response.SuccessDTO(c, extraction)
+	if result.Status != "succeeded" {
+		c.JSON(http.StatusAccepted, response.Response{Code: 0, Msg: "accepted", Data: result})
+		return
+	}
+	response.SuccessDTO(c, result)
 }
 
 func writeVisionError(c *gin.Context, err error) {

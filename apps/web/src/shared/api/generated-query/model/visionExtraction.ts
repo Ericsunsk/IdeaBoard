@@ -4,11 +4,12 @@
  * IdeaBoard API
  * OpenAPI spec version: 0.1.0
  */
+import type { VisionExtractionStatus } from './visionExtractionStatus'
 
 export interface VisionExtraction {
-  /**
-   * @minLength 1
-   * @maxLength 200
-   */
-  query: string
+  /** @maxLength 200 */
+  query?: string
+  operation_id: string
+  status: VisionExtractionStatus
+  replayed?: boolean
 }

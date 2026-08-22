@@ -104,6 +104,15 @@ paths:
       operationId: extractUserVisionSearch
       security:
         - cookieAuth: []
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: One stable key per user search action. Reuse it when retrying the same action.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 160
       requestBody:
         required: true
         content:
@@ -130,6 +139,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseVisionExtraction'
+        '202':
+          description: Vision extraction is still running or awaiting billing reconciliation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseVisionExtraction'
         '400':
           description: Invalid Vision input or unavailable reference image
           content:
@@ -147,6 +162,16 @@ paths:
               schema: { $ref: '#/components/schemas/VisionSearchError' }
         '504':
           description: Vision provider timeout
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VisionSearchError' }
+        '402':
+          description: Vision Search price is unavailable or the user has insufficient Credits
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VisionSearchError' }
+        '409':
+          description: Idempotency key was reused with different input
           content:
             application/json:
               schema: { $ref: '#/components/schemas/VisionSearchError' }
@@ -5217,9 +5242,14 @@ components:
 
     VisionExtraction:
       type: object
-      required: [query]
+      required: [operation_id, status]
       properties:
-        query: { type: string, minLength: 1, maxLength: 200 }
+        query: { type: string, maxLength: 200 }
+        operation_id: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [succeeded, pending, reconciliation_pending]
+        replayed: { type: boolean }
 
     VisionSearchError:
       type: object
@@ -5239,6 +5269,10 @@ components:
             - vision_search_network
             - vision_search_provider_error
             - vision_search_schema_error
+            - vision_search_idempotency_key_required
+            - vision_search_idempotency_conflict
+            - vision_search_pricing_unavailable
+            - insufficient_credits
         msg: { type: string }
         message_safe: { type: boolean, enum: [true] }
 

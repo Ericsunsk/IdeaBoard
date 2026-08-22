@@ -24,6 +24,7 @@ import (
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/rewards"
 	"ideaboard/api/internal/runtime/worker"
+	"ideaboard/api/internal/searchcatalog"
 	"ideaboard/api/internal/tasking/taskbilling"
 	"ideaboard/api/internal/tasking/taskstore"
 
@@ -137,6 +138,7 @@ func runtimePrivilegePolicies() []dbprivileges.Policy {
 		worker.RuntimePrivilegePolicy(),
 		rewards.RuntimePrivilegePolicy(),
 		payments.RuntimePrivilegePolicy(),
+		searchcatalog.RuntimePrivilegePolicy(),
 	}
 }
 
