@@ -10,6 +10,7 @@
       :to="item.path"
       exact-active-class="bg-ib-surface-hover text-board-page-text"
       class="flex h-full flex-1 items-center justify-center gap-1.5 rounded-full border border-transparent px-3 text-[13px] font-semibold text-board-page-text-muted no-underline transition-[background-color,color] duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] hover:text-board-page-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
+      @click="handleNavClick(item.path)"
     >
       <component
         :is="item.icon"
@@ -23,11 +24,20 @@
 
 <script setup lang="ts">
 import { Compass, ViewGrid } from '@iconoir/vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { USER_BOARDS_PATH, USER_SEARCH_PATH } from '../../../shared/constants/routePaths'
 
+const route = useRoute()
 const navigationItems = [
   { path: USER_SEARCH_PATH, label: 'Search', icon: Compass },
   { path: USER_BOARDS_PATH, label: 'Workspace', icon: ViewGrid },
 ] as const
+
+function handleNavClick(path: string) {
+  if (route.path === path && typeof window !== 'undefined') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    const pageEl = document.querySelector('.app-scrollbar')
+    if (pageEl) pageEl.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
 </script>

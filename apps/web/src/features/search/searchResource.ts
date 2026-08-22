@@ -21,6 +21,15 @@ export function isSearchQueryWithinLimit(query: string): boolean {
   return Array.from(query).length <= MAX_SEARCH_QUERY_RUNES
 }
 
+export function generateRandomInspirationCursor(): string {
+  const page = Math.floor(Math.random() * 8) + 1
+  const payload = JSON.stringify({ unsplash: page, pexels: page })
+  if (typeof btoa !== 'undefined') {
+    return btoa(payload).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  }
+  return ''
+}
+
 const inFlightRequests = new Map<string, { promise: Promise<SearchPage>; signal?: AbortSignal }>()
 
 export async function searchInspiration(input: {

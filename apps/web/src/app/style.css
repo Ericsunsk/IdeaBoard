@@ -156,7 +156,7 @@
   --color-board-card-action-hover: #2b3142;
   --color-board-create-icon: #cfd7ea;
   --color-board-create-title: #394054;
-  --color-board-loading-bg: var(--color-board-surface-soft);
+  --color-board-loading-bg: rgba(220, 227, 238, 0.45);
   --color-board-menu-border: #d8ddea;
   --color-board-menu-item: #4b5565;
   --color-board-menu-item-hover-bg: var(--color-ib-creative-accent-ring);

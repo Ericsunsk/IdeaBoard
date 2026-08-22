@@ -6,6 +6,16 @@ const mocks = vi.hoisted(() => ({
   route: { path: '/search', fullPath: '/search', query: {} as Record<string, unknown> },
   replace: vi.fn(async () => undefined),
   extractVisionSearch: vi.fn(),
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+    warning: vi.fn(),
+    info: vi.fn(),
+  },
+}))
+
+vi.mock('../../shared/composables/useAppToast', () => ({
+  useAppToast: () => mocks.toast,
 }))
 
 vi.mock('vue-router', () => ({
@@ -57,8 +67,9 @@ describe('useVisionSearchFlow', () => {
   it('keeps extraction state separate from Catalog loading', async () => {
     const loadCatalog = vi.fn(async () => undefined)
     const submittedQuery = ref('')
+    const draftQuery = ref('warm cafe')
     const flow = useVisionSearchFlow({
-      draftQuery: ref('warm cafe'),
+      draftQuery,
       submittedQuery,
       queryError: ref(''),
       keepResultsOnNextLoad: ref(false),
@@ -78,6 +89,8 @@ describe('useVisionSearchFlow', () => {
     await flow.runVisionSearch()
 
     expect(submittedQuery.value).toBe('warm minimalist cafe')
+    expect(draftQuery.value).toBe('warm cafe')
+    expect(flow.references.value).toHaveLength(1)
     expect(loadCatalog).toHaveBeenCalledOnce()
   })
 
@@ -134,10 +147,7 @@ describe('useVisionSearchFlow', () => {
     flow.clearAllReferences()
 
     expect(flow.references.value).toHaveLength(0)
-    expect(mocks.replace).toHaveBeenCalledWith({
-      path: '/user/search',
-      query: { q: 'cafe' },
-    })
+    expect(flow.visionState.value).toBe('idle')
   })
 
   it('handles search result reference selection and deduplication', async () => {
@@ -284,7 +294,7 @@ describe('useVisionSearchFlow', () => {
     } as unknown as Event)
 
     expect(flow.references.value).toHaveLength(4)
-    expect(queryError.value).toBe('最多添加 4 张参考图')
+    expect(mocks.toast.warning).toHaveBeenCalledWith('You can add up to 4 reference images')
     flow.clearAllReferences()
   })
 

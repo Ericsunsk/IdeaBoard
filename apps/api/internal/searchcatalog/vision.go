@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"image/draw"
 	"image/png"
 	"strings"
 	"time"
+
+	xdraw "golang.org/x/image/draw"
 
 	"ideaboard/api/internal/media/imageformat"
 )
@@ -18,6 +21,8 @@ const (
 	visionSearchTimeout = 30 * time.Second
 	visionMaxImages     = 4
 	visionMaxBytes      = 10 << 20
+	visionContactTile   = 512
+	visionContactGap    = 8
 )
 
 var (
@@ -171,6 +176,58 @@ func visionTestFixture() (VisionImage, error) {
 		return VisionImage{}, fmt.Errorf("encode vision test fixture: %w", err)
 	}
 	return VisionImage{Filename: "fixture.png", ContentType: "image/png", Data: data.Bytes()}, nil
+}
+
+// Cloudflare Workers AI's native vision endpoint accepts one image byte array.
+// A contact sheet preserves all references in one request without silently
+// dropping the user's additional selections.
+func buildVisionContactSheet(images []VisionImage) ([]byte, error) {
+	if len(images) == 0 {
+		return nil, ErrVisionInput
+	}
+	if len(images) == 1 {
+		return append([]byte(nil), images[0].Data...), nil
+	}
+
+	const columns = 2
+	rows := (len(images) + columns - 1) / columns
+	canvas := image.NewRGBA(image.Rect(
+		0,
+		0,
+		columns*visionContactTile+(columns-1)*visionContactGap,
+		rows*visionContactTile+(rows-1)*visionContactGap,
+	))
+	draw.Draw(canvas, canvas.Bounds(), image.NewUniform(color.RGBA{R: 245, G: 245, B: 245, A: 255}), image.Point{}, draw.Src)
+
+	for index, reference := range images {
+		source, _, err := image.Decode(bytes.NewReader(reference.Data))
+		if err != nil {
+			return nil, fmt.Errorf("decode reference %d: %w", index+1, err)
+		}
+		bounds := source.Bounds()
+		width, height := bounds.Dx(), bounds.Dy()
+		if width <= 0 || height <= 0 {
+			return nil, fmt.Errorf("reference %d has invalid dimensions", index+1)
+		}
+		targetWidth, targetHeight := visionContactTile, visionContactTile
+		if width > height {
+			targetHeight = max(1, height*visionContactTile/width)
+		} else {
+			targetWidth = max(1, width*visionContactTile/height)
+		}
+		column := index % columns
+		row := index / columns
+		x := column*(visionContactTile+visionContactGap) + (visionContactTile-targetWidth)/2
+		y := row*(visionContactTile+visionContactGap) + (visionContactTile-targetHeight)/2
+		destination := image.Rect(x, y, x+targetWidth, y+targetHeight)
+		xdraw.CatmullRom.Scale(canvas, destination, source, bounds, xdraw.Over, nil)
+	}
+
+	var encoded bytes.Buffer
+	if err := png.Encode(&encoded, canvas); err != nil {
+		return nil, fmt.Errorf("encode reference contact sheet: %w", err)
+	}
+	return encoded.Bytes(), nil
 }
 
 func visionProviderTestFailureMessage(category FailureCategory) string {

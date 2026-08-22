@@ -101,6 +101,16 @@ export function removeFolder(folderId: number): Promise<void> {
   return resolveApiOk(deleteLibraryFolder(folderId), '删除收藏夹失败')
 }
 
+export async function removeSearchReference(
+  provider: 'unsplash' | 'pexels',
+  sourceId: string,
+): Promise<void> {
+  const assets = await lookupSavedAssets([{ provider, source_id: sourceId }])
+  if (assets.length > 0 && assets[0]?.id) {
+    await removeAsset(assets[0].id)
+  }
+}
+
 export async function lookupSavedAssets(
   keys: Array<{ provider: 'unsplash' | 'pexels'; source_id: string }>,
 ): Promise<LibraryAsset[]> {

@@ -34,6 +34,12 @@ func normalizeAndValidateAsset(input AssetInput) (AssetInput, error) {
 	if input.Provider != ProviderUnsplash && input.Provider != ProviderPexels {
 		return AssetInput{}, ErrInvalidProvider
 	}
+	if input.OriginalURL == "" && input.PreviewURL != "" {
+		input.OriginalURL = input.PreviewURL
+	}
+	if input.SourceURL == "" && input.PreviewURL != "" {
+		input.SourceURL = input.PreviewURL
+	}
 	if input.SourceID == "" || utf8.RuneCountInString(input.SourceID) > 128 ||
 		input.SourceURL == "" || input.PreviewURL == "" || input.OriginalURL == "" {
 		return AssetInput{}, ErrInvalidSource
@@ -59,9 +65,9 @@ func isAllowedProviderURL(provider, raw string) bool {
 	allowed := []string(nil)
 	switch provider {
 	case ProviderUnsplash:
-		allowed = []string{"unsplash.com", "images.unsplash.com", "source.unsplash.com"}
+		allowed = []string{"unsplash.com", "images.unsplash.com", "plus.unsplash.com", "source.unsplash.com", "www.unsplash.com"}
 	case ProviderPexels:
-		allowed = []string{"pexels.com", "images.pexels.com", "videos.pexels.com"}
+		allowed = []string{"pexels.com", "images.pexels.com", "videos.pexels.com", "www.pexels.com"}
 	}
 	for _, domain := range allowed {
 		if host == domain || strings.HasSuffix(host, "."+domain) {

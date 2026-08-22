@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"image"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -143,6 +144,11 @@ func TestMultipartVisionInputReaderResolvesLibraryAssetForOwner(t *testing.T) {
 }
 
 func TestOpenAICompatibleVisionProviderMapsRequestAndResponse(t *testing.T) {
+	secondImage, err := visionTestFixture()
+	if err != nil {
+		t.Fatalf("visionTestFixture() error = %v", err)
+	}
+	secondImage.Filename = "second.png"
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Header.Get("Authorization") != "Bearer secret" {
 			t.Errorf("authorization = %q", request.Header.Get("Authorization"))
@@ -151,10 +157,10 @@ func TestOpenAICompatibleVisionProviderMapsRequestAndResponse(t *testing.T) {
 		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode request: %v", err)
 		}
-		if payload.Model != "model" || len(payload.Messages) != 2 || len(payload.Messages[1].Content) != 2 {
+		if payload.Model != "model" || len(payload.Messages) != 2 || len(payload.Messages[1].Content) != 3 {
 			t.Fatalf("request = %#v", payload)
 		}
-		if payload.Messages[0].Role != "system" || payload.Messages[1].Role != "user" || payload.Messages[1].Content[1].Type != "image_url" || !strings.HasPrefix(payload.Messages[1].Content[1].ImageURL.URL, "data:image/png;base64,") {
+		if payload.Messages[0].Role != "system" || payload.Messages[1].Role != "user" || payload.Messages[1].Content[1].Type != "image_url" || payload.Messages[1].Content[2].Type != "image_url" || !strings.HasPrefix(payload.Messages[1].Content[1].ImageURL.URL, "data:image/png;base64,") || !strings.HasPrefix(payload.Messages[1].Content[2].ImageURL.URL, "data:image/png;base64,") {
 			t.Fatalf("image content = %#v", payload.Messages)
 		}
 		_ = json.NewEncoder(writer).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": "```json\n{\"query\":\"warm cafe\"}\n```"}}}})
@@ -162,7 +168,7 @@ func TestOpenAICompatibleVisionProviderMapsRequestAndResponse(t *testing.T) {
 	defer server.Close()
 	configureVisionTestOutbound(t, server.URL)
 
-	got, err := (openAICompatibleVisionProviderClient{}).Extract(context.Background(), VisionProviderConfig{EndpointURL: server.URL, Model: "model", APIKey: "secret"}, VisionInput{Images: []VisionImage{validVisionImage()}, UserText: "warm cafe"})
+	got, err := (openAICompatibleVisionProviderClient{}).Extract(context.Background(), VisionProviderConfig{EndpointURL: server.URL, Model: "model", APIKey: "secret"}, VisionInput{Images: []VisionImage{validVisionImage(), secondImage}, UserText: "warm cafe"})
 	if err != nil {
 		t.Fatalf("Extract() error = %v", err)
 	}
@@ -353,6 +359,66 @@ func TestExtractCloudflareWorkersAIVision(t *testing.T) {
 		APIKey:      "secret",
 	}, VisionInput{
 		Images:   []VisionImage{validVisionImage()},
+		UserText: "cafe",
+	})
+	if err != nil {
+		t.Fatalf("extractCloudflareWorkersAIVision() error = %v", err)
+	}
+	if extraction.Query != "cafe interior" {
+		t.Fatalf("extraction = %#v, want query 'cafe interior'", extraction)
+	}
+}
+
+func TestExtractCloudflareWorkersAIVisionCombinesMultipleImages(t *testing.T) {
+	firstImage, err := visionTestFixture()
+	if err != nil {
+		t.Fatalf("visionTestFixture() error = %v", err)
+	}
+	secondImage, err := visionTestFixture()
+	if err != nil {
+		t.Fatalf("visionTestFixture() error = %v", err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var payload cloudflareAIRequest
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if len(payload.Image) <= len(firstImage.Data) {
+			t.Fatalf("payload image length = %d, want a composite larger than the first image", len(payload.Image))
+		}
+		composite := make([]byte, len(payload.Image))
+		for index, value := range payload.Image {
+			if value < 0 || value > 255 {
+				t.Fatalf("payload image byte %d = %d", index, value)
+			}
+			composite[index] = byte(value)
+		}
+		decoded, _, err := image.Decode(bytes.NewReader(composite))
+		if err != nil {
+			t.Fatalf("decode composite image: %v", err)
+		}
+		if decoded.Bounds().Dx() <= 64 {
+			t.Fatalf("composite width = %d, want multiple reference tiles", decoded.Bounds().Dx())
+		}
+		if !strings.Contains(payload.Prompt, "contact sheet") || !strings.Contains(payload.Prompt, "distinctive") || !strings.Contains(payload.Prompt, "searchable traits") || !strings.Contains(payload.Prompt, "JSON only") {
+			t.Fatalf("prompt does not describe multi-reference synthesis: %q", payload.Prompt)
+		}
+		_ = json.NewEncoder(writer).Encode(map[string]any{
+			"success": true,
+			"result": map[string]any{
+				"response": map[string]string{"query": "cafe interior"},
+			},
+		})
+	}))
+	defer server.Close()
+	configureVisionTestOutbound(t, server.URL)
+
+	extraction, err := extractCloudflareWorkersAIVision(context.Background(), VisionProviderConfig{
+		EndpointURL: server.URL + "/client/v4/accounts/acc123/ai/v1",
+		Model:       "@cf/meta/llama-3.2-11b-vision-instruct",
+		APIKey:      "secret",
+	}, VisionInput{
+		Images:   []VisionImage{firstImage, secondImage},
 		UserText: "cafe",
 	})
 	if err != nil {

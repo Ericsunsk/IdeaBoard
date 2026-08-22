@@ -72,15 +72,15 @@ type Asset struct {
 }
 
 type AssetInput struct {
-	Provider    string
-	SourceID    string
-	SourceURL   string
-	PreviewURL  string
-	OriginalURL string
-	Title       string
-	Author      string
-	Width       int32
-	Height      int32
+	Provider    string `json:"provider"`
+	SourceID    string `json:"source_id"`
+	SourceURL   string `json:"source_url"`
+	PreviewURL  string `json:"preview_url"`
+	OriginalURL string `json:"original_url"`
+	Title       string `json:"title"`
+	Author      string `json:"author"`
+	Width       int32  `json:"width"`
+	Height      int32  `json:"height"`
 }
 
 type SaveAssetCommand struct {
@@ -102,6 +102,6 @@ type ListAssetsResult struct {
 }
 
 type AssetKey struct {
-	Provider string
-	SourceID string
+	Provider string `json:"provider"`
+	SourceID string `json:"source_id"`
 }

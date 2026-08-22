@@ -6,15 +6,15 @@
       class="grid size-7 place-items-center rounded-full transition shadow-md focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] disabled:opacity-60 cursor-pointer"
       :class="[
         saved
-          ? 'bg-emerald-500 text-white'
+          ? 'bg-emerald-500 text-white hover:bg-emerald-600'
           : 'bg-board-primary text-ib-text-inverse hover:bg-board-primary-hover shadow-board-primary/30',
       ]"
-      :aria-label="saved ? 'Saved to Library' : 'Save to Library'"
-      :title="saved ? 'Saved to Library' : 'Save to Library Folder'"
+      :aria-label="saved ? 'Remove from Library' : 'Save to Library'"
+      :title="saved ? 'Remove from Library' : 'Save to Library Folder'"
       :disabled="saving"
       @click.stop="toggle"
     >
-      <Check v-if="saved" class="size-3.5 stroke-[2.5]" />
+      <BookmarkSolid v-if="saved" class="size-3.5" />
       <Plus v-else class="size-3.5 stroke-[2.5]" />
     </button>
 
@@ -113,17 +113,18 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
 import Popover from 'primevue/popover'
-import { Bookmark, Check, Folder, Plus, Search } from '@iconoir/vue'
+import { Bookmark, BookmarkSolid, Folder, Plus, Search } from '@iconoir/vue'
 import type { SearchResult } from '../searchResource'
 import {
   getLibraryFolders,
+  removeSearchReference,
   saveSearchReference,
   type LibraryFolderView,
 } from '../../library/libraryResource'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 
 const props = defineProps<{ result: SearchResult; saved?: boolean }>()
-const emit = defineEmits<{ saved: [] }>()
+const emit = defineEmits<{ saved: []; unsaved: [] }>()
 
 const toast = useAppToast()
 const popover = ref<InstanceType<typeof Popover>>()
@@ -212,8 +213,25 @@ function positionPopoverAbove() {
   pop.style.setProperty('top', `${top}px`, 'important')
 }
 
+async function handleUnsave() {
+  if (saving.value) return
+  saving.value = true
+  try {
+    await removeSearchReference(props.result.provider, props.result.id)
+    emit('unsaved')
+    toast.success('Removed from your Library')
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : '移除素材失败')
+  } finally {
+    saving.value = false
+  }
+}
+
 function toggle(event: Event) {
-  if (props.saved) return
+  if (props.saved) {
+    void handleUnsave()
+    return
+  }
   const target =
     triggerButtonRef.value || (event.currentTarget as HTMLElement) || (event.target as HTMLElement)
   popover.value?.toggle(event, target)

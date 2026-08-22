@@ -1,14 +1,21 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 import { lookupSavedAssetKeys, libraryAssetKey } from '../library/libraryResource'
 import {
+  generateRandomInspirationCursor,
   reportSearchImageFailure,
   searchInspiration,
   type SearchResult,
 } from './searchResource'
+import {
+  getSearchFeedCache,
+  setSearchFeedCache,
+  updateFeedScrollPosition,
+} from './searchCache'
 
 export function useSearchResults(options: {
   submittedQuery: Ref<string>
   keepResultsOnNextLoad: Ref<boolean>
+  cacheScope?: string
 }) {
   const results = ref<SearchResult[]>([])
   const nextCursor = ref('')
@@ -24,21 +31,56 @@ export function useSearchResults(options: {
   let controller: AbortController | null = null
   let observer: IntersectionObserver | null = null
   let loadGeneration = 0
+  const cacheScope = options.cacheScope ?? 'anonymous'
+
+  async function refreshSavedKeys(items: SearchResult[], generation: number) {
+    if (items.length === 0) return
+    try {
+      const saved = await lookupSavedAssetKeys(
+        items.map((result) => ({ provider: result.provider, source_id: result.id })),
+      )
+      if (generation === loadGeneration) savedKeys.value = new Set([...savedKeys.value, ...saved])
+    } catch (error) {
+      if (import.meta.env.DEV) console.debug('library lookup unavailable', error)
+    }
+  }
 
   async function load(reset: boolean) {
     const generation = reset ? ++loadGeneration : loadGeneration
     if (reset) {
       controller?.abort()
       controller = new AbortController()
-      if (!options.keepResultsOnNextLoad.value) results.value = []
+      savedKeys.value = new Set()
+
+      // Instant hydration from session cache if available
+      const cached = getSearchFeedCache(options.submittedQuery.value, true, cacheScope)
+      if (cached && cached.results.length > 0 && !options.keepResultsOnNextLoad.value) {
+        results.value = cached.results
+        nextCursor.value = cached.nextCursor
+        hasMore.value = cached.hasMore
+        loading.value = false
+        void refreshSavedKeys(cached.results, generation)
+        if (cached.scrollY > 0) {
+          void nextTick(() => {
+            if (typeof window !== 'undefined') {
+              window.scrollTo({ top: cached.scrollY, behavior: 'instant' })
+              const pageEl = document.querySelector('.app-scrollbar')
+              if (pageEl) pageEl.scrollTop = cached.scrollY
+            }
+          })
+        }
+      } else {
+        if (!options.keepResultsOnNextLoad.value) results.value = []
+        nextCursor.value =
+          options.submittedQuery.value === '' ? generateRandomInspirationCursor() : ''
+        hasMore.value = false
+        loading.value = true
+      }
+
       options.keepResultsOnNextLoad.value = false
-      nextCursor.value = ''
-      hasMore.value = false
       hasError.value = false
       failedImages.value = new Set()
       imageRetryCounts.value = new Map()
-      savedKeys.value = new Set()
-      loading.value = true
     } else {
       if (loadingMore.value || !hasMore.value) return
       loadingMore.value = true
@@ -53,17 +95,17 @@ export function useSearchResults(options: {
       if (generation !== loadGeneration) return
       const incomingResults = page.results
       results.value = reset ? incomingResults : [...results.value, ...page.results]
-      try {
-        const saved = await lookupSavedAssetKeys(
-          incomingResults.map((result) => ({ provider: result.provider, source_id: result.id })),
-        )
-        if (generation === loadGeneration) savedKeys.value = new Set([...savedKeys.value, ...saved])
-      } catch (error) {
-        if (import.meta.env.DEV) console.debug('library lookup unavailable', error)
-      }
+      await refreshSavedKeys(incomingResults, generation)
       if (generation === loadGeneration) {
         nextCursor.value = page.next_cursor || ''
         hasMore.value = page.has_more
+        setSearchFeedCache({
+          query: options.submittedQuery.value,
+          results: results.value,
+          nextCursor: nextCursor.value,
+          hasMore: hasMore.value,
+          scope: cacheScope,
+        })
       }
     } catch (error) {
       if (
@@ -113,8 +155,52 @@ export function useSearchResults(options: {
     savedKeys.value = new Set(savedKeys.value).add(key)
   }
 
+  function markUnsaved(result: SearchResult) {
+    markUnsavedKey(libraryAssetKey(result.provider, result.id))
+  }
+
+  function markUnsavedKey(key: string) {
+    const next = new Set(savedKeys.value)
+    next.delete(key)
+    savedKeys.value = next
+  }
+
+  function clearResults() {
+    loadGeneration += 1
+    controller?.abort()
+    controller = null
+    results.value = []
+    nextCursor.value = ''
+    hasMore.value = false
+    hasError.value = false
+    failedImages.value = new Set()
+    imageRetryCounts.value = new Map()
+    savedKeys.value = new Set()
+    loading.value = false
+    loadingMore.value = false
+  }
+
+  let scrollTimeout: ReturnType<typeof setTimeout> | null = null
+  const handleScroll = (e?: Event) => {
+    if (scrollTimeout) return
+    scrollTimeout = setTimeout(() => {
+      scrollTimeout = null
+      if (typeof window !== 'undefined') {
+        const target = e?.target as HTMLElement | null
+        const top =
+          target && target.scrollTop !== undefined
+            ? target.scrollTop
+            : (window.scrollY || document.documentElement.scrollTop || 0)
+        updateFeedScrollPosition(top, cacheScope)
+      }
+    }, 150)
+  }
+
   onMounted(async () => {
     await nextTick()
+    if (typeof window !== 'undefined') {
+      window.addEventListener('scroll', handleScroll, { capture: true, passive: true })
+    }
     observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) void load(false)
@@ -127,6 +213,10 @@ export function useSearchResults(options: {
   onBeforeUnmount(() => {
     controller?.abort()
     observer?.disconnect()
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('scroll', handleScroll, { capture: true } as EventListenerOptions)
+    }
+    if (scrollTimeout) clearTimeout(scrollTimeout)
   })
 
   return {
@@ -140,10 +230,13 @@ export function useSearchResults(options: {
     savedKeys,
     load,
     reload,
+    clearResults,
     markImageError,
     retryImage,
     imageRetryCount,
     markSaved,
     markSavedKey,
+    markUnsaved,
+    markUnsavedKey,
   }
 }

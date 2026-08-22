@@ -1,6 +1,7 @@
 package library
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -94,6 +95,17 @@ func TestSaveAssetHandlerDefaultsToQuickSaves(t *testing.T) {
 	router.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status = %d body = %s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestSaveAssetRequestJSONBinding(t *testing.T) {
+	raw := `{"folder_id":12,"new_folder_name":"Inspire","asset":{"provider":"unsplash","source_id":"photo-abc","source_url":"https://unsplash.com/photos/abc","preview_url":"https://images.unsplash.com/abc","original_url":"https://images.unsplash.com/abc-raw","title":"A title","author":"Author","width":1000,"height":800}}`
+	var req saveAssetRequest
+	if err := json.Unmarshal([]byte(raw), &req); err != nil {
+		t.Fatalf("json.Unmarshal failed: %v", err)
+	}
+	if req.Asset.Provider != "unsplash" || req.Asset.SourceID != "photo-abc" || req.Asset.SourceURL != "https://unsplash.com/photos/abc" || req.Asset.PreviewURL != "https://images.unsplash.com/abc" || req.Asset.OriginalURL != "https://images.unsplash.com/abc-raw" {
+		t.Fatalf("unmarshaled asset = %#v", req.Asset)
 	}
 }
 

@@ -1,6 +1,7 @@
-import { computed, onBeforeUnmount, ref, type Ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { USER_SEARCH_PATH } from '../../shared/constants/routePaths'
+import { useAppToast } from '../../shared/composables/useAppToast'
 import type { LibraryAssetView } from '../library/libraryResource'
 import {
   extractVisionSearch,
@@ -9,6 +10,11 @@ import {
   type VisionReference,
 } from './searchResource'
 import { searchReferenceKey, toVisionReference } from './searchLibraryBridge'
+import {
+  clearCachedVisionReferences,
+  getCachedVisionReferences,
+  setCachedVisionReferences,
+} from './searchCache'
 
 const MAX_REFERENCE_COUNT = 4
 const MAX_REFERENCE_BYTES = 10 * 1024 * 1024
@@ -19,10 +25,19 @@ export function useVisionSearchFlow(options: {
   queryError: Ref<string>
   keepResultsOnNextLoad: Ref<boolean>
   loadCatalog: () => Promise<void>
+  cacheScope?: string
 }) {
-  const route = useRoute()
   const router = useRouter()
-  const references = ref<VisionReference[]>([])
+  const toast = useAppToast()
+  const cacheScope = options.cacheScope ?? 'anonymous'
+  const cachedRefs = getCachedVisionReferences(cacheScope)
+  const references = ref<VisionReference[]>(
+    cachedRefs.map((cached) => ({
+      key: cached.key,
+      previewUrl: cached.previewUrl,
+      libraryAssetID: cached.libraryAssetID,
+    })),
+  )
   const fileInput = ref<HTMLInputElement | null>(null)
   const visionState = ref<'idle' | 'extracting' | 'ready'>('idle')
   const visionError = ref('')
@@ -58,18 +73,9 @@ export function useVisionSearchFlow(options: {
       })
       if (generation !== extractionGeneration) return
       options.submittedQuery.value = extraction.query
-      options.draftQuery.value = extraction.query
       visionState.value = 'ready'
       options.keepResultsOnNextLoad.value = true
-      const currentRoute = route.fullPath
-      await router.replace({
-        path: USER_SEARCH_PATH,
-        query: {
-          q: extraction.query,
-        },
-      })
-      if (generation !== extractionGeneration) return
-      if (route.fullPath === currentRoute) await options.loadCatalog()
+      await options.loadCatalog()
     } catch (error) {
       if (generation !== extractionGeneration || isAbortError(error)) return
       visionState.value = 'idle'
@@ -89,9 +95,11 @@ export function useVisionSearchFlow(options: {
     nextPendingKeys.delete(key)
     pendingReferenceKeys.value = nextPendingKeys
     pendingReferenceBytes.delete(key)
-    if (references.value.length > 0) markVisionStale()
-    else clearVisionExtraction()
-    if (references.value.length === 0) {
+    if (references.value.length > 0) {
+      markVisionStale()
+    } else {
+      clearVisionExtraction()
+      options.submittedQuery.value = normalizeSearchQuery(options.draftQuery.value)
       void router.replace({
         path: USER_SEARCH_PATH,
         query: options.draftQuery.value ? { q: normalizeSearchQuery(options.draftQuery.value) } : {},
@@ -108,12 +116,17 @@ export function useVisionSearchFlow(options: {
     references.value = []
     pendingReferenceKeys.value = new Set()
     pendingReferenceBytes.clear()
+    clearCachedVisionReferences(cacheScope)
     clearVisionExtraction()
-    void router.replace({
-      path: USER_SEARCH_PATH,
-      query: options.draftQuery.value ? { q: normalizeSearchQuery(options.draftQuery.value) } : {},
-    })
   }
+
+  watch(
+    references,
+    (current) => {
+      setCachedVisionReferences(current, cacheScope)
+    },
+    { deep: true },
+  )
 
   function handleFileInput(event: Event) {
     const input = event.target as HTMLInputElement
@@ -122,18 +135,18 @@ export function useVisionSearchFlow(options: {
     if (files.length === 0) return
     const room = MAX_REFERENCE_COUNT - referenceSlotCount.value
     if (files.length > room) {
-      options.queryError.value = '最多添加 4 张参考图'
+      toast.warning('You can add up to 4 reference images')
       return
     }
     let totalBytes = currentReferenceBytes()
     for (const file of files) {
       if (!file.type.startsWith('image/')) {
-        options.queryError.value = '仅支持图片格式'
+        toast.warning('Only image files are supported')
         return
       }
       totalBytes += file.size
       if (totalBytes > MAX_REFERENCE_BYTES) {
-        options.queryError.value = '参考图总大小不能超过 10MB'
+        toast.warning('Total reference images size cannot exceed 10MB')
         return
       }
     }
@@ -162,7 +175,7 @@ export function useVisionSearchFlow(options: {
       return
     }
     if (!canAddReference.value) {
-      options.queryError.value = '最多添加 4 张参考图'
+      toast.warning('You can add up to 4 reference images')
       return
     }
     references.value = [
@@ -182,7 +195,7 @@ export function useVisionSearchFlow(options: {
       return
     }
     if (!canAddReference.value) {
-      options.queryError.value = '最多添加 4 张参考图'
+      toast.warning('You can add up to 4 reference images')
       return
     }
     pendingReferenceKeys.value = new Set([...pendingReferenceKeys.value, key])

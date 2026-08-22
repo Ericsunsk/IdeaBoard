@@ -2,7 +2,7 @@
   <Transition name="library-island">
     <aside
       v-if="open"
-      class="fixed top-[84px] bottom-4 sm:bottom-6 left-4 sm:left-6 z-40 flex flex-col overflow-hidden rounded-[28px] border border-board-card-border bg-board-surface-strong/80 p-5 text-board-page-text backdrop-blur-xl shadow-[0_16px_48px_rgba(45,64,89,0.08),0_2px_8px_rgba(0,0,0,0.02)] will-change-[width,transform] transition-[width,transform] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] max-w-[calc(100vw-32px)]"
+      class="fixed top-[84px] bottom-4 sm:bottom-6 left-4 sm:left-6 z-40 flex flex-col overflow-hidden rounded-[28px] border border-board-card-border bg-board-control-bg/80 p-5 text-board-page-text backdrop-blur-md shadow-[0_16px_48px_rgba(45,64,89,0.08),0_2px_8px_rgba(0,0,0,0.02)] will-change-[width,transform] transition-[width,transform] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] max-w-[calc(100vw-32px)]"
       :class="
         isExpanded
           ? 'w-[calc(100vw-32px)] sm:w-[calc(100vw-48px)]'
@@ -14,49 +14,51 @@
       @dragleave="handleIslandDragLeave"
       @drop.prevent="handleIslandDrop"
     >
-      <!-- 🌟 1. 120fps CSS Grid (0fr ⟷ 1fr) 硬件加速智能折叠顶栏控制区 -->
-      <div
-        class="smooth-grid-collapse shrink-0"
-        :style="{
-          gridTemplateRows: isHeaderCollapsed ? '0fr' : '1fr',
-          marginBottom: isHeaderCollapsed ? '0px' : '0.5rem',
-        }"
-      >
-        <div
-          class="smooth-grid-content flex flex-col shrink-0"
-          :style="{
-            opacity: isHeaderCollapsed ? 0 : 1,
-            transform: isHeaderCollapsed ? 'translateY(-12px)' : 'translateY(0)',
-            pointerEvents: isHeaderCollapsed ? 'none' : 'auto',
-          }"
-        >
-          <!-- 顶栏：标题 + 展开/收缩按钮 + 微圆关闭按钮 -->
-          <div class="flex items-center justify-between pb-2 shrink-0">
+      <!-- 🌟 1. 常驻顶栏控制区与灵感夹微胶囊 (支持用户主动折叠/展开分类胶囊) -->
+      <div class="flex flex-col shrink-0 mb-2">
+        <!-- 顶栏：标题 + 折叠微按钮 + 展开/收缩按钮 + 微圆关闭按钮 -->
+        <div class="flex items-center justify-between pb-2 shrink-0">
+          <div class="flex items-center gap-1.5">
             <h2 class="m-0 text-base font-semibold tracking-tight">My Library</h2>
-            <div class="flex items-center gap-1.5">
-              <button
-                type="button"
-                class="grid size-8 shrink-0 place-items-center rounded-full bg-black/[0.04] text-board-page-text-muted transition-colors hover:bg-black/[0.08] hover:text-board-page-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] cursor-pointer"
-                :aria-label="isExpanded ? 'Collapse library' : 'Expand library'"
-                :title="isExpanded ? 'Collapse library' : 'Expand library'"
-                @click="isExpanded = !isExpanded"
-              >
-                <NavArrowLeft v-if="isExpanded" class="size-4" aria-hidden="true" />
-                <NavArrowRight v-else class="size-4" aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                class="grid size-8 shrink-0 place-items-center rounded-full bg-black/[0.04] text-board-page-text-muted transition-colors hover:bg-black/[0.08] hover:text-board-page-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] cursor-pointer"
-                aria-label="Close Library"
-                title="Close Library"
-                @click="emit('close')"
-              >
-                <Xmark class="size-4" aria-hidden="true" />
-              </button>
-            </div>
+            <button
+              type="button"
+              class="grid size-6 shrink-0 place-items-center rounded-full bg-black/[0.04] text-board-page-text-muted transition-colors hover:bg-black/[0.08] hover:text-board-page-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] cursor-pointer"
+              :aria-label="isHeaderCollapsed ? 'Show folders' : 'Hide folders'"
+              :title="isHeaderCollapsed ? 'Show folders' : 'Hide folders'"
+              @click="isHeaderCollapsed = !isHeaderCollapsed"
+            >
+              <NavArrowDown v-if="isHeaderCollapsed" class="size-3.5" aria-hidden="true" />
+              <NavArrowUp v-else class="size-3.5" aria-hidden="true" />
+            </button>
           </div>
+          <div class="flex items-center gap-1.5">
+            <button
+              type="button"
+              class="grid size-8 shrink-0 place-items-center rounded-full bg-black/[0.04] text-board-page-text-muted transition-colors hover:bg-black/[0.08] hover:text-board-page-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] cursor-pointer"
+              :aria-label="isExpanded ? 'Collapse library' : 'Expand library'"
+              :title="isExpanded ? 'Collapse library' : 'Expand library'"
+              @click="isExpanded = !isExpanded"
+            >
+              <NavArrowLeft v-if="isExpanded" class="size-4" aria-hidden="true" />
+              <NavArrowRight v-else class="size-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              class="grid size-8 shrink-0 place-items-center rounded-full bg-black/[0.04] text-board-page-text-muted transition-colors hover:bg-black/[0.08] hover:text-board-page-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] cursor-pointer"
+              aria-label="Close Library"
+              title="Close Library"
+              @click="emit('close')"
+            >
+              <Xmark class="size-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
 
-          <!-- 灵感夹筛选微胶囊 (自然流式换行，支持拖拽落盘，零滚动条) -->
+        <!-- 灵感夹筛选微胶囊 (自然流式换行，支持拖拽落盘，零滚动条) -->
+        <div
+          v-show="!isHeaderCollapsed"
+          class="transition-[opacity,transform] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
+        >
           <div v-if="workspace.foldersLoading.value" class="py-1">
             <div class="h-7 w-full animate-pulse rounded-full bg-board-card-border/50"></div>
           </div>
@@ -70,7 +72,7 @@
                 v-for="folder in workspace.folderTabs.value"
                 :key="folder.queryKey"
                 class="group/folder-pill inline-flex h-7 shrink-0 items-center rounded-full"
-                @dragover.prevent.stop="handlePillDragOver(folder.queryKey)"
+                @dragover.prevent.stop="handlePillDragOver($event, folder.queryKey)"
                 @dragleave.stop="handlePillDragLeave"
                 @drop.prevent.stop="handlePillDrop($event, folder)"
                 @contextmenu.stop="openFolderMenu($event, folder)"
@@ -136,12 +138,12 @@
         </button>
       </div>
 
-      <!-- 🌟 2. 纯净 18px 物理圆角裁剪画廊视口 (双列密排，带 onscroll 智能折叠阻尼) -->
+      <!-- 🌟 2. 纯净 18px 物理圆角裁剪画廊视口 (双列密排，零滚动条) -->
       <div
         ref="scrollAreaRef"
-        class="app-scrollbar mt-2 h-full min-h-0 flex-1 overflow-y-auto pr-0.5 pt-1 rounded-[18px]"
+        class="mt-2 h-full min-h-0 flex-1 overflow-y-auto pr-0.5 pt-1 rounded-[18px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         :aria-busy="workspace.loading.value"
-        @scroll="handleGalleryScroll"
+        @scroll="closeFolderMenu"
       >
         <div
           v-if="workspace.loading.value && workspace.assets.value.length === 0"
@@ -169,90 +171,96 @@
             </p>
           </div>
         </div>
-        <div
-          v-else
-          class="pb-2"
-          :class="
-            isExpanded
-              ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3'
-              : 'grid grid-cols-2 gap-2'
-          "
-        >
-          <article
-            v-for="asset in workspace.assets.value"
-            :key="asset.id"
-            class="group/libcard relative overflow-hidden rounded-xl bg-board-card-bg/80 backdrop-blur-md shadow-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
+        <div v-else class="pb-2">
+          <div
+            class="flex items-start"
+            :class="isExpanded ? 'gap-3' : 'gap-2'"
           >
-            <button
-              type="button"
-              class="block w-full cursor-zoom-in text-left focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
-              :aria-label="`View ${asset.title || 'saved reference'}`"
-              @click="openAsset(asset)"
-            >
-              <div
-                class="relative overflow-hidden bg-board-loading-bg"
-                :style="{ aspectRatio: `${asset.width || 1} / ${asset.height || 1}` }"
-              >
-                <div
-                  v-if="failedImages.has(asset.id)"
-                  class="grid min-h-24 place-items-center px-2 text-center text-xs text-board-page-text-muted"
-                >
-                  Image unavailable
-                </div>
-                <img
-                  v-else
-                  :src="asset.preview_url"
-                  :alt="asset.title || 'Saved reference'"
-                  loading="lazy"
-                  class="h-full w-full object-cover"
-                  @error="markImageError(asset.id)"
-                />
-              </div>
-            </button>
-
-            <!-- 悬浮微渐变覆盖层 -->
             <div
-              class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover/libcard:opacity-100 transition-opacity duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] flex flex-col justify-between p-2 pointer-events-none"
+              v-for="(column, colIndex) in columnBuckets"
+              :key="colIndex"
+              class="flex-1 flex flex-col min-w-0"
+              :class="isExpanded ? 'gap-3' : 'gap-2'"
             >
-              <div class="flex justify-end gap-1.5 pointer-events-auto">
+              <article
+                v-for="asset in column"
+                :key="asset.id"
+                draggable="true"
+                class="group/libcard relative overflow-hidden rounded-xl bg-board-control-bg/80 backdrop-blur-md shadow-none transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-grab active:cursor-grabbing select-none"
+                @dragstart="handleAssetDragStart($event, asset)"
+              >
                 <button
                   type="button"
-                  class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-board-danger transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
-                  aria-label="Remove saved reference"
-                  title="Remove saved reference"
-                  @click="requestRemove(asset)"
+                  class="block w-full cursor-zoom-in text-left focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
+                  :aria-label="`View ${asset.title || 'saved reference'}`"
+                  @click="openAsset(asset)"
                 >
-                  <Trash class="size-3" aria-hidden="true" />
+                  <div
+                    class="relative overflow-hidden bg-board-loading-bg backdrop-blur-md"
+                    :style="{ aspectRatio: `${asset.width || 1} / ${asset.height || 1}` }"
+                  >
+                    <div
+                      v-if="failedImages.has(asset.id)"
+                      class="grid min-h-24 place-items-center px-2 text-center text-xs text-board-page-text-muted"
+                    >
+                      Image unavailable
+                    </div>
+                    <img
+                      v-else
+                      :src="asset.preview_url"
+                      :alt="asset.title || 'Saved reference'"
+                      loading="lazy"
+                      class="h-full w-full object-cover"
+                      @error="markImageError(asset.id)"
+                    />
+                  </div>
                 </button>
-                <button
-                  type="button"
-                  class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-board-primary transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
-                  aria-label="Use as search reference"
-                  title="Use as search reference"
-                  @click.stop="selectReference(asset)"
+
+                <!-- 悬浮微渐变覆盖层 -->
+                <div
+                  class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover/libcard:opacity-100 transition-opacity duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] flex flex-col justify-between p-2 pointer-events-none"
                 >
-                  <Check
-                    v-if="
-                      props.referenceKeys?.includes(
-                        libraryAssetKey(asset.provider, asset.source_id),
-                      )
-                    "
-                    class="size-3"
-                    aria-hidden="true"
-                  />
-                  <Bookmark v-else class="size-3" aria-hidden="true" />
-                </button>
-              </div>
-              <div class="min-w-0 pointer-events-auto">
-                <p class="m-0 truncate text-[11px] font-medium text-white leading-tight">
-                  {{ asset.title || 'Untitled reference' }}
-                </p>
-                <p class="mt-0.5 mb-0 truncate text-[10px] text-white/70">
-                  {{ asset.author || asset.provider }}
-                </p>
-              </div>
+                  <div class="flex justify-end gap-1.5 pointer-events-auto">
+                    <button
+                      type="button"
+                      class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-board-danger transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
+                      aria-label="Remove saved reference"
+                      title="Remove saved reference"
+                      @click="requestRemove(asset)"
+                    >
+                      <Xmark class="size-3" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-board-primary transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
+                      aria-label="Use as search reference"
+                      title="Use as search reference"
+                      @click.stop="selectReference(asset)"
+                    >
+                      <Check
+                        v-if="
+                          props.referenceKeys?.includes(
+                            libraryAssetKey(asset.provider, asset.source_id),
+                          )
+                        "
+                        class="size-3"
+                        aria-hidden="true"
+                      />
+                      <Search v-else class="size-3" aria-hidden="true" />
+                    </button>
+                  </div>
+                  <div class="min-w-0 pointer-events-auto">
+                    <p class="m-0 truncate text-[11px] font-medium text-white leading-tight">
+                      {{ asset.title || 'Untitled reference' }}
+                    </p>
+                    <p class="mt-0.5 mb-0 truncate text-[10px] text-white/70">
+                      {{ asset.author || asset.provider }}
+                    </p>
+                  </div>
+                </div>
+              </article>
             </div>
-          </article>
+          </div>
 
           <button
             v-if="workspace.hasMore.value"
@@ -406,26 +414,26 @@
             </p>
           </div>
 
-          <!-- 右上角：来源链接 + 极简圆形 ✕ 关闭按钮 -->
-          <div class="flex items-center gap-2.5">
+          <!-- 右上角：来源链接 + 极简圆形 ✕ 关闭按钮 (通透轻量毛玻璃 + Search 同款紫色 Hover) -->
+          <div class="flex items-center gap-2">
             <a
               v-if="workspace.activeAsset.value.source_url"
               :href="workspace.activeAsset.value.source_url"
               target="_blank"
               rel="noreferrer"
-              class="h-9 px-4 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-md border border-white/15 flex items-center gap-1.5 transition no-underline shadow-sm"
+              class="h-7 px-3 rounded-full bg-white/10 text-white/90 backdrop-blur-md border border-white/15 transition-[background-color,color,border-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-board-primary hover:text-white hover:border-transparent flex items-center justify-center text-xs font-medium no-underline cursor-pointer"
             >
               <span>View Source</span>
             </a>
 
             <button
               type="button"
-              class="size-9 rounded-full bg-black/40 hover:bg-white/20 text-white/80 hover:text-white backdrop-blur-xl border border-white/10 flex items-center justify-center transition shadow-md shrink-0 cursor-pointer focus-visible:outline-none"
+              class="grid size-7 place-items-center rounded-full bg-white/10 text-white/90 backdrop-blur-md border border-white/15 transition-[background-color,color,border-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-board-primary hover:text-white hover:border-transparent focus-visible:outline-none cursor-pointer"
               aria-label="Close preview"
               title="Close (Esc)"
               @click="workspace.setActiveAsset(null)"
             >
-              <Xmark class="size-4" aria-hidden="true" />
+              <Xmark class="size-3.5" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -460,7 +468,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
@@ -468,11 +476,13 @@ import {
   Bookmark,
   Check,
   Folder,
+  NavArrowDown,
   NavArrowLeft,
   NavArrowRight,
+  NavArrowUp,
   Plus,
   ReportColumns,
-  Trash,
+  Search,
   Xmark,
 } from '@iconoir/vue'
 import { useLibraryWorkspace, type LibraryFolderTab } from '../useLibraryWorkspace'
@@ -501,6 +511,29 @@ const workspace = useLibraryWorkspace({ syncRoute: false, autoLoad: false })
 const initialized = ref(false)
 const failedImages = ref(new Set<number>())
 const isHeaderCollapsed = ref(false)
+const windowWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1200)
+
+const columnCount = computed(() => {
+  if (!isExpanded.value) return 2
+  const w = windowWidth.value
+  if (w < 640) return 2
+  if (w < 768) return 3
+  if (w < 1024) return 4
+  if (w < 1280) return 5
+  if (w < 1536) return 6
+  return 7
+})
+
+const columnBuckets = computed(() => {
+  const count = columnCount.value
+  const buckets: LibraryAssetView[][] = Array.from({ length: count }, () => [])
+  const list = workspace.assets.value
+  for (let i = 0; i < list.length; i++) {
+    buckets[i % count].push(list[i])
+  }
+  return buckets
+})
+
 const scrollAreaRef = ref<HTMLElement | null>(null)
 const hoveredPillKey = ref<string | null>(null)
 const folderMenuRef = ref<HTMLElement | null>(null)
@@ -524,34 +557,6 @@ const dialogPt = {
   content: { class: '!p-0' },
 }
 
-// 🌟 120fps CSS Grid 折叠控制与阻尼防抖
-let lastScrollTop = 0
-let scrollDeltaTracker = 0
-
-function handleGalleryScroll(event: Event) {
-  closeFolderMenu()
-  const el = event.target as HTMLElement
-  const currentScroll = el.scrollTop
-  const delta = currentScroll - lastScrollTop
-
-  if (currentScroll <= 8) {
-    if (isHeaderCollapsed.value) isHeaderCollapsed.value = false
-    scrollDeltaTracker = 0
-  } else if (delta > 0) {
-    scrollDeltaTracker = Math.max(0, scrollDeltaTracker + delta)
-    if (scrollDeltaTracker > 20 && !isHeaderCollapsed.value) {
-      isHeaderCollapsed.value = true
-    }
-  } else if (delta < 0) {
-    scrollDeltaTracker = Math.min(0, scrollDeltaTracker + delta)
-    if (scrollDeltaTracker < -12 && isHeaderCollapsed.value) {
-      isHeaderCollapsed.value = false
-    }
-  }
-
-  lastScrollTop = Math.max(0, currentScroll)
-}
-
 function markImageError(assetID: number) {
   failedImages.value = new Set(failedImages.value).add(assetID)
 }
@@ -567,9 +572,6 @@ function selectReference(asset: LibraryAssetView) {
 function selectFolder(folderKey: string) {
   closeFolderMenu()
   scrollAreaRef.value?.scrollTo({ top: 0 })
-  isHeaderCollapsed.value = false
-  lastScrollTop = 0
-  scrollDeltaTracker = 0
   workspace.selectFolder(folderKey)
 }
 
@@ -636,6 +638,7 @@ function handleDocumentPointerDown(event: PointerEvent) {
 
 function handleWindowResize() {
   closeFolderMenu()
+  windowWidth.value = window.innerWidth
 }
 
 function handleKeydown(event: KeyboardEvent) {
@@ -644,19 +647,78 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
-// 拖拽落盘事件处理
+// 🌟 素材卡片拖拽与跨文件夹移动处理
+function handleAssetDragStart(e: DragEvent, asset: LibraryAssetView) {
+  const payload = {
+    type: 'library-asset',
+    asset,
+  }
+  e.dataTransfer!.setData('application/json', JSON.stringify(payload))
+  e.dataTransfer!.setData('application/x-ideaboard-library-asset', JSON.stringify(asset))
+  e.dataTransfer!.effectAllowed = 'move'
+
+  // Micro Drag Ghost (58×44px 微缩投影圆角拖拽影子)
+  const ghost = document.createElement('div')
+  ghost.style.position = 'fixed'
+  ghost.style.top = '-9999px'
+  ghost.style.left = '-9999px'
+  ghost.style.width = '58px'
+  ghost.style.height = '44px'
+  ghost.style.borderRadius = '8px'
+  ghost.style.overflow = 'hidden'
+  ghost.style.boxShadow = '0 12px 28px rgba(0,0,0,0.3)'
+  ghost.style.transform = 'rotate(-3deg)'
+  ghost.style.zIndex = '9999'
+
+  const img = document.createElement('img')
+  img.src = asset.preview_url
+  img.style.width = '100%'
+  img.style.height = '100%'
+  img.style.objectFit = 'cover'
+
+  ghost.appendChild(img)
+  document.body.appendChild(ghost)
+  e.dataTransfer!.setDragImage(ghost, 29, 22)
+
+  setTimeout(() => {
+    document.body.removeChild(ghost)
+  }, 0)
+}
+
 function parseDraggedReference(e: DragEvent): LibrarySearchReference | null {
   try {
     const raw = e.dataTransfer?.getData('application/json')
     if (!raw) return null
-    return JSON.parse(raw) as LibrarySearchReference
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed === 'object' && parsed.type === 'library-asset') {
+      return null
+    }
+    return parsed as LibrarySearchReference
+  } catch {
+    return null
+  }
+}
+
+function parseDraggedLibraryAsset(e: DragEvent): LibraryAssetView | null {
+  try {
+    const rawAsset = e.dataTransfer?.getData('application/x-ideaboard-library-asset')
+    if (rawAsset) {
+      return JSON.parse(rawAsset) as LibraryAssetView
+    }
+    const raw = e.dataTransfer?.getData('application/json')
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed === 'object' && parsed.type === 'library-asset' && parsed.asset) {
+      return parsed.asset as LibraryAssetView
+    }
+    return null
   } catch {
     return null
   }
 }
 
 function handleIslandDragOver(e: DragEvent) {
-  e.dataTransfer!.dropEffect = 'copy'
+  e.dataTransfer!.dropEffect = 'move'
 }
 
 function handleIslandDragLeave() {
@@ -664,6 +726,15 @@ function handleIslandDragLeave() {
 }
 
 async function handleIslandDrop(e: DragEvent) {
+  const libraryAsset = parseDraggedLibraryAsset(e)
+  if (libraryAsset) {
+    const currentKey = workspace.selectedFolder.value
+    if (currentKey !== 'all') {
+      await workspace.moveSelectedAsset(libraryAsset, currentKey)
+    }
+    return
+  }
+
   const reference = parseDraggedReference(e)
   if (!reference) return
 
@@ -680,13 +751,13 @@ async function handleIslandDrop(e: DragEvent) {
     const key = libraryAssetKey(reference.provider, reference.id)
     emit('asset-saved', key)
     await Promise.all([workspace.loadFolders(), workspace.loadAssets(true)])
-    toast.success(`Saved "${reference.title || 'Image'}" to Library`)
   } catch (error) {
     toast.error(error instanceof Error ? error.message : '保存素材失败')
   }
 }
 
-function handlePillDragOver(key: string) {
+function handlePillDragOver(e: DragEvent, key: string) {
+  e.dataTransfer!.dropEffect = 'move'
   hoveredPillKey.value = key
 }
 
@@ -696,6 +767,15 @@ function handlePillDragLeave() {
 
 async function handlePillDrop(e: DragEvent, folder: LibraryFolderTab) {
   hoveredPillKey.value = null
+
+  const libraryAsset = parseDraggedLibraryAsset(e)
+  if (libraryAsset) {
+    if (folder.queryKey !== 'all') {
+      await workspace.moveSelectedAsset(libraryAsset, folder.queryKey)
+    }
+    return
+  }
+
   const reference = parseDraggedReference(e)
   if (!reference) return
 
@@ -711,7 +791,6 @@ async function handlePillDrop(e: DragEvent, folder: LibraryFolderTab) {
     emit('asset-saved', key)
     workspace.selectFolder(folder.queryKey)
     await workspace.loadFolders()
-    toast.success(`Saved "${reference.title || 'Image'}" to ${folder.name}`)
   } catch (error) {
     toast.error(error instanceof Error ? error.message : '保存素材失败')
   }
@@ -794,23 +873,5 @@ onBeforeUnmount(() => {
 .library-island-leave-to {
   opacity: 0;
   transform: translate3d(calc(-100% - 32px), 0, 0);
-}
-
-/* 🌟 120fps 硬件加速折叠动效 (CSS Grid 0fr <-> 1fr) */
-.smooth-grid-collapse {
-  display: grid;
-  transition:
-    grid-template-rows var(--motion-control-duration) var(--motion-control-easing),
-    margin-bottom var(--motion-control-duration) var(--motion-control-easing);
-  will-change: grid-template-rows, margin-bottom;
-}
-
-.smooth-grid-content {
-  overflow: hidden;
-  min-height: 0;
-  transition:
-    opacity var(--motion-control-duration) var(--motion-control-easing),
-    transform var(--motion-control-duration) var(--motion-control-easing);
-  will-change: opacity, transform;
 }
 </style>

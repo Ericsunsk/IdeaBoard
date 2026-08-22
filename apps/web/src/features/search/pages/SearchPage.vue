@@ -98,17 +98,17 @@
 
               <div class="flex items-center gap-1.5 shrink-0">
                 <button
-                  v-if="references.length > 0"
+                  v-if="references.length > 0 || draftQuery"
                   type="button"
                   class="search-reference-action"
-                  title="Clear all references"
-                  aria-label="Clear all references"
-                  @click="clearAllReferences"
+                  title="Clear search"
+                  aria-label="Clear search"
+                  @click="handleClearSearch"
                 >
                   <Xmark class="size-3.5" aria-hidden="true" />
                 </button>
                 <button
-                  v-else
+                  v-if="references.length === 0"
                   type="button"
                   class="h-8 px-3 rounded-full border border-board-card-border text-board-page-text-muted hover:text-board-page-text hover:border-board-primary hover:bg-board-primary/10 flex items-center gap-1.5 text-xs font-medium transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                   aria-label="Add search reference image"
@@ -184,7 +184,7 @@
       <div class="mt-6 flex items-center justify-between gap-3">
         <div>
           <h2 class="m-0 text-[22px] font-semibold">
-            {{ submittedQuery ? `Results for “${submittedQuery}”` : 'Inspiration' }}
+            {{ searchResultsHeading }}
           </h2>
           <div
             v-if="hasError && results.length > 0"
@@ -210,7 +210,7 @@
         <div
           v-for="h in [260, 340, 200, 380, 280, 320, 240, 360, 300, 220]"
           :key="h"
-          class="break-inside-avoid overflow-hidden rounded-2xl bg-board-loading-bg/80 animate-pulse border border-board-card-border/40"
+          class="break-inside-avoid overflow-hidden rounded-2xl bg-board-loading-bg/80 animate-pulse"
           :class="libraryIslandOpen && !libraryIslandExpanded ? 'mb-3.5' : 'mb-4'"
           :style="{ height: `${h}px` }"
         ></div>
@@ -249,7 +249,7 @@
           v-for="(result, index) in results"
           :key="`${result.provider}:${result.id}`"
           draggable="true"
-          class="group relative break-inside-avoid overflow-hidden rounded-2xl bg-board-card-bg shadow-sm transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-[var(--shadow-ib-panel)] cursor-grab active:cursor-grabbing select-none"
+          class="group relative break-inside-avoid overflow-hidden rounded-2xl bg-board-control-bg/80 backdrop-blur-md shadow-xs transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-[var(--shadow-ib-panel)] cursor-grab active:cursor-grabbing select-none"
           :class="libraryIslandOpen && !libraryIslandExpanded ? 'mb-3.5' : 'mb-4'"
           @dragstart="handleCardDragStart($event, result)"
           @dragend="handleCardDragEnd"
@@ -261,7 +261,7 @@
             @click="openLightbox(result)"
           >
             <div
-              class="relative overflow-hidden bg-board-loading-bg"
+              class="relative overflow-hidden bg-board-loading-bg backdrop-blur-md"
               :style="{ aspectRatio: `${result.width} / ${result.height}` }"
             >
               <img
@@ -275,11 +275,30 @@
             </div>
           </button>
 
-          <!-- 🌟 Demo 同款 Hover 渐变半透操作浮层 (顶栏右上角搜图 + 底栏标题/作者 + 存入个人素材库极简 + 号按钮) -->
+          <!-- 🌟 Hover 渐变半透操作浮层 (顶栏左上角多选对勾 + 右上角搜图 + 底栏标题/作者 + 存入个人素材库) -->
           <div
-            class="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between p-3.5 opacity-0 transition-opacity duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] bg-gradient-to-t from-black/80 via-transparent to-black/20 group-hover:opacity-100"
+            class="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between p-3.5 transition-opacity duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] bg-gradient-to-t from-black/80 via-transparent to-black/20 group-hover:opacity-100"
+            :class="isResultSelected(result) ? 'opacity-100' : 'opacity-0'"
           >
-            <div class="pointer-events-auto flex justify-end">
+            <!-- 顶栏：左上角极简多选对勾 + 右上角搜图参考圆纽 (严格统一在同一水平基准线) -->
+            <div class="pointer-events-auto flex items-center justify-between">
+              <!-- 左上角极简多选微圆对勾 (强制 28x28 正圆) -->
+              <button
+                type="button"
+                class="grid size-7 place-items-center rounded-full transition-colors duration-[var(--motion-control-duration)] cursor-pointer focus-visible:outline-none"
+                :class="
+                  isResultSelected(result)
+                    ? '!bg-board-primary text-ib-text-inverse shadow-xs'
+                    : 'bg-black/40 text-white/80 hover:bg-black/60 hover:text-white backdrop-blur-md'
+                "
+                :title="isResultSelected(result) ? 'Deselect image' : 'Select image'"
+                :aria-label="isResultSelected(result) ? 'Deselect image' : 'Select image'"
+                @click.stop="toggleBatchSelect(result)"
+              >
+                <Check class="size-3.5 stroke-[2.5]" aria-hidden="true" />
+              </button>
+
+              <!-- 右上角以图搜图参考圆纽 (强制 28x28 正圆) -->
               <button
                 type="button"
                 class="grid size-7 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md transition-colors hover:bg-board-primary focus-visible:outline-none cursor-pointer"
@@ -321,7 +340,8 @@
               <SearchSavePopover
                 :result="result"
                 :saved="savedKeys.has(libraryAssetKey(result.provider, result.id))"
-                @saved="markSaved(result)"
+                @saved="markSaved(result); libraryRefreshKey += 1"
+                @unsaved="markUnsaved(result); libraryRefreshKey += 1"
               />
             </div>
           </div>
@@ -400,26 +420,26 @@
               </p>
             </div>
 
-            <!-- 右上角：来源链接 + 极简圆形 ✕ 关闭按钮 -->
-            <div class="flex items-center gap-2.5">
+            <!-- 右上角：来源链接 + 极简圆形 ✕ 关闭按钮 (通透轻量毛玻璃 + Search 同款紫色 Hover) -->
+            <div class="flex items-center gap-2">
               <a
                 v-if="activeResult.source_url"
                 :href="activeResult.source_url"
                 target="_blank"
                 rel="noreferrer"
-                class="h-9 px-4 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-md border border-white/15 flex items-center gap-1.5 transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] active:scale-95 no-underline shadow-sm cursor-pointer"
+                class="h-7 px-3 rounded-full bg-white/10 text-white/90 backdrop-blur-md border border-white/15 transition-[background-color,color,border-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-board-primary hover:text-white hover:border-transparent flex items-center justify-center text-xs font-medium no-underline cursor-pointer"
               >
                 <span>View Source</span>
               </a>
 
               <button
                 type="button"
-                class="size-9 rounded-full bg-black/40 hover:bg-white/20 text-white/80 hover:text-white backdrop-blur-xl border border-white/10 flex items-center justify-center transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] active:scale-95 shadow-md shrink-0 cursor-pointer focus-visible:outline-none"
+                class="grid size-7 place-items-center rounded-full bg-white/10 text-white/90 backdrop-blur-md border border-white/15 transition-[background-color,color,border-color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:bg-board-primary hover:text-white hover:border-transparent focus-visible:outline-none cursor-pointer"
                 aria-label="Close preview"
                 title="Close (Esc)"
                 @click="closeLightbox"
               >
-                <Xmark class="size-4" aria-hidden="true" />
+                <Xmark class="size-3.5" aria-hidden="true" />
               </button>
             </div>
           </div>
@@ -438,16 +458,24 @@
         </div>
       </Transition>
     </Teleport>
+
+    <!-- 🌟 多选批量悬浮操作岛 (SearchBatchActionDock) -->
+    <SearchBatchActionDock
+      :selected-count="selectedBatchResults.length"
+      @vision-search="applySelectedAsVisionReferences"
+      @save-all="saveAllSelectedToLibrary"
+      @clear="clearSelection"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
-import { Bookmark, BookmarkSolid, Camera, Plus, Search, Xmark } from '@iconoir/vue'
+import { Bookmark, BookmarkSolid, Camera, Check, Plus, Search, Xmark } from '@iconoir/vue'
 import StudioName from '../../../shared/components/StudioName.vue'
 import UserAccountMenu from '../../../shared/components/UserAccountMenu.vue'
 import { HOME_PATH, USER_SEARCH_PATH } from '../../../shared/constants/routePaths'
@@ -455,6 +483,7 @@ import { useUserStore } from '../../auth/session/authSession'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import UserWorkspaceNavigation from '../../user-shell/components/UserWorkspaceNavigation.vue'
 import SearchSavePopover from '../components/SearchSavePopover.vue'
+import SearchBatchActionDock from '../components/SearchBatchActionDock.vue'
 import LibraryFloatingIsland from '../../library/components/LibraryFloatingIsland.vue'
 import {
   libraryAssetKey,
@@ -472,6 +501,7 @@ import {
 import { useSearchResults } from '../useSearchResults'
 import { useSearchLightbox } from '../useSearchLightbox'
 import { useVisionSearchFlow } from '../useVisionSearchFlow'
+import { getLibraryIslandState, setLibraryIslandState } from '../searchCache'
 
 const route = useRoute()
 const router = useRouter()
@@ -484,16 +514,85 @@ const accountControls = useUserAccountControls({
 const draftQuery = ref('')
 const submittedQuery = ref('')
 const queryError = ref('')
-const libraryIslandOpen = ref(false)
-const libraryIslandExpanded = ref(false)
+const cacheScope = userStore.user?.public_id ?? 'anonymous'
+const initialIslandState = getLibraryIslandState(cacheScope)
+const libraryIslandOpen = ref(initialIslandState.open)
+const libraryIslandExpanded = ref(initialIslandState.expanded)
 const libraryRefreshKey = ref(0)
 const isTriggerHoveredDuringDrag = ref(false)
 const keepResultsOnNextLoad = ref(false)
+const selectedBatchResults = ref<SearchResult[]>([])
 let autoOpenTimer: ReturnType<typeof setTimeout> | null = null
+
+watch([libraryIslandOpen, libraryIslandExpanded], ([open, expanded]) => {
+  setLibraryIslandState({ open, expanded }, cacheScope)
+})
+
+function isResultSelected(result: SearchResult): boolean {
+  return selectedBatchResults.value.some(
+    (r) => r.provider === result.provider && r.id === result.id,
+  )
+}
+
+function toggleBatchSelect(result: SearchResult) {
+  const idx = selectedBatchResults.value.findIndex(
+    (r) => r.provider === result.provider && r.id === result.id,
+  )
+  if (idx >= 0) {
+    selectedBatchResults.value.splice(idx, 1)
+  } else {
+    if (selectedBatchResults.value.length >= 8) {
+      toast.warning('Maximum 8 images for batch selection!')
+      return
+    }
+    selectedBatchResults.value.push(result)
+  }
+}
+
+function clearSelection() {
+  selectedBatchResults.value = []
+}
+
+async function applySelectedAsVisionReferences() {
+  const toAdd = selectedBatchResults.value.slice(0, 4)
+  for (const item of toAdd) {
+    await handleSearchResultReference(item)
+  }
+  if (selectedBatchResults.value.length > 4) {
+    toast.info('Added top 4 selected images as vision search references')
+  }
+  clearSelection()
+}
+
+async function saveAllSelectedToLibrary() {
+  const items = [...selectedBatchResults.value]
+  if (items.length === 0) return
+  let successCount = 0
+  let failureCount = 0
+  for (const item of items) {
+    try {
+      await saveSearchReference(toSearchReference(item))
+      markSavedKey(libraryAssetKey(item.provider, item.id))
+      successCount += 1
+    } catch {
+      failureCount += 1
+    }
+  }
+  libraryRefreshKey.value += 1
+  if (failureCount === 0) {
+    toast.success(`Saved ${successCount} assets to Library!`)
+  } else if (successCount === 0) {
+    toast.error('Failed to save selected assets')
+  } else {
+    toast.warning(`Saved ${successCount} assets; ${failureCount} failed`)
+  }
+  clearSelection()
+}
 
 const searchResults = useSearchResults({
   submittedQuery,
   keepResultsOnNextLoad: keepResultsOnNextLoad,
+  cacheScope,
 })
 const visionFlow = useVisionSearchFlow({
   draftQuery,
@@ -501,6 +600,7 @@ const visionFlow = useVisionSearchFlow({
   queryError,
   keepResultsOnNextLoad,
   loadCatalog: () => searchResults.load(true),
+  cacheScope,
 })
 const lightbox = useSearchLightbox()
 const {
@@ -519,6 +619,7 @@ const {
   imageRetryCount,
   markSaved,
   markSavedKey,
+  markUnsaved,
 } = searchResults
 const {
   references,
@@ -548,6 +649,13 @@ const {
   open: openLightbox,
   close: closeLightbox,
 } = lightbox
+
+const searchResultsHeading = computed(() => {
+  if (references.value.length > 0) {
+    return 'Results for “Visual Concepts”'
+  }
+  return submittedQuery.value ? `Results for “${submittedQuery.value}”` : 'Inspiration'
+})
 
 function clearAutoOpenTimer() {
   if (!autoOpenTimer) return
@@ -643,19 +751,31 @@ async function handleTriggerBtnDrop(e: DragEvent) {
   }
 }
 
+function handleClearSearch() {
+  clearAllReferences()
+  draftQuery.value = ''
+  submittedQuery.value = ''
+  queryError.value = ''
+  if (route.query.q) {
+    void router.replace({ path: USER_SEARCH_PATH, query: {} })
+  } else {
+    void load(true)
+  }
+}
+
 async function submitQuery() {
+  clearSelection()
   const query = normalizeSearchQuery(draftQuery.value)
   if (!isSearchQueryWithinLimit(query)) {
     queryError.value = '搜索关键词不能超过 200 个字符'
     return
   }
   queryError.value = ''
-  if (references.value.length > 0 && visionState.value !== 'ready') {
+  if (references.value.length > 0) {
     await runVisionSearch()
     return
   }
-  if (references.value.length === 0) clearVisionExtraction()
-  else keepResultsOnNextLoad.value = results.value.length > 0
+  clearVisionExtraction()
   const routeQuery: Record<string, string | string[]> = query ? { q: query } : {}
   await router.replace({ path: USER_SEARCH_PATH, query: routeQuery })
 }
@@ -678,11 +798,31 @@ function queryValue() {
   return Array.isArray(value) ? String(value[0] || '') : String(value || '')
 }
 
+watch(draftQuery, (val) => {
+  if (val.trim() === '' && references.value.length === 0 && submittedQuery.value !== '') {
+    submittedQuery.value = ''
+    if (route.query.q) {
+      void router.replace({ path: USER_SEARCH_PATH, query: {} })
+    } else {
+      void load(true)
+    }
+  }
+})
+
+watch(results, () => clearSelection())
+
 watch(
   () => [route.query.q],
   async () => {
-    submittedQuery.value = normalizeSearchQuery(queryValue())
-    draftQuery.value = submittedQuery.value
+    if (references.value.length > 0) {
+      const q = normalizeSearchQuery(queryValue())
+      if (q) draftQuery.value = q
+      if (visionState.value === 'idle') await runVisionSearch()
+      return
+    }
+    const q = normalizeSearchQuery(queryValue())
+    submittedQuery.value = q
+    draftQuery.value = q
     queryError.value = ''
     await load(true)
   },
