@@ -1,20 +1,13 @@
-import { nextTick, onBeforeUnmount, onMounted, ref, type ComputedRef, type Ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, type Ref } from 'vue'
 import { lookupSavedAssetKeys, libraryAssetKey } from '../library/libraryResource'
-import { MOCK_SEARCH_RESULTS } from './mockSearchData'
 import {
   reportSearchImageFailure,
   searchInspiration,
   type SearchResult,
 } from './searchResource'
 
-export type SearchRefinementState = {
-  palette: string[]
-  atmosphereTags: string[]
-}
-
 export function useSearchResults(options: {
   submittedQuery: Ref<string>
-  refinements: ComputedRef<SearchRefinementState>
   keepResultsOnNextLoad: Ref<boolean>
 }) {
   const results = ref<SearchResult[]>([])
@@ -56,12 +49,9 @@ export function useSearchResults(options: {
         cursor: nextCursor.value || undefined,
         limit: 24,
         signal: controller?.signal,
-        palette: options.refinements.value.palette,
-        atmosphereTags: options.refinements.value.atmosphereTags,
       })
       if (generation !== loadGeneration) return
-      const incomingResults =
-        page.results.length > 0 ? page.results : !options.submittedQuery.value ? MOCK_SEARCH_RESULTS : []
+      const incomingResults = page.results
       results.value = reset ? incomingResults : [...results.value, ...page.results]
       try {
         const saved = await lookupSavedAssetKeys(
@@ -80,12 +70,7 @@ export function useSearchResults(options: {
         generation === loadGeneration &&
         !(error instanceof DOMException && error.name === 'AbortError')
       ) {
-        if (import.meta.env.DEV && results.value.length === 0 && !options.submittedQuery.value) {
-          results.value = MOCK_SEARCH_RESULTS
-          hasError.value = false
-        } else {
-          hasError.value = true
-        }
+        hasError.value = true
       }
     } finally {
       if (generation === loadGeneration) {

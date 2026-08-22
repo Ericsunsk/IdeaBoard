@@ -54,7 +54,7 @@ describe('searchResource', () => {
     expect(generated.search).not.toHaveBeenCalled()
   })
 
-  it('passes structured refinements through the feature adapter', async () => {
+  it('passes the normalized query through the feature adapter', async () => {
     generated.search.mockResolvedValue({
       code: 0,
       data: { query: 'warm cafe', results: [], has_more: false },
@@ -62,15 +62,11 @@ describe('searchResource', () => {
 
     await searchInspiration({
       query: 'warm cafe',
-      palette: ['#ff0000'],
-      atmosphereTags: ['soft light'],
     })
 
     expect(generated.search).toHaveBeenCalledWith(
       expect.objectContaining({
         q: 'warm cafe',
-        palette: ['#ff0000'],
-        atmosphere_tag: ['soft light'],
       }),
       expect.anything(),
     )

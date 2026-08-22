@@ -19,23 +19,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestNormalizeVisionExtractionBoundsAndDeduplicates(t *testing.T) {
+func TestNormalizeVisionExtractionTrimsAndBoundsQuery(t *testing.T) {
 	got, err := normalizeVisionExtraction(VisionExtraction{
-		Query:          "  warm   cafe  ",
-		Palette:        []string{"#D97706", "#d97706", "invalid", "#78350F"},
-		AtmosphereTags: []string{" Walnut Wood ", "Walnut Wood", "Studio Lighting", "Night", "Ignored"},
+		Query: "  warm   cafe  ",
 	})
 	if err != nil {
 		t.Fatalf("normalizeVisionExtraction() error = %v", err)
 	}
 	if got.Query != "warm cafe" {
 		t.Fatalf("query = %q", got.Query)
-	}
-	if len(got.Palette) != 2 || got.Palette[0] != "#d97706" || got.Palette[1] != "#78350f" {
-		t.Fatalf("palette = %#v", got.Palette)
-	}
-	if len(got.AtmosphereTags) != 3 || got.AtmosphereTags[0] != "Walnut Wood" {
-		t.Fatalf("atmosphere_tags = %#v", got.AtmosphereTags)
 	}
 }
 
@@ -150,33 +142,36 @@ func TestMultipartVisionInputReaderResolvesLibraryAssetForOwner(t *testing.T) {
 	}
 }
 
-func TestMultipartVisionProviderClientMapsRequestAndResponse(t *testing.T) {
+func TestOpenAICompatibleVisionProviderMapsRequestAndResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Header.Get("Authorization") != "Bearer secret" {
 			t.Errorf("authorization = %q", request.Header.Get("Authorization"))
 		}
-		if err := request.ParseMultipartForm(1 << 20); err != nil {
-			t.Errorf("ParseMultipartForm() error = %v", err)
+		var payload openAIChatRequest
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request: %v", err)
 		}
-		if request.FormValue("model") != "model" || request.FormValue("user_text") != "warm cafe" {
-			t.Errorf("form values = model=%q text=%q", request.FormValue("model"), request.FormValue("user_text"))
+		if payload.Model != "model" || len(payload.Messages) != 2 || len(payload.Messages[1].Content) != 2 {
+			t.Fatalf("request = %#v", payload)
 		}
-		response := VisionExtraction{Query: "warm cafe", Palette: []string{"#ffffff"}}
-		_ = json.NewEncoder(writer).Encode(response)
+		if payload.Messages[0].Role != "system" || payload.Messages[1].Role != "user" || payload.Messages[1].Content[1].Type != "image_url" || !strings.HasPrefix(payload.Messages[1].Content[1].ImageURL.URL, "data:image/png;base64,") {
+			t.Fatalf("image content = %#v", payload.Messages)
+		}
+		_ = json.NewEncoder(writer).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": "```json\n{\"query\":\"warm cafe\"}\n```"}}}})
 	}))
 	defer server.Close()
 	configureVisionTestOutbound(t, server.URL)
 
-	got, err := (multipartVisionProviderClient{}).Extract(context.Background(), VisionProviderConfig{EndpointURL: server.URL, Model: "model", APIKey: "secret"}, VisionInput{Images: []VisionImage{validVisionImage()}, UserText: "warm cafe"})
+	got, err := (openAICompatibleVisionProviderClient{}).Extract(context.Background(), VisionProviderConfig{EndpointURL: server.URL, Model: "model", APIKey: "secret"}, VisionInput{Images: []VisionImage{validVisionImage()}, UserText: "warm cafe"})
 	if err != nil {
 		t.Fatalf("Extract() error = %v", err)
 	}
-	if got.Query != "warm cafe" || len(got.Palette) != 1 {
+	if got.Query != "warm cafe" {
 		t.Fatalf("response = %#v", got)
 	}
 }
 
-func TestMultipartVisionProviderClientClassifiesProviderFailures(t *testing.T) {
+func TestOpenAICompatibleVisionProviderClassifiesProviderFailures(t *testing.T) {
 	tests := []struct {
 		name       string
 		status     int
@@ -198,7 +193,7 @@ func TestMultipartVisionProviderClientClassifiesProviderFailures(t *testing.T) {
 			defer server.Close()
 			configureVisionTestOutbound(t, server.URL)
 
-			_, err := (multipartVisionProviderClient{}).Extract(context.Background(), VisionProviderConfig{EndpointURL: server.URL, Model: "model"}, VisionInput{Images: []VisionImage{validVisionImage()}})
+			_, err := (openAICompatibleVisionProviderClient{}).Extract(context.Background(), VisionProviderConfig{EndpointURL: server.URL, Model: "model"}, VisionInput{Images: []VisionImage{validVisionImage()}})
 			if err == nil {
 				t.Fatal("Extract() error = nil")
 			}
@@ -228,18 +223,18 @@ func configureVisionTestOutbound(t *testing.T, rawURL string) {
 	t.Cleanup(restore)
 }
 
-func TestMultipartVisionProviderClientUsesConfiguredOutboundPolicy(t *testing.T) {
+func TestOpenAICompatibleVisionProviderUsesConfiguredOutboundPolicy(t *testing.T) {
 	called := false
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		called = true
 		writer.WriteHeader(http.StatusOK)
-		_, _ = writer.Write([]byte(`{"query":"ok"}`))
+		_, _ = writer.Write([]byte(`{"choices":[{"message":{"content":"{\"query\":\"ok\"}"}}]}`))
 	}))
 	defer server.Close()
 	restore := outbound.ConfigurePolicyProvider(nil)
 	defer restore()
 
-	_, err := (multipartVisionProviderClient{}).Extract(context.Background(), VisionProviderConfig{EndpointURL: server.URL, Model: "model"}, VisionInput{Images: []VisionImage{validVisionImage()}})
+	_, err := (openAICompatibleVisionProviderClient{}).Extract(context.Background(), VisionProviderConfig{EndpointURL: server.URL, Model: "model"}, VisionInput{Images: []VisionImage{validVisionImage()}})
 	if err == nil || called {
 		t.Fatalf("Extract() error = %v, called = %v; endpoint must be blocked without policy", err, called)
 	}
@@ -257,6 +252,8 @@ func TestWriteVisionErrorUsesStableMachineCodes(t *testing.T) {
 		{err: ErrVisionNotConfigured, wantStatus: http.StatusServiceUnavailable, wantCode: "vision_search_not_configured"},
 		{err: ErrVisionUnavailable, wantStatus: http.StatusServiceUnavailable, wantCode: "vision_search_unavailable"},
 		{err: ErrVisionSchema, wantStatus: http.StatusBadGateway, wantCode: "vision_search_schema_error"},
+		{err: &visionProviderError{kind: visionProviderFailureCredentials, cause: errors.New("unauthorized")}, wantStatus: http.StatusBadGateway, wantCode: "vision_search_credentials"},
+		{err: &visionProviderError{kind: visionProviderFailureNetwork, cause: errors.New("connection reset")}, wantStatus: http.StatusBadGateway, wantCode: "vision_search_network"},
 		{err: &visionProviderError{kind: visionProviderFailureTimeout, cause: context.DeadlineExceeded}, wantStatus: http.StatusGatewayTimeout, wantCode: "vision_search_timeout"},
 	}
 	for _, test := range tests {

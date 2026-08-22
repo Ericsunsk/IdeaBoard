@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"ideaboard/api/internal/library"
+	"ideaboard/api/internal/platform/outbound"
+	"ideaboard/api/internal/platform/safehttp"
 )
 
 type VisionInputReader interface {
@@ -123,6 +125,14 @@ func readLibraryVisionImage(ctx context.Context, asset library.Asset) (VisionIma
 	}
 	contentType := strings.Split(response.Header.Get("Content-Type"), ";")[0]
 	return VisionImage{Filename: "library-reference", ContentType: contentType, Data: data}, nil
+}
+
+func getVisionImage(ctx context.Context, imageURL *url.URL) (*http.Response, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, imageURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	return safehttp.DoRequestWithAllowHosts(ctx, request, visionSearchTimeout, outbound.AllowHosts(ctx)...)
 }
 
 func parseLibraryAssetIDs(rawIDs []string) ([]int64, error) {

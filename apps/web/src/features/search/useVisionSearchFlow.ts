@@ -1,13 +1,17 @@
-import { onBeforeUnmount, ref, type Ref } from 'vue'
+import { computed, onBeforeUnmount, ref, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { USER_SEARCH_PATH } from '../../shared/constants/routePaths'
 import type { LibraryAssetView } from '../library/libraryResource'
 import {
   extractVisionSearch,
   normalizeSearchQuery,
+  type SearchResult,
   type VisionReference,
 } from './searchResource'
 import { searchReferenceKey, toVisionReference } from './searchLibraryBridge'
+
+const MAX_REFERENCE_COUNT = 4
+const MAX_REFERENCE_BYTES = 10 * 1024 * 1024
 
 export function useVisionSearchFlow(options: {
   draftQuery: Ref<string>
@@ -15,24 +19,30 @@ export function useVisionSearchFlow(options: {
   queryError: Ref<string>
   keepResultsOnNextLoad: Ref<boolean>
   loadCatalog: () => Promise<void>
-  selectedPalette?: Ref<Set<string>>
-  selectedTags?: Ref<Set<string>>
 }) {
   const route = useRoute()
   const router = useRouter()
   const references = ref<VisionReference[]>([])
   const fileInput = ref<HTMLInputElement | null>(null)
-  const visionState = ref<'idle' | 'extracting' | 'ready' | 'error'>('idle')
+  const visionState = ref<'idle' | 'extracting' | 'ready'>('idle')
   const visionError = ref('')
-  const palette = ref<string[]>([])
-  const atmosphereTags = ref<string[]>([])
-  const selectedPalette = options.selectedPalette ?? ref(new Set<string>())
-  const selectedTags = options.selectedTags ?? ref(new Set<string>())
-  let refinementTimer: ReturnType<typeof setTimeout> | null = null
+  const pendingReferenceKeys = ref(new Set<string>())
+  const pendingReferenceBytes = new Map<string, number>()
+  const hasPendingReferences = computed(() => pendingReferenceKeys.value.size > 0)
+  const referenceSlotCount = computed(() => {
+    const keys = new Set(references.value.map((reference) => reference.key))
+    for (const key of pendingReferenceKeys.value) keys.add(key)
+    return keys.size
+  })
+  const canAddReference = computed(() => referenceSlotCount.value < MAX_REFERENCE_COUNT)
   let extractionController: AbortController | null = null
   let extractionGeneration = 0
 
   async function runVisionSearch() {
+    if (hasPendingReferences.value) {
+      options.queryError.value = '正在准备参考图，请稍候'
+      return
+    }
     if (references.value.length === 0) return
     extractionController?.abort()
     const controller = new AbortController()
@@ -49,10 +59,6 @@ export function useVisionSearchFlow(options: {
       if (generation !== extractionGeneration) return
       options.submittedQuery.value = extraction.query
       options.draftQuery.value = extraction.query
-      palette.value = extraction.palette ?? []
-      atmosphereTags.value = extraction.atmosphere_tags ?? []
-      selectedPalette.value = new Set(palette.value)
-      selectedTags.value = new Set(atmosphereTags.value)
       visionState.value = 'ready'
       options.keepResultsOnNextLoad.value = true
       const currentRoute = route.fullPath
@@ -60,55 +66,17 @@ export function useVisionSearchFlow(options: {
         path: USER_SEARCH_PATH,
         query: {
           q: extraction.query,
-          ...(palette.value.length ? { palette: palette.value } : {}),
-          ...(atmosphereTags.value.length ? { atmosphere_tag: atmosphereTags.value } : {}),
         },
       })
       if (generation !== extractionGeneration) return
       if (route.fullPath === currentRoute) await options.loadCatalog()
     } catch (error) {
       if (generation !== extractionGeneration || isAbortError(error)) return
-      visionState.value = 'error'
+      visionState.value = 'idle'
       visionError.value = error instanceof Error ? error.message : 'Vision Search failed'
     } finally {
       if (extractionController === controller) extractionController = null
     }
-  }
-
-  function togglePalette(color: string) {
-    const next = new Set(selectedPalette.value)
-    if (next.has(color)) next.delete(color)
-    else next.add(color)
-    selectedPalette.value = next
-    scheduleRefinementSearch({
-      palette: [...next],
-      atmosphere_tag: [...selectedTags.value],
-    })
-  }
-
-  function toggleTag(tag: string) {
-    const next = new Set(selectedTags.value)
-    if (next.has(tag)) next.delete(tag)
-    else next.add(tag)
-    selectedTags.value = next
-    scheduleRefinementSearch({
-      palette: [...selectedPalette.value],
-      atmosphere_tag: [...next],
-    })
-  }
-
-  function scheduleRefinementSearch(refinement: { palette: string[]; atmosphere_tag: string[] }) {
-    options.keepResultsOnNextLoad.value = true
-    if (refinementTimer) clearTimeout(refinementTimer)
-    refinementTimer = setTimeout(() => {
-      const query = { ...route.query } as Record<string, string | string[]>
-      if (refinement.palette.length) query.palette = refinement.palette
-      else delete query.palette
-      if (refinement.atmosphere_tag.length) query.atmosphere_tag = refinement.atmosphere_tag
-      else delete query.atmosphere_tag
-      void router.replace({ query })
-      refinementTimer = null
-    }, 180)
   }
 
   function removeReference(key: string) {
@@ -117,6 +85,10 @@ export function useVisionSearchFlow(options: {
       URL.revokeObjectURL(reference.previewUrl)
     }
     references.value = references.value.filter((item) => item.key !== key)
+    const nextPendingKeys = new Set(pendingReferenceKeys.value)
+    nextPendingKeys.delete(key)
+    pendingReferenceKeys.value = nextPendingKeys
+    pendingReferenceBytes.delete(key)
     if (references.value.length > 0) markVisionStale()
     else clearVisionExtraction()
     if (references.value.length === 0) {
@@ -127,24 +99,40 @@ export function useVisionSearchFlow(options: {
     }
   }
 
+  function clearAllReferences() {
+    for (const reference of references.value) {
+      if (reference.file && reference.previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(reference.previewUrl)
+      }
+    }
+    references.value = []
+    pendingReferenceKeys.value = new Set()
+    pendingReferenceBytes.clear()
+    clearVisionExtraction()
+    void router.replace({
+      path: USER_SEARCH_PATH,
+      query: options.draftQuery.value ? { q: normalizeSearchQuery(options.draftQuery.value) } : {},
+    })
+  }
+
   function handleFileInput(event: Event) {
     const input = event.target as HTMLInputElement
     const files = Array.from(input.files ?? [])
     input.value = ''
     if (files.length === 0) return
-    const room = 4 - references.value.length
+    const room = MAX_REFERENCE_COUNT - referenceSlotCount.value
     if (files.length > room) {
       options.queryError.value = '最多添加 4 张参考图'
       return
     }
-    let totalBytes = references.value.reduce((sum, item) => sum + (item.file?.size ?? 0), 0)
+    let totalBytes = currentReferenceBytes()
     for (const file of files) {
       if (!file.type.startsWith('image/')) {
         options.queryError.value = '仅支持图片格式'
         return
       }
       totalBytes += file.size
-      if (totalBytes > 10 * 1024 * 1024) {
+      if (totalBytes > MAX_REFERENCE_BYTES) {
         options.queryError.value = '参考图总大小不能超过 10MB'
         return
       }
@@ -166,12 +154,17 @@ export function useVisionSearchFlow(options: {
   }
 
   function handleLibraryReference(asset: LibraryAssetView) {
-    if (references.value.length >= 4) {
+    const key = searchReferenceKey(asset.provider, asset.source_id)
+    if (
+      references.value.some((reference) => reference.key === key) ||
+      pendingReferenceKeys.value.has(key)
+    ) {
+      return
+    }
+    if (!canAddReference.value) {
       options.queryError.value = '最多添加 4 张参考图'
       return
     }
-    const key = searchReferenceKey(asset.provider, asset.source_id)
-    if (references.value.some((reference) => reference.key === key)) return
     references.value = [
       ...references.value,
       toVisionReference(asset),
@@ -180,35 +173,106 @@ export function useVisionSearchFlow(options: {
     options.queryError.value = ''
   }
 
+  async function handleSearchResultReference(result: SearchResult) {
+    const key = searchReferenceKey(result.provider, result.id)
+    if (
+      references.value.some((reference) => reference.key === key) ||
+      pendingReferenceKeys.value.has(key)
+    ) {
+      return
+    }
+    if (!canAddReference.value) {
+      options.queryError.value = '最多添加 4 张参考图'
+      return
+    }
+    pendingReferenceKeys.value = new Set([...pendingReferenceKeys.value, key])
+    markVisionStale()
+    options.queryError.value = ''
+
+    try {
+      const responsePromise = fetch(result.preview_url, { cache: 'force-cache' }).catch(() => null)
+      await decodePreviewImage(result.preview_url)
+      if (!pendingReferenceKeys.value.has(key)) return
+      references.value = [
+        ...references.value,
+        {
+          previewUrl: result.preview_url,
+          key,
+        },
+      ]
+
+      const res = await responsePromise
+      if (!res) throw new Error('reference preview request failed')
+      if (!res.ok) throw new Error('reference preview request failed')
+      const blob = await res.blob()
+      const contentType = blob.type || res.headers.get('content-type')?.split(';', 1)[0] || ''
+      if (
+        !contentType.startsWith('image/') ||
+        blob.size === 0 ||
+        blob.size > MAX_REFERENCE_BYTES
+      ) {
+        throw new Error('reference preview is not a valid image')
+      }
+      if (!pendingReferenceKeys.value.has(key)) return
+      if (currentReferenceBytes() + blob.size > MAX_REFERENCE_BYTES) {
+        throw new Error('reference previews exceed the request size limit')
+      }
+      pendingReferenceBytes.set(key, blob.size)
+      const file = new File([blob], `${result.provider}-${result.id}.jpg`, {
+        type: contentType,
+      })
+      references.value = references.value.map((ref) =>
+        ref.key === key ? { ...ref, file } : ref,
+      )
+      pendingReferenceBytes.delete(key)
+    } catch {
+      const isStillSelected =
+        pendingReferenceKeys.value.has(key) ||
+        references.value.some((reference) => reference.key === key)
+      references.value = references.value.filter((ref) => ref.key !== key)
+      if (isStillSelected) options.queryError.value = '该图片无法作为搜索参考，请重试'
+    } finally {
+      pendingReferenceBytes.delete(key)
+      const nextPendingKeys = new Set(pendingReferenceKeys.value)
+      nextPendingKeys.delete(key)
+      pendingReferenceKeys.value = nextPendingKeys
+      if (!hasPendingReferences.value && options.queryError.value === '正在准备参考图，请稍候') {
+        options.queryError.value = ''
+      }
+    }
+  }
+
+  async function decodePreviewImage(src: string): Promise<void> {
+    const image = new Image()
+    image.src = src
+    if (typeof image.decode === 'function') await image.decode()
+  }
+
+  function isReferencePending(key: string): boolean {
+    return pendingReferenceKeys.value.has(key)
+  }
+
+  function currentReferenceBytes(): number {
+    const storedBytes = references.value.reduce(
+      (total, reference) => total + (reference.file?.size ?? 0),
+      0,
+    )
+    const reservedBytes = [...pendingReferenceBytes.values()].reduce(
+      (total, size) => total + size,
+      0,
+    )
+    return storedBytes + reservedBytes
+  }
+
   function clearVisionExtraction() {
     cancelVisionExtraction()
-    clearRefinementTimer()
     visionState.value = 'idle'
     visionError.value = ''
-    palette.value = []
-    atmosphereTags.value = []
-    selectedPalette.value = new Set()
-    selectedTags.value = new Set()
   }
 
   function markVisionStale() {
     clearVisionExtraction()
     options.keepResultsOnNextLoad.value = true
-    const query = { ...route.query } as Record<string, string | string[]>
-    delete query.palette
-    delete query.atmosphere_tag
-    void router.replace({ query })
-  }
-
-  function queryArrayValue(key: string): string[] {
-    const value = route.query[key]
-    return Array.isArray(value) ? value.map(String) : value ? [String(value)] : []
-  }
-
-  function clearRefinementTimer() {
-    if (!refinementTimer) return
-    clearTimeout(refinementTimer)
-    refinementTimer = null
   }
 
   function cancelVisionExtraction() {
@@ -221,13 +285,7 @@ export function useVisionSearchFlow(options: {
     return error instanceof DOMException && error.name === 'AbortError'
   }
 
-  function syncFromRoute() {
-    selectedPalette.value = new Set(queryArrayValue('palette'))
-    selectedTags.value = new Set(queryArrayValue('atmosphere_tag'))
-  }
-
   onBeforeUnmount(() => {
-    clearRefinementTimer()
     cancelVisionExtraction()
     for (const reference of references.value) {
       if (reference.file && reference.previewUrl.startsWith('blob:')) {
@@ -238,21 +296,20 @@ export function useVisionSearchFlow(options: {
 
   return {
     references,
+    hasPendingReferences,
+    referenceSlotCount,
+    canAddReference,
+    isReferencePending,
     fileInput,
     visionState,
     visionError,
-    palette,
-    atmosphereTags,
-    selectedPalette,
-    selectedTags,
     runVisionSearch,
-    togglePalette,
-    toggleTag,
     removeReference,
+    clearAllReferences,
     handleFileInput,
     openFilePicker,
     handleLibraryReference,
+    handleSearchResultReference,
     clearVisionExtraction,
-    syncFromRoute,
   }
 }

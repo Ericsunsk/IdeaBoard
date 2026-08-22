@@ -11,14 +11,4 @@ export interface VisionExtraction {
    * @maxLength 200
    */
   query: string
-  /**
-   * @maxItems 5
-   * @items.pattern ^#[0-9a-fA-F]{6}$
-   */
-  palette?: string[]
-  /**
-   * @maxItems 3
-   * @items.maxLength 48
-   */
-  atmosphere_tags?: string[]
 }

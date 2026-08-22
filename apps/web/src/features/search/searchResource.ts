@@ -28,8 +28,6 @@ export async function searchInspiration(input: {
   cursor?: string
   limit?: number
   signal?: AbortSignal
-  palette?: string[]
-  atmosphereTags?: string[]
 }): Promise<SearchPage> {
   if (input.signal?.aborted) {
     throw new DOMException('The request was aborted.', 'AbortError')
@@ -38,8 +36,6 @@ export async function searchInspiration(input: {
     query: input.query,
     cursor: input.cursor ?? '',
     limit: input.limit ?? 0,
-    palette: input.palette ?? [],
-    atmosphereTags: input.atmosphereTags ?? [],
   })
   const inFlight = inFlightRequests.get(key)
   if (inFlight?.signal?.aborted) {
@@ -53,8 +49,6 @@ export async function searchInspiration(input: {
         q: input.query || undefined,
         cursor: input.cursor,
         limit: input.limit,
-        palette: input.palette?.length ? input.palette : undefined,
-        atmosphere_tag: input.atmosphereTags?.length ? input.atmosphereTags : undefined,
       },
       { signal: input.signal },
     ),

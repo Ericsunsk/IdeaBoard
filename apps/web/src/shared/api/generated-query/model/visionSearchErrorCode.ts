@@ -15,6 +15,9 @@ export const VisionSearchErrorCode = {
   vision_search_image_invalid: 'vision_search_image_invalid',
   vision_search_image_unavailable: 'vision_search_image_unavailable',
   vision_search_timeout: 'vision_search_timeout',
+  vision_search_credentials: 'vision_search_credentials',
+  vision_search_quota: 'vision_search_quota',
+  vision_search_network: 'vision_search_network',
   vision_search_provider_error: 'vision_search_provider_error',
   vision_search_schema_error: 'vision_search_schema_error',
 } as const

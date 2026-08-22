@@ -72,22 +72,6 @@ paths:
         - name: limit
           in: query
           schema: { type: integer, minimum: 1, maximum: 48, default: 24 }
-        - name: palette
-          in: query
-          style: form
-          explode: true
-          schema:
-            type: array
-            maxItems: 5
-            items: { type: string, pattern: '^#[0-9a-fA-F]{6}$' }
-        - name: atmosphere_tag
-          in: query
-          style: form
-          explode: true
-          schema:
-            type: array
-            maxItems: 3
-            items: { type: string, maxLength: 48 }
       responses:
         '200':
           description: Curated or text inspiration results
@@ -5236,14 +5220,6 @@ components:
       required: [query]
       properties:
         query: { type: string, minLength: 1, maxLength: 200 }
-        palette:
-          type: array
-          maxItems: 5
-          items: { type: string, pattern: '^#[0-9a-fA-F]{6}$' }
-        atmosphere_tags:
-          type: array
-          maxItems: 3
-          items: { type: string, maxLength: 48 }
 
     VisionSearchError:
       type: object
@@ -5258,6 +5234,9 @@ components:
             - vision_search_image_invalid
             - vision_search_image_unavailable
             - vision_search_timeout
+            - vision_search_credentials
+            - vision_search_quota
+            - vision_search_network
             - vision_search_provider_error
             - vision_search_schema_error
         msg: { type: string }

@@ -28,107 +28,143 @@
       <div class="sticky top-16 z-30 flex flex-col items-center mb-6 pointer-events-none">
         <div class="flex w-full max-w-[720px] items-center gap-2 pointer-events-auto">
           <form
-            class="min-w-0 flex-1 rounded-full border border-board-card-border bg-board-control-bg/80 p-1.5 shadow-2xs backdrop-blur-md"
+            class="min-w-0 flex-1 rounded-full border border-board-card-border bg-board-control-bg/80 p-1.5 backdrop-blur-md"
             @submit.prevent="submitQuery"
           >
             <div class="flex items-center gap-2">
-              <Search class="ml-3 size-4 shrink-0 text-board-control-icon" aria-hidden="true" />
+              <Search
+                v-if="references.length === 0"
+                class="ml-2 size-3.5 shrink-0 text-board-control-icon"
+                aria-hidden="true"
+              />
+
+              <div v-else class="flex items-center gap-1.5 shrink-0">
+                <div
+                  v-for="reference in references"
+                  :key="reference.key"
+                  class="group/thumb relative shrink-0"
+                >
+                  <button
+                    type="button"
+                    class="grid size-8 overflow-hidden rounded-full bg-board-card-bg cursor-pointer transition-[transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-board-primary"
+                    :class="isReferencePending(reference.key) ? 'opacity-60' : ''"
+                    :title="`Remove reference (${referenceSlotCount}/4)`"
+                    :aria-label="`Remove reference ${reference.key}`"
+                    :aria-busy="isReferencePending(reference.key)"
+                    @click="removeReference(reference.key)"
+                  >
+                    <img
+                      :src="reference.previewUrl"
+                      alt="Search reference"
+                      class="size-full object-cover select-none pointer-events-none"
+                    />
+                  </button>
+
+                  <div
+                    class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-4 z-50 w-14 opacity-0 scale-95 transition-[opacity,transform] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] group-hover/thumb:opacity-100 group-hover/thumb:scale-100 origin-bottom"
+                  >
+                    <div
+                      class="size-14 shrink-0 overflow-hidden rounded-md bg-board-card-bg shadow-md"
+                    >
+                      <img
+                        :src="reference.previewUrl"
+                        alt="Reference preview"
+                        class="size-full block object-cover select-none pointer-events-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  v-if="canAddReference"
+                  type="button"
+                  class="search-reference-action"
+                  :title="`Add more references (${referenceSlotCount}/4)`"
+                  :aria-label="`Add more references (${referenceSlotCount}/4)`"
+                  @click="openFilePicker"
+                >
+                  <Plus class="size-3.5" aria-hidden="true" />
+                </button>
+              </div>
+
               <InputText
                 v-model="draftQuery"
                 unstyled
-                class="min-w-0 flex-1 bg-transparent px-2 text-[14px] text-board-control-input-text outline-none"
-                placeholder="Search inspiration..."
+                class="min-w-0 flex-1 bg-transparent px-1 text-[13.5px] text-board-control-input-text outline-none"
+                :placeholder="references.length > 0 ? 'Add keywords or prompt (optional)...' : 'Search inspiration...'"
                 aria-label="搜索灵感"
                 @input="queryError = ''"
               />
-              <button
-                type="button"
-                class="grid size-8 shrink-0 place-items-center rounded-full border border-board-card-border text-board-control-icon transition-colors hover:border-board-primary hover:bg-board-primary/10 hover:text-board-primary"
-                aria-label="Add search reference image"
-                title="Add search reference image"
-                :disabled="references.length >= 4"
-                @click="openFilePicker"
-              >
-                <Camera class="size-4" aria-hidden="true" />
-              </button>
-              <Button
-                type="submit"
-                label="Search"
-                class="!h-9 !rounded-full !border-0 !bg-board-primary !px-5 !text-sm !font-bold !text-ib-text-inverse !shadow-none hover:!bg-board-primary-hover cursor-pointer"
-              />
+
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button
+                  v-if="references.length > 0"
+                  type="button"
+                  class="search-reference-action"
+                  title="Clear all references"
+                  aria-label="Clear all references"
+                  @click="clearAllReferences"
+                >
+                  <Xmark class="size-3.5" aria-hidden="true" />
+                </button>
+                <button
+                  v-else
+                  type="button"
+                  class="h-8 px-3 rounded-full border border-board-card-border text-board-page-text-muted hover:text-board-page-text hover:border-board-primary hover:bg-board-primary/10 flex items-center gap-1.5 text-xs font-medium transition-[border-color,background-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Add search reference image"
+                  title="Add search reference image"
+                  :disabled="!canAddReference"
+                  @click="openFilePicker"
+                >
+                  <Camera class="size-3.5 text-board-primary" aria-hidden="true" />
+                  <span class="hidden sm:inline">Image</span>
+                </button>
+                <Button
+                  type="submit"
+                  label="Search"
+                  :loading="visionState === 'extracting'"
+                  :disabled="hasPendingReferences || visionState === 'extracting'"
+                  :title="
+                    hasPendingReferences
+                      ? 'Preparing references'
+                      : visionState === 'extracting'
+                        ? 'Searching'
+                        : 'Search'
+                  "
+                  class="!h-8 !min-w-[68px] !rounded-full !border-0 !bg-board-primary !px-4 !text-xs !font-bold !text-ib-text-inverse !shadow-none hover:!bg-board-primary-hover cursor-pointer disabled:!cursor-wait disabled:!opacity-60"
+                />
+              </div>
             </div>
           </form>
 
-          <!-- 🌟 核心入口：搜索栏右侧专属【My Library 个人素材库】极简纯净正圆按钮 (支持点击展开与拖拽落盘) -->
           <button
             type="button"
-            class="grid size-11 shrink-0 place-items-center rounded-full border border-board-card-border bg-board-control-bg/80 backdrop-blur-md text-board-page-text-muted transition-[transform,background-color,border-color,color,box-shadow] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-90 hover:border-board-primary hover:bg-ib-surface-hover hover:text-board-primary focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] cursor-pointer"
+            class="group grid size-11 shrink-0 place-items-center rounded-full border border-board-card-border bg-board-control-bg/80 backdrop-blur-md transition-[transform,border-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 hover:border-board-card-border-hover focus-visible:outline-none cursor-pointer"
             :class="[
-              libraryIslandOpen
-                ? '!border-board-primary !bg-board-primary/10 !text-board-primary shadow-xs'
-                : '',
-              isTriggerHoveredDuringDrag
-                ? '!scale-110 !border-board-primary !text-board-primary'
-                : '',
+              isTriggerHoveredDuringDrag ? '!scale-110 !border-board-primary' : '',
             ]"
             aria-label="Toggle My Library"
-            title="Toggle My Library / Drop here to Quick Save"
+            title="My Library / Drop here to Quick Save"
             :aria-expanded="libraryIslandOpen"
             @click="toggleLibraryIsland"
             @dragover.prevent="handleTriggerBtnDragOver"
             @dragleave="handleTriggerBtnDragLeave"
             @drop.prevent="handleTriggerBtnDrop"
           >
+            <BookmarkSolid
+              v-if="libraryIslandOpen"
+              class="size-4 text-board-primary rotate-6 scale-110 transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
+              aria-hidden="true"
+            />
             <Bookmark
-              class="size-4 transition-transform duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)]"
-              :class="{ 'scale-110 rotate-6': libraryIslandOpen }"
+              v-else
+              class="size-4 text-board-page-text-muted transition-[transform,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] group-hover:text-board-page-text group-hover:rotate-6 group-hover:scale-105"
               aria-hidden="true"
             />
           </button>
         </div>
-        <div
-          v-if="references.length > 0"
-          class="mt-2 flex w-full max-w-[720px] flex-wrap items-center gap-2 pointer-events-auto"
-        >
-          <div
-            v-for="reference in references"
-            :key="reference.key"
-            class="group relative size-12 overflow-hidden rounded-xl border border-board-card-border bg-board-card-bg"
-          >
-            <img
-              :src="reference.previewUrl"
-              alt="Search reference"
-              class="h-full w-full object-cover"
-            />
-            <button
-              type="button"
-              class="absolute right-0.5 top-0.5 grid size-5 place-items-center rounded-full bg-black/65 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-              :aria-label="`Remove reference ${reference.key}`"
-              @click="removeReference(reference.key)"
-            >
-              <Xmark class="size-3" aria-hidden="true" />
-            </button>
-          </div>
-          <button
-            v-if="references.length < 4"
-            type="button"
-            class="grid size-12 place-items-center rounded-xl border border-dashed border-board-card-border text-board-page-text-muted transition-colors hover:border-board-primary hover:text-board-primary"
-            aria-label="Add search reference image"
-            @click="openFilePicker"
-          >
-            <Plus class="size-4" aria-hidden="true" />
-          </button>
-          <input
-            ref="fileInput"
-            type="file"
-            accept="image/*"
-            multiple
-            class="hidden"
-            @change="handleFileInput"
-          />
-        </div>
+
         <input
-          v-if="references.length === 0"
           ref="fileInput"
           type="file"
           accept="image/*"
@@ -136,59 +172,7 @@
           class="hidden"
           @change="handleFileInput"
         />
-        <div
-          v-if="
-            visionState === 'extracting' ||
-            visionState === 'error' ||
-            palette.length ||
-            atmosphereTags.length
-          "
-          class="mt-2 flex min-h-10 w-full max-w-[720px] flex-wrap items-center gap-2 rounded-2xl border border-board-card-border bg-board-control-bg/80 px-3 py-2 text-xs pointer-events-auto"
-          aria-live="polite"
-        >
-          <template v-if="visionState === 'extracting'">
-            <span class="h-3 w-24 animate-pulse rounded bg-board-card-border/70"></span>
-            <span class="h-3 w-16 animate-pulse rounded bg-board-card-border/70"></span>
-          </template>
-          <template v-else-if="visionState === 'error'">
-            <span class="font-semibold text-board-danger">{{ visionError }}</span>
-            <button
-              type="button"
-              class="ml-auto font-semibold text-board-primary"
-              @click="runVisionSearch"
-            >
-              Retry
-            </button>
-          </template>
-          <template v-else>
-            <button
-              v-for="color in palette"
-              :key="color"
-              type="button"
-              class="size-5 rounded-full border-2 transition-transform"
-              :class="
-                selectedPalette.has(color) ? 'scale-110 border-board-primary' : 'border-white/80'
-              "
-              :style="{ backgroundColor: color }"
-              :aria-label="`Toggle palette ${color}`"
-              @click="togglePalette(color)"
-            ></button>
-            <button
-              v-for="tag in atmosphereTags"
-              :key="tag"
-              type="button"
-              class="rounded-full border px-2.5 py-1 transition-colors"
-              :class="
-                selectedTags.has(tag)
-                  ? 'border-board-primary bg-board-primary/10 text-board-primary'
-                  : 'border-board-card-border text-board-page-text-muted'
-              "
-              @click="toggleTag(tag)"
-            >
-              {{ tag }}
-            </button>
-          </template>
-        </div>
+
         <p
           v-if="queryError"
           class="mt-2 mb-0 text-sm font-semibold text-board-danger pointer-events-auto"
@@ -202,9 +186,6 @@
           <h2 class="m-0 text-[22px] font-semibold">
             {{ submittedQuery ? `Results for “${submittedQuery}”` : 'Inspiration' }}
           </h2>
-          <p v-if="!hasError && statusText" class="mt-1 mb-0 text-sm text-board-page-text-muted">
-            {{ statusText }}
-          </p>
           <div
             v-if="hasError && results.length > 0"
             class="mt-1 flex items-center gap-2 text-sm text-board-danger"
@@ -217,16 +198,23 @@
         </div>
       </div>
 
-      <section
+      <div
         v-if="loading && results.length === 0"
-        class="mt-6 grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-board-card-border bg-board-loading-bg/80 backdrop-blur-sm"
+        class="mt-4 transition-[column-gap] duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)]"
+        :class="[
+          libraryIslandOpen && !libraryIslandExpanded
+            ? 'columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-4 gap-3.5'
+            : 'columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-4',
+        ]"
       >
-        <ProgressSpinner
-          class="!h-9 !w-9 text-board-primary"
-          stroke-width="4"
-          aria-label="加载灵感"
-        />
-      </section>
+        <div
+          v-for="h in [260, 340, 200, 380, 280, 320, 240, 360, 300, 220]"
+          :key="h"
+          class="break-inside-avoid overflow-hidden rounded-2xl bg-board-loading-bg/80 animate-pulse border border-board-card-border/40"
+          :class="libraryIslandOpen && !libraryIslandExpanded ? 'mb-3.5' : 'mb-4'"
+          :style="{ height: `${h}px` }"
+        ></div>
+      </div>
       <section
         v-else-if="hasError && results.length === 0"
         class="mt-6 grid min-h-[280px] place-items-center rounded-2xl border border-dashed border-board-card-border bg-board-loading-bg/80 backdrop-blur-sm text-center"
@@ -295,11 +283,26 @@
               <button
                 type="button"
                 class="grid size-7 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md transition-colors hover:bg-board-primary focus-visible:outline-none cursor-pointer"
-                title="查看大图"
-                aria-label="查看大图"
-                @click.stop="openLightbox(result)"
+                :class="{
+                  '!bg-board-primary shadow-xs':
+                    references.some(
+                      (ref) => ref.key === searchReferenceKey(result.provider, result.id),
+                    ) || isReferencePending(searchReferenceKey(result.provider, result.id)),
+                }"
+                title="Use as search reference"
+                aria-label="Use as search reference"
+                :aria-busy="isReferencePending(searchReferenceKey(result.provider, result.id))"
+                @click.stop="handleSearchResultReference(result)"
               >
-                <Search class="size-3.5" aria-hidden="true" />
+                <Search
+                  class="size-3.5"
+                  :class="
+                    isReferencePending(searchReferenceKey(result.provider, result.id))
+                      ? 'animate-pulse'
+                      : ''
+                  "
+                  aria-hidden="true"
+                />
               </button>
             </div>
 
@@ -404,14 +407,14 @@
                 :href="activeResult.source_url"
                 target="_blank"
                 rel="noreferrer"
-                class="h-9 px-4 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-md border border-white/15 flex items-center gap-1.5 transition no-underline shadow-sm"
+                class="h-9 px-4 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs font-semibold backdrop-blur-md border border-white/15 flex items-center gap-1.5 transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] active:scale-95 no-underline shadow-sm cursor-pointer"
               >
                 <span>View Source</span>
               </a>
 
               <button
                 type="button"
-                class="size-9 rounded-full bg-black/40 hover:bg-white/20 text-white/80 hover:text-white backdrop-blur-xl border border-white/10 flex items-center justify-center transition shadow-md shrink-0 cursor-pointer focus-visible:outline-none"
+                class="size-9 rounded-full bg-black/40 hover:bg-white/20 text-white/80 hover:text-white backdrop-blur-xl border border-white/10 flex items-center justify-center transition-colors duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] active:scale-95 shadow-md shrink-0 cursor-pointer focus-visible:outline-none"
                 aria-label="Close preview"
                 title="Close (Esc)"
                 @click="closeLightbox"
@@ -439,12 +442,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
-import { Bookmark, Camera, Plus, Search, Xmark } from '@iconoir/vue'
+import { Bookmark, BookmarkSolid, Camera, Plus, Search, Xmark } from '@iconoir/vue'
 import StudioName from '../../../shared/components/StudioName.vue'
 import UserAccountMenu from '../../../shared/components/UserAccountMenu.vue'
 import { HOME_PATH, USER_SEARCH_PATH } from '../../../shared/constants/routePaths'
@@ -458,6 +461,7 @@ import {
   saveSearchReference,
   type LibrarySearchReference,
 } from '../../library/libraryResource'
+import { searchReferenceKey } from '../searchLibraryBridge'
 import { useUserAccountControls } from '../../user-shell/useUserAccountControls'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import {
@@ -484,18 +488,11 @@ const libraryIslandOpen = ref(false)
 const libraryIslandExpanded = ref(false)
 const libraryRefreshKey = ref(0)
 const isTriggerHoveredDuringDrag = ref(false)
-const selectedPalette = ref(new Set<string>())
-const selectedTags = ref(new Set<string>())
 const keepResultsOnNextLoad = ref(false)
 let autoOpenTimer: ReturnType<typeof setTimeout> | null = null
 
-const refinements = computed(() => ({
-  palette: [...selectedPalette.value],
-  atmosphereTags: [...selectedTags.value],
-}))
 const searchResults = useSearchResults({
   submittedQuery,
-  refinements,
   keepResultsOnNextLoad: keepResultsOnNextLoad,
 })
 const visionFlow = useVisionSearchFlow({
@@ -504,8 +501,6 @@ const visionFlow = useVisionSearchFlow({
   queryError,
   keepResultsOnNextLoad,
   loadCatalog: () => searchResults.load(true),
-  selectedPalette,
-  selectedTags,
 })
 const lightbox = useSearchLightbox()
 const {
@@ -527,34 +522,32 @@ const {
 } = searchResults
 const {
   references,
+  hasPendingReferences,
+  referenceSlotCount,
+  canAddReference,
   fileInput,
   visionState,
   visionError,
-  palette,
-  atmosphereTags,
   runVisionSearch,
-  togglePalette,
-  toggleTag,
   removeReference,
+  clearAllReferences,
   handleFileInput,
   openFilePicker,
   handleLibraryReference,
+  handleSearchResultReference,
+  isReferencePending,
   clearVisionExtraction,
 } = visionFlow
+
+watch(visionError, (message) => {
+  if (message) toast.error(message)
+})
 const {
   visible: lightboxVisible,
   activeResult,
   open: openLightbox,
   close: closeLightbox,
 } = lightbox
-
-const statusText = computed(() =>
-  loadingMore.value
-    ? '正在加载更多...'
-    : submittedQuery.value
-      ? `${results.value.length} 个结果`
-      : '',
-)
 
 function clearAutoOpenTimer() {
   if (!autoOpenTimer) return
@@ -664,10 +657,6 @@ async function submitQuery() {
   if (references.value.length === 0) clearVisionExtraction()
   else keepResultsOnNextLoad.value = results.value.length > 0
   const routeQuery: Record<string, string | string[]> = query ? { q: query } : {}
-  if (references.value.length > 0) {
-    if (selectedPalette.value.size > 0) routeQuery.palette = [...selectedPalette.value]
-    if (selectedTags.value.size > 0) routeQuery.atmosphere_tag = [...selectedTags.value]
-  }
   await router.replace({ path: USER_SEARCH_PATH, query: routeQuery })
 }
 
@@ -690,11 +679,10 @@ function queryValue() {
 }
 
 watch(
-  () => [route.query.q, route.query.palette, route.query.atmosphere_tag],
+  () => [route.query.q],
   async () => {
     submittedQuery.value = normalizeSearchQuery(queryValue())
     draftQuery.value = submittedQuery.value
-    visionFlow.syncFromRoute()
     queryError.value = ''
     await load(true)
   },
@@ -702,3 +690,36 @@ watch(
 )
 
 </script>
+
+<style scoped>
+.search-reference-action {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  cursor: pointer;
+  place-items: center;
+  border-radius: var(--radius-ib-pill);
+  background-color: var(--color-board-loading-bg);
+  color: var(--color-board-page-text-muted);
+  transition:
+    background-color var(--motion-control-duration) var(--motion-control-easing),
+    color var(--motion-control-duration) var(--motion-control-easing),
+    transform var(--motion-control-duration) var(--motion-control-easing);
+}
+
+.search-reference-action:hover {
+  background-color: var(--color-board-card-border);
+  color: var(--color-board-page-text);
+  transform: scale(1.05);
+}
+
+.search-reference-action:active {
+  transform: scale(0.95);
+}
+
+.search-reference-action:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-board-focus);
+}
+</style>

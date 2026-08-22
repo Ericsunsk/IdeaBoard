@@ -19,14 +19,4 @@ export type SearchUserInspirationParams = {
    * @maximum 48
    */
   limit?: number
-  /**
-   * @maxItems 5
-   * @items.pattern ^#[0-9a-fA-F]{6}$
-   */
-  palette?: string[]
-  /**
-   * @maxItems 3
-   * @items.maxLength 48
-   */
-  atmosphere_tag?: string[]
 }

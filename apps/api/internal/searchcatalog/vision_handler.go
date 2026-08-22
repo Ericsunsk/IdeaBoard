@@ -66,8 +66,17 @@ func writeVisionError(c *gin.Context, err error) {
 		status, code, message = http.StatusBadGateway, "vision_search_schema_error", "视觉搜索返回格式无效"
 	default:
 		var providerErr *visionProviderError
-		if errors.As(err, &providerErr) && providerErr.kind == visionProviderFailureTimeout {
-			status, code, message = http.StatusGatewayTimeout, "vision_search_timeout", "视觉搜索超时，请重试"
+		if errors.As(err, &providerErr) {
+			switch providerErr.kind {
+			case visionProviderFailureCredentials:
+				status, code, message = http.StatusBadGateway, "vision_search_credentials", "视觉搜索凭证无效"
+			case visionProviderFailureQuota:
+				status, code, message = http.StatusBadGateway, "vision_search_quota", "视觉搜索权限或配额不可用"
+			case visionProviderFailureTimeout:
+				status, code, message = http.StatusGatewayTimeout, "vision_search_timeout", "视觉搜索超时，请重试"
+			case visionProviderFailureNetwork:
+				status, code, message = http.StatusBadGateway, "vision_search_network", "视觉搜索连接失败，请重试"
+			}
 		}
 	}
 	response.MachineError(c, status, code, message)

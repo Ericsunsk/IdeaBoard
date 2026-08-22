@@ -20,7 +20,12 @@ export async function fetchSearchProviders(): Promise<SearchProviderRecord[]> {
 
 export async function saveSearchProvider(
   provider: SearchProviderKey,
-  input: { apiKey?: string; endpointUrl?: string; model?: string; enabled: boolean },
+  input: {
+    apiKey?: string
+    endpointUrl?: string
+    model?: string
+    enabled: boolean
+  },
 ): Promise<void> {
   await resolveApiOk(
     updateAdminSearchProvider(provider, {

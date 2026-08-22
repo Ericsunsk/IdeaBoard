@@ -208,7 +208,7 @@ function providerLabel(provider: SearchProviderRecord['provider']) {
 function providerHost(provider: SearchProviderRecord['provider']) {
   if (provider === 'unsplash') return 'api.unsplash.com'
   if (provider === 'pexels') return 'api.pexels.com'
-  return 'multipart Vision endpoint'
+  return 'OpenAI-compatible vision endpoint'
 }
 function statusLabel(row: SearchProviderRecord) {
   if (row.enabled) return '已启用'

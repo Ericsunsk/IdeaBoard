@@ -1,9 +1,13 @@
 package searchcatalog
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"strings"
 	"time"
 
@@ -26,9 +30,7 @@ var (
 )
 
 type VisionExtraction struct {
-	Query          string   `json:"query"`
-	Palette        []string `json:"palette,omitempty"`
-	AtmosphereTags []string `json:"atmosphere_tags,omitempty"`
+	Query string `json:"query"`
 }
 
 type VisionImage struct {
@@ -57,7 +59,13 @@ type VisionSearchService struct {
 }
 
 func NewVisionSearchService(config VisionConfigReader, metrics SearchMetrics) *VisionSearchService {
-	return newVisionSearchService(config, multipartVisionProviderClient{}, metrics)
+	return newVisionSearchService(config, openAICompatibleVisionProviderClient{}, metrics)
+}
+
+type openAICompatibleVisionProviderClient struct{}
+
+func (openAICompatibleVisionProviderClient) Extract(ctx context.Context, config VisionProviderConfig, input VisionInput) (VisionExtraction, error) {
+	return extractOpenAICompatibleVision(ctx, config, input)
 }
 
 func newVisionSearchService(config VisionConfigReader, client VisionProviderClient, metrics SearchMetrics) *VisionSearchService {
@@ -125,40 +133,18 @@ func normalizeVisionExtraction(value VisionExtraction) (VisionExtraction, error)
 	if value.Query == "" || utf8RuneCount(value.Query) > MaxSearchQueryRunes {
 		return VisionExtraction{}, ErrVisionSchema
 	}
-	value.Palette = normalizePalette(value.Palette)
-	value.AtmosphereTags = normalizeAtmosphereTags(value.AtmosphereTags)
 	return value, nil
 }
 
 func utf8RuneCount(value string) int { return len([]rune(value)) }
 
-func normalizeUnique(values []string, limit int, normalize func(string) (string, bool)) []string {
-	result := make([]string, 0, limit)
-	seen := make(map[string]struct{}, len(values))
-	for _, value := range values {
-		normalized, ok := normalize(value)
-		if !ok {
-			continue
-		}
-		if _, exists := seen[normalized]; exists {
-			continue
-		}
-		seen[normalized] = struct{}{}
-		result = append(result, normalized)
-		if len(result) == limit {
-			break
-		}
-	}
-	return result
-}
-
 func testVisionProvider(ctx context.Context, endpoint, model, apiKey string) (FailureCategory, string, error) {
-	fixture := VisionImage{
-		Filename:    "fixture.png",
-		ContentType: "image/png",
-		Data:        []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x08, 0xd7, 0x63, 0xf8, 0xcf, 0xc0, 0xf0, 0x1f, 0x00, 0x05, 0x00, 0x01, 0xff, 0x89, 0x99, 0x3d, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82},
+	fixture, err := visionTestFixture()
+	if err != nil {
+		return FailureUnknown, "Vision Search 连接失败", err
 	}
-	extraction, err := (multipartVisionProviderClient{}).Extract(ctx, VisionProviderConfig{EndpointURL: endpoint, Model: model, APIKey: apiKey}, VisionInput{Images: []VisionImage{fixture}, UserText: "minimal studio still life"})
+	config := VisionProviderConfig{EndpointURL: endpoint, Model: model, APIKey: apiKey}
+	extraction, err := openAICompatibleVisionProviderClient{}.Extract(ctx, config, VisionInput{Images: []VisionImage{fixture}, UserText: "geometric color study"})
 	if err != nil {
 		category := classifyVisionProviderFailure(err)
 		return category, visionProviderTestFailureMessage(category), err
@@ -167,6 +153,21 @@ func testVisionProvider(ctx context.Context, endpoint, model, apiKey string) (Fa
 		return FailureResponse, "Vision Search 返回格式无效", err
 	}
 	return "", "连接测试通过", nil
+}
+
+func visionTestFixture() (VisionImage, error) {
+	canvas := image.NewRGBA(image.Rect(0, 0, 64, 64))
+	for y := 0; y < 64; y++ {
+		for x := 0; x < 64; x++ {
+			shade := uint8(72 + (x+y)/2)
+			canvas.SetRGBA(x, y, color.RGBA{R: shade, G: 112, B: 168, A: 255})
+		}
+	}
+	var data bytes.Buffer
+	if err := png.Encode(&data, canvas); err != nil {
+		return VisionImage{}, fmt.Errorf("encode vision test fixture: %w", err)
+	}
+	return VisionImage{Filename: "fixture.png", ContentType: "image/png", Data: data.Bytes()}, nil
 }
 
 func visionProviderTestFailureMessage(category FailureCategory) string {
