@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { USER_SEARCH_PATH } from '../../shared/constants/routePaths'
 import { useAppToast } from '../../shared/composables/useAppToast'
@@ -20,7 +20,9 @@ import { useSearchLightbox } from './useSearchLightbox'
 import { useSearchResults } from './useSearchResults'
 import { useVisionSearchFlow } from './useVisionSearchFlow'
 
-export function useSearchSession(options: { cacheScope?: string } = {}) {
+export function useSearchSession(
+  options: { cacheScope?: string; scrollContainer?: Ref<HTMLElement | null> } = {},
+) {
   const route = useRoute()
   const router = useRouter()
   const toast = useAppToast()
@@ -33,6 +35,7 @@ export function useSearchSession(options: { cacheScope?: string } = {}) {
     submittedQuery,
     keepResultsOnNextLoad,
     cacheScope,
+    scrollContainer: options.scrollContainer,
   })
   const vision = useVisionSearchFlow({
     draftQuery,

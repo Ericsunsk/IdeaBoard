@@ -1,5 +1,6 @@
 <template>
   <div
+    ref="pageScrollRef"
     class="app-scrollbar relative h-full w-full overflow-y-auto overflow-x-hidden bg-board-page px-[var(--spacing-ib-page-chrome-inset)] pt-[var(--spacing-ib-page-chrome-inset)] pb-16 text-board-page-text"
   >
     <div class="ib-board-page-background ib-page-dot-bg"></div>
@@ -235,133 +236,135 @@
         <p class="m-0 text-sm text-board-page-text-muted">没有找到匹配的灵感</p>
       </section>
 
-      <!-- 🌟 瀑布流容器 (纯 Tailwind CSS 响应式流式列排布：呼出浮岛自适应 4 列 / 全屏 5 列) -->
-      <div
+      <!-- Virtualized responsive Masonry result viewport -->
+      <SearchResultViewport
         v-else
-        class="mt-4 transition-[column-gap] duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)]"
-        :class="[
-          libraryIslandOpen && !libraryIslandExpanded
-            ? 'columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-4 gap-3.5'
-            : 'columns-1 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-4',
-        ]"
+        :items="results"
+        :compact="libraryIslandOpen && !libraryIslandExpanded"
+        :scroll-root="pageScrollRef"
+        class="mt-4"
       >
-        <article
-          v-for="(result, index) in results"
-          :key="`${result.provider}:${result.id}`"
-          draggable="true"
-          class="group relative break-inside-avoid overflow-hidden rounded-2xl bg-board-control-bg/80 backdrop-blur-md shadow-xs transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-[var(--shadow-ib-panel)] cursor-grab active:cursor-grabbing select-none"
-          :class="libraryIslandOpen && !libraryIslandExpanded ? 'mb-3.5' : 'mb-4'"
-          @dragstart="handleCardDragStart($event, result)"
-          @dragend="handleCardDragEnd"
-        >
-          <button
-            type="button"
-            class="block w-full cursor-zoom-in text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-board-primary"
-            :aria-label="`查看 ${result.title || '灵感图片'}`"
-            @click="openLightbox(result)"
+        <template #default="{ item: result, index, style }">
+          <article
+            :key="`${result.provider}:${result.id}`"
+            :style="style"
+            draggable="true"
+            class="group relative overflow-hidden rounded-2xl bg-board-control-bg/80 backdrop-blur-md shadow-xs transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-[var(--shadow-ib-panel)] cursor-grab active:cursor-grabbing select-none"
+            @dragstart="handleCardDragStart($event, result)"
+            @dragend="handleCardDragEnd"
           >
-            <div
-              class="relative overflow-hidden bg-board-loading-bg backdrop-blur-md"
-              :style="{ aspectRatio: `${result.width} / ${result.height}` }"
+            <button
+              type="button"
+              class="block w-full cursor-zoom-in text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-board-primary"
+              :aria-label="`查看 ${result.title || '灵感图片'}`"
+              @click="openLightbox(result)"
             >
-              <img
-                :key="`${result.provider}:${result.id}:${imageRetryCount(result.id)}`"
-                :src="result.preview_url"
-                :alt="result.title || '灵感图片'"
-                :loading="index < 8 ? 'eager' : 'lazy'"
-                class="block h-full w-full object-cover select-none pointer-events-none"
-                @error="markImageError(result.id)"
-              />
-            </div>
-          </button>
-
-          <!-- 🌟 Hover 渐变半透操作浮层 (顶栏左上角多选对勾 + 右上角搜图 + 底栏标题/作者 + 存入个人素材库) -->
-          <div
-            class="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between p-3.5 transition-opacity duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] bg-gradient-to-t from-black/80 via-transparent to-black/20 group-hover:opacity-100"
-            :class="isResultSelected(result) ? 'opacity-100' : 'opacity-0'"
-          >
-            <!-- 顶栏：左上角极简多选对勾 + 右上角搜图参考圆纽 (严格统一在同一水平基准线) -->
-            <div class="pointer-events-auto flex items-center justify-between">
-              <!-- 左上角极简多选微圆对勾 (强制 28x28 正圆) -->
-              <button
-                type="button"
-                class="grid size-7 place-items-center rounded-full transition-colors duration-[var(--motion-control-duration)] cursor-pointer focus-visible:outline-none"
-                :class="
-                  isResultSelected(result)
-                    ? '!bg-board-primary text-ib-text-inverse shadow-xs'
-                    : 'bg-black/40 text-white/80 hover:bg-black/60 hover:text-white backdrop-blur-md'
-                "
-                :title="isResultSelected(result) ? 'Deselect image' : 'Select image'"
-                :aria-label="isResultSelected(result) ? 'Deselect image' : 'Select image'"
-                @click.stop="toggleBatchSelect(result)"
+              <div
+                class="relative overflow-hidden bg-board-loading-bg backdrop-blur-md"
+                :style="{ aspectRatio: `${result.width} / ${result.height}` }"
               >
-                <Check class="size-3.5 stroke-[2.5]" aria-hidden="true" />
-              </button>
-
-              <!-- 右上角以图搜图参考圆纽 (强制 28x28 正圆) -->
-              <button
-                type="button"
-                class="grid size-7 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md transition-colors hover:bg-board-primary focus-visible:outline-none cursor-pointer"
-                :class="{
-                  '!bg-board-primary shadow-xs':
-                    references.some(
-                      (ref) => ref.key === searchReferenceKey(result.provider, result.id),
-                    ) || isReferencePending(searchReferenceKey(result.provider, result.id)),
-                }"
-                title="Use as search reference"
-                aria-label="Use as search reference"
-                :aria-busy="isReferencePending(searchReferenceKey(result.provider, result.id))"
-                @click.stop="handleSearchResultReference(result)"
-              >
-                <Search
-                  class="size-3.5"
-                  :class="
-                    isReferencePending(searchReferenceKey(result.provider, result.id))
-                      ? 'animate-pulse'
-                      : ''
-                  "
-                  aria-hidden="true"
+                <img
+                  :key="`${result.provider}:${result.id}:${imageRetryCount(result.id)}`"
+                  :src="result.preview_url || result.thumbnail_url"
+                  :srcset="`${result.thumbnail_url} 400w, ${result.preview_url} 1200w`"
+                  sizes="(min-width: 1280px) 20vw, (min-width: 1024px) 25vw, (min-width: 640px) 33vw, 100vw"
+                  :alt="result.title || '灵感图片'"
+                  :loading="index < 4 ? 'eager' : 'lazy'"
+                  :fetchpriority="index < 2 ? 'high' : 'auto'"
+                  class="block h-full w-full object-cover select-none pointer-events-none"
+                  @error="markImageError(result.id)"
                 />
-              </button>
-            </div>
+              </div>
+            </button>
 
-            <!-- 底部信息与存入素材库按钮 -->
-            <div class="pointer-events-auto flex items-end justify-between gap-3">
-              <div class="min-w-0 flex-1">
-                <p class="m-0 truncate text-xs font-medium text-white leading-tight">
-                  {{ result.title || 'Untitled reference' }}
-                </p>
-                <p class="mt-1 mb-0 truncate text-[11px] text-white/70 leading-tight">
-                  by {{ result.author }} · {{ result.provider }}
-                </p>
+            <!-- 🌟 Hover 渐变半透操作浮层 (顶栏左上角多选对勾 + 右上角搜图 + 底栏标题/作者 + 存入个人素材库) -->
+            <div
+              class="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between p-3.5 transition-opacity duration-[var(--motion-feedback-duration)] ease-[var(--motion-feedback-easing)] bg-gradient-to-t from-black/80 via-transparent to-black/20 group-hover:opacity-100"
+              :class="isResultSelected(result) ? 'opacity-100' : 'opacity-0'"
+            >
+              <!-- 顶栏：左上角极简多选对勾 + 右上角搜图参考圆纽 (严格统一在同一水平基准线) -->
+              <div class="pointer-events-auto flex items-center justify-between">
+                <!-- 左上角极简多选微圆对勾 (强制 28x28 正圆) -->
+                <button
+                  type="button"
+                  class="grid size-7 place-items-center rounded-full transition-colors duration-[var(--motion-control-duration)] cursor-pointer focus-visible:outline-none"
+                  :class="
+                    isResultSelected(result)
+                      ? '!bg-board-primary text-ib-text-inverse shadow-xs'
+                      : 'bg-black/40 text-white/80 hover:bg-black/60 hover:text-white backdrop-blur-md'
+                  "
+                  :title="isResultSelected(result) ? 'Deselect image' : 'Select image'"
+                  :aria-label="isResultSelected(result) ? 'Deselect image' : 'Select image'"
+                  @click.stop="toggleBatchSelect(result)"
+                >
+                  <Check class="size-3.5 stroke-[2.5]" aria-hidden="true" />
+                </button>
+
+                <!-- 右上角以图搜图参考圆纽 (强制 28x28 正圆) -->
+                <button
+                  type="button"
+                  class="grid size-7 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md transition-colors hover:bg-board-primary focus-visible:outline-none cursor-pointer"
+                  :class="{
+                    '!bg-board-primary shadow-xs':
+                      references.some(
+                        (ref) => ref.key === searchReferenceKey(result.provider, result.id),
+                      ) || isReferencePending(searchReferenceKey(result.provider, result.id)),
+                  }"
+                  title="Use as search reference"
+                  aria-label="Use as search reference"
+                  :aria-busy="isReferencePending(searchReferenceKey(result.provider, result.id))"
+                  @click.stop="handleSearchResultReference(result)"
+                >
+                  <Search
+                    class="size-3.5"
+                    :class="
+                      isReferencePending(searchReferenceKey(result.provider, result.id))
+                        ? 'animate-pulse'
+                        : ''
+                    "
+                    aria-hidden="true"
+                  />
+                </button>
               </div>
 
-              <!-- 存入个人素材库触发器 (SearchSavePopover) -->
-              <SearchSavePopover
-                :result="result"
-                :saved="savedKeys.has(libraryAssetKey(result.provider, result.id))"
-                @saved="markResultSaved(result)"
-                @unsaved="markResultUnsaved(result)"
+              <!-- 底部信息与存入素材库按钮 -->
+              <div class="pointer-events-auto flex items-end justify-between gap-3">
+                <div class="min-w-0 flex-1">
+                  <p class="m-0 truncate text-xs font-medium text-white leading-tight">
+                    {{ result.title || 'Untitled reference' }}
+                  </p>
+                  <p class="mt-1 mb-0 truncate text-[11px] text-white/70 leading-tight">
+                    by {{ result.author }} · {{ result.provider }}
+                  </p>
+                </div>
+
+                <!-- 存入个人素材库触发器 (SearchSavePopover) -->
+                <SearchSavePopover
+                  :result="result"
+                  :saved="savedKeys.has(libraryAssetKey(result.provider, result.id))"
+                  @saved="markResultSaved(result)"
+                  @unsaved="markResultUnsaved(result)"
+                />
+              </div>
+            </div>
+
+            <div
+              v-if="failedImages.has(result.id)"
+              class="grid place-items-center gap-2 bg-board-loading-bg px-4 py-5 text-center"
+            >
+              <span class="text-xs font-semibold text-board-page-text-muted">图片暂时无法加载</span>
+              <Button
+                label="重试"
+                size="small"
+                severity="secondary"
+                outlined
+                class="!rounded-full"
+                @click="retryImage(result.id)"
               />
             </div>
-          </div>
-
-          <div
-            v-if="failedImages.has(result.id)"
-            class="grid place-items-center gap-2 bg-board-loading-bg px-4 py-5 text-center"
-          >
-            <span class="text-xs font-semibold text-board-page-text-muted">图片暂时无法加载</span>
-            <Button
-              label="重试"
-              size="small"
-              severity="secondary"
-              outlined
-              class="!rounded-full"
-              @click="retryImage(result.id)"
-            />
-          </div>
-        </article>
-      </div>
+          </article>
+        </template>
+      </SearchResultViewport>
 
       <div ref="sentinel" class="h-10" aria-hidden="true"></div>
       <div v-if="loadingMore" class="flex justify-center py-5">
@@ -484,6 +487,7 @@ import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect
 import UserWorkspaceNavigation from '../../user-shell/components/UserWorkspaceNavigation.vue'
 import SearchSavePopover from '../components/SearchSavePopover.vue'
 import SearchBatchActionDock from '../components/SearchBatchActionDock.vue'
+import SearchResultViewport from '../components/SearchResultViewport.vue'
 import LibraryFloatingIsland from '../../library/components/LibraryFloatingIsland.vue'
 import { libraryAssetKey } from '../../library/libraryResource'
 import { writeSearchReferenceTransfer, readSearchReferenceTransfer } from '../../library/libraryTransfer'
@@ -500,9 +504,10 @@ const accountControls = useUserAccountControls({
 })
 const cacheScope = userStore.user?.public_id ?? 'anonymous'
 const isTriggerHoveredDuringDrag = ref(false)
+const pageScrollRef = ref<HTMLElement | null>(null)
 let autoOpenTimer: ReturnType<typeof setTimeout> | null = null
 
-const searchSession = useSearchSession({ cacheScope })
+const searchSession = useSearchSession({ cacheScope, scrollContainer: pageScrollRef })
 const { draftQuery, queryError, heading: searchResultsHeading } = searchSession.query
 const searchResults = searchSession.feed
 const visionFlow = searchSession.vision

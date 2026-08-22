@@ -35,8 +35,8 @@ describe('searchCache', () => {
       results: [mockResult],
       nextCursor: 'cursor-123',
       hasMore: true,
-      scrollY: 350,
     })
+    updateFeedScrollPosition(350, 'anonymous', 'cyberpunk')
 
     const cached = getSearchFeedCache('cyberpunk')
     expect(cached).not.toBeNull()
@@ -55,12 +55,26 @@ describe('searchCache', () => {
       results: [],
       nextCursor: '',
       hasMore: false,
-      scrollY: 0,
     })
 
-    updateFeedScrollPosition(820)
+    updateFeedScrollPosition(820, 'anonymous', 'architecture')
     const cached = getSearchFeedCache('architecture')
     expect(cached?.scrollY).toBe(820)
+  })
+
+  it('clears query-scoped scroll positions with the feed cache', () => {
+    setSearchFeedCache({
+      query: 'design',
+      results: [],
+      nextCursor: '',
+      hasMore: false,
+      scope: 'user-a',
+    })
+    updateFeedScrollPosition(480, 'user-a', 'design')
+
+    clearSearchFeedCache('user-a')
+
+    expect(getSearchFeedCache('design', false, 'user-a')).toBeNull()
   })
 
   it('clears feed cache', () => {

@@ -1,6 +1,7 @@
 import type { SearchResult, VisionReference } from './searchResource'
 
 const FEED_CACHE_KEY = 'ideaboard:search:feed_cache'
+const FEED_SCROLL_KEY = 'ideaboard:search:feed_scroll'
 const ISLAND_STATE_KEY = 'ideaboard:search:island_state'
 const VISION_REF_CACHE_KEY = 'ideaboard:search:vision_refs'
 const MAX_CACHE_AGE_MS = 30 * 60 * 1000 // 30 minutes
@@ -13,6 +14,8 @@ export interface SearchFeedCache {
   scrollY: number
   timestamp: number
 }
+
+type PersistedSearchFeedCache = Omit<SearchFeedCache, 'scrollY'>
 
 export interface CachedVisionReference {
   key: string
@@ -34,6 +37,10 @@ function safeGetStorage(): Storage | null {
 
 function scopedKey(key: string, scope: string): string {
   return `${key}:${scope || 'anonymous'}`
+}
+
+function scrollKey(scope: string, query: string): string {
+  return `${scopedKey(FEED_SCROLL_KEY, scope)}:${encodeURIComponent(query)}`
 }
 
 export function isBrowserReload(): boolean {
@@ -59,19 +66,23 @@ export function getSearchFeedCache(
   try {
     // If empty query AND user explicitly refreshed the page in browser, bypass cache to fetch fresh inspirations
     if (query === '' && allowReloadBypass && isBrowserReload()) {
-      storage.removeItem(scopedKey(FEED_CACHE_KEY, scope))
+      clearSearchFeedCache(scope)
       return null
     }
 
     const raw = storage.getItem(scopedKey(FEED_CACHE_KEY, scope))
     if (!raw) return null
-    const cache = JSON.parse(raw) as SearchFeedCache
+    const cache = JSON.parse(raw) as PersistedSearchFeedCache
     if (cache.query !== query) return null
     if (Date.now() - cache.timestamp > MAX_CACHE_AGE_MS) {
       storage.removeItem(scopedKey(FEED_CACHE_KEY, scope))
       return null
     }
-    return cache
+    const scrollPosition = Number(storage.getItem(scrollKey(scope, query)))
+    return {
+      ...cache,
+      scrollY: Number.isFinite(scrollPosition) && scrollPosition >= 0 ? scrollPosition : 0,
+    }
   } catch {
     return null
   }
@@ -82,20 +93,17 @@ export function setSearchFeedCache(data: {
   results: SearchResult[]
   nextCursor: string
   hasMore: boolean
-  scrollY?: number
   scope?: string
 }): void {
   const storage = safeGetStorage()
   if (!storage) return
   try {
     const scope = data.scope ?? 'anonymous'
-    const prev = getSearchFeedCache(data.query, true, scope)
-    const payload: SearchFeedCache = {
+    const payload = {
       query: data.query,
       results: data.results,
       nextCursor: data.nextCursor,
       hasMore: data.hasMore,
-      scrollY: data.scrollY ?? prev?.scrollY ?? (typeof window !== 'undefined' ? window.scrollY : 0),
       timestamp: Date.now(),
     }
     storage.setItem(scopedKey(FEED_CACHE_KEY, scope), JSON.stringify(payload))
@@ -104,16 +112,12 @@ export function setSearchFeedCache(data: {
   }
 }
 
-export function updateFeedScrollPosition(scrollY: number, scope = 'anonymous'): void {
+export function updateFeedScrollPosition(scrollY: number, scope = 'anonymous', query = ''): void {
   const storage = safeGetStorage()
   if (!storage) return
   try {
-    const key = scopedKey(FEED_CACHE_KEY, scope)
-    const raw = storage.getItem(key)
-    if (!raw) return
-    const cache = JSON.parse(raw) as SearchFeedCache
-    cache.scrollY = scrollY
-    storage.setItem(key, JSON.stringify(cache))
+    if (!Number.isFinite(scrollY) || scrollY < 0) return
+    storage.setItem(scrollKey(scope, query), String(Math.round(scrollY)))
   } catch {
     // ignore
   }
@@ -124,6 +128,13 @@ export function clearSearchFeedCache(scope = 'anonymous'): void {
   if (!storage) return
   try {
     storage.removeItem(scopedKey(FEED_CACHE_KEY, scope))
+    const scrollPrefix = `${scopedKey(FEED_SCROLL_KEY, scope)}:`
+    for (let index = storage.length - 1; index >= 0; index -= 1) {
+      const key = storage.key(index)
+      if (key?.startsWith(scrollPrefix)) {
+        storage.removeItem(key)
+      }
+    }
   } catch {
     // ignore
   }

@@ -46,6 +46,7 @@ export function createInspirationFeed(
     submittedQuery: Ref<string>
     keepResultsOnNextLoad: Ref<boolean>
     cacheScope?: string
+    scrollContainer?: Ref<HTMLElement | null>
   },
   overrides: Partial<InspirationFeedDependencies> = {},
 ) {
@@ -79,7 +80,16 @@ export function createInspirationFeed(
     nextCursor.value = cache.nextCursor
     hasMore.value = cache.hasMore
     loading.value = false
-    if (cache.scrollY > 0) void nextTick(() => dependencies.restoreScroll(cache.scrollY))
+    if (cache.scrollY > 0) {
+      void nextTick(() => {
+        const root = options.scrollContainer?.value
+        if (root) {
+          root.scrollTo({ top: cache.scrollY, behavior: 'instant' })
+          return
+        }
+        dependencies.restoreScroll(cache.scrollY)
+      })
+    }
   }
 
   async function load(reset: boolean): Promise<void> {

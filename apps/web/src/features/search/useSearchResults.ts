@@ -7,6 +7,7 @@ export function useSearchResults(options: {
   submittedQuery: Ref<string>
   keepResultsOnNextLoad: Ref<boolean>
   cacheScope?: string
+  scrollContainer?: Ref<HTMLElement | null>
 }) {
   const feed = createInspirationFeed(options)
   const sentinel = ref<HTMLElement>()
@@ -14,6 +15,7 @@ export function useSearchResults(options: {
   const imageRetryCounts = ref(new Map<string, number>())
   let observer: IntersectionObserver | null = null
   const cacheScope = options.cacheScope ?? 'anonymous'
+  const scrollContainer = options.scrollContainer
 
   async function load(reset: boolean) {
     if (reset) {
@@ -50,31 +52,34 @@ export function useSearchResults(options: {
   }
 
   let scrollTimeout: ReturnType<typeof setTimeout> | null = null
+  let pendingScrollTop = 0
   const handleScroll = (e?: Event) => {
     if (scrollTimeout) return
+    const target = (e?.target as HTMLElement | null) ?? scrollContainer?.value
+    pendingScrollTop = target?.scrollTop ?? window.scrollY
     scrollTimeout = setTimeout(() => {
       scrollTimeout = null
       if (typeof window !== 'undefined') {
-        const target = e?.target as HTMLElement | null
-        const top =
-          target && target.scrollTop !== undefined
-            ? target.scrollTop
-            : (window.scrollY || document.documentElement.scrollTop || 0)
-        updateFeedScrollPosition(top, cacheScope)
+        updateFeedScrollPosition(
+          pendingScrollTop,
+          cacheScope,
+          options.submittedQuery.value,
+        )
       }
     }, 150)
   }
 
   onMounted(async () => {
     await nextTick()
-    if (typeof window !== 'undefined') {
-      window.addEventListener('scroll', handleScroll, { capture: true, passive: true })
-    }
+    const target = scrollContainer?.value
+    if (target) target.addEventListener('scroll', handleScroll, { passive: true })
+    else if (typeof window !== 'undefined')
+      window.addEventListener('scroll', handleScroll, { passive: true })
     observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) void feed.load(false)
       },
-      { rootMargin: '640px' },
+      { root: target ?? null, rootMargin: '640px' },
     )
     if (sentinel.value) observer.observe(sentinel.value)
   })
@@ -82,9 +87,8 @@ export function useSearchResults(options: {
   onBeforeUnmount(() => {
     feed.dispose()
     observer?.disconnect()
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('scroll', handleScroll, { capture: true } as EventListenerOptions)
-    }
+    if (scrollContainer?.value) scrollContainer.value.removeEventListener('scroll', handleScroll)
+    else if (typeof window !== 'undefined') window.removeEventListener('scroll', handleScroll)
     if (scrollTimeout) clearTimeout(scrollTimeout)
   })
 
