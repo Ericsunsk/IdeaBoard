@@ -263,6 +263,48 @@ describe('useVisionSearchFlow', () => {
     expect(queryError.value).toBe('')
   })
 
+  it('does not materialize a remote reference after it is removed while pending', async () => {
+    let resolveFetch!: (value: {
+      ok: boolean
+      headers: { get: () => string }
+      blob: () => Promise<Blob>
+    }) => void
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise((resolve) => {
+            resolveFetch = resolve
+          }),
+      ),
+    )
+    const flow = useVisionSearchFlow({
+      draftQuery: ref('cafe'),
+      submittedQuery: ref(''),
+      queryError: ref(''),
+      keepResultsOnNextLoad: ref(false),
+      loadCatalog: vi.fn(async () => undefined),
+    })
+
+    const pending = flow.handleSearchResultReference({
+      provider: 'unsplash',
+      id: 'photo-cancelled',
+      preview_url: 'https://images.unsplash.com/photo-cancelled',
+    } as never)
+    await vi.waitFor(() => expect(flow.hasPendingReferences.value).toBe(true))
+
+    flow.removeReference('unsplash:photo-cancelled')
+    resolveFetch({
+      ok: true,
+      headers: { get: () => 'image/jpeg' },
+      blob: async () => new Blob(['image'], { type: 'image/jpeg' }),
+    })
+    await pending
+
+    expect(flow.references.value).toHaveLength(0)
+    expect(flow.hasPendingReferences.value).toBe(false)
+  })
+
   it('counts pending and visible references as the same slots', async () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise(() => undefined)))
     const queryError = ref('')

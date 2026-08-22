@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import { onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { USER_SEARCH_PATH } from '../../shared/constants/routePaths'
 import { useAppToast } from '../../shared/composables/useAppToast'
@@ -7,7 +7,6 @@ import {
   extractVisionSearch,
   normalizeSearchQuery,
   type SearchResult,
-  type VisionReference,
 } from './searchResource'
 import { searchReferenceKey, toVisionReference } from './searchLibraryBridge'
 import {
@@ -15,9 +14,7 @@ import {
   getCachedVisionReferences,
   setCachedVisionReferences,
 } from './searchCache'
-
-const MAX_REFERENCE_COUNT = 4
-const MAX_REFERENCE_BYTES = 10 * 1024 * 1024
+import { createVisionReferenceCollection, MAX_REFERENCE_BYTES, MAX_REFERENCE_COUNT } from './visionReferenceCollection'
 
 export function useVisionSearchFlow(options: {
   draftQuery: Ref<string>
@@ -31,25 +28,20 @@ export function useVisionSearchFlow(options: {
   const toast = useAppToast()
   const cacheScope = options.cacheScope ?? 'anonymous'
   const cachedRefs = getCachedVisionReferences(cacheScope)
-  const references = ref<VisionReference[]>(
+  const collection = createVisionReferenceCollection(
     cachedRefs.map((cached) => ({
       key: cached.key,
       previewUrl: cached.previewUrl,
       libraryAssetID: cached.libraryAssetID,
     })),
   )
+  const { references } = collection
   const fileInput = ref<HTMLInputElement | null>(null)
   const visionState = ref<'idle' | 'extracting' | 'ready'>('idle')
   const visionError = ref('')
-  const pendingReferenceKeys = ref(new Set<string>())
-  const pendingReferenceBytes = new Map<string, number>()
-  const hasPendingReferences = computed(() => pendingReferenceKeys.value.size > 0)
-  const referenceSlotCount = computed(() => {
-    const keys = new Set(references.value.map((reference) => reference.key))
-    for (const key of pendingReferenceKeys.value) keys.add(key)
-    return keys.size
-  })
-  const canAddReference = computed(() => referenceSlotCount.value < MAX_REFERENCE_COUNT)
+  const hasPendingReferences = collection.hasPending
+  const referenceSlotCount = collection.slotCount
+  const canAddReference = collection.canAdd
   let extractionController: AbortController | null = null
   let extractionGeneration = 0
 
@@ -86,15 +78,7 @@ export function useVisionSearchFlow(options: {
   }
 
   function removeReference(key: string) {
-    const reference = references.value.find((item) => item.key === key)
-    if (reference?.file && reference.previewUrl.startsWith('blob:')) {
-      URL.revokeObjectURL(reference.previewUrl)
-    }
-    references.value = references.value.filter((item) => item.key !== key)
-    const nextPendingKeys = new Set(pendingReferenceKeys.value)
-    nextPendingKeys.delete(key)
-    pendingReferenceKeys.value = nextPendingKeys
-    pendingReferenceBytes.delete(key)
+    collection.remove(key)
     if (references.value.length > 0) {
       markVisionStale()
     } else {
@@ -108,14 +92,7 @@ export function useVisionSearchFlow(options: {
   }
 
   function clearAllReferences() {
-    for (const reference of references.value) {
-      if (reference.file && reference.previewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(reference.previewUrl)
-      }
-    }
-    references.value = []
-    pendingReferenceKeys.value = new Set()
-    pendingReferenceBytes.clear()
+    collection.clear()
     clearCachedVisionReferences(cacheScope)
     clearVisionExtraction()
   }
@@ -138,7 +115,7 @@ export function useVisionSearchFlow(options: {
       toast.warning('You can add up to 4 reference images')
       return
     }
-    let totalBytes = currentReferenceBytes()
+    let totalBytes = collection.currentBytes()
     for (const file of files) {
       if (!file.type.startsWith('image/')) {
         toast.warning('Only image files are supported')
@@ -151,14 +128,13 @@ export function useVisionSearchFlow(options: {
       }
     }
     options.queryError.value = ''
-    references.value = [
-      ...references.value,
-      ...files.map((file) => ({
+    for (const file of files) {
+      collection.add({
         file,
         previewUrl: URL.createObjectURL(file),
         key: `local:${crypto.randomUUID()}`,
-      })),
-    ]
+      })
+    }
     markVisionStale()
   }
 
@@ -168,51 +144,36 @@ export function useVisionSearchFlow(options: {
 
   function handleLibraryReference(asset: LibraryAssetView) {
     const key = searchReferenceKey(asset.provider, asset.source_id)
-    if (
-      references.value.some((reference) => reference.key === key) ||
-      pendingReferenceKeys.value.has(key)
-    ) {
+    if (collection.has(key) || collection.isPending(key)) {
       return
     }
     if (!canAddReference.value) {
       toast.warning('You can add up to 4 reference images')
       return
     }
-    references.value = [
-      ...references.value,
-      toVisionReference(asset),
-    ]
+    collection.add(toVisionReference(asset))
     markVisionStale()
     options.queryError.value = ''
   }
 
   async function handleSearchResultReference(result: SearchResult) {
     const key = searchReferenceKey(result.provider, result.id)
-    if (
-      references.value.some((reference) => reference.key === key) ||
-      pendingReferenceKeys.value.has(key)
-    ) {
+    if (collection.has(key) || collection.isPending(key)) {
       return
     }
     if (!canAddReference.value) {
       toast.warning('You can add up to 4 reference images')
       return
     }
-    pendingReferenceKeys.value = new Set([...pendingReferenceKeys.value, key])
+    collection.begin(key)
     markVisionStale()
     options.queryError.value = ''
 
     try {
       const responsePromise = fetch(result.preview_url, { cache: 'force-cache' }).catch(() => null)
       await decodePreviewImage(result.preview_url)
-      if (!pendingReferenceKeys.value.has(key)) return
-      references.value = [
-        ...references.value,
-        {
-          previewUrl: result.preview_url,
-          key,
-        },
-      ]
+      if (!collection.isPending(key)) return
+      collection.appendPreview(key, result.preview_url)
 
       const res = await responsePromise
       if (!res) throw new Error('reference preview request failed')
@@ -226,29 +187,19 @@ export function useVisionSearchFlow(options: {
       ) {
         throw new Error('reference preview is not a valid image')
       }
-      if (!pendingReferenceKeys.value.has(key)) return
-      if (currentReferenceBytes() + blob.size > MAX_REFERENCE_BYTES) {
+      if (!collection.isPending(key)) return
+      if (!collection.reserveBytes(key, blob.size)) {
         throw new Error('reference previews exceed the request size limit')
       }
-      pendingReferenceBytes.set(key, blob.size)
       const file = new File([blob], `${result.provider}-${result.id}.jpg`, {
         type: contentType,
       })
-      references.value = references.value.map((ref) =>
-        ref.key === key ? { ...ref, file } : ref,
-      )
-      pendingReferenceBytes.delete(key)
+      collection.materialize(key, file)
     } catch {
-      const isStillSelected =
-        pendingReferenceKeys.value.has(key) ||
-        references.value.some((reference) => reference.key === key)
-      references.value = references.value.filter((ref) => ref.key !== key)
+      const isStillSelected = collection.fail(key)
       if (isStillSelected) options.queryError.value = '该图片无法作为搜索参考，请重试'
     } finally {
-      pendingReferenceBytes.delete(key)
-      const nextPendingKeys = new Set(pendingReferenceKeys.value)
-      nextPendingKeys.delete(key)
-      pendingReferenceKeys.value = nextPendingKeys
+      collection.finish(key)
       if (!hasPendingReferences.value && options.queryError.value === '正在准备参考图，请稍候') {
         options.queryError.value = ''
       }
@@ -262,19 +213,7 @@ export function useVisionSearchFlow(options: {
   }
 
   function isReferencePending(key: string): boolean {
-    return pendingReferenceKeys.value.has(key)
-  }
-
-  function currentReferenceBytes(): number {
-    const storedBytes = references.value.reduce(
-      (total, reference) => total + (reference.file?.size ?? 0),
-      0,
-    )
-    const reservedBytes = [...pendingReferenceBytes.values()].reduce(
-      (total, size) => total + size,
-      0,
-    )
-    return storedBytes + reservedBytes
+    return collection.isPending(key)
   }
 
   function clearVisionExtraction() {
@@ -300,11 +239,7 @@ export function useVisionSearchFlow(options: {
 
   onBeforeUnmount(() => {
     cancelVisionExtraction()
-    for (const reference of references.value) {
-      if (reference.file && reference.previewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(reference.previewUrl)
-      }
-    }
+    collection.clear()
   })
 
   return {

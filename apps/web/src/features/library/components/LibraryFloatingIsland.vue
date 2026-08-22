@@ -490,8 +490,13 @@ import {
   libraryAssetKey,
   saveSearchReference,
   type LibraryAssetView,
-  type LibrarySearchReference,
 } from '../libraryResource'
+import {
+  getLibraryDropEffect,
+  readLibraryAssetTransfer,
+  readSearchReferenceTransfer,
+  writeLibraryAssetTransfer,
+} from '../libraryTransfer'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import UserConfirmDialog from '../../../shared/components/UserConfirmDialog.vue'
 import { useUserConfirmDialog } from '../../../shared/composables/useUserConfirmDialog'
@@ -649,13 +654,7 @@ function handleKeydown(event: KeyboardEvent) {
 
 // 🌟 素材卡片拖拽与跨文件夹移动处理
 function handleAssetDragStart(e: DragEvent, asset: LibraryAssetView) {
-  const payload = {
-    type: 'library-asset',
-    asset,
-  }
-  e.dataTransfer!.setData('application/json', JSON.stringify(payload))
-  e.dataTransfer!.setData('application/x-ideaboard-library-asset', JSON.stringify(asset))
-  e.dataTransfer!.effectAllowed = 'move'
+  writeLibraryAssetTransfer(e.dataTransfer!, asset)
 
   // Micro Drag Ghost (58×44px 微缩投影圆角拖拽影子)
   const ghost = document.createElement('div')
@@ -685,40 +684,8 @@ function handleAssetDragStart(e: DragEvent, asset: LibraryAssetView) {
   }, 0)
 }
 
-function parseDraggedReference(e: DragEvent): LibrarySearchReference | null {
-  try {
-    const raw = e.dataTransfer?.getData('application/json')
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    if (parsed && typeof parsed === 'object' && parsed.type === 'library-asset') {
-      return null
-    }
-    return parsed as LibrarySearchReference
-  } catch {
-    return null
-  }
-}
-
-function parseDraggedLibraryAsset(e: DragEvent): LibraryAssetView | null {
-  try {
-    const rawAsset = e.dataTransfer?.getData('application/x-ideaboard-library-asset')
-    if (rawAsset) {
-      return JSON.parse(rawAsset) as LibraryAssetView
-    }
-    const raw = e.dataTransfer?.getData('application/json')
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    if (parsed && typeof parsed === 'object' && parsed.type === 'library-asset' && parsed.asset) {
-      return parsed.asset as LibraryAssetView
-    }
-    return null
-  } catch {
-    return null
-  }
-}
-
 function handleIslandDragOver(e: DragEvent) {
-  e.dataTransfer!.dropEffect = 'move'
+  e.dataTransfer!.dropEffect = getLibraryDropEffect(e.dataTransfer)
 }
 
 function handleIslandDragLeave() {
@@ -726,7 +693,7 @@ function handleIslandDragLeave() {
 }
 
 async function handleIslandDrop(e: DragEvent) {
-  const libraryAsset = parseDraggedLibraryAsset(e)
+  const libraryAsset = readLibraryAssetTransfer(e.dataTransfer)
   if (libraryAsset) {
     const currentKey = workspace.selectedFolder.value
     if (currentKey !== 'all') {
@@ -735,29 +702,13 @@ async function handleIslandDrop(e: DragEvent) {
     return
   }
 
-  const reference = parseDraggedReference(e)
+  const reference = readSearchReferenceTransfer(e.dataTransfer)
   if (!reference) return
-
-  // 存入当前选中的文件夹
-  const currentKey = workspace.selectedFolder.value
-  const currentFolder = workspace.folders.value.find((f) => f.query_key === currentKey)
-  const targetFolderId =
-    currentFolder && !currentFolder.is_virtual && !currentFolder.is_system
-      ? currentFolder.id
-      : undefined
-
-  try {
-    await saveSearchReference(reference, targetFolderId)
-    const key = libraryAssetKey(reference.provider, reference.id)
-    emit('asset-saved', key)
-    await Promise.all([workspace.loadFolders(), workspace.loadAssets(true)])
-  } catch (error) {
-    toast.error(error instanceof Error ? error.message : '保存素材失败')
-  }
+  await saveReferenceToFolder(reference, workspace.selectedFolder.value, true)
 }
 
 function handlePillDragOver(e: DragEvent, key: string) {
-  e.dataTransfer!.dropEffect = 'move'
+  e.dataTransfer!.dropEffect = getLibraryDropEffect(e.dataTransfer)
   hoveredPillKey.value = key
 }
 
@@ -768,7 +719,7 @@ function handlePillDragLeave() {
 async function handlePillDrop(e: DragEvent, folder: LibraryFolderTab) {
   hoveredPillKey.value = null
 
-  const libraryAsset = parseDraggedLibraryAsset(e)
+  const libraryAsset = readLibraryAssetTransfer(e.dataTransfer)
   if (libraryAsset) {
     if (folder.queryKey !== 'all') {
       await workspace.moveSelectedAsset(libraryAsset, folder.queryKey)
@@ -776,10 +727,18 @@ async function handlePillDrop(e: DragEvent, folder: LibraryFolderTab) {
     return
   }
 
-  const reference = parseDraggedReference(e)
+  const reference = readSearchReferenceTransfer(e.dataTransfer)
   if (!reference) return
 
-  const targetFolder = workspace.folders.value.find((f) => f.query_key === folder.queryKey)
+  await saveReferenceToFolder(reference, folder.queryKey, false)
+}
+
+async function saveReferenceToFolder(
+  reference: Parameters<typeof saveSearchReference>[0],
+  folderKey: string,
+  reloadAssets: boolean,
+) {
+  const targetFolder = workspace.folders.value.find((folder) => folder.query_key === folderKey)
   const targetFolderId =
     targetFolder && !targetFolder.is_virtual && !targetFolder.is_system
       ? targetFolder.id
@@ -789,8 +748,11 @@ async function handlePillDrop(e: DragEvent, folder: LibraryFolderTab) {
     await saveSearchReference(reference, targetFolderId)
     const key = libraryAssetKey(reference.provider, reference.id)
     emit('asset-saved', key)
-    workspace.selectFolder(folder.queryKey)
-    await workspace.loadFolders()
+    workspace.selectFolder(folderKey)
+    await Promise.all([
+      workspace.loadFolders(),
+      ...(reloadAssets ? [workspace.loadAssets(true)] : []),
+    ])
   } catch (error) {
     toast.error(error instanceof Error ? error.message : '保存素材失败')
   }

@@ -340,8 +340,8 @@
               <SearchSavePopover
                 :result="result"
                 :saved="savedKeys.has(libraryAssetKey(result.provider, result.id))"
-                @saved="markSaved(result); libraryRefreshKey += 1"
-                @unsaved="markUnsaved(result); libraryRefreshKey += 1"
+                @saved="markResultSaved(result)"
+                @unsaved="markResultUnsaved(result)"
               />
             </div>
           </div>
@@ -386,7 +386,7 @@
       :refresh-key="libraryRefreshKey"
       :reference-keys="references.map((reference) => reference.key)"
       @close="closeLibraryIsland"
-      @asset-saved="markSavedKey"
+      @asset-saved="markAssetSaved"
       @reference-selected="handleLibraryReference"
     />
 
@@ -470,139 +470,62 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import ProgressSpinner from 'primevue/progressspinner'
 import { Bookmark, BookmarkSolid, Camera, Check, Plus, Search, Xmark } from '@iconoir/vue'
 import StudioName from '../../../shared/components/StudioName.vue'
 import UserAccountMenu from '../../../shared/components/UserAccountMenu.vue'
-import { HOME_PATH, USER_SEARCH_PATH } from '../../../shared/constants/routePaths'
+import { HOME_PATH } from '../../../shared/constants/routePaths'
 import { useUserStore } from '../../auth/session/authSession'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
 import UserWorkspaceNavigation from '../../user-shell/components/UserWorkspaceNavigation.vue'
 import SearchSavePopover from '../components/SearchSavePopover.vue'
 import SearchBatchActionDock from '../components/SearchBatchActionDock.vue'
 import LibraryFloatingIsland from '../../library/components/LibraryFloatingIsland.vue'
-import {
-  libraryAssetKey,
-  saveSearchReference,
-  type LibrarySearchReference,
-} from '../../library/libraryResource'
+import { libraryAssetKey } from '../../library/libraryResource'
+import { writeSearchReferenceTransfer, readSearchReferenceTransfer } from '../../library/libraryTransfer'
 import { searchReferenceKey } from '../searchLibraryBridge'
 import { useUserAccountControls } from '../../user-shell/useUserAccountControls'
-import { useAppToast } from '../../../shared/composables/useAppToast'
-import {
-  isSearchQueryWithinLimit,
-  normalizeSearchQuery,
-  type SearchResult,
-} from '../searchResource'
-import { useSearchResults } from '../useSearchResults'
-import { useSearchLightbox } from '../useSearchLightbox'
-import { useVisionSearchFlow } from '../useVisionSearchFlow'
-import { getLibraryIslandState, setLibraryIslandState } from '../searchCache'
+import { type SearchResult } from '../searchResource'
+import { useSearchSession } from '../useSearchSession'
 
-const route = useRoute()
 const router = useRouter()
-const toast = useAppToast()
 const userStore = useUserStore()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const accountControls = useUserAccountControls({
   navigation: { navigate: (path) => router.push(path), logout: () => logoutAndRedirect(HOME_PATH) },
 })
-const draftQuery = ref('')
-const submittedQuery = ref('')
-const queryError = ref('')
 const cacheScope = userStore.user?.public_id ?? 'anonymous'
-const initialIslandState = getLibraryIslandState(cacheScope)
-const libraryIslandOpen = ref(initialIslandState.open)
-const libraryIslandExpanded = ref(initialIslandState.expanded)
-const libraryRefreshKey = ref(0)
 const isTriggerHoveredDuringDrag = ref(false)
-const keepResultsOnNextLoad = ref(false)
-const selectedBatchResults = ref<SearchResult[]>([])
 let autoOpenTimer: ReturnType<typeof setTimeout> | null = null
 
-watch([libraryIslandOpen, libraryIslandExpanded], ([open, expanded]) => {
-  setLibraryIslandState({ open, expanded }, cacheScope)
-})
-
-function isResultSelected(result: SearchResult): boolean {
-  return selectedBatchResults.value.some(
-    (r) => r.provider === result.provider && r.id === result.id,
-  )
-}
-
-function toggleBatchSelect(result: SearchResult) {
-  const idx = selectedBatchResults.value.findIndex(
-    (r) => r.provider === result.provider && r.id === result.id,
-  )
-  if (idx >= 0) {
-    selectedBatchResults.value.splice(idx, 1)
-  } else {
-    if (selectedBatchResults.value.length >= 8) {
-      toast.warning('Maximum 8 images for batch selection!')
-      return
-    }
-    selectedBatchResults.value.push(result)
-  }
-}
-
-function clearSelection() {
-  selectedBatchResults.value = []
-}
-
-async function applySelectedAsVisionReferences() {
-  const toAdd = selectedBatchResults.value.slice(0, 4)
-  for (const item of toAdd) {
-    await handleSearchResultReference(item)
-  }
-  if (selectedBatchResults.value.length > 4) {
-    toast.info('Added top 4 selected images as vision search references')
-  }
-  clearSelection()
-}
-
-async function saveAllSelectedToLibrary() {
-  const items = [...selectedBatchResults.value]
-  if (items.length === 0) return
-  let successCount = 0
-  let failureCount = 0
-  for (const item of items) {
-    try {
-      await saveSearchReference(toSearchReference(item))
-      markSavedKey(libraryAssetKey(item.provider, item.id))
-      successCount += 1
-    } catch {
-      failureCount += 1
-    }
-  }
-  libraryRefreshKey.value += 1
-  if (failureCount === 0) {
-    toast.success(`Saved ${successCount} assets to Library!`)
-  } else if (successCount === 0) {
-    toast.error('Failed to save selected assets')
-  } else {
-    toast.warning(`Saved ${successCount} assets; ${failureCount} failed`)
-  }
-  clearSelection()
-}
-
-const searchResults = useSearchResults({
-  submittedQuery,
-  keepResultsOnNextLoad: keepResultsOnNextLoad,
-  cacheScope,
-})
-const visionFlow = useVisionSearchFlow({
-  draftQuery,
-  submittedQuery,
-  queryError,
-  keepResultsOnNextLoad,
-  loadCatalog: () => searchResults.load(true),
-  cacheScope,
-})
-const lightbox = useSearchLightbox()
+const searchSession = useSearchSession({ cacheScope })
+const { draftQuery, queryError, heading: searchResultsHeading } = searchSession.query
+const searchResults = searchSession.feed
+const visionFlow = searchSession.vision
+const { library, batch, lightbox } = searchSession
+const {
+  open: libraryIslandOpen,
+  expanded: libraryIslandExpanded,
+  refreshKey: libraryRefreshKey,
+  close: closeLibraryIsland,
+  toggle: toggleLibraryIsland,
+  saveReferenceToQuickSaves,
+  markResultSaved,
+  markResultUnsaved,
+  markAssetSaved,
+} = library
+const {
+  selected: selectedBatchResults,
+  isSelected: isResultSelected,
+  toggle: toggleBatchSelect,
+  clear: clearSelection,
+  applyVisionReferences: applySelectedAsVisionReferences,
+  saveAllToLibrary: saveAllSelectedToLibrary,
+} = batch
 const {
   results,
   hasMore,
@@ -612,14 +535,10 @@ const {
   sentinel,
   failedImages,
   savedKeys,
-  load,
   reload,
   markImageError,
   retryImage,
   imageRetryCount,
-  markSaved,
-  markSavedKey,
-  markUnsaved,
 } = searchResults
 const {
   references,
@@ -628,21 +547,14 @@ const {
   canAddReference,
   fileInput,
   visionState,
-  visionError,
-  runVisionSearch,
   removeReference,
-  clearAllReferences,
   handleFileInput,
   openFilePicker,
   handleLibraryReference,
   handleSearchResultReference,
   isReferencePending,
-  clearVisionExtraction,
 } = visionFlow
 
-watch(visionError, (message) => {
-  if (message) toast.error(message)
-})
 const {
   visible: lightboxVisible,
   activeResult,
@@ -650,38 +562,15 @@ const {
   close: closeLightbox,
 } = lightbox
 
-const searchResultsHeading = computed(() => {
-  if (references.value.length > 0) {
-    return 'Results for “Visual Concepts”'
-  }
-  return submittedQuery.value ? `Results for “${submittedQuery.value}”` : 'Inspiration'
-})
-
 function clearAutoOpenTimer() {
   if (!autoOpenTimer) return
   clearTimeout(autoOpenTimer)
   autoOpenTimer = null
 }
 
-// 🌟 跨视窗拖拽入库事件处理
-function toSearchReference(result: SearchResult): LibrarySearchReference {
-  return {
-    provider: result.provider,
-    id: result.id,
-    source_url: result.source_url,
-    preview_url: result.preview_url,
-    original_url: result.original_url,
-    title: result.title,
-    author: result.author,
-    width: result.width,
-    height: result.height,
-  }
-}
-
 function handleCardDragStart(e: DragEvent, result: SearchResult) {
-  const reference = toSearchReference(result)
-  e.dataTransfer!.setData('application/json', JSON.stringify(reference))
-  e.dataTransfer!.effectAllowed = 'copy'
+  const reference = searchSession.toLibraryReference(result)
+  writeSearchReferenceTransfer(e.dataTransfer!, reference)
 
   // 创建 58×44px 微缩圆角影子 (Micro Drag Ghost)
   const ghost = document.createElement('div')
@@ -738,96 +627,18 @@ async function handleTriggerBtnDrop(e: DragEvent) {
   isTriggerHoveredDuringDrag.value = false
   clearAutoOpenTimer()
 
-  try {
-    const raw = e.dataTransfer?.getData('application/json')
-    if (!raw) return
-    const reference = JSON.parse(raw) as LibrarySearchReference
-    await saveSearchReference(reference)
-    markSavedKey(libraryAssetKey(reference.provider, reference.id))
-    libraryRefreshKey.value += 1
-    toast.success(`Saved "${reference.title || 'Image'}" to Quick Saves!`)
-  } catch (error) {
-    toast.error(error instanceof Error ? error.message : '保存素材失败')
-  }
+  const reference = readSearchReferenceTransfer(e.dataTransfer)
+  if (reference) await saveReferenceToQuickSaves(reference)
 }
 
 function handleClearSearch() {
-  clearAllReferences()
-  draftQuery.value = ''
-  submittedQuery.value = ''
-  queryError.value = ''
-  if (route.query.q) {
-    void router.replace({ path: USER_SEARCH_PATH, query: {} })
-  } else {
-    void load(true)
-  }
+  searchSession.clearSearch()
 }
 
 async function submitQuery() {
   clearSelection()
-  const query = normalizeSearchQuery(draftQuery.value)
-  if (!isSearchQueryWithinLimit(query)) {
-    queryError.value = '搜索关键词不能超过 200 个字符'
-    return
-  }
-  queryError.value = ''
-  if (references.value.length > 0) {
-    await runVisionSearch()
-    return
-  }
-  clearVisionExtraction()
-  const routeQuery: Record<string, string | string[]> = query ? { q: query } : {}
-  await router.replace({ path: USER_SEARCH_PATH, query: routeQuery })
+  await searchSession.submitQuery()
 }
-
-function closeLibraryIsland() {
-  libraryIslandOpen.value = false
-  libraryIslandExpanded.value = false
-}
-
-function toggleLibraryIsland() {
-  if (libraryIslandOpen.value) {
-    closeLibraryIsland()
-    return
-  }
-  libraryIslandOpen.value = true
-}
-
-function queryValue() {
-  const value = route.query.q
-  return Array.isArray(value) ? String(value[0] || '') : String(value || '')
-}
-
-watch(draftQuery, (val) => {
-  if (val.trim() === '' && references.value.length === 0 && submittedQuery.value !== '') {
-    submittedQuery.value = ''
-    if (route.query.q) {
-      void router.replace({ path: USER_SEARCH_PATH, query: {} })
-    } else {
-      void load(true)
-    }
-  }
-})
-
-watch(results, () => clearSelection())
-
-watch(
-  () => [route.query.q],
-  async () => {
-    if (references.value.length > 0) {
-      const q = normalizeSearchQuery(queryValue())
-      if (q) draftQuery.value = q
-      if (visionState.value === 'idle') await runVisionSearch()
-      return
-    }
-    const q = normalizeSearchQuery(queryValue())
-    submittedQuery.value = q
-    draftQuery.value = q
-    queryError.value = ''
-    await load(true)
-  },
-  { immediate: true },
-)
 
 </script>
 
