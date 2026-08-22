@@ -282,3 +282,83 @@ func validVisionImage() VisionImage {
 		Data:        []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41, 0x54, 0x08, 0xd7, 0x63, 0xf8, 0xcf, 0xc0, 0xf0, 0x1f, 0x00, 0x05, 0x00, 0x01, 0xff, 0x89, 0x99, 0x3d, 0x1d, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82},
 	}
 }
+
+func TestCloudflareEndpointURL(t *testing.T) {
+	tests := []struct {
+		endpoint string
+		model    string
+		want     string
+	}{
+		{
+			endpoint: "https://api.cloudflare.com/client/v4/accounts/acc123/ai/v1",
+			model:    "@cf/meta/llama-3.2-11b-vision-instruct",
+			want:     "https://api.cloudflare.com/client/v4/accounts/acc123/ai/run/@cf/meta/llama-3.2-11b-vision-instruct",
+		},
+		{
+			endpoint: "https://api.cloudflare.com/client/v4/accounts/acc123/ai/run",
+			model:    "@cf/meta/llama-3.2-11b-vision-instruct",
+			want:     "https://api.cloudflare.com/client/v4/accounts/acc123/ai/run/@cf/meta/llama-3.2-11b-vision-instruct",
+		},
+		{
+			endpoint: "https://api.cloudflare.com/client/v4/accounts/acc123/ai/run/@cf/meta/llama-3.2-11b-vision-instruct",
+			model:    "@cf/meta/llama-3.2-11b-vision-instruct",
+			want:     "https://api.cloudflare.com/client/v4/accounts/acc123/ai/run/@cf/meta/llama-3.2-11b-vision-instruct",
+		},
+	}
+	for _, test := range tests {
+		got, err := cloudflareEndpointURL(test.endpoint, test.model)
+		if err != nil {
+			t.Fatalf("cloudflareEndpointURL(%q, %q) error = %v", test.endpoint, test.model, err)
+		}
+		if got != test.want {
+			t.Fatalf("cloudflareEndpointURL(%q, %q) = %q, want %q", test.endpoint, test.model, got, test.want)
+		}
+	}
+}
+
+func TestIsCloudflareWorkersAIRequiresExactHostname(t *testing.T) {
+	if !isCloudflareWorkersAI("https://api.cloudflare.com/client/v4/accounts/acc/ai/v1") {
+		t.Fatal("expected Cloudflare API host to be detected")
+	}
+	if isCloudflareWorkersAI("https://api.cloudflare.com.evil.example/client/v4/accounts/acc/ai/v1") {
+		t.Fatal("unexpected lookalike host detected as Cloudflare")
+	}
+}
+
+func TestExtractCloudflareWorkersAIVision(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Authorization") != "Bearer secret" {
+			t.Errorf("authorization = %q", request.Header.Get("Authorization"))
+		}
+		var payload cloudflareAIRequest
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if len(payload.Image) != 70 || payload.Image[0] != 0x89 {
+			t.Fatalf("payload image = %#v", payload.Image)
+		}
+		_ = json.NewEncoder(writer).Encode(map[string]any{
+			"success": true,
+			"result": map[string]any{
+				"response": map[string]string{"query": "cafe interior"},
+			},
+		})
+	}))
+	defer server.Close()
+	configureVisionTestOutbound(t, server.URL)
+
+	extraction, err := extractCloudflareWorkersAIVision(context.Background(), VisionProviderConfig{
+		EndpointURL: server.URL + "/client/v4/accounts/acc123/ai/v1",
+		Model:       "@cf/meta/llama-3.2-11b-vision-instruct",
+		APIKey:      "secret",
+	}, VisionInput{
+		Images:   []VisionImage{validVisionImage()},
+		UserText: "cafe",
+	})
+	if err != nil {
+		t.Fatalf("extractCloudflareWorkersAIVision() error = %v", err)
+	}
+	if extraction.Query != "cafe interior" {
+		t.Fatalf("extraction = %#v, want query 'cafe interior'", extraction)
+	}
+}

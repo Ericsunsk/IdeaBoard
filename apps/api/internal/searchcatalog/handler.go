@@ -139,7 +139,7 @@ func (h *Handler) Test(c *gin.Context) {
 			return
 		}
 		if testErr != nil {
-			response.ErrorDTO(c, http.StatusBadRequest, TestProviderResponse{Provider: provider, TestState: state, FailureCategory: category, Message: message})
+			response.Error(c, http.StatusBadRequest, message)
 			return
 		}
 		response.SuccessDTO(c, TestProviderResponse{Provider: provider, TestState: state, Message: message})
@@ -160,7 +160,7 @@ func (h *Handler) Test(c *gin.Context) {
 		return
 	}
 	if testErr != nil {
-		response.ErrorDTO(c, http.StatusBadRequest, TestProviderResponse{Provider: provider, TestState: state, FailureCategory: category, Message: message})
+		response.Error(c, http.StatusBadRequest, message)
 		return
 	}
 	response.SuccessDTO(c, TestProviderResponse{Provider: provider, TestState: state, Message: message})

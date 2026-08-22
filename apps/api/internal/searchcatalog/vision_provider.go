@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"ideaboard/api/internal/platform/outbound"
@@ -223,4 +224,162 @@ func classifyVisionProviderFailure(err error) FailureCategory {
 	default:
 		return FailureUnknown
 	}
+}
+
+func isCloudflareWorkersAI(endpoint string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(endpoint))
+	return err == nil && strings.EqualFold(parsed.Hostname(), "api.cloudflare.com")
+}
+
+func cloudflareEndpointURL(endpoint, model string) (string, error) {
+	trimmed := strings.TrimRight(strings.TrimSpace(endpoint), "/")
+	if trimmed == "" {
+		return "", errors.New("vision endpoint URL is required")
+	}
+	model = strings.TrimSpace(model)
+	if strings.HasSuffix(trimmed, "/ai/run") {
+		if model == "" {
+			return "", errors.New("vision model is required")
+		}
+		return trimmed + "/" + strings.TrimPrefix(model, "/"), nil
+	}
+	if strings.Contains(trimmed, "/ai/run/") {
+		return trimmed, nil
+	}
+	trimmed = strings.TrimSuffix(trimmed, "/chat/completions")
+	trimmed = strings.TrimSuffix(trimmed, "/v1")
+	trimmed = strings.TrimSuffix(trimmed, "/ai")
+	if model == "" {
+		return "", errors.New("vision model is required")
+	}
+	return trimmed + "/ai/run/" + strings.TrimPrefix(model, "/"), nil
+}
+
+type cloudflareAIRequest struct {
+	Prompt string `json:"prompt"`
+	Image  []int  `json:"image"`
+}
+
+type cloudflareAIResponse struct {
+	Success bool `json:"success"`
+	Result  struct {
+		Response json.RawMessage `json:"response"`
+	} `json:"result"`
+	Errors []struct {
+		Message string `json:"message"`
+		Code    int    `json:"code"`
+	} `json:"errors"`
+}
+
+func extractCloudflareWorkersAIVision(ctx context.Context, config VisionProviderConfig, input VisionInput) (VisionExtraction, error) {
+	if len(input.Images) == 0 {
+		return VisionExtraction{}, ErrVisionInput
+	}
+	imageBytes := input.Images[0].Data
+	imageInts := make([]int, len(imageBytes))
+	for i, b := range imageBytes {
+		imageInts[i] = int(b)
+	}
+	prompt := cloudflareVisionPrompt(input.UserText)
+	body, err := json.Marshal(cloudflareAIRequest{Prompt: prompt, Image: imageInts})
+	if err != nil {
+		return VisionExtraction{}, err
+	}
+	endpoint, err := cloudflareEndpointURL(config.EndpointURL, config.Model)
+	if err != nil {
+		return VisionExtraction{}, &visionProviderError{kind: visionProviderFailureResponse, cause: err}
+	}
+	parsed, err := url.Parse(endpoint)
+	if err != nil || parsed.Hostname() == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return VisionExtraction{}, &visionProviderError{kind: visionProviderFailureResponse, cause: fmt.Errorf("invalid endpoint URL: %q", endpoint)}
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return VisionExtraction{}, &visionProviderError{kind: visionProviderFailureResponse, cause: err}
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Accept", "application/json")
+	if strings.TrimSpace(config.APIKey) != "" {
+		request.Header.Set("Authorization", "Bearer "+config.APIKey)
+	}
+	response, err := safehttp.DoRequestWithAllowHosts(ctx, request, visionSearchTimeout, outbound.AllowHosts(ctx)...)
+	if err != nil {
+		kind := visionProviderFailureNetwork
+		if errors.Is(err, context.DeadlineExceeded) || isTimeoutError(err) {
+			kind = visionProviderFailureTimeout
+		}
+		return VisionExtraction{}, &visionProviderError{kind: kind, cause: err}
+	}
+	defer response.Body.Close()
+	data, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+	if err != nil {
+		return VisionExtraction{}, &visionProviderError{kind: visionProviderFailureResponse, cause: err}
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		kind := visionProviderFailureResponse
+		switch response.StatusCode {
+		case http.StatusUnauthorized, http.StatusForbidden:
+			kind = visionProviderFailureCredentials
+		case http.StatusTooManyRequests:
+			kind = visionProviderFailureQuota
+		}
+		return VisionExtraction{}, &visionProviderError{kind: kind, cause: fmt.Errorf("status %d: %s", response.StatusCode, safeProviderErrorMessage(data))}
+	}
+	var envelope cloudflareAIResponse
+	if err := json.Unmarshal(data, &envelope); err != nil || (!envelope.Success && len(envelope.Errors) > 0) {
+		if len(envelope.Errors) > 0 {
+			return VisionExtraction{}, fmt.Errorf("%w: %s", ErrVisionSchema, envelope.Errors[0].Message)
+		}
+		return VisionExtraction{}, fmt.Errorf("%w: invalid Cloudflare Workers AI response", ErrVisionSchema)
+	}
+	return decodeCloudflareResponse(envelope.Result.Response)
+}
+
+func decodeCloudflareResponse(raw json.RawMessage) (VisionExtraction, error) {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 {
+		return VisionExtraction{}, fmt.Errorf("%w: empty response", ErrVisionSchema)
+	}
+	if trimmed[0] == '{' {
+		var extraction VisionExtraction
+		if err := json.Unmarshal(trimmed, &extraction); err == nil && strings.TrimSpace(extraction.Query) != "" {
+			return extraction, nil
+		}
+	}
+	if trimmed[0] == '"' {
+		var content string
+		if err := json.Unmarshal(trimmed, &content); err == nil {
+			if extraction, err := decodeVisionExtraction(content); err == nil && strings.TrimSpace(extraction.Query) != "" {
+				return extraction, nil
+			}
+			if fallback := sanitizeFallbackQuery(content); fallback != "" {
+				return VisionExtraction{Query: fallback}, nil
+			}
+		}
+	}
+	return decodeVisionExtraction(string(trimmed))
+}
+
+func cloudflareVisionPrompt(userText string) string {
+	prompt := "You are a visual search query generator.\nAnalyze the image and produce one concise visual search query.\nReturn valid JSON only with exactly one key \"query\".\nExample: {\"query\": \"blue geometric pattern\"}\nDo not output Markdown fences or any extra text."
+	if trimmed := strings.TrimSpace(userText); trimmed != "" {
+		prompt += "\nSupplementary user text: " + trimmed
+	}
+	return prompt
+}
+
+func sanitizeFallbackQuery(text string) string {
+	cleaned := strings.TrimSpace(stripJSONFence(text))
+	lines := strings.Split(cleaned, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(strings.Trim(line, `"*'-`))
+		if line != "" && len([]rune(line)) <= MaxSearchQueryRunes {
+			return line
+		}
+	}
+	if len([]rune(cleaned)) > MaxSearchQueryRunes {
+		runes := []rune(cleaned)
+		return string(runes[:MaxSearchQueryRunes])
+	}
+	return cleaned
 }

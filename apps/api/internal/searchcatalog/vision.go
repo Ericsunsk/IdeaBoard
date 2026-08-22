@@ -65,6 +65,9 @@ func NewVisionSearchService(config VisionConfigReader, metrics SearchMetrics) *V
 type openAICompatibleVisionProviderClient struct{}
 
 func (openAICompatibleVisionProviderClient) Extract(ctx context.Context, config VisionProviderConfig, input VisionInput) (VisionExtraction, error) {
+	if isCloudflareWorkersAI(config.EndpointURL) {
+		return extractCloudflareWorkersAIVision(ctx, config, input)
+	}
 	return extractOpenAICompatibleVision(ctx, config, input)
 }
 
