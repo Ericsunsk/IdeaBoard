@@ -131,7 +131,7 @@
       </div>
 
       <AdminFormField
-        v-slot="{ describedbyId, resolvePlaceholder }"
+        v-slot="{ describedbyId }"
         label="过期时间"
         for="reward-code-expires-at"
         hint="上海时间（UTC+8）；清除或留空为永久有效"
@@ -159,7 +159,7 @@
             v-model="expiresAtDate"
             input-id="reward-code-expires-at"
             date-format="yy-mm-dd"
-            :placeholder="resolvePlaceholder('永久有效')"
+            placeholder="永久有效"
             show-icon
             icon-display="input"
             show-time

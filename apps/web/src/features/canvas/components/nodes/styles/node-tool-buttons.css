@@ -10,8 +10,8 @@
 
 .node-tool-surface {
   --node-tool-border-width: var(--canvas-control-border-width);
-  --node-tool-button-size: 35px;
-  --node-tool-button-radius: 10px;
+  --node-tool-button-size: var(--canvas-control-size-md);
+  --node-tool-button-radius: var(--canvas-radius-lg);
   --node-tool-button-gap: var(--canvas-tool-button-gap);
   --node-tool-icon-size: 21px;
   --node-tool-popover-option-height: 33px;
@@ -23,21 +23,21 @@
   --node-tool-icon-button-size: var(--node-tool-button-size);
   --node-tool-icon-button-radius: var(--node-tool-button-radius);
   --node-tool-icon-button-border: var(--node-tool-button-border);
-  --node-tool-icon-button-bg: #ffffff;
-  --node-tool-icon-button-color: #6f61c6;
+  --node-tool-icon-button-bg: var(--canvas-glass-bg);
+  --node-tool-icon-button-color: var(--canvas-accent-hover);
   --node-tool-icon-button-active-border: var(--node-tool-button-brand);
   --node-tool-icon-button-active-color: var(--node-tool-button-brand);
-  --node-tool-icon-button-active-bg: #ffffff;
+  --node-tool-icon-button-active-bg: var(--canvas-glass-bg);
   --node-tool-icon-button-hover-border: var(--node-tool-button-brand);
   --node-tool-icon-button-hover-color: var(--node-tool-button-brand);
-  --node-tool-icon-button-hover-bg: #ffffff;
+  --node-tool-icon-button-hover-bg: var(--canvas-glass-bg);
   --node-tool-icon-button-hover-transform: scale(1.06);
   --node-tool-icon-button-primary-border: var(--node-tool-button-brand);
   --node-tool-icon-button-primary-color: #ffffff;
   --node-tool-icon-button-primary-bg: var(--node-tool-button-brand);
-  --node-tool-icon-button-primary-hover-border: #6c5cb8;
+  --node-tool-icon-button-primary-hover-border: var(--canvas-accent-strong);
   --node-tool-icon-button-primary-hover-color: #ffffff;
-  --node-tool-icon-button-primary-hover-bg: #6c5cb8;
+  --node-tool-icon-button-primary-hover-bg: var(--canvas-accent-strong);
   --node-tool-icon-button-icon-size: var(--node-tool-icon-size);
 }
 
@@ -152,11 +152,12 @@
   right: 0;
   bottom: calc(100% + var(--node-tool-button-gap));
   z-index: 43;
-  border: var(--node-tool-border-width) solid var(--canvas-accent-border-soft);
-  border-radius: var(--canvas-floating-radius);
-  background: var(--canvas-surface-bg);
-  box-shadow: 0 12px 30px rgba(38, 43, 61, 0.14);
-  backdrop-filter: blur(var(--canvas-surface-blur));
+  border: var(--node-tool-border-width) solid var(--canvas-glass-border);
+  border-radius: var(--canvas-radius-xl);
+  background: var(--canvas-glass-bg);
+  box-shadow: none;
+  backdrop-filter: blur(var(--canvas-glass-blur));
+  -webkit-backdrop-filter: blur(var(--canvas-glass-blur));
 }
 
 .node-tool-popover-grid {
@@ -176,11 +177,11 @@
   width: var(--node-tool-button-size);
   height: var(--node-tool-popover-option-height);
   border: var(--node-tool-border-width) solid var(--canvas-node-border);
-  border-radius: 9px;
+  border-radius: var(--canvas-radius-md);
   background: var(--canvas-node-bg);
   color: var(--canvas-text-option);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--canvas-font-size-control);
   font-weight: 700;
 }
 

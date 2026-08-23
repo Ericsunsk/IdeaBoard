@@ -1,6 +1,6 @@
 <template>
   <nav
-    class="absolute top-0 left-1/2 flex h-[var(--ib-page-chrome-control-size,40px)] w-[220px] -translate-x-1/2 items-center rounded-full border border-board-card-border bg-board-control-bg p-1 max-[860px]:static max-[860px]:order-3 max-[860px]:mt-4 max-[860px]:w-full max-[860px]:translate-x-0"
+    class="absolute top-0 left-1/2 flex h-[var(--ib-page-chrome-control-size,40px)] w-[220px] -translate-x-1/2 items-center rounded-full border border-board-card-border bg-board-control-bg p-1 backdrop-blur-md shadow-[var(--shadow-ib-control)] max-[860px]:static max-[860px]:order-3 max-[860px]:mt-4 max-[860px]:w-full max-[860px]:translate-x-0"
     aria-label="Workspace navigation"
   >
     <template v-for="item in navigationItems" :key="item.path">

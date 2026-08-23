@@ -158,4 +158,29 @@ describe('UserAccountMenu', () => {
     await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'))
     expect(trigger).toHaveFocus()
   })
+
+  it('renders custom injected actions slot between credit balance and avatar', () => {
+    const items: UserAccountMenuItem[] = [{ key: 'profile', label: '账户管理', command: vi.fn() }]
+    const balance: UserIdeaBalanceControl = {
+      status: 'ready',
+      availableIdeas: 100,
+      displayValue: '100',
+      ariaLabel: 'Idea余额 100 Ideas',
+      command: vi.fn(),
+    }
+    render(UserAccountMenu, {
+      props: { items, balance },
+      slots: {
+        actions: '<button type="button" aria-label="custom-action">Custom Action</button>',
+      },
+    })
+
+    const customAction = screen.getByRole('button', { name: 'custom-action' })
+    const credits = screen.getByRole('button', { name: 'Idea余额 100 Ideas' })
+    const accountMenu = screen.getByRole('button', { name: '账户菜单' })
+
+    expect(customAction).toBeVisible()
+    expect(credits.nextElementSibling).toBe(customAction)
+    expect(customAction.nextElementSibling).toBe(accountMenu)
+  })
 })

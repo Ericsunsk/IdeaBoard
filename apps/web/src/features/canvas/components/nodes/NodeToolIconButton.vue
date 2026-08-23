@@ -31,7 +31,7 @@ const props = withDefaults(
     active?: boolean
     disabled?: boolean
     primary?: boolean
-    ariaLabelValue?: string
+    ariaLabel?: string
     tooltip?: string
   }>(),
   {
@@ -40,7 +40,7 @@ const props = withDefaults(
     active: false,
     disabled: false,
     primary: false,
-    ariaLabelValue: undefined,
+    ariaLabel: undefined,
     tooltip: undefined,
   },
 )
@@ -48,6 +48,10 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'click', event: MouseEvent): void
 }>()
+
+defineOptions({
+  inheritAttrs: false,
+})
 
 function toCssSize(value?: number | string) {
   if (typeof value === 'number') return `${value}px`
@@ -61,9 +65,7 @@ const buttonStyle = computed(() => ({
     : { '--node-tool-icon-button-icon-size': toCssSize(props.iconSize) }),
 }))
 const resolvedTooltip = computed(() => props.tooltip ?? '')
-const resolvedAriaLabel = computed(
-  () => (props.ariaLabelValue ?? resolvedTooltip.value) || undefined,
-)
+const resolvedAriaLabel = computed(() => (props.ariaLabel ?? resolvedTooltip.value) || undefined)
 const controlStateAttrs = computed(() =>
   resolveInteractiveControlState({
     disabled: props.disabled,
@@ -81,7 +83,10 @@ const controlStateAttrs = computed(() =>
   border: var(--node-tool-border-width) solid var(--node-tool-icon-button-border);
   border-radius: var(--node-tool-icon-button-radius);
   background: var(--node-tool-icon-button-bg);
+  backdrop-filter: blur(var(--canvas-glass-blur));
+  -webkit-backdrop-filter: blur(var(--canvas-glass-blur));
   color: var(--node-tool-icon-button-color);
+  box-shadow: none;
   transition:
     border-color var(--motion-control-duration) var(--motion-control-easing),
     background-color var(--motion-control-duration) var(--motion-control-easing),

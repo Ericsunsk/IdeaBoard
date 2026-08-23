@@ -1,7 +1,7 @@
 <template>
   <Button
     text
-    :class="[adminToolbarIconButtonClass, active ? '!border-admin-text-1' : '']"
+    :class="[adminFramedIconButtonClass, active ? '!border-admin-text-1' : '']"
     :aria-label="filterLabel"
     :aria-pressed="active"
     @click="toggle"
@@ -40,7 +40,7 @@ import {
   adminActionButtonClass,
   adminPopoverSectionHeaderClass,
   adminPopoverTitleClass,
-  adminToolbarIconButtonClass,
+  adminFramedIconButtonClass,
 } from '../lib/adminUiClasses'
 import { createAdminPopoverPt } from '../lib/adminOverlayPt'
 

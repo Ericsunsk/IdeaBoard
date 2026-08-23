@@ -2,19 +2,13 @@ function joinClassNames(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(' ')
 }
 
-export const pageChromeClasses = {
+const pageChromeClasses = {
   roundControl: 'ib-round-control ib-page-chrome-control',
-} as const
-
-export const pageChromeRoundControlVariants = {
-  borderless: 'ib-round-control--borderless',
-  ghost: 'ib-round-control--ghost',
-  accent: 'ib-round-control--accent',
 } as const
 
 export const pageChromeAccountMenuClasses = {
   wrap: 'relative ib-page-chrome-account',
-  avatarButton: `${pageChromeClasses.roundControl} ${pageChromeRoundControlVariants.borderless} ib-user-avatar-button`,
+  avatarButton: `${pageChromeClasses.roundControl} ib-user-avatar-button`,
   avatarImage: 'ib-user-avatar-button__image',
   avatarPlaceholder: 'ib-user-avatar-button__placeholder',
   avatarIcon: 'size-5',

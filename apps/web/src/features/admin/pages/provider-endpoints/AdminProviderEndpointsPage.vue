@@ -60,8 +60,12 @@
               <button
                 type="button"
                 :class="[adminLogoButtonClass, 'size-10 p-2']"
-                :data-control-state="activeLogoTarget?.id === card.providerEndpoint.id ? 'selected' : 'idle'"
-                :aria-expanded="activeLogoTarget?.id === card.providerEndpoint.id ? 'true' : 'false'"
+                :data-control-state="
+                  activeLogoTarget?.id === card.providerEndpoint.id ? 'selected' : 'idle'
+                "
+                :aria-expanded="
+                  activeLogoTarget?.id === card.providerEndpoint.id ? 'true' : 'false'
+                "
                 title="点击切换端点 Logo"
                 aria-label="切换端点 Logo"
                 @click="openLogoPicker($event, card)"
@@ -90,10 +94,7 @@
                   :alt="card.providerEndpoint.name || 'Provider'"
                   class="size-full object-contain"
                 />
-                <span
-                  v-else
-                  class="text-xs font-bold text-admin-accent uppercase select-none"
-                >
+                <span v-else class="text-xs font-bold text-admin-accent uppercase select-none">
                   {{ (card.providerEndpoint.name || 'EP').substring(0, 2).toUpperCase() }}
                 </span>
               </button>
@@ -121,7 +122,12 @@
                 "
                 :title="card.providerEndpoint.status === 1 ? '点击停用端点' : '点击启用端点'"
                 :aria-label="card.providerEndpoint.status === 1 ? '点击停用端点' : '点击启用端点'"
-                @click.stop="commands.toggleProviderEndpointStatus({ kind: 'providerEndpoint', id: card.providerEndpoint.id })"
+                @click.stop="
+                  commands.toggleProviderEndpointStatus({
+                    kind: 'providerEndpoint',
+                    id: card.providerEndpoint.id,
+                  })
+                "
               >
                 <span
                   class="size-1.5 rounded-full"
@@ -174,9 +180,7 @@
                     🔑 {{ card.accounts.length }} Key
                   </span>
                   <span class="text-admin-border">|</span>
-                  <span class="font-medium text-admin-text-2">
-                    ⚡ {{ card.modelCount }} 模型
-                  </span>
+                  <span class="font-medium text-admin-text-2"> ⚡ {{ card.modelCount }} 模型 </span>
                 </template>
               </div>
             </div>
@@ -285,7 +289,9 @@
                 aria-label="添加 APIKey"
                 @click="accountEditor.openCreate(card.providerEndpoint.commandTarget)"
               >
-                <Plus class="size-4 text-admin-text-3 transition-colors group-hover:text-admin-accent" />
+                <Plus
+                  class="size-4 text-admin-text-3 transition-colors group-hover:text-admin-accent"
+                />
               </button>
             </div>
 
@@ -319,7 +325,7 @@
       :busy="providerEndpointSaveLoading"
     >
       <AdminFormField
-        v-slot="{ describedbyId, invalid, resolvePlaceholder }"
+        v-slot="{ describedbyId, invalid }"
         label="端点名称"
         for="admin-provider-endpoint-name"
         :error="providerEndpointFormErrors.name"
@@ -328,7 +334,7 @@
           id="admin-provider-endpoint-name"
           v-model="providerEndpointForm.name"
           class="w-full"
-          :placeholder="resolvePlaceholder('例如：Nano Banana 官方端点')"
+          placeholder="例如：Nano Banana 官方端点"
           :invalid="invalid"
           :aria-describedby="describedbyId"
           @update:model-value="clearProviderEndpointFormError('name')"
@@ -344,6 +350,7 @@
         <Select
           v-model="providerEndpointForm.protocol"
           input-id="admin-provider-endpoint-protocol"
+          aria-label="请求格式"
           class="w-full"
           :options="providerProtocolOptions"
           option-label="label"
@@ -356,7 +363,7 @@
 
       <AdminFormField
         v-if="providerEndpointForm.protocol === 'image-url-json-to-image'"
-        v-slot="{ describedbyId, invalid, resolvePlaceholder }"
+        v-slot="{ describedbyId, invalid }"
         label="处理功能"
         for="admin-provider-endpoint-capability"
         :error="providerEndpointFormErrors.capability"
@@ -364,11 +371,12 @@
         <Select
           v-model="providerEndpointForm.capability"
           input-id="admin-provider-endpoint-capability"
+          aria-label="处理功能"
           class="w-full"
           :options="providerProcessingCapabilityOptions"
           option-label="label"
           option-value="value"
-          :placeholder="resolvePlaceholder('选择处理功能')"
+          placeholder="选择处理功能"
           :invalid="invalid"
           :aria-describedby="describedbyId"
           @update:model-value="clearProviderEndpointFormError('capability')"
@@ -377,7 +385,7 @@
 
       <AdminFormField
         v-if="providerEndpointForm.protocol === 'model-api'"
-        v-slot="{ describedbyId, invalid, resolvePlaceholder }"
+        v-slot="{ describedbyId, invalid }"
         label="服务类型"
         for="admin-provider-endpoint-type"
         :error="providerEndpointFormErrors.apiType"
@@ -385,11 +393,12 @@
         <Select
           v-model="providerEndpointForm.apiType"
           input-id="admin-provider-endpoint-type"
+          aria-label="服务类型"
           class="w-full"
           :options="providerEndpointEditor.apiTypeOptions"
           option-label="label"
           option-value="value"
-          :placeholder="resolvePlaceholder('选择服务类型')"
+          placeholder="选择服务类型"
           :invalid="invalid"
           :aria-describedby="describedbyId"
           @update:model-value="clearProviderEndpointFormError('apiType')"
@@ -397,7 +406,7 @@
       </AdminFormField>
 
       <AdminFormField
-        v-slot="{ describedbyId, invalid, resolvePlaceholder }"
+        v-slot="{ describedbyId, invalid }"
         label="Base URL地址"
         for="admin-provider-endpoint-api-url"
         :error="providerEndpointFormErrors.baseUrl"
@@ -406,7 +415,7 @@
           id="admin-provider-endpoint-api-url"
           v-model="providerEndpointForm.baseUrl"
           class="w-full"
-          :placeholder="resolvePlaceholder('例如：https://api.example.com/v1')"
+          placeholder="例如：https://api.example.com/v1"
           :invalid="invalid"
           :aria-describedby="describedbyId"
           @blur="providerEndpointEditor.handleApiUrlBlur"
@@ -415,7 +424,7 @@
       </AdminFormField>
       <AdminFormField
         v-if="isModellessProviderProtocol(providerEndpointForm.protocol)"
-        v-slot="{ describedbyId, invalid, resolvePlaceholder }"
+        v-slot="{ describedbyId, invalid }"
         label="API Key"
         for="admin-provider-endpoint-api-key"
         :error="providerEndpointFormErrors.apiKey"
@@ -426,7 +435,7 @@
           type="password"
           class="w-full"
           autocomplete="new-password"
-          :placeholder="resolvePlaceholder('输入图片处理 API Key')"
+          placeholder="输入图片处理 API Key"
           :invalid="invalid"
           :aria-describedby="describedbyId"
           @update:model-value="clearProviderEndpointFormError('apiKey')"
@@ -475,7 +484,7 @@
       </div>
 
       <AdminFormField
-        v-slot="{ describedbyId, invalid, resolvePlaceholder }"
+        v-slot="{ describedbyId, invalid }"
         label="APIKey 名称"
         for="admin-account-name"
         :error="accountFormErrors.name"
@@ -484,7 +493,7 @@
           id="admin-account-name"
           v-model="accountForm.name"
           class="w-full"
-          :placeholder="resolvePlaceholder('用于区分同一端点下的不同 APIKey')"
+          placeholder="用于区分同一端点下的不同 APIKey"
           :invalid="invalid"
           :aria-describedby="describedbyId"
           @update:model-value="clearAccountFormError('name')"
@@ -492,7 +501,7 @@
       </AdminFormField>
 
       <AdminFormField
-        v-slot="{ describedbyId, invalid, resolvePlaceholder }"
+        v-slot="{ describedbyId, invalid }"
         :label="isEditAccount ? '修改 API 密钥 (留空不修改)' : 'API 密钥 (Key)'"
         for="admin-account-secret"
         :error="accountFormErrors.secret"
@@ -502,7 +511,7 @@
           v-model="accountForm.secret"
           class="w-full font-mono text-xs"
           type="password"
-          :placeholder="resolvePlaceholder(isEditAccount ? '留空则保持原密钥' : '输入此供应商端点的 API Key')"
+          :placeholder="isEditAccount ? '留空则保持原密钥' : '输入此供应商端点的 API Key'"
           :invalid="invalid"
           :aria-describedby="describedbyId"
           @update:model-value="clearAccountFormError('secret')"
@@ -514,7 +523,7 @@
         class="flex flex-col gap-3"
       >
         <AdminFormField
-          v-slot="{ describedbyId, invalid, resolvePlaceholder }"
+          v-slot="{ describedbyId, invalid }"
           label="分配模型"
           for="admin-account-models"
           :error="accountFormErrors.modelValues"
@@ -528,7 +537,7 @@
                 class="flex-1"
                 :suggestions="filteredSuggestions"
                 :loading="detectModelsLoading"
-                :placeholder="resolvePlaceholder('输入模型名称回车，或从下拉列表选择...')"
+                placeholder="输入模型名称回车，或从下拉列表选择..."
                 complete-on-focus
                 fluid
                 :invalid="invalid"
@@ -827,7 +836,6 @@ const providerProcessingCapabilityOptions = computed(() => {
     value: capability,
   }))
 })
-
 
 function closeProviderEndpointModal() {
   providerEndpointEditor.close()

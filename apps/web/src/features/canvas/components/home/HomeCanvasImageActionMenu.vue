@@ -21,7 +21,7 @@
           <NodeToolIconButton
             :ref="(el) => setItemStrengthTriggerRef(item, el)"
             class="image-action-icon-btn"
-            :aria-label-value="getItemTooltip(item)"
+            :aria-label="getItemTooltip(item)"
             :tooltip="getItemTooltip(item)"
             @click="onActionClick(item)"
           >
@@ -343,19 +343,21 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
   --node-tool-icon-button-size: var(--node-tool-button-size);
   --node-tool-icon-button-radius: var(--node-tool-button-radius);
   --node-tool-icon-button-border: var(--node-tool-button-border);
-  --node-tool-icon-button-bg: var(--canvas-control-bg);
+  --node-tool-icon-button-bg: var(--canvas-glass-bg);
   --node-tool-icon-button-color: #6f61c6;
   --node-tool-icon-button-active-border: var(--canvas-control-border-color);
   --node-tool-icon-button-active-color: var(--canvas-accent-hover);
-  --node-tool-icon-button-active-bg: var(--canvas-control-bg);
-  --node-tool-icon-button-hover-bg: var(--canvas-control-bg);
+  --node-tool-icon-button-active-bg: var(--canvas-glass-bg);
+  --node-tool-icon-button-hover-bg: var(--canvas-glass-bg);
   position: relative;
   overflow: visible;
+  backdrop-filter: blur(var(--canvas-glass-blur));
+  -webkit-backdrop-filter: blur(var(--canvas-glass-blur));
 }
 
 .image-action-icon-btn:hover:not(:disabled) {
   border-color: var(--canvas-control-border-color);
-  background: var(--canvas-control-bg);
+  background: var(--canvas-glass-bg);
   color: var(--canvas-accent-hover);
   transform: scale(1.06);
 }
@@ -370,8 +372,8 @@ function onStrengthRangeClick(item: ImageActionMenuItem, event: MouseEvent) {
   --canvas-range-thumb-size: 14px;
   --canvas-range-thumb-offset: -4px;
   --canvas-range-fill-color: var(--image-action-strength-fill);
-  --image-action-strength-fill: #7a6bd5;
-  --canvas-range-track-background: rgba(122, 107, 213, 0.2);
+  --image-action-strength-fill: var(--canvas-accent-hover);
+  --canvas-range-track-background: var(--canvas-accent-outline);
   position: absolute;
   inset: 0;
   z-index: 2;

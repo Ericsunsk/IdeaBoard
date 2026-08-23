@@ -84,6 +84,7 @@
 </template>
 
 <script setup lang="ts">
+import './styles/image-editor-histogram-plot.css'
 import { computed, nextTick, ref } from 'vue'
 import { usePointerDragSession } from '../../composables/usePointerDragSession'
 
@@ -366,5 +367,3 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
 }
 </script>
-
-<style src="./styles/image-editor-histogram-plot.css"></style>

@@ -99,12 +99,14 @@
   box-sizing: border-box;
   display: flex;
   width: min(200px, calc(100vw - 32px));
-  height: 39px;
+  height: var(--ib-page-chrome-control-size, 40px);
   align-items: center;
   gap: 8px;
   border: var(--canvas-control-border-width) solid var(--canvas-control-border-color);
   border-radius: 999px;
-  background: var(--canvas-control-bg);
+  background: var(--canvas-glass-bg);
+  backdrop-filter: blur(var(--canvas-glass-blur));
+  box-shadow: var(--shadow-ib-control);
   padding: 4px;
 }
 
@@ -117,8 +119,12 @@
   border: 0;
   border-radius: 999px;
   background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   padding: 0;
   color: var(--ib-control-icon);
+  cursor: pointer;
   transition:
     background-color var(--motion-control-duration) var(--motion-control-easing),
     color var(--motion-control-duration) var(--motion-control-easing);
@@ -146,10 +152,11 @@
   max-width: 280px;
   overflow-y: auto;
   border: var(--canvas-control-border-width) solid var(--canvas-surface-border);
-  border-radius: var(--canvas-surface-radius);
-  background: var(--canvas-surface-bg);
+  border-radius: var(--canvas-radius-xl);
+  background: var(--canvas-glass-bg);
+  box-shadow: var(--canvas-shadow-floating);
   padding: 6px;
-  backdrop-filter: blur(var(--canvas-surface-blur));
+  backdrop-filter: blur(var(--canvas-glass-blur));
   transform-origin: top left;
 }
 
@@ -162,11 +169,10 @@
   justify-content: space-between;
   gap: 8px;
   border: var(--canvas-control-border-width) solid var(--canvas-surface-border);
-  border-radius: var(--canvas-surface-radius);
+  border-radius: var(--canvas-radius-lg);
   background: var(--canvas-surface-bg);
   padding: 4px 5px 4px 10px;
   color: var(--canvas-text-body);
-  backdrop-filter: blur(var(--canvas-surface-blur));
 }
 
 .canvas-chrome-catalog-recovery-label {
@@ -184,7 +190,7 @@
   flex: none;
   cursor: pointer;
   border: 0;
-  border-radius: var(--canvas-surface-radius);
+  border-radius: var(--canvas-radius-lg);
   background: var(--canvas-surface-muted);
   padding: 0 8px;
   color: var(--canvas-text-strong);
@@ -216,21 +222,29 @@
 
 .canvas-chrome-action-group {
   pointer-events: auto;
-}
-
-.canvas-chrome-credit-control {
   --user-credit-pill-border: var(--canvas-control-border-color);
   --user-credit-pill-border-hover: var(--canvas-control-border-color);
   --user-credit-pill-border-active: var(--canvas-control-border-color);
-  --user-credit-pill-bg: var(--canvas-control-bg);
+  --user-credit-pill-bg: var(--canvas-glass-bg);
+}
+
+.canvas-chrome-icon-button,
+.canvas-user-avatar-button {
+  --ib-round-control-border-width: var(--canvas-control-border-width);
+  --ib-round-control-border: var(--canvas-control-border-color);
+  --ib-round-control-border-hover: var(--canvas-control-border-color);
+  --ib-round-control-bg: var(--canvas-glass-bg);
+  --ib-round-control-bg-hover: var(--canvas-surface-muted);
+  --ib-round-control-bg-disabled: var(--canvas-glass-bg);
+  --ib-round-control-color: var(--canvas-text-control);
+  --ib-round-control-color-hover: var(--canvas-text-strong);
+  --ib-round-control-color-disabled: var(--canvas-text-subtle);
+  --ib-round-control-focus-ring: var(--canvas-accent-outline);
+  backdrop-filter: blur(var(--canvas-glass-blur));
+  box-shadow: var(--shadow-ib-control);
 }
 
 .canvas-chrome-icon-button {
-  --ib-round-control-border: var(--canvas-control-border-color);
-  --ib-round-control-border-hover: var(--canvas-control-border-color);
-  --ib-round-control-bg: var(--canvas-control-bg);
-  --ib-round-control-bg-disabled: var(--canvas-control-bg);
-
   position: relative;
   margin: 0;
   cursor: pointer;
@@ -243,9 +257,15 @@
 }
 
 .canvas-chrome-icon-button.is-active {
-  border-color: var(--canvas-control-border-color);
-  background: var(--canvas-surface-muted);
-  color: var(--canvas-chrome-active-color);
+  border-color: var(--canvas-accent);
+  background: var(--canvas-accent);
+  color: #ffffff;
+}
+
+.canvas-chrome-icon-button.is-active:hover {
+  border-color: var(--canvas-accent-hover);
+  background: var(--canvas-accent-hover);
+  color: #ffffff;
 }
 
 .canvas-chrome-icon {
@@ -253,35 +273,8 @@
   height: var(--canvas-chrome-icon-size);
 }
 
-.canvas-chrome-icon-swap {
-  position: relative;
-  display: block;
-  width: var(--canvas-chrome-icon-size);
-  height: var(--canvas-chrome-icon-size);
-}
-
-.canvas-chrome-icon-swap .canvas-chrome-icon {
-  position: absolute;
-  inset: 0;
-  transition: opacity var(--motion-feedback-duration) var(--motion-feedback-easing);
-}
-
-.canvas-chrome-icon-swap-default {
-  opacity: 1;
-}
-
-.canvas-chrome-icon-swap-hover {
-  opacity: 0;
-}
-
-.canvas-chrome-icon-button:hover .canvas-chrome-icon-swap-default,
-.canvas-chrome-icon-button:focus-visible .canvas-chrome-icon-swap-default {
-  opacity: 0;
-}
-
-.canvas-chrome-icon-button:hover .canvas-chrome-icon-swap-hover,
-.canvas-chrome-icon-button:focus-visible .canvas-chrome-icon-swap-hover {
-  opacity: 1;
+.canvas-chrome-export-button {
+  --ib-round-control-color-disabled: var(--canvas-text-control);
 }
 
 .canvas-chrome-status-control {
@@ -292,7 +285,9 @@
   gap: 9px;
   border: var(--canvas-control-border-width) solid var(--canvas-control-border-color);
   border-radius: 999px;
-  background: var(--canvas-control-bg);
+  background: var(--canvas-glass-bg);
+  backdrop-filter: blur(var(--canvas-glass-blur));
+  box-shadow: var(--shadow-ib-control);
   padding: 4px;
   color: var(--canvas-text-strong);
 }
@@ -306,8 +301,12 @@
   border: 0;
   border-radius: 999px;
   background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   padding: 0;
   color: var(--ib-control-icon);
+  cursor: pointer;
   transition:
     background-color var(--motion-control-duration) var(--motion-control-easing),
     color var(--motion-control-duration) var(--motion-control-easing);

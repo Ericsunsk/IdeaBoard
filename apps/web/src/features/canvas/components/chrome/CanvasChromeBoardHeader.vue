@@ -3,7 +3,7 @@
     <div class="canvas-chrome-board-control">
       <button
         type="button"
-        class="canvas-chrome-icon-button canvas-chrome-board-icon-button"
+        class="canvas-chrome-board-icon-button"
         aria-label="返回画布列表"
         @click.stop="emit('navigate-back')"
       >
@@ -37,7 +37,7 @@
       <div class="canvas-chrome-board-menu-slot">
         <button
           type="button"
-          class="canvas-chrome-icon-button canvas-chrome-board-icon-button"
+          class="canvas-chrome-board-icon-button"
           aria-label="选择画布"
           @click.stop="emit('toggle-board-menu')"
         >

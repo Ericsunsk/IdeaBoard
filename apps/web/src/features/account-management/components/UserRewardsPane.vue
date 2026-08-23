@@ -1,9 +1,6 @@
 <template>
   <AccountManagementPane title="奖励中心">
-    <section
-      class="rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface p-5 shadow-[var(--shadow-ib-control)] max-[640px]:p-4"
-      aria-labelledby="reward-code-heading"
-    >
+    <section :class="accountCardPanelClass" aria-labelledby="reward-code-heading">
       <form class="grid gap-3" @submit.prevent="submitCode">
         <label
           id="reward-code-heading"
@@ -47,7 +44,7 @@
         :table-style="{ minWidth: '680px' }"
         table-aria-label="兑换记录表格"
         scroll-aria-label="兑换记录表格"
-        frame-class="rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface shadow-[var(--shadow-ib-control)]"
+        :frame-class="accountDataTableFrameClass"
         empty-title="暂无兑换记录"
         empty-description="成功兑换的奖励会显示在这里"
       >
@@ -166,7 +163,12 @@ import { useUserRewardRedemption } from '../useUserRewardRedemption'
 import { useUserRewardRedemptions } from '../useUserRewardRedemptions'
 import type { UserRewardRedemption } from '../userRewardsResource'
 import AccountManagementPane from './AccountManagementPane.vue'
-import { accountButtonPt, accountPrimaryActionButtonClass } from './accountManagementUi'
+import {
+  accountButtonPt,
+  accountCardPanelClass,
+  accountDataTableFrameClass,
+  accountPrimaryActionButtonClass,
+} from './accountManagementUi'
 
 const code = ref('')
 const profileFeedback = useProfileFeedback()

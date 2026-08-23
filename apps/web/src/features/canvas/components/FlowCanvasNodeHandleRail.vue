@@ -37,13 +37,16 @@
       :tabindex="aggregate.visible && !isConnectionDragging ? 0 : -1"
       :title="aggregate.title"
     >
-      <span class="flow-canvas-node__handle-plus" aria-hidden="true" />
+      <span class="flow-canvas-node__handle-plus" aria-hidden="true">
+        <Plus class="flow-canvas-node__handle-icon" />
+      </span>
     </Handle>
   </div>
 </template>
 
 <script setup lang="ts">
 import { Handle, useVueFlow } from '@vue-flow/core'
+import { Plus } from '@iconoir/vue'
 import { computed, watch } from 'vue'
 import type { FlowNodeData } from '../types/flowTypes'
 import { useFlowCanvasNodeHandleRail } from '../composables/useFlowCanvasNodeHandleRail'
@@ -109,7 +112,7 @@ watch(
 }
 
 .flow-canvas-node__handle-aggregate {
-  --handle-ring-color: var(--color-canvas-handle-border);
+  --handle-ring-color: var(--flow-edge-color);
   --handle-plus-rest-x: -12px;
   --handle-plus-active-x: -26px;
   --handle-plus-hover-x: -29px;
@@ -160,42 +163,34 @@ watch(
   position: absolute;
   left: var(--handle-plus-x);
   top: calc(50% + var(--handle-plus-y));
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 32px;
   height: 32px;
-  border: 1.5px solid var(--handle-ring-color);
+  border: calc(var(--flow-edge-width) * 1px) solid var(--handle-ring-color);
   border-radius: 999px;
-  background: var(--color-ib-surface-raised);
+  background: transparent;
+  color: var(--handle-ring-color);
   box-shadow: none;
   transform: translate(-50%, -50%);
   pointer-events: none;
   transition:
     left var(--motion-control-duration) var(--motion-control-easing),
     top var(--motion-control-duration) var(--motion-control-easing),
-    border-color var(--motion-feedback-duration) var(--motion-feedback-easing);
+    border-color var(--motion-feedback-duration) var(--motion-feedback-easing),
+    color var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
-.flow-canvas-node__handle-plus::before,
-.flow-canvas-node__handle-plus::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 12px;
-  height: 2px;
-  border-radius: 999px;
-  background: currentColor;
-  transform: translate(-50%, -50%);
-}
-
-.flow-canvas-node__handle-plus::after {
-  transform: translate(-50%, -50%) rotate(90deg);
+.flow-canvas-node__handle-icon {
+  width: 16px;
+  height: 16px;
+  stroke-width: calc(var(--flow-edge-width) * 1.5);
 }
 
 .flow-canvas-node__handle-aggregate.is-visible:hover,
 .flow-canvas-node__handle-aggregate.connecting,
 .flow-canvas-node__handle-aggregate:focus-visible {
-  --handle-ring-color: var(--color-canvas-handle-border-active);
   --handle-plus-x: var(--handle-plus-hover-x);
   opacity: 1;
 }
@@ -218,14 +213,9 @@ watch(
 }
 
 .flow-canvas-node__handle-aggregate.is-proximity-active {
-  --handle-ring-color: var(--color-canvas-handle-border-active);
   opacity: 1;
   visibility: visible;
   pointer-events: all;
-}
-
-.flow-canvas-node__handle-aggregate.is-proximity-active .flow-canvas-node__handle-plus {
-  transition: border-color var(--motion-feedback-duration) var(--motion-feedback-easing);
 }
 
 .flow-canvas-node__handle-rail.is-connection-dragging .flow-canvas-node__handle-aggregate {

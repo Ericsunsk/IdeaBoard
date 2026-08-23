@@ -28,6 +28,7 @@
     </template>
     <template v-else>
       <UserCreditBalanceButton v-if="showCredits && balance" :balance="balance" />
+      <slot name="actions" />
       <Button
         ref="avatarButtonRef"
         unstyled
@@ -36,7 +37,7 @@
         aria-label="账户菜单"
         aria-haspopup="menu"
         :aria-expanded="isMenuOpen"
-        :class="[avatarButtonClass, '!border !border-board-card-border !bg-board-control-bg/80 backdrop-blur-md hover:!bg-ib-surface-hover']"
+        :class="avatarButtonClass"
         @click="toggleMenu"
       >
         <img v-if="avatarUrl" :src="avatarUrl" :class="avatarImageClass" alt="用户头像" />

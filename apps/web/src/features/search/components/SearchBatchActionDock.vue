@@ -1,9 +1,9 @@
 <template>
   <Teleport to="body">
-    <Transition name="batch-dock">
+    <Transition name="search-batch-action-dock">
       <div
         v-if="selectedCount > 0"
-        class="fixed bottom-7 inset-x-0 mx-auto w-fit z-40 flex h-11 items-center gap-2 rounded-full border border-board-card-border bg-board-control-bg/80 p-1.5 backdrop-blur-md shadow-[0_4px_16px_rgba(45,64,89,0.04)] select-none pointer-events-auto"
+        class="search-batch-action-dock fixed inset-x-0 bottom-7 z-40 mx-auto h-[var(--search-dock-height)] w-fit gap-2 p-1.5"
         role="toolbar"
         aria-label="Batch actions"
       >
@@ -40,7 +40,7 @@
         <!-- 取消多选 ✕ -->
         <button
           type="button"
-          class="search-reference-action"
+          class="search-reference-control"
           title="Clear selection"
           aria-label="Clear selection"
           @click="emit('clear')"
@@ -65,54 +65,3 @@ const emit = defineEmits<{
   clear: []
 }>()
 </script>
-
-<style scoped>
-.batch-dock-enter-active {
-  transition:
-    opacity var(--motion-enter-duration) var(--motion-enter-easing),
-    transform var(--motion-enter-duration) var(--motion-enter-easing);
-}
-
-.batch-dock-leave-active {
-  transition:
-    opacity var(--motion-exit-duration) var(--motion-exit-easing),
-    transform var(--motion-exit-duration) var(--motion-exit-easing);
-}
-
-.batch-dock-enter-from,
-.batch-dock-leave-to {
-  opacity: 0;
-  transform: translateY(calc(100% + 3rem));
-}
-
-.search-reference-action {
-  display: grid;
-  width: 2rem;
-  height: 2rem;
-  flex-shrink: 0;
-  cursor: pointer;
-  place-items: center;
-  border-radius: var(--radius-ib-pill);
-  background-color: var(--color-board-loading-bg);
-  color: var(--color-board-page-text-muted);
-  transition:
-    background-color var(--motion-control-duration) var(--motion-control-easing),
-    color var(--motion-control-duration) var(--motion-control-easing),
-    transform var(--motion-control-duration) var(--motion-control-easing);
-}
-
-.search-reference-action:hover {
-  background-color: var(--color-board-card-border);
-  color: var(--color-board-page-text);
-  transform: scale(1.05);
-}
-
-.search-reference-action:active {
-  transform: scale(0.95);
-}
-
-.search-reference-action:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-board-focus);
-}
-</style>

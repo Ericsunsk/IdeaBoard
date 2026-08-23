@@ -2,15 +2,15 @@
   .ib-round-control {
     --ib-round-control-size: 40px;
     --ib-round-control-border-width: 1px;
-    --ib-round-control-border: var(--color-ib-page-dot);
-    --ib-round-control-border-hover: var(--color-ib-account-menu-border);
+    --ib-round-control-border: var(--color-ib-border);
+    --ib-round-control-border-hover: var(--color-ib-border-hover);
     --ib-round-control-bg: var(--color-ib-surface);
-    --ib-round-control-bg-hover: var(--ib-control-bg-hover);
+    --ib-round-control-bg-hover: var(--color-ib-surface-hover);
     --ib-round-control-bg-disabled: var(--color-ib-surface-disabled);
-    --ib-round-control-color: var(--ib-control-icon);
-    --ib-round-control-color-hover: var(--ib-control-icon-hover);
+    --ib-round-control-color: var(--color-ib-text-muted);
+    --ib-round-control-color-hover: var(--color-ib-text);
     --ib-round-control-color-disabled: var(--color-ib-text-disabled);
-    --ib-round-control-focus-ring: var(--color-board-focus-ring);
+    --ib-round-control-focus-ring: var(--color-ib-focus-ring);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -21,46 +21,28 @@
     padding: 0;
     flex-shrink: 0;
     border: var(--ib-round-control-border-width) solid var(--ib-round-control-border);
-    border-radius: 999px;
+    border-radius: 9999px;
     background: var(--ib-round-control-bg);
     color: var(--ib-round-control-color);
-    box-shadow: none;
+    box-shadow: var(--shadow-ib-control);
+    backdrop-filter: blur(var(--ib-glass-blur));
+    -webkit-backdrop-filter: blur(var(--ib-glass-blur));
     cursor: pointer;
     appearance: none;
     transition:
       background-color var(--motion-control-duration) var(--motion-control-easing),
       border-color var(--motion-control-duration) var(--motion-control-easing),
-      color var(--motion-control-duration) var(--motion-control-easing);
+      color var(--motion-control-duration) var(--motion-control-easing),
+      transform var(--motion-control-duration) var(--motion-control-easing);
+  }
+
+  .ib-round-control:active:not(:disabled) {
+    transform: scale(0.97);
   }
 
   .ib-page-chrome-control {
     --ib-page-chrome-control-size: 40px;
     --ib-round-control-size: var(--ib-page-chrome-control-size);
-  }
-
-  .ib-round-control--borderless {
-    --ib-round-control-border-width: 0px;
-    --ib-round-control-border: transparent;
-    --ib-round-control-border-hover: transparent;
-  }
-
-  .ib-round-control--ghost {
-    --ib-round-control-border-width: 0px;
-    --ib-round-control-border: transparent;
-    --ib-round-control-border-hover: transparent;
-    --ib-round-control-bg: transparent;
-    --ib-round-control-bg-hover: var(--color-ib-surface-hover);
-  }
-
-  .ib-round-control--accent {
-    --ib-round-control-border-width: 0px;
-    --ib-round-control-border: transparent;
-    --ib-round-control-border-hover: transparent;
-    --ib-round-control-bg: var(--color-ib-accent);
-    --ib-round-control-bg-hover: var(--color-ib-accent-hover);
-    --ib-round-control-color: var(--color-ib-text-inverse);
-    --ib-round-control-color-hover: var(--color-ib-text-inverse);
-    --ib-round-control-focus-ring: color-mix(in srgb, var(--color-ib-accent) 18%, transparent);
   }
 
   .ib-round-control:hover:not(:disabled) {

@@ -12,7 +12,7 @@
   --image-editor-panel-text-size: 11px;
   --image-editor-panel-meta-text-size: 10px;
   border: var(--image-editor-panel-border-width) solid var(--canvas-accent-outline);
-  border-radius: var(--canvas-floating-radius);
+  border-radius: var(--canvas-radius-xl);
   background: var(--canvas-surface-bg);
   box-sizing: border-box;
   overflow: hidden;

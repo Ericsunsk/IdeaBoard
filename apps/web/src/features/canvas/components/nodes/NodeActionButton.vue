@@ -1,7 +1,7 @@
 <template>
   <button
     type="button"
-    class="node-action-btn inline-flex min-h-7 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border-[length:var(--node-tool-border-width)] border-solid border-[#d6dcec] bg-[var(--canvas-node-bg)] px-2.5 text-[11px] leading-none font-medium text-[#5f6877] transition-[background-color,border-color,color,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] disabled:cursor-not-allowed disabled:opacity-[0.45]"
+    class="node-action-btn inline-flex min-h-7 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border-[length:var(--node-tool-border-width)] border-solid border-[var(--canvas-node-border)] bg-[var(--canvas-node-bg)] px-2.5 text-[11px] leading-none font-medium text-[var(--canvas-text-option)] transition-[background-color,border-color,color,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] disabled:cursor-not-allowed disabled:opacity-[0.45]"
     :class="[
       variantClass,
       {
@@ -90,14 +90,14 @@ const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant
 .node-action-btn.variant-tool:hover:not(:disabled),
 .node-action-btn.variant-chip:hover:not(:disabled) {
   border-color: var(--node-tool-button-accent);
-  color: #272932;
+  color: var(--canvas-node-text-primary);
 }
 
 .node-action-btn.variant-tool.active,
 .node-action-btn.variant-chip.active {
   border-color: var(--node-tool-button-accent);
-  background: #f8f7ff;
-  color: #272932;
+  background: var(--canvas-node-accent-soft);
+  color: var(--canvas-node-text-primary);
 }
 
 .node-action-btn.variant-chip {
@@ -122,7 +122,7 @@ const variantClass = computed(() => nodeActionButtonVariantClasses[props.variant
 }
 
 .node-action-btn.variant-primary:hover:not(:disabled) {
-  background: #7f68db;
-  border-color: #7f68db;
+  background: var(--canvas-accent-strong);
+  border-color: var(--canvas-accent-strong);
 }
 </style>

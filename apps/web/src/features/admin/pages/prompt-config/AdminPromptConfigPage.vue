@@ -149,6 +149,7 @@
               auto-resize
               class="w-full"
               rows="4"
+              :aria-label="item.title + ' 提示词模板'"
               placeholder="可使用上方变量插入模板"
               :disabled="saving[item.slug]"
             />

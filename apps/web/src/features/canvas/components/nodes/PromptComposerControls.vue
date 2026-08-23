@@ -6,6 +6,7 @@
     :class="textareaClass"
     :rows="rows"
     :placeholder="placeholder"
+    :aria-label="placeholder || 'Prompt 提示词'"
     :disabled="disabled"
     @focus="emit('focus')"
   />

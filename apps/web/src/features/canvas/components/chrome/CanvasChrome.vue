@@ -17,39 +17,36 @@
       @navigate-back="emit('navigate-back')"
     />
 
-    <div class="canvas-chrome-control-group canvas-chrome-action-group">
-      <UserCreditBalanceButton class="canvas-chrome-credit-control" :balance="account.balance" />
-      <button
-        type="button"
-        :class="canvasChromeActionControlClass"
-        aria-label="分享功能稍后接入"
-        title="分享功能稍后接入"
-        disabled
-        @mousedown.stop
-      >
-        <span class="canvas-chrome-icon-swap" aria-hidden="true">
-          <ShareAndroid class="canvas-chrome-icon canvas-chrome-icon-swap-default" />
-          <ShareAndroidSolid class="canvas-chrome-icon canvas-chrome-icon-swap-hover" />
-        </span>
-      </button>
-      <button
-        :class="canvasChromeExportControlClass"
-        type="button"
-        aria-label="导出"
-        :disabled="status.exportDisabled"
-        @mousedown.stop
-        @click="emit('export')"
-      >
-        <Download class="canvas-chrome-icon" />
-      </button>
-      <UserAccountMenu
-        :avatar-url="account.avatarUrl"
-        :balance="account.balance"
-        :items="account.menuItems"
-        :avatar-button-class="canvasChromeAvatarButtonClass"
-        :show-credits="false"
-      />
-    </div>
+    <UserAccountMenu
+      class="canvas-chrome-action-group"
+      :avatar-url="account.avatarUrl"
+      :balance="account.balance"
+      :items="account.menuItems"
+      :avatar-button-class="canvasChromeAvatarButtonClass"
+    >
+      <template #actions>
+        <button
+          type="button"
+          :class="canvasChromeActionControlClass"
+          aria-label="分享功能稍后接入"
+          title="分享功能稍后接入"
+          disabled
+          @mousedown.stop
+        >
+          <ShareAndroid class="canvas-chrome-icon" />
+        </button>
+        <button
+          :class="[canvasChromeExportControlClass, { 'is-active': !status.exportDisabled }]"
+          type="button"
+          aria-label="导出"
+          :disabled="status.exportDisabled"
+          @mousedown.stop
+          @click="emit('export')"
+        >
+          <Download class="canvas-chrome-icon" />
+        </button>
+      </template>
+    </UserAccountMenu>
   </header>
 
   <aside
@@ -97,7 +94,7 @@
     <div class="canvas-chrome-status-control">
       <button
         type="button"
-        class="canvas-chrome-icon-button canvas-chrome-status-button"
+        class="canvas-chrome-status-button"
         aria-label="缩小"
         @click="emit('zoom-out')"
       >
@@ -110,7 +107,7 @@
       </span>
       <button
         type="button"
-        class="canvas-chrome-icon-button canvas-chrome-status-button"
+        class="canvas-chrome-status-button"
         aria-label="放大"
         @click="emit('zoom-in')"
       >
@@ -128,12 +125,10 @@ import {
   OneFingerSelectHandGesture,
   Plus,
   ShareAndroid,
-  ShareAndroidSolid,
   SpockHandGesture,
 } from '@iconoir/vue'
 import CanvasChromeBoardHeader from './CanvasChromeBoardHeader.vue'
 import UserAccountMenu from '../../../../shared/components/UserAccountMenu.vue'
-import UserCreditBalanceButton from '../../../../shared/components/UserCreditBalanceButton.vue'
 import {
   createPageChromeAccountAvatarButtonClass,
   createPageChromeRoundControlClass,
@@ -175,7 +170,7 @@ const canvasChromeActionControlClass = createPageChromeRoundControlClass(
   'canvas-chrome-icon-button canvas-chrome-bordered-control',
 )
 const canvasChromeExportControlClass = createPageChromeRoundControlClass(
-  'canvas-chrome-icon-button canvas-chrome-bordered-control enabled:!bg-[var(--canvas-control-accent-bg)] enabled:!text-white enabled:hover:!bg-[var(--canvas-control-accent-bg-hover)] enabled:hover:!text-white',
+  'canvas-chrome-icon-button canvas-chrome-bordered-control canvas-chrome-export-button',
 )
 const canvasChromeAvatarButtonClass = createPageChromeAccountAvatarButtonClass(
   'canvas-user-avatar-button',

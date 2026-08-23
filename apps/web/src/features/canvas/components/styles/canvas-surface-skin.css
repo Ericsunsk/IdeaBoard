@@ -4,42 +4,42 @@
  * minimap consume its named variables without depending on Screen CSS.
  */
 .canvas-surface-skin {
-  --canvas-control-border-width: 1.2px;
+  /* ── Canvas Geometry & Sizing Tokens ── */
+  --canvas-control-border-width: 1px;
   --canvas-control-border-color: var(--color-canvas-neutral-line);
+  --canvas-control-size-sm: 28px;
+  --canvas-control-size-md: 35px;
   --canvas-tool-button-gap: 7px;
   --canvas-node-floating-ui-width: 287px;
+
+  /* ── Canvas Radius Tokens ── */
+  --canvas-radius-md: 8px;
+  --canvas-radius-lg: 10px;
+  --canvas-radius-xl: 13px;
+
+  /* ── Canvas Typography Tokens ── */
+  --canvas-font-size-title: 15px;
+  --canvas-font-size-control: 12px;
+  --canvas-font-size-caption: 11px;
+  --canvas-font-size-micro: 10px;
+
+  /* ── Canvas Elevation & Glass Tokens ── */
+  --canvas-shadow-floating:
+    0 12px 30px -4px rgba(15, 23, 42, 0.12), 0 4px 10px -2px rgba(15, 23, 42, 0.05);
+  --canvas-glass-bg: color-mix(in srgb, var(--canvas-surface-bg) 88%, transparent);
+  --canvas-glass-blur: var(--ib-glass-blur);
+  --canvas-glass-border: var(--canvas-accent-border-soft);
+
   --canvas-surface-page-bg: var(--color-canvas-workspace-bg);
   --canvas-surface-bg: var(--color-canvas-surface-bg);
-  --canvas-surface-bg-soft: color-mix(
-    in srgb,
-    var(--color-canvas-surface-bg) 94%,
-    transparent
-  );
-  --canvas-control-bg: var(--canvas-surface-bg-soft);
-  --canvas-control-accent-bg: color-mix(in srgb, var(--color-canvas-accent) 94%, transparent);
-  --canvas-control-accent-bg-hover: color-mix(
-    in srgb,
-    var(--color-canvas-accent-hover) 94%,
-    transparent
-  );
   --canvas-surface-muted: #f4f7fb;
   --canvas-surface-border: #d8ddea;
   --canvas-surface-border-soft: rgba(34, 42, 54, 0.08);
   --canvas-minimap-node: #b8bec9;
   --canvas-minimap-viewport: #c9ced8;
   --canvas-minimap-mask: rgb(201 206 216 / 0.26);
-  --canvas-surface-shadow: 0 14px 32px rgba(15, 23, 42, 0.13);
-  --canvas-floating-shadow: var(--canvas-surface-shadow);
-  --canvas-surface-blur: 10px;
-  --canvas-surface-radius: 10px;
-  --canvas-floating-radius: 13px;
-  --canvas-panel-radius: 8px;
-  --canvas-panel-border-width: 1px;
   --canvas-panel-content-gap: 10px;
   --canvas-panel-border: rgba(34, 42, 54, 0.14);
-  --canvas-panel-border-soft: rgba(34, 42, 54, 0.1);
-  --canvas-panel-header-from: #f8fafc;
-  --canvas-panel-header-to: #eef2f7;
   --canvas-text-strong: #111827;
   --canvas-text-body: #334155;
   --canvas-text-muted: var(--color-canvas-text-secondary);
@@ -68,10 +68,10 @@
   --canvas-accent-outline: rgba(122, 107, 213, 0.22);
   --canvas-running-from: var(--color-canvas-running-from);
   --canvas-running-to: var(--color-canvas-running-to);
-  --flow-edge-color: var(--color-canvas-neutral-line);
-  --flow-edge-active-color: rgb(146 120 230 / 50%);
-  --flow-edge-selected-color: rgb(123 135 152 / 50%);
-  --flow-edge-width: 2;
+  --flow-edge-color: var(--color-canvas-edge);
+  --flow-edge-selected-color: var(--color-canvas-edge-selected);
+  --flow-edge-running-color: var(--color-canvas-edge-running);
+  --flow-edge-width: var(--color-canvas-edge-width);
   --flow-edge-dasharray: 5;
   /* Execution edges need a continuous cycle rather than a finite interaction duration. */
   --flow-edge-running-duration: 0.5s;

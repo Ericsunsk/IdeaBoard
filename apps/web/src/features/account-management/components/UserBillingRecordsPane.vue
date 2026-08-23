@@ -7,7 +7,7 @@
       :table-style="{ minWidth: '720px' }"
       table-aria-label="账单记录表格"
       scroll-aria-label="账单记录表格"
-      frame-class="rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface shadow-[var(--shadow-ib-control)]"
+      :frame-class="accountDataTableFrameClass"
       empty-title="暂无账单记录"
       empty-description="Idea 收支记录会显示在这里"
     >
@@ -114,6 +114,7 @@ import DataTableFrame from '../../../shared/components/DataTableFrame.vue'
 import type { UserBillingRecord } from '../userBillingRecordsResource'
 import { useUserBillingRecords } from '../useUserBillingRecords'
 import AccountManagementPane from './AccountManagementPane.vue'
+import { accountDataTableFrameClass } from './accountManagementUi'
 
 type BillingSkeletonRow = {
   record_id: string

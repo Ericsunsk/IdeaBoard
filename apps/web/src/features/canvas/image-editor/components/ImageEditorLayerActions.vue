@@ -23,7 +23,7 @@
       </div>
       <NodeToolIconButton
         class="image-editor-layer-actions__cancel"
-        aria-label-value="取消应用"
+        aria-label="取消应用"
         tooltip="取消应用"
         @click="emit('cancel-apply')"
       >
@@ -33,7 +33,7 @@
     <div class="image-editor-layer-actions__buttons">
       <NodeToolIconButton
         class="image-editor-layer-actions__button"
-        aria-label-value="添加图层"
+        aria-label="添加图层"
         tooltip="添加图层"
         @click="emit('add-layer')"
       >
@@ -42,7 +42,7 @@
       <NodeToolIconButton
         class="image-editor-layer-actions__button"
         :disabled="!canCopyLayer"
-        aria-label-value="复制图层"
+        aria-label="复制图层"
         tooltip="复制图层"
         @click="emit('copy-layer')"
       >
@@ -51,7 +51,7 @@
       <NodeToolIconButton
         class="image-editor-layer-actions__button"
         :disabled="!canMergeLayer"
-        aria-label-value="合并图层"
+        aria-label="合并图层"
         tooltip="合并图层"
         @click="emit('merge-layer')"
       >
@@ -60,7 +60,7 @@
       <NodeToolIconButton
         class="image-editor-layer-actions__button"
         :disabled="!canRemoveLayer"
-        aria-label-value="删除图层"
+        aria-label="删除图层"
         tooltip="删除图层"
         @click="emit('remove-layer')"
       >
@@ -70,7 +70,7 @@
         class="image-editor-layer-actions__button image-editor-layer-actions__button--apply"
         primary
         :disabled="applyDisabled"
-        :aria-label-value="applying ? '应用中' : '应用为新节点'"
+        :aria-label="applying ? '应用中' : '应用为新节点'"
         :tooltip="applying ? '应用中' : '应用为新节点'"
         @click="emit('apply-adjustments')"
       >
@@ -191,7 +191,7 @@ onBeforeUnmount(clearProgressPanelDelay)
 .image-editor-layer-actions__progress {
   min-height: 46px;
   border: var(--node-tool-border-width) solid var(--canvas-accent-outline);
-  border-radius: var(--canvas-floating-radius);
+  border-radius: var(--canvas-radius-xl);
   padding: 7px 39px 7px 8px;
   position: relative;
   display: grid;

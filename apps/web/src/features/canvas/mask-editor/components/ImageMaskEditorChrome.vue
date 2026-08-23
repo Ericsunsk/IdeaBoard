@@ -4,7 +4,7 @@
       <NodeToolIconButton
         class="image-mask-editor-tool-btn"
         :active="drawMode === 'paint'"
-        aria-label-value="画笔"
+        aria-label="画笔"
         tooltip="画笔"
         @click="emit('set-draw-mode', 'paint')"
       >
@@ -13,7 +13,7 @@
       <NodeToolIconButton
         class="image-mask-editor-tool-btn"
         :active="drawMode === 'erase'"
-        aria-label-value="橡皮擦"
+        aria-label="橡皮擦"
         tooltip="橡皮擦"
         @click="emit('set-draw-mode', 'erase')"
       >
@@ -88,7 +88,7 @@
       <div class="image-mask-editor-right-actions node-tool-surface">
         <NodeToolIconButton
           class="image-mask-editor-tool-btn"
-          aria-label-value="清空蒙版"
+          aria-label="清空蒙版"
           tooltip="清空蒙版"
           @click="emit('clear-mask')"
         >
@@ -97,7 +97,7 @@
         <NodeToolIconButton
           class="image-mask-editor-tool-btn"
           :disabled="!canUndo"
-          aria-label-value="回退"
+          aria-label="回退"
           tooltip="回退"
           @click="emit('undo-mask')"
         >
@@ -106,7 +106,7 @@
         <NodeToolIconButton
           class="image-mask-editor-tool-btn"
           :disabled="!canRedo"
-          aria-label-value="前进"
+          aria-label="前进"
           tooltip="前进"
           @click="emit('redo-mask')"
         >

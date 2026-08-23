@@ -12,7 +12,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  font-size: 16px;
+  font-size: var(--canvas-font-size-title);
   font-weight: 700;
   text-transform: none;
   letter-spacing: 0.04em;
@@ -117,7 +117,7 @@
   gap: 6px;
   padding: 7px 8px;
   border: var(--node-tool-border-width) solid var(--canvas-node-border);
-  border-radius: 10px;
+  border-radius: var(--canvas-radius-lg);
   background: var(--canvas-node-bg);
 }
 
@@ -135,7 +135,7 @@
 }
 
 .node-control-label {
-  font-size: 11px;
+  font-size: var(--canvas-font-size-caption);
   font-weight: 600;
   color: var(--canvas-node-text-muted);
   letter-spacing: 0;

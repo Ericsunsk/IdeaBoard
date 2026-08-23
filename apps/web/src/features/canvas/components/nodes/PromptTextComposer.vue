@@ -151,25 +151,21 @@ const variantClass = computed(() => promptTextComposerVariantClasses[props.varia
 const hasText = computed(() => props.modelValue.trim().length > 0)
 const promptTextInputClass = computed(() =>
   [
-    'prompt-text-composer-input box-border min-h-0 w-full flex-auto cursor-text resize-none overflow-hidden border-0 bg-transparent font-[inherit] text-[#334155] outline-none placeholder:text-[#94a3b8] disabled:cursor-wait',
+    'prompt-text-composer-input box-border min-h-0 w-full flex-auto cursor-text resize-none overflow-hidden border-0 bg-transparent font-[inherit] text-[var(--canvas-text-body)] outline-none placeholder:text-[var(--canvas-text-subtle)] disabled:cursor-wait',
     props.variant === 'floating'
       ? 'px-1 py-1.5 text-xs leading-[18px]'
       : 'p-0 text-[14px] leading-[1.6]',
   ].join(' '),
 )
 
-function onSubmit(
-  prompt: string,
-  outputCount: number,
-  aspectRatio: PromptAspectRatio,
-) {
+function onSubmit(prompt: string, outputCount: number, aspectRatio: PromptAspectRatio) {
   emit('submit', prompt, outputCount, aspectRatio)
 }
 </script>
 
 <style scoped>
 .prompt-text-composer.node-tool-surface {
-  --node-tool-button-border: #e2e8f0;
+  --node-tool-button-border: var(--canvas-node-border);
 }
 
 .prompt-text-composer-image-row {
@@ -180,10 +176,12 @@ function onSubmit(
 .prompt-text-composer.variant-floating {
   gap: var(--node-tool-button-gap);
   padding: 9px;
-  border: var(--node-tool-border-width) solid rgba(122, 107, 213, 0.28);
-  border-radius: var(--canvas-floating-radius);
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(var(--canvas-surface-blur));
+  border: var(--node-tool-border-width) solid var(--canvas-glass-border);
+  border-radius: var(--canvas-radius-xl);
+  background: var(--canvas-glass-bg);
+  box-shadow: none;
+  backdrop-filter: blur(var(--canvas-glass-blur));
+  -webkit-backdrop-filter: blur(var(--canvas-glass-blur));
 }
 
 .prompt-text-composer.variant-floating:focus-within,

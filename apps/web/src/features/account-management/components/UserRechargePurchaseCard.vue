@@ -1,8 +1,5 @@
 <template>
-  <section
-    class="rounded-[var(--radius-ib-panel)] border border-ib-border-soft bg-ib-surface p-5 shadow-[var(--shadow-ib-control)] max-[640px]:p-4"
-    aria-labelledby="recharge-purchase-heading"
-  >
+  <section :class="accountCardPanelClass" aria-labelledby="recharge-purchase-heading">
     <div
       v-if="pending"
       class="grid gap-4"
@@ -154,8 +151,12 @@ import IbFormField from '../../../shared/components/IbFormField.vue'
 import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
 import { ibFormInputClass } from '../../../shared/theme/formControls'
 import { formatUsdForIdeas, MIN_IDEA_QUANTITY, normalizeIdeaQuantity } from '../paymentMoney'
-import { accountButtonPt, accountPrimaryActionButtonClass } from './accountManagementUi'
 import type { UserPaymentPurchaseOptions } from '../userPaymentsResource'
+import {
+  accountButtonPt,
+  accountCardPanelClass,
+  accountPrimaryActionButtonClass,
+} from './accountManagementUi'
 
 const props = defineProps<{
   options?: UserPaymentPurchaseOptions

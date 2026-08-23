@@ -78,6 +78,7 @@
 </template>
 
 <script setup lang="ts">
+import './styles/image-editor-curves.css'
 import { computed, ref, watch } from 'vue'
 import type { ImageEditorCurveChannel, ImageEditorCurvesParams } from '../types'
 import {
@@ -263,5 +264,3 @@ function resolveNextSelectedPointId(
   )
 }
 </script>
-
-<style src="./styles/image-editor-curves.css"></style>

@@ -11,7 +11,7 @@
     v-else
     unstyled
     type="button"
-    class="user-credit-pill !bg-board-control-bg/80 !border-board-card-border backdrop-blur-md"
+    class="user-credit-pill"
     :class="`is-${balance.status}`"
     :data-balance-status="balance.status"
     :title="balance.ariaLabel"
@@ -49,17 +49,24 @@ defineProps<{
   padding: 0 13px 0 11px;
   flex: none;
   overflow: hidden;
-  border: 1px solid var(--user-credit-pill-border, var(--color-ib-border-soft));
-  border-radius: 999px;
-  background: var(--user-credit-pill-bg, var(--color-ib-surface));
+  border: 1px solid var(--user-credit-pill-border, var(--color-board-card-border));
+  border-radius: 9999px;
+  background: var(--user-credit-pill-bg, var(--color-board-control-bg, rgba(255, 255, 255, 0.8)));
   color: var(--color-ib-text);
   box-shadow: var(--shadow-ib-control);
+  backdrop-filter: blur(var(--ib-glass-blur));
+  -webkit-backdrop-filter: blur(var(--ib-glass-blur));
   cursor: pointer;
   appearance: none;
   transition:
     background-color var(--motion-control-duration) var(--motion-control-easing),
     border-color var(--motion-control-duration) var(--motion-control-easing),
-    color var(--motion-control-duration) var(--motion-control-easing);
+    color var(--motion-control-duration) var(--motion-control-easing),
+    transform var(--motion-control-duration) var(--motion-control-easing);
+}
+
+.user-credit-pill:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 .user-credit-pill:hover {

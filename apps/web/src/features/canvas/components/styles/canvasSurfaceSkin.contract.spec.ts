@@ -9,6 +9,7 @@ const readSource = (relativePath: string) => readFileSync(resolve(sourceRoot, re
 
 const canvasScreen = readSource('screen-presentation/CanvasScreen.vue')
 const surfaceSkin = readSource('components/styles/canvas-surface-skin.css')
+const appStyle = readSource('../../app/style.css')
 const chromeSkin = readSource('components/styles/canvas-chrome.css')
 const nodeSkin = readSource('components/nodes/styles/node-shared.css')
 const nodeToolSkin = readSource('components/nodes/styles/node-tool-buttons.css')
@@ -19,6 +20,7 @@ const imageToolStagePresentation = readSource(
 )
 const vueFlowAdapterSkin = readSource('components/styles/canvas-vue-flow-adapter-skin.css')
 const canvasMiniMap = readSource('components/CanvasMiniMap.vue')
+const nodeHandleRail = readSource('components/FlowCanvasNodeHandleRail.vue')
 const imageEditorLayerActions = readSource('image-editor/components/ImageEditorLayerActions.vue')
 const imageEditorHistogram = readSource(
   'image-editor/components/styles/image-editor-histogram-plot.css',
@@ -35,18 +37,15 @@ describe('Canvas surface skin contract', () => {
 
   it('maps Canvas surface semantics to app tokens while keeping the named Canvas contract stable', () => {
     expect(surfaceSkin).toContain('--canvas-surface-bg: var(--color-canvas-surface-bg)')
-    expect(surfaceSkin).toContain(
-      '--canvas-control-border-color: var(--color-canvas-neutral-line)',
-    )
-    expect(surfaceSkin).toContain('--canvas-control-bg: var(--canvas-surface-bg-soft)')
-    expect(surfaceSkin).toContain('--canvas-control-accent-bg:')
-    expect(surfaceSkin).toContain('--flow-edge-color: var(--color-canvas-neutral-line)')
+    expect(surfaceSkin).toContain('--canvas-control-border-color: var(--color-canvas-neutral-line)')
+    expect(appStyle).toMatch(/--color-canvas-neutral-line:\s*rgb\(177 177 183 \/ 65%\);/)
+    expect(surfaceSkin).toContain('--flow-edge-color: var(--color-canvas-edge)')
     expect(surfaceSkin).toContain('--canvas-accent: var(--color-canvas-accent)')
     expect(surfaceSkin).toContain('--canvas-accent-hover: var(--color-canvas-accent-hover)')
     expect(surfaceSkin).toContain('--canvas-text-muted: var(--color-canvas-text-secondary)')
-    expect(surfaceSkin).toContain('--canvas-surface-shadow:')
-    expect(surfaceSkin).toContain('--canvas-floating-shadow: var(--canvas-surface-shadow)')
+    expect(surfaceSkin).toContain('--canvas-shadow-floating:')
     expect(surfaceSkin).toContain('--flow-edge-running-duration: 0.5s')
+    expect(nodeHandleRail).toContain('--handle-ring-color: var(--flow-edge-color)')
   })
 
   it('keeps Canvas consumers on the named surface contract instead of direct app token aliases', () => {
@@ -82,9 +81,7 @@ describe('Canvas surface skin contract', () => {
     expect(chromeSkin).toContain('max-width: calc(100vw - 32px)')
     expect(vueFlowAdapterSkin).toContain('edge.selected')
     expect(vueFlowAdapterSkin).toContain('edge:focus-visible')
-    expect(vueFlowAdapterSkin).toContain(
-      'border: 1px solid var(--canvas-control-border-color)',
-    )
+    expect(vueFlowAdapterSkin).toContain('border: 1px solid var(--canvas-control-border-color)')
     expect(canvasMiniMap).toContain('var(--canvas-minimap-node)')
     expect(nodeSkin).toContain('.workflow-node.running::before')
     expect(nodeSkin).toContain('animation: none;')

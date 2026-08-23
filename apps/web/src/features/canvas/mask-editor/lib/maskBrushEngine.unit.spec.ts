@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { MASK_EDITOR_PAINT_COLOR } from '../config/maskEditorConstants'
-import { perfectFreehandMaskStrokeEngine } from './maskBrushEngine'
+import { maskStrokeEngine } from './maskBrushEngine'
 
 function createCanvasFixture() {
   const canvas = document.createElement('canvas')
@@ -27,11 +27,11 @@ const points = [
   { x: 46, y: 14, pressure: 0.5 },
 ]
 
-describe('perfectFreehandMaskStrokeEngine', () => {
+describe('maskStrokeEngine', () => {
   it('renders a closed smoothed outline for a paint stroke', () => {
     const { canvas, context, lineTo } = createCanvasFixture()
 
-    perfectFreehandMaskStrokeEngine.draw(canvas, points, {
+    maskStrokeEngine.draw(canvas, points, {
       brushSize: 18,
       drawMode: 'paint',
       last: true,
@@ -48,7 +48,7 @@ describe('perfectFreehandMaskStrokeEngine', () => {
   it('uses destination-out for erase strokes', () => {
     const { canvas, context } = createCanvasFixture()
 
-    perfectFreehandMaskStrokeEngine.draw(canvas, points, {
+    maskStrokeEngine.draw(canvas, points, {
       brushSize: 18,
       drawMode: 'erase',
       last: false,

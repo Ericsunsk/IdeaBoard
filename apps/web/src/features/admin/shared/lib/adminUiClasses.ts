@@ -43,11 +43,7 @@ const adminFramedIconButtonBaseClass =
 
 export const adminFramedIconButtonClass = `${adminFramedIconButtonBaseClass} !rounded-lg`
 
-export const adminRoundIconButtonClass = `${adminFramedIconButtonBaseClass} !rounded-full`
-
-export const adminToolbarIconButtonClass = adminFramedIconButtonClass
-
-export const adminToolbarPagerButtonClass = `${adminToolbarIconButtonClass} disabled:!opacity-40`
+export const adminToolbarPagerButtonClass = `${adminFramedIconButtonClass} disabled:!opacity-40`
 
 export const adminToolbarPageLabelClass =
   'flex h-9 items-center justify-center rounded-lg !border !border-ib-border !bg-ib-surface px-3 text-admin-meta font-semibold text-ib-text-muted'

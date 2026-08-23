@@ -16,9 +16,9 @@
     var(--canvas-control-border-width)
   );
   --editing-controls-row-height: 31px;
-  --editing-controls-control-height: 28px;
+  --editing-controls-control-height: var(--canvas-control-size-sm);
   --editing-controls-compact-control-height: calc(var(--editing-controls-control-height) - 4px);
-  --editing-controls-control-radius: 8px;
+  --editing-controls-control-radius: var(--canvas-radius-md);
   --editing-controls-control-border-color: var(--canvas-accent-border);
   --editing-controls-control-hover-border-color: var(--canvas-accent);
   --editing-controls-control-focus-border-color: var(--ib-focus-border-color);
@@ -26,8 +26,8 @@
   --editing-controls-control-bg: var(--canvas-surface-muted);
   --editing-controls-control-active-bg: var(--canvas-node-accent-soft);
   --editing-controls-content-gap: var(--canvas-panel-content-gap);
-  --editing-controls-text-size: 11px;
-  --editing-controls-meta-text-size: 10px;
+  --editing-controls-text-size: var(--canvas-font-size-caption);
+  --editing-controls-meta-text-size: var(--canvas-font-size-micro);
   --editing-controls-tonal-range-gradient: linear-gradient(
     90deg,
     var(--canvas-accent-strong) 0%,
@@ -44,9 +44,12 @@
 }
 
 .editing-controls-panel {
-  border: var(--editing-controls-border-width) solid var(--canvas-accent-outline);
-  border-radius: var(--canvas-floating-radius);
-  background: var(--canvas-surface-bg);
+  border: var(--editing-controls-border-width) solid var(--canvas-glass-border);
+  border-radius: var(--canvas-radius-xl);
+  background: var(--canvas-glass-bg);
+  box-shadow: none;
+  backdrop-filter: blur(var(--canvas-glass-blur));
+  -webkit-backdrop-filter: blur(var(--canvas-glass-blur));
   box-sizing: border-box;
   overflow: visible;
 }

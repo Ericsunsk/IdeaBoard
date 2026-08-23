@@ -92,6 +92,10 @@
   --color-canvas-workspace-bg: #e7e7e7;
   --color-canvas-surface-bg: #f7f7f7;
   --color-canvas-neutral-line: rgb(177 177 183 / 65%);
+  --color-canvas-edge: rgba(0, 0, 0, 0.2);
+  --color-canvas-edge-selected: rgba(0, 0, 0, 0.4);
+  --color-canvas-edge-running: var(--color-canvas-edge-selected);
+  --color-canvas-edge-width: 2;
   --color-canvas-accent: #9278e6;
   --color-canvas-accent-hover: #7a6bd5;
   --color-canvas-accent-pressed: #6d5fd0;
@@ -108,8 +112,6 @@
   --color-canvas-accent-clear: rgba(122, 107, 213, 0);
   --color-canvas-node-bg: var(--color-canvas-surface-bg);
   --color-canvas-node-border: #e8ecf4;
-  --color-canvas-handle-border: #d8e0ea;
-  --color-canvas-handle-border-active: #c4ccd8;
   --color-canvas-track-bg: #eef2f5;
   --color-canvas-text-primary: #272932;
   --color-canvas-text-secondary: #64748b;
@@ -126,7 +128,10 @@
   --spacing-ib-page-dot: 12px;
   --spacing-ib-page-chrome-inset: 16px;
 
-  /* ── Boards list tokens ────────────────────────────────── */
+  /* ── Global Glass & Frosted Surface tokens ────────────── */
+  --ib-glass-blur: 12px;
+
+  /* ── Board-level tokens ────────────────────────────────── */
   --color-board-page: #f8f9fd;
   --color-board-page-text: #1f2430;
   --color-board-page-text-muted: #6e7487;
@@ -140,7 +145,7 @@
   --color-board-surface-soft: rgba(255, 255, 255, 0.6);
   --color-board-surface-strong: var(--color-ib-surface);
   --color-board-overlay-bg: rgba(255, 255, 255, 0.98);
-  --color-board-control-bg: rgba(255, 255, 255, 0.9);
+  --color-board-control-bg: rgba(255, 255, 255, 0.85);
   --color-board-control-text: #3e4457;
   --color-board-control-input-text: #2f3446;
   --color-board-control-icon: #8a90a3;

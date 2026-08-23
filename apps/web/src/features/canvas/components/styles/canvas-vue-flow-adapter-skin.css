@@ -35,6 +35,7 @@
 }
 
 .canvas-flow-wrap .vue-flow__edge.animated path {
+  stroke: var(--flow-edge-running-color);
   stroke-dasharray: var(--flow-edge-dasharray);
   animation: flow-edge-dashdraw var(--flow-edge-running-duration) linear infinite;
 }

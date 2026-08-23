@@ -79,7 +79,7 @@
                 <button
                   v-if="canAddReference"
                   type="button"
-                  class="search-reference-action"
+                  class="search-reference-control"
                   :title="`Add more references (${referenceSlotCount}/4)`"
                   :aria-label="`Add more references (${referenceSlotCount}/4)`"
                   @click="openFilePicker"
@@ -92,7 +92,11 @@
                 v-model="draftQuery"
                 unstyled
                 class="min-w-0 flex-1 bg-transparent px-1 text-[13.5px] text-board-control-input-text outline-none"
-                :placeholder="references.length > 0 ? 'Add keywords or prompt (optional)...' : 'Search inspiration...'"
+                :placeholder="
+                  references.length > 0
+                    ? 'Add keywords or prompt (optional)...'
+                    : 'Search inspiration...'
+                "
                 aria-label="搜索灵感"
                 @input="queryError = ''"
               />
@@ -101,7 +105,7 @@
                 <button
                   v-if="references.length > 0 || draftQuery"
                   type="button"
-                  class="search-reference-action"
+                  class="search-reference-control"
                   title="Clear search"
                   aria-label="Clear search"
                   @click="handleClearSearch"
@@ -135,9 +139,7 @@
           <button
             type="button"
             class="group grid size-11 shrink-0 place-items-center rounded-full border border-board-card-border bg-board-control-bg/80 backdrop-blur-md transition-[transform,border-color,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:scale-105 active:scale-95 hover:border-board-card-border-hover focus-visible:outline-none cursor-pointer"
-            :class="[
-              isTriggerHoveredDuringDrag ? '!scale-110 !border-board-primary' : '',
-            ]"
+            :class="[isTriggerHoveredDuringDrag ? '!scale-110 !border-board-primary' : '']"
             aria-label="Toggle My Library"
             title="My Library / Drop here to Quick Save"
             :aria-expanded="libraryIslandOpen"
@@ -165,6 +167,7 @@
           accept="image/*"
           multiple
           class="hidden"
+          aria-label="Upload reference images"
           @change="handleFileInput"
         />
 
@@ -243,7 +246,7 @@
             :key="`${result.provider}:${result.id}`"
             :style="style"
             draggable="true"
-            class="group relative overflow-hidden rounded-2xl bg-board-control-bg/80 backdrop-blur-md shadow-xs transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-[var(--shadow-ib-panel)] cursor-grab active:cursor-grabbing select-none"
+            class="group relative overflow-hidden rounded-[var(--search-card-radius)] bg-board-control-bg/80 backdrop-blur-md shadow-xs transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-[var(--shadow-ib-panel)] cursor-grab active:cursor-grabbing select-none"
             @dragstart="handleCardDragStart($event, result)"
             @dragend="handleCardDragEnd"
           >
@@ -281,11 +284,11 @@
                 <!-- 左上角极简多选微圆对勾 (强制 28x28 正圆) -->
                 <button
                   type="button"
-                  class="grid size-7 place-items-center rounded-full transition-colors duration-[var(--motion-control-duration)] cursor-pointer focus-visible:outline-none"
+                  class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full transition-colors duration-[var(--motion-control-duration)] cursor-pointer focus-visible:outline-none"
                   :class="
                     isResultSelected(result)
                       ? '!bg-board-primary text-ib-text-inverse shadow-xs'
-                      : 'bg-black/40 text-white/80 hover:bg-black/60 hover:text-white backdrop-blur-md'
+                      : 'bg-[var(--search-overlay-btn-bg)] text-white/80 hover:bg-[var(--search-overlay-btn-bg-hover)] hover:text-white backdrop-blur-[var(--search-glass-blur)]'
                   "
                   :title="isResultSelected(result) ? 'Deselect image' : 'Select image'"
                   :aria-label="isResultSelected(result) ? 'Deselect image' : 'Select image'"
@@ -297,7 +300,7 @@
                 <!-- 右上角以图搜图参考圆纽 (强制 28x28 正圆) -->
                 <button
                   type="button"
-                  class="grid size-7 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md transition-colors hover:bg-board-primary focus-visible:outline-none cursor-pointer"
+                  class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full bg-[var(--search-overlay-btn-bg)] text-white backdrop-blur-[var(--search-glass-blur)] transition-colors hover:bg-board-primary focus-visible:outline-none cursor-pointer"
                   :class="{
                     '!bg-board-primary shadow-xs':
                       references.some(
@@ -474,6 +477,7 @@
 </template>
 
 <script setup lang="ts">
+import '../search.css'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
@@ -491,7 +495,10 @@ import SearchBatchActionDock from '../components/SearchBatchActionDock.vue'
 import SearchResultViewport from '../components/SearchResultViewport.vue'
 import LibraryFloatingIsland from '../../library/components/LibraryFloatingIsland.vue'
 import { libraryAssetKey } from '../../library/libraryResource'
-import { writeSearchReferenceTransfer, readSearchReferenceTransfer } from '../../library/libraryTransfer'
+import {
+  writeSearchReferenceTransfer,
+  readSearchReferenceTransfer,
+} from '../../library/libraryTransfer'
 import { searchReferenceKey } from '../searchLibraryBridge'
 import { useUserAccountControls } from '../../user-shell/useUserAccountControls'
 import { type SearchResult } from '../searchResource'
@@ -651,7 +658,7 @@ function handleCardDragStart(e: DragEvent, result: SearchResult) {
   ghost.style.height = '44px'
   ghost.style.borderRadius = '8px'
   ghost.style.overflow = 'hidden'
-  ghost.style.boxShadow = '0 12px 28px rgba(0,0,0,0.3)'
+  ghost.style.boxShadow = 'var(--search-dock-shadow)'
   ghost.style.transform = 'rotate(-3deg)'
   ghost.style.zIndex = '9999'
 
@@ -726,38 +733,4 @@ watch(
     if (isAuthenticated && !wasAuthenticated) void resumePendingAction()
   },
 )
-
 </script>
-
-<style scoped>
-.search-reference-action {
-  display: grid;
-  width: 2rem;
-  height: 2rem;
-  flex-shrink: 0;
-  cursor: pointer;
-  place-items: center;
-  border-radius: var(--radius-ib-pill);
-  background-color: var(--color-board-loading-bg);
-  color: var(--color-board-page-text-muted);
-  transition:
-    background-color var(--motion-control-duration) var(--motion-control-easing),
-    color var(--motion-control-duration) var(--motion-control-easing),
-    transform var(--motion-control-duration) var(--motion-control-easing);
-}
-
-.search-reference-action:hover {
-  background-color: var(--color-board-card-border);
-  color: var(--color-board-page-text);
-  transform: scale(1.05);
-}
-
-.search-reference-action:active {
-  transform: scale(0.95);
-}
-
-.search-reference-action:focus-visible {
-  outline: none;
-  box-shadow: var(--shadow-board-focus);
-}
-</style>

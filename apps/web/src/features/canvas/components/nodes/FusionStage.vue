@@ -289,24 +289,20 @@ function getBlendWeightBadgeStyle(index: number) {
 
 .fusion-node-stage.is-active .fusion-node-ray,
 .fusion-node-stage.is-drop-target .fusion-node-ray {
-  --fusion-node-ray-color: var(--flow-edge-active-color);
+  --fusion-node-ray-color: var(--flow-edge-running-color);
 }
 
 .fusion-empty-mark {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 126px;
-  height: 126px;
+  width: 112px;
+  height: 112px;
+  stroke-width: 0.6;
   translate: -50% -50%;
   z-index: 1;
   pointer-events: none;
-  color: #a8b3be;
-  transition: color var(--motion-control-duration) var(--motion-control-easing);
-}
-
-.fusion-node-stage:hover .fusion-empty-mark {
-  color: #8894a5;
+  color: var(--canvas-text-subtle);
 }
 
 .fusion-node-slot {
@@ -380,7 +376,7 @@ function getBlendWeightBadgeStyle(index: number) {
   width: 16px;
   height: 16px;
   border-radius: 999px;
-  background: #9278e6;
+  background: var(--canvas-accent);
 }
 
 .fusion-blend-weight-layer {
@@ -397,7 +393,7 @@ function getBlendWeightBadgeStyle(index: number) {
   border-radius: 999px;
   border: 0;
   background: rgba(255, 255, 255, 0.8);
-  color: #475569;
+  color: var(--canvas-text-body);
   font-size: 11px;
   line-height: 1.3;
   font-weight: 600;

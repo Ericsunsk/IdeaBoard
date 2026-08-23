@@ -31,7 +31,7 @@
           <Button
             v-tooltip.top="'OAuth Provider 设置'"
             text
-            :class="adminToolbarIconButtonClass"
+            :class="adminFramedIconButtonClass"
             aria-label="OAuth Provider 设置"
             aria-haspopup="dialog"
             @click="oauthSettingsVisible = true"
@@ -315,10 +315,7 @@ import {
   type UserActionKey,
 } from './adminUserView'
 import { useAdminUsersFeedback } from './useAdminUsersFeedback'
-import {
-  adminFramedIconButtonClass,
-  adminToolbarIconButtonClass,
-} from '../shared/lib/adminUiClasses'
+import { adminFramedIconButtonClass } from '../shared/lib/adminUiClasses'
 
 const vTooltip = Tooltip
 

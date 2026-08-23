@@ -39,6 +39,7 @@
 </template>
 
 <script setup lang="ts">
+import './styles/image-editor-panel.css'
 import type { Component } from 'vue'
 import {
   Brightness,
@@ -97,7 +98,6 @@ function assertNever(value: never): never {
 }
 </script>
 
-<style src="./styles/image-editor-panel.css"></style>
 <style scoped>
 .image-editor-layers-panel {
   height: calc(

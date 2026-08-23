@@ -273,7 +273,7 @@ function submitExpand(prompt: string) {
   border: 0;
   border-radius: 11px;
   background: var(--canvas-node-bg);
-  color: #a8b3be;
+  color: var(--canvas-text-subtle);
   gap: 0;
   display: flex;
   flex-direction: column;
@@ -281,31 +281,24 @@ function submitExpand(prompt: string) {
   justify-content: center;
   cursor: pointer;
   outline: none;
-  transition:
-    background-color var(--motion-control-duration) var(--motion-control-easing),
-    color var(--motion-control-duration) var(--motion-control-easing);
 }
 
 .image-node-stage-empty:hover {
   background: var(--canvas-node-bg);
-  color: #8894a5;
+  color: var(--canvas-text-subtle);
 }
 
 .image-node-stage-empty:focus-visible {
-  color: #6f5ed1;
+  color: var(--canvas-accent-hover);
   outline: var(--ib-focus-outline-width) solid var(--ib-focus-outline-color);
   outline-offset: calc(-1 * var(--ib-focus-outline-width));
 }
 
-.image-node-stage-empty .node-empty-state-icon--image {
-  width: 84px;
-  height: 84px;
-  stroke-width: 0.85;
-}
-
+.image-node-stage-empty .node-empty-state-icon--image,
 .image-node-stage-empty .node-empty-state-icon--fusion {
-  width: 126px;
-  height: 126px;
+  width: 112px;
+  height: 112px;
+  stroke-width: 0.6;
 }
 
 .image-node-stage-empty span {
@@ -318,7 +311,7 @@ function submitExpand(prompt: string) {
 
 .image-node-stage-empty.is-loading {
   background: rgba(255, 255, 255, 0.56);
-  color: #a8b3be;
+  color: var(--canvas-text-subtle);
   cursor: default;
 }
 

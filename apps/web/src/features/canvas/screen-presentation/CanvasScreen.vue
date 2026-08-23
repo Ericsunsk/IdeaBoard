@@ -91,6 +91,9 @@
 </template>
 
 <script setup lang="ts">
+import '../components/styles/canvas-surface-skin.css'
+import '../components/styles/canvas-vue-flow-adapter-skin.css'
+import '../components/styles/canvas-style-contracts.css'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { uploadApi } from '../../../shared/api/upload'
@@ -409,12 +412,6 @@ useCanvasScreenLifecycle({
   },
 })
 </script>
-
-<style>
-@import '../components/styles/canvas-surface-skin.css';
-@import '../components/styles/canvas-vue-flow-adapter-skin.css';
-@import '../components/styles/canvas-style-contracts.css';
-</style>
 
 <style scoped>
 :global(html.canvas-overscroll-guard),

@@ -11,11 +11,6 @@
         :avatar-url="accountControls.viewModel.avatarUrl.value"
         :balance="accountControls.viewModel.balance.value"
         :items="accountControls.viewModel.menuItems.value"
-        :wrap-class="boardCatalogClasses.userMenuWrap"
-        :avatar-button-class="boardCatalogClasses.userAvatarButton"
-        :avatar-image-class="boardCatalogClasses.userAvatar"
-        :avatar-placeholder-class="boardCatalogClasses.userAvatarPlaceholder"
-        :avatar-icon-class="boardCatalogClasses.avatarIcon"
       />
     </header>
 
@@ -165,6 +160,7 @@
 </template>
 
 <script setup lang="ts">
+import '../styles/board-surface-skin.css'
 import { useRouter } from 'vue-router'
 import BoardCard from '../components/BoardCard.vue'
 import {

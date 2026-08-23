@@ -35,11 +35,11 @@
           <!-- 核心余额与状态 -->
           <div class="flex flex-wrap items-center gap-6 sm:gap-8">
             <div class="flex flex-col gap-0.5">
-              <span class="text-admin-caption font-semibold text-admin-text-3">
-                账户余额
-              </span>
+              <span class="text-admin-caption font-semibold text-admin-text-3"> 账户余额 </span>
               <div class="flex items-baseline gap-2">
-                <span class="text-2xl font-black tracking-tight text-admin-title-color font-mono tabular-nums">
+                <span
+                  class="text-2xl font-black tracking-tight text-admin-title-color font-mono tabular-nums"
+                >
                   {{ formatCredits(wallet?.available_credits ?? user.availableCredits) }}
                 </span>
                 <span
@@ -54,14 +54,9 @@
             <div class="hidden h-9 w-px bg-admin-border-soft sm:block" />
 
             <div class="flex flex-col gap-0.5">
-              <span class="text-admin-caption font-semibold text-admin-text-3">
-                账户状态
-              </span>
+              <span class="text-admin-caption font-semibold text-admin-text-3"> 账户状态 </span>
               <div class="flex items-center gap-1.5 pt-0.5">
-                <AdminStatusPill
-                  :label="accountStatus"
-                  :variant="accountStatusVariant"
-                />
+                <AdminStatusPill :label="accountStatus" :variant="accountStatusVariant" />
               </div>
             </div>
           </div>
@@ -106,7 +101,9 @@
             <span class="font-bold text-admin-warning">有效限制生效中</span>
             <ul class="space-y-0.5 pl-4 text-admin-text-2 list-disc">
               <li v-for="restriction in activeRestrictions" :key="restriction.restriction_id">
-                <span class="font-semibold text-admin-title-color">{{ getRestrictionLabel(restriction.type) }}：</span>
+                <span class="font-semibold text-admin-title-color"
+                  >{{ getRestrictionLabel(restriction.type) }}：</span
+                >
                 {{ restriction.reason }}
               </li>
             </ul>
@@ -198,17 +195,17 @@
           v-if="activeTab === 'refund' && refundSource"
           class="flex items-center gap-2 rounded-xl border border-admin-accent/20 bg-admin-accent-soft/40 px-3.5 py-2.5 text-xs text-admin-accent-strong font-mono"
         >
-          <span>原 Charge：{{ refundSource.transaction_id }}，剩余可退 {{ formatCredits(refundSource.charge?.remaining_refundable_credits ?? 0) }}。</span>
+          <span
+            >原 Charge：{{ refundSource.transaction_id }}，剩余可退
+            {{ formatCredits(refundSource.charge?.remaining_refundable_credits ?? 0) }}。</span
+          >
         </div>
 
-        <form
-          class="flex flex-col gap-4"
-          @submit.prevent="requestCommandConfirmation"
-        >
+        <form class="flex flex-col gap-4" @submit.prevent="requestCommandConfirmation">
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-12 sm:items-start">
             <div class="sm:col-span-4">
               <AdminFormField
-                v-slot="{ describedbyId, invalid, resolvePlaceholder }"
+                v-slot="{ describedbyId, invalid }"
                 label="Idea数量"
                 for="admin-user-wallet-command-amount"
                 :error="showErrors ? validation.amountError : ''"
@@ -220,7 +217,7 @@
                   fluid
                   :min="1"
                   :use-grouping="true"
-                  :placeholder="resolvePlaceholder('例如：100')"
+                  placeholder="例如：100"
                   :invalid="invalid"
                   :disabled="commandPending"
                   :aria-describedby="describedbyId"
@@ -304,7 +301,8 @@
                       : 'text-admin-title-color'
                   "
                 >
-                  {{ getCreditCommandSign(data.command_type) }}{{ formatCredits(data.amount_credits) }}
+                  {{ getCreditCommandSign(data.command_type)
+                  }}{{ formatCredits(data.amount_credits) }}
                 </span>
               </template>
             </Column>
@@ -319,10 +317,16 @@
 
             <Column header="原因 / 关联" style="min-width: 220px">
               <template #body="{ data }">
-                <div class="max-w-72 truncate text-admin-body-sm text-admin-text-1" :title="data.reason">
+                <div
+                  class="max-w-72 truncate text-admin-body-sm text-admin-text-1"
+                  :title="data.reason"
+                >
                   {{ data.reason || '-' }}
                 </div>
-                <div v-if="data.charge" class="mt-0.5 text-admin-caption text-admin-text-3 font-mono">
+                <div
+                  v-if="data.charge"
+                  class="mt-0.5 text-admin-caption text-admin-text-3 font-mono"
+                >
                   可退 {{ formatCredits(data.charge.remaining_refundable_credits) }}
                 </div>
               </template>

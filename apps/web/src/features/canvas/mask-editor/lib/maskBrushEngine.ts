@@ -46,7 +46,7 @@ function drawMaskStrokeOutline(
   ctx.restore()
 }
 
-export const perfectFreehandMaskStrokeEngine: MaskStrokeEngine = {
+export const maskStrokeEngine: MaskStrokeEngine = {
   draw(canvas, points, options) {
     const outline = getStroke(
       points.map(({ x, y, pressure }) => [x, y, pressure]),
@@ -62,5 +62,3 @@ export const perfectFreehandMaskStrokeEngine: MaskStrokeEngine = {
     drawMaskStrokeOutline(canvas, outline, options.drawMode)
   },
 }
-
-export const maskStrokeEngine = perfectFreehandMaskStrokeEngine

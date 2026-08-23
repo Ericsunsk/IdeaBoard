@@ -15,7 +15,7 @@
           <slot name="filters" />
         </div>
         <div v-if="hasActionsContent" :class="toolbarEndSlotGroupClass">
-          <slot name="actions" :icon-button-class="adminToolbarIconButtonClass" />
+          <slot name="actions" :icon-button-class="adminFramedIconButtonClass" />
         </div>
         <div v-if="hasPagerContent" :class="toolbarPagerGroupClass">
           <slot name="pager" />
@@ -29,7 +29,7 @@
 import { computed, useSlots } from 'vue'
 import {
   adminSurfaceToolbarClass,
-  adminToolbarIconButtonClass,
+  adminFramedIconButtonClass,
   adminToolbarMetricClass,
 } from '../lib/adminUiClasses'
 

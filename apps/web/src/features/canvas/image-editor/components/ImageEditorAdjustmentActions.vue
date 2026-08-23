@@ -5,7 +5,7 @@
       :key="item.kind"
       class="image-editor-adjustment-actions__button"
       :active="selectedKind === item.kind"
-      :aria-label-value="item.label"
+      :aria-label="item.label"
       :tooltip="item.label"
       @click="emit('select-adjustment', item.kind)"
     >

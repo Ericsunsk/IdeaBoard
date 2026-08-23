@@ -3,10 +3,10 @@
     <button
       ref="triggerButtonRef"
       type="button"
-      class="grid size-7 place-items-center rounded-full transition shadow-md focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] disabled:opacity-60 cursor-pointer"
+      class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full transition shadow-md focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] disabled:opacity-60 cursor-pointer"
       :class="[
         saved
-          ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+          ? 'bg-ib-success text-ib-text-inverse hover:bg-ib-success/90'
           : 'bg-board-primary text-ib-text-inverse hover:bg-board-primary-hover shadow-board-primary/30',
       ]"
       :aria-label="saved ? 'Remove from Library' : 'Save to Library'"
@@ -20,14 +20,7 @@
 
     <Popover
       ref="popover"
-      :pt="{
-        root: {
-          class:
-            '!rounded-[var(--radius-ib-control)] !border !border-board-card-border/70 !bg-white/80 dark:!bg-board-surface-strong/80 !p-1.5 !shadow-[0_12px_32px_rgba(45,64,89,0.14)] backdrop-blur-md',
-        },
-        content: { class: '!p-0' },
-        arrow: { class: '!hidden' },
-      }"
+      :pt="searchSavePopoverPt"
       @show="handlePopoverShow"
       @hide="handlePopoverHide"
     >
@@ -40,6 +33,7 @@
             v-model="searchQuery"
             type="text"
             placeholder="Save to folder or create..."
+            aria-label="Save to folder or create"
             class="w-full bg-transparent text-xs text-board-page-text placeholder:text-board-page-text-muted outline-none font-normal"
             @keydown.enter.prevent="handleEnterCreate"
           />
@@ -122,6 +116,8 @@ import {
   type LibraryFolderView,
 } from '../../library/libraryResource'
 import { useAppToast } from '../../../shared/composables/useAppToast'
+import { createPopoverMotionPt } from '../../../shared/motion/popoverMotion'
+import type { PopoverPassThroughOptions } from 'primevue/popover'
 
 const props = defineProps<{ result: SearchResult; saved?: boolean; authenticated?: boolean }>()
 const emit = defineEmits<{ saved: []; unsaved: []; 'auth-required': [] }>()
@@ -134,6 +130,15 @@ const folders = ref<LibraryFolderView[]>([])
 const saving = ref(false)
 const searchQuery = ref('')
 let foldersRefresh: Promise<void> | null = null
+
+const searchSavePopoverPt = {
+  ...createPopoverMotionPt(),
+  root: {
+    class:
+      '!rounded-[var(--radius-ib-control)] !border !border-board-card-border/70 !bg-[var(--search-glass-bg)] !p-1.5 !shadow-[var(--search-dock-shadow)] backdrop-blur-[var(--search-glass-blur)]',
+  },
+  content: { class: '!p-0' },
+} satisfies PopoverPassThroughOptions
 
 const quickSavesFolder = computed(() => {
   return folders.value.find((f) => f.name.toLowerCase() === 'quick saves' || f.is_default)

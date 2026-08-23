@@ -78,6 +78,8 @@ describe('CanvasChrome', () => {
     const share = screen.getByRole('button', { name: '分享功能稍后接入' })
 
     expect(share.previousElementSibling).toBe(credits)
+    expect(share).toBeDisabled()
+    expect(share).toHaveAttribute('title', '分享功能稍后接入')
     expect(screen.getAllByRole('button', { name: 'Idea余额 100 Ideas' })).toHaveLength(1)
     expect(credits).toHaveTextContent('100')
     expect(credits).not.toHaveTextContent('Ideas')

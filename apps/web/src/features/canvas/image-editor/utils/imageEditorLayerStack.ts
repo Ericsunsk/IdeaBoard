@@ -25,7 +25,6 @@ import { clampLevelsHandles } from './imageEditorLevels'
 import { normalizeThresholdAdjustment } from './imageEditorThreshold'
 
 export const SOURCE_LAYER_ID = 'source'
-export const INITIAL_SELECTED_IMAGE_EDITOR_LAYER_ID = SOURCE_LAYER_ID
 
 let imageEditorLayerIdSeed = 0
 
@@ -93,7 +92,7 @@ export type ImageEditorLayerCommand =
 export function createInitialLayerStack(): ImageEditorLayerStack {
   return {
     layers: [{ id: SOURCE_LAYER_ID, type: 'source', name: '原图', visible: true }],
-    selectedLayerId: INITIAL_SELECTED_IMAGE_EDITOR_LAYER_ID,
+    selectedLayerId: SOURCE_LAYER_ID,
   }
 }
 
