@@ -2,6 +2,7 @@ import js from '@eslint/js'
 import globals from 'globals'
 import tseslint from 'typescript-eslint'
 import vue from 'eslint-plugin-vue'
+import vueA11y from 'eslint-plugin-vuejs-accessibility'
 import prettierConfig from 'eslint-config-prettier'
 
 export default tseslint.config(
@@ -11,6 +12,7 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   ...vue.configs['flat/recommended'],
+  ...vueA11y.configs['flat/recommended'],
   {
     files: ['**/*.vue'],
     languageOptions: {
@@ -59,6 +61,15 @@ export default tseslint.config(
       'vue/max-attributes-per-line': 'off',
       'vue/multi-word-component-names': 'off',
       'vue/multiline-html-element-content-newline': 'off',
+      'vuejs-accessibility/aria-props': 'error',
+      'vuejs-accessibility/form-control-has-label': 'error',
+      'vuejs-accessibility/alt-text': 'error',
+      'vuejs-accessibility/anchor-has-content': 'error',
+      'vuejs-accessibility/heading-has-content': 'error',
+      'vuejs-accessibility/no-autofocus': 'off',
+      'vuejs-accessibility/no-static-element-interactions': 'off',
+      'vuejs-accessibility/click-events-have-key-events': 'off',
+      'vuejs-accessibility/label-has-for': 'off',
       'vue/no-duplicate-class-names': 'error',
       'vue/no-deprecated-filter': 'error',
       'vue/no-empty-component-block': 'error',

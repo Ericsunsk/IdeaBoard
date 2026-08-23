@@ -227,6 +227,10 @@ function isCanvasTokenAllowedFile(file: SourceFile): boolean {
   )
 }
 
+function isSearchTokenAllowedFile(file: SourceFile): boolean {
+  return file.sourcePath.startsWith('src/features/search/')
+}
+
 function isPageDotBackgroundAllowedFile(file: SourceFile): boolean {
   return (
     file.sourcePath === 'src/app/style.css' ||
@@ -320,6 +324,23 @@ function checkCanvasTokenBoundaries(file: SourceFile, content: string): Violatio
   ]
 }
 
+function checkSearchTokenBoundaries(file: SourceFile, content: string): Violation[] {
+  if (file.sourcePath.includes('.spec.') || file.sourcePath.includes('.test.')) return []
+
+  const pattern = /(?:var\(\s*)?--search(?:-[\w-]+)?/g
+  const count = countMatches(content, pattern)
+  if (count === 0 || isSearchTokenAllowedFile(file)) return []
+
+  return [
+    {
+      file: file.sourcePath,
+      rule: 'non-search-search-token',
+      message: 'Non-Search code must not depend directly on Search tokens.',
+      details: matchDetails(content, pattern),
+    },
+  ]
+}
+
 function checkPageDotBackgroundUtilityBoundary(file: SourceFile, content: string): Violation[] {
   const pattern = /radial-gradient\(\s*circle\s*,[^\]\n)]*(?:\s|_)1px\s*,\s*transparent(?:\s|_)1px/g
   const count = countMatches(content, pattern)
@@ -349,6 +370,7 @@ async function checkStyleGovernance(files: readonly SourceFile[]): Promise<Viola
 
     violations.push(
       ...checkCanvasTokenBoundaries(file, content),
+      ...checkSearchTokenBoundaries(file, content),
       ...checkPageDotBackgroundUtilityBoundary(file, content),
       ...checkCountRules(file, content, selectorCountRules, selectorAllowances),
       ...findMotionPolicyViolations(file.sourcePath, content).map((violation) => ({
