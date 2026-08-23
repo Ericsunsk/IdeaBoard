@@ -32,7 +32,7 @@
           Code
           <span v-if="!isEditing" class="text-admin-danger" aria-hidden="true">*</span>
         </label>
-        <div class="flex gap-2">
+        <div class="flex items-stretch gap-2">
           <InputText
             id="reward-code-value"
             v-model="form.code"
@@ -48,13 +48,19 @@
             @input="clearError('code')"
           />
           <Button
-            :label="isEditing ? '生成新 Code' : '重新生成'"
-            type="button"
-            :class="adminActionButtonClass"
-            severity="secondary"
+            severity="contrast"
             outlined
+            class="aspect-square shrink-0 !rounded-lg !p-0 flex items-center justify-center"
+            :disabled="pending"
+            :aria-label="isEditing ? '生成新 Code' : '重新生成'"
+            :title="isEditing ? '生成新 Code' : '重新生成'"
+            type="button"
             @click="regenerate"
-          />
+          >
+            <template #icon>
+              <Shuffle class="size-4" />
+            </template>
+          </Button>
         </div>
         <p id="reward-code-value-hint" class="m-0 text-admin-caption text-admin-text-3">
           {{ isEditing ? '留空则保留当前 Code；填写或生成后将更换 Code' : '保存后仅能查看末四位' }}
@@ -125,37 +131,57 @@
       </div>
 
       <AdminFormField
-        v-slot="{ describedbyId }"
+        v-slot="{ describedbyId, resolvePlaceholder }"
         label="过期时间"
         for="reward-code-expires-at"
-        hint="上海时间；清除后永久有效"
+        hint="上海时间（UTC+8）；清除或留空为永久有效"
       >
-        <DatePicker
-          v-model="expiresAtDate"
-          input-id="reward-code-expires-at"
-          date-format="yy-mm-dd"
-          placeholder="永久有效"
-          show-icon
-          icon-display="input"
-          show-time
-          show-button-bar
-          hour-format="24"
-          :manual-input="false"
-          :disabled="pending"
-          :aria-describedby="describedbyId"
-          :pt="adminDateTimePickerPt"
-          unstyled
-          fluid
-        >
-          <template #buttonbar="{ todayCallback, clearCallback }">
-            <button type="button" :class="adminDateTimePickerActionClass" @click="todayCallback">
-              今天
+        <div class="flex flex-col gap-2">
+          <div class="flex flex-wrap items-center gap-1.5">
+            <button
+              v-for="preset in expirationPresets"
+              :key="preset.label"
+              type="button"
+              class="rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors"
+              :class="
+                isPresetActive(preset.days)
+                  ? 'bg-admin-accent text-white shadow-xs'
+                  : 'border border-admin-border-soft bg-admin-surface text-admin-text-2 hover:bg-admin-surface-hover hover:text-admin-text-1'
+              "
+              :disabled="pending"
+              @click="applyPreset(preset.days)"
+            >
+              {{ preset.label }}
             </button>
-            <button type="button" :class="adminDateTimePickerActionClass" @click="clearCallback">
-              永久有效
-            </button>
-          </template>
-        </DatePicker>
+          </div>
+
+          <DatePicker
+            v-model="expiresAtDate"
+            input-id="reward-code-expires-at"
+            date-format="yy-mm-dd"
+            :placeholder="resolvePlaceholder('永久有效')"
+            show-icon
+            icon-display="input"
+            show-time
+            show-button-bar
+            hour-format="24"
+            :manual-input="false"
+            :disabled="pending"
+            :aria-describedby="describedbyId"
+            :pt="adminDateTimePickerPt"
+            unstyled
+            fluid
+          >
+            <template #buttonbar="{ todayCallback, clearCallback }">
+              <button type="button" :class="adminDateTimePickerActionClass" @click="todayCallback">
+                今天
+              </button>
+              <button type="button" :class="adminDateTimePickerActionClass" @click="clearCallback">
+                永久有效
+              </button>
+            </template>
+          </DatePicker>
+        </div>
       </AdminFormField>
 
       <Message v-if="errorMessage" severity="error" :closable="false" role="alert">
@@ -188,6 +214,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, watch } from 'vue'
+import { Shuffle } from '@iconoir/vue'
 import Button from 'primevue/button'
 import DatePicker from 'primevue/datepicker'
 import InputNumber from 'primevue/inputnumber'
@@ -238,6 +265,36 @@ const expiresAtDate = computed<Date | null>({
     form.expiresAt = pickerDateToShanghaiDateTimeInput(value)
   },
 })
+
+const expirationPresets = [
+  { label: '永久有效', days: 0 },
+  { label: '7 天', days: 7 },
+  { label: '30 天', days: 30 },
+  { label: '90 天', days: 90 },
+  { label: '1 年', days: 365 },
+]
+
+function applyPreset(days: number) {
+  if (days === 0) {
+    expiresAtDate.value = null
+    return
+  }
+  const date = new Date()
+  date.setDate(date.getDate() + days)
+  date.setHours(23, 59, 0, 0)
+  expiresAtDate.value = date
+}
+
+function isPresetActive(days: number): boolean {
+  if (days === 0) {
+    return !expiresAtDate.value
+  }
+  if (!expiresAtDate.value) return false
+  const now = new Date()
+  const diffMs = expiresAtDate.value.getTime() - now.getTime()
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
+  return Math.abs(diffDays - days) <= 1
+}
 const shownErrors = reactive<Record<FieldName, string>>({
   displayName: '',
   code: '',

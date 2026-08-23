@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { primeVueTestOptions } from '../../../test/primeVue'
 import { renderWithUser, screen, waitFor, within } from '../../../test/render'
 import OAuthProviderSettingsDialog from './OAuthProviderSettingsDialog.vue'
+
+vi.mock('../shared/logos/adminBrandLogoResource', () => ({
+  useAdminBrandLogoResource: () => ({ save: vi.fn(), remove: vi.fn() }),
+}))
 import type {
   OAuthProviderSettingsResource,
   OAuthProviderSettingsSummary,
@@ -53,7 +57,7 @@ describe('OAuthProviderSettingsDialog', () => {
     expect(within(dialog).getByRole('group', { name: 'OAuth 登录方式' })).toBeVisible()
     expect(within(dialog).getAllByRole('switch')).toHaveLength(2)
     expect(within(dialog).queryByText('Google 登录')).not.toBeInTheDocument()
-    expect(within(dialog).queryByText('已启用')).not.toBeInTheDocument()
+    expect(within(dialog).getByText('已启用')).toBeVisible()
     expect(within(dialog).getByLabelText('OAuth Provider')).toHaveTextContent('Google')
     const callback = within(dialog).getByLabelText('Callback URL') as HTMLInputElement
     expect(callback).toHaveValue('https://example.com/api/auth/callback/google')

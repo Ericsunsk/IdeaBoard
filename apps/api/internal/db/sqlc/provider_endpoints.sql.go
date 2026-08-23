@@ -287,6 +287,24 @@ func (q *Queries) UpdateManagedProviderEndpointAccount(ctx context.Context, arg 
 	return err
 }
 
+const updateManagedProviderEndpointAccountStatus = `-- name: UpdateManagedProviderEndpointAccountStatus :exec
+UPDATE api_accounts
+SET status = $1
+WHERE provider_endpoint_id = $2
+  AND extra_config = '{"managed_by":"image-processing-endpoint"}'
+  AND deleted_at IS NULL
+`
+
+type UpdateManagedProviderEndpointAccountStatusParams struct {
+	Status             int16 `json:"status"`
+	ProviderEndpointID int64 `json:"provider_endpoint_id"`
+}
+
+func (q *Queries) UpdateManagedProviderEndpointAccountStatus(ctx context.Context, arg UpdateManagedProviderEndpointAccountStatusParams) error {
+	_, err := q.db.ExecContext(ctx, updateManagedProviderEndpointAccountStatus, arg.Status, arg.ProviderEndpointID)
+	return err
+}
+
 const updateProviderEndpoint = `-- name: UpdateProviderEndpoint :execrows
 UPDATE provider_endpoints
 SET api_type = $1,
@@ -315,6 +333,25 @@ func (q *Queries) UpdateProviderEndpoint(ctx context.Context, arg UpdateProvider
 		arg.Status,
 		arg.ID,
 	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateProviderEndpointStatus = `-- name: UpdateProviderEndpointStatus :execrows
+UPDATE provider_endpoints
+SET status = $1
+WHERE id = $2
+`
+
+type UpdateProviderEndpointStatusParams struct {
+	Status int16 `json:"status"`
+	ID     int64 `json:"id"`
+}
+
+func (q *Queries) UpdateProviderEndpointStatus(ctx context.Context, arg UpdateProviderEndpointStatusParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateProviderEndpointStatus, arg.Status, arg.ID)
 	if err != nil {
 		return 0, err
 	}

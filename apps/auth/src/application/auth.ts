@@ -4,11 +4,15 @@ import { admin, emailOTP } from "better-auth/plugins";
 import { Pool, type PoolConfig } from "pg";
 import type { AuthAdmissionPolicy } from "../admission/authAdmissionPolicy.js";
 import { createAuthAdmissionPolicy } from "../admission/authAdmissionPolicy.js";
-import { createAuthGuardSettingsReader } from "../admission/authGuardSettings.js";
+import {
+  type AuthGuardSettings,
+  createAuthGuardSettingsReader,
+} from "../admission/authGuardSettings.js";
 import { normalizeCanonicalEmail } from "../infrastructure/authUtils.js";
 import type { AuthEnvironment } from "../infrastructure/env.js";
 import {
   passwordResetOtp,
+  resolveBrandingLogoUrl,
   verificationOtp,
 } from "../transactional-mail/emailTemplates/index.js";
 import {
@@ -96,6 +100,7 @@ export function createAuthComponents(
     database,
     mailConfigService,
     authAdmissionPolicy,
+    getAuthGuardSettings,
     loginMetadataReporter,
   });
   const runtimeAuthRegistry = socialProviderRuntime.configure(authBaseOptions);
@@ -139,6 +144,7 @@ export function createBetterAuthOptions(input: {
   database: BetterAuthOptions["database"];
   mailConfigService: Pick<MailConfigService, "send">;
   authAdmissionPolicy: AuthAdmissionPolicy;
+  getAuthGuardSettings?: () => Promise<AuthGuardSettings>;
   loginMetadataReporter?: LoginMetadataReporter;
 }): BetterAuthOptions {
   const {
@@ -146,6 +152,7 @@ export function createBetterAuthOptions(input: {
     database,
     mailConfigService,
     authAdmissionPolicy,
+    getAuthGuardSettings,
     loginMetadataReporter,
   } = input;
   return {
@@ -182,15 +189,27 @@ export function createBetterAuthOptions(input: {
         changeEmail: { enabled: true, verifyCurrentEmail: false },
         rateLimit: { window: 60 * 60, max: 5 },
         sendVerificationOTP: async ({ email, otp, type }) => {
+          const guardSettings = getAuthGuardSettings
+            ? await getAuthGuardSettings()
+            : undefined;
+          const appName = guardSettings?.projectName || "IdeaBoard";
+          const brandLogoUrl = resolveBrandingLogoUrl(
+            guardSettings?.logoUrl,
+            environment.auth.baseURL,
+          );
           const content =
             type === "forget-password"
               ? passwordResetOtp({
                   otp,
                   expiresInMinutes: EMAIL_OTP_EXPIRES_IN_MINUTES,
+                  appName,
+                  brandLogoUrl,
                 })
               : verificationOtp({
                   otp,
                   expiresInMinutes: EMAIL_OTP_EXPIRES_IN_MINUTES,
+                  appName,
+                  brandLogoUrl,
                 });
           await mailConfigService.send({ to: email, content });
         },

@@ -5,6 +5,7 @@ import dbprivileges "ideaboard/api/internal/platform/database/privileges"
 var apiOwnedTableNames = []string{
 	"api_account_models",
 	"api_account_secrets",
+	"admin_brand_logo_overrides",
 	"api_accounts",
 	"board_members",
 	"board_share_tokens",

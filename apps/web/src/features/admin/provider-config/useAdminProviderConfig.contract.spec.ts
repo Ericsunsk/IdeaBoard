@@ -85,6 +85,28 @@ describe('useAdminProviderConfig', () => {
     expect(context.accountEditor.modelSuggestions.value).toEqual(['gpt-4o', 'imagen-4'])
   })
 
+  it('resets the model search input when the account editor closes or changes endpoint', async () => {
+    mockResource.fetchProviderEndpoints.mockResolvedValueOnce([
+      makeProviderEndpoint({ id: 1, name: 'First endpoint' }),
+      makeProviderEndpoint({ id: 2, name: 'Second endpoint' }),
+    ])
+    const context = createContext()
+
+    await context.commands.loadData()
+    context.accountEditor.openCreate({ kind: 'providerEndpoint', id: 1 })
+    context.accountEditor.modelSearchInput.value = 'gpt-4o'
+
+    context.accountEditor.openCreate({ kind: 'providerEndpoint', id: 2 })
+
+    expect(context.accountEditor.modelSearchInput.value).toBe('')
+
+    context.accountEditor.modelSearchInput.value = 'imagen-4'
+    context.accountEditor.close()
+
+    expect(context.accountEditor.visible.value).toBe(false)
+    expect(context.accountEditor.modelSearchInput.value).toBe('')
+  })
+
   it('creates a uniquely named APIKey account with multiple assigned models per providerEndpoint', async () => {
     mockResource.fetchProviderEndpoints.mockResolvedValueOnce([
       {
@@ -199,5 +221,21 @@ function createProviderConfigFeedback() {
     modelStatusChangeFailed: vi.fn(),
     missingApiKeyForModelDetection: vi.fn(),
     modelDetectionFailed: vi.fn(),
+  }
+}
+
+function makeProviderEndpoint(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 1,
+    apiType: 'openai-compatible',
+    protocol: 'model-api',
+    capabilities: ['image-generation'],
+    name: 'OpenAI ProviderEndpoint',
+    baseUrl: 'https://api.example.com/v1',
+    apiKeyConfigured: false,
+    status: 1,
+    createdAt: '',
+    updatedAt: '',
+    ...overrides,
   }
 }

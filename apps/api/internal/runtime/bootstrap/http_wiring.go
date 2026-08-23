@@ -14,6 +14,7 @@ import (
 	"ideaboard/api/internal/library"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/payments"
+	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/rewards"
@@ -131,6 +132,7 @@ func newAppRouter(
 			RewardAdminReadHandler:      rewardAdminReadHandler,
 			PaymentAdminHandler:         paymentAdminHandler,
 			SearchCatalogHandler:        searchcatalog.NewHandler(searchProviderConfig),
+			AdminBrandLogoHandler:       adminbranding.NewHandler(repos.adminBrandLogoRepo),
 		},
 		PaymentWebhook: paymentWebhookHandler,
 		Internal:       httpapi.InternalRouteDeps{UserHandler: users.NewInternalHandler(repos.userRepo, cfg.Auth.InternalAPIKey)},

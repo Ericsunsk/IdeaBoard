@@ -16,6 +16,7 @@ import (
 	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/payments"
+	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/rewards"
@@ -115,6 +116,7 @@ type AdminRouteDeps struct {
 	RewardAdminReadHandler      *rewards.AdminReadHandler
 	PaymentAdminHandler         *payments.AdminHandler
 	SearchCatalogHandler        *searchcatalog.Handler
+	AdminBrandLogoHandler       *adminbranding.Handler
 }
 
 const globalRequestBodyLimitBytes int64 = 2 * 1024 * 1024
@@ -137,6 +139,7 @@ const (
 	RouteAdminSettingsMail        = "/settings/mail"
 	RouteAdminUsersOAuthProvider  = "/users/oauth-providers/:provider"
 	RouteAdminStripeConfiguration = "/payments/stripe-config"
+	RouteAdminBrandLogoOverrides  = "/brand-logo-overrides"
 	RoutePaymentStripeWebhook     = "/api/webhooks/stripe"
 )
 

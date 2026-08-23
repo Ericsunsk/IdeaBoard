@@ -86,6 +86,18 @@ SET api_type = sqlc.arg(api_type),
     status = sqlc.arg(status)
 WHERE id = sqlc.arg(id);
 
+-- name: UpdateProviderEndpointStatus :execrows
+UPDATE provider_endpoints
+SET status = sqlc.arg(status)
+WHERE id = sqlc.arg(id);
+
+-- name: UpdateManagedProviderEndpointAccountStatus :exec
+UPDATE api_accounts
+SET status = sqlc.arg(status)
+WHERE provider_endpoint_id = sqlc.arg(provider_endpoint_id)
+  AND extra_config = '{"managed_by":"image-processing-endpoint"}'
+  AND deleted_at IS NULL;
+
 -- name: DeleteProviderEndpoint :execrows
 DELETE FROM provider_endpoints
 WHERE id = sqlc.arg(id);

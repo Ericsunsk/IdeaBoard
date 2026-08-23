@@ -39,6 +39,67 @@ describe("emailTemplates", () => {
     assert.doesNotMatch(passwordReset.html, /RESET_URL|重置链接/);
   });
 
+  it("renders custom appName and brandLogoUrl when provided", () => {
+    const verification = verificationOtp({
+      otp: "998877",
+      expiresInMinutes: 10,
+      appName: "Design Studio",
+      brandLogoUrl: "https://example.com/custom-logo.png",
+    });
+    const passwordReset = passwordResetOtp({
+      otp: "112233",
+      expiresInMinutes: 5,
+      appName: "Design Studio",
+      brandLogoUrl: "https://example.com/custom-logo.png",
+    });
+
+    assertRenderedEmail(verification);
+    assertRenderedEmail(passwordReset);
+    assert.match(verification.subject, /Design Studio/);
+    assert.match(verification.html, /https:\/\/example\.com\/custom-logo\.png/);
+    assert.match(verification.html, /Design Studio/);
+    assert.match(verification.text, /Design Studio/);
+
+    assert.match(passwordReset.subject, /Design Studio/);
+    assert.match(passwordReset.html, /https:\/\/example\.com\/custom-logo\.png/);
+    assert.match(passwordReset.html, /Design Studio/);
+    assert.match(passwordReset.text, /Design Studio/);
+  });
+
+  it("resolves relative and remote branding logo URLs accurately", async () => {
+    const { resolveBrandingLogoUrl } = await import("./emailTemplates/index.js");
+
+    assert.equal(
+      resolveBrandingLogoUrl("", "https://app.example.com"),
+      "https://ideaboard.art/favicon.svg",
+    );
+    assert.equal(
+      resolveBrandingLogoUrl(
+        "/uploads/site/assets/logo.png",
+        "https://app.example.com",
+      ),
+      "https://app.example.com/uploads/site/assets/logo.png",
+    );
+    assert.equal(
+      resolveBrandingLogoUrl(
+        "/uploads/site/assets/logo.png",
+        "http://localhost:5173",
+      ),
+      "http://localhost:5173/uploads/site/assets/logo.png",
+    );
+    assert.equal(
+      resolveBrandingLogoUrl(
+        "https://cdn.example.com/logo.png",
+        "http://localhost:5173",
+      ),
+      "https://cdn.example.com/logo.png",
+    );
+    assert.equal(
+      resolveBrandingLogoUrl("javascript:alert(1)", "http://localhost:5173"),
+      "https://ideaboard.art/favicon.svg",
+    );
+  });
+
   it("escapes text variables and validates URL variables", () => {
     const invitation = teamInvite({
       inviterName: '<Admin & "Owner">',

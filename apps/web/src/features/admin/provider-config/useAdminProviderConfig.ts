@@ -59,6 +59,7 @@ export function useAdminProviderConfig(options: UseAdminProviderConfigOptions) {
       loadData: workspace.loadData,
       deleteProviderEndpoint: workspace.deleteProviderEndpoint,
       deleteAccount: workspace.deleteAccount,
+      toggleProviderEndpointStatus: workspace.toggleProviderEndpointStatus,
       toggleAccountModelStatus: workspace.toggleAccountModelStatus,
       isAccountModelStatusChanging: workspace.isAccountModelStatusChanging,
       getApiTypeLabel: workspace.getApiTypeLabel,
@@ -215,6 +216,7 @@ function createAccountEditor(options: {
   const detectModelsLoading = options.workspace.detectModelsLoading
   const detectedModelValues = ref<string[]>([])
   const modelSuggestions = ref<string[]>([])
+  const modelSearchInput = ref('')
   const detectedModelSessionCache = ref(new Set<string>())
   const hasShownApiKeyHint = ref(false)
 
@@ -235,10 +237,7 @@ function createAccountEditor(options: {
           .map((account) => account.name),
       ),
     )
-    detectedModelValues.value = []
-    modelSuggestions.value = []
-    detectedModelSessionCache.value = new Set()
-    hasShownApiKeyHint.value = false
+    resetModelEditorState()
     resetErrors()
     visible.value = true
   }
@@ -266,17 +265,23 @@ function createAccountEditor(options: {
       maxConcurrent: account.maxConcurrent,
       timeoutSeconds: account.timeoutSeconds,
     }
-    detectedModelValues.value = []
-    modelSuggestions.value = []
-    detectedModelSessionCache.value = new Set()
-    hasShownApiKeyHint.value = false
+    resetModelEditorState()
     resetErrors()
     visible.value = true
   }
 
   function close() {
     visible.value = false
+    resetModelEditorState()
     resetErrors()
+  }
+
+  function resetModelEditorState() {
+    modelSearchInput.value = ''
+    detectedModelValues.value = []
+    modelSuggestions.value = []
+    detectedModelSessionCache.value = new Set()
+    hasShownApiKeyHint.value = false
   }
 
   function clearError(field: ProviderAccountFormField) {
@@ -342,8 +347,7 @@ function createAccountEditor(options: {
       modelCapabilities: form.value.modelCapabilities,
       secret: form.value.secret.trim(),
       afterSaved: () => {
-        visible.value = false
-        resetErrors()
+        close()
       },
     })
   }
@@ -395,16 +399,22 @@ function createAccountEditor(options: {
     if (!nextVisible) resetErrors()
   })
 
+  const currentAccountTarget = computed<ProviderAccountCommandTarget | null>(() =>
+    currentAccountId.value ? { kind: 'account', id: currentAccountId.value } : null,
+  )
+
   return {
     visible,
     isEditing,
     saveLoading,
+    currentAccountTarget,
     accountLimits,
     selectedProviderEndpoint: selectedProviderEndpointView,
     form,
     errors,
     detectModelsLoading,
     modelSuggestions,
+    modelSearchInput,
     openCreate,
     openEdit,
     close,

@@ -207,9 +207,6 @@ func (r *ConfigRepository) RecordTest(ctx context.Context, provider Provider, st
 	stored.FailureCategory = category
 	stored.StatusMessage = strings.TrimSpace(message)
 	stored.TestedAt = &now
-	if state == TestStateFailed {
-		stored.Enabled = false
-	}
 	return r.persist(ctx, provider, stored, actorID, "test")
 }
 

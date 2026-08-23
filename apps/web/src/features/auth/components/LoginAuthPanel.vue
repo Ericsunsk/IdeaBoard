@@ -6,20 +6,19 @@
 
       <div :class="authModalHeaderClass">
         <p :class="authModalKickerClass">WELCOME BACK</p>
-        <h2 :class="authModalTitleClass">欢迎回来</h2>
-        <p :class="authModalSubtitleClass">登录 {{ projectName }}，继续你的创作</p>
+        <h2 :class="authModalTitleClass">Sign in</h2>
       </div>
 
       <form
         v-if="!resetMode"
-        class="relative z-[1] flex flex-col gap-5"
+        class="relative z-[1] flex flex-col gap-3.5"
         novalidate
         @submit.prevent="handleLogin"
       >
         <div
           v-if="enabledSocialProviders.length"
           :class="[
-            'grid gap-3',
+            'grid gap-2.5',
             enabledSocialProviders.length === 1 ? 'grid-cols-1' : 'grid-cols-2',
           ]"
         >
@@ -30,18 +29,18 @@
             type="button"
             :class="authSocialIconButtonClass"
             :disabled="loading"
-            :aria-label="`使用 ${getOAuthProviderLabel(provider)} 登录`"
-            :title="`使用 ${getOAuthProviderLabel(provider)} 登录`"
+            :aria-label="`Sign in with ${getOAuthProviderLabel(provider)}`"
+            :title="`Sign in with ${getOAuthProviderLabel(provider)}`"
             @click="handleSocialLogin(provider)"
           >
             <img
               v-if="providerLogoUrls[provider]"
               :src="providerLogoUrls[provider]"
-              :class="provider === 'discord' ? 'size-6 scale-[1.18]' : 'size-6'"
+              :class="provider === 'discord' ? 'size-5 scale-[1.12]' : 'size-5'"
               alt=""
               aria-hidden="true"
             />
-            <span v-else class="text-sm font-semibold uppercase">{{ provider.slice(0, 1) }}</span>
+            <span v-else class="text-xs font-semibold uppercase">{{ provider.slice(0, 1) }}</span>
           </Button>
         </div>
 
@@ -65,7 +64,7 @@
         >
           <div class="relative w-full">
             <span :class="authInputIconClass">
-              <UserIcon class="size-5" />
+              <UserIcon class="size-4.5" />
             </span>
             <InputText
               :id="fieldId"
@@ -74,28 +73,19 @@
               unstyled
               autocomplete="email"
               :required="required"
-              :class="[authInputClass, 'pl-11', inlineError ? authInputErrorClass : '']"
+              :class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
               :invalid="invalid"
-              :placeholder="inlineError ? inlineErrorText : '请输入 Email'"
+              :placeholder="inlineError ? inlineErrorText : 'you@example.com'"
               :aria-invalid="ariaInvalid"
               :aria-describedby="describedbyId"
-              @blur="validateField('identifier')"
+              @blur="handleFieldBlur('identifier')"
               @update:model-value="clearFieldError('identifier')"
             />
           </div>
         </IbFormField>
 
         <IbFormField
-          v-slot="{
-            ariaInvalid,
-            describedbyId,
-            fieldId,
-            inlineError,
-            inlineErrorText,
-            invalid,
-            required,
-          }"
-          label="密码"
+          label="Password"
           :error="errors.password"
           field-id="login-password"
           required
@@ -103,33 +93,55 @@
           :field-class="authFieldClass"
           :message-pt="authErrorMessagePt"
         >
-          <div class="relative w-full">
-            <span :class="authInputIconClass">
-              <LockIcon class="size-5" />
-            </span>
-            <Password
-              v-model="formValue.password"
-              unstyled
-              autocomplete="current-password"
-              :feedback="false"
-              fluid
-              :pt="authPasswordPt"
-              :input-props="{
-                ...resolveFieldControlState(invalid),
-                id: fieldId,
-                autocomplete: 'current-password',
-                required,
-                'aria-invalid': ariaInvalid,
-                'aria-describedby': describedbyId,
-              }"
-              :invalid="invalid"
-              :input-class="[authInputClass, inlineError ? authInputErrorClass : '']"
-              :placeholder="inlineError ? inlineErrorText : '请输入密码'"
-              toggle-mask
-              @blur="validateField('password')"
-              @update:model-value="clearFieldError('password')"
-            />
-          </div>
+          <template #header-extra>
+            <button
+              type="button"
+              class="border-0 bg-transparent p-0 text-[11px] font-semibold text-[var(--color-ib-auth-link)] transition-colors hover:text-[var(--color-ib-auth-link-hover)] hover:underline normal-case tracking-normal cursor-pointer disabled:opacity-60"
+              :disabled="loading"
+              @click="resetMode = true"
+            >
+              Forgot?
+            </button>
+          </template>
+          <template
+            #default="{
+              ariaInvalid,
+              describedbyId,
+              fieldId,
+              inlineError,
+              inlineErrorText,
+              invalid,
+              required,
+            }"
+          >
+            <div class="relative w-full">
+              <span :class="authInputIconClass">
+                <LockIcon class="size-4.5" />
+              </span>
+              <Password
+                v-model="formValue.password"
+                unstyled
+                autocomplete="current-password"
+                :feedback="false"
+                fluid
+                :pt="authPasswordPt"
+                :input-props="{
+                  ...resolveFieldControlState(invalid),
+                  id: fieldId,
+                  autocomplete: 'current-password',
+                  required,
+                  'aria-invalid': ariaInvalid,
+                  'aria-describedby': describedbyId,
+                }"
+                :invalid="invalid"
+                :input-class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
+                :placeholder="inlineError ? inlineErrorText : '••••••••'"
+                toggle-mask
+                @blur="handleFieldBlur('password')"
+                @update:model-value="clearFieldError('password')"
+              />
+            </div>
+          </template>
         </IbFormField>
 
         <Button
@@ -137,24 +149,15 @@
           :class="authPrimaryButtonClass"
           :pt="authButtonPt"
           type="submit"
-          :label="loading ? '登录中...' : '登录'"
+          :label="loading ? 'Signing in...' : 'Sign in'"
           :loading="loading"
           v-bind="submitControlState"
           fluid
         />
-
-        <button
-          type="button"
-          class="self-end border-0 bg-transparent p-0 text-xs font-semibold text-ib-creative-accent hover:underline"
-          :disabled="loading"
-          @click="resetMode = true"
-        >
-          忘记密码？
-        </button>
       </form>
 
-      <form v-else class="relative z-[1] flex flex-col gap-5" novalidate @submit.prevent="handleResetPassword">
-        <p class="text-sm text-ib-text-subtle">输入注册 Email，我们会发送一次性验证码。</p>
+      <form v-else class="relative z-[1] flex flex-col gap-3.5" novalidate @submit.prevent="handleResetPassword">
+        <p class="text-xs text-ib-text-subtle">Enter your email to receive a verification code.</p>
         <IbFormField
           v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
           label="Email"
@@ -173,7 +176,7 @@
             :required="required"
             :class="[authInputClass, inlineError ? authInputErrorClass : '']"
             :invalid="invalid"
-            :placeholder="inlineError ? inlineErrorText : '输入注册 Email'"
+            :placeholder="inlineError ? inlineErrorText : 'you@example.com'"
             :aria-invalid="ariaInvalid"
             :aria-describedby="describedbyId"
           />
@@ -183,25 +186,25 @@
           :class="authPrimaryButtonClass"
           :pt="authButtonPt"
           type="submit"
-          :label="loading ? '发送中...' : '发送验证码'"
+          :label="loading ? 'Sending...' : 'Send Code'"
           :loading="loading"
           v-bind="submitControlState"
           fluid
         />
         <button
           type="button"
-          class="self-center border-0 bg-transparent p-0 text-sm font-semibold text-ib-creative-accent hover:underline"
+          class="self-center border-0 bg-transparent p-0 text-xs font-semibold text-ib-creative-accent hover:underline"
           :disabled="loading"
           @click="resetMode = false"
         >
-          返回登录
+          Back to sign in
         </button>
       </form>
 
-      <form v-if="resetMode && resetOtpSent" class="relative z-[1] mt-4 flex flex-col gap-5" novalidate @submit.prevent="handleResetPasswordConfirm">
+      <form v-if="resetMode && resetOtpSent" class="relative z-[1] mt-3 flex flex-col gap-3.5" novalidate @submit.prevent="handleResetPasswordConfirm">
         <IbFormField
           v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
-          label="Email 验证码"
+          label="Verification Code"
           :error="resetErrors.otp"
           field-id="reset-otp"
           required
@@ -219,14 +222,14 @@
             :required="required"
             :class="[authInputClass, inlineError ? authInputErrorClass : '']"
             :invalid="invalid"
-            :placeholder="inlineError ? inlineErrorText : '输入 6 位验证码'"
+            :placeholder="inlineError ? inlineErrorText : 'Enter 6-digit code'"
             :aria-invalid="ariaInvalid"
             :aria-describedby="describedbyId"
           />
         </IbFormField>
         <IbFormField
           v-slot="{ ariaInvalid, describedbyId, fieldId, inlineError, inlineErrorText, invalid, required }"
-          label="新密码"
+          label="New Password"
           :error="resetErrors.password"
           field-id="reset-password"
           required
@@ -243,7 +246,7 @@
             :input-props="{ id: fieldId, autocomplete: 'new-password', required, 'aria-invalid': ariaInvalid, 'aria-describedby': describedbyId }"
             :invalid="invalid"
             :input-class="[authInputClass, inlineError ? authInputErrorClass : '']"
-            :placeholder="inlineError ? inlineErrorText : '不少于 10 位字符'"
+            :placeholder="inlineError ? inlineErrorText : 'At least 10 characters'"
             toggle-mask
           />
         </IbFormField>
@@ -252,22 +255,22 @@
           :class="authPrimaryButtonClass"
           :pt="authButtonPt"
           type="submit"
-          :label="loading ? '更新中...' : '重置密码'"
+          :label="loading ? 'Resetting...' : 'Reset Password'"
           :loading="loading"
           v-bind="submitControlState"
           fluid
         />
       </form>
 
-      <div :class="['mt-8', authFooterClass]">
-        <span>还没有账号？</span>
+      <div :class="['mt-5', authFooterClass]">
+        <span>Don't have an account?</span>
         <button
           type="button"
           :class="authSwitchButtonClass"
           v-bind="secondaryControlState"
           @click="emit('to-register')"
         >
-          立即注册
+          Sign up
         </button>
       </div>
     </div>
@@ -285,7 +288,6 @@ import discordLogoUrl from '../../../shared/assets/oauth/discord.svg'
 import { useUserStore } from '../session/authSession'
 import { authTransport } from '../session/authTransport'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
-import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { getPasswordLengthError } from '../../../shared/auth/passwordPolicy'
 import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
 import IbFormField from '../../../shared/components/IbFormField.vue'
@@ -308,7 +310,6 @@ import {
   authModalHeaderClass,
   authModalKickerClass,
   authModalShellClass,
-  authModalSubtitleClass,
   authModalTitleClass,
   authPasswordPt,
   authPrimaryButtonClass,
@@ -327,7 +328,6 @@ const emit = defineEmits<{
   'update:busy': [busy: boolean]
 }>()
 
-const { projectName } = useSiteBranding()
 const userStore = useUserStore()
 const authFeedback = useAuthFeedback()
 const { isPending: loading, runAsyncAction } = useAsyncAction()
@@ -342,7 +342,7 @@ type LoginField = 'identifier' | 'password'
 
 const loginFieldLabels: Record<LoginField, string> = {
   identifier: 'Email',
-  password: '密码',
+  password: 'Password',
 }
 const formValue = ref({
   identifier: '',
@@ -377,6 +377,14 @@ function resolveFieldControlState(invalid: boolean) {
     disabled: loading.value,
     tone: invalid ? 'danger' : 'default',
   })
+}
+
+function handleFieldBlur(field: LoginField) {
+  const value = formValue.value[field].trim()
+  if (!value) return
+  if (field === 'identifier' && (!value.includes('@') || value.endsWith('@'))) {
+    errors.value.identifier = 'Please enter a valid email address'
+  }
 }
 
 function validateField(field: LoginField) {
@@ -426,7 +434,7 @@ async function handleSocialLogin(provider: OAuthProviderCode) {
 
 async function handleResetPassword() {
   const email = resetForm.value.email.trim()
-  resetErrors.value.email = !email || !email.includes('@') ? '请输入有效的 Email' : ''
+  resetErrors.value.email = !email || !email.includes('@') ? 'Please enter a valid email address' : ''
   if (resetErrors.value.email) return
 
   const sent = await runAsyncAction(
@@ -437,7 +445,7 @@ async function handleResetPassword() {
 }
 
 async function handleResetPasswordConfirm() {
-  resetErrors.value.otp = /^\d{6}$/.test(resetForm.value.otp.trim()) ? '' : '请输入 6 位验证码'
+  resetErrors.value.otp = /^\d{6}$/.test(resetForm.value.otp.trim()) ? '' : 'Please enter a 6-digit code'
   resetErrors.value.password = getPasswordLengthError(resetForm.value.password)
   if (resetErrors.value.otp || resetErrors.value.password) return
 

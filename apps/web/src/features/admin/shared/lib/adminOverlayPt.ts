@@ -23,7 +23,7 @@ const adminOverlayMenuItemLinkClass =
   '!px-3 !py-2.5 !text-admin-body !font-[650] !text-ib-text-muted hover:!text-ib-text'
 
 const adminOverlayPopoverRootClass =
-  '!rounded-[var(--radius-ib-overlay)] !border-ib-border !bg-ib-surface !shadow-none'
+  '!rounded-[var(--radius-ib-overlay)] !border !border-admin-border-soft !bg-white !shadow-xl before:!hidden after:!hidden'
 
 const adminOverlayPopoverContentClass =
   '!overflow-clip !rounded-[calc(var(--radius-ib-overlay)-1px)]'

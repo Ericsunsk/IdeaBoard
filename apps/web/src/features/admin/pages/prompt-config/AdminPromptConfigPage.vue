@@ -269,8 +269,8 @@ const workflowSlugTagPt = {
   label: { class: 'truncate' },
 } satisfies TagPassThroughOptions
 const variableTokenButtonToneClass: Record<FeaturePromptVariableTone, string> = {
-  prompt: '!bg-[rgba(71,117,168,0.16)] !text-admin-info hover:!bg-[rgba(71,117,168,0.22)]',
-  control: '!bg-[rgba(212,136,48,0.16)] !text-admin-warning hover:!bg-[rgba(212,136,48,0.22)]',
+  prompt: '!bg-admin-info-soft !text-admin-info hover:!bg-admin-info-soft/80',
+  control: '!bg-admin-warning-soft !text-admin-warning hover:!bg-admin-warning-soft/80',
   context: '!bg-admin-surface-muted !text-admin-text-2-strong hover:!bg-admin-surface-hover',
 }
 

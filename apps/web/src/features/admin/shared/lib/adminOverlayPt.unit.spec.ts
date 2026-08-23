@@ -56,6 +56,9 @@ describe('Admin overlay Motion Policy', () => {
     expect(pt.root).toMatchObject({
       class: expect.stringContaining('!rounded-[var(--radius-ib-overlay)]'),
     })
+    expect(pt.root).toMatchObject({
+      class: expect.stringContaining('!shadow-xl before:!hidden after:!hidden'),
+    })
     expect(pt.content).toMatchObject({
       class: expect.stringContaining(
         '!overflow-clip !rounded-[calc(var(--radius-ib-overlay)-1px)]',

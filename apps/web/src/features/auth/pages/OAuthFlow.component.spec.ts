@@ -146,11 +146,11 @@ describe('Social OAuth entry points', () => {
     mocks.logout.mockResolvedValue(true)
   })
 
-  it('shows the Google button on User Login only when the capability is enabled', async () => {
+  it('shows only the enabled Google button and starts its redirect', async () => {
     mocks.getCapabilities.mockResolvedValue({ social: { google: true, discord: false } })
     const view = renderLoginPanel()
 
-    const googleButton = await screen.findByRole('button', { name: '使用 Google 登录' })
+    const googleButton = await screen.findByRole('button', { name: 'Sign in with Google' })
     expect(googleButton).toHaveTextContent('')
     expect(googleButton.querySelector('img')).toHaveAttribute('alt', '')
     expect(googleButton.parentElement).toHaveClass('grid-cols-1')
@@ -165,8 +165,8 @@ describe('Social OAuth entry points', () => {
     mocks.getCapabilities.mockResolvedValue({ social: { google: true, discord: true } })
     renderLoginPanel()
 
-    const googleButton = await screen.findByRole('button', { name: '使用 Google 登录' })
-    const discordButton = await screen.findByRole('button', { name: '使用 Discord 登录' })
+    const googleButton = await screen.findByRole('button', { name: 'Sign in with Google' })
+    const discordButton = await screen.findByRole('button', { name: 'Sign in with Discord' })
     expect(discordButton.parentElement).toBe(googleButton.parentElement)
     expect(googleButton.parentElement?.children).toHaveLength(2)
   })
@@ -175,7 +175,7 @@ describe('Social OAuth entry points', () => {
     renderLoginPanel()
 
     await waitFor(() => expect(mocks.getCapabilities).toHaveBeenCalledOnce())
-    expect(screen.queryByRole('button', { name: '使用 Google 登录' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Sign in with Google' })).not.toBeInTheDocument()
     expect(screen.queryByText('或')).not.toBeInTheDocument()
   })
 
@@ -184,7 +184,7 @@ describe('Social OAuth entry points', () => {
     mocks.signInWithOAuth.mockRejectedValue(new Error('Google 登录失败'))
     const view = renderLoginPanel()
 
-    await view.user.click(await screen.findByRole('button', { name: '使用 Google 登录' }))
+    await view.user.click(await screen.findByRole('button', { name: 'Sign in with Google' }))
 
     expect(mocks.toastError).toHaveBeenCalledOnce()
     expect(mocks.toastSuccess).not.toHaveBeenCalled()

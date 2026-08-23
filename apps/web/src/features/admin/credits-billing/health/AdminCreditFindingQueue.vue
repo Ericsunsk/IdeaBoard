@@ -81,9 +81,7 @@
       table-aria-label="账本异常队列"
     >
       <template #empty>
-        <div class="py-12 text-center text-admin-body text-admin-text-3">
-          {{ status === 'open' ? '暂无待处理异常' : '暂无已解决异常' }}
-        </div>
+        <AdminEmptyState :title="status === 'open' ? '暂无待处理异常' : '暂无已解决异常'" />
       </template>
 
       <Column header="异常摘要" style="width: 38%; min-width: 260px">
@@ -232,6 +230,7 @@ import Message from 'primevue/message'
 import SelectButton from 'primevue/selectbutton'
 import Tag from 'primevue/tag'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
+import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'

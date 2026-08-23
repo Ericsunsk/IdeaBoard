@@ -78,7 +78,7 @@ describe('resolveAuthFailureAction', () => {
     ).toEqual({ kind: 'ignore' })
   })
 
-  it('returns users to Boards after a protected user session is revoked', () => {
+  it('preserves the current user destination after a protected session is revoked', () => {
     expect(
       resolveAuthFailureAction({
         status: 401,
@@ -88,7 +88,7 @@ describe('resolveAuthFailureAction', () => {
       }),
     ).toEqual({
       kind: 'redirect-login',
-      targetPath: '/user/login?redirect=%2Fuser%2Fboards',
+      targetPath: '/user/login?redirect=%2Fuser%2Fcanvas%3FboardId%3Dboard-1',
     })
   })
 

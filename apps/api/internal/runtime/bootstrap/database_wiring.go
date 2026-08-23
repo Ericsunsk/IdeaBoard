@@ -17,6 +17,7 @@ import (
 	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/payments"
+	"ideaboard/api/internal/platform/adminbranding"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/platform/database"
 	dbprivileges "ideaboard/api/internal/platform/database/privileges"
@@ -54,6 +55,7 @@ type appRepositories struct {
 	boardRepo            *boards.BoardRepository
 	paymentRepo          *payments.Repository
 	libraryRepo          *library.Repository
+	adminBrandLogoRepo   *adminbranding.Repository
 }
 
 func openAppDatabases(ctx context.Context, cfg *config.Config) (appDatabases, error) {
@@ -183,6 +185,7 @@ func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error
 		boardRepo:            boards.NewBoardRepository(db),
 		paymentRepo:          payments.NewRepository(db),
 		libraryRepo:          library.NewRepository(db),
+		adminBrandLogoRepo:   adminbranding.NewRepository(db),
 	}
 	if err := repos.userRepo.EnsureStorageUIDs(ctx); err != nil {
 		return appRepositories{}, err

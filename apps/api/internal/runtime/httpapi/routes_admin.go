@@ -13,6 +13,7 @@ func registerAuthenticatedAdminRoutes(r *gin.Engine, authDeps AuthDeps, h AdminR
 }
 
 func registerAdminRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+	registerAdminBrandLogoRoutes(adminAPI, h)
 	registerAdminSettingsRoutes(adminAPI, h)
 	registerAdminUserRoutes(adminAPI, h)
 	registerAdminAccountRoutes(adminAPI, h)
@@ -26,6 +27,15 @@ func registerAdminRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
 	registerAdminBillingRoutes(adminAPI, h)
 	registerAdminRewardRoutes(adminAPI, h)
 	registerAdminPaymentRoutes(adminAPI, h)
+}
+
+func registerAdminBrandLogoRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
+	if h.AdminBrandLogoHandler == nil {
+		return
+	}
+	adminAPI.GET(RouteAdminBrandLogoOverrides, h.AdminBrandLogoHandler.List)
+	adminAPI.PUT(RouteAdminBrandLogoOverrides+"/:scope/:target_key", h.AdminBrandLogoHandler.Upsert)
+	adminAPI.DELETE(RouteAdminBrandLogoOverrides+"/:scope/:target_key", h.AdminBrandLogoHandler.Delete)
 }
 
 func registerAdminSearchProviderRoutes(adminAPI *gin.RouterGroup, h AdminRouteDeps) {
@@ -154,6 +164,7 @@ func registerAdminProviderEndpointRoutes(adminAPI *gin.RouterGroup, h AdminRoute
 	adminAPI.GET("/provider-endpoints/registry", h.ProviderEndpointHandler.Registry)
 	adminAPI.POST("/provider-endpoints", h.ProviderEndpointHandler.Create)
 	adminAPI.PUT("/provider-endpoints/:id", h.ProviderEndpointHandler.Update)
+	adminAPI.PATCH("/provider-endpoints/:id/status", h.ProviderEndpointHandler.UpdateStatus)
 	adminAPI.DELETE("/provider-endpoints/:id", h.ProviderEndpointHandler.Delete)
 	adminAPI.POST("/provider-endpoints/detect-models", h.ProviderEndpointHandler.DetectModels)
 }

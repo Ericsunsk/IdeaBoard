@@ -73,12 +73,6 @@ const rawStyleAllowances: Record<string, CountAllowance<StyleCountRuleId>> = {
     },
     reason: 'Login first-screen card composition keeps a one-off Admin entry shadow.',
   },
-  'src/features/admin/pages/prompt-config/AdminPromptConfigPage.vue': {
-    counts: {
-      'raw-color': 4,
-    },
-    reason: 'Prompt variable tone chips use fixed translucent fills for domain categories.',
-  },
   'src/features/admin/pages/system-settings/AdminSystemSettingsPage.vue': {
     counts: {
       'raw-shadow': 1,

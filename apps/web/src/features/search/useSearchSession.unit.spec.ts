@@ -6,6 +6,7 @@ import { setPendingSearchAuthAction } from './searchAuthContinuation'
 const mocks = vi.hoisted(() => ({
   route: { query: {} as Record<string, string | string[]> },
   replace: vi.fn(async () => undefined),
+  push: vi.fn(async () => undefined),
   load: vi.fn(async () => undefined),
   markSaved: vi.fn(),
   markSavedKey: vi.fn(),
@@ -20,7 +21,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('vue-router', () => ({
   useRoute: () => mocks.route,
-  useRouter: () => ({ replace: mocks.replace }),
+  useRouter: () => ({ replace: mocks.replace, push: mocks.push }),
 }))
 
 vi.mock('./useSearchResults', () => ({
@@ -133,4 +134,5 @@ describe('useSearchSession', () => {
 
     expect(session.library.open.value).toBe(true)
   })
+
 })

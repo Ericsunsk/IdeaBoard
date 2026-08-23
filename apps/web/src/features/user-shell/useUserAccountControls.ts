@@ -13,6 +13,7 @@ import {
 } from '../account-management/accountTabRegistry'
 import { useAccountManagementOverlay } from '../account-management/accountManagementOverlay'
 import { useUserCreditWalletSummary } from '../account-management/useUserCreditWalletSummary'
+import { useAuthOverlay } from '../auth/authOverlay'
 
 export type UserShellNavigationAdapter = {
   navigate: (path: string) => Promise<unknown> | unknown
@@ -33,8 +34,18 @@ export function useUserAccountControls(options: UseUserAccountControlsOptions) {
   const wallet = useUserCreditWalletSummary(() => Boolean(userStore.user))
   const accountManagement = useAccountManagementOverlay()
 
+  const authOverlay = useAuthOverlay()
+
   function openAccount(tab: AccountManagementTab = defaultAccountManagementTab) {
     accountManagement.commands.open(tab)
+  }
+
+  function openLogin() {
+    authOverlay.commands.open('login')
+  }
+
+  function openRegister() {
+    authOverlay.commands.open('register')
   }
 
   function goAdmin() {
@@ -50,6 +61,13 @@ export function useUserAccountControls(options: UseUserAccountControlsOptions) {
   }
 
   const balance = computed<UserIdeaBalanceControl>(() => {
+    if (!userStore.user) {
+      return {
+        status: 'anonymous',
+        displayValue: '',
+        ariaLabel: 'Idea 标识',
+      }
+    }
     const command = () => openAccount('billing')
     const state = wallet.state.value
     switch (state.status) {
@@ -83,6 +101,17 @@ export function useUserAccountControls(options: UseUserAccountControlsOptions) {
   })
 
   const menuItems = computed<UserAccountMenuItem[]>(() => {
+    if (!userStore.user) {
+      const guestItems: UserAccountMenuItem[] = [
+        { key: 'login', label: '登录', command: () => openLogin() },
+        { key: 'register', label: '免费注册', command: () => openRegister() },
+      ]
+      if (options.showHome ?? true) {
+        guestItems.push({ key: 'home', label: '返回首页', command: () => void goHome() })
+      }
+      return guestItems
+    }
+
     const items: UserAccountMenuItem[] = [
       { key: 'profile', label: '账户管理', command: () => openAccount() },
     ]
@@ -102,6 +131,6 @@ export function useUserAccountControls(options: UseUserAccountControlsOptions) {
       balance,
       menuItems,
     },
-    commands: { openAccount, goAdmin, goHome, logout },
+    commands: { openAccount, openLogin, openRegister, goAdmin, goHome, logout },
   }
 }

@@ -4,11 +4,11 @@
     type="button"
     :class="authCloseButtonClass"
     :disabled="disabled"
-    aria-label="关闭"
+    aria-label="Close"
     @click="emit('click')"
   >
     <template #icon>
-      <Xmark class="size-6" aria-hidden="true" />
+      <Xmark class="size-5" aria-hidden="true" />
     </template>
   </Button>
 </template>

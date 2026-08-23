@@ -83,6 +83,36 @@ func TestSaveVisionInvalidatesPassedTestWhenRuntimeConfigurationChanges(t *testi
 	}
 }
 
+func TestRecordFailedTestPreservesEnabledConfiguration(t *testing.T) {
+	secretstest.EnableEncryption(t)
+	db := testdb.Open(t)
+	repository := NewConfigRepository(settings.NewSystemConfigRepository(db))
+	ctx := context.Background()
+	key := "unsplash-test-key"
+
+	if err := repository.Save(ctx, ProviderUnsplash, &key, false, 1); err != nil {
+		t.Fatalf("save provider key: %v", err)
+	}
+	if err := repository.RecordTest(ctx, ProviderUnsplash, TestStatePassed, "", "连接测试通过", 1); err != nil {
+		t.Fatalf("record passed test: %v", err)
+	}
+	if err := repository.Save(ctx, ProviderUnsplash, nil, true, 1); err != nil {
+		t.Fatalf("enable provider: %v", err)
+	}
+	if err := repository.RecordTest(ctx, ProviderUnsplash, TestStateFailed, FailureNetwork, "连接超时", 1); err != nil {
+		t.Fatalf("record failed test: %v", err)
+	}
+
+	configs, err := repository.List(ctx)
+	if err != nil {
+		t.Fatalf("list provider configs: %v", err)
+	}
+	provider := configByProvider(configs, ProviderUnsplash)
+	if !provider.Enabled || provider.TestState != TestStateFailed {
+		t.Fatalf("provider after failed test = %#v", provider)
+	}
+}
+
 func configByProvider(configs []ProviderConfig, provider Provider) ProviderConfig {
 	for _, config := range configs {
 		if config.Provider == provider {

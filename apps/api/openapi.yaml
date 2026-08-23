@@ -27,6 +27,7 @@ tags:
   - name: AdminMonitor
   - name: AdminStatistics
   - name: AdminProviderEndpoints
+  - name: AdminBrandLogos
   - name: AdminSearchProviders
   - name: AdminStorage
   - name: AdminFeaturePrompts
@@ -1545,6 +1546,71 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ApiResponseBase' }
+  /admin/brand-logo-overrides:
+    get:
+      tags: [AdminBrandLogos]
+      operationId: listAdminBrandLogoOverrides
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Admin brand logo overrides
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseAdminBrandLogoOverrideList' }
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+        '403':
+          description: Admin role required
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseBase' }
+  /admin/brand-logo-overrides/{scope}/{target_key}:
+    parameters:
+      - name: scope
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [provider-endpoint, storage-profile, search-provider, oauth-provider]
+      - name: target_key
+        in: path
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'
+    put:
+      tags: [AdminBrandLogos]
+      operationId: setAdminBrandLogoOverride
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AdminBrandLogoOverrideUpdate' }
+      responses:
+        '200':
+          description: Brand logo override saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseAdminBrandLogoOverride' }
+    delete:
+      tags: [AdminBrandLogos]
+      operationId: deleteAdminBrandLogoOverride
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Brand logo override removed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponseEmpty' }
   /admin/users/{public_id}/ban:
     post:
       tags: [AdminUsers]
@@ -2552,6 +2618,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiResponseEmpty'
+  /admin/provider-endpoints/{id}/status:
+    patch:
+      tags: [AdminProviderEndpoints]
+      operationId: setAdminProviderEndpointStatus
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProviderEndpointStatusUpdate'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponseProviderEndpoint'
 
   /admin/storage/providers:
     get:
@@ -4363,6 +4448,34 @@ components:
           type: string
           maxLength: 2048
 
+    AdminBrandLogoOverride:
+      type: object
+      additionalProperties: false
+      required: [scope, target_key, logo_key, created_at, updated_at]
+      properties:
+        scope:
+          type: string
+          enum: [provider-endpoint, storage-profile, search-provider, oauth-provider]
+        target_key:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'
+        logo_key:
+          type: string
+          enum: [flux, midjourney, stability, fal, replicate, ideogram, recraft, runway, zhipu, aliyun, doubao, moonshot, minimax, baidu, tencent, lingyi, openai, gemini, anthropic, deepseek, cloudflare, siliconflow, mistral, groq, together, fireworks, huggingface, perplexity, cohere, novita, lepton, google, azure, bedrock, ollama, amazons3, cloudflare-r2, alibabacloud, tencent-cos, minio, unsplash, pexels, github, google-oauth, discord]
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    AdminBrandLogoOverrideUpdate:
+      type: object
+      additionalProperties: false
+      required: [logo_key]
+      properties:
+        logo_key:
+          type: string
+          enum: [flux, midjourney, stability, fal, replicate, ideogram, recraft, runway, zhipu, aliyun, doubao, moonshot, minimax, baidu, tencent, lingyi, openai, gemini, anthropic, deepseek, cloudflare, siliconflow, mistral, groq, together, fireworks, huggingface, perplexity, cohere, novita, lepton, google, azure, bedrock, ollama, amazons3, cloudflare-r2, alibabacloud, tencent-cos, minio, unsplash, pexels, github, google-oauth, discord]
+
     RateLimitSetting:
       type: object
       required: [window_seconds, max_requests]
@@ -5141,6 +5254,14 @@ components:
         base_url: { type: string }
         status: { type: integer }
 
+    ProviderEndpointStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: integer
+          enum: [0, 1]
+
     ProviderAPIType:
       type: string
       enum: [openai-compatible, self-hosted, google-ai, google-cloud]
@@ -5780,6 +5901,28 @@ components:
           properties:
             data:
               $ref: '#/components/schemas/OAuthProviderSettings'
+
+    ApiResponseAdminBrandLogoOverride:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              $ref: '#/components/schemas/AdminBrandLogoOverride'
+
+    ApiResponseAdminBrandLogoOverrideList:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [overrides]
+              properties:
+                overrides:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AdminBrandLogoOverride'
 
     ApiResponseCreditCommandResult:
       allOf:

@@ -1,5 +1,7 @@
 export type AuthGuardSettings = {
   registrationEnabled: boolean;
+  projectName?: string;
+  logoUrl?: string;
   windowSeconds: number;
   maxRequests: number;
 };
@@ -11,6 +13,8 @@ type AuthGuardSettingsCache = {
 
 type AuthGuardSettingsRow = {
   registration_enabled?: unknown;
+  branding_project_name?: unknown;
+  branding_logo_url?: unknown;
 };
 
 type AuthGuardSettingsDatabase = {
@@ -23,6 +27,8 @@ export const DEFAULT_AUTH_RATE_LIMIT_MAX_REQUESTS = 30;
 
 const DEFAULT_AUTH_GUARD_SETTINGS: AuthGuardSettings = {
   registrationEnabled: false,
+  projectName: "IdeaBoard",
+  logoUrl: "",
   windowSeconds: DEFAULT_AUTH_RATE_LIMIT_WINDOW_SECONDS,
   maxRequests: DEFAULT_AUTH_RATE_LIMIT_MAX_REQUESTS,
 };
@@ -57,11 +63,20 @@ export function createAuthGuardSettingsReader(
     };
     try {
       const result = await database.query(
-        "SELECT registration_enabled FROM get_auth_runtime_settings()",
+        "SELECT registration_enabled, branding_project_name, branding_logo_url FROM get_auth_runtime_settings()",
       );
       const row = result.rows[0] as AuthGuardSettingsRow | undefined;
       if (typeof row?.registration_enabled === "boolean") {
         nextSettings.registrationEnabled = row.registration_enabled;
+      }
+      if (
+        typeof row?.branding_project_name === "string" &&
+        row.branding_project_name.trim()
+      ) {
+        nextSettings.projectName = row.branding_project_name.trim();
+      }
+      if (typeof row?.branding_logo_url === "string") {
+        nextSettings.logoUrl = row.branding_logo_url.trim();
       }
     } catch (error) {
       // The cached default keeps registration closed without repeatedly querying a failed dependency.

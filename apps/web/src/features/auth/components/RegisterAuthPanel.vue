@@ -6,13 +6,12 @@
 
       <div :class="authModalHeaderClass">
         <p :class="authModalKickerClass">START MAKING</p>
-        <h2 :class="authModalTitleClass">创建账号</h2>
-        <p :class="authModalSubtitleClass">创建你的 {{ projectName }} 账号，开始创作</p>
+        <h2 :class="authModalTitleClass">Create account</h2>
       </div>
 
       <form
         v-if="!otpPending"
-        class="relative z-[1] flex flex-col gap-4"
+        class="relative z-[1] flex flex-col gap-3.5"
         novalidate
         @submit.prevent="handleRegister"
       >
@@ -26,7 +25,7 @@
             invalid,
             required,
           }"
-          label="显示名称"
+          label="Username"
           :error="errors.displayName"
           field-id="register-display-name"
           required
@@ -36,7 +35,7 @@
         >
           <div class="relative w-full">
             <span :class="authInputIconClass">
-              <UserIcon class="size-5" />
+              <UserIcon class="size-4.5" />
             </span>
             <InputText
               :id="fieldId"
@@ -45,12 +44,12 @@
               unstyled
               autocomplete="name"
               :required="required"
-              :class="[authInputClass, 'pl-11', inlineError ? authInputErrorClass : '']"
+              :class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
               :invalid="invalid"
-              :placeholder="inlineError ? inlineErrorText : '输入你的显示名称'"
+              :placeholder="inlineError ? inlineErrorText : 'e.g. alex'"
               :aria-invalid="ariaInvalid"
               :aria-describedby="describedbyId"
-              @blur="validateField('displayName')"
+              @blur="handleFieldBlur('displayName')"
               @update:model-value="clearFieldError('displayName')"
             />
           </div>
@@ -75,7 +74,7 @@
           :message-pt="authErrorMessagePt"
         >
           <div class="relative w-full">
-            <span :class="authInputIconClass"><UserIcon class="size-5" /></span>
+            <span :class="authInputIconClass"><UserIcon class="size-4.5" /></span>
             <InputText
               :id="fieldId"
               v-model="formValue.email"
@@ -83,12 +82,12 @@
               unstyled
               autocomplete="email"
               :required="required"
-              :class="[authInputClass, 'pl-11', inlineError ? authInputErrorClass : '']"
+              :class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
               :invalid="invalid"
-              :placeholder="inlineError ? inlineErrorText : '输入你的 Email'"
+              :placeholder="inlineError ? inlineErrorText : 'you@example.com'"
               :aria-invalid="ariaInvalid"
               :aria-describedby="describedbyId"
-              @blur="validateField('email')"
+              @blur="handleFieldBlur('email')"
               @update:model-value="clearFieldError('email')"
             />
           </div>
@@ -104,7 +103,7 @@
             invalid,
             required,
           }"
-          label="密码"
+          label="Password"
           :error="errors.password"
           field-id="register-password"
           required
@@ -114,7 +113,7 @@
         >
           <div class="relative w-full">
             <span :class="authInputIconClass">
-              <LockIcon class="size-5" />
+              <LockIcon class="size-4.5" />
             </span>
             <Password
               v-model="formValue.password"
@@ -132,10 +131,10 @@
                 'aria-describedby': describedbyId,
               }"
               :invalid="invalid"
-              :input-class="[authInputClass, inlineError ? authInputErrorClass : '']"
-              :placeholder="inlineError ? inlineErrorText : '设置登录密码'"
+              :input-class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
+              :placeholder="inlineError ? inlineErrorText : '••••••••'"
               toggle-mask
-              @blur="validateField('password')"
+              @blur="handleFieldBlur('password')"
               @update:model-value="handlePasswordInput"
             />
           </div>
@@ -151,7 +150,7 @@
             invalid,
             required,
           }"
-          label="确认密码"
+          label="Confirm Password"
           :error="errors.confirmPassword"
           field-id="register-confirm-password"
           required
@@ -161,7 +160,7 @@
         >
           <div class="relative w-full">
             <span :class="authInputIconClass">
-              <ShieldIcon class="size-5" />
+              <ShieldIcon class="size-4.5" />
             </span>
             <Password
               v-model="formValue.confirmPassword"
@@ -179,10 +178,10 @@
                 'aria-describedby': describedbyId,
               }"
               :invalid="invalid"
-              :input-class="[authInputClass, inlineError ? authInputErrorClass : '']"
-              :placeholder="inlineError ? inlineErrorText : '再次输入密码'"
+              :input-class="[authInputClass, 'pl-10', inlineError ? authInputErrorClass : '']"
+              :placeholder="inlineError ? inlineErrorText : '••••••••'"
               toggle-mask
-              @blur="validateField('confirmPassword')"
+              @blur="handleFieldBlur('confirmPassword')"
               @update:model-value="clearFieldError('confirmPassword')"
             />
           </div>
@@ -193,14 +192,14 @@
           :class="authPrimaryButtonClass"
           :pt="authButtonPt"
           type="submit"
-          :label="loading ? '创建中...' : '创建账号'"
+          :label="loading ? 'Creating...' : 'Create account'"
           :loading="loading"
           v-bind="submitControlState"
           fluid
         />
 
-        <p class="m-0 text-center text-[12px] leading-5 text-[var(--color-ib-auth-subtle)]">
-          创建账号即表示你已年满 18 岁。请先阅读
+        <p class="m-0 text-center text-[11px] leading-4 text-[var(--color-ib-auth-subtle)]">
+          By signing up, you agree to our
           <RouterLink
             :to="TERMS_PATH"
             target="_blank"
@@ -208,26 +207,26 @@
           >
             Terms
           </RouterLink>
-          和
+          &
           <RouterLink
             :to="PRIVACY_POLICY_PATH"
             target="_blank"
             class="rounded-[var(--radius-ib-control)] font-semibold text-[var(--color-ib-auth-link)] no-underline focus-visible:outline-none focus-visible:shadow-[var(--shadow-ib-auth-focus)]"
           >
-            Privacy Policy
+            Privacy
           </RouterLink>
-          。
+          .
         </p>
       </form>
 
       <form
         v-else
-        class="relative z-[1] flex flex-col gap-4"
+        class="relative z-[1] flex flex-col gap-3.5"
         novalidate
         @submit.prevent="handleVerifyOTP"
       >
-        <p class="text-sm text-slate-600">
-          验证码已发送到 {{ formValue.email }}，请输入 6 位验证码完成注册。
+        <p class="text-xs text-slate-600">
+          A verification code was sent to {{ formValue.email }}. Enter it below to complete registration.
         </p>
         <IbFormField
           v-slot="{
@@ -239,7 +238,7 @@
             invalid,
             required,
           }"
-          label="Email 验证码"
+          label="Verification Code"
           :error="otpError"
           field-id="register-otp"
           required
@@ -256,7 +255,7 @@
             :required="required"
             :class="[authInputClass, inlineError ? authInputErrorClass : '']"
             :invalid="invalid"
-            :placeholder="inlineError ? inlineErrorText : '输入 6 位验证码'"
+            :placeholder="inlineError ? inlineErrorText : 'Enter 6-digit code'"
             :aria-invalid="ariaInvalid"
             :aria-describedby="describedbyId"
             @update:model-value="otpError = ''"
@@ -267,22 +266,22 @@
           :class="authPrimaryButtonClass"
           :pt="authButtonPt"
           type="submit"
-          :label="loading ? '验证中...' : '验证并登录'"
+          :label="loading ? 'Verifying...' : 'Verify & Sign in'"
           :loading="loading"
           v-bind="submitControlState"
           fluid
         />
       </form>
 
-      <div :class="['mt-6', authFooterClass]">
-        <span>已经有账号？</span>
+      <div :class="['mt-5', authFooterClass]">
+        <span>Already have an account?</span>
         <button
           type="button"
           :class="authSwitchButtonClass"
           v-bind="secondaryControlState"
           @click="emit('to-login')"
         >
-          去登录
+          Sign in
         </button>
       </div>
     </div>
@@ -297,7 +296,6 @@ import Password from 'primevue/password'
 import { Lock as LockIcon, Shield as ShieldIcon, User as UserIcon } from '@iconoir/vue'
 import { useUserStore } from '../session/authSession'
 import { useAsyncAction } from '../../../shared/composables/useAsyncAction'
-import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import { resolveInteractiveControlState } from '../../../shared/interaction/interactiveControlState'
 import { PRIVACY_POLICY_PATH, TERMS_PATH } from '../../../shared/constants/routePaths'
 import IbFormField from '../../../shared/components/IbFormField.vue'
@@ -321,7 +319,6 @@ import {
   authModalBackdropClass,
   authModalHeaderClass,
   authModalKickerClass,
-  authModalSubtitleClass,
   authModalTitleClass,
   authPasswordPt,
   authPrimaryButtonClass,
@@ -335,7 +332,6 @@ const emit = defineEmits<{
   'update:busy': [busy: boolean]
 }>()
 
-const { projectName } = useSiteBranding()
 const userStore = useUserStore()
 const authFeedback = useAuthFeedback()
 const { isPending: loading, runAsyncAction } = useAsyncAction()
@@ -374,18 +370,42 @@ function resolveFieldControlState(invalid: boolean) {
   })
 }
 
+function handleFieldBlur(field: RegisterField) {
+  if (field === 'displayName') {
+    const displayName = formValue.value.displayName.trim()
+    if (displayName) {
+      errors.value.displayName = getLengthError(displayName, AUTH_DISPLAY_NAME_LIMIT, 'Username')
+    }
+  } else if (field === 'email') {
+    const email = formValue.value.email.trim()
+    if (email && (!email.includes('@') || email.endsWith('@'))) {
+      errors.value.email = 'Please enter a valid email address'
+    }
+  } else if (field === 'password') {
+    const password = formValue.value.password
+    if (password) {
+      errors.value.password = getPasswordLengthError(password)
+    }
+  } else if (field === 'confirmPassword') {
+    const confirmPassword = formValue.value.confirmPassword
+    if (confirmPassword && confirmPassword !== formValue.value.password) {
+      errors.value.confirmPassword = 'Passwords do not match'
+    }
+  }
+}
+
 function validateField(field: RegisterField) {
   if (field === 'displayName') {
     const displayName = formValue.value.displayName.trim()
     errors.value.displayName =
-      getRequiredError(displayName, '显示名称') ||
-      getLengthError(displayName, AUTH_DISPLAY_NAME_LIMIT, '显示名称')
+      getRequiredError(displayName, 'Username') ||
+      getLengthError(displayName, AUTH_DISPLAY_NAME_LIMIT, 'Username')
     return !errors.value.displayName
   }
 
   if (field === 'password') {
     const password = formValue.value.password
-    errors.value.password = getRequiredError(password, '密码') || getPasswordLengthError(password)
+    errors.value.password = getRequiredError(password, 'Password') || getPasswordLengthError(password)
     return !errors.value.password
   }
 
@@ -393,17 +413,17 @@ function validateField(field: RegisterField) {
     const email = formValue.value.email.trim()
     errors.value.email = getRequiredError(email, 'Email')
     if (!errors.value.email && (!email.includes('@') || email.endsWith('@'))) {
-      errors.value.email = '请输入有效的 Email'
+      errors.value.email = 'Please enter a valid email address'
     }
     return !errors.value.email
   }
 
   const confirmPassword = formValue.value.confirmPassword
   errors.value.confirmPassword =
-    getRequiredError(confirmPassword, '密码') || getPasswordLengthError(confirmPassword)
+    getRequiredError(confirmPassword, 'Confirm Password') || getPasswordLengthError(confirmPassword)
 
   if (!errors.value.confirmPassword && confirmPassword !== formValue.value.password) {
-    errors.value.confirmPassword = '两次输入的密码不一致'
+    errors.value.confirmPassword = 'Passwords do not match'
   }
   return !errors.value.confirmPassword
 }
@@ -454,7 +474,7 @@ async function handleRegister() {
 async function handleVerifyOTP() {
   const code = otp.value.trim()
   if (!/^\d{6}$/.test(code)) {
-    otpError.value = '请输入 6 位验证码'
+    otpError.value = 'Please enter a 6-digit code'
     return
   }
   const verified = await runAsyncAction(

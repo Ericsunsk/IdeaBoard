@@ -1,6 +1,7 @@
 import type { Component } from 'vue'
 import { DatabaseExport } from '@iconoir/vue'
 import type { StorageCard, StorageProvider, StorageProviderMeta } from './storageHelpers'
+import { getAdminBrandLogo } from '../shared/logos/adminBrandLogos'
 import logoAlibabaCloud from '../../../shared/assets/storage-vendors/alibabacloud.svg'
 import logoAmazonS3 from '../../../shared/assets/storage-vendors/amazons3.svg'
 import logoCloudflare from '../../../shared/assets/storage-vendors/cloudflare.svg'
@@ -100,43 +101,18 @@ export const vendorPresetCatalog: VendorPreset[] = [
   },
 ]
 
-const vendorLogoFingerprintRules = [
-  {
-    logoSrc: logoAlibabaCloud,
-    tokens: ['aliyun', 'alibaba', '阿里云', 'aliyuncs.com'],
-  },
-  {
-    logoSrc: logoTencentCloud,
-    tokens: ['tencent', '腾讯', 'myqcloud.com'],
-  },
-  {
-    logoSrc: logoCloudflare,
-    tokens: ['cloudflare', 'r2.cloudflarestorage.com'],
-  },
-  {
-    logoSrc: logoMinio,
-    tokens: ['minio', '127.0.0.1:9000', ':9000'],
-  },
-  {
-    logoSrc: logoAmazonS3,
-    tokens: ['amazon', 'aws', 'amazonaws.com'],
-  },
-] as const
-
 export function storageVendorLogo(storage: StorageCard) {
-  const fingerprint = [
-    storage.name,
-    storage.provider,
-    ...Object.values(storage.config).map((value) => String(value ?? '')),
-  ]
-    .join(' ')
-    .toLowerCase()
-
-  const matchedRule = vendorLogoFingerprintRules.find((rule) =>
-    rule.tokens.some((token) => fingerprint.includes(token)),
+  return (
+    getAdminBrandLogo(
+      {
+        name: storage.name,
+        provider: storage.provider,
+        endpoint: String(storage.config.endpoint ?? ''),
+      },
+      'storage-profile',
+      storage.id,
+    ) ?? vendorLogoMap[storage.provider]
   )
-
-  return matchedRule?.logoSrc || vendorLogoMap[storage.provider]
 }
 
 export function storageVendorIcon(storage: StorageCard) {

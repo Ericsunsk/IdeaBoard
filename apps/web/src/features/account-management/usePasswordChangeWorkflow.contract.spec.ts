@@ -15,11 +15,11 @@ describe('usePasswordChangeWorkflow', () => {
 
     workflow.form.value.newPassword = '123456789'
     expect(workflow.validateField('newPassword')).toBe(false)
-    expect(workflow.errors.value.newPassword).toBe('密码长度需为 10-128 个字符')
+    expect(workflow.errors.value.newPassword).toBe('Password must be 10-128 characters')
 
     workflow.form.value.newPassword = 'x'.repeat(129)
     expect(workflow.validateField('newPassword')).toBe(false)
-    expect(workflow.errors.value.newPassword).toBe('密码长度需为 10-128 个字符')
+    expect(workflow.errors.value.newPassword).toBe('Password must be 10-128 characters')
 
     workflow.form.value.newPassword = '1234567890'
     workflow.form.value.confirmPassword = 'abcdef'
@@ -32,7 +32,7 @@ describe('usePasswordChangeWorkflow', () => {
 
     workflow.form.value.newPassword = '1234567890'
     workflow.form.value.confirmPassword = 'abcdefghij'
-    workflow.errors.value.newPassword = '密码长度需为 10-128 个字符'
+    workflow.errors.value.newPassword = 'Password must be 10-128 characters'
     workflow.errors.value.confirmPassword = '两次输入密码不一致'
 
     workflow.form.value.newPassword = 'abcdefghij'

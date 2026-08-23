@@ -132,24 +132,24 @@ const authPanelCases: AuthPanelCase[] = [
     action: 'login',
     component: LoginAuthPanel,
     successEvent: 'login-success',
-    submitLabel: '登录',
-    switchLabel: '立即注册',
+    submitLabel: 'Sign in',
+    switchLabel: 'Sign up',
     async fill(user) {
       await user.type(screen.getByLabelText(/^Email/), 'tester@example.com')
-      await user.type(screen.getByLabelText(/^密码/), 'secret-pass')
+      await user.type(screen.getByLabelText(/^Password/), 'secret-pass')
     },
   },
   {
     action: 'register',
     component: RegisterAuthPanel,
     successEvent: 'register-success',
-    submitLabel: '创建账号',
-    switchLabel: '去登录',
+    submitLabel: 'Create account',
+    switchLabel: 'Sign in',
     async fill(user) {
-      await user.type(screen.getByLabelText(/^显示名称/), 'tester')
+      await user.type(screen.getByLabelText(/^Username/), 'tester')
       await user.type(screen.getByLabelText(/^Email/), 'tester@example.com')
-      await user.type(screen.getByLabelText(/^密码/), 'secret-pass')
-      await user.type(screen.getByLabelText(/^确认密码/), 'secret-pass')
+      await user.type(screen.getByLabelText(/^Password/), 'secret-pass')
+      await user.type(screen.getByLabelText(/^Confirm Password/), 'secret-pass')
     },
   },
 ]
@@ -245,15 +245,15 @@ describe.each(authPanelCases)('$action auth panel', (testCase) => {
     await waitFor(() => expect(authAction).toHaveBeenCalledOnce())
     await view.user.click(submitButton)
 
-    expect(screen.getByRole('button', { name: '关闭' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Close' })).toBeDisabled()
     expect(screen.getByRole('button', { name: testCase.switchLabel })).toBeDisabled()
     expect(authAction).toHaveBeenCalledOnce()
 
     resolveRequest(true)
     if (testCase.action === 'register') {
       const verifyAction = vi.spyOn(store, 'verifyRegistrationOTP').mockResolvedValue(true)
-      const otpButton = await screen.findByRole('button', { name: '验证并登录' })
-      await view.user.type(screen.getByLabelText(/^Email 验证码/), '123456')
+      const otpButton = await screen.findByRole('button', { name: 'Verify & Sign in' })
+      await view.user.type(screen.getByLabelText(/^Verification Code/), '123456')
       await view.user.click(otpButton)
       await waitFor(() => expect(verifyAction).toHaveBeenCalledOnce())
     }
@@ -274,7 +274,7 @@ describe.each(authPanelCases)('$action auth panel', (testCase) => {
     expect(submitButton).not.toHaveAttribute('aria-busy')
 
     await view.user.click(submitButton)
-    expect(screen.getByLabelText(testCase.action === 'login' ? /^Email/ : /^显示名称/)).toHaveAttribute(
+    expect(screen.getByLabelText(testCase.action === 'login' ? /^Email/ : /^Username/)).toHaveAttribute(
       'data-control-tone',
       'danger',
     )
@@ -285,7 +285,7 @@ describe.each(authPanelCases)('$action auth panel', (testCase) => {
     await waitFor(() => expect(submitButton).toHaveAttribute('data-control-state', 'loading'))
     expect(submitButton).toHaveAttribute('aria-busy', 'true')
     expect(submitButton).toBeDisabled()
-    expect(screen.getByLabelText(testCase.action === 'login' ? /^Email/ : /^显示名称/)).toHaveAttribute(
+    expect(screen.getByLabelText(testCase.action === 'login' ? /^Email/ : /^Username/)).toHaveAttribute(
       'data-control-state',
       'disabled',
     )

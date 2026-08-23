@@ -12,6 +12,7 @@ import {
   detectAdminProviderEndpointModels as detectAdminProviderEndpointModelsRequest,
   getAdminProviderEndpointRegistry,
   listAdminProviderEndpoints,
+  setAdminProviderEndpointStatus as setAdminProviderEndpointStatusRequest,
   updateAdminProviderEndpoint,
 } from '../../../shared/api/generated-query/admin-provider-endpoints/admin-provider-endpoints'
 import type {
@@ -41,6 +42,11 @@ type SaveAdminProviderEndpointInput = {
   data: ProviderEndpointFormData
 }
 
+type SetAdminProviderEndpointStatusInput = {
+  id: number
+  status: 0 | 1
+}
+
 const ADMIN_ACCOUNT_LIST_PAGE_SIZE = 100
 const PROVIDER_MODEL_DETECTION_TIMEOUT_MS = 20_000
 
@@ -63,6 +69,16 @@ export async function saveAdminProviderEndpoint(
       ? updateAdminProviderEndpoint(input.id, payload)
       : createAdminProviderEndpoint(payload)
   await resolveApiOk(request, '保存供应商端点失败')
+}
+
+export async function setAdminProviderEndpointStatus(
+  input: SetAdminProviderEndpointStatusInput,
+): Promise<ProviderEndpointRecord> {
+  const data = await resolveApiData(
+    setAdminProviderEndpointStatusRequest(input.id, { status: input.status }),
+    '更新供应商端点状态失败',
+  )
+  return toProviderEndpointRecord(data.provider_endpoint)
 }
 
 export async function deleteAdminProviderEndpoint(id: number): Promise<void> {

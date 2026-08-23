@@ -12,7 +12,15 @@ describe('getAuthGuardSettings', () => {
     const getAuthGuardSettings = createAuthGuardSettingsReader({
       query: async (queryText) => {
         settingsQuery = queryText
-        return { rows: [{ registration_enabled: true }] }
+        return {
+          rows: [
+            {
+              registration_enabled: true,
+              branding_project_name: 'Design Studio',
+              branding_logo_url: '/uploads/site/assets/logo.png',
+            },
+          ],
+        }
       },
     })
 
@@ -22,6 +30,8 @@ describe('getAuthGuardSettings', () => {
     assert.doesNotMatch(settingsQuery, /system_configs/)
     assert.deepEqual(settings, {
       registrationEnabled: true,
+      projectName: 'Design Studio',
+      logoUrl: '/uploads/site/assets/logo.png',
       windowSeconds: DEFAULT_AUTH_RATE_LIMIT_WINDOW_SECONDS,
       maxRequests: DEFAULT_AUTH_RATE_LIMIT_MAX_REQUESTS,
     })

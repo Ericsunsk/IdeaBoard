@@ -204,7 +204,7 @@
 
       <Column field="createdDateLabel" header="加入时间" :style="{ width: '136px' }">
         <template #body="{ data: user }">
-          <span class="text-admin-body text-admin-text-3">
+          <span class="whitespace-nowrap font-mono text-admin-body text-admin-text-3">
             {{ user.createdDateLabel }}
           </span>
         </template>
@@ -251,9 +251,7 @@
       </Column>
 
       <template #empty>
-        <div class="py-8 text-center text-admin-body text-admin-text-3">
-          {{ emptyUserMessage }}
-        </div>
+        <AdminEmptyState :title="emptyUserMessage" />
       </template>
     </DataTableFrame>
   </AdminTablePanel>
@@ -296,6 +294,7 @@ import Column from 'primevue/column'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import Tooltip from 'primevue/tooltip'
+import AdminEmptyState from '../shared/components/AdminEmptyState.vue'
 import AdminFilterPopover from '../shared/components/AdminFilterPopover.vue'
 import AdminPagerControls from '../shared/components/AdminPagerControls.vue'
 import AdminRowActionsPopover from '../shared/components/AdminRowActionsPopover.vue'

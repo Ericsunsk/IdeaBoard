@@ -54,6 +54,9 @@ export const adminToolbarPageLabelClass =
 
 export const adminActionButtonClass = '!h-9 !rounded-lg'
 
+export const adminLogoButtonClass =
+  'ib-control-state flex shrink-0 items-center justify-center rounded-xl border border-admin-border-soft bg-white shadow-xs cursor-pointer overflow-hidden transition-colors hover:border-admin-accent hover:bg-white focus-visible:outline-none focus-visible:border-admin-accent data-[control-state=selected]:border-admin-accent data-[control-state=selected]:bg-white'
+
 export const adminTextButtonClass = '!text-ib-text-muted hover:!text-admin-text-1'
 
 export const adminFilterPopoverClass =
@@ -85,6 +88,6 @@ export const adminDialogFormBodyClass = 'flex flex-col gap-3.5'
 
 export const adminDialogFooterClass = '!px-6 !pt-4 !pb-5'
 
-export const adminDialogFooterActionsClass = 'flex flex-wrap justify-end gap-2'
+export const adminDialogFooterActionsClass = 'flex w-full flex-wrap items-center justify-end gap-2'
 
 export const adminCompactTagClass = '!px-2 !py-0.5 !text-admin-caption !leading-4'

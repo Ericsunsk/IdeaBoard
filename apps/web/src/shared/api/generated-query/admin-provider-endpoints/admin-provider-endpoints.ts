@@ -25,6 +25,7 @@ import type {
   ApiResponseProviderEndpointRegistry,
   DetectModelsRequest,
   ProviderEndpointFormData,
+  ProviderEndpointStatusUpdate,
 } from '../model'
 
 import { orvalMutator } from '../../orvalMutator'
@@ -490,6 +491,104 @@ export function useDeleteAdminProviderEndpoint<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getDeleteAdminProviderEndpointQueryOptions(id, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getSetAdminProviderEndpointStatusUrl = (id: number) => {
+  return `/admin/provider-endpoints/${encodeURIComponent(String(id))}/status`
+}
+
+export const setAdminProviderEndpointStatus = async (
+  id: number,
+  providerEndpointStatusUpdate: ProviderEndpointStatusUpdate,
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseProviderEndpoint> => {
+  return orvalMutator<ApiResponseProviderEndpoint>(getSetAdminProviderEndpointStatusUrl(id), {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(providerEndpointStatusUpdate),
+  })
+}
+
+export const getSetAdminProviderEndpointStatusQueryKey = (
+  id: MaybeRefOrGetter<number>,
+  providerEndpointStatusUpdate?: MaybeRefOrGetter<ProviderEndpointStatusUpdate>,
+) => {
+  return [
+    'PATCH',
+    'admin',
+    'provider-endpoints',
+    id,
+    'status',
+    providerEndpointStatusUpdate,
+  ] as const
+}
+
+export const getSetAdminProviderEndpointStatusQueryOptions = <
+  TData = Awaited<ReturnType<typeof setAdminProviderEndpointStatus>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRefOrGetter<number>,
+  providerEndpointStatusUpdate: MaybeRefOrGetter<ProviderEndpointStatusUpdate>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof setAdminProviderEndpointStatus>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getSetAdminProviderEndpointStatusQueryKey(id, providerEndpointStatusUpdate)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof setAdminProviderEndpointStatus>>> = ({
+    signal,
+  }) =>
+    setAdminProviderEndpointStatus(toValue(id), toValue(providerEndpointStatusUpdate), {
+      signal,
+      ...requestOptions,
+    })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(id) !== null && toValue(id) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof setAdminProviderEndpointStatus>>, TError, TData>
+}
+
+export type SetAdminProviderEndpointStatusQueryResult = NonNullable<
+  Awaited<ReturnType<typeof setAdminProviderEndpointStatus>>
+>
+export type SetAdminProviderEndpointStatusQueryError = ErrorType<unknown>
+
+export function useSetAdminProviderEndpointStatus<
+  TData = Awaited<ReturnType<typeof setAdminProviderEndpointStatus>>,
+  TError = ErrorType<unknown>,
+>(
+  id: MaybeRefOrGetter<number>,
+  providerEndpointStatusUpdate: MaybeRefOrGetter<ProviderEndpointStatusUpdate>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof setAdminProviderEndpointStatus>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getSetAdminProviderEndpointStatusQueryOptions(
+    id,
+    providerEndpointStatusUpdate,
+    options,
+  )
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

@@ -11,28 +11,23 @@
       {{ hint }}
     </p>
 
-    <Message
-      v-if="hasError && errorPlacement === 'below'"
-      :id="errorElementId"
-      severity="error"
-      size="small"
-      :closable="false"
-    >
+    <span v-if="hasError" :id="errorElementId" class="sr-only">
       {{ error }}
-    </Message>
+    </span>
   </label>
 </template>
 
 <script setup lang="ts">
 import { computed, useId } from 'vue'
-import Message from 'primevue/message'
 
-interface AdminFormFieldSlotProps {
+export interface AdminFormFieldSlotProps {
   describedbyId?: string
   errorId?: string
   hintId?: string
   invalid: boolean
   required: boolean
+  error: string
+  resolvePlaceholder: (defaultPlaceholder?: string) => string
 }
 
 const props = withDefaults(
@@ -49,7 +44,7 @@ const props = withDefaults(
   {
     for: undefined,
     error: '',
-    errorPlacement: 'below',
+    errorPlacement: 'inline',
     hint: '',
     required: false,
     labelClass: '',
@@ -82,5 +77,7 @@ const slotProps = computed<AdminFormFieldSlotProps>(() => ({
   hintId: hintElementId.value,
   invalid: hasError.value,
   required: props.required,
+  error: props.error,
+  resolvePlaceholder: (defaultPlaceholder = '') => (props.error ? props.error : defaultPlaceholder),
 }))
 </script>

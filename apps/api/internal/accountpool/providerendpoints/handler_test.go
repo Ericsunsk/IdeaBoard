@@ -414,6 +414,23 @@ func TestProviderEndpointHandlerUpdateDuplicateReturnsConflict(t *testing.T) {
 	}
 }
 
+func TestProviderEndpointHandlerUpdateStatusValidatesInput(t *testing.T) {
+	router, repo := newProviderEndpointHandlerTestRouter(t)
+	endpoint := seedProviderEndpoint(t, context.Background(), repo, &ProviderEndpoint{
+		APIType: "openai-compatible",
+		Name:    "Status validation",
+		BaseURL: "http://127.0.0.1:19088/v1",
+		Status:  1,
+	})
+
+	for _, payload := range []any{map[string]any{}, map[string]any{"status": 2}} {
+		rec := serveProviderEndpointJSON(t, router, http.MethodPatch, fmt.Sprintf("/provider-endpoints/%d/status", endpoint.ID), payload)
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("status update response = %d, want 400; body=%s", rec.Code, rec.Body.String())
+		}
+	}
+}
+
 func TestParseModelIDs(t *testing.T) {
 	tests := []struct {
 		name string
@@ -469,6 +486,7 @@ func newProviderEndpointHandlerTestRouter(t *testing.T) (*gin.Engine, *ProviderE
 	router := gin.New()
 	router.POST("/provider-endpoints", handler.Create)
 	router.PUT("/provider-endpoints/:id", handler.Update)
+	router.PATCH("/provider-endpoints/:id/status", handler.UpdateStatus)
 	return router, repo
 }
 

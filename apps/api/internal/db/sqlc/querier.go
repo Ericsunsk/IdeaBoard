@@ -49,6 +49,7 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
 	DeleteAccountModel(ctx context.Context, arg DeleteAccountModelParams) (int64, error)
 	DeleteAccountModelsByAccountID(ctx context.Context, accountID int64) error
+	DeleteAdminBrandLogoOverride(ctx context.Context, arg DeleteAdminBrandLogoOverrideParams) (int64, error)
 	DeleteBoardByOwnerAndBoardID(ctx context.Context, arg DeleteBoardByOwnerAndBoardIDParams) (int64, error)
 	DeleteBoardMediaRefsByOwnerAndBoardID(ctx context.Context, arg DeleteBoardMediaRefsByOwnerAndBoardIDParams) error
 	DeleteBoardMember(ctx context.Context, arg DeleteBoardMemberParams) (int64, error)
@@ -145,6 +146,7 @@ type Querier interface {
 	ListAccounts(ctx context.Context, arg ListAccountsParams) ([]ListAccountsRow, error)
 	ListActivePaymentCheckoutShutdowns(ctx context.Context) ([]PaymentCheckoutShutdown, error)
 	ListActivePaymentOrders(ctx context.Context, userID int64) ([]PaymentOrder, error)
+	ListAdminBrandLogoOverrides(ctx context.Context) ([]AdminBrandLogoOverride, error)
 	ListAdminPaymentOrderWebhookEvents(ctx context.Context, arg ListAdminPaymentOrderWebhookEventsParams) ([]ListAdminPaymentOrderWebhookEventsRow, error)
 	ListAdminPaymentOrders(ctx context.Context, arg ListAdminPaymentOrdersParams) ([]ListAdminPaymentOrdersRow, error)
 	ListAdminTaskAttemptsByTaskIDs(ctx context.Context, taskIds []string) ([]ListAdminTaskAttemptsByTaskIDsRow, error)
@@ -251,7 +253,9 @@ type Querier interface {
 	UpdateAccountModelEnabled(ctx context.Context, arg UpdateAccountModelEnabledParams) (int64, error)
 	UpdateAccountStatus(ctx context.Context, arg UpdateAccountStatusParams) (int64, error)
 	UpdateManagedProviderEndpointAccount(ctx context.Context, arg UpdateManagedProviderEndpointAccountParams) error
+	UpdateManagedProviderEndpointAccountStatus(ctx context.Context, arg UpdateManagedProviderEndpointAccountStatusParams) error
 	UpdateProviderEndpoint(ctx context.Context, arg UpdateProviderEndpointParams) (int64, error)
+	UpdateProviderEndpointStatus(ctx context.Context, arg UpdateProviderEndpointStatusParams) (int64, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (int64, error)
 	UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarParams) (int64, error)
 	UpdateUserLastLoginMetadata(ctx context.Context, arg UpdateUserLastLoginMetadataParams) (int64, error)
@@ -259,6 +263,7 @@ type Querier interface {
 	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) (int64, error)
 	UpdateUserStorageUID(ctx context.Context, arg UpdateUserStorageUIDParams) (int64, error)
 	UpsertAccountModel(ctx context.Context, arg UpsertAccountModelParams) (int64, error)
+	UpsertAdminBrandLogoOverride(ctx context.Context, arg UpsertAdminBrandLogoOverrideParams) (AdminBrandLogoOverride, error)
 	UpsertBoard(ctx context.Context, arg UpsertBoardParams) (int64, error)
 	UpsertBoardMember(ctx context.Context, arg UpsertBoardMemberParams) error
 	UpsertFeaturePrompt(ctx context.Context, arg UpsertFeaturePromptParams) (FeaturePrompt, error)

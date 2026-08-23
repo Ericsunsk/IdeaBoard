@@ -6,45 +6,67 @@
     @mousedown.stop
     @click.stop
   >
-    <UserCreditBalanceButton v-if="showCredits && balance" :balance="balance" />
-    <Button
-      ref="avatarButtonRef"
-      unstyled
-      type="button"
-      title="账户菜单"
-      aria-label="账户菜单"
-      aria-haspopup="menu"
-      :aria-expanded="isMenuOpen"
-      :class="[avatarButtonClass, '!border !border-board-card-border !bg-board-control-bg/80 backdrop-blur-md hover:!bg-ib-surface-hover']"
-      @click="toggleMenu"
-    >
-      <img v-if="avatarUrl" :src="avatarUrl" :class="avatarImageClass" alt="用户头像" />
-      <div v-else :class="[avatarPlaceholderClass, 'bg-transparent']">
-        <User :class="avatarIconClass" />
-      </div>
-    </Button>
-    <Menu
-      ref="menuRef"
-      :model="primeMenuItems"
-      popup
-      :append-to="appendTo"
-      :pt="resolvedMenuPt"
-      @show="handleShow"
-      @hide="handleHide"
-    >
-      <template #item="{ item, props: itemProps }">
-        <a
-          v-bind="itemProps.action"
-          :class="[menuItemClass, item.tone === 'danger' ? menuDangerItemClass : '']"
-          data-control-state="idle"
-          :data-control-tone="item.tone"
-        >
-          <span class="flex min-w-0 flex-1 items-center justify-between gap-4">
-            <span class="truncate">{{ item.label }}</span>
-          </span>
-        </a>
-      </template>
-    </Menu>
+    <template v-if="isGuest">
+      <Button
+        unstyled
+        type="button"
+        class="ib-control-state [--ib-control-active-transform:scale(0.97)] inline-flex h-9 items-center justify-center rounded-full border border-board-card-border bg-board-control-bg/80 px-4 text-xs font-semibold text-ib-text backdrop-blur-md transition-[border-color,background-color,transform,color] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:border-ib-border-hover hover:bg-ib-surface-hover active:scale-[0.97]"
+        aria-label="Log in"
+        @click="loginItem?.command?.()"
+      >
+        Log in
+      </Button>
+      <Button
+        unstyled
+        type="button"
+        class="ib-control-state [--ib-control-hover-transform:scale(1.02)] [--ib-control-active-transform:scale(0.97)] inline-flex h-9 items-center justify-center rounded-full border-0 bg-gradient-to-r from-[var(--color-ib-auth-primary-from)] to-[var(--color-ib-auth-primary-to)] px-4.5 text-xs font-semibold text-[var(--color-ib-auth-primary-text)] shadow-[var(--shadow-ib-auth-primary)] transition-[box-shadow,transform,opacity] duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-[var(--shadow-ib-auth-primary-hover)] active:scale-[0.97]"
+        aria-label="Get started for free"
+        @click="registerItem?.command?.()"
+      >
+        Get started for free
+      </Button>
+    </template>
+    <template v-else>
+      <UserCreditBalanceButton v-if="showCredits && balance" :balance="balance" />
+      <Button
+        ref="avatarButtonRef"
+        unstyled
+        type="button"
+        title="账户菜单"
+        aria-label="账户菜单"
+        aria-haspopup="menu"
+        :aria-expanded="isMenuOpen"
+        :class="[avatarButtonClass, '!border !border-board-card-border !bg-board-control-bg/80 backdrop-blur-md hover:!bg-ib-surface-hover']"
+        @click="toggleMenu"
+      >
+        <img v-if="avatarUrl" :src="avatarUrl" :class="avatarImageClass" alt="用户头像" />
+        <div v-else :class="[avatarPlaceholderClass, 'bg-transparent']">
+          <User :class="avatarIconClass" />
+        </div>
+      </Button>
+      <Menu
+        ref="menuRef"
+        :model="primeMenuItems"
+        popup
+        :append-to="appendTo"
+        :pt="resolvedMenuPt"
+        @show="handleShow"
+        @hide="handleHide"
+      >
+        <template #item="{ item, props: itemProps }">
+          <a
+            v-bind="itemProps.action"
+            :class="[menuItemClass, item.tone === 'danger' ? menuDangerItemClass : '']"
+            data-control-state="idle"
+            :data-control-tone="item.tone"
+          >
+            <span class="flex min-w-0 flex-1 items-center justify-between gap-4">
+              <span class="truncate">{{ item.label }}</span>
+            </span>
+          </a>
+        </template>
+      </Menu>
+    </template>
   </div>
 </template>
 
@@ -106,6 +128,10 @@ const {
   select,
 } = usePrimePopupMenuOverlayLifecycle({})
 const resolvedMenuPt = computed(() => props.menuPt ?? userAccountMenuPt)
+
+const loginItem = computed(() => props.items.find((item) => item.key === 'login'))
+const registerItem = computed(() => props.items.find((item) => item.key === 'register'))
+const isGuest = computed(() => Boolean(loginItem.value && registerItem.value))
 
 const primeMenuItems = computed<MenuItem[]>(() =>
   props.items.map((item) => ({

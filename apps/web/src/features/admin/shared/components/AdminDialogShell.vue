@@ -50,7 +50,7 @@ import {
   adminDialogScrollableBodyClass,
 } from '../lib/adminUiClasses'
 
-export type AdminDialogSize = 'compact' | 'form' | 'wide'
+export type AdminDialogSize = 'compact' | 'form' | 'medium' | 'wide'
 export type AdminDialogContentLayout = 'form' | 'scrollable'
 
 const props = withDefaults(
@@ -89,6 +89,7 @@ const dialogAccessibilityAttrs = computed(() =>
 const dialogWidthClasses: Record<AdminDialogSize, string> = {
   compact: 'w-[min(30rem,calc(100vw-1.5rem))]',
   form: 'w-[min(35rem,calc(100vw-1.5rem))]',
+  medium: 'w-[min(46rem,calc(100vw-1.5rem))]',
   wide: 'w-[min(61.25rem,calc(100vw-1.5rem))]',
 }
 

@@ -161,23 +161,42 @@
       @show="userMenuOpen = true"
       @hide="userMenuOpen = false"
     >
-      <div class="flex min-w-[132px] flex-col gap-1 p-1.5" role="menu">
-        <Button
-          label="返回画布"
-          text
-          fluid
+      <div class="flex min-w-[190px] flex-col p-1.5 select-none" role="menu">
+        <div class="flex items-center gap-2.5 px-3 py-2">
+          <div
+            class="flex size-7.5 shrink-0 items-center justify-center rounded-lg bg-admin-surface-muted text-admin-caption font-black text-admin-accent border border-admin-border-soft"
+          >
+            {{ (userStore.user?.display_name || 'A').substring(0, 1).toUpperCase() }}
+          </div>
+          <div class="flex min-w-0 flex-col">
+            <span class="truncate text-xs font-bold text-admin-title-color">
+              {{ userStore.user?.display_name || 'Administrator' }}
+            </span>
+            <span class="truncate text-[11px] font-medium text-admin-text-3 font-mono">
+              {{ userStore.user?.role === 'admin' ? '系统管理员' : 'Administrator' }}
+            </span>
+          </div>
+        </div>
+
+        <button
+          type="button"
           role="menuitem"
-          class="justify-start rounded-md px-3 py-2.5 text-admin-meta font-[650]"
+          class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-admin-text-2 hover:bg-admin-surface-hover hover:text-admin-title-color transition-colors cursor-pointer"
           @click="handleUserAction('boards')"
-        />
-        <Button
-          label="退出登录"
-          text
-          fluid
+        >
+          <ViewGrid class="size-4 text-admin-text-3" />
+          <span>返回画布</span>
+        </button>
+
+        <button
+          type="button"
           role="menuitem"
-          class="justify-start rounded-md px-3 py-2.5 text-admin-meta font-[650]"
+          class="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-admin-text-2 hover:bg-admin-danger-soft hover:text-admin-danger transition-colors cursor-pointer"
           @click="handleUserAction('logout')"
-        />
+        >
+          <LogOut class="size-4" />
+          <span>退出登录</span>
+        </button>
       </div>
     </Popover>
     <ConfirmDialog />
@@ -249,7 +268,14 @@ import Drawer from 'primevue/drawer'
 import Popover from 'primevue/popover'
 import Tag from 'primevue/tag'
 import Tooltip from 'primevue/tooltip'
-import { Bell as BellIcon, Menu as MenuIcon, User as UserIcon, Xmark } from '@iconoir/vue'
+import {
+  Bell as BellIcon,
+  LogOut,
+  Menu as MenuIcon,
+  User as UserIcon,
+  ViewGrid,
+  Xmark,
+} from '@iconoir/vue'
 import {
   adminNavigationByKey,
   adminNavigationItems,
@@ -264,13 +290,14 @@ import { USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
 import SiteBrandLogo from '../../../shared/components/SiteBrandLogo.vue'
 import { brandMarkClasses, createBrandMarkClass } from '../../../shared/lib/brandMark'
 import { useAdminAnomalyRadar } from '../shared/composables/useAdminAnomalyRadar'
+import { useAdminToast } from '../shared/lib/adminToast'
+import { useAdminBrandLogoOverrides } from '../shared/logos/useAdminBrandLogoOverrides'
 import type { AdminAnomalyItem } from '../shared/lib/adminAnomalyRules'
-import {
-  createAdminPopoverPt,
-} from '../shared/lib/adminOverlayPt'
+import { createAdminPopoverPt } from '../shared/lib/adminOverlayPt'
 import { adminAnomalyPopoverClass } from '../shared/lib/adminUiClasses'
 
 const vTooltip = Tooltip
+const toast = useAdminToast()
 
 type PrimePopupMenu = {
   toggle: (event: Event) => void
@@ -298,6 +325,7 @@ const { anomalies, anomalyCount, hasAnomalies } = useAdminAnomalyRadar({
 const { fallbackText, logoURL, projectName } = useSiteBranding({
   enabled: isAdminShellRoute,
 })
+const adminBrandLogoOverridesQuery = useAdminBrandLogoOverrides(isAdminShellRoute)
 const brandAriaLabel = computed(() => `${projectName.value} Admin`)
 
 const layoutShellClass =
@@ -351,7 +379,7 @@ const navIconActiveClass = 'size-[17px] !text-ib-text-inverse'
 const shellIconClass = 'size-[19px]'
 const mainClass = 'flex min-h-screen min-w-0 flex-col overflow-visible bg-ib-surface'
 const headerClass =
-  'flex min-h-[88px] items-start justify-between gap-6 bg-ib-surface py-[21px] pr-[42px] pl-[7px] max-[1080px]:min-h-[92px] max-[1080px]:items-center max-[1080px]:px-[22px] max-[1080px]:pt-[22px] max-[1080px]:pb-4 max-[720px]:gap-3 max-[720px]:px-[14px] max-[720px]:pt-4 max-[720px]:pb-3'
+  'flex min-h-[88px] items-start justify-between gap-6 bg-ib-surface py-[21px] pr-[42px] pl-0 max-[1080px]:min-h-[92px] max-[1080px]:items-center max-[1080px]:px-[22px] max-[1080px]:pt-[22px] max-[1080px]:pb-4 max-[720px]:gap-3 max-[720px]:px-[14px] max-[720px]:pt-4 max-[720px]:pb-3'
 const contentClass =
   'min-h-0 flex-1 overflow-visible bg-ib-surface pr-[42px] pb-[38px] max-[1080px]:px-[22px] max-[1080px]:pb-7 max-[720px]:px-[14px] max-[720px]:pb-5'
 const mobileNavButtonClass = [
@@ -423,6 +451,13 @@ function setAdminRouteClass(enabled: boolean) {
   document.documentElement.classList.toggle('admin-route', enabled)
   document.body.classList.toggle('admin-route', enabled)
 }
+
+watch(
+  () => adminBrandLogoOverridesQuery.error.value,
+  (error) => {
+    if (error) toast.warning('读取品牌 Logo 配置失败')
+  },
+)
 
 onMounted(() => {
   setAdminRouteClass(true)

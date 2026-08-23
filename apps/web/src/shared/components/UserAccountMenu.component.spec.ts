@@ -37,6 +37,42 @@ describe('UserAccountMenu', () => {
     expect(openCredits).toHaveBeenCalledOnce()
   })
 
+  it('renders an inert circular idea icon when anonymous', () => {
+    const balance: UserIdeaBalanceControl = {
+      status: 'anonymous',
+      ariaLabel: 'Idea 标识',
+    }
+    render(UserAccountMenu, { props: { items: [], balance } })
+
+    const indicator = screen.getByTitle('Idea 标识')
+    expect(indicator).toBeVisible()
+    expect(indicator.tagName.toLowerCase()).toBe('div')
+    expect(screen.queryByText('加载中')).toBeNull()
+  })
+
+  it('renders guest pill action buttons when login and register items are provided', async () => {
+    const openLogin = vi.fn()
+    const openRegister = vi.fn()
+    const items: UserAccountMenuItem[] = [
+      { key: 'login', label: '登录', command: openLogin },
+      { key: 'register', label: '免费注册', command: openRegister },
+    ]
+    const { user } = renderWithUser(UserAccountMenu, { props: { items } })
+
+    const loginBtn = screen.getByRole('button', { name: 'Log in' })
+    const registerBtn = screen.getByRole('button', { name: 'Get started for free' })
+
+    expect(loginBtn).toBeVisible()
+    expect(registerBtn).toBeVisible()
+    expect(screen.queryByRole('button', { name: '账户菜单' })).toBeNull()
+
+    await user.click(loginBtn)
+    expect(openLogin).toHaveBeenCalledOnce()
+
+    await user.click(registerBtn)
+    expect(openRegister).toHaveBeenCalledOnce()
+  })
+
   it('keeps the balance control stable while credits are loading', () => {
     const items: UserAccountMenuItem[] = [{ key: 'profile', label: '账户管理', command: vi.fn() }]
     const balance: UserIdeaBalanceControl = {

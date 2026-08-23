@@ -99,13 +99,10 @@
         />
       </div>
     </Message>
-    <div
+    <AdminEmptyState
       v-if="showEmptyState"
-      class="grid h-full min-h-0 place-items-center text-admin-body text-admin-text-3"
-      role="status"
-    >
-      {{ emptyTitle }}
-    </div>
+      :title="emptyTitle"
+    />
     <DataTableFrame
       v-else-if="!initialError"
       :value="rewardCodes"
@@ -224,6 +221,7 @@ import AdminRowActionsPopover from '../../shared/components/AdminRowActionsPopov
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'
 import AdminToolbarSearch from '../../shared/components/AdminToolbarSearch.vue'
+import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
 import { useAdminCollectionState } from '../../shared/composables/useAdminCollectionState'
 import { useAdminCursorPagination } from '../../shared/composables/useAdminCursorPagination'

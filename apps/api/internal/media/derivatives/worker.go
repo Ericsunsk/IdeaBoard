@@ -35,10 +35,18 @@ var (
 		Name: "ideaboard_media_derivative_orphan_objects_total",
 		Help: "Total physical media derivative objects without a database record.",
 	})
+	mediaDerivativeOrphanScanFailures = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "ideaboard_media_derivative_orphan_scan_failures_total",
+		Help: "Total storage profile failures encountered while scanning for orphan media derivatives.",
+	})
 )
 
 func init() {
-	prometheus.MustRegister(mediaDerivativeReconcileRuns, mediaDerivativeOrphanObjects)
+	prometheus.MustRegister(
+		mediaDerivativeReconcileRuns,
+		mediaDerivativeOrphanObjects,
+		mediaDerivativeOrphanScanFailures,
+	)
 }
 
 type JobArgs struct {
@@ -67,6 +75,21 @@ func NewOutboxDispatcher(db *sql.DB, storageService *storage.StorageService) *Ou
 type DispatchScheduleArgs struct{}
 
 func (DispatchScheduleArgs) Kind() string { return "media_derivative_outbox_schedule" }
+
+type derivativeOrphanFinding struct {
+	storageProfileID string
+	count            int
+}
+
+type derivativeOrphanScanFailure struct {
+	storageProfileID string
+	err              error
+}
+
+type derivativeOrphanScanResult struct {
+	findings []derivativeOrphanFinding
+	failures []derivativeOrphanScanFailure
+}
 
 func (d *OutboxDispatcher) Work(ctx context.Context, job *river.Job[DispatchScheduleArgs]) error {
 	if d == nil || d.q == nil || job == nil {
@@ -175,10 +198,49 @@ func (d *OutboxDispatcher) reconcileOrphanObjects(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("list storage profiles for derivative scan: %w", err)
 	}
+	result := scanDerivativeOrphanObjects(
+		ctx,
+		profiles,
+		expected,
+		d.storage.ListObjectKeysByStorageProfile,
+	)
+	for _, failure := range result.failures {
+		mediaDerivativeOrphanScanFailures.Inc()
+		slog.Warn(
+			"storage profile derivative orphan scan failed",
+			"storage_profile_id", failure.storageProfileID,
+			"err", failure.err,
+		)
+	}
+	for _, finding := range result.findings {
+		mediaDerivativeOrphanObjects.Add(float64(finding.count))
+		slog.Warn(
+			"orphan media derivative objects detected",
+			"storage_profile_id", finding.storageProfileID,
+			"count", finding.count,
+		)
+	}
+	return nil
+}
+
+func scanDerivativeOrphanObjects(
+	ctx context.Context,
+	profiles []storage.StorageProfile,
+	expected map[string]map[string]struct{},
+	listObjectKeys func(context.Context, string, string) ([]string, error),
+) derivativeOrphanScanResult {
+	result := derivativeOrphanScanResult{}
 	for _, profile := range profiles {
-		keys, err := d.storage.ListObjectKeysByStorageProfile(ctx, profile.ID, "uploads/")
+		if !profile.Enabled {
+			continue
+		}
+		keys, err := listObjectKeys(ctx, profile.ID, "uploads/")
 		if err != nil {
-			return fmt.Errorf("list derivative objects profile=%s: %w", profile.ID, err)
+			result.failures = append(result.failures, derivativeOrphanScanFailure{
+				storageProfileID: profile.ID,
+				err:              err,
+			})
+			continue
 		}
 		orphanCount := 0
 		for _, key := range keys {
@@ -191,11 +253,13 @@ func (d *OutboxDispatcher) reconcileOrphanObjects(ctx context.Context) error {
 			orphanCount++
 		}
 		if orphanCount > 0 {
-			mediaDerivativeOrphanObjects.Add(float64(orphanCount))
-			slog.Warn("orphan media derivative objects detected", "storage_profile_id", profile.ID, "count", orphanCount)
+			result.findings = append(result.findings, derivativeOrphanFinding{
+				storageProfileID: profile.ID,
+				count:            orphanCount,
+			})
 		}
 	}
-	return nil
+	return result
 }
 
 func (d *OutboxDispatcher) reconcileStaleMediaUploads(ctx context.Context) error {

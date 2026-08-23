@@ -454,6 +454,7 @@ func assertAdminRouteSet(t *testing.T, routes []adminRouteUnderTest) {
 		"POST /api/admin/users/:public_id/revoke-sessions":            false,
 		"POST /api/admin/users/:public_id/unban":                      false,
 		"PATCH /api/admin/accounts/:id/models":                        false,
+		"PATCH /api/admin/provider-endpoints/:id/status":              false,
 		"PATCH /api/admin/rewards/codes/:id":                          false,
 		"PATCH /api/admin/rewards/codes/:id/enabled":                  false,
 		"PUT /api/admin/accounts/:id":                                 false,

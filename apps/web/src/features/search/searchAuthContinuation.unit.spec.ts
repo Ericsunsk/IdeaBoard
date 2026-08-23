@@ -48,4 +48,24 @@ describe('search auth continuation', () => {
     expect(consumePendingSearchAuthAction()).toEqual(action)
     expect(window.sessionStorage.getItem('ideaboard:search:pending-auth-action')).toBeNull()
   })
+
+  it('drops unknown persisted actions instead of exposing malformed data', () => {
+    window.sessionStorage.setItem(
+      'ideaboard:search:pending-auth-action',
+      JSON.stringify({ kind: 'unknown-action' }),
+    )
+
+    expect(peekPendingSearchAuthAction()).toBeNull()
+    expect(window.sessionStorage.getItem('ideaboard:search:pending-auth-action')).toBeNull()
+  })
+
+  it('drops malformed save batches before they reach the resume loop', () => {
+    window.sessionStorage.setItem(
+      'ideaboard:search:pending-auth-action',
+      JSON.stringify({ kind: 'save-batch', references: [{}] }),
+    )
+
+    expect(peekPendingSearchAuthAction()).toBeNull()
+    expect(window.sessionStorage.getItem('ideaboard:search:pending-auth-action')).toBeNull()
+  })
 })

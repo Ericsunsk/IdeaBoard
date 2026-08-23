@@ -12,6 +12,14 @@ import (
 	"github.com/google/uuid"
 )
 
+type AdminBrandLogoOverride struct {
+	Scope     string    `json:"scope"`
+	TargetKey string    `json:"target_key"`
+	LogoKey   string    `json:"logo_key"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type AiSearchOperation struct {
 	OperationID       uuid.UUID    `json:"operation_id"`
 	UserID            int64        `json:"user_id"`

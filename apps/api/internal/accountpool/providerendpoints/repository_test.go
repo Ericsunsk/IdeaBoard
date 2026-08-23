@@ -143,6 +143,84 @@ func TestCreateImageEndpointStoresManagedAPIKeyInSameTransaction(t *testing.T) {
 	}
 }
 
+func TestUpdateProviderEndpointStatusPreservesEndpointConfigurationAndSecret(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		protocol   string
+		capability string
+		apiKey     string
+	}{
+		{name: "model endpoint", protocol: ProtocolModelAPI},
+		{
+			name:       "managed image endpoint",
+			protocol:   ProtocolImageURLJSONImage,
+			capability: CapabilityBackgroundRemoval,
+			apiKey:     "modal-secret",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if test.apiKey != "" {
+				secretstest.EnableEncryption(t)
+			}
+			ctx := context.Background()
+			db := newProviderEndpointRepositoryTestDB(t)
+			repo := NewProviderEndpointRepository(db)
+			endpoint := seedProviderEndpoint(t, ctx, repo, &ProviderEndpoint{
+				APIType:      "openai-compatible",
+				Protocol:     test.protocol,
+				Capabilities: []string{test.capability},
+				Name:         "Status " + test.name,
+				BaseURL:      "https://example.com/status-" + strings.ReplaceAll(test.name, " ", "-"),
+				APIKey:       test.apiKey,
+				Status:       1,
+			})
+			before := *endpoint
+
+			var managedSecret string
+			if test.apiKey != "" {
+				if err := db.QueryRowContext(ctx, `
+SELECT secret_payload
+FROM api_account_secrets
+WHERE account_id = (SELECT id FROM api_accounts WHERE provider_endpoint_id = $1)
+  AND status = 'active'`, endpoint.ID).Scan(&managedSecret); err != nil {
+					t.Fatalf("load managed secret before status update: %v", err)
+				}
+			}
+
+			updated, err := repo.UpdateStatus(ctx, endpoint.ID, 0)
+			if err != nil {
+				t.Fatalf("disable provider endpoint: %v", err)
+			}
+			if updated.Status != 0 {
+				t.Fatalf("returned status = %d, want 0", updated.Status)
+			}
+			stored, err := repo.GetByID(ctx, endpoint.ID)
+			if err != nil {
+				t.Fatalf("reload provider endpoint: %v", err)
+			}
+			if stored.APIType != before.APIType || stored.Protocol != before.Protocol || stored.Name != before.Name || stored.BaseURL != before.BaseURL || strings.Join(stored.Capabilities, ",") != strings.Join(before.Capabilities, ",") {
+				t.Fatalf("status update changed endpoint configuration: before=%+v after=%+v", before, stored)
+			}
+			if test.apiKey == "" {
+				return
+			}
+
+			var accountStatus int16
+			var currentSecret string
+			if err := db.QueryRowContext(ctx, `
+SELECT account.status, secret.secret_payload
+FROM api_accounts AS account
+JOIN api_account_secrets AS secret ON secret.account_id = account.id AND secret.status = 'active'
+WHERE account.provider_endpoint_id = $1`, endpoint.ID).Scan(&accountStatus, &currentSecret); err != nil {
+				t.Fatalf("load managed account after status update: %v", err)
+			}
+			if accountStatus != 0 || currentSecret != managedSecret {
+				t.Fatalf("managed account status/secret = (%d, %q), want (0, unchanged)", accountStatus, currentSecret)
+			}
+		})
+	}
+}
+
 func TestCreateProviderEndpointReturnsURLConflict(t *testing.T) {
 	ctx := context.Background()
 	db := newProviderEndpointRepositoryTestDB(t)

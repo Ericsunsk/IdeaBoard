@@ -65,6 +65,10 @@ export type SaveProviderAccountCommand = {
   afterSaved?: () => void
 }
 
+export type DeleteProviderAccountCommand = {
+  afterDeleted?: () => void
+}
+
 export type DetectProviderModelsCommand = {
   providerEndpoint: ProviderEndpointRecord | null
   secret: string
@@ -258,7 +262,10 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
     })
   }
 
-  function deleteAccount(target: ProviderAccountCommandTarget) {
+  function deleteAccount(
+    target: ProviderAccountCommandTarget,
+    command: DeleteProviderAccountCommand = {},
+  ) {
     const account = resolveAccountTarget(target)
     if (!account) return
 
@@ -270,6 +277,7 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
       onConfirm: async () => {
         try {
           await resource.deleteAccountRecord(account.id)
+          command.afterDeleted?.()
           options.feedback.accountDeleted()
           await loadData()
         } catch (error) {
@@ -434,6 +442,32 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
     return accounts.value.filter((account) => account.providerEndpointId === providerEndpointId)
   }
 
+  async function toggleProviderEndpointStatus(
+    target: ProviderEndpointCommandTarget | { id: number },
+  ) {
+    const targetPayload: ProviderEndpointCommandTarget =
+      'kind' in target ? target : { kind: 'providerEndpoint', id: target.id }
+    const providerEndpoint = resolveProviderEndpointTarget(targetPayload)
+    if (!providerEndpoint) return
+
+    const nextStatus = providerEndpoint.status === 1 ? 0 : 1
+    const saved = await options.runAsyncAction(
+      async () => {
+        await resource.setProviderEndpointStatus({
+          id: providerEndpoint.id,
+          status: nextStatus,
+        })
+        return true
+      },
+      {
+        feedback: {
+          error: options.feedback.providerEndpointSaveFailed,
+        },
+      },
+    )
+    if (saved) await refreshAfterCommand()
+  }
+
   return {
     cards: {
       items: cardItems,
@@ -458,6 +492,7 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
     deleteProviderEndpoint,
     deleteAccount,
     detectModels,
+    toggleProviderEndpointStatus,
     toggleAccountModelStatus,
     isAccountModelStatusChanging,
     resolveProviderEndpointTarget,
@@ -473,8 +508,8 @@ export function createAdminProviderConfigWorkspace(options: AdminProviderConfigW
 }
 
 function getAccountStatusDotClass(account: ProviderAccountView) {
-  if (!account.isEnabled) return 'bg-admin-warning'
-  if (account.isDegraded) return 'bg-admin-danger'
+  const allDisabled = account.models.length > 0 && account.models.every((m) => !m.enabled)
+  if (!account.isEnabled || allDisabled || account.isDegraded) return 'bg-admin-danger'
   return 'bg-admin-success'
 }
 

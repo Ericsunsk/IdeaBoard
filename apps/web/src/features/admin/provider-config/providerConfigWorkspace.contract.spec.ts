@@ -19,6 +19,7 @@ const mockResource = {
   fetchProviderEndpoints: vi.fn(),
   patchAccountModelRecord: vi.fn(),
   saveProviderEndpoint: vi.fn(),
+  setProviderEndpointStatus: vi.fn(),
   updateAccountRecord: vi.fn(),
 }
 
@@ -42,6 +43,7 @@ beforeEach(() => {
     }),
   )
   mockResource.saveProviderEndpoint.mockResolvedValue(undefined)
+  mockResource.setProviderEndpointStatus.mockResolvedValue(makeProviderEndpoint({ status: 0 }))
   mockResource.updateAccountRecord.mockResolvedValue(undefined)
 })
 
@@ -283,6 +285,35 @@ describe('provider config workspace facade', () => {
     expect(retryResult.sessionCache.size).toBe(1)
   })
 
+  it('toggles provider endpoint status', async () => {
+    const { workspace } = createWorkspace()
+
+    await workspace.loadData()
+    await workspace.toggleProviderEndpointStatus({ kind: 'providerEndpoint', id: 1 })
+
+    expect(mockResource.setProviderEndpointStatus).toHaveBeenCalledWith({
+      id: 1,
+      status: 0,
+    })
+    expect(mockResource.saveProviderEndpoint).not.toHaveBeenCalled()
+    expect(mockResource.fetchProviderEndpoints).toHaveBeenCalledTimes(2)
+    expect(mockResource.fetchAccounts).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps canonical endpoint state when a status command fails', async () => {
+    const { workspace, feedback } = createWorkspace()
+    const error = new Error('status update failed')
+    mockResource.setProviderEndpointStatus.mockRejectedValueOnce(error)
+
+    await workspace.loadData()
+    await workspace.toggleProviderEndpointStatus({ kind: 'providerEndpoint', id: 1 })
+
+    expect(feedback.providerEndpointSaveFailed).toHaveBeenCalledWith(error)
+    expect(workspace.cards.items.value[0]?.providerEndpoint.status).toBe(1)
+    expect(mockResource.fetchProviderEndpoints).toHaveBeenCalledTimes(1)
+    expect(mockResource.saveProviderEndpoint).not.toHaveBeenCalled()
+  })
+
   it('toggles account model status and updates local card rows', async () => {
     const { workspace, feedback } = createWorkspace()
 
@@ -372,6 +403,29 @@ describe('provider config workspace facade', () => {
 
     expect(mockResource.deleteProviderEndpoint).toHaveBeenCalledWith(1)
     expect(feedback.providerEndpointDeleted).toHaveBeenCalledTimes(1)
+  })
+
+  it('only closes an account editor after confirmed deletion succeeds', async () => {
+    const { workspace, feedback, confirm } = createWorkspace()
+    const afterDeleted = vi.fn()
+
+    await workspace.loadData()
+    workspace.deleteAccount({ kind: 'account', id: 11 }, { afterDeleted })
+
+    await confirm.request.mock.calls[0]?.[0].onConfirm()
+
+    expect(mockResource.deleteAccountRecord).toHaveBeenCalledWith(11)
+    expect(afterDeleted).toHaveBeenCalledTimes(1)
+    expect(feedback.accountDeleted).toHaveBeenCalledTimes(1)
+
+    const deletionError = new Error('delete failed')
+    mockResource.deleteAccountRecord.mockRejectedValueOnce(deletionError)
+    workspace.deleteAccount({ kind: 'account', id: 11 }, { afterDeleted })
+
+    await confirm.request.mock.calls[1]?.[0].onConfirm()
+
+    expect(afterDeleted).toHaveBeenCalledTimes(1)
+    expect(feedback.accountDeleteFailed).toHaveBeenCalledWith(deletionError)
   })
 
   it('falls back to default account limits when limit loading fails', async () => {

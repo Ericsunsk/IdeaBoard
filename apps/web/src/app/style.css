@@ -49,13 +49,17 @@
   --color-admin-preview-bg: #f3f6fa;
   --color-admin-divider: rgba(29, 41, 57, 0.08);
   --color-admin-success: #2f9e73;
+  --color-admin-success-soft: rgba(47, 158, 115, 0.12);
   --color-admin-warning: #d48830;
+  --color-admin-warning-soft: rgba(212, 136, 48, 0.12);
   --color-admin-warning-strong: #e79a38;
   --color-admin-warning-hover: #eba84e;
   --color-admin-danger: #d14d5a;
+  --color-admin-danger-soft: rgba(209, 77, 90, 0.12);
   --color-admin-danger-hover: #df6370;
   --color-admin-danger-pressed: #b23a45;
   --color-admin-info: #4775a8;
+  --color-admin-info-soft: rgba(71, 117, 168, 0.12);
   --color-admin-model-indigo: #4f6f9f;
   --color-admin-model-purple: #7b668f;
   --color-admin-model-cyan: #3d8b9a;
@@ -232,13 +236,13 @@
    * These preserve the creative glass treatment while sourcing neutral values
    * from app semantics and expressive values from creative accent tokens.
    */
-  --color-ib-auth-shell: color-mix(in srgb, var(--color-ib-surface) 75%, transparent);
-  --color-ib-auth-shell-border: color-mix(in srgb, var(--color-ib-surface) 40%, transparent);
+  --color-ib-auth-shell: color-mix(in srgb, var(--color-ib-surface) 80%, transparent);
+  --color-ib-auth-shell-border: color-mix(in srgb, var(--color-ib-surface) 35%, transparent);
   --color-ib-auth-shell-glow: color-mix(in srgb, var(--color-ib-creative-accent) 18%, transparent);
   --color-ib-auth-shell-highlight: color-mix(in srgb, var(--color-ib-surface) 60%, transparent);
   --color-ib-auth-backdrop-from: color-mix(in srgb, var(--color-ib-surface) 30%, transparent);
-  --color-ib-auth-backdrop-via: color-mix(in srgb, var(--color-ib-surface) 70%, transparent);
-  --color-ib-auth-backdrop-to: color-mix(in srgb, var(--color-ib-surface) 90%, transparent);
+  --color-ib-auth-backdrop-via: color-mix(in srgb, var(--color-ib-surface) 55%, transparent);
+  --color-ib-auth-backdrop-to: color-mix(in srgb, var(--color-ib-surface) 80%, transparent);
   --color-ib-auth-text: var(--color-ib-text);
   --color-ib-auth-title: var(--color-ib-text);
   --color-ib-auth-muted: var(--color-ib-text-muted);

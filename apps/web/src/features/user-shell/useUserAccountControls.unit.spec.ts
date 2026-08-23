@@ -9,6 +9,11 @@ import {
   type AccountManagementOverlay,
 } from '../account-management/accountManagementOverlay'
 import type { UserCreditWalletSummaryState } from '../account-management/useUserCreditWalletSummary'
+import {
+  createAuthOverlay,
+  provideAuthOverlay,
+  type AuthOverlay,
+} from '../auth/authOverlay'
 import { useUserAccountControls } from './useUserAccountControls'
 
 const currentUser = ref<User | null>(null)
@@ -45,9 +50,11 @@ function makeUser(role: 'admin' | 'user' = 'user'): User {
 function renderAccountControls(options: Parameters<typeof useUserAccountControls>[0]): {
   controls: ReturnType<typeof useUserAccountControls>
   overlay: AccountManagementOverlay
+  authOverlay: AuthOverlay
 } {
   let controls: ReturnType<typeof useUserAccountControls> | undefined
   let overlay: AccountManagementOverlay | undefined
+  let authOverlay: AuthOverlay | undefined
   // The consumer must be a descendant because Vue does not expose a component's own provides to it.
   // eslint-disable-next-line vue/one-component-per-file
   const Consumer = defineComponent({
@@ -69,16 +76,21 @@ function renderAccountControls(options: Parameters<typeof useUserAccountControls
         route: { fullPath: '/user/boards', hash: '', path: '/user/boards', query: {} },
       })
       provideAccountManagementOverlay(overlay)
+      authOverlay = createAuthOverlay()
+      provideAuthOverlay(authOverlay)
       return () => h(Consumer)
     },
   })
   render(Harness)
-  if (!controls || !overlay) throw new Error('Account controls harness failed to initialize')
-  return { controls, overlay }
+  if (!controls || !overlay || !authOverlay) {
+    throw new Error('Account controls harness failed to initialize')
+  }
+  return { controls, overlay, authOverlay }
 }
 
 describe('useUserAccountControls', () => {
   beforeEach(() => {
+    window.history.replaceState({}, '', '/')
     currentUser.value = makeUser()
     walletState.value = { status: 'ready', availableCredits: 1280 }
   })
@@ -100,6 +112,38 @@ describe('useUserAccountControls', () => {
       'home',
       'logout',
     ])
+  })
+
+  it('exposes an anonymous balance state and guest menu items when user is not logged in', () => {
+    currentUser.value = null
+    const { controls } = renderAccountControls({
+      navigation: { navigate: vi.fn(), logout: vi.fn() },
+    })
+
+    expect(controls.viewModel.balance.value).toEqual({
+      status: 'anonymous',
+      displayValue: '',
+      ariaLabel: 'Idea 标识',
+    })
+    expect(controls.viewModel.menuItems.value.map((item) => item.key)).toEqual([
+      'login',
+      'register',
+      'home',
+    ])
+  })
+
+  it('opens login and registration through the installed auth overlay', () => {
+    const navigate = vi.fn()
+    const { controls, authOverlay } = renderAccountControls({
+      navigation: { navigate, logout: vi.fn() },
+    })
+
+    controls.commands.openLogin()
+    expect(authOverlay.viewModel.mode.value).toBe('login')
+
+    controls.commands.openRegister()
+    expect(authOverlay.viewModel.mode.value).toBe('register')
+    expect(navigate).not.toHaveBeenCalled()
   })
 
   it('keeps balance loading state typed and opens the billing tab from the balance control', () => {

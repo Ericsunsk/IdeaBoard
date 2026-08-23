@@ -202,7 +202,7 @@
         :table-style="{ minWidth: '1536px' }"
       >
         <template #empty>
-          <div class="py-7 text-center text-admin-body text-admin-text-3">暂无任务</div>
+          <AdminEmptyState title="暂无任务" />
         </template>
 
         <Column header="创建时间" :style="{ width: '156px' }">
@@ -317,7 +317,7 @@
 
         <Column header="耗时" :style="{ width: '88px' }">
           <template #body="{ data }">
-            <span v-if="getTaskDuration(data)" :class="getTaskDurationClass(data)">
+            <span v-if="getTaskDuration(data)" class="font-mono tabular-nums" :class="getTaskDurationClass(data)">
               {{ getTaskDuration(data)?.seconds }}s
             </span>
             <span v-else class="text-admin-meta text-admin-text-3">-</span>
@@ -394,6 +394,7 @@ import { formatDisplayErrorMessage } from '../../../../shared/utils/errorMessage
 import { useAdminTaskCancellationFeedback } from '../../task-monitor/useAdminTaskMonitorFeedback'
 import AdminTaskResultDialog from '../../task-monitor/AdminTaskResultDialog.vue'
 import AdminChartCard from '../../shared/components/AdminChartCard.vue'
+import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'

@@ -39,7 +39,7 @@ withDefaults(
   {
     error: '',
     label: '操作原因',
-    hint: '将进入不可变审计记录，请说明原因与影响范围。',
+    hint: '',
     rows: 3,
     bodyClass: '',
     disabled: false,

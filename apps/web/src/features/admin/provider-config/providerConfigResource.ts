@@ -9,6 +9,7 @@ import {
   fetchAllAdminAccounts,
   patchAdminAccountModelRecord,
   saveAdminProviderEndpoint,
+  setAdminProviderEndpointStatus,
   updateAdminAccountRecord,
 } from './providerConfigApi'
 
@@ -17,6 +18,7 @@ export type AdminProviderConfigResource = {
   fetchAccounts: typeof fetchAllAdminAccounts
   fetchAccountLimits: typeof fetchAdminAccountLimits
   saveProviderEndpoint: typeof saveAdminProviderEndpoint
+  setProviderEndpointStatus: typeof setAdminProviderEndpointStatus
   deleteProviderEndpoint: typeof deleteAdminProviderEndpoint
   detectProviderEndpointModels: typeof detectAdminProviderEndpointModels
   fetchProviderEndpointRegistry?: typeof fetchAdminProviderEndpointRegistry
@@ -32,6 +34,7 @@ export function createAdminProviderConfigResource(): AdminProviderConfigResource
     fetchAccounts: fetchAllAdminAccounts,
     fetchAccountLimits: fetchAdminAccountLimits,
     saveProviderEndpoint: saveAdminProviderEndpoint,
+    setProviderEndpointStatus: setAdminProviderEndpointStatus,
     deleteProviderEndpoint: deleteAdminProviderEndpoint,
     detectProviderEndpointModels: detectAdminProviderEndpointModels,
     fetchProviderEndpointRegistry: fetchAdminProviderEndpointRegistry,

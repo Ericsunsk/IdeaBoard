@@ -1,6 +1,13 @@
 <template>
   <div :class="fieldClass">
-    <label :for="resolvedFieldId" :class="labelClass">
+    <div v-if="$slots['header-extra']" class="flex items-center justify-between">
+      <label :for="resolvedFieldId" :class="labelClass">
+        {{ label }}
+        <span v-if="required" aria-hidden="true">*</span>
+      </label>
+      <slot name="header-extra" />
+    </div>
+    <label v-else :for="resolvedFieldId" :class="labelClass">
       {{ label }}
       <span v-if="required" aria-hidden="true">*</span>
     </label>
@@ -61,6 +68,7 @@ const props = withDefaults(
 
 defineSlots<{
   default(props: IbFormFieldSlotProps): unknown
+  'header-extra'?(): unknown
 }>()
 
 const generatedId = useId()

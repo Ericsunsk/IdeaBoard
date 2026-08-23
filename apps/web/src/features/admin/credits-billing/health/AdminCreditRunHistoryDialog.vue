@@ -81,15 +81,10 @@
         @row-collapse="collapseRun"
       >
         <template #empty>
-          <div
-            class="flex min-h-40 flex-col items-center justify-center px-6 py-10 text-center"
-            role="status"
-          >
-            <span class="font-semibold">暂无检查记录</span>
-            <span class="mt-1 text-admin-body text-admin-text-3">
-              运行一次检查后，记录会显示在这里
-            </span>
-          </div>
+          <AdminEmptyState
+            title="暂无检查记录"
+            description="运行一次检查后，记录会显示在这里"
+          />
         </template>
 
         <Column expander style="width: 52px" />
@@ -201,6 +196,7 @@ import Tag from 'primevue/tag'
 import type { DataTableRowCollapseEvent, DataTableRowExpandEvent } from 'primevue/datatable'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
+import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'
 import AdminTablePanel from '../../shared/components/AdminTablePanel.vue'

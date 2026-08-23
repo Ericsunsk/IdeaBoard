@@ -172,6 +172,31 @@ func (r *ProviderEndpointRepository) Update(ctx context.Context, endpoint *Provi
 	return nil
 }
 
+// UpdateStatus updates the scheduling state without touching endpoint configuration,
+// capabilities, or managed account secrets.
+func (r *ProviderEndpointRepository) UpdateStatus(ctx context.Context, id int64, status int16) (*ProviderEndpoint, error) {
+	err := dbutil.WithTx(ctx, r.db, func(q *dbsqlc.Queries) error {
+		updated, err := q.UpdateProviderEndpointStatus(ctx, dbsqlc.UpdateProviderEndpointStatusParams{
+			ID:     id,
+			Status: status,
+		})
+		if err != nil {
+			return err
+		}
+		if updated == 0 {
+			return database.ErrNotFound
+		}
+		return q.UpdateManagedProviderEndpointAccountStatus(ctx, dbsqlc.UpdateManagedProviderEndpointAccountStatusParams{
+			ProviderEndpointID: id,
+			Status:             status,
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return r.GetByID(ctx, id)
+}
+
 func (r *ProviderEndpointRepository) capabilities(ctx context.Context, ids []int64) (map[int64][]string, error) {
 	result := make(map[int64][]string, len(ids))
 	if len(ids) == 0 {

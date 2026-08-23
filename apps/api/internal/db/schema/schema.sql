@@ -1800,6 +1800,34 @@ CREATE TABLE system_configs (
   CONSTRAINT uq_system_configs_config_key UNIQUE (config_key)
 );
 
+-- Admin-managed presentation overrides are intentionally separate from
+-- system_configs: they are enumerable UI state, not runtime configuration.
+CREATE TABLE admin_brand_logo_overrides (
+  scope VARCHAR(32) NOT NULL,
+  target_key VARCHAR(128) NOT NULL,
+  logo_key VARCHAR(64) NOT NULL,
+  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  CONSTRAINT pk_admin_brand_logo_overrides PRIMARY KEY (scope, target_key),
+  CONSTRAINT ck_admin_brand_logo_overrides_scope CHECK (
+    scope IN ('provider-endpoint', 'storage-profile', 'search-provider', 'oauth-provider')
+  ),
+  CONSTRAINT ck_admin_brand_logo_overrides_target_key CHECK (
+    target_key ~ '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$'
+  ),
+  CONSTRAINT ck_admin_brand_logo_overrides_logo_key CHECK (
+    logo_key IN (
+      'flux', 'midjourney', 'stability', 'fal', 'replicate', 'ideogram', 'recraft', 'runway',
+      'zhipu', 'aliyun', 'doubao', 'moonshot', 'minimax', 'baidu', 'tencent', 'lingyi',
+      'openai', 'gemini', 'anthropic', 'deepseek', 'cloudflare', 'siliconflow', 'mistral',
+      'groq', 'together', 'fireworks', 'huggingface', 'perplexity', 'cohere', 'novita',
+      'lepton', 'google', 'azure', 'bedrock', 'ollama', 'amazons3', 'cloudflare-r2',
+      'alibabacloud', 'tencent-cos', 'minio', 'unsplash', 'pexels', 'github', 'google-oauth',
+      'discord'
+    )
+  )
+);
+
 CREATE TABLE storage_profiles (
   profile_id VARCHAR(64) PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
@@ -1900,13 +1928,18 @@ CREATE INDEX idx_storage_profile_secret_versions_status ON storage_profile_secre
 -- Name: get_auth_runtime_settings(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION get_auth_runtime_settings() RETURNS TABLE(registration_enabled boolean)
+CREATE FUNCTION get_auth_runtime_settings() RETURNS TABLE(
+  registration_enabled boolean,
+  branding_project_name text,
+  branding_logo_url text
+)
     LANGUAGE plpgsql STABLE SECURITY DEFINER
     SET search_path TO 'public', 'pg_catalog', 'pg_temp'
     AS $$
 BEGIN
   RETURN QUERY
-  SELECT COALESCE(
+  SELECT
+    COALESCE(
       (
         SELECT lower(btrim(config.value)) = 'true'
         FROM system_configs AS config
@@ -1914,6 +1947,24 @@ BEGIN
         LIMIT 1
       ),
       FALSE
+    ),
+    COALESCE(
+      (
+        SELECT btrim(config.value)
+        FROM system_configs AS config
+        WHERE config.config_key = 'branding_project_name'
+        LIMIT 1
+      ),
+      'IdeaBoard'
+    ),
+    COALESCE(
+      (
+        SELECT btrim(config.value)
+        FROM system_configs AS config
+        WHERE config.config_key = 'branding_logo_url'
+        LIMIT 1
+      ),
+      ''
     );
 END;
 $$;
@@ -4933,6 +4984,7 @@ CREATE TRIGGER set_task_daily_stat_backfills_updated_at BEFORE UPDATE ON task_da
 CREATE TRIGGER set_provider_endpoints_updated_at BEFORE UPDATE ON provider_endpoints FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_provider_endpoint_models_updated_at BEFORE UPDATE ON provider_endpoint_models FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_system_configs_updated_at BEFORE UPDATE ON system_configs FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER set_admin_brand_logo_overrides_updated_at BEFORE UPDATE ON admin_brand_logo_overrides FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_storage_profiles_updated_at BEFORE UPDATE ON storage_profiles FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_storage_profile_secret_versions_updated_at BEFORE UPDATE ON storage_profile_secret_versions FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TRIGGER set_feature_prompts_updated_at BEFORE UPDATE ON feature_prompts FOR EACH ROW EXECUTE FUNCTION set_updated_at();

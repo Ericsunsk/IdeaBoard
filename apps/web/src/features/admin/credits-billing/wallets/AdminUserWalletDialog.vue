@@ -8,60 +8,66 @@
     @update:visible="emit('update:visible', $event)"
   >
     <template #header>
-      <div>
-        <div class="text-admin-modal-title font-[780] text-admin-title-color">
-          {{ user.displayName }} 的Idea账户
+      <div class="flex items-center gap-3">
+        <div
+          class="flex size-10 shrink-0 items-center justify-center rounded-xl border border-admin-border-soft bg-admin-surface-muted text-admin-title-sm font-bold text-admin-accent select-none shadow-2xs"
+        >
+          {{ (user.displayName || 'U').substring(0, 1).toUpperCase() }}
+        </div>
+        <div class="min-w-0">
+          <div class="text-admin-title-sm font-bold text-admin-title-color truncate">
+            {{ user.displayName }} 的账户资产
+          </div>
+          <div class="text-admin-caption font-mono text-admin-subtitle-color truncate">
+            UID: {{ user.publicId }}
+          </div>
         </div>
       </div>
     </template>
 
-    <div class="flex min-w-0 flex-col gap-5">
-      <section class="grid grid-cols-1 gap-3 sm:grid-cols-2" aria-label="账户概览">
-        <AdminSummaryCard
-          label="账户余额"
-          :value="formatCredits(wallet?.available_credits ?? user.availableCredits)"
-        />
-        <AdminSummaryCard label="账户状态" :value="accountStatus" />
-      </section>
-
-      <Message v-if="walletError || ledgerError" severity="error" :closable="false">
-        账户或流水加载失败。请刷新后重试。
-      </Message>
-
+    <div class="flex min-w-0 flex-col gap-4 py-1">
+      <!-- 1. 顶部资产概览卡片 (Stats Hero Card) -->
       <section
-        v-if="activeRestrictions.length"
-        class="rounded-[var(--radius-ib-control)] border border-admin-border-soft bg-ib-surface-muted p-3"
+        class="flex flex-col gap-3.5 rounded-2xl border border-admin-border-soft bg-white p-4.5 shadow-2xs"
+        aria-label="账户资产概览"
       >
-        <div class="text-admin-meta font-[740] text-admin-text-1">有效限制</div>
-        <ul class="mt-2 space-y-2 pl-4 text-admin-body text-admin-text-2">
-          <li v-for="restriction in activeRestrictions" :key="restriction.restriction_id">
-            <span class="font-[680]">{{ getRestrictionLabel(restriction.type) }}：</span
-            >{{ restriction.reason }}
-          </li>
-        </ul>
-      </section>
-      <Message v-else-if="accountStatus === '冻结'" severity="warn" :closable="false">
-        {{
-          user.status === 0
-            ? '用户当前已停用或正在注销，账户由身份生命周期冻结。'
-            : '账户已被身份生命周期冻结，请核对用户状态与注销流程。'
-        }}
-      </Message>
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <!-- 核心余额与状态 -->
+          <div class="flex flex-wrap items-center gap-6 sm:gap-8">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-admin-caption font-semibold text-admin-text-3">
+                账户余额
+              </span>
+              <div class="flex items-baseline gap-2">
+                <span class="text-2xl font-black tracking-tight text-admin-title-color font-mono tabular-nums">
+                  {{ formatCredits(wallet?.available_credits ?? user.availableCredits) }}
+                </span>
+                <span
+                  v-if="wallet && wallet.reserved_credits > 0"
+                  class="rounded-md bg-admin-warning-soft px-1.5 py-0.5 font-mono text-admin-caption font-semibold text-admin-warning"
+                >
+                  保留 {{ formatCredits(wallet.reserved_credits) }}
+                </span>
+              </div>
+            </div>
 
-      <section
-        class="rounded-[var(--radius-ib-control)] border border-admin-border-soft p-4"
-        aria-labelledby="admin-user-wallet-command-title"
-      >
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div
-              id="admin-user-wallet-command-title"
-              class="text-admin-title-sm font-[740] text-admin-title-color"
-            >
-              账户操作
+            <div class="hidden h-9 w-px bg-admin-border-soft sm:block" />
+
+            <div class="flex flex-col gap-0.5">
+              <span class="text-admin-caption font-semibold text-admin-text-3">
+                账户状态
+              </span>
+              <div class="flex items-center gap-1.5 pt-0.5">
+                <AdminStatusPill
+                  :label="accountStatus"
+                  :variant="accountStatusVariant"
+                />
+              </div>
             </div>
           </div>
-          <div class="flex gap-2">
+
+          <!-- 快捷操作按钮组 -->
+          <div class="flex items-center gap-2">
             <Button
               label="赠送"
               :class="adminActionButtonClass"
@@ -69,7 +75,11 @@
               size="small"
               :disabled="commandPending || !wallet"
               @click="openCommand('grant')"
-            />
+            >
+              <template #icon>
+                <Plus class="size-4 mr-1.5" />
+              </template>
+            </Button>
             <Button
               label="扣减"
               :class="adminActionButtonClass"
@@ -78,43 +88,161 @@
               outlined
               :disabled="commandPending || !wallet || wallet.available_credits < 1"
               @click="openCommand('deduction')"
-            />
+            >
+              <template #icon>
+                <Minus class="size-4 mr-1.5" />
+              </template>
+            </Button>
           </div>
         </div>
 
+        <!-- 限制与冻结状态提示条 -->
+        <div
+          v-if="activeRestrictions.length"
+          class="flex items-start gap-2 rounded-xl border border-admin-warning/30 bg-admin-warning-soft p-3 text-xs"
+        >
+          <WarningTriangle class="size-4 shrink-0 text-admin-warning mt-0.5" />
+          <div class="flex flex-col gap-1">
+            <span class="font-bold text-admin-warning">有效限制生效中</span>
+            <ul class="space-y-0.5 pl-4 text-admin-text-2 list-disc">
+              <li v-for="restriction in activeRestrictions" :key="restriction.restriction_id">
+                <span class="font-semibold text-admin-title-color">{{ getRestrictionLabel(restriction.type) }}：</span>
+                {{ restriction.reason }}
+              </li>
+            </ul>
+          </div>
+        </div>
+        <Message v-else-if="accountStatus === '冻结'" severity="warn" :closable="false">
+          {{
+            user.status === 0
+              ? '用户当前已停用或正在注销，账户由身份生命周期冻结。'
+              : '账户已被身份生命周期冻结，请核对用户状态与注销流程。'
+          }}
+        </Message>
+      </section>
+
+      <Message v-if="walletError || ledgerError" severity="error" :closable="false">
+        账户或流水加载失败。请刷新后重试。
+      </Message>
+
+      <!-- 2. 分段功能导航 Tab (复用全局 SelectButton 规范) -->
+      <div class="flex items-center justify-between">
+        <SelectButton
+          :model-value="activeTab"
+          :options="walletTabOptions"
+          option-label="label"
+          option-value="value"
+          :allow-empty="false"
+          size="small"
+          aria-label="Idea账户操作面板"
+          @update:model-value="handleTabChange"
+        />
+
+        <Button
+          v-if="activeTab === 'ledger'"
+          label="刷新"
+          :class="adminActionButtonClass"
+          size="small"
+          severity="secondary"
+          outlined
+          :loading="walletLoading || ledgerLoading"
+          :disabled="commandPending"
+          @click="refreshWallet"
+        >
+          <template #icon>
+            <Refresh class="size-4 mr-1.5 text-admin-text-2" />
+          </template>
+        </Button>
+      </div>
+
+      <!-- 3. Tab 内容展示区 -->
+      <!-- A. 额度变动表单 Tab (Grant / Deduction / Refund) -->
+      <section
+        v-if="activeTab === 'grant' || activeTab === 'deduction' || activeTab === 'refund'"
+        class="flex flex-col gap-4 rounded-2xl border border-admin-border-soft bg-white p-5 shadow-2xs"
+      >
+        <div class="flex items-center justify-between border-b border-admin-border-soft pb-3">
+          <div class="flex items-center gap-2">
+            <span
+              class="size-2 rounded-full"
+              :class="
+                activeTab === 'grant'
+                  ? 'bg-admin-success'
+                  : activeTab === 'deduction'
+                    ? 'bg-admin-danger'
+                    : 'bg-admin-warning'
+              "
+            />
+            <h3 class="m-0 text-admin-title-sm font-bold text-admin-title-color">
+              {{
+                activeTab === 'grant'
+                  ? '赠送 Idea 额度'
+                  : activeTab === 'deduction'
+                    ? '扣减 Idea 额度'
+                    : '退款原交易'
+              }}
+            </h3>
+          </div>
+          <span class="text-admin-caption text-admin-text-3">
+            {{
+              activeTab === 'grant'
+                ? '赠送的额度将即时计入用户可用余额'
+                : activeTab === 'deduction'
+                  ? '扣减额度不得超过用户当前可用余额'
+                  : '退款将返还对应 Charge 的消费额度'
+            }}
+          </span>
+        </div>
+
+        <div
+          v-if="activeTab === 'refund' && refundSource"
+          class="flex items-center gap-2 rounded-xl border border-admin-accent/20 bg-admin-accent-soft/40 px-3.5 py-2.5 text-xs text-admin-accent-strong font-mono"
+        >
+          <span>原 Charge：{{ refundSource.transaction_id }}，剩余可退 {{ formatCredits(refundSource.charge?.remaining_refundable_credits ?? 0) }}。</span>
+        </div>
+
         <form
-          v-if="activeCommand"
-          class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,180px)_1fr_auto] sm:items-end"
+          class="flex flex-col gap-4"
           @submit.prevent="requestCommandConfirmation"
         >
-          <AdminFormField
-            v-slot="{ describedbyId, invalid }"
-            label="Idea数量"
-            for="admin-user-wallet-command-amount"
-            :error="showErrors ? validation.amountError : ''"
-            required
-          >
-            <InputNumber
-              v-model="amountCredits"
-              input-id="admin-user-wallet-command-amount"
-              fluid
-              :min="1"
-              :use-grouping="true"
-              :invalid="invalid"
-              :disabled="commandPending"
-              :aria-describedby="describedbyId"
-              @update:model-value="showErrors = false"
-            />
-          </AdminFormField>
-          <AdminActionReasonField
-            v-model="reason"
-            input-id="admin-user-wallet-command-reason"
-            :label="activeCommand === 'refund' ? '退款原因' : '操作原因'"
-            :error="showErrors ? validation.reasonError : ''"
-            :disabled="commandPending"
-            @update:model-value="showErrors = false"
-          />
-          <div class="flex gap-2 sm:pb-0.5">
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-12 sm:items-start">
+            <div class="sm:col-span-4">
+              <AdminFormField
+                v-slot="{ describedbyId, invalid, resolvePlaceholder }"
+                label="Idea数量"
+                for="admin-user-wallet-command-amount"
+                :error="showErrors ? validation.amountError : ''"
+                required
+              >
+                <InputNumber
+                  v-model="amountCredits"
+                  input-id="admin-user-wallet-command-amount"
+                  fluid
+                  :min="1"
+                  :use-grouping="true"
+                  :placeholder="resolvePlaceholder('例如：100')"
+                  :invalid="invalid"
+                  :disabled="commandPending"
+                  :aria-describedby="describedbyId"
+                  @update:model-value="showErrors = false"
+                />
+              </AdminFormField>
+            </div>
+
+            <div class="sm:col-span-8">
+              <AdminActionReasonField
+                v-model="reason"
+                input-id="admin-user-wallet-command-reason"
+                :label="activeTab === 'refund' ? '退款原因' : '操作原因'"
+                :error="showErrors ? validation.reasonError : ''"
+                :disabled="commandPending"
+                :rows="1"
+                @update:model-value="showErrors = false"
+              />
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-2.5 pt-1">
             <Button
               label="取消"
               type="button"
@@ -122,114 +250,111 @@
               severity="secondary"
               outlined
               :disabled="commandPending"
-              @click="clearCommand"
+              @click="switchToLedgerTab"
             />
             <Button
-              :label="activeCommand === 'refund' ? '核对退款' : '核对操作'"
+              :label="activeTab === 'refund' ? '核对退款' : '核对操作'"
               :class="adminActionButtonClass"
               type="submit"
-              :severity="activeCommand === 'grant' ? 'contrast' : 'danger'"
+              :severity="activeTab === 'grant' ? 'contrast' : 'danger'"
               :loading="commandPending"
               :disabled="commandPending"
             />
           </div>
         </form>
-        <Message
-          v-if="activeCommand === 'refund' && refundSource"
-          severity="info"
-          size="small"
-          :closable="false"
-          class="mt-3"
-        >
-          原 Charge：{{ refundSource.transaction_id }}，剩余可退
-          {{ formatCredits(refundSource.charge?.remaining_refundable_credits ?? 0) }}。
-        </Message>
       </section>
 
-      <section aria-labelledby="admin-user-wallet-ledger-title">
-        <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div
-              id="admin-user-wallet-ledger-title"
-              class="text-admin-title-sm font-[740] text-admin-title-color"
-            >
-              最近 Ledger 流水
-            </div>
-          </div>
-          <Button
-            label="刷新"
-            :class="adminActionButtonClass"
-            size="small"
-            severity="secondary"
-            outlined
-            :loading="walletLoading || ledgerLoading"
-            :disabled="commandPending"
-            @click="refreshWallet"
-          />
+      <!-- B. Ledger 流水明细 Tab (Ledger Transactions Table) -->
+      <section
+        v-else
+        class="flex flex-col gap-3.5 rounded-2xl border border-admin-border-soft bg-white p-4.5 shadow-2xs"
+        aria-labelledby="admin-user-wallet-ledger-title"
+      >
+        <div class="overflow-hidden rounded-xl border border-admin-border-soft">
+          <DataTableFrame
+            :value="transactions"
+            data-key="transaction_id"
+            :loading="ledgerLoading && transactions.length === 0"
+            scrollable
+            table-aria-label="Idea账户 Ledger 流水"
+            scroll-aria-label="Idea账户 Ledger 流水"
+            table-style="min-width: 780px"
+          >
+            <template #empty>
+              <AdminEmptyState compact title="该账户暂无流水" />
+            </template>
+
+            <Column header="类型" style="width: 96px">
+              <template #body="{ data }">
+                <Tag
+                  :value="getCreditCommandLabel(data.command_type)"
+                  :severity="getCreditCommandSeverity(data.command_type)"
+                  :class="adminCompactTagClass"
+                />
+              </template>
+            </Column>
+
+            <Column header="变动额度" style="width: 120px">
+              <template #body="{ data }">
+                <span
+                  class="font-bold tabular-nums font-mono text-admin-body"
+                  :class="
+                    data.command_type === 'grant' || data.command_type === 'refund'
+                      ? 'text-admin-success'
+                      : 'text-admin-title-color'
+                  "
+                >
+                  {{ getCreditCommandSign(data.command_type) }}{{ formatCredits(data.amount_credits) }}
+                </span>
+              </template>
+            </Column>
+
+            <Column header="变动后可用" style="width: 150px">
+              <template #body="{ data }">
+                <span class="font-mono text-admin-caption text-admin-text-2">
+                  可用 {{ formatCredits(data.available_credits_after) }}
+                </span>
+              </template>
+            </Column>
+
+            <Column header="原因 / 关联" style="min-width: 220px">
+              <template #body="{ data }">
+                <div class="max-w-72 truncate text-admin-body-sm text-admin-text-1" :title="data.reason">
+                  {{ data.reason || '-' }}
+                </div>
+                <div v-if="data.charge" class="mt-0.5 text-admin-caption text-admin-text-3 font-mono">
+                  可退 {{ formatCredits(data.charge.remaining_refundable_credits) }}
+                </div>
+              </template>
+            </Column>
+
+            <Column header="时间" style="width: 160px">
+              <template #body="{ data }">
+                <span class="font-mono text-admin-caption text-admin-text-3 whitespace-nowrap">
+                  {{ formatAdminDateTime(data.created_at) }}
+                </span>
+              </template>
+            </Column>
+
+            <Column header="操作" style="width: 80px">
+              <template #body="{ data }">
+                <Button
+                  v-if="isRefundableCharge(data)"
+                  label="退款"
+                  size="small"
+                  severity="danger"
+                  text
+                  :disabled="commandPending"
+                  :aria-label="`退还 ${data.transaction_id} 的Idea`"
+                  @click="openRefund(data)"
+                />
+                <span v-else class="text-admin-caption text-admin-text-3">-</span>
+              </template>
+            </Column>
+          </DataTableFrame>
         </div>
-        <DataTableFrame
-          :value="transactions"
-          data-key="transaction_id"
-          :loading="ledgerLoading && transactions.length === 0"
-          scrollable
-          table-aria-label="Idea账户 Ledger 流水"
-          scroll-aria-label="Idea账户 Ledger 流水"
-          table-style="min-width: 880px"
-        >
-          <template #empty
-            ><div class="py-8 text-center text-admin-body text-admin-text-3">
-              该账户暂无流水
-            </div></template
-          >
-          <Column header="类型" style="width: 104px"
-            ><template #body="{ data }"
-              ><Tag
-                :value="getCreditCommandLabel(data.command_type)"
-                :severity="getCreditCommandSeverity(data.command_type)"
-                :class="adminCompactTagClass" /></template
-          ></Column>
-          <Column header="Idea" style="width: 130px"
-            ><template #body="{ data }"
-              ><span class="font-[760] tabular-nums"
-                >{{ getCreditCommandSign(data.command_type)
-                }}{{ formatCredits(data.amount_credits) }}</span
-              ></template
-            ></Column
-          >
-          <Column header="余额快照" style="width: 180px"
-            ><template #body="{ data }"
-              ><div>可用 {{ formatCredits(data.available_credits_after) }}</div></template
-            ></Column
-          >
-          <Column header="原因 / 关联" style="min-width: 240px"
-            ><template #body="{ data }"
-              ><div class="max-w-72 truncate" :title="data.reason">{{ data.reason }}</div>
-              <div v-if="data.charge" class="mt-1 text-admin-caption text-admin-text-3">
-                可退 {{ formatCredits(data.charge.remaining_refundable_credits) }}
-              </div></template
-            ></Column
-          >
-          <Column header="时间" style="width: 180px"
-            ><template #body="{ data }">{{
-              formatAdminDateTime(data.created_at)
-            }}</template></Column
-          >
-          <Column header="操作" style="width: 108px"
-            ><template #body="{ data }"
-              ><Button
-                v-if="isRefundableCharge(data)"
-                label="退款"
-                size="small"
-                severity="danger"
-                text
-                :disabled="commandPending"
-                :aria-label="`退还 ${data.transaction_id} 的Idea`"
-                @click="openRefund(data)"
-              /><span v-else class="text-admin-caption text-admin-text-3">-</span></template
-            ></Column
-          >
-        </DataTableFrame>
-        <div v-if="nextBeforeSequence != null" class="mt-3 flex justify-center">
+
+        <div v-if="nextBeforeSequence != null" class="mt-2 flex justify-center">
           <Button
             label="加载更多 Ledger"
             :class="adminActionButtonClass"
@@ -248,15 +373,18 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { Minus, Plus, Refresh, WarningTriangle } from '@iconoir/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import InputNumber from 'primevue/inputnumber'
 import Message from 'primevue/message'
+import SelectButton from 'primevue/selectbutton'
 import Tag from 'primevue/tag'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
 import AdminDialogShell from '../../shared/components/AdminDialogShell.vue'
+import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminFormField from '../../shared/components/AdminFormField.vue'
-import AdminSummaryCard from '../../shared/components/AdminSummaryCard.vue'
+import AdminStatusPill from '../../shared/components/AdminStatusPill.vue'
 import { useAdminConfirm } from '../../shared/composables/useAdminConfirm'
 import { adminActionButtonClass, adminCompactTagClass } from '../../shared/lib/adminUiClasses'
 import AdminActionReasonField from '../AdminActionReasonField.vue'
@@ -314,6 +442,35 @@ const accountStatus = computed(() => {
   if (activeRestrictions.value.length > 0) return '受限'
   return '正常'
 })
+const accountStatusVariant = computed<'success' | 'warning' | 'danger'>(() => {
+  if (accountStatus.value === '正常') return 'success'
+  if (accountStatus.value === '受限') return 'warning'
+  return 'danger'
+})
+type WalletDialogTab = 'ledger' | 'grant' | 'deduction' | 'refund'
+const activeTab = ref<WalletDialogTab>('ledger')
+
+const walletTabOptions = computed<{ label: string; value: WalletDialogTab }[]>(() => {
+  const options: { label: string; value: WalletDialogTab }[] = [
+    { label: 'Ledger 流水', value: 'ledger' },
+    { label: '赠送额度', value: 'grant' },
+    { label: '扣减额度', value: 'deduction' },
+  ]
+  if (activeTab.value === 'refund' || refundSource.value) {
+    options.push({ label: '退款原交易', value: 'refund' })
+  }
+  return options
+})
+
+function handleTabChange(tab: 'ledger' | 'grant' | 'deduction' | 'refund') {
+  if (tab === 'ledger') {
+    switchToLedgerTab()
+  } else if (tab === 'grant' || tab === 'deduction') {
+    openCommand(tab)
+  } else if (tab === 'refund') {
+    activeTab.value = 'refund'
+  }
+}
 const validation = computed(() =>
   validateAdminCreditCommand({
     kind: activeCommand.value ?? 'grant',
@@ -328,7 +485,10 @@ const validation = computed(() =>
 watch(
   [() => props.visible, () => props.user.publicId],
   ([visible]) => {
-    if (visible) resetLedger()
+    if (visible) {
+      activeTab.value = 'ledger'
+      resetLedger()
+    }
   },
   { immediate: true },
 )
@@ -385,6 +545,7 @@ function refreshWallet() {
 function openCommand(kind: Exclude<AdminCreditCommandKind, 'refund'>) {
   refundSource.value = null
   activeCommand.value = kind
+  activeTab.value = kind
   amountCredits.value = null
   reason.value = ''
   showErrors.value = false
@@ -393,9 +554,14 @@ function openRefund(transaction: AdminCreditLedgerTransaction) {
   if (!isRefundableCharge(transaction)) return
   refundSource.value = transaction
   activeCommand.value = 'refund'
+  activeTab.value = 'refund'
   amountCredits.value = null
   reason.value = ''
   showErrors.value = false
+}
+function switchToLedgerTab() {
+  clearCommand()
+  activeTab.value = 'ledger'
 }
 function clearCommand() {
   activeCommand.value = null
@@ -432,6 +598,7 @@ function requestCommandConfirmation() {
         })
         feedback.commandSucceeded(label, response.replayed)
         clearCommand()
+        activeTab.value = 'ledger'
         resetLedger()
         emit('refresh-users')
       } catch (error) {

@@ -36,6 +36,10 @@ type UpdateProviderEndpointRequest struct {
 	Status     int16  `json:"status"`
 }
 
+type UpdateProviderEndpointStatusRequest struct {
+	Status *int16 `json:"status"`
+}
+
 type DetectModelsRequest struct {
 	BaseURL  string `json:"base_url" binding:"required"`
 	APIKey   string `json:"api_key" binding:"required"`

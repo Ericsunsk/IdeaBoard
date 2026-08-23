@@ -1,5 +1,14 @@
 <template>
+  <div
+    v-if="balance.status === 'anonymous'"
+    class="inline-flex size-[var(--ib-page-chrome-control-size,40px)] items-center justify-center rounded-full border border-board-card-border bg-board-control-bg/80 backdrop-blur-md select-none shrink-0"
+    :title="balance.ariaLabel"
+    :aria-label="balance.ariaLabel"
+  >
+    <LightBulb class="user-credit-pill__icon" aria-hidden="true" />
+  </div>
   <Button
+    v-else
     unstyled
     type="button"
     class="user-credit-pill !bg-board-control-bg/80 !border-board-card-border backdrop-blur-md"

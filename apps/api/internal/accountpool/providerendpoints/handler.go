@@ -228,6 +228,36 @@ func (h *ProviderEndpointHandler) Update(c *gin.Context) {
 	response.SuccessDTO(c, providerEndpointResponse{ProviderEndpoint: endpoint})
 }
 
+func (h *ProviderEndpointHandler) UpdateStatus(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.Error(c, 400, "无效的ID")
+		return
+	}
+
+	var req UpdateProviderEndpointStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil || req.Status == nil {
+		response.Error(c, 400, "参数错误")
+		return
+	}
+	if !isValidProviderEndpointStatus(*req.Status) {
+		response.Error(c, 400, "status 只支持 0 或 1")
+		return
+	}
+
+	endpoint, err := h.endpointRepo.UpdateStatus(c.Request.Context(), id, *req.Status)
+	if err != nil {
+		if database.IsNotFound(err) {
+			response.Error(c, 404, "ProviderEndpoint 不存在")
+			return
+		}
+		response.InternalError(c, 500, "更新 ProviderEndpoint 状态失败", err)
+		return
+	}
+
+	response.SuccessDTO(c, providerEndpointResponse{ProviderEndpoint: endpoint})
+}
+
 func (h *ProviderEndpointHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {

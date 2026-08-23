@@ -27,14 +27,53 @@ function isPersistableAction(action: SearchAuthAction): boolean {
   return action.kind !== 'vision-search'
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object'
+}
+
+function isLibrarySearchReference(value: unknown): value is LibrarySearchReference {
+  if (!isRecord(value)) return false
+  return (
+    (value.provider === 'unsplash' || value.provider === 'pexels') &&
+    typeof value.id === 'string' &&
+    typeof value.source_url === 'string' &&
+    typeof value.preview_url === 'string' &&
+    typeof value.original_url === 'string' &&
+    typeof value.title === 'string' &&
+    typeof value.author === 'string' &&
+    typeof value.width === 'number' &&
+    typeof value.height === 'number'
+  )
+}
+
+function isPersistedSearchAuthAction(value: unknown): value is SearchAuthAction {
+  if (!isRecord(value)) return false
+  switch (value.kind) {
+    case 'text-search':
+      return typeof value.query === 'string'
+    case 'save-reference':
+      return isLibrarySearchReference(value.reference)
+    case 'save-batch':
+      return Array.isArray(value.references) && value.references.every(isLibrarySearchReference)
+    case 'open-library':
+      return true
+    default:
+      // Vision references can contain File/blob values and are intentionally memory-only.
+      return false
+  }
+}
+
 function readPersistedAction(): SearchAuthAction | null {
   const currentStorage = storage()
   if (!currentStorage) return null
   try {
     const raw = currentStorage.getItem(PENDING_ACTION_KEY)
     if (!raw) return null
-    const value = JSON.parse(raw) as SearchAuthAction
-    if (!value || typeof value !== 'object' || typeof value.kind !== 'string') return null
+    const value: unknown = JSON.parse(raw)
+    if (!isPersistedSearchAuthAction(value)) {
+      currentStorage.removeItem(PENDING_ACTION_KEY)
+      return null
+    }
     return value
   } catch {
     currentStorage.removeItem(PENDING_ACTION_KEY)

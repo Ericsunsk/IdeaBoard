@@ -118,13 +118,10 @@
       </div>
     </Message>
 
-    <div
+    <AdminEmptyState
       v-if="showEmptyState"
-      class="grid h-full min-h-0 place-items-center text-admin-body text-admin-text-3"
-      role="status"
-    >
-      {{ emptyTitle }}
-    </div>
+      :title="emptyTitle"
+    />
 
     <DataTableFrame
       v-else-if="!initialError"
@@ -244,6 +241,7 @@ import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import DataTableFrame from '../../../../shared/components/DataTableFrame.vue'
+import AdminEmptyState from '../../shared/components/AdminEmptyState.vue'
 import AdminFilterPopover from '../../shared/components/AdminFilterPopover.vue'
 import AdminPagerControls from '../../shared/components/AdminPagerControls.vue'
 import AdminResourceToolbar from '../../shared/components/AdminResourceToolbar.vue'

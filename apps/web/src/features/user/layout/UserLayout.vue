@@ -38,8 +38,8 @@
       v-if="authModal"
       :mode="authModal.mode"
       :presentation="authModal.presentation"
-      @overlay-close="authOverlay.commands.close"
-      @overlay-success="authOverlay.commands.close"
+      @overlay-close="handleAuthOverlayClose"
+      @overlay-success="handleAuthOverlaySuccess"
       @update:mode="authOverlay.commands.open"
     />
   </div>
@@ -47,7 +47,7 @@
 
 <script setup lang="ts">
 import { Shield, Xmark } from '@iconoir/vue'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import { useAuthSession, useUserStore } from '../../auth/session/authSession'
@@ -64,6 +64,7 @@ import {
   createAuthOverlay,
   provideAuthOverlay,
 } from '../../auth/authOverlay'
+import { clearPendingSearchAuthAction } from '../../search/searchAuthContinuation'
 import AccountManagementDialogHost from '../../account-management/components/AccountManagementDialogHost.vue'
 import {
   createAccountManagementOverlay,
@@ -107,6 +108,30 @@ const authModal = computed<
   const overlayMode = authOverlay.viewModel.mode.value
   return overlayMode ? { mode: overlayMode, presentation: 'overlay' } : null
 })
+
+function handleAuthOverlayClose() {
+  clearPendingSearchAuthAction()
+  authOverlay.commands.clearPostAuthPath()
+  authOverlay.commands.close()
+}
+
+function resumePostAuthNavigation() {
+  const path = authOverlay.commands.consumePostAuthPath()
+  if (path && path !== route.fullPath) void router.push(path)
+}
+
+function handleAuthOverlaySuccess() {
+  authOverlay.commands.close()
+  resumePostAuthNavigation()
+}
+
+watch(
+  () => userStore.user,
+  (user) => {
+    if (user) resumePostAuthNavigation()
+  },
+  { immediate: true },
+)
 
 async function handleStopImpersonating() {
   await runAsyncAction(
