@@ -6,6 +6,7 @@ import (
 
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
+	"ideaboard/api/internal/searchcatalog"
 
 	"github.com/gin-gonic/gin"
 )
@@ -14,11 +15,14 @@ type healthResponse struct {
 	Status string `json:"status"`
 }
 
-func registerPublicRoutes(r *gin.Engine, branding settings.BrandingSettingProvider) {
+func registerPublicRoutes(r *gin.Engine, branding settings.BrandingSettingProvider, searchHandler *searchcatalog.SearchHandler) {
 	r.GET(RouteHealth, func(c *gin.Context) {
 		response.SuccessDTO(c, healthResponse{Status: "ok"})
 	})
 	r.GET(RoutePublicSettingsBranding, publicBrandingSettingsHandler(branding))
+	if searchHandler != nil {
+		r.GET(RoutePublicSearch, searchHandler.Search)
+	}
 }
 
 func publicBrandingSettingsHandler(provider settings.BrandingSettingProvider) gin.HandlerFunc {

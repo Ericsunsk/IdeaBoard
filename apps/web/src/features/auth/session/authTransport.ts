@@ -48,12 +48,12 @@ export const authTransport = {
     }
   },
 
-  async signInWithOAuth(provider: OAuthProviderCode): Promise<void> {
+  async signInWithOAuth(provider: OAuthProviderCode, redirectPath?: string): Promise<void> {
     const currentURL = new URL(window.location.href)
     const callbackURL = new URL(USER_AUTH_CALLBACK_PATH, window.location.origin)
-    const redirectPath = currentURL.searchParams.get('redirect')?.trim() ?? ''
-    if (isSafeInternalRedirectPath(redirectPath)) {
-      callbackURL.searchParams.set('redirect', redirectPath)
+    const requestedRedirect = redirectPath ?? currentURL.searchParams.get('redirect')?.trim() ?? ''
+    if (isSafeInternalRedirectPath(requestedRedirect)) {
+      callbackURL.searchParams.set('redirect', requestedRedirect)
     }
     const result = await authClient.signIn.social({
       provider,

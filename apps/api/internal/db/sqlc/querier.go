@@ -254,6 +254,7 @@ type Querier interface {
 	UpdateProviderEndpoint(ctx context.Context, arg UpdateProviderEndpointParams) (int64, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (int64, error)
 	UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarParams) (int64, error)
+	UpdateUserLastLoginMetadata(ctx context.Context, arg UpdateUserLastLoginMetadataParams) (int64, error)
 	UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (int64, error)
 	UpdateUserStatus(ctx context.Context, arg UpdateUserStatusParams) (int64, error)
 	UpdateUserStorageUID(ctx context.Context, arg UpdateUserStorageUIDParams) (int64, error)

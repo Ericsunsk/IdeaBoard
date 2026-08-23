@@ -74,6 +74,8 @@ export function loadEnv(source: EnvSource) {
   const authBaseURL =
     getEnv(source, 'BETTER_AUTH_URL', '') ||
     (productionRuntime ? '' : 'http://localhost:5173')
+  const apiInternalURL =
+    getEnv(source, 'API_INTERNAL_URL', '') || 'http://127.0.0.1:6000'
   const dbPassword = getEnv(source, 'DB_PASSWORD', '')
   const secretsEncryptionKey = getEnv(source, 'APP_SECRETS_ENCRYPTION_KEY', '')
   const dbSSLMode = validateDatabaseSSLMode(getEnv(source, 'DB_SSLMODE', 'disable'))
@@ -121,6 +123,7 @@ export function loadEnv(source: EnvSource) {
       secret: authSecret,
       baseURL: authBaseURL,
       trustedOrigins,
+      apiInternalURL,
     },
     database: {
       host: getEnv(source, 'DB_HOST', '127.0.0.1'),

@@ -22,25 +22,33 @@ import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
 import { useUserStore } from '../session/authSession'
 import { USER_LOGIN_PATH } from '../../../shared/constants/routePaths'
+import { isSafeInternalRedirectPath } from '../../../shared/utils/auth'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const status = ref<'loading' | 'failed'>('loading')
+const rawRedirect = Array.isArray(route.query.redirect) ? route.query.redirect[0] : route.query.redirect
+const safeRedirect =
+  typeof rawRedirect === 'string' && isSafeInternalRedirectPath(rawRedirect) ? rawRedirect : undefined
 const title = computed(() => (status.value === 'loading' ? '正在完成登录' : '登录未完成'))
 const message = computed(() =>
   status.value === 'loading' ? '正在恢复你的 Session...' : 'OAuth 登录失败，请重新尝试。',
 )
 
 async function returnToLogin() {
-  await router.replace(USER_LOGIN_PATH)
+  await router.replace(
+    safeRedirect
+      ? { path: USER_LOGIN_PATH, query: { redirect: safeRedirect } }
+      : USER_LOGIN_PATH,
+  )
 }
 
 onMounted(async () => {
   const providerError = Array.isArray(route.query.error) ? route.query.error[0] : route.query.error
   const succeeded = await userStore.completeOAuthCallback({
     providerError,
-    redirectPath: route.query.redirect,
+    redirectPath: safeRedirect,
     replace: (target) => router.replace(target),
   })
   if (!succeeded) {

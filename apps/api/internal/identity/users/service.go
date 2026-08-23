@@ -153,6 +153,8 @@ func (s *UserService) ListUsers(ctx context.Context, req *UserListRequest) (*Use
 				CreatedAt:        user.CreatedAt,
 				UpdatedAt:        user.UpdatedAt,
 				AvailableCredits: availableCredits,
+				LastLoginIP:      user.LastLoginIP,
+				LastLoginCountry: user.LastLoginCountry,
 			})
 		}
 	}

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { useSearchSession } from './useSearchSession'
+import { setPendingSearchAuthAction } from './searchAuthContinuation'
 
 const mocks = vi.hoisted(() => ({
   route: { query: {} as Record<string, string | string[]> },
@@ -121,5 +122,15 @@ describe('useSearchSession', () => {
     session.library.close()
     expect(session.library.open.value).toBe(false)
     expect(session.library.expanded.value).toBe(false)
+  })
+
+  it('opens Library after a gated anonymous action resumes', async () => {
+    setPendingSearchAuthAction({ kind: 'open-library' })
+    const session = useSearchSession({ isAuthenticated: () => true })
+    await nextTick()
+
+    await session.resumePendingAction()
+
+    expect(session.library.open.value).toBe(true)
   })
 })

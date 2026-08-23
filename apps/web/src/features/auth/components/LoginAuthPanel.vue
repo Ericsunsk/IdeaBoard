@@ -316,6 +316,10 @@ import {
   authSwitchButtonClass,
 } from './authModalUi'
 
+const props = defineProps<{
+  oauthRedirectPath?: string
+}>()
+
 const emit = defineEmits<{
   close: []
   'to-register': []
@@ -409,7 +413,11 @@ async function handleLogin() {
 async function handleSocialLogin(provider: OAuthProviderCode) {
   await runAsyncAction(
     async () => {
-      await authTransport.signInWithOAuth(provider)
+      if (props.oauthRedirectPath) {
+        await authTransport.signInWithOAuth(provider, props.oauthRedirectPath)
+      } else {
+        await authTransport.signInWithOAuth(provider)
+      }
       return true
     },
     { feedback: { error: authFeedback.login.error } },

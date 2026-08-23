@@ -48,6 +48,17 @@ const AuthPanelStub = defineComponent({
   template: '<div />',
 })
 
+const OverlayLoginPanelStub = defineComponent({
+  emits: ['close', 'to-register', 'login-success', 'update:busy'],
+  template: `
+    <div>
+      <button type="button" @click="$emit('to-register')">注册</button>
+      <button type="button" @click="$emit('login-success')">成功</button>
+      <button type="button" @click="$emit('close')">关闭</button>
+    </div>
+  `,
+})
+
 describe('UserAuthModals', () => {
   it('keeps one dialog surface mounted while switching auth modes', async () => {
     const view = renderWithUser(UserAuthModals, {
@@ -67,5 +78,27 @@ describe('UserAuthModals', () => {
     await nextTick()
 
     expect(screen.getAllByRole('dialog')).toHaveLength(1)
+  })
+
+  it('keeps the current page in place when opened as an overlay', async () => {
+    const view = renderWithUser(UserAuthModals, {
+      props: { mode: 'login', presentation: 'overlay' },
+      global: {
+        stubs: {
+          Dialog: TransitioningDialogStub,
+          LoginAuthPanel: OverlayLoginPanelStub,
+          RegisterAuthPanel: AuthPanelStub,
+        },
+      },
+    })
+
+    await view.user.click(screen.getByRole('button', { name: '注册' }))
+    await view.user.click(screen.getByRole('button', { name: '成功' }))
+    await view.user.click(screen.getByRole('button', { name: '关闭' }))
+
+    expect(view.emitted('update:mode')).toEqual([['register']])
+    expect(view.emitted('overlay-success')).toHaveLength(1)
+    expect(view.emitted('overlay-close')).toHaveLength(1)
+    expect(mocks.replace).not.toHaveBeenCalled()
   })
 })

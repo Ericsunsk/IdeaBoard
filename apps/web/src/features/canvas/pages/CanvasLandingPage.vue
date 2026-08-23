@@ -109,7 +109,7 @@ import socksAsset from '../assets/home/socks.svg'
 import starburstAsset from '../assets/home/starburst.svg'
 import { useSiteBranding } from '../../../shared/composables/useSiteBranding'
 import StudioName from '../../../shared/components/StudioName.vue'
-import { USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
+import { USER_SEARCH_PATH } from '../../../shared/constants/routePaths'
 import { PUBLIC_LEGAL_LINKS } from '../../../shared/constants/legalLinks'
 
 const router = useRouter()
@@ -123,7 +123,7 @@ const homeHeroAssets = {
 } as const
 
 function startJourney() {
-  router.push(USER_BOARDS_PATH)
+  router.push(USER_SEARCH_PATH)
 }
 </script>
 

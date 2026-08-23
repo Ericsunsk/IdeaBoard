@@ -7,6 +7,7 @@ import {
   extractVisionSearch,
   normalizeSearchQuery,
   type SearchResult,
+  type VisionReference,
 } from './searchResource'
 import { searchReferenceKey, toVisionReference } from './searchLibraryBridge'
 import {
@@ -23,11 +24,12 @@ export function useVisionSearchFlow(options: {
   keepResultsOnNextLoad: Ref<boolean>
   loadCatalog: () => Promise<void>
   cacheScope?: string
+  initialReferences?: VisionReference[]
 }) {
   const router = useRouter()
   const toast = useAppToast()
   const cacheScope = options.cacheScope ?? 'anonymous'
-  const cachedRefs = getCachedVisionReferences(cacheScope)
+  const cachedRefs = options.initialReferences ?? getCachedVisionReferences(cacheScope)
   const collection = createVisionReferenceCollection(
     cachedRefs.map((cached) => ({
       key: cached.key,

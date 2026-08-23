@@ -123,8 +123,8 @@ import {
 } from '../../library/libraryResource'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 
-const props = defineProps<{ result: SearchResult; saved?: boolean }>()
-const emit = defineEmits<{ saved: []; unsaved: [] }>()
+const props = defineProps<{ result: SearchResult; saved?: boolean; authenticated?: boolean }>()
+const emit = defineEmits<{ saved: []; unsaved: []; 'auth-required': [] }>()
 
 const toast = useAppToast()
 const popover = ref<InstanceType<typeof Popover>>()
@@ -228,6 +228,10 @@ async function handleUnsave() {
 }
 
 function toggle(event: Event) {
+  if (props.authenticated === false) {
+    emit('auth-required')
+    return
+  }
   if (props.saved) {
     void handleUnsave()
     return

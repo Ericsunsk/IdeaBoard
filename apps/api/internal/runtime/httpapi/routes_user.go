@@ -36,9 +36,6 @@ func registerUserRoutes(userAPI *gin.RouterGroup, h UserRouteDeps) {
 	registerUserTaskRoutes(userAPI, h)
 	registerUserBoardRoutes(userAPI, h)
 	registerUserUploadRoutes(userAPI, h)
-	if h.SearchHandler != nil {
-		userAPI.GET("/search", h.SearchHandler.Search)
-	}
 	if h.VisionHandler != nil {
 		userAPI.POST("/search/vision-extract", requestBodyLimitMiddleware(visionRequestBodyLimitBytes), h.VisionHandler.Extract)
 	}

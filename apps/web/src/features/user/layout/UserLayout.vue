@@ -34,7 +34,14 @@
     </div>
 
     <AccountManagementDialogHost />
-    <UserAuthModals v-if="authMode" :mode="authMode" />
+    <UserAuthModals
+      v-if="authModal"
+      :mode="authModal.mode"
+      :presentation="authModal.presentation"
+      @overlay-close="authOverlay.commands.close"
+      @overlay-success="authOverlay.commands.close"
+      @update:mode="authOverlay.commands.open"
+    />
   </div>
 </template>
 
@@ -53,6 +60,10 @@ import {
 } from '../../../shared/constants/routePaths'
 import { useAuthFeedback } from '../../auth/useAuthFeedback'
 import UserAuthModals from '../../auth/components/UserAuthModals.vue'
+import {
+  createAuthOverlay,
+  provideAuthOverlay,
+} from '../../auth/authOverlay'
 import AccountManagementDialogHost from '../../account-management/components/AccountManagementDialogHost.vue'
 import {
   createAccountManagementOverlay,
@@ -74,6 +85,8 @@ const accountManagementOverlay = createAccountManagementOverlay({
   route,
 })
 provideAccountManagementOverlay(accountManagementOverlay)
+const authOverlay = createAuthOverlay()
+provideAuthOverlay(authOverlay)
 
 const stopImpersonatingLoading = ref(false)
 const authSession = useAuthSession()
@@ -85,10 +98,14 @@ type AuthSessionData = {
 const isImpersonating = computed(() =>
   Boolean((authSession.value?.data as AuthSessionData | null | undefined)?.session?.impersonatedBy),
 )
-const authMode = computed<'login' | 'register' | null>(() => {
-  if (route.path === USER_LOGIN_PATH) return 'login'
-  if (route.path === USER_REGISTER_PATH) return 'register'
-  return null
+const authModal = computed<
+  | { mode: 'login' | 'register'; presentation: 'overlay' | 'route' }
+  | null
+>(() => {
+  if (route.path === USER_LOGIN_PATH) return { mode: 'login', presentation: 'route' }
+  if (route.path === USER_REGISTER_PATH) return { mode: 'register', presentation: 'route' }
+  const overlayMode = authOverlay.viewModel.mode.value
+  return overlayMode ? { mode: overlayMode, presentation: 'overlay' } : null
 })
 
 async function handleStopImpersonating() {

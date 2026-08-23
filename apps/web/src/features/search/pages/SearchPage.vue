@@ -125,13 +125,7 @@
                   label="Search"
                   :loading="visionState === 'extracting'"
                   :disabled="hasPendingReferences || visionState === 'extracting'"
-                  :title="
-                    hasPendingReferences
-                      ? 'Preparing references'
-                      : visionState === 'extracting'
-                        ? 'Searching'
-                        : 'Search'
-                  "
+                  :title="searchButtonTitle"
                   class="!h-8 !min-w-[68px] !rounded-full !border-0 !bg-board-primary !px-4 !text-xs !font-bold !text-ib-text-inverse !shadow-none hover:!bg-board-primary-hover cursor-pointer disabled:!cursor-wait disabled:!opacity-60"
                 />
               </div>
@@ -147,7 +141,7 @@
             aria-label="Toggle My Library"
             title="My Library / Drop here to Quick Save"
             :aria-expanded="libraryIslandOpen"
-            @click="toggleLibraryIsland"
+            @click="toggleLibraryIslandForUser"
             @dragover.prevent="handleTriggerBtnDragOver"
             @dragleave="handleTriggerBtnDragLeave"
             @drop.prevent="handleTriggerBtnDrop"
@@ -342,8 +336,15 @@
                 <SearchSavePopover
                   :result="result"
                   :saved="savedKeys.has(libraryAssetKey(result.provider, result.id))"
+                  :authenticated="Boolean(userStore.user)"
                   @saved="markResultSaved(result)"
                   @unsaved="markResultUnsaved(result)"
+                  @auth-required="
+                    requireSearchLogin({
+                      kind: 'save-reference',
+                      reference: searchSession.toLibraryReference(result),
+                    })
+                  "
                 />
               </div>
             </div>
@@ -473,7 +474,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -495,9 +496,14 @@ import { searchReferenceKey } from '../searchLibraryBridge'
 import { useUserAccountControls } from '../../user-shell/useUserAccountControls'
 import { type SearchResult } from '../searchResource'
 import { useSearchSession } from '../useSearchSession'
+import { setPendingSearchAuthAction, type SearchAuthAction } from '../searchAuthContinuation'
+import { useAuthOverlay } from '../../auth/authOverlay'
+import { fetchVisionSearchPrice } from '../visionSearchBillingResource'
+import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
 
 const router = useRouter()
 const userStore = useUserStore()
+const authOverlay = useAuthOverlay()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const accountControls = useUserAccountControls({
   navigation: { navigate: (path) => router.push(path), logout: () => logoutAndRedirect(HOME_PATH) },
@@ -505,13 +511,33 @@ const accountControls = useUserAccountControls({
 const cacheScope = userStore.user?.public_id ?? 'anonymous'
 const isTriggerHoveredDuringDrag = ref(false)
 const pageScrollRef = ref<HTMLElement | null>(null)
+const visionSearchPrice = ref<number | null>(null)
 let autoOpenTimer: ReturnType<typeof setTimeout> | null = null
+let visionSearchPriceController: AbortController | null = null
 
-const searchSession = useSearchSession({ cacheScope, scrollContainer: pageScrollRef })
+function requireSearchLogin(action: SearchAuthAction) {
+  setPendingSearchAuthAction(action)
+  authOverlay.commands.open('login')
+}
+
+function toggleLibraryIslandForUser() {
+  if (!userStore.user) {
+    requireSearchLogin({ kind: 'open-library' })
+    return
+  }
+  toggleLibraryIsland()
+}
+
+const searchSession = useSearchSession({
+  cacheScope,
+  scrollContainer: pageScrollRef,
+  isAuthenticated: () => Boolean(userStore.user),
+  requireLogin: requireSearchLogin,
+})
 const { draftQuery, queryError, heading: searchResultsHeading } = searchSession.query
 const searchResults = searchSession.feed
 const visionFlow = searchSession.vision
-const { library, batch, lightbox } = searchSession
+const { library, batch, lightbox, resumePendingAction } = searchSession
 const {
   open: libraryIslandOpen,
   expanded: libraryIslandExpanded,
@@ -559,6 +585,45 @@ const {
   handleSearchResultReference,
   isReferencePending,
 } = visionFlow
+
+const visionSearchPriceLabel = computed(() =>
+  visionSearchPrice.value === null
+    ? ''
+    : visionSearchPrice.value === 0
+      ? '免费'
+      : formatIdeaAmount(visionSearchPrice.value),
+)
+
+const searchButtonTitle = computed(() => {
+  if (hasPendingReferences.value) return 'Preparing references'
+  if (visionState.value === 'extracting') return 'Searching'
+  return references.value.length > 0 && visionSearchPriceLabel.value
+    ? `Search · ${visionSearchPriceLabel.value}`
+    : 'Search'
+})
+
+function refreshVisionSearchPrice() {
+  visionSearchPriceController?.abort()
+  visionSearchPriceController = null
+  visionSearchPrice.value = null
+  if (!userStore.user || references.value.length === 0) return
+
+  const controller = new AbortController()
+  visionSearchPriceController = controller
+  void fetchVisionSearchPrice(controller.signal)
+    .then((price) => {
+      if (!controller.signal.aborted) visionSearchPrice.value = price
+    })
+    .catch(() => {
+      // Pricing is supplementary feedback. Submission remains the authority.
+    })
+}
+
+watch([() => userStore.user?.public_id, () => references.value.length], refreshVisionSearchPrice, {
+  immediate: true,
+})
+
+onBeforeUnmount(() => visionSearchPriceController?.abort())
 
 const {
   visible: lightboxVisible,
@@ -611,6 +676,7 @@ function handleCardDragEnd() {
 }
 
 function handleTriggerBtnDragOver(e: DragEvent) {
+  if (!userStore.user) return
   e.dataTransfer!.dropEffect = 'copy'
   isTriggerHoveredDuringDrag.value = true
 
@@ -633,7 +699,12 @@ async function handleTriggerBtnDrop(e: DragEvent) {
   clearAutoOpenTimer()
 
   const reference = readSearchReferenceTransfer(e.dataTransfer)
-  if (reference) await saveReferenceToQuickSaves(reference)
+  if (!reference) return
+  if (!userStore.user) {
+    requireSearchLogin({ kind: 'save-reference', reference })
+    return
+  }
+  await saveReferenceToQuickSaves(reference)
 }
 
 function handleClearSearch() {
@@ -644,6 +715,17 @@ async function submitQuery() {
   clearSelection()
   await searchSession.submitQuery()
 }
+
+onMounted(() => {
+  void resumePendingAction()
+})
+
+watch(
+  () => Boolean(userStore.user),
+  (isAuthenticated, wasAuthenticated) => {
+    if (isAuthenticated && !wasAuthenticated) void resumePendingAction()
+  },
+)
 
 </script>
 

@@ -15,6 +15,8 @@ export type AdminUserCommandTarget = {
 
 export type AdminUserRowView = AdminUserCommandTarget & {
   email: string
+  lastLoginIP: string
+  lastLoginCountry: string
   providers: string[]
   availableCredits: number
   availableCreditsLabel: string
@@ -75,6 +77,8 @@ export function createAdminUserRowView(user: AdminUserListItem): AdminUserRowVie
   return {
     publicId: user.public_id,
     email: user.email ?? '',
+    lastLoginIP: user.last_login_ip ?? '',
+    lastLoginCountry: user.last_login_country ?? '',
     providers: user.providers ?? ['email'],
     displayName: user.display_name,
     role: user.role,
@@ -91,6 +95,24 @@ export function createAdminUserRowView(user: AdminUserListItem): AdminUserRowVie
     statusLabel: isActive ? '正常' : '封禁',
     statusSeverity: isActive ? 'success' : 'danger',
   }
+}
+
+export function normalizeCountryCode(country: string) {
+  const normalized = country.trim().toUpperCase()
+  return /^[A-Z]{2}$/.test(normalized) && normalized !== 'XX' ? normalized : ''
+}
+
+export function getCountryFlag(country: string) {
+  const code = normalizeCountryCode(country)
+  if (!code) return ''
+  return [...code]
+    .map((letter) => String.fromCodePoint(0x1f1e6 + letter.charCodeAt(0) - 65))
+    .join('')
+}
+
+export function getCountryLabel(country: string) {
+  const code = normalizeCountryCode(country)
+  return code ? `登录国家 ${code}` : '登录国家未知'
 }
 
 export function getUserActionItems(row: AdminUserCommandTarget): UserActionItem[] {

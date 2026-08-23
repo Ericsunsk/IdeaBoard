@@ -28,4 +28,11 @@ export interface AdminUserListItem {
    * @maximum 9000000000000000
    */
   available_credits: number
+  /** @maxLength 45 */
+  last_login_ip?: string
+  /**
+   * @minLength 2
+   * @maxLength 2
+   */
+  last_login_country?: string
 }

@@ -3,6 +3,8 @@ import type { AdminUserListItem } from '../../../shared/api/generated-query/mode
 import {
   createAdminUserRowView,
   getUserActionItems,
+  getCountryFlag,
+  getCountryLabel,
   getUserInitial,
   isActiveUser,
   isAdminUser,
@@ -34,12 +36,16 @@ describe('admin user view model', () => {
         avatar: '/avatar.png',
         providers: ['google', 'discord'],
         created_at: '2026-06-29T10:20:30Z',
+        last_login_ip: '203.0.113.42',
+        last_login_country: 'us',
       }),
     )
 
     expect(row).toMatchObject({
       publicId: '00000000-0000-0000-0000-000000000001',
       email: 'user@example.com',
+      lastLoginIP: '203.0.113.42',
+      lastLoginCountry: 'us',
       providers: ['google', 'discord'],
       availableCredits: 125,
       availableCreditsLabel: '125 Ideas',
@@ -53,6 +59,14 @@ describe('admin user view model', () => {
       statusSeverity: 'danger',
     })
     expect(row.createdDateLabel).toBe('2026-06-29')
+  })
+
+  it('renders a flag for a valid country and a globe fallback for unknown country data', () => {
+    expect(getCountryFlag('us')).toBe('🇺🇸')
+    expect(getCountryFlag('XX')).toBe('')
+    expect(getCountryFlag('')).toBe('')
+    expect(getCountryLabel('cn')).toBe('登录国家 CN')
+    expect(getCountryLabel('')).toBe('登录国家未知')
   })
 
   it('builds action items with destructive actions disabled for admins', () => {

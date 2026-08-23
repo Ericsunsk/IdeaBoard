@@ -8,28 +8,28 @@ INSERT INTO users (
 RETURNING id, public_id, display_name;
 
 -- name: GetUserByID :one
-SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at
 FROM users
 WHERE id = sqlc.arg(id);
 
 -- name: GetUsersByIDs :many
-SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at
 FROM users
 WHERE id = ANY(sqlc.arg(ids)::BIGINT[])
 ORDER BY id;
 
 -- name: GetUserByPublicID :one
-SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at
 FROM users
 WHERE public_id = sqlc.arg(public_id);
 
 -- name: GetUserByAuthUserID :one
-SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at
 FROM users
 WHERE auth_user_id = sqlc.arg(auth_user_id);
 
 -- name: GetUserByStorageUID :one
-SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at
 FROM users
 WHERE storage_uid = sqlc.arg(storage_uid);
 
@@ -59,13 +59,20 @@ WHERE (NOT sqlc.arg(has_keyword)::boolean OR display_name ILIKE sqlc.arg(keyword
   AND (NOT sqlc.arg(has_status)::boolean OR status = sqlc.arg(status));
 
 -- name: ListUsers :many
-SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at
 FROM users
 WHERE (NOT sqlc.arg(has_keyword)::boolean OR display_name ILIKE sqlc.arg(keyword_like))
   AND (NOT sqlc.arg(has_role)::boolean OR role = sqlc.arg(role))
   AND (NOT sqlc.arg(has_status)::boolean OR status = sqlc.arg(status))
 ORDER BY id DESC
 LIMIT sqlc.arg(page_limit) OFFSET sqlc.arg(page_offset);
+
+-- name: UpdateUserLastLoginMetadata :execrows
+UPDATE users
+SET last_login_ip = sqlc.arg(last_login_ip),
+    last_login_country = sqlc.arg(last_login_country),
+    updated_at = now()
+WHERE auth_user_id = sqlc.arg(auth_user_id);
 
 -- name: UpdateUserStatus :execrows
 UPDATE users

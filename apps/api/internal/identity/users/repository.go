@@ -154,6 +154,19 @@ func (r *UserRepository) Update(ctx context.Context, user *User) error {
 	return requireOneUserRow(updated)
 }
 
+// UpdateLastLoginMetadata records the latest successful auth session.
+func (r *UserRepository) UpdateLastLoginMetadata(ctx context.Context, authUserID, ip, country string) error {
+	updated, err := r.q.UpdateUserLastLoginMetadata(ctx, dbsqlc.UpdateUserLastLoginMetadataParams{
+		AuthUserID:       sql.NullString{String: authUserID, Valid: authUserID != ""},
+		LastLoginIp:      sql.NullString{String: ip, Valid: ip != ""},
+		LastLoginCountry: sql.NullString{String: country, Valid: country != ""},
+	})
+	if err != nil {
+		return err
+	}
+	return requireOneUserRow(updated)
+}
+
 // List 获取用户列表
 func (r *UserRepository) List(
 	ctx context.Context,
@@ -372,15 +385,17 @@ func requireOneUserRow(rows int64) error {
 
 func userFromSQLC(row dbsqlc.User) User {
 	return User{
-		ID:          row.ID,
-		PublicID:    row.PublicID,
-		DisplayName: row.DisplayName,
-		AuthUserID:  dbutil.StringPtr(row.AuthUserID),
-		StorageUID:  row.StorageUid,
-		Avatar:      row.Avatar,
-		Role:        row.Role,
-		Status:      row.Status,
-		CreatedAt:   row.CreatedAt,
-		UpdatedAt:   row.UpdatedAt,
+		ID:               row.ID,
+		PublicID:         row.PublicID,
+		DisplayName:      row.DisplayName,
+		AuthUserID:       dbutil.StringPtr(row.AuthUserID),
+		StorageUID:       row.StorageUid,
+		Avatar:           row.Avatar,
+		Role:             row.Role,
+		Status:           row.Status,
+		LastLoginIP:      row.LastLoginIp.String,
+		LastLoginCountry: row.LastLoginCountry.String,
+		CreatedAt:        row.CreatedAt,
+		UpdatedAt:        row.UpdatedAt,
 	}
 }

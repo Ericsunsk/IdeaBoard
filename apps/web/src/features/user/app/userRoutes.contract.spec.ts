@@ -70,7 +70,7 @@ describe('userRoutes contract', () => {
       { path: 'register', name: 'UserRegister', meta: { guest: true } },
       { path: 'auth/callback', name: 'UserAuthCallback', meta: { public: true } },
       { path: 'boards', name: 'UserBoards', meta: { requiresAuth: true } },
-      { path: 'search', name: 'UserSearch', meta: { requiresAuth: true } },
+      { path: 'search', name: 'UserSearch', meta: { public: true } },
       { path: 'canvas', name: 'UserCanvas', meta: { requiresAuth: true } },
     ])
   })

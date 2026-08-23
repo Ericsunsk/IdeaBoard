@@ -37,6 +37,8 @@ type AdminUserListItem struct {
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 	AvailableCredits int64     `json:"available_credits"`
+	LastLoginIP      string    `json:"last_login_ip,omitempty"`
+	LastLoginCountry string    `json:"last_login_country,omitempty"`
 }
 
 type AdminBanUserRequest struct {

@@ -37,7 +37,7 @@ export type BrowserSessionTransition = {
   completeOAuthCallback: (input: {
     providerError?: unknown
     redirectPath?: unknown
-    replace: (target: string | { path: string; query: Record<string, never> }) => Promise<unknown>
+    replace: (target: string | { path: string; query: Record<string, string> }) => Promise<unknown>
   }) => Promise<boolean>
 }
 
@@ -129,7 +129,7 @@ export function createBrowserSessionTransition(
   async function completeOAuthCallback(input: {
     providerError?: unknown
     redirectPath?: unknown
-    replace: (target: string | { path: string; query: Record<string, never> }) => Promise<unknown>
+    replace: (target: string | { path: string; query: Record<string, string> }) => Promise<unknown>
   }): Promise<boolean> {
     try {
       if (input.providerError) throw new Error('oauth callback failed')

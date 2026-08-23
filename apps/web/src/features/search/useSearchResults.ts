@@ -8,6 +8,7 @@ export function useSearchResults(options: {
   keepResultsOnNextLoad: Ref<boolean>
   cacheScope?: string
   scrollContainer?: Ref<HTMLElement | null>
+  isAuthenticated?: () => boolean
 }) {
   const feed = createInspirationFeed(options)
   const sentinel = ref<HTMLElement>()
@@ -16,6 +17,7 @@ export function useSearchResults(options: {
   let observer: IntersectionObserver | null = null
   const cacheScope = options.cacheScope ?? 'anonymous'
   const scrollContainer = options.scrollContainer
+  const isAuthenticated = options.isAuthenticated ?? (() => true)
 
   async function load(reset: boolean) {
     if (reset) {
@@ -29,7 +31,7 @@ export function useSearchResults(options: {
     if (failedImages.value.has(id)) return
     failedImages.value = new Set(failedImages.value).add(id)
     const result = feed.results.value.find((item) => item.id === id)
-    if (result) void reportSearchImageFailure(result.provider)
+    if (result && isAuthenticated()) void reportSearchImageFailure(result.provider)
   }
 
   function retryImage(id: string) {

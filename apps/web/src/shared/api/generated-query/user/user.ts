@@ -19,12 +19,10 @@ import type { MaybeRefOrGetter } from 'vue'
 
 import type {
   ApiResponseEmpty,
-  ApiResponseSearchResults,
   ApiResponseUserInfo,
   ApiResponseVisionExtraction,
   ExtractUserVisionSearchBody,
   RecordSearchImageFailureRequest,
-  SearchUserInspirationParams,
   VisionSearchError,
 } from '../model'
 
@@ -85,91 +83,6 @@ export function useGetUserInfo<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getGetUserInfoQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
-    queryKey: DataTag<QueryKey, TData, TError>
-  }
-
-  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
-
-  return query
-}
-
-export const getSearchUserInspirationUrl = (params?: SearchUserInspirationParams) => {
-  const normalizedParams = new URLSearchParams()
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
-    }
-  })
-
-  const stringifiedParams = normalizedParams.toString()
-
-  return stringifiedParams.length > 0 ? `/user/search?${stringifiedParams}` : `/user/search`
-}
-
-export const searchUserInspiration = async (
-  params?: SearchUserInspirationParams,
-  options?: Parameters<typeof orvalMutator>[1],
-): Promise<ApiResponseSearchResults> => {
-  return orvalMutator<ApiResponseSearchResults>(getSearchUserInspirationUrl(params), {
-    ...options,
-    method: 'GET',
-  })
-}
-
-export const getSearchUserInspirationQueryKey = (
-  params?: MaybeRefOrGetter<SearchUserInspirationParams>,
-) => {
-  return ['user', 'search', ...(params ? [params] : [])] as const
-}
-
-export const getSearchUserInspirationQueryOptions = <
-  TData = Awaited<ReturnType<typeof searchUserInspiration>>,
-  TError = ErrorType<unknown>,
->(
-  params?: MaybeRefOrGetter<SearchUserInspirationParams>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof searchUserInspiration>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-) => {
-  const { query: queryOptions, request: requestOptions } = options ?? {}
-
-  const queryKey = getSearchUserInspirationQueryKey(params)
-
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof searchUserInspiration>>> = ({ signal }) =>
-    searchUserInspiration(toValue(params), { signal, ...requestOptions })
-
-  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
-    Awaited<ReturnType<typeof searchUserInspiration>>,
-    TError,
-    TData
-  >
-}
-
-export type SearchUserInspirationQueryResult = NonNullable<
-  Awaited<ReturnType<typeof searchUserInspiration>>
->
-export type SearchUserInspirationQueryError = ErrorType<unknown>
-
-export function useSearchUserInspiration<
-  TData = Awaited<ReturnType<typeof searchUserInspiration>>,
-  TError = ErrorType<unknown>,
->(
-  params?: MaybeRefOrGetter<SearchUserInspirationParams>,
-  options?: {
-    query?: Partial<
-      UseQueryOptions<Awaited<ReturnType<typeof searchUserInspiration>>, TError, TData>
-    >
-    request?: SecondParameter<typeof orvalMutator>
-  },
-  queryClient?: QueryClient,
-): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getSearchUserInspirationQueryOptions(params, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

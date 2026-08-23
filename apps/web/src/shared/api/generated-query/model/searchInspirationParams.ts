@@ -5,7 +5,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type SearchUserInspirationParams = {
+export type SearchInspirationParams = {
   /**
    * @maxLength 200
    */

@@ -47,11 +47,13 @@ export function createInspirationFeed(
     keepResultsOnNextLoad: Ref<boolean>
     cacheScope?: string
     scrollContainer?: Ref<HTMLElement | null>
+    isAuthenticated?: () => boolean
   },
   overrides: Partial<InspirationFeedDependencies> = {},
 ) {
   const dependencies = { ...defaultDependencies, ...overrides }
   const cacheScope = options.cacheScope ?? 'anonymous'
+  const isAuthenticated = options.isAuthenticated ?? (() => true)
   const results = ref<SearchResult[]>([])
   const nextCursor = ref('')
   const hasMore = ref(false)
@@ -64,7 +66,9 @@ export function createInspirationFeed(
   let loadGeneration = 0
 
   async function refreshSavedKeys(items: SearchResult[], generation: number) {
-    if (items.length === 0) return
+    // The saved-state endpoint is protected. Anonymous search does not have a
+    // Library identity, so skip it rather than allowing its 401 to redirect away.
+    if (items.length === 0 || !isAuthenticated()) return
     try {
       const saved = await dependencies.lookupSavedKeys(
         items.map((result) => ({ provider: result.provider, source_id: result.id })),

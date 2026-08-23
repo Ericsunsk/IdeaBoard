@@ -26,6 +26,7 @@ import (
 	"ideaboard/api/internal/platform/settings"
 	"ideaboard/api/internal/prompts"
 	"ideaboard/api/internal/rewards"
+	"ideaboard/api/internal/searchcatalog"
 	"ideaboard/api/internal/tasking/taskservice"
 	"ideaboard/api/internal/tasking/taskstats"
 	"ideaboard/api/internal/testdb"
@@ -284,6 +285,23 @@ func TestPublicBrandingSettingsHandlerRequiresProvider(t *testing.T) {
 
 	if res.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want %d; body=%s", res.Code, http.StatusInternalServerError, res.Body.String())
+	}
+}
+
+func TestPublicSearchRouteDoesNotRequireAuthentication(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	registerPublicRoutes(router, nil, searchcatalog.NewSearchHandler(nil))
+
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, RoutePublicSearch, nil)
+	router.ServeHTTP(res, req)
+
+	if res.Code == http.StatusUnauthorized {
+		t.Fatalf("public search route unexpectedly required authentication: status=%d body=%s", res.Code, res.Body.String())
+	}
+	if res.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d for an unconfigured public search service; body=%s", res.Code, http.StatusServiceUnavailable, res.Body.String())
 	}
 }
 

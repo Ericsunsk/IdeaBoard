@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"ideaboard/api/internal/identity/principal"
 	"ideaboard/api/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
@@ -17,9 +16,6 @@ type SearchHandler struct{ service *SearchService }
 func NewSearchHandler(service *SearchService) *SearchHandler { return &SearchHandler{service: service} }
 
 func (h *SearchHandler) Search(c *gin.Context) {
-	if _, ok := principal.Require(c); !ok {
-		return
-	}
 	limit := DefaultSearchLimit
 	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
 		parsed, err := strconv.Atoi(raw)

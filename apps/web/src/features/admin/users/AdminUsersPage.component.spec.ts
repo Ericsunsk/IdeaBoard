@@ -52,6 +52,8 @@ describe('AdminUsersPage', () => {
                 role: 'user',
                 status: 1,
                 available_credits: 125,
+                last_login_ip: '203.0.113.42',
+                last_login_country: 'US',
                 created_at: '2026-07-24T08:00:00Z',
                 updated_at: '2026-07-24T08:00:00Z',
               },
@@ -158,6 +160,18 @@ describe('AdminUsersPage', () => {
     expect(within(dialog).getByText('受限')).toBeVisible()
     expect(within(dialog).queryByText('无限制')).not.toBeInTheDocument()
     expect(within(dialog).getByText('需要人工复核')).toBeVisible()
+  })
+
+  it('shows the latest login country and IP in one column after Email', async () => {
+    renderPage()
+
+    const emailHeader = await screen.findByRole('columnheader', { name: 'Email' })
+    const ipHeader = await screen.findByRole('columnheader', { name: 'IP' })
+    expect(
+      emailHeader.compareDocumentPosition(ipHeader) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(await screen.findByText('203.0.113.42')).toBeVisible()
+    expect(await screen.findByText('🇺🇸')).toBeVisible()
   })
 
   it('loads more Ledger entries and refreshes the user list after confirmed Grant', async () => {

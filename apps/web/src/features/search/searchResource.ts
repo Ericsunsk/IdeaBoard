@@ -1,8 +1,5 @@
-import {
-  extractUserVisionSearch,
-  recordSearchImageFailure,
-  searchUserInspiration,
-} from '../../shared/api/generated-query/user/user'
+import { searchInspiration as searchPublicInspiration } from '../../shared/api/generated-query/search/search'
+import { extractUserVisionSearch, recordSearchImageFailure } from '../../shared/api/generated-query/user/user'
 import type {
   SearchResults,
   SearchResult,
@@ -53,7 +50,7 @@ export async function searchInspiration(input: {
     return inFlight.promise
   }
   const request = resolveApiData(
-    searchUserInspiration(
+    searchPublicInspiration(
       {
         q: input.query || undefined,
         cursor: input.cursor,

@@ -27,6 +27,9 @@ func Run(args []string) {
 		case "finalize-migrate":
 			runFinalizeMigrate()
 			return
+		case "migrate":
+			runMigrate()
+			return
 		case "init-credit-wallets":
 			runInitCreditWallets(args[2:])
 			return
@@ -65,6 +68,23 @@ func Run(args []string) {
 	if err := app.shutdown(); err != nil {
 		fatal("server forced to shutdown", "err", err)
 	}
+}
+
+func runMigrate() {
+	cfg := config.Load()
+	configureRuntimeLogging(cfg)
+	atlasBinary := strings.TrimSpace(os.Getenv("ATLAS_BINARY"))
+	if atlasBinary == "" {
+		atlasBinary = "atlas"
+	}
+	migrationsDirectory := strings.TrimSpace(os.Getenv("ATLAS_MIGRATIONS_DIR"))
+	if migrationsDirectory == "" {
+		migrationsDirectory = defaultMigrationDirectory
+	}
+	if err := Migrate(context.Background(), cfg, atlasBinary, migrationsDirectory); err != nil {
+		fatal("failed to migrate database schema", "err", err)
+	}
+	slog.Info("database migration completed")
 }
 
 func runInitCreditWallets(args []string) {

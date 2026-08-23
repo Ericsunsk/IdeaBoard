@@ -28,15 +28,19 @@ import (
 )
 
 type Dependencies struct {
-	Auth           AuthDeps
-	UserRoutes     UserRouteDeps
-	AdminRoutes    AdminRouteDeps
-	StaticUploads  StaticUploadDeps
-	CORSMiddleware gin.HandlerFunc
-	RateLimit      settings.RateLimitSettingProvider
-	Branding       settings.BrandingSettingProvider
-	PaymentWebhook *payments.WebhookHandler
+	Auth                AuthDeps
+	UserRoutes          UserRouteDeps
+	PublicSearchHandler *searchcatalog.SearchHandler
+	AdminRoutes         AdminRouteDeps
+	StaticUploads       StaticUploadDeps
+	CORSMiddleware      gin.HandlerFunc
+	RateLimit           settings.RateLimitSettingProvider
+	Branding            settings.BrandingSettingProvider
+	PaymentWebhook      *payments.WebhookHandler
+	Internal            InternalRouteDeps
 }
+
+type InternalRouteDeps struct{ UserHandler *users.InternalHandler }
 
 type FrontendRouteOptions struct {
 	WarnMissingIndex bool
@@ -86,7 +90,6 @@ type UserRouteDeps struct {
 	MediaStorageService    *storage.StorageService
 	Uploads                UploadDeps
 	UploadDownloads        UploadDownloadDeps
-	SearchHandler          *searchcatalog.SearchHandler
 	VisionHandler          *searchcatalog.VisionHandler
 	SearchMetricsHandler   *searchcatalog.MetricsHandler
 	LibraryHandler         *library.Handler
@@ -122,6 +125,7 @@ const visionRequestBodyLimitBytes int64 = 11 * 1024 * 1024
 const (
 	RouteHealth                   = "/api/health"
 	RoutePublicSettingsBranding   = "/api/settings/branding"
+	RoutePublicSearch             = "/api/search"
 	RouteUserProfileAvatar        = "/profile/avatar"
 	RouteUserBoardUploads         = "/boards/:board_id/uploads"
 	RouteUserDownload             = "/download"
@@ -138,8 +142,9 @@ const (
 
 func RegisterRoutes(r *gin.Engine, deps Dependencies, frontendFS iofs.FS, frontendOptions FrontendRouteOptions) {
 	registerGlobalMiddleware(r, deps)
-	registerPublicRoutes(r, deps.Branding)
+	registerPublicRoutes(r, deps.Branding, deps.PublicSearchHandler)
 	registerPaymentWebhookRoutes(r, deps.PaymentWebhook)
+	registerInternalRoutes(r, deps.Internal)
 	registerStaticUploadRoutes(r, deps.StaticUploads)
 	registerAuthenticatedUserRoutes(r, deps.Auth, deps.UserRoutes)
 	registerAuthenticatedAdminRoutes(r, deps.Auth, deps.AdminRoutes)

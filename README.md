@@ -188,11 +188,7 @@ docker compose -f compose.local.yml up -d
 # 初始化 Go API Schema（Atlas + River/权限 finalize）
 cd apps/api && cp .env.example .env
 set -a && source ../../docker/.env && source ../../docker/migration.env && set +a
-atlas migrate apply --dir file://internal/db/migrations \
-  --url "postgres://${DB_MIGRATION_USER}:${DB_MIGRATION_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}"
-DB_USER=ideaboard_api DB_PASSWORD="$API_DB_PASSWORD" \
-  DB_MIGRATION_USER="$DB_MIGRATION_USER" DB_MIGRATION_PASSWORD="$DB_MIGRATION_PASSWORD" \
-  go run ./cmd finalize-migrate
+go run ./cmd migrate
 
 # 初始化并启动 Auth 服务
 cd ../auth && cp .env.example .env

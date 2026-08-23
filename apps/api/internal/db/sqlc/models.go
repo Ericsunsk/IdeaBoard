@@ -935,16 +935,18 @@ type TaskSubmissionClaim struct {
 }
 
 type User struct {
-	ID          int64          `json:"id"`
-	PublicID    uuid.UUID      `json:"public_id"`
-	DisplayName string         `json:"display_name"`
-	AuthUserID  sql.NullString `json:"auth_user_id"`
-	StorageUid  string         `json:"storage_uid"`
-	Avatar      string         `json:"avatar"`
-	Role        string         `json:"role"`
-	Status      int16          `json:"status"`
-	CreatedAt   time.Time      `json:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at"`
+	ID               int64          `json:"id"`
+	PublicID         uuid.UUID      `json:"public_id"`
+	DisplayName      string         `json:"display_name"`
+	AuthUserID       sql.NullString `json:"auth_user_id"`
+	StorageUid       string         `json:"storage_uid"`
+	Avatar           string         `json:"avatar"`
+	Role             string         `json:"role"`
+	Status           int16          `json:"status"`
+	LastLoginIp      sql.NullString `json:"last_login_ip"`
+	LastLoginCountry sql.NullString `json:"last_login_country"`
+	CreatedAt        time.Time      `json:"created_at"`
+	UpdatedAt        time.Time      `json:"updated_at"`
 }
 
 type UserDeletionRequest struct {

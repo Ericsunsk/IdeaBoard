@@ -98,4 +98,25 @@ describe('createInspirationFeed', () => {
     expect(search.mock.calls[1]?.[0]).toMatchObject({ cursor: 'page-2' })
     expect(feed.results.value.map((item) => item.id)).toEqual(['first', 'second'])
   })
+
+  it('does not read Library state for anonymous Search', async () => {
+    const lookupSavedKeys = vi.fn(async () => new Set<string>())
+    const feed = createInspirationFeed(
+      {
+        submittedQuery: ref('cafe'),
+        keepResultsOnNextLoad: ref(false),
+        cacheScope: 'anonymous',
+        isAuthenticated: () => false,
+      },
+      dependencies({
+        lookupSavedKeys,
+        search: vi.fn(async () => ({ results: [result('public')], next_cursor: '', has_more: false })),
+      }),
+    )
+
+    await feed.load(true)
+
+    expect(lookupSavedKeys).not.toHaveBeenCalled()
+    expect(feed.results.value).toEqual([result('public')])
+  })
 })

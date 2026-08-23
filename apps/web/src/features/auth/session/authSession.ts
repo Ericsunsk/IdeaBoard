@@ -27,7 +27,7 @@ export type UserSessionStore = {
   completeOAuthCallback: (input: {
     providerError?: unknown
     redirectPath?: unknown
-    replace: (target: string | { path: string; query: Record<string, never> }) => Promise<unknown>
+    replace: (target: string | { path: string; query: Record<string, string> }) => Promise<unknown>
   }) => Promise<boolean>
   stopImpersonating: () => Promise<void>
   updatePassword: (oldPassword: string, newPassword: string) => Promise<boolean>

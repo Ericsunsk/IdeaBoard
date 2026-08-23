@@ -79,4 +79,15 @@ describe('authTransport OAuth providers', () => {
       expect.objectContaining({ provider: 'discord' }),
     )
   })
+
+  it('accepts an explicit safe return path for an in-place auth overlay', async () => {
+    window.history.replaceState({}, '', '/user/search')
+
+    await authTransport.signInWithOAuth('google', '/user/search?q=architectural%20lighting')
+
+    const request = mocks.signInSocial.mock.calls[0]?.[0] as { callbackURL: string }
+    expect(new URL(request.callbackURL).searchParams.get('redirect')).toBe(
+      '/user/search?q=architectural%20lighting',
+    )
+  })
 })

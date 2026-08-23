@@ -82,7 +82,8 @@ func newAppRouter(
 	router := gin.New()
 	router.Use(gin.Recovery())
 	registerHTTPRoutes(router, httpapi.Dependencies{
-		Auth: authDeps,
+		Auth:                authDeps,
+		PublicSearchHandler: searchcatalog.NewSearchHandler(searchcatalog.NewSearchService(searchProviderConfig, searchMetrics)),
 		UserRoutes: httpapi.UserRouteDeps{
 			AuthHandler:            auth.NewAuthHandler(services.userService),
 			TaskHandler:            taskHandler,
@@ -101,7 +102,6 @@ func newAppRouter(
 				Reader:     services.storageService,
 				ReadAccess: uploadReadAccess,
 			},
-			SearchHandler:        searchcatalog.NewSearchHandler(searchcatalog.NewSearchService(searchProviderConfig, searchMetrics)),
 			VisionHandler:        visionHandler,
 			SearchMetricsHandler: searchcatalog.NewMetricsHandler(searchMetrics),
 			LibraryHandler:       libraryHandler,
@@ -133,6 +133,7 @@ func newAppRouter(
 			SearchCatalogHandler:        searchcatalog.NewHandler(searchProviderConfig),
 		},
 		PaymentWebhook: paymentWebhookHandler,
+		Internal:       httpapi.InternalRouteDeps{UserHandler: users.NewInternalHandler(repos.userRepo, cfg.Auth.InternalAPIKey)},
 		StaticUploads: httpapi.StaticUploadDeps{
 			Auth:         authDeps,
 			BoardService: services.boardService,

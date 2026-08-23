@@ -15,6 +15,7 @@ const testEnvironment: AuthEnvironment = {
     secret: "test-secret",
     baseURL: "http://localhost:5173",
     trustedOrigins: ["http://localhost:5173"],
+    apiInternalURL: "http://127.0.0.1:6000",
   },
   database: {
     host: "127.0.0.1",

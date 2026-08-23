@@ -246,4 +246,17 @@ describe('UserAuthCallbackPage', () => {
     })
     expect(screen.queryByText(/provider-raw-detail/)).not.toBeInTheDocument()
   })
+
+  it('preserves a safe Search redirect when returning to login after OAuth failure', async () => {
+    mocks.route.query = { error: 'access_denied', redirect: '/user/search?q=chairs' }
+    mocks.completeOAuthCallback.mockResolvedValue(false)
+
+    const view = renderCallbackPage()
+    await view.user.click(await screen.findByRole('button', { name: '返回登录' }))
+
+    expect(mocks.routerReplace).toHaveBeenCalledWith({
+      path: '/user/login',
+      query: { redirect: '/user/search?q=chairs' },
+    })
+  })
 })

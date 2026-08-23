@@ -101,7 +101,7 @@ func (q *Queries) GetUsedUIDForUpdate(ctx context.Context, storageUid string) (s
 }
 
 const getUserByAuthUserID = `-- name: GetUserByAuthUserID :one
-SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at
 FROM users
 WHERE auth_user_id = $1
 `
@@ -118,6 +118,8 @@ func (q *Queries) GetUserByAuthUserID(ctx context.Context, authUserID sql.NullSt
 		&i.Avatar,
 		&i.Role,
 		&i.Status,
+		&i.LastLoginIp,
+		&i.LastLoginCountry,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -125,7 +127,7 @@ func (q *Queries) GetUserByAuthUserID(ctx context.Context, authUserID sql.NullSt
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at
 FROM users
 WHERE id = $1
 `
@@ -142,6 +144,8 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
 		&i.Avatar,
 		&i.Role,
 		&i.Status,
+		&i.LastLoginIp,
+		&i.LastLoginCountry,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -149,7 +153,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
 }
 
 const getUserByPublicID = `-- name: GetUserByPublicID :one
-SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at
 FROM users
 WHERE public_id = $1
 `
@@ -166,6 +170,8 @@ func (q *Queries) GetUserByPublicID(ctx context.Context, publicID uuid.UUID) (Us
 		&i.Avatar,
 		&i.Role,
 		&i.Status,
+		&i.LastLoginIp,
+		&i.LastLoginCountry,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -173,7 +179,7 @@ func (q *Queries) GetUserByPublicID(ctx context.Context, publicID uuid.UUID) (Us
 }
 
 const getUserByStorageUID = `-- name: GetUserByStorageUID :one
-SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at
 FROM users
 WHERE storage_uid = $1
 `
@@ -190,6 +196,8 @@ func (q *Queries) GetUserByStorageUID(ctx context.Context, storageUid string) (U
 		&i.Avatar,
 		&i.Role,
 		&i.Status,
+		&i.LastLoginIp,
+		&i.LastLoginCountry,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -217,7 +225,7 @@ func (q *Queries) GetUserIDByStorageUIDForUpdate(ctx context.Context, arg GetUse
 }
 
 const getUsersByIDs = `-- name: GetUsersByIDs :many
-SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at
 FROM users
 WHERE id = ANY($1::BIGINT[])
 ORDER BY id
@@ -241,6 +249,8 @@ func (q *Queries) GetUsersByIDs(ctx context.Context, ids []int64) ([]User, error
 			&i.Avatar,
 			&i.Role,
 			&i.Status,
+			&i.LastLoginIp,
+			&i.LastLoginCountry,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -306,7 +316,7 @@ func (q *Queries) ListUserStorageUIDs(ctx context.Context) ([]ListUserStorageUID
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, created_at, updated_at
+SELECT id, public_id, display_name, auth_user_id, storage_uid, avatar, role, status, last_login_ip, last_login_country, created_at, updated_at
 FROM users
 WHERE (NOT $1::boolean OR display_name ILIKE $2)
   AND (NOT $3::boolean OR role = $4)
@@ -353,6 +363,8 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.Avatar,
 			&i.Role,
 			&i.Status,
+			&i.LastLoginIp,
+			&i.LastLoginCountry,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -466,6 +478,28 @@ type UpdateUserAvatarParams struct {
 
 func (q *Queries) UpdateUserAvatar(ctx context.Context, arg UpdateUserAvatarParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, updateUserAvatar, arg.Avatar, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateUserLastLoginMetadata = `-- name: UpdateUserLastLoginMetadata :execrows
+UPDATE users
+SET last_login_ip = $1,
+    last_login_country = $2,
+    updated_at = now()
+WHERE auth_user_id = $3
+`
+
+type UpdateUserLastLoginMetadataParams struct {
+	LastLoginIp      sql.NullString `json:"last_login_ip"`
+	LastLoginCountry sql.NullString `json:"last_login_country"`
+	AuthUserID       sql.NullString `json:"auth_user_id"`
+}
+
+func (q *Queries) UpdateUserLastLoginMetadata(ctx context.Context, arg UpdateUserLastLoginMetadataParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateUserLastLoginMetadata, arg.LastLoginIp, arg.LastLoginCountry, arg.AuthUserID)
 	if err != nil {
 		return 0, err
 	}

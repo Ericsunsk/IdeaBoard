@@ -5,8 +5,8 @@ const generated = vi.hoisted(() => ({
   search: vi.fn(),
 }))
 
-vi.mock('../../shared/api/generated-query/user/user', () => ({
-  searchUserInspiration: generated.search,
+vi.mock('../../shared/api/generated-query/search/search', () => ({
+  searchInspiration: generated.search,
 }))
 
 describe('searchResource', () => {

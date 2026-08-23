@@ -167,6 +167,35 @@
         </template>
       </Column>
 
+      <Column field="lastLoginIP" header="IP" :style="{ minWidth: '190px' }">
+        <template #body="{ data: user }">
+          <div class="flex min-w-0 items-center gap-2">
+            <span
+              v-if="getCountryFlag(user.lastLoginCountry)"
+              v-tooltip.top="getCountryLabel(user.lastLoginCountry)"
+              class="shrink-0 text-base leading-none"
+              role="img"
+              :aria-label="getCountryLabel(user.lastLoginCountry)"
+            >
+              {{ getCountryFlag(user.lastLoginCountry) }}
+            </span>
+            <Globe
+              v-else
+              v-tooltip.top="getCountryLabel(user.lastLoginCountry)"
+              class="size-4 shrink-0 text-admin-text-3"
+              role="img"
+              :aria-label="getCountryLabel(user.lastLoginCountry)"
+            />
+            <span
+              class="whitespace-nowrap font-mono text-admin-body text-admin-text-2"
+              :title="user.lastLoginIP || undefined"
+            >
+              {{ user.lastLoginIP || '-' }}
+            </span>
+          </div>
+        </template>
+      </Column>
+
       <Column field="role" header="角色" :style="{ width: '124px' }">
         <template #body="{ data: user }">
           <Tag :value="user.roleLabel" :severity="user.roleSeverity" rounded />
@@ -259,7 +288,7 @@
 </template>
 
 <script setup lang="ts">
-import { Discord, Google, Mail, Refresh, Search, Settings } from '@iconoir/vue'
+import { Discord, Globe, Google, Mail, Refresh, Search, Settings } from '@iconoir/vue'
 import { computed, ref } from 'vue'
 import Avatar from 'primevue/avatar'
 import Button from 'primevue/button'
@@ -280,7 +309,12 @@ import OAuthProviderSettingsDialog from './OAuthProviderSettingsDialog.vue'
 import { AdminUserWalletDialog } from '../credits-billing/wallets'
 import { banDurationOptions } from './adminUserCommands'
 import { useAdminUsersContext } from './adminUsersContext'
-import type { AdminUserRowView, UserActionKey } from './adminUserView'
+import {
+  getCountryFlag,
+  getCountryLabel,
+  type AdminUserRowView,
+  type UserActionKey,
+} from './adminUserView'
 import { useAdminUsersFeedback } from './useAdminUsersFeedback'
 import {
   adminFramedIconButtonClass,

@@ -7,6 +7,8 @@ CREATE TABLE users (
   avatar VARCHAR(1024) NOT NULL DEFAULT '',
   role VARCHAR(20) NOT NULL DEFAULT 'user',
   status SMALLINT NOT NULL DEFAULT 1,
+  last_login_ip VARCHAR(45),
+  last_login_country VARCHAR(2),
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
   CONSTRAINT uq_users_public_id UNIQUE (public_id),
@@ -15,6 +17,8 @@ CREATE TABLE users (
   CONSTRAINT chk_users_role CHECK (role IN ('admin', 'user')),
   CONSTRAINT chk_users_display_name CHECK (length(btrim(display_name)) BETWEEN 1 AND 100),
   CONSTRAINT chk_users_status CHECK (status IN (0, 1)),
+  CONSTRAINT chk_users_last_login_ip CHECK (last_login_ip IS NULL OR last_login_ip <> ''),
+  CONSTRAINT chk_users_last_login_country CHECK (last_login_country IS NULL OR last_login_country ~ '^[A-Z]{2}$'),
   CONSTRAINT chk_users_storage_uid CHECK (storage_uid ~ '^[A-Z0-9]{6}$')
 );
 

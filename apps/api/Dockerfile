@@ -54,7 +54,6 @@ FROM cgr.dev/chainguard/static:latest-glibc AS migrator
 
 WORKDIR /app
 
-COPY --from=builder --chown=65532:65532 /out/ideaboard-server /app/ideaboard-server
 COPY --from=builder --chown=65532:65532 /out/ideaboard-migrator /app/ideaboard-migrator
 COPY --from=builder --chown=65532:65532 /out/atlas /app/atlas
 COPY --from=builder --chown=65532:65532 /out/migrations /app/migrations

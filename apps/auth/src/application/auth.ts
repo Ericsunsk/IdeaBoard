@@ -25,6 +25,8 @@ import {
 import {
   type SocialProviderSettingsService,
 } from "../social-identity/socialProviderSettings.js";
+import type { LoginMetadataReporter } from "../trusted-identity/loginMetadataReporter.js";
+import { createLoginMetadataReporter } from "../trusted-identity/loginMetadataReporter.js";
 
 const EMAIL_OTP_EXPIRES_IN_SECONDS = 600;
 const EMAIL_OTP_EXPIRES_IN_MINUTES = EMAIL_OTP_EXPIRES_IN_SECONDS / 60;
@@ -49,6 +51,7 @@ export type AuthComponents = {
   authAdmissionPolicy: AuthAdmissionPolicy;
   runtimeAuthRegistry: ReturnType<ReturnType<typeof createSocialProviderRuntimeCoordinator>["configure"]>;
   socialProviderSettingsService: SocialProviderSettingsService;
+  loginMetadataReporter: LoginMetadataReporter;
 };
 
 export function createAuthPool(config: AuthEnvironment["database"]): Pool {
@@ -87,11 +90,13 @@ export function createAuthComponents(
     getSocialProviderReadiness: async (provider) =>
       isSupportedSocialProvider(provider) && socialProviderRuntime.isReady(provider),
   });
+  const loginMetadataReporter = createLoginMetadataReporter(environment);
   const authBaseOptions = createBetterAuthOptions({
     environment,
     database,
     mailConfigService,
     authAdmissionPolicy,
+    loginMetadataReporter,
   });
   const runtimeAuthRegistry = socialProviderRuntime.configure(authBaseOptions);
   const socialProviderSettingsService = createRuntimeSocialProviderSettingsService(
@@ -106,6 +111,7 @@ export function createAuthComponents(
     authAdmissionPolicy,
     runtimeAuthRegistry,
     socialProviderSettingsService,
+    loginMetadataReporter,
   };
 }
 
@@ -133,8 +139,15 @@ export function createBetterAuthOptions(input: {
   database: BetterAuthOptions["database"];
   mailConfigService: Pick<MailConfigService, "send">;
   authAdmissionPolicy: AuthAdmissionPolicy;
+  loginMetadataReporter?: LoginMetadataReporter;
 }): BetterAuthOptions {
-  const { environment, database, mailConfigService, authAdmissionPolicy } = input;
+  const {
+    environment,
+    database,
+    mailConfigService,
+    authAdmissionPolicy,
+    loginMetadataReporter,
+  } = input;
   return {
     database,
     basePath: "/api/auth",
@@ -194,6 +207,25 @@ export function createBetterAuthOptions(input: {
           before: createRegistrationUserCreationGuard(authAdmissionPolicy),
         },
       },
+      session: {
+        create: {
+          after: async (session, context) => {
+            if (!loginMetadataReporter || !session?.userId) return;
+            const ip = normalizeClientIP(session.ipAddress);
+            if (!ip) return;
+            const country = normalizeCountry(
+              context?.request instanceof Request
+                ? context.request.headers.get("cf-ipcountry")
+                : undefined,
+            );
+            void loginMetadataReporter.report({
+              authUserId: session.userId,
+              ip,
+              country,
+            });
+          },
+        },
+      },
     },
     hooks: {
       before: createAuthMiddleware(async (ctx) => {
@@ -209,4 +241,15 @@ export function createBetterAuthOptions(input: {
       }),
     },
   } satisfies BetterAuthOptions;
+}
+
+function normalizeClientIP(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.split(",", 1)[0]?.trim().slice(0, 255) ?? "";
+}
+
+function normalizeCountry(value: string | null | undefined): string | null {
+  const normalized = value?.trim().toUpperCase() ?? "";
+  if (!/^[A-Z]{2}$/.test(normalized) || normalized === "XX") return null;
+  return normalized;
 }
