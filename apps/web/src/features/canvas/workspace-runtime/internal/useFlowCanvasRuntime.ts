@@ -29,6 +29,8 @@ import {
   type PendingImageExecutionCore,
   type PendingImageExecutionLease,
 } from '../../execution/pending-execution'
+import { isCanvasGraphNodeId } from '../../graph-runtime'
+import { parseFlowNodeId } from '../../utils/flowSnapshotAdapter'
 
 export type UseFlowCanvasRuntimeOptions = {
   nodes: Ref<Node[]>
@@ -305,6 +307,9 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     if (nodeDragLifecycle.handleChanges(changes)) return
     if (deleteLifecycle.handleNodeChanges(changes)) return
     graphAdapter.applyNodeChanges(changes)
+    if (changes.some((change) => change.type === 'select')) {
+      reconcileRendererSelection([...renderNodes.value, ...renderEdgesRef.value])
+    }
   }
 
   function onEdgesChange(changes: EdgeChange[]) {
@@ -312,6 +317,34 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     groupRuntime?.internal.onBeforeEdgesChange(changes)
     if (deleteLifecycle.handleEdgeChanges(changes)) return
     graphAdapter.applyEdgeChanges(changes)
+    if (changes.some((change) => change.type === 'select')) {
+      reconcileRendererSelection([...renderNodes.value, ...renderEdgesRef.value])
+    }
+  }
+
+  function reconcileRendererSelection(elements: Array<Node | Edge>) {
+    const store = readCanvasGraphStore()
+    const selectedNodeIds = new Set(
+      elements
+        .filter((element): element is Node => !('source' in element && 'target' in element))
+        .map((element) => parseFlowNodeId(element.id))
+        .filter((ref): ref is NonNullable<typeof ref> => !!ref)
+        .map((ref) => `${ref.nodeType}-${ref.id}`)
+        .filter((id): id is `image-${number}` | `prompt-${number}` | `fusion-${number}` => isCanvasGraphNodeId(id)),
+    )
+    const selectedEdgeIds = new Set(
+      elements
+        .filter((element): element is Edge => 'source' in element && 'target' in element)
+        .map((element) => element.id)
+        .filter((id): id is `connection-${number}` => /^connection-\d+$/.test(id)),
+    )
+    const transaction = store.beginTransaction('node-update', {
+      recordHistory: false,
+      markDirty: false,
+    })
+    store.getNodeIds().forEach((nodeId) => transaction.selectNode(nodeId, selectedNodeIds.has(nodeId)))
+    store.getEdgeIds().forEach((edgeId) => transaction.selectEdge(edgeId, selectedEdgeIds.has(edgeId)))
+    transaction.commit()
   }
 
   return {
@@ -327,6 +360,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       renderEdges,
       onNodesChange,
       onEdgesChange,
+      reconcileRendererSelection,
       nodeDragTransactions: {
         begin: nodeDragLifecycle.begin,
         commit: nodeDragLifecycle.commit,

@@ -90,6 +90,7 @@ export type CanvasWorkspaceRuntimeCommands = {
   flowPane: {
     onNodesChange: (changes: NodeChange[]) => void
     onEdgesChange: (changes: EdgeChange[]) => void
+    reconcileRendererSelection: (elements: Array<Node | Edge>) => void
     connectionAdapter: CanvasVueFlowConnectionAdapter
     nodeDragTransactions: {
       begin: () => void

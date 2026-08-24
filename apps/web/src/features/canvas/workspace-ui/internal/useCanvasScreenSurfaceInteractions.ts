@@ -78,6 +78,7 @@ export function useCanvasScreenSurfaceInteractions(options: {
     activeTool: options.activeTool,
     dismissTransientCanvasUi,
     onEdgesChange: commands.flowPane.onEdgesChange,
+    onSelectionChanged: commands.flowPane.reconcileRendererSelection,
   })
 
   const isCanvasGroupInteractionEnabled = computed(

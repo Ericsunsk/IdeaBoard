@@ -44,6 +44,7 @@ export function createCanvasWorkspaceRuntimeFacade(
       flowPane: {
         onNodesChange: board.flowPane.onNodesChange,
         onEdgesChange: board.flowPane.onEdgesChange,
+        reconcileRendererSelection: board.flowPane.reconcileRendererSelection,
         connectionAdapter: graph.flowPane.connectionAdapter,
         nodeDragTransactions: board.flowPane.nodeDragTransactions,
       },

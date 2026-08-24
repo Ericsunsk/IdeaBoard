@@ -7,6 +7,7 @@ type UseVueFlowSelectionAdapterOptions = {
   activeTool: Ref<string>
   dismissTransientCanvasUi: DismissTransientCanvasUi
   onEdgesChange: (changes: EdgeChange[]) => void
+  onSelectionChanged?: (elements: Elements) => void
 }
 
 type FlowElement = Elements[number]
@@ -53,6 +54,7 @@ export function useVueFlowSelectionAdapter(options: UseVueFlowSelectionAdapterOp
 
   function onPaneClick() {
     clearSelection()
+    options.onSelectionChanged?.([])
     options.dismissTransientCanvasUi({
       closeExpand: true,
       closeBoardHeader: true,
@@ -63,6 +65,7 @@ export function useVueFlowSelectionAdapter(options: UseVueFlowSelectionAdapterOp
   function onFlowNodeClick() {
     if (options.activeTool.value === 'hand') return
     options.dismissTransientCanvasUi({ closeExpand: true })
+    options.onSelectionChanged?.(readSelectedElements())
   }
 
   function onFlowNodeMouseDown(...args: [string, MouseEvent]) {
@@ -94,6 +97,7 @@ export function useVueFlowSelectionAdapter(options: UseVueFlowSelectionAdapterOp
   function onSelectionEnd(event: MouseEvent) {
     const selectedElements = readSelectedElements()
     selectionController.endMarquee(event, selectedElements)
+    options.onSelectionChanged?.(readSelectedElements())
 
     nodesSelectionActive.value = readSelectedNodeIds().size > 1
   }
