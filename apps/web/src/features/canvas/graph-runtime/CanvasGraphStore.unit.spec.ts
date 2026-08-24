@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createEmptyCanvasBoardSnapshot,
   type CanvasBoardSnapshot,
   type CanvasConnection,
   type CanvasGroup,
+  type CanvasNodeItem,
   type ImageNodeItem,
   type PromptNodeItem,
 } from '../../canvas-board/domain'
@@ -504,6 +505,116 @@ describe('CanvasGraphStore', () => {
     expect(summary.shouldMarkDirty).toBe(false)
     expect(store.exportSnapshot(snapshot)).toEqual(snapshot)
     expect(() => transaction.commit()).toThrow('already cancelled')
+  })
+
+  it('keeps staged topology and group-index writes isolated until commit', () => {
+    const snapshot = createSampleSnapshot()
+    const groupId = toCanvasGraphGroupId(1)
+    const imageId = toCanvasGraphNodeId('image', 1)
+    const promptId = toCanvasGraphNodeId('prompt', 1)
+    const secondPromptId = toCanvasGraphNodeId('prompt', 2)
+    snapshot.groups = [createGroup(groupId, [imageId, promptId])]
+    const store = CanvasGraphStore.fromSnapshot(snapshot)
+    const transaction = store.beginTransaction('group-membership')
+
+    transaction
+      .moveNodeToGroup(secondPromptId, groupId)
+      .addEdge(createConnection(2, 1, 2))
+      .removeEdge(toCanvasGraphEdgeId(1))
+      .cancel()
+
+    expect(store.getIncomingEdgeIds(promptId)).toEqual([toCanvasGraphEdgeId(1)])
+    expect(store.getIncomingEdgeIds(secondPromptId)).toEqual([])
+    expect(store.getGroup(groupId)?.nodeIds).toEqual([imageId, promptId])
+    expect(store.getGroupIdForNode(secondPromptId)).toBeUndefined()
+    expect(store.exportSnapshot(snapshot)).toEqual(snapshot)
+  })
+
+  it('rejects an overlapping transaction after another transaction commits', () => {
+    const store = CanvasGraphStore.fromSnapshot(createSampleSnapshot())
+    const promptId = toCanvasGraphNodeId('prompt', 1)
+    const first = store.beginTransaction('node-update')
+    const stale = store.beginTransaction('node-update')
+
+    stale.updateNode(promptId, { x: 900 })
+    first.updateNode(promptId, { x: 500 }).commit()
+
+    expect(() => stale.commit()).toThrow('transaction is stale')
+    expect(store.getNode(promptId)?.snapshot.x).toBe(500)
+  })
+
+  it('rejects stale mutations before they can read a newer committed record', () => {
+    const store = CanvasGraphStore.fromSnapshot(createSampleSnapshot())
+    const promptId = toCanvasGraphNodeId('prompt', 1)
+    const first = store.beginTransaction('node-update')
+    const stale = store.beginTransaction('node-update')
+    const staleUpdate = vi.fn((node: CanvasNodeItem) => ({ ...node, x: node.x + 1 }))
+
+    first.updateNode(promptId, { x: 500 }).commit()
+
+    expect(() => stale.updateNode(promptId, staleUpdate)).toThrow('transaction is stale')
+    expect(staleUpdate).not.toHaveBeenCalled()
+    expect(stale.cancel().didChange).toBe(false)
+  })
+
+  it('normalizes add-then-remove journals to a no-op commit', () => {
+    const snapshot = createSampleSnapshot()
+    const store = CanvasGraphStore.fromSnapshot(snapshot)
+    const transaction = store.beginTransaction('batch-delete')
+    const transientNode = createPromptNode(99, 1200, 80)
+    const transientNodeId = toCanvasGraphNodeId('prompt', transientNode.id)
+    const transientEdge = createConnection(99, 1, 2)
+    const transientEdgeId = toCanvasGraphEdgeId(transientEdge.id)
+    const transientGroupId = toCanvasGraphGroupId(99)
+
+    transaction.addNode(transientNode).removeNode(transientNodeId)
+    transaction.addEdge(transientEdge).removeEdge(transientEdgeId)
+    transaction.createGroup(
+      [toCanvasGraphNodeId('image', 1), toCanvasGraphNodeId('prompt', 1)],
+      GROUP_GEOMETRY,
+      transientGroupId,
+    )
+    transaction.ungroup(transientGroupId)
+    const summary = transaction.commit()
+
+    expect(summary).toMatchObject({
+      didChange: false,
+      hasDomainChanges: false,
+      didChangeOrder: false,
+      shouldRecordHistory: false,
+      shouldMarkDirty: false,
+    })
+    expect(summary.projectionPatch).toEqual({
+      nodes: { added: [], updated: [], removedIds: [], selectionChanged: [] },
+      edges: { added: [], removedIds: [], selectionChanged: [] },
+      groups: { added: [], updated: [], removedIds: [] },
+    })
+    expect(store.exportSnapshot(snapshot)).toEqual(snapshot)
+  })
+
+  it('normalizes restored records and selection to a no-op commit', () => {
+    const snapshot = createSampleSnapshot()
+    const groupId = toCanvasGraphGroupId(1)
+    snapshot.groups = [
+      createGroup(groupId, [toCanvasGraphNodeId('image', 1), toCanvasGraphNodeId('prompt', 1)]),
+    ]
+    const store = CanvasGraphStore.fromSnapshot(snapshot)
+    const promptId = toCanvasGraphNodeId('prompt', 1)
+    const edgeId = toCanvasGraphEdgeId(1)
+    const transaction = store.beginTransaction('node-update')
+
+    transaction.updateNode(promptId, { x: 500 }).updateNode(promptId, { x: 420 })
+    transaction.selectNode(promptId, true).selectNode(promptId, false)
+    transaction.selectEdge(edgeId, true).selectEdge(edgeId, false)
+    transaction
+      .updateGroupGeometry(groupId, { ...GROUP_GEOMETRY, x: 100 })
+      .updateGroupGeometry(groupId, GROUP_GEOMETRY)
+    const summary = transaction.commit()
+
+    expect(summary.didChange).toBe(false)
+    expect(summary.shouldRecordHistory).toBe(false)
+    expect(summary.shouldMarkDirty).toBe(false)
+    expect(store.exportSnapshot(snapshot)).toEqual(snapshot)
   })
 
   it('tracks node and edge selection without marking history or dirty', () => {
