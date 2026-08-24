@@ -253,7 +253,7 @@ describe('useFlowNodeMutations', () => {
         },
       },
     })
-    expect(graphActions.addNodes).toHaveBeenCalledOnce()
+    expect(graphActions.setNodes).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ id: 'prompt-42' })]))
     expect(graphCommand).not.toHaveBeenCalled()
   })
 
@@ -308,8 +308,8 @@ describe('useFlowNodeMutations', () => {
       sourceHandle: 'out:image',
       targetHandle: 'in:image',
     })
-    expect(graphActions.addEdges).toHaveBeenCalledWith(
-      expect.objectContaining({ source: 'image-1' }),
+    expect(graphActions.setEdges).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ source: 'image-1' })]),
     )
     expect(getOutputStatus(nodes.value, 'fusion-1')).toBe('stale')
     expect(graphCommand).not.toHaveBeenCalled()
@@ -349,8 +349,8 @@ describe('useFlowNodeMutations', () => {
         },
       },
     })
-    expect(graphActions.addEdges).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'connection-1' }),
+    expect(graphActions.setEdges).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ id: 'connection-1' })]),
     )
   })
 
@@ -379,7 +379,9 @@ describe('useFlowNodeMutations', () => {
       sourceHandle: 'out:prompt',
       targetHandle: 'in:prompt',
     })
-    expect(graphActions.setEdges).not.toHaveBeenCalled()
+    expect(graphActions.setEdges).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ id: 'connection-2' })]),
+    )
   })
 
   it('rejects multi-input connections over the target limit', () => {

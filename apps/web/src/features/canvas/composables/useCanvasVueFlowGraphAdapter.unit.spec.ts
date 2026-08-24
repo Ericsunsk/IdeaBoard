@@ -22,7 +22,20 @@ describe('useCanvasVueFlowGraphAdapter', () => {
     const edges = shallowRef<Edge[]>([])
     const beforeCommand = vi.fn()
     const afterCommand = vi.fn()
-    const updateNode = vi.fn()
+    const runtimeNode = {
+      ...changedNode,
+      computedPosition: { x: 0, y: 0, z: 0 },
+      handleBounds: { source: [], target: [] },
+      dragging: false,
+      initialized: true,
+    }
+    const updateNode = vi.fn((id, update) => {
+      if (id !== runtimeNode.id) return
+      Object.assign(
+        runtimeNode,
+        typeof update === 'function' ? update(runtimeNode) : update,
+      )
+    })
     const adapter = useCanvasVueFlowGraphAdapter({
       nodes,
       edges,
@@ -39,7 +52,13 @@ describe('useCanvasVueFlowGraphAdapter', () => {
 
     expect(nodes.value).toEqual([projectedNode, unchangedNode])
     expect(nodes.value[1]).toBe(unchangedNode)
-    expect(updateNode).toHaveBeenCalledWith('node-1', projectedNode, { replace: true })
+    expect(updateNode).toHaveBeenCalledWith('node-1', expect.any(Function), { replace: false })
+    expect(runtimeNode).toMatchObject({
+      computedPosition: { x: 0, y: 0, z: 0 },
+      handleBounds: { source: [], target: [] },
+      initialized: true,
+      position: { x: 40, y: 0 },
+    })
     expect(beforeCommand).not.toHaveBeenCalled()
     expect(afterCommand).not.toHaveBeenCalled()
   })

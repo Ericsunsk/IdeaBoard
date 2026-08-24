@@ -104,6 +104,51 @@ describe('projectCanvasGraphCommit', () => {
     expect(result.changedNodeIds).toEqual(['image-1'])
   })
 
+  it('clears renderer selection only when the canonical selection changes', () => {
+    const currentNode = {
+      ...flowNode('image-1', 'old'),
+      selected: true,
+      computedPosition: { x: 100, y: 40, z: 0 },
+      handleBounds: { source: [], target: [] },
+    } as Node
+    const result = projectCanvasGraphCommit({
+      current: { nodes: [currentNode], edges: [] },
+      patch: patch({
+        nodes: {
+          records: [
+            {
+              id: 'image-1',
+              before: { ...imageRecord(1, 'old'), selected: true },
+              after: { ...imageRecord(1, 'new'), selected: false },
+            },
+          ],
+          order: [],
+        },
+      }),
+    })
+
+    expect(result.graph.nodes[0]).toMatchObject({
+      selected: false,
+      computedPosition: { x: 100, y: 40, z: 0 },
+      handleBounds: { source: [], target: [] },
+    })
+  })
+
+  it('keeps the renderer selection across a domain-only node update', () => {
+    const currentNode = { ...flowNode('image-1', 'old'), selected: true } as Node
+    const result = projectCanvasGraphCommit({
+      current: { nodes: [currentNode], edges: [] },
+      patch: patch({
+        nodes: {
+          records: [{ id: 'image-1', before: imageRecord(1, 'old'), after: imageRecord(1, 'new') }],
+          order: [],
+        },
+      }),
+    })
+
+    expect(result.graph.nodes[0]).toMatchObject({ selected: true })
+  })
+
   it('keeps execution animation out of canonical edge projection', () => {
     const currentEdge = {
       id: 'connection-1',

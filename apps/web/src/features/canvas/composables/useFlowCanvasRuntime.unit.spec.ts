@@ -734,8 +734,7 @@ describe('useFlowCanvasRuntime', () => {
     )
     const save = harness.runtime.persistence.flushAutosave({ silent: true })
     await vi.waitFor(() => expect(harness.boardSession.save).toHaveBeenCalled())
-    vi.mocked(harness.graphActions.addEdges).mockClear()
-    vi.mocked(harness.graphActions.removeEdges).mockClear()
+    vi.mocked(harness.graphActions.setEdges).mockClear()
     expect(
       harness.executionRuntime.transitionNode(lease, {
         status: 'succeeded',
@@ -743,13 +742,8 @@ describe('useFlowCanvasRuntime', () => {
       }),
     ).toBe(true)
     expect(harness.renderEdges.value[0]?.animated).toBe(false)
-    expect(harness.graphActions.addEdges).toHaveBeenCalled()
-    const lastPresentedEdgeInput = vi.mocked(harness.graphActions.addEdges).mock.lastCall?.[0]
-    const lastPresentedEdges = Array.isArray(lastPresentedEdgeInput)
-      ? lastPresentedEdgeInput
-      : lastPresentedEdgeInput
-        ? [lastPresentedEdgeInput]
-        : []
+    expect(harness.graphActions.setEdges).toHaveBeenCalled()
+    const lastPresentedEdges = vi.mocked(harness.graphActions.setEdges).mock.lastCall?.[0] ?? []
     expect(lastPresentedEdges.find((edge: Edge) => edge.id === 'connection-4')?.animated).toBe(false)
     resolveSave()
     await save
@@ -877,7 +871,7 @@ describe('useFlowCanvasRuntime', () => {
 
     harness.runtime.persistence.history.undo()
 
-    expect(harness.graphActions.addNodes).toHaveBeenCalled()
+    expect(harness.graphActions.setNodes).toHaveBeenCalled()
     expect(harness.fullNodes.value.map((node) => node.id)).not.toContain('prompt-99')
     expect(exportCurrentBoardSnapshot(harness).promptNodes.map((node) => node.id)).not.toContain(99)
 
@@ -945,8 +939,8 @@ describe('useFlowCanvasRuntime', () => {
         },
       },
     })
-    expect(harness.graphActions.addEdges).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'connection-4' }),
+    expect(harness.graphActions.setEdges).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ id: 'connection-4' })]),
     )
     expect(harness.isDirty.value).toBe(true)
     expect(harness.saveStatus.value).toBe('pending')
@@ -2729,8 +2723,8 @@ describe('useFlowCanvasRuntime', () => {
     ])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.graphActions.removeNodes).toHaveBeenCalledOnce()
-    expect(harness.graphActions.removeEdges).toHaveBeenCalledOnce()
+    expect(harness.graphActions.setNodes).toHaveBeenCalled()
+    expect(harness.graphActions.setEdges).toHaveBeenCalled()
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toHaveLength(0)
 
@@ -2822,7 +2816,7 @@ describe('useFlowCanvasRuntime', () => {
     ])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.graphActions.removeEdges).toHaveBeenCalledOnce()
+    expect(harness.graphActions.setEdges).toHaveBeenCalledWith([])
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual([
       'image-1',
       'prompt-1',
@@ -3021,8 +3015,8 @@ describe('useFlowCanvasRuntime', () => {
     ])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.graphActions.removeNodes).toHaveBeenCalledOnce()
-    expect(harness.graphActions.removeEdges).toHaveBeenCalledOnce()
+    expect(harness.graphActions.setNodes).toHaveBeenCalled()
+    expect(harness.graphActions.setEdges).toHaveBeenCalled()
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1'])
     expect(harness.fullEdges.value).toHaveLength(0)
 

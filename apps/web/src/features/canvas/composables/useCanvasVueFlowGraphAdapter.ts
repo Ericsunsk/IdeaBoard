@@ -115,6 +115,26 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
     return measureCanvasPerf('vue-flow.projection', { nodes, edges }, task)
   }
 
+  /**
+   * Vue Flow nodes contain renderer-owned state (`computedPosition`, handle
+   * bounds, drag state, and measurement flags). The canonical Canvas node is
+   * only a partial projection of that object, so replacing the runtime node
+   * would corrupt Vue Flow's drag/connection state. `updateNode` merges this
+   * projection into the existing runtime node and lets Vue Flow's position
+   * watcher recompute derived coordinates.
+   */
+  function updateRendererNodeProjection(node: Node) {
+    const selected = (node as Node & { selected?: boolean }).selected ?? false
+    options.actions?.updateNode?.(
+      node.id,
+      () => ({
+        ...node,
+        selected,
+      }),
+      { replace: false },
+    )
+  }
+
   const commandRunner = createGraphCommandRunner({
     beforeCommand: options.beforeCommand,
     afterCommand: options.afterCommand,
@@ -165,56 +185,60 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
     const changedNodeIds = projection.changedNodeIds ?? []
     const changedEdgeIds = projection.changedEdgeIds ?? []
     projectGraph(changedNodeIds.length, changedEdgeIds.length, () => {
-      // Remove dependent edges before removing their nodes. Vue Flow renders
-      // controlled edge updates synchronously and briefly sees invalid
-      // source/target references if the order is reversed.
-      if (nextEdges && projection.edgeMutations) {
-        const edgesToRemove = [
-          ...projection.edgeMutations.removedIds,
-          ...projection.edgeMutations.updated.map((edge) => edge.id),
-        ]
-        if (edgesToRemove.length > 0) options.actions?.removeEdges?.(edgesToRemove)
+      const nodeMutations = nextNodes && nextNodes !== options.nodes.value
+        ? projection.nodeMutations ?? {
+            added: [],
+            updated: changedNodeIds
+              .map((id) => nextNodes.find((node) => node.id === id))
+              .filter((node): node is Node => !!node),
+            removedIds: [],
+          }
+        : undefined
+      const hasAddedNodes = (nodeMutations?.added.length ?? 0) > 0
+      const edgeMutations = nextEdges
+        ? projection.edgeMutations ?? {
+            added: [],
+            updated: changedEdgeIds
+              .map((id) => nextEdges.find((edge) => edge.id === id))
+              .filter((edge): edge is Edge => !!edge),
+            removedIds: [],
+          }
+        : undefined
+      const hasEdgeChanges =
+        !!edgeMutations &&
+        (edgeMutations.added.length > 0 ||
+          edgeMutations.updated.length > 0 ||
+          edgeMutations.removedIds.length > 0 ||
+          nextEdges !== options.edges.value)
+      let edgesApplied = false
+
+      // A renderer projection must not emit edgesChange. Apply an edge update
+      // before node removal so edges never reference a missing runtime node.
+      // If new nodes are being added, defer the set until those nodes exist.
+      if (nextEdges && hasEdgeChanges && !hasAddedNodes) {
+        options.actions?.setEdges?.(projectEdgesForActions(nextEdges))
+        edgesApplied = true
       }
       if (nextNodes && nextNodes !== options.nodes.value) {
-        const nodeMutations = projection.nodeMutations ?? {
-          added: [],
-          updated: changedNodeIds
-            .map((id) => nextNodes.find((node) => node.id === id))
-            .filter((node): node is Node => !!node),
-          removedIds: [],
+        const resolvedNodeMutations = nodeMutations!
+        const { added: addedNodes, updated: updatedNodes, removedIds: removedNodeIds } = resolvedNodeMutations
+        const hasStructuralNodeMutation = addedNodes.length > 0 || removedNodeIds.length > 0
+        if (hasStructuralNodeMutation) {
+          // addNodes/removeNodes emit nodesChange and would re-enter the
+          // canonical graph command path. setNodes parses the full structural
+          // projection without emitting a second command and reuses existing
+          // runtime nodes by id.
+          options.actions?.setNodes?.(nextNodes)
+        } else {
+          updatedNodes.forEach(updateRendererNodeProjection)
         }
-        const { added: addedNodes, updated: updatedNodes, removedIds: removedNodeIds } = nodeMutations
-        if (removedNodeIds.length > 0) options.actions?.removeNodes?.([...removedNodeIds], false)
-        if (addedNodes.length > 0) {
-          options.actions?.addNodes?.(addedNodes.length === 1 ? addedNodes[0] : [...addedNodes])
-        }
-        updatedNodes.forEach((node) => {
-          options.actions?.updateNode?.(node.id, node, { replace: true })
-        })
         recordCanvasInteractionCount('incrementalNodeProjectionCount', changedNodeIds.length)
         syncNodes(nextNodes)
       }
       if (nextEdges && nextEdges !== options.edges.value) {
-        const edgeMutations = projection.edgeMutations ?? {
-          added: [],
-          updated: changedEdgeIds
-            .map((id) => nextEdges.find((edge) => edge.id === id))
-            .filter((edge): edge is Edge => !!edge),
-          removedIds: [],
-        }
-        const { added: addedEdges, updated: updatedEdges } = edgeMutations
-        // Edge removals and replacements were applied before node mutations.
-        if (updatedEdges.length > 0) {
-          const projectedUpdatedEdges = projectEdgesForActions([...updatedEdges])
-          options.actions?.addEdges?.(
-            projectedUpdatedEdges.length === 1 ? projectedUpdatedEdges[0] : projectedUpdatedEdges,
-          )
-        }
-        if (addedEdges.length > 0) {
-          const projectedEdges = projectEdgesForActions([...addedEdges])
-          options.actions?.addEdges?.(
-            projectedEdges.length === 1 ? projectedEdges[0] : projectedEdges,
-          )
+        if (!edgesApplied && hasEdgeChanges) {
+          // New nodes must be present before Vue Flow validates their edges.
+          options.actions?.setEdges?.(projectEdgesForActions(nextEdges))
         }
         recordCanvasInteractionCount('incrementalEdgeProjectionCount', changedEdgeIds.length)
         syncEdges(nextEdges)

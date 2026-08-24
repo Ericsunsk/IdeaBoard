@@ -100,7 +100,11 @@ function applyOrderPatches<T extends { id: string }>(
   return nextItems
 }
 
-function mergeProjectedNode(current: Node | undefined, record: CanvasGraphNodeRecord): Node {
+function mergeProjectedNode(
+  current: Node | undefined,
+  record: CanvasGraphNodeRecord,
+  selectionChanged = false,
+): Node {
   const projected = canvasNodeToFlowNode(record.kind, record.snapshot, record.selected)
   if (!current) return projected as Node
   const currentTransient = current as Node & {
@@ -127,7 +131,8 @@ function mergeProjectedNode(current: Node | undefined, record: CanvasGraphNodeRe
     current.position.y === projected.position.y &&
     currentTransient.dimensions?.width === projectedTransient.dimensions?.width &&
     currentTransient.dimensions?.height === projectedTransient.dimensions?.height &&
-    (currentTransient.selected ?? false) === (projectedTransient.selected ?? false)
+    (!selectionChanged ||
+      (currentTransient.selected ?? false) === (projectedTransient.selected ?? false))
   ) {
     // Native Vue Flow drag already applied the visual position. Reusing the
     // existing node/array avoids a second controlled-model rewrite at commit.
@@ -142,10 +147,17 @@ function mergeProjectedNode(current: Node | undefined, record: CanvasGraphNodeRe
     data: projected.data,
     position: projected.position,
     dimensions: projected.dimensions,
+    selected: selectionChanged
+      ? (projectedTransient.selected ?? false)
+      : (currentTransient.selected ?? false),
   } as Node
 }
 
-function mergeProjectedEdge(current: Edge | undefined, record: CanvasGraphEdgeRecord): Edge {
+function mergeProjectedEdge(
+  current: Edge | undefined,
+  record: CanvasGraphEdgeRecord,
+  selectionChanged = false,
+): Edge {
   const projected = canvasConnectionToFlowEdge(record.connection) as Edge
   if (!current) return (record.selected ? { ...projected, selected: true } : projected) as Edge
 
@@ -156,8 +168,8 @@ function mergeProjectedEdge(current: Edge | undefined, record: CanvasGraphEdgeRe
     ...semanticCurrent,
     ...projected,
     data: projected.data,
-    ...(record.selected ? { selected: true } : { selected: false }),
-  } as Edge
+    selected: selectionChanged ? record.selected : ((current as Edge & { selected?: boolean }).selected ?? false),
+  } as unknown as Edge
 }
 
 function projectCollection<Record extends { id: string }, FlowItem extends { id: string }>(input: {
@@ -253,15 +265,27 @@ export function projectCanvasGraphCommit(input: {
     }),
     () => {
       recordCanvasInteractionCount('incrementalGraphProjectionCount')
+      const selectionChangedNodeIds = new Set(
+        input.patch.nodes.records
+          .filter(({ before, after }) => before && after && before.selected !== after.selected)
+          .map(({ id }) => id),
+      )
+      const selectionChangedEdgeIds = new Set(
+        input.patch.edges.records
+          .filter(({ before, after }) => before && after && before.selected !== after.selected)
+          .map(({ id }) => id),
+      )
       const nodes = projectCollection({
         current: input.current.nodes,
         patch: input.patch.nodes,
-        project: (current, record) => input.projectNode?.(mergeProjectedNode(current, record)) ?? mergeProjectedNode(current, record),
+        project: (current, record) =>
+          input.projectNode?.(mergeProjectedNode(current, record, selectionChangedNodeIds.has(record.id))) ??
+          mergeProjectedNode(current, record, selectionChangedNodeIds.has(record.id)),
       })
       const edges = projectCollection({
         current: input.current.edges,
         patch: input.patch.edges,
-        project: mergeProjectedEdge,
+        project: (current, record) => mergeProjectedEdge(current, record, selectionChangedEdgeIds.has(record.id)),
       })
       const directlyChangedNodeIds = new Set(nodes.changedIds)
       const invalidatedNodeIds = new Set(directlyChangedNodeIds)
