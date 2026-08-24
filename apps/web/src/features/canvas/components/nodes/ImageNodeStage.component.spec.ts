@@ -1,8 +1,15 @@
-import { describe, expect, it } from 'vitest'
+import { computed, toValue } from 'vue'
+import { describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/vue'
 import type { ImageToolStageBinding } from '../../image-tools'
 import ImageNodeStage from './ImageNodeStage.vue'
 import { render } from '../../../../test/render'
+
+vi.mock('../../composables/useDisplayImagePreview', () => ({
+  useDisplayImagePreview: (sourceUrl: Parameters<typeof toValue>[0]) => ({
+    displayUrl: computed(() => toValue(sourceUrl) ?? ''),
+  }),
+}))
 
 function renderImageStage(toolActive: boolean) {
   return render(ImageNodeStage, {
@@ -53,6 +60,26 @@ describe('ImageNodeStage disabled state', () => {
 })
 
 describe('ImageNodeStage Library import recovery', () => {
+  it('keeps an optimistic preview visible while the Library import materializes', () => {
+    const view = render(ImageNodeStage, {
+      props: {
+        nodeId: 'image-1',
+        stageWidth: 280,
+        stageHeight: 280,
+        displayImage: { url: 'https://provider.example/preview.png' },
+        libraryImport: { state: 'pending', libraryAssetId: 7 },
+        active: false,
+        dragging: false,
+      },
+      global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
+    })
+
+    expect(view.getByRole('button', { name: /图片节点预览/ })).toHaveAttribute(
+      'src',
+      'https://provider.example/preview.png',
+    )
+  })
+
   it('offers Retry only for a failed persisted Library import', async () => {
     const view = render(ImageNodeStage, {
       props: {
@@ -71,8 +98,30 @@ describe('ImageNodeStage Library import recovery', () => {
       global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
     })
 
-    await fireEvent.click(view.getByLabelText('重试添加到画布'))
-    expect(view.emitted('retry-library-import')).toEqual([[]])
+    await fireEvent.click(view.getByLabelText('重试导入图片'))
+    expect(view.emitted('retry-image-import')).toEqual([[]])
+  })
+
+  it('offers the same compact Retry action for a failed local upload', async () => {
+    const view = render(ImageNodeStage, {
+      props: {
+        nodeId: 'image-1',
+        stageWidth: 280,
+        stageHeight: 280,
+        displayImage: { url: 'blob:local-image' },
+        localUpload: { previewUrl: 'blob:local-image', failureMessage: '上传失败' },
+        active: false,
+        dragging: false,
+      },
+      global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
+    })
+
+    expect(view.getByRole('button', { name: /图片节点预览/ })).toHaveAttribute(
+      'src',
+      'blob:local-image',
+    )
+    await fireEvent.click(view.getByLabelText('重试导入图片'))
+    expect(view.emitted('retry-image-import')).toEqual([[]])
   })
 })
 

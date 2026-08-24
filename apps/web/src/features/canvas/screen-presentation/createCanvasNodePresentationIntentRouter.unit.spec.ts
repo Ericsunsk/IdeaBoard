@@ -12,7 +12,7 @@ function createCommandSurface() {
       updateParameters: vi.fn(),
       generate: vi.fn(),
     },
-    node: { delete: vi.fn(), retryLibraryImport: vi.fn() },
+    node: { delete: vi.fn(), retryImageImport: vi.fn() },
     mediaInput: {
       drop: vi.fn(),
       open: vi.fn(),
@@ -77,8 +77,8 @@ describe('Canvas Node presentation intent routing seam', () => {
         args: [nodeId],
       },
       {
-        intent: { type: 'library-import-retry-requested', nodeId },
-        command: commands.node.retryLibraryImport,
+        intent: { type: 'image-import-retry-requested', nodeId },
+        command: commands.node.retryImageImport,
         args: [nodeId],
       },
       {

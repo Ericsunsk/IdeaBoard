@@ -214,6 +214,26 @@ describe('flowSnapshotAdapter', () => {
     expect(snapshot.connections.length).toBe(0)
   })
 
+  it('keeps an optimistic local upload outside the persisted Board snapshot', () => {
+    const localNode = makeImageFlowNode({
+      flowId: 'image-1',
+      id: 1,
+      outputStatus: 'idle',
+      sourceImageUrl: '',
+    })
+    ;(localNode.data as FlowNodeData).localUpload = { previewUrl: 'blob:local-image' }
+
+    const persisted = flowToCanvasBoardSnapshot({ nodes: [localNode], edges: [] })
+    const runtime = flowToCanvasBoardSnapshot(
+      { nodes: [localNode], edges: [] },
+      undefined,
+      { projection: 'runtime' },
+    )
+
+    expect(persisted.imageNodes).toEqual([])
+    expect(runtime.imageNodes.map((node) => node.id)).toEqual([1])
+  })
+
   it('can include local-only empty running image nodes for runtime materialization', () => {
     const nodes: FlowAdapterNode[] = [
       makeImageFlowNode({

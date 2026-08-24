@@ -24,6 +24,7 @@ interface PreviewOptions {
   maxSide?: MaybeRefOrGetter<number | null | undefined>
   mediaAssetId?: MaybeRefOrGetter<number | null | undefined>
   isVisible?: MaybeRefOrGetter<boolean>
+  keepPreviousOnSourceChange?: boolean
 }
 
 const DEFAULT_MAX_SIDE = 1280
@@ -157,6 +158,22 @@ async function getOrCreatePreviewUrl(sourceUrl: string, maxSide: number): Promis
   return task
 }
 
+function supportsImageDecode() {
+  return typeof Image !== 'undefined' && typeof Image.prototype.decode === 'function'
+}
+
+async function canDisplayImage(url: string): Promise<boolean> {
+  if (!supportsImageDecode()) return true
+  const image = new Image()
+  image.src = url
+  try {
+    await image.decode()
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function useDisplayImagePreview(
   sourceUrl: MaybeRefOrGetter<string | null | undefined>,
   options: PreviewOptions = {},
@@ -186,8 +203,11 @@ export function useDisplayImagePreview(
   })
   const previewUrl = ref<string | null>(null)
   const isResolved = ref(false)
+  const displayedUrl = ref('')
+  const displayedSource = ref('')
   let requestToken = 0
   let activeSource = ''
+  let displayRequestToken = 0
 
   watch(
     [
@@ -203,8 +223,7 @@ export function useDisplayImagePreview(
       activeSource = currentSource
       isResolved.value = false
 
-      if (!currentSource) return
-      if (mediaAssetId !== null && !visible) return
+      if (!currentSource || !visible) return
       if (maxSide === null) {
         previewUrl.value = null
         return
@@ -232,25 +251,65 @@ export function useDisplayImagePreview(
   if (getCurrentScope()) {
     onScopeDispose(() => {
       requestToken += 1
+      displayRequestToken += 1
     })
   }
 
-  const displayUrl = computed(() => {
+  const candidateUrl = computed(() => {
     if (resolvedMediaAssetId.value !== null) {
-      if (!isVisible.value) return ''
-      if (mediaDelivery.url.value) return mediaDelivery.url.value
-      return ''
+      return mediaDelivery.url.value
     }
     if (previewUrl.value) return previewUrl.value
     if (
       isManagedUpload.value &&
       resolvedMaxSide.value !== null &&
-      (resolvedMediaAssetId.value !== null || !isResolved.value)
+      !isResolved.value
     ) {
       return ''
     }
     return resolvedSourceUrl.value
   })
+
+  watch(
+    [resolvedSourceUrl, candidateUrl],
+    ([currentSource, nextUrl]) => {
+      displayRequestToken += 1
+      const token = displayRequestToken
+
+      if (!currentSource) {
+        displayedSource.value = ''
+        displayedUrl.value = ''
+        return
+      }
+
+      if (currentSource !== displayedSource.value) {
+        displayedSource.value = currentSource
+        if (!options.keepPreviousOnSourceChange) displayedUrl.value = ''
+      }
+      if (!nextUrl || nextUrl === displayedUrl.value) return
+
+      // A new external/blob source is already the optimistic preview. Commit it immediately;
+      // derived previews and delivery URLs wait for decode so a zoom never flashes a placeholder.
+      if (nextUrl === currentSource && !isManagedUpload.value && !displayedUrl.value) {
+        displayedUrl.value = nextUrl
+        return
+      }
+
+      void canDisplayImage(nextUrl).then((isDisplayable) => {
+        if (
+          !isDisplayable ||
+          token !== displayRequestToken ||
+          currentSource !== displayedSource.value
+        ) {
+          return
+        }
+        displayedUrl.value = nextUrl
+      })
+    },
+    { immediate: true, flush: 'sync' },
+  )
+
+  const displayUrl = computed(() => displayedUrl.value)
 
   return {
     displayUrl,

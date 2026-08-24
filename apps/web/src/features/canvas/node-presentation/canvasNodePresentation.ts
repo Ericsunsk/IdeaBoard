@@ -7,7 +7,7 @@ export type CanvasNodePresentationIntent =
   | { type: 'text-edited'; nodeId: string; text: string }
   | { type: 'parameter-changed'; nodeId: string; patch: FlowSnapshotParamPatch }
   | { type: 'delete-requested'; nodeId: string }
-  | { type: 'library-import-retry-requested'; nodeId: string }
+  | { type: 'image-import-retry-requested'; nodeId: string }
   | { type: 'media-input-dropped'; nodeId: string; event: DragEvent }
   | { type: 'media-input-open-requested'; nodeId: string }
   | {

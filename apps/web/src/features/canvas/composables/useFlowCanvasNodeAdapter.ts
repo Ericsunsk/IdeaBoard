@@ -60,15 +60,21 @@ export function useFlowCanvasNodeAdapter({
     if (!imageSnapshot.value) return null
     const pendingPreview = data().libraryImportPreviewUrl?.trim()
     if (imageSnapshot.value.libraryImport && pendingPreview) return { url: pendingPreview }
+    const localUploadPreview = data().localUpload?.previewUrl.trim()
+    if (localUploadPreview) return { url: localUploadPreview }
     const payload = resolveImageNodeDisplayPayload(imageSnapshot.value)
     return payload ? { url: payload.url, mediaAssetId: payload.mediaAssetId } : null
   })
   const libraryImport = computed(() => imageSnapshot.value?.libraryImport)
+  const localUpload = computed(() => data().localUpload)
 
   const imageGenerating = computed(() => imageDirectGenerating())
   const nodeRunning = computed(() => imageGenerating.value || !!uiState()?.isRunning)
   const imageInputLocked = computed(
-    () => !!libraryImport.value || (imageGenerating.value && !displayImage.value),
+    () =>
+      !!libraryImport.value ||
+      !!localUpload.value ||
+      (imageGenerating.value && !displayImage.value),
   )
   const imageEmptyIconVariant = computed<'image' | 'fusion'>(() => {
     const imageUiState = uiState() as NodeUiState<'image'> | undefined
@@ -90,6 +96,7 @@ export function useFlowCanvasNodeAdapter({
     imageGenerating,
     imageInputLocked,
     libraryImport,
+    localUpload,
     imageSnapshot,
     isFusionNode,
     isImageNode,

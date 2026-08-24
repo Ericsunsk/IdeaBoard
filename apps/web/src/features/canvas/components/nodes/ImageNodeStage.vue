@@ -13,9 +13,9 @@
     :active="active && !expandModeActive"
     :connection-drop-target="connectionDropTarget"
     :loading="!!directGenerating && !displayImage"
-    :running="!!directGenerating || libraryImport?.state === 'pending'"
+    :running="!!directGenerating || imageImportPending"
     :transparent="!!expandModeActive || isImageToolActive"
-    :aria-busy="!!directGenerating || libraryImport?.state === 'pending'"
+    :aria-busy="!!directGenerating || imageImportPending"
     aria-label="图片节点输入与预览区域"
     @dragover.stop="onStageDragOver"
     @drop.stop="onStageDrop"
@@ -29,7 +29,7 @@
         <img
           :src="stageDisplayUrl || undefined"
           class="image-node-stage-image image-tool-stage-media"
-          :class="{ 'is-dragging': dragging, 'is-preview-loading': !stageDisplayUrl }"
+          :class="{ 'is-dragging': dragging }"
           alt="图片节点预览"
           draggable="false"
           role="button"
@@ -44,7 +44,6 @@
         v-else-if="stageDisplayUrl"
         :src="stageDisplayUrl || undefined"
         class="image-node-stage-image"
-        :class="{ 'is-preview-loading': !stageDisplayUrl }"
         alt="图片节点预览"
         draggable="false"
         role="button"
@@ -54,10 +53,7 @@
         @keydown.enter.prevent="emit('open-preview')"
         @keydown.space.prevent="emit('append-to-canvas')"
       />
-      <div v-else class="image-node-stage-placeholder" role="status" aria-label="图片预览正在准备">
-        <ComposingOrb />
-        <span>图片处理中...</span>
-      </div>
+      <div v-else class="image-node-stage-placeholder" role="status" aria-label="图片预览正在准备" />
       <ImageCanvasExtendOverlay
         v-if="stageDisplayUrl && expandModeActive && expandOverlayStyle"
         :overlay-style="expandOverlayStyle"
@@ -68,7 +64,7 @@
         @handle-pointerup="emit('expand-handle-pointerup', $event)"
         @frame-pointerdown="emit('expand-frame-pointerdown', $event)"
       />
-      <div v-if="!libraryImport" class="image-node-stage-actions">
+      <div v-if="!libraryImport && !localUpload" class="image-node-stage-actions">
         <NodeActionButton
           variant="stage-ghost"
           aria-label="打开图片预览"
@@ -86,24 +82,28 @@
       </div>
     </template>
     <div
-      v-if="libraryImport"
-      class="image-node-stage-library-import"
-      :class="`is-${libraryImport.state}`"
+      v-if="imageImportFailureMessage"
+      class="image-node-stage-import-failure"
       role="status"
+      :title="imageImportFailureMessage"
     >
-      <ComposingOrb v-if="libraryImport.state === 'pending'" />
-      <span>{{ libraryImport.state === 'pending' ? 'Adding to Canvas…' : libraryImport.failureMessage }}</span>
+      <span>Failed</span>
       <NodeActionButton
-        v-if="libraryImport.state === 'failed'"
         variant="stage-ghost"
-        aria-label="重试添加到画布"
-        @click.stop="emit('retry-library-import')"
+        aria-label="重试导入图片"
+        @click.stop="emit('retry-image-import')"
       >
         Retry
       </NodeActionButton>
     </div>
+    <div
+      v-else-if="imageImportPending && !displayImage"
+      class="image-node-stage-pending"
+      aria-busy="true"
+      aria-label="图片预览正在准备"
+    />
     <button
-      v-if="!displayImage && !emptyStateDisabled"
+      v-else-if="!displayImage && !emptyStateDisabled"
       type="button"
       class="image-node-stage-empty"
       :aria-label="emptyStageAriaLabel"
@@ -133,6 +133,7 @@ import { useCanvasViewportContext } from '../../composables/useCanvasViewportCon
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import type { ImageToolStageBinding } from '../../image-tools'
 import type { LibraryImportFact } from '../../../canvas-board/domain'
+import type { FlowLocalUploadState } from '../../types/flowTypes'
 import { useCanvasImagePreviewQuality } from '../../composables/useCanvasImagePreviewQuality'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 import ImageToolStagePresentation from '../../image-tools/components/ImageToolStagePresentation.vue'
@@ -149,6 +150,7 @@ const props = defineProps<{
   stageHeight: number
   displayImage: { url: string; mediaAssetId?: number } | null
   libraryImport?: LibraryImportFact
+  localUpload?: FlowLocalUploadState
   inputLocked?: boolean
   emptyIconVariant?: 'image' | 'fusion'
   directGenerating?: boolean
@@ -167,7 +169,7 @@ const emit = defineEmits<{
   (e: 'open-preview'): void
   (e: 'append-to-canvas'): void
   (e: 'reset'): void
-  (e: 'retry-library-import'): void
+  (e: 'retry-image-import'): void
   (e: 'contextmenu', event: MouseEvent): void
   (e: 'expand-submit', prompt: string): void
   (
@@ -185,6 +187,15 @@ const stageElement = computed(() => stageFrameRef.value?.stageElement ?? null)
 const isStageVisible = useElementVisibility(stageElement)
 
 const sourceDisplayUrl = computed(() => props.displayImage?.url ?? null)
+const imageImportFailureMessage = computed(() => {
+  if (props.libraryImport?.state === 'failed') return props.libraryImport.failureMessage
+  return props.localUpload?.failureMessage?.trim() ?? ''
+})
+const imageImportPending = computed(
+  () =>
+    props.libraryImport?.state === 'pending' ||
+    (!!props.localUpload && !imageImportFailureMessage.value),
+)
 const isImageToolActive = computed(() => !!props.imageToolStageBinding?.active)
 const forceFullPreviewQuality = computed(() => !!props.expandModeActive || isImageToolActive.value)
 const canvasViewport = useCanvasViewportContext()
@@ -198,6 +209,7 @@ const { displayUrl: stageDisplayUrl } = useDisplayImagePreview(sourceDisplayUrl,
   maxSide: previewMaxSide,
   mediaAssetId: () => props.displayImage?.mediaAssetId,
   isVisible: isStageVisible,
+  keepPreviousOnSourceChange: true,
 })
 const emptyStateLabel = computed(() =>
   props.inputLocked ? 'Waiting...' : '上传或拖拽图片作为输入',
@@ -251,38 +263,35 @@ function submitExpand(prompt: string) {
 }
 
 .image-node-stage-placeholder {
-  display: flex;
   width: 100%;
   height: 100%;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: var(--color-canvas-muted, #8b8b8b);
-  background: var(--color-canvas-surface, #f5f5f5);
-  font-size: 12px;
+  background: var(--canvas-node-bg);
 }
 
-.image-node-stage-library-import {
+.image-node-stage-import-failure {
   position: absolute;
-  inset: 0;
+  right: 8px;
+  bottom: 8px;
   z-index: 3;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px;
-  background: color-mix(in srgb, var(--canvas-node-bg) 72%, transparent);
-  color: var(--canvas-text-strong);
+  max-width: calc(100% - 16px);
+  padding: 4px 6px 4px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--canvas-node-bg) 82%, var(--color-board-danger) 18%);
+  color: var(--color-board-danger);
   font-size: 12px;
   font-weight: 600;
   text-align: center;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
-.image-node-stage-library-import.is-failed {
-  background: color-mix(in srgb, var(--canvas-node-bg) 82%, var(--color-board-danger) 18%);
-  color: var(--color-board-danger);
-  pointer-events: auto;
+.image-node-stage-pending {
+  position: absolute;
+  inset: 0;
+  background: var(--canvas-node-bg);
 }
 
 .image-node-stage-image:focus-visible {
@@ -292,10 +301,6 @@ function submitExpand(prompt: string) {
 
 .image-node-stage-image.is-dragging {
   cursor: grabbing;
-}
-
-.image-node-stage-image.is-preview-loading {
-  visibility: hidden;
 }
 
 .image-node-stage.is-running .image-node-stage-image,

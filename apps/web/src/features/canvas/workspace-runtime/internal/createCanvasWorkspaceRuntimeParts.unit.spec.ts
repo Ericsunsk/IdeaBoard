@@ -135,8 +135,8 @@ function createGraphRuntime() {
     createNodeInteractions: vi.fn(),
     libraryImport: {
       add: vi.fn(),
-      retry: vi.fn(() => false),
     },
+    imageImport: { retry: vi.fn(async () => false) },
     resumePendingLibraryImports: vi.fn(() => 0),
   }
 }
@@ -161,6 +161,7 @@ function createGraphEditingRuntime(graph: ReturnType<typeof createGraphRuntime>)
         dragOver: vi.fn(),
       },
       libraryImport: graph.libraryImport,
+      imageImport: graph.imageImport,
     },
     recoveryPort: {
       resumePendingLibraryImports: graph.resumePendingLibraryImports,

@@ -340,7 +340,8 @@ function createRuntime() {
           onNodeDragStop: vi.fn(() => mocks.dragEvents.push('viewport:stop')),
         },
         graphEditing: {
-          libraryImport: { add: vi.fn(), retry: vi.fn(() => false) },
+          libraryImport: { add: vi.fn() },
+          imageImport: { retry: vi.fn(async () => false) },
           grouping: {
             selectGroupAtPoint: vi.fn(),
             handlePaneClick,

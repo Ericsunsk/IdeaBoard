@@ -38,6 +38,7 @@ async function waitForPreviewWork() {
 describe('useDisplayImagePreview', () => {
   beforeEach(() => {
     vi.resetModules()
+    vi.stubGlobal('Image', class {})
     const createElement = document.createElement.bind(document)
     vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
       if (tagName === 'canvas') return createCanvasMock() as unknown as HTMLCanvasElement
@@ -193,6 +194,119 @@ describe('useDisplayImagePreview', () => {
     scope.stop()
   })
 
+  it('keeps the current media derivative visible while a zoom tier refreshes', async () => {
+    const sourceUrl = ref('/uploads/canvas/U123/board/content/image.png')
+    const maxSide = ref(256)
+    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview(sourceUrl, { maxSide, mediaAssetId: 42 }),
+    )
+    if (!preview) throw new Error('preview composable was not created')
+
+    await vi.waitFor(() => expect(preview.displayUrl.value).toBe('/api/thumb.webp'))
+
+    maxSide.value = 640
+    await nextTick()
+    expect(preview.displayUrl.value).toBe('/api/thumb.webp')
+
+    await vi.waitFor(() => expect(preview.displayUrl.value).toBe('/api/preview.webp'))
+    scope.stop()
+  })
+
+  it('keeps the previous stage frame until a replacement source decodes', async () => {
+    const decodeResolvers: Array<() => void> = []
+    class DeferredImage {
+      src = ''
+
+      decode() {
+        return new Promise<void>((resolve) => decodeResolvers.push(resolve))
+      }
+    }
+    vi.stubGlobal('Image', DeferredImage)
+
+    const sourceUrl = ref('/uploads/canvas/U123/board/content/first.png')
+    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview(sourceUrl, { maxSide: null, keepPreviousOnSourceChange: true }),
+    )
+    if (!preview) throw new Error('preview composable was not created')
+
+    await vi.waitFor(() => expect(decodeResolvers).toHaveLength(1))
+    decodeResolvers.shift()?.()
+    await vi.waitFor(() => expect(preview.displayUrl.value).toContain('first.png'))
+
+    sourceUrl.value = '/uploads/canvas/U123/board/content/second.png'
+    await nextTick()
+    expect(preview.displayUrl.value).toContain('first.png')
+
+    await vi.waitFor(() => expect(decodeResolvers).toHaveLength(1))
+    decodeResolvers.shift()?.()
+    await vi.waitFor(() => expect(preview.displayUrl.value).toContain('second.png'))
+    scope.stop()
+  })
+
+  it('keeps the decoded frame when the stage leaves the viewport', async () => {
+    const sourceUrl = ref('/uploads/canvas/U123/board/content/image.png')
+    const isVisible = ref(true)
+    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const scope = effectScope()
+    const preview = scope.run(() =>
+      useDisplayImagePreview(sourceUrl, { maxSide: 640, mediaAssetId: 42, isVisible }),
+    )
+    if (!preview) throw new Error('preview composable was not created')
+
+    await vi.waitFor(() => expect(preview.displayUrl.value).toBe('/api/preview.webp'))
+    isVisible.value = false
+    await nextTick()
+    expect(preview.displayUrl.value).toBe('/api/preview.webp')
+    scope.stop()
+  })
+
+  it('clears the previous image on a source change and ignores stale decode races', async () => {
+    const decodeResolvers: Array<() => void> = []
+    class DeferredImage {
+      src = ''
+
+      decode() {
+        return new Promise<void>((resolve) => decodeResolvers.push(resolve))
+      }
+    }
+    vi.stubGlobal('Image', DeferredImage)
+
+    const sourceUrl = ref('/uploads/canvas/U123/board/content/first.png')
+    const { useDisplayImagePreview } = await import('./useDisplayImagePreview')
+    const scope = effectScope()
+    const preview = scope.run(() => useDisplayImagePreview(sourceUrl, { maxSide: null }))
+    if (!preview) throw new Error('preview composable was not created')
+
+    await vi.waitFor(() => expect(decodeResolvers).toHaveLength(1))
+    decodeResolvers.shift()?.()
+    await vi.waitFor(() => {
+      expect(preview.displayUrl.value).toContain('/uploads/canvas/U123/board/content/first.png')
+    })
+
+    sourceUrl.value = '/uploads/canvas/U123/board/content/second.png'
+    await nextTick()
+    expect(preview.displayUrl.value).toBe('')
+    await vi.waitFor(() => expect(decodeResolvers).toHaveLength(1))
+    const resolveSecond = decodeResolvers.shift()
+
+    sourceUrl.value = '/uploads/canvas/U123/board/content/third.png'
+    await nextTick()
+    await vi.waitFor(() => expect(decodeResolvers).toHaveLength(1))
+    resolveSecond?.()
+    await flushPreviewTasks()
+    expect(preview.displayUrl.value).toBe('')
+
+    decodeResolvers.shift()?.()
+    await vi.waitFor(() => {
+      expect(preview.displayUrl.value).toContain('/uploads/canvas/U123/board/content/third.png')
+    })
+    scope.stop()
+  })
+
   it('falls back to the original managed upload when browser preview fails', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({ ok: false } as Response)
     const sourceUrl = ref('/uploads/canvas/U123/board/content/fallback.png')
@@ -221,9 +335,11 @@ describe('useDisplayImagePreview', () => {
     )
     if (!preview) throw new Error('preview composable was not created')
 
-    expect(preview.displayUrl.value).toBe(
-      'https://assets.example.com/uploads/canvas/U123/board/content/image.png',
-    )
+    await vi.waitFor(() => {
+      expect(preview.displayUrl.value).toBe(
+        'https://assets.example.com/uploads/canvas/U123/board/content/image.png',
+      )
+    })
     scope.stop()
   })
 
@@ -241,9 +357,11 @@ describe('useDisplayImagePreview', () => {
     )
     if (!preview) throw new Error('preview composable was not created')
 
-    expect(preview.displayUrl.value).toBe(
-      'https://api.example.com/uploads/canvas/U123/board/content/local.png',
-    )
+    await vi.waitFor(() => {
+      expect(preview.displayUrl.value).toBe(
+        'https://api.example.com/uploads/canvas/U123/board/content/local.png',
+      )
+    })
     scope.stop()
   })
 })

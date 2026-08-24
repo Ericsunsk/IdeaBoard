@@ -190,9 +190,11 @@ export function canvasBoardSnapshotToFlow(snapshot: CanvasBoardSnapshot): {
 
 function hasRenderableImageSource(
   node: CanvasNodeItem,
+  data: FlowNodeData,
   options: FlowToCanvasBoardSnapshotOptions,
 ): boolean {
   if (node.type !== 'image-node') return true
+  if (data.localUpload && (options.projection ?? 'persistable') !== 'runtime') return false
   const imageNode = node as ImageNodeItem
   if (imageNode.libraryImport) return true
   const sourceUrl = imageNode.sourceImageUrl.trim()
@@ -242,7 +244,7 @@ export function flowToCanvasBoardSnapshot(
     const data = (node.data ?? {}) as FlowNodeData
     const snapshotNode = data.snapshotNode as CanvasNodeItem | undefined
     if (!snapshotNode || typeof snapshotNode !== 'object') return
-    if (!hasRenderableImageSource(snapshotNode, options)) return
+    if (!hasRenderableImageSource(snapshotNode, data, options)) return
 
     const positionedNode = clone(snapshotNode) as CanvasNodeItem
     positionedNode.x = node.position.x

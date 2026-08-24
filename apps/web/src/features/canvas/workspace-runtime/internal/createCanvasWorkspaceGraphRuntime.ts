@@ -79,6 +79,7 @@ export function createCanvasWorkspaceGraphRuntime(
       grouping: board.graphEditing.grouping.commands,
       createNodeAtPosition: editing.commands.createNodeAtPosition,
       libraryImport: editing.commands.libraryImport,
+      imageImport: editing.commands.imageImport,
       createNodeInteractions: editing.commands.createNodeInteractions,
       onExportSelectedImages: interactions.commands.exportSelectedImages,
       onFlowMediaInputImageDrop: editing.commands.mediaInputs.drop,

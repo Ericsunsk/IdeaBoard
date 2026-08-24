@@ -53,7 +53,9 @@ export function createCanvasScreenNodePresentation(options: {
     },
     node: {
       delete: options.nodeInteractions.onFlowDeleteNode,
-      retryLibraryImport: commands.graphEditing.libraryImport.retry,
+      retryImageImport: (nodeId) => {
+        void commands.graphEditing.imageImport.retry(nodeId)
+      },
     },
     mediaInput: {
       drop: commands.graphEditing.onFlowMediaInputImageDrop,

@@ -12,6 +12,7 @@ import { canonicalizeRuntimeUploadRef } from '../../../shared/config/runtimeUrls
 import { resolveImageNodeFrameSize } from '../../canvas-board/domain'
 import { readCurrentBoardIdRef } from '../utils/currentBoardId'
 import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
+import type { FlowLocalUploadState } from '../types/flowTypes'
 
 type FlowImageUploadResult = { url: string; ratio: number; mediaAssetId: number }
 
@@ -40,12 +41,23 @@ type UseFlowImageUploadActionsOptions = {
   onWarning: (msg: string) => void
   onSuccess: (msg: string) => void
   onNodeMutated?: (nodeId: string) => void
+  setLocalUploadState: (nodeId: string, state: FlowLocalUploadState | null) => void
+  createObjectUrl?: (file: File) => string
+  revokeObjectUrl?: (url: string) => void
+}
+
+type LocalUpload = {
+  boardId: string
+  file: File
+  previewUrl: string
 }
 
 export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOptions) {
   const inFlightUploads = new Map<string, Promise<FlowImageUploadResult>>()
   const nodeUploadRequests = new Map<string, number>()
+  const localUploads = new Map<string, LocalUpload>()
   let uploadRequestSequence = 0
+  let disposed = false
 
   function buildInFlightUploadKey(boardId: string, file: File): string {
     return `${boardId}::${file.name}::${file.size}::${file.lastModified}`
@@ -67,6 +79,66 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
 
   function resolveImageFileTitle(file: File): string {
     return file.name.trim()
+  }
+
+  async function resolveLocalPreviewRatio(file: File): Promise<number> {
+    if (typeof createImageBitmap !== 'function') return 1
+    try {
+      const bitmap = await createImageBitmap(file)
+      try {
+        return bitmap.width > 0 && bitmap.height > 0 ? bitmap.height / bitmap.width : 1
+      } finally {
+        bitmap.close()
+      }
+    } catch {
+      return 1
+    }
+  }
+
+  function createObjectUrl(file: File): string {
+    if (options.createObjectUrl) return options.createObjectUrl(file)
+    if (typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') return ''
+    return URL.createObjectURL(file)
+  }
+
+  function revokeObjectUrl(url: string) {
+    if (!url) return
+    if (options.revokeObjectUrl) {
+      options.revokeObjectUrl(url)
+      return
+    }
+    if (typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+      URL.revokeObjectURL(url)
+    }
+  }
+
+  function updateLocalUploadState(nodeId: string, state: FlowLocalUploadState | null) {
+    options.setLocalUploadState(nodeId, state)
+  }
+
+  function releaseLocalUpload(nodeId: string) {
+    const localUpload = localUploads.get(nodeId)
+    if (!localUpload) return
+    localUploads.delete(nodeId)
+    nodeUploadRequests.delete(nodeId)
+    updateLocalUploadState(nodeId, null)
+    revokeObjectUrl(localUpload.previewUrl)
+  }
+
+  function retainFailedLocalUpload(nodeId: string, message: string) {
+    const localUpload = localUploads.get(nodeId)
+    if (!localUpload) return
+    updateLocalUploadState(nodeId, {
+      previewUrl: localUpload.previewUrl,
+      failureMessage: message,
+    })
+  }
+
+  function beginLocalUpload(nodeId: string, localUpload: LocalUpload): number {
+    releaseLocalUpload(nodeId)
+    localUploads.set(nodeId, localUpload)
+    updateLocalUploadState(nodeId, { previewUrl: localUpload.previewUrl })
+    return startNodeUploadRequest(nodeId)
   }
 
   async function uploadImageToBoardForBoard(
@@ -166,26 +238,6 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
     }
   }
 
-  function createImageNodeFromPayload(
-    point: { x: number; y: number },
-    payload: FlowImageUploadResult,
-    title?: string,
-  ): CanvasGraphNodeIdForKind<'image'> | null {
-    const frameSize = resolveImageNodeFrameSize(payload.ratio, true)
-    const nodeId = options.createNodeAtPosition('image', point.x, point.y, {
-      ...(title ? { title } : {}),
-      width: frameSize.width,
-      sourceImageUrl: payload.url,
-      sourceMediaAssetId: payload.mediaAssetId,
-      sourceImageRatio: payload.ratio,
-      outputStatus: 'ready',
-      outputImages: [],
-    })
-    if (!nodeId) return null
-    options.onNodeMutated?.(nodeId)
-    return nodeId
-  }
-
   async function createImageNodeFromFile(
     point: { x: number; y: number },
     file: File,
@@ -195,14 +247,103 @@ export function useFlowImageUploadActions(options: UseFlowImageUploadActionsOpti
       return null
     }
     const boardId = readCurrentBoardIdRef(options.currentBoardId)
-    const uploaded = await uploadImageToBoardForBoard(file, boardId)
-    if (!isBoardStillCurrent(boardId)) return null
-    return createImageNodeFromPayload(point, uploaded, resolveImageFileTitle(file))
+    const previewRatio = await resolveLocalPreviewRatio(file)
+    if (disposed || !isBoardStillCurrent(boardId)) return null
+    const previewUrl = createObjectUrl(file)
+    const frameSize = resolveImageNodeFrameSize(previewRatio, true)
+    const nodeId = options.createNodeAtPosition('image', point.x, point.y, {
+      title: resolveImageFileTitle(file),
+      width: frameSize.width,
+      sourceImageRatio: previewRatio,
+      outputStatus: 'idle',
+      outputImages: [],
+    })
+    if (!nodeId) {
+      revokeObjectUrl(previewUrl)
+      return null
+    }
+
+    const requestId = beginLocalUpload(nodeId, { boardId, file, previewUrl })
+    const completed = await materializeLocalUpload(nodeId, requestId)
+    return completed || localUploads.has(nodeId) ? nodeId : null
+  }
+
+  async function materializeLocalUpload(nodeId: string, requestId: number): Promise<boolean> {
+    const localUpload = localUploads.get(nodeId)
+    if (!localUpload) return false
+    try {
+      const uploaded = await uploadImageToBoardForBoard(localUpload.file, localUpload.boardId)
+      if (
+        !isBoardStillCurrent(localUpload.boardId) ||
+        !isNodeUploadRequestCurrent(nodeId, requestId) ||
+        !options.getImageNodeSnapshot(nodeId)
+      ) {
+        releaseLocalUpload(nodeId)
+        return false
+      }
+      options.updateSnapshotNode(nodeId, (prev) => {
+        if (prev.type !== 'image-node') return prev
+        return {
+          ...prev,
+          title: resolveImageFileTitle(localUpload.file) || prev.title,
+          width: resolveImageNodeFrameSize(uploaded.ratio, true).width,
+          sourceImageUrl: uploaded.url,
+          sourceMediaAssetId: uploaded.mediaAssetId,
+          sourceImageRatio: uploaded.ratio,
+          outputStatus: 'ready',
+          outputImages: [],
+        }
+      })
+      options.onNodeMutated?.(nodeId)
+      releaseLocalUpload(nodeId)
+      options.onSuccess('Image 节点已添加')
+      return true
+    } catch (error) {
+      if (!isNodeUploadRequestCurrent(nodeId, requestId)) return false
+      const message = error instanceof Error ? error.message : '上传失败'
+      retainFailedLocalUpload(nodeId, message)
+      options.onWarning(message)
+      return false
+    } finally {
+      if (isNodeUploadRequestCurrent(nodeId, requestId)) {
+        nodeUploadRequests.delete(nodeId)
+      }
+    }
+  }
+
+  async function retryLocalUpload(nodeId: string): Promise<boolean> {
+    const localUpload = localUploads.get(nodeId)
+    if (!localUpload || !options.getImageNodeSnapshot(nodeId)) {
+      releaseLocalUpload(nodeId)
+      return false
+    }
+    const requestId = startNodeUploadRequest(nodeId)
+    updateLocalUploadState(nodeId, { previewUrl: localUpload.previewUrl })
+    return materializeLocalUpload(nodeId, requestId)
+  }
+
+  function releaseDetachedLocalUploads(
+    liveNodeIds: ReadonlySet<string>,
+    currentBoardId: string | null | undefined = readCurrentBoardIdRef(options.currentBoardId),
+  ) {
+    for (const [nodeId, localUpload] of localUploads) {
+      if (!liveNodeIds.has(nodeId) || localUpload.boardId !== currentBoardId) {
+        releaseLocalUpload(nodeId)
+      }
+    }
+  }
+
+  function disposeLocalUploads() {
+    disposed = true
+    for (const nodeId of Array.from(localUploads.keys())) releaseLocalUpload(nodeId)
   }
 
   return {
     uploadImageToBoard,
     applyImageFileToImageNode,
     createImageNodeFromFile,
+    retryLocalUpload,
+    releaseDetachedLocalUploads,
+    disposeLocalUploads,
   }
 }

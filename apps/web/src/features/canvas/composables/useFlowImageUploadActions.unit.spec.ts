@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../canvas-board/domain'
 import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
 import { useFlowImageUploadActions } from './useFlowImageUploadActions'
@@ -65,6 +65,10 @@ describe('useFlowImageUploadActions', () => {
     }))
   })
 
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('keeps the latest image upload result for the same node', async () => {
     const currentBoardId = { value: 'board-a' }
     const snapshots = new Map<string, ImageNodeItem>([['node-1', makeImageNode()]])
@@ -99,6 +103,7 @@ describe('useFlowImageUploadActions', () => {
       uploadApi,
       onWarning: (msg) => warnings.push(msg),
       onSuccess: vi.fn(),
+      setLocalUploadState: vi.fn(),
     })
 
     const firstUpload = actions.applyImageFileToImageNode('node-1', makeFile('a.png'))
@@ -134,6 +139,7 @@ describe('useFlowImageUploadActions', () => {
       uploadApi: { upload: vi.fn().mockReturnValue(upload.promise) },
       onWarning: vi.fn(),
       onSuccess: vi.fn(),
+      setLocalUploadState: vi.fn(),
     })
 
     const task = actions.applyImageFileToImageNode('node-1', makeFile('a.png'))
@@ -145,7 +151,7 @@ describe('useFlowImageUploadActions', () => {
     expect(updateSnapshotNode).not.toHaveBeenCalled()
   })
 
-  it('does not create an image node when upload completes after switching boards', async () => {
+  it('releases an optimistic image node upload that completes after switching boards', async () => {
     const currentBoardId = { value: 'board-a' }
     const upload = createDeferred<{
       url: string
@@ -162,6 +168,7 @@ describe('useFlowImageUploadActions', () => {
       uploadApi: { upload: vi.fn().mockReturnValue(upload.promise) },
       onWarning: vi.fn(),
       onSuccess: vi.fn(),
+      setLocalUploadState: vi.fn(),
     })
 
     const task = actions.createImageNodeFromFile({ x: 10, y: 20 }, makeFile('a.png'))
@@ -170,12 +177,13 @@ describe('useFlowImageUploadActions', () => {
     upload.resolve({ url: '/uploads/a.png', width: 100, height: 100, media_asset_id: 32 })
 
     await expect(task).resolves.toBeNull()
-    expect(createNodeAtPosition).not.toHaveBeenCalled()
+    expect(createNodeAtPosition).toHaveBeenCalledOnce()
   })
 
-  it('reuploads the same file when it is inserted again after a previous node was deleted', async () => {
+  it('does not reuse a completed upload when the same file is inserted again', async () => {
     const currentBoardId = { value: 'board-a' }
     const createdUrls: string[] = []
+    const snapshots = new Map<string, ImageNodeItem>()
     const uploadApi = {
       upload: vi
         .fn()
@@ -196,25 +204,205 @@ describe('useFlowImageUploadActions', () => {
       currentBoardId,
       createNodeAtPosition: vi.fn((_kind, _x, _y, patch) => {
         createdUrls.push(patch?.sourceImageUrl ?? '')
-        return `image-${createdUrls.length}` as CanvasGraphNodeIdForKind<'image'>
+        const nodeId = `image-${createdUrls.length}` as CanvasGraphNodeIdForKind<'image'>
+        snapshots.set(nodeId, { ...makeImageNode(), ...patch })
+        return nodeId
       }),
-      updateSnapshotNode: vi.fn(),
-      getImageNodeSnapshot: vi.fn(),
+      updateSnapshotNode: (nodeId, patcher) => {
+        const current = snapshots.get(nodeId)
+        if (current) snapshots.set(nodeId, patcher(current) as ImageNodeItem)
+      },
+      getImageNodeSnapshot: (nodeId) => snapshots.get(nodeId) ?? null,
       uploadApi,
       onWarning: vi.fn(),
       onSuccess: vi.fn(),
+      setLocalUploadState: vi.fn(),
     })
     const file = makeFile('same.png')
 
     await expect(actions.createImageNodeFromFile({ x: 10, y: 20 }, file)).resolves.toBe('image-1')
-    // The first node can now be deleted and its uploaded URL recycled by autosave.
     await expect(actions.createImageNodeFromFile({ x: 30, y: 40 }, file)).resolves.toBe('image-2')
 
     expect(uploadApi.upload).toHaveBeenCalledTimes(2)
-    expect(createdUrls).toEqual([
-      '/uploads/canvas/user/board-a/content/first.png',
-      '/uploads/canvas/user/board-a/content/second.png',
+    expect(createdUrls).toEqual(['', ''])
+  })
+
+  it('keeps a local object URL outside the snapshot until the managed upload succeeds', async () => {
+    const currentBoardId = { value: 'board-a' }
+    const snapshots = new Map<string, ImageNodeItem>()
+    const upload = createDeferred<{
+      url: string
+      width: number
+      height: number
+      media_asset_id: number
+    }>()
+    const runtimeStates: Array<{ previewUrl: string; failureMessage?: string } | null> = []
+    const revokeObjectUrl = vi.fn()
+    const actions = useFlowImageUploadActions({
+      currentBoardId,
+      createNodeAtPosition: vi.fn((_kind, _x, _y, patch) => {
+        snapshots.set('image-1', { ...makeImageNode(), ...patch })
+        return 'image-1' as CanvasGraphNodeIdForKind<'image'>
+      }),
+      updateSnapshotNode: (nodeId, patcher) => {
+        const current = snapshots.get(nodeId)
+        if (current) snapshots.set(nodeId, patcher(current) as ImageNodeItem)
+      },
+      getImageNodeSnapshot: (nodeId) => snapshots.get(nodeId) ?? null,
+      uploadApi: { upload: vi.fn().mockReturnValue(upload.promise) },
+      onWarning: vi.fn(),
+      onSuccess: vi.fn(),
+      createObjectUrl: vi.fn(() => 'blob:local-image'),
+      revokeObjectUrl,
+      setLocalUploadState: (_nodeId, state) => runtimeStates.push(state),
+    })
+
+    const task = actions.createImageNodeFromFile({ x: 10, y: 20 }, makeFile('local.png'))
+    await flushPromises()
+
+    expect(snapshots.get('image-1')?.sourceImageUrl).toBe('')
+    expect(runtimeStates).toEqual([{ previewUrl: 'blob:local-image' }])
+
+    upload.resolve({
+      url: '/uploads/local.png',
+      width: 200,
+      height: 100,
+      media_asset_id: 61,
+    })
+
+    await expect(task).resolves.toBe('image-1')
+    expect(snapshots.get('image-1')).toMatchObject({
+      sourceImageUrl: '/uploads/local.png',
+      sourceMediaAssetId: 61,
+      sourceImageRatio: 1,
+    })
+    expect(runtimeStates).toEqual([
+      { previewUrl: 'blob:local-image' },
+      null,
     ])
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:local-image')
+  })
+
+  it('keeps the local preview after a failed upload and retries with the same file', async () => {
+    const currentBoardId = { value: 'board-a' }
+    const snapshots = new Map<string, ImageNodeItem>()
+    const runtimeStates: Array<{ previewUrl: string; failureMessage?: string } | null> = []
+    const revokeObjectUrl = vi.fn()
+    const actions = useFlowImageUploadActions({
+      currentBoardId,
+      createNodeAtPosition: vi.fn((_kind, _x, _y, patch) => {
+        snapshots.set('image-1', { ...makeImageNode(), ...patch })
+        return 'image-1' as CanvasGraphNodeIdForKind<'image'>
+      }),
+      updateSnapshotNode: (nodeId, patcher) => {
+        const current = snapshots.get(nodeId)
+        if (current) snapshots.set(nodeId, patcher(current) as ImageNodeItem)
+      },
+      getImageNodeSnapshot: (nodeId) => snapshots.get(nodeId) ?? null,
+      uploadApi: {
+        upload: vi
+          .fn()
+          .mockRejectedValueOnce(new Error('network unavailable'))
+          .mockResolvedValueOnce({
+            url: '/uploads/retried.png',
+            width: 100,
+            height: 100,
+            media_asset_id: 62,
+          }),
+      },
+      onWarning: vi.fn(),
+      onSuccess: vi.fn(),
+      createObjectUrl: vi.fn(() => 'blob:retry-image'),
+      revokeObjectUrl,
+      setLocalUploadState: (_nodeId, state) => runtimeStates.push(state),
+    })
+
+    await expect(actions.createImageNodeFromFile({ x: 10, y: 20 }, makeFile('retry.png'))).resolves.toBe(
+      'image-1',
+    )
+    expect(runtimeStates).toEqual([
+      { previewUrl: 'blob:retry-image' },
+      { previewUrl: 'blob:retry-image', failureMessage: 'network unavailable' },
+    ])
+    expect(revokeObjectUrl).not.toHaveBeenCalled()
+
+    await expect(actions.retryLocalUpload('image-1')).resolves.toBe(true)
+    expect(snapshots.get('image-1')?.sourceImageUrl).toBe('/uploads/retried.png')
+    expect(runtimeStates).toEqual([
+      { previewUrl: 'blob:retry-image' },
+      { previewUrl: 'blob:retry-image', failureMessage: 'network unavailable' },
+      { previewUrl: 'blob:retry-image' },
+      null,
+    ])
+    expect(revokeObjectUrl).toHaveBeenCalledOnce()
+  })
+
+  it('releases a pending local preview when its node is detached', async () => {
+    const currentBoardId = { value: 'board-a' }
+    const snapshots = new Map<string, ImageNodeItem>()
+    const upload = createDeferred<{
+      url: string
+      width: number
+      height: number
+      media_asset_id: number
+    }>()
+    const revokeObjectUrl = vi.fn()
+    const updateSnapshotNode = vi.fn()
+    const actions = useFlowImageUploadActions({
+      currentBoardId,
+      createNodeAtPosition: vi.fn((_kind, _x, _y, patch) => {
+        snapshots.set('image-1', { ...makeImageNode(), ...patch })
+        return 'image-1' as CanvasGraphNodeIdForKind<'image'>
+      }),
+      updateSnapshotNode,
+      getImageNodeSnapshot: (nodeId) => snapshots.get(nodeId) ?? null,
+      uploadApi: { upload: vi.fn().mockReturnValue(upload.promise) },
+      onWarning: vi.fn(),
+      onSuccess: vi.fn(),
+      createObjectUrl: vi.fn(() => 'blob:detached-image'),
+      revokeObjectUrl,
+      setLocalUploadState: vi.fn(),
+    })
+
+    const task = actions.createImageNodeFromFile({ x: 10, y: 20 }, makeFile('detached.png'))
+    await flushPromises()
+    actions.releaseDetachedLocalUploads(new Set())
+    upload.resolve({
+      url: '/uploads/detached.png',
+      width: 100,
+      height: 100,
+      media_asset_id: 63,
+    })
+
+    await expect(task).resolves.toBeNull()
+    expect(updateSnapshotNode).not.toHaveBeenCalled()
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:detached-image')
+  })
+
+  it('does not create a node after its scope is disposed during image inspection', async () => {
+    const bitmap = createDeferred<ImageBitmap>()
+    vi.stubGlobal('createImageBitmap', vi.fn(() => bitmap.promise))
+    const createNodeAtPosition = vi.fn()
+    const createObjectUrl = vi.fn(() => 'blob:stale-image')
+    const actions = useFlowImageUploadActions({
+      currentBoardId: { value: 'board-a' },
+      createNodeAtPosition,
+      updateSnapshotNode: vi.fn(),
+      getImageNodeSnapshot: vi.fn(),
+      uploadApi: { upload: vi.fn() },
+      onWarning: vi.fn(),
+      onSuccess: vi.fn(),
+      setLocalUploadState: vi.fn(),
+      createObjectUrl,
+    })
+
+    const task = actions.createImageNodeFromFile({ x: 10, y: 20 }, makeFile('stale.png'))
+    actions.disposeLocalUploads()
+    bitmap.resolve({ width: 100, height: 100, close: vi.fn() } as unknown as ImageBitmap)
+
+    await expect(task).resolves.toBeNull()
+    expect(createNodeAtPosition).not.toHaveBeenCalled()
+    expect(createObjectUrl).not.toHaveBeenCalled()
   })
 
   it('rejects shared upload results that complete after switching boards', async () => {
@@ -233,6 +421,7 @@ describe('useFlowImageUploadActions', () => {
       uploadApi: { upload: vi.fn().mockReturnValue(upload.promise) },
       onWarning: vi.fn(),
       onSuccess: vi.fn(),
+      setLocalUploadState: vi.fn(),
     })
 
     const task = actions.uploadImageToBoard(makeFile('a.png'))

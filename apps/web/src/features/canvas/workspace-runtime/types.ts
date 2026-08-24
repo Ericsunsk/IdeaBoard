@@ -128,7 +128,9 @@ export type CanvasWorkspaceRuntimeCommands = {
         candidate: CanvasLibraryImportDescriptor,
         center: { x: number; y: number },
       ) => CanvasGraphNodeIdForKind<'image'> | null
-      retry: (nodeId: string) => boolean
+    }
+    imageImport: {
+      retry: (nodeId: string) => Promise<boolean>
     }
     onExportSelectedImages: () => void
     onFlowMediaInputImageDrop: (nodeId: string, event: DragEvent) => Promise<void>

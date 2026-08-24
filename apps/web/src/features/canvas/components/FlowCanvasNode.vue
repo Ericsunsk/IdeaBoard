@@ -54,6 +54,7 @@
           :stage-height="stageHeight"
           :display-image="displayImage"
           :library-import="libraryImport"
+          :local-upload="localUpload"
           :empty-icon-variant="imageEmptyIconVariant"
           :input-locked="imageInputLocked"
           :action-binding="props.imagePresentation.actionBinding"
@@ -71,7 +72,7 @@
           @open-preview="onImagePreviewRequest"
           @append-to-canvas="onImageAppendToCanvasRequest"
           @reset="onImageResetRequest"
-          @retry-library-import="onLibraryImportRetryRequest"
+          @retry-image-import="onImageImportRetryRequest"
           @contextmenu="onImageContextMenuRequest"
           @expand-submit="onImageCanvasExtendSubmit"
           @action="onImageActionRequest"
@@ -203,6 +204,7 @@ const {
   imageEmptyIconVariant,
   imageInputLocked,
   libraryImport,
+  localUpload,
   imageSnapshot,
   isFusionNode,
   isImageNode,
@@ -280,8 +282,8 @@ function onImageResetRequest() {
   emit('node-intent', { type: 'reset-requested', nodeId: props.nodeId })
 }
 
-function onLibraryImportRetryRequest() {
-  emit('node-intent', { type: 'library-import-retry-requested', nodeId: props.nodeId })
+function onImageImportRetryRequest() {
+  emit('node-intent', { type: 'image-import-retry-requested', nodeId: props.nodeId })
 }
 
 function onImageContextMenuRequest(event: MouseEvent) {

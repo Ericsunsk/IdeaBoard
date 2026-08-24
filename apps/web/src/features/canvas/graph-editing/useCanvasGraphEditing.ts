@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@vue-flow/core'
-import type { Ref } from 'vue'
+import { onScopeDispose, watch, type Ref } from 'vue'
 import type { CanvasBoardSnapshot, CanvasNodeItem } from '../../canvas-board/domain'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { CanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
@@ -16,6 +16,8 @@ import type { CanvasGraphEditingBrowserAdapter } from './browserAdapter'
 import { useCanvasLibraryImportRuntime } from './useCanvasLibraryImportRuntime'
 import type { CanvasBoardAttachment } from '../board-attachment'
 import type { LibraryAssetMaterializer } from '../../library/libraryResource'
+import type { FlowLocalUploadState, FlowNodeData } from '../types/flowTypes'
+import { createFlowGraphCommandOptions } from '../composables/flowGraphAdapterCommandSideEffects'
 
 type ValueRef<T> = { readonly value: T }
 type SnapshotNodeMutator = (snapshotNode: CanvasNodeItem) => CanvasNodeItem
@@ -89,20 +91,47 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
     scheduleFlowNodeInternalsRefresh([nodeId])
   }
 
+  function setLocalUploadState(nodeId: string, state: FlowLocalUploadState | null) {
+    const node = options.nodes.value.find((item) => item.id === nodeId)
+    const data = node?.data as FlowNodeData | undefined
+    if (!node || data?.kind !== 'image') return
+    options.graphAdapter.updateNode(
+      nodeId,
+      {
+        data: {
+          ...data,
+          ...(state ? { localUpload: state } : { localUpload: undefined }),
+        },
+      },
+      createFlowGraphCommandOptions({ recordHistory: false, markDirty: false }),
+    )
+  }
+
   const { getImageNodeSnapshot, getImageNodeDisplayPayload } = useFlowImageNodeSnapshots({
     nodes: options.nodes,
   })
-  const { uploadImageToBoard, applyImageFileToImageNode, createImageNodeFromFile } =
-    useFlowImageUploadActions({
-      currentBoardId: options.currentBoardId,
-      createNodeAtPosition: nodeMutations.createNodeAtPosition,
-      updateSnapshotNode,
-      getImageNodeSnapshot,
-      uploadApi: options.upload,
-      onWarning: options.feedback.operationWarning,
-      onSuccess: options.feedback.operationSucceeded,
-      onNodeMutated: (nodeId) => nodeMutations.markFlowExecutionNodeDirty(nodeId),
-    })
+  const uploadActions = useFlowImageUploadActions({
+    currentBoardId: options.currentBoardId,
+    createNodeAtPosition: nodeMutations.createNodeAtPosition,
+    updateSnapshotNode,
+    getImageNodeSnapshot,
+    uploadApi: options.upload,
+    onWarning: options.feedback.operationWarning,
+    onSuccess: options.feedback.operationSucceeded,
+    onNodeMutated: (nodeId) => nodeMutations.markFlowExecutionNodeDirty(nodeId),
+    setLocalUploadState,
+  })
+  const { uploadImageToBoard, applyImageFileToImageNode, createImageNodeFromFile } = uploadActions
+
+  watch(
+    () => ({
+      boardId: options.currentBoardId.value,
+      liveNodeIds: new Set(options.nodes.value.map((node) => node.id)),
+    }),
+    ({ boardId, liveNodeIds }) => uploadActions.releaseDetachedLocalUploads(liveNodeIds, boardId),
+    { flush: 'sync' },
+  )
+  onScopeDispose(() => uploadActions.disposeLocalUploads())
   const mediaInputs = useFlowMediaInputImages({
     browser: options.browser,
     nodes: options.nodes,
@@ -126,6 +155,11 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
     materialize: options.materializeLibraryAsset,
     onWarning: options.feedback.operationWarning,
   })
+
+  async function retryImageImport(nodeId: string): Promise<boolean> {
+    if (libraryImport.retry(nodeId)) return true
+    return uploadActions.retryLocalUpload(nodeId)
+  }
   const canvasDrop = useFlowCanvasDrop({
     browser: options.browser,
     screenToFlowCoordinate: options.screenToFlowCoordinate,
@@ -186,7 +220,9 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
       },
       libraryImport: {
         add: libraryImport.start,
-        retry: libraryImport.retry,
+      },
+      imageImport: {
+        retry: retryImageImport,
       },
     },
     workflowPort: {
