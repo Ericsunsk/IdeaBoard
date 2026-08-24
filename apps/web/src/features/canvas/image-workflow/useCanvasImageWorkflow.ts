@@ -36,6 +36,7 @@ type CanvasImageWorkflowExecutionPort = Pick<
   | 'runCanvasExtendAction'
   | 'isGenerationAvailable'
   | 'isNodeExecutionActive'
+  | 'hydratePendingImageLeases'
   | 'reattachPendingImageResults'
 >
 
@@ -132,6 +133,7 @@ export type CanvasImageWorkflow = {
 }
 
 type CanvasImageWorkflowRuntime = CanvasImageWorkflow & {
+  hydratePendingImageLeases: () => number
   reattachPendingImageResults: CanvasImageWorkflowExecutionPort['reattachPendingImageResults']
 }
 
@@ -271,6 +273,7 @@ export function useCanvasImageWorkflow(
       cancelCanvasExtend: canvasExtend.cancelExpandMode,
       hideStrengthControl: strengthControl.hideStrengthControl,
     },
+    hydratePendingImageLeases: execution.hydratePendingImageLeases,
     reattachPendingImageResults: execution.reattachPendingImageResults,
   }
 }

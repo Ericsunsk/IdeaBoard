@@ -17,6 +17,7 @@ import {
 } from '../../renderer/vue-flow/flowGraphAdapterCommandSideEffects'
 import {
   CanvasBoardGraphSession,
+  collectPendingImageTasks,
   createPendingImageExecutionCore,
 } from '../../execution/pending-execution'
 
@@ -337,6 +338,13 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     isSavingBoard: ref(false),
     boardSession,
     executionCore,
+    hydratePendingImageLeases: (snapshot) => {
+      const attachment = executionCore.currentAttachment()
+      if (!attachment) return
+      collectPendingImageTasks(snapshot ?? boardBaseSnapshot.value).forEach((pending) => {
+        executionCore.hydratePendingLease(attachment, pending)
+      })
+    },
     cancelTasks: vi.fn(),
     onWarning,
     onSuccess: vi.fn(),

@@ -19,6 +19,7 @@ type UseCanvasBoardRuntimeOptions = {
   logoutAndRedirect: (path: string) => Promise<unknown> | unknown
   feedback: CanvasBoardRuntimeFeedback
   executionCore: PendingImageExecutionCore
+  hydratePendingImageLeases?: (snapshot: CanvasBoardSnapshot) => void
   cancelTasks: (taskIds: readonly string[]) => void
   vueFlowGraphActions?: CanvasVueFlowGraphActions
 }
@@ -63,6 +64,7 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions) {
     autosaveResumeSignal,
     boardSession,
     executionCore: options.executionCore,
+    hydratePendingImageLeases: options.hydratePendingImageLeases,
     cancelTasks: options.cancelTasks,
     onWarning: options.feedback.warning,
     onSuccess: options.feedback.saveSucceeded,

@@ -224,6 +224,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
   return {
     executeImageWorkflow,
     isNodeExecutionActive,
+    hydratePendingImageLeases: executionWorkspace.commands.hydratePendingImageLeases,
     reattachPendingImageResults: executionWorkspace.commands.reattachPendingImageResults,
   }
 }

@@ -41,6 +41,7 @@ export type UseFlowCanvasRuntimeOptions = {
   autosaveResumeSignal?: Ref<unknown>
   boardSession: CanvasBoardSession
   executionCore: PendingImageExecutionCore
+  hydratePendingImageLeases?: (snapshot: CanvasBoardSnapshot) => void
   cancelTasks: (taskIds: readonly string[]) => void
   onWarning: (message: string) => void
   onSuccess: (message: string) => void
@@ -262,7 +263,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     boardSession: options.boardSession,
     graphAdapter,
     executionCore: options.executionCore,
-    cancelTasks: options.cancelTasks,
+    hydratePendingImageLeases: options.hydratePendingImageLeases,
     history: canvasGraphHistory,
     markDirty,
     isNodeExecutionActive,

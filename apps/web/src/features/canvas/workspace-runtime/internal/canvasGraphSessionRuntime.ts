@@ -7,11 +7,7 @@ import type { CanvasVueFlowGraphAdapter } from '../../renderer/vue-flow/useCanva
 import { bindCanvasGraphSessionProjection } from '../../renderer/vue-flow/bindCanvasGraphSessionProjection'
 import { canvasBoardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
 import { CanvasGraphSession, type CanvasGraphStore } from '../../graph-runtime'
-import {
-  CanvasBoardGraphSession,
-  collectPendingImageTasks,
-  type PendingImageExecutionCore,
-} from '../../execution/pending-execution'
+import { CanvasBoardGraphSession, type PendingImageExecutionCore } from '../../execution/pending-execution'
 
 type CanvasGraphSessionRuntimeOptions = {
   nodes: Ref<Node[]>
@@ -20,7 +16,7 @@ type CanvasGraphSessionRuntimeOptions = {
   boardSession: CanvasBoardSession
   graphAdapter: CanvasVueFlowGraphAdapter
   executionCore: PendingImageExecutionCore
-  cancelTasks: (taskIds: readonly string[]) => void
+  hydratePendingImageLeases?: (snapshot: CanvasBoardSnapshot) => void
   history: CanvasGraphHistory
   markDirty: () => void
   isNodeExecutionActive: (nodeId: string) => boolean
@@ -82,19 +78,6 @@ export function createCanvasGraphSessionRuntime(
     return requireGraphSession().store
   }
 
-  function hydratePendingExecutionLeases() {
-    const attachment = options.executionCore.currentAttachment()
-    if (!attachment) return
-    collectPendingImageTasks(options.boardBaseSnapshot.value).forEach((pending) => {
-      const reattached = options.executionCore.hydratePendingLease(attachment, {
-        resultNodeId: pending.resultNodeId,
-        taskId: pending.taskId,
-        clientActionId: pending.clientActionId,
-      })
-      if (reattached.kind === 'started') options.cancelTasks(reattached.cancellableTaskIds)
-    })
-  }
-
   function rebaseSavedFlowProjection(savedGraph: { nodes: Node[]; edges: Edge[] }) {
     const savedNodesById = new Map(savedGraph.nodes.map((node) => [node.id, node] as const))
     const savedEdgesById = new Map(savedGraph.edges.map((edge) => [edge.id, edge] as const))
@@ -122,7 +105,6 @@ export function createCanvasGraphSessionRuntime(
     nextGraph: { nodes: Node[]; edges: Edge[] },
     source: 'hydrate-replace' | 'save-reconcile',
   ) {
-    if (source === 'hydrate-replace') hydratePendingExecutionLeases()
     const semanticGraph = source === 'save-reconcile' ? rebaseSavedFlowProjection(nextGraph) : nextGraph
     const projectedGraph = {
       nodes: options.projectCurrentGroupNodeLayers(semanticGraph.nodes),
@@ -188,6 +170,7 @@ export function createCanvasGraphSessionRuntime(
       unsubscribeHistory()
     }
     options.executionCore.attachBoard(CanvasBoardGraphSession.create(boardId, { graphSession: session }))
+    options.hydratePendingImageLeases?.(snapshot)
   }
 
   function exportGraphSnapshot(baseSnapshot: CanvasBoardSnapshot): CanvasBoardSnapshot {

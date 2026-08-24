@@ -89,7 +89,7 @@ describe('useCanvasExecutionWorkspace', () => {
     })
   })
 
-  it('does not recreate a lease when hydration did not establish one', async () => {
+  it('hydrates a pending lease as part of the recovery flow', async () => {
     const store = createStore()
     const core = createPendingImageExecutionCore()
     core.attachBoard(CanvasBoardGraphSession.create('board-a', { graphSession: store }))
@@ -100,8 +100,8 @@ describe('useCanvasExecutionWorkspace', () => {
 
     await workspace.commands.reattachPendingImageResults()
 
-    expect(waitTaskImageResults).not.toHaveBeenCalled()
-    expect(core.factFor('image-1')).toBeNull()
+    expect(waitTaskImageResults).toHaveBeenCalledOnce()
+    expect(core.factFor('image-1')).toMatchObject({ status: 'succeeded', taskId: 'task-1' })
   })
 
   it('claims one hydration lease only once across concurrent reattach drivers', async () => {

@@ -2,7 +2,6 @@ import type { Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
 import type { TaskImageResult } from '../../../../shared/query/taskResult'
-import { TaskCancelledError } from '../../../../shared/api/taskEvents'
 import type { CanvasGraphStore } from '../../graph-runtime'
 import { loadImageSizeFromUrl } from '../media/imageSize'
 import type { ActivatedImageExecutionPlan } from '../planning/ImageExecutionPlan'
@@ -23,7 +22,8 @@ import {
 } from '../task-runner/taskClientActionIds'
 import { buildImageExecutionTaskRequest } from '../commands/flowImageTaskRequests'
 import { createPendingImageWorkflowRunner } from '../runtime/pendingImageWorkflowRunner'
-import { type PendingImageExecutionCore, collectPendingImageTasks } from '../pending-execution'
+import type { PendingImageExecutionCore } from '../pending-execution'
+import { createCanvasExecutionRecoveryCoordinator } from '../application/canvasExecutionRecoveryCoordinator'
 import {
   defaultCanvasTaskSubmissionAdapter,
   type CanvasTaskSubmissionAdapter,
@@ -38,6 +38,7 @@ export type CanvasExecutionWorkspaceCommands = {
   runPromptGeneration: (
     plan: ActivatedImageExecutionPlan & { kind: 'prompt-generation' },
   ) => Promise<void>
+  hydratePendingImageLeases: (snapshot?: CanvasBoardSnapshot) => number
   reattachPendingImageResults: () => Promise<void>
 }
 
@@ -150,41 +151,34 @@ export function useCanvasExecutionWorkspace(
     })
   }
 
-  async function reattachPendingImageResults(): Promise<void> {
-    const attachment = requireAttachment()
-    const pending = collectPendingImageTasks(options.boardBaseSnapshot.value)
-    await Promise.all(
-      pending.map(async ({ resultNodeId, taskId, resultIndex, fallbackRatio, clientActionId }) => {
-        const lease = options.executionCore.claimHydratedLease(attachment, {
-          resultNodeId,
-          taskId,
-          clientActionId,
-        })
-        if (!lease) return
-        try {
-          const results = await waitTaskImageResults(taskId)
-          if (!options.executionCore.isCurrent(lease, taskId)) return
-          const result =
-            resultIndex === undefined
-              ? await resolveFirstTaskImageResultDisplay(results, fallbackRatio, loadImageSize)
-              : await resolveTaskImageResultAtIndexDisplay(
-                  results,
-                  resultIndex,
-                  fallbackRatio,
-                  loadImageSize,
-                )
-          options.executionCore.materializeBatch([{ lease, result }])
-          await flushPendingTaskSnapshot()
-        } catch (error) {
-          if (error instanceof TaskCancelledError) options.executionCore.cancel([lease])
-          else options.executionCore.fail(lease)
-        }
-      }),
-    )
-  }
+  const recovery = createCanvasExecutionRecoveryCoordinator({
+    executionCore: options.executionCore,
+    readBoardSnapshot: () => options.boardBaseSnapshot.value,
+    resolveResult: async ({ taskId, resultIndex, fallbackRatio }) => {
+      const results = await waitTaskImageResults(taskId)
+      return resultIndex === undefined
+        ? await resolveFirstTaskImageResultDisplay(results, fallbackRatio, loadImageSize)
+        : await resolveTaskImageResultAtIndexDisplay(
+            results,
+            resultIndex,
+            fallbackRatio,
+            loadImageSize,
+          )
+    },
+    flushAutosave: flushPendingTaskSnapshot,
+    cancelTasks: options.cancelTasks,
+    onError: options.onError,
+    onWarning: options.onWarning,
+  })
 
   return {
     state: { executionCore: options.executionCore, isNodeRunning },
-    commands: { runPromptGeneration, reattachPendingImageResults },
+    commands: {
+      runPromptGeneration,
+      hydratePendingImageLeases: recovery.hydratePendingLeases,
+      reattachPendingImageResults: async () => {
+        await recovery.recover()
+      },
+    },
   }
 }

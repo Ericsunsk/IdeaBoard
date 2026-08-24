@@ -27,7 +27,9 @@ export type UseImageWorkflowExecutionOptions = {
   cancelTasks: (taskIds: readonly string[]) => void
 }
 
-export type ImageWorkflowExecution = ImageWorkflowCommands
+export type ImageWorkflowExecution = ImageWorkflowCommands & {
+  hydratePendingImageLeases: () => number
+}
 
 const DEFAULT_GENERATION_UNAVAILABLE_MESSAGE = '生成服务暂不可用，请稍后重试'
 const GENERATION_UNAVAILABLE_RETRY_MS = 15_000
@@ -125,11 +127,15 @@ export function useImageWorkflowExecution(
     cancelTasks: options.cancelTasks,
   })
 
-  return createImageWorkflowCommands({
+  const commands = createImageWorkflowCommands({
     planner,
     workflow,
     isGenerationAvailable,
     generationUnavailableMessage: () => generationUnavailableMessage.value,
     onWarning: handleWorkflowWarning,
   })
+  return {
+    ...commands,
+    hydratePendingImageLeases: executionWorkspace.commands.hydratePendingImageLeases,
+  }
 }

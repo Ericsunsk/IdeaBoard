@@ -19,6 +19,12 @@ export {
 } from './runtime/imageWorkflowCommandRuntime'
 export { useCanvasExecutionWorkspace } from './workspace/useCanvasExecutionWorkspace'
 export {
+  createCanvasExecutionRecoveryCoordinator,
+  type CanvasExecutionRecoveryCoordinator,
+  type CanvasExecutionRecoveryCoordinatorOptions,
+  type CanvasExecutionRecoveryResult,
+} from './application/canvasExecutionRecoveryCoordinator'
+export {
   CanvasBoardGraphSession,
   createPendingImageExecutionCore,
   PendingImageMaterializationError,
