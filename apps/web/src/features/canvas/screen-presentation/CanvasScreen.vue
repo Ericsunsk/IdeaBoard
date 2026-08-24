@@ -119,7 +119,11 @@ import { useFlowImagePreviewLightbox } from '../composables/useFlowImagePreviewL
 import { provideCanvasHandleProximityCoordinator } from '../composables/useCanvasHandleProximity'
 import { provideCanvasViewportContext } from '../composables/useCanvasViewportContext'
 import { CanvasGroupPresentation } from '../group-presentation'
-import { createCanvasConnectionDropLifecycle, useVueFlowPaneAdapter } from '../flow-pane'
+import {
+  createCanvasConnectionDropLifecycle,
+  useCanvasVueFlowHandleGeometryAdapter,
+  useVueFlowPaneAdapter,
+} from '../flow-pane'
 import {
   createCanvasGraphEditingBrowserAdapter,
   createCanvasGraphInteractionBrowserAdapter,
@@ -144,9 +148,7 @@ import { useCanvasScreenSurfaceInteractions } from './internal/useCanvasScreenSu
 import { createCanvasScreenNodePresentation } from './internal/createCanvasScreenNodePresentation'
 import { useCanvasScreenLifecycle } from './internal/useCanvasScreenLifecycle'
 import { useCanvasLibraryIsland } from './internal/useCanvasLibraryIsland'
-import {
-  materializeLibraryAssetForCanvas,
-} from '../../library/libraryResource'
+import { materializeLibraryAssetForCanvas } from '../../library/libraryResource'
 import type { CanvasLibraryImportDescriptor } from '../../library/libraryTransfer'
 
 const props = defineProps<{
@@ -168,7 +170,8 @@ function openRecharge() {
 
 const flowPaneAdapter = useVueFlowPaneAdapter()
 const { connectionStartHandle } = useVueFlow()
-const handleProximitySurface = provideCanvasHandleProximityCoordinator()
+const handleProximityGeometry = useCanvasVueFlowHandleGeometryAdapter()
+const handleProximitySurface = provideCanvasHandleProximityCoordinator(handleProximityGeometry)
 
 const canvasWrapRef = ref<HTMLElement | null>(null)
 const activeTool = ref<'select' | 'hand'>('select')

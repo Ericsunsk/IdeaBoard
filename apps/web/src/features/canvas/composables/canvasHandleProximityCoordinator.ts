@@ -5,21 +5,26 @@ export type CanvasHandleProximityPoint = {
   y: number
 }
 
+export type CanvasHandleProximityGeometry = {
+  /**
+   * Captures the shared Vue Flow surface geometry once for an evaluation.
+   * Handle registrations must never read their own DOM rectangles from the pointer hot path.
+   */
+  prepare: () => void
+  resolveAnchor: (
+    nodeId: string,
+    direction: CanvasHandleProximityDirection,
+  ) => CanvasHandleProximityPoint | null
+}
+
 type CanvasHandleProximityState = {
   isActive: boolean
   point: CanvasHandleProximityPoint
 }
 
-export type CanvasHandleAnchorRect = {
-  left: number
-  top: number
-  width: number
-  height: number
-}
-
 type CanvasHandleProximityRegistration = {
+  nodeId: string
   direction: CanvasHandleProximityDirection
-  getAnchorRect: () => CanvasHandleAnchorRect | null
   isEnabled: () => boolean
   onStateChange: (state: CanvasHandleProximityState) => void
 }
@@ -40,14 +45,15 @@ const ORIGIN: CanvasHandleProximityPoint = { x: 0, y: 0 }
 function readCandidate(
   registration: RegisteredHandle,
   pointer: CanvasHandleProximityPoint,
+  geometry: CanvasHandleProximityGeometry,
 ): Candidate | null {
   if (!registration.isEnabled()) return null
-  const bounds = registration.getAnchorRect()
-  if (!bounds) return null
+  const anchor = geometry.resolveAnchor(registration.nodeId, registration.direction)
+  if (!anchor) return null
 
   const point = {
-    x: pointer.x - (bounds.left + bounds.width / 2),
-    y: pointer.y - (bounds.top + bounds.height / 2),
+    x: pointer.x - anchor.x,
+    y: pointer.y - anchor.y,
   }
   const distance = Math.hypot(point.x, point.y)
   if (distance > PROXIMITY_RADIUS) return null
@@ -71,7 +77,7 @@ function notify(registration: RegisteredHandle, state: CanvasHandleProximityStat
   registration.onStateChange(state)
 }
 
-export function createCanvasHandleProximityCoordinator() {
+export function createCanvasHandleProximityCoordinator(geometry: CanvasHandleProximityGeometry) {
   const registrations = new Set<RegisteredHandle>()
   let activeRegistration: RegisteredHandle | null = null
   let lastPointer: CanvasHandleProximityPoint | null = null
@@ -82,8 +88,9 @@ export function createCanvasHandleProximityCoordinator() {
     let winner: Candidate | null = null
 
     if (pointer && !isSuspended) {
+      geometry.prepare()
       for (const registration of registrations) {
-        const candidate = readCandidate(registration, pointer)
+        const candidate = readCandidate(registration, pointer, geometry)
         if (!candidate) continue
         if (
           !winner ||

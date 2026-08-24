@@ -47,22 +47,12 @@ function setConnectionStartHandle(value: MockConnectingHandle | null) {
   vueFlowMock.connectionStartHandle.value = value
 }
 
-function setAnchorRect(element: HTMLElement, left: number) {
-  vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => ({
-    bottom: 101,
-    height: 1,
-    left,
-    right: left + 1,
-    top: 100,
-    width: 1,
-    x: left,
-    y: 100,
-    toJSON: () => undefined,
-  }))
-}
-
 function renderHandles(props: { kind: NodeKind; disabled?: boolean }) {
-  const coordinator = createCanvasHandleProximityCoordinator()
+  const geometry = {
+    prepare: () => undefined,
+    resolveAnchor: () => ({ x: 100.5, y: 100.5 }),
+  }
+  const coordinator = createCanvasHandleProximityCoordinator(geometry)
   const currentProps = reactive({
     nodeId: 'node-1',
     kind: props.kind,
@@ -75,7 +65,7 @@ function renderHandles(props: { kind: NodeKind; disabled?: boolean }) {
 
   const Host = defineComponent({
     setup() {
-      proximitySurface = provideCanvasHandleProximityCoordinator(coordinator)
+      proximitySurface = provideCanvasHandleProximityCoordinator(geometry, coordinator)
       provideCanvasViewportContext({ zoomLevel })
       return () =>
         h('div', { ref: interactionRoot, 'data-testid': 'interaction-root' }, [
@@ -135,8 +125,6 @@ describe('FlowCanvasNodeHandleRail', () => {
 
   it('keeps disabled handles hidden and non-connectable', async () => {
     const view = renderHandles({ kind: 'prompt', disabled: true })
-    const outputHandle = view.getByLabelText('提示词节点输出连接点，拖拽创建连接') as HTMLElement
-    setAnchorRect(outputHandle, 100)
 
     view.interactionRoot.dispatchEvent(new MouseEvent('mouseenter'))
     view.coordinator.movePointer({ x: 130, y: 100 })

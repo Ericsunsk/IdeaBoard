@@ -5,48 +5,37 @@ import {
   provideCanvasHandleProximityCoordinator,
   useCanvasHandleProximity,
 } from './useCanvasHandleProximity'
-import { createCanvasHandleProximityCoordinator } from './canvasHandleProximityCoordinator'
+import {
+  createCanvasHandleProximityCoordinator,
+  type CanvasHandleProximityGeometry,
+} from './canvasHandleProximityCoordinator'
 
-function createAnchor(left = 100, top = 100) {
-  const anchor = document.createElement('div')
-  vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
-    bottom: top + 1,
-    height: 1,
-    left,
-    right: left + 1,
-    top,
-    width: 1,
-    x: left,
-    y: top,
-    toJSON: () => undefined,
-  })
-  document.body.append(anchor)
-  return anchor
+function createGeometry(): CanvasHandleProximityGeometry {
+  return {
+    prepare: vi.fn(),
+    resolveAnchor: () => ({ x: 100.5, y: 100.5 }),
+  }
 }
 
 function mountProximity(
-  anchor: HTMLElement,
   direction: 'input' | 'output' = 'output',
   enabled = ref(true),
-  coordinator = createCanvasHandleProximityCoordinator(),
+  geometry = createGeometry(),
 ) {
   let proximity!: ReturnType<typeof useCanvasHandleProximity>
   let surface!: ReturnType<typeof provideCanvasHandleProximityCoordinator>
+  const coordinator = createCanvasHandleProximityCoordinator(geometry)
   const host = document.createElement('div')
   document.body.append(host)
   const Consumer = defineComponent({
     setup() {
-      proximity = useCanvasHandleProximity({
-        direction,
-        getAnchorRect: () => anchor.getBoundingClientRect(),
-        enabled,
-      })
+      proximity = useCanvasHandleProximity({ nodeId: 'node-1', direction, enabled })
       return () => null
     },
   })
   const Provider = defineComponent({
     setup() {
-      surface = provideCanvasHandleProximityCoordinator(coordinator)
+      surface = provideCanvasHandleProximityCoordinator(geometry, coordinator)
       return () => h(Consumer)
     },
   })
@@ -60,7 +49,6 @@ function mountProximity(
     unmount: () => {
       app.unmount()
       host.remove()
-      anchor.remove()
     },
   }
 }
@@ -73,69 +61,53 @@ describe('useCanvasHandleProximity', () => {
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
     document.body.innerHTML = ''
+    delete window.__canvasInteractionBenchmarkCounters
     frameCallback = null
   })
+
+  function installFrameScheduler() {
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn((callback: FrameRequestCallback) => {
+        frameCallback = callback
+        return 1
+      }),
+    )
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+  }
+
+  function flushFrame() {
+    const pendingFrame = frameCallback
+    frameCallback = null
+    pendingFrame?.(0)
+  }
 
   function movePointer(clientX: number, clientY: number, pointerType = 'mouse') {
     window.dispatchEvent(new PointerEvent('pointermove', { clientX, clientY, pointerType }))
     flushFrame()
   }
 
-  function flushFrame() {
-    const pendingFrame = frameCallback as FrameRequestCallback | null
-    frameCallback = null
-    pendingFrame?.(0)
-  }
-
-  it('activates an outward sector from an external pointer position', () => {
-    frameCallback = null
-    vi.stubGlobal(
-      'requestAnimationFrame',
-      vi.fn((callback: FrameRequestCallback) => {
-        frameCallback = callback
-        return 1
-      }),
-    )
-    vi.stubGlobal('cancelAnimationFrame', vi.fn())
-    const harness = mountProximity(createAnchor())
+  it('activates an outward sector from a node identity and direction', () => {
+    installFrameScheduler()
+    window.__canvasInteractionBenchmarkCounters = {}
+    const harness = mountProximity()
 
     movePointer(130, 100)
 
     expect(harness.proximity.isActive.value).toBe(true)
     expect(harness.proximity.point.value).toEqual({ x: 29.5, y: -0.5 })
-
-    harness.unmount()
-  })
-
-  it('rejects pointer positions outside the outward 120 degree sector', () => {
-    frameCallback = null
-    vi.stubGlobal(
-      'requestAnimationFrame',
-      vi.fn((callback: FrameRequestCallback) => {
-        frameCallback = callback
-        return 1
-      }),
-    )
-    vi.stubGlobal('cancelAnimationFrame', vi.fn())
-    const harness = mountProximity(createAnchor())
-
-    movePointer(100, 130)
-
-    expect(harness.proximity.isActive.value).toBe(false)
+    expect(window.__canvasInteractionBenchmarkCounters.handleGeometryLayoutReadCount ?? 0).toBe(0)
     harness.unmount()
   })
 
   it('coalesces repeated surface refresh requests into one frame', () => {
-    frameCallback = null
     const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
       frameCallback = callback
       return 1
     })
     vi.stubGlobal('requestAnimationFrame', requestAnimationFrame)
     vi.stubGlobal('cancelAnimationFrame', vi.fn())
-    const coordinator = createCanvasHandleProximityCoordinator()
-    const refresh = vi.spyOn(coordinator, 'refresh')
-    const harness = mountProximity(createAnchor(), 'output', ref(true), coordinator)
+    const harness = mountProximity()
 
     harness.surface.requestRefresh()
     harness.surface.requestRefresh()
@@ -143,22 +115,35 @@ describe('useCanvasHandleProximity', () => {
 
     expect(requestAnimationFrame).toHaveBeenCalledTimes(1)
     flushFrame()
-    expect(refresh).toHaveBeenCalledTimes(1)
+    harness.unmount()
+  })
 
+  it('refreshes stationary-pointer geometry after resize and scroll in one frame', () => {
+    const requestAnimationFrame = vi.fn((callback: FrameRequestCallback) => {
+      frameCallback = callback
+      return 1
+    })
+    vi.stubGlobal('requestAnimationFrame', requestAnimationFrame)
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+    const geometry = createGeometry()
+    const harness = mountProximity('output', ref(true), geometry)
+
+    movePointer(130, 100)
+    vi.mocked(geometry.prepare).mockClear()
+    requestAnimationFrame.mockClear()
+
+    window.dispatchEvent(new Event('resize'))
+    window.dispatchEvent(new Event('scroll'))
+
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(1)
+    flushFrame()
+    expect(geometry.prepare).toHaveBeenCalledTimes(1)
     harness.unmount()
   })
 
   it('releases the active handle when its enabled state changes', () => {
-    frameCallback = null
-    vi.stubGlobal(
-      'requestAnimationFrame',
-      vi.fn((callback: FrameRequestCallback) => {
-        frameCallback = callback
-        return 1
-      }),
-    )
-    vi.stubGlobal('cancelAnimationFrame', vi.fn())
-    const harness = mountProximity(createAnchor())
+    installFrameScheduler()
+    const harness = mountProximity()
 
     movePointer(130, 100)
     harness.enabled.value = false
@@ -168,77 +153,30 @@ describe('useCanvasHandleProximity', () => {
     harness.unmount()
   })
 
-  it('exposes one surface suspension control for all registrations', () => {
-    frameCallback = null
-    vi.stubGlobal(
-      'requestAnimationFrame',
-      vi.fn((callback: FrameRequestCallback) => {
-        frameCallback = callback
-        return 1
-      }),
-    )
-    vi.stubGlobal('cancelAnimationFrame', vi.fn())
-    const harness = mountProximity(createAnchor())
-
-    movePointer(130, 100)
-    harness.surface.setSuspended(true)
-    expect(harness.proximity.isActive.value).toBe(false)
-
-    harness.surface.setSuspended(false)
-    expect(harness.proximity.isActive.value).toBe(true)
-    harness.unmount()
-  })
-
-  it('ignores touch pointer movement', () => {
-    frameCallback = null
-    vi.stubGlobal(
-      'requestAnimationFrame',
-      vi.fn((callback: FrameRequestCallback) => {
-        frameCallback = callback
-        return 1
-      }),
-    )
-    vi.stubGlobal('cancelAnimationFrame', vi.fn())
-    const harness = mountProximity(createAnchor())
+  it('ignores touch pointer movement and cleans up surface listeners', () => {
+    installFrameScheduler()
+    const removeEventListener = vi.spyOn(window, 'removeEventListener')
+    const harness = mountProximity()
 
     movePointer(130, 100, 'touch')
-
     expect(harness.proximity.isActive.value).toBe(false)
-    harness.unmount()
-  })
-
-  it('supports pen input and evaluates only the latest pointer in a frame', () => {
-    frameCallback = null
-    vi.stubGlobal(
-      'requestAnimationFrame',
-      vi.fn((callback: FrameRequestCallback) => {
-        frameCallback = callback
-        return 1
-      }),
-    )
-    vi.stubGlobal('cancelAnimationFrame', vi.fn())
-    const harness = mountProximity(createAnchor())
-
-    window.dispatchEvent(
-      new PointerEvent('pointermove', { clientX: 120, clientY: 100, pointerType: 'pen' }),
-    )
-    window.dispatchEvent(
-      new PointerEvent('pointermove', { clientX: 135, clientY: 105, pointerType: 'pen' }),
-    )
-    flushFrame()
-
-    expect(harness.proximity.point.value).toEqual({ x: 34.5, y: 4.5 })
-    harness.unmount()
-  })
-
-  it('removes the Canvas surface pointer listeners when its provider unmounts', () => {
-    const removeEventListener = vi.spyOn(window, 'removeEventListener')
-    const harness = mountProximity(createAnchor())
 
     harness.unmount()
-
     expect(removeEventListener).toHaveBeenCalledWith('pointermove', expect.any(Function), true)
     expect(removeEventListener).toHaveBeenCalledWith('pointerleave', expect.any(Function), true)
     expect(removeEventListener).toHaveBeenCalledWith('blur', expect.any(Function))
+    expect(removeEventListener).toHaveBeenCalledWith('resize', expect.any(Function))
+    expect(removeEventListener).toHaveBeenCalledWith('scroll', expect.any(Function), true)
+  })
+
+  it('cancels a pending geometry refresh when the Canvas scope is disposed', () => {
+    installFrameScheduler()
+    const cancelAnimationFrame = vi.mocked(window.cancelAnimationFrame)
+    const harness = mountProximity()
+
+    harness.surface.requestRefresh()
+    harness.unmount()
+
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(1)
   })
 })

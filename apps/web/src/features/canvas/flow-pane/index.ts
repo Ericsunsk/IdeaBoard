@@ -6,6 +6,7 @@ export { createCanvasConnectionDropLifecycle } from './connectionDropTarget'
 export { createCanvasDeleteCommandLifecycle } from './deleteCommandLifecycle'
 export { useFlowPaneSelectionAdapter } from './useFlowPaneSelectionAdapter'
 export { useVueFlowPaneAdapter } from './useVueFlowPaneAdapter'
+export { useCanvasVueFlowHandleGeometryAdapter } from './useCanvasVueFlowHandleGeometryAdapter'
 export {
   createCanvasNodeDragLifecycle,
   type CanvasNodeDragChange,

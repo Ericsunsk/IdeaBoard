@@ -1,4 +1,4 @@
-import { computed, shallowRef, type ComponentPublicInstance, type CSSProperties } from 'vue'
+import { computed, type CSSProperties } from 'vue'
 import { Position } from '@vue-flow/core'
 import {
   getCanvasNodeVisibleInputPorts,
@@ -6,14 +6,10 @@ import {
   type CanvasConnectionNodeType,
   type CanvasConnectionPort,
 } from '../../canvas-board/domain'
-import { recordCanvasInteractionCount } from '../utils/canvasInteractionMetrics'
-import { measureCanvasPerf } from '../utils/canvasPerfProbe'
 import { useCanvasHandleProximity } from './useCanvasHandleProximity'
 import { resolveCanvasNodeUiScale, useCanvasViewportContext } from './useCanvasViewportContext'
 
 export type FlowNodeHandleDirection = 'input' | 'output'
-
-type FlowNodeHandleElement = Element | ComponentPublicInstance | null
 
 type FlowNodeAnchorHandlePresentation = {
   id: string
@@ -34,7 +30,6 @@ type FlowNodeAggregateHandlePresentation = {
   style: CSSProperties
   ariaLabel: string
   title: string
-  setElement: (value: FlowNodeHandleElement) => void
 }
 
 type FlowNodeHandlesPresentation = {
@@ -43,6 +38,7 @@ type FlowNodeHandlesPresentation = {
 }
 
 type UseFlowNodeHandlesPresentationOptions = {
+  nodeId: () => string
   kind: () => CanvasConnectionNodeType
   showHandles: () => boolean
   disabled: () => boolean
@@ -93,13 +89,6 @@ const HANDLE_DIRECTION_POLICIES: Record<FlowNodeHandleDirection, HandleDirection
   },
 }
 
-function resolveHandleElement(value: FlowNodeHandleElement): HTMLElement | null {
-  if (value instanceof HTMLElement) return value
-  if (!value || value instanceof Element) return null
-  const element = value.$el
-  return element instanceof HTMLElement ? element : null
-}
-
 function createFollowStyle(
   centeredStyle: CSSProperties,
   point: { x: number; y: number },
@@ -132,28 +121,17 @@ function useHandleDirectionPresentation(
   nodeKindLabel: () => string,
 ) {
   const policy = HANDLE_DIRECTION_POLICIES[direction]
-  const element = shallowRef<FlowNodeHandleElement>(null)
   const portIds = computed(() =>
     policy.getPorts(options.kind()).map((port) => `${policy.portPrefix}:${port}`),
   )
   const proximity = useCanvasHandleProximity({
+    nodeId: options.nodeId(),
     direction,
-    getAnchorRect: () => {
-      const handle = resolveHandleElement(element.value)
-      if (!handle) return null
-      return measureCanvasPerf('handle-proximity.layout-read', undefined, () => {
-        recordCanvasInteractionCount('handleGeometryLayoutReadCount')
-        return handle.getBoundingClientRect()
-      })
-    },
     enabled: computed(() => portIds.value.length > 0 && !options.disabled()),
   })
   const visible = computed(
     () => !options.disabled() && (options.showHandles() || proximity.isActive.value),
   )
-  const setElement = (value: FlowNodeHandleElement) => {
-    element.value = value
-  }
   const anchors = computed<FlowNodeAnchorHandlePresentation[]>(() =>
     policy.getAnchorIds(portIds.value).map((id) => ({
       id,
@@ -180,7 +158,6 @@ function useHandleDirectionPresentation(
         : policy.centeredStyle,
       ariaLabel: `${nodeKindLabel()}${policy.ariaDirectionLabel}连接点，拖拽创建连接`,
       title: policy.title,
-      setElement,
     }
   })
 

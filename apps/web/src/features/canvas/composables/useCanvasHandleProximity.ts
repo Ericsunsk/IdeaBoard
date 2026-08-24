@@ -12,15 +12,15 @@ import {
 } from 'vue'
 import {
   createCanvasHandleProximityCoordinator,
-  type CanvasHandleAnchorRect,
+  type CanvasHandleProximityGeometry,
   type CanvasHandleProximityCoordinator,
   type CanvasHandleProximityDirection,
   type CanvasHandleProximityPoint,
 } from './canvasHandleProximityCoordinator'
 
 type UseCanvasHandleProximityOptions = {
+  nodeId: string
   direction: CanvasHandleProximityDirection
-  getAnchorRect: () => CanvasHandleAnchorRect | null
   enabled: MaybeRef<boolean>
 }
 
@@ -88,6 +88,8 @@ function installPointerAdapter(coordinator: CanvasHandleProximityCoordinator) {
   window.addEventListener('pointermove', onPointerMove, true)
   window.addEventListener('pointerleave', onPointerLeave, true)
   window.addEventListener('blur', onPointerLeave)
+  window.addEventListener('resize', requestRefresh)
+  window.addEventListener('scroll', requestRefresh, true)
 
   return {
     requestRefresh,
@@ -95,6 +97,8 @@ function installPointerAdapter(coordinator: CanvasHandleProximityCoordinator) {
       window.removeEventListener('pointermove', onPointerMove, true)
       window.removeEventListener('pointerleave', onPointerLeave, true)
       window.removeEventListener('blur', onPointerLeave)
+      window.removeEventListener('resize', requestRefresh)
+      window.removeEventListener('scroll', requestRefresh, true)
       if (evaluationFrame !== null) window.cancelAnimationFrame(evaluationFrame)
       evaluationFrame = null
       pendingPointer = null
@@ -106,7 +110,8 @@ function installPointerAdapter(coordinator: CanvasHandleProximityCoordinator) {
 }
 
 export function provideCanvasHandleProximityCoordinator(
-  coordinator = createCanvasHandleProximityCoordinator(),
+  geometry: CanvasHandleProximityGeometry,
+  coordinator = createCanvasHandleProximityCoordinator(geometry),
 ) {
   const pointerAdapter = installPointerAdapter(coordinator)
   provide(COORDINATOR_KEY, {
@@ -133,8 +138,8 @@ export function useCanvasHandleProximity(options: UseCanvasHandleProximityOption
 
   onMounted(() => {
     unregister = coordinator.register({
+      nodeId: options.nodeId,
       direction: options.direction,
-      getAnchorRect: options.getAnchorRect,
       isEnabled: () => unref(options.enabled),
       onStateChange: (state) => {
         isActive.value = state.isActive

@@ -2,8 +2,8 @@ import { ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 type ProximityOptions = {
+  nodeId: string
   direction: 'input' | 'output'
-  getAnchorRect: () => DOMRect | null
 }
 
 const proximityOptions: ProximityOptions[] = []
@@ -20,38 +20,26 @@ vi.mock('./useCanvasHandleProximity', () => ({
 
 import { useFlowNodeHandlesPresentation } from './useFlowNodeHandlesPresentation'
 
-describe('useFlowNodeHandlesPresentation benchmark metrics', () => {
+describe('useFlowNodeHandlesPresentation', () => {
   afterEach(() => {
     proximityOptions.length = 0
-    delete window.__canvasInteractionBenchmarkCounters
     vi.restoreAllMocks()
   })
 
-  it('counts an actual handle layout read but not a missing element', () => {
-    window.__canvasInteractionBenchmarkCounters = {}
+  it('registers only node identity and direction with the proximity coordinator', () => {
     const presentation = useFlowNodeHandlesPresentation({
+      nodeId: () => 'image-1',
       kind: () => 'image',
       showHandles: () => true,
       disabled: () => false,
     })
-    const outputOptions = proximityOptions.find((options) => options.direction === 'output')
 
-    expect(outputOptions?.getAnchorRect()).toBeNull()
-    expect(
-      window.__canvasInteractionBenchmarkCounters.handleGeometryLayoutReadCount,
-    ).toBeUndefined()
-
-    const handle = document.createElement('div')
-    const bounds = handle.getBoundingClientRect()
-    vi.spyOn(handle, 'getBoundingClientRect').mockReturnValue(bounds)
-    presentation.value.aggregates.find((item) => item.direction === 'output')?.setElement(handle)
-
-    expect(outputOptions?.getAnchorRect()).toBe(bounds)
-    expect(window.__canvasInteractionBenchmarkCounters).toMatchObject({
-      handleGeometryLayoutReadCount: 1,
-      runtimeTimingMs: {
-        'handle-proximity.layout-read': { count: 1 },
-      },
-    })
+    expect(proximityOptions).toMatchObject([
+      { nodeId: 'image-1', direction: 'input' },
+      { nodeId: 'image-1', direction: 'output' },
+    ])
+    expect(presentation.value.aggregates.every((aggregate) => !('setElement' in aggregate))).toBe(
+      true,
+    )
   })
 })

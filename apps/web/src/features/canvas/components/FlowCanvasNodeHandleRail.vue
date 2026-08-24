@@ -16,7 +16,6 @@
     <Handle
       v-for="aggregate in presentation.aggregates"
       :id="aggregate.id"
-      :ref="aggregate.setElement"
       :key="`canvas-${aggregate.direction}-aggregate:${aggregate.id}`"
       :type="aggregate.handleType"
       :position="aggregate.position"
@@ -66,6 +65,7 @@ const { showHandleControls, refreshTransientHandleVisibility } =
 const { connectionStartHandle } = useVueFlow()
 const isConnectionDragging = computed(() => connectionStartHandle.value !== null)
 const presentation = useFlowNodeHandlesPresentation({
+  nodeId: () => props.nodeId,
   kind: () => props.kind,
   showHandles: () => showHandleControls.value,
   disabled: () => props.disabled === true,
