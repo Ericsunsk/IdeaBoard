@@ -87,7 +87,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watchPostEffect } from 'vue'
-import type { FusionNodeItem } from '../../../canvas-board/domain'
+import type { FusionNodeItem } from '../../../../canvas-board/domain'
 import {
   FUSION_SLOT_LAYOUT,
   buildFusionDisplayPercentages,
@@ -96,12 +96,12 @@ import {
   getFusionSlotAnchor,
   getFusionSlotAnchors,
   type FusionBlendPoint,
-} from '../../../canvas-board/domain'
+} from '../../../../canvas-board/domain'
 import { useFusionBlendControl } from './useFusionBlendControl'
-import NodeEmptyStateIcon from './NodeEmptyStateIcon.vue'
-import NodeInputThumbnail from './NodeInputThumbnail.vue'
-import NodeStageFrame from './NodeStageFrame.vue'
-import { useImageInputSlots } from './useImageInputSlots'
+import NodeEmptyStateIcon from '../primitives/NodeEmptyStateIcon.vue'
+import NodeInputThumbnail from '../primitives/NodeInputThumbnail.vue'
+import NodeStageFrame from '../primitives/NodeStageFrame.vue'
+import { useImageInputSlots } from '../primitives/useImageInputSlots'
 
 const props = defineProps<{
   active: boolean

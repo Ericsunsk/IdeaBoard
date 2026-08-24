@@ -142,9 +142,8 @@ import {
   MASK_EDITOR_MIN_BRUSH_SIZE,
   MASK_EDITOR_MIN_LAYER_OPACITY,
 } from '../config/maskEditorConstants'
-import ImageToolChromeFrame from '../../components/nodes/ImageToolChromeFrame.vue'
-import NodeToolIconButton from '../../components/nodes/NodeToolIconButton.vue'
-import PromptTextComposer from '../../components/nodes/PromptTextComposer.vue'
+import ImageToolChromeFrame from '../../image-tools/components/ImageToolChromeFrame.vue'
+import { NodeToolIconButton, PromptTextComposer } from '../../components/nodes/primitives'
 import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
 import { useCanvasBillingQuote } from '../../execution'
 

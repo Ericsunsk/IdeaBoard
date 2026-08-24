@@ -83,7 +83,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Copy, EmptyPage, SendDiagonalSolid, Trash, VerticalMerge, Xmark } from '@iconoir/vue'
-import NodeToolIconButton from '../../components/nodes/NodeToolIconButton.vue'
+import { NodeToolIconButton } from '../../components/nodes/primitives'
 import type { ImageAdjustmentFinalApplyProgress } from '../runtime/imageAdjustmentFinalApplyContext'
 
 const props = defineProps<{

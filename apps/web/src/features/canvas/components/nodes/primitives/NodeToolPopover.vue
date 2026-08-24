@@ -7,7 +7,7 @@
 </template>
 
 <script setup lang="ts">
-import { createPopoverMotionTransition } from '../../../../shared/motion/popoverMotion'
+import { createPopoverMotionTransition } from '../../../../../shared/motion/popoverMotion'
 
 const props = withDefaults(
   defineProps<{

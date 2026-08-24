@@ -146,9 +146,7 @@ import {
   useCanvasViewportContext,
 } from '../vue-flow-adapter/useCanvasViewportContext'
 import FlowCanvasNodeHandleRail from './FlowCanvasNodeHandleRail.vue'
-import FusionNode from './nodes/FusionNode.vue'
-import ImageNode from './nodes/ImageNode.vue'
-import PromptNode from './nodes/PromptNode.vue'
+import { FusionNode, ImageNode, PromptNode } from './nodes/workflows'
 
 const props = withDefaults(
   defineProps<{

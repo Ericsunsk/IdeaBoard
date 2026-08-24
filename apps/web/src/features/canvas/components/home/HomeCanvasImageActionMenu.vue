@@ -83,7 +83,7 @@ import {
 } from '../../execution/commands/flowImageTaskRequests'
 import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import ImageActionMenuIcon from './ImageActionMenuIcon.vue'
-import NodeToolIconButton from '../nodes/NodeToolIconButton.vue'
+import { NodeToolIconButton } from '../nodes/primitives'
 import { createPopoverMotionTransition } from '../../../../shared/motion/popoverMotion'
 
 const props = defineProps<{

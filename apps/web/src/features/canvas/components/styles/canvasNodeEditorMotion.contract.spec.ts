@@ -11,13 +11,13 @@ function readSource(relativePath: string) {
 }
 
 const nodeMotionSources = [
-  'components/nodes/FusionStage.vue',
-  'components/nodes/ImageNodeStage.vue',
-  'components/nodes/ImageToolChromeFrame.vue',
-  'components/nodes/NodeAspectRatioPicker.vue',
-  'components/nodes/NodePromptComposer.vue',
-  'components/nodes/NodeStageFrame.vue',
-  'components/nodes/NodeToolIconButton.vue',
+  'components/nodes/workflows/FusionStage.vue',
+  'components/nodes/workflows/ImageNodeStage.vue',
+  'image-tools/components/ImageToolChromeFrame.vue',
+  'components/nodes/primitives/NodeAspectRatioPicker.vue',
+  'components/nodes/primitives/NodePromptComposer.vue',
+  'components/nodes/primitives/NodeStageFrame.vue',
+  'components/nodes/primitives/NodeToolIconButton.vue',
   'components/nodes/styles/node-input-thumbnails.css',
   'components/nodes/styles/node-shared.css',
   'components/nodes/styles/node-tool-buttons.css',
@@ -44,7 +44,7 @@ describe('Canvas Node and editor Motion contract', () => {
 
   it('stops continuous running and apply motion when reduced motion is requested', () => {
     const runningBorder = readSource('components/nodes/styles/node-shared.css')
-    const fusionStage = readSource('components/nodes/FusionStage.vue')
+    const fusionStage = readSource('components/nodes/workflows/FusionStage.vue')
     const layerActions = readSource('image-editor/components/ImageEditorLayerActions.vue')
 
     expect(runningBorder).toMatch(

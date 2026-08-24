@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { render, renderWithUser, screen } from '../../../../test/render'
-import type { CanvasBillingQuoteState } from '../../execution'
+import { render, renderWithUser, screen } from '../../../../../test/render'
+import type { CanvasBillingQuoteState } from '../../../execution'
 import PromptComposerControls from './PromptComposerControls.vue'
 
 function renderControls(billingState?: CanvasBillingQuoteState | null) {

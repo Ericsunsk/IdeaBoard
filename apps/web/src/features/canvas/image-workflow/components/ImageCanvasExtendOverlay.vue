@@ -41,11 +41,11 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import NodePromptComposer from './NodePromptComposer.vue'
+import { NodePromptComposer } from '../../components/nodes/primitives'
 import {
   CANVAS_EXTEND_DRAG_ANCHORS,
   type CanvasExtendDragAnchor,
-} from '../../image-workflow/useImageCanvasExtendOverlay'
+} from '../useImageCanvasExtendOverlay'
 import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
 import { useCanvasBillingQuote } from '../../execution'
 import { buildCanvasExtendReadinessRequest } from '../../execution/commands/flowImageTaskRequests'

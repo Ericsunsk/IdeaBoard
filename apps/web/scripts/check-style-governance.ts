@@ -145,7 +145,7 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
     },
     reason: 'Admin route typography and tooltip bridge for PrimeVue vendor DOM.',
   },
-  'src/features/canvas/components/nodes/NodeToolIconButton.vue': {
+  'src/features/canvas/components/nodes/primitives/NodeToolIconButton.vue': {
     counts: {
       'deep-selector': 1,
     },

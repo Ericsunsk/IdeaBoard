@@ -2,7 +2,7 @@ import { defineComponent } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '../../../test/render'
 import CanvasNodeContextMenu from './CanvasNodeContextMenu.vue'
-import NodeToolPopover from './nodes/NodeToolPopover.vue'
+import NodeToolPopover from './nodes/primitives/NodeToolPopover.vue'
 
 const TransitionStub = defineComponent({
   props: {

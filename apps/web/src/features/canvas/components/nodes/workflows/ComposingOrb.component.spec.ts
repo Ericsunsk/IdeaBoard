@@ -1,6 +1,6 @@
 import { cleanup } from '@testing-library/vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render } from '../../../../test/render'
+import { render } from '../../../../../test/render'
 import ComposingOrb from './ComposingOrb.vue'
 
 function installBrowserMocks(prefersReducedMotion: boolean) {

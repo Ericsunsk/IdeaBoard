@@ -1,11 +1,11 @@
 import { computed, toValue } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent } from '@testing-library/vue'
-import type { ImageToolStageBinding } from '../../image-tools'
+import type { ImageToolStageBinding } from '../../../image-tools'
 import ImageNodeStage from './ImageNodeStage.vue'
-import { render } from '../../../../test/render'
+import { render } from '../../../../../test/render'
 
-vi.mock('../../vue-flow-adapter/useDisplayImagePreview', () => ({
+vi.mock('../../../vue-flow-adapter/useDisplayImagePreview', () => ({
   useDisplayImagePreview: (sourceUrl: Parameters<typeof toValue>[0]) => ({
     displayUrl: computed(() => toValue(sourceUrl) ?? ''),
   }),

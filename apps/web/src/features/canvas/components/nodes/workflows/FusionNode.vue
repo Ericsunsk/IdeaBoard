@@ -55,17 +55,17 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Keyframes } from '@iconoir/vue'
-import { requireImageNodeOutputCount, type FusionNodeItem } from '../../../canvas-board/domain'
-import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../canvas-board/domain'
-import type { OutputResolution } from '../../../../shared/domain/generationContract'
-import type { NodeUiState } from '../../types/canvasNodeUi'
-import type { FusionBlendPoint } from '../../../canvas-board/domain'
+import { requireImageNodeOutputCount, type FusionNodeItem } from '../../../../canvas-board/domain'
+import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../../canvas-board/domain'
+import type { OutputResolution } from '../../../../../shared/domain/generationContract'
+import type { NodeUiState } from '../../../types/canvasNodeUi'
+import type { FusionBlendPoint } from '../../../../canvas-board/domain'
 import FusionStage from './FusionStage.vue'
-import NodeShell from './NodeShell.vue'
-import NodePromptComposer from './NodePromptComposer.vue'
-import NodeFloatingControls from './NodeFloatingControls.vue'
-import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
-import { buildFusionBillingReadinessRequest, useCanvasBillingQuote } from '../../execution'
+import NodeShell from '../primitives/NodeShell.vue'
+import NodePromptComposer from '../primitives/NodePromptComposer.vue'
+import NodeFloatingControls from '../primitives/NodeFloatingControls.vue'
+import { WORKFLOW_FEATURE } from '../../../../../shared/domain/workflowFeatures'
+import { buildFusionBillingReadinessRequest, useCanvasBillingQuote } from '../../../execution'
 
 const props = defineProps<{
   node: FusionNodeItem

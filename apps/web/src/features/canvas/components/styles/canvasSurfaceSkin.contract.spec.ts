@@ -13,8 +13,10 @@ const appStyle = readSource('../../app/style.css')
 const chromeSkin = readSource('components/styles/canvas-chrome.css')
 const nodeSkin = readSource('components/nodes/styles/node-shared.css')
 const nodeToolSkin = readSource('components/nodes/styles/node-tool-buttons.css')
-const nodeStageFrame = readSource('components/nodes/NodeStageFrame.vue')
-const renderedImagePreviewCanvas = readSource('components/nodes/RenderedImagePreviewCanvas.vue')
+const nodeStageFrame = readSource('components/nodes/primitives/NodeStageFrame.vue')
+const renderedImagePreviewCanvas = readSource(
+  'image-tools/components/RenderedImagePreviewCanvas.vue',
+)
 const imageToolStagePresentation = readSource(
   'image-tools/components/ImageToolStagePresentation.vue',
 )

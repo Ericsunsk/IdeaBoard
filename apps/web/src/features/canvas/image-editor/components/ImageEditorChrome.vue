@@ -46,7 +46,7 @@ import type {
   ImageEditorParamValue,
 } from '../types'
 import ImageEditorAdjustmentActions from './ImageEditorAdjustmentActions.vue'
-import ImageToolChromeFrame from '../../components/nodes/ImageToolChromeFrame.vue'
+import ImageToolChromeFrame from '../../image-tools/components/ImageToolChromeFrame.vue'
 import ImageEditorLayerActions from './ImageEditorLayerActions.vue'
 import ImageEditorLayersPanel from './ImageEditorLayersPanel.vue'
 import ImageEditorPropertiesPanel from './ImageEditorPropertiesPanel.vue'

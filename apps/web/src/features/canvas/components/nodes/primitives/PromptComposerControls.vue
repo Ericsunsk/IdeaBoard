@@ -74,13 +74,13 @@ import { SendDiagonalSolid } from '@iconoir/vue'
 import {
   IMAGE_OUTPUT_COUNT_PRESET_OPTIONS,
   type PromptAspectRatio,
-} from '../../../canvas-board/domain'
+} from '../../../../canvas-board/domain'
 import {
   OUTPUT_RESOLUTION_OPTIONS,
   type OutputResolution,
-} from '../../../../shared/domain/generationContract'
-import { formatIdeaAmount } from '../../../../shared/utils/ideaCurrency'
-import type { CanvasBillingQuoteState } from '../../execution'
+} from '../../../../../shared/domain/generationContract'
+import { formatIdeaAmount } from '../../../../../shared/utils/ideaCurrency'
+import type { CanvasBillingQuoteState } from '../../../execution'
 import NodeAspectRatioPicker from './NodeAspectRatioPicker.vue'
 import NodeTextOptionPicker from './NodeTextOptionPicker.vue'
 import {

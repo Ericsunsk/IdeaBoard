@@ -92,17 +92,17 @@ import {
   requireImageNodeOutputCount,
   type ImageNodeItem,
   type LibraryImportFact,
-} from '../../../canvas-board/domain'
-import type { ImageNodeAction } from '../../config/imageActionRegistry'
-import type { OutputResolution } from '../../../../shared/domain/generationContract'
-import type { CanvasExtendDragAnchor } from '../../image-workflow/useImageCanvasExtendOverlay'
-import type { ImageActionBinding, ImageToolStageBinding } from '../../image-tools'
-import type { FlowLocalUploadState } from '../../types/flowTypes'
-import HomeCanvasImageActionMenu from '../home/HomeCanvasImageActionMenu.vue'
-import NodePromptComposer from './NodePromptComposer.vue'
-import NodeFloatingControls from './NodeFloatingControls.vue'
+} from '../../../../canvas-board/domain'
+import type { ImageNodeAction } from '../../../config/imageActionRegistry'
+import type { OutputResolution } from '../../../../../shared/domain/generationContract'
+import type { CanvasExtendDragAnchor } from '../../../image-workflow/useImageCanvasExtendOverlay'
+import type { ImageActionBinding, ImageToolStageBinding } from '../../../image-tools'
+import type { FlowLocalUploadState } from '../../../types/flowTypes'
+import HomeCanvasImageActionMenu from '../../home/HomeCanvasImageActionMenu.vue'
+import NodePromptComposer from '../primitives/NodePromptComposer.vue'
+import NodeFloatingControls from '../primitives/NodeFloatingControls.vue'
 import ImageNodeStage from './ImageNodeStage.vue'
-import NodeShell from './NodeShell.vue'
+import NodeShell from '../primitives/NodeShell.vue'
 
 const props = defineProps<{
   node: ImageNodeItem

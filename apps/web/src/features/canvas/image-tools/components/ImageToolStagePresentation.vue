@@ -21,7 +21,7 @@
 import { computed, onBeforeUnmount, watch } from 'vue'
 import type { ImageToolStageBinding } from '../imageToolBindings'
 import { ImageMaskEditorOverlay } from '../../mask-editor'
-import RenderedImagePreviewCanvas from '../../components/nodes/RenderedImagePreviewCanvas.vue'
+import RenderedImagePreviewCanvas from './RenderedImagePreviewCanvas.vue'
 
 const props = defineProps<{ binding: ImageToolStageBinding }>()
 const maskOverlayStyle = computed(() =>

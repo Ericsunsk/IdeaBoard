@@ -64,9 +64,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Plus } from '@iconoir/vue'
-import type { PromptAspectRatio } from '../../../canvas-board/domain'
-import type { OutputResolution } from '../../../../shared/domain/generationContract'
-import type { CanvasBillingQuoteState } from '../../execution'
+import type { PromptAspectRatio } from '../../../../canvas-board/domain'
+import type { OutputResolution } from '../../../../../shared/domain/generationContract'
+import type { CanvasBillingQuoteState } from '../../../execution'
 import NodeInputThumbnail from './NodeInputThumbnail.vue'
 import PromptComposerControls from './PromptComposerControls.vue'
 

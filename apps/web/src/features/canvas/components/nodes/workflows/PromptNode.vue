@@ -80,17 +80,17 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ChatLines, Plus } from '@iconoir/vue'
-import { requireImageNodeOutputCount, type PromptNodeItem } from '../../../canvas-board/domain'
-import type { PromptNodeUiState } from '../../types/canvasNodeUi'
-import NodeInputThumbnail from './NodeInputThumbnail.vue'
-import NodeShell from './NodeShell.vue'
-import NodeStageFrame from './NodeStageFrame.vue'
-import PromptTextComposer from './PromptTextComposer.vue'
-import { useImageInputSlots } from './useImageInputSlots'
-import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../canvas-board/domain'
-import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
-import { useCanvasBillingQuote } from '../../execution'
-import { buildPromptGenerationTaskRequest } from '../../execution/commands/flowImageTaskRequests'
+import { requireImageNodeOutputCount, type PromptNodeItem } from '../../../../canvas-board/domain'
+import type { PromptNodeUiState } from '../../../types/canvasNodeUi'
+import NodeInputThumbnail from '../primitives/NodeInputThumbnail.vue'
+import NodeShell from '../primitives/NodeShell.vue'
+import NodeStageFrame from '../primitives/NodeStageFrame.vue'
+import PromptTextComposer from '../primitives/PromptTextComposer.vue'
+import { useImageInputSlots } from '../primitives/useImageInputSlots'
+import { normalizePromptAspectRatio, type PromptAspectRatio } from '../../../../canvas-board/domain'
+import { WORKFLOW_FEATURE } from '../../../../../shared/domain/workflowFeatures'
+import { useCanvasBillingQuote } from '../../../execution'
+import { buildPromptGenerationTaskRequest } from '../../../execution/commands/flowImageTaskRequests'
 
 const props = defineProps<{
   node: PromptNodeItem
@@ -109,7 +109,7 @@ const emit = defineEmits<{
   (e: 'focus'): void
   (e: 'update:text', value: string): void
   (e: 'update:output-count', value: number): void
-  (e: 'update:output-resolution', value: import('../../../../shared/domain/generationContract').OutputResolution): void
+  (e: 'update:output-resolution', value: import('../../../../../shared/domain/generationContract').OutputResolution): void
   (e: 'update:aspect-ratio', value: PromptAspectRatio): void
   (e: 'update:input-images', value: PromptNodeItem['inputImages']): void
   (e: 'input-image-drop', event: DragEvent): void

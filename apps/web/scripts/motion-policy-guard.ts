@@ -24,7 +24,7 @@ const localMotionAllowances: Record<string, LocalMotionAllowance> = {
     properties: ['--node-tool-tooltip-delay'],
     reason: 'Image-editor tooltips need a dwell delay, which is not a transition duration.',
   },
-  'src/features/canvas/components/nodes/NodeActionButton.vue': {
+  'src/features/canvas/components/nodes/primitives/NodeActionButton.vue': {
     properties: ['--node-tool-tooltip-delay'],
     reason: 'The compact node action tooltip needs a dwell delay, not a motion duration.',
   },
@@ -40,7 +40,7 @@ const localMotionAllowances: Record<string, LocalMotionAllowance> = {
     reason:
       'Indeterminate apply progress needs a continuous cycle and exposes a static reduced-motion state.',
   },
-  'src/features/canvas/components/nodes/FusionStage.vue': {
+  'src/features/canvas/components/nodes/workflows/FusionStage.vue': {
     animationEasingCount: 1,
     reason:
       'Fusion execution flow reuses the Canvas activity cycle and stops under reduced motion.',
