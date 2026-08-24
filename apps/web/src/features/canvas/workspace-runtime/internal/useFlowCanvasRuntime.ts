@@ -3,7 +3,7 @@ import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import { useCanvasGraphHistory } from '../../graph-runtime/application/useCanvasGraphHistory'
 import {
   useCanvasBoardAutosave,
-  useCanvasBoardPersistence,
+  useCanvasBoardSync,
   type SaveStatus,
 } from '../../board-session'
 import {
@@ -18,6 +18,7 @@ import {
 import { createFlowGraphCommandOptions } from '../../vue-flow-adapter/flowGraphAdapterCommandSideEffects'
 import { useCanvasGroupRuntime } from '../../graph-runtime/application/useCanvasGroupRuntime'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
+import { canvasBoardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
 import type { CanvasBoardSession } from '../../board-session'
 import {
   createCanvasDeleteCommandLifecycle,
@@ -164,8 +165,9 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     },
   })
 
-  const boardPersistence = useCanvasBoardPersistence({
-    boardBaseSnapshot: options.boardBaseSnapshot,
+  const boardSync = useCanvasBoardSync({
+    buildCurrentSnapshot: () =>
+      requireGraphSessionRuntime().exportGraphSnapshot(options.boardBaseSnapshot.value),
     isDirty: options.isDirty,
     saveStatus: options.saveStatus,
     graphRevision: localEditVersion,
@@ -176,34 +178,55 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     onWarning: options.onWarning,
     onSuccess: options.onSuccess,
     onError: options.onError,
-    clearGraphHistoryBaseline: canvasGraphHistory.clearBaseline,
-    canReconcileGraph: () => !nodeDragLifecycle.isActive(),
-    replaceGraphSnapshot: (snapshot, reason) =>
-      requireGraphSessionRuntime().replaceGraphSnapshot(snapshot, reason),
-    exportGraphSnapshot: (baseSnapshot) =>
-      requireGraphSessionRuntime().exportGraphSnapshot(baseSnapshot),
-    commitGraph: (graph, commitOptions) =>
-      requireGraphSessionRuntime().commitGraph(
-        {
-          nodes: graph.nodes as Node[],
-          edges: graph.edges as Edge[],
-        },
-        commitOptions.source,
-      ),
+    canApplyReconciliation: () => !nodeDragLifecycle.isActive(),
   })
 
-  const currentBoardId = boardPersistence.currentBoardId
-  const loadInitialOrRouteBoardBase = boardPersistence.loadInitialOrRouteBoard
-  const loadInitialOrRouteBoard: typeof loadInitialOrRouteBoardBase = async (...args) => {
+  const currentBoardId = boardSync.currentBoardId
+  function applyBoardSnapshot(
+    snapshot: CanvasBoardSnapshot,
+    source: 'hydrate-replace' | 'save-reconcile',
+    applyOptions: { clearHistory?: boolean } = {},
+  ) {
+    const graphRuntime = requireGraphSessionRuntime()
+    options.boardBaseSnapshot.value = snapshot
+    graphRuntime.replaceGraphSnapshot(
+      snapshot,
+      source === 'hydrate-replace' ? 'hydrate' : 'save-reconcile',
+    )
+    const flow = canvasBoardSnapshotToFlow(snapshot)
+    graphRuntime.commitGraph(
+      { nodes: flow.nodes as Node[], edges: flow.edges as Edge[] },
+      source,
+    )
+    if (source === 'hydrate-replace' || applyOptions.clearHistory) {
+      canvasGraphHistory.clearBaseline()
+    }
+  }
+
+  const loadInitialOrRouteBoard = async (): Promise<void> => {
     nodeDragLifecycle.cancel()
     groupRuntime?.internal.resetTransientSelectionState()
     graphSessionRuntime?.dispose()
     options.executionCore.detachBoard()
-    await loadInitialOrRouteBoardBase(...args)
+    const result = await boardSync.loadInitialOrRouteBoard()
+    if (result.status === 'empty' || result.status === 'loaded') {
+      applyBoardSnapshot(result.snapshot, 'hydrate-replace')
+    }
     groupRuntime?.internal.handleCommittedGroupsChanged()
   }
-  const saveCurrentBoardSnapshot = boardPersistence.saveCurrentBoardSnapshot
-  const canSaveBoard = boardPersistence.canSaveBoard
+  const saveCurrentBoardSnapshot = async (saveOptions: {
+    waitForPreview?: boolean
+    silent?: boolean
+  } = {}) => {
+    const result = await boardSync.saveCurrentBoardSnapshot(saveOptions)
+    if (result.reconciliation) {
+      applyBoardSnapshot(result.reconciliation.snapshot, 'save-reconcile', {
+        clearHistory: !result.reconciliation.hasLocalDraftAdvanced,
+      })
+    }
+    return result.saved
+  }
+  const canSaveBoard = boardSync.canSaveBoard
 
   const { markDirtyAndSchedule, flushAutosave } = useCanvasBoardAutosave({
     isDirty: options.isDirty,

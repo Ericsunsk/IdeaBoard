@@ -1,14 +1,19 @@
 import { computed } from 'vue'
 import {
-  createBoardPersistenceSession,
-  type BoardPersistenceSessionOptions,
-} from './boardPersistenceSession'
+  createBoardSyncCoordinator,
+  type BoardSyncCoordinatorOptions,
+} from './boardSyncCoordinator'
 
-export type { CanvasGraphSnapshotReplaceReason, SaveStatus } from './boardPersistenceSession'
+export type {
+  CanvasBoardLoadResult,
+  CanvasBoardSaveResult,
+  CanvasBoardSaveReconciliation,
+  SaveStatus,
+} from './boardSyncCoordinator'
 
-export type UseCanvasBoardPersistenceOptions = Omit<BoardPersistenceSessionOptions, 'canSaveBoard'>
+export type UseCanvasBoardSyncOptions = Omit<BoardSyncCoordinatorOptions, 'canSaveBoard'>
 
-export function useCanvasBoardPersistence(options: UseCanvasBoardPersistenceOptions) {
+export function useCanvasBoardSync(options: UseCanvasBoardSyncOptions) {
   const currentBoardId = options.boardSession.currentBoardId
   const currentBoardExists = computed(() => {
     const boardId = currentBoardId.value
@@ -19,7 +24,7 @@ export function useCanvasBoardPersistence(options: UseCanvasBoardPersistenceOpti
     () =>
       !!currentBoardId.value && currentBoardExists.value && !options.isLoadingBoardSnapshot.value,
   )
-  const session = createBoardPersistenceSession({
+  const session = createBoardSyncCoordinator({
     ...options,
     canSaveBoard: () => canSaveBoard.value,
   })

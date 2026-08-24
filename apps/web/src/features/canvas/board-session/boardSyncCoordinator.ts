@@ -1,7 +1,4 @@
 import {
-  canvasBoardSnapshotToFlow,
-} from '../utils/flowSnapshotAdapter'
-import {
   createEmptyCanvasBoardSnapshot,
   InvalidBoardStateError,
   rebuildCanvasBoardMediaRefs,
@@ -16,21 +13,13 @@ export type SaveStatus = 'idle' | 'saved' | 'pending' | 'retry' | 'conflict' | '
 
 type SaveFailureKind = 'sync-failed' | 'conflict' | 'save-failed'
 export type ValueRef<T> = { value: T }
-export type ArrayRef = { value: unknown[] }
-
 export type SaveCurrentBoardSnapshotOptions = {
   waitForPreview?: boolean
   silent?: boolean
 }
 
-export type FlowGraphCommitOptions = {
-  source: 'hydrate-replace' | 'save-reconcile'
-}
-
-export type CanvasGraphSnapshotReplaceReason = 'hydrate' | 'save-reconcile'
-
-export type BoardPersistenceSessionOptions = {
-  boardBaseSnapshot: ValueRef<CanvasBoardSnapshot>
+export type BoardSyncCoordinatorOptions = {
+  buildCurrentSnapshot: () => CanvasBoardSnapshot
   isDirty: ValueRef<boolean>
   saveStatus: ValueRef<SaveStatus>
   graphRevision: ValueRef<number>
@@ -39,25 +28,33 @@ export type BoardPersistenceSessionOptions = {
   boardSession: CanvasBoardSession
   readBoardAttachmentEpoch: () => number
   canSaveBoard: () => boolean
+  canApplyReconciliation: () => boolean
   onWarning: (text: string) => void
   onSuccess: (text: string) => void
   onError: (text: string) => void
-  clearGraphHistoryBaseline: () => void
-  canReconcileGraph: () => boolean
-  replaceGraphSnapshot: (
-    snapshot: CanvasBoardSnapshot,
-    reason: CanvasGraphSnapshotReplaceReason,
-  ) => void
-  exportGraphSnapshot: (base: CanvasBoardSnapshot) => CanvasBoardSnapshot
-  commitGraph: (
-    graph: { nodes: unknown[]; edges: unknown[] },
-    options: FlowGraphCommitOptions,
-  ) => void
 }
 
-export type BoardPersistenceSession = {
-  loadInitialOrRouteBoard: () => Promise<void>
-  saveCurrentBoardSnapshot: (options?: SaveCurrentBoardSnapshotOptions) => Promise<boolean>
+export type BoardSyncCoordinator = {
+  loadInitialOrRouteBoard: () => Promise<CanvasBoardLoadResult>
+  saveCurrentBoardSnapshot: (
+    options?: SaveCurrentBoardSnapshotOptions,
+  ) => Promise<CanvasBoardSaveResult>
+}
+
+export type CanvasBoardLoadResult =
+  | { status: 'empty'; snapshot: CanvasBoardSnapshot }
+  | { status: 'loaded'; snapshot: CanvasBoardSnapshot }
+  | { status: 'stale' }
+  | { status: 'failed' }
+
+export type CanvasBoardSaveReconciliation = {
+  snapshot: CanvasBoardSnapshot
+  hasLocalDraftAdvanced: boolean
+}
+
+export type CanvasBoardSaveResult = {
+  saved: boolean
+  reconciliation?: CanvasBoardSaveReconciliation
 }
 
 type MediaAssetReference = Pick<ImageNodeOutputItem, 'url' | 'mediaAssetId'>
@@ -173,9 +170,9 @@ function isRecoverableSaveStatus(status: SaveStatus): boolean {
   return status === 'retry' || status === 'conflict' || status === 'recover'
 }
 
-export function createBoardPersistenceSession(
-  options: BoardPersistenceSessionOptions,
-): BoardPersistenceSession {
+export function createBoardSyncCoordinator(
+  options: BoardSyncCoordinatorOptions,
+): BoardSyncCoordinator {
   let saveSequence = 0
   let loadSequence = 0
   let deferredMediaStabilization:
@@ -212,20 +209,15 @@ export function createBoardPersistenceSession(
     options.saveStatus.value = options.canSaveBoard() ? 'saved' : 'idle'
   }
 
-  function applyBoardSnapshot(snapshot: CanvasBoardSnapshot) {
+  function applyLoadedSnapshot() {
     deferredMediaStabilization = null
-    const flow = canvasBoardSnapshotToFlow(snapshot)
-    options.replaceGraphSnapshot(snapshot, 'hydrate')
-    options.boardBaseSnapshot.value = snapshot
-    options.commitGraph(flow as { nodes: unknown[]; edges: unknown[] }, {
-      source: 'hydrate-replace',
-    })
     clearDirtyAfterImport()
-    options.clearGraphHistoryBaseline()
   }
 
   function importEmptyBoardSnapshot() {
-    applyBoardSnapshot(createEmptyCanvasBoardSnapshot())
+    const snapshot = createEmptyCanvasBoardSnapshot()
+    applyLoadedSnapshot()
+    return snapshot
   }
 
   function notifyLoadFailure(error: unknown) {
@@ -236,13 +228,12 @@ export function createBoardPersistenceSession(
     options.onError('导入画布快照失败，请稍后重试')
   }
 
-  async function importBoardSnapshot() {
+  async function importBoardSnapshot(): Promise<CanvasBoardLoadResult> {
     const boardId = readBoardIdFromQuery()
     if (!boardId) {
       loadSequence += 1
       options.isLoadingBoardSnapshot.value = false
-      importEmptyBoardSnapshot()
-      return
+      return { status: 'empty', snapshot: importEmptyBoardSnapshot() }
     }
     const loadToken = ++loadSequence
     deferredMediaStabilization = null
@@ -251,16 +242,17 @@ export function createBoardPersistenceSession(
     options.isLoadingBoardSnapshot.value = true
     try {
       const snapshot = await options.boardSession.load(boardId)
-      if (!isLoadStillCurrent()) return
+      if (!isLoadStillCurrent()) return { status: 'stale' }
       if (!snapshot) {
-        importEmptyBoardSnapshot()
-        return
+        return { status: 'empty', snapshot: importEmptyBoardSnapshot() }
       }
-      applyBoardSnapshot(snapshot)
+      applyLoadedSnapshot()
+      return { status: 'loaded', snapshot }
     } catch (error) {
-      if (!isLoadStillCurrent()) return
+      if (!isLoadStillCurrent()) return { status: 'stale' }
       console.warn('[canvas] load board snapshot failed', error)
       notifyLoadFailure(error)
+      return { status: 'failed' }
     } finally {
       if (loadToken === loadSequence) {
         options.isLoadingBoardSnapshot.value = false
@@ -271,23 +263,19 @@ export function createBoardPersistenceSession(
   async function loadInitialOrRouteBoard() {
     const boardId = readBoardIdFromQuery()
     if (boardId) {
-      await importBoardSnapshot()
-      return
+      return importBoardSnapshot()
     }
-    importEmptyBoardSnapshot()
+    return { status: 'empty', snapshot: importEmptyBoardSnapshot() } satisfies CanvasBoardLoadResult
   }
 
   function buildCurrentBoardSnapshot(): CanvasBoardSnapshot {
     return measureCanvasPerf(
       'board.save.buildSnapshot',
       () => ({
-        imageNodes: options.boardBaseSnapshot.value.imageNodes.length,
-        promptNodes: options.boardBaseSnapshot.value.promptNodes.length,
-        fusionNodes: options.boardBaseSnapshot.value.fusionNodes.length,
-        connections: options.boardBaseSnapshot.value.connections.length,
+        boardId: options.boardSession.currentBoardId.value,
       }),
       () => {
-        const current = options.exportGraphSnapshot(options.boardBaseSnapshot.value)
+        const current = options.buildCurrentSnapshot()
         if (!deferredMediaStabilization) return current
         return rebaseStabilizedMedia(
           deferredMediaStabilization.captured,
@@ -312,11 +300,11 @@ export function createBoardPersistenceSession(
 
   async function saveCurrentBoardSnapshot(
     saveOptions: SaveCurrentBoardSnapshotOptions = {},
-  ): Promise<boolean> {
+  ): Promise<CanvasBoardSaveResult> {
     const boardId = options.boardSession.currentBoardId.value
     if (!boardId) {
       options.onWarning('缺少 boardId，无法保存')
-      return false
+      return { saved: false }
     }
     const saveToken = ++saveSequence
     const saveAttachmentEpoch = options.readBoardAttachmentEpoch()
@@ -352,32 +340,25 @@ export function createBoardPersistenceSession(
         clearNotifiedSaveFailure(boardId)
       }
       const shouldCommitToCurrentGraph = isSaveStillCurrent()
+      let reconciliation: CanvasBoardSaveReconciliation | undefined
       if (shouldCommitToCurrentGraph) {
         const hasLocalDraftAdvanced = readGraphRevision() !== saveGraphRevision
         const currentSnapshot = hasLocalDraftAdvanced ? buildCurrentBoardSnapshot() : null
         const committedSnapshot = currentSnapshot
           ? rebaseStabilizedMedia(capturedSnapshot, currentSnapshot, stabilizedSnapshot)
           : stabilizedSnapshot
-        const didReconcileGraph = options.canReconcileGraph()
-        if (didReconcileGraph) {
-          options.replaceGraphSnapshot(committedSnapshot, 'save-reconcile')
-          options.boardBaseSnapshot.value = committedSnapshot
-          const nextFlow = canvasBoardSnapshotToFlow(committedSnapshot)
-          options.commitGraph(nextFlow as { nodes: unknown[]; edges: unknown[] }, {
-            source: 'save-reconcile',
-          })
+        const canApplyReconciliation = options.canApplyReconciliation()
+        if (canApplyReconciliation) {
           deferredMediaStabilization = null
+          reconciliation = { snapshot: committedSnapshot, hasLocalDraftAdvanced }
         } else {
           deferredMediaStabilization = {
             captured: capturedSnapshot,
             stabilized: stabilizedSnapshot,
           }
         }
-        if (remoteSync.ok && !hasLocalDraftAdvanced && didReconcileGraph) {
-          options.clearGraphHistoryBaseline()
-        }
         if (remoteSync.ok) {
-          const hasUnreconciledDraft = hasLocalDraftAdvanced || !didReconcileGraph
+          const hasUnreconciledDraft = hasLocalDraftAdvanced || !canApplyReconciliation
           options.isDirty.value = hasUnreconciledDraft
           options.saveStatus.value = hasUnreconciledDraft ? 'pending' : 'saved'
           if (!saveOptions.silent && !hasUnreconciledDraft) {
@@ -397,7 +378,10 @@ export function createBoardPersistenceSession(
       ) {
         options.saveStatus.value = previousSaveStatus
       }
-      return remoteSync.ok
+      return {
+        saved: remoteSync.ok,
+        reconciliation,
+      }
     } catch (error) {
       if (isSaveStillCurrent()) {
         options.saveStatus.value = 'retry'
@@ -409,7 +393,7 @@ export function createBoardPersistenceSession(
       ) {
         options.onError(error instanceof Error ? error.message : '保存失败，请稍后重试')
       }
-      return false
+      return { saved: false }
     } finally {
       if (saveToken === saveSequence) {
         options.isSavingBoard.value = false

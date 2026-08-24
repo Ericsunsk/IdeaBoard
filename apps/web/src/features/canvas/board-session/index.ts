@@ -1,7 +1,9 @@
 export { useCanvasBoardSession, type CanvasBoardSession } from './useCanvasBoardSession'
 export { useCanvasBoardAutosave } from './useCanvasBoardAutosave'
 export {
-  useCanvasBoardPersistence,
-  type CanvasGraphSnapshotReplaceReason,
+  useCanvasBoardSync,
+  type CanvasBoardLoadResult,
+  type CanvasBoardSaveResult,
+  type CanvasBoardSaveReconciliation,
   type SaveStatus,
-} from './useCanvasBoardPersistence'
+} from './useCanvasBoardSync'
