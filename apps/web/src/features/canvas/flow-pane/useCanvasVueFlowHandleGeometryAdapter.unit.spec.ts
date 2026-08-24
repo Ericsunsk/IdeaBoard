@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createCanvasHandleProximityCoordinator } from '../composables/canvasHandleProximityCoordinator'
+import { createCanvasHandleProximityCoordinator } from '../renderer/vue-flow/canvasHandleProximityCoordinator'
 
 const vueFlowMock = vi.hoisted(() => ({
   findNode: vi.fn(),

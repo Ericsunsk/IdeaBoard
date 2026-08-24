@@ -5,7 +5,7 @@ import type { ImageToolStageBinding } from '../../image-tools'
 import ImageNodeStage from './ImageNodeStage.vue'
 import { render } from '../../../../test/render'
 
-vi.mock('../../composables/useDisplayImagePreview', () => ({
+vi.mock('../../renderer/vue-flow/useDisplayImagePreview', () => ({
   useDisplayImagePreview: (sourceUrl: Parameters<typeof toValue>[0]) => ({
     displayUrl: computed(() => toValue(sourceUrl) ?? ''),
   }),

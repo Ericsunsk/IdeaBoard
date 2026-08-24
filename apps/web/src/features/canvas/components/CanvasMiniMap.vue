@@ -51,7 +51,7 @@ import { computed, onBeforeUnmount, ref } from 'vue'
 import { getBoundsofRects, getRectOfNodes, useVueFlow } from '@vue-flow/core'
 import { MiniMap } from '@vue-flow/minimap'
 import '@vue-flow/minimap/dist/style.css'
-import { usePointerDragSession } from '../composables/usePointerDragSession'
+import { usePointerDragSession } from '../utils/interaction/usePointerDragSession'
 
 const emit = defineEmits<{
   'center-requested': [payload: { position: { x: number; y: number } }]

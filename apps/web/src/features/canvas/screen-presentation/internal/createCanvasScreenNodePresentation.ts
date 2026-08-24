@@ -3,8 +3,8 @@ import type { NodeProps } from '@vue-flow/core'
 import {
   ACTIVE_NODE_PANEL_KIND,
   type useFlowActiveNodePanels,
-} from '../../composables/useFlowActiveNodePanels'
-import type { useImageStageRegistry } from '../../composables/useImageStageRegistry'
+} from '../useFlowActiveNodePanels'
+import type { useImageStageRegistry } from '../../renderer/vue-flow/useImageStageRegistry'
 import {
   createFusionNodePresentationResolver,
   createImageNodePresentationResolver,

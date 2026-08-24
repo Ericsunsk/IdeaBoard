@@ -11,7 +11,7 @@ import {
   type CanvasPoint,
 } from '../utils/canvasGroupGeometry'
 import type { CanvasSelectionGroupAction } from '../graph-runtime/application/useCanvasGroupRuntime'
-import type { DismissTransientCanvasUi } from '../composables/useFlowTransientUiDismissal'
+import type { DismissTransientCanvasUi } from '../screen-presentation/useFlowTransientUiDismissal'
 
 export type CanvasGroupResizeStartPayload = {
   event: PointerEvent

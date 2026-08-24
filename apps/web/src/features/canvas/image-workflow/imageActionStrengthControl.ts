@@ -4,7 +4,7 @@ import {
   getImageActionStrengthConfig,
   type ImageStrengthAction,
 } from '../execution'
-import { useStrengthRangeEditSession } from '../composables/useStrengthRangeEditSession'
+import { useStrengthRangeEditSession } from './useStrengthRangeEditSession'
 
 export function useFlowImageActionStrengthControl(options: {
   onCommit: (action: ImageStrengthAction, strength: number) => void

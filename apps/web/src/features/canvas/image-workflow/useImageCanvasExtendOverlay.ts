@@ -1,7 +1,7 @@
 import { tryOnScopeDispose, useEventListener } from '@vueuse/core'
 import { computed, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
-import type { CanvasInteractionKey } from './useFlowCanvasInteractionState'
+import type { CanvasInteractionKey } from '../screen-presentation/useFlowCanvasInteractionState'
 import {
   containImageRect,
   createCanvasExtendRect,
@@ -11,7 +11,7 @@ import {
 } from '../utils/canvasExtendGeometry'
 import { isEditableEventTarget } from '../utils/domEventTargets'
 import { useCanvasCustomLayerOverlay } from '../overlay-lifecycle'
-import { usePointerDragSession } from './usePointerDragSession'
+import { usePointerDragSession } from '../utils/interaction/usePointerDragSession'
 
 const windowTarget = () => (typeof window === 'undefined' ? null : window)
 

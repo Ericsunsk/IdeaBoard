@@ -1,6 +1,6 @@
 import type { Actions, Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
-import type { CanvasFlowViewport } from '../composables/useCanvasViewportRuntime'
+import type { CanvasFlowViewport } from '../renderer/vue-flow/useCanvasViewportRuntime'
 
 type ValueRef<T> = {
   readonly value: T

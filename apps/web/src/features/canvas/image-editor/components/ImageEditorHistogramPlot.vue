@@ -86,7 +86,7 @@
 <script setup lang="ts">
 import './styles/image-editor-histogram-plot.css'
 import { computed, nextTick, ref } from 'vue'
-import { usePointerDragSession } from '../../composables/usePointerDragSession'
+import { usePointerDragSession } from '../../utils/interaction/usePointerDragSession'
 
 export type ImageEditorHistogramPlotMarker = {
   id: string

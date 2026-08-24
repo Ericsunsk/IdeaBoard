@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ImageNodeAction } from '../config/imageActionRegistry'
-import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
+import type { CanvasExtendDragAnchor } from '../image-workflow/useImageCanvasExtendOverlay'
 import type { CanvasNodePresentationIntent } from '../node-presentation'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 import { createCanvasNodePresentationIntentRouter } from './createCanvasNodePresentationIntentRouter'

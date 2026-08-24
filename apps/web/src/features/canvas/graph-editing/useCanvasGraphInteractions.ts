@@ -13,8 +13,8 @@ import {
   type CanvasGraphNodeId,
   type CanvasGraphStore,
 } from '../graph-runtime'
-import { useFlowCanvasInteractionState } from '../composables/useFlowCanvasInteractionState'
-import { useFlowNodeUiState } from '../composables/useFlowNodeUiState'
+import { useFlowCanvasInteractionState } from '../screen-presentation/useFlowCanvasInteractionState'
+import { useFlowNodeUiState } from '../node-presentation/useFlowNodeUiState'
 import type { CanvasVueFlowGraphAdapter } from '../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
 import { createFlowGraphCommandOptions } from '../renderer/vue-flow/flowGraphAdapterCommandSideEffects'
 import { createImageFlowNode } from '../utils/flowImageNodeFactory'

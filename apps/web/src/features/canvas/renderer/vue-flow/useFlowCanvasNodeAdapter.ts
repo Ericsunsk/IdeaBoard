@@ -5,10 +5,10 @@ import {
   type FusionNodeItem,
   type ImageNodeItem,
   type PromptNodeItem,
-} from '../../canvas-board/domain'
-import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
-import type { FlowNodeData } from '../types/flowTypes'
-import { resolveImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
+} from '../../../canvas-board/domain'
+import type { NodeUiState, PromptNodeUiState } from '../../types/canvasNodeUi'
+import type { FlowNodeData } from '../../types/flowTypes'
+import { resolveImageNodeDisplayPayload } from '../../utils/flowImageNodeSelectors'
 
 interface UseFlowCanvasNodeAdapterOptions {
   data: () => FlowNodeData

@@ -1,5 +1,5 @@
 import { nextTick, ref, toValue, watch, type Ref, type WatchSource } from 'vue'
-import { usePointerDragSession } from '../../../composables/usePointerDragSession'
+import { usePointerDragSession } from '../../../utils/interaction/usePointerDragSession'
 
 export interface SortableMediaInput {
   id: string

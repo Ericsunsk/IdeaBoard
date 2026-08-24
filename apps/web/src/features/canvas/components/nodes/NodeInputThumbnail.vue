@@ -31,7 +31,7 @@
 import { ref } from 'vue'
 import { useElementVisibility } from '@vueuse/core'
 import { Xmark } from '@iconoir/vue'
-import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
+import { useDisplayImagePreview } from '../../renderer/vue-flow/useDisplayImagePreview'
 
 const props = withDefaults(
   defineProps<{

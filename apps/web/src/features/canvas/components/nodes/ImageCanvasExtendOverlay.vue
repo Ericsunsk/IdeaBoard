@@ -45,7 +45,7 @@ import NodePromptComposer from './NodePromptComposer.vue'
 import {
   CANVAS_EXTEND_DRAG_ANCHORS,
   type CanvasExtendDragAnchor,
-} from '../../composables/useImageCanvasExtendOverlay'
+} from '../../image-workflow/useImageCanvasExtendOverlay'
 import { WORKFLOW_FEATURE } from '../../../../shared/domain/workflowFeatures'
 import { useCanvasBillingQuote } from '../../execution'
 import { buildCanvasExtendReadinessRequest } from '../../execution/commands/flowImageTaskRequests'

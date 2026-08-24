@@ -54,7 +54,7 @@
 
 <script setup lang="ts">
 import { nextTick, ref, useId, watch, type ComponentPublicInstance } from 'vue'
-import { usePointerDragSession } from '../../composables/usePointerDragSession'
+import { usePointerDragSession } from '../../utils/interaction/usePointerDragSession'
 import type { ImageEditorCurveChannel } from '../types'
 import type { NormalizedCurveChannelPoint } from '../utils/imageEditorCurves'
 

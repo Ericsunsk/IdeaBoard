@@ -115,9 +115,9 @@ import { USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
 import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
-import { useFlowImagePreviewLightbox } from '../composables/useFlowImagePreviewLightbox'
-import { provideCanvasHandleProximityCoordinator } from '../composables/useCanvasHandleProximity'
-import { provideCanvasViewportContext } from '../composables/useCanvasViewportContext'
+import { useFlowImagePreviewLightbox } from './useFlowImagePreviewLightbox'
+import { provideCanvasHandleProximityCoordinator } from '../renderer/vue-flow/useCanvasHandleProximity'
+import { provideCanvasViewportContext } from '../renderer/vue-flow/useCanvasViewportContext'
 import { CanvasGroupPresentation } from '../group-presentation'
 import {
   createCanvasConnectionDropLifecycle,

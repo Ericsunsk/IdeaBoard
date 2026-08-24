@@ -1,6 +1,6 @@
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import type { CanvasBoardSnapshot, ImageNodeItem } from '../../../canvas-board/domain'
-import { useCanvasViewportRuntime } from '../../composables/useCanvasViewportRuntime'
+import { useCanvasViewportRuntime } from '../../renderer/vue-flow/useCanvasViewportRuntime'
 import { useCanvasBoardRuntime } from './useCanvasBoardRuntime'
 import { useCanvasFeedback } from '../../feedback/useCanvasFeedback'
 import type { CanvasFlowPaneAdapter } from '../../flow-pane'

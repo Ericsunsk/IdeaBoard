@@ -32,7 +32,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
-import { usePointerDragSession } from '../composables/usePointerDragSession'
+import { usePointerDragSession } from '../utils/interaction/usePointerDragSession'
 
 type TwoHandleSliderHandle = {
   id: string

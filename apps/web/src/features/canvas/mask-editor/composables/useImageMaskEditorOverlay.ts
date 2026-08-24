@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
-import { usePointerDragSession } from '../../composables/usePointerDragSession'
+import { usePointerDragSession } from '../../utils/interaction/usePointerDragSession'
 import { MASK_EDITOR_INTERACTION_KEY } from '../types'
 import type {
   ImageMaskDrawMode,

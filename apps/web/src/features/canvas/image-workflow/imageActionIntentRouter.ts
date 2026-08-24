@@ -15,7 +15,7 @@ import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations
 import {
   ACTIVE_NODE_PANEL_KIND,
   type ActiveNodePanel,
-} from '../composables/useFlowActiveNodePanels'
+} from '../screen-presentation/useFlowActiveNodePanels'
 import type { ImageEditorMode } from '../image-editor'
 
 type FusionPromptParamPatch = Extract<

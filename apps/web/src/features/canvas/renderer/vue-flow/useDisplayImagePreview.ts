@@ -7,18 +7,18 @@ import {
   watch,
   type MaybeRefOrGetter,
 } from 'vue'
-import { canvasToBlob, resolveFetchUrl } from '../services/flowMediaIO'
+import { canvasToBlob, resolveFetchUrl } from '../../services/flowMediaIO'
 import {
   detectCanvasTransparency,
   resolvePreviewMimeType,
   WEBP_PREVIEW_MIME_TYPE,
   WEBP_PREVIEW_QUALITY,
-} from '../utils/displayImagePreviewEncoding'
-import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../shared/config/runtimeUrls'
+} from '../../utils/displayImagePreviewEncoding'
+import { canonicalizeRuntimeUploadRef, resolveAssetUrl } from '../../../../shared/config/runtimeUrls'
 import {
   useMediaAssetDelivery,
   type MediaAssetDeliveryTier,
-} from '../../../shared/api/mediaAssetDelivery'
+} from '../../../../shared/api/mediaAssetDelivery'
 
 interface PreviewOptions {
   maxSide?: MaybeRefOrGetter<number | null | undefined>

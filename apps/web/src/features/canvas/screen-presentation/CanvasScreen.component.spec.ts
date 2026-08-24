@@ -56,33 +56,33 @@ vi.mock('../flow-pane', () => ({
   }),
 }))
 
-vi.mock('../composables/useFlowKeyboardShortcuts', () => ({
+vi.mock('./useFlowKeyboardShortcuts', () => ({
   useFlowKeyboardShortcuts: (options: KeyboardOptions) => {
     mocks.keyboardOptions = options
   },
 }))
 
-vi.mock('../composables/useFlowLeaveGuard', () => ({
+vi.mock('./useFlowLeaveGuard', () => ({
   useFlowLeaveGuard: (options: LeaveGuardOptions) => {
     mocks.leaveGuardOptions = options
   },
 }))
 
-vi.mock('../composables/useFlowNodeDragInteractions', () => ({
+vi.mock('./useFlowNodeDragInteractions', () => ({
   useFlowNodeDragInteractions: () => ({
     onNodeDragStart: () => mocks.dragEvents.push('drag:start'),
     onNodeDragStop: () => mocks.dragEvents.push('drag:stop'),
   }),
 }))
 
-vi.mock('../composables/useFlowImagePreviewLightbox', () => ({
+vi.mock('./useFlowImagePreviewLightbox', () => ({
   useFlowImagePreviewLightbox: () => ({
     openNodeImagePreview: vi.fn(),
     openImageUrlPreview: vi.fn(),
   }),
 }))
 
-vi.mock('../composables/useCanvasViewportContext', () => ({
+vi.mock('../renderer/vue-flow/useCanvasViewportContext', () => ({
   provideCanvasViewportContext: vi.fn(),
 }))
 

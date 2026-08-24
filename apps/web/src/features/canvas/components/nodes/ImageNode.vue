@@ -95,7 +95,7 @@ import {
 } from '../../../canvas-board/domain'
 import type { ImageNodeAction } from '../../config/imageActionRegistry'
 import type { OutputResolution } from '../../../../shared/domain/generationContract'
-import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
+import type { CanvasExtendDragAnchor } from '../../image-workflow/useImageCanvasExtendOverlay'
 import type { ImageActionBinding, ImageToolStageBinding } from '../../image-tools'
 import type { FlowLocalUploadState } from '../../types/flowTypes'
 import HomeCanvasImageActionMenu from '../home/HomeCanvasImageActionMenu.vue'

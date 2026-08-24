@@ -1,5 +1,5 @@
 import type { Ref } from 'vue'
-import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
+import type { CanvasExtendDragAnchor } from './useImageCanvasExtendOverlay'
 
 type UseFlowExpandInteractionHandlersOptions = {
   flowExpandNodeId: Ref<string | null>

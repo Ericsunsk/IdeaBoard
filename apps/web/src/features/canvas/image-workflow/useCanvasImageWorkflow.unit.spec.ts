@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { IMAGE_NODE_ACTION } from '../config/imageActionRegistry'
-import type { MediaInputImage } from '../composables/useFlowMediaInputImages'
+import type { MediaInputImage } from '../graph-editing/useFlowMediaInputImages'
 import { createPendingImageExecutionCore } from '../execution/pending-execution'
 import { useCanvasImageWorkflow } from './useCanvasImageWorkflow'
 

@@ -1,6 +1,6 @@
 import { normalizePromptAspectRatio } from '../../canvas-board/domain'
 import type { PromptAspectRatio } from '../../canvas-board/domain'
-import type { MediaInputImage } from '../composables/useFlowMediaInputImages'
+import type { MediaInputImage } from '../graph-editing/useFlowMediaInputImages'
 
 export type PromptGenerationIntentOptions = {
   cancelFlowExpandMode: () => void

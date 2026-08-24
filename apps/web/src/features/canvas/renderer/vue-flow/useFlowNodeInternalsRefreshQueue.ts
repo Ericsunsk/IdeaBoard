@@ -1,5 +1,5 @@
 import { nextTick } from 'vue'
-import { useRafScheduler } from './useRafScheduler'
+import { useRafScheduler } from '../../utils/interaction/useRafScheduler'
 
 type UpdateNodeInternals = (nodeIds: string[]) => void
 

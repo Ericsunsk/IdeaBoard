@@ -1,6 +1,6 @@
 import type { PromptAspectRatio } from '../../canvas-board/domain'
 import type { ImageNodeAction } from '../config/imageActionRegistry'
-import type { CanvasExtendDragAnchor } from '../composables/useImageCanvasExtendOverlay'
+import type { CanvasExtendDragAnchor } from '../image-workflow/useImageCanvasExtendOverlay'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 
 export type CanvasNodePresentationIntent =
