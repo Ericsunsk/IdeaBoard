@@ -137,7 +137,7 @@ import {
   CanvasChromeMiniMap,
   type CanvasChromeAccountState,
   type CanvasChromeBoardState,
-} from '../components/chrome'
+} from '../workspace-chrome'
 import { CANVAS_VIEWPORT_MAX_ZOOM, CANVAS_VIEWPORT_MIN_ZOOM } from '../utils/canvasViewportStorage'
 import {
   useUserAccountControls,

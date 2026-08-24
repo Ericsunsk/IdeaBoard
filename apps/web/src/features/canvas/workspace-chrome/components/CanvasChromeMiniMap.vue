@@ -12,7 +12,7 @@
 </template>
 
 <script setup lang="ts">
-import CanvasMiniMap from '../CanvasMiniMap.vue'
+import CanvasMiniMap from '../../components/CanvasMiniMap.vue'
 
 type MiniMapPoint = {
   x: number
