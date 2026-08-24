@@ -2,7 +2,7 @@ import type { Edge, Node } from '@vue-flow/core'
 import { ref, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
-import { createCanvasGraphStore } from '../graph-runtime'
+import { CanvasGraphSession } from '../graph-runtime'
 import { useCanvasGroupRuntime } from './useCanvasGroupRuntime'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import type { FlowHistorySnapshot } from './useFlowHistory'
@@ -76,6 +76,7 @@ function createHarness() {
   ])
   const edges = shallowRef<Edge[]>([])
   const boardBaseSnapshot = ref(createSnapshot())
+  const graphSession = CanvasGraphSession.hydrate('board-a', boardBaseSnapshot.value)
   const historyBefore = {} as FlowHistorySnapshot
   const markDirty = vi.fn()
   const commitGroups = vi.fn((groups: CanvasBoardSnapshot['groups']) => {
@@ -107,7 +108,7 @@ function createHarness() {
       capture: vi.fn(() => historyBefore),
       push: vi.fn(() => true),
     },
-    createCurrentCanvasGraphStore: () => createCanvasGraphStore(boardBaseSnapshot.value),
+    readCanvasGraphStore: () => graphSession.store,
     commitGroups,
     markDirty,
     onWarning: vi.fn(),

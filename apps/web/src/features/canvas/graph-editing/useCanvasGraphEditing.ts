@@ -3,6 +3,8 @@ import { onScopeDispose, watch, type Ref } from 'vue'
 import type { CanvasBoardSnapshot, CanvasNodeItem } from '../../canvas-board/domain'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { CanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
+import type { FlowHistorySnapshot } from '../composables/useFlowHistory'
+import type { CanvasGraphStore } from '../graph-runtime'
 import { useFlowCanvasDrop } from '../composables/useFlowCanvasDrop'
 import { useFlowCanvasNodeHandlers } from '../composables/useFlowCanvasNodeHandlers'
 import { useFlowImageNodeSnapshots } from '../composables/useFlowImageNodeSnapshots'
@@ -56,6 +58,8 @@ type UseCanvasGraphEditingOptions = {
   boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   currentBoardId: ValueRef<string | null | undefined>
   graphAdapter: CanvasVueFlowGraphAdapter
+  readCanvasGraphStore: () => CanvasGraphStore
+  captureHistory: () => FlowHistorySnapshot
   deleteNode: (nodeId: string) => boolean
   updateNodeInternals: (nodeIds: string[]) => void
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
@@ -78,7 +82,9 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
     nodes: options.nodes,
     edges: options.edges,
     boardBaseSnapshot: options.boardBaseSnapshot,
+    readCanvasGraphStore: options.readCanvasGraphStore,
     graphAdapter: options.graphAdapter,
+    captureHistory: options.captureHistory,
     onWarning: options.feedback.operationWarning,
   })
 
@@ -138,6 +144,8 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
     edges: options.edges,
     uploadImageToBoard,
     updateSnapshotNodeBase: nodeMutations.updateSnapshotNode,
+    readCanvasGraphStore: options.readCanvasGraphStore,
+    captureHistory: options.captureHistory,
     graphAdapter: options.graphAdapter,
     markFlowExecutionNodeDirty: nodeMutations.markFlowExecutionNodeDirty,
     getImageNodeDisplayPayload,
@@ -148,6 +156,12 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
     nodes: options.nodes,
     readAttachment: options.readLibraryImportAttachment,
     graphAdapter: options.graphAdapter,
+    updateImageSnapshot: (nodeId, mutate) =>
+      nodeMutations.updateSnapshotNode(
+        nodeId,
+        (snapshot) => (snapshot.type === 'image-node' ? mutate(snapshot) : snapshot),
+        { history: false },
+      ),
     createImageNodeAtPosition: (x, y, initialSnapshotPatch) =>
       nodeMutations.createNodeAtPosition('image', x, y, initialSnapshotPatch),
     refreshNodeInternals: scheduleFlowNodeInternalsRefresh,

@@ -15,6 +15,11 @@ import {
 } from '../utils/flowImageNodeSelectors'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
+import type { FlowHistorySnapshot } from './useFlowHistory'
+import {
+  type CanvasGraphStore,
+} from '../graph-runtime'
+import { canvasBoardSnapshotToFlow } from '../utils/flowSnapshotAdapter'
 
 export type MediaInputImage = {
   id: string
@@ -39,6 +44,8 @@ type UseFlowMediaInputImagesOptions = {
     mutate: (snapshotNode: CanvasNodeItem) => CanvasNodeItem,
     options?: { history?: boolean; dirty?: boolean },
   ) => void
+  readCanvasGraphStore: () => CanvasGraphStore
+  captureHistory: () => FlowHistorySnapshot
   graphAdapter: CanvasVueFlowGraphAdapter
   markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
   getImageNodeDisplayPayload: (nodeId: string) => ImageNodeDisplayPayload | null
@@ -359,40 +366,39 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
   }
 
   function onFlowMediaInputImageRemove(nodeId: string, imageId: string) {
-    const currentInputImages = getMediaInputImages(nodeId)
+    const store = options.readCanvasGraphStore()
+    const target = store.getNode(nodeId as `prompt-${number}` | `fusion-${number}`)
+    if (!target || !isMediaInputSnapshotNode(target.snapshot)) return
+    const currentInputImages = target.snapshot.inputImages
     const removed = currentInputImages.find((item) => item.id === imageId)
     if (!removed) return
-    const nextNodes = options.nodes.value.map((node) => {
-      if (node.id !== nodeId || (node.data?.kind !== 'prompt' && node.data?.kind !== 'fusion')) {
-        return node
-      }
-      const snapshotNode = node.data.snapshotNode
-      if (!snapshotNode || typeof snapshotNode !== 'object') return node
-      return {
-        ...node,
-        data: {
-          ...node.data,
-          snapshotNode: {
-            ...(snapshotNode as Record<string, unknown>),
-            inputImages: currentInputImages.filter((item) => item.id !== imageId),
-          },
-        },
-      }
-    })
-    const nextEdges =
+    const nextInputImages = currentInputImages.filter((item) => item.id !== imageId)
+    const edgeIds =
       removed.sourceType === 'node'
-        ? options.edges.value.filter(
-            (edge) =>
-              !(
-                edge.source === removed.sourceId &&
-                edge.target === nodeId &&
-                isImageInputHandle(edge.targetHandle)
-              ),
-          )
-        : options.edges.value
+        ? store.getIncomingEdgeIds(target.id).filter((edgeId) => {
+            const connection = store.getEdge(edgeId)?.connection
+            return (
+              connection?.toPort === 'image' &&
+              `${connection.fromNodeType}-${connection.fromNodeId}` === removed.sourceId
+            )
+          })
+        : []
+    const historyBefore = options.captureHistory()
+    const transaction = store.beginTransaction('node-update')
+    try {
+      transaction.updateNode(target.id, { inputImages: nextInputImages })
+      edgeIds.forEach((edgeId) => transaction.removeEdge(edgeId))
+      transaction.commit()
+    } catch (error) {
+      transaction.cancel()
+      console.error('[Canvas] Failed to remove media input', error)
+      options.onWarning('移除输入图片失败，请刷新画布后重试')
+      return
+    }
+    const projection = canvasBoardSnapshotToFlow(store.exportSnapshot())
     options.graphAdapter.replaceGraph(
-      { nodes: nextNodes, edges: nextEdges },
-      createFlowGraphCommandOptions(),
+      { nodes: projection.nodes as Node[], edges: projection.edges as Edge[] },
+      createFlowGraphCommandOptions({ historyBefore }),
     )
     options.markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
   }

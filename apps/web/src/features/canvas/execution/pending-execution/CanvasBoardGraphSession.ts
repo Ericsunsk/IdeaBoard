@@ -1,5 +1,5 @@
 import { resolveImageNodeFrameSize, type ImageNodeItem } from '../../../canvas-board/domain'
-import { CanvasGraphStore } from '../../graph-runtime'
+import { CanvasGraphSession, type CanvasGraphStore } from '../../graph-runtime'
 import type { CanvasBoardAttachment, CanvasBoardSessionIdentity } from '../../board-attachment'
 
 
@@ -52,7 +52,7 @@ export type CanvasBoardGraphSessionBinding = Readonly<{
 }>
 
 export type CanvasBoardGraphSessionOptions = Readonly<{
-  createGraphStore: () => CanvasGraphStore
+  graphSession: CanvasGraphSession
   onMaterialized?: (
     store: CanvasGraphStore,
     result: PendingImageDomainMutationResult,
@@ -94,13 +94,13 @@ function requireBoardId(boardId: string): string {
 
 export class CanvasBoardGraphSession {
   readonly boardId: string
-  readonly #createGraphStore: () => CanvasGraphStore
+  readonly #graphSession: CanvasGraphSession
   readonly #onMaterialized?: CanvasBoardGraphSessionOptions['onMaterialized']
   readonly #identity = Object.freeze({}) as CanvasBoardSessionIdentity
 
   private constructor(boardId: string, options: CanvasBoardGraphSessionOptions) {
     this.boardId = requireBoardId(boardId)
-    this.#createGraphStore = options.createGraphStore
+    this.#graphSession = options.graphSession
     this.#onMaterialized = options.onMaterialized
     Object.freeze(this)
   }
@@ -130,7 +130,7 @@ export class CanvasBoardGraphSession {
   #materializeBatch(
     inputs: readonly PendingImageDomainMutationInput[],
   ): PendingImageDomainMutationResult {
-    const store = this.#createGraphStore()
+    const store = this.#graphSession.store
     const transaction = store.beginTransaction('result-materialize', {
       recordHistory: false,
       markDirty: true,

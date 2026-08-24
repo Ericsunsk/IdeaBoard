@@ -4,7 +4,7 @@ import {
   type CanvasBoardSnapshot,
   type ImageNodeItem,
 } from '../../../canvas-board/domain'
-import { CanvasGraphStore } from '../../graph-runtime'
+import { CanvasGraphSession } from '../../graph-runtime'
 import {
   CanvasBoardGraphSession,
   createPendingImageExecutionCore,
@@ -42,10 +42,10 @@ function createPendingImageNode(id: number, taskId: string): ImageNodeItem {
   }
 }
 
-function createPendingResultStore(taskIds: readonly string[]): CanvasGraphStore {
+function createPendingResultStore(taskIds: readonly string[]): CanvasGraphSession {
   const snapshot: CanvasBoardSnapshot = createEmptyCanvasBoardSnapshot()
   snapshot.imageNodes = taskIds.map((taskId, index) => createPendingImageNode(index + 1, taskId))
-  return CanvasGraphStore.fromSnapshot(snapshot)
+  return CanvasGraphSession.hydrate('board-a', snapshot)
 }
 
 function requireLease(result: PendingImageExecutionStartResult): PendingImageExecutionLease {
@@ -54,7 +54,7 @@ function requireLease(result: PendingImageExecutionStartResult): PendingImageExe
 }
 
 function attachCore(
-  store: CanvasGraphStore,
+  graphSession: CanvasGraphSession,
   boardId = 'board-a',
 ): {
   core: PendingImageExecutionCore
@@ -62,7 +62,7 @@ function attachCore(
 } {
   const core = createPendingImageExecutionCore()
   const attachment = core.attachBoard(
-    CanvasBoardGraphSession.create(boardId, { createGraphStore: () => store }),
+    CanvasBoardGraphSession.create(boardId, { graphSession }),
   )
   return { core, attachment }
 }
@@ -120,7 +120,7 @@ const mutationContractViolations: Array<{
 describe('PendingImageExecutionCore', () => {
   it('materializes current slots in one transaction and rejects partial stale slots', () => {
     const store = createPendingResultStore(['task-1', 'task-2', 'task-current'])
-    const beginTransaction = vi.spyOn(store, 'beginTransaction')
+    const beginTransaction = vi.spyOn(store.store, 'beginTransaction')
     const { core, attachment } = attachCore(store)
     const firstLease = requireLease(core.begin(attachment, imageNodeId(1)))
     expect(core.markSubmitted(firstLease, 'task-1', 'action-task-1')).toMatchObject({
@@ -179,7 +179,7 @@ describe('PendingImageExecutionCore', () => {
     const snapshots = [core.snapshot()]
     const unsubscribe = core.subscribe((snapshot) => snapshots.push(snapshot))
     const attachment = core.attachBoard(
-      CanvasBoardGraphSession.create('board-a', { createGraphStore: () => store }),
+      CanvasBoardGraphSession.create('board-a', { graphSession: store }),
     )
     const lease = requireLease(
       hydrateLease(core, attachment, imageNodeId(1), 'task-1'),
@@ -222,7 +222,7 @@ describe('PendingImageExecutionCore', () => {
     core.subscribe(laterSubscriber)
 
     expect(() => {
-      core.attachBoard(CanvasBoardGraphSession.create('board-a', { createGraphStore: () => store }))
+      core.attachBoard(CanvasBoardGraphSession.create('board-a', { graphSession: store }))
     }).not.toThrow()
 
     expect(onSubscriberError).toHaveBeenCalledOnce()
@@ -237,7 +237,7 @@ describe('PendingImageExecutionCore', () => {
     const nextStore = createPendingResultStore(['task-next'])
     const core = createPendingImageExecutionCore()
     const firstSession = CanvasBoardGraphSession.create('board-a', {
-      createGraphStore: () => firstStore,
+      graphSession: firstStore,
     })
     const firstAttachment = core.attachBoard(firstSession)
     const oldEpochLease = requireLease(
@@ -263,7 +263,7 @@ describe('PendingImageExecutionCore', () => {
       hydrateLease(core, nextEpochAttachment, imageNodeId(1), 'task-first'),
     )
     const nextSession = CanvasBoardGraphSession.create('board-a', {
-      createGraphStore: () => nextStore,
+      graphSession: nextStore,
     })
     core.attachBoard(nextSession)
 
@@ -290,13 +290,13 @@ describe('PendingImageExecutionCore', () => {
     const boardBStore = createPendingResultStore(['task-b'])
     const core = createPendingImageExecutionCore()
     const boardAAttachment = core.attachBoard(
-      CanvasBoardGraphSession.create('board-a', { createGraphStore: () => boardAStore }),
+      CanvasBoardGraphSession.create('board-a', { graphSession: boardAStore }),
     )
     const boardALease = requireLease(
       hydrateLease(core, boardAAttachment, imageNodeId(1), 'task-a'),
     )
     core.attachBoard(
-      CanvasBoardGraphSession.create('board-b', { createGraphStore: () => boardBStore }),
+      CanvasBoardGraphSession.create('board-b', { graphSession: boardBStore }),
     )
 
     expect(
@@ -411,11 +411,11 @@ describe('PendingImageExecutionCore', () => {
     const store = createPendingResultStore(['task-1', 'task-2'])
     const core = createPendingImageExecutionCore()
     const mutationError = new Error('graph write failed')
-    vi.spyOn(store, 'beginTransaction').mockImplementation(() => {
+    vi.spyOn(store.store, 'beginTransaction').mockImplementation(() => {
       throw mutationError
     })
     const attachment = core.attachBoard(
-      CanvasBoardGraphSession.create('board-a', { createGraphStore: () => store }),
+      CanvasBoardGraphSession.create('board-a', { graphSession: store }),
     )
     const firstLease = requireLease(
       hydrateLease(core, attachment, imageNodeId(1), 'task-1'),
@@ -450,7 +450,7 @@ describe('PendingImageExecutionCore', () => {
     'fails closed when the mutation port returns $name',
     ({ result }) => {
       const store = createPendingResultStore(['task-1'])
-      const session = CanvasBoardGraphSession.create('board-a', { createGraphStore: () => store })
+      const session = CanvasBoardGraphSession.create('board-a', { graphSession: store })
       const bindSession = session[bindCanvasBoardGraphSession]
       const bindSpy = vi
         .spyOn(CanvasBoardGraphSession.prototype, bindCanvasBoardGraphSession)

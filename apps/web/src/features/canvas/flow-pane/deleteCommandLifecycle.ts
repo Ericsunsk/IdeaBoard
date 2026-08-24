@@ -28,7 +28,7 @@ export type CanvasDeleteCommandLifecycleOptions<HistorySnapshot> = {
   readNodes: () => Node[]
   readEdges: () => Edge[]
   readBoardBaseSnapshot: () => CanvasBoardSnapshot
-  createGraphStore: () => CanvasGraphStore
+  readGraphStore: () => CanvasGraphStore
   graphAdapter: Pick<CanvasVueFlowGraphAdapter, 'applyGraphChanges'>
   captureHistory: () => HistorySnapshot
   commitGroups: (groups: CanvasBoardSnapshot['groups']) => void
@@ -125,7 +125,7 @@ export function createCanvasDeleteCommandLifecycle<HistorySnapshot>(
       options.onWarning('删除操作未能写入画布，请刷新后重试')
       return false
     }
-    const store = options.createGraphStore()
+    const store = options.readGraphStore()
     if (!store.getNode(nodeId)) {
       options.onWarning('删除操作未能写入画布，请刷新后重试')
       return false
@@ -164,7 +164,7 @@ export function createCanvasDeleteCommandLifecycle<HistorySnapshot>(
       ...removedNodes.flowNodeIds,
       ...removedNodes.graphNodeIds,
     ])
-    const store = options.createGraphStore()
+    const store = options.readGraphStore()
     const projectionIndex = createFlowEdgeProjectionIndex(store, options.readEdges())
     const edgeIds = resolveNativeRemovedEdgeIds(projectionIndex, edgeChanges, removedNodeIds)
     if (!edgeIds) return false

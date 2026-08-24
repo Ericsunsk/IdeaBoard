@@ -95,7 +95,7 @@ function createBoardRuntime() {
     },
     graphEditing: {
       adapter: {},
-      createCurrentCanvasGraphStore: vi.fn(),
+      readCanvasGraphStore: vi.fn(),
       deleteNode: vi.fn(),
       grouping,
     },

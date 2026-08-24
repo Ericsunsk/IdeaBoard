@@ -23,7 +23,6 @@ import {
   withTaskClientActionId,
 } from '../task-runner/taskClientActionIds'
 import { buildImageExecutionTaskRequest } from '../commands/flowImageTaskRequests'
-import type { FlowToCanvasBoardSnapshotOptions } from '../../utils/flowSnapshotAdapter'
 import { createPendingImageWorkflowRunner } from '../runtime/pendingImageWorkflowRunner'
 import { type PendingImageExecutionCore, collectPendingImageTasks } from '../pending-execution'
 import {
@@ -52,9 +51,7 @@ export type UseCanvasExecutionWorkspaceOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   graphAdapter: CanvasVueFlowGraphAdapter
-  createCurrentCanvasGraphStore: (
-    snapshotOptions?: FlowToCanvasBoardSnapshotOptions,
-  ) => CanvasGraphStore
+  readCanvasGraphStore: () => CanvasGraphStore
   boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   refreshNodeInternals?: (nodeIds: string[]) => void
   flushAutosave?: (options?: { silent?: boolean }) => Promise<void>
@@ -82,8 +79,9 @@ export function useCanvasExecutionWorkspace(
       nodes: options.nodes,
       edges: options.edges,
       graphAdapter: options.graphAdapter,
-      createCurrentCanvasGraphStore: options.createCurrentCanvasGraphStore,
-      boardBaseSnapshot: options.boardBaseSnapshot,
+      readCanvasGraphStore: options.readCanvasGraphStore,
+      readCurrentAttachment: options.executionCore.currentAttachment,
+      isAttachmentCurrent: options.executionCore.isAttachmentCurrent,
       refreshNodeInternals: options.refreshNodeInternals,
       isNodeExecutionActive: (nodeId) =>
         options.executionCore.captureActiveLeases([nodeId as `image-${number}`]).length > 0,

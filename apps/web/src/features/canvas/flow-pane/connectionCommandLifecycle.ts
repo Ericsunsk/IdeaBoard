@@ -7,12 +7,12 @@ import {
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
 import {
   canvasConnectionToFlowEdge,
-  flowToCanvasBoardSnapshot,
   resolveNextCanvasConnectionId,
 } from '../utils/flowSnapshotAdapter'
 import {
   commitCanvasGraphConnectIntent,
-  createCanvasGraphStore,
+  shouldReplaceCanvasConnection,
+  type CanvasGraphEdgeId,
   type CanvasGraphStore,
   type CanvasGraphTransactionSummary,
 } from '../graph-runtime'
@@ -20,7 +20,6 @@ import type { CanvasBoardSnapshot, CanvasConnection } from '../../canvas-board/d
 import {
   createFlowEdgeProjectionIndex,
   resolveFlowEdgeProjectionReplacement,
-  type FlowEdgeProjectionIndex,
 } from './flowConnectionIdentity'
 import { createCanvasFlowPaneConnectionAdapter } from './vueFlowConnectionBindings'
 
@@ -28,6 +27,7 @@ export type CanvasConnectionCommandLifecycleOptions = {
   readNodes: () => Node[]
   readEdges: () => Edge[]
   readBoardBaseSnapshot: () => CanvasBoardSnapshot | undefined
+  readGraphStore: () => CanvasGraphStore
   isValidConnection: (connection: Connection) => boolean
   normalizeConnection?: (
     connection: Connection,
@@ -39,6 +39,7 @@ export type CanvasConnectionCommandLifecycleOptions = {
     existingEdges: readonly Edge[],
   ) => string | null
   graphAdapter: CanvasVueFlowGraphAdapter
+  captureHistory: () => unknown
   onWarning: (message: string) => void
   markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
 }
@@ -67,18 +68,6 @@ export function createCanvasConnectionCommandLifecycle(
     return resolvedConnection
   }
 
-  function createCurrentGraphStore(): CanvasGraphStore {
-    return createCanvasGraphStore(
-      flowToCanvasBoardSnapshot(
-        {
-          nodes: options.readNodes(),
-          edges: options.readEdges() as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
-        },
-        options.readBoardBaseSnapshot(),
-      ),
-    )
-  }
-
   function createNextCanvasConnection(resolvedConnection: Connection, existingEdges: Edge[]) {
     const nextConnectionId = resolveNextCanvasConnectionId(
       options.readBoardBaseSnapshot(),
@@ -97,26 +86,10 @@ export function createCanvasConnectionCommandLifecycle(
 
   function commitConnectProjection(
     existingEdges: Edge[],
-    projectionIndex: FlowEdgeProjectionIndex,
-    nextConnection: CanvasConnection,
-    allowsMultipleTargetConnections: boolean,
+    replacement: NonNullable<ReturnType<typeof resolveFlowEdgeProjectionReplacement>>,
+    nextEdge: Edge,
     commitPolicy: CanvasGraphCommitPolicy,
   ) {
-    const { summary } = commitPolicy
-    const nextEdge = resolveAddedConnectEdge(summary, nextConnection)
-    const removedEdgeIds = new Set(summary.projectionPatch.edges.removedIds)
-    const replacement = resolveFlowEdgeProjectionReplacement({
-      edges: existingEdges,
-      projectionIndex,
-      removedEdgeIds,
-      nextConnection,
-      policy: { allowsMultipleTargetConnections },
-    })
-    if (!replacement) {
-      options.onWarning('连线未能写入画布，请刷新后重试')
-      return false
-    }
-
     applyCanvasGraphCommitPolicy(commitPolicy, (commandOptions) => {
       if (!replacement.didReplace) {
         options.graphAdapter.addEdges(nextEdge, commandOptions)
@@ -138,8 +111,30 @@ export function createCanvasConnectionCommandLifecycle(
 
     const allowsMultipleTargetConnections =
       options.allowsMultipleTargetConnections?.(resolvedConnection) ?? false
-    const store = createCurrentGraphStore()
+    const store = options.readGraphStore()
     const projectionIndex = createFlowEdgeProjectionIndex(store, existingEdges)
+    const removedEdgeIds = new Set<CanvasGraphEdgeId>()
+    for (const edgeId of store.getEdgeIds()) {
+      const existing = store.getEdge(edgeId)?.connection
+      if (
+        existing &&
+        shouldReplaceCanvasConnection(existing, nextConnection, { allowsMultipleTargetConnections })
+      ) {
+        removedEdgeIds.add(edgeId)
+      }
+    }
+    const replacement = resolveFlowEdgeProjectionReplacement({
+      edges: existingEdges,
+      projectionIndex,
+      removedEdgeIds,
+      nextConnection,
+      policy: { allowsMultipleTargetConnections },
+    })
+    if (!replacement) {
+      options.onWarning('连线未能写入画布，请刷新后重试')
+      return false
+    }
+    const historyBefore = options.captureHistory()
     let summary: CanvasGraphTransactionSummary
     try {
       summary = commitCanvasGraphConnectIntent(store, {
@@ -153,12 +148,12 @@ export function createCanvasConnectionCommandLifecycle(
     }
     if (!summary.didChange) return false
 
+    const nextEdge = resolveAddedConnectEdge(summary, nextConnection)
     const didCommitProjection = commitConnectProjection(
       existingEdges,
-      projectionIndex,
-      nextConnection,
-      allowsMultipleTargetConnections,
-      { summary },
+      replacement,
+      nextEdge,
+      { summary, historyBefore },
     )
     if (!didCommitProjection) return false
     options.markFlowExecutionNodeDirty(resolvedConnection.target, { includeSelf: true })

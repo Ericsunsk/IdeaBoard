@@ -7,7 +7,6 @@ import { resolveFlowNodeDragHandle } from '../../utils/flowNodeDragHandle'
 import {
   resolveImageNodeFrameSize,
   resolveImageNodeStageHeight,
-  type CanvasBoardSnapshot,
 } from '../../../canvas-board/domain'
 import type {
   ImageExecutionInput,
@@ -23,12 +22,10 @@ import type {
   CanvasVueFlowGraphRemoveNodesOptions,
 } from '../../composables/useCanvasVueFlowGraphAdapter'
 import { createFlowGraphCommandOptions } from '../../composables/flowGraphAdapterCommandSideEffects'
-import {
-  canvasBoardSnapshotToFlow,
-  type FlowToCanvasBoardSnapshotOptions,
-} from '../../utils/flowSnapshotAdapter'
 import type { CanvasGraphStore } from '../../graph-runtime'
-import { CanvasBoardGraphSession } from '../pending-execution'
+import type { CanvasBoardAttachment } from '../../board-attachment'
+import { flowConnectionToCanvasConnection } from '../../utils/flowConnectionAdapter'
+import { canvasConnectionToFlowEdge } from '../../utils/flowSnapshotAdapter'
 
 export type PendingImageResultGraphAdapter = {
   replaceGraph: (
@@ -54,10 +51,9 @@ type UsePendingImageResultNodesOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   graphAdapter: PendingImageResultGraphAdapter
-  createCurrentCanvasGraphStore: (
-    snapshotOptions?: FlowToCanvasBoardSnapshotOptions,
-  ) => CanvasGraphStore
-  boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
+  readCanvasGraphStore: () => CanvasGraphStore
+  readCurrentAttachment: () => CanvasBoardAttachment | null
+  isAttachmentCurrent: (attachment: CanvasBoardAttachment) => boolean
   refreshNodeInternals?: (nodeIds: string[]) => void
   isNodeExecutionActive: (nodeId: string) => boolean
 }
@@ -84,7 +80,6 @@ export type PendingImageResultExecution = {
     }>[],
   ) => void
   removePendingResults: (resultNodeIds: readonly string[]) => void
-  createBoardGraphSession: (boardId: string) => CanvasBoardGraphSession
 }
 
 export type PendingImageResultReservation = {
@@ -342,12 +337,26 @@ export function usePendingImageResultExecution(
   }
 
   async function appendPendingImageResultEdges(
+    sessionStore: CanvasGraphStore,
+    attachment: CanvasBoardAttachment,
     anchorNodeId: string,
     resultNodeIds: string[],
     edgesToAppend: Edge[],
   ) {
     if (edgesToAppend.length === 0) return
+    const isCurrentProjection = () => {
+      try {
+        return (
+          options.readCanvasGraphStore() === sessionStore &&
+          options.isAttachmentCurrent(attachment)
+        )
+      } catch {
+        return false
+      }
+    }
+    if (!isCurrentProjection()) return
     await waitForNextRenderFrame()
+    if (!isCurrentProjection()) return
     const activeResultNodeIds = resultNodeIds.filter((resultNodeId) =>
       options.nodes.value.some((node) => node.id === resultNodeId),
     )
@@ -373,7 +382,7 @@ export function usePendingImageResultExecution(
         return true
       })
       .map((edge) => ({ ...edge }))
-    if (nextEdges.length === 0) return
+    if (nextEdges.length === 0 || !isCurrentProjection()) return
     options.refreshNodeInternals?.([anchorNodeId, ...activeResultNodeIds])
     options.graphAdapter.addEdges(
       nextEdges,
@@ -509,6 +518,42 @@ export function usePendingImageResultExecution(
         .map((plan) => plan.nextNode),
     ]
     const resultNodeIds = plans.map((plan) => plan.resultNodeId)
+    const store = options.readCanvasGraphStore()
+    const attachment = options.readCurrentAttachment()
+    if (!attachment || !options.isAttachmentCurrent(attachment)) {
+      throw new Error('Pending result reservation requires the current Board attachment')
+    }
+    let nextConnectionId = store.getEdgeIds().reduce((highest, edgeId) => {
+      const match = /^connection-(\d+)$/.exec(edgeId)
+      return match ? Math.max(highest, Number(match[1])) : highest
+    }, 0) + 1
+    const pendingEdges = plans.flatMap((plan) => (plan.edgeToAppend ? [plan.edgeToAppend] : []))
+    const canonicalEdges = pendingEdges.map((edge) => {
+      const connection = flowConnectionToCanvasConnection(nextConnectionId++, edge)
+      if (!connection) {
+        throw new Error('Pending result edge has invalid Canvas endpoints')
+      }
+      return connection
+    })
+    const transaction = store.beginTransaction('node-update', {
+      recordHistory: false,
+      markDirty: true,
+    })
+    try {
+      plans.forEach((plan) => {
+        const snapshot = (plan.nextNode.data as FlowNodeData).snapshotNode
+        if (!snapshot || typeof snapshot !== 'object') return
+        const nodeId = plan.resultNodeId as `image-${number}`
+        if (store.getNode(nodeId)) transaction.updateNode(nodeId, () => snapshot as ImageNodeItem)
+        else transaction.addNode(snapshot as ImageNodeItem)
+      })
+      canonicalEdges.forEach((connection) => transaction.addEdge(connection))
+      transaction.commit()
+    } catch (error) {
+      transaction.cancel()
+      console.error('[Canvas] Failed to reserve pending result nodes', error)
+      throw new Error('Unable to reserve pending result nodes', { cause: error })
+    }
     options.graphAdapter.replaceGraph(
       {
         nodes: nextNodes,
@@ -518,9 +563,11 @@ export function usePendingImageResultExecution(
     )
     options.refreshNodeInternals?.([anchorNodeId, ...resultNodeIds])
     void appendPendingImageResultEdges(
+      store,
+      attachment,
       anchorNodeId,
       resultNodeIds,
-      plans.flatMap((plan) => (plan.edgeToAppend ? [plan.edgeToAppend] : [])),
+      canonicalEdges.map((connection) => canvasConnectionToFlowEdge(connection) as Edge),
     )
     return { resultNodeIds }
   }
@@ -533,23 +580,41 @@ export function usePendingImageResultExecution(
       clientActionId: string
     }>[],
   ) {
+    const store = options.readCanvasGraphStore()
+    const transaction = store.beginTransaction('node-update', {
+      recordHistory: false,
+      markDirty: true,
+    })
+    const flowUpdates: Array<{ nodeId: string; snapshot: ImageNodeItem; data: FlowNodeData }> = []
     for (const slot of slots) {
       const taskId = slot.taskId.trim()
       if (!taskId) continue
       const targetNode = options.nodes.value.find((item) => item.id === slot.resultNodeId)
-      const snapshot = targetNode?.data?.snapshotNode
-      if (targetNode?.data?.kind !== 'image' || !snapshot || typeof snapshot !== 'object') continue
+      const record = store.getNode(slot.resultNodeId as `image-${number}`)
+      if (targetNode?.data?.kind !== 'image' || record?.kind !== 'image') continue
+      const nextSnapshot: ImageNodeItem = {
+        ...(record.snapshot as ImageNodeItem),
+        pendingTaskId: taskId,
+        pendingResultIndex: slot.resultIndex,
+        pendingClientActionId: slot.clientActionId,
+      }
+      transaction.updateNode(slot.resultNodeId as `image-${number}`, () => nextSnapshot)
+      flowUpdates.push({ nodeId: slot.resultNodeId, snapshot: nextSnapshot, data: targetNode.data })
+    }
+    try {
+      transaction.commit()
+    } catch (error) {
+      transaction.cancel()
+      console.error('[Canvas] Failed to attach pending task ids', error)
+      return
+    }
+    for (const update of flowUpdates) {
       options.graphAdapter.updateNode(
-        slot.resultNodeId,
+        update.nodeId,
         {
           data: {
-            ...targetNode.data,
-            snapshotNode: {
-              ...(snapshot as ImageNodeItem),
-              pendingTaskId: taskId,
-              pendingResultIndex: slot.resultIndex,
-              pendingClientActionId: slot.clientActionId,
-            },
+            ...update.data,
+            snapshotNode: update.snapshot,
           },
         },
         createPendingResultCommandOptions({ recordHistory: false }),
@@ -558,6 +623,21 @@ export function usePendingImageResultExecution(
   }
 
   function removePendingResults(resultNodeIds: readonly string[]) {
+    const store = options.readCanvasGraphStore()
+    const transaction = store.beginTransaction('delete', {
+      recordHistory: false,
+      markDirty: true,
+    })
+    resultNodeIds.forEach((resultNodeId) =>
+      transaction.removeNode(resultNodeId as `image-${number}`, { removeConnectedEdges: true }),
+    )
+    try {
+      transaction.commit()
+    } catch (error) {
+      transaction.cancel()
+      console.error('[Canvas] Failed to remove pending result nodes', error)
+      return
+    }
     for (const resultNodeId of resultNodeIds) {
       options.graphAdapter.removeNodes(resultNodeId, {
         ...createPendingResultCommandOptions({ recordHistory: false }),
@@ -566,25 +646,9 @@ export function usePendingImageResultExecution(
     }
   }
 
-  function createBoardGraphSession(boardId: string): CanvasBoardGraphSession {
-    return CanvasBoardGraphSession.create(boardId, {
-      createGraphStore: () => options.createCurrentCanvasGraphStore({ projection: 'runtime' }),
-      onMaterialized: (store, result) => {
-        const snapshot = store.exportSnapshot(options.boardBaseSnapshot?.value)
-        const nextFlow = canvasBoardSnapshotToFlow(snapshot)
-        options.graphAdapter.replaceGraph(
-          { nodes: nextFlow.nodes as Node[], edges: nextFlow.edges as Edge[] },
-          createPendingResultCommandOptions({ recordHistory: false }),
-        )
-        options.refreshNodeInternals?.([...result.changedNodeIds])
-      },
-    })
-  }
-
   return {
     reservePendingResults,
     attachPendingTaskIds,
     removePendingResults,
-    createBoardGraphSession,
   }
 }

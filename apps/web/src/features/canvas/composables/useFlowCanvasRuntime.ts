@@ -4,6 +4,7 @@ import { useFlowHistory, type FlowHistorySnapshot } from './useFlowHistory'
 import {
   useCanvasBoardAutosave,
   useCanvasBoardPersistence,
+  type CanvasGraphSnapshotReplaceReason,
   type SaveStatus,
 } from '../board-session'
 import {
@@ -20,13 +21,8 @@ import {
 import { useCanvasGroupRuntime } from './useCanvasGroupRuntime'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasBoardSession } from '../board-session'
-import {
-  canvasBoardSnapshotToFlow,
-  flowToCanvasBoardSnapshot,
-  type FlowToCanvasBoardSnapshotOptions,
-} from '../utils/flowSnapshotAdapter'
-import { createCanvasGraphStore } from '../graph-runtime'
-import { measureCanvasPerf } from '../utils/canvasPerfProbe'
+import { canvasBoardSnapshotToFlow } from '../utils/flowSnapshotAdapter'
+import { CanvasGraphSession, type CanvasGraphStore } from '../graph-runtime'
 import {
   createCanvasDeleteCommandLifecycle,
   createCanvasNodeDragLifecycle,
@@ -81,6 +77,7 @@ export type UseFlowCanvasRuntimeOptions = {
 
 export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   const localEditVersion = ref(0)
+  let graphSession: CanvasGraphSession | null = null
   const executionSnapshot = shallowRef(options.executionCore.snapshot())
   const projectEdgesForRendering = (edges: Edge[]) =>
     projectPendingImageExecutionEdges(edges, executionSnapshot.value).edges
@@ -174,6 +171,65 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     afterCommand: commitGraphCommandSideEffects,
   })
 
+  function disposeGraphSession() {
+    graphSession?.dispose()
+    graphSession = null
+  }
+
+  function requireGraphSession(): CanvasGraphSession {
+    const boardId = options.boardSession.currentBoardId.value
+    if (!graphSession || !boardId || graphSession.boardId !== boardId) {
+      throw new Error('Canvas Graph Session is not attached to the current Board')
+    }
+    return graphSession
+  }
+
+  function readCanvasGraphStore(): CanvasGraphStore {
+    return requireGraphSession().store
+  }
+
+  function projectGraphSession(session: CanvasGraphSession, recordHistory = false) {
+    if (session !== graphSession || session.boardId !== options.boardSession.currentBoardId.value) return
+    const snapshot = session.exportSnapshot(options.boardBaseSnapshot.value)
+    options.boardBaseSnapshot.value = snapshot
+    const flow = canvasBoardSnapshotToFlow(snapshot)
+    graphAdapter.replaceGraph(
+      { nodes: flow.nodes as Node[], edges: flow.edges as Edge[] },
+      createFlowGraphCommandOptions({ recordHistory }),
+    )
+  }
+
+  function replaceGraphSnapshot(
+    snapshot: CanvasBoardSnapshot,
+    reason: CanvasGraphSnapshotReplaceReason,
+  ) {
+    const boardId = options.boardSession.currentBoardId.value
+    if (!boardId) {
+      disposeGraphSession()
+      options.executionCore.detachBoard()
+      return
+    }
+
+    if (reason === 'save-reconcile' && graphSession?.boardId === boardId) {
+      graphSession.replace(snapshot)
+      return
+    }
+
+    disposeGraphSession()
+    const session = CanvasGraphSession.hydrate(boardId, snapshot)
+    graphSession = session
+    options.executionCore.attachBoard(
+      CanvasBoardGraphSession.create(boardId, {
+        graphSession: session,
+        onMaterialized: () => projectGraphSession(session),
+      }),
+    )
+  }
+  onScopeDispose(() => {
+    disposeGraphSession()
+    options.executionCore.detachBoard()
+  })
+
   function rebaseSavedFlowProjection(savedGraph: { nodes: Node[]; edges: Edge[] }) {
     const savedNodesById = new Map(savedGraph.nodes.map((node) => [node.id, node] as const))
     const savedEdgesById = new Map(savedGraph.edges.map((edge) => [edge.id, edge] as const))
@@ -252,11 +308,15 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       graphAdapter.replaceEdges(edges as Edge[], createRestoreGraphCommandOptions()),
     groups: historyGroups,
     commitGroups: commitHistoryGroups,
+    captureCanonicalSnapshot: () => requireGraphSession().exportSnapshot(options.boardBaseSnapshot.value),
+    restoreCanonicalSnapshot: (snapshot) => {
+      const restoredSnapshot = snapshot as CanvasBoardSnapshot
+      requireGraphSession().replace(restoredSnapshot)
+      options.boardBaseSnapshot.value = restoredSnapshot
+    },
   })
 
   const boardPersistence = useCanvasBoardPersistence({
-    fullNodes: options.nodes,
-    fullEdges: options.edges,
     boardBaseSnapshot: options.boardBaseSnapshot,
     isDirty: options.isDirty,
     saveStatus: options.saveStatus,
@@ -269,6 +329,9 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     onSuccess: options.onSuccess,
     onError: options.onError,
     clearFlowHistoryBaseline: flowHistory.clearBaseline,
+    canReconcileGraph: () => !nodeDragLifecycle.isActive(),
+    replaceGraphSnapshot,
+    exportGraphSnapshot: (baseSnapshot) => requireGraphSession().exportSnapshot(baseSnapshot),
     commitGraph: (graph, commitOptions) =>
       commitFlowGraph(
         {
@@ -284,25 +347,10 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   const loadInitialOrRouteBoard: typeof loadInitialOrRouteBoardBase = async (...args) => {
     nodeDragLifecycle.cancel()
     groupRuntime?.internal.resetTransientSelectionState()
-    const boardId = options.boardSession.currentBoardId.value
-    if (boardId) {
-      options.executionCore.attachBoard(
-        CanvasBoardGraphSession.create(boardId, {
-          createGraphStore: () => createCurrentCanvasGraphStore({ projection: 'runtime' }),
-          onMaterialized: (store) => {
-            const snapshot = store.exportSnapshot(options.boardBaseSnapshot.value)
-            const flow = canvasBoardSnapshotToFlow(snapshot)
-            graphAdapter.replaceGraph(
-              { nodes: flow.nodes as Node[], edges: flow.edges as Edge[] },
-              createFlowGraphCommandOptions({ recordHistory: false }),
-            )
-          },
-        }),
-      )
-    } else options.executionCore.detachBoard()
-    const result = await loadInitialOrRouteBoardBase(...args)
+    disposeGraphSession()
+    options.executionCore.detachBoard()
+    await loadInitialOrRouteBoardBase(...args)
     groupRuntime?.internal.handleCommittedGroupsChanged()
-    return result
   }
   const saveCurrentBoardSnapshot = boardPersistence.saveCurrentBoardSnapshot
   const canSaveBoard = boardPersistence.canSaveBoard
@@ -331,35 +379,13 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     localEditVersion.value += 1
   }
 
-  function createCurrentCanvasGraphStore(snapshotOptions?: FlowToCanvasBoardSnapshotOptions) {
-    return measureCanvasPerf(
-      'graph-store.rebuild',
-      () => ({
-        nodes: options.nodes.value.length,
-        edges: options.edges.value.length,
-        groups: options.boardBaseSnapshot.value.groups.length,
-      }),
-      () => {
-        const snapshot = flowToCanvasBoardSnapshot(
-          {
-            nodes: options.nodes.value,
-            edges: options.edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
-          },
-          options.boardBaseSnapshot.value,
-          snapshotOptions,
-        )
-        return createCanvasGraphStore(snapshot)
-      },
-    )
-  }
-
   const groupRuntime = useCanvasGroupRuntime({
     nodes: options.nodes,
     edges: options.edges,
     boardBaseSnapshot: options.boardBaseSnapshot,
     graphAdapter,
     flowHistory,
-    createCurrentCanvasGraphStore,
+    readCanvasGraphStore,
     commitGroups: commitHistoryGroups,
     markDirty,
     onWarning: options.onWarning,
@@ -369,7 +395,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
 
   const nodeDragLifecycle: CanvasNodeDragLifecycle = createCanvasNodeDragLifecycle({
     createCommand: () => {
-      const store = createCurrentCanvasGraphStore()
+      const store = readCanvasGraphStore()
       return {
         store,
         transaction: store.beginTransaction('node-drag'),
@@ -398,7 +424,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     readNodes: () => options.nodes.value,
     readEdges: () => options.edges.value,
     readBoardBaseSnapshot: () => options.boardBaseSnapshot.value,
-    createGraphStore: createCurrentCanvasGraphStore,
+    readGraphStore: readCanvasGraphStore,
     graphAdapter,
     captureHistory: flowHistory.capture,
     commitGroups: commitHistoryGroups,
@@ -449,7 +475,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     },
     graphEditing: {
       adapter: graphAdapter,
-      createCurrentCanvasGraphStore,
+      readCanvasGraphStore,
       deleteNode,
       grouping: groupRuntime,
     },

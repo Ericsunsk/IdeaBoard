@@ -13,7 +13,6 @@ import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasGraphStore } from '../graph-runtime'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { CanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
-import type { FlowToCanvasBoardSnapshotOptions } from '../utils/flowSnapshotAdapter'
 
 type CanvasTaskExecutionFeedback = CanvasFeedback['taskExecution']
 
@@ -21,9 +20,7 @@ export type UseImageWorkflowExecutionOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   graphAdapter: CanvasVueFlowGraphAdapter
-  createCurrentCanvasGraphStore: (
-    snapshotOptions?: FlowToCanvasBoardSnapshotOptions,
-  ) => CanvasGraphStore
+  readCanvasGraphStore: () => CanvasGraphStore
   boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   flushAutosave: (options?: { silent?: boolean }) => Promise<void>
   refreshNodeInternals: (nodeIds: string[]) => void
@@ -107,7 +104,7 @@ export function useImageWorkflowExecution(
     nodes: options.nodes,
     edges: options.edges,
     graphAdapter: options.graphAdapter,
-    createCurrentCanvasGraphStore: options.createCurrentCanvasGraphStore,
+    readCanvasGraphStore: options.readCanvasGraphStore,
     boardBaseSnapshot: options.boardBaseSnapshot,
     flushAutosave: options.flushAutosave,
     refreshNodeInternals: options.refreshNodeInternals,
@@ -121,7 +118,7 @@ export function useImageWorkflowExecution(
     nodes: options.nodes,
     edges: options.edges,
     graphAdapter: options.graphAdapter,
-    createCurrentCanvasGraphStore: options.createCurrentCanvasGraphStore,
+    readCanvasGraphStore: options.readCanvasGraphStore,
     boardBaseSnapshot: options.boardBaseSnapshot,
     flushAutosave: options.flushAutosave,
     refreshNodeInternals: options.refreshNodeInternals,

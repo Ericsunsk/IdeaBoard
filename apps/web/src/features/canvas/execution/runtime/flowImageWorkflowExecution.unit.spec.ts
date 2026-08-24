@@ -5,11 +5,9 @@ import { TaskCancelledError } from '../../../../shared/api/taskEvents'
 import { createEmptyCanvasBoardSnapshot } from '../../../canvas-board/domain'
 import { useCanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
 import { createFlowGraphCommandOptions, readFlowGraphCommandSideEffects } from '../../composables/flowGraphAdapterCommandSideEffects'
-import { CanvasGraphStore } from '../../graph-runtime'
+import { CanvasGraphSession } from '../../graph-runtime'
 import {
   canvasBoardSnapshotToFlow,
-  flowToCanvasBoardSnapshot,
-  type FlowAdapterEdge,
 } from '../../utils/flowSnapshotAdapter'
 import { CanvasBoardGraphSession, createPendingImageExecutionCore } from '../pending-execution'
 import { useFlowImageWorkflowExecution } from './flowImageWorkflowExecution'
@@ -46,15 +44,9 @@ function createPublicHarness(transport: PendingImageWorkflowTaskTransport) {
     },
   })
   const core = createPendingImageExecutionCore()
+  const graphSession = CanvasGraphSession.hydrate('board-a', base)
   core.attachBoard(CanvasBoardGraphSession.create('board-a', {
-    createGraphStore: () =>
-      CanvasGraphStore.fromSnapshot(
-        flowToCanvasBoardSnapshot(
-          { nodes: nodes.value, edges: edges.value as FlowAdapterEdge[] },
-          base,
-          { projection: 'runtime' },
-        ),
-      ),
+    graphSession,
     onMaterialized: (store) => {
       const next = canvasBoardSnapshotToFlow(store.exportSnapshot(base))
       graphAdapter.replaceGraph(
@@ -65,14 +57,7 @@ function createPublicHarness(transport: PendingImageWorkflowTaskTransport) {
   }))
   const execution = useFlowImageWorkflowExecution({
     nodes, edges, graphAdapter,
-    createCurrentCanvasGraphStore: () =>
-      CanvasGraphStore.fromSnapshot(
-        flowToCanvasBoardSnapshot(
-          { nodes: nodes.value, edges: edges.value as FlowAdapterEdge[] },
-          base,
-          { projection: 'runtime' },
-        ),
-      ),
+    readCanvasGraphStore: () => graphSession.store,
     boardBaseSnapshot: ref(base),
     executionWorkspace: { state: { executionCore: core, isNodeRunning: (id) => core.captureActiveLeases([id]).length > 0 }, commands: { runPromptGeneration: vi.fn(), reattachPendingImageResults: vi.fn() } },
     cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(), taskTransport: transport,
@@ -113,11 +98,13 @@ describe('useFlowImageWorkflowExecution', () => {
 
   it('passes a prepared image action to the real Runner transport without per-run callbacks', async () => {
     const core = createPendingImageExecutionCore()
-    const store = CanvasGraphStore.fromSnapshot(createEmptyCanvasBoardSnapshot())
-    core.attachBoard(CanvasBoardGraphSession.create('board-a', { createGraphStore: () => store }))
+    const graphSession = CanvasGraphSession.hydrate('board-a', createEmptyCanvasBoardSnapshot())
+    core.attachBoard(CanvasBoardGraphSession.create('board-a', {
+      graphSession,
+    }))
     const assertReady = vi.fn(async () => { throw new Error('not ready') })
     const execution = useFlowImageWorkflowExecution({
-      nodes: ref([]), edges: ref([]), graphAdapter: {} as never, createCurrentCanvasGraphStore: () => store,
+      nodes: ref([]), edges: ref([]), graphAdapter: {} as never, readCanvasGraphStore: () => graphSession.store,
       boardBaseSnapshot: ref(createEmptyCanvasBoardSnapshot()),
       executionWorkspace: { state: { executionCore: core, isNodeRunning: () => false }, commands: { runPromptGeneration: vi.fn(), reattachPendingImageResults: vi.fn() } },
       cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(),
@@ -212,11 +199,13 @@ describe('useFlowImageWorkflowExecution', () => {
 
   it('delegates prompt execution and pending reattach to the shared Core workspace seam', async () => {
     const core = createPendingImageExecutionCore()
-    const store = CanvasGraphStore.fromSnapshot(createEmptyCanvasBoardSnapshot())
-    core.attachBoard(CanvasBoardGraphSession.create('board-a', { createGraphStore: () => store }))
+    const graphSession = CanvasGraphSession.hydrate('board-a', createEmptyCanvasBoardSnapshot())
+    core.attachBoard(CanvasBoardGraphSession.create('board-a', {
+      graphSession,
+    }))
     const workspace = { state: { executionCore: core, isNodeRunning: () => false }, commands: { runPromptGeneration: vi.fn(), reattachPendingImageResults: vi.fn() } }
     const execution = useFlowImageWorkflowExecution({
-      nodes: ref([]), edges: ref([]), graphAdapter: {} as never, createCurrentCanvasGraphStore: () => store,
+      nodes: ref([]), edges: ref([]), graphAdapter: {} as never, readCanvasGraphStore: () => graphSession.store,
       boardBaseSnapshot: ref(createEmptyCanvasBoardSnapshot()),
       executionWorkspace: workspace, cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(),
       taskTransport: { assertReady: vi.fn(), submit: vi.fn(), resolve: vi.fn() },

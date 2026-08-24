@@ -34,7 +34,7 @@ type UseCanvasGraphInteractionsOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   graphAdapter: CanvasVueFlowGraphAdapter
-  createCurrentCanvasGraphStore: () => CanvasGraphStore
+  readCanvasGraphStore: () => CanvasGraphStore
   selection: CanvasGraphInteractionSelectionAdapter
   browser: CanvasGraphInteractionBrowserAdapter
   preview: {
@@ -158,7 +158,7 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
         ? nodeId
         : null
     if (!graphNodeId) return null
-    const record = options.createCurrentCanvasGraphStore().getNode(graphNodeId)
+    const record = options.readCanvasGraphStore().getNode(graphNodeId)
     return record?.kind === 'image' ? (record.snapshot as ImageNodeItem) : null
   }
 
@@ -187,11 +187,20 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
     image.width = resolveImageNodeFrameSize(payload.ratio, true).width
     image.outputStatus = 'ready'
     image.outputImages = []
+    const transaction = options.readCanvasGraphStore().beginTransaction('node-update')
+    try {
+      transaction.addNode(image).commit()
+    } catch (error) {
+      transaction.cancel()
+      console.error('[Canvas] Failed to append image node', error)
+      options.feedback.operationWarning('添加图片失败，请刷新画布后重试')
+      return
+    }
     options.graphAdapter.addNodes(createImageFlowNode(image), createFlowGraphCommandOptions())
   }
 
   async function exportSelectedImages() {
-    const store = options.createCurrentCanvasGraphStore()
+    const store = options.readCanvasGraphStore()
     const entries = readSelectedGraphNodeIds().flatMap((nodeId) => {
       const record = store.getNode(nodeId)
       return record ? resolveExportEntries(record.snapshot) : []
@@ -258,10 +267,11 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
     const initial = duplicateDrag.value
     duplicateDrag.value = undefined
     if (!initial || !isDuplicateMode || initial.size === 0) return
-    const store = options.createCurrentCanvasGraphStore()
+    const store = options.readCanvasGraphStore()
     const currentById = new Map(options.nodes.value.map((node) => [node.id, node]))
     const reset = new Map<string, { x: number; y: number }>()
     const appended: Node[] = []
+    const appendedSnapshots: ImageNodeItem[] = []
     initial.forEach((start, flowNodeId) => {
       const current = currentById.get(flowNodeId)
       const record = store.getNode(start.graphNodeId)
@@ -281,8 +291,24 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
       copied.outputStatus = source.outputStatus
       reset.set(flowNodeId, { x: start.x, y: start.y })
       appended.push(createImageFlowNode(copied))
+      appendedSnapshots.push(copied)
     })
     if (appended.length === 0) return
+    const transaction = store.beginTransaction('node-update')
+    try {
+      initial.forEach((start, flowNodeId) => {
+        if (reset.has(flowNodeId)) {
+          transaction.updateNode(start.graphNodeId, { x: start.x, y: start.y })
+        }
+      })
+      appendedSnapshots.forEach((snapshot) => transaction.addNode(snapshot))
+      transaction.commit()
+    } catch (error) {
+      transaction.cancel()
+      console.error('[Canvas] Failed to duplicate image nodes', error)
+      options.feedback.operationWarning('复制图片失败，请刷新画布后重试')
+      return
+    }
     options.graphAdapter.replaceNodes(
       (nodes) => [
         ...nodes.map((node) => {

@@ -4,7 +4,7 @@ import {
   type BoardPersistenceSessionOptions,
 } from './boardPersistenceSession'
 
-export type { SaveStatus } from './boardPersistenceSession'
+export type { CanvasGraphSnapshotReplaceReason, SaveStatus } from './boardPersistenceSession'
 
 export type UseCanvasBoardPersistenceOptions = Omit<BoardPersistenceSessionOptions, 'canSaveBoard'>
 

@@ -49,31 +49,6 @@ function makePendingImageFlowNode(): FlowAdapterNode {
   }
 }
 
-function makeReadyImageFlowNode(sourceImageUrl: string): FlowAdapterNode {
-  const snapshotNode: ImageNodeItem = {
-    id: 1,
-    type: 'image-node',
-    x: 0,
-    y: 0,
-    width: 280,
-    sourceImageUrl,
-    sourceImageRatio: 1,
-    outputStatus: 'ready',
-    outputImages: [],
-  }
-  return {
-    id: 'image-1',
-    type: 'canvas',
-    position: { x: 0, y: 0 },
-    data: {
-      kind: 'image',
-      nodeType: 'image',
-      title: 'Image',
-      snapshotNode,
-    },
-  }
-}
-
 function createSessionHarness(initialBoardId = 'board-a') {
   const routeBoardId = ref(initialBoardId)
   const fullNodes = ref<unknown[]>([])
@@ -85,6 +60,7 @@ function createSessionHarness(initialBoardId = 'board-a') {
   const isLoadingBoardSnapshot = ref(false)
   const isSavingBoard = ref(false)
   const canSaveBoard = ref(true)
+  const canReconcileGraph = ref(true)
   const boardAttachmentEpoch = ref(1)
   const commitGraph = vi.fn((nextGraph: { nodes: unknown[]; edges: unknown[] }) => {
     fullNodes.value = nextGraph.nodes
@@ -94,6 +70,10 @@ function createSessionHarness(initialBoardId = 'board-a') {
   const onSuccess = vi.fn()
   const onError = vi.fn()
   const clearFlowHistoryBaseline = vi.fn()
+  const replaceGraphSnapshot = vi.fn((snapshot: CanvasBoardSnapshot) => {
+    boardBaseSnapshot.value = snapshot
+  })
+  const exportGraphSnapshot = vi.fn(() => boardBaseSnapshot.value)
   const boardSession: CanvasBoardSession = {
     currentBoardId: computed(() => {
       const boardId = routeBoardId.value.trim()
@@ -123,6 +103,9 @@ function createSessionHarness(initialBoardId = 'board-a') {
     onSuccess,
     onError,
     clearFlowHistoryBaseline,
+    canReconcileGraph: () => canReconcileGraph.value,
+    replaceGraphSnapshot,
+    exportGraphSnapshot,
     commitGraph,
   })
 
@@ -138,29 +121,16 @@ function createSessionHarness(initialBoardId = 'board-a') {
     isLoadingBoardSnapshot,
     isSavingBoard,
     canSaveBoard,
+    canReconcileGraph,
     commitGraph,
     onWarning,
     onSuccess,
     onError,
     clearFlowHistoryBaseline,
+    replaceGraphSnapshot,
+    exportGraphSnapshot,
     boardSession,
     boardAttachmentEpoch,
-  }
-}
-
-function makePromptFlowNode(id = 1, x = 40): FlowAdapterNode {
-  const snapshotNode = makePromptSnapshot(id)
-  snapshotNode.x = x
-  return {
-    id: `prompt-${id}`,
-    type: 'canvas',
-    position: { x, y: snapshotNode.y },
-    data: {
-      kind: 'prompt',
-      nodeType: 'prompt',
-      title: `Prompt ${id}`,
-      snapshotNode,
-    },
   }
 }
 
@@ -500,7 +470,10 @@ describe('boardPersistenceSession', () => {
 
   it('preserves local draft edits when an older save completes', async () => {
     const harness = createSessionHarness()
-    harness.fullNodes.value = [makePromptFlowNode(1, 40)]
+    harness.boardBaseSnapshot.value = {
+      ...harness.boardBaseSnapshot.value,
+      promptNodes: [makePromptSnapshot(1)],
+    }
     const savedSnapshot = createEmptyCanvasBoardSnapshot()
     savedSnapshot.promptNodes = [makePromptSnapshot(1)]
     let resolveSave: () => void = () => {
@@ -522,8 +495,10 @@ describe('boardPersistenceSession', () => {
     await Promise.resolve()
     harness.commitGraph.mockClear()
     harness.localEditVersion.value += 1
-    const draftNode = makePromptFlowNode(2, 520)
-    harness.fullNodes.value = [draftNode]
+    harness.boardBaseSnapshot.value = {
+      ...harness.boardBaseSnapshot.value,
+      promptNodes: [{ ...makePromptSnapshot(2), x: 520 }],
+    }
     resolveSave()
 
     const saved = await savePromise
@@ -535,7 +510,7 @@ describe('boardPersistenceSession', () => {
       }),
       { source: 'save-reconcile' },
     )
-    expect(harness.fullNodes.value).toEqual([expect.objectContaining({ id: draftNode.id })])
+    expect(harness.fullNodes.value).toEqual([expect.objectContaining({ id: 'prompt-2' })])
     expect(harness.isDirty.value).toBe(true)
     expect(harness.saveStatus.value).toBe('pending')
   })
@@ -555,12 +530,27 @@ describe('boardPersistenceSession', () => {
       ...harness.boardBaseSnapshot.value,
       groups: [capturedGroup],
     }
-    harness.fullNodes.value = [makeReadyImageFlowNode('blob:captured-source')]
+    harness.boardBaseSnapshot.value = {
+      ...harness.boardBaseSnapshot.value,
+      imageNodes: [
+        {
+          id: 1,
+          type: 'image-node',
+          x: 0,
+          y: 0,
+          width: 280,
+          sourceImageUrl: 'blob:captured-source',
+          sourceImageRatio: 1,
+          outputStatus: 'ready',
+          outputImages: [],
+        },
+      ],
+    }
     let resolveSave!: () => void
     vi.mocked(harness.boardSession.save).mockImplementationOnce(
       (snapshot) =>
         new Promise<CanvasBoardSessionSaveResult>((resolve) => {
-          const stabilized = structuredClone(snapshot)
+          const stabilized = JSON.parse(JSON.stringify(snapshot)) as CanvasBoardSnapshot
           stabilized.imageNodes[0]!.sourceImageUrl = '/uploads/canvas/stable-source.png'
           stabilized.imageNodes[0]!.sourceMediaAssetId = 42
           stabilized.mediaRefs = [
@@ -609,6 +599,70 @@ describe('boardPersistenceSession', () => {
     expect(harness.saveStatus.value).toBe('pending')
   })
 
+  it('does not carry deferred media stabilization into a different Board', async () => {
+    const harness = createSessionHarness('board-a')
+    harness.boardBaseSnapshot.value = {
+      ...harness.boardBaseSnapshot.value,
+      imageNodes: [
+        {
+          id: 1,
+          type: 'image-node',
+          x: 0,
+          y: 0,
+          width: 280,
+          sourceImageUrl: 'blob:board-a',
+          sourceImageRatio: 1,
+          outputStatus: 'ready',
+          outputImages: [],
+        },
+      ],
+    }
+    let resolveFirstSave!: () => void
+    vi.mocked(harness.boardSession.save).mockImplementationOnce(
+      (snapshot) =>
+        new Promise<CanvasBoardSessionSaveResult>((resolve) => {
+          const stabilized = JSON.parse(JSON.stringify(snapshot)) as CanvasBoardSnapshot
+          stabilized.imageNodes[0]!.sourceImageUrl = '/uploads/board-a-stable.png'
+          stabilized.imageNodes[0]!.sourceMediaAssetId = 42
+          resolveFirstSave = () => resolve({ snapshot: stabilized, remoteSync: { ok: true } })
+        }),
+    )
+
+    const firstSave = harness.session.saveCurrentBoardSnapshot()
+    await Promise.resolve()
+    harness.localEditVersion.value += 1
+    harness.canReconcileGraph.value = false
+    resolveFirstSave()
+    await firstSave
+
+    const boardBSnapshot = createEmptyCanvasBoardSnapshot()
+    boardBSnapshot.imageNodes = [
+      {
+        id: 1,
+        type: 'image-node',
+        x: 0,
+        y: 0,
+        width: 280,
+        sourceImageUrl: 'blob:board-b',
+        sourceImageRatio: 1,
+        outputStatus: 'ready',
+        outputImages: [],
+      },
+    ]
+    harness.routeBoardId.value = 'board-b'
+    vi.mocked(harness.boardSession.load).mockResolvedValueOnce(boardBSnapshot)
+    await harness.session.loadInitialOrRouteBoard()
+
+    await harness.session.saveCurrentBoardSnapshot()
+
+    expect(harness.boardSession.save).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        imageNodes: [expect.objectContaining({ sourceImageUrl: 'blob:board-b' })],
+      }),
+      expect.anything(),
+    )
+  })
+
   it('rejects an older overlapping save after a newer save commits', async () => {
     const harness = createSessionHarness()
     const firstSnapshot = createEmptyCanvasBoardSnapshot()
@@ -640,7 +694,10 @@ describe('boardPersistenceSession', () => {
 
   it('rejects a deferred save commit after the same Board opens a new attachment epoch', async () => {
     const harness = createSessionHarness()
-    harness.fullNodes.value = [makePromptFlowNode(1, 40)]
+    harness.boardBaseSnapshot.value = {
+      ...harness.boardBaseSnapshot.value,
+      promptNodes: [makePromptSnapshot(1)],
+    }
     const savedSnapshot = createEmptyCanvasBoardSnapshot()
     savedSnapshot.promptNodes = [makePromptSnapshot(1)]
     let resolveSave!: () => void

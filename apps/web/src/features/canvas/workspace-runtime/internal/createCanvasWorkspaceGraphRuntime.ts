@@ -39,6 +39,8 @@ export function createCanvasWorkspaceGraphRuntime(
     boardBaseSnapshot: board.boardSession.boardBaseSnapshot,
     currentBoardId: board.boardSession.currentBoardId,
     graphAdapter: board.graphEditing.adapter,
+    readCanvasGraphStore: board.graphEditing.readCanvasGraphStore,
+    captureHistory: board.boardSession.history.capture,
     deleteNode: board.graphEditing.deleteNode,
     updateNodeInternals: flowPaneAdapter.updateNodeInternals,
     screenToFlowCoordinate: flowPaneAdapter.screenToFlowCoordinate,
@@ -55,7 +57,7 @@ export function createCanvasWorkspaceGraphRuntime(
     nodes: board.flowPane.nodes,
     edges: board.flowPane.edges,
     graphAdapter: board.graphEditing.adapter,
-    createCurrentCanvasGraphStore: board.graphEditing.createCurrentCanvasGraphStore,
+    readCanvasGraphStore: board.graphEditing.readCanvasGraphStore,
     selection: {
       selectedElements: flowPaneAdapter.getSelectedElements,
       clear: flowPaneAdapter.removeSelectedElements,

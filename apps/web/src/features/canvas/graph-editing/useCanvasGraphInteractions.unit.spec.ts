@@ -6,7 +6,7 @@ import {
   type CanvasBoardSnapshot,
   type ImageNodeItem,
 } from '../../canvas-board/domain'
-import { createCanvasGraphStore } from '../graph-runtime'
+import { CanvasGraphSession } from '../graph-runtime'
 import { useCanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
 import type { FlowNodeData } from '../types/flowTypes'
 import { useCanvasGraphInteractions } from './useCanvasGraphInteractions'
@@ -46,6 +46,7 @@ function createHarness() {
   const snapshot: CanvasBoardSnapshot = createEmptyCanvasBoardSnapshot()
   const image = createImageSnapshot()
   snapshot.imageNodes.push(image)
+  const graphSession = CanvasGraphSession.hydrate('board-a', snapshot)
   const nodes = shallowRef<Node[]>([createFlowImage(image)])
   const edges = shallowRef<Edge[]>([])
   const selectedElements = shallowRef([nodes.value[0]] as unknown as Elements)
@@ -63,7 +64,7 @@ function createHarness() {
     nodes,
     edges,
     graphAdapter,
-    createCurrentCanvasGraphStore: () => createCanvasGraphStore(snapshot),
+    readCanvasGraphStore: () => graphSession.store,
     selection: { selectedElements, clear },
     browser: { downloadImage },
     preview: { openNodeImage },

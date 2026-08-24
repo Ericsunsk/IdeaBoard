@@ -61,7 +61,7 @@ function createRuntime() {
     nodes: ref([]),
     edges: ref([]),
     graphAdapter: {},
-    createCurrentCanvasGraphStore: vi.fn(() => ({})),
+    readCanvasGraphStore: vi.fn(() => ({})),
     flushAutosave: vi.fn(async () => undefined),
     refreshNodeInternals: vi.fn(),
     executionCore: createPendingImageExecutionCore(),

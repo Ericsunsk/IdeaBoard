@@ -3,7 +3,6 @@ import type { Edge, Node } from '@vue-flow/core'
 import type { CanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
 import type { CanvasGraphStore } from '../../graph-runtime'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
-import type { FlowToCanvasBoardSnapshotOptions } from '../../utils/flowSnapshotAdapter'
 import {
   buildImageActionReadinessRequest,
   buildImageExecutionTaskRequest,
@@ -41,9 +40,7 @@ export type UseFlowImageWorkflowExecutionOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   graphAdapter: CanvasVueFlowGraphAdapter
-  createCurrentCanvasGraphStore: (
-    snapshotOptions?: FlowToCanvasBoardSnapshotOptions,
-  ) => CanvasGraphStore
+  readCanvasGraphStore: () => CanvasGraphStore
   boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   refreshNodeInternals?: (nodeIds: string[]) => void
   flushAutosave?: (options?: { silent?: boolean }) => Promise<void>
@@ -60,8 +57,9 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     nodes: options.nodes,
     edges: options.edges,
     graphAdapter: options.graphAdapter,
-    createCurrentCanvasGraphStore: options.createCurrentCanvasGraphStore,
-    boardBaseSnapshot: options.boardBaseSnapshot,
+    readCanvasGraphStore: options.readCanvasGraphStore,
+    readCurrentAttachment: options.executionWorkspace.state.executionCore.currentAttachment,
+    isAttachmentCurrent: options.executionWorkspace.state.executionCore.isAttachmentCurrent,
     refreshNodeInternals: options.refreshNodeInternals,
     isNodeExecutionActive: options.executionWorkspace.state.isNodeRunning,
   })

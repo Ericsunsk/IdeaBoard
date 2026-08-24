@@ -22,6 +22,7 @@ type FlowHistorySnapshotState = {
   nodeIndex: FlowHistoryItemIndex
   edgeIndex: FlowHistoryItemIndex
   groupIndex: FlowHistoryItemIndex
+  canonicalSnapshot?: unknown
 }
 
 type FlowHistoryPatch = {
@@ -40,6 +41,8 @@ type FlowHistoryEntry = {
   afterEdgeOrder: string[]
   beforeGroupOrder: string[]
   afterGroupOrder: string[]
+  beforeCanonicalSnapshot?: unknown
+  afterCanonicalSnapshot?: unknown
 }
 
 type ArrayRef<T> = { value: T[] }
@@ -53,6 +56,8 @@ type UseFlowHistoryOptions = {
   commitEdges: (edges: unknown[]) => void
   groups?: ArrayRef<unknown>
   commitGroups?: (groups: unknown[]) => void
+  captureCanonicalSnapshot?: () => unknown
+  restoreCanonicalSnapshot?: (snapshot: unknown) => void
 }
 
 const snapshotStates = new WeakMap<FlowHistorySnapshot, FlowHistorySnapshotState>()
@@ -97,12 +102,14 @@ function createFlowHistorySnapshot(
   nodes: unknown[],
   edges: unknown[],
   groups: unknown[],
+  canonicalSnapshot?: unknown,
 ): FlowHistorySnapshot {
   const snapshot = Object.freeze({}) as FlowHistorySnapshot
   snapshotStates.set(snapshot, {
     nodeIndex: createHistoryItemIndex(nodes),
     edgeIndex: createHistoryItemIndex(edges),
     groupIndex: createHistoryItemIndex(groups),
+    canonicalSnapshot,
   })
   return snapshot
 }
@@ -189,7 +196,12 @@ export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
         const nodes = options.nodes.value as unknown[]
         const edges = (options.edges.value as unknown[]).map(stripExecutionProjection)
         const groups = (options.groups?.value ?? []) as unknown[]
-        return createFlowHistorySnapshot(nodes, edges, groups)
+        return createFlowHistorySnapshot(
+          nodes,
+          edges,
+          groups,
+          options.captureCanonicalSnapshot?.(),
+        )
       },
     )
   }
@@ -232,6 +244,8 @@ export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
       afterEdgeOrder: afterEdgeIndex.order,
       beforeGroupOrder: beforeGroupIndex.order,
       afterGroupOrder: afterGroupIndex.order,
+      beforeCanonicalSnapshot: beforeState.canonicalSnapshot,
+      afterCanonicalSnapshot: afterState.canonicalSnapshot,
     }
   }
 
@@ -297,6 +311,9 @@ export function useFlowHistory(options: UseFlowHistoryOptions): FlowHistory {
   }
 
   function applyHistoryEntry(entry: FlowHistoryEntry, direction: 'forward' | 'backward') {
+    const canonicalSnapshot =
+      direction === 'forward' ? entry.afterCanonicalSnapshot : entry.beforeCanonicalSnapshot
+    if (canonicalSnapshot !== undefined) options.restoreCanonicalSnapshot?.(canonicalSnapshot)
     const nextNodes = applyCollectionPatches(
       options.nodes.value as unknown[],
       entry.nodePatches,

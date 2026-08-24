@@ -1,7 +1,15 @@
 import type { Edge, Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
 import { shallowRef } from 'vue'
-import type { FusionNodeItem, ImageNodeItem, PromptNodeItem } from '../../canvas-board/domain'
+import {
+  createEmptyCanvasBoardSnapshot,
+  type CanvasNodeItem,
+  type FusionNodeItem,
+  type ImageNodeItem,
+  type PromptNodeItem,
+} from '../../canvas-board/domain'
+import { CanvasGraphSession } from '../graph-runtime'
+import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
 import { FLOW_NODE_DRAG_HANDLE } from '../utils/flowNodeDragHandle'
 import { useCanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import { useFlowNodeMutations } from './useFlowNodeMutations'
@@ -85,6 +93,23 @@ function makeEdge(
   return { id, source, target, sourceHandle, targetHandle }
 }
 
+function createGraphSession(initialNodes: Node[], initialEdges: Edge[]) {
+  const snapshot = createEmptyCanvasBoardSnapshot()
+  for (const node of initialNodes) {
+    const snapshotNode = node.data?.snapshotNode as CanvasNodeItem | undefined
+    if (!snapshotNode) continue
+    if (snapshotNode.type === 'image-node') snapshot.imageNodes.push(snapshotNode)
+    else if (snapshotNode.type === 'prompt') snapshot.promptNodes.push(snapshotNode)
+    else snapshot.fusionNodes.push(snapshotNode)
+  }
+  for (const edge of initialEdges) {
+    const match = /^connection-(\d+)$/.exec(edge.id)
+    if (!match) continue
+    snapshot.connections.push(flowConnectionToCanvasConnection(Number(match[1]), edge))
+  }
+  return CanvasGraphSession.hydrate('board-a', snapshot)
+}
+
 function createMutationsHarness(initialNodes: Node[], initialEdges: Edge[]) {
   const nodes = shallowRef<Node[]>(initialNodes)
   const edges = shallowRef<Edge[]>(initialEdges)
@@ -103,11 +128,14 @@ function createMutationsHarness(initialNodes: Node[], initialEdges: Edge[]) {
     afterCommand: graphCommand,
   })
   const onWarning = vi.fn()
+  const graphSession = createGraphSession(initialNodes, initialEdges)
 
   const mutations = useFlowNodeMutations({
     nodes,
     edges,
+    readCanvasGraphStore: () => graphSession.store,
     graphAdapter,
+    captureHistory: () => ({}) as import('./useFlowHistory').FlowHistorySnapshot,
     onWarning,
   })
 

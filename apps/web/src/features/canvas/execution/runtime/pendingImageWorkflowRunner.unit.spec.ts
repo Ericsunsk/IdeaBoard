@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { TaskCancelledError, TaskResultPendingError } from '../../../../shared/api/taskEvents'
 import { createEmptyCanvasBoardSnapshot, type ImageNodeItem } from '../../../canvas-board/domain'
-import { CanvasGraphStore } from '../../graph-runtime'
+import { CanvasGraphSession } from '../../graph-runtime'
 import { CanvasBoardGraphSession, createPendingImageExecutionCore } from '../pending-execution'
 import { CanvasBillingPreflightError } from '../task-runner/canvasBillingPreflight'
 import { createPendingImageWorkflowRunner } from './pendingImageWorkflowRunner'
@@ -25,10 +25,10 @@ function createHarness(taskIds: readonly string[] = ['task-1']) {
         outputImages: [],
       }) satisfies ImageNodeItem,
   )
-  const store = CanvasGraphStore.fromSnapshot(snapshot)
+  const store = CanvasGraphSession.hydrate('board-a', snapshot)
   const core = createPendingImageExecutionCore()
   const attachment = core.attachBoard(
-    CanvasBoardGraphSession.create('board-a', { createGraphStore: () => store }),
+    CanvasBoardGraphSession.create('board-a', { graphSession: store }),
   )
   const pendingResults = {
     reservePendingResults: vi.fn(() => ({
@@ -138,7 +138,7 @@ describe('pendingImageWorkflowRunner', () => {
 
   it('keeps pending nodes when graph materialization fails so reattach can recover them', async () => {
     const harness = createHarness()
-    vi.spyOn(harness.store, 'beginTransaction').mockImplementation(() => {
+    vi.spyOn(harness.store.store, 'beginTransaction').mockImplementation(() => {
       throw new Error('graph write failed')
     })
     await harness.runner.execute(harness.intent)

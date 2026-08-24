@@ -20,6 +20,7 @@ type UseCanvasLibraryImportRuntimeOptions = {
   nodes: Ref<Node[]>
   readAttachment: () => CanvasBoardAttachment | null
   graphAdapter: CanvasVueFlowGraphAdapter
+  updateImageSnapshot: (nodeId: string, mutate: (snapshot: ImageNodeItem) => ImageNodeItem) => void
   createImageNodeAtPosition: (
     x: number,
     y: number,
@@ -132,22 +133,15 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
       throw new Error('素材导入失败：服务未返回有效媒体资产')
     }
 
-    updateNode(nodeId, (current) => {
-      if (!isCurrentAttachment(attachment)) return {}
+    options.updateImageSnapshot(nodeId, (current) => {
+      if (!isCurrentAttachment(attachment)) return current
       const nextSnapshot = materializeLibraryImport(
-        current.snapshot,
+        current,
         libraryAssetId,
         materialized,
         fallbackRatio,
       )
-      if (!nextSnapshot) return {}
-      const { libraryImportPreviewUrl: _preview, ...data } = current.data
-      return {
-        data: {
-          ...data,
-          snapshotNode: nextSnapshot,
-        },
-      }
+      return nextSnapshot ?? current
     })
     options.refreshNodeInternals([nodeId])
   }
@@ -162,12 +156,9 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
     if (!isCurrentAttachment(attachment)) return
     if (!hasPendingLibraryImport(readLibraryImportNode(options.nodes.value, nodeId)?.snapshot, libraryAssetId)) return
     const message = resolveErrorMessage(error)
-    updateNode(nodeId, (current) => {
-      const nextSnapshot = failLibraryImport(current.snapshot, libraryAssetId, message)
-      return nextSnapshot
-        ? { data: { ...current.data, snapshotNode: nextSnapshot } }
-        : {}
-    })
+    options.updateImageSnapshot(nodeId, (current) =>
+      failLibraryImport(current, libraryAssetId, message) ?? current,
+    )
     options.refreshNodeInternals([nodeId])
     if (notify) options.onWarning(message)
   }
@@ -249,10 +240,7 @@ export function useCanvasLibraryImportRuntime(options: UseCanvasLibraryImportRun
     const fact = current?.snapshot.libraryImport
     const attachment = options.readAttachment()
     if (!current || fact?.state !== 'failed' || !attachment) return false
-    updateNode(nodeId, (node) => {
-      const nextSnapshot = retryLibraryImport(node.snapshot)
-      return nextSnapshot ? { data: { ...node.data, snapshotNode: nextSnapshot } } : {}
-    })
+    options.updateImageSnapshot(nodeId, (snapshot) => retryLibraryImport(snapshot) ?? snapshot)
     options.refreshNodeInternals([nodeId])
     return materializePending(
       nodeId,

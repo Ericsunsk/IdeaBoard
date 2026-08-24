@@ -11,7 +11,11 @@ import {
 import { createCanvasConnectionCommandLifecycle } from '../flow-pane'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
-import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
+import {
+  isCanvasGraphNodeId,
+  type CanvasGraphNodeIdForKind,
+  type CanvasGraphStore,
+} from '../graph-runtime'
 import {
   createFlowGraphCommandOptions,
   type FlowGraphCommandSideEffectOptions,
@@ -22,6 +26,7 @@ import {
   isCanvasExecutionOutputNodeType,
   type CanvasBoardSnapshot,
   type CanvasCreatableNodeKind,
+  type ImageNodeItem,
   type CanvasNodeItem,
   type CanvasNodeItemByKind,
 } from '../../canvas-board/domain'
@@ -31,7 +36,9 @@ type UseFlowNodeMutationsOptions = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- vue-flow node/edge data is an open Record; narrowing here breaks vue-flow's internal type expectations
   edges: Ref<Array<Record<string, any>>>
   boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
+  readCanvasGraphStore: () => CanvasGraphStore
   graphAdapter: CanvasVueFlowGraphAdapter
+  captureHistory: () => FlowHistorySnapshot
   onWarning: (message: string) => void
 }
 
@@ -179,6 +186,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     readNodes: () => options.nodes.value as unknown as Node[],
     readEdges: () => options.edges.value as unknown as Edge[],
     readBoardBaseSnapshot: () => options.boardBaseSnapshot?.value,
+    readGraphStore: options.readCanvasGraphStore,
     isValidConnection,
     normalizeConnection: (connection, existingEdges) =>
       normalizeFlowConnection(connection, lookupData, existingEdges),
@@ -206,6 +214,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
       return null
     },
     graphAdapter: options.graphAdapter,
+    captureHistory: options.captureHistory,
     onWarning: options.onWarning,
     markFlowExecutionNodeDirty,
   })
@@ -239,7 +248,18 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
         snapshotNode,
       } satisfies FlowNodeData,
     }
-    options.graphAdapter.addNodes(flowNode, createFlowGraphCommandOptions())
+    const store = options.readCanvasGraphStore()
+    const historyBefore = options.captureHistory()
+    const transaction = store.beginTransaction('node-update')
+    try {
+      transaction.addNode(snapshotNode).commit()
+    } catch (error) {
+      transaction.cancel()
+      console.error('[Canvas] Failed to create graph node', error)
+      options.onWarning('创建节点失败，请刷新画布后重试')
+      return null
+    }
+    options.graphAdapter.addNodes(flowNode, createFlowGraphCommandOptions({ historyBefore }))
     return flowNodeId
   }
 
@@ -259,10 +279,27 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   ) {
     const node = (options.nodes.value as Node[]).find((item) => item.id === nodeId)
     const data = (node?.data ?? {}) as { snapshotNode?: unknown; title?: string }
-    if (!node || !data.snapshotNode || typeof data.snapshotNode !== 'object') return
-    const snapshotNode = data.snapshotNode as CanvasNodeItem
+    const graphNodeId = isCanvasGraphNodeId(nodeId) ? nodeId : null
+    if (!node || !graphNodeId) return
+    const store = options.readCanvasGraphStore()
+    const record = store.getNode(graphNodeId)
+    if (!record) return
+    const snapshotNode = record.snapshot
     const nextSnapshotNode = patcher(snapshotNode)
     if (nextSnapshotNode === snapshotNode) return
+    const historyBefore =
+      mutationOptions.history === false
+        ? undefined
+        : (mutationOptions.historyBefore ?? options.captureHistory())
+    const transaction = store.beginTransaction('node-update')
+    try {
+      transaction.updateNode(graphNodeId, () => nextSnapshotNode).commit()
+    } catch (error) {
+      transaction.cancel()
+      console.error('[Canvas] Failed to update graph node', error)
+      options.onWarning('节点更新失败，请刷新画布后重试')
+      return
+    }
     options.graphAdapter.updateNode(
       nodeId,
       {
@@ -275,7 +312,9 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
           snapshotNode: nextSnapshotNode,
         },
       },
-      createFlowGraphCommandOptions(createSnapshotCommandSideEffects(mutationOptions)),
+      createFlowGraphCommandOptions(
+        createSnapshotCommandSideEffects({ ...mutationOptions, historyBefore }),
+      ),
     )
   }
 
@@ -303,6 +342,26 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     })
 
     if (staleNodeIds.size === 0) return
+
+    const store = options.readCanvasGraphStore()
+    const transaction = store.beginTransaction('node-update', {
+      recordHistory: false,
+      markDirty: false,
+    })
+    try {
+      staleNodeIds.forEach((nodeId) => {
+        const record = store.getNode(nodeId as CanvasGraphNodeIdForKind<'image'>)
+        if (record?.kind === 'image' && (record.snapshot as ImageNodeItem).outputStatus === 'ready') {
+          transaction.updateNode(record.id, { outputStatus: 'stale' })
+        }
+      })
+      transaction.commit()
+    } catch (error) {
+      transaction.cancel()
+      console.error('[Canvas] Failed to mark execution nodes stale', error)
+      options.onWarning('节点状态更新失败，请刷新画布后重试')
+      return
+    }
 
     options.graphAdapter.replaceNodes(
       (items) => markReadyExecutionOutputNodesStale(items, staleNodeIds),

@@ -8,9 +8,14 @@ import {
   type CanvasBoardSnapshot,
   type CanvasGroup,
 } from '../../canvas-board/domain'
+import { CanvasGraphSession, type CanvasGraphTransaction } from '../graph-runtime'
+import { canvasBoardSnapshotToFlow } from '../utils/flowSnapshotAdapter'
 import { useCanvasGraphEditing } from '../graph-editing'
 import { useFlowCanvasRuntime, type UseFlowCanvasRuntimeOptions } from './useFlowCanvasRuntime'
-import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
+import {
+  createFlowGraphCommandOptions,
+  createFlowGraphCommandOptionsFromTransactionSummary,
+} from './flowGraphAdapterCommandSideEffects'
 import {
   CanvasBoardGraphSession,
   createPendingImageExecutionCore,
@@ -240,6 +245,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
   const nodes = fullNodes
   const edges = fullEdges
   const boardBaseSnapshot = shallowRef(createEmptyCanvasBoardSnapshot())
+  const routeBoardId = ref('board-a')
   const savedSnapshots: CanvasBoardSnapshot[] = []
   const scheduledMicrotasks: Array<() => void> = []
   const scheduledAnimationFrames = new Map<number, FrameRequestCallback>()
@@ -270,7 +276,9 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     },
     attachBoard(boardId: string) {
       return executionCore.attachBoard(
-        CanvasBoardGraphSession.create(boardId, { createGraphStore: () => ({}) as never }),
+        CanvasBoardGraphSession.create(boardId, {
+          graphSession: CanvasGraphSession.hydrate(boardId, createEmptyCanvasBoardSnapshot()),
+        }),
       )
     },
     hydratePending(attachment: ReturnType<typeof executionCore.currentAttachment>, nodeId: string, taskId: string) {
@@ -309,7 +317,7 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     },
   }
   const boardSession: CanvasBoardSession = {
-    currentBoardId: computed(() => 'board-a'),
+    currentBoardId: computed(() => routeBoardId.value),
     exists: vi.fn(() => true),
     load: vi.fn(async () => snapshot),
     save: vi.fn(async (nextSnapshot: CanvasBoardSnapshot) => {
@@ -393,11 +401,13 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     boardBaseSnapshot,
     savedSnapshots,
     boardSession,
+    routeBoardId,
     onWarning,
     onError,
     graphActions,
     isDirty,
     saveStatus,
+    executionCore,
     executionRuntime,
     flushAnimationFrames,
     flushNativeGraphChanges,
@@ -420,6 +430,8 @@ function createCanvasGraphRuntimeHarness(harness: ReturnType<typeof createRuntim
     boardBaseSnapshot: harness.boardBaseSnapshot,
     currentBoardId: harness.runtime.persistence.currentBoardId,
     graphAdapter: harness.runtime.graphEditing.adapter,
+    readCanvasGraphStore: harness.runtime.graphEditing.readCanvasGraphStore,
+    captureHistory: harness.runtime.persistence.history.capture,
     deleteNode: harness.runtime.graphEditing.deleteNode,
     updateNodeInternals: vi.fn(),
     screenToFlowCoordinate: (point) => point,
@@ -468,8 +480,36 @@ function clearGraphActionMocks(harness: ReturnType<typeof createRuntimeHarness>)
 
 function exportCurrentBoardSnapshot(harness: ReturnType<typeof createRuntimeHarness>) {
   return harness.runtime.graphEditing
-    .createCurrentCanvasGraphStore()
+    .readCanvasGraphStore()
     .exportSnapshot(harness.boardBaseSnapshot.value)
+}
+
+function projectCanonicalGraph(
+  harness: ReturnType<typeof createRuntimeHarness>,
+  commandOptions = createFlowGraphCommandOptions({ recordHistory: false, markDirty: false }),
+) {
+  const snapshot = exportCurrentBoardSnapshot(harness)
+  harness.boardBaseSnapshot.value = snapshot
+  const flow = canvasBoardSnapshotToFlow(snapshot)
+  harness.runtime.graphEditing.adapter.replaceGraph(
+    { nodes: flow.nodes as Node[], edges: flow.edges as Edge[] },
+    commandOptions,
+  )
+}
+
+function commitCanonicalGraphMutation(
+  harness: ReturnType<typeof createRuntimeHarness>,
+  reason: Parameters<ReturnType<typeof harness.runtime.graphEditing.readCanvasGraphStore>['beginTransaction']>[0],
+  mutate: (transaction: CanvasGraphTransaction) => void,
+) {
+  const transaction = harness.runtime.graphEditing.readCanvasGraphStore().beginTransaction(reason, {
+    recordHistory: false,
+    markDirty: false,
+  })
+  mutate(transaction)
+  const summary = transaction.commit()
+  if (summary.didChange) projectCanonicalGraph(harness)
+  return summary
 }
 
 function readEdgeProjection(edges: Edge[]) {
@@ -481,31 +521,6 @@ function readEdgeProjection(edges: Edge[]) {
     targetHandle: edge.targetHandle,
     data: edge.data,
   }))
-}
-
-function createPromptFlowNode(id: number, x: number, y: number): Node {
-  return {
-    id: `prompt-${id}`,
-    type: 'canvas',
-    position: { x, y },
-    data: {
-      kind: 'prompt',
-      nodeType: 'prompt',
-      title: `Prompt ${id}`,
-      snapshotNode: {
-        id,
-        type: 'prompt',
-        x,
-        y,
-        width: 280,
-        title: `Prompt ${id}`,
-        text: '',
-        outputCount: 1,
-        aspectRatio: 'auto',
-        inputImages: [],
-      },
-    },
-  }
 }
 
 function readSelectedFlag(node: Node | undefined) {
@@ -558,6 +573,7 @@ function clickNodeThroughGrouping(
 describe('useFlowCanvasRuntime', () => {
   it('hydrates the full graph into the Vue Flow store', async () => {
     const harness = createRuntimeHarness()
+    const hydrateSession = vi.spyOn(CanvasGraphSession, 'hydrate')
 
     await harness.runtime.persistence.loadInitialOrRouteBoard()
 
@@ -569,6 +585,52 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-3'])
     expect(harness.nodes.value.map((node) => node.id)).toEqual(['image-1', 'prompt-1', 'prompt-2'])
     expect(harness.edges.value.map((edge) => edge.id)).toEqual(['connection-3'])
+    expect(hydrateSession).toHaveBeenCalledTimes(1)
+    hydrateSession.mockRestore()
+  })
+
+  it('replaces the Graph Session and advances the attachment epoch when the board reloads', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.persistence.loadInitialOrRouteBoard()
+
+    const firstStore = harness.runtime.graphEditing.readCanvasGraphStore()
+    const firstAttachment = harness.executionCore.currentAttachment()
+
+    await harness.runtime.persistence.loadInitialOrRouteBoard()
+
+    const nextStore = harness.runtime.graphEditing.readCanvasGraphStore()
+    const nextAttachment = harness.executionCore.currentAttachment()
+    expect(nextStore).not.toBe(firstStore)
+    expect(nextAttachment?.epoch).toBeGreaterThan(firstAttachment?.epoch ?? -1)
+    firstStore.beginTransaction('node-update').updateNode('prompt-1', { x: 999 }).commit()
+    expect(nextStore.exportSnapshot().promptNodes.find((node) => node.id === 1)?.x).toBe(400)
+  })
+
+  it('detaches Board A before a deferred Board B load so autosave cannot persist A into B', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.persistence.loadInitialOrRouteBoard()
+    const attachmentA = harness.executionCore.currentAttachment()
+    let resolveBoardB!: (snapshot: CanvasBoardSnapshot) => void
+    vi.mocked(harness.boardSession.load).mockImplementationOnce(
+      () =>
+        new Promise<CanvasBoardSnapshot>((resolve) => {
+          resolveBoardB = resolve
+        }),
+    )
+
+    harness.routeBoardId.value = 'board-b'
+    const loadingBoardB = harness.runtime.persistence.loadInitialOrRouteBoard()
+    await Promise.resolve()
+
+    expect(harness.executionCore.isAttachmentCurrent(attachmentA!)).toBe(false)
+    harness.isDirty.value = true
+    await harness.runtime.persistence.flushAutosave()
+    expect(harness.boardSession.save).not.toHaveBeenCalled()
+
+    resolveBoardB(createEmptyCanvasBoardSnapshot())
+    await loadingBoardB
+
+    expect(harness.executionCore.currentAttachment()?.boardId).toBe('board-b')
   })
 
   it('hydrates persisted pending tasks into Runtime before the first graph projection', async () => {
@@ -606,20 +668,20 @@ describe('useFlowCanvasRuntime', () => {
   })
 
   it('keeps runtime edge projection active when a deferred save reconciles', async () => {
-    const harness = createRuntimeHarness()
+    const snapshot = createSnapshot()
+    snapshot.connections = [
+      {
+        id: 4,
+        fromNodeType: 'prompt',
+        fromNodeId: 1,
+        fromPort: 'prompt',
+        toNodeType: 'image',
+        toNodeId: 1,
+        toPort: 'image',
+      },
+    ]
+    const harness = createRuntimeHarness(snapshot)
     await harness.runtime.persistence.loadInitialOrRouteBoard()
-    const executionEdge: Edge = {
-      id: 'connection-4',
-      source: 'prompt-1',
-      sourceHandle: 'out:prompt',
-      target: 'image-1',
-      targetHandle: 'in:image',
-      animated: false,
-    }
-    harness.runtime.graphEditing.adapter.replaceEdges(
-      [executionEdge],
-      createFlowGraphCommandOptions(),
-    )
     const attachment = harness.executionRuntime.attachment.value!
     const lease = harness.executionRuntime.hydratePending(attachment, 'image-1', 'task-1')!
     expect(harness.renderEdges.value[0]?.animated).toBe(true)
@@ -631,6 +693,7 @@ describe('useFlowCanvasRuntime', () => {
           resolveSave = () => resolve({ snapshot, remoteSync: { ok: true as const } })
         }),
     )
+    harness.isDirty.value = true
     const save = harness.runtime.persistence.flushAutosave({ silent: true })
     await vi.waitFor(() => expect(harness.boardSession.save).toHaveBeenCalled())
     resolveSave()
@@ -693,93 +756,76 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.renderEdges.value[0]?.animated).toBe(false)
   })
 
-  it('preserves only lease-owned serializer omissions during save reconciliation', async () => {
+  it('preserves canonical graph data during save reconciliation', async () => {
     const harness = createRuntimeHarness()
     await harness.runtime.persistence.loadInitialOrRouteBoard()
-    const templateNode = harness.nodes.value.find((node) => node.id === 'image-1')!
-    const makeRuntimeOnlyNode = (id: number): Node => ({
-      ...templateNode,
-      id: `image-${id}`,
-      data: {
-        ...templateNode.data,
-        snapshotNode: {
-          ...templateNode.data.snapshotNode,
+    const imageTemplate = exportCurrentBoardSnapshot(harness).imageNodes[0]!
+    commitCanonicalGraphMutation(harness, 'node-update', (transaction) => {
+      for (const id of [9, 10]) {
+        transaction.addNode({
+          ...imageTemplate,
           id,
           sourceImageUrl: '',
           outputStatus: 'running',
           outputImages: [],
           pendingTaskId: undefined,
-        },
-      },
+        })
+      }
+      transaction.addEdge({
+        id: 4,
+        fromNodeType: 'prompt',
+        fromNodeId: 1,
+        fromPort: 'prompt',
+        toNodeType: 'image',
+        toNodeId: 9,
+        toPort: 'image',
+      })
+      transaction.addEdge({
+        id: 5,
+        fromNodeType: 'prompt',
+        fromNodeId: 1,
+        fromPort: 'prompt',
+        toNodeType: 'image',
+        toNodeId: 10,
+        toPort: 'image',
+      })
     })
-    harness.runtime.graphEditing.adapter.addNodes(
-      [makeRuntimeOnlyNode(9), makeRuntimeOnlyNode(10)],
-      createFlowGraphCommandOptions(),
-    )
-    harness.runtime.graphEditing.adapter.addEdges(
-      [
-        {
-          id: 'runtime-edge-9',
-          source: 'prompt-1',
-          sourceHandle: 'out:prompt',
-          target: 'image-9',
-          targetHandle: 'in:image',
-        },
-        {
-          id: 'runtime-edge-10',
-          source: 'prompt-1',
-          sourceHandle: 'out:prompt',
-          target: 'image-10',
-          targetHandle: 'in:image',
-        },
-      ],
-      createFlowGraphCommandOptions(),
-    )
     const attachment = harness.executionRuntime.attachment.value!
     harness.executionRuntime.beginSubmission(attachment, 'image-9')
 
     await harness.runtime.persistence.flushAutosave({ silent: true })
 
     expect(harness.nodes.value.map((node) => node.id)).toContain('image-9')
-    expect(harness.nodes.value.map((node) => node.id)).not.toContain('image-10')
-    expect(harness.edges.value.map((edge) => edge.id)).toContain('runtime-edge-9')
-    expect(harness.edges.value.map((edge) => edge.id)).not.toContain('runtime-edge-10')
-    expect(harness.renderEdges.value.find((edge) => edge.id === 'runtime-edge-9')?.animated).toBe(true)
+    expect(harness.nodes.value.map((node) => node.id)).toContain('image-10')
+    expect(harness.edges.value.map((edge) => edge.id)).toContain('connection-4')
+    expect(harness.edges.value.map((edge) => edge.id)).toContain('connection-5')
+    expect(harness.renderEdges.value.find((edge) => edge.id === 'connection-4')?.animated).toBe(true)
   })
 
   it('reconciles a persisted pending edge by endpoints instead of retaining both edge ids', async () => {
     const harness = createRuntimeHarness()
     await harness.runtime.persistence.loadInitialOrRouteBoard()
-    const templateNode = harness.nodes.value.find((node) => node.id === 'image-1')!
-    harness.runtime.graphEditing.adapter.addNodes(
-      {
-        ...templateNode,
-        id: 'image-9',
-        data: {
-          ...templateNode.data,
-          snapshotNode: {
-            ...templateNode.data.snapshotNode,
-            id: 9,
-            sourceImageUrl: '',
-            outputStatus: 'running',
-            outputImages: [],
-            pendingTaskId: 'task-9',
-            pendingClientActionId: 'action-task-9',
-          },
-        },
-      },
-      createFlowGraphCommandOptions(),
-    )
-    harness.runtime.graphEditing.adapter.addEdges(
-      {
-        id: 'runtime-edge-9',
-        source: 'prompt-1',
-        sourceHandle: 'out:prompt',
-        target: 'image-9',
-        targetHandle: 'in:image',
-      },
-      createFlowGraphCommandOptions(),
-    )
+    const imageTemplate = exportCurrentBoardSnapshot(harness).imageNodes[0]!
+    commitCanonicalGraphMutation(harness, 'node-update', (transaction) => {
+      transaction.addNode({
+        ...imageTemplate,
+        id: 9,
+        sourceImageUrl: '',
+        outputStatus: 'running',
+        outputImages: [],
+        pendingTaskId: 'task-9',
+        pendingClientActionId: 'action-task-9',
+      })
+      transaction.addEdge({
+        id: 4,
+        fromNodeType: 'prompt',
+        fromNodeId: 1,
+        fromPort: 'prompt',
+        toNodeType: 'image',
+        toNodeId: 9,
+        toPort: 'image',
+      })
+    })
     const attachment = harness.executionRuntime.attachment.value!
     harness.executionRuntime.hydratePending(attachment, 'image-9', 'task-9')
 
@@ -796,15 +842,33 @@ describe('useFlowCanvasRuntime', () => {
     )
   })
 
-  it('uses graph adapter command side effects as the history and dirty boundary', async () => {
+  it('uses canonical graph transactions as the history and dirty boundary', async () => {
     const harness = createRuntimeHarness()
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
     harness.graphActions.setNodes.mockClear()
 
-    harness.runtime.graphEditing.adapter.addNodes(
-      createPromptFlowNode(99, 720, 96),
-      createFlowGraphCommandOptions(),
+    const historyBefore = harness.runtime.persistence.history.capture()
+    const transaction = harness.runtime.graphEditing.readCanvasGraphStore().beginTransaction(
+      'node-update',
+      { recordHistory: true, markDirty: true },
+    )
+    transaction.addNode({
+      id: 99,
+      type: 'prompt',
+      x: 720,
+      y: 96,
+      width: 280,
+      title: 'Prompt 99',
+      text: '',
+      outputCount: 1,
+      aspectRatio: 'auto',
+      inputImages: [],
+    })
+    const summary = transaction.commit()
+    projectCanonicalGraph(
+      harness,
+      createFlowGraphCommandOptionsFromTransactionSummary(summary, { historyBefore }),
     )
 
     expect(harness.isDirty.value).toBe(true)
@@ -815,10 +879,12 @@ describe('useFlowCanvasRuntime', () => {
 
     expect(harness.graphActions.setNodes).toHaveBeenCalled()
     expect(harness.fullNodes.value.map((node) => node.id)).not.toContain('prompt-99')
+    expect(exportCurrentBoardSnapshot(harness).promptNodes.map((node) => node.id)).not.toContain(99)
 
     harness.runtime.persistence.history.redo()
 
     expect(harness.fullNodes.value.map((node) => node.id)).toContain('prompt-99')
+    expect(exportCurrentBoardSnapshot(harness).promptNodes.map((node) => node.id)).toContain(99)
 
     await harness.runtime.persistence.flushAutosave({ silent: true })
 
@@ -1025,7 +1091,7 @@ describe('useFlowCanvasRuntime', () => {
     harness.runtime.persistence.history.undo()
     expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-1', staleEdge.id])
     expect(exportCurrentBoardSnapshot(harness).connections).toEqual([
-      expect.objectContaining({ id: 2, fromNodeId: 2 }),
+      expect.objectContaining({ id: 1, fromNodeId: 1 }),
     ])
 
     harness.runtime.persistence.history.redo()
@@ -1082,13 +1148,17 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
 
-    const before = harness.runtime.persistence.history.capture()
-    harness.boardBaseSnapshot.value = {
-      ...harness.boardBaseSnapshot.value,
-      groups: [createGroup('group-1', ['image-1', 'prompt-1'])],
-    }
-
-    expect(harness.runtime.persistence.history.push(before)).toBe(true)
+    const historyBefore = harness.runtime.persistence.history.capture()
+    const transaction = harness.runtime.graphEditing.readCanvasGraphStore().beginTransaction('group', {
+      recordHistory: true,
+      markDirty: true,
+    })
+    transaction.createGroup(['image-1', 'prompt-1'], SAMPLE_GROUP_GEOMETRY, 'group-1')
+    const summary = transaction.commit()
+    projectCanonicalGraph(
+      harness,
+      createFlowGraphCommandOptionsFromTransactionSummary(summary, { historyBefore }),
+    )
 
     harness.runtime.persistence.history.undo()
     expect(harness.boardBaseSnapshot.value.groups).toEqual([])
@@ -2442,6 +2512,27 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.nodes.value).toBe(nodesBeforeCommit)
   })
 
+  it('keeps one canonical Graph Store for the entire drag transaction', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.persistence.loadInitialOrRouteBoard()
+    const store = harness.runtime.graphEditing.readCanvasGraphStore()
+
+    harness.runtime.flowPane.nodeDragTransactions.begin()
+    await harness.applyNativeNodeChanges([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        position: { x: 720, y: 96 },
+        from: { x: 400, y: 40 },
+        dragging: true,
+      },
+    ])
+    expect(harness.runtime.graphEditing.readCanvasGraphStore()).toBe(store)
+
+    harness.runtime.flowPane.nodeDragTransactions.commit()
+    expect(harness.runtime.graphEditing.readCanvasGraphStore()).toBe(store)
+  })
+
   it('routes UI node deletion through the shared delete contract', async () => {
     const snapshot = createSnapshot()
     snapshot.imageNodes[0] = {
@@ -2596,17 +2687,13 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
 
-    harness.fullNodes.value = harness.fullNodes.value.map((node) =>
-      node.id === 'image-1'
-        ? {
-            ...node,
-            data: {
-              kind: 'image',
-              nodeType: 'image',
-            },
-          }
-        : node,
-    )
+    const graphStore = harness.runtime.graphEditing.readCanvasGraphStore()
+    const corruption = graphStore.beginTransaction('delete', {
+      recordHistory: false,
+      markDirty: false,
+    })
+    corruption.removeNode('image-1', { removeConnectedEdges: true })
+    corruption.commit()
     const nodesBefore = harness.fullNodes.value
     const edgesBefore = harness.fullEdges.value
     const groupsBefore = harness.boardBaseSnapshot.value.groups

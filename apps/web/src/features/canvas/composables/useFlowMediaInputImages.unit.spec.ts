@@ -8,7 +8,10 @@ import type {
   PromptNodeInputImage,
   PromptNodeItem,
 } from '../../canvas-board/domain'
+import { createEmptyCanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { FlowNodeData } from '../types/flowTypes'
+import { CanvasGraphSession } from '../graph-runtime'
+import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
 import { useFlowMediaInputImages } from './useFlowMediaInputImages'
 import { useCanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 
@@ -63,6 +66,23 @@ function makeFlowNode(
   }
 }
 
+function createGraphSession(nodes: Node[], edges: Edge[]) {
+  const snapshot = createEmptyCanvasBoardSnapshot()
+  for (const node of nodes) {
+    const snapshotNode = node.data?.snapshotNode as CanvasNodeItem | undefined
+    if (!snapshotNode) continue
+    if (snapshotNode.type === 'image-node') snapshot.imageNodes.push(snapshotNode)
+    else if (snapshotNode.type === 'prompt') snapshot.promptNodes.push(snapshotNode)
+    else snapshot.fusionNodes.push(snapshotNode)
+  }
+  for (const edge of edges) {
+    const match = /^connection-(\d+)$/.exec(edge.id)
+    if (!match) continue
+    snapshot.connections.push(flowConnectionToCanvasConnection(Number(match[1]), edge))
+  }
+  return CanvasGraphSession.hydrate('board-a', snapshot)
+}
+
 function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
   const graphActions = {
     setNodes: vi.fn(),
@@ -74,6 +94,7 @@ function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
     actions: graphActions,
   })
   const markFlowExecutionNodeDirty = vi.fn()
+  const graphSession = createGraphSession(nodes.value, edges.value)
   const updateSnapshotNodeBase = vi.fn(
     (nodeId: string, mutate: (snapshotNode: CanvasNodeItem) => CanvasNodeItem) => {
       nodes.value = nodes.value.map((node) => {
@@ -107,6 +128,8 @@ function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
     edges,
     uploadImageToBoard,
     updateSnapshotNodeBase,
+    readCanvasGraphStore: () => graphSession.store,
+    captureHistory: () => ({}) as import('./useFlowHistory').FlowHistorySnapshot,
     graphAdapter,
     markFlowExecutionNodeDirty,
     getImageNodeDisplayPayload: (nodeId) => {
@@ -129,6 +152,7 @@ function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
     updateSnapshotNodeBase,
     graphActions,
     markFlowExecutionNodeDirty,
+    graphSession,
   }
 }
 
@@ -140,6 +164,7 @@ describe('useFlowMediaInputImages', () => {
         'prompt-1',
         'prompt',
         makePromptSnapshot({
+          id: 1,
           inputImages: [
             {
               id: 'node:image-1',
@@ -155,7 +180,7 @@ describe('useFlowMediaInputImages', () => {
     ] as Node[])
     const edges: Ref<Edge[]> = shallowRef([
       {
-        id: 'edge-1',
+        id: 'connection-1',
         source: 'image-1',
         sourceHandle: 'out:image',
         target: 'prompt-1',
@@ -227,13 +252,14 @@ describe('useFlowMediaInputImages', () => {
     ])
   })
 
-  it('removes a node-linked media input and its edge through the graph adapter', () => {
+  it('removes a node-linked media input and its edge through the graph adapter', async () => {
     const nodes: Ref<Node[]> = shallowRef([
       makeFlowNode('image-1', 'image', makeImageSnapshot()),
       makeFlowNode(
         'prompt-1',
         'prompt',
         makePromptSnapshot({
+          id: 1,
           inputImages: [
             {
               id: 'node:image-1',
@@ -249,7 +275,7 @@ describe('useFlowMediaInputImages', () => {
     ] as Node[])
     const edges: Ref<Edge[]> = shallowRef([
       {
-        id: 'edge-1',
+        id: 'connection-1',
         source: 'image-1',
         sourceHandle: 'out:image',
         target: 'prompt-1',
@@ -258,18 +284,64 @@ describe('useFlowMediaInputImages', () => {
     ] as Edge[])
     const {
       onFlowMediaInputImageRemove,
-      getMediaInputImages,
       graphActions,
       markFlowExecutionNodeDirty,
     } = createHarness(nodes, edges)
 
     onFlowMediaInputImageRemove('prompt-1', 'node:image-1')
+    await nextTick()
 
-    expect(getMediaInputImages('prompt-1')).toEqual([])
+    expect(nodes.value.find((node) => node.id === 'prompt-1')?.data?.snapshotNode).toMatchObject({
+      inputImages: [],
+    })
     expect(edges.value).toEqual([])
     expect(graphActions.setNodes).toHaveBeenCalledOnce()
     expect(graphActions.setEdges).toHaveBeenCalledOnce()
     expect(markFlowExecutionNodeDirty).toHaveBeenCalledWith('prompt-1', { includeSelf: true })
+  })
+
+  it('removes from canonical Graph state when the Flow projection is stale', async () => {
+    const nodes: Ref<Node[]> = shallowRef([
+      makeFlowNode('image-1', 'image', makeImageSnapshot()),
+      makeFlowNode(
+        'prompt-1',
+        'prompt',
+        makePromptSnapshot({
+          id: 1,
+          inputImages: [
+            {
+              id: 'node:image-1',
+              sourceType: 'node',
+              sourceId: 'image-1',
+              sourceNodeId: 'image-1',
+              url: 'https://example.com/source.png',
+              ratio: 1,
+            } satisfies PromptNodeInputImage,
+          ],
+        }),
+      ),
+    ] as Node[])
+    const edges: Ref<Edge[]> = shallowRef([
+      {
+        id: 'connection-1',
+        source: 'image-1',
+        sourceHandle: 'out:image',
+        target: 'prompt-1',
+        targetHandle: 'in:image',
+      },
+    ] as Edge[])
+    const { graphSession, onFlowMediaInputImageRemove } = createHarness(nodes, edges)
+
+    nodes.value = [
+      makeFlowNode('prompt-1', 'prompt', makePromptSnapshot({ id: 1, inputImages: [] })),
+    ] as Node[]
+    edges.value = []
+    onFlowMediaInputImageRemove('prompt-1', 'node:image-1')
+
+    expect(graphSession.store.exportSnapshot().promptNodes[0]?.inputImages).toEqual([])
+    expect(graphSession.store.exportSnapshot().connections).toEqual([])
+    expect(nodes.value.map((node) => node.id)).toEqual(['image-1', 'prompt-1'])
+    expect(edges.value).toEqual([])
   })
 
   it('removes a node-linked media input when its connection disappears', async () => {

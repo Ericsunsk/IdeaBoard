@@ -4,7 +4,6 @@ import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { PendingImageExecutionLease } from '../execution/pending-execution'
 import {
   commitCanvasGraphDeleteGroupIntent,
-  createCanvasGraphStore,
   isCanvasGraphNodeId,
   readCanvasGraphNodeBounds,
   resolveCanvasGraphNodesBounds,
@@ -29,10 +28,7 @@ import {
   type CanvasPoint,
   type CanvasRect,
 } from '../utils/canvasGroupGeometry'
-import {
-  resolveFlowNodeCanvasRef,
-  type FlowToCanvasBoardSnapshotOptions,
-} from '../utils/flowSnapshotAdapter'
+import { resolveFlowNodeCanvasRef } from '../utils/flowSnapshotAdapter'
 import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
 import { createFlowEdgeProjectionIndex } from '../flow-pane/flowConnectionIdentity'
 import { applyFlowGraphDeleteProjection } from '../flow-pane/flowGraphDeleteProjection'
@@ -158,9 +154,7 @@ export type UseCanvasGroupRuntimeOptions = {
   boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   graphAdapter: CanvasVueFlowGraphAdapter
   flowHistory: FlowHistoryGroupRuntime
-  createCurrentCanvasGraphStore: (
-    snapshotOptions?: FlowToCanvasBoardSnapshotOptions,
-  ) => ReturnType<typeof createCanvasGraphStore>
+  readCanvasGraphStore: () => CanvasGraphStore
   commitGroups: (groups: CanvasBoardSnapshot['groups']) => void
   markDirty: () => void
   onWarning: (message: string) => void
@@ -331,7 +325,7 @@ export function useCanvasGroupRuntime(
     if (!groupId) return []
     const frame = groupFrames.value.find((item) => item.id === groupId)
     if (!frame) return []
-    const store = options.createCurrentCanvasGraphStore()
+    const store = options.readCanvasGraphStore()
 
     const coveredNodeIds: CanvasGraphNodeId[] = []
     store.getNodeIds().forEach((nodeId) => {
@@ -356,7 +350,7 @@ export function useCanvasGroupRuntime(
   function prunePendingGroupJoin() {
     const pending = pendingGroupJoin.value
     if (!pending) return false
-    const store = options.createCurrentCanvasGraphStore()
+    const store = options.readCanvasGraphStore()
     if (!store.getGroup(pending.groupId)) return clearPendingGroupJoin()
     const validNodeIds = pending.nodeIds.filter(
       (nodeId) => !store.getGroupIdForNode(nodeId) && !!store.getNode(nodeId),
@@ -399,7 +393,7 @@ export function useCanvasGroupRuntime(
   }
 
   function commitGroupsFromStore(
-    store: ReturnType<UseCanvasGroupRuntimeOptions['createCurrentCanvasGraphStore']>,
+    store: CanvasGraphStore,
   ) {
     const snapshot = store.exportSnapshot(options.boardBaseSnapshot.value)
     options.commitGroups(snapshot.groups)
@@ -413,7 +407,7 @@ export function useCanvasGroupRuntime(
     if (!nodeId || !pending.nodeIds.includes(nodeId)) return false
 
     const historyBefore = options.flowHistory.capture()
-    const store = options.createCurrentCanvasGraphStore()
+    const store = options.readCanvasGraphStore()
     if (!store.getGroup(pending.groupId) || store.getGroupIdForNode(nodeId)) return false
     const transaction = store.beginTransaction('group-membership')
     let summary: ReturnType<CanvasGraphTransaction['commit']>
@@ -509,7 +503,7 @@ export function useCanvasGroupRuntime(
     clearPendingGroupJoin()
     const action = selectionGroupAction.value
     if (action?.kind !== 'group') return false
-    const store = options.createCurrentCanvasGraphStore()
+    const store = options.readCanvasGraphStore()
     const bounds = resolveCanvasGraphNodesBounds(
       store,
       action.nodeIds,
@@ -546,7 +540,7 @@ export function useCanvasGroupRuntime(
     if (action?.kind !== 'ungroup') return false
 
     const historyBefore = options.flowHistory.capture()
-    const store = options.createCurrentCanvasGraphStore()
+    const store = options.readCanvasGraphStore()
     const transaction = store.beginTransaction('ungroup')
     let didChange: boolean
     try {
@@ -586,7 +580,7 @@ export function useCanvasGroupRuntime(
 
     const nodeIds = group.nodeIds.filter(isCanvasGraphNodeId)
     const historyBefore = options.flowHistory.capture()
-    const store = options.createCurrentCanvasGraphStore()
+    const store = options.readCanvasGraphStore()
     const projectionIndex = createFlowEdgeProjectionIndex(store, options.edges.value)
     const shouldDeleteMembers = nodeIds.length > 0
     const summary = commitCanvasGraphDeleteGroupIntent(store, {
@@ -631,7 +625,7 @@ export function useCanvasGroupRuntime(
     clearPendingGroupJoin()
     const frame = findTopmostCanvasGroupFrameAtPoint(groupFrames.value, point)
     if (!frame) return false
-    const store = options.createCurrentCanvasGraphStore()
+    const store = options.readCanvasGraphStore()
     const startPositions = readGroupMemberNodePositions(store, frame.id)
     if (!startPositions) return false
     selectGroup(frame.id)
@@ -745,7 +739,7 @@ export function useCanvasGroupRuntime(
     const frame = readGroupFrame(groupId)
     if (!frame) return false
     selectGroup(groupId)
-    const store = options.createCurrentCanvasGraphStore()
+    const store = options.readCanvasGraphStore()
     activeGroupResize = {
       store,
       transaction: store.beginTransaction('group-resize'),

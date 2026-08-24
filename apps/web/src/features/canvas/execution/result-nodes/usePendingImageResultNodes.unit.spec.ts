@@ -37,6 +37,12 @@ function imageNode(id: number, x: number, sourceImageUrl = 'source'): Node {
 function createHarness(activeNodeIds: readonly string[] = []) {
   const nodes = shallowRef<Node[]>([imageNode(1, 10)])
   const edges = shallowRef<Edge[]>([])
+  const snapshot = createEmptyCanvasBoardSnapshot()
+  snapshot.imageNodes.push(nodes.value[0]!.data.snapshotNode)
+  const store = CanvasGraphStore.fromSnapshot(snapshot)
+  let currentStore = store
+  const attachment = { boardId: 'board-a', epoch: 1 } as never
+  let isAttachmentCurrent = true
   const replaceGraph = vi.fn(
     (
       graph: { nodes: Node[]; edges: Edge[] },
@@ -77,16 +83,32 @@ function createHarness(activeNodeIds: readonly string[] = []) {
     nodes,
     edges,
     graphAdapter,
-    createCurrentCanvasGraphStore: () => CanvasGraphStore.fromSnapshot(createEmptyCanvasBoardSnapshot()),
+    readCanvasGraphStore: () => currentStore,
+    readCurrentAttachment: () => attachment,
+    isAttachmentCurrent: (candidate) => candidate === attachment && isAttachmentCurrent,
     isNodeExecutionActive: (nodeId) => activeNodeIds.includes(nodeId),
   })
-  return { actions, addEdges, edges, nodes, replaceGraph, updateNode }
+  return {
+    actions,
+    addEdges,
+    edges,
+    nodes,
+    replaceGraph,
+    store,
+    invalidateAttachment: () => {
+      isAttachmentCurrent = false
+    },
+    replaceCurrentStore: (nextStore: CanvasGraphStore) => {
+      currentStore = nextStore
+    },
+    updateNode,
+  }
 }
 
 const source = { url: 'source', ratio: 1 }
 
 describe('usePendingImageResultExecution reservation projection', () => {
-  it('reserves a nearby derived image slot as runtime graph state without semantic history', () => {
+  it('reserves a nearby derived image slot and canonical connection before the deferred projection', () => {
     const harness = createHarness()
     const reservation = harness.actions.reservePendingResults({
       source,
@@ -99,10 +121,38 @@ describe('usePendingImageResultExecution reservation projection', () => {
     expect(harness.nodes.value[1]!.position.x).toBeGreaterThan(
       harness.nodes.value[0]!.position.x,
     )
+    expect(harness.store.exportSnapshot().connections).toEqual([
+      expect.objectContaining({
+        id: 1,
+        fromNodeId: 1,
+        toNodeId: Number(reservation.resultNodeIds[0]?.split('-')[1]),
+      }),
+    ])
     const commandOptions = harness.replaceGraph.mock.calls[0]?.[1]
     expect(readFlowGraphCommandSideEffects(commandOptions?.metadata)).toMatchObject({
       recordHistory: false,
     })
+  })
+
+  it('does not project a deferred result edge after its attachment becomes stale', async () => {
+    const frameCallbacks: FrameRequestCallback[] = []
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frameCallbacks.push(callback)
+      return frameCallbacks.length
+    })
+    try {
+      const harness = createHarness()
+      harness.actions.reservePendingResults({ source, sourceNodeId: 'image-1', outputCount: 1 })
+      await Promise.resolve()
+      harness.invalidateAttachment()
+      frameCallbacks.shift()?.(0)
+      await Promise.resolve()
+
+      expect(harness.store.exportSnapshot().connections).toHaveLength(1)
+      expect(harness.addEdges).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('reuses the first inactive empty image child before appending a slot', () => {
