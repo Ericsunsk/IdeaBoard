@@ -1,4 +1,4 @@
-import { computed, onScopeDispose, ref, shallowRef, watch, type Ref } from 'vue'
+import { computed, onScopeDispose, ref, shallowRef, type Ref } from 'vue'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import { useCanvasGraphHistory } from './useCanvasGraphHistory'
 import {
@@ -19,11 +19,6 @@ import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasBoardSession } from '../board-session'
 import { canvasBoardSnapshotToFlow } from '../utils/flowSnapshotAdapter'
 import { CanvasGraphSession, type CanvasGraphStore } from '../graph-runtime'
-import {
-  projectVisibleCanvasGraph,
-  type CanvasProjectionViewport,
-  type CanvasProjectionViewportSize,
-} from './canvasVisibleGraphProjection'
 import {
   createCanvasDeleteCommandLifecycle,
   createCanvasNodeDragLifecycle,
@@ -58,10 +53,6 @@ function createFlowEdgeEndpointKey(edge: Edge): string {
 export type UseFlowCanvasRuntimeOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  renderNodes?: Ref<Node[]>
-  renderEdges?: Ref<Edge[]>
-  viewport?: Readonly<Ref<CanvasProjectionViewport>>
-  viewportSize?: CanvasProjectionViewportSize
   boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   isDirty: Ref<boolean>
   saveStatus: Ref<SaveStatus>
@@ -81,10 +72,8 @@ export type UseFlowCanvasRuntimeOptions = {
 }
 
 export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
-  const renderNodes = options.renderNodes ?? options.nodes
-  const renderEdgesRef = options.renderEdges ?? options.edges
-  const canonicalNodes = options.nodes
-  const canonicalEdges = options.edges
+  const renderNodes = options.nodes
+  const renderEdgesRef = options.edges
   const localEditVersion = ref(0)
   let graphSession: CanvasGraphSession | null = null
   let unsubscribeGraphSessionCommits: (() => void) | null = null
@@ -137,52 +126,6 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     actions: options.vueFlowGraphActions,
     projectEdgesForActions: projectEdgesForRendering,
   })
-
-  function readAlwaysVisibleNodeIds(): Set<string> {
-    return new Set(
-      executionSnapshot.value.executions
-        .filter((execution) => execution.status === 'running')
-        .map((execution) => execution.resultNodeId),
-    )
-  }
-
-  function refreshVisibleProjection() {
-    if (!options.viewport) {
-      graphAdapter.replaceFullProjection({ nodes: canonicalNodes.value, edges: canonicalEdges.value })
-      return
-    }
-    const visibleGraph = projectVisibleCanvasGraph(
-      { nodes: canonicalNodes.value, edges: canonicalEdges.value },
-      {
-        viewport: options.viewport.value,
-        viewportSize: options.viewportSize,
-        alwaysIncludeNodeIds: readAlwaysVisibleNodeIds(),
-      },
-    )
-    // Vue Flow can observe transient dangling edges when its imperative
-    // add/remove methods are interleaved with controlled arrays. Replace the
-    // bounded viewport projection atomically; the canonical graph stays full.
-    graphAdapter.replaceVisibleProjection(visibleGraph)
-  }
-
-  let visibleProjectionFrame: number | null = null
-  function scheduleVisibleProjection() {
-    if (!options.viewport || visibleProjectionFrame !== null) return
-    const schedule = options.scheduleAnimationFrame ?? requestAnimationFrame
-    visibleProjectionFrame = schedule(() => {
-      visibleProjectionFrame = null
-      refreshVisibleProjection()
-    })
-  }
-
-  if (options.viewport) {
-    watch(options.viewport, scheduleVisibleProjection, { deep: true })
-    onScopeDispose(() => {
-      if (visibleProjectionFrame === null) return
-      ;(options.cancelAnimationFrame ?? cancelAnimationFrame)(visibleProjectionFrame)
-      visibleProjectionFrame = null
-    })
-  }
 
   function changedExecutionResultNodeIds(
     previous: typeof executionSnapshot.value,
@@ -279,20 +222,13 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     const unsubscribeProjection = bindCanvasGraphSessionProjection({
       session,
       graphAdapter,
-      readCurrent: () => ({ nodes: canonicalNodes.value, edges: canonicalEdges.value }),
+      readCurrent: () => ({ nodes: options.nodes.value, edges: options.edges.value }),
       projectFull: () => {
         const flow = canvasBoardSnapshotToFlow(session.exportSnapshot(options.boardBaseSnapshot.value))
         const nodes =
           groupRuntime?.internal.projectCurrentGroupNodeLayers(flow.nodes as Node[]) ??
           (flow.nodes as Node[])
         return { nodes, edges: flow.edges as Edge[] }
-      },
-      onProjection: (projection) => {
-        if (!options.viewport) return false
-        canonicalNodes.value = projection.graph.nodes
-        canonicalEdges.value = projection.graph.edges
-        refreshVisibleProjection()
-        return true
       },
       isCurrentAttachment: () =>
         session === graphSession && session.boardId === options.boardSession.currentBoardId.value,
@@ -331,13 +267,13 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     return {
       nodes: [
         ...savedGraph.nodes,
-        ...canonicalNodes.value.filter(
+        ...options.nodes.value.filter(
           (node) => !savedNodesById.has(node.id) && isNodeExecutionActive(node.id),
         ),
       ],
       edges: [
         ...savedGraph.edges,
-        ...canonicalEdges.value.filter(
+        ...options.edges.value.filter(
           (edge) =>
             !savedEdgesById.has(edge.id) &&
             !savedEdgeEndpointKeys.has(createFlowEdgeEndpointKey(edge)) &&
@@ -379,13 +315,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       commitOptions.source === 'save-reconcile'
         ? preserveCurrentSelection(projectedGraph)
         : projectedGraph
-    if (!options.viewport) {
-      graphAdapter.replaceGraph(resolvedGraph)
-      return
-    }
-    canonicalNodes.value = resolvedGraph.nodes
-    canonicalEdges.value = resolvedGraph.edges
-    refreshVisibleProjection()
+    graphAdapter.replaceGraph(resolvedGraph)
   }
 
   const canvasGraphHistory = useCanvasGraphHistory({

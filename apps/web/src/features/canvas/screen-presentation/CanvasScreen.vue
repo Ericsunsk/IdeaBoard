@@ -406,7 +406,7 @@ const vueFlowProps = computed(() => {
     panOnScroll: !isCanvasLocked,
     zoomOnPinch: !isCanvasLocked,
     panOnScrollMode: PanOnScrollMode.Free,
-    onlyRenderVisibleElements: true,
+    onlyRenderVisibleElements: false,
     ...connectionAdapter.vueFlowBindings,
   }
 })

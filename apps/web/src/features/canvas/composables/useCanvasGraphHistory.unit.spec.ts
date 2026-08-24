@@ -84,6 +84,6 @@ describe('useCanvasGraphHistory', () => {
 
     history.redo()
 
-    expect(store.getNode('prompt-1')?.snapshot.text).toBe('materialized')
+    expect((store.getNode('prompt-1')?.snapshot as { text?: string }).text).toBe('materialized')
   })
 })

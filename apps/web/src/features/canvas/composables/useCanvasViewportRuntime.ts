@@ -46,8 +46,6 @@ type ReadonlyValueRef<T> = {
 export type UseCanvasViewportRuntimeOptions = {
   nodes: ReadonlyValueRef<readonly unknown[]>
   edges: ReadonlyValueRef<readonly unknown[]>
-  fullNodes: ReadonlyValueRef<readonly unknown[]>
-  fullEdges: ReadonlyValueRef<readonly unknown[]>
   currentBoardId: ReadonlyValueRef<string | null>
   getUserUid: () => string
   viewport: Readonly<Ref<CanvasFlowViewport>>
@@ -110,8 +108,6 @@ export function useCanvasViewportRuntime(options: UseCanvasViewportRuntimeOption
       boardId: options.currentBoardId.value,
       nodes: options.nodes.value.length,
       edges: options.edges.value.length,
-      fullNodes: options.fullNodes.value.length,
-      fullEdges: options.fullEdges.value.length,
       viewportX: Math.round(viewport.x),
       viewportY: Math.round(viewport.y),
       zoomPct: Math.round(viewport.zoom * 100),

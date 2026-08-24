@@ -61,8 +61,6 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
   }
 
   const persistence = useCanvasBoardPersistence({
-    fullNodes,
-    fullEdges,
     boardBaseSnapshot,
     isDirty,
     saveStatus,

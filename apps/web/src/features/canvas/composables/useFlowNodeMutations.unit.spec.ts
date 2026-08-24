@@ -105,7 +105,8 @@ function createGraphSession(initialNodes: Node[], initialEdges: Edge[]) {
   }
   initialEdges.forEach((edge, index) => {
     const match = /^connection-(\d+)$/.exec(edge.id)
-    snapshot.connections.push(flowConnectionToCanvasConnection(Number(match?.[1] ?? index + 1), edge))
+    const connection = flowConnectionToCanvasConnection(Number(match?.[1] ?? index + 1), edge)
+    if (connection) snapshot.connections.push(connection)
   })
   return CanvasGraphSession.hydrate('board-a', snapshot)
 }

@@ -158,7 +158,7 @@ describe('useUserAccountControls', () => {
       ariaLabel: 'Idea余额 加载中',
     })
 
-    controls.viewModel.balance.value.command()
+    controls.viewModel.balance.value.command?.()
     expect(overlay.viewModel.initialTab.value).toBe('billing')
     expect(overlay.viewModel.visible.value).toBe(true)
   })
@@ -176,7 +176,7 @@ describe('useUserAccountControls', () => {
       errorMessage: 'wallet unavailable',
     })
 
-    controls.viewModel.balance.value.command()
+    controls.viewModel.balance.value.command?.()
     expect(overlay.viewModel.initialTab.value).toBe('billing')
     expect(overlay.viewModel.visible.value).toBe(true)
   })

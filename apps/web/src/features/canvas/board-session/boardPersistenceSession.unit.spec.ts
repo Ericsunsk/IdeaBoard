@@ -88,8 +88,6 @@ function createSessionHarness(initialBoardId = 'board-a') {
     refreshPreview: vi.fn(),
   }
   const session = createBoardPersistenceSession({
-    fullNodes,
-    fullEdges,
     boardBaseSnapshot,
     isDirty,
     saveStatus,

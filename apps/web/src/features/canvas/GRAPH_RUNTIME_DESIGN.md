@@ -11,7 +11,7 @@ Baseline 证据来自 `apps/web/.benchmark-reports/` 的本地 report，汇总�
 | `structure-heavy 500 node-drag`     | p95 `116.7ms`，dropped `208`，`nodeArrayReplacements=36`           |
 | `structure-heavy 1000 node-drag`    | p95 `234.1ms`，dropped `479`，`nodeArrayReplacements=36`           |
 | `structure-heavy 2500 node-drag`    | p95 `950ms`，dropped `2005`，`nodeArrayReplacements=36`            |
-| `structure-heavy 2500 initial-load` | max frame `132.5ms`，dropped `12`，`longTaskMax=131ms`，bounded viewport projection |
+| `structure-heavy 2500 initial-load` | max frame `132.5ms`，dropped `12`，`longTaskMax=131ms` |
 | `structure-heavy 2500 viewport-pan` | p95 低但 max frame `3433.4ms`，dropped `341`                       |
 | `media-heavy 500/1000`              | 不比同规模 `structure-heavy` 更糟，media rendering 不是第一瓶颈    |
 
@@ -88,6 +88,9 @@ Projection strategy:
 - Replace arrays only when order, visibility, add/remove, or Vue Flow limitations require it.
 - For single-node position updates, patch only the changed Flow Node record when practical.
 - Keep Flow Node UI-only fields separate from Canvas Node domain fields when possible.
+- Keep the complete Graph in the Vue Flow controlled arrays. Viewport movement only changes the
+  transform; it must not replace the node/edge arrays because doing so makes connected edges
+  disappear while zooming and also makes MiniMap represent only a partial board.
 
 ### `PendingImageExecutionCore`
 
@@ -151,11 +154,12 @@ Benchmark reports remain local. Issue comments should include compact summaries 
 
 ## Projection Boundary
 
-The canonical Graph keeps every node and edge for persistence, history, execution,
-and MiniMap. Vue Flow receives only the current viewport plus overscan. The
-bounded projection is refreshed after viewport changes and on Graph commits;
-renderer replacement is atomic for that small subset so Vue Flow never observes
-an edge whose endpoint is outside the controlled node set.
+The canonical Graph and the Vue Flow controlled arrays contain the same complete
+node/edge set. Vue Flow's `onlyRenderVisibleElements` is disabled deliberately:
+viewport clipping changes the controlled node set during zoom and pan, which can
+detach edges and makes MiniMap bounds unstable. Performance work therefore stays
+on Graph transactions, stable object identity, and incremental adapter updates;
+viewport changes never trigger graph projection.
 
 ## Future Optimization Candidates
 

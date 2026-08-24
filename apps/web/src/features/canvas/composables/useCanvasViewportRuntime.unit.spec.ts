@@ -63,8 +63,6 @@ function createViewportRuntimeHarness(
     useCanvasViewportRuntime({
       nodes: ref([]),
       edges: ref([]),
-      fullNodes: ref([]),
-      fullEdges: ref([]),
       currentBoardId,
       getUserUid: () => userUid.value,
       viewport,

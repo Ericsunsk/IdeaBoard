@@ -4,7 +4,6 @@ import type { Node } from '@vue-flow/core'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import {
   createCanvasGraphCommitProjectionController,
-  type CanvasGraphCommitProjection,
   type CanvasFlowGraphProjection,
 } from './canvasGraphCommitProjection'
 
@@ -19,9 +18,6 @@ export function bindCanvasGraphSessionProjection(options: {
   graphAdapter: Pick<CanvasVueFlowGraphAdapter, 'applyIncrementalProjection' | 'replaceFullProjection'>
   readCurrent: () => CanvasFlowGraphProjection
   projectFull: () => CanvasFlowGraphProjection
-  /** Return true when the caller owns renderer projection (for example a
-   * viewport-limited projection); otherwise the default adapter path runs. */
-  onProjection?: (projection: CanvasGraphCommitProjection) => boolean
   isCurrentAttachment: () => boolean
   readGroups?: () => CanvasGroup[]
   onGroupsChanged?: (groups: CanvasGroup[]) => void
@@ -33,19 +29,18 @@ export function bindCanvasGraphSessionProjection(options: {
     scheduleMicrotask: options.scheduleMicrotask,
     render: (projection) => {
       if (!options.isCurrentAttachment()) return
-      if (options.onProjection?.(projection)) return
       if (projection.kind === 'full') {
         options.graphAdapter.replaceFullProjection(projection.graph)
         return
       }
       options.graphAdapter.applyIncrementalProjection({
-          nodes: projection.graph.nodes,
-          edges: projection.graph.edges,
-          changedNodeIds: projection.changedNodeIds,
-          changedEdgeIds: projection.changedEdgeIds,
-          nodeMutations: projection.nodeMutations,
-          edgeMutations: projection.edgeMutations,
-        })
+        nodes: projection.graph.nodes,
+        edges: projection.graph.edges,
+        changedNodeIds: projection.changedNodeIds,
+        changedEdgeIds: projection.changedEdgeIds,
+        nodeMutations: projection.nodeMutations,
+        edgeMutations: projection.edgeMutations,
+      })
     },
   })
 

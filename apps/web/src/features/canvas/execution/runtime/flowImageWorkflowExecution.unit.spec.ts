@@ -64,7 +64,7 @@ function createPublicHarness(transport: PendingImageWorkflowTaskTransport) {
     },
   }))
   const execution = useFlowImageWorkflowExecution({
-    nodes, edges, graphAdapter,
+    nodes, edges,
     readCanvasGraphStore: () => graphSession.store,
     boardBaseSnapshot: ref(base),
     executionWorkspace: { state: { executionCore: core, isNodeRunning: (id) => core.captureActiveLeases([id]).length > 0 }, commands: { runPromptGeneration: vi.fn(), reattachPendingImageResults: vi.fn() } },

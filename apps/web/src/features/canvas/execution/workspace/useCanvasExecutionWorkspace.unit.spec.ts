@@ -42,7 +42,7 @@ function createReattachWorkspace(
     nodes: ref([{ id: 'image-99', position: { x: 0, y: 0 }, data: { pendingTaskId: 'ui-only-task' } }] as never),
     edges: ref([]), readCanvasGraphStore: () => store,
     boardBaseSnapshot: ref(store.exportSnapshot()),
-    pendingResults: { reservePendingResults: vi.fn(), attachPendingTaskIds: vi.fn(), removePendingResults: vi.fn(), createBoardGraphSession: vi.fn() },
+    pendingResults: { reservePendingResults: vi.fn(), attachPendingTaskIds: vi.fn(), removePendingResults: vi.fn() },
     executionCore: core, cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(),
     waitTaskImageResults, loadImageSize: async () => ({ width: 400, height: 200 }),
   })
@@ -58,7 +58,7 @@ describe('useCanvasExecutionWorkspace', () => {
     const workspace = useCanvasExecutionWorkspace({
       nodes: ref([]), edges: ref([]), readCanvasGraphStore: () => store.store,
       boardBaseSnapshot: ref(createEmptyCanvasBoardSnapshot()),
-      pendingResults: { reservePendingResults: () => ({ resultNodeIds: ['image-1'] }), attachPendingTaskIds, removePendingResults: vi.fn(), createBoardGraphSession: vi.fn() },
+      pendingResults: { reservePendingResults: () => ({ resultNodeIds: ['image-1'] }), attachPendingTaskIds, removePendingResults: vi.fn() },
       executionCore: core, cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(), flushAutosave,
       taskAdapter: { assertTaskRequestReady: vi.fn(async () => undefined), submitTaskRequest: vi.fn(async () => ({ taskId: 'task-1' })) },
       waitTaskImageResults: async () => [{ url: 'https://example.com/result.png', width: 400, height: 200, resultIndex: 0 }], loadImageSize: async () => ({ width: 400, height: 200 }),

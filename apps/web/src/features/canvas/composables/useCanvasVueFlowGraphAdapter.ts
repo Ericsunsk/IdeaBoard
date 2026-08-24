@@ -85,11 +85,6 @@ function createGraph(nodes: Node[], edges: Edge[]): CanvasVueFlowGraph {
   return { nodes, edges: toCanvasSemanticEdges(edges) }
 }
 
-function hasDifferentItems<T>(current: readonly T[], next: readonly T[]): boolean {
-  if (current.length !== next.length) return true
-  return current.some((item, index) => item !== next[index])
-}
-
 function readNodeTargetId(target: NodeTarget): string {
   return typeof target === 'string' ? target : target.id
 }
@@ -232,27 +227,15 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
    * This is intentionally separate from command-based graph edits so recovery
    * cannot create a second history or persistence boundary.
    */
-  function replaceProjection(graph: CanvasVueFlowGraph, force: boolean) {
+  function replaceFullProjection(graph: CanvasVueFlowGraph) {
     const semanticGraph = createGraph(graph.nodes, graph.edges)
     projectGraph(semanticGraph.nodes.length, semanticGraph.edges.length, () => {
-      if (force || hasDifferentItems(options.nodes.value, semanticGraph.nodes)) {
-        options.actions?.setNodes?.(semanticGraph.nodes)
-        syncNodes(semanticGraph.nodes)
-      }
+      options.actions?.setNodes?.(semanticGraph.nodes)
+      syncNodes(semanticGraph.nodes)
       const projectedEdges = projectEdgesForActions(semanticGraph.edges)
-      if (force || hasDifferentItems(options.edges.value, semanticGraph.edges)) {
-        options.actions?.setEdges?.(projectedEdges)
-        syncEdges(semanticGraph.edges)
-      }
+      options.actions?.setEdges?.(projectedEdges)
+      syncEdges(semanticGraph.edges)
     })
-  }
-
-  function replaceFullProjection(graph: CanvasVueFlowGraph) {
-    replaceProjection(graph, true)
-  }
-
-  function replaceVisibleProjection(graph: CanvasVueFlowGraph) {
-    replaceProjection(graph, false)
   }
 
   function replaceNodes(
@@ -433,7 +416,6 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
     replaceGraph,
     applyIncrementalProjection,
     replaceFullProjection,
-    replaceVisibleProjection,
     replaceNodes,
     replaceEdges,
     addNodes,

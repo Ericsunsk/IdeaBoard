@@ -36,7 +36,7 @@ describe('SearchProviderCard', () => {
         provider: 'pexels',
         enabled: false,
         api_key_configured: false,
-        test_state: 'idle',
+        test_state: 'never',
       },
       {
         provider: 'vision',

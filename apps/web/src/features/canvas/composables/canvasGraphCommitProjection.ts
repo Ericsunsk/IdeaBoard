@@ -221,8 +221,9 @@ function projectMutations<T extends { id: string }>(input: {
     if (!before) added.push(item)
     else updatedIds.add(id)
   })
+  const addedIds = new Set(added.map((item) => item.id))
   updatedIds.forEach((id) => {
-    if (added.some((item) => item.id === id)) return
+    if (addedIds.has(id)) return
     const item = itemsById.get(id)
     if (item) updated.push(item)
   })
@@ -262,7 +263,8 @@ export function projectCanvasGraphCommit(input: {
         patch: input.patch.edges,
         project: mergeProjectedEdge,
       })
-      const invalidatedNodeIds = new Set(nodes.changedIds)
+      const directlyChangedNodeIds = new Set(nodes.changedIds)
+      const invalidatedNodeIds = new Set(directlyChangedNodeIds)
       input.patch.edges.records.forEach(({ before, after }) => {
         for (const record of [before, after]) {
           if (!record) continue
@@ -280,7 +282,7 @@ export function projectCanvasGraphCommit(input: {
       if (input.readNode) {
         const nodeIndexes = new Map(projectedNodes.map((node, index) => [node.id, index]))
         for (const nodeId of invalidatedNodeIds) {
-          if (nodes.changedIds.includes(nodeId)) continue
+          if (directlyChangedNodeIds.has(nodeId)) continue
           const index = nodeIndexes.get(nodeId)
           const record = input.readNode(nodeId)
           if (index === undefined || !record) continue

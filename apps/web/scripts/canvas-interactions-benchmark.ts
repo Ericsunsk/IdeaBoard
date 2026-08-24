@@ -124,8 +124,6 @@ type BenchmarkReport = {
     height: number
   }
   runtime: {
-    nodeDragV2: true
-    graphTransactionsV2: true
     dragTargetId: number
   }
   fixture: {
@@ -1261,8 +1259,6 @@ function buildReport(
     },
     viewport: options.viewport,
     runtime: {
-      nodeDragV2: true,
-      graphTransactionsV2: true,
       dragTargetId: fixture.dragTargetId,
     },
     fixture: fixture.reportFixture,

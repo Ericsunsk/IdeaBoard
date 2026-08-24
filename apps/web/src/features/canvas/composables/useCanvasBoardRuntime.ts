@@ -9,7 +9,6 @@ import { useFlowCanvasRuntime } from './useFlowCanvasRuntime'
 import type { CanvasVueFlowGraphActions } from './useCanvasVueFlowGraphAdapter'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { PendingImageExecutionCore } from '../execution/pending-execution'
-import type { CanvasProjectionViewport } from './canvasVisibleGraphProjection'
 
 type CanvasBoardRuntimeFeedback = CanvasFeedback['boardSession']
 
@@ -22,7 +21,6 @@ type UseCanvasBoardRuntimeOptions = {
   executionCore: PendingImageExecutionCore
   cancelTasks: (taskIds: readonly string[]) => void
   vueFlowGraphActions?: CanvasVueFlowGraphActions
-  viewport?: Readonly<Ref<CanvasProjectionViewport>>
 }
 
 function boardSessionIdentityKey(identity: { userId: number; userUid: string }): string {
@@ -37,10 +35,8 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions) {
     success: options.feedback.saveSucceeded,
     error: options.feedback.saveFailed,
   }
-  const fullNodes: Ref<Node[]> = ref([])
-  const fullEdges: Ref<Edge[]> = ref([])
-  const nodes = shallowRef<Node[]>([])
-  const edges = shallowRef<Edge[]>([])
+  const nodes: Ref<Node[]> = shallowRef([])
+  const edges: Ref<Edge[]> = shallowRef([])
   const boardBaseSnapshot: Ref<CanvasBoardSnapshot> = ref(createEmptyCanvasBoardSnapshot())
   const isLoadingBoardSnapshot: Ref<boolean> = ref(false)
   const isSavingBoard: Ref<boolean> = ref(false)
@@ -57,11 +53,8 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions) {
   })
 
   const flowRuntime = useFlowCanvasRuntime({
-    nodes: fullNodes,
-    edges: fullEdges,
-    renderNodes: nodes,
-    renderEdges: edges,
-    viewport: options.viewport,
+    nodes,
+    edges,
     boardBaseSnapshot,
     isDirty,
     saveStatus,
@@ -130,9 +123,5 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions) {
       onLogoutRequest,
     },
   }
-  Object.defineProperty(runtime, 'canonicalGraph', {
-    value: { nodes: fullNodes, edges: fullEdges },
-    enumerable: false,
-  })
   return runtime
 }
