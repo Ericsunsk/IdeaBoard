@@ -3,16 +3,11 @@ import type { Edge, Node } from '@vue-flow/core'
 import { createCanvasNodeAt } from '../../utils/canvasNodeFactory'
 import { requireImageNodeOutputCount, type ImageNodeItem } from '../../../canvas-board/domain'
 import type { FlowNodeData } from '../../types/flowTypes'
-import {
-  resolveImageNodeFrameSize,
-  resolveImageNodeStageHeight,
-} from '../../../canvas-board/domain'
+import { resolveImageNodeFrameSize } from '../../../canvas-board/domain'
 import type {
   ImageExecutionInput,
   ImageExecutionResultOptions,
-  ImageResultAnchor,
 } from '../planning/imageExecutionResultTypes'
-import { resolveImageNodeLayoutAnchor } from '../../utils/flowImageNodeSelectors'
 import type {
   CanvasGraphNodeRecord,
   CanvasGraphReadPort,
@@ -22,6 +17,13 @@ import type { CanvasBoardAttachment } from '../../board-attachment'
 import { flowConnectionToCanvasConnection } from '../../utils/flowConnectionAdapter'
 import { canvasNodeToFlowNode } from '../../utils/flowSnapshotAdapter'
 import type { CanvasRendererMetricsPort } from '../../vue-flow-adapter'
+import {
+  readOutputAnchorLayout,
+  resolvePendingImageResultPosition,
+  type ImageResultLayout,
+  type PendingImageResultLookup,
+  type PendingImageResultPlacementOptions,
+} from './pendingImageResultPlanning'
 
 type UsePendingImageResultNodesOptions = {
   nodes: Ref<Node[]>
@@ -63,34 +65,10 @@ export type PendingImageResultReservation = {
   resultNodeIds: string[]
 }
 
-type ImageResultLayout = ImageResultAnchor & {
-  ratio: number
-}
-
-type PendingImageResultLookup = {
-  nodeById: Map<string, CanvasGraphNodeRecord>
-  imageChildIdsBySource: Map<string, string[]>
-}
-
-type PendingImageResultPlacementOptions = {
-  anchor?: ImageResultAnchor
-  targetRatio?: number
-  targetWidth?: number
-}
-
 type PendingImageResultReservationPlan = {
   resultNodeId: string
   nextNode: Node
   edgeToAppend?: Edge
-}
-
-const IMAGE_RESULT_NODE_X_GAP = 100
-const IMAGE_RESULT_NODE_Y_GAP = 14
-const IMAGE_NODE_HEADER_HEIGHT = 26
-
-function estimateImageNodeHeight(source: Pick<ImageResultLayout, 'width' | 'ratio'>): number {
-  const stageHeight = resolveImageNodeStageHeight(source.width, source.ratio, true)
-  return IMAGE_NODE_HEADER_HEIGHT + stageHeight
 }
 
 export function usePendingImageResultExecution(
@@ -143,92 +121,6 @@ export function usePendingImageResultExecution(
     }
   }
 
-  function readImageNodeLayout(node: CanvasGraphNodeRecord): ImageResultLayout | null {
-    if (node.kind !== 'image') return null
-    const snapshot = node.snapshot as ImageNodeItem
-    const metrics = rendererMetrics.readNodeMetrics(node.id)
-    const anchor = resolveImageNodeLayoutAnchor(
-      { position: metrics?.position ?? { x: snapshot.x, y: snapshot.y } },
-      snapshot,
-    )
-    const measuredWidth = metrics?.measured ? metrics.dimensions.width : null
-    return anchor
-      ? {
-          x: anchor.x,
-          y: anchor.y,
-          width: measuredWidth ?? anchor.width,
-          ratio: anchor.ratio,
-        }
-      : null
-  }
-
-  function readOutputAnchorLayout(
-    nodeId: string,
-    fallback: ImageResultLayout,
-    lookup: PendingImageResultLookup,
-    anchorHint?: ImageResultAnchor,
-  ): ImageResultLayout {
-    const node = lookup.nodeById.get(nodeId)
-    if (node) {
-      if (node.kind === 'image') {
-        return readImageNodeLayout(node) ?? fallback
-      }
-      const snapshot = node.snapshot as { width?: unknown }
-      const metrics = rendererMetrics.readNodeMetrics(nodeId)
-      const width = metrics?.measured ? metrics.dimensions.width : Number(snapshot.width)
-      return {
-        ratio: 1,
-        x: metrics?.position.x ?? Number(node.snapshot.x ?? 0),
-        y: metrics?.position.y ?? Number(node.snapshot.y ?? 0),
-        width: Number.isFinite(width) && width > 0 ? width : fallback.width,
-      }
-    }
-    if (anchorHint) {
-      return {
-        ...anchorHint,
-        ratio: fallback.ratio,
-      }
-    }
-    return fallback
-  }
-
-  function readNodeBounds(
-    node: CanvasGraphNodeRecord,
-  ): { x: number; y: number; width: number; height: number } | null {
-    const imageLayout = readImageNodeLayout(node)
-    if (imageLayout) {
-      const metrics = rendererMetrics.readNodeMetrics(node.id)
-      const measuredHeight = metrics?.measured ? metrics.dimensions.height : 0
-      return {
-        x: imageLayout.x,
-        y: imageLayout.y,
-        width: imageLayout.width,
-        height:
-          Number.isFinite(measuredHeight) && measuredHeight > 0
-            ? measuredHeight
-            : estimateImageNodeHeight(imageLayout),
-      }
-    }
-
-    const snapshot = node.snapshot as { width?: unknown; height?: unknown }
-    const metrics = rendererMetrics.readNodeMetrics(node.id)
-    const width = metrics?.measured ? metrics.dimensions.width : Number(snapshot.width)
-    if (!Number.isFinite(width) || width <= 0) return null
-    const measuredHeight = metrics?.measured ? metrics.dimensions.height : 0
-    const snapshotHeight = Number(snapshot.height)
-    return {
-      x: metrics?.position.x ?? Number(node.snapshot.x ?? 0),
-      y: metrics?.position.y ?? Number(node.snapshot.y ?? 0),
-      width,
-      height:
-        Number.isFinite(measuredHeight) && measuredHeight > 0
-          ? measuredHeight
-          : Number.isFinite(snapshotHeight) && snapshotHeight > 0
-            ? snapshotHeight
-            : width,
-    }
-  }
-
   function isEmptyReusableImageNode(node: CanvasGraphNodeRecord): boolean {
     if (node.kind !== 'image') return false
     const snapshot = node.snapshot as ImageNodeItem
@@ -248,58 +140,6 @@ export function usePendingImageResultExecution(
       if (node && isEmptyReusableImageNode(node)) return candidateId
     }
     return null
-  }
-
-  function resolvePendingImageResultPosition(
-    anchor: ImageResultLayout,
-    lookup: PendingImageResultLookup,
-    target: Pick<ImageResultLayout, 'width' | 'ratio'>,
-  ) {
-    const preferredPosition = {
-      x: anchor.x + anchor.width + IMAGE_RESULT_NODE_X_GAP,
-      y: anchor.y,
-    }
-    const occupiedBounds = Array.from(lookup.nodeById.values())
-      .map(readNodeBounds)
-      .filter(
-        (bounds): bounds is { x: number; y: number; width: number; height: number } => !!bounds,
-      )
-    const targetHeight = estimateImageNodeHeight(target)
-
-    const isCollisionFree = (position: { x: number; y: number }) =>
-      occupiedBounds.every(
-        (bounds) =>
-          position.x + target.width <= bounds.x ||
-          position.x >= bounds.x + bounds.width ||
-          position.y + targetHeight <= bounds.y ||
-          position.y >= bounds.y + bounds.height,
-      )
-    if (isCollisionFree(preferredPosition)) return preferredPosition
-
-    let preferredColumnBottom = preferredPosition.y
-    for (const bounds of occupiedBounds) {
-      const overlapsPreferredColumn =
-        preferredPosition.x < bounds.x + bounds.width &&
-        preferredPosition.x + target.width > bounds.x
-      if (!overlapsPreferredColumn || bounds.y + bounds.height <= preferredPosition.y) continue
-      preferredColumnBottom = Math.max(
-        preferredColumnBottom,
-        bounds.y + bounds.height + IMAGE_RESULT_NODE_Y_GAP,
-      )
-    }
-    const candidate = { x: preferredPosition.x, y: preferredColumnBottom }
-    if (isCollisionFree(candidate)) return candidate
-
-    const escapePosition = {
-      x: preferredPosition.x,
-      y:
-        occupiedBounds.reduce(
-          (bottom, bounds) => Math.max(bottom, bounds.y + bounds.height),
-          preferredPosition.y,
-        ) + IMAGE_RESULT_NODE_Y_GAP,
-    }
-    if (isCollisionFree(escapePosition)) return escapePosition
-    throw new Error('Unable to find a collision-free position for derived image node')
   }
 
   function buildPendingImageNodeSnapshot(
@@ -337,6 +177,7 @@ export function usePendingImageResultExecution(
       anchorNodeId,
       fallbackAnchor,
       lookup,
+      rendererMetrics,
       optionsOverride?.anchor,
     )
     const resolvedRatio =
@@ -349,7 +190,7 @@ export function usePendingImageResultExecution(
       Number.isFinite(optionsOverride?.targetWidth) && (optionsOverride?.targetWidth as number) > 0
         ? Math.max(1, Math.round(optionsOverride?.targetWidth as number))
         : resolveImageNodeFrameSize(resolvedRatio, true).width
-    const position = resolvePendingImageResultPosition(anchor, lookup, {
+    const position = resolvePendingImageResultPosition(anchor, lookup, rendererMetrics, {
       width: resolvedWidth,
       ratio: resolvedRatio,
     })
