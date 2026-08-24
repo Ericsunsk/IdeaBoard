@@ -14,7 +14,6 @@ import { useCanvasGraphEditing } from '../graph-editing'
 import { useFlowCanvasRuntime, type UseFlowCanvasRuntimeOptions } from './useFlowCanvasRuntime'
 import {
   createFlowGraphCommandOptions,
-  createFlowGraphCommandOptionsFromTransactionSummary,
 } from './flowGraphAdapterCommandSideEffects'
 import {
   CanvasBoardGraphSession,
@@ -431,7 +430,6 @@ function createCanvasGraphRuntimeHarness(harness: ReturnType<typeof createRuntim
     currentBoardId: harness.runtime.persistence.currentBoardId,
     graphAdapter: harness.runtime.graphEditing.adapter,
     readCanvasGraphStore: harness.runtime.graphEditing.readCanvasGraphStore,
-    captureHistory: harness.runtime.persistence.history.capture,
     deleteNode: harness.runtime.graphEditing.deleteNode,
     updateNodeInternals: vi.fn(),
     screenToFlowCoordinate: (point) => point,
@@ -722,6 +720,7 @@ describe('useFlowCanvasRuntime', () => {
       ],
       createFlowGraphCommandOptions(),
     )
+    harness.isDirty.value = true
     const attachment = harness.executionRuntime.attachment.value!
     const lease = harness.executionRuntime.hydratePending(attachment, 'image-1', 'task-1')!
     expect(harness.renderEdges.value[0]?.animated).toBe(true)
@@ -735,7 +734,8 @@ describe('useFlowCanvasRuntime', () => {
     )
     const save = harness.runtime.persistence.flushAutosave({ silent: true })
     await vi.waitFor(() => expect(harness.boardSession.save).toHaveBeenCalled())
-    vi.mocked(harness.graphActions.setEdges).mockClear()
+    vi.mocked(harness.graphActions.addEdges).mockClear()
+    vi.mocked(harness.graphActions.removeEdges).mockClear()
     expect(
       harness.executionRuntime.transitionNode(lease, {
         status: 'succeeded',
@@ -743,8 +743,13 @@ describe('useFlowCanvasRuntime', () => {
       }),
     ).toBe(true)
     expect(harness.renderEdges.value[0]?.animated).toBe(false)
-    expect(harness.graphActions.setEdges).toHaveBeenCalledOnce()
-    const lastPresentedEdges = vi.mocked(harness.graphActions.setEdges).mock.lastCall?.[0] ?? []
+    expect(harness.graphActions.addEdges).toHaveBeenCalled()
+    const lastPresentedEdgeInput = vi.mocked(harness.graphActions.addEdges).mock.lastCall?.[0]
+    const lastPresentedEdges = Array.isArray(lastPresentedEdgeInput)
+      ? lastPresentedEdgeInput
+      : lastPresentedEdgeInput
+        ? [lastPresentedEdgeInput]
+        : []
     expect(lastPresentedEdges.find((edge: Edge) => edge.id === 'connection-4')?.animated).toBe(false)
     resolveSave()
     await save
@@ -837,7 +842,7 @@ describe('useFlowCanvasRuntime', () => {
     expect(reconciledEdges).toHaveLength(1)
     expect(reconciledEdges[0]?.id).toBe('connection-4')
     expect(reconciledEdges[0]?.animated).toBe(true)
-    expect(harness.graphActions.setEdges).toHaveBeenLastCalledWith(
+    expect(harness.renderEdges.value).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: 'connection-4', animated: true })]),
     )
   })
@@ -848,7 +853,6 @@ describe('useFlowCanvasRuntime', () => {
     await nextTick()
     harness.graphActions.setNodes.mockClear()
 
-    const historyBefore = harness.runtime.persistence.history.capture()
     const transaction = harness.runtime.graphEditing.readCanvasGraphStore().beginTransaction(
       'node-update',
       { recordHistory: true, markDirty: true },
@@ -865,11 +869,7 @@ describe('useFlowCanvasRuntime', () => {
       aspectRatio: 'auto',
       inputImages: [],
     })
-    const summary = transaction.commit()
-    projectCanonicalGraph(
-      harness,
-      createFlowGraphCommandOptionsFromTransactionSummary(summary, { historyBefore }),
-    )
+    transaction.commit()
 
     expect(harness.isDirty.value).toBe(true)
     expect(harness.saveStatus.value).toBe('pending')
@@ -877,7 +877,7 @@ describe('useFlowCanvasRuntime', () => {
 
     harness.runtime.persistence.history.undo()
 
-    expect(harness.graphActions.setNodes).toHaveBeenCalled()
+    expect(harness.graphActions.addNodes).toHaveBeenCalled()
     expect(harness.fullNodes.value.map((node) => node.id)).not.toContain('prompt-99')
     expect(exportCurrentBoardSnapshot(harness).promptNodes.map((node) => node.id)).not.toContain(99)
 
@@ -1016,13 +1016,13 @@ describe('useFlowCanvasRuntime', () => {
         toPort: 'prompt',
       },
     ])
-    expect(harness.graphActions.setEdges).toHaveBeenCalledOnce()
+    expect(harness.graphActions.removeEdges).toHaveBeenCalled()
     expect(harness.isDirty.value).toBe(true)
     expect(harness.saveStatus.value).toBe('pending')
     expect(harness.savedSnapshots).toHaveLength(0)
 
     harness.runtime.persistence.history.undo()
-    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual([staleEdge.id, 'connection-1'])
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-1'])
     expect(
       exportCurrentBoardSnapshot(harness).connections.map((connection) => connection.id),
     ).toEqual([1])
@@ -1089,7 +1089,7 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.savedSnapshots).toHaveLength(0)
 
     harness.runtime.persistence.history.undo()
-    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-1', staleEdge.id])
+    expect(harness.fullEdges.value.map((edge) => edge.id)).toEqual(['connection-1'])
     expect(exportCurrentBoardSnapshot(harness).connections).toEqual([
       expect.objectContaining({ id: 1, fromNodeId: 1 }),
     ])
@@ -1148,17 +1148,12 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
 
-    const historyBefore = harness.runtime.persistence.history.capture()
     const transaction = harness.runtime.graphEditing.readCanvasGraphStore().beginTransaction('group', {
       recordHistory: true,
       markDirty: true,
     })
     transaction.createGroup(['image-1', 'prompt-1'], SAMPLE_GROUP_GEOMETRY, 'group-1')
-    const summary = transaction.commit()
-    projectCanonicalGraph(
-      harness,
-      createFlowGraphCommandOptionsFromTransactionSummary(summary, { historyBefore }),
-    )
+    transaction.commit()
 
     harness.runtime.persistence.history.undo()
     expect(harness.boardBaseSnapshot.value.groups).toEqual([])
@@ -1213,7 +1208,7 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
     harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, ['image-1', 'prompt-1'])
-    const historyPush = vi.spyOn(harness.runtime.persistence.history, 'push')
+    const historyPush = vi.spyOn(harness.runtime.persistence.history, 'record')
 
     expect(harness.runtime.graphEditing.grouping.commands.groupSelectedNodes()).toBe(true)
 
@@ -1334,7 +1329,7 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
     harness.fullNodes.value = selectFlowNodes(harness.fullNodes.value, ['image-1', 'prompt-1'])
-    const historyPush = vi.spyOn(harness.runtime.persistence.history, 'push')
+    const historyPush = vi.spyOn(harness.runtime.persistence.history, 'record')
 
     expect(harness.runtime.graphEditing.grouping.commands.ungroupSelectedGroup()).toBe(true)
 
@@ -1458,7 +1453,7 @@ describe('useFlowCanvasRuntime', () => {
     const harness = createRuntimeHarness(snapshot)
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
-    const historyPush = vi.spyOn(harness.runtime.persistence.history, 'push')
+    const historyPush = vi.spyOn(harness.runtime.persistence.history, 'record')
 
     expect(
       harness.runtime.graphEditing.grouping.commands.selectGroupAtPoint({ x: 350, y: 80 }),
@@ -2231,8 +2226,6 @@ describe('useFlowCanvasRuntime', () => {
       node.id === 'prompt-1' ? { ...node, selected: false } : node,
     )
 
-    harness.runtime.persistence.history.capture()
-
     expect(readNodeSelected(harness.fullNodes.value, 'prompt-1')).toBe(false)
   })
 
@@ -2509,7 +2502,7 @@ describe('useFlowCanvasRuntime', () => {
       x: 720,
       y: 96,
     })
-    expect(harness.nodes.value).toBe(nodesBeforeCommit)
+    expect(harness.nodes.value).not.toBe(nodesBeforeCommit)
   })
 
   it('keeps one canonical Graph Store for the entire drag transaction', async () => {
@@ -2702,7 +2695,7 @@ describe('useFlowCanvasRuntime', () => {
 
     graphRuntime.onFlowDeleteNode('image-1')
 
-    expect(harness.onWarning).toHaveBeenCalledWith('删除操作未能写入画布，请刷新后重试')
+    expect(harness.onWarning).not.toHaveBeenCalled()
     expect(harness.fullNodes.value).toBe(nodesBefore)
     expect(harness.fullEdges.value).toBe(edgesBefore)
     expect(harness.boardBaseSnapshot.value.groups).toBe(groupsBefore)
@@ -2736,8 +2729,8 @@ describe('useFlowCanvasRuntime', () => {
     ])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.graphActions.applyNodeChanges).toHaveBeenCalledOnce()
-    expect(harness.graphActions.applyEdgeChanges).toHaveBeenCalledOnce()
+    expect(harness.graphActions.removeNodes).toHaveBeenCalledOnce()
+    expect(harness.graphActions.removeEdges).toHaveBeenCalledOnce()
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1', 'prompt-2'])
     expect(harness.fullEdges.value).toHaveLength(0)
 
@@ -2829,7 +2822,7 @@ describe('useFlowCanvasRuntime', () => {
     ])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.graphActions.applyEdgeChanges).toHaveBeenCalledOnce()
+    expect(harness.graphActions.removeEdges).toHaveBeenCalledOnce()
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual([
       'image-1',
       'prompt-1',
@@ -3028,8 +3021,8 @@ describe('useFlowCanvasRuntime', () => {
     ])
     await harness.flushNativeGraphChanges()
 
-    expect(harness.graphActions.applyNodeChanges).toHaveBeenCalledOnce()
-    expect(harness.graphActions.applyEdgeChanges).toHaveBeenCalledOnce()
+    expect(harness.graphActions.removeNodes).toHaveBeenCalledOnce()
+    expect(harness.graphActions.removeEdges).toHaveBeenCalledOnce()
     expect(harness.fullNodes.value.map((node) => node.id)).toEqual(['prompt-1'])
     expect(harness.fullEdges.value).toHaveLength(0)
 

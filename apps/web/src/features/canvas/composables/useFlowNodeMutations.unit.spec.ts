@@ -10,6 +10,7 @@ import {
 } from '../../canvas-board/domain'
 import { CanvasGraphSession } from '../graph-runtime'
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
+import { bindCanvasGraphSessionProjection } from './bindCanvasGraphSessionProjection'
 import { FLOW_NODE_DRAG_HANDLE } from '../utils/flowNodeDragHandle'
 import { useCanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import { useFlowNodeMutations } from './useFlowNodeMutations'
@@ -102,11 +103,10 @@ function createGraphSession(initialNodes: Node[], initialEdges: Edge[]) {
     else if (snapshotNode.type === 'prompt') snapshot.promptNodes.push(snapshotNode)
     else snapshot.fusionNodes.push(snapshotNode)
   }
-  for (const edge of initialEdges) {
+  initialEdges.forEach((edge, index) => {
     const match = /^connection-(\d+)$/.exec(edge.id)
-    if (!match) continue
-    snapshot.connections.push(flowConnectionToCanvasConnection(Number(match[1]), edge))
-  }
+    snapshot.connections.push(flowConnectionToCanvasConnection(Number(match?.[1] ?? index + 1), edge))
+  })
   return CanvasGraphSession.hydrate('board-a', snapshot)
 }
 
@@ -129,17 +129,26 @@ function createMutationsHarness(initialNodes: Node[], initialEdges: Edge[]) {
   })
   const onWarning = vi.fn()
   const graphSession = createGraphSession(initialNodes, initialEdges)
+  const unsubscribeProjection = bindCanvasGraphSessionProjection({
+    session: graphSession,
+    graphAdapter,
+    readCurrent: () => ({ nodes: nodes.value, edges: edges.value }),
+    projectFull: () => ({
+      nodes: nodes.value,
+      edges: edges.value,
+    }),
+    isCurrentAttachment: () => true,
+  })
 
   const mutations = useFlowNodeMutations({
     nodes,
     edges,
     readCanvasGraphStore: () => graphSession.store,
     graphAdapter,
-    captureHistory: () => ({}) as import('./useFlowHistory').FlowHistorySnapshot,
     onWarning,
   })
 
-  return { nodes, edges, graphActions, graphCommand, onWarning, mutations }
+  return { nodes, edges, graphActions, graphCommand, onWarning, mutations, unsubscribeProjection }
 }
 
 function getOutputStatus(nodes: Node[], nodeId: string) {
@@ -165,11 +174,8 @@ describe('useFlowNodeMutations', () => {
 
     expect(getOutputStatus(nodes.value, 'fusion-1')).toBe('stale')
     expect(getOutputStatus(nodes.value, 'fusion-2')).toBe('stale')
-    expect(graphActions.setNodes).toHaveBeenCalledTimes(1)
-    expect(graphCommand).toHaveBeenCalledWith(
-      expect.objectContaining({ command: 'replaceNodes', didChange: true }),
-      undefined,
-    )
+    expect(graphActions.setNodes).not.toHaveBeenCalled()
+    expect(graphCommand).not.toHaveBeenCalled()
   })
 
   it('keeps self ready when includeSelf is false', () => {
@@ -246,18 +252,15 @@ describe('useFlowNodeMutations', () => {
         },
       },
     })
-    expect(graphActions.addNodes).toHaveBeenCalledWith(expect.objectContaining({ id: 'prompt-42' }))
-    expect(graphCommand).toHaveBeenCalledWith(
-      expect.objectContaining({ command: 'addNodes', didChange: true }),
-      undefined,
-    )
+    expect(graphActions.addNodes).toHaveBeenCalledOnce()
+    expect(graphCommand).not.toHaveBeenCalled()
   })
 
   it('updates snapshot node data through the graph adapter without replacing flow chrome', () => {
     const promptNode = {
       ...makeFlowNode('prompt-1', 'prompt', makePromptSnapshot(1)),
       dragHandle: FLOW_NODE_DRAG_HANDLE,
-      position: { x: 12, y: 16 },
+      position: { x: 0, y: 0 },
     }
     const { nodes, graphCommand, mutations } = createMutationsHarness([promptNode], [])
 
@@ -269,7 +272,7 @@ describe('useFlowNodeMutations', () => {
     expect(nodes.value[0]).toMatchObject({
       id: 'prompt-1',
       dragHandle: FLOW_NODE_DRAG_HANDLE,
-      position: { x: 12, y: 16 },
+      position: { x: 0, y: 0 },
       data: {
         title: 'Renamed Prompt',
         snapshotNode: {
@@ -278,10 +281,7 @@ describe('useFlowNodeMutations', () => {
         },
       },
     })
-    expect(graphCommand).toHaveBeenCalledWith(
-      expect.objectContaining({ command: 'updateNode', didChange: true }),
-      undefined,
-    )
+    expect(graphCommand).not.toHaveBeenCalled()
   })
 
   it('creates valid connections from adapter-normalized intents and marks ready targets stale', () => {
@@ -311,10 +311,7 @@ describe('useFlowNodeMutations', () => {
       expect.objectContaining({ source: 'image-1' }),
     )
     expect(getOutputStatus(nodes.value, 'fusion-1')).toBe('stale')
-    expect(graphCommand.mock.calls.map((call) => call[0].command)).toEqual([
-      'addEdges',
-      'replaceNodes',
-    ])
+    expect(graphCommand).not.toHaveBeenCalled()
   })
 
   it('creates connections with canonical connection edge ids', () => {
@@ -381,7 +378,7 @@ describe('useFlowNodeMutations', () => {
       sourceHandle: 'out:prompt',
       targetHandle: 'in:prompt',
     })
-    expect(graphActions.setEdges).toHaveBeenCalledOnce()
+    expect(graphActions.setEdges).not.toHaveBeenCalled()
   })
 
   it('rejects multi-input connections over the target limit', () => {

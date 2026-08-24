@@ -39,6 +39,7 @@ describe('canvasFrameProbe', () => {
 
   it('stays inert when the canvas perf probe flag is disabled', async () => {
     vi.stubEnv('VITE_CANVAS_PERF_PROBE', 'false')
+    vi.doMock('./canvasPerfProbe', () => ({ isCanvasPerfProbeEnabled: () => false }))
     const frame = installAnimationFrameMock()
     const metadata = vi.fn(() => ({ phase: 'disabled' }))
     const info = vi.spyOn(console, 'info').mockImplementation(() => {})
@@ -56,6 +57,7 @@ describe('canvasFrameProbe', () => {
 
   it('samples frame deltas and logs a frame summary when enabled', async () => {
     vi.stubEnv('VITE_CANVAS_PERF_PROBE', 'true')
+    vi.doMock('./canvasPerfProbe', () => ({ isCanvasPerfProbeEnabled: () => true }))
     vi.spyOn(performance, 'now')
       .mockReturnValueOnce(100)
       .mockReturnValueOnce(120)
@@ -95,6 +97,7 @@ describe('canvasFrameProbe', () => {
 
   it('stops without logging when cleanup is called', async () => {
     vi.stubEnv('VITE_CANVAS_PERF_PROBE', 'true')
+    vi.doMock('./canvasPerfProbe', () => ({ isCanvasPerfProbeEnabled: () => true }))
     vi.spyOn(performance, 'now').mockReturnValue(0)
     const frame = installAnimationFrameMock()
     const info = vi.spyOn(console, 'info').mockImplementation(() => {})
@@ -115,6 +118,7 @@ describe('canvasFrameProbe', () => {
 
   it('stays inert when requestAnimationFrame is unavailable', async () => {
     vi.stubEnv('VITE_CANVAS_PERF_PROBE', 'true')
+    vi.doMock('./canvasPerfProbe', () => ({ isCanvasPerfProbeEnabled: () => true }))
     vi.stubGlobal('requestAnimationFrame', undefined)
     const cancelAnimationFrameMock = vi.fn()
     vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrameMock)

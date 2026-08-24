@@ -1,5 +1,12 @@
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
-import { CanvasGraphStore } from './CanvasGraphStore'
+import {
+  CanvasGraphStore,
+  type CanvasGraphCommitEvent,
+  type CanvasGraphCommitPatch,
+  type CanvasGraphPatchDirection,
+  type CanvasGraphTransactionOptions,
+  type CanvasGraphTransactionSummary,
+} from './CanvasGraphStore'
 
 /**
  * Owns the canonical graph for exactly one attached Canvas Board.  Flow is a
@@ -9,6 +16,7 @@ import { CanvasGraphStore } from './CanvasGraphStore'
 export class CanvasGraphSession {
   readonly boardId: string
   readonly #store: CanvasGraphStore
+  readonly #unsubscribeCommitListeners = new Set<() => void>()
   #disposed = false
 
   private constructor(boardId: string, snapshot: CanvasBoardSnapshot) {
@@ -37,7 +45,35 @@ export class CanvasGraphSession {
     return this.#store.exportSnapshot(base)
   }
 
+  /** Subscribe to canonical graph commits for this Board attachment. */
+  subscribe(listener: (event: CanvasGraphCommitEvent) => void): () => void {
+    this.assertActive()
+    const unsubscribeStore = this.#store.subscribe((event) => {
+      if (this.#disposed) return
+      listener(event)
+    })
+    let unsubscribed = false
+    const unsubscribe = () => {
+      if (unsubscribed) return
+      unsubscribed = true
+      this.#unsubscribeCommitListeners.delete(unsubscribe)
+      unsubscribeStore()
+    }
+    this.#unsubscribeCommitListeners.add(unsubscribe)
+    return unsubscribe
+  }
+
+  applyCommitPatch(
+    patch: CanvasGraphCommitPatch,
+    direction: CanvasGraphPatchDirection,
+    options?: CanvasGraphTransactionOptions,
+  ): CanvasGraphTransactionSummary {
+    this.assertActive()
+    return this.#store.applyCommitPatch(patch, direction, options)
+  }
+
   dispose(): void {
+    this.#unsubscribeCommitListeners.forEach((unsubscribe) => unsubscribe())
     this.#disposed = true
   }
 

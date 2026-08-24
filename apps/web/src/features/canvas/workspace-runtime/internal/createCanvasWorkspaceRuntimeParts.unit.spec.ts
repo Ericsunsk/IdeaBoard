@@ -424,7 +424,6 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
         flowPaneAdapter: runtimeOptions.flowPaneAdapter,
         execution: expect.objectContaining({
           edges: board.flowPane.edges,
-          graphAdapter: board.graphEditing.adapter,
           refreshNodeInternals: graph.scheduleFlowNodeInternalsRefresh,
           flushAutosave: runtime.persistence.flushAutosave,
           executionCore: expect.any(Object),

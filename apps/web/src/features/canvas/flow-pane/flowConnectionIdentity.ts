@@ -99,14 +99,16 @@ export function resolveFlowEdgeProjectionReplacement(options: {
   removedEdgeIds: ReadonlySet<CanvasGraphEdgeId>
   nextConnection: CanvasConnectionEndpoint
   policy: CanvasGraphConnectionTargetPolicy
-}): { retainedEdges: Edge[]; didReplace: boolean } | null {
+}): { retainedEdges: Edge[]; removedFlowEdgeIds: string[]; didReplace: boolean } | null {
   const retainedEdges: Edge[] = []
+  const removedFlowEdgeIds: string[] = []
   let didReplace = false
 
   for (const edge of options.edges) {
     const projectionEdgeId = options.projectionIndex.resolveCanvasEdgeId(edge)
     if (projectionEdgeId !== null && options.removedEdgeIds.has(projectionEdgeId)) {
       didReplace = true
+      removedFlowEdgeIds.push(edge.id)
       continue
     }
 
@@ -118,10 +120,11 @@ export function resolveFlowEdgeProjectionReplacement(options: {
     if (replacement === 'unresolved') return null
     if (replacement === 'replace') {
       didReplace = true
+      removedFlowEdgeIds.push(edge.id)
     } else {
       retainedEdges.push(edge)
     }
   }
 
-  return { retainedEdges, didReplace }
+  return { retainedEdges, removedFlowEdgeIds, didReplace }
 }

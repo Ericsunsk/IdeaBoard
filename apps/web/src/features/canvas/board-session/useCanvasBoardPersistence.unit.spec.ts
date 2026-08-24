@@ -6,7 +6,11 @@ import {
   type CanvasBoardSnapshot,
   type PromptNodeItem,
 } from '../../canvas-board/domain'
-import type { FlowAdapterEdge, FlowAdapterNode } from '../utils/flowSnapshotAdapter'
+import {
+  flowToCanvasBoardSnapshot,
+  type FlowAdapterEdge,
+  type FlowAdapterNode,
+} from '../utils/flowSnapshotAdapter'
 import { useCanvasBoardPersistence, type SaveStatus } from './useCanvasBoardPersistence'
 
 const mocks = vi.hoisted(() => ({
@@ -32,7 +36,19 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
   const onWarning = vi.fn()
   const onSuccess = vi.fn()
   const onError = vi.fn()
-  const clearFlowHistoryBaseline = vi.fn()
+  const clearGraphHistoryBaseline = vi.fn()
+  const replaceGraphSnapshot = vi.fn((snapshot: CanvasBoardSnapshot) => {
+    boardBaseSnapshot.value = snapshot
+  })
+  const exportGraphSnapshot = vi.fn((base: CanvasBoardSnapshot) =>
+    flowToCanvasBoardSnapshot(
+      {
+        nodes: fullNodes.value as FlowAdapterNode[],
+        edges: fullEdges.value as FlowAdapterEdge[],
+      },
+      base,
+    ),
+  )
   const boardSession: CanvasBoardSession = {
     currentBoardId: computed(() => {
       const boardId = routeBoardId.value.trim()
@@ -58,7 +74,10 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
     onWarning,
     onSuccess,
     onError,
-    clearFlowHistoryBaseline,
+    clearGraphHistoryBaseline,
+    canReconcileGraph: () => true,
+    replaceGraphSnapshot,
+    exportGraphSnapshot,
     commitGraph,
   })
 
@@ -76,7 +95,9 @@ function createPersistenceHarness(initialBoardId = 'board-a') {
     onWarning,
     onSuccess,
     onError,
-    clearFlowHistoryBaseline,
+    clearGraphHistoryBaseline,
+    replaceGraphSnapshot,
+    exportGraphSnapshot,
   }
 }
 
@@ -201,7 +222,7 @@ describe('useCanvasBoardPersistence', () => {
 
     expect(saved).toBe(false)
     expect(harness.commitGraph).toHaveBeenCalledOnce()
-    expect(harness.clearFlowHistoryBaseline).not.toHaveBeenCalled()
+    expect(harness.clearGraphHistoryBaseline).not.toHaveBeenCalled()
     expect(harness.isDirty.value).toBe(true)
     expect(harness.saveStatus.value).toBe('retry')
     expect(harness.onWarning).toHaveBeenCalledWith('已保存到本地，远端同步失败，将在网络恢复后重试')
@@ -224,7 +245,7 @@ describe('useCanvasBoardPersistence', () => {
 
     expect(saved).toBe(false)
     expect(harness.commitGraph).toHaveBeenCalledOnce()
-    expect(harness.clearFlowHistoryBaseline).not.toHaveBeenCalled()
+    expect(harness.clearGraphHistoryBaseline).not.toHaveBeenCalled()
     expect(harness.isDirty.value).toBe(true)
     expect(harness.saveStatus.value).toBe('conflict')
     expect(harness.onError).toHaveBeenCalledWith('已保存到本地，但画布名称已存在，请更换后再试')

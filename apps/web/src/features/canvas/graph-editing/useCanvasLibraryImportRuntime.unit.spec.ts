@@ -51,6 +51,20 @@ function createHarness(initialNodes: Node[] = []) {
   const edges = shallowRef<Edge[]>([])
   const currentAttachment = ref<CanvasBoardAttachment | null>(attachment())
   const graphAdapter = useCanvasVueFlowGraphAdapter({ nodes, edges })
+  const updateImageSnapshot = vi.fn(
+    (nodeId: string, mutate: (snapshot: ImageNodeItem) => ImageNodeItem) => {
+      nodes.value = nodes.value.map((node) => {
+        if (node.id !== nodeId) return node
+        const data = node.data as FlowNodeData
+        const snapshot = data.snapshotNode as ImageNodeItem
+        const { libraryImportPreviewUrl: _preview, ...nextData } = data
+        return {
+          ...node,
+          data: { ...nextData, snapshotNode: mutate(snapshot) },
+        }
+      })
+    },
+  )
   const materialize = vi.fn()
   const addImageNodeAtPosition = vi.fn((x: number, y: number, patch: object) => {
     const nodeId = `image-${nodes.value.length + 1}`
@@ -76,13 +90,22 @@ function createHarness(initialNodes: Node[] = []) {
     nodes,
     readAttachment: () => currentAttachment.value,
     graphAdapter,
+    updateImageSnapshot,
     createImageNodeAtPosition: addImageNodeAtPosition,
     refreshNodeInternals,
     selectOnlyNode: vi.fn(() => true),
     materialize,
     onWarning,
   })
-  return { nodes, currentAttachment, materialize, imports, refreshNodeInternals, onWarning }
+  return {
+    nodes,
+    currentAttachment,
+    materialize,
+    imports,
+    refreshNodeInternals,
+    onWarning,
+    updateImageSnapshot,
+  }
 }
 
 describe('useCanvasLibraryImportRuntime', () => {

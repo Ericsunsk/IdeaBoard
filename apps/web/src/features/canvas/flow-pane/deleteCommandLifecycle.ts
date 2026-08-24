@@ -12,9 +12,7 @@ import {
   type FlowEdgeIdentity,
   type FlowEdgeProjectionIndex,
 } from './flowConnectionIdentity'
-import { applyFlowGraphDeleteProjection } from './flowGraphDeleteProjection'
-import type { CanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
-import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
+import { releaseCanvasGraphDeleteExecutions } from './flowGraphDeleteProjection'
 import type { PendingImageExecutionLease } from '../execution/pending-execution'
 
 type EdgeRemoveChange = Extract<EdgeChange, { type: 'remove' }>
@@ -24,14 +22,10 @@ type ResolvedFlowNodeChanges = {
   flowNodeIds: string[]
 }
 
-export type CanvasDeleteCommandLifecycleOptions<HistorySnapshot> = {
+export type CanvasDeleteCommandLifecycleOptions = {
   readNodes: () => Node[]
   readEdges: () => Edge[]
-  readBoardBaseSnapshot: () => CanvasBoardSnapshot
   readGraphStore: () => CanvasGraphStore
-  graphAdapter: Pick<CanvasVueFlowGraphAdapter, 'applyGraphChanges'>
-  captureHistory: () => HistorySnapshot
-  commitGroups: (groups: CanvasBoardSnapshot['groups']) => void
   resolveRemovedFlowNodes: (changes: readonly NodeChange[]) => ResolvedFlowNodeChanges | null
   scheduleMicrotask: (callback: () => void) => void
   onWarning: (message: string) => void
@@ -59,10 +53,9 @@ function dedupeRemoveChanges<T extends NodeChange | EdgeChange>(changes: T[]): T
   })
 }
 
-export function createCanvasDeleteCommandLifecycle<HistorySnapshot>(
-  options: CanvasDeleteCommandLifecycleOptions<HistorySnapshot>,
+export function createCanvasDeleteCommandLifecycle(
+  options: CanvasDeleteCommandLifecycleOptions,
 ): CanvasDeleteCommandLifecycle {
-  let pendingHistory: { before: HistorySnapshot } | null = null
   let isCommitScheduled = false
   let pendingNodeChanges: NodeChange[] = []
   let pendingEdgeChanges: EdgeChange[] = []
@@ -86,38 +79,52 @@ export function createCanvasDeleteCommandLifecycle<HistorySnapshot>(
     return Array.from(new Set(edgeIds))
   }
 
+  function collectPendingResultNodeIds(sourceFlowNodeIds: readonly string[]): CanvasGraphNodeId[] {
+    const sourceIds = new Set(sourceFlowNodeIds)
+    const nodesById = new Map(options.readNodes().map((node) => [node.id, node]))
+    const pendingIds = new Set<CanvasGraphNodeId>()
+    options.readEdges().forEach((edge) => {
+      if (!sourceIds.has(edge.source) || edge.targetHandle !== 'in:image') return
+      const target = nodesById.get(edge.target)
+      const snapshot = (target?.data as { snapshotNode?: { outputStatus?: string; pendingTaskId?: string } } | undefined)
+        ?.snapshotNode
+      if (
+        target?.data &&
+        (target.data as { kind?: string }).kind === 'image' &&
+        (snapshot?.outputStatus === 'running' || !!snapshot?.pendingTaskId) &&
+        isCanvasGraphNodeId(edge.target)
+      ) {
+        pendingIds.add(edge.target)
+      }
+    })
+    return [...pendingIds]
+  }
+
   function applyDelete(command: {
     store: CanvasGraphStore
     nodeIds: CanvasGraphNodeId[]
     edgeIds?: CanvasGraphEdgeId[]
     flowNodeIds: string[]
-    edgeRemoveChanges?: EdgeChange[]
-    historyBefore: HistorySnapshot
-    projectionIndex?: FlowEdgeProjectionIndex
     acceptNoop?: boolean
   }): boolean {
-    const projectionIndex =
-      command.projectionIndex ?? createFlowEdgeProjectionIndex(command.store, options.readEdges())
+    const pendingResultNodeIds = collectPendingResultNodeIds(command.flowNodeIds)
+    const nodeIds = [...new Set([...command.nodeIds, ...pendingResultNodeIds])]
     const summary = commitCanvasGraphDeleteIntent(command.store, {
-      nodeIds: command.nodeIds,
+      nodeIds,
       edgeIds: command.edgeIds,
       removeConnectedEdges: true,
     })
     if (!summary.didChange) return command.acceptNoop ?? false
 
-    options.commitGroups(command.store.exportSnapshot(options.readBoardBaseSnapshot()).groups)
-    const result = applyFlowGraphDeleteProjection({
-      graphAdapter: options.graphAdapter,
+    releaseCanvasGraphDeleteExecutions({
+      summary,
       nodes: options.readNodes(),
       edges: options.readEdges(),
-      commitPolicy: { summary, historyBefore: command.historyBefore },
-      flowNodeIds: command.flowNodeIds,
-      projectionIndex,
-      edgeRemoveChanges: command.edgeRemoveChanges,
+      flowNodeIds: [...command.flowNodeIds, ...pendingResultNodeIds],
       captureActiveNodeExecutions: options.captureActiveNodeExecutions,
       releaseNodeExecutions: options.releaseNodeExecutions,
     })
-    return result?.didChange ?? false
+    return true
   }
 
   function deleteNode(nodeId: string): boolean {
@@ -135,7 +142,6 @@ export function createCanvasDeleteCommandLifecycle<HistorySnapshot>(
         store,
         nodeIds: [nodeId],
         flowNodeIds: [nodeId],
-        historyBefore: options.captureHistory(),
       })
     } catch (error) {
       console.error('[Canvas] Failed to commit node delete transaction', error)
@@ -154,7 +160,6 @@ export function createCanvasDeleteCommandLifecycle<HistorySnapshot>(
   }
 
   function commitNativeRemove(
-    capturedHistory: HistorySnapshot,
     nodeChanges: NodeChange[],
     edgeChanges: EdgeChange[],
   ): boolean {
@@ -174,26 +179,21 @@ export function createCanvasDeleteCommandLifecycle<HistorySnapshot>(
       nodeIds: removedNodes.graphNodeIds,
       edgeIds,
       flowNodeIds: removedNodes.flowNodeIds,
-      edgeRemoveChanges: edgeChanges,
-      historyBefore: capturedHistory,
-      projectionIndex,
       acceptNoop: true,
     })
   }
 
   function commitPendingNativeRemove() {
     isCommitScheduled = false
-    const capturedHistory = pendingHistory
     const nodeChanges = dedupeRemoveChanges(pendingNodeChanges)
     const edgeChanges = dedupeRemoveChanges(pendingEdgeChanges)
-    pendingHistory = null
     pendingNodeChanges = []
     pendingEdgeChanges = []
-    if (!capturedHistory || !hasApplicableRemoveChanges(nodeChanges, edgeChanges)) {
+    if (!hasApplicableRemoveChanges(nodeChanges, edgeChanges)) {
       return
     }
     try {
-      if (commitNativeRemove(capturedHistory.before, nodeChanges, edgeChanges)) return
+      if (commitNativeRemove(nodeChanges, edgeChanges)) return
     } catch (error) {
       console.error('[Canvas] Failed to commit native delete transaction', error)
     }
@@ -201,7 +201,6 @@ export function createCanvasDeleteCommandLifecycle<HistorySnapshot>(
   }
 
   function scheduleCommit() {
-    if (!pendingHistory) pendingHistory = { before: options.captureHistory() }
     if (isCommitScheduled) return
     isCommitScheduled = true
     options.scheduleMicrotask(() => {

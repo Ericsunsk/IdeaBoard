@@ -14,6 +14,7 @@ import {
   toCanvasGraphGroupId,
   toCanvasGraphNodeId,
 } from './CanvasGraphStore'
+import { CanvasGraphSession } from './CanvasGraphSession'
 import {
   commitCanvasGraphConnectIntent,
   commitCanvasGraphDeleteGroupIntent,
@@ -203,6 +204,82 @@ describe('CanvasGraphStore', () => {
       x: 560,
       text: 'updated prompt',
     })
+  })
+
+  it('publishes a compact reversible commit patch and isolates listener failures', () => {
+    const store = CanvasGraphStore.fromSnapshot(createLargeSnapshot(2_500))
+    const received = vi.fn()
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    store.subscribe(() => {
+      throw new Error('renderer unavailable')
+    })
+    store.subscribe(received)
+
+    const added = createPromptNode(1_251, 999, 999)
+    const summary = store.beginTransaction('node-update').addNode(added).commit()
+
+    expect(summary.commitPatch.nodes.records).toHaveLength(1)
+    expect(summary.commitPatch.nodes.order).toEqual([
+      expect.objectContaining({ id: toCanvasGraphNodeId('prompt', 1_251), after: expect.any(Object) }),
+    ])
+    expect(JSON.stringify(summary.commitPatch).length).toBeLessThan(2_000)
+    expect(store.getNode(toCanvasGraphNodeId('prompt', 1_251))).toBeDefined()
+    expect(received).toHaveBeenCalledWith(
+      expect.objectContaining({ patch: summary.commitPatch }),
+    )
+    expect(error).toHaveBeenCalledTimes(1)
+
+    const removed = store
+      .beginTransaction('delete')
+      .removeNode(toCanvasGraphNodeId('prompt', 1_251))
+      .commit()
+    expect(removed.commitPatch.nodes.records).toHaveLength(1)
+    expect(removed.commitPatch.nodes.order).toHaveLength(1)
+    expect(JSON.stringify(removed.commitPatch).length).toBeLessThan(2_000)
+    error.mockRestore()
+  })
+
+  it('restores nodes, edges, groups, order, and selection from a commit patch', () => {
+    const snapshot = createSampleSnapshot()
+    const store = CanvasGraphStore.fromSnapshot(snapshot)
+    const promptId = toCanvasGraphNodeId('prompt', 1)
+    const imageId = toCanvasGraphNodeId('image', 1)
+    const groupId = toCanvasGraphGroupId(1)
+    const summary = store
+      .beginTransaction('group')
+      .selectNode(promptId, true)
+      .removeNode(imageId, { removeConnectedEdges: true })
+      .createGroup([promptId, toCanvasGraphNodeId('prompt', 2)], GROUP_GEOMETRY, groupId)
+      .commit()
+
+    const undo = store.applyCommitPatch(summary.commitPatch, 'backward')
+    expect(undo.reason).toBe('history-undo')
+    expect(store.getNode(imageId)).toBeDefined()
+    expect(store.getNode(promptId)?.selected).toBe(false)
+    expect(store.getGroup(groupId)).toBeUndefined()
+    expect(store.getNodeIds()).toEqual([
+      imageId,
+      promptId,
+      toCanvasGraphNodeId('prompt', 2),
+    ])
+
+    store.applyCommitPatch(summary.commitPatch, 'forward')
+    expect(store.getNode(imageId)).toBeUndefined()
+    expect(store.getNode(promptId)?.selected).toBe(true)
+    expect(store.getGroup(groupId)).toBeDefined()
+  })
+
+  it('detaches session observers before a stale store can publish', () => {
+    const session = CanvasGraphSession.hydrate('board-1', createSampleSnapshot())
+    const staleStore = session.store
+    const listener = vi.fn()
+    session.subscribe(listener)
+
+    session.dispose()
+    staleStore.beginTransaction('node-update').updateNode('prompt-1', { x: 640 }).commit()
+
+    expect(listener).not.toHaveBeenCalled()
+    expect(staleStore.getNode('prompt-1')?.snapshot.x).toBe(640)
   })
 
   it('adds and removes edges while keeping endpoint indexes current', () => {

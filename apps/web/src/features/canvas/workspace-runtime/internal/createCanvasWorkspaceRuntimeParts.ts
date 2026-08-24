@@ -50,6 +50,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     executionCore,
     cancelTasks: taskLifecycle.cancelTasks,
     vueFlowGraphActions: options.flowPaneAdapter.vueFlowGraphActions,
+    viewport: options.flowPaneAdapter.viewport,
   })
 
   const graph = createCanvasWorkspaceGraphRuntime({
@@ -70,8 +71,8 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
   const viewport = useCanvasViewportRuntime({
     nodes: board.flowPane.nodes,
     edges: board.flowPane.edges,
-    fullNodes: board.flowPane.nodes,
-    fullEdges: board.flowPane.edges,
+    fullNodes: board.canonicalGraph?.nodes ?? board.flowPane.nodes,
+    fullEdges: board.canonicalGraph?.edges ?? board.flowPane.edges,
     currentBoardId: board.boardSession.currentBoardId,
     getUserUid: () => options.getUserIdentity().userUid,
     viewport: options.flowPaneAdapter.viewport,

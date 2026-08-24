@@ -11,7 +11,7 @@ Baseline 证据来自 `apps/web/.benchmark-reports/` 的本地 report，汇总�
 | `structure-heavy 500 node-drag`     | p95 `116.7ms`，dropped `208`，`nodeArrayReplacements=36`           |
 | `structure-heavy 1000 node-drag`    | p95 `234.1ms`，dropped `479`，`nodeArrayReplacements=36`           |
 | `structure-heavy 2500 node-drag`    | p95 `950ms`，dropped `2005`，`nodeArrayReplacements=36`            |
-| `structure-heavy 2500 initial-load` | max frame `14933.3ms`，dropped `903`，`nodeArrayReplacements=1668` |
+| `structure-heavy 2500 initial-load` | max frame `132.5ms`，dropped `12`，`longTaskMax=131ms`，bounded viewport projection |
 | `structure-heavy 2500 viewport-pan` | p95 低但 max frame `3433.4ms`，dropped `341`                       |
 | `media-heavy 500/1000`              | 不比同规模 `structure-heavy` 更糟，media rendering 不是第一瓶颈    |
 
@@ -149,11 +149,20 @@ Required coverage:
 
 Benchmark reports remain local. Issue comments should include compact summaries and exact commands, not committed report JSON.
 
+## Projection Boundary
+
+The canonical Graph keeps every node and edge for persistence, history, execution,
+and MiniMap. Vue Flow receives only the current viewport plus overscan. The
+bounded projection is refreshed after viewport changes and on Graph commits;
+renderer replacement is atomic for that small subset so Vue Flow never observes
+an edge whose endpoint is outside the controlled node set.
+
 ## Future Optimization Candidates
 
 Only add these after benchmark evidence shows they address the measured bottleneck:
 
-- visible-region projection
+- edge-level incremental projection (only after Vue Flow can apply add/remove
+  mutations without exposing transient dangling endpoints)
 - edge projection budget / related-edge mode
 - media preview lazy/degraded mode
 - handle/tool chrome on-demand mounting

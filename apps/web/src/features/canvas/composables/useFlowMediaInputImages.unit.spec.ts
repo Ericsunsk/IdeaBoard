@@ -129,7 +129,6 @@ function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
     uploadImageToBoard,
     updateSnapshotNodeBase,
     readCanvasGraphStore: () => graphSession.store,
-    captureHistory: () => ({}) as import('./useFlowHistory').FlowHistorySnapshot,
     graphAdapter,
     markFlowExecutionNodeDirty,
     getImageNodeDisplayPayload: (nodeId) => {

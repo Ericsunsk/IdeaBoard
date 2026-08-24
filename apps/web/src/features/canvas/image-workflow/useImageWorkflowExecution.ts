@@ -12,14 +12,12 @@ import {
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasGraphStore } from '../graph-runtime'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
-import type { CanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
 
 type CanvasTaskExecutionFeedback = CanvasFeedback['taskExecution']
 
 export type UseImageWorkflowExecutionOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  graphAdapter: CanvasVueFlowGraphAdapter
   readCanvasGraphStore: () => CanvasGraphStore
   boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   flushAutosave: (options?: { silent?: boolean }) => Promise<void>
@@ -103,7 +101,6 @@ export function useImageWorkflowExecution(
   const executionWorkspace = useCanvasExecutionWorkspace({
     nodes: options.nodes,
     edges: options.edges,
-    graphAdapter: options.graphAdapter,
     readCanvasGraphStore: options.readCanvasGraphStore,
     boardBaseSnapshot: options.boardBaseSnapshot,
     flushAutosave: options.flushAutosave,
@@ -117,7 +114,6 @@ export function useImageWorkflowExecution(
   const workflow = useFlowImageWorkflowExecution({
     nodes: options.nodes,
     edges: options.edges,
-    graphAdapter: options.graphAdapter,
     readCanvasGraphStore: options.readCanvasGraphStore,
     boardBaseSnapshot: options.boardBaseSnapshot,
     flushAutosave: options.flushAutosave,

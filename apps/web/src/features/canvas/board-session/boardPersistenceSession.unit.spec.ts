@@ -69,7 +69,7 @@ function createSessionHarness(initialBoardId = 'board-a') {
   const onWarning = vi.fn()
   const onSuccess = vi.fn()
   const onError = vi.fn()
-  const clearFlowHistoryBaseline = vi.fn()
+  const clearGraphHistoryBaseline = vi.fn()
   const replaceGraphSnapshot = vi.fn((snapshot: CanvasBoardSnapshot) => {
     boardBaseSnapshot.value = snapshot
   })
@@ -102,7 +102,7 @@ function createSessionHarness(initialBoardId = 'board-a') {
     onWarning,
     onSuccess,
     onError,
-    clearFlowHistoryBaseline,
+    clearGraphHistoryBaseline,
     canReconcileGraph: () => canReconcileGraph.value,
     replaceGraphSnapshot,
     exportGraphSnapshot,
@@ -126,7 +126,7 @@ function createSessionHarness(initialBoardId = 'board-a') {
     onWarning,
     onSuccess,
     onError,
-    clearFlowHistoryBaseline,
+    clearGraphHistoryBaseline,
     replaceGraphSnapshot,
     exportGraphSnapshot,
     boardSession,
@@ -157,7 +157,7 @@ describe('boardPersistenceSession', () => {
     })
     expect(harness.isDirty.value).toBe(false)
     expect(harness.saveStatus.value).toBe('saved')
-    expect(harness.clearFlowHistoryBaseline).toHaveBeenCalledOnce()
+    expect(harness.clearGraphHistoryBaseline).toHaveBeenCalledOnce()
     expect(harness.isLoadingBoardSnapshot.value).toBe(false)
   })
 
@@ -217,7 +217,7 @@ describe('boardPersistenceSession', () => {
       expect.objectContaining({ nodes: expect.any(Array), edges: expect.any(Array) }),
       { source: 'save-reconcile' },
     )
-    expect(harness.clearFlowHistoryBaseline).toHaveBeenCalledOnce()
+    expect(harness.clearGraphHistoryBaseline).toHaveBeenCalledOnce()
     expect(harness.isDirty.value).toBe(false)
     expect(harness.saveStatus.value).toBe('saved')
     expect(harness.onSuccess).toHaveBeenCalledWith('已保存')
@@ -243,7 +243,7 @@ describe('boardPersistenceSession', () => {
     expect(harness.boardBaseSnapshot.value).toEqual(savedSnapshot)
     expect(harness.isDirty.value).toBe(true)
     expect(harness.saveStatus.value).toBe('retry')
-    expect(harness.clearFlowHistoryBaseline).not.toHaveBeenCalled()
+    expect(harness.clearGraphHistoryBaseline).not.toHaveBeenCalled()
     expect(harness.onWarning).toHaveBeenCalledWith('已保存到本地，远端同步失败，将在网络恢复后重试')
     expect(harness.onSuccess).not.toHaveBeenCalled()
     expect(harness.isSavingBoard.value).toBe(false)

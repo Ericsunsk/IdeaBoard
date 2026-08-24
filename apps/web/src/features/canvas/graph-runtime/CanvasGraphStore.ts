@@ -10,6 +10,7 @@ import {
   type PromptNodeItem,
 } from '../../canvas-board/domain'
 import { measureCanvasPerf } from '../utils/canvasPerfProbe'
+import { recordCanvasInteractionCount } from '../utils/canvasInteractionMetrics'
 
 export type CanvasGraphNodeKind = CanvasConnectionNodeType
 export type CanvasGraphNodeId = `${CanvasGraphNodeKind}-${number}`
@@ -31,6 +32,8 @@ export type CanvasGraphTransactionReason =
   | 'group-move'
   | 'group-resize'
   | 'group-membership'
+  | 'history-undo'
+  | 'history-redo'
   | 'hydrate'
 
 export type CanvasGraphNodeRecord = {
@@ -76,6 +79,55 @@ export type CanvasGraphProjectionPatch = {
   }
 }
 
+/**
+ * The reversible domain delta produced by one committed graph transaction.
+ *
+ * This is deliberately expressed in graph records rather than Flow values: it
+ * is the shared fact consumed by History, persistence and Flow projection.
+ * Selection is part of a record delta so undoing a semantic edit restores the
+ * selection that accompanied it, but selection-only commits never request
+ * History or persistence side effects.
+ */
+export type CanvasGraphRecordPatch<Record, Id extends string> = Readonly<{
+  id: Id
+  before?: Record
+  after?: Record
+}>
+
+export type CanvasGraphOrderPlacement<Id extends string> = Readonly<{
+  previousId?: Id
+  nextId?: Id
+}>
+
+export type CanvasGraphOrderPatch<Id extends string> = Readonly<{
+  id: Id
+  before?: CanvasGraphOrderPlacement<Id>
+  after?: CanvasGraphOrderPlacement<Id>
+}>
+
+export type CanvasGraphCollectionPatch<Record, Id extends string> = Readonly<{
+  records: readonly CanvasGraphRecordPatch<Record, Id>[]
+  /** Only changed IDs are retained; never a full Board-sized order snapshot. */
+  order: readonly CanvasGraphOrderPatch<Id>[]
+}>
+
+export type CanvasGraphCommitPatch = Readonly<{
+  nodes: CanvasGraphCollectionPatch<CanvasGraphNodeRecord, CanvasGraphNodeId>
+  edges: CanvasGraphCollectionPatch<CanvasGraphEdgeRecord, CanvasGraphEdgeId>
+  groups: CanvasGraphCollectionPatch<CanvasGraphGroupRecord, CanvasGraphGroupId>
+}>
+
+export type CanvasGraphCommitEvent = Readonly<{
+  summary: CanvasGraphTransactionSummary
+  patch: CanvasGraphCommitPatch
+  sideEffects: Readonly<{
+    recordHistory: boolean
+    markDirty: boolean
+  }>
+}>
+
+export type CanvasGraphPatchDirection = 'forward' | 'backward'
+
 export type CanvasGraphTransactionSummary = {
   id: string
   reason: CanvasGraphTransactionReason
@@ -92,6 +144,7 @@ export type CanvasGraphTransactionSummary = {
   didChangeOrder: boolean
   shouldRecordHistory: boolean
   shouldMarkDirty: boolean
+  commitPatch: CanvasGraphCommitPatch
   projectionPatch: CanvasGraphProjectionPatch
 }
 
@@ -138,6 +191,9 @@ type CanvasGraphTransactionDraft = {
   nodeOrder?: CanvasGraphNodeId[]
   edgeOrder?: CanvasGraphEdgeId[]
   groupOrder?: CanvasGraphGroupId[]
+  nodeOrderPatches: Map<CanvasGraphNodeId, CanvasGraphOrderPatch<CanvasGraphNodeId>>
+  edgeOrderPatches: Map<CanvasGraphEdgeId, CanvasGraphOrderPatch<CanvasGraphEdgeId>>
+  groupOrderPatches: Map<CanvasGraphGroupId, CanvasGraphOrderPatch<CanvasGraphGroupId>>
 }
 
 type TransactionChangeSet = {
@@ -495,10 +551,6 @@ function createChangeSet(): TransactionChangeSet {
   }
 }
 
-function isSameOrder<Id>(left: readonly Id[], right: readonly Id[]): boolean {
-  return left.length === right.length && left.every((id, index) => id === right[index])
-}
-
 function isSameJsonValue(left: unknown, right: unknown): boolean {
   return JSON.stringify(left) === JSON.stringify(right)
 }
@@ -561,12 +613,15 @@ function normalizeTransactionChanges(draft: CanvasGraphTransactionDraft): Transa
     }
   }
 
+  // Transactions only mutate order through add/remove.  Derive this from the
+  // changed records so a one-node edit never scans or copies Board-sized order
+  // arrays merely to decide whether a History patch is needed.
   changes.didChangeNodeOrder =
-    !!draft.nodeOrder && !isSameOrder(draft.base.nodeOrder, draft.nodeOrder)
+    changes.addedNodeIds.size > 0 || changes.removedNodeIds.size > 0
   changes.didChangeEdgeOrder =
-    !!draft.edgeOrder && !isSameOrder(draft.base.edgeOrder, draft.edgeOrder)
+    changes.addedEdgeIds.size > 0 || changes.removedEdgeIds.size > 0
   changes.didChangeGroupOrder =
-    !!draft.groupOrder && !isSameOrder(draft.base.groupOrder, draft.groupOrder)
+    changes.addedGroupIds.size > 0 || changes.removedGroupIds.size > 0
   changes.hasDomainChanges =
     changes.addedNodeIds.size > 0 ||
     changes.updatedNodeIds.size > 0 ||
@@ -619,11 +674,74 @@ function isSameGroupGeometry(
   )
 }
 
+function cloneRecordPatch<Record, Id extends string>(
+  id: Id,
+  before: Record | undefined,
+  after: Record | undefined,
+  clone: (record: Record) => Record,
+): CanvasGraphRecordPatch<Record, Id> | null {
+  if (before === undefined && after === undefined) return null
+  if (before !== undefined && after !== undefined && isSameJsonValue(before, after)) return null
+  return Object.freeze({
+    id,
+    ...(before === undefined ? {} : { before: clone(before) }),
+    ...(after === undefined ? {} : { after: clone(after) }),
+  })
+}
+
+function createCollectionCommitPatch<Record, Id extends string>(params: {
+  writes: TransactionRecordWrites<Id, Record>
+  beforeRecords: Map<Id, Record>
+  orderPatches: ReadonlyMap<Id, CanvasGraphOrderPatch<Id>>
+  clone: (record: Record) => Record
+}): CanvasGraphCollectionPatch<Record, Id> {
+  const records = Array.from(params.writes, ([id, after]) =>
+    cloneRecordPatch(
+      id,
+      params.beforeRecords.get(id),
+      after ?? undefined,
+      params.clone,
+    ),
+  ).filter((patch): patch is CanvasGraphRecordPatch<Record, Id> => patch !== null)
+  const order = Array.from(params.orderPatches.values(), (patch) => Object.freeze({ ...patch }))
+  return Object.freeze({
+    records: Object.freeze(records),
+    order: Object.freeze(order),
+  })
+}
+
+function createCommitPatch(
+  draft: CanvasGraphTransactionDraft,
+): CanvasGraphCommitPatch {
+  return Object.freeze({
+    nodes: createCollectionCommitPatch({
+      writes: draft.nodeWrites,
+      beforeRecords: draft.base.nodesById,
+      orderPatches: draft.nodeOrderPatches,
+      clone: cloneNodeRecord,
+    }),
+    edges: createCollectionCommitPatch({
+      writes: draft.edgeWrites,
+      beforeRecords: draft.base.edgesById,
+      orderPatches: draft.edgeOrderPatches,
+      clone: cloneEdgeRecord,
+    }),
+    groups: createCollectionCommitPatch({
+      writes: draft.groupWrites,
+      beforeRecords: draft.base.groupsById,
+      orderPatches: draft.groupOrderPatches,
+      clone: cloneGroupRecord,
+    }),
+  })
+}
+
 function createSummary(
   reason: CanvasGraphTransactionReason,
   options: Required<CanvasGraphTransactionOptions>,
   state: CanvasGraphStoreState,
   changes: TransactionChangeSet,
+  draft: CanvasGraphTransactionDraft,
+  commitPatch: CanvasGraphCommitPatch = createCommitPatch(draft),
 ): CanvasGraphTransactionSummary {
   const addedNodeIds = Array.from(changes.addedNodeIds)
   const updatedNodeIds = Array.from(changes.updatedNodeIds)
@@ -658,6 +776,7 @@ function createSummary(
       changes.didChangeNodeOrder || changes.didChangeEdgeOrder || changes.didChangeGroupOrder,
     shouldRecordHistory: changes.hasDomainChanges && options.recordHistory,
     shouldMarkDirty: changes.hasDomainChanges && options.markDirty,
+    commitPatch,
     projectionPatch: {
       nodes: {
         added: addedNodeIds
@@ -703,6 +822,7 @@ function createSummary(
 export class CanvasGraphStore {
   private state: CanvasGraphStoreState
   private revision = 0
+  private readonly commitListeners = new Set<(event: CanvasGraphCommitEvent) => void>()
 
   constructor(snapshot: CanvasBoardSnapshot = createEmptyCanvasBoardSnapshot()) {
     this.state = createMeasuredStateFromSnapshot(snapshot)
@@ -725,6 +845,125 @@ export class CanvasGraphStore {
       recordHistory: options.recordHistory ?? true,
       markDirty: options.markDirty ?? true,
     })
+  }
+
+  subscribe(listener: (event: CanvasGraphCommitEvent) => void): () => void {
+    this.commitListeners.add(listener)
+    return () => this.commitListeners.delete(listener)
+  }
+
+  applyCommitPatch(
+    patch: CanvasGraphCommitPatch,
+    direction: CanvasGraphPatchDirection,
+    options: CanvasGraphTransactionOptions = {},
+  ): CanvasGraphTransactionSummary {
+    if (!this._canApplyCommitPatch(patch, direction)) {
+      const draft = this._createTransactionDraft()
+      return createSummary(
+        direction === 'forward' ? 'history-redo' : 'history-undo',
+        {
+          recordHistory: false,
+          markDirty: options.markDirty ?? true,
+        },
+        this._readState(),
+        createChangeSet(),
+        draft,
+      )
+    }
+    const draft = this._createTransactionDraft()
+    const select = <Record, Id extends string>(
+      collection: CanvasGraphCollectionPatch<Record, Id>,
+      writes: TransactionRecordWrites<Id, Record>,
+      clone: (record: Record) => Record,
+    ) => {
+      for (const recordPatch of collection.records) {
+        const next = direction === 'forward' ? recordPatch.after : recordPatch.before
+        writes.set(recordPatch.id, next === undefined ? null : clone(next))
+      }
+    }
+    const applyOrder = <Id extends string>(
+      current: readonly Id[],
+      orderPatch: readonly CanvasGraphOrderPatch<Id>[],
+    ): Id[] | undefined => {
+      if (orderPatch.length === 0) return undefined
+      const targetPlacement = (patchItem: CanvasGraphOrderPatch<Id>) =>
+        direction === 'forward' ? patchItem.after : patchItem.before
+      const next = [...current]
+      const orderedPatches = direction === 'forward' ? orderPatch : [...orderPatch].reverse()
+      for (const patchItem of orderedPatches) {
+        const placement = targetPlacement(patchItem)
+        const currentIndex = next.indexOf(patchItem.id)
+        if (!placement) {
+          if (currentIndex >= 0) next.splice(currentIndex, 1)
+          continue
+        }
+        if (currentIndex >= 0) next.splice(currentIndex, 1)
+        const previousIndex = placement.previousId
+          ? next.indexOf(placement.previousId)
+          : -1
+        const nextIndex = placement.nextId ? next.indexOf(placement.nextId) : -1
+        const insertIndex = previousIndex >= 0 ? previousIndex + 1 : nextIndex >= 0 ? nextIndex : next.length
+        next.splice(insertIndex, 0, patchItem.id)
+      }
+      return next
+    }
+    const recordAppliedOrderPatch = <Id extends string>(
+      before: readonly Id[],
+      after: readonly Id[] | undefined,
+      target: Map<Id, CanvasGraphOrderPatch<Id>>,
+    ) => {
+      if (!after) return
+      const ids = new Set([...before, ...after])
+      const placement = (order: readonly Id[], id: Id) => {
+        const index = order.indexOf(id)
+        if (index < 0) return undefined
+        return {
+          ...(order[index - 1] === undefined ? {} : { previousId: order[index - 1] }),
+          ...(order[index + 1] === undefined ? {} : { nextId: order[index + 1] }),
+        }
+      }
+      ids.forEach((id) => {
+        const beforePlacement = placement(before, id)
+        const afterPlacement = placement(after, id)
+        if (JSON.stringify(beforePlacement) === JSON.stringify(afterPlacement)) return
+        target.set(id, {
+          id,
+          ...(beforePlacement ? { before: beforePlacement } : {}),
+          ...(afterPlacement ? { after: afterPlacement } : {}),
+        })
+      })
+    }
+    select(patch.nodes, draft.nodeWrites, cloneNodeRecord)
+    select(patch.edges, draft.edgeWrites, cloneEdgeRecord)
+    select(patch.groups, draft.groupWrites, cloneGroupRecord)
+    draft.nodeOrder = applyOrder(this.state.nodeOrder, patch.nodes.order)
+    draft.edgeOrder = applyOrder(this.state.edgeOrder, patch.edges.order)
+    draft.groupOrder = applyOrder(this.state.groupOrder, patch.groups.order)
+    recordAppliedOrderPatch(this.state.nodeOrder, draft.nodeOrder, draft.nodeOrderPatches)
+    recordAppliedOrderPatch(this.state.edgeOrder, draft.edgeOrder, draft.edgeOrderPatches)
+    recordAppliedOrderPatch(this.state.groupOrder, draft.groupOrder, draft.groupOrderPatches)
+
+    const resolvedOptions: Required<CanvasGraphTransactionOptions> = {
+      recordHistory: options.recordHistory ?? false,
+      markDirty: options.markDirty ?? true,
+    }
+    const changes = normalizeTransactionChanges(draft)
+    const didChange =
+      changes.hasDomainChanges ||
+      changes.selectedNodeIds.size > 0 ||
+      changes.selectedEdgeIds.size > 0
+    const commitPatch = createCommitPatch(draft)
+    if (didChange) this._commitTransaction(draft)
+    const summary = createSummary(
+      direction === 'forward' ? 'history-redo' : 'history-undo',
+      resolvedOptions,
+      this._readState(),
+      changes,
+      draft,
+      commitPatch,
+    )
+    if (didChange) this._publishCommit(summary)
+    return summary
   }
 
   exportSnapshot(base?: CanvasBoardSnapshot): CanvasBoardSnapshot {
@@ -791,6 +1030,9 @@ export class CanvasGraphStore {
         nodeWrites: new Map(),
         edgeWrites: new Map(),
         groupWrites: new Map(),
+        nodeOrderPatches: new Map(),
+        edgeOrderPatches: new Map(),
+        groupOrderPatches: new Map(),
       }),
     )
   }
@@ -851,6 +1093,73 @@ export class CanvasGraphStore {
     this.state = { ...this.state }
   }
 
+  _publishCommit(summary: CanvasGraphTransactionSummary) {
+    const event: CanvasGraphCommitEvent = Object.freeze({
+      summary,
+      patch: summary.commitPatch,
+      sideEffects: Object.freeze({
+        recordHistory: summary.shouldRecordHistory,
+        markDirty: summary.shouldMarkDirty,
+      }),
+    })
+    recordCanvasInteractionCount('graphCommitCount')
+    if (event.sideEffects.recordHistory) recordCanvasInteractionCount('graphHistoryCommitCount')
+    if (event.sideEffects.markDirty) recordCanvasInteractionCount('graphDirtyCommitCount')
+    this.commitListeners.forEach((listener) => {
+      try {
+        listener(event)
+      } catch (error) {
+        // A projection/observer failure must never invalidate a canonical
+        // graph commit or prevent remaining observers from seeing it.
+        console.error('[Canvas] Graph commit listener failed', error)
+      }
+    })
+  }
+
+  _canApplyCommitPatch(patch: CanvasGraphCommitPatch, direction: CanvasGraphPatchDirection): boolean {
+    const source = <Record, Id extends string>(recordPatch: CanvasGraphRecordPatch<Record, Id>) =>
+      direction === 'forward' ? recordPatch.before : recordPatch.after
+    const matchesRecords = <Record, Id extends string>(
+      records: ReadonlyMap<Id, Record>,
+      collection: CanvasGraphCollectionPatch<Record, Id>,
+    ) =>
+      collection.records.every((recordPatch) => {
+        const expected = source(recordPatch)
+        const current = records.get(recordPatch.id)
+        return expected === undefined ? current === undefined : !!current && isSameJsonValue(current, expected)
+      })
+    const matchesPlacement = <Id extends string>(
+      order: readonly Id[],
+      placement: CanvasGraphOrderPlacement<Id> | undefined,
+      id: Id,
+    ) => {
+      const index = order.indexOf(id)
+      if (!placement) return index < 0
+      if (index < 0) return false
+      const previousId = order[index - 1]
+      const nextId = order[index + 1]
+      return (
+        (placement.previousId === undefined || placement.previousId === previousId) &&
+        (placement.nextId === undefined || placement.nextId === nextId)
+      )
+    }
+    const matchesOrder = <Id extends string>(
+      order: readonly Id[],
+      changes: readonly CanvasGraphOrderPatch<Id>[],
+    ) =>
+      changes.every((change) =>
+        matchesPlacement(order, direction === 'forward' ? change.before : change.after, change.id),
+      )
+    return (
+      matchesRecords(this.state.nodesById, patch.nodes) &&
+      matchesRecords(this.state.edgesById, patch.edges) &&
+      matchesRecords(this.state.groupsById, patch.groups) &&
+      matchesOrder(this.state.nodeOrder, patch.nodes.order) &&
+      matchesOrder(this.state.edgeOrder, patch.edges.order) &&
+      matchesOrder(this.state.groupOrder, patch.groups.order)
+    )
+  }
+
   _assertTransactionCurrent(draft: CanvasGraphTransactionDraft) {
     if (this.revision !== draft.baseRevision) {
       throw new Error('CanvasGraphStore transaction is stale')
@@ -893,7 +1202,9 @@ export class CanvasGraphTransaction {
       snapshot: cloneJson(node),
       selected: false,
     })
-    this.ensureNodeOrder().push(id)
+    const order = this.ensureNodeOrder()
+    this.recordOrderAdded(this.draft.nodeOrderPatches, id, order)
+    order.push(id)
     return this
   }
 
@@ -921,7 +1232,7 @@ export class CanvasGraphTransaction {
     }
     this.removeNodeFromGroups(nodeId)
     this.draft.nodeWrites.set(nodeId, null)
-    this.removeFromOrder(this.ensureNodeOrder(), nodeId)
+    this.removeFromOrder(this.ensureNodeOrder(), nodeId, this.draft.nodeOrderPatches)
     return this
   }
 
@@ -953,7 +1264,9 @@ export class CanvasGraphTransaction {
       nodeIds: normalizedNodeIds,
       ...normalizedGeometry,
     })
-    this.ensureGroupOrder().push(resolvedGroupId)
+    const order = this.ensureGroupOrder()
+    this.recordOrderAdded(this.draft.groupOrderPatches, resolvedGroupId, order)
+    order.push(resolvedGroupId)
     return this
   }
 
@@ -1005,7 +1318,9 @@ export class CanvasGraphTransaction {
       connection: cloneJson(connection),
       selected: false,
     })
-    this.ensureEdgeOrder().push(id)
+    const order = this.ensureEdgeOrder()
+    this.recordOrderAdded(this.draft.edgeOrderPatches, id, order)
+    order.push(id)
     return this
   }
 
@@ -1013,7 +1328,7 @@ export class CanvasGraphTransaction {
     this.assertOpen()
     if (!this.getEdgeRecord(edgeId)) return this
     this.draft.edgeWrites.set(edgeId, null)
-    this.removeFromOrder(this.ensureEdgeOrder(), edgeId)
+    this.removeFromOrder(this.ensureEdgeOrder(), edgeId, this.draft.edgeOrderPatches)
     return this
   }
 
@@ -1050,15 +1365,31 @@ export class CanvasGraphTransaction {
       changes.hasDomainChanges ||
       changes.selectedNodeIds.size > 0 ||
       changes.selectedEdgeIds.size > 0
+    const commitPatch = createCommitPatch(this.draft)
     if (didChange) this.store._commitTransaction(this.draft)
     this.status = 'committed'
-    return createSummary(this.reason, this.options, this.store._readState(), changes)
+    const summary = createSummary(
+      this.reason,
+      this.options,
+      this.store._readState(),
+      changes,
+      this.draft,
+      commitPatch,
+    )
+    if (didChange) this.store._publishCommit(summary)
+    return summary
   }
 
   cancel(): CanvasGraphTransactionSummary {
     this.assertOpen(false)
     this.status = 'cancelled'
-    return createSummary(this.reason, this.options, this.draft.base, createChangeSet())
+    return createSummary(
+      this.reason,
+      this.options,
+      this.draft.base,
+      createChangeSet(),
+      this.draft,
+    )
   }
 
   private assertOpen(requireCurrentRevision = true) {
@@ -1109,7 +1440,7 @@ export class CanvasGraphTransaction {
 
   private removeGroup(groupId: CanvasGraphGroupId) {
     this.draft.groupWrites.set(groupId, null)
-    this.removeFromOrder(this.ensureGroupOrder(), groupId)
+    this.removeFromOrder(this.ensureGroupOrder(), groupId, this.draft.groupOrderPatches)
   }
 
   private addNodeToGroup(nodeId: CanvasGraphNodeId, groupId: CanvasGraphGroupId) {
@@ -1205,9 +1536,50 @@ export class CanvasGraphTransaction {
     return (this.draft.groupOrder ??= [...this.draft.base.groupOrder])
   }
 
-  private removeFromOrder<Id>(order: Id[], id: Id) {
+  private recordOrderAdded<Id extends string>(
+    patches: Map<Id, CanvasGraphOrderPatch<Id>>,
+    id: Id,
+    order: readonly Id[],
+  ) {
+    const previous = patches.get(id)
+    const placement = Object.freeze({
+      ...(order.at(-1) === undefined ? {} : { previousId: order.at(-1) }),
+    })
+    patches.set(
+      id,
+      Object.freeze({
+        id,
+        ...(previous?.before === undefined ? {} : { before: previous.before }),
+        after: placement,
+      }),
+    )
+  }
+
+  private removeFromOrder<Id extends string>(
+    order: Id[],
+    id: Id,
+    patches: Map<Id, CanvasGraphOrderPatch<Id>>,
+  ) {
     const index = order.indexOf(id)
-    if (index >= 0) order.splice(index, 1)
+    if (index < 0) return
+    const previous = patches.get(id)
+    // An item added and removed in one draft has no net order delta.
+    if (previous?.before === undefined && previous?.after !== undefined) {
+      patches.delete(id)
+      order.splice(index, 1)
+      return
+    }
+    patches.set(
+      id,
+      Object.freeze({
+        id,
+        before: Object.freeze({
+          ...(order[index - 1] === undefined ? {} : { previousId: order[index - 1] }),
+          ...(order[index + 1] === undefined ? {} : { nextId: order[index + 1] }),
+        }),
+      }),
+    )
+    order.splice(index, 1)
   }
 }
 

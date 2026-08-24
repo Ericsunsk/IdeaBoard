@@ -1,4 +1,4 @@
-import { computed, ref, type Ref } from 'vue'
+import { computed, ref, shallowRef, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
@@ -9,6 +9,7 @@ import { useFlowCanvasRuntime } from './useFlowCanvasRuntime'
 import type { CanvasVueFlowGraphActions } from './useCanvasVueFlowGraphAdapter'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { PendingImageExecutionCore } from '../execution/pending-execution'
+import type { CanvasProjectionViewport } from './canvasVisibleGraphProjection'
 
 type CanvasBoardRuntimeFeedback = CanvasFeedback['boardSession']
 
@@ -21,6 +22,7 @@ type UseCanvasBoardRuntimeOptions = {
   executionCore: PendingImageExecutionCore
   cancelTasks: (taskIds: readonly string[]) => void
   vueFlowGraphActions?: CanvasVueFlowGraphActions
+  viewport?: Readonly<Ref<CanvasProjectionViewport>>
 }
 
 function boardSessionIdentityKey(identity: { userId: number; userUid: string }): string {
@@ -37,8 +39,8 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions) {
   }
   const fullNodes: Ref<Node[]> = ref([])
   const fullEdges: Ref<Edge[]> = ref([])
-  const nodes = fullNodes
-  const edges = fullEdges
+  const nodes = shallowRef<Node[]>([])
+  const edges = shallowRef<Edge[]>([])
   const boardBaseSnapshot: Ref<CanvasBoardSnapshot> = ref(createEmptyCanvasBoardSnapshot())
   const isLoadingBoardSnapshot: Ref<boolean> = ref(false)
   const isSavingBoard: Ref<boolean> = ref(false)
@@ -55,8 +57,11 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions) {
   })
 
   const flowRuntime = useFlowCanvasRuntime({
-    nodes,
-    edges,
+    nodes: fullNodes,
+    edges: fullEdges,
+    renderNodes: nodes,
+    renderEdges: edges,
+    viewport: options.viewport,
     boardBaseSnapshot,
     isDirty,
     saveStatus,
@@ -90,7 +95,7 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions) {
     await options.logoutAndRedirect(HOME_PATH)
   }
 
-  return {
+  const runtime = {
     boardSession: {
       boardBaseSnapshot,
       currentBoardId: flowRuntime.persistence.currentBoardId,
@@ -102,8 +107,6 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions) {
       history: flowRuntime.persistence.history,
     },
     flowPane: {
-      nodes,
-      edges,
       ...flowRuntime.flowPane,
     },
     graphEditing: flowRuntime.graphEditing,
@@ -127,4 +130,9 @@ export function useCanvasBoardRuntime(options: UseCanvasBoardRuntimeOptions) {
       onLogoutRequest,
     },
   }
+  Object.defineProperty(runtime, 'canonicalGraph', {
+    value: { nodes: fullNodes, edges: fullEdges },
+    enumerable: false,
+  })
+  return runtime
 }

@@ -1,12 +1,8 @@
 import type { Connection, Edge, Node } from '@vue-flow/core'
 import type { CanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
-import {
-  applyCanvasGraphCommitPolicy,
-  type CanvasGraphCommitPolicy,
-} from '../composables/canvasGraphCommitPolicy'
+import { createFlowGraphCommandOptions } from '../composables/flowGraphAdapterCommandSideEffects'
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
 import {
-  canvasConnectionToFlowEdge,
   resolveNextCanvasConnectionId,
 } from '../utils/flowSnapshotAdapter'
 import {
@@ -16,7 +12,7 @@ import {
   type CanvasGraphStore,
   type CanvasGraphTransactionSummary,
 } from '../graph-runtime'
-import type { CanvasBoardSnapshot, CanvasConnection } from '../../canvas-board/domain'
+import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import {
   createFlowEdgeProjectionIndex,
   resolveFlowEdgeProjectionReplacement,
@@ -39,7 +35,6 @@ export type CanvasConnectionCommandLifecycleOptions = {
     existingEdges: readonly Edge[],
   ) => string | null
   graphAdapter: CanvasVueFlowGraphAdapter
-  captureHistory: () => unknown
   onWarning: (message: string) => void
   markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
 }
@@ -76,28 +71,23 @@ export function createCanvasConnectionCommandLifecycle(
     return flowConnectionToCanvasConnection(nextConnectionId, resolvedConnection)
   }
 
-  function resolveAddedConnectEdge(
-    summary: CanvasGraphTransactionSummary,
-    nextConnection: CanvasConnection,
-  ) {
-    const addedConnection = summary.projectionPatch.edges.added[0]?.connection ?? nextConnection
-    return canvasConnectionToFlowEdge(addedConnection) as Edge
-  }
-
   function commitConnectProjection(
-    existingEdges: Edge[],
     replacement: NonNullable<ReturnType<typeof resolveFlowEdgeProjectionReplacement>>,
-    nextEdge: Edge,
-    commitPolicy: CanvasGraphCommitPolicy,
+    store: CanvasGraphStore,
   ) {
-    applyCanvasGraphCommitPolicy(commitPolicy, (commandOptions) => {
-      if (!replacement.didReplace) {
-        options.graphAdapter.addEdges(nextEdge, commandOptions)
-        return
-      }
-
-      options.graphAdapter.replaceEdges([...replacement.retainedEdges, nextEdge], commandOptions)
-    })
+    // The canonical commit subscriber projects the added/removed graph edges.
+    // Only Flow IDs that never belonged to the canonical store need an
+    // explicit cleanup (for example a stale Vue Flow-generated edge ID).
+    const canonicalEdgeIds = new Set(store.getEdgeIds())
+    const staleFlowEdgeIds = replacement.removedFlowEdgeIds.filter(
+      (edgeId) => !canonicalEdgeIds.has(edgeId as CanvasGraphEdgeId),
+    )
+    if (staleFlowEdgeIds.length > 0) {
+      options.graphAdapter.removeEdges(
+        staleFlowEdgeIds,
+        createFlowGraphCommandOptions({ recordHistory: false, markDirty: false }),
+      )
+    }
     return true
   }
 
@@ -134,7 +124,6 @@ export function createCanvasConnectionCommandLifecycle(
       options.onWarning('连线未能写入画布，请刷新后重试')
       return false
     }
-    const historyBefore = options.captureHistory()
     let summary: CanvasGraphTransactionSummary
     try {
       summary = commitCanvasGraphConnectIntent(store, {
@@ -148,12 +137,9 @@ export function createCanvasConnectionCommandLifecycle(
     }
     if (!summary.didChange) return false
 
-    const nextEdge = resolveAddedConnectEdge(summary, nextConnection)
     const didCommitProjection = commitConnectProjection(
-      existingEdges,
       replacement,
-      nextEdge,
-      { summary, historyBefore },
+      store,
     )
     if (!didCommitProjection) return false
     options.markFlowExecutionNodeDirty(resolvedConnection.target, { includeSelf: true })

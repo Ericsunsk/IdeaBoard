@@ -12,6 +12,8 @@ import {
   useCanvasVueFlowGraphAdapter,
   type CanvasVueFlowGraphAdapter,
 } from '../composables/useCanvasVueFlowGraphAdapter'
+import { bindCanvasGraphSessionProjection } from '../composables/bindCanvasGraphSessionProjection'
+import { canvasBoardSnapshotToFlow } from '../utils/flowSnapshotAdapter'
 import type { FlowNodeData } from '../types/flowTypes'
 import { useCanvasGraphEditing } from './useCanvasGraphEditing'
 import {
@@ -72,6 +74,16 @@ function createHarness(initialNodes: Node[] = []) {
     else graphSnapshot.fusionNodes.push(snapshotNode)
   }
   const graphSession = CanvasGraphSession.hydrate('board-a', graphSnapshot)
+  bindCanvasGraphSessionProjection({
+    session: graphSession,
+    graphAdapter,
+    readCurrent: () => ({ nodes: nodes.value, edges: edges.value }),
+    projectFull: () => {
+      const flow = canvasBoardSnapshotToFlow(graphSession.exportSnapshot(graphSnapshot))
+      return { nodes: flow.nodes, edges: flow.edges }
+    },
+    isCurrentAttachment: () => true,
+  })
   const materializeLibraryAsset = vi.fn(async () => ({
     mediaAssetId: 43,
     url: 'https://example.com/materialized.png',
@@ -83,11 +95,10 @@ function createHarness(initialNodes: Node[] = []) {
   const editing = useCanvasGraphEditing({
     nodes,
     edges,
-    boardBaseSnapshot: ref(createEmptyCanvasBoardSnapshot()),
+    boardBaseSnapshot: ref(graphSnapshot),
     currentBoardId: ref('board-a'),
     graphAdapter,
     readCanvasGraphStore: () => graphSession.store,
-    captureHistory: () => ({}) as import('../composables/useFlowHistory').FlowHistorySnapshot,
     deleteNode: vi.fn(() => true),
     updateNodeInternals: vi.fn(),
     screenToFlowCoordinate: ({ x, y }) => ({ x: x + 10, y: y + 20 }),

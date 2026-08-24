@@ -3,7 +3,6 @@ import type { Connection, Edge, Node } from '@vue-flow/core'
 import { createCanvasNodeAt } from '../utils/canvasNodeFactory'
 import { getDefaultCanvasNodeTitle } from '../config/canvasNodeRegistry'
 import { isFlowConnectionAllowed, normalizeFlowConnection } from '../utils/flowConnectionAdapter'
-import { resolveFlowNodeDragHandle } from '../utils/flowNodeDragHandle'
 import {
   patchFlowSnapshotParam,
   type FlowSnapshotParamPatch,
@@ -13,20 +12,15 @@ import type { FlowNodeData } from '../types/flowTypes'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import {
   isCanvasGraphNodeId,
+  type CanvasGraphNodeId,
   type CanvasGraphNodeIdForKind,
   type CanvasGraphStore,
 } from '../graph-runtime'
-import {
-  createFlowGraphCommandOptions,
-  type FlowGraphCommandSideEffectOptions,
-} from './flowGraphAdapterCommandSideEffects'
-import type { FlowHistorySnapshot } from './useFlowHistory'
 import {
   getCanvasNodePortInputLimit,
   isCanvasExecutionOutputNodeType,
   type CanvasBoardSnapshot,
   type CanvasCreatableNodeKind,
-  type ImageNodeItem,
   type CanvasNodeItem,
   type CanvasNodeItemByKind,
 } from '../../canvas-board/domain'
@@ -38,14 +32,12 @@ type UseFlowNodeMutationsOptions = {
   boardBaseSnapshot?: Ref<CanvasBoardSnapshot>
   readCanvasGraphStore: () => CanvasGraphStore
   graphAdapter: CanvasVueFlowGraphAdapter
-  captureHistory: () => FlowHistorySnapshot
   onWarning: (message: string) => void
 }
 
 type UpdateSnapshotNodeOptions = {
   history?: boolean
   dirty?: boolean
-  historyBefore?: FlowHistorySnapshot
 }
 
 type InitialSnapshotPatch<T extends CanvasCreatableNodeKind> = Partial<CanvasNodeItemByKind[T]>
@@ -125,51 +117,6 @@ function collectReadyExecutionOutputNodeIds(params: {
   return staleNodeIds
 }
 
-function markReadyExecutionOutputNodesStale(items: Node[], staleNodeIds: Set<string>): Node[] {
-  let nextNodes: Node[] | null = null
-  for (let index = 0; index < items.length; index += 1) {
-    const node = items[index]!
-    if (!staleNodeIds.has(node.id)) continue
-    const data = (node.data ?? {}) as { snapshotNode?: unknown; title?: string }
-    const snapshotNode = data.snapshotNode
-    if (
-      !snapshotNode ||
-      typeof snapshotNode !== 'object' ||
-      !('outputStatus' in snapshotNode) ||
-      snapshotNode.outputStatus !== 'ready'
-    ) {
-      continue
-    }
-    const nextSnapshotNode = {
-      ...(snapshotNode as CanvasNodeItem),
-      outputStatus: 'stale',
-    }
-    if (!nextNodes) nextNodes = [...items]
-    nextNodes[index] = {
-      ...node,
-      data: {
-        ...data,
-        title:
-          typeof nextSnapshotNode.title === 'string' && nextSnapshotNode.title.trim()
-            ? nextSnapshotNode.title.trim()
-            : data.title,
-        snapshotNode: nextSnapshotNode,
-      },
-    }
-  }
-  return nextNodes ?? items
-}
-
-function createSnapshotCommandSideEffects(
-  mutationOptions: UpdateSnapshotNodeOptions,
-): FlowGraphCommandSideEffectOptions {
-  const sideEffects: FlowGraphCommandSideEffectOptions = {}
-  if (mutationOptions.history !== undefined) sideEffects.recordHistory = mutationOptions.history
-  if (mutationOptions.historyBefore) sideEffects.historyBefore = mutationOptions.historyBefore
-  if (mutationOptions.dirty !== undefined) sideEffects.markDirty = mutationOptions.dirty
-  return sideEffects
-}
-
 export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
   function lookupData(nodeId: string) {
     const matched = (options.nodes.value as Array<{ id: string; data?: unknown }>).find(
@@ -214,7 +161,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
       return null
     },
     graphAdapter: options.graphAdapter,
-    captureHistory: options.captureHistory,
     onWarning: options.onWarning,
     markFlowExecutionNodeDirty,
   })
@@ -232,24 +178,7 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     const snapshotId = Number(snapshotNode.id)
     if (!Number.isFinite(snapshotId) || snapshotId <= 0) return null
     const flowNodeId = `${kind}-${snapshotId}` as CanvasGraphNodeIdForKind<T>
-    const flowNodeTitle =
-      typeof snapshotNode.title === 'string' && snapshotNode.title.trim()
-        ? snapshotNode.title.trim()
-        : getDefaultCanvasNodeTitle(kind)
-    const flowNode: Node = {
-      id: flowNodeId,
-      type: 'canvas',
-      dragHandle: resolveFlowNodeDragHandle(kind),
-      position: { x, y },
-      data: {
-        kind,
-        nodeType: kind,
-        title: flowNodeTitle,
-        snapshotNode,
-      } satisfies FlowNodeData,
-    }
     const store = options.readCanvasGraphStore()
-    const historyBefore = options.captureHistory()
     const transaction = store.beginTransaction('node-update')
     try {
       transaction.addNode(snapshotNode).commit()
@@ -259,7 +188,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
       options.onWarning('创建节点失败，请刷新画布后重试')
       return null
     }
-    options.graphAdapter.addNodes(flowNode, createFlowGraphCommandOptions({ historyBefore }))
     return flowNodeId
   }
 
@@ -278,7 +206,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     mutationOptions: UpdateSnapshotNodeOptions = {},
   ) {
     const node = (options.nodes.value as Node[]).find((item) => item.id === nodeId)
-    const data = (node?.data ?? {}) as { snapshotNode?: unknown; title?: string }
     const graphNodeId = isCanvasGraphNodeId(nodeId) ? nodeId : null
     if (!node || !graphNodeId) return
     const store = options.readCanvasGraphStore()
@@ -287,11 +214,10 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     const snapshotNode = record.snapshot
     const nextSnapshotNode = patcher(snapshotNode)
     if (nextSnapshotNode === snapshotNode) return
-    const historyBefore =
-      mutationOptions.history === false
-        ? undefined
-        : (mutationOptions.historyBefore ?? options.captureHistory())
-    const transaction = store.beginTransaction('node-update')
+    const transaction = store.beginTransaction('node-update', {
+      recordHistory: mutationOptions.history ?? true,
+      markDirty: mutationOptions.dirty ?? true,
+    })
     try {
       transaction.updateNode(graphNodeId, () => nextSnapshotNode).commit()
     } catch (error) {
@@ -300,22 +226,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
       options.onWarning('节点更新失败，请刷新画布后重试')
       return
     }
-    options.graphAdapter.updateNode(
-      nodeId,
-      {
-        data: {
-          ...data,
-          title:
-            typeof nextSnapshotNode.title === 'string' && nextSnapshotNode.title.trim()
-              ? nextSnapshotNode.title.trim()
-              : data.title,
-          snapshotNode: nextSnapshotNode,
-        },
-      },
-      createFlowGraphCommandOptions(
-        createSnapshotCommandSideEffects({ ...mutationOptions, historyBefore }),
-      ),
-    )
   }
 
   function onFlowPromptTextUpdate(nodeId: string, value: string) {
@@ -350,8 +260,12 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
     })
     try {
       staleNodeIds.forEach((nodeId) => {
-        const record = store.getNode(nodeId as CanvasGraphNodeIdForKind<'image'>)
-        if (record?.kind === 'image' && (record.snapshot as ImageNodeItem).outputStatus === 'ready') {
+        const record = store.getNode(nodeId as CanvasGraphNodeId)
+        if (
+          record?.kind === 'fusion' &&
+          record.snapshot.type === 'fusion' &&
+          record.snapshot.outputStatus === 'ready'
+        ) {
           transaction.updateNode(record.id, { outputStatus: 'stale' })
         }
       })
@@ -363,10 +277,6 @@ export function useFlowNodeMutations(options: UseFlowNodeMutationsOptions) {
       return
     }
 
-    options.graphAdapter.replaceNodes(
-      (items) => markReadyExecutionOutputNodesStale(items, staleNodeIds),
-      createFlowGraphCommandOptions({ recordHistory: false, markDirty: false }),
-    )
   }
 
   return {

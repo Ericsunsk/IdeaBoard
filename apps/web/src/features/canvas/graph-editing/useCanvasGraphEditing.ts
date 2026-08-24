@@ -3,7 +3,6 @@ import { onScopeDispose, watch, type Ref } from 'vue'
 import type { CanvasBoardSnapshot, CanvasNodeItem } from '../../canvas-board/domain'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { CanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
-import type { FlowHistorySnapshot } from '../composables/useFlowHistory'
 import type { CanvasGraphStore } from '../graph-runtime'
 import { useFlowCanvasDrop } from '../composables/useFlowCanvasDrop'
 import { useFlowCanvasNodeHandlers } from '../composables/useFlowCanvasNodeHandlers'
@@ -59,7 +58,6 @@ type UseCanvasGraphEditingOptions = {
   currentBoardId: ValueRef<string | null | undefined>
   graphAdapter: CanvasVueFlowGraphAdapter
   readCanvasGraphStore: () => CanvasGraphStore
-  captureHistory: () => FlowHistorySnapshot
   deleteNode: (nodeId: string) => boolean
   updateNodeInternals: (nodeIds: string[]) => void
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
@@ -84,7 +82,6 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
     boardBaseSnapshot: options.boardBaseSnapshot,
     readCanvasGraphStore: options.readCanvasGraphStore,
     graphAdapter: options.graphAdapter,
-    captureHistory: options.captureHistory,
     onWarning: options.feedback.operationWarning,
   })
 
@@ -145,7 +142,6 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
     uploadImageToBoard,
     updateSnapshotNodeBase: nodeMutations.updateSnapshotNode,
     readCanvasGraphStore: options.readCanvasGraphStore,
-    captureHistory: options.captureHistory,
     graphAdapter: options.graphAdapter,
     markFlowExecutionNodeDirty: nodeMutations.markFlowExecutionNodeDirty,
     getImageNodeDisplayPayload,

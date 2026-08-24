@@ -37,6 +37,10 @@ vi.mock('../flow-pane', () => ({
     viewport: ref({ x: 0, y: 0, zoom: 1 }),
     selectOnlyNode: vi.fn(() => true),
   }),
+  useCanvasVueFlowHandleGeometryAdapter: () => ({
+    prepare: vi.fn(),
+    resolveAnchor: vi.fn(() => null),
+  }),
   useFlowPaneSelectionAdapter: () => ({
     paneSelectionBindings: { onPointerDownCapture: vi.fn() },
     vueFlowSelectionBindings: {

@@ -92,7 +92,6 @@ function createOptions() {
     graph,
     execution: {
       edges: ref([]),
-      graphAdapter: {},
       readCanvasGraphStore: vi.fn(() => ({})),
       boardBaseSnapshot: ref({ groups: [] }),
       flushAutosave: vi.fn(async () => undefined),

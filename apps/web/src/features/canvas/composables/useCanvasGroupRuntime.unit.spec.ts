@@ -5,7 +5,6 @@ import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../
 import { CanvasGraphSession } from '../graph-runtime'
 import { useCanvasGroupRuntime } from './useCanvasGroupRuntime'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
-import type { FlowHistorySnapshot } from './useFlowHistory'
 
 type SelectableHarnessNode = Node & {
   selected?: boolean
@@ -77,12 +76,16 @@ function createHarness() {
   const edges = shallowRef<Edge[]>([])
   const boardBaseSnapshot = ref(createSnapshot())
   const graphSession = CanvasGraphSession.hydrate('board-a', boardBaseSnapshot.value)
-  const historyBefore = {} as FlowHistorySnapshot
-  const markDirty = vi.fn()
-  const commitGroups = vi.fn((groups: CanvasBoardSnapshot['groups']) => {
+  graphSession.subscribe((event) => {
+    if (event.patch.groups.records.length === 0) return
     boardBaseSnapshot.value = {
       ...boardBaseSnapshot.value,
-      groups,
+      groups: graphSession.store
+        .getGroupIds()
+        .flatMap((id) => {
+          const group = graphSession.store.getGroup(id)
+          return group ? [group] : []
+        }),
     }
   })
   const graphAdapter = {
@@ -104,13 +107,7 @@ function createHarness() {
     edges,
     boardBaseSnapshot,
     graphAdapter,
-    flowHistory: {
-      capture: vi.fn(() => historyBefore),
-      push: vi.fn(() => true),
-    },
     readCanvasGraphStore: () => graphSession.store,
-    commitGroups,
-    markDirty,
     onWarning: vi.fn(),
     captureActiveNodeExecutions: vi.fn(() => []),
     releaseNodeExecutions: vi.fn(),
@@ -120,8 +117,6 @@ function createHarness() {
     runtime,
     nodes,
     boardBaseSnapshot,
-    commitGroups,
-    markDirty,
   }
 }
 
@@ -142,7 +137,6 @@ describe('useCanvasGroupRuntime', () => {
 
     expect(harness.runtime.commands.groupSelectedNodes()).toBe(true)
 
-    expect(harness.commitGroups).toHaveBeenCalledOnce()
     expect(harness.boardBaseSnapshot.value.groups).toEqual([
       {
         id: 'group-1',
@@ -159,6 +153,5 @@ describe('useCanvasGroupRuntime', () => {
       selected: true,
     })
     expect(harness.nodes.value.map((node) => node.selected)).toEqual([false, false])
-    expect(harness.markDirty).toHaveBeenCalledOnce()
   })
 })

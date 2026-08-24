@@ -40,7 +40,6 @@ export function createCanvasWorkspaceGraphRuntime(
     currentBoardId: board.boardSession.currentBoardId,
     graphAdapter: board.graphEditing.adapter,
     readCanvasGraphStore: board.graphEditing.readCanvasGraphStore,
-    captureHistory: board.boardSession.history.capture,
     deleteNode: board.graphEditing.deleteNode,
     updateNodeInternals: flowPaneAdapter.updateNodeInternals,
     screenToFlowCoordinate: flowPaneAdapter.screenToFlowCoordinate,

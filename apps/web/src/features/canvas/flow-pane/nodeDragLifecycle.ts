@@ -16,19 +16,19 @@ export type CanvasNodeDragLifecycle = {
   isActive: () => boolean
 }
 
-export type CanvasNodeDragLifecycleOptions<HistorySnapshot> = {
+export type CanvasNodeDragLifecycleOptions = {
   createCommand: () => {
     store: CanvasGraphStore
     transaction: CanvasGraphTransaction
   }
   projectChanges: (changes: CanvasNodeDragChange[]) => void
   syncChanges: (changes: CanvasNodeDragChange[]) => void
-  captureHistory: () => HistorySnapshot
-  commitHistory: (before: HistorySnapshot) => boolean
-  advanceLocalEditVersion: () => void
-  markDirtyAndScheduleAutosave: () => void
   onBegin: () => void
-  reconcileMembership: (store: CanvasGraphStore, changes: CanvasNodeDragChange[]) => void
+  reconcileMembership: (
+    store: CanvasGraphStore,
+    transaction: CanvasGraphTransaction,
+    changes: CanvasNodeDragChange[],
+  ) => (() => void) | void
   scheduleAnimationFrame?: (callback: FrameRequestCallback) => number
   cancelAnimationFrame?: (handle: number) => void
 }
@@ -47,8 +47,8 @@ function mergeNodeDragChanges(
   return [...changesByKey.values()]
 }
 
-export function createCanvasNodeDragLifecycle<HistorySnapshot>(
-  options: CanvasNodeDragLifecycleOptions<HistorySnapshot>,
+export function createCanvasNodeDragLifecycle(
+  options: CanvasNodeDragLifecycleOptions,
 ): CanvasNodeDragLifecycle {
   const scheduleAnimationFrame =
     options.scheduleAnimationFrame ?? ((callback) => window.requestAnimationFrame(callback))
@@ -58,12 +58,10 @@ export function createCanvasNodeDragLifecycle<HistorySnapshot>(
   let activeDrag: {
     store: CanvasGraphStore
     transaction: CanvasGraphTransaction
-    historyBefore: HistorySnapshot
   } | null = null
   let pendingProjectionChanges: CanvasNodeDragChange[] = []
   let latestChanges: CanvasNodeDragChange[] = []
   let pendingFrameId: number | null = null
-  let hasAdvancedLocalEdit = false
 
   function isActive() {
     return activeDrag !== null
@@ -93,7 +91,6 @@ export function createCanvasNodeDragLifecycle<HistorySnapshot>(
   function reset() {
     pendingProjectionChanges = []
     latestChanges = []
-    hasAdvancedLocalEdit = false
     clearPendingFrame()
     activeDrag = null
   }
@@ -113,10 +110,7 @@ export function createCanvasNodeDragLifecycle<HistorySnapshot>(
     options.onBegin()
     const command = options.createCommand()
     try {
-      activeDrag = {
-        ...command,
-        historyBefore: options.captureHistory(),
-      }
+      activeDrag = command
     } catch (error) {
       try {
         command.transaction.cancel()
@@ -137,10 +131,6 @@ export function createCanvasNodeDragLifecycle<HistorySnapshot>(
       return false
     }
 
-    if (!hasAdvancedLocalEdit && changes.some((change) => change.type === 'position')) {
-      options.advanceLocalEditVersion()
-      hasAdvancedLocalEdit = true
-    }
     changes.forEach((change) => {
       stageCanvasGraphNodeDragIntent(drag.transaction, {
         nodeId: change.id,
@@ -167,12 +157,14 @@ export function createCanvasNodeDragLifecycle<HistorySnapshot>(
       const committedChanges = latestChanges
       flushProjection()
       syncProjection()
+      const finalizeMembership = options.reconcileMembership(
+        drag.store,
+        drag.transaction,
+        committedChanges,
+      )
       drag.transaction.commit()
       didCommitTransaction = true
-      options.reconcileMembership(drag.store, committedChanges)
-      if (options.commitHistory(drag.historyBefore)) {
-        options.markDirtyAndScheduleAutosave()
-      }
+      finalizeMembership?.()
     } catch (error) {
       if (!didCommitTransaction) {
         drag.transaction.cancel()

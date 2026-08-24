@@ -6,6 +6,7 @@ import {
   commitCanvasGraphDeleteGroupIntent,
   isCanvasGraphNodeId,
   readCanvasGraphNodeBounds,
+  resolveCanvasGraphNodeDimensions,
   resolveCanvasGraphNodesBounds,
   toCanvasGraphNodeId,
   type CanvasGraphGroupId,
@@ -29,11 +30,8 @@ import {
   type CanvasRect,
 } from '../utils/canvasGroupGeometry'
 import { resolveFlowNodeCanvasRef } from '../utils/flowSnapshotAdapter'
-import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
-import { createFlowEdgeProjectionIndex } from '../flow-pane/flowConnectionIdentity'
-import { applyFlowGraphDeleteProjection } from '../flow-pane/flowGraphDeleteProjection'
+import { releaseCanvasGraphDeleteExecutions } from '../flow-pane/flowGraphDeleteProjection'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
-import type { FlowHistorySnapshot } from './useFlowHistory'
 
 type SelectableFlowItem = {
   id: string
@@ -46,7 +44,6 @@ type ActiveGroupDrag = {
   groupId: CanvasGraphGroupId
   startPoint: CanvasPoint
   latestPoint: CanvasPoint
-  historyBefore: FlowHistorySnapshot
   startPositions: Map<CanvasGraphNodeId, CanvasPoint>
   startBounds: CanvasRect
 }
@@ -58,18 +55,12 @@ type ActiveGroupResize = {
   handle: CanvasGroupResizeHandle
   startPoint: CanvasPoint
   latestPoint: CanvasPoint
-  historyBefore: FlowHistorySnapshot
   startBounds: CanvasRect
 }
 
 type PendingGroupJoin = {
   groupId: CanvasGraphGroupId
   nodeIds: CanvasGraphNodeId[]
-}
-
-type FlowHistoryGroupRuntime = {
-  capture: () => FlowHistorySnapshot
-  push: (historyBefore: FlowHistorySnapshot) => boolean
 }
 
 export type CanvasSelectionGroupAction =
@@ -129,6 +120,7 @@ export type CanvasGroupRuntimeInternalHooks = {
   selectedGroupId: Ref<CanvasGraphGroupId | null>
   selectedGroupCoveredExternalNodeIds: ComputedRef<CanvasGraphNodeId[]>
   projectCurrentGroupNodeLayers: (nodes: readonly Node[]) => Node[]
+  projectCommittedGroupNodeLayer: (node: Node) => Node
   handleCommittedGroupsChanged: () => void
   resetTransientSelectionState: () => void
   clearPendingGroupJoin: () => boolean
@@ -138,8 +130,9 @@ export type CanvasGroupRuntimeInternalHooks = {
   resolveRemovedFlowNodeChanges: (changes: readonly NodeChange[]) => ResolvedFlowNodeChanges | null
   applyDraggedNodeMembershipChanges: (
     store: CanvasGraphStore,
+    transaction: CanvasGraphTransaction,
     changes: readonly NodeChange[],
-  ) => void
+  ) => (() => void) | void
 }
 
 export type CanvasGroupRuntimeControls = {
@@ -153,10 +146,7 @@ export type UseCanvasGroupRuntimeOptions = {
   edges: Ref<Edge[]>
   boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   graphAdapter: CanvasVueFlowGraphAdapter
-  flowHistory: FlowHistoryGroupRuntime
   readCanvasGraphStore: () => CanvasGraphStore
-  commitGroups: (groups: CanvasBoardSnapshot['groups']) => void
-  markDirty: () => void
   onWarning: (message: string) => void
   captureActiveNodeExecutions: (nodeIds: readonly string[]) => PendingImageExecutionLease[]
   releaseNodeExecutions: (leases: readonly PendingImageExecutionLease[]) => void
@@ -171,21 +161,18 @@ export function useCanvasGroupRuntime(
   const pendingGroupJoin = ref<PendingGroupJoin | null>(null)
   const previewGroupBounds = ref<ReadonlyMap<CanvasGraphGroupId, CanvasRect>>(new Map())
 
+  // Selection and drag previews are Flow-only visual state. Graph commits own
+  // History, persistence and canonical projection.
   function createTransientGraphCommandOptions() {
-    return createFlowGraphCommandOptions({
-      recordHistory: false,
-      markDirty: false,
-    })
+    return {}
   }
 
   function projectCurrentGroupNodeLayers(nodes: readonly Node[]) {
     return projectCanvasGroupNodeLayers(nodes, options.boardBaseSnapshot.value.groups) as Node[]
   }
 
-  function syncCurrentGroupNodeLayers() {
-    const nextNodes = projectCurrentGroupNodeLayers(options.nodes.value)
-    if (nextNodes === options.nodes.value) return
-    options.graphAdapter.replaceNodes(nextNodes, createTransientGraphCommandOptions())
+  function projectCommittedGroupNodeLayer(node: Node): Node {
+    return projectCurrentGroupNodeLayers([node])[0] ?? node
   }
 
   function hasGroup(groupId: CanvasGraphGroupId | null): groupId is CanvasGraphGroupId {
@@ -200,7 +187,6 @@ export function useCanvasGroupRuntime(
   }
 
   function handleCommittedGroupsChanged() {
-    syncCurrentGroupNodeLayers()
     pruneSelectedGroup()
     prunePendingGroupJoin()
   }
@@ -392,13 +378,6 @@ export function useCanvasGroupRuntime(
     return true
   }
 
-  function commitGroupsFromStore(
-    store: CanvasGraphStore,
-  ) {
-    const snapshot = store.exportSnapshot(options.boardBaseSnapshot.value)
-    options.commitGroups(snapshot.groups)
-  }
-
   function joinPendingGroupNode(flowNode: Pick<Node, 'id' | 'data'>): boolean {
     const pending = pendingGroupJoin.value
     if (!pending) return false
@@ -406,7 +385,6 @@ export function useCanvasGroupRuntime(
     clearPendingGroupJoin()
     if (!nodeId || !pending.nodeIds.includes(nodeId)) return false
 
-    const historyBefore = options.flowHistory.capture()
     const store = options.readCanvasGraphStore()
     if (!store.getGroup(pending.groupId) || store.getGroupIdForNode(nodeId)) return false
     const transaction = store.beginTransaction('group-membership')
@@ -419,9 +397,7 @@ export function useCanvasGroupRuntime(
       return false
     }
     if (!summary.didChange) return false
-    commitGroupsFromStore(store)
     selectOnlyFlowNodesByGraphIds([nodeId])
-    if (options.flowHistory.push(historyBefore)) options.markDirty()
     return true
   }
 
@@ -514,7 +490,6 @@ export function useCanvasGroupRuntime(
       return false
     }
 
-    const historyBefore = options.flowHistory.capture()
     const transaction = store.beginTransaction('group')
     let summary: ReturnType<CanvasGraphTransaction['commit']>
     try {
@@ -527,10 +502,8 @@ export function useCanvasGroupRuntime(
     if (!summary.didChange) return false
     const createdGroupId =
       summary.projectionPatch.groups.added[0]?.id ?? summary.changedGroupIds[0] ?? null
-    commitGroupsFromStore(store)
     clearFlowSelection()
     if (createdGroupId) selectedGroupId.value = createdGroupId
-    if (options.flowHistory.push(historyBefore)) options.markDirty()
     return true
   }
 
@@ -539,7 +512,6 @@ export function useCanvasGroupRuntime(
     const action = selectionGroupAction.value
     if (action?.kind !== 'ungroup') return false
 
-    const historyBefore = options.flowHistory.capture()
     const store = options.readCanvasGraphStore()
     const transaction = store.beginTransaction('ungroup')
     let didChange: boolean
@@ -551,9 +523,7 @@ export function useCanvasGroupRuntime(
       return false
     }
     if (!didChange) return false
-    commitGroupsFromStore(store)
     if (selectedGroupId.value === action.groupId) clearSelectedGroup()
-    if (options.flowHistory.push(historyBefore)) options.markDirty()
     return true
   }
 
@@ -579,9 +549,7 @@ export function useCanvasGroupRuntime(
     if (!group) return false
 
     const nodeIds = group.nodeIds.filter(isCanvasGraphNodeId)
-    const historyBefore = options.flowHistory.capture()
     const store = options.readCanvasGraphStore()
-    const projectionIndex = createFlowEdgeProjectionIndex(store, options.edges.value)
     const shouldDeleteMembers = nodeIds.length > 0
     const summary = commitCanvasGraphDeleteGroupIntent(store, {
       groupId: group.id as CanvasGraphGroupId,
@@ -590,22 +558,16 @@ export function useCanvasGroupRuntime(
     })
     if (!summary.didChange) return false
 
-    commitGroupsFromStore(store)
-    if (!shouldDeleteMembers) {
-      if (options.flowHistory.push(historyBefore)) options.markDirty()
-      return true
-    }
+    if (!shouldDeleteMembers) return true
 
-    const result = applyFlowGraphDeleteProjection({
-      graphAdapter: options.graphAdapter,
+    releaseCanvasGraphDeleteExecutions({
+      summary,
       nodes: options.nodes.value,
       edges: options.edges.value,
-      commitPolicy: { summary, historyBefore },
-      projectionIndex,
       captureActiveNodeExecutions: options.captureActiveNodeExecutions,
       releaseNodeExecutions: options.releaseNodeExecutions,
     })
-    return result?.didChange ?? false
+    return true
   }
 
   function readGroupMemberNodePositions(store: CanvasGraphStore, groupId: CanvasGraphGroupId) {
@@ -635,7 +597,6 @@ export function useCanvasGroupRuntime(
       groupId: frame.id,
       startPoint: point,
       latestPoint: point,
-      historyBefore: options.flowHistory.capture(),
       startPositions,
       startBounds: frame.bounds,
     }
@@ -707,8 +668,6 @@ export function useCanvasGroupRuntime(
     )
     clearPreviewGroupBounds(drag.groupId)
     if (!summary.didChange) return false
-    commitGroupsFromStore(drag.store)
-    if (options.flowHistory.push(drag.historyBefore)) options.markDirty()
     return true
   }
 
@@ -747,7 +706,6 @@ export function useCanvasGroupRuntime(
       handle,
       startPoint: point,
       latestPoint: point,
-      historyBefore: options.flowHistory.capture(),
       startBounds: frame.bounds,
     }
     return true
@@ -808,8 +766,6 @@ export function useCanvasGroupRuntime(
     }
     clearPreviewGroupBounds(resize.groupId)
     if (!summary.didChange) return false
-    commitGroupsFromStore(resize.store)
-    if (options.flowHistory.push(resize.historyBefore)) options.markDirty()
     return true
   }
 
@@ -825,8 +781,9 @@ export function useCanvasGroupRuntime(
   function resolveNodeContainedGroupIds(
     store: CanvasGraphStore,
     nodeId: CanvasGraphNodeId,
+    positions?: ReadonlyMap<CanvasGraphNodeId, CanvasPoint>,
   ): CanvasGraphGroupId[] {
-    const nodeBounds = readCanvasGraphNodeBounds(store, nodeId)
+    const nodeBounds = readNodeBoundsForMembership(store, nodeId, positions)
     if (!nodeBounds) return []
     return groupFrames.value
       .filter((frame) => rectContainsRect(frame.bounds, nodeBounds))
@@ -837,9 +794,10 @@ export function useCanvasGroupRuntime(
     store: CanvasGraphStore,
     nodeId: CanvasGraphNodeId,
     groupId: CanvasGraphGroupId,
+    positions?: ReadonlyMap<CanvasGraphNodeId, CanvasPoint>,
   ): boolean {
     const frame = groupFrames.value.find((item) => item.id === groupId)
-    const nodeBounds = readCanvasGraphNodeBounds(store, nodeId)
+    const nodeBounds = readNodeBoundsForMembership(store, nodeId, positions)
     if (!nodeBounds || !frame) return false
     return rectsIntersect(frame.bounds, nodeBounds)
   }
@@ -847,11 +805,12 @@ export function useCanvasGroupRuntime(
   function resolveNodeMembershipTarget(
     store: CanvasGraphStore,
     nodeId: CanvasGraphNodeId,
+    positions?: ReadonlyMap<CanvasGraphNodeId, CanvasPoint>,
   ): CanvasGraphGroupId | null | undefined {
     const currentGroupId = store.getGroupIdForNode(nodeId)
-    const containingGroupIds = resolveNodeContainedGroupIds(store, nodeId)
+    const containingGroupIds = resolveNodeContainedGroupIds(store, nodeId, positions)
     if (currentGroupId) {
-      if (isNodeIntersectingGroup(store, nodeId, currentGroupId)) return undefined
+      if (isNodeIntersectingGroup(store, nodeId, currentGroupId, positions)) return undefined
       return containingGroupIds.length === 1 ? containingGroupIds[0] : null
     }
 
@@ -859,29 +818,35 @@ export function useCanvasGroupRuntime(
     return containingGroupIds[0]
   }
 
-  function applyNodeMembershipReconciliation(
+  function readNodeBoundsForMembership(
     store: CanvasGraphStore,
-    nodeIds: readonly CanvasGraphNodeId[],
-  ): boolean {
-    if (nodeIds.length === 0) return false
-    const transaction = store.beginTransaction('group-membership')
-    let summary: ReturnType<CanvasGraphTransaction['commit']>
-    try {
-      nodeIds.forEach((nodeId) => {
-        const targetGroupId = resolveNodeMembershipTarget(store, nodeId)
-        if (targetGroupId !== undefined) {
-          transaction.moveNodeToGroup(nodeId, targetGroupId)
-        }
-      })
-      summary = transaction.commit()
-    } catch (_error) {
-      transaction.cancel()
-      options.onWarning('组合关系更新失败，请刷新画布后重试')
-      return false
+    nodeId: CanvasGraphNodeId,
+    positions?: ReadonlyMap<CanvasGraphNodeId, CanvasPoint>,
+  ): CanvasRect | null {
+    const position = positions?.get(nodeId)
+    if (!position) return readCanvasGraphNodeBounds(store, nodeId)
+    const node = store.getNode(nodeId)
+    if (!node) return null
+    const dimensions = resolveCanvasGraphNodeDimensions(node.kind, node.snapshot)
+    return {
+      left: position.x,
+      top: position.y,
+      right: position.x + dimensions.width,
+      bottom: position.y + dimensions.height,
+      ...dimensions,
     }
-    if (!summary.didChange) return false
-    commitGroupsFromStore(store)
-    return true
+  }
+
+  function stageNodeMembershipReconciliation(
+    store: CanvasGraphStore,
+    transaction: CanvasGraphTransaction,
+    nodeIds: readonly CanvasGraphNodeId[],
+    positions: ReadonlyMap<CanvasGraphNodeId, CanvasPoint>,
+  ): void {
+    nodeIds.forEach((nodeId) => {
+      const targetGroupId = resolveNodeMembershipTarget(store, nodeId, positions)
+      if (targetGroupId !== undefined) transaction.moveNodeToGroup(nodeId, targetGroupId)
+    })
   }
 
   function readGroupMemberExitsForBounds(
@@ -897,10 +862,18 @@ export function useCanvasGroupRuntime(
     })
   }
 
-  function applyDraggedNodeMembershipChanges(
+  function stageDraggedNodeMembershipChanges(
     store: CanvasGraphStore,
-    nodeIds: readonly CanvasGraphNodeId[],
-  ) {
+    transaction: CanvasGraphTransaction,
+    changes: readonly NodeChange[],
+  ): (() => void) | void {
+    const positions = new Map<CanvasGraphNodeId, CanvasPoint>()
+    changes.forEach((change) => {
+      if (change.type !== 'position' || !isCanvasGraphNodeId(change.id)) return
+      positions.set(change.id, change.position)
+    })
+    const nodeIds = Array.from(positions.keys())
+    if (nodeIds.length === 0) return
     const selectedGroupIdBefore = selectedGroupId.value
     const selectedGroupBefore = selectedGroupIdBefore
       ? store.getGroup(selectedGroupIdBefore)
@@ -908,36 +881,26 @@ export function useCanvasGroupRuntime(
     const selectedGroupNodeIdsBefore = selectedGroupBefore
       ? new Set(selectedGroupBefore.nodeIds.filter(isCanvasGraphNodeId))
       : null
-    const didChange = applyNodeMembershipReconciliation(store, nodeIds)
-    if (!didChange || !selectedGroupIdBefore || !selectedGroupNodeIdsBefore) return
-
-    const selectedGroupAfter = store.getGroup(selectedGroupIdBefore)
-    const selectedGroupNodeIdsAfter = new Set(
-      selectedGroupAfter?.nodeIds.filter(isCanvasGraphNodeId) ?? [],
-    )
-    const movedOutNodeIds = nodeIds.filter(
-      (nodeId) => selectedGroupNodeIdsBefore.has(nodeId) && !selectedGroupNodeIdsAfter.has(nodeId),
-    )
-    if (movedOutNodeIds.length === 0) return
-
-    clearSelectedGroup()
-    selectOnlyFlowNodesByGraphIds(movedOutNodeIds)
-  }
-
-  function readDraggedGraphNodeIds(changes: readonly NodeChange[]): CanvasGraphNodeId[] {
-    const nodeIds = new Set<CanvasGraphNodeId>()
-    changes.forEach((change) => {
-      if (change.type !== 'position') return
-      if (isCanvasGraphNodeId(change.id)) nodeIds.add(change.id)
-    })
-    return Array.from(nodeIds)
-  }
-
-  function applyDraggedFlowNodeMembershipChanges(
-    store: CanvasGraphStore,
-    changes: readonly NodeChange[],
-  ) {
-    applyDraggedNodeMembershipChanges(store, readDraggedGraphNodeIds(changes))
+    try {
+      stageNodeMembershipReconciliation(store, transaction, nodeIds, positions)
+    } catch (_error) {
+      options.onWarning('组合关系更新失败，请刷新画布后重试')
+      return
+    }
+    return () => {
+      if (!selectedGroupIdBefore || !selectedGroupNodeIdsBefore) return
+      const selectedGroupAfter = store.getGroup(selectedGroupIdBefore)
+      const selectedGroupNodeIdsAfter = new Set(
+        selectedGroupAfter?.nodeIds.filter(isCanvasGraphNodeId) ?? [],
+      )
+      const movedOutNodeIds = nodeIds.filter(
+        (nodeId) =>
+          selectedGroupNodeIdsBefore.has(nodeId) && !selectedGroupNodeIdsAfter.has(nodeId),
+      )
+      if (movedOutNodeIds.length === 0) return
+      clearSelectedGroup()
+      selectOnlyFlowNodesByGraphIds(movedOutNodeIds)
+    }
   }
 
   function resolveRemovedFlowNodeChanges(
@@ -1022,6 +985,7 @@ export function useCanvasGroupRuntime(
       selectedGroupId,
       selectedGroupCoveredExternalNodeIds,
       projectCurrentGroupNodeLayers,
+      projectCommittedGroupNodeLayer,
       handleCommittedGroupsChanged,
       resetTransientSelectionState,
       clearPendingGroupJoin,
@@ -1029,7 +993,7 @@ export function useCanvasGroupRuntime(
       onBeforeNodesChange,
       onBeforeEdgesChange,
       resolveRemovedFlowNodeChanges,
-      applyDraggedNodeMembershipChanges: applyDraggedFlowNodeMembershipChanges,
+      applyDraggedNodeMembershipChanges: stageDraggedNodeMembershipChanges,
     },
   }
 }

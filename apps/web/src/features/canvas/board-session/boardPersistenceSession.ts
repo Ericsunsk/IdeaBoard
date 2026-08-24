@@ -42,7 +42,7 @@ export type BoardPersistenceSessionOptions = {
   onWarning: (text: string) => void
   onSuccess: (text: string) => void
   onError: (text: string) => void
-  clearFlowHistoryBaseline: () => void
+  clearGraphHistoryBaseline: () => void
   canReconcileGraph: () => boolean
   replaceGraphSnapshot: (
     snapshot: CanvasBoardSnapshot,
@@ -221,7 +221,7 @@ export function createBoardPersistenceSession(
       source: 'hydrate-replace',
     })
     clearDirtyAfterImport()
-    options.clearFlowHistoryBaseline()
+    options.clearGraphHistoryBaseline()
   }
 
   function importEmptyBoardSnapshot() {
@@ -358,7 +358,8 @@ export function createBoardPersistenceSession(
         const committedSnapshot = currentSnapshot
           ? rebaseStabilizedMedia(capturedSnapshot, currentSnapshot, stabilizedSnapshot)
           : stabilizedSnapshot
-        if (!hasLocalDraftAdvanced || options.canReconcileGraph()) {
+        const didReconcileGraph = options.canReconcileGraph()
+        if (didReconcileGraph) {
           options.replaceGraphSnapshot(committedSnapshot, 'save-reconcile')
           options.boardBaseSnapshot.value = committedSnapshot
           const nextFlow = canvasBoardSnapshotToFlow(committedSnapshot)
@@ -372,13 +373,14 @@ export function createBoardPersistenceSession(
             stabilized: stabilizedSnapshot,
           }
         }
-        if (remoteSync.ok && !hasLocalDraftAdvanced) {
-          options.clearFlowHistoryBaseline()
+        if (remoteSync.ok && !hasLocalDraftAdvanced && didReconcileGraph) {
+          options.clearGraphHistoryBaseline()
         }
         if (remoteSync.ok) {
-          options.isDirty.value = hasLocalDraftAdvanced
-          options.saveStatus.value = hasLocalDraftAdvanced ? 'pending' : 'saved'
-          if (!saveOptions.silent && !hasLocalDraftAdvanced) {
+          const hasUnreconciledDraft = hasLocalDraftAdvanced || !didReconcileGraph
+          options.isDirty.value = hasUnreconciledDraft
+          options.saveStatus.value = hasUnreconciledDraft ? 'pending' : 'saved'
+          if (!saveOptions.silent && !hasUnreconciledDraft) {
             options.onSuccess('已保存')
           }
         } else {

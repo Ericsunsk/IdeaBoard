@@ -15,42 +15,14 @@ import type {
 } from '../planning/imageExecutionResultTypes'
 import { resolveImageNodeLayoutAnchor } from '../../utils/flowImageNodeSelectors'
 import { waitForNextRenderFrame } from '../../utils/animationFrame'
-import type {
-  CanvasVueFlowGraph,
-  CanvasVueFlowGraphCommandOptions,
-  CanvasVueFlowGraphNodeUpdateOptions,
-  CanvasVueFlowGraphRemoveNodesOptions,
-} from '../../composables/useCanvasVueFlowGraphAdapter'
-import { createFlowGraphCommandOptions } from '../../composables/flowGraphAdapterCommandSideEffects'
 import type { CanvasGraphStore } from '../../graph-runtime'
 import type { CanvasBoardAttachment } from '../../board-attachment'
 import { flowConnectionToCanvasConnection } from '../../utils/flowConnectionAdapter'
 import { canvasConnectionToFlowEdge } from '../../utils/flowSnapshotAdapter'
 
-export type PendingImageResultGraphAdapter = {
-  replaceGraph: (
-    nextGraph: CanvasVueFlowGraph,
-    commandOptions?: CanvasVueFlowGraphCommandOptions,
-  ) => void
-  addEdges: (
-    edges: Edge | Edge[],
-    commandOptions?: CanvasVueFlowGraphCommandOptions,
-  ) => void
-  updateNode: (
-    nodeId: string,
-    update: Partial<Node> | ((node: Node) => Partial<Node>),
-    commandOptions?: CanvasVueFlowGraphNodeUpdateOptions,
-  ) => void
-  removeNodes: (
-    nodeId: string,
-    commandOptions?: CanvasVueFlowGraphRemoveNodesOptions,
-  ) => void
-}
-
 type UsePendingImageResultNodesOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  graphAdapter: PendingImageResultGraphAdapter
   readCanvasGraphStore: () => CanvasGraphStore
   readCurrentAttachment: () => CanvasBoardAttachment | null
   isAttachmentCurrent: (attachment: CanvasBoardAttachment) => boolean
@@ -95,10 +67,6 @@ type PendingImageResultLookup = {
   imageChildIdsBySource: Map<string, string[]>
 }
 
-type PendingImageResultMutationOptions = {
-  recordHistory?: boolean
-}
-
 type PendingImageResultPlacementOptions = {
   anchor?: ImageResultAnchor
   targetRatio?: number
@@ -114,14 +82,6 @@ type PendingImageResultReservationPlan = {
 const IMAGE_RESULT_NODE_X_GAP = 100
 const IMAGE_RESULT_NODE_Y_GAP = 14
 const IMAGE_NODE_HEADER_HEIGHT = 26
-
-function createPendingResultCommandOptions(
-  sideEffects?: PendingImageResultMutationOptions,
-): CanvasVueFlowGraphCommandOptions {
-  return createFlowGraphCommandOptions({
-    recordHistory: sideEffects?.recordHistory,
-  })
-}
 
 function estimateImageNodeHeight(source: Pick<ImageResultLayout, 'width' | 'ratio'>): number {
   const stageHeight = resolveImageNodeStageHeight(source.width, source.ratio, true)
@@ -384,11 +344,6 @@ export function usePendingImageResultExecution(
       .map((edge) => ({ ...edge }))
     if (nextEdges.length === 0 || !isCurrentProjection()) return
     options.refreshNodeInternals?.([anchorNodeId, ...activeResultNodeIds])
-    options.graphAdapter.addEdges(
-      nextEdges,
-      createPendingResultCommandOptions({ recordHistory: false }),
-    )
-    options.refreshNodeInternals?.([anchorNodeId, ...activeResultNodeIds])
   }
 
   function planPendingImageResultNodeWithLookup(
@@ -509,14 +464,6 @@ export function usePendingImageResultExecution(
         index === 0 ? reusableNodeId : null,
       ),
     )
-    const plannedNodesById = new Map(plans.map((plan) => [plan.resultNodeId, plan.nextNode]))
-    const existingNodeIds = new Set(options.nodes.value.map((node) => node.id))
-    const nextNodes = [
-      ...options.nodes.value.map((node) => plannedNodesById.get(node.id) ?? node),
-      ...plans
-        .filter((plan) => !existingNodeIds.has(plan.resultNodeId))
-        .map((plan) => plan.nextNode),
-    ]
     const resultNodeIds = plans.map((plan) => plan.resultNodeId)
     const store = options.readCanvasGraphStore()
     const attachment = options.readCurrentAttachment()
@@ -554,13 +501,6 @@ export function usePendingImageResultExecution(
       console.error('[Canvas] Failed to reserve pending result nodes', error)
       throw new Error('Unable to reserve pending result nodes', { cause: error })
     }
-    options.graphAdapter.replaceGraph(
-      {
-        nodes: nextNodes,
-        edges: options.edges.value,
-      },
-      createPendingResultCommandOptions({ recordHistory: false }),
-    )
     options.refreshNodeInternals?.([anchorNodeId, ...resultNodeIds])
     void appendPendingImageResultEdges(
       store,
@@ -585,7 +525,6 @@ export function usePendingImageResultExecution(
       recordHistory: false,
       markDirty: true,
     })
-    const flowUpdates: Array<{ nodeId: string; snapshot: ImageNodeItem; data: FlowNodeData }> = []
     for (const slot of slots) {
       const taskId = slot.taskId.trim()
       if (!taskId) continue
@@ -599,7 +538,6 @@ export function usePendingImageResultExecution(
         pendingClientActionId: slot.clientActionId,
       }
       transaction.updateNode(slot.resultNodeId as `image-${number}`, () => nextSnapshot)
-      flowUpdates.push({ nodeId: slot.resultNodeId, snapshot: nextSnapshot, data: targetNode.data })
     }
     try {
       transaction.commit()
@@ -607,18 +545,6 @@ export function usePendingImageResultExecution(
       transaction.cancel()
       console.error('[Canvas] Failed to attach pending task ids', error)
       return
-    }
-    for (const update of flowUpdates) {
-      options.graphAdapter.updateNode(
-        update.nodeId,
-        {
-          data: {
-            ...update.data,
-            snapshotNode: update.snapshot,
-          },
-        },
-        createPendingResultCommandOptions({ recordHistory: false }),
-      )
     }
   }
 
@@ -637,12 +563,6 @@ export function usePendingImageResultExecution(
       transaction.cancel()
       console.error('[Canvas] Failed to remove pending result nodes', error)
       return
-    }
-    for (const resultNodeId of resultNodeIds) {
-      options.graphAdapter.removeNodes(resultNodeId, {
-        ...createPendingResultCommandOptions({ recordHistory: false }),
-        removeConnectedEdges: true,
-      })
     }
   }
 

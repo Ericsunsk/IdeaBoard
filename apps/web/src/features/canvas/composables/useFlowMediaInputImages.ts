@@ -15,7 +15,6 @@ import {
 } from '../utils/flowImageNodeSelectors'
 import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
 import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
-import type { FlowHistorySnapshot } from './useFlowHistory'
 import {
   type CanvasGraphStore,
 } from '../graph-runtime'
@@ -45,7 +44,6 @@ type UseFlowMediaInputImagesOptions = {
     options?: { history?: boolean; dirty?: boolean },
   ) => void
   readCanvasGraphStore: () => CanvasGraphStore
-  captureHistory: () => FlowHistorySnapshot
   graphAdapter: CanvasVueFlowGraphAdapter
   markFlowExecutionNodeDirty: (nodeId: string, options?: { includeSelf?: boolean }) => void
   getImageNodeDisplayPayload: (nodeId: string) => ImageNodeDisplayPayload | null
@@ -383,7 +381,6 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
             )
           })
         : []
-    const historyBefore = options.captureHistory()
     const transaction = store.beginTransaction('node-update')
     try {
       transaction.updateNode(target.id, { inputImages: nextInputImages })
@@ -398,7 +395,7 @@ export function useFlowMediaInputImages(options: UseFlowMediaInputImagesOptions)
     const projection = canvasBoardSnapshotToFlow(store.exportSnapshot())
     options.graphAdapter.replaceGraph(
       { nodes: projection.nodes as Node[], edges: projection.edges as Edge[] },
-      createFlowGraphCommandOptions({ historyBefore }),
+      createFlowGraphCommandOptions(),
     )
     options.markFlowExecutionNodeDirty(nodeId, { includeSelf: true })
   }

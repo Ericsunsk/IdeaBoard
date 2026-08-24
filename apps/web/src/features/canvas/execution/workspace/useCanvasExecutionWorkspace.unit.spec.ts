@@ -40,7 +40,7 @@ function createReattachWorkspace(
   return useCanvasExecutionWorkspace({
     // Reattach facts must come from the Canvas graph snapshot, never this Flow projection.
     nodes: ref([{ id: 'image-99', position: { x: 0, y: 0 }, data: { pendingTaskId: 'ui-only-task' } }] as never),
-    edges: ref([]), graphAdapter: {} as never, readCanvasGraphStore: () => store,
+    edges: ref([]), readCanvasGraphStore: () => store,
     boardBaseSnapshot: ref(store.exportSnapshot()),
     pendingResults: { reservePendingResults: vi.fn(), attachPendingTaskIds: vi.fn(), removePendingResults: vi.fn(), createBoardGraphSession: vi.fn() },
     executionCore: core, cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(),
@@ -56,7 +56,7 @@ describe('useCanvasExecutionWorkspace', () => {
     const flushAutosave = vi.fn(async () => undefined)
     const attachPendingTaskIds = vi.fn()
     const workspace = useCanvasExecutionWorkspace({
-      nodes: ref([]), edges: ref([]), graphAdapter: {} as never, readCanvasGraphStore: () => store.store,
+      nodes: ref([]), edges: ref([]), readCanvasGraphStore: () => store.store,
       boardBaseSnapshot: ref(createEmptyCanvasBoardSnapshot()),
       pendingResults: { reservePendingResults: () => ({ resultNodeIds: ['image-1'] }), attachPendingTaskIds, removePendingResults: vi.fn(), createBoardGraphSession: vi.fn() },
       executionCore: core, cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(), flushAutosave,

@@ -60,7 +60,6 @@ function createRuntime() {
   const runtimeOptions = {
     nodes: ref([]),
     edges: ref([]),
-    graphAdapter: {},
     readCanvasGraphStore: vi.fn(() => ({})),
     flushAutosave: vi.fn(async () => undefined),
     refreshNodeInternals: vi.fn(),

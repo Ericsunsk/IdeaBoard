@@ -31,22 +31,13 @@ function createHarness() {
     createCommand: () => ({ store, transaction: store.beginTransaction('node-drag') }),
     projectChanges: (changes) => projectedChanges.push(changes),
     syncChanges: (changes) => syncedChanges.push(changes),
-    captureHistory: () => {
-      lifecycleOrder.push('history-capture')
-      return { token: 'before' }
-    },
-    commitHistory: (before) => {
-      expect(before).toEqual({ token: 'before' })
-      lifecycleOrder.push('history-commit')
-      return true
-    },
-    advanceLocalEditVersion: () => lifecycleOrder.push('local-edit'),
-    markDirtyAndScheduleAutosave: () => lifecycleOrder.push('dirty'),
     onBegin: () => lifecycleOrder.push('begin'),
-    reconcileMembership: (committedStore, changes) => {
+    reconcileMembership: (committedStore, transaction, changes) => {
       expect(committedStore).toBe(store)
+      expect(transaction).toBeDefined()
       committedMembershipChanges.push(changes)
-      lifecycleOrder.push(`membership:${store.getNode('prompt-1')?.snapshot.x}`)
+      lifecycleOrder.push('membership-stage')
+      return () => lifecycleOrder.push(`membership:${store.getNode('prompt-1')?.snapshot.x}`)
     },
     scheduleAnimationFrame: (callback) => {
       const frameId = nextFrameId++
@@ -127,11 +118,8 @@ describe('createCanvasNodeDragLifecycle', () => {
     expect(harness.committedMembershipChanges).toEqual([harness.syncedChanges[0]])
     expect(harness.lifecycleOrder).toEqual([
       'begin',
-      'history-capture',
-      'local-edit',
+      'membership-stage',
       'membership:620',
-      'history-commit',
-      'dirty',
     ])
     expect(harness.lifecycle.isActive()).toBe(false)
   })
@@ -156,7 +144,7 @@ describe('createCanvasNodeDragLifecycle', () => {
     expect(harness.projectedChanges).toEqual([])
     expect(harness.syncedChanges).toEqual([])
     expect(harness.committedMembershipChanges).toEqual([])
-    expect(harness.lifecycleOrder).toEqual(['begin', 'history-capture', 'local-edit'])
+    expect(harness.lifecycleOrder).toEqual(['begin'])
     expect(harness.lifecycle.isActive()).toBe(false)
   })
 })

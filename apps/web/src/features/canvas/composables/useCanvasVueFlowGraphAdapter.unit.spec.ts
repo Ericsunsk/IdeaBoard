@@ -15,6 +15,35 @@ type MeasuredNode = Node & {
 }
 
 describe('useCanvasVueFlowGraphAdapter', () => {
+  it('applies an incremental projection without creating a Flow command', () => {
+    const unchangedNode: Node = { id: 'node-2', position: { x: 20, y: 0 }, data: {} }
+    const changedNode: Node = { id: 'node-1', position: { x: 0, y: 0 }, data: {} }
+    const nodes = shallowRef<Node[]>([changedNode, unchangedNode])
+    const edges = shallowRef<Edge[]>([])
+    const beforeCommand = vi.fn()
+    const afterCommand = vi.fn()
+    const updateNode = vi.fn()
+    const adapter = useCanvasVueFlowGraphAdapter({
+      nodes,
+      edges,
+      actions: { updateNode },
+      beforeCommand,
+      afterCommand,
+    })
+    const projectedNode = { ...changedNode, position: { x: 40, y: 0 } }
+
+    adapter.applyIncrementalProjection({
+      nodes: [projectedNode, unchangedNode],
+      changedNodeIds: ['node-1'],
+    })
+
+    expect(nodes.value).toEqual([projectedNode, unchangedNode])
+    expect(nodes.value[1]).toBe(unchangedNode)
+    expect(updateNode).toHaveBeenCalledWith('node-1', projectedNode, { replace: true })
+    expect(beforeCommand).not.toHaveBeenCalled()
+    expect(afterCommand).not.toHaveBeenCalled()
+  })
+
   it('keeps animated edge state out of the semantic graph on every write path', () => {
     const nodes = shallowRef<Node[]>([])
     const edges = shallowRef<Edge[]>([])
@@ -42,6 +71,22 @@ describe('useCanvasVueFlowGraphAdapter', () => {
       expect.objectContaining({ id: 'edge-2' }),
     ])
     expect(edges.value.every((edge) => !('animated' in edge))).toBe(true)
+  })
+
+  it('replaces the renderer projection during full recovery', () => {
+    const nodes = shallowRef<Node[]>([{ id: 'stale', position: { x: 0, y: 0 }, data: {} }])
+    const edges = shallowRef<Edge[]>([{ id: 'stale-edge', source: 'stale', target: 'stale' }])
+    const setNodes = vi.fn()
+    const setEdges = vi.fn()
+    const adapter = useCanvasVueFlowGraphAdapter({ nodes, edges, actions: { setNodes, setEdges } })
+
+    const canonicalNode: Node = { id: 'canonical', position: { x: 20, y: 20 }, data: {} }
+    adapter.replaceFullProjection({ nodes: [canonicalNode], edges: [] })
+
+    expect(setNodes).toHaveBeenCalledWith([canonicalNode])
+    expect(setEdges).toHaveBeenCalledWith([])
+    expect(nodes.value).toEqual([canonicalNode])
+    expect(edges.value).toEqual([])
   })
 
   it('runs a node command through Vue Flow actions and exposes hook results', () => {

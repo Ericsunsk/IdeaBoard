@@ -3,7 +3,6 @@ import type { Ref } from 'vue'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
 import type { TaskImageResult } from '../../../../shared/query/taskResult'
 import { TaskCancelledError } from '../../../../shared/api/taskEvents'
-import type { CanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
 import type { CanvasGraphStore } from '../../graph-runtime'
 import { loadImageSizeFromUrl } from '../media/imageSize'
 import type { ActivatedImageExecutionPlan } from '../planning/ImageExecutionPlan'
@@ -50,7 +49,6 @@ export type CanvasExecutionWorkspace = {
 export type UseCanvasExecutionWorkspaceOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  graphAdapter: CanvasVueFlowGraphAdapter
   readCanvasGraphStore: () => CanvasGraphStore
   boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   refreshNodeInternals?: (nodeIds: string[]) => void
@@ -78,7 +76,6 @@ export function useCanvasExecutionWorkspace(
     usePendingImageResultExecution({
       nodes: options.nodes,
       edges: options.edges,
-      graphAdapter: options.graphAdapter,
       readCanvasGraphStore: options.readCanvasGraphStore,
       readCurrentAttachment: options.executionCore.currentAttachment,
       isAttachmentCurrent: options.executionCore.isAttachmentCurrent,

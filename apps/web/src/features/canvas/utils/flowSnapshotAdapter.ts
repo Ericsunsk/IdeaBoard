@@ -155,6 +155,27 @@ function toFlowDataFromCanvasNode(
   }
 }
 
+/**
+ * Projects one canonical Canvas node record into the Flow shape. Keeping this
+ * conversion public lets commit projection replace only changed node IDs
+ * instead of rebuilding a Board snapshot and every Flow node on each edit.
+ */
+export function canvasNodeToFlowNode(
+  nodeType: CanvasConnectionNodeType,
+  node: CanvasNodeItem,
+  selected = false,
+): FlowAdapterNode {
+  return {
+    id: toFlowNodeId(nodeType, node.id),
+    type: 'canvas',
+    dragHandle: resolveFlowNodeDragHandle(nodeType),
+    position: { x: node.x, y: node.y },
+    dimensions: resolveCanvasGraphNodeDimensions(nodeType, node),
+    data: toFlowDataFromCanvasNode(nodeType, node),
+    ...(selected ? { selected: true } : {}),
+  }
+}
+
 export function canvasBoardSnapshotToFlow(snapshot: CanvasBoardSnapshot): {
   nodes: FlowAdapterNode[]
   edges: FlowAdapterEdge[]
@@ -166,14 +187,7 @@ export function canvasBoardSnapshotToFlow(snapshot: CanvasBoardSnapshot): {
   CANVAS_NODE_REGISTRY_LIST.forEach(({ snapshotCollection, kind }) => {
     getSnapshotNodeCollection(snapshot, snapshotCollection).forEach((node) => {
       const id = toFlowNodeId(kind, node.id)
-      nodes.push({
-        id,
-        type: 'canvas',
-        dragHandle: resolveFlowNodeDragHandle(kind),
-        position: { x: node.x, y: node.y },
-        dimensions: resolveCanvasGraphNodeDimensions(kind, node),
-        data: toFlowDataFromCanvasNode(kind, node),
-      })
+      nodes.push(canvasNodeToFlowNode(kind, node))
       flowNodeIds.add(id)
     })
   })

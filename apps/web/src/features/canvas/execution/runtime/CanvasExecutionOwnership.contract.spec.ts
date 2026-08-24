@@ -25,9 +25,7 @@ describe('Pending Image Execution ownership contract', () => {
       /projectPendingImageExecutionEdges\(edges, executionSnapshot\.value\)\.edges/,
     )
     expect(flowRuntime).toMatch(/const renderEdges = computed\(/)
-    expect(flowRuntime).toMatch(
-      /options\.vueFlowGraphActions\?\.setEdges\?\.\(renderEdges\.value\)/,
-    )
+    expect(flowRuntime).toMatch(/graphAdapter\.applyIncrementalProjection\(/)
     expect(flowRuntime).not.toMatch(/watch\(\s*\[options\.edges, executionSnapshot\]/)
     expect(flowRuntime).toMatch(/options\.executionCore\.release\(leases\)/)
     expect(flowRuntime).toMatch(/options\.cancelTasks\(release\.cancellableTaskIds\)/)

@@ -31,6 +31,23 @@ export type CanvasVueFlowGraphRemoveNodesOptions = CanvasVueFlowGraphCommandOpti
   removeChildren?: boolean
 }
 
+export type CanvasVueFlowIncrementalProjection = Readonly<{
+  nodes?: Node[]
+  edges?: Edge[]
+  changedNodeIds?: readonly string[]
+  changedEdgeIds?: readonly string[]
+  nodeMutations?: Readonly<{
+    added: readonly Node[]
+    updated: readonly Node[]
+    removedIds: readonly string[]
+  }>
+  edgeMutations?: Readonly<{
+    added: readonly Edge[]
+    updated: readonly Edge[]
+    removedIds: readonly string[]
+  }>
+}>
+
 export type UseCanvasVueFlowGraphAdapterOptions = CanvasVueFlowGraphCommandOptions & {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
@@ -66,6 +83,11 @@ function toArray<T>(value: T | T[]): T[] {
 
 function createGraph(nodes: Node[], edges: Edge[]): CanvasVueFlowGraph {
   return { nodes, edges: toCanvasSemanticEdges(edges) }
+}
+
+function hasDifferentItems<T>(current: readonly T[], next: readonly T[]): boolean {
+  if (current.length !== next.length) return true
+  return current.some((item, index) => item !== next[index])
 }
 
 function readNodeTargetId(target: NodeTarget): string {
@@ -134,6 +156,103 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
         }),
       commandOptions,
     })
+  }
+
+  /**
+   * Applies an already-planned canonical graph commit without creating a Flow
+   * command. History and persistence consume the graph commit itself; Flow is
+   * only its renderer and therefore must not introduce a second side-effect
+   * path.
+   */
+  function applyIncrementalProjection(projection: CanvasVueFlowIncrementalProjection) {
+    const nextNodes = projection.nodes
+    const nextEdges = projection.edges ? toCanvasSemanticEdges(projection.edges) : undefined
+    const changedNodeIds = projection.changedNodeIds ?? []
+    const changedEdgeIds = projection.changedEdgeIds ?? []
+    projectGraph(changedNodeIds.length, changedEdgeIds.length, () => {
+      // Remove dependent edges before removing their nodes. Vue Flow renders
+      // controlled edge updates synchronously and briefly sees invalid
+      // source/target references if the order is reversed.
+      if (nextEdges && projection.edgeMutations) {
+        const edgesToRemove = [
+          ...projection.edgeMutations.removedIds,
+          ...projection.edgeMutations.updated.map((edge) => edge.id),
+        ]
+        if (edgesToRemove.length > 0) options.actions?.removeEdges?.(edgesToRemove)
+      }
+      if (nextNodes && nextNodes !== options.nodes.value) {
+        const nodeMutations = projection.nodeMutations ?? {
+          added: [],
+          updated: changedNodeIds
+            .map((id) => nextNodes.find((node) => node.id === id))
+            .filter((node): node is Node => !!node),
+          removedIds: [],
+        }
+        const { added: addedNodes, updated: updatedNodes, removedIds: removedNodeIds } = nodeMutations
+        if (removedNodeIds.length > 0) options.actions?.removeNodes?.([...removedNodeIds], false)
+        if (addedNodes.length > 0) {
+          options.actions?.addNodes?.(addedNodes.length === 1 ? addedNodes[0] : [...addedNodes])
+        }
+        updatedNodes.forEach((node) => {
+          options.actions?.updateNode?.(node.id, node, { replace: true })
+        })
+        recordCanvasInteractionCount('incrementalNodeProjectionCount', changedNodeIds.length)
+        syncNodes(nextNodes)
+      }
+      if (nextEdges && nextEdges !== options.edges.value) {
+        const edgeMutations = projection.edgeMutations ?? {
+          added: [],
+          updated: changedEdgeIds
+            .map((id) => nextEdges.find((edge) => edge.id === id))
+            .filter((edge): edge is Edge => !!edge),
+          removedIds: [],
+        }
+        const { added: addedEdges, updated: updatedEdges } = edgeMutations
+        // Edge removals and replacements were applied before node mutations.
+        if (updatedEdges.length > 0) {
+          const projectedUpdatedEdges = projectEdgesForActions([...updatedEdges])
+          options.actions?.addEdges?.(
+            projectedUpdatedEdges.length === 1 ? projectedUpdatedEdges[0] : projectedUpdatedEdges,
+          )
+        }
+        if (addedEdges.length > 0) {
+          const projectedEdges = projectEdgesForActions([...addedEdges])
+          options.actions?.addEdges?.(
+            projectedEdges.length === 1 ? projectedEdges[0] : projectedEdges,
+          )
+        }
+        recordCanvasInteractionCount('incrementalEdgeProjectionCount', changedEdgeIds.length)
+        syncEdges(nextEdges)
+      }
+    })
+  }
+
+  /**
+   * Replaces the renderer projection from canonical facts after a recovery.
+   * This is intentionally separate from command-based graph edits so recovery
+   * cannot create a second history or persistence boundary.
+   */
+  function replaceProjection(graph: CanvasVueFlowGraph, force: boolean) {
+    const semanticGraph = createGraph(graph.nodes, graph.edges)
+    projectGraph(semanticGraph.nodes.length, semanticGraph.edges.length, () => {
+      if (force || hasDifferentItems(options.nodes.value, semanticGraph.nodes)) {
+        options.actions?.setNodes?.(semanticGraph.nodes)
+        syncNodes(semanticGraph.nodes)
+      }
+      const projectedEdges = projectEdgesForActions(semanticGraph.edges)
+      if (force || hasDifferentItems(options.edges.value, semanticGraph.edges)) {
+        options.actions?.setEdges?.(projectedEdges)
+        syncEdges(semanticGraph.edges)
+      }
+    })
+  }
+
+  function replaceFullProjection(graph: CanvasVueFlowGraph) {
+    replaceProjection(graph, true)
+  }
+
+  function replaceVisibleProjection(graph: CanvasVueFlowGraph) {
+    replaceProjection(graph, false)
   }
 
   function replaceNodes(
@@ -312,6 +431,9 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
 
   return {
     replaceGraph,
+    applyIncrementalProjection,
+    replaceFullProjection,
+    replaceVisibleProjection,
     replaceNodes,
     replaceEdges,
     addNodes,
