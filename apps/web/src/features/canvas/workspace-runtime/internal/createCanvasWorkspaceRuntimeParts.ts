@@ -1,9 +1,9 @@
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import type { CanvasBoardSnapshot, ImageNodeItem } from '../../../canvas-board/domain'
-import { useCanvasViewportRuntime } from '../../renderer/vue-flow/useCanvasViewportRuntime'
+import { useCanvasViewportRuntime } from '../../vue-flow-adapter/useCanvasViewportRuntime'
 import { useCanvasBoardRuntime } from './useCanvasBoardRuntime'
 import { useCanvasFeedback } from '../../feedback/useCanvasFeedback'
-import type { CanvasFlowPaneAdapter } from '../../flow-pane'
+import type { CanvasVueFlowAdapter } from '../../vue-flow-adapter'
 import {
   type CanvasGraphEditingBrowserAdapter,
   type CanvasGraphInteractionBrowserAdapter,
@@ -24,7 +24,7 @@ export type UseCanvasWorkspaceRuntimeOptions = {
   route: RouteLocationNormalizedLoaded
   router: Router
   getUserIdentity: () => { userId: number; userUid: string }
-  flowPaneAdapter: CanvasFlowPaneAdapter
+  flowPaneAdapter: CanvasVueFlowAdapter
   uploadApi: CanvasGraphEditingUploadAdapter
   materializeLibraryAsset: LibraryAssetMaterializer
   graphEditingBrowser: CanvasGraphEditingBrowserAdapter

@@ -1,11 +1,11 @@
-export type { CanvasFlowPaneAdapter } from './types'
-export type { CanvasFlowPaneConnectionAdapter } from './vueFlowConnectionBindings'
-export { createCanvasFlowPaneConnectionAdapter } from './vueFlowConnectionBindings'
+export type { CanvasVueFlowAdapter } from './types'
+export type { CanvasVueFlowConnectionAdapter } from './vueFlowConnectionBindings'
+export { createCanvasVueFlowConnectionAdapter } from './vueFlowConnectionBindings'
 export { createCanvasConnectionCommandLifecycle } from './connectionCommandLifecycle'
 export { createCanvasConnectionDropLifecycle } from './connectionDropTarget'
 export { createCanvasDeleteCommandLifecycle } from './deleteCommandLifecycle'
-export { useFlowPaneSelectionAdapter } from './useFlowPaneSelectionAdapter'
-export { useVueFlowPaneAdapter } from './useVueFlowPaneAdapter'
+export { useVueFlowSelectionAdapter } from './useVueFlowSelectionAdapter'
+export { useVueFlowAdapter } from './useVueFlowAdapter'
 export { useCanvasVueFlowHandleGeometryAdapter } from './useCanvasVueFlowHandleGeometryAdapter'
 export {
   createCanvasNodeDragLifecycle,

@@ -3,7 +3,7 @@ import type {
   CanvasHandleProximityDirection,
   CanvasHandleProximityGeometry,
   CanvasHandleProximityPoint,
-} from '../renderer/vue-flow/canvasHandleProximityCoordinator'
+} from './canvasHandleProximityCoordinator'
 
 type CanvasSurfaceOrigin = CanvasHandleProximityPoint | null
 

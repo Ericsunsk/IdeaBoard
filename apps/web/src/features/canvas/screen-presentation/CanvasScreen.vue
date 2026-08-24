@@ -116,14 +116,14 @@ import { PanOnScrollMode, useVueFlow, VueFlow } from '@vue-flow/core'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import { useFlowImagePreviewLightbox } from './useFlowImagePreviewLightbox'
-import { provideCanvasHandleProximityCoordinator } from '../renderer/vue-flow/useCanvasHandleProximity'
-import { provideCanvasViewportContext } from '../renderer/vue-flow/useCanvasViewportContext'
+import { provideCanvasHandleProximityCoordinator } from '../vue-flow-adapter/useCanvasHandleProximity'
+import { provideCanvasViewportContext } from '../vue-flow-adapter/useCanvasViewportContext'
 import { CanvasGroupPresentation } from '../group-presentation'
 import {
   createCanvasConnectionDropLifecycle,
   useCanvasVueFlowHandleGeometryAdapter,
-  useVueFlowPaneAdapter,
-} from '../flow-pane'
+  useVueFlowAdapter,
+} from '../vue-flow-adapter'
 import {
   createCanvasGraphEditingBrowserAdapter,
   createCanvasGraphInteractionBrowserAdapter,
@@ -168,7 +168,7 @@ function openRecharge() {
   accountControls.commands.openAccount('recharge')
 }
 
-const flowPaneAdapter = useVueFlowPaneAdapter()
+const flowPaneAdapter = useVueFlowAdapter()
 const { connectionStartHandle } = useVueFlow()
 const handleProximityGeometry = useCanvasVueFlowHandleGeometryAdapter()
 const handleProximitySurface = provideCanvasHandleProximityCoordinator(handleProximityGeometry)

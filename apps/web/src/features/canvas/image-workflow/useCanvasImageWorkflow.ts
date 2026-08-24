@@ -5,7 +5,7 @@ import type { CanvasExtendDragAnchor } from './useImageCanvasExtendOverlay'
 import { useImageCanvasExtendOverlay } from './useImageCanvasExtendOverlay'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { ImageNodeAction } from '../config/imageActionRegistry'
-import type { CanvasFlowPaneAdapter } from '../flow-pane'
+import type { CanvasVueFlowAdapter } from '../vue-flow-adapter'
 import {
   useCanvasImageTools,
   type CanvasImageTools,
@@ -74,7 +74,7 @@ export type CanvasImageWorkflowUiAdapter = {
 export type CanvasImageWorkflowOptions = {
   graph: CanvasImageWorkflowGraphPort
   execution: Omit<UseImageWorkflowExecutionOptions, 'nodes' | 'currentBoardId' | 'feedback'>
-  flowPaneAdapter: CanvasFlowPaneAdapter
+  flowPaneAdapter: CanvasVueFlowAdapter
   openImageUrlPreview: UseCanvasImageToolsOptions['openImageUrlPreview']
   ui: CanvasImageWorkflowUiAdapter
   feedback: {

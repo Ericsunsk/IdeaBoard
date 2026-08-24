@@ -11,8 +11,8 @@ import { CanvasGraphSession } from '../graph-runtime'
 import {
   useCanvasVueFlowGraphAdapter,
   type CanvasVueFlowGraphAdapter,
-} from '../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
-import { bindCanvasGraphSessionProjection } from '../renderer/vue-flow/bindCanvasGraphSessionProjection'
+} from '../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
+import { bindCanvasGraphSessionProjection } from '../vue-flow-adapter/bindCanvasGraphSessionProjection'
 import { canvasBoardSnapshotToFlow } from '../utils/flowSnapshotAdapter'
 import type { FlowNodeData } from '../types/flowTypes'
 import { useCanvasGraphEditing } from './useCanvasGraphEditing'

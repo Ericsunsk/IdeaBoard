@@ -1,5 +1,5 @@
 import type { Edge, Node } from '@vue-flow/core'
-import { recordCanvasGraphCommand } from '../../utils/canvasInteractionMetrics'
+import { recordCanvasGraphCommand } from '../utils/canvasInteractionMetrics'
 
 export type CanvasVueFlowGraph = {
   nodes: Node[]

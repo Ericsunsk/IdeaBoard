@@ -8,8 +8,8 @@ import {
   type NodeChange,
 } from '@vue-flow/core'
 import type { Ref } from 'vue'
-import { recordCanvasInteractionCount } from '../../utils/canvasInteractionMetrics'
-import { measureCanvasPerf } from '../../utils/canvasPerfProbe'
+import { recordCanvasInteractionCount } from '../utils/canvasInteractionMetrics'
+import { measureCanvasPerf } from '../utils/canvasPerfProbe'
 import { toCanvasSemanticEdges } from './canvasEdgeProjection'
 import type {
   CanvasVueFlowGraphCommandOptions,

@@ -2,31 +2,31 @@ import type { Connection } from '@vue-flow/core'
 import type { CanvasConnectionPort } from '../../canvas-board/domain'
 import type { CanvasGraphNodeId } from '../graph-runtime'
 
-export type CanvasFlowPaneConnectIntent = {
+export type CanvasVueFlowConnectIntent = {
   sourceNodeId: CanvasGraphNodeId
   targetNodeId: CanvasGraphNodeId
   sourcePort: CanvasConnectionPort
   targetPort: CanvasConnectionPort
 }
 
-type CanvasFlowPaneConnectionHandlers = {
+type CanvasVueFlowConnectionHandlers = {
   canConnect: (connection: Connection) => boolean
   connect: (connection: Connection) => boolean
 }
 
-export type CanvasFlowPaneConnectionBindings = {
+export type CanvasVueFlowConnectionBindings = {
   isValidConnection: (connection: Connection) => boolean
   onConnect: (connection: Connection) => void
 }
 
-export type CanvasFlowPaneConnectionAdapter = {
-  vueFlowBindings: CanvasFlowPaneConnectionBindings
-  connectIntent: (intent: CanvasFlowPaneConnectIntent) => boolean
+export type CanvasVueFlowConnectionAdapter = {
+  vueFlowBindings: CanvasVueFlowConnectionBindings
+  connectIntent: (intent: CanvasVueFlowConnectIntent) => boolean
 }
 
-export function createCanvasFlowPaneConnectionAdapter(
-  handlers: CanvasFlowPaneConnectionHandlers,
-): CanvasFlowPaneConnectionAdapter {
+export function createCanvasVueFlowConnectionAdapter(
+  handlers: CanvasVueFlowConnectionHandlers,
+): CanvasVueFlowConnectionAdapter {
   return {
     vueFlowBindings: {
       isValidConnection: handlers.canConnect,

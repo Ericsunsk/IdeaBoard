@@ -3,13 +3,13 @@ import {
   beginCanvasFrameProbe,
   isCanvasFrameProbeEnabled,
   type CanvasFrameProbeSession,
-} from '../../utils/canvasFrameProbe'
-import { waitForNextRenderFrame } from '../../utils/animationFrame'
+} from '../utils/canvasFrameProbe'
+import { waitForNextRenderFrame } from '../utils/animationFrame'
 import {
   createCanvasViewportPersistence,
   type CanvasViewportPersistence,
   type CanvasViewportPersistenceIdentity,
-} from '../../utils/canvasViewportPersistence'
+} from '../utils/canvasViewportPersistence'
 
 export type CanvasFlowViewport = {
   x: number

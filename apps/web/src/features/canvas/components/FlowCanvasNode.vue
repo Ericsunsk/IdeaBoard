@@ -133,7 +133,7 @@ import { computed, ref } from 'vue'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { CanvasExtendDragAnchor } from '../image-workflow/useImageCanvasExtendOverlay'
-import { useFlowCanvasNodeAdapter } from '../renderer/vue-flow/useFlowCanvasNodeAdapter'
+import { useFlowCanvasNodeAdapter } from '../vue-flow-adapter/useFlowCanvasNodeAdapter'
 import type { PromptAspectRatio } from '../../canvas-board/domain'
 import type {
   CanvasNodePresentationIntent,
@@ -144,7 +144,7 @@ import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations
 import {
   resolveCanvasNodeUiScale,
   useCanvasViewportContext,
-} from '../renderer/vue-flow/useCanvasViewportContext'
+} from '../vue-flow-adapter/useCanvasViewportContext'
 import FlowCanvasNodeHandleRail from './FlowCanvasNodeHandleRail.vue'
 import FusionNode from './nodes/FusionNode.vue'
 import ImageNode from './nodes/ImageNode.vue'

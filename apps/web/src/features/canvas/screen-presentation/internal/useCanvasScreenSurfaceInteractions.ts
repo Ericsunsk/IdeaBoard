@@ -5,7 +5,7 @@ import { useFlowNodeDragInteractions } from '../useFlowNodeDragInteractions'
 import { useFlowCanvasShellInteractions } from '../useFlowCanvasShellInteractions'
 import { useFlowTransientUiDismissal } from '../useFlowTransientUiDismissal'
 import { useCanvasCustomLayerOverlay } from '../../overlay-lifecycle'
-import { useFlowPaneSelectionAdapter, type CanvasFlowPaneAdapter } from '../../flow-pane'
+import { useVueFlowSelectionAdapter, type CanvasVueFlowAdapter } from '../../vue-flow-adapter'
 import { useCanvasGroupPresentationInteraction } from '../../group-presentation'
 import type { CanvasWorkspaceRuntime } from '../../workspace-runtime'
 import { useCanvasNodeContextMenu } from '../useCanvasNodeContextMenu'
@@ -15,7 +15,7 @@ type ActivePanels = ReturnType<typeof useFlowActiveNodePanels>
 
 export function useCanvasScreenSurfaceInteractions(options: {
   workspace: CanvasWorkspaceRuntime
-  flowPaneAdapter: CanvasFlowPaneAdapter
+  flowPaneAdapter: CanvasVueFlowAdapter
   canvasWrapRef: Ref<HTMLElement | null>
   activeTool: Ref<'select' | 'hand'>
   isCanvasMinimapEnabled: Ref<boolean>
@@ -74,7 +74,7 @@ export function useCanvasScreenSurfaceInteractions(options: {
     discardNodeEdits: discardFlowImageToolNodeEdits,
   })
 
-  const selection = useFlowPaneSelectionAdapter({
+  const selection = useVueFlowSelectionAdapter({
     activeTool: options.activeTool,
     dismissTransientCanvasUi,
     onEdgesChange: commands.flowPane.onEdgesChange,

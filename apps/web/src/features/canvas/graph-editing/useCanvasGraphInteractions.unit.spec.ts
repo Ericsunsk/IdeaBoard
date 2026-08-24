@@ -7,7 +7,7 @@ import {
   type ImageNodeItem,
 } from '../../canvas-board/domain'
 import { CanvasGraphSession } from '../graph-runtime'
-import { useCanvasVueFlowGraphAdapter } from '../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
+import { useCanvasVueFlowGraphAdapter } from '../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import type { FlowNodeData } from '../types/flowTypes'
 import { useCanvasGraphInteractions } from './useCanvasGraphInteractions'
 

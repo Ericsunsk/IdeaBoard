@@ -14,7 +14,7 @@ import { useCanvasGraphEditing } from '../../graph-editing'
 import { useFlowCanvasRuntime, type UseFlowCanvasRuntimeOptions } from './useFlowCanvasRuntime'
 import {
   createFlowGraphCommandOptions,
-} from '../../renderer/vue-flow/flowGraphAdapterCommandSideEffects'
+} from '../../vue-flow-adapter/flowGraphAdapterCommandSideEffects'
 import {
   CanvasBoardGraphSession,
   collectPendingImageTasks,

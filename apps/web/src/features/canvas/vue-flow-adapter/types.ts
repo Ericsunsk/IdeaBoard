@@ -1,12 +1,12 @@
 import type { Actions, Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
-import type { CanvasFlowViewport } from '../renderer/vue-flow/useCanvasViewportRuntime'
+import type { CanvasFlowViewport } from './useCanvasViewportRuntime'
 
 type ValueRef<T> = {
   readonly value: T
 }
 
-export type CanvasFlowPaneGraphActions = Partial<
+export type CanvasVueFlowGraphActions = Partial<
   Pick<
     Actions,
     | 'setNodes'
@@ -21,7 +21,7 @@ export type CanvasFlowPaneGraphActions = Partial<
   >
 >
 
-export type CanvasFlowPaneAdapter = {
+export type CanvasVueFlowAdapter = {
   viewport: Readonly<Ref<CanvasFlowViewport>>
   getViewport: () => CanvasFlowViewport
   setViewport: (
@@ -41,5 +41,5 @@ export type CanvasFlowPaneAdapter = {
   getSelectedElements: ValueRef<Array<Node | Edge>>
   removeSelectedElements: (elements: Array<Node | Edge>) => void
   selectOnlyNode: (nodeId: string) => boolean
-  vueFlowGraphActions: CanvasFlowPaneGraphActions
+  vueFlowGraphActions: CanvasVueFlowGraphActions
 }

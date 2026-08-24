@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createCanvasFlowPaneConnectionAdapter } from './index'
+import { createCanvasVueFlowConnectionAdapter } from './index'
 import { normalizeFlowConnection } from '../utils/flowConnectionAdapter'
 import type { FlowNodeData } from '../types/flowTypes'
 
@@ -7,11 +7,11 @@ function createLookup(nodes: Record<string, FlowNodeData>) {
   return (nodeId: string) => nodes[nodeId]
 }
 
-describe('flow-pane connection public seam', () => {
+describe('vue-flow-adapter connection public seam', () => {
   it('keeps Vue Flow bindings and programmatic intent behind one adapter', () => {
     const canConnect = vi.fn(() => true)
     const connect = vi.fn(() => true)
-    const adapter = createCanvasFlowPaneConnectionAdapter({ canConnect, connect })
+    const adapter = createCanvasVueFlowConnectionAdapter({ canConnect, connect })
 
     const connection = {
       source: 'prompt-1',

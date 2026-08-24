@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createEmptyCanvasBoardSnapshot } from '../../../canvas-board/domain'
-import { CanvasGraphSession } from '../../graph-runtime'
+import { createEmptyCanvasBoardSnapshot } from '../../canvas-board/domain'
+import { CanvasGraphSession } from '../graph-runtime'
 import { bindCanvasGraphSessionProjection } from './bindCanvasGraphSessionProjection'
 
 describe('bindCanvasGraphSessionProjection', () => {

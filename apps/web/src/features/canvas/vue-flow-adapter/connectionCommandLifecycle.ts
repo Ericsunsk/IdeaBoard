@@ -1,6 +1,6 @@
 import type { Connection, Edge, Node } from '@vue-flow/core'
-import type { CanvasVueFlowGraphAdapter } from '../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
-import { createFlowGraphCommandOptions } from '../renderer/vue-flow/flowGraphAdapterCommandSideEffects'
+import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
+import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
 import {
   resolveNextCanvasConnectionId,
@@ -17,7 +17,7 @@ import {
   createFlowEdgeProjectionIndex,
   resolveFlowEdgeProjectionReplacement,
 } from './flowConnectionIdentity'
-import { createCanvasFlowPaneConnectionAdapter } from './vueFlowConnectionBindings'
+import { createCanvasVueFlowConnectionAdapter } from './vueFlowConnectionBindings'
 
 export type CanvasConnectionCommandLifecycleOptions = {
   readNodes: () => Node[]
@@ -153,7 +153,7 @@ export function createCanvasConnectionCommandLifecycle(
     return commitConnection(resolvedConnection)
   }
 
-  return createCanvasFlowPaneConnectionAdapter({
+  return createCanvasVueFlowConnectionAdapter({
     canConnect: options.isValidConnection,
     connect,
   })

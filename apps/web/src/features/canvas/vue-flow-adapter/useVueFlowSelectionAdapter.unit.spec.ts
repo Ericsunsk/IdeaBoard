@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 import type { EdgeChange } from '@vue-flow/core'
-import { useFlowPaneSelectionAdapter } from './useFlowPaneSelectionAdapter'
+import { useVueFlowSelectionAdapter } from './useVueFlowSelectionAdapter'
 
 type TestFlowItem = {
   id: string
@@ -31,7 +31,7 @@ vi.mock('@vue-flow/core', () => ({
 function createHarness(activeTool = ref<string>('select')) {
   const dismissTransientCanvasUi = vi.fn()
   const onEdgesChange = vi.fn()
-  const adapter = useFlowPaneSelectionAdapter({
+  const adapter = useVueFlowSelectionAdapter({
     activeTool,
     dismissTransientCanvasUi,
     onEdgesChange,
@@ -62,7 +62,7 @@ function createPanePointerEvent(options: MouseEventInit = {}) {
   return event
 }
 
-describe('useFlowPaneSelectionAdapter', () => {
+describe('useVueFlowSelectionAdapter', () => {
   beforeEach(() => {
     vueFlowMocks.selectedElements = []
     vueFlowMocks.nodesSelectionActive.value = false

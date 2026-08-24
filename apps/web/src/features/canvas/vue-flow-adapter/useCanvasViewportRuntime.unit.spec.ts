@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { effectScope, ref } from 'vue'
 import { useCanvasViewportRuntime, type CanvasFlowViewport } from './useCanvasViewportRuntime'
-import type { CanvasViewportPersistence } from '../../utils/canvasViewportPersistence'
+import type { CanvasViewportPersistence } from '../utils/canvasViewportPersistence'
 
 const frameProbeMocks = vi.hoisted(() => ({
   isEnabled: vi.fn(() => false),
@@ -9,12 +9,12 @@ const frameProbeMocks = vi.hoisted(() => ({
   waitForNextRenderFrame: vi.fn(async () => undefined),
 }))
 
-vi.mock('../../utils/canvasFrameProbe', () => ({
+vi.mock('../utils/canvasFrameProbe', () => ({
   isCanvasFrameProbeEnabled: frameProbeMocks.isEnabled,
   beginCanvasFrameProbe: frameProbeMocks.begin,
 }))
 
-vi.mock('../../utils/animationFrame', () => ({
+vi.mock('../utils/animationFrame', () => ({
   waitForNextRenderFrame: frameProbeMocks.waitForNextRenderFrame,
 }))
 

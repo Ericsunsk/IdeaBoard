@@ -1,6 +1,6 @@
 import type { Edge } from '@vue-flow/core'
 import type { PendingImageExecutionSnapshot } from './PendingImageExecutionCore'
-import { projectCanvasRenderEdges } from '../../renderer/vue-flow/canvasEdgeProjection'
+import { projectCanvasRenderEdges } from '../../vue-flow-adapter/canvasEdgeProjection'
 
 export type PendingImageExecutionEdgeProjection = Readonly<{
   edges: Edge[]

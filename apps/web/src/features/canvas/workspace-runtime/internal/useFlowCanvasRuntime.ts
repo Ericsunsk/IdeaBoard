@@ -10,12 +10,12 @@ import {
   useCanvasVueFlowGraphAdapter,
   type CanvasVueFlowGraphActions,
   type CanvasVueFlowGraphAdapter,
-} from '../../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
+} from '../../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import {
   createCanvasGraphSessionRuntime,
   type CanvasGraphSessionRuntime,
 } from './canvasGraphSessionRuntime'
-import { createFlowGraphCommandOptions } from '../../renderer/vue-flow/flowGraphAdapterCommandSideEffects'
+import { createFlowGraphCommandOptions } from '../../vue-flow-adapter/flowGraphAdapterCommandSideEffects'
 import { useCanvasGroupRuntime } from '../../graph-runtime/application/useCanvasGroupRuntime'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
 import type { CanvasBoardSession } from '../../board-session'
@@ -23,7 +23,7 @@ import {
   createCanvasDeleteCommandLifecycle,
   createCanvasNodeDragLifecycle,
   type CanvasNodeDragLifecycle,
-} from '../../flow-pane'
+} from '../../vue-flow-adapter'
 import {
   projectPendingImageExecutionEdges,
   type PendingImageExecutionCore,

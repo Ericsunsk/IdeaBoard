@@ -2,9 +2,9 @@ import { defineComponent, h, nextTick, reactive, ref } from 'vue'
 import { cleanup } from '@testing-library/vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render } from '../../../test/render'
-import { createCanvasHandleProximityCoordinator } from '../renderer/vue-flow/canvasHandleProximityCoordinator'
-import { provideCanvasHandleProximityCoordinator } from '../renderer/vue-flow/useCanvasHandleProximity'
-import { provideCanvasViewportContext } from '../renderer/vue-flow/useCanvasViewportContext'
+import { createCanvasHandleProximityCoordinator } from '../vue-flow-adapter/canvasHandleProximityCoordinator'
+import { provideCanvasHandleProximityCoordinator } from '../vue-flow-adapter/useCanvasHandleProximity'
+import { provideCanvasViewportContext } from '../vue-flow-adapter/useCanvasViewportContext'
 import FlowCanvasNodeHandleRail from './FlowCanvasNodeHandleRail.vue'
 
 const vueFlowMock = vi.hoisted(() => ({

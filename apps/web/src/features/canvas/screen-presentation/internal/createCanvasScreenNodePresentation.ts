@@ -4,7 +4,7 @@ import {
   ACTIVE_NODE_PANEL_KIND,
   type useFlowActiveNodePanels,
 } from '../useFlowActiveNodePanels'
-import type { useImageStageRegistry } from '../../renderer/vue-flow/useImageStageRegistry'
+import type { useImageStageRegistry } from '../../vue-flow-adapter/useImageStageRegistry'
 import {
   createFusionNodePresentationResolver,
   createImageNodePresentationResolver,

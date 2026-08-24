@@ -1,5 +1,5 @@
 import type { CanvasVueFlowGraphCommandOptions } from './useCanvasVueFlowGraphAdapter'
-import type { CanvasGraphTransactionSummary } from '../../graph-runtime'
+import type { CanvasGraphTransactionSummary } from '../graph-runtime'
 
 const FLOW_GRAPH_COMMAND_SIDE_EFFECTS_METADATA_KEY = 'flowGraphCommandSideEffects'
 

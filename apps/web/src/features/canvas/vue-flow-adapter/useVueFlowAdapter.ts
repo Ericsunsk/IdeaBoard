@@ -1,7 +1,7 @@
 import { useVueFlow } from '@vue-flow/core'
-import type { CanvasFlowPaneAdapter } from './types'
+import type { CanvasVueFlowAdapter } from './types'
 
-export function useVueFlowPaneAdapter(): CanvasFlowPaneAdapter {
+export function useVueFlowAdapter(): CanvasVueFlowAdapter {
   const {
     screenToFlowCoordinate,
     updateNodeInternals,

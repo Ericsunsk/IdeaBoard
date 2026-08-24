@@ -3,15 +3,15 @@ import type {
   CanvasGraphCommitPatch,
   CanvasGraphEdgeRecord,
   CanvasGraphNodeRecord,
-} from '../../graph-runtime'
+} from '../graph-runtime'
 import {
   canvasConnectionToFlowEdge,
   canvasNodeToFlowNode,
   type FlowAdapterEdge,
   type FlowAdapterNode,
-} from '../../utils/flowSnapshotAdapter'
-import { recordCanvasInteractionCount } from '../../utils/canvasInteractionMetrics'
-import { measureCanvasPerf } from '../../utils/canvasPerfProbe'
+} from '../utils/flowSnapshotAdapter'
+import { recordCanvasInteractionCount } from '../utils/canvasInteractionMetrics'
+import { measureCanvasPerf } from '../utils/canvasPerfProbe'
 
 export type CanvasFlowGraphProjection = Readonly<{
   nodes: Node[]

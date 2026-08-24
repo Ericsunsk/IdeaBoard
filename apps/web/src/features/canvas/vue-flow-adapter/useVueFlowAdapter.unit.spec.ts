@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
-import { useVueFlowPaneAdapter } from './useVueFlowPaneAdapter'
+import { useVueFlowAdapter } from './useVueFlowAdapter'
 
 const vueFlow = vi.hoisted(() => ({
   selectedElements: { value: [] as Array<{ id: string }> },
@@ -36,7 +36,7 @@ vi.mock('@vue-flow/core', () => ({
   }),
 }))
 
-describe('useVueFlowPaneAdapter', () => {
+describe('useVueFlowAdapter', () => {
   beforeEach(() => {
     vueFlow.selectedElements.value = []
     vueFlow.findNode.mockReset()
@@ -50,7 +50,7 @@ describe('useVueFlowPaneAdapter', () => {
     vueFlow.selectedElements.value = [previousNode]
     vueFlow.findNode.mockReturnValue(targetNode)
 
-    const adapter = useVueFlowPaneAdapter()
+    const adapter = useVueFlowAdapter()
 
     expect(adapter.selectOnlyNode('node-b')).toBe(true)
     expect(vueFlow.removeSelectedElements).toHaveBeenCalledWith([previousNode])
@@ -62,7 +62,7 @@ describe('useVueFlowPaneAdapter', () => {
     vueFlow.selectedElements.value = [previousNode]
     vueFlow.findNode.mockReturnValue(undefined)
 
-    const adapter = useVueFlowPaneAdapter()
+    const adapter = useVueFlowAdapter()
 
     expect(adapter.selectOnlyNode('missing-node')).toBe(false)
     expect(vueFlow.removeSelectedElements).not.toHaveBeenCalled()

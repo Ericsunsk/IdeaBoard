@@ -10,8 +10,8 @@ import {
   retryLibraryImport,
   type CanvasGraphNodeIdForKind,
 } from '../graph-runtime'
-import { createFlowGraphCommandOptions } from '../renderer/vue-flow/flowGraphAdapterCommandSideEffects'
-import type { CanvasVueFlowGraphAdapter } from '../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
+import { createFlowGraphCommandOptions } from '../vue-flow-adapter/flowGraphAdapterCommandSideEffects'
+import type { CanvasVueFlowGraphAdapter } from '../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import type { FlowNodeData } from '../types/flowTypes'
 import type { CanvasLibraryImportDescriptor } from '../../library/libraryTransfer'
 import type { LibraryAssetMaterializer } from '../../library/libraryResource'

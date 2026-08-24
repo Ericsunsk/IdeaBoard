@@ -5,7 +5,7 @@ import type {
   CanvasGroupRuntimeCommands,
   CanvasGroupRuntimeView,
 } from '../graph-runtime/application/useCanvasGroupRuntime'
-import type { CanvasFlowPaneConnectionAdapter } from '../flow-pane'
+import type { CanvasVueFlowConnectionAdapter } from '../vue-flow-adapter'
 import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
 import type { CanvasImageWorkflow } from '../image-workflow'
 import type {
@@ -90,7 +90,7 @@ export type CanvasWorkspaceRuntimeCommands = {
   flowPane: {
     onNodesChange: (changes: NodeChange[]) => void
     onEdgesChange: (changes: EdgeChange[]) => void
-    connectionAdapter: CanvasFlowPaneConnectionAdapter
+    connectionAdapter: CanvasVueFlowConnectionAdapter
     nodeDragTransactions: {
       begin: () => void
       commit: () => void

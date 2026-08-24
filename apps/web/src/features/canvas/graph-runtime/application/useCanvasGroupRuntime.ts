@@ -30,8 +30,8 @@ import {
   type CanvasRect,
 } from '../../utils/canvasGroupGeometry'
 import { resolveFlowNodeCanvasRef } from '../../utils/flowSnapshotAdapter'
-import { releaseCanvasGraphDeleteExecutions } from '../../flow-pane/flowGraphDeleteProjection'
-import type { CanvasVueFlowGraphAdapter } from '../../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
+import { releaseCanvasGraphDeleteExecutions } from '../../vue-flow-adapter/flowGraphDeleteProjection'
+import type { CanvasVueFlowGraphAdapter } from '../../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 
 type SelectableFlowItem = {
   id: string

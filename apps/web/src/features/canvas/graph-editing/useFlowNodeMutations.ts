@@ -7,9 +7,9 @@ import {
   patchFlowSnapshotParam,
   type FlowSnapshotParamPatch,
 } from '../utils/flowSnapshotParamMutations'
-import { createCanvasConnectionCommandLifecycle } from '../flow-pane'
+import { createCanvasConnectionCommandLifecycle } from '../vue-flow-adapter'
 import type { FlowNodeData } from '../types/flowTypes'
-import type { CanvasVueFlowGraphAdapter } from '../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
+import type { CanvasVueFlowGraphAdapter } from '../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import {
   isCanvasGraphNodeId,
   type CanvasGraphNodeId,

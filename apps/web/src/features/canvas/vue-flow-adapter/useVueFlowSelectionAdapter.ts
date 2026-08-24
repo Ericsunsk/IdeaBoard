@@ -2,7 +2,7 @@ import type { Ref } from 'vue'
 import { useVueFlow, type EdgeChange, type Elements } from '@vue-flow/core'
 import type { DismissTransientCanvasUi } from '../screen-presentation/useFlowTransientUiDismissal'
 
-type UseFlowPaneSelectionAdapterOptions = {
+type UseVueFlowSelectionAdapterOptions = {
   activeTool: Ref<string>
   dismissTransientCanvasUi: DismissTransientCanvasUi
   onEdgesChange: (changes: EdgeChange[]) => void
@@ -39,7 +39,7 @@ function isPointerMoved(snapshot: MarqueeSelectionSnapshot, event: MouseEvent): 
   )
 }
 
-export function useFlowPaneSelectionAdapter(options: UseFlowPaneSelectionAdapterOptions) {
+export function useVueFlowSelectionAdapter(options: UseVueFlowSelectionAdapterOptions) {
   const {
     getSelectedElements,
     removeSelectedElements,

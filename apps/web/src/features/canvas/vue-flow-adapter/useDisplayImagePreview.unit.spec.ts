@@ -6,7 +6,7 @@ const flowMediaIOMocks = vi.hoisted(() => ({
   resolveFetchUrl: vi.fn((url: string) => url),
 }))
 
-vi.mock('../../services/flowMediaIO', () => ({
+vi.mock('../services/flowMediaIO', () => ({
   canvasToBlob: flowMediaIOMocks.canvasToBlob,
   resolveFetchUrl: flowMediaIOMocks.resolveFetchUrl,
 }))

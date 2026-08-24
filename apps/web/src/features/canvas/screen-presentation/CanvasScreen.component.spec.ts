@@ -25,14 +25,14 @@ vi.mock('../workspace-runtime', () => ({
   useCanvasWorkspaceRuntime: mocks.useCanvasWorkspaceRuntime,
 }))
 
-vi.mock('../flow-pane', () => ({
+vi.mock('../vue-flow-adapter', () => ({
   createCanvasConnectionDropLifecycle: () => ({
     onConnectStart: vi.fn(),
     onConnectEnd: vi.fn(),
     cancel: vi.fn(),
     dispose: vi.fn(),
   }),
-  useVueFlowPaneAdapter: () => ({
+  useVueFlowAdapter: () => ({
     screenToFlowCoordinate: vi.fn((point: { x: number; y: number }) => point),
     viewport: ref({ x: 0, y: 0, zoom: 1 }),
     selectOnlyNode: vi.fn(() => true),
@@ -41,7 +41,7 @@ vi.mock('../flow-pane', () => ({
     prepare: vi.fn(),
     resolveAnchor: vi.fn(() => null),
   }),
-  useFlowPaneSelectionAdapter: () => ({
+  useVueFlowSelectionAdapter: () => ({
     paneSelectionBindings: { onPointerDownCapture: vi.fn() },
     vueFlowSelectionBindings: {
       onEdgesChange: vi.fn(),
@@ -82,7 +82,7 @@ vi.mock('./useFlowImagePreviewLightbox', () => ({
   }),
 }))
 
-vi.mock('../renderer/vue-flow/useCanvasViewportContext', () => ({
+vi.mock('../vue-flow-adapter/useCanvasViewportContext', () => ({
   provideCanvasViewportContext: vi.fn(),
 }))
 

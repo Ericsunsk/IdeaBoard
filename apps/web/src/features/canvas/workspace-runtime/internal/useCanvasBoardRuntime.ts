@@ -6,7 +6,7 @@ import { HOME_PATH } from '../../../../shared/constants/routePaths'
 import { useCanvasBoardSession, type SaveStatus } from '../../board-session'
 import { useFlowBoardHeaderActions } from '../../canvas-chrome/useFlowBoardHeaderActions'
 import { useFlowCanvasRuntime } from './useFlowCanvasRuntime'
-import type { CanvasVueFlowGraphActions } from '../../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
+import type { CanvasVueFlowGraphActions } from '../../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import type { CanvasFeedback } from '../../feedback/useCanvasFeedback'
 import type { PendingImageExecutionCore } from '../../execution/pending-execution'
 

@@ -1,7 +1,7 @@
 import type { ImageNodeItem } from '../../../canvas-board/domain'
 import type { useCanvasBoardRuntime } from './useCanvasBoardRuntime'
 import type { CanvasFeedback } from '../../feedback/useCanvasFeedback'
-import type { CanvasFlowPaneAdapter } from '../../flow-pane'
+import type { CanvasVueFlowAdapter } from '../../vue-flow-adapter'
 import {
   useCanvasGraphEditing,
   useCanvasGraphInteractions,
@@ -16,7 +16,7 @@ type CanvasWorkspaceBoardRuntime = ReturnType<typeof useCanvasBoardRuntime>
 
 type CreateCanvasWorkspaceGraphRuntimeOptions = {
   board: CanvasWorkspaceBoardRuntime
-  flowPaneAdapter: CanvasFlowPaneAdapter
+  flowPaneAdapter: CanvasVueFlowAdapter
   upload: CanvasGraphEditingUploadAdapter
   materializeLibraryAsset: LibraryAssetMaterializer
   editingBrowser: CanvasGraphEditingBrowserAdapter

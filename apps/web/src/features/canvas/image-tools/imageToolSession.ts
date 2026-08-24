@@ -3,7 +3,7 @@ import type { Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import type { ImageNodeItem } from '../../canvas-board/domain'
 import type { CanvasInteractionKey } from '../screen-presentation/useFlowCanvasInteractionState'
-import type { CanvasFlowPaneConnectionAdapter } from '../flow-pane'
+import type { CanvasVueFlowConnectionAdapter } from '../vue-flow-adapter'
 import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
 import { useImageEditorMode } from '../image-editor/composables/useImageEditorMode'
 import { useImageEditorSession } from '../image-editor/composables/useImageEditorSession'
@@ -50,7 +50,7 @@ export type UseCanvasImageToolsOptions = {
     point: { x: number; y: number },
     file: File,
   ) => Promise<CanvasGraphNodeIdForKind<'image'> | null>
-  connectionAdapter: Pick<CanvasFlowPaneConnectionAdapter, 'connectIntent'>
+  connectionAdapter: Pick<CanvasVueFlowConnectionAdapter, 'connectIntent'>
   uploadImageToBoard: (file: File) => Promise<{ url: string; ratio: number }>
   openImageUrlPreview: (url: string, ratio: number) => void | Promise<void>
   clearActiveNodePanel: () => void
@@ -79,7 +79,7 @@ export type ImageToolSessionCapabilities = {
     getImageNodeDisplayPayload: UseCanvasImageToolsOptions['getImageNodeDisplayPayload']
     getImageNodeSnapshot: UseCanvasImageToolsOptions['getImageNodeSnapshot']
     createImageNodeFromFile: UseCanvasImageToolsOptions['createImageNodeFromFile']
-    connectIntent: CanvasFlowPaneConnectionAdapter['connectIntent']
+    connectIntent: CanvasVueFlowConnectionAdapter['connectIntent']
   }
   execution: {
     isNodeExecutionActive: UseCanvasImageToolsOptions['isNodeExecutionActive']

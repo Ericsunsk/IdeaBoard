@@ -50,7 +50,7 @@ vi.mock('../../graph-editing', () => ({
   useCanvasGraphInteractions: mocks.useCanvasGraphInteractions,
 }))
 
-vi.mock('../../renderer/vue-flow/useCanvasViewportRuntime', () => ({
+vi.mock('../../vue-flow-adapter/useCanvasViewportRuntime', () => ({
   useCanvasViewportRuntime: mocks.useCanvasViewportRuntime,
 }))
 

@@ -120,7 +120,7 @@ export function useCanvasGroupPointerInteraction(options: UseCanvasGroupPointerI
     return target instanceof Element && !!target.closest(ACTION_BUTTON_SELECTOR)
   }
 
-  function isFlowPanePointerTarget(target: EventTarget | null): boolean {
+  function isVueFlowPointerTarget(target: EventTarget | null): boolean {
     return target instanceof Element && target.classList.contains(FLOW_PANE_CLASS)
   }
 
@@ -243,7 +243,7 @@ export function useCanvasGroupPointerInteraction(options: UseCanvasGroupPointerI
     if (event.button !== 0 || event.pointerType === 'touch') return false
     if (isSelectionGroupActionButtonTarget(event.target)) return false
     if (isCanvasGroupResizeHandleTarget(event.target)) return false
-    if (!isFlowPanePointerTarget(event.target) && !isCanvasGroupFrameBodyTarget(event.target)) {
+    if (!isVueFlowPointerTarget(event.target) && !isCanvasGroupFrameBodyTarget(event.target)) {
       return false
     }
 
