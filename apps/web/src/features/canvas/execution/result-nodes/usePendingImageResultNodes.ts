@@ -13,7 +13,6 @@ import type {
   ImageResultAnchor,
 } from '../planning/imageExecutionResultTypes'
 import { resolveImageNodeLayoutAnchor } from '../../utils/flowImageNodeSelectors'
-import { waitForNextRenderFrame } from '../../utils/animationFrame'
 import type {
   CanvasGraphNodeRecord,
   CanvasGraphReadPort,
@@ -21,7 +20,6 @@ import type {
 } from '../../graph-runtime'
 import type { CanvasBoardAttachment } from '../../board-attachment'
 import { flowConnectionToCanvasConnection } from '../../utils/flowConnectionAdapter'
-import { canvasConnectionToFlowEdge } from '../../utils/flowSnapshotAdapter'
 import { canvasNodeToFlowNode } from '../../utils/flowSnapshotAdapter'
 import type { CanvasRendererMetricsPort } from '../../vue-flow-adapter'
 
@@ -321,59 +319,6 @@ export function usePendingImageResultExecution(
     }
   }
 
-  async function appendPendingImageResultEdges(
-    sessionStore: CanvasGraphStore,
-    attachment: CanvasBoardAttachment,
-    anchorNodeId: string,
-    resultNodeIds: string[],
-    edgesToAppend: Edge[],
-  ) {
-    if (edgesToAppend.length === 0) return
-    const isCurrentProjection = () => {
-      try {
-        return (
-          writeGraphStore() === sessionStore &&
-          options.isAttachmentCurrent(attachment)
-        )
-      } catch {
-        return false
-      }
-    }
-    if (!isCurrentProjection()) return
-    await waitForNextRenderFrame()
-    if (!isCurrentProjection()) return
-    const graph = options.readCanvasGraphStore()
-    const activeResultNodeIds = resultNodeIds.filter((resultNodeId) =>
-      !!graph.getNode(resultNodeId as `image-${number}`),
-    )
-    if (activeResultNodeIds.length === 0) return
-    const hasSource = !!graph.getNode(anchorNodeId as `image-${number}`)
-    if (!hasSource) return
-    const activeResultNodeIdSet = new Set(activeResultNodeIds)
-    const existingEdgeKeys = new Set(
-      graph
-        .getEdgeIds()
-        .map((edgeId) => graph.getEdge(edgeId))
-        .filter((edge): edge is NonNullable<typeof edge> => !!edge)
-        .map(
-          (edge) =>
-            `${edge.connection.fromNodeType}-${edge.connection.fromNodeId}:out:image:${edge.connection.toNodeType}-${edge.connection.toNodeId}:in:${edge.connection.toPort}`,
-        ),
-    )
-    const nextEdges = edgesToAppend
-      .filter((edge) => {
-        if (!activeResultNodeIdSet.has(edge.target)) return false
-        if (!graph.getNode(edge.target as `image-${number}`)) return false
-        const edgeKey = `${edge.source}:${edge.sourceHandle ?? ''}:${edge.target}:${edge.targetHandle ?? ''}`
-        if (existingEdgeKeys.has(edgeKey)) return false
-        existingEdgeKeys.add(edgeKey)
-        return true
-      })
-      .map((edge) => ({ ...edge }))
-    if (nextEdges.length === 0 || !isCurrentProjection()) return
-    options.refreshNodeInternals?.([anchorNodeId, ...activeResultNodeIds])
-  }
-
   function planPendingImageResultNodeWithLookup(
     source: ImageExecutionInput,
     anchorNodeId: string,
@@ -513,13 +458,7 @@ export function usePendingImageResultExecution(
       throw new Error('Unable to reserve pending result nodes', { cause: error })
     }
     options.refreshNodeInternals?.([anchorNodeId, ...resultNodeIds])
-    void appendPendingImageResultEdges(
-      store,
-      attachment,
-      anchorNodeId,
-      resultNodeIds,
-      canonicalEdges.map((connection) => canvasConnectionToFlowEdge(connection) as Edge),
-    )
+    options.refreshNodeInternals?.([anchorNodeId, ...resultNodeIds])
     return { resultNodeIds }
   }
 
