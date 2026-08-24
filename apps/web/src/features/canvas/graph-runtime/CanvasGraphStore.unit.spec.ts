@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
   createEmptyCanvasBoardSnapshot,
   type CanvasBoardSnapshot,
@@ -106,6 +106,21 @@ function createLargeSnapshot(nodeCount: number): CanvasBoardSnapshot {
 }
 
 describe('CanvasGraphStore', () => {
+  afterEach(() => {
+    delete window.__canvasInteractionBenchmarkCounters
+  })
+
+  it('measures both constructor and explicit hydrate paths during a benchmark', () => {
+    window.__canvasInteractionBenchmarkCounters = {}
+    const store = CanvasGraphStore.fromSnapshot(createSampleSnapshot())
+
+    store.hydrate(createEmptyCanvasBoardSnapshot())
+
+    expect(window.__canvasInteractionBenchmarkCounters.runtimeTimingMs).toMatchObject({
+      'graph-store.hydrate': { count: 2 },
+    })
+  })
+
   it('hydrates and exports a CanvasBoardSnapshot without changing the schema shape', () => {
     const snapshot = createSampleSnapshot()
     const store = CanvasGraphStore.fromSnapshot(snapshot)

@@ -9,6 +9,7 @@ import {
   type ImageNodeItem,
   type PromptNodeItem,
 } from '../../canvas-board/domain'
+import { measureCanvasPerf } from '../utils/canvasPerfProbe'
 
 export type CanvasGraphNodeKind = CanvasConnectionNodeType
 export type CanvasGraphNodeId = `${CanvasGraphNodeKind}-${number}`
@@ -355,6 +356,18 @@ function createStateFromSnapshot(snapshot: CanvasBoardSnapshot): CanvasGraphStor
   return createState(nodesById, edgesById, groupsById, nodeOrder, edgeOrder, groupOrder)
 }
 
+function createMeasuredStateFromSnapshot(snapshot: CanvasBoardSnapshot): CanvasGraphStoreState {
+  return measureCanvasPerf(
+    'graph-store.hydrate',
+    () => ({
+      nodes: snapshot.imageNodes.length + snapshot.promptNodes.length + snapshot.fusionNodes.length,
+      edges: snapshot.connections.length,
+      groups: snapshot.groups.length,
+    }),
+    () => createStateFromSnapshot(snapshot),
+  )
+}
+
 function exportSnapshotFromState(
   state: CanvasGraphStoreState,
   base?: CanvasBoardSnapshot,
@@ -616,7 +629,7 @@ export class CanvasGraphStore {
   private state: CanvasGraphStoreState
 
   constructor(snapshot: CanvasBoardSnapshot = createEmptyCanvasBoardSnapshot()) {
-    this.state = createStateFromSnapshot(snapshot)
+    this.state = createMeasuredStateFromSnapshot(snapshot)
   }
 
   static fromSnapshot(snapshot: CanvasBoardSnapshot): CanvasGraphStore {
@@ -624,7 +637,7 @@ export class CanvasGraphStore {
   }
 
   hydrate(snapshot: CanvasBoardSnapshot) {
-    this.state = createStateFromSnapshot(snapshot)
+    this.state = createMeasuredStateFromSnapshot(snapshot)
   }
 
   beginTransaction(
@@ -692,7 +705,11 @@ export class CanvasGraphStore {
   }
 
   _createDraftState(): MutableTransactionState {
-    return cloneState(this.state)
+    return measureCanvasPerf(
+      'graph-transaction.draft',
+      () => this.readCounts(),
+      () => cloneState(this.state),
+    )
   }
 
   _commitDraftState(state: MutableTransactionState) {

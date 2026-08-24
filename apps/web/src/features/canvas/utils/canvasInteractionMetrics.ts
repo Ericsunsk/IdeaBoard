@@ -1,5 +1,13 @@
 export type CanvasInteractionBenchmarkCounters = Record<string, number> & {
   graphCommands?: Record<string, number>
+  runtimeTimingMs?: Record<
+    string,
+    {
+      count: number
+      totalMs: number
+      maxMs: number
+    }
+  >
 }
 
 declare global {
@@ -26,4 +34,22 @@ export function recordCanvasGraphCommand(command: string) {
   const graphCommands = counters.graphCommands ?? {}
   graphCommands[command] = (graphCommands[command] ?? 0) + 1
   counters.graphCommands = graphCommands
+}
+
+export function isCanvasInteractionBenchmarkActive(): boolean {
+  return readCounters() !== null
+}
+
+export function recordCanvasInteractionTiming(name: string, durationMs: number) {
+  const counters = readCounters()
+  if (!counters || !Number.isFinite(durationMs) || durationMs < 0) return
+
+  const timings = counters.runtimeTimingMs ?? {}
+  const current = timings[name] ?? { count: 0, totalMs: 0, maxMs: 0 }
+  timings[name] = {
+    count: current.count + 1,
+    totalMs: current.totalMs + durationMs,
+    maxMs: Math.max(current.maxMs, durationMs),
+  }
+  counters.runtimeTimingMs = timings
 }

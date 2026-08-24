@@ -21,6 +21,7 @@ import {
 } from '../../canvas-board/domain'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import { parseHandlePort, resolveSourceImageFromNode } from '../utils/flowNodeSourceResolution'
+import { measureCanvasPerf } from '../utils/canvasPerfProbe'
 
 type FlowEdgeLike = {
   source: string
@@ -132,7 +133,7 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
     createFlowConnectionIndex(options.edges.value as FlowEdgeLike[]),
   )
 
-  const flowNodeUiStateCache = computed(() => {
+  function recomputeFlowNodeUiState() {
     const result: Record<string, FlowNodeUiState> = {}
     const nextUiStateByNodeId = new Map<string, FlowNodeUiState>()
     const flowNodes = options.nodes.value as FlowNodeLike[]
@@ -319,7 +320,15 @@ export function useFlowNodeUiState(options: UseFlowNodeUiStateOptions) {
 
     previousUiStateByNodeId = nextUiStateByNodeId
     return result
-  })
+  }
+
+  const flowNodeUiStateCache = computed(() =>
+    measureCanvasPerf(
+      'node-ui.recompute',
+      () => ({ nodes: options.nodes.value.length, edges: options.edges.value.length }),
+      recomputeFlowNodeUiState,
+    ),
+  )
 
   function getFlowNodeUiStateCached(nodeId: string): NodeUiState | PromptNodeUiState {
     return (

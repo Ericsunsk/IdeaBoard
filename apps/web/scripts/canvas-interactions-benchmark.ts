@@ -38,7 +38,19 @@ type BenchmarkCounters = {
   historyPushCount?: number
   autosaveScheduleCount?: number
   autosaveSaveCount?: number
+  handleGeometryLayoutReadCount?: number
   graphCommands?: Record<string, number>
+  runtimeTimingMs?: Record<string, RuntimeTimingCounter>
+}
+
+type RuntimeTimingCounter = {
+  count: number
+  totalMs: number
+  maxMs: number
+}
+
+type RuntimeTimingSummary = RuntimeTimingCounter & {
+  avgMs: number
 }
 
 type PathBudget = {
@@ -73,6 +85,8 @@ type FrameProbeSnapshot = {
   frames: number[]
   durationMs: number
   counters: BenchmarkCounters
+  longTaskDurationsMs: number[]
+  longTaskObserverAvailable: boolean
 }
 
 type PathResult = {
@@ -83,14 +97,22 @@ type PathResult = {
   avgFrameMs: number
   maxFrameMs: number
   sampleCount: number
+  timeToInteractiveMs: number
+  longTaskCount: number
+  longTaskTotalMs: number
+  longTaskP95Ms: number
+  longTaskMaxMs: number
+  longTaskDurationsMs: number[]
+  longTaskObserverAvailable: boolean
   mutationCount: number
   eventCount: number
   counters: BenchmarkCounters
+  timings: Record<string, RuntimeTimingSummary>
   positionChanges?: number
 }
 
 type BenchmarkReport = {
-  schemaVersion: 4
+  schemaVersion: 5
   generatedAt: string
   command: string
   browser: {
@@ -119,6 +141,9 @@ type BenchmarkReport = {
   smoothnessBudget: {
     frameBudgetMs: number
     ranking: string
+    timeToInteractiveDefinition: string
+    longTaskSource: string
+    runtimeTimingLabels: readonly string[]
   }
   budgets: Record<BenchmarkPath, PathBudget>
   paths: PathResult[]
@@ -173,6 +198,18 @@ const PNG_1X1 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/axpRFQAAAAASUVORK5CYII=',
   'base64',
 )
+
+// These labels are intentionally emitted only while the benchmark counter is installed.
+// Keeping absent labels in every report makes pre/post-refactor comparisons mechanically safe.
+const EXPECTED_RUNTIME_TIMING_LABELS = [
+  'graph-store.rebuild',
+  'graph-store.hydrate',
+  'graph-transaction.draft',
+  'history.capture',
+  'vue-flow.projection',
+  'node-ui.recompute',
+  'handle-proximity.layout-read',
+] as const
 
 const DEFAULT_BUDGETS: Record<BenchmarkPath, PathBudget> = {
   'initial-load': {
@@ -262,15 +299,35 @@ const FRAME_PROBE_SOURCE = String.raw`
     if (activeProbe && activeProbe.running) {
       activeProbe.running = false
       cancelAnimationFrame(activeProbe.rafId)
+      activeProbe.longTaskObserver?.disconnect()
     }
 
     const probe = {
       frameBudgetMs,
       frames: [],
+      longTaskDurationsMs: [],
+      longTaskObserverAvailable: false,
       lastFrameTime: null,
       running: true,
       startTime: performance.now(),
       rafId: 0,
+      longTaskObserver: null,
+    }
+
+    if (typeof PerformanceObserver !== 'undefined') {
+      try {
+        probe.longTaskObserver = new PerformanceObserver((entries) => {
+          for (const entry of entries.getEntries()) {
+            if (Number.isFinite(entry.duration) && entry.duration > 0) {
+              probe.longTaskDurationsMs.push(entry.duration)
+            }
+          }
+        })
+        probe.longTaskObserver.observe({ type: 'longtask' })
+        probe.longTaskObserverAvailable = true
+      } catch {
+        // Long Task entries are browser-dependent; frame timings remain available everywhere.
+      }
     }
 
     const tick = (timestamp) => {
@@ -289,15 +346,29 @@ const FRAME_PROBE_SOURCE = String.raw`
   window.__canvasBenchmarkStopFrameProbe = () => {
     const probe = window.__canvasBenchmarkFrameProbe
     if (!probe) {
-      return { frames: [], durationMs: 0, counters: {} }
+      return {
+        frames: [],
+        durationMs: 0,
+        counters: {},
+        longTaskDurationsMs: [],
+        longTaskObserverAvailable: false,
+      }
     }
     probe.running = false
     cancelAnimationFrame(probe.rafId)
+    for (const entry of probe.longTaskObserver?.takeRecords?.() || []) {
+      if (Number.isFinite(entry.duration) && entry.duration > 0) {
+        probe.longTaskDurationsMs.push(entry.duration)
+      }
+    }
+    probe.longTaskObserver?.disconnect()
     const counters = window.__canvasInteractionBenchmarkCounters || {}
     return {
       frames: probe.frames.slice(),
       durationMs: performance.now() - probe.startTime,
       counters: JSON.parse(JSON.stringify(counters)),
+      longTaskDurationsMs: probe.longTaskDurationsMs.slice(),
+      longTaskObserverAvailable: probe.longTaskObserverAvailable,
     }
   }
 })()
@@ -858,7 +929,10 @@ window.__canvasBenchmarkStartFrameProbe(${JSON.stringify(options.frameBudgetMs)}
   return { page, errors }
 }
 
-async function gotoBenchmarkCanvas(page: Page, baseUrl: string) {
+async function gotoBenchmarkCanvas(
+  page: Page,
+  baseUrl: string,
+): Promise<{ timeToInteractiveMs: number }> {
   const url = `${baseUrl}/user/canvas?boardId=${encodeURIComponent(BOARD_ID)}&canvasBenchmarkActions=1`
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
   await page.waitForSelector('.vue-flow', { state: 'visible', timeout: 30_000 })
@@ -869,6 +943,8 @@ async function gotoBenchmarkCanvas(page: Page, baseUrl: string) {
     { timeout: 30_000 },
   )
   await page.waitForTimeout(250)
+  const timeToInteractiveMs = await page.evaluate(() => performance.now())
+  return { timeToInteractiveMs }
 }
 
 async function startFrameProbe(page: Page, frameBudgetMs: number) {
@@ -892,6 +968,8 @@ async function stopFrameProbe(page: Page): Promise<FrameProbeSnapshot> {
         frames: [],
         durationMs: 0,
         counters: {},
+        longTaskDurationsMs: [],
+        longTaskObserverAvailable: false,
       }
     )
   })
@@ -907,7 +985,7 @@ async function runPath(
   const { page, errors } = await createBenchmarkPage(context, options, pathName === 'initial-load')
 
   try {
-    await gotoBenchmarkCanvas(page, baseUrl)
+    const readiness = await gotoBenchmarkCanvas(page, baseUrl)
 
     let interaction: { eventCount: number; positionChanges?: number } = {
       eventCount: 0,
@@ -921,7 +999,7 @@ async function runPath(
 
     const probe = await stopFrameProbe(page)
     assertBrowserClean(errors, pathName)
-    return summarizePath(pathName, probe, options.frameBudgetMs, interaction)
+    return summarizePath(pathName, probe, options.frameBudgetMs, interaction, readiness)
   } finally {
     await page.close()
   }
@@ -1046,8 +1124,12 @@ function summarizePath(
   probe: FrameProbeSnapshot,
   frameBudgetMs: number,
   interaction: { eventCount: number; positionChanges?: number },
+  readiness: { timeToInteractiveMs: number },
 ): PathResult {
   const frames = probe.frames.filter((value) => Number.isFinite(value) && value >= 0)
+  const longTaskDurationsMs = probe.longTaskDurationsMs
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .map((value) => roundMetric(value))
   const counters = normalizeCounters(probe.counters)
   const result: PathResult = {
     path: pathName,
@@ -1057,9 +1139,21 @@ function summarizePath(
     avgFrameMs: roundMetric(average(frames)),
     maxFrameMs: roundMetric(frames.length > 0 ? Math.max(...frames) : 0),
     sampleCount: frames.length,
+    timeToInteractiveMs: roundMetric(readiness.timeToInteractiveMs),
+    longTaskCount: longTaskDurationsMs.length,
+    longTaskTotalMs: roundMetric(
+      longTaskDurationsMs.reduce((total, durationMs) => total + durationMs, 0),
+    ),
+    longTaskP95Ms: roundMetric(percentile(longTaskDurationsMs, 0.95)),
+    longTaskMaxMs: roundMetric(
+      longTaskDurationsMs.length > 0 ? Math.max(...longTaskDurationsMs) : 0,
+    ),
+    longTaskDurationsMs,
+    longTaskObserverAvailable: probe.longTaskObserverAvailable,
     mutationCount: counters.graphCommandCount ?? 0,
     eventCount: interaction.eventCount,
     counters,
+    timings: summarizeRuntimeTimings(counters.runtimeTimingMs),
   }
 
   if (typeof interaction.positionChanges === 'number') {
@@ -1082,8 +1176,43 @@ function normalizeCounters(counters: BenchmarkCounters): BenchmarkCounters {
     historyPushCount: counters.historyPushCount ?? 0,
     autosaveScheduleCount: counters.autosaveScheduleCount ?? 0,
     autosaveSaveCount: counters.autosaveSaveCount ?? 0,
+    handleGeometryLayoutReadCount: counters.handleGeometryLayoutReadCount ?? 0,
     graphCommands: counters.graphCommands ?? {},
+    runtimeTimingMs: normalizeRuntimeTimingCounters(counters.runtimeTimingMs),
   }
+}
+
+function normalizeRuntimeTimingCounters(
+  timings: BenchmarkCounters['runtimeTimingMs'],
+): Record<string, RuntimeTimingCounter> {
+  const normalized: Record<string, RuntimeTimingCounter> = {}
+
+  for (const label of [...EXPECTED_RUNTIME_TIMING_LABELS, ...Object.keys(timings ?? {})]) {
+    if (normalized[label]) continue
+    const current = timings?.[label]
+    const count = Number.isFinite(current?.count) && current!.count > 0 ? current!.count : 0
+    const totalMs = Number.isFinite(current?.totalMs) && current!.totalMs > 0 ? current!.totalMs : 0
+    const maxMs = Number.isFinite(current?.maxMs) && current!.maxMs > 0 ? current!.maxMs : 0
+    normalized[label] = { count, totalMs, maxMs }
+  }
+
+  return normalized
+}
+
+function summarizeRuntimeTimings(
+  timings: BenchmarkCounters['runtimeTimingMs'],
+): Record<string, RuntimeTimingSummary> {
+  return Object.fromEntries(
+    Object.entries(timings ?? {}).map(([label, timing]) => [
+      label,
+      {
+        count: timing.count,
+        totalMs: roundMetric(timing.totalMs),
+        avgMs: roundMetric(timing.count > 0 ? timing.totalMs / timing.count : 0),
+        maxMs: roundMetric(timing.maxMs),
+      },
+    ]),
+  )
 }
 
 function percentile(values: number[], percentileValue: number): number {
@@ -1122,7 +1251,7 @@ function buildReport(
   const failures = evaluateBudgetFailures(pathResults, DEFAULT_BUDGETS)
 
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     generatedAt,
     command:
       `cd apps/web && npm run benchmark:canvas-interactions -- ${process.argv.slice(2).join(' ')}`.trim(),
@@ -1139,7 +1268,12 @@ function buildReport(
     fixture: fixture.reportFixture,
     smoothnessBudget: {
       frameBudgetMs: options.frameBudgetMs,
-      ranking: 'Higher p95FrameMs, droppedFrames, then maxFrameMs is worse.',
+      ranking: 'Higher longTaskMaxMs, maxFrameMs, p95FrameMs, then droppedFrames is worse.',
+      timeToInteractiveDefinition:
+        'Navigation start to Canvas Board label, visible Vue Flow node, and a 250ms settle.',
+      longTaskSource:
+        'PerformanceObserver longtask entries during the measured path; inspect each path longTaskObserverAvailable before interpreting zero values.',
+      runtimeTimingLabels: EXPECTED_RUNTIME_TIMING_LABELS,
     },
     budgets: DEFAULT_BUDGETS,
     paths: pathResults,
@@ -1210,9 +1344,13 @@ function evaluateBudgetFailures(
 function findWorstPath(results: PathResult[]): PathResult | null {
   if (results.length === 0) return null
   return [...results].sort((left, right) => {
+    if (right.longTaskMaxMs !== left.longTaskMaxMs) {
+      return right.longTaskMaxMs - left.longTaskMaxMs
+    }
+    if (right.maxFrameMs !== left.maxFrameMs) return right.maxFrameMs - left.maxFrameMs
     if (right.p95FrameMs !== left.p95FrameMs) return right.p95FrameMs - left.p95FrameMs
     if (right.droppedFrames !== left.droppedFrames) return right.droppedFrames - left.droppedFrames
-    return right.maxFrameMs - left.maxFrameMs
+    return right.timeToInteractiveMs - left.timeToInteractiveMs
   })[0]
 }
 
@@ -1265,7 +1403,7 @@ async function main() {
       )
       for (const result of report.paths) {
         console.log(
-          `${result.path}: p95=${result.p95FrameMs}ms dropped=${result.droppedFrames} duration=${result.durationMs}ms`,
+          `${result.path}: tti=${result.timeToInteractiveMs}ms p95=${result.p95FrameMs}ms max=${result.maxFrameMs}ms longTaskMax=${result.longTaskMaxMs}ms longTasks=${result.longTaskCount} dropped=${result.droppedFrames} duration=${result.durationMs}ms`,
         )
       }
       report.verdict.failures.forEach((failure) => console.error(failure))

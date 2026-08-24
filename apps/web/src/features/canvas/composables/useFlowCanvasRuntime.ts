@@ -26,6 +26,7 @@ import {
   type FlowToCanvasBoardSnapshotOptions,
 } from '../utils/flowSnapshotAdapter'
 import { createCanvasGraphStore } from '../graph-runtime'
+import { measureCanvasPerf } from '../utils/canvasPerfProbe'
 import {
   createCanvasDeleteCommandLifecycle,
   createCanvasNodeDragLifecycle,
@@ -331,15 +332,25 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   }
 
   function createCurrentCanvasGraphStore(snapshotOptions?: FlowToCanvasBoardSnapshotOptions) {
-    const snapshot = flowToCanvasBoardSnapshot(
-      {
-        nodes: options.nodes.value,
-        edges: options.edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
+    return measureCanvasPerf(
+      'graph-store.rebuild',
+      () => ({
+        nodes: options.nodes.value.length,
+        edges: options.edges.value.length,
+        groups: options.boardBaseSnapshot.value.groups.length,
+      }),
+      () => {
+        const snapshot = flowToCanvasBoardSnapshot(
+          {
+            nodes: options.nodes.value,
+            edges: options.edges.value as Parameters<typeof flowToCanvasBoardSnapshot>[0]['edges'],
+          },
+          options.boardBaseSnapshot.value,
+          snapshotOptions,
+        )
+        return createCanvasGraphStore(snapshot)
       },
-      options.boardBaseSnapshot.value,
-      snapshotOptions,
     )
-    return createCanvasGraphStore(snapshot)
   }
 
   const groupRuntime = useCanvasGroupRuntime({

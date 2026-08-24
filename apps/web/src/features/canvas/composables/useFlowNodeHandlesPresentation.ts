@@ -1,9 +1,4 @@
-import {
-  computed,
-  shallowRef,
-  type ComponentPublicInstance,
-  type CSSProperties,
-} from 'vue'
+import { computed, shallowRef, type ComponentPublicInstance, type CSSProperties } from 'vue'
 import { Position } from '@vue-flow/core'
 import {
   getCanvasNodeVisibleInputPorts,
@@ -11,6 +6,8 @@ import {
   type CanvasConnectionNodeType,
   type CanvasConnectionPort,
 } from '../../canvas-board/domain'
+import { recordCanvasInteractionCount } from '../utils/canvasInteractionMetrics'
+import { measureCanvasPerf } from '../utils/canvasPerfProbe'
 import { useCanvasHandleProximity } from './useCanvasHandleProximity'
 import { resolveCanvasNodeUiScale, useCanvasViewportContext } from './useCanvasViewportContext'
 
@@ -141,7 +138,14 @@ function useHandleDirectionPresentation(
   )
   const proximity = useCanvasHandleProximity({
     direction,
-    getAnchorRect: () => resolveHandleElement(element.value)?.getBoundingClientRect() ?? null,
+    getAnchorRect: () => {
+      const handle = resolveHandleElement(element.value)
+      if (!handle) return null
+      return measureCanvasPerf('handle-proximity.layout-read', undefined, () => {
+        recordCanvasInteractionCount('handleGeometryLayoutReadCount')
+        return handle.getBoundingClientRect()
+      })
+    },
     enabled: computed(() => portIds.value.length > 0 && !options.disabled()),
   })
   const visible = computed(

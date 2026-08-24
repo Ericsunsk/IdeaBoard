@@ -1,3 +1,8 @@
+import {
+  isCanvasInteractionBenchmarkActive,
+  recordCanvasInteractionTiming,
+} from './canvasInteractionMetrics'
+
 type CanvasPerfMetadata = Record<string, string | number | boolean | null | undefined>
 
 type CanvasPerfMetadataInput = CanvasPerfMetadata | (() => CanvasPerfMetadata)
@@ -5,7 +10,15 @@ type CanvasPerfMetadataInput = CanvasPerfMetadata | (() => CanvasPerfMetadata)
 const DEFAULT_MIN_DURATION_MS = 16
 
 export function isCanvasPerfProbeEnabled(): boolean {
-  return import.meta.env.DEV && import.meta.env.VITE_CANVAS_PERF_PROBE === 'true'
+  const env = (
+    import.meta as ImportMeta & {
+      readonly env?: {
+        readonly DEV?: boolean
+        readonly VITE_CANVAS_PERF_PROBE?: string
+      }
+    }
+  ).env
+  return env?.DEV === true && env.VITE_CANVAS_PERF_PROBE === 'true'
 }
 
 function now(): number {
@@ -39,12 +52,16 @@ export function measureCanvasPerf<T>(
   task: () => T,
   minDurationMs?: number,
 ): T {
-  if (!isCanvasPerfProbeEnabled()) return task()
+  const isPerfProbeEnabled = isCanvasPerfProbeEnabled()
+  const isBenchmarkActive = isCanvasInteractionBenchmarkActive()
+  if (!isPerfProbeEnabled && !isBenchmarkActive) return task()
   const startedAt = now()
   try {
     return task()
   } finally {
-    logCanvasPerf(label, now() - startedAt, metadata, minDurationMs)
+    const durationMs = now() - startedAt
+    if (isBenchmarkActive) recordCanvasInteractionTiming(label, durationMs)
+    if (isPerfProbeEnabled) logCanvasPerf(label, durationMs, metadata, minDurationMs)
   }
 }
 
@@ -54,11 +71,15 @@ export async function measureCanvasPerfAsync<T>(
   task: () => Promise<T>,
   minDurationMs?: number,
 ): Promise<T> {
-  if (!isCanvasPerfProbeEnabled()) return task()
+  const isPerfProbeEnabled = isCanvasPerfProbeEnabled()
+  const isBenchmarkActive = isCanvasInteractionBenchmarkActive()
+  if (!isPerfProbeEnabled && !isBenchmarkActive) return task()
   const startedAt = now()
   try {
     return await task()
   } finally {
-    logCanvasPerf(label, now() - startedAt, metadata, minDurationMs)
+    const durationMs = now() - startedAt
+    if (isBenchmarkActive) recordCanvasInteractionTiming(label, durationMs)
+    if (isPerfProbeEnabled) logCanvasPerf(label, durationMs, metadata, minDurationMs)
   }
 }

@@ -9,6 +9,7 @@ import {
 } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import { recordCanvasInteractionCount } from '../utils/canvasInteractionMetrics'
+import { measureCanvasPerf } from '../utils/canvasPerfProbe'
 import { toCanvasSemanticEdges } from './canvasEdgeProjection'
 import type {
   CanvasVueFlowGraphCommandOptions,
@@ -64,24 +65,36 @@ export function createCanvasVueFlowNativeChangeAdapter(
   options: CanvasVueFlowNativeChangeAdapterOptions,
 ) {
   function applyNativeNodeChanges(changes: NodeChange[]) {
-    recordCanvasInteractionCount('nativeNodeChangeBatches')
-    recordCanvasInteractionCount('nativeNodeChangeCount', changes.length)
-    const actionResult = options.actions?.applyNodeChanges?.(changes)
-    if (Array.isArray(actionResult)) {
-      options.syncNodes(actionResult as Node[])
-      return
-    }
-    const nextNodes = applyVueFlowNodeChanges(
-      changes,
-      options.nodes.value as Parameters<typeof applyVueFlowNodeChanges>[1],
-    ) as unknown as Node[]
-    if (nextNodes !== options.nodes.value) options.syncNodes(nextNodes)
+    measureCanvasPerf(
+      'vue-flow.projection',
+      () => ({ nodes: options.nodes.value.length, changes: changes.length }),
+      () => {
+        recordCanvasInteractionCount('nativeNodeChangeBatches')
+        recordCanvasInteractionCount('nativeNodeChangeCount', changes.length)
+        const actionResult = options.actions?.applyNodeChanges?.(changes)
+        if (Array.isArray(actionResult)) {
+          options.syncNodes(actionResult as Node[])
+          return
+        }
+        const nextNodes = applyVueFlowNodeChanges(
+          changes,
+          options.nodes.value as Parameters<typeof applyVueFlowNodeChanges>[1],
+        ) as unknown as Node[]
+        if (nextNodes !== options.nodes.value) options.syncNodes(nextNodes)
+      },
+    )
   }
 
   function projectNodeChanges(changes: NodeChange[]) {
-    recordCanvasInteractionCount('nativeNodeChangeBatches')
-    recordCanvasInteractionCount('nativeNodeChangeCount', changes.length)
-    options.actions?.applyNodeChanges?.(changes)
+    measureCanvasPerf(
+      'vue-flow.projection',
+      () => ({ nodes: options.nodes.value.length, changes: changes.length }),
+      () => {
+        recordCanvasInteractionCount('nativeNodeChangeBatches')
+        recordCanvasInteractionCount('nativeNodeChangeCount', changes.length)
+        options.actions?.applyNodeChanges?.(changes)
+      },
+    )
   }
 
   function syncProjectedNodeChanges(
@@ -104,30 +117,41 @@ export function createCanvasVueFlowNativeChangeAdapter(
     }
     return options.commandRunner.runNative(
       'applyNodeChanges',
-      () => {
-        const nextNodes = applyVueFlowNodeChanges(
-          changes,
-          options.nodes.value as Parameters<typeof applyVueFlowNodeChanges>[1],
-        ) as unknown as Node[]
-        if (nextNodes !== options.nodes.value) options.syncNodes(nextNodes)
-      },
+      () =>
+        measureCanvasPerf(
+          'vue-flow.projection',
+          () => ({ nodes: options.nodes.value.length, changes: changes.length }),
+          () => {
+            const nextNodes = applyVueFlowNodeChanges(
+              changes,
+              options.nodes.value as Parameters<typeof applyVueFlowNodeChanges>[1],
+            ) as unknown as Node[]
+            if (nextNodes !== options.nodes.value) options.syncNodes(nextNodes)
+          },
+        ),
       commandOptions,
     )
   }
 
   function applyNativeEdgeChanges(changes: EdgeChange[]) {
-    recordCanvasInteractionCount('nativeEdgeChangeBatches')
-    recordCanvasInteractionCount('nativeEdgeChangeCount', changes.length)
-    const actionResult = options.actions?.applyEdgeChanges?.(changes)
-    if (Array.isArray(actionResult)) {
-      options.syncEdges(toCanvasSemanticEdges(actionResult as Edge[]))
-      return
-    }
-    const nextEdges = applyVueFlowEdgeChanges(
-      changes,
-      options.edges.value as Parameters<typeof applyVueFlowEdgeChanges>[1],
-    ) as unknown as Edge[]
-    if (nextEdges !== options.edges.value) options.syncEdges(nextEdges)
+    measureCanvasPerf(
+      'vue-flow.projection',
+      () => ({ edges: options.edges.value.length, changes: changes.length }),
+      () => {
+        recordCanvasInteractionCount('nativeEdgeChangeBatches')
+        recordCanvasInteractionCount('nativeEdgeChangeCount', changes.length)
+        const actionResult = options.actions?.applyEdgeChanges?.(changes)
+        if (Array.isArray(actionResult)) {
+          options.syncEdges(toCanvasSemanticEdges(actionResult as Edge[]))
+          return
+        }
+        const nextEdges = applyVueFlowEdgeChanges(
+          changes,
+          options.edges.value as Parameters<typeof applyVueFlowEdgeChanges>[1],
+        ) as unknown as Edge[]
+        if (nextEdges !== options.edges.value) options.syncEdges(nextEdges)
+      },
+    )
   }
 
   function applyNodeChanges(
