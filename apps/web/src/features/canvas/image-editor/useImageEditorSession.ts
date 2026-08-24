@@ -6,7 +6,7 @@ import type {
   ImageEditorLayer,
   ImageEditorParamKey,
   ImageEditorParamValue,
-} from '../types'
+} from './types'
 import {
   applyLayerCommand,
   createDefaultImageAdjustmentLayer,
@@ -14,8 +14,8 @@ import {
   getSelectedAdjustment,
   SOURCE_LAYER_ID,
   type ImageEditorLayerCommand,
-} from '../utils/imageEditorLayerStack'
-import { getImageAdjustmentDefaultParams } from '../utils/imageAdjustmentDefinitions'
+} from './utils/imageEditorLayerStack'
+import { getImageAdjustmentDefaultParams } from './utils/imageAdjustmentDefinitions'
 
 export function useImageEditorSession() {
   const stack = ref(createInitialLayerStack())

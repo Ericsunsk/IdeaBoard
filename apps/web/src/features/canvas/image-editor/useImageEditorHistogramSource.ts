@@ -3,11 +3,11 @@ import type {
   ImageEditorAdjustmentLayer,
   ImageEditorLayer,
   ImageEditorRenderedPreview,
-} from '../types'
+} from './types'
 import {
   resolveImageEditorHistogramSource,
   type ImageEditorHistogramSourceResolution,
-} from '../utils/imageEditorHistogramSource'
+} from './utils/imageEditorHistogramSource'
 
 type UseImageEditorHistogramSourceOptions = {
   isAdjustMode: Ref<boolean> | ComputedRef<boolean>

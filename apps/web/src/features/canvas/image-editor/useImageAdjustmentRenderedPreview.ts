@@ -7,9 +7,9 @@ import {
   type MaybeRefOrGetter,
   type Ref,
 } from 'vue'
-import type { ImageEditorLayer, ImageEditorRenderedPreview } from '../types'
-import { createImageAdjustmentInlinePreviewRenderer } from '../services/imageAdjustmentInlinePreviewRenderer'
-import { buildImageAdjustmentPlan } from '../utils/imageAdjustmentPlanPipeline'
+import type { ImageEditorLayer, ImageEditorRenderedPreview } from './types'
+import { createImageAdjustmentInlinePreviewRenderer } from './services/imageAdjustmentInlinePreviewRenderer'
+import { buildImageAdjustmentPlan } from './utils/imageAdjustmentPlanPipeline'
 
 type UseImageAdjustmentRenderedPreviewOptions = {
   isAdjustMode: Ref<boolean>

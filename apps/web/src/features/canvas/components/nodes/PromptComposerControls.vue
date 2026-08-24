@@ -86,7 +86,7 @@ import NodeTextOptionPicker from './NodeTextOptionPicker.vue'
 import {
   usePromptComposerControls,
   type PromptComposerResizePayload,
-} from './composables/usePromptComposerControls'
+} from './usePromptComposerControls'
 
 const props = withDefaults(
   defineProps<{

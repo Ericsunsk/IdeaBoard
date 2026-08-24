@@ -2,7 +2,7 @@ import { ref, watch } from 'vue'
 import {
   clampMaskLayerOpacity,
   MASK_EDITOR_DEFAULT_LAYER_OPACITY,
-} from '../config/maskEditorConstants'
+} from './config/maskEditorConstants'
 
 type ValueRef<T> = {
   readonly value: T

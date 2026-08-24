@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { useImageEditorSession } from './useImageEditorSession'
-import { flattenVisibleImageEditorAdjustmentLayers } from '../utils/imageEditorLayerAdjustments'
+import { flattenVisibleImageEditorAdjustmentLayers } from './utils/imageEditorLayerAdjustments'
 
 describe('useImageEditorSession', () => {
   it('keeps adjustment selection transient until a parameter changes', () => {

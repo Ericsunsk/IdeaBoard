@@ -1,5 +1,5 @@
 import { computed } from 'vue'
-import type { ImageEditorModeState } from '../image-editor/composables/useImageEditorMode'
+import type { ImageEditorModeState } from '../image-editor/useImageEditorMode'
 
 type ValueRef<T> = {
   readonly value: T

@@ -1,8 +1,8 @@
 import { useEventListener } from '@vueuse/core'
 import { computed, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
-import type { ImageEditorMode } from '../types'
-import { isEditableEventTarget } from '../../utils/domEventTargets'
+import type { ImageEditorMode } from './types'
+import { isEditableEventTarget } from '../utils/domEventTargets'
 
 const windowTarget = () => (typeof window === 'undefined' ? null : window)
 

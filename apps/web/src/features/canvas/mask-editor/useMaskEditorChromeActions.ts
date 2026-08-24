@@ -1,4 +1,4 @@
-import type { ImageMaskEditorCommittedData } from '../types'
+import type { ImageMaskEditorCommittedData } from './types'
 
 type ValueRef<T> = {
   readonly value: T

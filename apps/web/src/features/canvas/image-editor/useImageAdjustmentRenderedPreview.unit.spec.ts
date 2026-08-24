@@ -1,15 +1,15 @@
 import { nextTick, ref } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { ImageProcessingRuntime } from '../runtime/types'
-import type { ImageEditorLayer } from '../types'
-import { buildImageAdjustmentPlan } from '../utils/imageAdjustmentPlanPipeline'
+import type { ImageProcessingRuntime } from './runtime/types'
+import type { ImageEditorLayer } from './types'
+import { buildImageAdjustmentPlan } from './utils/imageAdjustmentPlanPipeline'
 import { useImageAdjustmentRenderedPreview } from './useImageAdjustmentRenderedPreview'
 
 const { getImageAdjustmentProcessingRuntimeMock } = vi.hoisted(() => ({
   getImageAdjustmentProcessingRuntimeMock: vi.fn(),
 }))
 
-vi.mock('../runtime/imageAdjustmentProcessingRuntime', () => ({
+vi.mock('./runtime/imageAdjustmentProcessingRuntime', () => ({
   getImageAdjustmentProcessingRuntime: getImageAdjustmentProcessingRuntimeMock,
 }))
 

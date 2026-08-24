@@ -4,7 +4,7 @@ import type {
   ImageEditorAdjustmentLayer,
   ImageEditorLayer,
   ImageEditorRenderedPreview,
-} from '../types'
+} from './types'
 import { useImageEditorHistogramSource } from './useImageEditorHistogramSource'
 
 function makeImageData(values: number[]) {

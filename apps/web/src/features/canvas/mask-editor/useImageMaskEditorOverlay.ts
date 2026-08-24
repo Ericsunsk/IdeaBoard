@@ -1,30 +1,30 @@
 import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
-import { usePointerDragSession } from '../../utils/interaction/usePointerDragSession'
-import { MASK_EDITOR_INTERACTION_KEY } from '../types'
+import { usePointerDragSession } from '../utils/interaction/usePointerDragSession'
+import { MASK_EDITOR_INTERACTION_KEY } from './types'
 import type {
   ImageMaskDrawMode,
   ImageMaskEditorCommittedData,
   MaskEditorInteractionKey,
-} from '../types'
+} from './types'
 import {
   buildMaskCommitResult,
   drawMaskRasterPreviewToCanvas,
-} from '../lib/maskPaintingCanvas'
+} from './lib/maskPaintingCanvas'
 import {
   maskStrokeEngine,
   type MaskStrokePoint,
   type MaskStrokeRenderOptions,
-} from '../lib/maskBrushEngine'
+} from './lib/maskBrushEngine'
 import {
   createMaskCanvasPointerProjection,
   type MaskCanvasPointerProjection,
-} from '../lib/maskCanvasGeometry'
+} from './lib/maskCanvasGeometry'
 import {
   clampMaskBrushSize,
   MASK_EDITOR_DEFAULT_BRUSH_SIZE,
   MASK_EDITOR_HISTORY_LIMIT,
-} from '../config/maskEditorConstants'
-import type { ImageEditorImageRect } from '../../image-editor'
+} from './config/maskEditorConstants'
+import type { ImageEditorImageRect } from '../image-editor'
 
 type MaskHistoryEntry = {
   width: number

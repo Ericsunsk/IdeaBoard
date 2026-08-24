@@ -25,7 +25,7 @@ vi.mock('../image-editor/services/imageAdjustmentRenderer', async (importOrigina
   }
 })
 
-vi.mock('../image-editor/composables/useImageAdjustmentRenderedPreview', async () => {
+vi.mock('../image-editor/useImageAdjustmentRenderedPreview', async () => {
   const { computed } = await import('vue')
   return {
     useImageAdjustmentRenderedPreview: vi.fn(() => ({

@@ -97,11 +97,11 @@ import {
   getFusionSlotAnchors,
   type FusionBlendPoint,
 } from '../../../canvas-board/domain'
-import { useFusionBlendControl } from './composables/useFusionBlendControl'
+import { useFusionBlendControl } from './useFusionBlendControl'
 import NodeEmptyStateIcon from './NodeEmptyStateIcon.vue'
 import NodeInputThumbnail from './NodeInputThumbnail.vue'
 import NodeStageFrame from './NodeStageFrame.vue'
-import { useImageInputSlots } from './composables/useImageInputSlots'
+import { useImageInputSlots } from './useImageInputSlots'
 
 const props = defineProps<{
   active: boolean

@@ -1,11 +1,11 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
-import type { PromptAspectRatio } from '../../../../canvas-board/domain'
-import { normalizePromptAspectRatio } from '../../../../canvas-board/domain'
-import { requireImageNodeOutputCount } from '../../../../canvas-board/domain'
+import type { PromptAspectRatio } from '../../../canvas-board/domain'
+import { normalizePromptAspectRatio } from '../../../canvas-board/domain'
+import { requireImageNodeOutputCount } from '../../../canvas-board/domain'
 import { useAutoResizeTextarea } from './useAutoResizeTextarea'
 import { useNodeToolPopoverGroup } from './useNodeToolPopoverGroup'
-import type { OutputResolution } from '../../../../../shared/domain/generationContract'
-import { normalizeOutputResolution } from '../../../../../shared/domain/generationContract'
+import type { OutputResolution } from '../../../../shared/domain/generationContract'
+import { normalizeOutputResolution } from '../../../../shared/domain/generationContract'
 
 export type PromptComposerResizePayload = {
   naturalHeight: number

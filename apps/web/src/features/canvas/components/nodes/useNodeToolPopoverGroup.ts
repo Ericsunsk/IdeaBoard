@@ -1,5 +1,5 @@
 import { computed, ref, type Ref } from 'vue'
-import { useCanvasCustomLayerOverlay } from '../../../overlay-lifecycle'
+import { useCanvasCustomLayerOverlay } from '../../overlay-lifecycle'
 
 type PopoverRootRef = Ref<HTMLElement | null | undefined>
 

@@ -3,8 +3,8 @@ import {
   resolveMediaAssetOriginalURL,
   useMediaAssetDelivery,
 } from '../../../shared/api/mediaAssetDelivery'
-import { useImageAdjustmentRenderedPreview } from '../image-editor/composables/useImageAdjustmentRenderedPreview'
-import { useImageEditorHistogramSource } from '../image-editor/composables/useImageEditorHistogramSource'
+import { useImageAdjustmentRenderedPreview } from '../image-editor/useImageAdjustmentRenderedPreview'
+import { useImageEditorHistogramSource } from '../image-editor/useImageEditorHistogramSource'
 import type { ImageToolChromeCommands, ImageToolChromeModel } from './imageToolBindings'
 import type { ImageToolSession } from './imageToolSession'
 

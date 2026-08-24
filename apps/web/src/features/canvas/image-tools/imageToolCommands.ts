@@ -2,7 +2,7 @@ import {
   hasRenderableImageEditorLayerStack,
   renderImageEditorLayerStackFile,
 } from '../image-editor/services/imageAdjustmentRenderer'
-import { useMaskEditorChromeActions } from '../mask-editor/composables/useMaskEditorChromeActions'
+import { useMaskEditorChromeActions } from '../mask-editor/useMaskEditorChromeActions'
 import { isCanvasGraphNodeId } from '../graph-runtime'
 import { IMAGE_GENERATION_SUCCESS_MESSAGE } from '../../../shared/constants/media'
 import type { ImageToolChromeCommands } from './imageToolBindings'
