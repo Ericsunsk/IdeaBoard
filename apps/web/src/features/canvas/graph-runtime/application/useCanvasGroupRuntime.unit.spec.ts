@@ -1,10 +1,10 @@
 import type { Edge, Node } from '@vue-flow/core'
 import { ref, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
-import { CanvasGraphSession } from '../graph-runtime'
+import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../../canvas-board/domain'
+import { CanvasGraphSession } from '..'
 import { useCanvasGroupRuntime } from './useCanvasGroupRuntime'
-import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
+import type { CanvasVueFlowGraphAdapter } from '../../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
 
 type SelectableHarnessNode = Node & {
   selected?: boolean

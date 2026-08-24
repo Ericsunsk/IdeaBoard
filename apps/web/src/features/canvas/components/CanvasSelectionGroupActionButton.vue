@@ -25,7 +25,7 @@ import { computed, type CSSProperties } from 'vue'
 import { KeyframesMinus, KeyframesPlus } from '@iconoir/vue'
 import { createPageChromeRoundControlClass } from '../../../shared/lib/pageChrome'
 import { createPopoverMotionTransition } from '../../../shared/motion/popoverMotion'
-import type { CanvasSelectionGroupAction } from '../composables/useCanvasGroupRuntime'
+import type { CanvasSelectionGroupAction } from '../graph-runtime/application/useCanvasGroupRuntime'
 
 const props = defineProps<{
   action: CanvasSelectionGroupAction | null

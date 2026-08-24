@@ -3,7 +3,7 @@ import { ref, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import type { ImageNodeItem } from '../../canvas-board/domain'
 import type { CanvasBoardAttachment } from '../board-attachment'
-import { useCanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
+import { useCanvasVueFlowGraphAdapter } from '../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
 import type { FlowNodeData } from '../types/flowTypes'
 import { useCanvasLibraryImportRuntime } from './useCanvasLibraryImportRuntime'
 

@@ -1,6 +1,6 @@
 import type { Connection, Edge, Node } from '@vue-flow/core'
-import type { CanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
-import { createFlowGraphCommandOptions } from '../composables/flowGraphAdapterCommandSideEffects'
+import type { CanvasVueFlowGraphAdapter } from '../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
+import { createFlowGraphCommandOptions } from '../renderer/vue-flow/flowGraphAdapterCommandSideEffects'
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
 import {
   resolveNextCanvasConnectionId,

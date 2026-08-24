@@ -4,7 +4,7 @@ import type { CanvasCreatableNodeKind, CanvasNodeItemByKind } from '../../canvas
 import type {
   CanvasGroupRuntimeCommands,
   CanvasGroupRuntimeView,
-} from '../composables/useCanvasGroupRuntime'
+} from '../graph-runtime/application/useCanvasGroupRuntime'
 import type { CanvasFlowPaneConnectionAdapter } from '../flow-pane'
 import type { CanvasGraphNodeIdForKind } from '../graph-runtime'
 import type { CanvasImageWorkflow } from '../image-workflow'

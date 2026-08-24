@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createEmptyCanvasBoardSnapshot } from '../../canvas-board/domain'
-import { CanvasGraphSession } from '../graph-runtime'
+import { createEmptyCanvasBoardSnapshot } from '../../../canvas-board/domain'
+import { CanvasGraphSession } from '..'
 import { useCanvasGraphHistory } from './useCanvasGraphHistory'
 
 function createHarness() {

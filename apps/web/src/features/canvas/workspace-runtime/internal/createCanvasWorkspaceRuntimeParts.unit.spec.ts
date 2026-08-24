@@ -41,7 +41,7 @@ vi.mock('../../feedback/useCanvasFeedback', () => ({
   useCanvasFeedback: () => mocks.feedback,
 }))
 
-vi.mock('../../composables/useCanvasBoardRuntime', () => ({
+vi.mock('./useCanvasBoardRuntime', () => ({
   useCanvasBoardRuntime: mocks.useCanvasBoardRuntime,
 }))
 

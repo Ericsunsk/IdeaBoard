@@ -2,7 +2,7 @@ import type { Edge, Node } from '@vue-flow/core'
 import { onScopeDispose, watch, type Ref } from 'vue'
 import type { CanvasBoardSnapshot, CanvasNodeItem } from '../../canvas-board/domain'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
-import type { CanvasVueFlowGraphAdapter } from '../composables/useCanvasVueFlowGraphAdapter'
+import type { CanvasVueFlowGraphAdapter } from '../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
 import type { CanvasGraphStore } from '../graph-runtime'
 import { useFlowCanvasDrop } from '../composables/useFlowCanvasDrop'
 import { useFlowCanvasNodeHandlers } from '../composables/useFlowCanvasNodeHandlers'
@@ -18,7 +18,7 @@ import { useCanvasLibraryImportRuntime } from './useCanvasLibraryImportRuntime'
 import type { CanvasBoardAttachment } from '../board-attachment'
 import type { LibraryAssetMaterializer } from '../../library/libraryResource'
 import type { FlowLocalUploadState, FlowNodeData } from '../types/flowTypes'
-import { createFlowGraphCommandOptions } from '../composables/flowGraphAdapterCommandSideEffects'
+import { createFlowGraphCommandOptions } from '../renderer/vue-flow/flowGraphAdapterCommandSideEffects'
 
 type ValueRef<T> = { readonly value: T }
 type SnapshotNodeMutator = (snapshotNode: CanvasNodeItem) => CanvasNodeItem

@@ -10,7 +10,7 @@ import {
   type CanvasGroupResizeHandle,
   type CanvasPoint,
 } from '../utils/canvasGroupGeometry'
-import type { CanvasSelectionGroupAction } from '../composables/useCanvasGroupRuntime'
+import type { CanvasSelectionGroupAction } from '../graph-runtime/application/useCanvasGroupRuntime'
 import type { DismissTransientCanvasUi } from '../composables/useFlowTransientUiDismissal'
 
 export type CanvasGroupResizeStartPayload = {

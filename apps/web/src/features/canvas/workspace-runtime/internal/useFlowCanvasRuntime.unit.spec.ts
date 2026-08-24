@@ -1,24 +1,24 @@
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
 import { computed, nextTick, ref, shallowRef } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
-import type { CanvasBoardSession, SaveStatus } from '../board-session'
+import type { CanvasBoardSession, SaveStatus } from '../../board-session'
 import {
   assertLatestCanvasBoardState,
   createEmptyCanvasBoardSnapshot,
   type CanvasBoardSnapshot,
   type CanvasGroup,
-} from '../../canvas-board/domain'
-import { CanvasGraphSession, type CanvasGraphTransaction } from '../graph-runtime'
-import { canvasBoardSnapshotToFlow } from '../utils/flowSnapshotAdapter'
-import { useCanvasGraphEditing } from '../graph-editing'
+} from '../../../canvas-board/domain'
+import { CanvasGraphSession, type CanvasGraphTransaction } from '../../graph-runtime'
+import { canvasBoardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
+import { useCanvasGraphEditing } from '../../graph-editing'
 import { useFlowCanvasRuntime, type UseFlowCanvasRuntimeOptions } from './useFlowCanvasRuntime'
 import {
   createFlowGraphCommandOptions,
-} from './flowGraphAdapterCommandSideEffects'
+} from '../../renderer/vue-flow/flowGraphAdapterCommandSideEffects'
 import {
   CanvasBoardGraphSession,
   createPendingImageExecutionCore,
-} from '../execution/pending-execution'
+} from '../../execution/pending-execution'
 
 type MutableHarnessNode = Node & {
   selected?: boolean

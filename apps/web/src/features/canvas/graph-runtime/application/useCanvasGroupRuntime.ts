@@ -1,7 +1,7 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import type { Edge, EdgeChange, Node, NodeChange } from '@vue-flow/core'
-import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
-import type { PendingImageExecutionLease } from '../execution/pending-execution'
+import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
+import type { PendingImageExecutionLease } from '../../execution/pending-execution'
 import {
   commitCanvasGraphDeleteGroupIntent,
   isCanvasGraphNodeId,
@@ -13,7 +13,7 @@ import {
   type CanvasGraphNodeId,
   type CanvasGraphStore,
   type CanvasGraphTransaction,
-} from '../graph-runtime'
+} from '..'
 import {
   CANVAS_GROUP_FRAME_PADDING_PX,
   canvasRectToGroupGeometry,
@@ -28,10 +28,10 @@ import {
   type CanvasGroupResizeHandle,
   type CanvasPoint,
   type CanvasRect,
-} from '../utils/canvasGroupGeometry'
-import { resolveFlowNodeCanvasRef } from '../utils/flowSnapshotAdapter'
-import { releaseCanvasGraphDeleteExecutions } from '../flow-pane/flowGraphDeleteProjection'
-import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
+} from '../../utils/canvasGroupGeometry'
+import { resolveFlowNodeCanvasRef } from '../../utils/flowSnapshotAdapter'
+import { releaseCanvasGraphDeleteExecutions } from '../../flow-pane/flowGraphDeleteProjection'
+import type { CanvasVueFlowGraphAdapter } from '../../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
 
 type SelectableFlowItem = {
   id: string

@@ -3,10 +3,10 @@ import type { Edge, Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
 import { TaskCancelledError } from '../../../../shared/api/taskEvents'
 import { createEmptyCanvasBoardSnapshot } from '../../../canvas-board/domain'
-import { useCanvasVueFlowGraphAdapter } from '../../composables/useCanvasVueFlowGraphAdapter'
-import { createFlowGraphCommandOptions, readFlowGraphCommandSideEffects } from '../../composables/flowGraphAdapterCommandSideEffects'
+import { useCanvasVueFlowGraphAdapter } from '../../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
+import { createFlowGraphCommandOptions, readFlowGraphCommandSideEffects } from '../../renderer/vue-flow/flowGraphAdapterCommandSideEffects'
 import { CanvasGraphSession } from '../../graph-runtime'
-import { bindCanvasGraphSessionProjection } from '../../composables/bindCanvasGraphSessionProjection'
+import { bindCanvasGraphSessionProjection } from '../../renderer/vue-flow/bindCanvasGraphSessionProjection'
 import {
   canvasBoardSnapshotToFlow,
 } from '../../utils/flowSnapshotAdapter'

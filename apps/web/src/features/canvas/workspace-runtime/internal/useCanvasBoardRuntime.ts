@@ -1,14 +1,14 @@
 import { computed, ref, shallowRef, type Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
-import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../canvas-board/domain'
-import { HOME_PATH } from '../../../shared/constants/routePaths'
-import { useCanvasBoardSession, type SaveStatus } from '../board-session'
-import { useFlowBoardHeaderActions } from './useFlowBoardHeaderActions'
+import { createEmptyCanvasBoardSnapshot, type CanvasBoardSnapshot } from '../../../canvas-board/domain'
+import { HOME_PATH } from '../../../../shared/constants/routePaths'
+import { useCanvasBoardSession, type SaveStatus } from '../../board-session'
+import { useFlowBoardHeaderActions } from '../../composables/useFlowBoardHeaderActions'
 import { useFlowCanvasRuntime } from './useFlowCanvasRuntime'
-import type { CanvasVueFlowGraphActions } from './useCanvasVueFlowGraphAdapter'
-import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
-import type { PendingImageExecutionCore } from '../execution/pending-execution'
+import type { CanvasVueFlowGraphActions } from '../../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
+import type { CanvasFeedback } from '../../feedback/useCanvasFeedback'
+import type { PendingImageExecutionCore } from '../../execution/pending-execution'
 
 type CanvasBoardRuntimeFeedback = CanvasFeedback['boardSession']
 

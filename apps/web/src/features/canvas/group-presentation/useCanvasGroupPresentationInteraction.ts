@@ -7,7 +7,7 @@ import type {
   CanvasGroupResizeHandle,
   CanvasPoint,
 } from '../utils/canvasGroupGeometry'
-import type { CanvasSelectionGroupAction } from '../composables/useCanvasGroupRuntime'
+import type { CanvasSelectionGroupAction } from '../graph-runtime/application/useCanvasGroupRuntime'
 import type { DismissTransientCanvasUi } from '../composables/useFlowTransientUiDismissal'
 import { useCanvasCustomLayerOverlay } from '../overlay-lifecycle'
 import { useCanvasGroupPointerInteraction } from './useCanvasGroupPointerInteraction'

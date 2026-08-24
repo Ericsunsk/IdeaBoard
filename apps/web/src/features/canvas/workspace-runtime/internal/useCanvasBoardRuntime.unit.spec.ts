@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { computed, ref } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
-import { HOME_PATH } from '../../../shared/constants/routePaths'
+import { HOME_PATH } from '../../../../shared/constants/routePaths'
 import { useCanvasBoardRuntime } from './useCanvasBoardRuntime'
-import { createPendingImageExecutionCore } from '../execution/pending-execution'
+import { createPendingImageExecutionCore } from '../../execution/pending-execution'
 
 const mocks = vi.hoisted(() => ({
   useCanvasBoardSession: vi.fn(),
@@ -11,11 +11,11 @@ const mocks = vi.hoisted(() => ({
   useFlowCanvasRuntime: vi.fn(),
 }))
 
-vi.mock('../board-session', () => ({
+vi.mock('../../board-session', () => ({
   useCanvasBoardSession: mocks.useCanvasBoardSession,
 }))
 
-vi.mock('./useFlowBoardHeaderActions', () => ({
+vi.mock('../../composables/useFlowBoardHeaderActions', () => ({
   useFlowBoardHeaderActions: mocks.useFlowBoardHeaderActions,
 }))
 

@@ -13,8 +13,8 @@ import {
   resolveImageNodeDisplayPayload,
   type ImageNodeDisplayPayload,
 } from '../utils/flowImageNodeSelectors'
-import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
-import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
+import type { CanvasVueFlowGraphAdapter } from '../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
+import { createFlowGraphCommandOptions } from '../renderer/vue-flow/flowGraphAdapterCommandSideEffects'
 import {
   type CanvasGraphStore,
 } from '../graph-runtime'

@@ -4,7 +4,7 @@ import type {
   CanvasGraphCommitPatch,
   CanvasGraphEdgeRecord,
   CanvasGraphNodeRecord,
-} from '../graph-runtime'
+} from '../../graph-runtime'
 import {
   createCanvasGraphCommitProjectionController,
   projectCanvasGraphCommit,

@@ -2,9 +2,9 @@ import { shallowRef } from 'vue'
 import type {
   CanvasGraphCommitPatch,
   CanvasGraphPatchDirection,
-} from '../graph-runtime'
-import { recordCanvasInteractionCount } from '../utils/canvasInteractionMetrics'
-import { measureCanvasPerf } from '../utils/canvasPerfProbe'
+} from '..'
+import { recordCanvasInteractionCount } from '../../utils/canvasInteractionMetrics'
+import { measureCanvasPerf } from '../../utils/canvasPerfProbe'
 
 type UseCanvasGraphHistoryOptions = {
   maxSteps?: number

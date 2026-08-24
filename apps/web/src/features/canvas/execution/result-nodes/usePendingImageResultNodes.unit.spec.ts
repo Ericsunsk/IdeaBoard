@@ -3,7 +3,7 @@ import type { Edge, Node } from '@vue-flow/core'
 import { describe, expect, it, vi } from 'vitest'
 import { createEmptyCanvasBoardSnapshot } from '../../../canvas-board/domain'
 import { CanvasGraphStore, CanvasGraphSession } from '../../graph-runtime'
-import { bindCanvasGraphSessionProjection } from '../../composables/bindCanvasGraphSessionProjection'
+import { bindCanvasGraphSessionProjection } from '../../renderer/vue-flow/bindCanvasGraphSessionProjection'
 import { canvasBoardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
 import { usePendingImageResultExecution } from './usePendingImageResultNodes'
 

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CanvasGraphGroupId } from '../graph-runtime'
 import type { CanvasFlowViewportTransform, CanvasGroupFrame } from '../utils/canvasGroupGeometry'
 import { useCanvasGroupPresentationInteraction } from './index'
-import type { CanvasSelectionGroupAction } from '../composables/useCanvasGroupRuntime'
+import type { CanvasSelectionGroupAction } from '../graph-runtime/application/useCanvasGroupRuntime'
 
 function createPromptNode(id: string, x: number, y: number, width = 280): Node {
   return {

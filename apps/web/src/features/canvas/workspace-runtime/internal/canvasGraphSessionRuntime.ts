@@ -1,17 +1,17 @@
-import type { Edge, Node, Ref } from '@vue-flow/core'
-import { onScopeDispose } from 'vue'
-import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
-import type { CanvasBoardSession } from '../board-session'
-import type { CanvasGraphHistory } from './useCanvasGraphHistory'
-import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
-import { bindCanvasGraphSessionProjection } from './bindCanvasGraphSessionProjection'
-import { canvasBoardSnapshotToFlow } from '../utils/flowSnapshotAdapter'
-import { CanvasGraphSession, type CanvasGraphStore } from '../graph-runtime'
+import type { Edge, Node } from '@vue-flow/core'
+import { onScopeDispose, type Ref } from 'vue'
+import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
+import type { CanvasBoardSession } from '../../board-session'
+import type { CanvasGraphHistory } from '../../graph-runtime/application/useCanvasGraphHistory'
+import type { CanvasVueFlowGraphAdapter } from '../../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
+import { bindCanvasGraphSessionProjection } from '../../renderer/vue-flow/bindCanvasGraphSessionProjection'
+import { canvasBoardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
+import { CanvasGraphSession, type CanvasGraphStore } from '../../graph-runtime'
 import {
   CanvasBoardGraphSession,
   collectPendingImageTasks,
   type PendingImageExecutionCore,
-} from '../execution/pending-execution'
+} from '../../execution/pending-execution'
 
 type CanvasGraphSessionRuntimeOptions = {
   nodes: Ref<Node[]>

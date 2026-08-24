@@ -1,4 +1,4 @@
-import type { useCanvasBoardRuntime } from '../../composables/useCanvasBoardRuntime'
+import type { useCanvasBoardRuntime } from './useCanvasBoardRuntime'
 import type { CanvasFeedback } from '../../feedback/useCanvasFeedback'
 import type { CanvasFlowPaneAdapter } from '../../flow-pane'
 import { useCanvasImageWorkflow, type CanvasImageWorkflowUiAdapter } from '../../image-workflow'

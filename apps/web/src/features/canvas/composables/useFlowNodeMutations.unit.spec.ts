@@ -10,9 +10,9 @@ import {
 } from '../../canvas-board/domain'
 import { CanvasGraphSession } from '../graph-runtime'
 import { flowConnectionToCanvasConnection } from '../utils/flowConnectionAdapter'
-import { bindCanvasGraphSessionProjection } from './bindCanvasGraphSessionProjection'
+import { bindCanvasGraphSessionProjection } from '../renderer/vue-flow/bindCanvasGraphSessionProjection'
 import { FLOW_NODE_DRAG_HANDLE } from '../utils/flowNodeDragHandle'
-import { useCanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
+import { useCanvasVueFlowGraphAdapter } from '../renderer/vue-flow/useCanvasVueFlowGraphAdapter'
 import { useFlowNodeMutations } from './useFlowNodeMutations'
 
 function makePromptSnapshot(id: number): PromptNodeItem {
