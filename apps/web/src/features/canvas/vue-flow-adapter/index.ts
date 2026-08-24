@@ -1,4 +1,6 @@
 export type { CanvasVueFlowAdapter } from './types'
+export { createCanvasSelectionController } from './canvasSelectionController'
+export type { CanvasSelectionController, CanvasSelectionPhase } from './canvasSelectionController'
 export {
   createCanvasVueFlowRendererMetricsPort,
   type CanvasRendererDimensions,

@@ -1,6 +1,7 @@
 import type { Ref } from 'vue'
 import { useVueFlow, type EdgeChange, type Elements } from '@vue-flow/core'
 import type { DismissTransientCanvasUi } from '../workspace-ui/useFlowTransientUiDismissal'
+import { createCanvasSelectionController } from './canvasSelectionController'
 
 type UseVueFlowSelectionAdapterOptions = {
   activeTool: Ref<string>
@@ -9,15 +10,6 @@ type UseVueFlowSelectionAdapterOptions = {
 }
 
 type FlowElement = Elements[number]
-
-type MarqueeSelectionSnapshot = {
-  selectedNodeIds: Set<string>
-  isToggleMode: boolean
-  startX: number
-  startY: number
-}
-
-const MARQUEE_CLICK_TOLERANCE_PX = 1
 
 function isFlowEdgeElement(element: FlowElement): boolean {
   const candidate = element as { source?: unknown; target?: unknown }
@@ -32,13 +24,6 @@ function isCanvasPanePointerTarget(target: EventTarget | null): boolean {
   return target instanceof Element && target.classList.contains('vue-flow__pane')
 }
 
-function isPointerMoved(snapshot: MarqueeSelectionSnapshot, event: MouseEvent): boolean {
-  return (
-    Math.abs(event.clientX - snapshot.startX) > MARQUEE_CLICK_TOLERANCE_PX ||
-    Math.abs(event.clientY - snapshot.startY) > MARQUEE_CLICK_TOLERANCE_PX
-  )
-}
-
 export function useVueFlowSelectionAdapter(options: UseVueFlowSelectionAdapterOptions) {
   const {
     getSelectedElements,
@@ -47,19 +32,19 @@ export function useVueFlowSelectionAdapter(options: UseVueFlowSelectionAdapterOp
     findNode,
     nodesSelectionActive,
   } = useVueFlow()
-  let marqueeSelectionSnapshot: MarqueeSelectionSnapshot | null = null
-  let isMarqueeSelectionActive = false
+  const selectionController = createCanvasSelectionController({
+    readElements: () => [...getSelectedElements.value],
+    clearElements: (elements) => removeSelectedElements(elements),
+    addNodes: (nodes) => addSelectedNodes(nodes as Parameters<typeof addSelectedNodes>[0]),
+    findNode,
+  })
 
   function readSelectedElements(): Elements {
     return [...getSelectedElements.value]
   }
 
   function clearSelection(elements?: Elements): boolean {
-    const targetElements = elements ?? readSelectedElements()
-    if (targetElements.length > 0) {
-      removeSelectedElements(targetElements)
-    }
-    return targetElements.length > 0
+    return selectionController.clear(elements ?? readSelectedElements())
   }
 
   function readSelectedNodeIds(elements = readSelectedElements()): Set<string> {
@@ -88,30 +73,17 @@ export function useVueFlowSelectionAdapter(options: UseVueFlowSelectionAdapterOp
   }
 
   function onPointerDownCapture(event: PointerEvent) {
-    marqueeSelectionSnapshot = null
+    selectionController.reset()
     if (options.activeTool.value !== 'select') return
     if (event.button !== 0 || event.pointerType === 'touch') return
     if (!isCanvasPanePointerTarget(event.target)) return
 
-    marqueeSelectionSnapshot = {
-      selectedNodeIds: readSelectedNodeIds(),
-      isToggleMode: event.shiftKey,
-      startX: event.clientX,
-      startY: event.clientY,
-    }
+    selectionController.beginMarquee(event)
   }
 
   function onSelectionStart(event: MouseEvent) {
     if (options.activeTool.value !== 'select') return
-    isMarqueeSelectionActive = true
-    if (!marqueeSelectionSnapshot) {
-      marqueeSelectionSnapshot = {
-        selectedNodeIds: readSelectedNodeIds(),
-        isToggleMode: event.shiftKey,
-        startX: event.clientX,
-        startY: event.clientY,
-      }
-    }
+    selectionController.beginMarquee(event)
     options.dismissTransientCanvasUi({
       closeExpand: true,
       closeBoardHeader: true,
@@ -119,50 +91,15 @@ export function useVueFlowSelectionAdapter(options: UseVueFlowSelectionAdapterOp
     })
   }
 
-  function reconcileShiftMarqueeSelection(
-    snapshot: MarqueeSelectionSnapshot,
-    selectedNodes: FlowElement[],
-    event: MouseEvent,
-  ) {
-    const marqueeNodeIds = new Set(selectedNodes.map((node) => node.id))
-    const didDragMarquee = isPointerMoved(snapshot, event) || marqueeNodeIds.size > 0
-    if (!snapshot.isToggleMode || !didDragMarquee) return
-
-    const nodesToToggleOff = selectedNodes.filter((node) => snapshot.selectedNodeIds.has(node.id))
-    if (nodesToToggleOff.length > 0) {
-      removeSelectedElements(nodesToToggleOff)
-    }
-
-    const nodesToRestore = [...snapshot.selectedNodeIds]
-      .filter((nodeId) => !marqueeNodeIds.has(nodeId))
-      .map((nodeId) => findNode(nodeId))
-      .filter((node): node is NonNullable<typeof node> => !!node)
-
-    if (nodesToRestore.length > 0) {
-      addSelectedNodes(nodesToRestore)
-    }
-  }
-
   function onSelectionEnd(event: MouseEvent) {
-    const snapshot = marqueeSelectionSnapshot
-    marqueeSelectionSnapshot = null
-    isMarqueeSelectionActive = false
-
     const selectedElements = readSelectedElements()
-    const selectedEdges = selectedElements.filter(isFlowEdgeElement)
-    if (selectedEdges.length > 0) {
-      removeSelectedElements(selectedEdges)
-    }
-
-    if (snapshot) {
-      reconcileShiftMarqueeSelection(snapshot, selectedElements.filter(isFlowNodeElement), event)
-    }
+    selectionController.endMarquee(event, selectedElements)
 
     nodesSelectionActive.value = readSelectedNodeIds().size > 1
   }
 
   function filterMarqueeEdgeChanges(changes: EdgeChange[]): EdgeChange[] {
-    if (!isMarqueeSelectionActive) return changes
+    if (selectionController.phase !== 'marquee') return changes
     return changes.filter((change) => change.type !== 'select')
   }
 
