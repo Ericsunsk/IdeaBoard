@@ -1,6 +1,7 @@
 import type { Actions, Edge, Node } from '@vue-flow/core'
 import type { Ref } from 'vue'
 import type { CanvasFlowViewport } from './useCanvasViewportRuntime'
+import type { CanvasRendererMetricsPort } from './canvasRendererMetrics'
 
 type ValueRef<T> = {
   readonly value: T
@@ -42,4 +43,5 @@ export type CanvasVueFlowAdapter = {
   removeSelectedElements: (elements: Array<Node | Edge>) => void
   selectOnlyNode: (nodeId: string) => boolean
   vueFlowGraphActions: CanvasVueFlowGraphActions
+  rendererMetrics: CanvasRendererMetricsPort
 }

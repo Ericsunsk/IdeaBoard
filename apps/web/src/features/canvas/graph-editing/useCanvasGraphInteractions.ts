@@ -9,18 +9,18 @@ import {
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import {
   isCanvasGraphNodeId,
-  toCanvasGraphNodeId,
   type CanvasGraphNodeId,
   type CanvasGraphStore,
+  type CanvasGraphReadPort,
 } from '../graph-runtime'
 import { useFlowCanvasInteractionState } from '../workspace-ui/useFlowCanvasInteractionState'
 import { useFlowNodeUiState } from '../node-presentation/useFlowNodeUiState'
 import type { CanvasVueFlowGraphAdapter } from '../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
+import type { CanvasRendererMetricsPort } from '../vue-flow-adapter'
 import { createFlowGraphCommandOptions } from '../vue-flow-adapter/flowGraphAdapterCommandSideEffects'
 import { createImageFlowNode } from '../utils/flowImageNodeFactory'
 import { createCanvasNodeAt } from '../utils/canvasNodeFactory'
 import { resolveImageNodeDisplayPayload } from '../utils/flowImageNodeSelectors'
-import { resolveFlowNodeCanvasRef } from '../utils/flowSnapshotAdapter'
 import type { CanvasGraphInteractionBrowserAdapter } from './interactionBrowserAdapter'
 
 type MessageLoadingHandle = { destroy: () => void }
@@ -34,7 +34,9 @@ type UseCanvasGraphInteractionsOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   graphAdapter: CanvasVueFlowGraphAdapter
-  readCanvasGraphStore: () => CanvasGraphStore
+  readCanvasGraphStore: () => CanvasGraphReadPort
+  writeCanvasGraphStore?: () => CanvasGraphStore
+  rendererMetrics?: CanvasRendererMetricsPort
   selection: CanvasGraphInteractionSelectionAdapter
   browser: CanvasGraphInteractionBrowserAdapter
   preview: {
@@ -124,6 +126,21 @@ function cloneImageOutputs(source: ImageNodeItem): ImageNodeItem['outputImages']
 }
 
 export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOptions) {
+  const writeGraphStore = () =>
+    options.writeCanvasGraphStore?.() ?? (options.readCanvasGraphStore() as CanvasGraphStore)
+  const rendererMetrics: CanvasRendererMetricsPort = options.rendererMetrics ?? {
+    readNodeMetrics: (nodeId) => {
+      const node = options.nodes.value.find((candidate) => candidate.id === nodeId)
+      if (!node) return null
+      return {
+        nodeId,
+        position: { x: node.position.x, y: node.position.y },
+        dimensions: { width: Number(node.width ?? 0), height: Number(node.height ?? 0) },
+        computedPosition: { x: node.position.x, y: node.position.y },
+        measured: Number(node.width ?? 0) > 0 && Number(node.height ?? 0) > 0,
+      }
+    },
+  }
   const interaction = useFlowCanvasInteractionState()
   const nodeUiState = useFlowNodeUiState({
     nodes: options.nodes,
@@ -135,28 +152,22 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
     Map<string, { graphNodeId: CanvasGraphNodeId; x: number; y: number }> | undefined
   >()
 
-  function resolveGraphNodeId(flowNode: Pick<Node, 'id' | 'data'>): CanvasGraphNodeId | null {
-    const ref = resolveFlowNodeCanvasRef(flowNode)
-    if (ref) return toCanvasGraphNodeId(ref.nodeType, ref.id)
-    return isCanvasGraphNodeId(flowNode.id) ? flowNode.id : null
+  function resolveGraphNodeId(flowNodeId: string): CanvasGraphNodeId | null {
+    return isCanvasGraphNodeId(flowNodeId) ? flowNodeId : null
   }
 
   function readSelectedGraphNodeIds(): CanvasGraphNodeId[] {
     const selectedFlowIds = new Set(options.selection.selectedElements.value.map((item) => item.id))
-    const graphNodeIds = options.nodes.value
-      .filter((node) => selectedFlowIds.has(node.id))
+    const store = options.readCanvasGraphStore()
+    const graphNodeIds = Array.from(selectedFlowIds)
       .map(resolveGraphNodeId)
       .filter((nodeId): nodeId is CanvasGraphNodeId => nodeId !== null)
+      .filter((nodeId) => !!store.getNode(nodeId))
     return Array.from(new Set(graphNodeIds))
   }
 
   function readImageNode(nodeId: string): ImageNodeItem | null {
-    const flowNode = options.nodes.value.find((node) => node.id === nodeId)
-    const graphNodeId = flowNode
-      ? resolveGraphNodeId(flowNode)
-      : isCanvasGraphNodeId(nodeId)
-        ? nodeId
-        : null
+    const graphNodeId = resolveGraphNodeId(nodeId)
     if (!graphNodeId) return null
     const record = options.readCanvasGraphStore().getNode(graphNodeId)
     return record?.kind === 'image' ? (record.snapshot as ImageNodeItem) : null
@@ -187,7 +198,7 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
     image.width = resolveImageNodeFrameSize(payload.ratio, true).width
     image.outputStatus = 'ready'
     image.outputImages = []
-    const transaction = options.readCanvasGraphStore().beginTransaction('node-update')
+    const transaction = writeGraphStore().beginTransaction('node-update')
     try {
       transaction.addNode(image).commit()
     } catch (error) {
@@ -248,16 +259,20 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
       duplicateDrag.value = undefined
       return
     }
+    const store = options.readCanvasGraphStore()
     const selectedIds = new Set(options.selection.selectedElements.value.map((item) => item.id))
-    const candidates =
-      selectedIds.size > 0
-        ? options.nodes.value.filter((node) => selectedIds.has(node.id))
-        : options.nodes.value
+    const candidateIds =
+      selectedIds.size > 0 ? Array.from(selectedIds) : store.getNodeIds()
     duplicateDrag.value = new Map(
-      candidates.flatMap((node) => {
-        const graphNodeId = resolveGraphNodeId(node)
-        return graphNodeId
-          ? [[node.id, { graphNodeId, x: node.position.x, y: node.position.y }] as const]
+      candidateIds.flatMap((flowNodeId) => {
+        const graphNodeId = resolveGraphNodeId(flowNodeId)
+        const record = graphNodeId ? store.getNode(graphNodeId) : undefined
+        const metrics = graphNodeId
+          ? rendererMetrics.readNodeMetrics(flowNodeId)
+          : null
+        const position = metrics?.position ?? (record ? { x: record.snapshot.x, y: record.snapshot.y } : null)
+        return graphNodeId && record?.kind === 'image' && position
+          ? [[flowNodeId, { graphNodeId, x: position.x, y: position.y }] as const]
           : []
       }),
     )
@@ -268,16 +283,15 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
     duplicateDrag.value = undefined
     if (!initial || !isDuplicateMode || initial.size === 0) return
     const store = options.readCanvasGraphStore()
-    const currentById = new Map(options.nodes.value.map((node) => [node.id, node]))
     const reset = new Map<string, { x: number; y: number }>()
     const appended: Node[] = []
     const appendedSnapshots: ImageNodeItem[] = []
     initial.forEach((start, flowNodeId) => {
-      const current = currentById.get(flowNodeId)
       const record = store.getNode(start.graphNodeId)
-      if (!current || record?.kind !== 'image') return
-      const dx = current.position.x - start.x
-      const dy = current.position.y - start.y
+      const metrics = rendererMetrics.readNodeMetrics(flowNodeId)
+      if (!metrics || record?.kind !== 'image') return
+      const dx = metrics.position.x - start.x
+      const dy = metrics.position.y - start.y
       if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return
       const source = record.snapshot as ImageNodeItem
       const copied = createCanvasNodeAt('image', { x: source.x + dx, y: source.y + dy })
@@ -294,7 +308,7 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
       appendedSnapshots.push(copied)
     })
     if (appended.length === 0) return
-    const transaction = store.beginTransaction('node-update')
+    const transaction = writeGraphStore().beginTransaction('node-update')
     try {
       initial.forEach((start, flowNodeId) => {
         if (reset.has(flowNodeId)) {

@@ -73,7 +73,36 @@ function createHarness(activeNodeIds: readonly string[] = []) {
     replaceCurrentStore: (nextStore: CanvasGraphStore) => {
       currentStore = nextStore
     },
+    syncGraph: () => {
+      currentStore.hydrate(createSnapshotFromFlow(nodes.value, edges.value))
+    },
   }
+}
+
+function createSnapshotFromFlow(nodes: readonly Node[], edges: readonly Edge[]) {
+  const snapshot = createEmptyCanvasBoardSnapshot()
+  nodes.forEach((node) => {
+    const snapshotNode = node.data?.snapshotNode
+    if (!snapshotNode) return
+    if (snapshotNode.type === 'image-node') snapshot.imageNodes.push(snapshotNode)
+    else if (snapshotNode.type === 'prompt') snapshot.promptNodes.push(snapshotNode)
+    else snapshot.fusionNodes.push(snapshotNode)
+  })
+  edges.forEach((edge) => {
+    const match = /^edge-(\d+)$/.exec(edge.id)
+    if (!match) return
+    const connection = {
+      id: Number(match[1]),
+      fromNodeType: 'image',
+      fromNodeId: Number(edge.source.split('-')[1]),
+      fromPort: 'image',
+      toNodeType: 'image',
+      toNodeId: Number(edge.target.split('-')[1]),
+      toPort: 'image',
+    } as const
+    snapshot.connections.push(connection)
+  })
+  return snapshot
 }
 
 const source = { url: 'source', ratio: 1 }
@@ -128,6 +157,7 @@ describe('usePendingImageResultExecution reservation projection', () => {
     harness.edges.value.push({
       id: 'edge-1', source: 'image-1', sourceHandle: 'out:image', target: 'image-2', targetHandle: 'in:image',
     })
+    harness.syncGraph()
 
     const reservation = harness.actions.reservePendingResults({ source, sourceNodeId: 'image-1', outputCount: 1 })
 
@@ -142,6 +172,7 @@ describe('usePendingImageResultExecution reservation projection', () => {
     harness.edges.value.push({
       id: 'edge-1', source: 'image-1', sourceHandle: 'out:image', target: 'image-2', targetHandle: 'in:image',
     })
+    harness.syncGraph()
 
     const reservation = harness.actions.reservePendingResults({ source, sourceNodeId: 'image-1', outputCount: 1 })
 
@@ -152,12 +183,26 @@ describe('usePendingImageResultExecution reservation projection', () => {
   it('places a new result below an occupied preferred column instead of colliding', () => {
     const harness = createHarness()
     harness.nodes.value.push({
-      id: 'note-2',
+      id: 'prompt-2',
       position: { x: 390, y: 20 },
       width: 280,
       height: 180,
-      data: { kind: 'note', snapshotNode: { width: 280, height: 180 } },
+      data: {
+        kind: 'prompt',
+        snapshotNode: {
+          id: 2,
+          type: 'prompt',
+          x: 390,
+          y: 20,
+          width: 280,
+          text: 'occupied',
+          outputCount: 1,
+          aspectRatio: 'auto',
+          inputImages: [],
+        },
+      },
     })
+    harness.syncGraph()
 
     const reservation = harness.actions.reservePendingResults({ source, sourceNodeId: 'image-1', outputCount: 1 })
     const resultNode = harness.nodes.value.find((node) => node.id === reservation.resultNodeIds[0])

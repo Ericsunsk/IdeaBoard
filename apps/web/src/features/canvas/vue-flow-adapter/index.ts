@@ -1,4 +1,11 @@
 export type { CanvasVueFlowAdapter } from './types'
+export {
+  createCanvasVueFlowRendererMetricsPort,
+  type CanvasRendererDimensions,
+  type CanvasRendererMetricsPort,
+  type CanvasRendererNodeMetrics,
+  type CanvasRendererPoint,
+} from './canvasRendererMetrics'
 export type { CanvasVueFlowConnectionAdapter } from './vueFlowConnectionBindings'
 export { createCanvasVueFlowConnectionAdapter } from './vueFlowConnectionBindings'
 export { createCanvasConnectionCommandLifecycle } from './connectionCommandLifecycle'

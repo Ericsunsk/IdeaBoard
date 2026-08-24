@@ -60,6 +60,25 @@ export type CanvasGraphGroupRecord = {
 
 export type CanvasGraphGroupGeometry = Pick<CanvasGraphGroupRecord, 'x' | 'y' | 'width' | 'height'>
 
+/**
+ * Read-only canonical graph boundary for business modules.
+ *
+ * Consumers that only inspect topology or domain snapshots must depend on
+ * this port instead of the mutable store implementation or Vue Flow arrays.
+ */
+export type CanvasGraphReadPort = {
+  getNodeIds: () => CanvasGraphNodeId[]
+  getEdgeIds: () => CanvasGraphEdgeId[]
+  getGroupIds: () => CanvasGraphGroupId[]
+  getNode: (id: CanvasGraphNodeId) => CanvasGraphNodeRecord | undefined
+  getEdge: (id: CanvasGraphEdgeId) => CanvasGraphEdgeRecord | undefined
+  getGroup: (id: CanvasGraphGroupId) => CanvasGraphGroupRecord | undefined
+  getGroupIdForNode: (nodeId: CanvasGraphNodeId) => CanvasGraphGroupId | undefined
+  getNodeIdsByKind: (kind: CanvasGraphNodeKind) => CanvasGraphNodeId[]
+  getOutgoingEdgeIds: (nodeId: CanvasGraphNodeId) => CanvasGraphEdgeId[]
+  getIncomingEdgeIds: (nodeId: CanvasGraphNodeId) => CanvasGraphEdgeId[]
+}
+
 export type CanvasGraphProjectionPatch = {
   nodes: {
     added: CanvasGraphNodeRecord[]

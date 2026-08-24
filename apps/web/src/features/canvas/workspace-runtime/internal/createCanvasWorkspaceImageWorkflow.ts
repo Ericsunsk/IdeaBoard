@@ -25,6 +25,7 @@ export function createCanvasWorkspaceImageWorkflow(
     execution: {
       edges: options.board.flowPane.edges,
       readCanvasGraphStore: options.board.graphEditing.readCanvasGraphStore,
+      rendererMetrics: options.flowPaneAdapter.rendererMetrics,
       boardBaseSnapshot: options.board.boardSession.boardBaseSnapshot,
       flushAutosave: options.flushAutosave,
       refreshNodeInternals: options.graph.executionPort.refreshNodeInternals,

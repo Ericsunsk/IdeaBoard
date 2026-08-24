@@ -3,6 +3,7 @@ import type { Ref } from 'vue'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
 import type { TaskImageResult } from '../../../../shared/query/taskResult'
 import type { CanvasGraphStore } from '../../graph-runtime'
+import type { CanvasRendererMetricsPort } from '../../vue-flow-adapter'
 import { loadImageSizeFromUrl } from '../media/imageSize'
 import type { ActivatedImageExecutionPlan } from '../planning/ImageExecutionPlan'
 import {
@@ -51,6 +52,7 @@ export type UseCanvasExecutionWorkspaceOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   readCanvasGraphStore: () => CanvasGraphStore
+  rendererMetrics: CanvasRendererMetricsPort
   boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   refreshNodeInternals?: (nodeIds: string[]) => void
   flushAutosave?: (options?: { silent?: boolean }) => Promise<void>
@@ -78,6 +80,8 @@ export function useCanvasExecutionWorkspace(
       nodes: options.nodes,
       edges: options.edges,
       readCanvasGraphStore: options.readCanvasGraphStore,
+      writeCanvasGraphStore: options.readCanvasGraphStore,
+      rendererMetrics: options.rendererMetrics,
       readCurrentAttachment: options.executionCore.currentAttachment,
       isAttachmentCurrent: options.executionCore.isAttachmentCurrent,
       refreshNodeInternals: options.refreshNodeInternals,

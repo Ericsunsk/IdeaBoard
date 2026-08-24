@@ -1,5 +1,6 @@
 import { useVueFlow } from '@vue-flow/core'
 import type { CanvasVueFlowAdapter } from './types'
+import { createCanvasVueFlowRendererMetricsPort } from './canvasRendererMetrics'
 
 export function useVueFlowAdapter(): CanvasVueFlowAdapter {
   const {
@@ -64,5 +65,6 @@ export function useVueFlowAdapter(): CanvasVueFlowAdapter {
       applyNodeChanges,
       applyEdgeChanges,
     },
+    rendererMetrics: createCanvasVueFlowRendererMetricsPort(findNode),
   }
 }

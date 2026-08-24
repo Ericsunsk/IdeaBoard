@@ -11,6 +11,7 @@ import {
 } from '../execution'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasGraphStore } from '../graph-runtime'
+import type { CanvasRendererMetricsPort } from '../vue-flow-adapter'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 
 type CanvasTaskExecutionFeedback = CanvasFeedback['taskExecution']
@@ -19,6 +20,7 @@ export type UseImageWorkflowExecutionOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   readCanvasGraphStore: () => CanvasGraphStore
+  rendererMetrics: CanvasRendererMetricsPort
   boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   flushAutosave: (options?: { silent?: boolean }) => Promise<void>
   refreshNodeInternals: (nodeIds: string[]) => void
@@ -104,6 +106,7 @@ export function useImageWorkflowExecution(
     nodes: options.nodes,
     edges: options.edges,
     readCanvasGraphStore: options.readCanvasGraphStore,
+    rendererMetrics: options.rendererMetrics,
     boardBaseSnapshot: options.boardBaseSnapshot,
     flushAutosave: options.flushAutosave,
     refreshNodeInternals: options.refreshNodeInternals,
@@ -117,6 +120,7 @@ export function useImageWorkflowExecution(
     nodes: options.nodes,
     edges: options.edges,
     readCanvasGraphStore: options.readCanvasGraphStore,
+    rendererMetrics: options.rendererMetrics,
     boardBaseSnapshot: options.boardBaseSnapshot,
     flushAutosave: options.flushAutosave,
     refreshNodeInternals: options.refreshNodeInternals,

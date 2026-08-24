@@ -1,4 +1,5 @@
 import { useVueFlow } from '@vue-flow/core'
+import { createCanvasVueFlowRendererMetricsPort } from './canvasRendererMetrics'
 import type {
   CanvasHandleProximityDirection,
   CanvasHandleProximityGeometry,
@@ -30,6 +31,7 @@ function resolveAnchorOffset(
  */
 export function useCanvasVueFlowHandleGeometryAdapter(): CanvasHandleProximityGeometry {
   const { findNode, viewport, vueFlowRef } = useVueFlow()
+  const rendererMetrics = createCanvasVueFlowRendererMetricsPort(findNode)
   let surfaceOrigin: CanvasSurfaceOrigin = null
 
   function prepare() {
@@ -48,11 +50,11 @@ export function useCanvasVueFlowHandleGeometryAdapter(): CanvasHandleProximityGe
     direction: CanvasHandleProximityDirection,
   ): CanvasHandleProximityPoint | null {
     const origin = surfaceOrigin
-    const node = findNode(nodeId)
-    if (!origin || !node) return null
+    const metrics = rendererMetrics.readNodeMetrics(nodeId)
+    if (!origin || !metrics || !metrics.measured || !metrics.computedPosition) return null
 
-    const { width, height } = node.dimensions
-    const { x, y } = node.computedPosition
+    const { width, height } = metrics.dimensions
+    const { x, y } = metrics.computedPosition
     const activeViewport = viewport.value
     if (
       !isUsableCoordinate(width) ||

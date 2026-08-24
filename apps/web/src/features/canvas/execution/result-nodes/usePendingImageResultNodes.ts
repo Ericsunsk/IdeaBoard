@@ -3,7 +3,6 @@ import type { Edge, Node } from '@vue-flow/core'
 import { createCanvasNodeAt } from '../../utils/canvasNodeFactory'
 import { requireImageNodeOutputCount, type ImageNodeItem } from '../../../canvas-board/domain'
 import type { FlowNodeData } from '../../types/flowTypes'
-import { resolveFlowNodeDragHandle } from '../../utils/flowNodeDragHandle'
 import {
   resolveImageNodeFrameSize,
   resolveImageNodeStageHeight,
@@ -15,15 +14,23 @@ import type {
 } from '../planning/imageExecutionResultTypes'
 import { resolveImageNodeLayoutAnchor } from '../../utils/flowImageNodeSelectors'
 import { waitForNextRenderFrame } from '../../utils/animationFrame'
-import type { CanvasGraphStore } from '../../graph-runtime'
+import type {
+  CanvasGraphNodeRecord,
+  CanvasGraphReadPort,
+  CanvasGraphStore,
+} from '../../graph-runtime'
 import type { CanvasBoardAttachment } from '../../board-attachment'
 import { flowConnectionToCanvasConnection } from '../../utils/flowConnectionAdapter'
 import { canvasConnectionToFlowEdge } from '../../utils/flowSnapshotAdapter'
+import { canvasNodeToFlowNode } from '../../utils/flowSnapshotAdapter'
+import type { CanvasRendererMetricsPort } from '../../vue-flow-adapter'
 
 type UsePendingImageResultNodesOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
-  readCanvasGraphStore: () => CanvasGraphStore
+  readCanvasGraphStore: () => CanvasGraphReadPort
+  writeCanvasGraphStore?: () => CanvasGraphStore
+  rendererMetrics?: CanvasRendererMetricsPort
   readCurrentAttachment: () => CanvasBoardAttachment | null
   isAttachmentCurrent: (attachment: CanvasBoardAttachment) => boolean
   refreshNodeInternals?: (nodeIds: string[]) => void
@@ -63,7 +70,7 @@ type ImageResultLayout = ImageResultAnchor & {
 }
 
 type PendingImageResultLookup = {
-  nodeById: Map<string, Node>
+  nodeById: Map<string, CanvasGraphNodeRecord>
   imageChildIdsBySource: Map<string, string[]>
 }
 
@@ -91,24 +98,46 @@ function estimateImageNodeHeight(source: Pick<ImageResultLayout, 'width' | 'rati
 export function usePendingImageResultExecution(
   options: UsePendingImageResultNodesOptions,
 ): PendingImageResultExecution {
+  const rendererMetrics: CanvasRendererMetricsPort = options.rendererMetrics ?? {
+    readNodeMetrics: (nodeId) => {
+      const node = options.nodes.value.find((candidate) => candidate.id === nodeId)
+      if (!node) return null
+      const dimensions = (node as Node & { dimensions?: { width?: number; height?: number } }).dimensions
+      const width = Number(dimensions?.width ?? node.width ?? 0)
+      const height = Number(dimensions?.height ?? node.height ?? 0)
+      return {
+        nodeId,
+        position: { x: node.position.x, y: node.position.y },
+        dimensions: { width, height },
+        computedPosition: { x: node.position.x, y: node.position.y },
+        measured: width > 0 && height > 0,
+      }
+    },
+  }
+  const writeGraphStore = () =>
+    options.writeCanvasGraphStore?.() ?? (options.readCanvasGraphStore() as CanvasGraphStore)
   function buildPendingResultLookup(): PendingImageResultLookup {
-    const nodeById = new Map<string, Node>()
+    const nodeById = new Map<string, CanvasGraphNodeRecord>()
     const imageChildIdsBySource = new Map<string, string[]>()
+    const graph = options.readCanvasGraphStore()
 
-    options.nodes.value.forEach((node) => {
-      if (nodeById.has(node.id)) return
-      nodeById.set(node.id, node)
+    graph.getNodeIds().forEach((nodeId) => {
+      const node = graph.getNode(nodeId)
+      if (node) nodeById.set(node.id, node)
     })
 
-    for (const edge of options.edges.value) {
-      if (edge.sourceHandle !== 'out:image' || edge.targetHandle !== 'in:image') continue
-      const current = imageChildIdsBySource.get(edge.source)
+    graph.getEdgeIds().forEach((edgeId) => {
+      const edge = graph.getEdge(edgeId)
+      if (!edge || edge.connection.fromNodeType !== 'image' || edge.connection.toPort !== 'image') return
+      const source = `${edge.connection.fromNodeType}-${edge.connection.fromNodeId}`
+      const target = `${edge.connection.toNodeType}-${edge.connection.toNodeId}`
+      const current = imageChildIdsBySource.get(source)
       if (current) {
-        current.push(edge.target)
+        current.push(target)
       } else {
-        imageChildIdsBySource.set(edge.source, [edge.target])
+        imageChildIdsBySource.set(source, [target])
       }
-    }
+    })
 
     return {
       nodeById,
@@ -116,12 +145,15 @@ export function usePendingImageResultExecution(
     }
   }
 
-  function readImageNodeLayout(node: Node): ImageResultLayout | null {
-    if (node.data?.kind !== 'image') return null
-    const snapshot = node.data.snapshotNode
-    if (!snapshot || typeof snapshot !== 'object') return null
-    const anchor = resolveImageNodeLayoutAnchor(node, snapshot as ImageNodeItem)
-    const measuredWidth = readMeasuredNodeWidth(node)
+  function readImageNodeLayout(node: CanvasGraphNodeRecord): ImageResultLayout | null {
+    if (node.kind !== 'image') return null
+    const snapshot = node.snapshot as ImageNodeItem
+    const metrics = rendererMetrics.readNodeMetrics(node.id)
+    const anchor = resolveImageNodeLayoutAnchor(
+      { position: metrics?.position ?? { x: snapshot.x, y: snapshot.y } },
+      snapshot,
+    )
+    const measuredWidth = metrics?.measured ? metrics.dimensions.width : null
     return anchor
       ? {
           x: anchor.x,
@@ -140,15 +172,16 @@ export function usePendingImageResultExecution(
   ): ImageResultLayout {
     const node = lookup.nodeById.get(nodeId)
     if (node) {
-      if (node.data?.kind === 'image') {
+      if (node.kind === 'image') {
         return readImageNodeLayout(node) ?? fallback
       }
-      const snapshot = node.data?.snapshotNode as { width?: unknown } | undefined
-      const width = readMeasuredNodeWidth(node) ?? Number(snapshot?.width)
+      const snapshot = node.snapshot as { width?: unknown }
+      const metrics = rendererMetrics.readNodeMetrics(nodeId)
+      const width = metrics?.measured ? metrics.dimensions.width : Number(snapshot.width)
       return {
         ratio: 1,
-        x: Number(node.position?.x ?? 0),
-        y: Number(node.position?.y ?? 0),
+        x: metrics?.position.x ?? Number(node.snapshot.x ?? 0),
+        y: metrics?.position.y ?? Number(node.snapshot.y ?? 0),
         width: Number.isFinite(width) && width > 0 ? width : fallback.width,
       }
     }
@@ -161,21 +194,13 @@ export function usePendingImageResultExecution(
     return fallback
   }
 
-  function readMeasuredNodeWidth(node: Node): number | null {
-    const dimensions = (node as { dimensions?: { width?: unknown } }).dimensions
-    const measuredWidth = Number(dimensions?.width)
-    if (Number.isFinite(measuredWidth) && measuredWidth > 0) return measuredWidth
-    const directWidth = Number((node as { width?: unknown }).width)
-    return Number.isFinite(directWidth) && directWidth > 0 ? directWidth : null
-  }
-
   function readNodeBounds(
-    node: Node,
+    node: CanvasGraphNodeRecord,
   ): { x: number; y: number; width: number; height: number } | null {
     const imageLayout = readImageNodeLayout(node)
     if (imageLayout) {
-      const dimensions = (node as { dimensions?: { height?: unknown } }).dimensions
-      const measuredHeight = Number(dimensions?.height)
+      const metrics = rendererMetrics.readNodeMetrics(node.id)
+      const measuredHeight = metrics?.measured ? metrics.dimensions.height : 0
       return {
         x: imageLayout.x,
         y: imageLayout.y,
@@ -187,15 +212,15 @@ export function usePendingImageResultExecution(
       }
     }
 
-    const snapshot = node.data?.snapshotNode as { width?: unknown; height?: unknown } | undefined
-    const width = readMeasuredNodeWidth(node) ?? Number(snapshot?.width)
+    const snapshot = node.snapshot as { width?: unknown; height?: unknown }
+    const metrics = rendererMetrics.readNodeMetrics(node.id)
+    const width = metrics?.measured ? metrics.dimensions.width : Number(snapshot.width)
     if (!Number.isFinite(width) || width <= 0) return null
-    const dimensions = (node as { dimensions?: { height?: unknown } }).dimensions
-    const measuredHeight = Number(dimensions?.height)
-    const snapshotHeight = Number(snapshot?.height)
+    const measuredHeight = metrics?.measured ? metrics.dimensions.height : 0
+    const snapshotHeight = Number(snapshot.height)
     return {
-      x: Number(node.position?.x ?? 0),
-      y: Number(node.position?.y ?? 0),
+      x: metrics?.position.x ?? Number(node.snapshot.x ?? 0),
+      y: metrics?.position.y ?? Number(node.snapshot.y ?? 0),
       width,
       height:
         Number.isFinite(measuredHeight) && measuredHeight > 0
@@ -206,9 +231,9 @@ export function usePendingImageResultExecution(
     }
   }
 
-  function isEmptyReusableImageNode(node: Node): boolean {
-    if (node.data?.kind !== 'image') return false
-    const snapshot = node.data.snapshotNode as ImageNodeItem | undefined
+  function isEmptyReusableImageNode(node: CanvasGraphNodeRecord): boolean {
+    if (node.kind !== 'image') return false
+    const snapshot = node.snapshot as ImageNodeItem
     if (!snapshot || typeof snapshot !== 'object') return false
     const sourceUrl = `${snapshot.sourceImageUrl ?? ''}`.trim()
     const outputImages = Array.isArray(snapshot.outputImages) ? snapshot.outputImages : []
@@ -307,7 +332,7 @@ export function usePendingImageResultExecution(
     const isCurrentProjection = () => {
       try {
         return (
-          options.readCanvasGraphStore() === sessionStore &&
+          writeGraphStore() === sessionStore &&
           options.isAttachmentCurrent(attachment)
         )
       } catch {
@@ -317,25 +342,28 @@ export function usePendingImageResultExecution(
     if (!isCurrentProjection()) return
     await waitForNextRenderFrame()
     if (!isCurrentProjection()) return
+    const graph = options.readCanvasGraphStore()
     const activeResultNodeIds = resultNodeIds.filter((resultNodeId) =>
-      options.nodes.value.some((node) => node.id === resultNodeId),
+      !!graph.getNode(resultNodeId as `image-${number}`),
     )
     if (activeResultNodeIds.length === 0) return
-    const hasSource = options.nodes.value.some((node) => node.id === anchorNodeId)
+    const hasSource = !!graph.getNode(anchorNodeId as `image-${number}`)
     if (!hasSource) return
     const activeResultNodeIdSet = new Set(activeResultNodeIds)
     const existingEdgeKeys = new Set(
-      options.edges.value.map(
-        (edge) =>
-          `${edge.source}:${edge.sourceHandle ?? ''}:${edge.target}:${edge.targetHandle ?? ''}`,
-      ),
+      graph
+        .getEdgeIds()
+        .map((edgeId) => graph.getEdge(edgeId))
+        .filter((edge): edge is NonNullable<typeof edge> => !!edge)
+        .map(
+          (edge) =>
+            `${edge.connection.fromNodeType}-${edge.connection.fromNodeId}:out:image:${edge.connection.toNodeType}-${edge.connection.toNodeId}:in:${edge.connection.toPort}`,
+        ),
     )
-    const nodesById = new Map(options.nodes.value.map((node) => [node.id, node]))
     const nextEdges = edgesToAppend
       .filter((edge) => {
         if (!activeResultNodeIdSet.has(edge.target)) return false
-        const targetNode = nodesById.get(edge.target)
-        if (!targetNode) return false
+        if (!graph.getNode(edge.target as `image-${number}`)) return false
         const edgeKey = `${edge.source}:${edge.sourceHandle ?? ''}:${edge.target}:${edge.targetHandle ?? ''}`
         if (existingEdgeKeys.has(edgeKey)) return false
         existingEdgeKeys.add(edgeKey)
@@ -389,47 +417,30 @@ export function usePendingImageResultExecution(
     if (preferredNodeId) {
       let updatedNode: Node | null = null
       const currentNode = lookup.nodeById.get(preferredNodeId)
-      if (currentNode?.data?.kind === 'image') {
-        const snapshot = currentNode.data.snapshotNode
-        if (snapshot && typeof snapshot === 'object') {
-          const currentSnapshot = snapshot as ImageNodeItem
-          updatedNode = {
-            ...currentNode,
-            data: {
-              ...currentNode.data,
-              snapshotNode: buildPendingImageNodeSnapshot(currentSnapshot, {
-                sourceImageRatio: pendingImageNode.sourceImageRatio,
-                width: pendingImageNode.width,
-              }),
-            },
-          }
-        }
+      if (currentNode?.kind === 'image') {
+        const nextSnapshot = buildPendingImageNodeSnapshot(currentNode.snapshot as ImageNodeItem, {
+          sourceImageRatio: pendingImageNode.sourceImageRatio,
+          width: pendingImageNode.width,
+        })
+        updatedNode = canvasNodeToFlowNode('image', nextSnapshot) as Node
+        lookup.nodeById.set(preferredNodeId, { ...currentNode, snapshot: nextSnapshot })
       }
       if (!updatedNode) {
         throw new Error(`Reusable pending result node is no longer available: ${preferredNodeId}`)
       }
-      lookup.nodeById.set(preferredNodeId, updatedNode)
       return {
         resultNodeId: preferredNodeId,
         nextNode: updatedNode,
       }
     }
 
-    const nextNode: Node<FlowNodeData> = {
-      id: `image-${pendingImageNode.id}`,
-      type: 'canvas',
-      dragHandle: resolveFlowNodeDragHandle('image'),
-      position: { x: pendingImageNode.x, y: pendingImageNode.y },
-      data: {
-        kind: 'image',
-        nodeType: 'image',
-        title: `Image #${pendingImageNode.id}`,
-        summary: 'Canvas image node',
-        snapshotNode: pendingImageNode,
-      },
-    }
-
-    lookup.nodeById.set(nextNode.id, nextNode as Node)
+    const nextNode = canvasNodeToFlowNode('image', pendingImageNode) as Node<FlowNodeData>
+    lookup.nodeById.set(nextNode.id, {
+      id: nextNode.id as `image-${number}`,
+      kind: 'image',
+      snapshot: pendingImageNode,
+      selected: false,
+    })
     return {
       resultNodeId: nextNode.id,
       nextNode: nextNode as Node,
@@ -465,7 +476,7 @@ export function usePendingImageResultExecution(
       ),
     )
     const resultNodeIds = plans.map((plan) => plan.resultNodeId)
-    const store = options.readCanvasGraphStore()
+    const store = writeGraphStore()
     const attachment = options.readCurrentAttachment()
     if (!attachment || !options.isAttachmentCurrent(attachment)) {
       throw new Error('Pending result reservation requires the current Board attachment')
@@ -520,7 +531,7 @@ export function usePendingImageResultExecution(
       clientActionId: string
     }>[],
   ) {
-    const store = options.readCanvasGraphStore()
+    const store = writeGraphStore()
     const transaction = store.beginTransaction('node-update', {
       recordHistory: false,
       markDirty: true,
@@ -528,9 +539,8 @@ export function usePendingImageResultExecution(
     for (const slot of slots) {
       const taskId = slot.taskId.trim()
       if (!taskId) continue
-      const targetNode = options.nodes.value.find((item) => item.id === slot.resultNodeId)
       const record = store.getNode(slot.resultNodeId as `image-${number}`)
-      if (targetNode?.data?.kind !== 'image' || record?.kind !== 'image') continue
+      if (record?.kind !== 'image') continue
       const nextSnapshot: ImageNodeItem = {
         ...(record.snapshot as ImageNodeItem),
         pendingTaskId: taskId,
@@ -549,7 +559,7 @@ export function usePendingImageResultExecution(
   }
 
   function removePendingResults(resultNodeIds: readonly string[]) {
-    const store = options.readCanvasGraphStore()
+    const store = writeGraphStore()
     const transaction = store.beginTransaction('delete', {
       recordHistory: false,
       markDirty: true,

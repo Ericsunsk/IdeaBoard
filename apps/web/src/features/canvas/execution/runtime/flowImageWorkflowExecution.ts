@@ -1,6 +1,7 @@
 import type { Ref } from 'vue'
 import type { Edge, Node } from '@vue-flow/core'
 import type { CanvasGraphStore } from '../../graph-runtime'
+import type { CanvasRendererMetricsPort } from '../../vue-flow-adapter'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
 import {
   buildImageActionReadinessRequest,
@@ -39,6 +40,7 @@ export type UseFlowImageWorkflowExecutionOptions = {
   nodes: Ref<Node[]>
   edges: Ref<Edge[]>
   readCanvasGraphStore: () => CanvasGraphStore
+  rendererMetrics: CanvasRendererMetricsPort
   boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   refreshNodeInternals?: (nodeIds: string[]) => void
   flushAutosave?: (options?: { silent?: boolean }) => Promise<void>
@@ -55,6 +57,8 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     nodes: options.nodes,
     edges: options.edges,
     readCanvasGraphStore: options.readCanvasGraphStore,
+    writeCanvasGraphStore: options.readCanvasGraphStore,
+    rendererMetrics: options.rendererMetrics,
     readCurrentAttachment: options.executionWorkspace.state.executionCore.currentAttachment,
     isAttachmentCurrent: options.executionWorkspace.state.executionCore.isAttachmentCurrent,
     refreshNodeInternals: options.refreshNodeInternals,

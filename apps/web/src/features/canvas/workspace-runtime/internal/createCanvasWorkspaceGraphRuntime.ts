@@ -57,6 +57,8 @@ export function createCanvasWorkspaceGraphRuntime(
     edges: board.flowPane.edges,
     graphAdapter: board.graphEditing.adapter,
     readCanvasGraphStore: board.graphEditing.readCanvasGraphStore,
+    writeCanvasGraphStore: board.graphEditing.readCanvasGraphStore,
+    rendererMetrics: flowPaneAdapter.rendererMetrics,
     selection: {
       selectedElements: flowPaneAdapter.getSelectedElements,
       clear: flowPaneAdapter.removeSelectedElements,

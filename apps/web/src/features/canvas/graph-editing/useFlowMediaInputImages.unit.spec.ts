@@ -98,6 +98,15 @@ function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
   const graphSession = createGraphSession(nodes.value, edges.value)
   const updateSnapshotNodeBase = vi.fn(
     (nodeId: string, mutate: (snapshotNode: CanvasNodeItem) => CanvasNodeItem) => {
+      const target = graphSession.store.getNode(nodeId as `prompt-${number}` | `fusion-${number}`)
+      if (target) {
+        const transaction = graphSession.store.beginTransaction('node-update', {
+          recordHistory: false,
+          markDirty: false,
+        })
+        transaction.updateNode(target.id, mutate)
+        transaction.commit()
+      }
       nodes.value = nodes.value.map((node) => {
         if (node.id !== nodeId) return node
         const snapshotNode = node.data?.snapshotNode
@@ -153,6 +162,17 @@ function createHarness(nodes: Ref<Node[]>, edges: Ref<Edge[]>) {
     graphActions,
     markFlowExecutionNodeDirty,
     graphSession,
+    project: () => {
+      const snapshot = graphSession.store.exportSnapshot()
+      const nextEdges = snapshot.connections.map((connection) => ({
+        id: `connection-${connection.id}`,
+        source: `${connection.fromNodeType}-${connection.fromNodeId}`,
+        sourceHandle: `out:${connection.fromPort}`,
+        target: `${connection.toNodeType}-${connection.toNodeId}`,
+        targetHandle: `in:${connection.toPort}`,
+      }))
+      edges.value = nextEdges as Edge[]
+    },
   }
 }
 
@@ -204,20 +224,15 @@ describe('useFlowMediaInputImages', () => {
       makeFlowNode('prompt-1', 'prompt', makePromptSnapshot()),
     ] as Node[])
     const edges: Ref<Edge[]> = shallowRef([])
-    const { getMediaInputImages } = createHarness(nodes, edges)
+    const harness = createHarness(nodes, edges)
 
-    edges.value = [
-      {
-        id: 'edge-1',
-        source: 'image-1',
-        sourceHandle: 'out:image',
-        target: 'prompt-1',
-        targetHandle: 'in:image',
-      },
-    ] as Edge[]
+    harness.graphSession.store.beginTransaction('connect', { recordHistory: false, markDirty: false })
+      .addEdge({ id: 1, fromNodeType: 'image', fromNodeId: 1, fromPort: 'image', toNodeType: 'prompt', toNodeId: 2, toPort: 'image' })
+      .commit()
+    harness.project()
     await nextTick()
 
-    expect(getMediaInputImages('prompt-1')).toEqual([
+    expect(harness.getMediaInputImages('prompt-2')).toEqual([
       {
         id: 'node:image-1',
         sourceType: 'node',
@@ -238,11 +253,11 @@ describe('useFlowMediaInputImages', () => {
     const { getMediaInputImages, onFlowMediaInputImageDrop } = createHarness(nodes, edges)
     const file = new File(['image'], 'input.png', { type: 'image/png' })
 
-    await onFlowMediaInputImageDrop('prompt-1', {
+    await onFlowMediaInputImageDrop('prompt-2', {
       dataTransfer: { files: [file] },
     } as unknown as DragEvent)
 
-    expect(getMediaInputImages('prompt-1')).toEqual([
+    expect(getMediaInputImages('prompt-2')).toEqual([
       expect.objectContaining({
         sourceType: 'external',
         url: 'https://example.com/external.png',
