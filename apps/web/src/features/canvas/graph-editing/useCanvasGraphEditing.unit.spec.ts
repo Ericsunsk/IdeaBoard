@@ -12,6 +12,10 @@ import {
 } from '../composables/useCanvasVueFlowGraphAdapter'
 import type { FlowNodeData } from '../types/flowTypes'
 import { useCanvasGraphEditing } from './useCanvasGraphEditing'
+import {
+  writeCanvasLibraryImportTransfer,
+  type CanvasLibraryImportDescriptor,
+} from '../../library/libraryTransfer'
 
 const mocks = vi.hoisted(() => ({
   prepareImageAssetForUpload: vi.fn(),
@@ -57,6 +61,14 @@ function createHarness(initialNodes: Node[] = []) {
     operationLoading: vi.fn(),
   }
   const graphAdapter: CanvasVueFlowGraphAdapter = useCanvasVueFlowGraphAdapter({ nodes, edges })
+  const materializeLibraryAsset = vi.fn(async () => ({
+    mediaAssetId: 43,
+    url: 'https://example.com/materialized.png',
+    width: 200,
+    height: 100,
+  }))
+  const libraryImportAttachment = {} as import('../board-attachment').CanvasBoardAttachment
+  const markDropAsCopy = vi.fn()
   const editing = useCanvasGraphEditing({
     nodes,
     edges,
@@ -70,9 +82,12 @@ function createHarness(initialNodes: Node[] = []) {
       pickImageFile: async () => pickedFile.value,
       readDroppedFile: () => droppedFile.value,
       readDropScreenPoint: (event) => ({ x: event.clientX, y: event.clientY }),
-      markDropAsCopy: vi.fn(),
+      markDropAsCopy,
     },
     upload: { upload },
+    materializeLibraryAsset,
+    readLibraryImportAttachment: () => libraryImportAttachment,
+    selectOnlyNode: vi.fn(() => true),
     preview: { openImageUrl },
     feedback,
   })
@@ -83,6 +98,8 @@ function createHarness(initialNodes: Node[] = []) {
     pickedFile,
     droppedFile,
     upload,
+    materializeLibraryAsset,
+    markDropAsCopy,
     openImageUrl,
     feedback,
   }
@@ -186,5 +203,57 @@ describe('useCanvasGraphEditing', () => {
       }),
     )
     expect(harness.upload).toHaveBeenCalledTimes(2)
+  })
+
+  it('imports a dragged Library asset at its Canvas drop coordinate without upload', async () => {
+    const harness = createHarness()
+    const values = new Map<string, string>()
+    const types: string[] = []
+    const dataTransfer = {
+      types,
+      effectAllowed: 'all',
+      dropEffect: 'none',
+      setData(type: string, value: string) {
+        values.set(type, value)
+        types.push(type)
+      },
+      getData(type: string) {
+        return values.get(type) ?? ''
+      },
+      files: [new File(['ignored'], 'should-not-upload.png', { type: 'image/png' })],
+    } as unknown as DataTransfer
+    const asset: CanvasLibraryImportDescriptor = {
+      assetId: 42,
+      previewUrl: 'https://images.unsplash.com/dragged-asset-preview',
+      title: 'Dragged asset',
+      width: 1200,
+      height: 800,
+    }
+    writeCanvasLibraryImportTransfer(dataTransfer, asset)
+
+    await harness.editing.commands.canvasFiles.drop({
+      clientX: 90,
+      clientY: 110,
+      dataTransfer,
+    } as unknown as DragEvent)
+    await Promise.resolve()
+
+    expect(harness.materializeLibraryAsset).toHaveBeenCalledWith(42)
+    expect(harness.upload).not.toHaveBeenCalled()
+    expect(harness.nodes.value).toContainEqual(
+      expect.objectContaining({
+        position: { x: 100, y: 130 },
+        data: expect.objectContaining({
+          kind: 'image',
+          snapshotNode: expect.objectContaining({
+            sourceImageUrl: 'https://example.com/materialized.png',
+            sourceMediaAssetId: 43,
+          }),
+        }),
+      }),
+    )
+
+    harness.editing.commands.canvasFiles.dragOver({ dataTransfer } as unknown as DragEvent)
+    expect(harness.markDropAsCopy).toHaveBeenCalled()
   })
 })

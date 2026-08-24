@@ -11,8 +11,8 @@ import (
 
 	"ideaboard/api/internal/boards"
 	"ideaboard/api/internal/identity/principal"
-	"ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/imageformat"
+	"ideaboard/api/internal/media/ingestion"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/response"
 	"ideaboard/api/internal/platform/settings"
@@ -203,10 +203,10 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
-		mediaAssetID, err := h.MediaAssets.BeginBoardUpload(c.Request.Context(), assets.BoardUploadAsset{
-			OwnerUserID: board.OwnerUserID,
-			BoardID:     board.BoardID,
-			Stored:      *prepared,
+		handle, err := h.MediaAssets.Begin(c.Request.Context(), ingestion.Request{
+			OwnerUserID: board.OwnerUserID, StorageProfile: prepared.StorageProfile,
+			StorageKey: prepared.StorageKey, URL: prepared.URL,
+			Origin: ingestion.BoardUploadFacts{BoardID: board.BoardID},
 		})
 		if err != nil {
 			response.InternalError(c, 500, "上传失败", err)
@@ -215,7 +215,7 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 		storeOpts.ObjectKey = prepared.StorageKey
 		stored, err := h.StorageService.UploadRefWithOptions(c.Request.Context(), file, storeOpts)
 		if err != nil {
-			_ = h.MediaAssets.FailBoardUpload(context.WithoutCancel(c.Request.Context()), board.OwnerUserID, mediaAssetID, err)
+			_ = h.MediaAssets.Fail(context.WithoutCancel(c.Request.Context()), handle, err)
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
@@ -224,19 +224,14 @@ func uploadBoardAssetHandler(h UploadDeps) gin.HandlerFunc {
 			stored.Height = meta.Height
 			stored.MIMEType = meta.Mime
 		}
-		uploadAsset := assets.BoardUploadAsset{
-			OwnerUserID: board.OwnerUserID,
-			BoardID:     board.BoardID,
-			Stored:      *stored,
-		}
-		if err := h.MediaAssets.CompleteBoardUpload(c.Request.Context(), uploadAsset, mediaAssetID); err != nil {
-			_ = h.MediaAssets.FailBoardUpload(context.WithoutCancel(c.Request.Context()), board.OwnerUserID, mediaAssetID, err)
+		if err := h.MediaAssets.Complete(c.Request.Context(), handle, stored.IngestionCompletion("")); err != nil {
+			_ = h.MediaAssets.Fail(context.WithoutCancel(c.Request.Context()), handle, err)
 			_ = h.StorageService.DeleteObjectByStorageProfile(context.WithoutCancel(c.Request.Context()), stored.StorageProfile, stored.StorageKey)
 			response.InternalError(c, 500, "上传失败", err)
 			return
 		}
 		payload := newUploadImageResponse("url", stored.URL, file, ext)
-		payload.MediaAssetID = mediaAssetID
+		payload.MediaAssetID = handle.AssetID
 		response.SuccessDTO(c, payload)
 	}
 }

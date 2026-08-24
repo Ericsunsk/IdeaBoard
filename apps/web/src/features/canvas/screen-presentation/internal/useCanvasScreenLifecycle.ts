@@ -38,8 +38,7 @@ export function useCanvasScreenLifecycle(options: {
   }
 }) {
   async function loadBoardSession() {
-    await options.persistence.loadCanvasBoardAndProbe()
-    void options.persistence.reattachPendingImageResults()
+    await options.persistence.recoverBoardSession()
   }
 
   watch(() => options.route.query.boardId, loadBoardSession)

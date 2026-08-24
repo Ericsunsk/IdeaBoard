@@ -1,24 +1,29 @@
 import { describe, expect, it } from 'vitest'
 import {
+  CANVAS_LIBRARY_IMPORT_MIME,
   getLibraryDropEffect,
-  LIBRARY_ASSET_MIME,
-  readLibraryAssetTransfer,
+  LIBRARY_FOLDER_MOVE_MIME,
+  readCanvasLibraryImportTransfer,
+  readLibraryFolderMoveTransfer,
   readSearchReferenceTransfer,
   SEARCH_REFERENCE_MIME,
-  writeLibraryAssetTransfer,
+  toCanvasLibraryImportDescriptor,
+  writeCanvasLibraryImportTransfer,
+  writeLibraryFolderMoveTransfer,
   writeSearchReferenceTransfer,
 } from './libraryTransfer'
 import type { LibraryAssetView, LibrarySearchReference } from './libraryResource'
 
 function transfer(): DataTransfer {
   const values = new Map<string, string>()
+  const types: string[] = []
   return {
-    types: [],
+    types,
     effectAllowed: 'all',
     dropEffect: 'none',
     setData(type: string, value: string) {
       values.set(type, value)
-      ;(this.types as string[]).push(type)
+      types.push(type)
     },
     getData(type: string) {
       return values.get(type) ?? ''
@@ -49,8 +54,9 @@ const asset: LibraryAssetView = {
   author: 'B. Creator',
   width: 800,
   height: 800,
-  folder_id: null,
+  folder_id: 1,
   created_at: '2026-08-22T00:00:00Z',
+  updated_at: '2026-08-22T00:00:00Z',
 }
 
 describe('libraryTransfer', () => {
@@ -61,18 +67,39 @@ describe('libraryTransfer', () => {
     expect(dataTransfer.effectAllowed).toBe('copy')
     expect(dataTransfer.types).toContain(SEARCH_REFERENCE_MIME)
     expect(readSearchReferenceTransfer(dataTransfer)).toEqual(reference)
-    expect(readLibraryAssetTransfer(dataTransfer)).toBeNull()
+    expect(readLibraryFolderMoveTransfer(dataTransfer)).toBeNull()
+    expect(readCanvasLibraryImportTransfer(dataTransfer)).toBeNull()
     expect(getLibraryDropEffect(dataTransfer)).toBe('copy')
   })
 
-  it('round-trips Library assets with move semantics', () => {
+  it('uses a minimal descriptor for Canvas imports', () => {
     const dataTransfer = transfer()
-    writeLibraryAssetTransfer(dataTransfer, asset)
+    const descriptor = toCanvasLibraryImportDescriptor(asset)
+    writeCanvasLibraryImportTransfer(dataTransfer, descriptor)
 
-    expect(dataTransfer.effectAllowed).toBe('move')
-    expect(dataTransfer.types).toContain(LIBRARY_ASSET_MIME)
-    expect(readLibraryAssetTransfer(dataTransfer)).toEqual(asset)
+    expect(dataTransfer.effectAllowed).toBe('copyMove')
+    expect(dataTransfer.types).toContain(CANVAS_LIBRARY_IMPORT_MIME)
+    expect(readCanvasLibraryImportTransfer(dataTransfer)).toEqual(descriptor)
     expect(readSearchReferenceTransfer(dataTransfer)).toBeNull()
+    expect(JSON.parse(dataTransfer.getData(CANVAS_LIBRARY_IMPORT_MIME))).toEqual({
+      type: 'canvas-library-import',
+      asset: {
+        assetId: asset.id,
+        title: asset.title,
+        previewUrl: asset.preview_url,
+        width: asset.width,
+        height: asset.height,
+      },
+    })
+  })
+
+  it('uses only an asset ID for Library folder moves', () => {
+    const dataTransfer = transfer()
+    writeLibraryFolderMoveTransfer(dataTransfer, asset.id)
+
+    expect(dataTransfer.effectAllowed).toBe('copyMove')
+    expect(dataTransfer.types).toContain(LIBRARY_FOLDER_MOVE_MIME)
+    expect(readLibraryFolderMoveTransfer(dataTransfer)).toBe(asset.id)
     expect(getLibraryDropEffect(dataTransfer)).toBe('move')
   })
 
@@ -84,7 +111,25 @@ describe('libraryTransfer', () => {
     const unrelated = transfer()
     unrelated.setData('text/plain', 'hello')
     expect(readSearchReferenceTransfer(unrelated)).toBeNull()
-    expect(readLibraryAssetTransfer(unrelated)).toBeNull()
+    expect(readLibraryFolderMoveTransfer(unrelated)).toBeNull()
+    expect(readCanvasLibraryImportTransfer(unrelated)).toBeNull()
     expect(getLibraryDropEffect(unrelated)).toBe('none')
+
+    const invalidFolderMove = transfer()
+    invalidFolderMove.setData(
+      LIBRARY_FOLDER_MOVE_MIME,
+      JSON.stringify({ type: 'library-folder-move', assetId: 0 }),
+    )
+    expect(readLibraryFolderMoveTransfer(invalidFolderMove)).toBeNull()
+
+    const malformedCanvasImport = transfer()
+    malformedCanvasImport.setData(
+      CANVAS_LIBRARY_IMPORT_MIME,
+      JSON.stringify({
+        type: 'canvas-library-import',
+        asset: { assetId: asset.id, title: asset.title, width: asset.width, height: asset.height },
+      }),
+    )
+    expect(readCanvasLibraryImportTransfer(malformedCanvasImport)).toBeNull()
   })
 })

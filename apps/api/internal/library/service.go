@@ -12,11 +12,12 @@ import (
 )
 
 type Service struct {
-	repo *Repository
+	repo         *Repository
+	materializer AssetMaterializer
 }
 
-func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo *Repository, materializer AssetMaterializer) *Service {
+	return &Service{repo: repo, materializer: materializer}
 }
 
 func (s *Service) ListFolders(ctx context.Context, ownerUserID int64) ([]Folder, error) {
@@ -254,6 +255,27 @@ func (s *Service) GetAsset(ctx context.Context, ownerUserID, assetID int64) (Ass
 		return Asset{}, err
 	}
 	return assetFromRow(row), nil
+}
+
+func (s *Service) MaterializeAsset(ctx context.Context, ownerUserID, assetID int64) (MaterializedAsset, error) {
+	if err := validateOwner(ownerUserID); err != nil {
+		return MaterializedAsset{}, err
+	}
+	if assetID <= 0 {
+		return MaterializedAsset{}, ErrAssetNotFound
+	}
+	if s == nil || s.materializer == nil {
+		return MaterializedAsset{}, ErrMaterializerUnavailable
+	}
+	asset, err := s.GetAsset(ctx, ownerUserID, assetID)
+	if err != nil {
+		return MaterializedAsset{}, err
+	}
+	return s.materializer.MaterializeLibraryAsset(ctx, MaterializeInput{
+		OwnerUserID: ownerUserID, LibraryAssetID: asset.ID, Provider: asset.Provider, SourceID: asset.SourceID,
+		SourceURL: asset.SourceURL, OriginalURL: asset.OriginalURL, PreviewURL: asset.PreviewURL,
+		Title: asset.Title, Author: asset.Author,
+	})
 }
 
 func (s *Service) LookupAssets(ctx context.Context, ownerUserID int64, keys []AssetKey) ([]Asset, error) {

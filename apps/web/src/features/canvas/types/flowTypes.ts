@@ -8,4 +8,6 @@ export interface FlowNodeData {
   title: string
   summary?: string
   snapshotNode?: unknown
+  /** Runtime-only visual continuity while a persisted Library import is active. */
+  libraryImportPreviewUrl?: string
 }

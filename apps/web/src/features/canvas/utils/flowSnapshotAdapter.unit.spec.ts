@@ -9,8 +9,10 @@ import {
   CANVAS_BOARD_STATE_SCHEMA_VERSION,
   createEmptyCanvasBoardSnapshot,
   type CanvasGroup,
+  type ImageNodeItem,
   type PromptNodeInputImage,
 } from '../../canvas-board/domain'
+import type { FlowNodeData } from '../types/flowTypes'
 
 const GROUP_GEOMETRY = {
   x: 20,
@@ -247,6 +249,34 @@ describe('flowSnapshotAdapter', () => {
       outputStatus: 'running',
       sourceImageUrl: '',
       outputImages: [],
+    })
+  })
+
+  it('round-trips pending Library materialization without persisting a provider URL or media ref', () => {
+    const pending = makeImageFlowNode({
+      flowId: 'image-1',
+      id: 1,
+      outputStatus: 'idle',
+      sourceImageUrl: '',
+    })
+    ;((pending.data as FlowNodeData).snapshotNode as ImageNodeItem).libraryImport = {
+      state: 'pending',
+      libraryAssetId: 7,
+    }
+
+    const snapshot = flowToCanvasBoardSnapshot({ nodes: [pending], edges: [] })
+
+    expect(snapshot.imageNodes).toEqual([
+      expect.objectContaining({
+        id: 1,
+        sourceImageUrl: '',
+        libraryImport: { state: 'pending', libraryAssetId: 7 },
+      }),
+    ])
+    expect(snapshot.imageNodes[0]?.sourceMediaAssetId).toBeUndefined()
+    expect(snapshot.mediaRefs).toBeUndefined()
+    expect(canvasBoardSnapshotToFlow(snapshot).nodes[0]?.data).toMatchObject({
+      snapshotNode: { libraryImport: { state: 'pending', libraryAssetId: 7 } },
     })
   })
 

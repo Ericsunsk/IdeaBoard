@@ -16,6 +16,7 @@ const (
 	UploadResourceKindCanvas        UploadResourceKind = "canvas"
 	UploadResourceKindProfileAvatar UploadResourceKind = "profile_avatar"
 	UploadResourceKindTaskOutput    UploadResourceKind = "task_output"
+	UploadResourceKindLibrary       UploadResourceKind = "library"
 	UploadResourceKindSiteAsset     UploadResourceKind = "site_asset"
 )
 
@@ -36,6 +37,12 @@ type UploadTaskOutputResource struct {
 	RelativePath string
 }
 
+type UploadLibraryResource struct {
+	UserSegment  string
+	AssetSegment string
+	RelativePath string
+}
+
 type UploadSiteAssetResource struct {
 	RelativePath string
 }
@@ -46,6 +53,7 @@ type UploadResource struct {
 	Canvas        *UploadCanvasResource
 	ProfileAvatar *UploadProfileAvatarResource
 	TaskOutput    *UploadTaskOutputResource
+	Library       *UploadLibraryResource
 	SiteAsset     *UploadSiteAssetResource
 }
 
@@ -115,6 +123,20 @@ func TaskOutputUploadDirPrefix(userID int64, taskID string) (string, error) {
 	return path.Join("tasks", fmt.Sprintf("%d", userID), taskSegment), nil
 }
 
+func LibraryAssetUploadDirPrefix(userID, libraryAssetID int64) (string, error) {
+	if userID <= 0 || libraryAssetID <= 0 {
+		return "", fmt.Errorf("素材库媒体标识无效")
+	}
+	return path.Join("library", fmt.Sprintf("%d", userID), fmt.Sprintf("%d", libraryAssetID)), nil
+}
+
+func LibraryAssetUploadObjectPrefix(userID int64) (string, error) {
+	if userID <= 0 {
+		return "", fmt.Errorf("用户ID无效")
+	}
+	return path.Join(uploadObjectRoot, "library", fmt.Sprintf("%d", userID)) + "/", nil
+}
+
 func TaskOutputUploadObjectPrefix(userID int64, taskID string) (string, error) {
 	dirPrefix, err := TaskOutputUploadDirPrefix(userID, taskID)
 	if err != nil {
@@ -144,7 +166,11 @@ func userUploadObjectPrefixes(userID int64, storageUID string) ([]string, error)
 	if err != nil {
 		return nil, err
 	}
-	return []string{canvasPrefix, profileAvatarPrefix, taskOutputPrefix}, nil
+	libraryPrefix, err := LibraryAssetUploadObjectPrefix(userID)
+	if err != nil {
+		return nil, err
+	}
+	return []string{canvasPrefix, profileAvatarPrefix, taskOutputPrefix, libraryPrefix}, nil
 }
 
 func ParseUploadResource(rawPath string) (UploadResource, error) {
@@ -189,6 +215,12 @@ func ParseUploadResource(rawPath string) (UploadResource, error) {
 			TaskSegment:  parts[2],
 			RelativePath: strings.Join(parts[3:], "/"),
 		}
+		return resource, nil
+	}
+
+	if parts[0] == "library" && len(parts) >= 4 && parts[1] != "" && parts[2] != "" && strings.Join(parts[3:], "") != "" {
+		resource.Kind = UploadResourceKindLibrary
+		resource.Library = &UploadLibraryResource{UserSegment: parts[1], AssetSegment: parts[2], RelativePath: strings.Join(parts[3:], "/")}
 		return resource, nil
 	}
 

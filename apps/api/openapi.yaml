@@ -255,6 +255,17 @@ paths:
         '200':
           description: Assets already saved by the current user
           content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponseLibraryAssetList' } } }
+  /user/library/assets/{asset_id}/materialize:
+    post:
+      tags: [UserLibrary]
+      operationId: materializeLibraryAsset
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { name: asset_id, in: path, required: true, schema: { type: integer, format: int64, minimum: 1 } }
+      responses:
+        '200':
+          description: Owned Library asset materialized into managed Media
+          content: { application/json: { schema: { $ref: '#/components/schemas/ApiResponseLibraryMaterializedAsset' } } }
   /user/library/assets/{asset_id}:
     patch:
       tags: [UserLibrary]
@@ -6220,6 +6231,25 @@ components:
                   items: { $ref: '#/components/schemas/LibraryAsset' }
                 next_cursor: { type: string }
                 has_more: { type: boolean }
+
+    LibraryMaterializedAsset:
+      type: object
+      required: [media_asset_id, asset_id, url, width, height, mime_type, extension]
+      properties:
+        media_asset_id: { type: integer, format: int64 }
+        asset_id: { type: string, minLength: 1 }
+        url: { type: string, minLength: 1 }
+        width: { type: integer, minimum: 1 }
+        height: { type: integer, minimum: 1 }
+        mime_type: { type: string, minLength: 1 }
+        extension: { type: string, minLength: 1 }
+
+    ApiResponseLibraryMaterializedAsset:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponseBase'
+        - type: object
+          properties:
+            data: { $ref: '#/components/schemas/LibraryMaterializedAsset' }
 
     ApiResponseEmpty:
       allOf:

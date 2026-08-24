@@ -126,14 +126,6 @@ func (s *StorageService) PrepareUploadRef(ctx context.Context, filename string, 
 	}, nil
 }
 
-func (s *StorageService) StoreRemote(ctx context.Context, remoteURL string, opts StorageStoreOptions) (string, error) {
-	ref, err := s.StoreRemoteRef(ctx, remoteURL, opts)
-	if err != nil {
-		return "", err
-	}
-	return ref.URL, nil
-}
-
 func (s *StorageService) StoreRemoteRef(ctx context.Context, remoteURL string, opts StorageStoreOptions) (*StoredUploadRef, error) {
 	profile, err := s.resolveActiveProfile(ctx)
 	if err != nil {
@@ -182,14 +174,6 @@ func (s *StorageService) storeMediaRefWithProfile(ctx context.Context, profile S
 		return nil, err
 	}
 	return adapter.StoreBytesRef(ctx, &profile, obj.Filename, obj.Data, opts)
-}
-
-func (s *StorageService) StoreBytes(ctx context.Context, filename string, data []byte, opts StorageStoreOptions) (string, error) {
-	ref, err := s.StoreBytesRef(ctx, filename, data, opts)
-	if err != nil {
-		return "", err
-	}
-	return ref.URL, nil
 }
 
 func (s *StorageService) StoreBytesRef(ctx context.Context, filename string, data []byte, opts StorageStoreOptions) (*StoredUploadRef, error) {
@@ -642,14 +626,6 @@ func (s *StorageService) uploadRefWithProfile(ctx context.Context, profile Stora
 	return adapter.UploadRef(ctx, &profile, file, opts)
 }
 
-func (s *StorageService) storeRemoteWithProfile(ctx context.Context, profile StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error) {
-	ref, err := s.storeRemoteRefWithProfile(ctx, profile, remoteURL, opts)
-	if err != nil {
-		return "", err
-	}
-	return ref.URL, nil
-}
-
 func (s *StorageService) storeRemoteRefWithProfile(ctx context.Context, profile StorageProfile, remoteURL string, opts StorageStoreOptions) (*StoredUploadRef, error) {
 	if strings.HasPrefix(remoteURL, "data:image/") {
 		filename, data, err := decodeDataURL(remoteURL)
@@ -683,26 +659,19 @@ func (s *StorageService) saveUploadedFileLocalRef(ctx context.Context, file *mul
 	return s.saveReaderLocalRef(ctx, file.Filename, file.Header.Get("Content-Type"), src, file.Size, opts)
 }
 
-func (s *StorageService) saveBytesLocal(ctx context.Context, filename string, data []byte, opts StorageStoreOptions) (string, error) {
-	return s.saveReaderLocal(ctx, filename, bytes.NewReader(data), int64(len(data)), opts)
-}
-
 func (s *StorageService) saveBytesLocalRef(ctx context.Context, filename string, data []byte, opts StorageStoreOptions) (*StoredUploadRef, error) {
 	ref, err := s.saveReaderLocalRef(ctx, filename, inferStoredUploadContentType(filename, data), bytes.NewReader(data), int64(len(data)), opts)
 	if err != nil {
 		return nil, err
 	}
-	ref.Width, ref.Height, _ = imageformat.ImageDimensions(data)
-	ref.Animated = imageformat.IsAnimated(data)
-	return ref, nil
-}
-
-func (s *StorageService) saveReaderLocal(ctx context.Context, filename string, src io.Reader, size int64, opts StorageStoreOptions) (string, error) {
-	ref, err := s.saveReaderLocalRef(ctx, filename, "", src, size, opts)
+	facts, err := imageformat.InspectBytes(data, filepath.Ext(filename))
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("读取图片信息失败: %w", err)
 	}
-	return ref.URL, nil
+	ref.Width = facts.Width
+	ref.Height = facts.Height
+	ref.Animated = facts.Animated
+	return ref, nil
 }
 
 func (s *StorageService) saveReaderLocalRef(ctx context.Context, filename string, contentType string, src io.Reader, size int64, opts StorageStoreOptions) (*StoredUploadRef, error) {
@@ -1075,15 +1044,9 @@ func (s *StorageService) downloadRemoteFileWithLimit(ctx context.Context, remote
 	if ext == "" {
 		return nil, fmt.Errorf("仅支持 %s 图片", imageformat.SupportedUploadImageLabel())
 	}
-	if err := validateRemoteImageFile(tmpFile, ext); err != nil {
-		return nil, err
-	}
-	if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
-		return nil, fmt.Errorf("读取临时文件失败: %w", err)
-	}
-	width, height, animated, err := imageReaderFacts(tmpFile)
+	facts, err := imageformat.Inspect(tmpFile, ext)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("远程图片校验失败: %w", err)
 	}
 	if _, err := tmpFile.Seek(0, io.SeekStart); err != nil {
 		return nil, fmt.Errorf("读取临时文件失败: %w", err)
@@ -1093,45 +1056,14 @@ func (s *StorageService) downloadRemoteFileWithLimit(ctx context.Context, remote
 	cleanupTemp = false
 	return &remoteImageFile{
 		Filename:    filename,
-		ContentType: imageformat.ImageMIMEFromExtension(ext),
-		Width:       width,
-		Height:      height,
-		Animated:    animated,
+		ContentType: facts.MIMEType,
+		Width:       facts.Width,
+		Height:      facts.Height,
+		Animated:    facts.Animated,
 		Size:        size,
 		file:        tmpFile,
 		path:        tmpFile.Name(),
 	}, nil
-}
-
-func imageReaderFacts(file *os.File) (int, int, bool, error) {
-	if file == nil {
-		return 0, 0, false, fmt.Errorf("文件内容为空")
-	}
-	data, err := io.ReadAll(file)
-	if err != nil {
-		return 0, 0, false, fmt.Errorf("读取图片尺寸失败: %w", err)
-	}
-	width, height, err := imageformat.ImageDimensions(data)
-	if err != nil {
-		return 0, 0, false, err
-	}
-	return width, height, imageformat.IsAnimated(data), nil
-}
-
-func validateRemoteImageFile(file *os.File, ext string) error {
-	if file == nil {
-		return fmt.Errorf("远程文件校验失败: 文件为空")
-	}
-	if _, ok := imageformat.NormalizeImageExtension(ext); !ok {
-		return fmt.Errorf("仅支持 %s 图片", imageformat.SupportedUploadImageLabel())
-	}
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("读取临时文件失败: %w", err)
-	}
-	if err := imageformat.ValidateImageReader(file, ext); err != nil {
-		return fmt.Errorf("远程文件校验失败: %w", err)
-	}
-	return nil
 }
 
 func validateImageBytes(filename string, data []byte) error {
@@ -1139,7 +1071,7 @@ func validateImageBytes(filename string, data []byte) error {
 	if !ok {
 		return fmt.Errorf("仅支持 %s 图片", imageformat.SupportedUploadImageLabel())
 	}
-	if err := imageformat.ValidateImageBytes(data, ext); err != nil {
+	if _, err := imageformat.InspectBytes(data, ext); err != nil {
 		return fmt.Errorf("图片校验失败: %w", err)
 	}
 	return nil

@@ -34,6 +34,7 @@
         :stage-width="node.width"
         :stage-height="stageHeight"
         :display-image="displayImage"
+        :library-import="libraryImport"
         :input-locked="inputLocked"
         :empty-icon-variant="emptyIconVariant"
         :direct-generating="actionBinding.directGenerating"
@@ -49,6 +50,7 @@
         @open-preview="emit('open-preview')"
         @append-to-canvas="emit('append-to-canvas')"
         @reset="emit('reset')"
+        @retry-library-import="emit('retry-library-import')"
         @contextmenu="onImageStageContextMenu"
         @expand-submit="submitExpand"
         @expand-handle-pointerdown="emit('expand-handle-pointerdown', $event)"
@@ -85,7 +87,11 @@
 <script setup lang="ts">
 import { computed, ref, watchPostEffect } from 'vue'
 import { MediaImage } from '@iconoir/vue'
-import { requireImageNodeOutputCount, type ImageNodeItem } from '../../../canvas-board/domain'
+import {
+  requireImageNodeOutputCount,
+  type ImageNodeItem,
+  type LibraryImportFact,
+} from '../../../canvas-board/domain'
 import type { ImageNodeAction } from '../../config/imageActionRegistry'
 import type { OutputResolution } from '../../../../shared/domain/generationContract'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
@@ -107,6 +113,7 @@ const props = defineProps<{
   copyMode: boolean
   stageHeight: number
   displayImage: { url: string; mediaAssetId?: number } | null
+  libraryImport?: LibraryImportFact
   emptyIconVariant?: 'image' | 'fusion'
   inputLocked?: boolean
   actionBinding: ImageActionBinding
@@ -127,6 +134,7 @@ const emit = defineEmits<{
   (e: 'open-preview'): void
   (e: 'append-to-canvas'): void
   (e: 'reset'): void
+  (e: 'retry-library-import'): void
   (e: 'contextmenu', event: MouseEvent): void
   (e: 'expand-submit', prompt: string): void
   (
@@ -149,11 +157,18 @@ const emptyIconVariant = computed(() => props.emptyIconVariant ?? 'image')
 const isImageEditorActive = computed(() => props.imageToolStageBinding?.mode != null)
 
 const showImageActionMenu = computed(
-  () => props.actionBinding.actionMenuVisible && !!props.displayImage && !isImageEditorActive.value,
+  () =>
+    !props.libraryImport &&
+    props.actionBinding.actionMenuVisible &&
+    !!props.displayImage &&
+    !isImageEditorActive.value,
 )
 const showPromptComposer = computed(
   () =>
-    props.actionBinding.promptComposerVisible && !!props.displayImage && !props.expandModeActive,
+    !props.libraryImport &&
+    props.actionBinding.promptComposerVisible &&
+    !!props.displayImage &&
+    !props.expandModeActive,
 )
 type StageExpose = { stageElement: HTMLElement | null }
 const imageStageRef = ref<StageExpose | null>(null)

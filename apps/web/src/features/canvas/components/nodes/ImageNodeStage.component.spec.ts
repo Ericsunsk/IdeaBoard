@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { fireEvent } from '@testing-library/vue'
 import type { ImageToolStageBinding } from '../../image-tools'
 import ImageNodeStage from './ImageNodeStage.vue'
 import { render } from '../../../../test/render'
@@ -48,6 +49,30 @@ describe('ImageNodeStage disabled state', () => {
 
     expect(view.getByLabelText('图片正在生成，暂时无法上传')).toBeTruthy()
     expect(view.getByLabelText('图片正在生成，暂时无法上传').tagName).not.toBe('BUTTON')
+  })
+})
+
+describe('ImageNodeStage Library import recovery', () => {
+  it('offers Retry only for a failed persisted Library import', async () => {
+    const view = render(ImageNodeStage, {
+      props: {
+        nodeId: 'image-1',
+        stageWidth: 280,
+        stageHeight: 280,
+        displayImage: null,
+        libraryImport: {
+          state: 'failed',
+          libraryAssetId: 7,
+          failureMessage: '素材导入失败',
+        },
+        active: false,
+        dragging: false,
+      },
+      global: { stubs: { NodeStageFrame: { template: '<div><slot /></div>' } } },
+    })
+
+    await fireEvent.click(view.getByLabelText('重试添加到画布'))
+    expect(view.emitted('retry-library-import')).toEqual([[]])
   })
 })
 

@@ -133,6 +133,11 @@ function createGraphRuntime() {
     resolvePromptInputImageNodeIds: vi.fn(() => []),
     createNodeAtPosition: vi.fn(),
     createNodeInteractions: vi.fn(),
+    libraryImport: {
+      add: vi.fn(),
+      retry: vi.fn(() => false),
+    },
+    resumePendingLibraryImports: vi.fn(() => 0),
   }
 }
 
@@ -155,6 +160,10 @@ function createGraphEditingRuntime(graph: ReturnType<typeof createGraphRuntime>)
         drop: vi.fn(),
         dragOver: vi.fn(),
       },
+      libraryImport: graph.libraryImport,
+    },
+    recoveryPort: {
+      resumePendingLibraryImports: graph.resumePendingLibraryImports,
     },
     workflowPort: {
       getImageNodeDisplayPayload: graph.getImageNodeDisplayPayload,
@@ -247,6 +256,12 @@ function createWorkspaceOptions() {
     getUserIdentity: () => ({ userId: 1, userUid: 'user-a' }),
     flowPaneAdapter,
     uploadApi: { upload: vi.fn() },
+    materializeLibraryAsset: vi.fn(async () => ({
+      mediaAssetId: 43,
+      url: 'https://example.com/materialized.png',
+      width: 200,
+      height: 100,
+    })),
     graphEditingBrowser: {
       pickImageFile: vi.fn(async () => null),
       readDroppedFile: vi.fn(() => null),
@@ -338,17 +353,20 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
     expect('isSavingBoard' in runtime.persistence).toBe(false)
     expect('saveStatus' in runtime.persistence).toBe(false)
     expect(runtime.persistence.flushAutosave).not.toBe(board.boardSession.flushAutosave)
-    expect(runtime.persistence.reattachPendingImageResults).toBe(
-      imageWorkflow.reattachPendingImageResults,
-    )
+    expect('reattachPendingImageResults' in runtime.persistence).toBe(false)
+    expect('resumePendingLibraryImports' in runtime.persistence).toBe(false)
     expect(runtime.graph.viewModel.grouping).toBe(board.graphEditing.grouping.view)
     expect(runtime.graph.commands.grouping).toBe(board.graphEditing.grouping.commands)
     expect(runtime.imageWorkflow).toBe(imageWorkflow)
 
     await runtime.persistence.flushAutosave({ silent: false })
+    await runtime.persistence.recoverBoardSession()
 
     expect(events).toEqual(['viewport', 'autosave'])
     expect(board.boardSession.flushAutosave).toHaveBeenCalledWith({ silent: false })
+    expect(viewportRuntime.loadCanvasBoardAndProbe).toHaveBeenCalledTimes(1)
+    expect(imageWorkflow.reattachPendingImageResults).toHaveBeenCalledTimes(1)
+    expect(graph.resumePendingLibraryImports).toHaveBeenCalledTimes(1)
 
     expect(mocks.useCanvasBoardRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -440,9 +458,9 @@ describe('createCanvasWorkspaceRuntimeParts', () => {
       connectionAdapter: graph.connectionAdapter,
       nodeDragTransactions: board.flowPane.nodeDragTransactions,
     })
-    expect(runtime.commands.persistence.reattachPendingImageResults).toBe(
-      imageWorkflow.reattachPendingImageResults,
-    )
+    expect(runtime.commands.persistence.recoverBoardSession).toEqual(expect.any(Function))
+    expect('reattachPendingImageResults' in runtime.commands.persistence).toBe(false)
+    expect('resumePendingLibraryImports' in runtime.commands.persistence).toBe(false)
     expect(runtime.commands.imageWorkflow.isGenerationAvailable).toBe(
       imageWorkflow.commands.isGenerationAvailable,
     )

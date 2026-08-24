@@ -1,8 +1,7 @@
 import { resolveImageNodeFrameSize, type ImageNodeItem } from '../../../canvas-board/domain'
 import { CanvasGraphStore } from '../../graph-runtime'
+import type { CanvasBoardAttachment, CanvasBoardSessionIdentity } from '../../board-attachment'
 
-declare const pendingImageAttachmentBrand: unique symbol
-declare const canvasBoardGraphSessionIdentityBrand: unique symbol
 
 export type PendingImageResultNodeId = `image-${number}`
 
@@ -14,17 +13,6 @@ export type PendingImageResolvedResult = Readonly<{
   mimeType?: string
   mediaAssetId?: number
   resultIndex?: number
-}>
-
-export type CanvasBoardGraphSessionIdentity = Readonly<{
-  [canvasBoardGraphSessionIdentityBrand]: true
-}>
-
-export type PendingImageAttachment = Readonly<{
-  boardId: string
-  epoch: number
-  sessionIdentity: CanvasBoardGraphSessionIdentity
-  [pendingImageAttachmentBrand]: true
 }>
 
 export type PendingImageMutationRejectReason = 'missing-node' | 'non-image-node' | 'stale-task'
@@ -50,16 +38,16 @@ export type PendingImageDomainMutationResult = Readonly<{
 }>
 
 export type PendingImageDomainMutationPort = Readonly<{
-  attachment: PendingImageAttachment
-  sessionIdentity: CanvasBoardGraphSessionIdentity
+  attachment: CanvasBoardAttachment
+  sessionIdentity: CanvasBoardSessionIdentity
   materializeBatch: (
     inputs: readonly PendingImageDomainMutationInput[],
   ) => PendingImageDomainMutationResult
 }>
 
 export type CanvasBoardGraphSessionBinding = Readonly<{
-  attachment: PendingImageAttachment
-  sessionIdentity: CanvasBoardGraphSessionIdentity
+  attachment: CanvasBoardAttachment
+  sessionIdentity: CanvasBoardSessionIdentity
   mutations: PendingImageDomainMutationPort
 }>
 
@@ -108,7 +96,7 @@ export class CanvasBoardGraphSession {
   readonly boardId: string
   readonly #createGraphStore: () => CanvasGraphStore
   readonly #onMaterialized?: CanvasBoardGraphSessionOptions['onMaterialized']
-  readonly #identity = Object.freeze({}) as CanvasBoardGraphSessionIdentity
+  readonly #identity = Object.freeze({}) as CanvasBoardSessionIdentity
 
   private constructor(boardId: string, options: CanvasBoardGraphSessionOptions) {
     this.boardId = requireBoardId(boardId)
@@ -126,7 +114,7 @@ export class CanvasBoardGraphSession {
       boardId: this.boardId,
       epoch,
       sessionIdentity: this.#identity,
-    }) as PendingImageAttachment
+    }) as CanvasBoardAttachment
     const mutations: PendingImageDomainMutationPort = Object.freeze({
       attachment,
       sessionIdentity: this.#identity,

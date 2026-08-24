@@ -12,7 +12,7 @@ import (
 
 func TestServiceSaveAssetIsIdempotentAndMovesExistingAsset(t *testing.T) {
 	db := testdb.Open(t)
-	service := NewService(NewRepository(db))
+	service := NewService(NewRepository(db), nil)
 	ctx := context.Background()
 	input := integrationAsset("idempotent")
 
@@ -46,7 +46,7 @@ func TestServiceSaveAssetIsIdempotentAndMovesExistingAsset(t *testing.T) {
 
 func TestServiceOwnerIsolation(t *testing.T) {
 	db := testdb.Open(t)
-	service := NewService(NewRepository(db))
+	service := NewService(NewRepository(db), nil)
 	ctx := context.Background()
 	asset, err := service.SaveAsset(ctx, SaveAssetCommand{OwnerUserID: 1, Asset: integrationAsset("private")})
 	if err != nil {
@@ -69,7 +69,7 @@ func TestServiceOwnerIsolation(t *testing.T) {
 
 func TestServiceDeleteFolderMovesAssetsToQuickSaves(t *testing.T) {
 	db := testdb.Open(t)
-	service := NewService(NewRepository(db))
+	service := NewService(NewRepository(db), nil)
 	ctx := context.Background()
 	folder, err := service.CreateFolder(ctx, 1, "To Delete")
 	if err != nil {
@@ -96,7 +96,7 @@ func TestServiceDeleteFolderMovesAssetsToQuickSaves(t *testing.T) {
 
 func TestServiceListAssetsUsesCursorPagination(t *testing.T) {
 	db := testdb.Open(t)
-	service := NewService(NewRepository(db))
+	service := NewService(NewRepository(db), nil)
 	ctx := context.Background()
 	for index := 0; index < 3; index++ {
 		if _, err := service.SaveAsset(ctx, SaveAssetCommand{OwnerUserID: 1, Asset: integrationAsset(fmt.Sprintf("page-%d", index))}); err != nil {

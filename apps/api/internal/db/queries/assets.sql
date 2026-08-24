@@ -108,6 +108,44 @@ SET status = 'failed', updated_at = now(), metadata = jsonb_set(
 WHERE id = sqlc.arg(id) AND owner_user_id = sqlc.arg(owner_user_id) AND status IN ('pending', 'uploading')
 RETURNING id;
 
+-- name: GetReadyLibraryMaterializedMediaAsset :one
+SELECT asset.id, asset.asset_id, asset.owner_user_id, asset.storage_profile_id, asset.storage_key,
+  asset.url, asset.source_url, asset.media_kind, asset.mime_type,
+  asset.width, asset.height, asset.size_bytes, asset.checksum_sha256,
+  asset.status, asset.metadata, asset.created_at, asset.updated_at, asset.deleted_at, asset.reclaim_after, asset.reclaim_started_at,
+  asset.reclaim_claim_token, asset.reclaim_generation
+FROM library_asset_media_assets AS link
+JOIN media_assets AS asset ON asset.id = link.media_asset_id AND asset.owner_user_id = link.owner_user_id
+WHERE link.library_asset_id = sqlc.arg(library_asset_id)
+  AND link.owner_user_id = sqlc.arg(owner_user_id)
+  AND asset.status = 'ready'
+  AND asset.deleted_at IS NULL;
+
+-- name: BeginLibraryMaterializedMediaAsset :one
+INSERT INTO media_assets (
+  asset_id, owner_user_id, storage_profile_id, storage_key, url, source_url,
+  media_kind, status, metadata, reclaim_after, reclaim_generation
+)
+VALUES (
+  sqlc.arg(asset_id), sqlc.arg(owner_user_id), sqlc.arg(storage_profile_id), sqlc.arg(storage_key), sqlc.arg(url), sqlc.arg(source_url),
+  'image', 'uploading', sqlc.arg(metadata), sqlc.arg(reclaim_after), 1
+)
+ON CONFLICT (storage_profile_id, storage_key) DO UPDATE
+SET source_url = EXCLUDED.source_url,
+    status = CASE WHEN media_assets.status = 'ready' THEN 'ready' ELSE 'uploading' END,
+    metadata = CASE WHEN media_assets.status = 'ready' THEN media_assets.metadata ELSE EXCLUDED.metadata END,
+    updated_at = now(), deleted_at = NULL, reclaim_after = CASE WHEN media_assets.status = 'ready' THEN media_assets.reclaim_after ELSE EXCLUDED.reclaim_after END,
+    reclaim_started_at = NULL, reclaim_claim_token = NULL
+WHERE media_assets.owner_user_id = EXCLUDED.owner_user_id
+RETURNING id;
+
+-- name: UpsertLibraryAssetMediaLink :exec
+INSERT INTO library_asset_media_assets (library_asset_id, owner_user_id, media_asset_id)
+VALUES (sqlc.arg(library_asset_id), sqlc.arg(owner_user_id), sqlc.arg(media_asset_id))
+ON CONFLICT (library_asset_id) DO UPDATE
+SET media_asset_id = EXCLUDED.media_asset_id, updated_at = now()
+WHERE library_asset_media_assets.owner_user_id = EXCLUDED.owner_user_id;
+
 -- name: ListStaleUploadingMediaAssetIDs :many
 SELECT id
 FROM media_assets

@@ -23,6 +23,7 @@ import type {
   ApiResponseLibraryAssetList,
   ApiResponseLibraryFolder,
   ApiResponseLibraryFolderList,
+  ApiResponseLibraryMaterializedAsset,
   LibraryFolderRequest,
   LibraryLookupRequest,
   LibraryMoveAssetRequest,
@@ -540,6 +541,81 @@ export function useLookupLibraryAssets<
   queryClient?: QueryClient,
 ): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getLookupLibraryAssetsQueryOptions(libraryLookupRequest, options)
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
+    queryKey: DataTag<QueryKey, TData, TError>
+  }
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<QueryKey, TData, TError>
+
+  return query
+}
+
+export const getMaterializeLibraryAssetUrl = (assetId: number) => {
+  return `/user/library/assets/${encodeURIComponent(String(assetId))}/materialize`
+}
+
+export const materializeLibraryAsset = async (
+  assetId: number,
+  options?: Parameters<typeof orvalMutator>[1],
+): Promise<ApiResponseLibraryMaterializedAsset> => {
+  return orvalMutator<ApiResponseLibraryMaterializedAsset>(getMaterializeLibraryAssetUrl(assetId), {
+    ...options,
+    method: 'POST',
+  })
+}
+
+export const getMaterializeLibraryAssetQueryKey = (assetId: MaybeRefOrGetter<number>) => {
+  return ['POST', 'user', 'library', 'assets', assetId, 'materialize'] as const
+}
+
+export const getMaterializeLibraryAssetQueryOptions = <
+  TData = Awaited<ReturnType<typeof materializeLibraryAsset>>,
+  TError = ErrorType<unknown>,
+>(
+  assetId: MaybeRefOrGetter<number>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof materializeLibraryAsset>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {}
+
+  const queryKey = getMaterializeLibraryAssetQueryKey(assetId)
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof materializeLibraryAsset>>> = ({
+    signal,
+  }) => materializeLibraryAsset(toValue(assetId), { signal, ...requestOptions })
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(() => toValue(assetId) !== null && toValue(assetId) !== undefined),
+    ...queryOptions,
+  } as UseQueryOptions<Awaited<ReturnType<typeof materializeLibraryAsset>>, TError, TData>
+}
+
+export type MaterializeLibraryAssetQueryResult = NonNullable<
+  Awaited<ReturnType<typeof materializeLibraryAsset>>
+>
+export type MaterializeLibraryAssetQueryError = ErrorType<unknown>
+
+export function useMaterializeLibraryAsset<
+  TData = Awaited<ReturnType<typeof materializeLibraryAsset>>,
+  TError = ErrorType<unknown>,
+>(
+  assetId: MaybeRefOrGetter<number>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof materializeLibraryAsset>>, TError, TData>
+    >
+    request?: SecondParameter<typeof orvalMutator>
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getMaterializeLibraryAssetQueryOptions(assetId, options)
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<TData, TError> & {
     queryKey: DataTag<QueryKey, TData, TError>

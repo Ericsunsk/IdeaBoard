@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { h } from 'vue'
 import { render, renderWithUser, screen } from '../../../../test/render'
 import CanvasChrome from './CanvasChrome.vue'
 
@@ -28,7 +29,7 @@ describe('CanvasChrome', () => {
           },
           menuItems: [],
         },
-        tools: { activeTool: 'select', minimapEnabled: false },
+        tools: { activeTool: 'select', libraryMounted: false, libraryOpen: false, minimapEnabled: false },
         status: { exportDisabled: false, zoomLevel: 100 },
       },
     })
@@ -69,7 +70,7 @@ describe('CanvasChrome', () => {
           },
           menuItems: [{ key: 'logout', label: '退出登录', command: vi.fn() }],
         },
-        tools: { activeTool: 'select', minimapEnabled: false },
+        tools: { activeTool: 'select', libraryMounted: false, libraryOpen: false, minimapEnabled: false },
         status: { exportDisabled: false, zoomLevel: 100 },
       },
     })
@@ -110,7 +111,7 @@ describe('CanvasChrome', () => {
           },
           menuItems: [],
         },
-        tools: { activeTool: 'select', minimapEnabled: false },
+        tools: { activeTool: 'select', libraryMounted: false, libraryOpen: false, minimapEnabled: false },
         status: { exportDisabled: false, zoomLevel: 100 },
       },
     })
@@ -145,7 +146,7 @@ describe('CanvasChrome', () => {
           },
           menuItems: [],
         },
-        tools: { activeTool: 'select', minimapEnabled: false },
+        tools: { activeTool: 'select', libraryMounted: false, libraryOpen: false, minimapEnabled: false },
         status: { exportDisabled: false, zoomLevel: 100 },
       },
     })
@@ -184,7 +185,7 @@ describe('CanvasChrome', () => {
           },
           menuItems: [],
         },
-        tools: { activeTool: 'select', minimapEnabled: false },
+        tools: { activeTool: 'select', libraryMounted: false, libraryOpen: false, minimapEnabled: false },
         status: { exportDisabled: false, zoomLevel: 100 },
       },
     })
@@ -252,7 +253,7 @@ describe('CanvasChrome', () => {
           },
           menuItems: [],
         },
-        tools: { activeTool: 'select', minimapEnabled: false },
+        tools: { activeTool: 'select', libraryMounted: false, libraryOpen: false, minimapEnabled: false },
         status: { exportDisabled: false, zoomLevel: 100 },
       },
     })
@@ -264,6 +265,85 @@ describe('CanvasChrome', () => {
 
     expect(emitted()['select-board']).toEqual([['board-b']])
     expect(emitted()['reload-board-catalog']).toHaveLength(1)
+  })
+
+  it('places an active Library control immediately above the minimap control', async () => {
+    const { emitted, user } = renderWithUser(CanvasChrome, {
+      props: {
+        inert: false,
+        isHidden: false,
+        board: {
+          currentName: 'Untitled',
+          options: [],
+          currentId: null,
+          isMenuOpen: false,
+          isRenaming: false,
+          isRenamePending: false,
+          catalogRecovery: { status: 'idle' },
+          setNameInputRef: vi.fn(),
+        },
+        account: {
+          balance: {
+            status: 'ready',
+            availableIdeas: 0,
+            displayValue: '0',
+            ariaLabel: 'Idea余额 0 Ideas',
+            command: vi.fn(),
+          },
+          menuItems: [],
+        },
+        tools: { activeTool: 'select', libraryMounted: true, libraryOpen: true, minimapEnabled: false },
+        status: { exportDisabled: false, zoomLevel: 100 },
+      },
+    })
+
+    const library = screen.getByRole('button', { name: 'Library' })
+    const minimap = screen.getByRole('button', { name: '小地图' })
+
+    expect(library.nextElementSibling).toBe(minimap)
+    expect(library).toHaveAttribute('aria-pressed', 'true')
+    await user.click(library)
+    expect(emitted()['toggle-library']).toHaveLength(1)
+  })
+
+  it('publishes a scoped focus state for contained Library inputs', () => {
+    const { emitted } = render(CanvasChrome, {
+      props: {
+        inert: false,
+        isHidden: false,
+        board: {
+          currentName: 'Untitled',
+          options: [],
+          currentId: null,
+          isMenuOpen: false,
+          isRenaming: false,
+          isRenamePending: false,
+          catalogRecovery: { status: 'idle' },
+          setNameInputRef: vi.fn(),
+        },
+        account: {
+          balance: {
+            status: 'ready',
+            availableIdeas: 0,
+            displayValue: '0',
+            ariaLabel: 'Idea余额 0 Ideas',
+            command: vi.fn(),
+          },
+          menuItems: [],
+        },
+        tools: { activeTool: 'select', libraryMounted: true, libraryOpen: true, minimapEnabled: false },
+        status: { exportDisabled: false, zoomLevel: 100 },
+      },
+      slots: {
+        library: () => h('input', { 'aria-label': 'Library folder name' }),
+      },
+    })
+
+    const input = screen.getByRole('textbox', { name: 'Library folder name' })
+    input.dispatchEvent(new FocusEvent('focusin', { bubbles: true }))
+    input.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: document.body }))
+
+    expect(emitted()['library-focus-change']).toEqual([[true], [false]])
   })
 
   it('keeps the full Canvas Chrome inaccessible while hidden and inert', () => {
@@ -291,7 +371,7 @@ describe('CanvasChrome', () => {
           },
           menuItems: [],
         },
-        tools: { activeTool: 'select', minimapEnabled: false },
+        tools: { activeTool: 'select', libraryMounted: false, libraryOpen: false, minimapEnabled: false },
         status: { exportDisabled: false, zoomLevel: 100 },
       },
     })

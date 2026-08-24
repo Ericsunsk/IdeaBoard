@@ -119,7 +119,10 @@ func validateVisionImages(images []VisionImage) error {
 				ext = imageformat.DetectImageExtensionFromBytes(image.Data)
 			}
 		}
-		if ext == "" || imageformat.ValidateImageBytes(image.Data, ext) != nil || imageformat.ValidateImageDimensions(image.Data) != nil {
+		if ext == "" {
+			return ErrVisionImageInvalid
+		}
+		if _, err := imageformat.InspectBytes(image.Data, ext); err != nil {
 			return ErrVisionImageInvalid
 		}
 		total += len(image.Data)

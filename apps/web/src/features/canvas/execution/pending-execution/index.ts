@@ -1,7 +1,6 @@
 export {
   CanvasBoardGraphSession,
   type CanvasBoardGraphSessionOptions,
-  type PendingImageAttachment,
   type PendingImageMutationRejectReason,
   type PendingImageResolvedResult,
   type PendingImageResultNodeId,

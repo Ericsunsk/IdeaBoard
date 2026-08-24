@@ -233,8 +233,7 @@ const ContextMenuStub = defineComponent({
 
 function createRuntime() {
   const flushAutosave = vi.fn()
-  const loadCanvasBoardAndProbe = vi.fn(async () => {})
-  const reattachPendingImageResults = vi.fn()
+  const recoverBoardSession = vi.fn(async () => {})
   const onZoomOut = vi.fn()
   const onExportSelectedImages = vi.fn()
   const handlePaneClick = vi.fn()
@@ -321,7 +320,10 @@ function createRuntime() {
           connectionAdapter: { vueFlowBindings: {}, connectIntent: vi.fn() },
           nodeDragTransactions: { begin: vi.fn(), commit: vi.fn() },
         },
-        persistence: { flushAutosave, loadCanvasBoardAndProbe, reattachPendingImageResults },
+        persistence: {
+          flushAutosave,
+          recoverBoardSession,
+        },
         viewportControls: {
           onZoomIn: vi.fn(),
           onZoomOut,
@@ -338,6 +340,7 @@ function createRuntime() {
           onNodeDragStop: vi.fn(() => mocks.dragEvents.push('viewport:stop')),
         },
         graphEditing: {
+          libraryImport: { add: vi.fn(), retry: vi.fn(() => false) },
           grouping: {
             selectGroupAtPoint: vi.fn(),
             handlePaneClick,
@@ -385,8 +388,7 @@ function createRuntime() {
       },
     },
     flushAutosave,
-    loadCanvasBoardAndProbe,
-    reattachPendingImageResults,
+    recoverBoardSession,
     onZoomOut,
     onExportSelectedImages,
     handlePaneClick,
@@ -502,28 +504,25 @@ describe('CanvasScreen', () => {
     await vi.waitFor(() => expect(view.queryByTestId('node-context-menu')).not.toBeInTheDocument())
   })
 
-  it('loads the Board and reattaches pending results on mount', async () => {
+  it('recovers the active Board session on mount', async () => {
     const { harness } = renderScreen()
 
     await Promise.resolve()
 
-    expect(harness.loadCanvasBoardAndProbe).toHaveBeenCalledTimes(1)
-    expect(harness.reattachPendingImageResults).toHaveBeenCalledTimes(1)
+    expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1)
   })
 
-  it('loads the next Board and reattaches its pending results when the route switches', async () => {
+  it('recovers the next Board session when the route switches', async () => {
     const route = reactive({
       query: { boardId: 'board-a' },
     }) as unknown as RouteLocationNormalizedLoaded
     const { harness } = renderScreen(route)
-    await vi.waitFor(() => expect(harness.loadCanvasBoardAndProbe).toHaveBeenCalledTimes(1))
-    harness.loadCanvasBoardAndProbe.mockClear()
-    harness.reattachPendingImageResults.mockClear()
+    await vi.waitFor(() => expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1))
+    harness.recoverBoardSession.mockClear()
 
     route.query.boardId = 'board-b'
 
-    await vi.waitFor(() => expect(harness.loadCanvasBoardAndProbe).toHaveBeenCalledTimes(1))
-    expect(harness.reattachPendingImageResults).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(harness.recoverBoardSession).toHaveBeenCalledTimes(1))
   })
 
   it('saves through keyboard and leave-guard behavior', async () => {

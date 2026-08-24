@@ -124,7 +124,7 @@ func (s *Service) Process(ctx context.Context, derivativeID int64) error {
 	if err != nil {
 		return s.markFailed(ctx, q, processing.ID, "source_read_failed", err)
 	}
-	if err := imageformat.ValidateImageDimensions(original.Data); err != nil {
+	if _, err := imageformat.InspectBytes(original.Data, filepath.Ext(asset.StorageKey)); err != nil {
 		return s.markFailed(ctx, q, processing.ID, "source_limits_exceeded", err)
 	}
 	if s.renderer == nil {
@@ -310,11 +310,11 @@ func (r vipsRenderer) Render(ctx context.Context, data []byte, sourceName string
 	if err != nil {
 		return nil, 0, 0, "", fmt.Errorf("read libvips output: %w", err)
 	}
-	width, height, err := imageformat.ImageDimensions(encoded)
+	facts, err := imageformat.InspectBytes(encoded, ".webp")
 	if err != nil {
 		return nil, 0, 0, "", fmt.Errorf("validate libvips output: %w", err)
 	}
-	return encoded, width, height, FormatWebP, nil
+	return encoded, facts.Width, facts.Height, FormatWebP, nil
 }
 
 func hasTransparency(img image.Image) bool {

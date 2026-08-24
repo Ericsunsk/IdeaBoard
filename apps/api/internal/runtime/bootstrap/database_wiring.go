@@ -43,6 +43,7 @@ type appDatabaseOpeners struct {
 }
 
 type appRepositories struct {
+	db                   *sql.DB
 	userRepo             *users.UserRepository
 	accountRepo          *accounts.AccountRepository
 	taskRepo             *taskstore.Repository
@@ -173,6 +174,7 @@ func separatedMigrationDatabaseConfig(runtimeConfig config.DatabaseConfig) (conf
 func newAppRepositories(ctx context.Context, db *sql.DB) (appRepositories, error) {
 	taskRepo := taskstore.NewRepository(db)
 	repos := appRepositories{
+		db:                   db,
 		userRepo:             users.NewUserRepository(db),
 		accountRepo:          accounts.NewAccountRepositoryWithRunningTaskFinalizer(db, taskRepo),
 		taskRepo:             taskRepo,

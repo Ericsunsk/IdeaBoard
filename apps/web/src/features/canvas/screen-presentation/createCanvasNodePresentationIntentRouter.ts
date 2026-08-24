@@ -21,6 +21,7 @@ export type CanvasNodePresentationIntentCommands = {
   }
   node: {
     delete: (nodeId: string) => void
+    retryLibraryImport: (nodeId: string) => void
   }
   mediaInput: {
     drop: (nodeId: string, event: DragEvent) => void
@@ -82,6 +83,9 @@ export function createCanvasNodePresentationIntentRouter(
         return
       case 'delete-requested':
         commands.node.delete(intent.nodeId)
+        return
+      case 'library-import-retry-requested':
+        commands.node.retryLibraryImport(intent.nodeId)
         return
       case 'media-input-dropped':
         commands.mediaInput.drop(intent.nodeId, intent.event)

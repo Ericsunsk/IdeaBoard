@@ -49,8 +49,7 @@ export function createCanvasWorkspaceRuntimeFacade(
       },
       persistence: {
         flushAutosave: persistence.flushAutosave,
-        loadCanvasBoardAndProbe: persistence.loadCanvasBoardAndProbe,
-        reattachPendingImageResults: persistence.reattachPendingImageResults,
+        recoverBoardSession: persistence.recoverBoardSession,
       },
       viewportControls: {
         onZoomIn: viewport.onZoomIn,
@@ -67,7 +66,6 @@ export function createCanvasWorkspaceRuntimeFacade(
         onNodeDragStart: viewport.onNodeDragStart,
         onNodeDragStop: viewport.onNodeDragStop,
         flushViewportPersistence: viewport.flushViewportPersistence,
-        loadCanvasBoardAndProbe: viewport.loadCanvasBoardAndProbe,
       },
       graphEditing: graph.commands,
       imageWorkflow: imageWorkflow.commands,

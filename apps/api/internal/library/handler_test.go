@@ -1,6 +1,7 @@
 package library
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -24,12 +25,44 @@ func newLibraryTestRouter(t testing.TB, handler *Handler) *gin.Engine {
 	})
 	router.GET("/assets", handler.ListAssets)
 	router.POST("/assets", handler.SaveAsset)
+	router.POST("/assets/:asset_id/materialize", handler.MaterializeAsset)
 	return router
+}
+
+type materializerStub struct {
+	input MaterializeInput
+}
+
+func (s *materializerStub) MaterializeLibraryAsset(_ context.Context, input MaterializeInput) (MaterializedAsset, error) {
+	s.input = input
+	return MaterializedAsset{MediaAssetID: 88, AssetID: "asset_library", URL: "/api/user/media-assets/asset_library/original/content", Width: 1200, Height: 800, MIMEType: "image/jpeg", Extension: ".jpg"}, nil
+}
+
+func TestMaterializeAssetHandlerUsesOnlyOwnedLibraryAsset(t *testing.T) {
+	db := testdb.Open(t)
+	stub := &materializerStub{}
+	service := NewService(NewRepository(db), stub)
+	saved, err := service.SaveAsset(t.Context(), SaveAssetCommand{OwnerUserID: 1, Asset: AssetInput{
+		Provider: "unsplash", SourceID: "materialize-handler", SourceURL: "https://unsplash.com/photos/materialize-handler",
+		PreviewURL: "https://images.unsplash.com/materialize-handler-preview", OriginalURL: "https://images.unsplash.com/materialize-handler-original",
+	}})
+	if err != nil {
+		t.Fatalf("SaveAsset returned error: %v", err)
+	}
+	router := newLibraryTestRouter(t, NewHandler(service))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, "/assets/"+stringID(saved.ID)+"/materialize", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d body = %s", recorder.Code, recorder.Body.String())
+	}
+	if stub.input.LibraryAssetID != saved.ID || stub.input.OwnerUserID != 1 || stub.input.OriginalURL == "" {
+		t.Fatalf("materializer input = %#v", stub.input)
+	}
 }
 
 func TestListAssetsHandlerAcceptsCanonicalFolderSelectors(t *testing.T) {
 	db := testdb.Open(t)
-	service := NewService(NewRepository(db))
+	service := NewService(NewRepository(db), nil)
 	folder, err := service.CreateFolder(t.Context(), 1, "Travel")
 	if err != nil {
 		t.Fatalf("CreateFolder returned error: %v", err)
@@ -68,7 +101,7 @@ func TestListAssetsHandlerRejectsInvalidFolderSelector(t *testing.T) {
 
 func TestSaveAssetHandlerUsesLibraryFolderSelection(t *testing.T) {
 	db := testdb.Open(t)
-	service := NewService(NewRepository(db))
+	service := NewService(NewRepository(db), nil)
 	folder, err := service.CreateFolder(t.Context(), 1, "Travel")
 	if err != nil {
 		t.Fatalf("CreateFolder returned error: %v", err)
@@ -86,7 +119,7 @@ func TestSaveAssetHandlerUsesLibraryFolderSelection(t *testing.T) {
 
 func TestSaveAssetHandlerDefaultsToQuickSaves(t *testing.T) {
 	db := testdb.Open(t)
-	service := NewService(NewRepository(db))
+	service := NewService(NewRepository(db), nil)
 	router := newLibraryTestRouter(t, NewHandler(service))
 	payload := `{"asset":{"provider":"pexels","source_id":"quick-handler-asset","source_url":"https://www.pexels.com/photo/quick-handler-asset","preview_url":"https://images.pexels.com/quick-handler-asset","original_url":"https://images.pexels.com/quick-handler-asset"}}`
 	recorder := httptest.NewRecorder()

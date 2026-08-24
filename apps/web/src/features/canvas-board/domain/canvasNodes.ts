@@ -90,6 +90,15 @@ export interface BoardStateMediaRef {
   role?: string
 }
 
+/**
+ * Durable intent to materialize an owned Library asset into a Canvas image.
+ * The source remains owned by Library until materialization succeeds, so this
+ * fact never carries provider URLs or a temporary media reference.
+ */
+export type LibraryImportFact =
+  | { state: 'pending'; libraryAssetId: number }
+  | { state: 'failed'; libraryAssetId: number; failureMessage: string }
+
 export interface ImageNodeItem {
   id: number
   type: 'image-node'
@@ -105,6 +114,7 @@ export interface ImageNodeItem {
   pendingTaskId?: string
   pendingResultIndex?: number
   pendingClientActionId?: string
+  libraryImport?: LibraryImportFact
   outputStatus: WorkflowNodeOutputStatus
   outputImages: ImageNodeOutputItem[]
 }

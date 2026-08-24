@@ -1,6 +1,7 @@
 package library
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"time"
@@ -104,4 +105,35 @@ type ListAssetsResult struct {
 type AssetKey struct {
 	Provider string `json:"provider"`
 	SourceID string `json:"source_id"`
+}
+
+// MaterializeInput is the only cross-context handoff for turning an owned
+// external Library asset into managed Media. The browser never supplies URLs
+// to this command; Library resolves them from its own owner-scoped record.
+type MaterializeInput struct {
+	OwnerUserID    int64
+	LibraryAssetID int64
+	Provider       string
+	SourceID       string
+	SourceURL      string
+	OriginalURL    string
+	PreviewURL     string
+	Title          string
+	Author         string
+}
+
+type MaterializedAsset struct {
+	MediaAssetID int64
+	AssetID      string
+	URL          string
+	Width        int32
+	Height       int32
+	MIMEType     string
+	Extension    string
+}
+
+// AssetMaterializer is caller-owned so Library keeps its URL-backed domain
+// model while Media owns outbound fetch, storage and managed Asset lifecycle.
+type AssetMaterializer interface {
+	MaterializeLibraryAsset(context.Context, MaterializeInput) (MaterializedAsset, error)
 }

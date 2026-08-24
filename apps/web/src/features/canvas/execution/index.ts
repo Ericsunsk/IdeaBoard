@@ -23,7 +23,6 @@ export {
   createPendingImageExecutionCore,
   PendingImageMaterializationError,
   PendingImageMutationContractError,
-  type PendingImageAttachment,
   type CanvasBoardGraphSessionOptions,
   type PendingImageExecutionCore,
   type PendingImageExecutionEdgeProjection,

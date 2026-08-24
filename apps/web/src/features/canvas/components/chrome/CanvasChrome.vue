@@ -75,6 +75,17 @@
     </button>
     <button
       type="button"
+      :class="[canvasChromeRoundControlClass, { 'is-active': tools.libraryOpen }]"
+      aria-label="Library"
+      :aria-pressed="tools.libraryOpen"
+      title="Library"
+      @click="emit('toggle-library')"
+    >
+      <BookmarkSolid v-if="tools.libraryOpen" class="canvas-chrome-icon" />
+      <Bookmark v-else class="canvas-chrome-icon" />
+    </button>
+    <button
+      type="button"
       :class="[canvasChromeRoundControlClass, { 'is-active': tools.minimapEnabled }]"
       aria-label="小地图"
       :aria-pressed="tools.minimapEnabled"
@@ -84,6 +95,17 @@
       <Map class="canvas-chrome-icon" />
     </button>
   </aside>
+
+  <section
+    v-if="tools.libraryMounted"
+    class="canvas-chrome-region canvas-chrome-region--library"
+    :class="{ 'is-hidden': isHidden, 'is-open': tools.libraryOpen }"
+    :inert="inert"
+    @focusin="emit('library-focus-change', true)"
+    @focusout="handleLibraryFocusOut"
+  >
+    <slot name="library" />
+  </section>
 
   <section
     class="canvas-chrome-region canvas-chrome-region--status"
@@ -119,6 +141,8 @@
 
 <script setup lang="ts">
 import {
+  Bookmark,
+  BookmarkSolid,
   Download,
   Map,
   Minus,
@@ -160,6 +184,8 @@ const emit = defineEmits<{
   export: []
   'navigate-back': []
   'select-tool': [tool: 'select' | 'hand']
+  'toggle-library': []
+  'library-focus-change': [focused: boolean]
   'toggle-minimap': []
   'zoom-out': []
   'zoom-in': []
@@ -175,4 +201,17 @@ const canvasChromeExportControlClass = createPageChromeRoundControlClass(
 const canvasChromeAvatarButtonClass = createPageChromeAccountAvatarButtonClass(
   'canvas-user-avatar-button',
 )
+
+function handleLibraryFocusOut(event: FocusEvent) {
+  const nextTarget = event.relatedTarget
+  const currentTarget = event.currentTarget
+  if (
+    nextTarget instanceof Node &&
+    currentTarget instanceof HTMLElement &&
+    currentTarget.contains(nextTarget)
+  ) {
+    return
+  }
+  emit('library-focus-change', false)
+}
 </script>

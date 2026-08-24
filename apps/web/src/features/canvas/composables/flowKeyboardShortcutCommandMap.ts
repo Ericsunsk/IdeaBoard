@@ -22,7 +22,6 @@ type ShortcutCommandResult = {
 type FlowKeyboardShortcutCommand = {
   id: string
   allowEditableTarget?: boolean
-  usesCanvasSuppression?: boolean
   match: (event: KeyboardEvent, key: string) => boolean
   run: (
     event: KeyboardEvent,
@@ -83,7 +82,6 @@ const flowKeyboardShortcutCommands: FlowKeyboardShortcutCommand[] = [
   },
   {
     id: 'undo-redo-z',
-    usesCanvasSuppression: true,
     match: (event, key) => hasCommandModifier(event) && key === 'z',
     run: (event, handlers) => {
       const handler = event.shiftKey ? handlers.onRedo : handlers.onUndo
@@ -94,7 +92,6 @@ const flowKeyboardShortcutCommands: FlowKeyboardShortcutCommand[] = [
   },
   {
     id: 'redo-y',
-    usesCanvasSuppression: true,
     match: (event, key) => !event.metaKey && event.ctrlKey && key === 'y',
     run: (_event, handlers) => {
       if (!handlers.onRedo) return { handled: true }
@@ -104,7 +101,6 @@ const flowKeyboardShortcutCommands: FlowKeyboardShortcutCommand[] = [
   },
   {
     id: 'viewport-pan',
-    usesCanvasSuppression: true,
     match: (event, key) =>
       !event.metaKey && !event.ctrlKey && !event.altKey && !!getKeyboardPanDelta(key, 1),
     run: (event, handlers, key) => {
@@ -119,7 +115,6 @@ const flowKeyboardShortcutCommands: FlowKeyboardShortcutCommand[] = [
   },
   {
     id: 'tool-select',
-    usesCanvasSuppression: true,
     match: (event, key) =>
       !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && key === 'v',
     run: (_event, handlers) => {
@@ -129,7 +124,6 @@ const flowKeyboardShortcutCommands: FlowKeyboardShortcutCommand[] = [
   },
   {
     id: 'tool-hand',
-    usesCanvasSuppression: true,
     match: (event, key) =>
       !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && key === 'h',
     run: (_event, handlers) => {
@@ -139,7 +133,6 @@ const flowKeyboardShortcutCommands: FlowKeyboardShortcutCommand[] = [
   },
   {
     id: 'space-drag',
-    usesCanvasSuppression: true,
     match: (event) => event.code === 'Space',
     run: (_event, handlers) => {
       handlers.onSpacePressedChange?.(true)
@@ -156,7 +149,6 @@ const flowKeyboardShortcutCommands: FlowKeyboardShortcutCommand[] = [
   },
   {
     id: 'inline-delete',
-    usesCanvasSuppression: true,
     match: (_event, key) => key === 'delete' || key === 'backspace',
     run: (event, handlers) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return { handled: false }
@@ -173,13 +165,12 @@ export function dispatchFlowKeyboardShortcutKeydown(
   event: KeyboardEvent,
   handlers: FlowKeyboardShortcutHandlers,
 ): boolean {
+  if (isCanvasShortcutSuppressed(event, handlers)) return false
   const key = event.key.toLowerCase()
   const isEditableTarget = isEditableEventTarget(event.target)
   for (const command of flowKeyboardShortcutCommands) {
     if (!command.match(event, key)) continue
     if (!command.allowEditableTarget && isEditableTarget) return false
-    if (command.usesCanvasSuppression && isCanvasShortcutSuppressed(event, handlers)) return false
-
     const result = command.run(event, handlers, key)
     if (result.preventDefault) event.preventDefault()
     return result.handled

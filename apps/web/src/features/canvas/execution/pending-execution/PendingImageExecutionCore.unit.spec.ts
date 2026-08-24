@@ -10,12 +10,12 @@ import {
   createPendingImageExecutionCore,
   PendingImageMaterializationError,
   PendingImageMutationContractError,
-  type PendingImageAttachment,
   type PendingImageExecutionCore,
   type PendingImageExecutionLease,
   type PendingImageExecutionStartResult,
   type PendingImageResultNodeId,
 } from './index'
+import type { CanvasBoardAttachment } from '../../board-attachment'
 import {
   bindCanvasBoardGraphSession,
   type PendingImageDomainMutationResult,
@@ -58,7 +58,7 @@ function attachCore(
   boardId = 'board-a',
 ): {
   core: PendingImageExecutionCore
-  attachment: PendingImageAttachment
+  attachment: CanvasBoardAttachment
 } {
   const core = createPendingImageExecutionCore()
   const attachment = core.attachBoard(
@@ -69,7 +69,7 @@ function attachCore(
 
 function hydrateLease(
   core: PendingImageExecutionCore,
-  attachment: PendingImageAttachment,
+  attachment: CanvasBoardAttachment,
   resultNodeId: PendingImageResultNodeId,
   taskId: string,
   clientActionId = `action-${taskId}`,

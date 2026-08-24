@@ -52,6 +52,18 @@ const imageNodeOutputItemSchema = v.strictObject({
   mediaAssetId: v.optional(positiveIntegerSchema),
 })
 
+const libraryImportFactSchema = v.union([
+  v.strictObject({
+    state: v.literal('pending'),
+    libraryAssetId: positiveIntegerSchema,
+  }),
+  v.strictObject({
+    state: v.literal('failed'),
+    libraryAssetId: positiveIntegerSchema,
+    failureMessage: v.pipe(nonEmptyStringSchema, v.maxLength(500)),
+  }),
+])
+
 const boardStateMediaRefSchema = v.strictObject({
   mediaAssetId: positiveIntegerSchema,
   refType: v.picklist(['board', 'board_node']),
@@ -98,6 +110,7 @@ const imageNodeItemSchema = v.strictObject({
   pendingTaskId: v.optional(nonEmptyStringSchema),
   pendingResultIndex: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0))),
   pendingClientActionId: v.optional(nonEmptyStringSchema),
+  libraryImport: v.optional(libraryImportFactSchema),
   outputStatus: workflowNodeOutputStatusSchema,
   outputImages: v.array(imageNodeOutputItemSchema),
 })

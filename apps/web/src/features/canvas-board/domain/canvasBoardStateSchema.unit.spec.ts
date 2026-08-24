@@ -95,6 +95,44 @@ describe('canvasBoardStateSchema', () => {
     }
   })
 
+  it('accepts only durable Library import facts on image nodes', () => {
+    const state = makeCanvasBoardState({
+      imageNodes: [
+        {
+          ...makePendingImageNodeSnapshot(),
+          libraryImport: { state: 'failed', libraryAssetId: 7, failureMessage: '素材导入失败' },
+        },
+      ],
+    })
+
+    const parsed = v.safeParse(canvasBoardStateSchema, state)
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      expect(parsed.output.imageNodes[0]?.libraryImport).toEqual({
+        state: 'failed',
+        libraryAssetId: 7,
+        failureMessage: '素材导入失败',
+      })
+    }
+  })
+
+  it('rejects transient provider URLs inside Library import facts', () => {
+    const validState = makeCanvasBoardState({ imageNodes: [makePendingImageNodeSnapshot()] })
+    const state = {
+      ...validState,
+      imageNodes: validState.imageNodes.map((node) => ({
+        ...node,
+        libraryImport: {
+          state: 'pending',
+          libraryAssetId: 7,
+          previewUrl: 'https://provider.example/preview.png',
+        },
+      })),
+    }
+
+    expect(v.safeParse(canvasBoardStateSchema, state).success).toBe(false)
+  })
+
   it('preserves media asset ids on node output images', () => {
     const state = makeCanvasBoardState({
       imageNodes: [

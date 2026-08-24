@@ -13,6 +13,9 @@ import { useFlowNodeMediaInputs } from '../composables/useFlowNodeMediaInputs'
 import { useFlowNodeMutations } from '../composables/useFlowNodeMutations'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 import type { CanvasGraphEditingBrowserAdapter } from './browserAdapter'
+import { useCanvasLibraryImportRuntime } from './useCanvasLibraryImportRuntime'
+import type { CanvasBoardAttachment } from '../board-attachment'
+import type { LibraryAssetMaterializer } from '../../library/libraryResource'
 
 type ValueRef<T> = { readonly value: T }
 type SnapshotNodeMutator = (snapshotNode: CanvasNodeItem) => CanvasNodeItem
@@ -56,6 +59,9 @@ type UseCanvasGraphEditingOptions = {
   screenToFlowCoordinate: (point: { x: number; y: number }) => { x: number; y: number }
   browser: CanvasGraphEditingBrowserAdapter
   upload: CanvasGraphEditingUploadAdapter
+  materializeLibraryAsset: LibraryAssetMaterializer
+  readLibraryImportAttachment: () => CanvasBoardAttachment | null
+  selectOnlyNode: (nodeId: string) => boolean
   preview: {
     openImageUrl: (src: string, ratio?: number) => Promise<void>
   }
@@ -109,11 +115,23 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
     openImageUrlPreview: options.preview.openImageUrl,
     onWarning: options.feedback.operationWarning,
   })
+  const libraryImport = useCanvasLibraryImportRuntime({
+    nodes: options.nodes,
+    readAttachment: options.readLibraryImportAttachment,
+    graphAdapter: options.graphAdapter,
+    createImageNodeAtPosition: (x, y, initialSnapshotPatch) =>
+      nodeMutations.createNodeAtPosition('image', x, y, initialSnapshotPatch),
+    refreshNodeInternals: scheduleFlowNodeInternalsRefresh,
+    selectOnlyNode: options.selectOnlyNode,
+    materialize: options.materializeLibraryAsset,
+    onWarning: options.feedback.operationWarning,
+  })
   const canvasDrop = useFlowCanvasDrop({
     browser: options.browser,
     screenToFlowCoordinate: options.screenToFlowCoordinate,
     onWarning: options.feedback.operationWarning,
     createImageNodeFromFile,
+    addLibraryAsset: libraryImport.start,
   })
   function createNodeInteractions(
     interactionOptions: CanvasGraphEditingNodeInteractionsOptions,
@@ -166,6 +184,10 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
         drop: canvasDrop.onCanvasDrop,
         dragOver: canvasDrop.onCanvasDragOver,
       },
+      libraryImport: {
+        add: libraryImport.start,
+        retry: libraryImport.retry,
+      },
     },
     workflowPort: {
       getImageNodeDisplayPayload,
@@ -176,6 +198,9 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
       resolvePromptInputImageNodeIds: mediaInputs.resolvePromptInputImageNodeIds,
       updateNodeParams: nodeMutations.onFlowNodeParamUpdate,
       markNodeExecutionDirty: nodeMutations.markFlowExecutionNodeDirty,
+    },
+    recoveryPort: {
+      resumePendingLibraryImports: libraryImport.resumePending,
     },
   }
 }

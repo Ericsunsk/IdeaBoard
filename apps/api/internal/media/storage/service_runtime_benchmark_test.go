@@ -27,11 +27,11 @@ func BenchmarkStorageStoreBytesLocal(b *testing.B) {
 	b.SetBytes(int64(len(payload)))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		url, err := adapter.StoreBytes(context.Background(), &profile, "bench.png", payload, opts)
+		ref, err := adapter.StoreBytesRef(context.Background(), &profile, "bench.png", payload, opts)
 		if err != nil {
-			b.Fatalf("StoreBytes returned error: %v", err)
+			b.Fatalf("StoreBytesRef returned error: %v", err)
 		}
-		removeBenchmarkUpload(b, url)
+		removeBenchmarkUpload(b, ref.URL)
 	}
 }
 
@@ -72,11 +72,11 @@ func BenchmarkStorageStoreRemoteLocal(b *testing.B) {
 	b.SetBytes(int64(len(payload)))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		url, err := service.storeRemoteWithProfile(context.Background(), profile, server.URL+"/image.png", opts)
+		ref, err := service.storeRemoteRefWithProfile(context.Background(), profile, server.URL+"/image.png", opts)
 		if err != nil {
-			b.Fatalf("StoreRemote returned error: %v", err)
+			b.Fatalf("StoreRemoteRef returned error: %v", err)
 		}
-		removeBenchmarkUpload(b, url)
+		removeBenchmarkUpload(b, ref.URL)
 	}
 }
 

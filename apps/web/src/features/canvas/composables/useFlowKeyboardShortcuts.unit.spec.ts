@@ -170,7 +170,7 @@ describe('useFlowKeyboardShortcuts', () => {
     }
   })
 
-  it('keeps save available while canvas shortcuts are suppressed', () => {
+  it('does not save while an explicit Canvas focus scope suppresses shortcuts', () => {
     const onSave = vi.fn()
     const harness = mountKeyboardShortcuts({
       onSave,
@@ -180,8 +180,8 @@ describe('useFlowKeyboardShortcuts', () => {
     try {
       const event = dispatchKeydown({ key: 's', metaKey: true })
 
-      expect(event.defaultPrevented).toBe(true)
-      expect(onSave).toHaveBeenCalledOnce()
+      expect(event.defaultPrevented).toBe(false)
+      expect(onSave).not.toHaveBeenCalled()
     } finally {
       harness.unmount()
     }

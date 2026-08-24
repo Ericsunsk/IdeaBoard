@@ -172,7 +172,7 @@ describe('flowKeyboardShortcutCommandMap', () => {
     }
   })
 
-  it('applies canvas suppression to canvas commands without blocking save or Alt state', () => {
+  it('suppresses every Canvas shortcut while an explicit Canvas focus scope is active', () => {
     const handlers = createHandlers({
       isCanvasShortcutSuppressed: vi.fn(() => true),
     })
@@ -190,15 +190,15 @@ describe('flowKeyboardShortcutCommandMap', () => {
     expect(tool.handled).toBe(false)
     expect(space.handled).toBe(false)
     expect(del.handled).toBe(false)
-    expect(alt.handled).toBe(true)
-    expect(save.handled).toBe(true)
+    expect(alt.handled).toBe(false)
+    expect(save.handled).toBe(false)
     expect(handlers.onUndo).not.toHaveBeenCalled()
     expect(handlers.onPanViewport).not.toHaveBeenCalled()
     expect(handlers.onToolSelect).not.toHaveBeenCalled()
     expect(handlers.onSpacePressedChange).not.toHaveBeenCalled()
     expect(handlers.onDeleteInlineSelection).not.toHaveBeenCalled()
-    expect(handlers.onDuplicateModifierChange).toHaveBeenCalledWith(true)
-    expect(handlers.onSave).toHaveBeenCalledOnce()
+    expect(handlers.onDuplicateModifierChange).not.toHaveBeenCalled()
+    expect(handlers.onSave).not.toHaveBeenCalled()
   })
 
   it('leaves Delete default handling alone when inline deletion does not consume it', () => {

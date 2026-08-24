@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -412,22 +413,19 @@ func (s *S3CompatibleService) UploadRefWithConfig(ctx context.Context, file *mul
 	return s.putReaderWithConfigRef(ctx, client, file.Filename, file.Header.Get("Content-Type"), src, file.Size, cfg, opts)
 }
 
-func (s *S3CompatibleService) uploadBytesWithConfig(ctx context.Context, filename string, data []byte, cfg *S3CompatibleConfig, opts StorageStoreOptions) (string, error) {
-	ref, err := s.uploadBytesWithConfigRef(ctx, filename, data, cfg, opts)
-	if err != nil {
-		return "", err
-	}
-	return ref.URL, nil
-}
-
 func (s *S3CompatibleService) uploadBytesWithConfigRef(ctx context.Context, filename string, data []byte, cfg *S3CompatibleConfig, opts StorageStoreOptions) (*StoredUploadRef, error) {
 	contentType := inferStoredUploadContentType(filename, data)
 	ref, err := s.uploadReaderWithConfigRef(ctx, filename, contentType, bytes.NewReader(data), int64(len(data)), cfg, opts)
 	if err != nil {
 		return nil, err
 	}
-	ref.Width, ref.Height, _ = imageformat.ImageDimensions(data)
-	ref.Animated = imageformat.IsAnimated(data)
+	facts, err := imageformat.InspectBytes(data, filepath.Ext(filename))
+	if err != nil {
+		return nil, fmt.Errorf("读取图片信息失败: %w", err)
+	}
+	ref.Width = facts.Width
+	ref.Height = facts.Height
+	ref.Animated = facts.Animated
 	return ref, nil
 }
 
@@ -461,14 +459,6 @@ func (s *S3CompatibleService) putBytesAtKeyWithConfig(ctx context.Context, objec
 		return fmt.Errorf("上传派生图片失败: %w", err)
 	}
 	return nil
-}
-
-func (s *S3CompatibleService) uploadReaderWithConfig(ctx context.Context, filename string, contentType string, body io.Reader, size int64, cfg *S3CompatibleConfig, opts StorageStoreOptions) (string, error) {
-	ref, err := s.uploadReaderWithConfigRef(ctx, filename, contentType, body, size, cfg, opts)
-	if err != nil {
-		return "", err
-	}
-	return ref.URL, nil
 }
 
 func (s *S3CompatibleService) uploadReaderWithConfigRef(ctx context.Context, filename string, contentType string, body io.Reader, size int64, cfg *S3CompatibleConfig, opts StorageStoreOptions) (*StoredUploadRef, error) {

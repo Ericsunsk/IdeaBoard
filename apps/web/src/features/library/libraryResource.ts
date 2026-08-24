@@ -5,6 +5,7 @@ import {
   listLibraryAssets,
   listLibraryFolders,
   lookupLibraryAssets,
+  materializeLibraryAsset,
   moveLibraryAsset,
   renameLibraryFolder,
   saveLibraryAsset,
@@ -19,6 +20,13 @@ import { resolveApiData, resolveApiOk } from '../../shared/api/apiResponse'
 
 export type LibraryFolderView = LibraryFolder
 export type LibraryAssetView = LibraryAsset
+export type LibraryMaterializedMedia = {
+  mediaAssetId: number
+  url: string
+  width: number
+  height: number
+}
+export type LibraryAssetMaterializer = (assetId: number) => Promise<LibraryMaterializedMedia>
 
 export type LibrarySearchReference = {
   provider: 'unsplash' | 'pexels'
@@ -99,6 +107,16 @@ export function removeAsset(assetId: number): Promise<void> {
 
 export function removeFolder(folderId: number): Promise<void> {
   return resolveApiOk(deleteLibraryFolder(folderId), '删除收藏夹失败')
+}
+
+/** Turns an owned URL-backed Library asset into a managed Media asset for Canvas. */
+export function materializeLibraryAssetForCanvas(assetId: number): Promise<LibraryMaterializedMedia> {
+  return resolveApiData(materializeLibraryAsset(assetId), '导入素材失败').then((data) => ({
+    mediaAssetId: data.media_asset_id,
+    url: data.url,
+    width: data.width,
+    height: data.height,
+  }))
 }
 
 export async function removeSearchReference(

@@ -70,6 +70,16 @@ type lookupAssetsRequest struct {
 	Keys []AssetKey `json:"keys"`
 }
 
+type materializedAssetDTO struct {
+	MediaAssetID int64  `json:"media_asset_id"`
+	AssetID      string `json:"asset_id"`
+	URL          string `json:"url"`
+	Width        int32  `json:"width"`
+	Height       int32  `json:"height"`
+	MIMEType     string `json:"mime_type"`
+	Extension    string `json:"extension"`
+}
+
 func NewHandler(service *Service) *Handler { return &Handler{service: service} }
 
 func (h *Handler) ListFolders(c *gin.Context) {
@@ -251,6 +261,28 @@ func (h *Handler) DeleteAsset(c *gin.Context) {
 	response.Success(c, gin.H{"deleted": true})
 }
 
+func (h *Handler) MaterializeAsset(c *gin.Context) {
+	userID, ok := requireUserID(c)
+	if !ok {
+		return
+	}
+	assetID, ok := parsePositiveID(c.Param("asset_id"))
+	if !ok {
+		writeLibraryError(c, ErrAssetNotFound)
+		return
+	}
+	materialized, err := h.service.MaterializeAsset(c.Request.Context(), userID, assetID)
+	if err != nil {
+		writeLibraryError(c, err)
+		return
+	}
+	response.SuccessDTO(c, materializedAssetDTO{
+		MediaAssetID: materialized.MediaAssetID, AssetID: materialized.AssetID, URL: materialized.URL,
+		Width: materialized.Width, Height: materialized.Height, MIMEType: materialized.MIMEType,
+		Extension: materialized.Extension,
+	})
+}
+
 func (h *Handler) LookupAssets(c *gin.Context) {
 	userID, ok := requireUserID(c)
 	if !ok {
@@ -322,6 +354,8 @@ func writeLibraryError(c *gin.Context, err error) {
 		code = "library_page_size_invalid"
 	case errors.Is(err, ErrInvalidOwner):
 		status = http.StatusUnauthorized
+	case errors.Is(err, ErrMaterializerUnavailable):
+		status, code = http.StatusServiceUnavailable, "library_materialization_unavailable"
 	}
 	response.MachineError(c, status, code, "素材库请求失败")
 }

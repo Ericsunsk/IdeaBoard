@@ -147,6 +147,7 @@ func TestUserUploadObjectPrefixesIncludesAllUserOwnedUploadRoots(t *testing.T) {
 		"uploads/canvas/OWNR1A/",
 		"uploads/profile/OWNR1A/avatar/",
 		"uploads/tasks/42/",
+		"uploads/library/42/",
 	}
 	if len(prefixes) != len(want) {
 		t.Fatalf("prefixes = %#v, want %#v", prefixes, want)

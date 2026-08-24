@@ -1,4 +1,4 @@
-h1:liBQhqpjeLg07b2RW61P4wMn+ZQkXM71hd8sc5fMjUo=
+h1:6fxWIsfwQWlOwGed2OQEjR9sH/Man3xt2ZMaWhvU6xI=
 20260819000000_baseline.sql h1:YTs3izecmQpm1Fy5L0UFiD6llYu+9v1Cx5rh5snsSU8=
 20260820050000_media_derivative_storage_key_index.sql h1:x8M92JoC8g8fx+wtiogHXPUpleMwrfU/zGmo+4RJ+3w=
 20260820060000_search_provider_audit_action.sql h1:5sV9aFkhLRdJKzFnIRYSokvHaCdLLTDlZfV4o6Ag2Vc=
@@ -7,3 +7,4 @@ h1:liBQhqpjeLg07b2RW61P4wMn+ZQkXM71hd8sc5fMjUo=
 20260823000000_user_last_login_metadata.sql h1:S2AxcYSAqzXQrUusKD6UIt+CB67EuO0bSuyjWzMk7lE=
 20260823010000_auth_runtime_branding_settings.sql h1:lfRkTwkymOZNZS5Q+USG5Us2MfnU+xknPXpYw5FXb0c=
 20260823020000_admin_brand_logo_overrides.sql h1:53Fh9bdSIs7ElDyW93tNQaDrrng5FsjmKw6pKPNES/c=
+20260824000000_library_asset_materialization.sql h1:v279mJEmSbneHubQ4OXO8j8U0Gm1QkY1v/otCzkS0js=

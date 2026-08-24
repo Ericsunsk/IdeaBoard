@@ -10,6 +10,7 @@ import {
   type CanvasGraphInteractionBrowserAdapter,
 } from '../../graph-editing'
 import type { PendingImageExecutionCore } from '../../execution/pending-execution'
+import type { LibraryAssetMaterializer } from '../../../library/libraryResource'
 
 type CanvasWorkspaceBoardRuntime = ReturnType<typeof useCanvasBoardRuntime>
 
@@ -17,6 +18,7 @@ type CreateCanvasWorkspaceGraphRuntimeOptions = {
   board: CanvasWorkspaceBoardRuntime
   flowPaneAdapter: CanvasFlowPaneAdapter
   upload: CanvasGraphEditingUploadAdapter
+  materializeLibraryAsset: LibraryAssetMaterializer
   editingBrowser: CanvasGraphEditingBrowserAdapter
   interactionBrowser: CanvasGraphInteractionBrowserAdapter
   preview: {
@@ -42,6 +44,9 @@ export function createCanvasWorkspaceGraphRuntime(
     screenToFlowCoordinate: flowPaneAdapter.screenToFlowCoordinate,
     browser: options.editingBrowser,
     upload: options.upload,
+    materializeLibraryAsset: options.materializeLibraryAsset,
+    readLibraryImportAttachment: options.executionCore.currentAttachment,
+    selectOnlyNode: flowPaneAdapter.selectOnlyNode,
     preview: { openImageUrl: options.preview.openImageUrl },
     feedback: options.feedback,
   })
@@ -73,6 +78,7 @@ export function createCanvasWorkspaceGraphRuntime(
     commands: {
       grouping: board.graphEditing.grouping.commands,
       createNodeAtPosition: editing.commands.createNodeAtPosition,
+      libraryImport: editing.commands.libraryImport,
       createNodeInteractions: editing.commands.createNodeInteractions,
       onExportSelectedImages: interactions.commands.exportSelectedImages,
       onFlowMediaInputImageDrop: editing.commands.mediaInputs.drop,
@@ -91,6 +97,7 @@ export function createCanvasWorkspaceGraphRuntime(
       connectionAdapter: editing.flowPane.connectionAdapter,
     },
     interactionPort: interactions.runtimePort,
+    recoveryPort: editing.recoveryPort,
     imageWorkflowPort: {
       nodes: board.flowPane.nodes,
       currentBoardId: board.boardSession.currentBoardId,

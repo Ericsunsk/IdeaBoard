@@ -1,17 +1,13 @@
 <template>
   <Transition name="library-island">
     <aside
-      v-if="open"
-      class="fixed top-[84px] bottom-4 sm:bottom-6 left-4 sm:left-6 z-40 flex flex-col overflow-hidden rounded-[28px] border border-board-card-border bg-board-control-bg/80 p-5 text-board-page-text backdrop-blur-md shadow-[0_16px_48px_rgba(45,64,89,0.08),0_2px_8px_rgba(0,0,0,0.02)] will-change-[width,transform] transition-[width,transform] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] max-w-[calc(100vw-32px)]"
-      :class="
-        isExpanded
-          ? 'w-[calc(100vw-32px)] sm:w-[calc(100vw-48px)]'
-          : 'w-[calc(100vw-32px)] sm:w-[350px]'
-      "
+      v-if="presentation === 'canvas' || open"
+      v-show="open"
+      class="z-40 flex flex-col overflow-hidden rounded-[28px] border border-board-card-border bg-board-control-bg/80 p-5 text-board-page-text backdrop-blur-md shadow-[0_16px_48px_rgba(45,64,89,0.08),0_2px_8px_rgba(0,0,0,0.02)] will-change-[width,transform] transition-[width,transform] duration-[var(--motion-enter-duration)] ease-[var(--motion-enter-easing)] max-w-[calc(100vw-32px)]"
+      :class="isCanvasPresentation ? 'relative h-full w-full' : searchIslandClass"
       aria-label="Personal Library"
       @click="closeFolderMenu"
       @dragover.prevent="handleIslandDragOver"
-      @dragleave="handleIslandDragLeave"
       @drop.prevent="handleIslandDrop"
     >
       <!-- 🌟 1. 常驻顶栏控制区与灵感夹微胶囊 (支持用户主动折叠/展开分类胶囊) -->
@@ -33,6 +29,7 @@
           </div>
           <div class="flex items-center gap-1.5">
             <button
+              v-if="!isCanvasPresentation"
               type="button"
               class="grid size-8 shrink-0 place-items-center rounded-full bg-black/[0.04] text-board-page-text-muted transition-colors hover:bg-black/[0.08] hover:text-board-page-text focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] cursor-pointer"
               :aria-label="isExpanded ? 'Collapse library' : 'Expand library'"
@@ -231,6 +228,17 @@
                       <Xmark class="size-3" aria-hidden="true" />
                     </button>
                     <button
+                      v-if="isCanvasPresentation"
+                      type="button"
+                      class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-board-primary transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
+                      aria-label="Add to Canvas"
+                      title="Add to Canvas"
+                      @click.stop="emit('add-to-canvas', toCanvasLibraryImportDescriptor(asset))"
+                    >
+                      <Plus class="size-3" aria-hidden="true" />
+                    </button>
+                    <button
+                      v-else
                       type="button"
                       class="grid size-6 shrink-0 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md hover:bg-board-primary transition-colors focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)]"
                       aria-label="Use as search reference"
@@ -310,6 +318,8 @@
     :show-header="false"
     :style="{ width: 'min(420px, calc(100vw - 32px))' }"
     :pt="dialogPt"
+    @focusin="emit('focus-scope-change', true)"
+    @focusout="emit('focus-scope-change', false)"
   >
     <form class="p-6" @submit.prevent="submitFolder">
       <h3 class="m-0 text-lg font-semibold">New folder</h3>
@@ -350,6 +360,8 @@
     :show-header="false"
     :style="{ width: 'min(420px, calc(100vw - 32px))' }"
     :pt="dialogPt"
+    @focusin="emit('focus-scope-change', true)"
+    @focusout="emit('focus-scope-change', false)"
   >
     <form class="p-6" @submit.prevent="submitRenameFolder">
       <h3 class="m-0 text-lg font-semibold">Rename folder</h3>
@@ -493,10 +505,13 @@ import {
   type LibraryAssetView,
 } from '../libraryResource'
 import {
+  toCanvasLibraryImportDescriptor,
   getLibraryDropEffect,
-  readLibraryAssetTransfer,
+  readLibraryFolderMoveTransfer,
   readSearchReferenceTransfer,
-  writeLibraryAssetTransfer,
+  writeCanvasLibraryImportTransfer,
+  writeLibraryFolderMoveTransfer,
+  type CanvasLibraryImportDescriptor,
 } from '../libraryTransfer'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import UserConfirmDialog from '../../../shared/components/UserConfirmDialog.vue'
@@ -508,13 +523,22 @@ const props = defineProps<{
   folderFacts: LibraryFolderFacts
   mutationPublisher: LibraryMutationPublisher
   referenceKeys?: string[]
+  presentation: 'search' | 'canvas'
 }>()
 const emit = defineEmits<{
   close: []
   'reference-selected': [LibraryAssetView]
+  'add-to-canvas': [CanvasLibraryImportDescriptor]
+  'focus-scope-change': [focused: boolean]
 }>()
 const isExpanded = defineModel<boolean>('expanded', { default: false })
 
+const isCanvasPresentation = computed(() => props.presentation === 'canvas')
+const searchIslandClass = computed(() =>
+  isExpanded.value
+    ? 'fixed top-[84px] bottom-4 left-4 sm:bottom-6 sm:left-6 w-[calc(100vw-32px)] sm:w-[calc(100vw-48px)]'
+    : 'fixed top-[84px] bottom-4 left-4 sm:bottom-6 sm:left-6 w-[calc(100vw-32px)] sm:w-[350px]',
+)
 const toast = useAppToast()
 const confirmDialog = useUserConfirmDialog()
 const workspace = useLibraryWorkspace({
@@ -581,6 +605,7 @@ function openAsset(asset: LibraryAssetView) {
 }
 
 function selectReference(asset: LibraryAssetView) {
+  if (isCanvasPresentation.value) return
   emit('reference-selected', asset)
 }
 
@@ -664,7 +689,10 @@ function handleKeydown(event: KeyboardEvent) {
 
 // 🌟 素材卡片拖拽与跨文件夹移动处理
 function handleAssetDragStart(e: DragEvent, asset: LibraryAssetView) {
-  writeLibraryAssetTransfer(e.dataTransfer!, asset)
+  if (!e.dataTransfer) return
+  const descriptor = toCanvasLibraryImportDescriptor(asset)
+  writeLibraryFolderMoveTransfer(e.dataTransfer, asset.id)
+  writeCanvasLibraryImportTransfer(e.dataTransfer, descriptor)
 
   // Micro Drag Ghost (58×44px 微缩投影圆角拖拽影子)
   const ghost = document.createElement('div')
@@ -687,7 +715,7 @@ function handleAssetDragStart(e: DragEvent, asset: LibraryAssetView) {
 
   ghost.appendChild(img)
   document.body.appendChild(ghost)
-  e.dataTransfer!.setDragImage(ghost, 29, 22)
+  e.dataTransfer.setDragImage(ghost, 29, 22)
 
   setTimeout(() => {
     document.body.removeChild(ghost)
@@ -698,23 +726,22 @@ function handleIslandDragOver(e: DragEvent) {
   e.dataTransfer!.dropEffect = getLibraryDropEffect(e.dataTransfer)
 }
 
-function handleIslandDragLeave() {
-  // 静默保持纯净，无外描边干扰
+async function handleIslandDrop(e: DragEvent) {
+  await handleDropIntoFolder(e, workspace.selectedFolder.value)
 }
 
-async function handleIslandDrop(e: DragEvent) {
-  const libraryAsset = readLibraryAssetTransfer(e.dataTransfer)
-  if (libraryAsset) {
-    const currentKey = workspace.selectedFolder.value
-    if (currentKey !== 'all') {
-      await workspace.moveSelectedAsset(libraryAsset, currentKey)
+async function handleDropIntoFolder(e: DragEvent, folderKey: string) {
+  const libraryAssetID = readLibraryFolderMoveTransfer(e.dataTransfer)
+  if (libraryAssetID) {
+    if (folderKey !== 'all') {
+      await workspace.moveSelectedAsset(libraryAssetID, folderKey)
     }
     return
   }
 
   const reference = readSearchReferenceTransfer(e.dataTransfer)
   if (!reference) return
-  await saveReferenceToFolder(reference, workspace.selectedFolder.value)
+  await saveReferenceToFolder(reference, folderKey)
 }
 
 function handlePillDragOver(e: DragEvent, key: string) {
@@ -728,19 +755,7 @@ function handlePillDragLeave() {
 
 async function handlePillDrop(e: DragEvent, folder: LibraryFolderTab) {
   hoveredPillKey.value = null
-
-  const libraryAsset = readLibraryAssetTransfer(e.dataTransfer)
-  if (libraryAsset) {
-    if (folder.queryKey !== 'all') {
-      await workspace.moveSelectedAsset(libraryAsset, folder.queryKey)
-    }
-    return
-  }
-
-  const reference = readSearchReferenceTransfer(e.dataTransfer)
-  if (!reference) return
-
-  await saveReferenceToFolder(reference, folder.queryKey)
+  await handleDropIntoFolder(e, folder.queryKey)
 }
 
 async function saveReferenceToFolder(
@@ -790,7 +805,7 @@ watch(
   (isOpen) => {
     if (!isOpen) {
       closeFolderMenu()
-      isExpanded.value = false
+      if (!isCanvasPresentation.value) isExpanded.value = false
     }
     if (isOpen && !initialized.value) {
       initialized.value = true

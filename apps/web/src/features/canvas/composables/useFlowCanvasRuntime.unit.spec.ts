@@ -435,6 +435,14 @@ function createCanvasGraphRuntimeHarness(harness: ReturnType<typeof createRuntim
         media_asset_id: 42,
       })),
     },
+    materializeLibraryAsset: vi.fn(async () => ({
+      mediaAssetId: 43,
+      url: 'https://example.com/materialized.png',
+      width: 200,
+      height: 100,
+    })),
+    readLibraryImportAttachment: () => harness.executionRuntime.attachment.value,
+    selectOnlyNode: vi.fn(() => true),
     preview: {
       openImageUrl: vi.fn(async () => {}),
     },

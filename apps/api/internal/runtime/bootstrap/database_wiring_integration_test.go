@@ -44,6 +44,23 @@ func TestOpenAppDatabasesStartsWithConfiguredLimitedRole(t *testing.T) {
 		t.Fatalf("ping startup River pool: %v", err)
 	}
 	assertProviderEndpointConfigurationAccess(t, databases.db)
+	assertLibraryMaterializationMappingAccess(t, databases.db)
+}
+
+func assertLibraryMaterializationMappingAccess(t *testing.T, db *sql.DB) {
+	t.Helper()
+	var allowed bool
+	if err := db.QueryRowContext(t.Context(), `
+SELECT has_table_privilege(
+  current_user,
+  'library_asset_media_assets',
+  'SELECT,INSERT,UPDATE,DELETE'
+)`).Scan(&allowed); err != nil {
+		t.Fatalf("assert library materialization mapping privileges: %v", err)
+	}
+	if !allowed {
+		t.Fatal("runtime role lacks library_asset_media_assets SELECT, INSERT, UPDATE, or DELETE")
+	}
 }
 
 func assertProviderEndpointConfigurationAccess(t *testing.T, db *sql.DB) {

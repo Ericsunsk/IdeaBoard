@@ -194,6 +194,7 @@ function hasRenderableImageSource(
 ): boolean {
   if (node.type !== 'image-node') return true
   const imageNode = node as ImageNodeItem
+  if (imageNode.libraryImport) return true
   const sourceUrl = imageNode.sourceImageUrl.trim()
   const hasOutputImage = Array.isArray(imageNode.outputImages)
     ? imageNode.outputImages.some(

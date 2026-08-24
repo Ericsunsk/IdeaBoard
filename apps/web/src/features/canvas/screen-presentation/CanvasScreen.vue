@@ -22,10 +22,24 @@
       @export="exportSelectedImages"
       @navigate-back="navigateBack"
       @select-tool="setActiveTool"
+      @toggle-library="canvasLibrary.commands.toggle"
+      @library-focus-change="canvasLibrary.commands.setFocusWithin"
       @toggle-minimap="toggleCanvasMinimap"
       @zoom-out="onZoomOut"
       @zoom-in="onZoomIn"
-    />
+    >
+      <template #library>
+        <CanvasLibraryFloatingIsland
+          presentation="canvas"
+          :open="canvasLibrary.view.open.value"
+          :folder-facts="canvasLibrary.view.folderFacts"
+          :mutation-publisher="canvasLibrary.view.mutationPublisher"
+          @add-to-canvas="addLibraryAssetToCanvas"
+          @close="canvasLibrary.commands.close"
+          @focus-scope-change="canvasLibrary.commands.setFocusWithin"
+        />
+      </template>
+    </CanvasChrome>
 
     <div
       ref="canvasWrapRef"
@@ -94,7 +108,7 @@
 import '../components/styles/canvas-surface-skin.css'
 import '../components/styles/canvas-vue-flow-adapter-skin.css'
 import '../components/styles/canvas-style-contracts.css'
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from 'vue'
 import type { RouteLocationNormalizedLoaded, Router } from 'vue-router'
 import { uploadApi } from '../../../shared/api/upload'
 import { USER_BOARDS_PATH } from '../../../shared/constants/routePaths'
@@ -129,6 +143,11 @@ import { useCanvasScreenImageToolUi } from './internal/useCanvasScreenImageToolU
 import { useCanvasScreenSurfaceInteractions } from './internal/useCanvasScreenSurfaceInteractions'
 import { createCanvasScreenNodePresentation } from './internal/createCanvasScreenNodePresentation'
 import { useCanvasScreenLifecycle } from './internal/useCanvasScreenLifecycle'
+import { useCanvasLibraryIsland } from './internal/useCanvasLibraryIsland'
+import {
+  materializeLibraryAssetForCanvas,
+} from '../../library/libraryResource'
+import type { CanvasLibraryImportDescriptor } from '../../library/libraryTransfer'
 
 const props = defineProps<{
   route: RouteLocationNormalizedLoaded
@@ -138,6 +157,10 @@ const props = defineProps<{
 }>()
 
 const { route, router, getUserIdentity, logoutAndRedirect } = props
+
+const CanvasLibraryFloatingIsland = defineAsyncComponent(
+  () => import('../../library/components/LibraryFloatingIsland.vue'),
+)
 
 function openRecharge() {
   accountControls.commands.openAccount('recharge')
@@ -151,6 +174,7 @@ const canvasWrapRef = ref<HTMLElement | null>(null)
 const activeTool = ref<'select' | 'hand'>('select')
 const isCanvasMinimapEnabled = ref(false)
 const duplicateModifierPressed = ref(false)
+const canvasLibrary = useCanvasLibraryIsland()
 const imageToolUi = useCanvasScreenImageToolUi({ activeTool, canvasWrapRef })
 const { openNodeImagePreview, openImageUrlPreview } = useFlowImagePreviewLightbox()
 const graphEditingBrowser = createCanvasGraphEditingBrowserAdapter()
@@ -164,6 +188,7 @@ const workspace = useCanvasWorkspaceRuntime({
   uploadApi,
   graphEditingBrowser,
   graphInteractionBrowser,
+  materializeLibraryAsset: materializeLibraryAssetForCanvas,
   openNodeImagePreview,
   openImageUrlPreview,
   imageWorkflowUi: imageToolUi.imageWorkflowUi,
@@ -311,9 +336,26 @@ const nodePresentation = createCanvasScreenNodePresentation({
   duplicateModifierPressed,
   nodeInteractions: surface.nodeInteractions,
 })
-const { nodePresentationIntentRouter, nodePropsFor, isCanvasShortcutSuppressed } = nodePresentation
+const {
+  nodePresentationIntentRouter,
+  nodePropsFor,
+  isCanvasShortcutSuppressed: isNodePresentationShortcutSuppressed,
+} = nodePresentation
+const isCanvasShortcutSuppressed = computed(
+  () => canvasLibrary.view.focusWithin.value || isNodePresentationShortcutSuppressed.value,
+)
 const onCanvasDrop = commands.graphEditing.onCanvasDrop
 const onExportSelectedImages = commands.graphEditing.onExportSelectedImages
+
+function addLibraryAssetToCanvas(asset: CanvasLibraryImportDescriptor) {
+  const bounds = canvasWrapRef.value?.getBoundingClientRect()
+  if (!bounds) return
+  const center = flowPaneAdapter.screenToFlowCoordinate({
+    x: bounds.left + bounds.width / 2,
+    y: bounds.top + bounds.height / 2,
+  })
+  commands.graphEditing.libraryImport.add(asset, center)
+}
 
 function handleMiniMapDragMove(payload: { delta: Parameters<typeof onMiniMapDragMove>[0] }) {
   onMiniMapDragMove(payload.delta)
@@ -326,6 +368,8 @@ const chromeProps = computed(() => ({
   account: canvasChromeAccount.value,
   tools: {
     activeTool: activeTool.value,
+    libraryMounted: canvasLibrary.view.mounted.value,
+    libraryOpen: canvasLibrary.view.open.value,
     minimapEnabled: isCanvasMinimapEnabled.value,
   },
   status: {

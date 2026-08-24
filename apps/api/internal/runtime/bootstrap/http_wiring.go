@@ -12,6 +12,7 @@ import (
 	"ideaboard/api/internal/identity/auth"
 	"ideaboard/api/internal/identity/users"
 	"ideaboard/api/internal/library"
+	"ideaboard/api/internal/media/librarymaterialization"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/payments"
 	"ideaboard/api/internal/platform/adminbranding"
@@ -70,7 +71,8 @@ func newAppRouter(
 		uploadOwnerStorageUIDResolver{repo: repos.userRepo},
 	)
 	searchProviderConfig := searchcatalog.NewConfigRepository(repos.systemConfigRepo)
-	libraryService := library.NewService(repos.libraryRepo)
+	libraryMaterializer := librarymaterialization.NewService(repos.db, services.storageService, repos.mediaAssetRegistry)
+	libraryService := library.NewService(repos.libraryRepo, libraryMaterializer)
 	libraryHandler := library.NewHandler(libraryService)
 	searchMetrics, metricsErr := searchcatalog.NewPrometheusMetrics(prometheus.DefaultRegisterer)
 	if metricsErr != nil {

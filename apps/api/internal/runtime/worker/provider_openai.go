@@ -386,7 +386,7 @@ func (c *ProviderExecutor) resolveOpenAIImageBytes(ctx context.Context, ref stri
 		if readErr != nil {
 			return "", "", nil, fmt.Errorf("读取上传图像失败: %w", readErr)
 		}
-		if err := imageformat.ValidateImageDimensions(obj.Data); err != nil {
+		if _, err := imageformat.InspectDetectedBytes(obj.Data); err != nil {
 			return "", "", nil, err
 		}
 		mimeType = strings.TrimSpace(obj.ContentType)

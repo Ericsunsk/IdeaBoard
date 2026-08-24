@@ -58,7 +58,7 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
   createNewFolder: (name: string) => Promise<void>
   renameFolder: (key: string, name: string) => Promise<void>
   deleteFolder: (key: string) => Promise<boolean>
-  moveSelectedAsset: (asset: LibraryAssetView, folderKey: string) => Promise<boolean>
+  moveSelectedAsset: (assetID: number, folderKey: string) => Promise<boolean>
   requestRemove: (asset: LibraryAssetView) => Promise<void>
   retry: () => Promise<void>
   setActiveAsset: (asset: LibraryAssetView | null) => void
@@ -195,7 +195,9 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
     }
   }
 
-  async function moveSelectedAsset(asset: LibraryAssetView, folderKey: string): Promise<boolean> {
+  async function moveSelectedAsset(assetID: number, folderKey: string): Promise<boolean> {
+    const asset = assets.value.find((item) => item.id === assetID)
+    if (!asset) return false
     const folder = folders.value.find((item) => item.query_key === folderKey)
     if (!folder || folder.is_virtual || folder.id === asset.folder_id) return false
     try {

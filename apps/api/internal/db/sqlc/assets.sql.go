@@ -15,6 +15,52 @@ import (
 	"github.com/lib/pq"
 )
 
+const beginLibraryMaterializedMediaAsset = `-- name: BeginLibraryMaterializedMediaAsset :one
+INSERT INTO media_assets (
+  asset_id, owner_user_id, storage_profile_id, storage_key, url, source_url,
+  media_kind, status, metadata, reclaim_after, reclaim_generation
+)
+VALUES (
+  $1, $2, $3, $4, $5, $6,
+  'image', 'uploading', $7, $8, 1
+)
+ON CONFLICT (storage_profile_id, storage_key) DO UPDATE
+SET source_url = EXCLUDED.source_url,
+    status = CASE WHEN media_assets.status = 'ready' THEN 'ready' ELSE 'uploading' END,
+    metadata = CASE WHEN media_assets.status = 'ready' THEN media_assets.metadata ELSE EXCLUDED.metadata END,
+    updated_at = now(), deleted_at = NULL, reclaim_after = CASE WHEN media_assets.status = 'ready' THEN media_assets.reclaim_after ELSE EXCLUDED.reclaim_after END,
+    reclaim_started_at = NULL, reclaim_claim_token = NULL
+WHERE media_assets.owner_user_id = EXCLUDED.owner_user_id
+RETURNING id
+`
+
+type BeginLibraryMaterializedMediaAssetParams struct {
+	AssetID          string          `json:"asset_id"`
+	OwnerUserID      int64           `json:"owner_user_id"`
+	StorageProfileID string          `json:"storage_profile_id"`
+	StorageKey       string          `json:"storage_key"`
+	Url              string          `json:"url"`
+	SourceUrl        string          `json:"source_url"`
+	Metadata         json.RawMessage `json:"metadata"`
+	ReclaimAfter     sql.NullTime    `json:"reclaim_after"`
+}
+
+func (q *Queries) BeginLibraryMaterializedMediaAsset(ctx context.Context, arg BeginLibraryMaterializedMediaAssetParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, beginLibraryMaterializedMediaAsset,
+		arg.AssetID,
+		arg.OwnerUserID,
+		arg.StorageProfileID,
+		arg.StorageKey,
+		arg.Url,
+		arg.SourceUrl,
+		arg.Metadata,
+		arg.ReclaimAfter,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 const beginTaskResultMediaAsset = `-- name: BeginTaskResultMediaAsset :one
 INSERT INTO media_assets (
   asset_id, owner_user_id, storage_profile_id, storage_key, url, source_url,
@@ -708,6 +754,55 @@ func (q *Queries) GetMediaAssetByStorageLocator(ctx context.Context, arg GetMedi
 	return i, err
 }
 
+const getReadyLibraryMaterializedMediaAsset = `-- name: GetReadyLibraryMaterializedMediaAsset :one
+SELECT asset.id, asset.asset_id, asset.owner_user_id, asset.storage_profile_id, asset.storage_key,
+  asset.url, asset.source_url, asset.media_kind, asset.mime_type,
+  asset.width, asset.height, asset.size_bytes, asset.checksum_sha256,
+  asset.status, asset.metadata, asset.created_at, asset.updated_at, asset.deleted_at, asset.reclaim_after, asset.reclaim_started_at,
+  asset.reclaim_claim_token, asset.reclaim_generation
+FROM library_asset_media_assets AS link
+JOIN media_assets AS asset ON asset.id = link.media_asset_id AND asset.owner_user_id = link.owner_user_id
+WHERE link.library_asset_id = $1
+  AND link.owner_user_id = $2
+  AND asset.status = 'ready'
+  AND asset.deleted_at IS NULL
+`
+
+type GetReadyLibraryMaterializedMediaAssetParams struct {
+	LibraryAssetID int64 `json:"library_asset_id"`
+	OwnerUserID    int64 `json:"owner_user_id"`
+}
+
+func (q *Queries) GetReadyLibraryMaterializedMediaAsset(ctx context.Context, arg GetReadyLibraryMaterializedMediaAssetParams) (MediaAsset, error) {
+	row := q.db.QueryRowContext(ctx, getReadyLibraryMaterializedMediaAsset, arg.LibraryAssetID, arg.OwnerUserID)
+	var i MediaAsset
+	err := row.Scan(
+		&i.ID,
+		&i.AssetID,
+		&i.OwnerUserID,
+		&i.StorageProfileID,
+		&i.StorageKey,
+		&i.Url,
+		&i.SourceUrl,
+		&i.MediaKind,
+		&i.MimeType,
+		&i.Width,
+		&i.Height,
+		&i.SizeBytes,
+		&i.ChecksumSha256,
+		&i.Status,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.ReclaimAfter,
+		&i.ReclaimStartedAt,
+		&i.ReclaimClaimToken,
+		&i.ReclaimGeneration,
+	)
+	return i, err
+}
+
 const getReadyMediaAssetStorageLocationByID = `-- name: GetReadyMediaAssetStorageLocationByID :one
 SELECT storage_profile_id, storage_key
 FROM media_assets
@@ -1190,6 +1285,25 @@ type ScheduleUnreferencedMediaAssetsForReclamationParams struct {
 
 func (q *Queries) ScheduleUnreferencedMediaAssetsForReclamation(ctx context.Context, arg ScheduleUnreferencedMediaAssetsForReclamationParams) error {
 	_, err := q.db.ExecContext(ctx, scheduleUnreferencedMediaAssetsForReclamation, arg.ReclaimAfter, pq.Array(arg.MediaAssetIds))
+	return err
+}
+
+const upsertLibraryAssetMediaLink = `-- name: UpsertLibraryAssetMediaLink :exec
+INSERT INTO library_asset_media_assets (library_asset_id, owner_user_id, media_asset_id)
+VALUES ($1, $2, $3)
+ON CONFLICT (library_asset_id) DO UPDATE
+SET media_asset_id = EXCLUDED.media_asset_id, updated_at = now()
+WHERE library_asset_media_assets.owner_user_id = EXCLUDED.owner_user_id
+`
+
+type UpsertLibraryAssetMediaLinkParams struct {
+	LibraryAssetID int64 `json:"library_asset_id"`
+	OwnerUserID    int64 `json:"owner_user_id"`
+	MediaAssetID   int64 `json:"media_asset_id"`
+}
+
+func (q *Queries) UpsertLibraryAssetMediaLink(ctx context.Context, arg UpsertLibraryAssetMediaLinkParams) error {
+	_, err := q.db.ExecContext(ctx, upsertLibraryAssetMediaLink, arg.LibraryAssetID, arg.OwnerUserID, arg.MediaAssetID)
 	return err
 }
 

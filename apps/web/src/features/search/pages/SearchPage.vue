@@ -409,6 +409,7 @@
     <LibraryFloatingIsland
       v-if="libraryIslandMounted"
       v-model:expanded="libraryIslandExpanded"
+      presentation="search"
       :open="libraryIslandOpen"
       :folder-facts="libraryFolderFacts"
       :mutation-publisher="libraryMutationPublisher"

@@ -1,16 +1,30 @@
 import type { LibraryAssetView, LibrarySearchReference } from './libraryResource'
 
 export const SEARCH_REFERENCE_MIME = 'application/x-ideaboard-search-reference'
-export const LIBRARY_ASSET_MIME = 'application/x-ideaboard-library-asset'
+export const LIBRARY_FOLDER_MOVE_MIME = 'application/x-ideaboard-library-folder-move'
+export const CANVAS_LIBRARY_IMPORT_MIME = 'application/x-ideaboard-canvas-library-import'
 
 type SearchReferencePayload = {
   type: 'search-reference'
   reference: LibrarySearchReference
 }
 
-type LibraryAssetPayload = {
-  type: 'library-asset'
-  asset: LibraryAssetView
+type LibraryFolderMovePayload = {
+  type: 'library-folder-move'
+  assetId: number
+}
+
+export type CanvasLibraryImportDescriptor = {
+  assetId: number
+  title: string
+  previewUrl: string
+  width: number
+  height: number
+}
+
+type CanvasLibraryImportPayload = {
+  type: 'canvas-library-import'
+  asset: CanvasLibraryImportDescriptor
 }
 
 function setPayload(dataTransfer: DataTransfer, mime: string, payload: unknown): void {
@@ -28,15 +42,38 @@ export function writeSearchReferenceTransfer(
   dataTransfer.effectAllowed = 'copy'
 }
 
-export function writeLibraryAssetTransfer(
+export function writeLibraryFolderMoveTransfer(
   dataTransfer: DataTransfer,
-  asset: LibraryAssetView,
+  assetId: number,
 ): void {
-  setPayload(dataTransfer, LIBRARY_ASSET_MIME, {
-    type: 'library-asset',
+  setPayload(dataTransfer, LIBRARY_FOLDER_MOVE_MIME, {
+    type: 'library-folder-move',
+    assetId,
+  } satisfies LibraryFolderMovePayload)
+  dataTransfer.effectAllowed = 'copyMove'
+}
+
+export function toCanvasLibraryImportDescriptor(
+  asset: LibraryAssetView,
+): CanvasLibraryImportDescriptor {
+  return {
+    assetId: asset.id,
+    title: asset.title,
+    previewUrl: asset.preview_url,
+    width: asset.width,
+    height: asset.height,
+  }
+}
+
+export function writeCanvasLibraryImportTransfer(
+  dataTransfer: DataTransfer,
+  asset: CanvasLibraryImportDescriptor,
+): void {
+  setPayload(dataTransfer, CANVAS_LIBRARY_IMPORT_MIME, {
+    type: 'canvas-library-import',
     asset,
-  } satisfies LibraryAssetPayload)
-  dataTransfer.effectAllowed = 'move'
+  } satisfies CanvasLibraryImportPayload)
+  dataTransfer.effectAllowed = 'copyMove'
 }
 
 function readPayload(dataTransfer: DataTransfer | null | undefined, mime: string): unknown {
@@ -62,14 +99,23 @@ function isSearchReference(value: unknown): value is LibrarySearchReference {
   )
 }
 
-function isLibraryAsset(value: unknown): value is LibraryAssetView {
+function isValidAssetID(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0
+}
+
+function isCanvasLibraryImportDescriptor(value: unknown): value is CanvasLibraryImportDescriptor {
   if (!value || typeof value !== 'object') return false
-  const asset = value as Partial<LibraryAssetView>
+  const asset = value as Partial<CanvasLibraryImportDescriptor>
   return (
-    typeof asset.id === 'number' &&
-    (asset.provider === 'unsplash' || asset.provider === 'pexels') &&
-    typeof asset.source_id === 'string' &&
-    typeof asset.preview_url === 'string'
+    isValidAssetID(asset.assetId) &&
+    typeof asset.title === 'string' &&
+    typeof asset.previewUrl === 'string' &&
+    typeof asset.width === 'number' &&
+    Number.isInteger(asset.width) &&
+    asset.width >= 0 &&
+    typeof asset.height === 'number' &&
+    Number.isInteger(asset.height) &&
+    asset.height >= 0
   )
 }
 
@@ -84,13 +130,34 @@ export function readSearchReferenceTransfer(
   return null
 }
 
-export function readLibraryAssetTransfer(
+export function readLibraryFolderMoveTransfer(
   dataTransfer: DataTransfer | null | undefined,
-): LibraryAssetView | null {
-  const payload = readPayload(dataTransfer, LIBRARY_ASSET_MIME)
-  if (payload && typeof payload === 'object' && 'asset' in payload) {
-    const asset = (payload as Partial<LibraryAssetPayload>).asset
-    return isLibraryAsset(asset) ? asset : null
+): number | null {
+  const payload = readPayload(dataTransfer, LIBRARY_FOLDER_MOVE_MIME)
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    (payload as Partial<LibraryFolderMovePayload>).type === 'library-folder-move' &&
+    'assetId' in payload
+  ) {
+    const assetId = (payload as Partial<LibraryFolderMovePayload>).assetId
+    return isValidAssetID(assetId) ? assetId : null
+  }
+  return null
+}
+
+export function readCanvasLibraryImportTransfer(
+  dataTransfer: DataTransfer | null | undefined,
+): CanvasLibraryImportDescriptor | null {
+  const payload = readPayload(dataTransfer, CANVAS_LIBRARY_IMPORT_MIME)
+  if (
+    payload &&
+    typeof payload === 'object' &&
+    (payload as Partial<CanvasLibraryImportPayload>).type === 'canvas-library-import' &&
+    'asset' in payload
+  ) {
+    const asset = (payload as Partial<CanvasLibraryImportPayload>).asset
+    return isCanvasLibraryImportDescriptor(asset) ? asset : null
   }
   return null
 }
@@ -99,7 +166,7 @@ export function getLibraryDropEffect(
   dataTransfer: DataTransfer | null | undefined,
 ): 'copy' | 'move' | 'none' {
   const types = Array.from(dataTransfer?.types ?? [])
-  if (types.includes(LIBRARY_ASSET_MIME)) return 'move'
+  if (types.includes(LIBRARY_FOLDER_MOVE_MIME)) return 'move'
   if (types.includes(SEARCH_REFERENCE_MIME)) return 'copy'
   return 'none'
 }

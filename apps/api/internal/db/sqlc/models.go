@@ -339,6 +339,14 @@ type LibraryAsset struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
+type LibraryAssetMediaAsset struct {
+	LibraryAssetID int64     `json:"library_asset_id"`
+	OwnerUserID    int64     `json:"owner_user_id"`
+	MediaAssetID   int64     `json:"media_asset_id"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
 type LibraryFolder struct {
 	ID          int64     `json:"id"`
 	OwnerUserID int64     `json:"owner_user_id"`

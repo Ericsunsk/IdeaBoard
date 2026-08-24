@@ -12,6 +12,7 @@ var apiOwnedTableNames = []string{
 	"boards",
 	"feature_prompts",
 	"library_assets",
+	"library_asset_media_assets",
 	"library_folders",
 	"media_assets",
 	"media_asset_sources",

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"ideaboard/api/internal/media/assets"
+	"ideaboard/api/internal/media/ingestion"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/tasking/tasks"
 )
@@ -42,9 +43,10 @@ type reusableMediaRegistry struct {
 	reusableAssetID int64
 	registeredID    int64
 	ingesting       assets.PreparedGenerationMedia
-	beginItem       assets.PreparedGenerationMedia
-	completedItem   assets.PreparedGenerationMedia
-	failedAssetID   int64
+	beginRequest    ingestion.Request
+	completedHandle ingestion.Handle
+	completion      ingestion.Completion
+	failedHandle    ingestion.Handle
 }
 
 func (*reusableMediaRegistry) FindPreparedGenerationMedia(context.Context, int64, string, string, int) (assets.PreparedGenerationMedia, bool, error) {
@@ -59,18 +61,22 @@ func (r *reusableMediaRegistry) FindReusableGenerationMedia(context.Context, int
 	return r.reusableAssetID, r.reusableAssetID > 0, nil
 }
 
-func (r *reusableMediaRegistry) BeginPreparedGenerationMedia(_ context.Context, media assets.PreparedGenerationMedia) (int64, error) {
-	r.beginItem = media
-	return r.registeredID, nil
+func (r *reusableMediaRegistry) Begin(_ context.Context, request ingestion.Request) (ingestion.Handle, error) {
+	r.beginRequest = request
+	return ingestion.Handle{
+		AssetID: r.registeredID, OwnerUserID: request.OwnerUserID, StorageProfile: request.StorageProfile,
+		StorageKey: request.StorageKey, Origin: request.Origin,
+	}, nil
 }
 
-func (r *reusableMediaRegistry) CompletePreparedGenerationMedia(_ context.Context, media assets.PreparedGenerationMedia, _ int64) error {
-	r.completedItem = media
+func (r *reusableMediaRegistry) Complete(_ context.Context, handle ingestion.Handle, completion ingestion.Completion) error {
+	r.completedHandle = handle
+	r.completion = completion
 	return nil
 }
 
-func (r *reusableMediaRegistry) FailPreparedGenerationMedia(_ context.Context, _ int64, assetID int64, _ error) error {
-	r.failedAssetID = assetID
+func (r *reusableMediaRegistry) Fail(_ context.Context, handle ingestion.Handle, _ error) error {
+	r.failedHandle = handle
 	return nil
 }
 
@@ -104,11 +110,11 @@ func TestPrepareGenerationMediaRegistersBeforeStorageAndCompletesSameAsset(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	if registry.beginItem.StorageKey == "" || store.storeOption.ObjectKey != registry.beginItem.StorageKey {
-		t.Fatalf("stable storage key begin=%q store=%q", registry.beginItem.StorageKey, store.storeOption.ObjectKey)
+	if registry.beginRequest.StorageKey == "" || store.storeOption.ObjectKey != registry.beginRequest.StorageKey {
+		t.Fatalf("stable storage key begin=%q store=%q", registry.beginRequest.StorageKey, store.storeOption.ObjectKey)
 	}
-	if registry.completedItem.AssetID != 99 || registry.completedItem.ChecksumSHA256 != "" {
-		t.Fatalf("completed item = %#v", registry.completedItem)
+	if registry.completedHandle.AssetID != 99 || registry.completion.ChecksumSHA256 != "" {
+		t.Fatalf("completed handle=%#v completion=%#v", registry.completedHandle, registry.completion)
 	}
 	if prepared.Media[0].AssetID != 99 || prepared.Media[0].Source != "" {
 		t.Fatalf("prepared media = %#v", prepared.Media[0])
@@ -118,7 +124,7 @@ func TestPrepareGenerationMediaRegistersBeforeStorageAndCompletesSameAsset(t *te
 func TestPrepareGenerationMediaRetryReusesFailedAssetAndStableKey(t *testing.T) {
 	store := &recordingMediaStore{}
 	registry := &reusableMediaRegistry{ingesting: assets.PreparedGenerationMedia{
-		AssetID: 77, OwnerUserID: 1, StorageProfile: "profile-1", StorageKey: "uploads/tasks/1/prepare-action-1/input-0", Role: tasks.MediaRoleInput, InputIndex: 0, RefID: "action-1",
+		AssetID: 77, StorageProfile: "profile-1", StorageKey: "uploads/tasks/1/prepare-action-1/input-0",
 	}}
 	prepared, err := NewService(store, registry).PrepareGenerationMedia(t.Context(), 1, "action-1", &tasks.GenerationRequestSnapshot{
 		Media: []tasks.GenerationMediaIntent{{InputIndex: 0, Role: tasks.MediaRoleInput, Source: "https://source.example/input.png"}},
@@ -126,7 +132,7 @@ func TestPrepareGenerationMediaRetryReusesFailedAssetAndStableKey(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if registry.beginItem.AssetID != 0 {
+	if registry.beginRequest.OwnerUserID != 0 {
 		t.Fatal("retry created a second asset")
 	}
 	if store.storeOption.ObjectKey != registry.ingesting.StorageKey || prepared.Media[0].AssetID != 77 {
@@ -140,7 +146,7 @@ func TestPrepareGenerationMediaMarksAssetFailedWhenStorageFails(t *testing.T) {
 	_, err := NewService(store, registry).PrepareGenerationMedia(t.Context(), 1, "action-1", &tasks.GenerationRequestSnapshot{
 		Media: []tasks.GenerationMediaIntent{{InputIndex: 0, Role: tasks.MediaRoleInput, Source: "https://source.example/input.png"}},
 	})
-	if err == nil || registry.failedAssetID != 88 {
-		t.Fatalf("err=%v failed asset=%d", err, registry.failedAssetID)
+	if err == nil || registry.failedHandle.AssetID != 88 {
+		t.Fatalf("err=%v failed handle=%#v", err, registry.failedHandle)
 	}
 }

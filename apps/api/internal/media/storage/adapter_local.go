@@ -105,30 +105,11 @@ func (a *localStorageAdapter) PutObject(ctx context.Context, profile *StoragePro
 	return a.service.putLocalObject(objectKey, data)
 }
 
-func (a *localStorageAdapter) StoreBytes(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error) {
-	if err := ctx.Err(); err != nil {
-		return "", err
-	}
-	return a.service.saveBytesLocal(ctx, filename, data, opts)
-}
-
 func (a *localStorageAdapter) StoreBytesRef(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (*StoredUploadRef, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	return a.service.saveBytesLocalRef(ctx, filename, data, opts)
-}
-
-func (a *localStorageAdapter) StoreRemote(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error) {
-	remoteFile, err := a.service.downloadRemoteFile(ctx, remoteURL, opts.AllowHosts)
-	if err != nil {
-		return "", err
-	}
-	defer remoteFile.Cleanup()
-	if err := ctx.Err(); err != nil {
-		return "", err
-	}
-	return a.service.saveReaderLocal(ctx, remoteFile.Filename, remoteFile, remoteFile.Size, opts)
 }
 
 func (a *localStorageAdapter) StoreRemoteRef(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (*StoredUploadRef, error) {

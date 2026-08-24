@@ -18,6 +18,7 @@ import { createCanvasWorkspaceGraphRuntime } from './createCanvasWorkspaceGraphR
 import { createCanvasWorkspaceImageWorkflow } from './createCanvasWorkspaceImageWorkflow'
 import { createCanvasWorkspaceRuntimeFacade } from './createCanvasWorkspaceRuntimeFacade'
 import { createPendingImageExecutionCore } from '../../execution/pending-execution'
+import type { LibraryAssetMaterializer } from '../../../library/libraryResource'
 
 export type UseCanvasWorkspaceRuntimeOptions = {
   route: RouteLocationNormalizedLoaded
@@ -25,6 +26,7 @@ export type UseCanvasWorkspaceRuntimeOptions = {
   getUserIdentity: () => { userId: number; userUid: string }
   flowPaneAdapter: CanvasFlowPaneAdapter
   uploadApi: CanvasGraphEditingUploadAdapter
+  materializeLibraryAsset: LibraryAssetMaterializer
   graphEditingBrowser: CanvasGraphEditingBrowserAdapter
   graphInteractionBrowser: CanvasGraphInteractionBrowserAdapter
   openNodeImagePreview: (snapshot: ImageNodeItem, mode: 'latest-output') => Promise<void>
@@ -54,6 +56,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     board,
     flowPaneAdapter: options.flowPaneAdapter,
     upload: options.uploadApi,
+    materializeLibraryAsset: options.materializeLibraryAsset,
     editingBrowser: options.graphEditingBrowser,
     interactionBrowser: options.graphInteractionBrowser,
     preview: {
@@ -104,6 +107,12 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     cancelTasks: taskLifecycle.cancelTasks,
   })
 
+  async function recoverBoardSession(): Promise<void> {
+    await viewport.loadCanvasBoardAndProbe()
+    void imageWorkflow.reattachPendingImageResults()
+    graph.recoveryPort.resumePendingLibraryImports()
+  }
+
   return {
     board,
     graph,
@@ -111,8 +120,7 @@ export function createCanvasWorkspaceRuntimeParts(options: UseCanvasWorkspaceRun
     persistence: {
       flushAutosave: flushAutosaveWithViewportPersistence,
       history: board.boardSession.history,
-      loadCanvasBoardAndProbe: viewport.loadCanvasBoardAndProbe,
-      reattachPendingImageResults: imageWorkflow.reattachPendingImageResults,
+      recoverBoardSession,
     },
     imageWorkflow,
   }

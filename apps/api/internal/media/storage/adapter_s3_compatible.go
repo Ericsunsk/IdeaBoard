@@ -54,21 +54,8 @@ func (a *s3CompatibleStorageAdapter) PutObject(ctx context.Context, profile *Sto
 	return a.service.s3CompatibleService.putBytesAtKeyWithConfig(ctx, objectKey, data, contentType, a.service.s3CompatibleConfigFromProfile(profile))
 }
 
-func (a *s3CompatibleStorageAdapter) StoreBytes(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (string, error) {
-	return a.service.s3CompatibleService.uploadBytesWithConfig(ctx, filename, data, a.service.s3CompatibleConfigFromProfile(profile), opts)
-}
-
 func (a *s3CompatibleStorageAdapter) StoreBytesRef(ctx context.Context, profile *StorageProfile, filename string, data []byte, opts StorageStoreOptions) (*StoredUploadRef, error) {
 	return a.service.s3CompatibleService.uploadBytesWithConfigRef(ctx, filename, data, a.service.s3CompatibleConfigFromProfile(profile), opts)
-}
-
-func (a *s3CompatibleStorageAdapter) StoreRemote(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (string, error) {
-	remoteFile, err := a.service.downloadRemoteFile(ctx, remoteURL, opts.AllowHosts)
-	if err != nil {
-		return "", err
-	}
-	defer remoteFile.Cleanup()
-	return a.service.s3CompatibleService.uploadReaderWithConfig(ctx, remoteFile.Filename, remoteFile.ContentType, remoteFile, remoteFile.Size, a.service.s3CompatibleConfigFromProfile(profile), opts)
 }
 
 func (a *s3CompatibleStorageAdapter) StoreRemoteRef(ctx context.Context, profile *StorageProfile, remoteURL string, opts StorageStoreOptions) (*StoredUploadRef, error) {

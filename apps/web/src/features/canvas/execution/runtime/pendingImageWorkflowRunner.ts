@@ -11,10 +11,10 @@ import type {
 import type { ResolvedTaskImageResult } from '../result-nodes/resolvedTaskImageResult'
 import type { PendingImageResultExecution } from '../result-nodes/usePendingImageResultNodes'
 import {
-  type PendingImageAttachment,
   type PendingImageExecutionCore,
   type PendingImageExecutionLease,
 } from '../pending-execution'
+import type { CanvasBoardAttachment } from '../../board-attachment'
 import {
   createCanvasTaskClientActionId,
   type ClientActionIdFactory,
@@ -40,7 +40,7 @@ export type PendingImageWorkflowTaskTransport = Readonly<{
 export type PendingImageWorkflowIntent = {
   source: ImageExecutionInput
   sourceNodeId: string
-  attachment: PendingImageAttachment
+  attachment: CanvasBoardAttachment
   outputCount: number
   resultOptions?: PendingImageResultOptions
   taskRequest: SubmitTaskData

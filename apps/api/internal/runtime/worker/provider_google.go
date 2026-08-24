@@ -375,7 +375,7 @@ func (c *ProviderExecutor) resolveGoogleImageBytes(ctx context.Context, ref stri
 		if err != nil {
 			return "", nil, fmt.Errorf("解析 data URL 失败: %w", err)
 		}
-		if err := imageformat.ValidateImageDimensions(parsed.Data); err != nil {
+		if _, err := imageformat.InspectBytes(parsed.Data, parsed.Ext); err != nil {
 			return "", nil, err
 		}
 		return parsed.MIMEType, parsed.Data, nil
@@ -385,7 +385,7 @@ func (c *ProviderExecutor) resolveGoogleImageBytes(ctx context.Context, ref stri
 		if err != nil {
 			return "", nil, fmt.Errorf("读取上传图像失败: %w", err)
 		}
-		if err := imageformat.ValidateImageDimensions(obj.Data); err != nil {
+		if _, err := imageformat.InspectDetectedBytes(obj.Data); err != nil {
 			return "", nil, err
 		}
 		mimeType := strings.TrimSpace(obj.ContentType)
@@ -422,7 +422,7 @@ func (c *ProviderExecutor) resolveGoogleImageBytes(ctx context.Context, ref stri
 	if len(body) == 0 {
 		return "", nil, fmt.Errorf("拉取图像为空: %q", ref)
 	}
-	if err := imageformat.ValidateImageDimensions(body); err != nil {
+	if _, err := imageformat.InspectDetectedBytes(body); err != nil {
 		return "", nil, err
 	}
 	mimeType := strings.TrimSpace(resp.Header.Get("Content-Type"))

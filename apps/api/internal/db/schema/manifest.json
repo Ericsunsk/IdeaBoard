@@ -8,7 +8,7 @@
     {"name": "platform", "path": "fragments/platform.sql", "depends_on": ["identity"]},
     {"name": "tasks", "path": "fragments/tasks.sql", "depends_on": ["identity", "account_pool"]},
     {"name": "media", "path": "fragments/media.sql", "depends_on": ["identity", "tasks"]},
-    {"name": "library", "path": "fragments/library.sql", "depends_on": ["identity"]},
+    {"name": "library", "path": "fragments/library.sql", "depends_on": ["identity", "media"]},
     {"name": "search", "path": "fragments/search.sql", "depends_on": ["identity", "credits"]},
     {"name": "usage", "path": "fragments/usage.sql", "depends_on": ["tasks"]},
     {"name": "workflow", "path": "fragments/workflow.sql", "depends_on": ["platform"]},

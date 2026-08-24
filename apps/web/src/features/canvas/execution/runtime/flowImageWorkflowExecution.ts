@@ -29,7 +29,7 @@ import {
   createPendingImageWorkflowRunner,
   type PendingImageWorkflowTaskTransport,
 } from './pendingImageWorkflowRunner'
-import type { PendingImageAttachment } from '../pending-execution'
+import type { CanvasBoardAttachment } from '../../board-attachment'
 import {
   createCanvasTaskClientActionId,
   withTaskClientActionId,
@@ -114,7 +114,7 @@ export function useFlowImageWorkflowExecution(options: UseFlowImageWorkflowExecu
     return executionWorkspace.state.isNodeRunning(nodeId)
   }
 
-  function requireCurrentAttachment(): PendingImageAttachment {
+  function requireCurrentAttachment(): CanvasBoardAttachment {
     const attachment = executionCore.currentAttachment()
     if (!attachment) {
       throw new Error('Canvas execution requires the current Board attachment')

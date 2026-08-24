@@ -13,9 +13,9 @@
     :active="active && !expandModeActive"
     :connection-drop-target="connectionDropTarget"
     :loading="!!directGenerating && !displayImage"
-    :running="!!directGenerating"
+    :running="!!directGenerating || libraryImport?.state === 'pending'"
     :transparent="!!expandModeActive || isImageToolActive"
-    :aria-busy="!!directGenerating"
+    :aria-busy="!!directGenerating || libraryImport?.state === 'pending'"
     aria-label="图片节点输入与预览区域"
     @dragover.stop="onStageDragOver"
     @drop.stop="onStageDrop"
@@ -68,7 +68,7 @@
         @handle-pointerup="emit('expand-handle-pointerup', $event)"
         @frame-pointerdown="emit('expand-frame-pointerdown', $event)"
       />
-      <div class="image-node-stage-actions">
+      <div v-if="!libraryImport" class="image-node-stage-actions">
         <NodeActionButton
           variant="stage-ghost"
           aria-label="打开图片预览"
@@ -85,6 +85,23 @@
         </NodeActionButton>
       </div>
     </template>
+    <div
+      v-if="libraryImport"
+      class="image-node-stage-library-import"
+      :class="`is-${libraryImport.state}`"
+      role="status"
+    >
+      <ComposingOrb v-if="libraryImport.state === 'pending'" />
+      <span>{{ libraryImport.state === 'pending' ? 'Adding to Canvas…' : libraryImport.failureMessage }}</span>
+      <NodeActionButton
+        v-if="libraryImport.state === 'failed'"
+        variant="stage-ghost"
+        aria-label="重试添加到画布"
+        @click.stop="emit('retry-library-import')"
+      >
+        Retry
+      </NodeActionButton>
+    </div>
     <button
       v-if="!displayImage && !emptyStateDisabled"
       type="button"
@@ -115,6 +132,7 @@ import { useElementVisibility } from '@vueuse/core'
 import { useCanvasViewportContext } from '../../composables/useCanvasViewportContext'
 import type { CanvasExtendDragAnchor } from '../../composables/useImageCanvasExtendOverlay'
 import type { ImageToolStageBinding } from '../../image-tools'
+import type { LibraryImportFact } from '../../../canvas-board/domain'
 import { useCanvasImagePreviewQuality } from '../../composables/useCanvasImagePreviewQuality'
 import { useDisplayImagePreview } from '../../composables/useDisplayImagePreview'
 import ImageToolStagePresentation from '../../image-tools/components/ImageToolStagePresentation.vue'
@@ -130,6 +148,7 @@ const props = defineProps<{
   stageWidth: number
   stageHeight: number
   displayImage: { url: string; mediaAssetId?: number } | null
+  libraryImport?: LibraryImportFact
   inputLocked?: boolean
   emptyIconVariant?: 'image' | 'fusion'
   directGenerating?: boolean
@@ -148,6 +167,7 @@ const emit = defineEmits<{
   (e: 'open-preview'): void
   (e: 'append-to-canvas'): void
   (e: 'reset'): void
+  (e: 'retry-library-import'): void
   (e: 'contextmenu', event: MouseEvent): void
   (e: 'expand-submit', prompt: string): void
   (
@@ -240,6 +260,29 @@ function submitExpand(prompt: string) {
   color: var(--color-canvas-muted, #8b8b8b);
   background: var(--color-canvas-surface, #f5f5f5);
   font-size: 12px;
+}
+
+.image-node-stage-library-import {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--canvas-node-bg) 72%, transparent);
+  color: var(--canvas-text-strong);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  pointer-events: none;
+}
+
+.image-node-stage-library-import.is-failed {
+  background: color-mix(in srgb, var(--canvas-node-bg) 82%, var(--color-board-danger) 18%);
+  color: var(--color-board-danger);
+  pointer-events: auto;
 }
 
 .image-node-stage-image:focus-visible {

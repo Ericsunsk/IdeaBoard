@@ -42,7 +42,8 @@ CREATE TABLE library_assets (
   CONSTRAINT ck_library_assets_dimensions CHECK (width >= 0 AND height >= 0),
   CONSTRAINT fk_library_assets_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_library_assets_folder_owner FOREIGN KEY (folder_id, owner_user_id)
-    REFERENCES library_folders(id, owner_user_id) ON DELETE RESTRICT
+    REFERENCES library_folders(id, owner_user_id) ON DELETE RESTRICT,
+  CONSTRAINT uq_library_assets_id_owner UNIQUE (id, owner_user_id)
 );
 
 CREATE INDEX idx_library_assets_owner_folder_order
@@ -50,3 +51,21 @@ CREATE INDEX idx_library_assets_owner_folder_order
 
 CREATE INDEX idx_library_assets_owner_order
   ON library_assets (owner_user_id, created_at DESC, id DESC);
+
+-- A Library asset is URL-backed until a user imports it. This association is
+-- intentionally not a media_ref: only actual Canvas/Task use keeps Media
+-- alive, so unused imports remain reclaimable.
+CREATE TABLE library_asset_media_assets (
+  library_asset_id BIGINT PRIMARY KEY,
+  owner_user_id BIGINT NOT NULL,
+  media_asset_id BIGINT NOT NULL,
+  created_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ(3) NOT NULL DEFAULT now(),
+  CONSTRAINT uq_library_asset_media_assets_media_asset UNIQUE (media_asset_id),
+  CONSTRAINT fk_library_asset_media_assets_library_owner FOREIGN KEY (library_asset_id, owner_user_id)
+    REFERENCES library_assets(id, owner_user_id) ON DELETE CASCADE,
+  CONSTRAINT fk_library_asset_media_assets_media_owner FOREIGN KEY (media_asset_id, owner_user_id)
+    REFERENCES media_assets(id, owner_user_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_library_asset_media_assets_owner ON library_asset_media_assets (owner_user_id, media_asset_id);

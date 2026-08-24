@@ -1,6 +1,8 @@
 .canvas-chrome-region {
   --canvas-chrome-inset: var(--spacing-ib-page-chrome-inset);
   --canvas-chrome-control-gap: 12px;
+  --canvas-chrome-minimap-height: 134px;
+  --canvas-chrome-library-clearance: 20px;
   --canvas-chrome-icon-size: 19px;
   --canvas-chrome-presence-duration: var(--motion-enter-duration);
   --canvas-chrome-presence-easing: var(--motion-enter-easing);
@@ -68,6 +70,31 @@
   left: var(--canvas-chrome-inset);
 }
 
+.canvas-chrome-region--library {
+  position: absolute;
+  top: 84px;
+  bottom: calc(
+    var(--canvas-chrome-inset) + var(--canvas-chrome-minimap-height) +
+      var(--canvas-chrome-library-clearance)
+  );
+  left: calc(
+    var(--canvas-chrome-inset) + var(--ib-page-chrome-control-size, 40px) +
+      var(--canvas-chrome-control-gap)
+  );
+  width: min(
+    320px,
+    calc(
+      100vw - var(--canvas-chrome-inset) * 2 - var(--ib-page-chrome-control-size, 40px) -
+        var(--canvas-chrome-control-gap)
+    )
+  );
+  pointer-events: auto;
+}
+
+.canvas-chrome-region--library:not(.is-open) {
+  pointer-events: none;
+}
+
 .canvas-chrome-region--top.is-hidden {
   transform: translateY(-82px) scale(0.985);
 }
@@ -82,6 +109,10 @@
 
 .canvas-chrome-region--minimap.is-hidden {
   transform: translateY(76px) scale(0.985);
+}
+
+.canvas-chrome-region--library.is-hidden {
+  transform: translateX(-76px) scale(0.985);
 }
 
 .canvas-chrome-board-stack {
@@ -333,5 +364,9 @@
 
   .canvas-chrome-region--left.is-hidden {
     transform: translateY(-50%);
+  }
+
+  .canvas-chrome-region--library.is-hidden {
+    transform: none;
   }
 }

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"ideaboard/api/internal/media/ingestion"
 	"ideaboard/api/internal/platform/outbound"
 	"ideaboard/api/internal/tasking/taskmedia"
 	"ideaboard/api/internal/tasking/tasks"
@@ -18,29 +19,34 @@ import (
 type fixedAssetLocator map[int64]StoredUploadLocation
 
 type recordingTaskResultRegistry struct {
-	nextID    int64
-	started   []TaskResultIngestion
-	completed []TaskResultIngestion
-	failedIDs []int64
+	nextID      int64
+	started     []ingestion.Request
+	completed   []ingestion.Handle
+	completions []ingestion.Completion
+	failed      []ingestion.Handle
 }
 
-func (r *recordingTaskResultRegistry) BeginTaskResultIngestion(_ context.Context, ingestion TaskResultIngestion) (int64, bool, error) {
-	r.started = append(r.started, ingestion)
+func (r *recordingTaskResultRegistry) Begin(_ context.Context, request ingestion.Request) (ingestion.Handle, error) {
+	r.started = append(r.started, request)
 	if r.nextID == 0 {
 		r.nextID = 100
 	}
 	id := r.nextID
 	r.nextID++
-	return id, false, nil
+	return ingestion.Handle{
+		AssetID: id, OwnerUserID: request.OwnerUserID, StorageProfile: request.StorageProfile,
+		StorageKey: request.StorageKey, Origin: request.Origin,
+	}, nil
 }
 
-func (r *recordingTaskResultRegistry) CompleteTaskResultIngestion(_ context.Context, ingestion TaskResultIngestion, _ StoredUploadRef) error {
-	r.completed = append(r.completed, ingestion)
+func (r *recordingTaskResultRegistry) Complete(_ context.Context, handle ingestion.Handle, completion ingestion.Completion) error {
+	r.completed = append(r.completed, handle)
+	r.completions = append(r.completions, completion)
 	return nil
 }
 
-func (r *recordingTaskResultRegistry) FailTaskResultIngestion(_ context.Context, _ int64, assetID int64, _ error) error {
-	r.failedIDs = append(r.failedIDs, assetID)
+func (r *recordingTaskResultRegistry) Fail(_ context.Context, handle ingestion.Handle, _ error) error {
+	r.failed = append(r.failed, handle)
 	return nil
 }
 
@@ -160,6 +166,12 @@ func TestRuntimeTaskMediaStoreMaterializeRemoteResultsStoresOutputs(t *testing.T
 	if len(registry.completed) != 2 || registry.completed[0].AssetID != 100 || registry.completed[1].AssetID != 101 {
 		t.Fatalf("completed ingestions = %#v", registry.completed)
 	}
+	for index, request := range registry.started {
+		facts, ok := request.Origin.(ingestion.TaskResultFacts)
+		if !ok || facts.TaskID != "task-abc" || facts.ResultIndex != index {
+			t.Fatalf("started request[%d] = %#v", index, request)
+		}
+	}
 	assertDirEmpty(t, tmpDir)
 }
 
@@ -198,8 +210,8 @@ func TestRuntimeTaskMediaStoreMaterializeRemoteResultsCleansStoredKeysOnFailure(
 	} else if len(entries) != 1 {
 		t.Fatalf("expected first tracked result to remain retryable, found %d entries", len(entries))
 	}
-	if len(registry.failedIDs) != 1 || registry.failedIDs[0] != 101 {
-		t.Fatalf("failed ingestions = %#v, want [101]", registry.failedIDs)
+	if len(registry.failed) != 1 || registry.failed[0].AssetID != 101 {
+		t.Fatalf("failed ingestions = %#v, want [101]", registry.failed)
 	}
 	assertDirEmpty(t, tmpDir)
 }

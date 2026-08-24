@@ -11,6 +11,7 @@ import (
 	dbsqlc "ideaboard/api/internal/db/sqlc"
 	"ideaboard/api/internal/identity/users"
 	mediaassets "ideaboard/api/internal/media/assets"
+	"ideaboard/api/internal/media/ingestion"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/database"
 	"ideaboard/api/internal/testdb"
@@ -294,24 +295,22 @@ func TestBoardUploadRegistrationConvergesThroughSaveDeleteAndGraceScheduling(t *
 		t.Fatalf("create owner: %v", err)
 	}
 	registry := mediaassets.NewMediaAssetRegistry(db)
-	upload := mediaassets.BoardUploadAsset{
-		OwnerUserID: owner.ID,
-		BoardID:     "upload-reclamation-board",
-		Stored: storage.StoredUploadRef{
-			URL:            "/uploads/canvas/owner/upload-reclamation-board/content/image.png",
-			StorageKey:     "uploads/canvas/owner/upload-reclamation-board/content/image.png",
-			StorageProfile: "builtin-local",
-			MIMEType:       "image/png",
-			Width:          640,
-			Height:         480,
-			SizeBytes:      2048,
-		},
+	upload := ingestion.Request{OwnerUserID: owner.ID, StorageProfile: "builtin-local", StorageKey: "uploads/canvas/owner/upload-reclamation-board/content/image.png", URL: "/uploads/canvas/owner/upload-reclamation-board/content/image.png", Origin: ingestion.BoardUploadFacts{BoardID: "upload-reclamation-board"}}
+	stored := storage.StoredUploadRef{
+		URL:            "/uploads/canvas/owner/upload-reclamation-board/content/image.png",
+		StorageKey:     "uploads/canvas/owner/upload-reclamation-board/content/image.png",
+		StorageProfile: "builtin-local",
+		MIMEType:       "image/png",
+		Width:          640,
+		Height:         480,
+		SizeBytes:      2048,
 	}
-	assetID, err := registry.BeginBoardUpload(ctx, upload)
+	handle, err := registry.Begin(ctx, upload)
 	if err != nil {
 		t.Fatalf("begin uploaded media asset: %v", err)
 	}
-	if err := registry.CompleteBoardUpload(ctx, upload, assetID); err != nil {
+	assetID := handle.AssetID
+	if err := registry.Complete(ctx, handle, stored.IngestionCompletion("")); err != nil {
 		t.Fatalf("complete uploaded media asset: %v", err)
 	}
 	q := dbsqlc.New(db)

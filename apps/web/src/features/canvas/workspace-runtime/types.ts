@@ -13,6 +13,7 @@ import type {
   CanvasGraphEditingNodeInteractionsOptions,
 } from '../graph-editing'
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
+import type { CanvasLibraryImportDescriptor } from '../../library/libraryTransfer'
 
 type CanvasWorkspaceCatalogRecoveryState =
   { status: 'idle' } | { status: 'reload-required' | 'reloading'; boardId: string }
@@ -97,8 +98,7 @@ export type CanvasWorkspaceRuntimeCommands = {
   }
   persistence: {
     flushAutosave: (options?: { silent?: boolean }) => Promise<void>
-    loadCanvasBoardAndProbe: () => Promise<void>
-    reattachPendingImageResults: () => Promise<void> | void
+    recoverBoardSession: () => Promise<void>
   }
   viewportControls: {
     onZoomIn: () => void
@@ -115,7 +115,6 @@ export type CanvasWorkspaceRuntimeCommands = {
     onNodeDragStart: () => void
     onNodeDragStop: () => void
     flushViewportPersistence: () => void
-    loadCanvasBoardAndProbe: () => Promise<void>
   }
   graphEditing: {
     createNodeAtPosition: <T extends CanvasCreatableNodeKind>(
@@ -124,6 +123,13 @@ export type CanvasWorkspaceRuntimeCommands = {
       y: number,
       initialSnapshotPatch?: Partial<CanvasNodeItemByKind[T]>,
     ) => CanvasGraphNodeIdForKind<T> | null
+    libraryImport: {
+      add: (
+        candidate: CanvasLibraryImportDescriptor,
+        center: { x: number; y: number },
+      ) => CanvasGraphNodeIdForKind<'image'> | null
+      retry: (nodeId: string) => boolean
+    }
     onExportSelectedImages: () => void
     onFlowMediaInputImageDrop: (nodeId: string, event: DragEvent) => Promise<void>
     onFlowMediaInputImageOpen: (nodeId: string) => void

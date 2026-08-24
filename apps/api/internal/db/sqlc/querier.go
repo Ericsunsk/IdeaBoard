@@ -16,6 +16,7 @@ type Querier interface {
 	AddProviderEndpointCapability(ctx context.Context, arg AddProviderEndpointCapabilityParams) error
 	ArchiveAccount(ctx context.Context, id int64) (int64, error)
 	BackfillDailyStatsByCreatedRange(ctx context.Context, arg BackfillDailyStatsByCreatedRangeParams) (BackfillDailyStatsByCreatedRangeRow, error)
+	BeginLibraryMaterializedMediaAsset(ctx context.Context, arg BeginLibraryMaterializedMediaAssetParams) (int64, error)
 	BeginTaskResultMediaAsset(ctx context.Context, arg BeginTaskResultMediaAssetParams) (int64, error)
 	BindPaymentOrderCheckout(ctx context.Context, arg BindPaymentOrderCheckoutParams) (PaymentOrder, error)
 	CancelMediaAssetReclamation(ctx context.Context, arg CancelMediaAssetReclamationParams) ([]int64, error)
@@ -116,6 +117,7 @@ type Querier interface {
 	GetPaymentStripeCredentialForOrderNumber(ctx context.Context, publicOrderNumber string) (PaymentStripeCredential, error)
 	GetProviderEndpointByID(ctx context.Context, id int64) (GetProviderEndpointByIDRow, error)
 	GetQuickSavesFolder(ctx context.Context, ownerUserID int64) (LibraryFolder, error)
+	GetReadyLibraryMaterializedMediaAsset(ctx context.Context, arg GetReadyLibraryMaterializedMediaAssetParams) (MediaAsset, error)
 	GetReadyMediaAssetStorageLocationByID(ctx context.Context, id int64) (GetReadyMediaAssetStorageLocationByIDRow, error)
 	GetRuntimeAccountByIDWithSecret(ctx context.Context, id int64) (GetRuntimeAccountByIDWithSecretRow, error)
 	GetRuntimeAccountForAssignment(ctx context.Context, arg GetRuntimeAccountForAssignmentParams) (GetRuntimeAccountForAssignmentRow, error)
@@ -268,6 +270,7 @@ type Querier interface {
 	UpsertBoardMember(ctx context.Context, arg UpsertBoardMemberParams) error
 	UpsertFeaturePrompt(ctx context.Context, arg UpsertFeaturePromptParams) (FeaturePrompt, error)
 	UpsertLibraryAsset(ctx context.Context, arg UpsertLibraryAssetParams) (LibraryAsset, error)
+	UpsertLibraryAssetMediaLink(ctx context.Context, arg UpsertLibraryAssetMediaLinkParams) error
 	UpsertMediaAsset(ctx context.Context, arg UpsertMediaAssetParams) (int64, error)
 	UpsertMediaAssetSource(ctx context.Context, arg UpsertMediaAssetSourceParams) (int64, error)
 	UpsertMediaDerivative(ctx context.Context, arg UpsertMediaDerivativeParams) (MediaDerivative, error)
