@@ -1,5 +1,4 @@
 import type { LibrarySearchReference } from '../library/libraryResource'
-import type { VisionReference } from './searchResource'
 
 const ANONYMOUS_QUERY_GATE_KEY = 'ideaboard:search:anonymous-query-gate'
 const PENDING_ACTION_KEY = 'ideaboard:search:pending-auth-action'
@@ -7,7 +6,7 @@ export const MAX_ANONYMOUS_SEARCH_QUERIES = 5
 
 export type SearchAuthAction =
   | { kind: 'text-search'; query: string }
-  | { kind: 'vision-search'; references: VisionReference[]; query: string }
+  | { kind: 'vision-search'; query: string }
   | { kind: 'save-reference'; reference: LibrarySearchReference }
   | { kind: 'save-batch'; references: LibrarySearchReference[] }
   | { kind: 'open-library' }

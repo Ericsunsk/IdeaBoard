@@ -1,4 +1,4 @@
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { ref } from 'vue'
 import type { SearchResult } from './searchResource'
 
 export function useSearchLightbox() {
@@ -19,8 +19,20 @@ export function useSearchLightbox() {
     if (event.key === 'Escape' && visible.value) close()
   }
 
-  onMounted(() => window.addEventListener('keydown', handleKeydown))
-  onBeforeUnmount(() => window.removeEventListener('keydown', handleKeydown))
+  let active = false
 
-  return { visible, activeResult, open, close }
+  function activate() {
+    if (active) return
+    active = true
+    window.addEventListener('keydown', handleKeydown)
+  }
+
+  function dispose() {
+    if (!active) return
+    active = false
+    window.removeEventListener('keydown', handleKeydown)
+    close()
+  }
+
+  return { visible, activeResult, open, close, activate, dispose }
 }

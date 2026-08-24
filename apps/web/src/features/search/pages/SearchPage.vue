@@ -143,10 +143,12 @@
             aria-label="Toggle My Library"
             title="My Library / Drop here to Quick Save"
             :aria-expanded="libraryIslandOpen"
+            @pointerenter="preloadLibraryIsland"
+            @focus="preloadLibraryIsland"
             @click="toggleLibraryIslandForUser"
-            @dragover.prevent="handleTriggerBtnDragOver"
-            @dragleave="handleTriggerBtnDragLeave"
-            @drop.prevent="handleTriggerBtnDrop"
+            @dragover.prevent="handleLibraryTriggerDragOver"
+            @dragleave="handleLibraryTriggerDragLeave"
+            @drop.prevent="handleLibraryTriggerDrop"
           >
             <BookmarkSolid
               v-if="libraryIslandOpen"
@@ -237,16 +239,22 @@
       <SearchResultViewport
         v-else
         :items="results"
+        :has-more="hasMore"
+        :loading="loading || loadingMore"
         :compact="libraryIslandOpen && !libraryIslandExpanded"
         :scroll-root="pageScrollRef"
+        :active-anchor="savePopoverAnchor"
         class="mt-4"
+        @active-anchor-hidden="libraryCommands.handleAnchorHidden"
+        @load-next-page="loadNextPage"
+        @scroll-position="recordScroll"
       >
         <template #default="{ item: result, index, style }">
           <article
             :key="`${result.provider}:${result.id}`"
             :style="style"
             draggable="true"
-            class="group relative overflow-hidden rounded-[var(--search-card-radius)] bg-board-control-bg/80 backdrop-blur-md shadow-xs transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-[var(--shadow-ib-panel)] cursor-grab active:cursor-grabbing select-none"
+            class="group relative overflow-hidden rounded-[var(--search-card-radius)] bg-board-control-bg/80 shadow-xs transition-shadow duration-[var(--motion-control-duration)] ease-[var(--motion-control-easing)] hover:shadow-[var(--shadow-ib-panel)] cursor-grab active:cursor-grabbing select-none"
             @dragstart="handleCardDragStart($event, result)"
             @dragend="handleCardDragEnd"
           >
@@ -257,7 +265,7 @@
               @click="openLightbox(result)"
             >
               <div
-                class="relative overflow-hidden bg-board-loading-bg backdrop-blur-md"
+                class="relative overflow-hidden bg-board-loading-bg"
                 :style="{ aspectRatio: `${result.width} / ${result.height}` }"
               >
                 <img
@@ -335,20 +343,32 @@
                   </p>
                 </div>
 
-                <!-- 存入个人素材库触发器 (SearchSavePopover) -->
-                <SearchSavePopover
-                  :result="result"
-                  :saved="savedKeys.has(libraryAssetKey(result.provider, result.id))"
-                  :authenticated="Boolean(userStore.user)"
-                  @saved="markResultSaved(result)"
-                  @unsaved="markResultUnsaved(result)"
-                  @auth-required="
-                    requireSearchLogin({
-                      kind: 'save-reference',
-                      reference: searchSession.toLibraryReference(result),
-                    })
+                <button
+                  type="button"
+                  class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full shadow-md transition focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                  :class="
+                    savedKeys.has(libraryAssetKey(result.provider, result.id))
+                      ? 'bg-ib-success text-ib-text-inverse hover:bg-ib-success/90'
+                      : 'bg-board-primary text-ib-text-inverse hover:bg-board-primary-hover shadow-board-primary/30'
                   "
-                />
+                  :aria-label="
+                    savedKeys.has(libraryAssetKey(result.provider, result.id))
+                      ? 'Remove from Library'
+                      : 'Save to Library'
+                  "
+                  :title="
+                    savedKeys.has(libraryAssetKey(result.provider, result.id))
+                      ? 'Remove from Library'
+                      : 'Save to Library Folder'
+                  "
+                  @click.stop="toggleSavePopover($event, result)"
+                >
+                  <BookmarkSolid
+                    v-if="savedKeys.has(libraryAssetKey(result.provider, result.id))"
+                    class="size-3.5"
+                  />
+                  <Plus v-else class="size-3.5 stroke-[2.5]" />
+                </button>
               </div>
             </div>
 
@@ -370,7 +390,6 @@
         </template>
       </SearchResultViewport>
 
-      <div ref="sentinel" class="h-10" aria-hidden="true"></div>
       <div v-if="loadingMore" class="flex justify-center py-5">
         <ProgressSpinner
           class="!h-7 !w-7 text-board-primary"
@@ -388,13 +407,20 @@
 
     <!-- 🌟 左侧悬浮圆角素材岛组件 -->
     <LibraryFloatingIsland
+      v-if="libraryIslandMounted"
       v-model:expanded="libraryIslandExpanded"
       :open="libraryIslandOpen"
-      :refresh-key="libraryRefreshKey"
+      :folder-facts="libraryFolderFacts"
+      :mutation-publisher="libraryMutationPublisher"
       :reference-keys="references.map((reference) => reference.key)"
       @close="closeLibraryIsland"
-      @asset-saved="markAssetSaved"
       @reference-selected="handleLibraryReference"
+    />
+
+    <SearchSavePopover
+      :ref="libraryCommands.registerSavePopover"
+      @auth-required="libraryCommands.requestSaveAuthentication"
+      @anchor-changed="libraryCommands.setSavePopoverAnchor"
     />
 
     <!-- 🌟 Demo 同款零遮挡全景高清 Lightbox 弹窗 (bg-black/65 backdrop-blur-2xl) -->
@@ -468,7 +494,7 @@
 
     <!-- 🌟 多选批量悬浮操作岛 (SearchBatchActionDock) -->
     <SearchBatchActionDock
-      :selected-count="selectedBatchResults.length"
+      :selected-count="selectedBatchCount"
       @vision-search="applySelectedAsVisionReferences"
       @save-all="saveAllSelectedToLibrary"
       @clear="clearSelection"
@@ -478,7 +504,7 @@
 
 <script setup lang="ts">
 import '../search.css'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -493,91 +519,35 @@ import UserWorkspaceNavigation from '../../user-shell/components/UserWorkspaceNa
 import SearchSavePopover from '../components/SearchSavePopover.vue'
 import SearchBatchActionDock from '../components/SearchBatchActionDock.vue'
 import SearchResultViewport from '../components/SearchResultViewport.vue'
-import LibraryFloatingIsland from '../../library/components/LibraryFloatingIsland.vue'
 import { libraryAssetKey } from '../../library/libraryResource'
-import {
-  writeSearchReferenceTransfer,
-  readSearchReferenceTransfer,
-} from '../../library/libraryTransfer'
 import { searchReferenceKey } from '../searchLibraryBridge'
 import { useUserAccountControls } from '../../user-shell/useUserAccountControls'
-import { type SearchResult } from '../searchResource'
-import { useSearchSession } from '../useSearchSession'
-import { setPendingSearchAuthAction, type SearchAuthAction } from '../searchAuthContinuation'
-import { useAuthOverlay } from '../../auth/authOverlay'
-import { fetchVisionSearchPrice } from '../visionSearchBillingResource'
-import { formatIdeaAmount } from '../../../shared/utils/ideaCurrency'
+import {
+  SearchLibraryFloatingIsland as LibraryFloatingIsland,
+  useSearchScreenRuntime,
+} from '../useSearchScreenRuntime'
 
 const router = useRouter()
 const userStore = useUserStore()
-const authOverlay = useAuthOverlay()
 const { logoutAndRedirect } = useLogoutRedirect({ logout: () => userStore.logout() })
 const accountControls = useUserAccountControls({
   navigation: { navigate: (path) => router.push(path), logout: () => logoutAndRedirect(HOME_PATH) },
 })
-const cacheScope = userStore.user?.public_id ?? 'anonymous'
-const isTriggerHoveredDuringDrag = ref(false)
 const pageScrollRef = ref<HTMLElement | null>(null)
-const visionSearchPrice = ref<number | null>(null)
-let autoOpenTimer: ReturnType<typeof setTimeout> | null = null
-let visionSearchPriceController: AbortController | null = null
-
-function requireSearchLogin(action: SearchAuthAction) {
-  setPendingSearchAuthAction(action)
-  authOverlay.commands.open('login')
-}
-
-function toggleLibraryIslandForUser() {
-  if (!userStore.user) {
-    requireSearchLogin({ kind: 'open-library' })
-    return
-  }
-  toggleLibraryIsland()
-}
-
-const searchSession = useSearchSession({
-  cacheScope,
+const userPublicID = computed(() => userStore.user?.public_id)
+const searchScreen = useSearchScreenRuntime({
+  userPublicID,
   scrollContainer: pageScrollRef,
   isAuthenticated: () => Boolean(userStore.user),
-  requireLogin: requireSearchLogin,
 })
-const { draftQuery, queryError, heading: searchResultsHeading } = searchSession.query
-const searchResults = searchSession.feed
-const visionFlow = searchSession.vision
-const { library, batch, lightbox, resumePendingAction } = searchSession
+const { search, results: searchResults, library, selection, preview } = searchScreen.view
 const {
-  open: libraryIslandOpen,
-  expanded: libraryIslandExpanded,
-  refreshKey: libraryRefreshKey,
-  close: closeLibraryIsland,
-  toggle: toggleLibraryIsland,
-  saveReferenceToQuickSaves,
-  markResultSaved,
-  markResultUnsaved,
-  markAssetSaved,
-} = library
-const {
-  selected: selectedBatchResults,
-  isSelected: isResultSelected,
-  toggle: toggleBatchSelect,
-  clear: clearSelection,
-  applyVisionReferences: applySelectedAsVisionReferences,
-  saveAllToLibrary: saveAllSelectedToLibrary,
-} = batch
-const {
-  results,
-  hasMore,
-  loading,
-  loadingMore,
-  hasError,
-  sentinel,
-  failedImages,
-  savedKeys,
-  reload,
-  markImageError,
-  retryImage,
-  imageRetryCount,
-} = searchResults
+  search: searchCommands,
+  results: resultsCommands,
+  selection: selectionCommands,
+  library: libraryCommands,
+} = searchScreen.commands
+const { draftQuery, queryError, heading: searchResultsHeading } = search
 const {
   references,
   hasPendingReferences,
@@ -585,152 +555,64 @@ const {
   canAddReference,
   fileInput,
   visionState,
-  removeReference,
-  handleFileInput,
-  openFilePicker,
-  handleLibraryReference,
-  handleSearchResultReference,
-  isReferencePending,
-} = visionFlow
-
-const visionSearchPriceLabel = computed(() =>
-  visionSearchPrice.value === null
-    ? ''
-    : visionSearchPrice.value === 0
-      ? '免费'
-      : formatIdeaAmount(visionSearchPrice.value),
-)
-
-const searchButtonTitle = computed(() => {
-  if (hasPendingReferences.value) return 'Preparing references'
-  if (visionState.value === 'extracting') return 'Searching'
-  return references.value.length > 0 && visionSearchPriceLabel.value
-    ? `Search · ${visionSearchPriceLabel.value}`
-    : 'Search'
-})
-
-function refreshVisionSearchPrice() {
-  visionSearchPriceController?.abort()
-  visionSearchPriceController = null
-  visionSearchPrice.value = null
-  if (!userStore.user || references.value.length === 0) return
-
-  const controller = new AbortController()
-  visionSearchPriceController = controller
-  void fetchVisionSearchPrice(controller.signal)
-    .then((price) => {
-      if (!controller.signal.aborted) visionSearchPrice.value = price
-    })
-    .catch(() => {
-      // Pricing is supplementary feedback. Submission remains the authority.
-    })
-}
-
-watch([() => userStore.user?.public_id, () => references.value.length], refreshVisionSearchPrice, {
-  immediate: true,
-})
-
-onBeforeUnmount(() => visionSearchPriceController?.abort())
-
+  buttonTitle: searchButtonTitle,
+} = search
 const {
-  visible: lightboxVisible,
-  activeResult,
-  open: openLightbox,
-  close: closeLightbox,
-} = lightbox
-
-function clearAutoOpenTimer() {
-  if (!autoOpenTimer) return
-  clearTimeout(autoOpenTimer)
-  autoOpenTimer = null
-}
-
-function handleCardDragStart(e: DragEvent, result: SearchResult) {
-  const reference = searchSession.toLibraryReference(result)
-  writeSearchReferenceTransfer(e.dataTransfer!, reference)
-
-  // 创建 58×44px 微缩圆角影子 (Micro Drag Ghost)
-  const ghost = document.createElement('div')
-  ghost.style.position = 'fixed'
-  ghost.style.top = '-9999px'
-  ghost.style.left = '-9999px'
-  ghost.style.width = '58px'
-  ghost.style.height = '44px'
-  ghost.style.borderRadius = '8px'
-  ghost.style.overflow = 'hidden'
-  ghost.style.boxShadow = 'var(--search-dock-shadow)'
-  ghost.style.transform = 'rotate(-3deg)'
-  ghost.style.zIndex = '9999'
-
-  const img = document.createElement('img')
-  img.src = result.preview_url
-  img.style.width = '100%'
-  img.style.height = '100%'
-  img.style.objectFit = 'cover'
-
-  ghost.appendChild(img)
-  document.body.appendChild(ghost)
-  e.dataTransfer!.setDragImage(ghost, 29, 22)
-
-  setTimeout(() => {
-    document.body.removeChild(ghost)
-  }, 0)
-}
-
-function handleCardDragEnd() {
-  clearAutoOpenTimer()
-  isTriggerHoveredDuringDrag.value = false
-}
-
-function handleTriggerBtnDragOver(e: DragEvent) {
-  if (!userStore.user) return
-  e.dataTransfer!.dropEffect = 'copy'
-  isTriggerHoveredDuringDrag.value = true
-
-  // 悬停 280ms 自动展开左侧素材库浮岛
-  if (!libraryIslandOpen.value && !autoOpenTimer) {
-    autoOpenTimer = setTimeout(() => {
-      libraryIslandOpen.value = true
-      autoOpenTimer = null
-    }, 280)
-  }
-}
-
-function handleTriggerBtnDragLeave() {
-  isTriggerHoveredDuringDrag.value = false
-  clearAutoOpenTimer()
-}
-
-async function handleTriggerBtnDrop(e: DragEvent) {
-  isTriggerHoveredDuringDrag.value = false
-  clearAutoOpenTimer()
-
-  const reference = readSearchReferenceTransfer(e.dataTransfer)
-  if (!reference) return
-  if (!userStore.user) {
-    requireSearchLogin({ kind: 'save-reference', reference })
-    return
-  }
-  await saveReferenceToQuickSaves(reference)
-}
-
-function handleClearSearch() {
-  searchSession.clearSearch()
-}
-
-async function submitQuery() {
-  clearSelection()
-  await searchSession.submitQuery()
-}
-
-onMounted(() => {
-  void resumePendingAction()
-})
-
-watch(
-  () => Boolean(userStore.user),
-  (isAuthenticated, wasAuthenticated) => {
-    if (isAuthenticated && !wasAuthenticated) void resumePendingAction()
-  },
-)
+  items: results,
+  hasMore,
+  loading,
+  loadingMore,
+  hasError,
+  failedImages,
+  savedKeys,
+} = searchResults
+const {
+  open: libraryIslandOpen,
+  expanded: libraryIslandExpanded,
+  folderFacts: libraryFolderFacts,
+  mutationPublisher: libraryMutationPublisher,
+  mounted: libraryIslandMounted,
+  isDropTarget: isTriggerHoveredDuringDrag,
+} = library
+const { count: selectedBatchCount } = selection
+const { visible: lightboxVisible, activeResult } = preview
+const { savePopoverAnchor } = searchScreen
+const {
+  clear: handleClearSearch,
+  submit: submitQuery,
+  openFilePicker,
+  handleFileInput,
+  removeReference,
+  useResultAsReference: handleSearchResultReference,
+  useLibraryReference: handleLibraryReference,
+  isReferencePending,
+} = searchCommands
+const {
+  reload,
+  loadNextPage,
+  recordScroll,
+  markImageError,
+  retryImage,
+  imageRetryCount,
+  openPreview: openLightbox,
+  closePreview: closeLightbox,
+} = resultsCommands
+const {
+  isSelected: isResultSelected,
+  toggle: toggleBatchSelect,
+  clear: clearSelection,
+  useAsVisionReferences: applySelectedAsVisionReferences,
+  saveAllToLibrary: saveAllSelectedToLibrary,
+} = selectionCommands
+const {
+  toggleForUser: toggleLibraryIslandForUser,
+  preload: preloadLibraryIsland,
+  close: closeLibraryIsland,
+  openSavePopover: toggleSavePopover,
+  handleCardDragStart,
+  handleCardDragEnd,
+  handleTriggerDragOver: handleLibraryTriggerDragOver,
+  handleTriggerDragLeave: handleLibraryTriggerDragLeave,
+  handleTriggerDrop: handleLibraryTriggerDrop,
+} = libraryCommands
 </script>

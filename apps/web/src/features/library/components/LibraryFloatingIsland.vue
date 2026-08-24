@@ -486,6 +486,7 @@ import {
   Xmark,
 } from '@iconoir/vue'
 import { useLibraryWorkspace, type LibraryFolderTab } from '../useLibraryWorkspace'
+import type { LibraryFolderFacts, LibraryMutationPublisher } from '../libraryFolderFacts'
 import {
   libraryAssetKey,
   saveSearchReference,
@@ -502,17 +503,26 @@ import UserConfirmDialog from '../../../shared/components/UserConfirmDialog.vue'
 import { useUserConfirmDialog } from '../../../shared/composables/useUserConfirmDialog'
 import { deleteFolderConfirmation, removeAssetConfirmation } from '../libraryConfirmations'
 
-const props = defineProps<{ open: boolean; refreshKey: number; referenceKeys?: string[] }>()
+const props = defineProps<{
+  open: boolean
+  folderFacts: LibraryFolderFacts
+  mutationPublisher: LibraryMutationPublisher
+  referenceKeys?: string[]
+}>()
 const emit = defineEmits<{
   close: []
-  'asset-saved': [key: string]
   'reference-selected': [LibraryAssetView]
 }>()
 const isExpanded = defineModel<boolean>('expanded', { default: false })
 
 const toast = useAppToast()
 const confirmDialog = useUserConfirmDialog()
-const workspace = useLibraryWorkspace({ syncRoute: false, autoLoad: false })
+const workspace = useLibraryWorkspace({
+  syncRoute: false,
+  autoLoad: false,
+  folderFacts: props.folderFacts,
+  mutationPublisher: props.mutationPublisher,
+})
 const initialized = ref(false)
 const failedImages = ref(new Set<number>())
 const isHeaderCollapsed = ref(false)
@@ -704,7 +714,7 @@ async function handleIslandDrop(e: DragEvent) {
 
   const reference = readSearchReferenceTransfer(e.dataTransfer)
   if (!reference) return
-  await saveReferenceToFolder(reference, workspace.selectedFolder.value, true)
+  await saveReferenceToFolder(reference, workspace.selectedFolder.value)
 }
 
 function handlePillDragOver(e: DragEvent, key: string) {
@@ -730,13 +740,12 @@ async function handlePillDrop(e: DragEvent, folder: LibraryFolderTab) {
   const reference = readSearchReferenceTransfer(e.dataTransfer)
   if (!reference) return
 
-  await saveReferenceToFolder(reference, folder.queryKey, false)
+  await saveReferenceToFolder(reference, folder.queryKey)
 }
 
 async function saveReferenceToFolder(
   reference: Parameters<typeof saveSearchReference>[0],
   folderKey: string,
-  reloadAssets: boolean,
 ) {
   const targetFolder = workspace.folders.value.find((folder) => folder.query_key === folderKey)
   const targetFolderId =
@@ -745,14 +754,16 @@ async function saveReferenceToFolder(
       : undefined
 
   try {
-    await saveSearchReference(reference, targetFolderId)
-    const key = libraryAssetKey(reference.provider, reference.id)
-    emit('asset-saved', key)
+    const asset = await saveSearchReference(reference, targetFolderId)
+    await props.mutationPublisher.publishMutation({
+      kind: 'asset-saved',
+      provider: asset.provider,
+      sourceID: asset.source_id,
+      assetKey: libraryAssetKey(asset.provider, asset.source_id),
+      affectedFolderKeys: ['all', folderKey],
+      galleryEffect: 'selection-will-reload',
+    })
     workspace.selectFolder(folderKey)
-    await Promise.all([
-      workspace.loadFolders(),
-      ...(reloadAssets ? [workspace.loadAssets(true)] : []),
-    ])
   } catch (error) {
     toast.error(error instanceof Error ? error.message : '保存素材失败')
   }
@@ -789,16 +800,19 @@ watch(
   { immediate: true },
 )
 
-watch(
-  () => props.refreshKey,
-  () => {
-    if (props.open && initialized.value) {
-      void Promise.all([workspace.loadFolders(), workspace.loadAssets(true)])
-    }
-  },
-)
-
+let unsubscribeMutation = () => {}
 onMounted(() => {
+  unsubscribeMutation = props.mutationPublisher.subscribe((outcome) => {
+    if (
+      !props.open ||
+      !initialized.value ||
+      outcome.galleryEffect !== 'reload-current' ||
+      !outcome.affectedFolderKeys.includes(workspace.selectedFolder.value)
+    ) {
+      return
+    }
+    void workspace.loadAssets(true)
+  })
   document.addEventListener('pointerdown', handleDocumentPointerDown)
   window.addEventListener('keydown', handleKeydown)
   window.addEventListener('resize', handleWindowResize)
@@ -808,6 +822,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('resize', handleWindowResize)
+  unsubscribeMutation()
 })
 </script>
 

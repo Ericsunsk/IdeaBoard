@@ -5,13 +5,13 @@ export const MAX_REFERENCE_COUNT = 4
 export const MAX_REFERENCE_BYTES = 10 * 1024 * 1024
 
 function revokeLocalPreview(reference: VisionReference): void {
-  if (reference.file && reference.previewUrl.startsWith('blob:')) {
+  if (reference.previewUrl.startsWith('blob:')) {
     URL.revokeObjectURL(reference.previewUrl)
   }
 }
 
 export function createVisionReferenceCollection(initial: VisionReference[] = []) {
-  const references = ref<VisionReference[]>(initial)
+  const references = ref<VisionReference[]>(normalizeInitialReferences(initial))
   const pendingKeys = ref(new Set<string>())
   const pendingBytes = new Map<string, number>()
 
@@ -105,6 +105,14 @@ export function createVisionReferenceCollection(initial: VisionReference[] = [])
     pendingBytes.clear()
   }
 
+  function take(): VisionReference[] {
+    const current = references.value
+    references.value = []
+    pendingKeys.value = new Set()
+    pendingBytes.clear()
+    return current
+  }
+
   return {
     references,
     hasPending,
@@ -122,7 +130,24 @@ export function createVisionReferenceCollection(initial: VisionReference[] = [])
     fail,
     remove,
     clear,
+    take,
   }
+}
+
+function normalizeInitialReferences(initial: VisionReference[]): VisionReference[] {
+  const accepted: VisionReference[] = []
+  const keys = new Set<string>()
+  for (const reference of initial) {
+    const acceptedByKey = !keys.has(reference.key) && accepted.length < MAX_REFERENCE_COUNT
+    if (acceptedByKey) {
+      keys.add(reference.key)
+      accepted.push(reference)
+      continue
+    }
+    const previewStillOwned = accepted.some((item) => item.previewUrl === reference.previewUrl)
+    if (!previewStillOwned) revokeLocalPreview(reference)
+  }
+  return accepted
 }
 
 export type VisionReferenceCollection = ReturnType<typeof createVisionReferenceCollection>

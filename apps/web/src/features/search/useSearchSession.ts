@@ -2,63 +2,65 @@ import { computed, ref, watch, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { USER_SEARCH_PATH } from '../../shared/constants/routePaths'
 import { useAppToast } from '../../shared/composables/useAppToast'
-import {
-  libraryAssetKey,
-  saveSearchReference,
-  type LibrarySearchReference,
-} from '../library/libraryResource'
-import {
-  getLibraryIslandState,
-  setLibraryIslandState,
-} from './searchCache'
+import { libraryAssetKey, type LibrarySearchReference } from '../library/libraryResource'
+import { getLibraryIslandState, setLibraryIslandState } from './libraryIslandPersistence'
 import {
   isSearchQueryWithinLimit,
   normalizeSearchQuery,
   type SearchResult,
+  type VisionReference,
 } from './searchResource'
 import { useSearchLightbox } from './useSearchLightbox'
-import { useSearchResults } from './useSearchResults'
-import { useVisionSearchFlow } from './useVisionSearchFlow'
+import { createSearchFeed } from './searchFeed'
+import { useVisionQueryLifecycle } from './useVisionQueryLifecycle'
 import {
   allowAnonymousSearchQuery,
   consumePendingSearchAuthAction,
   peekPendingSearchAuthAction,
   type SearchAuthAction,
 } from './searchAuthContinuation'
+import { type SearchLibraryCoordinator } from './searchLibraryCoordinator'
 
-export function useSearchSession(
-  options: {
-    cacheScope?: string
-    scrollContainer?: Ref<HTMLElement | null>
-    isAuthenticated?: () => boolean
-    requireLogin?: (action: SearchAuthAction) => void
-  } = {},
-) {
-  const route = useRoute()
-  const router = useRouter()
-  const toast = useAppToast()
+export function useSearchSession(options: {
+  libraryCoordinator: SearchLibraryCoordinator
+  cacheScope?: string
+  scrollContainer?: Ref<HTMLElement | null>
+  isAuthenticated?: () => boolean
+  requireLogin?: (action: SearchAuthAction) => void
+  initialVisionReferences?: VisionReference[]
+  route?: ReturnType<typeof useRoute>
+  router?: ReturnType<typeof useRouter>
+  toast?: ReturnType<typeof useAppToast>
+}) {
+  const route = options.route ?? useRoute()
+  const router = options.router ?? useRouter()
+  const toast = options.toast ?? useAppToast()
   const cacheScope = options.cacheScope ?? 'anonymous'
   const isAuthenticated = options.isAuthenticated ?? (() => true)
+  const libraryCoordinator = options.libraryCoordinator
   const draftQuery = ref('')
   const submittedQuery = ref('')
   const queryError = ref('')
   const keepResultsOnNextLoad = ref(false)
-  const feed = useSearchResults({
+  const feed = createSearchFeed({
     submittedQuery,
     keepResultsOnNextLoad,
     cacheScope,
     scrollContainer: options.scrollContainer,
     isAuthenticated,
   })
-  const pendingAction = peekPendingSearchAuthAction()
-  const vision = useVisionSearchFlow({
+  const vision = useVisionQueryLifecycle({
     draftQuery,
     submittedQuery,
     queryError,
     keepResultsOnNextLoad,
-    loadCatalog: () => feed.load(true),
+    loadResults: () => feed.load(true),
+    isAuthenticated,
+    requireLogin: (action) => options.requireLogin?.(action),
     cacheScope,
-    initialReferences: pendingAction?.kind === 'vision-search' ? pendingAction.references : undefined,
+    initialReferences: options.initialVisionReferences,
+    router,
+    toast,
   })
   const lightbox = useSearchLightbox()
   const islandState = getLibraryIslandState(cacheScope)
@@ -66,7 +68,6 @@ export function useSearchSession(
   // for an anonymous Search session. It would immediately issue 401 requests.
   const libraryIslandOpen = ref(isAuthenticated() && islandState.open)
   const libraryIslandExpanded = ref(isAuthenticated() && islandState.expanded)
-  const libraryRefreshKey = ref(0)
   const selectedBatchResults = ref<SearchResult[]>([])
   const heading = computed(() => {
     if (vision.references.value.length > 0) return 'Results for “Visual Concepts”'
@@ -79,7 +80,7 @@ export function useSearchSession(
   }
 
   function clearSearch(): void {
-    vision.clearAllReferences()
+    vision.clearReferences()
     draftQuery.value = ''
     submittedQuery.value = ''
     queryError.value = ''
@@ -131,7 +132,7 @@ export function useSearchSession(
 
   async function applySelectedAsVisionReferences(): Promise<void> {
     const toAdd = selectedBatchResults.value.slice(0, 4)
-    for (const result of toAdd) await vision.handleSearchResultReference(result)
+    await vision.addSearchResults(toAdd)
     if (selectedBatchResults.value.length > 4) {
       toast.info('Added top 4 selected images as vision search references')
     }
@@ -140,9 +141,8 @@ export function useSearchSession(
 
   async function saveReferenceToQuickSaves(reference: LibrarySearchReference): Promise<boolean> {
     try {
-      await saveSearchReference(reference)
+      await libraryCoordinator.saveReference(reference)
       feed.markSavedKey(libraryAssetKey(reference.provider, reference.id))
-      libraryRefreshKey.value += 1
       toast.success(`Saved "${reference.title || 'Image'}" to Quick Saves!`)
       return true
     } catch (error) {
@@ -161,18 +161,16 @@ export function useSearchSession(
       })
       return
     }
+    const outcomes = await libraryCoordinator.saveReferences(items.map(toLibraryReference))
     let successCount = 0
-    let failureCount = 0
-    for (const item of items) {
-      try {
-        await saveSearchReference(toLibraryReference(item))
-        feed.markSavedKey(libraryAssetKey(item.provider, item.id))
-        successCount += 1
-      } catch {
-        failureCount += 1
-      }
+    for (const [index, outcome] of outcomes.entries()) {
+      if (outcome.status !== 'fulfilled') continue
+      const item = items[index]
+      if (!item) continue
+      feed.markSavedKey(libraryAssetKey(item.provider, item.id))
+      successCount += 1
     }
-    libraryRefreshKey.value += 1
+    const failureCount = outcomes.length - successCount
     if (failureCount === 0) {
       toast.success(`Saved ${successCount} assets to Library!`)
     } else if (successCount === 0) {
@@ -183,18 +181,12 @@ export function useSearchSession(
     clearSelection()
   }
 
-  function markResultSaved(result: SearchResult): void {
-    feed.markSaved(result)
-    libraryRefreshKey.value += 1
-  }
-
-  function markResultUnsaved(result: SearchResult): void {
-    feed.markUnsaved(result)
-    libraryRefreshKey.value += 1
-  }
-
   function markAssetSaved(key: string): void {
     feed.markSavedKey(key)
+  }
+
+  function markAssetUnsaved(key: string): void {
+    feed.markUnsavedKey(key)
   }
 
   function closeLibraryIsland(): void {
@@ -218,32 +210,20 @@ export function useSearchSession(
     }
     queryError.value = ''
     if (vision.references.value.length > 0) {
-      if (!isAuthenticated()) {
-        options.requireLogin?.({
-          kind: 'vision-search',
-          references: vision.references.value.map((reference) => ({
-            ...reference,
-            previewUrl: reference.file
-              ? URL.createObjectURL(reference.file)
-              : reference.previewUrl,
-          })),
-          query,
-        })
-        return
-      }
-      await vision.runVisionSearch()
+      await vision.submit()
       return
     }
     if (!isAuthenticated() && !allowAnonymousSearchQuery(query)) {
       options.requireLogin?.({ kind: 'text-search', query })
       return
     }
-    vision.clearVisionExtraction()
+    vision.resetExtraction()
     await router.replace({ path: USER_SEARCH_PATH, query: query ? { q: query } : {} })
   }
 
   watch(draftQuery, (value) => {
-    if (value.trim() !== '' || vision.references.value.length > 0 || submittedQuery.value === '') return
+    if (value.trim() !== '' || vision.references.value.length > 0 || submittedQuery.value === '')
+      return
     submittedQuery.value = ''
     if (route.query.q) {
       void router.replace({ path: USER_SEARCH_PATH, query: {} })
@@ -258,7 +238,7 @@ export function useSearchSession(
 
   watch(feed.results, clearSelection)
 
-  watch(vision.visionError, (message) => {
+  watch(vision.error, (message) => {
     if (message) toast.error(message)
   })
 
@@ -271,10 +251,10 @@ export function useSearchSession(
         const pending = peekPendingSearchAuthAction()
         if (
           isAuthenticated() &&
-          pending?.kind !== 'vision-search' &&
-          vision.visionState.value === 'idle'
+          pending?.kind === 'vision-search' &&
+          vision.state.value === 'idle'
         ) {
-          await vision.runVisionSearch()
+          await vision.resumeAfterAuthentication()
         }
         return
       }
@@ -302,8 +282,8 @@ export function useSearchSession(
     }
 
     if (action.kind === 'vision-search') {
-      if (vision.visionState.value === 'idle') await vision.runVisionSearch()
-      if (vision.visionState.value === 'ready') consumePendingSearchAuthAction()
+      if (vision.state.value === 'idle') await vision.resumeAfterAuthentication()
+      if (vision.state.value === 'ready') consumePendingSearchAuthAction()
       return
     }
 
@@ -321,6 +301,16 @@ export function useSearchSession(
     if (allSaved) consumePendingSearchAuthAction()
   }
 
+  function activate() {
+    lightbox.activate()
+  }
+
+  function dispose() {
+    vision.dispose()
+    lightbox.dispose()
+    feed.dispose()
+  }
+
   return {
     query: {
       draftQuery,
@@ -334,13 +324,11 @@ export function useSearchSession(
     library: {
       open: libraryIslandOpen,
       expanded: libraryIslandExpanded,
-      refreshKey: libraryRefreshKey,
       close: closeLibraryIsland,
       toggle: toggleLibraryIsland,
       saveReferenceToQuickSaves,
-      markResultSaved,
-      markResultUnsaved,
       markAssetSaved,
+      markAssetUnsaved,
     },
     batch: {
       selected: selectedBatchResults,
@@ -354,5 +342,7 @@ export function useSearchSession(
     submitQuery,
     resumePendingAction,
     toLibraryReference,
+    activate,
+    dispose,
   }
 }

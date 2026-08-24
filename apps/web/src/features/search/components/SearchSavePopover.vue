@@ -1,135 +1,129 @@
 <template>
-  <div class="relative shrink-0">
-    <button
-      ref="triggerButtonRef"
-      type="button"
-      class="grid size-[var(--search-overlay-btn-size)] place-items-center rounded-full transition shadow-md focus-visible:outline-none focus-visible:shadow-[var(--shadow-board-focus)] disabled:opacity-60 cursor-pointer"
-      :class="[
-        saved
-          ? 'bg-ib-success text-ib-text-inverse hover:bg-ib-success/90'
-          : 'bg-board-primary text-ib-text-inverse hover:bg-board-primary-hover shadow-board-primary/30',
-      ]"
-      :aria-label="saved ? 'Remove from Library' : 'Save to Library'"
-      :title="saved ? 'Remove from Library' : 'Save to Library Folder'"
-      :disabled="saving"
-      @click.stop="toggle"
-    >
-      <BookmarkSolid v-if="saved" class="size-3.5" />
-      <Plus v-else class="size-3.5 stroke-[2.5]" />
-    </button>
-
-    <Popover
-      ref="popover"
-      :pt="searchSavePopoverPt"
-      @show="handlePopoverShow"
-      @hide="handlePopoverHide"
-    >
-      <div class="w-48 select-none text-board-page-text" @click.stop>
-        <!-- 极简无边框搜索栏 (零下划线) -->
-        <div class="flex items-center gap-2 px-2 py-1.5">
-          <Search class="size-3.5 text-board-page-text-muted shrink-0" aria-hidden="true" />
-          <input
-            ref="searchInputRef"
-            v-model="searchQuery"
-            type="text"
-            placeholder="Save to folder or create..."
-            aria-label="Save to folder or create"
-            class="w-full bg-transparent text-xs text-board-page-text placeholder:text-board-page-text-muted outline-none font-normal"
-            @keydown.enter.prevent="handleEnterCreate"
-          />
-        </div>
-
-        <!-- 动态新建候选行 (输入未匹配时出现) -->
-        <div v-if="canCreateFromQuery" class="my-0.5 px-1">
-          <button
-            type="button"
-            class="flex w-full items-center justify-between rounded-lg bg-board-primary/10 px-2 py-1.5 text-xs font-medium text-board-primary transition hover:bg-board-primary/20 cursor-pointer border-none"
-            :disabled="saving"
-            @click="handleEnterCreate"
-          >
-            <span class="truncate">+ Create "{{ searchQuery.trim() }}"</span>
-            <span class="font-mono text-[10px] text-board-primary">↵</span>
-          </button>
-        </div>
-
-        <!-- 极简灵感夹纯净列表 -->
-        <div class="max-h-48 overflow-y-auto space-y-0.5 pt-1 app-scrollbar">
-          <div
-            v-if="!showQuickSaves && filteredFolders.length === 0 && !canCreateFromQuery"
-            class="py-2.5 text-center text-xs text-board-page-text-muted"
-          >
-            No matching folders
-          </div>
-
-          <!-- 系统默认灵感夹：Quick Saves (真实数据) -->
-          <button
-            v-if="showQuickSaves"
-            type="button"
-            class="group/fitem flex w-full items-center justify-between rounded-lg bg-transparent px-2.5 py-1.5 text-left text-xs text-board-page-text hover:text-board-primary transition hover:bg-ib-surface-hover cursor-pointer border-none disabled:opacity-50"
-            :disabled="saving"
-            @click="saveTo(quickSavesFolder?.id)"
-          >
-            <div class="flex min-w-0 items-center gap-2">
-              <Bookmark class="size-3.5 text-board-primary shrink-0" aria-hidden="true" />
-              <span class="truncate font-medium">Quick Saves</span>
-            </div>
-            <span class="text-[11px] text-board-page-text-muted font-sans shrink-0">{{
-              quickSavesCount
-            }}</span>
-          </button>
-
-          <!-- 用户真实自定义灵感夹列表 -->
-          <button
-            v-for="folder in filteredFolders"
-            :key="folder.id"
-            type="button"
-            class="group/fitem flex w-full items-center justify-between rounded-lg bg-transparent px-2.5 py-1.5 text-left text-xs text-board-page-text hover:text-board-primary transition hover:bg-ib-surface-hover cursor-pointer border-none disabled:opacity-50"
-            :disabled="saving"
-            @click="saveTo(folder.id)"
-          >
-            <div class="flex min-w-0 items-center gap-2">
-              <Folder
-                class="size-3.5 text-board-page-text-muted group-hover/fitem:text-board-primary shrink-0 transition-colors"
-                aria-hidden="true"
-              />
-              <span class="truncate font-medium">{{ folder.name }}</span>
-            </div>
-            <span class="text-[11px] text-board-page-text-muted font-sans shrink-0">{{
-              folder.asset_count
-            }}</span>
-          </button>
-        </div>
+  <Popover
+    ref="popover"
+    :pt="searchSavePopoverPt"
+    @show="handlePopoverShow"
+    @hide="handlePopoverHide"
+  >
+    <div class="w-48 select-none text-board-page-text" @click.stop>
+      <div class="flex items-center gap-2 px-2 py-1.5">
+        <Search class="size-3.5 shrink-0 text-board-page-text-muted" aria-hidden="true" />
+        <input
+          ref="searchInputRef"
+          v-model="searchQuery"
+          type="text"
+          placeholder="Save to folder or create..."
+          aria-label="Save to folder or create"
+          class="w-full bg-transparent text-xs font-normal text-board-page-text placeholder:text-board-page-text-muted outline-none"
+          @keydown.enter.prevent="handleEnterCreate"
+        />
       </div>
-    </Popover>
-  </div>
+
+      <div v-if="folderFactsReady && canCreateFromQuery" class="my-0.5 px-1">
+        <button
+          type="button"
+          class="flex w-full cursor-pointer items-center justify-between rounded-lg border-none bg-board-primary/10 px-2 py-1.5 text-xs font-medium text-board-primary transition hover:bg-board-primary/20"
+          :disabled="saving || !folderFactsReady"
+          @click="handleEnterCreate"
+        >
+          <span class="truncate">+ Create "{{ searchQuery.trim() }}"</span>
+          <span class="font-mono text-[10px] text-board-primary">↵</span>
+        </button>
+      </div>
+
+      <div class="app-scrollbar max-h-48 space-y-0.5 overflow-y-auto pt-1">
+        <div
+          v-if="folderFactsReady && !showQuickSaves && filteredFolders.length === 0 && !canCreateFromQuery"
+          class="py-2.5 text-center text-xs text-board-page-text-muted"
+        >
+          No matching folders
+        </div>
+
+        <button
+          v-if="showQuickSaves"
+          type="button"
+          class="group/fitem flex w-full cursor-pointer items-center justify-between rounded-lg border-none bg-transparent px-2.5 py-1.5 text-left text-xs text-board-page-text transition hover:bg-ib-surface-hover hover:text-board-primary disabled:opacity-50"
+          :disabled="saving || !folderFactsReady"
+          @click="saveTo(quickSavesFolder?.id)"
+        >
+          <div class="flex min-w-0 items-center gap-2">
+            <Bookmark class="size-3.5 shrink-0 text-board-primary" aria-hidden="true" />
+            <span class="truncate font-medium">Quick Saves</span>
+          </div>
+          <span class="shrink-0 font-sans text-[11px] text-board-page-text-muted">{{
+            quickSavesCount
+          }}</span>
+        </button>
+
+        <button
+          v-for="folder in filteredFolders"
+          :key="folder.id"
+          type="button"
+          class="group/fitem flex w-full cursor-pointer items-center justify-between rounded-lg border-none bg-transparent px-2.5 py-1.5 text-left text-xs text-board-page-text transition hover:bg-ib-surface-hover hover:text-board-primary disabled:opacity-50"
+          :disabled="saving || !folderFactsReady"
+          @click="saveTo(folder.id)"
+        >
+          <div class="flex min-w-0 items-center gap-2">
+            <Folder
+              class="size-3.5 shrink-0 text-board-page-text-muted transition-colors group-hover/fitem:text-board-primary"
+              aria-hidden="true"
+            />
+            <span class="truncate font-medium">{{ folder.name }}</span>
+          </div>
+          <span class="shrink-0 font-sans text-[11px] text-board-page-text-muted">{{
+            folder.asset_count
+          }}</span>
+        </button>
+      </div>
+    </div>
+  </Popover>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, shallowRef } from 'vue'
 import Popover from 'primevue/popover'
-import { Bookmark, BookmarkSolid, Folder, Plus, Search } from '@iconoir/vue'
+import { Bookmark, Folder, Search } from '@iconoir/vue'
 import type { SearchResult } from '../searchResource'
-import {
-  getLibraryFolders,
-  removeSearchReference,
-  saveSearchReference,
-  type LibraryFolderView,
-} from '../../library/libraryResource'
 import { useAppToast } from '../../../shared/composables/useAppToast'
 import { createPopoverMotionPt } from '../../../shared/motion/popoverMotion'
 import type { PopoverPassThroughOptions } from 'primevue/popover'
+import { useSearchLibraryCoordinator } from '../searchLibraryCoordinator'
 
-const props = defineProps<{ result: SearchResult; saved?: boolean; authenticated?: boolean }>()
-const emit = defineEmits<{ saved: []; unsaved: []; 'auth-required': [] }>()
+export type SearchSavePopoverRequest = {
+  result: SearchResult
+  saved: boolean
+  authenticated: boolean
+}
+
+export type SearchSavePopoverController = {
+  toggle: (event: Event, request: SearchSavePopoverRequest) => void
+  hide: () => void
+}
+
+type OpenRequest = SearchSavePopoverRequest & { event: Event; anchor: HTMLElement }
+type PrimePopover = {
+  show: (event: Event, target?: HTMLElement) => void
+  hide: () => void
+  $el?: HTMLElement
+  container?: HTMLElement
+}
+
+const emit = defineEmits<{
+  'auth-required': [result: SearchResult]
+  'anchor-changed': [anchor: HTMLElement | null]
+}>()
 
 const toast = useAppToast()
-const popover = ref<InstanceType<typeof Popover>>()
-const triggerButtonRef = ref<HTMLButtonElement>()
+const popover = ref<PrimePopover | null>(null)
 const searchInputRef = ref<HTMLInputElement>()
-const folders = ref<LibraryFolderView[]>([])
+const activeRequest = shallowRef<OpenRequest | null>(null)
 const saving = ref(false)
 const searchQuery = ref('')
-let foldersRefresh: Promise<void> | null = null
+const isOpenOrOpening = ref(false)
+const folderFactsReady = ref(false)
+const library = useSearchLibraryCoordinator()
+const { folders } = library.folderFacts
+let pendingOpen: OpenRequest | null = null
 
 const searchSavePopoverPt = {
   ...createPopoverMotionPt(),
@@ -140,90 +134,83 @@ const searchSavePopoverPt = {
   content: { class: '!p-0' },
 } satisfies PopoverPassThroughOptions
 
-const quickSavesFolder = computed(() => {
-  return folders.value.find((f) => f.name.toLowerCase() === 'quick saves' || f.is_default)
+const quickSavesFolder = computed(() =>
+  folders.value.find((folder) => folder.name.toLowerCase() === 'quick saves' || folder.is_default),
+)
+const quickSavesCount = computed(() => quickSavesFolder.value?.asset_count ?? 0)
+const displayFolders = computed(() =>
+  folders.value.filter(
+    (folder) =>
+      !folder.is_system &&
+      !folder.is_default &&
+      folder.name.toLowerCase() !== 'all assets' &&
+      folder.name.toLowerCase() !== 'quick saves',
+  ),
+)
+const showQuickSaves = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase()
+  return !query || 'quick saves'.includes(query)
 })
-
-const quickSavesCount = computed(() => {
-  return quickSavesFolder.value ? quickSavesFolder.value.asset_count : 0
+const filteredFolders = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase()
+  return query
+    ? displayFolders.value.filter((folder) => folder.name.toLowerCase().includes(query))
+    : displayFolders.value
 })
-
-const displayFolders = computed(() => {
-  return folders.value.filter(
-    (f) =>
-      !f.is_system &&
-      !f.is_default &&
-      f.name.toLowerCase() !== 'all assets' &&
-      f.name.toLowerCase() !== 'quick saves',
+const canCreateFromQuery = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase()
+  return Boolean(
+    query &&
+    query !== 'quick saves' &&
+    query !== 'all assets' &&
+    !displayFolders.value.some((folder) => folder.name.toLowerCase() === query),
   )
 })
 
-const showQuickSaves = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return true
-  return 'quick saves'.includes(q)
-})
-
-const filteredFolders = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return displayFolders.value
-  return displayFolders.value.filter((f) => f.name.toLowerCase().includes(q))
-})
-
-const canCreateFromQuery = computed(() => {
-  const q = searchQuery.value.trim().toLowerCase()
-  if (!q) return false
-  if (q === 'quick saves' || q === 'all assets') return false
-  return !displayFolders.value.some((f) => f.name.toLowerCase() === q)
-})
-
-async function refreshFolders() {
-  if (foldersRefresh) return foldersRefresh
-  const request = (async () => {
-    try {
-      folders.value = await getLibraryFolders()
-    } catch (error) {
-      if (import.meta.env.DEV) console.debug('Failed to load library folders', error)
-    }
-  })()
-  foldersRefresh = request
-  await request
-  foldersRefresh = null
+async function loadFolders(): Promise<boolean> {
+  const snapshot = await library.folderFacts.load()
+  if (snapshot.status === 'current') {
+    folderFactsReady.value = true
+    return true
+  }
+  folderFactsReady.value = false
+  if (snapshot.status === 'error') toast.error('Unable to load Library folders. Please try again.')
+  return false
 }
 
 function positionPopoverAbove() {
-  const btn = triggerButtonRef.value
-  const pop =
-    (popover.value as unknown as { $el?: HTMLElement; container?: HTMLElement })?.$el ||
-    (popover.value as unknown as { $el?: HTMLElement; container?: HTMLElement })?.container
-  if (!btn || !pop) return
-  const rect = btn.getBoundingClientRect()
-  const popWidth = pop.offsetWidth || 192
-  const popHeight = pop.offsetHeight || 220
-
-  // 气泡右边缘精准对齐加号按钮右侧向左展开 (完整收在卡片内)
-  let left = rect.right - popWidth
-  if (left < 16) left = 16
-  if (left + popWidth > window.innerWidth - 16) {
-    left = window.innerWidth - popWidth - 16
-  }
-
-  // 气泡底边缘精准吸附在加号按钮正上方 (8px 黄金间距)
-  let top = rect.top - popHeight - 8
-  if (top < 70) {
-    top = rect.bottom + 8
-  }
-
-  pop.style.setProperty('left', `${left}px`, 'important')
-  pop.style.setProperty('top', `${top}px`, 'important')
+  const anchor = activeRequest.value?.anchor
+  const element = popover.value?.$el || popover.value?.container
+  if (!anchor || !anchor.isConnected || !element) return
+  const rect = anchor.getBoundingClientRect()
+  const popoverWidth = element.offsetWidth || 192
+  const popoverHeight = element.offsetHeight || 220
+  let left = Math.max(16, rect.right - popoverWidth)
+  if (left + popoverWidth > window.innerWidth - 16) left = window.innerWidth - popoverWidth - 16
+  const top = rect.top - popoverHeight - 8 < 70 ? rect.bottom + 8 : rect.top - popoverHeight - 8
+  element.style.setProperty('left', `${left}px`, 'important')
+  element.style.setProperty('top', `${top}px`, 'important')
 }
 
-async function handleUnsave() {
+function show(request: OpenRequest) {
+  if (!request.anchor.isConnected) return
+  activeRequest.value = request
+  isOpenOrOpening.value = true
+  folderFactsReady.value = false
+  emit('anchor-changed', request.anchor)
+  popover.value?.show(request.event, request.anchor)
+  void loadFolders()
+  void nextTick(() => {
+    positionPopoverAbove()
+    requestAnimationFrame(positionPopoverAbove)
+  })
+}
+
+async function handleUnsave(request: SearchSavePopoverRequest) {
   if (saving.value) return
   saving.value = true
   try {
-    await removeSearchReference(props.result.provider, props.result.id)
-    emit('unsaved')
+    await library.removeReference(request.result.provider, request.result.id)
     toast.success('Removed from your Library')
   } catch (error) {
     toast.error(error instanceof Error ? error.message : '移除素材失败')
@@ -232,23 +219,34 @@ async function handleUnsave() {
   }
 }
 
-function toggle(event: Event) {
-  if (props.authenticated === false) {
-    emit('auth-required')
+function toggle(event: Event, request: SearchSavePopoverRequest) {
+  if (saving.value) return
+  if (!request.authenticated) {
+    emit('auth-required', request.result)
     return
   }
-  if (props.saved) {
-    void handleUnsave()
+  if (request.saved) {
+    void handleUnsave(request)
     return
   }
-  const target =
-    triggerButtonRef.value || (event.currentTarget as HTMLElement) || (event.target as HTMLElement)
-  popover.value?.toggle(event, target)
-  void refreshFolders()
-  void nextTick(() => {
-    positionPopoverAbove()
-    requestAnimationFrame(positionPopoverAbove)
-  })
+
+  const anchor = event.currentTarget as HTMLElement | null
+  if (!anchor) return
+  const nextRequest: OpenRequest = { ...request, event, anchor }
+  const activeKey =
+    activeRequest.value && `${activeRequest.value.result.provider}:${activeRequest.value.result.id}`
+  const nextKey = `${request.result.provider}:${request.result.id}`
+  if (isOpenOrOpening.value) {
+    if (activeKey === nextKey) {
+      pendingOpen = null
+      popover.value?.hide()
+      return
+    }
+    pendingOpen = nextRequest
+    popover.value?.hide()
+    return
+  }
+  show(nextRequest)
 }
 
 function handlePopoverShow() {
@@ -261,18 +259,27 @@ function handlePopoverShow() {
 
 function handlePopoverHide() {
   searchQuery.value = ''
+  isOpenOrOpening.value = false
+  const nextRequest = pendingOpen
+  pendingOpen = null
+  activeRequest.value = null
+  if (nextRequest) {
+    void nextTick(() => show(nextRequest))
+    return
+  }
+  emit('anchor-changed', null)
 }
 
 async function persist(folderId?: number, newFolderName?: string) {
+  const request = activeRequest.value
+  if (!request || saving.value) return
   saving.value = true
   try {
-    await saveSearchReference(props.result, folderId, newFolderName)
-    emit('saved')
+    await library.saveReference(request.result, folderId, newFolderName)
     popover.value?.hide()
     const targetName =
-      newFolderName || folders.value.find((f) => f.id === folderId)?.name || 'Quick Saves'
+      newFolderName || folders.value.find((folder) => folder.id === folderId)?.name || 'Quick Saves'
     toast.success(`Saved to "${targetName}" in your Personal Library!`)
-    void refreshFolders()
   } catch (error) {
     toast.error(error instanceof Error ? error.message : '保存素材失败')
   } finally {
@@ -280,31 +287,23 @@ async function persist(folderId?: number, newFolderName?: string) {
   }
 }
 
-function saveTo(folderId?: number) {
+async function saveTo(folderId?: number) {
+  if (!folderFactsReady.value && !(await loadFolders())) return
   void persist(folderId)
 }
 
 async function handleEnterCreate() {
   const name = searchQuery.value.trim()
   const normalizedName = name.toLowerCase()
-  if (!normalizedName || saving.value) return
-  if (normalizedName === 'all assets') return
-
-  await refreshFolders()
-
-  if (normalizedName === 'quick saves') {
-    saveTo(quickSavesFolder.value?.id)
-    return
-  }
-
+  if (!normalizedName || saving.value || normalizedName === 'all assets') return
+  if (!(await loadFolders())) return
+  if (normalizedName === 'quick saves') return saveTo(quickSavesFolder.value?.id)
   const existingFolder = displayFolders.value.find(
     (folder) => folder.name.toLowerCase() === normalizedName,
   )
-  if (existingFolder) {
-    saveTo(existingFolder.id)
-    return
-  }
-
+  if (existingFolder) return saveTo(existingFolder.id)
   if (canCreateFromQuery.value) void persist(undefined, name)
 }
+
+defineExpose({ toggle, hide: () => popover.value?.hide() })
 </script>

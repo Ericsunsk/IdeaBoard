@@ -1,10 +1,10 @@
-import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { computed, onScopeDispose, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppToast } from '../../shared/composables/useAppToast'
 import {
   createFolder,
   getLibraryAssets,
-  getLibraryFolders,
+  libraryAssetKey,
   moveAsset,
   removeAsset,
   removeFolder,
@@ -12,6 +12,12 @@ import {
   type LibraryAssetView,
   type LibraryFolderView,
 } from './libraryResource'
+import {
+  createLibraryFolderFacts,
+  createLibraryMutationPublisher,
+  type LibraryFolderFacts,
+  type LibraryMutationPublisher,
+} from './libraryFolderFacts'
 
 export type LibraryFolderTab = {
   queryKey: string
@@ -24,6 +30,8 @@ export type LibraryWorkspaceOptions = {
   syncRoute?: boolean
   autoLoad?: boolean
   initialFolder?: string
+  folderFacts?: LibraryFolderFacts
+  mutationPublisher?: LibraryMutationPublisher
 }
 
 function normalizeFolderQuery(value: unknown): string {
@@ -34,12 +42,12 @@ function normalizeFolderQuery(value: unknown): string {
 }
 
 export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
-  folders: Ref<LibraryFolderView[]>
+  folders: Readonly<Ref<LibraryFolderView[]>>
   folderTabs: ComputedRef<LibraryFolderTab[]>
   assets: Ref<LibraryAssetView[]>
   selectedFolder: Ref<string>
   loading: Ref<boolean>
-  foldersLoading: Ref<boolean>
+  foldersLoading: Readonly<Ref<boolean>>
   errorMessage: Ref<string>
   hasMore: Ref<boolean>
   activeAsset: Ref<LibraryAssetView | null>
@@ -60,16 +68,17 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
   const syncRoute = options.syncRoute ?? true
   const autoLoad = options.autoLoad ?? true
   const toast = useAppToast()
-  const folders = ref<LibraryFolderView[]>([])
+  const ownedFolderFacts = !options.folderFacts
+  const folderFacts = options.folderFacts ?? createLibraryFolderFacts()
+  const mutationPublisher = options.mutationPublisher ?? createLibraryMutationPublisher(folderFacts)
+  const folders = folderFacts.folders
   const assets = ref<LibraryAssetView[]>([])
   const loading = ref(true)
-  const foldersLoading = ref(true)
   const errorMessage = ref('')
   const nextCursor = ref('')
   const hasMore = ref(false)
   const activeAsset = ref<LibraryAssetView | null>(null)
   let assetRequestID = 0
-  let folderRequestID = 0
   const selectedFolder = ref(
     normalizeFolderQuery(syncRoute ? route.query.folder : options.initialFolder),
   )
@@ -132,18 +141,9 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
   }
 
   async function loadFolders() {
-    const requestID = ++folderRequestID
-    foldersLoading.value = true
-    try {
-      const nextFolders = await getLibraryFolders()
-      if (requestID === folderRequestID) folders.value = nextFolders
-    } catch (error) {
-      if (requestID === folderRequestID) {
-        errorMessage.value = error instanceof Error ? error.message : '加载收藏夹失败'
-      }
-    } finally {
-      if (requestID === folderRequestID) foldersLoading.value = false
-    }
+    errorMessage.value = ''
+    const result = await folderFacts.load()
+    if (result.status === 'error') errorMessage.value = result.error.message
   }
 
   function selectFolder(key: string) {
@@ -154,7 +154,11 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
 
   async function createNewFolder(name: string) {
     const folder = await createFolder(name)
-    folders.value = [...folders.value, folder]
+    await mutationPublisher.publishMutation({
+      kind: 'folder-created',
+      affectedFolderKeys: [folder.query_key],
+      galleryEffect: 'selection-will-reload',
+    })
     selectFolder(folder.query_key)
     toast.success('Folder created')
   }
@@ -163,7 +167,11 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
     const folder = folders.value.find((item) => item.query_key === key)
     if (!folder || folder.is_system || folder.is_virtual) return
     const updated = await renameFolder(folder.id, name)
-    folders.value = folders.value.map((item) => (item.id === updated.id ? updated : item))
+    await mutationPublisher.publishMutation({
+      kind: 'folder-renamed',
+      affectedFolderKeys: [updated.query_key],
+      galleryEffect: 'none',
+    })
     toast.success('Folder renamed')
   }
 
@@ -172,7 +180,12 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
     if (!folder || folder.is_system || folder.is_virtual) return false
     try {
       await removeFolder(folder.id)
-      await loadFolders()
+      const selectedFolderWasDeleted = selectedFolder.value === key
+      await mutationPublisher.publishMutation({
+        kind: 'folder-deleted',
+        affectedFolderKeys: [key],
+        galleryEffect: selectedFolderWasDeleted ? 'selection-will-reload' : 'none',
+      })
       if (selectedFolder.value === key) selectFolder('quick-saves')
       toast.success('Folder deleted')
       return true
@@ -192,7 +205,11 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
       } else {
         assets.value = assets.value.map((item) => (item.id === updated.id ? updated : item))
       }
-      await loadFolders()
+      await mutationPublisher.publishMutation({
+        kind: 'asset-moved',
+        affectedFolderKeys: ['all', String(asset.folder_id), folderKey],
+        galleryEffect: 'none',
+      })
       toast.success('Asset moved')
       return true
     } catch (error) {
@@ -205,7 +222,14 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
     try {
       await removeAsset(asset.id)
       assets.value = assets.value.filter((item) => item.id !== asset.id)
-      await loadFolders()
+      await mutationPublisher.publishMutation({
+        kind: 'asset-removed',
+        provider: asset.provider,
+        sourceID: asset.source_id,
+        assetKey: libraryAssetKey(asset.provider, asset.source_id),
+        affectedFolderKeys: ['all', String(asset.folder_id)],
+        galleryEffect: 'none',
+      })
       toast.success('Removed from Library')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '移除素材失败')
@@ -236,13 +260,15 @@ export function useLibraryWorkspace(options: LibraryWorkspaceOptions = {}): {
 
   if (autoLoad) void initialize()
 
+  if (ownedFolderFacts) onScopeDispose(folderFacts.dispose)
+
   return {
     folders,
     folderTabs,
     assets,
     selectedFolder,
     loading,
-    foldersLoading,
+    foldersLoading: folderFacts.loading,
     errorMessage,
     hasMore,
     activeAsset,
