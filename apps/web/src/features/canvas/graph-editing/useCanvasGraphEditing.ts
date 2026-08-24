@@ -5,12 +5,10 @@ import type { CanvasFeedback } from '../feedback/useCanvasFeedback'
 import type { CanvasVueFlowGraphAdapter } from '../vue-flow-adapter/useCanvasVueFlowGraphAdapter'
 import type { CanvasGraphStore } from '../graph-runtime'
 import { useFlowCanvasDrop } from './useFlowCanvasDrop'
-import { useFlowCanvasNodeHandlers } from './useFlowCanvasNodeHandlers'
 import { useFlowImageNodeSnapshots } from './useFlowImageNodeSnapshots'
 import { useFlowImageUploadActions } from './useFlowImageUploadActions'
 import { useFlowMediaInputImages } from './useFlowMediaInputImages'
 import { useFlowNodeInternalsRefreshQueue } from '../vue-flow-adapter/useFlowNodeInternalsRefreshQueue'
-import { useFlowNodeMediaInputs } from './useFlowNodeMediaInputs'
 import { useFlowNodeMutations } from './useFlowNodeMutations'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 import type { CanvasGraphEditingBrowserAdapter } from './browserAdapter'
@@ -19,6 +17,7 @@ import type { CanvasBoardAttachment } from '../board-attachment'
 import type { LibraryAssetMaterializer } from '../../library/libraryResource'
 import type { FlowLocalUploadState, FlowNodeData } from '../types/flowTypes'
 import { createFlowGraphCommandOptions } from '../vue-flow-adapter/flowGraphAdapterCommandSideEffects'
+import { createCanvasGraphEditingNodeRuntime } from './createCanvasGraphEditingNodeRuntime'
 
 type ValueRef<T> = { readonly value: T }
 type SnapshotNodeMutator = (snapshotNode: CanvasNodeItem) => CanvasNodeItem
@@ -181,34 +180,17 @@ export function useCanvasGraphEditing(options: UseCanvasGraphEditingOptions) {
   function createNodeInteractions(
     interactionOptions: CanvasGraphEditingNodeInteractionsOptions,
   ): CanvasGraphEditingNodeInteractions {
-    async function applyImageFile(nodeId: string, file: File) {
-      const updated = await applyImageFileToImageNode(nodeId, file)
-      if (updated) interactionOptions.discardNodeEdits(nodeId)
-      return updated
-    }
-
-    const media = useFlowNodeMediaInputs({
-      pickImageFile: options.browser.pickImageFile,
-      readDroppedFile: options.browser.readDroppedFile,
-      applyImageFileToImageNode: applyImageFile,
+    return createCanvasGraphEditingNodeRuntime({
+      browser: options.browser,
+      applyImageFileToImageNode,
       updateSnapshotNode,
       markFlowExecutionNodeDirty: nodeMutations.markFlowExecutionNodeDirty,
-    })
-    const handlers = useFlowCanvasNodeHandlers({
-      dismissTransientCanvasUi: interactionOptions.dismissTransientCanvasUi,
-      discardFlowImageToolNodeEdits: interactionOptions.discardNodeEdits,
       deleteNode: options.deleteNode,
       updatePromptText: nodeMutations.onFlowPromptTextUpdate,
       updateNodeParams: nodeMutations.onFlowNodeParamUpdate,
-      resetImage: media.onFlowImageReset,
-      markFlowExecutionNodeDirty: nodeMutations.markFlowExecutionNodeDirty,
+      dismissTransientCanvasUi: interactionOptions.dismissTransientCanvasUi,
+      discardNodeEdits: interactionOptions.discardNodeEdits,
     })
-
-    return {
-      ...handlers,
-      onFlowImageOpenFile: media.onFlowImageOpenFile,
-      onFlowImageStageDrop: media.onFlowImageStageDrop,
-    }
   }
 
   return {
