@@ -157,12 +157,6 @@ const selectorAllowances: Record<string, CountAllowance<SelectorCountRuleId>> = 
     },
     reason: 'Central adapter skin owns Vue Flow vendor DOM styling.',
   },
-  'src/features/canvas/screen-presentation/CanvasScreen.vue': {
-    counts: {
-      'global-selector': 2,
-    },
-    reason: 'Canvas route toggles html/body overscroll guard during direct manipulation.',
-  },
 }
 
 async function listSourceFiles(dir: string, baseDir = dir): Promise<SourceFile[]> {

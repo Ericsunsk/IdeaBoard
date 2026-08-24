@@ -461,12 +461,6 @@ useCanvasScreenLifecycle({
 </script>
 
 <style scoped>
-:global(html.canvas-overscroll-guard),
-:global(body.canvas-overscroll-guard) {
-  overscroll-behavior: none;
-  overscroll-behavior-x: none;
-}
-
 .canvas-layout {
   width: 100%;
   height: 100vh;

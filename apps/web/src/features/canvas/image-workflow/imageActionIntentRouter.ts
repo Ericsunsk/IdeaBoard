@@ -15,7 +15,7 @@ import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations
 import {
   ACTIVE_NODE_PANEL_KIND,
   type ActiveNodePanel,
-} from '../screen-presentation/useFlowActiveNodePanels'
+} from '../workspace-ui/useFlowActiveNodePanels'
 import type { ImageEditorMode } from '../image-editor'
 
 type FusionPromptParamPatch = Extract<

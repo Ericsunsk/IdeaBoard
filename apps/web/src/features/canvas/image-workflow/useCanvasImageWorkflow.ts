@@ -1,6 +1,6 @@
 import type { ComputedRef, Ref } from 'vue'
 import type { PromptAspectRatio } from '../../canvas-board/domain'
-import type { ActiveNodePanel, ActiveNodePanelKind } from '../screen-presentation/useFlowActiveNodePanels'
+import type { ActiveNodePanel, ActiveNodePanelKind } from '../workspace-ui/useFlowActiveNodePanels'
 import type { CanvasExtendDragAnchor } from './useImageCanvasExtendOverlay'
 import { useImageCanvasExtendOverlay } from './useImageCanvasExtendOverlay'
 import type { CanvasFeedback } from '../feedback/useCanvasFeedback'

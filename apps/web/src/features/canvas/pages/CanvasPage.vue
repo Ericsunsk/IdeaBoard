@@ -11,7 +11,7 @@
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../../auth/session/authSession'
 import { useLogoutRedirect } from '../../../shared/composables/useLogoutRedirect'
-import { CanvasScreen } from '../screen-presentation'
+import { CanvasScreen } from '../workspace-ui'
 
 const route = useRoute()
 const router = useRouter()

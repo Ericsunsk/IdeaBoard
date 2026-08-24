@@ -1,7 +1,7 @@
 import { tryOnScopeDispose, useEventListener } from '@vueuse/core'
 import { computed, ref, watch, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
-import type { CanvasInteractionKey } from '../screen-presentation/useFlowCanvasInteractionState'
+import type { CanvasInteractionKey } from '../workspace-ui/useFlowCanvasInteractionState'
 import {
   containImageRect,
   createCanvasExtendRect,

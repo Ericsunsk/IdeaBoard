@@ -7,14 +7,14 @@ import { describe, expect, it } from 'vitest'
 const canvasRoot = resolve(process.cwd(), 'src/features/canvas')
 const readSource = (relativePath: string) => readFileSync(resolve(canvasRoot, relativePath), 'utf8')
 
-const canvasScreen = readSource('screen-presentation/CanvasScreen.vue')
-const screenIndex = readSource('screen-presentation/index.ts')
-const screenLifecycle = readSource('screen-presentation/internal/useCanvasScreenLifecycle.ts')
+const canvasScreen = readSource('workspace-ui/CanvasScreen.vue')
+const screenIndex = readSource('workspace-ui/index.ts')
+const screenLifecycle = readSource('workspace-ui/internal/useCanvasScreenLifecycle.ts')
 const runtimeParts = readSource('workspace-runtime/internal/createCanvasWorkspaceRuntimeParts.ts')
 const imageWorkflow = readSource('image-workflow/useCanvasImageWorkflow.ts')
 
 describe('Canvas Screen architecture contract', () => {
-  it('keeps CanvasScreen as the sole public screen-presentation seam', () => {
+  it('keeps CanvasScreen as the sole public workspace-ui seam', () => {
     expect(screenIndex.trim()).toBe("export { default as CanvasScreen } from './CanvasScreen.vue'")
     expect(screenIndex).not.toContain('./internal/')
   })

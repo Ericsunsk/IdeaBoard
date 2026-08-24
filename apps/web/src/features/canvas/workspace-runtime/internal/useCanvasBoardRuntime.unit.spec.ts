@@ -15,7 +15,7 @@ vi.mock('../../board-session', () => ({
   useCanvasBoardSession: mocks.useCanvasBoardSession,
 }))
 
-vi.mock('../../canvas-chrome/useFlowBoardHeaderActions', () => ({
+vi.mock('../../workspace-chrome/useFlowBoardHeaderActions', () => ({
   useFlowBoardHeaderActions: mocks.useFlowBoardHeaderActions,
 }))
 

@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 const sourceRoot = resolve(process.cwd(), 'src/features/canvas')
 const readSource = (relativePath: string) => readFileSync(resolve(sourceRoot, relativePath), 'utf8')
 
-const canvasScreen = readSource('screen-presentation/CanvasScreen.vue')
+const canvasScreen = readSource('workspace-ui/CanvasScreen.vue')
 const surfaceSkin = readSource('components/styles/canvas-surface-skin.css')
 const appStyle = readSource('../../app/style.css')
 const chromeSkin = readSource('components/styles/canvas-chrome.css')
@@ -33,6 +33,7 @@ describe('Canvas surface skin contract', () => {
     expect(canvasScreen).not.toMatch(/--canvas-[a-z0-9-]+\s*:/)
     expect(canvasScreen).not.toMatch(/--flow-[a-z0-9-]+\s*:/)
     expect(surfaceSkin).toContain('.canvas-surface-skin')
+    expect(surfaceSkin).toContain('html.canvas-overscroll-guard')
   })
 
   it('maps Canvas surface semantics to app tokens while keeping the named Canvas contract stable', () => {

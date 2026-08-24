@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 import { useVueFlow, type EdgeChange, type Elements } from '@vue-flow/core'
-import type { DismissTransientCanvasUi } from '../screen-presentation/useFlowTransientUiDismissal'
+import type { DismissTransientCanvasUi } from '../workspace-ui/useFlowTransientUiDismissal'
 
 type UseVueFlowSelectionAdapterOptions = {
   activeTool: Ref<string>

@@ -1,4 +1,4 @@
-import type { DismissTransientCanvasUi } from '../screen-presentation/useFlowTransientUiDismissal'
+import type { DismissTransientCanvasUi } from '../workspace-ui/useFlowTransientUiDismissal'
 import type { FlowSnapshotParamPatch } from '../utils/flowSnapshotParamMutations'
 
 type UseFlowCanvasNodeHandlersOptions = {

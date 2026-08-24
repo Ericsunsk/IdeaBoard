@@ -3,6 +3,12 @@
  * Canvas Chrome, nodes, Vue Flow, Image Editing, Image Mask Editing, and the
  * minimap consume its named variables without depending on Screen CSS.
  */
+html.canvas-overscroll-guard,
+body.canvas-overscroll-guard {
+  overscroll-behavior: none;
+  overscroll-behavior-x: none;
+}
+
 .canvas-surface-skin {
   /* ── Canvas Geometry & Sizing Tokens ── */
   --canvas-control-border-width: 1px;
