@@ -4,7 +4,6 @@ import { useCanvasGraphHistory } from './useCanvasGraphHistory'
 import {
   useCanvasBoardAutosave,
   useCanvasBoardPersistence,
-  type CanvasGraphSnapshotReplaceReason,
   type SaveStatus,
 } from '../board-session'
 import {
@@ -12,43 +11,24 @@ import {
   type CanvasVueFlowGraphActions,
   type CanvasVueFlowGraphAdapter,
 } from './useCanvasVueFlowGraphAdapter'
+import {
+  createCanvasGraphSessionRuntime,
+  type CanvasGraphSessionRuntime,
+} from './canvasGraphSessionRuntime'
 import { createFlowGraphCommandOptions } from './flowGraphAdapterCommandSideEffects'
 import { useCanvasGroupRuntime } from './useCanvasGroupRuntime'
-import { bindCanvasGraphSessionProjection } from './bindCanvasGraphSessionProjection'
 import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
 import type { CanvasBoardSession } from '../board-session'
-import { canvasBoardSnapshotToFlow } from '../utils/flowSnapshotAdapter'
-import { CanvasGraphSession, type CanvasGraphStore } from '../graph-runtime'
 import {
   createCanvasDeleteCommandLifecycle,
   createCanvasNodeDragLifecycle,
   type CanvasNodeDragLifecycle,
 } from '../flow-pane'
 import {
-  CanvasBoardGraphSession,
-  collectPendingImageTasks,
   projectPendingImageExecutionEdges,
   type PendingImageExecutionCore,
   type PendingImageExecutionLease,
 } from '../execution/pending-execution'
-
-type SelectableFlowItem = {
-  id: string
-  selected?: boolean
-}
-
-type FlowGraphCommitOptions = {
-  source: 'hydrate-replace' | 'save-reconcile'
-}
-
-function createFlowEdgeEndpointKey(edge: Edge): string {
-  return JSON.stringify([
-    edge.source,
-    edge.sourceHandle ?? null,
-    edge.target,
-    edge.targetHandle ?? null,
-  ])
-}
 
 export type UseFlowCanvasRuntimeOptions = {
   nodes: Ref<Node[]>
@@ -75,8 +55,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   const renderNodes = options.nodes
   const renderEdgesRef = options.edges
   const localEditVersion = ref(0)
-  let graphSession: CanvasGraphSession | null = null
-  let unsubscribeGraphSessionCommits: (() => void) | null = null
+  let graphSessionRuntime: CanvasGraphSessionRuntime | null = null
   const executionSnapshot = shallowRef(options.executionCore.snapshot())
   const projectEdgesForRendering = (edges: Edge[]) =>
     projectPendingImageExecutionEdges(edges, executionSnapshot.value).edges
@@ -87,7 +66,9 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     const release = options.executionCore.release(leases)
     options.cancelTasks(release.cancellableTaskIds)
   }
-  function collectSelectedItemIds(...itemGroups: SelectableFlowItem[][]): Set<string> {
+  function collectSelectedItemIds(
+    ...itemGroups: Array<Array<{ id: string; selected?: boolean }>>
+  ): Set<string> {
     const ids = new Set<string>()
     for (const items of itemGroups) {
       for (const item of items) {
@@ -97,7 +78,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     return ids
   }
 
-  function preserveSelectedItems<T extends SelectableFlowItem>(
+  function preserveSelectedItems<T extends { id: string; selected?: boolean }>(
     nextItems: T[],
     selectedIds: Set<string>,
   ): T[] {
@@ -162,166 +143,17 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   })
   onScopeDispose(unsubscribeExecutionSnapshot)
 
-  function disposeGraphSession() {
-    unsubscribeGraphSessionCommits?.()
-    unsubscribeGraphSessionCommits = null
-    graphSession?.dispose()
-    graphSession = null
+  function requireGraphSessionRuntime(): CanvasGraphSessionRuntime {
+    if (!graphSessionRuntime) throw new Error('Canvas Graph Session runtime is not initialized')
+    return graphSessionRuntime
   }
 
-  function requireGraphSession(): CanvasGraphSession {
-    const boardId = options.boardSession.currentBoardId.value
-    if (!graphSession || !boardId || graphSession.boardId !== boardId) {
-      throw new Error('Canvas Graph Session is not attached to the current Board')
-    }
-    return graphSession
-  }
-
-  function readCanvasGraphStore(): CanvasGraphStore {
-    return requireGraphSession().store
-  }
-
-  function syncCommittedGroups(session: CanvasGraphSession) {
-    if (session !== graphSession || session.boardId !== options.boardSession.currentBoardId.value) return
-    const groups = session.store
-      .getGroupIds()
-      .flatMap((groupId) => {
-        const group = session.store.getGroup(groupId)
-        return group ? [group] : []
-      })
-    options.boardBaseSnapshot.value = { ...options.boardBaseSnapshot.value, groups }
-    groupRuntime?.internal.handleCommittedGroupsChanged()
-  }
-
-  function replaceGraphSnapshot(
-    snapshot: CanvasBoardSnapshot,
-    reason: CanvasGraphSnapshotReplaceReason,
-  ) {
-    const boardId = options.boardSession.currentBoardId.value
-    if (!boardId) {
-      disposeGraphSession()
-      options.executionCore.detachBoard()
-      return
-    }
-
-    if (reason === 'save-reconcile' && graphSession?.boardId === boardId) {
-      graphSession.replace(snapshot)
-      return
-    }
-
-    disposeGraphSession()
-    const session = CanvasGraphSession.hydrate(boardId, snapshot)
-    graphSession = session
-    const unsubscribeHistory = session.subscribe((event) => {
-      if (session !== graphSession || session.boardId !== options.boardSession.currentBoardId.value) {
-        return
-      }
-      if (event.sideEffects.recordHistory) canvasGraphHistory.record(event.patch)
-      if (event.sideEffects.markDirty) markDirty()
-    })
-    const unsubscribeProjection = bindCanvasGraphSessionProjection({
-      session,
-      graphAdapter,
-      readCurrent: () => ({ nodes: options.nodes.value, edges: options.edges.value }),
-      projectFull: () => {
-        const flow = canvasBoardSnapshotToFlow(session.exportSnapshot(options.boardBaseSnapshot.value))
-        const nodes =
-          groupRuntime?.internal.projectCurrentGroupNodeLayers(flow.nodes as Node[]) ??
-          (flow.nodes as Node[])
-        return { nodes, edges: flow.edges as Edge[] }
-      },
-      isCurrentAttachment: () =>
-        session === graphSession && session.boardId === options.boardSession.currentBoardId.value,
-      readGroups: () =>
-        session.store
-          .getGroupIds()
-          .flatMap((groupId) => {
-            const group = session.store.getGroup(groupId)
-            return group ? [group] : []
-          }),
-      onGroupsChanged: () => syncCommittedGroups(session),
-      projectNode: (node) => groupRuntime?.internal.projectCommittedGroupNodeLayer(node) ?? node,
-      scheduleMicrotask:
-        options.scheduleMicrotask ??
-        ((callback: () => void) => void Promise.resolve().then(callback)),
-    })
-    unsubscribeGraphSessionCommits = () => {
-      unsubscribeProjection()
-      unsubscribeHistory()
-    }
-    options.executionCore.attachBoard(
-      CanvasBoardGraphSession.create(boardId, {
-        graphSession: session,
-      }),
-    )
-  }
-  onScopeDispose(() => {
-    disposeGraphSession()
-    options.executionCore.detachBoard()
-  })
-
-  function rebaseSavedFlowProjection(savedGraph: { nodes: Node[]; edges: Edge[] }) {
-    const savedNodesById = new Map(savedGraph.nodes.map((node) => [node.id, node] as const))
-    const savedEdgesById = new Map(savedGraph.edges.map((edge) => [edge.id, edge] as const))
-    const savedEdgeEndpointKeys = new Set(savedGraph.edges.map(createFlowEdgeEndpointKey))
-    return {
-      nodes: [
-        ...savedGraph.nodes,
-        ...options.nodes.value.filter(
-          (node) => !savedNodesById.has(node.id) && isNodeExecutionActive(node.id),
-        ),
-      ],
-      edges: [
-        ...savedGraph.edges,
-        ...options.edges.value.filter(
-          (edge) =>
-            !savedEdgesById.has(edge.id) &&
-            !savedEdgeEndpointKeys.has(createFlowEdgeEndpointKey(edge)) &&
-            isNodeExecutionActive(edge.target),
-        ),
-      ],
-    }
-  }
-
-  function hydratePendingExecutionLeases() {
-    const attachment = options.executionCore.currentAttachment()
-    if (!attachment) return
-    collectPendingImageTasks(options.boardBaseSnapshot.value).forEach((pending) => {
-      const reattached = options.executionCore.hydratePendingLease(attachment, {
-        resultNodeId: pending.resultNodeId,
-        taskId: pending.taskId,
-        clientActionId: pending.clientActionId,
-      })
-      if (reattached.kind === 'started') options.cancelTasks(reattached.cancellableTaskIds)
-    })
-  }
-
-  function commitFlowGraph(
-    nextGraph: { nodes: Node[]; edges: Edge[] },
-    commitOptions: FlowGraphCommitOptions,
-  ) {
-    if (commitOptions.source === 'hydrate-replace') {
-      hydratePendingExecutionLeases()
-    }
-    const semanticGraph =
-      commitOptions.source === 'save-reconcile' ? rebaseSavedFlowProjection(nextGraph) : nextGraph
-    const projectedGraph = {
-      nodes:
-        groupRuntime?.internal.projectCurrentGroupNodeLayers(semanticGraph.nodes) ??
-        semanticGraph.nodes,
-      edges: semanticGraph.edges,
-    }
-    const resolvedGraph =
-      commitOptions.source === 'save-reconcile'
-        ? preserveCurrentSelection(projectedGraph)
-        : projectedGraph
-    graphAdapter.replaceGraph(resolvedGraph)
-  }
+  const readCanvasGraphStore = () => requireGraphSessionRuntime().readCanvasGraphStore()
 
   const canvasGraphHistory = useCanvasGraphHistory({
     maxSteps: 10,
     applyPatch: (patch, direction) => {
-      const summary = requireGraphSession().applyCommitPatch(patch, direction, {
+      const summary = readCanvasGraphStore().applyCommitPatch(patch, direction, {
         recordHistory: false,
         markDirty: true,
       })
@@ -343,15 +175,17 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     onError: options.onError,
     clearGraphHistoryBaseline: canvasGraphHistory.clearBaseline,
     canReconcileGraph: () => !nodeDragLifecycle.isActive(),
-    replaceGraphSnapshot,
-    exportGraphSnapshot: (baseSnapshot) => requireGraphSession().exportSnapshot(baseSnapshot),
+    replaceGraphSnapshot: (snapshot, reason) =>
+      requireGraphSessionRuntime().replaceGraphSnapshot(snapshot, reason),
+    exportGraphSnapshot: (baseSnapshot) =>
+      requireGraphSessionRuntime().exportGraphSnapshot(baseSnapshot),
     commitGraph: (graph, commitOptions) =>
-      commitFlowGraph(
+      requireGraphSessionRuntime().commitGraph(
         {
           nodes: graph.nodes as Node[],
           edges: graph.edges as Edge[],
         },
-        commitOptions,
+        commitOptions.source,
       ),
   })
 
@@ -360,7 +194,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   const loadInitialOrRouteBoard: typeof loadInitialOrRouteBoardBase = async (...args) => {
     nodeDragLifecycle.cancel()
     groupRuntime?.internal.resetTransientSelectionState()
-    disposeGraphSession()
+    graphSessionRuntime?.dispose()
     options.executionCore.detachBoard()
     await loadInitialOrRouteBoardBase(...args)
     groupRuntime?.internal.handleCommittedGroupsChanged()
@@ -419,6 +253,31 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     reconcileMembership: groupRuntime.internal.applyDraggedNodeMembershipChanges,
     scheduleAnimationFrame: options.scheduleAnimationFrame,
     cancelAnimationFrame: options.cancelAnimationFrame,
+  })
+
+  graphSessionRuntime = createCanvasGraphSessionRuntime({
+    nodes: renderNodes,
+    edges: renderEdgesRef,
+    boardBaseSnapshot: options.boardBaseSnapshot,
+    boardSession: options.boardSession,
+    graphAdapter,
+    executionCore: options.executionCore,
+    cancelTasks: options.cancelTasks,
+    history: canvasGraphHistory,
+    markDirty,
+    isNodeExecutionActive,
+    preserveCurrentSelection,
+    projectCurrentGroupNodeLayers: (nodes) =>
+      groupRuntime.internal.projectCurrentGroupNodeLayers(nodes),
+    projectCommittedGroupNodeLayer: (node) =>
+      groupRuntime.internal.projectCommittedGroupNodeLayer(node),
+    onGroupsChanged: (groups) => {
+      options.boardBaseSnapshot.value = { ...options.boardBaseSnapshot.value, groups }
+      groupRuntime.internal.handleCommittedGroupsChanged()
+    },
+    scheduleMicrotask:
+      options.scheduleMicrotask ??
+      ((callback: () => void) => void Promise.resolve().then(callback)),
   })
 
   const deleteLifecycle = createCanvasDeleteCommandLifecycle({

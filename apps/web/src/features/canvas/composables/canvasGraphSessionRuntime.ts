@@ -1,0 +1,209 @@
+import type { Edge, Node, Ref } from '@vue-flow/core'
+import { onScopeDispose } from 'vue'
+import type { CanvasBoardSnapshot } from '../../canvas-board/domain'
+import type { CanvasBoardSession } from '../board-session'
+import type { CanvasGraphHistory } from './useCanvasGraphHistory'
+import type { CanvasVueFlowGraphAdapter } from './useCanvasVueFlowGraphAdapter'
+import { bindCanvasGraphSessionProjection } from './bindCanvasGraphSessionProjection'
+import { canvasBoardSnapshotToFlow } from '../utils/flowSnapshotAdapter'
+import { CanvasGraphSession, type CanvasGraphStore } from '../graph-runtime'
+import {
+  CanvasBoardGraphSession,
+  collectPendingImageTasks,
+  type PendingImageExecutionCore,
+} from '../execution/pending-execution'
+
+type CanvasGraphSessionRuntimeOptions = {
+  nodes: Ref<Node[]>
+  edges: Ref<Edge[]>
+  boardBaseSnapshot: Ref<CanvasBoardSnapshot>
+  boardSession: CanvasBoardSession
+  graphAdapter: CanvasVueFlowGraphAdapter
+  executionCore: PendingImageExecutionCore
+  cancelTasks: (taskIds: readonly string[]) => void
+  history: CanvasGraphHistory
+  markDirty: () => void
+  isNodeExecutionActive: (nodeId: string) => boolean
+  preserveCurrentSelection: (graph: { nodes: Node[]; edges: Edge[] }) => {
+    nodes: Node[]
+    edges: Edge[]
+  }
+  projectCurrentGroupNodeLayers: (nodes: Node[]) => Node[]
+  projectCommittedGroupNodeLayer: (node: Node) => Node
+  onGroupsChanged: (groups: CanvasBoardSnapshot['groups']) => void
+  scheduleMicrotask?: (callback: () => void) => void
+}
+
+export type CanvasGraphSessionRuntime = {
+  readCanvasGraphStore: () => CanvasGraphStore
+  replaceGraphSnapshot: (
+    snapshot: CanvasBoardSnapshot,
+    reason: 'hydrate' | 'save-reconcile',
+  ) => void
+  exportGraphSnapshot: (baseSnapshot: CanvasBoardSnapshot) => CanvasBoardSnapshot
+  commitGraph: (
+    graph: { nodes: Node[]; edges: Edge[] },
+    source: 'hydrate-replace' | 'save-reconcile',
+  ) => void
+  dispose: () => void
+}
+
+function createFlowEdgeEndpointKey(edge: Edge): string {
+  return JSON.stringify([
+    edge.source,
+    edge.sourceHandle ?? null,
+    edge.target,
+    edge.targetHandle ?? null,
+  ])
+}
+
+export function createCanvasGraphSessionRuntime(
+  options: CanvasGraphSessionRuntimeOptions,
+): CanvasGraphSessionRuntime {
+  let graphSession: CanvasGraphSession | null = null
+  let unsubscribeGraphSessionCommits: (() => void) | null = null
+
+  function dispose() {
+    unsubscribeGraphSessionCommits?.()
+    unsubscribeGraphSessionCommits = null
+    graphSession?.dispose()
+    graphSession = null
+  }
+
+  function requireGraphSession(): CanvasGraphSession {
+    const boardId = options.boardSession.currentBoardId.value
+    if (!graphSession || !boardId || graphSession.boardId !== boardId) {
+      throw new Error('Canvas Graph Session is not attached to the current Board')
+    }
+    return graphSession
+  }
+
+  function readCanvasGraphStore(): CanvasGraphStore {
+    return requireGraphSession().store
+  }
+
+  function hydratePendingExecutionLeases() {
+    const attachment = options.executionCore.currentAttachment()
+    if (!attachment) return
+    collectPendingImageTasks(options.boardBaseSnapshot.value).forEach((pending) => {
+      const reattached = options.executionCore.hydratePendingLease(attachment, {
+        resultNodeId: pending.resultNodeId,
+        taskId: pending.taskId,
+        clientActionId: pending.clientActionId,
+      })
+      if (reattached.kind === 'started') options.cancelTasks(reattached.cancellableTaskIds)
+    })
+  }
+
+  function rebaseSavedFlowProjection(savedGraph: { nodes: Node[]; edges: Edge[] }) {
+    const savedNodesById = new Map(savedGraph.nodes.map((node) => [node.id, node] as const))
+    const savedEdgesById = new Map(savedGraph.edges.map((edge) => [edge.id, edge] as const))
+    const savedEdgeEndpointKeys = new Set(savedGraph.edges.map(createFlowEdgeEndpointKey))
+    return {
+      nodes: [
+        ...savedGraph.nodes,
+        ...options.nodes.value.filter(
+          (node) => !savedNodesById.has(node.id) && options.isNodeExecutionActive(node.id),
+        ),
+      ],
+      edges: [
+        ...savedGraph.edges,
+        ...options.edges.value.filter(
+          (edge) =>
+            !savedEdgesById.has(edge.id) &&
+            !savedEdgeEndpointKeys.has(createFlowEdgeEndpointKey(edge)) &&
+            options.isNodeExecutionActive(edge.target),
+        ),
+      ],
+    }
+  }
+
+  function commitGraph(
+    nextGraph: { nodes: Node[]; edges: Edge[] },
+    source: 'hydrate-replace' | 'save-reconcile',
+  ) {
+    if (source === 'hydrate-replace') hydratePendingExecutionLeases()
+    const semanticGraph = source === 'save-reconcile' ? rebaseSavedFlowProjection(nextGraph) : nextGraph
+    const projectedGraph = {
+      nodes: options.projectCurrentGroupNodeLayers(semanticGraph.nodes),
+      edges: semanticGraph.edges,
+    }
+    const resolvedGraph =
+      source === 'save-reconcile'
+        ? options.preserveCurrentSelection(projectedGraph)
+        : projectedGraph
+    options.graphAdapter.replaceGraph(resolvedGraph)
+  }
+
+  function replaceGraphSnapshot(
+    snapshot: CanvasBoardSnapshot,
+    reason: 'hydrate' | 'save-reconcile',
+  ) {
+    const boardId = options.boardSession.currentBoardId.value
+    if (!boardId) {
+      dispose()
+      options.executionCore.detachBoard()
+      return
+    }
+
+    if (reason === 'save-reconcile' && graphSession?.boardId === boardId) {
+      graphSession.replace(snapshot)
+      return
+    }
+
+    dispose()
+    const session = CanvasGraphSession.hydrate(boardId, snapshot)
+    graphSession = session
+    const unsubscribeHistory = session.subscribe((event) => {
+      if (session !== graphSession || session.boardId !== options.boardSession.currentBoardId.value) return
+      if (event.sideEffects.recordHistory) options.history.record(event.patch)
+      if (event.sideEffects.markDirty) options.markDirty()
+    })
+    const unsubscribeProjection = bindCanvasGraphSessionProjection({
+      session,
+      graphAdapter: options.graphAdapter,
+      readCurrent: () => ({ nodes: options.nodes.value, edges: options.edges.value }),
+      projectFull: () => {
+        const flow = canvasBoardSnapshotToFlow(session.exportSnapshot(options.boardBaseSnapshot.value))
+        return {
+          nodes: options.projectCurrentGroupNodeLayers(flow.nodes as Node[]),
+          edges: flow.edges as Edge[],
+        }
+      },
+      isCurrentAttachment: () =>
+        session === graphSession && session.boardId === options.boardSession.currentBoardId.value,
+      readGroups: () =>
+        session.store
+          .getGroupIds()
+          .flatMap((groupId) => {
+            const group = session.store.getGroup(groupId)
+            return group ? [group] : []
+          }),
+      onGroupsChanged: options.onGroupsChanged,
+      projectNode: options.projectCommittedGroupNodeLayer,
+      scheduleMicrotask: options.scheduleMicrotask,
+    })
+    unsubscribeGraphSessionCommits = () => {
+      unsubscribeProjection()
+      unsubscribeHistory()
+    }
+    options.executionCore.attachBoard(CanvasBoardGraphSession.create(boardId, { graphSession: session }))
+  }
+
+  function exportGraphSnapshot(baseSnapshot: CanvasBoardSnapshot): CanvasBoardSnapshot {
+    return requireGraphSession().exportSnapshot(baseSnapshot)
+  }
+
+  const runtime = {
+    readCanvasGraphStore,
+    replaceGraphSnapshot,
+    exportGraphSnapshot,
+    commitGraph,
+    dispose,
+  }
+  onScopeDispose(() => {
+    runtime.dispose()
+    options.executionCore.detachBoard()
+  })
+  return runtime
+}
