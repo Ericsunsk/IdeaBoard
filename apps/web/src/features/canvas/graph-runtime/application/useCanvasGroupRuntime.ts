@@ -436,7 +436,6 @@ export function useCanvasGroupRuntime(
   }
 
   function resolveSelectedGroupAction(): CanvasSelectionGroupAction | null {
-    if (!options.isGraphSessionAttached()) return null
     const selectedNodeIds = readSelectedGraphNodeIds()
     if (!selectedNodeIds) return null
 
@@ -480,6 +479,7 @@ export function useCanvasGroupRuntime(
 
   function groupSelectedNodes(): boolean {
     clearPendingGroupJoin()
+    if (!options.isGraphSessionAttached()) return false
     const action = selectionGroupAction.value
     if (action?.kind !== 'group') return false
     const store = options.readCanvasGraphStore()
@@ -512,6 +512,7 @@ export function useCanvasGroupRuntime(
 
   function ungroupSelectedGroup(): boolean {
     clearPendingGroupJoin()
+    if (!options.isGraphSessionAttached()) return false
     const action = selectionGroupAction.value
     if (action?.kind !== 'ungroup') return false
 

@@ -68,7 +68,7 @@ function createSnapshot(): CanvasBoardSnapshot {
   return snapshot
 }
 
-function createHarness() {
+function createHarness(options: { isGraphSessionAttached?: () => boolean } = {}) {
   const nodes = shallowRef<SelectableHarnessNode[]>([
     createPromptNode(1, 40, 40, true),
     createPromptNode(2, 400, 40, true),
@@ -108,7 +108,7 @@ function createHarness() {
     boardBaseSnapshot,
     graphAdapter,
     readCanvasGraphStore: () => graphSession.store,
-    isGraphSessionAttached: () => true,
+    isGraphSessionAttached: options.isGraphSessionAttached ?? (() => true),
     onWarning: vi.fn(),
     captureActiveNodeExecutions: vi.fn(() => []),
     releaseNodeExecutions: vi.fn(),
@@ -122,6 +122,17 @@ function createHarness() {
 }
 
 describe('useCanvasGroupRuntime', () => {
+  it('keeps the selection action available while a board attachment is changing', () => {
+    const harness = createHarness({ isGraphSessionAttached: () => false })
+
+    expect(harness.runtime.view.selectionGroupAction.value).toEqual({
+      kind: 'group',
+      label: '组合',
+      nodeIds: ['prompt-1', 'prompt-2'],
+    })
+    expect(harness.runtime.commands.groupSelectedNodes()).toBe(false)
+  })
+
   it('owns grouping commands through injected graph and side-effect adapters', () => {
     const harness = createHarness()
 
