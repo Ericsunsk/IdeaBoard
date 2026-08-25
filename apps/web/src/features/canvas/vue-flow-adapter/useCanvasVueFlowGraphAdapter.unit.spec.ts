@@ -90,7 +90,7 @@ describe('useCanvasVueFlowGraphAdapter', () => {
     const adapter = useCanvasVueFlowGraphAdapter({ nodes, edges, actions: { applyNodeChanges } })
 
     adapter.syncControlledNodeChanges([
-      { id: 'node-1', type: 'position', position: { x: 40, y: 20 }, dragging: true },
+      { id: 'node-1', type: 'position', position: { x: 40, y: 20 }, from: { x: 0, y: 0 }, dragging: true },
     ])
 
     expect(nodes.value[0]).toMatchObject({ position: { x: 40, y: 20 } })

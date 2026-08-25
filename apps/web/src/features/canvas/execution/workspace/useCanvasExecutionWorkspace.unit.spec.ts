@@ -9,6 +9,8 @@ import {
 } from '../pending-execution'
 import { useCanvasExecutionWorkspace } from './useCanvasExecutionWorkspace'
 
+const rendererMetrics = { readNodeMetrics: () => null }
+
 function createStore(taskId = 'task-1') {
   const snapshot = createEmptyCanvasBoardSnapshot()
   snapshot.imageNodes.push({ id: 1, type: 'image-node', x: 0, y: 0, width: 280, sourceImageUrl: '', sourceImageRatio: 1, pendingTaskId: taskId, pendingResultIndex: 0, pendingClientActionId: `action-${taskId}`, outputStatus: 'running', outputImages: [] })
@@ -41,6 +43,7 @@ function createReattachWorkspace(
     // Reattach facts must come from the Canvas graph snapshot, never this Flow projection.
     nodes: ref([{ id: 'image-99', position: { x: 0, y: 0 }, data: { pendingTaskId: 'ui-only-task' } }] as never),
     edges: ref([]), readCanvasGraphStore: () => store,
+    rendererMetrics,
     boardBaseSnapshot: ref(store.exportSnapshot()),
     pendingResults: { reservePendingResults: vi.fn(), attachPendingTaskIds: vi.fn(), removePendingResults: vi.fn() },
     executionCore: core, cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(),
@@ -57,6 +60,7 @@ describe('useCanvasExecutionWorkspace', () => {
     const attachPendingTaskIds = vi.fn()
     const workspace = useCanvasExecutionWorkspace({
       nodes: ref([]), edges: ref([]), readCanvasGraphStore: () => store.store,
+      rendererMetrics,
       boardBaseSnapshot: ref(createEmptyCanvasBoardSnapshot()),
       pendingResults: { reservePendingResults: () => ({ resultNodeIds: ['image-1'] }), attachPendingTaskIds, removePendingResults: vi.fn() },
       executionCore: core, cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(), flushAutosave,

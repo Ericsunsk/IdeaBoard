@@ -31,6 +31,7 @@ import {
 } from '../../execution/pending-execution'
 import { isCanvasGraphNodeId } from '../../graph-runtime'
 import { parseFlowNodeId } from '../../utils/flowSnapshotAdapter'
+import type { CanvasRendererSelectableElement } from '../types'
 
 export type UseFlowCanvasRuntimeOptions = {
   nodes: Ref<Node[]>
@@ -79,8 +80,8 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     return ids
   }
 
-  function isRendererSelected(item: Node | Edge): boolean {
-    return (item as { selected?: boolean }).selected === true
+  function isRendererSelected(item: CanvasRendererSelectableElement): boolean {
+    return item.selected === true
   }
 
   function preserveSelectedItems<T extends { id: string; selected?: boolean }>(
@@ -369,7 +370,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     }
   }
 
-  function resolveRendererSelection(elements: Array<Node | Edge>) {
+  function resolveRendererSelection(elements: CanvasRendererSelectableElement[]) {
     const selectedNodeIds = new Set(
       elements
         .filter(
@@ -396,14 +397,14 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
   function stageRendererSelection(
     store: ReturnType<typeof readCanvasGraphStore>,
     transaction: ReturnType<ReturnType<typeof readCanvasGraphStore>['beginTransaction']>,
-    elements: Array<Node | Edge>,
+    elements: CanvasRendererSelectableElement[],
   ) {
     const { selectedNodeIds, selectedEdgeIds } = resolveRendererSelection(elements)
     store.getNodeIds().forEach((nodeId) => transaction.selectNode(nodeId, selectedNodeIds.has(nodeId)))
     store.getEdgeIds().forEach((edgeId) => transaction.selectEdge(edgeId, selectedEdgeIds.has(edgeId)))
   }
 
-  function reconcileRendererSelection(elements: Array<Node | Edge>) {
+  function reconcileRendererSelection(elements: CanvasRendererSelectableElement[]) {
     // Vue Flow owns renderer selection. During a drag the pending graph
     // transaction is still based on the pre-drag revision, so selection must
     // join that transaction at commit instead of opening a competing one.

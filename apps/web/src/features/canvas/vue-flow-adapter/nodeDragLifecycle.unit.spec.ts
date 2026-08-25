@@ -4,6 +4,14 @@ import { createEmptyCanvasBoardSnapshot } from '../../canvas-board/domain'
 import { createCanvasGraphStore } from '../graph-runtime'
 import { createCanvasNodeDragLifecycle } from './nodeDragLifecycle'
 
+function createTerminalPositionChange(nodeId: string): NodeChange {
+  return {
+    id: nodeId,
+    type: 'position',
+    dragging: false,
+  } as unknown as NodeChange
+}
+
 function createHarness() {
   const snapshot = createEmptyCanvasBoardSnapshot()
   snapshot.promptNodes = [
@@ -147,11 +155,7 @@ describe('createCanvasNodeDragLifecycle', () => {
       },
     ])
     harness.lifecycle.handleChanges([
-      {
-        id: 'prompt-1',
-        type: 'position',
-        dragging: false,
-      },
+      createTerminalPositionChange('prompt-1'),
     ])
 
     harness.lifecycle.commit()

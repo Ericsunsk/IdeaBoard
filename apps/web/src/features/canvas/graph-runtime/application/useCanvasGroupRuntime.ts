@@ -162,12 +162,6 @@ export function useCanvasGroupRuntime(
   const pendingGroupJoin = ref<PendingGroupJoin | null>(null)
   const previewGroupBounds = ref<ReadonlyMap<CanvasGraphGroupId, CanvasRect>>(new Map())
 
-  // Selection and drag previews are Flow-only visual state. Graph commits own
-  // History, persistence and canonical projection.
-  function createTransientGraphCommandOptions() {
-    return {}
-  }
-
   function projectCurrentGroupNodeLayers(nodes: readonly Node[]) {
     return projectCanvasGroupNodeLayers(nodes, options.boardBaseSnapshot.value.groups) as Node[]
   }
@@ -205,13 +199,10 @@ export function useCanvasGroupRuntime(
       return { ...edge, selected: false }
     })
     if (!didChange) return false
-    options.graphAdapter.replaceGraph(
-      {
-        nodes: nextNodes,
-        edges: nextEdges,
-      },
-      createTransientGraphCommandOptions(),
-    )
+    options.graphAdapter.replaceGraph({
+      nodes: nextNodes,
+      edges: nextEdges,
+    })
     return true
   }
 
@@ -230,13 +221,10 @@ export function useCanvasGroupRuntime(
       return { ...edge, selected: false }
     })
     if (!didChange) return false
-    options.graphAdapter.replaceGraph(
-      {
-        nodes: nextNodes,
-        edges: nextEdges,
-      },
-      createTransientGraphCommandOptions(),
-    )
+    options.graphAdapter.replaceGraph({
+      nodes: nextNodes,
+      edges: nextEdges,
+    })
     return true
   }
 
@@ -617,10 +605,7 @@ export function useCanvasGroupRuntime(
     drag.latestPoint = point
     if (delta.x === 0 && delta.y === 0) return true
     if (drag.startPositions.size > 0) {
-      options.graphAdapter.applyNodeChanges(
-        createPositionChanges(drag.startPositions, delta, true),
-        createTransientGraphCommandOptions(),
-      )
+      options.graphAdapter.applyNodeChanges(createPositionChanges(drag.startPositions, delta, true))
     }
     setPreviewGroupBounds(drag.groupId, moveCanvasRect(drag.startBounds, delta))
     return true
@@ -638,7 +623,6 @@ export function useCanvasGroupRuntime(
       drag.transaction.cancel()
       options.graphAdapter.applyNodeChanges(
         createPositionChanges(drag.startPositions, delta, false),
-        createTransientGraphCommandOptions(),
       )
       clearPreviewGroupBounds(drag.groupId)
       return false
@@ -660,16 +644,12 @@ export function useCanvasGroupRuntime(
       drag.transaction.cancel()
       options.graphAdapter.applyNodeChanges(
         createPositionChanges(drag.startPositions, { x: 0, y: 0 }, false),
-        createTransientGraphCommandOptions(),
       )
       clearPreviewGroupBounds(drag.groupId)
       options.onWarning('组合移动失败，请刷新画布后重试')
       return false
     }
-    options.graphAdapter.applyNodeChanges(
-      createPositionChanges(drag.startPositions, delta, false),
-      createTransientGraphCommandOptions(),
-    )
+    options.graphAdapter.applyNodeChanges(createPositionChanges(drag.startPositions, delta, false))
     clearPreviewGroupBounds(drag.groupId)
     if (!summary.didChange) return false
     return true
@@ -682,7 +662,6 @@ export function useCanvasGroupRuntime(
     drag.transaction.cancel()
     options.graphAdapter.applyNodeChanges(
       createPositionChanges(drag.startPositions, { x: 0, y: 0 }, false),
-      createTransientGraphCommandOptions(),
     )
     clearPreviewGroupBounds(drag.groupId)
     return true

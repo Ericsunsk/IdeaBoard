@@ -246,6 +246,9 @@ function createWorkspaceOptions() {
     getSelectedElements: ref([]),
     removeSelectedElements: vi.fn(),
     selectOnlyNode: vi.fn(() => true),
+    rendererMetrics: {
+      readNodeMetrics: vi.fn(() => null),
+    },
     vueFlowGraphActions: {
       setNodes: vi.fn(),
     },

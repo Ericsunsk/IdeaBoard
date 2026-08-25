@@ -92,7 +92,11 @@ describe('Canvas Execution Recovery Coordinator', () => {
 
     expect(harness.core.snapshot().attachment).toMatchObject({ boardId: 'board-b' })
     expect(harness.core.factFor('image-1')).toBeNull()
-    expect(harness.graph.store.getNode('image-1')?.snapshot.pendingTaskId).toBe('task-1')
+    const staleNode = harness.graph.store.getNode('image-1')
+    if (!staleNode || staleNode.snapshot.type !== 'image-node') {
+      throw new Error('Expected image node')
+    }
+    expect(staleNode.snapshot.pendingTaskId).toBe('task-1')
   })
 
   it('cancels a task when the recovery transport reports cancellation', async () => {

@@ -21,6 +21,8 @@ vi.mock('../media/flowPartialEditMask', () => ({
   prepareFlowPartialEditMask: vi.fn(async () => 'https://example.com/mask.png'),
 }))
 
+const rendererMetrics = { readNodeMetrics: () => null }
+
 function imageActionPlan() {
   return { kind: 'image-action', activationId: 'a', sourceNodeId: 'image-1', source: { url: 'https://example.com/a.png', ratio: 1 }, action: 'remove-bg', prompt: '', outputCount: 1, resultOptions: {} } as never
 }
@@ -66,8 +68,9 @@ function createPublicHarness(transport: PendingImageWorkflowTaskTransport) {
   const execution = useFlowImageWorkflowExecution({
     nodes, edges,
     readCanvasGraphStore: () => graphSession.store,
+    rendererMetrics,
     boardBaseSnapshot: ref(base),
-    executionWorkspace: { state: { executionCore: core, isNodeRunning: (id) => core.captureActiveLeases([id]).length > 0 }, commands: { runPromptGeneration: vi.fn(), reattachPendingImageResults: vi.fn() } },
+    executionWorkspace: { state: { executionCore: core, isNodeRunning: (id) => core.captureActiveLeases([id]).length > 0 }, commands: { runPromptGeneration: vi.fn(), hydratePendingImageLeases: vi.fn(), reattachPendingImageResults: vi.fn() } },
     cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(), taskTransport: transport,
   })
   return { core, execution, flushAutosave, markDirty, nodes }
@@ -113,8 +116,9 @@ describe('useFlowImageWorkflowExecution', () => {
     const assertReady = vi.fn(async () => { throw new Error('not ready') })
     const execution = useFlowImageWorkflowExecution({
       nodes: ref([]), edges: ref([]), readCanvasGraphStore: () => graphSession.store,
+      rendererMetrics,
       boardBaseSnapshot: ref(createEmptyCanvasBoardSnapshot()),
-      executionWorkspace: { state: { executionCore: core, isNodeRunning: () => false }, commands: { runPromptGeneration: vi.fn(), reattachPendingImageResults: vi.fn() } },
+      executionWorkspace: { state: { executionCore: core, isNodeRunning: () => false }, commands: { runPromptGeneration: vi.fn(), hydratePendingImageLeases: vi.fn(), reattachPendingImageResults: vi.fn() } },
       cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(),
       taskTransport: { assertReady, submit: vi.fn(), resolve: vi.fn() },
     })
@@ -211,9 +215,10 @@ describe('useFlowImageWorkflowExecution', () => {
     core.attachBoard(CanvasBoardGraphSession.create('board-a', {
       graphSession,
     }))
-    const workspace = { state: { executionCore: core, isNodeRunning: () => false }, commands: { runPromptGeneration: vi.fn(), reattachPendingImageResults: vi.fn() } }
+    const workspace = { state: { executionCore: core, isNodeRunning: () => false }, commands: { runPromptGeneration: vi.fn(), hydratePendingImageLeases: vi.fn(), reattachPendingImageResults: vi.fn() } }
     const execution = useFlowImageWorkflowExecution({
       nodes: ref([]), edges: ref([]), readCanvasGraphStore: () => graphSession.store,
+      rendererMetrics,
       boardBaseSnapshot: ref(createEmptyCanvasBoardSnapshot()),
       executionWorkspace: workspace, cancelTasks: vi.fn(), onSuccess: vi.fn(), onWarning: vi.fn(),
       taskTransport: { assertReady: vi.fn(), submit: vi.fn(), resolve: vi.fn() },

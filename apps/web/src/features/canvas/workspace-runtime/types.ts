@@ -15,6 +15,10 @@ import type {
 import type { NodeUiState, PromptNodeUiState } from '../types/canvasNodeUi'
 import type { CanvasLibraryImportDescriptor } from '../../library/libraryTransfer'
 
+export type CanvasRendererSelectableElement = (Node | Edge) & {
+  selected?: boolean
+}
+
 type CanvasWorkspaceCatalogRecoveryState =
   { status: 'idle' } | { status: 'reload-required' | 'reloading'; boardId: string }
 
@@ -90,7 +94,7 @@ export type CanvasWorkspaceRuntimeCommands = {
   flowPane: {
     onNodesChange: (changes: NodeChange[]) => void
     onEdgesChange: (changes: EdgeChange[]) => void
-    reconcileRendererSelection: (elements: Array<Node | Edge>) => void
+    reconcileRendererSelection: (elements: CanvasRendererSelectableElement[]) => void
     connectionAdapter: CanvasVueFlowConnectionAdapter
     nodeDragTransactions: {
       begin: (nodeIds: readonly string[]) => void
