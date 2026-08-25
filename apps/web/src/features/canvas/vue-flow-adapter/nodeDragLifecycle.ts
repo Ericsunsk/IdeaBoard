@@ -5,13 +5,19 @@ import {
   type CanvasGraphTransaction,
 } from '../graph-runtime'
 
-export type CanvasNodeDragChange =
-  Extract<NodeChange, { type: 'position' }> | Extract<NodeChange, { type: 'select' }>
+export type CanvasNodeDragChange = Extract<NodeChange, { type: 'position' }>
+
+export type CanvasNodeDragChangeHandling = {
+  consumed: CanvasNodeDragChange[]
+  remaining: NodeChange[]
+}
 
 export type CanvasNodeDragLifecycle = {
-  begin: () => void
-  handleChanges: (changes: NodeChange[]) => boolean
-  commit: () => void
+  begin: (nodeIds: readonly string[]) => void
+  handleChanges: (changes: NodeChange[]) => CanvasNodeDragChangeHandling | null
+  commit: (
+    stageFinalization?: (store: CanvasGraphStore, transaction: CanvasGraphTransaction) => void,
+  ) => void
   cancel: () => void
   isActive: () => boolean
 }
@@ -21,20 +27,16 @@ export type CanvasNodeDragLifecycleOptions = {
     store: CanvasGraphStore
     transaction: CanvasGraphTransaction
   }
-  projectChanges: (changes: CanvasNodeDragChange[]) => void
-  syncChanges: (changes: CanvasNodeDragChange[]) => void
   onBegin: () => void
   reconcileMembership: (
     store: CanvasGraphStore,
     transaction: CanvasGraphTransaction,
     changes: CanvasNodeDragChange[],
   ) => (() => void) | void
-  scheduleAnimationFrame?: (callback: FrameRequestCallback) => number
-  cancelAnimationFrame?: (handle: number) => void
 }
 
 function isNodeDragChange(change: NodeChange): change is CanvasNodeDragChange {
-  return change.type === 'position' || change.type === 'select'
+  return change.type === 'position'
 }
 
 function mergeNodeDragChanges(
@@ -43,55 +45,42 @@ function mergeNodeDragChanges(
 ): CanvasNodeDragChange[] {
   const changesByKey = new Map<string, CanvasNodeDragChange>()
   current.forEach((change) => changesByKey.set(`${change.type}:${change.id}`, change))
-  incoming.forEach((change) => changesByKey.set(`${change.type}:${change.id}`, change))
+  incoming.forEach((change) => {
+    const key = `${change.type}:${change.id}`
+    const previous = changesByKey.get(key)
+
+    // Vue Flow's final position change only carries dragging: false. Keep the
+    // last measured position while adopting that terminal drag state.
+    changesByKey.set(key, {
+      ...previous,
+      ...change,
+      ...(change.position === undefined && previous?.position !== undefined
+        ? { position: previous.position }
+        : {}),
+      ...(change.from === undefined && previous?.from !== undefined
+        ? { from: previous.from }
+        : {}),
+    })
+  })
   return [...changesByKey.values()]
 }
 
 export function createCanvasNodeDragLifecycle(
   options: CanvasNodeDragLifecycleOptions,
 ): CanvasNodeDragLifecycle {
-  const scheduleAnimationFrame =
-    options.scheduleAnimationFrame ?? ((callback) => window.requestAnimationFrame(callback))
-  const cancelAnimationFrame =
-    options.cancelAnimationFrame ?? ((handle) => window.cancelAnimationFrame(handle))
-
   let activeDrag: {
     store: CanvasGraphStore
     transaction: CanvasGraphTransaction
+    nodeIds: ReadonlySet<string>
   } | null = null
-  let pendingProjectionChanges: CanvasNodeDragChange[] = []
   let latestChanges: CanvasNodeDragChange[] = []
-  let pendingFrameId: number | null = null
 
   function isActive() {
     return activeDrag !== null
   }
 
-  function clearPendingFrame() {
-    if (pendingFrameId === null) return
-    cancelAnimationFrame(pendingFrameId)
-    pendingFrameId = null
-  }
-
-  function flushProjection() {
-    clearPendingFrame()
-    if (pendingProjectionChanges.length === 0) return
-    const changes = pendingProjectionChanges
-    pendingProjectionChanges = []
-    options.projectChanges(changes)
-  }
-
-  function syncProjection() {
-    if (latestChanges.length === 0) return
-    const changes = latestChanges
-    latestChanges = []
-    options.syncChanges(changes)
-  }
-
   function reset() {
-    pendingProjectionChanges = []
     latestChanges = []
-    clearPendingFrame()
     activeDrag = null
   }
 
@@ -105,12 +94,15 @@ export function createCanvasNodeDragLifecycle(
     }
   }
 
-  function begin() {
+  function begin(nodeIds: readonly string[]) {
     if (activeDrag) cancel()
+    const targetNodeIds = new Set(nodeIds)
+    if (targetNodeIds.size === 0) return
+
     options.onBegin()
     const command = options.createCommand()
     try {
-      activeDrag = command
+      activeDrag = { ...command, nodeIds: targetNodeIds }
     } catch (error) {
       try {
         command.transaction.cancel()
@@ -121,47 +113,48 @@ export function createCanvasNodeDragLifecycle(
     }
   }
 
-  function handleChanges(changes: NodeChange[]): boolean {
+  function handleChanges(changes: NodeChange[]): CanvasNodeDragChangeHandling | null {
     const drag = activeDrag
-    if (!drag) return false
-    if (changes.length === 0) return false
-    if (!changes.every(isNodeDragChange)) {
-      flushProjection()
-      syncProjection()
-      return false
-    }
+    if (!drag || changes.length === 0) return null
 
-    changes.forEach((change) => {
-      stageCanvasGraphNodeDragIntent(drag.transaction, {
-        nodeId: change.id,
-        position: change.type === 'position' ? change.position : undefined,
-        selected: change.type === 'select' ? change.selected : undefined,
-      })
+    const positionChanges = changes.filter(isNodeDragChange)
+    if (positionChanges.length === 0) return null
+
+    // A Vue Flow batch can include nodes outside the pointer drag cohort. All
+    // position writes must share this transaction, otherwise committing either
+    // path invalidates the other's revision. Membership remains limited to the
+    // actual drag cohort below.
+    positionChanges.forEach((change) => {
+      if (change.position) {
+        stageCanvasGraphNodeDragIntent(drag.transaction, {
+          nodeId: change.id,
+          position: change.position,
+        })
+      }
     })
-    pendingProjectionChanges = mergeNodeDragChanges(pendingProjectionChanges, changes)
-    latestChanges = mergeNodeDragChanges(latestChanges, changes)
-    if (pendingFrameId === null) {
-      pendingFrameId = scheduleAnimationFrame(() => {
-        pendingFrameId = null
-        flushProjection()
-      })
+    const targetChanges = positionChanges.filter((change) => drag.nodeIds.has(change.id))
+    latestChanges = mergeNodeDragChanges(latestChanges, targetChanges)
+    const consumedChanges = new Set<NodeChange>(positionChanges)
+    return {
+      consumed: positionChanges,
+      remaining: changes.filter((change) => !consumedChanges.has(change)),
     }
-    return true
   }
 
-  function commit() {
+  function commit(
+    stageFinalization?: (store: CanvasGraphStore, transaction: CanvasGraphTransaction) => void,
+  ) {
     const drag = activeDrag
     if (!drag) return
     let didCommitTransaction = false
     try {
       const committedChanges = latestChanges
-      flushProjection()
-      syncProjection()
       const finalizeMembership = options.reconcileMembership(
         drag.store,
         drag.transaction,
         committedChanges,
       )
+      stageFinalization?.(drag.store, drag.transaction)
       drag.transaction.commit()
       didCommitTransaction = true
       finalizeMembership?.()

@@ -241,6 +241,20 @@ describe('useCanvasGroupPresentationInteraction', () => {
     expect(harness.runtime.isSelectionGroupActionVisible.value).toBe(false)
   })
 
+  it('opens a group action from any canvas context-menu location when selection is valid', () => {
+    const harness = createHarness()
+    const event = createPointerEvent(document.createElement('div'), {
+      clientX: 960,
+      clientY: 640,
+    }) as MouseEvent
+
+    harness.runtime.onCanvasContextMenuCapture(event)
+
+    expect(event.preventDefault).toHaveBeenCalled()
+    expect(event.stopPropagation).toHaveBeenCalled()
+    expect(harness.runtime.isSelectionGroupActionVisible.value).toBe(true)
+  })
+
   it('keeps the group action open on its control and non-primary pointers, then dismisses on primary outside pointerdown', async () => {
     const harness = createHarness()
     const actionButton = document.createElement('button')

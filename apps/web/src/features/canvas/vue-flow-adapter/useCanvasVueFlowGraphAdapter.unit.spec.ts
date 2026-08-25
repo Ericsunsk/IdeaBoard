@@ -63,6 +63,41 @@ describe('useCanvasVueFlowGraphAdapter', () => {
     expect(afterCommand).not.toHaveBeenCalled()
   })
 
+  it('synchronizes a drag commit through Vue Flow renderer actions', () => {
+    const currentNode: Node = { id: 'node-1', position: { x: 0, y: 0 }, data: {} }
+    const projectedNode: Node = { ...currentNode, position: { x: 40, y: 20 } }
+    const nodes = shallowRef<Node[]>([currentNode])
+    const edges = shallowRef<Edge[]>([])
+    const updateNode = vi.fn()
+    const setNodes = vi.fn()
+    const adapter = useCanvasVueFlowGraphAdapter({ nodes, edges, actions: { updateNode, setNodes } })
+
+    adapter.applyIncrementalProjection({
+      nodes: [projectedNode],
+      changedNodeIds: ['node-1'],
+      nodeMutations: { added: [], updated: [projectedNode], removedIds: [] },
+    })
+
+    expect(nodes.value).toEqual([projectedNode])
+    expect(updateNode).toHaveBeenCalledWith('node-1', expect.any(Function), { replace: false })
+    expect(setNodes).not.toHaveBeenCalled()
+  })
+
+  it('syncs active drag positions into the controlled model without renderer fields', () => {
+    const nodes = shallowRef<Node[]>([{ id: 'node-1', position: { x: 0, y: 0 }, data: {} }])
+    const edges = shallowRef<Edge[]>([])
+    const applyNodeChanges = vi.fn()
+    const adapter = useCanvasVueFlowGraphAdapter({ nodes, edges, actions: { applyNodeChanges } })
+
+    adapter.syncControlledNodeChanges([
+      { id: 'node-1', type: 'position', position: { x: 40, y: 20 }, dragging: true },
+    ])
+
+    expect(nodes.value[0]).toMatchObject({ position: { x: 40, y: 20 } })
+    expect(nodes.value[0]).not.toHaveProperty('dragging')
+    expect(applyNodeChanges).not.toHaveBeenCalled()
+  })
+
   it('keeps animated edge state out of the semantic graph on every write path', () => {
     const nodes = shallowRef<Node[]>([])
     const edges = shallowRef<Edge[]>([])
@@ -413,7 +448,7 @@ describe('useCanvasVueFlowGraphAdapter', () => {
     expect(applyNodeChanges).not.toHaveBeenCalled()
   })
 
-  it('applies changed handle bounds and resizing as visual-only command results', () => {
+  it('applies changed handle bounds and resizing without leaking them into the controlled model', () => {
     const measuredNode = {
       id: 'node-1',
       position: { x: 0, y: 0 },
@@ -449,10 +484,8 @@ describe('useCanvasVueFlowGraphAdapter', () => {
     ])
 
     expect(result).toMatchObject({ command: 'applyNodeChanges', didChange: false })
-    expect(result.after.nodes[0]).toMatchObject({
-      handleBounds: { source: [{ id: 'out' }], target: [] },
-      resizing: true,
-    })
+    expect(result.after.nodes[0]).not.toHaveProperty('handleBounds')
+    expect(result.after.nodes[0]).not.toHaveProperty('resizing')
     expect(applyNodeChanges).toHaveBeenCalledOnce()
     expect(afterCommand).not.toHaveBeenCalled()
   })

@@ -37,10 +37,11 @@ describe('useFlowNodeDragInteractions', () => {
   it('dismisses transient UI before starting a node drag transaction', () => {
     const harness = createHarness({ duplicateModifierPressed: true })
 
-    harness.interactions.onNodeDragStart()
+    harness.interactions.onNodeDragStart(['node-a'])
 
     expect(harness.dismissTransientCanvasUi).toHaveBeenCalledWith({ closeExpand: true })
     expect(harness.beginNodeDragTransaction).toHaveBeenCalledTimes(1)
+    expect(harness.beginNodeDragTransaction).toHaveBeenCalledWith(['node-a'])
     expect(harness.beginFlowNodeDragDuplicateTracking).toHaveBeenCalledWith(true)
     expect(harness.dismissTransientCanvasUi.mock.invocationCallOrder[0]).toBeLessThan(
       harness.beginNodeDragTransaction.mock.invocationCallOrder[0] ?? 0,
@@ -79,7 +80,7 @@ describe('useFlowNodeDragInteractions', () => {
   it('ignores node drag callbacks while node drag is locked', async () => {
     const harness = createHarness({ nodeDragLocked: true })
 
-    harness.interactions.onNodeDragStart()
+    harness.interactions.onNodeDragStart(['node-a'])
     harness.interactions.onNodeDragStop()
 
     expect(harness.dismissTransientCanvasUi).not.toHaveBeenCalled()

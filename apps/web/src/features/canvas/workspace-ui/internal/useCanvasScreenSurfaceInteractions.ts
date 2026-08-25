@@ -1,5 +1,5 @@
 import { computed, type Ref } from 'vue'
-import type { NodeChange, NodeMouseEvent } from '@vue-flow/core'
+import type { NodeChange, NodeDragEvent, NodeMouseEvent } from '@vue-flow/core'
 import type { CanvasCreatableNodeKind } from '../../../canvas-board/domain'
 import { useFlowNodeDragInteractions } from '../useFlowNodeDragInteractions'
 import { useFlowCanvasShellInteractions } from '../useFlowCanvasShellInteractions'
@@ -147,10 +147,10 @@ export function useCanvasScreenSurfaceInteractions(options: {
     isNodeDragLocked: () => isFlowCanvasLocked.value,
   })
 
-  function onNodeDragStart() {
+  function onNodeDragStart(payload: NodeDragEvent) {
     commands.viewportControls.onNodeDragStart()
     try {
-      dragInteractions.onNodeDragStart()
+      dragInteractions.onNodeDragStart(payload.nodes.map((node) => node.id))
     } catch (error) {
       commands.viewportControls.onNodeDragStop()
       throw error

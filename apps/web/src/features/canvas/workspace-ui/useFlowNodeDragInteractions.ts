@@ -2,7 +2,7 @@ import type { Ref } from 'vue'
 import type { DismissTransientCanvasUi } from './useFlowTransientUiDismissal'
 
 type UseFlowNodeDragInteractionsOptions = {
-  beginNodeDragTransaction: () => void
+  beginNodeDragTransaction: (nodeIds: readonly string[]) => void
   commitNodeDragTransaction: () => void
   duplicateModifierPressed: Ref<boolean>
   beginFlowNodeDragDuplicateTracking: (altPressed: boolean) => void
@@ -14,11 +14,11 @@ type UseFlowNodeDragInteractionsOptions = {
 export function useFlowNodeDragInteractions(options: UseFlowNodeDragInteractionsOptions) {
   let pendingDragStopCommit: object | null = null
 
-  function onNodeDragStart() {
+  function onNodeDragStart(nodeIds: readonly string[]) {
     if (options.isNodeDragLocked?.()) return
     pendingDragStopCommit = null
     options.dismissTransientCanvasUi({ closeExpand: true })
-    options.beginNodeDragTransaction()
+    options.beginNodeDragTransaction(nodeIds)
     options.beginFlowNodeDragDuplicateTracking(options.duplicateModifierPressed.value)
   }
 

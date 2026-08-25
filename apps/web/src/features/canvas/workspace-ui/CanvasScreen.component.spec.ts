@@ -150,7 +150,14 @@ const VueFlowStub = defineComponent({
           },
           '打开节点菜单',
         ),
-        h('button', { type: 'button', onClick: () => emit('node-drag-start') }, '开始拖动节点'),
+        h(
+          'button',
+          {
+            type: 'button',
+            onClick: () => emit('node-drag-start', { nodes: [{ id: 'node-a' }] }),
+          },
+          '开始拖动节点',
+        ),
         h('button', { type: 'button', onClick: () => emit('node-drag-stop') }, '结束拖动节点'),
         slots['zoom-pane']?.(),
         slots['node-canvas']?.({ id: 'node-a', data: {}, selected: false, dragging: false }),

@@ -149,6 +149,38 @@ describe('projectCanvasGraphCommit', () => {
     expect(result.graph.nodes[0]).toMatchObject({ selected: true })
   })
 
+  it('commits a dragged node snapshot even when Vue Flow already rendered its new position', () => {
+    const currentNode = {
+      ...flowNode('image-1', 'old'),
+      // Vue Flow has applied this movement before the drag transaction commits.
+      position: { x: 240, y: 160 },
+      dimensions: { width: 280, height: 180 },
+      computedPosition: { x: 240, y: 160, z: 0 },
+    } as Node
+    const before = imageRecord(1, 'old')
+    const after = {
+      ...before,
+      snapshot: { ...before.snapshot, x: 240, y: 160 },
+    }
+
+    const result = projectCanvasGraphCommit({
+      current: { nodes: [currentNode], edges: [] },
+      patch: patch({
+        nodes: {
+          records: [{ id: 'image-1', before, after }],
+          order: [],
+        },
+      }),
+    })
+
+    expect(result.graph.nodes[0]).not.toBe(currentNode)
+    expect(result.graph.nodes[0]).toMatchObject({
+      position: { x: 240, y: 160 },
+      data: { snapshotNode: { x: 240, y: 160 } },
+      computedPosition: { x: 240, y: 160, z: 0 },
+    })
+  })
+
   it('keeps execution animation out of canonical edge projection', () => {
     const currentEdge = {
       id: 'connection-1',

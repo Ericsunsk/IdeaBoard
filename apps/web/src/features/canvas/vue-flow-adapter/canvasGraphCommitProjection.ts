@@ -19,7 +19,6 @@ export type CanvasFlowGraphProjection = Readonly<{
 }>
 
 export type CanvasGraphCommitProjectionKind = 'incremental' | 'full'
-
 export type CanvasGraphCommitProjection = Readonly<{
   kind: CanvasGraphCommitProjectionKind
   graph: CanvasFlowGraphProjection
@@ -116,31 +115,13 @@ function mergeProjectedNode(
     selected?: boolean
   }
 
-  const currentSnapshot = (current.data as { snapshotNode?: unknown } | undefined)?.snapshotNode
-  const projectedSnapshot = (projected.data as { snapshotNode?: unknown } | undefined)?.snapshotNode
-  const sameSnapshotExceptPosition = (() => {
-    if (!currentSnapshot || !projectedSnapshot) return false
-    if (typeof currentSnapshot !== 'object' || typeof projectedSnapshot !== 'object') return false
-    const { x: _currentX, y: _currentY, ...currentRest } = currentSnapshot as Record<string, unknown>
-    const { x: _projectedX, y: _projectedY, ...projectedRest } = projectedSnapshot as Record<string, unknown>
-    return JSON.stringify(currentRest) === JSON.stringify(projectedRest)
-  })()
-  if (
-    sameSnapshotExceptPosition &&
-    current.position.x === projected.position.x &&
-    current.position.y === projected.position.y &&
-    currentTransient.dimensions?.width === projectedTransient.dimensions?.width &&
-    currentTransient.dimensions?.height === projectedTransient.dimensions?.height &&
-    (!selectionChanged ||
-      (currentTransient.selected ?? false) === (projectedTransient.selected ?? false))
-  ) {
-    // Native Vue Flow drag already applied the visual position. Reusing the
-    // existing node/array avoids a second controlled-model rewrite at commit.
-    return current
-  }
-
-  // Vue Flow owns measurement/drag internals. Preserve those transient fields
-  // while replacing the canonical Canvas-derived fields for this ID only.
+  // Every patched node receives its committed canonical fields. Vue Flow may
+  // already show the final drag position while its data snapshot is stale;
+  // reusing that node would let a later renderer update restore the old
+  // position. Unchanged nodes retain identity in projectCollection instead.
+  // The projection may carry renderer fields while processing one commit, but
+  // the adapter strips them at its controlled-model boundary. Canonical
+  // geometry is intentionally replaced here.
   return {
     ...current,
     ...projected,
@@ -368,7 +349,10 @@ export function createCanvasGraphCommitProjectionController(options: {
     })
   }
 
-  function render(projection: CanvasGraphCommitProjection, scheduleOnFailure = true) {
+  function render(
+    projection: CanvasGraphCommitProjection,
+    scheduleOnFailure = true,
+  ) {
     try {
       options.render(projection)
       recoveryRequired = false

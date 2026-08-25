@@ -15,7 +15,6 @@ import {
   createCanvasGraphSessionRuntime,
   type CanvasGraphSessionRuntime,
 } from './canvasGraphSessionRuntime'
-import { createFlowGraphCommandOptions } from '../../vue-flow-adapter/flowGraphAdapterCommandSideEffects'
 import { useCanvasGroupRuntime } from '../../graph-runtime/application/useCanvasGroupRuntime'
 import type { CanvasBoardSnapshot } from '../../../canvas-board/domain'
 import { canvasBoardSnapshotToFlow } from '../../utils/flowSnapshotAdapter'
@@ -50,8 +49,6 @@ export type UseFlowCanvasRuntimeOptions = {
   onSuccess: (message: string) => void
   onError: (message: string) => void
   scheduleMicrotask?: (callback: () => void) => void
-  scheduleAnimationFrame?: (callback: FrameRequestCallback) => number
-  cancelAnimationFrame?: (handle: number) => void
   vueFlowGraphActions?: CanvasVueFlowGraphActions
 }
 
@@ -80,6 +77,10 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       }
     }
     return ids
+  }
+
+  function isRendererSelected(item: Node | Edge): boolean {
+    return (item as { selected?: boolean }).selected === true
   }
 
   function preserveSelectedItems<T extends { id: string; selected?: boolean }>(
@@ -267,19 +268,8 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
         transaction: store.beginTransaction('node-drag'),
       }
     },
-    projectChanges: (changes) => graphAdapter.projectNodeChanges(changes),
-    syncChanges: (changes) =>
-      graphAdapter.syncProjectedNodeChanges(
-        changes,
-        createFlowGraphCommandOptions({
-          recordHistory: false,
-          markDirty: false,
-        }),
-      ),
     onBegin: groupRuntime.internal.onNodeDragStart,
     reconcileMembership: groupRuntime.internal.applyDraggedNodeMembershipChanges,
-    scheduleAnimationFrame: options.scheduleAnimationFrame,
-    cancelAnimationFrame: options.cancelAnimationFrame,
   })
 
   graphSessionRuntime = createCanvasGraphSessionRuntime({
@@ -327,8 +317,41 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
 
   function onNodesChange(changes: NodeChange[]) {
     if (changes.length === 0) return
+    const dragChanges = nodeDragLifecycle.handleChanges(changes)
+    if (dragChanges) {
+      graphAdapter.syncControlledNodeChanges(dragChanges.consumed)
+
+      const selectionChanges = dragChanges.remaining.filter(
+        (change): change is Extract<NodeChange, { type: 'select' }> => change.type === 'select',
+      )
+      groupRuntime?.internal.onBeforeNodesChange(selectionChanges)
+      graphAdapter.syncControlledNodeChanges(selectionChanges)
+
+      const remainingGraphChanges = dragChanges.remaining.filter(
+        (change) => change.type !== 'select',
+      )
+      if (remainingGraphChanges.length > 0) {
+        groupRuntime?.internal.onBeforeNodesChange(remainingGraphChanges)
+        if (!deleteLifecycle.handleNodeChanges(remainingGraphChanges)) {
+          graphAdapter.applyNodeChanges(remainingGraphChanges)
+        }
+      }
+      return
+    }
+
+    const onlyVisualChanges = changes.every(
+      (change) => change.type === 'position' || change.type === 'select',
+    )
+    if (nodeDragLifecycle.isActive() && onlyVisualChanges) {
+      const selectionChanges = changes.filter(
+        (change): change is Extract<NodeChange, { type: 'select' }> => change.type === 'select',
+      )
+      groupRuntime?.internal.onBeforeNodesChange(selectionChanges)
+      graphAdapter.syncControlledNodeChanges(changes)
+      return
+    }
+
     groupRuntime?.internal.onBeforeNodesChange(changes)
-    if (nodeDragLifecycle.handleChanges(changes)) return
     if (deleteLifecycle.handleNodeChanges(changes)) return
     graphAdapter.applyNodeChanges(changes)
     if (changes.some((change) => change.type === 'select')) {
@@ -346,11 +369,13 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     }
   }
 
-  function reconcileRendererSelection(elements: Array<Node | Edge>) {
-    const store = readCanvasGraphStore()
+  function resolveRendererSelection(elements: Array<Node | Edge>) {
     const selectedNodeIds = new Set(
       elements
-        .filter((element): element is Node => !('source' in element && 'target' in element))
+        .filter(
+          (element): element is Node =>
+            !('source' in element && 'target' in element) && isRendererSelected(element),
+        )
         .map((element) => parseFlowNodeId(element.id))
         .filter((ref): ref is NonNullable<typeof ref> => !!ref)
         .map((ref) => `${ref.nodeType}-${ref.id}`)
@@ -358,17 +383,45 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     )
     const selectedEdgeIds = new Set(
       elements
-        .filter((element): element is Edge => 'source' in element && 'target' in element)
+        .filter(
+          (element): element is Edge =>
+            'source' in element && 'target' in element && isRendererSelected(element),
+        )
         .map((element) => element.id)
         .filter((id): id is `connection-${number}` => /^connection-\d+$/.test(id)),
     )
+    return { selectedNodeIds, selectedEdgeIds }
+  }
+
+  function stageRendererSelection(
+    store: ReturnType<typeof readCanvasGraphStore>,
+    transaction: ReturnType<ReturnType<typeof readCanvasGraphStore>['beginTransaction']>,
+    elements: Array<Node | Edge>,
+  ) {
+    const { selectedNodeIds, selectedEdgeIds } = resolveRendererSelection(elements)
+    store.getNodeIds().forEach((nodeId) => transaction.selectNode(nodeId, selectedNodeIds.has(nodeId)))
+    store.getEdgeIds().forEach((edgeId) => transaction.selectEdge(edgeId, selectedEdgeIds.has(edgeId)))
+  }
+
+  function reconcileRendererSelection(elements: Array<Node | Edge>) {
+    // Vue Flow owns renderer selection. During a drag the pending graph
+    // transaction is still based on the pre-drag revision, so selection must
+    // join that transaction at commit instead of opening a competing one.
+    if (nodeDragLifecycle.isActive()) return
+
+    const store = readCanvasGraphStore()
     const transaction = store.beginTransaction('node-update', {
       recordHistory: false,
       markDirty: false,
     })
-    store.getNodeIds().forEach((nodeId) => transaction.selectNode(nodeId, selectedNodeIds.has(nodeId)))
-    store.getEdgeIds().forEach((edgeId) => transaction.selectEdge(edgeId, selectedEdgeIds.has(edgeId)))
+    stageRendererSelection(store, transaction, elements)
     transaction.commit()
+  }
+
+  function commitNodeDragTransaction() {
+    nodeDragLifecycle.commit((store, transaction) =>
+      stageRendererSelection(store, transaction, [...renderNodes.value, ...renderEdgesRef.value]),
+    )
   }
 
   return {
@@ -387,7 +440,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
       reconcileRendererSelection,
       nodeDragTransactions: {
         begin: nodeDragLifecycle.begin,
-        commit: nodeDragLifecycle.commit,
+        commit: commitNodeDragTransaction,
       },
     },
     graphEditing: {

@@ -93,7 +93,7 @@ export type CanvasWorkspaceRuntimeCommands = {
     reconcileRendererSelection: (elements: Array<Node | Edge>) => void
     connectionAdapter: CanvasVueFlowConnectionAdapter
     nodeDragTransactions: {
-      begin: () => void
+      begin: (nodeIds: readonly string[]) => void
       commit: () => void
     }
   }

@@ -2,7 +2,6 @@ import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import type { Node } from '@vue-flow/core'
 import type { CanvasGraphGroupId } from '../graph-runtime'
 import {
-  pointInRect,
   resolveCanvasSelectionGroupActionBounds,
   resolveCanvasSelectionGroupActionButtonPosition,
   type CanvasFlowViewportTransform,
@@ -132,6 +131,22 @@ export function useCanvasGroupPointerInteraction(options: UseCanvasGroupPointerI
     return target instanceof Element && !!target.closest(GROUP_FRAME_RESIZE_HANDLE_SELECTOR)
   }
 
+  function isVueFlowElementContextMenuTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof Element)) return false
+    let current: Element | null = target
+    while (current) {
+      if (
+        current.classList.contains('vue-flow__node') ||
+        current.classList.contains('vue-flow__edge') ||
+        current.classList.contains('canvas-node-context-menu')
+      ) {
+        return true
+      }
+      current = current.parentElement
+    }
+    return false
+  }
+
   function bindGroupDragListeners() {
     const ownerWindow = readOwnerWindow()
     ownerWindow.addEventListener('pointermove', onGroupDragPointerMove)
@@ -198,7 +213,13 @@ export function useCanvasGroupPointerInteraction(options: UseCanvasGroupPointerI
 
   function onCanvasContextMenuCapture(event: MouseEvent) {
     if (isSelectionGroupActionButtonTarget(event.target)) return
+    if (isVueFlowElementContextMenuTarget(event.target)) return
     if (!options.isEnabled.value) {
+      closeSelectionGroupAction()
+      return
+    }
+
+    if (!options.selectionGroupAction.value) {
       closeSelectionGroupAction()
       return
     }
@@ -209,8 +230,7 @@ export function useCanvasGroupPointerInteraction(options: UseCanvasGroupPointerI
       frames: options.groupFrames.value,
       requireSelectedGroupFrame: true,
     })
-    const flowPoint = options.screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
-    if (!bounds || !pointInRect(flowPoint, bounds)) {
+    if (options.selectionGroupAction.value.kind === 'ungroup' && !bounds) {
       closeSelectionGroupAction()
       return
     }

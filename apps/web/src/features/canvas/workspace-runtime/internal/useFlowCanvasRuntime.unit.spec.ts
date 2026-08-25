@@ -248,8 +248,6 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
   const routeBoardId = ref('board-a')
   const savedSnapshots: CanvasBoardSnapshot[] = []
   const scheduledMicrotasks: Array<() => void> = []
-  const scheduledAnimationFrames = new Map<number, FrameRequestCallback>()
-  let nextAnimationFrameId = 1
   const onWarning = vi.fn()
   const onError = vi.fn()
   const graphActions = {
@@ -352,27 +350,10 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     scheduleMicrotask: (callback) => {
       scheduledMicrotasks.push(callback)
     },
-    scheduleAnimationFrame: (callback) => {
-      const frameId = nextAnimationFrameId
-      nextAnimationFrameId += 1
-      scheduledAnimationFrames.set(frameId, callback)
-      return frameId
-    },
-    cancelAnimationFrame: (frameId) => {
-      scheduledAnimationFrames.delete(frameId)
-    },
     vueFlowGraphActions:
       graphActions as unknown as UseFlowCanvasRuntimeOptions['vueFlowGraphActions'],
   }
   const runtime = useFlowCanvasRuntime(runtimeOptions)
-
-  function flushAnimationFrames() {
-    const callbacks = Array.from(scheduledAnimationFrames.values())
-    scheduledAnimationFrames.clear()
-    callbacks.forEach((callback) => {
-      callback(performance.now())
-    })
-  }
 
   async function flushNativeGraphChanges() {
     while (scheduledMicrotasks.length > 0) {
@@ -385,7 +366,6 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     changes: Parameters<typeof runtime.flowPane.onNodesChange>[0],
   ) {
     runtime.flowPane.onNodesChange(changes)
-    flushAnimationFrames()
     await nextTick()
     await flushNativeGraphChanges()
   }
@@ -416,7 +396,6 @@ function createRuntimeHarness(snapshot = createSnapshot()) {
     saveStatus,
     executionCore,
     executionRuntime,
-    flushAnimationFrames,
     flushNativeGraphChanges,
     applyNativeNodeChanges,
     applyNativeEdgeChanges,
@@ -1700,7 +1679,7 @@ describe('useFlowCanvasRuntime', () => {
     ).toEqual(['prompt-2'])
     clickPaneThroughGrouping(harness.runtime)
 
-    harness.runtime.flowPane.nodeDragTransactions.begin()
+    harness.runtime.flowPane.nodeDragTransactions.begin(['prompt-2'])
 
     clickNodeThroughGrouping(harness, 'prompt-2')
     harness.runtime.flowPane.nodeDragTransactions.commit()
@@ -1861,7 +1840,7 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
 
-    harness.runtime.flowPane.nodeDragTransactions.begin()
+    harness.runtime.flowPane.nodeDragTransactions.begin(['image-1'])
     harness.runtime.flowPane.onNodesChange([
       {
         id: 'image-1',
@@ -1871,7 +1850,6 @@ describe('useFlowCanvasRuntime', () => {
         dragging: true,
       },
     ])
-    harness.flushAnimationFrames()
     harness.runtime.flowPane.nodeDragTransactions.commit()
 
     expect(harness.boardBaseSnapshot.value.groups).toEqual([createGroup('group-1', ['prompt-1'])])
@@ -1881,7 +1859,7 @@ describe('useFlowCanvasRuntime', () => {
       createGroup('group-1', ['image-1', 'prompt-1']),
     ])
 
-    harness.runtime.flowPane.nodeDragTransactions.begin()
+    harness.runtime.flowPane.nodeDragTransactions.begin(['prompt-2'])
     harness.runtime.flowPane.onNodesChange([
       {
         id: 'prompt-2',
@@ -1891,7 +1869,6 @@ describe('useFlowCanvasRuntime', () => {
         dragging: true,
       },
     ])
-    harness.flushAnimationFrames()
     harness.runtime.flowPane.nodeDragTransactions.commit()
 
     expect(harness.boardBaseSnapshot.value.groups).toEqual([
@@ -1906,7 +1883,7 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
 
-    harness.runtime.flowPane.nodeDragTransactions.begin()
+    harness.runtime.flowPane.nodeDragTransactions.begin(['image-1'])
     harness.runtime.flowPane.onNodesChange([
       {
         id: 'image-1',
@@ -1916,14 +1893,13 @@ describe('useFlowCanvasRuntime', () => {
         dragging: true,
       },
     ])
-    harness.flushAnimationFrames()
     harness.runtime.flowPane.nodeDragTransactions.commit()
 
     expect(harness.boardBaseSnapshot.value.groups).toEqual([
       createGroup('group-1', ['image-1', 'prompt-1']),
     ])
 
-    harness.runtime.flowPane.nodeDragTransactions.begin()
+    harness.runtime.flowPane.nodeDragTransactions.begin(['image-1'])
     harness.runtime.flowPane.onNodesChange([
       {
         id: 'image-1',
@@ -1933,7 +1909,6 @@ describe('useFlowCanvasRuntime', () => {
         dragging: true,
       },
     ])
-    harness.flushAnimationFrames()
     harness.runtime.flowPane.nodeDragTransactions.commit()
 
     expect(harness.boardBaseSnapshot.value.groups).toEqual([createGroup('group-1', ['prompt-1'])])
@@ -1951,7 +1926,7 @@ describe('useFlowCanvasRuntime', () => {
     ).toBe(true)
     expect(harness.runtime.graphEditing.grouping.internal.selectedGroupId.value).toBe('group-1')
 
-    harness.runtime.flowPane.nodeDragTransactions.begin()
+    harness.runtime.flowPane.nodeDragTransactions.begin(['image-1'])
     harness.runtime.flowPane.onNodesChange([
       {
         id: 'image-1',
@@ -1961,7 +1936,6 @@ describe('useFlowCanvasRuntime', () => {
         dragging: true,
       },
     ])
-    harness.flushAnimationFrames()
     harness.runtime.flowPane.nodeDragTransactions.commit()
 
     expect(harness.boardBaseSnapshot.value.groups).toEqual([createGroup('group-1', ['prompt-1'])])
@@ -2015,7 +1989,7 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
 
-    harness.runtime.flowPane.nodeDragTransactions.begin()
+    harness.runtime.flowPane.nodeDragTransactions.begin(['prompt-2'])
     harness.runtime.flowPane.onNodesChange([
       {
         id: 'prompt-2',
@@ -2025,7 +1999,6 @@ describe('useFlowCanvasRuntime', () => {
         dragging: true,
       },
     ])
-    harness.flushAnimationFrames()
     harness.runtime.flowPane.nodeDragTransactions.commit()
 
     expect(harness.boardBaseSnapshot.value.groups).toEqual([
@@ -2116,6 +2089,30 @@ describe('useFlowCanvasRuntime', () => {
     expect(readEdgeSelected(harness.edges.value, 'connection-3')).toBe(true)
   })
 
+  it('reconciles only explicitly selected Vue Flow elements', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.persistence.loadInitialOrRouteBoard()
+    await nextTick()
+
+    const promptNode = harness.nodes.value.find((node) => node.id === 'prompt-1')
+    const imageNode = harness.nodes.value.find((node) => node.id === 'image-1')
+    const edge = harness.edges.value.find((item) => item.id === 'connection-3')
+    expect(promptNode).toBeDefined()
+    expect(imageNode).toBeDefined()
+    expect(edge).toBeDefined()
+    if (!promptNode || !imageNode || !edge) return
+
+    harness.runtime.flowPane.reconcileRendererSelection([
+      { ...promptNode, selected: true },
+      { ...imageNode, selected: false },
+      { ...edge, selected: false },
+    ])
+
+    expect(readNodeSelected(harness.fullNodes.value, 'prompt-1')).toBe(true)
+    expect(readNodeSelected(harness.fullNodes.value, 'image-1')).not.toBe(true)
+    expect(readEdgeSelected(harness.fullEdges.value, 'connection-3')).not.toBe(true)
+  })
+
   it('does not carry selection into a freshly imported board snapshot', async () => {
     const firstSnapshot = createSnapshot()
     const harness = createRuntimeHarness(firstSnapshot)
@@ -2158,7 +2155,7 @@ describe('useFlowCanvasRuntime', () => {
     const originalFullNode = harness.fullNodes.value.find((node) => node.id === 'prompt-1')
     expect(originalFullNode?.position).toEqual({ x: 400, y: 40 })
 
-    harness.runtime.flowPane.nodeDragTransactions.begin()
+    harness.runtime.flowPane.nodeDragTransactions.begin(['prompt-1'])
 
     for (const x of [440, 500, 620]) {
       await harness.applyNativeNodeChanges([
@@ -2268,13 +2265,13 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.savedSnapshots).toHaveLength(0)
   })
 
-  it('coalesces native node drag progress through frame projection', async () => {
+  it('keeps drag progress in the controlled model without re-entering Vue Flow', async () => {
     const harness = createRuntimeHarness()
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
     harness.graphActions.applyNodeChanges.mockClear()
 
-    harness.runtime.flowPane.nodeDragTransactions.begin()
+    harness.runtime.flowPane.nodeDragTransactions.begin(['prompt-1'])
     harness.runtime.flowPane.onNodesChange([
       {
         id: 'prompt-1',
@@ -2304,24 +2301,7 @@ describe('useFlowCanvasRuntime', () => {
     ])
 
     expect(harness.graphActions.applyNodeChanges).not.toHaveBeenCalled()
-    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position).toEqual({
-      x: 400,
-      y: 40,
-    })
-
-    harness.flushAnimationFrames()
-    await nextTick()
-
-    expect(harness.graphActions.applyNodeChanges).toHaveBeenCalledOnce()
-    expect(harness.graphActions.applyNodeChanges.mock.calls[0]?.[0]).toEqual([
-      {
-        id: 'prompt-1',
-        type: 'position',
-        position: { x: 620, y: 80 },
-        from: { x: 400, y: 40 },
-        dragging: true,
-      },
-    ])
+    expect(harness.graphActions.applyNodeChanges).not.toHaveBeenCalled()
     expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position).toEqual({
       x: 620,
       y: 80,
@@ -2350,6 +2330,47 @@ describe('useFlowCanvasRuntime', () => {
     expect(harness.savedSnapshots[0]?.promptNodes.find((node) => node.id === 1)).toMatchObject({
       x: 620,
       y: 80,
+    })
+  })
+
+  it('commits a non-target position from a mixed drag batch through the canonical graph', async () => {
+    const harness = createRuntimeHarness()
+    await harness.runtime.persistence.loadInitialOrRouteBoard()
+    await nextTick()
+
+    harness.runtime.flowPane.nodeDragTransactions.begin(['prompt-1'])
+    harness.runtime.flowPane.onNodesChange([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        position: { x: 620, y: 80 },
+        from: { x: 400, y: 40 },
+        dragging: true,
+      },
+      {
+        id: 'prompt-2',
+        type: 'position',
+        position: { x: 2280, y: 120 },
+        from: { x: 2200, y: 40 },
+        dragging: true,
+      },
+    ])
+    harness.runtime.flowPane.nodeDragTransactions.commit()
+    await nextTick()
+
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position).toEqual({
+      x: 620,
+      y: 80,
+    })
+    expect(harness.fullNodes.value.find((node) => node.id === 'prompt-2')?.position).toEqual({
+      x: 2280,
+      y: 120,
+    })
+
+    await harness.runtime.persistence.flushAutosave({ silent: true })
+    expect(harness.savedSnapshots[0]?.promptNodes.find((node) => node.id === 2)).toMatchObject({
+      x: 2280,
+      y: 120,
     })
   })
 
@@ -2384,7 +2405,7 @@ describe('useFlowCanvasRuntime', () => {
       y: 40,
     })
 
-    harness.runtime.flowPane.nodeDragTransactions.begin()
+    harness.runtime.flowPane.nodeDragTransactions.begin(['prompt-1'])
     harness.runtime.flowPane.onNodesChange([
       {
         id: 'prompt-1',
@@ -2394,7 +2415,6 @@ describe('useFlowCanvasRuntime', () => {
         dragging: true,
       },
     ])
-    harness.flushAnimationFrames()
     await nextTick()
 
     expect(harness.fullNodes.value.find((node) => node.id === 'prompt-1')?.position).toEqual({
@@ -2426,13 +2446,13 @@ describe('useFlowCanvasRuntime', () => {
     })
   })
 
-  it('cancels queued node drag progress when reloading the board', async () => {
+  it('cancels an active node drag when reloading the board', async () => {
     const harness = createRuntimeHarness()
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
     harness.graphActions.applyNodeChanges.mockClear()
 
-    harness.runtime.flowPane.nodeDragTransactions.begin()
+    harness.runtime.flowPane.nodeDragTransactions.begin(['prompt-1'])
     harness.runtime.flowPane.onNodesChange([
       {
         id: 'prompt-1',
@@ -2444,7 +2464,6 @@ describe('useFlowCanvasRuntime', () => {
     ])
 
     await harness.runtime.persistence.loadInitialOrRouteBoard()
-    harness.flushAnimationFrames()
     await nextTick()
 
     expect(harness.graphActions.applyNodeChanges).not.toHaveBeenCalled()
@@ -2484,7 +2503,7 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     await nextTick()
 
-    harness.runtime.flowPane.nodeDragTransactions.begin()
+    harness.runtime.flowPane.nodeDragTransactions.begin(['prompt-1'])
 
     await harness.applyNativeNodeChanges([
       {
@@ -2512,7 +2531,7 @@ describe('useFlowCanvasRuntime', () => {
     await harness.runtime.persistence.loadInitialOrRouteBoard()
     const store = harness.runtime.graphEditing.readCanvasGraphStore()
 
-    harness.runtime.flowPane.nodeDragTransactions.begin()
+    harness.runtime.flowPane.nodeDragTransactions.begin(['prompt-1'])
     await harness.applyNativeNodeChanges([
       {
         id: 'prompt-1',

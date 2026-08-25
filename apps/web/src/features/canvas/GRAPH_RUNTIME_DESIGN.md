@@ -68,7 +68,11 @@ Responsibilities:
 - commit atomically and return `CanvasGraphTransactionSummary`
 - report dirty scope: changed node ids, changed edge ids, removed ids, order changes, history intent and autosave intent
 
-For `node-drag`, drag progress may update transient position projection, but one completed drag should produce at most one history entry and one autosave schedule.
+For `node-drag`, Vue Flow owns transient renderer measurements and interaction fields. Canvas may
+mirror the current position and selection into the controlled model, but never feeds renderer-only
+geometry back into it. At drag stop, the Graph Runtime commits the coalesced final position
+through the renderer adapter. One completed drag produces at most one history entry and one
+autosave schedule.
 
 ### `CanvasVueFlowGraphAdapter`
 
@@ -78,7 +82,8 @@ Responsibilities:
 
 - initialize Vue Flow arrays from board snapshot projection
 - apply graph adapter commands with command side effects
-- project native drag progress through `requestAnimationFrame`
+- keep Vue Flow geometry, handles and transient interaction fields out of the controlled node
+  model; apply committed canonical changes through the Vue Flow renderer adapter
 - preserve selection and existing user-visible Vue Flow behavior
 - keep Vue Flow-specific node/edge shape outside `CanvasGraphStore`
 

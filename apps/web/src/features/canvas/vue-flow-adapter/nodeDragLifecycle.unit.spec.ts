@@ -18,19 +18,24 @@ function createHarness() {
       aspectRatio: 'auto',
       inputImages: [],
     },
+    {
+      id: 2,
+      type: 'prompt',
+      x: 800,
+      y: 40,
+      width: 280,
+      text: '',
+      outputCount: 1,
+      aspectRatio: 'auto',
+      inputImages: [],
+    },
   ]
   const store = createCanvasGraphStore(snapshot)
-  const scheduledFrames = new Map<number, FrameRequestCallback>()
-  const projectedChanges: NodeChange[][] = []
-  const syncedChanges: NodeChange[][] = []
   const committedMembershipChanges: NodeChange[][] = []
   const lifecycleOrder: string[] = []
-  let nextFrameId = 1
 
   const lifecycle = createCanvasNodeDragLifecycle({
     createCommand: () => ({ store, transaction: store.beginTransaction('node-drag') }),
-    projectChanges: (changes) => projectedChanges.push(changes),
-    syncChanges: (changes) => syncedChanges.push(changes),
     onBegin: () => lifecycleOrder.push('begin'),
     reconcileMembership: (committedStore, transaction, changes) => {
       expect(committedStore).toBe(store)
@@ -39,28 +44,13 @@ function createHarness() {
       lifecycleOrder.push('membership-stage')
       return () => lifecycleOrder.push(`membership:${store.getNode('prompt-1')?.snapshot.x}`)
     },
-    scheduleAnimationFrame: (callback) => {
-      const frameId = nextFrameId++
-      scheduledFrames.set(frameId, callback)
-      return frameId
-    },
-    cancelAnimationFrame: (frameId) => {
-      scheduledFrames.delete(frameId)
-    },
   })
 
   return {
     lifecycle,
     store,
-    projectedChanges,
-    syncedChanges,
     committedMembershipChanges,
     lifecycleOrder,
-    flushFrames() {
-      const callbacks = [...scheduledFrames.values()]
-      scheduledFrames.clear()
-      callbacks.forEach((callback) => callback(performance.now()))
-    },
   }
 }
 
@@ -68,7 +58,7 @@ describe('createCanvasNodeDragLifecycle', () => {
   it('commits one coalesced drag through graph, history, dirty, and membership boundaries', () => {
     const harness = createHarness()
 
-    harness.lifecycle.begin()
+    harness.lifecycle.begin(['prompt-1'])
     expect(
       harness.lifecycle.handleChanges([
         {
@@ -79,10 +69,12 @@ describe('createCanvasNodeDragLifecycle', () => {
           dragging: true,
         },
       ]),
-    ).toBe(true)
+    ).toMatchObject({
+      consumed: [expect.objectContaining({ id: 'prompt-1', type: 'position' })],
+      remaining: [],
+    })
     expect(
       harness.lifecycle.handleChanges([
-        { id: 'prompt-1', type: 'select', selected: true },
         {
           id: 'prompt-1',
           type: 'position',
@@ -91,31 +83,27 @@ describe('createCanvasNodeDragLifecycle', () => {
           dragging: true,
         },
       ]),
-    ).toBe(true)
+    ).toMatchObject({
+      consumed: [expect.objectContaining({ id: 'prompt-1', type: 'position' })],
+      remaining: [],
+    })
 
     expect(harness.lifecycle.isActive()).toBe(true)
-    expect(harness.projectedChanges).toEqual([])
-
-    harness.flushFrames()
     harness.lifecycle.commit()
 
-    expect(harness.projectedChanges).toHaveLength(1)
-    expect(harness.syncedChanges).toHaveLength(1)
-    expect(harness.syncedChanges[0]).toEqual([
+    expect(harness.committedMembershipChanges).toEqual([[
       {
         id: 'prompt-1',
         type: 'position',
         position: { x: 620, y: 96 },
         from: { x: 40, y: 40 },
-        dragging: true,
+      dragging: true,
       },
-      { id: 'prompt-1', type: 'select', selected: true },
-    ])
+    ]])
     expect(harness.store.getNode('prompt-1')).toMatchObject({
-      selected: true,
+      selected: false,
       snapshot: { x: 620, y: 96 },
     })
-    expect(harness.committedMembershipChanges).toEqual([harness.syncedChanges[0]])
     expect(harness.lifecycleOrder).toEqual([
       'begin',
       'membership-stage',
@@ -124,10 +112,10 @@ describe('createCanvasNodeDragLifecycle', () => {
     expect(harness.lifecycle.isActive()).toBe(false)
   })
 
-  it('cancels queued drag work without projection or commit side effects', () => {
+  it('cancels staged drag work without committing it', () => {
     const harness = createHarness()
 
-    harness.lifecycle.begin()
+    harness.lifecycle.begin(['prompt-1'])
     harness.lifecycle.handleChanges([
       {
         id: 'prompt-1',
@@ -138,13 +126,135 @@ describe('createCanvasNodeDragLifecycle', () => {
       },
     ])
     harness.lifecycle.cancel()
-    harness.flushFrames()
 
     expect(harness.store.getNode('prompt-1')?.snapshot).toMatchObject({ x: 40, y: 40 })
-    expect(harness.projectedChanges).toEqual([])
-    expect(harness.syncedChanges).toEqual([])
     expect(harness.committedMembershipChanges).toEqual([])
     expect(harness.lifecycleOrder).toEqual(['begin'])
     expect(harness.lifecycle.isActive()).toBe(false)
+  })
+
+  it('retains the last position when Vue Flow ends a drag without one', () => {
+    const harness = createHarness()
+
+    harness.lifecycle.begin(['prompt-1'])
+    harness.lifecycle.handleChanges([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        position: { x: 620, y: 96 },
+        from: { x: 40, y: 40 },
+        dragging: true,
+      },
+    ])
+    harness.lifecycle.handleChanges([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        dragging: false,
+      },
+    ])
+
+    harness.lifecycle.commit()
+
+    expect(harness.store.getNode('prompt-1')).toMatchObject({
+      snapshot: { x: 620, y: 96 },
+    })
+    expect(harness.committedMembershipChanges).toEqual([
+      [
+        expect.objectContaining({
+          id: 'prompt-1',
+          position: { x: 620, y: 96 },
+          dragging: false,
+        }),
+      ],
+    ])
+  })
+
+  it('keeps non-target position changes in the active graph transaction', () => {
+    const harness = createHarness()
+
+    harness.lifecycle.begin(['prompt-1'])
+    expect(
+      harness.lifecycle.handleChanges([
+        {
+          id: 'prompt-2',
+          type: 'position',
+          position: { x: 900, y: 120 },
+          from: { x: 40, y: 40 },
+          dragging: true,
+        },
+        {
+          id: 'prompt-1',
+          type: 'position',
+          position: { x: 160, y: 120 },
+          from: { x: 40, y: 40 },
+          dragging: true,
+        },
+      ]),
+    ).toMatchObject({
+      consumed: [
+        expect.objectContaining({ id: 'prompt-2', type: 'position' }),
+        expect.objectContaining({ id: 'prompt-1', type: 'position' }),
+      ],
+      remaining: [],
+    })
+
+    harness.lifecycle.commit()
+
+    expect(harness.committedMembershipChanges[0]).toEqual([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        position: { x: 160, y: 120 },
+        from: { x: 40, y: 40 },
+        dragging: true,
+      },
+    ])
+    expect(harness.store.getNode('prompt-2')).toMatchObject({
+      snapshot: { x: 900, y: 120 },
+    })
+  })
+
+  it('does not consume non-position renderer changes while a drag is active', () => {
+    const harness = createHarness()
+
+    harness.lifecycle.begin(['prompt-1'])
+
+    expect(
+      harness.lifecycle.handleChanges([
+        {
+          id: 'prompt-2',
+          type: 'select',
+          selected: true,
+        },
+      ]),
+    ).toBeNull()
+
+    harness.lifecycle.cancel()
+    expect(harness.lifecycle.isActive()).toBe(false)
+  })
+
+  it('allows a renderer boundary to atomically stage final selection with the drag', () => {
+    const harness = createHarness()
+
+    harness.lifecycle.begin(['prompt-1'])
+    harness.lifecycle.handleChanges([
+      {
+        id: 'prompt-1',
+        type: 'position',
+        position: { x: 160, y: 120 },
+        from: { x: 40, y: 40 },
+        dragging: true,
+      },
+    ])
+
+    harness.lifecycle.commit((store, transaction) => {
+      store.getNodeIds().forEach((nodeId) => transaction.selectNode(nodeId, nodeId === 'prompt-1'))
+    })
+
+    expect(harness.store.getNode('prompt-1')).toMatchObject({
+      selected: true,
+      snapshot: { x: 160, y: 120 },
+    })
   })
 })

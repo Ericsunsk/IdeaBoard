@@ -1,9 +1,52 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createEmptyCanvasBoardSnapshot } from '../../canvas-board/domain'
-import { CanvasGraphSession } from '../graph-runtime'
+import { CanvasGraphSession, stageCanvasGraphNodeDragIntent } from '../graph-runtime'
 import { bindCanvasGraphSessionProjection } from './bindCanvasGraphSessionProjection'
 
 describe('bindCanvasGraphSessionProjection', () => {
+  it('projects a committed drag into the Vue Flow renderer', () => {
+    const snapshot = createEmptyCanvasBoardSnapshot()
+    snapshot.imageNodes = [
+      {
+        id: 1,
+        type: 'image-node',
+        x: 40,
+        y: 20,
+        width: 280,
+        sourceImageUrl: '',
+        sourceImageRatio: 1,
+        outputStatus: 'idle',
+        outputImages: [],
+        outputCount: 1,
+        outputResolution: '1k',
+      },
+    ]
+    const session = CanvasGraphSession.hydrate('board-1', snapshot)
+    const applyIncrementalProjection = vi.fn()
+    const unsubscribe = bindCanvasGraphSessionProjection({
+      session,
+      graphAdapter: { applyIncrementalProjection, replaceFullProjection: vi.fn() },
+      readCurrent: () => ({
+        nodes: [{ id: 'image-1', position: { x: 40, y: 20 }, data: {} }],
+        edges: [],
+      }),
+      projectFull: () => ({ nodes: [], edges: [] }),
+      isCurrentAttachment: () => true,
+    })
+
+    const transaction = session.store.beginTransaction('node-drag')
+    stageCanvasGraphNodeDragIntent(transaction, {
+      nodeId: 'image-1',
+      position: { x: 120, y: 80 },
+    })
+    transaction.commit()
+
+    expect(applyIncrementalProjection).toHaveBeenCalledWith(
+      expect.objectContaining({ changedNodeIds: ['image-1'] }),
+    )
+    unsubscribe()
+  })
+
   it('contains renderer failures and schedules a full projection from canonical facts', () => {
     const snapshot = createEmptyCanvasBoardSnapshot()
     snapshot.imageNodes = [

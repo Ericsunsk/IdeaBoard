@@ -46,6 +46,14 @@ type CanvasVueFlowNativeChangeAdapterOptions = {
   commandRunner: CanvasVueFlowGraphCommandRunner
 }
 
+type CanvasControlledNodeChange =
+  | Extract<NodeChange, { type: 'position' }>
+  | Extract<NodeChange, { type: 'select' }>
+
+function isCanvasControlledNodeChange(change: NodeChange): change is CanvasControlledNodeChange {
+  return change.type === 'position' || change.type === 'select'
+}
+
 function createVisualOnlyResult(
   command: 'applyGraphChanges' | 'applyNodeChanges' | 'applyEdgeChanges',
   before: { nodes: Node[]; edges: Edge[] },
@@ -85,52 +93,41 @@ export function createCanvasVueFlowNativeChangeAdapter(
     )
   }
 
-  function projectNodeChanges(changes: NodeChange[]) {
-    measureCanvasPerf(
-      'vue-flow.projection',
-      () => ({ nodes: options.nodes.value.length, changes: changes.length }),
-      () => {
-        recordCanvasInteractionCount('nativeNodeChangeBatches')
-        recordCanvasInteractionCount('nativeNodeChangeCount', changes.length)
-        options.actions?.applyNodeChanges?.(changes)
-      },
-    )
-  }
+  /**
+   * Mirrors an event already applied by Vue Flow into the controlled prop.
+   * Active drags must not re-enter Vue Flow through its action API.
+   */
+  function syncControlledNodeChanges(changes: NodeChange[]) {
+    const changesByNodeId = new Map<string, CanvasControlledNodeChange[]>()
+    changes.filter(isCanvasControlledNodeChange).forEach((change) => {
+      const nodeChanges = changesByNodeId.get(change.id) ?? []
+      nodeChanges.push(change)
+      changesByNodeId.set(change.id, nodeChanges)
+    })
+    if (changesByNodeId.size === 0) return
 
-  function syncProjectedNodeChanges(
-    changes: NodeChange[],
-    commandOptions?: CanvasVueFlowGraphCommandOptions,
-  ): CanvasVueFlowGraphCommandResult {
-    const classification = classifyVueFlowNativeNodeChanges(changes, options.nodes.value)
-    if (classification === 'no-op') {
-      return options.commandRunner.noOp('applyNodeChanges', commandOptions)
+    let nextNodes: Node[] | null = null
+    options.nodes.value.forEach((node, index) => {
+      const nodeChanges = changesByNodeId.get(node.id)
+      if (!nodeChanges) return
+      let nextNode = node
+      nodeChanges.forEach((change) => {
+        if (change.type === 'select') {
+          nextNode = { ...nextNode, selected: change.selected } as Node
+          return
+        }
+        nextNode = {
+          ...nextNode,
+          ...(change.position ? { position: change.position } : {}),
+        } as Node
+      })
+      if (nextNode === node) return
+      if (!nextNodes) nextNodes = [...options.nodes.value]
+      nextNodes[index] = nextNode
+    })
+    if (nextNodes) {
+      options.syncNodes(nextNodes)
     }
-    if (classification === 'visual-only') {
-      const before = { nodes: options.nodes.value, edges: options.edges.value }
-      applyNativeNodeChanges(changes)
-      return createVisualOnlyResult(
-        'applyNodeChanges',
-        before,
-        { nodes: options.nodes.value, edges: options.edges.value },
-        commandOptions,
-      )
-    }
-    return options.commandRunner.runNative(
-      'applyNodeChanges',
-      () =>
-        measureCanvasPerf(
-          'vue-flow.projection',
-          () => ({ nodes: options.nodes.value.length, changes: changes.length }),
-          () => {
-            const nextNodes = applyVueFlowNodeChanges(
-              changes,
-              options.nodes.value as Parameters<typeof applyVueFlowNodeChanges>[1],
-            ) as unknown as Node[]
-            if (nextNodes !== options.nodes.value) options.syncNodes(nextNodes)
-          },
-        ),
-      commandOptions,
-    )
   }
 
   function applyNativeEdgeChanges(changes: EdgeChange[]) {
@@ -245,8 +242,7 @@ export function createCanvasVueFlowNativeChangeAdapter(
 
   return {
     applyGraphChanges,
-    projectNodeChanges,
-    syncProjectedNodeChanges,
+    syncControlledNodeChanges,
     applyNodeChanges,
     applyEdgeChanges,
   }

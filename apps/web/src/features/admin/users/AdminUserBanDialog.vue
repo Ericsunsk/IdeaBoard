@@ -19,10 +19,15 @@
       </div>
     </template>
 
-    <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+    <label
+      for="admin-ban-duration-select"
+      class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+    >
       <span>封禁时长 (Duration)</span>
       <Select
+        input-id="admin-ban-duration-select"
         :model-value="expiresInDays"
+        name="ban-duration"
         :options="durationOptions"
         option-label="label"
         option-value="value"
@@ -30,10 +35,15 @@
         @update:model-value="handleExpiresInDaysUpdate"
       />
     </label>
-    <label class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2">
+    <label
+      for="admin-ban-reason-textarea"
+      class="flex min-w-0 flex-col gap-1.5 text-admin-meta font-[650] text-admin-text-2"
+    >
       <span>封禁原因 (内部记录)</span>
       <Textarea
+        id="admin-ban-reason-textarea"
         :model-value="reason"
+        name="ban-reason"
         placeholder="例如：发表违规内容、恶意刷量..."
         rows="3"
         auto-resize

@@ -19,6 +19,7 @@ export { useCanvasVueFlowHandleGeometryAdapter } from './useCanvasVueFlowHandleG
 export {
   createCanvasNodeDragLifecycle,
   type CanvasNodeDragChange,
+  type CanvasNodeDragChangeHandling,
   type CanvasNodeDragLifecycle,
   type CanvasNodeDragLifecycleOptions,
 } from './nodeDragLifecycle'

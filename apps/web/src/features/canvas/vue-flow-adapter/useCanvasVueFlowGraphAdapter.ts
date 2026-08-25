@@ -85,6 +85,58 @@ function createGraph(nodes: Node[], edges: Edge[]): CanvasVueFlowGraph {
   return { nodes, edges: toCanvasSemanticEdges(edges) }
 }
 
+type VueFlowRuntimeNode = Node & {
+  computedPosition?: unknown
+  handleBounds?: unknown
+  isParent?: boolean
+  resizing?: boolean
+  dragging?: boolean
+  initialized?: boolean
+  events?: unknown
+}
+
+/**
+ * Canvas owns semantic graph state; Vue Flow owns measurements and interaction
+ * state. Feeding renderer fields back through the controlled `nodes` prop can
+ * overwrite a newer internal geometry update with an older snapshot.
+ */
+function toControlledNode(node: Node): Node {
+  const runtimeNode = node as VueFlowRuntimeNode
+  if (
+    runtimeNode.computedPosition === undefined &&
+    runtimeNode.handleBounds === undefined &&
+    runtimeNode.isParent === undefined &&
+    runtimeNode.resizing === undefined &&
+    runtimeNode.dragging === undefined &&
+    runtimeNode.initialized === undefined &&
+    runtimeNode.events === undefined
+  ) {
+    return node
+  }
+  const {
+    computedPosition: _computedPosition,
+    handleBounds: _handleBounds,
+    isParent: _isParent,
+    resizing: _resizing,
+    dragging: _dragging,
+    initialized: _initialized,
+    events: _events,
+    ...controlledNode
+  } = runtimeNode
+  return controlledNode as Node
+}
+
+function toControlledNodes(nodes: Node[]): Node[] {
+  let nextNodes: Node[] | null = null
+  nodes.forEach((node, index) => {
+    const controlledNode = toControlledNode(node)
+    if (controlledNode === node) return
+    if (!nextNodes) nextNodes = [...nodes]
+    nextNodes[index] = controlledNode
+  })
+  return nextNodes ?? nodes
+}
+
 function readNodeTargetId(target: NodeTarget): string {
   return typeof target === 'string' ? target : target.id
 }
@@ -101,8 +153,9 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
   }
 
   function syncNodes(nextNodes: Node[]) {
-    if (nextNodes !== options.nodes.value) recordCanvasInteractionCount('nodeArrayReplacements')
-    options.nodes.value = nextNodes
+    const controlledNodes = toControlledNodes(nextNodes)
+    if (controlledNodes !== options.nodes.value) recordCanvasInteractionCount('nodeArrayReplacements')
+    options.nodes.value = controlledNodes
   }
 
   function syncEdges(nextEdges: Edge[]) {
@@ -124,11 +177,12 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
    * watcher recompute derived coordinates.
    */
   function updateRendererNodeProjection(node: Node) {
-    const selected = (node as Node & { selected?: boolean }).selected ?? false
+    const controlledNode = toControlledNode(node)
+    const selected = (controlledNode as Node & { selected?: boolean }).selected ?? false
     options.actions?.updateNode?.(
-      node.id,
+      controlledNode.id,
       () => ({
-        ...node,
+        ...controlledNode,
         selected,
       }),
       { replace: false },
@@ -228,7 +282,7 @@ export function useCanvasVueFlowGraphAdapter(options: UseCanvasVueFlowGraphAdapt
           // canonical graph command path. setNodes parses the full structural
           // projection without emitting a second command and reuses existing
           // runtime nodes by id.
-          options.actions?.setNodes?.(nextNodes)
+          options.actions?.setNodes?.(toControlledNodes(nextNodes))
         } else {
           updatedNodes.forEach(updateRendererNodeProjection)
         }
