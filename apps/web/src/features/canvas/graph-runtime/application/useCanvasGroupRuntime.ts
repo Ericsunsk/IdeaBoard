@@ -147,6 +147,7 @@ export type UseCanvasGroupRuntimeOptions = {
   boardBaseSnapshot: Ref<CanvasBoardSnapshot>
   graphAdapter: CanvasVueFlowGraphAdapter
   readCanvasGraphStore: () => CanvasGraphStore
+  isGraphSessionAttached: () => boolean
   onWarning: (message: string) => void
   captureActiveNodeExecutions: (nodeIds: readonly string[]) => PendingImageExecutionLease[]
   releaseNodeExecutions: (leases: readonly PendingImageExecutionLease[]) => void
@@ -307,6 +308,7 @@ export function useCanvasGroupRuntime(
   }
 
   const selectedGroupCoveredExternalNodeIds = computed(() => {
+    if (!options.isGraphSessionAttached()) return []
     const groupId = selectedGroupId.value
     if (!groupId) return []
     const frame = groupFrames.value.find((item) => item.id === groupId)
@@ -434,6 +436,7 @@ export function useCanvasGroupRuntime(
   }
 
   function resolveSelectedGroupAction(): CanvasSelectionGroupAction | null {
+    if (!options.isGraphSessionAttached()) return null
     const selectedNodeIds = readSelectedGraphNodeIds()
     if (!selectedNodeIds) return null
 

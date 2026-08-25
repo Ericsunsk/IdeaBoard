@@ -35,6 +35,7 @@ type UseCanvasGraphInteractionsOptions = {
   edges: Ref<Edge[]>
   graphAdapter: CanvasVueFlowGraphAdapter
   readCanvasGraphStore: () => CanvasGraphReadPort
+  isGraphSessionAttached: () => boolean
   writeCanvasGraphStore?: () => CanvasGraphStore
   rendererMetrics?: CanvasRendererMetricsPort
   selection: CanvasGraphInteractionSelectionAdapter
@@ -157,6 +158,7 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
   }
 
   function readSelectedGraphNodeIds(): CanvasGraphNodeId[] {
+    if (!options.isGraphSessionAttached()) return []
     const selectedFlowIds = new Set(options.selection.selectedElements.value.map((item) => item.id))
     const store = options.readCanvasGraphStore()
     const graphNodeIds = Array.from(selectedFlowIds)

@@ -31,6 +31,7 @@ type CanvasGraphSessionRuntimeOptions = {
 }
 
 export type CanvasGraphSessionRuntime = {
+  isAttached: () => boolean
   readCanvasGraphStore: () => CanvasGraphStore
   replaceGraphSnapshot: (
     snapshot: CanvasBoardSnapshot,
@@ -67,11 +68,15 @@ export function createCanvasGraphSessionRuntime(
   }
 
   function requireGraphSession(): CanvasGraphSession {
-    const boardId = options.boardSession.currentBoardId.value
-    if (!graphSession || !boardId || graphSession.boardId !== boardId) {
+    if (!isAttached()) {
       throw new Error('Canvas Graph Session is not attached to the current Board')
     }
-    return graphSession
+    return graphSession!
+  }
+
+  function isAttached(): boolean {
+    const boardId = options.boardSession.currentBoardId.value
+    return !!graphSession && !!boardId && graphSession.boardId === boardId
   }
 
   function readCanvasGraphStore(): CanvasGraphStore {
@@ -178,6 +183,7 @@ export function createCanvasGraphSessionRuntime(
   }
 
   const runtime = {
+    isAttached,
     readCanvasGraphStore,
     replaceGraphSnapshot,
     exportGraphSnapshot,

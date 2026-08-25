@@ -59,12 +59,14 @@ function createHarness() {
     operationWarning: vi.fn(),
     operationLoading: vi.fn(() => loading),
   }
+  let attached = true
   const graphAdapter = useCanvasVueFlowGraphAdapter({ nodes, edges })
   const interactions = useCanvasGraphInteractions({
     nodes,
     edges,
     graphAdapter,
     readCanvasGraphStore: () => graphSession.store,
+    isGraphSessionAttached: () => attached,
     selection: { selectedElements, clear },
     browser: { downloadImage },
     preview: { openNodeImage },
@@ -81,6 +83,9 @@ function createHarness() {
     feedback,
     loading,
     image,
+    setAttached: (value: boolean) => {
+      attached = value
+    },
   }
 }
 
@@ -141,5 +146,12 @@ describe('useCanvasGraphInteractions', () => {
 
     harness.interactions.runtimePort.stopInteraction('image-mask-editor')
     expect(harness.interactions.viewModel.isInteractionLocked.value).toBe(false)
+  })
+
+  it('returns an empty selection while the Graph Session is between Board attachments', () => {
+    const harness = createHarness()
+    harness.setAttached(false)
+
+    expect(harness.interactions.viewModel.hasSelectedNodes.value).toBe(false)
   })
 })

@@ -108,6 +108,7 @@ function createHarness() {
     boardBaseSnapshot,
     graphAdapter,
     readCanvasGraphStore: () => graphSession.store,
+    isGraphSessionAttached: () => true,
     onWarning: vi.fn(),
     captureActiveNodeExecutions: vi.fn(() => []),
     releaseNodeExecutions: vi.fn(),

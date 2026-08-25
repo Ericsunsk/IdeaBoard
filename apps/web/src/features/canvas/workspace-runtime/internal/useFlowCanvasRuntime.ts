@@ -253,6 +253,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     boardBaseSnapshot: options.boardBaseSnapshot,
     graphAdapter,
     readCanvasGraphStore,
+    isGraphSessionAttached: () => graphSessionRuntime?.isAttached() ?? false,
     onWarning: options.onWarning,
     captureActiveNodeExecutions: options.executionCore.captureActiveLeases,
     releaseNodeExecutions,
@@ -392,6 +393,7 @@ export function useFlowCanvasRuntime(options: UseFlowCanvasRuntimeOptions) {
     graphEditing: {
       adapter: graphAdapter,
       readCanvasGraphStore,
+      isGraphSessionAttached: () => graphSessionRuntime?.isAttached() ?? false,
       deleteNode,
       grouping: groupRuntime,
     },
