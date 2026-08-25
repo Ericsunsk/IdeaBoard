@@ -142,9 +142,10 @@ func (s *Service) Process(ctx context.Context, derivativeID int64) error {
 		return s.markFailed(ctx, q, processing.ID, "key_failed", err)
 	}
 	mimeType := "image/jpeg"
-	if format == FormatPNG {
+	switch format {
+	case FormatPNG:
 		mimeType = "image/png"
-	} else if format == FormatWebP {
+	case FormatWebP:
 		mimeType = "image/webp"
 	}
 	if err := s.storage.PutObjectAtProfile(ctx, asset.StorageProfileID, key, encoded, mimeType); err != nil {

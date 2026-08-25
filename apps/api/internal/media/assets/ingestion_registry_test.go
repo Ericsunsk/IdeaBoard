@@ -3,6 +3,7 @@ package assets
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -105,8 +106,12 @@ func TestLibraryMaterializationReusesManagedAssetAndQueuesDerivatives(t *testing
 	if asset.SourceUrl != "https://images.unsplash.com/materialized-original" {
 		t.Fatalf("media source URL = %q, want downloaded URL", asset.SourceUrl)
 	}
-	if !strings.Contains(string(asset.Metadata), `"source_url":"https://unsplash.com/photos/materialized"`) ||
-		!strings.Contains(string(asset.Metadata), `"download_url":"https://images.unsplash.com/materialized-original"`) {
+	var provenance map[string]any
+	if err := json.Unmarshal(asset.Metadata, &provenance); err != nil {
+		t.Fatalf("decode materialization provenance: %v", err)
+	}
+	if provenance["source_url"] != "https://unsplash.com/photos/materialized" ||
+		provenance["download_url"] != "https://images.unsplash.com/materialized-original" {
 		t.Fatalf("materialization provenance = %s", asset.Metadata)
 	}
 	derivatives, err := registry.ListDerivatives(ctx, owner.ID, mediaAssetID)

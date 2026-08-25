@@ -18,6 +18,7 @@ import (
 
 	"ideaboard/api/internal/accountpool/accounts"
 	"ideaboard/api/internal/accountpool/providerendpoints"
+	mediaassets "ideaboard/api/internal/media/assets"
 	"ideaboard/api/internal/media/storage"
 	"ideaboard/api/internal/platform/config"
 	"ideaboard/api/internal/tasking/taskmedia"
@@ -204,7 +205,10 @@ func newTestProviderExecutorWithLocalStorage(t *testing.T) *ProviderExecutor {
 
 	db := testdb.Open(t)
 	storageService := storage.NewStorageService(storage.NewStorageProfileRepository(db), nil)
-	mediaStore := storage.NewRuntimeTaskMediaStore(storageService, nil)
+	if err := storageService.EnsureDefaultProfiles(context.Background()); err != nil {
+		t.Fatalf("ensure default storage profiles: %v", err)
+	}
+	mediaStore := storage.NewRuntimeTaskMediaStore(storageService, mediaassets.NewMediaAssetRegistry(db))
 
 	return &ProviderExecutor{
 		mediaReader:        mediaStore,

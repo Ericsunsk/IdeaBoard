@@ -23,7 +23,6 @@ type providerAdapter interface {
 
 type httpProviderAdapter struct {
 	provider Provider
-	client   *http.Client
 	request  func(context.Context, string) (*http.Request, error)
 }
 

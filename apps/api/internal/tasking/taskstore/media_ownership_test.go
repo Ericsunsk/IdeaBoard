@@ -160,6 +160,12 @@ func TestInsertTaskOutputsReusesReadyMaterializedAssetAndPersistsLineage(t *test
 	db := testdb.Open(t)
 	q := dbsqlc.New(db)
 	owner := createMediaOwnerForTest(t, db, "task-result-convergence-owner", "TRESULT")
+	repo := NewRepository(db)
+	if err := createRepositoryTestTask(t, repo, ctx, &tasks.Task{
+		TaskID: "task-result-convergence", UserID: owner.ID, Status: tasks.StatusPending,
+	}); err != nil {
+		t.Fatalf("create task: %v", err)
+	}
 	sourceID, err := q.UpsertMediaAsset(ctx, mediaAssetParamsForTest(owner.ID, "task-result-source", "inputs/source.png"))
 	if err != nil {
 		t.Fatalf("create source asset: %v", err)

@@ -978,7 +978,7 @@ func addAssignerModel(t *testing.T, db *sql.DB, accountID int64, modelName strin
 	t.Helper()
 	if _, err := db.Exec(`
 	INSERT INTO api_account_models (account_id, model_name, enabled, sort_order, max_concurrent)
-	VALUES ($1, $2, TRUE, $3, $4)`, accountID, modelName, sortOrder, maxConcurrent); err != nil {
+		VALUES ($1, $2, TRUE, $3, NULLIF($4, 0))`, accountID, modelName, sortOrder, maxConcurrent); err != nil {
 		t.Fatalf("add model %q for account %d failed: %v", modelName, accountID, err)
 	}
 }

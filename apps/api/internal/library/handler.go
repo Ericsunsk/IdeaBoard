@@ -276,11 +276,7 @@ func (h *Handler) MaterializeAsset(c *gin.Context) {
 		writeLibraryError(c, err)
 		return
 	}
-	response.SuccessDTO(c, materializedAssetDTO{
-		MediaAssetID: materialized.MediaAssetID, AssetID: materialized.AssetID, URL: materialized.URL,
-		Width: materialized.Width, Height: materialized.Height, MIMEType: materialized.MIMEType,
-		Extension: materialized.Extension,
-	})
+	response.SuccessDTO(c, materializedAssetDTO(materialized))
 }
 
 func (h *Handler) LookupAssets(c *gin.Context) {
