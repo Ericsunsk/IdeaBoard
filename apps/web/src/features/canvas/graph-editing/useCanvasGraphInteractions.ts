@@ -159,8 +159,9 @@ export function useCanvasGraphInteractions(options: UseCanvasGraphInteractionsOp
   }
 
   function readSelectedGraphNodeIds(): CanvasGraphNodeId[] {
+    const selectedElements = options.selection.selectedElements.value
     if (!options.isGraphSessionAttached()) return []
-    const selectedFlowIds = new Set(options.selection.selectedElements.value.map((item) => item.id))
+    const selectedFlowIds = new Set(selectedElements.map((item) => item.id))
     const store = options.readCanvasGraphStore()
     const graphNodeIds = Array.from(selectedFlowIds)
       .map(resolveGraphNodeId)

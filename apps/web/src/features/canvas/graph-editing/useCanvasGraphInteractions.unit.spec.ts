@@ -90,6 +90,20 @@ function createHarness() {
 }
 
 describe('useCanvasGraphInteractions', () => {
+  it('enables image export when selection changes after the Graph Session attaches', () => {
+    const harness = createHarness()
+    const selectedImage = harness.nodes.value[0]
+
+    harness.selectedElements.value = []
+    harness.setAttached(false)
+    expect(harness.interactions.viewModel.hasSelectedNodes.value).toBe(false)
+
+    harness.setAttached(true)
+    harness.selectedElements.value = [selectedImage] as unknown as Elements
+
+    expect(harness.interactions.viewModel.hasSelectedNodes.value).toBe(true)
+  })
+
   it('exports selected images from Graph facts through the browser adapter', async () => {
     const harness = createHarness()
 
