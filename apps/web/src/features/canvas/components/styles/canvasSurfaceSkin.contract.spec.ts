@@ -42,6 +42,7 @@ describe('Canvas surface skin contract', () => {
     expect(surfaceSkin).toContain('--canvas-surface-bg: var(--color-canvas-surface-bg)')
     expect(surfaceSkin).toContain('--canvas-control-border-color: var(--color-canvas-neutral-line)')
     expect(appStyle).toMatch(/--color-canvas-neutral-line:\s*rgb\(177 177 183 \/ 65%\);/)
+    expect(appStyle).toContain('--color-ib-page-chrome-border: var(--color-board-card-border)')
     expect(surfaceSkin).toContain('--flow-edge-color: var(--color-canvas-edge)')
     expect(surfaceSkin).toContain('--canvas-accent: var(--color-canvas-accent)')
     expect(surfaceSkin).toContain('--canvas-accent-hover: var(--color-canvas-accent-hover)')
@@ -75,11 +76,8 @@ describe('Canvas surface skin contract', () => {
 
   it('retains the focus, selected, active, disabled, loading, reduced-motion, and responsive contracts', () => {
     expect(chromeSkin).toContain('.canvas-chrome-board-icon-button:focus-visible')
-    expect(chromeSkin).toContain('--ib-round-control-border: var(--canvas-control-border-color)')
-    expect(chromeSkin).toContain('.canvas-chrome-bordered-control')
-    expect(chromeSkin).toContain(
-      '--ib-round-control-border-width: var(--canvas-control-border-width)',
-    )
+    expect(chromeSkin).not.toContain('--ib-page-chrome-account-')
+    expect(chromeSkin).not.toContain('.canvas-chrome-bordered-control')
     expect(chromeSkin).toContain('@media (prefers-reduced-motion: reduce)')
     expect(chromeSkin).toContain('max-width: calc(100vw - 32px)')
     expect(vueFlowAdapterSkin).toContain('edge.selected')

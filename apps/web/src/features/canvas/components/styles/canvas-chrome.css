@@ -133,9 +133,9 @@
   height: var(--ib-page-chrome-control-size, 40px);
   align-items: center;
   gap: 8px;
-  border: var(--canvas-control-border-width) solid var(--canvas-control-border-color);
+  border: var(--canvas-control-border-width) solid var(--color-ib-page-chrome-border);
   border-radius: 999px;
-  background: var(--canvas-glass-bg);
+  background: var(--color-ib-page-chrome-bg);
   backdrop-filter: blur(var(--canvas-glass-blur));
   box-shadow: var(--shadow-ib-control);
   padding: 4px;
@@ -255,32 +255,8 @@
   pointer-events: auto;
 }
 
-.canvas-chrome-icon-button,
-.canvas-user-avatar-button {
-  --ib-round-control-border-width: var(--canvas-control-border-width);
-  --ib-round-control-border: var(--canvas-control-border-color);
-  --ib-round-control-border-hover: var(--canvas-control-border-color);
-  --ib-round-control-bg: var(--canvas-glass-bg);
-  --ib-round-control-bg-hover: var(--canvas-surface-muted);
-  --ib-round-control-bg-disabled: var(--canvas-glass-bg);
-  --ib-round-control-color: var(--canvas-text-control);
-  --ib-round-control-color-hover: var(--canvas-text-strong);
-  --ib-round-control-color-disabled: var(--canvas-text-subtle);
-  --ib-round-control-focus-ring: var(--canvas-accent-outline);
-  backdrop-filter: blur(var(--canvas-glass-blur));
-  box-shadow: var(--shadow-ib-control);
-}
-
 .canvas-chrome-icon-button {
   position: relative;
-  margin: 0;
-  cursor: pointer;
-}
-
-.canvas-chrome-bordered-control {
-  --ib-round-control-border-width: var(--canvas-control-border-width);
-  --ib-round-control-border: var(--canvas-control-border-color);
-  --ib-round-control-border-hover: var(--canvas-control-border-color);
 }
 
 .canvas-chrome-icon-button.is-active {
@@ -310,13 +286,13 @@
   height: 33px;
   align-items: center;
   gap: 9px;
-  border: var(--canvas-control-border-width) solid var(--canvas-control-border-color);
+  border: var(--canvas-control-border-width) solid var(--color-ib-page-chrome-border);
   border-radius: 999px;
-  background: var(--canvas-glass-bg);
+  background: var(--color-ib-page-chrome-bg);
   backdrop-filter: blur(var(--canvas-glass-blur));
   box-shadow: var(--shadow-ib-control);
   padding: 4px;
-  color: var(--canvas-text-strong);
+  color: var(--color-ib-page-chrome-color-hover);
 }
 
 .canvas-chrome-status-button {
@@ -341,7 +317,7 @@
 
 .canvas-chrome-status-button:hover,
 .canvas-chrome-status-button:focus-visible {
-  background: var(--canvas-surface-muted);
+  background: var(--color-ib-page-chrome-bg-hover);
   color: var(--ib-control-icon-hover);
 }
 

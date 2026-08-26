@@ -61,7 +61,7 @@
     <button
       type="button"
       :class="[canvasChromeRoundControlClass, { 'is-active': tools.activeTool === 'select' }]"
-:aria-label="t('canvas.chrome.selectTool')"
+      :aria-label="t('canvas.chrome.selectTool')"
       :aria-pressed="tools.activeTool === 'select'"
       @click="emit('select-tool', 'select')"
     >
@@ -70,7 +70,7 @@
     <button
       type="button"
       :class="[canvasChromeRoundControlClass, { 'is-active': tools.activeTool === 'hand' }]"
-:aria-label="t('canvas.chrome.handTool')"
+      :aria-label="t('canvas.chrome.handTool')"
       :aria-pressed="tools.activeTool === 'hand'"
       @click="emit('select-tool', 'hand')"
     >
@@ -120,7 +120,7 @@
       <button
         type="button"
         class="canvas-chrome-status-button"
-:aria-label="t('canvas.viewport.zoomOut')"
+        :aria-label="t('canvas.viewport.zoomOut')"
         @click="emit('zoom-out')"
       >
         <Minus class="size-4" />
@@ -133,7 +133,7 @@
       <button
         type="button"
         class="canvas-chrome-status-button"
-:aria-label="t('canvas.viewport.zoomIn')"
+        :aria-label="t('canvas.viewport.zoomIn')"
         @click="emit('zoom-in')"
       >
         <Plus class="size-4" />
@@ -200,14 +200,12 @@ const { t } = useI18n()
 
 const canvasChromeRoundControlClass = createPageChromeRoundControlClass('canvas-chrome-icon-button')
 const canvasChromeActionControlClass = createPageChromeRoundControlClass(
-  'canvas-chrome-icon-button canvas-chrome-bordered-control',
+  'canvas-chrome-icon-button',
 )
 const canvasChromeExportControlClass = createPageChromeRoundControlClass(
-  'canvas-chrome-icon-button canvas-chrome-bordered-control canvas-chrome-export-button',
+  'canvas-chrome-icon-button canvas-chrome-export-button',
 )
-const canvasChromeAvatarButtonClass = createPageChromeAccountRoundControlClass(
-  'canvas-user-avatar-button',
-)
+const canvasChromeAvatarButtonClass = createPageChromeAccountRoundControlClass()
 
 function handleLibraryFocusOut(event: FocusEvent) {
   const nextTarget = event.relatedTarget

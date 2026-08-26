@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="balance.status === 'anonymous'"
-    class="inline-flex size-[var(--ib-page-chrome-control-size,40px)] items-center justify-center rounded-full border border-board-card-border bg-board-control-bg/80 backdrop-blur-md select-none shrink-0"
+    class="inline-flex size-[var(--ib-page-chrome-control-size,40px)] items-center justify-center rounded-full border border-[var(--color-ib-page-chrome-border)] bg-[var(--color-ib-page-chrome-bg)] backdrop-blur-md select-none shrink-0"
     :title="balance.ariaLabel"
     :aria-label="balance.ariaLabel"
   >
@@ -49,12 +49,9 @@ defineProps<{
   padding: 0 13px 0 11px;
   flex: none;
   overflow: hidden;
-  border: 1px solid var(--ib-page-chrome-account-border, var(--color-board-card-border));
+  border: 1px solid var(--color-ib-page-chrome-border);
   border-radius: 9999px;
-  background: var(
-    --ib-page-chrome-account-bg,
-    var(--color-board-control-bg, rgba(255, 255, 255, 0.8))
-  );
+  background: var(--color-ib-page-chrome-bg);
   color: var(--color-ib-text);
   box-shadow: var(--shadow-ib-control);
   backdrop-filter: blur(var(--ib-glass-blur));
@@ -73,12 +70,12 @@ defineProps<{
 }
 
 .user-credit-pill:hover {
-  border-color: var(--ib-page-chrome-account-border-hover, var(--color-ib-border-hover));
-  background: var(--ib-page-chrome-account-bg-hover, var(--color-ib-surface-hover));
+  border-color: var(--color-ib-page-chrome-border-hover);
+  background: var(--color-ib-page-chrome-bg-hover);
 }
 
 .user-credit-pill:active {
-  border-color: var(--ib-page-chrome-account-border-hover, var(--color-ib-border-pressed));
+  border-color: var(--color-ib-page-chrome-border-hover);
   background: var(--color-ib-surface-pressed);
 }
 

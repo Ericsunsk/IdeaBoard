@@ -43,6 +43,16 @@
   .ib-page-chrome-control {
     --ib-page-chrome-control-size: 40px;
     --ib-round-control-size: var(--ib-page-chrome-control-size);
+    --ib-round-control-border-width: 1px;
+    --ib-round-control-border: var(--color-ib-page-chrome-border);
+    --ib-round-control-border-hover: var(--color-ib-page-chrome-border-hover);
+    --ib-round-control-bg: var(--color-ib-page-chrome-bg);
+    --ib-round-control-bg-hover: var(--color-ib-page-chrome-bg-hover);
+    --ib-round-control-bg-disabled: var(--color-ib-page-chrome-bg);
+    --ib-round-control-color: var(--color-ib-page-chrome-color);
+    --ib-round-control-color-hover: var(--color-ib-page-chrome-color-hover);
+    --ib-round-control-color-disabled: var(--color-ib-page-chrome-color-disabled);
+    --ib-round-control-focus-ring: var(--color-ib-page-chrome-focus-ring);
   }
 
   .ib-round-control:hover:not(:disabled) {

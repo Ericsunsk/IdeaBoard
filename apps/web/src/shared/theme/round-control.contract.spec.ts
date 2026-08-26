@@ -21,26 +21,22 @@ describe('Round Control surface ownership contract', () => {
     expect(roundControl).not.toContain('--ib-control-')
   })
 
-  it('lets Account chrome and Canvas tools provide complete surface state skins', () => {
+  it('keeps every page chrome control on one complete shared state skin', () => {
     ;[
-      '--ib-round-control-border:',
-      '--ib-round-control-border-hover:',
-      '--ib-round-control-bg:',
-      '--ib-round-control-bg-hover:',
-      '--ib-round-control-bg-disabled:',
-      '--ib-round-control-color:',
-      '--ib-round-control-color-hover:',
-      '--ib-round-control-color-disabled:',
-      '--ib-round-control-focus-ring:',
+      '--ib-round-control-border: var(--color-ib-page-chrome-border)',
+      '--ib-round-control-border-hover: var(--color-ib-page-chrome-border-hover)',
+      '--ib-round-control-bg: var(--color-ib-page-chrome-bg)',
+      '--ib-round-control-bg-hover: var(--color-ib-page-chrome-bg-hover)',
+      '--ib-round-control-bg-disabled: var(--color-ib-page-chrome-bg)',
+      '--ib-round-control-color: var(--color-ib-page-chrome-color)',
+      '--ib-round-control-color-hover: var(--color-ib-page-chrome-color-hover)',
+      '--ib-round-control-color-disabled: var(--color-ib-page-chrome-color-disabled)',
+      '--ib-round-control-focus-ring: var(--color-ib-page-chrome-focus-ring)',
     ].forEach((token) => {
-      expect(pageChrome).toContain(token)
-      expect(canvasChromeSkin).toContain(token)
+      expect(roundControl).toContain(token)
     })
-    expect(pageChrome).toContain(
-      '.ib-page-chrome-account > .ib-round-control.ib-page-chrome-control',
-    )
-    expect(canvasChromeSkin).toMatch(
-      /\.canvas-chrome-icon-button\s*,\s*\.canvas-user-avatar-button/,
-    )
+    expect(pageChrome).not.toContain('--ib-round-control-')
+    expect(canvasChromeSkin).not.toContain('--ib-round-control-border:')
+    expect(canvasChromeSkin).not.toContain('--ib-page-chrome-account-')
   })
 })

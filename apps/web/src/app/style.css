@@ -125,6 +125,14 @@
 
   /* ── Page surface tokens ─────────────────────────────────── */
   --color-ib-page-dot: #e2e4e8;
+  --color-ib-page-chrome-border: var(--color-board-card-border);
+  --color-ib-page-chrome-border-hover: var(--color-board-card-border-hover);
+  --color-ib-page-chrome-bg: var(--color-board-control-bg);
+  --color-ib-page-chrome-bg-hover: var(--color-ib-surface-hover);
+  --color-ib-page-chrome-color: var(--color-board-card-action);
+  --color-ib-page-chrome-color-hover: var(--color-board-card-action-hover);
+  --color-ib-page-chrome-color-disabled: var(--color-board-card-text);
+  --color-ib-page-chrome-focus-ring: var(--color-board-focus-ring);
   --spacing-ib-page-dot: 12px;
   --spacing-ib-page-chrome-inset: 16px;
 
